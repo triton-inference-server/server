@@ -1,4 +1,4 @@
-// Copyright (c) 2019-2020, NVIDIA CORPORATION. All rights reserved.
+// Copyright 2019-2021, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 //
 // Redistribution and use in source and binary forms, with or without
 // modification, are permitted provided that the following conditions
@@ -45,6 +45,23 @@ struct SslOptions {
   bool use_mutual_auth;
 };
 
+// GRPC KeepAlive: https://grpc.github.io/grpc/cpp/md_doc_keepalive.html
+struct KeepAliveOptions {
+  explicit KeepAliveOptions()
+      : keepalive_time_ms(7200000), keepalive_timeout_ms(20000),
+        keepalive_permit_without_calls(false), http2_max_pings_without_data(2),
+        http2_min_recv_ping_interval_without_data_ms(300000),
+        http2_max_ping_strikes(2)
+  {
+  }
+  int keepalive_time_ms;
+  int keepalive_timeout_ms;
+  bool keepalive_permit_without_calls;
+  int http2_max_pings_without_data;
+  int http2_min_recv_ping_interval_without_data_ms;
+  int http2_max_ping_strikes;
+};
+
 class GRPCServer {
  public:
   static TRITONSERVER_Error* Create(
@@ -53,13 +70,8 @@ class GRPCServer {
       const std::shared_ptr<SharedMemoryManager>& shm_manager, int32_t port,
       bool use_ssl, const SslOptions& ssl_options,
       int infer_allocation_pool_size, grpc_compression_level compression_level,
-      std::unique_ptr<GRPCServer>* grpc_server,
-      const int grpc_arg_keepalive_time_ms = 7200000,
-      const int grpc_arg_keepalive_timeout_ms = 20000,
-      const bool grpc_arg_keepalive_permit_without_calls = false,
-      const int grpc_arg_http2_max_pings_without_data = 2,
-      const int grpc_arg_http2_min_recv_ping_interval_without_data_ms = 300000,
-      const int grpc_arg_http2_max_ping_strikes = 2);
+      const KeepAliveOptions& keepalive_options,
+      std::unique_ptr<GRPCServer>* grpc_server);
 
   ~GRPCServer();
 
@@ -88,12 +100,7 @@ class GRPCServer {
       const std::string& server_addr, bool use_ssl,
       const SslOptions& ssl_options, const int infer_allocation_pool_size,
       grpc_compression_level compression_level,
-      const int grpc_arg_keepalive_time_ms = 7200000,
-      const int grpc_arg_keepalive_timeout_ms = 20000,
-      const bool grpc_arg_keepalive_permit_without_calls = false,
-      const int grpc_arg_http2_max_pings_without_data = 2,
-      const int grpc_arg_http2_min_recv_ping_interval_without_data_ms = 300000,
-      const int grpc_arg_http2_max_ping_strikes = 2);
+      const KeepAliveOptions& keepalive_options);
 
   std::shared_ptr<TRITONSERVER_Server> server_;
   TraceManager* trace_manager_;
@@ -105,14 +112,7 @@ class GRPCServer {
   const int infer_allocation_pool_size_;
   grpc_compression_level compression_level_;
 
-  // GRPC KeepAlive Settings:
-  // https://grpc.github.io/grpc/cpp/md_doc_keepalive.html
-  const int grpc_arg_keepalive_time_ms_;
-  const int grpc_arg_keepalive_timeout_ms_;
-  const bool grpc_arg_keepalive_permit_without_calls_;
-  const int grpc_arg_http2_max_pings_without_data_;
-  const int grpc_arg_http2_min_recv_ping_interval_without_data_ms_;
-  const int grpc_arg_http2_max_ping_strikes_;
+  const KeepAliveOptions keepalive_options_;
 
   std::unique_ptr<grpc::ServerCompletionQueue> common_cq_;
   std::unique_ptr<grpc::ServerCompletionQueue> model_infer_cq_;
