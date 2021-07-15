@@ -31,6 +31,7 @@
 
 namespace nvidia { namespace inferenceserver {
 
+#ifdef TRITON_ENABLE_GPU
 void CUDART_CB
 MemcpyHost(void* args)
 {
@@ -38,6 +39,7 @@ MemcpyHost(void* args)
   memcpy(copy_params->dst_, copy_params->src_, copy_params->byte_size_);
   delete copy_params;
 }
+#endif  // TRITON_ENABLE_GPU
 
 Status
 EnablePeerAccess(const double min_compute_capability)
@@ -95,6 +97,7 @@ CopyBuffer(
   // the src buffer is valid.
   if ((src_memory_type != TRITONSERVER_MEMORY_GPU) &&
       (dst_memory_type != TRITONSERVER_MEMORY_GPU)) {
+#ifdef TRITON_ENABLE_GPU
     if (copy_on_stream) {
       auto params = new CopyParams(dst, src, byte_size);
       cudaLaunchHostFunc(
@@ -103,6 +106,9 @@ CopyBuffer(
     } else {
       memcpy(dst, src, byte_size);
     }
+#else
+    memcpy(dst, src, byte_size);
+#endif  // TRITON_ENABLE_GPU
   } else {
 #ifdef TRITON_ENABLE_GPU
     RETURN_IF_CUDA_ERR(
