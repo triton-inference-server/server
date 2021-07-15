@@ -26,6 +26,7 @@
 
 import triton_python_backend_utils as pb_utils
 from torch.utils.dlpack import to_dlpack, from_dlpack
+import torch
 import numpy as np
 import json
 
@@ -43,6 +44,17 @@ class TritonPythonModel:
             output0_config['data_type'])
         self.output1_dtype = pb_utils.triton_string_to_numpy(
             output1_config['data_type'])
+        self.numpy_to_pytorch_dtype = {
+            np.bool: torch.bool,
+            np.uint8: torch.uint8,
+            np.int8: torch.int8,
+            np.int16: torch.int16,
+            np.int32: torch.int32,
+            np.int64: torch.int64,
+            np.float16: torch.float16,
+            np.float32: torch.float32,
+            np.float64: torch.float64,
+        }
 
     def execute(self, requests):
         output0_dtype = self.output0_dtype
@@ -65,22 +77,27 @@ class TritonPythonModel:
                                                    out_1.astype(output1_dtype))
                 else:
                     in_0_pytorch, in_1_pytorch = from_dlpack(
-                        in_0.to_dlpack()), from_dlpack(
-                            in_1.to_dlpack())
+                        in_0.to_dlpack()), from_dlpack(in_1.to_dlpack())
                     out_0, out_1 = (in_0_pytorch - in_1_pytorch,
                                     in_0_pytorch + in_1_pytorch)
 
                     if self.output0_dtype == np.object_:
                         out_tensor_0 = pb_utils.Tensor(
-                            "OUTPUT0", out_0.numpy().astype(output0_dtype))
+                            "OUTPUT0",
+                            out_0.numpy().astype(output0_dtype))
                     else:
+                        out_0 = out_0.type(
+                            self.numpy_to_pytorch_dtype[output0_dtype])
                         out_tensor_0 = pb_utils.Tensor.from_dlpack(
                             "OUTPUT0", to_dlpack(out_0))
 
                     if self.output1_dtype == np.object_:
                         out_tensor_1 = pb_utils.Tensor(
-                            "OUTPUT1", out_1.numpy().astype(output1_dtype))
+                            "OUTPUT1",
+                            out_1.numpy().astype(output1_dtype))
                     else:
+                        out_1 = out_1.type(
+                            self.numpy_to_pytorch_dtype[output1_dtype])
                         out_tensor_1 = pb_utils.Tensor.from_dlpack(
                             "OUTPUT1", to_dlpack(out_1))
 
