@@ -998,7 +998,8 @@ ValidateModelConfig(
         "'max_batch_size' must be non-negative value for " + config.name());
   }
 
-  //If backend is  empty, validate the platform
+  // If backend is  empty, validate the platform.
+  // Otherwise, the platform validation should be performed by the backend, if necessary, as Triton may not know about the backend's requirements.
   if (!config.platform().empty() && config.backend().empty()) {
     if (!expected_platform.empty() &&
         (config.platform() != expected_platform)) {
