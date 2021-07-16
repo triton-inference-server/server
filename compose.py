@@ -56,7 +56,7 @@ def fail_if(p, msg):
         fail(msg)
 
 
-def start_gpu_dockerfile(ddir, argmap, dockerfile_name, backends):
+def start_gpu_dockerfile(ddir, images, argmap, dockerfile_name, backends):
     # Set enviroment variables, set default user and install dependencies
     df = '''
 #
@@ -65,11 +65,10 @@ def start_gpu_dockerfile(ddir, argmap, dockerfile_name, backends):
 ARG TRITON_VERSION={}
 ARG TRITON_CONTAINER_VERSION={}
 
-FROM nvcr.io/nvidia/tritonserver:{}-py3 as full
-FROM nvcr.io/nvidia/tritonserver:{}-py3-min
+FROM {} as full
+FROM {}
 '''.format(argmap['TRITON_VERSION'], argmap['TRITON_CONTAINER_VERSION'],
-           argmap['TRITON_CONTAINER_VERSION'],
-           argmap['TRITON_CONTAINER_VERSION'])
+           images["full"], images["min"])
 
     import build
     df += build.dockerfile_add_installation_linux(argmap, backends)
@@ -145,11 +144,10 @@ def get_container_version_if_not_specified():
     log('using container version {}'.format(FLAGS.container_version))
 
 
-def create_argmap(container_version):
+def create_argmap(images):
     # Extract information from upstream build and create map other functions can
     # use
-    upstreamDockerImage = 'nvcr.io/nvidia/tritonserver:{}-py3'.format(
-        container_version)
+    upstreamDockerImage = images["full"]
 
     # first pull docker image
     log("pulling container:{}".format(upstreamDockerImage))
@@ -175,6 +173,15 @@ def create_argmap(container_version):
         p_version.returncode != 0 or len(version) == 0,
         'docker inspect to find triton version failed, {}'.format(
             p_version.stderr))
+
+    vars = p_version.stdout
+    e = re.search("NVIDIA_TRITON_SERVER_VERSION=([\S]{5,}) ", vars)
+    container_version = "" if e == None else e.group(1)
+    fail_if(
+        len(container_version) == 0,
+        'docker inspect to find triton container version failed, {}'.format(
+            vars))
+
     p_sha = subprocess.run(baseRunArgs + [
         '{{ index .Config.Labels "com.nvidia.build.ref"}}', upstreamDockerImage
     ],
@@ -242,6 +249,13 @@ if __name__ == '__main__':
         help=
         'The version to use for the generated Docker image. If not specified the container version will be chosen automatically based on the repository branch.'
     )
+    parser.add_argument(
+        '--image',
+        action='append',
+        required=False,
+        help=
+        'Use specified Docker image to generate Docker image. Specified as <image-name>,<full-image-name>. <image-name> can be "min" or "full". Both "min" and "full" need to be specified at the same time. This will override "--container-version".'
+    )
     parser.add_argument('--enable-gpu',
                         action="store_true",
                         required=False,
@@ -285,10 +299,33 @@ if __name__ == '__main__':
     if FLAGS.repoagent is None:
         FLAGS.repoagent = []
 
-    get_container_version_if_not_specified()
-    argmap = create_argmap(FLAGS.container_version)
+    # Initialize map of docker images.
+    images = {}
+    if FLAGS.images:
+        for img in FLAGS.image:
+            parts = img.split(',')
+            fail_if(
+                len(parts) != 2,
+                '--image must specific <image-name>,<full-image-registry>')
+            fail_if(parts[0] not in ['min', 'full'],
+                    'unsupported value for --image')
+            log('image "{}": "{}"'.format(parts[0], parts[1]))
+            images[parts[0]] = parts[1]
+    else:
+        get_container_version_if_not_specified()
+        images = {
+            "full":
+                "nvcr.io/nvidia/tritonserver:{}-py3".format(
+                    FLAGS.container_version),
+            "min":
+                "nvcr.io/nvidia/tritonserver:{}-py3-min".format(
+                    FLAGS.container_version)
+        }   
+    fail_if(len(images) != 2, "Need to both specify 'full' and 'min' images if at all")
 
-    start_gpu_dockerfile(FLAGS.work_dir, argmap, dockerfile_name, FLAGS.backend)
+    argmap = create_argmap(images)
+
+    start_gpu_dockerfile(FLAGS.work_dir, images, argmap, dockerfile_name, FLAGS.backend)
     add_requested_backends(FLAGS.work_dir, dockerfile_name, FLAGS.backend)
     add_requested_repoagents(FLAGS.work_dir, dockerfile_name, FLAGS.repoagent)
     end_gpu_dockerfile(FLAGS.work_dir, dockerfile_name, argmap)
