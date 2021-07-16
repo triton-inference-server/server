@@ -1,4 +1,4 @@
-# Copyright 2019-2021, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright 2021, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -169,7 +169,7 @@ def check_sequence_async(client_metadata,
 
 
 def get_datatype(trial):
-    # Get the datatype to use based on what models are available (see test.sh)
+    # Get the datatype to use based on what models are available.
     if ("plan" in trial) or ("savedmodel" in trial):
         return np.float32
     if "graphdef" in trial:

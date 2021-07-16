@@ -1,4 +1,4 @@
-# Copyright 2019-2021, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright 2021, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -55,8 +55,6 @@ class NoBatchStressTest(tu.TestResultCollector):
                      model_name,
                      input_name='INPUT0',
                      output_name='OUTPUT0'):
-
-        # Send a small payload to verify if the server is still functional
         inputs = [
             client[0].InferInput(input_name, self._small_in0.shape,
                                  np_to_triton_dtype(self._data_type))

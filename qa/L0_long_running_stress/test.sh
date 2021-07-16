@@ -1,5 +1,5 @@
 #!/bin/bash
-# Copyright 2019-2021, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright 2021, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -40,8 +40,9 @@ export CUDA_VISIBLE_DEVICES=0
 SEQUENCE_CLIENT_LOG="./sequnce_client.log"
 NOBATCH_CLIENT_LOG_BASE="./nobatch_client"
 MODEL_DIR=all_models
+BACKENDS=${BACKENDS:="graphdef savedmodel onnx libtorch plan python"}
 
-SEQUENCE_STRESS_TEST=sequence_stress.py
+SEQUENCE_STRESS_TEST=stress.py
 NOBATCH_STRESS_TEST=nobatch_stress.py
 
 SERVER=/opt/tritonserver/bin/tritonserver
@@ -55,17 +56,20 @@ rm -fr all_models *.log *.serverlog && mkdir all_models
 
 # Setup nobatch models
 NOBATCH_MODEL_SUFFIX=nobatch_zero_1_float32
-for TARGET in graphdef savedmodel onnx libtorch plan; do
-    cp -r /data/inferenceserver/${REPO_VERSION}/qa_identity_model_repository/${TARGET}_$NOBATCH_MODEL_SUFFIX \
-       all_models/.
-done
-mkdir -p all_models/python_$NOBATCH_MODEL_SUFFIX/1/
-cp ../python_models/identity_fp32/config.pbtxt all_models/python_$NOBATCH_MODEL_SUFFIX/
-(cd all_models/python_$NOBATCH_MODEL_SUFFIX && \
-            sed -i "s/max_batch_size: 64/max_batch_size: 0/" config.pbtxt && \
-            sed -i "s/name: \"identity_fp32\"/name: \"python_$NOBATCH_MODEL_SUFFIX\"/" config.pbtxt)
+for TARGET in $BACKENDS; do
+    if [ "$TARGET" != "python" ]; then
+        cp -r /data/inferenceserver/${REPO_VERSION}/qa_identity_model_repository/${TARGET}_$NOBATCH_MODEL_SUFFIX \
+            all_models/.
+    else
+        mkdir -p all_models/python_$NOBATCH_MODEL_SUFFIX/1/
+        cp ../python_models/identity_fp32/config.pbtxt all_models/python_$NOBATCH_MODEL_SUFFIX/
+        (cd all_models/python_$NOBATCH_MODEL_SUFFIX && \
+                    sed -i "s/max_batch_size: 64/max_batch_size: 0/" config.pbtxt && \
+                    sed -i "s/name: \"identity_fp32\"/name: \"python_$NOBATCH_MODEL_SUFFIX\"/" config.pbtxt)
 
-cp ../python_models/identity_fp32/model.py all_models/python_$NOBATCH_MODEL_SUFFIX/1/model.py
+        cp ../python_models/identity_fp32/model.py all_models/python_$NOBATCH_MODEL_SUFFIX/1/model.py
+    fi
+done
 
 # Setup sequence models - four instances with batch-size 1
 for m in ../custom_models/custom_sequence_int32 ; do
@@ -77,9 +81,8 @@ for m in ../custom_models/custom_sequence_int32 ; do
             sed -i "s/kind: KIND_CPU/kind: KIND_CPU\\ncount: 4/" config.pbtxt)
 done
 
-#Setup batched models
-
-
+# Setup batched models
+# TODO: Load bacthed models
 
 run_server
 if [ "$SERVER_PID" == "0" ]; then
@@ -88,13 +91,12 @@ if [ "$SERVER_PID" == "0" ]; then
     exit 1
 fi
 
-for TARGET in graphdef savedmodel onnx libtorch plan python; do
+for TARGET in $BACKENDS; do
     set +e
 
     NOBATCH_CLIENT_LOG="$NOBATCH_CLIENT_LOG_BASE.$TARGET.log"
     python $NOBATCH_STRESS_TEST NoBatchStressTest.test_$TARGET >$NOBATCH_CLIENT_LOG 2>&1 &
-    python $SEQUENCE_STRESS_TEST >>$SEQUENCE_CLIENT_LOG 2>&1 &
-    
+    python $SEQUENCE_STRESS_TEST >>$SEQUENCE_CLIENT_LOG 2>&1
     if [ $? -ne 0 ]; then
         cat $NOBATCH_CLIENT_LOG
         echo -e "\n***\n*** Test Failed\n***"
@@ -117,7 +119,7 @@ wait $SERVER_PID
 if [ $RET -eq 0 ]; then
     echo -e "\n***\n*** Test Passed\n***"
 else
-    cat $CLIENT_LOG
+    cat $SEQUENCE_CLIENT_LOG
     echo -e "\n***\n*** Test FAILED\n***"
 fi
 
