@@ -1,5 +1,5 @@
 #!/usr/bin/env python
-# Copyright (c) 2021, NVIDIA CORPORATION. All rights reserved.
+# Copyright (c) 2021, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -35,12 +35,25 @@ from datetime import date
 
 if __name__ == '__main__':
     today = date.today().strftime("%Y-%m-%d")
-    subject = "Triton Server Memory Growth Summary: " + today
-    memory_graphs = glob.glob("memory_growth*.log")
-    html_content = "<html><head></head><body><pre style=\"font-size:11pt;font-family:Consolas;\">"
-    for mem_graph in sorted(memory_graphs):
+    subject = "Triton Server Memory Growth " + sys.argv[1] + " Summary: " + today
+    memory_graphs_resnet = glob.glob("memory_growth_resnet*.log")
+    memory_graphs_busyop = glob.glob("memory_growth_busyop.log")
+    write_up = "<p>This test uses perf_analyzer as clients running on 4 different models. The max allowed difference between mean and maximum memory usage is set to 150MB.</p>"
+    write_up += "<p><b>&#8226 What to look for</b><br>A linear memory growth in the beginning of the graph is acceptable only when it is followed by a flat memory usage. If a linear memory growth is observed during the entire test then there is possibly a memory leak.</p>"
+    html_content = "<html><head></head><body><pre style=\"font-size:11pt;font-family:Arial, sans-serif;\">" + write_up + "</pre><pre style=\"font-size:11pt;font-family:Consolas;\">"
+    for mem_graph in sorted(memory_graphs_resnet):
         html_content += "\n" + mem_graph + "\n"
         with open(mem_graph, "r") as f:
             html_content += f.read() + "\n"
+    # The busy op model causes PTX failures when running the CI.
+    # Should be uncommented when it's ready for merging.
+    # TODO Uncomment after PTX issues are resolved.
+    # write_up = "<p>The busyop test is by design to show that actual memory growth is correctly detected and displayed.</p>"
+    # write_up += "<p><b>&#8226 What to look for</b><br>The memory usage should increase continually over time, and a linear growth should be observed in the graph below.</p>"
+    # html_content += "</pre><pre style=\"font-size:11pt;font-family:Arial, sans-serif;\">" + write_up + "</pre><pre style=\"font-size:11pt;font-family:Consolas;\">"
+    # for mem_graph in sorted(memory_graphs_busyop):
+    #     html_content += "\n" + mem_graph + "\n"
+    #     with open(mem_graph, "r") as f:
+    #         html_content += f.read() + "\n"
     html_content += "</pre></body></html>"
     nightly_email_helper.send(subject, html_content, is_html=True)
