@@ -301,7 +301,7 @@ if __name__ == '__main__':
 
     # Initialize map of docker images.
     images = {}
-    if FLAGS.images:
+    if FLAGS.image:
         for img in FLAGS.image:
             parts = img.split(',')
             fail_if(
