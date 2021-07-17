@@ -275,7 +275,12 @@ RUN rm -f /usr/bin/python && \
     ln -s /usr/bin/python3 /usr/bin/python
 
 RUN pip3 install --upgrade wheel setuptools && \
-    pip3 install --upgrade numpy pillow attrdict future grpcio requests gsutil awscli six boofuzz grpcio-channelz azure-cli
+    pip3 install --upgrade numpy pillow attrdict future grpcio requests gsutil awscli six grpcio-channelz azure-cli
+
+# L0_http_fuzz is hitting similar issue with boofuzz with latest version (0.4.0):
+# https://github.com/jtpereyda/boofuzz/issues/529
+# Hence, fixing the boofuzz version to 0.3.0
+RUN pip3 install 'boofuzz==0.3.0'
 
 # go needed to example go client test.
 ADD https://golang.org/dl/go1.16.3.linux-amd64.tar.gz go1.16.3.linux-amd64.tar.gz
