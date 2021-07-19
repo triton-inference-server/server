@@ -91,7 +91,7 @@ fi
 set +e
 
 # Send multiple requests simultaneously
-parallel -u ::: 'bash sequence_stress.sh' 'bash nobatch_stress.sh' 'bash timeout_stress.sh'
+parallel -u ::: 'bash stress.sh' 'bash nobatch_stress.sh' 'bash timeout_stress.sh'
 
 set -e
 

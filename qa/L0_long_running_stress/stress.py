@@ -51,6 +51,7 @@ CORRELATION_ID_BLOCK_SIZE = 100
 DEFAULT_TIMEOUT_MS = 5000
 SEQUENCE_LENGTH_MEAN = 16
 SEQUENCE_LENGTH_STDEV = 8
+BACKENDS = os.environ.get('BACKENDS', "custom")
 
 _thread_exceptions = []
 _thread_exceptions_mutex = threading.Lock()
@@ -567,44 +568,45 @@ if __name__ == '__main__':
     print("concurrency = {}".format(FLAGS.concurrency))
     print("iterations = {}".format(FLAGS.iterations))
 
-    trial = "custom"
-    dtype = get_datatype(trial)
-    model_name = tu.get_sequence_model_name(trial, dtype)
+    for TARGET in BACKENDS.split():
+        trial = TARGET
+        dtype = get_datatype(trial)
+        model_name = tu.get_sequence_model_name(trial, dtype)
 
-    threads = []
-    for idx, thd in enumerate(range(FLAGS.concurrency)):
-        thread_name = "thread_{}".format(idx)
+        threads = []
+        for idx, thd in enumerate(range(FLAGS.concurrency)):
+            thread_name = "thread_{}".format(idx)
 
-        # Create the seed for the thread. Since these are created in
-        # reproducible order off of the initial seed we will get
-        # reproducible results when given the same seed.
-        seed = np.random.randint(2**32)
+            # Create the seed for the thread. Since these are created in
+            # reproducible order off of the initial seed we will get
+            # reproducible results when given the same seed.
+            seed = np.random.randint(2**32)
 
-        # Each thread is reserved a block of correlation IDs or size
-        # CORRELATION_ID_BLOCK_SIZE
-        correlation_id_base = 1 + (idx * CORRELATION_ID_BLOCK_SIZE)
+            # Each thread is reserved a block of correlation IDs or size
+            # CORRELATION_ID_BLOCK_SIZE
+            correlation_id_base = 1 + (idx * CORRELATION_ID_BLOCK_SIZE)
 
-        threads.append(
-            threading.Thread(target=stress_thread,
-                             args=(thread_name, seed, FLAGS.iterations,
-                                   correlation_id_base, trial, model_name,
-                                   dtype)))
+            threads.append(
+                threading.Thread(target=stress_thread,
+                                 args=(thread_name, seed, FLAGS.iterations,
+                                       correlation_id_base, trial, model_name,
+                                       dtype)))
 
-    for t in threads:
-        t.start()
-    for t in threads:
-        t.join()
+        for t in threads:
+            t.start()
+        for t in threads:
+            t.join()
 
-    check_status(model_name)
+        check_status(model_name)
 
-    _thread_exceptions_mutex.acquire()
-    try:
-        if len(_thread_exceptions) > 0:
-            for ex in _thread_exceptions:
-                print("*********\n{}".format(ex))
-            sys.exit(1)
-    finally:
-        _thread_exceptions_mutex.release()
+        _thread_exceptions_mutex.acquire()
+        try:
+            if len(_thread_exceptions) > 0:
+                for ex in _thread_exceptions:
+                    print("*********\n{}".format(ex))
+                sys.exit(1)
+        finally:
+            _thread_exceptions_mutex.release()
 
     print("Exiting stress test")
     sys.exit(0)
