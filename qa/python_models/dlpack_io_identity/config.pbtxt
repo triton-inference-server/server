@@ -1,4 +1,4 @@
-# Copyright (c) 2020, NVIDIA CORPORATION. All rights reserved.
+# Copyright 2021, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -24,18 +24,44 @@
 # (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-import os
-import triton_python_backend_utils as pb_utils
+name: "dlpack_io_identity"
+backend: "python"
+max_batch_size: 0
 
+input [
+  {
+    name: "INPUT0"
+    data_type: TYPE_FP32
+    dims: [ -1 ]
+  }
+]
+input [
+  {
+    name: "GPU_OUTPUT"
+    data_type: TYPE_BOOL
+    dims: [ -1 ]
+  }
+]
+output [
+  {
+    name: "OUTPUT0"
+    data_type: TYPE_FP32
+    dims: [ -1 ]
+  }
+]
+output [
+  {
+    name: "NEXT_GPU_OUTPUT"
+    data_type: TYPE_BOOL
+    dims: [ -1 ]
+  }
+]
 
-class TritonPythonModel:
+instance_group [{kind : KIND_CPU}]
 
-    def initialize(self, args):
-        # Make sure that environment variables are correctly propagated
-        # to the Python models
-        if "MY_ENV" not in os.environ or os.environ["MY_ENV"] != 'MY_ENV':
-            raise pb_utils.TritonModelException(
-                "MY_ENV doesn't exists or contains incorrect value")
-
-    def execute(self, requests):
-        pass
+parameters: {
+  key: "FORCE_CPU_ONLY_INPUT_TENSORS"
+  value: {
+    string_value:"no"
+  }
+}

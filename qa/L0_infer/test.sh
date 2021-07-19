@@ -40,6 +40,7 @@ export CUDA_VISIBLE_DEVICES=0
 TEST_RESULT_FILE='test_results.txt'
 CLIENT_LOG_BASE="./client"
 INFER_TEST=infer_test.py
+SERVER_TIMEOUT=240
 
 if [ -z "$TEST_SYSTEM_SHARED_MEMORY" ]; then
     TEST_SYSTEM_SHARED_MEMORY="0"
@@ -87,7 +88,7 @@ else
 fi
 
 # Allow more time to exit. Ensemble brings in too many models
-SERVER_ARGS_EXTRA="--exit-timeout-secs=120 --backend-directory=${BACKEND_DIR} --backend-config=tensorflow,version=${TF_VERSION} --backend-config=python,stub-timeout-seconds=120"
+SERVER_ARGS_EXTRA="--exit-timeout-secs=${SERVER_TIMEOUT} --backend-directory=${BACKEND_DIR} --backend-config=tensorflow,version=${TF_VERSION} --backend-config=python,stub-timeout-seconds=120"
 SERVER_ARGS="--model-repository=${MODELDIR} ${SERVER_ARGS_EXTRA}"
 SERVER_LOG_BASE="./inference_server"
 source ../common/util.sh
@@ -107,12 +108,19 @@ if [ "$TRITON_SERVER_CPU_ONLY" == "1" ]; then
 fi
 
 # If BACKENDS not specified, set to all
-BACKENDS=${BACKENDS:="graphdef savedmodel onnx libtorch plan python"}
+BACKENDS=${BACKENDS:="graphdef savedmodel onnx libtorch plan python python_dlpack"}
 export BACKENDS
 
 # If ENSEMBLES not specified, set to 1
 ENSEMBLES=${ENSEMBLES:="1"}
 export ENSEMBLES
+
+for BACKEND in $BACKENDS; do
+    if [ "$BACKEND" == "python_dlpack" ]; then
+        pip3 install torch==1.9.0+cpu torchvision==0.10.0+cpu torchaudio==0.9.0 -f https://download.pytorch.org/whl/torch_stable.html
+	break
+    fi
+done
 
 
 for TARGET in cpu gpu; do
@@ -131,10 +139,7 @@ for TARGET in cpu gpu; do
 
     rm -fr models && mkdir models
     for BACKEND in $BACKENDS; do
-      if [ "$BACKEND" != "python" ]; then
-        cp -r ${DATADIR}/qa_model_repository/${BACKEND}* \
-          models/.
-      elif [ "$BACKEND" == "python" ]; then
+      if [ "$BACKEND" == "python" ] || [ "$BACKEND" == "python_dlpack" ]; then
         # We will be using ONNX models config.pbtxt and tweak them to make them
         # appropriate for Python backend
         onnx_models=`find ${DATADIR}/qa_model_repository/ -maxdepth 1 -type d -regex '.*onnx_.*'`
@@ -142,10 +147,19 @@ for TARGET in cpu gpu; do
         # Types that need to use SubAdd instead of AddSub
         swap_types="float32 int32 int16 int8"
         for onnx_model in $onnx_models; do
-          python_model=`echo $onnx_model | sed 's/onnx/python/g' | sed 's,'"$DATADIR/qa_model_repository/"',,g'`
+          if [ "$BACKEND" == "python_dlpack" ]; then
+            python_model=`echo $onnx_model | sed 's/onnx/python_dlpack/g' | sed 's,'"$DATADIR/qa_model_repository/"',,g'`
+          else
+            python_model=`echo $onnx_model | sed 's/onnx/python/g' | sed 's,'"$DATADIR/qa_model_repository/"',,g'`
+          fi
+
           mkdir -p models/$python_model/1/
           # Remove platform and use Python as the backend
-          cat $onnx_model/config.pbtxt | sed 's/platform:.*//g' | sed 's/version_policy.*/backend:\ "python"/g' | sed 's/onnx/python/g' > models/$python_model/config.pbtxt
+          if [ "$BACKEND" == "python" ]; then
+            cat $onnx_model/config.pbtxt | sed 's/platform:.*//g' | sed 's/version_policy.*/backend:\ "python"/g' | sed 's/onnx/python/g' > models/$python_model/config.pbtxt
+          else
+            cat $onnx_model/config.pbtxt | sed 's/platform:.*//g' | sed 's/version_policy.*/backend:\ "python"/g' | sed 's/onnx/python_dlpack/g' > models/$python_model/config.pbtxt
+          fi
           cp $onnx_model/output0_labels.txt models/$python_model
 
           is_swap_type="0"
@@ -153,19 +167,35 @@ for TARGET in cpu gpu; do
           # Check whether this model needs to be swapped
           for swap_type in $swap_types; do
             model_type="$swap_type"_"$swap_type"_"$swap_type"
-            model_name=python_$model_type
-            model_name_nobatch=python_nobatch_$model_type
-            if [ $python_model == $model_name ] || [ $python_model == $model_name_nobatch ]; then
-                cp ../python_models/sub_add/model.py models/$python_model/1/
-                is_swap_type="1"
+            if [ "$BACKEND" == "python_dlpack" ]; then
+              model_name=python_dlpack_$model_type
+              model_name_nobatch=python_dlpack_nobatch_$model_type
+              if [ $python_model == $model_name ] || [ $python_model == $model_name_nobatch ]; then
+                  cp ../python_models/dlpack_sub_add/model.py models/$python_model/1/
+                  is_swap_type="1"
+              fi
+            else
+              model_name=python_$model_type
+              model_name_nobatch=python_nobatch_$model_type
+              if [ $python_model == $model_name ] || [ $python_model == $model_name_nobatch ]; then
+                  cp ../python_models/sub_add/model.py models/$python_model/1/
+                  is_swap_type="1"
+              fi
             fi
           done
 
           # Use the AddSub model if it doesn't need to be swapped
           if [ $is_swap_type == "0" ]; then
-                cp ../python_models/add_sub/model.py models/$python_model/1/
+            if [ "$BACKEND" == "python_dlpack" ]; then
+                    cp ../python_models/dlpack_add_sub/model.py models/$python_model/1/
+            else
+                    cp ../python_models/add_sub/model.py models/$python_model/1/
+            fi
           fi
         done
+      else
+        cp -r ${DATADIR}/qa_model_repository/${BACKEND}* \
+          models/.
       fi
     done
 
@@ -173,7 +203,7 @@ for TARGET in cpu gpu; do
 
       # Copy identity backend models and ensembles
       for BACKEND in $BACKENDS; do
-        if [ "$BACKEND" != "python" ]; then
+        if [ "$BACKEND" != "python" ] && [ "$BACKEND" != "python_dlpack" ]; then
             cp -r ${DATADIR}/qa_ensemble_model_repository/qa_model_repository/*${BACKEND}* \
               models/.
         fi
