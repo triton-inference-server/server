@@ -25,29 +25,24 @@
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 import numpy as np
-import sys
-import json
-
-sys.path.append('../../')
 import triton_python_backend_utils as pb_utils
 
 
 class TritonPythonModel:
+    """
+    This model returns a constant string on every inference request.
+    """
+
     def initialize(self, args):
-        self.model_config = json.loads(args['model_config'])
         self._index = 0
         self._dtypes = [np.bytes_, np.object_, np.object]
 
     def execute(self, requests):
-        """ This function is called on inference request.
-        """
-
         responses = []
-        for request in requests:
-            in_0 = pb_utils.get_input_tensor_by_name(request, "INPUT0")
+        for _ in requests:
             out_tensor_0 = pb_utils.Tensor(
-                "OUTPUT0",
-                np.array(['123456'], dtype=self._dtypes[self._index]))
+                "OUTPUT0", np.array(['123456'],
+                                    dtype=self._dtypes[self._index]))
             self._index += 1
             responses.append(pb_utils.InferenceResponse([out_tensor_0]))
         return responses

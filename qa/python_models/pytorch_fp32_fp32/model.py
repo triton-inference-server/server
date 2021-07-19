@@ -1,4 +1,4 @@
-# Copyright (c) 2020, NVIDIA CORPORATION. All rights reserved.
+# Copyright (c) 20202-2021, NVIDIA CORPORATION. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -30,8 +30,6 @@ import torch
 import torch.nn as nn
 import torchvision.models as models
 import torch.nn.functional as F
-import sys
-sys.path.append('../..')
 
 import triton_python_backend_utils as pb_utils
 
@@ -67,13 +65,10 @@ class TritonPythonModel:
 
     def initialize(self, args):
         torch.manual_seed(0)
-        self.model_config = args['model_config']
         self.model = Net()
         self.model.eval()
 
     def execute(self, requests):
-        """ This function is called on inference request.
-        """
         responses = []
         for request in requests:
             input_tensor = pb_utils.get_input_tensor_by_name(request, "IN")

@@ -25,6 +25,7 @@
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 import sys
+
 sys.path.append("../../common")
 
 import test_util as tu
@@ -34,34 +35,32 @@ import numpy as np
 import unittest
 
 
-class RestartTest(tu.TestResultCollector):
-    def _infer_helper(self, model_name, shape, data_type):
+class IOTest(tu.TestResultCollector):
+    def test_ensemble_io(self):
+        model_name = "ensemble_io"
         with httpclient.InferenceServerClient("localhost:8000") as client:
-            input_data_0 = np.array(np.random.randn(*shape), dtype=data_type)
-            inputs = [
-                httpclient.InferInput("INPUT0", shape,
-                                      np_to_triton_dtype(input_data_0.dtype))
-            ]
-            inputs[0].set_data_from_numpy(input_data_0)
-            result = client.infer(model_name, inputs)
-            output0 = result.as_numpy('OUTPUT0')
-            self.assertTrue(np.all(input_data_0 == output0))
-
-    def test_restart(self):
-        shape = [1, 16]
-        model_name = 'identity_fp32'
-        dtype = np.float32
-
-        # Since the stub process has been killed, the first request
-        # will return an exception.
-        with self.assertRaises(InferenceServerException):
-            self._infer_helper(model_name, shape, dtype)
-
-        # The second request should work properly since the stub process should
-        # have come alive.
-        self._infer_helper(model_name, shape, dtype)
+            input0 = np.random.random([1000]).astype(np.float32)
+            for model_1_in_gpu in [True, False]:
+                for model_2_in_gpu in [True, False]:
+                    for model_3_in_gpu in [True, False]:
+                        gpu_output = np.asarray(
+                            [model_1_in_gpu, model_2_in_gpu, model_3_in_gpu],
+                            dtype=bool)
+                        inputs = [
+                            httpclient.InferInput(
+                                "INPUT0", input0.shape,
+                                np_to_triton_dtype(input0.dtype)),
+                            httpclient.InferInput(
+                                "GPU_OUTPUT", gpu_output.shape,
+                                np_to_triton_dtype(gpu_output.dtype))
+                        ]
+                        inputs[0].set_data_from_numpy(input0)
+                        inputs[1].set_data_from_numpy(gpu_output)
+                        result = client.infer(model_name, inputs)
+                        output0 = result.as_numpy('OUTPUT0')
+                        self.assertTrue(output0 is not None)
+                        self.assertTrue(np.all(output0 == input0))
 
 
 if __name__ == '__main__':
     unittest.main()
-

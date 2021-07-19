@@ -25,10 +25,6 @@
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 import numpy as np
-import sys
-import json
-
-sys.path.append('../../')
 import triton_python_backend_utils as pb_utils
 
 
@@ -37,14 +33,10 @@ class TritonPythonModel:
     serialize_byte_tensor works correctly in the Python backend.
     """
     def initialize(self, args):
-        self.model_config = json.loads(args['model_config'])
         self._index = 0
         self._dtypes = [np.bytes_, np.object_, np.object]
 
     def execute(self, requests):
-        """ This function is called on inference request.
-        """
-
         responses = []
         for request in requests:
             in_0 = pb_utils.get_input_tensor_by_name(request, "INPUT0")

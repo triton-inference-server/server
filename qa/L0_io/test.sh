@@ -52,11 +52,13 @@ LD_LIBRARY_PATH=/opt/tritonserver/lib:$LD_LIBRARY_PATH
 
 rm -f $CLIENT_LOG.*
 
+# PyTorch is required for the Python backend dlpack add sub models
+pip3 install torch==1.9.0+cu111 torchvision==0.10.0+cu111 torchaudio==0.9.0 -f https://download.pytorch.org/whl/torch_stable.html
 RET=0
 
 # Prepare float32 models with basic config
 rm -rf $MODELSDIR
-for trial in graphdef savedmodel onnx libtorch plan python; do
+for trial in graphdef savedmodel onnx libtorch plan python python_dlpack; do
     full=${trial}_float32_float32_float32
     if [ "$trial" == "python" ]; then
         mkdir -p $MODELSDIR/${full}/1 && \
@@ -65,7 +67,7 @@ for trial in graphdef savedmodel onnx libtorch plan python; do
             (cd $MODELSDIR/${full} && \
                     sed -i "s/label_filename:.*//" config.pbtxt && \
                     sed -i "0,/name:.*/{s/name:.*/name: \"${full}\"/}" config.pbtxt && \
-                    echo "max_batch_size: 64" >> config.pbtxt)
+                                        echo "max_batch_size: 64" >> config.pbtxt)
 
         # ensemble version of the model.
         mkdir -p $MODELSDIR/fan_${full}/1 && \
@@ -73,6 +75,28 @@ for trial in graphdef savedmodel onnx libtorch plan python; do
             cp ../python_models/fan_add_sub/config.pbtxt $MODELSDIR/fan_${full}/. && \
             (cd $MODELSDIR/fan_${full} && \
                     sed -i "s/label_filename:.*//" config.pbtxt && \
+                    sed -i "s/model_name: \"ENSEMBLE_MODEL_NAME\"/model_name: \"${full}\"/" config.pbtxt && \
+                    sed -i "0,/name:.*/{s/name:.*/name: \"fan_${full}\"/}" config.pbtxt && \
+                    echo "max_batch_size: 64" >> config.pbtxt)
+        continue
+    fi
+
+    if [ "$trial" == "python_dlpack" ]; then
+        mkdir -p $MODELSDIR/${full}/1 && \
+            cp ../python_models/dlpack_add_sub/model.py $MODELSDIR/${full}/1/. && \
+            cp ../python_models/dlpack_add_sub/config.pbtxt $MODELSDIR/${full}/. && \
+            (cd $MODELSDIR/${full} && \
+                    sed -i "s/label_filename:.*//" config.pbtxt && \
+                    sed -i "0,/name:.*/{s/name:.*/name: \"${full}\"/}" config.pbtxt && \
+                    echo "max_batch_size: 64" >> config.pbtxt)
+
+        # ensemble version of the model.
+        mkdir -p $MODELSDIR/fan_${full}/1 && \
+            cp ../python_models/dlpack_add_sub/model.py $MODELSDIR/fan_${full}/1/. && \
+            cp ../python_models/fan_add_sub/config.pbtxt $MODELSDIR/fan_${full}/. && \
+            (cd $MODELSDIR/fan_${full} && \
+                    sed -i "s/label_filename:.*//" config.pbtxt && \
+                    sed -i "s/model_name: \"ENSEMBLE_MODEL_NAME\"/model_name: \"${full}\"/" config.pbtxt && \
                     sed -i "0,/name:.*/{s/name:.*/name: \"fan_${full}\"/}" config.pbtxt && \
                     echo "max_batch_size: 64" >> config.pbtxt)
         continue
@@ -110,7 +134,7 @@ for trial in graphdef savedmodel onnx ; do
     mkdir -p $MODELSDIR/${full}/1 && \
         cp -r $DATADIR/${full}/1/* $MODELSDIR/${full}/1/. && \
         cp $DATADIR/${full}/config.pbtxt $MODELSDIR/${full}/. && \
-        (cd $MODELSDIR/${full} && \
+                (cd $MODELSDIR/${full} && \
                 sed -i "s/label_filename:.*//" config.pbtxt && \
                 echo "instance_group [{ kind: KIND_CPU }]" >> config.pbtxt)
 done
@@ -126,7 +150,7 @@ cp -r $ENSEMBLEDIR/nop_TYPE_FP32_-1 $MODELSDIR/. && \
 
 for input_device in -1 0 1; do
     for output_device in -1 0 1; do
-        for trial in graphdef savedmodel onnx libtorch plan python; do
+        for trial in graphdef savedmodel onnx libtorch plan python python_dlpack; do
             # TensorRT Plan should only be deployed on GPU device
             model_devices="-1 0 1" && [[ "$trial" == "plan" ]] && model_devices="0 1"
             for model_device in $model_devices; do

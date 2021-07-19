@@ -33,7 +33,7 @@ import infer_util as iu
 import test_util as tu
 import os
 
-from tritonclientutils import *
+from tritonclient.utils import *
 
 TEST_SYSTEM_SHARED_MEMORY = bool(
     int(os.environ.get('TEST_SYSTEM_SHARED_MEMORY', 0)))
@@ -46,7 +46,7 @@ USE_HTTP = (os.environ.get('USE_HTTP', 1) != "0")
 assert USE_GRPC or USE_HTTP, "USE_GRPC or USE_HTTP must be non-zero"
 
 BACKENDS = os.environ.get('BACKENDS',
-                          "graphdef savedmodel onnx libtorch plan python")
+                          "graphdef savedmodel onnx libtorch plan python python_dlpack")
 ENSEMBLES = bool(int(os.environ.get('ENSEMBLES', 1)))
 
 np_dtype_string = np.dtype(object)
@@ -204,9 +204,21 @@ class InferTest(tu.TestResultCollector):
                                         output0_raw=output0_raw,
                                         output1_raw=output1_raw,
                                         swap=swap)
+        for prefix in ensemble_prefix:
+            if prefix != "":
+                continue
 
-        if prefix == "":
-            if 'python' in BACKENDS:
+            if 'python_dlpack' in BACKENDS:
+                _infer_exact_helper(self,
+                                    prefix + 'python_dlpack', (input_size,),
+                                    8,
+                                    input_dtype,
+                                    output0_dtype,
+                                    output1_dtype,
+                                    output0_raw=output0_raw,
+                                    output1_raw=output1_raw,
+                                    swap=swap)
+            elif 'python' in BACKENDS:
                 _infer_exact_helper(self,
                                     prefix + 'python', (input_size,),
                                     8,

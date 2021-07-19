@@ -26,8 +26,6 @@
 
 import numpy as np
 import sys
-
-sys.path.append('../../')
 import triton_python_backend_utils as pb_utils
 
 
@@ -35,7 +33,7 @@ class TritonPythonModel:
 
     def initialize(self, args):
         self.model_config = args['model_config']
-        print(f'Python version is {sys.version_info.major}.{sys.version_info.minor} and NumPy version is {np.version.version}')
+        print(f'Python version is {sys.version_info.major}.{sys.version_info.minor} and NumPy version is {np.version.version}', flush=True)
 
     def execute(self, requests):
         """ This function is called on inference request.

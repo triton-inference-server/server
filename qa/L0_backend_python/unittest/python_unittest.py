@@ -1,4 +1,4 @@
-# Copyright (c) 2020, NVIDIA CORPORATION. All rights reserved.
+# Copyright (c) 2021, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -24,18 +24,35 @@
 # (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-import os
-import triton_python_backend_utils as pb_utils
+import sys
+
+sys.path.append("../../common")
+
+import test_util as tu
+import unittest
+import tritonclient.http as httpclient
+from tritonclient.utils import *
+import numpy as np
 
 
-class TritonPythonModel:
+class PythonUnittest(tu.TestResultCollector):
+    def test_dlpack_tensor(self):
+        model_name = "dlpack_test"
+        with httpclient.InferenceServerClient("localhost:8000") as client:
+            # Input data is not used.
+            input_data = np.array([1], dtype=np.float32)
+            inputs = [
+                httpclient.InferInput("INPUT0", input_data.shape,
+                                      np_to_triton_dtype(input_data.dtype))
+            ]
+            inputs[0].set_data_from_numpy(input_data)
+            result = client.infer(model_name, inputs)
+            output0 = result.as_numpy('OUTPUT0')
 
-    def initialize(self, args):
-        # Make sure that environment variables are correctly propagated
-        # to the Python models
-        if "MY_ENV" not in os.environ or os.environ["MY_ENV"] != 'MY_ENV':
-            raise pb_utils.TritonModelException(
-                "MY_ENV doesn't exists or contains incorrect value")
+            # The model returns 1 if the tests were sucessfully passed.
+            # Otherwise, it will return 0.
+            self.assertTrue(output0 == [1])
 
-    def execute(self, requests):
-        pass
+
+if __name__ == '__main__':
+    unittest.main()
