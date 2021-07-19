@@ -37,22 +37,22 @@ fi
 
 export CUDA_VISIBLE_DEVICES=0
 
-SEQUENCE_CLIENT_LOG="./sequnce_client.log"
-NOBATCH_CLIENT_LOG_BASE="./nobatch_client"
 MODEL_DIR=all_models
 BACKENDS=${BACKENDS:="graphdef savedmodel onnx libtorch plan python"}
-
-SEQUENCE_STRESS_TEST=stress.py
-NOBATCH_STRESS_TEST=nobatch_stress.py
 
 SERVER=/opt/tritonserver/bin/tritonserver
 SERVER_LOG="./inference_server.log"
 SERVER_ARGS="--model-repository=`pwd`/$MODEL_DIR"
 source ../common/util.sh
 
-RET=0
+rm -fr all_models/*float32 *.log *.serverlog RET.txt
 
-rm -fr all_models *.log *.serverlog && mkdir all_models
+RET=0
+echo "$RET" > RET.txt
+
+# Get Parallel for sendling multiple requests simultaneously
+apt-get -y update
+apt-get install -y parallel
 
 # Setup nobatch models
 NOBATCH_MODEL_SUFFIX=nobatch_zero_1_float32
@@ -81,9 +81,6 @@ for m in ../custom_models/custom_sequence_int32 ; do
             sed -i "s/kind: KIND_CPU/kind: KIND_CPU\\ncount: 4/" config.pbtxt)
 done
 
-# Setup batched models
-# TODO: Load bacthed models
-
 run_server
 if [ "$SERVER_PID" == "0" ]; then
     echo -e "\n***\n*** Failed to start $SERVER\n***"
@@ -91,31 +88,17 @@ if [ "$SERVER_PID" == "0" ]; then
     exit 1
 fi
 
-for TARGET in $BACKENDS; do
-    set +e
+set +e
 
-    NOBATCH_CLIENT_LOG="$NOBATCH_CLIENT_LOG_BASE.$TARGET.log"
-    python $NOBATCH_STRESS_TEST NoBatchStressTest.test_$TARGET >$NOBATCH_CLIENT_LOG 2>&1 &
-    python $SEQUENCE_STRESS_TEST >>$SEQUENCE_CLIENT_LOG 2>&1
-    if [ $? -ne 0 ]; then
-        cat $NOBATCH_CLIENT_LOG
-        echo -e "\n***\n*** Test Failed\n***"
-        RET=1
-    else
-        check_test_results $NOBATCH_CLIENT_LOG 1
-        if [ $? -ne 0 ]; then
-            cat $NOBATCH_CLIENT_LOG
-            echo -e "\n***\n*** Test Result Verification Failed\n***"
-            RET=1
-        fi
-    fi
+# Send multiple requests simultaneously
+parallel -u ::: 'bash sequence_stress.sh' 'bash nobatch_stress.sh' 'bash timeout_stress.sh'
 
-    set -e
-done
+set -e
 
 kill $SERVER_PID
 wait $SERVER_PID
 
+RET=`cat RET.txt`
 if [ $RET -eq 0 ]; then
     echo -e "\n***\n*** Test Passed\n***"
 else
