@@ -1,4 +1,4 @@
-// Copyright (c) 2018-2021, NVIDIA CORPORATION. All rights reserved.
+// Copyright 2018-2021, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 //
 // Redistribution and use in source and binary forms, with or without
 // modification, are permitted provided that the following conditions
@@ -94,6 +94,8 @@ bool grpc_use_ssl_ = false;
 nvidia::inferenceserver::SslOptions grpc_ssl_options_;
 grpc_compression_level grpc_response_compression_level_ =
     GRPC_COMPRESS_LEVEL_NONE;
+// KeepAlive defaults: https://grpc.github.io/grpc/cpp/md_doc_keepalive.html
+nvidia::inferenceserver::KeepAliveOptions grpc_keepalive_options_;
 #endif  // TRITON_ENABLE_GRPC
 
 #ifdef TRITON_ENABLE_METRICS
@@ -221,6 +223,12 @@ enum OptionId {
   OPTION_GRPC_SERVER_KEY,
   OPTION_GRPC_ROOT_CERT,
   OPTION_GRPC_RESPONSE_COMPRESSION_LEVEL,
+  OPTION_GRPC_ARG_KEEPALIVE_TIME_MS,
+  OPTION_GRPC_ARG_KEEPALIVE_TIMEOUT_MS,
+  OPTION_GRPC_ARG_KEEPALIVE_PERMIT_WITHOUT_CALLS,
+  OPTION_GRPC_ARG_HTTP2_MAX_PINGS_WITHOUT_DATA,
+  OPTION_GRPC_ARG_HTTP2_MIN_RECV_PING_INTERVAL_WITHOUT_DATA_MS,
+  OPTION_GRPC_ARG_HTTP2_MAX_PING_STRIKES,
 #endif  // TRITON_ENABLE_GRPC
 #if defined(TRITON_ENABLE_SAGEMAKER)
   OPTION_ALLOW_SAGEMAKER,
@@ -350,6 +358,38 @@ std::vector<Option> options_
        "The compression level to be used while returning the infer response to "
        "the peer. Allowed values are none, low, medium and high. By default, "
        "compression level is selected as none."},
+      {OPTION_GRPC_ARG_KEEPALIVE_TIME_MS, "grpc-keepalive-time", Option::ArgInt,
+       "The period (in milliseconds) after which a keepalive ping is sent on "
+       "the transport. Default is 7200000 (2 hours)."},
+      {OPTION_GRPC_ARG_KEEPALIVE_TIMEOUT_MS, "grpc-keepalive-timeout",
+       Option::ArgInt,
+       "The period (in milliseconds) the sender of the keepalive ping waits "
+       "for an acknowledgement. If it does not receive an acknowledgment "
+       "within this time, it will close the connection. "
+       "Default is 20000 (20 seconds)."},
+      {OPTION_GRPC_ARG_KEEPALIVE_PERMIT_WITHOUT_CALLS,
+       "grpc-keepalive-permit-without-calls", Option::ArgBool,
+       "Allows keepalive pings to be sent even if there are no calls in flight "
+       "(0 : false; 1 : true). Default is 0 (false)."},
+      {OPTION_GRPC_ARG_HTTP2_MAX_PINGS_WITHOUT_DATA,
+       "grpc-http2-max-pings-without-data", Option::ArgInt,
+       "The maximum number of pings that can be sent when there is no "
+       "data/header frame to be sent. gRPC Core will not continue sending "
+       "pings if we run over the limit. Setting it to 0 allows sending pings "
+       "without such a restriction. Default is 2."},
+      {OPTION_GRPC_ARG_HTTP2_MIN_RECV_PING_INTERVAL_WITHOUT_DATA_MS,
+       "grpc-http2-min-recv-ping-interval-without-data", Option::ArgInt,
+       "If there are no data/header frames being sent on the transport, this "
+       "channel argument on the server side controls the minimum time "
+       "(in milliseconds) that gRPC Core would expect between receiving "
+       "successive pings. If the time between successive pings is less than "
+       "this time, then the ping will be considered a bad ping from the peer. "
+       "Such a ping counts as a ‘ping strike’. Default is 300000 (5 minutes)."},
+      {OPTION_GRPC_ARG_HTTP2_MAX_PING_STRIKES, "grpc-http2-max-ping-strikes",
+       Option::ArgInt,
+       "Maximum number of bad pings that the server will tolerate before "
+       "sending an HTTP2 GOAWAY frame and closing the transport. Setting it to "
+       "0 allows the server to accept any number of bad pings. Default is 2."},
 #endif  // TRITON_ENABLE_GRPC
 #if defined(TRITON_ENABLE_SAGEMAKER)
       {OPTION_ALLOW_SAGEMAKER, "allow-sagemaker", Option::ArgBool,
@@ -554,7 +594,7 @@ StartGrpcService(
   TRITONSERVER_Error* err = nvidia::inferenceserver::GRPCServer::Create(
       server, trace_manager, shm_manager, grpc_port_, grpc_use_ssl_,
       grpc_ssl_options_, grpc_infer_allocation_pool_size_,
-      grpc_response_compression_level_, service);
+      grpc_response_compression_level_, grpc_keepalive_options_, service);
   if (err == nullptr) {
     err = (*service)->Start();
   }
@@ -1048,7 +1088,7 @@ Parse(TRITONSERVER_ServerOptions** server_options, int argc, char** argv)
   int32_t grpc_port = grpc_port_;
   int32_t grpc_use_ssl = grpc_use_ssl_;
   int32_t grpc_infer_allocation_pool_size = grpc_infer_allocation_pool_size_;
-  grpc_compression_level grpc_response_comression_level =
+  grpc_compression_level grpc_response_compression_level =
       grpc_response_compression_level_;
 #endif  // TRITON_ENABLE_GRPC
 
@@ -1184,13 +1224,13 @@ Parse(TRITONSERVER_ServerOptions** server_options, int argc, char** argv)
         std::transform(
             mode_str.begin(), mode_str.end(), mode_str.begin(), ::tolower);
         if (mode_str == "none") {
-          grpc_response_comression_level = GRPC_COMPRESS_LEVEL_NONE;
+          grpc_response_compression_level = GRPC_COMPRESS_LEVEL_NONE;
         } else if (mode_str == "low") {
-          grpc_response_comression_level = GRPC_COMPRESS_LEVEL_LOW;
+          grpc_response_compression_level = GRPC_COMPRESS_LEVEL_LOW;
         } else if (mode_str == "medium") {
-          grpc_response_comression_level = GRPC_COMPRESS_LEVEL_MED;
+          grpc_response_compression_level = GRPC_COMPRESS_LEVEL_MED;
         } else if (mode_str == "high") {
-          grpc_response_comression_level = GRPC_COMPRESS_LEVEL_HIGH;
+          grpc_response_compression_level = GRPC_COMPRESS_LEVEL_HIGH;
         } else {
           std::cerr
               << "invalid argument for --grpc_infer_response_compression_level"
@@ -1200,6 +1240,27 @@ Parse(TRITONSERVER_ServerOptions** server_options, int argc, char** argv)
         }
         break;
       }
+      case OPTION_GRPC_ARG_KEEPALIVE_TIME_MS:
+        grpc_keepalive_options_.keepalive_time_ms = ParseIntOption(optarg);
+        break;
+      case OPTION_GRPC_ARG_KEEPALIVE_TIMEOUT_MS:
+        grpc_keepalive_options_.keepalive_timeout_ms = ParseIntOption(optarg);
+        break;
+      case OPTION_GRPC_ARG_KEEPALIVE_PERMIT_WITHOUT_CALLS:
+        grpc_keepalive_options_.keepalive_permit_without_calls =
+            ParseBoolOption(optarg);
+        break;
+      case OPTION_GRPC_ARG_HTTP2_MAX_PINGS_WITHOUT_DATA:
+        grpc_keepalive_options_.http2_max_pings_without_data =
+            ParseIntOption(optarg);
+        break;
+      case OPTION_GRPC_ARG_HTTP2_MIN_RECV_PING_INTERVAL_WITHOUT_DATA_MS:
+        grpc_keepalive_options_.http2_min_recv_ping_interval_without_data_ms =
+            ParseIntOption(optarg);
+        break;
+      case OPTION_GRPC_ARG_HTTP2_MAX_PING_STRIKES:
+        grpc_keepalive_options_.http2_max_ping_strikes = ParseIntOption(optarg);
+        break;
 #endif  // TRITON_ENABLE_GRPC
 
 #ifdef TRITON_ENABLE_METRICS
@@ -1316,7 +1377,7 @@ Parse(TRITONSERVER_ServerOptions** server_options, int argc, char** argv)
   grpc_port_ = grpc_port;
   grpc_infer_allocation_pool_size_ = grpc_infer_allocation_pool_size;
   grpc_use_ssl_ = grpc_use_ssl;
-  grpc_response_compression_level_ = grpc_response_comression_level;
+  grpc_response_compression_level_ = grpc_response_compression_level;
 #endif  // TRITON_ENABLE_GRPC
 
 #ifdef TRITON_ENABLE_METRICS

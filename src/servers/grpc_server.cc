@@ -1,4 +1,4 @@
-// Copyright (c) 2019-2020, NVIDIA CORPORATION. All rights reserved.
+// Copyright 2019-2021, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 //
 // Redistribution and use in source and binary forms, with or without
 // modification, are permitted provided that the following conditions
@@ -3920,10 +3920,10 @@ ModelStreamInferHandler::StreamInferResponseComplete(
       response->set_error_message(status.error_message());
 
       // repopulate the id so that client knows which request failed.
-      const char *id;
+      const char* id;
       LOG_TRITONSERVER_ERROR(
-        TRITONSERVER_InferenceResponseId(iresponse, &id),
-        "couldn't retrieve id for failed request");
+          TRITONSERVER_InferenceResponseId(iresponse, &id),
+          "couldn't retrieve id for failed request");
       LOG_VERBOSE(1) << "Failed for ID: " << id << std::endl;
       response->mutable_infer_response()->set_id(id);
     }
@@ -3977,11 +3977,13 @@ GRPCServer::GRPCServer(
     const std::shared_ptr<SharedMemoryManager>& shm_manager,
     const std::string& server_addr, bool use_ssl, const SslOptions& ssl_options,
     const int infer_allocation_pool_size,
-    grpc_compression_level compression_level)
+    grpc_compression_level compression_level,
+    const KeepAliveOptions& keepalive_options)
     : server_(server), trace_manager_(trace_manager), shm_manager_(shm_manager),
       server_addr_(server_addr), use_ssl_(use_ssl), ssl_options_(ssl_options),
       infer_allocation_pool_size_(infer_allocation_pool_size),
-      compression_level_(compression_level), running_(false)
+      compression_level_(compression_level),
+      keepalive_options_(keepalive_options), running_(false)
 {
 }
 
@@ -3997,12 +3999,13 @@ GRPCServer::Create(
     const std::shared_ptr<SharedMemoryManager>& shm_manager, int32_t port,
     bool use_ssl, const SslOptions& ssl_options, int infer_allocation_pool_size,
     grpc_compression_level compression_level,
+    const KeepAliveOptions& keepalive_options,
     std::unique_ptr<GRPCServer>* grpc_server)
 {
   const std::string addr = "0.0.0.0:" + std::to_string(port);
   grpc_server->reset(new GRPCServer(
       server, trace_manager, shm_manager, addr, use_ssl, ssl_options,
-      infer_allocation_pool_size, compression_level));
+      infer_allocation_pool_size, compression_level, keepalive_options));
 
   return nullptr;  // success
 }
@@ -4039,6 +4042,42 @@ GRPCServer::Start()
   grpc_builder_.AddListeningPort(server_addr_, credentials);
   grpc_builder_.SetMaxMessageSize(MAX_GRPC_MESSAGE_SIZE);
   grpc_builder_.RegisterService(&service_);
+  // GRPC KeepAlive Docs: https://grpc.github.io/grpc/cpp/md_doc_keepalive.html
+  // NOTE: In order to work properly, the client-side settings should
+  // be in agreement with server-side settings.
+  grpc_builder_.AddChannelArgument(
+      GRPC_ARG_KEEPALIVE_TIME_MS, keepalive_options_.keepalive_time_ms);
+  grpc_builder_.AddChannelArgument(
+      GRPC_ARG_KEEPALIVE_TIMEOUT_MS, keepalive_options_.keepalive_timeout_ms);
+  grpc_builder_.AddChannelArgument(
+      GRPC_ARG_KEEPALIVE_PERMIT_WITHOUT_CALLS,
+      keepalive_options_.keepalive_permit_without_calls);
+  grpc_builder_.AddChannelArgument(
+      GRPC_ARG_HTTP2_MAX_PINGS_WITHOUT_DATA,
+      keepalive_options_.http2_max_pings_without_data);
+  grpc_builder_.AddChannelArgument(
+      GRPC_ARG_HTTP2_MIN_RECV_PING_INTERVAL_WITHOUT_DATA_MS,
+      keepalive_options_.http2_min_recv_ping_interval_without_data_ms);
+  grpc_builder_.AddChannelArgument(
+      GRPC_ARG_HTTP2_MAX_PING_STRIKES,
+      keepalive_options_.http2_max_ping_strikes);
+
+  LOG_VERBOSE(1) << "=== GRPC KeepAlive Options ===";
+  LOG_VERBOSE(1) << "keepalive_time_ms: "
+                 << keepalive_options_.keepalive_time_ms;
+  LOG_VERBOSE(1) << "keepalive_timeout_ms: "
+                 << keepalive_options_.keepalive_timeout_ms;
+  LOG_VERBOSE(1) << "keepalive_permit_without_calls: "
+                 << keepalive_options_.keepalive_permit_without_calls;
+  LOG_VERBOSE(1) << "http2_max_pings_without_data: "
+                 << keepalive_options_.http2_max_pings_without_data;
+  LOG_VERBOSE(1)
+      << "http2_min_recv_ping_interval_without_data_ms: "
+      << keepalive_options_.http2_min_recv_ping_interval_without_data_ms;
+  LOG_VERBOSE(1) << "http2_max_ping_strikes: "
+                 << keepalive_options_.http2_max_ping_strikes;
+  LOG_VERBOSE(1) << "==============================";
+
   common_cq_ = grpc_builder_.AddCompletionQueue();
   model_infer_cq_ = grpc_builder_.AddCompletionQueue();
   model_stream_infer_cq_ = grpc_builder_.AddCompletionQueue();
