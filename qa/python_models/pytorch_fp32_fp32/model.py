@@ -1,4 +1,4 @@
-# Copyright (c) 20202-2021, NVIDIA CORPORATION. All rights reserved.
+# Copyright 2020-2021, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -35,7 +35,6 @@ import triton_python_backend_utils as pb_utils
 
 
 class Net(nn.Module):
-
     def __init__(self):
         super(Net, self).__init__()
         self.conv1 = nn.Conv2d(1, 32, 3, 1)
@@ -62,7 +61,6 @@ class Net(nn.Module):
 
 
 class TritonPythonModel:
-
     def initialize(self, args):
         torch.manual_seed(0)
         self.model = Net()
