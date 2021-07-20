@@ -71,7 +71,7 @@ FROM {}
            images["full"], images["min"])
 
     import build
-    df += build.dockerfile_add_installation_linux(argmap, backends)
+    df += build.dockerfile_prepare_container_linux(argmap, backends)
     # Copy over files
     df += '''
 WORKDIR /opt/tritonserver

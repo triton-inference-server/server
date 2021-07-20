@@ -657,7 +657,7 @@ FROM ${{BASE_IMAGE}}
 '''.format(argmap['TRITON_VERSION'], argmap['TRITON_CONTAINER_VERSION'],
            argmap['BASE_IMAGE'])
 
-    df += dockerfile_add_installation_linux(argmap, backends)
+    df += dockerfile_prepare_container_linux(argmap, backends)
 
     df += '''
 WORKDIR /opt/tritonserver
@@ -695,8 +695,9 @@ COPY --chown=1000:1000 --from=tritonserver_build /workspace/build/sagemaker/serv
         dfile.write(df)
 
 
-def dockerfile_add_installation_linux(argmap, backends):
-    # Common steps for producing docker images shared by build.py and compose.py.
+def dockerfile_prepare_container_linux(argmap, backends):
+    # Common steps to produce docker images shared by build.py and compose.py.
+    # Sets enviroment variables, installs dependencies and adds entrypoint
     df = '''
 ARG TRITON_VERSION
 ARG TRITON_CONTAINER_VERSION
