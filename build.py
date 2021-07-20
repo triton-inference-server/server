@@ -696,8 +696,7 @@ COPY --chown=1000:1000 --from=tritonserver_build /workspace/build/sagemaker/serv
 
 
 def dockerfile_add_installation_linux(argmap, backends):
-    # Common steps for production docker image, shared by build.py and compose.py
-    # set enviroment variables and TRITON_SERVER_USER so should be added earlier
+    # Common steps for producing docker images shared by build.py and compose.py.
     df = '''
 ARG TRITON_VERSION
 ARG TRITON_CONTAINER_VERSION
