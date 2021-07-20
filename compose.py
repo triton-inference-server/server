@@ -320,12 +320,15 @@ if __name__ == '__main__':
             "min":
                 "nvcr.io/nvidia/tritonserver:{}-py3-min".format(
                     FLAGS.container_version)
-        }   
-    fail_if(len(images) != 2, "Need to both specify 'full' and 'min' images if at all")
+        }
+    fail_if(
+        len(images) != 2,
+        "Need to both specify 'full' and 'min' images if at all")
 
     argmap = create_argmap(images)
 
-    start_gpu_dockerfile(FLAGS.work_dir, images, argmap, dockerfile_name, FLAGS.backend)
+    start_gpu_dockerfile(FLAGS.work_dir, images, argmap, dockerfile_name,
+                         FLAGS.backend)
     add_requested_backends(FLAGS.work_dir, dockerfile_name, FLAGS.backend)
     add_requested_repoagents(FLAGS.work_dir, dockerfile_name, FLAGS.repoagent)
     end_gpu_dockerfile(FLAGS.work_dir, dockerfile_name, argmap)
