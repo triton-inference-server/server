@@ -66,6 +66,7 @@ gcloud beta container clusters create ${DEPLOYMENT_NAME} \
 --addons=HorizontalPodAutoscaling,HttpLoadBalancing,Istio \
 --machine-type=n1-standard-8 \
 --node-locations=${ZONE} \
+--zone=${ZONE} \
 --subnetwork=default \
 --scopes cloud-platform \
 --num-nodes 1 \
