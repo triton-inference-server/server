@@ -60,15 +60,17 @@ Currently, GKE >= 1.18.7 only supported in GKE rapid channel, to find the latest
 export PROJECT_ID=<your GCP project ID>
 export ZONE=<GCP zone of your choice>
 export REGION=<GCP region of your choice>
-export DEPLOYMENT_NAME=<GKE cluster name, triton_gke for example>
+export DEPLOYMENT_NAME=<GKE cluster name, triton-gke for example>
 
 gcloud beta container clusters create ${DEPLOYMENT_NAME} \
 --addons=HorizontalPodAutoscaling,HttpLoadBalancing,Istio \
 --machine-type=n1-standard-8 \
 --node-locations=${ZONE} \
+--zone=${ZONE} \
 --subnetwork=default \
 --scopes cloud-platform \
---num-nodes 1
+--num-nodes 1 \
+--project ${PROJECT_ID}
 
 # add GPU node pools, user can modify number of node based on workloads
 gcloud container node-pools create accel \
@@ -95,8 +97,7 @@ kubectl create clusterrolebinding cluster-admin-binding --clusterrole cluster-ad
 # enable stackdriver custom metrics adaptor
 kubectl apply -f https://raw.githubusercontent.com/GoogleCloudPlatform/k8s-stackdriver/master/custom-metrics-stackdriver-adapter/deploy/production/adapter.yaml
 ```
-
-GPU resources in GCP could be fully utilized, so please try a different zone in case compute resource cannot be allocated. After GKE cluster is running, run `kubectl get pods --all-namespaces` to make sure the client can access the cluster correctly: 
+Creating a cluster and adding GPU nodes could take up-to 10 minutes. Please be patient after executing this command. GPU resources in GCP could be fully utilized, so please try a different zone in case compute resource cannot be allocated. After GKE cluster is running, run `kubectl get pods --all-namespaces` to make sure the client can access the cluster correctly: 
 
 If user would like to experiment with A100 MIG partitioned GPU in GKE, please create node pool with following command:
 ```
@@ -135,7 +136,7 @@ export INGRESS_PORT=$(kubectl -n istio-system get service istio-ingressgateway -
 
 Third, we will try sending request to server with provide client example.
 
-If User selected deploy Triton to accept HTTP request, please launch [Locust](https://docs.locust.io/en/stable/installation.html) with Ingress host and port to query Triton Inference Server. In this [example script](https://github.com/triton-inference-server/server/tree/master/deploy/gke-marketplace-app/client-sample/locustfile_bert_large.py), we send request to Triton server which has loaded a BERT large TensorRT Engine with Sequence length of 128 into GCP bucket. We simulate 300 concurrent user as target and spawn user at rate of 10 users per second.
+If User selected deploy Triton to accept HTTP request, please launch [Locust](https://docs.locust.io/en/stable/installation.html) with Ingress host and port to query Triton Inference Server. In this [example script](https://github.com/triton-inference-server/server/tree/master/deploy/gke-marketplace-app/client-sample/locustfile_bert_large.py), we send request to Triton server which has loaded a BERT large TensorRT Engine with Sequence length of 128 into GCP bucket. We simulate 1000 concurrent user as target and spawn user at rate of 50 users per second.
 ```
 locust -f locustfile_bert_large.py -H http://${INGRESS_HOST}:${INGRESS_PORT}
 ```
