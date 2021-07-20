@@ -96,8 +96,7 @@ kubectl create clusterrolebinding cluster-admin-binding --clusterrole cluster-ad
 # enable stackdriver custom metrics adaptor
 kubectl apply -f https://raw.githubusercontent.com/GoogleCloudPlatform/k8s-stackdriver/master/custom-metrics-stackdriver-adapter/deploy/production/adapter.yaml
 ```
-
-GPU resources in GCP could be fully utilized, so please try a different zone in case compute resource cannot be allocated. After GKE cluster is running, run `kubectl get pods --all-namespaces` to make sure the client can access the cluster correctly: 
+Creating a cluster and adding GPU nodes could take up-to 10 minutes. Please be patient after executing this command. GPU resources in GCP could be fully utilized, so please try a different zone in case compute resource cannot be allocated. After GKE cluster is running, run `kubectl get pods --all-namespaces` to make sure the client can access the cluster correctly: 
 
 If user would like to experiment with A100 MIG partitioned GPU in GKE, please create node pool with following command:
 ```
