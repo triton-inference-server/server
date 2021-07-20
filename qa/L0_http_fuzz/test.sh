@@ -67,9 +67,9 @@ if [ $? -ne 0 ]; then
     cat ${FUZZ_LOG}
     RET=1
 else
-    check_test_results $FUZZ_LOG $EXPECTED_NUM_TESTS
+    check_test_results $TEST_RESULT_FILE $EXPECTED_NUM_TESTS
     if [ $? -ne 0 ]; then
-        cat $FUZZ_LOG
+        cat $TEST_RESULT_FILE
         echo -e "\n***\n*** Test Result Verification Failed\n***"
         RET=1
     fi
