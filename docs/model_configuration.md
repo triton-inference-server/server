@@ -529,7 +529,7 @@ Dynamic batching is a feature of Triton that allows inference requests
 to be combined by the server, so that a batch is created
 dynamically. Creating a batch of requests typically results in
 increased throughput. The dynamic batcher should be used for
-[stateless](architecture.md#stateless-models). The dynamically created
+[stateless models](architecture.md#stateless-models). The dynamically created
 batches are distributed to all [model instances](#instance-groups)
 configured for the model.
 
@@ -634,7 +634,7 @@ timeout.
 Like the dynamic batcher, the sequence batcher combines non-batched
 inference requests, so that a batch is created dynamically. Unlike the
 dynamic batcher, the sequence batcher should be used for
-[stateful](architecture.md#stateful-models) where a sequence of
+[stateful models](architecture.md#stateful-models) where a sequence of
 inference requests must be routed to the same model instance. The
 dynamically created batches are distributed to all [model
 instances](#instance-groups) configured for the model.
