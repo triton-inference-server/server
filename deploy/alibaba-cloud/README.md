@@ -129,7 +129,7 @@ See the following resources to learn more about how to use Alibaba Cloud's OSS o
 
 
 # Known Issues
-- [Binary Tensor Data Extension](https://github.com/triton-inference-server/server/blob/main/docs/protocol/extension_binary_data.md) is not fully supported yet, users want to use service with binary extension supported, please contact PAI-EAS's related staff.
+- [Binary Tensor Data Extension](https://github.com/triton-inference-server/server/blob/main/docs/protocol/extension_binary_data.md) is not fully supported yet, users want to use service with binary extension supported, it is only available in cn-shanghai region of PAI-EAS.
 - Currently only HTTP/1 is supported, hence gRPC cannot be used when query Triton servers on EAS. HTP/2 will be officially supported in a short time.
 - Users should not mount a whole OSS bucket when launching Triton processor, but an arbitrarily deep sub-directory in bucket. Otherwise the mounted path will no be as expected.
 - Not all of Triton Server parameters are be supported on EAS, the following params are the ones supported now.
