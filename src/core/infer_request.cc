@@ -496,6 +496,7 @@ InferenceRequest::RemoveAllOriginalRequestedOutputs()
 Status
 InferenceRequest::PrepareForInference()
 {
+  LOG_VERBOSE(1) << "Enter InferenceRequest::PrepareForInference()\n";
   // Remove override inputs as those are added during any previous
   // inference execution.
   inputs_.clear();
@@ -522,7 +523,7 @@ InferenceRequest::PrepareForInference()
 #endif  // TRITON_ENABLE_STATS
 
   LOG_VERBOSE(1) << "prepared: " << *this;
-
+  LOG_VERBOSE(1) << "InferenceRequest::PrepareForInference() END\n";
   return Status::Success;
 }
 

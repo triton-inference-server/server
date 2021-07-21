@@ -619,8 +619,11 @@ TRITONSERVER_ErrorNew(TRITONSERVER_Error_Code code, const char* msg)
 void
 TRITONSERVER_ErrorDelete(TRITONSERVER_Error* error)
 {
+  // LOG_VERBOSE(1) << "\n\nTRITONSERVER_ErrorDelete\n\n";
   TritonServerError* lerror = reinterpret_cast<TritonServerError*>(error);
+  // LOG_VERBOSE(1) << "\nerror:" << lerror << "\n";
   delete lerror;
+  // LOG_VERBOSE(1) << "\n\nTRITONSERVER_ErrorDelete Finish\n\n";
 }
 
 TRITONSERVER_Error_Code

@@ -259,8 +259,10 @@ ReadDataFromJsonHelper(
     char* base, const TRITONSERVER_DataType dtype,
     triton::common::TritonJson::Value& tensor_data, int* counter)
 {
+  LOG_VERBOSE(1) << "\n\nEnter ReadDataFromJasonHelper\n\n";
   // FIXME should invert loop and switch so don't have to do a switch
   // each iteration.
+  LOG_VERBOSE(1) << "tensor_data size: " << tensor_data.ArraySize() << "\n";
   for (size_t i = 0; i < tensor_data.ArraySize(); i++) {
     triton::common::TritonJson::Value el;
     RETURN_IF_ERR(tensor_data.At(i, &el));
@@ -269,10 +271,13 @@ ReadDataFromJsonHelper(
     TRITONSERVER_Error* assert_err =
         el.AssertType(triton::common::TritonJson::ValueType::ARRAY);
     if (assert_err == nullptr) {
+      LOG_VERBOSE(1) << "\nassert_err == nullptr\n";
       RETURN_IF_ERR(ReadDataFromJsonHelper(base, dtype, el, counter));
     } else {
+      // LOG_VERBOSE(1) << "dtype: " << dtype << "\n";
       switch (dtype) {
         case TRITONSERVER_TYPE_BOOL: {
+          LOG_VERBOSE(1) << "Case 0\n";
           bool b = false;
           RETURN_IF_ERR(el.AsBool(&b));
           uint8_t* data_vec = reinterpret_cast<uint8_t*>(base);
@@ -284,6 +289,7 @@ ReadDataFromJsonHelper(
           break;
         }
         case TRITONSERVER_TYPE_UINT8: {
+          LOG_VERBOSE(1) << "Case 1\n";
           uint64_t ui = 0;
           RETURN_IF_ERR(el.AsUInt(&ui));
           uint8_t* data_vec = reinterpret_cast<uint8_t*>(base);
@@ -292,6 +298,7 @@ ReadDataFromJsonHelper(
           break;
         }
         case TRITONSERVER_TYPE_UINT16: {
+          LOG_VERBOSE(1) << "Case 2\n";
           uint64_t ui = 0;
           RETURN_IF_ERR(el.AsUInt(&ui));
           uint16_t* data_vec = reinterpret_cast<uint16_t*>(base);
@@ -300,6 +307,7 @@ ReadDataFromJsonHelper(
           break;
         }
         case TRITONSERVER_TYPE_UINT32: {
+          LOG_VERBOSE(1) << "Case 3\n";
           uint64_t ui = 0;
           RETURN_IF_ERR(el.AsUInt(&ui));
           uint32_t* data_vec = reinterpret_cast<uint32_t*>(base);
@@ -308,6 +316,7 @@ ReadDataFromJsonHelper(
           break;
         }
         case TRITONSERVER_TYPE_UINT64: {
+          LOG_VERBOSE(1) << "Case 4\n";
           uint64_t ui = 0;
           RETURN_IF_ERR(el.AsUInt(&ui));
           uint64_t* data_vec = reinterpret_cast<uint64_t*>(base);
@@ -316,6 +325,7 @@ ReadDataFromJsonHelper(
           break;
         }
         case TRITONSERVER_TYPE_INT8: {
+          LOG_VERBOSE(1) << "Case 5\n";
           // FIXME for signed type just assigning to smaller type is
           // "implementation defined" and so really need to bounds
           // check.
@@ -327,6 +337,7 @@ ReadDataFromJsonHelper(
           break;
         }
         case TRITONSERVER_TYPE_INT16: {
+          LOG_VERBOSE(1) << "Case 6\n";
           int64_t si = 0;
           RETURN_IF_ERR(el.AsInt(&si));
           int16_t* data_vec = reinterpret_cast<int16_t*>(base);
@@ -335,6 +346,7 @@ ReadDataFromJsonHelper(
           break;
         }
         case TRITONSERVER_TYPE_INT32: {
+          LOG_VERBOSE(1) << "Case 7\n";
           int64_t si = 0;
           RETURN_IF_ERR(el.AsInt(&si));
           int32_t* data_vec = reinterpret_cast<int32_t*>(base);
@@ -343,6 +355,7 @@ ReadDataFromJsonHelper(
           break;
         }
         case TRITONSERVER_TYPE_INT64: {
+          LOG_VERBOSE(1) << "Case 8\n";
           int64_t si = 0;
           RETURN_IF_ERR(el.AsInt(&si));
           int64_t* data_vec = reinterpret_cast<int64_t*>(base);
@@ -351,14 +364,17 @@ ReadDataFromJsonHelper(
           break;
         }
         case TRITONSERVER_TYPE_FP32: {
+          // LOG_VERBOSE(1) << "Case 9\n";
           double fp64 = 0;
           RETURN_IF_ERR(el.AsDouble(&fp64));
           float* data_vec = reinterpret_cast<float*>(base);
           data_vec[*counter] = fp64;
           *counter += 1;
+          // LOG_VERBOSE(1) << "Case 9 END\n";
           break;
         }
         case TRITONSERVER_TYPE_FP64: {
+          LOG_VERBOSE(1) << "Case 10\n";
           double fp64 = 0;
           RETURN_IF_ERR(el.AsDouble(&fp64));
           double* data_vec = reinterpret_cast<double*>(base);
@@ -367,6 +383,7 @@ ReadDataFromJsonHelper(
           break;
         }
         case TRITONSERVER_TYPE_BYTES: {
+          LOG_VERBOSE(1) << "Case 11\n";
           const char* cstr;
           size_t len = 0;
           RETURN_IF_ERR(el.AsString(&cstr, &len));
@@ -377,12 +394,14 @@ ReadDataFromJsonHelper(
           break;
         }
         default:
+          LOG_VERBOSE(1) << "Default\n";
           break;
       }
     }
+    // LOG_VERBOSE(1) << "\nExit switch " << i << "/" << tensor_data.ArraySize() << "\n";
     TRITONSERVER_ErrorDelete(assert_err);
   }
-
+  LOG_VERBOSE(1) << "ReadDataFromJasonHelper Finish\n";
   return nullptr;  // success
 }
 
@@ -391,6 +410,7 @@ ReadDataFromJson(
     const char* tensor_name, triton::common::TritonJson::Value& tensor_data,
     char* base, const TRITONSERVER_DataType dtype)
 {
+  LOG_VERBOSE(1) << "\n\nEnter ReadDataFromJson\n\n";
   int counter = 0;
   switch (dtype) {
     // FP16 not supported via JSON
@@ -415,7 +435,7 @@ ReadDataFromJson(
           "Unable to parse 'data'");
       break;
   }
-
+  LOG_VERBOSE(1) << "\nReadDataFromJson Finish\n";
   return nullptr;
 }
 
@@ -806,12 +826,14 @@ EVBufferToJson(
     triton::common::TritonJson::Value* document, evbuffer_iovec* v, int* v_idx,
     const size_t length, int n)
 {
+  LOG_VERBOSE(1) << "\n\nEnter EVBufferToJson\n\n";
   size_t offset = 0, remaining_length = length;
   char* json_base;
   std::vector<char> json_buffer;
 
   // No need to memcpy when number of iovecs is 1
   if ((n > 0) and (v[0].iov_len >= remaining_length)) {
+    LOG_VERBOSE(1) << "EVBufferToJson - 1\n";
     json_base = static_cast<char*>(v[0].iov_base);
     if (v[0].iov_len > remaining_length) {
       v[0].iov_base = static_cast<void*>(json_base + remaining_length);
@@ -822,6 +844,7 @@ EVBufferToJson(
       *v_idx += 1;
     }
   } else {
+    LOG_VERBOSE(1) << "EVBufferToJson - 2\n";
     json_buffer.resize(length);
     json_base = json_buffer.data();
     while ((remaining_length > 0) && (*v_idx < n)) {
@@ -844,6 +867,7 @@ EVBufferToJson(
   }
 
   if (remaining_length != 0) {
+    LOG_VERBOSE(1) << "EVBufferToJson - 3\n";
     return TRITONSERVER_ErrorNew(
         TRITONSERVER_ERROR_INVALID_ARG,
         std::string(
@@ -851,9 +875,10 @@ EVBufferToJson(
             std::to_string(remaining_length) + " more bytes")
             .c_str());
   }
-
+  // LOG_VERBOSE(1) << "\nEnter ReturnIfErr\n";
   RETURN_IF_ERR(document->Parse(json_base, length));
-
+  LOG_VERBOSE(1) << document->Parse(json_base, length) << "\n";
+  LOG_VERBOSE(1) << "EVBufferToJson Finish\n";
   return nullptr;  // success
 }
 
@@ -1056,6 +1081,7 @@ HTTPAPIServer::InferResponseFree(
     size_t byte_size, TRITONSERVER_MemoryType memory_type,
     int64_t memory_type_id)
 {
+  LOG_VERBOSE(1) << "\n\nEnter InferResponseFree\n\n";
   LOG_VERBOSE(1) << "HTTP release: "
                  << "size " << byte_size << ", addr " << buffer;
 
@@ -1063,7 +1089,7 @@ HTTPAPIServer::InferResponseFree(
   // delete directly.
   auto info = reinterpret_cast<AllocPayload::OutputInfo*>(buffer_userp);
   delete info;
-
+  LOG_VERBOSE(1) << "InferResponseFree END\n";
   return nullptr;  // Success
 }
 
@@ -1763,6 +1789,7 @@ HTTPAPIServer::EVBufferToInput(
   //
   // Get the addr and size of each chunk of memory holding the HTTP
   // body.
+  LOG_VERBOSE(1) <<  "\n\nEntered EVBufferToInput\n\n";
   struct evbuffer_iovec* v = nullptr;
   int v_idx = 0;
 
@@ -1776,19 +1803,21 @@ HTTPAPIServer::EVBufferToInput(
           "unexpected error getting input buffers");
     }
   }
-
+  LOG_VERBOSE(1) << "EVBufferToInput - Break Point 1\n";
   // Extract just the json header from the HTTP body. 'header_length'
   // == 0 means that the entire HTTP body should be parsed as json.
   triton::common::TritonJson::Value request_json;
   int json_header_len = 0;
   if (header_length == 0) {
+    LOG_VERBOSE(1) << "EVBufferToInput - Ready to call evbuffer_get_length" << json_header_len << "\n";
     json_header_len = evbuffer_get_length(input_buffer);
   } else {
     json_header_len = header_length;
   }
-
+  LOG_VERBOSE(1) << "EVBufferToInput - json_header_len: " << json_header_len << "\n";
+  LOG_VERBOSE(1) << "EVBufferToInput - Break Point 2\n";
   RETURN_IF_ERR(EVBufferToJson(&request_json, v, &v_idx, json_header_len, n));
-
+  LOG_VERBOSE(1) << "EVBufferToInput - Break Point 3\n";
   // Set InferenceRequest request_id
   triton::common::TritonJson::Value id_json;
   if (request_json.Find("id", &id_json)) {
@@ -1879,7 +1908,7 @@ HTTPAPIServer::EVBufferToInput(
   RETURN_MSG_IF_ERR(
       request_json.MemberAsArray("inputs", &inputs_json),
       "Unable to parse 'inputs'");
-
+  LOG_VERBOSE(1) << "EVBufferToInput - inputs_json.ArraySize() - " << inputs_json.ArraySize() << "\n";
   for (size_t i = 0; i < inputs_json.ArraySize(); i++) {
     triton::common::TritonJson::Value request_input;
     RETURN_IF_ERR(inputs_json.At(i, &request_input));
@@ -2010,27 +2039,30 @@ HTTPAPIServer::EVBufferToInput(
           // safe and then the commented out check below will no
           // longer be necessary either (as that check should happen
           // in ReadDataFromJson)
+          LOG_VERBOSE(1) << "EVBufferToInput - Ready to call ReadDataFromJson\n";
           RETURN_IF_ERR(
               ReadDataFromJson(input_name, tensor_data, &serialized[0], dtype));
-          //          if (byte_size != serialized.size()) {
-          //            return TRITONSERVER_ErrorNew(
-          //                TRITONSERVER_ERROR_INTERNAL,
-          //                std::string(
-          //                    "serialized tensor data has unexpected size,
-          //                    expecting " + std::to_string(byte_size) + ", got
-          //                    " + std::to_string(serialized.size()))
-          //                    .c_str());
-          //        }
-
+                //    if (byte_size != serialized.size()) {
+                //      return TRITONSERVER_ErrorNew(
+                //          TRITONSERVER_ERROR_INTERNAL,
+                //          std::string(
+                //              "serialized tensor data has unexpected size,
+                //              expecting " + std::to_string(byte_size) + ", got
+                //              " + std::to_string(serialized.size()))
+                //              .c_str());
+                //  }
+          LOG_VERBOSE(1) << "EVBufferToInput - Ready to call TRITONSERVER_InferenceRequestAppendInputData\n";
           RETURN_IF_ERR(TRITONSERVER_InferenceRequestAppendInputData(
               irequest, input_name, &serialized[0], serialized.size(),
               TRITONSERVER_MEMORY_CPU, 0 /* memory_type_id */));
+          LOG_VERBOSE(1) << "EVBufferToInput - TRITONSERVER_InferenceRequestAppendInputData End\n";
         }
       }
     }
   }
-
+  LOG_VERBOSE(1) << "EVBufferToInput - Exit for loop\n";
   if (v_idx != n) {
+    LOG_VERBOSE(1) << "EVBufferToInput - v_idx != n\n";
     return TRITONSERVER_ErrorNew(
         TRITONSERVER_ERROR_INVALID_ARG,
         std::string(
@@ -2040,10 +2072,12 @@ HTTPAPIServer::EVBufferToInput(
 
   // outputs is optional
   if (request_json.Find("outputs")) {
+    LOG_VERBOSE(1) << "EVBufferToInput - request_json.Find('outputs')\n";
     triton::common::TritonJson::Value outputs_json;
     RETURN_MSG_IF_ERR(
         request_json.MemberAsArray("outputs", &outputs_json),
         "Unable to parse 'outputs'");
+    LOG_VERBOSE(1) << "EVBufferToInput - outputs_json.ArraySize(): " << outputs_json.ArraySize() << "\n";
     for (size_t i = 0; i < outputs_json.ArraySize(); i++) {
       triton::common::TritonJson::Value request_output;
       RETURN_IF_ERR(outputs_json.At(i, &request_output));
@@ -2091,9 +2125,8 @@ HTTPAPIServer::EVBufferToInput(
       }
     }
   }
-
   infer_req->alloc_payload_.default_output_kind_ = default_output_kind;
-
+  LOG_VERBOSE(1) << "EVBufferToInput END\n";
   return nullptr;  // success
 }
 
@@ -2102,6 +2135,7 @@ HTTPAPIServer::HandleInfer(
     evhtp_request_t* req, const std::string& model_name,
     const std::string& model_version_str)
 {
+  LOG_VERBOSE(1) << "\n\nEnter HandleInfer\n\n";
   if (req->method != htp_method_POST) {
     evhtp_send_reply(req, EVHTP_RES_METHNALLOWED);
     return;
@@ -2224,17 +2258,21 @@ HTTPAPIServer::HandleInfer(
 #endif  // TRITON_ENABLE_TRACING
 
     if (err == nullptr) {
+      LOG_VERBOSE(1) << "Flag1 - " << &infer_request << " - " << req->buffer_in << "\n";
       err = EVBufferToInput(
           model_name, irequest,
           (decompressed_buffer == nullptr) ? req->buffer_in
                                            : decompressed_buffer,
           infer_request.get(), header_length);
+      LOG_VERBOSE(1) << "Flag1 End\n";
     }
     if (err == nullptr) {
+      LOG_VERBOSE(1) << "Flag2\n";
       err = TRITONSERVER_InferenceRequestSetReleaseCallback(
           irequest, InferRequestClass::InferRequestComplete,
           decompressed_buffer);
       if (err == nullptr) {
+        LOG_VERBOSE(1) << "Flag3\n";
         err = TRITONSERVER_InferenceRequestSetResponseCallback(
             irequest, allocator_,
             reinterpret_cast<void*>(&infer_request->alloc_payload_),
@@ -2242,14 +2280,16 @@ HTTPAPIServer::HandleInfer(
             reinterpret_cast<void*>(infer_request.get()));
       }
       if (err == nullptr) {
+        LOG_VERBOSE(1) << "Flag4\n";
         err = TRITONSERVER_ServerInferAsync(server_.get(), irequest, trace);
       }
       if (err == nullptr) {
+        LOG_VERBOSE(1) << "Flag5\n";
         infer_request.release();
       }
     }
   }
-
+  LOG_VERBOSE(1) << "Flags everywhere?\n";
   if (err != nullptr) {
     LOG_VERBOSE(1) << "Infer failed: " << TRITONSERVER_ErrorMessage(err);
     evhtp_headers_add_header(
@@ -2266,6 +2306,7 @@ HTTPAPIServer::HandleInfer(
         TRITONSERVER_InferenceRequestDelete(irequest),
         "deleting HTTP/REST inference request");
   }
+  LOG_VERBOSE(1) << "\nHandleInfer END\n";
 }
 
 void
@@ -2359,6 +2400,7 @@ HTTPAPIServer::InferRequestClass::InferResponseComplete(
   // But for now userp is the InferRequestClass object and the end of
   // its life is in the OK or BAD ReplyCallback.
 
+  LOG_VERBOSE(1) << "\n\nEnter InferResponseComplete\n\n";
   HTTPAPIServer::InferRequestClass* infer_request =
       reinterpret_cast<HTTPAPIServer::InferRequestClass*>(userp);
 
@@ -2372,12 +2414,14 @@ HTTPAPIServer::InferRequestClass::InferResponseComplete(
 
   TRITONSERVER_Error* err = nullptr;
   if (response_count != 0) {
+    LOG_VERBOSE(1) << "\nresponse_count != 0\n";
     err = TRITONSERVER_ErrorNew(
         TRITONSERVER_ERROR_INTERNAL, std::string(
                                          "expected a single response, got " +
                                          std::to_string(response_count + 1))
                                          .c_str());
   } else if (response == nullptr) {
+    LOG_VERBOSE(1) << "\nresponse == nullptr\n";
     err = TRITONSERVER_ErrorNew(
         TRITONSERVER_ERROR_INTERNAL, "received an unexpected null response");
   } else {
@@ -2387,20 +2431,22 @@ HTTPAPIServer::InferRequestClass::InferResponseComplete(
   if (err == nullptr) {
     evthr_defer(infer_request->thread_, OKReplyCallback, infer_request);
   } else {
+    LOG_VERBOSE(1) << "\nerr != nullptr\n";
     EVBufferAddErrorJson(infer_request->req_->buffer_out, err);
     TRITONSERVER_ErrorDelete(err);
     evthr_defer(infer_request->thread_, BADReplyCallback, infer_request);
   }
-
   LOG_TRITONSERVER_ERROR(
       TRITONSERVER_InferenceResponseDelete(response),
       "deleting inference response");
+  LOG_VERBOSE(1) << "InferResponseComplete Finish\n";
 }
 
 TRITONSERVER_Error*
 HTTPAPIServer::InferRequestClass::FinalizeResponse(
     TRITONSERVER_InferenceResponse* response)
 {
+  LOG_VERBOSE(1) << "\n\nEnter FinalizeResponse\n\n";
   RETURN_IF_ERR(TRITONSERVER_InferenceResponseError(response));
 
   triton::common::TritonJson::Value response_json(
@@ -2655,7 +2701,7 @@ HTTPAPIServer::InferRequestClass::FinalizeResponse(
   // Destroy the evbuffer object as the data has been moved
   // to HTTP response buffer
   evbuffer_free(response_body);
-
+  LOG_VERBOSE(1) << "FinalizeResponse Finish\n";
   return nullptr;  // success
 }
 
