@@ -70,7 +70,8 @@ TRITON_VERSION_MAP = {
        '21.06',      # upstream container
        '1.8.0',      # ORT
        '2021.2.200', # ORT OpenVINO
-       '2021.2')     # Standalone OpenVINO
+       '2021.2',     # Standalone OpenVINO
+       '2.2.8')      # DCGM version
 }
 
 EXAMPLE_BACKENDS = ['identity', 'square', 'repeat']
@@ -474,16 +475,21 @@ def dali_cmake_args():
 
 
 def install_dcgm_libraries():
+    dcgm_version = ''
+    if FLAGS.version not in TRITON_VERSION_MAP:
+        fail('unable to determine default repo-tag, container version not known for {}'.format(FLAGS.version))
+    else:
+        dcgm_version = TRITON_VERSION_MAP[FLAGS.version][5]
     return '''
-# Install DCGM
+# Install DCGM. Steps from https://developer.nvidia.com/dcgm#Downloads
 RUN apt-get update && apt-get install -y --no-install-recommends software-properties-common
 RUN wget https://developer.download.nvidia.com/compute/cuda/repos/ubuntu2004/x86_64/cuda-ubuntu2004.pin \
 && mv cuda-ubuntu2004.pin /etc/apt/preferences.d/cuda-repository-pin-600 \
 && apt-key adv --fetch-keys https://developer.download.nvidia.com/compute/cuda/repos/ubuntu2004/x86_64/7fa2af80.pub \
 && add-apt-repository "deb https://developer.download.nvidia.com/compute/cuda/repos/ubuntu2004/x86_64/ /"
 RUN apt-get update \
-&& apt-get install -y datacenter-gpu-manager
-'''
+&& apt-get install -y datacenter-gpu-manager=1:{}
+'''.format(dcgm_version)
 
 
 def fil_cmake_args(images):
@@ -581,9 +587,6 @@ COPY . .
 ENTRYPOINT []
 '''
         df += install_dcgm_libraries()
-        df += '''
-RUN patch -ruN -d /usr/include/ < /workspace/build/libdcgm/dcgm_api_export.patch
-'''
 
     df += '''
 ENV TRITON_SERVER_VERSION ${TRITON_VERSION}
