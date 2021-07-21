@@ -55,8 +55,8 @@ from distutils.dir_util import copy_tree
 #      upstream container version,
 #      ORT version,
 #      ORT OpenVINO version (use None to disable OpenVINO in ORT),
-#      Standalone OpenVINO version (non-windows),
-#      Standalone OpenVINO version (windows)
+#      Standalone OpenVINO version,
+#      DCGM version
 #     )
 #
 # Currently the OpenVINO versions used in ORT and standalone must
@@ -477,7 +477,7 @@ def dali_cmake_args():
 def install_dcgm_libraries():
     dcgm_version = ''
     if FLAGS.version not in TRITON_VERSION_MAP:
-        fail('unable to determine default repo-tag, container version not known for {}'.format(FLAGS.version))
+        fail('unable to determine default repo-tag, DCGM version not known for {}'.format(FLAGS.version))
     else:
         dcgm_version = TRITON_VERSION_MAP[FLAGS.version][5]
     return '''
