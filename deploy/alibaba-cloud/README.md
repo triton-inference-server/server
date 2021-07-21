@@ -1,4 +1,4 @@
-Deploy Triton Inference Server on PAI-EAS 
+# Deploy Triton Inference Server on PAI-EAS 
 * Table Of Contents
    - [Description](https://yuque.alibaba-inc.com/pai/blade/mtptqc#Description)
    - [Prerequisites](https://yuque.alibaba-inc.com/pai/blade/mtptqc#Prerequisites)
@@ -77,16 +77,17 @@ pip install tritonclient[all]
 ```
 import numpy as np
 import time
+from PIL import Image
 
 import tritonclient.http as httpclient
 from tritonclient.utils import InferenceServerException
 
-URL = "<servcice url which you can get when eascmd create service>"
-HEADERS = {"Authorization": "<service token which you can get when eascmd create service>"}
-
+URL = "<servcice url>"
+HEADERS = {"Authorization": "<service token>"}
 input_img = httpclient.InferInput("input", [1, 299, 299, 3], "FP32")
-rand_img = np.random.rand(1, 299, 299, 3).astype(np.float32)
-input_img.set_data_from_numpy(rand_img, binary_data=True)
+img = Image.open('./cat.png').resize((299, 299))
+img = np.asarray(img).astype('float32') / 255.0
+input_img.set_data_from_numpy(img.reshape([1, 299, 299, 3]), binary_data=True)
 
 output = httpclient.InferRequestedOutput(
     "InceptionV3/Predictions/Softmax", binary_data=True
@@ -94,12 +95,17 @@ output = httpclient.InferRequestedOutput(
 triton_client = httpclient.InferenceServerClient(url=URL, verbose=False)
 
 start = time.time()
-for i in range(100):
+for i in range(10):
     results = triton_client.infer(
         "inception_graphdef", inputs=[input_img], outputs=[output], headers=HEADERS
     )
     res_body = results.get_response()
     elapsed_ms = (time.time() - start) * 1000
+    if i == 0:
+        print("model name: ", res_body["model_name"])
+        print("model version: ", res_body["model_version"])
+        print("output name: ", res_body["outputs"][0]["name"])
+        print("output shape: ", res_body["outputs"][0]["shape"])
     print("[{}] Avg rt(ms): {:.2f}".format(i, elapsed_ms))
     start = time.time()
 ```
