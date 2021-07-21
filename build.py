@@ -65,13 +65,13 @@ from distutils.dir_util import copy_tree
 # incorrectly load the other version of the openvino libraries.
 #
 TRITON_VERSION_MAP = {
-    '2.13.0dev':
-      ('21.08dev',   # triton container
-       '21.06',      # upstream container
-       '1.8.0',      # ORT
-       '2021.2.200', # ORT OpenVINO
-       '2021.2',     # Standalone OpenVINO
-       '2.2.8')      # DCGM version
+    '2.13.0dev': (
+        '21.08dev',  # triton container
+        '21.06',  # upstream container
+        '1.8.0',  # ORT
+        '2021.2.200',  # ORT OpenVINO
+        '2021.2',  # Standalone OpenVINO
+        '2.2.8')  # DCGM version
 }
 
 EXAMPLE_BACKENDS = ['identity', 'square', 'repeat']
@@ -477,7 +477,9 @@ def dali_cmake_args():
 def install_dcgm_libraries():
     dcgm_version = ''
     if FLAGS.version not in TRITON_VERSION_MAP:
-        fail('unable to determine default repo-tag, DCGM version not known for {}'.format(FLAGS.version))
+        fail(
+            'unable to determine default repo-tag, DCGM version not known for {}'
+            .format(FLAGS.version))
     else:
         dcgm_version = TRITON_VERSION_MAP[FLAGS.version][5]
     return '''
