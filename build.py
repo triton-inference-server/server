@@ -474,14 +474,15 @@ def dali_cmake_args():
     ]
 
 
-def install_dcgm_libraries():
+def install_dcgm_libraries(argmap):
     dcgm_version = ''
-    if FLAGS.version not in TRITON_VERSION_MAP:
+    version = argmap['TRITON_VERSION']
+    if version not in TRITON_VERSION_MAP or version is None:
         fail(
             'unable to determine default repo-tag, DCGM version not known for {}'
-            .format(FLAGS.version))
+            .format(version))
     else:
-        dcgm_version = TRITON_VERSION_MAP[FLAGS.version][5]
+        dcgm_version = TRITON_VERSION_MAP[version][5]
     return '''
 # Install DCGM. Steps from https://developer.nvidia.com/dcgm#Downloads
 RUN apt-get update && apt-get install -y --no-install-recommends software-properties-common
@@ -518,7 +519,7 @@ def get_container_versions(version, container_version,
     return container_version, upstream_container_version
 
 
-def create_dockerfile_buildbase(ddir, dockerfile_name, argmap, backends):
+def create_dockerfile_buildbase(ddir, dockerfile_name, argmap):
     df = '''
 ARG TRITON_VERSION={}
 ARG TRITON_CONTAINER_VERSION={}
@@ -601,7 +602,7 @@ RUN rm -fr *
 COPY . .
 ENTRYPOINT []
 '''
-        df += install_dcgm_libraries()
+        df += install_dcgm_libraries(argmap)
 
     df += '''
 ENV TRITON_SERVER_VERSION ${TRITON_VERSION}
@@ -613,7 +614,7 @@ ENV NVIDIA_TRITON_SERVER_VERSION ${TRITON_CONTAINER_VERSION}
         dfile.write(df)
 
 
-def create_dockerfile_build(ddir, dockerfile_name, argmap, backends):
+def create_dockerfile_build(ddir, dockerfile_name, backends):
     df = '''
 FROM tritonserver_builder_image AS build
 FROM tritonserver_buildbase
@@ -739,7 +740,7 @@ RUN apt-get update && \
          libre2-5 && \
     rm -rf /var/lib/apt/lists/*
 '''
-    df += install_dcgm_libraries()
+    df += install_dcgm_libraries(argmap)
     # Add dependencies needed for python backend
     if 'python' in backends:
         df += '''
@@ -889,7 +890,7 @@ def container_build(images, backends, repoagents, endpoints):
 
     log_verbose('buildbase container {}'.format(commonargs + cachefromargs))
     create_dockerfile_buildbase(FLAGS.build_dir, 'Dockerfile.buildbase',
-                                dockerfileargmap, backends)
+                                dockerfileargmap)
     try:
         # Create buildbase image, this is an image with all
         # dependencies needed for the build.
@@ -1001,8 +1002,7 @@ def container_build(images, backends, repoagents, endpoints):
         container.commit('tritonserver_builder_image', 'latest')
         container.remove(force=True)
 
-        create_dockerfile_build(FLAGS.build_dir, 'Dockerfile.build',
-                                dockerfileargmap, backends)
+        create_dockerfile_build(FLAGS.build_dir, 'Dockerfile.build', backends)
         p = subprocess.Popen([
             'docker', 'build', '-t', 'tritonserver_build', '-f',
             os.path.join(FLAGS.build_dir, 'Dockerfile.build'), '.'
