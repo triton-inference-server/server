@@ -186,8 +186,8 @@ def create_argmap(images):
     dcgm_ver = re.search("DCGM_VERSION=([\S]{4,}) ", vars)
     dcgm_version = ""
     if dcgm_ver == None:
-        dcgm_version = "2.2.3"
-        log("WARNING: DCGM version not found from image, installing the earlierst version {}"
+        dcgm_version = "2.2.8"
+        log("WARNING: DCGM version not found from image, installing default version {}"
             .format(dcgm_version))
     else:
         dcgm_version = dcgm_ver.group(1)
