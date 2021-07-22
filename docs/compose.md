@@ -41,7 +41,7 @@ from source to get more exact customization.
 
 ## Use the compose.py script
 
-The `compose.py` script can be found in the [server repository](https://github.com/triton-inference-server/server). Simply clone the repository and run `compose.py` to create a custom container. Note created container version will depend on the branch that was cloned. For example branch [r21.08](https://github.com/triton-inference-server/server/tree/r21.06) should be used to create a image based on the NGC 21.08 Triton release. 
+The `compose.py` script can be found in the [server repository](https://github.com/triton-inference-server/server). Simply clone the repository and run `compose.py` to create a custom container. Note created container version will depend on the branch that was cloned. For example branch [r21.06](https://github.com/triton-inference-server/server/tree/r21.06) should be used to create a image based on the NGC 21.06 Triton release. 
 
 `compose.py` provides `--backend`, `--repoagent` options that allow you to specify which backends and repository agents to include in the custom image. The `--enable-gpu` flag indicates that you want to create an image that supports NVIDIA GPUs. For example, the following creates a new docker image that contains only the TensorFlow 1 and TensorFlow 2 backends and the checksum repository agent.
 
@@ -54,7 +54,7 @@ will provide a container `tritonserver` locally. You can access the container wi
 $ docker run -it tritonserver:latest
 ```
 
-Note: If `compose.py` is run on release versions older than r21.08, the resulting container will have DCGM version 2.2.8 installed. This may result in different GPU statistic reporting behavior.
+Note: If `compose.py` is run on release versions `r21.07` and older, the resulting container will have DCGM version 2.2.3 installed. This may result in different GPU statistic reporting behavior.
 
 ## Build it yourself
 
