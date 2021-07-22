@@ -128,6 +128,7 @@ FetchContent_Declare(
   GIT_TAG ${TRITON_THIRD_PARTY_REPO_TAG}
 )
 set(TRITON_THIRD_PARTY_INSTALL_PREFIX ${CMAKE_CURRENT_BINARY_DIR}/third-party)
+set(TRITON_THIRD_PARTY_SRC_INSTALL_PREFIX ${CMAKE_CURRENT_BINARY_DIR}/third-party-src)
 FetchContent_MakeAvailable(repo-third-party)
 
 # If CMAKE_TOOLCHAIN_FILE is set, propagate that hint path to the external

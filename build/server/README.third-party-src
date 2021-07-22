@@ -1,0 +1,5 @@
+This directory contains the licenses and source code for software
+included in the Triton Inference Server build. To extract the files
+use:
+
+  $ tar zxf src.tar.gz
