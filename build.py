@@ -591,6 +591,9 @@ COPY . .
 ENTRYPOINT []
 '''
         df += install_dcgm_libraries()
+        df += '''
+RUN patch -ruN -d /usr/include/ < /workspace/build/libdcgm/dcgm_api_export.patch
+'''
 
     df += '''
 ENV TRITON_SERVER_VERSION ${TRITON_VERSION}
