@@ -184,7 +184,13 @@ def create_argmap(images):
 
     vars = p_version.stdout
     dcgm_ver = re.search("DCGM_VERSION=([\S]{4,}) ", vars)
-    dcgm_version = "" if dcgm_ver == None else dcgm_ver.group(1)
+    dcgm_version = ""
+    if dcgm_ver == None:
+        dcgm_version = "2.2.3"
+        log("WARNING: DCGM version not found from image, installing the earlierst version {}"
+            .format(dcgm_version))
+    else:
+        dcgm_version = dcgm_ver.group(1)
     fail_if(
         len(dcgm_version) == 0,
         'docker inspect to find DCGM version failed, {}'.format(vars))
