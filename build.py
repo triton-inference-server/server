@@ -474,16 +474,16 @@ def dali_cmake_args():
     ]
 
 
-def install_dcgm_libraries(argmap):
-    dcgm_version = ''
-    version = argmap['TRITON_VERSION']
-    if version not in TRITON_VERSION_MAP or version is None:
+def install_dcgm_libraries(dcgm_version):
+    if dcgm_version == '':
         fail(
             'unable to determine default repo-tag, DCGM version not known for {}'
-            .format(version))
+            .format(FLAGS.version))
+        return ''
     else:
-        dcgm_version = TRITON_VERSION_MAP[version][5]
-    return '''
+
+        return '''
+ENV DCGM_VERSION {}
 # Install DCGM. Steps from https://developer.nvidia.com/dcgm#Downloads
 RUN apt-get update && apt-get install -y --no-install-recommends software-properties-common
 RUN wget https://developer.download.nvidia.com/compute/cuda/repos/ubuntu2004/x86_64/cuda-ubuntu2004.pin \
@@ -492,7 +492,7 @@ RUN wget https://developer.download.nvidia.com/compute/cuda/repos/ubuntu2004/x86
 && add-apt-repository "deb https://developer.download.nvidia.com/compute/cuda/repos/ubuntu2004/x86_64/ /"
 RUN apt-get update \
 && apt-get install -y datacenter-gpu-manager=1:{}
-'''.format(dcgm_version)
+'''.format(dcgm_version, dcgm_version)
 
 
 def fil_cmake_args(images):
@@ -602,7 +602,7 @@ RUN rm -fr *
 COPY . .
 ENTRYPOINT []
 '''
-        df += install_dcgm_libraries(argmap)
+        df += install_dcgm_libraries(argmap['DCGM_VERSION'])
 
     df += '''
 ENV TRITON_SERVER_VERSION ${TRITON_VERSION}
@@ -740,7 +740,7 @@ RUN apt-get update && \
          libre2-5 && \
     rm -rf /var/lib/apt/lists/*
 '''
-    df += install_dcgm_libraries(argmap)
+    df += install_dcgm_libraries(argmap['DCGM_VERSION'])
     # Add dependencies needed for python backend
     if 'python' in backends:
         df += '''
@@ -871,6 +871,9 @@ def container_build(images, backends, repoagents, endpoints):
             FLAGS.container_version,
         'BASE_IMAGE':
             base_image,
+        'DCGM_VERSION':
+            '' if FLAGS.version is None or FLAGS.version
+            not in TRITON_VERSION_MAP else TRITON_VERSION_MAP[FLAGS.version][5],
     }
 
     cachefrommap = [

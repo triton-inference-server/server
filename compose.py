@@ -182,6 +182,13 @@ def create_argmap(images):
         'docker inspect to find triton container version failed, {}'.format(
             vars))
 
+    vars = p_version.stdout
+    dcgm_ver = re.search("DCGM_VERSION=([\S]{4,}) ", vars)
+    dcgm_version = "" if dcgm_ver == None else dcgm_ver.group(1)
+    fail_if(
+        len(dcgm_version) == 0,
+        'docker inspect to find DCGM version failed, {}'.format(vars))
+
     p_sha = subprocess.run(baseRunArgs + [
         '{{ index .Config.Labels "com.nvidia.build.ref"}}', upstreamDockerImage
     ],
@@ -213,6 +220,7 @@ def create_argmap(images):
         'NVIDIA_BUILD_ID': p_build.stdout.rstrip(),
         'TRITON_VERSION': version,
         'TRITON_CONTAINER_VERSION': container_version,
+        'DCGM_VERSION': dcgm_version,
         'SAGEMAKER_ENDPOINT': f is not None,
     }
     return argmap
