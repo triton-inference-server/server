@@ -7,8 +7,8 @@
    - [Known Issues](https://yuque.alibaba-inc.com/pai/blade/mtptqc#558ab0be)
 
 # Description
-This repository contains infomation about how to deploy NVIDIA Triton Inference Server in  EAS(Elastic Algorithm Service) of Alibaba-Cloud.
-- EAS providing a simple way for deep learning developers to deploy their models in Alibaba Cloud.
+This repository contains information about how to deploy NVIDIA Triton Inference Server in EAS(Elastic Algorithm Service) of Alibaba-Cloud.
+- EAS provides a simple way for deep learning developers to deploy their models in Alibaba Cloud.
 - Using **Triton Processor** is the recommended way on EAS to deploy Triton Inference Server. Users can simply deploy a Triton Server by preparing models and creating a EAS service by setting processor type to `triton`.
 - Models should be uploaded to Alibaba Cloud's OSS(Object Storage Service). User's model repository in OSS will be mounted onto local path visible to Triton Server.
 - This documentation uses Triton's own example models for demo. The tensorflow inception model can be downloaded by the `fetch_models.sh` script.
@@ -132,8 +132,9 @@ See the following resources to learn more about how to use Alibaba Cloud's OSS o
 - [Binary Tensor Data Extension](https://github.com/triton-inference-server/server/blob/main/docs/protocol/extension_binary_data.md) is not fully supported yet, users want to use service with binary extension supported, it is only available in cn-shanghai region of PAI-EAS.
 - Currently only HTTP/1 is supported, hence gRPC cannot be used when query Triton servers on EAS. HTP/2 will be officially supported in a short time.
 - Users should not mount a whole OSS bucket when launching Triton processor, but an arbitrarily deep sub-directory in bucket. Otherwise the mounted path will no be as expected.
-- Not all of Triton Server parameters are be supported on EAS, the following params are the ones supported now.
+- Not all of Triton Server parameters are be supported on EAS, the following params are supported on EAS:
 ```
+model-repository
 log-verbose
 log-info
 log-warning
