@@ -47,6 +47,18 @@ model health, metadata and statistics. Additional endpoints allow
 model loading and unloading, and inferencing. See the KFServing and
 extension documentation for details.
 
+### GRPC KeepAlive Options
+
+Triton exposes GRPC KeepAlive parameters with the default values for both
+client and server described [here](https://github.com/grpc/grpc/blob/master/doc/keepalive.md).
+
+You can find a `KeepAliveOptions` struct that encapsulates these parameters
+in [grpc_server.h](../src/servers/grpc_server.h).
+
+### GRPC SSL/TLS Options
+
+TODO: Tanmay to help here
+
 ## C API
 
 The Triton Inference Server provides a backwards-compatible C API that
