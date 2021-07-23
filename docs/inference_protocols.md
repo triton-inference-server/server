@@ -60,7 +60,7 @@ These options can be used to configure a secured channel for communication. The 
 * --grpc-server-key
 * --grpc-root-cert
 
-For client-side documentation, see [Client-Side GRPC SSL/TLS](https://github.com/triton-inference-server/client/tree/main#grpc-ssltls)
+For client-side documentation, see [Client-Side GRPC SSL/TLS](https://github.com/triton-inference-server/client/tree/main#grpc-ssltls-options)
 
 For more details on overview of authentication in gRPC, refer [here](https://grpc.io/docs/guides/auth/).
 
@@ -70,7 +70,7 @@ Triton allows the on-wire compression of request/response messages by exposing f
 
 * --grpc-infer-response-compression-level
 
-For client-side documentation, see [Client-Side GRPC Compression](https://github.com/triton-inference-server/client/tree/main#grpc-compression)
+For client-side documentation, see [Client-Side GRPC Compression](https://github.com/triton-inference-server/client/tree/main#grpc-compression-options)
 
 Compression can be used to reduce the amount of bandwidth used in server-client communication. For more details, see [gRPC Compression](https://grpc.github.io/grpc/core/md_doc_compression.html). 
 
