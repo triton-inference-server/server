@@ -47,7 +47,34 @@ model health, metadata and statistics. Additional endpoints allow
 model loading and unloading, and inferencing. See the KFServing and
 extension documentation for details.
 
-### GRPC KeepAlive Options
+### GRPC Options
+Triton exposes various GRPC parameters for configuring the server-client network transactions. For usage of these options, refer to the output from `tritonserver --help`.
+
+#### SSL/TLS
+
+These options can be used to configure a secured channel for communication. The server-side options include:
+
+* --grpc-use-ssl
+* --grpc-use-ssl-mutual
+* --grpc-server-cert
+* --grpc-server-key
+* --grpc-root-cert
+
+For client-side documentation, see [Client-Side GRPC SSL/TLS](https://github.com/triton-inference-server/client/tree/main#grpc-ssltls)
+
+For more details on overview of authentication in gRPC, refer [here](https://grpc.io/docs/guides/auth/).
+
+#### Compression
+
+Triton allows the on-wire compression of request/response messages by exposing following option on server-side:
+
+* --grpc-infer-response-compression-level
+
+For client-side documentation, see [Client-Side GRPC Compression](https://github.com/triton-inference-server/client/tree/main#grpc-compression)
+
+Compression can be used to reduce the amount of bandwidth used in server-client communication. For more details, see [gRPC Compression](https://grpc.github.io/grpc/core/md_doc_compression.html). 
+
+#### GRPC KeepAlive
 
 Triton exposes GRPC KeepAlive parameters with the default values for both
 client and server described [here](https://github.com/grpc/grpc/blob/master/doc/keepalive.md).
@@ -57,10 +84,6 @@ in [grpc_server.h](../src/servers/grpc_server.h).
 
 For more information on the client side KeepAlive parameters, see the
 [client library documentation](https://github.com/triton-inference-server/client/blob/main/README.md#client-library-apis).
-
-### GRPC SSL/TLS Options
-
-TODO: Tanmay to help here
 
 ## C API
 
