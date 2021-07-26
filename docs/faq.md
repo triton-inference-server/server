@@ -157,3 +157,6 @@ The build.py as well defaults to a Release build. Refer to the instructions
 in [build.md](build.md#building-with-debug-symbols) to create a Debug build
 of Triton. This will help find the cause of the segmentation fault when
 looking at the gdb trace for the segfault.
+
+When opening an GitHub issue for the segfault with Triton, please include
+the backtrace to better help us resolve the problem.
