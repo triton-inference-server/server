@@ -158,5 +158,5 @@ in [build.md](build.md#building-with-debug-symbols) to create a Debug build
 of Triton. This will help find the cause of the segmentation fault when
 looking at the gdb trace for the segfault.
 
-When opening an GitHub issue for the segfault with Triton, please include
+When opening a GitHub issue for the segfault with Triton, please include
 the backtrace to better help us resolve the problem.
