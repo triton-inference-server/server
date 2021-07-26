@@ -336,3 +336,9 @@ changes in the following areas.
   NGC container. But the build can also use PyTorch shared libraries
   that you build separately for your platform. See the pytorch_backend
   build process for details.
+
+## Building with Debug Symbols
+
+To build with Debug symbols, use the --build-type=Debug arguement while
+launching build.py. You can then launch the built server with gdb and see 
+the debug symbols/information in the gdb trace.
