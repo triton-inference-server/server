@@ -53,16 +53,29 @@ metrics reported by the inference server.
 
 ## Installing Helm
 
-If you do not already have Helm installed,
+### Helm v3
+
+If you do not already have Helm installed in your Kubernetes cluster,
 executing the following steps from the [official helm install
 guide](https://helm.sh/docs/intro/install/) will
 give you a quick setup.
 
-```sh
+If you're currently using Helm v2 and would like to migrate to Helm v3,
+please see the [official migration guide](https://helm.sh/docs/topics/v2_v3_migration/).
+
+### Helm v2
+
+> **NOTE**: Moving forward this chart will only be tested and maintained for Helm v3.
+
+Below are example instructions for installing Helm v2.
+
+```
 $ curl -fsSL -o get_helm.sh https://raw.githubusercontent.com/helm/helm/master/scripts/get-helm-3
 $ chmod 700 get_helm.sh
 $ ./get_helm.sh
 ```
+
+If you run into any issues, you can refer to the official installation guide [here](https://v2.helm.sh/docs/install/).
 
 ## Model Repository
 
@@ -97,16 +110,16 @@ $ az storage blob directory upload -c $AZURE_STORAGE_CONTAINER -d . -s model_rep
 ### Azure Model Repository
 To load models from the Blob Storage Container, you need to convert the following Azure credentials to base64 format and add them to the Helm Chart's [values.yaml](./values.yaml)
 
-For `AZURE_STORAGE_ACCOUNT_NAME`:
+For `.values.secret.accountName`:
 ```sh
 $ echo -n $AZURE_STORAGE_ACCOUNT | base64
 ```
 
-For `AZURE_STORAGE_KEY`:
+For `.values.secret.accountKey`:
 ```sh
 $ AZURE_STORAGE_KEY=`az storage account keys list -n $AZURE_STORAGE_ACCOUNT --query "[0].value"`
 
-$ echo -n $AZURE_STORAGE_KEY | base64
+$ echo -n $AZURE_STORAGE_KEY | base64 -w 0
 ```
 
 ## Deploy Prometheus and Grafana
@@ -122,7 +135,9 @@ Prometheus can find the inference server metrics in the *example*
 release deployed below.
 
 ```
-$ helm install --name example-metrics --set prometheus.prometheusSpec.serviceMonitorSelectorNilUsesHelmValues=false stable/prometheus-operator
+helm repo add prometheus-community https://prometheus-community.github.io/helm-charts
+helm repo update
+helm install example-metrics prometheus-community/kube-prometheus-stack --set prometheus.prometheusSpec.serviceMonitorSelectorNilUsesHelmValues=false
 ```
 
 Then port-forward to the Grafana service so you can access it from
@@ -146,7 +161,7 @@ following commands.
 
 ```
 $ cd <directory containing Chart.yaml>
-$ helm install --name example .
+$ helm install example .
 ```
 
 Use kubectl to see status and wait until the inference server pods are
@@ -168,7 +183,7 @@ deploy a cluster of four inference servers use *--set* to set the
 replicaCount parameter.
 
 ```
-$ helm install --name example --set replicaCount=4 .
+$ helm install example . --set replicaCount=4
 ```
 
 You can also write your own "config.yaml" file with the values you
@@ -179,9 +194,9 @@ $ cat << EOF > config.yaml
 namespace: MyCustomNamespace
 image:
   imageName: nvcr.io/nvidia/tritonserver:custom-tag
-  modelRepositoryPath: gs://my_model_repository
+  modelRepositoryPath: as://account_name/container_name/path/to/model/repository
 EOF
-$ helm install --name example -f config.yaml .
+$ helm install example . -f config.yaml
 ```
 
 ## Using Triton Inference Server
@@ -233,8 +248,8 @@ NAME            REVISION  UPDATED                   STATUS    CHART             
 example         1         Wed Feb 27 22:16:55 2019  DEPLOYED  triton-inference-server-1.0.0  1.0           default
 example-metrics	1       	Tue Jan 21 12:24:07 2020	DEPLOYED	prometheus-operator-6.18.0   	 0.32.0     	 default
 
-$ helm delete --purge example
-$ helm delete --purge example-metrics
+$ helm delete example
+$ helm delete example-metrics
 ```
 
 For the Prometheus and Grafana services you should [explicitly delete
