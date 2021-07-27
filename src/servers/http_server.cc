@@ -802,7 +802,7 @@ ValidateOutputParameter(triton::common::TritonJson::Value& io)
 }
 
 TRITONSERVER_Error*
-CheckInputShape(
+CheckInputElementCount(
     const std::vector<int64_t>& shape,
     triton::common::TritonJson::Value& tensor_data)
 {
@@ -812,7 +812,8 @@ CheckInputShape(
   }
   if (shape_product != static_cast<int>(tensor_data.ArraySize())) {
     return TRITONSERVER_ErrorNew(
-        TRITONSERVER_ERROR_INTERNAL, "Shape size is mismatched with data size");
+        TRITONSERVER_ERROR_INTERNAL,
+        "Shape does not match true shape of 'data' field");
   }
 
   return nullptr;  // success
@@ -2010,7 +2011,7 @@ HTTPAPIServer::EVBufferToInput(
           RETURN_MSG_IF_ERR(
               request_input.MemberAsArray("data", &tensor_data),
               "Unable to parse 'data'");
-          RETURN_IF_ERR(CheckInputShape(shape_vec, tensor_data));
+          RETURN_IF_ERR(CheckInputElementCount(shape_vec, tensor_data));
 
           if (dtype == TRITONSERVER_TYPE_BYTES) {
             RETURN_IF_ERR(JsonBytesArrayByteSize(tensor_data, &byte_size));
