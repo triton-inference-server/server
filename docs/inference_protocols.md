@@ -54,11 +54,11 @@ Triton exposes various GRPC parameters for configuring the server-client network
 
 These options can be used to configure a secured channel for communication. The server-side options include:
 
-* --grpc-use-ssl
-* --grpc-use-ssl-mutual
-* --grpc-server-cert
-* --grpc-server-key
-* --grpc-root-cert
+* `--grpc-use-ssl`
+* `--grpc-use-ssl-mutual`
+* `--grpc-server-cert`
+* `--grpc-server-key`
+* `--grpc-root-cert`
 
 For client-side documentation, see [Client-Side GRPC SSL/TLS](https://github.com/triton-inference-server/client/tree/main#grpc-ssltls)
 
@@ -68,7 +68,7 @@ For more details on overview of authentication in gRPC, refer [here](https://grp
 
 Triton allows the on-wire compression of request/response messages by exposing following option on server-side:
 
-* --grpc-infer-response-compression-level
+* `--grpc-infer-response-compression-level`
 
 For client-side documentation, see [Client-Side GRPC Compression](https://github.com/triton-inference-server/client/tree/main#grpc-compression)
 
@@ -79,11 +79,16 @@ Compression can be used to reduce the amount of bandwidth used in server-client 
 Triton exposes GRPC KeepAlive parameters with the default values for both
 client and server described [here](https://github.com/grpc/grpc/blob/master/doc/keepalive.md).
 
-You can find a `KeepAliveOptions` struct that encapsulates these parameters
-in [grpc_server.h](../src/servers/grpc_server.h).
+These options can be used to configure the KeepAlive settings:
 
-For more information on the client side KeepAlive parameters, see the
-[client library documentation](https://github.com/triton-inference-server/client/blob/main/README.md#client-library-apis).
+* `--grpc-keepalive-time`
+* `--grpc-keepalive-timeout`
+* `--grpc-keepalive-permit-without-calls`
+* `--grpc-http2-max-pings-without-data`
+* `--grpc-http2-min-recv-ping-interval-without-data`
+* `--grpc-http2-max-ping-strikes`
+
+For client-side documentation, see [Client-Side GRPC KeepAlive](https://github.com/triton-inference-server/client/blob/main/README.md#grpc-keepalive).
 
 ## C API
 
