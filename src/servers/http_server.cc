@@ -1,4 +1,4 @@
-// Copyright (c) 2019-2021, NVIDIA CORPORATION. All rights reserved.
+// Copyright 2019-2021, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 //
 // Redistribution and use in source and binary forms, with or without
 // modification, are permitted provided that the following conditions
@@ -796,6 +796,23 @@ ValidateOutputParameter(triton::common::TritonJson::Value& io)
         }
       }
     }
+  }
+
+  return nullptr;  // success
+}
+
+TRITONSERVER_Error*
+CheckInputShape(
+    const std::vector<int64_t>& shape,
+    triton::common::TritonJson::Value& tensor_data)
+{
+  int shape_product = 1;
+  for (size_t i = 0; i < shape.size(); i++) {
+    shape_product *= shape[i];
+  }
+  if (shape_product != static_cast<int>(tensor_data.ArraySize())) {
+    return TRITONSERVER_ErrorNew(
+        TRITONSERVER_ERROR_INTERNAL, "Shape size is mismatched with data size");
   }
 
   return nullptr;  // success
@@ -1993,6 +2010,7 @@ HTTPAPIServer::EVBufferToInput(
           RETURN_MSG_IF_ERR(
               request_input.MemberAsArray("data", &tensor_data),
               "Unable to parse 'data'");
+          RETURN_IF_ERR(CheckInputShape(shape_vec, tensor_data));
 
           if (dtype == TRITONSERVER_TYPE_BYTES) {
             RETURN_IF_ERR(JsonBytesArrayByteSize(tensor_data, &byte_size));
