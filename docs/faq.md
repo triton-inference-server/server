@@ -1,5 +1,5 @@
 <!--
-# Copyright (c) 2019-2020, NVIDIA CORPORATION. All rights reserved.
+# Copyright 2019-2021, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -149,3 +149,14 @@ server into multiple *nodes*, each with one GPU. In this case the
 orchestration environment will run a different Triton for each GPU and
 an load balancer will be used to divide inference requests across the
 available Triton instances.
+
+## If the server segfaults, how can I debug it?
+
+The NGC build is a Release build and does not contain Debug symbols. 
+The build.py as well defaults to a Release build. Refer to the instructions
+in [build.md](build.md#building-with-debug-symbols) to create a Debug build
+of Triton. This will help find the cause of the segmentation fault when
+looking at the gdb trace for the segfault.
+
+When opening a GitHub issue for the segfault with Triton, please include
+the backtrace to better help us resolve the problem.
