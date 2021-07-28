@@ -430,8 +430,8 @@ ReadDataFromJson(
           "Unable to parse 'data'");
       break;
   }
-  // Check if 'ReadDataFromJsonHelper' reads
-  // less than the expected byte size
+
+  // Check if 'ReadDataFromJsonHelper' reads less than the expected byte size
   if (counter != expected_cnt) {
     return TRITONSERVER_ErrorNew(
         TRITONSERVER_ERROR_INTERNAL,
