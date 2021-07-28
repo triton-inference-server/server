@@ -274,7 +274,7 @@ ReadDataFromJsonHelper(
           ReadDataFromJsonHelper(base, dtype, el, counter, expected_cnt));
     } else {
       // Check if writing to 'serialized' is overrunning the expected byte_size
-      if (*counter == expected_cnt) {
+      if (*counter >= expected_cnt) {
         return TRITONSERVER_ErrorNew(
             TRITONSERVER_ERROR_INTERNAL,
             "Shape does not match true shape of 'data' field");
@@ -378,6 +378,12 @@ ReadDataFromJsonHelper(
           const char* cstr;
           size_t len = 0;
           RETURN_IF_ERR(el.AsString(&cstr, &len));
+          if (static_cast<int64_t>(*counter + len + sizeof(uint32_t)) >
+              expected_cnt) {
+            return TRITONSERVER_ErrorNew(
+                TRITONSERVER_ERROR_INTERNAL,
+                "Shape does not match true shape of 'data' field");
+          }
           memcpy(
               base + *counter, reinterpret_cast<char*>(&len), sizeof(uint32_t));
           std::copy(cstr, cstr + len, base + *counter + sizeof(uint32_t));
@@ -429,7 +435,8 @@ ReadDataFromJson(
   if (counter != expected_cnt) {
     return TRITONSERVER_ErrorNew(
         TRITONSERVER_ERROR_INTERNAL,
-        "Shape does not match true shape of 'data' field");
+        "Unable to parse 'data': Shape does not match true shape of 'data' "
+        "field");
   }
 
   return nullptr;
