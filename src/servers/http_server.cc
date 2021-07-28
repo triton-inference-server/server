@@ -258,7 +258,7 @@ TRITONSERVER_Error*
 ReadDataFromJsonHelper(
     char* base, const TRITONSERVER_DataType dtype,
     triton::common::TritonJson::Value& tensor_data, int* counter,
-    size_t byte_size)
+    int64_t expected_cnt)
 {
   // FIXME should invert loop and switch so don't have to do a switch
   // each iteration.
@@ -271,8 +271,14 @@ ReadDataFromJsonHelper(
         el.AssertType(triton::common::TritonJson::ValueType::ARRAY);
     if (assert_err == nullptr) {
       RETURN_IF_ERR(
-          ReadDataFromJsonHelper(base, dtype, el, counter, byte_size));
+          ReadDataFromJsonHelper(base, dtype, el, counter, expected_cnt));
     } else {
+      // Check if writing to 'serialized' is overrunning the expected byte_size
+      if (*counter == expected_cnt) {
+        return TRITONSERVER_ErrorNew(
+            TRITONSERVER_ERROR_INTERNAL,
+            "Shape does not match true shape of 'data' field");
+      }
       switch (dtype) {
         case TRITONSERVER_TYPE_BOOL: {
           bool b = false;
@@ -381,13 +387,6 @@ ReadDataFromJsonHelper(
         default:
           break;
       }
-      // Check if writing to 'serialized' is overrunning the expected byte_size
-      uint64_t bytes_read = *counter * TRITONSERVER_DataTypeByteSize(dtype);
-      if (bytes_read > byte_size) {
-        return TRITONSERVER_ErrorNew(
-            TRITONSERVER_ERROR_INTERNAL,
-            "Shape does not match true shape of 'data' field");
-      }
     }
     TRITONSERVER_ErrorDelete(assert_err);
   }
@@ -398,7 +397,7 @@ ReadDataFromJsonHelper(
 TRITONSERVER_Error*
 ReadDataFromJson(
     const char* tensor_name, triton::common::TritonJson::Value& tensor_data,
-    char* base, const TRITONSERVER_DataType dtype, size_t byte_size)
+    char* base, const TRITONSERVER_DataType dtype, int64_t expected_cnt)
 {
   int counter = 0;
   switch (dtype) {
@@ -420,14 +419,14 @@ ReadDataFromJson(
 
     default:
       RETURN_MSG_IF_ERR(
-          ReadDataFromJsonHelper(base, dtype, tensor_data, &counter, byte_size),
+          ReadDataFromJsonHelper(
+              base, dtype, tensor_data, &counter, expected_cnt),
           "Unable to parse 'data'");
       break;
   }
   // Check if 'ReadDataFromJsonHelper' reads
   // less than the expected byte size
-  uint64_t bytes_read = counter * TRITONSERVER_DataTypeByteSize(dtype);
-  if (bytes_read != byte_size) {
+  if (counter != expected_cnt) {
     return TRITONSERVER_ErrorNew(
         TRITONSERVER_ERROR_INTERNAL,
         "Shape does not match true shape of 'data' field");
@@ -2022,7 +2021,8 @@ HTTPAPIServer::EVBufferToInput(
           serialized.resize(byte_size);
 
           RETURN_IF_ERR(ReadDataFromJson(
-              input_name, tensor_data, &serialized[0], dtype, byte_size));
+              input_name, tensor_data, &serialized[0], dtype,
+              dtype == TRITONSERVER_TYPE_BYTES ? byte_size : element_cnt));
           RETURN_IF_ERR(TRITONSERVER_InferenceRequestAppendInputData(
               irequest, input_name, &serialized[0], serialized.size(),
               TRITONSERVER_MEMORY_CPU, 0 /* memory_type_id */));
