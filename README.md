@@ -143,6 +143,7 @@ describe supported GPUs.
   - [Model Analyzer](docs/model_analyzer.md)
   - [Performance Analyzer](docs/perf_analyzer.md)
 - [Metrics](docs/metrics.md)
+- [Jetson and JetPack](docs/jetson.md)
 
 The [quickstart](docs/quickstart.md) walks you through all the steps
 required to install and run Triton with an example image
