@@ -1,5 +1,5 @@
 #!/bin/bash
-# Copyright (c) 2019-2021, NVIDIA CORPORATION. All rights reserved.
+# Copyright 2019-2021, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -34,6 +34,8 @@ if [ -z "$REPO_VERSION" ]; then
     echo -e "\n***\n*** Test Failed\n***"
     exit 1
 fi
+
+TEST_JETSON=${TEST_JETSON:="0"}
 
 rm -f *.log *.serverlog *.csv *.metrics *.tjson *.json
 
@@ -139,7 +141,13 @@ TEST_CONCURRENCY+=(
     1
     16
     16)
-TEST_BACKENDS="plan custom graphdef savedmodel onnx libtorch python"
+
+# Only TF, Onnx and TRT are supported on Jetson
+if [ "$TEST_JETSON" -eq 1 ]; then
+    TEST_BACKENDS="plan custom graphdef savedmodel onnx"
+else
+    TEST_BACKENDS="plan custom graphdef savedmodel onnx libtorch python"
+fi
 
 mkdir -p ${REPO_VERSION}
 
@@ -171,6 +179,7 @@ for idx in "${!TEST_NAMES[@]}"; do
                 DYNAMIC_BATCH_SIZES=1 \
                 INSTANCE_COUNTS=${TEST_INSTANCE_COUNT} \
                 CONCURRENCY=${TEST_CONCURRENCY} \
+                TEST_JETSON=${TEST_JETSON} \
                 bash -x ${RUNTEST} ${REPO_VERSION}
     if (( $? != 0 )); then
         RET=1
