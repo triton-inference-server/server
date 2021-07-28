@@ -71,7 +71,8 @@ FROM {}
            images["full"], images["min"])
 
     import build
-    df += build.dockerfile_prepare_container_linux(argmap, backends)
+    df += build.dockerfile_prepare_container_linux(argmap, backends,
+                                                   FLAGS.enable_gpu)
     # Copy over files
     df += '''
 WORKDIR /opt/tritonserver
@@ -91,7 +92,8 @@ def add_requested_backends(ddir, dockerfile_name, backends):
     for backend in backends:
         df += '''COPY --chown=1000:1000 --from=full /opt/tritonserver/backends/{} /opt/tritonserver/backends/{}    
 '''.format(backend, backend)
-    df += '''
+    if len(backends) > 0:
+        df += '''
 # Top-level /opt/tritonserver/backends not copied so need to explicitly set permissions here
 RUN chown triton-server:triton-server /opt/tritonserver/backends
 '''
