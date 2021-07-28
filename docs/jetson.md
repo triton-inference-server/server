@@ -28,7 +28,7 @@
 
 # Triton Inference Server Support for Jetson and JetPack
 
-Triton inference server is officially supported on JetPack starting from JetPack 4.6.  Triton Inference Server on Jetson supports trained AI models from multiple frameworks includings NVIDIA TensorRT, TensorFlow and ONNX Runtime.
+Triton inference server is officially supported on JetPack starting from JetPack 4.6. Triton Inference Server on Jetson supports trained AI models from multiple frameworks includings NVIDIA TensorRT, TensorFlow and ONNX Runtime.
 
 On JetPack, although HTTP/REST and GRPC inference protocols are supported, for edge use cases, direct [C API integration](https://github.com/triton-inference-server/server/blob/main/docs/inference_protocols.md#c-api) is recommended, and, hence, Triton Inference Server support is released as a shared library for Jetson.
 
