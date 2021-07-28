@@ -1,5 +1,5 @@
 <!--
-# Copyright (c) 2018-2020, NVIDIA CORPORATION. All rights reserved.
+# Copyright (c) 2018-2021, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -46,6 +46,49 @@ The HTTP/REST and GRPC protcols provide endpoints to check server and
 model health, metadata and statistics. Additional endpoints allow
 model loading and unloading, and inferencing. See the KFServing and
 extension documentation for details.
+
+### GRPC Options
+Triton exposes various GRPC parameters for configuring the server-client network transactions. For usage of these options, refer to the output from `tritonserver --help`.
+
+#### SSL/TLS
+
+These options can be used to configure a secured channel for communication. The server-side options include:
+
+* `--grpc-use-ssl`
+* `--grpc-use-ssl-mutual`
+* `--grpc-server-cert`
+* `--grpc-server-key`
+* `--grpc-root-cert`
+
+For client-side documentation, see [Client-Side GRPC SSL/TLS](https://github.com/triton-inference-server/client/tree/main#ssltls)
+
+For more details on overview of authentication in gRPC, refer [here](https://grpc.io/docs/guides/auth/).
+
+#### Compression
+
+Triton allows the on-wire compression of request/response messages by exposing following option on server-side:
+
+* `--grpc-infer-response-compression-level`
+
+For client-side documentation, see [Client-Side GRPC Compression](https://github.com/triton-inference-server/client/tree/main#compression)
+
+Compression can be used to reduce the amount of bandwidth used in server-client communication. For more details, see [gRPC Compression](https://grpc.github.io/grpc/core/md_doc_compression.html). 
+
+#### GRPC KeepAlive
+
+Triton exposes GRPC KeepAlive parameters with the default values for both
+client and server described [here](https://github.com/grpc/grpc/blob/master/doc/keepalive.md).
+
+These options can be used to configure the KeepAlive settings:
+
+* `--grpc-keepalive-time`
+* `--grpc-keepalive-timeout`
+* `--grpc-keepalive-permit-without-calls`
+* `--grpc-http2-max-pings-without-data`
+* `--grpc-http2-min-recv-ping-interval-without-data`
+* `--grpc-http2-max-ping-strikes`
+
+For client-side documentation, see [Client-Side GRPC KeepAlive](https://github.com/triton-inference-server/client/blob/main/README.md#grpc-keepalive).
 
 ## C API
 
