@@ -45,7 +45,7 @@ SERVER_LOG="./inference_server.log"
 SERVER_ARGS="--model-repository=`pwd`/$MODEL_DIR"
 source ../common/util.sh
 
-rm -fr all_models/*float32 *.log *.serverlog RET.txt
+rm -fr all_models/*float32 *.log *.serverlog *.txt
 
 RET=0
 echo "$RET" > RET.txt

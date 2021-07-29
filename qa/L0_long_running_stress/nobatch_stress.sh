@@ -27,6 +27,7 @@
 
 NOBATCH_CLIENT_LOG_BASE="./nobatch_client"
 NOBATCH_STRESS_TEST=nobatch_stress.py
+TEST_RESULT_FILE='test_results.txt'
 BACKENDS=${BACKENDS:="graphdef savedmodel onnx libtorch plan python"}
 source ../common/util.sh
 
@@ -39,7 +40,7 @@ for TARGET in $BACKENDS; do
         RET=1
         echo "$RET" > RET.txt
     fi
-    check_test_results $NOBATCH_CLIENT_LOG 1
+    check_test_results $TEST_RESULT_FILE 1
     if [ $? -ne 0 ]; then
         cat $NOBATCH_CLIENT_LOG
         echo -e "\n***\n*** Nobatch Test Result Verification Failed\n***"
