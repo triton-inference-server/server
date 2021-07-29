@@ -64,6 +64,9 @@ from distutils.dir_util import copy_tree
 # different versions are used then one backend or the other will
 # incorrectly load the other version of the openvino libraries.
 #
+# Adding mlperf openvino version. Take note of the above issue
+# when loading multiple backends with different openvino versions.
+#
 TRITON_VERSION_MAP = {
     '2.13.0dev': (
         '21.08dev',  # triton container
@@ -71,14 +74,15 @@ TRITON_VERSION_MAP = {
         '1.8.0',  # ORT
         '2021.2.200',  # ORT OpenVINO
         '2021.2',  # Standalone OpenVINO
-        '2.2.8')  # DCGM version
+        '2.2.8',  # DCGM version
+        '2021.4.582')  # MLperf OpenVINO
 }
 
 EXAMPLE_BACKENDS = ['identity', 'square', 'repeat']
 CORE_BACKENDS = ['tensorrt', 'ensemble']
 NONCORE_BACKENDS = [
     'tensorflow1', 'tensorflow2', 'onnxruntime', 'python', 'dali', 'pytorch',
-    'openvino', 'fil', 'fastertransformer'
+    'openvino', 'fil', 'fastertransformer', 'openvino_21_02', 'openvino_21_04'
 ]
 EXAMPLE_REPOAGENTS = ['checksum']
 FLAGS = None
@@ -321,14 +325,18 @@ def repoagent_cmake_args(images, components, ra, install_dir):
 def backend_repo(be):
     if (be == 'tensorflow1') or (be == 'tensorflow2'):
         return 'tensorflow_backend'
+    if (be == 'openvino_21_04') or (be == 'openvino_21_02'):
+        return 'openvino_backend'
     return '{}_backend'.format(be)
 
 
 def backend_cmake_args(images, components, be, install_dir, library_paths):
     if be == 'onnxruntime':
         args = onnxruntime_cmake_args(images, library_paths)
-    elif be == 'openvino':
-        args = openvino_cmake_args()
+    elif (be == 'openvino_21_02') or (be == 'openvino'):
+        args = openvino_cmake_args(1)
+    elif be == 'openvino_21_04':
+        args = openvino_cmake_args(2)
     elif be == 'tensorflow1':
         args = tensorflow_cmake_args(1, images, library_paths)
     elif be == 'tensorflow2':
@@ -418,10 +426,13 @@ def onnxruntime_cmake_args(images, library_paths):
     return cargs
 
 
-def openvino_cmake_args():
+def openvino_cmake_args(openvino_variant):
+    if (openvino_variant == 1):
+        ov_version = TRITON_VERSION_MAP[FLAGS.version][4]
+    else:
+        ov_version = TRITON_VERSION_MAP[FLAGS.version][6]
     cargs = [
-        '-DTRITON_BUILD_OPENVINO_VERSION={}'.format(
-            TRITON_VERSION_MAP[FLAGS.version][4]),
+        '-DTRITON_BUILD_OPENVINO_VERSION={}'.format(ov_version)
     ]
 
     if target_platform() == 'windows':
@@ -432,7 +443,9 @@ def openvino_cmake_args():
             cargs.append('-DTRITON_BUILD_CONTAINER={}'.format(images['base']))
         else:
             cargs.append('-DTRITON_BUILD_CONTAINER_VERSION={}'.format(
-                TRITON_VERSION_MAP[FLAGS.version][1]))
+                TRITON_VERSION_MAP[FLAGS.version][1]))   
+        if openvino_variant == 2:
+            cargs.append('-DTRITON_BUILD_USE_PREBUILT_OPENVINO=ON')
 
     return cargs
 
@@ -1407,8 +1420,12 @@ if __name__ == '__main__':
         backend_install_dir = os.path.join(FLAGS.install_dir, 'backends', be)
         rmdir(backend_install_dir)
         mkdir(backend_install_dir)
-        cpdir(os.path.join(repo_install_dir, 'backends', be),
-              backend_install_dir)
+        if ((be == 'openvino_21_02') or (be == 'openvino_21_04')):
+            backend_repo_install_dir = os.path.join(repo_install_dir, 'backends', 'openvino')
+        else:
+            backend_repo_install_dir = os.path.join(repo_install_dir, 'backends', be)
+
+        cpdir(backend_repo_install_dir, backend_install_dir)
 
     # Build each repo agent...
     for ra in repoagents:
