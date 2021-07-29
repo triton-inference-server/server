@@ -37,7 +37,7 @@ On JetPack, although HTTP/REST and GRPC inference protocols are supported, for e
 Triton Inference Server support on JetPack includes:
 
 * Running models on GPU and NVDLA
-* Support for multiple frameworks: TensorRT, TensorFlow and ONNX Runtime. PyTorch backend can also be easily added (please refer to the [build intructions](https://github.com/triton-inference-server/pytorch_backend)).
+* Support for multiple frameworks: TensorRT, TensorFlow and ONNX Runtime.
 * [Concurrent model execution](docs/architecture.md#concurrent-model-execution)
 * [Dynamic batching](docs/architecture.md#models-and-schedulers)
 * [Model pipelines](docs/architecture.md#ensemble-models)
@@ -51,6 +51,4 @@ Note that [perf_analyzer](perf_analyzer.md) is supported on Jetson, while the [m
 
 ```shell
 perf_analyzer -m graphdef_int32_int32_int32 --service-kind=triton_c_api --triton-server-directory=/opt/tritonserver --model-repository=/workspace/qa/L0_perf_analyzer_capi/models
-``` 
-
-
+```
