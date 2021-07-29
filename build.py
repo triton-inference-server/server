@@ -791,9 +791,18 @@ RUN apt-get update && \
     apt-get install -y --no-install-recommends \
         git \
         dirmngr \ 
-        libnuma-dev && \
+        libnuma-dev \
+        curl && \
     rm -rf /var/lib/apt/lists/*
 '''
+        if 'onnxruntime' in backends:
+            df += '''
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends \
+        libgomp1 && \
+    rm -rf /var/lib/apt/lists
+'''
+
     # Add dependencies needed for python backend
     if 'python' in backends:
         df += '''

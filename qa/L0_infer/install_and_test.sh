@@ -29,11 +29,13 @@
 # dependencies to run L0_infer tests
 apt-get update && \
     apt-get install -y --no-install-recommends \
+         curl \
+         jq \
          python3 \
          python3-pip && \
-pip3 install --upgrade pip
+pip3 install --upgrade pip && \
 # install client libraries
-pip3 install nvidia-pyindex
+pip3 install nvidia-pyindex && \
 pip3 install tritonclient[all]
 
 # Run the actual test
