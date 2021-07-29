@@ -24,10 +24,7 @@
 // (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-#pragma once
-
-#include <boost/interprocess/managed_external_buffer.hpp>
-#include "src/core/status.h"
+#include "src/core/response_cache.h"
 
 namespace nvidia { namespace inferenceserver {
 
