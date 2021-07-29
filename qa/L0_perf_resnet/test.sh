@@ -50,7 +50,7 @@ TFTRT_MODEL_NAME="resnet50v1.5_fp16_savedmodel_trt"
 ONNXTRT_MODEL_NAME="resnet50_fp32_onnx_trt"
 TFAMP_MODEL_NAME="resnet50v1.5_fp16_savedmodel_amp"
 
-TEST_JETSON=${TEST_JETSON:="0"}
+ARCH=${ARCH:="x86_64"}
 REPODIR=${REPODIR:="/data/inferenceserver/${REPO_VERSION}"}
 TRITON_DIR=${TRITON_DIR:="/opt/tritonserver"}
 
@@ -62,7 +62,7 @@ INSTANCE_CNT=1
 CONCURRENCY=1
 
 # Only TF, Onnx and TRT are supported on Jetson
-if [ "$TEST_JETSON" -eq 1 ]; then
+if [ "$ARCH" == "aarch64" ]; then
     MODEL_NAMES="${TRT_MODEL_NAME} ${TF_MODEL_NAME} ${ONNX_MODEL_NAME}"
     OPTIMIZED_MODEL_NAMES="${TFTRT_MODEL_NAME} ${ONNXTRT_MODEL_NAME} ${TFAMP_MODEL_NAME}"
     CAFFE2PLAN=${TRITON_DIR}/test-util/bin/caffe2plan
@@ -121,7 +121,7 @@ for MODEL_NAME in $MODEL_NAMES; do
                 PERF_CLIENT_PROTOCOL=${PROTOCOL} \
                 INSTANCE_CNT=${INSTANCE_CNT} \
                 CONCURRENCY=${CONCURRENCY} \
-                TEST_JETSON=${TEST_JETSON} \
+                ARCH=${ARCH} \
                 bash -x run_test.sh
     done
 done
@@ -138,7 +138,7 @@ for MODEL_NAME in $OPTIMIZED_MODEL_NAMES; do
                 PERF_CLIENT_PROTOCOL=${PROTOCOL} \
                 INSTANCE_CNT=${INSTANCE_CNT} \
                 CONCURRENCY=${CONCURRENCY} \
-                TEST_JETSON=${TEST_JETSON} \
+                ARCH=${ARCH} \
                 bash -x run_test.sh
     done
 done
@@ -172,7 +172,7 @@ for MODEL_NAME in $MODEL_NAMES; do
                 PERF_CLIENT_PROTOCOL=${PROTOCOL} \
                 INSTANCE_CNT=${INSTANCE_CNT} \
                 CONCURRENCY=${CONCURRENCY} \
-                TEST_JETSON=${TEST_JETSON} \
+                ARCH=${ARCH} \
                 bash -x run_test.sh
     done
 done
@@ -188,13 +188,13 @@ for MODEL_NAME in $OPTIMIZED_MODEL_NAMES; do
                 PERF_CLIENT_PROTOCOL=${PROTOCOL} \
                 INSTANCE_CNT=${INSTANCE_CNT} \
                 CONCURRENCY=${CONCURRENCY} \
-                TEST_JETSON=${TEST_JETSON} \
+                ARCH=${ARCH} \
                 bash -x run_test.sh
     done
 done
 
 # Needs this additional test configuration for comparing against TFS.
-if [ "$TEST_JETSON" -eq 0 ]; then
+if [ "$ARCH" == "x86_64" ]; then
     MODEL_NAME=${TF_MODEL_NAME}
     REPO=$REPODIR/perf_model_store
     STATIC_BATCH=128
@@ -208,7 +208,7 @@ if [ "$TEST_JETSON" -eq 0 ]; then
         PERF_CLIENT_PROTOCOL="grpc" \
         INSTANCE_CNT=${INSTANCE_CNT} \
         CONCURRENCY=${CONCURRENCY} \
-        TEST_JETSON=${TEST_JETSON} \
+        ARCH=${ARCH} \
         BACKEND_CONFIG=" --backend-config=tensorflow,version=2" \
         bash -x run_test.sh
 fi

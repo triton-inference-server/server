@@ -60,11 +60,9 @@ if (( $SERVER_PID == 0 )); then
     exit 1
 fi
 
-if [ "$TEST_JETSON" -eq 1 ]; then
-    ARCH="aarch64"
+if [ "$ARCH" == "aarch64" ]; then
     PERF_CLIENT=${TRITON_DIR}/clients/bin/perf_client
 else
-    ARCH="x86_64"
     PERF_CLIENT=../clients/perf_client
 fi
 

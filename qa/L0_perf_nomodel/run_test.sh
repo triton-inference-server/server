@@ -45,16 +45,15 @@ DATADIR=${DATADIR:="/data/inferenceserver/${REPO_VERSION}"}
 RESULTDIR=${RESULTDIR:=.}
 
 TRITON_DIR=${TRITON_DIR:="/opt/tritonserver"}
+ARCH=${ARCH:="x86_64"}
 SERVER=${TRITON_DIR}/bin/tritonserver
 BACKEND_DIR=${TRITON_DIR}/backends
 SERVER_ARGS="--model-repository=`pwd`/models --backend-directory=${BACKEND_DIR}" 
 source ../common/util.sh
 
-if [ "$TEST_JETSON" -eq 1 ]; then
-    ARCH="aarch64"
+if [ "$ARCH" == "aarch64" ]; then
     PERF_CLIENT=${TRITON_DIR}/clients/bin/perf_client
 else
-    ARCH="x86_64"
     PERF_CLIENT=../clients/perf_client
 fi
 
@@ -64,7 +63,7 @@ export CUDA_VISIBLE_DEVICES=0
 mkdir -p ${RESULTDIR}
 RET=0
 
-if [ "$TEST_JETSON" -eq 0 ]; then
+if [[ $BACKENDS == *"python"* ]]; then
     cp /opt/tritonserver/backends/python/triton_python_backend_utils.py .
 
     mkdir -p python_models/python_zero_1_float32/1 && \

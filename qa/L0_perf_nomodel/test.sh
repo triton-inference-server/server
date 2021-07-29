@@ -141,13 +141,7 @@ TEST_CONCURRENCY+=(
     1
     16
     16)
-
-# Only TF, Onnx and TRT are supported on Jetson
-if [ "$TEST_JETSON" -eq 1 ]; then
-    TEST_BACKENDS="plan custom graphdef savedmodel onnx"
-else
-    TEST_BACKENDS="plan custom graphdef savedmodel onnx libtorch python"
-fi
+TEST_BACKENDS=${BACKENDS:="plan custom graphdef savedmodel onnx libtorch python"}
 
 mkdir -p ${REPO_VERSION}
 
