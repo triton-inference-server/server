@@ -393,6 +393,7 @@ fi
 if [ `grep -c "\{\"error\":\"Unable to parse 'data': Shape does not match true shape of 'data' field\"\}" ./curl.out` != "1" ]; then
     RET=1
 fi
+
 # Check if the server is still working after the above bad requests
 rm -f ./curl.out
 set +e
