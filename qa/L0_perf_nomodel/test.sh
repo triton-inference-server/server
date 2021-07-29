@@ -35,8 +35,6 @@ if [ -z "$REPO_VERSION" ]; then
     exit 1
 fi
 
-TEST_JETSON=${TEST_JETSON:="0"}
-
 rm -f *.log *.serverlog *.csv *.metrics *.tjson *.json
 
 # Descriptive name for the current results
@@ -173,7 +171,6 @@ for idx in "${!TEST_NAMES[@]}"; do
                 DYNAMIC_BATCH_SIZES=1 \
                 INSTANCE_COUNTS=${TEST_INSTANCE_COUNT} \
                 CONCURRENCY=${TEST_CONCURRENCY} \
-                TEST_JETSON=${TEST_JETSON} \
                 bash -x ${RUNTEST} ${REPO_VERSION}
     if (( $? != 0 )); then
         RET=1
