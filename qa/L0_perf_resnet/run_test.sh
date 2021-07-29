@@ -31,9 +31,9 @@ BACKEND_CONFIG=${BACKEND_CONFIG:=""}
 
 REPORTER=../common/reporter.py
 
-OPTDIR=${OPTDIR:="/opt"}
-SERVER=${OPTDIR}/tritonserver/bin/tritonserver
-BACKEND_DIR=${OPTDIR}/tritonserver/backends
+TRITON_DIR=${TRITON_DIR:="/opt/tritonserver"}
+SERVER=${TRITON_DIR}/bin/tritonserver
+BACKEND_DIR=${TRITON_DIR}/backends
 SERVER_ARGS="--model-repository=`pwd`/models --backend-directory=${BACKEND_DIR} ${BACKEND_CONFIG}" 
 source ../common/util.sh
 
@@ -62,7 +62,7 @@ fi
 
 if [ "$TEST_JETSON" -eq 1 ]; then
     ARCH="aarch64"
-    PERF_CLIENT=${OPTDIR}/tritonserver/clients/bin/perf_client
+    PERF_CLIENT=${TRITON_DIR}/clients/bin/perf_client
 else
     ARCH="x86_64"
     PERF_CLIENT=../clients/perf_client

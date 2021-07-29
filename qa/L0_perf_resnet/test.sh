@@ -52,6 +52,7 @@ TFAMP_MODEL_NAME="resnet50v1.5_fp16_savedmodel_amp"
 
 TEST_JETSON=${TEST_JETSON:="0"}
 REPODIR=${REPODIR:="/data/inferenceserver/${REPO_VERSION}"}
+TRITON_DIR=${TRITON_DIR:="/opt/tritonserver"}
 
 #
 # Test minimum latency
@@ -64,8 +65,7 @@ CONCURRENCY=1
 if [ "$TEST_JETSON" -eq 1 ]; then
     MODEL_NAMES="${TRT_MODEL_NAME} ${TF_MODEL_NAME} ${ONNX_MODEL_NAME}"
     OPTIMIZED_MODEL_NAMES="${TFTRT_MODEL_NAME} ${ONNXTRT_MODEL_NAME} ${TFAMP_MODEL_NAME}"
-    OPTDIR=${OPTDIR:="/opt"}
-    CAFFE2PLAN=${OPTDIR}/tritonserver/test-util/bin/caffe2plan
+    CAFFE2PLAN=${TRITON_DIR}/test-util/bin/caffe2plan
 else
     MODEL_NAMES="${TRT_MODEL_NAME} ${TF_MODEL_NAME} ${PYT_MODEL_NAME} ${ONNX_MODEL_NAME}"
     OPTIMIZED_MODEL_NAMES="${TFTRT_MODEL_NAME} ${ONNXTRT_MODEL_NAME} ${TFAMP_MODEL_NAME}"
