@@ -1,4 +1,4 @@
-// Copyright (c) 2019-2021, NVIDIA CORPORATION. All rights reserved.
+// Copyright 2019-2021, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 //
 // Redistribution and use in source and binary forms, with or without
 // modification, are permitted provided that the following conditions
@@ -257,7 +257,8 @@ JsonBytesArrayByteSize(
 TRITONSERVER_Error*
 ReadDataFromJsonHelper(
     char* base, const TRITONSERVER_DataType dtype,
-    triton::common::TritonJson::Value& tensor_data, int* counter)
+    triton::common::TritonJson::Value& tensor_data, int* counter,
+    int64_t expected_cnt)
 {
   // FIXME should invert loop and switch so don't have to do a switch
   // each iteration.
@@ -269,8 +270,15 @@ ReadDataFromJsonHelper(
     TRITONSERVER_Error* assert_err =
         el.AssertType(triton::common::TritonJson::ValueType::ARRAY);
     if (assert_err == nullptr) {
-      RETURN_IF_ERR(ReadDataFromJsonHelper(base, dtype, el, counter));
+      RETURN_IF_ERR(
+          ReadDataFromJsonHelper(base, dtype, el, counter, expected_cnt));
     } else {
+      // Check if writing to 'serialized' is overrunning the expected byte_size
+      if (*counter >= expected_cnt) {
+        return TRITONSERVER_ErrorNew(
+            TRITONSERVER_ERROR_INTERNAL,
+            "Shape does not match true shape of 'data' field");
+      }
       switch (dtype) {
         case TRITONSERVER_TYPE_BOOL: {
           bool b = false;
@@ -370,6 +378,12 @@ ReadDataFromJsonHelper(
           const char* cstr;
           size_t len = 0;
           RETURN_IF_ERR(el.AsString(&cstr, &len));
+          if (static_cast<int64_t>(*counter + len + sizeof(uint32_t)) >
+              expected_cnt) {
+            return TRITONSERVER_ErrorNew(
+                TRITONSERVER_ERROR_INTERNAL,
+                "Shape does not match true shape of 'data' field");
+          }
           memcpy(
               base + *counter, reinterpret_cast<char*>(&len), sizeof(uint32_t));
           std::copy(cstr, cstr + len, base + *counter + sizeof(uint32_t));
@@ -389,7 +403,7 @@ ReadDataFromJsonHelper(
 TRITONSERVER_Error*
 ReadDataFromJson(
     const char* tensor_name, triton::common::TritonJson::Value& tensor_data,
-    char* base, const TRITONSERVER_DataType dtype)
+    char* base, const TRITONSERVER_DataType dtype, int64_t expected_cnt)
 {
   int counter = 0;
   switch (dtype) {
@@ -411,9 +425,18 @@ ReadDataFromJson(
 
     default:
       RETURN_MSG_IF_ERR(
-          ReadDataFromJsonHelper(base, dtype, tensor_data, &counter),
+          ReadDataFromJsonHelper(
+              base, dtype, tensor_data, &counter, expected_cnt),
           "Unable to parse 'data'");
       break;
+  }
+
+  // Check if 'ReadDataFromJsonHelper' reads less than the expected byte size
+  if (counter != expected_cnt) {
+    return TRITONSERVER_ErrorNew(
+        TRITONSERVER_ERROR_INTERNAL,
+        "Unable to parse 'data': Shape does not match true shape of 'data' "
+        "field");
   }
 
   return nullptr;
@@ -2004,24 +2027,9 @@ HTTPAPIServer::EVBufferToInput(
           std::vector<char>& serialized = infer_req->serialized_data_.back();
           serialized.resize(byte_size);
 
-          // FIXME ReadDataFromJson is unsafe as it writes to
-          // 'serialized' without verifying that it is not overrunning
-          // byte_size (as resized above...). Need to rework it to be
-          // safe and then the commented out check below will no
-          // longer be necessary either (as that check should happen
-          // in ReadDataFromJson)
-          RETURN_IF_ERR(
-              ReadDataFromJson(input_name, tensor_data, &serialized[0], dtype));
-          //          if (byte_size != serialized.size()) {
-          //            return TRITONSERVER_ErrorNew(
-          //                TRITONSERVER_ERROR_INTERNAL,
-          //                std::string(
-          //                    "serialized tensor data has unexpected size,
-          //                    expecting " + std::to_string(byte_size) + ", got
-          //                    " + std::to_string(serialized.size()))
-          //                    .c_str());
-          //        }
-
+          RETURN_IF_ERR(ReadDataFromJson(
+              input_name, tensor_data, &serialized[0], dtype,
+              dtype == TRITONSERVER_TYPE_BYTES ? byte_size : element_cnt));
           RETURN_IF_ERR(TRITONSERVER_InferenceRequestAppendInputData(
               irequest, input_name, &serialized[0], serialized.size(),
               TRITONSERVER_MEMORY_CPU, 0 /* memory_type_id */));
