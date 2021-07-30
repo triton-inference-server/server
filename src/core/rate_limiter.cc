@@ -382,6 +382,14 @@ RateLimiter::GetPayload(
       payload = payload_bucket_.back();
       payload_bucket_.pop_back();
     }
+    if (payload.get() == nullptr && (!payloads_in_use_.empty())) {
+      // Just checking the front of the queue instead the entire queue for
+      // an available payload to save time.
+      if (payloads_in_use_.front().use_count() == 1) {
+        payload = payloads_in_use_.front();
+        payloads_in_use_.pop_front();
+      }
+    }
   }
 
   if (payload.get() == nullptr) {
@@ -398,10 +406,16 @@ RateLimiter::PayloadRelease(std::shared_ptr<RateLimiter::Payload>& payload)
   if (max_payload_bucket_count_ > 0) {
     std::lock_guard<std::mutex> lock(alloc_mu_);
 
-    if (payload_bucket_.size() < max_payload_bucket_count_) {
-      payload->Release();
-      payload_bucket_.push_back(std::move(payload));
-      return;
+    if (payloads_in_use_.size() + payload_bucket_.size() <
+        max_payload_bucket_count_) {
+      // Release iff the payload shared_ptr is uniquely held.
+      if (payload.use_count() == 1) {
+        payload->Release();
+        payload_bucket_.push_back(std::move(payload));
+        return;
+      } else {
+        payloads_in_use_.push_back(std::move(payload));
+      }
     }
   }
 }

@@ -331,6 +331,7 @@ class RateLimiter {
   // of creating a Payload for every new request.
   const size_t max_payload_bucket_count_;
   std::vector<std::shared_ptr<Payload>> payload_bucket_;
+  std::deque<std::shared_ptr<Payload>> payloads_in_use_;
 
   struct PayloadQueue {
     std::deque<std::shared_ptr<Payload>> queue_;
