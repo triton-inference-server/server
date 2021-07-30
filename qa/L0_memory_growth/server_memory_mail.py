@@ -38,7 +38,7 @@ if __name__ == '__main__':
     subject = "Triton Server Memory Growth " + sys.argv[1] + " Summary: " + today
     memory_graphs_resnet = glob.glob("memory_growth_resnet*.log")
     memory_graphs_busyop = glob.glob("memory_growth_busyop.log")
-    write_up = "<p>This test uses perf_analyzer as clients running on 4 different models. The max allowed difference between mean and maximum memory usage is set to 150MB.</p>"
+    write_up = "<p>This test uses perf_analyzer as clients running on 4 different models for around 8 hours. The max allowed difference between mean and maximum memory usage is set to 150MB.</p>"
     write_up += "<p><b>&#8226 What to look for</b><br>A linear memory growth in the beginning of the graph is acceptable only when it is followed by a flat memory usage. If a linear memory growth is observed during the entire test then there is possibly a memory leak.</p>"
     html_content = "<html><head></head><body><pre style=\"font-size:11pt;font-family:Arial, sans-serif;\">" + write_up + "</pre><pre style=\"font-size:11pt;font-family:Consolas;\">"
     for mem_graph in sorted(memory_graphs_resnet):
