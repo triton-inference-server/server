@@ -1,5 +1,5 @@
 <!--
-# Copyright (c) 2018-2020, NVIDIA CORPORATION. All rights reserved.
+# Copyright 2018-2021, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -54,9 +54,9 @@ The following table describes the available metrics.
 |              |GPU Utilization |GPU utilization rate (0.0 - 1.0)       |Per GPU    |Per second   |
 |GPU Memory    |GPU Total Memory|Total GPU memory, in bytes             |Per GPU    |Per second   |
 |              |GPU Used Memory |Used GPU memory, in bytes              |Per GPU    |Per second   |
-|Count         |Request Count   |Number of inference requests           |Per model  |Per request  |
-|              |Execution Count |Number of inference executions (request count / execution count = average dynamic batch size)|Per model|Per request|
-|              |Inference Count |Number of inferences performed (one request counts as "batch size" inferences)|Per model|Per request|
+|Count         |Request Count   |Number of inference requests received by Triton (each request is counted as 1, even if the request contains a batch) |Per model  |Per request  |
+|              |Inference Count |Number of inferences performed (a batch of "n" is counted as "n" inferences)|Per model|Per request|
+|              |Execution Count |Number of inference executions (inference count / execution count = average executed batch size)|Per model|Per request|
 |Latency       |Request Time    |Cumulative end-to-end inference request handling time    |Per model  |Per request  |
 |              |Queue Time      |Cumulative time requests spend waiting in the scheduling queue     |Per model  |Per request  |
 |              |Compute Input Time|Cumulative time requests spend processing inference inputs (in the framework backend)     |Per model  |Per request  |
