@@ -54,18 +54,41 @@ RequestResponseCache::~RequestResponseCache()
 }
 
 uint64_t Hash(const InferenceRequest& request) {
+    // TODO: OriginalInputs, OverrideInputs, ImmutableInputs ?
+    auto inputs = request->OriginalInputs();
+    // Create hash function
+    std::hash<vector<std::string>> hash_function;
+    // Setup vector of strings for hashing from request parameters
+    std::vector<std::string> hash_inputs;
+    hash_inputs.push_back(request->Name());
+    hash_inputs.push_back(request->ModelName());
+    // TODO: RequestedModelVersion or ActualModelVersion ?
+    hash_inputs.push_back(request->RequestedModelVersion());
+    // Setup vector of input tensor values for hashing
+    for (auto const& input : inputs) {
+        hash_inputs.push_back(input->Name());
+        // TODO: Example of accessing/iterating over input data?
+        // TODO: Can we cast any type to string here? Or hash based on defined dtype?
+        //       Can we hash just the raw bits/bytes for any input buffer, or is this too collision prone?
+    }
 
+    // Hash together the various request fields
+    uint64_t key = static_cast<uint64_t>(hash_function(hash_inputs));
+    return key;
 }
 
+// TODO: Doc describes returning handle/ptr, how does this work if ptr evicted
+//    after it's returned but before it's used/de-referenced?
 InferenceResponse Lookup(const uint64_t key, const InferenceRequest& request) {
-
+    // TODO
 }
 
 Status Insert(const uint64_t key, const InferenceResponse& response) {
-
+    // TODO
 }
 
 Status Evict(const uint64_t size) {
+    // TODO: Use enum/typedef over strings for cache_policy_
     switch(cache_policy_) {
         case: "LRU":
             return EvictLRU(size);

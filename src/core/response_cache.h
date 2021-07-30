@@ -26,6 +26,9 @@
 
 #pragma once
 
+#include <string>
+#include <functional>
+
 #include <boost/interprocess/managed_external_buffer.hpp>
 #include "src/core/status.h"
 
@@ -38,7 +41,7 @@ class RequestResponseCache {
     uint64_t Hash(const InferenceRequest& request);
     // Lookup key in cache, request used for strict exact matching on collisions
     // Return InferenceResponse if found in cache
-    // Q: Doc describes returning handle/ptr, how does this work if ptr evicted
+    // TODO: Doc describes returning handle/ptr, how does this work if ptr evicted
     //    after it's returned but before it's used/de-referenced?
     InferenceResponse Lookup(const uint64_t key, const InferenceRequest& request);
     // Insert response into cache, evict entries to make space if necessary
