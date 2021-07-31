@@ -178,7 +178,6 @@ def gitclone(cwd, repo, tag, subdir, org):
                 'git clone of repo "{}" at tag "{}" failed'.format(repo, tag))
 
 
-
 def prebuild_command():
     p = subprocess.Popen(FLAGS.container_prebuild_command.split())
     p.wait()
