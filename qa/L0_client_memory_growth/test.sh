@@ -1,5 +1,5 @@
 #!/bin/bash
-# Copyright (c) 2021, NVIDIA CORPORATION. All rights reserved.
+# Copyright (c) 2021, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -53,6 +53,18 @@ SERVER=/opt/tritonserver/bin/tritonserver
 SERVER_ARGS="--model-repository=$DATADIR"
 source ../common/util.sh
 
+# Set the number of repetitions in nightly and weekly tests
+# Set the email subject for nightly and weekly tests
+if [ "$TRITON_PERF_WEEKLY" == 1 ]; then
+    REPETITION_CPP=2000000
+    REPETITION_PY=2400000
+    EMAIL_SUBJECT="Weekly"
+else
+    REPETITION_CPP=100000
+    REPETITION_PY=10000
+    EMAIL_SUBJECT="Nightly"
+fi
+
 mkdir -p $DATADIR/custom_identity_int32/1
 
 RET=0
@@ -77,11 +89,11 @@ for PROTOCOL in http grpc; do
         if [ "$LANG" == "c++" ]; then
             MEMORY_GROWTH_TEST=$MEMORY_GROWTH_TEST_CPP
             MAX_ALLOWED_ALLOC="10"
-            EXTRA_ARGS="-r 100000 -i ${PROTOCOL}"
+            EXTRA_ARGS="-r ${REPETITION_CPP} -i ${PROTOCOL}"
         else
             MEMORY_GROWTH_TEST="python $MEMORY_GROWTH_TEST_PY"
             MAX_ALLOWED_ALLOC="1"
-            EXTRA_ARGS="-r 10000 -i ${PROTOCOL}"
+            EXTRA_ARGS="-r ${REPETITION_PY} -i ${PROTOCOL}"
         fi
 
         $LEAKCHECK $LEAKCHECK_ARGS $MEMORY_GROWTH_TEST $EXTRA_ARGS >> ${CLIENT_LOG} 2>&1
@@ -125,7 +137,7 @@ fi
 
 # Run only if both TRITON_FROM and TRITON_TO_DL are set
 if [[ ! -z "$TRITON_FROM" ]] || [[ ! -z "$TRITON_TO_DL" ]]; then
-    python client_memory_mail.py
+    python client_memory_mail.py $EMAIL_SUBJECT
 fi
 
 exit $RET

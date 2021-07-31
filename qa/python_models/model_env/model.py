@@ -24,25 +24,18 @@
 # (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-import numpy as np
-import sys
 import os
-
-sys.path.append('../../')
 import triton_python_backend_utils as pb_utils
 
 
 class TritonPythonModel:
 
     def initialize(self, args):
+        # Make sure that environment variables are correctly propagated
+        # to the Python models
         if "MY_ENV" not in os.environ or os.environ["MY_ENV"] != 'MY_ENV':
             raise pb_utils.TritonModelException(
                 "MY_ENV doesn't exists or contains incorrect value")
 
     def execute(self, requests):
-        responses = []
-        for request in requests:
-            input_tensor = pb_utils.get_input_tensor_by_name(request, "IN")
-            out_tensor = pb_utils.Tensor("OUT", input_tensor.as_numpy())
-            responses.append(pb_utils.InferenceResponse([out_tensor], error))
-        return responses
+        pass

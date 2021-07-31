@@ -1,5 +1,5 @@
 <!--
-# Copyright (c) 2018-2021, NVIDIA CORPORATION. All rights reserved.
+# Copyright 2018-2021, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -63,7 +63,7 @@ build will be a Docker image called *tritonserver* that will contain
 the tritonserver executable in /opt/tritonserver/bin and the required
 shared libraries in /opt/tritonserver/lib. The backends built for
 Triton will be in /opt/tritonserver/backends (note that as of the
-21.06 release the TensorRT backend is still included in the core of
+21.07 release the TensorRT backend is still included in the core of
 Triton and so does not appear in /opt/tritonserver/backends).
 
 The first step for any build is to checkout the
@@ -101,8 +101,8 @@ $ ./build.py --cmake-dir=<path/to/repo>/build --build-dir=/tmp/citritonbuild --e
 If you are building on master/main branch then \<container tag\> will
 default to "main". If you are building on a release branch then
 \<container tag\> will default to the branch name. For example, if you
-are building on the r21.06 branch, \<container tag\> will default to
-r21.06. Therefore, you typically do not need to provide \<container
+are building on the r21.07 branch, \<container tag\> will default to
+r21.07. Therefore, you typically do not need to provide \<container
 tag\> at all (nor the preceding colon). You can use a different
 \<container tag\> for a component to instead use the corresponding
 branch/tag in the build. For example, if you have a branch called
@@ -258,8 +258,8 @@ $ python build.py --cmake-dir=<path/to/repo>/build --build-dir=/tmp/citritonbuil
 If you are building on master/main branch then \<container tag\> will
 default to "main". If you are building on a release branch then
 \<container tag\> will default to the branch name. For example, if you
-are building on the r21.06 branch, \<container tag\> will default to
-r21.06. Therefore, you typically do not need to provide \<container
+are building on the r21.07 branch, \<container tag\> will default to
+r21.07. Therefore, you typically do not need to provide \<container
 tag\> at all (nor the preceding colon). You can use a different
 \<container tag\> for a component to instead use the corresponding
 branch/tag in the build. For example, if you have a branch called
@@ -336,3 +336,9 @@ changes in the following areas.
   NGC container. But the build can also use PyTorch shared libraries
   that you build separately for your platform. See the pytorch_backend
   build process for details.
+
+## Building with Debug Symbols
+
+To build with Debug symbols, use the --build-type=Debug arguement while
+launching build.py. You can then launch the built server with gdb and see 
+the debug symbols/information in the gdb trace.

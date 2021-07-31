@@ -56,7 +56,7 @@ class RestartTest(tu.TestResultCollector):
         # will return an exception.
         with self.assertRaises(InferenceServerException):
             self._infer_helper(model_name, shape, dtype)
-        
+
         # The second request should work properly since the stub process should
         # have come alive.
         self._infer_helper(model_name, shape, dtype)
@@ -64,3 +64,4 @@ class RestartTest(tu.TestResultCollector):
 
 if __name__ == '__main__':
     unittest.main()
+
