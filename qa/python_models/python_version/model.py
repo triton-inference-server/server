@@ -26,14 +26,21 @@
 
 import numpy as np
 import sys
+import os
 import triton_python_backend_utils as pb_utils
 
 
 class TritonPythonModel:
 
     def initialize(self, args):
+        import tensorflow
         self.model_config = args['model_config']
-        print(f'Python version is {sys.version_info.major}.{sys.version_info.minor} and NumPy version is {np.version.version}', flush=True)
+        # This is to make sure that /bin/bash is not picking up
+        # the wrong shared libraries after installing Tensorflow.
+        # Tensorflow uses a shared library which is common with
+        # bash.
+        os.system('/bin/bash --help')
+        print(f'Python version is {sys.version_info.major}.{sys.version_info.minor}, NumPy version is {np.version.version}, and Tensorflow version is {tensorflow.__version__}', flush=True)
 
     def execute(self, requests):
         """ This function is called on inference request.
