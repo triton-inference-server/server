@@ -118,8 +118,8 @@ for PROTOCOL in http grpc; do
                 RET=1
             fi
 
-            # Log the graph for memory growth and the change between Average and Max memory usage
-            echo -e "Test Duration: $(($TEST_DURATION / 3600)):$((($TEST_DURATION / 60) % 60)):$(($TEST_DURATION % 60)) (H:M:S)" >> ${GRAPH_LOG}
+            # Log test duration, the graph for memory growth and the change between Average and Max memory usage
+            echo -e "Test Duration: $(($TEST_DURATION / 3600)):$((($TEST_DURATION / 60) % 60)):$(($TEST_DURATION % 60)) (HH::MM::SS)" >> ${GRAPH_LOG}
             cat ${CLIENT_LOG}.massif
             ms_print ${MASSIF_LOG} | head -n35 >> ${GRAPH_LOG}
             cat ${GRAPH_LOG}

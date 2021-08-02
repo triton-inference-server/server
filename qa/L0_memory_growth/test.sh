@@ -161,7 +161,8 @@ for MODEL in $(ls models); do
 
     set +e
 
-    echo -e "Test Duration: $(($TEST_DURATION / 3600)):$((($TEST_DURATION / 60) % 60)):$(($TEST_DURATION % 60)) (H:M:S)" >> ${GRAPH_LOG}
+    # Log test duration and the graph for memory growth
+    echo -e "Test Duration: $(($TEST_DURATION / 3600)):$((($TEST_DURATION / 60) % 60)):$(($TEST_DURATION % 60)) (HH::MM::SS)" >> ${GRAPH_LOG}
     ms_print ${MASSIF_LOG} | head -n35 >> ${GRAPH_LOG}
     cat ${GRAPH_LOG}
     # Check the massif output
@@ -226,7 +227,7 @@ done
 
 # set +e
 
-# echo -e "Test Duration: $(($TEST_DURATION / 3600)):$((($TEST_DURATION / 60) % 60)):$(($TEST_DURATION % 60)) (H:M:S)" >> ${GRAPH_LOG}
+# echo -e "Test Duration: $(($TEST_DURATION / 3600)):$((($TEST_DURATION / 60) % 60)):$(($TEST_DURATION % 60)) (HH:MM:SS)" >> ${GRAPH_LOG}
 # ms_print ${MASSIF_LOG} | head -n35 >> ${GRAPH_LOG}
 # cat ${GRAPH_LOG}
 # # Check the massif output
