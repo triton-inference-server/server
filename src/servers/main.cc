@@ -84,6 +84,8 @@ bool allow_sagemaker_ = false;
 int32_t sagemaker_port_ = 8080;
 bool sagemaker_safe_range_set_ = false;
 std::pair<int32_t, int32_t> sagemaker_safe_range_ = {0, 0};
+// The number of threads to initialize for the SageMaker HTTP front-end.
+int sagemaker_thread_cnt_ = 8;
 #endif  // TRITON_ENABLE_SAGEMAKER
 
 #ifdef TRITON_ENABLE_GRPC
@@ -123,12 +125,6 @@ int grpc_infer_allocation_pool_size_ = 8;
 // The number of threads to initialize for the HTTP front-end.
 int http_thread_cnt_ = 8;
 #endif  // TRITON_ENABLE_HTTP
-
-
-#if defined(TRITON_ENABLE_SAGEMAKER)
-// The number of threads to initialize for the HTTP front-end.
-int sagemaker_thread_cnt_ = 8;
-#endif  // TRITON_ENABLE_SAGEMAKER
 
 #ifdef _WIN32
 // Minimum implementation of <getopt.h> for Windows
@@ -395,13 +391,14 @@ std::vector<Option> options_
       {OPTION_ALLOW_SAGEMAKER, "allow-sagemaker", Option::ArgBool,
        "Allow the server to listen for Sagemaker requests. Default is false."},
       {OPTION_SAGEMAKER_PORT, "sagemaker-port", Option::ArgInt,
-       "The port for the server to listen on for Sagemaker requests."},
+       "The port for the server to listen on for Sagemaker requests. Default "
+       "is 8080."},
       {OPTION_SAGEMAKER_SAFE_PORT_RANGE, "sagemaker-safe-port-range",
        "<integer>-<integer>",
        "Set the allowed port range for endpoints other than the SageMaker "
        "endpoints."},
       {OPTION_SAGEMAKER_THREAD_COUNT, "sagemaker-thread-count", Option::ArgInt,
-       "Number of threads handling Sagemaker requests."},
+       "Number of threads handling Sagemaker requests. Default is 8."},
 #endif  // TRITON_ENABLE_SAGEMAKER
 #ifdef TRITON_ENABLE_METRICS
       {OPTION_ALLOW_METRICS, "allow-metrics", Option::ArgBool,
