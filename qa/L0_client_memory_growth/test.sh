@@ -119,7 +119,10 @@ for PROTOCOL in http grpc; do
             fi
 
             # Log test duration, the graph for memory growth and the change between Average and Max memory usage
-            echo -e "Test Duration: $(($TEST_DURATION / 3600)):$((($TEST_DURATION / 60) % 60)):$(($TEST_DURATION % 60)) (HH::MM::SS)" >> ${GRAPH_LOG}
+            hrs=$(printf "%02d" $((TEST_DURATION / 3600)))
+            mins=$(printf "%02d" $(((TEST_DURATION / 60) % 60)))
+            secs=$(printf "%02d" $((TEST_DURATION % 60)))
+            echo -e "Test Duration: $hrs:$mins:$secs (HH:MM:SS)" >> ${GRAPH_LOG}
             cat ${CLIENT_LOG}.massif
             ms_print ${MASSIF_LOG} | head -n35 >> ${GRAPH_LOG}
             cat ${GRAPH_LOG}

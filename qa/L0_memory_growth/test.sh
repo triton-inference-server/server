@@ -162,7 +162,10 @@ for MODEL in $(ls models); do
     set +e
 
     # Log test duration and the graph for memory growth
-    echo -e "Test Duration: $(($TEST_DURATION / 3600)):$((($TEST_DURATION / 60) % 60)):$(($TEST_DURATION % 60)) (HH::MM::SS)" >> ${GRAPH_LOG}
+    hrs=$(printf "%02d" $((TEST_DURATION / 3600)))
+    mins=$(printf "%02d" $(((TEST_DURATION / 60) % 60)))
+    secs=$(printf "%02d" $((TEST_DURATION % 60)))
+    echo -e "Test Duration: $hrs:$mins:$secs (HH:MM:SS)" >> ${GRAPH_LOG}
     ms_print ${MASSIF_LOG} | head -n35 >> ${GRAPH_LOG}
     cat ${GRAPH_LOG}
     # Check the massif output
@@ -227,7 +230,11 @@ done
 
 # set +e
 
-# echo -e "Test Duration: $(($TEST_DURATION / 3600)):$((($TEST_DURATION / 60) % 60)):$(($TEST_DURATION % 60)) (HH:MM:SS)" >> ${GRAPH_LOG}
+# # Log test duration and the graph for memory growth
+# hrs=$(printf "%02d" $((TEST_DURATION / 3600)))
+# mins=$(printf "%02d" $(((TEST_DURATION / 60) % 60)))
+# secs=$(printf "%02d" $((TEST_DURATION % 60)))
+# echo -e "Test Duration: $hrs:$mins:$secs (HH:MM:SS)" >> ${GRAPH_LOG}
 # ms_print ${MASSIF_LOG} | head -n35 >> ${GRAPH_LOG}
 # cat ${GRAPH_LOG}
 # # Check the massif output
