@@ -144,9 +144,14 @@ for MODEL_NAME in $OPTIMIZED_MODEL_NAMES; do
 done
 
 #
-# Test large static batch = 128 w/ 2 instances
+# Test large static batch = 128 w/ 2 instances (Use batch size 64 on Jetson Xavier)
 #
-STATIC_BATCH=128
+if [ "$ARCH" == "aarch64" ]; then
+    STATIC_BATCH=64
+else
+    STATIC_BATCH=128
+fi
+
 INSTANCE_CNT=2
 CONCURRENCY=4
 
