@@ -80,7 +80,7 @@ int32_t http_port_ = 8000;
 
 #ifdef TRITON_ENABLE_SAGEMAKER
 std::unique_ptr<nvidia::inferenceserver::HTTPServer> sagemaker_service_;
-bool allow_sagemaker_ = true;
+bool allow_sagemaker_ = false;
 int32_t sagemaker_port_ = 8080;
 bool sagemaker_safe_range_set_ = false;
 std::pair<int32_t, int32_t> sagemaker_safe_range_ = {0, 0};
@@ -393,7 +393,7 @@ std::vector<Option> options_
 #endif  // TRITON_ENABLE_GRPC
 #if defined(TRITON_ENABLE_SAGEMAKER)
       {OPTION_ALLOW_SAGEMAKER, "allow-sagemaker", Option::ArgBool,
-       "Allow the server to listen for Sagemaker requests."},
+       "Allow the server to listen for Sagemaker requests. Default is false."},
       {OPTION_SAGEMAKER_PORT, "sagemaker-port", Option::ArgInt,
        "The port for the server to listen on for Sagemaker requests."},
       {OPTION_SAGEMAKER_SAFE_PORT_RANGE, "sagemaker-safe-port-range",
