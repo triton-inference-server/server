@@ -56,6 +56,7 @@ source ../common/util.sh
 # Set the number of repetitions in nightly and weekly tests
 # Set the email subject for nightly and weekly tests
 if [ "$TRITON_PERF_WEEKLY" == 1 ]; then
+    # Run the test for approximately 7 hours
     REPETITION_CPP=1800000
     REPETITION_PY=2200000
     EMAIL_SUBJECT="Weekly"
