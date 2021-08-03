@@ -41,14 +41,7 @@ RET=0
 
 rm -fr ./models
 rm -rf *.tar.gz
-apt update && apt install software-properties-common rapidjson-dev -y
-wget -O - https://apt.kitware.com/keys/kitware-archive-latest.asc 2>/dev/null | \
-	gpg --dearmor - |  \
-	tee /etc/apt/trusted.gpg.d/kitware.gpg >/dev/null && \
-	apt-add-repository 'deb https://apt.kitware.com/ubuntu/ focal main' && \
-	apt-get update && \
-	apt-get install -y --no-install-recommends \
-	cmake-data=3.18.4-0kitware1ubuntu20.04.1 cmake=3.18.4-0kitware1ubuntu20.04.1
+install_build_deps
 install_conda
 
 # Create a model with python 3.7 version

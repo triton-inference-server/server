@@ -85,7 +85,7 @@ class PBTensorTest(unittest.TestCase):
 
         self.assertTrue(
             str(e.exception) ==
-            'TYPE_BYTES tensors cannot be converted to DLPack.')
+            'DLPack does not have support for string tensors.')
 
     def test_dlpack_gpu_tensors(self):
         # Test different dtypes
