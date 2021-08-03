@@ -143,7 +143,9 @@ for MODEL in $(ls models); do
 
     # Run the perf analyzer 'REPETITION' times
     for ((i=1; i<=$REPETITION; i++)); do
+        SECONDS=0
         $PERF_ANALYZER -v -m $MODEL -i grpc --concurrency-range $CONCURRENCY -b $CLIENT_BS >> $CLIENT_LOG 2>&1
+        TEST_DURATION=$SECONDS
         if [ $? -ne 0 ]; then
             cat $CLIENT_LOG
             echo -e "\n***\n*** perf_analyzer for $MODEL failed on iteration $i\n***"
@@ -159,6 +161,11 @@ for MODEL in $(ls models); do
 
     set +e
 
+    # Log test duration and the graph for memory growth
+    hrs=$(printf "%02d" $((TEST_DURATION / 3600)))
+    mins=$(printf "%02d" $(((TEST_DURATION / 60) % 60)))
+    secs=$(printf "%02d" $((TEST_DURATION % 60)))
+    echo -e "Test Duration: $hrs:$mins:$secs (HH:MM:SS)" >> ${GRAPH_LOG}
     ms_print ${MASSIF_LOG} | head -n35 >> ${GRAPH_LOG}
     cat ${GRAPH_LOG}
     # Check the massif output
@@ -207,7 +214,9 @@ done
 # set +e
 
 # # Run the busy_op test
+# SECONDS=0
 # python $BUSY_OP_TEST -v -m graphdef_busyop -d $DELAY_CYCLES -n $NUM_REQUESTS > $CLIENT_LOG 2>&1
+# TEST_DURATION=$SECONDS
 # if [ $? -ne 0 ]; then
 #     cat $CLIENT_LOG
 #     echo -e "\n***\n*** Test graphdef_busyop Failed\n***"
@@ -221,6 +230,11 @@ done
 
 # set +e
 
+# # Log test duration and the graph for memory growth
+# hrs=$(printf "%02d" $((TEST_DURATION / 3600)))
+# mins=$(printf "%02d" $(((TEST_DURATION / 60) % 60)))
+# secs=$(printf "%02d" $((TEST_DURATION % 60)))
+# echo -e "Test Duration: $hrs:$mins:$secs (HH:MM:SS)" >> ${GRAPH_LOG}
 # ms_print ${MASSIF_LOG} | head -n35 >> ${GRAPH_LOG}
 # cat ${GRAPH_LOG}
 # # Check the massif output
