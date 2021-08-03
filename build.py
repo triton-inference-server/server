@@ -137,7 +137,7 @@ def untar(targetdir, tarfile):
             'untar {} into {} failed'.format(tarfile, targetdir))
 
 
-def gitclone(cwd, repo, tag, subdir, org):
+def gitclone(cwd, repo, tag, subdir):
     # If 'tag' starts with "pull/" then it must be of form
     # "pull/<pr>/head". We just clone at "main" and then fetch the
     # reference onto a new branch we name "tritonbuildref".
@@ -145,7 +145,7 @@ def gitclone(cwd, repo, tag, subdir, org):
         log_verbose('git clone of repo "{}" at ref "{}"'.format(repo, tag))
         p = subprocess.Popen([
             'git', 'clone', '--recursive', '--depth=1', '{}/{}.git'.format(
-                org, repo), subdir
+                FLAGS.github_organization, repo), subdir
         ],
                              cwd=cwd)
         p.wait()
@@ -170,7 +170,7 @@ def gitclone(cwd, repo, tag, subdir, org):
         log_verbose('git clone of repo "{}" at tag "{}"'.format(repo, tag))
         p = subprocess.Popen([
             'git', 'clone', '--recursive', '--single-branch', '--depth=1', '-b',
-            tag, '{}/{}.git'.format(org, repo), subdir
+            tag, '{}/{}.git'.format(FLAGS.github_organization, repo), subdir
         ],
                              cwd=cwd)
         p.wait()
@@ -1145,9 +1145,9 @@ if __name__ == '__main__':
         '--github-organization',
         type=str,
         required=False,
-        default='https://github.com/triton-inference-server',
+        default=None,
         help=
-        'The GitHub organization containing the repos used for the build. Defaults to "https://github.com/triton-inference-server".'
+        'The GitHub organization containing the repos used for the build. Defaults to "https://github.com/triton-inference-server" if platform is not "ubuntu/arm64".'
     )
     parser.add_argument(
         '--version',
@@ -1319,6 +1319,13 @@ if __name__ == '__main__':
         log('upstream container version {}'.format(
             FLAGS.upstream_container_version))
 
+    # Set github organization based on selected platform
+    if not FLAGS.github_organization:
+        if target_platform() != 'ubuntu/arm64':
+            FLAGS.github_organization = 'https://github.com/triton-inference-server'
+        else:
+            FLAGS.github_organization = 'https://gitlab.com/arm-research/smarter'
+
     # Initialize map of backends to build and repo-tag for each.
     backends = {}
     for be in FLAGS.backend:
@@ -1426,13 +1433,7 @@ if __name__ == '__main__':
         repo_install_dir = os.path.join(FLAGS.build_dir, be, 'install')
 
         mkdir(FLAGS.build_dir)
-        # If tflite backend, source from external repo for git clone
-        if be == 'tflite':
-            gitclone(FLAGS.build_dir, backend_repo(be), backends[be], be,
-                     'https://gitlab.com/arm-research/smarter/')
-        else:
-            gitclone(FLAGS.build_dir, backend_repo(be), backends[be], be,
-                     FLAGS.github_organization)
+        gitclone(FLAGS.build_dir, backend_repo(be), backends[be], be)
         mkdir(repo_build_dir)
         cmake(
             repo_build_dir,
@@ -1452,8 +1453,7 @@ if __name__ == '__main__':
         repo_install_dir = os.path.join(FLAGS.build_dir, ra, 'install')
 
         mkdir(FLAGS.build_dir)
-        gitclone(FLAGS.build_dir, repoagent_repo(ra), repoagents[ra], ra,
-                 FLAGS.github_organization)
+        gitclone(FLAGS.build_dir, repoagent_repo(ra), repoagents[ra], ra)
         mkdir(repo_build_dir)
         cmake(repo_build_dir,
               repoagent_cmake_args(images, components, ra, repo_install_dir))
