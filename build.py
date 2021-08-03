@@ -546,6 +546,7 @@ ARG BASE_IMAGE={}
 
     df += '''
 FROM ${BASE_IMAGE}
+
 ARG TRITON_VERSION
 ARG TRITON_CONTAINER_VERSION
 '''
@@ -558,6 +559,7 @@ SHELL ["cmd", "/S", "/C"]
         df += '''
 # Ensure apt-get won't prompt for selecting options
 ENV DEBIAN_FRONTEND=noninteractive
+
 # libcurl4-openSSL-dev is needed for GCS
 # python3-dev is needed by Torchvision
 # python3-pip and libarchive-dev is needed by python backend
@@ -588,8 +590,10 @@ RUN apt-get update && \
             pkg-config \
             uuid-dev && \
     rm -rf /var/lib/apt/lists/*
+
 RUN pip3 install --upgrade pip && \
     pip3 install --upgrade wheel setuptools docker
+
 # Server build requires recent version of CMake (FetchContent required)
 RUN wget -O - https://apt.kitware.com/keys/kitware-archive-latest.asc 2>/dev/null | \
       gpg --dearmor - |  \
