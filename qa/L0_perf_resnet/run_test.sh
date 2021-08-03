@@ -60,8 +60,13 @@ if (( $SERVER_PID == 0 )); then
     exit 1
 fi
 
+# Onnx and onnx-trt models are very slow on Jetson Xavier. So we need to increase the time period for perf_client
+MEASUREMENT_WINDOW=5000
 if [ "$ARCH" == "aarch64" ]; then
     PERF_CLIENT=${TRITON_DIR}/clients/bin/perf_client
+    if [ "$MODEL_FRAMEWORK" == "onnx" ] || [ "$MODEL_FRAMEWORK" == "onnx_trt" ]; then
+        MEASUREMENT_WINDOW=20000
+    fi
 else
     PERF_CLIENT=../clients/perf_client
 fi
@@ -69,9 +74,9 @@ fi
 set +e
 
 # Run the model once to warm up. Some frameworks do optimization on the first requests.
-$PERF_CLIENT -v -i ${PERF_CLIENT_PROTOCOL} -m $MODEL_NAME -p5000 -b${STATIC_BATCH}
+$PERF_CLIENT -v -i ${PERF_CLIENT_PROTOCOL} -m $MODEL_NAME -p${MEASUREMENT_WINDOW} -b${STATIC_BATCH}
 
-$PERF_CLIENT -v -i ${PERF_CLIENT_PROTOCOL} -m $MODEL_NAME -p5000 \
+$PERF_CLIENT -v -i ${PERF_CLIENT_PROTOCOL} -m $MODEL_NAME -p${MEASUREMENT_WINDOW} \
                 -b${STATIC_BATCH} --concurrency-range ${CONCURRENCY} \
                 -f ${NAME}.csv >> ${NAME}.log 2>&1
 if (( $? != 0 )); then
