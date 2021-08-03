@@ -41,7 +41,6 @@ TENSOR_SIZE=${TENSOR_SIZE:=1}
 SHARED_MEMORY=${SHARED_MEMORY:="none"}
 REPORTER=../common/reporter.py
 
-DATADIR=${DATADIR:="/data/inferenceserver/${REPO_VERSION}"}
 RESULTDIR=${RESULTDIR:=.}
 
 TRITON_DIR=${TRITON_DIR:="/opt/tritonserver"}
@@ -51,10 +50,12 @@ BACKEND_DIR=${TRITON_DIR}/backends
 SERVER_ARGS="--model-repository=`pwd`/models --backend-directory=${BACKEND_DIR}" 
 source ../common/util.sh
 
+# DATADIR is already set in environment variable for aarch64
 if [ "$ARCH" == "aarch64" ]; then
     PERF_CLIENT=${TRITON_DIR}/clients/bin/perf_client
 else
     PERF_CLIENT=../clients/perf_client
+    DATADIR=/data/inferenceserver/${REPO_VERSION}
 fi
 
 # Select the single GPU that will be available to the inference server
