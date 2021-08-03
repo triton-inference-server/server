@@ -96,7 +96,9 @@ for PROTOCOL in http grpc; do
             EXTRA_ARGS="-r ${REPETITION_PY} -i ${PROTOCOL}"
         fi
 
+        SECONDS=0
         $LEAKCHECK $LEAKCHECK_ARGS $MEMORY_GROWTH_TEST $EXTRA_ARGS >> ${CLIENT_LOG} 2>&1
+        TEST_DURATION=$SECONDS
         if [ $? -ne 0 ]; then
             cat ${CLIENT_LOG}
             RET=1
@@ -116,7 +118,11 @@ for PROTOCOL in http grpc; do
                 RET=1
             fi
 
-            # Log the graph for memory growth and the change between Average and Max memory usage
+            # Log test duration, the graph for memory growth and the change between Average and Max memory usage
+            hrs=$(printf "%02d" $((TEST_DURATION / 3600)))
+            mins=$(printf "%02d" $(((TEST_DURATION / 60) % 60)))
+            secs=$(printf "%02d" $((TEST_DURATION % 60)))
+            echo -e "Test Duration: $hrs:$mins:$secs (HH:MM:SS)" >> ${GRAPH_LOG}
             cat ${CLIENT_LOG}.massif
             ms_print ${MASSIF_LOG} | head -n35 >> ${GRAPH_LOG}
             cat ${GRAPH_LOG}
