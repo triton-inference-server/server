@@ -386,6 +386,9 @@ def onnxruntime_cmake_args(images, library_paths):
             TRITON_VERSION_MAP[FLAGS.version][2])
     ]
 
+    # ONNX-TRT support is currently disabled since TRT 8 is not supported
+    cargs.append('-DTRITON_ENABLE_ONNXRUNTIME_TENSORRT=OFF')
+
     # If platform is jetpack do not use docker based build
     if target_platform() == 'jetpack':
         ort_lib_path = library_paths['onnxruntime'] + "/lib"
@@ -393,12 +396,9 @@ def onnxruntime_cmake_args(images, library_paths):
         cargs += [
             '-DTRITON_ONNXRUNTIME_INCLUDE_PATHS={}'.format(ort_include_path),
             '-DTRITON_ONNXRUNTIME_LIB_PATHS={}'.format(ort_lib_path),
-            '-DTRITON_ENABLE_ONNXRUNTIME_TENSORRT=ON',
             '-DTRITON_ENABLE_ONNXRUNTIME_OPENVINO=OFF'
         ]
     else:
-        # ONNX-TRT support is currently disabled for non-jetpack builds
-        cargs.append('-DTRITON_ENABLE_ONNXRUNTIME_TENSORRT=OFF')
         if target_platform() == 'windows':
             if 'base' in images:
                 cargs.append('-DTRITON_BUILD_CONTAINER={}'.format(
