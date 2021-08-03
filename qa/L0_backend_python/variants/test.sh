@@ -1,4 +1,5 @@
-# Copyright (c) 2021, NVIDIA CORPORATION. All rights reserved.
+#!/bin/bash
+# Copyright 2021, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -24,30 +25,20 @@
 # (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-import numpy as np
-import sys
-import os
-import triton_python_backend_utils as pb_utils
+# Buidling a CPU build of Python backend
 
+source ../common.sh
+install_build_deps
+rm -rf python_backend
 
-class TritonPythonModel:
+git clone https://github.com/triton-inference-server/python_backend -b $PYTHON_BACKEND_REPO_TAG
+(cd python_backend/ && mkdir builddir && cd builddir && \
+  cmake -DTRITON_ENABLE_GPU=OFF -DTRITON_BACKEND_REPO_TAG=$TRITON_BACKEND_REPO_TAG -DTRITON_COMMON_REPO_TAG=$TRITON_COMMON_REPO_TAG -DTRITON_CORE_REPO_TAG=$TRITON_CORE_REPO_TAG ../ && \
+  make -j18 install)
 
-    def initialize(self, args):
-        import tensorflow
-        self.model_config = args['model_config']
-        # This is to make sure that /bin/bash is not picking up
-        # the wrong shared libraries after installing Tensorflow.
-        # Tensorflow uses a shared library which is common with
-        # bash.
-        os.system('/bin/bash --help')
-        print(f'Python version is {sys.version_info.major}.{sys.version_info.minor}, NumPy version is {np.version.version}, and Tensorflow version is {tensorflow.__version__}', flush=True)
+if [ $? == 0 ]; then
+  echo -e "\n***\n*** No CPU build test PASSED.\n***"
+else
+  echo -e "\n***\n*** No CPU build test FAILED.\n***"
+fi
 
-    def execute(self, requests):
-        """ This function is called on inference request.
-        """
-        responses = []
-        for request in requests:
-            input_tensor = pb_utils.get_input_tensor_by_name(request, "INPUT0")
-            out_tensor = pb_utils.Tensor("OUTPUT0", input_tensor.as_numpy())
-            responses.append(pb_utils.InferenceResponse([out_tensor]))
-        return responses

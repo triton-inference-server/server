@@ -67,7 +67,7 @@ from distutils.dir_util import copy_tree
 TRITON_VERSION_MAP = {
     '2.13.0dev': (
         '21.08dev',  # triton container
-        '21.06',  # upstream container
+        '21.07',  # upstream container
         '1.8.0',  # ORT
         '2021.2.200',  # ORT OpenVINO
         '2021.2',  # Standalone OpenVINO
@@ -391,7 +391,6 @@ def pytorch_cmake_args(images):
 
 def onnxruntime_cmake_args(images, library_paths):
     cargs = [
-        '-DTRITON_ENABLE_ONNXRUNTIME_TENSORRT=ON',
         '-DTRITON_BUILD_ONNXRUNTIME_VERSION={}'.format(
             TRITON_VERSION_MAP[FLAGS.version][2])
     ]
@@ -403,9 +402,12 @@ def onnxruntime_cmake_args(images, library_paths):
         cargs += [
             '-DTRITON_ONNXRUNTIME_INCLUDE_PATHS={}'.format(ort_include_path),
             '-DTRITON_ONNXRUNTIME_LIB_PATHS={}'.format(ort_lib_path),
+            '-DTRITON_ENABLE_ONNXRUNTIME_TENSORRT=ON',
             '-DTRITON_ENABLE_ONNXRUNTIME_OPENVINO=OFF'
         ]
     else:
+        # ONNX-TRT support is currently disabled for non-jetpack builds
+        cargs.append('-DTRITON_ENABLE_ONNXRUNTIME_TENSORRT=OFF')
         if target_platform() == 'windows':
             if 'base' in images:
                 cargs.append('-DTRITON_BUILD_CONTAINER={}'.format(

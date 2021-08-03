@@ -41,6 +41,17 @@ install_conda() {
   eval "$(./miniconda/bin/conda shell.bash hook)"
 }
 
+install_build_deps() {
+  apt update && apt install software-properties-common rapidjson-dev -y
+  wget -O - https://apt.kitware.com/keys/kitware-archive-latest.asc 2>/dev/null | \
+  	gpg --dearmor - |  \
+  	tee /etc/apt/trusted.gpg.d/kitware.gpg >/dev/null && \
+  	apt-add-repository 'deb https://apt.kitware.com/ubuntu/ focal main' && \
+  	apt-get update && \
+  	apt-get install -y --no-install-recommends \
+  	cmake-data=3.18.4-0kitware1ubuntu20.04.1 cmake=3.18.4-0kitware1ubuntu20.04.1
+}
+
 create_conda_env() {
   python_version=$1
   env_name=$2
@@ -53,6 +64,6 @@ create_python_backend_stub() {
   rm -rf python_backend
   git clone https://github.com/triton-inference-server/python_backend -b $PYTHON_BACKEND_REPO_TAG
   (cd python_backend/ && mkdir builddir && cd builddir && \
-  cmake -DTRITON_BACKEND_REPO_TAG=$TRITON_BACKEND_REPO_TAG -DTRITON_COMMON_REPO_TAG=$TRITON_COMMON_REPO_TAG -DTRITON_CORE_REPO_TAG=$TRITON_CORE_REPO_TAG ../ && \
+  cmake -DTRITON_ENABLE_GPU=ON -DTRITON_BACKEND_REPO_TAG=$TRITON_BACKEND_REPO_TAG -DTRITON_COMMON_REPO_TAG=$TRITON_COMMON_REPO_TAG -DTRITON_CORE_REPO_TAG=$TRITON_CORE_REPO_TAG ../ && \
   make -j18 triton-python-backend-stub)
 }

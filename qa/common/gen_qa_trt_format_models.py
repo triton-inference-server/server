@@ -184,7 +184,12 @@ def create_plan_dynamic_modelfile(models_dir,
     config.flags = flags
     config.add_optimization_profile(profile)
     config.max_workspace_size = 1 << 20
-    engine = builder.build_engine(network, config)
+    try:
+        engine_bytes = builder.build_serialized_network(network, config)
+    except AttributeError:
+        engine = builder.build_engine(network, config)
+        engine_bytes = engine.serialize()
+        del engine
 
     # Use a different model name for different kinds of models
     base_name = "plan_nobatch" if max_batch == 0 else "plan"
@@ -201,9 +206,8 @@ def create_plan_dynamic_modelfile(models_dir,
         pass  # ignore existing dir
 
     with open(model_version_dir + "/model.plan", "wb") as f:
-        f.write(engine.serialize())
+        f.write(engine_bytes)
 
-    del engine
     del builder
 
 
@@ -261,7 +265,12 @@ def create_plan_fixed_modelfile(models_dir, max_batch, model_version,
     config.flags = flags
     config.max_workspace_size = 1 << 20
     builder.max_batch_size = max(1, max_batch)
-    engine = builder.build_engine(network, config)
+    try:
+        engine_bytes = builder.build_serialized_network(network, config)
+    except AttributeError:
+        engine = builder.build_engine(network, config)
+        engine_bytes = engine.serialize()
+        del engine
 
     base_name = "plan_nobatch" if max_batch == 0 else "plan"
     base_name += "_" + trt_format_to_string(
@@ -276,9 +285,8 @@ def create_plan_fixed_modelfile(models_dir, max_batch, model_version,
         pass  # ignore existing dir
 
     with open(model_version_dir + "/model.plan", "wb") as f:
-        f.write(engine.serialize())
+        f.write(engine_bytes)
 
-    del engine
     del builder
 
 
@@ -446,7 +454,6 @@ if __name__ == '__main__':
                       trt.TensorFormat.CHW2, trt.TensorFormat.LINEAR)
 
     # Dynamic shape
-    # FIXME The generated model inputs are LINEAR format instead of CHW32 format
     create_plan_model(FLAGS.models_dir, 0, 1, (-1, 2, 1), (-1, 2, 1),
                       (-1, 2, 1), np.float32, np.float32, np.float32,
                       trt.TensorFormat.CHW32, trt.TensorFormat.LINEAR)

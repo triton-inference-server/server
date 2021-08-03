@@ -1,4 +1,4 @@
-# Copyright (c) 2020, NVIDIA CORPORATION. All rights reserved.
+# Copyright 2020-2021, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -185,8 +185,7 @@ class TrtReformatFreeTest(tu.TestResultCollector):
         input_np = np.arange(26, dtype=np.float32).reshape((13, 2, 1))
         expected_output0_np = input_np + input_np
         expected_output1_np = input_np - input_np
-        # FIXME Can't generate reformat-free model of this specification
-        reformatted_input_np = input_np  #reformat("CHW32", input_np)
+        reformatted_input_np = reformat("CHW32", input_np)
 
         # Use shared memory to bypass the shape check in client library, because
         # for non-linear format tensor, the data buffer is padded and thus the

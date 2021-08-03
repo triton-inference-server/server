@@ -30,7 +30,7 @@
 
 Triton Inference Server is officially supported on JetPack starting from JetPack 4.6. Triton Inference Server on Jetson supports trained AI models from multiple frameworks includings NVIDIA TensorRT, TensorFlow and ONNX Runtime.
 
-On JetPack, although HTTP/REST and GRPC inference protocols are supported, for edge use cases, direct [C API integration](https://github.com/triton-inference-server/server/blob/main/docs/inference_protocols.md#c-api) is recommended.
+On JetPack, although HTTP/REST and GRPC inference protocols are supported, for edge use cases, direct [C API integration](inference_protocols.md#c-api) is recommended.
 
 ![Triton on Jetson Diagram](images/triton_on_jetson.png)
 
@@ -38,14 +38,14 @@ Triton Inference Server support on JetPack includes:
 
 * Running models on GPU and NVDLA
 * Support for multiple frameworks: TensorRT, TensorFlow and ONNX Runtime.
-* [Concurrent model execution](docs/architecture.md#concurrent-model-execution)
-* [Dynamic batching](docs/architecture.md#models-and-schedulers)
-* [Model pipelines](docs/architecture.md#ensemble-models)
+* [Concurrent model execution](architecture.md#concurrent-model-execution)
+* [Dynamic batching](architecture.md#models-and-schedulers)
+* [Model pipelines](architecture.md#ensemble-models)
 * [Extensible backends](https://github.com/triton-inference-server/backend)
-* [HTTP/REST and GRPC inference protocols](docs/inference_protocols.md)
-* [C API](docs/inference_protocols.md#c-api)
+* [HTTP/REST and GRPC inference protocols](inference_protocols.md)
+* [C API](inference_protocols.md#c-api)
 
-You can download the `.tar` files for Jetson published on the Triton Infence Server [release page](https://github.com/triton-inference-server/server/releases/) in _"Jetson JetPack Support"_ section. The `.tar` file contains the Triton executables and shared libraries, as well as the C++ and Python client libraries and examples.
+You can download the `.tar` files for Jetson published on the Triton Infence Server [release page](https://github.com/triton-inference-server/server/releases) in _"Jetson JetPack Support"_ section. The `.tar` file contains the Triton executables and shared libraries, as well as the C++ and Python client libraries and examples.
 
 Note that [perf_analyzer](perf_analyzer.md) is supported on Jetson, while the [model_analyzer](model_analyzer.md) is currently not available for Jetson. To execute `perf_analyzer` for C API, include the option `--service-kind=triton_c_api`: 
 

@@ -41,34 +41,29 @@ RET=0
 
 rm -fr ./models
 rm -rf *.tar.gz
-apt update && apt install software-properties-common rapidjson-dev -y
-wget -O - https://apt.kitware.com/keys/kitware-archive-latest.asc 2>/dev/null | \
-	gpg --dearmor - |  \
-	tee /etc/apt/trusted.gpg.d/kitware.gpg >/dev/null && \
-	apt-add-repository 'deb https://apt.kitware.com/ubuntu/ focal main' && \
-	apt-get update && \
-	apt-get install -y --no-install-recommends \
-	cmake-data=3.18.4-0kitware1ubuntu20.04.1 cmake=3.18.4-0kitware1ubuntu20.04.1
+install_build_deps
 install_conda
 
-# Create a model with python 3.9 version
-create_conda_env "3.9" "python-3-9"
+# Create a model with python 3.7 version
+create_conda_env "3.7" "python-3-7"
 conda install numpy=1.20.1 -y
+conda install tensorflow=2.1.0 -y
 create_python_backend_stub
-conda-pack -o python3.9.tar.gz
-path_to_conda_pack=`pwd`/python3.9.tar.gz
-mkdir -p models/python_3_9/1/
-cp ../../python_models/python_version/config.pbtxt ./models/python_3_9
-(cd models/python_3_9 && \
-          sed -i "s/^name:.*/name: \"python_3_9\"/" config.pbtxt && \
+conda-pack -o python3.7.tar.gz
+path_to_conda_pack=`pwd`/python3.7.tar.gz
+mkdir -p models/python_3_7/1/
+cp ../../python_models/python_version/config.pbtxt ./models/python_3_7
+(cd models/python_3_7 && \
+          sed -i "s/^name:.*/name: \"python_3_7\"/" config.pbtxt && \
           echo "parameters: {key: \"EXECUTION_ENV_PATH\", value: {string_value: \"$path_to_conda_pack\"}}">> config.pbtxt)
-cp ../../python_models/python_version/model.py ./models/python_3_9/1/
-cp python_backend/builddir/triton_python_backend_stub ./models/python_3_9
+cp ../../python_models/python_version/model.py ./models/python_3_7/1/
+cp python_backend/builddir/triton_python_backend_stub ./models/python_3_7
 conda deactivate
 
 # Create a model with python 3.6 version
 create_conda_env "3.6" "python-3-6"
 conda install numpy=1.18.1 -y
+conda install tensorflow=2.1.0 -y
 conda-pack -o python3.6.tar.gz
 path_to_conda_pack=`pwd`/python3.6.tar.gz
 create_python_backend_stub
@@ -77,6 +72,7 @@ cp ../../python_models/python_version/config.pbtxt ./models/python_3_6
 (cd models/python_3_6 && \
           sed -i "s/^name:.*/name: \"python_3_6\"/" config.pbtxt && \
           echo "parameters: {key: \"EXECUTION_ENV_PATH\", value: {string_value: \"$path_to_conda_pack\"}}" >> config.pbtxt)
+rm -rf ./miniconda
 cp ../../python_models/python_version/model.py ./models/python_3_6/1/
 cp python_backend/builddir/triton_python_backend_stub ./models/python_3_6
 
@@ -91,17 +87,24 @@ kill $SERVER_PID
 wait $SERVER_PID
 
 set +e
-grep "Python version is 3.6 and NumPy version is 1.18.1" $SERVER_LOG
+grep "Python version is 3.6, NumPy version is 1.18.1, and Tensorflow version is 2.1.0" $SERVER_LOG
 if [ $? -ne 0 ]; then
     cat $SERVER_LOG
-    echo -e "\n***\n*** Python 3.6 and NumPy 1.18.1 was not found in Triton logs. \n***"
+    echo -e "\n***\n*** Python version is 3.6, NumPy version is 1.18.1, and Tensorflow version is 2.1.0 was not found in Triton logs. \n***"
     RET=1
 fi
 
-grep "Python version is 3.9 and NumPy version is 1.20.1" $SERVER_LOG
+grep "Python version is 3.7, NumPy version is 1.20.1, and Tensorflow version is 2.1.0" $SERVER_LOG
 if [ $? -ne 0 ]; then
     cat $SERVER_LOG
-    echo -e "\n***\n*** Python 3.9 and NumPy 1.20.1 was not found in Triton logs. \n***"
+    echo -e "\n***\n*** Python version is 3.7, NumPy version is 1.20.1, and Tensorflow version is 2.1.0 was not found in Triton logs. \n***"
+    RET=1
+fi
+
+grep "no version information available (required by /bin/bash)." $SERVER_LOG
+if [ $? -eq 0 ]; then
+    cat $SERVER_LOG
+    echo -e "\n***\n*** \"no version information available (required by /bin/bash).\" was found in the server logs. \n***"
     RET=1
 fi
 set -e
@@ -114,3 +117,4 @@ else
 fi
 
 exit $RET
+
