@@ -51,7 +51,7 @@ CORRELATION_ID_BLOCK_SIZE = 100
 DEFAULT_TIMEOUT_MS = 5000
 SEQUENCE_LENGTH_MEAN = 16
 SEQUENCE_LENGTH_STDEV = 8
-BACKENDS = os.environ.get('BACKENDS', "custom")
+BACKENDS = os.environ.get('BACKENDS', "graphdef savedmodel onnx plan custom")
 
 _thread_exceptions = []
 _thread_exceptions_mutex = threading.Lock()
@@ -365,8 +365,48 @@ def sequence_no_end(client_metadata, rng, trial, model_name, dtype, len_mean,
                          sequence_name=sequence_name)
 
 
-def stress_thread(name, seed, pass_cnt, correlation_id_base, trial, model_name,
-                  dtype):
+def timeout_request(rng, sequence_name):
+    # Provide too small a timeout and expect a failure.
+    # Note, the custom_identity_int32 is configured with a delay
+    # of 3 sec
+    timeout_client = "../clients/client_timeout_test"
+    timeout_result = "timeout_result_{}_".format(sequence_name)
+    if rng.rand() < 0.33:
+        # Test request timeout in grpc synchronous inference
+        timeout_result += "grpc_infer.log"
+        os.system("{} -t 1000 -v -i grpc > {} 2>&1".format(
+            timeout_client, timeout_result))
+    elif rng.rand() < 0.66:
+        # Test request timeout in grpc asynchronous inference
+        timeout_result += "grpc_async_infer.log"
+        os.system("{} -t 1000 -v -i grpc -a > {} 2>&1".format(
+            timeout_client, timeout_result))
+    else:
+        # Test stream timeout in grpc asynchronous streaming inference
+        timeout_result += "grpc_async_stream_infer.log"
+        os.system("{} -t 1000 -v -i grpc -s > {} 2>&1".format(
+            timeout_client, timeout_result))
+
+    with open(timeout_result) as f:
+        result = f.read()
+        if ("Deadline Exceeded" not in result) and ("Stream has been closed"
+                                                    not in result):
+            assert False, "timeout_request failed {} {}".format(
+                sequence_name, timeout_result)
+
+
+def resnet_model_request(model_name, sequence_name):
+    image_client = "../clients/image_client.py"
+    image = "../images/vulture.jpeg"
+    resnet_result = "resnet_{}.log".format(sequence_name)
+    os.system("{} -m {} -s VGG -c 1 -b 1 {} > {}".format(
+        image_client, model_name, image, resnet_result))
+    with open(resnet_result) as f:
+        if "VULTURE" not in f.read():
+            assert False, "resnet_model_request failed"
+
+
+def stress_thread(name, seed, test_duration, correlation_id_base):
     # Thread responsible for generating sequences of inference
     # requests.
     global _thread_exceptions
@@ -375,6 +415,7 @@ def stress_thread(name, seed, pass_cnt, correlation_id_base, trial, model_name,
     rng = np.random.RandomState(seed)
 
     client_metadata_list = []
+    start_time = time.time()
 
     try:
         # Must use streaming GRPC context to ensure each sequences'
@@ -398,12 +439,15 @@ def stress_thread(name, seed, pass_cnt, correlation_id_base, trial, model_name,
             last_choices.append(None)
 
         rare_idx = 0
-        for p in range(pass_cnt):
+        while time.time() - start_time < test_duration:
             # Common or rare context?
             if rng.rand() < 0.1:
                 # Rare context...
                 choice = rng.rand()
                 client_idx = common_cnt + rare_idx
+                trial = "custom"
+                dtype = get_datatype(trial)
+                model_name = tu.get_sequence_model_name(trial, dtype)
 
                 # Send a no-end, valid-no-end or valid-valid
                 # sequence... because it is a rare context this should
@@ -441,11 +485,14 @@ def stress_thread(name, seed, pass_cnt, correlation_id_base, trial, model_name,
                     last_choices[client_idx] = "valid-valid"
 
                 rare_idx = (rare_idx + 1) % rare_cnt
-            else:
+            elif rng.rand() < 0.6:
                 # Common context...
                 client_idx = 0 if rng.rand() < 0.5 else 1
                 client_metadata = client_metadata_list[client_idx]
                 last_choice = last_choices[client_idx]
+                trial = "custom"
+                dtype = get_datatype(trial)
+                model_name = tu.get_sequence_model_name(trial, dtype)
 
                 choice = rng.rand()
 
@@ -502,6 +549,14 @@ def stress_thread(name, seed, pass_cnt, correlation_id_base, trial, model_name,
                                    SEQUENCE_LENGTH_STDEV,
                                    sequence_name=name)
                     last_choices[client_idx] = "valid"
+            else:
+                choice = rng.rand()
+                if choice < 0.9:
+                    model_name = "resnet_v1_50_graphdef_def"
+                    resnet_model_request(model_name, sequence_name=name)
+                else:
+                    model_name = "custom_identity_int32"
+                    timeout_request(rng, sequence_name=name)
 
     except Exception as ex:
         _thread_exceptions_mutex.acquire()
@@ -518,6 +573,7 @@ def stress_thread(name, seed, pass_cnt, correlation_id_base, trial, model_name,
         c.close()
 
     print("Exiting thread {}".format(name))
+    check_status(model_name)
 
 
 def check_status(model_name):
@@ -548,11 +604,11 @@ if __name__ == '__main__':
                         help='Request concurrency. Default is 8.')
     parser.add_argument(
         '-i',
-        '--iterations',
+        '--test-duration',
         type=int,
         required=False,
-        default=200,
-        help='Number of iterations of stress test to run. Default is 200.')
+        default=160,
+        help='Duration of stress test to run. Default is 160 seconds.')
     FLAGS = parser.parse_args()
 
     # Initialize the random seed. For reproducibility each thread
@@ -566,47 +622,39 @@ if __name__ == '__main__':
 
     print("random seed = {}".format(randseed))
     print("concurrency = {}".format(FLAGS.concurrency))
-    print("iterations = {}".format(FLAGS.iterations))
+    print("test duration = {}".format(FLAGS.test_duration))
 
-    for TARGET in BACKENDS.split():
-        trial = TARGET
-        dtype = get_datatype(trial)
-        model_name = tu.get_sequence_model_name(trial, dtype)
+    threads = []
+    for idx, thd in enumerate(range(FLAGS.concurrency)):
+        thread_name = "thread_{}".format(idx)
 
-        threads = []
-        for idx, thd in enumerate(range(FLAGS.concurrency)):
-            thread_name = "thread_{}".format(idx)
+        # Create the seed for the thread. Since these are created in
+        # reproducible order off of the initial seed we will get
+        # reproducible results when given the same seed.
+        seed = np.random.randint(2**32)
 
-            # Create the seed for the thread. Since these are created in
-            # reproducible order off of the initial seed we will get
-            # reproducible results when given the same seed.
-            seed = np.random.randint(2**32)
+        # Each thread is reserved a block of correlation IDs or size
+        # CORRELATION_ID_BLOCK_SIZE
+        correlation_id_base = 1 + (idx * CORRELATION_ID_BLOCK_SIZE)
 
-            # Each thread is reserved a block of correlation IDs or size
-            # CORRELATION_ID_BLOCK_SIZE
-            correlation_id_base = 1 + (idx * CORRELATION_ID_BLOCK_SIZE)
+        threads.append(
+            threading.Thread(target=stress_thread,
+                             args=(thread_name, seed, FLAGS.test_duration,
+                                   correlation_id_base)))
 
-            threads.append(
-                threading.Thread(target=stress_thread,
-                                 args=(thread_name, seed, FLAGS.iterations,
-                                       correlation_id_base, trial, model_name,
-                                       dtype)))
+    for t in threads:
+        t.start()
+    for t in threads:
+        t.join()
 
-        for t in threads:
-            t.start()
-        for t in threads:
-            t.join()
-
-        check_status(model_name)
-
-        _thread_exceptions_mutex.acquire()
-        try:
-            if len(_thread_exceptions) > 0:
-                for ex in _thread_exceptions:
-                    print("*********\n{}".format(ex))
-                sys.exit(1)
-        finally:
-            _thread_exceptions_mutex.release()
+    _thread_exceptions_mutex.acquire()
+    try:
+        if len(_thread_exceptions) > 0:
+            for ex in _thread_exceptions:
+                print("*********\n{}".format(ex))
+            sys.exit(1)
+    finally:
+        _thread_exceptions_mutex.release()
 
     print("Exiting stress test")
     sys.exit(0)
