@@ -34,8 +34,6 @@ import platform
 import shutil
 import subprocess
 import sys
-import re
-import docker
 import traceback
 from distutils.dir_util import copy_tree
 
@@ -515,43 +513,6 @@ def fil_cmake_args(images):
     return cargs
 
 
-def add_dependencies(image, dependencies):
-    # Helper function for all installations. For the list of dependencies provided,
-    # apt-get install dependency if it does not exist in docker image
-    df = ""
-    need_to_install_dependencies = False
-    log("pulling container:{}".format(image))
-    p = subprocess.run(['docker', 'pull', image])
-    fail_if(
-        p.returncode != 0,
-        'ERROR: docker pull container {} failed, {}'.format(image, p.stderr))
-
-    df += '''
-RUN apt-get update && \
-    apt-get install -y --no-install-recommends \ 
-'''
-    client = docker.from_env()
-    for dep in dependencies:
-        searchString = "dpkg -s {}".format(dep)
-        try:
-            var = client.containers.run(image, searchString)
-            log("found package: {}".format(dep))
-        # dpkg-query returns 1 when cannot find package with error message
-        except docker.errors.ContainerError as var:
-            packages = re.search(
-                "package '{}' is not installed and no information is available".
-                format(dep), str(var))
-
-            fail_if(packages == None,
-                    "Unexpected throw on docker run:" + str(var))
-            need_to_install_dependencies = True
-            df += '''{} \ 
-'''.format(dep)
-    df += '''&& rm -rf /var/lib/apt/lists/*
-'''
-    return df if need_to_install_dependencies else ""
-
-
 def get_container_versions(version, container_version,
                            upstream_container_version):
     if container_version is None:
@@ -593,19 +554,36 @@ ENV DEBIAN_FRONTEND=noninteractive
 # python3-dev is needed by Torchvision
 # python3-pip and libarchive-dev is needed by python backend
 # uuid-dev and pkg-config is needed for Azure Storage
-'''
-        dependencies = [
-            "autoconf", "automake", "build-essential", "docker.io", "git",
-            "libre2-dev", "libssl-dev", "libtool", "libboost-dev",
-            "libcurl4-openssl-dev", "libb64-dev", "patchelf", "python3-dev",
-            "python3-pip", "python3-setuptools", "rapidjson-dev",
-            "software-properties-common", "unzip", "wget", "zlib1g-dev",
-            "libarchive-dev", "pkg-config", "uuid-dev", "libnuma-dev",
-            "libnuma1"
-        ]
-        image = argmap['BASE_IMAGE']
-        df += add_dependencies(image, dependencies)
-        df += '''
+
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends \
+            autoconf \
+            automake \
+            build-essential \
+            docker.io \
+            git \
+            libre2-dev \
+            libssl-dev \
+            libtool \
+            libboost-dev \
+            libcurl4-openssl-dev \
+            libb64-dev \
+            patchelf \
+            python3-dev \
+            python3-pip \
+            python3-setuptools \
+            rapidjson-dev \
+            software-properties-common \
+            unzip \
+            wget \
+            zlib1g-dev \
+            libarchive-dev \
+            pkg-config \
+            uuid-dev \
+            libnuma-dev \
+            libnuma1 && \
+    rm -rf /var/lib/apt/lists/*
+
 RUN pip3 install --upgrade pip && \
     pip3 install --upgrade wheel setuptools docker
 
@@ -784,17 +762,19 @@ ENV DEBIAN_FRONTEND=noninteractive
 
 # Common dependencies. FIXME (can any of these be conditional? For
 # example libcurl only needed for GCS?)
+# libgomp1 is used for Onnxruntime
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends \
+            libb64-0d \
+            libcurl4-openssl-dev \
+            libre2-5 \
+            git \
+            dirmngr \
+            libnuma-dev \
+            curl \
+            libgomp1 && \
+    rm -rf /var/lib/apt/lists/*
 '''
-    dependencies = [
-        "libb64-0d", "libcurl4-openssl-dev", "libre2-5", "git", "dirmngr",
-        "libnuma-dev", "curl"
-    ]
-    image = argmap['BASE_IMAGE']
-    df += add_dependencies(image, dependencies)
-
-    if 'onnxruntime' in backends:
-        dependencies = ["libgomp1"]
-        df += add_dependencies(image, dependencies)
 
     if enable_gpu:
         df += install_dcgm_libraries(argmap['DCGM_VERSION'])
@@ -812,8 +792,8 @@ RUN ln -sf ${_CUDA_COMPAT_PATH}/lib.real ${_CUDA_COMPAT_PATH}/lib \
 # python3, python3-pip and some pip installs required for the python backend
 RUN apt-get update && \
     apt-get install -y --no-install-recommends \
-         python3 libarchive-dev \
-         python3-pip && \
+            python3 libarchive-dev \
+            python3-pip && \
     pip3 install --upgrade pip && \
     pip3 install --upgrade wheel setuptools && \
     pip3 install --upgrade numpy && \

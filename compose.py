@@ -224,7 +224,6 @@ def create_argmap(images):
     fail_if(p_find.returncode != 0,
             "Cannot search for 'serve' in /usr/bin, {}".format(p_find.stderr))
     argmap = {
-        'BASE_IMAGE': images["min"],
         'NVIDIA_BUILD_REF': p_sha.stdout.rstrip(),
         'NVIDIA_BUILD_ID': p_build.stdout.rstrip(),
         'TRITON_VERSION': version,
