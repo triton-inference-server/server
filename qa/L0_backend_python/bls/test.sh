@@ -1,5 +1,5 @@
 #!/bin/bash
-# Copyright 2021, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright (c) 2021, NVIDIA CORPORATION. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -40,16 +40,17 @@ rm -fr *.log ./models
 
 source ../../common/util.sh
 
-# Uninstall the non CUDA version of PyTorch
-pip3 uninstall -y torch
-pip3 install torch==1.9.0+cu111 torchvision==0.10.0+cu111 torchaudio==0.9.0 -f https://download.pytorch.org/whl/torch_stable.html
-pip3 install tensorflow
+mkdir -p models/bls/1/
+cp ../../python_models/bls/model.py models/bls/1/
+cp ../../python_models/bls/config.pbtxt models/bls
 
-rm -fr *.log ./models
+mkdir -p models/add_sub/1/
+cp ../../python_models/add_sub/model.py models/add_sub/1/
+cp ../../python_models/add_sub/config.pbtxt models/add_sub
 
-mkdir -p models/dlpack_test/1/
-cp ../../python_models/dlpack_test/model.py models/dlpack_test/1/
-cp ../../python_models/dlpack_test/config.pbtxt models/dlpack_test
+mkdir -p models/execute_error/1/
+cp ../../python_models/execute_error/model.py models/execute_error/1/
+cp ../../python_models/execute_error/config.pbtxt models/execute_error
 
 run_server
 if [ "$SERVER_PID" == "0" ]; then
@@ -59,7 +60,9 @@ if [ "$SERVER_PID" == "0" ]; then
 fi
 
 set +e
-export MODEL_NAME="dlpack_test"
+
+# Model name required by the unittest
+export MODEL_NAME='bls'
 python3 $CLIENT_PY > $CLIENT_LOG 2>&1 
 
 if [ $? -ne 0 ]; then
@@ -81,9 +84,9 @@ wait $SERVER_PID
 if [ $RET -eq 1 ]; then
     cat $CLIENT_LOG
     cat $SERVER_LOG
-    echo -e "\n***\n*** Unittest test FAILED. \n***"
+    echo -e "\n***\n*** BLS test FAILED. \n***"
 else
-    echo -e "\n***\n*** Unittest test PASSED. \n***"
+    echo -e "\n***\n*** BLS test PASSED. \n***"
 fi
 
 exit $RET

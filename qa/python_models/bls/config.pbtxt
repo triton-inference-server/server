@@ -1,4 +1,4 @@
-# Copyright 2021, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright (c) 2020, NVIDIA CORPORATION. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -24,21 +24,15 @@
 # (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-name: "dlpack_test"
+name: "bls"
 backend: "python"
-max_batch_size: 0
 
 output [
   {
     name: "OUTPUT0"
     data_type: TYPE_FP32
-    dims: [ -1 ]
+    dims: [ 16 ]
   }
 ]
 
-instance_group [
-  {
-    count: 1
-    kind : KIND_CPU
-  }
-]
+instance_group [{ kind: KIND_CPU }]

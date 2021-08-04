@@ -1,4 +1,4 @@
-# Copyright 2021, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright (c) 2021, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -24,21 +24,29 @@
 # (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-name: "dlpack_test"
-backend: "python"
-max_batch_size: 0
+import sys
 
-output [
-  {
-    name: "OUTPUT0"
-    data_type: TYPE_FP32
-    dims: [ -1 ]
-  }
-]
+sys.path.append("../../common")
 
-instance_group [
-  {
-    count: 1
-    kind : KIND_CPU
-  }
-]
+import test_util as tu
+import unittest
+import tritonclient.http as httpclient
+from tritonclient.utils import *
+import os
+
+
+class PythonUnittest(tu.TestResultCollector):
+    def test_dlpack_tensor(self):
+        model_name = os.environ['MODEL_NAME']
+        with httpclient.InferenceServerClient("localhost:8000") as client:
+            # No input is required
+            result = client.infer(model_name, [])
+            output0 = result.as_numpy('OUTPUT0')
+
+            # The model returns 1 if the tests were sucessfully passed.
+            # Otherwise, it will return 0.
+            self.assertTrue(output0 == [1])
+
+
+if __name__ == '__main__':
+    unittest.main()
