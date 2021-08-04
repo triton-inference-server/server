@@ -56,9 +56,12 @@ source ../common/util.sh
 # Set the number of repetitions in nightly and weekly tests
 # Set the email subject for nightly and weekly tests
 if [ "$TRITON_PERF_WEEKLY" == 1 ]; then
-    # Run the test for approximately 7 hours
-    REPETITION_CPP=1800000
-    REPETITION_PY=2200000
+    # Run the test for each case approximately 1.5 hours
+    # All tests are run cumulatively for 7 hours
+    REPETITION_HTTP_CPP=1400000
+    REPETITION_HTTP_PY=2100000
+    REPETITION_GRPC_CPP=2400000
+    REPETITION_GRPC_PY=1800000
     EMAIL_SUBJECT="Weekly"
 else
     REPETITION_CPP=100000
@@ -79,6 +82,16 @@ for PROTOCOL in http grpc; do
         MASSIF_LOG="./${PROTOCOL}.${LANG}.massif"
         LEAKCHECK_ARGS="$LEAKCHECK_ARGS_BASE --log-file=$LEAKCHECK_LOG --massif-out-file=$MASSIF_LOG"
 
+        if [ "$TRITON_PERF_WEEKLY" == 1 ]; then
+            if [ $PROTOCOL ==  http ]; then
+                REPETITION_CPP=$REPETITION_HTTP_CPP
+                REPETITION_PY=$REPETITION_HTTP_PY
+            else
+                REPETITION_CPP=$REPETITION_GRPC_CPP
+                REPETITION_PY=$REPETITION_GRPC_PY
+            fi
+        fi 
+        
         run_server
         if [ "$SERVER_PID" == "0" ]; then
             echo -e "\n***\n*** Failed to start $SERVER\n***"
