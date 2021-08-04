@@ -142,17 +142,17 @@ for MODEL in $(ls models); do
 
     set +e
 
+    SECONDS=0
     # Run the perf analyzer 'REPETITION' times
     for ((i=1; i<=$REPETITION; i++)); do
-        SECONDS=0
         $PERF_ANALYZER -v -m $MODEL -i grpc --concurrency-range $CONCURRENCY -b $CLIENT_BS >> $CLIENT_LOG 2>&1
-        TEST_DURATION=$SECONDS
         if [ $? -ne 0 ]; then
             cat $CLIENT_LOG
             echo -e "\n***\n*** perf_analyzer for $MODEL failed on iteration $i\n***"
             RET=1   
         fi
     done
+    TEST_DURATION=$SECONDS
 
     set -e
 
