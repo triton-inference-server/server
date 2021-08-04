@@ -48,7 +48,7 @@ else:
 
 FLAGS = None
 CORRELATION_ID_BLOCK_SIZE = 100
-DEFAULT_TIMEOUT_MS = 5000
+DEFAULT_TIMEOUT_MS = 7000
 SEQUENCE_LENGTH_MEAN = 16
 SEQUENCE_LENGTH_STDEV = 8
 BACKENDS = os.environ.get('BACKENDS', "graphdef savedmodel onnx plan custom")
@@ -79,21 +79,22 @@ def check_sequence_async(client_metadata,
                          input_dtype,
                          steps,
                          timeout_ms=DEFAULT_TIMEOUT_MS,
-                         sequence_name="<unknown>"):
+                         batch_size=1,
+                         sequence_name="<unknown>",
+                         tensor_shape=(1,)):
     """Perform sequence of inferences using async run. The 'steps' holds
     a list of tuples, one for each inference with format:
 
     (flag_str, value, expected_result, delay_ms)
 
     """
-    if (("savedmodel" in trial) or ("graphdef" in trial) or
-        ("custom" in trial) or ("plan" in trial)):
-        tensor_shape = (
-            1,
-            1,
-        )
-    else:
+    if (("savedmodel" not in trial) and ("graphdef" not in trial) and
+        ("custom" not in trial) and ("onnx" not in trial) and
+        ("libtorch" not in trial) and ("plan" not in trial)):
         assert False, "unknown trial type: " + trial
+
+    tensor_shape = tensor_shape if "nobatch" in trial else (
+        batch_size,) + tensor_shape
 
     triton_client = client_metadata[0]
     sequence_id = client_metadata[1]
@@ -152,7 +153,9 @@ def check_sequence_async(client_metadata,
                 raise TimeoutException(
                     "Timeout expired for {}".format(sequence_name))
 
-        result = results.as_numpy("OUTPUT")[0][0]
+        result = results.as_numpy(
+            "OUTPUT")[0] if "nobatch" in trial else results.as_numpy(
+                "OUTPUT")[0][0]
         if FLAGS.verbose:
             print("{} {}: + {} = {}".format(sequence_name, sequence_id, value,
                                             result))
@@ -170,12 +173,36 @@ def check_sequence_async(client_metadata,
 
 
 def get_datatype(trial):
-    # Get the datatype to use based on what models are available.
+    # Get the datatype to use based on what models are available (see test.sh)
     if ("plan" in trial) or ("savedmodel" in trial):
         return np.float32
     if "graphdef" in trial:
         return np.dtype(object)
     return np.int32
+
+
+def get_expected_result(expected_result, value, trial, flag_str=None):
+    # Adjust the expected_result for models that
+    # couldn't implement the full accumulator. See
+    # qa/common/gen_qa_sequence_models.py for more
+    # information.
+    if (("nobatch" not in trial and
+         ("custom" not in trial)) or ("graphdef" in trial) or
+        ("plan" in trial) or ("onnx" in trial)) or ("libtorch" in trial):
+        expected_result = value
+        if (flag_str is not None) and ("start" in flag_str):
+            expected_result += 1
+    return expected_result
+
+
+def get_trial():
+    # Randomly pick one trial for each thread
+    _trials = ()
+    for backend in BACKENDS.split(' '):
+        if (backend != "libtorch") and (backend != 'custom'):
+            _trials += (backend + "_nobatch",)
+        _trials += (backend,)
+    return np.random.choice(_trials)
 
 
 def sequence_valid(client_metadata, rng, trial, model_name, dtype, len_mean,
@@ -185,7 +212,7 @@ def sequence_valid(client_metadata, rng, trial, model_name, dtype, len_mean,
     print("{} {}: valid seqlen = {}".format(sequence_name, client_metadata[1],
                                             seqlen))
 
-    values = rng.randint(0, 1024 * 1024, size=seqlen, dtype=dtype)
+    values = rng.randint(0, 1024 * 1024, size=seqlen).astype(dtype)
 
     steps = []
     expected_result = 0
@@ -200,6 +227,8 @@ def sequence_valid(client_metadata, rng, trial, model_name, dtype, len_mean,
         val = values[idx]
         delay_ms = None
         expected_result += val
+        expected_result = get_expected_result(expected_result, val, trial,
+                                              flags)
 
         # (flag_str, value, expected_result, delay_ms)
         steps.append((flags, val, expected_result, delay_ms),)
@@ -225,8 +254,8 @@ def sequence_valid_valid(client_metadata, rng, trial, model_name, dtype,
         sequence_name, client_metadata[1], seqlen[0], seqlen[1]))
 
     values = [
-        rng.randint(0, 1024 * 1024, size=seqlen[0], dtype=dtype),
-        rng.randint(0, 1024 * 1024, size=seqlen[1], dtype=dtype)
+        rng.randint(0, 1024 * 1024, size=seqlen[0]).astype(dtype),
+        rng.randint(0, 1024 * 1024, size=seqlen[1]).astype(dtype)
     ]
 
     for p in [0, 1]:
@@ -243,6 +272,8 @@ def sequence_valid_valid(client_metadata, rng, trial, model_name, dtype,
             val = values[p][idx]
             delay_ms = None
             expected_result += val
+            expected_result = get_expected_result(expected_result, val, trial,
+                                                  flags)
 
             # (flag_str, value, expected_result, delay_ms)
             steps.append((flags, val, expected_result, delay_ms),)
@@ -268,8 +299,8 @@ def sequence_valid_no_end(client_metadata, rng, trial, model_name, dtype,
         sequence_name, client_metadata[1], seqlen[0], seqlen[1]))
 
     values = [
-        rng.randint(0, 1024 * 1024, size=seqlen[0], dtype=dtype),
-        rng.randint(0, 1024 * 1024, size=seqlen[1], dtype=dtype)
+        rng.randint(0, 1024 * 1024, size=seqlen[0]).astype(dtype),
+        rng.randint(0, 1024 * 1024, size=seqlen[1]).astype(dtype)
     ]
 
     for p in [0, 1]:
@@ -286,6 +317,8 @@ def sequence_valid_no_end(client_metadata, rng, trial, model_name, dtype,
             val = values[p][idx]
             delay_ms = None
             expected_result += val
+            expected_result = get_expected_result(expected_result, val, trial,
+                                                  flags)
 
             # (flag_str, value, expected_result, delay_ms)
             steps.append((flags, val, expected_result, delay_ms),)
@@ -306,7 +339,7 @@ def sequence_no_start(client_metadata, rng, trial, model_name, dtype,
     print("{} {}: no-start seqlen = {}".format(sequence_name,
                                                client_metadata[1], seqlen))
 
-    values = rng.randint(0, 1024 * 1024, size=seqlen, dtype=dtype)
+    values = rng.randint(0, 1024 * 1024, size=seqlen).astype(dtype)
 
     steps = []
 
@@ -340,7 +373,7 @@ def sequence_no_end(client_metadata, rng, trial, model_name, dtype, len_mean,
     print("{} {}: no-end seqlen = {}".format(sequence_name, client_metadata[1],
                                              seqlen))
 
-    values = rng.randint(0, 1024 * 1024, size=seqlen, dtype=dtype)
+    values = rng.randint(0, 1024 * 1024, size=seqlen).astype(dtype)
 
     steps = []
     expected_result = 0
@@ -353,6 +386,8 @@ def sequence_no_end(client_metadata, rng, trial, model_name, dtype, len_mean,
         val = values[idx]
         delay_ms = None
         expected_result += val
+        expected_result = get_expected_result(expected_result, val, trial,
+                                              flags)
 
         # (flag_str, value, expected_result, delay_ms)
         steps.append((flags, val, expected_result, delay_ms),)
@@ -427,7 +462,7 @@ def stress_thread(name, seed, test_duration, correlation_id_base):
         # Need to remember the last choice for each context since we
         # don't want some choices to follow others since that gives
         # results not expected. See below for details.
-        common_cnt = 2
+        common_cnt = 4
         rare_cnt = 8
         last_choices = []
 
@@ -445,7 +480,7 @@ def stress_thread(name, seed, test_duration, correlation_id_base):
                 # Rare context...
                 choice = rng.rand()
                 client_idx = common_cnt + rare_idx
-                trial = "custom"
+                trial = get_trial()
                 dtype = get_datatype(trial)
                 model_name = tu.get_sequence_model_name(trial, dtype)
 
@@ -490,7 +525,7 @@ def stress_thread(name, seed, test_duration, correlation_id_base):
                 client_idx = 0 if rng.rand() < 0.5 else 1
                 client_metadata = client_metadata_list[client_idx]
                 last_choice = last_choices[client_idx]
-                trial = "custom"
+                trial = get_trial()
                 dtype = get_datatype(trial)
                 model_name = tu.get_sequence_model_name(trial, dtype)
 
@@ -550,13 +585,18 @@ def stress_thread(name, seed, test_duration, correlation_id_base):
                                    sequence_name=name)
                     last_choices[client_idx] = "valid"
             else:
+                client_idx = 2 if rng.rand() < 0.5 else 3
+                client_metadata = client_metadata_list[client_idx]
+                last_choice = last_choices[client_idx]
                 choice = rng.rand()
-                if choice < 0.9:
-                    model_name = "resnet_v1_50_graphdef_def"
-                    resnet_model_request(model_name, sequence_name=name)
-                else:
+                if choice < 0.1:
                     model_name = "custom_identity_int32"
                     timeout_request(rng, sequence_name=name)
+                    last_choices[client_idx] = "timeout-request"
+                else:
+                    model_name = "resnet_v1_50_graphdef_def"
+                    resnet_model_request(model_name, sequence_name=name)
+                    last_choices[client_idx] = "resnet-request"
 
     except Exception as ex:
         _thread_exceptions_mutex.acquire()

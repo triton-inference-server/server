@@ -77,10 +77,6 @@ for BACKEND in $BACKENDS; do
   else
     DTYPE=$(get_datatype $BACKEND)
     MODELS="$MODELS $DATADIR/qa_sequence_model_repository/${BACKEND}_sequence_${DTYPE}"
-
-    if [[ $BACKEND == "graphdef" ]]; then
-      MODELS="$MODELS $DATADIR/qa_sequence_model_repository/graphdef_sequence_int32"
-    fi
   fi
 done
 
@@ -106,10 +102,6 @@ MODELS=""
 for BACKEND in $BACKENDS; do
     DTYPE=$(get_datatype $BACKEND)
     MODELS="$MODELS $DATADIR/qa_sequence_model_repository/${BACKEND}_nobatch_sequence_${DTYPE}"
-
-    if [[ $BACKEND == "graphdef" ]]; then
-        MODELS="$MODELS $DATADIR/qa_sequence_model_repository/graphdef_nobatch_sequence_int32"
-    fi
 done
 
 for MODEL in $MODELS; do
