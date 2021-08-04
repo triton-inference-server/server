@@ -202,7 +202,7 @@ if [ -n "$SAGEMAKER_SAFE_PORT_RANGE" ]; then
 fi
 
 # Enable HTTP endpoint and expect server fail to start (default port 8000 < 8081)
-SERVER_ARGS="--allow-grpc false --allow-http true --allow-metrics false \
+SERVER_ARGS="--allow-sagemaker=true --allow-grpc false --allow-http true --allow-metrics false \
              --model-control-mode=explicit --load-model=${SAGEMAKER_TRITON_DEFAULT_MODEL_NAME} \
              $SAGEMAKER_ARGS"
 run_server_nowait
@@ -305,8 +305,8 @@ kill $SERVER_PID
 wait $SERVE_PID
 
 # Test unspecified SAGEMAKER_TRITON_DEFAULT_MODEL_NAME for ecs/eks case
-SERVER_ARGS="--model-repository `pwd`/models --allow-grpc false --allow-http false --allow-metrics false \
-             --model-control-mode=explicit --exit-on-error=false"
+SERVER_ARGS="--allow-sagemaker=true --allow-grpc false --allow-http false --allow-metrics false \
+             --model-repository `pwd`/models --model-control-mode=explicit --exit-on-error=false"
 run_server_nowait
 sleep 5
 if [ "$SERVER_PID" == "0" ]; then
@@ -336,8 +336,8 @@ wait $SERVER_PID
 
 # Run server with invalid model and exit-on-error=false
 rm models/sm_model/1/*
-SERVER_ARGS="--model-repository `pwd`/models --allow-grpc false --allow-http false --allow-metrics false \
-             --model-control-mode=explicit --load-model=sm_model \
+SERVER_ARGS="--allow-sagemaker=true --allow-grpc false --allow-http false --allow-metrics false \
+             --model-repository `pwd`/models --model-control-mode=explicit --load-model=sm_model \
              --exit-on-error=false"
 run_server_nowait
 sleep 5

@@ -72,4 +72,4 @@ else
     SAGEMAKER_ARGS="${SAGEMAKER_ARGS} --load-model=${SAGEMAKER_TRITON_DEFAULT_MODEL_NAME}"
 fi
 
-tritonserver --allow-grpc=false --allow-http=false --allow-metrics=false --model-control-mode=explicit $SAGEMAKER_ARGS
+tritonserver --allow-sagemaker=true --allow-grpc=false --allow-http=false --allow-metrics=false --model-control-mode=explicit $SAGEMAKER_ARGS
