@@ -73,7 +73,7 @@ class TritonModelInstance {
     const std::string kind_;
     const int64_t id_;
   };
-  const std::vector<SecondaryDevice> SecondaryDevices() const
+  const std::vector<SecondaryDevice>& SecondaryDevices() const
   {
     return secondary_devices_;
   }
