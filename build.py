@@ -382,12 +382,10 @@ def pytorch_cmake_args(images):
 
 def onnxruntime_cmake_args(images, library_paths):
     cargs = [
+        '-DTRITON_ENABLE_ONNXRUNTIME_TENSORRT=ON',
         '-DTRITON_BUILD_ONNXRUNTIME_VERSION={}'.format(
             TRITON_VERSION_MAP[FLAGS.version][2])
     ]
-
-    # ONNX-TRT support is currently disabled since TRT 8 is not supported
-    cargs.append('-DTRITON_ENABLE_ONNXRUNTIME_TENSORRT=OFF')
 
     # If platform is jetpack do not use docker based build
     if target_platform() == 'jetpack':
