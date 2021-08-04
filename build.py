@@ -763,7 +763,6 @@ ENV DEBIAN_FRONTEND=noninteractive
 
 # Common dependencies. FIXME (can any of these be conditional? For
 # example libcurl only needed for GCS?)
-# libgomp1 is used for Onnxruntime
 RUN apt-get update && \
     apt-get install -y --no-install-recommends \
             libb64-0d \
