@@ -65,6 +65,19 @@ class TritonModelInstance {
   bool IsPassive() const { return passive_; }
   const std::vector<std::string>& Profiles() const { return profile_names_; }
 
+  struct SecondaryDevice {
+    SecondaryDevice(const std::string kind, const int64_t id)
+        : kind_(kind), id_(id)
+    {
+    }
+    const std::string kind_;
+    const int64_t id_;
+  };
+  const std::vector<SecondaryDevice> SecondaryDevices() const
+  {
+    return secondary_devices_;
+  }
+
   Status Initialize();
   Status WarmUp();
   void Schedule(
@@ -85,7 +98,8 @@ class TritonModelInstance {
       const TRITONSERVER_InstanceGroupKind kind, const int32_t device_id,
       const std::vector<std::string>& profile_names, const bool passive,
       const HostPolicyCmdlineConfig& host_policy,
-      const TritonServerMessage& host_policy_message);
+      const TritonServerMessage& host_policy_message,
+      const std::vector<SecondaryDevice>& secondary_devices);
   static Status CreateInstance(
       TritonModel* model, const std::string& name, const size_t index,
       const TRITONSERVER_InstanceGroupKind kind, const int32_t device_id,
@@ -95,7 +109,8 @@ class TritonModelInstance {
       const inference::ModelRateLimiter& rate_limiter_config,
       const bool device_blocking,
       std::map<uint32_t, std::shared_ptr<TritonBackendThread>>*
-          device_to_thread_map);
+          device_to_thread_map,
+      const std::vector<SecondaryDevice>& secondary_devices);
   Status SetBackendThread(
       const TRITONSERVER_InstanceGroupKind kind, const int32_t device_id,
       const bool device_blocking,
@@ -159,6 +174,8 @@ class TritonModelInstance {
   TritonServerMessage host_policy_message_;
   std::vector<std::string> profile_names_;
   bool passive_;
+
+  std::vector<SecondaryDevice> secondary_devices_;
 
   std::shared_ptr<TritonBackendThread> backend_thread_;
 

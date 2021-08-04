@@ -112,11 +112,12 @@ TritonModelInstance::TritonModelInstance(
     const TRITONSERVER_InstanceGroupKind kind, const int32_t device_id,
     const std::vector<std::string>& profile_names, const bool passive,
     const HostPolicyCmdlineConfig& host_policy,
-    const TritonServerMessage& host_policy_message)
+    const TritonServerMessage& host_policy_message,
+    const std::vector<SecondaryDevice>& secondary_devices)
     : model_(model), name_(name), index_(index), kind_(kind),
       device_id_(device_id), host_policy_(host_policy),
       host_policy_message_(host_policy_message), profile_names_(profile_names),
-      passive_(passive), state_(nullptr)
+      passive_(passive), secondary_devices_(secondary_devices), state_(nullptr)
 {
 #ifdef TRITON_ENABLE_METRICS
   if (Metrics::Enabled()) {
@@ -157,6 +158,14 @@ TritonModelInstance::CreateInstances(
     std::vector<std::string> profile_names;
     for (const auto& profile_name : group.profile()) {
       profile_names.push_back(profile_name);
+    }
+    std::vector<SecondaryDevice> secondary_devices;
+    for (const auto& secondary_device : group.secondary_devices()) {
+      secondary_devices.emplace_back(
+          inference::
+              ModelInstanceGroup_SecondaryDevice_SecondaryDeviceKind_Name(
+                  secondary_device.kind()),
+          secondary_device.device_id());
     }
     for (int32_t c = 0; c < group.count(); ++c) {
       std::string instance_name{group.count() > 1
@@ -204,7 +213,8 @@ TritonModelInstance::CreateInstances(
         auto err = CreateInstance(
             model, instance_name, c, std::get<1>(is), std::get<2>(is),
             profile_names, passive, policy_name, *host_policy,
-            *(std::get<3>(is)), device_blocking, &device_to_thread_map);
+            *(std::get<3>(is)), device_blocking, &device_to_thread_map,
+            secondary_devices);
         RETURN_IF_ERROR(ResetNumaMemoryPolicy());
         RETURN_IF_ERROR(err);
       }
@@ -224,7 +234,8 @@ TritonModelInstance::CreateInstance(
     const inference::ModelRateLimiter& rate_limiter_config,
     const bool device_blocking,
     std::map<uint32_t, std::shared_ptr<TritonBackendThread>>*
-        device_to_thread_map)
+        device_to_thread_map,
+    const std::vector<SecondaryDevice>& secondary_devices)
 {
   // Create the JSON representation of the backend configuration.
   triton::common::TritonJson::Value host_policy_json(
@@ -241,7 +252,7 @@ TritonModelInstance::CreateInstance(
 
   std::unique_ptr<TritonModelInstance> local_instance(new TritonModelInstance(
       model, name, index, kind, device_id, profile_names, passive, host_policy,
-      host_policy_message));
+      host_policy_message, secondary_devices));
 
   model->Server()->GetRateLimiter()->InitializePayloadQueues(
       local_instance.get());
@@ -736,6 +747,39 @@ TRITONBACKEND_ModelInstanceProfileName(
   }
 
   *profile_name = rprofiles[index].c_str();
+
+  return nullptr;  // success
+}
+
+TRITONSERVER_Error*
+TRITONBACKEND_ModelInstanceSecondaryDeviceCount(
+    TRITONBACKEND_ModelInstance* instance, uint32_t* count)
+{
+  TritonModelInstance* ti = reinterpret_cast<TritonModelInstance*>(instance);
+  *count = ti->SecondaryDevices().size();
+
+  return nullptr;  // success
+}
+
+TRITONSERVER_Error*
+TRITONBACKEND_ModelInstanceSecondaryDeviceProperties(
+    TRITONBACKEND_ModelInstance* instance, uint32_t index, const char** kind,
+    int64_t* id)
+{
+  TritonModelInstance* ti = reinterpret_cast<TritonModelInstance*>(instance);
+  const auto& rsecondarydevices = ti->SecondaryDevices();
+
+  if (index >= rsecondarydevices.size()) {
+    return TRITONSERVER_ErrorNew(
+        TRITONSERVER_ERROR_INVALID_ARG,
+        (std::string("out of bounds index ") + std::to_string(index) +
+         ": instance is configured with " +
+         std::to_string(rsecondarydevices.size()) + " secondary devices")
+            .c_str());
+  }
+
+  *kind = rsecondarydevices[index].kind_.c_str();
+  *id = rsecondarydevices[index].id_;
 
   return nullptr;  // success
 }
