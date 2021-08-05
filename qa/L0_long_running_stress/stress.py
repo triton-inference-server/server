@@ -48,10 +48,10 @@ else:
 
 FLAGS = None
 CORRELATION_ID_BLOCK_SIZE = 100
-DEFAULT_TIMEOUT_MS = 7000
+DEFAULT_TIMEOUT_MS = 9000
 SEQUENCE_LENGTH_MEAN = 16
 SEQUENCE_LENGTH_STDEV = 8
-BACKENDS = os.environ.get('BACKENDS', "graphdef savedmodel onnx plan custom")
+BACKENDS = os.environ.get('BACKENDS', "graphdef savedmodel custom")
 
 _thread_exceptions = []
 _thread_exceptions_mutex = threading.Lock()
@@ -199,7 +199,8 @@ def get_trial():
     # Randomly pick one trial for each thread
     _trials = ()
     for backend in BACKENDS.split(' '):
-        if (backend != "libtorch") and (backend != 'custom'):
+        if (backend != "libtorch") and (backend != 'custom') and (backend !=
+                                                                  'savedmodel'):
             _trials += (backend + "_nobatch",)
         _trials += (backend,)
     return np.random.choice(_trials)
@@ -400,34 +401,18 @@ def sequence_no_end(client_metadata, rng, trial, model_name, dtype, len_mean,
                          sequence_name=sequence_name)
 
 
-def timeout_request(rng, sequence_name):
+def timeout_client(sequence_name):
     # Provide too small a timeout and expect a failure.
     # Note, the custom_identity_int32 is configured with a delay
     # of 3 sec
-    timeout_client = "../clients/client_timeout_test"
-    timeout_result = "timeout_result_{}_".format(sequence_name)
-    if rng.rand() < 0.33:
-        # Test request timeout in grpc synchronous inference
-        timeout_result += "grpc_infer.log"
-        os.system("{} -t 1000 -v -i grpc > {} 2>&1".format(
-            timeout_client, timeout_result))
-    elif rng.rand() < 0.66:
-        # Test request timeout in grpc asynchronous inference
-        timeout_result += "grpc_async_infer.log"
-        os.system("{} -t 1000 -v -i grpc -a > {} 2>&1".format(
-            timeout_client, timeout_result))
-    else:
-        # Test stream timeout in grpc asynchronous streaming inference
-        timeout_result += "grpc_async_stream_infer.log"
-        os.system("{} -t 1000 -v -i grpc -s > {} 2>&1".format(
-            timeout_client, timeout_result))
+    timeout_client = "timeout_client.py"
+    timeout_result = "timeout_{}.log".format(sequence_name)
+    os.system("python {} ClientTimeoutTest.test_grpc_infer > {} 2>&1".format(
+        timeout_client, timeout_result))
 
     with open(timeout_result) as f:
-        result = f.read()
-        if ("Deadline Exceeded" not in result) and ("Stream has been closed"
-                                                    not in result):
-            assert False, "timeout_request failed {} {}".format(
-                sequence_name, timeout_result)
+        if "Deadline Exceeded" not in f.read():
+            assert False, "timeout_client failed {}".format(sequence_name)
 
 
 def resnet_model_request(model_name, sequence_name):
@@ -439,6 +424,14 @@ def resnet_model_request(model_name, sequence_name):
     with open(resnet_result) as f:
         if "VULTURE" not in f.read():
             assert False, "resnet_model_request failed"
+
+
+def crashing_client(sequence_name):
+    # Client will be terminated after 3 seconds
+    crashing_client = "crashing_client.py"
+    crashing_client_log = "crashing_{}.log".format(sequence_name)
+    if os.system("python {} > {}".format(crashing_client, crashing_client_log)):
+        assert False, "crashing_client failed"
 
 
 def stress_thread(name, seed, test_duration, correlation_id_base):
@@ -462,7 +455,7 @@ def stress_thread(name, seed, test_duration, correlation_id_base):
         # Need to remember the last choice for each context since we
         # don't want some choices to follow others since that gives
         # results not expected. See below for details.
-        common_cnt = 4
+        common_cnt = 2
         rare_cnt = 8
         last_choices = []
 
@@ -480,7 +473,7 @@ def stress_thread(name, seed, test_duration, correlation_id_base):
                 # Rare context...
                 choice = rng.rand()
                 client_idx = common_cnt + rare_idx
-                trial = get_trial()
+                trial = "custom"
                 dtype = get_datatype(trial)
                 model_name = tu.get_sequence_model_name(trial, dtype)
 
@@ -522,10 +515,10 @@ def stress_thread(name, seed, test_duration, correlation_id_base):
                 rare_idx = (rare_idx + 1) % rare_cnt
             elif rng.rand() < 0.6:
                 # Common context...
-                client_idx = 0 if rng.rand() < 0.5 else 1
+                client_idx = 0
                 client_metadata = client_metadata_list[client_idx]
                 last_choice = last_choices[client_idx]
-                trial = get_trial()
+                trial = "custom"
                 dtype = get_datatype(trial)
                 model_name = tu.get_sequence_model_name(trial, dtype)
 
@@ -585,18 +578,37 @@ def stress_thread(name, seed, test_duration, correlation_id_base):
                                    sequence_name=name)
                     last_choices[client_idx] = "valid"
             else:
-                client_idx = 2 if rng.rand() < 0.5 else 3
+                client_idx = 1
                 client_metadata = client_metadata_list[client_idx]
-                last_choice = last_choices[client_idx]
                 choice = rng.rand()
+
                 if choice < 0.1:
                     model_name = "custom_identity_int32"
-                    timeout_request(rng, sequence_name=name)
-                    last_choices[client_idx] = "timeout-request"
-                else:
+                    timeout_client(sequence_name=name)
+                    last_choices[client_idx] = "timeout-client"
+                elif choice < 0.3:
                     model_name = "resnet_v1_50_graphdef_def"
                     resnet_model_request(model_name, sequence_name=name)
                     last_choices[client_idx] = "resnet-request"
+                elif choice < 0.5:
+                    trial = "savedmodel_nobatch"
+                    dtype = get_datatype(trial)
+                    model_name = tu.get_sequence_model_name(trial, dtype)
+                    crashing_client(sequence_name=name)
+                    last_choices[client_idx] = "crashing-client"
+                else:
+                    trial = get_trial()
+                    dtype = get_datatype(trial)
+                    model_name = tu.get_sequence_model_name(trial, dtype)
+                    sequence_valid(client_metadata,
+                                   rng,
+                                   trial,
+                                   model_name,
+                                   dtype,
+                                   SEQUENCE_LENGTH_MEAN,
+                                   SEQUENCE_LENGTH_STDEV,
+                                   sequence_name=name)
+                    last_choices[client_idx] = "valid"
 
     except Exception as ex:
         _thread_exceptions_mutex.acquire()

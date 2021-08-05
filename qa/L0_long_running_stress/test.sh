@@ -47,7 +47,7 @@ source ../common/util.sh
 RET=0
 
 # If BACKENDS not specified, set to all
-BACKENDS=${BACKENDS:="graphdef savedmodel onnx plan custom"}
+BACKENDS=${BACKENDS:="graphdef savedmodel custom"}
 export BACKENDS
 
 # If MODEL_TRIALS not specified set to 1 2 4
@@ -57,7 +57,7 @@ MODEL_TRIALS=${MODEL_TRIALS:="1 2 4"}
 #   models1 - one instance with batch-size 4
 #   models2 - two instances with batch-size 2
 #   models4 - four instances with batch-size 1
-rm -fr *.log *.serverlog models{1,2,4} && mkdir models{1,2,4}
+rm -fr *.log *.txt *.serverlog models{1,2,4} && mkdir models{1,2,4}
 
 # Get the datatype to use based on the backend
 function get_datatype () {
