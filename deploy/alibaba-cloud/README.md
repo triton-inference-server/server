@@ -85,6 +85,7 @@ from tritonclient.utils import InferenceServerException
 URL = "<servcice url>"
 HEADERS = {"Authorization": "<service token>"}
 input_img = httpclient.InferInput("input", [1, 299, 299, 3], "FP32")
+# Using one of the cat images from imagenet or a random cat images you like
 img = Image.open('./cat.png').resize((299, 299))
 img = np.asarray(img).astype('float32') / 255.0
 input_img.set_data_from_numpy(img.reshape([1, 299, 299, 3]), binary_data=True)
