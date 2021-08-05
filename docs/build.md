@@ -229,7 +229,7 @@ cuDNN and TensorRT versions and place them in the local directory.
 
 * For cuDNN the CUDNN_VERSION and CUDNN_ZIP arguments indicate the
   version of cuDNN that your should download from
-  https://developer.nvidia.com/rdp/cudnn-archive.
+  https://developer.nvidia.com/rdp/cudnn-download.
 
 * For TensorRT the TENSORRT_VERSION and TENSORRT_ZIP arguments
   indicate the version of TensorRT that your should download from
@@ -340,5 +340,5 @@ changes in the following areas.
 ## Building with Debug Symbols
 
 To build with Debug symbols, use the --build-type=Debug arguement while
-launching build.py. You can then launch the built server with gdb and see 
+launching build.py. You can then launch the built server with gdb and see
 the debug symbols/information in the gdb trace.
