@@ -44,6 +44,10 @@ mkdir -p models/bls/1/
 cp ../../python_models/bls/model.py models/bls/1/
 cp ../../python_models/bls/config.pbtxt models/bls
 
+mkdir -p models/bls_memory/1/
+cp ../../python_models/bls_memory/model.py models/bls_memory/1/
+cp ../../python_models/bls_memory/config.pbtxt models/bls_memory
+
 mkdir -p models/add_sub/1/
 cp ../../python_models/add_sub/model.py models/add_sub/1/
 cp ../../python_models/add_sub/config.pbtxt models/add_sub
@@ -51,6 +55,10 @@ cp ../../python_models/add_sub/config.pbtxt models/add_sub
 mkdir -p models/execute_error/1/
 cp ../../python_models/execute_error/model.py models/execute_error/1/
 cp ../../python_models/execute_error/config.pbtxt models/execute_error
+
+mkdir -p models/identity_fp32/1/
+cp ../../python_models/identity_fp32/model.py models/identity_fp32/1/
+cp ../../python_models/identity_fp32/config.pbtxt models/identity_fp32
 
 run_server
 if [ "$SERVER_PID" == "0" ]; then
@@ -62,8 +70,16 @@ fi
 set +e
 
 # Model name required by the unittest
+
+# First try the BLS memory test and then test the normal BLS. This ensures that
+# the Python backend can work properly after shared memory saturation caused by
+# one of the older requests.
+export MODEL_NAME='bls_memory'
+python3 $CLIENT_PY > $CLIENT_LOG 2>&1 
+
 export MODEL_NAME='bls'
 python3 $CLIENT_PY > $CLIENT_LOG 2>&1 
+
 
 if [ $? -ne 0 ]; then
     echo -e "\n***\n*** python_unittest.py FAILED. \n***"
