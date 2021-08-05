@@ -30,27 +30,6 @@ ARG BASE_IMAGE=mcr.microsoft.com/dotnet/framework/sdk:4.8
 
 FROM ${BASE_IMAGE}
 
-ARG CUDA_MAJOR=11
-ARG CUDA_MINOR=1
-ARG CUDA_PATCH=1
-ARG CUDA_VERSION=${CUDA_MAJOR}.${CUDA_MINOR}.${CUDA_PATCH}
-ARG CUDA_PACKAGES="nvcc_${CUDA_MAJOR}.${CUDA_MINOR} \
-                   cudart_${CUDA_MAJOR}.${CUDA_MINOR} \
-                   nvml_dev_${CUDA_MAJOR}.${CUDA_MINOR} \
-                   cublas_${CUDA_MAJOR}.${CUDA_MINOR} cublas_dev_${CUDA_MAJOR}.${CUDA_MINOR} \
-                   cufft_${CUDA_MAJOR}.${CUDA_MINOR} cufft_dev_${CUDA_MAJOR}.${CUDA_MINOR} \
-                   curand_${CUDA_MAJOR}.${CUDA_MINOR} curand_dev_${CUDA_MAJOR}.${CUDA_MINOR} \
-                   cusolver_${CUDA_MAJOR}.${CUDA_MINOR} cusolver_dev_${CUDA_MAJOR}.${CUDA_MINOR} \
-                   cusparse_${CUDA_MAJOR}.${CUDA_MINOR} cusparse_dev_${CUDA_MAJOR}.${CUDA_MINOR} \
-                   visual_studio_integration_${CUDA_MAJOR}.${CUDA_MINOR}"
-ARG CUDA_INSTALL_ROOT_WP="C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v${CUDA_MAJOR}.${CUDA_MINOR}"
-
-ARG TENSORRT_VERSION=7.2.2.3
-ARG TENSORRT_ZIP=TensorRT-${TENSORRT_VERSION}.Windows10.x86_64.cuda-11.1.cudnn8.0.zip
-
-ARG CUDNN_VERSION=8.0.5.39
-ARG CUDNN_ZIP=cudnn-11.1-windows-x64-v${CUDNN_VERSION}.zip
-
 SHELL ["cmd", "/S", "/C"]
 
 RUN mkdir c:\tmp
@@ -85,6 +64,27 @@ RUN bootstrap-vcpkg.bat
 RUN vcpkg.exe update
 RUN vcpkg.exe install openssl:x64-windows openssl-windows:x64-windows rapidjson:x64-windows re2:x64-windows boost-interprocess:x64-windows zlib:x64-windows
 RUN vcpkg.exe integrate install
+
+ARG CUDA_MAJOR=11
+ARG CUDA_MINOR=4
+ARG CUDA_PATCH=0
+ARG CUDA_VERSION=${CUDA_MAJOR}.${CUDA_MINOR}.${CUDA_PATCH}
+ARG CUDA_PACKAGES="nvcc_${CUDA_MAJOR}.${CUDA_MINOR} \
+                   cudart_${CUDA_MAJOR}.${CUDA_MINOR} \
+                   nvml_dev_${CUDA_MAJOR}.${CUDA_MINOR} \
+                   cublas_${CUDA_MAJOR}.${CUDA_MINOR} cublas_dev_${CUDA_MAJOR}.${CUDA_MINOR} \
+                   cufft_${CUDA_MAJOR}.${CUDA_MINOR} cufft_dev_${CUDA_MAJOR}.${CUDA_MINOR} \
+                   curand_${CUDA_MAJOR}.${CUDA_MINOR} curand_dev_${CUDA_MAJOR}.${CUDA_MINOR} \
+                   cusolver_${CUDA_MAJOR}.${CUDA_MINOR} cusolver_dev_${CUDA_MAJOR}.${CUDA_MINOR} \
+                   cusparse_${CUDA_MAJOR}.${CUDA_MINOR} cusparse_dev_${CUDA_MAJOR}.${CUDA_MINOR} \
+                   visual_studio_integration_${CUDA_MAJOR}.${CUDA_MINOR}"
+ARG CUDA_INSTALL_ROOT_WP="C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v${CUDA_MAJOR}.${CUDA_MINOR}"
+
+ARG TENSORRT_VERSION=8.0.1.6
+ARG TENSORRT_ZIP=TensorRT-${TENSORRT_VERSION}.Windows10.x86_64.cuda-11.3.cudnn8.2.zip
+
+ARG CUDNN_VERSION=8.2.2.26
+ARG CUDNN_ZIP=cudnn-11.4-windows-x64-v${CUDNN_VERSION}.zip
 
 WORKDIR /tmp
 ADD https://developer.download.nvidia.com/compute/cuda/${CUDA_VERSION}/network_installers/cuda_${CUDA_VERSION}_win10_network.exe cuda_${CUDA_VERSION}_win10_network.exe
