@@ -25,15 +25,12 @@
 # (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-UNITTEST_PY=./io_test.py
+SERVER=/opt/tritonserver/bin/tritonserver
+SERVER_ARGS="--model-repository=`pwd`/models --log-verbose=1"
+CLIENT_PY=../python_unittest.py
 CLIENT_LOG="./client.log"
 EXPECTED_NUM_TESTS="1"
 TEST_RESULT_FILE='test_results.txt'
-source ../common.sh
-source ../../common/util.sh
-
-SERVER=/opt/tritonserver/bin/tritonserver
-SERVER_ARGS="--model-repository=`pwd`/models --log-verbose=1"
 SERVER_LOG="./inference_server.log"
 REPO_VERSION=${NVIDIA_TRITON_SERVER_VERSION}
 DATADIR=${DATADIR:="/data/inferenceserver/${REPO_VERSION}"}
@@ -41,20 +38,27 @@ DATADIR=${DATADIR:="/data/inferenceserver/${REPO_VERSION}"}
 RET=0
 rm -fr *.log ./models
 
-pip3 uninstall -y torch
-pip3 install torch==1.9.0+cu111 torchvision==0.10.0+cu111 torchaudio==0.9.0 -f https://download.pytorch.org/whl/torch_stable.html
+source ../../common/util.sh
 
-for i in {1..3}; do
-    model_name=dlpack_io_identity_$i
-    mkdir -p models/$model_name/1/
-    cp ../../python_models/dlpack_io_identity/model.py ./models/$model_name/1/
-    cp ../../python_models/dlpack_io_identity/config.pbtxt ./models/$model_name/
-    (cd models/$model_name && \
-              sed -i "s/^name:.*/name: \"$model_name\"/" config.pbtxt)
-done
+mkdir -p models/bls/1/
+cp ../../python_models/bls/model.py models/bls/1/
+cp ../../python_models/bls/config.pbtxt models/bls
 
-mkdir -p models/ensemble_io/1/
-cp ../../python_models/ensemble_io/config.pbtxt ./models/ensemble_io
+mkdir -p models/bls_memory/1/
+cp ../../python_models/bls_memory/model.py models/bls_memory/1/
+cp ../../python_models/bls_memory/config.pbtxt models/bls_memory
+
+mkdir -p models/add_sub/1/
+cp ../../python_models/add_sub/model.py models/add_sub/1/
+cp ../../python_models/add_sub/config.pbtxt models/add_sub
+
+mkdir -p models/execute_error/1/
+cp ../../python_models/execute_error/model.py models/execute_error/1/
+cp ../../python_models/execute_error/config.pbtxt models/execute_error
+
+mkdir -p models/identity_fp32/1/
+cp ../../python_models/identity_fp32/model.py models/identity_fp32/1/
+cp ../../python_models/identity_fp32/config.pbtxt models/identity_fp32
 
 run_server
 if [ "$SERVER_PID" == "0" ]; then
@@ -64,10 +68,14 @@ if [ "$SERVER_PID" == "0" ]; then
 fi
 
 set +e
-python3 $UNITTEST_PY > $CLIENT_LOG
+
+# First try the BLS memory test and then test the normal BLS. This ensures that
+# the Python backend can work properly after shared memory saturation caused by
+# one of the older requests.
+export MODEL_NAME='bls_memory'
+python3 $CLIENT_PY > $CLIENT_LOG 2>&1 
 if [ $? -ne 0 ]; then
-    echo -e "\n***\n*** io_test.py FAILED. \n***"
-    cat $CLIENT_LOG
+    echo -e "\n***\n*** python_unittest.py FAILED. \n***"
     RET=1
 else
     check_test_results $TEST_RESULT_FILE $EXPECTED_NUM_TESTS
@@ -78,15 +86,30 @@ else
     fi
 fi
 
+export MODEL_NAME='bls'
+python3 $CLIENT_PY > $CLIENT_LOG 2>&1 
+if [ $? -ne 0 ]; then
+    echo -e "\n***\n*** python_unittest.py FAILED. \n***"
+    RET=1
+else
+    check_test_results $TEST_RESULT_FILE $EXPECTED_NUM_TESTS
+    if [ $? -ne 0 ]; then
+        cat $CLIENT_LOG
+        echo -e "\n***\n*** Test Result Verification Failed\n***"
+        RET=1
+    fi
+fi
 set -e
 
 kill $SERVER_PID
 wait $SERVER_PID
 
-if [ $RET -eq 0 ]; then
-    echo -e "\n***\n*** IO test PASSED.\n***"
+if [ $RET -eq 1 ]; then
+    cat $CLIENT_LOG
+    cat $SERVER_LOG
+    echo -e "\n***\n*** BLS test FAILED. \n***"
 else
-    echo -e "\n***\n*** IO test FAILED.\n***"
+    echo -e "\n***\n*** BLS test PASSED. \n***"
 fi
 
 exit $RET
