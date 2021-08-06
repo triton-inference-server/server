@@ -36,7 +36,7 @@ import os
 
 
 class PythonUnittest(tu.TestResultCollector):
-    def test_dlpack_tensor(self):
+    def test_python_unittest(self):
         model_name = os.environ['MODEL_NAME']
         with httpclient.InferenceServerClient("localhost:8000") as client:
             # No input is required
