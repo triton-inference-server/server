@@ -73,7 +73,7 @@ class RequestResponseCache {
         uint64_t available_size_;
         // key -> CacheEntry containing values and list iterator for LRU management
         std::unordered_map<uint64_t, CacheEntry> cache_;
-        // list of keys sorted from least to most recently used
+        // list of keys sorted from most to least recently used
         std::list<uint64_t> lru_;
 
         // Update LRU ordering on lookup
