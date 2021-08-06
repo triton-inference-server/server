@@ -43,9 +43,10 @@ def crashing_client(triton_client):
 
     inputs_[0].set_data_from_numpy(input0_data_)
 
-    result = triton_client.infer(model_name=model_name_,
-                                 inputs=inputs_,
-                                 outputs=outputs_)
+    while True:
+        result = triton_client.infer(model_name=model_name_,
+                                     inputs=inputs_,
+                                     outputs=outputs_)
 
 
 if __name__ == '__main__':
