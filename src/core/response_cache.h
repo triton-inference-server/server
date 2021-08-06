@@ -77,7 +77,7 @@ class RequestResponseCache {
         std::list<uint64_t> lru_;
 
         // Update LRU ordering on lookup
-        void Update();
+        void Update(std::unordered_map<uint64_t, CacheEntry>::iterator&);
 };
 
 }}  // namespace nvidia::inferenceserver
