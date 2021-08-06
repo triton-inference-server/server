@@ -1,4 +1,4 @@
-// Copyright (c) 2018-2020, NVIDIA CORPORATION. All rights reserved.
+// Copyright (c) 2018-2021, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 //
 // Redistribution and use in source and binary forms, with or without
 // modification, are permitted provided that the following conditions
@@ -50,7 +50,7 @@ Status GetBooleanSequenceControlProperties(
     const bool required, std::string* tensor_name,
     inference::DataType* tensor_datatype, float* fp32_false_value,
     float* fp32_true_value, int32_t* int32_false_value,
-    int32_t* int32_true_value);
+    int32_t* int32_true_value, bool* bool_false_value, bool* bool_true_value);
 
 /// Get the tensor name and datatype for a non-boolean sequence
 /// batcher control kind. If 'required' is true then must find a
