@@ -160,7 +160,8 @@ GetBooleanOverrideInputs(
     const std::string& tensor_name, const bool support_batching,
     const inference::DataType tensor_datatype, const float fp32_false_value,
     const float fp32_true_value, const int32_t int32_false_value,
-    const int32_t int32_true_value,
+    const int32_t int32_true_value, const bool bool_false_value,
+    const bool bool_true_value,
     std::shared_ptr<InferenceRequest::Input>* true_override,
     std::shared_ptr<InferenceRequest::Input>* false_override)
 {
@@ -201,9 +202,12 @@ GetBooleanOverrideInputs(
   if (tensor_datatype == inference::DataType::TYPE_INT32) {
     *(reinterpret_cast<int32_t*>(true_p_ptr)) = int32_true_value;
     *(reinterpret_cast<int32_t*>(false_p_ptr)) = int32_false_value;
-  } else {
+  } else if (tensor_datatype == inference::DataType::TYPE_FP32) {
     *(reinterpret_cast<float*>(true_p_ptr)) = fp32_true_value;
     *(reinterpret_cast<float*>(false_p_ptr)) = fp32_false_value;
+  } else {
+    *(reinterpret_cast<bool*>(true_p_ptr)) = bool_true_value;
+    *(reinterpret_cast<bool*>(false_p_ptr)) = bool_false_value;
   }
 
   auto ltrue_override = std::make_shared<InferenceRequest::Input>(
@@ -247,6 +251,7 @@ SequenceBatchScheduler::CreateBooleanControlTensors(
   inference::DataType tensor_datatype;
   int32_t int32_false_value, int32_true_value;
   float fp32_false_value, fp32_true_value;
+  bool bool_false_value, bool_true_value;
 
   // START, optional
   {
@@ -254,7 +259,8 @@ SequenceBatchScheduler::CreateBooleanControlTensors(
         config.sequence_batching(), config.name(),
         inference::ModelSequenceBatching::Control::CONTROL_SEQUENCE_START,
         false /* required */, &tensor_name, &tensor_datatype, &fp32_false_value,
-        &fp32_true_value, &int32_false_value, &int32_true_value));
+        &fp32_true_value, &int32_false_value, &int32_true_value,
+        &bool_false_value, &bool_true_value));
     if (!tensor_name.empty()) {
       std::shared_ptr<InferenceRequest::Input> true_override;
       std::shared_ptr<InferenceRequest::Input> false_override;
@@ -262,7 +268,8 @@ SequenceBatchScheduler::CreateBooleanControlTensors(
       RETURN_IF_ERROR(GetBooleanOverrideInputs(
           tensor_name, config.max_batch_size() != 0, tensor_datatype,
           fp32_false_value, fp32_true_value, int32_false_value,
-          int32_true_value, &true_override, &false_override));
+          int32_true_value, bool_false_value, bool_true_value, &true_override,
+          &false_override));
 
       (*start_input_overrides)->emplace_back(true_override);
       (*end_input_overrides)->emplace_back(false_override);
@@ -278,7 +285,8 @@ SequenceBatchScheduler::CreateBooleanControlTensors(
         config.sequence_batching(), config.name(),
         inference::ModelSequenceBatching::Control::CONTROL_SEQUENCE_END,
         false /* required */, &tensor_name, &tensor_datatype, &fp32_false_value,
-        &fp32_true_value, &int32_false_value, &int32_true_value));
+        &fp32_true_value, &int32_false_value, &int32_true_value,
+        &bool_false_value, &bool_true_value));
     if (!tensor_name.empty()) {
       std::shared_ptr<InferenceRequest::Input> true_override;
       std::shared_ptr<InferenceRequest::Input> false_override;
@@ -286,7 +294,8 @@ SequenceBatchScheduler::CreateBooleanControlTensors(
       RETURN_IF_ERROR(GetBooleanOverrideInputs(
           tensor_name, config.max_batch_size() != 0, tensor_datatype,
           fp32_false_value, fp32_true_value, int32_false_value,
-          int32_true_value, &true_override, &false_override));
+          int32_true_value, bool_false_value, bool_true_value, &true_override,
+          &false_override));
 
       (*start_input_overrides)->emplace_back(false_override);
       (*end_input_overrides)->emplace_back(true_override);
@@ -302,15 +311,16 @@ SequenceBatchScheduler::CreateBooleanControlTensors(
         config.sequence_batching(), config.name(),
         inference::ModelSequenceBatching::Control::CONTROL_SEQUENCE_READY,
         false /* required */, &tensor_name, &tensor_datatype, &fp32_false_value,
-        &fp32_true_value, &int32_false_value, &int32_true_value));
+        &fp32_true_value, &int32_false_value, &int32_true_value,
+        &bool_false_value, &bool_true_value));
     if (!tensor_name.empty()) {
       std::shared_ptr<InferenceRequest::Input> true_override;
       std::shared_ptr<InferenceRequest::Input> false_override;
 
       RETURN_IF_ERROR(GetBooleanOverrideInputs(
           tensor_name, config.max_batch_size() != 0, tensor_datatype,
-          fp32_false_value, fp32_true_value, int32_false_value,
-          int32_true_value, &true_override, &false_override));
+          fp32_false_value, fp32_true_value, int32_false_value, nt32_true_value,
+          bool_false_value, bool_true_value, &true_override, &false_override));
 
       (*start_input_overrides)->emplace_back(true_override);
       (*end_input_overrides)->emplace_back(true_override);
