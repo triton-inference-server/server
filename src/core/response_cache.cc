@@ -98,12 +98,6 @@ Status Lookup(const uint64_t key, InferenceResponse** ptr) {
     return Status::Success;
 }
 
-Status LookupStrict(const uint64_t key, const InferenceRequest& request, InferenceResponse** ptr) {
-    return Status(
-        Status::Code::INTERNAL, "Strict Lookup not implemented yet"
-    );
-}
-
 Status Insert(const uint64_t key, const InferenceResponse& response) {
     // Exit early if key already exists in cache
     auto iter = cache_.find(key);
