@@ -27,7 +27,7 @@
 
 SERVER=/opt/tritonserver/bin/tritonserver
 SERVER_ARGS="--model-repository=`pwd`/models --log-verbose=1"
-CLIENT_PY=./python_unittest.py
+CLIENT_PY=../python_unittest.py
 CLIENT_LOG="./client.log"
 EXPECTED_NUM_TESTS="1"
 TEST_RESULT_FILE='test_results.txt'
@@ -59,6 +59,7 @@ if [ "$SERVER_PID" == "0" ]; then
 fi
 
 set +e
+export MODEL_NAME="dlpack_test"
 python3 $CLIENT_PY > $CLIENT_LOG 2>&1 
 
 if [ $? -ne 0 ]; then

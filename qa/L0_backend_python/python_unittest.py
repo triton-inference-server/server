@@ -1,4 +1,4 @@
-# Copyright (c) 2021, NVIDIA CORPORATION. All rights reserved.
+# Copyright (c) 2021, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -29,39 +29,23 @@ import sys
 sys.path.append("../../common")
 
 import test_util as tu
+import unittest
 import tritonclient.http as httpclient
 from tritonclient.utils import *
-import numpy as np
-import unittest
+import os
 
 
-class IOTest(tu.TestResultCollector):
-    def test_ensemble_io(self):
-        model_name = "ensemble_io"
+class PythonUnittest(tu.TestResultCollector):
+    def test_python_unittest(self):
+        model_name = os.environ['MODEL_NAME']
         with httpclient.InferenceServerClient("localhost:8000") as client:
-            input0 = np.random.random([1000]).astype(np.float32)
-            # TODO: Fix after DLIS-2689 is merged. The arrays below must
-            # contain both true and false.
-            for model_1_in_gpu in [False]:
-                for model_2_in_gpu in [False]:
-                    for model_3_in_gpu in [False]:
-                        gpu_output = np.asarray(
-                            [model_1_in_gpu, model_2_in_gpu, model_3_in_gpu],
-                            dtype=bool)
-                        inputs = [
-                            httpclient.InferInput(
-                                "INPUT0", input0.shape,
-                                np_to_triton_dtype(input0.dtype)),
-                            httpclient.InferInput(
-                                "GPU_OUTPUT", gpu_output.shape,
-                                np_to_triton_dtype(gpu_output.dtype))
-                        ]
-                        inputs[0].set_data_from_numpy(input0)
-                        inputs[1].set_data_from_numpy(gpu_output)
-                        result = client.infer(model_name, inputs)
-                        output0 = result.as_numpy('OUTPUT0')
-                        self.assertTrue(output0 is not None)
-                        self.assertTrue(np.all(output0 == input0))
+            # No input is required
+            result = client.infer(model_name, [])
+            output0 = result.as_numpy('OUTPUT0')
+
+            # The model returns 1 if the tests were sucessfully passed.
+            # Otherwise, it will return 0.
+            self.assertTrue(output0 == [1])
 
 
 if __name__ == '__main__':

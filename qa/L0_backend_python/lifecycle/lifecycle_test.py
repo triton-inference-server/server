@@ -87,9 +87,10 @@ class LifecycleTest(tu.TestResultCollector):
             try:
                 client.infer(model_name, inputs)
             except InferenceServerException as e:
+                print(e.message())
                 self.assertTrue(
                     e.message().startswith(
-                        "Failed to process the request(s),"),
+                        "Failed to process the request(s) for model instance"),
                     "Exception message is not correct")
             else:
                 self.assertTrue(
