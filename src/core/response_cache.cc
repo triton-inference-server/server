@@ -89,7 +89,7 @@ Status Lookup(const uint64_t key, InferenceResponse** ptr) {
     // Populate passed-in "ptr" from cache entry
     auto entry = iter->second;
     // TODO: Populate ptr correctly here
-    *ptr = nullptr;
+    // *ptr = managed_buffer_.allocate(...)
     if (*ptr == nullptr) {
         return Status(
             Status::Code::INTERNAL, "InferenceResponse ptr in cache was invalid nullptr"
@@ -109,6 +109,7 @@ Status Insert(const uint64_t key, const InferenceResponse& response) {
     // TODO: Construct cache entry from response
     auto entry = CacheEntry();
     // TODO: request buffer from managed_buffer
+    // *ptr = managed_buffer_.allocate(...)
     // TODO: update cache entry size
     // If cache entry is larger than total cache size, exit with failure
     if (entry.size > total_size_) {
@@ -152,6 +153,8 @@ Status Evict() {
             "key not found in cache during eviction: this indicates a bug in the code"
         );
     }
+    // TODO: free managed memory used in cache entry as well?
+    // managed_buffer_.deallocate(...)
     // Get size of cache entry being evicted to update available size
     auto entry = iter->second;
     uint64_t entry_size = entry.size;
