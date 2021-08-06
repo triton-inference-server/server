@@ -26,40 +26,58 @@
 
 #pragma once
 
+#include <list>
 #include <string>
 #include <functional>
+#include <unordered_map>
 
 #include <boost/interprocess/managed_external_buffer.hpp>
 #include "src/core/status.h"
 
 namespace nvidia { namespace inferenceserver {
 
+struct CacheEntry {
+    explicit CacheEntry() {}
+    // Point to key in LRU list for maintaining LRU order
+    std::list<uint64_t>::iterator lru_iter;
+    // TODO: Figure out how to use managed_external_buffer and schema
+    //       storing full response vs. outputs only + metadata, etc.
+    void* buffer;
+    uint64_t size;
+};
+
 class RequestResponseCache {
-    RequestResponseCache(const uint64_t cache_size);
-    ~RequestResponseCache();
-    // Hash inference request to access cache
-    uint64_t Hash(const InferenceRequest& request);
-    // Lookup key in cache, request used for strict exact matching on collisions
-    // Return InferenceResponse if found in cache
-    // TODO: Doc describes returning handle/ptr, how does this work if ptr evicted
-    //    after it's returned but before it's used/de-referenced?
-    InferenceResponse Lookup(const uint64_t key, const InferenceRequest& request);
-    // Insert response into cache, evict entries to make space if necessary
-    // Return Status object indicating success or failure.
-    Status Insert(const uint64_t key, const InferenceResponse& response);
-    // Eviction handler to call corresponding function based on policy
-    Status Evict();
-    // Eviction function for LRU policy
-    Status EvictLRU();
+    public:
+        RequestResponseCache(const uint64_t cache_size);
+        ~RequestResponseCache();
+        // Hash inference request to access cache
+        uint64_t Hash(const InferenceRequest& request);
+        // Lookup 'key' in cache and return the inference response in 'ptr' on cache hit or nullptr on cache miss
+        // Return Status object indicating success or failure.
+        Status Lookup(const uint64_t key, InferenceResponse** ptr);
+        // Insert response into cache, evict entries to make space if necessary
+        // Return Status object indicating success or failure.
+        Status Insert(const uint64_t key, const InferenceResponse& response);
+        // Evict entry from cache based on policy
+        // Return Status object indicating success or failure.
+        Status Evict();
 
-    // Cache buffer
-    char* buffer_;
-    // Managed buffer
-    boost::interprocess::managed_external_buffer cache_;
-    // Eviction policy
-    // TODO: Enum / typedef this
-    std::string eviction_policy_ = "LRU";
+    private:
+        // Cache buffer
+        char* buffer_;
+        // Managed buffer
+        boost::interprocess::managed_external_buffer managed_buffer_;
+        // Total size of cache, will evict if a new item will exceed the total/available size
+        uint64_t cache_size_;
+        // Remaining size left in cache, updated on insertion and eviction
+        uint64_t available_size_;
+        // key -> CacheEntry containing values and list iterator for LRU management
+        std::unordered_map<uint64_t, CacheEntry> cache_;
+        // list of keys sorted from least to most recently used
+        std::list<uint64_t> lru_;
 
+        // Update LRU ordering on lookup
+        void Update();
 };
 
 }}  // namespace nvidia::inferenceserver

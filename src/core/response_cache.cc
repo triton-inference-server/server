@@ -38,10 +38,10 @@ RequestResponseCache::RequestResponseCache(const uint64_t size)
     } 
 
     // Create cache as managed buffer
-    cache_ = boost::interprocess::managed_external_buffer(
+    managed_buffer_ = boost::interprocess::managed_external_buffer(
         boost::interprocess::create_only_t{}, this->buffer, size);
     // Exit early if managed buffer allocation failed
-    if (cache_ == nullptr) {
+    if (managed_buffer_ == nullptr) {
         throw("failed to create managed external buffer");
     }
 }
@@ -77,33 +77,114 @@ uint64_t Hash(const InferenceRequest& request) {
     return key;
 }
 
-// TODO: Doc describes returning handle/ptr, how does this work if ptr evicted
-//    after it's returned but before it's used/de-referenced?
-InferenceResponse Lookup(const uint64_t key, const InferenceRequest& request) {
-    // TODO
+Status Lookup(const uint64_t key, InferenceResponse** ptr) {
+    auto iter = cache_.find(key);
+    if (iter == cache_.end()) {
+        return Status(
+            Status::Code::INTERNAL, "key not found in cache"
+        );
+    }
+    // Update this key to front of LRU list
+    Update(iter);
+    // Populate passed-in "ptr" from cache entry
+    auto entry = iter->second;
+    // TODO: Populate ptr correctly here
+    *ptr = nullptr;
+    if (*ptr == nullptr) {
+        return Status(
+            Status::Code::INTERNAL, "InferenceResponse ptr in cache was invalid nullptr"
+        );
+    }
+    return Status::Success;
+}
+
+Status LookupStrict(const uint64_t key, const InferenceRequest& request, InferenceResponse** ptr) {
+    return Status(
+        Status::Code::INTERNAL, "Strict Lookup not implemented yet"
+    );
 }
 
 Status Insert(const uint64_t key, const InferenceResponse& response) {
-    // TODO
-}
-
-Status Evict(const uint64_t size) {
-    // TODO: Use enum/typedef over strings for cache_policy_
-    switch(cache_policy_) {
-        case: "LRU":
-            return EvictLRU(size);
-        default:
-            return Status(Status::Code::INTERNAL, "Unsupported Cache Policy");
-
+    // Exit early if key already exists in cache
+    auto iter = cache_.find(key);
+    if (iter != cache_.end()) {
+        return Status(
+            Status::Code::INTERNAL, "key already exists in cache"
+        );
+    }
+    // TODO: Construct cache entry from response
+    auto entry = CacheEntry();
+    // TODO: request buffer from managed_buffer
+    // TODO: update cache entry size
+    // If cache entry is larger than total cache size, exit with failure
+    if (entry.size > total_size_) {
+        return Status(
+            Status::Code::INTERNAL, "Cache entry is larger than total cache size"
+        );
+    } 
+    // If cache doesn't have room for new entry, evict until enough size is available
+    while (entry.size > available_size_) {
+        auto status = Evict();
+        // If evict fails for some reason, exit with its failure status
+        if (!status.IsOk()) {
+            return status;
+        }
+    }
+    // Now that we have room for new entry, update LRU and insert it in cache
+    lru_.push_front(key);
+    cache_.insert({key, entry});
+    // Update available cache size
+    available_size_ -= entry.size;
+    // Error checking cache size management
+    if (available_size_ > total_size_) {
+        return Status(
+            Status::Code::INTERNAL,
+            "Available size exceeded total size: this indicates a bug in the code"
+        );
     }
 
+    return Status::Success;
 }
 
-Status EvictLRU(const uint64_t size) {
-    auto status = Status::Success;
-    // TODO: Evict entries with LRU policy until "size" bytes is available
-    return status;
+// LRU
+Status Evict() {
+    auto lru_key = lru_.back();
+    auto iter = cache_.find(lru_key);
+    // Error check if key isn't in cache, but this shouldn't happen in evict
+    // and probably indicates a bug
+    if (iter == cache_.end()) {
+        return Status(
+            Status::Code::INTERNAL,
+            "key not found in cache during eviction: this indicates a bug in the code"
+        );
+    }
+    // Get size of cache entry being evicted to update available size
+    auto entry = iter->second;
+    uint64_t entry_size = entry.size;
+    // Remove LRU entry from cache
+    cache_.erase(lru_key);
+    // Remove LRU key from LRU list
+    lru_.pop_back();
+    // Update available cache size
+    available_size_ += entry_size;
+    // Error checking cache size management
+    if (available_size_ > total_size_) {
+        return Status(
+            Status::Code::INTERNAL,
+            "Available size exceeded total size: this indicates a bug in the code"
+        );
+    }
+    return Status::Success;
 }
 
+// LRU
+void Update(std::unordered_map<uint64_t, CacheEntry>::iterator& cache_iter) {
+    // Remove key from LRU list at it's current location
+    lru_.erase(cache_iter->second.lru_iter);
+    // Add key to front of LRU list since it's most recently used
+    lru_.push_front(cache_iter->first);
+    // Set CacheEntry iterator to new LRU key location
+    cache_iter->second.lru_iter = lru_.begin();
+}
 
 }}  // namespace nvidia::inferenceserver
