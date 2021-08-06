@@ -68,7 +68,7 @@ class RequestResponseCache {
         // Managed buffer
         boost::interprocess::managed_external_buffer managed_buffer_;
         // Total size of cache, will evict if a new item will exceed the total/available size
-        uint64_t cache_size_;
+        uint64_t total_size_;
         // Remaining size left in cache, updated on insertion and eviction
         uint64_t available_size_;
         // key -> CacheEntry containing values and list iterator for LRU management
