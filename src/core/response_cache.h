@@ -36,13 +36,21 @@
 
 namespace nvidia { namespace inferenceserver {
 
+// TODO: flesh this out
+struct Output {
+    void* buffer;
+    uint64_t size;
+    std::string name;
+    inference::DataType dtype;
+};
+
 struct CacheEntry {
     explicit CacheEntry() {}
     // Point to key in LRU list for maintaining LRU order
     std::list<uint64_t>::iterator lru_iter;
-    // TODO: Figure out how to use managed_external_buffer and schema
-    //       storing full response vs. outputs only + metadata, etc.
-    void* buffer;
+    // each output buffer = managed_buffer.allocate(size, ...)
+    std::vector<Output> outputs;
+    // sum of output sizes
     uint64_t size;
 };
 
