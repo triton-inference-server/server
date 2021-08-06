@@ -53,7 +53,7 @@ RequestResponseCache::~RequestResponseCache()
     }
 }
 
-uint64_t Hash(const InferenceRequest& request) {
+uint64_t RequestResponseCache::Hash(const InferenceRequest& request) {
     // TODO: OriginalInputs, OverrideInputs, ImmutableInputs ?
     auto inputs = request->OriginalInputs();
     // Create hash function
@@ -77,7 +77,7 @@ uint64_t Hash(const InferenceRequest& request) {
     return key;
 }
 
-Status Lookup(const uint64_t key, InferenceResponse** ptr) {
+Status RequestResponseCache::Lookup(const uint64_t key, InferenceResponse** ptr) {
     auto iter = cache_.find(key);
     if (iter == cache_.end()) {
         return Status(
@@ -98,7 +98,7 @@ Status Lookup(const uint64_t key, InferenceResponse** ptr) {
     return Status::Success;
 }
 
-Status Insert(const uint64_t key, const InferenceResponse& response) {
+Status RequestResponseCache::Insert(const uint64_t key, const InferenceResponse& response) {
     // Exit early if key already exists in cache
     auto iter = cache_.find(key);
     if (iter != cache_.end()) {
@@ -145,7 +145,7 @@ Status Insert(const uint64_t key, const InferenceResponse& response) {
 }
 
 // LRU
-Status Evict() {
+Status RequestResponseCache::Evict() {
     auto lru_key = lru_.back();
     auto iter = cache_.find(lru_key);
     // Error check if key isn't in cache, but this shouldn't happen in evict
@@ -178,7 +178,7 @@ Status Evict() {
 }
 
 // LRU
-void Update(std::unordered_map<uint64_t, CacheEntry>::iterator& cache_iter) {
+void RequestResponseCache::Update(std::unordered_map<uint64_t, CacheEntry>::iterator& cache_iter) {
     // Remove key from LRU list at it's current location
     lru_.erase(cache_iter->second.lru_iter);
     // Add key to front of LRU list since it's most recently used
