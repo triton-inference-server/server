@@ -39,7 +39,7 @@ RequestResponseCache::RequestResponseCache(const uint64_t size)
 
     // Create cache as managed buffer
     managed_buffer_ = boost::interprocess::managed_external_buffer(
-        boost::interprocess::create_only_t{}, this->buffer, size);
+        boost::interprocess::create_only_t{}, buffer_, size);
     // Exit early if managed buffer allocation failed
     if (managed_buffer_ == nullptr) {
         throw("failed to create managed external buffer");
@@ -88,8 +88,8 @@ Status Lookup(const uint64_t key, InferenceResponse** ptr) {
     Update(iter);
     // Populate passed-in "ptr" from cache entry
     auto entry = iter->second;
-    // TODO: Populate ptr correctly here
-    // *ptr = managed_buffer_.allocate(...)
+    // TODO: Copy contents from CacheEntry ptr to passed-in ptr
+    // *ptr = ...
     if (*ptr == nullptr) {
         return Status(
             Status::Code::INTERNAL, "InferenceResponse ptr in cache was invalid nullptr"
@@ -108,9 +108,12 @@ Status Insert(const uint64_t key, const InferenceResponse& response) {
     }
     // TODO: Construct cache entry from response
     auto entry = CacheEntry();
-    // TODO: request buffer from managed_buffer
-    // *ptr = managed_buffer_.allocate(...)
     // TODO: update cache entry size
+    // entry.size = ...
+    // TODO: request buffer from managed_buffer
+    // *ptr = managed_buffer_.allocate(entry.size, ...)
+    // cache.ptr = ptr
+
     // If cache entry is larger than total cache size, exit with failure
     if (entry.size > total_size_) {
         return Status(
