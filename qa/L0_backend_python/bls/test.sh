@@ -69,18 +69,25 @@ fi
 
 set +e
 
-# Model name required by the unittest
-
 # First try the BLS memory test and then test the normal BLS. This ensures that
 # the Python backend can work properly after shared memory saturation caused by
 # one of the older requests.
 export MODEL_NAME='bls_memory'
 python3 $CLIENT_PY > $CLIENT_LOG 2>&1 
+if [ $? -ne 0 ]; then
+    echo -e "\n***\n*** python_unittest.py FAILED. \n***"
+    RET=1
+else
+    check_test_results $TEST_RESULT_FILE $EXPECTED_NUM_TESTS
+    if [ $? -ne 0 ]; then
+        cat $CLIENT_LOG
+        echo -e "\n***\n*** Test Result Verification Failed\n***"
+        RET=1
+    fi
+fi
 
 export MODEL_NAME='bls'
 python3 $CLIENT_PY > $CLIENT_LOG 2>&1 
-
-
 if [ $? -ne 0 ]; then
     echo -e "\n***\n*** python_unittest.py FAILED. \n***"
     RET=1
