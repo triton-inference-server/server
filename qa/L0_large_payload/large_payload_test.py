@@ -41,10 +41,10 @@ class LargePayLoadTest(tu.TestResultCollector):
     def setUp(self):
         self._data_type = np.float32
 
-        # Very large tensor will always fail for gRPC because the Protobuf has
-        # a hard limit on 2GBs for the size of input tensors. All backends
-        # except the Python and plan backend should be able to handle payloads
-        # larger than 2GBs using HTTP.
+        # Very large tensor will always fail for gRPC because the Protobuf has a
+        # hard limit on 2GBs for the size of input tensors. All backends except
+        # plan backend should be able to handle payloads larger than 2GBs using
+        # HTTP.
         very_large_tensor_shape = (math.trunc(
             3 * (1024 * 1024 * 1024) / np.dtype(self._data_type).itemsize),)
         self._very_large_in0 = np.random.random(very_large_tensor_shape).astype(
