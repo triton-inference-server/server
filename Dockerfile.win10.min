@@ -117,3 +117,10 @@ ENV VCPKG_TARGET_TRIPLET x64-windows
 ENV TRITONBUILD_CMAKE_TOOLCHAIN_FILE /vcpkg/scripts/buildsystems/vcpkg.cmake
 ENV TRITONBUILD_VCPKG_TARGET_TRIPLET x64-windows
 ENTRYPOINT C:\BuildTools\Common7\Tools\VsDevCmd.bat &&
+
+# CUB
+WORKDIR /tmp
+ADD https://github.com/NVlabs/cub/archive/1.8.0.zip cub-1.8.0.zip
+RUN unzip cub-1.8.0.zip
+RUN mkdir "C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v11.4\include\cub"
+RUN xcopy /s /e /h cub-1.8.0\cub "C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v11.4\include\cub"
