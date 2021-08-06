@@ -1140,17 +1140,17 @@ ValidateModelConfig(
         batcher, config.name(),
         inference::ModelSequenceBatching::Control::CONTROL_SEQUENCE_START,
         false /* required */, &tensor_name, nullptr, nullptr, nullptr, nullptr,
-        nullptr));
+        nullptr, nullptr, nullptr));
     RETURN_IF_ERROR(GetBooleanSequenceControlProperties(
         batcher, config.name(),
         inference::ModelSequenceBatching::Control::CONTROL_SEQUENCE_END,
         false /* required */, &tensor_name, nullptr, nullptr, nullptr, nullptr,
-        nullptr));
+        nullptr, nullptr, nullptr));
     RETURN_IF_ERROR(GetBooleanSequenceControlProperties(
         batcher, config.name(),
         inference::ModelSequenceBatching::Control::CONTROL_SEQUENCE_READY,
         false /* required */, &tensor_name, nullptr, nullptr, nullptr, nullptr,
-        nullptr));
+        nullptr, nullptr, nullptr));
 
     // Check CORRID control and make sure it is one of the allowed types.
     inference::DataType tensor_datatype;
