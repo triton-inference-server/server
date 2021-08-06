@@ -623,6 +623,18 @@ FROM tritonserver_buildbase
 COPY --from=build /tmp/tritonbuild /tmp/tritonbuild
 '''
 
+    # If requested, package the source code for all OSS used to build
+    # Triton Windows is not delivered as a container (and tar not
+    # available) so skip for windows platform.
+    if target_platform() != 'windows':
+        if not FLAGS.no_container_source:
+            df += '''
+RUN mkdir -p /tmp/tritonbuild/install/third-party-src && \
+    (cd /tmp/tritonbuild/tritonserver/build && \
+     tar zcf /tmp/tritonbuild/install/third-party-src/src.tar.gz third-party-src)
+COPY --from=build /workspace/build/server/README.third-party-src /tmp/tritonbuild/install/third-party-src/README
+'''
+
     if 'onnxruntime' in backends:
         if target_platform() != 'windows':
             df += '''
@@ -676,6 +688,12 @@ COPY --chown=1000:1000 --from=tritonserver_build /tmp/tritonbuild/install/includ
 # Top-level include/core not copied so --chown does not set it correctly,
 # so explicit set on all of include
 RUN chown -R triton-server:triton-server include
+'''
+
+    # If requested, include the source code for all OSS used to build Triton
+    if not FLAGS.no_container_source:
+        df += '''
+COPY --chown=1000:1000 --from=tritonserver_build /tmp/tritonbuild/install/third-party-src third-party-src
 '''
 
     for noncore in NONCORE_BACKENDS:
@@ -1154,6 +1172,10 @@ if __name__ == '__main__':
         help=
         'When performing a container build, this command will be executed within the container just before the build it performed.'
     )
+    parser.add_argument('--no-container-source',
+                        action="store_true",
+                        required=False,
+                        help='Do not include OSS source code in Docker container.')
     parser.add_argument(
         '--image',
         action='append',
