@@ -1,5 +1,5 @@
 #!/bin/bash
-# Copyright 2021, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright (c) 2021, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -35,19 +35,16 @@ if [ -z "$REPO_VERSION" ]; then
     exit 1
 fi
 
-export CUDA_VISIBLE_DEVICES=0
-
 # Need to run on only one device since only creating a single
 # PLAN. Without this test will fail on a heterogeneous system.
 export CUDA_VISIBLE_DEVICES=0
 
-IMAGE_CLIENT=../clients/image_client
-IMAGE=../images/vulture.jpeg
-
-CAFFE2PLAN=../common/caffe2plan
+# Only need to set paths for jetson since this test runs only on jetson
+TRITON_DIR=${TRITON_DIR:="/opt/tritonserver"}
+IMAGE=${TRITON_DIR}/qa/images/vulture.jpeg
+IMAGE_CLIENT=${TRITON_DIR}/clients/bin/image_client
 
 DATADIR=${DATADIR:="/data/inferenceserver/${REPO_VERSION}"}
-TRITON_DIR=${TRITON_DIR:="/opt/tritonserver"}
 SERVER=${TRITON_DIR}/bin/tritonserver
 BACKEND_DIR=${TRITON_DIR}/backends
 
@@ -75,7 +72,7 @@ set +e
 CLIENT_LOG=${IMAGE_CLIENT##*/}.log
 
 echo "Model: resnet50_plan" >> $CLIENT_LOG
-$IMAGE_CLIENT $EXTRA_ARGS -m resnet50_plan -s VGG -c 1 -b 1 $IMAGE >> $CLIENT_LOG 2>&1
+$IMAGE_CLIENT -m resnet50_plan -s VGG -c 1 -b 1 $IMAGE >> $CLIENT_LOG 2>&1
 if [ $? -ne 0 ]; then
     cat $CLIENT_LOG
     RET=1
