@@ -33,6 +33,7 @@ from builtins import str
 from future.utils import iteritems
 import os
 import time
+import math
 import threading
 import traceback
 import numpy as np
@@ -407,13 +408,12 @@ def sequence_no_end(client_metadata, rng, trial, model_name, dtype, len_mean,
                          sequence_name=sequence_name)
 
 
-def timeout_client(client_metadata,
-                   name,
-                   tensor_shape=(1,),
-                   input_dtype=np.float32):
+def timeout_client(client_metadata, name, input_dtype=np.float32):
     trial = get_trial(is_sequence=False)
     model_name = tu.get_zero_model_name(trial, 1, input_dtype)
     triton_client = client_metadata[0]
+    tensor_shape = (math.trunc(1 * (1024 * 1024 * 1024) //
+                               np.dtype(input_dtype).itemsize),)
     in0 = np.random.random(tensor_shape).astype(input_dtype)
     inputs = [
         grpcclient.InferInput("INPUT0", tensor_shape,
@@ -423,9 +423,8 @@ def timeout_client(client_metadata,
 
     # Expect an exception for small timeout values.
     try:
-        results = triton_client.infer(model_name,
-                                      inputs,
-                                      client_timeout=0.00000001)
+        results = triton_client.infer(model_name, inputs, client_timeout=0.1)
+        assert False, "expected inference failure from deadline exceeded"
     except Exception as ex:
         if "Deadline Exceeded" not in str(ex):
             assert False, "timeout_client failed {}".format(name)
