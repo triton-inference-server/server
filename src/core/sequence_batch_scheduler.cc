@@ -319,8 +319,9 @@ SequenceBatchScheduler::CreateBooleanControlTensors(
 
       RETURN_IF_ERROR(GetBooleanOverrideInputs(
           tensor_name, config.max_batch_size() != 0, tensor_datatype,
-          fp32_false_value, fp32_true_value, int32_false_value, int32_true_value,
-          bool_false_value, bool_true_value, &true_override, &false_override));
+          fp32_false_value, fp32_true_value, int32_false_value,
+          int32_true_value, bool_false_value, bool_true_value, &true_override,
+          &false_override));
 
       (*start_input_overrides)->emplace_back(true_override);
       (*end_input_overrides)->emplace_back(true_override);
