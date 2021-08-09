@@ -1,5 +1,5 @@
 #!/bin/bash
-# Copyright (c) 2019-2021, NVIDIA CORPORATION. All rights reserved.
+# Copyright 2019-2021, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -33,7 +33,6 @@ DYNAMIC_BATCH_SIZES=${DYNAMIC_BATCH_SIZES:=1}
 INSTANCE_COUNTS=${INSTANCE_COUNTS:=1}
 CONCURRENCY=${CONCURRENCY:=1}
 
-PERF_CLIENT=../clients/perf_client
 PERF_CLIENT_PROTOCOL=${PERF_CLIENT_PROTOCOL:=grpc}
 PERF_CLIENT_PERCENTILE=${PERF_CLIENT_PERCENTILE:=95}
 PERF_CLIENT_STABILIZE_WINDOW=${PERF_CLIENT_STABILIZE_WINDOW:=5000}
@@ -42,12 +41,22 @@ TENSOR_SIZE=${TENSOR_SIZE:=1}
 SHARED_MEMORY=${SHARED_MEMORY:="none"}
 REPORTER=../common/reporter.py
 
-DATADIR=/data/inferenceserver/${REPO_VERSION}
 RESULTDIR=${RESULTDIR:=.}
 
-SERVER=/opt/tritonserver/bin/tritonserver
-SERVER_ARGS="--model-repository=`pwd`/models"
+TRITON_DIR=${TRITON_DIR:="/opt/tritonserver"}
+ARCH=${ARCH:="x86_64"}
+SERVER=${TRITON_DIR}/bin/tritonserver
+BACKEND_DIR=${TRITON_DIR}/backends
+SERVER_ARGS="--model-repository=`pwd`/models --backend-directory=${BACKEND_DIR}" 
 source ../common/util.sh
+
+# DATADIR is already set in environment variable for aarch64
+if [ "$ARCH" == "aarch64" ]; then
+    PERF_CLIENT=${TRITON_DIR}/clients/bin/perf_client
+else
+    PERF_CLIENT=../clients/perf_client
+    DATADIR=/data/inferenceserver/${REPO_VERSION}
+fi
 
 # Select the single GPU that will be available to the inference server
 export CUDA_VISIBLE_DEVICES=0
@@ -55,13 +64,15 @@ export CUDA_VISIBLE_DEVICES=0
 mkdir -p ${RESULTDIR}
 RET=0
 
-cp /opt/tritonserver/backends/python/triton_python_backend_utils.py .
+if [[ $BACKENDS == *"python"* ]]; then
+    cp /opt/tritonserver/backends/python/triton_python_backend_utils.py .
 
-mkdir -p python_models/python_zero_1_float32/1 && \
-    cp ../python_models/identity_fp32/model.py ./python_models/python_zero_1_float32/1/model.py && \
-    cp ../python_models/identity_fp32/config.pbtxt ./python_models/python_zero_1_float32/config.pbtxt
-(cd python_models/python_zero_1_float32 && \
-    sed -i "s/^name:.*/name: \"python_zero_1_float32\"/" config.pbtxt)
+    mkdir -p python_models/python_zero_1_float32/1 && \
+        cp ../python_models/identity_fp32/model.py ./python_models/python_zero_1_float32/1/model.py && \
+        cp ../python_models/identity_fp32/config.pbtxt ./python_models/python_zero_1_float32/config.pbtxt
+    (cd python_models/python_zero_1_float32 && \
+        sed -i "s/^name:.*/name: \"python_zero_1_float32\"/" config.pbtxt)
+fi
 
 PERF_CLIENT_PERCENTILE_ARGS="" &&
     (( ${PERF_CLIENT_PERCENTILE} != 0 )) &&
@@ -172,7 +183,8 @@ for BACKEND in $BACKENDS; do
     echo -e "\"l_batch_size\":${STATIC_BATCH}," >> ${RESULTDIR}/${NAME}.tjson
     echo -e "\"l_size\":${TENSOR_SIZE}," >> ${RESULTDIR}/${NAME}.tjson
     echo -e "\"s_shared_memory\":\"${SHARED_MEMORY}\"," >> ${RESULTDIR}/${NAME}.tjson
-    echo -e "\"l_instance_count\":${INSTANCE_CNT}}]" >> ${RESULTDIR}/${NAME}.tjson
+    echo -e "\"l_instance_count\":${INSTANCE_CNT}," >> ${RESULTDIR}/${NAME}.tjson
+    echo -e "\"s_architecture\":\"${ARCH}\"}]" >> ${RESULTDIR}/${NAME}.tjson
 
     kill $SERVER_PID
     wait $SERVER_PID

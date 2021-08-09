@@ -1,5 +1,5 @@
 #!/bin/bash
-# Copyright (c) 2019-2021, NVIDIA CORPORATION. All rights reserved.
+# Copyright 2019-2021, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -139,7 +139,7 @@ TEST_CONCURRENCY+=(
     1
     16
     16)
-TEST_BACKENDS="plan custom graphdef savedmodel onnx libtorch python"
+TEST_BACKENDS=${BACKENDS:="plan custom graphdef savedmodel onnx libtorch python"}
 
 mkdir -p ${REPO_VERSION}
 

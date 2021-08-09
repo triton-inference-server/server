@@ -1,5 +1,5 @@
 #!/bin/bash
-# Copyright (c) 2019-2020, NVIDIA CORPORATION. All rights reserved.
+# Copyright 2019-2021, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -29,11 +29,12 @@ STATIC_BATCH=${STATIC_BATCH:=1}
 INSTANCE_CNT=${INSTANCE_CNT:=1}
 BACKEND_CONFIG=${BACKEND_CONFIG:=""}
 
-PERF_CLIENT=../clients/perf_client
 REPORTER=../common/reporter.py
 
-SERVER=/opt/tritonserver/bin/tritonserver
-SERVER_ARGS="--model-repository=`pwd`/models ${BACKEND_CONFIG}" 
+TRITON_DIR=${TRITON_DIR:="/opt/tritonserver"}
+SERVER=${TRITON_DIR}/bin/tritonserver
+BACKEND_DIR=${TRITON_DIR}/backends
+SERVER_ARGS="--model-repository=`pwd`/models --backend-directory=${BACKEND_DIR} ${BACKEND_CONFIG}" 
 source ../common/util.sh
 
 # Select the single GPU that will be available to the inference
@@ -59,13 +60,23 @@ if (( $SERVER_PID == 0 )); then
     exit 1
 fi
 
+# Onnx and onnx-trt models are very slow on Jetson Xavier. So we need to increase the time period for perf_client
+MEASUREMENT_WINDOW=5000
+if [ "$ARCH" == "aarch64" ]; then
+    PERF_CLIENT=${TRITON_DIR}/clients/bin/perf_client
+    if [ "$MODEL_FRAMEWORK" == "onnx" ] || [ "$MODEL_FRAMEWORK" == "onnx_trt" ]; then
+        MEASUREMENT_WINDOW=20000
+    fi
+else
+    PERF_CLIENT=../clients/perf_client
+fi
 
 set +e
 
 # Run the model once to warm up. Some frameworks do optimization on the first requests.
-$PERF_CLIENT -v -i ${PERF_CLIENT_PROTOCOL} -m $MODEL_NAME -p5000 -b${STATIC_BATCH}
+$PERF_CLIENT -v -i ${PERF_CLIENT_PROTOCOL} -m $MODEL_NAME -p${MEASUREMENT_WINDOW} -b${STATIC_BATCH}
 
-$PERF_CLIENT -v -i ${PERF_CLIENT_PROTOCOL} -m $MODEL_NAME -p5000 \
+$PERF_CLIENT -v -i ${PERF_CLIENT_PROTOCOL} -m $MODEL_NAME -p${MEASUREMENT_WINDOW} \
                 -b${STATIC_BATCH} --concurrency-range ${CONCURRENCY} \
                 -f ${NAME}.csv >> ${NAME}.log 2>&1
 if (( $? != 0 )); then
@@ -86,7 +97,8 @@ echo -e "\"s_framework\":\"${MODEL_FRAMEWORK}\"," >> ${NAME}.tjson
 echo -e "\"s_model\":\"${MODEL_NAME}\"," >> ${NAME}.tjson
 echo -e "\"l_concurrency\":${CONCURRENCY}," >> ${NAME}.tjson
 echo -e "\"l_batch_size\":${STATIC_BATCH}," >> ${NAME}.tjson
-echo -e "\"l_instance_count\":${INSTANCE_CNT}}]" >> ${NAME}.tjson
+echo -e "\"l_instance_count\":${INSTANCE_CNT}," >> ${NAME}.tjson
+echo -e "\"s_architecture\":\"${ARCH}\"}]" >> ${NAME}.tjson
 
 kill $SERVER_PID
 wait $SERVER_PID
