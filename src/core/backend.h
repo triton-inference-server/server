@@ -1,4 +1,4 @@
-// Copyright (c) 2018-2020, NVIDIA CORPORATION. All rights reserved.
+// Copyright 2018-2021, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 //
 // Redistribution and use in source and binary forms, with or without
 // modification, are permitted provided that the following conditions
@@ -164,7 +164,7 @@ class InferenceBackend {
 
   // Set the scheduler based on the model configuration. The scheduler
   // can only be set once for a backend.
-  // FIXME: The pointer is of TritonModel* type and is doen to keep ensemble
+  // FIXME: The pointer is of TritonModel* type and is done to keep ensemble
   // happy
   Status SetConfiguredScheduler(void* model);
 

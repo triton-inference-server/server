@@ -169,7 +169,6 @@ TritonModel::Create(
   }
   local_model->initialized_ = true;
 
-  // FIXME: Should we use device blocking even for the sequential models?
   const bool device_blocking =
       (local_model->backend_->ExecutionPolicy() ==
        TRITONBACKEND_EXECUTION_DEVICE_BLOCKING);
