@@ -30,37 +30,54 @@ sys.path.append("../common")
 import numpy as np
 import multiprocessing
 import time
+import test_util as tu
+import argparse
 import tritongrpcclient as grpcclient
+from tritonclientutils import np_to_triton_dtype
 
 
-def crashing_client(triton_client):
-    model_name_ = "custom_identity_int32"
-    input0_data_ = np.array([[10]], dtype=np.int32)
-    inputs_ = []
-    inputs_.append(grpcclient.InferInput('INPUT0', [1, 1], "INT32"))
-    outputs_ = []
-    outputs_.append(grpcclient.InferRequestedOutput('OUTPUT0'))
+def crashing_client(model_name, dtype, triton_client, tensor_shape=(1,)):
+    in0 = np.random.random(tensor_shape).astype(dtype)
+    inputs = [
+        grpcclient.InferInput("INPUT0", tensor_shape,
+                              np_to_triton_dtype(dtype)),
+    ]
+    inputs[0].set_data_from_numpy(in0)
 
-    inputs_[0].set_data_from_numpy(input0_data_)
-
+    # Run in a loop so that it is guaranteed that
+    # the inference will not have completed when being terminated.
     while True:
-        result = triton_client.infer(model_name=model_name_,
-                                     inputs=inputs_,
-                                     outputs=outputs_)
+        results = triton_client.infer(model_name, inputs)
 
 
 if __name__ == '__main__':
+    parser = argparse.ArgumentParser()
+    parser.add_argument('-t',
+                        '--trial',
+                        type=str,
+                        required=True,
+                        help='Set trial for the crashing client')
+    FLAGS = parser.parse_args()
+
+    trial = FLAGS.trial
+    dtype = np.float32
+    model_name = tu.get_zero_model_name(trial, 1, dtype)
+
     triton_client = grpcclient.InferenceServerClient(url="localhost:8001",
                                                      verbose=True)
 
     p = multiprocessing.Process(target=crashing_client,
                                 name="crashing_client",
-                                args=(triton_client,))
+                                args=(
+                                    model_name,
+                                    dtype,
+                                    triton_client,
+                                ))
 
     p.start()
 
-    # Terminate the client after 3 seconds
-    time.sleep(3)
+    # Terminate the client after 5 seconds
+    time.sleep(5)
     p.terminate()
 
     # Cleanup

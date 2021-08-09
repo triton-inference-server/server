@@ -51,7 +51,7 @@ CORRELATION_ID_BLOCK_SIZE = 100
 DEFAULT_TIMEOUT_MS = 9000
 SEQUENCE_LENGTH_MEAN = 16
 SEQUENCE_LENGTH_STDEV = 8
-BACKENDS = os.environ.get('BACKENDS', "graphdef savedmodel custom")
+BACKENDS = os.environ.get('BACKENDS', "graphdef savedmodel onnx plan")
 
 _thread_exceptions = []
 _thread_exceptions_mutex = threading.Lock()
@@ -164,11 +164,11 @@ def check_sequence_async(client_metadata,
             if input_dtype == np.object_:
                 assert int(
                     result
-                ) == expected, "{}: expected result {}, got {}".format(
-                    sequence_name, expected, int(result))
+                ) == expected, "{}: expected result {}, got {} {} {}".format(
+                    sequence_name, expected, int(result), trial, model_name)
             else:
-                assert result == expected, "{}: expected result {}, got {}".format(
-                    sequence_name, expected, result)
+                assert result == expected, "{}: expected result {}, got {} {} {}".format(
+                    sequence_name, expected, result, trial, model_name)
     triton_client.stop_stream()
 
 
@@ -195,15 +195,21 @@ def get_expected_result(expected_result, value, trial, flag_str=None):
     return expected_result
 
 
-def get_trial():
+def get_trial(is_sequence=True):
     # Randomly pick one trial for each thread
-    _trials = ()
-    for backend in BACKENDS.split(' '):
-        if (backend != "libtorch") and (backend != 'custom') and (backend !=
-                                                                  'savedmodel'):
-            _trials += (backend + "_nobatch",)
-        _trials += (backend,)
-    return np.random.choice(_trials)
+    if is_sequence:
+        _trials = ()
+        for backend in BACKENDS.split(' '):
+            if (backend != "libtorch") and (backend != 'savedmodel'):
+                _trials += (backend + "_nobatch",)
+            _trials += (backend,)
+        return np.random.choice(_trials)
+    else:
+        _trials = ()
+        for backend in BACKENDS.split(' '):
+            if (backend != "libtorch"):
+                _trials += (backend + "_nobatch",)
+        return np.random.choice(_trials)
 
 
 def sequence_valid(client_metadata, rng, trial, model_name, dtype, len_mean,
@@ -401,24 +407,36 @@ def sequence_no_end(client_metadata, rng, trial, model_name, dtype, len_mean,
                          sequence_name=sequence_name)
 
 
-def timeout_client(sequence_name):
-    # Provide too small a timeout and expect a failure.
-    # Note, the custom_identity_int32 is configured with a delay
-    # of 3 sec
-    timeout_client = "timeout_client.py"
-    timeout_result = "timeout_{}.log".format(sequence_name)
-    os.system("python {} ClientTimeoutTest.test_grpc_infer > {} 2>&1".format(
-        timeout_client, timeout_result))
+def timeout_client(client_metadata,
+                   name,
+                   tensor_shape=(1,),
+                   input_dtype=np.float32):
+    trial = get_trial(is_sequence=False)
+    model_name = tu.get_zero_model_name(trial, 1, input_dtype)
+    triton_client = client_metadata[0]
+    in0 = np.random.random(tensor_shape).astype(input_dtype)
+    inputs = [
+        grpcclient.InferInput("INPUT0", tensor_shape,
+                              np_to_triton_dtype(input_dtype)),
+    ]
+    inputs[0].set_data_from_numpy(in0)
 
-    with open(timeout_result) as f:
-        if "Deadline Exceeded" not in f.read():
-            assert False, "timeout_client failed {}".format(sequence_name)
+    # Expect an exception for small timeout values.
+    try:
+        results = triton_client.infer(model_name,
+                                      inputs,
+                                      client_timeout=0.00000001)
+    except Exception as ex:
+        if "Deadline Exceeded" not in str(ex):
+            assert False, "timeout_client failed {}".format(name)
 
 
-def resnet_model_request(model_name, sequence_name):
+def resnet_model_request(name):
     image_client = "../clients/image_client.py"
     image = "../images/vulture.jpeg"
-    resnet_result = "resnet_{}.log".format(sequence_name)
+    model_name = "resnet_v1_50_graphdef_def"
+    resnet_result = "resnet_{}.log".format(name)
+
     os.system("{} -m {} -s VGG -c 1 -b 1 {} > {}".format(
         image_client, model_name, image, resnet_result))
     with open(resnet_result) as f:
@@ -426,12 +444,15 @@ def resnet_model_request(model_name, sequence_name):
             assert False, "resnet_model_request failed"
 
 
-def crashing_client(sequence_name):
-    # Client will be terminated after 3 seconds
+def crashing_client(name):
+    trial = get_trial(is_sequence=False)
+
+    # Client will be terminated after 5 seconds
     crashing_client = "crashing_client.py"
-    crashing_client_log = "crashing_{}.log".format(sequence_name)
-    if os.system("python {} > {}".format(crashing_client, crashing_client_log)):
-        assert False, "crashing_client failed"
+    crashing_client_log = "crashing_{}.log".format(name)
+    if os.system("python {} -t {} >> {}".format(crashing_client, trial,
+                                                crashing_client_log)):
+        assert False, "crashing_client failed {}".format(name)
 
 
 def stress_thread(name, seed, test_duration, correlation_id_base):
@@ -468,14 +489,14 @@ def stress_thread(name, seed, test_duration, correlation_id_base):
 
         rare_idx = 0
         while time.time() - start_time < test_duration:
+            trial = get_trial()
+            dtype = get_datatype(trial)
+            model_name = tu.get_sequence_model_name(trial, dtype)
             # Common or rare context?
             if rng.rand() < 0.1:
                 # Rare context...
                 choice = rng.rand()
                 client_idx = common_cnt + rare_idx
-                trial = "custom"
-                dtype = get_datatype(trial)
-                model_name = tu.get_sequence_model_name(trial, dtype)
 
                 # Send a no-end, valid-no-end or valid-valid
                 # sequence... because it is a rare context this should
@@ -518,9 +539,6 @@ def stress_thread(name, seed, test_duration, correlation_id_base):
                 client_idx = 0
                 client_metadata = client_metadata_list[client_idx]
                 last_choice = last_choices[client_idx]
-                trial = "custom"
-                dtype = get_datatype(trial)
-                model_name = tu.get_sequence_model_name(trial, dtype)
 
                 choice = rng.rand()
 
@@ -582,33 +600,15 @@ def stress_thread(name, seed, test_duration, correlation_id_base):
                 client_metadata = client_metadata_list[client_idx]
                 choice = rng.rand()
 
-                if choice < 0.1:
-                    model_name = "custom_identity_int32"
-                    timeout_client(sequence_name=name)
+                if choice < 0.3:
+                    timeout_client(client_metadata_list[client_idx], name)
                     last_choices[client_idx] = "timeout-client"
-                elif choice < 0.3:
-                    model_name = "resnet_v1_50_graphdef_def"
-                    resnet_model_request(model_name, sequence_name=name)
-                    last_choices[client_idx] = "resnet-request"
                 elif choice < 0.5:
-                    trial = "savedmodel_nobatch"
-                    dtype = get_datatype(trial)
-                    model_name = tu.get_sequence_model_name(trial, dtype)
-                    crashing_client(sequence_name=name)
-                    last_choices[client_idx] = "crashing-client"
+                    resnet_model_request(name)
+                    last_choices[client_idx] = "resnet-request"
                 else:
-                    trial = get_trial()
-                    dtype = get_datatype(trial)
-                    model_name = tu.get_sequence_model_name(trial, dtype)
-                    sequence_valid(client_metadata,
-                                   rng,
-                                   trial,
-                                   model_name,
-                                   dtype,
-                                   SEQUENCE_LENGTH_MEAN,
-                                   SEQUENCE_LENGTH_STDEV,
-                                   sequence_name=name)
-                    last_choices[client_idx] = "valid"
+                    crashing_client(name)
+                    last_choices[client_idx] = "crashing-client"
 
     except Exception as ex:
         _thread_exceptions_mutex.acquire()
@@ -655,7 +655,7 @@ if __name__ == '__main__':
                         default=8,
                         help='Request concurrency. Default is 8.')
     parser.add_argument(
-        '-i',
+        '-d',
         '--test-duration',
         type=int,
         required=False,

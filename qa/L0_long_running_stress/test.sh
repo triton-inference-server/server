@@ -47,17 +47,12 @@ source ../common/util.sh
 RET=0
 
 # If BACKENDS not specified, set to all
-BACKENDS=${BACKENDS:="graphdef savedmodel custom"}
+BACKENDS=${BACKENDS:="graphdef savedmodel onnx plan"}
 export BACKENDS
 
-# If MODEL_TRIALS not specified set to 1 2 4
-MODEL_TRIALS=${MODEL_TRIALS:="1 2 4"}
+MODEL_DIR=models
 
-# Setup model repository.
-#   models1 - one instance with batch-size 4
-#   models2 - two instances with batch-size 2
-#   models4 - four instances with batch-size 1
-rm -fr *.log *.txt *.serverlog models{1,2,4} && mkdir models{1,2,4}
+rm -fr *.log *.txt *.serverlog models && mkdir models
 
 # Get the datatype to use based on the backend
 function get_datatype () {
@@ -70,32 +65,19 @@ function get_datatype () {
   echo $dtype
 }
 
+# Setup model repository - two instances with batch-size 2
 MODELS=""
 for BACKEND in $BACKENDS; do
-  if [[ $BACKEND == "custom" ]]; then
-    MODELS="$MODELS ../custom_models/custom_sequence_int32"
-  else
-    DTYPE=$(get_datatype $BACKEND)
-    MODELS="$MODELS $DATADIR/qa_sequence_model_repository/${BACKEND}_sequence_${DTYPE}"
-  fi
+  DTYPE=$(get_datatype $BACKEND)
+  MODELS="$MODELS $DATADIR/qa_sequence_model_repository/${BACKEND}_sequence_${DTYPE}"
 done
 
 for MODEL in $MODELS; do
-    cp -r $MODEL models1/. && \
-      (cd models1/$(basename $MODEL) && \
-        sed -i "s/^max_batch_size:.*/max_batch_size: 4/" config.pbtxt && \
-        sed -i "s/kind: KIND_GPU/kind: KIND_GPU\\ncount: 1/" config.pbtxt && \
-        sed -i "s/kind: KIND_CPU/kind: KIND_CPU\\ncount: 1/" config.pbtxt)
-    cp -r $MODEL models2/. && \
-      (cd models2/$(basename $MODEL) && \
+    cp -r $MODEL $MODEL_DIR/. && \
+      (cd $MODEL_DIR/$(basename $MODEL) && \
         sed -i "s/^max_batch_size:.*/max_batch_size: 2/" config.pbtxt && \
         sed -i "s/kind: KIND_GPU/kind: KIND_GPU\\ncount: 2/" config.pbtxt && \
         sed -i "s/kind: KIND_CPU/kind: KIND_CPU\\ncount: 2/" config.pbtxt)
-    cp -r $MODEL models4/. && \
-      (cd models4/$(basename $MODEL) && \
-        sed -i "s/^max_batch_size:.*/max_batch_size: 1/" config.pbtxt && \
-        sed -i "s/kind: KIND_GPU/kind: KIND_GPU\\ncount: 4/" config.pbtxt && \
-        sed -i "s/kind: KIND_CPU/kind: KIND_CPU\\ncount: 4/" config.pbtxt)
 done
 
 MODELS=""
@@ -105,54 +87,41 @@ for BACKEND in $BACKENDS; do
 done
 
 for MODEL in $MODELS; do
-    cp -r $MODEL models1/. && \
-      (cd models1/$(basename $MODEL) && \
-        sed -i "s/kind: KIND_GPU/kind: KIND_GPU\\ncount: 1/" config.pbtxt && \
-        sed -i "s/kind: KIND_CPU/kind: KIND_CPU\\ncount: 1/" config.pbtxt)
-    cp -r $MODEL models2/. && \
-      (cd models2/$(basename $MODEL) && \
+    cp -r $MODEL $MODEL_DIR/. && \
+      (cd $MODEL_DIR/$(basename $MODEL) && \
         sed -i "s/kind: KIND_GPU/kind: KIND_GPU\\ncount: 2/" config.pbtxt && \
         sed -i "s/kind: KIND_CPU/kind: KIND_CPU\\ncount: 2/" config.pbtxt)
-    cp -r $MODEL models4/. && \
-      (cd models4/$(basename $MODEL) && \
-        sed -i "s/kind: KIND_GPU/kind: KIND_GPU\\ncount: 4/" config.pbtxt && \
-        sed -i "s/kind: KIND_CPU/kind: KIND_CPU\\ncount: 4/" config.pbtxt)
 done
 
-mkdir -p models/custom_identity_int32/1
-
-for model_trial in $MODEL_TRIALS; do
-    MODEL_DIR=models${model_trial}
-    cp -r $DATADIR/tf_model_store/resnet_v1_50_graphdef $MODEL_DIR/resnet_v1_50_graphdef_def && \
-    (cd $MODEL_DIR/resnet_v1_50_graphdef_def && \
-            sed -i 's/^name: "resnet_v1_50_graphdef"/name: "resnet_v1_50_graphdef_def"/' config.pbtxt && \
-            echo "optimization { }" >> config.pbtxt)
-    cp -r `pwd`/models/. $MODEL_DIR
+for BACKEND in $BACKENDS; do
+    cp -r $DATADIR/qa_identity_model_repository/${BACKEND}_nobatch_zero_1_float32 \
+      $MODEL_DIR/.
 done
 
-# Stress-test each model repository
-for model_trial in $MODEL_TRIALS; do
-    MODEL_DIR=models${model_trial}
-    SERVER_ARGS="--model-repository=`pwd`/$MODEL_DIR"
-    SERVER_LOG="./$MODEL_DIR.serverlog"
-    run_server
-    if [ "$SERVER_PID" == "0" ]; then
-        echo -e "\n***\n*** Failed to start $SERVER\n***"
-        cat $SERVER_LOG
-        exit 1
-    fi
+cp -r $DATADIR/tf_model_store/resnet_v1_50_graphdef $MODEL_DIR/resnet_v1_50_graphdef_def && \
+  (cd $MODEL_DIR/resnet_v1_50_graphdef_def && \
+    sed -i 's/^name: "resnet_v1_50_graphdef"/name: "resnet_v1_50_graphdef_def"/' config.pbtxt && \
+    echo "optimization { }" >> config.pbtxt)
 
-    set +e
-    python $STRESS_TEST >>$CLIENT_LOG 2>&1
-    if [ $? -ne 0 ]; then
-        echo -e "\n***\n*** Test Failed\n***"
-        RET=1
-    fi
-    set -e
+SERVER_ARGS="--model-repository=`pwd`/$MODEL_DIR"
+SERVER_LOG="./serverlog"
+run_server
+if [ "$SERVER_PID" == "0" ]; then
+    echo -e "\n***\n*** Failed to start $SERVER\n***"
+    cat $SERVER_LOG
+    exit 1
+fi
 
-    kill $SERVER_PID
-    wait $SERVER_PID
-done
+set +e
+python $STRESS_TEST >>$CLIENT_LOG 2>&1
+if [ $? -ne 0 ]; then
+    echo -e "\n***\n*** Test Failed\n***"
+    RET=1
+fi
+set -e
+
+kill $SERVER_PID
+wait $SERVER_PID
 
 if [ $RET -eq 0 ]; then
     echo -e "\n***\n*** Test Passed\n***"
