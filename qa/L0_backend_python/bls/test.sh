@@ -76,6 +76,7 @@ export MODEL_NAME='bls_memory'
 python3 $CLIENT_PY > $CLIENT_LOG 2>&1 
 if [ $? -ne 0 ]; then
     echo -e "\n***\n*** python_unittest.py FAILED. \n***"
+    cat $CLIENT_LOG
     RET=1
 else
     check_test_results $TEST_RESULT_FILE $EXPECTED_NUM_TESTS
@@ -90,6 +91,7 @@ export MODEL_NAME='bls'
 python3 $CLIENT_PY > $CLIENT_LOG 2>&1 
 if [ $? -ne 0 ]; then
     echo -e "\n***\n*** python_unittest.py FAILED. \n***"
+    cat $CLIENT_LOG
     RET=1
 else
     check_test_results $TEST_RESULT_FILE $EXPECTED_NUM_TESTS
