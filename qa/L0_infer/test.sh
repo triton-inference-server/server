@@ -267,7 +267,7 @@ for TARGET in cpu gpu; do
         # We rely on HTTP endpoint in run_server so until HTTP is
         # implemented for win we do this hack...
         run_server_nowait
-        sleep 60
+        sleep ${SERVER_TIMEOUT}
     else
         run_server
     fi
