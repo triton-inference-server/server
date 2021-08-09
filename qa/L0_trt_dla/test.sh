@@ -1,5 +1,5 @@
 #!/bin/bash
-# Copyright (c) 2021, NVIDIA CORPORATION. All rights reserved.
+# Copyright 2021, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -47,9 +47,9 @@ IMAGE=../images/vulture.jpeg
 CAFFE2PLAN=../common/caffe2plan
 
 DATADIR=${DATADIR:="/data/inferenceserver/${REPO_VERSION}"}
-OPTDIR=${OPTDIR:="/opt"}
-SERVER=${OPTDIR}/tritonserver/bin/tritonserver
-BACKEND_DIR=${OPTDIR}/tritonserver/backends
+TRITON_DIR=${TRITON_DIR:="/opt/tritonserver"}
+SERVER=${TRITON_DIR}/bin/tritonserver
+BACKEND_DIR=${TRITON_DIR}/backends
 
 SERVER_ARGS="--model-repository=`pwd`/models --exit-timeout-secs=120 --backend-directory=${BACKEND_DIR}"
 SERVER_LOG="./inference_server.log"

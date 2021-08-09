@@ -1,5 +1,5 @@
 #!/bin/bash
-# Copyright (c) 2020, NVIDIA CORPORATION. All rights reserved.
+# Copyright 2020-2021, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -37,9 +37,9 @@ fi
 
 export CUDA_VISIBLE_DEVICES=0
 
-OPTDIR=${OPTDIR:="/opt"}
+TRITON_DIR=${TRITON_DIR:="/opt/tritonserver"}
+SERVER=${TRITON_DIR}/bin/tritonserver
 DATADIR=${DATADIR:="/data/inferenceserver/${REPO_VERSION}"}
-SERVER=${OPTDIR}/tritonserver/bin/tritonserver
 source ../common/util.sh
 
 rm -f *.log
