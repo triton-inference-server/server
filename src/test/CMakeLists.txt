@@ -407,6 +407,7 @@ install(
   RUNTIME DESTINATION bin
 )
 
+## FIXME: Enable rate limiter testing once the feature is complete.
 ##
 ## RateLimiter
 ##

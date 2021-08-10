@@ -156,8 +156,8 @@ InferenceServer::Init()
   if (!ignore_resources_and_priority) {
     return Status(
         Status::Code::INVALID_ARG,
-        "rate limiter implementation is not complete. Please use "
-        "--rate-limit=OFF");
+        "rate limiter implementation is not complete. Please disable "
+        "rate limiter");
   }
   status = RateLimiter::Create(
       ignore_resources_and_priority, rate_limit_resource_map_,

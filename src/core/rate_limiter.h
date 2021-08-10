@@ -61,7 +61,6 @@ class RateLimiter {
     PER_DEVICE_RESOURCE_KEY = -1
   };
 
-
   /// Creates a rate limiter object which will funnel the requests to
   /// the model instances. A typical lifetime of the model instance within
   /// RateLimiter transition from available -> staged -> allocated -> available.

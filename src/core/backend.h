@@ -164,8 +164,7 @@ class InferenceBackend {
 
   // Set the scheduler based on the model configuration. The scheduler
   // can only be set once for a backend.
-  // FIXME: The pointer is of TritonModel* type and is done to keep ensemble
-  // happy
+  // FIXME: Change pointer to the type TritonModel* in future.
   Status SetConfiguredScheduler(void* model);
 
   // Get the raw pointer to the scheduler of this backend.

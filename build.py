@@ -78,7 +78,7 @@ EXAMPLE_BACKENDS = ['identity', 'square', 'repeat']
 CORE_BACKENDS = ['ensemble']
 NONCORE_BACKENDS = [
     'tensorflow1', 'tensorflow2', 'onnxruntime', 'python', 'dali', 'pytorch',
-    'openvino', 'fil',  'fastertransformer', 'tensorrt'
+    'openvino', 'fil', 'fastertransformer', 'tensorrt'
 ]
 EXAMPLE_REPOAGENTS = ['checksum']
 FLAGS = None
