@@ -39,7 +39,6 @@ def preprocess(img, dtype, c, h, w, scaling):
     Pre-process an image to meet the size and type
     requirements specified by the parameters.
     """
-    # np.set_printoptions(threshold='nan')
 
     sample_img = img.convert('RGB')
     resized_img = sample_img.resize((w, h), Image.BILINEAR)
@@ -113,7 +112,6 @@ if __name__ == '__main__':
 
     inputs = [httpclient.InferInput('input_tensor_0', [batch_size, 3, 224, 224], 'INT8')]
     inputs[0].set_data_from_numpy(batched_image_data, binary_data=True)
-    # inputs[0].set_data_from_numpy([image_data], binary_data=True)
 
     outputs = [
         httpclient.InferRequestedOutput('topk_layer_output_index', binary_data=True)
