@@ -36,10 +36,16 @@ import tritongrpcclient as grpcclient
 from tritonclientutils import np_to_triton_dtype
 
 
-def crashing_client(model_name, dtype, triton_client, tensor_shape=(1,)):
+def crashing_client(model_name,
+                    dtype,
+                    triton_client,
+                    tensor_shape=(1,),
+                    input_name="INPUT0"):
     in0 = np.random.random(tensor_shape).astype(dtype)
+    if "libtorch" in model_name:
+        input_name = "INPUT__0"
     inputs = [
-        grpcclient.InferInput("INPUT0", tensor_shape,
+        grpcclient.InferInput(input_name, tensor_shape,
                               np_to_triton_dtype(dtype)),
     ]
     inputs[0].set_data_from_numpy(in0)

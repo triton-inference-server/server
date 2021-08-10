@@ -47,7 +47,7 @@ source ../common/util.sh
 RET=0
 
 # If BACKENDS not specified, set to all
-BACKENDS=${BACKENDS:="graphdef savedmodel onnx plan"}
+BACKENDS=${BACKENDS:="graphdef savedmodel onnx plan libtorch"}
 export BACKENDS
 
 MODEL_DIR=models

@@ -82,7 +82,9 @@ def check_sequence_async(client_metadata,
                          timeout_ms=DEFAULT_TIMEOUT_MS,
                          batch_size=1,
                          sequence_name="<unknown>",
-                         tensor_shape=(1,)):
+                         tensor_shape=(1,),
+                         input_name="INPUT",
+                         output_name="OUTPUT"):
     """Perform sequence of inferences using async run. The 'steps' holds
     a list of tuples, one for each inference with format:
 
@@ -94,8 +96,11 @@ def check_sequence_async(client_metadata,
         ("libtorch" not in trial) and ("plan" not in trial)):
         assert False, "unknown trial type: " + trial
 
-    tensor_shape = tensor_shape if "nobatch" in trial else (
-        batch_size,) + tensor_shape
+    if "nobatch" not in trial:
+        tensor_shape = (batch_size,) + tensor_shape
+    if "libtorch" in trial:
+        input_name = "INPUT__0"
+        output_name = "OUTPUT__0"
 
     triton_client = client_metadata[0]
     sequence_id = client_metadata[1]
@@ -122,8 +127,9 @@ def check_sequence_async(client_metadata,
             in0 = in0n.reshape(tensor_shape)
         else:
             in0 = np.full(tensor_shape, value, dtype=input_dtype)
+
         inputs = [
-            grpcclient.InferInput("INPUT", tensor_shape,
+            grpcclient.InferInput(input_name, tensor_shape,
                                   np_to_triton_dtype(input_dtype)),
         ]
         inputs[0].set_data_from_numpy(in0)
@@ -155,8 +161,8 @@ def check_sequence_async(client_metadata,
                     "Timeout expired for {}".format(sequence_name))
 
         result = results.as_numpy(
-            "OUTPUT")[0] if "nobatch" in trial else results.as_numpy(
-                "OUTPUT")[0][0]
+            output_name)[0] if "nobatch" in trial else results.as_numpy(
+                output_name)[0][0]
         if FLAGS.verbose:
             print("{} {}: + {} = {}".format(sequence_name, sequence_id, value,
                                             result))
@@ -408,15 +414,21 @@ def sequence_no_end(client_metadata, rng, trial, model_name, dtype, len_mean,
                          sequence_name=sequence_name)
 
 
-def timeout_client(client_metadata, name, input_dtype=np.float32):
+def timeout_client(client_metadata,
+                   name,
+                   input_dtype=np.float32,
+                   input_name="INPUT0"):
     trial = get_trial(is_sequence=False)
     model_name = tu.get_zero_model_name(trial, 1, input_dtype)
     triton_client = client_metadata[0]
+    if "librotch" in trial:
+        input_name = "INPUT__0"
+
     tensor_shape = (math.trunc(1 * (1024 * 1024 * 1024) //
                                np.dtype(input_dtype).itemsize),)
     in0 = np.random.random(tensor_shape).astype(input_dtype)
     inputs = [
-        grpcclient.InferInput("INPUT0", tensor_shape,
+        grpcclient.InferInput(input_name, tensor_shape,
                               np_to_triton_dtype(input_dtype)),
     ]
     inputs[0].set_data_from_numpy(in0)
@@ -426,7 +438,7 @@ def timeout_client(client_metadata, name, input_dtype=np.float32):
         results = triton_client.infer(model_name, inputs, client_timeout=0.1)
         assert False, "expected inference failure from deadline exceeded"
     except Exception as ex:
-        if "Deadline Exceeded" not in str(ex):
+        if "Deadline Exceeded" not in ex.message():
             assert False, "timeout_client failed {}".format(name)
 
 
