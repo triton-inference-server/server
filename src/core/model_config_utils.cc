@@ -444,7 +444,8 @@ GetBooleanSequenceControlProperties(
         seen_control = true;
 
         if (c.int32_false_true_size() > 0) {
-          if (c.fp32_false_true_size() != 0 || c.bool_false_true_size() != 0) {
+          if ((c.fp32_false_true_size() != 0) ||
+              (c.bool_false_true_size() != 0)) {
             return Status(
                 Status::Code::INVALID_ARG,
                 "sequence batching specifies more than one from "
