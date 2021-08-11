@@ -1,5 +1,5 @@
 #!/bin/bash
-# Copyright 2021, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright (c) 2021, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -35,19 +35,15 @@ if [ -z "$REPO_VERSION" ]; then
     exit 1
 fi
 
-export CUDA_VISIBLE_DEVICES=0
-
 # Need to run on only one device since only creating a single
 # PLAN. Without this test will fail on a heterogeneous system.
 export CUDA_VISIBLE_DEVICES=0
 
-IMAGE_CLIENT=../clients/image_client
-IMAGE=../images/vulture.jpeg
-
-CAFFE2PLAN=../common/caffe2plan
+# Only need to set paths for jetson since this test runs only on jetson
+TRITON_DIR=${TRITON_DIR:="/opt/tritonserver"}
+DLA_TEST=./dla_test.py
 
 DATADIR=${DATADIR:="/data/inferenceserver/${REPO_VERSION}"}
-TRITON_DIR=${TRITON_DIR:="/opt/tritonserver"}
 SERVER=${TRITON_DIR}/bin/tritonserver
 BACKEND_DIR=${TRITON_DIR}/backends
 
@@ -59,8 +55,6 @@ rm -fr models && mkdir models
 cp -r $DATADIR/trt_dla_model_store/resnet50_plan models/.
 rm -f *.log
 
-set +e
-
 run_server
 if [ "$SERVER_PID" == "0" ]; then
     echo -e "\n***\n*** Failed to start $SERVER\n***"
@@ -69,20 +63,13 @@ if [ "$SERVER_PID" == "0" ]; then
 fi
 
 RET=0
+CLIENT_LOG=client.log
 
 set +e
 
-CLIENT_LOG=${IMAGE_CLIENT##*/}.log
-
-echo "Model: resnet50_plan" >> $CLIENT_LOG
-$IMAGE_CLIENT $EXTRA_ARGS -m resnet50_plan -s VGG -c 1 -b 1 $IMAGE >> $CLIENT_LOG 2>&1
+python3 $DLA_TEST >> $CLIENT_LOG 2>&1
 if [ $? -ne 0 ]; then
     cat $CLIENT_LOG
-    RET=1
-fi
-
-if [ `grep -c VULTURE $CLIENT_LOG` != "1" ]; then
-    echo -e "\n***\n*** Failed. Expected 1 VULTURE results\n***"
     RET=1
 fi
 
