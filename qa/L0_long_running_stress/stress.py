@@ -670,8 +670,9 @@ if __name__ == '__main__':
         '--test-duration',
         type=int,
         required=False,
-        default=160,
-        help='Duration of stress test to run. Default is 160 seconds.')
+        default=25000,
+        help='Duration of stress test to run. Default is 25000 seconds ' +
+        '(approximately 7 hours).')
     FLAGS = parser.parse_args()
 
     # Initialize the random seed. For reproducibility each thread
