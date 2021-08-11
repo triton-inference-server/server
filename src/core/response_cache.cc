@@ -40,10 +40,7 @@ RequestResponseCache::RequestResponseCache(const uint64_t size)
     // Create cache as managed buffer
     managed_buffer_ = boost::interprocess::managed_external_buffer(
         boost::interprocess::create_only_t{}, buffer_, size);
-    // Exit early if managed buffer allocation failed
-    if (managed_buffer_ == nullptr) {
-        throw("failed to create managed external buffer");
-    }
+    // TODO: Error check creation of managed_buffer_ ?
 }
 
 RequestResponseCache::~RequestResponseCache()
@@ -54,26 +51,27 @@ RequestResponseCache::~RequestResponseCache()
 }
 
 uint64_t RequestResponseCache::Hash(const InferenceRequest& request) {
-    // TODO: OriginalInputs, OverrideInputs, ImmutableInputs ?
-    auto inputs = request->OriginalInputs();
-    // Create hash function
-    std::hash<vector<std::string>> hash_function;
-    // Setup vector of strings for hashing from request parameters
-    std::vector<std::string> hash_inputs;
-    hash_inputs.push_back(request->Name());
-    hash_inputs.push_back(request->ModelName());
+    std::size_t seed = 0;
+    auto version = request.RequestedModelVersion();   // OK
+    auto name = request.ModelName();                  // ERROR
+    //boost::hash_combine(seed, request.ModelName()); 
+    boost::hash_combine(seed, name); 
     // TODO: RequestedModelVersion or ActualModelVersion ?
-    hash_inputs.push_back(request->RequestedModelVersion());
+    //boost::hash_combine(seed, request.RequestedModelVersion());
+    boost::hash_combine(seed, version);
+
+    // TODO: OriginalInputs, OverrideInputs, ImmutableInputs ?
+    /*auto inputs = request.OriginalInputs();
     // Setup vector of input tensor values for hashing
-    for (auto const& input : inputs) {
-        hash_inputs.push_back(input->Name());
+    for (const auto& input : inputs) {
+        //boost::hash_combine(seed, input.second.Name());
         // TODO: Example of accessing/iterating over input data?
         // TODO: Can we cast any type to string here? Or hash based on defined dtype?
         //       Can we hash just the raw bits/bytes for any input buffer, or is this too collision prone?
-    }
+    }*/
 
     // Hash together the various request fields
-    uint64_t key = static_cast<uint64_t>(hash_function(hash_inputs));
+    uint64_t key = static_cast<uint64_t>(seed);
     return key;
 }
 
@@ -109,7 +107,7 @@ Status RequestResponseCache::Insert(const uint64_t key, const InferenceResponse&
     // TODO: Construct cache entry from response
     auto entry = CacheEntry();
     // TODO: update cache entry size
-    // entry.size = ...
+    entry.size = 0;
     // TODO: request buffer from managed_buffer
     // *ptr = managed_buffer_.allocate(entry.size, ...)
     // cache.ptr = ptr

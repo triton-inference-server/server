@@ -81,6 +81,25 @@ set(
 )
 
 #
+# RequestResponseCache 
+#
+set(
+  RESPONSE_CACHE_SRCS
+  ../core/response_cache.cc
+  ../core/status.cc
+  #../core/infer_request.cc
+  #../core/infer_response.cc
+)
+
+set(
+  RESPONSE_CACHE_HDRS
+  ../core/response_cache.h
+  ../core/status.h
+  #../core/infer_request.h
+  #../core/infer_response.h
+)
+
+#
 # Memory
 #
 set(
@@ -196,6 +215,57 @@ target_link_libraries(
 )
 install(
   TARGETS pinned_memory_manager_test
+  RUNTIME DESTINATION bin
+)
+
+#
+# Unit test for RequestResponseCache
+#
+set(
+  RESPONSE_CACHE_TEST_SRCS
+  response_cache_test.cc
+  ${RESPONSE_CACHE_SRCS}
+)
+
+set(
+  RESPONSE_CACHE_TEST_HDRS
+  ${RESPONSE_CACHE_HDRS}
+)
+
+find_package(GTest REQUIRED)
+add_executable(
+  response_cache_test
+  ${RESPONSE_CACHE_TEST_SRCS}
+  ${RESPONSE_CACHE_TEST_HDRS}
+  $<TARGET_OBJECTS:proto-library>
+)
+set_target_properties(
+  response_cache_test
+  PROPERTIES
+    SKIP_BUILD_RPATH TRUE
+    BUILD_WITH_INSTALL_RPATH TRUE
+    INSTALL_RPATH_USE_LINK_PATH FALSE
+    INSTALL_RPATH ""
+)
+target_include_directories(
+  response_cache_test
+  PRIVATE ${GTEST_INCLUDE_DIR}
+  PRIVATE ${CUDA_INCLUDE_DIRS}
+)
+target_link_libraries(
+  response_cache_test
+  PRIVATE triton-common-error        # from repo-common
+  PRIVATE triton-common-sync-queue   # from repo-common
+  PRIVATE triton-core-serverapi      # from repo-core
+  PRIVATE proto-library              # from repo-common
+  PRIVATE ${GTEST_LIBRARY}
+  PRIVATE ${GTEST_MAIN_LIBRARY}
+  PRIVATE ${CUDA_LIBRARIES}
+  PRIVATE protobuf::libprotobuf
+  PRIVATE -lpthread
+)
+install(
+  TARGETS response_cache_test
   RUNTIME DESTINATION bin
 )
 

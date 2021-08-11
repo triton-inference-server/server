@@ -28,11 +28,14 @@
 
 #include <list>
 #include <string>
-#include <functional>
 #include <unordered_map>
 
-#include <boost/interprocess/managed_external_buffer.hpp>
 #include "src/core/status.h"
+#include "src/core/infer_request.h"
+#include "src/core/infer_response.h"
+
+#include <boost/interprocess/managed_external_buffer.hpp>
+#include <boost/functional/hash.hpp>
 
 namespace nvidia { namespace inferenceserver {
 
@@ -72,7 +75,7 @@ class RequestResponseCache {
 
     private:
         // Cache buffer
-        char* buffer_;
+        void* buffer_;
         // Managed buffer
         boost::interprocess::managed_external_buffer managed_buffer_;
         // Total size of cache, will evict if a new item will exceed the total/available size
