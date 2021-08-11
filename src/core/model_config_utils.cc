@@ -604,8 +604,8 @@ GetTypedSequenceControlProperties(
             (c.bool_false_true_size() > 0)) {
           return Status(
               Status::Code::INVALID_ARG,
-              "sequence batching must not specify neither 'int32_false_true' "
-              "nor 'fp32_false_true' nor 'bool_false_true' for " +
+              "sequence batching must not specify either 'int32_false_true', "
+              "'fp32_false_true' or 'bool_false_true' for " +
                   inference::ModelSequenceBatching_Control_Kind_Name(
                       control_kind) +
                   " for " + model_name);
