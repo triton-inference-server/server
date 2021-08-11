@@ -334,7 +334,7 @@ def backend_cmake_args(images, components, be, install_dir, library_paths):
     elif be == 'tensorflow2':
         args = tensorflow_cmake_args(2, images, library_paths)
     elif be == 'python':
-        args = []
+        args = ['-DTRITON_ENABLE_GPU={}'.format(cmake_enable(FLAGS.enable_gpu))]
     elif be == 'dali':
         args = dali_cmake_args()
     elif be == 'pytorch':
@@ -793,7 +793,8 @@ RUN ln -sf ${_CUDA_COMPAT_PATH}/lib.real ${_CUDA_COMPAT_PATH}/lib \
 RUN apt-get update && \
     apt-get install -y --no-install-recommends \
             python3 libarchive-dev \
-            python3-pip && \
+            python3-pip \
+            libpython3-dev && \
     pip3 install --upgrade pip && \
     pip3 install --upgrade wheel setuptools && \
     pip3 install --upgrade numpy && \
