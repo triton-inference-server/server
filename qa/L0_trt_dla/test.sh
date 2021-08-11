@@ -41,8 +41,7 @@ export CUDA_VISIBLE_DEVICES=0
 
 # Only need to set paths for jetson since this test runs only on jetson
 TRITON_DIR=${TRITON_DIR:="/opt/tritonserver"}
-IMAGE=${TRITON_DIR}/qa/images/vulture.jpeg
-IMAGE_CLIENT=./dla_client.py
+DLA_TEST=./dla_test.py
 
 DATADIR=${DATADIR:="/data/inferenceserver/${REPO_VERSION}"}
 SERVER=${TRITON_DIR}/bin/tritonserver
@@ -64,20 +63,13 @@ if [ "$SERVER_PID" == "0" ]; then
 fi
 
 RET=0
+CLIENT_LOG=client.log
 
 set +e
 
-CLIENT_LOG=${IMAGE_CLIENT##*/}.log
-
-echo "Model: resnet50_plan" >> $CLIENT_LOG
-$IMAGE_CLIENT -s VGG $IMAGE >> $CLIENT_LOG 2>&1
+python3 $DLA_TEST >> $CLIENT_LOG 2>&1
 if [ $? -ne 0 ]; then
     cat $CLIENT_LOG
-    RET=1
-fi
-
-if [ `grep -c 23 $CLIENT_LOG` != "32" ]; then
-    echo -e "\n***\n*** Failed. Expected 32 '23' (VULTURE) results\n***"
     RET=1
 fi
 
