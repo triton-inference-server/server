@@ -404,7 +404,7 @@ GetBooleanSequenceControlProperties(
     const bool required, std::string* tensor_name,
     inference::DataType* tensor_datatype, float* fp32_false_value,
     float* fp32_true_value, int32_t* int32_false_value,
-    int32_t* int32_true_value)
+    int32_t* int32_true_value, bool* bool_false_value, bool* bool_true_value)
 {
   // Make sure same tensor is not configured for multiple controls
   std::set<std::string> seen_tensors;
@@ -443,17 +443,35 @@ GetBooleanSequenceControlProperties(
         *tensor_name = control_input.name();
         seen_control = true;
 
-        if (c.int32_false_true_size() > 0) {
-          if (c.fp32_false_true_size() != 0) {
-            return Status(
-                Status::Code::INVALID_ARG,
-                "sequence batching specifies both 'int32_false_true' and "
-                "'fp32_false_true' for " +
-                    inference::ModelSequenceBatching_Control_Kind_Name(
-                        control_kind) +
-                    " for " + model_name);
-          }
+        // Make sure only one of int, float, or bool type is specified.
+        if (!((c.int32_false_true_size() != 0) ||
+              (c.fp32_false_true_size() != 0) ||
+              (c.bool_false_true_size() != 0))) {
+          return Status(
+              Status::Code::INVALID_ARG,
+              "sequence batching must specify either 'int32_false_true', "
+              "'fp32_false_true' or 'bool_false_true' for " +
+                  inference::ModelSequenceBatching_Control_Kind_Name(
+                      control_kind) +
+                  " for " + model_name);
+        } else if (
+            ((c.int32_false_true_size() != 0) &&
+             (c.fp32_false_true_size() != 0)) ||
+            ((c.int32_false_true_size() != 0) &&
+             (c.bool_false_true_size() != 0)) ||
+            ((c.fp32_false_true_size() != 0) &&
+             (c.bool_false_true_size() != 0))) {
+          return Status(
+              Status::Code::INVALID_ARG,
+              "sequence batching specifies more than one from "
+              "'int32_false_true', 'fp32_false_true' and 'bool_false_true' "
+              "for " +
+                  inference::ModelSequenceBatching_Control_Kind_Name(
+                      control_kind) +
+                  " for " + model_name);
+        }
 
+        if (c.int32_false_true_size() > 0) {
           if (c.int32_false_true_size() != 2) {
             return Status(
                 Status::Code::INVALID_ARG,
@@ -473,17 +491,7 @@ GetBooleanSequenceControlProperties(
           if (int32_true_value != nullptr) {
             *int32_true_value = c.int32_false_true(1);
           }
-        } else {
-          if (c.fp32_false_true_size() == 0) {
-            return Status(
-                Status::Code::INVALID_ARG,
-                "sequence batching must specify either 'int32_false_true' or "
-                "'fp32_false_true' for " +
-                    inference::ModelSequenceBatching_Control_Kind_Name(
-                        control_kind) +
-                    " for " + model_name);
-          }
-
+        } else if (c.fp32_false_true_size() > 0) {
           if (c.fp32_false_true_size() != 2) {
             return Status(
                 Status::Code::INVALID_ARG,
@@ -502,6 +510,26 @@ GetBooleanSequenceControlProperties(
           }
           if (fp32_true_value != nullptr) {
             *fp32_true_value = c.fp32_false_true(1);
+          }
+        } else {
+          if (c.bool_false_true_size() != 2) {
+            return Status(
+                Status::Code::INVALID_ARG,
+                "sequence batching control 'bool_false_true' must have exactly "
+                "2 entries for " +
+                    inference::ModelSequenceBatching_Control_Kind_Name(
+                        control_kind) +
+                    " for " + model_name);
+          }
+
+          if (tensor_datatype != nullptr) {
+            *tensor_datatype = inference::DataType::TYPE_BOOL;
+          }
+          if (bool_false_value != nullptr) {
+            *bool_false_value = c.bool_false_true(0);
+          }
+          if (bool_true_value != nullptr) {
+            *bool_true_value = c.bool_false_true(1);
           }
         }
       }
@@ -572,11 +600,12 @@ GetTypedSequenceControlProperties(
 
         seen_control = true;
 
-        if ((c.int32_false_true_size() > 0) || (c.fp32_false_true_size() > 0)) {
+        if ((c.int32_false_true_size() > 0) || (c.fp32_false_true_size() > 0) ||
+            (c.bool_false_true_size() > 0)) {
           return Status(
               Status::Code::INVALID_ARG,
-              "sequence batching must not specify either 'int32_false_true' "
-              "nor 'fp32_false_true' for " +
+              "sequence batching must not specify either 'int32_false_true', "
+              "'fp32_false_true' or 'bool_false_true' for " +
                   inference::ModelSequenceBatching_Control_Kind_Name(
                       control_kind) +
                   " for " + model_name);
@@ -1108,17 +1137,17 @@ ValidateModelConfig(
         batcher, config.name(),
         inference::ModelSequenceBatching::Control::CONTROL_SEQUENCE_START,
         false /* required */, &tensor_name, nullptr, nullptr, nullptr, nullptr,
-        nullptr));
+        nullptr, nullptr, nullptr));
     RETURN_IF_ERROR(GetBooleanSequenceControlProperties(
         batcher, config.name(),
         inference::ModelSequenceBatching::Control::CONTROL_SEQUENCE_END,
         false /* required */, &tensor_name, nullptr, nullptr, nullptr, nullptr,
-        nullptr));
+        nullptr, nullptr, nullptr));
     RETURN_IF_ERROR(GetBooleanSequenceControlProperties(
         batcher, config.name(),
         inference::ModelSequenceBatching::Control::CONTROL_SEQUENCE_READY,
         false /* required */, &tensor_name, nullptr, nullptr, nullptr, nullptr,
-        nullptr));
+        nullptr, nullptr, nullptr));
 
     // Check CORRID control and make sure it is one of the allowed types.
     inference::DataType tensor_datatype;
