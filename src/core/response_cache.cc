@@ -151,6 +151,8 @@ Status RequestResponseCache::BuildCacheEntry(CacheEntry& entry, const InferenceR
         TRITONSERVER_MemoryType response_memory_type;
         int64_t response_memory_type_id;
         void* userp;
+        // TODO: How to differently handle different memory types?
+        //       GPU vs. CPU memory, etc.
         Status status = response_output.DataBuffer(
             &response_buffer, &response_byte_size, &response_memory_type,
             &response_memory_type_id, &userp);
@@ -184,6 +186,8 @@ Status RequestResponseCache::BuildCacheEntry(CacheEntry& entry, const InferenceR
         }
 
         // Copy data from response buffer to cache entry output buffer
+        // TODO: How to differently handle different memory types?
+        //       GPU vs. CPU memory, etc.
         std::memcpy(cache_output.buffer, response_buffer, response_byte_size);
         // Sum up output sizes for total cache entry size
         entry.size += cache_output.size;
