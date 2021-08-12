@@ -1,0 +1,28 @@
+name: "peoplenet"
+platform: "tensorrt_plan"
+max_batch_size: 64
+input [
+  {
+    name: "input_1"
+    data_type: TYPE_FP32
+    dims: [ 3, 544, 960  ]
+  }
+]
+output [
+  {
+    name: "output_bbox/BiasAdd"
+    data_type: TYPE_FP32
+    dims: [ 12, 34, 60 ]
+  },
+  {
+    name: "output_cov/Sigmoid"
+    data_type: TYPE_FP32
+    dims: [ 3, 34, 60 ]
+  }
+]
+instance_group [
+  {
+    count: 3
+    kind: KIND_GPU
+  }
+]
