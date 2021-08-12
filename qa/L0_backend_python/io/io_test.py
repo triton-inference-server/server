@@ -40,11 +40,9 @@ class IOTest(tu.TestResultCollector):
         model_name = "ensemble_io"
         with httpclient.InferenceServerClient("localhost:8000") as client:
             input0 = np.random.random([1000]).astype(np.float32)
-            # TODO: Fix after DLIS-2689 is merged. The arrays below must
-            # contain both true and false.
-            for model_1_in_gpu in [False]:
-                for model_2_in_gpu in [False]:
-                    for model_3_in_gpu in [False]:
+            for model_1_in_gpu in [True, False]:
+                for model_2_in_gpu in [True, False]:
+                    for model_3_in_gpu in [True, False]:
                         gpu_output = np.asarray(
                             [model_1_in_gpu, model_2_in_gpu, model_3_in_gpu],
                             dtype=bool)

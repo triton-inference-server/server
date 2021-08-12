@@ -30,7 +30,7 @@ sys.path.append("../../common")
 
 import test_util as tu
 import unittest
-import tritonclient.http as httpclient
+import tritonclient.grpc as grpcclient
 from tritonclient.utils import *
 import os
 
@@ -38,9 +38,9 @@ import os
 class PythonUnittest(tu.TestResultCollector):
     def test_python_unittest(self):
         model_name = os.environ['MODEL_NAME']
-        with httpclient.InferenceServerClient("localhost:8000") as client:
+        with grpcclient.InferenceServerClient("localhost:8001") as client:
             # No input is required
-            result = client.infer(model_name, [])
+            result = client.infer(model_name, [], client_timeout=120)
             output0 = result.as_numpy('OUTPUT0')
 
             # The model returns 1 if the tests were sucessfully passed.
