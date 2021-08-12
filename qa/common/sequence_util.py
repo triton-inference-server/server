@@ -63,7 +63,7 @@ _valgrind_delay_ms = bool(int(os.environ.get('TEST_DELAY_MS', 50)))
 
 _deferred_exceptions_lock = threading.Lock()
 _deferred_exceptions = None
-_jetson_slowdown_factor = 1.6
+_jetson_slowdown_factor = 2
 
 
 class UserData:

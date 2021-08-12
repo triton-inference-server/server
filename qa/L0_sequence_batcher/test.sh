@@ -93,7 +93,7 @@ else
     BACKEND_DIR=${TRITON_DIR}/backends
 fi
 
-SERVER_ARGS_EXTRA="--backend-directory=${BACKEND_DIR} --backend-config=tensorflow,version=${TF_VERSION}"
+SERVER_ARGS_EXTRA="--backend-directory=${BACKEND_DIR} --log-verbose=1 --backend-config=tensorflow,version=${TF_VERSION}"
 
 source ../common/util.sh
 
@@ -328,6 +328,7 @@ for model_trial in $MODEL_TRIALS; do
         if [ $? -ne 0 ]; then
             echo -e "\n***\n*** Test $i Failed\n***" >>$CLIENT_LOG
             echo -e "\n***\n*** Test $i Failed\n***"
+            cat $CLIENT_LOG
             RET=1
         else
             check_test_results $TEST_RESULT_FILE 1
@@ -393,6 +394,7 @@ for model_trial in $MODEL_TRIALS; do
         if [ $? -ne 0 ]; then
             echo -e "\n***\n*** Test $i Failed\n***" >>$CLIENT_LOG
             echo -e "\n***\n*** Test $i Failed\n***"
+            cat $CLIENT_LOG
             RET=1
         else
             check_test_results $TEST_RESULT_FILE 1
@@ -531,6 +533,7 @@ for i in $QUEUE_DELAY_TESTS ; do
     if [ $? -ne 0 ]; then
         echo -e "\n***\n*** Test $i Failed\n***" >>$CLIENT_LOG
         echo -e "\n***\n*** Test $i Failed\n***"
+        cat $CLIENT_LOG
         RET=1
     else
         check_test_results $TEST_RESULT_FILE 1
