@@ -298,8 +298,9 @@ function kill_server () {
     # means that it does not gracefully exit.
     if [[ "$(< /proc/sys/kernel/osrelease)" == *Microsoft ]]; then
         # Disable -x as it makes output below hard to read
-        [ -o xtrace ] && ts='set -x' || ts='set +x'
+        oldstate="$(set +o)"; [[ -o errexit ]] && oldstate="$oldstate; set -e"
         set +x
+        set +e
         
         tasklist=$(/mnt/c/windows/system32/tasklist.exe /FI 'IMAGENAME eq tritonserver.exe' /FO CSV)
         echo "=== Windows tritonserver tasks"
@@ -318,7 +319,7 @@ function kill_server () {
             done
         fi
         
-        eval "$ts"
+        set +vx; eval "$oldstate"
     else
         # Non-windows...
         kill $SERVER_PID
