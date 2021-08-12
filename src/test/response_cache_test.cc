@@ -26,7 +26,6 @@
 #include "gtest/gtest.h"
 
 #include "src/core/response_cache.h"
-#include "src/core/tritonserver_apis.h"
 
 namespace ni = nvidia::inferenceserver;
 

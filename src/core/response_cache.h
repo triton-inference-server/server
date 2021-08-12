@@ -39,11 +39,14 @@
 
 namespace nvidia { namespace inferenceserver {
 
-// TODO: flesh this out
 struct Output {
+    // Output tensor data buffer
     void* buffer;
+    // Size of "buffer" above
     uint64_t size;
+    // Name of the output
     std::string name;
+    // Datatype of the output
     inference::DataType dtype;
 };
 
@@ -88,7 +91,11 @@ class RequestResponseCache {
         std::list<uint64_t> lru_;
 
         // Update LRU ordering on lookup
-        void Update(std::unordered_map<uint64_t, CacheEntry>::iterator&);
+        void UpdateLRU(std::unordered_map<uint64_t, CacheEntry>::iterator&);
+        // Build CacheEntry from InferenceResponse
+        Status BuildCacheEntry(CacheEntry& entry, const InferenceResponse& response);
+        // Build InferenceResponse from CacheEntry
+        Status BuildInferenceResponse(const CacheEntry& entry, InferenceResponse** response);
 };
 
 }}  // namespace nvidia::inferenceserver

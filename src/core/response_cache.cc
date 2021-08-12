@@ -52,25 +52,22 @@ RequestResponseCache::~RequestResponseCache()
 
 uint64_t RequestResponseCache::Hash(const InferenceRequest& request) {
     std::size_t seed = 0;
-    auto version = request.RequestedModelVersion();   // OK
-    auto name = request.ModelName();                  // ERROR
+    // TODO: Linker ERROR
     //boost::hash_combine(seed, request.ModelName()); 
-    boost::hash_combine(seed, name); 
     // TODO: RequestedModelVersion or ActualModelVersion ?
-    //boost::hash_combine(seed, request.RequestedModelVersion());
-    boost::hash_combine(seed, version);
+    boost::hash_combine(seed, request.RequestedModelVersion());
 
     // TODO: OriginalInputs, OverrideInputs, ImmutableInputs ?
-    /*auto inputs = request.OriginalInputs();
-    // Setup vector of input tensor values for hashing
+    const auto& inputs = request.OriginalInputs();
     for (const auto& input : inputs) {
-        //boost::hash_combine(seed, input.second.Name());
-        // TODO: Example of accessing/iterating over input data?
-        // TODO: Can we cast any type to string here? Or hash based on defined dtype?
-        //       Can we hash just the raw bits/bytes for any input buffer, or is this too collision prone?
-    }*/
+        // Add input name to hash
+        boost::hash_combine(seed, input.second.Name());
+        // Add input data to hash
+        // TODO: Consider hashing pointer as-is vs. actual raw input bytes
+        // Scenario: What about the same input values stored in a different memory address?
+        boost::hash_combine(seed, input.second.Data());
+    }
 
-    // Hash together the various request fields
     uint64_t key = static_cast<uint64_t>(seed);
     return key;
 }
@@ -83,16 +80,15 @@ Status RequestResponseCache::Lookup(const uint64_t key, InferenceResponse** ptr)
         );
     }
     // Update this key to front of LRU list
-    Update(iter);
+    UpdateLRU(iter);
     // Populate passed-in "ptr" from cache entry
     auto entry = iter->second;
-    // TODO: Copy contents from CacheEntry ptr to passed-in ptr
-    // *ptr = ...
-    if (*ptr == nullptr) {
-        return Status(
-            Status::Code::INTERNAL, "InferenceResponse ptr in cache was invalid nullptr"
-        );
+    // Build InferenceResponse from CacheEntry
+    auto status = BuildInferenceResponse(entry, ptr);
+    if (!status.IsOk()) {
+        return status;
     }
+
     return Status::Success;
 }
 
@@ -104,20 +100,13 @@ Status RequestResponseCache::Insert(const uint64_t key, const InferenceResponse&
             Status::Code::INTERNAL, "key already exists in cache"
         );
     }
-    // TODO: Construct cache entry from response
+    // Construct cache entry from response
     auto entry = CacheEntry();
-    // TODO: update cache entry size
-    entry.size = 0;
-    // TODO: request buffer from managed_buffer
-    // *ptr = managed_buffer_.allocate(entry.size, ...)
-    // cache.ptr = ptr
+    auto status = BuildCacheEntry(entry, response);
+    if (!status.IsOk()) {
+        return status;
+    }
 
-    // If cache entry is larger than total cache size, exit with failure
-    if (entry.size > total_size_) {
-        return Status(
-            Status::Code::INTERNAL, "Cache entry is larger than total cache size"
-        );
-    } 
     // If cache doesn't have room for new entry, evict until enough size is available
     while (entry.size > available_size_) {
         auto status = Evict();
@@ -126,9 +115,18 @@ Status RequestResponseCache::Insert(const uint64_t key, const InferenceResponse&
             return status;
         }
     }
-    // Now that we have room for new entry, update LRU and insert it in cache
-    lru_.push_front(key);
-    cache_.insert({key, entry});
+    // Insert entry into cache
+    auto cache_pair = cache_.insert({key, entry});
+    bool ok = cache_pair.second;
+    // Exit early if cache insertion failed
+    if (!ok) {
+        return Status(
+            Status::Code::INTERNAL, "Cache insertion failed"
+        );
+    }
+    // Update LRU with new cache entry
+    auto cache_iter = cache_pair.first;
+    UpdateLRU(cache_iter);
     // Update available cache size
     available_size_ -= entry.size;
     // Error checking cache size management
@@ -142,9 +140,73 @@ Status RequestResponseCache::Insert(const uint64_t key, const InferenceResponse&
     return Status::Success;
 }
 
+Status RequestResponseCache::BuildCacheEntry(CacheEntry& entry, const InferenceResponse& response) {
+    // Build cache entry data from response outputs
+    for (const auto& response_output : response.Outputs()) {
+        auto cache_output = Output();
+
+        // Fetch output buffer details
+        const void* response_buffer;
+        size_t response_byte_size;
+        TRITONSERVER_MemoryType response_memory_type;
+        int64_t response_memory_type_id;
+        void* userp;
+        Status status = response_output.DataBuffer(
+            &response_buffer, &response_byte_size, &response_memory_type,
+            &response_memory_type_id, &userp);
+
+        // Exit early if we fail to get output buffer from response
+        if (!status.IsOk()) {
+            return Status(
+                Status::Code::INTERNAL, "Failed to get output buffer for " + response_output.Name()
+            );
+        }
+
+        // Exit early if cache entry will be larger than total cache size
+        if (response_byte_size > total_size_) {
+            return Status(
+                Status::Code::INTERNAL, "Cache entry is larger than total cache size"
+            );
+        } 
+
+        // Set output metadata
+        cache_output.name = response_output.Name();
+        cache_output.dtype = response_output.DType();
+        cache_output.size = static_cast<uint64_t>(response_byte_size);
+
+        // Allocate buffer for response output in cache entry
+        cache_output.buffer = managed_buffer_.allocate(response_byte_size, std::nothrow_t{});
+        // Exit early if we fail to allocate from managed buffer
+        if (cache_output.buffer == nullptr) {
+            return Status(
+                Status::Code::INTERNAL, "Failed to allocate buffer from managed buffer"
+            );
+        }
+
+        // Copy data from response buffer to cache entry output buffer
+        std::memcpy(cache_output.buffer, response_buffer, response_byte_size);
+        // Sum up output sizes for total cache entry size
+        entry.size += cache_output.size;
+        // Add each output to cache entry
+        entry.outputs.push_back(cache_output);
+    }
+
+    return Status::Success;
+}
+
+
+Status RequestResponseCache::BuildInferenceResponse(const CacheEntry& entry, InferenceResponse** response) {
+    // TODO
+        return Status(
+            Status::Code::INTERNAL, "NotImplementedError"
+        );
+}
+
 // LRU
 Status RequestResponseCache::Evict() {
-    auto lru_key = lru_.back();
+    // Least recently used key in back of LRU list
+    uint64_t lru_key = lru_.back();
+    // Find cache entry for least recently used key
     auto iter = cache_.find(lru_key);
     // Error check if key isn't in cache, but this shouldn't happen in evict
     // and probably indicates a bug
@@ -154,17 +216,19 @@ Status RequestResponseCache::Evict() {
             "key not found in cache during eviction: this indicates a bug in the code"
         );
     }
-    // TODO: free managed memory used in cache entry as well?
-    // managed_buffer_.deallocate(...)
     // Get size of cache entry being evicted to update available size
     auto entry = iter->second;
-    uint64_t entry_size = entry.size;
+    // Free managed memory used in cache entry's outputs
+    for (const auto& output : entry.outputs) {
+        managed_buffer_.deallocate(output.buffer);
+    }
+
     // Remove LRU entry from cache
     cache_.erase(lru_key);
     // Remove LRU key from LRU list
     lru_.pop_back();
     // Update available cache size
-    available_size_ += entry_size;
+    available_size_ += entry.size;
     // Error checking cache size management
     if (available_size_ > total_size_) {
         return Status(
@@ -176,13 +240,18 @@ Status RequestResponseCache::Evict() {
 }
 
 // LRU
-void RequestResponseCache::Update(std::unordered_map<uint64_t, CacheEntry>::iterator& cache_iter) {
-    // Remove key from LRU list at it's current location
-    lru_.erase(cache_iter->second.lru_iter);
+void RequestResponseCache::UpdateLRU(std::unordered_map<uint64_t, CacheEntry>::iterator& cache_iter) {
+    const auto& key = cache_iter->first;
+    auto& cache_entry = cache_iter->second;
+    // Remove key from LRU list if it was already in there
+    auto lru_iter = std::find(lru_.begin(), lru_.end(), key);
+    if (lru_iter != lru_.end()) {
+        lru_.erase(lru_iter);
+    }
     // Add key to front of LRU list since it's most recently used
-    lru_.push_front(cache_iter->first);
-    // Set CacheEntry iterator to new LRU key location
-    cache_iter->second.lru_iter = lru_.begin();
+    lru_.push_front(key);
+    // Set CacheEntry LRU iterator to new LRU key location
+    cache_entry.lru_iter = lru_.begin();
 }
 
 }}  // namespace nvidia::inferenceserver
