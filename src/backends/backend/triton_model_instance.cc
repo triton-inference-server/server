@@ -36,9 +36,9 @@
 #include "src/core/logging.h"
 #include "src/core/metrics.h"
 #include "src/core/numa_utils.h"
-#include "src/core/nvtx.h"
 #include "src/core/server.h"
 #include "src/core/shared_library.h"
+#include "triton/common/nvtx.h"
 
 namespace nvidia { namespace inferenceserver {
 

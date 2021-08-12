@@ -442,12 +442,12 @@ def openvino_cmake_args():
 
 
 def tensorrt_cmake_args():
+    cargs = ['-DTRITON_ENABLE_NVTX:BOOL={}'.format(
+        cmake_enable(FLAGS.enable_nvtx))]
     if target_platform() == 'windows':
-        return [
-            '-DTRITON_TENSORRT_INCLUDE_PATHS=c:/TensorRT/include',
-        ]
+        cargs.append('-DTRITON_TENSORRT_INCLUDE_PATHS=c:/TensorRT/include')
 
-    return []
+    return cargs
 
 
 def tensorflow_cmake_args(ver, images, library_paths):
