@@ -34,8 +34,8 @@
 #include "src/core/infer_request.h"
 #include "src/core/infer_response.h"
 
-#include <boost/interprocess/managed_external_buffer.hpp>
 #include <boost/functional/hash.hpp>
+#include <boost/interprocess/managed_external_buffer.hpp>
 
 namespace nvidia { namespace inferenceserver {
 

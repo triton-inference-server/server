@@ -45,6 +45,16 @@ RequestResponseCache::RequestResponseCache(const uint64_t size)
 
 RequestResponseCache::~RequestResponseCache()
 {
+    // TODO: Free each managed buffer allocated to cache entries,
+    //       or is it enough to free full buffer?
+    for (auto& iter : cache_) {
+        auto& entry = iter.second;
+        for (auto& output : entry.outputs) {
+            managed_buffer_.deallocate(output.buffer);
+        }
+    }
+
+    // Free total cache buffer
     if (buffer_ != nullptr) {
         free(buffer_);
     }
@@ -142,25 +152,38 @@ Status RequestResponseCache::Insert(const uint64_t key, const InferenceResponse&
 
 Status RequestResponseCache::BuildCacheEntry(CacheEntry& entry, const InferenceResponse& response) {
     // Build cache entry data from response outputs
+    //for (const InferenceResponse::Output& response_output : response.Outputs()) {
     for (const auto& response_output : response.Outputs()) {
         auto cache_output = Output();
 
         // Fetch output buffer details
-        const void* response_buffer;
-        size_t response_byte_size;
+        const void* response_buffer = nullptr;
+        size_t response_byte_size = 0;
+        /*
         TRITONSERVER_MemoryType response_memory_type;
-        int64_t response_memory_type_id;
-        void* userp;
+        int64_t response_memory_type_id = 0;
+        void* userp = nullptr;
         // TODO: How to differently handle different memory types?
         //       GPU vs. CPU memory, etc.
+        // TODO: Linker error on calling DataBuffer() here
         Status status = response_output.DataBuffer(
             &response_buffer, &response_byte_size, &response_memory_type,
             &response_memory_type_id, &userp);
+        */
+        // TODO: Temp WAR
+        auto status = Status::Success;
 
         // Exit early if we fail to get output buffer from response
         if (!status.IsOk()) {
             return Status(
                 Status::Code::INTERNAL, "Failed to get output buffer for " + response_output.Name()
+            );
+        }
+
+        // Exit early if response buffer from output is invalid
+        if (response_buffer == nullptr) {
+            return Status(
+                Status::Code::INTERNAL, "Response buffer from output was nullptr"
             );
         }
 
@@ -201,9 +224,9 @@ Status RequestResponseCache::BuildCacheEntry(CacheEntry& entry, const InferenceR
 
 Status RequestResponseCache::BuildInferenceResponse(const CacheEntry& entry, InferenceResponse** response) {
     // TODO
-        return Status(
-            Status::Code::INTERNAL, "NotImplementedError"
-        );
+    return Status(
+        Status::Code::INTERNAL, "NotImplementedError"
+    );
 }
 
 // LRU
