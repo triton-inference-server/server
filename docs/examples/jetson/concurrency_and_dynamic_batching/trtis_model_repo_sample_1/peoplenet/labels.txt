@@ -1,0 +1,4 @@
+person
+bag
+face
+
