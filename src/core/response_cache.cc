@@ -246,7 +246,7 @@ Status RequestResponseCache::Evict() {
     // Get size of cache entry being evicted to update available size
     auto entry = iter->second;
     // Free managed memory used in cache entry's outputs
-    for (const auto& output : entry.outputs) {
+    for (auto& output : entry.outputs) {
         managed_buffer_.deallocate(output.buffer);
     }
 
