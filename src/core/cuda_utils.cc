@@ -27,7 +27,7 @@
 #include "src/core/cuda_utils.h"
 
 #include "src/core/model_config_utils.h"
-#include "src/core/nvtx.h"
+#include "triton/common/nvtx.h"
 
 namespace nvidia { namespace inferenceserver {
 

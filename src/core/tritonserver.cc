@@ -37,7 +37,6 @@
 #include "src/core/model_config.h"
 #include "src/core/model_config_utils.h"
 #include "src/core/model_repository_manager.h"
-#include "src/core/nvtx.h"
 #include "src/core/rate_limiter.h"
 #include "src/core/response_allocator.h"
 #include "src/core/server.h"
@@ -50,6 +49,7 @@
   return nvidia::inferenceserver::Status( \
       nvidia::inferenceserver::Status::Code::INTERNAL, (M))
 #define TRITONJSON_STATUSSUCCESS nvidia::inferenceserver::Status::Success
+#include "triton/common/nvtx.h"
 #include "triton/common/table_printer.h"
 #include "triton/common/triton_json.h"
 

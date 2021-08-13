@@ -271,7 +271,7 @@ def core_cmake_args(components, backends, install_dir):
             cargs.append('-DTRITON_ENABLE_{}={}'.format(
                 be.upper(), cmake_enable(be in backends)))
         if be == 'tensorrt':
-                cargs += tensorrt_cmake_args()
+            cargs += tensorrt_cmake_args()
         if (be in CORE_BACKENDS) and (be in backends):
             if be == 'ensemble':
                 pass
@@ -442,12 +442,13 @@ def openvino_cmake_args():
 
 
 def tensorrt_cmake_args():
+    cargs = [
+        '-DTRITON_ENABLE_NVTX:BOOL={}'.format(cmake_enable(FLAGS.enable_nvtx))
+    ]
     if target_platform() == 'windows':
-        return [
-            '-DTRITON_TENSORRT_INCLUDE_PATHS=c:/TensorRT/include',
-        ]
+        cargs.append('-DTRITON_TENSORRT_INCLUDE_PATHS=c:/TensorRT/include')
 
-    return []
+    return cargs
 
 
 def tensorflow_cmake_args(ver, images, library_paths):
@@ -1174,10 +1175,11 @@ if __name__ == '__main__':
         help=
         'When performing a container build, this command will be executed within the container just before the build it performed.'
     )
-    parser.add_argument('--no-container-source',
-                        action="store_true",
-                        required=False,
-                        help='Do not include OSS source code in Docker container.')
+    parser.add_argument(
+        '--no-container-source',
+        action="store_true",
+        required=False,
+        help='Do not include OSS source code in Docker container.')
     parser.add_argument(
         '--image',
         action='append',
