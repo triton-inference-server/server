@@ -442,7 +442,7 @@ class SequenceBatcherTest(su.SequenceBatcherTestUtil):
                         model_name,
                         dtype,
                         4566,
-                        (4000, None),
+                        (4500, None),
                         # (flag_str, value, (ls_ms, gt_ms), (pre_delay, post_delay))
                         (("start", 1, None, None), (None, 2, None, None),
                          ("start", 42, None, None), ("end", 9, None, None)),
