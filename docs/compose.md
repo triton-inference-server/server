@@ -68,7 +68,7 @@ backend](https://github.com/triton-inference-server/backend).  The
 result of that build should be a directory containing your backend
 shared library and any additional files required by the
 backend. Assuming your backend is called "mybackend" and that the
-directory is "./mkbackend", adding the following to the Dockerfile `compose.py`
+directory is "./mybackend", adding the following to the Dockerfile `compose.py`
 created will create a Triton image that contains all the supported Triton backends plus your
 custom backend.
 
