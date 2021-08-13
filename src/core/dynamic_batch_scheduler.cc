@@ -34,8 +34,8 @@
 #include "src/core/constants.h"
 #include "src/core/logging.h"
 #include "src/core/model_config.h"
-#include "src/core/nvtx.h"
 #include "src/core/server.h"
+#include "triton/common/nvtx.h"
 
 namespace nvidia { namespace inferenceserver {
 

@@ -170,7 +170,6 @@ set(
   model_config_utils.h
   model_repository_manager.h
   numa_utils.h
-  nvtx.h
   persistent_backend_manager.h
   pinned_memory_manager.h
   rate_limiter.h
