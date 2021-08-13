@@ -62,9 +62,7 @@ The easiest way to build Triton is to use Docker. The result of the
 build will be a Docker image called *tritonserver* that will contain
 the tritonserver executable in /opt/tritonserver/bin and the required
 shared libraries in /opt/tritonserver/lib. The backends built for
-Triton will be in /opt/tritonserver/backends (note that as of the
-21.07 release the TensorRT backend is still included in the core of
-Triton and so does not appear in /opt/tritonserver/backends).
+Triton will be in /opt/tritonserver/backends.
 
 The first step for any build is to checkout the
 [triton-inference-server/server](https://github.com/triton-inference-server/server)
@@ -95,7 +93,7 @@ and so you must enable them explicitly. The following build.py
 invocation builds all features, backends, and repository agents.
 
 ```
-$ ./build.py --cmake-dir=<path/to/repo>/build --build-dir=/tmp/citritonbuild --enable-logging --enable-stats --enable-tracing --enable-metrics --enable-gpu-metrics --enable-gpu --filesystem=gcs --filesystem=azure_storage --filesystem=s3 --endpoint=http --endpoint=grpc --repo-tag=common:<container tag> --repo-tag=core:<container tag> --repo-tag=backend:<container tag> --repo-tag=thirdparty:<container tag> --backend=ensemble --backend=tensorrt --backend=identity:<container tag> --backend=repeat:<container tag> --backend=square:<container tag> --backend=onnxruntime:<container tag> --backend=pytorch:<container tag> --backend=tensorflow1:<container tag> --backend=tensorflow2:<container tag> --backend=openvino:<container tag> --backend=python:<container tag> --backend=dali:<container tag> --backend=fil:<container tag> --repoagent=checksum:<container tag>
+$ ./build.py --cmake-dir=<path/to/repo>/build --build-dir=/tmp/citritonbuild --enable-logging --enable-stats --enable-tracing --enable-metrics --enable-gpu-metrics --enable-gpu --filesystem=gcs --filesystem=azure_storage --filesystem=s3 --endpoint=http --endpoint=grpc --repo-tag=common:<container tag> --repo-tag=core:<container tag> --repo-tag=backend:<container tag> --repo-tag=thirdparty:<container tag> --backend=ensemble --backend=tensorrt:<container tag> --backend=identity:<container tag> --backend=repeat:<container tag> --backend=square:<container tag> --backend=onnxruntime:<container tag> --backend=pytorch:<container tag> --backend=tensorflow1:<container tag> --backend=tensorflow2:<container tag> --backend=openvino:<container tag> --backend=python:<container tag> --backend=dali:<container tag> --backend=fil:<container tag> --repoagent=checksum:<container tag>
 ```
 
 If you are building on master/main branch then \<container tag\> will
@@ -252,7 +250,7 @@ and so you must enable them explicitly. The following build.py
 invocation builds all features and backends available on windows.
 
 ```
-$ python build.py --cmake-dir=<path/to/repo>/build --build-dir=/tmp/citritonbuild --no-container-pull --image=base,win10-py3-min --enable-logging --enable-stats --enable-tracing --enable-gpu --endpoint=grpc --repo-tag=common:<container tag> --repo-tag=core:<container tag> --repo-tag=backend:<container tag> --repo-tag=thirdparty:<container tag> --backend=ensemble --backend=tensorrt --backend=onnxruntime:<container tag>
+$ python build.py --cmake-dir=<path/to/repo>/build --build-dir=/tmp/citritonbuild --no-container-pull --image=base,win10-py3-min --enable-logging --enable-stats --enable-tracing --enable-gpu --endpoint=grpc --repo-tag=common:<container tag> --repo-tag=core:<container tag> --repo-tag=backend:<container tag> --repo-tag=thirdparty:<container tag> --backend=ensemble --backend=tensorrt:<container tag> --backend=onnxruntime:<container tag>
 ```
 
 If you are building on master/main branch then \<container tag\> will
