@@ -67,7 +67,7 @@ from distutils.dir_util import copy_tree
 TRITON_VERSION_MAP = {
     '2.14.0dev': (
         '21.09dev',  # triton container
-        '21.07',  # upstream container
+        '21.08',  # upstream container
         '1.8.1',  # ORT
         '2021.2.200',  # ORT OpenVINO
         '2021.2',  # Standalone OpenVINO
@@ -384,7 +384,6 @@ def pytorch_cmake_args(images):
 
 def onnxruntime_cmake_args(images, library_paths):
     cargs = [
-        '-DTRITON_ENABLE_ONNXRUNTIME_TENSORRT=ON',
         '-DTRITON_BUILD_ONNXRUNTIME_VERSION={}'.format(
             TRITON_VERSION_MAP[FLAGS.version][2])
     ]
