@@ -40,7 +40,8 @@ class InferTest(tu.TestResultCollector):
 
     def test_infer(self):
         try:
-            triton_client = httpclient.InferenceServerClient(url="localhost:8000")
+            triton_client = httpclient.InferenceServerClient(
+                url="localhost:8000")
         except Exception as e:
             print("channel creation failed: " + str(e))
             sys.exit(1)
@@ -59,16 +60,15 @@ class InferTest(tu.TestResultCollector):
         input1_data = np.full(shape=(1, 16), fill_value=-1, dtype=np.int32)
 
         # Initialize the data
-        inputs[0].set_data_from_numpy(input0_data, binary_data=False)
+        inputs[0].set_data_from_numpy(input0_data, binary_data=True)
         inputs[1].set_data_from_numpy(input1_data, binary_data=True)
 
-        outputs.append(httpclient.InferRequestedOutput('OUTPUT__0', binary_data=True))
-        outputs.append(httpclient.InferRequestedOutput('OUTPUT__1',
-                                                    binary_data=False))
+        outputs.append(
+            httpclient.InferRequestedOutput('OUTPUT__0', binary_data=True))
+        outputs.append(
+            httpclient.InferRequestedOutput('OUTPUT__1', binary_data=True))
 
-        results = triton_client.infer(model_name,
-                            inputs,
-                            outputs=outputs)
+        results = triton_client.infer(model_name, inputs, outputs=outputs)
 
         output0_data = results.as_numpy('OUTPUT__0')
         output1_data = results.as_numpy('OUTPUT__1')
