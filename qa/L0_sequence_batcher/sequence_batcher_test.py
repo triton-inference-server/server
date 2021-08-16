@@ -1194,7 +1194,6 @@ class SequenceBatcherTest(su.SequenceBatcherTestUtil):
 
                 for t in threads:
                     t.start()
-                    time.sleep(1)
                 for t in threads:
                     t.join()
                 self.check_deferred_exception()
