@@ -56,7 +56,6 @@ else:
 
 BACKENDS = os.environ.get('BACKENDS', "graphdef savedmodel onnx plan custom")
 ENSEMBLES = bool(int(os.environ.get('ENSEMBLES', 1)))
-TEST_JETSON = os.environ.get('TEST_JETSON', 0)
 
 NO_BATCHING = (int(os.environ['NO_BATCHING']) == 1)
 MODEL_INSTANCES = int(os.environ['MODEL_INSTANCES'])
@@ -424,13 +423,6 @@ class SequenceBatcherTest(su.SequenceBatcherTestUtil):
         # Send sequence without end flag. Use same correlation ID to
         # send another sequence. The first sequence will be ended
         # automatically but the second should complete successfully.
-
-        # Adjust the values of 'sequence_thresholds' due to Jetson intermittence
-        if TEST_JETSON:
-            sequence_thresholds = (4500, None)
-        else:
-            sequence_thresholds = (4000, None)
-
         for trial in _trials:
             # Run on different protocols.
             for idx, protocol in enumerate(_protocols):
@@ -450,7 +442,7 @@ class SequenceBatcherTest(su.SequenceBatcherTestUtil):
                         model_name,
                         dtype,
                         4566,
-                        sequence_thresholds,
+                        (4000, None),
                         # (flag_str, value, (ls_ms, gt_ms), (pre_delay, post_delay))
                         (("start", 1, None, None), (None, 2, None, None),
                          ("start", 42, None, None), ("end", 9, None, None)),
@@ -2060,12 +2052,6 @@ class SequenceBatcherTest(su.SequenceBatcherTestUtil):
         # execution to be a batch of 'null, seq 2'. The executions should not be
         # waited.
 
-        # Adjust the values of 'sequence_thresholds' due to Jetson intermittence
-        if TEST_JETSON:
-            sequence_thresholds = (6000, None)
-        else:
-            sequence_thresholds = (2000, None)
-
         for trial in _trials:
             is_ensemble = False
             for prefix in ENSEMBLE_PREFIXES:
@@ -2103,7 +2089,7 @@ class SequenceBatcherTest(su.SequenceBatcherTestUtil):
                             model_name,
                             dtype,
                             1001,
-                            sequence_thresholds,
+                            (2000, None),
                             # (flag_str, value, pre_delay_ms)
                             (
                                 ("start", 1, None),),
@@ -2120,7 +2106,7 @@ class SequenceBatcherTest(su.SequenceBatcherTestUtil):
                             model_name,
                             dtype,
                             1002,
-                            sequence_thresholds,
+                            (2000, None),
                             # (flag_str, value, pre_delay_ms)
                             (
                                 ("start", 11, None),
@@ -2154,14 +2140,6 @@ class SequenceBatcherTest(su.SequenceBatcherTestUtil):
         # request while the second sequence has two, so expecting the second
         # execution to be a batch of 'null, seq 2'. The second execution should
         # be waited until the max queue delay is exceeded for sequence 2.
-
-        # Adjust the values of 'sequence_thresholds' due to Jetson intermittence
-        if TEST_JETSON:
-            sequence_thresholds_1 = (6200, None)
-            sequence_thresholds_2 = (4600, 3000)
-        else:
-            sequence_thresholds_1 = (2000, None)
-            sequence_thresholds_2 = (4000, 3000)
 
         for trial in _trials:
             is_ensemble = False
@@ -2200,7 +2178,7 @@ class SequenceBatcherTest(su.SequenceBatcherTestUtil):
                             model_name,
                             dtype,
                             1001,
-                            sequence_thresholds_1,
+                            (2000, None),
                             # (flag_str, value, pre_delay_ms)
                             (
                                 ("start", 1, None),),
@@ -2217,7 +2195,7 @@ class SequenceBatcherTest(su.SequenceBatcherTestUtil):
                             model_name,
                             dtype,
                             1002,
-                            sequence_thresholds_2,
+                            (4000, 3000),
                             # (flag_str, value, pre_delay_ms)
                             (
                                 ("start", 11, None),
@@ -2251,15 +2229,6 @@ class SequenceBatcherTest(su.SequenceBatcherTestUtil):
         # request while the second sequence has two, so expecting the second
         # execution to be a batch of 'null, seq 2'. Both executions should be
         # waited until the max queue delay is exceeded.
-
-        # Adjust the values of 'sequence_thresholds' due to Jetson intermittence
-        if TEST_JETSON:
-            sequence_thresholds_1 = (7500, 3000)
-            sequence_thresholds_2 = (7500, 5000)
-        else:
-            sequence_thresholds_1 = (4000, 3000)
-            sequence_thresholds_2 = (6000, 5000)
-
         for trial in _trials:
             is_ensemble = False
             for prefix in ENSEMBLE_PREFIXES:
@@ -2297,7 +2266,7 @@ class SequenceBatcherTest(su.SequenceBatcherTestUtil):
                             model_name,
                             dtype,
                             1001,
-                            sequence_thresholds_1,
+                            (4000, 3000),
                             # (flag_str, value, pre_delay_ms)
                             (
                                 ("start", 1, None),),
@@ -2314,7 +2283,7 @@ class SequenceBatcherTest(su.SequenceBatcherTestUtil):
                             model_name,
                             dtype,
                             1002,
-                            sequence_thresholds_2,
+                            (6000, 5000),
                             # (flag_str, value, pre_delay_ms)
                             (
                                 ("start", 11, None),
