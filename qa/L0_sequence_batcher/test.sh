@@ -266,7 +266,6 @@ done
 for MODEL in $MODELS; do
     cp -r $MODEL modelsv/. && \
         (cd modelsv/$(basename $MODEL) && \
-            sed -i "s/max_sequence_idle_microseconds:.*/max_sequence_idle_microseconds: 10000000/" config.pbtxt && \
             sed -i "s/^max_batch_size:.*/max_batch_size: 4/" config.pbtxt && \
             sed -i "s/kind: KIND_GPU/kind: KIND_GPU\\ncount: 1/" config.pbtxt && \
             sed -i "s/kind: KIND_CPU/kind: KIND_CPU\\ncount: 1/" config.pbtxt)
@@ -329,7 +328,6 @@ for model_trial in $MODEL_TRIALS; do
         if [ $? -ne 0 ]; then
             echo -e "\n***\n*** Test $i Failed\n***" >>$CLIENT_LOG
             echo -e "\n***\n*** Test $i Failed\n***"
-            cat $CLIENT_LOG
             RET=1
         else
             check_test_results $TEST_RESULT_FILE 1
@@ -395,7 +393,6 @@ for model_trial in $MODEL_TRIALS; do
         if [ $? -ne 0 ]; then
             echo -e "\n***\n*** Test $i Failed\n***" >>$CLIENT_LOG
             echo -e "\n***\n*** Test $i Failed\n***"
-            cat $CLIENT_LOG
             RET=1
         else
             check_test_results $TEST_RESULT_FILE 1
@@ -477,7 +474,6 @@ if [[ $BACKENDS == *"custom"* ]]; then
       if [ $? -ne 0 ]; then
         cat $CLIENT_LOG
         echo -e "\n***\n*** Test Result Verification Failed\n***"
-        cat $CLIENT_LOG
         RET=1
       fi
     fi
@@ -535,7 +531,6 @@ for i in $QUEUE_DELAY_TESTS ; do
     if [ $? -ne 0 ]; then
         echo -e "\n***\n*** Test $i Failed\n***" >>$CLIENT_LOG
         echo -e "\n***\n*** Test $i Failed\n***"
-        cat $CLIENT_LOG
         RET=1
     else
         check_test_results $TEST_RESULT_FILE 1
