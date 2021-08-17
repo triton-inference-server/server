@@ -290,7 +290,7 @@ platforms by reading the above documentation and then follow the
 process for the supported platform that most closely matches the
 platform you are interested in (for example, if you are trying to
 build for RHEL/x86-64 then follow the [Building for Ubuntu
-20.04](building-for-ubuntu-2004) process. You will likely need to make
+20.04](#building-for-ubuntu-2004) process. You will likely need to make
 changes in the following areas.
 
 * The build.py script installs dependencies for the build using
