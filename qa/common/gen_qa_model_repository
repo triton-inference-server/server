@@ -175,11 +175,12 @@ pip3 install numpy setuptools
 PYTHONPATH=/opt/intel/openvino_${OPENVINO_VERSION}/python/python3
 source /opt/intel/openvino_${OPENVINO_VERSION}/bin/setupvars.sh .
 
-# PS: Since variable shape tensors are not allowed, identity models may fail to generate
+# Since variable shape tensors are not allowed, identity models may fail to generate.
+# TODO Add variable size tensor models after DLIS-2827 adds support for variable shape tensors.
 python3 $SRCDIR/gen_qa_models.py --openvino --models_dir=$DESTDIR
 chmod -R 777 $DESTDIR
-python3 $SRCDIR/gen_qa_identity_models.py --openvino --models_dir=$IDENTITYDESTDIR
-chmod -R 777 $IDENTITYDESTDIR
+# python3 $SRCDIR/gen_qa_identity_models.py --openvino --models_dir=$IDENTITYDESTDIR
+# chmod -R 777 $IDENTITYDESTDIR
 python3 $SRCDIR/gen_qa_reshape_models.py --openvino --models_dir=$RESHAPEDESTDIR
 chmod -R 777 $RESHAPEDESTDIR
 python3 $SRCDIR/gen_qa_sequence_models.py --openvino --models_dir=$SEQDESTDIR
