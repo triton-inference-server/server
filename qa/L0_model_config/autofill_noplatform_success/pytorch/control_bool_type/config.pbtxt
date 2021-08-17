@@ -1,0 +1,44 @@
+
+max_batch_size: 8
+sequence_batching {
+  max_sequence_idle_microseconds: 5000000
+  control_input [
+    {
+      name: "START__1"
+      control [
+        {
+          kind: CONTROL_SEQUENCE_START
+          fp32_false_true: [ 0, 1 ]
+        }
+      ]
+    },
+    {
+      name: "READY__2"
+      control [
+        {
+          kind: CONTROL_SEQUENCE_READY
+          fp32_false_true: [ 0, 1 ]
+        }
+      ]
+    }
+  ]
+}
+input [
+  {
+    name: "INPUT__0"
+    data_type: TYPE_BOOL
+    dims: [ 1 ]
+  }
+]
+output [
+  {
+    name: "OUTPUT__0"
+    data_type: TYPE_BOOL
+    dims: [ 1 ]
+  }
+]
+instance_group [
+  {
+    kind: KIND_GPU
+  }
+]
