@@ -1347,10 +1347,6 @@ def create_openvino_modelfile(models_dir,
     function = ng.impl.Function([op0, op1], [in0, in1], model_name)
     ie_network = IENetwork(ng.impl.Function.to_capsule(function))
 
-    # Batch size needs to be a positive integer value
-    # if max_batch != 0:
-    #     ie_network.batch_size = max_batch
-
     try:
         os.makedirs(model_version_dir)
     except OSError as ex:

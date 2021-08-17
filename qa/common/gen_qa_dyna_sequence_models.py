@@ -1385,15 +1385,16 @@ def create_openvino_modelfile(models_dir, model_version, max_batch, dtype,
                                           shape):
         return
 
+    batch_dim = [] if max_batch == 0 else [max_batch,]
     model_name = tu.get_dyna_sequence_model_name(
         "openvino_nobatch" if max_batch == 0 else "openvino", dtype)
     model_version_dir = models_dir + "/" + model_name + "/" + str(model_version)
 
-    in0 = ng.parameter(shape=shape, dtype=dtype, name="INPUT")
-    start = ng.parameter(shape=shape, dtype=dtype, name="START")
-    end = ng.parameter(shape=shape, dtype=dtype, name="END")
-    ready = ng.parameter(shape=shape, dtype=dtype, name="READY")
-    corrid = ng.parameter(shape=shape, dtype=np.uint64, name="CORRID")
+    in0 = ng.parameter(shape=batch_dim + shape, dtype=dtype, name="INPUT")
+    start = ng.parameter(shape=batch_dim + shape, dtype=dtype, name="START")
+    end = ng.parameter(shape=batch_dim + shape, dtype=dtype, name="END")
+    ready = ng.parameter(shape=batch_dim + shape, dtype=dtype, name="READY")
+    corrid = ng.parameter(shape=batch_dim + shape, dtype=dtype, name="CORRID")
 
     tmp1 = ng.add(in0, start)
     tmp2 = ng.multiply(end, corrid)
@@ -1403,10 +1404,6 @@ def create_openvino_modelfile(models_dir, model_version, max_batch, dtype,
     function = ng.impl.Function([op0], [in0, start, end, ready, corrid],
                                 model_name)
     ie_network = IENetwork(ng.impl.Function.to_capsule(function))
-
-    # Batch size needs to be a positive integer value
-    if max_batch != 0:
-        ie_network.batch_size = max_batch
 
     try:
         os.makedirs(model_version_dir)

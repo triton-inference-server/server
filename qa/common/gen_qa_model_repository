@@ -55,9 +55,9 @@ ONNX_VERSION=1.7.0
 ONNX_OPSET=0
 
 # OPENVINO version
-OPENVINO_VERSION=2021.2.200
+OPENVINO_VERSION=2021.4.582
 
-ONNX_IMAGE=${ONNX_IMAGE:=ubuntu:20.04}
+UBUNTU_IMAGE=${UBUNTU_IMAGE:=ubuntu:20.04}
 PYTORCH_IMAGE=${PYTORCH_IMAGE:=nvcr.io/nvidia/pytorch:$TRITON_VERSION-py3}
 TENSORFLOW_IMAGE=${TENSORFLOW_IMAGE:=nvcr.io/nvidia/tensorflow:$TRITON_VERSION-tf1-py3}
 TENSORRT_IMAGE=${TENSORRT_IMAGE:=nvcr.io/nvidia/tensorrt:$TRITON_VERSION-py3}
@@ -194,7 +194,7 @@ if [ $? -ne 0 ]; then
     exit 1
 fi
 
-docker pull $ONNX_IMAGE
+docker pull $UBUNTU_IMAGE
 docker run --gpus device=$CUDA_DEVICE --rm -it --entrypoint $SRCDIR/$OPENVINOSCRIPT \
        --mount type=bind,source=$HOST_SRCDIR,target=$SRCDIR \
        --mount type=bind,source=$HOST_DESTDIR,target=$DESTDIR \
@@ -205,7 +205,7 @@ docker run --gpus device=$CUDA_DEVICE --rm -it --entrypoint $SRCDIR/$OPENVINOSCR
        --mount type=bind,source=$HOST_DYNASEQDESTDIR,target=$DYNASEQDESTDIR \
        --mount type=bind,source=$HOST_VARSEQDESTDIR,target=$VARSEQDESTDIR \
        --mount type=bind,source=$HOST_RAGGEDDESTDIR,target=$RAGGEDDESTDIR \
-       $ONNX_IMAGE
+       $UBUNTU_IMAGE
 if [ $? -ne 0 ]; then
     echo -e "Failed"
     exit 1
@@ -246,7 +246,7 @@ if [ $? -ne 0 ]; then
     exit 1
 fi
 
-docker pull $ONNX_IMAGE
+docker pull $UBUNTU_IMAGE
 docker run --gpus device=$CUDA_DEVICE --rm --entrypoint $SRCDIR/$ONNXSCRIPT \
        --mount type=bind,source=$HOST_SRCDIR,target=$SRCDIR \
        --mount type=bind,source=$HOST_DESTDIR,target=$DESTDIR \
@@ -257,7 +257,7 @@ docker run --gpus device=$CUDA_DEVICE --rm --entrypoint $SRCDIR/$ONNXSCRIPT \
        --mount type=bind,source=$HOST_DYNASEQDESTDIR,target=$DYNASEQDESTDIR \
        --mount type=bind,source=$HOST_VARSEQDESTDIR,target=$VARSEQDESTDIR \
        --mount type=bind,source=$HOST_RAGGEDDESTDIR,target=$RAGGEDDESTDIR \
-       $ONNX_IMAGE
+       $UBUNTU_IMAGE
 if [ $? -ne 0 ]; then
     echo -e "Failed"
     exit 1
