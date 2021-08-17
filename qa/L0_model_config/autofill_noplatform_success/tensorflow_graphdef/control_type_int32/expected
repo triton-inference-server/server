@@ -1,0 +1,52 @@
+name: "control_type_int32"
+platform: "tensorflow_graphdef"
+version_policy {
+  latest {
+    num_versions: 1
+  }
+}
+max_batch_size: 8
+input {
+  name: "INPUT"
+  data_type: TYPE_INT32
+  dims: 1
+}
+output {
+  name: "OUTPUT"
+  data_type: TYPE_INT32
+  dims: 1
+}
+instance_group {
+  name: "control_type_int32_0"
+  count: 1
+  gpus: 0
+  kind: KIND_GPU
+}
+default_model_filename: "model.graphdef"
+optimization {
+  input_pinned_memory {
+    enable: true
+  }
+  output_pinned_memory {
+    enable: true
+  }
+}
+sequence_batching {
+  max_sequence_idle_microseconds: 5000000
+  control_input {
+    name: "START"
+    control {
+      int32_false_true: 0
+      int32_false_true: 1
+    }
+  }
+  control_input {
+    name: "READY"
+    control {
+      kind: CONTROL_SEQUENCE_READY
+      int32_false_true: 0
+      int32_false_true: 1
+    }
+  }
+}
+backend: "tensorflow"

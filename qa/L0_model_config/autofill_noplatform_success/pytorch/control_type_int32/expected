@@ -1,5 +1,5 @@
-name: "control_bool_type"
-platform: "tensorflow_graphdef"
+name: "control_type_int32"
+platform: "pytorch_libtorch"
 version_policy {
   latest {
     num_versions: 1
@@ -7,22 +7,22 @@ version_policy {
 }
 max_batch_size: 8
 input {
-  name: "INPUT"
-  data_type: TYPE_BOOL
+  name: "INPUT__0"
+  data_type: TYPE_INT32
   dims: 1
 }
 output {
-  name: "OUTPUT"
-  data_type: TYPE_BOOL
+  name: "OUTPUT__0"
+  data_type: TYPE_INT32
   dims: 1
 }
 instance_group {
-  name: "control_bool_type_0"
+  name: "control_type_int32_0"
   count: 1
   gpus: 0
   kind: KIND_GPU
 }
-default_model_filename: "model.graphdef"
+default_model_filename: "model.pt"
 optimization {
   input_pinned_memory {
     enable: true
@@ -34,19 +34,19 @@ optimization {
 sequence_batching {
   max_sequence_idle_microseconds: 5000000
   control_input {
-    name: "START"
+    name: "START__1"
     control {
-      bool_false_true: false
-      bool_false_true: true
+      int32_false_true: 0
+      int32_false_true: 1
     }
   }
   control_input {
-    name: "READY"
+    name: "READY__2"
     control {
       kind: CONTROL_SEQUENCE_READY
-      bool_false_true: false
-      bool_false_true: true
+      int32_false_true: 0
+      int32_false_true: 1
     }
   }
 }
-backend: "tensorflow"
+backend: "pytorch"
