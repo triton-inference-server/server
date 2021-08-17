@@ -1,4 +1,3 @@
 person
 bag
 face
-
