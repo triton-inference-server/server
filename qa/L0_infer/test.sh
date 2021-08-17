@@ -108,7 +108,7 @@ if [ "$TRITON_SERVER_CPU_ONLY" == "1" ]; then
 fi
 
 # If BACKENDS not specified, set to all
-BACKENDS=${BACKENDS:="graphdef savedmodel onnx libtorch plan python python_dlpack"}
+BACKENDS=${BACKENDS:=BACKENDS=${BACKENDS:="graphdef savedmodel onnx libtorch plan python python_dlpack openvino"}
 export BACKENDS
 
 # If ENSEMBLES not specified, set to 1
@@ -203,7 +203,7 @@ for TARGET in cpu gpu; do
 
       # Copy identity backend models and ensembles
       for BACKEND in $BACKENDS; do
-        if [ "$BACKEND" != "python" ] && [ "$BACKEND" != "python_dlpack" ]; then
+        if [ "$BACKEND" != "python" ] && [ "$BACKEND" != "python_dlpack" ] && [ "$BACKEND" != "openvino" ]; then
             cp -r ${DATADIR}/qa_ensemble_model_repository/qa_model_repository/*${BACKEND}* \
               models/.
         fi
@@ -235,7 +235,7 @@ for TARGET in cpu gpu; do
         for MC in `ls models/${FW}*/config.pbtxt`; do
             echo "instance_group [ { kind: ${KIND} }]" >> $MC
         done
-      elif [ "$FW" == "python" ]; then
+      elif [ "$FW" == "python" ] || [ "$FW" == "openvino" ]; then
         for MC in `ls models/${FW}*/config.pbtxt`; do
             echo "instance_group [ { kind: KIND_CPU }]" >> $MC
         done
