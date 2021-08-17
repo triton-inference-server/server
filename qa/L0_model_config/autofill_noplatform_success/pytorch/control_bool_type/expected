@@ -36,16 +36,16 @@ sequence_batching {
   control_input {
     name: "START__1"
     control {
-      fp32_false_true: 0.0
-      fp32_false_true: 1.0
+      bool_false_true: false
+      bool_false_true: true
     }
   }
   control_input {
     name: "READY__2"
     control {
       kind: CONTROL_SEQUENCE_READY
-      fp32_false_true: 0.0
-      fp32_false_true: 1.0
+      bool_false_true: false
+      bool_false_true: true
     }
   }
 }
