@@ -1,0 +1,45 @@
+name: "control_type_int32"
+platform: "pytorch_libtorch"
+max_batch_size: 8
+sequence_batching {
+  max_sequence_idle_microseconds: 5000000
+  control_input [
+    {
+      name: "START__1"
+      control [
+        {
+          kind: CONTROL_SEQUENCE_START
+          int32_false_true: [ 0, 1 ]
+        }
+      ]
+    },
+    {
+      name: "READY__2"
+      control [
+        {
+          kind: CONTROL_SEQUENCE_READY
+          int32_false_true: [ 0, 1 ]
+        }
+      ]
+    }
+  ]
+}
+input [
+  {
+    name: "INPUT__0"
+    data_type: TYPE_INT32
+    dims: [ 1 ]
+  }
+]
+output [
+  {
+    name: "OUTPUT__0"
+    data_type: TYPE_INT32
+    dims: [ 1 ]
+  }
+]
+instance_group [
+  {
+    kind: KIND_GPU
+  }
+]

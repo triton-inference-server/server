@@ -1,0 +1,45 @@
+name: "control_type_bool"
+platform: "tensorflow_savedmodel"
+max_batch_size: 1
+sequence_batching {
+  max_sequence_idle_microseconds: 5000000
+  control_input [
+    {
+      name: "START"
+      control [
+        {
+          kind: CONTROL_SEQUENCE_START
+          bool_false_true: [ 0, 1 ]
+        }
+      ]
+    },
+    {
+      name: "READY"
+      control [
+        {
+          kind: CONTROL_SEQUENCE_READY
+          bool_false_true: [ 0, 1 ]
+        }
+      ]
+    }
+  ]
+}
+input [
+  {
+    name: "INPUT"
+    data_type: TYPE_BOOL
+    dims: [ 1 ]
+  }
+]
+output [
+  {
+    name: "OUTPUT"
+    data_type: TYPE_BOOL
+    dims: [ 1 ]
+  }
+]
+instance_group [
+  {
+    kind: KIND_GPU
+  }
+]

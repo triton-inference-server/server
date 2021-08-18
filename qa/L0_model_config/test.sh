@@ -1,5 +1,5 @@
 #!/bin/bash
-# Copyright (c) 2019-2021, NVIDIA CORPORATION. All rights reserved.
+# Copyright (c) 2019-2021, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -328,6 +328,46 @@ for TARGET_DIR in `ls -d autofill_noplatform_success/*/*`; do
     TARGET=`basename ${TARGET_DIR}`
 
     SERVER_ARGS="--model-repository=`pwd`/models --strict-model-config=false"
+    SERVER_LOG=$SERVER_LOG_BASE.${TARGET_DIR_DOT}.log
+
+    # If there is a config.pbtxt at the top-level of the test then
+    # assume that the directory is a single model. Otherwise assume
+    # that the directory is an entire model repository.
+    rm -fr models && mkdir models
+    if [ -f ${TARGET_DIR}/config.pbtxt ] || [ "$TARGET" = "no_config" ] \
+            || [ "$TARGET" = "no_config_variable" ] || [ "$TARGET" = "no_config_shape_tensor" ] ; then
+        cp -r ${TARGET_DIR} models/.
+    else
+        cp -r ${TARGET_DIR}/* models/.
+    fi
+
+    echo -e "Test $TARGET_DIR" >> $CLIENT_LOG
+
+    run_server
+    if [ "$SERVER_PID" == "0" ]; then
+        echo -e "*** FAILED: unable to start $SERVER" >> $CLIENT_LOG
+        RET=1
+    else
+        set +e
+        python ./compare_status.py --expected_dir models/$TARGET --model $TARGET >>$CLIENT_LOG 2>&1
+        if [ $? -ne 0 ]; then
+            echo -e "*** FAILED: unexpected model config" >> $CLIENT_LOG
+            RET=1
+        fi
+        set -e
+
+        kill $SERVER_PID
+        wait $SERVER_PID
+    fi
+done
+
+# Run all noautofill tests that are expected to be successful. These
+# tests add the platform to the model config before running.
+for TARGET_DIR in `ls -d noautofill_platform_success/*/*`; do
+    TARGET_DIR_DOT=`echo $TARGET_DIR | tr / .`
+    TARGET=`basename ${TARGET_DIR}`
+
+    SERVER_ARGS="--model-repository=`pwd`/models --strict-model-config=true"
     SERVER_LOG=$SERVER_LOG_BASE.${TARGET_DIR_DOT}.log
 
     # If there is a config.pbtxt at the top-level of the test then
