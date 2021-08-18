@@ -130,10 +130,15 @@ TritonModelInstance::TritonModelInstance(
         &reporter_);
   }
 #endif  // TRITON_ENABLE_METRICS
+  ongoing_requests_count_.store(0);
 }
 
 TritonModelInstance::~TritonModelInstance()
 {
+  while (ongoing_requests_count_.load() != 0) {
+    LOG_VERBOSE(1) << "Waiting for the execution on instance to finish...";
+    std::this_thread::sleep_for(std::chrono::milliseconds(1000));
+  }
   // Model finalization is optional...
   if (model_->Backend()->ModelInstanceFiniFn() != nullptr) {
     LOG_TRITONSERVER_ERROR(
@@ -559,6 +564,8 @@ void
 TritonModelInstance::Execute(
     std::vector<TRITONBACKEND_Request*>& triton_requests)
 {
+  ongoing_requests_count_++;
+
   TRITONBACKEND_ModelInstance* triton_model_instance =
       reinterpret_cast<TRITONBACKEND_ModelInstance*>(this);
   TritonBackend::TritonModelInstanceExecFn_t inst_exec_fn =
@@ -580,6 +587,8 @@ TritonModelInstance::Execute(
 
     TRITONSERVER_ErrorDelete(err);
   }
+
+  ongoing_requests_count_--;
 }
 
 Status

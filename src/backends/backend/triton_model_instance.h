@@ -184,6 +184,8 @@ class TritonModelInstance {
 
   // Opaque state associated with this model instance.
   void* state_;
+
+  std::atomic<int> ongoing_requests_count_;
 };
 
 }}  // namespace nvidia::inferenceserver
