@@ -69,6 +69,13 @@ cp -r ./models/identity_fp32 ./models/identity_bool
           sed -i "s/^name:.*/name: \"identity_bool\"/" config.pbtxt && \
           sed -i "s/TYPE_FP32/TYPE_BOOL/g" config.pbtxt)
 
+# Test models with `default_model_filename` variable set.
+cp -r ./models/identity_fp32 ./models/default_model_name
+mv ./models/default_model_name/1/model.py ./models/default_model_name/1/mymodel.py
+(cd models/default_model_name && \
+    sed -i "s/^name:.*/name: \"default_model_name\"/" config.pbtxt && \
+    echo "default_model_filename: \"mymodel.py\"" >> config.pbtxt )
+
 mkdir -p models/pytorch_fp32_fp32/1/
 cp -r ../python_models/pytorch_fp32_fp32/model.py ./models/pytorch_fp32_fp32/1/
 cp ../python_models/pytorch_fp32_fp32/config.pbtxt ./models/pytorch_fp32_fp32/
