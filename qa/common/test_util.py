@@ -169,7 +169,8 @@ def validate_for_openvino_model(input_dtype, output0_dtype, output1_dtype,
                                 input_shape, output0_shape, output1_shape):
     """Return True if input and output dtypes are supported by an OpenVino model."""
 
-    supported_datatypes = [np.int8, np.int32, np.float16, np.float32]
+    # float16 is not supported on CPU by OpenVino 
+    supported_datatypes = [np.int8, np.int32, np.float32]
     if not input_dtype in supported_datatypes:
         return False
     if not output0_dtype in supported_datatypes:
