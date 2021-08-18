@@ -31,6 +31,7 @@
 #include <unordered_map>
 
 #include "src/core/status.h"
+#include "src/core/backend.h"
 #include "src/core/infer_request.h"
 #include "src/core/infer_response.h"
 

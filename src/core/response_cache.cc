@@ -62,8 +62,7 @@ RequestResponseCache::~RequestResponseCache()
 
 uint64_t RequestResponseCache::Hash(const InferenceRequest& request) {
     std::size_t seed = 0;
-    // TODO: Linker ERROR
-    //boost::hash_combine(seed, request.ModelName()); 
+    boost::hash_combine(seed, request.ModelName()); 
     // TODO: RequestedModelVersion or ActualModelVersion ?
     boost::hash_combine(seed, request.RequestedModelVersion());
 
@@ -73,8 +72,7 @@ uint64_t RequestResponseCache::Hash(const InferenceRequest& request) {
         // Add input name to hash
         boost::hash_combine(seed, input.second.Name());
         // Add input data to hash
-        // TODO: Consider hashing pointer as-is vs. actual raw input bytes
-        // Scenario: What about the same input values stored in a different memory address?
+        // TODO: Hash actual raw input bytes and not pointer here
         boost::hash_combine(seed, input.second.Data());
     }
 
@@ -151,34 +149,27 @@ Status RequestResponseCache::Insert(const uint64_t key, const InferenceResponse&
 }
 
 Status RequestResponseCache::BuildCacheEntry(CacheEntry& entry, const InferenceResponse& response) {
+    auto status = Status::Success;
+
     // Build cache entry data from response outputs
     //for (const InferenceResponse::Output& response_output : response.Outputs()) {
+
     for (const auto& response_output : response.Outputs()) {
         auto cache_output = Output();
 
         // Fetch output buffer details
         const void* response_buffer = nullptr;
         size_t response_byte_size = 0;
-        /*
         TRITONSERVER_MemoryType response_memory_type;
-        int64_t response_memory_type_id = 0;
-        void* userp = nullptr;
-        // TODO: How to differently handle different memory types?
-        //       GPU vs. CPU memory, etc.
-        // TODO: Linker error on calling DataBuffer() here
-        Status status = response_output.DataBuffer(
+        int64_t response_memory_type_id;
+        void* userp;
+        // TODO: How to handle different memory types? GPU vs CPU vs Pinned, etc.
+        status = response_output.DataBuffer(
             &response_buffer, &response_byte_size, &response_memory_type,
             &response_memory_type_id, &userp);
-        */
-        // TODO: Temp WAR
-        auto status = Status::Success;
-
+        
         // Exit early if we fail to get output buffer from response
-        if (!status.IsOk()) {
-            return Status(
-                Status::Code::INTERNAL, "Failed to get output buffer for " + response_output.Name()
-            );
-        }
+        if (!status.IsOk()) { return status; }
 
         // Exit early if response buffer from output is invalid
         if (response_buffer == nullptr) {
@@ -211,7 +202,7 @@ Status RequestResponseCache::BuildCacheEntry(CacheEntry& entry, const InferenceR
         // Copy data from response buffer to cache entry output buffer
         // TODO: How to differently handle different memory types?
         //       GPU vs. CPU memory, etc.
-        std::memcpy(cache_output.buffer, response_buffer, response_byte_size);
+        std::memcpy(&cache_output.buffer, &response_buffer, response_byte_size);
         // Sum up output sizes for total cache entry size
         entry.size += cache_output.size;
         // Add each output to cache entry

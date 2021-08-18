@@ -29,6 +29,62 @@
 
 namespace ni = nvidia::inferenceserver;
 
+/* Mock classes for Unit Testing */
+namespace nvidia { namespace inferenceserver {
+
+// Same as defined in infer_request.cc
+const std::string&
+InferenceRequest::ModelName() const
+{
+  return backend_raw_->Name();
+}
+
+// Same as defined in infer_response.cc
+Status
+InferenceResponse::Output::DataBuffer(
+    const void** buffer, size_t* buffer_byte_size,
+    TRITONSERVER_MemoryType* memory_type, int64_t* memory_type_id,
+    void** userp) const
+{
+  *buffer = allocated_buffer_;
+  *buffer_byte_size = allocated_buffer_byte_size_;
+  *memory_type = allocated_memory_type_;
+  *memory_type_id = allocated_memory_type_id_;
+  *userp = allocated_userp_;
+  return Status::Success;
+}
+
+// Simplified version of AllocateDataBuffer for CPU memory only
+Status
+InferenceResponse::Output::AllocateDataBuffer(
+    void** buffer, size_t buffer_byte_size,
+    TRITONSERVER_MemoryType* memory_type, int64_t* memory_type_id)
+{
+    if (allocated_buffer_ != nullptr) {
+        return Status(
+            Status::Code::ALREADY_EXISTS,
+            "allocated buffer for output '" + name_ + "' already exists");
+    }
+    
+    // Simplifications - CPU memory only for now
+    if (*memory_type != TRITONSERVER_MEMORY_CPU || *memory_type_id != 0) {
+        return Status(
+            Status::Code::INTERNAL,
+            "Only standard CPU memory supported for now");
+    }
+
+    // Set relevant member variables for DataBuffer() to return
+    std::memcpy(&allocated_buffer_, &buffer, buffer_byte_size);
+    allocated_buffer_byte_size_ = buffer_byte_size;
+    allocated_memory_type_ = *memory_type;
+    allocated_memory_type_id_ = *memory_type_id;
+    allocated_userp_ = nullptr;
+    return Status::Success;
+}
+
+}}  // namespace nvidia::inferenceserver
+
+
 namespace {
 
 // Test Fixture
