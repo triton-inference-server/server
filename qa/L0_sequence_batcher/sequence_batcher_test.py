@@ -1534,15 +1534,15 @@ class SequenceBatcherTest(su.SequenceBatcherTestUtil):
                         }))
 
                 threads[0].start()
-                time.sleep(4)
+                time.sleep(2)
                 threads[1].start()
-                time.sleep(4)
+                time.sleep(2)
                 threads[2].start()
-                time.sleep(4)
+                time.sleep(2)
                 threads[3].start()
-                time.sleep(4)
+                time.sleep(2)
                 threads[4].start()
-                time.sleep(4)
+                time.sleep(2)
                 threads[5].start()
                 for t in threads:
                     t.join()
@@ -1738,10 +1738,10 @@ class SequenceBatcherTest(su.SequenceBatcherTestUtil):
         for trial in _trials:
             self.clear_deferred_exceptions()
             dtype = self.get_datatype(trial)
-            precreated_shm0_handles = self.precreate_register_regions(
-                (11, 12, 12, 13), dtype, 1)
-            precreated_shm1_handles = self.precreate_register_regions((1, 3),
+            precreated_shm0_handles = self.precreate_register_regions((1, 3),
                                                                       dtype, 0)
+            precreated_shm1_handles = self.precreate_register_regions(
+                (11, 12, 12, 13), dtype, 1)
             precreated_shm2_handles = self.precreate_register_regions(
                 (111, 112, 112, 113), dtype, 2)
             precreated_shm3_handles = self.precreate_register_regions(
@@ -1774,9 +1774,8 @@ class SequenceBatcherTest(su.SequenceBatcherTestUtil):
                             1001,
                             (None, None),
                             # (flag_str, value, pre_delay_ms)
-                            (("start", 11, None), (None, 12, None),
-                             (None, 12, None), ("end", 13, None)),
-                            self.get_expected_result(48, 13, trial, "end"),
+                            (("start", 1, None), (None, 3, None)),
+                            self.get_expected_result(4, 3, trial, None),
                             precreated_shm0_handles),
                         kwargs={
                             'sequence_name': "{}".format(self._testMethodName)
@@ -1791,8 +1790,9 @@ class SequenceBatcherTest(su.SequenceBatcherTestUtil):
                             1002,
                             (None, None),
                             # (flag_str, value, pre_delay_ms)
-                            (("start", 1, None), (None, 3, None)),
-                            self.get_expected_result(4, 3, trial, None),
+                            (("start", 11, None), (None, 12, None),
+                             (None, 12, None), ("end", 13, None)),
+                            self.get_expected_result(48, 13, trial, "end"),
                             precreated_shm1_handles),
                         kwargs={
                             'sequence_name': "{}".format(self._testMethodName)
@@ -1838,7 +1838,7 @@ class SequenceBatcherTest(su.SequenceBatcherTestUtil):
                             trial,
                             model_name,
                             dtype,
-                            1002,
+                            1001,
                             (None, None),
                             # (flag_str, value, pre_delay_ms)
                             (("start", 11111, None), ("end", 11113, None)),
