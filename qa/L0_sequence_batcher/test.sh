@@ -62,6 +62,9 @@ if [ "$TEST_VALGRIND" -eq 1 ]; then
                     test_backlog_sequence_timeout \
                     test_ragged_batch"
     QUEUE_DELAY_TESTS="test_queue_delay_full_min_util"
+    BOOL_TYPE_TESTS="test_simple_sequence_bool \
+                      test_batch_size_bool \
+                      test_no_sequence_start_bool"
 fi
 
 if [ -z "$TEST_JETSON" ]; then
@@ -103,7 +106,7 @@ RET=0
 BACKENDS=${BACKENDS:="graphdef savedmodel onnx plan custom"}
 export BACKENDS
 
-# If MODEL_TRIALS not specified set to 0 1 2 3 v
+# If MODEL_TRIALS not specified set to 0 1 2 4 v
 MODEL_TRIALS=${MODEL_TRIALS:="0 1 2 4 v"}
 
 # Basic sequence batcher tests
@@ -132,13 +135,22 @@ QUEUE_DELAY_TESTS=${QUEUE_DELAY_TESTS:="test_queue_delay_no_min_util \
                                     test_queue_delay_half_min_util \
                                     test_queue_delay_full_min_util"}
 
+# Tests for bool type models
+BOOL_TYPE_TESTS=${NO_DELAY_TESTS_BOOL:="test_simple_sequence_bool \
+                                    test_length1_sequence_bool \
+                                    test_batch_size_bool \
+                                    test_no_sequence_start_bool\
+                                    test_no_sequence_start2_bool \
+                                    test_no_sequence_end_bool \
+                                    test_no_correlation_id_bool"}
+
 # If ENSEMBLES not specified, set to 1
 ENSEMBLES=${ENSEMBLES:="1"}
 export ENSEMBLES
 
 # Setup non-variable-size model repositories. The same models are in each
 # repository but they are configured as:
-#   models0 - four instance with non-batching model
+#   models0 - four instances with non-batching model
 #   models1 - one instance with batch-size 4
 #   models2 - two instances with batch-size 2
 #   models4 - four instances with batch-size 1
@@ -246,7 +258,7 @@ for MODEL in $MODELS; do
             sed -i "s/kind: KIND_CPU/kind: KIND_CPU\\ncount: 4/" config.pbtxt)
 done
 
-#   modelsv - one instance with batch-size 4
+# modelsv - one instance with batch-size 4
 rm -fr modelsv && mkdir modelsv
 
 MODELS=""
@@ -544,6 +556,63 @@ for i in $QUEUE_DELAY_TESTS ; do
 
     unset TRITONSERVER_DELAY_SCHEDULER
     unset TRITONSERVER_BACKLOG_DELAY_SCHEDULER
+    kill_server
+
+    set +e
+    if [ "$TEST_VALGRIND" -eq 1 ]; then
+        python3 ../common/check_valgrind_log.py -f $LEAKCHECK_LOG
+        if [ $? -ne 0 ]; then
+            RET=1
+        fi
+    fi
+    set -e
+done
+
+MODEL_PATH=bool_type_sequence_models
+export NO_BATCHING=0
+export MODEL_INSTANCES=1
+export BATCHER_TYPE="FIXED"
+for i in $BOOL_TYPE_TESTS ; do
+    SERVER_ARGS="--model-repository=$MODELDIR/$MODEL_PATH ${SERVER_ARGS_EXTRA}"
+    SERVER_LOG="./$i.$MODEL_PATH.serverlog"
+
+    if [ "$TEST_VALGRIND" -eq 1 ]; then
+        LEAKCHECK_LOG="./$i.$MODEL_PATH.valgrind.log"
+        LEAKCHECK_ARGS="$LEAKCHECK_ARGS_BASE --log-file=$LEAKCHECK_LOG"
+        run_server_leakcheck
+    elif [[ "$(< /proc/sys/kernel/osrelease)" == *Microsoft ]]; then
+        # We rely on HTTP endpoint in run_server so until HTTP is
+        # implemented for win we do this hack...
+        run_server_nowait
+        sleep 15
+    else
+        run_server
+    fi
+
+    if [ "$SERVER_PID" == "0" ]; then
+        echo -e "\n***\n*** Failed to start $SERVER\n***"
+        cat $SERVER_LOG
+        exit 1
+    fi
+
+    echo "Test: $i, repository $MODEL_PATH" >>$CLIENT_LOG
+
+    set +e
+    python3 $BATCHER_TEST SequenceBatcherTest.$i >>$CLIENT_LOG 2>&1
+    if [ $? -ne 0 ]; then
+        echo -e "\n***\n*** Test $i Failed\n***" >>$CLIENT_LOG
+        echo -e "\n***\n*** Test $i Failed\n***"
+        RET=1
+    else
+        check_test_results $TEST_RESULT_FILE 1
+        if [ $? -ne 0 ]; then
+            cat $CLIENT_LOG
+            echo -e "\n***\n*** Test Result Verification Failed\n***"
+            RET=1
+        fi
+    fi
+    set -e
+
     kill_server
 
     set +e

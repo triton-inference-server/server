@@ -1,4 +1,4 @@
-# Copyright (c) 2018-2021, NVIDIA CORPORATION. All rights reserved.
+# Copyright (c) 2018-2021, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -72,6 +72,12 @@ elif os.environ['BATCHER_TYPE'] == "VARIABLE":
             _trials += (backend,)
 else:
     _trials = BACKENDS.split(' ')
+
+# Tensorrt doesn't support boolean I/O, so remove 'plan' for bool type tests
+_bool_trials = ()
+for backend in BACKENDS.split(' '):
+    if (backend != "custom") and (backend != "plan"):
+        _bool_trials += (backend,)
 
 # Add ensemble to the _trials
 ENSEMBLE_PREFIXES = ["simple_", "sequence_", "fan_"]
@@ -2309,6 +2315,281 @@ class SequenceBatcherTest(su.SequenceBatcherTestUtil):
                 if TEST_SYSTEM_SHARED_MEMORY or TEST_CUDA_SHARED_MEMORY:
                     self.cleanup_shm_regions(precreated_shm0_handles)
                     self.cleanup_shm_regions(precreated_shm1_handles)
+
+    def test_simple_sequence_bool(self):
+        # Send one sequence and check for correct result.
+        # The result should be returned immediately.
+        for trial in _bool_trials:
+            # Run on different protocols.
+            for idx, protocol in enumerate(_protocols):
+                self.clear_deferred_exceptions()
+                try:
+                    dtype = np.bool
+                    model_name = tu.get_sequence_model_name(trial, dtype)
+
+                    self.check_setup(model_name)
+                    self.assertFalse(
+                        "TRITONSERVER_DELAY_SCHEDULER" in os.environ)
+                    self.assertFalse(
+                        "TRITONSERVER_BACKLOG_DELAY_SCHEDULER" in os.environ)
+
+                    self.check_sequence(
+                        trial,
+                        model_name,
+                        dtype,
+                        5,
+                        (4000, None),
+                        # (flag_str, value, (ls_ms, gt_ms), (pre_delay, post_delay))
+                        (("start", True, None, None), (None, True, None, None),
+                         (None, True, None, None), (None, True, None, None),
+                         (None, True, None, None), (None, True, None, None),
+                         (None, True, None, None), (None, True, None, None),
+                         ("end", False, None, None)),
+                        False,
+                        protocol,
+                        sequence_name="{}_{}".format(self._testMethodName,
+                                                     protocol))
+
+                    self.check_deferred_exception()
+                    self.check_status(model_name, {1: 9 * (idx + 1)},
+                                      9 * (idx + 1), 9 * (idx + 1))
+                except Exception as ex:
+                    self.assertTrue(False, "unexpected error {}".format(ex))
+
+    def test_length1_sequence_bool(self):
+        # Send a length-1 sequence and check for correct accumulator
+        # result. The result should be returned immediately.
+        for trial in _bool_trials:
+            # Run on different protocols.
+            for idx, protocol in enumerate(_protocols):
+                self.clear_deferred_exceptions()
+                try:
+                    dtype = np.bool
+                    model_name = tu.get_sequence_model_name(trial, dtype)
+
+                    self.check_setup(model_name)
+                    self.assertFalse(
+                        "TRITONSERVER_DELAY_SCHEDULER" in os.environ)
+                    self.assertFalse(
+                        "TRITONSERVER_BACKLOG_DELAY_SCHEDULER" in os.environ)
+
+                    self.check_sequence(
+                        trial,
+                        model_name,
+                        dtype,
+                        99,
+                        (4000, None),
+                        # (flag_str, value, (ls_ms, gt_ms), (pre_delay, post_delay))
+                        (
+                            ("start,end", True, None, None),),
+                        True,
+                        protocol,
+                        sequence_name="{}_{}".format(self._testMethodName,
+                                                     protocol))
+
+                    self.check_deferred_exception()
+                    self.check_status(model_name, {1: idx + 1}, (idx + 1),
+                                      (idx + 1))
+                except Exception as ex:
+                    self.assertTrue(False, "unexpected error {}".format(ex))
+
+    def test_batch_size_bool(self):
+        # Send sequence with a batch-size > 1 and check for error.
+        for trial in _bool_trials:
+            # Run on different protocols.
+            for idx, protocol in enumerate(_protocols):
+                self.clear_deferred_exceptions()
+                try:
+                    dtype = np.bool
+                    model_name = tu.get_sequence_model_name(trial, dtype)
+
+                    self.check_setup(model_name)
+                    self.assertFalse(
+                        "TRITONSERVER_DELAY_SCHEDULER" in os.environ)
+                    self.assertFalse(
+                        "TRITONSERVER_BACKLOG_DELAY_SCHEDULER" in os.environ)
+
+                    self.check_sequence(
+                        trial,
+                        model_name,
+                        dtype,
+                        27,
+                        (4000, None),
+                        # (flag_str, value, (ls_ms, gt_ms), (pre_delay, post_delay))
+                        (("start", True, None, None),
+                         ("end", False, None, None)),
+                        False,
+                        protocol,
+                        batch_size=2,
+                        sequence_name="{}_{}".format(self._testMethodName,
+                                                     protocol))
+
+                    self.check_deferred_exception()
+                    self.assertTrue(False, "expected error")
+                except Exception as ex:
+                    self.assertTrue(ex.message().startswith(
+                        str("inference request to model '{}' must specify " +
+                            "batch-size 1 due to requirements of sequence " +
+                            "batcher").format(model_name)))
+
+    def test_no_correlation_id_bool(self):
+        # Send sequence without correlation ID and check for error.
+        for trial in _bool_trials:
+            # Run on different protocols.
+            for idx, protocol in enumerate(_protocols):
+                self.clear_deferred_exceptions()
+                try:
+                    dtype = np.bool
+                    model_name = tu.get_sequence_model_name(trial, dtype)
+
+                    self.check_setup(model_name)
+                    self.assertFalse(
+                        "TRITONSERVER_DELAY_SCHEDULER" in os.environ)
+                    self.assertFalse(
+                        "TRITONSERVER_BACKLOG_DELAY_SCHEDULER" in os.environ)
+
+                    self.check_sequence(
+                        trial,
+                        model_name,
+                        dtype,
+                        0,  # correlation_id = 0
+                        (4000, None),
+                        # (flag_str, value, (ls_ms, gt_ms), (pre_delay, post_delay))
+                        (("start", False, None, None),
+                         ("end", False, None, None)),
+                        False,
+                        protocol,
+                        sequence_name="{}_{}".format(self._testMethodName,
+                                                     protocol))
+
+                    self.check_deferred_exception()
+                    self.assertTrue(False, "expected error")
+                except Exception as ex:
+                    self.assertTrue(ex.message().startswith(
+                        str("inference request to model '{}' must specify a " +
+                            "non-zero correlation ID").format(model_name)))
+
+    def test_no_sequence_start_bool(self):
+        # Send sequence without start flag for never before seen
+        # correlation ID. Expect failure.
+        for trial in _bool_trials:
+            # Run on different protocols.
+            for idx, protocol in enumerate(_protocols):
+                self.clear_deferred_exceptions()
+                try:
+                    dtype = np.bool
+                    model_name = tu.get_sequence_model_name(trial, dtype)
+
+                    self.check_setup(model_name)
+                    self.assertFalse(
+                        "TRITONSERVER_DELAY_SCHEDULER" in os.environ)
+                    self.assertFalse(
+                        "TRITONSERVER_BACKLOG_DELAY_SCHEDULER" in os.environ)
+
+                    self.check_sequence(
+                        trial,
+                        model_name,
+                        dtype,
+                        37469245,
+                        (4000, None),
+                        # (flag_str, value, (ls_ms, gt_ms), (pre_delay, post_delay))
+                        ((None, True, None, None), (None, True, None, None),
+                         ("end", False, None, None)),
+                        False,
+                        protocol,
+                        sequence_name="{}_{}".format(self._testMethodName,
+                                                     protocol))
+
+                    self.check_deferred_exception()
+                    self.assertTrue(False, "expected error")
+                except Exception as ex:
+                    print(model_name + "-> " + ex.message())
+                    self.assertTrue(ex.message().startswith(
+                        str("inference request for sequence 37469245 to " +
+                            "model '{}' must specify the START flag on the first "
+                            + "request of the sequence").format(model_name)))
+
+    def test_no_sequence_start2_bool(self):
+        # Send sequence without start flag after sending a valid
+        # sequence with the same correlation ID. Expect failure for
+        # the second sequence.
+        for trial in _bool_trials:
+            # Run on different protocols.
+            for idx, protocol in enumerate(_protocols):
+                self.clear_deferred_exceptions()
+                try:
+                    dtype = np.bool
+                    model_name = tu.get_sequence_model_name(trial, dtype)
+
+                    self.check_setup(model_name)
+                    self.assertFalse(
+                        "TRITONSERVER_DELAY_SCHEDULER" in os.environ)
+                    self.assertFalse(
+                        "TRITONSERVER_BACKLOG_DELAY_SCHEDULER" in os.environ)
+
+                    self.check_sequence(
+                        trial,
+                        model_name,
+                        dtype,
+                        3,
+                        (4000, None),
+                        # (flag_str, value, (ls_ms, gt_ms), (pre_delay, post_delay))
+                        (("start", True, None, None), (None, False, None, None),
+                         ("end", False, None, None), (None, False, None, None)),
+                        False,
+                        protocol,
+                        sequence_name="{}_{}".format(self._testMethodName,
+                                                     protocol))
+
+                    self.check_status(model_name, {1: 3 * (idx + 1)},
+                                      3 * (idx + 1), 3 * (idx + 1))
+                    self.check_deferred_exception()
+                    self.assertTrue(False, "expected error")
+                except Exception as ex:
+                    self.assertTrue(ex.message().startswith(
+                        str("inference request for sequence 3 to model '{}' must "
+                            +
+                            "specify the START flag on the first request of " +
+                            "the sequence").format(model_name)))
+
+    def test_no_sequence_end_bool(self):
+        # Send sequence without end flag. Use same correlation ID to
+        # send another sequence. The first sequence will be ended
+        # automatically but the second should complete successfully.
+        for trial in _bool_trials:
+            # Run on different protocols.
+            for idx, protocol in enumerate(_protocols):
+                self.clear_deferred_exceptions()
+                try:
+                    dtype = np.bool
+                    model_name = tu.get_sequence_model_name(trial, dtype)
+
+                    self.check_setup(model_name)
+                    self.assertFalse(
+                        "TRITONSERVER_DELAY_SCHEDULER" in os.environ)
+                    self.assertFalse(
+                        "TRITONSERVER_BACKLOG_DELAY_SCHEDULER" in os.environ)
+
+                    self.check_sequence(
+                        trial,
+                        model_name,
+                        dtype,
+                        4566,
+                        (4000, None),
+                        # (flag_str, value, (ls_ms, gt_ms), (pre_delay, post_delay))
+                        (("start", True, None, None), (None, True, None, None),
+                         ("start", False, None, None),
+                         ("end", False, None, None)),
+                        False,
+                        protocol,
+                        sequence_name="{}_{}".format(self._testMethodName,
+                                                     protocol))
+
+                    self.check_deferred_exception()
+                    self.check_status(model_name, {1: 4 * (idx + 1)},
+                                      4 * (idx + 1), 4 * (idx + 1))
+                except Exception as ex:
+                    self.assertTrue(False, "unexpected error {}".format(ex))
 
 
 if __name__ == '__main__':
