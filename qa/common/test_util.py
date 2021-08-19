@@ -1,4 +1,4 @@
-# Copyright (c) 2018-2019, NVIDIA CORPORATION. All rights reserved.
+# Copyright (c) 2018-2021, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -176,6 +176,11 @@ def validate_for_openvino_model(input_dtype, output0_dtype, output1_dtype,
     if not output0_dtype in supported_datatypes:
         return False
     if not output1_dtype in supported_datatypes:
+        return False
+
+    # Return false if input dtype != output dtype and shape > 1 dims
+    # https://github.com/openvinotoolkit/openvino/issues/7173
+    if ((output1_dtype != input_dtype) or (output0_dtype != input_dtype)) and len(input_shape) > 1:
         return False
 
     return True
