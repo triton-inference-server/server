@@ -1,5 +1,5 @@
 <!--
-# Copyright (c) 2018-2020, NVIDIA CORPORATION. All rights reserved.
+# Copyright 2018-2021, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -25,6 +25,35 @@
 # (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 -->
+
+# Contribution Guidelines
+
+Contributions that fix documentation errors or that make small changes
+to existing code can be contributed directly by following the rules
+below and submitting an appropriate PR.
+
+Contributions intended to add significant new functionality must
+follow a more collaborative path described in the following
+points. Before submitting a large PR that adds a major enhancement or
+extension, be sure to submit a GitHub issue that describes the
+proposed change so that the Triton team can provide feedback.
+
+- As part of the GitHub issue discussion, a design for your change
+  will be agreed upon. An up-front design discussion is required to
+  ensure that your enhancement is done in a manner that is consistent
+  with Triton's overall architecture.
+
+- The Triton project is spread across multiple repos. The Triton team
+  will provide guidance about how and where your enhancement should be
+  implemented.
+
+- Testing is a critical part of any Triton enhancement. You should
+  plan on spending significant time on creating tests for your
+  change. The Triton team will help you to design your testing so that
+  it is compatible with existing testing infrastructure.
+
+- If your enhancement provides a user visible feature then you need to
+  provide documentation.
 
 # Contribution Rules
 
@@ -73,9 +102,9 @@
 
 # Coding Convention
 
-Use clang-format to format all source files (\*.h, \*.cc, \*.proto) to
-a consistent format. You should run clang-format on all source files
-before submitting a pull request:
+Use clang-format to format all source files (\*.h, \*.cc, \*.proto,
+*.py) to a consistent format. You should run clang-format on all
+source files before submitting a pull request:
 
 ```
 $ apt-get install clang-format clang-format-6.0
