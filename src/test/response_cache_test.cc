@@ -28,6 +28,7 @@
 #include "src/core/memory.h"
 #include "src/core/response_cache.h"
 
+
 namespace ni = nvidia::inferenceserver;
 
 /* Mock classes for Unit Testing */
@@ -44,11 +45,14 @@ InferenceRequest::Input::Input(
       data_(new MemoryReference), has_host_policy_specific_data_(false)
 {}
 
-// Same as defined in infer_request.cc
+// Use const global var as locals can't be returned in ModelName(), 
+// and we don't care about the backend for the unit test
+const std::string BACKEND = "backend";
+
 const std::string&
 InferenceRequest::ModelName() const
 {
-  return backend_raw_->Name();
+  return BACKEND;
 }
 
 void
