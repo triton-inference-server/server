@@ -127,6 +127,7 @@ set(
   infer_parameter.cc
   infer_request.cc
   infer_response.cc
+  instance_queue.cc
   label_provider.cc
   logging.cc
   memory.cc
@@ -163,6 +164,7 @@ set(
   infer_parameter.h
   infer_request.h
   infer_response.h
+  instance_queue.h
   label_provider.h
   logging.h
   memory.h

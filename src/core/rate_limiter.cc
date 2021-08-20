@@ -112,14 +112,16 @@ RateLimiter::UnregisterModel(const TritonModel* model)
 void
 RateLimiter::InitializePayloadQueues(const TritonModelInstance* instance)
 {
+  auto& config = instance->Model()->Config();
   if (payload_queues_.find(instance->Model()) == payload_queues_.end()) {
-    payload_queues_.emplace(instance->Model(), new PayloadQueue());
+    payload_queues_.emplace(
+        instance->Model(), new PayloadQueue(config.max_batch_size()));
   }
   PayloadQueue* payload_queue = payload_queues_[instance->Model()].get();
   if (payload_queue->specific_queues_.find(instance) ==
       payload_queue->specific_queues_.end()) {
     payload_queue->specific_queues_.emplace(
-        instance, new std::deque<std::shared_ptr<Payload>>());
+        instance, new InstanceQueue(config.max_batch_size()));
   }
 }
 
@@ -130,7 +132,7 @@ RateLimiter::PayloadSlotAvailable(const TritonModel* model)
   PayloadQueue* payload_queue = payload_queues_[model].get();
   {
     std::lock_guard<std::mutex> lk(payload_queue->mu_);
-    result = payload_queue->queue_.size() <
+    result = payload_queue->queue_->Size() <
              2 * payload_queue->specific_queues_.size();
   }
   return result;
@@ -149,9 +151,9 @@ RateLimiter::EnqueuePayload(
     std::lock_guard<std::mutex> lk(payload_queue->mu_);
     payload->SetState(Payload::State::REQUESTED);
     if (pinstance == nullptr) {
-      payload_queue->queue_.push_back(payload);
+      payload_queue->queue_->Enqueue(payload);
     } else {
-      payload_queue->specific_queues_[pinstance]->push_back(payload);
+      payload_queue->specific_queues_[pinstance]->Enqueue(payload);
     }
   }
 
@@ -187,11 +189,11 @@ RateLimiter::DequeuePayload(
       std::unique_lock<std::mutex> lk(payload_queue->mu_);
       payload_queue->cv_.wait(
           lk, [&instances, &instance_index, payload_queue]() {
-            bool empty = payload_queue->queue_.empty();
+            bool empty = payload_queue->queue_->Empty();
             if (empty) {
               instance_index = 0;
               for (const auto instance : instances) {
-                empty = payload_queue->specific_queues_[instance]->empty();
+                empty = payload_queue->specific_queues_[instance]->Empty();
                 if (empty) {
                   instance_index++;
                 } else {
@@ -203,13 +205,11 @@ RateLimiter::DequeuePayload(
           });
       if (instance_index < instances.size()) {
         TritonModelInstance* instance = instances[instance_index];
-        if (!payload_queue->specific_queues_[instance]->empty()) {
-          *payload = payload_queue->specific_queues_[instance]->front();
-          payload_queue->specific_queues_[instance]->pop_front();
+        if (!payload_queue->specific_queues_[instance]->Empty()) {
+          payload_queue->specific_queues_[instance]->Dequeue(payload);
         }
       } else {
-        *payload = payload_queue->queue_.front();
-        payload_queue->queue_.pop_front();
+        payload_queue->queue_->Dequeue(payload);
       }
     }
     {

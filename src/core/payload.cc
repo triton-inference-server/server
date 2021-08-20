@@ -26,16 +26,51 @@
 
 #include "src/core/payload.h"
 
-#include "src/core/infer_request.h"
-
 namespace nvidia { namespace inferenceserver {
 
 Payload::Payload()
     : op_type_(Operation::INFER_RUN),
       requests_(std::vector<std::unique_ptr<InferenceRequest>>()),
-      OnCallback_([]() {}), instance_(nullptr), state_(State::UNINITIALIZED)
+      OnCallback_([]() {}), instance_(nullptr), state_(State::UNINITIALIZED),
+      queue_start_ns_(0)
 {
   exec_mu_.reset(new std::mutex());
+}
+
+Status
+Payload::MergePayload(std::shared_ptr<Payload>& payload)
+{
+  if ((payload->GetOpType() != Operation::INFER_RUN) ||
+      (op_type_ != Operation::INFER_RUN)) {
+    return Status(
+        Status::Code::INTERNAL,
+        "Attempted to merge payloads of type that are not INFER_RUN");
+  }
+  if (payload->GetInstance() != instance_) {
+    return Status(
+        Status::Code::INTERNAL,
+        "Attempted to merge payloads of mismatching instance");
+  }
+  if ((payload->GetState() != State::SCHEDULED) ||
+      (state_ != State::SCHEDULED)) {
+    return Status(
+        Status::Code::INTERNAL,
+        "Attempted to merge payloads that are not in scheduled state");
+  }
+
+  requests_.insert(
+      requests_.end(), std::make_move_iterator(payload->Requests().begin()),
+      std::make_move_iterator(payload->Requests().begin()));
+  
+  {
+    std::lock_guard<std::mutex> exec_lock(*(payload->GetExecMutex()));
+    payload->SetState(Payload::State::EXECUTING);
+  }
+  payload->Callback();
+
+  // rate_limiter_->PayloadRelease(payload);
+
+  return Status::Success;
 }
 
 void
@@ -48,6 +83,7 @@ Payload::Reset(const Operation op_type, TritonModelInstance* instance)
   state_ = State::UNINITIALIZED;
   OnCallback_ = []() {};
   status_.reset(new std::promise<Status>());
+  queue_start_ns_ = 0;
 }
 
 void
@@ -59,6 +95,7 @@ Payload::Release()
   instance_ = nullptr;
   state_ = State::RELEASED;
   OnCallback_ = []() {};
+  queue_start_ns_ = 0;
 }
 
 size_t
@@ -80,6 +117,9 @@ Payload::ReserveRequests(size_t size)
 void
 Payload::AddRequest(std::unique_ptr<InferenceRequest> request)
 {
+  if ((queue_start_ns_ == 0) || (queue_start_ns_ > request->QueueStartNs())) {
+    queue_start_ns_ = request->QueueStartNs();
+  }
   requests_.push_back(std::move(request));
 }
 

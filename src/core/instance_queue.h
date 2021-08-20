@@ -25,65 +25,31 @@
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #pragma once
 
-#include <functional>
-#include <future>
-#include <memory>
-#include <mutex>
-#include <queue>
-#include <vector>
-
-#include "src/backends/backend/triton_model_instance.h"
-#include "src/core/infer_request.h"
-#include "src/core/status.h"
+#include "src/core/payload.h"
 
 namespace nvidia { namespace inferenceserver {
 
-class Payload {
+//
+// InstanceQueue
+//
+// A queue implementation holding Payloads ready to be scheduled on
+// model instance.
+class InstanceQueue {
  public:
-  enum Operation { INFER_RUN = 0, INIT = 1, WARM_UP = 2, EXIT = 3 };
-  enum State {
-    UNINITIALIZED = 0,
-    READY = 1,
-    REQUESTED = 2,
-    SCHEDULED = 3,
-    EXECUTING = 4,
-    RELEASED = 5
-  };
+  explicit InstanceQueue(size_t max_batch_size, uint64_t max_queue_delay = 0);
 
-  Payload();
-  void Reset(const Operation op_type, TritonModelInstance* instance = nullptr);
-  Status MergePayload(std::shared_ptr<Payload>& payload);
-  Operation GetOpType() { return op_type_; }
-  std::mutex* GetExecMutex() { return exec_mu_.get(); }
-  size_t RequestCount() { return requests_.size(); }
-  size_t BatchSize();
-  void ReserveRequests(size_t size);
-  void AddRequest(std::unique_ptr<InferenceRequest> request);
-  std::vector<std::unique_ptr<InferenceRequest>>& Requests()
-  {
-    return requests_;
-  }
-  uint64_t QueueStartNs() { return queue_start_ns_; }
-  void SetCallback(std::function<void()> OnCallback);
-  void Callback();
-  void SetInstance(TritonModelInstance* model_instance);
-  TritonModelInstance* GetInstance() { return instance_; }
-
-  State GetState() { return state_; }
-  void SetState(State state);
-  void Execute(bool* should_exit);
-  Status Wait();
-  void Release();
+  size_t Size();
+  bool Empty();
+  void Enqueue(std::shared_ptr<Payload>& payload);
+  void Dequeue(std::shared_ptr<Payload>* payload);
 
  private:
-  Operation op_type_;
-  std::vector<std::unique_ptr<InferenceRequest>> requests_;
-  std::function<void()> OnCallback_;
-  TritonModelInstance* instance_;
-  State state_;
-  std::unique_ptr<std::promise<Status>> status_;
-  std::unique_ptr<std::mutex> exec_mu_;
-  uint64_t queue_start_ns_;
+  size_t max_batch_size_;
+  uint64_t max_queue_delay_;
+
+  std::deque<std::shared_ptr<Payload>> payload_queue_;
+  std::shared_ptr<Payload> staged_payload_;
+  std::mutex mu_;
 };
 
 }}  // namespace nvidia::inferenceserver

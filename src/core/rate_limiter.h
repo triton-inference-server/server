@@ -34,6 +34,7 @@
 #include "model_config.pb.h"
 #include "src/backends/backend/triton_model.h"
 #include "src/backends/backend/triton_model_instance.h"
+#include "src/core/instance_queue.h"
 #include "src/core/payload.h"
 #include "src/core/status.h"
 
@@ -289,10 +290,12 @@ class RateLimiter {
   std::deque<std::shared_ptr<Payload>> payloads_in_use_;
 
   struct PayloadQueue {
-    std::deque<std::shared_ptr<Payload>> queue_;
-    std::map<
-        const TritonModelInstance*,
-        std::unique_ptr<std::deque<std::shared_ptr<Payload>>>>
+    explicit PayloadQueue(size_t max_batch_size)
+    {
+      queue_.reset(new InstanceQueue(max_batch_size));
+    }
+    std::unique_ptr<InstanceQueue> queue_;
+    std::map<const TritonModelInstance*, std::unique_ptr<InstanceQueue>>
         specific_queues_;
     std::mutex mu_;
     std::condition_variable cv_;
