@@ -116,8 +116,8 @@ SignalHandler(int signum)
 void
 ErrorSignalHandler(int signum)
 {
-  std::cout << "Signal (" << signum << ") received." << std::endl;
-  std::cout << boost::stacktrace::stacktrace() << std::endl;
+  std::cerr << "Signal (" << signum << ") received." << std::endl;
+  std::cerr << boost::stacktrace::stacktrace() << std::endl;
 
   _Exit(1);
 }
