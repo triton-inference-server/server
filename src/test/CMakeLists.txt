@@ -221,11 +221,18 @@ set(
   RESPONSE_CACHE_TEST_SRCS
   response_cache_test.cc
   ${RESPONSE_CACHE_SRCS}
+  ${MEMORY_SRCS}
+  ${CUDA_MEMORY_MANAGER_SRCS}
+  ${PINNED_MEMORY_MANAGER_SRCS}
+
 )
 
 set(
   RESPONSE_CACHE_TEST_HDRS
   ${RESPONSE_CACHE_HDRS}
+  ${MEMORY_HDRS}
+  ${CUDA_MEMORY_MANAGER_HDRS}
+  ${PINNED_MEMORY_MANAGER_HDRS}
 )
 
 find_package(GTest REQUIRED)
@@ -247,6 +254,7 @@ target_include_directories(
   response_cache_test
   PRIVATE ${GTEST_INCLUDE_DIR}
   PRIVATE ${CUDA_INCLUDE_DIRS}
+  PRIVATE ${CNMEM_PATH}/include
 )
 target_link_libraries(
   response_cache_test
@@ -259,6 +267,9 @@ target_link_libraries(
   PRIVATE ${CUDA_LIBRARIES}
   PRIVATE protobuf::libprotobuf
   PRIVATE -lpthread
+  PRIVATE -L${CNMEM_PATH}/lib
+  PRIVATE -lcnmem
+  PRIVATE numa
 )
 install(
   TARGETS response_cache_test
