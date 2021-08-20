@@ -90,6 +90,19 @@ InferenceRequest::AddOriginalInput(
   return AddOriginalInput(name, datatype, &shape[0], shape.size(), input);
 }
 
+Status
+InferenceRequest::Input::AppendData(
+    const void* base, size_t byte_size, TRITONSERVER_MemoryType memory_type,
+    int64_t memory_type_id)
+{
+  if (byte_size > 0) {
+    std::static_pointer_cast<MemoryReference>(data_)->AddBuffer(
+        static_cast<const char*>(base), byte_size, memory_type, memory_type_id);
+  }
+
+  return Status::Success;
+}
+
 /* InferenceResponse */
 
 // Same as defined in infer_response.cc
@@ -158,26 +171,34 @@ TEST_F(RequestResponseCacheTest, TestRequestHashing) {
     std::cout << "Create cache" << std::endl;
     uint64_t cache_size = 4*1024*1024;
     ni::RequestResponseCache cache(cache_size);
+
     // Create backend
     std::cout << "Create backend" << std::endl;
-    std::shared_ptr<ni::InferenceBackend> backend;
+    ni::InferenceBackend* backend = nullptr;
     const uint64_t model_version = 1;
+
     // Create request
     std::cout << "Create request" << std::endl;
     ni::InferenceRequest request(backend, model_version);
+
     // Create input
     std::cout << "Create input" << std::endl;
     std::string input_name = "input0";
     inference::DataType dtype = inference::DataType::TYPE_INT32;
-    std::vector<int64_t> shape{1, 256};
-    //ni::InferenceRequest::Input input0(input_name, dtype, shape); 
+    std::vector<int64_t> shape{1, 4};
     ni::InferenceRequest::Input* input0 = nullptr;
     // Add input to request
     std::cout << "Add input to request" << std::endl;
     request.AddOriginalInput(input_name, dtype, shape, &input0);
+    assert(input0 != nullptr);
+    // Add data to input
+    int data0[4] = {1, 2, 3, 4};
+    TRITONSERVER_MemoryType memory_type = TRITONSERVER_MEMORY_CPU;
+    int64_t memory_type_id = 0; // TODO
+    input0->AppendData(data0, sizeof(int)*256, memory_type, memory_type_id);
+
     // Compare hashes
     std::cout << "Compare hashes" << std::endl;
-    // TODO: Segfault
     uint64_t hash1 = cache.Hash(request);
     uint64_t hash2 = cache.Hash(request);
     std::cout << "Hash1: " << hash1 << std::endl;
