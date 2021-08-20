@@ -87,12 +87,16 @@ set(
   RESPONSE_CACHE_SRCS
   ../core/response_cache.cc
   ../core/status.cc
+  #../core/infer_request.cc
+  #../core/infer_response.cc
 )
 
 set(
   RESPONSE_CACHE_HDRS
   ../core/response_cache.h
   ../core/status.h
+  #../core/infer_request.h
+  #../core/infer_response.h
 )
 
 #
