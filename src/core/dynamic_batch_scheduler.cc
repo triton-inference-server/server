@@ -157,8 +157,7 @@ DynamicBatchScheduler::Enqueue(std::unique_ptr<InferenceRequest>& request)
     // If not using dynamic batching, directly enqueue the
     // request to model for execution
     auto payload = model_->Server()->GetRateLimiter()->GetPayload(
-        RateLimiter::Payload::Operation::INFER_RUN,
-        nullptr /* TritonModelInstance*/);
+        Payload::Operation::INFER_RUN, nullptr /* TritonModelInstance*/);
     payload->AddRequest(std::move(request));
     RETURN_IF_ERROR(
         model_->Server()->GetRateLimiter()->EnqueuePayload(model_, payload));
@@ -203,7 +202,7 @@ void
 DynamicBatchScheduler::NewPayload()
 {
   curr_payload_ = model_->Server()->GetRateLimiter()->GetPayload(
-      RateLimiter::Payload::Operation::INFER_RUN, model_instance_);
+      Payload::Operation::INFER_RUN, model_instance_);
   payload_saturated_ = false;
 }
 
@@ -318,9 +317,8 @@ DynamicBatchScheduler::BatcherThread(const int nice)
               }
             }
 
-            if (curr_payload_->GetState() ==
-                RateLimiter::Payload::State::UNINITIALIZED) {
-              curr_payload_->SetState(RateLimiter::Payload::State::READY);
+            if (curr_payload_->GetState() == Payload::State::UNINITIALIZED) {
+              curr_payload_->SetState(Payload::State::READY);
             }
 
             queued_batch_size_ -= pending_batch_size_;
@@ -337,7 +335,7 @@ DynamicBatchScheduler::BatcherThread(const int nice)
       }
     }
 
-    if (curr_payload_->GetState() == RateLimiter::Payload::State::READY) {
+    if (curr_payload_->GetState() == Payload::State::READY) {
       auto callback = [this]() { cv_.notify_one(); };
       curr_payload_->SetCallback(callback);
       model_->Server()->GetRateLimiter()->EnqueuePayload(model_, curr_payload_);

@@ -262,118 +262,11 @@ RateLimiter::RequestModelInstance(
   return Status::Success;
 }
 
-RateLimiter::Payload::Payload()
-    : op_type_(Operation::INFER_RUN),
-      requests_(std::vector<std::unique_ptr<InferenceRequest>>()),
-      OnCallback_([]() {}), instance_(nullptr), state_(State::UNINITIALIZED)
-{
-  exec_mu_.reset(new std::mutex());
-}
-
-void
-RateLimiter::Payload::Reset(
-    const Operation op_type, TritonModelInstance* instance)
-{
-  op_type_ = op_type;
-  requests_.clear();
-  OnCallback_ = []() {};
-  instance_ = instance;
-  state_ = State::UNINITIALIZED;
-  OnCallback_ = []() {};
-  status_.reset(new std::promise<Status>());
-}
-
-void
-RateLimiter::Payload::Release()
-{
-  op_type_ = Operation::INFER_RUN;
-  requests_.clear();
-  OnCallback_ = []() {};
-  instance_ = nullptr;
-  state_ = State::RELEASED;
-  OnCallback_ = []() {};
-}
-
-size_t
-RateLimiter::Payload::BatchSize()
-{
-  size_t batch_size = 0;
-  for (const auto& request : requests_) {
-    batch_size += std::max(1U, request->BatchSize());
-  }
-  return batch_size;
-}
-
-void
-RateLimiter::Payload::ReserveRequests(size_t size)
-{
-  requests_.reserve(size);
-}
-
-void
-RateLimiter::Payload::AddRequest(std::unique_ptr<InferenceRequest> request)
-{
-  requests_.push_back(std::move(request));
-}
-
-void
-RateLimiter::Payload::SetCallback(std::function<void()> OnCallback)
-{
-  OnCallback_ = OnCallback;
-}
-
-void
-RateLimiter::Payload::SetInstance(TritonModelInstance* model_instance)
-{
-  instance_ = model_instance;
-}
-
-void
-RateLimiter::Payload::SetState(RateLimiter::Payload::State state)
-{
-  state_ = state;
-}
-
-Status
-RateLimiter::Payload::Wait()
-{
-  return status_->get_future().get();
-}
-
-void
-RateLimiter::Payload::Callback()
-{
-  OnCallback_();
-}
-
-void
-RateLimiter::Payload::Execute(bool* should_exit)
-{
-  *should_exit = false;
-
-  Status status;
-  switch (op_type_) {
-    case Operation::INFER_RUN:
-      instance_->Schedule(std::move(requests_), OnCallback_);
-      break;
-    case Operation::INIT:
-      status = instance_->Initialize();
-      break;
-    case Operation::WARM_UP:
-      status = instance_->WarmUp();
-      break;
-    case Operation::EXIT:
-      *should_exit = true;
-  }
-
-  status_->set_value(status);
-}
-
-std::shared_ptr<RateLimiter::Payload>
+std::shared_ptr<Payload>
 RateLimiter::GetPayload(
     const Payload::Operation op_type, TritonModelInstance* instance)
 {
-  std::shared_ptr<RateLimiter::Payload> payload;
+  std::shared_ptr<Payload> payload;
 
   if (max_payload_bucket_count_ > 0) {
     std::lock_guard<std::mutex> lock(alloc_mu_);
@@ -393,7 +286,7 @@ RateLimiter::GetPayload(
   }
 
   if (payload.get() == nullptr) {
-    payload.reset(new RateLimiter::Payload());
+    payload.reset(new Payload());
   }
 
   payload->Reset(op_type, instance);
@@ -401,7 +294,7 @@ RateLimiter::GetPayload(
 }
 
 void
-RateLimiter::PayloadRelease(std::shared_ptr<RateLimiter::Payload>& payload)
+RateLimiter::PayloadRelease(std::shared_ptr<Payload>& payload)
 {
   if (max_payload_bucket_count_ > 0) {
     std::lock_guard<std::mutex> lock(alloc_mu_);

@@ -113,7 +113,7 @@ class DynamicBatchScheduler : public Scheduler {
 
   std::shared_ptr<RateLimiter> rate_limiter_;
 
-  std::shared_ptr<RateLimiter::Payload> curr_payload_;
+  std::shared_ptr<Payload> curr_payload_;
   bool payload_saturated_;
 
   size_t max_batch_size_;
