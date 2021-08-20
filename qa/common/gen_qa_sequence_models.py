@@ -185,8 +185,15 @@ def create_tf_modelfile(create_savedmodel, models_dir, model_version, max_batch,
         acc = tf.get_variable("ACC", [
             1,
         ], dtype=tf_dtype)
-        tmp = tf.where(tf.equal(start0, 1), input0, tf.add(acc, input0))
-        newacc = tf.where(tf.equal(ready0, 1), tmp, acc)
+
+        if tf_dtype == tf.bool:
+            tmp = tf.where(tf.equal(start0, True), input0,
+                           tf.math.logical_and(acc, input0))
+            newacc = tf.where(tf.equal(ready0, True), tmp, acc)
+        else:
+            tmp = tf.where(tf.equal(start0, 1), input0, tf.add(acc, input0))
+            newacc = tf.where(tf.equal(ready0, 1), tmp, acc)
+
         assign = tf.assign(acc, newacc)
         if tf_input_dtype == tf.string:
             output0 = tf.dtypes.as_string(assign, name="OUTPUT")
@@ -208,8 +215,15 @@ def create_tf_modelfile(create_savedmodel, models_dir, model_version, max_batch,
                                           tf_dtype)
         start0 = tf.placeholder(tf_dtype, [None, 1], "START")
         ready0 = tf.placeholder(tf_dtype, [None, 1], "READY")
-        tmp = tf.where(tf.equal(ready0, 1), tf.add(start0, input0),
-                       tf.zeros(tf.shape(input0), dtype=tf_dtype))
+
+        if tf_dtype == tf.bool:
+            tmp = tf.where(tf.equal(ready0, True),
+                           tf.math.logical_and(start0, input0),
+                           tf.zeros(tf.shape(input0), dtype=tf_dtype))
+        else:
+            tmp = tf.where(tf.equal(ready0, 1), tf.add(start0, input0),
+                           tf.zeros(tf.shape(input0), dtype=tf_dtype))
+
         if tf_input_dtype == tf.string:
             output0 = tf.dtypes.as_string(tmp, name="OUTPUT")
         else:
@@ -269,6 +283,13 @@ def create_tf_modelconfig(create_savedmodel, models_dir, model_version,
         model_name = tu.get_sequence_model_name(
             "graphdef_nobatch" if max_batch == 0 else "graphdef", dtype)
 
+    if dtype == np.float32:
+        control_type = "fp32"
+    elif dtype == np.bool:
+        control_type = "bool"
+    else:
+        control_type = "int32"
+
     config_dir = models_dir + "/" + model_name
     config = '''
 name: "{}"
@@ -319,8 +340,7 @@ instance_group [
 '''.format(
         model_name,
         "tensorflow_savedmodel" if create_savedmodel else "tensorflow_graphdef",
-        max_batch, "fp32" if dtype == np.float32 else "int32",
-        "fp32" if dtype == np.float32 else "int32", np_to_model_dtype(dtype),
+        max_batch, control_type, control_type, np_to_model_dtype(dtype),
         tu.shape_to_dims_str(shape), np_to_model_dtype(dtype))
 
     try:
@@ -963,9 +983,13 @@ def create_onnx_modelfile(models_dir, model_version, max_batch, dtype, shape):
         internal_input = onnx.helper.make_node("Cast", ["INPUT"], ["_INPUT"],
                                                to=onnx.TensorProto.INT32)
 
-    add = onnx.helper.make_node("Add", ["_INPUT", "START"], ["add"])
-    # Take advantage of knowledge that the READY false value is 0 and true is 1
-    mul = onnx.helper.make_node("Mul", ["READY", "add"], ["CAST"])
+    if onnx_dtype == onnx.TensorProto.BOOL:
+        add = onnx.helper.make_node("And", ["_INPUT", "START"], ["add"])
+        mul = onnx.helper.make_node("And", ["READY", "add"], ["CAST"])
+    else:
+        add = onnx.helper.make_node("Add", ["_INPUT", "START"], ["add"])
+        # Take advantage of knowledge that the READY false value is 0 and true is 1
+        mul = onnx.helper.make_node("Mul", ["READY", "add"], ["CAST"])
     cast = onnx.helper.make_node("Cast", ["CAST"], ["OUTPUT"], to=onnx_dtype)
 
     # Avoid cast from float16 to float16
@@ -1003,6 +1027,13 @@ def create_onnx_modelconfig(models_dir, model_version, max_batch, dtype, shape):
     model_name = tu.get_sequence_model_name(
         "onnx_nobatch" if max_batch == 0 else "onnx", dtype)
     config_dir = models_dir + "/" + model_name
+
+    if dtype == np.float32:
+        control_type = "fp32"
+    elif dtype == np.bool:
+        control_type = "bool"
+    else:
+        control_type = "int32"
 
     instance_group_string = '''
 instance_group [
@@ -1045,7 +1076,7 @@ sequence_batching {{
     }}
   ]
 }}
-'''.format(type="fp32" if dtype == np.float32 else "int32")
+'''.format(type=control_type)
 
     try:
         os.makedirs(config_dir)
@@ -1104,6 +1135,14 @@ def create_libtorch_modelconfig(models_dir, model_version, max_batch, dtype,
     model_name = tu.get_sequence_model_name(
         "libtorch_nobatch" if max_batch == 0 else "libtorch", dtype)
     config_dir = models_dir + "/" + model_name
+
+    if dtype == np.float32:
+        control_type = "fp32"
+    elif dtype == np.bool:
+        control_type = "bool"
+    else:
+        control_type = "int32"
+
     #  FIX FOR LibTorch
     config = '''
 name: "{}"
@@ -1151,11 +1190,11 @@ instance_group [
     kind: KIND_GPU
   }}
 ]
-'''.format(model_name, max_batch, "int32" if dtype == np.int32 else "fp32",
-           "int32" if dtype == np.int32 else "fp32", np_to_model_dtype(dtype),
-           tu.shape_to_dims_str(shape), np_to_model_dtype(dtype),
-           tu.shape_to_dims_str(shape), np_to_model_dtype(dtype),
-           tu.shape_to_dims_str(shape), np_to_model_dtype(dtype))
+'''.format(model_name, max_batch, control_type, control_type,
+           np_to_model_dtype(dtype), tu.shape_to_dims_str(shape),
+           np_to_model_dtype(dtype), tu.shape_to_dims_str(shape),
+           np_to_model_dtype(dtype), tu.shape_to_dims_str(shape),
+           np_to_model_dtype(dtype))
 
     try:
         os.makedirs(config_dir)
@@ -1302,6 +1341,8 @@ def create_models(models_dir, dtype, shape, no_batch=True):
                                 shape)
 
     if FLAGS.tensorrt:
+        if dtype == np.bool:
+            return
         suffix = []
         if dtype == np.int8:
             suffix = [1, 1]
@@ -1449,6 +1490,9 @@ if __name__ == '__main__':
             create_models(FLAGS.models_dir, np_dtype_string, [
                 1,
             ])
+            create_models(FLAGS.models_dir, np.bool, [
+                1,
+            ])
 
         # Tests with models that accept variable-shape input/output tensors
         if FLAGS.variable:
@@ -1461,9 +1505,12 @@ if __name__ == '__main__':
             create_models(FLAGS.models_dir, np_dtype_string, [
                 -1,
             ], False)
+            create_models(FLAGS.models_dir, np.bool, [
+                -1,
+            ], False)
         if FLAGS.ensemble:
             # Create nop models used in ensemble
-            for model_dtype in ["TYPE_INT32", "TYPE_FP32"]:
+            for model_dtype in ["TYPE_INT32", "TYPE_FP32", "TYPE_BOOL"]:
                 for model_shape in [(-1,)]:
                     emu.create_nop_modelconfig(FLAGS.models_dir, model_shape,
                                                model_dtype)

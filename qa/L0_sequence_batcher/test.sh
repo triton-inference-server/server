@@ -62,9 +62,6 @@ if [ "$TEST_VALGRIND" -eq 1 ]; then
                     test_backlog_sequence_timeout \
                     test_ragged_batch"
     QUEUE_DELAY_TESTS="test_queue_delay_full_min_util"
-    BOOL_TYPE_TESTS="test_simple_sequence_bool \
-                      test_batch_size_bool \
-                      test_no_sequence_start_bool"
 fi
 
 if [ -z "$TEST_JETSON" ]; then
@@ -135,15 +132,6 @@ QUEUE_DELAY_TESTS=${QUEUE_DELAY_TESTS:="test_queue_delay_no_min_util \
                                     test_queue_delay_half_min_util \
                                     test_queue_delay_full_min_util"}
 
-# Tests for bool type models
-BOOL_TYPE_TESTS=${NO_DELAY_TESTS_BOOL:="test_simple_sequence_bool \
-                                    test_length1_sequence_bool \
-                                    test_batch_size_bool \
-                                    test_no_sequence_start_bool\
-                                    test_no_sequence_start2_bool \
-                                    test_no_sequence_end_bool \
-                                    test_no_correlation_id_bool"}
-
 # If ENSEMBLES not specified, set to 1
 ENSEMBLES=${ENSEMBLES:="1"}
 export ENSEMBLES
@@ -158,11 +146,13 @@ rm -fr *.log *.serverlog models{0,1,2,4} queue_delay_models && mkdir models{0,1,
 
 # Get the datatype to use based on the backend
 function get_datatype () {
-  local dtype='int32'
-  if [[ $1 == "plan" ]] || [[ $1 == "savedmodel" ]]; then
-      dtype='float32'
+  local dtype="int32 bool"
+  if [[ $1 == "plan" ]]; then
+    dtype="float32"
+  elif [[ $1 == "savedmodel" ]]; then
+    dtype="float32 bool"
   elif [[ $1 == "graphdef" ]]; then
-      dtype='object'
+    dtype="object bool"
   fi
   echo $dtype
 }
@@ -172,15 +162,19 @@ for BACKEND in $BACKENDS; do
   if [[ $BACKEND == "custom" ]]; then
     MODELS="$MODELS ../custom_models/custom_sequence_int32"
   else
-    DTYPE=$(get_datatype $BACKEND)
-    MODELS="$MODELS $DATADIR/qa_sequence_model_repository/${BACKEND}_sequence_${DTYPE}"
+    DTYPES=$(get_datatype $BACKEND)
+    for DTYPE in $DTYPES; do
+      MODELS="$MODELS $DATADIR/qa_sequence_model_repository/${BACKEND}_sequence_${DTYPE}"
+    done
 
     if [[ $BACKEND == "graphdef" ]]; then
       MODELS="$MODELS $DATADIR/qa_sequence_model_repository/graphdef_sequence_int32"
     fi
 
     if [ "$ENSEMBLES" == "1" ]; then
-      MODELS="$MODELS $DATADIR/qa_ensemble_model_repository/qa_sequence_model_repository/*_${BACKEND}_sequence_${DTYPE}"
+      for DTYPE in $DTYPES; do
+        MODELS="$MODELS $DATADIR/qa_ensemble_model_repository/qa_sequence_model_repository/*_${BACKEND}_sequence_${DTYPE}"
+      done
     fi
   fi
 done
@@ -234,15 +228,19 @@ for BACKEND in $BACKENDS; do
   if [[ $BACKEND == "custom" ]]; then
     MODELS="$MODELS ../custom_models/custom_sequence_int32"
   else
-    DTYPE=$(get_datatype $BACKEND)
-    MODELS="$MODELS $DATADIR/qa_sequence_model_repository/${BACKEND}_nobatch_sequence_${DTYPE}"
+    DTYPES=$(get_datatype $BACKEND)
+    for DTYPE in $DTYPES; do
+      MODELS="$MODELS $DATADIR/qa_sequence_model_repository/${BACKEND}_nobatch_sequence_${DTYPE}"
+    done
 
     if [[ $BACKEND == "graphdef" ]]; then
       MODELS="$MODELS $DATADIR/qa_sequence_model_repository/graphdef_nobatch_sequence_int32"
     fi
 
     if [ "$ENSEMBLES" == "1" ]; then
+      for DTYPE in $DTYPES; do
       MODELS="$MODELS $DATADIR/qa_ensemble_model_repository/qa_sequence_model_repository/*_${BACKEND}_nobatch_sequence_${DTYPE}"
+      done
 
       if [[ $BACKEND == "graphdef" ]]; then
         MODELS="$MODELS $DATADIR/qa_ensemble_model_repository/qa_sequence_model_repository/*_graphdef_nobatch_sequence_int32"
@@ -266,11 +264,15 @@ for BACKEND in $BACKENDS; do
   if [[ $BACKEND == "custom" ]]; then
     MODELS="$MODELS ../custom_models/custom_sequence_int32"
   else
-    DTYPE=$(get_datatype $BACKEND)
-    MODELS="$MODELS $DATADIR/qa_variable_sequence_model_repository/${BACKEND}_sequence_${DTYPE}"
+    DTYPES=$(get_datatype $BACKEND)
+    for DTYPE in $DTYPES; do
+      MODELS="$MODELS $DATADIR/qa_variable_sequence_model_repository/${BACKEND}_sequence_${DTYPE}"
+    done
 
     if [ "$ENSEMBLES" == "1" ]; then
-      MODELS="$MODELS $DATADIR/qa_ensemble_model_repository/qa_variable_sequence_model_repository/*_${BACKEND}_sequence_${DTYPE}"
+      for DTYPE in $DTYPES; do
+        MODELS="$MODELS $DATADIR/qa_ensemble_model_repository/qa_variable_sequence_model_repository/*_${BACKEND}_sequence_${DTYPE}"
+        done
     fi
   fi
 done
@@ -556,63 +558,6 @@ for i in $QUEUE_DELAY_TESTS ; do
 
     unset TRITONSERVER_DELAY_SCHEDULER
     unset TRITONSERVER_BACKLOG_DELAY_SCHEDULER
-    kill_server
-
-    set +e
-    if [ "$TEST_VALGRIND" -eq 1 ]; then
-        python3 ../common/check_valgrind_log.py -f $LEAKCHECK_LOG
-        if [ $? -ne 0 ]; then
-            RET=1
-        fi
-    fi
-    set -e
-done
-
-MODEL_PATH=bool_type_sequence_models
-export NO_BATCHING=0
-export MODEL_INSTANCES=1
-export BATCHER_TYPE="FIXED"
-for i in $BOOL_TYPE_TESTS ; do
-    SERVER_ARGS="--model-repository=$MODELDIR/$MODEL_PATH ${SERVER_ARGS_EXTRA}"
-    SERVER_LOG="./$i.$MODEL_PATH.serverlog"
-
-    if [ "$TEST_VALGRIND" -eq 1 ]; then
-        LEAKCHECK_LOG="./$i.$MODEL_PATH.valgrind.log"
-        LEAKCHECK_ARGS="$LEAKCHECK_ARGS_BASE --log-file=$LEAKCHECK_LOG"
-        run_server_leakcheck
-    elif [[ "$(< /proc/sys/kernel/osrelease)" == *Microsoft ]]; then
-        # We rely on HTTP endpoint in run_server so until HTTP is
-        # implemented for win we do this hack...
-        run_server_nowait
-        sleep 15
-    else
-        run_server
-    fi
-
-    if [ "$SERVER_PID" == "0" ]; then
-        echo -e "\n***\n*** Failed to start $SERVER\n***"
-        cat $SERVER_LOG
-        exit 1
-    fi
-
-    echo "Test: $i, repository $MODEL_PATH" >>$CLIENT_LOG
-
-    set +e
-    python3 $BATCHER_TEST SequenceBatcherTest.$i >>$CLIENT_LOG 2>&1
-    if [ $? -ne 0 ]; then
-        echo -e "\n***\n*** Test $i Failed\n***" >>$CLIENT_LOG
-        echo -e "\n***\n*** Test $i Failed\n***"
-        RET=1
-    else
-        check_test_results $TEST_RESULT_FILE 1
-        if [ $? -ne 0 ]; then
-            cat $CLIENT_LOG
-            echo -e "\n***\n*** Test Result Verification Failed\n***"
-            RET=1
-        fi
-    fi
-    set -e
-
     kill_server
 
     set +e

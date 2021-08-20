@@ -73,12 +73,6 @@ elif os.environ['BATCHER_TYPE'] == "VARIABLE":
 else:
     _trials = BACKENDS.split(' ')
 
-# Tensorrt doesn't support boolean I/O, so remove 'plan' for bool type tests
-_bool_trials = ()
-for backend in BACKENDS.split(' '):
-    if (backend != "custom") and (backend != "plan"):
-        _bool_trials += (backend,)
-
 # Add ensemble to the _trials
 ENSEMBLE_PREFIXES = ["simple_", "sequence_", "fan_"]
 
@@ -123,11 +117,15 @@ class SequenceBatcherTest(su.SequenceBatcherTestUtil):
 
     def get_datatype(self, trial):
         # Get the datatype to use based on what models are available (see test.sh)
-        if ("plan" in trial) or ("savedmodel" in trial):
-            return np.float32
+        if ("plan" in trial):
+            return (np.float32,)
+        if ("custom" in trial):
+            return (np.int32,)
+        if ("savedmodel" in trial):
+            return (np.float32, np.bool)
         if ("graphdef" in trial):
-            return np.dtype(object)
-        return np.int32
+            return (np.dtype(object), np.bool)
+        return (np.int32, np.bool)
 
     def get_expected_result(self, expected_result, value, trial, flag_str=None):
         # Adjust the expected_result for models that
@@ -148,39 +146,50 @@ class SequenceBatcherTest(su.SequenceBatcherTestUtil):
         for trial in _trials:
             # Run on different protocols.
             for idx, protocol in enumerate(_protocols):
-                self.clear_deferred_exceptions()
-                try:
-                    dtype = self.get_datatype(trial)
-                    model_name = tu.get_sequence_model_name(trial, dtype)
+                dtypes = self.get_datatype(trial)
 
-                    self.check_setup(model_name)
-                    self.assertFalse(
-                        "TRITONSERVER_DELAY_SCHEDULER" in os.environ)
-                    self.assertFalse(
-                        "TRITONSERVER_BACKLOG_DELAY_SCHEDULER" in os.environ)
+                for dtype in dtypes:
+                    self.clear_deferred_exceptions()
+                    try:
+                        model_name = tu.get_sequence_model_name(trial, dtype)
+                        print("model:", model_name)
 
-                    self.check_sequence(
-                        trial,
-                        model_name,
-                        dtype,
-                        5,
-                        (4000, None),
-                        # (flag_str, value, (ls_ms, gt_ms), (pre_delay, post_delay))
-                        (("start", 1, None, None), (None, 2, None, None),
-                         (None, 3, None, None), (None, 4, None, None),
-                         (None, 5, None, None), (None, 6, None, None),
-                         (None, 7, None, None), (None, 8, None, None),
-                         ("end", 9, None, None)),
-                        self.get_expected_result(45, 9, trial, "end"),
-                        protocol,
-                        sequence_name="{}_{}".format(self._testMethodName,
-                                                     protocol))
+                        self.check_setup(model_name)
+                        self.assertFalse(
+                            "TRITONSERVER_DELAY_SCHEDULER" in os.environ)
+                        self.assertFalse("TRITONSERVER_BACKLOG_DELAY_SCHEDULER"
+                                         in os.environ)
 
-                    self.check_deferred_exception()
-                    self.check_status(model_name, {1: 9 * (idx + 1)},
-                                      9 * (idx + 1), 9 * (idx + 1))
-                except Exception as ex:
-                    self.assertTrue(False, "unexpected error {}".format(ex))
+                        self.check_sequence(
+                            trial,
+                            model_name,
+                            dtype,
+                            5,
+                            (4000, None),
+                            # (flag_str, value, (ls_ms, gt_ms), (pre_delay, post_delay))
+                            (("start", True, None, None), (None, True, None,
+                                                           None),
+                             (None, True, None, None), (None, True, None, None),
+                             (None, True, None, None), (None, True, None, None),
+                             (None, True, None, None), (None, True, None, None),
+                             ("end", False, None,
+                              None)) if dtype == np.bool else
+                            (("start", 1, None, None), (None, 2, None, None),
+                             (None, 3, None, None), (None, 4, None, None),
+                             (None, 5, None, None), (None, 6, None, None),
+                             (None, 7, None, None), (None, 8, None, None),
+                             ("end", 9, None, None)),
+                            False if dtype == np.bool else
+                            self.get_expected_result(45, 9, trial, "end"),
+                            protocol,
+                            sequence_name="{}_{}".format(
+                                self._testMethodName, protocol))
+
+                        self.check_deferred_exception()
+                        self.check_status(model_name, {1: 9 * (idx + 1)},
+                                          9 * (idx + 1), 9 * (idx + 1))
+                    except Exception as ex:
+                        self.assertTrue(False, "unexpected error {}".format(ex))
 
     def test_length1_sequence(self):
         # Send a length-1 sequence and check for correct accumulator
@@ -188,36 +197,42 @@ class SequenceBatcherTest(su.SequenceBatcherTestUtil):
         for trial in _trials:
             # Run on different protocols.
             for idx, protocol in enumerate(_protocols):
-                self.clear_deferred_exceptions()
-                try:
-                    dtype = self.get_datatype(trial)
-                    model_name = tu.get_sequence_model_name(trial, dtype)
+                dtypes = self.get_datatype(trial)
 
-                    self.check_setup(model_name)
-                    self.assertFalse(
-                        "TRITONSERVER_DELAY_SCHEDULER" in os.environ)
-                    self.assertFalse(
-                        "TRITONSERVER_BACKLOG_DELAY_SCHEDULER" in os.environ)
+                for dtype in dtypes:
+                    self.clear_deferred_exceptions()
+                    try:
+                        model_name = tu.get_sequence_model_name(trial, dtype)
 
-                    self.check_sequence(
-                        trial,
-                        model_name,
-                        dtype,
-                        99,
-                        (4000, None),
-                        # (flag_str, value, (ls_ms, gt_ms), (pre_delay, post_delay))
-                        (
-                            ("start,end", 42, None, None),),
-                        self.get_expected_result(42, 42, trial, "start,end"),
-                        protocol,
-                        sequence_name="{}_{}".format(self._testMethodName,
-                                                     protocol))
+                        self.check_setup(model_name)
+                        self.assertFalse(
+                            "TRITONSERVER_DELAY_SCHEDULER" in os.environ)
+                        self.assertFalse("TRITONSERVER_BACKLOG_DELAY_SCHEDULER"
+                                         in os.environ)
 
-                    self.check_deferred_exception()
-                    self.check_status(model_name, {1: idx + 1}, (idx + 1),
-                                      (idx + 1))
-                except Exception as ex:
-                    self.assertTrue(False, "unexpected error {}".format(ex))
+                        self.check_sequence(
+                            trial,
+                            model_name,
+                            dtype,
+                            99,
+                            (4000, None),
+                            # (flag_str, value, (ls_ms, gt_ms), (pre_delay, post_delay))
+                            (
+                                ("start,end", True, None,
+                                 None),) if dtype == np.bool else
+                            (("start,end", 42, None, None),),
+                            True
+                            if dtype == np.bool else self.get_expected_result(
+                                42, 42, trial, "start,end"),
+                            protocol,
+                            sequence_name="{}_{}".format(
+                                self._testMethodName, protocol))
+
+                        self.check_deferred_exception()
+                        self.check_status(model_name, {1: idx + 1}, (idx + 1),
+                                          (idx + 1))
+                    except Exception as ex:
+                        self.assertTrue(False, "unexpected error {}".format(ex))
 
     def test_batch_size(self):
         # Send sequence with a batch-size > 1 and check for error.
@@ -231,94 +246,107 @@ class SequenceBatcherTest(su.SequenceBatcherTestUtil):
         for trial in _trials:
             # Run on different protocols.
             for idx, protocol in enumerate(_protocols):
-                self.clear_deferred_exceptions()
-                try:
-                    dtype = self.get_datatype(trial)
-                    model_name = tu.get_sequence_model_name(trial, dtype)
+                dtypes = self.get_datatype(trial)
 
-                    self.check_setup(model_name)
-                    self.assertFalse(
-                        "TRITONSERVER_DELAY_SCHEDULER" in os.environ)
-                    self.assertFalse(
-                        "TRITONSERVER_BACKLOG_DELAY_SCHEDULER" in os.environ)
+                for dtype in dtypes:
+                    self.clear_deferred_exceptions()
+                    try:
+                        model_name = tu.get_sequence_model_name(trial, dtype)
 
-                    self.check_sequence(
-                        trial,
-                        model_name,
-                        dtype,
-                        27,
-                        (4000, None),
-                        # (flag_str, value, (ls_ms, gt_ms), (pre_delay, post_delay))
-                        (("start", 1, None, None), ("end", 9, None, None)),
-                        self.get_expected_result(10, 9, trial, "end"),
-                        protocol,
-                        batch_size=2,
-                        sequence_name="{}_{}".format(self._testMethodName,
-                                                     protocol))
+                        self.check_setup(model_name)
+                        self.assertFalse(
+                            "TRITONSERVER_DELAY_SCHEDULER" in os.environ)
+                        self.assertFalse("TRITONSERVER_BACKLOG_DELAY_SCHEDULER"
+                                         in os.environ)
 
-                    self.check_deferred_exception()
-                    self.assertTrue(False, "expected error")
-                except Exception as ex:
-                    for prefix in ENSEMBLE_PREFIXES:
-                        if model_name.startswith(prefix):
-                            base_model_name = model_name[(len(prefix)):]
-                            self.assertTrue(ex.message().startswith(
-                                str("in ensemble '{}', " +
-                                    "inference request to model '{}' must specify "
-                                    +
-                                    "batch-size 1 due to requirements of sequence "
-                                    + "batcher").format(model_name,
-                                                        base_model_name)))
-                            return
-                    self.assertTrue(ex.message().startswith(
-                        str("inference request to model '{}' must specify " +
-                            "batch-size 1 due to requirements of sequence " +
-                            "batcher").format(model_name)))
+                        self.check_sequence(
+                            trial,
+                            model_name,
+                            dtype,
+                            27,
+                            (4000, None),
+                            # (flag_str, value, (ls_ms, gt_ms), (pre_delay, post_delay))
+                            (("start", True, None, None),
+                             ("end", False, None,
+                              None)) if dtype == np.bool else
+                            (("start", 1, None, None), ("end", 9, None, None)),
+                            False if dtype == np.bool else
+                            self.get_expected_result(10, 9, trial, "end"),
+                            protocol,
+                            batch_size=2,
+                            sequence_name="{}_{}".format(
+                                self._testMethodName, protocol))
+
+                        self.check_deferred_exception()
+                        self.assertTrue(False, "expected error")
+                    except Exception as ex:
+                        for prefix in ENSEMBLE_PREFIXES:
+                            if model_name.startswith(prefix):
+                                base_model_name = model_name[(len(prefix)):]
+                                self.assertTrue(ex.message().startswith(
+                                    str("in ensemble '{}', " +
+                                        "inference request to model '{}' must specify "
+                                        +
+                                        "batch-size 1 due to requirements of sequence "
+                                        + "batcher").format(
+                                            model_name, base_model_name)))
+                                return
+                        self.assertTrue(ex.message().startswith(
+                            str("inference request to model '{}' must specify "
+                                +
+                                "batch-size 1 due to requirements of sequence "
+                                + "batcher").format(model_name)))
 
     def test_no_correlation_id(self):
         # Send sequence without correlation ID and check for error.
         for trial in _trials:
             # Run on different protocols.
             for idx, protocol in enumerate(_protocols):
-                self.clear_deferred_exceptions()
-                try:
-                    dtype = self.get_datatype(trial)
-                    model_name = tu.get_sequence_model_name(trial, dtype)
+                dtypes = self.get_datatype(trial)
+                for dtype in dtypes:
+                    self.clear_deferred_exceptions()
+                    try:
+                        model_name = tu.get_sequence_model_name(trial, dtype)
 
-                    self.check_setup(model_name)
-                    self.assertFalse(
-                        "TRITONSERVER_DELAY_SCHEDULER" in os.environ)
-                    self.assertFalse(
-                        "TRITONSERVER_BACKLOG_DELAY_SCHEDULER" in os.environ)
+                        self.check_setup(model_name)
+                        self.assertFalse(
+                            "TRITONSERVER_DELAY_SCHEDULER" in os.environ)
+                        self.assertFalse("TRITONSERVER_BACKLOG_DELAY_SCHEDULER"
+                                         in os.environ)
 
-                    self.check_sequence(
-                        trial,
-                        model_name,
-                        dtype,
-                        0,  # correlation_id = 0
-                        (4000, None),
-                        # (flag_str, value, (ls_ms, gt_ms), (pre_delay, post_delay))
-                        (("start", 1, None, None), ("end", 9, None, None)),
-                        self.get_expected_result(10, 9, trial, "end"),
-                        protocol,
-                        sequence_name="{}_{}".format(self._testMethodName,
-                                                     protocol))
+                        self.check_sequence(
+                            trial,
+                            model_name,
+                            dtype,
+                            0,  # correlation_id = 0
+                            (4000, None),
+                            # (flag_str, value, (ls_ms, gt_ms), (pre_delay, post_delay))
+                            (("start", False, None, None),
+                             ("end", False, None,
+                              None)) if dtype == np.bool else
+                            (("start", 1, None, None), ("end", 9, None, None)),
+                            False if dtype == np.bool else
+                            self.get_expected_result(10, 9, trial, "end"),
+                            protocol,
+                            sequence_name="{}_{}".format(
+                                self._testMethodName, protocol))
 
-                    self.check_deferred_exception()
-                    self.assertTrue(False, "expected error")
-                except Exception as ex:
-                    for prefix in ENSEMBLE_PREFIXES:
-                        if model_name.startswith(prefix):
-                            base_model_name = model_name[(len(prefix)):]
-                            self.assertTrue(ex.message().startswith(
-                                str("in ensemble '{}', " +
-                                    "inference request to model '{}' must specify a "
-                                    + "non-zero correlation ID").format(
-                                        model_name, base_model_name)))
-                            return
-                    self.assertTrue(ex.message().startswith(
-                        str("inference request to model '{}' must specify a " +
-                            "non-zero correlation ID").format(model_name)))
+                        self.check_deferred_exception()
+                        self.assertTrue(False, "expected error")
+                    except Exception as ex:
+                        for prefix in ENSEMBLE_PREFIXES:
+                            if model_name.startswith(prefix):
+                                base_model_name = model_name[(len(prefix)):]
+                                self.assertTrue(ex.message().startswith(
+                                    str("in ensemble '{}', " +
+                                        "inference request to model '{}' must specify a "
+                                        + "non-zero correlation ID").format(
+                                            model_name, base_model_name)))
+                                return
+                        self.assertTrue(ex.message().startswith(
+                            str("inference request to model '{}' must specify a "
+                                +
+                                "non-zero correlation ID").format(model_name)))
 
     def test_no_sequence_start(self):
         # Send sequence without start flag for never before seen
@@ -326,50 +354,56 @@ class SequenceBatcherTest(su.SequenceBatcherTestUtil):
         for trial in _trials:
             # Run on different protocols.
             for idx, protocol in enumerate(_protocols):
-                self.clear_deferred_exceptions()
-                try:
-                    dtype = self.get_datatype(trial)
-                    model_name = tu.get_sequence_model_name(trial, dtype)
+                dtypes = self.get_datatype(trial)
+                for dtype in dtypes:
+                    self.clear_deferred_exceptions()
+                    try:
+                        model_name = tu.get_sequence_model_name(trial, dtype)
 
-                    self.check_setup(model_name)
-                    self.assertFalse(
-                        "TRITONSERVER_DELAY_SCHEDULER" in os.environ)
-                    self.assertFalse(
-                        "TRITONSERVER_BACKLOG_DELAY_SCHEDULER" in os.environ)
+                        self.check_setup(model_name)
+                        self.assertFalse(
+                            "TRITONSERVER_DELAY_SCHEDULER" in os.environ)
+                        self.assertFalse("TRITONSERVER_BACKLOG_DELAY_SCHEDULER"
+                                         in os.environ)
 
-                    self.check_sequence(
-                        trial,
-                        model_name,
-                        dtype,
-                        37469245,
-                        (4000, None),
-                        # (flag_str, value, (ls_ms, gt_ms), (pre_delay, post_delay))
-                        ((None, 1, None, None), (None, 2, None, None),
-                         ("end", 3, None, None)),
-                        self.get_expected_result(6, 3, trial, "end"),
-                        protocol,
-                        sequence_name="{}_{}".format(self._testMethodName,
-                                                     protocol))
+                        self.check_sequence(
+                            trial,
+                            model_name,
+                            dtype,
+                            37469245,
+                            (4000, None),
+                            # (flag_str, value, (ls_ms, gt_ms), (pre_delay, post_delay))
+                            ((None, True, None, None), (None, True, None, None),
+                             ("end", False, None,
+                              None)) if dtype == np.bool else
+                            ((None, 1, None, None), (None, 2, None, None),
+                             ("end", 3, None, None)),
+                            False if dtype == np.bool else
+                            self.get_expected_result(6, 3, trial, "end"),
+                            protocol,
+                            sequence_name="{}_{}".format(
+                                self._testMethodName, protocol))
 
-                    self.check_deferred_exception()
-                    self.assertTrue(False, "expected error")
-                except Exception as ex:
-                    print(model_name + "-> " + ex.message())
-                    for prefix in ENSEMBLE_PREFIXES:
-                        if model_name.startswith(prefix):
-                            base_model_name = model_name[(len(prefix)):]
-                            self.assertTrue(ex.message().startswith(
-                                str("in ensemble '{}', " +
-                                    "inference request for sequence 37469245 to "
-                                    +
-                                    "model '{}' must specify the START flag on the first "
-                                    + "request of the sequence").format(
-                                        model_name, base_model_name)))
-                            return
-                    self.assertTrue(ex.message().startswith(
-                        str("inference request for sequence 37469245 to " +
-                            "model '{}' must specify the START flag on the first "
-                            + "request of the sequence").format(model_name)))
+                        self.check_deferred_exception()
+                        self.assertTrue(False, "expected error")
+                    except Exception as ex:
+                        print(model_name + "-> " + ex.message())
+                        for prefix in ENSEMBLE_PREFIXES:
+                            if model_name.startswith(prefix):
+                                base_model_name = model_name[(len(prefix)):]
+                                self.assertTrue(ex.message().startswith(
+                                    str("in ensemble '{}', " +
+                                        "inference request for sequence 37469245 to "
+                                        +
+                                        "model '{}' must specify the START flag on the first "
+                                        + "request of the sequence").format(
+                                            model_name, base_model_name)))
+                                return
+                        self.assertTrue(ex.message().startswith(
+                            str("inference request for sequence 37469245 to " +
+                                "model '{}' must specify the START flag on the first "
+                                +
+                                "request of the sequence").format(model_name)))
 
     def test_no_sequence_start2(self):
         # Send sequence without start flag after sending a valid
@@ -378,52 +412,58 @@ class SequenceBatcherTest(su.SequenceBatcherTestUtil):
         for trial in _trials:
             # Run on different protocols.
             for idx, protocol in enumerate(_protocols):
-                self.clear_deferred_exceptions()
-                try:
-                    dtype = self.get_datatype(trial)
-                    model_name = tu.get_sequence_model_name(trial, dtype)
+                dtypes = self.get_datatype(trial)
+                for dtype in dtypes:
+                    self.clear_deferred_exceptions()
+                    try:
+                        model_name = tu.get_sequence_model_name(trial, dtype)
 
-                    self.check_setup(model_name)
-                    self.assertFalse(
-                        "TRITONSERVER_DELAY_SCHEDULER" in os.environ)
-                    self.assertFalse(
-                        "TRITONSERVER_BACKLOG_DELAY_SCHEDULER" in os.environ)
+                        self.check_setup(model_name)
+                        self.assertFalse(
+                            "TRITONSERVER_DELAY_SCHEDULER" in os.environ)
+                        self.assertFalse("TRITONSERVER_BACKLOG_DELAY_SCHEDULER"
+                                         in os.environ)
 
-                    self.check_sequence(
-                        trial,
-                        model_name,
-                        dtype,
-                        3,
-                        (4000, None),
-                        # (flag_str, value, (ls_ms, gt_ms), (pre_delay, post_delay))
-                        (("start", 1, None, None), (None, 2, None, None),
-                         ("end", 3, None, None), (None, 55, None, None)),
-                        self.get_expected_result(6, 3, trial, None),
-                        protocol,
-                        sequence_name="{}_{}".format(self._testMethodName,
-                                                     protocol))
+                        self.check_sequence(
+                            trial,
+                            model_name,
+                            dtype,
+                            3,
+                            (4000, None),
+                            # (flag_str, value, (ls_ms, gt_ms), (pre_delay, post_delay))
+                            (("start", True, None, None), (None, False, None,
+                                                           None), ("end", False,
+                                                                   None, None),
+                             (None, False, None, None)) if dtype == np.bool else
+                            (("start", 1, None, None), (None, 2, None, None),
+                             ("end", 3, None, None), (None, 55, None, None)),
+                            False if dtype == np.bool else
+                            self.get_expected_result(6, 3, trial, None),
+                            protocol,
+                            sequence_name="{}_{}".format(
+                                self._testMethodName, protocol))
 
-                    self.check_status(model_name, {1: 3 * (idx + 1)},
-                                      3 * (idx + 1), 3 * (idx + 1))
-                    self.check_deferred_exception()
-                    self.assertTrue(False, "expected error")
-                except Exception as ex:
-                    for prefix in ENSEMBLE_PREFIXES:
-                        if model_name.startswith(prefix):
-                            base_model_name = model_name[(len(prefix)):]
-                            self.assertTrue(ex.message().startswith(
-                                str("in ensemble '{}', " +
-                                    "inference request for sequence 3 to model '{}' must "
-                                    +
-                                    "specify the START flag on the first request of "
-                                    + "the sequence").format(
-                                        model_name, base_model_name)))
-                            return
-                    self.assertTrue(ex.message().startswith(
-                        str("inference request for sequence 3 to model '{}' must "
-                            +
-                            "specify the START flag on the first request of " +
-                            "the sequence").format(model_name)))
+                        self.check_status(model_name, {1: 3 * (idx + 1)},
+                                          3 * (idx + 1), 3 * (idx + 1))
+                        self.check_deferred_exception()
+                        self.assertTrue(False, "expected error")
+                    except Exception as ex:
+                        for prefix in ENSEMBLE_PREFIXES:
+                            if model_name.startswith(prefix):
+                                base_model_name = model_name[(len(prefix)):]
+                                self.assertTrue(ex.message().startswith(
+                                    str("in ensemble '{}', " +
+                                        "inference request for sequence 3 to model '{}' must "
+                                        +
+                                        "specify the START flag on the first request of "
+                                        + "the sequence").format(
+                                            model_name, base_model_name)))
+                                return
+                        self.assertTrue(ex.message().startswith(
+                            str("inference request for sequence 3 to model '{}' must "
+                                +
+                                "specify the START flag on the first request of "
+                                + "the sequence").format(model_name)))
 
     def test_no_sequence_end(self):
         # Send sequence without end flag. Use same correlation ID to
@@ -432,36 +472,43 @@ class SequenceBatcherTest(su.SequenceBatcherTestUtil):
         for trial in _trials:
             # Run on different protocols.
             for idx, protocol in enumerate(_protocols):
-                self.clear_deferred_exceptions()
-                try:
-                    dtype = self.get_datatype(trial)
-                    model_name = tu.get_sequence_model_name(trial, dtype)
+                dtypes = self.get_datatype(trial)
+                for dtype in dtypes:
+                    self.clear_deferred_exceptions()
+                    try:
+                        model_name = tu.get_sequence_model_name(trial, dtype)
 
-                    self.check_setup(model_name)
-                    self.assertFalse(
-                        "TRITONSERVER_DELAY_SCHEDULER" in os.environ)
-                    self.assertFalse(
-                        "TRITONSERVER_BACKLOG_DELAY_SCHEDULER" in os.environ)
+                        self.check_setup(model_name)
+                        self.assertFalse(
+                            "TRITONSERVER_DELAY_SCHEDULER" in os.environ)
+                        self.assertFalse("TRITONSERVER_BACKLOG_DELAY_SCHEDULER"
+                                         in os.environ)
 
-                    self.check_sequence(
-                        trial,
-                        model_name,
-                        dtype,
-                        4566,
-                        (4000, None),
-                        # (flag_str, value, (ls_ms, gt_ms), (pre_delay, post_delay))
-                        (("start", 1, None, None), (None, 2, None, None),
-                         ("start", 42, None, None), ("end", 9, None, None)),
-                        self.get_expected_result(51, 9, trial, "end"),
-                        protocol,
-                        sequence_name="{}_{}".format(self._testMethodName,
-                                                     protocol))
+                        self.check_sequence(
+                            trial,
+                            model_name,
+                            dtype,
+                            4566,
+                            (4000, None),
+                            # (flag_str, value, (ls_ms, gt_ms), (pre_delay, post_delay))
+                            (("start", True, None,
+                              None), (None, True, None, None), ("start", False,
+                                                                None, None),
+                             ("end", False, None,
+                              None)) if dtype == np.bool else
+                            (("start", 1, None, None), (None, 2, None, None),
+                             ("start", 42, None, None), ("end", 9, None, None)),
+                            False if dtype == np.bool else
+                            self.get_expected_result(51, 9, trial, "end"),
+                            protocol,
+                            sequence_name="{}_{}".format(
+                                self._testMethodName, protocol))
 
-                    self.check_deferred_exception()
-                    self.check_status(model_name, {1: 4 * (idx + 1)},
-                                      4 * (idx + 1), 4 * (idx + 1))
-                except Exception as ex:
-                    self.assertTrue(False, "unexpected error {}".format(ex))
+                        self.check_deferred_exception()
+                        self.check_status(model_name, {1: 4 * (idx + 1)},
+                                          4 * (idx + 1), 4 * (idx + 1))
+                    except Exception as ex:
+                        self.assertTrue(False, "unexpected error {}".format(ex))
 
     def test_half_batch(self):
         # Test model instances that together are configured with
@@ -469,83 +516,102 @@ class SequenceBatcherTest(su.SequenceBatcherTestUtil):
         # parallel and make sure they get completely batched into
         # batch-size 2 inferences.
         for trial in _trials:
-            self.clear_deferred_exceptions()
-            dtype = self.get_datatype(trial)
-            precreated_shm0_handles = self.precreate_register_regions(
-                (1, 2, 3, 4), dtype, 0)
-            precreated_shm1_handles = self.precreate_register_regions(
-                (0, 9, 5, 13), dtype, 1)
-            try:
-                model_name = tu.get_sequence_model_name(trial, dtype)
-                self.check_setup(model_name)
+            dtypes = self.get_datatype(trial)
+            for dtype in dtypes:
+                self.clear_deferred_exceptions()
 
-                # Need scheduler to wait for queue to contain all
-                # inferences for both sequences.
-                self.assertTrue("TRITONSERVER_DELAY_SCHEDULER" in os.environ)
-                self.assertEqual(
-                    int(os.environ["TRITONSERVER_DELAY_SCHEDULER"]), 8)
-                self.assertTrue(
-                    "TRITONSERVER_BACKLOG_DELAY_SCHEDULER" in os.environ)
-                self.assertEqual(
-                    int(os.environ["TRITONSERVER_BACKLOG_DELAY_SCHEDULER"]), 0)
+                precreated_shm0_handles = self.precreate_register_regions(
+                    (True, True, False, False), dtype,
+                    0) if dtype == np.bool else self.precreate_register_regions(
+                        (1, 2, 3, 4), dtype, 0)
+                precreated_shm1_handles = self.precreate_register_regions(
+                    (True, True, True, False), dtype,
+                    1) if dtype == np.bool else self.precreate_register_regions(
+                        (0, 9, 5, 13), dtype, 1)
 
-                threads = []
-                threads.append(
-                    threading.Thread(
-                        target=self.check_sequence_async,
-                        args=(
-                            trial,
+                try:
+                    model_name = tu.get_sequence_model_name(trial, dtype)
+                    self.check_setup(model_name)
+
+                    # Need scheduler to wait for queue to contain all
+                    # inferences for both sequences.
+                    self.assertTrue(
+                        "TRITONSERVER_DELAY_SCHEDULER" in os.environ)
+                    self.assertEqual(
+                        int(os.environ["TRITONSERVER_DELAY_SCHEDULER"]), 8)
+                    self.assertTrue(
+                        "TRITONSERVER_BACKLOG_DELAY_SCHEDULER" in os.environ)
+                    self.assertEqual(
+                        int(os.environ["TRITONSERVER_BACKLOG_DELAY_SCHEDULER"]),
+                        0)
+
+                    threads = []
+                    threads.append(
+                        threading.Thread(
+                            target=self.check_sequence_async,
+                            args=(
+                                trial,
+                                model_name,
+                                dtype,
+                                987,
+                                (None, None),
+                                # (flag_str, value, pre_delay_ms)
+                                (("start", True, None), (None, True, None),
+                                 (None, False, None),
+                                 ("end", False, None)) if dtype == np.bool else
+                                (("start", 1, None), (None, 2, None),
+                                 (None, 3, None), ("end", 4, None)),
+                                False if dtype == np.bool else
+                                self.get_expected_result(10, 4, trial, "end"),
+                                precreated_shm0_handles),
+                            kwargs={
+                                'sequence_name':
+                                    "{}".format(self._testMethodName)
+                            }))
+                    threads.append(
+                        threading.Thread(
+                            target=self.check_sequence_async,
+                            args=(
+                                trial,
+                                model_name,
+                                dtype,
+                                988,
+                                (None, None),
+                                # (flag_str, value, pre_delay_ms)
+                                (("start", True,
+                                  None), (None, True, None), (None, True, None),
+                                 ("end", False, None)) if dtype == np.bool else
+                                (("start", 0, None), (None, 9, None),
+                                 (None, 5, None), ("end", 13, None)),
+                                False if dtype == np.bool else
+                                self.get_expected_result(27, 13, trial, "end"),
+                                precreated_shm1_handles),
+                            kwargs={
+                                'sequence_name':
+                                    "{}".format(self._testMethodName)
+                            }))
+
+                    for t in threads:
+                        t.start()
+                    for t in threads:
+                        t.join()
+                    self.check_deferred_exception()
+                    if is_ensemble(model_name):
+                        # Requests do not get batched for the ensemble model
+                        self.check_status(model_name, {1: 8}, 8, 8)
+                    else:
+                        stats_batch_size = 2 if MODEL_INSTANCES == 1 else 1
+                        exec_cnt = 4 if MODEL_INSTANCES == 1 else 8
+                        self.check_status(
                             model_name,
-                            dtype,
-                            987,
-                            (None, None),
-                            # (flag_str, value, pre_delay_ms)
-                            (("start", 1, None), (None, 2, None),
-                             (None, 3, None), ("end", 4, None)),
-                            self.get_expected_result(10, 4, trial, "end"),
-                            precreated_shm0_handles),
-                        kwargs={
-                            'sequence_name': "{}".format(self._testMethodName)
-                        }))
-                threads.append(
-                    threading.Thread(
-                        target=self.check_sequence_async,
-                        args=(
-                            trial,
-                            model_name,
-                            dtype,
-                            988,
-                            (None, None),
-                            # (flag_str, value, pre_delay_ms)
-                            (("start", 0, None), (None, 9, None),
-                             (None, 5, None), ("end", 13, None)),
-                            self.get_expected_result(27, 13, trial, "end"),
-                            precreated_shm1_handles),
-                        kwargs={
-                            'sequence_name': "{}".format(self._testMethodName)
-                        }))
-
-                for t in threads:
-                    t.start()
-                for t in threads:
-                    t.join()
-                self.check_deferred_exception()
-                if is_ensemble(model_name):
-                    # Requests do not get batched for the ensemble model
-                    self.check_status(model_name, {1: 8}, 8, 8)
-                else:
-                    stats_batch_size = 2 if MODEL_INSTANCES == 1 else 1
-                    exec_cnt = 4 if MODEL_INSTANCES == 1 else 8
-                    self.check_status(
-                        model_name,
-                        {stats_batch_size: 4 * min(2, MODEL_INSTANCES)},
-                        exec_cnt, 8)
-            except Exception as ex:
-                self.assertTrue(False, "unexpected error {}".format(ex))
-            finally:
-                if TEST_SYSTEM_SHARED_MEMORY or TEST_CUDA_SHARED_MEMORY:
-                    self.cleanup_shm_regions(precreated_shm0_handles)
-                    self.cleanup_shm_regions(precreated_shm1_handles)
+                            {stats_batch_size: 4 * min(2, MODEL_INSTANCES)},
+                            exec_cnt, 8)
+                except Exception as ex:
+                    self.assertTrue(False, "unexpected error {}".format(ex))
+                finally:
+                    if TEST_SYSTEM_SHARED_MEMORY or TEST_CUDA_SHARED_MEMORY:
+                        self.cleanup_shm_regions(precreated_shm0_handles)
+                        self.cleanup_shm_regions(precreated_shm1_handles)
 
     def test_skip_batch(self):
         # Test model instances together are configured with
@@ -553,131 +619,164 @@ class SequenceBatcherTest(su.SequenceBatcherTestUtil):
         # two sequences have shorter length so that padding must be
         # applied correctly for the longer sequences.
         for trial in _trials:
-            self.clear_deferred_exceptions()
-            dtype = self.get_datatype(trial)
-            precreated_shm0_handles = self.precreate_register_regions((1, 3),
-                                                                      dtype, 0)
-            precreated_shm1_handles = self.precreate_register_regions(
-                (11, 12, 13, 14), dtype, 1)
-            precreated_shm2_handles = self.precreate_register_regions(
-                (111, 113), dtype, 2)
-            precreated_shm3_handles = self.precreate_register_regions(
-                (1111, 1112, 1113, 1114), dtype, 3)
-            try:
-                model_name = tu.get_sequence_model_name(trial, dtype)
+            dtypes = self.get_datatype(trial)
+            for dtype in dtypes:
+                self.clear_deferred_exceptions()
 
-                self.check_setup(model_name)
+                precreated_shm0_handles = self.precreate_register_regions(
+                    (False, False), dtype,
+                    0) if dtype == np.bool else self.precreate_register_regions(
+                        (1, 3), dtype, 0)
+                precreated_shm1_handles = self.precreate_register_regions(
+                    (True, True, False, False), dtype,
+                    1) if dtype == np.bool else self.precreate_register_regions(
+                        (11, 12, 13, 14), dtype, 1)
+                precreated_shm2_handles = self.precreate_register_regions(
+                    (True, False), dtype,
+                    2) if dtype == np.bool else self.precreate_register_regions(
+                        (111, 113), dtype, 2)
+                precreated_shm3_handles = self.precreate_register_regions(
+                    (True, True, True, False), dtype,
+                    3) if dtype == np.bool else self.precreate_register_regions(
+                        (1111, 1112, 1113, 1114), dtype, 3)
 
-                # Need scheduler to wait for queue to contain all
-                # inferences for both sequences.
-                self.assertTrue("TRITONSERVER_DELAY_SCHEDULER" in os.environ)
-                self.assertEqual(
-                    int(os.environ["TRITONSERVER_DELAY_SCHEDULER"]), 12)
-                self.assertTrue(
-                    "TRITONSERVER_BACKLOG_DELAY_SCHEDULER" in os.environ)
-                self.assertEqual(
-                    int(os.environ["TRITONSERVER_BACKLOG_DELAY_SCHEDULER"]), 0)
+                try:
+                    model_name = tu.get_sequence_model_name(trial, dtype)
 
-                threads = []
-                threads.append(
-                    threading.Thread(
-                        target=self.check_sequence_async,
-                        args=(
-                            trial,
-                            model_name,
-                            dtype,
-                            1001,
-                            (None, None),
-                            # (flag_str, value, pre_delay_ms)
-                            (("start", 1, None), ("end", 3, None)),
-                            self.get_expected_result(4, 3, trial, "end"),
-                            precreated_shm0_handles),
-                        kwargs={
-                            'sequence_name': "{}".format(self._testMethodName)
-                        }))
-                threads.append(
-                    threading.Thread(
-                        target=self.check_sequence_async,
-                        args=(
-                            trial,
-                            model_name,
-                            dtype,
-                            1002,
-                            (None, None),
-                            # (flag_str, value, pre_delay_ms)
-                            (("start", 11, None), (None, 12, None),
-                             (None, 13, None), ("end", 14, None)),
-                            self.get_expected_result(50, 14, trial, "end"),
-                            precreated_shm1_handles),
-                        kwargs={
-                            'sequence_name': "{}".format(self._testMethodName)
-                        }))
-                threads.append(
-                    threading.Thread(
-                        target=self.check_sequence_async,
-                        args=(
-                            trial,
-                            model_name,
-                            dtype,
-                            1003,
-                            (None, None),
-                            # (flag_str, value, pre_delay_ms)
-                            (("start", 111, None), ("end", 113, None)),
-                            self.get_expected_result(224, 113, trial, "end"),
-                            precreated_shm2_handles),
-                        kwargs={
-                            'sequence_name': "{}".format(self._testMethodName)
-                        }))
-                threads.append(
-                    threading.Thread(
-                        target=self.check_sequence_async,
-                        args=(
-                            trial,
-                            model_name,
-                            dtype,
-                            1004,
-                            (None, None),
-                            # (flag_str, value, pre_delay_ms)
-                            (("start", 1111, None), (None, 1112, None),
-                             (None, 1113, None), ("end", 1114, None)),
-                            self.get_expected_result(4450, 1114, trial, "end"),
-                            precreated_shm3_handles),
-                        kwargs={
-                            'sequence_name': "{}".format(self._testMethodName)
-                        }))
+                    self.check_setup(model_name)
 
-                threads[1].start()
-                threads[3].start()
-                time.sleep(3)
-                threads[0].start()
-                threads[2].start()
-                for t in threads:
-                    t.join()
-                self.check_deferred_exception()
-                if is_ensemble(model_name):
-                    # Requests do not get batched for the ensemble model
-                    self.check_status(model_name, {1: 12}, 12, 12)
-                else:
-                    # Batch size is 4 for the first two inferences and
-                    # then 2 for the second two inferences. This is
-                    # because we request the longer sequences first
-                    # (threads 1 and 3) in slots 0 and 1 and so after
-                    # shorter sequences are complete there are only slots
-                    # 0 and 1 to execute.
-                    if MODEL_INSTANCES == 1:
-                        self.check_status(model_name, {2: 2, 4: 2}, 4, 12)
-                    elif MODEL_INSTANCES == 2:
-                        self.check_status(model_name, {2: 4, 1: 4}, 8, 12)
-                    elif MODEL_INSTANCES == 4:
+                    # Need scheduler to wait for queue to contain all
+                    # inferences for both sequences.
+                    self.assertTrue(
+                        "TRITONSERVER_DELAY_SCHEDULER" in os.environ)
+                    self.assertEqual(
+                        int(os.environ["TRITONSERVER_DELAY_SCHEDULER"]), 12)
+                    self.assertTrue(
+                        "TRITONSERVER_BACKLOG_DELAY_SCHEDULER" in os.environ)
+                    self.assertEqual(
+                        int(os.environ["TRITONSERVER_BACKLOG_DELAY_SCHEDULER"]),
+                        0)
+
+                    threads = []
+                    threads.append(
+                        threading.Thread(
+                            target=self.check_sequence_async,
+                            args=(
+                                trial,
+                                model_name,
+                                dtype,
+                                1001,
+                                (None, None),
+                                # (flag_str, value, pre_delay_ms)
+                                (("start", False, None),
+                                 ("end", False, None)) if dtype == np.bool else
+                                (("start", 1, None), ("end", 3, None)),
+                                False if dtype == np.bool else
+                                self.get_expected_result(4, 3, trial, "end"),
+                                precreated_shm0_handles),
+                            kwargs={
+                                'sequence_name':
+                                    "{}".format(self._testMethodName)
+                            }))
+                    threads.append(
+                        threading.Thread(
+                            target=self.check_sequence_async,
+                            args=(
+                                trial,
+                                model_name,
+                                dtype,
+                                1002,
+                                (None, None),
+                                # (flag_str, value, pre_delay_ms)
+                                (("start", True, None), (None, True, None),
+                                 (None, False, None),
+                                 ("end", False, None)) if dtype == np.bool else
+                                (("start", 11, None), (None, 12, None),
+                                 (None, 13, None), ("end", 14, None)),
+                                False if dtype == np.bool else
+                                self.get_expected_result(50, 14, trial, "end"),
+                                precreated_shm1_handles),
+                            kwargs={
+                                'sequence_name':
+                                    "{}".format(self._testMethodName)
+                            }))
+                    threads.append(
+                        threading.Thread(
+                            target=self.check_sequence_async,
+                            args=(
+                                trial,
+                                model_name,
+                                dtype,
+                                1003,
+                                (None, None),
+                                # (flag_str, value, pre_delay_ms)
+                                (("start", True, None),
+                                 ("end", False, None)) if dtype == np.bool else
+                                (("start", 111, None), ("end", 113, None)),
+                                False if dtype == np.bool else
+                                self.get_expected_result(
+                                    224, 113, trial, "end"),
+                                precreated_shm2_handles),
+                            kwargs={
+                                'sequence_name':
+                                    "{}".format(self._testMethodName)
+                            }))
+                    threads.append(
+                        threading.Thread(
+                            target=self.check_sequence_async,
+                            args=(
+                                trial,
+                                model_name,
+                                dtype,
+                                1004,
+                                (None, None),
+                                # (flag_str, value, pre_delay_ms)
+                                (("start", True,
+                                  None), (None, True, None), (None, True, None),
+                                 ("end", False, None)) if dtype == np.bool else
+                                (("start", 1111, None), (None, 1112, None),
+                                 (None, 1113, None), ("end", 1114, None)),
+                                False if dtype == np.bool else
+                                self.get_expected_result(
+                                    4450, 1114, trial, "end"),
+                                precreated_shm3_handles),
+                            kwargs={
+                                'sequence_name':
+                                    "{}".format(self._testMethodName)
+                            }))
+
+                    threads[1].start()
+                    threads[3].start()
+                    time.sleep(3)
+                    threads[0].start()
+                    threads[2].start()
+                    for t in threads:
+                        t.join()
+                    self.check_deferred_exception()
+                    if is_ensemble(model_name):
+                        # Requests do not get batched for the ensemble model
                         self.check_status(model_name, {1: 12}, 12, 12)
-            except Exception as ex:
-                self.assertTrue(False, "unexpected error {}".format(ex))
-            finally:
-                if TEST_SYSTEM_SHARED_MEMORY or TEST_CUDA_SHARED_MEMORY:
-                    self.cleanup_shm_regions(precreated_shm0_handles)
-                    self.cleanup_shm_regions(precreated_shm1_handles)
-                    self.cleanup_shm_regions(precreated_shm2_handles)
-                    self.cleanup_shm_regions(precreated_shm3_handles)
+                    else:
+                        # Batch size is 4 for the first two inferences and
+                        # then 2 for the second two inferences. This is
+                        # because we request the longer sequences first
+                        # (threads 1 and 3) in slots 0 and 1 and so after
+                        # shorter sequences are complete there are only slots
+                        # 0 and 1 to execute.
+                        if MODEL_INSTANCES == 1:
+                            self.check_status(model_name, {2: 2, 4: 2}, 4, 12)
+                        elif MODEL_INSTANCES == 2:
+                            self.check_status(model_name, {2: 4, 1: 4}, 8, 12)
+                        elif MODEL_INSTANCES == 4:
+                            self.check_status(model_name, {1: 12}, 12, 12)
+                except Exception as ex:
+                    self.assertTrue(False, "unexpected error {}".format(ex))
+                finally:
+                    if TEST_SYSTEM_SHARED_MEMORY or TEST_CUDA_SHARED_MEMORY:
+                        self.cleanup_shm_regions(precreated_shm0_handles)
+                        self.cleanup_shm_regions(precreated_shm1_handles)
+                        self.cleanup_shm_regions(precreated_shm2_handles)
+                        self.cleanup_shm_regions(precreated_shm3_handles)
 
     def test_full_batch(self):
         # Test model instances together are configured with
@@ -685,127 +784,158 @@ class SequenceBatcherTest(su.SequenceBatcherTestUtil):
         # parallel and make sure they get completely batched into
         # batch-size 4 inferences.
         for trial in _trials:
-            self.clear_deferred_exceptions()
-            dtype = self.get_datatype(trial)
-            precreated_shm0_handles = self.precreate_register_regions((1, 2, 3),
-                                                                      dtype, 0)
-            precreated_shm1_handles = self.precreate_register_regions(
-                (11, 12, 13), dtype, 1)
-            precreated_shm2_handles = self.precreate_register_regions(
-                (111, 112, 113), dtype, 2)
-            precreated_shm3_handles = self.precreate_register_regions(
-                (1111, 1112, 1113), dtype, 3)
-            try:
-                model_name = tu.get_sequence_model_name(trial, dtype)
+            dtypes = self.get_datatype(trial)
+            for dtype in dtypes:
+                self.clear_deferred_exceptions()
 
-                self.check_setup(model_name)
+                precreated_shm0_handles = self.precreate_register_regions(
+                    (False, False, False), dtype,
+                    0) if dtype == np.bool else self.precreate_register_regions(
+                        (1, 2, 3), dtype, 0)
+                precreated_shm1_handles = self.precreate_register_regions(
+                    (True, True, False), dtype,
+                    1) if dtype == np.bool else self.precreate_register_regions(
+                        (11, 12, 13), dtype, 1)
+                precreated_shm2_handles = self.precreate_register_regions(
+                    (False, False, False), dtype,
+                    2) if dtype == np.bool else self.precreate_register_regions(
+                        (111, 112, 113), dtype, 2)
+                precreated_shm3_handles = self.precreate_register_regions(
+                    (True, True, False), dtype,
+                    3) if dtype == np.bool else self.precreate_register_regions(
+                        (1111, 1112, 1113), dtype, 3)
 
-                # Need scheduler to wait for queue to contain all
-                # inferences for both sequences.
-                self.assertTrue("TRITONSERVER_DELAY_SCHEDULER" in os.environ)
-                self.assertEqual(
-                    int(os.environ["TRITONSERVER_DELAY_SCHEDULER"]), 12)
-                self.assertTrue(
-                    "TRITONSERVER_BACKLOG_DELAY_SCHEDULER" in os.environ)
-                self.assertEqual(
-                    int(os.environ["TRITONSERVER_BACKLOG_DELAY_SCHEDULER"]), 0)
+                try:
+                    model_name = tu.get_sequence_model_name(trial, dtype)
 
-                threads = []
-                threads.append(
-                    threading.Thread(
-                        target=self.check_sequence_async,
-                        args=(
-                            trial,
-                            model_name,
-                            dtype,
-                            1001,
-                            (None, None),
-                            # (flag_str, value, pre_delay_ms)
-                            (("start", 1, None), (None, 2, None), ("end", 3,
-                                                                   None)),
-                            self.get_expected_result(6, 3, trial, "end"),
-                            precreated_shm0_handles),
-                        kwargs={
-                            'sequence_name': "{}".format(self._testMethodName)
-                        }))
-                threads.append(
-                    threading.Thread(
-                        target=self.check_sequence_async,
-                        args=(
-                            trial,
-                            model_name,
-                            dtype,
-                            1002,
-                            (None, None),
-                            # (flag_str, value, pre_delay_ms)
-                            (("start", 11, None), (None, 12, None), ("end", 13,
-                                                                     None)),
-                            self.get_expected_result(36, 13, trial, "end"),
-                            precreated_shm1_handles),
-                        kwargs={
-                            'sequence_name': "{}".format(self._testMethodName)
-                        }))
-                threads.append(
-                    threading.Thread(
-                        target=self.check_sequence_async,
-                        args=(
-                            trial,
-                            model_name,
-                            dtype,
-                            1003,
-                            (None, None),
-                            # (flag_str, value, pre_delay_ms)
-                            (("start", 111, None), (None, 112, None),
-                             ("end", 113, None)),
-                            self.get_expected_result(336, 113, trial, "end"),
-                            precreated_shm2_handles),
-                        kwargs={
-                            'sequence_name': "{}".format(self._testMethodName)
-                        }))
-                threads.append(
-                    threading.Thread(
-                        target=self.check_sequence_async,
-                        args=(
-                            trial,
-                            model_name,
-                            dtype,
-                            1004,
-                            (None, None),
-                            # (flag_str, value, pre_delay_ms)
-                            (("start", 1111, None), (None, 1112, None),
-                             ("end", 1113, None)),
-                            self.get_expected_result(3336, 1113, trial, "end"),
-                            precreated_shm3_handles),
-                        kwargs={
-                            'sequence_name': "{}".format(self._testMethodName)
-                        }))
+                    self.check_setup(model_name)
 
-                for t in threads:
-                    t.start()
-                for t in threads:
-                    t.join()
-                self.check_deferred_exception()
-                if is_ensemble(model_name):
-                    # Requests do not get batched for the ensemble model
-                    self.check_status(model_name, {1: 12}, 12, 12)
-                else:
-                    self.check_status(model_name, {
-                        (4 / MODEL_INSTANCES): (3 * MODEL_INSTANCES)
-                    }, 3 * MODEL_INSTANCES, 12)
-            except Exception as ex:
-                self.assertTrue(False, "unexpected error {}".format(ex))
-            finally:
-                if TEST_SYSTEM_SHARED_MEMORY or TEST_CUDA_SHARED_MEMORY:
-                    self.cleanup_shm_regions(precreated_shm0_handles)
-                    self.cleanup_shm_regions(precreated_shm1_handles)
-                    self.cleanup_shm_regions(precreated_shm2_handles)
-                    self.cleanup_shm_regions(precreated_shm3_handles)
+                    # Need scheduler to wait for queue to contain all
+                    # inferences for both sequences.
+                    self.assertTrue(
+                        "TRITONSERVER_DELAY_SCHEDULER" in os.environ)
+                    self.assertEqual(
+                        int(os.environ["TRITONSERVER_DELAY_SCHEDULER"]), 12)
+                    self.assertTrue(
+                        "TRITONSERVER_BACKLOG_DELAY_SCHEDULER" in os.environ)
+                    self.assertEqual(
+                        int(os.environ["TRITONSERVER_BACKLOG_DELAY_SCHEDULER"]),
+                        0)
+
+                    threads = []
+                    threads.append(
+                        threading.Thread(
+                            target=self.check_sequence_async,
+                            args=(
+                                trial,
+                                model_name,
+                                dtype,
+                                1001,
+                                (None, None),
+                                # (flag_str, value, pre_delay_ms)
+                                (("start", False, None), (None, False, None),
+                                 ("end", False, None)) if dtype == np.bool else
+                                (("start", 1, None), (None, 2, None), ("end", 3,
+                                                                       None)),
+                                False if dtype == np.bool else
+                                self.get_expected_result(6, 3, trial, "end"),
+                                precreated_shm0_handles),
+                            kwargs={
+                                'sequence_name':
+                                    "{}".format(self._testMethodName)
+                            }))
+                    threads.append(
+                        threading.Thread(
+                            target=self.check_sequence_async,
+                            args=(
+                                trial,
+                                model_name,
+                                dtype,
+                                1002,
+                                (None, None),
+                                # (flag_str, value, pre_delay_ms)
+                                (("start", False, None), (None, False, None),
+                                 ("end", False, None)) if dtype == np.bool else
+                                (("start", 11, None), (None, 12, None),
+                                 ("end", 13, None)),
+                                False if dtype == np.bool else
+                                self.get_expected_result(36, 13, trial, "end"),
+                                precreated_shm1_handles),
+                            kwargs={
+                                'sequence_name':
+                                    "{}".format(self._testMethodName)
+                            }))
+                    threads.append(
+                        threading.Thread(
+                            target=self.check_sequence_async,
+                            args=(
+                                trial,
+                                model_name,
+                                dtype,
+                                1003,
+                                (None, None),
+                                # (flag_str, value, pre_delay_ms)
+                                (("start", False, None), (None, False, None),
+                                 ("end", False, None)) if dtype == np.bool else
+                                (("start", 111, None), (None, 112, None),
+                                 ("end", 113, None)),
+                                False if dtype == np.bool else
+                                self.get_expected_result(
+                                    336, 113, trial, "end"),
+                                precreated_shm2_handles),
+                            kwargs={
+                                'sequence_name':
+                                    "{}".format(self._testMethodName)
+                            }))
+                    threads.append(
+                        threading.Thread(
+                            target=self.check_sequence_async,
+                            args=(
+                                trial,
+                                model_name,
+                                dtype,
+                                1004,
+                                (None, None),
+                                # (flag_str, value, pre_delay_ms)
+                                (("start", False, None), (None, False, None),
+                                 ("end", False, None)) if dtype == np.bool else
+                                (("start", 1111, None), (None, 1112, None),
+                                 ("end", 1113, None)),
+                                False if dtype == np.bool else
+                                self.get_expected_result(
+                                    3336, 1113, trial, "end"),
+                                precreated_shm3_handles),
+                            kwargs={
+                                'sequence_name':
+                                    "{}".format(self._testMethodName)
+                            }))
+
+                    for t in threads:
+                        t.start()
+                    for t in threads:
+                        t.join()
+                    self.check_deferred_exception()
+                    if is_ensemble(model_name):
+                        # Requests do not get batched for the ensemble model
+                        self.check_status(model_name, {1: 12}, 12, 12)
+                    else:
+                        self.check_status(model_name, {
+                            (4 / MODEL_INSTANCES): (3 * MODEL_INSTANCES)
+                        }, 3 * MODEL_INSTANCES, 12)
+                except Exception as ex:
+                    self.assertTrue(False, "unexpected error {}".format(ex))
+                finally:
+                    if TEST_SYSTEM_SHARED_MEMORY or TEST_CUDA_SHARED_MEMORY:
+                        self.cleanup_shm_regions(precreated_shm0_handles)
+                        self.cleanup_shm_regions(precreated_shm1_handles)
+                        self.cleanup_shm_regions(precreated_shm2_handles)
+                        self.cleanup_shm_regions(precreated_shm3_handles)
 
     def test_ragged_batch(self):
         # Test model instances that together are configured with
         # total-batch-size 4. The sequences use the different size
         # inputs and the inputs are *not* marked as allowing ragged
-        # batch.  Send four equal-length sequences in parallel and
+        # batch. Send four equal-length sequences in parallel and
         # make sure they don't get batched.
 
         # Only works with 1 model instance since want to test all
@@ -814,127 +944,159 @@ class SequenceBatcherTest(su.SequenceBatcherTestUtil):
             return
 
         for trial in _ragged_batch_not_supported_trials:
-            self.clear_deferred_exceptions()
-            dtype = self.get_datatype(trial)
-            precreated_shm0_handles = self.precreate_register_regions(
-                (1, 2, 3), dtype, 0, tensor_shape=(2,))
-            precreated_shm1_handles = self.precreate_register_regions(
-                (11, 12, 13), dtype, 1, tensor_shape=(2,))
-            precreated_shm2_handles = self.precreate_register_regions(
-                (111, 112, 113), dtype, 2, tensor_shape=(1,))
-            precreated_shm3_handles = self.precreate_register_regions(
-                (1111, 1112, 1113), dtype, 3, tensor_shape=(3,))
-            try:
-                model_name = tu.get_sequence_model_name(trial, dtype)
+            dtypes = self.get_datatype(trial)
+            for dtype in dtypes:
+                self.clear_deferred_exceptions()
 
-                self.check_setup(model_name)
+                precreated_shm0_handles = self.precreate_register_regions(
+                    (False, False, False), dtype, 0, tensor_shape=(2,)
+                ) if dtype == np.bool else self.precreate_register_regions(
+                    (1, 2, 3), dtype, 0, tensor_shape=(2,))
+                precreated_shm1_handles = self.precreate_register_regions(
+                    (True, True, False), dtype, 1, tensor_shape=(2,)
+                ) if dtype == np.bool else self.precreate_register_regions(
+                    (11, 12, 13), dtype, 1, tensor_shape=(2,))
+                precreated_shm2_handles = self.precreate_register_regions(
+                    (False, False, False), dtype, 2, tensor_shape=(1,)
+                ) if dtype == np.bool else self.precreate_register_regions(
+                    (111, 112, 113), dtype, 2, tensor_shape=(1,))
+                precreated_shm3_handles = self.precreate_register_regions(
+                    (True, True, False), dtype, 3, tensor_shape=(3,)
+                ) if dtype == np.bool else self.precreate_register_regions(
+                    (1111, 1112, 1113), dtype, 3, tensor_shape=(3,))
 
-                # Need scheduler to wait for queue to contain all
-                # inferences for both sequences.
-                self.assertTrue("TRITONSERVER_DELAY_SCHEDULER" in os.environ)
-                self.assertEqual(
-                    int(os.environ["TRITONSERVER_DELAY_SCHEDULER"]), 12)
-                self.assertTrue(
-                    "TRITONSERVER_BACKLOG_DELAY_SCHEDULER" in os.environ)
-                self.assertEqual(
-                    int(os.environ["TRITONSERVER_BACKLOG_DELAY_SCHEDULER"]), 0)
+                try:
+                    model_name = tu.get_sequence_model_name(trial, dtype)
 
-                threads = []
-                threads.append(
-                    threading.Thread(
-                        target=self.check_sequence_async,
-                        args=(
-                            trial,
-                            model_name,
-                            dtype,
-                            1001,
-                            (None, None),
-                            # (flag_str, value, pre_delay_ms)
-                            (("start", 1, None), (None, 2, None), ("end", 3,
-                                                                   None)),
-                            self.get_expected_result(6 * 2, 3, trial, "end"),
-                            precreated_shm0_handles),
-                        kwargs={
-                            'sequence_name': "{}".format(self._testMethodName),
-                            'tensor_shape': (2,)
-                        }))
-                threads.append(
-                    threading.Thread(
-                        target=self.check_sequence_async,
-                        args=(
-                            trial,
-                            model_name,
-                            dtype,
-                            1002,
-                            (None, None),
-                            # (flag_str, value, pre_delay_ms)
-                            (("start", 11, None), (None, 12, None), ("end", 13,
-                                                                     None)),
-                            self.get_expected_result(36 * 2, 13, trial, "end"),
-                            precreated_shm1_handles),
-                        kwargs={
-                            'sequence_name': "{}".format(self._testMethodName),
-                            'tensor_shape': (2,)
-                        }))
-                threads.append(
-                    threading.Thread(
-                        target=self.check_sequence_async,
-                        args=(
-                            trial,
-                            model_name,
-                            dtype,
-                            1003,
-                            (None, None),
-                            # (flag_str, value, pre_delay_ms)
-                            (("start", 111, None), (None, 112, None),
-                             ("end", 113, None)),
-                            self.get_expected_result(336, 113, trial, "end"),
-                            precreated_shm2_handles),
-                        kwargs={
-                            'sequence_name': "{}".format(self._testMethodName),
-                            'tensor_shape': (1,)
-                        }))
-                threads.append(
-                    threading.Thread(
-                        target=self.check_sequence_async,
-                        args=(
-                            trial,
-                            model_name,
-                            dtype,
-                            1004,
-                            (None, None),
-                            # (flag_str, value, pre_delay_ms)
-                            (("start", 1111, None), (None, 1112, None),
-                             ("end", 1113, None)),
-                            self.get_expected_result(3336 * 3, 1113, trial,
-                                                     "end"),
-                            precreated_shm3_handles),
-                        kwargs={
-                            'sequence_name': "{}".format(self._testMethodName),
-                            'tensor_shape': (3,)
-                        }))
+                    self.check_setup(model_name)
 
-                threads[0].start()
-                threads[1].start()
-                threads[2].start()
-                time.sleep(3)
-                threads[3].start()
-                for t in threads:
-                    t.join()
-                self.check_deferred_exception()
-                if is_ensemble(model_name):
-                    # Requests do not get batched for the ensemble model
-                    self.check_status(model_name, {1: 12}, 12, 12)
-                else:
-                    self.check_status(model_name, {4: 9}, 9, 12)
-            except Exception as ex:
-                self.assertTrue(False, "unexpected error {}".format(ex))
-            finally:
-                if TEST_SYSTEM_SHARED_MEMORY or TEST_CUDA_SHARED_MEMORY:
-                    self.cleanup_shm_regions(precreated_shm0_handles)
-                    self.cleanup_shm_regions(precreated_shm1_handles)
-                    self.cleanup_shm_regions(precreated_shm2_handles)
-                    self.cleanup_shm_regions(precreated_shm3_handles)
+                    # Need scheduler to wait for queue to contain all
+                    # inferences for both sequences.
+                    self.assertTrue(
+                        "TRITONSERVER_DELAY_SCHEDULER" in os.environ)
+                    self.assertEqual(
+                        int(os.environ["TRITONSERVER_DELAY_SCHEDULER"]), 12)
+                    self.assertTrue(
+                        "TRITONSERVER_BACKLOG_DELAY_SCHEDULER" in os.environ)
+                    self.assertEqual(
+                        int(os.environ["TRITONSERVER_BACKLOG_DELAY_SCHEDULER"]),
+                        0)
+
+                    threads = []
+                    threads.append(
+                        threading.Thread(
+                            target=self.check_sequence_async,
+                            args=(
+                                trial,
+                                model_name,
+                                dtype,
+                                1001,
+                                (None, None),
+                                # (flag_str, value, pre_delay_ms)
+                                (("start", False, None), (None, False, None),
+                                 ("end", False, None)) if dtype == np.bool else
+                                (("start", 1, None), (None, 2, None), ("end", 3,
+                                                                       None)),
+                                False if dtype == np.bool else
+                                self.get_expected_result(
+                                    6 * 2, 3, trial, "end"),
+                                precreated_shm0_handles),
+                            kwargs={
+                                'sequence_name':
+                                    "{}".format(self._testMethodName),
+                                'tensor_shape': (2,)
+                            }))
+                    threads.append(
+                        threading.Thread(
+                            target=self.check_sequence_async,
+                            args=(
+                                trial,
+                                model_name,
+                                dtype,
+                                1002,
+                                (None, None),
+                                # (flag_str, value, pre_delay_ms)
+                                (("start", True, None), (None, True, None),
+                                 ("end", False, None)) if dtype == np.bool else
+                                (("start", 11, None), (None, 12, None),
+                                 ("end", 13, None)),
+                                False if dtype == np.bool else
+                                self.get_expected_result(
+                                    36 * 2, 13, trial, "end"),
+                                precreated_shm1_handles),
+                            kwargs={
+                                'sequence_name':
+                                    "{}".format(self._testMethodName),
+                                'tensor_shape': (2,)
+                            }))
+                    threads.append(
+                        threading.Thread(
+                            target=self.check_sequence_async,
+                            args=(
+                                trial,
+                                model_name,
+                                dtype,
+                                1003,
+                                (None, None),
+                                # (flag_str, value, pre_delay_ms)
+                                (("start", False, None), (None, False, None),
+                                 ("end", False, None)) if dtype == np.bool else
+                                (("start", 111, None), (None, 112, None),
+                                 ("end", 113, None)),
+                                False if dtype == np.bool else
+                                self.get_expected_result(
+                                    336, 113, trial, "end"),
+                                precreated_shm2_handles),
+                            kwargs={
+                                'sequence_name':
+                                    "{}".format(self._testMethodName),
+                                'tensor_shape': (1,)
+                            }))
+                    threads.append(
+                        threading.Thread(
+                            target=self.check_sequence_async,
+                            args=(
+                                trial,
+                                model_name,
+                                dtype,
+                                1004,
+                                (None, None),
+                                # (flag_str, value, pre_delay_ms)
+                                (("start", True, None), (None, True, None),
+                                 ("end", False, None)) if dtype == np.bool else
+                                (("start", 1111, None), (None, 1112, None),
+                                 ("end", 1113, None)),
+                                False if dtype == np.bool else
+                                self.get_expected_result(
+                                    3336 * 3, 1113, trial, "end"),
+                                precreated_shm3_handles),
+                            kwargs={
+                                'sequence_name':
+                                    "{}".format(self._testMethodName),
+                                'tensor_shape': (3,)
+                            }))
+
+                    threads[0].start()
+                    threads[1].start()
+                    threads[2].start()
+                    time.sleep(3)
+                    threads[3].start()
+                    for t in threads:
+                        t.join()
+                    self.check_deferred_exception()
+                    if is_ensemble(model_name):
+                        # Requests do not get batched for the ensemble model
+                        self.check_status(model_name, {1: 12}, 12, 12)
+                    else:
+                        self.check_status(model_name, {4: 9}, 9, 12)
+                except Exception as ex:
+                    self.assertTrue(False, "unexpected error {}".format(ex))
+                finally:
+                    if TEST_SYSTEM_SHARED_MEMORY or TEST_CUDA_SHARED_MEMORY:
+                        self.cleanup_shm_regions(precreated_shm0_handles)
+                        self.cleanup_shm_regions(precreated_shm1_handles)
+                        self.cleanup_shm_regions(precreated_shm2_handles)
+                        self.cleanup_shm_regions(precreated_shm3_handles)
 
     def test_ragged_batch_allowed(self):
         # Test model instances that together are configured with
@@ -949,124 +1111,155 @@ class SequenceBatcherTest(su.SequenceBatcherTestUtil):
             return
 
         for trial in _ragged_batch_supported_trials:
-            self.clear_deferred_exceptions()
-            dtype = self.get_datatype(trial)
-            precreated_shm0_handles = self.precreate_register_regions(
-                (1, 2, 3), dtype, 0, tensor_shape=(2,))
-            precreated_shm1_handles = self.precreate_register_regions(
-                (11, 12, 13), dtype, 1, tensor_shape=(2,))
-            precreated_shm2_handles = self.precreate_register_regions(
-                (111, 112, 113), dtype, 2, tensor_shape=(1,))
-            precreated_shm3_handles = self.precreate_register_regions(
-                (1111, 1112, 1113), dtype, 3, tensor_shape=(3,))
-            try:
-                model_name = tu.get_sequence_model_name(trial, dtype)
+            dtypes = self.get_datatype(trial)
+            for dtype in dtypes:
+                self.clear_deferred_exceptions()
 
-                self.check_setup(model_name)
+                precreated_shm0_handles = self.precreate_register_regions(
+                    (False, False, False), dtype, 0, tensor_shape=(2,)
+                ) if dtype == np.bool else self.precreate_register_regions(
+                    (1, 2, 3), dtype, 0, tensor_shape=(2,))
+                precreated_shm1_handles = self.precreate_register_regions(
+                    (False, True, False), dtype, 1, tensor_shape=(2,)
+                ) if dtype == np.bool else self.precreate_register_regions(
+                    (11, 12, 13), dtype, 1, tensor_shape=(2,))
+                precreated_shm2_handles = elf.precreate_register_regions(
+                    (True, False, True), dtype, 2, tensor_shape=(1,)
+                ) if dtype == np.bool else self.precreate_register_regions(
+                    (111, 112, 113), dtype, 2, tensor_shape=(1,))
+                precreated_shm3_handles = self.precreate_register_regions(
+                    (True, True, False), dtype, 3, tensor_shape=(3,)
+                ) if dtype == np.bool else self.precreate_register_regions(
+                    (1111, 1112, 1113), dtype, 3, tensor_shape=(3,))
+                try:
+                    model_name = tu.get_sequence_model_name(trial, dtype)
 
-                # Need scheduler to wait for queue to contain all
-                # inferences for both sequences.
-                self.assertTrue("TRITONSERVER_DELAY_SCHEDULER" in os.environ)
-                self.assertEqual(
-                    int(os.environ["TRITONSERVER_DELAY_SCHEDULER"]), 12)
-                self.assertTrue(
-                    "TRITONSERVER_BACKLOG_DELAY_SCHEDULER" in os.environ)
-                self.assertEqual(
-                    int(os.environ["TRITONSERVER_BACKLOG_DELAY_SCHEDULER"]), 0)
+                    self.check_setup(model_name)
 
-                threads = []
-                threads.append(
-                    threading.Thread(
-                        target=self.check_sequence_async,
-                        args=(
-                            trial,
-                            model_name,
-                            dtype,
-                            1001,
-                            (None, None),
-                            # (flag_str, value, pre_delay_ms)
-                            (("start", 1, None), (None, 2, None), ("end", 3,
-                                                                   None)),
-                            self.get_expected_result(6 * 2, 3, trial, "end"),
-                            precreated_shm0_handles),
-                        kwargs={
-                            'sequence_name': "{}".format(self._testMethodName),
-                            'tensor_shape': (2,)
-                        }))
-                threads.append(
-                    threading.Thread(
-                        target=self.check_sequence_async,
-                        args=(
-                            trial,
-                            model_name,
-                            dtype,
-                            1002,
-                            (None, None),
-                            # (flag_str, value, pre_delay_ms)
-                            (("start", 11, None), (None, 12, None), ("end", 13,
-                                                                     None)),
-                            self.get_expected_result(36 * 2, 13, trial, "end"),
-                            precreated_shm1_handles),
-                        kwargs={
-                            'sequence_name': "{}".format(self._testMethodName),
-                            'tensor_shape': (2,)
-                        }))
-                threads.append(
-                    threading.Thread(
-                        target=self.check_sequence_async,
-                        args=(
-                            trial,
-                            model_name,
-                            dtype,
-                            1003,
-                            (None, None),
-                            # (flag_str, value, pre_delay_ms)
-                            (("start", 111, None), (None, 112, None),
-                             ("end", 113, None)),
-                            self.get_expected_result(336, 113, trial, "end"),
-                            precreated_shm2_handles),
-                        kwargs={
-                            'sequence_name': "{}".format(self._testMethodName),
-                            'tensor_shape': (1,)
-                        }))
-                threads.append(
-                    threading.Thread(
-                        target=self.check_sequence_async,
-                        args=(
-                            trial,
-                            model_name,
-                            dtype,
-                            1004,
-                            (None, None),
-                            # (flag_str, value, pre_delay_ms)
-                            (("start", 1111, None), (None, 1112, None),
-                             ("end", 1113, None)),
-                            self.get_expected_result(3336 * 3, 1113, trial,
-                                                     "end"),
-                            precreated_shm3_handles),
-                        kwargs={
-                            'sequence_name': "{}".format(self._testMethodName),
-                            'tensor_shape': (3,)
-                        }))
+                    # Need scheduler to wait for queue to contain all
+                    # inferences for both sequences.
+                    self.assertTrue(
+                        "TRITONSERVER_DELAY_SCHEDULER" in os.environ)
+                    self.assertEqual(
+                        int(os.environ["TRITONSERVER_DELAY_SCHEDULER"]), 12)
+                    self.assertTrue(
+                        "TRITONSERVER_BACKLOG_DELAY_SCHEDULER" in os.environ)
+                    self.assertEqual(
+                        int(os.environ["TRITONSERVER_BACKLOG_DELAY_SCHEDULER"]),
+                        0)
 
-                for t in threads:
-                    t.start()
-                for t in threads:
-                    t.join()
-                self.check_deferred_exception()
-                if is_ensemble(model_name):
-                    # Requests do not get batched for the ensemble model
-                    self.check_status(model_name, {1: 12}, 12, 12)
-                else:
-                    self.check_status(model_name, {4: 3}, 3, 12)
-            except Exception as ex:
-                self.assertTrue(False, "unexpected error {}".format(ex))
-            finally:
-                if TEST_SYSTEM_SHARED_MEMORY or TEST_CUDA_SHARED_MEMORY:
-                    self.cleanup_shm_regions(precreated_shm0_handles)
-                    self.cleanup_shm_regions(precreated_shm1_handles)
-                    self.cleanup_shm_regions(precreated_shm2_handles)
-                    self.cleanup_shm_regions(precreated_shm3_handles)
+                    threads = []
+                    threads.append(
+                        threading.Thread(
+                            target=self.check_sequence_async,
+                            args=(
+                                trial,
+                                model_name,
+                                dtype,
+                                1001,
+                                (None, None),
+                                # (flag_str, value, pre_delay_ms)
+                                (("start", False, None), (None, False, None),
+                                 ("end", False, None)) if dtype == np.bool else
+                                (("start", 1, None), (None, 2, None), ("end", 3,
+                                                                       None)),
+                                False if dtype == np.bool else
+                                self.get_expected_result(
+                                    6 * 2, 3, trial, "end"),
+                                precreated_shm0_handles),
+                            kwargs={
+                                'sequence_name':
+                                    "{}".format(self._testMethodName),
+                                'tensor_shape': (2,)
+                            }))
+                    threads.append(
+                        threading.Thread(
+                            target=self.check_sequence_async,
+                            args=(
+                                trial,
+                                model_name,
+                                dtype,
+                                1002,
+                                (None, None),
+                                # (flag_str, value, pre_delay_ms)
+                                (("start", False, None), (None, True, None),
+                                 ("end", False, None)) if dtype == np.bool else
+                                (("start", 11, None), (None, 12, None),
+                                 ("end", 13, None)),
+                                False if dtype == np.bool else
+                                self.get_expected_result(
+                                    36 * 2, 13, trial, "end"),
+                                precreated_shm1_handles),
+                            kwargs={
+                                'sequence_name':
+                                    "{}".format(self._testMethodName),
+                                'tensor_shape': (2,)
+                            }))
+                    threads.append(
+                        threading.Thread(
+                            target=self.check_sequence_async,
+                            args=(
+                                trial,
+                                model_name,
+                                dtype,
+                                1003,
+                                (None, None),
+                                # (flag_str, value, pre_delay_ms)
+                                (("start", True, None), (None, False, None),
+                                 ("end", True, None)) if dtype == np.bool else
+                                (("start", 111, None), (None, 112, None),
+                                 ("end", 113, None)),
+                                False if dtype == np.bool else
+                                self.get_expected_result(
+                                    336, 113, trial, "end"),
+                                precreated_shm2_handles),
+                            kwargs={
+                                'sequence_name':
+                                    "{}".format(self._testMethodName),
+                                'tensor_shape': (1,)
+                            }))
+                    threads.append(
+                        threading.Thread(
+                            target=self.check_sequence_async,
+                            args=(
+                                trial,
+                                model_name,
+                                dtype,
+                                1004,
+                                (None, None),
+                                # (flag_str, value, pre_delay_ms)
+                                (("start", True, None), (None, True, None),
+                                 ("end", False, None)) if dtype == np.bool else
+                                (("start", 1111, None), (None, 1112, None),
+                                 ("end", 1113, None)),
+                                False if dtype == np.bool else
+                                self.get_expected_result(
+                                    3336 * 3, 1113, trial, "end"),
+                                precreated_shm3_handles),
+                            kwargs={
+                                'sequence_name':
+                                    "{}".format(self._testMethodName),
+                                'tensor_shape': (3,)
+                            }))
+
+                    for t in threads:
+                        t.start()
+                    for t in threads:
+                        t.join()
+                    self.check_deferred_exception()
+                    if is_ensemble(model_name):
+                        # Requests do not get batched for the ensemble model
+                        self.check_status(model_name, {1: 12}, 12, 12)
+                    else:
+                        self.check_status(model_name, {4: 3}, 3, 12)
+                except Exception as ex:
+                    self.assertTrue(False, "unexpected error {}".format(ex))
+                finally:
+                    if TEST_SYSTEM_SHARED_MEMORY or TEST_CUDA_SHARED_MEMORY:
+                        self.cleanup_shm_regions(precreated_shm0_handles)
+                        self.cleanup_shm_regions(precreated_shm1_handles)
+                        self.cleanup_shm_regions(precreated_shm2_handles)
+                        self.cleanup_shm_regions(precreated_shm3_handles)
 
     def test_backlog(self):
         # Test model instances together are configured with
@@ -1075,145 +1268,182 @@ class SequenceBatcherTest(su.SequenceBatcherTestUtil):
         # batch-size 4 inferences plus the 5th should go in the
         # backlog and then get handled once there is a free slot.
         for trial in _trials:
-            self.clear_deferred_exceptions()
-            dtype = self.get_datatype(trial)
-            precreated_shm0_handles = self.precreate_register_regions((1, 2, 3),
-                                                                      dtype, 0)
-            precreated_shm1_handles = self.precreate_register_regions(
-                (11, 12, 13), dtype, 1)
-            precreated_shm2_handles = self.precreate_register_regions(
-                (111, 112, 113), dtype, 2)
-            precreated_shm3_handles = self.precreate_register_regions(
-                (1111, 1112, 1113), dtype, 3)
-            precreated_shm4_handles = self.precreate_register_regions(
-                (11111, 11112, 11113), dtype, 4)
-            try:
-                model_name = tu.get_sequence_model_name(trial, dtype)
+            dtypes = self.get_datatype(trial)
+            for dtype in dtypes:
+                self.clear_deferred_exceptions()
 
-                self.check_setup(model_name)
+                precreated_shm0_handles = self.precreate_register_regions(
+                    (False, False, False), dtype,
+                    0) if dtype == np.bool else self.precreate_register_regions(
+                        (1, 2, 3), dtype, 0)
+                precreated_shm1_handles = self.precreate_register_regions(
+                    (True, True, False), dtype,
+                    1) if dtype == np.bool else self.precreate_register_regions(
+                        (11, 12, 13), dtype, 1)
+                precreated_shm2_handles = self.precreate_register_regions(
+                    (False, False, False), dtype,
+                    2) if dtype == np.bool else self.precreate_register_regions(
+                        (111, 112, 113), dtype, 2)
+                precreated_shm3_handles = self.precreate_register_regions(
+                    (True, True, False), dtype,
+                    3) if dtype == np.bool else self.precreate_register_regions(
+                        (1111, 1112, 1113), dtype, 3)
+                precreated_shm4_handles = self.precreate_register_regions(
+                    (False, True, False), dtype,
+                    4) if dtype == np.bool else self.precreate_register_regions(
+                        (11111, 11112, 11113), dtype, 4)
 
-                # Need scheduler to wait for queue to contain all
-                # inferences for both sequences.
-                self.assertTrue("TRITONSERVER_DELAY_SCHEDULER" in os.environ)
-                self.assertEqual(
-                    int(os.environ["TRITONSERVER_DELAY_SCHEDULER"]), 12)
-                self.assertTrue(
-                    "TRITONSERVER_BACKLOG_DELAY_SCHEDULER" in os.environ)
-                self.assertEqual(
-                    int(os.environ["TRITONSERVER_BACKLOG_DELAY_SCHEDULER"]), 0)
+                try:
+                    model_name = tu.get_sequence_model_name(trial, dtype)
 
-                threads = []
-                threads.append(
-                    threading.Thread(
-                        target=self.check_sequence_async,
-                        args=(
-                            trial,
-                            model_name,
-                            dtype,
-                            1001,
-                            (None, None),
-                            # (flag_str, value, pre_delay_ms)
-                            (("start", 1, None), (None, 2, None), ("end", 3,
-                                                                   None)),
-                            self.get_expected_result(6, 3, trial, "end"),
-                            precreated_shm0_handles),
-                        kwargs={
-                            'sequence_name': "{}".format(self._testMethodName)
-                        }))
-                threads.append(
-                    threading.Thread(
-                        target=self.check_sequence_async,
-                        args=(
-                            trial,
-                            model_name,
-                            dtype,
-                            1002,
-                            (None, None),
-                            # (flag_str, value, pre_delay_ms)
-                            (("start", 11, None), (None, 12, None), ("end", 13,
-                                                                     None)),
-                            self.get_expected_result(36, 13, trial, "end"),
-                            precreated_shm1_handles),
-                        kwargs={
-                            'sequence_name': "{}".format(self._testMethodName)
-                        }))
-                threads.append(
-                    threading.Thread(
-                        target=self.check_sequence_async,
-                        args=(
-                            trial,
-                            model_name,
-                            dtype,
-                            1003,
-                            (None, None),
-                            # (flag_str, value, pre_delay_ms)
-                            (("start", 111, None), (None, 112, None),
-                             ("end", 113, None)),
-                            self.get_expected_result(336, 113, trial, "end"),
-                            precreated_shm2_handles),
-                        kwargs={
-                            'sequence_name': "{}".format(self._testMethodName)
-                        }))
-                threads.append(
-                    threading.Thread(
-                        target=self.check_sequence_async,
-                        args=(
-                            trial,
-                            model_name,
-                            dtype,
-                            1004,
-                            (None, None),
-                            # (flag_str, value, pre_delay_ms)
-                            (("start", 1111, None), (None, 1112, None),
-                             ("end", 1113, None)),
-                            self.get_expected_result(3336, 1113, trial, "end"),
-                            precreated_shm3_handles),
-                        kwargs={
-                            'sequence_name': "{}".format(self._testMethodName)
-                        }))
-                threads.append(
-                    threading.Thread(
-                        target=self.check_sequence_async,
-                        args=(
-                            trial,
-                            model_name,
-                            dtype,
-                            1005,
-                            (None, None),
-                            # (flag_str, value, pre_delay_ms)
-                            (("start", 11111, None), (None, 11112, None),
-                             ("end", 11113, None)),
-                            self.get_expected_result(33336, 11113, trial,
-                                                     "end"),
-                            precreated_shm4_handles),
-                        kwargs={
-                            'sequence_name': "{}".format(self._testMethodName)
-                        }))
+                    self.check_setup(model_name)
 
-                for t in threads:
-                    t.start()
-                for t in threads:
-                    t.join()
-                self.check_deferred_exception()
-                if is_ensemble(model_name):
-                    # Requests do not get batched for the ensemble model
-                    self.check_status(model_name, {1: 15}, 15, 15)
-                else:
-                    if MODEL_INSTANCES == 1:
-                        self.check_status(model_name, {4: 3, 1: 3}, 6, 15)
-                    elif MODEL_INSTANCES == 2:
-                        self.check_status(model_name, {2: 6, 1: 3}, 9, 15)
-                    else:
+                    # Need scheduler to wait for queue to contain all
+                    # inferences for both sequences.
+                    self.assertTrue(
+                        "TRITONSERVER_DELAY_SCHEDULER" in os.environ)
+                    self.assertEqual(
+                        int(os.environ["TRITONSERVER_DELAY_SCHEDULER"]), 12)
+                    self.assertTrue(
+                        "TRITONSERVER_BACKLOG_DELAY_SCHEDULER" in os.environ)
+                    self.assertEqual(
+                        int(os.environ["TRITONSERVER_BACKLOG_DELAY_SCHEDULER"]),
+                        0)
+
+                    threads = []
+                    threads.append(
+                        threading.Thread(
+                            target=self.check_sequence_async,
+                            args=(
+                                trial,
+                                model_name,
+                                dtype,
+                                1001,
+                                (None, None),
+                                # (flag_str, value, pre_delay_ms)
+                                (("start", False, None), (None, False, None),
+                                 ("end", False, None)) if dtype == np.bool else
+                                (("start", 1, None), (None, 2, None), ("end", 3,
+                                                                       None)),
+                                False if dtype == np.bool else
+                                self.get_expected_result(6, 3, trial, "end"),
+                                precreated_shm0_handles),
+                            kwargs={
+                                'sequence_name':
+                                    "{}".format(self._testMethodName)
+                            }))
+                    threads.append(
+                        threading.Thread(
+                            target=self.check_sequence_async,
+                            args=(
+                                trial,
+                                model_name,
+                                dtype,
+                                1002,
+                                (None, None),
+                                # (flag_str, value, pre_delay_ms)
+                                (("start", True, None), (None, True, None),
+                                 ("end", False, None)) if dtype == np.bool else
+                                (("start", 11, None), (None, 12, None),
+                                 ("end", 13, None)),
+                                False if dtype == np.bool else
+                                self.get_expected_result(36, 13, trial, "end"),
+                                precreated_shm1_handles),
+                            kwargs={
+                                'sequence_name':
+                                    "{}".format(self._testMethodName)
+                            }))
+                    threads.append(
+                        threading.Thread(
+                            target=self.check_sequence_async,
+                            args=(
+                                trial,
+                                model_name,
+                                dtype,
+                                1003,
+                                (None, None),
+                                # (flag_str, value, pre_delay_ms)
+                                (("start", False, None), (None, False, None),
+                                 ("end", False, None)) if dtype == np.bool else
+                                (("start", 111, None), (None, 112, None),
+                                 ("end", 113, None)),
+                                False if dtype == np.bool else
+                                self.get_expected_result(
+                                    336, 113, trial, "end"),
+                                precreated_shm2_handles),
+                            kwargs={
+                                'sequence_name':
+                                    "{}".format(self._testMethodName)
+                            }))
+                    threads.append(
+                        threading.Thread(
+                            target=self.check_sequence_async,
+                            args=(
+                                trial,
+                                model_name,
+                                dtype,
+                                1004,
+                                (None, None),
+                                # (flag_str, value, pre_delay_ms)
+                                (("start", True, None), (None, True, None),
+                                 ("end", False, None)) if dtype == np.bool else
+                                (("start", 1111, None), (None, 1112, None),
+                                 ("end", 1113, None)),
+                                False if dtype == np.bool else
+                                self.get_expected_result(
+                                    3336, 1113, trial, "end"),
+                                precreated_shm3_handles),
+                            kwargs={
+                                'sequence_name':
+                                    "{}".format(self._testMethodName)
+                            }))
+                    threads.append(
+                        threading.Thread(
+                            target=self.check_sequence_async,
+                            args=(
+                                trial,
+                                model_name,
+                                dtype,
+                                1005,
+                                (None, None),
+                                # (flag_str, value, pre_delay_ms)
+                                (("start", False, None), (None, True, None),
+                                 ("end", False, None)) if dtype == np.bool else
+                                (("start", 11111, None), (None, 11112, None),
+                                 ("end", 11113, None)),
+                                False if dtype == np.bool else
+                                self.get_expected_result(
+                                    33336, 11113, trial, "end"),
+                                precreated_shm4_handles),
+                            kwargs={
+                                'sequence_name':
+                                    "{}".format(self._testMethodName)
+                            }))
+
+                    for t in threads:
+                        t.start()
+                    for t in threads:
+                        t.join()
+                    self.check_deferred_exception()
+                    if is_ensemble(model_name):
+                        # Requests do not get batched for the ensemble model
                         self.check_status(model_name, {1: 15}, 15, 15)
-            except Exception as ex:
-                self.assertTrue(False, "unexpected error {}".format(ex))
-            finally:
-                if TEST_SYSTEM_SHARED_MEMORY or TEST_CUDA_SHARED_MEMORY:
-                    self.cleanup_shm_regions(precreated_shm0_handles)
-                    self.cleanup_shm_regions(precreated_shm1_handles)
-                    self.cleanup_shm_regions(precreated_shm2_handles)
-                    self.cleanup_shm_regions(precreated_shm3_handles)
-                    self.cleanup_shm_regions(precreated_shm4_handles)
+                    else:
+                        if MODEL_INSTANCES == 1:
+                            self.check_status(model_name, {4: 3, 1: 3}, 6, 15)
+                        elif MODEL_INSTANCES == 2:
+                            self.check_status(model_name, {2: 6, 1: 3}, 9, 15)
+                        else:
+                            self.check_status(model_name, {1: 15}, 15, 15)
+                except Exception as ex:
+                    self.assertTrue(False, "unexpected error {}".format(ex))
+                finally:
+                    if TEST_SYSTEM_SHARED_MEMORY or TEST_CUDA_SHARED_MEMORY:
+                        self.cleanup_shm_regions(precreated_shm0_handles)
+                        self.cleanup_shm_regions(precreated_shm1_handles)
+                        self.cleanup_shm_regions(precreated_shm2_handles)
+                        self.cleanup_shm_regions(precreated_shm3_handles)
+                        self.cleanup_shm_regions(precreated_shm4_handles)
 
     def test_backlog_fill(self):
         # Test model instances together are configured with
@@ -1229,164 +1459,207 @@ class SequenceBatcherTest(su.SequenceBatcherTestUtil):
             return
 
         for trial in _trials:
-            self.clear_deferred_exceptions()
-            dtype = self.get_datatype(trial)
-            precreated_shm0_handles = self.precreate_register_regions((1, 2, 3),
-                                                                      dtype, 0)
-            precreated_shm1_handles = self.precreate_register_regions((11, 13),
-                                                                      dtype, 1)
-            precreated_shm2_handles = self.precreate_register_regions(
-                (111, 113), dtype, 2)
-            precreated_shm3_handles = self.precreate_register_regions(
-                (1111, 1112, 1113), dtype, 3)
-            precreated_shm4_handles = self.precreate_register_regions((11111,),
-                                                                      dtype, 4)
-            precreated_shm5_handles = self.precreate_register_regions((22222,),
-                                                                      dtype, 5)
-            try:
-                model_name = tu.get_sequence_model_name(trial, dtype)
+            dtypes = self.get_datatype(trial)
+            for dtype in dtypes:
+                self.clear_deferred_exceptions()
 
-                self.check_setup(model_name)
+                precreated_shm0_handles = self.precreate_register_regions(
+                    (False, False, False), dtype,
+                    0) if dtype == np.bool else self.precreate_register_regions(
+                        (1, 2, 3), dtype, 0)
+                precreated_shm1_handles = self.precreate_register_regions(
+                    (False, True), dtype,
+                    1) if dtype == np.bool else self.precreate_register_regions(
+                        (11, 13), dtype, 1)
+                precreated_shm2_handles = self.precreate_register_regions(
+                    (True, False), dtype,
+                    2) if dtype == np.bool else self.precreate_register_regions(
+                        (111, 113), dtype, 2)
+                precreated_shm3_handles = self.precreate_register_regions(
+                    (False, False, True), dtype,
+                    3) if dtype == np.bool else self.precreate_register_regions(
+                        (1111, 1112, 1113), dtype, 3)
+                precreated_shm4_handles = self.precreate_register_regions(
+                    (True,), dtype,
+                    4) if dtype == np.bool else self.precreate_register_regions(
+                        (11111,), dtype, 4)
+                precreated_shm5_handles = self.precreate_register_regions(
+                    (True,), dtype,
+                    5) if dtype == np.bool else self.precreate_register_regions(
+                        (22222,), dtype, 5)
 
-                # Need scheduler to wait for queue to contain all
-                # inferences for both sequences.
-                self.assertTrue("TRITONSERVER_DELAY_SCHEDULER" in os.environ)
-                self.assertEqual(
-                    int(os.environ["TRITONSERVER_DELAY_SCHEDULER"]), 10)
-                self.assertTrue(
-                    "TRITONSERVER_BACKLOG_DELAY_SCHEDULER" in os.environ)
-                self.assertEqual(
-                    int(os.environ["TRITONSERVER_BACKLOG_DELAY_SCHEDULER"]), 2)
+                try:
+                    model_name = tu.get_sequence_model_name(trial, dtype)
 
-                threads = []
-                threads.append(
-                    threading.Thread(
-                        target=self.check_sequence_async,
-                        args=(
-                            trial,
-                            model_name,
-                            dtype,
-                            1001,
-                            (None, None),
-                            # (flag_str, value, pre_delay_ms)
-                            (("start", 1, None), (None, 2, None), ("end", 3,
-                                                                   None)),
-                            self.get_expected_result(6, 3, trial, "end"),
-                            precreated_shm0_handles),
-                        kwargs={
-                            'sequence_name': "{}".format(self._testMethodName)
-                        }))
-                threads.append(
-                    threading.Thread(
-                        target=self.check_sequence_async,
-                        args=(
-                            trial,
-                            model_name,
-                            dtype,
-                            1002,
-                            (None, None),
-                            # (flag_str, value, pre_delay_ms)
-                            (("start", 11, None), ("end", 13, None)),
-                            self.get_expected_result(24, 13, trial, "end"),
-                            precreated_shm1_handles),
-                        kwargs={
-                            'sequence_name': "{}".format(self._testMethodName)
-                        }))
-                threads.append(
-                    threading.Thread(
-                        target=self.check_sequence_async,
-                        args=(
-                            trial,
-                            model_name,
-                            dtype,
-                            1003,
-                            (None, None),
-                            # (flag_str, value, pre_delay_ms)
-                            (("start", 111, None), ("end", 113, None)),
-                            self.get_expected_result(224, 113, trial, "end"),
-                            precreated_shm2_handles),
-                        kwargs={
-                            'sequence_name': "{}".format(self._testMethodName)
-                        }))
-                threads.append(
-                    threading.Thread(
-                        target=self.check_sequence_async,
-                        args=(
-                            trial,
-                            model_name,
-                            dtype,
-                            1004,
-                            (None, None),
-                            # (flag_str, value, pre_delay_ms)
-                            (("start", 1111, None), (None, 1112, None),
-                             ("end", 1113, None)),
-                            self.get_expected_result(3336, 1113, trial, "end"),
-                            precreated_shm3_handles),
-                        kwargs={
-                            'sequence_name': "{}".format(self._testMethodName)
-                        }))
-                threads.append(
-                    threading.Thread(
-                        target=self.check_sequence_async,
-                        args=(
-                            trial,
-                            model_name,
-                            dtype,
-                            1005,
-                            (None, None),
-                            # (flag_str, value, pre_delay_ms)
-                            (
-                                ("start,end", 11111, None),),
-                            self.get_expected_result(11111, 11111, trial,
-                                                     "start,end"),
-                            precreated_shm4_handles),
-                        kwargs={
-                            'sequence_name': "{}".format(self._testMethodName)
-                        }))
-                threads.append(
-                    threading.Thread(
-                        target=self.check_sequence_async,
-                        args=(
-                            trial,
-                            model_name,
-                            dtype,
-                            1006,
-                            (None, None),
-                            # (flag_str, value, pre_delay_ms)
-                            (
-                                ("start,end", 22222, None),),
-                            self.get_expected_result(22222, 22222, trial,
-                                                     "start,end"),
-                            precreated_shm5_handles),
-                        kwargs={
-                            'sequence_name': "{}".format(self._testMethodName)
-                        }))
+                    self.check_setup(model_name)
 
-                threads[0].start()
-                threads[1].start()
-                threads[2].start()
-                threads[3].start()
-                time.sleep(3)
-                threads[4].start()
-                threads[5].start()
-                for t in threads:
-                    t.join()
-                self.check_deferred_exception()
-                if is_ensemble(model_name):
-                    # Requests do not get batched for the ensemble model
-                    self.check_status(model_name, {1: 12}, 12, 12)
-                else:
-                    self.check_status(model_name, {4: 3}, 3, 12)
-            except Exception as ex:
-                self.assertTrue(False, "unexpected error {}".format(ex))
-            finally:
-                if TEST_SYSTEM_SHARED_MEMORY or TEST_CUDA_SHARED_MEMORY:
-                    self.cleanup_shm_regions(precreated_shm0_handles)
-                    self.cleanup_shm_regions(precreated_shm1_handles)
-                    self.cleanup_shm_regions(precreated_shm2_handles)
-                    self.cleanup_shm_regions(precreated_shm3_handles)
-                    self.cleanup_shm_regions(precreated_shm4_handles)
-                    self.cleanup_shm_regions(precreated_shm5_handles)
+                    # Need scheduler to wait for queue to contain all
+                    # inferences for both sequences.
+                    self.assertTrue(
+                        "TRITONSERVER_DELAY_SCHEDULER" in os.environ)
+                    self.assertEqual(
+                        int(os.environ["TRITONSERVER_DELAY_SCHEDULER"]), 10)
+                    self.assertTrue(
+                        "TRITONSERVER_BACKLOG_DELAY_SCHEDULER" in os.environ)
+                    self.assertEqual(
+                        int(os.environ["TRITONSERVER_BACKLOG_DELAY_SCHEDULER"]),
+                        2)
+
+                    threads = []
+                    threads.append(
+                        threading.Thread(
+                            target=self.check_sequence_async,
+                            args=(
+                                trial,
+                                model_name,
+                                dtype,
+                                1001,
+                                (None, None),
+                                # (flag_str, value, pre_delay_ms)
+                                (("start", False, None), (None, False, None),
+                                 ("end", False, None)) if dtype == np.bool else
+                                (("start", 1, None), (None, 2, None), ("end", 3,
+                                                                       None)),
+                                False if dtype == np.bool else
+                                self.get_expected_result(6, 3, trial, "end"),
+                                precreated_shm0_handles),
+                            kwargs={
+                                'sequence_name':
+                                    "{}".format(self._testMethodName)
+                            }))
+                    threads.append(
+                        threading.Thread(
+                            target=self.check_sequence_async,
+                            args=(
+                                trial,
+                                model_name,
+                                dtype,
+                                1002,
+                                (None, None),
+                                # (flag_str, value, pre_delay_ms)
+                                (("start", False, None),
+                                 ("end", True, None)) if dtype == np.bool else
+                                (("start", 11, None), ("end", 13, None)),
+                                False if dtype == np.bool else
+                                self.get_expected_result(24, 13, trial, "end"),
+                                precreated_shm1_handles),
+                            kwargs={
+                                'sequence_name':
+                                    "{}".format(self._testMethodName)
+                            }))
+                    threads.append(
+                        threading.Thread(
+                            target=self.check_sequence_async,
+                            args=(
+                                trial,
+                                model_name,
+                                dtype,
+                                1003,
+                                (None, None),
+                                # (flag_str, value, pre_delay_ms)
+                                (("start", True, None),
+                                 ("end", False, None)) if dtype == np.bool else
+                                (("start", 111, None), ("end", 113, None)),
+                                False if dtype == np.bool else
+                                self.get_expected_result(
+                                    224, 113, trial, "end"),
+                                precreated_shm2_handles),
+                            kwargs={
+                                'sequence_name':
+                                    "{}".format(self._testMethodName)
+                            }))
+                    threads.append(
+                        threading.Thread(
+                            target=self.check_sequence_async,
+                            args=(
+                                trial,
+                                model_name,
+                                dtype,
+                                1004,
+                                (None, None),
+                                # (flag_str, value, pre_delay_ms)
+                                (("start", False, None), (None, False, None),
+                                 ("end", True, None)) if dtype == np.bool else
+                                (("start", 1111, None), (None, 1112, None),
+                                 ("end", 1113, None)),
+                                False if dtype == np.bool else
+                                self.get_expected_result(
+                                    3336, 1113, trial, "end"),
+                                precreated_shm3_handles),
+                            kwargs={
+                                'sequence_name':
+                                    "{}".format(self._testMethodName)
+                            }))
+                    threads.append(
+                        threading.Thread(
+                            target=self.check_sequence_async,
+                            args=(
+                                trial,
+                                model_name,
+                                dtype,
+                                1005,
+                                (None, None),
+                                # (flag_str, value, pre_delay_ms)
+                                (
+                                    ("start,end", True,
+                                     None),) if dtype == np.bool else
+                                (("start,end", 11111, None),),
+                                True if dtype == np.bool else
+                                self.get_expected_result(
+                                    11111, 11111, trial, "start,end"),
+                                precreated_shm4_handles),
+                            kwargs={
+                                'sequence_name':
+                                    "{}".format(self._testMethodName)
+                            }))
+                    threads.append(
+                        threading.Thread(
+                            target=self.check_sequence_async,
+                            args=(
+                                trial,
+                                model_name,
+                                dtype,
+                                1006,
+                                (None, None),
+                                # (flag_str, value, pre_delay_ms)
+                                (
+                                    ("start,end", True,
+                                     None),) if dtype == np.bool else
+                                (("start,end", 22222, None),),
+                                True if dtype == np.bool else
+                                self.get_expected_result(
+                                    22222, 22222, trial, "start,end"),
+                                precreated_shm5_handles),
+                            kwargs={
+                                'sequence_name':
+                                    "{}".format(self._testMethodName)
+                            }))
+
+                    threads[0].start()
+                    threads[1].start()
+                    threads[2].start()
+                    threads[3].start()
+                    time.sleep(3)
+                    threads[4].start()
+                    threads[5].start()
+                    for t in threads:
+                        t.join()
+                    self.check_deferred_exception()
+                    if is_ensemble(model_name):
+                        # Requests do not get batched for the ensemble model
+                        self.check_status(model_name, {1: 12}, 12, 12)
+                    else:
+                        self.check_status(model_name, {4: 3}, 3, 12)
+                except Exception as ex:
+                    self.assertTrue(False, "unexpected error {}".format(ex))
+                finally:
+                    if TEST_SYSTEM_SHARED_MEMORY or TEST_CUDA_SHARED_MEMORY:
+                        self.cleanup_shm_regions(precreated_shm0_handles)
+                        self.cleanup_shm_regions(precreated_shm1_handles)
+                        self.cleanup_shm_regions(precreated_shm2_handles)
+                        self.cleanup_shm_regions(precreated_shm3_handles)
+                        self.cleanup_shm_regions(precreated_shm4_handles)
+                        self.cleanup_shm_regions(precreated_shm5_handles)
 
     def test_backlog_fill_no_end(self):
         # Test model instances together are configured with
@@ -1403,174 +1676,219 @@ class SequenceBatcherTest(su.SequenceBatcherTestUtil):
             return
 
         for trial in _trials:
-            self.clear_deferred_exceptions()
-            dtype = self.get_datatype(trial)
-            precreated_shm0_handles = self.precreate_register_regions((1, 2, 3),
-                                                                      dtype, 0)
-            precreated_shm1_handles = self.precreate_register_regions((11, 13),
-                                                                      dtype, 1)
-            precreated_shm2_handles = self.precreate_register_regions(
-                (111, 113), dtype, 2)
-            precreated_shm3_handles = self.precreate_register_regions(
-                (1111, 1112, 1113), dtype, 3)
-            precreated_shm4_handles = self.precreate_register_regions((11111,),
-                                                                      dtype, 4)
-            precreated_shm5_handles = self.precreate_register_regions(
-                (22222, 22223, 22224), dtype, 5)
-            try:
-                model_name = tu.get_sequence_model_name(trial, dtype)
+            dtypes = self.get_datatype(trial)
+            for dtype in dtypes:
+                self.clear_deferred_exceptions()
 
-                self.check_setup(model_name)
+                precreated_shm0_handles = self.precreate_register_regions(
+                    (False, False, False), dtype,
+                    0) if dtype == np.bool else self.precreate_register_regions(
+                        (1, 2, 3), dtype, 0)
+                precreated_shm1_handles = self.precreate_register_regions(
+                    (False, True), dtype,
+                    1) if dtype == np.bool else self.precreate_register_regions(
+                        (11, 13), dtype, 1)
+                precreated_shm2_handles = self.precreate_register_regions(
+                    (True, False), dtype,
+                    2) if dtype == np.bool else self.precreate_register_regions(
+                        (111, 113), dtype, 2)
+                precreated_shm3_handles = self.precreate_register_regions(
+                    (False, False, True), dtype,
+                    3) if dtype == np.bool else self.precreate_register_regions(
+                        (1111, 1112, 1113), dtype, 3)
+                precreated_shm4_handles = self.precreate_register_regions(
+                    (True,), dtype,
+                    4) if dtype == np.bool else self.precreate_register_regions(
+                        (11111,), dtype, 4)
+                precreated_shm5_handles = self.precreate_register_regions(
+                    (True, True, False), dtype,
+                    5) if dtype == np.bool else self.precreate_register_regions(
+                        (22222, 22223, 22224), dtype, 5)
 
-                # Need scheduler to wait for queue to contain all
-                # inferences for both sequences.
-                self.assertTrue("TRITONSERVER_DELAY_SCHEDULER" in os.environ)
-                self.assertEqual(
-                    int(os.environ["TRITONSERVER_DELAY_SCHEDULER"]), 10)
-                self.assertTrue(
-                    "TRITONSERVER_BACKLOG_DELAY_SCHEDULER" in os.environ)
-                self.assertEqual(
-                    int(os.environ["TRITONSERVER_BACKLOG_DELAY_SCHEDULER"]), 3)
+                try:
+                    model_name = tu.get_sequence_model_name(trial, dtype)
 
-                threads = []
-                threads.append(
-                    threading.Thread(
-                        target=self.check_sequence_async,
-                        args=(
-                            trial,
-                            model_name,
-                            dtype,
-                            1001,
-                            (None, None),
-                            # (flag_str, value, pre_delay_ms)
-                            (("start", 1, None), (None, 2, None), ("end", 3,
-                                                                   None)),
-                            self.get_expected_result(6, 3, trial, "end"),
-                            precreated_shm0_handles),
-                        kwargs={
-                            'sequence_name': "{}".format(self._testMethodName)
-                        }))
-                threads.append(
-                    threading.Thread(
-                        target=self.check_sequence_async,
-                        args=(
-                            trial,
-                            model_name,
-                            dtype,
-                            1002,
-                            (None, None),
-                            # (flag_str, value, pre_delay_ms)
-                            (("start", 11, None), ("end", 13, None)),
-                            self.get_expected_result(24, 13, trial, "end"),
-                            precreated_shm1_handles),
-                        kwargs={
-                            'sequence_name': "{}".format(self._testMethodName)
-                        }))
-                threads.append(
-                    threading.Thread(
-                        target=self.check_sequence_async,
-                        args=(
-                            trial,
-                            model_name,
-                            dtype,
-                            1003,
-                            (None, None),
-                            # (flag_str, value, pre_delay_ms)
-                            (("start", 111, None), ("end", 113, None)),
-                            self.get_expected_result(224, 113, trial, "end"),
-                            precreated_shm2_handles),
-                        kwargs={
-                            'sequence_name': "{}".format(self._testMethodName)
-                        }))
-                threads.append(
-                    threading.Thread(
-                        target=self.check_sequence_async,
-                        args=(
-                            trial,
-                            model_name,
-                            dtype,
-                            1004,
-                            (None, None),
-                            # (flag_str, value, pre_delay_ms)
-                            (("start", 1111, None), (None, 1112, None),
-                             ("end", 1113, None)),
-                            self.get_expected_result(3336, 1113, trial, "end"),
-                            precreated_shm3_handles),
-                        kwargs={
-                            'sequence_name': "{}".format(self._testMethodName)
-                        }))
-                threads.append(
-                    threading.Thread(
-                        target=self.check_sequence_async,
-                        args=(
-                            trial,
-                            model_name,
-                            dtype,
-                            1005,
-                            (None, None),
-                            # (flag_str, value, pre_delay_ms)
-                            (
-                                ("start,end", 11111, None),),
-                            self.get_expected_result(11111, 11111, trial,
-                                                     "start,end"),
-                            precreated_shm4_handles),
-                        kwargs={
-                            'sequence_name': "{}".format(self._testMethodName)
-                        }))
-                threads.append(
-                    threading.Thread(
-                        target=self.check_sequence_async,
-                        args=(
-                            trial,
-                            model_name,
-                            dtype,
-                            1006,
-                            (None, None),
-                            # (flag_str, value, pre_delay_ms)
-                            (
-                                ("start", 22222, None),
-                                (None, 22223, None),
-                                ("end", 22224, 2000),
-                            ),
-                            self.get_expected_result(66669, 22224, trial,
-                                                     "end"),
-                            precreated_shm5_handles),
-                        kwargs={
-                            'sequence_name': "{}".format(self._testMethodName)
-                        }))
+                    self.check_setup(model_name)
 
-                threads[0].start()
-                time.sleep(2)
-                threads[1].start()
-                time.sleep(2)
-                threads[2].start()
-                time.sleep(2)
-                threads[3].start()
-                time.sleep(2)
-                threads[4].start()
-                time.sleep(2)
-                threads[5].start()
-                for t in threads:
-                    t.join()
-                self.check_deferred_exception()
-                if is_ensemble(model_name):
-                    # Requests do not get batched for the ensemble model
-                    self.check_status(model_name, {1: 14}, 14, 14)
-                else:
-                    # Expecting 3 batch-size 4 inferences and then the
-                    # 1006 sequence will follow 1003 (a different
-                    # implementation could also follow 1002...)
-                    self.check_status(model_name, {4: 3, 3: 2}, 5, 14)
-            except Exception as ex:
-                self.assertTrue(False, "unexpected error {}".format(ex))
-            finally:
-                if TEST_SYSTEM_SHARED_MEMORY or TEST_CUDA_SHARED_MEMORY:
-                    self.cleanup_shm_regions(precreated_shm0_handles)
-                    self.cleanup_shm_regions(precreated_shm1_handles)
-                    self.cleanup_shm_regions(precreated_shm2_handles)
-                    self.cleanup_shm_regions(precreated_shm3_handles)
-                    self.cleanup_shm_regions(precreated_shm4_handles)
-                    self.cleanup_shm_regions(precreated_shm5_handles)
+                    # Need scheduler to wait for queue to contain all
+                    # inferences for both sequences.
+                    self.assertTrue(
+                        "TRITONSERVER_DELAY_SCHEDULER" in os.environ)
+                    self.assertEqual(
+                        int(os.environ["TRITONSERVER_DELAY_SCHEDULER"]), 10)
+                    self.assertTrue(
+                        "TRITONSERVER_BACKLOG_DELAY_SCHEDULER" in os.environ)
+                    self.assertEqual(
+                        int(os.environ["TRITONSERVER_BACKLOG_DELAY_SCHEDULER"]),
+                        3)
+
+                    threads = []
+                    threads.append(
+                        threading.Thread(
+                            target=self.check_sequence_async,
+                            args=(
+                                trial,
+                                model_name,
+                                dtype,
+                                1001,
+                                (None, None),
+                                # (flag_str, value, pre_delay_ms)
+                                (("start", False, None), (None, False, None),
+                                 ("end", False, None)) if dtype == np.bool else
+                                (("start", 1, None), (None, 2, None), ("end", 3,
+                                                                       None)),
+                                False if dtype == np.bool else
+                                self.get_expected_result(6, 3, trial, "end"),
+                                precreated_shm0_handles),
+                            kwargs={
+                                'sequence_name':
+                                    "{}".format(self._testMethodName)
+                            }))
+                    threads.append(
+                        threading.Thread(
+                            target=self.check_sequence_async,
+                            args=(
+                                trial,
+                                model_name,
+                                dtype,
+                                1002,
+                                (None, None),
+                                # (flag_str, value, pre_delay_ms)
+                                (("start", False, None),
+                                 ("end", True, None)) if dtype == np.bool else
+                                (("start", 11, None), ("end", 13, None)),
+                                False if dtype == np.bool else
+                                self.get_expected_result(24, 13, trial, "end"),
+                                precreated_shm1_handles),
+                            kwargs={
+                                'sequence_name':
+                                    "{}".format(self._testMethodName)
+                            }))
+                    threads.append(
+                        threading.Thread(
+                            target=self.check_sequence_async,
+                            args=(
+                                trial,
+                                model_name,
+                                dtype,
+                                1003,
+                                (None, None),
+                                # (flag_str, value, pre_delay_ms)
+                                (("start", True, None),
+                                 ("end", False, None)) if dtype == np.bool else
+                                (("start", 111, None), ("end", 113, None)),
+                                False if dtype == np.bool else
+                                self.get_expected_result(
+                                    224, 113, trial, "end"),
+                                precreated_shm2_handles),
+                            kwargs={
+                                'sequence_name':
+                                    "{}".format(self._testMethodName)
+                            }))
+                    threads.append(
+                        threading.Thread(
+                            target=self.check_sequence_async,
+                            args=(
+                                trial,
+                                model_name,
+                                dtype,
+                                1004,
+                                (None, None),
+                                # (flag_str, value, pre_delay_ms)
+                                (("start", False, None), (None, False, None),
+                                 ("end", True, None)) if dtype == np.bool else
+                                (("start", 1111, None), (None, 1112, None),
+                                 ("end", 1113, None)),
+                                False if dtype == np.bool else
+                                self.get_expected_result(
+                                    3336, 1113, trial, "end"),
+                                precreated_shm3_handles),
+                            kwargs={
+                                'sequence_name':
+                                    "{}".format(self._testMethodName)
+                            }))
+                    threads.append(
+                        threading.Thread(
+                            target=self.check_sequence_async,
+                            args=(
+                                trial,
+                                model_name,
+                                dtype,
+                                1005,
+                                (None, None),
+                                # (flag_str, value, pre_delay_ms)
+                                (
+                                    ("start,end", True,
+                                     None),) if dtype == np.bool else
+                                (("start,end", 11111, None),),
+                                True if dtype == np.bool else
+                                self.get_expected_result(
+                                    11111, 11111, trial, "start,end"),
+                                precreated_shm4_handles),
+                            kwargs={
+                                'sequence_name':
+                                    "{}".format(self._testMethodName)
+                            }))
+                    threads.append(
+                        threading.Thread(
+                            target=self.check_sequence_async,
+                            args=(
+                                trial,
+                                model_name,
+                                dtype,
+                                1006,
+                                (None, None),
+                                # (flag_str, value, pre_delay_ms)
+                                (
+                                    ("start", True, None),
+                                    (None, True, None),
+                                    ("end", False, 2000),
+                                ) if dtype == np.bool else (
+                                    ("start", 22222, None),
+                                    (None, 22223, None),
+                                    ("end", 22224, 2000),
+                                ),
+                                False if dtype == np.bool else
+                                self.get_expected_result(
+                                    66669, 22224, trial, "end"),
+                                precreated_shm5_handles),
+                            kwargs={
+                                'sequence_name':
+                                    "{}".format(self._testMethodName)
+                            }))
+
+                    threads[0].start()
+                    time.sleep(2)
+                    threads[1].start()
+                    time.sleep(2)
+                    threads[2].start()
+                    time.sleep(2)
+                    threads[3].start()
+                    time.sleep(2)
+                    threads[4].start()
+                    time.sleep(2)
+                    threads[5].start()
+                    for t in threads:
+                        t.join()
+                    self.check_deferred_exception()
+                    if is_ensemble(model_name):
+                        # Requests do not get batched for the ensemble model
+                        self.check_status(model_name, {1: 14}, 14, 14)
+                    else:
+                        # Expecting 3 batch-size 4 inferences and then the
+                        # 1006 sequence will follow 1003 (a different
+                        # implementation could also follow 1002...)
+                        self.check_status(model_name, {4: 3, 3: 2}, 5, 14)
+                except Exception as ex:
+                    self.assertTrue(False, "unexpected error {}".format(ex))
+                finally:
+                    if TEST_SYSTEM_SHARED_MEMORY or TEST_CUDA_SHARED_MEMORY:
+                        self.cleanup_shm_regions(precreated_shm0_handles)
+                        self.cleanup_shm_regions(precreated_shm1_handles)
+                        self.cleanup_shm_regions(precreated_shm2_handles)
+                        self.cleanup_shm_regions(precreated_shm3_handles)
+                        self.cleanup_shm_regions(precreated_shm4_handles)
+                        self.cleanup_shm_regions(precreated_shm5_handles)
 
     def test_backlog_same_correlation_id(self):
         # Test model instances together are configured with
@@ -1579,151 +1897,188 @@ class SequenceBatcherTest(su.SequenceBatcherTestUtil):
         # batch-size 4 inferences. Send a 5th with the same
         # correlation ID as one of the first four.
         for trial in _trials:
-            self.clear_deferred_exceptions()
-            dtype = self.get_datatype(trial)
-            precreated_shm0_handles = self.precreate_register_regions((1, 2, 3),
-                                                                      dtype, 0)
-            precreated_shm1_handles = self.precreate_register_regions(
-                (11, 12, 13), dtype, 1)
-            precreated_shm2_handles = self.precreate_register_regions(
-                (111, 112, 113), dtype, 2)
-            precreated_shm3_handles = self.precreate_register_regions(
-                (1111, 1112, 1113), dtype, 3)
-            precreated_shm4_handles = self.precreate_register_regions(
-                (11111, 11113), dtype, 4)
-            try:
-                model_name = tu.get_sequence_model_name(trial, dtype)
+            dtypes = self.get_datatype(trial)
+            for dtype in dtypes:
+                self.clear_deferred_exceptions()
 
-                self.check_setup(model_name)
+                precreated_shm0_handles = self.precreate_register_regions(
+                    (False, False, False), dtype,
+                    0) if dtype == np.bool else self.precreate_register_regions(
+                        (1, 2, 3), dtype, 0)
+                precreated_shm1_handles = self.precreate_register_regions(
+                    (False, False, True), dtype,
+                    1) if dtype == np.bool else self.precreate_register_regions(
+                        (11, 12, 13), dtype, 1)
+                precreated_shm2_handles = self.precreate_register_regions(
+                    (True, False, False), dtype,
+                    2) if dtype == np.bool else self.precreate_register_regions(
+                        (111, 112, 113), dtype, 2)
+                precreated_shm3_handles = self.precreate_register_regions(
+                    (True, False, True), dtype,
+                    3) if dtype == np.bool else self.precreate_register_regions(
+                        (1111, 1112, 1113), dtype, 3)
+                precreated_shm4_handles = self.precreate_register_regions(
+                    (True, False), dtype,
+                    4) if dtype == np.bool else self.precreate_register_regions(
+                        (11111, 11113), dtype, 4)
 
-                # Need scheduler to wait for queue to contain all
-                # inferences for both sequences.
-                self.assertTrue("TRITONSERVER_DELAY_SCHEDULER" in os.environ)
-                self.assertEqual(
-                    int(os.environ["TRITONSERVER_DELAY_SCHEDULER"]), 12)
-                self.assertTrue(
-                    "TRITONSERVER_BACKLOG_DELAY_SCHEDULER" in os.environ)
-                self.assertEqual(
-                    int(os.environ["TRITONSERVER_BACKLOG_DELAY_SCHEDULER"]), 2)
+                try:
+                    model_name = tu.get_sequence_model_name(trial, dtype)
 
-                threads = []
-                threads.append(
-                    threading.Thread(
-                        target=self.check_sequence_async,
-                        args=(
-                            trial,
-                            model_name,
-                            dtype,
-                            1001,
-                            (None, None),
-                            # (flag_str, value, pre_delay_ms)
-                            (("start", 1, None), (None, 2, None), ("end", 3,
-                                                                   None)),
-                            self.get_expected_result(6, 3, trial, "end"),
-                            precreated_shm0_handles),
-                        kwargs={
-                            'sequence_name': "{}".format(self._testMethodName)
-                        }))
-                threads.append(
-                    threading.Thread(
-                        target=self.check_sequence_async,
-                        args=(
-                            trial,
-                            model_name,
-                            dtype,
-                            1002,
-                            (None, None),
-                            # (flag_str, value, pre_delay_ms)
-                            (("start", 11, None), (None, 12, None), ("end", 13,
-                                                                     None)),
-                            self.get_expected_result(36, 13, trial, "end"),
-                            precreated_shm1_handles),
-                        kwargs={
-                            'sequence_name': "{}".format(self._testMethodName)
-                        }))
-                threads.append(
-                    threading.Thread(
-                        target=self.check_sequence_async,
-                        args=(
-                            trial,
-                            model_name,
-                            dtype,
-                            1003,
-                            (None, None),
-                            # (flag_str, value, pre_delay_ms)
-                            (("start", 111, None), (None, 112, None),
-                             ("end", 113, None)),
-                            self.get_expected_result(336, 113, trial, "end"),
-                            precreated_shm2_handles),
-                        kwargs={
-                            'sequence_name': "{}".format(self._testMethodName)
-                        }))
-                threads.append(
-                    threading.Thread(
-                        target=self.check_sequence_async,
-                        args=(
-                            trial,
-                            model_name,
-                            dtype,
-                            1004,
-                            (None, None),
-                            # (flag_str, value, pre_delay_ms)
-                            (("start", 1111, None), (None, 1112, None),
-                             ("end", 1113, None)),
-                            self.get_expected_result(3336, 1113, trial, "end"),
-                            precreated_shm3_handles),
-                        kwargs={
-                            'sequence_name': "{}".format(self._testMethodName)
-                        }))
-                threads.append(
-                    threading.Thread(
-                        target=self.check_sequence_async,
-                        args=(
-                            trial,
-                            model_name,
-                            dtype,
-                            1002,
-                            (None, None),
-                            # (flag_str, value, pre_delay_ms)
-                            (("start", 11111, None), ("end", 11113, None)),
-                            self.get_expected_result(22224, 11113, trial,
-                                                     "end"),
-                            precreated_shm4_handles),
-                        kwargs={
-                            'sequence_name': "{}".format(self._testMethodName)
-                        }))
+                    self.check_setup(model_name)
 
-                threads[0].start()
-                threads[1].start()
-                threads[2].start()
-                threads[3].start()
-                time.sleep(3)
-                threads[4].start()
-                for t in threads:
-                    t.join()
-                self.check_deferred_exception()
-                if is_ensemble(model_name):
-                    # Requests do not get batched for the ensemble model
-                    self.check_status(model_name, {1: 14}, 14, 14)
-                else:
-                    if MODEL_INSTANCES != 4:
-                        batch_exec = {
-                            (4 / MODEL_INSTANCES): (3 * MODEL_INSTANCES),
-                            1: 2
-                        }
+                    # Need scheduler to wait for queue to contain all
+                    # inferences for both sequences.
+                    self.assertTrue(
+                        "TRITONSERVER_DELAY_SCHEDULER" in os.environ)
+                    self.assertEqual(
+                        int(os.environ["TRITONSERVER_DELAY_SCHEDULER"]), 12)
+                    self.assertTrue(
+                        "TRITONSERVER_BACKLOG_DELAY_SCHEDULER" in os.environ)
+                    self.assertEqual(
+                        int(os.environ["TRITONSERVER_BACKLOG_DELAY_SCHEDULER"]),
+                        2)
+
+                    threads = []
+                    threads.append(
+                        threading.Thread(
+                            target=self.check_sequence_async,
+                            args=(
+                                trial,
+                                model_name,
+                                dtype,
+                                1001,
+                                (None, None),
+                                # (flag_str, value, pre_delay_ms)
+                                (("start", False, None), (None, False, None),
+                                 ("end", False, None)) if dtype == np.bool else
+                                (("start", 1, None), (None, 2, None), ("end", 3,
+                                                                       None)),
+                                False if dtype == np.bool else
+                                self.get_expected_result(6, 3, trial, "end"),
+                                precreated_shm0_handles),
+                            kwargs={
+                                'sequence_name':
+                                    "{}".format(self._testMethodName)
+                            }))
+                    threads.append(
+                        threading.Thread(
+                            target=self.check_sequence_async,
+                            args=(
+                                trial,
+                                model_name,
+                                dtype,
+                                1002,
+                                (None, None),
+                                # (flag_str, value, pre_delay_ms)
+                                (("start", False, None), (None, False, None),
+                                 ("end", True, None)) if dtype == np.bool else
+                                (("start", 11, None), (None, 12, None),
+                                 ("end", 13, None)),
+                                False if dtype == np.bool else
+                                self.get_expected_result(36, 13, trial, "end"),
+                                precreated_shm1_handles),
+                            kwargs={
+                                'sequence_name':
+                                    "{}".format(self._testMethodName)
+                            }))
+                    threads.append(
+                        threading.Thread(
+                            target=self.check_sequence_async,
+                            args=(
+                                trial,
+                                model_name,
+                                dtype,
+                                1003,
+                                (None, None),
+                                # (flag_str, value, pre_delay_ms)
+                                (("start", True, None), (None, False, None),
+                                 ("end", False, None)) if dtype == np.bool else
+                                (("start", 111, None), (None, 112, None),
+                                 ("end", 113, None)),
+                                False if dtype == np.bool else
+                                self.get_expected_result(
+                                    336, 113, trial, "end"),
+                                precreated_shm2_handles),
+                            kwargs={
+                                'sequence_name':
+                                    "{}".format(self._testMethodName)
+                            }))
+                    threads.append(
+                        threading.Thread(
+                            target=self.check_sequence_async,
+                            args=(
+                                trial,
+                                model_name,
+                                dtype,
+                                1004,
+                                (None, None),
+                                # (flag_str, value, pre_delay_ms)
+                                (("start", True, None), (None, False, None),
+                                 ("end", True, None)) if dtype == np.bool else
+                                (("start", 1111, None), (None, 1112, None),
+                                 ("end", 1113, None)),
+                                False if dtype == np.bool else
+                                self.get_expected_result(
+                                    3336, 1113, trial, "end"),
+                                precreated_shm3_handles),
+                            kwargs={
+                                'sequence_name':
+                                    "{}".format(self._testMethodName)
+                            }))
+                    threads.append(
+                        threading.Thread(
+                            target=self.check_sequence_async,
+                            args=(
+                                trial,
+                                model_name,
+                                dtype,
+                                1002,
+                                (None, None),
+                                # (flag_str, value, pre_delay_ms)
+                                (("start", True, None),
+                                 ("end", False, None)) if dtype == np.bool else
+                                (("start", 11111, None), ("end", 11113, None)),
+                                False if dtype == np.bool else
+                                self.get_expected_result(
+                                    22224, 11113, trial, "end"),
+                                precreated_shm4_handles),
+                            kwargs={
+                                'sequence_name':
+                                    "{}".format(self._testMethodName)
+                            }))
+
+                    threads[0].start()
+                    threads[1].start()
+                    threads[2].start()
+                    threads[3].start()
+                    time.sleep(3)
+                    threads[4].start()
+                    for t in threads:
+                        t.join()
+                    self.check_deferred_exception()
+                    if is_ensemble(model_name):
+                        # Requests do not get batched for the ensemble model
+                        self.check_status(model_name, {1: 14}, 14, 14)
                     else:
-                        batch_exec = {1: (3 * MODEL_INSTANCES) + 2}
-                    self.check_status(model_name, batch_exec,
-                                      (3 * MODEL_INSTANCES) + 2, 14)
-            except Exception as ex:
-                self.assertTrue(False, "unexpected error {}".format(ex))
-            finally:
-                if TEST_SYSTEM_SHARED_MEMORY or TEST_CUDA_SHARED_MEMORY:
-                    self.cleanup_shm_regions(precreated_shm0_handles)
-                    self.cleanup_shm_regions(precreated_shm1_handles)
-                    self.cleanup_shm_regions(precreated_shm2_handles)
-                    self.cleanup_shm_regions(precreated_shm3_handles)
-                    self.cleanup_shm_regions(precreated_shm4_handles)
+                        if MODEL_INSTANCES != 4:
+                            batch_exec = {
+                                (4 / MODEL_INSTANCES): (3 * MODEL_INSTANCES),
+                                1: 2
+                            }
+                        else:
+                            batch_exec = {1: (3 * MODEL_INSTANCES) + 2}
+                        self.check_status(model_name, batch_exec,
+                                          (3 * MODEL_INSTANCES) + 2, 14)
+                except Exception as ex:
+                    self.assertTrue(False, "unexpected error {}".format(ex))
+                finally:
+                    if TEST_SYSTEM_SHARED_MEMORY or TEST_CUDA_SHARED_MEMORY:
+                        self.cleanup_shm_regions(precreated_shm0_handles)
+                        self.cleanup_shm_regions(precreated_shm1_handles)
+                        self.cleanup_shm_regions(precreated_shm2_handles)
+                        self.cleanup_shm_regions(precreated_shm3_handles)
+                        self.cleanup_shm_regions(precreated_shm4_handles)
 
     def test_backlog_same_correlation_id_no_end(self):
         # Test model instances together are configured with
@@ -1742,142 +2097,181 @@ class SequenceBatcherTest(su.SequenceBatcherTestUtil):
             return
 
         for trial in _trials:
-            self.clear_deferred_exceptions()
-            dtype = self.get_datatype(trial)
-            precreated_shm0_handles = self.precreate_register_regions((1, 3),
-                                                                      dtype, 0)
-            precreated_shm1_handles = self.precreate_register_regions(
-                (11, 12, 12, 13), dtype, 1)
-            precreated_shm2_handles = self.precreate_register_regions(
-                (111, 112, 112, 113), dtype, 2)
-            precreated_shm3_handles = self.precreate_register_regions(
-                (1111, 1112, 1112, 1113), dtype, 3)
-            precreated_shm4_handles = self.precreate_register_regions(
-                (11111, 11113), dtype, 4)
-            try:
-                model_name = tu.get_sequence_model_name(trial, dtype)
+            dtypes = self.get_datatype(trial)
+            for dtype in dtypes:
+                self.clear_deferred_exceptions()
 
-                self.check_setup(model_name)
+                precreated_shm0_handles = self.precreate_register_regions(
+                    (False, False), dtype,
+                    0) if dtype == np.bool else self.precreate_register_regions(
+                        (1, 3), dtype, 0)
+                precreated_shm1_handles = self.precreate_register_regions(
+                    (False, True, False, True), dtype,
+                    1) if dtype == np.bool else self.precreate_register_regions(
+                        (11, 12, 12, 13), dtype, 1)
+                precreated_shm2_handles = self.precreate_register_regions(
+                    (True, False, True, False), dtype,
+                    2) if dtype == np.bool else self.precreate_register_regions(
+                        (111, 112, 112, 113), dtype, 2)
+                precreated_shm3_handles = self.precreate_register_regions(
+                    (True, False, False, True), dtype,
+                    3) if dtype == np.bool else self.precreate_register_regions(
+                        (1111, 1112, 1112, 1113), dtype, 3)
+                precreated_shm4_handles = self.precreate_register_regions(
+                    (True, False), dtype,
+                    4) if dtype == np.bool else self.precreate_register_regions(
+                        (11111, 11113), dtype, 4)
+                try:
+                    model_name = tu.get_sequence_model_name(trial, dtype)
 
-                # Need scheduler to wait for queue to contain all
-                # inferences for both sequences.
-                self.assertTrue("TRITONSERVER_DELAY_SCHEDULER" in os.environ)
-                self.assertEqual(
-                    int(os.environ["TRITONSERVER_DELAY_SCHEDULER"]), 16)
-                self.assertTrue(
-                    "TRITONSERVER_BACKLOG_DELAY_SCHEDULER" in os.environ)
-                self.assertEqual(
-                    int(os.environ["TRITONSERVER_BACKLOG_DELAY_SCHEDULER"]), 0)
+                    self.check_setup(model_name)
 
-                threads = []
-                threads.append(
-                    threading.Thread(
-                        target=self.check_sequence_async,
-                        args=(
-                            trial,
-                            model_name,
-                            dtype,
-                            1001,
-                            (None, None),
-                            # (flag_str, value, pre_delay_ms)
-                            (("start", 1, None), (None, 3, None)),
-                            self.get_expected_result(4, 3, trial, None),
-                            precreated_shm0_handles),
-                        kwargs={
-                            'sequence_name': "{}".format(self._testMethodName)
-                        }))
-                threads.append(
-                    threading.Thread(
-                        target=self.check_sequence_async,
-                        args=(
-                            trial,
-                            model_name,
-                            dtype,
-                            1002,
-                            (None, None),
-                            # (flag_str, value, pre_delay_ms)
-                            (("start", 11, None), (None, 12, None),
-                             (None, 12, None), ("end", 13, None)),
-                            self.get_expected_result(48, 13, trial, "end"),
-                            precreated_shm1_handles),
-                        kwargs={
-                            'sequence_name': "{}".format(self._testMethodName)
-                        }))
-                threads.append(
-                    threading.Thread(
-                        target=self.check_sequence_async,
-                        args=(
-                            trial,
-                            model_name,
-                            dtype,
-                            1003,
-                            (None, None),
-                            # (flag_str, value, pre_delay_ms)
-                            (("start", 111, None), (None, 112, None),
-                             (None, 112, None), ("end", 113, None)),
-                            self.get_expected_result(448, 113, trial, "end"),
-                            precreated_shm2_handles),
-                        kwargs={
-                            'sequence_name': "{}".format(self._testMethodName)
-                        }))
-                threads.append(
-                    threading.Thread(
-                        target=self.check_sequence_async,
-                        args=(
-                            trial,
-                            model_name,
-                            dtype,
-                            1004,
-                            (None, None),
-                            # (flag_str, value, pre_delay_ms)
-                            (("start", 1111, None), (None, 1112, None),
-                             (None, 1112, None), ("end", 1113, None)),
-                            self.get_expected_result(4448, 1113, trial, "end"),
-                            precreated_shm3_handles),
-                        kwargs={
-                            'sequence_name': "{}".format(self._testMethodName)
-                        }))
-                threads.append(
-                    threading.Thread(
-                        target=self.check_sequence_async,
-                        args=(
-                            trial,
-                            model_name,
-                            dtype,
-                            1001,
-                            (None, None),
-                            # (flag_str, value, pre_delay_ms)
-                            (("start", 11111, None), ("end", 11113, None)),
-                            self.get_expected_result(22224, 11113, trial,
-                                                     "end"),
-                            precreated_shm4_handles),
-                        kwargs={
-                            'sequence_name': "{}".format(self._testMethodName)
-                        }))
+                    # Need scheduler to wait for queue to contain all
+                    # inferences for both sequences.
+                    self.assertTrue(
+                        "TRITONSERVER_DELAY_SCHEDULER" in os.environ)
+                    self.assertEqual(
+                        int(os.environ["TRITONSERVER_DELAY_SCHEDULER"]), 16)
+                    self.assertTrue(
+                        "TRITONSERVER_BACKLOG_DELAY_SCHEDULER" in os.environ)
+                    self.assertEqual(
+                        int(os.environ["TRITONSERVER_BACKLOG_DELAY_SCHEDULER"]),
+                        0)
 
-                threads[0].start()
-                threads[1].start()
-                threads[2].start()
-                threads[3].start()
-                time.sleep(2)
-                threads[4].start()
-                for t in threads:
-                    t.join()
-                self.check_deferred_exception()
-                if is_ensemble(model_name):
-                    # Requests do not get batched for the ensemble model
-                    self.check_status(model_name, {1: 16}, 16, 16)
-                else:
-                    self.check_status(model_name, {4: 4}, 4, 16)
-            except Exception as ex:
-                self.assertTrue(False, "unexpected error {}".format(ex))
-            finally:
-                if TEST_SYSTEM_SHARED_MEMORY or TEST_CUDA_SHARED_MEMORY:
-                    self.cleanup_shm_regions(precreated_shm0_handles)
-                    self.cleanup_shm_regions(precreated_shm1_handles)
-                    self.cleanup_shm_regions(precreated_shm2_handles)
-                    self.cleanup_shm_regions(precreated_shm3_handles)
-                    self.cleanup_shm_regions(precreated_shm4_handles)
+                    threads = []
+                    threads.append(
+                        threading.Thread(
+                            target=self.check_sequence_async,
+                            args=(
+                                trial,
+                                model_name,
+                                dtype,
+                                1001,
+                                (None, None),
+                                # (flag_str, value, pre_delay_ms)
+                                (("start", False, None),
+                                 (None, False, None)) if dtype == np.bool else
+                                (("start", 1, None), (None, 3, None)),
+                                False if dtype == np.bool else
+                                self.get_expected_result(4, 3, trial, None),
+                                precreated_shm0_handles),
+                            kwargs={
+                                'sequence_name':
+                                    "{}".format(self._testMethodName)
+                            }))
+                    threads.append(
+                        threading.Thread(
+                            target=self.check_sequence_async,
+                            args=(
+                                trial,
+                                model_name,
+                                dtype,
+                                1002,
+                                (None, None),
+                                # (flag_str, value, pre_delay_ms)
+                                (("start", False, None), (None, True, None),
+                                 (None, False, None),
+                                 ("end", True, None)) if dtype == np.bool else
+                                (("start", 11, None), (None, 12, None),
+                                 (None, 12, None), ("end", 13, None)),
+                                False if dtype == np.bool else
+                                self.get_expected_result(48, 13, trial, "end"),
+                                precreated_shm1_handles),
+                            kwargs={
+                                'sequence_name':
+                                    "{}".format(self._testMethodName)
+                            }))
+                    threads.append(
+                        threading.Thread(
+                            target=self.check_sequence_async,
+                            args=(
+                                trial,
+                                model_name,
+                                dtype,
+                                1003,
+                                (None, None),
+                                # (flag_str, value, pre_delay_ms)
+                                (("start", True, None), (None, False, None),
+                                 (None, True, None),
+                                 ("end", False, None)) if dtype == np.bool else
+                                (("start", 111, None), (None, 112, None),
+                                 (None, 112, None), ("end", 113, None)),
+                                False if dtype == np.bool else
+                                self.get_expected_result(
+                                    448, 113, trial, "end"),
+                                precreated_shm2_handles),
+                            kwargs={
+                                'sequence_name':
+                                    "{}".format(self._testMethodName)
+                            }))
+                    threads.append(
+                        threading.Thread(
+                            target=self.check_sequence_async,
+                            args=(
+                                trial,
+                                model_name,
+                                dtype,
+                                1004,
+                                (None, None),
+                                # (flag_str, value, pre_delay_ms)
+                                (("start", True, None), (None, False, None),
+                                 (None, False, None),
+                                 ("end", True, None)) if dtype == np.bool else
+                                (("start", 1111, None), (None, 1112, None),
+                                 (None, 1112, None), ("end", 1113, None)),
+                                False if dtype == np.bool else
+                                self.get_expected_result(
+                                    4448, 1113, trial, "end"),
+                                precreated_shm3_handles),
+                            kwargs={
+                                'sequence_name':
+                                    "{}".format(self._testMethodName)
+                            }))
+                    threads.append(
+                        threading.Thread(
+                            target=self.check_sequence_async,
+                            args=(
+                                trial,
+                                model_name,
+                                dtype,
+                                1001,
+                                (None, None),
+                                # (flag_str, value, pre_delay_ms)
+                                (("start", True, None),
+                                 ("end", False, None)) if dtype == np.bool else
+                                (("start", 11111, None), ("end", 11113, None)),
+                                False if dtype == np.bool else
+                                self.get_expected_result(
+                                    22224, 11113, trial, "end"),
+                                precreated_shm4_handles),
+                            kwargs={
+                                'sequence_name':
+                                    "{}".format(self._testMethodName)
+                            }))
+
+                    threads[0].start()
+                    threads[1].start()
+                    threads[2].start()
+                    threads[3].start()
+                    time.sleep(2)
+                    threads[4].start()
+                    for t in threads:
+                        t.join()
+                    self.check_deferred_exception()
+                    if is_ensemble(model_name):
+                        # Requests do not get batched for the ensemble model
+                        self.check_status(model_name, {1: 16}, 16, 16)
+                    else:
+                        self.check_status(model_name, {4: 4}, 4, 16)
+                except Exception as ex:
+                    self.assertTrue(False, "unexpected error {}".format(ex))
+                finally:
+                    if TEST_SYSTEM_SHARED_MEMORY or TEST_CUDA_SHARED_MEMORY:
+                        self.cleanup_shm_regions(precreated_shm0_handles)
+                        self.cleanup_shm_regions(precreated_shm1_handles)
+                        self.cleanup_shm_regions(precreated_shm2_handles)
+                        self.cleanup_shm_regions(precreated_shm3_handles)
+                        self.cleanup_shm_regions(precreated_shm4_handles)
 
     def test_backlog_sequence_timeout(self):
         # Test model instances together are configured with
@@ -1896,159 +2290,204 @@ class SequenceBatcherTest(su.SequenceBatcherTestUtil):
             return
 
         for trial in _trials:
-            self.clear_deferred_exceptions()
-            dtype = self.get_datatype(trial)
-            precreated_shm0_handles = self.precreate_register_regions((1, 3),
-                                                                      dtype, 0)
-            precreated_shm1_handles = self.precreate_register_regions(
-                (11, 12, 12, 13), dtype, 1)
-            precreated_shm2_handles = self.precreate_register_regions(
-                (111, 112, 112, 113), dtype, 2)
-            precreated_shm3_handles = self.precreate_register_regions(
-                (1111, 1112, 1112, 1113), dtype, 3)
-            precreated_shm4_handles = self.precreate_register_regions(
-                (11111, 11113), dtype, 4)
-            try:
-                model_name = tu.get_sequence_model_name(trial, dtype)
+            dtypes = self.get_datatype(trial)
+            for dtype in dtypes:
+                self.clear_deferred_exceptions()
 
-                self.check_setup(model_name)
+                precreated_shm0_handles = self.precreate_register_regions(
+                    (False, False), dtype,
+                    0) if dtype == np.bool else self.precreate_register_regions(
+                        (1, 3), dtype, 0)
+                precreated_shm1_handles = self.precreate_register_regions(
+                    (False, True, False, True), dtype,
+                    1) if dtype == np.bool else self.precreate_register_regions(
+                        (11, 12, 12, 13), dtype, 1)
+                precreated_shm2_handles = self.precreate_register_regions(
+                    (True, False, True, False), dtype,
+                    2) if dtype == np.bool else self.precreate_register_regions(
+                        (111, 112, 112, 113), dtype, 2)
+                precreated_shm3_handles = self.precreate_register_regions(
+                    (True, False, False, True), dtype,
+                    3) if dtype == np.bool else self.precreate_register_regions(
+                        (1111, 1112, 1112, 1113), dtype, 3)
+                precreated_shm4_handles = self.precreate_register_regions(
+                    (True, False), dtype,
+                    4) if dtype == np.bool else self.precreate_register_regions(
+                        (11111, 11113), dtype, 4)
+                try:
+                    model_name = tu.get_sequence_model_name(trial, dtype)
 
-                # Need scheduler to wait for queue to contain all
-                # inferences for all sequences.
-                self.assertTrue("TRITONSERVER_DELAY_SCHEDULER" in os.environ)
-                self.assertEqual(
-                    int(os.environ["TRITONSERVER_DELAY_SCHEDULER"]), 4)
-                self.assertTrue(
-                    "TRITONSERVER_BACKLOG_DELAY_SCHEDULER" in os.environ)
-                self.assertEqual(
-                    int(os.environ["TRITONSERVER_BACKLOG_DELAY_SCHEDULER"]), 0)
+                    self.check_setup(model_name)
 
-                threads = []
-                threads.append(
-                    threading.Thread(
-                        target=self.check_sequence_async,
-                        args=(
-                            trial,
-                            model_name,
-                            dtype,
-                            1001,
-                            (None, None),
-                            # (flag_str, value, pre_delay_ms)
-                            (("start", 1, None),
-                             (None, 3, _max_sequence_idle_ms + 1000)),
-                            self.get_expected_result(4, 3, trial, None),
-                            precreated_shm0_handles),
-                        kwargs={
-                            'sequence_name': "{}".format(self._testMethodName)
-                        }))
-                threads.append(
-                    threading.Thread(
-                        target=self.check_sequence_async,
-                        args=(
-                            trial,
-                            model_name,
-                            dtype,
-                            1002,
-                            (None, None),
-                            # (flag_str, value, pre_delay_ms)
-                            (("start", 11, None), (None, 12,
-                                                   _max_sequence_idle_ms / 2),
-                             (None, 12, _max_sequence_idle_ms / 2),
-                             ("end", 13, _max_sequence_idle_ms / 2)),
-                            self.get_expected_result(48, 13, trial, None),
-                            precreated_shm1_handles),
-                        kwargs={
-                            'sequence_name': "{}".format(self._testMethodName)
-                        }))
-                threads.append(
-                    threading.Thread(
-                        target=self.check_sequence_async,
-                        args=(
-                            trial,
-                            model_name,
-                            dtype,
-                            1003,
-                            (None, None),
-                            # (flag_str, value, pre_delay_ms)
-                            (("start", 111, None), (None, 112,
-                                                    _max_sequence_idle_ms / 2),
-                             (None, 112, _max_sequence_idle_ms / 2),
-                             ("end", 113, _max_sequence_idle_ms / 2)),
-                            self.get_expected_result(448, 113, trial, None),
-                            precreated_shm2_handles),
-                        kwargs={
-                            'sequence_name': "{}".format(self._testMethodName)
-                        }))
-                threads.append(
-                    threading.Thread(
-                        target=self.check_sequence_async,
-                        args=(
-                            trial,
-                            model_name,
-                            dtype,
-                            1004,
-                            (None, None),
-                            # (flag_str, value, pre_delay_ms)
-                            (("start", 1111, None), (None, 1112,
-                                                     _max_sequence_idle_ms / 2),
-                             (None, 1112, _max_sequence_idle_ms / 2),
-                             ("end", 1113, _max_sequence_idle_ms / 2)),
-                            self.get_expected_result(4448, 1113, trial, None),
-                            precreated_shm3_handles),
-                        kwargs={
-                            'sequence_name': "{}".format(self._testMethodName)
-                        }))
-                threads.append(
-                    threading.Thread(
-                        target=self.check_sequence_async,
-                        args=(
-                            trial,
-                            model_name,
-                            dtype,
-                            1005,
-                            (None, None),
-                            # (flag_str, value, pre_delay_ms)
-                            (("start", 11111, None), ("end", 11113, None)),
-                            self.get_expected_result(22224, 11113, trial,
-                                                     "end"),
-                            precreated_shm4_handles),
-                        kwargs={
-                            'sequence_name': "{}".format(self._testMethodName)
-                        }))
+                    # Need scheduler to wait for queue to contain all
+                    # inferences for all sequences.
+                    self.assertTrue(
+                        "TRITONSERVER_DELAY_SCHEDULER" in os.environ)
+                    self.assertEqual(
+                        int(os.environ["TRITONSERVER_DELAY_SCHEDULER"]), 4)
+                    self.assertTrue(
+                        "TRITONSERVER_BACKLOG_DELAY_SCHEDULER" in os.environ)
+                    self.assertEqual(
+                        int(os.environ["TRITONSERVER_BACKLOG_DELAY_SCHEDULER"]),
+                        0)
 
-                threads[0].start()
-                threads[1].start()
-                threads[2].start()
-                threads[3].start()
-                time.sleep(2)
-                threads[4].start()
-                for t in threads:
-                    t.join()
+                    threads = []
+                    threads.append(
+                        threading.Thread(
+                            target=self.check_sequence_async,
+                            args=(
+                                trial,
+                                model_name,
+                                dtype,
+                                1001,
+                                (None, None),
+                                # (flag_str, value, pre_delay_ms)
+                                (("start", False, None),
+                                 (None, False, _max_sequence_idle_ms +
+                                  1000)) if dtype == np.bool else
+                                (("start", 1, None),
+                                 (None, 3, _max_sequence_idle_ms + 1000)),
+                                False if dtype == np.bool else
+                                self.get_expected_result(4, 3, trial, None),
+                                precreated_shm0_handles),
+                            kwargs={
+                                'sequence_name':
+                                    "{}".format(self._testMethodName)
+                            }))
+                    threads.append(
+                        threading.Thread(
+                            target=self.check_sequence_async,
+                            args=(
+                                trial,
+                                model_name,
+                                dtype,
+                                1002,
+                                (None, None),
+                                # (flag_str, value, pre_delay_ms)
+                                (("start", False, None),
+                                 (None, True, _max_sequence_idle_ms / 2),
+                                 (None, False, _max_sequence_idle_ms / 2),
+                                 ("end", True, _max_sequence_idle_ms /
+                                  2)) if dtype == np.bool else
+                                (("start", 11,
+                                  None), (None, 12, _max_sequence_idle_ms / 2),
+                                 (None, 12, _max_sequence_idle_ms / 2),
+                                 ("end", 13, _max_sequence_idle_ms / 2)),
+                                False if dtype == np.bool else
+                                self.get_expected_result(48, 13, trial, None),
+                                precreated_shm1_handles),
+                            kwargs={
+                                'sequence_name':
+                                    "{}".format(self._testMethodName)
+                            }))
+                    threads.append(
+                        threading.Thread(
+                            target=self.check_sequence_async,
+                            args=(
+                                trial,
+                                model_name,
+                                dtype,
+                                1003,
+                                (None, None),
+                                # (flag_str, value, pre_delay_ms)
+                                (("start", True, None),
+                                 (None, False, _max_sequence_idle_ms / 2),
+                                 (None, True, _max_sequence_idle_ms / 2),
+                                 ("end", False, _max_sequence_idle_ms /
+                                  2)) if dtype == np.bool else
+                                (("start", 111,
+                                  None), (None, 112, _max_sequence_idle_ms / 2),
+                                 (None, 112, _max_sequence_idle_ms / 2),
+                                 ("end", 113, _max_sequence_idle_ms / 2)),
+                                False if dtype == np.bool else
+                                self.get_expected_result(448, 113, trial, None),
+                                precreated_shm2_handles),
+                            kwargs={
+                                'sequence_name':
+                                    "{}".format(self._testMethodName)
+                            }))
+                    threads.append(
+                        threading.Thread(
+                            target=self.check_sequence_async,
+                            args=(
+                                trial,
+                                model_name,
+                                dtype,
+                                1004,
+                                (None, None),
+                                # (flag_str, value, pre_delay_ms)
+                                (("start", True, None),
+                                 (None, False, _max_sequence_idle_ms / 2),
+                                 (None, False, _max_sequence_idle_ms / 2),
+                                 ("end", True, _max_sequence_idle_ms /
+                                  2)) if dtype == np.bool else
+                                (("start", 1111, None),
+                                 (None, 1112, _max_sequence_idle_ms / 2),
+                                 (None, 1112, _max_sequence_idle_ms / 2),
+                                 ("end", 1113, _max_sequence_idle_ms / 2)),
+                                False if dtype == np.bool else
+                                self.get_expected_result(
+                                    4448, 1113, trial, None),
+                                precreated_shm3_handles),
+                            kwargs={
+                                'sequence_name':
+                                    "{}".format(self._testMethodName)
+                            }))
+                    threads.append(
+                        threading.Thread(
+                            target=self.check_sequence_async,
+                            args=(
+                                trial,
+                                model_name,
+                                dtype,
+                                1005,
+                                (None, None),
+                                # (flag_str, value, pre_delay_ms)
+                                (("start", True, None),
+                                 ("end", False, None)) if dtype == np.bool else
+                                (("start", 11111, None), ("end", 11113, None)),
+                                False if dtype == np.bool else
+                                self.get_expected_result(
+                                    22224, 11113, trial, "end"),
+                                precreated_shm4_handles),
+                            kwargs={
+                                'sequence_name':
+                                    "{}".format(self._testMethodName)
+                            }))
 
-                self.check_deferred_exception()
-                self.assertTrue(False, "expected error")
-            except Exception as ex:
-                for prefix in ENSEMBLE_PREFIXES:
-                    if model_name.startswith(prefix):
-                        base_model_name = model_name[(len(prefix)):]
-                        self.assertTrue(ex.message().startswith(
-                            str("in ensemble '{}', " +
-                                "inference request for sequence 1001 to " +
-                                "model '{}' must specify the START flag on the first "
-                                + "request of the sequence").format(
-                                    model_name, base_model_name)))
-                        return
-                self.assertTrue(ex.message().startswith(
-                    str("inference request for sequence 1001 to " +
-                        "model '{}' must specify the START flag on the first " +
-                        "request of the sequence").format(model_name)))
-            finally:
-                if TEST_SYSTEM_SHARED_MEMORY or TEST_CUDA_SHARED_MEMORY:
-                    self.cleanup_shm_regions(precreated_shm0_handles)
-                    self.cleanup_shm_regions(precreated_shm1_handles)
-                    self.cleanup_shm_regions(precreated_shm2_handles)
-                    self.cleanup_shm_regions(precreated_shm3_handles)
-                    self.cleanup_shm_regions(precreated_shm4_handles)
+                    threads[0].start()
+                    threads[1].start()
+                    threads[2].start()
+                    threads[3].start()
+                    time.sleep(2)
+                    threads[4].start()
+                    for t in threads:
+                        t.join()
+
+                    self.check_deferred_exception()
+                    self.assertTrue(False, "expected error")
+                except Exception as ex:
+                    for prefix in ENSEMBLE_PREFIXES:
+                        if model_name.startswith(prefix):
+                            base_model_name = model_name[(len(prefix)):]
+                            self.assertTrue(ex.message().startswith(
+                                str("in ensemble '{}', " +
+                                    "inference request for sequence 1001 to " +
+                                    "model '{}' must specify the START flag on the first "
+                                    + "request of the sequence").format(
+                                        model_name, base_model_name)))
+                            return
+                    self.assertTrue(ex.message().startswith(
+                        str("inference request for sequence 1001 to " +
+                            "model '{}' must specify the START flag on the first "
+                            + "request of the sequence").format(model_name)))
+                finally:
+                    if TEST_SYSTEM_SHARED_MEMORY or TEST_CUDA_SHARED_MEMORY:
+                        self.cleanup_shm_regions(precreated_shm0_handles)
+                        self.cleanup_shm_regions(precreated_shm1_handles)
+                        self.cleanup_shm_regions(precreated_shm2_handles)
+                        self.cleanup_shm_regions(precreated_shm3_handles)
+                        self.cleanup_shm_regions(precreated_shm4_handles)
 
     def test_queue_delay_no_min_util(self):
         # Test model that have set max queue delay but minimum slot utilization
@@ -2066,78 +2505,96 @@ class SequenceBatcherTest(su.SequenceBatcherTestUtil):
                     break
             if is_ensemble:
                 continue
-            self.clear_deferred_exceptions()
-            dtype = self.get_datatype(trial)
-            precreated_shm0_handles = self.precreate_register_regions((1,),
-                                                                      dtype, 0)
-            precreated_shm1_handles = self.precreate_register_regions((11, 12),
-                                                                      dtype, 1)
-            try:
-                model_name = tu.get_sequence_model_name(trial, dtype)
 
-                self.check_setup(model_name)
+            dtypes = self.get_datatype(trial)
+            for dtype in dtypes:
+                self.clear_deferred_exceptions()
 
-                # Need scheduler to wait for queue to contain 2 sequences.
-                self.assertTrue("TRITONSERVER_DELAY_SCHEDULER" in os.environ)
-                self.assertEqual(
-                    int(os.environ["TRITONSERVER_DELAY_SCHEDULER"]), 2)
-                self.assertTrue(
-                    "TRITONSERVER_BACKLOG_DELAY_SCHEDULER" in os.environ)
-                self.assertEqual(
-                    int(os.environ["TRITONSERVER_BACKLOG_DELAY_SCHEDULER"]), 0)
+                precreated_shm0_handles = self.precreate_register_regions(
+                    (True,), dtype,
+                    0) if dtype == np.bool else self.precreate_register_regions(
+                        (1,), dtype, 0)
+                precreated_shm1_handles = self.precreate_register_regions(
+                    (True, False), dtype,
+                    1) if dtype == np.bool else self.precreate_register_regions(
+                        (11, 12), dtype, 1)
+                try:
+                    model_name = tu.get_sequence_model_name(trial, dtype)
 
-                threads = []
-                threads.append(
-                    threading.Thread(
-                        target=self.check_sequence_async,
-                        args=(
-                            trial,
-                            model_name,
-                            dtype,
-                            1001,
-                            (2000, None),
-                            # (flag_str, value, pre_delay_ms)
-                            (
-                                ("start", 1, None),),
-                            self.get_expected_result(1, 1, trial, "start"),
-                            precreated_shm0_handles),
-                        kwargs={
-                            'sequence_name': "{}".format(self._testMethodName)
-                        }))
-                threads.append(
-                    threading.Thread(
-                        target=self.check_sequence_async,
-                        args=(
-                            trial,
-                            model_name,
-                            dtype,
-                            1002,
-                            (2000, None),
-                            # (flag_str, value, pre_delay_ms)
-                            (
-                                ("start", 11, None),
-                                (None, 12, None),
-                            ),
-                            self.get_expected_result(23, 12, trial, None),
-                            precreated_shm1_handles),
-                        kwargs={
-                            'sequence_name': "{}".format(self._testMethodName)
-                        }))
+                    self.check_setup(model_name)
 
-                threads[0].start()
-                time.sleep(1)
-                threads[1].start()
-                for t in threads:
-                    t.join()
+                    # Need scheduler to wait for queue to contain 2 sequences.
+                    self.assertTrue(
+                        "TRITONSERVER_DELAY_SCHEDULER" in os.environ)
+                    self.assertEqual(
+                        int(os.environ["TRITONSERVER_DELAY_SCHEDULER"]), 2)
+                    self.assertTrue(
+                        "TRITONSERVER_BACKLOG_DELAY_SCHEDULER" in os.environ)
+                    self.assertEqual(
+                        int(os.environ["TRITONSERVER_BACKLOG_DELAY_SCHEDULER"]),
+                        0)
 
-                self.check_deferred_exception()
-                self.check_status(model_name, {2: 2}, 2, 3)
-            except Exception as ex:
-                self.assertTrue(False, "unexpected error {}".format(ex))
-            finally:
-                if TEST_SYSTEM_SHARED_MEMORY or TEST_CUDA_SHARED_MEMORY:
-                    self.cleanup_shm_regions(precreated_shm0_handles)
-                    self.cleanup_shm_regions(precreated_shm1_handles)
+                    threads = []
+                    threads.append(
+                        threading.Thread(
+                            target=self.check_sequence_async,
+                            args=(
+                                trial,
+                                model_name,
+                                dtype,
+                                1001,
+                                (2000, None),
+                                # (flag_str, value, pre_delay_ms)
+                                (
+                                    ("start", True,
+                                     None),) if dtype == np.bool else
+                                (("start", 1, None),),
+                                True if dtype == np.bool else
+                                self.get_expected_result(1, 1, trial, "start"),
+                                precreated_shm0_handles),
+                            kwargs={
+                                'sequence_name':
+                                    "{}".format(self._testMethodName)
+                            }))
+                    threads.append(
+                        threading.Thread(
+                            target=self.check_sequence_async,
+                            args=(
+                                trial,
+                                model_name,
+                                dtype,
+                                1002,
+                                (2000, None),
+                                # (flag_str, value, pre_delay_ms)
+                                (
+                                    ("start", True, None),
+                                    (None, False, None),
+                                ) if dtype == np.bool else (
+                                    ("start", 11, None),
+                                    (None, 12, None),
+                                ),
+                                False if dtype == np.bool else
+                                self.get_expected_result(23, 12, trial, None),
+                                precreated_shm1_handles),
+                            kwargs={
+                                'sequence_name':
+                                    "{}".format(self._testMethodName)
+                            }))
+
+                    threads[0].start()
+                    time.sleep(1)
+                    threads[1].start()
+                    for t in threads:
+                        t.join()
+
+                    self.check_deferred_exception()
+                    self.check_status(model_name, {2: 2}, 2, 3)
+                except Exception as ex:
+                    self.assertTrue(False, "unexpected error {}".format(ex))
+                finally:
+                    if TEST_SYSTEM_SHARED_MEMORY or TEST_CUDA_SHARED_MEMORY:
+                        self.cleanup_shm_regions(precreated_shm0_handles)
+                        self.cleanup_shm_regions(precreated_shm1_handles)
 
     def test_queue_delay_half_min_util(self):
         # Test model that have set max queue delay but minimum slot utilization
@@ -2155,78 +2612,97 @@ class SequenceBatcherTest(su.SequenceBatcherTestUtil):
                     break
             if is_ensemble:
                 continue
-            self.clear_deferred_exceptions()
-            dtype = self.get_datatype(trial)
-            precreated_shm0_handles = self.precreate_register_regions((1,),
-                                                                      dtype, 0)
-            precreated_shm1_handles = self.precreate_register_regions((11, 12),
-                                                                      dtype, 1)
-            try:
-                model_name = tu.get_sequence_model_name(trial, dtype) + "_half"
 
-                self.check_setup(model_name)
+            dtypes = self.get_datatype(trial)
+            for dtype in dtypes:
+                self.clear_deferred_exceptions()
 
-                # Need scheduler to wait for queue to contain 2 sequences.
-                self.assertTrue("TRITONSERVER_DELAY_SCHEDULER" in os.environ)
-                self.assertEqual(
-                    int(os.environ["TRITONSERVER_DELAY_SCHEDULER"]), 2)
-                self.assertTrue(
-                    "TRITONSERVER_BACKLOG_DELAY_SCHEDULER" in os.environ)
-                self.assertEqual(
-                    int(os.environ["TRITONSERVER_BACKLOG_DELAY_SCHEDULER"]), 0)
+                precreated_shm0_handles = self.precreate_register_regions(
+                    (True,), dtype,
+                    0) if dtype == np.bool else self.precreate_register_regions(
+                        (1,), dtype, 0)
+                precreated_shm1_handles = self.precreate_register_regions(
+                    (False, True), dtype,
+                    1) if dtype == np.bool else self.precreate_register_regions(
+                        (11, 12), dtype, 1)
+                try:
+                    model_name = tu.get_sequence_model_name(trial,
+                                                            dtype) + "_half"
 
-                threads = []
-                threads.append(
-                    threading.Thread(
-                        target=self.check_sequence_async,
-                        args=(
-                            trial,
-                            model_name,
-                            dtype,
-                            1001,
-                            (2000, None),
-                            # (flag_str, value, pre_delay_ms)
-                            (
-                                ("start", 1, None),),
-                            self.get_expected_result(1, 1, trial, "start"),
-                            precreated_shm0_handles),
-                        kwargs={
-                            'sequence_name': "{}".format(self._testMethodName)
-                        }))
-                threads.append(
-                    threading.Thread(
-                        target=self.check_sequence_async,
-                        args=(
-                            trial,
-                            model_name,
-                            dtype,
-                            1002,
-                            (4000, 3000),
-                            # (flag_str, value, pre_delay_ms)
-                            (
-                                ("start", 11, None),
-                                (None, 12, None),
-                            ),
-                            self.get_expected_result(23, 12, trial, None),
-                            precreated_shm1_handles),
-                        kwargs={
-                            'sequence_name': "{}".format(self._testMethodName)
-                        }))
+                    self.check_setup(model_name)
 
-                threads[0].start()
-                time.sleep(1)
-                threads[1].start()
-                for t in threads:
-                    t.join()
+                    # Need scheduler to wait for queue to contain 2 sequences.
+                    self.assertTrue(
+                        "TRITONSERVER_DELAY_SCHEDULER" in os.environ)
+                    self.assertEqual(
+                        int(os.environ["TRITONSERVER_DELAY_SCHEDULER"]), 2)
+                    self.assertTrue(
+                        "TRITONSERVER_BACKLOG_DELAY_SCHEDULER" in os.environ)
+                    self.assertEqual(
+                        int(os.environ["TRITONSERVER_BACKLOG_DELAY_SCHEDULER"]),
+                        0)
 
-                self.check_deferred_exception()
-                self.check_status(model_name, {2: 2}, 2, 3)
-            except Exception as ex:
-                self.assertTrue(False, "unexpected error {}".format(ex))
-            finally:
-                if TEST_SYSTEM_SHARED_MEMORY or TEST_CUDA_SHARED_MEMORY:
-                    self.cleanup_shm_regions(precreated_shm0_handles)
-                    self.cleanup_shm_regions(precreated_shm1_handles)
+                    threads = []
+                    threads.append(
+                        threading.Thread(
+                            target=self.check_sequence_async,
+                            args=(
+                                trial,
+                                model_name,
+                                dtype,
+                                1001,
+                                (2000, None),
+                                # (flag_str, value, pre_delay_ms)
+                                (
+                                    ("start", True,
+                                     None),) if dtype == np.bool else
+                                (("start", 1, None),),
+                                True if dtype == np.bool else
+                                self.get_expected_result(1, 1, trial, "start"),
+                                precreated_shm0_handles),
+                            kwargs={
+                                'sequence_name':
+                                    "{}".format(self._testMethodName)
+                            }))
+                    threads.append(
+                        threading.Thread(
+                            target=self.check_sequence_async,
+                            args=(
+                                trial,
+                                model_name,
+                                dtype,
+                                1002,
+                                (4000, 3000),
+                                # (flag_str, value, pre_delay_ms)
+                                (
+                                    ("start", False, None),
+                                    (None, True, None),
+                                ) if dtype == np.bool else (
+                                    ("start", 11, None),
+                                    (None, 12, None),
+                                ),
+                                False if dtype == np.bool else
+                                self.get_expected_result(23, 12, trial, None),
+                                precreated_shm1_handles),
+                            kwargs={
+                                'sequence_name':
+                                    "{}".format(self._testMethodName)
+                            }))
+
+                    threads[0].start()
+                    time.sleep(1)
+                    threads[1].start()
+                    for t in threads:
+                        t.join()
+
+                    self.check_deferred_exception()
+                    self.check_status(model_name, {2: 2}, 2, 3)
+                except Exception as ex:
+                    self.assertTrue(False, "unexpected error {}".format(ex))
+                finally:
+                    if TEST_SYSTEM_SHARED_MEMORY or TEST_CUDA_SHARED_MEMORY:
+                        self.cleanup_shm_regions(precreated_shm0_handles)
+                        self.cleanup_shm_regions(precreated_shm1_handles)
 
     def test_queue_delay_full_min_util(self):
         # Test model that have set max queue delay but minimum slot utilization
@@ -2243,353 +2719,97 @@ class SequenceBatcherTest(su.SequenceBatcherTestUtil):
                     break
             if is_ensemble:
                 continue
-            self.clear_deferred_exceptions()
-            dtype = self.get_datatype(trial)
-            precreated_shm0_handles = self.precreate_register_regions((1,),
-                                                                      dtype, 0)
-            precreated_shm1_handles = self.precreate_register_regions((11, 12),
-                                                                      dtype, 1)
-            try:
-                model_name = tu.get_sequence_model_name(trial, dtype) + "_full"
 
-                self.check_setup(model_name)
-
-                # Need scheduler to wait for queue to contain 2 sequences.
-                self.assertTrue("TRITONSERVER_DELAY_SCHEDULER" in os.environ)
-                self.assertEqual(
-                    int(os.environ["TRITONSERVER_DELAY_SCHEDULER"]), 2)
-                self.assertTrue(
-                    "TRITONSERVER_BACKLOG_DELAY_SCHEDULER" in os.environ)
-                self.assertEqual(
-                    int(os.environ["TRITONSERVER_BACKLOG_DELAY_SCHEDULER"]), 0)
-
-                threads = []
-                threads.append(
-                    threading.Thread(
-                        target=self.check_sequence_async,
-                        args=(
-                            trial,
-                            model_name,
-                            dtype,
-                            1001,
-                            (4000, 3000),
-                            # (flag_str, value, pre_delay_ms)
-                            (
-                                ("start", 1, None),),
-                            self.get_expected_result(1, 1, trial, "start"),
-                            precreated_shm0_handles),
-                        kwargs={
-                            'sequence_name': "{}".format(self._testMethodName)
-                        }))
-                threads.append(
-                    threading.Thread(
-                        target=self.check_sequence_async,
-                        args=(
-                            trial,
-                            model_name,
-                            dtype,
-                            1002,
-                            (6000, 5000),
-                            # (flag_str, value, pre_delay_ms)
-                            (
-                                ("start", 11, None),
-                                (None, 12, 2000),
-                            ),
-                            self.get_expected_result(23, 12, trial, None),
-                            precreated_shm1_handles),
-                        kwargs={
-                            'sequence_name': "{}".format(self._testMethodName)
-                        }))
-
-                threads[0].start()
-                time.sleep(1)
-                threads[1].start()
-                for t in threads:
-                    t.join()
-
-                self.check_deferred_exception()
-                self.check_status(model_name, {2: 2}, 2, 3)
-            except Exception as ex:
-                self.assertTrue(False, "unexpected error {}".format(ex))
-            finally:
-                if TEST_SYSTEM_SHARED_MEMORY or TEST_CUDA_SHARED_MEMORY:
-                    self.cleanup_shm_regions(precreated_shm0_handles)
-                    self.cleanup_shm_regions(precreated_shm1_handles)
-
-    def test_simple_sequence_bool(self):
-        # Send one sequence and check for correct result.
-        # The result should be returned immediately.
-        for trial in _bool_trials:
-            # Run on different protocols.
-            for idx, protocol in enumerate(_protocols):
+            dtypes = self.get_datatype(trial)
+            for dtype in dtypes:
                 self.clear_deferred_exceptions()
+
+                precreated_shm0_handles = self.precreate_register_regions(
+                    (True,), dtype,
+                    0) if dtype == np.bool else self.precreate_register_regions(
+                        (1,), dtype, 0)
+                precreated_shm1_handles = self.precreate_register_regions(
+                    (False, True), dtype,
+                    1) if dtype == np.bool else self.precreate_register_regions(
+                        (11, 12), dtype, 1)
                 try:
-                    dtype = np.bool
-                    model_name = tu.get_sequence_model_name(trial, dtype)
+                    model_name = tu.get_sequence_model_name(trial,
+                                                            dtype) + "_full"
 
                     self.check_setup(model_name)
-                    self.assertFalse(
-                        "TRITONSERVER_DELAY_SCHEDULER" in os.environ)
-                    self.assertFalse(
-                        "TRITONSERVER_BACKLOG_DELAY_SCHEDULER" in os.environ)
 
-                    self.check_sequence(
-                        trial,
-                        model_name,
-                        dtype,
-                        5,
-                        (4000, None),
-                        # (flag_str, value, (ls_ms, gt_ms), (pre_delay, post_delay))
-                        (("start", True, None, None), (None, True, None, None),
-                         (None, True, None, None), (None, True, None, None),
-                         (None, True, None, None), (None, True, None, None),
-                         (None, True, None, None), (None, True, None, None),
-                         ("end", False, None, None)),
-                        False,
-                        protocol,
-                        sequence_name="{}_{}".format(self._testMethodName,
-                                                     protocol))
+                    # Need scheduler to wait for queue to contain 2 sequences.
+                    self.assertTrue(
+                        "TRITONSERVER_DELAY_SCHEDULER" in os.environ)
+                    self.assertEqual(
+                        int(os.environ["TRITONSERVER_DELAY_SCHEDULER"]), 2)
+                    self.assertTrue(
+                        "TRITONSERVER_BACKLOG_DELAY_SCHEDULER" in os.environ)
+                    self.assertEqual(
+                        int(os.environ["TRITONSERVER_BACKLOG_DELAY_SCHEDULER"]),
+                        0)
+
+                    threads = []
+                    threads.append(
+                        threading.Thread(
+                            target=self.check_sequence_async,
+                            args=(
+                                trial,
+                                model_name,
+                                dtype,
+                                1001,
+                                (4000, 3000),
+                                # (flag_str, value, pre_delay_ms)
+                                (
+                                    ("start", True,
+                                     None),) if dtype == np.bool else
+                                (("start", 1, None),),
+                                True if dtype == np.bool else
+                                self.get_expected_result(1, 1, trial, "start"),
+                                precreated_shm0_handles),
+                            kwargs={
+                                'sequence_name':
+                                    "{}".format(self._testMethodName)
+                            }))
+                    threads.append(
+                        threading.Thread(
+                            target=self.check_sequence_async,
+                            args=(
+                                trial,
+                                model_name,
+                                dtype,
+                                1002,
+                                (6000, 5000),
+                                # (flag_str, value, pre_delay_ms)
+                                (
+                                    ("start", False, None),
+                                    (None, True, 2000),
+                                ) if dtype == np.bool else (
+                                    ("start", 11, None),
+                                    (None, 12, 2000),
+                                ),
+                                False if dtype == np.bool else
+                                self.get_expected_result(23, 12, trial, None),
+                                precreated_shm1_handles),
+                            kwargs={
+                                'sequence_name':
+                                    "{}".format(self._testMethodName)
+                            }))
+
+                    threads[0].start()
+                    time.sleep(1)
+                    threads[1].start()
+                    for t in threads:
+                        t.join()
 
                     self.check_deferred_exception()
-                    self.check_status(model_name, {1: 9 * (idx + 1)},
-                                      9 * (idx + 1), 9 * (idx + 1))
+                    self.check_status(model_name, {2: 2}, 2, 3)
                 except Exception as ex:
                     self.assertTrue(False, "unexpected error {}".format(ex))
-
-    def test_length1_sequence_bool(self):
-        # Send a length-1 sequence and check for correct accumulator
-        # result. The result should be returned immediately.
-        for trial in _bool_trials:
-            # Run on different protocols.
-            for idx, protocol in enumerate(_protocols):
-                self.clear_deferred_exceptions()
-                try:
-                    dtype = np.bool
-                    model_name = tu.get_sequence_model_name(trial, dtype)
-
-                    self.check_setup(model_name)
-                    self.assertFalse(
-                        "TRITONSERVER_DELAY_SCHEDULER" in os.environ)
-                    self.assertFalse(
-                        "TRITONSERVER_BACKLOG_DELAY_SCHEDULER" in os.environ)
-
-                    self.check_sequence(
-                        trial,
-                        model_name,
-                        dtype,
-                        99,
-                        (4000, None),
-                        # (flag_str, value, (ls_ms, gt_ms), (pre_delay, post_delay))
-                        (
-                            ("start,end", True, None, None),),
-                        True,
-                        protocol,
-                        sequence_name="{}_{}".format(self._testMethodName,
-                                                     protocol))
-
-                    self.check_deferred_exception()
-                    self.check_status(model_name, {1: idx + 1}, (idx + 1),
-                                      (idx + 1))
-                except Exception as ex:
-                    self.assertTrue(False, "unexpected error {}".format(ex))
-
-    def test_batch_size_bool(self):
-        # Send sequence with a batch-size > 1 and check for error.
-        for trial in _bool_trials:
-            # Run on different protocols.
-            for idx, protocol in enumerate(_protocols):
-                self.clear_deferred_exceptions()
-                try:
-                    dtype = np.bool
-                    model_name = tu.get_sequence_model_name(trial, dtype)
-
-                    self.check_setup(model_name)
-                    self.assertFalse(
-                        "TRITONSERVER_DELAY_SCHEDULER" in os.environ)
-                    self.assertFalse(
-                        "TRITONSERVER_BACKLOG_DELAY_SCHEDULER" in os.environ)
-
-                    self.check_sequence(
-                        trial,
-                        model_name,
-                        dtype,
-                        27,
-                        (4000, None),
-                        # (flag_str, value, (ls_ms, gt_ms), (pre_delay, post_delay))
-                        (("start", True, None, None),
-                         ("end", False, None, None)),
-                        False,
-                        protocol,
-                        batch_size=2,
-                        sequence_name="{}_{}".format(self._testMethodName,
-                                                     protocol))
-
-                    self.check_deferred_exception()
-                    self.assertTrue(False, "expected error")
-                except Exception as ex:
-                    self.assertTrue(ex.message().startswith(
-                        str("inference request to model '{}' must specify " +
-                            "batch-size 1 due to requirements of sequence " +
-                            "batcher").format(model_name)))
-
-    def test_no_correlation_id_bool(self):
-        # Send sequence without correlation ID and check for error.
-        for trial in _bool_trials:
-            # Run on different protocols.
-            for idx, protocol in enumerate(_protocols):
-                self.clear_deferred_exceptions()
-                try:
-                    dtype = np.bool
-                    model_name = tu.get_sequence_model_name(trial, dtype)
-
-                    self.check_setup(model_name)
-                    self.assertFalse(
-                        "TRITONSERVER_DELAY_SCHEDULER" in os.environ)
-                    self.assertFalse(
-                        "TRITONSERVER_BACKLOG_DELAY_SCHEDULER" in os.environ)
-
-                    self.check_sequence(
-                        trial,
-                        model_name,
-                        dtype,
-                        0,  # correlation_id = 0
-                        (4000, None),
-                        # (flag_str, value, (ls_ms, gt_ms), (pre_delay, post_delay))
-                        (("start", False, None, None),
-                         ("end", False, None, None)),
-                        False,
-                        protocol,
-                        sequence_name="{}_{}".format(self._testMethodName,
-                                                     protocol))
-
-                    self.check_deferred_exception()
-                    self.assertTrue(False, "expected error")
-                except Exception as ex:
-                    self.assertTrue(ex.message().startswith(
-                        str("inference request to model '{}' must specify a " +
-                            "non-zero correlation ID").format(model_name)))
-
-    def test_no_sequence_start_bool(self):
-        # Send sequence without start flag for never before seen
-        # correlation ID. Expect failure.
-        for trial in _bool_trials:
-            # Run on different protocols.
-            for idx, protocol in enumerate(_protocols):
-                self.clear_deferred_exceptions()
-                try:
-                    dtype = np.bool
-                    model_name = tu.get_sequence_model_name(trial, dtype)
-
-                    self.check_setup(model_name)
-                    self.assertFalse(
-                        "TRITONSERVER_DELAY_SCHEDULER" in os.environ)
-                    self.assertFalse(
-                        "TRITONSERVER_BACKLOG_DELAY_SCHEDULER" in os.environ)
-
-                    self.check_sequence(
-                        trial,
-                        model_name,
-                        dtype,
-                        37469245,
-                        (4000, None),
-                        # (flag_str, value, (ls_ms, gt_ms), (pre_delay, post_delay))
-                        ((None, True, None, None), (None, True, None, None),
-                         ("end", False, None, None)),
-                        False,
-                        protocol,
-                        sequence_name="{}_{}".format(self._testMethodName,
-                                                     protocol))
-
-                    self.check_deferred_exception()
-                    self.assertTrue(False, "expected error")
-                except Exception as ex:
-                    print(model_name + "-> " + ex.message())
-                    self.assertTrue(ex.message().startswith(
-                        str("inference request for sequence 37469245 to " +
-                            "model '{}' must specify the START flag on the first "
-                            + "request of the sequence").format(model_name)))
-
-    def test_no_sequence_start2_bool(self):
-        # Send sequence without start flag after sending a valid
-        # sequence with the same correlation ID. Expect failure for
-        # the second sequence.
-        for trial in _bool_trials:
-            # Run on different protocols.
-            for idx, protocol in enumerate(_protocols):
-                self.clear_deferred_exceptions()
-                try:
-                    dtype = np.bool
-                    model_name = tu.get_sequence_model_name(trial, dtype)
-
-                    self.check_setup(model_name)
-                    self.assertFalse(
-                        "TRITONSERVER_DELAY_SCHEDULER" in os.environ)
-                    self.assertFalse(
-                        "TRITONSERVER_BACKLOG_DELAY_SCHEDULER" in os.environ)
-
-                    self.check_sequence(
-                        trial,
-                        model_name,
-                        dtype,
-                        3,
-                        (4000, None),
-                        # (flag_str, value, (ls_ms, gt_ms), (pre_delay, post_delay))
-                        (("start", True, None, None), (None, False, None, None),
-                         ("end", False, None, None), (None, False, None, None)),
-                        False,
-                        protocol,
-                        sequence_name="{}_{}".format(self._testMethodName,
-                                                     protocol))
-
-                    self.check_status(model_name, {1: 3 * (idx + 1)},
-                                      3 * (idx + 1), 3 * (idx + 1))
-                    self.check_deferred_exception()
-                    self.assertTrue(False, "expected error")
-                except Exception as ex:
-                    self.assertTrue(ex.message().startswith(
-                        str("inference request for sequence 3 to model '{}' must "
-                            +
-                            "specify the START flag on the first request of " +
-                            "the sequence").format(model_name)))
-
-    def test_no_sequence_end_bool(self):
-        # Send sequence without end flag. Use same correlation ID to
-        # send another sequence. The first sequence will be ended
-        # automatically but the second should complete successfully.
-        for trial in _bool_trials:
-            # Run on different protocols.
-            for idx, protocol in enumerate(_protocols):
-                self.clear_deferred_exceptions()
-                try:
-                    dtype = np.bool
-                    model_name = tu.get_sequence_model_name(trial, dtype)
-
-                    self.check_setup(model_name)
-                    self.assertFalse(
-                        "TRITONSERVER_DELAY_SCHEDULER" in os.environ)
-                    self.assertFalse(
-                        "TRITONSERVER_BACKLOG_DELAY_SCHEDULER" in os.environ)
-
-                    self.check_sequence(
-                        trial,
-                        model_name,
-                        dtype,
-                        4566,
-                        (4000, None),
-                        # (flag_str, value, (ls_ms, gt_ms), (pre_delay, post_delay))
-                        (("start", True, None, None), (None, True, None, None),
-                         ("start", False, None, None),
-                         ("end", False, None, None)),
-                        False,
-                        protocol,
-                        sequence_name="{}_{}".format(self._testMethodName,
-                                                     protocol))
-
-                    self.check_deferred_exception()
-                    self.check_status(model_name, {1: 4 * (idx + 1)},
-                                      4 * (idx + 1), 4 * (idx + 1))
-                except Exception as ex:
-                    self.assertTrue(False, "unexpected error {}".format(ex))
+                finally:
+                    if TEST_SYSTEM_SHARED_MEMORY or TEST_CUDA_SHARED_MEMORY:
+                        self.cleanup_shm_regions(precreated_shm0_handles)
+                        self.cleanup_shm_regions(precreated_shm1_handles)
 
 
 if __name__ == '__main__':
