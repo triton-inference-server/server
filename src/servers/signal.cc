@@ -1,4 +1,4 @@
-// Copyright (c) 2020, NVIDIA CORPORATION. All rights reserved.
+// Copyright (c) 2020-2021, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 //
 // Redistribution and use in source and binary forms, with or without
 // modification, are permitted provided that the following conditions
@@ -33,6 +33,9 @@
 #else
 #include <csignal>
 #endif
+
+#define BOOST_STACKTRACE_USE_ADDR2LINE
+#include <boost/stacktrace.hpp>
 
 namespace nvidia { namespace inferenceserver {
 
@@ -107,6 +110,8 @@ void
 SignalHandler(int signum)
 {
   std::cout << "Signal (" << signum << ") received." << std::endl;
+  std::cout << boost::stacktrace::stacktrace() << std::endl;
+
   CommonSignalHandler();
 }
 
@@ -115,9 +120,12 @@ SignalHandler(int signum)
 TRITONSERVER_Error*
 RegisterSignalHandler()
 {
-  // Trap SIGINT and SIGTERM to allow server to exit gracefully
+  // Trap SIGINT, SIGTERM, SIGSEGV and SIGABRT to allow server to exit
+  // gracefully
   signal(SIGINT, SignalHandler);
   signal(SIGTERM, SignalHandler);
+  signal(SIGSEGV, SignalHandler);
+  signal(SIGABRT, SignalHandler);
 
   return nullptr;  // success
 }
