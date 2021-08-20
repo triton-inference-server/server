@@ -128,6 +128,7 @@ class TritonModelInstance {
         std::unique_ptr<TritonBackendThread>* triton_backend_thread);
     void AddModelInstance(TritonModelInstance* model_instance);
     Status InitAndWarmUpModelInstance(TritonModelInstance* model_instance);
+    void StopBackendThread();
     ~TritonBackendThread();
 
    private:
@@ -176,8 +177,6 @@ class TritonModelInstance {
   bool passive_;
 
   std::vector<SecondaryDevice> secondary_devices_;
-
-  std::shared_ptr<TritonBackendThread> backend_thread_;
 
   // Reporter for metrics, or nullptr if no metrics should be reported
   std::shared_ptr<MetricModelReporter> reporter_;

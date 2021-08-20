@@ -134,6 +134,10 @@ TritonModelInstance::TritonModelInstance(
 
 TritonModelInstance::~TritonModelInstance()
 {
+  if (triton_backend_thread_.get() != nullptr) {
+    triton_backend_thread_->StopBackendThread();
+  }
+
   // Model finalization is optional...
   if (model_->Backend()->ModelInstanceFiniFn() != nullptr) {
     LOG_TRITONSERVER_ERROR(
@@ -639,11 +643,17 @@ TritonModelInstance::TritonBackendThread::TritonBackendThread(
 
 TritonModelInstance::TritonBackendThread::~TritonBackendThread()
 {
-  // Signal the backend thread to exit and then wait for it...
-  auto exit_payload = model_->Server()->GetRateLimiter()->GetPayload(
-      RateLimiter::Payload::Operation::EXIT, model_instances_.back());
-  model_->Server()->GetRateLimiter()->EnqueuePayload(model_, exit_payload);
+  StopBackendThread();
+}
+
+void
+TritonModelInstance::TritonBackendThread::StopBackendThread()
+{
   if (backend_thread_.joinable()) {
+    // Signal the backend thread to exit and then wait for it...
+    auto exit_payload = model_->Server()->GetRateLimiter()->GetPayload(
+        RateLimiter::Payload::Operation::EXIT, model_instances_.back());
+    model_->Server()->GetRateLimiter()->EnqueuePayload(model_, exit_payload);
     backend_thread_.join();
   }
 }
