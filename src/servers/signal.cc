@@ -110,9 +110,16 @@ void
 SignalHandler(int signum)
 {
   std::cout << "Signal (" << signum << ") received." << std::endl;
+  CommonSignalHandler();
+}
+
+void
+ErrorSignalHandler(int signum)
+{
+  std::cout << "Signal (" << signum << ") received." << std::endl;
   std::cout << boost::stacktrace::stacktrace() << std::endl;
 
-  CommonSignalHandler();
+  _Exit(1);
 }
 
 }  // namespace
@@ -120,12 +127,13 @@ SignalHandler(int signum)
 TRITONSERVER_Error*
 RegisterSignalHandler()
 {
-  // Trap SIGINT, SIGTERM, SIGSEGV and SIGABRT to allow server to exit
-  // gracefully
+  // Trap SIGINT and SIGTERM to allow server to exit gracefully
   signal(SIGINT, SignalHandler);
   signal(SIGTERM, SignalHandler);
-  signal(SIGSEGV, SignalHandler);
-  signal(SIGABRT, SignalHandler);
+
+  // Trap SIGSEGV and SIGABRT to exit when server crashes
+  signal(SIGSEGV, ErrorSignalHandler);
+  signal(SIGABRT, ErrorSignalHandler);
 
   return nullptr;  // success
 }
