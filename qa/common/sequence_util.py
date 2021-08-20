@@ -1,4 +1,4 @@
-# Copyright (c) 2019-2021, NVIDIA CORPORATION. All rights reserved.
+# Copyright (c) 2019-2021, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -63,7 +63,7 @@ _valgrind_delay_ms = bool(int(os.environ.get('TEST_DELAY_MS', 50)))
 
 _deferred_exceptions_lock = threading.Lock()
 _deferred_exceptions = None
-_jetson_slowdown_factor = 1.6
+_jetson_slowdown_factor = 3
 
 
 class UserData:
