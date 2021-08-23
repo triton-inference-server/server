@@ -795,7 +795,7 @@ if __name__ == '__main__':
         '--test-duration',
         type=int,
         required=False,
-        default=25000,
+        default=7200,
         help='Duration of stress test to run. Default is 25000 seconds ' +
         '(approximately 7 hours).')
     FLAGS = parser.parse_args()
