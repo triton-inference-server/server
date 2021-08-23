@@ -103,6 +103,8 @@ cp -r $DATADIR/tf_model_store/resnet_v1_50_graphdef $MODEL_DIR/resnet_v1_50_grap
     sed -i 's/^name: "resnet_v1_50_graphdef"/name: "resnet_v1_50_graphdef_def"/' config.pbtxt && \
     echo "optimization { }" >> config.pbtxt)
 
+python -m pip install -U prettytable
+
 SERVER_ARGS="--model-repository=`pwd`/$MODEL_DIR"
 SERVER_LOG="./serverlog"
 run_server
@@ -128,6 +130,11 @@ if [ $RET -eq 0 ]; then
 else
     cat $CLIENT_LOG
     echo -e "\n***\n*** Test FAILED\n***"
+fi
+
+# Run only if both TRITON_FROM and TRITON_TO_DL are set
+if [[ ! -z "$TRITON_FROM" ]] || [[ ! -z "$TRITON_TO_DL" ]]; then
+    python stress_mail.py
 fi
 
 exit $RET

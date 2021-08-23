@@ -41,6 +41,7 @@ import test_util as tu
 from functools import partial
 import tritongrpcclient as grpcclient
 from tritonclientutils import np_to_triton_dtype
+import prettytable
 
 if sys.version_info >= (3, 0):
     import queue
@@ -56,6 +57,12 @@ BACKENDS = os.environ.get('BACKENDS', "graphdef savedmodel onnx plan")
 
 _thread_exceptions = []
 _thread_exceptions_mutex = threading.Lock()
+
+_test_case_count = {}
+_test_case_count_mutex = threading.Lock()
+
+_failed_test_case_count = {}
+_failed_test_case_count_mutex = threading.Lock()
 
 
 class UserData:
@@ -217,6 +224,30 @@ def get_trial(is_sequence=True):
             if (backend != "libtorch"):
                 _trials += (backend + "_nobatch",)
         return np.random.choice(_trials)
+
+
+def count_test_case(test_case_name):
+    # Count the times each test case runs
+    _test_case_count_mutex.acquire()
+    try:
+        if test_case_name in _test_case_count:
+            _test_case_count[test_case_name] += 1
+        else:
+            _test_case_count[test_case_name] = 1
+    finally:
+        _test_case_count_mutex.release()
+
+
+def count_failed_test_case(test_case_name):
+    # Count the times each test case fails
+    _failed_test_case_count_mutex.acquire()
+    try:
+        if test_case_name in _failed_test_case_count:
+            _failed_test_case_count[test_case_name] += 1
+        else:
+            _failed_test_case_count[test_case_name] = 1
+    finally:
+        _failed_test_case_count_mutex.release()
 
 
 def sequence_valid(client_metadata, rng, trial, model_name, dtype, len_mean,
@@ -475,31 +506,32 @@ def stress_thread(name, seed, test_duration, correlation_id_base):
     rng = np.random.RandomState(seed)
 
     client_metadata_list = []
+
+    # Must use streaming GRPC context to ensure each sequences'
+    # requests are received in order. Create 2 common-use contexts
+    # with different correlation IDs that are used for most
+    # inference requests. Also create some rare-use contexts that
+    # are used to make requests with rarely-used correlation IDs.
+    #
+    # Need to remember the last choice for each context since we
+    # don't want some choices to follow others since that gives
+    # results not expected. See below for details.
+    common_cnt = 2
+    rare_cnt = 8
+    last_choices = []
+
+    for c in range(common_cnt + rare_cnt):
+        client_metadata_list.append(
+            (grpcclient.InferenceServerClient("localhost:8001",
+                                              verbose=FLAGS.verbose),
+             correlation_id_base + c))
+        last_choices.append(None)
+
+    rare_idx = 0
     start_time = time.time()
 
-    try:
-        # Must use streaming GRPC context to ensure each sequences'
-        # requests are received in order. Create 2 common-use contexts
-        # with different correlation IDs that are used for most
-        # inference requests. Also create some rare-use contexts that
-        # are used to make requests with rarely-used correlation IDs.
-        #
-        # Need to remember the last choice for each context since we
-        # don't want some choices to follow others since that gives
-        # results not expected. See below for details.
-        common_cnt = 2
-        rare_cnt = 8
-        last_choices = []
-
-        for c in range(common_cnt + rare_cnt):
-            client_metadata_list.append(
-                (grpcclient.InferenceServerClient("localhost:8001",
-                                                  verbose=FLAGS.verbose),
-                 correlation_id_base + c))
-            last_choices.append(None)
-
-        rare_idx = 0
-        while time.time() - start_time < test_duration:
+    while time.time() - start_time < test_duration:
+        try:
             trial = get_trial()
             dtype = get_datatype(trial)
             model_name = tu.get_sequence_model_name(trial, dtype)
@@ -514,6 +546,8 @@ def stress_thread(name, seed, test_duration, correlation_id_base):
                 # exercise the idle sequence path of the sequence
                 # scheduler
                 if choice < 0.33:
+                    count_test_case("sequence_no_end")
+                    last_choices[client_idx] = "sequence_no_end"
                     sequence_no_end(client_metadata_list[client_idx],
                                     rng,
                                     trial,
@@ -522,8 +556,9 @@ def stress_thread(name, seed, test_duration, correlation_id_base):
                                     SEQUENCE_LENGTH_MEAN,
                                     SEQUENCE_LENGTH_STDEV,
                                     sequence_name=name)
-                    last_choices[client_idx] = "no-end"
                 elif choice < 0.66:
+                    count_test_case("sequence_valid_no_end")
+                    last_choices[client_idx] = "sequence_valid_no_end"
                     sequence_valid_no_end(client_metadata_list[client_idx],
                                           rng,
                                           trial,
@@ -532,8 +567,9 @@ def stress_thread(name, seed, test_duration, correlation_id_base):
                                           SEQUENCE_LENGTH_MEAN,
                                           SEQUENCE_LENGTH_STDEV,
                                           sequence_name=name)
-                    last_choices[client_idx] = "valid-no-end"
                 else:
+                    count_test_case("sequence_valid_valid")
+                    last_choices[client_idx] = "sequence_valid_valid"
                     sequence_valid_valid(client_metadata_list[client_idx],
                                          rng,
                                          trial,
@@ -542,7 +578,6 @@ def stress_thread(name, seed, test_duration, correlation_id_base):
                                          SEQUENCE_LENGTH_MEAN,
                                          SEQUENCE_LENGTH_STDEV,
                                          sequence_name=name)
-                    last_choices[client_idx] = "valid-valid"
 
                 rare_idx = (rare_idx + 1) % rare_cnt
             elif rng.rand() < 0.6:
@@ -557,16 +592,20 @@ def stress_thread(name, seed, test_duration, correlation_id_base):
                 # just assume that the no-start is a continuation of
                 # the no-end sequence instead of being a sequence
                 # missing start flag.
-                if ((last_choice != "no-end") and
-                    (last_choice != "valid-no-end") and (choice < 0.01)):
+                if ((last_choice != "sequence_no_end") and
+                    (last_choice != "sequence_valid_no_end") and
+                    (choice < 0.01)):
+                    count_test_case("sequence_no_start")
+                    last_choices[client_idx] = "sequence_no_start"
                     sequence_no_start(client_metadata,
                                       rng,
                                       trial,
                                       model_name,
                                       dtype,
                                       sequence_name=name)
-                    last_choices[client_idx] = "no-start"
                 elif choice < 0.05:
+                    count_test_case("sequence_no_end")
+                    last_choices[client_idx] = "sequence_no_end"
                     sequence_no_end(client_metadata,
                                     rng,
                                     trial,
@@ -575,8 +614,9 @@ def stress_thread(name, seed, test_duration, correlation_id_base):
                                     SEQUENCE_LENGTH_MEAN,
                                     SEQUENCE_LENGTH_STDEV,
                                     sequence_name=name)
-                    last_choices[client_idx] = "no-end"
                 elif choice < 0.10:
+                    count_test_case("sequence_valid_no_end")
+                    last_choices[client_idx] = "sequence_valid_no_end"
                     sequence_valid_no_end(client_metadata,
                                           rng,
                                           trial,
@@ -585,8 +625,9 @@ def stress_thread(name, seed, test_duration, correlation_id_base):
                                           SEQUENCE_LENGTH_MEAN,
                                           SEQUENCE_LENGTH_STDEV,
                                           sequence_name=name)
-                    last_choices[client_idx] = "valid-no-end"
                 elif choice < 0.15:
+                    count_test_case("sequence_valid_valid")
+                    last_choices[client_idx] = "sequence_valid_valid"
                     sequence_valid_valid(client_metadata,
                                          rng,
                                          trial,
@@ -595,8 +636,9 @@ def stress_thread(name, seed, test_duration, correlation_id_base):
                                          SEQUENCE_LENGTH_MEAN,
                                          SEQUENCE_LENGTH_STDEV,
                                          sequence_name=name)
-                    last_choices[client_idx] = "valid-valid"
                 else:
+                    count_test_case("sequence_valid")
+                    last_choices[client_idx] = "sequence_valid"
                     sequence_valid(client_metadata,
                                    rng,
                                    trial,
@@ -605,28 +647,30 @@ def stress_thread(name, seed, test_duration, correlation_id_base):
                                    SEQUENCE_LENGTH_MEAN,
                                    SEQUENCE_LENGTH_STDEV,
                                    sequence_name=name)
-                    last_choices[client_idx] = "valid"
             else:
                 client_idx = 1
                 client_metadata = client_metadata_list[client_idx]
                 choice = rng.rand()
 
                 if choice < 0.3:
+                    count_test_case("timeout_client")
+                    last_choices[client_idx] = "timeout_client"
                     timeout_client(client_metadata_list[client_idx], name)
-                    last_choices[client_idx] = "timeout-client"
                 elif choice < 0.5:
+                    count_test_case("resnet_model_request")
+                    last_choices[client_idx] = "resnet_model_request"
                     resnet_model_request(name)
-                    last_choices[client_idx] = "resnet-request"
                 else:
+                    count_test_case("crashing_client")
+                    last_choices[client_idx] = "crashing_client"
                     crashing_client(name)
-                    last_choices[client_idx] = "crashing-client"
-
-    except Exception as ex:
-        _thread_exceptions_mutex.acquire()
-        try:
-            _thread_exceptions.append(traceback.format_exc())
-        finally:
-            _thread_exceptions_mutex.release()
+        except Exception as ex:
+            _thread_exceptions_mutex.acquire()
+            try:
+                count_failed_test_case(last_choices[client_idx])
+                _thread_exceptions.append(traceback.format_exc())
+            finally:
+                _thread_exceptions_mutex.release()
 
     # We need to explicitly close each client so that streams get
     # cleaned up and closed correctly, otherwise the application
@@ -644,6 +688,87 @@ def check_status(model_name):
                                               verbose=FLAGS.verbose)
     stats = client.get_inference_statistics(model_name)
     print(stats)
+
+
+def format_content(content, max_line_length):
+    # Accumulated line length
+    ACC_length = 0
+    words = content.split(" ")
+    formatted_content = ""
+
+    for word in words:
+        if (ACC_length + (len(word) + 1)) <= max_line_length:
+            # Append the word and a space
+            formatted_content = formatted_content + word + " "
+            ACC_length = ACC_length + len(word) + 1
+        else:
+            # Append a line break, then the word and a space
+            formatted_content = formatted_content + "\n" + word + " "
+            # Reset the counter of length
+            ACC_length = len(word) + 1
+    return formatted_content
+
+
+def generate_report(elapsed_time):
+    # Generate email report
+    hrs = elapsed_time // 3600
+    mins = (elapsed_time / 60) % 60
+    secs = elapsed_time % 60
+
+    test_case_description = {
+        'sequence_valid': 'Send a sequence with "start" and "end" flags.',
+        'sequence_valid_valid':
+            'Send two sequences back to back using the same correlation ID'
+            ' with "start" and "end" flags.',
+        'sequence_valid_no_end':
+            'Send two sequences back to back using the same correlation ID.'
+            ' The first with "start" and "end" flags, and the second with no'
+            ' "end" flag.',
+        'sequence_no_start':
+            'Send a sequence without a "start" flag. Sequence should get an'
+            ' error from the server.',
+        'sequence_no_end':
+            'Send a sequence with "start" flag but that never ends. The'
+            ' sequence should be aborted by the server and its slot reused'
+            ' for another sequence.',
+        'timeout_client': 'Expect an exception for small timeout values.',
+        'resnet_model_request': 'Send a request using resnet model.',
+        'crashing_client': 'Client crashes in the middle of inferences.'
+    }
+
+    f = open("stress_report.txt", "w")
+    f.write("Test Duration: {:0>2}:{:0>2}:{:0>2} (HH:MM:SS)\n".format(
+        int(hrs), int(mins), int(secs)))
+
+    t = prettytable.PrettyTable(hrules=prettytable.ALL)
+    t.field_names = [
+        'Test Case', 'Number of Failures', 'Total Times',
+        'Test Case Description'
+    ]
+
+    t.align["Test Case"] = "l"
+    t.align["Number of Failures"] = "l"
+    t.align["Total Times"] = "l"
+    t.align["Test Case Description"] = "l"
+
+    for c in test_case_description:
+        t.add_row([
+            c,
+            _failed_test_case_count[c] if c in _failed_test_case_count else 0,
+            _test_case_count[c] if c in _test_case_count else 0,
+            format_content(test_case_description[c], 50)
+        ])
+
+    t.add_row([
+        'TOTAL',
+        sum(_failed_test_case_count.values()),
+        sum(_test_case_count.values()), 'X'
+    ])
+
+    print(t)
+    f.write(str(t))
+
+    f.close()
 
 
 if __name__ == '__main__':
@@ -706,10 +831,13 @@ if __name__ == '__main__':
                              args=(thread_name, seed, FLAGS.test_duration,
                                    correlation_id_base)))
 
+    start_time = time.time()
     for t in threads:
         t.start()
     for t in threads:
         t.join()
+
+    generate_report(time.time() - start_time)
 
     _thread_exceptions_mutex.acquire()
     try:
