@@ -44,9 +44,17 @@ mkdir -p models/bls/1/
 cp ../../python_models/bls/model.py models/bls/1/
 cp ../../python_models/bls/config.pbtxt models/bls
 
+mkdir -p models/bls_async/1/
+cp ../../python_models/bls_async/model.py models/bls_async/1/
+cp ../../python_models/bls_async/config.pbtxt models/bls_async
+
 mkdir -p models/bls_memory/1/
 cp ../../python_models/bls_memory/model.py models/bls_memory/1/
 cp ../../python_models/bls_memory/config.pbtxt models/bls_memory
+
+mkdir -p models/bls_memory_async/1/
+cp ../../python_models/bls_memory_async/model.py models/bls_memory_async/1/
+cp ../../python_models/bls_memory_async/config.pbtxt models/bls_memory_async
 
 mkdir -p models/add_sub/1/
 cp ../../python_models/add_sub/model.py models/add_sub/1/
@@ -64,18 +72,15 @@ run_server
 if [ "$SERVER_PID" == "0" ]; then
     echo -e "\n***\n*** Failed to start $SERVER\n***"
     cat $SERVER_LOG
-    RET=1
+    exit 1
 fi
 
 set +e
 
-# First try the BLS memory test and then test the normal BLS. This ensures that
-# the Python backend can work properly after shared memory saturation caused by
-# one of the older requests.
-export MODEL_NAME='bls_memory'
-python3 $CLIENT_PY > $CLIENT_LOG 2>&1 
+export MODEL_NAME='bls'
+python3 $CLIENT_PY >> $CLIENT_LOG 2>&1 
 if [ $? -ne 0 ]; then
-    echo -e "\n***\n*** python_unittest.py FAILED. \n***"
+    echo -e "\n***\n*** 'bls' test FAILED. \n***"
     cat $CLIENT_LOG
     RET=1
 else
@@ -87,10 +92,40 @@ else
     fi
 fi
 
-export MODEL_NAME='bls'
+export MODEL_NAME='bls_memory'
 python3 $CLIENT_PY > $CLIENT_LOG 2>&1 
 if [ $? -ne 0 ]; then
-    echo -e "\n***\n*** python_unittest.py FAILED. \n***"
+    echo -e "\n***\n*** 'bls_memory' test FAILED. \n***"
+    cat $CLIENT_LOG
+    RET=1
+else
+    check_test_results $TEST_RESULT_FILE $EXPECTED_NUM_TESTS
+    if [ $? -ne 0 ]; then
+        cat $CLIENT_LOG
+        echo -e "\n***\n*** Test Result Verification Failed\n***"
+        RET=1
+    fi
+fi
+
+export MODEL_NAME='bls_memory_async'
+python3 $CLIENT_PY >> $CLIENT_LOG 2>&1 
+if [ $? -ne 0 ]; then
+    echo -e "\n***\n*** 'bls_async_memory' test FAILED. \n***"
+    cat $CLIENT_LOG
+    RET=1
+else
+    check_test_results $TEST_RESULT_FILE $EXPECTED_NUM_TESTS
+    if [ $? -ne 0 ]; then
+        cat $CLIENT_LOG
+        echo -e "\n***\n*** Test Result Verification Failed\n***"
+        RET=1
+    fi
+fi
+
+export MODEL_NAME='bls_async'
+python3 $CLIENT_PY >> $CLIENT_LOG 2>&1 
+if [ $? -ne 0 ]; then
+    echo -e "\n***\n*** 'bls_async' test FAILED. \n***"
     cat $CLIENT_LOG
     RET=1
 else

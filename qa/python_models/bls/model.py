@@ -27,31 +27,42 @@
 import numpy as np
 import unittest
 import triton_python_backend_utils as pb_utils
+from multiprocessing import Pool
+
+
+def bls_add_sub(_=None):
+    input0_np = np.random.randn(*[16])
+    input0_np = input0_np.astype(np.float32)
+    input1_np = np.random.randn(*[16])
+    input1_np = input1_np.astype(np.float32)
+    input0 = pb_utils.Tensor('INPUT0', input0_np)
+    input1 = pb_utils.Tensor('INPUT1', input1_np)
+    infer_request = pb_utils.InferenceRequest(
+        model_name='add_sub',
+        inputs=[input0, input1],
+        requested_output_names=['OUTPUT0', 'OUTPUT1'])
+    infer_response = infer_request.exec()
+    if infer_response.has_error():
+        return False
+
+    output0 = pb_utils.get_output_tensor_by_name(infer_response, 'OUTPUT0')
+    output1 = pb_utils.get_output_tensor_by_name(infer_response, 'OUTPUT1')
+    if output0 is None or output1 is None:
+        return False
+
+    expected_output_0 = input0.as_numpy() + input1.as_numpy()
+    expected_output_1 = input0.as_numpy() - input1.as_numpy()
+
+    if not np.all(expected_output_0 == output0.as_numpy()):
+        return False
+
+    if not np.all(expected_output_1 == output1.as_numpy()):
+        return False
+
+    return True
 
 
 class PBBLSTest(unittest.TestCase):
-    def _bls_add_sub(self):
-        input0_np = np.random.randn(*[16])
-        input0_np = input0_np.astype(np.float32)
-        input1_np = np.random.randn(*[16])
-        input1_np = input1_np.astype(np.float32)
-        input0 = pb_utils.Tensor('INPUT0', input0_np)
-        input1 = pb_utils.Tensor('INPUT1', input1_np)
-        infer_request = pb_utils.InferenceRequest(
-            model_name='add_sub',
-            inputs=[input0, input1],
-            requested_output_names=['OUTPUT0', 'OUTPUT1'])
-        infer_response = infer_request.exec()
-        self.assertFalse(infer_response.has_error())
-        output0 = pb_utils.get_output_tensor_by_name(infer_response, 'OUTPUT0')
-        output1 = pb_utils.get_output_tensor_by_name(infer_response, 'OUTPUT1')
-        self.assertIsNotNone(output0)
-        self.assertIsNotNone(output1)
-
-        expected_output_0 = input0.as_numpy() + input1.as_numpy()
-        expected_output_1 = input0.as_numpy() - input1.as_numpy()
-        self.assertTrue(np.all(expected_output_0 == output0.as_numpy()))
-        self.assertTrue(np.all(expected_output_1 == output1.as_numpy()))
 
     def test_bls_wrong_inputs(self):
         input0 = pb_utils.Tensor('INPUT0', np.random.randn(*[1, 16]))
@@ -76,6 +87,11 @@ class PBBLSTest(unittest.TestCase):
         with self.assertRaises(TypeError):
             pb_utils.InferenceRequest(model_name='add_sub', inputs=[])
 
+    def test_multiprocess(self):
+        # Test multiprocess Pool with sync BLS
+        pool = Pool(10)
+        pool.map(bls_add_sub, [1, 2, 3, 4, 5, 6, 7, 8, 9, 10])
+
     def test_bls_sync(self):
         infer_request = pb_utils.InferenceRequest(
             model_name='non_existent_model',
@@ -89,7 +105,7 @@ class PBBLSTest(unittest.TestCase):
 
         # Make sure that the inference requests can be performed properly after
         # an error.
-        self._bls_add_sub()
+        self.assertTrue(bls_add_sub())
 
     def test_bls_execute_error(self):
         # Test BLS with a model that has an error during execution.
@@ -102,7 +118,7 @@ class PBBLSTest(unittest.TestCase):
     def test_multiple_bls(self):
         # Test running multiple BLS requests together
         for _ in range(100):
-            self._bls_add_sub()
+            self.assertTrue(bls_add_sub())
 
 
 class TritonPythonModel:
