@@ -1,4 +1,4 @@
-# Copyright (c) 2019-2020, NVIDIA CORPORATION. All rights reserved.
+# Copyright 2019-2021, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -497,6 +497,92 @@ output [
         cfile.write(config)
 
 
+def create_openvino_modelfile(models_dir, model_version, io_cnt, max_batch,
+                              dtype, shape):
+
+    if not tu.validate_for_openvino_model(dtype, dtype, dtype, shape, shape,
+                                          shape):
+        return
+
+    # Create the model
+    model_name = tu.get_zero_model_name(
+        "openvino_nobatch" if max_batch == 0 else "openvino", io_cnt, dtype)
+    model_version_dir = models_dir + "/" + model_name + "/" + str(model_version)
+
+    batch_dim = [] if max_batch == 0 else [max_batch,]
+    openvino_inputs = []
+    openvino_outputs = []
+    for io_num in range(io_cnt):
+        in_name = "INPUT{}".format(io_num)
+        out_name = "OUTPUT{}".format(io_num)
+        openvino_inputs.append(
+            ng.parameter(shape=batch_dim + shape, dtype=dtype, name=in_name))
+        openvino_outputs.append(
+            ng.result(openvino_inputs[io_num], name=out_name))
+
+    function = ng.impl.Function(openvino_outputs, openvino_inputs, model_name)
+    ie_network = IENetwork(ng.impl.Function.to_capsule(function))
+
+    try:
+        os.makedirs(model_version_dir)
+    except OSError as ex:
+        pass  # ignore existing dir
+
+    ie_network.serialize(model_version_dir + "/model.xml",
+                         model_version_dir + "/model.bin")
+
+
+def create_openvino_modelconfig(models_dir, model_version, io_cnt, max_batch,
+                                dtype, shape):
+
+    if not tu.validate_for_openvino_model(dtype, dtype, dtype, shape, shape,
+                                          shape):
+        return
+
+    # Unpack version policy
+    version_policy_str = "{ latest { num_versions: 1 }}"
+
+    # Use a different model name for the non-batching variant
+    model_name = tu.get_zero_model_name(
+        "openvino_nobatch" if max_batch == 0 else "openvino", io_cnt, dtype)
+    shape_str = tu.shape_to_dims_str(shape)
+
+    config_dir = models_dir + "/" + model_name
+    config = '''
+name: "{}"
+backend: "openvino"
+max_batch_size: {}
+version_policy: {}
+'''.format(model_name, max_batch, version_policy_str)
+
+    for io_num in range(io_cnt):
+        config += '''
+input [
+  {{
+    name: "INPUT__{}"
+    data_type: {}
+    dims: [ {} ]
+  }}
+]
+output [
+  {{
+    name: "OUTPUT__{}"
+    data_type: {}
+    dims: [ {} ]
+  }}
+]
+'''.format(io_num, np_to_model_dtype(dtype), shape_str, io_num,
+           np_to_model_dtype(dtype), shape_str)
+
+    try:
+        os.makedirs(config_dir)
+    except OSError as ex:
+        pass  # ignore existing dir
+
+    with open(config_dir + "/config.pbtxt", "w") as cfile:
+        cfile.write(config)
+
+
 def create_plan_modelfile(create_savedmodel, models_dir, model_version, io_cnt,
                           max_batch, dtype, shape, profile_max_size):
 
@@ -915,6 +1001,17 @@ def create_models(models_dir, dtype, shape, io_cnt=1, no_batch=True):
             create_onnx_modelfile(True, models_dir, model_version, io_cnt, 0,
                                   dtype, shape)
 
+    if FLAGS.openvino:
+        create_openvino_modelconfig(models_dir, model_version, io_cnt, 8, dtype,
+                                    shape)
+        create_openvino_modelfile(models_dir, model_version, io_cnt, 8, dtype,
+                                  shape)
+        if no_batch:
+            create_openvino_modelconfig(models_dir, model_version, io_cnt, 0,
+                                        dtype, shape)
+            create_openvino_modelfile(models_dir, model_version, io_cnt, 0,
+                                      dtype, shape)
+
     if FLAGS.libtorch:
         create_libtorch_modelconfig(True, models_dir, model_version, io_cnt, 8,
                                     dtype, shape)
@@ -989,6 +1086,10 @@ if __name__ == '__main__':
                         required=False,
                         action='store_true',
                         help='Generate Pytorch LibTorch models')
+    parser.add_argument('--openvino',
+                        required=False,
+                        action='store_true',
+                        help='Generate OpenVino models')
     parser.add_argument('--tensorrt',
                         required=False,
                         action='store_true',
@@ -1019,6 +1120,9 @@ if __name__ == '__main__':
         from torch import nn
     if FLAGS.tensorrt or FLAGS.tensorrt_big or FLAGS.tensorrt_shape_io:
         import tensorrt as trt
+    if FLAGS.openvino:
+        from openvino.inference_engine import IECore, IENetwork
+        import ngraph as ng
 
     import test_util as tu
 
