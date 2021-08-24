@@ -334,7 +334,7 @@ def backend_cmake_args(images, components, be, install_dir, library_paths):
     elif be == 'tensorflow2':
         args = tensorflow_cmake_args(2, images, library_paths)
     elif be == 'python':
-        args = ['-DTRITON_ENABLE_GPU={}'.format(cmake_enable(FLAGS.enable_gpu))]
+        args = []
     elif be == 'dali':
         args = dali_cmake_args()
     elif be == 'pytorch':
@@ -553,7 +553,6 @@ ENV DEBIAN_FRONTEND=noninteractive
 # python3-dev is needed by Torchvision
 # python3-pip and libarchive-dev is needed by python backend
 # uuid-dev and pkg-config is needed for Azure Storage
-
 RUN apt-get update && \
     apt-get install -y --no-install-recommends \
             autoconf \
