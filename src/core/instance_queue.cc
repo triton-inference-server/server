@@ -36,32 +36,27 @@ InstanceQueue::InstanceQueue(size_t max_batch_size, uint64_t max_queue_delay)
 size_t
 InstanceQueue::Size()
 {
-  std::lock_guard<std::mutex> lk(mu_);
   return payload_queue_.size();
 }
 
 bool
 InstanceQueue::Empty()
 {
-  std::lock_guard<std::mutex> lk(mu_);
   return payload_queue_.empty();
 }
 
 void
 InstanceQueue::Enqueue(std::shared_ptr<Payload>& payload)
 {
-  std::lock_guard<std::mutex> lk(mu_);
   payload_queue_.push_back(payload);
 }
 
 void
 InstanceQueue::Dequeue(std::shared_ptr<Payload>* payload)
 {
-  std::lock_guard<std::mutex> lk(mu_);
   // TODO: Enhance this to actually merge the payload
   *payload = payload_queue_.front();
   payload_queue_.pop_front();
 }
-
 
 }}  // namespace nvidia::inferenceserver
