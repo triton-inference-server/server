@@ -40,12 +40,12 @@
 namespace nvidia { namespace inferenceserver {
 
 bool
-IsStaleState(RateLimiter::Payload::State payload_state)
+IsStaleState(Payload::State payload_state)
 {
   return (
-      (payload_state == RateLimiter::Payload::State::SCHEDULED) ||
-      (payload_state == RateLimiter::Payload::State::EXECUTING) ||
-      (payload_state == RateLimiter::Payload::State::RELEASED));
+      (payload_state == Payload::State::SCHEDULED) ||
+      (payload_state == Payload::State::EXECUTING) ||
+      (payload_state == Payload::State::RELEASED));
 }
 
 DynamicBatchScheduler::DynamicBatchScheduler(
