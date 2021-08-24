@@ -152,7 +152,13 @@ class SequenceBatcherTest(su.SequenceBatcherTestUtil):
                     self.clear_deferred_exceptions()
                     try:
                         model_name = tu.get_sequence_model_name(trial, dtype)
-                        print("model:", model_name)
+                        # Skip bool type ensemble models
+                        if (any(word in trial for word in ENSEMBLE_PREFIXES)
+                           ) and ('bool' in model_name):
+                            continue
+                        # For bool type control models, use int32 as I/O types
+                        if dtype == np.bool:
+                            dtype = np.int32
 
                         self.check_setup(model_name)
                         self.assertFalse(
@@ -167,19 +173,11 @@ class SequenceBatcherTest(su.SequenceBatcherTestUtil):
                             5,
                             (4000, None),
                             # (flag_str, value, (ls_ms, gt_ms), (pre_delay, post_delay))
-                            (("start", True, None, None), (None, True, None,
-                                                           None),
-                             (None, True, None, None), (None, True, None, None),
-                             (None, True, None, None), (None, True, None, None),
-                             (None, True, None, None), (None, True, None, None),
-                             ("end", False, None,
-                              None)) if dtype == np.bool else
                             (("start", 1, None, None), (None, 2, None, None),
                              (None, 3, None, None), (None, 4, None, None),
                              (None, 5, None, None), (None, 6, None, None),
                              (None, 7, None, None), (None, 8, None, None),
                              ("end", 9, None, None)),
-                            False if dtype == np.bool else
                             self.get_expected_result(45, 9, trial, "end"),
                             protocol,
                             sequence_name="{}_{}".format(
@@ -203,6 +201,13 @@ class SequenceBatcherTest(su.SequenceBatcherTestUtil):
                     self.clear_deferred_exceptions()
                     try:
                         model_name = tu.get_sequence_model_name(trial, dtype)
+                        # Skip bool type ensemble models
+                        if (any(word in trial for word in ENSEMBLE_PREFIXES)
+                           ) and ('bool' in model_name):
+                            continue
+                        # For bool type control models, use int32 as I/O types
+                        if dtype == np.bool:
+                            dtype = np.int32
 
                         self.check_setup(model_name)
                         self.assertFalse(
@@ -218,12 +223,9 @@ class SequenceBatcherTest(su.SequenceBatcherTestUtil):
                             (4000, None),
                             # (flag_str, value, (ls_ms, gt_ms), (pre_delay, post_delay))
                             (
-                                ("start,end", True, None,
-                                 None),) if dtype == np.bool else
-                            (("start,end", 42, None, None),),
-                            True
-                            if dtype == np.bool else self.get_expected_result(
-                                42, 42, trial, "start,end"),
+                                ("start,end", 42, None, None),),
+                            self.get_expected_result(42, 42, trial,
+                                                     "start,end"),
                             protocol,
                             sequence_name="{}_{}".format(
                                 self._testMethodName, protocol))
@@ -252,6 +254,13 @@ class SequenceBatcherTest(su.SequenceBatcherTestUtil):
                     self.clear_deferred_exceptions()
                     try:
                         model_name = tu.get_sequence_model_name(trial, dtype)
+                        # Skip bool type ensemble models
+                        if (any(word in trial for word in ENSEMBLE_PREFIXES)
+                           ) and ('bool' in model_name):
+                            continue
+                        # For bool type control models, use int32 as I/O types
+                        if dtype == np.bool:
+                            dtype = np.int32
 
                         self.check_setup(model_name)
                         self.assertFalse(
@@ -266,11 +275,7 @@ class SequenceBatcherTest(su.SequenceBatcherTestUtil):
                             27,
                             (4000, None),
                             # (flag_str, value, (ls_ms, gt_ms), (pre_delay, post_delay))
-                            (("start", True, None, None),
-                             ("end", False, None,
-                              None)) if dtype == np.bool else
                             (("start", 1, None, None), ("end", 9, None, None)),
-                            False if dtype == np.bool else
                             self.get_expected_result(10, 9, trial, "end"),
                             protocol,
                             batch_size=2,
@@ -307,6 +312,13 @@ class SequenceBatcherTest(su.SequenceBatcherTestUtil):
                     self.clear_deferred_exceptions()
                     try:
                         model_name = tu.get_sequence_model_name(trial, dtype)
+                        # Skip bool type ensemble models
+                        if (any(word in trial for word in ENSEMBLE_PREFIXES)
+                           ) and ('bool' in model_name):
+                            continue
+                        # For bool type control models, use int32 as I/O types
+                        if dtype == np.bool:
+                            dtype = np.int32
 
                         self.check_setup(model_name)
                         self.assertFalse(
@@ -321,11 +333,7 @@ class SequenceBatcherTest(su.SequenceBatcherTestUtil):
                             0,  # correlation_id = 0
                             (4000, None),
                             # (flag_str, value, (ls_ms, gt_ms), (pre_delay, post_delay))
-                            (("start", False, None, None),
-                             ("end", False, None,
-                              None)) if dtype == np.bool else
                             (("start", 1, None, None), ("end", 9, None, None)),
-                            False if dtype == np.bool else
                             self.get_expected_result(10, 9, trial, "end"),
                             protocol,
                             sequence_name="{}_{}".format(
@@ -359,6 +367,13 @@ class SequenceBatcherTest(su.SequenceBatcherTestUtil):
                     self.clear_deferred_exceptions()
                     try:
                         model_name = tu.get_sequence_model_name(trial, dtype)
+                        # Skip bool type ensemble models
+                        if (any(word in trial for word in ENSEMBLE_PREFIXES)
+                           ) and ('bool' in model_name):
+                            continue
+                        # For bool type control models, use int32 as I/O types
+                        if dtype == np.bool:
+                            dtype = np.int32
 
                         self.check_setup(model_name)
                         self.assertFalse(
@@ -373,12 +388,8 @@ class SequenceBatcherTest(su.SequenceBatcherTestUtil):
                             37469245,
                             (4000, None),
                             # (flag_str, value, (ls_ms, gt_ms), (pre_delay, post_delay))
-                            ((None, True, None, None), (None, True, None, None),
-                             ("end", False, None,
-                              None)) if dtype == np.bool else
                             ((None, 1, None, None), (None, 2, None, None),
                              ("end", 3, None, None)),
-                            False if dtype == np.bool else
                             self.get_expected_result(6, 3, trial, "end"),
                             protocol,
                             sequence_name="{}_{}".format(
@@ -417,6 +428,13 @@ class SequenceBatcherTest(su.SequenceBatcherTestUtil):
                     self.clear_deferred_exceptions()
                     try:
                         model_name = tu.get_sequence_model_name(trial, dtype)
+                        # Skip bool type ensemble models
+                        if (any(word in trial for word in ENSEMBLE_PREFIXES)
+                           ) and ('bool' in model_name):
+                            continue
+                        # For bool type control models, use int32 as I/O types
+                        if dtype == np.bool:
+                            dtype = np.int32
 
                         self.check_setup(model_name)
                         self.assertFalse(
@@ -431,13 +449,8 @@ class SequenceBatcherTest(su.SequenceBatcherTestUtil):
                             3,
                             (4000, None),
                             # (flag_str, value, (ls_ms, gt_ms), (pre_delay, post_delay))
-                            (("start", True, None, None), (None, False, None,
-                                                           None), ("end", False,
-                                                                   None, None),
-                             (None, False, None, None)) if dtype == np.bool else
                             (("start", 1, None, None), (None, 2, None, None),
                              ("end", 3, None, None), (None, 55, None, None)),
-                            False if dtype == np.bool else
                             self.get_expected_result(6, 3, trial, None),
                             protocol,
                             sequence_name="{}_{}".format(
@@ -477,6 +490,13 @@ class SequenceBatcherTest(su.SequenceBatcherTestUtil):
                     self.clear_deferred_exceptions()
                     try:
                         model_name = tu.get_sequence_model_name(trial, dtype)
+                        # Skip bool type ensemble models
+                        if (any(word in trial for word in ENSEMBLE_PREFIXES)
+                           ) and ('bool' in model_name):
+                            continue
+                        # For bool type control models, use int32 as I/O types
+                        if dtype == np.bool:
+                            dtype = np.int32
 
                         self.check_setup(model_name)
                         self.assertFalse(
@@ -491,14 +511,8 @@ class SequenceBatcherTest(su.SequenceBatcherTestUtil):
                             4566,
                             (4000, None),
                             # (flag_str, value, (ls_ms, gt_ms), (pre_delay, post_delay))
-                            (("start", True, None,
-                              None), (None, True, None, None), ("start", False,
-                                                                None, None),
-                             ("end", False, None,
-                              None)) if dtype == np.bool else
                             (("start", 1, None, None), (None, 2, None, None),
                              ("start", 42, None, None), ("end", 9, None, None)),
-                            False if dtype == np.bool else
                             self.get_expected_result(51, 9, trial, "end"),
                             protocol,
                             sequence_name="{}_{}".format(
@@ -521,16 +535,20 @@ class SequenceBatcherTest(su.SequenceBatcherTestUtil):
                 self.clear_deferred_exceptions()
 
                 precreated_shm0_handles = self.precreate_register_regions(
-                    (True, True, False, False), dtype,
-                    0) if dtype == np.bool else self.precreate_register_regions(
-                        (1, 2, 3, 4), dtype, 0)
+                    (1, 2, 3, 4), dtype, 0)
                 precreated_shm1_handles = self.precreate_register_regions(
-                    (True, True, True, False), dtype,
-                    1) if dtype == np.bool else self.precreate_register_regions(
-                        (0, 9, 5, 13), dtype, 1)
+                    (0, 9, 5, 13), dtype, 1)
 
                 try:
                     model_name = tu.get_sequence_model_name(trial, dtype)
+                    # Skip bool type ensemble models
+                    if (any(word in trial for word in ENSEMBLE_PREFIXES)) and (
+                            'bool' in model_name):
+                        continue
+                    # For bool type control models, use int32 as I/O types
+                    if dtype == np.bool:
+                        dtype = np.int32
+
                     self.check_setup(model_name)
 
                     # Need scheduler to wait for queue to contain all
@@ -556,12 +574,8 @@ class SequenceBatcherTest(su.SequenceBatcherTestUtil):
                                 987,
                                 (None, None),
                                 # (flag_str, value, pre_delay_ms)
-                                (("start", True, None), (None, True, None),
-                                 (None, False, None),
-                                 ("end", False, None)) if dtype == np.bool else
                                 (("start", 1, None), (None, 2, None),
                                  (None, 3, None), ("end", 4, None)),
-                                False if dtype == np.bool else
                                 self.get_expected_result(10, 4, trial, "end"),
                                 precreated_shm0_handles),
                             kwargs={
@@ -578,12 +592,8 @@ class SequenceBatcherTest(su.SequenceBatcherTestUtil):
                                 988,
                                 (None, None),
                                 # (flag_str, value, pre_delay_ms)
-                                (("start", True,
-                                  None), (None, True, None), (None, True, None),
-                                 ("end", False, None)) if dtype == np.bool else
                                 (("start", 0, None), (None, 9, None),
                                  (None, 5, None), ("end", 13, None)),
-                                False if dtype == np.bool else
                                 self.get_expected_result(27, 13, trial, "end"),
                                 precreated_shm1_handles),
                             kwargs={
@@ -624,24 +634,23 @@ class SequenceBatcherTest(su.SequenceBatcherTestUtil):
                 self.clear_deferred_exceptions()
 
                 precreated_shm0_handles = self.precreate_register_regions(
-                    (False, False), dtype,
-                    0) if dtype == np.bool else self.precreate_register_regions(
-                        (1, 3), dtype, 0)
+                    (1, 3), dtype, 0)
                 precreated_shm1_handles = self.precreate_register_regions(
-                    (True, True, False, False), dtype,
-                    1) if dtype == np.bool else self.precreate_register_regions(
-                        (11, 12, 13, 14), dtype, 1)
+                    (11, 12, 13, 14), dtype, 1)
                 precreated_shm2_handles = self.precreate_register_regions(
-                    (True, False), dtype,
-                    2) if dtype == np.bool else self.precreate_register_regions(
-                        (111, 113), dtype, 2)
+                    (111, 113), dtype, 2)
                 precreated_shm3_handles = self.precreate_register_regions(
-                    (True, True, True, False), dtype,
-                    3) if dtype == np.bool else self.precreate_register_regions(
-                        (1111, 1112, 1113, 1114), dtype, 3)
+                    (1111, 1112, 1113, 1114), dtype, 3)
 
                 try:
                     model_name = tu.get_sequence_model_name(trial, dtype)
+                    # Skip bool type ensemble models
+                    if (any(word in trial for word in ENSEMBLE_PREFIXES)) and (
+                            'bool' in model_name):
+                        continue
+                    # For bool type control models, use int32 as I/O types
+                    if dtype == np.bool:
+                        dtype = np.int32
 
                     self.check_setup(model_name)
 
@@ -668,10 +677,7 @@ class SequenceBatcherTest(su.SequenceBatcherTestUtil):
                                 1001,
                                 (None, None),
                                 # (flag_str, value, pre_delay_ms)
-                                (("start", False, None),
-                                 ("end", False, None)) if dtype == np.bool else
                                 (("start", 1, None), ("end", 3, None)),
-                                False if dtype == np.bool else
                                 self.get_expected_result(4, 3, trial, "end"),
                                 precreated_shm0_handles),
                             kwargs={
@@ -688,12 +694,8 @@ class SequenceBatcherTest(su.SequenceBatcherTestUtil):
                                 1002,
                                 (None, None),
                                 # (flag_str, value, pre_delay_ms)
-                                (("start", True, None), (None, True, None),
-                                 (None, False, None),
-                                 ("end", False, None)) if dtype == np.bool else
                                 (("start", 11, None), (None, 12, None),
                                  (None, 13, None), ("end", 14, None)),
-                                False if dtype == np.bool else
                                 self.get_expected_result(50, 14, trial, "end"),
                                 precreated_shm1_handles),
                             kwargs={
@@ -710,10 +712,7 @@ class SequenceBatcherTest(su.SequenceBatcherTestUtil):
                                 1003,
                                 (None, None),
                                 # (flag_str, value, pre_delay_ms)
-                                (("start", True, None),
-                                 ("end", False, None)) if dtype == np.bool else
                                 (("start", 111, None), ("end", 113, None)),
-                                False if dtype == np.bool else
                                 self.get_expected_result(
                                     224, 113, trial, "end"),
                                 precreated_shm2_handles),
@@ -731,12 +730,8 @@ class SequenceBatcherTest(su.SequenceBatcherTestUtil):
                                 1004,
                                 (None, None),
                                 # (flag_str, value, pre_delay_ms)
-                                (("start", True,
-                                  None), (None, True, None), (None, True, None),
-                                 ("end", False, None)) if dtype == np.bool else
                                 (("start", 1111, None), (None, 1112, None),
                                  (None, 1113, None), ("end", 1114, None)),
-                                False if dtype == np.bool else
                                 self.get_expected_result(
                                     4450, 1114, trial, "end"),
                                 precreated_shm3_handles),
@@ -789,24 +784,23 @@ class SequenceBatcherTest(su.SequenceBatcherTestUtil):
                 self.clear_deferred_exceptions()
 
                 precreated_shm0_handles = self.precreate_register_regions(
-                    (False, False, False), dtype,
-                    0) if dtype == np.bool else self.precreate_register_regions(
-                        (1, 2, 3), dtype, 0)
+                    (1, 2, 3), dtype, 0)
                 precreated_shm1_handles = self.precreate_register_regions(
-                    (True, True, False), dtype,
-                    1) if dtype == np.bool else self.precreate_register_regions(
-                        (11, 12, 13), dtype, 1)
+                    (11, 12, 13), dtype, 1)
                 precreated_shm2_handles = self.precreate_register_regions(
-                    (False, False, False), dtype,
-                    2) if dtype == np.bool else self.precreate_register_regions(
-                        (111, 112, 113), dtype, 2)
+                    (111, 112, 113), dtype, 2)
                 precreated_shm3_handles = self.precreate_register_regions(
-                    (True, True, False), dtype,
-                    3) if dtype == np.bool else self.precreate_register_regions(
-                        (1111, 1112, 1113), dtype, 3)
+                    (1111, 1112, 1113), dtype, 3)
 
                 try:
                     model_name = tu.get_sequence_model_name(trial, dtype)
+                    # Skip bool type ensemble models
+                    if (any(word in trial for word in ENSEMBLE_PREFIXES)) and (
+                            'bool' in model_name):
+                        continue
+                    # For bool type control models, use int32 as I/O types
+                    if dtype == np.bool:
+                        dtype = np.int32
 
                     self.check_setup(model_name)
 
@@ -833,11 +827,8 @@ class SequenceBatcherTest(su.SequenceBatcherTestUtil):
                                 1001,
                                 (None, None),
                                 # (flag_str, value, pre_delay_ms)
-                                (("start", False, None), (None, False, None),
-                                 ("end", False, None)) if dtype == np.bool else
                                 (("start", 1, None), (None, 2, None), ("end", 3,
                                                                        None)),
-                                False if dtype == np.bool else
                                 self.get_expected_result(6, 3, trial, "end"),
                                 precreated_shm0_handles),
                             kwargs={
@@ -854,11 +845,8 @@ class SequenceBatcherTest(su.SequenceBatcherTestUtil):
                                 1002,
                                 (None, None),
                                 # (flag_str, value, pre_delay_ms)
-                                (("start", False, None), (None, False, None),
-                                 ("end", False, None)) if dtype == np.bool else
                                 (("start", 11, None), (None, 12, None),
                                  ("end", 13, None)),
-                                False if dtype == np.bool else
                                 self.get_expected_result(36, 13, trial, "end"),
                                 precreated_shm1_handles),
                             kwargs={
@@ -875,11 +863,8 @@ class SequenceBatcherTest(su.SequenceBatcherTestUtil):
                                 1003,
                                 (None, None),
                                 # (flag_str, value, pre_delay_ms)
-                                (("start", False, None), (None, False, None),
-                                 ("end", False, None)) if dtype == np.bool else
                                 (("start", 111, None), (None, 112, None),
                                  ("end", 113, None)),
-                                False if dtype == np.bool else
                                 self.get_expected_result(
                                     336, 113, trial, "end"),
                                 precreated_shm2_handles),
@@ -897,11 +882,8 @@ class SequenceBatcherTest(su.SequenceBatcherTestUtil):
                                 1004,
                                 (None, None),
                                 # (flag_str, value, pre_delay_ms)
-                                (("start", False, None), (None, False, None),
-                                 ("end", False, None)) if dtype == np.bool else
                                 (("start", 1111, None), (None, 1112, None),
                                  ("end", 1113, None)),
-                                False if dtype == np.bool else
                                 self.get_expected_result(
                                     3336, 1113, trial, "end"),
                                 precreated_shm3_handles),
@@ -949,24 +931,23 @@ class SequenceBatcherTest(su.SequenceBatcherTestUtil):
                 self.clear_deferred_exceptions()
 
                 precreated_shm0_handles = self.precreate_register_regions(
-                    (False, False, False), dtype, 0, tensor_shape=(2,)
-                ) if dtype == np.bool else self.precreate_register_regions(
                     (1, 2, 3), dtype, 0, tensor_shape=(2,))
                 precreated_shm1_handles = self.precreate_register_regions(
-                    (True, True, False), dtype, 1, tensor_shape=(2,)
-                ) if dtype == np.bool else self.precreate_register_regions(
                     (11, 12, 13), dtype, 1, tensor_shape=(2,))
                 precreated_shm2_handles = self.precreate_register_regions(
-                    (False, False, False), dtype, 2, tensor_shape=(1,)
-                ) if dtype == np.bool else self.precreate_register_regions(
                     (111, 112, 113), dtype, 2, tensor_shape=(1,))
                 precreated_shm3_handles = self.precreate_register_regions(
-                    (True, True, False), dtype, 3, tensor_shape=(3,)
-                ) if dtype == np.bool else self.precreate_register_regions(
                     (1111, 1112, 1113), dtype, 3, tensor_shape=(3,))
 
                 try:
                     model_name = tu.get_sequence_model_name(trial, dtype)
+                    # Skip bool type ensemble models
+                    if (any(word in trial for word in ENSEMBLE_PREFIXES)) and (
+                            'bool' in model_name):
+                        continue
+                    # For bool type control models, use int32 as I/O types
+                    if dtype == np.bool:
+                        dtype = np.int32
 
                     self.check_setup(model_name)
 
@@ -993,11 +974,8 @@ class SequenceBatcherTest(su.SequenceBatcherTestUtil):
                                 1001,
                                 (None, None),
                                 # (flag_str, value, pre_delay_ms)
-                                (("start", False, None), (None, False, None),
-                                 ("end", False, None)) if dtype == np.bool else
                                 (("start", 1, None), (None, 2, None), ("end", 3,
                                                                        None)),
-                                False if dtype == np.bool else
                                 self.get_expected_result(
                                     6 * 2, 3, trial, "end"),
                                 precreated_shm0_handles),
@@ -1016,11 +994,8 @@ class SequenceBatcherTest(su.SequenceBatcherTestUtil):
                                 1002,
                                 (None, None),
                                 # (flag_str, value, pre_delay_ms)
-                                (("start", True, None), (None, True, None),
-                                 ("end", False, None)) if dtype == np.bool else
                                 (("start", 11, None), (None, 12, None),
                                  ("end", 13, None)),
-                                False if dtype == np.bool else
                                 self.get_expected_result(
                                     36 * 2, 13, trial, "end"),
                                 precreated_shm1_handles),
@@ -1039,11 +1014,8 @@ class SequenceBatcherTest(su.SequenceBatcherTestUtil):
                                 1003,
                                 (None, None),
                                 # (flag_str, value, pre_delay_ms)
-                                (("start", False, None), (None, False, None),
-                                 ("end", False, None)) if dtype == np.bool else
                                 (("start", 111, None), (None, 112, None),
                                  ("end", 113, None)),
-                                False if dtype == np.bool else
                                 self.get_expected_result(
                                     336, 113, trial, "end"),
                                 precreated_shm2_handles),
@@ -1062,11 +1034,8 @@ class SequenceBatcherTest(su.SequenceBatcherTestUtil):
                                 1004,
                                 (None, None),
                                 # (flag_str, value, pre_delay_ms)
-                                (("start", True, None), (None, True, None),
-                                 ("end", False, None)) if dtype == np.bool else
                                 (("start", 1111, None), (None, 1112, None),
                                  ("end", 1113, None)),
-                                False if dtype == np.bool else
                                 self.get_expected_result(
                                     3336 * 3, 1113, trial, "end"),
                                 precreated_shm3_handles),
@@ -1116,23 +1085,22 @@ class SequenceBatcherTest(su.SequenceBatcherTestUtil):
                 self.clear_deferred_exceptions()
 
                 precreated_shm0_handles = self.precreate_register_regions(
-                    (False, False, False), dtype, 0, tensor_shape=(2,)
-                ) if dtype == np.bool else self.precreate_register_regions(
                     (1, 2, 3), dtype, 0, tensor_shape=(2,))
                 precreated_shm1_handles = self.precreate_register_regions(
-                    (False, True, False), dtype, 1, tensor_shape=(2,)
-                ) if dtype == np.bool else self.precreate_register_regions(
                     (11, 12, 13), dtype, 1, tensor_shape=(2,))
-                precreated_shm2_handles = elf.precreate_register_regions(
-                    (True, False, True), dtype, 2, tensor_shape=(1,)
-                ) if dtype == np.bool else self.precreate_register_regions(
+                precreated_shm2_handles = self.precreate_register_regions(
                     (111, 112, 113), dtype, 2, tensor_shape=(1,))
                 precreated_shm3_handles = self.precreate_register_regions(
-                    (True, True, False), dtype, 3, tensor_shape=(3,)
-                ) if dtype == np.bool else self.precreate_register_regions(
                     (1111, 1112, 1113), dtype, 3, tensor_shape=(3,))
                 try:
                     model_name = tu.get_sequence_model_name(trial, dtype)
+                    # Skip bool type ensemble models
+                    if (any(word in trial for word in ENSEMBLE_PREFIXES)) and (
+                            'bool' in model_name):
+                        continue
+                    # For bool type control models, use int32 as I/O types
+                    if dtype == np.bool:
+                        dtype = np.int32
 
                     self.check_setup(model_name)
 
@@ -1159,11 +1127,8 @@ class SequenceBatcherTest(su.SequenceBatcherTestUtil):
                                 1001,
                                 (None, None),
                                 # (flag_str, value, pre_delay_ms)
-                                (("start", False, None), (None, False, None),
-                                 ("end", False, None)) if dtype == np.bool else
                                 (("start", 1, None), (None, 2, None), ("end", 3,
                                                                        None)),
-                                False if dtype == np.bool else
                                 self.get_expected_result(
                                     6 * 2, 3, trial, "end"),
                                 precreated_shm0_handles),
@@ -1182,11 +1147,8 @@ class SequenceBatcherTest(su.SequenceBatcherTestUtil):
                                 1002,
                                 (None, None),
                                 # (flag_str, value, pre_delay_ms)
-                                (("start", False, None), (None, True, None),
-                                 ("end", False, None)) if dtype == np.bool else
                                 (("start", 11, None), (None, 12, None),
                                  ("end", 13, None)),
-                                False if dtype == np.bool else
                                 self.get_expected_result(
                                     36 * 2, 13, trial, "end"),
                                 precreated_shm1_handles),
@@ -1205,11 +1167,8 @@ class SequenceBatcherTest(su.SequenceBatcherTestUtil):
                                 1003,
                                 (None, None),
                                 # (flag_str, value, pre_delay_ms)
-                                (("start", True, None), (None, False, None),
-                                 ("end", True, None)) if dtype == np.bool else
                                 (("start", 111, None), (None, 112, None),
                                  ("end", 113, None)),
-                                False if dtype == np.bool else
                                 self.get_expected_result(
                                     336, 113, trial, "end"),
                                 precreated_shm2_handles),
@@ -1228,11 +1187,8 @@ class SequenceBatcherTest(su.SequenceBatcherTestUtil):
                                 1004,
                                 (None, None),
                                 # (flag_str, value, pre_delay_ms)
-                                (("start", True, None), (None, True, None),
-                                 ("end", False, None)) if dtype == np.bool else
                                 (("start", 1111, None), (None, 1112, None),
                                  ("end", 1113, None)),
-                                False if dtype == np.bool else
                                 self.get_expected_result(
                                     3336 * 3, 1113, trial, "end"),
                                 precreated_shm3_handles),
@@ -1273,28 +1229,25 @@ class SequenceBatcherTest(su.SequenceBatcherTestUtil):
                 self.clear_deferred_exceptions()
 
                 precreated_shm0_handles = self.precreate_register_regions(
-                    (False, False, False), dtype,
-                    0) if dtype == np.bool else self.precreate_register_regions(
-                        (1, 2, 3), dtype, 0)
+                    (1, 2, 3), dtype, 0)
                 precreated_shm1_handles = self.precreate_register_regions(
-                    (True, True, False), dtype,
-                    1) if dtype == np.bool else self.precreate_register_regions(
-                        (11, 12, 13), dtype, 1)
+                    (11, 12, 13), dtype, 1)
                 precreated_shm2_handles = self.precreate_register_regions(
-                    (False, False, False), dtype,
-                    2) if dtype == np.bool else self.precreate_register_regions(
-                        (111, 112, 113), dtype, 2)
+                    (111, 112, 113), dtype, 2)
                 precreated_shm3_handles = self.precreate_register_regions(
-                    (True, True, False), dtype,
-                    3) if dtype == np.bool else self.precreate_register_regions(
-                        (1111, 1112, 1113), dtype, 3)
+                    (1111, 1112, 1113), dtype, 3)
                 precreated_shm4_handles = self.precreate_register_regions(
-                    (False, True, False), dtype,
-                    4) if dtype == np.bool else self.precreate_register_regions(
-                        (11111, 11112, 11113), dtype, 4)
+                    (11111, 11112, 11113), dtype, 4)
 
                 try:
                     model_name = tu.get_sequence_model_name(trial, dtype)
+                    # Skip bool type ensemble models
+                    if (any(word in trial for word in ENSEMBLE_PREFIXES)) and (
+                            'bool' in model_name):
+                        continue
+                    # For bool type control models, use int32 as I/O types
+                    if dtype == np.bool:
+                        dtype = np.int32
 
                     self.check_setup(model_name)
 
@@ -1321,11 +1274,8 @@ class SequenceBatcherTest(su.SequenceBatcherTestUtil):
                                 1001,
                                 (None, None),
                                 # (flag_str, value, pre_delay_ms)
-                                (("start", False, None), (None, False, None),
-                                 ("end", False, None)) if dtype == np.bool else
                                 (("start", 1, None), (None, 2, None), ("end", 3,
                                                                        None)),
-                                False if dtype == np.bool else
                                 self.get_expected_result(6, 3, trial, "end"),
                                 precreated_shm0_handles),
                             kwargs={
@@ -1342,11 +1292,8 @@ class SequenceBatcherTest(su.SequenceBatcherTestUtil):
                                 1002,
                                 (None, None),
                                 # (flag_str, value, pre_delay_ms)
-                                (("start", True, None), (None, True, None),
-                                 ("end", False, None)) if dtype == np.bool else
                                 (("start", 11, None), (None, 12, None),
                                  ("end", 13, None)),
-                                False if dtype == np.bool else
                                 self.get_expected_result(36, 13, trial, "end"),
                                 precreated_shm1_handles),
                             kwargs={
@@ -1363,11 +1310,8 @@ class SequenceBatcherTest(su.SequenceBatcherTestUtil):
                                 1003,
                                 (None, None),
                                 # (flag_str, value, pre_delay_ms)
-                                (("start", False, None), (None, False, None),
-                                 ("end", False, None)) if dtype == np.bool else
                                 (("start", 111, None), (None, 112, None),
                                  ("end", 113, None)),
-                                False if dtype == np.bool else
                                 self.get_expected_result(
                                     336, 113, trial, "end"),
                                 precreated_shm2_handles),
@@ -1385,11 +1329,8 @@ class SequenceBatcherTest(su.SequenceBatcherTestUtil):
                                 1004,
                                 (None, None),
                                 # (flag_str, value, pre_delay_ms)
-                                (("start", True, None), (None, True, None),
-                                 ("end", False, None)) if dtype == np.bool else
                                 (("start", 1111, None), (None, 1112, None),
                                  ("end", 1113, None)),
-                                False if dtype == np.bool else
                                 self.get_expected_result(
                                     3336, 1113, trial, "end"),
                                 precreated_shm3_handles),
@@ -1407,11 +1348,8 @@ class SequenceBatcherTest(su.SequenceBatcherTestUtil):
                                 1005,
                                 (None, None),
                                 # (flag_str, value, pre_delay_ms)
-                                (("start", False, None), (None, True, None),
-                                 ("end", False, None)) if dtype == np.bool else
                                 (("start", 11111, None), (None, 11112, None),
                                  ("end", 11113, None)),
-                                False if dtype == np.bool else
                                 self.get_expected_result(
                                     33336, 11113, trial, "end"),
                                 precreated_shm4_handles),
@@ -1464,32 +1402,27 @@ class SequenceBatcherTest(su.SequenceBatcherTestUtil):
                 self.clear_deferred_exceptions()
 
                 precreated_shm0_handles = self.precreate_register_regions(
-                    (False, False, False), dtype,
-                    0) if dtype == np.bool else self.precreate_register_regions(
-                        (1, 2, 3), dtype, 0)
+                    (1, 2, 3), dtype, 0)
                 precreated_shm1_handles = self.precreate_register_regions(
-                    (False, True), dtype,
-                    1) if dtype == np.bool else self.precreate_register_regions(
-                        (11, 13), dtype, 1)
+                    (11, 13), dtype, 1)
                 precreated_shm2_handles = self.precreate_register_regions(
-                    (True, False), dtype,
-                    2) if dtype == np.bool else self.precreate_register_regions(
-                        (111, 113), dtype, 2)
+                    (111, 113), dtype, 2)
                 precreated_shm3_handles = self.precreate_register_regions(
-                    (False, False, True), dtype,
-                    3) if dtype == np.bool else self.precreate_register_regions(
-                        (1111, 1112, 1113), dtype, 3)
+                    (1111, 1112, 1113), dtype, 3)
                 precreated_shm4_handles = self.precreate_register_regions(
-                    (True,), dtype,
-                    4) if dtype == np.bool else self.precreate_register_regions(
-                        (11111,), dtype, 4)
+                    (11111,), dtype, 4)
                 precreated_shm5_handles = self.precreate_register_regions(
-                    (True,), dtype,
-                    5) if dtype == np.bool else self.precreate_register_regions(
-                        (22222,), dtype, 5)
+                    (22222,), dtype, 5)
 
                 try:
                     model_name = tu.get_sequence_model_name(trial, dtype)
+                    # Skip bool type ensemble models
+                    if (any(word in trial for word in ENSEMBLE_PREFIXES)) and (
+                            'bool' in model_name):
+                        continue
+                    # For bool type control models, use int32 as I/O types
+                    if dtype == np.bool:
+                        dtype = np.int32
 
                     self.check_setup(model_name)
 
@@ -1516,11 +1449,8 @@ class SequenceBatcherTest(su.SequenceBatcherTestUtil):
                                 1001,
                                 (None, None),
                                 # (flag_str, value, pre_delay_ms)
-                                (("start", False, None), (None, False, None),
-                                 ("end", False, None)) if dtype == np.bool else
                                 (("start", 1, None), (None, 2, None), ("end", 3,
                                                                        None)),
-                                False if dtype == np.bool else
                                 self.get_expected_result(6, 3, trial, "end"),
                                 precreated_shm0_handles),
                             kwargs={
@@ -1537,10 +1467,7 @@ class SequenceBatcherTest(su.SequenceBatcherTestUtil):
                                 1002,
                                 (None, None),
                                 # (flag_str, value, pre_delay_ms)
-                                (("start", False, None),
-                                 ("end", True, None)) if dtype == np.bool else
                                 (("start", 11, None), ("end", 13, None)),
-                                False if dtype == np.bool else
                                 self.get_expected_result(24, 13, trial, "end"),
                                 precreated_shm1_handles),
                             kwargs={
@@ -1557,10 +1484,7 @@ class SequenceBatcherTest(su.SequenceBatcherTestUtil):
                                 1003,
                                 (None, None),
                                 # (flag_str, value, pre_delay_ms)
-                                (("start", True, None),
-                                 ("end", False, None)) if dtype == np.bool else
                                 (("start", 111, None), ("end", 113, None)),
-                                False if dtype == np.bool else
                                 self.get_expected_result(
                                     224, 113, trial, "end"),
                                 precreated_shm2_handles),
@@ -1578,11 +1502,8 @@ class SequenceBatcherTest(su.SequenceBatcherTestUtil):
                                 1004,
                                 (None, None),
                                 # (flag_str, value, pre_delay_ms)
-                                (("start", False, None), (None, False, None),
-                                 ("end", True, None)) if dtype == np.bool else
                                 (("start", 1111, None), (None, 1112, None),
                                  ("end", 1113, None)),
-                                False if dtype == np.bool else
                                 self.get_expected_result(
                                     3336, 1113, trial, "end"),
                                 precreated_shm3_handles),
@@ -1601,10 +1522,7 @@ class SequenceBatcherTest(su.SequenceBatcherTestUtil):
                                 (None, None),
                                 # (flag_str, value, pre_delay_ms)
                                 (
-                                    ("start,end", True,
-                                     None),) if dtype == np.bool else
-                                (("start,end", 11111, None),),
-                                True if dtype == np.bool else
+                                    ("start,end", 11111, None),),
                                 self.get_expected_result(
                                     11111, 11111, trial, "start,end"),
                                 precreated_shm4_handles),
@@ -1623,10 +1541,7 @@ class SequenceBatcherTest(su.SequenceBatcherTestUtil):
                                 (None, None),
                                 # (flag_str, value, pre_delay_ms)
                                 (
-                                    ("start,end", True,
-                                     None),) if dtype == np.bool else
-                                (("start,end", 22222, None),),
-                                True if dtype == np.bool else
+                                    ("start,end", 22222, None),),
                                 self.get_expected_result(
                                     22222, 22222, trial, "start,end"),
                                 precreated_shm5_handles),
@@ -1681,32 +1596,27 @@ class SequenceBatcherTest(su.SequenceBatcherTestUtil):
                 self.clear_deferred_exceptions()
 
                 precreated_shm0_handles = self.precreate_register_regions(
-                    (False, False, False), dtype,
-                    0) if dtype == np.bool else self.precreate_register_regions(
-                        (1, 2, 3), dtype, 0)
+                    (1, 2, 3), dtype, 0)
                 precreated_shm1_handles = self.precreate_register_regions(
-                    (False, True), dtype,
-                    1) if dtype == np.bool else self.precreate_register_regions(
-                        (11, 13), dtype, 1)
+                    (11, 13), dtype, 1)
                 precreated_shm2_handles = self.precreate_register_regions(
-                    (True, False), dtype,
-                    2) if dtype == np.bool else self.precreate_register_regions(
-                        (111, 113), dtype, 2)
+                    (111, 113), dtype, 2)
                 precreated_shm3_handles = self.precreate_register_regions(
-                    (False, False, True), dtype,
-                    3) if dtype == np.bool else self.precreate_register_regions(
-                        (1111, 1112, 1113), dtype, 3)
+                    (1111, 1112, 1113), dtype, 3)
                 precreated_shm4_handles = self.precreate_register_regions(
-                    (True,), dtype,
-                    4) if dtype == np.bool else self.precreate_register_regions(
-                        (11111,), dtype, 4)
+                    (11111,), dtype, 4)
                 precreated_shm5_handles = self.precreate_register_regions(
-                    (True, True, False), dtype,
-                    5) if dtype == np.bool else self.precreate_register_regions(
-                        (22222, 22223, 22224), dtype, 5)
+                    (22222, 22223, 22224), dtype, 5)
 
                 try:
                     model_name = tu.get_sequence_model_name(trial, dtype)
+                    # Skip bool type ensemble models
+                    if (any(word in trial for word in ENSEMBLE_PREFIXES)) and (
+                            'bool' in model_name):
+                        continue
+                    # For bool type control models, use int32 as I/O types
+                    if dtype == np.bool:
+                        dtype = np.int32
 
                     self.check_setup(model_name)
 
@@ -1733,11 +1643,8 @@ class SequenceBatcherTest(su.SequenceBatcherTestUtil):
                                 1001,
                                 (None, None),
                                 # (flag_str, value, pre_delay_ms)
-                                (("start", False, None), (None, False, None),
-                                 ("end", False, None)) if dtype == np.bool else
                                 (("start", 1, None), (None, 2, None), ("end", 3,
                                                                        None)),
-                                False if dtype == np.bool else
                                 self.get_expected_result(6, 3, trial, "end"),
                                 precreated_shm0_handles),
                             kwargs={
@@ -1754,10 +1661,7 @@ class SequenceBatcherTest(su.SequenceBatcherTestUtil):
                                 1002,
                                 (None, None),
                                 # (flag_str, value, pre_delay_ms)
-                                (("start", False, None),
-                                 ("end", True, None)) if dtype == np.bool else
                                 (("start", 11, None), ("end", 13, None)),
-                                False if dtype == np.bool else
                                 self.get_expected_result(24, 13, trial, "end"),
                                 precreated_shm1_handles),
                             kwargs={
@@ -1774,10 +1678,7 @@ class SequenceBatcherTest(su.SequenceBatcherTestUtil):
                                 1003,
                                 (None, None),
                                 # (flag_str, value, pre_delay_ms)
-                                (("start", True, None),
-                                 ("end", False, None)) if dtype == np.bool else
                                 (("start", 111, None), ("end", 113, None)),
-                                False if dtype == np.bool else
                                 self.get_expected_result(
                                     224, 113, trial, "end"),
                                 precreated_shm2_handles),
@@ -1795,11 +1696,8 @@ class SequenceBatcherTest(su.SequenceBatcherTestUtil):
                                 1004,
                                 (None, None),
                                 # (flag_str, value, pre_delay_ms)
-                                (("start", False, None), (None, False, None),
-                                 ("end", True, None)) if dtype == np.bool else
                                 (("start", 1111, None), (None, 1112, None),
                                  ("end", 1113, None)),
-                                False if dtype == np.bool else
                                 self.get_expected_result(
                                     3336, 1113, trial, "end"),
                                 precreated_shm3_handles),
@@ -1818,10 +1716,7 @@ class SequenceBatcherTest(su.SequenceBatcherTestUtil):
                                 (None, None),
                                 # (flag_str, value, pre_delay_ms)
                                 (
-                                    ("start,end", True,
-                                     None),) if dtype == np.bool else
-                                (("start,end", 11111, None),),
-                                True if dtype == np.bool else
+                                    ("start,end", 11111, None),),
                                 self.get_expected_result(
                                     11111, 11111, trial, "start,end"),
                                 precreated_shm4_handles),
@@ -1840,15 +1735,10 @@ class SequenceBatcherTest(su.SequenceBatcherTestUtil):
                                 (None, None),
                                 # (flag_str, value, pre_delay_ms)
                                 (
-                                    ("start", True, None),
-                                    (None, True, None),
-                                    ("end", False, 2000),
-                                ) if dtype == np.bool else (
                                     ("start", 22222, None),
                                     (None, 22223, None),
                                     ("end", 22224, 2000),
                                 ),
-                                False if dtype == np.bool else
                                 self.get_expected_result(
                                     66669, 22224, trial, "end"),
                                 precreated_shm5_handles),
@@ -1902,28 +1792,25 @@ class SequenceBatcherTest(su.SequenceBatcherTestUtil):
                 self.clear_deferred_exceptions()
 
                 precreated_shm0_handles = self.precreate_register_regions(
-                    (False, False, False), dtype,
-                    0) if dtype == np.bool else self.precreate_register_regions(
-                        (1, 2, 3), dtype, 0)
+                    (1, 2, 3), dtype, 0)
                 precreated_shm1_handles = self.precreate_register_regions(
-                    (False, False, True), dtype,
-                    1) if dtype == np.bool else self.precreate_register_regions(
-                        (11, 12, 13), dtype, 1)
+                    (11, 12, 13), dtype, 1)
                 precreated_shm2_handles = self.precreate_register_regions(
-                    (True, False, False), dtype,
-                    2) if dtype == np.bool else self.precreate_register_regions(
-                        (111, 112, 113), dtype, 2)
+                    (111, 112, 113), dtype, 2)
                 precreated_shm3_handles = self.precreate_register_regions(
-                    (True, False, True), dtype,
-                    3) if dtype == np.bool else self.precreate_register_regions(
-                        (1111, 1112, 1113), dtype, 3)
+                    (1111, 1112, 1113), dtype, 3)
                 precreated_shm4_handles = self.precreate_register_regions(
-                    (True, False), dtype,
-                    4) if dtype == np.bool else self.precreate_register_regions(
-                        (11111, 11113), dtype, 4)
+                    (11111, 11113), dtype, 4)
 
                 try:
                     model_name = tu.get_sequence_model_name(trial, dtype)
+                    # Skip bool type ensemble models
+                    if (any(word in trial for word in ENSEMBLE_PREFIXES)) and (
+                            'bool' in model_name):
+                        continue
+                    # For bool type control models, use int32 as I/O types
+                    if dtype == np.bool:
+                        dtype = np.int32
 
                     self.check_setup(model_name)
 
@@ -1950,11 +1837,8 @@ class SequenceBatcherTest(su.SequenceBatcherTestUtil):
                                 1001,
                                 (None, None),
                                 # (flag_str, value, pre_delay_ms)
-                                (("start", False, None), (None, False, None),
-                                 ("end", False, None)) if dtype == np.bool else
                                 (("start", 1, None), (None, 2, None), ("end", 3,
                                                                        None)),
-                                False if dtype == np.bool else
                                 self.get_expected_result(6, 3, trial, "end"),
                                 precreated_shm0_handles),
                             kwargs={
@@ -1971,11 +1855,8 @@ class SequenceBatcherTest(su.SequenceBatcherTestUtil):
                                 1002,
                                 (None, None),
                                 # (flag_str, value, pre_delay_ms)
-                                (("start", False, None), (None, False, None),
-                                 ("end", True, None)) if dtype == np.bool else
                                 (("start", 11, None), (None, 12, None),
                                  ("end", 13, None)),
-                                False if dtype == np.bool else
                                 self.get_expected_result(36, 13, trial, "end"),
                                 precreated_shm1_handles),
                             kwargs={
@@ -1992,11 +1873,8 @@ class SequenceBatcherTest(su.SequenceBatcherTestUtil):
                                 1003,
                                 (None, None),
                                 # (flag_str, value, pre_delay_ms)
-                                (("start", True, None), (None, False, None),
-                                 ("end", False, None)) if dtype == np.bool else
                                 (("start", 111, None), (None, 112, None),
                                  ("end", 113, None)),
-                                False if dtype == np.bool else
                                 self.get_expected_result(
                                     336, 113, trial, "end"),
                                 precreated_shm2_handles),
@@ -2014,11 +1892,8 @@ class SequenceBatcherTest(su.SequenceBatcherTestUtil):
                                 1004,
                                 (None, None),
                                 # (flag_str, value, pre_delay_ms)
-                                (("start", True, None), (None, False, None),
-                                 ("end", True, None)) if dtype == np.bool else
                                 (("start", 1111, None), (None, 1112, None),
                                  ("end", 1113, None)),
-                                False if dtype == np.bool else
                                 self.get_expected_result(
                                     3336, 1113, trial, "end"),
                                 precreated_shm3_handles),
@@ -2036,10 +1911,7 @@ class SequenceBatcherTest(su.SequenceBatcherTestUtil):
                                 1002,
                                 (None, None),
                                 # (flag_str, value, pre_delay_ms)
-                                (("start", True, None),
-                                 ("end", False, None)) if dtype == np.bool else
                                 (("start", 11111, None), ("end", 11113, None)),
-                                False if dtype == np.bool else
                                 self.get_expected_result(
                                     22224, 11113, trial, "end"),
                                 precreated_shm4_handles),
@@ -2102,27 +1974,24 @@ class SequenceBatcherTest(su.SequenceBatcherTestUtil):
                 self.clear_deferred_exceptions()
 
                 precreated_shm0_handles = self.precreate_register_regions(
-                    (False, False), dtype,
-                    0) if dtype == np.bool else self.precreate_register_regions(
-                        (1, 3), dtype, 0)
+                    (1, 3), dtype, 0)
                 precreated_shm1_handles = self.precreate_register_regions(
-                    (False, True, False, True), dtype,
-                    1) if dtype == np.bool else self.precreate_register_regions(
-                        (11, 12, 12, 13), dtype, 1)
+                    (11, 12, 12, 13), dtype, 1)
                 precreated_shm2_handles = self.precreate_register_regions(
-                    (True, False, True, False), dtype,
-                    2) if dtype == np.bool else self.precreate_register_regions(
-                        (111, 112, 112, 113), dtype, 2)
+                    (111, 112, 112, 113), dtype, 2)
                 precreated_shm3_handles = self.precreate_register_regions(
-                    (True, False, False, True), dtype,
-                    3) if dtype == np.bool else self.precreate_register_regions(
-                        (1111, 1112, 1112, 1113), dtype, 3)
+                    (1111, 1112, 1112, 1113), dtype, 3)
                 precreated_shm4_handles = self.precreate_register_regions(
-                    (True, False), dtype,
-                    4) if dtype == np.bool else self.precreate_register_regions(
-                        (11111, 11113), dtype, 4)
+                    (11111, 11113), dtype, 4)
                 try:
                     model_name = tu.get_sequence_model_name(trial, dtype)
+                    # Skip bool type ensemble models
+                    if (any(word in trial for word in ENSEMBLE_PREFIXES)) and (
+                            'bool' in model_name):
+                        continue
+                    # For bool type control models, use int32 as I/O types
+                    if dtype == np.bool:
+                        dtype = np.int32
 
                     self.check_setup(model_name)
 
@@ -2149,10 +2018,7 @@ class SequenceBatcherTest(su.SequenceBatcherTestUtil):
                                 1001,
                                 (None, None),
                                 # (flag_str, value, pre_delay_ms)
-                                (("start", False, None),
-                                 (None, False, None)) if dtype == np.bool else
                                 (("start", 1, None), (None, 3, None)),
-                                False if dtype == np.bool else
                                 self.get_expected_result(4, 3, trial, None),
                                 precreated_shm0_handles),
                             kwargs={
@@ -2169,12 +2035,8 @@ class SequenceBatcherTest(su.SequenceBatcherTestUtil):
                                 1002,
                                 (None, None),
                                 # (flag_str, value, pre_delay_ms)
-                                (("start", False, None), (None, True, None),
-                                 (None, False, None),
-                                 ("end", True, None)) if dtype == np.bool else
                                 (("start", 11, None), (None, 12, None),
                                  (None, 12, None), ("end", 13, None)),
-                                False if dtype == np.bool else
                                 self.get_expected_result(48, 13, trial, "end"),
                                 precreated_shm1_handles),
                             kwargs={
@@ -2191,12 +2053,8 @@ class SequenceBatcherTest(su.SequenceBatcherTestUtil):
                                 1003,
                                 (None, None),
                                 # (flag_str, value, pre_delay_ms)
-                                (("start", True, None), (None, False, None),
-                                 (None, True, None),
-                                 ("end", False, None)) if dtype == np.bool else
                                 (("start", 111, None), (None, 112, None),
                                  (None, 112, None), ("end", 113, None)),
-                                False if dtype == np.bool else
                                 self.get_expected_result(
                                     448, 113, trial, "end"),
                                 precreated_shm2_handles),
@@ -2214,12 +2072,8 @@ class SequenceBatcherTest(su.SequenceBatcherTestUtil):
                                 1004,
                                 (None, None),
                                 # (flag_str, value, pre_delay_ms)
-                                (("start", True, None), (None, False, None),
-                                 (None, False, None),
-                                 ("end", True, None)) if dtype == np.bool else
                                 (("start", 1111, None), (None, 1112, None),
                                  (None, 1112, None), ("end", 1113, None)),
-                                False if dtype == np.bool else
                                 self.get_expected_result(
                                     4448, 1113, trial, "end"),
                                 precreated_shm3_handles),
@@ -2237,10 +2091,7 @@ class SequenceBatcherTest(su.SequenceBatcherTestUtil):
                                 1001,
                                 (None, None),
                                 # (flag_str, value, pre_delay_ms)
-                                (("start", True, None),
-                                 ("end", False, None)) if dtype == np.bool else
                                 (("start", 11111, None), ("end", 11113, None)),
-                                False if dtype == np.bool else
                                 self.get_expected_result(
                                     22224, 11113, trial, "end"),
                                 precreated_shm4_handles),
@@ -2295,27 +2146,24 @@ class SequenceBatcherTest(su.SequenceBatcherTestUtil):
                 self.clear_deferred_exceptions()
 
                 precreated_shm0_handles = self.precreate_register_regions(
-                    (False, False), dtype,
-                    0) if dtype == np.bool else self.precreate_register_regions(
-                        (1, 3), dtype, 0)
+                    (1, 3), dtype, 0)
                 precreated_shm1_handles = self.precreate_register_regions(
-                    (False, True, False, True), dtype,
-                    1) if dtype == np.bool else self.precreate_register_regions(
-                        (11, 12, 12, 13), dtype, 1)
+                    (11, 12, 12, 13), dtype, 1)
                 precreated_shm2_handles = self.precreate_register_regions(
-                    (True, False, True, False), dtype,
-                    2) if dtype == np.bool else self.precreate_register_regions(
-                        (111, 112, 112, 113), dtype, 2)
+                    (111, 112, 112, 113), dtype, 2)
                 precreated_shm3_handles = self.precreate_register_regions(
-                    (True, False, False, True), dtype,
-                    3) if dtype == np.bool else self.precreate_register_regions(
-                        (1111, 1112, 1112, 1113), dtype, 3)
+                    (1111, 1112, 1112, 1113), dtype, 3)
                 precreated_shm4_handles = self.precreate_register_regions(
-                    (True, False), dtype,
-                    4) if dtype == np.bool else self.precreate_register_regions(
-                        (11111, 11113), dtype, 4)
+                    (11111, 11113), dtype, 4)
                 try:
                     model_name = tu.get_sequence_model_name(trial, dtype)
+                    # Skip bool type ensemble models
+                    if (any(word in trial for word in ENSEMBLE_PREFIXES)) and (
+                            'bool' in model_name):
+                        continue
+                    # For bool type control models, use int32 as I/O types
+                    if dtype == np.bool:
+                        dtype = np.int32
 
                     self.check_setup(model_name)
 
@@ -2342,12 +2190,8 @@ class SequenceBatcherTest(su.SequenceBatcherTestUtil):
                                 1001,
                                 (None, None),
                                 # (flag_str, value, pre_delay_ms)
-                                (("start", False, None),
-                                 (None, False, _max_sequence_idle_ms +
-                                  1000)) if dtype == np.bool else
                                 (("start", 1, None),
                                  (None, 3, _max_sequence_idle_ms + 1000)),
-                                False if dtype == np.bool else
                                 self.get_expected_result(4, 3, trial, None),
                                 precreated_shm0_handles),
                             kwargs={
@@ -2364,16 +2208,10 @@ class SequenceBatcherTest(su.SequenceBatcherTestUtil):
                                 1002,
                                 (None, None),
                                 # (flag_str, value, pre_delay_ms)
-                                (("start", False, None),
-                                 (None, True, _max_sequence_idle_ms / 2),
-                                 (None, False, _max_sequence_idle_ms / 2),
-                                 ("end", True, _max_sequence_idle_ms /
-                                  2)) if dtype == np.bool else
                                 (("start", 11,
                                   None), (None, 12, _max_sequence_idle_ms / 2),
                                  (None, 12, _max_sequence_idle_ms / 2),
                                  ("end", 13, _max_sequence_idle_ms / 2)),
-                                False if dtype == np.bool else
                                 self.get_expected_result(48, 13, trial, None),
                                 precreated_shm1_handles),
                             kwargs={
@@ -2390,16 +2228,10 @@ class SequenceBatcherTest(su.SequenceBatcherTestUtil):
                                 1003,
                                 (None, None),
                                 # (flag_str, value, pre_delay_ms)
-                                (("start", True, None),
-                                 (None, False, _max_sequence_idle_ms / 2),
-                                 (None, True, _max_sequence_idle_ms / 2),
-                                 ("end", False, _max_sequence_idle_ms /
-                                  2)) if dtype == np.bool else
                                 (("start", 111,
                                   None), (None, 112, _max_sequence_idle_ms / 2),
                                  (None, 112, _max_sequence_idle_ms / 2),
                                  ("end", 113, _max_sequence_idle_ms / 2)),
-                                False if dtype == np.bool else
                                 self.get_expected_result(448, 113, trial, None),
                                 precreated_shm2_handles),
                             kwargs={
@@ -2416,16 +2248,10 @@ class SequenceBatcherTest(su.SequenceBatcherTestUtil):
                                 1004,
                                 (None, None),
                                 # (flag_str, value, pre_delay_ms)
-                                (("start", True, None),
-                                 (None, False, _max_sequence_idle_ms / 2),
-                                 (None, False, _max_sequence_idle_ms / 2),
-                                 ("end", True, _max_sequence_idle_ms /
-                                  2)) if dtype == np.bool else
                                 (("start", 1111, None),
                                  (None, 1112, _max_sequence_idle_ms / 2),
                                  (None, 1112, _max_sequence_idle_ms / 2),
                                  ("end", 1113, _max_sequence_idle_ms / 2)),
-                                False if dtype == np.bool else
                                 self.get_expected_result(
                                     4448, 1113, trial, None),
                                 precreated_shm3_handles),
@@ -2443,10 +2269,7 @@ class SequenceBatcherTest(su.SequenceBatcherTestUtil):
                                 1005,
                                 (None, None),
                                 # (flag_str, value, pre_delay_ms)
-                                (("start", True, None),
-                                 ("end", False, None)) if dtype == np.bool else
                                 (("start", 11111, None), ("end", 11113, None)),
-                                False if dtype == np.bool else
                                 self.get_expected_result(
                                     22224, 11113, trial, "end"),
                                 precreated_shm4_handles),
@@ -2511,15 +2334,14 @@ class SequenceBatcherTest(su.SequenceBatcherTestUtil):
                 self.clear_deferred_exceptions()
 
                 precreated_shm0_handles = self.precreate_register_regions(
-                    (True,), dtype,
-                    0) if dtype == np.bool else self.precreate_register_regions(
-                        (1,), dtype, 0)
+                    (1,), dtype, 0)
                 precreated_shm1_handles = self.precreate_register_regions(
-                    (True, False), dtype,
-                    1) if dtype == np.bool else self.precreate_register_regions(
-                        (11, 12), dtype, 1)
+                    (11, 12), dtype, 1)
                 try:
                     model_name = tu.get_sequence_model_name(trial, dtype)
+                    # For bool type control models, use int32 as I/O types
+                    if dtype == np.bool:
+                        dtype = np.int32
 
                     self.check_setup(model_name)
 
@@ -2546,10 +2368,7 @@ class SequenceBatcherTest(su.SequenceBatcherTestUtil):
                                 (2000, None),
                                 # (flag_str, value, pre_delay_ms)
                                 (
-                                    ("start", True,
-                                     None),) if dtype == np.bool else
-                                (("start", 1, None),),
-                                True if dtype == np.bool else
+                                    ("start", 1, None),),
                                 self.get_expected_result(1, 1, trial, "start"),
                                 precreated_shm0_handles),
                             kwargs={
@@ -2567,13 +2386,9 @@ class SequenceBatcherTest(su.SequenceBatcherTestUtil):
                                 (2000, None),
                                 # (flag_str, value, pre_delay_ms)
                                 (
-                                    ("start", True, None),
-                                    (None, False, None),
-                                ) if dtype == np.bool else (
                                     ("start", 11, None),
                                     (None, 12, None),
                                 ),
-                                False if dtype == np.bool else
                                 self.get_expected_result(23, 12, trial, None),
                                 precreated_shm1_handles),
                             kwargs={
@@ -2618,16 +2433,15 @@ class SequenceBatcherTest(su.SequenceBatcherTestUtil):
                 self.clear_deferred_exceptions()
 
                 precreated_shm0_handles = self.precreate_register_regions(
-                    (True,), dtype,
-                    0) if dtype == np.bool else self.precreate_register_regions(
-                        (1,), dtype, 0)
+                    (1,), dtype, 0)
                 precreated_shm1_handles = self.precreate_register_regions(
-                    (False, True), dtype,
-                    1) if dtype == np.bool else self.precreate_register_regions(
-                        (11, 12), dtype, 1)
+                    (11, 12), dtype, 1)
                 try:
                     model_name = tu.get_sequence_model_name(trial,
                                                             dtype) + "_half"
+                    # For bool type control models, use int32 as I/O types
+                    if dtype == np.bool:
+                        dtype = np.int32
 
                     self.check_setup(model_name)
 
@@ -2654,10 +2468,7 @@ class SequenceBatcherTest(su.SequenceBatcherTestUtil):
                                 (2000, None),
                                 # (flag_str, value, pre_delay_ms)
                                 (
-                                    ("start", True,
-                                     None),) if dtype == np.bool else
-                                (("start", 1, None),),
-                                True if dtype == np.bool else
+                                    ("start", 1, None),),
                                 self.get_expected_result(1, 1, trial, "start"),
                                 precreated_shm0_handles),
                             kwargs={
@@ -2675,13 +2486,9 @@ class SequenceBatcherTest(su.SequenceBatcherTestUtil):
                                 (4000, 3000),
                                 # (flag_str, value, pre_delay_ms)
                                 (
-                                    ("start", False, None),
-                                    (None, True, None),
-                                ) if dtype == np.bool else (
                                     ("start", 11, None),
                                     (None, 12, None),
                                 ),
-                                False if dtype == np.bool else
                                 self.get_expected_result(23, 12, trial, None),
                                 precreated_shm1_handles),
                             kwargs={
@@ -2725,16 +2532,15 @@ class SequenceBatcherTest(su.SequenceBatcherTestUtil):
                 self.clear_deferred_exceptions()
 
                 precreated_shm0_handles = self.precreate_register_regions(
-                    (True,), dtype,
-                    0) if dtype == np.bool else self.precreate_register_regions(
-                        (1,), dtype, 0)
+                    (1,), dtype, 0)
                 precreated_shm1_handles = self.precreate_register_regions(
-                    (False, True), dtype,
-                    1) if dtype == np.bool else self.precreate_register_regions(
-                        (11, 12), dtype, 1)
+                    (11, 12), dtype, 1)
                 try:
                     model_name = tu.get_sequence_model_name(trial,
                                                             dtype) + "_full"
+                    # For bool type control models, use int32 as I/O types
+                    if dtype == np.bool:
+                        dtype = np.int32
 
                     self.check_setup(model_name)
 
@@ -2761,10 +2567,7 @@ class SequenceBatcherTest(su.SequenceBatcherTestUtil):
                                 (4000, 3000),
                                 # (flag_str, value, pre_delay_ms)
                                 (
-                                    ("start", True,
-                                     None),) if dtype == np.bool else
-                                (("start", 1, None),),
-                                True if dtype == np.bool else
+                                    ("start", 1, None),),
                                 self.get_expected_result(1, 1, trial, "start"),
                                 precreated_shm0_handles),
                             kwargs={
@@ -2782,13 +2585,9 @@ class SequenceBatcherTest(su.SequenceBatcherTestUtil):
                                 (6000, 5000),
                                 # (flag_str, value, pre_delay_ms)
                                 (
-                                    ("start", False, None),
-                                    (None, True, 2000),
-                                ) if dtype == np.bool else (
                                     ("start", 11, None),
                                     (None, 12, 2000),
                                 ),
-                                False if dtype == np.bool else
                                 self.get_expected_result(23, 12, trial, None),
                                 precreated_shm1_handles),
                             kwargs={
