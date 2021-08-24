@@ -39,6 +39,15 @@
 
 namespace nvidia { namespace inferenceserver {
 
+bool
+IsStaleState(RateLimiter::Payload::State payload_state)
+{
+  return (
+      (payload_state == RateLimiter::Payload::State::SCHEDULED) ||
+      (payload_state == RateLimiter::Payload::State::EXECUTING) ||
+      (payload_state == RateLimiter::Payload::State::RELEASED));
+}
+
 DynamicBatchScheduler::DynamicBatchScheduler(
     TritonModel* model, TritonModelInstance* model_instance,
     const bool dynamic_batching_enabled, const int32_t max_batch_size,
@@ -177,9 +186,7 @@ DynamicBatchScheduler::Enqueue(std::unique_ptr<InferenceRequest>& request)
         std::lock_guard<std::mutex> exec_lock(*(curr_payload_->GetExecMutex()));
         auto payload_state = curr_payload_->GetState();
         wake_batcher &=
-            ((payload_saturated_) ||
-             (payload_state == RateLimiter::Payload::State::EXECUTING) ||
-             (payload_state == RateLimiter::Payload::State::RELEASED) ||
+            (payload_saturated_ || IsStaleState(payload_state) ||
              (queued_batch_size_ >= next_preferred_batch_size_));
       }
     }
@@ -247,9 +254,7 @@ DynamicBatchScheduler::BatcherThread(const int nice)
       {
         std::lock_guard<std::mutex> exec_lock(*(curr_payload_->GetExecMutex()));
         auto payload_state = curr_payload_->GetState();
-        if (payload_saturated_ ||
-            payload_state == RateLimiter::Payload::State::EXECUTING ||
-            payload_state == RateLimiter::Payload::State::RELEASED) {
+        if (payload_saturated_ || IsStaleState(payload_state)) {
           NewPayload();
           next_preferred_batch_size_ = 0;
           required_equal_inputs_.clear();
@@ -278,8 +283,7 @@ DynamicBatchScheduler::BatcherThread(const int nice)
               *(curr_payload_->GetExecMutex()));
 
           auto payload_state = curr_payload_->GetState();
-          if (payload_state == RateLimiter::Payload::State::EXECUTING ||
-              payload_state == RateLimiter::Payload::State::RELEASED) {
+          if (IsStaleState(payload_state)) {
             continue;
           }
 
