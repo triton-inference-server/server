@@ -578,8 +578,7 @@ RUN apt-get update && \
             libarchive-dev \
             pkg-config \
             uuid-dev \
-            libnuma-dev \
-            libnuma1 && \
+            libnuma-dev && \
     rm -rf /var/lib/apt/lists/*
 
 RUN pip3 install --upgrade pip && \
