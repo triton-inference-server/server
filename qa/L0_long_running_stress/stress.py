@@ -58,12 +58,6 @@ BACKENDS = os.environ.get('BACKENDS', "graphdef savedmodel onnx plan")
 _thread_exceptions = []
 _thread_exceptions_mutex = threading.Lock()
 
-_test_case_count = {}
-_test_case_count_mutex = threading.Lock()
-
-_failed_test_case_count = {}
-_failed_test_case_count_mutex = threading.Lock()
-
 
 class UserData:
 
@@ -89,6 +83,8 @@ def check_sequence_async(client_metadata,
                          timeout_ms=DEFAULT_TIMEOUT_MS,
                          batch_size=1,
                          sequence_name="<unknown>",
+                         test_case_name="<unknown>",
+                         sequence_request_count={},
                          tensor_shape=(1,),
                          input_name="INPUT",
                          output_name="OUTPUT"):
@@ -146,6 +142,7 @@ def check_sequence_async(client_metadata,
                                          sequence_id=sequence_id,
                                          sequence_start=seq_start,
                                          sequence_end=seq_end)
+        count_sequence_request(test_case_name, sequence_request_count)
         sent_count += 1
 
         if delay_ms is not None:
@@ -226,32 +223,32 @@ def get_trial(is_sequence=True):
         return np.random.choice(_trials)
 
 
-def count_test_case(test_case_name):
+def count_test_case(test_case_name, test_case_count):
     # Count the times each test case runs
-    _test_case_count_mutex.acquire()
-    try:
-        if test_case_name in _test_case_count:
-            _test_case_count[test_case_name] += 1
-        else:
-            _test_case_count[test_case_name] = 1
-    finally:
-        _test_case_count_mutex.release()
+    if test_case_name in test_case_count:
+        test_case_count[test_case_name] += 1
+    else:
+        test_case_count[test_case_name] = 1
 
 
-def count_failed_test_case(test_case_name):
+def count_failed_test_case(test_case_name, failed_test_case_count):
     # Count the times each test case fails
-    _failed_test_case_count_mutex.acquire()
-    try:
-        if test_case_name in _failed_test_case_count:
-            _failed_test_case_count[test_case_name] += 1
-        else:
-            _failed_test_case_count[test_case_name] = 1
-    finally:
-        _failed_test_case_count_mutex.release()
+    if test_case_name in failed_test_case_count:
+        failed_test_case_count[test_case_name] += 1
+    else:
+        failed_test_case_count[test_case_name] = 1
+
+
+def count_sequence_request(test_case_name, sequence_request_count):
+    # Count the number of requests were sent for each test case
+    if test_case_name in sequence_request_count:
+        sequence_request_count[test_case_name] += 1
+    else:
+        sequence_request_count[test_case_name] = 1
 
 
 def sequence_valid(client_metadata, rng, trial, model_name, dtype, len_mean,
-                   len_stddev, sequence_name):
+                   len_stddev, sequence_name, sequence_request_count):
     # Create a variable length sequence with "start" and "end" flags.
     seqlen = max(1, int(rng.normal(len_mean, len_stddev)))
     print("{} {}: valid seqlen = {}".format(sequence_name, client_metadata[1],
@@ -283,11 +280,14 @@ def sequence_valid(client_metadata, rng, trial, model_name, dtype, len_mean,
                          model_name,
                          dtype,
                          steps,
-                         sequence_name=sequence_name)
+                         sequence_name=sequence_name,
+                         test_case_name="sequence_valid",
+                         sequence_request_count=sequence_request_count)
 
 
 def sequence_valid_valid(client_metadata, rng, trial, model_name, dtype,
-                         len_mean, len_stddev, sequence_name):
+                         len_mean, len_stddev, sequence_name,
+                         sequence_request_count):
     # Create two variable length sequences with "start" and "end"
     # flags, where both sequences use the same correlation ID and are
     # sent back-to-back.
@@ -328,11 +328,14 @@ def sequence_valid_valid(client_metadata, rng, trial, model_name, dtype,
                          model_name,
                          dtype,
                          steps,
-                         sequence_name=sequence_name)
+                         sequence_name=sequence_name,
+                         test_case_name="sequence_valid_valid",
+                         sequence_request_count=sequence_request_count)
 
 
 def sequence_valid_no_end(client_metadata, rng, trial, model_name, dtype,
-                          len_mean, len_stddev, sequence_name):
+                          len_mean, len_stddev, sequence_name,
+                          sequence_request_count):
     # Create two variable length sequences, the first with "start" and
     # "end" flags and the second with no "end" flag, where both
     # sequences use the same correlation ID and are sent back-to-back.
@@ -373,11 +376,13 @@ def sequence_valid_no_end(client_metadata, rng, trial, model_name, dtype,
                          model_name,
                          dtype,
                          steps,
-                         sequence_name=sequence_name)
+                         sequence_name=sequence_name,
+                         test_case_name="sequence_valid_no_end",
+                         sequence_request_count=sequence_request_count)
 
 
 def sequence_no_start(client_metadata, rng, trial, model_name, dtype,
-                      sequence_name):
+                      sequence_name, sequence_request_count):
     # Create a sequence without a "start" flag. Sequence should get an
     # error from the server.
     seqlen = 1
@@ -402,7 +407,9 @@ def sequence_no_start(client_metadata, rng, trial, model_name, dtype,
                              model_name,
                              dtype,
                              steps,
-                             sequence_name=sequence_name)
+                             sequence_name=sequence_name,
+                             test_case_name="sequence_no_start",
+                             sequence_request_count=sequence_request_count)
         assert False, "expected inference failure from missing START flag"
     except Exception as ex:
         if "must specify the START flag" not in ex.message():
@@ -410,7 +417,7 @@ def sequence_no_start(client_metadata, rng, trial, model_name, dtype,
 
 
 def sequence_no_end(client_metadata, rng, trial, model_name, dtype, len_mean,
-                    len_stddev, sequence_name):
+                    len_stddev, sequence_name, sequence_request_count):
     # Create a variable length sequence with "start" flag but that
     # never ends. The sequence should be aborted by the server and its
     # slot reused for another sequence.
@@ -442,7 +449,9 @@ def sequence_no_end(client_metadata, rng, trial, model_name, dtype, len_mean,
                          model_name,
                          dtype,
                          steps,
-                         sequence_name=sequence_name)
+                         sequence_name=sequence_name,
+                         test_case_name="sequence_no_end",
+                         sequence_request_count=sequence_request_count)
 
 
 def timeout_client(client_metadata,
@@ -497,7 +506,9 @@ def crashing_client(name):
         assert False, "crashing_client failed {}".format(name)
 
 
-def stress_thread(name, seed, test_duration, correlation_id_base):
+def stress_thread(name, seed, test_duration, correlation_id_base,
+                  test_case_count, failed_test_case_count,
+                  sequence_request_count):
     # Thread responsible for generating sequences of inference
     # requests.
     global _thread_exceptions
@@ -546,38 +557,44 @@ def stress_thread(name, seed, test_duration, correlation_id_base):
                 # exercise the idle sequence path of the sequence
                 # scheduler
                 if choice < 0.33:
-                    count_test_case("sequence_no_end")
+                    count_test_case("sequence_no_end", test_case_count)
                     last_choices[client_idx] = "sequence_no_end"
-                    sequence_no_end(client_metadata_list[client_idx],
-                                    rng,
-                                    trial,
-                                    model_name,
-                                    dtype,
-                                    SEQUENCE_LENGTH_MEAN,
-                                    SEQUENCE_LENGTH_STDEV,
-                                    sequence_name=name)
+                    sequence_no_end(
+                        client_metadata_list[client_idx],
+                        rng,
+                        trial,
+                        model_name,
+                        dtype,
+                        SEQUENCE_LENGTH_MEAN,
+                        SEQUENCE_LENGTH_STDEV,
+                        sequence_name=name,
+                        sequence_request_count=sequence_request_count)
                 elif choice < 0.66:
-                    count_test_case("sequence_valid_no_end")
+                    count_test_case("sequence_valid_no_end", test_case_count)
                     last_choices[client_idx] = "sequence_valid_no_end"
-                    sequence_valid_no_end(client_metadata_list[client_idx],
-                                          rng,
-                                          trial,
-                                          model_name,
-                                          dtype,
-                                          SEQUENCE_LENGTH_MEAN,
-                                          SEQUENCE_LENGTH_STDEV,
-                                          sequence_name=name)
+                    sequence_valid_no_end(
+                        client_metadata_list[client_idx],
+                        rng,
+                        trial,
+                        model_name,
+                        dtype,
+                        SEQUENCE_LENGTH_MEAN,
+                        SEQUENCE_LENGTH_STDEV,
+                        sequence_name=name,
+                        sequence_request_count=sequence_request_count)
                 else:
-                    count_test_case("sequence_valid_valid")
+                    count_test_case("sequence_valid_valid", test_case_count)
                     last_choices[client_idx] = "sequence_valid_valid"
-                    sequence_valid_valid(client_metadata_list[client_idx],
-                                         rng,
-                                         trial,
-                                         model_name,
-                                         dtype,
-                                         SEQUENCE_LENGTH_MEAN,
-                                         SEQUENCE_LENGTH_STDEV,
-                                         sequence_name=name)
+                    sequence_valid_valid(
+                        client_metadata_list[client_idx],
+                        rng,
+                        trial,
+                        model_name,
+                        dtype,
+                        SEQUENCE_LENGTH_MEAN,
+                        SEQUENCE_LENGTH_STDEV,
+                        sequence_name=name,
+                        sequence_request_count=sequence_request_count)
 
                 rare_idx = (rare_idx + 1) % rare_cnt
             elif rng.rand() < 0.6:
@@ -595,79 +612,90 @@ def stress_thread(name, seed, test_duration, correlation_id_base):
                 if ((last_choice != "sequence_no_end") and
                     (last_choice != "sequence_valid_no_end") and
                     (choice < 0.01)):
-                    count_test_case("sequence_no_start")
+                    count_test_case("sequence_no_start", test_case_count)
                     last_choices[client_idx] = "sequence_no_start"
-                    sequence_no_start(client_metadata,
-                                      rng,
-                                      trial,
-                                      model_name,
-                                      dtype,
-                                      sequence_name=name)
+                    sequence_no_start(
+                        client_metadata,
+                        rng,
+                        trial,
+                        model_name,
+                        dtype,
+                        sequence_name=name,
+                        sequence_request_count=sequence_request_count)
                 elif choice < 0.05:
-                    count_test_case("sequence_no_end")
+                    count_test_case("sequence_no_end", test_case_count)
                     last_choices[client_idx] = "sequence_no_end"
-                    sequence_no_end(client_metadata,
-                                    rng,
-                                    trial,
-                                    model_name,
-                                    dtype,
-                                    SEQUENCE_LENGTH_MEAN,
-                                    SEQUENCE_LENGTH_STDEV,
-                                    sequence_name=name)
+                    sequence_no_end(
+                        client_metadata,
+                        rng,
+                        trial,
+                        model_name,
+                        dtype,
+                        SEQUENCE_LENGTH_MEAN,
+                        SEQUENCE_LENGTH_STDEV,
+                        sequence_name=name,
+                        sequence_request_count=sequence_request_count)
                 elif choice < 0.10:
-                    count_test_case("sequence_valid_no_end")
+                    count_test_case("sequence_valid_no_end", test_case_count)
                     last_choices[client_idx] = "sequence_valid_no_end"
-                    sequence_valid_no_end(client_metadata,
-                                          rng,
-                                          trial,
-                                          model_name,
-                                          dtype,
-                                          SEQUENCE_LENGTH_MEAN,
-                                          SEQUENCE_LENGTH_STDEV,
-                                          sequence_name=name)
+                    sequence_valid_no_end(
+                        client_metadata,
+                        rng,
+                        trial,
+                        model_name,
+                        dtype,
+                        SEQUENCE_LENGTH_MEAN,
+                        SEQUENCE_LENGTH_STDEV,
+                        sequence_name=name,
+                        sequence_request_count=sequence_request_count)
                 elif choice < 0.15:
-                    count_test_case("sequence_valid_valid")
+                    count_test_case("sequence_valid_valid", test_case_count)
                     last_choices[client_idx] = "sequence_valid_valid"
-                    sequence_valid_valid(client_metadata,
-                                         rng,
-                                         trial,
-                                         model_name,
-                                         dtype,
-                                         SEQUENCE_LENGTH_MEAN,
-                                         SEQUENCE_LENGTH_STDEV,
-                                         sequence_name=name)
+                    sequence_valid_valid(
+                        client_metadata,
+                        rng,
+                        trial,
+                        model_name,
+                        dtype,
+                        SEQUENCE_LENGTH_MEAN,
+                        SEQUENCE_LENGTH_STDEV,
+                        sequence_name=name,
+                        sequence_request_count=sequence_request_count)
                 else:
-                    count_test_case("sequence_valid")
+                    count_test_case("sequence_valid", test_case_count)
                     last_choices[client_idx] = "sequence_valid"
-                    sequence_valid(client_metadata,
-                                   rng,
-                                   trial,
-                                   model_name,
-                                   dtype,
-                                   SEQUENCE_LENGTH_MEAN,
-                                   SEQUENCE_LENGTH_STDEV,
-                                   sequence_name=name)
+                    sequence_valid(
+                        client_metadata,
+                        rng,
+                        trial,
+                        model_name,
+                        dtype,
+                        SEQUENCE_LENGTH_MEAN,
+                        SEQUENCE_LENGTH_STDEV,
+                        sequence_name=name,
+                        sequence_request_count=sequence_request_count)
             else:
                 client_idx = 1
                 client_metadata = client_metadata_list[client_idx]
                 choice = rng.rand()
 
                 if choice < 0.3:
-                    count_test_case("timeout_client")
+                    count_test_case("timeout_client", test_case_count)
                     last_choices[client_idx] = "timeout_client"
                     timeout_client(client_metadata_list[client_idx], name)
                 elif choice < 0.5:
-                    count_test_case("resnet_model_request")
+                    count_test_case("resnet_model_request", test_case_count)
                     last_choices[client_idx] = "resnet_model_request"
                     resnet_model_request(name)
                 else:
-                    count_test_case("crashing_client")
+                    count_test_case("crashing_client", test_case_count)
                     last_choices[client_idx] = "crashing_client"
                     crashing_client(name)
         except Exception as ex:
+            count_failed_test_case(last_choices[client_idx],
+                                   failed_test_case_count)
             _thread_exceptions_mutex.acquire()
             try:
-                count_failed_test_case(last_choices[client_idx])
                 _thread_exceptions.append(traceback.format_exc())
             finally:
                 _thread_exceptions_mutex.release()
@@ -709,8 +737,17 @@ def format_content(content, max_line_length):
     return formatted_content
 
 
-def generate_report(elapsed_time):
-    # Generate email report
+def accumulate_count(dict_list, test_case_name):
+    count = 0
+    for d in dict_list:
+        if test_case_name in d:
+            count += d[test_case_name]
+
+    return count
+
+
+def generate_report(elapsed_time, _test_case_count, _failed_test_case_count,
+                    _sequence_request_count):
     hrs = elapsed_time // 3600
     mins = (elapsed_time / 60) % 60
     secs = elapsed_time % 60
@@ -742,27 +779,43 @@ def generate_report(elapsed_time):
 
     t = prettytable.PrettyTable(hrules=prettytable.ALL)
     t.field_names = [
-        'Test Case', 'Number of Failures', 'Total Times',
+        'Test Case', 'Number of Failures', 'Count', 'Request Count',
         'Test Case Description'
     ]
 
     t.align["Test Case"] = "l"
     t.align["Number of Failures"] = "l"
-    t.align["Total Times"] = "l"
+    t.align["Count"] = "l"
+    t.align["Request Count"] = "l"
     t.align["Test Case Description"] = "l"
 
+    acc_test_case_count = {}
+    acc_failed_test_case_count = {}
+    acc_sequence_request_count = {}
+
     for c in test_case_description:
+        # Accumulate all the individual thread counts
+        acc_test_case_count[c] = accumulate_count(_test_case_count, c)
+        acc_failed_test_case_count[c] = accumulate_count(
+            _failed_test_case_count, c)
+        acc_sequence_request_count[c] = accumulate_count(
+            _sequence_request_count, c)
+
         t.add_row([
             c,
-            _failed_test_case_count[c] if c in _failed_test_case_count else 0,
-            _test_case_count[c] if c in _test_case_count else 0,
+            acc_failed_test_case_count[c]
+            if c in acc_failed_test_case_count else 0,
+            acc_test_case_count[c] if c in acc_test_case_count else 0,
+            # Only shows the number of total requests for sequence test cases
+            acc_sequence_request_count[c] if 'sequence' in c else 'X',
             format_content(test_case_description[c], 50)
         ])
 
     t.add_row([
         'TOTAL',
-        sum(_failed_test_case_count.values()),
-        sum(_test_case_count.values()), 'X'
+        sum(acc_failed_test_case_count.values()),
+        sum(acc_test_case_count.values()),
+        sum(acc_sequence_request_count.values()), 'X'
     ])
 
     print(t)
@@ -795,7 +848,7 @@ if __name__ == '__main__':
         '--test-duration',
         type=int,
         required=False,
-        default=7200,
+        default=25000,
         help='Duration of stress test to run. Default is 25000 seconds ' +
         '(approximately 7 hours).')
     FLAGS = parser.parse_args()
@@ -813,7 +866,13 @@ if __name__ == '__main__':
     print("concurrency = {}".format(FLAGS.concurrency))
     print("test duration = {}".format(FLAGS.test_duration))
 
+    # Create hashes for each thread for generating report
+    _test_case_count = [dict() for x in range(FLAGS.concurrency)]
+    _failed_test_case_count = [dict() for x in range(FLAGS.concurrency)]
+    _sequence_request_count = [dict() for x in range(FLAGS.concurrency)]
+
     threads = []
+
     for idx, thd in enumerate(range(FLAGS.concurrency)):
         thread_name = "thread_{}".format(idx)
 
@@ -829,7 +888,9 @@ if __name__ == '__main__':
         threads.append(
             threading.Thread(target=stress_thread,
                              args=(thread_name, seed, FLAGS.test_duration,
-                                   correlation_id_base)))
+                                   correlation_id_base, _test_case_count[idx],
+                                   _failed_test_case_count[idx],
+                                   _sequence_request_count[idx])))
 
     start_time = time.time()
     for t in threads:
@@ -837,7 +898,8 @@ if __name__ == '__main__':
     for t in threads:
         t.join()
 
-    generate_report(time.time() - start_time)
+    generate_report(time.time() - start_time, _test_case_count,
+                    _failed_test_case_count, _sequence_request_count)
 
     _thread_exceptions_mutex.acquire()
     try:
