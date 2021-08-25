@@ -45,19 +45,9 @@ EXPECTED_NUM_TESTS="4"
 DATADIR=/data/inferenceserver/${REPO_VERSION}
 
 SERVER=/opt/tritonserver/bin/tritonserver
-SERVER_ARGS="--model-repository=`pwd`/models"
+SERVER_ARGS="--model-repository=$DATADIR/qa_model_repository"
 SERVER_LOG="./inference_server.log"
 source ../common/util.sh
-
-rm -rf models
-cp -r $DATADIR/qa_model_repository models
-
-# Openvino models must be run on CPU
-OV_MODELS=$(find models -name 'openvino_*')
-for MODEL in $OV_MODELS; do
-    (cd $MODEL && \
-        echo "instance_group [ { kind: KIND_CPU }]" >> config.pbtxt)
-done
 
 run_server
 if (( $SERVER_PID == 0 )); then

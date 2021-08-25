@@ -831,6 +831,7 @@ output [
                 tu.shape_to_dims_str(output_model_shapes[io_num]))
             if output_shapes[io_num] != output_model_shapes[io_num] else "")
 
+    config += "\ninstance_group [ { kind: KIND_CPU }]"
     try:
         os.makedirs(config_dir)
     except OSError as ex:
