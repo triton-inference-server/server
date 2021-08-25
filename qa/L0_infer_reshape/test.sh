@@ -72,6 +72,13 @@ for i in \
                 echo "instance_group [ { kind: KIND_CPU }]" >> config.pbtxt)
 done
 
+# Openvino models must be run on CPU
+OV_MODELS=$(find models -name 'openvino_*')
+for MODEL in $OV_MODELS; do
+    (cd $MODEL && \
+        echo "instance_group [ { kind: KIND_CPU }]" >> config.pbtxt)
+done
+
 create_nop_version_dir `pwd`/models
 
 RET=0
