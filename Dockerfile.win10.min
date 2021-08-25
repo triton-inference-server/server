@@ -58,11 +58,13 @@ ARG VS_INSTALL_PATH_WP="C:\BuildTools"
 RUN powershell.exe Start-Process -FilePath vs_buildtools.exe -ArgumentList "--wait","--quiet","--norestart","--nocache","--installPath","%VS_INSTALL_PATH_WP%","--channelUri","C:\tmp\doesnotexist.chman","--add","Microsoft.VisualStudio.Workload.VCTools`;includeRecommended","--add","Microsoft.Component.MSBuild" -Wait -PassThru
 
 WORKDIR /
-RUN git clone --depth=1 --single-branch -b 2021.04.30 https://github.com/microsoft/vcpkg.git
+# change back to https://github.com/microsoft/vcpkg.git
+# once b64 PR is merged: https://github.com/microsoft/vcpkg/pull/19447
+RUN git clone --depth=1 --single-branch -b libb64 https://github.com/9cvele3/vcpkg.git
 WORKDIR /vcpkg
 RUN bootstrap-vcpkg.bat
 RUN vcpkg.exe update
-RUN vcpkg.exe install openssl:x64-windows openssl-windows:x64-windows rapidjson:x64-windows re2:x64-windows boost-interprocess:x64-windows boost-stacktrace:x64-windows zlib:x64-windows
+RUN vcpkg.exe install openssl:x64-windows openssl-windows:x64-windows rapidjson:x64-windows re2:x64-windows boost-interprocess:x64-windows boost-stacktrace:x64-windows zlib:x64-windows pthread:x64-windows b64:x64-windows
 RUN vcpkg.exe integrate install
 
 ARG CUDA_MAJOR=11

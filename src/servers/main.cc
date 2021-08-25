@@ -24,6 +24,11 @@
 // (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
+#ifdef _WIN32
+#define NOMINMAX
+#pragma comment(lib, "ws2_32.lib")
+#endif
+
 #ifndef _WIN32
 #include <getopt.h>
 #include <unistd.h>
@@ -702,6 +707,11 @@ StartEndpoints(
     const std::shared_ptr<nvidia::inferenceserver::SharedMemoryManager>&
         shm_manager)
 {
+#ifdef _WIN32
+  WSADATA wsaData;
+  WSAStartup(MAKEWORD(2,2), &wsaData);
+#endif
+
 #ifdef TRITON_ENABLE_GRPC
   // Enable GRPC endpoints if requested...
   if (allow_grpc_) {
@@ -806,6 +816,9 @@ StopEndpoints()
   }
 #endif  // TRITON_ENABLE_SAGEMAKER
 
+#ifdef _WIN32
+  WSACleanup();
+#endif
   return ret;
 }
 

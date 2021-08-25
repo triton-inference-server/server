@@ -64,7 +64,7 @@ class HTTPServer {
  protected:
   virtual void Handle(evhtp_request_t* req) = 0;
 
-  static void StopCallback(int sock, short events, void* arg);
+  static void StopCallback(evutil_socket_t sock, short events, void* arg);
 
   int32_t port_;
   int thread_cnt_;
@@ -72,7 +72,7 @@ class HTTPServer {
   evhtp_t* htp_;
   struct event_base* evbase_;
   std::thread worker_;
-  int fds_[2];
+  evutil_socket_t fds_[2];
   event* break_ev_;
 };
 
