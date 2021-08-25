@@ -53,6 +53,13 @@ source ../common/util.sh
 rm -fr models
 cp -r $DATADIR/qa_model_repository models
 
+# Openvino models must be run on CPU
+OV_MODELS=$(find models -name 'openvino_*')
+for MODEL in $OV_MODELS; do
+    (cd $MODEL && \
+        echo "instance_group [ { kind: KIND_CPU }]" >> config.pbtxt)
+done
+
 run_server
 if [ "$SERVER_PID" == "0" ]; then
     echo -e "\n***\n*** Failed to start $SERVER\n***"
