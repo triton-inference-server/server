@@ -160,11 +160,20 @@ def create_tf_modelfile(create_savedmodel, models_dir, model_version, max_batch,
 
     tf_input_dtype = np_to_tf_dtype(dtype)
     tf_dtype = tf_input_dtype
+    tf_control_type = tf_input_dtype
 
     # If the input is a string then use int32 for operation and just
     # cast to/from string for input and output.
     if tf_input_dtype == tf.string:
         tf_dtype = tf.int32
+        tf_control_type = tf.int32
+
+    # If input dtype is bool, then use bool type for control and
+    # int32 type for input/output
+    if tf_input_dtype == tf.bool:
+        tf_control_type = tf.bool
+        tf_dtype = tf.int32
+        tf_input_dtype = tf.int32
 
     # Create the model. If non-batching then don't include the batch
     # dimension.
@@ -176,17 +185,24 @@ def create_tf_modelfile(create_savedmodel, models_dir, model_version, max_batch,
         if tf_input_dtype == tf.string:
             input0 = tf.strings.to_number(tf.strings.join(["0", input0]),
                                           tf_dtype)
-        start0 = tf.placeholder(tf_dtype, [
+        start0 = tf.placeholder(tf_control_type, [
             1,
         ], "START")
-        ready0 = tf.placeholder(tf_dtype, [
+        ready0 = tf.placeholder(tf_control_type, [
             1,
         ], "READY")
         acc = tf.get_variable("ACC", [
             1,
         ], dtype=tf_dtype)
+
+        # Convert boolean value to int32 value
+        if tf_control_type == tf.bool:
+            start0 = tf.cast(start0, tf.int32)
+            ready0 = tf.cast(ready0, tf.int32)
+
         tmp = tf.where(tf.equal(start0, 1), input0, tf.add(acc, input0))
         newacc = tf.where(tf.equal(ready0, 1), tmp, acc)
+
         assign = tf.assign(acc, newacc)
         if tf_input_dtype == tf.string:
             output0 = tf.dtypes.as_string(assign, name="OUTPUT")
@@ -206,10 +222,17 @@ def create_tf_modelfile(create_savedmodel, models_dir, model_version, max_batch,
         if tf_input_dtype == tf.string:
             input0 = tf.strings.to_number(tf.strings.join(["0", input0]),
                                           tf_dtype)
-        start0 = tf.placeholder(tf_dtype, [None, 1], "START")
-        ready0 = tf.placeholder(tf_dtype, [None, 1], "READY")
+        start0 = tf.placeholder(tf_control_type, [None, 1], "START")
+        ready0 = tf.placeholder(tf_control_type, [None, 1], "READY")
+
+        # Convert boolean value to int32 value
+        if tf_control_type == tf.bool:
+            start0 = tf.cast(start0, tf.int32)
+            ready0 = tf.cast(ready0, tf.int32)
+
         tmp = tf.where(tf.equal(ready0, 1), tf.add(start0, input0),
                        tf.zeros(tf.shape(input0), dtype=tf_dtype))
+
         if tf_input_dtype == tf.string:
             output0 = tf.dtypes.as_string(tmp, name="OUTPUT")
         else:
@@ -269,6 +292,14 @@ def create_tf_modelconfig(create_savedmodel, models_dir, model_version,
         model_name = tu.get_sequence_model_name(
             "graphdef_nobatch" if max_batch == 0 else "graphdef", dtype)
 
+    if dtype == np.float32:
+        control_type = "fp32"
+    elif dtype == np.bool:
+        control_type = "bool"
+        dtype = np.int32
+    else:
+        control_type = "int32"
+
     config_dir = models_dir + "/" + model_name
     config = '''
 name: "{}"
@@ -319,8 +350,7 @@ instance_group [
 '''.format(
         model_name,
         "tensorflow_savedmodel" if create_savedmodel else "tensorflow_graphdef",
-        max_batch, "fp32" if dtype == np.float32 else "int32",
-        "fp32" if dtype == np.float32 else "int32", np_to_model_dtype(dtype),
+        max_batch, control_type, control_type, np_to_model_dtype(dtype),
         tu.shape_to_dims_str(shape), np_to_model_dtype(dtype))
 
     try:
@@ -933,14 +963,19 @@ def create_onnx_modelfile(models_dir, model_version, max_batch, dtype, shape):
     # just return 0 if not-ready and 'INPUT'+'START' otherwise...  the
     # tests know to expect this.
     onnx_dtype = np_to_onnx_dtype(dtype)
+    onnx_control_dtype = onnx_dtype
     onnx_input_shape, idx = tu.shape_to_onnx_shape(shape, 0)
     onnx_output_shape, idx = tu.shape_to_onnx_shape(shape, idx)
 
     # If the input is a string then use int32 for operation and just
     # cast to/from string for input and output.
-    onnx_control_dtype = onnx_dtype
     if onnx_dtype == onnx.TensorProto.STRING:
         onnx_control_dtype = onnx.TensorProto.INT32
+
+    # If input dtype is bool, then use bool type for control and
+    # int32 type for input/output
+    if onnx_dtype == onnx.TensorProto.BOOL:
+        onnx_dtype = onnx.TensorProto.INT32
 
     batch_dim = [] if max_batch == 0 else [None]
 
@@ -963,9 +998,21 @@ def create_onnx_modelfile(models_dir, model_version, max_batch, dtype, shape):
         internal_input = onnx.helper.make_node("Cast", ["INPUT"], ["_INPUT"],
                                                to=onnx.TensorProto.INT32)
 
-    add = onnx.helper.make_node("Add", ["_INPUT", "START"], ["add"])
-    # Take advantage of knowledge that the READY false value is 0 and true is 1
-    mul = onnx.helper.make_node("Mul", ["READY", "add"], ["CAST"])
+    # Convert boolean value to int32 value
+    if onnx_control_dtype == onnx.TensorProto.BOOL:
+        internal_input1 = onnx.helper.make_node("Cast", ["START"], ["_START"],
+                                                to=onnx.TensorProto.INT32)
+        internal_input2 = onnx.helper.make_node("Cast", ["READY"], ["_READY"],
+                                                to=onnx.TensorProto.INT32)
+        add = onnx.helper.make_node("Add", ["_INPUT", "_START"], ["add"])
+        # Take advantage of knowledge that the READY false value is 0 and true is 1
+        mul = onnx.helper.make_node("Mul", ["_READY", "add"], ["CAST"])
+
+    else:
+        add = onnx.helper.make_node("Add", ["_INPUT", "START"], ["add"])
+        # Take advantage of knowledge that the READY false value is 0 and true is 1
+        mul = onnx.helper.make_node("Mul", ["READY", "add"], ["CAST"])
+
     cast = onnx.helper.make_node("Cast", ["CAST"], ["OUTPUT"], to=onnx_dtype)
 
     # Avoid cast from float16 to float16
@@ -973,7 +1020,12 @@ def create_onnx_modelfile(models_dir, model_version, max_batch, dtype, shape):
     if onnx_dtype == onnx.TensorProto.FLOAT16:
         cast = onnx.helper.make_node("Identity", ["CAST"], ["OUTPUT"])
 
-    onnx_nodes = [internal_input, add, mul, cast]
+    if onnx_control_dtype == onnx.TensorProto.BOOL:
+        onnx_nodes = [
+            internal_input, internal_input1, internal_input2, add, mul, cast
+        ]
+    else:
+        onnx_nodes = [internal_input, add, mul, cast]
     onnx_inputs = [onnx_input, onnx_start, onnx_ready]
     onnx_outputs = [onnx_output]
 
@@ -1003,6 +1055,14 @@ def create_onnx_modelconfig(models_dir, model_version, max_batch, dtype, shape):
     model_name = tu.get_sequence_model_name(
         "onnx_nobatch" if max_batch == 0 else "onnx", dtype)
     config_dir = models_dir + "/" + model_name
+
+    if dtype == np.float32:
+        control_type = "fp32"
+    elif dtype == np.bool:
+        control_type = "bool"
+        dtype = np.int32
+    else:
+        control_type = "int32"
 
     instance_group_string = '''
 instance_group [
@@ -1045,7 +1105,7 @@ sequence_batching {{
     }}
   ]
 }}
-'''.format(type="fp32" if dtype == np.float32 else "int32")
+'''.format(type=control_type)
 
     try:
         os.makedirs(config_dir)
@@ -1064,6 +1124,12 @@ def create_libtorch_modelfile(models_dir, model_version, max_batch, dtype,
         return
 
     torch_dtype = np_to_torch_dtype(dtype)
+    torch_control_type = torch_dtype
+
+    # If input dtype is bool, then use bool type for control and
+    # int32 type for input/output
+    if torch_dtype == torch.bool:
+        torch_dtype = torch.int32
 
     model_name = tu.get_sequence_model_name(
         "libtorch_nobatch" if max_batch == 0 else "libtorch", dtype)
@@ -1080,9 +1146,17 @@ def create_libtorch_modelfile(models_dir, model_version, max_batch, dtype,
             return tmp * ready0
 
     sequenceModel = SequenceNet()
-    example_input = torch.zeros(shape, dtype=torch_dtype)
+    example_input0 = torch.zeros(shape, dtype=torch_dtype)
+    example_input1 = torch.zeros(shape, dtype=torch_control_type)
+    example_input2 = torch.zeros(shape, dtype=torch_control_type)
+
+    # Convert boolean value to int32 value
+    if torch_control_type == torch.bool:
+        example_input1 = example_input1.long()
+        example_input2 = example_input2.long()
+
     traced = torch.jit.trace(sequenceModel,
-                             (example_input, example_input, example_input))
+                             (example_input0, example_input1, example_input2))
 
     model_version_dir = models_dir + "/" + model_name + "/" + str(model_version)
 
@@ -1104,6 +1178,15 @@ def create_libtorch_modelconfig(models_dir, model_version, max_batch, dtype,
     model_name = tu.get_sequence_model_name(
         "libtorch_nobatch" if max_batch == 0 else "libtorch", dtype)
     config_dir = models_dir + "/" + model_name
+
+    if dtype == np.float32:
+        control_type = "fp32"
+    elif dtype == np.bool:
+        control_type = "bool"
+        dtype = np.int32
+    else:
+        control_type = "int32"
+
     #  FIX FOR LibTorch
     config = '''
 name: "{}"
@@ -1151,11 +1234,11 @@ instance_group [
     kind: KIND_GPU
   }}
 ]
-'''.format(model_name, max_batch, "int32" if dtype == np.int32 else "fp32",
-           "int32" if dtype == np.int32 else "fp32", np_to_model_dtype(dtype),
-           tu.shape_to_dims_str(shape), np_to_model_dtype(dtype),
-           tu.shape_to_dims_str(shape), np_to_model_dtype(dtype),
-           tu.shape_to_dims_str(shape), np_to_model_dtype(dtype))
+'''.format(model_name, max_batch, control_type, control_type,
+           np_to_model_dtype(dtype), tu.shape_to_dims_str(shape),
+           np_to_model_dtype(dtype), tu.shape_to_dims_str(shape),
+           np_to_model_dtype(dtype), tu.shape_to_dims_str(shape),
+           np_to_model_dtype(dtype))
 
     try:
         os.makedirs(config_dir)
@@ -1177,7 +1260,9 @@ def create_openvino_modelfile(models_dir, model_version, max_batch, dtype,
         "openvino_nobatch" if max_batch == 0 else "openvino", dtype)
     model_version_dir = models_dir + "/" + model_name + "/" + str(model_version)
 
-    batch_dim = [] if max_batch == 0 else [max_batch,]
+    batch_dim = [] if max_batch == 0 else [
+        max_batch,
+    ]
     in0 = ng.parameter(shape=batch_dim + shape, dtype=dtype, name="INPUT")
     start = ng.parameter(shape=batch_dim + shape, dtype=dtype, name="START")
     ready = ng.parameter(shape=batch_dim + shape, dtype=dtype, name="READY")
@@ -1302,6 +1387,8 @@ def create_models(models_dir, dtype, shape, no_batch=True):
                                 shape)
 
     if FLAGS.tensorrt:
+        if dtype == np.bool:
+            return
         suffix = []
         if dtype == np.int8:
             suffix = [1, 1]
@@ -1342,6 +1429,8 @@ def create_models(models_dir, dtype, shape, no_batch=True):
                                       shape)
 
     if FLAGS.ensemble:
+        if dtype == np.bool:
+            return
         for pair in emu.platform_types_and_validation():
             config_shape = shape
             if pair[0] == "plan" and dtype == np.int8:
@@ -1449,6 +1538,9 @@ if __name__ == '__main__':
             create_models(FLAGS.models_dir, np_dtype_string, [
                 1,
             ])
+            create_models(FLAGS.models_dir, np.bool, [
+                1,
+            ])
 
         # Tests with models that accept variable-shape input/output tensors
         if FLAGS.variable:
@@ -1461,6 +1553,10 @@ if __name__ == '__main__':
             create_models(FLAGS.models_dir, np_dtype_string, [
                 -1,
             ], False)
+            create_models(FLAGS.models_dir, np.bool, [
+                -1,
+            ], False)
+
         if FLAGS.ensemble:
             # Create nop models used in ensemble
             for model_dtype in ["TYPE_INT32", "TYPE_FP32"]:

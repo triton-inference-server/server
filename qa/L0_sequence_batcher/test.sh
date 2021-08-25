@@ -103,7 +103,7 @@ RET=0
 BACKENDS=${BACKENDS:="graphdef savedmodel onnx plan custom"}
 export BACKENDS
 
-# If MODEL_TRIALS not specified set to 0 1 2 3 v
+# If MODEL_TRIALS not specified set to 0 1 2 4 v
 MODEL_TRIALS=${MODEL_TRIALS:="0 1 2 4 v"}
 
 # Basic sequence batcher tests
@@ -138,7 +138,7 @@ export ENSEMBLES
 
 # Setup non-variable-size model repositories. The same models are in each
 # repository but they are configured as:
-#   models0 - four instance with non-batching model
+#   models0 - four instances with non-batching model
 #   models1 - one instance with batch-size 4
 #   models2 - two instances with batch-size 2
 #   models4 - four instances with batch-size 1
@@ -146,11 +146,13 @@ rm -fr *.log *.serverlog models{0,1,2,4} queue_delay_models && mkdir models{0,1,
 
 # Get the datatype to use based on the backend
 function get_datatype () {
-  local dtype='int32'
-  if [[ $1 == "plan" ]] || [[ $1 == "savedmodel" ]]; then
-      dtype='float32'
+  local dtype="int32 bool"
+  if [[ $1 == "plan" ]]; then
+    dtype="float32"
+  elif [[ $1 == "savedmodel" ]]; then
+    dtype="float32 bool"
   elif [[ $1 == "graphdef" ]]; then
-      dtype='object'
+    dtype="object bool"
   fi
   echo $dtype
 }
@@ -160,15 +162,19 @@ for BACKEND in $BACKENDS; do
   if [[ $BACKEND == "custom" ]]; then
     MODELS="$MODELS ../custom_models/custom_sequence_int32"
   else
-    DTYPE=$(get_datatype $BACKEND)
-    MODELS="$MODELS $DATADIR/qa_sequence_model_repository/${BACKEND}_sequence_${DTYPE}"
+    DTYPES=$(get_datatype $BACKEND)
+    for DTYPE in $DTYPES; do
+      MODELS="$MODELS $DATADIR/qa_sequence_model_repository/${BACKEND}_sequence_${DTYPE}"
+    done
 
     if [[ $BACKEND == "graphdef" ]]; then
       MODELS="$MODELS $DATADIR/qa_sequence_model_repository/graphdef_sequence_int32"
     fi
 
     if [ "$ENSEMBLES" == "1" ]; then
-      MODELS="$MODELS $DATADIR/qa_ensemble_model_repository/qa_sequence_model_repository/*_${BACKEND}_sequence_${DTYPE}"
+      for DTYPE in $DTYPES; do
+        MODELS="$MODELS $DATADIR/qa_ensemble_model_repository/qa_sequence_model_repository/*_${BACKEND}_sequence_${DTYPE}"
+      done
     fi
   fi
 done
@@ -222,15 +228,19 @@ for BACKEND in $BACKENDS; do
   if [[ $BACKEND == "custom" ]]; then
     MODELS="$MODELS ../custom_models/custom_sequence_int32"
   else
-    DTYPE=$(get_datatype $BACKEND)
-    MODELS="$MODELS $DATADIR/qa_sequence_model_repository/${BACKEND}_nobatch_sequence_${DTYPE}"
+    DTYPES=$(get_datatype $BACKEND)
+    for DTYPE in $DTYPES; do
+      MODELS="$MODELS $DATADIR/qa_sequence_model_repository/${BACKEND}_nobatch_sequence_${DTYPE}"
+    done
 
     if [[ $BACKEND == "graphdef" ]]; then
       MODELS="$MODELS $DATADIR/qa_sequence_model_repository/graphdef_nobatch_sequence_int32"
     fi
 
     if [ "$ENSEMBLES" == "1" ]; then
+      for DTYPE in $DTYPES; do
       MODELS="$MODELS $DATADIR/qa_ensemble_model_repository/qa_sequence_model_repository/*_${BACKEND}_nobatch_sequence_${DTYPE}"
+      done
 
       if [[ $BACKEND == "graphdef" ]]; then
         MODELS="$MODELS $DATADIR/qa_ensemble_model_repository/qa_sequence_model_repository/*_graphdef_nobatch_sequence_int32"
@@ -246,7 +256,7 @@ for MODEL in $MODELS; do
             sed -i "s/kind: KIND_CPU/kind: KIND_CPU\\ncount: 4/" config.pbtxt)
 done
 
-#   modelsv - one instance with batch-size 4
+# modelsv - one instance with batch-size 4
 rm -fr modelsv && mkdir modelsv
 
 MODELS=""
@@ -254,11 +264,15 @@ for BACKEND in $BACKENDS; do
   if [[ $BACKEND == "custom" ]]; then
     MODELS="$MODELS ../custom_models/custom_sequence_int32"
   else
-    DTYPE=$(get_datatype $BACKEND)
-    MODELS="$MODELS $DATADIR/qa_variable_sequence_model_repository/${BACKEND}_sequence_${DTYPE}"
+    DTYPES=$(get_datatype $BACKEND)
+    for DTYPE in $DTYPES; do
+      MODELS="$MODELS $DATADIR/qa_variable_sequence_model_repository/${BACKEND}_sequence_${DTYPE}"
+    done
 
     if [ "$ENSEMBLES" == "1" ]; then
-      MODELS="$MODELS $DATADIR/qa_ensemble_model_repository/qa_variable_sequence_model_repository/*_${BACKEND}_sequence_${DTYPE}"
+      for DTYPE in $DTYPES; do
+        MODELS="$MODELS $DATADIR/qa_ensemble_model_repository/qa_variable_sequence_model_repository/*_${BACKEND}_sequence_${DTYPE}"
+        done
     fi
   fi
 done
