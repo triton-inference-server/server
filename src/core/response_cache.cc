@@ -100,7 +100,7 @@ Status RequestResponseCache::Hash(const InferenceRequest& request, uint64_t* key
     return Status::Success;
 }
 
-Status RequestResponseCache::Lookup(const uint64_t key, InferenceResponse** ptr) {
+Status RequestResponseCache::Lookup(const uint64_t key, InferenceResponse* ptr) {
     auto iter = cache_.find(key);
     if (iter == cache_.end()) {
         return Status(
@@ -172,8 +172,6 @@ Status RequestResponseCache::BuildCacheEntry(CacheEntry& entry, const InferenceR
     auto status = Status::Success;
 
     // Build cache entry data from response outputs
-    //for (const InferenceResponse::Output& response_output : response.Outputs()) {
-
     for (const auto& response_output : response.Outputs()) {
         auto cache_output = Output();
 
@@ -208,6 +206,9 @@ Status RequestResponseCache::BuildCacheEntry(CacheEntry& entry, const InferenceR
         // Set output metadata
         cache_output.name = response_output.Name();
         cache_output.dtype = response_output.DType();
+        cache_output.shape = response_output.Shape();
+        cache_output.memory_type = response_memory_type;
+        cache_output.memory_type_id = response_memory_type_id;
         cache_output.size = static_cast<uint64_t>(response_byte_size);
 
         // Allocate buffer for response output in cache entry
@@ -233,11 +234,40 @@ Status RequestResponseCache::BuildCacheEntry(CacheEntry& entry, const InferenceR
 }
 
 
-Status RequestResponseCache::BuildInferenceResponse(const CacheEntry& entry, InferenceResponse** response) {
-    // TODO
-    return Status(
-        Status::Code::INTERNAL, "NotImplementedError"
-    );
+Status RequestResponseCache::BuildInferenceResponse(const CacheEntry& entry, InferenceResponse* response) {
+    // TODO: Assuming the response outputs/metadata are already setup,
+    //       and just need the data buffers to be filled
+    for (auto& response_output : response->Outputs()) {
+        bool cached = false;
+        // TODO: Setup cache outputs as map instead for easier access here?
+        for (auto& cache_output : entry.outputs) {
+            // Verify cache output metadata matches response output metadata
+            if (cache_output.name  == response_output.Name()  &&
+                cache_output.dtype == response_output.DType() &&
+                cache_output.shape == response_output.Shape()) {
+                
+                // TODO: AllocateDataBuffer may modify the memory_type/id args, we probably don't want to edit cache entry fields, check temp vars after?
+                TRITONSERVER_MemoryType memory_type = cache_output.memory_type;
+                int64_t memory_type_id = cache_output.memory_type_id;
+                // AllocateDataBuffer shouldn't modify the buffer arg, but it expects void** and not const void**, so we remove the const modifier
+                auto status = response_output.AllocateDataBuffer(
+                    const_cast<void**>(&cache_output.buffer), cache_output.size, &memory_type, &memory_type_id);
+                if (!status.IsOk()) {
+                    return status;
+                }
+                // Mark that we successfully copied output buffer from cache to response 
+                cached = true;
+            }
+        }
+        // Return failed status if we didn't find a cached output buffer for this response output
+        if (!cached) {
+            return Status(
+                Status::Code::INTERNAL, "No matching cache output found for response output: " + response_output.Name()
+            );
+        }
+    }
+
+    return Status::Success;
 }
 
 // LRU

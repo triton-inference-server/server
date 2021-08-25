@@ -49,6 +49,12 @@ struct Output {
     std::string name;
     // Datatype of the output
     inference::DataType dtype;
+    // Shape of the output
+    std::vector<int64_t> shape;
+    // Type of memory used to store buffer
+    TRITONSERVER_MemoryType memory_type;
+    // ID of memory type used to store buffer
+    uint64_t memory_type_id;
 };
 
 struct CacheEntry {
@@ -70,7 +76,7 @@ class RequestResponseCache {
         Status Hash(const InferenceRequest& request, uint64_t* key);
         // Lookup 'key' in cache and return the inference response in 'ptr' on cache hit or nullptr on cache miss
         // Return Status object indicating success or failure.
-        Status Lookup(const uint64_t key, InferenceResponse** ptr);
+        Status Lookup(const uint64_t key, InferenceResponse* ptr);
         // Insert response into cache, evict entries to make space if necessary
         // Return Status object indicating success or failure.
         Status Insert(const uint64_t key, const InferenceResponse& response);
@@ -97,7 +103,7 @@ class RequestResponseCache {
         // Build CacheEntry from InferenceResponse
         Status BuildCacheEntry(CacheEntry& entry, const InferenceResponse& response);
         // Build InferenceResponse from CacheEntry
-        Status BuildInferenceResponse(const CacheEntry& entry, InferenceResponse** response);
+        Status BuildInferenceResponse(const CacheEntry& entry, InferenceResponse* response);
 };
 
 }}  // namespace nvidia::inferenceserver
