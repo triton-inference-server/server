@@ -51,24 +51,18 @@ Payload::MergePayload(std::shared_ptr<Payload>& payload)
         Status::Code::INTERNAL,
         "Attempted to merge payloads of mismatching instance");
   }
-  if ((payload->GetState() != State::SCHEDULED) ||
-      (state_ != State::SCHEDULED)) {
+  if ((payload->GetState() != State::EXECUTING) ||
+      (state_ != State::EXECUTING)) {
     return Status(
         Status::Code::INTERNAL,
-        "Attempted to merge payloads that are not in scheduled state");
+        "Attempted to merge payloads that are not in executing state");
   }
 
   requests_.insert(
       requests_.end(), std::make_move_iterator(payload->Requests().begin()),
-      std::make_move_iterator(payload->Requests().begin()));
-  
-  {
-    std::lock_guard<std::mutex> exec_lock(*(payload->GetExecMutex()));
-    payload->SetState(Payload::State::EXECUTING);
-  }
-  payload->Callback();
+      std::make_move_iterator(payload->Requests().end()));
 
-  // rate_limiter_->PayloadRelease(payload);
+  payload->Callback();
 
   return Status::Success;
 }

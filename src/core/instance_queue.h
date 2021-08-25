@@ -36,16 +36,18 @@ namespace nvidia { namespace inferenceserver {
 // model instance.
 class InstanceQueue {
  public:
-  explicit InstanceQueue(size_t max_batch_size, uint64_t max_queue_delay = 0);
+  explicit InstanceQueue(size_t max_batch_size, uint64_t max_queue_delay_ns);
 
   size_t Size();
   bool Empty();
   void Enqueue(std::shared_ptr<Payload>& payload);
-  void Dequeue(std::shared_ptr<Payload>* payload);
+  void Dequeue(
+      std::shared_ptr<Payload>* payload,
+      std::vector<std::shared_ptr<Payload>>* merged_payloads);
 
  private:
   size_t max_batch_size_;
-  uint64_t max_queue_delay_;
+  uint64_t max_queue_delay_ns_;
 
   std::deque<std::shared_ptr<Payload>> payload_queue_;
   std::shared_ptr<Payload> staged_payload_;

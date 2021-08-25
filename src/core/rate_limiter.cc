@@ -113,15 +113,35 @@ void
 RateLimiter::InitializePayloadQueues(const TritonModelInstance* instance)
 {
   auto& config = instance->Model()->Config();
+  uint64_t max_queue_delay_microseconds;
+  if (config.has_sequence_batching()) {
+    const auto& batcher_config = config.sequence_batching();
+    if (batcher_config.has_oldest()) {
+      max_queue_delay_microseconds =
+          batcher_config.oldest().max_queue_delay_microseconds();
+    } else {
+      max_queue_delay_microseconds =
+          batcher_config.direct().max_queue_delay_microseconds();
+    }
+  } else if (config.has_dynamic_batching()) {
+    max_queue_delay_microseconds =
+        config.dynamic_batching().max_queue_delay_microseconds();
+  } else {
+    max_queue_delay_microseconds = 0;
+  }
   if (payload_queues_.find(instance->Model()) == payload_queues_.end()) {
     payload_queues_.emplace(
-        instance->Model(), new PayloadQueue(config.max_batch_size()));
+        instance->Model(),
+        new PayloadQueue(
+            config.max_batch_size(), max_queue_delay_microseconds * 1000));
   }
   PayloadQueue* payload_queue = payload_queues_[instance->Model()].get();
   if (payload_queue->specific_queues_.find(instance) ==
       payload_queue->specific_queues_.end()) {
     payload_queue->specific_queues_.emplace(
-        instance, new InstanceQueue(config.max_batch_size()));
+        instance,
+        new InstanceQueue(
+            config.max_batch_size(), max_queue_delay_microseconds * 1000));
   }
 }
 
@@ -155,20 +175,19 @@ RateLimiter::EnqueuePayload(
     } else {
       payload_queue->specific_queues_[pinstance]->Enqueue(payload);
     }
-  }
-
-  if (ignore_resources_and_priority_) {
-    // Directly wake up any one of the waiting threadto process the payload.
-    // TODO: If payload includes a specific TritonModelInstance
-    payload->SetState(Payload::State::SCHEDULED);
-    if (pinstance == nullptr) {
-      payload_queue->cv_.notify_one();
+    if (ignore_resources_and_priority_) {
+      // Directly wake up any one of the waiting threadto process the payload.
+      // TODO: If payload includes a specific TritonModelInstance
+      payload->SetState(Payload::State::SCHEDULED);
+      if (pinstance == nullptr) {
+        payload_queue->cv_.notify_one();
+      } else {
+        payload_queue->cv_.notify_all();
+      }
     } else {
-      payload_queue->cv_.notify_all();
+      // TODO: Implement the RateLimiting pipeline here that will schedule when
+      // an ExecuteThread gets to run.
     }
-  } else {
-    // TODO: Implement the RateLimiting pipeline here that will schedule when
-    // an ExecuteThread gets to run.
   }
   return Status::Success;
 }
@@ -184,6 +203,7 @@ RateLimiter::DequeuePayload(
   }
   PayloadQueue* payload_queue = payload_queues_[instances[0]->Model()].get();
   if (ignore_resources_and_priority_) {
+    std::vector<std::shared_ptr<Payload>> merged_payloads;
     size_t instance_index;
     {
       std::unique_lock<std::mutex> lk(payload_queue->mu_);
@@ -206,15 +226,15 @@ RateLimiter::DequeuePayload(
       if (instance_index < instances.size()) {
         TritonModelInstance* instance = instances[instance_index];
         if (!payload_queue->specific_queues_[instance]->Empty()) {
-          payload_queue->specific_queues_[instance]->Dequeue(payload);
+          payload_queue->specific_queues_[instance]->Dequeue(
+              payload, &merged_payloads);
         }
       } else {
-        payload_queue->queue_->Dequeue(payload);
+        payload_queue->queue_->Dequeue(payload, &merged_payloads);
       }
     }
-    {
-      std::lock_guard<std::mutex> exec_lock(*((*payload)->GetExecMutex()));
-      (*payload)->SetState(Payload::State::EXECUTING);
+    for (auto& merge_payload : merged_payloads) {
+      PayloadRelease(merge_payload);
     }
     (*payload)->Callback();
     if ((*payload)->GetInstance() == nullptr) {

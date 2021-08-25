@@ -290,9 +290,9 @@ class RateLimiter {
   std::deque<std::shared_ptr<Payload>> payloads_in_use_;
 
   struct PayloadQueue {
-    explicit PayloadQueue(size_t max_batch_size)
+    explicit PayloadQueue(size_t max_batch_size, uint64_t max_queue_delay_ns)
     {
-      queue_.reset(new InstanceQueue(max_batch_size));
+      queue_.reset(new InstanceQueue(max_batch_size, max_queue_delay_ns));
     }
     std::unique_ptr<InstanceQueue> queue_;
     std::map<const TritonModelInstance*, std::unique_ptr<InstanceQueue>>
