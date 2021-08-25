@@ -805,7 +805,7 @@ max_batch_size: {}
         config += '''
 input [
   {{
-    name: "INPUT__{}"
+    name: "INPUT{}"
     data_type: {}
     dims: [ {} ]
     {}
@@ -813,7 +813,7 @@ input [
 ]
 output [
   {{
-    name: "OUTPUT__{}"
+    name: "OUTPUT{}"
     data_type: {}
     dims: [ {} ]
     {}
