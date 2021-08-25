@@ -65,8 +65,9 @@ class RequestResponseCache {
     public:
         RequestResponseCache(const uint64_t cache_size);
         ~RequestResponseCache();
-        // Hash inference request to access cache
-        uint64_t Hash(const InferenceRequest& request);
+        // Hash inference request to access cache and store it in "key"
+        // Return Status object indicating success or failure.
+        Status Hash(const InferenceRequest& request, uint64_t* key);
         // Lookup 'key' in cache and return the inference response in 'ptr' on cache hit or nullptr on cache miss
         // Return Status object indicating success or failure.
         Status Lookup(const uint64_t key, InferenceResponse** ptr);

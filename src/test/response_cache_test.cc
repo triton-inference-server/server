@@ -55,6 +55,16 @@ InferenceRequest::ModelName() const
   return BACKEND;
 }
 
+Status
+InferenceRequest::Input::DataBuffer(
+    const size_t idx, const void** base, size_t* byte_size,
+    TRITONSERVER_MemoryType* memory_type, int64_t* memory_type_id) const
+{
+  *base = data_->BufferAt(idx, byte_size, memory_type, memory_type_id);
+
+  return Status::Success;
+}
+
 void
 InferenceRequest::SetPriority(unsigned int)
 {}
@@ -179,30 +189,49 @@ TEST_F(RequestResponseCacheTest, TestRequestHashing) {
 
     // Create request
     std::cout << "Create request" << std::endl;
-    ni::InferenceRequest request(backend, model_version);
+    ni::InferenceRequest request0(backend, model_version);
+    ni::InferenceRequest request1(backend, model_version);
+    ni::InferenceRequest request2(backend, model_version);
 
     // Create input
-    std::cout << "Create input" << std::endl;
-    std::string input_name = "input0";
+    std::cout << "Create inputs" << std::endl;
     inference::DataType dtype = inference::DataType::TYPE_INT32;
     std::vector<int64_t> shape{1, 4};
     ni::InferenceRequest::Input* input0 = nullptr;
+    ni::InferenceRequest::Input* input1 = nullptr;
+    ni::InferenceRequest::Input* input2 = nullptr;
     // Add input to request
     std::cout << "Add input to request" << std::endl;
-    request.AddOriginalInput(input_name, dtype, shape, &input0);
+    request0.AddOriginalInput("input", dtype, shape, &input0);
+    request1.AddOriginalInput("input", dtype, shape, &input1);
+    request2.AddOriginalInput("input", dtype, shape, &input2);
     assert(input0 != nullptr);
     // Add data to input
     int data0[4] = {1, 2, 3, 4};
+    int data1[4] = {5, 6, 7 ,8};
+    int data2[4] = {5, 6, 7 ,8};
     TRITONSERVER_MemoryType memory_type = TRITONSERVER_MEMORY_CPU;
     int64_t memory_type_id = 0; // TODO
-    input0->AppendData(data0, sizeof(int)*256, memory_type, memory_type_id);
+    input0->AppendData(data0, sizeof(int)*4, memory_type, memory_type_id);
+    input1->AppendData(data1, sizeof(int)*4, memory_type, memory_type_id);
+    input2->AppendData(data2, sizeof(int)*4, memory_type, memory_type_id);
 
     // Compare hashes
     std::cout << "Compare hashes" << std::endl;
-    uint64_t hash1 = cache.Hash(request);
-    uint64_t hash2 = cache.Hash(request);
-    std::cout << "Hash1: " << hash1 << std::endl;
-    std::cout << "Hash2: " << hash2 << std::endl;
+    uint64_t hash0, hash1, hash2;
+    ni::Status status0 = cache.Hash(request0, &hash0);
+    ni::Status status1 = cache.Hash(request1, &hash1);
+    ni::Status status2 = cache.Hash(request2, &hash2);
+    if (!status0.IsOk() || !status1.IsOk() || !status2.IsOk()) {
+        assert(false); // TODO
+    }
+
+    std::cout << "hash0: " << hash0 << std::endl;
+    std::cout << "hash1: " << hash1 << std::endl;
+    std::cout << "hash2: " << hash2 << std::endl;
+    // Different input data should have different hashes
+    assert(hash0 != hash1);
+    // Same input data should have same hashes
     assert(hash1 == hash2);
 }
 

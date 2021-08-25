@@ -60,24 +60,44 @@ RequestResponseCache::~RequestResponseCache()
     }
 }
 
-uint64_t RequestResponseCache::Hash(const InferenceRequest& request) {
+Status RequestResponseCache::Hash(const InferenceRequest& request, uint64_t* key) {
     std::size_t seed = 0;
+    // Add request model name to hash
     boost::hash_combine(seed, request.ModelName()); 
+    std::cout << "request.ModelName(): " << request.ModelName() << std::endl;
+    // Add request model version to hash
     // TODO: RequestedModelVersion or ActualModelVersion ?
     boost::hash_combine(seed, request.RequestedModelVersion());
+    std::cout << "request.RequestedModelVersion(): " << request.RequestedModelVersion() << std::endl;
 
     // TODO: OriginalInputs, OverrideInputs, ImmutableInputs ?
     const auto& inputs = request.OriginalInputs();
     for (const auto& input : inputs) {
         // Add input name to hash
         boost::hash_combine(seed, input.second.Name());
-        // Add input data to hash
-        // TODO: Hash actual raw input bytes and not pointer here
-        boost::hash_combine(seed, input.second.Data());
+        std::cout << "Input name: " << input.second.Name() << std::endl;
+        // Fetch input buffer for hashing raw data
+        const void* buffer = nullptr;
+        uint64_t buffer_byte_size = 0;
+        TRITONSERVER_MemoryType memory_type = TRITONSERVER_MEMORY_CPU;
+        int64_t memory_type_id = 0;
+        const uint32_t index = 0;
+        Status status = input.second.DataBuffer(
+            index, &buffer, &buffer_byte_size, &memory_type, &memory_type_id);
+        if (!status.IsOk()) {
+            buffer = nullptr;
+            buffer_byte_size = 0;
+            return status;
+        }
+        // Add each byte of input buffer to hash
+        const unsigned char* tmp = static_cast<const unsigned char*>(buffer);
+        for (uint64_t byte = 0; byte < buffer_byte_size; byte++) {
+            boost::hash_combine(seed, tmp[byte]);
+        }
     }
 
-    uint64_t key = static_cast<uint64_t>(seed);
-    return key;
+    *key = static_cast<uint64_t>(seed);
+    return Status::Success;
 }
 
 Status RequestResponseCache::Lookup(const uint64_t key, InferenceResponse** ptr) {
