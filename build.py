@@ -384,10 +384,13 @@ def pytorch_cmake_args(images):
 
 def onnxruntime_cmake_args(images, library_paths):
     cargs = [
-        '-DTRITON_ENABLE_ONNXRUNTIME_TENSORRT=ON',
         '-DTRITON_BUILD_ONNXRUNTIME_VERSION={}'.format(
             TRITON_VERSION_MAP[FLAGS.version][2])
     ]
+    if FLAGS.enable_gpu:
+        cargs.append('-DTRITON_ENABLE_ONNXRUNTIME_TENSORRT=ON')
+    else:
+        cargs.append('-DTRITON_ENABLE_GPU=OFF')
 
     # If platform is jetpack do not use docker based build
     if target_platform() == 'jetpack':
@@ -574,7 +577,8 @@ RUN apt-get update && \
             zlib1g-dev \
             libarchive-dev \
             pkg-config \
-            uuid-dev && \
+            uuid-dev \
+            libnuma-dev && \
     rm -rf /var/lib/apt/lists/*
 
 RUN pip3 install --upgrade pip && \
@@ -605,7 +609,8 @@ RUN rm -fr *
 COPY . .
 ENTRYPOINT []
 '''
-        df += install_dcgm_libraries(argmap['DCGM_VERSION'])
+        if FLAGS.enable_gpu:
+            df += install_dcgm_libraries(argmap['DCGM_VERSION'])
 
     df += '''
 ENV TRITON_SERVER_VERSION ${TRITON_VERSION}
@@ -675,7 +680,7 @@ FROM ${{BASE_IMAGE}}
 '''.format(argmap['TRITON_VERSION'], argmap['TRITON_CONTAINER_VERSION'],
            argmap['BASE_IMAGE'])
 
-    df += dockerfile_prepare_container_linux(argmap, backends)
+    df += dockerfile_prepare_container_linux(argmap, backends, FLAGS.enable_gpu)
 
     df += '''
 WORKDIR /opt/tritonserver
@@ -719,7 +724,7 @@ COPY --chown=1000:1000 --from=tritonserver_build /workspace/build/sagemaker/serv
         dfile.write(df)
 
 
-def dockerfile_prepare_container_linux(argmap, backends):
+def dockerfile_prepare_container_linux(argmap, backends, enable_gpu):
     # Common steps to produce docker images shared by build.py and compose.py.
     # Sets enviroment variables, installs dependencies and adds entrypoint
     df = '''
@@ -732,6 +737,7 @@ LABEL com.nvidia.tritonserver.version="${TRITON_SERVER_VERSION}"
 
 ENV PATH /opt/tritonserver/bin:${PATH}
 '''
+    ort_dependencies = "libgomp1" if 'onnxruntime' in backends else ""
     df += '''
 ENV TF_ADJUST_HUE_FUSED         1
 ENV TF_ADJUST_SATURATION_FUSED  1
@@ -756,32 +762,42 @@ ENV DEBIAN_FRONTEND=noninteractive
 # example libcurl only needed for GCS?)
 RUN apt-get update && \
     apt-get install -y --no-install-recommends \
-         libb64-0d \
-         libcurl4-openssl-dev \
-         libre2-5 && \
+            libb64-0d \
+            libcurl4-openssl-dev \
+            libre2-5 \
+            git \
+            dirmngr \
+            libnuma-dev \
+            curl \
+            {ort_dependencies} && \
     rm -rf /var/lib/apt/lists/*
+'''.format(ort_dependencies=ort_dependencies)
+
+    if enable_gpu:
+        df += install_dcgm_libraries(argmap['DCGM_VERSION'])
+        df += '''
+# Extra defensive wiring for CUDA Compat lib
+RUN ln -sf ${_CUDA_COMPAT_PATH}/lib.real ${_CUDA_COMPAT_PATH}/lib \
+ && echo ${_CUDA_COMPAT_PATH}/lib > /etc/ld.so.conf.d/00-cuda-compat.conf \
+ && ldconfig \
+ && rm -f ${_CUDA_COMPAT_PATH}/lib 
 '''
-    df += install_dcgm_libraries(argmap['DCGM_VERSION'])
+
     # Add dependencies needed for python backend
     if 'python' in backends:
         df += '''
 # python3, python3-pip and some pip installs required for the python backend
 RUN apt-get update && \
     apt-get install -y --no-install-recommends \
-         python3 libarchive-dev \
-         python3-pip && \
+            python3 libarchive-dev \
+            python3-pip \
+            libpython3-dev && \
     pip3 install --upgrade pip && \
     pip3 install --upgrade wheel setuptools && \
     pip3 install --upgrade numpy && \
     rm -rf /var/lib/apt/lists/*
 '''
     df += '''
-# Extra defensive wiring for CUDA Compat lib
-RUN ln -sf ${_CUDA_COMPAT_PATH}/lib.real ${_CUDA_COMPAT_PATH}/lib \
- && echo ${_CUDA_COMPAT_PATH}/lib > /etc/ld.so.conf.d/00-cuda-compat.conf \
- && ldconfig \
- && rm -f ${_CUDA_COMPAT_PATH}/lib
-
 WORKDIR /opt/tritonserver
 RUN rm -fr /opt/tritonserver/*
 COPY --chown=1000:1000 nvidia_entrypoint.sh .
