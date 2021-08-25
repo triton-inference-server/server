@@ -158,6 +158,31 @@ InferenceResponse::Output::AllocateDataBuffer(
     return Status::Success;
 }
 
+Status
+InferenceResponse::AddOutput(
+    const std::string& name, const inference::DataType datatype,
+    const std::vector<int64_t>& shape, InferenceResponse::Output** output)
+{
+  outputs_.emplace_back(name, datatype, shape, allocator_, alloc_userp_);
+
+  //LOG_VERBOSE(1) << "add response output: " << outputs_.back();
+
+  /*if (backend_ != nullptr) {
+    const inference::ModelOutput* output_config;
+    RETURN_IF_ERROR(backend_->GetOutput(name, &output_config));
+    if (output_config->has_reshape()) {
+      const bool has_batch_dim = (backend_->Config().max_batch_size() > 0);
+      outputs_.back().Reshape(has_batch_dim, output_config);
+    }
+  }*/
+
+  if (output != nullptr) {
+    *output = std::addressof(outputs_.back());
+  }
+
+  return Status::Success;
+}
+
 }}  // namespace nvidia::inferenceserver
 
 
