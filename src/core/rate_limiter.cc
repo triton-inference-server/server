@@ -176,18 +176,20 @@ RateLimiter::EnqueuePayload(
       payload_queue->specific_queues_[pinstance]->Enqueue(payload);
     }
     if (ignore_resources_and_priority_) {
-      // Directly wake up any one of the waiting threadto process the payload.
-      // TODO: If payload includes a specific TritonModelInstance
+      // Directly schedule the payload to run
       payload->SetState(Payload::State::SCHEDULED);
-      if (pinstance == nullptr) {
-        payload_queue->cv_.notify_one();
-      } else {
-        payload_queue->cv_.notify_all();
-      }
-    } else {
-      // TODO: Implement the RateLimiting pipeline here that will schedule when
-      // an ExecuteThread gets to run.
     }
+  }
+  if (ignore_resources_and_priority_) {
+    // Directly wake up any one of the waiting threadto process the payload.
+    if (pinstance == nullptr) {
+      payload_queue->cv_.notify_one();
+    } else {
+      payload_queue->cv_.notify_all();
+    }
+  } else {
+    // TODO: Implement the RateLimiting pipeline here that will schedule when
+    // an ExecuteThread gets to run.
   }
   return Status::Success;
 }
