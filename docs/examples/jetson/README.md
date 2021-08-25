@@ -28,7 +28,8 @@
 
 # Using Triton Inference Server as a shared library for execution on Jetson
 
-This project demonstrates how to run C API applications using Triton Inference Server as a shared library. We also show how to build and execute such applications on Jetson.
+This project demonstrates how to run C API applications using Triton Inference Server as a shared library.
+We also show how to build and execute such applications on Jetson.
 
 ### Prerequisites
 
@@ -46,11 +47,15 @@ In our example, we placed the contents of downloaded release directory under `/o
 
 ## Part 1. Concurrent inference and dynamic batching
 
-The purpose of the sample located under [concurrency_and_dynamic_batching](https://gitlab-master.nvidia.com/ekaterinas/triton-on-jetson-gesture-demo/-/tree/master/concurrency_and_dynamic_batching) is to demonstrate the important features of Triton Inference Server such as concurrent model execution and dynamic batching. In order to do that, we implemented a people detection application using C API and Triton Inference Server as a shared library.
+The purpose of the sample located under [concurrency_and_dynamic_batching](concurrency_and_dynamic_batching)
+is to demonstrate the important features of Triton Inference Server such as concurrent model execution and
+dynamic batching. In order to do that, we implemented a people detection application using C API and Triton
+Inference Server as a shared library.
 
 ## Part 2. Analyzing model performance with perf_analyzer
 
-To analyze model performance on Jetson, `perf_analyzer` tool is used. The `perf_analyzer` is included with the client examples which are available from [several sources](https://github.com/triton-inference-server/client#getting-the-client-libraries-and-examples).
+To analyze model performance on Jetson, `perf_analyzer` tool is used. The `perf_analyzer` is included with the
+client examples which are available from [several sources](https://github.com/triton-inference-server/client#getting-the-client-libraries-and-examples).
 
 From the root directory of this repository, execute to evaluate model performance:
 
