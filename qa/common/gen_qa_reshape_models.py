@@ -756,14 +756,10 @@ def create_openvino_modelfile(models_dir, model_version, max_batch, dtype,
         openvino_inputs.append(
             ng.parameter(shape=batch_dim + input_shapes[io_num], dtype=dtype, name=in_name))
 
-        if input_shapes[io_num] == output_shapes[io_num]:
-            openvino_outputs.append(
-                ng.result(openvino_inputs[io_num], name=out_name))
-        else:
-            openvino_outputs.append(
-                ng.reshape(openvino_inputs[io_num],
-                           batch_dim + output_shapes[io_num],
-                           name=out_name, special_zero=False))
+        openvino_outputs.append(
+            ng.reshape(openvino_inputs[io_num],
+                        batch_dim + output_shapes[io_num],
+                        name=out_name, special_zero=False))
 
     function = ng.impl.Function(openvino_outputs, openvino_inputs, model_name)
     ie_network = IENetwork(ng.impl.Function.to_capsule(function))
@@ -799,7 +795,7 @@ def create_openvino_modelconfig(models_dir, model_version, max_batch, dtype,
 name: "{}"
 backend: "openvino"
 max_batch_size: {}
-instance_group [ { kind: KIND_CPU }]
+instance_group [ {{ kind: KIND_CPU }}]
 '''.format(model_name, max_batch)
 
     for io_num in range(io_cnt):
