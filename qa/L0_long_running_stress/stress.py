@@ -42,6 +42,7 @@ from functools import partial
 import tritongrpcclient as grpcclient
 from tritonclientutils import np_to_triton_dtype
 import prettytable
+import subprocess
 
 if sys.version_info >= (3, 0):
     import queue
@@ -239,12 +240,12 @@ def count_failed_test_case(test_case_name, failed_test_case_count):
         failed_test_case_count[test_case_name] = 1
 
 
-def count_sequence_request(test_case_name, sequence_request_count):
+def count_sequence_request(test_case_name, sequence_request_count, count=1):
     # Count the number of requests were sent for each test case
     if test_case_name in sequence_request_count:
-        sequence_request_count[test_case_name] += 1
+        sequence_request_count[test_case_name] += count
     else:
-        sequence_request_count[test_case_name] = 1
+        sequence_request_count[test_case_name] = count
 
 
 def sequence_valid(client_metadata, rng, trial, model_name, dtype, len_mean,
@@ -454,10 +455,11 @@ def sequence_no_end(client_metadata, rng, trial, model_name, dtype, len_mean,
                          sequence_request_count=sequence_request_count)
 
 
-def timeout_client(client_metadata,
-                   name,
+def timeout_client(client_metadata=[],
+                   sequence_name="<unknown>",
                    input_dtype=np.float32,
-                   input_name="INPUT0"):
+                   input_name="INPUT0",
+                   sequence_request_count={}):
     trial = get_trial(is_sequence=False)
     model_name = tu.get_zero_model_name(trial, 1, input_dtype)
     triton_client = client_metadata[0]
@@ -475,35 +477,62 @@ def timeout_client(client_metadata,
 
     # Expect an exception for small timeout values.
     try:
+        count_sequence_request('timeout_client', sequence_request_count)
         results = triton_client.infer(model_name, inputs, client_timeout=0.1)
         assert False, "expected inference failure from deadline exceeded"
     except Exception as ex:
         if "Deadline Exceeded" not in ex.message():
-            assert False, "timeout_client failed {}".format(name)
+            assert False, "timeout_client failed {}".format(sequence_name)
 
 
-def resnet_model_request(name):
+def resnet_model_request(sequence_name, sequence_request_count):
     image_client = "../clients/image_client.py"
     image = "../images/vulture.jpeg"
     model_name = "resnet_v1_50_graphdef_def"
-    resnet_result = "resnet_{}.log".format(name)
+    resnet_result = "resnet_{}.log".format(sequence_name)
 
     os.system("{} -m {} -s VGG -c 1 -b 1 {} > {}".format(
         image_client, model_name, image, resnet_result))
+    count_sequence_request('resnet_model_request', sequence_request_count)
     with open(resnet_result) as f:
         if "VULTURE" not in f.read():
             assert False, "resnet_model_request failed"
 
 
-def crashing_client(name):
+def get_crashing_client_request_result(log):
+    # Get result from the log
+    request_count = 0
+    is_server_live = "false"
+
+    if "request_count:" in log:
+        idx_start = log.rindex("request_count:")
+        idx_start = log.find(" ", idx_start)
+        idx_end = log.find('\n', idx_start)
+        request_count = int(log[idx_start + 1:idx_end])
+
+    if "live:" in log:
+        idx_start = log.rindex("live:")
+        idx_start = log.find(" ", idx_start)
+        idx_end = log.find('\n', idx_start)
+        is_server_live = log[idx_start + 1:idx_end]
+
+    return (request_count, is_server_live == "true")
+
+
+def crashing_client(sequence_name, sequence_request_count):
     trial = get_trial(is_sequence=False)
 
-    # Client will be terminated after 5 seconds
+    # Client will be terminated after 3 seconds
     crashing_client = "crashing_client.py"
-    crashing_client_log = "crashing_{}.log".format(name)
-    if os.system("python {} -t {} >> {}".format(crashing_client, trial,
-                                                crashing_client_log)):
-        assert False, "crashing_client failed {}".format(name)
+    log = subprocess.check_output(
+        [sys.executable, crashing_client, "-t", trial])
+    result = get_crashing_client_request_result(log.decode("utf-8"))
+
+    count_sequence_request("crashing_client",
+                           sequence_request_count,
+                           count=int(result[0]))
+    if not result[1]:
+        assert False, "crashing_client failed {}".format(sequence_name)
 
 
 def stress_thread(name, seed, test_duration, correlation_id_base,
@@ -597,7 +626,7 @@ def stress_thread(name, seed, test_duration, correlation_id_base,
                         sequence_request_count=sequence_request_count)
 
                 rare_idx = (rare_idx + 1) % rare_cnt
-            elif rng.rand() < 0.6:
+            elif rng.rand() < 0.8:
                 # Common context...
                 client_idx = 0
                 client_metadata = client_metadata_list[client_idx]
@@ -682,15 +711,22 @@ def stress_thread(name, seed, test_duration, correlation_id_base,
                 if choice < 0.3:
                     count_test_case("timeout_client", test_case_count)
                     last_choices[client_idx] = "timeout_client"
-                    timeout_client(client_metadata_list[client_idx], name)
-                elif choice < 0.5:
+                    timeout_client(
+                        client_metadata=client_metadata_list[client_idx],
+                        sequence_name=name,
+                        sequence_request_count=sequence_request_count)
+                elif choice < 0.7:
                     count_test_case("resnet_model_request", test_case_count)
                     last_choices[client_idx] = "resnet_model_request"
-                    resnet_model_request(name)
+                    resnet_model_request(
+                        sequence_name=name,
+                        sequence_request_count=sequence_request_count)
                 else:
                     count_test_case("crashing_client", test_case_count)
                     last_choices[client_idx] = "crashing_client"
-                    crashing_client(name)
+                    crashing_client(
+                        sequence_name=name,
+                        sequence_request_count=sequence_request_count)
         except Exception as ex:
             count_failed_test_case(last_choices[client_idx],
                                    failed_test_case_count)
@@ -779,13 +815,13 @@ def generate_report(elapsed_time, _test_case_count, _failed_test_case_count,
 
     t = prettytable.PrettyTable(hrules=prettytable.ALL)
     t.field_names = [
-        'Test Case', 'Number of Failures', 'Count', 'Request Count',
+        'Test Case', 'Number of Failures', 'Test Count', 'Request Count',
         'Test Case Description'
     ]
 
     t.align["Test Case"] = "l"
     t.align["Number of Failures"] = "l"
-    t.align["Count"] = "l"
+    t.align["Test Count"] = "l"
     t.align["Request Count"] = "l"
     t.align["Test Case Description"] = "l"
 
@@ -802,12 +838,10 @@ def generate_report(elapsed_time, _test_case_count, _failed_test_case_count,
             _sequence_request_count, c)
 
         t.add_row([
-            c,
-            acc_failed_test_case_count[c]
-            if c in acc_failed_test_case_count else 0,
-            acc_test_case_count[c] if c in acc_test_case_count else 0,
-            # Only shows the number of total requests for sequence test cases
-            acc_sequence_request_count[c] if 'sequence' in c else 'X',
+            c, acc_failed_test_case_count[c] if c in acc_failed_test_case_count
+            else 0, acc_test_case_count[c] if c in acc_test_case_count else 0,
+            acc_sequence_request_count[c]
+            if c in acc_sequence_request_count else 0,
             format_content(test_case_description[c], 50)
         ])
 
