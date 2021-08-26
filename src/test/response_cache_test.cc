@@ -289,11 +289,6 @@ void check_status(ni::Status status) {
     }
 }
 
-// Simplest test possible just to test flow
-TEST_F(RequestResponseCacheTest, TestHelloWorld) {
-    std::cout << "Hello, World!" << std::endl;
-}
-
 // Test hashing for consistency on same request
 TEST_F(RequestResponseCacheTest, TestRequestHashing) {
     // Create cache
@@ -364,6 +359,10 @@ TEST_F(RequestResponseCacheTest, TestRequestHashing) {
     ni::InferenceResponse::Output* response_output = nullptr;
     uint64_t output_size = input_size;
     std::vector<int> output0 = {2, 4, 6, 8};
+    std::cout << "Example InferenceResponse outputs:" << std::endl;
+    for (const auto& output : output0) {
+        std::cout << output << std::endl;
+    }
     status = response0->AddOutput("output", dtype, shape, &response_output);
     check_status(status);
 
@@ -396,7 +395,6 @@ TEST_F(RequestResponseCacheTest, TestRequestHashing) {
     // Lookup should now succeed
     std::cout << "DEBUG: Checking lookup status" << std::endl;
     check_status(status);
-    std::cout << "DEBUG: Done with test" << std::endl;
 
     //std::vector<int> output_test;
     //response_test->DataBuffer(output_test.data(), output_size, memory_type, memory_type_id);
@@ -423,6 +421,8 @@ TEST_F(RequestResponseCacheTest, TestRequestHashing) {
         std::cout << output_test[i] << std::endl;
     }
     std::cout << "Done!" << std::endl;
+
+    // TODO: Test Evict()
 }
 
 }  // namespace
