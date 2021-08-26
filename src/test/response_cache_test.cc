@@ -34,6 +34,20 @@ namespace ni = nvidia::inferenceserver;
 /* Mock classes for Unit Testing */
 namespace nvidia { namespace inferenceserver {
 
+//
+// InferenceResponseFactory
+//
+Status
+InferenceResponseFactory::CreateResponse(
+    std::unique_ptr<InferenceResponse>* response) const
+{
+  response->reset(new InferenceResponse(
+      backend_, id_, allocator_, alloc_userp_, response_fn_, response_userp_,
+      response_delegator_));
+
+  return Status::Success;
+}
+
 /* InferenceRequest*/
 
 // InferenceRequest Input Constructor
@@ -115,6 +129,61 @@ InferenceRequest::Input::AppendData(
 
 /* InferenceResponse */
 
+//
+// InferenceResponse::Output
+//
+
+InferenceResponse::InferenceResponse(
+    const std::shared_ptr<InferenceBackend>& backend, const std::string& id,
+    const ResponseAllocator* allocator, void* alloc_userp,
+    TRITONSERVER_InferenceResponseCompleteFn_t response_fn,
+    void* response_userp,
+    const std::function<
+        void(std::unique_ptr<InferenceResponse>&&, const uint32_t)>& delegator)
+    : backend_(backend), id_(id), allocator_(allocator),
+      alloc_userp_(alloc_userp), response_fn_(response_fn),
+      response_userp_(response_userp), response_delegator_(delegator),
+      null_response_(false)
+{
+    // Skip allocator logic / references in unit test
+}
+
+InferenceResponse::Output::~Output()
+{
+  Status status = ReleaseDataBuffer();
+  if (!status.IsOk()) {
+    /*LOG_ERROR << "failed to release buffer for output '" << name_
+              << "': " << status.AsString();*/
+  }
+}
+
+Status
+InferenceResponse::Output::ReleaseDataBuffer()
+{
+  //TRITONSERVER_Error* err = nullptr;
+
+  if (allocated_buffer_ != nullptr) {
+    // TODO: Double free here, check valgrind
+    //std::free(allocated_buffer_);
+
+    /*err = allocator_->ReleaseFn()(
+        reinterpret_cast<TRITONSERVER_ResponseAllocator*>(
+            const_cast<ResponseAllocator*>(allocator_)),
+        allocated_buffer_, allocated_userp_, allocated_buffer_byte_size_,
+        allocated_memory_type_, allocated_memory_type_id_);*/
+  }
+
+  allocated_buffer_ = nullptr;
+  allocated_buffer_byte_size_ = 0;
+  allocated_memory_type_ = TRITONSERVER_MEMORY_CPU;
+  allocated_memory_type_id_ = 0;
+  allocated_userp_ = nullptr;
+
+  //RETURN_IF_TRITONSERVER_ERROR(err);
+
+  return Status::Success;
+}
+
 // Same as defined in infer_response.cc
 Status
 InferenceResponse::Output::DataBuffer(
@@ -149,7 +218,10 @@ InferenceResponse::Output::AllocateDataBuffer(
             "Only standard CPU memory supported for now");
     }
 
+    // TODO: look into memory management here with valgrind
+    //allocated_buffer_ = std::malloc(buffer_byte_size);
     // Set relevant member variables for DataBuffer() to return
+    // TODO: Confirm this is working, we don't alloc memory for this buffer
     std::memcpy(&allocated_buffer_, &buffer, buffer_byte_size);
     allocated_buffer_byte_size_ = buffer_byte_size;
     allocated_memory_type_ = *memory_type;
@@ -232,14 +304,16 @@ TEST_F(RequestResponseCacheTest, TestRequestHashing) {
     request2.AddOriginalInput("input", dtype, shape, &input2);
     assert(input0 != nullptr);
     // Add data to input
+    // TODO: Use vectors and vector.data() / vector.size() / etc.
     int data0[4] = {1, 2, 3, 4};
     int data1[4] = {5, 6, 7 ,8};
     int data2[4] = {5, 6, 7 ,8};
     TRITONSERVER_MemoryType memory_type = TRITONSERVER_MEMORY_CPU;
     int64_t memory_type_id = 0; // TODO
-    input0->AppendData(data0, sizeof(int)*4, memory_type, memory_type_id);
-    input1->AppendData(data1, sizeof(int)*4, memory_type, memory_type_id);
-    input2->AppendData(data2, sizeof(int)*4, memory_type, memory_type_id);
+    uint64_t input_size = sizeof(int)*4;
+    input0->AppendData(data0, input_size, memory_type, memory_type_id);
+    input1->AppendData(data1, input_size, memory_type, memory_type_id);
+    input2->AppendData(data2, input_size, memory_type, memory_type_id);
 
     // Compare hashes
     std::cout << "Compare hashes" << std::endl;
@@ -258,6 +332,53 @@ TEST_F(RequestResponseCacheTest, TestRequestHashing) {
     assert(hash0 != hash1);
     // Same input data should have same hashes
     assert(hash1 == hash2);
+
+    std::cout << "Create response object" << std::endl;
+    std::unique_ptr<ni::InferenceResponse> response0;
+    ni::Status status = request0.ResponseFactory().CreateResponse(&response0);
+    if (!status.IsOk()) {
+        assert(false); // TODO
+    }
+
+    std::cout << "Add output metadata to response object" << std::endl;
+    ni::InferenceResponse::Output* response_output = nullptr;
+    uint64_t output_size = input_size;
+    std::vector<int> output0 = {2, 4, 6, 8};
+    status = response0->AddOutput("output", dtype, shape, &response_output);
+    if (!status.IsOk()) {
+        assert(false); // TODO
+    }
+
+    // AllocateDataBuffer shouldn't modify the buffer arg, but it expects void** and not const void**, so we remove the const modifier
+    std::cout << "Allocate output data buffer for response object" << std::endl;
+    void* vp = output0.data();
+    void** vpp = &vp;
+    status = response_output->AllocateDataBuffer(
+        vpp, output_size, &memory_type, &memory_type_id);
+    if (!status.IsOk()) {
+        assert(false); // TODO
+    }
+
+    std::cout << "Lookup hash0 in empty cache" << std::endl;
+    status = cache.Lookup(hash0, nullptr);
+    // This hash not in cache yet
+    assert(!status.IsOk());
+    std::cout << "Insert response into cache with hash0" << std::endl;
+    status = cache.Insert(hash0, *response0);
+    // Insertion should succeed
+    assert(status.IsOk());
+
+    // Create response to test cache lookup
+    std::cout << "Create response object into fill from cache" << std::endl;
+    status = cache.Insert(hash0, *response0);
+    std::unique_ptr<ni::InferenceResponse> response_test;
+    status = request0.ResponseFactory().CreateResponse(&response_test);
+    assert(status.IsOk())
+
+    std::cout << "Lookup hash0 in cache after insertion" << std::endl;
+    status = cache.Lookup(hash0, response_test.get());
+    // Lookup should now succeed
+    assert(status.IsOk());
 }
 
 }  // namespace

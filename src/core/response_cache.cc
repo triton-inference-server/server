@@ -236,6 +236,13 @@ Status RequestResponseCache::BuildCacheEntry(CacheEntry& entry, const InferenceR
 
 Status RequestResponseCache::BuildInferenceResponse(const CacheEntry& entry, InferenceResponse* response) {
     auto status = Status::Success;
+    if (response == nullptr) {
+        return Status(
+            Status::Code::INTERNAL,
+            "invalid response ptr passed in"
+        );
+    }
+
     for (auto& cache_output : entry.outputs) {
         InferenceResponse::Output* response_output = nullptr;
         status = response->AddOutput(cache_output.name, cache_output.dtype, cache_output.shape, &response_output);
