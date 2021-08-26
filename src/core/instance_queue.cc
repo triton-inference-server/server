@@ -65,7 +65,9 @@ InstanceQueue::Dequeue(
     (*payload)->SetState(Payload::State::EXECUTING);
     if ((!payload_queue_.empty()) && (max_queue_delay_ns_ > 0) &&
         (max_batch_size_ > 1)) {
-      while (true) {
+      bool continue_merge;
+      do {
+        continue_merge = false;
         uint64_t now_ns =
             std::chrono::duration_cast<std::chrono::nanoseconds>(
                 std::chrono::steady_clock::now().time_since_epoch())
@@ -83,14 +85,11 @@ InstanceQueue::Dequeue(
             if (status.IsOk()) {
               merged_payloads->push_back(payload_queue_.front());
               payload_queue_.pop_front();
+              continue_merge = true;
             }
-          } else {
-            break;
           }
-        } else {
-          break;
         }
-      }
+      } while (continue_merge);
     }
   }
 }
