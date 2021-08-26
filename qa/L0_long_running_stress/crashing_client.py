@@ -28,7 +28,7 @@ import sys
 sys.path.append("../common")
 
 import numpy as np
-from multiprocessing import Process, Value
+from multiprocessing import Process, Value, shared_memory
 import time
 import test_util as tu
 import argparse
@@ -38,7 +38,7 @@ from tritonclientutils import np_to_triton_dtype
 
 def crashing_client(model_name,
                     dtype,
-                    count,
+                    shm_name,
                     triton_client,
                     tensor_shape=(1,),
                     input_name="INPUT0"):
@@ -50,12 +50,14 @@ def crashing_client(model_name,
                               np_to_triton_dtype(dtype)),
     ]
     inputs[0].set_data_from_numpy(in0)
+    existing_shm = shared_memory.SharedMemory(shm_name)
+    count = np.ndarray((1,), dtype=np.int32, buffer=existing_shm.buf)
 
     # Run in a loop so that it is guaranteed that
     # the inference will not have completed when being terminated.
     while True:
         results = triton_client.infer(model_name, inputs)
-        count.value += 1
+        count[0] += 1
 
 
 if __name__ == '__main__':
@@ -74,14 +76,16 @@ if __name__ == '__main__':
     triton_client = grpcclient.InferenceServerClient(url="localhost:8001",
                                                      verbose=True)
 
-    count = Value('i', 0)
+    shm = shared_memory.SharedMemory(create=True, size=8)
+    count = np.ndarray((1,), dtype=np.int32, buffer=shm.buf)
+    count[0] = 0
 
     p = Process(target=crashing_client,
                 name="crashing_client",
                 args=(
                     model_name,
                     dtype,
-                    count,
+                    shm.name,
                     triton_client,
                 ))
 
@@ -94,7 +98,10 @@ if __name__ == '__main__':
     # Cleanup
     p.join()
 
-    print("request_count:", count.value)
+    print("request_count:", count[0])
+
+    shm.close()
+    shm.unlink()
 
     if not triton_client.is_server_live():
         sys.exit(1)
