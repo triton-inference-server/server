@@ -164,7 +164,7 @@ InferenceResponse::Output::ReleaseDataBuffer()
 
   if (allocated_buffer_ != nullptr) {
     // TODO: Double free here, check valgrind
-    //std::free(allocated_buffer_);
+    free(allocated_buffer_);
 
     /*err = allocator_->ReleaseFn()(
         reinterpret_cast<TRITONSERVER_ResponseAllocator*>(
@@ -218,15 +218,29 @@ InferenceResponse::Output::AllocateDataBuffer(
             "Only standard CPU memory supported for now");
     }
 
+    if (buffer == nullptr || *buffer == nullptr) {
+         return Status(
+            Status::Code::INTERNAL,
+            "buffer was nullptr in AllocateDataBuffer");
+    }
     // TODO: look into memory management here with valgrind
-    //allocated_buffer_ = std::malloc(buffer_byte_size);
+    std::cout << "Malloc'ing allocated_buffer_ for output" << std::endl;
+    allocated_buffer_ = malloc(buffer_byte_size);
+    if (allocated_buffer_ == nullptr) {
+        return Status(
+            Status::Code::INTERNAL,
+            "Allocating internal response output buffer failed");
+    }
+
     // Set relevant member variables for DataBuffer() to return
     // TODO: Confirm this is working, we don't alloc memory for this buffer
-    std::memcpy(&allocated_buffer_, &buffer, buffer_byte_size);
+    std::cout << "Memcpying from cache buffer to response output buffer" << std::endl;
+    std::memcpy(allocated_buffer_, *buffer, buffer_byte_size);
     allocated_buffer_byte_size_ = buffer_byte_size;
     allocated_memory_type_ = *memory_type;
     allocated_memory_type_id_ = *memory_type_id;
     allocated_userp_ = nullptr;
+    std::cout << "Done in AllocateDataBuffer" << std::endl;
     return Status::Success;
 }
 
@@ -266,6 +280,14 @@ class RequestResponseCacheTest : public ::testing::Test {
   void SetUp() override {}
   void TearDown() override {}
 };
+
+// Helpers
+void check_status(ni::Status status) {
+    if(!status.IsOk()) {
+        std::cout << "ERROR: " << status.Message() << std::endl;
+        assert(false); // TODO
+    }
+}
 
 // Simplest test possible just to test flow
 TEST_F(RequestResponseCacheTest, TestHelloWorld) {
@@ -336,18 +358,14 @@ TEST_F(RequestResponseCacheTest, TestRequestHashing) {
     std::cout << "Create response object" << std::endl;
     std::unique_ptr<ni::InferenceResponse> response0;
     ni::Status status = request0.ResponseFactory().CreateResponse(&response0);
-    if (!status.IsOk()) {
-        assert(false); // TODO
-    }
+    check_status(status);
 
     std::cout << "Add output metadata to response object" << std::endl;
     ni::InferenceResponse::Output* response_output = nullptr;
     uint64_t output_size = input_size;
     std::vector<int> output0 = {2, 4, 6, 8};
     status = response0->AddOutput("output", dtype, shape, &response_output);
-    if (!status.IsOk()) {
-        assert(false); // TODO
-    }
+    check_status(status);
 
     // AllocateDataBuffer shouldn't modify the buffer arg, but it expects void** and not const void**, so we remove the const modifier
     std::cout << "Allocate output data buffer for response object" << std::endl;
@@ -355,9 +373,7 @@ TEST_F(RequestResponseCacheTest, TestRequestHashing) {
     void** vpp = &vp;
     status = response_output->AllocateDataBuffer(
         vpp, output_size, &memory_type, &memory_type_id);
-    if (!status.IsOk()) {
-        assert(false); // TODO
-    }
+    check_status(status);
 
     std::cout << "Lookup hash0 in empty cache" << std::endl;
     status = cache.Lookup(hash0, nullptr);
@@ -366,19 +382,47 @@ TEST_F(RequestResponseCacheTest, TestRequestHashing) {
     std::cout << "Insert response into cache with hash0" << std::endl;
     status = cache.Insert(hash0, *response0);
     // Insertion should succeed
-    assert(status.IsOk());
+    check_status(status);
 
     // Create response to test cache lookup
     std::cout << "Create response object into fill from cache" << std::endl;
     status = cache.Insert(hash0, *response0);
     std::unique_ptr<ni::InferenceResponse> response_test;
     status = request0.ResponseFactory().CreateResponse(&response_test);
-    assert(status.IsOk())
+    check_status(status);
 
     std::cout << "Lookup hash0 in cache after insertion" << std::endl;
     status = cache.Lookup(hash0, response_test.get());
     // Lookup should now succeed
-    assert(status.IsOk());
+    std::cout << "DEBUG: Checking lookup status" << std::endl;
+    check_status(status);
+    std::cout << "DEBUG: Done with test" << std::endl;
+
+    //std::vector<int> output_test;
+    //response_test->DataBuffer(output_test.data(), output_size, memory_type, memory_type_id);
+    // Fetch output buffer details
+    const void* response_buffer = nullptr;
+    size_t response_byte_size = 0;
+    TRITONSERVER_MemoryType response_memory_type;
+    int64_t response_memory_type_id;
+    void* userp;
+    // TODO: How to handle different memory types? GPU vs CPU vs Pinned, etc.
+    //const auto outputs = response_test->Outputs();
+    // Build cache entry data from response outputs
+    for (const auto& response_output : response_test->Outputs()) {
+        status = response_output.DataBuffer(
+            &response_buffer, &response_byte_size, &response_memory_type,
+            &response_memory_type_id, &userp);
+    }
+        
+    // Exit early if we fail to get output buffer from response
+    check_status(status);
+    int* output_test = (int*) response_buffer;
+    std::cout << "Check output buffer data from cache entry:" << std::endl;
+    for (size_t i = 0; i < response_byte_size / sizeof(int); i++) {
+        std::cout << output_test[i] << std::endl;
+    }
+    std::cout << "Done!" << std::endl;
 }
 
 }  // namespace

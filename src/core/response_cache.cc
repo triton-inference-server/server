@@ -29,6 +29,7 @@
 namespace nvidia { namespace inferenceserver {
 
 RequestResponseCache::RequestResponseCache(const uint64_t size)
+    : total_size_(size), available_size_(size)
 {
     // Allocate buffer
     buffer_ = malloc(size);
@@ -40,6 +41,7 @@ RequestResponseCache::RequestResponseCache(const uint64_t size)
     // Create cache as managed buffer
     managed_buffer_ = boost::interprocess::managed_external_buffer(
         boost::interprocess::create_only_t{}, buffer_, size);
+
     // TODO: Error check creation of managed_buffer_ ?
 }
 
@@ -47,17 +49,32 @@ RequestResponseCache::~RequestResponseCache()
 {
     // TODO: Free each managed buffer allocated to cache entries,
     //       or is it enough to free full buffer?
+    std::cout << "Total cache size: " << total_size_ << std::endl;
+    std::cout << "Managed buffer size: " << managed_buffer_.get_size() << std::endl;
+    std::cout << "Available cache size: " << available_size_ << std::endl;
+    std::cout << "Managed buffer free size: " << managed_buffer_.get_free_memory() << std::endl;
+    std::cout << "Managed buffer all deallocated?: " << managed_buffer_.all_memory_deallocated() << std::endl;
+    std::cout << "Managed buffer sanity?: " << managed_buffer_.check_sanity() << std::endl;
+    std::cout << "Deallocating managed cache entry buffers" << std::endl;
     for (auto& iter : cache_) {
         auto& entry = iter.second;
         for (auto& output : entry.outputs) {
-            managed_buffer_.deallocate(output.buffer);
+            if (output.buffer != nullptr) {
+                std::cout << "Deallocating buffer for [" << output.name << "] from managed buffer" << std::endl;
+                std::cout << "output.buffer address: " << output.buffer << std::endl;
+                managed_buffer_.deallocate(output.buffer);
+            }
         }
     }
+    std::cout << "Managed buffer all deallocated?: " << managed_buffer_.all_memory_deallocated() << std::endl;
 
     // Free total cache buffer
     if (buffer_ != nullptr) {
+        std::cout << "Freeing underlying cache buffer" << std::endl;
         free(buffer_);
     }
+
+    std::cout << "Done destroying cache" << std::endl;
 }
 
 Status RequestResponseCache::Hash(const InferenceRequest& request, uint64_t* key) {
@@ -101,6 +118,7 @@ Status RequestResponseCache::Hash(const InferenceRequest& request, uint64_t* key
 }
 
 Status RequestResponseCache::Lookup(const uint64_t key, InferenceResponse* ptr) {
+    std::cout << "Lookup(key=" << key << ", ptr=" << ptr << ")" << std::endl;
     auto iter = cache_.find(key);
     if (iter == cache_.end()) {
         return Status(
@@ -136,6 +154,7 @@ Status RequestResponseCache::Insert(const uint64_t key, const InferenceResponse&
     }
 
     // If cache doesn't have room for new entry, evict until enough size is available
+    available_size_ = managed_buffer_.get_free_memory();
     while (entry.size > available_size_) {
         auto status = Evict();
         // If evict fails for some reason, exit with its failure status
@@ -155,10 +174,16 @@ Status RequestResponseCache::Insert(const uint64_t key, const InferenceResponse&
     // Update LRU with new cache entry
     auto cache_iter = cache_pair.first;
     UpdateLRU(cache_iter);
-    // Update available cache size
-    available_size_ -= entry.size;
+    // Update available cache size - done automatically in managed_buffer_
+    //available_size_ -= entry.size;
     // Error checking cache size management
+    //if (available_size_ > total_size_) {
+    total_size_ = managed_buffer_.get_size();
+    // TODO: Can get rid of this when using managed_buffer helper methods instead
     if (available_size_ > total_size_) {
+        std::cout << "available cache size: " << available_size_ << std::endl;
+        std::cout << "total cache size: " << total_size_ << std::endl;
+        std::cout << "entry.size: " << entry.size << std::endl;
         return Status(
             Status::Code::INTERNAL,
             "Available size exceeded total size: this indicates a bug in the code"
@@ -212,7 +237,9 @@ Status RequestResponseCache::BuildCacheEntry(CacheEntry& entry, const InferenceR
         cache_output.size = static_cast<uint64_t>(response_byte_size);
 
         // Allocate buffer for response output in cache entry
+        std::cout << "Allocating [" << response_byte_size << "] bytes from managed_buffer_" << std::endl;
         cache_output.buffer = managed_buffer_.allocate(response_byte_size, std::nothrow_t{});
+        std::cout << "cache_output.buffer address: " << cache_output.buffer << std::endl;
         // Exit early if we fail to allocate from managed buffer
         if (cache_output.buffer == nullptr) {
             return Status(
@@ -223,7 +250,8 @@ Status RequestResponseCache::BuildCacheEntry(CacheEntry& entry, const InferenceR
         // Copy data from response buffer to cache entry output buffer
         // TODO: How to differently handle different memory types?
         //       GPU vs. CPU memory, etc.
-        std::memcpy(&cache_output.buffer, &response_buffer, response_byte_size);
+        std::memcpy(cache_output.buffer, response_buffer, response_byte_size);
+        std::cout << "cache_output.buffer address after memcpy: " << cache_output.buffer << std::endl;
         // Sum up output sizes for total cache entry size
         entry.size += cache_output.size;
         // Add each output to cache entry
@@ -235,6 +263,7 @@ Status RequestResponseCache::BuildCacheEntry(CacheEntry& entry, const InferenceR
 
 
 Status RequestResponseCache::BuildInferenceResponse(const CacheEntry& entry, InferenceResponse* response) {
+    std::cout << "BuildInferenceResponse" << std::endl;
     auto status = Status::Success;
     if (response == nullptr) {
         return Status(
@@ -250,12 +279,29 @@ Status RequestResponseCache::BuildInferenceResponse(const CacheEntry& entry, Inf
             return status;
         }
 
+        if (response_output == nullptr) {
+            return Status(
+                Status::Code::INTERNAL,
+                "InferenceResponse::Output pointer as nullptr"
+            );           
+        }
+
         // TODO: AllocateDataBuffer may modify the memory_type/id args, we probably don't want to edit cache entry fields, check temp vars after?
         TRITONSERVER_MemoryType memory_type = cache_output.memory_type;
         int64_t memory_type_id = cache_output.memory_type_id;
         // AllocateDataBuffer shouldn't modify the buffer arg, but it expects void** and not const void**, so we remove the const modifier
+        std::cout << "BuildInferenceResponse: response_output->AllocateDataBuffer" << std::endl;
+        void* vp = cache_output.buffer;
+        assert(vp != nullptr);
+        void** vpp = &vp;
+        int* ip = (int*)cache_output.buffer;
+        std::cout << "Cache output buffer entries:" << std::endl;
+        std::cout << "---> " << ip[0] << " " << ip[1] << " " << ip[2] << " " << ip[3] << std::endl;
+        std::cout << "response_output->AllocateDataBuffer()" << std::endl;
         status = response_output->AllocateDataBuffer(
-            const_cast<void**>(&cache_output.buffer), cache_output.size, &memory_type, &memory_type_id);
+            vpp, cache_output.size, &memory_type, &memory_type_id);
+            //const_cast<void**>(&cache_output.buffer), cache_output.size, &memory_type, &memory_type_id);
+        std::cout << "Finished allocating data buffer" << std::endl;
         if (!status.IsOk()) {
             return status;
         }
@@ -292,7 +338,10 @@ Status RequestResponseCache::Evict() {
     // Remove LRU key from LRU list
     lru_.pop_back();
     // Update available cache size
-    available_size_ += entry.size;
+    //available_size_ += entry.size;
+    // TODO: Get rid of this check if using managed buffer helpers
+    available_size_ = managed_buffer_.get_free_memory();
+    total_size_ = managed_buffer_.get_size();
     // Error checking cache size management
     if (available_size_ > total_size_) {
         return Status(
@@ -305,6 +354,7 @@ Status RequestResponseCache::Evict() {
 
 // LRU
 void RequestResponseCache::UpdateLRU(std::unordered_map<uint64_t, CacheEntry>::iterator& cache_iter) {
+    std::cout << "UpdateLRU" << std::endl;
     const auto& key = cache_iter->first;
     auto& cache_entry = cache_iter->second;
     // Remove key from LRU list if it was already in there
