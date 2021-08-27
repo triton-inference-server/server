@@ -50,14 +50,15 @@ def crashing_client(model_name,
                               np_to_triton_dtype(dtype)),
     ]
     inputs[0].set_data_from_numpy(in0)
-    existing_shm = shared_memory.SharedMemory(shm_name)
-    count = np.ndarray((1,), dtype=np.int32, buffer=existing_shm.buf)
 
     # Run in a loop so that it is guaranteed that
     # the inference will not have completed when being terminated.
     while True:
         results = triton_client.infer(model_name, inputs)
+        existing_shm = shared_memory.SharedMemory(shm_name)
+        count = np.ndarray((1,), dtype=np.int32, buffer=existing_shm.buf)
         count[0] += 1
+        existing_shm.close()
 
 
 if __name__ == '__main__':
