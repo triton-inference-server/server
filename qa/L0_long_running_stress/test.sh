@@ -93,9 +93,17 @@ for MODEL in $MODELS; do
         sed -i "s/kind: KIND_CPU/kind: KIND_CPU\\ncount: 2/" config.pbtxt)
 done
 
+MODELS=""
 for BACKEND in $BACKENDS; do
-    cp -r $DATADIR/qa_identity_model_repository/${BACKEND}_nobatch_zero_1_float32 \
-      $MODEL_DIR/.
+    MODELS="$MODELS $DATADIR/qa_identity_model_repository/${BACKEND}_nobatch_zero_1_float32"
+done
+
+for MODEL in $MODELS; do
+    cp -r $MODEL $MODEL_DIR/. && \
+      (cd $MODEL_DIR/$(basename $MODEL) && \
+        echo "parameters [" >> config.pbtxt && \
+        echo "{ key: \"execute_delay_ms\"; value: { string_value: \"1000\" }}" >> config.pbtxt && \
+        echo "]" >> config.pbtxt)
 done
 
 cp -r $DATADIR/tf_model_store/resnet_v1_50_graphdef $MODEL_DIR/resnet_v1_50_graphdef_def && \

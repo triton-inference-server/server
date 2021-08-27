@@ -40,7 +40,7 @@ def crashing_client(model_name,
                     dtype,
                     shm_name,
                     triton_client,
-                    tensor_shape=(1,),
+                    tensor_shape=(1000,),
                     input_name="INPUT0"):
     in0 = np.random.random(tensor_shape).astype(dtype)
     if "libtorch" in model_name:
