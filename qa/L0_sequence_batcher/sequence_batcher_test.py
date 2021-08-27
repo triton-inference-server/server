@@ -149,17 +149,17 @@ class SequenceBatcherTest(su.SequenceBatcherTestUtil):
                 dtypes = self.get_datatype(trial)
 
                 for dtype in dtypes:
+                    model_name = tu.get_sequence_model_name(trial, dtype)
+                    # Skip bool type ensemble models
+                    if (any(word in trial for word in ENSEMBLE_PREFIXES)) and (
+                            dtype == np.bool):
+                        continue
+                    # For bool type control models, use int32 as I/O types
+                    if dtype == np.bool:
+                        dtype = np.int32
+
                     self.clear_deferred_exceptions()
                     try:
-                        model_name = tu.get_sequence_model_name(trial, dtype)
-                        # Skip bool type ensemble models
-                        if (any(word in trial for word in ENSEMBLE_PREFIXES)
-                           ) and ('bool' in model_name):
-                            continue
-                        # For bool type control models, use int32 as I/O types
-                        if dtype == np.bool:
-                            dtype = np.int32
-
                         self.check_setup(model_name)
                         self.assertFalse(
                             "TRITONSERVER_DELAY_SCHEDULER" in os.environ)
@@ -198,17 +198,17 @@ class SequenceBatcherTest(su.SequenceBatcherTestUtil):
                 dtypes = self.get_datatype(trial)
 
                 for dtype in dtypes:
+                    model_name = tu.get_sequence_model_name(trial, dtype)
+                    # Skip bool type ensemble models
+                    if (any(word in trial for word in ENSEMBLE_PREFIXES)) and (
+                            dtype == np.bool):
+                        continue
+                    # For bool type control models, use int32 as I/O types
+                    if dtype == np.bool:
+                        dtype = np.int32
+
                     self.clear_deferred_exceptions()
                     try:
-                        model_name = tu.get_sequence_model_name(trial, dtype)
-                        # Skip bool type ensemble models
-                        if (any(word in trial for word in ENSEMBLE_PREFIXES)
-                           ) and ('bool' in model_name):
-                            continue
-                        # For bool type control models, use int32 as I/O types
-                        if dtype == np.bool:
-                            dtype = np.int32
-
                         self.check_setup(model_name)
                         self.assertFalse(
                             "TRITONSERVER_DELAY_SCHEDULER" in os.environ)
@@ -251,17 +251,17 @@ class SequenceBatcherTest(su.SequenceBatcherTestUtil):
                 dtypes = self.get_datatype(trial)
 
                 for dtype in dtypes:
+                    model_name = tu.get_sequence_model_name(trial, dtype)
+                    # Skip bool type ensemble models
+                    if (any(word in trial for word in ENSEMBLE_PREFIXES)) and (
+                            dtype == np.bool):
+                        continue
+                    # For bool type control models, use int32 as I/O types
+                    if dtype == np.bool:
+                        dtype = np.int32
+
                     self.clear_deferred_exceptions()
                     try:
-                        model_name = tu.get_sequence_model_name(trial, dtype)
-                        # Skip bool type ensemble models
-                        if (any(word in trial for word in ENSEMBLE_PREFIXES)
-                           ) and ('bool' in model_name):
-                            continue
-                        # For bool type control models, use int32 as I/O types
-                        if dtype == np.bool:
-                            dtype = np.int32
-
                         self.check_setup(model_name)
                         self.assertFalse(
                             "TRITONSERVER_DELAY_SCHEDULER" in os.environ)
@@ -309,17 +309,17 @@ class SequenceBatcherTest(su.SequenceBatcherTestUtil):
             for idx, protocol in enumerate(_protocols):
                 dtypes = self.get_datatype(trial)
                 for dtype in dtypes:
+                    model_name = tu.get_sequence_model_name(trial, dtype)
+                    # Skip bool type ensemble models
+                    if (any(word in trial for word in ENSEMBLE_PREFIXES)) and (
+                            dtype == np.bool):
+                        continue
+                    # For bool type control models, use int32 as I/O types
+                    if dtype == np.bool:
+                        dtype = np.int32
+
                     self.clear_deferred_exceptions()
                     try:
-                        model_name = tu.get_sequence_model_name(trial, dtype)
-                        # Skip bool type ensemble models
-                        if (any(word in trial for word in ENSEMBLE_PREFIXES)
-                           ) and ('bool' in model_name):
-                            continue
-                        # For bool type control models, use int32 as I/O types
-                        if dtype == np.bool:
-                            dtype = np.int32
-
                         self.check_setup(model_name)
                         self.assertFalse(
                             "TRITONSERVER_DELAY_SCHEDULER" in os.environ)
@@ -364,17 +364,17 @@ class SequenceBatcherTest(su.SequenceBatcherTestUtil):
             for idx, protocol in enumerate(_protocols):
                 dtypes = self.get_datatype(trial)
                 for dtype in dtypes:
+                    model_name = tu.get_sequence_model_name(trial, dtype)
+                    # Skip bool type ensemble models
+                    if (any(word in trial for word in ENSEMBLE_PREFIXES)) and (
+                            dtype == np.bool):
+                        continue
+                    # For bool type control models, use int32 as I/O types
+                    if dtype == np.bool:
+                        dtype = np.int32
+
                     self.clear_deferred_exceptions()
                     try:
-                        model_name = tu.get_sequence_model_name(trial, dtype)
-                        # Skip bool type ensemble models
-                        if (any(word in trial for word in ENSEMBLE_PREFIXES)
-                           ) and ('bool' in model_name):
-                            continue
-                        # For bool type control models, use int32 as I/O types
-                        if dtype == np.bool:
-                            dtype = np.int32
-
                         self.check_setup(model_name)
                         self.assertFalse(
                             "TRITONSERVER_DELAY_SCHEDULER" in os.environ)
@@ -425,17 +425,17 @@ class SequenceBatcherTest(su.SequenceBatcherTestUtil):
             for idx, protocol in enumerate(_protocols):
                 dtypes = self.get_datatype(trial)
                 for dtype in dtypes:
+                    model_name = tu.get_sequence_model_name(trial, dtype)
+                    # Skip bool type ensemble models
+                    if (any(word in trial for word in ENSEMBLE_PREFIXES)) and (
+                            dtype == np.bool):
+                        continue
+                    # For bool type control models, use int32 as I/O types
+                    if dtype == np.bool:
+                        dtype = np.int32
+
                     self.clear_deferred_exceptions()
                     try:
-                        model_name = tu.get_sequence_model_name(trial, dtype)
-                        # Skip bool type ensemble models
-                        if (any(word in trial for word in ENSEMBLE_PREFIXES)
-                           ) and ('bool' in model_name):
-                            continue
-                        # For bool type control models, use int32 as I/O types
-                        if dtype == np.bool:
-                            dtype = np.int32
-
                         self.check_setup(model_name)
                         self.assertFalse(
                             "TRITONSERVER_DELAY_SCHEDULER" in os.environ)
@@ -487,17 +487,17 @@ class SequenceBatcherTest(su.SequenceBatcherTestUtil):
             for idx, protocol in enumerate(_protocols):
                 dtypes = self.get_datatype(trial)
                 for dtype in dtypes:
+                    model_name = tu.get_sequence_model_name(trial, dtype)
+                    # Skip bool type ensemble models
+                    if (any(word in trial for word in ENSEMBLE_PREFIXES)) and (
+                            dtype == np.bool):
+                        continue
+                    # For bool type control models, use int32 as I/O types
+                    if dtype == np.bool:
+                        dtype = np.int32
+
                     self.clear_deferred_exceptions()
                     try:
-                        model_name = tu.get_sequence_model_name(trial, dtype)
-                        # Skip bool type ensemble models
-                        if (any(word in trial for word in ENSEMBLE_PREFIXES)
-                           ) and ('bool' in model_name):
-                            continue
-                        # For bool type control models, use int32 as I/O types
-                        if dtype == np.bool:
-                            dtype = np.int32
-
                         self.check_setup(model_name)
                         self.assertFalse(
                             "TRITONSERVER_DELAY_SCHEDULER" in os.environ)
@@ -532,6 +532,15 @@ class SequenceBatcherTest(su.SequenceBatcherTestUtil):
         for trial in _trials:
             dtypes = self.get_datatype(trial)
             for dtype in dtypes:
+                model_name = tu.get_sequence_model_name(trial, dtype)
+                # Skip bool type ensemble models
+                if (any(word in trial
+                        for word in ENSEMBLE_PREFIXES)) and (dtype == np.bool):
+                    continue
+                # For bool type control models, use int32 as I/O types
+                if dtype == np.bool:
+                    dtype = np.int32
+
                 self.clear_deferred_exceptions()
 
                 precreated_shm0_handles = self.precreate_register_regions(
@@ -540,15 +549,6 @@ class SequenceBatcherTest(su.SequenceBatcherTestUtil):
                     (0, 9, 5, 13), dtype, 1)
 
                 try:
-                    model_name = tu.get_sequence_model_name(trial, dtype)
-                    # Skip bool type ensemble models
-                    if (any(word in trial for word in ENSEMBLE_PREFIXES)) and (
-                            'bool' in model_name):
-                        continue
-                    # For bool type control models, use int32 as I/O types
-                    if dtype == np.bool:
-                        dtype = np.int32
-
                     self.check_setup(model_name)
 
                     # Need scheduler to wait for queue to contain all
@@ -631,6 +631,15 @@ class SequenceBatcherTest(su.SequenceBatcherTestUtil):
         for trial in _trials:
             dtypes = self.get_datatype(trial)
             for dtype in dtypes:
+                model_name = tu.get_sequence_model_name(trial, dtype)
+                # Skip bool type ensemble models
+                if (any(word in trial
+                        for word in ENSEMBLE_PREFIXES)) and (dtype == np.bool):
+                    continue
+                # For bool type control models, use int32 as I/O types
+                if dtype == np.bool:
+                    dtype = np.int32
+
                 self.clear_deferred_exceptions()
 
                 precreated_shm0_handles = self.precreate_register_regions(
@@ -643,15 +652,6 @@ class SequenceBatcherTest(su.SequenceBatcherTestUtil):
                     (1111, 1112, 1113, 1114), dtype, 3)
 
                 try:
-                    model_name = tu.get_sequence_model_name(trial, dtype)
-                    # Skip bool type ensemble models
-                    if (any(word in trial for word in ENSEMBLE_PREFIXES)) and (
-                            'bool' in model_name):
-                        continue
-                    # For bool type control models, use int32 as I/O types
-                    if dtype == np.bool:
-                        dtype = np.int32
-
                     self.check_setup(model_name)
 
                     # Need scheduler to wait for queue to contain all
@@ -781,6 +781,15 @@ class SequenceBatcherTest(su.SequenceBatcherTestUtil):
         for trial in _trials:
             dtypes = self.get_datatype(trial)
             for dtype in dtypes:
+                model_name = tu.get_sequence_model_name(trial, dtype)
+                # Skip bool type ensemble models
+                if (any(word in trial
+                        for word in ENSEMBLE_PREFIXES)) and (dtype == np.bool):
+                    continue
+                # For bool type control models, use int32 as I/O types
+                if dtype == np.bool:
+                    dtype = np.int32
+
                 self.clear_deferred_exceptions()
 
                 precreated_shm0_handles = self.precreate_register_regions(
@@ -793,15 +802,6 @@ class SequenceBatcherTest(su.SequenceBatcherTestUtil):
                     (1111, 1112, 1113), dtype, 3)
 
                 try:
-                    model_name = tu.get_sequence_model_name(trial, dtype)
-                    # Skip bool type ensemble models
-                    if (any(word in trial for word in ENSEMBLE_PREFIXES)) and (
-                            'bool' in model_name):
-                        continue
-                    # For bool type control models, use int32 as I/O types
-                    if dtype == np.bool:
-                        dtype = np.int32
-
                     self.check_setup(model_name)
 
                     # Need scheduler to wait for queue to contain all
@@ -928,6 +928,15 @@ class SequenceBatcherTest(su.SequenceBatcherTestUtil):
         for trial in _ragged_batch_not_supported_trials:
             dtypes = self.get_datatype(trial)
             for dtype in dtypes:
+                model_name = tu.get_sequence_model_name(trial, dtype)
+                # Skip bool type ensemble models
+                if (any(word in trial
+                        for word in ENSEMBLE_PREFIXES)) and (dtype == np.bool):
+                    continue
+                # For bool type control models, use int32 as I/O types
+                if dtype == np.bool:
+                    dtype = np.int32
+
                 self.clear_deferred_exceptions()
 
                 precreated_shm0_handles = self.precreate_register_regions(
@@ -940,15 +949,6 @@ class SequenceBatcherTest(su.SequenceBatcherTestUtil):
                     (1111, 1112, 1113), dtype, 3, tensor_shape=(3,))
 
                 try:
-                    model_name = tu.get_sequence_model_name(trial, dtype)
-                    # Skip bool type ensemble models
-                    if (any(word in trial for word in ENSEMBLE_PREFIXES)) and (
-                            'bool' in model_name):
-                        continue
-                    # For bool type control models, use int32 as I/O types
-                    if dtype == np.bool:
-                        dtype = np.int32
-
                     self.check_setup(model_name)
 
                     # Need scheduler to wait for queue to contain all
@@ -1082,6 +1082,15 @@ class SequenceBatcherTest(su.SequenceBatcherTestUtil):
         for trial in _ragged_batch_supported_trials:
             dtypes = self.get_datatype(trial)
             for dtype in dtypes:
+                model_name = tu.get_sequence_model_name(trial, dtype)
+                # Skip bool type ensemble models
+                if (any(word in trial
+                        for word in ENSEMBLE_PREFIXES)) and (dtype == np.bool):
+                    continue
+                # For bool type control models, use int32 as I/O types
+                if dtype == np.bool:
+                    dtype = np.int32
+
                 self.clear_deferred_exceptions()
 
                 precreated_shm0_handles = self.precreate_register_regions(
@@ -1093,15 +1102,6 @@ class SequenceBatcherTest(su.SequenceBatcherTestUtil):
                 precreated_shm3_handles = self.precreate_register_regions(
                     (1111, 1112, 1113), dtype, 3, tensor_shape=(3,))
                 try:
-                    model_name = tu.get_sequence_model_name(trial, dtype)
-                    # Skip bool type ensemble models
-                    if (any(word in trial for word in ENSEMBLE_PREFIXES)) and (
-                            'bool' in model_name):
-                        continue
-                    # For bool type control models, use int32 as I/O types
-                    if dtype == np.bool:
-                        dtype = np.int32
-
                     self.check_setup(model_name)
 
                     # Need scheduler to wait for queue to contain all
@@ -1226,6 +1226,15 @@ class SequenceBatcherTest(su.SequenceBatcherTestUtil):
         for trial in _trials:
             dtypes = self.get_datatype(trial)
             for dtype in dtypes:
+                model_name = tu.get_sequence_model_name(trial, dtype)
+                # Skip bool type ensemble models
+                if (any(word in trial
+                        for word in ENSEMBLE_PREFIXES)) and (dtype == np.bool):
+                    continue
+                # For bool type control models, use int32 as I/O types
+                if dtype == np.bool:
+                    dtype = np.int32
+
                 self.clear_deferred_exceptions()
 
                 precreated_shm0_handles = self.precreate_register_regions(
@@ -1240,15 +1249,6 @@ class SequenceBatcherTest(su.SequenceBatcherTestUtil):
                     (11111, 11112, 11113), dtype, 4)
 
                 try:
-                    model_name = tu.get_sequence_model_name(trial, dtype)
-                    # Skip bool type ensemble models
-                    if (any(word in trial for word in ENSEMBLE_PREFIXES)) and (
-                            'bool' in model_name):
-                        continue
-                    # For bool type control models, use int32 as I/O types
-                    if dtype == np.bool:
-                        dtype = np.int32
-
                     self.check_setup(model_name)
 
                     # Need scheduler to wait for queue to contain all
@@ -1399,6 +1399,15 @@ class SequenceBatcherTest(su.SequenceBatcherTestUtil):
         for trial in _trials:
             dtypes = self.get_datatype(trial)
             for dtype in dtypes:
+                model_name = tu.get_sequence_model_name(trial, dtype)
+                # Skip bool type ensemble models
+                if (any(word in trial
+                        for word in ENSEMBLE_PREFIXES)) and (dtype == np.bool):
+                    continue
+                # For bool type control models, use int32 as I/O types
+                if dtype == np.bool:
+                    dtype = np.int32
+
                 self.clear_deferred_exceptions()
 
                 precreated_shm0_handles = self.precreate_register_regions(
@@ -1415,15 +1424,6 @@ class SequenceBatcherTest(su.SequenceBatcherTestUtil):
                     (22222,), dtype, 5)
 
                 try:
-                    model_name = tu.get_sequence_model_name(trial, dtype)
-                    # Skip bool type ensemble models
-                    if (any(word in trial for word in ENSEMBLE_PREFIXES)) and (
-                            'bool' in model_name):
-                        continue
-                    # For bool type control models, use int32 as I/O types
-                    if dtype == np.bool:
-                        dtype = np.int32
-
                     self.check_setup(model_name)
 
                     # Need scheduler to wait for queue to contain all
@@ -1593,6 +1593,15 @@ class SequenceBatcherTest(su.SequenceBatcherTestUtil):
         for trial in _trials:
             dtypes = self.get_datatype(trial)
             for dtype in dtypes:
+                model_name = tu.get_sequence_model_name(trial, dtype)
+                # Skip bool type ensemble models
+                if (any(word in trial
+                        for word in ENSEMBLE_PREFIXES)) and (dtype == np.bool):
+                    continue
+                # For bool type control models, use int32 as I/O types
+                if dtype == np.bool:
+                    dtype = np.int32
+
                 self.clear_deferred_exceptions()
 
                 precreated_shm0_handles = self.precreate_register_regions(
@@ -1609,15 +1618,6 @@ class SequenceBatcherTest(su.SequenceBatcherTestUtil):
                     (22222, 22223, 22224), dtype, 5)
 
                 try:
-                    model_name = tu.get_sequence_model_name(trial, dtype)
-                    # Skip bool type ensemble models
-                    if (any(word in trial for word in ENSEMBLE_PREFIXES)) and (
-                            'bool' in model_name):
-                        continue
-                    # For bool type control models, use int32 as I/O types
-                    if dtype == np.bool:
-                        dtype = np.int32
-
                     self.check_setup(model_name)
 
                     # Need scheduler to wait for queue to contain all
@@ -1789,6 +1789,15 @@ class SequenceBatcherTest(su.SequenceBatcherTestUtil):
         for trial in _trials:
             dtypes = self.get_datatype(trial)
             for dtype in dtypes:
+                model_name = tu.get_sequence_model_name(trial, dtype)
+                # Skip bool type ensemble models
+                if (any(word in trial
+                        for word in ENSEMBLE_PREFIXES)) and (dtype == np.bool):
+                    continue
+                # For bool type control models, use int32 as I/O types
+                if dtype == np.bool:
+                    dtype = np.int32
+
                 self.clear_deferred_exceptions()
 
                 precreated_shm0_handles = self.precreate_register_regions(
@@ -1803,15 +1812,6 @@ class SequenceBatcherTest(su.SequenceBatcherTestUtil):
                     (11111, 11113), dtype, 4)
 
                 try:
-                    model_name = tu.get_sequence_model_name(trial, dtype)
-                    # Skip bool type ensemble models
-                    if (any(word in trial for word in ENSEMBLE_PREFIXES)) and (
-                            'bool' in model_name):
-                        continue
-                    # For bool type control models, use int32 as I/O types
-                    if dtype == np.bool:
-                        dtype = np.int32
-
                     self.check_setup(model_name)
 
                     # Need scheduler to wait for queue to contain all
@@ -1971,6 +1971,15 @@ class SequenceBatcherTest(su.SequenceBatcherTestUtil):
         for trial in _trials:
             dtypes = self.get_datatype(trial)
             for dtype in dtypes:
+                model_name = tu.get_sequence_model_name(trial, dtype)
+                # Skip bool type ensemble models
+                if (any(word in trial
+                        for word in ENSEMBLE_PREFIXES)) and (dtype == np.bool):
+                    continue
+                # For bool type control models, use int32 as I/O types
+                if dtype == np.bool:
+                    dtype = np.int32
+
                 self.clear_deferred_exceptions()
 
                 precreated_shm0_handles = self.precreate_register_regions(
@@ -1984,15 +1993,6 @@ class SequenceBatcherTest(su.SequenceBatcherTestUtil):
                 precreated_shm4_handles = self.precreate_register_regions(
                     (11111, 11113), dtype, 4)
                 try:
-                    model_name = tu.get_sequence_model_name(trial, dtype)
-                    # Skip bool type ensemble models
-                    if (any(word in trial for word in ENSEMBLE_PREFIXES)) and (
-                            'bool' in model_name):
-                        continue
-                    # For bool type control models, use int32 as I/O types
-                    if dtype == np.bool:
-                        dtype = np.int32
-
                     self.check_setup(model_name)
 
                     # Need scheduler to wait for queue to contain all
@@ -2143,6 +2143,15 @@ class SequenceBatcherTest(su.SequenceBatcherTestUtil):
         for trial in _trials:
             dtypes = self.get_datatype(trial)
             for dtype in dtypes:
+                model_name = tu.get_sequence_model_name(trial, dtype)
+                # Skip bool type ensemble models
+                if (any(word in trial
+                        for word in ENSEMBLE_PREFIXES)) and (dtype == np.bool):
+                    continue
+                # For bool type control models, use int32 as I/O types
+                if dtype == np.bool:
+                    dtype = np.int32
+
                 self.clear_deferred_exceptions()
 
                 precreated_shm0_handles = self.precreate_register_regions(
@@ -2156,15 +2165,6 @@ class SequenceBatcherTest(su.SequenceBatcherTestUtil):
                 precreated_shm4_handles = self.precreate_register_regions(
                     (11111, 11113), dtype, 4)
                 try:
-                    model_name = tu.get_sequence_model_name(trial, dtype)
-                    # Skip bool type ensemble models
-                    if (any(word in trial for word in ENSEMBLE_PREFIXES)) and (
-                            'bool' in model_name):
-                        continue
-                    # For bool type control models, use int32 as I/O types
-                    if dtype == np.bool:
-                        dtype = np.int32
-
                     self.check_setup(model_name)
 
                     # Need scheduler to wait for queue to contain all
@@ -2331,6 +2331,11 @@ class SequenceBatcherTest(su.SequenceBatcherTestUtil):
 
             dtypes = self.get_datatype(trial)
             for dtype in dtypes:
+                model_name = tu.get_sequence_model_name(trial, dtype)
+                # For bool type control models, use int32 as I/O types
+                if dtype == np.bool:
+                    dtype = np.int32
+
                 self.clear_deferred_exceptions()
 
                 precreated_shm0_handles = self.precreate_register_regions(
@@ -2338,11 +2343,6 @@ class SequenceBatcherTest(su.SequenceBatcherTestUtil):
                 precreated_shm1_handles = self.precreate_register_regions(
                     (11, 12), dtype, 1)
                 try:
-                    model_name = tu.get_sequence_model_name(trial, dtype)
-                    # For bool type control models, use int32 as I/O types
-                    if dtype == np.bool:
-                        dtype = np.int32
-
                     self.check_setup(model_name)
 
                     # Need scheduler to wait for queue to contain 2 sequences.
@@ -2430,6 +2430,11 @@ class SequenceBatcherTest(su.SequenceBatcherTestUtil):
 
             dtypes = self.get_datatype(trial)
             for dtype in dtypes:
+                model_name = tu.get_sequence_model_name(trial, dtype) + "_half"
+                # For bool type control models, use int32 as I/O types
+                if dtype == np.bool:
+                    dtype = np.int32
+
                 self.clear_deferred_exceptions()
 
                 precreated_shm0_handles = self.precreate_register_regions(
@@ -2437,12 +2442,6 @@ class SequenceBatcherTest(su.SequenceBatcherTestUtil):
                 precreated_shm1_handles = self.precreate_register_regions(
                     (11, 12), dtype, 1)
                 try:
-                    model_name = tu.get_sequence_model_name(trial,
-                                                            dtype) + "_half"
-                    # For bool type control models, use int32 as I/O types
-                    if dtype == np.bool:
-                        dtype = np.int32
-
                     self.check_setup(model_name)
 
                     # Need scheduler to wait for queue to contain 2 sequences.
@@ -2529,6 +2528,11 @@ class SequenceBatcherTest(su.SequenceBatcherTestUtil):
 
             dtypes = self.get_datatype(trial)
             for dtype in dtypes:
+                model_name = tu.get_sequence_model_name(trial, dtype) + "_full"
+                # For bool type control models, use int32 as I/O types
+                if dtype == np.bool:
+                    dtype = np.int32
+
                 self.clear_deferred_exceptions()
 
                 precreated_shm0_handles = self.precreate_register_regions(
@@ -2536,12 +2540,6 @@ class SequenceBatcherTest(su.SequenceBatcherTestUtil):
                 precreated_shm1_handles = self.precreate_register_regions(
                     (11, 12), dtype, 1)
                 try:
-                    model_name = tu.get_sequence_model_name(trial,
-                                                            dtype) + "_full"
-                    # For bool type control models, use int32 as I/O types
-                    if dtype == np.bool:
-                        dtype = np.int32
-
                     self.check_setup(model_name)
 
                     # Need scheduler to wait for queue to contain 2 sequences.
