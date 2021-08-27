@@ -120,8 +120,7 @@ RateLimiter::InitializePayloadQueues(const TritonModelInstance* instance)
       max_queue_delay_microseconds =
           batcher_config.oldest().max_queue_delay_microseconds();
     } else {
-      max_queue_delay_microseconds =
-          batcher_config.direct().max_queue_delay_microseconds();
+      max_queue_delay_microseconds = 0;
     }
   } else if (config.has_dynamic_batching()) {
     max_queue_delay_microseconds =
