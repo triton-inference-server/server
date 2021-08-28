@@ -93,15 +93,25 @@ for MODEL in $MODELS; do
         sed -i "s/kind: KIND_CPU/kind: KIND_CPU\\ncount: 2/" config.pbtxt)
 done
 
+MODELS=""
 for BACKEND in $BACKENDS; do
-    cp -r $DATADIR/qa_identity_model_repository/${BACKEND}_nobatch_zero_1_float32 \
-      $MODEL_DIR/.
+    MODELS="$MODELS $DATADIR/qa_identity_model_repository/${BACKEND}_nobatch_zero_1_float32"
+done
+
+for MODEL in $MODELS; do
+    cp -r $MODEL $MODEL_DIR/. && \
+      (cd $MODEL_DIR/$(basename $MODEL) && \
+        echo "parameters [" >> config.pbtxt && \
+        echo "{ key: \"execute_delay_ms\"; value: { string_value: \"1000\" }}" >> config.pbtxt && \
+        echo "]" >> config.pbtxt)
 done
 
 cp -r $DATADIR/tf_model_store/resnet_v1_50_graphdef $MODEL_DIR/resnet_v1_50_graphdef_def && \
   (cd $MODEL_DIR/resnet_v1_50_graphdef_def && \
     sed -i 's/^name: "resnet_v1_50_graphdef"/name: "resnet_v1_50_graphdef_def"/' config.pbtxt && \
     echo "optimization { }" >> config.pbtxt)
+
+python -m pip install -U prettytable
 
 SERVER_ARGS="--model-repository=`pwd`/$MODEL_DIR"
 SERVER_LOG="./serverlog"
@@ -128,6 +138,11 @@ if [ $RET -eq 0 ]; then
 else
     cat $CLIENT_LOG
     echo -e "\n***\n*** Test FAILED\n***"
+fi
+
+# Run only if both TRITON_FROM and TRITON_TO_DL are set
+if [[ ! -z "$TRITON_FROM" ]] || [[ ! -z "$TRITON_TO_DL" ]]; then
+    python stress_mail.py
 fi
 
 exit $RET
