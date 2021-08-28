@@ -28,7 +28,7 @@ import sys
 sys.path.append("../common")
 
 import numpy as np
-import multiprocessing
+from multiprocessing import Process, Value, shared_memory
 import time
 import test_util as tu
 import argparse
@@ -38,8 +38,9 @@ from tritonclientutils import np_to_triton_dtype
 
 def crashing_client(model_name,
                     dtype,
+                    shm_name,
                     triton_client,
-                    tensor_shape=(1,),
+                    tensor_shape=(1000,),
                     input_name="INPUT0"):
     in0 = np.random.random(tensor_shape).astype(dtype)
     if "libtorch" in model_name:
@@ -54,6 +55,10 @@ def crashing_client(model_name,
     # the inference will not have completed when being terminated.
     while True:
         results = triton_client.infer(model_name, inputs)
+        existing_shm = shared_memory.SharedMemory(shm_name)
+        count = np.ndarray((1,), dtype=np.int32, buffer=existing_shm.buf)
+        count[0] += 1
+        existing_shm.close()
 
 
 if __name__ == '__main__':
@@ -64,30 +69,40 @@ if __name__ == '__main__':
                         required=True,
                         help='Set trial for the crashing client')
     FLAGS = parser.parse_args()
-
     trial = FLAGS.trial
+
     dtype = np.float32
     model_name = tu.get_zero_model_name(trial, 1, dtype)
 
     triton_client = grpcclient.InferenceServerClient(url="localhost:8001",
                                                      verbose=True)
 
-    p = multiprocessing.Process(target=crashing_client,
-                                name="crashing_client",
-                                args=(
-                                    model_name,
-                                    dtype,
-                                    triton_client,
-                                ))
+    shm = shared_memory.SharedMemory(create=True, size=8)
+    count = np.ndarray((1,), dtype=np.int32, buffer=shm.buf)
+    count[0] = 0
+
+    p = Process(target=crashing_client,
+                name="crashing_client",
+                args=(
+                    model_name,
+                    dtype,
+                    shm.name,
+                    triton_client,
+                ))
 
     p.start()
 
-    # Terminate the client after 5 seconds
-    time.sleep(5)
+    # Terminate the client after 3 seconds
+    time.sleep(3)
     p.terminate()
 
     # Cleanup
     p.join()
+
+    print("request_count:", count[0])
+
+    shm.close()
+    shm.unlink()
 
     if not triton_client.is_server_live():
         sys.exit(1)
