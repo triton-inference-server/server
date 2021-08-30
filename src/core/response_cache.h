@@ -30,10 +30,10 @@
 #include <string>
 #include <unordered_map>
 
-#include "src/core/status.h"
 #include "src/core/backend.h"
 #include "src/core/infer_request.h"
 #include "src/core/infer_response.h"
+#include "src/core/status.h"
 
 #include <boost/functional/hash.hpp>
 #include <boost/interprocess/managed_external_buffer.hpp>
@@ -41,69 +41,69 @@
 namespace nvidia { namespace inferenceserver {
 
 struct Output {
-    // Output tensor data buffer
-    void* buffer;
-    // Size of "buffer" above
-    uint64_t size;
-    // Name of the output
-    std::string name;
-    // Datatype of the output
-    inference::DataType dtype;
-    // Shape of the output
-    std::vector<int64_t> shape;
-    // Type of memory used to store buffer
-    TRITONSERVER_MemoryType memory_type;
-    // ID of memory type used to store buffer
-    uint64_t memory_type_id;
+  // Output tensor data buffer
+  void* buffer;
+  // Size of "buffer" above
+  uint64_t size;
+  // Name of the output
+  std::string name;
+  // Datatype of the output
+  inference::DataType dtype;
+  // Shape of the output
+  std::vector<int64_t> shape;
+  // Type of memory used to store buffer
+  TRITONSERVER_MemoryType memory_type;
+  // ID of memory type used to store buffer
+  uint64_t memory_type_id;
 };
 
 struct CacheEntry {
-    explicit CacheEntry() {}
-    // Point to key in LRU list for maintaining LRU order
-    std::list<uint64_t>::iterator lru_iter;
-    // each output buffer = managed_buffer.allocate(size, ...)
-    std::vector<Output> outputs;
-    // sum of output sizes
-    uint64_t size;
+  explicit CacheEntry() {}
+  // Point to key in LRU list for maintaining LRU order
+  std::list<uint64_t>::iterator lru_iter;
+  // each output buffer = managed_buffer.allocate(size, ...)
+  std::vector<Output> outputs;
+  // sum of output sizes
+  uint64_t size;
 };
 
 class RequestResponseCache {
-    public:
-        RequestResponseCache(const uint64_t cache_size);
-        ~RequestResponseCache();
-        // Hash inference request to access cache and store it in "key"
-        // Return Status object indicating success or failure.
-        Status Hash(const InferenceRequest& request, uint64_t* key);
-        // Lookup 'key' in cache and return the inference response in 'ptr' on cache hit or nullptr on cache miss
-        // Return Status object indicating success or failure.
-        Status Lookup(const uint64_t key, InferenceResponse* ptr);
-        // Insert response into cache, evict entries to make space if necessary
-        // Return Status object indicating success or failure.
-        Status Insert(const uint64_t key, const InferenceResponse& response);
-        // Evict entry from cache based on policy
-        // Return Status object indicating success or failure.
-        Status Evict();
+ public:
+  RequestResponseCache(const uint64_t cache_size);
+  ~RequestResponseCache();
+  // Hash inference request to access cache and store it in "key"
+  // Return Status object indicating success or failure.
+  Status Hash(const InferenceRequest& request, uint64_t* key);
+  // Lookup 'key' in cache and return the inference response in 'ptr' on cache
+  // hit or nullptr on cache miss Return Status object indicating success or
+  // failure.
+  Status Lookup(const uint64_t key, InferenceResponse* ptr);
+  // Insert response into cache, evict entries to make space if necessary
+  // Return Status object indicating success or failure.
+  Status Insert(const uint64_t key, const InferenceResponse& response);
+  // Evict entry from cache based on policy
+  // Return Status object indicating success or failure.
+  Status Evict();
+  // Returns number of items in cache
+  size_t size() { return cache_.size(); }
 
-    private:
-        // Cache buffer
-        void* buffer_;
-        // Managed buffer
-        boost::interprocess::managed_external_buffer managed_buffer_;
-        // Total size of cache, will evict if a new item will exceed the total/available size
-        uint64_t total_size_;
-        // Remaining size left in cache, updated on insertion and eviction
-        uint64_t available_size_;
-        // key -> CacheEntry containing values and list iterator for LRU management
-        std::unordered_map<uint64_t, CacheEntry> cache_;
-        // list of keys sorted from most to least recently used
-        std::list<uint64_t> lru_;
+ private:
+  // Cache buffer
+  void* buffer_;
+  // Managed buffer
+  boost::interprocess::managed_external_buffer managed_buffer_;
+  // key -> CacheEntry containing values and list iterator for LRU management
+  std::unordered_map<uint64_t, CacheEntry> cache_;
+  // list of keys sorted from most to least recently used
+  std::list<uint64_t> lru_;
 
-        // Update LRU ordering on lookup
-        void UpdateLRU(std::unordered_map<uint64_t, CacheEntry>::iterator&);
-        // Build CacheEntry from InferenceResponse
-        Status BuildCacheEntry(CacheEntry& entry, const InferenceResponse& response);
-        // Build InferenceResponse from CacheEntry
-        Status BuildInferenceResponse(const CacheEntry& entry, InferenceResponse* response);
+  // Update LRU ordering on lookup
+  void UpdateLRU(std::unordered_map<uint64_t, CacheEntry>::iterator&);
+  // Build CacheEntry from InferenceResponse
+  Status BuildCacheEntry(CacheEntry& entry, const InferenceResponse& response);
+  // Build InferenceResponse from CacheEntry
+  Status BuildInferenceResponse(
+      const CacheEntry& entry, InferenceResponse* response);
 };
 
 }}  // namespace nvidia::inferenceserver
