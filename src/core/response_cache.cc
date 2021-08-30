@@ -27,6 +27,12 @@
 #include "src/core/response_cache.h"
 #include "src/core/logging.h"
 
+// TODO: Figure out how to use Triton log macros in unit test
+#define DEBUG(x)                               \
+  do {                                         \
+    std::cerr << "[DEBUG] " << x << std::endl; \
+  } while (0)
+
 namespace nvidia { namespace inferenceserver {
 
 RequestResponseCache::RequestResponseCache(const uint64_t size)
@@ -113,8 +119,6 @@ RequestResponseCache::Lookup(const uint64_t key, InferenceResponse* ptr)
   if (iter == cache_.end()) {
     return Status(Status::Code::INTERNAL, "key not found in cache");
   }
-  // Update this key to front of LRU list
-  UpdateLRU(iter);
   // Populate passed-in "ptr" from cache entry
   auto entry = iter->second;
   // Build InferenceResponse from CacheEntry
@@ -122,6 +126,9 @@ RequestResponseCache::Lookup(const uint64_t key, InferenceResponse* ptr)
   if (!status.IsOk()) {
     return status;
   }
+
+  // Update this key to front of LRU list
+  UpdateLRU(iter);
 
   return Status::Success;
 }
@@ -133,8 +140,11 @@ RequestResponseCache::Insert(
   // Exit early if key already exists in cache
   auto iter = cache_.find(key);
   if (iter != cache_.end()) {
-    return Status(Status::Code::INTERNAL, "key already exists in cache");
+    return Status(
+        Status::Code::INTERNAL,
+        "key [" + std::to_string(key) + "] already exists in cache");
   }
+
   // Construct cache entry from response
   auto entry = CacheEntry();
   auto status = BuildCacheEntry(entry, response);
@@ -142,16 +152,8 @@ RequestResponseCache::Insert(
     return status;
   }
 
-  // If cache doesn't have room for new entry, evict until enough size is
-  // available
-  while (entry.size > managed_buffer_.get_free_memory()) {
-    auto status = Evict();
-    // If evict fails for some reason, exit with its failure status
-    if (!status.IsOk()) {
-      return status;
-    }
-  }
   // Insert entry into cache
+  DEBUG("Inserting key [" + std::to_string(key) + "] into cache.");
   auto cache_pair = cache_.insert({key, entry});
   bool ok = cache_pair.second;
   // Exit early if cache insertion failed
@@ -197,10 +199,18 @@ RequestResponseCache::BuildCacheEntry(
     }
 
     // Exit early if cache entry will be larger than available cache size
-    if (response_byte_size > managed_buffer_.get_free_memory()) {
+    if (response_byte_size > managed_buffer_.get_size()) {
       return Status(
           Status::Code::INTERNAL,
-          "Cache entry is larger than available cache size");
+          "Cache entry is larger than total cache size");
+    }
+
+    // If cache doesn't enough space, evict until enough is available
+    while (response_byte_size > managed_buffer_.get_free_memory()) {
+      status = Evict();
+      if (!status.IsOk()) {
+        return status;
+      }
     }
 
     // Set output metadata
@@ -283,6 +293,8 @@ RequestResponseCache::Evict()
 {
   // Least recently used key in back of LRU list
   uint64_t lru_key = lru_.back();
+  DEBUG("Evicting key [" + std::to_string(lru_key) + "] from cache.");
+
   // Find cache entry for least recently used key
   auto iter = cache_.find(lru_key);
   // Error check if key isn't in cache, but this shouldn't happen in evict
@@ -290,8 +302,9 @@ RequestResponseCache::Evict()
   if (iter == cache_.end()) {
     return Status(
         Status::Code::INTERNAL,
-        "key not found in cache during eviction: this indicates a bug in the "
-        "code");
+        "key [" + std::to_string(lru_key) +
+            "] not found in cache during eviction: this indicates a bug in the "
+            "code");
   }
   // Get size of cache entry being evicted to update available size
   auto entry = iter->second;
@@ -304,6 +317,9 @@ RequestResponseCache::Evict()
   cache_.erase(lru_key);
   // Remove LRU key from LRU list
   lru_.pop_back();
+  // Increment number of evictions
+  num_evictions_++;
+
   return Status::Success;
 }
 

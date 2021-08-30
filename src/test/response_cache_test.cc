@@ -28,7 +28,6 @@
 #include "src/core/memory.h"
 #include "src/core/response_cache.h"
 
-
 namespace ni = nvidia::inferenceserver;
 
 /* Mock classes for Unit Testing */
@@ -220,8 +219,8 @@ InferenceResponse::Output::AllocateDataBuffer(
     return Status(
         Status::Code::INTERNAL, "buffer was nullptr in AllocateDataBuffer");
   }
-  // TODO: look into memory management here with valgrind
-  std::cout << "Malloc'ing allocated_buffer_ for output" << std::endl;
+
+  // Allocate buffer to copy to
   allocated_buffer_ = malloc(buffer_byte_size);
   if (allocated_buffer_ == nullptr) {
     return Status(
@@ -230,9 +229,6 @@ InferenceResponse::Output::AllocateDataBuffer(
   }
 
   // Set relevant member variables for DataBuffer() to return
-  // TODO: Confirm this is working, we don't alloc memory for this buffer
-  std::cout << "Memcpying from cache buffer to response output buffer"
-            << std::endl;
   std::memcpy(allocated_buffer_, *buffer, buffer_byte_size);
   allocated_buffer_byte_size_ = buffer_byte_size;
   allocated_memory_type_ = *memory_type;
@@ -289,8 +285,17 @@ check_status(ni::Status status)
   }
 }
 
+void
+cache_stats(const ni::RequestResponseCache& cache)
+{
+  std::cout << "Cache entries:" << cache.num_entries() << std::endl;
+  std::cout << "Cache free bytes:" << cache.free_bytes() << std::endl;
+  std::cout << "Cache alloc'd bytes:" << cache.allocated_bytes() << std::endl;
+  std::cout << "Cache total bytes:" << cache.total_bytes() << std::endl;
+}
+
 // Test hashing for consistency on same request
-TEST_F(RequestResponseCacheTest, TestRequestHashing)
+TEST_F(RequestResponseCacheTest, TestHashing)
 {
   // Create cache
   std::cout << "Create cache" << std::endl;
@@ -308,26 +313,25 @@ TEST_F(RequestResponseCacheTest, TestRequestHashing)
   ni::InferenceRequest request1(backend, model_version);
   ni::InferenceRequest request2(backend, model_version);
 
-  // Create input
+  // Create inputs
   std::cout << "Create inputs" << std::endl;
   inference::DataType dtype = inference::DataType::TYPE_INT32;
   std::vector<int64_t> shape{1, 4};
   ni::InferenceRequest::Input* input0 = nullptr;
   ni::InferenceRequest::Input* input1 = nullptr;
   ni::InferenceRequest::Input* input2 = nullptr;
-  // Add input to request
+  // Add input to requests
   std::cout << "Add input to request" << std::endl;
   request0.AddOriginalInput("input", dtype, shape, &input0);
   request1.AddOriginalInput("input", dtype, shape, &input1);
   request2.AddOriginalInput("input", dtype, shape, &input2);
   assert(input0 != nullptr);
   // Add data to input
-  // TODO: Use vectors and vector.data() / vector.size() / etc.
   int data0[4] = {1, 2, 3, 4};
   int data1[4] = {5, 6, 7, 8};
   int data2[4] = {5, 6, 7, 8};
   TRITONSERVER_MemoryType memory_type = TRITONSERVER_MEMORY_CPU;
-  int64_t memory_type_id = 0;  // TODO
+  int64_t memory_type_id = 0;
   uint64_t input_size = sizeof(int) * 4;
   input0->AppendData(data0, input_size, memory_type, memory_type_id);
   input1->AppendData(data1, input_size, memory_type, memory_type_id);
@@ -340,7 +344,7 @@ TEST_F(RequestResponseCacheTest, TestRequestHashing)
   ni::Status status1 = cache.Hash(request1, &hash1);
   ni::Status status2 = cache.Hash(request2, &hash2);
   if (!status0.IsOk() || !status1.IsOk() || !status2.IsOk()) {
-    assert(false);  // TODO
+    assert(false);
   }
 
   std::cout << "hash0: " << hash0 << std::endl;
@@ -350,6 +354,32 @@ TEST_F(RequestResponseCacheTest, TestRequestHashing)
   assert(hash0 != hash1);
   // Same input data should have same hashes
   assert(hash1 == hash2);
+}
+
+// Test cache too small for entry
+TEST_F(RequestResponseCacheTest, TestCacheTooSmall)
+{
+  // Create cache
+  std::cout << "Create cache" << std::endl;
+  uint64_t cache_size = 1024;
+  ni::RequestResponseCache cache(cache_size);
+
+  // Create backend
+  std::cout << "Create backend" << std::endl;
+  ni::InferenceBackend* backend = nullptr;
+  const uint64_t model_version = 1;
+
+  // Create request
+  std::cout << "Create request" << std::endl;
+  ni::InferenceRequest request0(backend, model_version);
+
+  inference::DataType dtype = inference::DataType::TYPE_INT32;
+  std::vector<int64_t> shape{1, 4};
+  TRITONSERVER_MemoryType memory_type = TRITONSERVER_MEMORY_CPU;
+  int64_t memory_type_id = 0;
+
+  // Fake hashes to input same response to cache repeatedly
+  uint64_t hash0 = 0;
 
   std::cout << "Create response object" << std::endl;
   std::unique_ptr<ni::InferenceResponse> response0;
@@ -358,8 +388,153 @@ TEST_F(RequestResponseCacheTest, TestRequestHashing)
 
   std::cout << "Add output metadata to response object" << std::endl;
   ni::InferenceResponse::Output* response_output = nullptr;
-  uint64_t output_size = input_size;
+  // Explicitly create output buffer larger than entire cache
+  std::vector<int> output0(1025, 0);
+  uint64_t output_size = sizeof(int) * output0.size();
+  std::cout << "Output size: " << output_size << std::endl;
+  status = response0->AddOutput("output", dtype, shape, &response_output);
+  check_status(status);
+
+  std::cout << "Allocate output data buffer for response object" << std::endl;
+  void* vp = output0.data();
+  status = response_output->AllocateDataBuffer(
+      &vp, output_size, &memory_type, &memory_type_id);
+  check_status(status);
+
+  std::cout << "Insert response into cache with hash0" << std::endl;
+  status = cache.Insert(hash0, *response0);
+  // We expect insertion to fail here since cache is too small
+  std::cout << status.Message() << std::endl;
+  assert(!status.IsOk());
+}
+
+// TODO: Understand why managed buffer allocates more memory than requested
+// TODO: Understand minimum size requirement for managed buffer
+// Test hashing for consistency on same request
+TEST_F(RequestResponseCacheTest, TestEviction)
+{
+  // Create cache
+  std::cout << "Create cache" << std::endl;
+  uint64_t cache_size = 1024;
+  ni::RequestResponseCache cache(cache_size);
+
+  // Create backend
+  std::cout << "Create backend" << std::endl;
+  ni::InferenceBackend* backend = nullptr;
+  const uint64_t model_version = 1;
+
+  // Create request
+  std::cout << "Create request" << std::endl;
+  ni::InferenceRequest request0(backend, model_version);
+
+  inference::DataType dtype = inference::DataType::TYPE_INT32;
+  std::vector<int64_t> shape{1, 4};
+  TRITONSERVER_MemoryType memory_type = TRITONSERVER_MEMORY_CPU;
+  int64_t memory_type_id = 0;
+
+  // Fake hashes to input same response to cache repeatedly
+  uint64_t hash0 = 0;
+  uint64_t hash1 = 1;
+  uint64_t hash2 = 2;
+  uint64_t hash3 = 3;
+
+  std::cout << "Create response object" << std::endl;
+  std::unique_ptr<ni::InferenceResponse> response0;
+  ni::Status status = request0.ResponseFactory().CreateResponse(&response0);
+  check_status(status);
+
+  std::cout << "Add output metadata to response object" << std::endl;
+  ni::InferenceResponse::Output* response_output = nullptr;
+  std::vector<int> output0(100, 0);
+  uint64_t output_size = sizeof(int) * output0.size();
+  std::cout << "Output size: " << output_size << std::endl;
+  status = response0->AddOutput("output", dtype, shape, &response_output);
+  check_status(status);
+
+  std::cout << "Allocate output data buffer for response object" << std::endl;
+  void* vp = output0.data();
+  status = response_output->AllocateDataBuffer(
+      &vp, output_size, &memory_type, &memory_type_id);
+  check_status(status);
+
+  std::cout << "Lookup hash0 in empty cache" << std::endl;
+  status = cache.Lookup(hash0, nullptr);
+  // This hash not in cache yet
+  assert(!status.IsOk());
+  std::cout << "Insert response into cache with hash0" << std::endl;
+  status = cache.Insert(hash0, *response0);
+  check_status(status);
+  cache_stats(cache);
+  assert(cache.num_entries() == 1);
+  assert(cache.num_evictions() == 0);
+
+  status = cache.Insert(hash1, *response0);
+  check_status(status);
+  cache_stats(cache);
+  assert(cache.num_entries() == 2);
+  assert(cache.num_evictions() == 0);
+
+  status = cache.Insert(hash2, *response0);
+  check_status(status);
+  cache_stats(cache);
+  assert(cache.num_entries() == 2);
+  assert(cache.num_evictions() == 1);
+
+  status = cache.Insert(hash3, *response0);
+  check_status(status);
+  cache_stats(cache);
+  assert(cache.num_entries() == 2);
+  assert(cache.num_evictions() == 2);
+}
+
+
+// Test hashing for consistency on same request
+TEST_F(RequestResponseCacheTest, TestEndToEnd)
+{
+  // Create cache
+  std::cout << "Create cache" << std::endl;
+  uint64_t cache_size = 4 * 1024 * 1024;
+  ni::RequestResponseCache cache(cache_size);
+
+  // Create backend
+  std::cout << "Create backend" << std::endl;
+  ni::InferenceBackend* backend = nullptr;
+  const uint64_t model_version = 1;
+
+  // Create request
+  std::cout << "Create request" << std::endl;
+  ni::InferenceRequest request0(backend, model_version);
+
+  // Create input
+  std::cout << "Create inputs" << std::endl;
+  inference::DataType dtype = inference::DataType::TYPE_INT32;
+  std::vector<int64_t> shape{1, 4};
+  ni::InferenceRequest::Input* input0 = nullptr;
+  // Add input to request
+  std::cout << "Add input to request" << std::endl;
+  request0.AddOriginalInput("input", dtype, shape, &input0);
+  assert(input0 != nullptr);
+  // Add data to input
+  std::vector<int> data0 = {1, 2, 3, 4};
+  TRITONSERVER_MemoryType memory_type = TRITONSERVER_MEMORY_CPU;
+  int64_t memory_type_id = 0;
+  uint64_t input_size = sizeof(int) * data0.size();
+  input0->AppendData(data0.data(), input_size, memory_type, memory_type_id);
+
+  // Hash input request
+  uint64_t hash0;
+  ni::Status status0 = cache.Hash(request0, &hash0);
+  check_status(status0);
+
+  std::cout << "Create response object" << std::endl;
+  std::unique_ptr<ni::InferenceResponse> response0;
+  ni::Status status = request0.ResponseFactory().CreateResponse(&response0);
+  check_status(status);
+
+  std::cout << "Add output metadata to response object" << std::endl;
+  ni::InferenceResponse::Output* response_output = nullptr;
   std::vector<int> output0 = {2, 4, 6, 8};
+  uint64_t output_size = sizeof(int) * output0.size();
   std::cout << "Example InferenceResponse outputs:" << std::endl;
   for (const auto& output : output0) {
     std::cout << output << std::endl;
@@ -367,13 +542,10 @@ TEST_F(RequestResponseCacheTest, TestRequestHashing)
   status = response0->AddOutput("output", dtype, shape, &response_output);
   check_status(status);
 
-  // AllocateDataBuffer shouldn't modify the buffer arg, but it expects void**
-  // and not const void**, so we remove the const modifier
   std::cout << "Allocate output data buffer for response object" << std::endl;
   void* vp = output0.data();
-  void** vpp = &vp;
   status = response_output->AllocateDataBuffer(
-      vpp, output_size, &memory_type, &memory_type_id);
+      &vp, output_size, &memory_type, &memory_type_id);
   check_status(status);
 
   std::cout << "Lookup hash0 in empty cache" << std::endl;
@@ -385,9 +557,12 @@ TEST_F(RequestResponseCacheTest, TestRequestHashing)
   // Insertion should succeed
   check_status(status);
 
+  // Duplicate insertion should fail since key already exists
+  status = cache.Insert(hash0, *response0);
+  assert(!status.IsOk());
+
   // Create response to test cache lookup
   std::cout << "Create response object into fill from cache" << std::endl;
-  status = cache.Insert(hash0, *response0);
   std::unique_ptr<ni::InferenceResponse> response_test;
   status = request0.ResponseFactory().CreateResponse(&response_test);
   check_status(status);
@@ -398,9 +573,6 @@ TEST_F(RequestResponseCacheTest, TestRequestHashing)
   std::cout << "DEBUG: Checking lookup status" << std::endl;
   check_status(status);
 
-  // std::vector<int> output_test;
-  // response_test->DataBuffer(output_test.data(), output_size, memory_type,
-  // memory_type_id);
   // Fetch output buffer details
   const void* response_buffer = nullptr;
   size_t response_byte_size = 0;
@@ -423,12 +595,14 @@ TEST_F(RequestResponseCacheTest, TestRequestHashing)
   for (size_t i = 0; i < response_byte_size / sizeof(int); i++) {
     std::cout << output_test[i] << std::endl;
   }
-  std::cout << "Done!" << std::endl;
 
   // Simple Evict() test
-  assert(cache.size() == 1);
+  assert(cache.num_entries() == 1);
+  assert(cache.num_evictions() == 0);
   cache.Evict();
-  assert(cache.size() == 0);
+  assert(cache.num_entries() == 0);
+  assert(cache.num_evictions() == 1);
+  std::cout << "Done!" << std::endl;
 }
 
 }  // namespace

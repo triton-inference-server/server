@@ -44,7 +44,7 @@ struct Output {
   // Output tensor data buffer
   void* buffer;
   // Size of "buffer" above
-  uint64_t size;
+  uint64_t size = 0;
   // Name of the output
   std::string name;
   // Datatype of the output
@@ -64,7 +64,7 @@ struct CacheEntry {
   // each output buffer = managed_buffer.allocate(size, ...)
   std::vector<Output> outputs;
   // sum of output sizes
-  uint64_t size;
+  uint64_t size = 0;
 };
 
 class RequestResponseCache {
@@ -85,7 +85,19 @@ class RequestResponseCache {
   // Return Status object indicating success or failure.
   Status Evict();
   // Returns number of items in cache
-  size_t size() { return cache_.size(); }
+  size_t num_entries() const { return cache_.size(); }
+  // Returns number of items evicted in lifespan of cache
+  size_t num_evictions() const { return num_evictions_; }
+  // Returns total number of bytes allocated for cache
+  size_t total_bytes() const { return managed_buffer_.get_size(); }
+  // Returns number of free bytes in cache
+  size_t free_bytes() const { return managed_buffer_.get_free_memory(); }
+  // Returns number of bytes in use by cache
+  size_t allocated_bytes() const
+  {
+    return managed_buffer_.get_size() - managed_buffer_.get_free_memory();
+  }
+
 
  private:
   // Cache buffer
@@ -94,8 +106,10 @@ class RequestResponseCache {
   boost::interprocess::managed_external_buffer managed_buffer_;
   // key -> CacheEntry containing values and list iterator for LRU management
   std::unordered_map<uint64_t, CacheEntry> cache_;
-  // list of keys sorted from most to least recently used
+  // List of keys sorted from most to least recently used
   std::list<uint64_t> lru_;
+  // Track number of evictions
+  uint64_t num_evictions_ = 0;
 
   // Update LRU ordering on lookup
   void UpdateLRU(std::unordered_map<uint64_t, CacheEntry>::iterator&);
