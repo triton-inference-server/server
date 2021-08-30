@@ -1,0 +1,11 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  name: private-reg
+spec:
+  containers:
+  - name: private-reg-container
+    image: nvcr.io/nvidian/swdl/nginxplus:v1
+  imagePullSecrets:
+  - name: regcred
+

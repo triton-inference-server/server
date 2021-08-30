@@ -1,0 +1,11 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: triton-custom-metrics-api
+  namespace: monitoring
+spec:
+  selector:
+    app: triton-custom-metrics-apiserver
+  ports:
+  - port: 443
+    targetPort: 6443

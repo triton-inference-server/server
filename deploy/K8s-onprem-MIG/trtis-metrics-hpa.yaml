@@ -1,0 +1,20 @@
+apiVersion: autoscaling/v2beta1
+kind: HorizontalPodAutoscaler
+metadata:
+  name: trtis-metrics-app-hpa
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1beta1
+    kind: Deployment
+    name: tensorrt-inference-server
+  minReplicas: 1
+  maxReplicas: 3
+  metrics:
+  - type: Object
+    object:
+      target:
+        kind: Namespace
+        name: default
+      metricName: avg_time_queue_ms
+      targetValue: 3000m
+

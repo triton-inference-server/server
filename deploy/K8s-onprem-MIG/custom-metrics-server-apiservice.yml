@@ -1,0 +1,13 @@
+apiVersion: apiregistration.k8s.io/v1beta1
+kind: APIService
+metadata:
+  name: v1beta1.custom.metrics.k8s.io
+spec:
+  insecureSkipTLSVerify: true
+  group: custom.metrics.k8s.io
+  groupPriorityMinimum: 100
+  versionPriority: 100
+  service:
+    name: triton-custom-metrics-api
+    namespace: monitoring
+  version: v1beta1

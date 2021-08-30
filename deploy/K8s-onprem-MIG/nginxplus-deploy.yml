@@ -1,0 +1,20 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: nginxplus
+spec:
+  selector:
+    matchLabels:
+      app: nginxplus
+  replicas: 1
+  template:
+    metadata:
+      labels:
+        app: nginxplus
+    spec:
+      containers:
+      - name: nginxplus
+        image: nvcr.io/nvidian/swdl/nginxplus:v1
+        ports:
+        - containerPort: 80
+
