@@ -270,9 +270,12 @@ namespace {
 
 // Test Fixture
 class RequestResponseCacheTest : public ::testing::Test {
- protected:
-  void SetUp() override {}
-  void TearDown() override {}
+  protected:
+    void SetUp() override {}
+    void TearDown() override {}
+  public:
+    ni::InferenceBackend* backend = nullptr;
+    uint64_t model_version = 1;
 };
 
 // Helpers
@@ -301,11 +304,6 @@ TEST_F(RequestResponseCacheTest, TestHashing)
   std::cout << "Create cache" << std::endl;
   uint64_t cache_size = 4 * 1024 * 1024;
   ni::RequestResponseCache cache(cache_size);
-
-  // Create backend
-  std::cout << "Create backend" << std::endl;
-  ni::InferenceBackend* backend = nullptr;
-  const uint64_t model_version = 1;
 
   // Create request
   std::cout << "Create request" << std::endl;
@@ -364,11 +362,6 @@ TEST_F(RequestResponseCacheTest, TestCacheTooSmall)
   uint64_t cache_size = 1024;
   ni::RequestResponseCache cache(cache_size);
 
-  // Create backend
-  std::cout << "Create backend" << std::endl;
-  ni::InferenceBackend* backend = nullptr;
-  const uint64_t model_version = 1;
-
   // Create request
   std::cout << "Create request" << std::endl;
   ni::InferenceRequest request0(backend, model_version);
@@ -417,11 +410,6 @@ TEST_F(RequestResponseCacheTest, TestEviction)
   std::cout << "Create cache" << std::endl;
   uint64_t cache_size = 1024;
   ni::RequestResponseCache cache(cache_size);
-
-  // Create backend
-  std::cout << "Create backend" << std::endl;
-  ni::InferenceBackend* backend = nullptr;
-  const uint64_t model_version = 1;
 
   // Create request
   std::cout << "Create request" << std::endl;
@@ -495,11 +483,6 @@ TEST_F(RequestResponseCacheTest, TestEndToEnd)
   std::cout << "Create cache" << std::endl;
   uint64_t cache_size = 4 * 1024 * 1024;
   ni::RequestResponseCache cache(cache_size);
-
-  // Create backend
-  std::cout << "Create backend" << std::endl;
-  ni::InferenceBackend* backend = nullptr;
-  const uint64_t model_version = 1;
 
   // Create request
   std::cout << "Create request" << std::endl;
