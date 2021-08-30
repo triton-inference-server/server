@@ -291,10 +291,10 @@ check_status(ni::Status status)
 void
 cache_stats(const ni::RequestResponseCache& cache)
 {
-  std::cout << "Cache entries:" << cache.num_entries() << std::endl;
-  std::cout << "Cache free bytes:" << cache.free_bytes() << std::endl;
-  std::cout << "Cache alloc'd bytes:" << cache.allocated_bytes() << std::endl;
-  std::cout << "Cache total bytes:" << cache.total_bytes() << std::endl;
+  std::cout << "Cache entries: " << cache.num_entries() << std::endl;
+  std::cout << "Cache free bytes: " << cache.free_bytes() << std::endl;
+  std::cout << "Cache alloc'd bytes: " << cache.allocated_bytes() << std::endl;
+  std::cout << "Cache total bytes: " << cache.total_bytes() << std::endl;
 }
 
 // Test hashing for consistency on same request
@@ -384,7 +384,7 @@ TEST_F(RequestResponseCacheTest, TestCacheTooSmall)
   // Explicitly create output buffer larger than entire cache
   std::vector<int> output0(1025, 0);
   uint64_t output_size = sizeof(int) * output0.size();
-  std::cout << "Output size: " << output_size << std::endl;
+  std::cout << "Output size bytes: " << output_size << std::endl;
   status = response0->AddOutput("output", dtype, shape, &response_output);
   check_status(status);
 
@@ -410,6 +410,7 @@ TEST_F(RequestResponseCacheTest, TestEviction)
   std::cout << "Create cache" << std::endl;
   uint64_t cache_size = 1024;
   ni::RequestResponseCache cache(cache_size);
+  cache_stats(cache);
 
   // Create request
   std::cout << "Create request" << std::endl;
@@ -553,7 +554,6 @@ TEST_F(RequestResponseCacheTest, TestEndToEnd)
   std::cout << "Lookup hash0 in cache after insertion" << std::endl;
   status = cache.Lookup(hash0, response_test.get());
   // Lookup should now succeed
-  std::cout << "DEBUG: Checking lookup status" << std::endl;
   check_status(status);
 
   // Fetch output buffer details
