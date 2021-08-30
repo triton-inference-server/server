@@ -58,9 +58,9 @@ ARG VS_INSTALL_PATH_WP="C:\BuildTools"
 RUN powershell.exe Start-Process -FilePath vs_buildtools.exe -ArgumentList "--wait","--quiet","--norestart","--nocache","--installPath","%VS_INSTALL_PATH_WP%","--channelUri","C:\tmp\doesnotexist.chman","--add","Microsoft.VisualStudio.Workload.VCTools`;includeRecommended","--add","Microsoft.Component.MSBuild" -Wait -PassThru
 
 WORKDIR /
-# change back to https://github.com/microsoft/vcpkg.git
-# once b64 PR is merged: https://github.com/microsoft/vcpkg/pull/19447
-RUN git clone --depth=1 --single-branch -b libb64 https://github.com/9cvele3/vcpkg.git
+# vcpkg 2021.05.12 does not contain b64 port, so checking out master branch here
+# should be switched to next vcpkg tag when one is created
+RUN git clone --depth=1 --single-branch -b master https://github.com/microsoft/vcpkg.git
 WORKDIR /vcpkg
 RUN bootstrap-vcpkg.bat
 RUN vcpkg.exe update
