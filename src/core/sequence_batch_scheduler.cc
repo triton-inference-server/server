@@ -928,7 +928,7 @@ DirectSequenceBatch::NewPayload()
 {
   curr_payload_ =
       model_instance_->Model()->Server()->GetRateLimiter()->GetPayload(
-          RateLimiter::Payload::Operation::INFER_RUN, model_instance_);
+          Payload::Operation::INFER_RUN, model_instance_);
 }
 
 void
@@ -1157,9 +1157,8 @@ DirectSequenceBatch::BatcherThread(const int nice)
             queue.pop_front();
           }
 
-          if (curr_payload_->GetState() ==
-              RateLimiter::Payload::State::UNINITIALIZED) {
-            curr_payload_->SetState(RateLimiter::Payload::State::READY);
+          if (curr_payload_->GetState() == Payload::State::UNINITIALIZED) {
+            curr_payload_->SetState(Payload::State::READY);
           }
 
           // If the sequence has ended then attempt to refill the
@@ -1207,7 +1206,7 @@ DirectSequenceBatch::BatcherThread(const int nice)
       }
     }
 
-    if (curr_payload_->GetState() == RateLimiter::Payload::State::READY) {
+    if (curr_payload_->GetState() == Payload::State::READY) {
       // Run the backend...
       model_instance_->Model()->Server()->GetRateLimiter()->EnqueuePayload(
           model_instance_->Model(), curr_payload_);
