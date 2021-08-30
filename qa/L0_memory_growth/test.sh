@@ -183,70 +183,67 @@ done
 # Next perform a test that has unbound memory growth. Use the busy op model
 # with a high delay in order to force requests to sit in the queue, and result
 # in memory growth.
-# The busy op model causes PTX failures when running the CI.
-# Should be uncommented when it's ready for merging.
-# TODO Re-enable after PTX issues are resolved. 
-# BUSY_OP_TEST=busy_op_test.py
-# DELAY_CYCLES=2100000000
-# NUM_REQUESTS=100
+BUSY_OP_TEST=busy_op_test.py
+DELAY_CYCLES=2100000000
+NUM_REQUESTS=100
 
-# rm -rf test_repo && mkdir test_repo
-# cp -r ${DATADIR}/qa_custom_ops/tf_custom_ops/graphdef_busyop test_repo/
+rm -rf test_repo && mkdir test_repo
+cp -r ${DATADIR}/qa_custom_ops/tf_custom_ops/graphdef_busyop test_repo/
 
-# # Explicitly set library path so custom ops can find TF
-# LD_LIBRARY_PATH=/opt/tritonserver/backends/tensorflow1
-# SERVER_ARGS="--model-repository=`pwd`/test_repo"
-# SERVER_LD_PRELOAD="${DATADIR}/qa_custom_ops/tf_custom_ops/libbusyop.so"
+# Explicitly set library path so custom ops can find TF
+LD_LIBRARY_PATH=/opt/tritonserver/backends/tensorflow1
+SERVER_ARGS="--model-repository=`pwd`/test_repo"
+SERVER_LD_PRELOAD="${DATADIR}/qa_custom_ops/tf_custom_ops/libbusyop.so"
 
-# LEAKCHECK_LOG="test_busyop.valgrind.log"
-# MASSIF_LOG="test_busyop.massif"
-# GRAPH_LOG="memory_growth_busyop.log"
-# LEAKCHECK_ARGS="$LEAKCHECK_ARGS_BASE --massif-out-file=$MASSIF_LOG --max-threads=3000 --log-file=$LEAKCHECK_LOG"
-# SERVER_LOG="test_busyop.server.log"
-# CLIENT_LOG="test_busyop.client.log"
+LEAKCHECK_LOG="test_busyop.valgrind.log"
+MASSIF_LOG="test_busyop.massif"
+GRAPH_LOG="memory_growth_busyop.log"
+LEAKCHECK_ARGS="$LEAKCHECK_ARGS_BASE --massif-out-file=$MASSIF_LOG --max-threads=3000 --log-file=$LEAKCHECK_LOG"
+SERVER_LOG="test_busyop.server.log"
+CLIENT_LOG="test_busyop.client.log"
 
-# # Run server
-# run_server_leakcheck
-# if [ "$SERVER_PID" == "0" ]; then
-#     echo -e "\n***\n*** Failed to start $SERVER\n***"
-#     cat $SERVER_LOG
-#     exit 1
-# fi
+# Run server
+run_server_leakcheck
+if [ "$SERVER_PID" == "0" ]; then
+    echo -e "\n***\n*** Failed to start $SERVER\n***"
+    cat $SERVER_LOG
+    exit 1
+fi
 
-# set +e
+set +e
 
-# # Run the busy_op test
-# SECONDS=0
-# python $BUSY_OP_TEST -v -m graphdef_busyop -d $DELAY_CYCLES -n $NUM_REQUESTS > $CLIENT_LOG 2>&1
-# TEST_DURATION=$SECONDS
-# if [ $? -ne 0 ]; then
-#     cat $CLIENT_LOG
-#     echo -e "\n***\n*** Test graphdef_busyop Failed\n***"
-#     RET=1
-# fi
-# set -e
+# Run the busy_op test
+SECONDS=0
+python $BUSY_OP_TEST -v -m graphdef_busyop -d $DELAY_CYCLES -n $NUM_REQUESTS > $CLIENT_LOG 2>&1
+TEST_DURATION=$SECONDS
+if [ $? -ne 0 ]; then
+    cat $CLIENT_LOG
+    echo -e "\n***\n*** Test graphdef_busyop Failed\n***"
+    RET=1
+fi
+set -e
 
-# # Stop Server
-# kill $SERVER_PID
-# wait $SERVER_PID
+# Stop Server
+kill $SERVER_PID
+wait $SERVER_PID
 
-# set +e
+set +e
 
-# # Log test duration and the graph for memory growth
-# hrs=$(printf "%02d" $((TEST_DURATION / 3600)))
-# mins=$(printf "%02d" $(((TEST_DURATION / 60) % 60)))
-# secs=$(printf "%02d" $((TEST_DURATION % 60)))
-# echo -e "Test Duration: $hrs:$mins:$secs (HH:MM:SS)" >> ${GRAPH_LOG}
-# ms_print ${MASSIF_LOG} | head -n35 >> ${GRAPH_LOG}
-# cat ${GRAPH_LOG}
-# # Check the massif output
-# python $MASSIF_TEST $MASSIF_LOG $MAX_ALLOWED_ALLOC --start-from-middle >> $CLIENT_LOG 2>&1
-# if [ $? -ne 1 ]; then
-#     cat $CLIENT_LOG
-#     echo -e "\n***\n*** Test for graphdef_busyop Failed\n***"
-#     RET=1
-# fi
-# set -e
+# Log test duration and the graph for memory growth
+hrs=$(printf "%02d" $((TEST_DURATION / 3600)))
+mins=$(printf "%02d" $(((TEST_DURATION / 60) % 60)))
+secs=$(printf "%02d" $((TEST_DURATION % 60)))
+echo -e "Test Duration: $hrs:$mins:$secs (HH:MM:SS)" >> ${GRAPH_LOG}
+ms_print ${MASSIF_LOG} | head -n35 >> ${GRAPH_LOG}
+cat ${GRAPH_LOG}
+# Check the massif output
+python $MASSIF_TEST $MASSIF_LOG $MAX_ALLOWED_ALLOC --start-from-middle >> $CLIENT_LOG 2>&1
+if [ $? -ne 1 ]; then
+    cat $CLIENT_LOG
+    echo -e "\n***\n*** Test for graphdef_busyop Failed\n***"
+    RET=1
+fi
+set -e
 
 if [ $RET -eq 0 ]; then
     echo -e "\n***\n*** Test Passed\n***"
