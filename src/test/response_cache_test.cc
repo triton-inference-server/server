@@ -69,6 +69,13 @@ InferenceRequest::ModelName() const
   return BACKEND;
 }
 
+int64_t
+InferenceRequest::ActualModelVersion() const
+{
+  // Not using backend in unit test mock
+  return requested_model_version_; 
+}
+
 Status
 InferenceRequest::Input::DataBuffer(
     const size_t idx, const void** base, size_t* byte_size,
@@ -291,10 +298,10 @@ check_status(ni::Status status)
 void
 cache_stats(const ni::RequestResponseCache& cache)
 {
-  std::cout << "Cache entries: " << cache.num_entries() << std::endl;
-  std::cout << "Cache free bytes: " << cache.free_bytes() << std::endl;
-  std::cout << "Cache alloc'd bytes: " << cache.allocated_bytes() << std::endl;
-  std::cout << "Cache total bytes: " << cache.total_bytes() << std::endl;
+  std::cout << "Cache entries: " << cache.NumEntries() << std::endl;
+  std::cout << "Cache free bytes: " << cache.FreeBytes() << std::endl;
+  std::cout << "Cache alloc'd bytes: " << cache.AllocatedBytes() << std::endl;
+  std::cout << "Cache total bytes: " << cache.TotalBytes() << std::endl;
 }
 
 // Test hashing for consistency on same request
@@ -454,26 +461,26 @@ TEST_F(RequestResponseCacheTest, TestEviction)
   status = cache.Insert(hash0, *response0);
   check_status(status);
   cache_stats(cache);
-  assert(cache.num_entries() == 1);
-  assert(cache.num_evictions() == 0);
+  assert(cache.NumEntries() == 1);
+  assert(cache.NumEvictions() == 0);
 
   status = cache.Insert(hash1, *response0);
   check_status(status);
   cache_stats(cache);
-  assert(cache.num_entries() == 2);
-  assert(cache.num_evictions() == 0);
+  assert(cache.NumEntries() == 2);
+  assert(cache.NumEvictions() == 0);
 
   status = cache.Insert(hash2, *response0);
   check_status(status);
   cache_stats(cache);
-  assert(cache.num_entries() == 2);
-  assert(cache.num_evictions() == 1);
+  assert(cache.NumEntries() == 2);
+  assert(cache.NumEvictions() == 1);
 
   status = cache.Insert(hash3, *response0);
   check_status(status);
   cache_stats(cache);
-  assert(cache.num_entries() == 2);
-  assert(cache.num_evictions() == 2);
+  assert(cache.NumEntries() == 2);
+  assert(cache.NumEvictions() == 2);
 }
 
 
@@ -580,11 +587,11 @@ TEST_F(RequestResponseCacheTest, TestEndToEnd)
   }
 
   // Simple Evict() test
-  assert(cache.num_entries() == 1);
-  assert(cache.num_evictions() == 0);
+  assert(cache.NumEntries() == 1);
+  assert(cache.NumEvictions() == 0);
   cache.Evict();
-  assert(cache.num_entries() == 0);
-  assert(cache.num_evictions() == 1);
+  assert(cache.NumEntries() == 0);
+  assert(cache.NumEvictions() == 1);
   std::cout << "Done!" << std::endl;
 }
 

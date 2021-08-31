@@ -54,9 +54,9 @@ RequestResponseCache::~RequestResponseCache()
   // Deallocate each chunk from managed buffer
   for (auto& iter : cache_) {
     auto& entry = iter.second;
-    for (auto& output : entry.outputs) {
-      if (output.buffer != nullptr) {
-        managed_buffer_.deallocate(output.buffer);
+    for (auto& output : entry.outputs_) {
+      if (output.buffer_ != nullptr) {
+        managed_buffer_.deallocate(output.buffer_);
       }
     }
   }
@@ -76,14 +76,16 @@ RequestResponseCache::~RequestResponseCache()
 Status
 RequestResponseCache::Hash(const InferenceRequest& request, uint64_t* key)
 {
+  Status status = Status::Success;
   std::size_t seed = 0;
   // Add request model name to hash
   boost::hash_combine(seed, request.ModelName());
   // Add request model version to hash
   // TODO: RequestedModelVersion or ActualModelVersion ?
-  boost::hash_combine(seed, request.RequestedModelVersion());
+  //boost::hash_combine(seed, request.RequestedModelVersion());
+  boost::hash_combine(seed, request.ActualModelVersion());
 
-  // TODO: OriginalInputs, OverrideInputs, ImmutableInputs ?
+  // TODO: Use PrepareForInference + ImmutableInputs?
   const auto& inputs = request.OriginalInputs();
   for (const auto& input : inputs) {
     // Add input name to hash
@@ -94,7 +96,7 @@ RequestResponseCache::Hash(const InferenceRequest& request, uint64_t* key)
     TRITONSERVER_MemoryType memory_type = TRITONSERVER_MEMORY_CPU;
     int64_t memory_type_id = 0;
     const uint32_t index = 0;
-    Status status = input.second.DataBuffer(
+    status = input.second.DataBuffer(
         index, &buffer, &buffer_byte_size, &memory_type, &memory_type_id);
     if (!status.IsOk()) {
       buffer = nullptr;
@@ -147,7 +149,7 @@ RequestResponseCache::Insert(
 
   // Construct cache entry from response
   auto entry = CacheEntry();
-  auto status = BuildCacheEntry(entry, response);
+  auto status = BuildCacheEntry(response, &entry);
   if (!status.IsOk()) {
     return status;
   }
@@ -168,7 +170,7 @@ RequestResponseCache::Insert(
 
 Status
 RequestResponseCache::BuildCacheEntry(
-    CacheEntry& entry, const InferenceResponse& response)
+    const InferenceResponse& response, CacheEntry* entry)
 {
   auto status = Status::Success;
 
@@ -214,18 +216,16 @@ RequestResponseCache::BuildCacheEntry(
     }
 
     // Set output metadata
-    cache_output.name = response_output.Name();
-    cache_output.dtype = response_output.DType();
-    cache_output.shape = response_output.Shape();
-    cache_output.memory_type = response_memory_type;
-    cache_output.memory_type_id = response_memory_type_id;
-    cache_output.size = static_cast<uint64_t>(response_byte_size);
+    cache_output.name_ = response_output.Name();
+    cache_output.dtype_ = response_output.DType();
+    cache_output.shape_ = response_output.Shape();
+    cache_output.buffer_size_ = static_cast<uint64_t>(response_byte_size);
 
     // Allocate buffer for response output in cache entry
-    cache_output.buffer =
+    cache_output.buffer_ =
         managed_buffer_.allocate(response_byte_size, std::nothrow_t{});
     // Exit early if we fail to allocate from managed buffer
-    if (cache_output.buffer == nullptr) {
+    if (cache_output.buffer_ == nullptr) {
       return Status(
           Status::Code::INTERNAL,
           "Failed to allocate buffer from managed buffer");
@@ -234,11 +234,9 @@ RequestResponseCache::BuildCacheEntry(
     // Copy data from response buffer to cache entry output buffer
     // TODO: How to differently handle different memory types?
     //       GPU vs. CPU memory, etc.
-    std::memcpy(cache_output.buffer, response_buffer, response_byte_size);
-    // Sum up output sizes for total cache entry size
-    entry.size += cache_output.size;
+    std::memcpy(cache_output.buffer_, response_buffer, response_byte_size);
     // Add each output to cache entry
-    entry.outputs.push_back(cache_output);
+    entry->outputs_.push_back(cache_output);
   }
 
   return Status::Success;
@@ -254,10 +252,10 @@ RequestResponseCache::BuildInferenceResponse(
     return Status(Status::Code::INTERNAL, "invalid response ptr passed in");
   }
 
-  for (auto& cache_output : entry.outputs) {
+  for (auto& cache_output : entry.outputs_) {
     InferenceResponse::Output* response_output = nullptr;
     status = response->AddOutput(
-        cache_output.name, cache_output.dtype, cache_output.shape,
+        cache_output.name_, cache_output.dtype_, cache_output.shape_,
         &response_output);
     if (!status.IsOk()) {
       return status;
@@ -269,13 +267,13 @@ RequestResponseCache::BuildInferenceResponse(
           "InferenceResponse::Output pointer as nullptr");
     }
 
-    // TODO: AllocateDataBuffer may modify the memory_type/id args, we probably
-    // don't want to edit cache entry fields, check temp vars after?
-    TRITONSERVER_MemoryType memory_type = cache_output.memory_type;
-    int64_t memory_type_id = cache_output.memory_type_id;
-    void* vp = cache_output.buffer;
+    // TODO: Assuming CPU memory only for now
+    TRITONSERVER_MemoryType memory_type = TRITONSERVER_MEMORY_CPU;
+    int64_t memory_type_id = 0;
+
+    void* vp = cache_output.buffer_;
     status = response_output->AllocateDataBuffer(
-        &vp, cache_output.size, &memory_type, &memory_type_id);
+        &vp, cache_output.buffer_size_, &memory_type, &memory_type_id);
     if (!status.IsOk()) {
       return status;
     }
@@ -309,8 +307,8 @@ RequestResponseCache::Evict()
   // Get size of cache entry being evicted to update available size
   auto entry = iter->second;
   // Free managed memory used in cache entry's outputs
-  for (auto& output : entry.outputs) {
-    managed_buffer_.deallocate(output.buffer);
+  for (auto& output : entry.outputs_) {
+    managed_buffer_.deallocate(output.buffer_);
   }
 
   // Remove LRU entry from cache
@@ -338,7 +336,7 @@ RequestResponseCache::UpdateLRU(
   // Add key to front of LRU list since it's most recently used
   lru_.push_front(key);
   // Set CacheEntry LRU iterator to new LRU key location
-  cache_entry.lru_iter = lru_.begin();
+  cache_entry.lru_iter_ = lru_.begin();
 }
 
 }}  // namespace nvidia::inferenceserver

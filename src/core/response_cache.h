@@ -40,31 +40,26 @@
 
 namespace nvidia { namespace inferenceserver {
 
+// Assuming CPU memory only for now
 struct Output {
   // Output tensor data buffer
-  void* buffer;
+  void* buffer_;
   // Size of "buffer" above
-  uint64_t size = 0;
+  uint64_t buffer_size_ = 0;
   // Name of the output
-  std::string name;
+  std::string name_;
   // Datatype of the output
-  inference::DataType dtype;
+  inference::DataType dtype_;
   // Shape of the output
-  std::vector<int64_t> shape;
-  // Type of memory used to store buffer
-  TRITONSERVER_MemoryType memory_type;
-  // ID of memory type used to store buffer
-  uint64_t memory_type_id;
+  std::vector<int64_t> shape_;
 };
 
 struct CacheEntry {
   explicit CacheEntry() {}
   // Point to key in LRU list for maintaining LRU order
-  std::list<uint64_t>::iterator lru_iter;
+  std::list<uint64_t>::iterator lru_iter_;
   // each output buffer = managed_buffer.allocate(size, ...)
-  std::vector<Output> outputs;
-  // sum of output sizes
-  uint64_t size = 0;
+  std::vector<Output> outputs_;
 };
 
 class RequestResponseCache {
@@ -85,21 +80,29 @@ class RequestResponseCache {
   // Return Status object indicating success or failure.
   Status Evict();
   // Returns number of items in cache
-  size_t num_entries() const { return cache_.size(); }
+  size_t NumEntries() const { return cache_.size(); }
   // Returns number of items evicted in lifespan of cache
-  size_t num_evictions() const { return num_evictions_; }
+  size_t NumEvictions() const { return num_evictions_; }
   // Returns total number of bytes allocated for cache
-  size_t total_bytes() const { return managed_buffer_.get_size(); }
+  size_t TotalBytes() const { return managed_buffer_.get_size(); }
   // Returns number of free bytes in cache
-  size_t free_bytes() const { return managed_buffer_.get_free_memory(); }
+  size_t FreeBytes() const { return managed_buffer_.get_free_memory(); }
   // Returns number of bytes in use by cache
-  size_t allocated_bytes() const
+  size_t AllocatedBytes() const
   {
     return managed_buffer_.get_size() - managed_buffer_.get_free_memory();
   }
 
 
  private:
+  // Update LRU ordering on lookup
+  void UpdateLRU(std::unordered_map<uint64_t, CacheEntry>::iterator&);
+  // Build CacheEntry from InferenceResponse
+  Status BuildCacheEntry(const InferenceResponse& response, CacheEntry* entry);
+  // Build InferenceResponse from CacheEntry
+  Status BuildInferenceResponse(
+      const CacheEntry& entry, InferenceResponse* response);
+
   // Cache buffer
   void* buffer_;
   // Managed buffer
@@ -110,14 +113,6 @@ class RequestResponseCache {
   std::list<uint64_t> lru_;
   // Track number of evictions
   uint64_t num_evictions_ = 0;
-
-  // Update LRU ordering on lookup
-  void UpdateLRU(std::unordered_map<uint64_t, CacheEntry>::iterator&);
-  // Build CacheEntry from InferenceResponse
-  Status BuildCacheEntry(CacheEntry& entry, const InferenceResponse& response);
-  // Build InferenceResponse from CacheEntry
-  Status BuildInferenceResponse(
-      const CacheEntry& entry, InferenceResponse* response);
 };
 
 }}  // namespace nvidia::inferenceserver
