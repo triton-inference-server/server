@@ -709,7 +709,13 @@ StartEndpoints(
 {
 #ifdef _WIN32
   WSADATA wsaData;
-  WSAStartup(MAKEWORD(2,2), &wsaData);
+  int wsa_ret = WSAStartup(MAKEWORD(2,2), &wsaData);
+
+  if (wsa_ret != 0)
+  {
+    LOG_ERROR << "Error in WSAStartup " << wsa_ret;
+    return false;
+  }
 #endif
 
 #ifdef TRITON_ENABLE_GRPC
@@ -817,8 +823,15 @@ StopEndpoints()
 #endif  // TRITON_ENABLE_SAGEMAKER
 
 #ifdef _WIN32
-  WSACleanup();
+  int wsa_ret = WSACleanup();
+
+  if (wsa_ret != 0)
+  {
+    LOG_ERROR << "Error in WSACleanup " << wsa_ret;
+    ret = false;
+  }
 #endif
+
   return ret;
 }
 
