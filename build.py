@@ -248,8 +248,8 @@ def core_cmake_args(components, backends, install_dir):
     cargs.append('-DTRITON_MIN_COMPUTE_CAPABILITY={}'.format(
         FLAGS.min_compute_capability))
 
-    # If building the TFLite backend set enable MALI GPU
-    if 'tflite' in backends:
+    # If building the ArmNN TFLite backend set enable MALI GPU
+    if 'armnn_tflite' in backends:
         cargs.append('-DTRITON_ENABLE_MALI_GPU:BOOL={}'.format(
             cmake_enable(FLAGS.enable_mali_gpu)))
 
@@ -344,8 +344,8 @@ def backend_cmake_args(images, components, be, install_dir, library_paths):
         args = dali_cmake_args()
     elif be == 'pytorch':
         args = pytorch_cmake_args(images)
-    elif be == 'tflite':
-        args = tflite_cmake_args()
+    elif be == 'armnn_tflite':
+        args = armnn_tflite_cmake_args()
     elif be == 'fil':
         args = fil_cmake_args(images)
     elif be == 'fastertransformer':
@@ -489,7 +489,7 @@ def dali_cmake_args():
     ]
 
 
-def tflite_cmake_args():
+def armnn_tflite_cmake_args():
     return [
         '-DJOBS={}'.format(multiprocessing.cpu_count()),
     ]
@@ -1468,8 +1468,8 @@ if __name__ == '__main__':
         repo_install_dir = os.path.join(FLAGS.build_dir, be, 'install')
 
         mkdir(FLAGS.build_dir)
-        # If tflite backend, source from external repo for git clone
-        if be == 'tflite':
+        # If armnn_tflite backend, source from external repo for git clone
+        if be == 'armnn_tflite':
             gitclone(FLAGS.build_dir, backend_repo(be), backends[be], be,
                      'https://gitlab.com/arm-research/smarter/')
         else:
