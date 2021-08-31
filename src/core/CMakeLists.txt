@@ -1,4 +1,4 @@
-# Copyright (c) 2019-2021, NVIDIA CORPORATION. All rights reserved.
+# Copyright 2019-2021, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -127,6 +127,7 @@ set(
   infer_parameter.cc
   infer_request.cc
   infer_response.cc
+  instance_queue.cc
   label_provider.cc
   logging.cc
   memory.cc
@@ -135,6 +136,7 @@ set(
   model_config_utils.cc
   model_repository_manager.cc
   numa_utils.cc
+  payload.cc
   persistent_backend_manager.cc
   pinned_memory_manager.cc
   scheduler_utils.cc
@@ -143,6 +145,7 @@ set(
   shared_library.cc
   infer_stats.cc
   infer_trace.cc
+  rate_limiter.cc
   status.cc
   tritonserver.cc
 )
@@ -161,6 +164,7 @@ set(
   infer_parameter.h
   infer_request.h
   infer_response.h
+  instance_queue.h
   label_provider.h
   logging.h
   memory.h
@@ -169,9 +173,10 @@ set(
   model_config_utils.h
   model_repository_manager.h
   numa_utils.h
-  nvtx.h
+  payload.h
   persistent_backend_manager.h
   pinned_memory_manager.h
+  rate_limiter.h
   response_allocator.h
   scheduler.h
   scheduler_utils.h

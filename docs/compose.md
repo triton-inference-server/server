@@ -54,7 +54,7 @@ will provide a container `tritonserver` locally. You can access the container wi
 $ docker run -it tritonserver:latest
 ```
 
-Note: If `compose.py` is run on release versions `r21.07` and older, the resulting container will have DCGM version 2.2.3 installed. This may result in different GPU statistic reporting behavior.
+Note: If `compose.py` is run on release versions `r21.08` and older, the resulting container will have DCGM version 2.2.3 installed. This may result in different GPU statistic reporting behavior.
 
 ## Build it yourself
 
@@ -68,7 +68,7 @@ backend](https://github.com/triton-inference-server/backend).  The
 result of that build should be a directory containing your backend
 shared library and any additional files required by the
 backend. Assuming your backend is called "mybackend" and that the
-directory is "./mkbackend", adding the following to the Dockerfile `compose.py`
+directory is "./mybackend", adding the following to the Dockerfile `compose.py`
 created will create a Triton image that contains all the supported Triton backends plus your
 custom backend.
 

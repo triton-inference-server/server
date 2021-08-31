@@ -1,4 +1,4 @@
-// Copyright (c) 2018-2020, NVIDIA CORPORATION. All rights reserved.
+// Copyright 2018-2021, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 //
 // Redistribution and use in source and binary forms, with or without
 // modification, are permitted provided that the following conditions
@@ -35,14 +35,13 @@
 #include "src/core/dynamic_batch_scheduler.h"
 #include "src/core/logging.h"
 #include "src/core/model_config_utils.h"
+#include "src/core/server.h"
 
 namespace nvidia { namespace inferenceserver {
 
 Status
 SequenceBatchScheduler::Create(
-    const inference::ModelConfig& config, const uint32_t runner_cnt,
-    const StandardInitFunc& OnInit, const StandardWarmupFunc& OnWarmup,
-    const StandardRunFunc& OnSchedule,
+    TritonModel* model,
     const std::unordered_map<std::string, bool>& enforce_equal_shape_tensors,
     std::unique_ptr<Scheduler>* scheduler)
 {
@@ -56,7 +55,11 @@ SequenceBatchScheduler::Create(
     LOG_INFO << "Delaying scheduler until " << sched->backlog_delay_cnt_
              << " backlog queued requests...";
   }
-  sched->queue_request_cnts_.resize(runner_cnt, 0);
+
+  auto instance_count = model->Instances().size();
+  sched->queue_request_cnts_.resize(instance_count, 0);
+
+  auto config = model->Config();
 
   // Max sequence idle...
   sched->max_sequence_idle_microseconds_ =
@@ -86,33 +89,36 @@ SequenceBatchScheduler::Create(
   // Create one SequenceBatch object for each requested runner. The
   // SequenceBatch object has a thread that manages the batch of
   // requests.
-  for (uint32_t c = 0; c < runner_cnt; ++c) {
-    std::promise<bool> init_state;
+  const auto& instances = model->Instances();
+  uint32_t index = 0;
+  for (const auto& instance : instances) {
+    bool init_state;
     std::shared_ptr<SequenceBatch> sb;
 
     // Create the SequenceBatch derivative that handles the requested
     // scheduling strategy.
     if (config.sequence_batching().has_oldest()) {
       sb.reset(new OldestSequenceBatch(
-          sched.get(), c, seq_slot_cnt, config, OnInit, OnWarmup, OnSchedule,
+          sched.get(), index, seq_slot_cnt, instance.get(),
           enforce_equal_shape_tensors, start, end, startend, cont, notready,
           &init_state));
     } else {
       sb.reset(new DirectSequenceBatch(
-          sched.get(), c, seq_slot_cnt, config, OnInit, OnWarmup, OnSchedule,
+          sched.get(), index, seq_slot_cnt, instance.get(),
           enforce_equal_shape_tensors, start, end, startend, cont, notready,
           &init_state));
     }
 
-    if (init_state.get_future().get()) {
+    if (init_state) {
       sched->batchers_.push_back(sb);
       // All sequence slots in the batcher are initially ready for a
       // new sequence.
       for (size_t b = 0; b < seq_slot_cnt; ++b) {
         sched->ready_batcher_seq_slots_.push(
-            SequenceBatchScheduler::BatcherSequenceSlot(c, b));
+            SequenceBatchScheduler::BatcherSequenceSlot(index, b));
       }
     }
+    ++index;
   }
   if (sched->batchers_.empty()) {
     return Status(
@@ -154,7 +160,8 @@ GetBooleanOverrideInputs(
     const std::string& tensor_name, const bool support_batching,
     const inference::DataType tensor_datatype, const float fp32_false_value,
     const float fp32_true_value, const int32_t int32_false_value,
-    const int32_t int32_true_value,
+    const int32_t int32_true_value, const bool bool_false_value,
+    const bool bool_true_value,
     std::shared_ptr<InferenceRequest::Input>* true_override,
     std::shared_ptr<InferenceRequest::Input>* false_override)
 {
@@ -195,9 +202,12 @@ GetBooleanOverrideInputs(
   if (tensor_datatype == inference::DataType::TYPE_INT32) {
     *(reinterpret_cast<int32_t*>(true_p_ptr)) = int32_true_value;
     *(reinterpret_cast<int32_t*>(false_p_ptr)) = int32_false_value;
-  } else {
+  } else if (tensor_datatype == inference::DataType::TYPE_FP32) {
     *(reinterpret_cast<float*>(true_p_ptr)) = fp32_true_value;
     *(reinterpret_cast<float*>(false_p_ptr)) = fp32_false_value;
+  } else {
+    *(reinterpret_cast<bool*>(true_p_ptr)) = bool_true_value;
+    *(reinterpret_cast<bool*>(false_p_ptr)) = bool_false_value;
   }
 
   auto ltrue_override = std::make_shared<InferenceRequest::Input>(
@@ -241,6 +251,7 @@ SequenceBatchScheduler::CreateBooleanControlTensors(
   inference::DataType tensor_datatype;
   int32_t int32_false_value, int32_true_value;
   float fp32_false_value, fp32_true_value;
+  bool bool_false_value, bool_true_value;
 
   // START, optional
   {
@@ -248,7 +259,8 @@ SequenceBatchScheduler::CreateBooleanControlTensors(
         config.sequence_batching(), config.name(),
         inference::ModelSequenceBatching::Control::CONTROL_SEQUENCE_START,
         false /* required */, &tensor_name, &tensor_datatype, &fp32_false_value,
-        &fp32_true_value, &int32_false_value, &int32_true_value));
+        &fp32_true_value, &int32_false_value, &int32_true_value,
+        &bool_false_value, &bool_true_value));
     if (!tensor_name.empty()) {
       std::shared_ptr<InferenceRequest::Input> true_override;
       std::shared_ptr<InferenceRequest::Input> false_override;
@@ -256,7 +268,8 @@ SequenceBatchScheduler::CreateBooleanControlTensors(
       RETURN_IF_ERROR(GetBooleanOverrideInputs(
           tensor_name, config.max_batch_size() != 0, tensor_datatype,
           fp32_false_value, fp32_true_value, int32_false_value,
-          int32_true_value, &true_override, &false_override));
+          int32_true_value, bool_false_value, bool_true_value, &true_override,
+          &false_override));
 
       (*start_input_overrides)->emplace_back(true_override);
       (*end_input_overrides)->emplace_back(false_override);
@@ -272,7 +285,8 @@ SequenceBatchScheduler::CreateBooleanControlTensors(
         config.sequence_batching(), config.name(),
         inference::ModelSequenceBatching::Control::CONTROL_SEQUENCE_END,
         false /* required */, &tensor_name, &tensor_datatype, &fp32_false_value,
-        &fp32_true_value, &int32_false_value, &int32_true_value));
+        &fp32_true_value, &int32_false_value, &int32_true_value,
+        &bool_false_value, &bool_true_value));
     if (!tensor_name.empty()) {
       std::shared_ptr<InferenceRequest::Input> true_override;
       std::shared_ptr<InferenceRequest::Input> false_override;
@@ -280,7 +294,8 @@ SequenceBatchScheduler::CreateBooleanControlTensors(
       RETURN_IF_ERROR(GetBooleanOverrideInputs(
           tensor_name, config.max_batch_size() != 0, tensor_datatype,
           fp32_false_value, fp32_true_value, int32_false_value,
-          int32_true_value, &true_override, &false_override));
+          int32_true_value, bool_false_value, bool_true_value, &true_override,
+          &false_override));
 
       (*start_input_overrides)->emplace_back(false_override);
       (*end_input_overrides)->emplace_back(true_override);
@@ -296,7 +311,8 @@ SequenceBatchScheduler::CreateBooleanControlTensors(
         config.sequence_batching(), config.name(),
         inference::ModelSequenceBatching::Control::CONTROL_SEQUENCE_READY,
         false /* required */, &tensor_name, &tensor_datatype, &fp32_false_value,
-        &fp32_true_value, &int32_false_value, &int32_true_value));
+        &fp32_true_value, &int32_false_value, &int32_true_value,
+        &bool_false_value, &bool_true_value));
     if (!tensor_name.empty()) {
       std::shared_ptr<InferenceRequest::Input> true_override;
       std::shared_ptr<InferenceRequest::Input> false_override;
@@ -304,7 +320,8 @@ SequenceBatchScheduler::CreateBooleanControlTensors(
       RETURN_IF_ERROR(GetBooleanOverrideInputs(
           tensor_name, config.max_batch_size() != 0, tensor_datatype,
           fp32_false_value, fp32_true_value, int32_false_value,
-          int32_true_value, &true_override, &false_override));
+          int32_true_value, bool_false_value, bool_true_value, &true_override,
+          &false_override));
 
       (*start_input_overrides)->emplace_back(true_override);
       (*end_input_overrides)->emplace_back(true_override);
@@ -812,10 +829,7 @@ SequenceBatch::SetControlTensors(
 
 DirectSequenceBatch::DirectSequenceBatch(
     SequenceBatchScheduler* base, const uint32_t batcher_idx,
-    const size_t seq_slot_cnt, const inference::ModelConfig& config,
-    const Scheduler::StandardInitFunc& OnInit,
-    const Scheduler::StandardWarmupFunc& OnWarmup,
-    const Scheduler::StandardRunFunc& OnSchedule,
+    const size_t seq_slot_cnt, TritonModelInstance* model_instance,
     const std::unordered_map<std::string, bool>& enforce_equal_shape_tensors,
     const std::shared_ptr<SequenceBatchScheduler::ControlInputs>&
         start_input_overrides,
@@ -827,21 +841,21 @@ DirectSequenceBatch::DirectSequenceBatch(
         continue_input_overrides,
     const std::shared_ptr<SequenceBatchScheduler::ControlInputs>&
         notready_input_overrides,
-    std::promise<bool>* is_initialized)
+    bool* is_initialized)
     : SequenceBatch(
           base, batcher_idx, seq_slot_cnt, enforce_equal_shape_tensors,
           start_input_overrides, end_input_overrides, startend_input_overrides,
           continue_input_overrides, notready_input_overrides),
-      OnInit_(OnInit), OnWarmup_(OnWarmup), OnSchedule_(OnSchedule),
-      scheduler_thread_exit_(false), scheduler_idle_(false),
-      queues_(seq_slot_cnt), seq_slot_correlation_ids_(seq_slot_cnt, 0),
-      max_active_seq_slot_(-1)
+      model_instance_(model_instance), scheduler_thread_exit_(false),
+      scheduler_idle_(false), queues_(seq_slot_cnt),
+      seq_slot_correlation_ids_(seq_slot_cnt, 0), max_active_seq_slot_(-1)
 {
   // Initialize to handle CORRID control. If error just exit
   // now... that means the corresponding model instance will not have
   // any runner and so will not get used for execution.
+  const auto& config = model_instance_->Model()->Config();
   if (!CreateCorrelationIDControl(config)) {
-    is_initialized->set_value(false);
+    *is_initialized = false;
     return;
   }
 
@@ -853,10 +867,11 @@ DirectSequenceBatch::DirectSequenceBatch(
 
   // Create a scheduler thread associated with 'batcher_idx' that
   // executes the queued requests.
-  const int nice = GetCpuNiceLevel(config);
-  scheduler_thread_.reset(new std::thread([this, nice, is_initialized]() {
-    SchedulerThread(nice, is_initialized);
-  }));
+  const int nice = 0;
+  scheduler_thread_.reset(
+      new std::thread([this, nice]() { BatcherThread(nice); }));
+
+  *is_initialized = true;
 }
 
 DirectSequenceBatch::~DirectSequenceBatch()
@@ -876,10 +891,8 @@ DirectSequenceBatch::~DirectSequenceBatch()
   // scheduler thread does not join it against itself and instead
   // detach it so there is not a problem when its thread object is
   // destroyed.
-  if (scheduler_thread_->get_id() != std::this_thread::get_id()) {
+  if (scheduler_thread_->joinable()) {
     scheduler_thread_->join();
-  } else {
-    scheduler_thread_->detach();
   }
 }
 
@@ -911,8 +924,15 @@ DirectSequenceBatch::Enqueue(
 }
 
 void
-DirectSequenceBatch::SchedulerThread(
-    const int nice, std::promise<bool>* is_initialized)
+DirectSequenceBatch::NewPayload()
+{
+  curr_payload_ =
+      model_instance_->Model()->Server()->GetRateLimiter()->GetPayload(
+          Payload::Operation::INFER_RUN, model_instance_);
+}
+
+void
+DirectSequenceBatch::BatcherThread(const int nice)
 {
 #ifndef _WIN32
   if (setpriority(PRIO_PROCESS, syscall(SYS_gettid), nice) == 0) {
@@ -928,25 +948,6 @@ DirectSequenceBatch::SchedulerThread(
                  << batcher_idx_ << " at default nice...";
 #endif
 
-  // Initialize using the thread. If error then just exit this thread
-  // now... that means the corresponding model instance will not have
-  // any runner and so will not get used for execution.
-  Status startup_status = OnInit_(batcher_idx_);
-
-  // Run warmup function if initialization succeed.
-  if (startup_status.IsOk()) {
-    startup_status = OnWarmup_(batcher_idx_);
-  }
-  if (!startup_status.IsOk()) {
-    LOG_ERROR
-        << "Initialization failed for Direct sequence-batch scheduler thread "
-        << batcher_idx_ << ": " << startup_status.Message();
-    is_initialized->set_value(false);
-    return;
-  } else {
-    is_initialized->set_value(true);
-  }
-
   // For debugging and testing, delay start of thread until queues
   // contain the specified number of entries (across all
   // SequenceBatchs in the scheduler).
@@ -958,23 +959,11 @@ DirectSequenceBatch::SchedulerThread(
                    << delay_cnt << " queued requests...";
   }
 
-  // For testing this scheduler thread to be the last to release the
-  // backend object.
-  uint64_t backend_release_wait_milliseconds = 0;
-  {
-    const char* dstr = getenv("TRITONSERVER_DELAY_SCHEDULER_BACKEND_RELEASE");
-    if (dstr != nullptr) {
-      backend_release_wait_milliseconds = atoi(dstr);
-      LOG_VERBOSE(1) << "Delaying scheduler backend release for "
-                     << batcher_idx_ << ": "
-                     << backend_release_wait_milliseconds << "ms";
-    }
-  }
-
   const uint64_t default_wait_microseconds = 500 * 1000;
 
+  NewPayload();
+
   while (!scheduler_thread_exit_) {
-    std::vector<std::unique_ptr<InferenceRequest>> requests;
     uint64_t wait_microseconds = default_wait_microseconds;
 
     // Hold the lock for as short a time as possible.
@@ -1150,7 +1139,7 @@ DirectSequenceBatch::SchedulerThread(
             // just use zero for that.
             SetControlTensors(
                 ni, seq_slot, 0 /* corrid */, true /* not_ready */);
-            requests.emplace_back(std::move(ni));
+            curr_payload_->AddRequest(std::move(ni));
           } else {
             std::unique_ptr<InferenceRequest>& irequest = queue.front();
 
@@ -1163,9 +1152,13 @@ DirectSequenceBatch::SchedulerThread(
               end_of_sequence = true;
             }
 
-            requests.emplace_back(std::move(irequest));
+            curr_payload_->AddRequest(std::move(irequest));
 
             queue.pop_front();
+          }
+
+          if (curr_payload_->GetState() == Payload::State::UNINITIALIZED) {
+            curr_payload_->SetState(Payload::State::READY);
           }
 
           // If the sequence has ended then attempt to refill the
@@ -1213,33 +1206,12 @@ DirectSequenceBatch::SchedulerThread(
       }
     }
 
-    if (!requests.empty()) {
+    if (curr_payload_->GetState() == Payload::State::READY) {
       // Run the backend...
-      OnSchedule_(batcher_idx_, std::move(requests));
-
-      // For testing we introduce a delay here to make the
-      // "SequenceBatchScheduler destroyed by this thread" case
-      // described in the comment below reproducible.
-      if (backend_release_wait_milliseconds > 0) {
-        std::this_thread::sleep_for(
-            std::chrono::milliseconds(backend_release_wait_milliseconds));
-      }
+      model_instance_->Model()->Server()->GetRateLimiter()->EnqueuePayload(
+          model_instance_->Model(), curr_payload_);
+      NewPayload();
     }
-
-    // FIXME, this isn't really true anymore so needs to be revisited.
-    //
-    // At the end of this scope 'requests' will be destroyed.  A
-    // handle to the backend is held by the request. If the server is
-    // exiting or the backend is unloaded, it could be that this
-    // handle is the last one for the backend and so destroying
-    // 'requests' will cause the backend to be deleted which in turn
-    // will call this thread's DynamicBatchScheduler to be destroyed
-    // by this thread itself. In that case it is important that this
-    // thread not reference the object after this point since the
-    // object will be invalid. The while statement above uses a local
-    // atomic which is set to false by the destructor (and so the
-    // while loop will exit) and the logging below uses only local
-    // variables... so this code is ok.
   }  // end runner loop
 
   LOG_VERBOSE(1) << "Stopping Direct sequence-batch scheduler thread "
@@ -1248,10 +1220,7 @@ DirectSequenceBatch::SchedulerThread(
 
 OldestSequenceBatch::OldestSequenceBatch(
     SequenceBatchScheduler* base, const uint32_t batcher_idx,
-    const size_t seq_slot_cnt, const inference::ModelConfig& config,
-    const Scheduler::StandardInitFunc& OnInit,
-    const Scheduler::StandardWarmupFunc& OnWarmup,
-    const Scheduler::StandardRunFunc& OnSchedule,
+    const size_t seq_slot_cnt, TritonModelInstance* model_instance,
     const std::unordered_map<std::string, bool>& enforce_equal_shape_tensors,
     const std::shared_ptr<SequenceBatchScheduler::ControlInputs>&
         start_input_overrides,
@@ -1263,7 +1232,7 @@ OldestSequenceBatch::OldestSequenceBatch(
         continue_input_overrides,
     const std::shared_ptr<SequenceBatchScheduler::ControlInputs>&
         notready_input_overrides,
-    std::promise<bool>* is_initialized)
+    bool* is_initialized)
     : SequenceBatch(
           base, batcher_idx, seq_slot_cnt, enforce_equal_shape_tensors,
           start_input_overrides, end_input_overrides, startend_input_overrides,
@@ -1273,8 +1242,9 @@ OldestSequenceBatch::OldestSequenceBatch(
   // Initialize to handle CORRID control. If error just exit
   // now... that means the corresponding model instance will not have
   // any runner and so will not get used for execution.
+  const auto& config = model_instance->Model()->Config();
   if (!CreateCorrelationIDControl(config)) {
-    is_initialized->set_value(false);
+    *is_initialized = false;
     return;
   }
 
@@ -1287,22 +1257,21 @@ OldestSequenceBatch::OldestSequenceBatch(
   }
 
   Status status = DynamicBatchScheduler::Create(
-      batcher_idx_, 1 /* runner_cnt */, GetCpuNiceLevel(config), OnInit,
-      OnWarmup, OnSchedule, true /* dynamic_batching_enabled */,
-      config.max_batch_size(), enforce_equal_shape_tensors_,
-      true /* preserve_ordering */, preferred_batch_sizes,
+      model_instance->Model(), model_instance, GetCpuNiceLevel(config),
+      true /* dynamic_batching_enabled */, config.max_batch_size(),
+      enforce_equal_shape_tensors_, true /* preserve_ordering */,
+      preferred_batch_sizes,
       config.sequence_batching().oldest().max_queue_delay_microseconds(),
       &dynamic_batcher_);
   if (!status.IsOk()) {
     LOG_ERROR << "failed creating dynamic sequence batcher for OldestFirst "
               << batcher_idx_ << ": " << status.Message();
-    is_initialized->set_value(false);
+    *is_initialized = false;
     return;
   }
 
-  is_initialized->set_value(true);
+  *is_initialized = true;
 }
-
 OldestSequenceBatch::~OldestSequenceBatch() {}
 
 void

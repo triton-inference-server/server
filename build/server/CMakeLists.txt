@@ -1,4 +1,4 @@
-# Copyright (c) 2019-2021, NVIDIA CORPORATION. All rights reserved.
+# Copyright (c) 2019-2021, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -41,7 +41,7 @@ else()
   # Disable Triton kernel if on "aarch64" platform
   execute_process(COMMAND uname -p OUTPUT_VARIABLE ARCH)
   set(CMAKE_CXX_FLAGS "-Wall -Wextra -Wno-unused-parameter -Werror -Wno-deprecated-declarations")
-  set(CMAKE_CXX_FLAGS_DEBUG "-g")
+  set(CMAKE_CXX_FLAGS_DEBUG "-g -rdynamic")
   set(CMAKE_CXX_FLAGS_RELEASE "-O3")
 endif()
 set(CMAKE_CXX_STANDARD 11)

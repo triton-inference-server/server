@@ -73,6 +73,8 @@ CLIENT_BS=8
 # Set the number of repetitions in nightly and weekly tests
 # Set the email subject for nightly and weekly tests
 if [ "$TRITON_PERF_WEEKLY" == 1 ]; then
+    # Run the test for each model approximately 1.5 hours
+    # All tests are run cumulatively for 7 hours
     REPETITION=200
     EMAIL_SUBJECT="Weekly"
 else
@@ -141,17 +143,17 @@ for MODEL in $(ls models); do
 
     set +e
 
+    SECONDS=0
     # Run the perf analyzer 'REPETITION' times
     for ((i=1; i<=$REPETITION; i++)); do
-        SECONDS=0
         $PERF_ANALYZER -v -m $MODEL -i grpc --concurrency-range $CONCURRENCY -b $CLIENT_BS >> $CLIENT_LOG 2>&1
-        TEST_DURATION=$SECONDS
         if [ $? -ne 0 ]; then
             cat $CLIENT_LOG
             echo -e "\n***\n*** perf_analyzer for $MODEL failed on iteration $i\n***"
             RET=1   
         fi
     done
+    TEST_DURATION=$SECONDS
 
     set -e
 

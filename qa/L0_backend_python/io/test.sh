@@ -83,4 +83,10 @@ set -e
 kill $SERVER_PID
 wait $SERVER_PID
 
+if [ $RET -eq 0 ]; then
+    echo -e "\n***\n*** IO test PASSED.\n***"
+else
+    echo -e "\n***\n*** IO test FAILED.\n***"
+fi
+
 exit $RET

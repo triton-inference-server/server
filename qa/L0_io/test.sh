@@ -58,6 +58,7 @@ RET=0
 
 # Prepare float32 models with basic config
 rm -rf $MODELSDIR
+
 for trial in graphdef savedmodel onnx libtorch plan python python_dlpack; do
     full=${trial}_float32_float32_float32
     if [ "$trial" == "python" ]; then

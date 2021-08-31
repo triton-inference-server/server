@@ -1,5 +1,5 @@
 #!/bin/bash
-# Copyright (c) 2018-2021, NVIDIA CORPORATION. All rights reserved.
+# Copyright 2018-2021, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -82,9 +82,9 @@ if [[ "$(< /proc/sys/kernel/osrelease)" == *Microsoft ]]; then
 else
     MODELDIR=${MODELDIR:=`pwd`/models}
     DATADIR=${DATADIR:="/data/inferenceserver/${REPO_VERSION}"}
-    OPTDIR=${OPTDIR:="/opt"}
-    SERVER=${OPTDIR}/tritonserver/bin/tritonserver
-    BACKEND_DIR=${OPTDIR}/tritonserver/backends
+    TRITON_DIR=${TRITON_DIR:="/opt/tritonserver"}
+    SERVER=${TRITON_DIR}/bin/tritonserver
+    BACKEND_DIR=${TRITON_DIR}/backends
 fi
 
 # Allow more time to exit. Ensemble brings in too many models
@@ -108,7 +108,7 @@ if [ "$TRITON_SERVER_CPU_ONLY" == "1" ]; then
 fi
 
 # If BACKENDS not specified, set to all
-BACKENDS=${BACKENDS:="graphdef savedmodel onnx libtorch plan python python_dlpack"}
+BACKENDS=${BACKENDS:="graphdef savedmodel onnx libtorch plan python python_dlpack openvino"}
 export BACKENDS
 
 # If ENSEMBLES not specified, set to 1
@@ -203,7 +203,7 @@ for TARGET in cpu gpu; do
 
       # Copy identity backend models and ensembles
       for BACKEND in $BACKENDS; do
-        if [ "$BACKEND" != "python" ] && [ "$BACKEND" != "python_dlpack" ]; then
+        if [ "$BACKEND" != "python" ] && [ "$BACKEND" != "python_dlpack" ] && [ "$BACKEND" != "openvino" ]; then
             cp -r ${DATADIR}/qa_ensemble_model_repository/qa_model_repository/*${BACKEND}* \
               models/.
         fi
@@ -231,11 +231,11 @@ for TARGET in cpu gpu; do
 
     KIND="KIND_GPU" && [[ "$TARGET" == "cpu" ]] && KIND="KIND_CPU"
     for FW in $BACKENDS; do
-      if [ "$FW" != "plan" ] && [ "$FW" != "python" ];then
+      if [ "$FW" != "plan" ] && [ "$FW" != "python" ] && [ "$FW" != "openvino" ];then
         for MC in `ls models/${FW}*/config.pbtxt`; do
             echo "instance_group [ { kind: ${KIND} }]" >> $MC
         done
-      elif [ "$FW" == "python" ]; then
+      elif [ "$FW" == "python" ] || [ "$FW" == "openvino" ]; then
         for MC in `ls models/${FW}*/config.pbtxt`; do
             echo "instance_group [ { kind: KIND_CPU }]" >> $MC
         done
@@ -267,7 +267,7 @@ for TARGET in cpu gpu; do
         # We rely on HTTP endpoint in run_server so until HTTP is
         # implemented for win we do this hack...
         run_server_nowait
-        sleep 60
+        sleep ${SERVER_TIMEOUT}
     else
         run_server
     fi

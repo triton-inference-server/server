@@ -1,4 +1,4 @@
-// Copyright (c) 2018-2019, NVIDIA CORPORATION. All rights reserved.
+// Copyright 2021, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 //
 // Redistribution and use in source and binary forms, with or without
 // modification, are permitted provided that the following conditions
@@ -23,50 +23,35 @@
 // OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 // (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+#pragma once
 
-#include "src/backends/tensorrt/loader.h"
-
-#include <NvInferPlugin.h>
-#include <mutex>
-#include "src/backends/tensorrt/logging.h"
-#include "src/core/logging.h"
+#include "src/core/payload.h"
 
 namespace nvidia { namespace inferenceserver {
 
-Status
-LoadPlan(
-    const std::vector<char>& model_data, int64_t dla_core_id,
-    nvinfer1::IRuntime** runtime, nvinfer1::ICudaEngine** engine)
-{
-  // Create runtime only if it is not provided
-  if (*runtime == nullptr) {
-    *runtime = nvinfer1::createInferRuntime(tensorrt_logger);
-    if (*runtime == nullptr) {
-      return Status(
-          Status::Code::INTERNAL, "unable to create TensorRT runtime");
-    }
+//
+// InstanceQueue
+//
+// A queue implementation holding Payloads ready to be scheduled on
+// model instance.
+class InstanceQueue {
+ public:
+  explicit InstanceQueue(size_t max_batch_size, uint64_t max_queue_delay_ns);
 
-    // Report error if 'dla_core_id' >= number of DLA cores
-    if (dla_core_id != -1) {
-      if (dla_core_id < (*runtime)->getNbDLACores()) {
-        (*runtime)->setDLACore(dla_core_id);
-      } else {
-        return Status(
-            Status::Code::INVALID_ARG,
-            ("unable to create TensorRT runtime with DLA Core ID: " +
-             std::to_string(dla_core_id))
-                .c_str());
-      }
-    }
-  }
+  size_t Size();
+  bool Empty();
+  void Enqueue(std::shared_ptr<Payload>& payload);
+  void Dequeue(
+      std::shared_ptr<Payload>* payload,
+      std::vector<std::shared_ptr<Payload>>* merged_payloads);
 
-  *engine =
-      (*runtime)->deserializeCudaEngine(&model_data[0], model_data.size());
-  if (*engine == nullptr) {
-    return Status(Status::Code::INTERNAL, "unable to create TensorRT engine");
-  }
+ private:
+  size_t max_batch_size_;
+  uint64_t max_queue_delay_ns_;
 
-  return Status::Success;
-}
+  std::deque<std::shared_ptr<Payload>> payload_queue_;
+  std::shared_ptr<Payload> staged_payload_;
+  std::mutex mu_;
+};
 
 }}  // namespace nvidia::inferenceserver

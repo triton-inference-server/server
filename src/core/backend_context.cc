@@ -29,7 +29,7 @@
 #include "src/core/cuda_utils.h"
 #include "src/core/logging.h"
 #include "src/core/metric_model_reporter.h"
-#include "src/core/nvtx.h"
+#include "triton/common/nvtx.h"
 #include "triton/common/sync_queue.h"
 
 #ifdef TRITON_ENABLE_GPU

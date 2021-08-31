@@ -65,20 +65,20 @@ from distutils.dir_util import copy_tree
 # incorrectly load the other version of the openvino libraries.
 #
 TRITON_VERSION_MAP = {
-    '2.13.0dev': (
-        '21.08dev',  # triton container
+    '2.14.0dev': (
+        '21.09dev',  # triton container
         '21.07',  # upstream container
-        '1.8.0',  # ORT
+        '1.8.1',  # ORT
         '2021.2.200',  # ORT OpenVINO
         '2021.2',  # Standalone OpenVINO
         '2.2.8')  # DCGM version
 }
 
 EXAMPLE_BACKENDS = ['identity', 'square', 'repeat']
-CORE_BACKENDS = ['tensorrt', 'ensemble']
+CORE_BACKENDS = ['ensemble']
 NONCORE_BACKENDS = [
     'tensorflow1', 'tensorflow2', 'onnxruntime', 'python', 'dali', 'pytorch',
-    'openvino', 'fil', 'fastertransformer', 'tflite'
+    'openvino', 'fil', 'fastertransformer', 'tensorrt', 'armnn_tflite'
 ]
 EXAMPLE_REPOAGENTS = ['checksum']
 FLAGS = None
@@ -275,10 +275,10 @@ def core_cmake_args(components, backends, install_dir):
         if not be.startswith('tensorflow'):
             cargs.append('-DTRITON_ENABLE_{}={}'.format(
                 be.upper(), cmake_enable(be in backends)))
+        if be == 'tensorrt':
+            cargs += tensorrt_cmake_args()
         if (be in CORE_BACKENDS) and (be in backends):
-            if be == 'tensorrt':
-                cargs += tensorrt_cmake_args()
-            elif be == 'ensemble':
+            if be == 'ensemble':
                 pass
             else:
                 fail('unknown core backend {}'.format(be))
@@ -350,6 +350,8 @@ def backend_cmake_args(images, components, be, install_dir, library_paths):
         args = fil_cmake_args(images)
     elif be == 'fastertransformer':
         args = []
+    elif be == 'tensorrt':
+        args = tensorrt_cmake_args()
     elif be in EXAMPLE_BACKENDS:
         args = []
     else:
@@ -394,9 +396,10 @@ def onnxruntime_cmake_args(images, library_paths):
         '-DTRITON_BUILD_ONNXRUNTIME_VERSION={}'.format(
             TRITON_VERSION_MAP[FLAGS.version][2])
     ]
-
-    # ONNX-TRT support is currently disabled since TRT 8 is not supported
-    cargs.append('-DTRITON_ENABLE_ONNXRUNTIME_TENSORRT=OFF')
+    if FLAGS.enable_gpu:
+        cargs.append('-DTRITON_ENABLE_ONNXRUNTIME_TENSORRT=ON')
+    else:
+        cargs.append('-DTRITON_ENABLE_GPU=OFF')
 
     # If platform is jetpack do not use docker based build
     if target_platform() == 'jetpack':
@@ -449,12 +452,13 @@ def openvino_cmake_args():
 
 
 def tensorrt_cmake_args():
+    cargs = [
+        '-DTRITON_ENABLE_NVTX:BOOL={}'.format(cmake_enable(FLAGS.enable_nvtx))
+    ]
     if target_platform() == 'windows':
-        return [
-            '-DTRITON_TENSORRT_INCLUDE_PATHS=c:/TensorRT/include',
-        ]
+        cargs.append('-DTRITON_TENSORRT_INCLUDE_PATHS=c:/TensorRT/include')
 
-    return []
+    return cargs
 
 
 def tensorflow_cmake_args(ver, images, library_paths):
@@ -588,7 +592,8 @@ RUN apt-get update && \
             zlib1g-dev \
             libarchive-dev \
             pkg-config \
-            uuid-dev && \
+            uuid-dev \
+            libnuma-dev && \
     rm -rf /var/lib/apt/lists/*
 
 RUN pip3 install --upgrade pip && \
@@ -619,7 +624,7 @@ RUN rm -fr *
 COPY . .
 ENTRYPOINT []
 '''
-        if target_platform() != 'ubuntu/arm64':
+        if FLAGS.enable_gpu:
             df += install_dcgm_libraries(argmap['DCGM_VERSION'])
 
     df += '''
@@ -637,6 +642,18 @@ def create_dockerfile_build(ddir, dockerfile_name, backends):
 FROM tritonserver_builder_image AS build
 FROM tritonserver_buildbase
 COPY --from=build /tmp/tritonbuild /tmp/tritonbuild
+'''
+
+    # If requested, package the source code for all OSS used to build
+    # Triton Windows is not delivered as a container (and tar not
+    # available) so skip for windows platform.
+    if target_platform() != 'windows':
+        if not FLAGS.no_container_source:
+            df += '''
+RUN mkdir -p /tmp/tritonbuild/install/third-party-src && \
+    (cd /tmp/tritonbuild/tritonserver/build && \
+     tar zcf /tmp/tritonbuild/install/third-party-src/src.tar.gz third-party-src)
+COPY --from=build /workspace/build/server/README.third-party-src /tmp/tritonbuild/install/third-party-src/README
 '''
 
     if 'onnxruntime' in backends:
@@ -678,7 +695,7 @@ FROM ${{BASE_IMAGE}}
 '''.format(argmap['TRITON_VERSION'], argmap['TRITON_CONTAINER_VERSION'],
            argmap['BASE_IMAGE'])
 
-    df += dockerfile_prepare_container_linux(argmap, backends)
+    df += dockerfile_prepare_container_linux(argmap, backends, FLAGS.enable_gpu)
 
     df += '''
 WORKDIR /opt/tritonserver
@@ -692,6 +709,12 @@ COPY --chown=1000:1000 --from=tritonserver_build /tmp/tritonbuild/install/includ
 # Top-level include/core not copied so --chown does not set it correctly,
 # so explicit set on all of include
 RUN chown -R triton-server:triton-server include
+'''
+
+    # If requested, include the source code for all OSS used to build Triton
+    if not FLAGS.no_container_source:
+        df += '''
+COPY --chown=1000:1000 --from=tritonserver_build /tmp/tritonbuild/install/third-party-src third-party-src
 '''
 
     for noncore in NONCORE_BACKENDS:
@@ -716,7 +739,7 @@ COPY --chown=1000:1000 --from=tritonserver_build /workspace/build/sagemaker/serv
         dfile.write(df)
 
 
-def dockerfile_prepare_container_linux(argmap, backends):
+def dockerfile_prepare_container_linux(argmap, backends, enable_gpu):
     # Common steps to produce docker images shared by build.py and compose.py.
     # Sets enviroment variables, installs dependencies and adds entrypoint
     df = '''
@@ -729,6 +752,7 @@ LABEL com.nvidia.tritonserver.version="${TRITON_SERVER_VERSION}"
 
 ENV PATH /opt/tritonserver/bin:${PATH}
 '''
+    ort_dependencies = "libgomp1" if 'onnxruntime' in backends else ""
     df += '''
 ENV TF_ADJUST_HUE_FUSED         1
 ENV TF_ADJUST_SATURATION_FUSED  1
@@ -753,14 +777,26 @@ ENV DEBIAN_FRONTEND=noninteractive
 # example libcurl only needed for GCS?)
 RUN apt-get update && \
     apt-get install -y --no-install-recommends \
-         libb64-0d \
-         libcurl4-openssl-dev \
-         libnuma-dev \
-         libre2-5 && \
+            libb64-0d \
+            libcurl4-openssl-dev \
+            libre2-5 \
+            git \
+            dirmngr \
+            libnuma-dev \
+            curl \
+            {ort_dependencies} && \
     rm -rf /var/lib/apt/lists/*
-'''
-    if target_platform() != 'ubuntu/arm64':
+'''.format(ort_dependencies=ort_dependencies)
+
+    if enable_gpu:
         df += install_dcgm_libraries(argmap['DCGM_VERSION'])
+        df += '''
+# Extra defensive wiring for CUDA Compat lib
+RUN ln -sf ${_CUDA_COMPAT_PATH}/lib.real ${_CUDA_COMPAT_PATH}/lib \
+ && echo ${_CUDA_COMPAT_PATH}/lib > /etc/ld.so.conf.d/00-cuda-compat.conf \
+ && ldconfig \
+ && rm -f ${_CUDA_COMPAT_PATH}/lib 
+'''
 
     # Add dependencies needed for python backend
     if 'python' in backends:
@@ -768,14 +804,15 @@ RUN apt-get update && \
 # python3, python3-pip and some pip installs required for the python backend
 RUN apt-get update && \
     apt-get install -y --no-install-recommends \
-         python3 libarchive-dev \
-         python3-pip && \
+            python3 libarchive-dev \
+            python3-pip \
+            libpython3-dev && \
     pip3 install --upgrade pip && \
     pip3 install --upgrade wheel setuptools && \
     pip3 install --upgrade numpy && \
     rm -rf /var/lib/apt/lists/*
 '''
-    if target_platform() != 'ubuntu/arm64':
+    if not enable_gpu:
         df += '''
 # Extra defensive wiring for CUDA Compat lib
 RUN ln -sf ${_CUDA_COMPAT_PATH}/lib.real ${_CUDA_COMPAT_PATH}/lib \
@@ -1178,6 +1215,11 @@ if __name__ == '__main__':
         'When performing a container build, this command will be executed within the container just before the build it performed.'
     )
     parser.add_argument(
+        '--no-container-source',
+        action="store_true",
+        required=False,
+        help='Do not include OSS source code in Docker container.')
+    parser.add_argument(
         '--image',
         action='append',
         required=False,
@@ -1243,21 +1285,21 @@ if __name__ == '__main__':
         action='append',
         required=False,
         help=
-        'Include specified backend in build as <backend-name>[:<repo-tag>]. If <repo-tag> starts with "pull/" then it refers to a pull-request reference, otherwise <repo-tag> indicates the git tag/branch to use for the build. If the version is non-development then the default <repo-tag> is the release branch matching the container version (e.g. version 21.07 -> branch r21.07); otherwise the default <repo-tag> is "main" (e.g. version 21.07dev -> branch main).'
+        'Include specified backend in build as <backend-name>[:<repo-tag>]. If <repo-tag> starts with "pull/" then it refers to a pull-request reference, otherwise <repo-tag> indicates the git tag/branch to use for the build. If the version is non-development then the default <repo-tag> is the release branch matching the container version (e.g. version 21.08 -> branch r21.08); otherwise the default <repo-tag> is "main" (e.g. version 21.08dev -> branch main).'
     )
     parser.add_argument(
         '--repo-tag',
         action='append',
         required=False,
         help=
-        'The version of a component to use in the build as <component-name>:<repo-tag>. <component-name> can be "common", "core", "backend" or "thirdparty". If <repo-tag> starts with "pull/" then it refers to a pull-request reference, otherwise <repo-tag> indicates the git tag/branch. If the version is non-development then the default <repo-tag> is the release branch matching the container version (e.g. version 21.07 -> branch r21.07); otherwise the default <repo-tag> is "main" (e.g. version 21.07dev -> branch main).'
+        'The version of a component to use in the build as <component-name>:<repo-tag>. <component-name> can be "common", "core", "backend" or "thirdparty". If <repo-tag> starts with "pull/" then it refers to a pull-request reference, otherwise <repo-tag> indicates the git tag/branch. If the version is non-development then the default <repo-tag> is the release branch matching the container version (e.g. version 21.08 -> branch r21.08); otherwise the default <repo-tag> is "main" (e.g. version 21.08dev -> branch main).'
     )
     parser.add_argument(
         '--repoagent',
         action='append',
         required=False,
         help=
-        'Include specified repo agent in build as <repoagent-name>[:<repo-tag>]. If <repo-tag> starts with "pull/" then it refers to a pull-request reference, otherwise <repo-tag> indicates the git tag/branch to use for the build. If the version is non-development then the default <repo-tag> is the release branch matching the container version (e.g. version 21.07 -> branch r21.07); otherwise the default <repo-tag> is "main" (e.g. version 21.07dev -> branch main).'
+        'Include specified repo agent in build as <repoagent-name>[:<repo-tag>]. If <repo-tag> starts with "pull/" then it refers to a pull-request reference, otherwise <repo-tag> indicates the git tag/branch to use for the build. If the version is non-development then the default <repo-tag> is the release branch matching the container version (e.g. version 21.08 -> branch r21.08); otherwise the default <repo-tag> is "main" (e.g. version 21.08dev -> branch main).'
     )
 
     FLAGS = parser.parse_args()

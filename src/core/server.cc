@@ -1,4 +1,4 @@
-// Copyright (c) 2018-2021, NVIDIA CORPORATION. All rights reserved.
+// Copyright 2018-2021, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 //
 // Redistribution and use in source and binary forms, with or without
 // modification, are permitted provided that the following conditions
@@ -149,6 +149,21 @@ InferenceServer::Init()
     status = CommonErrorToStatus(triton::common::AsyncWorkQueue::Initialize(
         buffer_manager_thread_count_));
   }
+
+  std::unique_ptr<RateLimiter> local_rate_limiter;
+  bool ignore_resources_and_priority =
+      (rate_limit_mode_ == RateLimitMode::RL_OFF);
+  if (!ignore_resources_and_priority) {
+    return Status(
+        Status::Code::INVALID_ARG,
+        "rate limiter implementation is not complete. Please disable "
+        "rate limiter");
+  }
+  status = RateLimiter::Create(
+      ignore_resources_and_priority, rate_limit_resource_map_,
+      &local_rate_limiter);
+  rate_limiter_ = std::move(local_rate_limiter);
+
   if (!status.IsOk()) {
     ready_state_ = ServerReadyState::SERVER_FAILED_TO_INITIALIZE;
     return status;
@@ -510,18 +525,6 @@ InferenceServer::PrintBackendAndModelSummary()
   backend_headers.emplace_back("Config");
 
   triton::common::TablePrinter backends_table(backend_headers);
-
-  // TensorRT is built-in to core Triton (for now), so explicitly add
-  // a row for it.
-#ifdef TRITON_ENABLE_TENSORRT
-  {
-    std::vector<std::string> backend_record;
-    backend_record.emplace_back("tensorrt");
-    backend_record.emplace_back("<built-in>");
-    backend_record.emplace_back("{}");
-    backends_table.InsertRow(backend_record);
-  }
-#endif  // TRITON_ENABLE_TENSORRT
 
   std::unique_ptr<std::unordered_map<std::string, std::vector<std::string>>>
       backend_state;

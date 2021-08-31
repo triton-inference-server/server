@@ -1,5 +1,5 @@
 #!/bin/bash
-# Copyright (c) 2019-2021, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright 2019-2021, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -35,9 +35,6 @@ if [ -z "$REPO_VERSION" ]; then
     exit 1
 fi
 
-REPODIR=/data/inferenceserver/${REPO_VERSION}
-CAFFE2PLAN=../common/caffe2plan
-
 rm -f *.log *.serverlog *.csv *.metrics *.tjson *.json
 
 PROTOCOLS="grpc http"
@@ -53,14 +50,27 @@ TFTRT_MODEL_NAME="resnet50v1.5_fp16_savedmodel_trt"
 ONNXTRT_MODEL_NAME="resnet50_fp32_onnx_trt"
 TFAMP_MODEL_NAME="resnet50v1.5_fp16_savedmodel_amp"
 
+ARCH=${ARCH:="x86_64"}
+REPODIR=${REPODIR:="/data/inferenceserver/${REPO_VERSION}"}
+TRITON_DIR=${TRITON_DIR:="/opt/tritonserver"}
+
 #
 # Test minimum latency
 #
 STATIC_BATCH=1
 INSTANCE_CNT=1
 CONCURRENCY=1
-MODEL_NAMES="${TRT_MODEL_NAME} ${TF_MODEL_NAME} ${PYT_MODEL_NAME} ${ONNX_MODEL_NAME}"
-OPTIMIZED_MODEL_NAMES="${TFTRT_MODEL_NAME} ${ONNXTRT_MODEL_NAME} ${TFAMP_MODEL_NAME}"
+
+# Only TF, Onnx and TRT are supported on Jetson
+if [ "$ARCH" == "aarch64" ]; then
+    MODEL_NAMES="${TRT_MODEL_NAME} ${TF_MODEL_NAME} ${ONNX_MODEL_NAME}"
+    OPTIMIZED_MODEL_NAMES="${TFTRT_MODEL_NAME} ${TFAMP_MODEL_NAME} ${ONNXTRT_MODEL_NAME}"
+    CAFFE2PLAN=${TRITON_DIR}/test-util/bin/caffe2plan
+else
+    MODEL_NAMES="${TRT_MODEL_NAME} ${TF_MODEL_NAME} ${PYT_MODEL_NAME} ${ONNX_MODEL_NAME}"
+    OPTIMIZED_MODEL_NAMES="${TFTRT_MODEL_NAME} ${TFAMP_MODEL_NAME} ${ONNXTRT_MODEL_NAME}"
+    CAFFE2PLAN=../common/caffe2plan
+fi
 
 # Create optimized models
 rm -fr optimized_model_store && mkdir optimized_model_store
@@ -111,6 +121,7 @@ for MODEL_NAME in $MODEL_NAMES; do
                 PERF_CLIENT_PROTOCOL=${PROTOCOL} \
                 INSTANCE_CNT=${INSTANCE_CNT} \
                 CONCURRENCY=${CONCURRENCY} \
+                ARCH=${ARCH} \
                 bash -x run_test.sh
     done
 done
@@ -127,18 +138,22 @@ for MODEL_NAME in $OPTIMIZED_MODEL_NAMES; do
                 PERF_CLIENT_PROTOCOL=${PROTOCOL} \
                 INSTANCE_CNT=${INSTANCE_CNT} \
                 CONCURRENCY=${CONCURRENCY} \
+                ARCH=${ARCH} \
                 bash -x run_test.sh
     done
 done
 
 #
-# Test large static batch = 128 w/ 2 instances
+# Test large static batch = 128 w/ 2 instances (Use batch size 64 on Jetson Xavier)
 #
-STATIC_BATCH=128
+if [ "$ARCH" == "aarch64" ]; then
+    STATIC_BATCH=64
+else
+    STATIC_BATCH=128
+fi
+
 INSTANCE_CNT=2
 CONCURRENCY=4
-MODEL_NAMES="${TRT_MODEL_NAME} ${TF_MODEL_NAME} ${PYT_MODEL_NAME} ${ONNX_MODEL_NAME}"
-OPTIMIZED_MODEL_NAMES="${TFTRT_MODEL_NAME} ${ONNXTRT_MODEL_NAME} ${TFAMP_MODEL_NAME}"
 
 # Create the TensorRT plan from Caffe model
 rm -fr tensorrt_models && mkdir tensorrt_models
@@ -162,6 +177,7 @@ for MODEL_NAME in $MODEL_NAMES; do
                 PERF_CLIENT_PROTOCOL=${PROTOCOL} \
                 INSTANCE_CNT=${INSTANCE_CNT} \
                 CONCURRENCY=${CONCURRENCY} \
+                ARCH=${ARCH} \
                 bash -x run_test.sh
     done
 done
@@ -177,23 +193,27 @@ for MODEL_NAME in $OPTIMIZED_MODEL_NAMES; do
                 PERF_CLIENT_PROTOCOL=${PROTOCOL} \
                 INSTANCE_CNT=${INSTANCE_CNT} \
                 CONCURRENCY=${CONCURRENCY} \
+                ARCH=${ARCH} \
                 bash -x run_test.sh
     done
 done
 
 # Needs this additional test configuration for comparing against TFS.
-MODEL_NAME=${TF_MODEL_NAME}
-REPO=$REPODIR/perf_model_store
-STATIC_BATCH=128
-INSTANCE_CNT=1
-CONCURRENCY=1
-FRAMEWORK=$(echo ${MODEL_NAME} | cut -d '_' -f 3)
-MODEL_NAME=${MODEL_NAME} \
-    MODEL_FRAMEWORK=${FRAMEWORK} \
-    MODEL_PATH="$REPO/${MODEL_NAME}" \
-    STATIC_BATCH=${STATIC_BATCH} \
-    PERF_CLIENT_PROTOCOL="grpc" \
-    INSTANCE_CNT=${INSTANCE_CNT} \
-    CONCURRENCY=${CONCURRENCY} \
-    BACKEND_CONFIG=" --backend-config=tensorflow,version=2" \
-    bash -x run_test.sh
+if [ "$ARCH" == "x86_64" ]; then
+    MODEL_NAME=${TF_MODEL_NAME}
+    REPO=$REPODIR/perf_model_store
+    STATIC_BATCH=128
+    INSTANCE_CNT=1
+    CONCURRENCY=1
+    FRAMEWORK=$(echo ${MODEL_NAME} | cut -d '_' -f 3)
+    MODEL_NAME=${MODEL_NAME} \
+        MODEL_FRAMEWORK=${FRAMEWORK} \
+        MODEL_PATH="$REPO/${MODEL_NAME}" \
+        STATIC_BATCH=${STATIC_BATCH} \
+        PERF_CLIENT_PROTOCOL="grpc" \
+        INSTANCE_CNT=${INSTANCE_CNT} \
+        CONCURRENCY=${CONCURRENCY} \
+        ARCH=${ARCH} \
+        BACKEND_CONFIG=" --backend-config=tensorflow,version=2" \
+        bash -x run_test.sh
+fi
