@@ -241,13 +241,12 @@ target_link_libraries(
   PRIVATE triton-common-error
   PRIVATE triton-core-serverapi
   PRIVATE tritonserver
-  PRIVATE pthread
-  PRIVATE dl
 )
 if (NOT WIN32)
 target_link_libraries(
   main
   PRIVATE rt
+  PRIVATE dl
 )
 endif()
 if(${TRITON_ENABLE_GPU})
