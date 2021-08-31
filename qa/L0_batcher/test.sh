@@ -125,6 +125,10 @@ DIFFERENT_SHAPE_TESTS=${DIFFERENT_SHAPE_TESTS:="test_multi_batch_not_preferred_d
                                         test_multi_batch_different_shape_allow_ragged \
                                         test_multi_batch_different_shape"}
 
+# Test with preferred batch sizes but default max_queue_delay 
+PREFERRED_BATCH_ONLY_TESTS=${PREFERRED_BATCH_ONLY_TESTS:="test_preferred_batch_only_aligned \
+                                                    test_preferred_batch_only_unaligned"}
+
 # Setup non-variable-size model repository
 rm -fr *.log *.serverlog models && mkdir models
 for BACKEND in $BACKENDS; do
@@ -135,6 +139,17 @@ for BACKEND in $BACKENDS; do
           sed -i "s/^max_batch_size:.*/max_batch_size: 8/" config.pbtxt && \
           sed -i "s/^version_policy:.*/version_policy: { specific { versions: [1] }}/" config.pbtxt && \
           echo "dynamic_batching { preferred_batch_size: [ 2, 6 ], max_queue_delay_microseconds: 10000000 }" >> config.pbtxt)
+done
+
+rm -fr preferred_batch_only_models && mkdir preferred_batch_only_models
+for BACKEND in $BACKENDS; do
+    TMP_MODEL_DIR="$DATADIR/qa_model_repository/${BACKEND}_float32_float32_float32"
+
+    cp -r $TMP_MODEL_DIR preferred_batch_only_models/. &&
+    (cd preferred_batch_only_models/$(basename $TMP_MODEL_DIR) && \
+          sed -i "s/^max_batch_size:.*/max_batch_size: 8/" config.pbtxt && \
+          sed -i "s/^version_policy:.*/version_policy: { specific { versions: [1] }}/" config.pbtxt && \
+          echo "dynamic_batching { preferred_batch_size: [ 2 ] }" >> config.pbtxt)
 done
 
 # Setup variable-size model repository
@@ -376,6 +391,62 @@ for i in \
 
     if [ "$TEST_VALGRIND" -eq 1 ]; then
         LEAKCHECK_LOG="./$i.VARIABLE.valgrind.log"
+        LEAKCHECK_ARGS="$LEAKCHECK_ARGS_BASE --log-file=$LEAKCHECK_LOG"
+        run_server_leakcheck
+    elif [[ "$(< /proc/sys/kernel/osrelease)" == *Microsoft ]]; then
+        # We rely on HTTP endpoint in run_server so until HTTP is
+        # implemented for win we do this hack...
+        run_server_nowait
+        sleep 60
+    else
+        run_server
+    fi
+
+    if [ "$SERVER_PID" == "0" ]; then
+        echo -e "\n***\n*** Failed to start $SERVER\n***"
+        cat $SERVER_LOG
+        exit 1
+    fi
+
+    echo "Test: $i" >>$CLIENT_LOG
+
+    set +e
+    python3 $BATCHER_TEST BatcherTest.$i >>$CLIENT_LOG 2>&1
+    if [ $? -ne 0 ]; then
+        echo -e "\n***\n*** Test Failed\n***"
+        RET=1
+    else
+        check_test_results $TEST_RESULT_FILE 1
+        if [ $? -ne 0 ]; then
+            cat $CLIENT_LOG
+            echo -e "\n***\n*** Test Result Verification Failed\n***"
+            RET=1
+        fi
+    fi
+    set -e
+
+    unset TRITONSERVER_DELAY_SCHEDULER
+    kill_server
+
+    set +e
+    if [ "$TEST_VALGRIND" -eq 1 ]; then
+        python3 ../common/check_valgrind_log.py -f $LEAKCHECK_LOG
+        if [ $? -ne 0 ]; then
+            RET=1
+        fi
+    fi
+    set -e
+done
+
+export BATCHER_TYPE=FIXED
+for i in $PREFERRED_BATCH_ONLY_TESTS ; do
+    export TRITONSERVER_DELAY_SCHEDULER=4 &&
+            [[ "$i" != "test_preferred_batch_only_aligned" ]] && export TRITONSERVER_DELAY_SCHEDULER=3
+    SERVER_ARGS="--model-repository=$MODELDIR/preferred_batch_only_models ${SERVER_ARGS_EXTRA}"
+    SERVER_LOG="./$i.PREFERRED_BATCH_ONLY.serverlog"
+
+    if [ "$TEST_VALGRIND" -eq 1 ]; then
+        LEAKCHECK_LOG="./$i.PREFERRED_BATCH_ONLY.valgrind.log"
         LEAKCHECK_ARGS="$LEAKCHECK_ARGS_BASE --log-file=$LEAKCHECK_LOG"
         run_server_leakcheck
     elif [[ "$(< /proc/sys/kernel/osrelease)" == *Microsoft ]]; then
