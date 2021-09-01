@@ -93,7 +93,8 @@ def verify_timestamps(traces, preserve):
             response_request_after_large_delay_count += 1
 
     # Hardcoded expected count here
-    print(response_request_after_large_delay_count)
+    print("responses after large delay count: {}".format(
+        response_request_after_large_delay_count))
     if preserve:
         # If preserve ordering, there must be large delay batch followed by
         # small delay batch and thus at least 4 responses are sent after
