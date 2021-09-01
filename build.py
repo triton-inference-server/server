@@ -568,6 +568,7 @@ ENV DEBIAN_FRONTEND=noninteractive
 # python3-dev is needed by Torchvision
 # python3-pip and libarchive-dev is needed by python backend
 # uuid-dev and pkg-config is needed for Azure Storage
+# scons is needed for armnn_tflite backend build dep 
 RUN apt-get update && \
     apt-get install -y --no-install-recommends \
             autoconf \
@@ -586,6 +587,7 @@ RUN apt-get update && \
             python3-pip \
             python3-setuptools \
             rapidjson-dev \
+            scons \
             software-properties-common \
             unzip \
             wget \
@@ -599,14 +601,17 @@ RUN apt-get update && \
 RUN pip3 install --upgrade pip && \
     pip3 install --upgrade wheel setuptools docker
 
-# Server build requires recent version of CMake (FetchContent required)
-RUN wget -O - https://apt.kitware.com/keys/kitware-archive-latest.asc 2>/dev/null | \
-      gpg --dearmor - |  \
-      tee /etc/apt/trusted.gpg.d/kitware.gpg >/dev/null && \
-    apt-add-repository 'deb https://apt.kitware.com/ubuntu/ focal main' && \
-    apt-get update && \
-    apt-get install -y --no-install-recommends \
-      cmake-data=3.18.4-0kitware1ubuntu20.04.1 cmake=3.18.4-0kitware1ubuntu20.04.1
+# Server build requires recent version of CMake (FetchContent required), build from source
+RUN build=1 && \
+    mkdir /temp && \
+    cd /temp && \
+    wget https://cmake.org/files/v3.19/cmake-3.19.$build.tar.gz && \
+    tar -xzvf cmake-3.19.$build.tar.gz && \
+    rm cmake-3.19.$build.tar.gz && \
+    cd cmake-3.19.$build/ && \
+    ./bootstrap --parallel=$(nproc) && \
+    make -j$(nproc) && \
+    make install
 '''
 
     # Copy in the triton source. We remove existing contents first in
@@ -812,7 +817,7 @@ RUN apt-get update && \
     pip3 install --upgrade numpy && \
     rm -rf /var/lib/apt/lists/*
 '''
-    if not enable_gpu:
+    if enable_gpu:
         df += '''
 # Extra defensive wiring for CUDA Compat lib
 RUN ln -sf ${_CUDA_COMPAT_PATH}/lib.real ${_CUDA_COMPAT_PATH}/lib \
