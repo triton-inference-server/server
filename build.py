@@ -71,7 +71,7 @@ TRITON_VERSION_MAP = {
         '1.8.1',  # ORT
         '2021.2.200',  # ORT OpenVINO
         '2021.2',  # Standalone OpenVINO
-        '2.2.8')  # DCGM version
+        '2.2.9')  # DCGM version
 }
 
 EXAMPLE_BACKENDS = ['identity', 'square', 'repeat']
