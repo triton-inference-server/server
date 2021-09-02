@@ -102,6 +102,10 @@ class RequestResponseCache {
   // Build InferenceResponse from CacheEntry
   Status BuildInferenceResponse(
       const CacheEntry& entry, InferenceResponse* response);
+  // Helper function to hash data buffers used by "input"
+  Status HashInputBuffers(const InferenceRequest::Input& input, size_t* seed);
+  // Helper function to hash each input in "request"
+  Status HashInputs(const InferenceRequest& request, size_t* seed);
 
   // Cache buffer
   void* buffer_;

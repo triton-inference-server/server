@@ -47,6 +47,13 @@ RequestResponseCache::RequestResponseCache(const uint64_t size)
   // Create cache as managed buffer
   managed_buffer_ = boost::interprocess::managed_external_buffer(
       boost::interprocess::create_only_t{}, buffer_, size);
+  DEBUG("Requested managed_buffer_ size: " << size);
+  DEBUG(
+      "managed_buffer_ free memory right after creation: "
+      << managed_buffer_.get_free_memory());
+  DEBUG(
+      "Diff: " << managed_buffer_.get_size() -
+                      managed_buffer_.get_free_memory());
 }
 
 RequestResponseCache::~RequestResponseCache()
@@ -74,42 +81,70 @@ RequestResponseCache::~RequestResponseCache()
 }
 
 Status
-RequestResponseCache::Hash(const InferenceRequest& request, uint64_t* key)
+RequestResponseCache::HashInputBuffers(
+    const InferenceRequest::Input& input, size_t* seed)
 {
-  Status status = Status::Success;
-  std::size_t seed = 0;
-  // Add request model name to hash
-  boost::hash_combine(seed, request.ModelName());
-  // Add request model version to hash
-  // TODO: RequestedModelVersion or ActualModelVersion ?
-  //boost::hash_combine(seed, request.RequestedModelVersion());
-  boost::hash_combine(seed, request.ActualModelVersion());
+  auto status = Status::Success;
 
+  // Iterate over each data buffer in input in case of non-contiguous memory
+  for (size_t idx = 0; idx < input.DataBufferCount(); ++idx) {
+    const void* src_buffer;
+    size_t src_byte_size;
+    TRITONSERVER_MemoryType src_memory_type;
+    int64_t src_memory_type_id;
+
+    status = input.DataBuffer(
+        idx, &src_buffer, &src_byte_size, &src_memory_type,
+        &src_memory_type_id);
+
+    if (!status.IsOk()) {
+      return status;
+    }
+
+    // Add each byte of input buffer chunk to hash
+    const unsigned char* tmp = static_cast<const unsigned char*>(src_buffer);
+    for (uint64_t byte = 0; byte < src_byte_size; byte++) {
+      boost::hash_combine(*seed, tmp[byte]);
+    }
+  }
+
+  return status;
+}
+
+
+Status
+RequestResponseCache::HashInputs(const InferenceRequest& request, size_t* seed)
+{
+  auto status = Status::Success;
   // TODO: Use PrepareForInference + ImmutableInputs?
   const auto& inputs = request.OriginalInputs();
   for (const auto& input : inputs) {
     // Add input name to hash
-    boost::hash_combine(seed, input.second.Name());
+    boost::hash_combine(*seed, input.second.Name());
     // Fetch input buffer for hashing raw data
-    const void* buffer = nullptr;
-    uint64_t buffer_byte_size = 0;
-    TRITONSERVER_MemoryType memory_type = TRITONSERVER_MEMORY_CPU;
-    int64_t memory_type_id = 0;
-    const uint32_t index = 0;
-    status = input.second.DataBuffer(
-        index, &buffer, &buffer_byte_size, &memory_type, &memory_type_id);
+    status = HashInputBuffers(input.second, seed);
     if (!status.IsOk()) {
-      buffer = nullptr;
-      buffer_byte_size = 0;
       return status;
-    }
-    // Add each byte of input buffer to hash
-    const unsigned char* tmp = static_cast<const unsigned char*>(buffer);
-    for (uint64_t byte = 0; byte < buffer_byte_size; byte++) {
-      boost::hash_combine(seed, tmp[byte]);
     }
   }
 
+  return Status::Success;
+}
+
+
+Status
+RequestResponseCache::Hash(const InferenceRequest& request, uint64_t* key)
+{
+  auto status = Status::Success;
+  std::size_t seed = 0;
+  // Add request model name to hash
+  boost::hash_combine(seed, request.ModelName());
+  // Add request model version to hash
+  boost::hash_combine(seed, request.ActualModelVersion());
+  status = HashInputs(request, &seed);
+  if (!status.IsOk()) {
+    return status;
+  }
   *key = static_cast<uint64_t>(seed);
   return Status::Success;
 }
