@@ -92,6 +92,8 @@ for MODEL_NAME in $OPTIMIZED_MODEL_NAMES; do
         if [ "${MODEL_NAME}" = "${ONNXTRT_MODEL_NAME}" ] ; then
             echo "parameters { key: \"precision_mode\" value: \"FP16\" }" >> ${CONFIG_PATH}
             echo "parameters { key: \"max_workspace_size_bytes\" value: \"1073741824\" }" >> ${CONFIG_PATH}
+            echo "parameters { key: \"trt_engine_cache_enable\" value: \"1\" }" >> ${CONFIG_PATH}
+            echo "parameters { key: \"trt_engine_cache_path\" value: \"/opt/tritonserver/backends/onnxruntime\" } " >> ${CONFIG_PATH}
         fi
     fi
     echo "} ]" >> ${CONFIG_PATH}
