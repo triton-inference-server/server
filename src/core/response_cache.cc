@@ -84,8 +84,6 @@ Status
 RequestResponseCache::HashInputBuffers(
     const InferenceRequest::Input& input, size_t* seed)
 {
-  auto status = Status::Success;
-
   // Iterate over each data buffer in input in case of non-contiguous memory
   for (size_t idx = 0; idx < input.DataBufferCount(); ++idx) {
     const void* src_buffer;
@@ -93,13 +91,9 @@ RequestResponseCache::HashInputBuffers(
     TRITONSERVER_MemoryType src_memory_type;
     int64_t src_memory_type_id;
 
-    status = input.DataBuffer(
+    RETURN_IF_ERROR(input.DataBuffer(
         idx, &src_buffer, &src_byte_size, &src_memory_type,
-        &src_memory_type_id);
-
-    if (!status.IsOk()) {
-      return status;
-    }
+        &src_memory_type_id));
 
     // Add each byte of input buffer chunk to hash
     const unsigned char* tmp = static_cast<const unsigned char*>(src_buffer);
@@ -108,24 +102,20 @@ RequestResponseCache::HashInputBuffers(
     }
   }
 
-  return status;
+  return Status::Success;
 }
 
 
 Status
 RequestResponseCache::HashInputs(const InferenceRequest& request, size_t* seed)
 {
-  auto status = Status::Success;
   // TODO: Use PrepareForInference + ImmutableInputs?
   const auto& inputs = request.OriginalInputs();
   for (const auto& input : inputs) {
     // Add input name to hash
     boost::hash_combine(*seed, input.second.Name());
     // Fetch input buffer for hashing raw data
-    status = HashInputBuffers(input.second, seed);
-    if (!status.IsOk()) {
-      return status;
-    }
+    RETURN_IF_ERROR(HashInputBuffers(input.second, seed));
   }
 
   return Status::Success;
@@ -135,16 +125,12 @@ RequestResponseCache::HashInputs(const InferenceRequest& request, size_t* seed)
 Status
 RequestResponseCache::Hash(const InferenceRequest& request, uint64_t* key)
 {
-  auto status = Status::Success;
   std::size_t seed = 0;
   // Add request model name to hash
   boost::hash_combine(seed, request.ModelName());
   // Add request model version to hash
   boost::hash_combine(seed, request.ActualModelVersion());
-  status = HashInputs(request, &seed);
-  if (!status.IsOk()) {
-    return status;
-  }
+  RETURN_IF_ERROR(HashInputs(request, &seed));
   *key = static_cast<uint64_t>(seed);
   return Status::Success;
 }
@@ -159,11 +145,8 @@ RequestResponseCache::Lookup(const uint64_t key, InferenceResponse* ptr)
   // Populate passed-in "ptr" from cache entry
   auto entry = iter->second;
   // Build InferenceResponse from CacheEntry
-  auto status = BuildInferenceResponse(entry, ptr);
-  if (!status.IsOk()) {
-    return status;
-  }
-
+  RETURN_IF_ERROR(BuildInferenceResponse(entry, ptr));
+  
   // Update this key to front of LRU list
   UpdateLRU(iter);
 
@@ -184,10 +167,7 @@ RequestResponseCache::Insert(
 
   // Construct cache entry from response
   auto entry = CacheEntry();
-  auto status = BuildCacheEntry(response, &entry);
-  if (!status.IsOk()) {
-    return status;
-  }
+  RETURN_IF_ERROR(BuildCacheEntry(response, &entry));
 
   // Insert entry into cache
   DEBUG("Inserting key [" + std::to_string(key) + "] into cache.");
@@ -207,8 +187,6 @@ Status
 RequestResponseCache::BuildCacheEntry(
     const InferenceResponse& response, CacheEntry* entry)
 {
-  auto status = Status::Success;
-
   // Build cache entry data from response outputs
   for (const auto& response_output : response.Outputs()) {
     auto cache_output = Output();
@@ -220,14 +198,9 @@ RequestResponseCache::BuildCacheEntry(
     int64_t response_memory_type_id;
     void* userp;
     // TODO: How to handle different memory types? GPU vs CPU vs Pinned, etc.
-    status = response_output.DataBuffer(
+    RETURN_IF_ERROR(response_output.DataBuffer(
         &response_buffer, &response_byte_size, &response_memory_type,
-        &response_memory_type_id, &userp);
-
-    // Exit early if we fail to get output buffer from response
-    if (!status.IsOk()) {
-      return status;
-    }
+        &response_memory_type_id, &userp));
 
     // Exit early if response buffer from output is invalid
     if (response_buffer == nullptr) {
@@ -244,10 +217,7 @@ RequestResponseCache::BuildCacheEntry(
 
     // If cache doesn't enough space, evict until enough is available
     while (response_byte_size > managed_buffer_.get_free_memory()) {
-      status = Evict();
-      if (!status.IsOk()) {
-        return status;
-      }
+      RETURN_IF_ERROR(Evict());
     }
 
     // Set output metadata
@@ -282,19 +252,15 @@ Status
 RequestResponseCache::BuildInferenceResponse(
     const CacheEntry& entry, InferenceResponse* response)
 {
-  auto status = Status::Success;
   if (response == nullptr) {
     return Status(Status::Code::INTERNAL, "invalid response ptr passed in");
   }
 
   for (auto& cache_output : entry.outputs_) {
     InferenceResponse::Output* response_output = nullptr;
-    status = response->AddOutput(
+    RETURN_IF_ERROR(response->AddOutput(
         cache_output.name_, cache_output.dtype_, cache_output.shape_,
-        &response_output);
-    if (!status.IsOk()) {
-      return status;
-    }
+        &response_output));
 
     if (response_output == nullptr) {
       return Status(
@@ -307,17 +273,14 @@ RequestResponseCache::BuildInferenceResponse(
     int64_t memory_type_id = 0;
 
     void* vp = cache_output.buffer_;
-    status = response_output->AllocateDataBuffer(
-        &vp, cache_output.buffer_size_, &memory_type, &memory_type_id);
-    if (!status.IsOk()) {
-      return status;
-    }
+    RETURN_IF_ERROR(response_output->AllocateDataBuffer(
+        &vp, cache_output.buffer_size_, &memory_type, &memory_type_id));
 
     // TODO: Add field to InferenceResponse to indicate this was from cache
     // response.cached = true;
   }
 
-  return status;
+  return Status::Success;
 }
 
 // LRU
