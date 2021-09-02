@@ -34,6 +34,8 @@
 #include "model_config.pb.h"
 #include "src/backends/backend/triton_model.h"
 #include "src/backends/backend/triton_model_instance.h"
+#include "src/core/instance_queue.h"
+#include "src/core/payload.h"
 #include "src/core/status.h"
 
 namespace nvidia { namespace inferenceserver {
@@ -45,8 +47,6 @@ class RateLimiter {
 
  public:
   class ModelInstance;
-  class Payload;
-
 
   using StandardReleaseFunc = std::function<void(ModelInstance*)>;
   using StandardScheduleFunc = std::function<void(ModelInstance*)>;
@@ -127,49 +127,6 @@ class RateLimiter {
   /// Whether or not to ignore the resource configurations and priority settings
   /// for the rate limiter.
   bool IgnoreResourcesAndPriority() { return ignore_resources_and_priority_; }
-
-  class Payload {
-   public:
-    enum Operation { INFER_RUN = 0, INIT = 1, WARM_UP = 2, EXIT = 3 };
-    enum State {
-      UNINITIALIZED = 0,
-      READY = 1,
-      REQUESTED = 2,
-      SCHEDULED = 3,
-      EXECUTING = 4,
-      RELEASED = 5
-    };
-
-    Payload();
-    void Reset(
-        const Operation op_type, TritonModelInstance* instance = nullptr);
-    Operation GetOpType() { return op_type_; }
-    std::mutex* GetExecMutex() { return exec_mu_.get(); }
-    size_t RequestCount() { return requests_.size(); }
-    size_t BatchSize();
-    void ReserveRequests(size_t size);
-    void AddRequest(std::unique_ptr<InferenceRequest> request);
-    void SetCallback(std::function<void()> OnCallback);
-    void Callback();
-    void SetInstance(TritonModelInstance* model_instance);
-    TritonModelInstance* GetInstance() { return instance_; }
-
-    State GetState() { return state_; }
-    void SetState(State state);
-    void Execute(bool* should_exit);
-    Status Wait();
-    void Release();
-
-   private:
-    Operation op_type_;
-    std::vector<std::unique_ptr<InferenceRequest>> requests_;
-    std::function<void()> OnCallback_;
-    TritonModelInstance* instance_;
-    State state_;
-    std::unique_ptr<std::promise<Status>> status_;
-    std::unique_ptr<std::mutex> exec_mu_;
-  };
-
 
   std::shared_ptr<Payload> GetPayload(
       const Payload::Operation op_type,
@@ -333,10 +290,12 @@ class RateLimiter {
   std::deque<std::shared_ptr<Payload>> payloads_in_use_;
 
   struct PayloadQueue {
-    std::deque<std::shared_ptr<Payload>> queue_;
-    std::map<
-        const TritonModelInstance*,
-        std::unique_ptr<std::deque<std::shared_ptr<Payload>>>>
+    explicit PayloadQueue(size_t max_batch_size, uint64_t max_queue_delay_ns)
+    {
+      queue_.reset(new InstanceQueue(max_batch_size, max_queue_delay_ns));
+    }
+    std::unique_ptr<InstanceQueue> queue_;
+    std::map<const TritonModelInstance*, std::unique_ptr<InstanceQueue>>
         specific_queues_;
     std::mutex mu_;
     std::condition_variable cv_;

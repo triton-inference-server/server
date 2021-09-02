@@ -232,8 +232,8 @@ RUN mkdir -p qa/clients && mkdir -p qa/pkgs && \
     cp install/lib/libhttpclient.so qa/clients/. && \
     cp install/python/*.py qa/clients/. && \
     cp install/python/triton*.whl qa/pkgs/.
-RUN cp client/src/go/*.go qa/L0_simple_go_client/. && \
-    cp -r client/src/java qa/L0_client_java/.
+RUN cp client/src/grpc_generated/go/*.go qa/L0_simple_go_client/. && \
+    cp -r client/src/grpc_generated/java qa/L0_client_java/.
 
 ############################################################################
 ## Create CI enabled image

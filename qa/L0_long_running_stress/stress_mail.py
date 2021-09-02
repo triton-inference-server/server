@@ -1,4 +1,5 @@
-# Copyright (c) 2019-2021, NVIDIA CORPORATION. All rights reserved.
+#!/usr/bin/env python
+# Copyright (c) 2021, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -24,13 +25,21 @@
 # (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-replicaCount: 1
+import sys
+sys.path.append("../common")
 
-image:
-  imageName: nvcr.io/nvidia/tritonserver:21.08-py3
-  pullPolicy: IfNotPresent
-  modelRepositoryPath: gs://triton-inference-server-repository/model_repository
-  numGpus: 1
+import nightly_email_helper
 
-service:
-  type: LoadBalancer
+import glob
+from datetime import date
+
+if __name__ == '__main__':
+    today = date.today().strftime("%Y-%m-%d")
+    subject = "Triton Long-Running Stress Test Summary: " + today
+    stress_report = "stress_report.txt"
+    write_up = "<p>The table below includes results from long-running stress test. Please refer to the description of each test case to see what different kinds of inference requests were sent. Request concurrency is set to 8.</p>"
+    html_content = "<html><head></head><body><pre style=\"font-size:11pt;font-family:Arial, sans-serif;\">" + write_up + "</pre><pre style=\"font-size:11pt;font-family:Consolas;\">"
+    with open(stress_report, "r") as f:
+        html_content += f.read() + "\n"
+    html_content += "</pre></body></html>"
+    nightly_email_helper.send(subject, html_content, is_html=True)
