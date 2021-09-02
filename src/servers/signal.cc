@@ -119,7 +119,9 @@ ErrorSignalHandler(int signum)
   std::cerr << "Signal (" << signum << ") received." << std::endl;
   std::cerr << boost::stacktrace::stacktrace() << std::endl;
 
-  _Exit(1);
+  // Trigger the core dump
+  signal(signum, SIG_DFL);
+  raise(signum);
 }
 
 }  // namespace
