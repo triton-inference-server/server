@@ -205,13 +205,7 @@ class TritonServerOptions {
   void SetExitOnError(bool b) { exit_on_error_ = b; }
 
   bool StrictModelConfig() const { return strict_model_config_; }
-  void SetStrictModelConfig(bool b)
-  {
-    strict_model_config_ = b;
-    // Note the condition is reverted due to setting name is different
-    AddBackendConfig(
-        std::string(), "auto-complete-config", b ? "false" : "true");
-  }
+  void SetStrictModelConfig(bool b) { strict_model_config_ = b; }
 
   ni::RateLimitMode RateLimiterMode() const { return rate_limit_mode_; }
   void SetRateLimiterMode(ni::RateLimitMode m) { rate_limit_mode_ = m; }
@@ -246,8 +240,6 @@ class TritonServerOptions {
   void SetMinSupportedComputeCapability(double c)
   {
     min_compute_capability_ = c;
-    AddBackendConfig(
-        std::string(), "min-compute-capability", std::to_string(c));
   }
 
   bool StrictReadiness() const { return strict_readiness_; }
@@ -275,11 +267,7 @@ class TritonServerOptions {
   void SetMetricsInterval(uint64_t m) { metrics_interval_ = m; }
 
   const std::string& BackendDir() const { return backend_dir_; }
-  void SetBackendDir(const std::string& bd)
-  {
-    backend_dir_ = bd;
-    AddBackendConfig(std::string(), "backend-directory", bd);
-  }
+  void SetBackendDir(const std::string& bd) { backend_dir_ = bd; }
 
   const std::string& RepoAgentDir() const { return repoagent_dir_; }
   void SetRepoAgentDir(const std::string& rad) { repoagent_dir_ = rad; }
@@ -1737,13 +1725,27 @@ TRITONSERVER_ServerNew(
   lserver->SetModelRepositoryPaths(loptions->ModelRepositoryPaths());
   lserver->SetModelControlMode(loptions->ModelControlMode());
   lserver->SetStartupModels(loptions->StartupModels());
-  lserver->SetStrictModelConfigEnabled(loptions->StrictModelConfig());
+
+  bool strict_model_config = loptions->StrictModelConfig();
+  lserver->SetStrictModelConfigEnabled(strict_model_config);
+  // Note the condition is reverted due to setting name is different
+  loptions->AddBackendConfig(
+      std::string(), "auto-complete-config",
+      strict_model_config ? "false" : "true");
+
   lserver->SetRateLimiterMode(loptions->RateLimiterMode());
   lserver->SetRateLimiterResources(loptions->RateLimiterResources());
   lserver->SetPinnedMemoryPoolByteSize(loptions->PinnedMemoryPoolByteSize());
   lserver->SetCudaMemoryPoolByteSize(loptions->CudaMemoryPoolByteSize());
-  lserver->SetMinSupportedComputeCapability(
-      loptions->MinSupportedComputeCapability());
+
+  double min_compute_capability = loptions->MinSupportedComputeCapability();
+  lserver->SetMinSupportedComputeCapability(min_compute_capability);
+  loptions->AddBackendConfig(
+      std::string(), "min-compute-capability",
+      std::to_string(min_compute_capability));
+  loptions->AddBackendConfig(
+      std::string(), "backend-directory", loptions->BackendDir());
+
   lserver->SetStrictReadinessEnabled(loptions->StrictReadiness());
   lserver->SetExitTimeoutSeconds(loptions->ExitTimeout());
   lserver->SetBackendCmdlineConfig(loptions->BackendCmdlineConfigMap());
