@@ -65,10 +65,13 @@ create_conda_env "3.6" "python-3-6"
 conda install numpy=1.18.1 -y
 conda install tensorflow=2.1.0 -y
 conda-pack -o python3.6.tar.gz
-path_to_conda_pack=`pwd`/python3.6.tar.gz
+
+# Test relative execution env path
+path_to_conda_pack='$$TRITON_MODEL_DIRECTORY/python3.6.tar.gz'
 create_python_backend_stub
 mkdir -p models/python_3_6/1/
 cp ../../python_models/python_version/config.pbtxt ./models/python_3_6
+cp python3.6.tar.gz models/python_3_6
 (cd models/python_3_6 && \
           sed -i "s/^name:.*/name: \"python_3_6\"/" config.pbtxt && \
           echo "parameters: {key: \"EXECUTION_ENV_PATH\", value: {string_value: \"$path_to_conda_pack\"}}" >> config.pbtxt)
