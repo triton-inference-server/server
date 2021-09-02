@@ -73,7 +73,7 @@ HTTPServer::Start()
     evhtp_bind_socket(htp_, "0.0.0.0", port_, 1024);
 
     // Set listening event for breaking event loop
-    evutil_socketpair(AF_UNIX, SOCK_STREAM, 0, (intptr_t*)fds_);
+    evutil_socketpair(AF_UNIX, SOCK_STREAM, 0, fds_);
     break_ev_ = event_new(evbase_, fds_[0], EV_READ, StopCallback, evbase_);
     event_add(break_ev_, NULL);
     worker_ = std::thread(event_base_loop, evbase_, 0);
