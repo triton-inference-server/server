@@ -80,13 +80,25 @@ class RequestResponseCache {
   // Return Status object indicating success or failure.
   Status Evict();
   // Returns number of items in cache
-  size_t NumEntries() const { return cache_.size(); }
+  size_t NumEntries() 
+  {
+    std::lock_guard<std::mutex> lk(cache_mtx_);
+    return cache_.size();
+  }
   // Returns number of items evicted in lifespan of cache
   size_t NumEvictions() const { return num_evictions_; }
   // Returns total number of bytes allocated for cache
-  size_t TotalBytes() const { return managed_buffer_.get_size(); }
+  size_t TotalBytes() 
+  {
+    std::lock_guard<std::mutex> lk(buffer_mtx_);
+    return managed_buffer_.get_size();
+  }
   // Returns number of free bytes in cache
-  size_t FreeBytes() const { return managed_buffer_.get_free_memory(); }
+  size_t FreeBytes() 
+  {
+    std::lock_guard<std::mutex> lk(buffer_mtx_);
+    return managed_buffer_.get_free_memory();
+  }
   // Returns number of bytes in use by cache
   size_t AllocatedBytes() const
   {
@@ -117,6 +129,10 @@ class RequestResponseCache {
   std::list<uint64_t> lru_;
   // Track number of evictions
   size_t num_evictions_ = 0;
+  // Mutex for buffer synchronization
+  std::mutex buffer_mtx_;
+  // Mutex for cache synchronization
+  std::mutex cache_mtx_;
 };
 
 }}  // namespace nvidia::inferenceserver

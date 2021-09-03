@@ -25,8 +25,8 @@
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include "gtest/gtest.h"
 
-#include "src/core/logging.h"
 #include "src/core/memory.h"
+#include "src/core/logging.h"
 #include "src/core/response_cache.h"
 
 // TODO: Not sure how to incorporate this
@@ -319,7 +319,7 @@ check_status(ni::Status status)
 }
 
 void
-cache_stats(const ni::RequestResponseCache& cache)
+cache_stats(ni::RequestResponseCache& cache)
 {
   std::cout << "Cache entries: " << cache.NumEntries() << std::endl;
   std::cout << "Cache free bytes: " << cache.FreeBytes() << std::endl;
