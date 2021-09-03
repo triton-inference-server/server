@@ -47,7 +47,7 @@ TRITON_DIR=${TRITON_DIR:="/opt/tritonserver"}
 ARCH=${ARCH:="x86_64"}
 SERVER=${TRITON_DIR}/bin/tritonserver
 BACKEND_DIR=${TRITON_DIR}/backends
-SERVER_ARGS="--model-repository=`pwd`/models --backend-directory=${BACKEND_DIR}" 
+SERVER_ARGS="--model-repository=`pwd`/models --backend-directory=${BACKEND_DIR}"
 source ../common/util.sh
 
 # DATADIR is already set in environment variable for aarch64
@@ -161,7 +161,7 @@ for BACKEND in $BACKENDS; do
                  -i ${PERF_CLIENT_PROTOCOL} -m ${MODEL_NAME} \
                  -b${STATIC_BATCH} -t${CONCURRENCY} \
                  --shape ${INPUT_NAME}:${SHAPE} \
-                 -f ${RESULTDIR}/${NAME}.csv >> ${RESULTDIR}/${NAME}.log 2>&1
+                 -f ${RESULTDIR}/${NAME}.csv 2>&1 | tee ${RESULTDIR}/${NAME}.log
     if [ $? -ne 0 ]; then
         RET=1
     fi
