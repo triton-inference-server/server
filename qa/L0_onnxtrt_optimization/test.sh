@@ -43,6 +43,7 @@ CLIENT_LOG="./client.log"
 ONNXTRT_OPTIMIZATION_TEST=onnxtrt_optimization_test.py
 
 SERVER=/opt/tritonserver/bin/tritonserver
+CACHE_PATH=`pwd`/trt_cache
 SERVER_ARGS="--model-repository=`pwd`/models --log-verbose=1 --exit-on-error=false"
 SERVER_LOG="./inference_server.log"
 source ../common/util.sh
@@ -73,6 +74,15 @@ for MODEL in \
             echo "optimization { execution_accelerators { gpu_execution_accelerator : [ { name : \"tensorrt\" \
             parameters { key: \"precision_mode\" value: \"FP16\" } \
             parameters { key: \"max_workspace_size_bytes\" value: \"1073741824\" } }]}}" \
+            >> config.pbtxt) && \
+    # GPU execution accelerators with cache enabled
+    cp -r models/${MODEL}_test models/${MODEL}_cache_on && \
+    (cd models/${MODEL}_cache_on && \
+            sed -i 's/_float32_test/_float32_cache_on/' \
+                config.pbtxt && \
+            echo "optimization { execution_accelerators { gpu_execution_accelerator : [ { name : \"tensorrt\" \
+            parameters { key: \"trt_engine_cache_enable\" value: \"1\" } \
+            parameters { key: \"trt_engine_cache_path\" value: \"${CACHE_PATH}\" } }]}}" \
             >> config.pbtxt) && \
     # GPU execution accelerators with unknown parameters
     cp -r models/${MODEL}_test models/${MODEL}_unknown_param && \
@@ -117,6 +127,12 @@ for MODEL in \
     grep "TensorRT Execution Accelerator is set for '${MODEL}_param'" $SERVER_LOG
     if [ $? -ne 0 ]; then
         echo -e "\n***\n*** Failed. Expected TensorRT Execution Accelerator is set\n***"
+        RET=1
+    fi
+
+    grep "TensorRT Execution Accelerator is set for '${MODEL}_cache_on'" $SERVER_LOG
+    if [ $? -ne 0 ]; then
+        echo -e "\n***\n*** Failed. Expected TensorRT Execution Accelerator is set for '${MODEL}_cache_on'\n***"
         RET=1
     fi
 
