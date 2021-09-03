@@ -24,8 +24,8 @@
 // (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-#include "src/core/response_cache.h"
 #include "src/core/logging.h"
+#include "src/core/response_cache.h"
 
 // TODO: Figure out how to use Triton log macros in unit test
 #define DEBUG(x)                               \
@@ -47,13 +47,6 @@ RequestResponseCache::RequestResponseCache(const uint64_t size)
   // Create cache as managed buffer
   managed_buffer_ = boost::interprocess::managed_external_buffer(
       boost::interprocess::create_only_t{}, buffer_, size);
-  DEBUG("Requested managed_buffer_ size: " << size);
-  DEBUG(
-      "managed_buffer_ free memory right after creation: "
-      << managed_buffer_.get_free_memory());
-  DEBUG(
-      "Diff: " << managed_buffer_.get_size() -
-                      managed_buffer_.get_free_memory());
 }
 
 RequestResponseCache::~RequestResponseCache()
@@ -82,16 +75,16 @@ RequestResponseCache::~RequestResponseCache()
 
 Status
 RequestResponseCache::HashInputBuffers(
-    const InferenceRequest::Input& input, size_t* seed)
+    const InferenceRequest::Input* input, size_t* seed)
 {
   // Iterate over each data buffer in input in case of non-contiguous memory
-  for (size_t idx = 0; idx < input.DataBufferCount(); ++idx) {
+  for (size_t idx = 0; idx < input->DataBufferCount(); ++idx) {
     const void* src_buffer;
     size_t src_byte_size;
     TRITONSERVER_MemoryType src_memory_type;
     int64_t src_memory_type_id;
 
-    RETURN_IF_ERROR(input.DataBuffer(
+    RETURN_IF_ERROR(input->DataBuffer(
         idx, &src_buffer, &src_byte_size, &src_memory_type,
         &src_memory_type_id));
 
@@ -109,11 +102,10 @@ RequestResponseCache::HashInputBuffers(
 Status
 RequestResponseCache::HashInputs(const InferenceRequest& request, size_t* seed)
 {
-  // TODO: Use PrepareForInference + ImmutableInputs?
-  const auto& inputs = request.OriginalInputs();
+  const auto& inputs = request.ImmutableInputs();
   for (const auto& input : inputs) {
     // Add input name to hash
-    boost::hash_combine(*seed, input.second.Name());
+    boost::hash_combine(*seed, input.second->Name());
     // Fetch input buffer for hashing raw data
     RETURN_IF_ERROR(HashInputBuffers(input.second, seed));
   }
