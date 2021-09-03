@@ -137,6 +137,9 @@ RequestResponseCache::Hash(const InferenceRequest& request, uint64_t* key)
 Status
 RequestResponseCache::Lookup(const uint64_t key, InferenceResponse* ptr)
 {
+  // Lock on cache lookup
+  std::lock_guard<std::recursive_mutex> lk(cache_mtx_);
+
   auto iter = cache_.find(key);
   if (iter == cache_.end()) {
     return Status(Status::Code::INTERNAL, "key not found in cache");
@@ -156,6 +159,9 @@ Status
 RequestResponseCache::Insert(
     const uint64_t key, const InferenceResponse& response)
 {
+  // Lock on cache insertion
+  std::lock_guard<std::recursive_mutex> lk(cache_mtx_);
+
   // Exit early if key already exists in cache
   auto iter = cache_.find(key);
   if (iter != cache_.end()) {
@@ -213,38 +219,43 @@ RequestResponseCache::BuildCacheEntry(
           Status::Code::INTERNAL, "Response buffer from output was nullptr");
     }
 
-    // Exit early if cache entry will be larger than available cache size
-    if (response_byte_size > managed_buffer_.get_size()) {
-      return Status(
-          Status::Code::INTERNAL,
-          "Cache entry is larger than total cache size");
+    // Lock on managed buffer references 
+    {
+      std::lock_guard<std::recursive_mutex> lk(buffer_mtx_);
+
+      // Exit early if cache entry will be larger than available cache size
+      if (response_byte_size > managed_buffer_.get_size()) {
+        return Status(
+            Status::Code::INTERNAL,
+            "Cache entry is larger than total cache size");
+      }
+
+      // If cache doesn't enough space, evict until enough is available
+      while (response_byte_size > managed_buffer_.get_free_memory()) {
+        RETURN_IF_ERROR(Evict());
+      }
+
+      // Set output metadata
+      cache_output.name_ = response_output.Name();
+      cache_output.dtype_ = response_output.DType();
+      cache_output.shape_ = response_output.Shape();
+      cache_output.buffer_size_ = static_cast<uint64_t>(response_byte_size);
+
+      // Allocate buffer for response output in cache entry
+      cache_output.buffer_ =
+          managed_buffer_.allocate(response_byte_size, std::nothrow_t{});
+      // Exit early if we fail to allocate from managed buffer
+      if (cache_output.buffer_ == nullptr) {
+        return Status(
+            Status::Code::INTERNAL,
+            "Failed to allocate buffer from managed buffer");
+      }
+
+      // Copy data from response buffer to cache entry output buffer
+      // TODO: How to differently handle different memory types?
+      //       GPU vs. CPU memory, etc.
+      std::memcpy(cache_output.buffer_, response_buffer, response_byte_size);
     }
-
-    // If cache doesn't enough space, evict until enough is available
-    while (response_byte_size > managed_buffer_.get_free_memory()) {
-      RETURN_IF_ERROR(Evict());
-    }
-
-    // Set output metadata
-    cache_output.name_ = response_output.Name();
-    cache_output.dtype_ = response_output.DType();
-    cache_output.shape_ = response_output.Shape();
-    cache_output.buffer_size_ = static_cast<uint64_t>(response_byte_size);
-
-    // Allocate buffer for response output in cache entry
-    cache_output.buffer_ =
-        managed_buffer_.allocate(response_byte_size, std::nothrow_t{});
-    // Exit early if we fail to allocate from managed buffer
-    if (cache_output.buffer_ == nullptr) {
-      return Status(
-          Status::Code::INTERNAL,
-          "Failed to allocate buffer from managed buffer");
-    }
-
-    // Copy data from response buffer to cache entry output buffer
-    // TODO: How to differently handle different memory types?
-    //       GPU vs. CPU memory, etc.
-    std::memcpy(cache_output.buffer_, response_buffer, response_byte_size);
 
     // Add each output to cache entry
     entry->outputs_.push_back(cache_output);
@@ -262,46 +273,51 @@ RequestResponseCache::BuildInferenceResponse(
     return Status(Status::Code::INTERNAL, "invalid response ptr passed in");
   }
 
-  for (auto& cache_output : entry.outputs_) {
-    InferenceResponse::Output* response_output = nullptr;
-    RETURN_IF_ERROR(response->AddOutput(
-        cache_output.name_, cache_output.dtype_, cache_output.shape_,
-        &response_output));
+  // Lock on cache references 
+  {
+    std::lock_guard<std::recursive_mutex> lk(cache_mtx_);
 
-    if (response_output == nullptr) {
-      return Status(
-          Status::Code::INTERNAL,
-          "InferenceResponse::Output pointer as nullptr");
+    for (auto& cache_output : entry.outputs_) {
+      InferenceResponse::Output* response_output = nullptr;
+      RETURN_IF_ERROR(response->AddOutput(
+          cache_output.name_, cache_output.dtype_, cache_output.shape_,
+          &response_output));
+
+      if (response_output == nullptr) {
+        return Status(
+            Status::Code::INTERNAL,
+            "InferenceResponse::Output pointer as nullptr");
+      }
+
+      // TODO: Assuming CPU memory only for now
+      TRITONSERVER_MemoryType memory_type = TRITONSERVER_MEMORY_CPU;
+      int64_t memory_type_id = 0;
+
+      // Allocate buffer for inference response
+      void* buffer;
+      RETURN_IF_ERROR(response_output->AllocateDataBuffer(
+          &buffer, cache_output.buffer_size_, &memory_type, &memory_type_id));
+
+      // TODO: Handle other memory types
+      if (memory_type != TRITONSERVER_MEMORY_CPU) {
+        return Status(
+            Status::Code::INTERNAL,
+            "Only input buffers in CPU memory are allowed in cache currently");
+      }
+
+      if (buffer == nullptr) {
+        return Status(
+            Status::Code::INTERNAL,
+            "failed to allocate buffer for output '" + cache_output.name_ + "'");
+      }
+
+      // TODO: No out of scope issue here? With underlying
+      //       allocated_buffer_ == buffer ?
+      std::memcpy(buffer, cache_output.buffer_, cache_output.buffer_size_);
+
+      // TODO: Add field to InferenceResponse to indicate this was from cache
+      // response.cached = true;
     }
-
-    // TODO: Assuming CPU memory only for now
-    TRITONSERVER_MemoryType memory_type = TRITONSERVER_MEMORY_CPU;
-    int64_t memory_type_id = 0;
-
-    // Allocate buffer for inference response
-    void* buffer;
-    RETURN_IF_ERROR(response_output->AllocateDataBuffer(
-        &buffer, cache_output.buffer_size_, &memory_type, &memory_type_id));
-
-    // TODO: Handle other memory types
-    if (memory_type != TRITONSERVER_MEMORY_CPU) {
-      return Status(
-          Status::Code::INTERNAL,
-          "Only input buffers in CPU memory are allowed in cache currently");
-    }
-
-    if (buffer == nullptr) {
-      return Status(
-          Status::Code::INTERNAL,
-          "failed to allocate buffer for output '" + cache_output.name_ + "'");
-    }
-
-    // TODO: No out of scope issue here? With underlying
-    //       allocated_buffer_ == buffer ?
-    std::memcpy(buffer, cache_output.buffer_, cache_output.buffer_size_);
-
-    // TODO: Add field to InferenceResponse to indicate this was from cache
-    // response.cached = true;
   }
 
   return Status::Success;
@@ -311,6 +327,9 @@ RequestResponseCache::BuildInferenceResponse(
 Status
 RequestResponseCache::Evict()
 {
+  // Lock on cache eviction
+  std::lock_guard<std::recursive_mutex> lk(cache_mtx_);
+
   // Least recently used key in back of LRU list
   uint64_t lru_key = lru_.back();
   DEBUG("Evicting key [" + std::to_string(lru_key) + "] from cache.");
@@ -330,6 +349,8 @@ RequestResponseCache::Evict()
   auto entry = iter->second;
   // Free managed memory used in cache entry's outputs
   for (auto& output : entry.outputs_) {
+    // Lock on buffer deallocation
+    std::lock_guard<std::recursive_mutex> lk(buffer_mtx_);
     managed_buffer_.deallocate(output.buffer_);
   }
 
@@ -348,6 +369,9 @@ void
 RequestResponseCache::UpdateLRU(
     std::unordered_map<uint64_t, CacheEntry>::iterator& cache_iter)
 {
+  // Lock on cache update
+  std::lock_guard<std::recursive_mutex> lk(cache_mtx_);
+
   const auto& key = cache_iter->first;
   auto& cache_entry = cache_iter->second;
   // Remove key from LRU list if it was already in there
