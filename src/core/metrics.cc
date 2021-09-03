@@ -392,8 +392,11 @@ Metrics::InitializeDcgmMetrics()
                 } else {
                   power_limit_fail_cnt[didx]++;
                   power_limit = 0;
-                  LOG_WARNING << "Unable to get power limit for GPU " << cuda_id
-                              << ": " << errorString(dcgmerr);
+                  dcgmReturn_t status = dcgmReturn_t(field_values[0].status);
+                  LOG_WARNING
+                      << "Unable to get power limit for GPU " << cuda_id
+                      << ". Status:" << errorString(status)
+                      << ", value:" << dcgmValueToErrorMessage(power_limit);
                 }
                 gpu_power_limit_[didx]->Set(power_limit);
               }
@@ -407,15 +410,18 @@ Metrics::InitializeDcgmMetrics()
                 } else {
                   power_usage_fail_cnt[didx]++;
                   power_usage = 0;
-                  LOG_WARNING << "Unable to get power usage for GPU " << cuda_id
-                              << ": " << errorString(dcgmerr);
+                  dcgmReturn_t status = dcgmReturn_t(field_values[1].status);
+                  LOG_WARNING
+                      << "Unable to get power usage for GPU " << cuda_id
+                      << ". Status:" << errorString(status)
+                      << ", value:" << dcgmValueToErrorMessage(power_usage);
                 }
                 gpu_power_usage_[didx]->Set(power_usage);
               }
 
               // Energy Consumption
               if (energy_fail_cnt[didx] < fail_threshold) {
-                unsigned int energy = field_values[2].value.i64;
+                int64_t energy = field_values[2].value.i64;
                 if ((field_values[2].status == DCGM_ST_OK) &&
                     (!DCGM_INT64_IS_BLANK(energy))) {
                   energy_fail_cnt[didx] = 0;
@@ -428,31 +434,35 @@ Metrics::InitializeDcgmMetrics()
                 } else {
                   energy_fail_cnt[didx]++;
                   energy = 0;
+                  dcgmReturn_t status = dcgmReturn_t(field_values[2].status);
                   LOG_WARNING << "Unable to get energy consumption for "
-                              << "GPU " << cuda_id << ": "
-                              << errorString(dcgmerr);
+                              << "GPU " << cuda_id
+                              << ". Status:" << errorString(status)
+                              << ", value:" << dcgmValueToErrorMessage(energy);
                 }
               }
 
               // Utilization
               if (util_fail_cnt[didx] < fail_threshold) {
-                unsigned int util = field_values[3].value.i64;
+                int64_t util = field_values[3].value.i64;
                 if ((field_values[3].status == DCGM_ST_OK) &&
                     (!DCGM_INT64_IS_BLANK(util))) {
                   util_fail_cnt[didx] = 0;
                 } else {
                   util_fail_cnt[didx]++;
                   util = 0;
+                  dcgmReturn_t status = dcgmReturn_t(field_values[3].status);
                   LOG_WARNING << "Unable to get GPU utilization for GPU "
-                              << cuda_id << ": " << errorString(dcgmerr);
+                              << cuda_id << ". Status:" << errorString(status)
+                              << ", value:" << dcgmValueToErrorMessage(util);
                 }
                 gpu_utilization_[didx]->Set((double)util * 0.01);
               }
 
               // Memory Usage
               if (mem_fail_cnt[didx] < fail_threshold) {
-                unsigned int memory_used = field_values[4].value.i64;
-                unsigned int memory_total = field_values[5].value.i64;
+                int64_t memory_used = field_values[4].value.i64;
+                int64_t memory_total = field_values[5].value.i64;
                 if ((field_values[4].status == DCGM_ST_OK) &&
                     (!DCGM_INT64_IS_BLANK(memory_used)) &&
                     (field_values[5].status == DCGM_ST_OK) &&
@@ -462,8 +472,17 @@ Metrics::InitializeDcgmMetrics()
                   memory_total = 0;
                   memory_used = 0;
                   mem_fail_cnt[didx]++;
-                  LOG_WARNING << "Unable to get memory usage for GPU "
-                              << cuda_id << ": " << errorString(dcgmerr);
+                  dcgmReturn_t usageStatus =
+                      dcgmReturn_t(field_values[4].status);
+                  dcgmReturn_t memoryTotaltatus =
+                      dcgmReturn_t(field_values[5].status);
+                  LOG_WARNING
+                      << "Unable to get memory usage for GPU " << cuda_id
+                      << ". Memory usage status:" << errorString(usageStatus)
+                      << ", value:" << dcgmValueToErrorMessage(memory_used)
+                      << ". Memory total status:"
+                      << errorString(memoryTotaltatus)
+                      << ", value:" << dcgmValueToErrorMessage(memory_total);
                 }
                 gpu_memory_total_[didx]->Set(
                     memory_total * 1024 * 1024);  // bytes
@@ -480,6 +499,49 @@ Metrics::InitializeDcgmMetrics()
   return true;
 #endif  // TRITON_ENABLE_METRICS_GPU
 }
+
+#ifdef TRITON_ENABLE_METRICS_GPU
+std::string
+Metrics::dcgmValueToErrorMessage(double val)
+{
+  if (DCGM_FP64_IS_BLANK(val)) {
+    if (val == DCGM_FP64_BLANK) {
+      return "Not Specified";
+    } else if (val == DCGM_FP64_NOT_FOUND) {
+      return "Not Found";
+    } else if (val == DCGM_FP64_NOT_SUPPORTED) {
+      return "Not Supported";
+    } else if (val == DCGM_FP64_NOT_PERMISSIONED) {
+      return "Insf. Permission";
+    } else {
+      return "Unknown";
+    }
+  } else {
+    return std::to_string(val);
+  }
+}
+
+std::string
+Metrics::dcgmValueToErrorMessage(int64_t val)
+{
+  if (DCGM_INT64_IS_BLANK(val)) {
+    switch (val) {
+      case DCGM_INT64_BLANK:
+        return "Not Specified";
+      case DCGM_INT64_NOT_FOUND:
+        return "Not Found";
+      case DCGM_INT64_NOT_SUPPORTED:
+        return "Not Supported";
+      case DCGM_INT64_NOT_PERMISSIONED:
+        return "Insf. Permission";
+      default:
+        return "Unknown";
+    }
+  } else {
+    return std::to_string(val);
+  }
+}
+#endif  // TRITON_ENABLE_METRICS_GPU
 
 bool
 Metrics::UUIDForCudaDevice(int cuda_device, std::string* uuid)
