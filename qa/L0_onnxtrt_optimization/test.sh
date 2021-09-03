@@ -132,7 +132,7 @@ for MODEL in \
 
     grep "TensorRT Execution Accelerator is set for '${MODEL}_cache_on'" $SERVER_LOG
     if [ $? -ne 0 ]; then
-        echo -e "\n***\n*** Failed. Expected TensorRT Execution Accelerator is set\n***"
+        echo -e "\n***\n*** Failed. Expected TensorRT Execution Accelerator is set for '${MODEL}_cache_on'\n***"
         RET=1
     fi
 
