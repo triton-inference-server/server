@@ -42,7 +42,7 @@ FROM ${BASE_IMAGE}
 ENV DEBIAN_FRONTEND=noninteractive
 
 # DCGM version to install for Model Analyzer
-ARG DCGM_VERSION=2.0.13
+ARG DCGM_VERSION=2.2.9
 
 RUN apt-get update && \
     apt-get install -y --no-install-recommends \
@@ -142,8 +142,12 @@ RUN pip3 install --upgrade numpy pillow attrdict && \
 
 # Install DCGM
 RUN if [ "$TRITON_ENABLE_GPU" = "ON" ]; then \
-      wget https://developer.download.nvidia.com/compute/cuda/repos/ubuntu2004/x86_64/datacenter-gpu-manager_${DCGM_VERSION}_amd64.deb && \
-      dpkg -i datacenter-gpu-manager_${DCGM_VERSION}_amd64.deb; \
+      apt-get update && apt-get install -y --no-install-recommends software-properties-common && \
+      wget https://developer.download.nvidia.com/compute/cuda/repos/ubuntu2004/x86_64/cuda-ubuntu2004.pin && \
+      mv cuda-ubuntu2004.pin /etc/apt/preferences.d/cuda-repository-pin-600 && \
+      apt-key adv --fetch-keys https://developer.download.nvidia.com/compute/cuda/repos/ubuntu2004/x86_64/7fa2af80.pub && \
+      add-apt-repository "deb https://developer.download.nvidia.com/compute/cuda/repos/ubuntu2004/x86_64/ /" && \
+      apt-get install -y datacenter-gpu-manager=1:${DCGM_VERSION}; \
     fi
 
 # Install Model Analyzer
