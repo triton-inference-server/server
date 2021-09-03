@@ -284,7 +284,7 @@ class RequestResponseCacheTest : public ::testing::Test {
 void
 check_status(ni::Status status)
 {
-  EXPECT_TRUE(status.IsOk()) << "ERROR: " << status.Message();
+  ASSERT_TRUE(status.IsOk()) << "ERROR: " << status.Message();
 }
 
 void
@@ -322,7 +322,7 @@ TEST_F(RequestResponseCacheTest, TestHashing)
   request0.AddOriginalInput("input", dtype, shape, &input0);
   request1.AddOriginalInput("input", dtype, shape, &input1);
   request2.AddOriginalInput("input", dtype, shape, &input2);
-  EXPECT_NE(input0, nullptr);
+  ASSERT_NE(input0, nullptr);
   // Add data to input
   int data0[4] = {1, 2, 3, 4};
   int data1[4] = {5, 6, 7, 8};
@@ -348,9 +348,9 @@ TEST_F(RequestResponseCacheTest, TestHashing)
   std::cout << "hash1: " << hash1 << std::endl;
   std::cout << "hash2: " << hash2 << std::endl;
   // Different input data should have different hashes
-  EXPECT_NE(hash0, hash1);
+  ASSERT_NE(hash0, hash1);
   // Same input data should have same hashes
-  EXPECT_EQ(hash1, hash2);
+  ASSERT_EQ(hash1, hash2);
 }
 
 // Test cache too small for entry
@@ -392,7 +392,7 @@ TEST_F(RequestResponseCacheTest, TestCacheTooSmall)
   status = response_output->AllocateDataBuffer(
       &buffer, output_size, &memory_type, &memory_type_id);
   check_status(status);
-  EXPECT_NE(buffer, nullptr);
+  ASSERT_NE(buffer, nullptr);
   // Copy data from output to response buffer
   std::memcpy(buffer, output0.data(), output_size);
 
@@ -400,7 +400,7 @@ TEST_F(RequestResponseCacheTest, TestCacheTooSmall)
   status = cache.Insert(hash0, *response0);
   // We expect insertion to fail here since cache is too small
   std::cout << status.Message() << std::endl;
-  EXPECT_FALSE(status.IsOk()) << "Inserting item larger than cache succeeded when it should fail";
+  ASSERT_FALSE(status.IsOk()) << "Inserting item larger than cache succeeded when it should fail";
 }
 
 // TODO: Understand why managed buffer allocates more memory than requested
@@ -447,38 +447,38 @@ TEST_F(RequestResponseCacheTest, TestEviction)
   status = response_output->AllocateDataBuffer(
       &buffer, output_size, &memory_type, &memory_type_id);
   check_status(status);
-  EXPECT_NE(buffer, nullptr);
+  ASSERT_NE(buffer, nullptr);
   // Copy data from output to response buffer
   std::memcpy(buffer, output0.data(), output_size);
 
   std::cout << "Lookup hash0 in empty cache" << std::endl;
   status = cache.Lookup(hash0, nullptr);
   // This hash not in cache yet
-  EXPECT_FALSE(status.IsOk()) << "hash [" + std::to_string(hash0) + "] should not be in cache";
+  ASSERT_FALSE(status.IsOk()) << "hash [" + std::to_string(hash0) + "] should not be in cache";
   std::cout << "Insert response into cache with hash0" << std::endl;
   status = cache.Insert(hash0, *response0);
   check_status(status);
   cache_stats(cache);
-  EXPECT_EQ(cache.NumEntries(), 1u);
-  EXPECT_EQ(cache.NumEvictions(), 0u);
+  ASSERT_EQ(cache.NumEntries(), 1u);
+  ASSERT_EQ(cache.NumEvictions(), 0u);
 
   status = cache.Insert(hash1, *response0);
   check_status(status);
   cache_stats(cache);
-  EXPECT_EQ(cache.NumEntries(), 2u);
-  EXPECT_EQ(cache.NumEvictions(), 0u);
+  ASSERT_EQ(cache.NumEntries(), 2u);
+  ASSERT_EQ(cache.NumEvictions(), 0u);
 
   status = cache.Insert(hash2, *response0);
   check_status(status);
   cache_stats(cache);
-  EXPECT_EQ(cache.NumEntries(), 2u);
-  EXPECT_EQ(cache.NumEvictions(), 1u);
+  ASSERT_EQ(cache.NumEntries(), 2u);
+  ASSERT_EQ(cache.NumEvictions(), 1u);
 
   status = cache.Insert(hash3, *response0);
   check_status(status);
   cache_stats(cache);
-  EXPECT_EQ(cache.NumEntries(), 2u);
-  EXPECT_EQ(cache.NumEvictions(), 2u);
+  ASSERT_EQ(cache.NumEntries(), 2u);
+  ASSERT_EQ(cache.NumEvictions(), 2u);
 }
 
 
@@ -503,7 +503,7 @@ TEST_F(RequestResponseCacheTest, TestEndToEnd)
   // Add input to request
   std::cout << "Add input to request" << std::endl;
   request0.AddOriginalInput("input", dtype, shape, &input0);
-  EXPECT_NE(input0, nullptr);
+  ASSERT_NE(input0, nullptr);
   // Add data to input
   std::vector<int> data0 = {1, 2, 3, 4};
   TRITONSERVER_MemoryType memory_type = TRITONSERVER_MEMORY_CPU;
@@ -538,14 +538,14 @@ TEST_F(RequestResponseCacheTest, TestEndToEnd)
   status = response_output->AllocateDataBuffer(
       &buffer, output_size, &memory_type, &memory_type_id);
   check_status(status);
-  EXPECT_NE(buffer, nullptr);
+  ASSERT_NE(buffer, nullptr);
   // Copy data from output to response buffer
   std::memcpy(buffer, output0.data(), output_size);
 
   std::cout << "Lookup hash0 in empty cache" << std::endl;
   status = cache.Lookup(hash0, nullptr);
   // This hash not in cache yet
-  EXPECT_FALSE(status.IsOk()) << "hash [" + std::to_string(hash0) + "] should not be in cache";
+  ASSERT_FALSE(status.IsOk()) << "hash [" + std::to_string(hash0) + "] should not be in cache";
   std::cout << "Insert response into cache with hash0" << std::endl;
   status = cache.Insert(hash0, *response0);
   // Insertion should succeed
@@ -555,7 +555,7 @@ TEST_F(RequestResponseCacheTest, TestEndToEnd)
 
   // Duplicate insertion should fail since key already exists
   status = cache.Insert(hash0, *response0);
-  EXPECT_FALSE(status.IsOk()) << "Inserting duplicate item in cache should fail";
+  ASSERT_FALSE(status.IsOk()) << "Inserting duplicate item in cache should fail";
 
   // Create response to test cache lookup
   std::cout << "Create response object into fill from cache" << std::endl;
@@ -589,15 +589,15 @@ TEST_F(RequestResponseCacheTest, TestEndToEnd)
   std::cout << "Check output buffer data from cache entry:" << std::endl;
   for (size_t i = 0; i < response_byte_size / sizeof(int); i++) {
     std::cout << output_test[i] << " == " << output0[i] << std::endl;
-    EXPECT_EQ(output_test[i], output0[i]);
+    ASSERT_EQ(output_test[i], output0[i]);
   }
 
   // Simple Evict() test
-  EXPECT_EQ(cache.NumEntries(), 1u);
-  EXPECT_EQ(cache.NumEvictions(), 0u);
+  ASSERT_EQ(cache.NumEntries(), 1u);
+  ASSERT_EQ(cache.NumEvictions(), 0u);
   cache.Evict();
-  EXPECT_EQ(cache.NumEntries(), 0u);
-  EXPECT_EQ(cache.NumEvictions(), 1u);
+  ASSERT_EQ(cache.NumEntries(), 0u);
+  ASSERT_EQ(cache.NumEvictions(), 1u);
   std::cout << "Done!" << std::endl;
 }
 
