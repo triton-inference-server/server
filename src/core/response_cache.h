@@ -116,7 +116,7 @@ class RequestResponseCache {
   // List of keys sorted from most to least recently used
   std::list<uint64_t> lru_;
   // Track number of evictions
-  uint64_t num_evictions_ = 0;
+  size_t num_evictions_ = 0;
 };
 
 }}  // namespace nvidia::inferenceserver
