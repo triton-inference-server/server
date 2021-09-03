@@ -112,6 +112,56 @@ if [ $? -eq 0 ]; then
 fi
 set -e
 
+# Test execution environments with S3
+# S3 credentials are necessary for this test. Pass via ENV variables
+aws configure set default.region $AWS_DEFAULT_REGION && \
+    aws configure set aws_access_key_id $AWS_ACCESS_KEY_ID && \
+    aws configure set aws_secret_access_key $AWS_SECRET_ACCESS_KEY
+
+# S3 bucket path (Point to bucket when testing cloud storage)
+BUCKET_URL="s3://triton-bucket-${CI_PIPELINE_ID}"
+
+# Cleanup and delete S3 test bucket if it already exists (due to test failure)
+aws s3 rm $BUCKET_URL --recursive --include "*" && \
+    aws s3 rb $BUCKET_URL || true
+
+# Make S3 test bucket
+aws s3 mb "${BUCKET_URL}"
+
+# Remove Slash in BUCKET_URL
+BUCKET_URL=${BUCKET_URL%/}
+BUCKET_URL_SLASH="${BUCKET_URL}/"
+
+# Model Python 3.7 contains absolute paths and because of this it cannot be used
+# with S3.
+rm -rf models/python_3_7
+rm $SERVER_LOG
+
+aws s3 cp models/ "${BUCKET_URL_SLASH}" --recursive --include "*"
+SERVER_ARGS="--model-repository=$BUCKET_URL_SLASH --log-verbose=1"
+run_server
+if [ "$SERVER_PID" == "0" ]; then
+    echo -e "\n***\n*** Failed to start $SERVER\n***"
+    cat $SERVER_LOG
+    exit 1
+fi
+
+kill $SERVER_PID
+wait $SERVER_PID
+
+set +e
+grep "Python version is 3.6, NumPy version is 1.18.1, and Tensorflow version is 2.1.0" $SERVER_LOG
+if [ $? -ne 0 ]; then
+    cat $SERVER_LOG
+    echo -e "\n***\n*** Python version is 3.6, NumPy version is 1.18.1, and Tensorflow version is 2.1.0 was not found in Triton logs. \n***"
+    RET=1
+fi
+set -e
+
+# Clean up bucket contents and delete bucket
+aws s3 rm "${BUCKET_URL_SLASH}" --recursive --include "*"
+aws s3 rb "${BUCKET_URL}"
+
 if [ $RET -eq 0 ]; then
   echo -e "\n***\n*** Env Manager Test PASSED.\n***"
 else
@@ -120,4 +170,3 @@ else
 fi
 
 exit $RET
-
