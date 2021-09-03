@@ -601,17 +601,14 @@ RUN apt-get update && \
 RUN pip3 install --upgrade pip && \
     pip3 install --upgrade wheel setuptools docker
 
-# Server build requires recent version of CMake (FetchContent required), build from source
-RUN build=1 && \
-    mkdir /temp && \
-    cd /temp && \
-    wget https://cmake.org/files/v3.19/cmake-3.19.$build.tar.gz && \
-    tar -xzvf cmake-3.19.$build.tar.gz && \
-    rm cmake-3.19.$build.tar.gz && \
-    cd cmake-3.19.$build/ && \
-    ./bootstrap --parallel=$(nproc) && \
-    make -j$(nproc) && \
-    make install
+# Server build requires recent version of CMake (FetchContent required)
+RUN wget -O - https://apt.kitware.com/keys/kitware-archive-latest.asc 2>/dev/null | \
+      gpg --dearmor - |  \
+      tee /etc/apt/trusted.gpg.d/kitware.gpg >/dev/null && \
+    apt-add-repository 'deb https://apt.kitware.com/ubuntu/ focal main' && \
+    apt-get update && \
+    apt-get install -y --no-install-recommends \
+      cmake-data=3.21.1-0kitware1ubuntu20.04.1 cmake=3.21.1-0kitware1ubuntu20.04.1
 '''
 
     # Copy in the triton source. We remove existing contents first in
