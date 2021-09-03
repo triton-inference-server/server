@@ -222,21 +222,16 @@ InferenceResponse::Output::AllocateDataBuffer(
         Status::Code::INTERNAL, "Only standard CPU memory supported for now");
   }
 
+  // Allocate buffer to copy to
+  *buffer = malloc(buffer_byte_size);
   if (buffer == nullptr || *buffer == nullptr) {
     return Status(
         Status::Code::INTERNAL, "buffer was nullptr in AllocateDataBuffer");
   }
 
-  // Allocate buffer to copy to
-  allocated_buffer_ = malloc(buffer_byte_size);
-  if (allocated_buffer_ == nullptr) {
-    return Status(
-        Status::Code::INTERNAL,
-        "Allocating internal response output buffer failed");
-  }
-
   // Set relevant member variables for DataBuffer() to return
-  std::memcpy(allocated_buffer_, *buffer, buffer_byte_size);
+  allocated_buffer_ = *buffer;
+  //std::memcpy(allocated_buffer_, *buffer, buffer_byte_size);
   allocated_buffer_byte_size_ = buffer_byte_size;
   allocated_memory_type_ = *memory_type;
   allocated_memory_type_id_ = *memory_type_id;
@@ -396,10 +391,13 @@ TEST_F(RequestResponseCacheTest, TestCacheTooSmall)
   check_status(status);
 
   std::cout << "Allocate output data buffer for response object" << std::endl;
-  void* vp = output0.data();
+  void* buffer;
   status = response_output->AllocateDataBuffer(
-      &vp, output_size, &memory_type, &memory_type_id);
+      &buffer, output_size, &memory_type, &memory_type_id);
   check_status(status);
+  assert(buffer != nullptr);
+  // Copy data from output to response buffer
+  std::memcpy(buffer, output0.data(), output_size);
 
   std::cout << "Insert response into cache with hash0" << std::endl;
   status = cache.Insert(hash0, *response0);
@@ -448,10 +446,13 @@ TEST_F(RequestResponseCacheTest, TestEviction)
   check_status(status);
 
   std::cout << "Allocate output data buffer for response object" << std::endl;
-  void* vp = output0.data();
+  void* buffer;
   status = response_output->AllocateDataBuffer(
-      &vp, output_size, &memory_type, &memory_type_id);
+      &buffer, output_size, &memory_type, &memory_type_id);
   check_status(status);
+  assert(buffer != nullptr);
+  // Copy data from output to response buffer
+  std::memcpy(buffer, output0.data(), output_size);
 
   std::cout << "Lookup hash0 in empty cache" << std::endl;
   status = cache.Lookup(hash0, nullptr);
@@ -491,6 +492,7 @@ TEST_F(RequestResponseCacheTest, TestEndToEnd)
   std::cout << "Create cache" << std::endl;
   uint64_t cache_size = 4 * 1024 * 1024;
   ni::RequestResponseCache cache(cache_size);
+  cache_stats(cache);
 
   // Create request
   std::cout << "Create request" << std::endl;
@@ -530,14 +532,18 @@ TEST_F(RequestResponseCacheTest, TestEndToEnd)
   for (const auto& output : output0) {
     std::cout << output << std::endl;
   }
+  std::cout << "Output size bytes: " << output_size << std::endl;
   status = response0->AddOutput("output", dtype, shape, &response_output);
   check_status(status);
 
   std::cout << "Allocate output data buffer for response object" << std::endl;
-  void* vp = output0.data();
+  void* buffer;
   status = response_output->AllocateDataBuffer(
-      &vp, output_size, &memory_type, &memory_type_id);
+      &buffer, output_size, &memory_type, &memory_type_id);
   check_status(status);
+  assert(buffer != nullptr);
+  // Copy data from output to response buffer
+  std::memcpy(buffer, output0.data(), output_size);
 
   std::cout << "Lookup hash0 in empty cache" << std::endl;
   status = cache.Lookup(hash0, nullptr);
@@ -547,6 +553,8 @@ TEST_F(RequestResponseCacheTest, TestEndToEnd)
   status = cache.Insert(hash0, *response0);
   // Insertion should succeed
   check_status(status);
+  // DEBUG
+  cache_stats(cache);
 
   // Duplicate insertion should fail since key already exists
   status = cache.Insert(hash0, *response0);
@@ -583,7 +591,8 @@ TEST_F(RequestResponseCacheTest, TestEndToEnd)
   int* output_test = (int*)response_buffer;
   std::cout << "Check output buffer data from cache entry:" << std::endl;
   for (size_t i = 0; i < response_byte_size / sizeof(int); i++) {
-    std::cout << output_test[i] << std::endl;
+    std::cout << output_test[i] << " == " << output0[i] << std::endl;
+    assert(output_test[i] == output0[i]);
   }
 
   // Simple Evict() test

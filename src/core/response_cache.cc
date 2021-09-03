@@ -172,9 +172,8 @@ RequestResponseCache::Insert(
   // Insert entry into cache
   DEBUG("Inserting key [" + std::to_string(key) + "] into cache.");
   auto cache_pair = cache_.insert({key, entry});
-  bool ok = cache_pair.second;
   // Exit early if cache insertion failed
-  if (!ok) {
+  if (!cache_pair.second) {
     return Status(Status::Code::INTERNAL, "Cache insertion failed");
   }
   // Update LRU with new cache entry
@@ -240,6 +239,7 @@ RequestResponseCache::BuildCacheEntry(
     // TODO: How to differently handle different memory types?
     //       GPU vs. CPU memory, etc.
     std::memcpy(cache_output.buffer_, response_buffer, response_byte_size);
+
     // Add each output to cache entry
     entry->outputs_.push_back(cache_output);
   }
@@ -272,9 +272,21 @@ RequestResponseCache::BuildInferenceResponse(
     TRITONSERVER_MemoryType memory_type = TRITONSERVER_MEMORY_CPU;
     int64_t memory_type_id = 0;
 
-    void* vp = cache_output.buffer_;
+    // Allocate buffer for inference response
+    void* buffer;
     RETURN_IF_ERROR(response_output->AllocateDataBuffer(
-        &vp, cache_output.buffer_size_, &memory_type, &memory_type_id));
+        &buffer, cache_output.buffer_size_, &memory_type, &memory_type_id));
+        //&vp, cache_output.buffer_size_, &memory_type, &memory_type_id));
+
+    if (buffer == nullptr) {
+      return Status(
+          Status::Code::INTERNAL,
+          "failed to allocate buffer for output '" + cache_output.name_ + "'");
+    }
+
+    // TODO: No out of scope issue here? With underlying
+    //       allocated_buffer_ == buffer ?
+    std::memcpy(buffer, cache_output.buffer_, cache_output.buffer_size_);
 
     // TODO: Add field to InferenceResponse to indicate this was from cache
     // response.cached = true;
