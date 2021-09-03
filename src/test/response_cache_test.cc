@@ -25,12 +25,12 @@
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include "gtest/gtest.h"
 
-#include "src/core/memory.h"
 #include "src/core/logging.h"
+#include "src/core/memory.h"
 #include "src/core/response_cache.h"
 
 // TODO: Not sure how to incorporate this
-//LOG_SET_VERBOSE(TRITONSERVER_LOG_VERBOSE);
+// LOG_SET_VERBOSE(TRITONSERVER_LOG_VERBOSE);
 
 namespace ni = nvidia::inferenceserver;
 
@@ -77,7 +77,7 @@ int64_t
 InferenceRequest::ActualModelVersion() const
 {
   // Not using backend in unit test mock
-  return requested_model_version_; 
+  return requested_model_version_;
 }
 
 Status
@@ -261,7 +261,7 @@ InferenceResponse::Output::AllocateDataBuffer(
 
   // Set relevant member variables for DataBuffer() to return
   allocated_buffer_ = *buffer;
-  //std::memcpy(allocated_buffer_, *buffer, buffer_byte_size);
+  // std::memcpy(allocated_buffer_, *buffer, buffer_byte_size);
   allocated_buffer_byte_size_ = buffer_byte_size;
   allocated_memory_type_ = *memory_type;
   allocated_memory_type_id_ = *memory_type_id;
@@ -302,12 +302,13 @@ namespace {
 
 // Test Fixture
 class RequestResponseCacheTest : public ::testing::Test {
-  protected:
-    void SetUp() override {}
-    void TearDown() override {}
-  public:
-    ni::InferenceBackend* backend = nullptr;
-    uint64_t model_version = 1;
+ protected:
+  void SetUp() override {}
+  void TearDown() override {}
+
+ public:
+  ni::InferenceBackend* backend = nullptr;
+  uint64_t model_version = 1;
 };
 
 // Helpers
@@ -431,7 +432,8 @@ TEST_F(RequestResponseCacheTest, TestCacheTooSmall)
   auto status = cache.Insert(hash0, *response0);
   // We expect insertion to fail here since cache is too small
   std::cout << status.Message() << std::endl;
-  ASSERT_FALSE(status.IsOk()) << "Inserting item larger than cache succeeded when it should fail";
+  ASSERT_FALSE(status.IsOk())
+      << "Inserting item larger than cache succeeded when it should fail";
 }
 
 // Test hashing for consistency on same request
@@ -480,7 +482,8 @@ TEST_F(RequestResponseCacheTest, TestEviction)
   std::cout << "Lookup hash0 in empty cache" << std::endl;
   auto status = cache.Lookup(hash0, nullptr);
   // This hash not in cache yet
-  ASSERT_FALSE(status.IsOk()) << "hash [" + std::to_string(hash0) + "] should not be in cache";
+  ASSERT_FALSE(status.IsOk())
+      << "hash [" + std::to_string(hash0) + "] should not be in cache";
   std::cout << "Insert response into cache with hash0" << std::endl;
   check_status(cache.Insert(hash0, *response0));
   cache_stats(cache);
@@ -566,7 +569,8 @@ TEST_F(RequestResponseCacheTest, TestEndToEnd)
   std::cout << "Lookup hash0 in empty cache" << std::endl;
   auto status = cache.Lookup(hash0, nullptr);
   // This hash not in cache yet
-  ASSERT_FALSE(status.IsOk()) << "hash [" + std::to_string(hash0) + "] should not be in cache";
+  ASSERT_FALSE(status.IsOk())
+      << "hash [" + std::to_string(hash0) + "] should not be in cache";
   std::cout << "Insert response into cache with hash0" << std::endl;
   // Insertion should succeed
   check_status(cache.Insert(hash0, *response0));
@@ -574,7 +578,8 @@ TEST_F(RequestResponseCacheTest, TestEndToEnd)
 
   // Duplicate insertion should fail since key already exists
   status = cache.Insert(hash0, *response0);
-  ASSERT_FALSE(status.IsOk()) << "Inserting duplicate item in cache should fail";
+  ASSERT_FALSE(status.IsOk())
+      << "Inserting duplicate item in cache should fail";
 
   // Create response to test cache lookup
   std::cout << "Create response object into fill from cache" << std::endl;

@@ -24,7 +24,6 @@
 // (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-#include "src/core/logging.h"
 #include "src/core/response_cache.h"
 
 // TODO: Figure out how to use Triton log macros in unit test
@@ -88,6 +87,13 @@ RequestResponseCache::HashInputBuffers(
         idx, &src_buffer, &src_byte_size, &src_memory_type,
         &src_memory_type_id));
 
+    // TODO: Handle other memory types
+    if (src_memory_type != TRITONSERVER_MEMORY_CPU) {
+      return Status(
+          Status::Code::INTERNAL,
+          "Only input buffers in CPU memory are allowed in cache currently");
+    }
+
     // Add each byte of input buffer chunk to hash
     const unsigned char* tmp = static_cast<const unsigned char*>(src_buffer);
     for (uint64_t byte = 0; byte < src_byte_size; byte++) {
@@ -138,7 +144,7 @@ RequestResponseCache::Lookup(const uint64_t key, InferenceResponse* ptr)
   auto entry = iter->second;
   // Build InferenceResponse from CacheEntry
   RETURN_IF_ERROR(BuildInferenceResponse(entry, ptr));
-  
+
   // Update this key to front of LRU list
   UpdateLRU(iter);
 
@@ -192,6 +198,13 @@ RequestResponseCache::BuildCacheEntry(
     RETURN_IF_ERROR(response_output.DataBuffer(
         &response_buffer, &response_byte_size, &response_memory_type,
         &response_memory_type_id, &userp));
+
+    // TODO: Handle other memory types
+    if (response_memory_type != TRITONSERVER_MEMORY_CPU) {
+      return Status(
+          Status::Code::INTERNAL,
+          "Only input buffers in CPU memory are allowed in cache currently");
+    }
 
     // Exit early if response buffer from output is invalid
     if (response_buffer == nullptr) {
@@ -268,7 +281,13 @@ RequestResponseCache::BuildInferenceResponse(
     void* buffer;
     RETURN_IF_ERROR(response_output->AllocateDataBuffer(
         &buffer, cache_output.buffer_size_, &memory_type, &memory_type_id));
-        //&vp, cache_output.buffer_size_, &memory_type, &memory_type_id));
+
+    // TODO: Handle other memory types
+    if (memory_type != TRITONSERVER_MEMORY_CPU) {
+      return Status(
+          Status::Code::INTERNAL,
+          "Only input buffers in CPU memory are allowed in cache currently");
+    }
 
     if (buffer == nullptr) {
       return Status(
