@@ -26,7 +26,11 @@
 #include "gtest/gtest.h"
 
 #include "src/core/memory.h"
+#include "src/core/logging.h"
 #include "src/core/response_cache.h"
+
+// TODO: Not sure how to incorporate this
+//LOG_SET_VERBOSE(TRITONSERVER_LOG_VERBOSE);
 
 namespace ni = nvidia::inferenceserver;
 
@@ -74,6 +78,32 @@ InferenceRequest::ActualModelVersion() const
 {
   // Not using backend in unit test mock
   return requested_model_version_; 
+}
+
+Status
+InferenceRequest::PrepareForInference()
+{
+  // Remove override inputs as those are added during any previous
+  // inference execution.
+  inputs_.clear();
+  override_inputs_.clear();
+
+  // Initially show the actual inputs to be only the original
+  // inputs. If overrides are added later they will be added to
+  // 'inputs_'.
+  for (auto& pr : original_inputs_) {
+    inputs_.emplace(std::make_pair(pr.first, std::addressof(pr.second)));
+  }
+
+  // Clear the timestamps
+  queue_start_ns_ = 0;
+#ifdef TRITON_ENABLE_STATS
+  request_start_ns_ = 0;
+#endif  // TRITON_ENABLE_STATS
+
+  LOG_VERBOSE(1) << "prepared: " << *this;
+
+  return Status::Success;
 }
 
 Status
@@ -323,6 +353,8 @@ TEST_F(RequestResponseCacheTest, TestHashing)
   request1.AddOriginalInput("input", dtype, shape, &input1);
   request2.AddOriginalInput("input", dtype, shape, &input2);
   ASSERT_NE(input0, nullptr);
+  ASSERT_NE(input1, nullptr);
+  ASSERT_NE(input2, nullptr);
   // Add data to input
   int data0[4] = {1, 2, 3, 4};
   int data1[4] = {5, 6, 7, 8};
@@ -334,15 +366,17 @@ TEST_F(RequestResponseCacheTest, TestHashing)
   input1->AppendData(data1, input_size, memory_type, memory_type_id);
   input2->AppendData(data2, input_size, memory_type, memory_type_id);
 
+  // PrepareForInference for use of ImmutableInputs()
+  check_status(request0.PrepareForInference());
+  check_status(request1.PrepareForInference());
+  check_status(request2.PrepareForInference());
+
   // Compare hashes
   std::cout << "Compare hashes" << std::endl;
   uint64_t hash0, hash1, hash2;
-  ni::Status status0 = cache.Hash(request0, &hash0);
-  ni::Status status1 = cache.Hash(request1, &hash1);
-  ni::Status status2 = cache.Hash(request2, &hash2);
-  check_status(status0);
-  check_status(status1);
-  check_status(status2);
+  check_status(cache.Hash(request0, &hash0));
+  check_status(cache.Hash(request1, &hash1));
+  check_status(cache.Hash(request2, &hash2));
 
   std::cout << "hash0: " << hash0 << std::endl;
   std::cout << "hash1: " << hash1 << std::endl;
@@ -375,8 +409,7 @@ TEST_F(RequestResponseCacheTest, TestCacheTooSmall)
 
   std::cout << "Create response object" << std::endl;
   std::unique_ptr<ni::InferenceResponse> response0;
-  ni::Status status = request0.ResponseFactory().CreateResponse(&response0);
-  check_status(status);
+  check_status(request0.ResponseFactory().CreateResponse(&response0));
 
   std::cout << "Add output metadata to response object" << std::endl;
   ni::InferenceResponse::Output* response_output = nullptr;
@@ -384,27 +417,23 @@ TEST_F(RequestResponseCacheTest, TestCacheTooSmall)
   std::vector<int> output0(1025, 0);
   uint64_t output_size = sizeof(int) * output0.size();
   std::cout << "Output size bytes: " << output_size << std::endl;
-  status = response0->AddOutput("output", dtype, shape, &response_output);
-  check_status(status);
+  check_status(response0->AddOutput("output", dtype, shape, &response_output));
 
   std::cout << "Allocate output data buffer for response object" << std::endl;
   void* buffer;
-  status = response_output->AllocateDataBuffer(
-      &buffer, output_size, &memory_type, &memory_type_id);
-  check_status(status);
+  check_status(response_output->AllocateDataBuffer(
+      &buffer, output_size, &memory_type, &memory_type_id));
   ASSERT_NE(buffer, nullptr);
   // Copy data from output to response buffer
   std::memcpy(buffer, output0.data(), output_size);
 
   std::cout << "Insert response into cache with hash0" << std::endl;
-  status = cache.Insert(hash0, *response0);
+  auto status = cache.Insert(hash0, *response0);
   // We expect insertion to fail here since cache is too small
   std::cout << status.Message() << std::endl;
   ASSERT_FALSE(status.IsOk()) << "Inserting item larger than cache succeeded when it should fail";
 }
 
-// TODO: Understand why managed buffer allocates more memory than requested
-// TODO: Understand minimum size requirement for managed buffer
 // Test hashing for consistency on same request
 TEST_F(RequestResponseCacheTest, TestEviction)
 {
@@ -431,51 +460,44 @@ TEST_F(RequestResponseCacheTest, TestEviction)
 
   std::cout << "Create response object" << std::endl;
   std::unique_ptr<ni::InferenceResponse> response0;
-  ni::Status status = request0.ResponseFactory().CreateResponse(&response0);
-  check_status(status);
+  check_status(request0.ResponseFactory().CreateResponse(&response0));
 
   std::cout << "Add output metadata to response object" << std::endl;
   ni::InferenceResponse::Output* response_output = nullptr;
   std::vector<int> output0(100, 0);
   uint64_t output_size = sizeof(int) * output0.size();
   std::cout << "Output size: " << output_size << std::endl;
-  status = response0->AddOutput("output", dtype, shape, &response_output);
-  check_status(status);
+  check_status(response0->AddOutput("output", dtype, shape, &response_output));
 
   std::cout << "Allocate output data buffer for response object" << std::endl;
   void* buffer;
-  status = response_output->AllocateDataBuffer(
-      &buffer, output_size, &memory_type, &memory_type_id);
-  check_status(status);
+  check_status(response_output->AllocateDataBuffer(
+      &buffer, output_size, &memory_type, &memory_type_id));
   ASSERT_NE(buffer, nullptr);
   // Copy data from output to response buffer
   std::memcpy(buffer, output0.data(), output_size);
 
   std::cout << "Lookup hash0 in empty cache" << std::endl;
-  status = cache.Lookup(hash0, nullptr);
+  auto status = cache.Lookup(hash0, nullptr);
   // This hash not in cache yet
   ASSERT_FALSE(status.IsOk()) << "hash [" + std::to_string(hash0) + "] should not be in cache";
   std::cout << "Insert response into cache with hash0" << std::endl;
-  status = cache.Insert(hash0, *response0);
-  check_status(status);
+  check_status(cache.Insert(hash0, *response0));
   cache_stats(cache);
   ASSERT_EQ(cache.NumEntries(), 1u);
   ASSERT_EQ(cache.NumEvictions(), 0u);
 
-  status = cache.Insert(hash1, *response0);
-  check_status(status);
+  check_status(cache.Insert(hash1, *response0));
   cache_stats(cache);
   ASSERT_EQ(cache.NumEntries(), 2u);
   ASSERT_EQ(cache.NumEvictions(), 0u);
 
-  status = cache.Insert(hash2, *response0);
-  check_status(status);
+  check_status(cache.Insert(hash2, *response0));
   cache_stats(cache);
   ASSERT_EQ(cache.NumEntries(), 2u);
   ASSERT_EQ(cache.NumEvictions(), 1u);
 
-  status = cache.Insert(hash3, *response0);
-  check_status(status);
+  check_status(cache.Insert(hash3, *response0));
   cache_stats(cache);
   ASSERT_EQ(cache.NumEntries(), 2u);
   ASSERT_EQ(cache.NumEvictions(), 2u);
@@ -504,6 +526,9 @@ TEST_F(RequestResponseCacheTest, TestEndToEnd)
   std::cout << "Add input to request" << std::endl;
   request0.AddOriginalInput("input", dtype, shape, &input0);
   ASSERT_NE(input0, nullptr);
+  // PrepareForInference for use of ImmutableInputs()
+  check_status(request0.PrepareForInference());
+
   // Add data to input
   std::vector<int> data0 = {1, 2, 3, 4};
   TRITONSERVER_MemoryType memory_type = TRITONSERVER_MEMORY_CPU;
@@ -513,13 +538,11 @@ TEST_F(RequestResponseCacheTest, TestEndToEnd)
 
   // Hash input request
   uint64_t hash0;
-  ni::Status status0 = cache.Hash(request0, &hash0);
-  check_status(status0);
+  check_status(cache.Hash(request0, &hash0));
 
   std::cout << "Create response object" << std::endl;
   std::unique_ptr<ni::InferenceResponse> response0;
-  ni::Status status = request0.ResponseFactory().CreateResponse(&response0);
-  check_status(status);
+  check_status(request0.ResponseFactory().CreateResponse(&response0));
 
   std::cout << "Add output metadata to response object" << std::endl;
   ni::InferenceResponse::Output* response_output = nullptr;
@@ -530,27 +553,23 @@ TEST_F(RequestResponseCacheTest, TestEndToEnd)
     std::cout << output << std::endl;
   }
   std::cout << "Output size bytes: " << output_size << std::endl;
-  status = response0->AddOutput("output", dtype, shape, &response_output);
-  check_status(status);
+  check_status(response0->AddOutput("output", dtype, shape, &response_output));
 
   std::cout << "Allocate output data buffer for response object" << std::endl;
   void* buffer;
-  status = response_output->AllocateDataBuffer(
-      &buffer, output_size, &memory_type, &memory_type_id);
-  check_status(status);
+  check_status(response_output->AllocateDataBuffer(
+      &buffer, output_size, &memory_type, &memory_type_id));
   ASSERT_NE(buffer, nullptr);
   // Copy data from output to response buffer
   std::memcpy(buffer, output0.data(), output_size);
 
   std::cout << "Lookup hash0 in empty cache" << std::endl;
-  status = cache.Lookup(hash0, nullptr);
+  auto status = cache.Lookup(hash0, nullptr);
   // This hash not in cache yet
   ASSERT_FALSE(status.IsOk()) << "hash [" + std::to_string(hash0) + "] should not be in cache";
   std::cout << "Insert response into cache with hash0" << std::endl;
-  status = cache.Insert(hash0, *response0);
   // Insertion should succeed
-  check_status(status);
-  // DEBUG
+  check_status(cache.Insert(hash0, *response0));
   cache_stats(cache);
 
   // Duplicate insertion should fail since key already exists
@@ -560,13 +579,11 @@ TEST_F(RequestResponseCacheTest, TestEndToEnd)
   // Create response to test cache lookup
   std::cout << "Create response object into fill from cache" << std::endl;
   std::unique_ptr<ni::InferenceResponse> response_test;
-  status = request0.ResponseFactory().CreateResponse(&response_test);
-  check_status(status);
+  check_status(request0.ResponseFactory().CreateResponse(&response_test));
 
-  std::cout << "Lookup hash0 in cache after insertion" << std::endl;
-  status = cache.Lookup(hash0, response_test.get());
   // Lookup should now succeed
-  check_status(status);
+  std::cout << "Lookup hash0 in cache after insertion" << std::endl;
+  check_status(cache.Lookup(hash0, response_test.get()));
 
   // Fetch output buffer details
   const void* response_buffer = nullptr;
@@ -577,14 +594,13 @@ TEST_F(RequestResponseCacheTest, TestEndToEnd)
   // TODO: How to handle different memory types? GPU vs CPU vs Pinned, etc.
   // const auto outputs = response_test->Outputs();
   // Build cache entry data from response outputs
+  // TODO: Handle multiple outputs more generically
   for (const auto& response_output : response_test->Outputs()) {
-    status = response_output.DataBuffer(
+    check_status(response_output.DataBuffer(
         &response_buffer, &response_byte_size, &response_memory_type,
-        &response_memory_type_id, &userp);
+        &response_memory_type_id, &userp));
   }
 
-  // Exit early if we fail to get output buffer from response
-  check_status(status);
   int* output_test = (int*)response_buffer;
   std::cout << "Check output buffer data from cache entry:" << std::endl;
   for (size_t i = 0; i < response_byte_size / sizeof(int); i++) {
