@@ -127,7 +127,9 @@ DIFFERENT_SHAPE_TESTS=${DIFFERENT_SHAPE_TESTS:="test_multi_batch_not_preferred_d
 
 # Test with preferred batch sizes but default max_queue_delay 
 PREFERRED_BATCH_ONLY_TESTS=${PREFERRED_BATCH_ONLY_TESTS:="test_preferred_batch_only_aligned \
-                                                    test_preferred_batch_only_unaligned"}
+                                                    test_preferred_batch_only_unaligned \
+                                                    test_preferred_batch_only_use_biggest_preferred \
+                                                    test_preferred_batch_only_use_no_preferred_size"}
 
 # Setup non-variable-size model repository
 rm -fr *.log *.serverlog models && mkdir models
@@ -149,7 +151,7 @@ for BACKEND in $BACKENDS; do
     (cd preferred_batch_only_models/$(basename $TMP_MODEL_DIR) && \
           sed -i "s/^max_batch_size:.*/max_batch_size: 8/" config.pbtxt && \
           sed -i "s/^version_policy:.*/version_policy: { specific { versions: [1] }}/" config.pbtxt && \
-          echo "dynamic_batching { preferred_batch_size: [ 2 ] }" >> config.pbtxt)
+          echo "dynamic_batching { preferred_batch_size: [ 4, 6 ] }" >> config.pbtxt)
 done
 
 # Setup variable-size model repository
@@ -441,7 +443,9 @@ done
 export BATCHER_TYPE=FIXED
 for i in $PREFERRED_BATCH_ONLY_TESTS ; do
     export TRITONSERVER_DELAY_SCHEDULER=4 &&
-            [[ "$i" != "test_preferred_batch_only_aligned" ]] && export TRITONSERVER_DELAY_SCHEDULER=3
+            [[ "$i" != "test_preferred_batch_only_aligned" ]] && export TRITONSERVER_DELAY_SCHEDULER=5 &&
+            [[ "$i" != "test_preferred_batch_only_unaligned" ]] && export TRITONSERVER_DELAY_SCHEDULER=7 &&
+            [[ "$i" != "test_preferred_batch_only_use_biggest_preferred" ]] && export TRITONSERVER_DELAY_SCHEDULER=3
     SERVER_ARGS="--model-repository=$MODELDIR/preferred_batch_only_models ${SERVER_ARGS_EXTRA}"
     SERVER_LOG="./$i.PREFERRED_BATCH_ONLY.serverlog"
 
