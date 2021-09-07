@@ -327,6 +327,22 @@ cache_stats(ni::RequestResponseCache& cache)
   std::cout << "Cache total bytes: " << cache.TotalBytes() << std::endl;
 }
 
+/*void
+cache_stats2(ni::RequestResponseCache* cache)
+{
+  std::cout << "Cache entries: " << cache->NumEntries() << std::endl;
+  std::cout << "Cache free bytes: " << cache->FreeBytes() << std::endl;
+  std::cout << "Cache alloc'd bytes: " << cache->AllocatedBytes() << std::endl;
+  std::cout << "Cache total bytes: " << cache->TotalBytes() << std::endl;
+}*/
+
+// TODO: REMOVE
+/*void
+hello_world(int idx)
+{
+    std::cout << "Hello World from Thread: " << idx << std::endl;
+}*/
+
 // Test hashing for consistency on same request
 TEST_F(RequestResponseCacheTest, TestHashing)
 {
@@ -620,6 +636,94 @@ TEST_F(RequestResponseCacheTest, TestEndToEnd)
   ASSERT_EQ(cache.NumEntries(), 0u);
   ASSERT_EQ(cache.NumEvictions(), 1u);
   std::cout << "Done!" << std::endl;
+}
+
+// Test hashing for consistency on same request
+TEST_F(RequestResponseCacheTest, TestParallelEviction)
+{
+  // Create cache
+  std::cout << "Create cache" << std::endl;
+  uint64_t cache_size = 1024;
+  ni::RequestResponseCache cache(cache_size);
+  cache_stats(cache);
+
+  // Create request
+  std::cout << "Create request" << std::endl;
+  ni::InferenceRequest request0(backend, model_version);
+
+  inference::DataType dtype = inference::DataType::TYPE_INT32;
+  std::vector<int64_t> shape{1, 4};
+  TRITONSERVER_MemoryType memory_type = TRITONSERVER_MEMORY_CPU;
+  int64_t memory_type_id = 0;
+
+  // Fake hashes to input same response to cache repeatedly
+  uint64_t hash0 = 0;
+  uint64_t hash1 = 1;
+  uint64_t hash2 = 2;
+  uint64_t hash3 = 3;
+
+  std::cout << "Create response object" << std::endl;
+  std::unique_ptr<ni::InferenceResponse> response0;
+  check_status(request0.ResponseFactory().CreateResponse(&response0));
+
+  std::cout << "Add output metadata to response object" << std::endl;
+  ni::InferenceResponse::Output* response_output = nullptr;
+  std::vector<int> output0(100, 0);
+  uint64_t output_size = sizeof(int) * output0.size();
+  std::cout << "Output size: " << output_size << std::endl;
+  check_status(response0->AddOutput("output", dtype, shape, &response_output));
+
+  std::cout << "Allocate output data buffer for response object" << std::endl;
+  void* buffer;
+  check_status(response_output->AllocateDataBuffer(
+      &buffer, output_size, &memory_type, &memory_type_id));
+  ASSERT_NE(buffer, nullptr);
+  // Copy data from output to response buffer
+  std::memcpy(buffer, output0.data(), output_size);
+
+  std::cout << "Lookup hash0 in empty cache" << std::endl;
+  auto status = cache.Lookup(hash0, nullptr);
+  // This hash not in cache yet
+  ASSERT_FALSE(status.IsOk())
+      << "hash [" + std::to_string(hash0) + "] should not be in cache";
+
+  // Create threads
+  std::vector<std::thread> threads;
+  size_t thread_count = 10;
+  std::cout << "Insert response into cache with hash0 with 10 threads in parallel" << std::endl;
+  // TODO: fix this
+  for (size_t idx = 0; idx < thread_count; idx++) {
+    threads.emplace_back(
+        std::thread(&ni::RequestResponseCache::Insert, &cache, hash0, *response0)); // ERROR
+        //std::thread(&ni::RequestResponseCache::Hash, &cache, request0, &hash0));  // ERROR
+        //std::thread(&hello_world, idx));     // OK
+        //std::thread(&cache_stats2, &cache)); // OK
+  }
+  // Join threads
+  for (size_t idx = 0; idx < thread_count; idx++) {
+    threads[idx].join();
+  }
+
+  // TODO
+  check_status(cache.Insert(hash0, *response0));
+  cache_stats(cache);
+  ASSERT_EQ(cache.NumEntries(), 1u) << "Only one thread should've succeeded with insertion";
+  ASSERT_EQ(cache.NumEvictions(), 0u) << "No evictions should've happened";
+
+  check_status(cache.Insert(hash1, *response0));
+  cache_stats(cache);
+  ASSERT_EQ(cache.NumEntries(), 2u);
+  ASSERT_EQ(cache.NumEvictions(), 0u);
+
+  check_status(cache.Insert(hash2, *response0));
+  cache_stats(cache);
+  ASSERT_EQ(cache.NumEntries(), 2u);
+  ASSERT_EQ(cache.NumEvictions(), 1u);
+
+  check_status(cache.Insert(hash3, *response0));
+  cache_stats(cache);
+  ASSERT_EQ(cache.NumEntries(), 2u);
+  ASSERT_EQ(cache.NumEvictions(), 2u);
 }
 
 }  // namespace
