@@ -1,5 +1,5 @@
 #!/bin/bash
-# Copyright (c) 2021, NVIDIA CORPORATION. All rights reserved.
+# Copyright (c) 2021, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -71,25 +71,38 @@ if [ "$SERVER_PID" == "0" ]; then
     exit 1
 fi
 
-pushd java/examples
 set +e
+pushd java/examples
 
-# Test simple java client example
+# Test grpc_generated simple java client example
 mvn exec:java -Dexec.mainClass=clients.SimpleJavaClient -Dexec.args="localhost 8001" >> ${CLIENT_LOG}.java 2>&1
 if [ $? -ne 0 ]; then
     cat ${CLIENT_LOG}.java
     RET=1
 fi
 
-# Test simple scala client example
+# Test grpc_generated simple scala client example
 mvn exec:java -Dexec.mainClass=clients.SimpleClient -Dexec.args="localhost 8001" >> ${CLIENT_LOG}.scala 2>&1
 if [ $? -ne 0 ]; then
     cat ${CLIENT_LOG}.scala
     RET=1
 fi
 
-set -e
 popd
+
+# Test simple infer java client
+SIMPLE_INFER_JAVA_CLIENT=../clients/SimpleInferClient.jar
+
+pushd ../clients
+
+java -jar ${SIMPLE_INFER_JAVA_CLIENT} >> ${CLIENT_LOG}.simple_infer_java 2>&1
+if [ $? -ne 0 ]; then
+    cat ${CLIENT_LOG}.simple_infer_java
+    RET=1
+fi
+
+popd
+set -e
 
 kill $SERVER_PID
 wait $SERVER_PID
