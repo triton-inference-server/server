@@ -541,6 +541,42 @@ delayed in the scheduler to allow other requests to join the dynamic
 batch, and queue properties such a queue size, priorities, and
 time-outs.
 
+The individual settings are described in detail below. The following
+steps are the recommended process for tuning the dynamic batcher for
+each model. It is also possible to use the [Model
+Analyzer](model_analyzer.md) to automatically seach across different
+dynamic batcher configurations.
+
+* Decide on a [maximum batch size](#maximum-batch-size) for the model.
+
+* Add the following to the model configuration to enable the dynamic
+  batcher with all default settings. By default the dynamic batcher
+  will create batches as large as possible up to the maximum batch
+  size and will not [delay](#delayed-batching) when forming batches.
+
+```
+  dynamic_batching { }
+```
+
+* Use the [Performance Analyzer](perf_analyzer.md) to determine the
+  latency and throughput provided by the default dynamic batcher
+  configuration.
+
+* If the default configuration results in latency values that are
+  withing your latency budget, try one or both of the following to
+  trade off increased latency for increased throughput:
+
+  * Increase maximum batch size.
+
+  * Set [batch delay](#delayed-batching) to a non-zero value. Try
+    increasing delay values until the latency budget is exceeded to
+    see the impact on throughput.
+
+* [Preferred batch sizes](#preferred-batch-sizes) should not be used
+  for most models. A preferred batch size(s) should only be configured
+  if that batch size results in significantly higher performance than
+  other batch sizes.
+
 #### Preferred Batch Sizes
 
 The *preferred_batch_size* property indicates the batch sizes that the
@@ -560,13 +596,14 @@ available in the scheduler. Requests are added to the batch in the
 order the requests were received. If the dynamic batcher can form a
 batch of a preferred size(s) it will create a batch of the largest
 possible preferred size and send it for inferencing. If the dynamic
-batcher cannot form a batch of a preferred size, it will send a batch
-of the largest size possible that is less than the maximum batch size
-allowed by the model (but see the following section for the delay
-option that changes this behavior).
+batcher cannot form a batch of a preferred size (or if the dynamic
+batcher is not configured with any preferred batch sizes), it will
+send a batch of the largest size possible that is less than the
+maximum batch size allowed by the model (but see the following section
+for the delay option that changes this behavior).
 
 The size of generated batches can be examined in aggregate using
-[count metrics](metrics.md).
+[count metrics](metrics.md#count-metrics).
 
 #### Delayed Batching
 
