@@ -51,7 +51,7 @@ version 2.
 
 * The HTTP/REST and GRPC protocols, while conceptually similar to
   version 1, are completely changed in version 2. See [inference
-  protocols](docs/inference_protocols.md) for more information.
+  protocols](inference_protocols.md) for more information.
 
 * Python and C++ client libraries are re-implemented to match the new
   HTTP/REST and GRPC protocols. The Python client no longer depends on
@@ -61,7 +61,7 @@ version 2.
   more information.
 
 * Building Triton has changed significantly in version 2. See
-  [build](docs/build.md) for more information.
+  [build](build.md) for more information.
 
 * In the Docker containers the environment variables indicating the
   Triton version have changed to have a TRITON prefix, for example,
