@@ -241,12 +241,9 @@ class PythonTest(tu.TestResultCollector):
         model_name = "string_fixed"
         shape = [1]
 
-        # Each time inference is performed with a new
-        # API
-        for i in range(3):
+        for i in range(6):
             with httpclient.InferenceServerClient("localhost:8000") as client:
-                sample_input = '123456'
-                input_data = np.array([sample_input], dtype=np.object_)
+                input_data = np.array(['123456'], dtype=np.object_)
                 inputs = [
                     httpclient.InferInput("INPUT0", shape,
                                           np_to_triton_dtype(input_data.dtype))
@@ -255,7 +252,12 @@ class PythonTest(tu.TestResultCollector):
                 result = client.infer(model_name, inputs)
                 output0 = result.as_numpy('OUTPUT0')
                 self.assertTrue(output0 is not None)
-                self.assertTrue(output0[0] == input_data.astype(np.bytes_))
+
+                if i % 2 == 0:
+                    self.assertTrue(output0[0] == input_data.astype(np.bytes_))
+                else:
+                    self.assertTrue(output0.size == 0)
+
 
     def test_non_contiguous(self):
         model_name = 'non_contiguous'
