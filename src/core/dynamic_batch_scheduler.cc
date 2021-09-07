@@ -339,10 +339,6 @@ DynamicBatchScheduler::BatcherThread(const int nice)
       auto callback = [this]() { cv_.notify_one(); };
       curr_payload_->SetCallback(callback);
       model_->Server()->GetRateLimiter()->EnqueuePayload(model_, curr_payload_);
-      // curr_payload_->SetInstance(model_->Instances()[0].get());
-      // bool should_exit;
-      // curr_payload_->Execute(&should_exit);
-      // model_->Instances()[0]->Schedule(std::move(requests_), OnCompletion_);
     }
 
     // Finish rejected requests if any
@@ -443,7 +439,8 @@ DynamicBatchScheduler::GetDynamicBatch()
                         std::chrono::steady_clock::now().time_since_epoch())
                         .count();
   uint64_t delay_ns = now_ns - queue_.OldestEnqueueTime();
-  bool delay_is_exceeded = (delay_ns >= pending_batch_delay_ns_);
+  bool delay_is_exceeded =
+      (pending_batch_delay_ns_ != 0) && (delay_ns >= pending_batch_delay_ns_);
 
   // If we found a preferred batch size and the queue delay hasn't been
   // exceeded, then execute that.
@@ -467,7 +464,7 @@ DynamicBatchScheduler::GetDynamicBatch()
     return 0;
   }
 
-  if (delay_is_exceeded) {
+  if (delay_is_exceeded || (pending_batch_delay_ns_ == 0)) {
     return 0;
   }
 
