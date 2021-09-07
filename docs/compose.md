@@ -41,25 +41,27 @@ from source to get more exact customization.
 
 ## Use the compose.py script
 
-The `compose.py` script can be found in the [server repository](https://github.com/triton-inference-server/server). Simply clone the repository and run `compose.py` to create a custom container. Note created container version will depend on the branch that was cloned. For example branch [r21.09](https://github.com/triton-inference-server/server/tree/r21.09) should be used to create a image based on the NGC 21.09 Triton release. 
+The `compose.py` script can be found in the [server repository](https://github.com/triton-inference-server/server). Simply clone the repository and run `compose.py` to create a custom container. Note created container version will depend on the branch that was cloned. For example branch [r21.09](https://github.com/triton-inference-server/server/tree/r21.09) should be used to create a image based on the NGC 21.09 Triton release.  
 
 `compose.py` provides `--backend`, `--repoagent` options that allow you to specify which backends and repository agents to include in the custom image. The `--enable-gpu` flag indicates that you want to create an image that supports NVIDIA GPUs. For example, the following creates a new docker image that contains only the TensorFlow 1 and TensorFlow 2 backends and the checksum repository agent.
 
 Example:
-```
+
+```bash
 python3 compose.py --backend tensorflow1 --backend tensorflow2 --repoagent checksum --enable-gpu
 ```
+
 will provide a container `tritonserver` locally. You can access the container with
-```
-$ docker run -it tritonserver:latest
+
+```bash
+docker run -it tritonserver:latest
 ```
 
 Note: If `compose.py` is run on release versions `r21.08` and older, the resulting container will have DCGM version 2.2.3 installed. This may result in different GPU statistic reporting behavior.
 
 ## Build it yourself
 
-If you would like to do what `compose.py` is doing under the hood yourself, you can run `compose.py` with the `--dry-run` option and then modify the `Dockerfile.compose` file to satisfy your needs. 
-
+If you would like to do what `compose.py` is doing under the hood yourself, you can run `compose.py` with the `--dry-run` option and then modify the `Dockerfile.compose` file to satisfy your needs.  
 
 ### Triton with Unsupported and Custom Backends
 
@@ -72,7 +74,7 @@ directory is "./mybackend", adding the following to the Dockerfile `compose.py`
 created will create a Triton image that contains all the supported Triton backends plus your
 custom backend.
 
-```
+```docker
 COPY ./mybackend /opt/tritonserver/backends/mybackend
 ```
 
@@ -80,6 +82,6 @@ You also need to install any additional dependencies required by your
 backend as part of the Dockerfile. Then use Docker to create the
 image.
 
-```
-$ docker build -t tritonserver_custom -f Dockerfile.compose .
+```bash
+docker build -t tritonserver_custom -f Dockerfile.compose .
 ```
