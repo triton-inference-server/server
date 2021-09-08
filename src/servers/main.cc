@@ -104,6 +104,7 @@ nvidia::inferenceserver::KeepAliveOptions grpc_keepalive_options_;
 std::unique_ptr<nvidia::inferenceserver::HTTPServer> metrics_service_;
 bool allow_metrics_ = true;
 int32_t metrics_port_ = 8002;
+float metrics_interval_secs_ = 2;
 #endif  // TRITON_ENABLE_METRICS
 
 #ifdef TRITON_ENABLE_TRACING
@@ -236,6 +237,7 @@ enum OptionId {
   OPTION_ALLOW_METRICS,
   OPTION_ALLOW_GPU_METRICS,
   OPTION_METRICS_PORT,
+  OPTION_METRICS_INTERVAL_SECS,
 #endif  // TRITON_ENABLE_METRICS
 #ifdef TRITON_ENABLE_TRACING
   OPTION_TRACE_FILEPATH,
@@ -410,6 +412,8 @@ std::vector<Option> options_
        "--allow-metrics is true."},
       {OPTION_METRICS_PORT, "metrics-port", Option::ArgInt,
        "The port reporting prometheus metrics."},
+      {OPTION_METRICS_INTERVAL_SECS, "metrics-interval-secs", Option::ArgFloat,
+       "Metrics will be collected once every <metrics-interval-secs> seconds."},
 #endif  // TRITON_ENABLE_METRICS
 #ifdef TRITON_ENABLE_TRACING
       {OPTION_TRACE_FILEPATH, "trace-file", Option::ArgStr,
@@ -931,13 +935,11 @@ ParseLongLongOption(const std::string arg)
   return std::stoll(arg);
 }
 
-#if 0
 float
 ParseFloatOption(const std::string arg)
 {
   return std::stof(arg);
 }
-#endif
 
 double
 ParseDoubleOption(const std::string arg)
@@ -1162,6 +1164,7 @@ Parse(TRITONSERVER_ServerOptions** server_options, int argc, char** argv)
 #ifdef TRITON_ENABLE_METRICS
   int32_t metrics_port = metrics_port_;
   bool allow_gpu_metrics = true;
+  float metrics_interval_secs = metrics_interval_secs_;
 #endif  // TRITON_ENABLE_METRICS
 
 #ifdef TRITON_ENABLE_TRACING
@@ -1340,6 +1343,9 @@ Parse(TRITONSERVER_ServerOptions** server_options, int argc, char** argv)
       case OPTION_METRICS_PORT:
         metrics_port = ParseIntOption(optarg);
         break;
+      case OPTION_METRICS_INTERVAL_SECS:
+        metrics_interval_secs = ParseFloatOption(optarg);
+        break;
 #endif  // TRITON_ENABLE_METRICS
 
 #ifdef TRITON_ENABLE_TRACING
@@ -1484,6 +1490,7 @@ Parse(TRITONSERVER_ServerOptions** server_options, int argc, char** argv)
 #ifdef TRITON_ENABLE_METRICS
   metrics_port_ = metrics_port;
   allow_gpu_metrics = allow_metrics_ ? allow_gpu_metrics : false;
+  metrics_interval_secs_ = metrics_interval_secs;
 #endif  // TRITON_ENABLE_METRICS
 
 #ifdef TRITON_ENABLE_TRACING
@@ -1582,6 +1589,10 @@ Parse(TRITONSERVER_ServerOptions** server_options, int argc, char** argv)
   FAIL_IF_ERR(
       TRITONSERVER_ServerOptionsSetGpuMetrics(loptions, allow_gpu_metrics),
       "setting GPU metrics enable");
+  FAIL_IF_ERR(
+      TRITONSERVER_ServerOptionsSetMetricsInterval(
+          loptions, metrics_interval_secs_),
+      "setting metrics interval");
 #endif  // TRITON_ENABLE_METRICS
 
   FAIL_IF_ERR(
