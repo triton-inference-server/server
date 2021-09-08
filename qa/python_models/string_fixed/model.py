@@ -32,7 +32,6 @@ class TritonPythonModel:
     """
     This model returns a constant string on every inference request.
     """
-
     def initialize(self, args):
         self._index = 0
         self._dtypes = [np.bytes_, np.object_, np.object]
@@ -40,9 +39,16 @@ class TritonPythonModel:
     def execute(self, requests):
         responses = []
         for _ in requests:
-            out_tensor_0 = pb_utils.Tensor(
-                "OUTPUT0", np.array(['123456'],
-                                    dtype=self._dtypes[self._index]))
+            if self._index % 2 == 0:
+                out_tensor_0 = pb_utils.Tensor(
+                    "OUTPUT0",
+                    np.array(['123456'], dtype=self._dtypes[self._index % 3]))
+            else:
+                # Test sending strings with no elements
+                out_tensor_0 = pb_utils.Tensor(
+                    "OUTPUT0", np.array([],
+                                        dtype=self._dtypes[self._index % 3]))
+
             self._index += 1
             responses.append(pb_utils.InferenceResponse([out_tensor_0]))
         return responses
