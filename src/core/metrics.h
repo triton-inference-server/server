@@ -56,7 +56,7 @@ class Metrics {
   static void EnableGPUMetrics();
 
   // Set the time interval in secs at which metrics are collected
-  static void SetMetricsInterval(float metrics_interval_secs);
+  static void SetMetricsInterval(uint64_t metrics_interval_ms);
 
   // Get the prometheus registry
   static std::shared_ptr<prometheus::Registry> GetRegistry();
@@ -176,7 +176,7 @@ class Metrics {
   bool metrics_enabled_;
   bool gpu_metrics_enabled_;
   std::mutex gpu_metrics_enabling_;
-  float metrics_interval_secs_;
+  uint64_t metrics_interval_ms_;
 };
 
 }}  // namespace nvidia::inferenceserver

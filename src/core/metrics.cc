@@ -189,10 +189,10 @@ Metrics::EnableGPUMetrics()
 }
 
 void
-Metrics::SetMetricsInterval(float metrics_interval_secs)
+Metrics::SetMetricsInterval(uint64_t metrics_interval_ms)
 {
   auto singleton = GetSingleton();
-  singleton->metrics_interval_secs_ = metrics_interval_secs;
+  singleton->metrics_interval_ms_ = metrics_interval_ms;
 }
 
 bool
@@ -363,14 +363,14 @@ Metrics::InitializeDcgmMetrics()
       }
       dcgmerr = dcgmWatchFields(
           handle, groupId, fieldGroupId,
-          (long long)(metrics_interval_secs_ * 1e6) /*update period, usec*/,
+          (long long)(metrics_interval_ms_ * 1e3) /*update period, usec*/,
           5.0 /*maxKeepAge, sec*/, 5 /*maxKeepSamples*/);
       if (dcgmerr != DCGM_ST_OK) {
         LOG_WARNING << "Cannot start watching fields: " << errorString(dcgmerr);
       } else {
         while (!dcgm_thread_exit_.load()) {
-          std::this_thread::sleep_for(std::chrono::milliseconds(
-              (uint32_t)(metrics_interval_secs_ * 1000)));
+          std::this_thread::sleep_for(
+              std::chrono::milliseconds(metrics_interval_ms_ / 2));
           dcgmUpdateAllFields(handle, 1 /* wait for update*/);
           for (int didx = 0; didx < available_cuda_gpu_count; ++didx) {
             uint32_t cuda_id = available_cuda_gpu_ids[didx];
