@@ -51,7 +51,7 @@ else:
 
 FLAGS = None
 CORRELATION_ID_BLOCK_SIZE = 100
-DEFAULT_TIMEOUT_MS = 20000
+DEFAULT_TIMEOUT_MS = 25000
 SEQUENCE_LENGTH_MEAN = 16
 SEQUENCE_LENGTH_STDEV = 8
 BACKENDS = os.environ.get('BACKENDS', "graphdef savedmodel onnx plan")
@@ -108,6 +108,15 @@ def check_sequence_async(client_metadata,
 
     triton_client = client_metadata[0]
     sequence_id = client_metadata[1]
+
+    # Need to use a unique ID for 'sequence_no_start' case since we
+    # need to prevent sequences with no 'start' flags from following
+    # some sequences with no 'end' flags since the server will just
+    # assume that the no-start is a continuation of the no-end sequence
+    # instead of being a sequence missing start flag, which gives results
+    # not expected.
+    if test_case_name == "sequence_no_start":
+        sequence_id *= 10
 
     # Execute the sequence of inference...
     seq_start_ms = int(round(time.time() * 1000))
@@ -554,9 +563,8 @@ def stress_thread(name, seed, test_duration, correlation_id_base,
     # inference requests. Also create some rare-use contexts that
     # are used to make requests with rarely-used correlation IDs.
     #
-    # Need to remember the last choice for each context since we
-    # don't want some choices to follow others since that gives
-    # results not expected. See below for details.
+    # Need to remember the last choice for each context for counting
+    # failed test cases.
     common_cnt = 2
     rare_cnt = 8
     last_choices = []
@@ -635,13 +643,7 @@ def stress_thread(name, seed, test_duration, correlation_id_base,
 
                 choice = rng.rand()
 
-                # no-start cannot follow no-end since the server will
-                # just assume that the no-start is a continuation of
-                # the no-end sequence instead of being a sequence
-                # missing start flag.
-                if ((last_choice != "sequence_no_end") and
-                    (last_choice != "sequence_valid_no_end") and
-                    (choice < 0.01)):
+                if choice < 0.01:
                     count_test_case("sequence_no_start", test_case_count)
                     last_choices[client_idx] = "sequence_no_start"
                     sequence_no_start(
@@ -883,7 +885,7 @@ if __name__ == '__main__':
         '--test-duration',
         type=int,
         required=False,
-        default=3600,
+        default=25000,
         help='Duration of stress test to run. Default is 25000 seconds ' +
         '(approximately 7 hours).')
     FLAGS = parser.parse_args()

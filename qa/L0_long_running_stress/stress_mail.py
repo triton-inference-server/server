@@ -42,7 +42,7 @@ if __name__ == '__main__':
     stress_report = "stress_report.txt"
     link = "https://gitlab-master.nvidia.com/dl/dgx/tritonserver/-/jobs/" + CI_JOB_ID
     write_up = "<p>The table below includes results from long-running stress test. Please refer to the description of each test case to see what different kinds of inference requests were sent. Request concurrency is set to 8.</p>"
-    write_up += "<p>CI output webpage: " + link + "</p>"
+    write_up += "<p>Please check the CI output webpage for the details of the failures: " + link + "</p>"
     html_content = "<html><head></head><body><pre style=\"font-size:11pt;font-family:Arial, sans-serif;\">" + write_up + "</pre><pre style=\"font-size:11pt;font-family:Consolas;\">"
     with open(stress_report, "r") as f:
         html_content += f.read() + "\n"
