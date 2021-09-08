@@ -544,7 +544,7 @@ time-outs.
 The individual settings are described in detail below. The following
 steps are the recommended process for tuning the dynamic batcher for
 each model. It is also possible to use the [Model
-Analyzer](model_analyzer.md) to automatically seach across different
+Analyzer](model_analyzer.md) to automatically search across different
 dynamic batcher configurations.
 
 * Decide on a [maximum batch size](#maximum-batch-size) for the model.
@@ -563,7 +563,7 @@ dynamic batcher configurations.
   configuration.
 
 * If the default configuration results in latency values that are
-  withing your latency budget, try one or both of the following to
+  within your latency budget, try one or both of the following to
   trade off increased latency for increased throughput:
 
   * Increase maximum batch size.
