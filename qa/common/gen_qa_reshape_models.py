@@ -736,8 +736,10 @@ def create_openvino_modelfile(models_dir, model_version, max_batch, dtype,
                               input_shapes, output_shapes):
 
     assert len(input_shapes) == len(output_shapes)
-    if not tu.validate_for_openvino_model(dtype, dtype, dtype, input_shapes[0],
-                                          input_shapes[0], input_shapes[0]):
+    batch_dim = [] if max_batch == 0 else [max_batch,]
+    if not tu.validate_for_openvino_model(
+            dtype, dtype, dtype, batch_dim + input_shapes[0],
+            batch_dim + input_shapes[0], batch_dim + input_shapes[0]):
         return
 
     io_cnt = len(input_shapes)
@@ -747,19 +749,21 @@ def create_openvino_modelfile(models_dir, model_version, max_batch, dtype,
         "openvino_nobatch" if max_batch == 0 else "openvino", io_cnt, dtype)
     model_version_dir = models_dir + "/" + model_name + "/" + str(model_version)
 
-    batch_dim = [] if max_batch == 0 else [max_batch,]
     openvino_inputs = []
     openvino_outputs = []
     for io_num in range(io_cnt):
         in_name = "INPUT{}".format(io_num)
         out_name = "OUTPUT{}".format(io_num)
         openvino_inputs.append(
-            ng.parameter(shape=batch_dim + input_shapes[io_num], dtype=dtype, name=in_name))
+            ng.parameter(shape=batch_dim + input_shapes[io_num],
+                         dtype=dtype,
+                         name=in_name))
 
         openvino_outputs.append(
             ng.reshape(openvino_inputs[io_num],
-                        batch_dim + output_shapes[io_num],
-                        name=out_name, special_zero=False))
+                       batch_dim + output_shapes[io_num],
+                       name=out_name,
+                       special_zero=False))
 
     function = ng.impl.Function(openvino_outputs, openvino_inputs, model_name)
     ie_network = IENetwork(ng.impl.Function.to_capsule(function))
@@ -780,8 +784,10 @@ def create_openvino_modelconfig(models_dir, model_version, max_batch, dtype,
     assert len(input_shapes) == len(input_model_shapes)
     assert len(output_shapes) == len(output_model_shapes)
     assert len(input_shapes) == len(output_shapes)
-    if not tu.validate_for_openvino_model(dtype, dtype, dtype, input_shapes[0],
-                                          input_shapes[0], input_shapes[0]):
+    batch_dim = [] if max_batch == 0 else [max_batch,]
+    if not tu.validate_for_openvino_model(
+            dtype, dtype, dtype, batch_dim + input_shapes[0],
+            batch_dim + input_shapes[0], batch_dim + input_shapes[0]):
         return
 
     io_cnt = len(input_shapes)
