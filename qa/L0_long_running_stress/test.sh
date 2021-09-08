@@ -76,6 +76,7 @@ for MODEL in $MODELS; do
     cp -r $MODEL $MODEL_DIR/. && \
       (cd $MODEL_DIR/$(basename $MODEL) && \
         sed -i "s/^max_batch_size:.*/max_batch_size: 2/" config.pbtxt && \
+        sed -i "s/max_sequence_idle_microseconds:.*/max_sequence_idle_microseconds: 10000000/" config.pbtxt && \
         sed -i "s/kind: KIND_GPU/kind: KIND_GPU\\ncount: 2/" config.pbtxt && \
         sed -i "s/kind: KIND_CPU/kind: KIND_CPU\\ncount: 2/" config.pbtxt)
 done
@@ -89,6 +90,7 @@ done
 for MODEL in $MODELS; do
     cp -r $MODEL $MODEL_DIR/. && \
       (cd $MODEL_DIR/$(basename $MODEL) && \
+        sed -i "s/max_sequence_idle_microseconds:.*/max_sequence_idle_microseconds: 10000000/" config.pbtxt && \
         sed -i "s/kind: KIND_GPU/kind: KIND_GPU\\ncount: 2/" config.pbtxt && \
         sed -i "s/kind: KIND_CPU/kind: KIND_CPU\\ncount: 2/" config.pbtxt)
 done
