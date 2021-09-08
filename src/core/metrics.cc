@@ -119,7 +119,8 @@ Metrics::Metrics()
                     "started")
               .Register(*registry_)),
 #endif  // TRITON_ENABLE_METRICS_GPU
-      metrics_enabled_(false), gpu_metrics_enabled_(false)
+      metrics_enabled_(false), gpu_metrics_enabled_(false),
+      metrics_interval_ms_(2000)
 {
 }
 
@@ -363,7 +364,7 @@ Metrics::InitializeDcgmMetrics()
       }
       dcgmerr = dcgmWatchFields(
           handle, groupId, fieldGroupId,
-          (long long)(metrics_interval_ms_ * 1e3) /*update period, usec*/,
+          metrics_interval_ms_ * 1000 /*update period, usec*/,
           5.0 /*maxKeepAge, sec*/, 5 /*maxKeepSamples*/);
       if (dcgmerr != DCGM_ST_OK) {
         LOG_WARNING << "Cannot start watching fields: " << errorString(dcgmerr);

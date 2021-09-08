@@ -414,7 +414,7 @@ std::vector<Option> options_
        "The port reporting prometheus metrics."},
       {OPTION_METRICS_INTERVAL_MS, "metrics-interval-ms", Option::ArgFloat,
        "Metrics will be collected once every <metrics-interval-ms> "
-       "milliseconds."},
+       "milliseconds. Default is 2000 milliseconds."},
 #endif  // TRITON_ENABLE_METRICS
 #ifdef TRITON_ENABLE_TRACING
       {OPTION_TRACE_FILEPATH, "trace-file", Option::ArgStr,
