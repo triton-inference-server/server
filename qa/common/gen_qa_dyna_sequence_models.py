@@ -1381,11 +1381,12 @@ instance_group [
 def create_openvino_modelfile(models_dir, model_version, max_batch, dtype,
                               shape):
 
-    if not tu.validate_for_openvino_model(dtype, dtype, dtype, shape, shape,
-                                          shape):
+    batch_dim = [] if max_batch == 0 else [max_batch,]
+    if not tu.validate_for_openvino_model(dtype, dtype, dtype,
+                                          batch_dim + shape, batch_dim + shape,
+                                          batch_dim + shape):
         return
 
-    batch_dim = [] if max_batch == 0 else [max_batch,]
     model_name = tu.get_dyna_sequence_model_name(
         "openvino_nobatch" if max_batch == 0 else "openvino", dtype)
     model_version_dir = models_dir + "/" + model_name + "/" + str(model_version)
@@ -1417,8 +1418,10 @@ def create_openvino_modelfile(models_dir, model_version, max_batch, dtype,
 def create_openvino_modelconfig(models_dir, model_version, max_batch, dtype,
                                 shape):
 
-    if not tu.validate_for_openvino_model(dtype, dtype, dtype, shape, shape,
-                                          shape):
+    batch_dim = [] if max_batch == 0 else [max_batch,]
+    if not tu.validate_for_openvino_model(dtype, dtype, dtype,
+                                          batch_dim + shape, batch_dim + shape,
+                                          batch_dim + shape):
         return
 
     model_name = tu.get_dyna_sequence_model_name(
