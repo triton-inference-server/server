@@ -163,7 +163,8 @@ def check_sequence_async(client_metadata,
             now_ms = int(round(time.time() * 1000))
             if (now_ms - seq_start_ms) > timeout_ms:
                 raise TimeoutException(
-                    "Timeout expired for {}".format(sequence_name))
+                    "Timeout expired for {}, got {} ms".format(
+                        sequence_name, (now_ms - seq_start_ms)))
 
         result = results.as_numpy(
             output_name)[0] if "nobatch" in trial else results.as_numpy(
@@ -882,7 +883,7 @@ if __name__ == '__main__':
         '--test-duration',
         type=int,
         required=False,
-        default=25000,
+        default=3600,
         help='Duration of stress test to run. Default is 25000 seconds ' +
         '(approximately 7 hours).')
     FLAGS = parser.parse_args()
