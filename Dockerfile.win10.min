@@ -128,4 +128,4 @@ ENV CMAKE_TOOLCHAIN_FILE /vcpkg/scripts/buildsystems/vcpkg.cmake
 ENV VCPKG_TARGET_TRIPLET x64-windows
 ENV TRITONBUILD_CMAKE_TOOLCHAIN_FILE /vcpkg/scripts/buildsystems/vcpkg.cmake
 ENV TRITONBUILD_VCPKG_TARGET_TRIPLET x64-windows
-ENTRYPOINT C:\BuildTools\Common7\Tools\VsDevCmd.bat &&
+ENTRYPOINT C:\BuildTools\VC\Auxiliary\Build\vcvars64.bat &&
