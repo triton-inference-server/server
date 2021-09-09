@@ -61,6 +61,12 @@ CONTAINER_NAME="tritonqatest${timestamp}"
 # container path (Point to the container when testing cloud storage)
 AS_URL="as://${ACCOUNT_NAME}/${CONTAINER_NAME}"
 
+# Must use setuptools version before 58.0.0 due to https://github.com/Azure/azure-cli/issues/19468
+python -m pip install -U setuptools==57.5.0
+
+# Can now install latest azure-cli (instead of 2.0.73)
+python -m pip install azure-cli
+
 # create test container
 az storage container create --name ${CONTAINER_NAME} --account-name ${ACCOUNT_NAME} --account-key ${ACCOUNT_KEY}
 sleep 10
