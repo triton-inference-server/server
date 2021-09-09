@@ -1,3 +1,5 @@
-This repo provides the K8s code for deploying Triton on MIG in scale.
+This repo provides the scripts for autoscaling Triton deployment with Kubernetes (on MIG) and load balacing using NGNIX Plus.
+
 For more information, please reference this developer blog:
+
 * [Deploying NVIDIA Triton at Scale with MIG and Kubernetes](https://developer.nvidia.com/blog/deploying-nvidia-triton-at-scale-with-mig-and-kubernetes/). 
