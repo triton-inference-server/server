@@ -29,11 +29,6 @@
 #include "src/core/memory.h"
 #include "src/core/response_cache.h"
 
-#ifdef TRITON_ENABLE_LOGGING
-  LOG_SET_VERBOSE(1);
-#endif  // TRITON_ENABLE_LOGGING
-
-
 namespace ni = nvidia::inferenceserver;
 
 /* Mock classes for Unit Testing */
@@ -103,7 +98,7 @@ InferenceRequest::PrepareForInference()
   request_start_ns_ = 0;
 #endif  // TRITON_ENABLE_STATS
 
-  LOG_VERBOSE(1) << "prepared: " << *this;
+  // LOG_VERBOSE(1) << "prepared: " << *this;
 
   return Status::Success;
 }
@@ -907,6 +902,10 @@ TEST_F(RequestResponseCacheTest, TestLRU)
 int
 main(int argc, char** argv)
 {
+#ifdef TRITON_ENABLE_LOGGING
+  LOG_SET_VERBOSE(1);
+#endif  // TRITON_ENABLE_LOGGING
+
   ::testing::InitGoogleTest(&argc, argv);
   return RUN_ALL_TESTS();
 }

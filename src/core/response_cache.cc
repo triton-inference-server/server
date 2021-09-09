@@ -27,12 +27,6 @@
 #include "src/core/response_cache.h"
 #include "src/core/logging.h"
 
-// TODO: Figure out how to use Triton log macros in unit test
-#define DEBUG(x)                               \
-  do {                                         \
-    std::cerr << "[DEBUG] " << x << std::endl; \
-  } while (0)
-
 namespace nvidia { namespace inferenceserver {
 
 RequestResponseCache::RequestResponseCache(const uint64_t size)
@@ -179,7 +173,7 @@ RequestResponseCache::Insert(
   RETURN_IF_ERROR(BuildCacheEntry(response, &entry));
 
   // Insert entry into cache
-  DEBUG("Inserting key [" + std::to_string(key) + "] into cache.");
+  LOG_VERBOSE(1) << "Inserting key [" + std::to_string(key) + "] into cache.";
   auto cache_pair = cache_.insert({key, entry});
   // Exit early if cache insertion failed
   if (!cache_pair.second) {
@@ -344,7 +338,8 @@ RequestResponseCache::Evict()
 
   // Least recently used key in back of LRU list
   uint64_t lru_key = lru_.back();
-  DEBUG("Evicting key [" + std::to_string(lru_key) + "] from cache.");
+  LOG_VERBOSE(1) << "Evicting key [" + std::to_string(lru_key) +
+                        "] from cache.";
 
   // Find cache entry for least recently used key
   auto iter = cache_.find(lru_key);

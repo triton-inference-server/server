@@ -85,14 +85,14 @@ set(
 #
 set(
   RESPONSE_CACHE_SRCS
-  #../core/logging.cc
+  ../core/logging.cc
   ../core/status.cc
   ../core/response_cache.cc
 )
 
 set(
   RESPONSE_CACHE_HDRS
-  #../core/logging.h
+  ../core/logging.h
   ../core/status.h
   ../core/response_cache.h
 )
@@ -274,7 +274,7 @@ target_link_libraries(
   PRIVATE numa
 )
 
-#target_compile_definitions(response_cache_test PUBLIC "TRITON_ENABLE_LOGGING=1")
+target_compile_definitions(response_cache_test PUBLIC "TRITON_ENABLE_LOGGING=1")
 
 install(
   TARGETS response_cache_test
