@@ -29,8 +29,10 @@
 #include "src/core/memory.h"
 #include "src/core/response_cache.h"
 
-// TODO: Not sure how to incorporate this
-// LOG_SET_VERBOSE(TRITONSERVER_LOG_VERBOSE);
+#ifdef TRITON_ENABLE_LOGGING
+  LOG_SET_VERBOSE(1);
+#endif  // TRITON_ENABLE_LOGGING
+
 
 namespace ni = nvidia::inferenceserver;
 
