@@ -261,7 +261,6 @@ InferenceResponse::Output::AllocateDataBuffer(
 
   // Set relevant member variables for DataBuffer() to return
   allocated_buffer_ = *buffer;
-  // std::memcpy(allocated_buffer_, *buffer, buffer_byte_size);
   allocated_buffer_byte_size_ = buffer_byte_size;
   allocated_memory_type_ = *memory_type;
   allocated_memory_type_id_ = *memory_type_id;
@@ -327,20 +326,33 @@ cache_stats(ni::RequestResponseCache& cache)
   std::cout << "Cache total bytes: " << cache.TotalBytes() << std::endl;
 }
 
-/*void
-cache_stats2(ni::RequestResponseCache* cache)
+void
+reset_response(std::unique_ptr<ni::InferenceResponse>* response, ni::InferenceRequest* request)
 {
-  std::cout << "Cache entries: " << cache->NumEntries() << std::endl;
-  std::cout << "Cache free bytes: " << cache->FreeBytes() << std::endl;
-  std::cout << "Cache alloc'd bytes: " << cache->AllocatedBytes() << std::endl;
-  std::cout << "Cache total bytes: " << cache->TotalBytes() << std::endl;
-}*/
+  check_status(request->ResponseFactory().CreateResponse(response));
+}
 
-// TODO: REMOVE
 /*void
-hello_world(int idx)
+lookup_and_compare(ni::RequestResponseCache& cache, uint64_t hash, const ni::InferenceResponse& response_in, ni::InferenceRequest* request)
 {
-    std::cout << "Hello World from Thread: " << idx << std::endl;
+  // Create response object to populate from cache
+  std::unique_ptr<ni::InferenceResponse> response_out;
+  check_status(request.ResponseFactory().CreateResponse(&response_out));
+
+  // Insert response into cache then immediately look it up
+  check_status(cache.Lookup(hash, response_out));
+
+  // Compare number of outputs
+  const auto& response_in_outputs = response_in.Outputs();
+  const auto& response_out_outputs = response_out->Outputs();
+  ASSERT_EQ(response_in_outputs.size(), response_out_outputs.size());
+
+  // Compare output metadata
+  for (size_t i=0; i < response_in_outputs.size(); i++) {
+    ASSERT_EQ(response_in_outputs[i].Name(),  response_out_outputs[i].Name());
+    ASSERT_EQ(response_in_outputs[i].DType(), response_out_outputs[i].DType());
+    ASSERT_EQ(response_in_outputs[i].Shape(), response_out_outputs[i].Shape());
+  }
 }*/
 
 // Test hashing for consistency on same request
@@ -417,7 +429,7 @@ TEST_F(RequestResponseCacheTest, TestCacheTooSmall)
   ni::InferenceRequest request0(backend, model_version);
 
   inference::DataType dtype = inference::DataType::TYPE_INT32;
-  std::vector<int64_t> shape{1, 4};
+  std::vector<int64_t> shape{1, 1025};
   TRITONSERVER_MemoryType memory_type = TRITONSERVER_MEMORY_CPU;
   int64_t memory_type_id = 0;
 
@@ -431,7 +443,7 @@ TEST_F(RequestResponseCacheTest, TestCacheTooSmall)
   std::cout << "Add output metadata to response object" << std::endl;
   ni::InferenceResponse::Output* response_output = nullptr;
   // Explicitly create output buffer larger than entire cache
-  std::vector<int> output0(1025, 0);
+  std::vector<int> output0(shape[1], 0);
   uint64_t output_size = sizeof(int) * output0.size();
   std::cout << "Output size bytes: " << output_size << std::endl;
   check_status(response0->AddOutput("output", dtype, shape, &response_output));
@@ -466,7 +478,7 @@ TEST_F(RequestResponseCacheTest, TestEviction)
   ni::InferenceRequest request0(backend, model_version);
 
   inference::DataType dtype = inference::DataType::TYPE_INT32;
-  std::vector<int64_t> shape{1, 4};
+  std::vector<int64_t> shape{1, 100};
   TRITONSERVER_MemoryType memory_type = TRITONSERVER_MEMORY_CPU;
   int64_t memory_type_id = 0;
 
@@ -482,7 +494,7 @@ TEST_F(RequestResponseCacheTest, TestEviction)
 
   std::cout << "Add output metadata to response object" << std::endl;
   ni::InferenceResponse::Output* response_output = nullptr;
-  std::vector<int> output0(100, 0);
+  std::vector<int> output0(shape[1], 0);
   uint64_t output_size = sizeof(int) * output0.size();
   std::cout << "Output size: " << output_size << std::endl;
   check_status(response0->AddOutput("output", dtype, shape, &response_output));
@@ -616,12 +628,16 @@ TEST_F(RequestResponseCacheTest, TestEndToEnd)
   // const auto outputs = response_test->Outputs();
   // Build cache entry data from response outputs
   // TODO: Handle multiple outputs more generically
-  for (const auto& response_output : response_test->Outputs()) {
-    check_status(response_output.DataBuffer(
+  for (const auto& response_test_output : response_test->Outputs()) {
+    ASSERT_EQ(response_test_output.Name(), response_output->Name());
+    ASSERT_EQ(response_test_output.DType(), response_output->DType());
+    ASSERT_EQ(response_test_output.Shape(), response_output->Shape());
+    check_status(response_test_output.DataBuffer(
         &response_buffer, &response_byte_size, &response_memory_type,
         &response_memory_type_id, &userp));
   }
 
+  // TODO: Use Triton DType to cast buffer and compare outputs generically
   int* output_test = (int*)response_buffer;
   std::cout << "Check output buffer data from cache entry:" << std::endl;
   for (size_t i = 0; i < response_byte_size / sizeof(int); i++) {
@@ -638,7 +654,68 @@ TEST_F(RequestResponseCacheTest, TestEndToEnd)
   std::cout << "Done!" << std::endl;
 }
 
-// Test hashing for consistency on same request
+// Test inserting into cache with multiple threads in parallel
+// and asserting that the correct number of entries and evictions
+// occurred based on cache and entry sizes
+TEST_F(RequestResponseCacheTest, TestParallelInsertion)
+{
+  // Create cache
+  std::cout << "Create cache" << std::endl;
+  uint64_t cache_size = 1024;
+  ni::RequestResponseCache cache(cache_size);
+  cache_stats(cache);
+
+  // Create request
+  std::cout << "Create request" << std::endl;
+  ni::InferenceRequest request0(backend, model_version);
+
+  inference::DataType dtype = inference::DataType::TYPE_INT32;
+  std::vector<int64_t> shape{1, 100};
+  TRITONSERVER_MemoryType memory_type = TRITONSERVER_MEMORY_CPU;
+  int64_t memory_type_id = 0;
+
+  std::cout << "Create response object to insert into cache" << std::endl;
+  std::unique_ptr<ni::InferenceResponse> response_in;
+  check_status(request0.ResponseFactory().CreateResponse(&response_in));
+
+  std::cout << "Add output metadata to response object" << std::endl;
+  ni::InferenceResponse::Output* response_output = nullptr;
+  std::vector<int> output0(shape[1], 0);
+  uint64_t output_size = sizeof(int) * output0.size();
+  std::cout << "Output size: " << output_size << std::endl;
+  check_status(response_in->AddOutput("output", dtype, shape, &response_output));
+
+  std::cout << "Allocate output data buffer for response object" << std::endl;
+  void* buffer;
+  check_status(response_output->AllocateDataBuffer(
+      &buffer, output_size, &memory_type, &memory_type_id));
+  ASSERT_NE(buffer, nullptr);
+  // Copy data from output to response buffer
+  std::memcpy(buffer, output0.data(), output_size);
+
+  // Create threads
+  std::vector<std::thread> threads;
+  size_t thread_count = 10;
+  std::cout << "Insert response into cache with hash0 with [" << thread_count << "] threads in parallel" << std::endl;
+  for (size_t idx = 0; idx < thread_count; idx++) {
+    threads.emplace_back(
+        std::thread(&ni::RequestResponseCache::Insert, &cache, idx, std::ref(*response_in)));
+  }
+
+  // Join threads
+  for (size_t idx = 0; idx < thread_count; idx++) {
+    threads[idx].join();
+  }
+
+  // Cache size only has room for 2 entries, so we expect 2 entries and N-2 evictions for N threads
+  cache_stats(cache);
+  ASSERT_EQ(cache.NumEntries(), 2u) << "NumEntries: " << cache.NumEntries();
+  ASSERT_EQ(cache.NumEvictions(), (uint64_t)(thread_count - 2u)) << "NumEvictions: " << cache.NumEvictions();
+}
+
+// Test evicting from cache with multiple threads in parallel
+// and asserting that the correct number of entries and evictions
+// occurred
 TEST_F(RequestResponseCacheTest, TestParallelEviction)
 {
   // Create cache
@@ -656,19 +733,13 @@ TEST_F(RequestResponseCacheTest, TestParallelEviction)
   TRITONSERVER_MemoryType memory_type = TRITONSERVER_MEMORY_CPU;
   int64_t memory_type_id = 0;
 
-  // Fake hashes to input same response to cache repeatedly
-  uint64_t hash0 = 0;
-  uint64_t hash1 = 1;
-  uint64_t hash2 = 2;
-  uint64_t hash3 = 3;
-
   std::cout << "Create response object" << std::endl;
   std::unique_ptr<ni::InferenceResponse> response0;
   check_status(request0.ResponseFactory().CreateResponse(&response0));
 
   std::cout << "Add output metadata to response object" << std::endl;
   ni::InferenceResponse::Output* response_output = nullptr;
-  std::vector<int> output0(100, 0);
+  std::vector<int> output0(shape[1], 0);
   uint64_t output_size = sizeof(int) * output0.size();
   std::cout << "Output size: " << output_size << std::endl;
   check_status(response0->AddOutput("output", dtype, shape, &response_output));
@@ -681,49 +752,133 @@ TEST_F(RequestResponseCacheTest, TestParallelEviction)
   // Copy data from output to response buffer
   std::memcpy(buffer, output0.data(), output_size);
 
-  std::cout << "Lookup hash0 in empty cache" << std::endl;
-  auto status = cache.Lookup(hash0, nullptr);
-  // This hash not in cache yet
-  ASSERT_FALSE(status.IsOk())
-      << "hash [" + std::to_string(hash0) + "] should not be in cache";
-
   // Create threads
   std::vector<std::thread> threads;
   size_t thread_count = 10;
-  std::cout << "Insert response into cache with hash0 with 10 threads in parallel" << std::endl;
-  // TODO: fix this
+
+  // Insert [thread_count] entries into cache sequentially
+  for (size_t idx = 0; idx < thread_count; idx++) {
+        cache.Insert(idx, *response0);
+  }
+
+  // Assert all entries were put into cache and no evictions occurred yet
+  cache_stats(cache);
+  ASSERT_EQ(cache.NumEntries(), (uint64_t) thread_count) << "NumEntries: " << cache.NumEntries();
+  ASSERT_EQ(cache.NumEvictions(), 0u) << "NumEvictions: " << cache.NumEvictions();
+
+  // Evict [thread_count] entries from cache in parallel
+  std::cout << "Evict from cache with [" << thread_count << "] threads in parallel" << std::endl;
   for (size_t idx = 0; idx < thread_count; idx++) {
     threads.emplace_back(
-        std::thread(&ni::RequestResponseCache::Insert, &cache, hash0, *response0)); // ERROR
-        //std::thread(&ni::RequestResponseCache::Hash, &cache, request0, &hash0));  // ERROR
-        //std::thread(&hello_world, idx));     // OK
-        //std::thread(&cache_stats2, &cache)); // OK
+        std::thread(&ni::RequestResponseCache::Evict, &cache));
   }
+
   // Join threads
   for (size_t idx = 0; idx < thread_count; idx++) {
     threads[idx].join();
   }
 
-  // TODO
-  check_status(cache.Insert(hash0, *response0));
+  // Assert all entries were evicted from cache and exactly [thread_count]
+  // evictions occurred
   cache_stats(cache);
-  ASSERT_EQ(cache.NumEntries(), 1u) << "Only one thread should've succeeded with insertion";
-  ASSERT_EQ(cache.NumEvictions(), 0u) << "No evictions should've happened";
+  ASSERT_EQ(cache.NumEntries(), 0u) << "NumEntries: " << cache.NumEntries();
+  ASSERT_EQ(cache.NumEvictions(), (uint64_t) thread_count) << "NumEvictions: " << cache.NumEvictions();
+}
 
-  check_status(cache.Insert(hash1, *response0));
+// Test LRU ordering of cache
+TEST_F(RequestResponseCacheTest, TestLRU)
+{
+  // Create cache
+  std::cout << "Create cache" << std::endl;
+  uint64_t cache_size = 1024;
+  ni::RequestResponseCache cache(cache_size);
   cache_stats(cache);
-  ASSERT_EQ(cache.NumEntries(), 2u);
-  ASSERT_EQ(cache.NumEvictions(), 0u);
 
-  check_status(cache.Insert(hash2, *response0));
-  cache_stats(cache);
-  ASSERT_EQ(cache.NumEntries(), 2u);
-  ASSERT_EQ(cache.NumEvictions(), 1u);
+  // Create request
+  std::cout << "Create request" << std::endl;
+  ni::InferenceRequest request0(backend, model_version);
 
-  check_status(cache.Insert(hash3, *response0));
-  cache_stats(cache);
-  ASSERT_EQ(cache.NumEntries(), 2u);
-  ASSERT_EQ(cache.NumEvictions(), 2u);
+  inference::DataType dtype = inference::DataType::TYPE_INT32;
+  std::vector<int64_t> shape{1, 4};
+  TRITONSERVER_MemoryType memory_type = TRITONSERVER_MEMORY_CPU;
+  int64_t memory_type_id = 0;
+
+  std::cout << "Create response object" << std::endl;
+  std::unique_ptr<ni::InferenceResponse> response0;
+  check_status(request0.ResponseFactory().CreateResponse(&response0));
+
+  std::cout << "Add output metadata to response object" << std::endl;
+  ni::InferenceResponse::Output* response_output = nullptr;
+  std::vector<int> output0(shape[1], 0);
+  uint64_t output_size = sizeof(int) * output0.size();
+  std::cout << "Output size: " << output_size << std::endl;
+  check_status(response0->AddOutput("output", dtype, shape, &response_output));
+
+  std::cout << "Allocate output data buffer for response object" << std::endl;
+  void* buffer;
+  check_status(response_output->AllocateDataBuffer(
+      &buffer, output_size, &memory_type, &memory_type_id));
+  ASSERT_NE(buffer, nullptr);
+  // Copy data from output to response buffer
+  std::memcpy(buffer, output0.data(), output_size);
+
+  // Create response to test cache lookup
+  std::cout << "Create response object into fill from cache" << std::endl;
+  std::unique_ptr<ni::InferenceResponse> response_test;
+  check_status(request0.ResponseFactory().CreateResponse(&response_test));
+
+  // Insert 3 items into cache: 0, 1, 2
+  check_status(cache.Insert(0, *response0));
+  check_status(cache.Insert(1, *response0));
+  check_status(cache.Insert(2, *response0));
+
+  // Verify items 0, 1, 2, in cache
+  reset_response(&response_test, &request0);
+  check_status(cache.Lookup(0, response_test.get()));
+  reset_response(&response_test, &request0);
+  check_status(cache.Lookup(1, response_test.get()));
+  reset_response(&response_test, &request0);
+  check_status(cache.Lookup(2, response_test.get()));
+
+  // Evict item from cache, should be item 0 since it was looked up last
+  cache.Evict();
+  // Assert Lookup for item 0 fails but items 1, 2 succeed
+  reset_response(&response_test, &request0);
+  ni::Status status;
+  status = cache.Lookup(0, response_test.get());
+  ASSERT_FALSE(status.IsOk());
+  reset_response(&response_test, &request0);
+  check_status(cache.Lookup(1, response_test.get()));
+  reset_response(&response_test, &request0);
+  check_status(cache.Lookup(2, response_test.get()));
+
+  // Insert item 3, 4
+  check_status(cache.Insert(3, *response0));
+  check_status(cache.Insert(4, *response0));
+
+  // Evict twice, assert items 1 and 2 were evicted
+  cache.Evict();
+  cache.Evict();
+  reset_response(&response_test, &request0);
+  status = cache.Lookup(1, response_test.get());
+  ASSERT_FALSE(status.IsOk());
+  reset_response(&response_test, &request0);
+  status = cache.Lookup(2, response_test.get());
+  ASSERT_FALSE(status.IsOk());
+
+  // Lookup items 3 and 4
+  reset_response(&response_test, &request0);
+  check_status(cache.Lookup(3, response_test.get()));
+  reset_response(&response_test, &request0);
+  check_status(cache.Lookup(4, response_test.get()));
+
+  // Evict, assert item 3 was evicted
+  cache.Evict();
+  reset_response(&response_test, &request0);
+  status = cache.Lookup(3, response_test.get());
+  ASSERT_FALSE(status.IsOk());
+  reset_response(&response_test, &request0);
+  check_status(cache.Lookup(4, response_test.get()));
 }
 
 }  // namespace

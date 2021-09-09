@@ -277,6 +277,14 @@ RequestResponseCache::BuildInferenceResponse(
   {
     std::lock_guard<std::recursive_mutex> lk(cache_mtx_);
 
+    // TODO: What should we do if [response] already contains
+    //       some outputs? Currently it will just append outputs
+    if (response->Outputs().size() != 0) {
+        return Status(
+            Status::Code::INTERNAL,
+            "InferenceResponse already contains some outputs");
+    }
+
     for (auto& cache_output : entry.outputs_) {
       InferenceResponse::Output* response_output = nullptr;
       RETURN_IF_ERROR(response->AddOutput(
