@@ -742,6 +742,7 @@ COPY --chown=1000:1000 --from=tritonserver_build /workspace/build/sagemaker/serv
 
 
 def dockerfile_prepare_container_linux(argmap, backends, enable_gpu):
+    gpu_enabled = 1 if not enable_gpu else 0
     # Common steps to produce docker images shared by build.py and compose.py.
     # Sets enviroment variables, installs dependencies and adds entrypoint
     df = '''
@@ -760,6 +761,7 @@ ENV TF_ADJUST_HUE_FUSED         1
 ENV TF_ADJUST_SATURATION_FUSED  1
 ENV TF_ENABLE_WINOGRAD_NONFUSED 1
 ENV TF_AUTOTUNE_THRESHOLD       2
+ENV TRITON_GPU_ENABLED_BUILD    {gpu_enabled}        
 
 # Create a user that can be used to run triton as
 # non-root. Make sure that this user to given ID 1000. All server
@@ -788,7 +790,7 @@ RUN apt-get update && \
             curl \
             {ort_dependencies} && \
     rm -rf /var/lib/apt/lists/*
-'''.format(ort_dependencies=ort_dependencies)
+'''.format(gpu_enabled=gpu_enabled, ort_dependencies=ort_dependencies)
 
     if enable_gpu:
         df += install_dcgm_libraries(argmap['DCGM_VERSION'])

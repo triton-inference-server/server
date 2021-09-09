@@ -56,7 +56,7 @@ def fail_if(p, msg):
         fail(msg)
 
 
-def start_gpu_dockerfile(ddir, images, argmap, dockerfile_name, backends):
+def start_dockerfile(ddir, images, argmap, dockerfile_name, backends):
     # Set enviroment variables, set default user and install dependencies
     df = '''
 #
@@ -114,7 +114,7 @@ RUN chown triton-server:triton-server /opt/tritonserver/repoagents
         dfile.write(df)
 
 
-def end_gpu_dockerfile(ddir, dockerfile_name, argmap):
+def end_dockerfile(ddir, dockerfile_name, argmap):
     # Install additional dependencies
     df = ""
     if argmap['SAGEMAKER_ENDPOINT']:
@@ -177,6 +177,20 @@ def create_argmap(images):
             p_version.stderr))
 
     vars = p_version.stdout
+    log_verbose("inspect args: {}".format(vars))
+    import re  # parse all PATH enviroment variables
+    e = re.search("TRITON_GPU_ENABLED_BUILD=([\S]{1,}) ", vars)
+    gpu_enabled = False if e == None else (True if e.group(1) == "1" else False)
+    fail_if(
+        p_version.returncode != 0,
+        'docker inspect to find triton version failed, {}'.format(
+            p_version.stderr))
+    fail_if(
+        gpu_enabled == FLAGS.enable_gpu,
+        'Full container provided was build with different \'enable_gpu\' flag than requested'
+    )
+
+    vars = p_version.stdout
     e = re.search("NVIDIA_TRITON_SERVER_VERSION=([\S]{5,}) ", vars)
     container_version = "" if e == None else e.group(1)
     fail_if(
@@ -230,6 +244,7 @@ def create_argmap(images):
         'TRITON_CONTAINER_VERSION': container_version,
         'DCGM_VERSION': dcgm_version,
         'SAGEMAKER_ENDPOINT': f is not None,
+        'TRITON_GPU_ENABLED_BUILD': gpu_enabled,
     }
     return argmap
 
@@ -298,10 +313,6 @@ if __name__ == '__main__':
     )
 
     FLAGS = parser.parse_args()
-    fail_if(
-        not FLAGS.enable_gpu,
-        "Only GPU versions are supported right now. Add --enable-gpu to compose.py command."
-    )
 
     if FLAGS.work_dir is None:
         FLAGS.work_dir = "."
@@ -329,24 +340,34 @@ if __name__ == '__main__':
             images[parts[0]] = parts[1]
     else:
         get_container_version_if_not_specified()
-        images = {
-            "full":
-                "nvcr.io/nvidia/tritonserver:{}-py3".format(
-                    FLAGS.container_version),
-            "min":
-                "nvcr.io/nvidia/tritonserver:{}-py3-min".format(
-                    FLAGS.container_version)
-        }
+        if (FLAGS.enable_gpu):
+            images = {
+                "full":
+                    "nvcr.io/nvidia/tritonserver:{}-py3".format(
+                        FLAGS.container_version),
+                "min":
+                    "nvcr.io/nvidia/tritonserver:{}-py3-min".format(
+                        FLAGS.container_version)
+            }
+        else:
+            images = {
+                "full":
+                    "nvcr.io/nvidia/tritonserver:{}-cpu-only-py3".format(
+                        FLAGS.container_version),
+                "min":
+                    "ubuntu:20.04".format(FLAGS.container_version)
+            }
     fail_if(
         len(images) != 2,
         "Need to both specify 'full' and 'min' images if at all")
 
     argmap = create_argmap(images)
 
-    start_gpu_dockerfile(FLAGS.work_dir, images, argmap, dockerfile_name,
-                         FLAGS.backend)
+    start_dockerfile(FLAGS.work_dir, images, argmap, dockerfile_name,
+                     FLAGS.backend)
     add_requested_backends(FLAGS.work_dir, dockerfile_name, FLAGS.backend)
     add_requested_repoagents(FLAGS.work_dir, dockerfile_name, FLAGS.repoagent)
-    end_gpu_dockerfile(FLAGS.work_dir, dockerfile_name, argmap)
+    end_dockerfile(FLAGS.work_dir, dockerfile_name, argmap)
+
     if (not FLAGS.dry_run):
         build_docker_image(FLAGS.work_dir, dockerfile_name, FLAGS.output_name)
