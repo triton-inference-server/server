@@ -25,8 +25,8 @@
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include "gtest/gtest.h"
 
-#include "src/core/memory.h"
 #include "src/core/logging.h"
+#include "src/core/memory.h"
 #include "src/core/response_cache.h"
 
 // TODO: Not sure how to incorporate this
@@ -327,33 +327,12 @@ cache_stats(ni::RequestResponseCache& cache)
 }
 
 void
-reset_response(std::unique_ptr<ni::InferenceResponse>* response, ni::InferenceRequest* request)
+reset_response(
+    std::unique_ptr<ni::InferenceResponse>* response,
+    ni::InferenceRequest* request)
 {
   check_status(request->ResponseFactory().CreateResponse(response));
 }
-
-/*void
-lookup_and_compare(ni::RequestResponseCache& cache, uint64_t hash, const ni::InferenceResponse& response_in, ni::InferenceRequest* request)
-{
-  // Create response object to populate from cache
-  std::unique_ptr<ni::InferenceResponse> response_out;
-  check_status(request.ResponseFactory().CreateResponse(&response_out));
-
-  // Insert response into cache then immediately look it up
-  check_status(cache.Lookup(hash, response_out));
-
-  // Compare number of outputs
-  const auto& response_in_outputs = response_in.Outputs();
-  const auto& response_out_outputs = response_out->Outputs();
-  ASSERT_EQ(response_in_outputs.size(), response_out_outputs.size());
-
-  // Compare output metadata
-  for (size_t i=0; i < response_in_outputs.size(); i++) {
-    ASSERT_EQ(response_in_outputs[i].Name(),  response_out_outputs[i].Name());
-    ASSERT_EQ(response_in_outputs[i].DType(), response_out_outputs[i].DType());
-    ASSERT_EQ(response_in_outputs[i].Shape(), response_out_outputs[i].Shape());
-  }
-}*/
 
 // Test hashing for consistency on same request
 TEST_F(RequestResponseCacheTest, TestHashing)
@@ -368,6 +347,8 @@ TEST_F(RequestResponseCacheTest, TestHashing)
   ni::InferenceRequest request0(backend, model_version);
   ni::InferenceRequest request1(backend, model_version);
   ni::InferenceRequest request2(backend, model_version);
+  ni::InferenceRequest request3(backend, model_version);
+  ni::InferenceRequest request4(backend, model_version);
 
   // Create inputs
   std::cout << "Create inputs" << std::endl;
@@ -376,14 +357,32 @@ TEST_F(RequestResponseCacheTest, TestHashing)
   ni::InferenceRequest::Input* input0 = nullptr;
   ni::InferenceRequest::Input* input1 = nullptr;
   ni::InferenceRequest::Input* input2 = nullptr;
+  ni::InferenceRequest::Input* input3_0 = nullptr;
+  ni::InferenceRequest::Input* input3_1 = nullptr;
+  ni::InferenceRequest::Input* input4_0 = nullptr;
+  ni::InferenceRequest::Input* input4_1 = nullptr;
+
   // Add input to requests
   std::cout << "Add input to request" << std::endl;
+  // Create three requests with same input name, two with same data, one with
+  // different data
   request0.AddOriginalInput("input", dtype, shape, &input0);
   request1.AddOriginalInput("input", dtype, shape, &input1);
   request2.AddOriginalInput("input", dtype, shape, &input2);
+  // Create two requests with the same two inputs but inserted in different
+  // order
+  request3.AddOriginalInput("input0", dtype, shape, &input3_0);
+  request3.AddOriginalInput("input1", dtype, shape, &input3_1);
+  request4.AddOriginalInput("input1", dtype, shape, &input4_1);
+  request4.AddOriginalInput("input0", dtype, shape, &input4_0);
   ASSERT_NE(input0, nullptr);
   ASSERT_NE(input1, nullptr);
   ASSERT_NE(input2, nullptr);
+  ASSERT_NE(input3_0, nullptr);
+  ASSERT_NE(input3_1, nullptr);
+  ASSERT_NE(input4_0, nullptr);
+  ASSERT_NE(input4_1, nullptr);
+
   // Add data to input
   int data0[4] = {1, 2, 3, 4};
   int data1[4] = {5, 6, 7, 8};
@@ -394,26 +393,38 @@ TEST_F(RequestResponseCacheTest, TestHashing)
   input0->AppendData(data0, input_size, memory_type, memory_type_id);
   input1->AppendData(data1, input_size, memory_type, memory_type_id);
   input2->AppendData(data2, input_size, memory_type, memory_type_id);
+  input3_0->AppendData(data0, input_size, memory_type, memory_type_id);
+  input3_1->AppendData(data1, input_size, memory_type, memory_type_id);
+  input4_0->AppendData(data0, input_size, memory_type, memory_type_id);
+  input4_1->AppendData(data1, input_size, memory_type, memory_type_id);
 
   // PrepareForInference for use of ImmutableInputs()
   check_status(request0.PrepareForInference());
   check_status(request1.PrepareForInference());
   check_status(request2.PrepareForInference());
+  check_status(request3.PrepareForInference());
+  check_status(request4.PrepareForInference());
 
   // Compare hashes
   std::cout << "Compare hashes" << std::endl;
-  uint64_t hash0, hash1, hash2;
+  uint64_t hash0, hash1, hash2, hash3, hash4;
   check_status(cache.Hash(request0, &hash0));
   check_status(cache.Hash(request1, &hash1));
   check_status(cache.Hash(request2, &hash2));
+  check_status(cache.Hash(request3, &hash3));
+  check_status(cache.Hash(request4, &hash4));
 
   std::cout << "hash0: " << hash0 << std::endl;
   std::cout << "hash1: " << hash1 << std::endl;
   std::cout << "hash2: " << hash2 << std::endl;
+  std::cout << "hash3: " << hash3 << std::endl;
+  std::cout << "hash4: " << hash4 << std::endl;
   // Different input data should have different hashes
   ASSERT_NE(hash0, hash1);
   // Same input data should have same hashes
   ASSERT_EQ(hash1, hash2);
+  // Two requests with same two inputs but added in different orders
+  ASSERT_EQ(hash3, hash4);
 }
 
 // Test cache too small for entry
@@ -683,7 +694,8 @@ TEST_F(RequestResponseCacheTest, TestParallelInsertion)
   std::vector<int> output0(shape[1], 0);
   uint64_t output_size = sizeof(int) * output0.size();
   std::cout << "Output size: " << output_size << std::endl;
-  check_status(response_in->AddOutput("output", dtype, shape, &response_output));
+  check_status(
+      response_in->AddOutput("output", dtype, shape, &response_output));
 
   std::cout << "Allocate output data buffer for response object" << std::endl;
   void* buffer;
@@ -696,10 +708,12 @@ TEST_F(RequestResponseCacheTest, TestParallelInsertion)
   // Create threads
   std::vector<std::thread> threads;
   size_t thread_count = 10;
-  std::cout << "Insert response into cache with hash0 with [" << thread_count << "] threads in parallel" << std::endl;
+  std::cout << "Insert response into cache with hash0 with [" << thread_count
+            << "] threads in parallel" << std::endl;
   for (size_t idx = 0; idx < thread_count; idx++) {
-    threads.emplace_back(
-        std::thread(&ni::RequestResponseCache::Insert, &cache, idx, std::ref(*response_in)));
+    threads.emplace_back(std::thread(
+        &ni::RequestResponseCache::Insert, &cache, idx,
+        std::ref(*response_in)));
   }
 
   // Join threads
@@ -707,10 +721,12 @@ TEST_F(RequestResponseCacheTest, TestParallelInsertion)
     threads[idx].join();
   }
 
-  // Cache size only has room for 2 entries, so we expect 2 entries and N-2 evictions for N threads
+  // Cache size only has room for 2 entries, so we expect 2 entries and N-2
+  // evictions for N threads
   cache_stats(cache);
   ASSERT_EQ(cache.NumEntries(), 2u) << "NumEntries: " << cache.NumEntries();
-  ASSERT_EQ(cache.NumEvictions(), (uint64_t)(thread_count - 2u)) << "NumEvictions: " << cache.NumEvictions();
+  ASSERT_EQ(cache.NumEvictions(), (uint64_t)(thread_count - 2u))
+      << "NumEvictions: " << cache.NumEvictions();
 }
 
 // Test evicting from cache with multiple threads in parallel
@@ -758,19 +774,21 @@ TEST_F(RequestResponseCacheTest, TestParallelEviction)
 
   // Insert [thread_count] entries into cache sequentially
   for (size_t idx = 0; idx < thread_count; idx++) {
-        cache.Insert(idx, *response0);
+    cache.Insert(idx, *response0);
   }
 
   // Assert all entries were put into cache and no evictions occurred yet
   cache_stats(cache);
-  ASSERT_EQ(cache.NumEntries(), (uint64_t) thread_count) << "NumEntries: " << cache.NumEntries();
-  ASSERT_EQ(cache.NumEvictions(), 0u) << "NumEvictions: " << cache.NumEvictions();
+  ASSERT_EQ(cache.NumEntries(), (uint64_t)thread_count)
+      << "NumEntries: " << cache.NumEntries();
+  ASSERT_EQ(cache.NumEvictions(), 0u)
+      << "NumEvictions: " << cache.NumEvictions();
 
   // Evict [thread_count] entries from cache in parallel
-  std::cout << "Evict from cache with [" << thread_count << "] threads in parallel" << std::endl;
+  std::cout << "Evict from cache with [" << thread_count
+            << "] threads in parallel" << std::endl;
   for (size_t idx = 0; idx < thread_count; idx++) {
-    threads.emplace_back(
-        std::thread(&ni::RequestResponseCache::Evict, &cache));
+    threads.emplace_back(std::thread(&ni::RequestResponseCache::Evict, &cache));
   }
 
   // Join threads
@@ -782,7 +800,8 @@ TEST_F(RequestResponseCacheTest, TestParallelEviction)
   // evictions occurred
   cache_stats(cache);
   ASSERT_EQ(cache.NumEntries(), 0u) << "NumEntries: " << cache.NumEntries();
-  ASSERT_EQ(cache.NumEvictions(), (uint64_t) thread_count) << "NumEvictions: " << cache.NumEvictions();
+  ASSERT_EQ(cache.NumEvictions(), (uint64_t)thread_count)
+      << "NumEvictions: " << cache.NumEvictions();
 }
 
 // Test LRU ordering of cache

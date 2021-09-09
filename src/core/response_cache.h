@@ -80,30 +80,31 @@ class RequestResponseCache {
   // Return Status object indicating success or failure.
   Status Evict();
   // Returns number of items in cache
-  size_t NumEntries() 
+  size_t NumEntries()
   {
     std::lock_guard<std::recursive_mutex> lk(cache_mtx_);
     return cache_.size();
   }
   // Returns number of items evicted in lifespan of cache
-  size_t NumEvictions() { 
+  size_t NumEvictions()
+  {
     std::lock_guard<std::recursive_mutex> lk(cache_mtx_);
-    return num_evictions_; 
+    return num_evictions_;
   }
   // Returns total number of bytes allocated for cache
-  size_t TotalBytes() 
+  size_t TotalBytes()
   {
     std::lock_guard<std::recursive_mutex> lk(buffer_mtx_);
     return managed_buffer_.get_size();
   }
   // Returns number of free bytes in cache
-  size_t FreeBytes() 
+  size_t FreeBytes()
   {
     std::lock_guard<std::recursive_mutex> lk(buffer_mtx_);
     return managed_buffer_.get_free_memory();
   }
   // Returns number of bytes in use by cache
-  size_t AllocatedBytes() 
+  size_t AllocatedBytes()
   {
     std::lock_guard<std::recursive_mutex> lk(buffer_mtx_);
     return managed_buffer_.get_size() - managed_buffer_.get_free_memory();

@@ -24,8 +24,8 @@
 // (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-#include "src/core/logging.h"
 #include "src/core/response_cache.h"
+#include "src/core/logging.h"
 
 // TODO: Figure out how to use Triton log macros in unit test
 #define DEBUG(x)                               \
@@ -110,7 +110,11 @@ Status
 RequestResponseCache::HashInputs(const InferenceRequest& request, size_t* seed)
 {
   const auto& inputs = request.ImmutableInputs();
-  for (const auto& input : inputs) {
+  // Convert inputs to ordered map for consistency in hashing
+  // inputs sorted by key (input) name
+  std::map<std::string, InferenceRequest::Input*> ordered_inputs(
+      inputs.begin(), inputs.end());
+  for (const auto& input : ordered_inputs) {
     // Add input name to hash
     boost::hash_combine(*seed, input.second->Name());
     // Fetch input buffer for hashing raw data
@@ -219,7 +223,7 @@ RequestResponseCache::BuildCacheEntry(
           Status::Code::INTERNAL, "Response buffer from output was nullptr");
     }
 
-    // Lock on managed buffer references 
+    // Lock on managed buffer references
     {
       std::lock_guard<std::recursive_mutex> lk(buffer_mtx_);
 
@@ -273,16 +277,16 @@ RequestResponseCache::BuildInferenceResponse(
     return Status(Status::Code::INTERNAL, "invalid response ptr passed in");
   }
 
-  // Lock on cache references 
+  // Lock on cache references
   {
     std::lock_guard<std::recursive_mutex> lk(cache_mtx_);
 
     // TODO: What should we do if [response] already contains
     //       some outputs? Currently it will just append outputs
     if (response->Outputs().size() != 0) {
-        return Status(
-            Status::Code::INTERNAL,
-            "InferenceResponse already contains some outputs");
+      return Status(
+          Status::Code::INTERNAL,
+          "InferenceResponse already contains some outputs");
     }
 
     for (auto& cache_output : entry.outputs_) {
@@ -315,8 +319,8 @@ RequestResponseCache::BuildInferenceResponse(
 
       if (buffer == nullptr) {
         return Status(
-            Status::Code::INTERNAL,
-            "failed to allocate buffer for output '" + cache_output.name_ + "'");
+            Status::Code::INTERNAL, "failed to allocate buffer for output '" +
+                                        cache_output.name_ + "'");
       }
 
       // TODO: No out of scope issue here? With underlying
