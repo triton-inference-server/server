@@ -54,7 +54,7 @@ will provide a container `tritonserver` locally. You can access the container wi
 $ docker run -it tritonserver:latest
 ```
 
-Note: If `compose.py` is run on release versions `r21.07` and older, the resulting container will have DCGM version 2.2.3 installed. This may result in different GPU statistic reporting behavior.
+Note: If `compose.py` is run on release versions `r21.08` and older, the resulting container will have DCGM version 2.2.3 installed. This may result in different GPU statistic reporting behavior.
 
 ## Build it yourself
 

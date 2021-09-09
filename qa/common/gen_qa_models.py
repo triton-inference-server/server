@@ -1320,9 +1320,10 @@ def create_openvino_modelfile(models_dir,
                               output1_dtype,
                               swap=False):
 
-    if not tu.validate_for_openvino_model(input_dtype, output0_dtype,
-                                          output1_dtype, input_shape,
-                                          output0_shape, output1_shape):
+    batch_dim = () if max_batch == 0 else (max_batch,)
+    if not tu.validate_for_openvino_model(
+            input_dtype, output0_dtype, output1_dtype, batch_dim + input_shape,
+            batch_dim + output0_shape, batch_dim + output1_shape):
         return
 
     # Create the model
@@ -1331,9 +1332,12 @@ def create_openvino_modelfile(models_dir,
         output0_dtype, output1_dtype)
     model_version_dir = models_dir + "/" + model_name + "/" + str(model_version)
 
-    batch_dim = () if max_batch == 0 else (max_batch,)
-    in0 = ng.parameter(shape=batch_dim + input_shape, dtype=input_dtype, name="INPUT0")
-    in1 = ng.parameter(shape=batch_dim + input_shape, dtype=input_dtype, name="INPUT1")
+    in0 = ng.parameter(shape=batch_dim + input_shape,
+                       dtype=input_dtype,
+                       name="INPUT0")
+    in1 = ng.parameter(shape=batch_dim + input_shape,
+                       dtype=input_dtype,
+                       name="INPUT1")
 
     r0 = ng.add(in0, in1) if not swap else ng.subtract(in0, in1)
     r1 = ng.subtract(in0, in1) if not swap else ng.add(in0, in1)
@@ -1361,9 +1365,10 @@ def create_openvino_modelconfig(models_dir, max_batch, model_version,
                                 input_dtype, output0_dtype, output1_dtype,
                                 output0_label_cnt, version_policy):
 
-    if not tu.validate_for_openvino_model(input_dtype, output0_dtype,
-                                          output1_dtype, input_shape,
-                                          output0_shape, output1_shape):
+    batch_dim = () if max_batch == 0 else (max_batch,)
+    if not tu.validate_for_openvino_model(
+            input_dtype, output0_dtype, output1_dtype, batch_dim + input_shape,
+            batch_dim + output0_shape, batch_dim + output1_shape):
         return
 
     # Unpack version policy

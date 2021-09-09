@@ -253,7 +253,7 @@ class DirectSequenceBatch : public SequenceBatch {
   void BatcherThread(const int nice);
   void NewPayload();
 
-  std::shared_ptr<RateLimiter::Payload> curr_payload_;
+  std::shared_ptr<Payload> curr_payload_;
   TritonModelInstance* model_instance_;
 
   // The thread scheduling requests that are queued in this batch.

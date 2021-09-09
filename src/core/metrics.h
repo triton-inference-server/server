@@ -130,6 +130,8 @@ class Metrics {
   virtual ~Metrics();
   static Metrics* GetSingleton();
   bool InitializeDcgmMetrics();
+  std::string dcgmValueToErrorMessage(double val);
+  std::string dcgmValueToErrorMessage(int64_t val);
 
   std::shared_ptr<prometheus::Registry> registry_;
   std::unique_ptr<prometheus::Serializer> serializer_;

@@ -112,14 +112,35 @@ RateLimiter::UnregisterModel(const TritonModel* model)
 void
 RateLimiter::InitializePayloadQueues(const TritonModelInstance* instance)
 {
+  auto& config = instance->Model()->Config();
+  uint64_t max_queue_delay_microseconds;
+  if (config.has_sequence_batching()) {
+    const auto& batcher_config = config.sequence_batching();
+    if (batcher_config.has_oldest()) {
+      max_queue_delay_microseconds =
+          batcher_config.oldest().max_queue_delay_microseconds();
+    } else {
+      max_queue_delay_microseconds = 0;
+    }
+  } else if (config.has_dynamic_batching()) {
+    max_queue_delay_microseconds =
+        config.dynamic_batching().max_queue_delay_microseconds();
+  } else {
+    max_queue_delay_microseconds = 0;
+  }
   if (payload_queues_.find(instance->Model()) == payload_queues_.end()) {
-    payload_queues_.emplace(instance->Model(), new PayloadQueue());
+    payload_queues_.emplace(
+        instance->Model(),
+        new PayloadQueue(
+            config.max_batch_size(), max_queue_delay_microseconds * 1000));
   }
   PayloadQueue* payload_queue = payload_queues_[instance->Model()].get();
   if (payload_queue->specific_queues_.find(instance) ==
       payload_queue->specific_queues_.end()) {
     payload_queue->specific_queues_.emplace(
-        instance, new std::deque<std::shared_ptr<Payload>>());
+        instance,
+        new InstanceQueue(
+            config.max_batch_size(), max_queue_delay_microseconds * 1000));
   }
 }
 
@@ -130,7 +151,7 @@ RateLimiter::PayloadSlotAvailable(const TritonModel* model)
   PayloadQueue* payload_queue = payload_queues_[model].get();
   {
     std::lock_guard<std::mutex> lk(payload_queue->mu_);
-    result = payload_queue->queue_.size() <
+    result = payload_queue->queue_->Size() <
              2 * payload_queue->specific_queues_.size();
   }
   return result;
@@ -149,16 +170,17 @@ RateLimiter::EnqueuePayload(
     std::lock_guard<std::mutex> lk(payload_queue->mu_);
     payload->SetState(Payload::State::REQUESTED);
     if (pinstance == nullptr) {
-      payload_queue->queue_.push_back(payload);
+      payload_queue->queue_->Enqueue(payload);
     } else {
-      payload_queue->specific_queues_[pinstance]->push_back(payload);
+      payload_queue->specific_queues_[pinstance]->Enqueue(payload);
+    }
+    if (ignore_resources_and_priority_) {
+      // Directly schedule the payload to run
+      payload->SetState(Payload::State::SCHEDULED);
     }
   }
-
   if (ignore_resources_and_priority_) {
     // Directly wake up any one of the waiting threadto process the payload.
-    // TODO: If payload includes a specific TritonModelInstance
-    payload->SetState(Payload::State::SCHEDULED);
     if (pinstance == nullptr) {
       payload_queue->cv_.notify_one();
     } else {
@@ -182,16 +204,17 @@ RateLimiter::DequeuePayload(
   }
   PayloadQueue* payload_queue = payload_queues_[instances[0]->Model()].get();
   if (ignore_resources_and_priority_) {
+    std::vector<std::shared_ptr<Payload>> merged_payloads;
     size_t instance_index;
     {
       std::unique_lock<std::mutex> lk(payload_queue->mu_);
       payload_queue->cv_.wait(
           lk, [&instances, &instance_index, payload_queue]() {
-            bool empty = payload_queue->queue_.empty();
+            bool empty = payload_queue->queue_->Empty();
             if (empty) {
               instance_index = 0;
               for (const auto instance : instances) {
-                empty = payload_queue->specific_queues_[instance]->empty();
+                empty = payload_queue->specific_queues_[instance]->Empty();
                 if (empty) {
                   instance_index++;
                 } else {
@@ -203,18 +226,16 @@ RateLimiter::DequeuePayload(
           });
       if (instance_index < instances.size()) {
         TritonModelInstance* instance = instances[instance_index];
-        if (!payload_queue->specific_queues_[instance]->empty()) {
-          *payload = payload_queue->specific_queues_[instance]->front();
-          payload_queue->specific_queues_[instance]->pop_front();
+        if (!payload_queue->specific_queues_[instance]->Empty()) {
+          payload_queue->specific_queues_[instance]->Dequeue(
+              payload, &merged_payloads);
         }
       } else {
-        *payload = payload_queue->queue_.front();
-        payload_queue->queue_.pop_front();
+        payload_queue->queue_->Dequeue(payload, &merged_payloads);
       }
     }
-    {
-      std::lock_guard<std::mutex> exec_lock(*((*payload)->GetExecMutex()));
-      (*payload)->SetState(Payload::State::EXECUTING);
+    for (auto& merge_payload : merged_payloads) {
+      PayloadRelease(merge_payload);
     }
     (*payload)->Callback();
     if ((*payload)->GetInstance() == nullptr) {
@@ -262,118 +283,11 @@ RateLimiter::RequestModelInstance(
   return Status::Success;
 }
 
-RateLimiter::Payload::Payload()
-    : op_type_(Operation::INFER_RUN),
-      requests_(std::vector<std::unique_ptr<InferenceRequest>>()),
-      OnCallback_([]() {}), instance_(nullptr), state_(State::UNINITIALIZED)
-{
-  exec_mu_.reset(new std::mutex());
-}
-
-void
-RateLimiter::Payload::Reset(
-    const Operation op_type, TritonModelInstance* instance)
-{
-  op_type_ = op_type;
-  requests_.clear();
-  OnCallback_ = []() {};
-  instance_ = instance;
-  state_ = State::UNINITIALIZED;
-  OnCallback_ = []() {};
-  status_.reset(new std::promise<Status>());
-}
-
-void
-RateLimiter::Payload::Release()
-{
-  op_type_ = Operation::INFER_RUN;
-  requests_.clear();
-  OnCallback_ = []() {};
-  instance_ = nullptr;
-  state_ = State::RELEASED;
-  OnCallback_ = []() {};
-}
-
-size_t
-RateLimiter::Payload::BatchSize()
-{
-  size_t batch_size = 0;
-  for (const auto& request : requests_) {
-    batch_size += std::max(1U, request->BatchSize());
-  }
-  return batch_size;
-}
-
-void
-RateLimiter::Payload::ReserveRequests(size_t size)
-{
-  requests_.reserve(size);
-}
-
-void
-RateLimiter::Payload::AddRequest(std::unique_ptr<InferenceRequest> request)
-{
-  requests_.push_back(std::move(request));
-}
-
-void
-RateLimiter::Payload::SetCallback(std::function<void()> OnCallback)
-{
-  OnCallback_ = OnCallback;
-}
-
-void
-RateLimiter::Payload::SetInstance(TritonModelInstance* model_instance)
-{
-  instance_ = model_instance;
-}
-
-void
-RateLimiter::Payload::SetState(RateLimiter::Payload::State state)
-{
-  state_ = state;
-}
-
-Status
-RateLimiter::Payload::Wait()
-{
-  return status_->get_future().get();
-}
-
-void
-RateLimiter::Payload::Callback()
-{
-  OnCallback_();
-}
-
-void
-RateLimiter::Payload::Execute(bool* should_exit)
-{
-  *should_exit = false;
-
-  Status status;
-  switch (op_type_) {
-    case Operation::INFER_RUN:
-      instance_->Schedule(std::move(requests_), OnCallback_);
-      break;
-    case Operation::INIT:
-      status = instance_->Initialize();
-      break;
-    case Operation::WARM_UP:
-      status = instance_->WarmUp();
-      break;
-    case Operation::EXIT:
-      *should_exit = true;
-  }
-
-  status_->set_value(status);
-}
-
-std::shared_ptr<RateLimiter::Payload>
+std::shared_ptr<Payload>
 RateLimiter::GetPayload(
     const Payload::Operation op_type, TritonModelInstance* instance)
 {
-  std::shared_ptr<RateLimiter::Payload> payload;
+  std::shared_ptr<Payload> payload;
 
   if (max_payload_bucket_count_ > 0) {
     std::lock_guard<std::mutex> lock(alloc_mu_);
@@ -393,7 +307,7 @@ RateLimiter::GetPayload(
   }
 
   if (payload.get() == nullptr) {
-    payload.reset(new RateLimiter::Payload());
+    payload.reset(new Payload());
   }
 
   payload->Reset(op_type, instance);
@@ -401,7 +315,7 @@ RateLimiter::GetPayload(
 }
 
 void
-RateLimiter::PayloadRelease(std::shared_ptr<RateLimiter::Payload>& payload)
+RateLimiter::PayloadRelease(std::shared_ptr<Payload>& payload)
 {
   if (max_payload_bucket_count_ > 0) {
     std::lock_guard<std::mutex> lock(alloc_mu_);

@@ -67,18 +67,18 @@ from distutils.dir_util import copy_tree
 TRITON_VERSION_MAP = {
     '2.14.0dev': (
         '21.09dev',  # triton container
-        '21.07',  # upstream container
+        '21.08',  # upstream container
         '1.8.1',  # ORT
         '2021.2.200',  # ORT OpenVINO
         '2021.2',  # Standalone OpenVINO
-        '2.2.8')  # DCGM version
+        '2.2.9')  # DCGM version
 }
 
 EXAMPLE_BACKENDS = ['identity', 'square', 'repeat']
 CORE_BACKENDS = ['ensemble']
 NONCORE_BACKENDS = [
     'tensorflow1', 'tensorflow2', 'onnxruntime', 'python', 'dali', 'pytorch',
-    'openvino', 'fil', 'fastertransformer', 'tensorrt'
+    'openvino', 'fil', 'fastertransformer', 'tensorrt', 'armnn_tflite'
 ]
 EXAMPLE_REPOAGENTS = ['checksum']
 FLAGS = None
@@ -137,7 +137,7 @@ def untar(targetdir, tarfile):
             'untar {} into {} failed'.format(tarfile, targetdir))
 
 
-def gitclone(cwd, repo, tag, subdir):
+def gitclone(cwd, repo, tag, subdir, org):
     # If 'tag' starts with "pull/" then it must be of form
     # "pull/<pr>/head". We just clone at "main" and then fetch the
     # reference onto a new branch we name "tritonbuildref".
@@ -145,7 +145,7 @@ def gitclone(cwd, repo, tag, subdir):
         log_verbose('git clone of repo "{}" at ref "{}"'.format(repo, tag))
         p = subprocess.Popen([
             'git', 'clone', '--recursive', '--depth=1', '{}/{}.git'.format(
-                FLAGS.github_organization, repo), subdir
+                org, repo), subdir
         ],
                              cwd=cwd)
         p.wait()
@@ -170,7 +170,7 @@ def gitclone(cwd, repo, tag, subdir):
         log_verbose('git clone of repo "{}" at tag "{}"'.format(repo, tag))
         p = subprocess.Popen([
             'git', 'clone', '--recursive', '--single-branch', '--depth=1', '-b',
-            tag, '{}/{}.git'.format(FLAGS.github_organization, repo), subdir
+            tag, '{}/{}.git'.format(org, repo), subdir
         ],
                              cwd=cwd)
         p.wait()
@@ -247,6 +247,11 @@ def core_cmake_args(components, backends, install_dir):
         cmake_enable(FLAGS.enable_gpu)))
     cargs.append('-DTRITON_MIN_COMPUTE_CAPABILITY={}'.format(
         FLAGS.min_compute_capability))
+
+    # If building the ArmNN TFLite backend set enable MALI GPU
+    if 'armnn_tflite' in backends:
+        cargs.append('-DTRITON_ENABLE_MALI_GPU:BOOL={}'.format(
+            cmake_enable(FLAGS.enable_mali_gpu)))
 
     cargs.append('-DTRITON_ENABLE_GRPC:BOOL={}'.format(
         cmake_enable('grpc' in FLAGS.endpoint)))
@@ -339,6 +344,8 @@ def backend_cmake_args(images, components, be, install_dir, library_paths):
         args = dali_cmake_args()
     elif be == 'pytorch':
         args = pytorch_cmake_args(images)
+    elif be == 'armnn_tflite':
+        args = armnn_tflite_cmake_args()
     elif be == 'fil':
         args = fil_cmake_args(images)
     elif be == 'fastertransformer':
@@ -360,6 +367,8 @@ def backend_cmake_args(images, components, be, install_dir, library_paths):
 
     cargs.append('-DTRITON_ENABLE_GPU:BOOL={}'.format(
         cmake_enable(FLAGS.enable_gpu)))
+    cargs.append('-DTRITON_ENABLE_MALI_GPU:BOOL={}'.format(
+        cmake_enable(FLAGS.enable_mali_gpu)))
 
     # If TRITONBUILD_* is defined in the env then we use it to set
     # corresponding cmake value.
@@ -480,6 +489,12 @@ def dali_cmake_args():
     ]
 
 
+def armnn_tflite_cmake_args():
+    return [
+        '-DJOBS={}'.format(multiprocessing.cpu_count()),
+    ]
+
+
 def install_dcgm_libraries(dcgm_version):
     if dcgm_version == '':
         fail(
@@ -553,6 +568,7 @@ ENV DEBIAN_FRONTEND=noninteractive
 # python3-dev is needed by Torchvision
 # python3-pip and libarchive-dev is needed by python backend
 # uuid-dev and pkg-config is needed for Azure Storage
+# scons is needed for armnn_tflite backend build dep 
 RUN apt-get update && \
     apt-get install -y --no-install-recommends \
             autoconf \
@@ -571,6 +587,7 @@ RUN apt-get update && \
             python3-pip \
             python3-setuptools \
             rapidjson-dev \
+            scons \
             software-properties-common \
             unzip \
             wget \
@@ -591,7 +608,7 @@ RUN wget -O - https://apt.kitware.com/keys/kitware-archive-latest.asc 2>/dev/nul
     apt-add-repository 'deb https://apt.kitware.com/ubuntu/ focal main' && \
     apt-get update && \
     apt-get install -y --no-install-recommends \
-      cmake-data=3.18.4-0kitware1ubuntu20.04.1 cmake=3.18.4-0kitware1ubuntu20.04.1
+      cmake-data=3.21.1-0kitware1ubuntu20.04.1 cmake=3.21.1-0kitware1ubuntu20.04.1
 '''
 
     # Copy in the triton source. We remove existing contents first in
@@ -893,6 +910,8 @@ def container_build(images, backends, repoagents, endpoints):
         base_image = images['base']
     elif target_platform() == 'windows':
         base_image = 'mcr.microsoft.com/dotnet/framework/sdk:4.8'
+    elif target_platform() == 'ubuntu/arm64':
+        base_image = 'arm64v8/ubuntu:20.04'
     else:
         base_image = 'nvcr.io/nvidia/tritonserver:{}-py3-min'.format(
             FLAGS.upstream_container_version)
@@ -1101,7 +1120,7 @@ if __name__ == '__main__':
         required=False,
         default=None,
         help=
-        'Target for build, can be "ubuntu", "windows" or "jetpack". If not specified, build targets the current platform.'
+        'Target for build, can be "ubuntu", "windows", "ubuntu/arm64" or "jetpack". If not specified, build targets the current platform.'
     )
 
     parser.add_argument('--build-id',
@@ -1230,6 +1249,10 @@ if __name__ == '__main__':
                         action="store_true",
                         required=False,
                         help='Enable GPU support.')
+    parser.add_argument('--enable-mali-gpu',
+                        action="store_true",
+                        required=False,
+                        help='Enable ARM MALI GPU support.')
     parser.add_argument(
         '--min-compute-capability',
         type=str,
@@ -1256,21 +1279,21 @@ if __name__ == '__main__':
         action='append',
         required=False,
         help=
-        'Include specified backend in build as <backend-name>[:<repo-tag>]. If <repo-tag> starts with "pull/" then it refers to a pull-request reference, otherwise <repo-tag> indicates the git tag/branch to use for the build. If the version is non-development then the default <repo-tag> is the release branch matching the container version (e.g. version 21.07 -> branch r21.07); otherwise the default <repo-tag> is "main" (e.g. version 21.07dev -> branch main).'
+        'Include specified backend in build as <backend-name>[:<repo-tag>]. If <repo-tag> starts with "pull/" then it refers to a pull-request reference, otherwise <repo-tag> indicates the git tag/branch to use for the build. If the version is non-development then the default <repo-tag> is the release branch matching the container version (e.g. version 21.08 -> branch r21.08); otherwise the default <repo-tag> is "main" (e.g. version 21.08dev -> branch main).'
     )
     parser.add_argument(
         '--repo-tag',
         action='append',
         required=False,
         help=
-        'The version of a component to use in the build as <component-name>:<repo-tag>. <component-name> can be "common", "core", "backend" or "thirdparty". If <repo-tag> starts with "pull/" then it refers to a pull-request reference, otherwise <repo-tag> indicates the git tag/branch. If the version is non-development then the default <repo-tag> is the release branch matching the container version (e.g. version 21.07 -> branch r21.07); otherwise the default <repo-tag> is "main" (e.g. version 21.07dev -> branch main).'
+        'The version of a component to use in the build as <component-name>:<repo-tag>. <component-name> can be "common", "core", "backend" or "thirdparty". If <repo-tag> starts with "pull/" then it refers to a pull-request reference, otherwise <repo-tag> indicates the git tag/branch. If the version is non-development then the default <repo-tag> is the release branch matching the container version (e.g. version 21.08 -> branch r21.08); otherwise the default <repo-tag> is "main" (e.g. version 21.08dev -> branch main).'
     )
     parser.add_argument(
         '--repoagent',
         action='append',
         required=False,
         help=
-        'Include specified repo agent in build as <repoagent-name>[:<repo-tag>]. If <repo-tag> starts with "pull/" then it refers to a pull-request reference, otherwise <repo-tag> indicates the git tag/branch to use for the build. If the version is non-development then the default <repo-tag> is the release branch matching the container version (e.g. version 21.07 -> branch r21.07); otherwise the default <repo-tag> is "main" (e.g. version 21.07dev -> branch main).'
+        'Include specified repo agent in build as <repoagent-name>[:<repo-tag>]. If <repo-tag> starts with "pull/" then it refers to a pull-request reference, otherwise <repo-tag> indicates the git tag/branch to use for the build. If the version is non-development then the default <repo-tag> is the release branch matching the container version (e.g. version 21.08 -> branch r21.08); otherwise the default <repo-tag> is "main" (e.g. version 21.08dev -> branch main).'
     )
 
     FLAGS = parser.parse_args()
@@ -1376,6 +1399,7 @@ if __name__ == '__main__':
     # tritonserver container holding the results of the build.
     if not FLAGS.no_container_build:
         import docker
+
         container_build(images, backends, repoagents, FLAGS.endpoint)
         sys.exit(0)
 
@@ -1438,7 +1462,13 @@ if __name__ == '__main__':
         repo_install_dir = os.path.join(FLAGS.build_dir, be, 'install')
 
         mkdir(FLAGS.build_dir)
-        gitclone(FLAGS.build_dir, backend_repo(be), backends[be], be)
+        # If armnn_tflite backend, source from external repo for git clone
+        if be == 'armnn_tflite':
+            gitclone(FLAGS.build_dir, backend_repo(be), backends[be], be,
+                     'https://gitlab.com/arm-research/smarter/')
+        else:
+            gitclone(FLAGS.build_dir, backend_repo(be), backends[be], be,
+                     FLAGS.github_organization)
         mkdir(repo_build_dir)
         cmake(
             repo_build_dir,
@@ -1458,7 +1488,8 @@ if __name__ == '__main__':
         repo_install_dir = os.path.join(FLAGS.build_dir, ra, 'install')
 
         mkdir(FLAGS.build_dir)
-        gitclone(FLAGS.build_dir, repoagent_repo(ra), repoagents[ra], ra)
+        gitclone(FLAGS.build_dir, repoagent_repo(ra), repoagents[ra], ra,
+                 FLAGS.github_organization)
         mkdir(repo_build_dir)
         cmake(repo_build_dir,
               repoagent_cmake_args(images, components, ra, repo_install_dir))

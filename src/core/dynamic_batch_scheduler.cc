@@ -40,12 +40,12 @@
 namespace nvidia { namespace inferenceserver {
 
 bool
-IsStaleState(RateLimiter::Payload::State payload_state)
+IsStaleState(Payload::State payload_state)
 {
   return (
-      (payload_state == RateLimiter::Payload::State::SCHEDULED) ||
-      (payload_state == RateLimiter::Payload::State::EXECUTING) ||
-      (payload_state == RateLimiter::Payload::State::RELEASED));
+      (payload_state == Payload::State::SCHEDULED) ||
+      (payload_state == Payload::State::EXECUTING) ||
+      (payload_state == Payload::State::RELEASED));
 }
 
 DynamicBatchScheduler::DynamicBatchScheduler(
@@ -157,8 +157,7 @@ DynamicBatchScheduler::Enqueue(std::unique_ptr<InferenceRequest>& request)
     // If not using dynamic batching, directly enqueue the
     // request to model for execution
     auto payload = model_->Server()->GetRateLimiter()->GetPayload(
-        RateLimiter::Payload::Operation::INFER_RUN,
-        nullptr /* TritonModelInstance*/);
+        Payload::Operation::INFER_RUN, nullptr /* TritonModelInstance*/);
     payload->AddRequest(std::move(request));
     RETURN_IF_ERROR(
         model_->Server()->GetRateLimiter()->EnqueuePayload(model_, payload));
@@ -203,7 +202,7 @@ void
 DynamicBatchScheduler::NewPayload()
 {
   curr_payload_ = model_->Server()->GetRateLimiter()->GetPayload(
-      RateLimiter::Payload::Operation::INFER_RUN, model_instance_);
+      Payload::Operation::INFER_RUN, model_instance_);
   payload_saturated_ = false;
 }
 
@@ -318,9 +317,8 @@ DynamicBatchScheduler::BatcherThread(const int nice)
               }
             }
 
-            if (curr_payload_->GetState() ==
-                RateLimiter::Payload::State::UNINITIALIZED) {
-              curr_payload_->SetState(RateLimiter::Payload::State::READY);
+            if (curr_payload_->GetState() == Payload::State::UNINITIALIZED) {
+              curr_payload_->SetState(Payload::State::READY);
             }
 
             queued_batch_size_ -= pending_batch_size_;
@@ -337,14 +335,10 @@ DynamicBatchScheduler::BatcherThread(const int nice)
       }
     }
 
-    if (curr_payload_->GetState() == RateLimiter::Payload::State::READY) {
+    if (curr_payload_->GetState() == Payload::State::READY) {
       auto callback = [this]() { cv_.notify_one(); };
       curr_payload_->SetCallback(callback);
       model_->Server()->GetRateLimiter()->EnqueuePayload(model_, curr_payload_);
-      // curr_payload_->SetInstance(model_->Instances()[0].get());
-      // bool should_exit;
-      // curr_payload_->Execute(&should_exit);
-      // model_->Instances()[0]->Schedule(std::move(requests_), OnCompletion_);
     }
 
     // Finish rejected requests if any
@@ -445,7 +439,8 @@ DynamicBatchScheduler::GetDynamicBatch()
                         std::chrono::steady_clock::now().time_since_epoch())
                         .count();
   uint64_t delay_ns = now_ns - queue_.OldestEnqueueTime();
-  bool delay_is_exceeded = (delay_ns >= pending_batch_delay_ns_);
+  bool delay_is_exceeded =
+      (pending_batch_delay_ns_ != 0) && (delay_ns >= pending_batch_delay_ns_);
 
   // If we found a preferred batch size and the queue delay hasn't been
   // exceeded, then execute that.
@@ -469,7 +464,7 @@ DynamicBatchScheduler::GetDynamicBatch()
     return 0;
   }
 
-  if (delay_is_exceeded) {
+  if (delay_is_exceeded || (pending_batch_delay_ns_ == 0)) {
     return 0;
   }
 

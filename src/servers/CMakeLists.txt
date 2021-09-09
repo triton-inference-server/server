@@ -246,6 +246,7 @@ if (NOT WIN32)
 target_link_libraries(
   main
   PRIVATE rt
+  PRIVATE dl
 )
 endif()
 if(${TRITON_ENABLE_GPU})

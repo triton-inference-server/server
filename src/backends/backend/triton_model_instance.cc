@@ -620,14 +620,14 @@ TritonModelInstance::TritonBackendThread::InitAndWarmUpModelInstance(
 {
   // Initialize the instance on the backend thread
   auto init_payload = model_->Server()->GetRateLimiter()->GetPayload(
-      RateLimiter::Payload::Operation::INIT, model_instance);
+      Payload::Operation::INIT, model_instance);
   RETURN_IF_ERROR(
       model_->Server()->GetRateLimiter()->EnqueuePayload(model_, init_payload));
   RETURN_IF_ERROR(init_payload->Wait());
 
   // Warm-up the instance on the backend thread
   auto warmup_payload = model_->Server()->GetRateLimiter()->GetPayload(
-      RateLimiter::Payload::Operation::WARM_UP, model_instance);
+      Payload::Operation::WARM_UP, model_instance);
   RETURN_IF_ERROR(model_->Server()->GetRateLimiter()->EnqueuePayload(
       model_, warmup_payload));
   RETURN_IF_ERROR(warmup_payload->Wait());
@@ -652,7 +652,7 @@ TritonModelInstance::TritonBackendThread::StopBackendThread()
   if (backend_thread_.joinable()) {
     // Signal the backend thread to exit and then wait for it...
     auto exit_payload = model_->Server()->GetRateLimiter()->GetPayload(
-        RateLimiter::Payload::Operation::EXIT, model_instances_.back());
+        Payload::Operation::EXIT, model_instances_.back());
     model_->Server()->GetRateLimiter()->EnqueuePayload(model_, exit_payload);
     backend_thread_.join();
   }
@@ -678,7 +678,7 @@ TritonModelInstance::TritonBackendThread::BackendThread(
 
   bool should_exit = false;
   while (!should_exit) {
-    std::shared_ptr<RateLimiter::Payload> payload;
+    std::shared_ptr<Payload> payload;
     model_->Server()->GetRateLimiter()->DequeuePayload(
         model_instances_, &payload);
     NVTX_RANGE(nvtx_, "BackendThread " + name_);

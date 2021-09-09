@@ -1,4 +1,4 @@
-# Copyright (c) 2019-2021, NVIDIA CORPORATION. All rights reserved.
+# Copyright (c) 2019-2021, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -25,7 +25,7 @@
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 # Base image on the minimum Triton container
-ARG BASE_IMAGE=nvcr.io/nvidia/tritonserver:21.07-py3-min
+ARG BASE_IMAGE=nvcr.io/nvidia/tritonserver:21.08-py3-min
 
 ARG TRITON_CLIENT_REPO_SUBDIR=clientrepo
 ARG TRITON_COMMON_REPO_TAG=main
@@ -42,7 +42,7 @@ FROM ${BASE_IMAGE}
 ENV DEBIAN_FRONTEND=noninteractive
 
 # DCGM version to install for Model Analyzer
-ARG DCGM_VERSION=2.0.13
+ARG DCGM_VERSION=2.2.9
 
 RUN apt-get update && \
     apt-get install -y --no-install-recommends \
@@ -64,7 +64,9 @@ RUN apt-get update && \
             rapidjson-dev \
             vim \
             wget \
-            python3-pdfkit && \
+            python3-pdfkit \
+            maven \
+            default-jdk && \
     pip3 install --upgrade wheel setuptools && \
     pip3 install --upgrade grpcio-tools && \
     pip3 install --upgrade pip
@@ -114,10 +116,11 @@ RUN cmake -DCMAKE_INSTALL_PREFIX=/workspace/install \
           -DTRITON_THIRD_PARTY_REPO_TAG=${TRITON_THIRD_PARTY_REPO_TAG} \
           -DTRITON_ENABLE_CC_HTTP=ON -DTRITON_ENABLE_CC_GRPC=ON \
           -DTRITON_ENABLE_PYTHON_HTTP=ON -DTRITON_ENABLE_PYTHON_GRPC=ON \
+          -DTRITON_ENABLE_JAVA_HTTP=ON \
           -DTRITON_ENABLE_PERF_ANALYZER=ON \
           -DTRITON_ENABLE_EXAMPLES=ON -DTRITON_ENABLE_TESTS=ON \
           -DTRITON_ENABLE_GPU=${TRITON_ENABLE_GPU} /workspace/client
-RUN make -j16 cc-clients python-clients
+RUN make -j16 cc-clients python-clients java-clients
 
 WORKDIR /workspace
 RUN cd install && \
@@ -142,8 +145,12 @@ RUN pip3 install --upgrade numpy pillow attrdict && \
 
 # Install DCGM
 RUN if [ "$TRITON_ENABLE_GPU" = "ON" ]; then \
-      wget https://developer.download.nvidia.com/compute/cuda/repos/ubuntu2004/x86_64/datacenter-gpu-manager_${DCGM_VERSION}_amd64.deb && \
-      dpkg -i datacenter-gpu-manager_${DCGM_VERSION}_amd64.deb; \
+      apt-get update && apt-get install -y --no-install-recommends software-properties-common && \
+      wget https://developer.download.nvidia.com/compute/cuda/repos/ubuntu2004/x86_64/cuda-ubuntu2004.pin && \
+      mv cuda-ubuntu2004.pin /etc/apt/preferences.d/cuda-repository-pin-600 && \
+      apt-key adv --fetch-keys https://developer.download.nvidia.com/compute/cuda/repos/ubuntu2004/x86_64/7fa2af80.pub && \
+      add-apt-repository "deb https://developer.download.nvidia.com/compute/cuda/repos/ubuntu2004/x86_64/ /" && \
+      apt-get install -y datacenter-gpu-manager=1:${DCGM_VERSION}; \
     fi
 
 # Install Model Analyzer

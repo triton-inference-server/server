@@ -500,8 +500,10 @@ output [
 def create_openvino_modelfile(models_dir, model_version, io_cnt, max_batch,
                               dtype, shape):
 
-    if not tu.validate_for_openvino_model(dtype, dtype, dtype, shape, shape,
-                                          shape):
+    batch_dim = [] if max_batch == 0 else [max_batch,]
+    if not tu.validate_for_openvino_model(dtype, dtype, dtype,
+                                          batch_dim + shape, batch_dim + shape,
+                                          batch_dim + shape):
         return
 
     # Create the model
@@ -509,7 +511,6 @@ def create_openvino_modelfile(models_dir, model_version, io_cnt, max_batch,
         "openvino_nobatch" if max_batch == 0 else "openvino", io_cnt, dtype)
     model_version_dir = models_dir + "/" + model_name + "/" + str(model_version)
 
-    batch_dim = [] if max_batch == 0 else [max_batch,]
     openvino_inputs = []
     openvino_outputs = []
     for io_num in range(io_cnt):
@@ -535,8 +536,10 @@ def create_openvino_modelfile(models_dir, model_version, io_cnt, max_batch,
 def create_openvino_modelconfig(models_dir, model_version, io_cnt, max_batch,
                                 dtype, shape):
 
-    if not tu.validate_for_openvino_model(dtype, dtype, dtype, shape, shape,
-                                          shape):
+    batch_dim = [] if max_batch == 0 else [max_batch,]
+    if not tu.validate_for_openvino_model(dtype, dtype, dtype,
+                                          batch_dim + shape, batch_dim + shape,
+                                          batch_dim + shape):
         return
 
     # Unpack version policy

@@ -1,5 +1,5 @@
 #!/bin/bash
-# Copyright (c) 2019-2020, NVIDIA CORPORATION. All rights reserved.
+# Copyright (c) 2019-2021, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -175,6 +175,24 @@ for l in $EXECUTABLES; do
     RET=1
   fi
 done
+
+# Check java client
+if [[ ! -e "triton_client/java/java-api-0.0.1.jar" ]]; then
+    echo -e "*** java-api-0.0.1.jar not present\n"
+    RET=1
+fi
+if [[ ! -e "triton_client/java/examples/MemoryGrowthTest.jar" ]]; then
+    echo -e "*** MemoryGrowthTest.jar not present\n"
+    RET=1
+fi
+if [[ ! -e "triton_client/java/examples/SimpleInferClient.jar" ]]; then
+    echo -e "*** SimpleInferClient.jar not present\n"
+    RET=1
+fi
+if [[ ! -e "triton_client/java/examples/SimpleInferPerf.jar" ]]; then
+    echo -e "*** SimpleInferPerf.jar not present\n"
+    RET=1
+fi
 
 if [ $RET -eq 0 ]; then
   echo -e "\n***\n*** Test Passed\n***"
