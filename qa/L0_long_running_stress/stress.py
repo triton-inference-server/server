@@ -50,7 +50,7 @@ else:
     import Queue as queue
 
 FLAGS = None
-CORRELATION_ID_BLOCK_SIZE = 100
+CORRELATION_ID_BLOCK_SIZE = 1024 * 1024
 DEFAULT_TIMEOUT_MS = 25000
 SEQUENCE_LENGTH_MEAN = 16
 SEQUENCE_LENGTH_STDEV = 8
@@ -108,15 +108,6 @@ def check_sequence_async(client_metadata,
 
     triton_client = client_metadata[0]
     sequence_id = client_metadata[1]
-
-    # Need to use a unique ID for 'sequence_no_start' case since we
-    # need to prevent sequences with no 'start' flags from following
-    # some sequences with no 'end' flags since the server will just
-    # assume that the no-start is a continuation of the no-end sequence
-    # instead of being a sequence missing start flag, which gives results
-    # not expected.
-    if test_case_name == "sequence_no_start":
-        sequence_id *= 10
 
     # Execute the sequence of inference...
     seq_start_ms = int(round(time.time() * 1000))
@@ -563,18 +554,19 @@ def stress_thread(name, seed, test_duration, correlation_id_base,
     # inference requests. Also create some rare-use contexts that
     # are used to make requests with rarely-used correlation IDs.
     #
-    # Need to remember the last choice for each context for counting
-    # failed test cases.
+    # Need to remember the last sequence choice for each context 
+    # since we don't want some choices to follow others since that 
+    # gives results not expected. See below for details.
     common_cnt = 2
     rare_cnt = 8
-    last_choices = []
+    last_seq_choices = []
 
     for c in range(common_cnt + rare_cnt):
         client_metadata_list.append(
             (grpcclient.InferenceServerClient("localhost:8001",
                                               verbose=FLAGS.verbose),
              correlation_id_base + c))
-        last_choices.append(None)
+        last_seq_choices.append(None)
 
     rare_idx = 0
     start_time = time.time()
@@ -596,7 +588,8 @@ def stress_thread(name, seed, test_duration, correlation_id_base,
                 # scheduler
                 if choice < 0.33:
                     count_test_case("sequence_no_end", test_case_count)
-                    last_choices[client_idx] = "sequence_no_end"
+                    last_seq_choices[client_idx] = "sequence_no_end"
+                    last_choice = "sequence_no_end"
                     sequence_no_end(
                         client_metadata_list[client_idx],
                         rng,
@@ -609,7 +602,8 @@ def stress_thread(name, seed, test_duration, correlation_id_base,
                         sequence_request_count=sequence_request_count)
                 elif choice < 0.66:
                     count_test_case("sequence_valid_no_end", test_case_count)
-                    last_choices[client_idx] = "sequence_valid_no_end"
+                    last_seq_choices[client_idx] = "sequence_valid_no_end"
+                    last_choice = "sequence_valid_no_end"
                     sequence_valid_no_end(
                         client_metadata_list[client_idx],
                         rng,
@@ -622,7 +616,8 @@ def stress_thread(name, seed, test_duration, correlation_id_base,
                         sequence_request_count=sequence_request_count)
                 else:
                     count_test_case("sequence_valid_valid", test_case_count)
-                    last_choices[client_idx] = "sequence_valid_valid"
+                    last_seq_choices[client_idx] = "sequence_valid_valid"
+                    last_choice = "sequence_valid_valid"
                     sequence_valid_valid(
                         client_metadata_list[client_idx],
                         rng,
@@ -639,13 +634,20 @@ def stress_thread(name, seed, test_duration, correlation_id_base,
                 # Common context...
                 client_idx = 0
                 client_metadata = client_metadata_list[client_idx]
-                last_choice = last_choices[client_idx]
+                last_seq_choice = last_seq_choices[client_idx]
 
                 choice = rng.rand()
 
-                if choice < 0.01:
+                # no-start cannot follow no-end since the server will
+                # just assume that the no-start is a continuation of
+                # the no-end sequence instead of being a sequence
+                # missing start flag.
+                if ((last_seq_choice != "sequence_no_end") and
+                    (last_seq_choice != "sequence_valid_no_end") and
+                    (choice < 0.01)):
                     count_test_case("sequence_no_start", test_case_count)
-                    last_choices[client_idx] = "sequence_no_start"
+                    last_seq_choices[client_idx] = "sequence_no_start"
+                    last_choice = "sequence_no_start"
                     sequence_no_start(
                         client_metadata,
                         rng,
@@ -656,7 +658,8 @@ def stress_thread(name, seed, test_duration, correlation_id_base,
                         sequence_request_count=sequence_request_count)
                 elif choice < 0.05:
                     count_test_case("sequence_no_end", test_case_count)
-                    last_choices[client_idx] = "sequence_no_end"
+                    last_seq_choices[client_idx] = "sequence_no_end"
+                    last_choice = "sequence_no_end"
                     sequence_no_end(
                         client_metadata,
                         rng,
@@ -669,7 +672,8 @@ def stress_thread(name, seed, test_duration, correlation_id_base,
                         sequence_request_count=sequence_request_count)
                 elif choice < 0.10:
                     count_test_case("sequence_valid_no_end", test_case_count)
-                    last_choices[client_idx] = "sequence_valid_no_end"
+                    last_seq_choices[client_idx] = "sequence_valid_no_end"
+                    last_choice = "sequence_valid_no_end"
                     sequence_valid_no_end(
                         client_metadata,
                         rng,
@@ -682,7 +686,8 @@ def stress_thread(name, seed, test_duration, correlation_id_base,
                         sequence_request_count=sequence_request_count)
                 elif choice < 0.15:
                     count_test_case("sequence_valid_valid", test_case_count)
-                    last_choices[client_idx] = "sequence_valid_valid"
+                    last_seq_choices[client_idx] = "sequence_valid_valid"
+                    last_choice = "sequence_valid_valid"
                     sequence_valid_valid(
                         client_metadata,
                         rng,
@@ -695,7 +700,8 @@ def stress_thread(name, seed, test_duration, correlation_id_base,
                         sequence_request_count=sequence_request_count)
                 else:
                     count_test_case("sequence_valid", test_case_count)
-                    last_choices[client_idx] = "sequence_valid"
+                    last_seq_choices[client_idx] = "sequence_valid"
+                    last_choice = "sequence_valid"
                     sequence_valid(
                         client_metadata,
                         rng,
@@ -713,26 +719,25 @@ def stress_thread(name, seed, test_duration, correlation_id_base,
 
                 if choice < 0.3:
                     count_test_case("timeout_client", test_case_count)
-                    last_choices[client_idx] = "timeout_client"
+                    last_choice = "timeout_client"
                     timeout_client(
                         client_metadata=client_metadata_list[client_idx],
                         sequence_name=name,
                         sequence_request_count=sequence_request_count)
                 elif choice < 0.7:
                     count_test_case("resnet_model_request", test_case_count)
-                    last_choices[client_idx] = "resnet_model_request"
+                    last_choice = "resnet_model_request"
                     resnet_model_request(
                         sequence_name=name,
                         sequence_request_count=sequence_request_count)
                 else:
                     count_test_case("crashing_client", test_case_count)
-                    last_choices[client_idx] = "crashing_client"
+                    last_choice = "crashing_client"
                     crashing_client(
                         sequence_name=name,
                         sequence_request_count=sequence_request_count)
         except Exception as ex:
-            count_failed_test_case(last_choices[client_idx],
-                                   failed_test_case_count)
+            count_failed_test_case(last_choice, failed_test_case_count)
             _thread_exceptions_mutex.acquire()
             try:
                 _thread_exceptions.append(traceback.format_exc())
