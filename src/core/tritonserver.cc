@@ -1725,30 +1725,16 @@ TRITONSERVER_ServerNew(
   lserver->SetModelRepositoryPaths(loptions->ModelRepositoryPaths());
   lserver->SetModelControlMode(loptions->ModelControlMode());
   lserver->SetStartupModels(loptions->StartupModels());
-
   bool strict_model_config = loptions->StrictModelConfig();
   lserver->SetStrictModelConfigEnabled(strict_model_config);
-  // Note the condition is reverted due to setting name is different
-  loptions->AddBackendConfig(
-      std::string(), "auto-complete-config",
-      strict_model_config ? "false" : "true");
-
   lserver->SetRateLimiterMode(loptions->RateLimiterMode());
   lserver->SetRateLimiterResources(loptions->RateLimiterResources());
   lserver->SetPinnedMemoryPoolByteSize(loptions->PinnedMemoryPoolByteSize());
   lserver->SetCudaMemoryPoolByteSize(loptions->CudaMemoryPoolByteSize());
-
   double min_compute_capability = loptions->MinSupportedComputeCapability();
   lserver->SetMinSupportedComputeCapability(min_compute_capability);
-  loptions->AddBackendConfig(
-      std::string(), "min-compute-capability",
-      std::to_string(min_compute_capability));
-  loptions->AddBackendConfig(
-      std::string(), "backend-directory", loptions->BackendDir());
-
   lserver->SetStrictReadinessEnabled(loptions->StrictReadiness());
   lserver->SetExitTimeoutSeconds(loptions->ExitTimeout());
-  lserver->SetBackendCmdlineConfig(loptions->BackendCmdlineConfigMap());
   lserver->SetHostPolicyCmdlineConfig(loptions->HostPolicyCmdlineConfigMap());
   lserver->SetRepoAgentDir(loptions->RepoAgentDir());
   lserver->SetBufferManagerThreadCount(loptions->BufferManagerThreadCount());
@@ -1759,6 +1745,20 @@ TRITONSERVER_ServerNew(
       loptions->TensorFlowSoftPlacement());
   lserver->SetTensorFlowGPUMemoryFraction(
       loptions->TensorFlowGpuMemoryFraction());
+
+  // SetBackendCmdlineConfig must be called after all AddBackendConfig calls
+  // have completed.
+  // Note that the auto complete config condition is reverted
+  // due to setting name being different
+  loptions->AddBackendConfig(
+      std::string(), "auto-complete-config",
+      strict_model_config ? "false" : "true");
+  loptions->AddBackendConfig(
+      std::string(), "min-compute-capability",
+      std::to_string(min_compute_capability));
+  loptions->AddBackendConfig(
+      std::string(), "backend-directory", loptions->BackendDir());
+  lserver->SetBackendCmdlineConfig(loptions->BackendCmdlineConfigMap());
 
   ni::Status status = lserver->Init();
   std::vector<std::string> options_headers;
