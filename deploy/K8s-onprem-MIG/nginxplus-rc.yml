@@ -39,7 +39,7 @@ spec:
             name: etc-nginx-confd
       volumes:
         - nfs:
-           server: 192.168.20.80
-           path: /volume1/NFSVolume/flowerdemo/nginx/conf.d
+           server: <NFS server IP>
+           path: </path/to/nginx/config>
            readOnly: false
           name: etc-nginx-confd
