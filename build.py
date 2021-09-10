@@ -742,7 +742,7 @@ COPY --chown=1000:1000 --from=tritonserver_build /workspace/build/sagemaker/serv
 
 
 def dockerfile_prepare_container_linux(argmap, backends, enable_gpu):
-    gpu_enabled = 1 if not enable_gpu else 0
+    gpu_enabled = 1 if enable_gpu else 0
     # Common steps to produce docker images shared by build.py and compose.py.
     # Sets enviroment variables, installs dependencies and adds entrypoint
     df = '''

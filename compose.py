@@ -106,7 +106,8 @@ def add_requested_repoagents(ddir, dockerfile_name, repoagents):
     for ra in repoagents:
         df += '''COPY --chown=1000:1000 --from=full /opt/tritonserver/repoagents/{} /opt/tritonserver/repoagents/{}    
 '''.format(ra, ra)
-    df += '''
+    if len(repoagents) > 0:
+        df += '''
 # Top-level /opt/tritonserver/repoagents not copied so need to explicitly set permissions here
 RUN chown triton-server:triton-server /opt/tritonserver/repoagents
 '''
@@ -150,55 +151,75 @@ def create_argmap(images):
     # Extract information from upstream build and create map other functions can
     # use
     upstreamDockerImage = images["full"]
+    minDockerImage = images["min"]
+    enable_gpu = FLAGS.enable_gpu
+    # Docker inspect enviroment variables
+    baseRunArgs = ['docker', 'inspect', '-f']
+    import re  # parse all PATH enviroment variables
 
-    # first pull docker image
+    # first pull docker images
     log("pulling container:{}".format(upstreamDockerImage))
     p = subprocess.run(['docker', 'pull', upstreamDockerImage])
     fail_if(
         p.returncode != 0,
         'docker pull container {} failed, {}'.format(upstreamDockerImage,
                                                      p.stderr))
+    if enable_gpu:
+        pm = subprocess.run(['docker', 'pull', minDockerImage])
+        fail_if(
+            pm.returncode != 0, 'docker pull container {} failed, {}'.format(
+                minDockerImage, pm.stderr))
+        pm_path = subprocess.run(baseRunArgs + [
+            '{{range $index, $value := .Config.Env}}{{$value}} {{end}}',
+            minDockerImage
+        ],
+                                 capture_output=True,
+                                 text=True)
+        fail_if(
+            pm_path.returncode != 0,
+            'docker inspect to find triton enviroment variables for min container failed, {}'
+            .format(pm_path.stderr))
+        # min container needs to be GPU enabled if the build is GPU build
+        vars = pm_path.stdout
+        e = re.search("CUDA_VERSION", vars)
+        gpu_enabled = False if e == None else True
+        fail_if(
+            not gpu_enabled,
+            '\'enable-gpu\' flag added but min container provided does not have CUDA installed'
+        )
 
-    baseRunArgs = ['docker', 'inspect', '-f']
-    p_version = subprocess.run(baseRunArgs + [
+    # Check full container enviroment variables
+    p_path = subprocess.run(baseRunArgs + [
         '{{range $index, $value := .Config.Env}}{{$value}} {{end}}',
         upstreamDockerImage
     ],
-                               capture_output=True,
-                               text=True)
-    vars = p_version.stdout
-    log_verbose("inspect args: {}".format(vars))
-    import re  # parse all PATH enviroment variables
-    e = re.search("TRITON_SERVER_VERSION=([\S]{6,}) ", vars)
-    version = "" if e == None else e.group(1)
+                            capture_output=True,
+                            text=True)
     fail_if(
-        p_version.returncode != 0 or len(version) == 0,
-        'docker inspect to find triton version failed, {}'.format(
-            p_version.stderr))
-
-    vars = p_version.stdout
+        p_path.returncode != 0,
+        'docker inspect to find enviroment variables for full container failed, {}'
+        .format(p_path.stderr))
+    vars = p_path.stdout
     log_verbose("inspect args: {}".format(vars))
-    import re  # parse all PATH enviroment variables
+
     e = re.search("TRITON_GPU_ENABLED_BUILD=([\S]{1,}) ", vars)
     gpu_enabled = False if e == None else (True if e.group(1) == "1" else False)
     fail_if(
-        p_version.returncode != 0,
-        'docker inspect to find triton version failed, {}'.format(
-            p_version.stderr))
+        gpu_enabled != enable_gpu,
+        'Error: full container provided was build with \'enable_gpu\' as {} and you are composing container with \'enable_gpu\' as {}'
+        .format(gpu_enabled, enable_gpu))
+    e = re.search("TRITON_SERVER_VERSION=([\S]{6,}) ", vars)
+    version = "" if e == None else e.group(1)
     fail_if(
-        gpu_enabled == FLAGS.enable_gpu,
-        'Full container provided was build with different \'enable_gpu\' flag than requested'
-    )
-
-    vars = p_version.stdout
+        len(version) == 0,
+        'docker inspect to find triton server version failed, {}'.format(
+            p_path.stderr))
     e = re.search("NVIDIA_TRITON_SERVER_VERSION=([\S]{5,}) ", vars)
     container_version = "" if e == None else e.group(1)
     fail_if(
         len(container_version) == 0,
         'docker inspect to find triton container version failed, {}'.format(
             vars))
-
-    vars = p_version.stdout
     dcgm_ver = re.search("DCGM_VERSION=([\S]{4,}) ", vars)
     dcgm_version = ""
     if dcgm_ver == None:
@@ -244,7 +265,6 @@ def create_argmap(images):
         'TRITON_CONTAINER_VERSION': container_version,
         'DCGM_VERSION': dcgm_version,
         'SAGEMAKER_ENDPOINT': f is not None,
-        'TRITON_GPU_ENABLED_BUILD': gpu_enabled,
     }
     return argmap
 
