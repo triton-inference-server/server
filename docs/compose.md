@@ -56,6 +56,10 @@ $ docker run -it tritonserver:latest
 
 Note: If `compose.py` is run on release versions `r21.08` and older, the resulting container will have DCGM version 2.2.3 installed. This may result in different GPU statistic reporting behavior.
 
+### CPU only container composition
+
+To compose a container that is build for only cpu usage, simply remove the `--enable-gpu` flag when running `compose.py`. This will build a container from `ubuntu:20.04` docker and use backends/repoagents from `nvcr.io/nvidia/tritonserver:<upstream-container-version>-cpu-only-py3`.
+
 ## Build it yourself
 
 If you would like to do what `compose.py` is doing under the hood yourself, you can run `compose.py` with the `--dry-run` option and then modify the `Dockerfile.compose` file to satisfy your needs. 
