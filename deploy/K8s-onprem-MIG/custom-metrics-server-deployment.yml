@@ -20,7 +20,7 @@ spec:
         image: quay.io/coreos/k8s-prometheus-adapter-amd64:v0.4.1
         args:
         - --cert-dir=/tmp
-        - --prometheus-url=http://10.233.22.248:9090
+        - --prometheus-url=<IP address:9090>
         - --metrics-relist-interval=30s
         - --v=10
         - --config=/etc/config/triton-adapter-config.yaml
