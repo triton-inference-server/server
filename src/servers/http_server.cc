@@ -150,7 +150,6 @@ HTTPMetricsServer::Handle(evhtp_request_t* req)
   evhtp_send_reply(req, res);
 }
 
-#ifdef TRITON_ENABLE_METRICS
 TRITONSERVER_Error*
 HTTPMetricsServer::Create(
     const std::shared_ptr<TRITONSERVER_Server>& server, const int32_t port,
@@ -163,7 +162,6 @@ HTTPMetricsServer::Create(
 
   return nullptr;
 }
-#endif  // TRITON_ENABLE_METRICS
 
 #endif  // TRITON_ENABLE_METRICS
 

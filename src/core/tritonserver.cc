@@ -271,6 +271,9 @@ class TritonServerOptions {
   bool GpuMetrics() const { return gpu_metrics_; }
   void SetGpuMetrics(bool b) { gpu_metrics_ = b; }
 
+  uint64_t MetricsInterval() const { return metrics_interval_; }
+  void SetMetricsInterval(uint64_t m) { metrics_interval_ = m; }
+
   const std::string& BackendDir() const { return backend_dir_; }
   void SetBackendDir(const std::string& bd)
   {
@@ -319,6 +322,7 @@ class TritonServerOptions {
   ni::RateLimiter::ResourceMap rate_limit_resource_map_;
   bool metrics_;
   bool gpu_metrics_;
+  uint64_t metrics_interval_;
   unsigned int exit_timeout_;
   uint64_t pinned_memory_pool_size_;
   unsigned int buffer_manager_thread_count_;
@@ -338,8 +342,8 @@ TritonServerOptions::TritonServerOptions()
       model_control_mode_(ni::ModelControlMode::MODE_POLL),
       exit_on_error_(true), strict_model_config_(true), strict_readiness_(true),
       rate_limit_mode_(ni::RateLimitMode::RL_OFF), metrics_(true),
-      gpu_metrics_(true), exit_timeout_(30), pinned_memory_pool_size_(1 << 28),
-      buffer_manager_thread_count_(0),
+      gpu_metrics_(true), metrics_interval_(2000), exit_timeout_(30),
+      pinned_memory_pool_size_(1 << 28), buffer_manager_thread_count_(0),
 #ifdef TRITON_ENABLE_GPU
       min_compute_capability_(TRITON_MIN_COMPUTE_CAPABILITY),
 #else
@@ -1218,6 +1222,21 @@ TRITONSERVER_ServerOptionsSetGpuMetrics(
 }
 
 TRITONSERVER_Error*
+TRITONSERVER_ServerOptionsSetMetricsInterval(
+    TRITONSERVER_ServerOptions* options, uint64_t metrics_interval_ms)
+{
+#ifdef TRITON_ENABLE_METRICS
+  TritonServerOptions* loptions =
+      reinterpret_cast<TritonServerOptions*>(options);
+  loptions->SetMetricsInterval(metrics_interval_ms);
+  return nullptr;  // Success
+#else
+  return TRITONSERVER_ErrorNew(
+      TRITONSERVER_ERROR_UNSUPPORTED, "metrics not supported");
+#endif  // TRITON_ENABLE_METRICS
+}
+
+TRITONSERVER_Error*
 TRITONSERVER_ServerOptionsSetBackendDirectory(
     TRITONSERVER_ServerOptions* options, const char* backend_dir)
 {
@@ -1705,6 +1724,7 @@ TRITONSERVER_ServerNew(
 #ifdef TRITON_ENABLE_METRICS
   if (loptions->Metrics()) {
     ni::Metrics::EnableMetrics();
+    ni::Metrics::SetMetricsInterval(loptions->MetricsInterval());
   }
 #ifdef TRITON_ENABLE_METRICS_GPU
   if (loptions->Metrics() && loptions->GpuMetrics()) {

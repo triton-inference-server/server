@@ -94,6 +94,35 @@ kill $SERVER_PID
 wait $SERVER_PID
 
 
+# Test metrics interval by querying host and checking energy
+METRICS_INTERVAL_MS=500
+METRICS_INTERVAL_SECS=0.5
+
+SERVER_ARGS="$SERVER_ARGS --metrics-interval-ms=${METRICS_INTERVAL_MS}"
+run_server
+if [ "$SERVER_PID" == "0" ]; then
+  echo -e "\n***\n*** Failed to start $SERVER\n***"
+  cat $SERVER_LOG
+  exit 1
+fi
+
+num_iterations=10
+prev_energy=`curl -s localhost:8002/metrics | awk '/nv_energy_consumption{/ {print $2}'`
+for (( i = 0; i < $num_iterations; ++i )); do
+  sleep $METRICS_INTERVAL_SECS
+  current_energy=`curl -s localhost:8002/metrics | awk '/nv_energy_consumption{/ {print $2}'`
+  if [ $current_energy == $prev_energy ]; then
+    echo "Metrics were not updated in interval of ${METRICS_INTERVAL_MS} seconds"
+    echo -e "\n***\n*** Metric Interval test failed. \n***"
+    RET=1
+    break
+  fi
+  prev_energy=$current_energy
+done
+
+kill $SERVER_PID
+wait $SERVER_PID
+
 if [ $RET -eq 0 ]; then
   echo -e "\n***\n*** Test Passed\n***"
 else
