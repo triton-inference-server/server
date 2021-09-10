@@ -1,0 +1,38 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: triton-custom-metrics-apiserver
+  namespace: monitoring
+  labels:
+    app: triton-custom-metris-apiserver
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: triton-custom-metrics-apiserver
+  template:
+    metadata:
+      labels:
+        app: triton-custom-metrics-apiserver
+    spec:
+      containers:
+      - name: custom-metrics-server
+        image: quay.io/coreos/k8s-prometheus-adapter-amd64:v0.4.1
+        args:
+        - --cert-dir=/tmp
+        - --prometheus-url=http://10.233.22.248:9090
+        - --metrics-relist-interval=30s
+        - --v=10
+        - --config=/etc/config/triton-adapter-config.yaml
+        - --secure-port=6443
+        ports:
+        - name: main-port
+          containerPort: 6443
+        volumeMounts:
+        - name: config-volume
+          mountPath: /etc/config
+          readOnly: false
+      volumes:
+      - name: config-volume
+        configMap:
+          name: adapter-config
