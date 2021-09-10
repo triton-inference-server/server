@@ -6,7 +6,7 @@ spec:
   insecureSkipTLSVerify: true
   group: custom.metrics.k8s.io
   groupPriorityMinimum: 100
-  versionPriority: 100
+  versionPriority: 5
   service:
     name: triton-custom-metrics-api
     namespace: monitoring
