@@ -69,10 +69,6 @@ if [ "$ARCH" == "aarch64" ]; then
     fi
 else
     PERF_CLIENT=../clients/perf_client
-    # FIXME With 21.08 upstreams savedmodel loading got much slower
-    if [ "$MODEL_FRAMEWORK" == "savedmodel" ] || [ "$MODEL_FRAMEWORK" == "savedmodel_trt" ]; then
-        MEASUREMENT_WINDOW=20000
-    fi
 fi
 
 set +e
