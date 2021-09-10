@@ -1274,6 +1274,10 @@ if __name__ == '__main__':
         help=
         'Include specified filesystem in build. Allowed values are "gcs", "azure_storage" and "s3".'
     )
+    parser.add_argument('--no-core-build',
+                        action="store_true",
+                        required=False,
+                        help='Do not build Triton core library.')
     parser.add_argument(
         '--backend',
         action='append',
@@ -1438,7 +1442,7 @@ if __name__ == '__main__':
 
     # Build the core server. For now the core is contained in this
     # repo so we just build in place
-    if True:
+    if not FLAGS.no_core_build:
         repo_build_dir = os.path.join(FLAGS.build_dir, 'tritonserver', 'build')
         repo_install_dir = os.path.join(FLAGS.build_dir, 'tritonserver',
                                         'install')
