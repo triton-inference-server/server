@@ -17,8 +17,8 @@ spec:
       volumes:
       - name: models
         nfs:
-          server: 192.168.20.80
-          path: /volume1/NFSVolume/flowerdemo/model/flower_A100_20.07_model
+          server: <IP address of the server>
+          path: <path/to/flowerdemo/model/files>
           readOnly: false
       containers:
         - name: flower
@@ -29,12 +29,12 @@ spec:
             name: grpc-triton
           - containerPort: 8002
             name: metrics-triton
-          image: "nvcr.io/nvidia/tritonserver:20.07-py3"
+          image: "nvcr.io/nvidia/tritonserver:20.12-py3"
           volumeMounts:
           - mountPath: /models
             name: models
           command: ["/bin/sh", "-c"]
-          args: ["cd /models && ls -lah && /opt/tritonserver/bin/tritonserver --model-repository=/models --allow-gpu-metrics=false --strict-model-config=false"]
+          args: ["cd /models /opt/tritonserver/bin/tritonserver --model-repository=/models --allow-gpu-metrics=false --strict-model-config=false"]
           resources:
             limits:
               nvidia.com/mig-1g.5gb: 1
