@@ -148,7 +148,7 @@ batcher ensures that all inference requests in a sequence get routed
 to the same model instance so that the model can maintain state
 correctly. The sequence batcher also communicates with the model to
 indicate when a sequence is starting, when a sequence is ending, when
-a sequence has a inference request ready for execution, and the
+a sequence has an inference request ready for execution, and the
 *correlation ID* of the sequence.
 
 When making inference requests for a stateful model, the client
