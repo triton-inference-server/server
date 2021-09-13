@@ -107,6 +107,12 @@ def target_platform():
     return platform.system().lower()
 
 
+def target_machine():
+    if FLAGS.target_machine is not None:
+        return FLAGS.target_machine
+    return platform.machine().lower()
+
+
 def fail_if(p, msg):
     if p:
         print('error: {}'.format(msg), file=sys.stderr)
@@ -423,7 +429,8 @@ def onnxruntime_cmake_args(images, library_paths):
                 cargs.append('-DTRITON_BUILD_CONTAINER_VERSION={}'.format(
                     TRITON_VERSION_MAP[FLAGS.version][1]))
 
-            if TRITON_VERSION_MAP[FLAGS.version][3] is not None:
+            if ((target_machine() != 'aarch64') and
+                (TRITON_VERSION_MAP[FLAGS.version][3] is not None)):
                 cargs.append('-DTRITON_ENABLE_ONNXRUNTIME_OPENVINO=ON')
                 cargs.append(
                     '-DTRITON_BUILD_ONNXRUNTIME_OPENVINO_VERSION={}'.format(
@@ -495,24 +502,32 @@ def armnn_tflite_cmake_args():
     ]
 
 
-def install_dcgm_libraries(dcgm_version):
+def install_dcgm_libraries(dcgm_version, target_machine):
     if dcgm_version == '':
         fail(
             'unable to determine default repo-tag, DCGM version not known for {}'
             .format(FLAGS.version))
         return ''
     else:
-
-        return '''
+        if target_machine == 'aarch64':
+            return '''
 ENV DCGM_VERSION {}
 # Install DCGM. Steps from https://developer.nvidia.com/dcgm#Downloads
-RUN apt-get update && apt-get install -y --no-install-recommends software-properties-common
-RUN wget https://developer.download.nvidia.com/compute/cuda/repos/ubuntu2004/x86_64/cuda-ubuntu2004.pin \
-&& mv cuda-ubuntu2004.pin /etc/apt/preferences.d/cuda-repository-pin-600 \
-&& apt-key adv --fetch-keys https://developer.download.nvidia.com/compute/cuda/repos/ubuntu2004/x86_64/7fa2af80.pub \
-&& add-apt-repository "deb https://developer.download.nvidia.com/compute/cuda/repos/ubuntu2004/x86_64/ /"
-RUN apt-get update \
-&& apt-get install -y datacenter-gpu-manager=1:{}
+RUN wget https://developer.download.nvidia.com/compute/cuda/repos/ubuntu2004/sbsa/cuda-ubuntu2004.pin && \
+    mv cuda-ubuntu2004.pin /etc/apt/preferences.d/cuda-repository-pin-600 && \
+    apt-key adv --fetch-keys https://developer.download.nvidia.com/compute/cuda/repos/ubuntu2004/sbsa/7fa2af80.pub && \
+    add-apt-repository "deb https://developer.download.nvidia.com/compute/cuda/repos/ubuntu2004/sbsa/ /" && \
+    apt-get update && apt-get install -y datacenter-gpu-manager=1:{}
+'''.format(dcgm_version, dcgm_version)
+        else:
+            return '''
+ENV DCGM_VERSION {}
+# Install DCGM. Steps from https://developer.nvidia.com/dcgm#Downloads
+RUN wget https://developer.download.nvidia.com/compute/cuda/repos/ubuntu2004/x86_64/cuda-ubuntu2004.pin && \
+    mv cuda-ubuntu2004.pin /etc/apt/preferences.d/cuda-repository-pin-600 && \
+    apt-key adv --fetch-keys https://developer.download.nvidia.com/compute/cuda/repos/ubuntu2004/x86_64/7fa2af80.pub && \
+    add-apt-repository "deb https://developer.download.nvidia.com/compute/cuda/repos/ubuntu2004/x86_64/ /" && \
+    apt-get update && apt-get install -y datacenter-gpu-manager=1:{}
 '''.format(dcgm_version, dcgm_version)
 
 
@@ -568,7 +583,7 @@ ENV DEBIAN_FRONTEND=noninteractive
 # python3-dev is needed by Torchvision
 # python3-pip and libarchive-dev is needed by python backend
 # uuid-dev and pkg-config is needed for Azure Storage
-# scons is needed for armnn_tflite backend build dep 
+# scons is needed for armnn_tflite backend build dep
 RUN apt-get update && \
     apt-get install -y --no-install-recommends \
             autoconf \
@@ -627,7 +642,7 @@ COPY . .
 ENTRYPOINT []
 '''
         if FLAGS.enable_gpu:
-            df += install_dcgm_libraries(argmap['DCGM_VERSION'])
+            df += install_dcgm_libraries(argmap['DCGM_VERSION'], target_machine())
 
     df += '''
 ENV TRITON_SERVER_VERSION ${TRITON_VERSION}
@@ -697,7 +712,7 @@ FROM ${{BASE_IMAGE}}
 '''.format(argmap['TRITON_VERSION'], argmap['TRITON_CONTAINER_VERSION'],
            argmap['BASE_IMAGE'])
 
-    df += dockerfile_prepare_container_linux(argmap, backends, FLAGS.enable_gpu)
+    df += dockerfile_prepare_container_linux(argmap, backends, FLAGS.enable_gpu, target_machine())
 
     df += '''
 WORKDIR /opt/tritonserver
@@ -741,7 +756,7 @@ COPY --chown=1000:1000 --from=tritonserver_build /workspace/build/sagemaker/serv
         dfile.write(df)
 
 
-def dockerfile_prepare_container_linux(argmap, backends, enable_gpu):
+def dockerfile_prepare_container_linux(argmap, backends, enable_gpu, target_machine):
     gpu_enabled = 1 if enable_gpu else 0
     # Common steps to produce docker images shared by build.py and compose.py.
     # Sets enviroment variables, installs dependencies and adds entrypoint
@@ -781,6 +796,7 @@ ENV DEBIAN_FRONTEND=noninteractive
 # example libcurl only needed for GCS?)
 RUN apt-get update && \
     apt-get install -y --no-install-recommends \
+            software-properties-common \
             libb64-0d \
             libcurl4-openssl-dev \
             libre2-5 \
@@ -793,13 +809,13 @@ RUN apt-get update && \
 '''.format(gpu_enabled=gpu_enabled, ort_dependencies=ort_dependencies)
 
     if enable_gpu:
-        df += install_dcgm_libraries(argmap['DCGM_VERSION'])
+        df += install_dcgm_libraries(argmap['DCGM_VERSION'], target_machine)
         df += '''
 # Extra defensive wiring for CUDA Compat lib
 RUN ln -sf ${_CUDA_COMPAT_PATH}/lib.real ${_CUDA_COMPAT_PATH}/lib \
  && echo ${_CUDA_COMPAT_PATH}/lib > /etc/ld.so.conf.d/00-cuda-compat.conf \
  && ldconfig \
- && rm -f ${_CUDA_COMPAT_PATH}/lib 
+ && rm -f ${_CUDA_COMPAT_PATH}/lib
 '''
 
     # Add dependencies needed for python backend
@@ -912,8 +928,6 @@ def container_build(images, backends, repoagents, endpoints):
         base_image = images['base']
     elif target_platform() == 'windows':
         base_image = 'mcr.microsoft.com/dotnet/framework/sdk:4.8'
-    elif target_platform() == 'ubuntu/arm64':
-        base_image = 'arm64v8/ubuntu:20.04'
     else:
         base_image = 'nvcr.io/nvidia/tritonserver:{}-py3-min'.format(
             FLAGS.upstream_container_version)
@@ -1139,7 +1153,14 @@ if __name__ == '__main__':
         required=False,
         default=None,
         help=
-        'Target for build, can be "ubuntu", "windows", "ubuntu/arm64" or "jetpack". If not specified, build targets the current platform.'
+        'Target platform for build, can be "linux", "windows" or "jetpack". If not specified, build targets the current platform.'
+    )
+    parser.add_argument(
+        '--target-machine',
+        required=False,
+        default=None,
+        help=
+        'Target machine/architecture for build. If not specified, build targets the current machine/architecture.'
     )
 
     parser.add_argument('--build-id',
@@ -1349,6 +1370,8 @@ if __name__ == '__main__':
         with open('TRITON_VERSION', "r") as vfile:
             FLAGS.version = vfile.readline().strip()
 
+    log('platform {}'.format(target_platform()))
+    log('machine {}'.format(target_machine()))
     log('version {}'.format(FLAGS.version))
 
     # Determine the default repo-tag that should be used for images,
