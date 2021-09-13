@@ -947,6 +947,13 @@ def container_build(images, backends, repoagents, endpoints):
             '--pull',
         ]
 
+    # Windows docker runs in a VM and memory needs to be specified
+    # explicitly.
+    if target_platform() == 'windows':
+        commonargs += [
+            '--memory', FLAGS.container_memory
+        ]
+
     log_verbose('buildbase container {}'.format(commonargs + cachefromargs))
     create_dockerfile_buildbase(FLAGS.build_dir, 'Dockerfile.buildbase',
                                 dockerfileargmap)
@@ -1010,6 +1017,11 @@ def container_build(images, backends, repoagents, endpoints):
             '/workspace'
         ]
         if target_platform() == 'windows':
+            # Windows docker runs in a VM and memory needs to be
+            # specified explicitly.
+            dockerrunargs += [
+                '--memory', FLAGS.container_memory
+            ]
             dockerrunargs += [
                 '-v', '\\\\.\pipe\docker_engine:\\\\.\pipe\docker_engine'
             ]
@@ -1115,6 +1127,11 @@ if __name__ == '__main__':
         action="store_true",
         required=False,
         help='Do not use Docker --pull argument when building container.')
+    parser.add_argument(
+        '--container-memory',
+        default="8g",
+        required=False,
+        help='Value for Docker --memory argument. Used only for windows builds.')
     parser.add_argument(
         '--target-platform',
         required=False,
