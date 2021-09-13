@@ -26,6 +26,7 @@
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 import argparse
 import os
+import platform
 import subprocess
 import sys
 
@@ -72,7 +73,8 @@ FROM {}
 
     import build
     df += build.dockerfile_prepare_container_linux(argmap, backends,
-                                                   FLAGS.enable_gpu)
+                                                   FLAGS.enable_gpu,
+                                                   platform.machine().lower())
     # Copy over files
     df += '''
 WORKDIR /opt/tritonserver
