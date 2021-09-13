@@ -1,5 +1,5 @@
 #!/bin/bash
-# Copyright (c) 2019-2020, NVIDIA CORPORATION. All rights reserved.
+# Copyright 2019-2021, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -80,12 +80,14 @@ for STATIC_BATCH in $STATIC_BATCH_SIZES; do
             set +e
 
             # Run the model once to warm up. Some frameworks do
-            # optimization on the first requests.
-            $PERF_CLIENT -v -i ${PERF_CLIENT_PROTOCOL} -m $MODEL_NAME -p5000 -b${STATIC_BATCH}
+            # optimization on the first requests.  Must warmup similar
+            # to actual run so that all instances are ready
+            $PERF_CLIENT -v -i ${PERF_CLIENT_PROTOCOL} -m $MODEL_NAME -p5000 \
+                         -b${STATIC_BATCH} --concurrency-range ${CONCURRENCY}
 
             $PERF_CLIENT -v -i ${PERF_CLIENT_PROTOCOL} -m $MODEL_NAME -p5000 \
                          -b${STATIC_BATCH} --concurrency-range ${CONCURRENCY} \
-                         -f ${NAME}.csv >> ${NAME}.log 2>&1
+                         -f ${NAME}.csv 2>&1 | tee ${NAME}.log
             if (( $? != 0 )); then
                 RET=1
             fi
