@@ -141,7 +141,7 @@ def get_container_version_if_not_specified():
         with open('TRITON_VERSION', "r") as vfile:
             version = vfile.readline().strip()
         import build
-        FLAGS.container_version, upstream_container_version = build.get_container_versions(
+        current_container_version, FLAGS.container_version = build.get_container_versions(
             version, FLAGS.container_version, "")
         log('version {}'.format(version))
     log('using container version {}'.format(FLAGS.container_version))
@@ -202,8 +202,12 @@ def create_argmap(images):
     vars = p_path.stdout
     log_verbose("inspect args: {}".format(vars))
 
-    e = re.search("TRITON_GPU_ENABLED_BUILD=([\S]{1,}) ", vars)
-    gpu_enabled = False if e == None else (True if e.group(1) == "1" else False)
+    e0 = re.search("TRITON_GPU_ENABLED_BUILD=([\S]{1,}) ", vars)
+    e1 = re.search("CUDA_VERSION", vars)
+    fail_if(e0 == None and e1 == None,
+            "Error, full container is not GPU enabled")
+    gpu_enabled = True if (e0 == None and e1 != None) else (
+        True if e0.group(1) == "1" else False)
     fail_if(
         gpu_enabled != enable_gpu,
         'Error: full container provided was build with \'enable_gpu\' as {} and you are composing container with \'enable_gpu\' as {}'
