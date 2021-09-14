@@ -241,6 +241,8 @@ RUN cp client/src/grpc_generated/go/*.go qa/L0_simple_go_client/. && \
 ############################################################################
 FROM $BASE_IMAGE
 
+ARG TARGETPLATFORM
+
 # Ensure apt-get won't prompt for selecting options
 ENV DEBIAN_FRONTEND=noninteractive
 
@@ -289,9 +291,16 @@ RUN pip3 install --upgrade wheel setuptools && \
 # Hence, fixing the boofuzz version to 0.3.0
 RUN pip3 install 'boofuzz==0.3.0'
 
-# go needed to example go client test.
-ADD https://golang.org/dl/go1.16.3.linux-amd64.tar.gz go1.16.3.linux-amd64.tar.gz
-RUN rm -rf /usr/local/go && tar -C /usr/local -xzf go1.16.3.linux-amd64.tar.gz
+# go needed for example go client test.
+RUN if [ "$TARGETPLATFORM" = "linux/arm64" ]; then \
+      wget https://golang.org/dl/go1.16.3.linux-arm64.tar.gz && \
+      rm -rf /usr/local/go && tar -C /usr/local -xzf go1.16.3.linux-arm64.tar.gz && \
+      rm -f go1.16.3.linux-arm64.tar.gz; \
+    else \
+      wget https://golang.org/dl/go1.16.3.linux-amd64.tar.gz && \
+      rm -rf /usr/local/go && tar -C /usr/local -xzf go1.16.3.linux-amd64.tar.gz && \
+      rm -f go1.16.3.linux-amd64.tar.gz; \
+    fi
 ENV GOPATH /root/go
 ENV PATH $PATH:/usr/local/go/bin:$GOPATH/bin
 RUN GO111MODULE=off go get github.com/golang/protobuf/protoc-gen-go && \
@@ -307,7 +316,7 @@ COPY --chown=1000:1000 --from=sdk /workspace/qa/ qa/
 # install the tritonserver/triton python client APIs.
 RUN rm -fr qa/L0_copyrights qa/L0_build_variants && \
     find qa/pkgs/ -maxdepth 1 -type f -name \
-    "tritonclient-*-manylinux1_x86_64.whl" | xargs printf -- '%s[all]' | \
+    "tritonclient-*linux*.whl" | xargs printf -- '%s[all]' | \
     xargs pip3 install --upgrade
 
 ENV LD_LIBRARY_PATH /opt/tritonserver/qa/clients:${LD_LIBRARY_PATH}
