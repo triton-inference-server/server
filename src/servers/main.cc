@@ -26,7 +26,10 @@
 
 #ifdef _WIN32
 #define NOMINMAX
+#define WIN32_LEAN_AND_MEAN
+#include <windows.h>
 #include <winsock2.h>
+#include <ws2tcpip.h>
 #pragma comment(lib, "ws2_32.lib")
 #endif
 
@@ -34,6 +37,7 @@
 #include <getopt.h>
 #include <unistd.h>
 #endif
+
 #include <stdint.h>
 #include <algorithm>
 #include <cctype>
