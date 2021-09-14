@@ -35,7 +35,6 @@ apt-get update && \
          python3-pip
 pip3 install --upgrade pip
 # install client libraries
-pip3 install nvidia-pyindex
 pip3 install tritonclient[all]
 
 # Run the actual test
