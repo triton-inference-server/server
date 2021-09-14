@@ -45,15 +45,13 @@ if __name__ == '__main__':
         html_content += "\n" + mem_graph + "\n"
         with open(mem_graph, "r") as f:
             html_content += f.read() + "\n"
-    # The busy op model causes PTX failures when running the CI.
-    # Should be uncommented when it's ready for merging.
-    # TODO Uncomment after PTX issues are resolved.
-    # write_up = "<p>The busyop test is by design to show that actual memory growth is correctly detected and displayed.</p>"
-    # write_up += "<p><b>&#8226 What to look for</b><br>The memory usage should increase continually over time, and a linear growth should be observed in the graph below.</p>"
-    # html_content += "</pre><pre style=\"font-size:11pt;font-family:Arial, sans-serif;\">" + write_up + "</pre><pre style=\"font-size:11pt;font-family:Consolas;\">"
-    # for mem_graph in sorted(memory_graphs_busyop):
-    #     html_content += "\n" + mem_graph + "\n"
-    #     with open(mem_graph, "r") as f:
-    #         html_content += f.read() + "\n"
+
+    write_up = "<p>The busyop test is by design to show that actual memory growth is correctly detected and displayed.</p>"
+    write_up += "<p><b>&#8226 What to look for</b><br>The memory usage should increase continually over time, and a linear growth should be observed in the graph below.</p>"
+    html_content += "</pre><pre style=\"font-size:11pt;font-family:Arial, sans-serif;\">" + write_up + "</pre><pre style=\"font-size:11pt;font-family:Consolas;\">"
+    for mem_graph in sorted(memory_graphs_busyop):
+        html_content += "\n" + mem_graph + "\n"
+        with open(mem_graph, "r") as f:
+            html_content += f.read() + "\n"
     html_content += "</pre></body></html>"
     nightly_email_helper.send(subject, html_content, is_html=True)
