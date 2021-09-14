@@ -142,7 +142,7 @@ def get_container_version_if_not_specified():
             version = vfile.readline().strip()
         import build
         current_container_version, FLAGS.container_version = build.get_container_versions(
-            version, FLAGS.container_version, "")
+            version, None, FLAGS.container_version)
         log('version {}'.format(version))
     log('using container version {}'.format(FLAGS.container_version))
 
@@ -150,28 +150,28 @@ def get_container_version_if_not_specified():
 def create_argmap(images):
     # Extract information from upstream build and create map other functions can
     # use
-    upstreamDockerImage = images["full"]
-    minDockerImage = images["min"]
+    full_docker_image = images["full"]
+    min_docker_image = images["min"]
     enable_gpu = FLAGS.enable_gpu
     # Docker inspect enviroment variables
-    baseRunArgs = ['docker', 'inspect', '-f']
+    base_run_args = ['docker', 'inspect', '-f']
     import re  # parse all PATH enviroment variables
 
     # first pull docker images
-    log("pulling container:{}".format(upstreamDockerImage))
-    p = subprocess.run(['docker', 'pull', upstreamDockerImage])
+    log("pulling container:{}".format(full_docker_image))
+    p = subprocess.run(['docker', 'pull', full_docker_image])
     fail_if(
         p.returncode != 0,
-        'docker pull container {} failed, {}'.format(upstreamDockerImage,
+        'docker pull container {} failed, {}'.format(full_docker_image,
                                                      p.stderr))
     if enable_gpu:
-        pm = subprocess.run(['docker', 'pull', minDockerImage])
+        pm = subprocess.run(['docker', 'pull', min_docker_image])
         fail_if(
             pm.returncode != 0, 'docker pull container {} failed, {}'.format(
-                minDockerImage, pm.stderr))
-        pm_path = subprocess.run(baseRunArgs + [
+                min_docker_image, pm.stderr))
+        pm_path = subprocess.run(base_run_args + [
             '{{range $index, $value := .Config.Env}}{{$value}} {{end}}',
-            minDockerImage
+            min_docker_image
         ],
                                  capture_output=True,
                                  text=True)
@@ -185,13 +185,13 @@ def create_argmap(images):
         gpu_enabled = False if e == None else True
         fail_if(
             not gpu_enabled,
-            '\'enable-gpu\' flag added but min container provided does not have CUDA installed'
+            '\'enable-gpu\' flag specified but min container provided does not have CUDA installed'
         )
 
     # Check full container enviroment variables
-    p_path = subprocess.run(baseRunArgs + [
+    p_path = subprocess.run(base_run_args + [
         '{{range $index, $value := .Config.Env}}{{$value}} {{end}}',
-        upstreamDockerImage
+        full_docker_image
     ],
                             capture_output=True,
                             text=True)
@@ -202,12 +202,13 @@ def create_argmap(images):
     vars = p_path.stdout
     log_verbose("inspect args: {}".format(vars))
 
-    e0 = re.search("TRITON_GPU_ENABLED_BUILD=([\S]{1,}) ", vars)
+    e0 = re.search("TRITON_SERVER_GPU_ENABLED=([\S]{1,}) ", vars)
     e1 = re.search("CUDA_VERSION", vars)
-    fail_if(e0 == None and e1 == None,
-            "Error, full container is not GPU enabled")
-    gpu_enabled = True if (e0 == None and e1 != None) else (
-        True if e0.group(1) == "1" else False)
+    gpu_enabled = False
+    if (e0 != None):
+        gpu_enabled = e0.group(1) == "1"
+    elif (e1 != None):
+        gpu_enabled = True
     fail_if(
         gpu_enabled != enable_gpu,
         'Error: full container provided was build with \'enable_gpu\' as {} and you are composing container with \'enable_gpu\' as {}'
@@ -236,27 +237,27 @@ def create_argmap(images):
         len(dcgm_version) == 0,
         'docker inspect to find DCGM version failed, {}'.format(vars))
 
-    p_sha = subprocess.run(baseRunArgs + [
-        '{{ index .Config.Labels "com.nvidia.build.ref"}}', upstreamDockerImage
-    ],
-                           capture_output=True,
-                           text=True)
+    p_sha = subprocess.run(
+        base_run_args +
+        ['{{ index .Config.Labels "com.nvidia.build.ref"}}', full_docker_image],
+        capture_output=True,
+        text=True)
     fail_if(
         p_sha.returncode != 0,
         'docker inspect of upstream docker image build sha failed, {}'.format(
             p_sha.stderr))
-    p_build = subprocess.run(baseRunArgs + [
-        '{{ index .Config.Labels "com.nvidia.build.id"}}', upstreamDockerImage
-    ],
-                             capture_output=True,
-                             text=True)
+    p_build = subprocess.run(
+        base_run_args +
+        ['{{ index .Config.Labels "com.nvidia.build.id"}}', full_docker_image],
+        capture_output=True,
+        text=True)
     fail_if(
         p_build.returncode != 0,
         'docker inspect of upstream docker image build sha failed, {}'.format(
             p_build.stderr))
 
     p_find = subprocess.run(
-        ['docker', 'run', upstreamDockerImage, 'bash', '-c', 'ls /usr/bin/'],
+        ['docker', 'run', full_docker_image, 'bash', '-c', 'ls /usr/bin/'],
         capture_output=True,
         text=True)
     f = re.search("serve", p_find.stdout)
@@ -379,7 +380,7 @@ if __name__ == '__main__':
                     "nvcr.io/nvidia/tritonserver:{}-cpu-only-py3".format(
                         FLAGS.container_version),
                 "min":
-                    "ubuntu:20.04".format(FLAGS.container_version)
+                    "ubuntu:20.04"
             }
     fail_if(
         len(images) != 2,
