@@ -41,9 +41,18 @@ from source to get more exact customization.
 
 ## Use the compose.py script
 
-The `compose.py` script can be found in the [server repository](https://github.com/triton-inference-server/server). Simply clone the repository and run `compose.py` to create a custom container. Note created container version will depend on the branch that was cloned. For example branch [r21.06](https://github.com/triton-inference-server/server/tree/r21.06) should be used to create a image based on the NGC 21.06 Triton release. 
+The `compose.py` script can be found in the [server repository](https://github.com/triton-inference-server/server).
+Simply clone the repository and run `compose.py` to create a custom container. 
+Note: Created container version will depend on the branch that was cloned. 
+For example branch [r21.08](https://github.com/triton-inference-server/server/tree/r21.08) 
+should be used to create a image based on the NGC 21.08 Triton release. 
 
-`compose.py` provides `--backend`, `--repoagent` options that allow you to specify which backends and repository agents to include in the custom image. The `--enable-gpu` flag indicates that you want to create an image that supports NVIDIA GPUs. For example, the following creates a new docker image that contains only the TensorFlow 1 and TensorFlow 2 backends and the checksum repository agent.
+`compose.py` provides `--backend`, `--repoagent` options that allow you to 
+specify which backends and repository agents to include in the custom image. 
+The `--enable-gpu` flag indicates that you want to create an image that supports
+NVIDIA GPUs. For example, the following creates a new docker image that 
+contains only the TensorFlow 1 and TensorFlow 2 backends and the checksum 
+repository agent.
 
 Example:
 ```
@@ -54,7 +63,47 @@ will provide a container `tritonserver` locally. You can access the container wi
 $ docker run -it tritonserver:latest
 ```
 
-Note: If `compose.py` is run on release versions `r21.08` and older, the resulting container will have DCGM version 2.2.3 installed. This may result in different GPU statistic reporting behavior.
+Note: If `compose.py` is run on release versions `r21.08` and earlier, 
+the resulting container will have DCGM version 2.2.3 installed. 
+This may result in different GPU statistic reporting behavior.
+
+### Compose a specific version of Triton
+
+`compose.py` requires two containers: a `min` container which is the 
+base the compose container is built from and a `full` container from which the 
+script will extract components. The version of the `min` and `full` container 
+is determined by the branch of Triton `compose.py` is on. 
+For example, running
+```
+python3 compose.py --backend tensorflow1 --repoagent checksum --enable-gpu
+```
+on branch [r21.08](https://github.com/triton-inference-server/server/tree/r21.08) pulls:
+- `min` container `nvcr.io/nvidia/tritonserver:21.08-py3-min` 
+- `full` container `nvcr.io/nvidia/tritonserver:21.08-py3`
+
+Alternatively, users can specify the version of Triton container to pull from any branch by either:
+1. Adding flag `--container-version <container version>` to branch
+```
+python3 compose.py --backend tensorflow1 --repoagent checksum --container-version 21.08 --enable-gpu
+```
+2. Specifying `--image min,<min container image name> --image full,<full container image name>`. 
+   The user is responsible for specifying compatible `min` and `full` containers. 
+```
+python3 compose.py --backend tensorflow1 --repoagent checksum --image min,nvcr.io/nvidia/tritonserver:21.08-py3-min --image full,nvcr.io/nvidia/tritonserver:21.08-py3 --enable-gpu
+```
+Method 1 and 2 will result in the same composed container. Furthermore, `--image` flag overrides the `--container-version` flag when both are specified.
+
+### CPU only container composition
+
+To compose a container that is built for only cpu usage, simply remove the 
+`--enable-gpu` flag when running `compose.py`. 
+
+This will build a container using `ubuntu:20.04` docker as the `min` container 
+and `nvcr.io/nvidia/tritonserver:<upstream-container-version>-cpu-only-py3` as the `full` container.
+Note: 
+1. When composing a CPU only container, both `min` and `full` containers should be built for CPU only and not have CUDA installed.
+2. CPU only containers are only available for Triton versions > `21.09` 
+3. CPU only "full" containers are build with less backends then the GPU enabled containers. Currently supported backends are `onnxruntime`, `openvino` and `python`.
 
 ## Build it yourself
 
