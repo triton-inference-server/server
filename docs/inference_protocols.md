@@ -48,7 +48,7 @@ model loading and unloading, and inferencing. See the KFServing and
 extension documentation for details.
 
 ### HTTP Options
-Triton provides following configuring options for server-client network transactions over HTTP protocol.
+Triton provides the following configuration options for server-client network transactions over HTTP protocol.
 
 #### Compression
 
