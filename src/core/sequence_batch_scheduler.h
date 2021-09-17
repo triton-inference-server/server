@@ -69,7 +69,6 @@ class SequenceBatchScheduler : public Scheduler {
   // by the index into 'batchers_'.
   struct BatcherSequenceSlot {
     BatcherSequenceSlot() = default;
-    BatcherSequenceSlot(const BatcherSequenceSlot&) = default;
     BatcherSequenceSlot(size_t b, uint32_t s) : batcher_idx_(b), seq_slot_(s) {}
     size_t batcher_idx_;
     uint32_t seq_slot_;
@@ -85,6 +84,19 @@ class SequenceBatchScheduler : public Scheduler {
   // and returns true if the batcher should continue waiting.
   bool DelayScheduler(
       const uint32_t batcher_idx, const size_t cnt, const size_t total);
+
+  const std::unordered_map<std::string, std::string>& StateIOMap()
+  {
+    return state_io_map_;
+  }
+
+  const std::unordered_map<
+      std::string, const inference::ModelSequenceBatching_State&>&
+  StateOutputConfigMap()
+  {
+    return state_output_config_map_;
+  }
+  bool HasImplicitState() { return has_implicit_state_; }
 
  private:
   void ReaperThread(const int nice);
@@ -154,6 +166,17 @@ class SequenceBatchScheduler : public Scheduler {
   // Used for debugging/testing.
   size_t backlog_delay_cnt_;
   std::vector<size_t> queue_request_cnts_;
+
+  // IO mapping between the output state name and the input state name.
+  std::unordered_map<std::string, std::string> state_io_map_;
+
+  // IO mapping between the output state name and the state configuration.
+  std::unordered_map<std::string, const inference::ModelSequenceBatching_State&>
+      state_output_config_map_;
+
+  // Cached value indicating whether the model configuration requires storing
+  // the implicit state.
+  bool has_implicit_state_;
 };
 
 // Base class for a scheduler that implements a particular scheduling
@@ -191,6 +214,10 @@ class SequenceBatch {
       const InferenceRequest::SequenceId& corr_id,
       const bool not_ready = false);
 
+  // Update the implicit state and set the required input states.
+  void UpdateImplicitState(
+      std::unique_ptr<InferenceRequest>& irequest, const int32_t seq_slot);
+
   // The controlling scheduler.
   SequenceBatchScheduler* const base_;
 
@@ -226,6 +253,11 @@ class SequenceBatch {
   // control.
   std::vector<std::shared_ptr<InferenceRequest::Input>>
       seq_slot_corrid_overrides_;
+
+  // For each sequence slot store the optional implicit state tensors.
+  std::vector<std::shared_ptr<
+      std::unordered_map<std::string, InferenceRequest::OutputState>>>
+      states_;
 };
 
 // Scheduler that implements the Direct sequence scheduling strategy

@@ -586,6 +586,62 @@ TRITONBACKEND_RequestRelease(
   return nullptr;  // success
 }
 
+TRITONSERVER_Error*
+TRITONBACKEND_RequestUpdateState(TRITONBACKEND_Request* request)
+{
+  InferenceRequest* tr = reinterpret_cast<InferenceRequest*>(request);
+  auto status = tr->UpdateState();
+
+  if (!status.IsOk()) {
+    return TRITONSERVER_ErrorNew(
+        StatusCodeToTritonCode(status.StatusCode()), status.Message().c_str());
+  }
+
+  return nullptr;  // success
+}
+
+TRITONSERVER_Error*
+TRITONBACKEND_RequestStateNew(
+    TRITONBACKEND_Request* request, TRITONBACKEND_State** state,
+    const char* name, const TRITONSERVER_DataType datatype,
+    const int64_t* shape, const uint32_t dims_count)
+{
+  InferenceRequest* tr = reinterpret_cast<InferenceRequest*>(request);
+  std::vector<int64_t> lshape(shape, shape + dims_count);
+  InferenceRequest::OutputState* loutput_state;
+  Status status = tr->AddOutputState(
+      name, TritonToDataType(datatype), lshape, &loutput_state);
+  *loutput_state->MutableShape() = lshape;
+  if (!status.IsOk()) {
+    *state = nullptr;
+    return TRITONSERVER_ErrorNew(
+        StatusCodeToTritonCode(status.StatusCode()), status.Message().c_str());
+  }
+
+  *state = reinterpret_cast<TRITONBACKEND_State*>(loutput_state);
+  return nullptr;  // success
+}
+
+TRITONSERVER_Error*
+TRITONBACKEND_StateOutputBuffer(
+    TRITONBACKEND_State* state, void** buffer, const uint64_t buffer_byte_size,
+    TRITONSERVER_MemoryType* memory_type, int64_t* memory_type_id)
+{
+  InferenceRequest::OutputState* to =
+      reinterpret_cast<InferenceRequest::OutputState*>(state);
+  std::shared_ptr<AllocatedMemory> memory = std::make_shared<AllocatedMemory>(
+      buffer_byte_size, *memory_type, *memory_type_id);
+  *buffer = memory->MutableBuffer(memory_type, memory_type_id);
+
+  Status status = to->SetData(std::move(memory));
+  if (!status.IsOk()) {
+    *buffer = nullptr;
+    return TRITONSERVER_ErrorNew(
+        StatusCodeToTritonCode(status.StatusCode()), status.Message().c_str());
+  }
+  return nullptr;  // success
+}
+
 //
 // TRITONBACKEND_ResponseFactory
 //

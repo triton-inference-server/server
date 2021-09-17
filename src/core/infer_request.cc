@@ -391,11 +391,76 @@ InferenceRequest::AddOriginalInput(
 }
 
 Status
+InferenceRequest::TransferOutputStates(
+    std::shared_ptr<std::unordered_map<std::string, OutputState>>&
+        output_states)
+{
+  if (output_states == nullptr || output_states_ == nullptr) {
+    return Status(Status::Code::INVALID_ARG, "invalid state detected.");
+  }
+
+  // The new state size and the old state size must match.
+  if (output_states_->size() != output_states->size()) {
+    return Status(
+        Status::Code::INVALID_ARG,
+        "Expected '" + std::to_string(output_states_->size()) +
+            "' output states from the model, found '" +
+            std::to_string(output_states->size()) + "' output states.");
+  }
+
+  // Make sure that the name of the output states provided by the backend are
+  // correct.
+  for (auto& pair : *output_states_) {
+    auto& output_state_name = pair.first;
+    auto output_state_itr = output_states->find(output_state_name);
+    if (output_state_itr == output_states->end()) {
+      return Status(
+          Status::Code::INVALID_ARG,
+          "detected incorrect output state name '" + output_state_name + "'.");
+    }
+  }
+
+  output_states = std::move(output_states_);
+  return Status::Success;
+}
+
+Status
 InferenceRequest::AddOriginalInput(
     const std::string& name, const inference::DataType datatype,
     const std::vector<int64_t>& shape, InferenceRequest::Input** input)
 {
   return AddOriginalInput(name, datatype, &shape[0], shape.size(), input);
+}
+
+Status
+InferenceRequest::AddOutputState(
+    const std::string& name, const inference::DataType datatype,
+    const int64_t* shape, const uint64_t dim_count,
+    InferenceRequest::OutputState** output_state)
+{
+  const auto& pr = output_states_->emplace(
+      std::piecewise_construct, std::forward_as_tuple(name),
+      std::forward_as_tuple(name, datatype, shape, dim_count));
+  if (!pr.second) {
+    return Status(
+        Status::Code::INVALID_ARG,
+        "state '" + name + "' already exists in request");
+  }
+
+  if (output_state != nullptr) {
+    *output_state = std::addressof(pr.first->second);
+  }
+
+  return Status::Success;
+}
+
+Status
+InferenceRequest::AddOutputState(
+    const std::string& name, const inference::DataType datatype,
+    const std::vector<int64_t>& shape,
+    InferenceRequest::OutputState** output_state)
+{
+  return AddOutputState(name, datatype, &shape[0], shape.size(), output_state);
 }
 
 Status

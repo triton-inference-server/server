@@ -31,6 +31,7 @@
 #include <sys/syscall.h>
 #include <unistd.h>
 #endif
+#include <algorithm>
 #include "src/core/constants.h"
 #include "src/core/dynamic_batch_scheduler.h"
 #include "src/core/logging.h"
@@ -59,11 +60,26 @@ SequenceBatchScheduler::Create(
   auto instance_count = model->Instances().size();
   sched->queue_request_cnts_.resize(instance_count, 0);
 
-  auto config = model->Config();
+  auto& config = model->Config();
 
   // Max sequence idle...
   sched->max_sequence_idle_microseconds_ =
       config.sequence_batching().max_sequence_idle_microseconds();
+
+  // Implicit States
+  auto& states = config.sequence_batching().state();
+  bool has_implicit_state = false;
+  if (states.size() > 0) {
+    has_implicit_state = true;
+  }
+  sched->has_implicit_state_ = has_implicit_state;
+
+  if (has_implicit_state) {
+    for (const inference::ModelSequenceBatching_State& state : states) {
+      sched->state_io_map_.emplace(state.output_name(), state.input_name());
+      sched->state_output_config_map_.insert({state.output_name(), state});
+    }
+  }
 
   // Get the number of candidate sequence slots to allow for each
   // runner. This is at least 1 even if the model doesn't support
@@ -138,6 +154,7 @@ SequenceBatchScheduler::Create(
 
   return Status::Success;
 }
+
 
 SequenceBatchScheduler::~SequenceBatchScheduler()
 {
@@ -714,7 +731,7 @@ SequenceBatch::SequenceBatch(
       end_input_overrides_(end_input_overrides),
       startend_input_overrides_(startend_input_overrides),
       continue_input_overrides_(continue_input_overrides),
-      notready_input_overrides_(notready_input_overrides)
+      notready_input_overrides_(notready_input_overrides), states_(seq_slot_cnt)
 {
 }
 
@@ -853,6 +870,86 @@ SequenceBatch::SetControlTensors(
       memcpy(slot_corrid_ptr, corrid_p, data->TotalByteSize());
     }
     irequest->AddOverrideInput(input);
+  }
+}
+
+void
+SequenceBatch::UpdateImplicitState(
+    std::unique_ptr<InferenceRequest>& irequest, const int32_t seq_slot)
+{
+  // This should be executed only if the model has an states section.
+  if (base_->HasImplicitState()) {
+    std::shared_ptr<
+        std::unordered_map<std::string, InferenceRequest::OutputState>>&
+        states = states_[seq_slot];
+
+    // Create the state for the first request in the sequence.
+    if (states == nullptr) {
+      states.reset(
+          new std::unordered_map<std::string, InferenceRequest::OutputState>{});
+      for (auto& state : base_->StateOutputConfigMap()) {
+        std::shared_ptr<InferenceRequest::Input> input;
+        auto& state_config = state.second;
+
+        std::vector<int64_t> dims;
+        for (auto& dim : state_config.dims()) {
+          if (dim == -1) {
+            dims.push_back(1);
+          } else {
+            dims.push_back(dim);
+          }
+        }
+
+        // Replace the dynamic shapes with 1 for the first inference request.
+        std::replace(dims.begin(), dims.end(), -1, 1);
+        irequest->AddOverrideInput(
+            state_config.input_name(), state.second.data_type(),
+            irequest->BatchSize(), dims, &input);
+
+        const size_t state_size = GetByteSize(state.second.data_type(), dims);
+        auto data = std::make_shared<AllocatedMemory>(
+            state_size, TRITONSERVER_MEMORY_CPU, 0);
+        input->SetData(data);
+
+        // Insert a dummy state for the first request in the sequence.
+        states->emplace(
+            std::piecewise_construct,
+            std::forward_as_tuple(state_config.output_name()),
+            std::forward_as_tuple());
+      }
+    } else {
+      for (auto& state : *states) {
+        std::shared_ptr<InferenceRequest::Input> input;
+        auto& output_state = state.second;
+        auto state_mapping_itr = base_->StateIOMap().find(output_state.Name());
+
+        // If there is an unexpected state stored, log an error
+        // and stop processing other states. This should never
+        // happen because we have already checked the name of
+        // the output states in state update callback.
+        if (state_mapping_itr == base_->StateIOMap().end()) {
+          LOG_ERROR << "Unexpected output state name '" << output_state.Name()
+                    << "'.";
+          break;
+        }
+
+        // Add the stored implicit state to the inputs of the
+        // inference request.
+        irequest->AddOverrideInput(
+            state_mapping_itr->second, output_state.DType(),
+            irequest->BatchSize(), output_state.Shape(), &input);
+        input->SetData(output_state.Data());
+      }
+    }
+
+    // Set the callback that will be called when
+    // TRITONBACKEND_RequestStateUpdate() is called. This is the place where the
+    // new state will replace the old state.  If the number of provided states
+    // is incorrect or it contains wrong output state names, the state will not
+    // be updated.
+    irequest->SetStateUpdateCallback([&states](InferenceRequest* irequest) {
+      return irequest->TransferOutputStates(states);
+    });
   }
 }
 
@@ -1049,6 +1146,7 @@ DirectSequenceBatch::BatcherThread(const int nice)
                   batcher_idx_, seq_slot);
               seq_slot_correlation_ids_[seq_slot] =
                   base_->ReleaseSequenceSlot(batcher_seq_slot, &queue);
+              states_[seq_slot] = nullptr;
             }
           }
 
@@ -1179,6 +1277,11 @@ DirectSequenceBatch::BatcherThread(const int nice)
             if ((irequest->Flags() & TRITONSERVER_REQUEST_FLAG_SEQUENCE_END) !=
                 0) {
               end_of_sequence = true;
+            } else {
+              // Update the implicit state and set the input state tensors. The
+              // state update doesn't need to happen when the sequence is
+              // ending.
+              UpdateImplicitState(irequest, seq_slot);
             }
 
             curr_payload_->AddRequest(std::move(irequest));
@@ -1214,6 +1317,9 @@ DirectSequenceBatch::BatcherThread(const int nice)
                 batcher_idx_, seq_slot);
             seq_slot_correlation_ids_[seq_slot] =
                 base_->ReleaseSequenceSlot(batcher_seq_slot, &queue);
+
+            // If the sequence is ending, set the internal state to null.
+            states_[seq_slot] = nullptr;
           }
         }
       }
@@ -1291,8 +1397,7 @@ OldestSequenceBatch::OldestSequenceBatch(
       model_instance->Model(), model_instance, GetCpuNiceLevel(config),
       true /* dynamic_batching_enabled */, config.max_batch_size(),
       enforce_equal_shape_tensors_, true /* preserve_ordering */,
-      false /* response_cache_enable */,
-      preferred_batch_sizes,
+      false /* response_cache_enable */, preferred_batch_sizes,
       config.sequence_batching().oldest().max_queue_delay_microseconds(),
       &dynamic_batcher_);
   if (!status.IsOk()) {
@@ -1352,6 +1457,9 @@ OldestSequenceBatch::CompleteAndNext(const uint32_t seq_slot)
                          << " in batcher " << batcher_idx_ << ", slot "
                          << seq_slot;
           release_seq_slot = true;
+        } else {
+          // Update the implicit state and set the input state tensors.
+          UpdateImplicitState(irequest, seq_slot);
         }
 
         // Add the appropriate control tensor values to the request.
@@ -1387,7 +1495,9 @@ OldestSequenceBatch::CompleteAndNext(const uint32_t seq_slot)
           batcher_idx_, seq_slot);
       const InferenceRequest::SequenceId& released_cid =
           base_->ReleaseSequenceSlot(batcher_seq_slot, &queue);
+      states_[seq_slot] = nullptr;
       if (released_cid.InSequence()) {
+
         LOG_VERBOSE(1) << "Enqueued new sequence containing " << queue.size()
                        << " requests into OldestFirst batcher " << batcher_idx_
                        << ", slot " << seq_slot;
