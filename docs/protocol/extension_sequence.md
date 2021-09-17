@@ -35,24 +35,26 @@ supported, Triton reports “sequence” in the extensions field of its
 Server Metadata.
 
 An inference request can specify that it is part of a sequence using
-the “sequence_id” parameter in the request and by using the
+the “sequence_id” parameter in the request and by using the 
 “sequence_start” and “sequence_end” parameters to indicate the start
 and end of sequences.
 
-- "sequence_id" : uint64 value that indicates which sequence a request
-  belongs to. All inference requests that belong to the same sequence
-  must use the same sequence ID. A sequence ID of 0 indicates the
+- "sequence_id" : a string or uint64 value that identifies the sequence to which
+  a request belongs. All inference requests that belong to the same sequence
+  must use the same sequence ID. A sequence ID of 0 or "" indicates the
   inference request is not part of a sequence.
 
 - "sequence_start" : boolean value if set to true in a request
   indicates that the request is the first in a sequence. If not set,
   or set to false the request is not the first in a sequence. If set
-  the "sequence_id" parameter must be set to a non-zero value.
+  the "sequence_id" parameter must be set to a non-zero or non-empty string 
+  value.
 
-- "sequence_end" : booleam value if set to true in a request indicates
+- "sequence_end" : boolean value if set to true in a request indicates
   that the request is the last in a sequence. If not set, or set to
   false the request is not the last in a sequence. If set the
-  "sequence_id" parameter must be set to a non-zero value.
+  "sequence_id" parameter must be set to a non-zero or non-empty string 
+  value.
 
 ## HTTP/REST
 
@@ -68,6 +70,32 @@ Content-Type: application/json
 Content-Length: <xx>
 {
   "parameters" : { "sequence_id" : 42 }
+  "inputs" : [
+    {
+      "name" : "input0",
+      "shape" : [ 2, 2 ],
+      "datatype" : "UINT32",
+      "data" : [ 1, 2, 3, 4 ]
+    }
+  ],
+  "outputs" : [
+    {
+      "name" : "output0",
+    }
+  ]
+}
+```
+
+The example below uses a v4 UUID string as the value for the "sequence_id"
+parameter.
+
+```
+POST /v2/models/mymodel/infer HTTP/1.1
+Host: localhost:8000
+Content-Type: application/json
+Content-Length: <xx>
+{
+  "parameters" : { "sequence_id" : "e333c95a-07fc-42d2-ab16-033b1a566ed5" }
   "inputs" : [
     {
       "name" : "input0",
