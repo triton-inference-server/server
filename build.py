@@ -222,6 +222,7 @@ def cmake_enable(flag):
 def core_cmake_args(components, backends, install_dir):
     cargs = [
         '-DCMAKE_BUILD_TYPE={}'.format(FLAGS.build_type),
+        '-DTRITON_REPOS_DIRECTORY={}'.format(FLAGS.repos_dir),
         '-DCMAKE_INSTALL_PREFIX:PATH={}'.format(install_dir),
         '-DTRITON_COMMON_REPO_TAG:STRING={}'.format(components['common']),
         '-DTRITON_CORE_REPO_TAG:STRING={}'.format(components['core']),
@@ -300,6 +301,7 @@ def repoagent_cmake_args(images, components, ra, install_dir):
 
     cargs = args + [
         '-DCMAKE_BUILD_TYPE={}'.format(FLAGS.build_type),
+        '-DCMAKE_REPOS_DIRECTORY={}'.format(FLAGS.repos_dir),
         '-DCMAKE_INSTALL_PREFIX:PATH={}'.format(install_dir),
         '-DTRITON_COMMON_REPO_TAG:STRING={}'.format(components['common']),
         '-DTRITON_CORE_REPO_TAG:STRING={}'.format(components['core'])
@@ -350,6 +352,7 @@ def backend_cmake_args(images, components, be, install_dir, library_paths):
 
     cargs = args + [
         '-DCMAKE_BUILD_TYPE={}'.format(FLAGS.build_type),
+        '-DCMAKE_REPOS_DIRECTORY={}'.format(FLAGS.repos_dir),
         '-DCMAKE_INSTALL_PREFIX:PATH={}'.format(install_dir),
         '-DTRITON_COMMON_REPO_TAG:STRING={}'.format(components['common']),
         '-DTRITON_CORE_REPO_TAG:STRING={}'.format(components['core']),
@@ -1252,6 +1255,12 @@ if __name__ == '__main__':
         help=
         'Include specified repo agent in build as <repoagent-name>[:<repo-tag>]. If <repo-tag> starts with "pull/" then it refers to a pull-request reference, otherwise <repo-tag> indicates the git tag/branch to use for the build. If the version is non-development then the default <repo-tag> is the release branch matching the container version (e.g. version 21.08 -> branch r21.08); otherwise the default <repo-tag> is "main" (e.g. version 21.08dev -> branch main).'
     )
+    parser.add_argument(
+        '--repos-dir',
+        type=str,
+        required=True,
+        default=None,
+        help='The directory which contains the local copies of the repositories.')
 
     FLAGS = parser.parse_args()
 

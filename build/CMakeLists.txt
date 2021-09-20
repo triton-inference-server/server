@@ -79,6 +79,9 @@ set(TRITON_CORE_REPO_TAG "main" CACHE STRING "Tag for triton-inference-server/co
 set(TRITON_BACKEND_REPO_TAG "main" CACHE STRING "Tag for triton-inference-server/backend repo")
 set(TRITON_THIRD_PARTY_REPO_TAG "main" CACHE STRING "Tag for triton-inference-server/third_party repo")
 
+# Repos directory path
+set(TRITON_REPOS_DIRECTORY "" CACHE PATH "Path to directory with local copies of repos")
+
 # Version
 file(STRINGS "${CMAKE_CURRENT_SOURCE_DIR}/../TRITON_VERSION" TRITON_VERSION)
 
@@ -124,12 +127,13 @@ include(FetchContent)
 
 FetchContent_Declare(
   repo-third-party
-  GIT_REPOSITORY https://github.com/triton-inference-server/third_party.git
-  GIT_TAG ${TRITON_THIRD_PARTY_REPO_TAG}
+  URL ${TRITON_REPOS_DIRECTORY}/third_party
 )
 set(TRITON_THIRD_PARTY_INSTALL_PREFIX ${CMAKE_CURRENT_BINARY_DIR}/third-party)
 set(TRITON_THIRD_PARTY_SRC_INSTALL_PREFIX ${CMAKE_CURRENT_BINARY_DIR}/third-party-src)
 FetchContent_MakeAvailable(repo-third-party)
+# configure_file(${TRITON_REPOS_DIRECTORY}/third_party ${CMAKE_CURRENT_BINARY_DIR}/third-party COPYONLY)
+# set(TRITON_THIRD_PARTY_SRC_INSTALL_PREFIX ${CMAKE_CURRENT_BINARY_DIR}/third-party-src)
 
 # If CMAKE_TOOLCHAIN_FILE is set, propagate that hint path to the external
 # projects.
@@ -182,6 +186,7 @@ ExternalProject_Add(test-util
     -DLibevent_DIR:PATH=${TRITON_THIRD_PARTY_INSTALL_PREFIX}/libevent/lib/cmake/libevent
     -DCNMEM_PATH:PATH=${TRITON_THIRD_PARTY_INSTALL_PREFIX}/cnmem
     -DTRITON_COMMON_REPO_TAG:STRING=${TRITON_COMMON_REPO_TAG}
+    -DTRITON_REPOS_DIRECTORY:STRING=${TRITON_REPOS_DIRECTORY}
     -DTRITON_CORE_REPO_TAG:STRING=${TRITON_CORE_REPO_TAG}
     -DTRITON_BACKEND_REPO_TAG:STRING=${TRITON_BACKEND_REPO_TAG}
     -DTRITON_ENABLE_GPU:BOOL=${TRITON_ENABLE_GPU}
@@ -253,6 +258,7 @@ ExternalProject_Add(server
     -Daws-checksums_DIR:PATH=${TRITON_THIRD_PARTY_INSTALL_PREFIX}/aws-sdk-cpp/lib/aws-checksums/cmake
     -DCNMEM_PATH:PATH=${TRITON_THIRD_PARTY_INSTALL_PREFIX}/cnmem
     -DTRITON_COMMON_REPO_TAG:STRING=${TRITON_COMMON_REPO_TAG}
+    -DTRITON_REPOS_DIRECTORY:STRING=${TRITON_REPOS_DIRECTORY}
     -DTRITON_CORE_REPO_TAG:STRING=${TRITON_CORE_REPO_TAG}
     -DTRITON_BACKEND_REPO_TAG:STRING=${TRITON_BACKEND_REPO_TAG}
     -DTRITON_ONNXRUNTIME_INCLUDE_PATHS:PATH=${TRITON_ONNXRUNTIME_INCLUDE_PATHS}
