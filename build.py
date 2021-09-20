@@ -301,7 +301,7 @@ def repoagent_cmake_args(images, components, ra, install_dir):
 
     cargs = args + [
         '-DCMAKE_BUILD_TYPE={}'.format(FLAGS.build_type),
-        '-DCMAKE_REPOS_DIRECTORY={}'.format(FLAGS.repos_dir),
+        '-DTRITON_REPOS_DIRECTORY={}'.format(FLAGS.repos_dir),
         '-DCMAKE_INSTALL_PREFIX:PATH={}'.format(install_dir),
         '-DTRITON_COMMON_REPO_TAG:STRING={}'.format(components['common']),
         '-DTRITON_CORE_REPO_TAG:STRING={}'.format(components['core'])
@@ -352,7 +352,7 @@ def backend_cmake_args(images, components, be, install_dir, library_paths):
 
     cargs = args + [
         '-DCMAKE_BUILD_TYPE={}'.format(FLAGS.build_type),
-        '-DCMAKE_REPOS_DIRECTORY={}'.format(FLAGS.repos_dir),
+        '-DTRITON_REPOS_DIRECTORY={}'.format(FLAGS.repos_dir),
         '-DCMAKE_INSTALL_PREFIX:PATH={}'.format(install_dir),
         '-DTRITON_COMMON_REPO_TAG:STRING={}'.format(components['common']),
         '-DTRITON_CORE_REPO_TAG:STRING={}'.format(components['core']),
