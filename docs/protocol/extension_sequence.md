@@ -28,16 +28,18 @@
 
 # Sequence Extension
 
-This document describes Triton's sequence extension.  The sequence
+This document describes Triton's sequence extension. The sequence
 extension allows Triton to support stateful models that expect a
-sequence of related inference requests.  Because this extension is
-supported, Triton reports “sequence” in the extensions field of its
-Server Metadata.
+sequence of related inference requests.
 
 An inference request can specify that it is part of a sequence using
-the “sequence_id” parameter in the request and by using the 
+the “sequence_id” parameter in the request and by using the
 “sequence_start” and “sequence_end” parameters to indicate the start
 and end of sequences.
+
+Because this extension is supported, Triton reports either "sequence(uint64)" 
+or "sequence(string)" in the extensions field of its Server Metadata
+depending on the type of the supplied "sequence_id" parameter. 
 
 - "sequence_id" : a string or uint64 value that identifies the sequence to which
   a request belongs. All inference requests that belong to the same sequence
