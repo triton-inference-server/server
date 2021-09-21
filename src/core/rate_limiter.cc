@@ -169,26 +169,30 @@ RateLimiter::EnqueuePayload(
   {
     std::lock_guard<std::mutex> lk(payload_queue->mu_);
     payload->SetState(Payload::State::REQUESTED);
-    if (pinstance == nullptr) {
-      payload_queue->queue_->Enqueue(payload);
-    } else {
-      payload_queue->specific_queues_[pinstance]->Enqueue(payload);
-    }
     if (ignore_resources_and_priority_) {
-      // Directly schedule the payload to run
-      payload->SetState(Payload::State::SCHEDULED);
+      SchedulePayload(pinstance, payload_queue, payload);
     }
   }
   if (ignore_resources_and_priority_) {
-    // Directly wake up any one of the waiting threadto process the payload.
+    // Directly wake up any one of the waiting thread to process the payload.
     if (pinstance == nullptr) {
       payload_queue->cv_.notify_one();
     } else {
       payload_queue->cv_.notify_all();
     }
   } else {
-    // TODO: Implement the RateLimiting pipeline here that will schedule when
-    // an ExecuteThread gets to run.
+    StandardScheduleFunc sched_func = [this, payload_queue,
+                                       payload](ModelInstance* mi) {
+      this->SchedulePayload(mi->RawInstance(), payload_queue, payload);
+      auto cb = [mi]() { mi->Release(); };
+      payload->SetSecondaryCallback(cb);
+      if (mi->RawInstance() == nullptr) {
+        payload_queue->cv_.notify_one();
+      } else {
+        payload_queue->cv_.notify_all();
+      }
+    };
+    DeferPayloadSchedule(sched_func, model, payload->GetInstance());
   }
   return Status::Success;
 }
@@ -203,55 +207,50 @@ RateLimiter::DequeuePayload(
     LOG_INFO << "Should not print this ";
   }
   PayloadQueue* payload_queue = payload_queues_[instances[0]->Model()].get();
-  if (ignore_resources_and_priority_) {
-    std::vector<std::shared_ptr<Payload>> merged_payloads;
-    size_t instance_index;
-    {
-      std::unique_lock<std::mutex> lk(payload_queue->mu_);
-      payload_queue->cv_.wait(
-          lk, [&instances, &instance_index, payload_queue]() {
-            bool empty = payload_queue->queue_->Empty();
-            if (empty) {
-              instance_index = 0;
-              for (const auto instance : instances) {
-                empty = payload_queue->specific_queues_[instance]->Empty();
-                if (empty) {
-                  instance_index++;
-                } else {
-                  break;
-                }
-              }
-            }
-            return !empty;
-          });
-      if (instance_index < instances.size()) {
-        TritonModelInstance* instance = instances[instance_index];
-        if (!payload_queue->specific_queues_[instance]->Empty()) {
-          payload_queue->specific_queues_[instance]->Dequeue(
-              payload, &merged_payloads);
+  std::vector<std::shared_ptr<Payload>> merged_payloads;
+  size_t instance_index;
+  {
+    std::unique_lock<std::mutex> lk(payload_queue->mu_);
+    payload_queue->cv_.wait(lk, [&instances, &instance_index, payload_queue]() {
+      bool empty = payload_queue->queue_->Empty();
+      if (empty) {
+        instance_index = 0;
+        for (const auto instance : instances) {
+          empty = payload_queue->specific_queues_[instance]->Empty();
+          if (empty) {
+            instance_index++;
+          } else {
+            break;
+          }
         }
-      } else {
-        payload_queue->queue_->Dequeue(payload, &merged_payloads);
       }
-    }
-    for (auto& merge_payload : merged_payloads) {
-      PayloadRelease(merge_payload);
-    }
-    (*payload)->Callback();
-    if ((*payload)->GetInstance() == nullptr) {
-      (*payload)->SetInstance(instances.front());
-      instances.pop_front();
+      return !empty;
+    });
+    if (instance_index < instances.size()) {
+      TritonModelInstance* instance = instances[instance_index];
+      if (!payload_queue->specific_queues_[instance]->Empty()) {
+        payload_queue->specific_queues_[instance]->Dequeue(
+            payload, &merged_payloads);
+      }
     } else {
-      instances.erase(instances.begin() + instance_index);
+      payload_queue->queue_->Dequeue(payload, &merged_payloads);
     }
+  }
+  for (auto& merge_payload : merged_payloads) {
+    PayloadRelease(merge_payload);
+  }
+  (*payload)->Callback();
+  if ((*payload)->GetInstance() == nullptr) {
+    (*payload)->SetInstance(instances.front());
+    instances.pop_front();
   } else {
-    // TODO: Wait till RateLimiting pipeline notifies the thread
+    instances.erase(instances.begin() + instance_index);
   }
 }
 
 
 Status
-RateLimiter::RequestModelInstance(
+RateLimiter::DeferPayloadSchedule(
     const StandardScheduleFunc& OnSchedule, const TritonModel* model,
     TritonModelInstance* triton_model_instance)
 {
@@ -317,6 +316,7 @@ RateLimiter::GetPayload(
 void
 RateLimiter::PayloadRelease(std::shared_ptr<Payload>& payload)
 {
+  payload->SecondaryCallback();
   if (max_payload_bucket_count_ > 0) {
     std::lock_guard<std::mutex> lock(alloc_mu_);
 
@@ -340,6 +340,20 @@ RateLimiter::RateLimiter(
       max_payload_bucket_count_(MAX_PAYLOAD_BUCKET_COUNT)
 {
   ResourceManager::Create(resource_map, &resource_manager_);
+}
+
+void
+RateLimiter::SchedulePayload(
+    TritonModelInstance* tmi, PayloadQueue* payload_queue,
+    const std::shared_ptr<Payload>& payload)
+{
+  if (tmi == nullptr) {
+    payload_queue->queue_->Enqueue(payload);
+  } else {
+    payload_queue->specific_queues_[tmi]->Enqueue(payload);
+  }
+  // Directly schedule the payload to run
+  payload->SetState(Payload::State::SCHEDULED);
 }
 
 void

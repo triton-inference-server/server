@@ -280,12 +280,13 @@ TritonModelInstance::CreateInstance(
 
   if (!passive) {
     RETURN_IF_ERROR(local_instance->GenerateWarmupData());
+    RETURN_IF_ERROR(model->Server()->GetRateLimiter()->RegisterModelInstance(
+        local_instance.get(), rate_limiter_config));
     local_instance->SetBackendThread(
         kind, device_id, device_blocking, device_to_thread_map);
   }
 
-  RETURN_IF_ERROR(model->AddInstance(
-      std::move(local_instance), passive, rate_limiter_config));
+  RETURN_IF_ERROR(model->AddInstance(std::move(local_instance), passive));
 
   return Status::Success;
 }

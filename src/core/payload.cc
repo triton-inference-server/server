@@ -31,8 +31,8 @@ namespace nvidia { namespace inferenceserver {
 Payload::Payload()
     : op_type_(Operation::INFER_RUN),
       requests_(std::vector<std::unique_ptr<InferenceRequest>>()),
-      OnCallback_([]() {}), instance_(nullptr), state_(State::UNINITIALIZED),
-      queue_start_ns_(0)
+      OnCallback_([]() {}), OnSecondaryCallback_([]() {}), instance_(nullptr),
+      state_(State::UNINITIALIZED), queue_start_ns_(0)
 {
   exec_mu_.reset(new std::mutex());
 }
@@ -73,9 +73,9 @@ Payload::Reset(const Operation op_type, TritonModelInstance* instance)
   op_type_ = op_type;
   requests_.clear();
   OnCallback_ = []() {};
+  OnSecondaryCallback_ = []() {};
   instance_ = instance;
   state_ = State::UNINITIALIZED;
-  OnCallback_ = []() {};
   status_.reset(new std::promise<Status>());
   queue_start_ns_ = 0;
 }
@@ -86,9 +86,9 @@ Payload::Release()
   op_type_ = Operation::INFER_RUN;
   requests_.clear();
   OnCallback_ = []() {};
+  OnSecondaryCallback_ = []() {};
   instance_ = nullptr;
   state_ = State::RELEASED;
-  OnCallback_ = []() {};
   queue_start_ns_ = 0;
 }
 
@@ -130,6 +130,12 @@ Payload::SetInstance(TritonModelInstance* model_instance)
 }
 
 void
+Payload::SetSecondaryCallback(std::function<void()> OnSecondaryCallback)
+{
+  OnSecondaryCallback_ = OnSecondaryCallback;
+}
+
+void
 Payload::SetState(Payload::State state)
 {
   state_ = state;
@@ -145,6 +151,12 @@ void
 Payload::Callback()
 {
   OnCallback_();
+}
+
+void
+Payload::SecondaryCallback()
+{
+  OnSecondaryCallback_();
 }
 
 void

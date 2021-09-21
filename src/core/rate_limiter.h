@@ -44,6 +44,7 @@ namespace nvidia { namespace inferenceserver {
 class RateLimiter {
  private:
   class ModelContext;
+  class PayloadQueue;
 
  public:
   class ModelInstance;
@@ -103,26 +104,6 @@ class RateLimiter {
   void DequeuePayload(
       std::deque<TritonModelInstance*>& instance,
       std::shared_ptr<Payload>* payload);
-
-  /// Requests one of the available model instance. In future, when the
-  /// conditions are met, the callback will be invoked and a pointer to
-  /// allocated RateLimiter::ModelInstance object will be exposed as a
-  /// parameter. The user must ensure RateLimiter::ModelInstance::Release
-  /// gets called on the instance once the inference request is complete
-  /// so that the instance and its resources are returned to the available
-  /// pool. Also, note the callback should be a light-weight call and
-  /// must not itself invoke the inference execution but just be used
-  /// as a signal to proceed with the execution.
-  /// \param OnSchedule The callback function to be called when scheduling.
-  /// \param model The TritonModel object pointer to be used for running the
-  /// inference.
-  /// \param instance The TritonModelInstance object pointer to be used for
-  /// running the inference. The default value is nullptr which means that an
-  /// instance with highest priority will be selected for the execution.
-  /// \return Status object indicating success or failure.
-  Status RequestModelInstance(
-      const StandardScheduleFunc& OnSchedule, const TritonModel* model,
-      TritonModelInstance* instance = nullptr);
 
   /// Whether or not to ignore the resource configurations and priority settings
   /// for the rate limiter.
@@ -189,6 +170,28 @@ class RateLimiter {
       const bool ignore_resources_and_priority,
       const ResourceMap& resource_map);
 
+  /// Requests one of the available model instance. In future, when the
+  /// conditions are met, the callback will be invoked and a pointer to
+  /// allocated RateLimiter::ModelInstance object will be exposed as a
+  /// parameter. The user must ensure RateLimiter::ModelInstance::Release
+  /// gets called on the instance once the inference request is complete
+  /// so that the instance and its resources are returned to the available
+  /// pool. Also, note the callback should be a light-weight call and
+  /// must not itself invoke the inference execution but just be used
+  /// as a signal to proceed with the execution.
+  /// \param OnSchedule The callback function to be called when scheduling.
+  /// \param model The TritonModel object pointer to be used for running the
+  /// inference.
+  /// \param instance The TritonModelInstance object pointer to be used for
+  /// running the inference. The default value is nullptr which means that an
+  /// instance with highest priority will be selected for the execution.
+  /// \return Status object indicating success or failure.
+  Status DeferPayloadSchedule(
+      const StandardScheduleFunc& OnSchedule, const TritonModel* model,
+      TritonModelInstance* instance = nullptr);
+  void SchedulePayload(
+      TritonModelInstance* tmi, PayloadQueue* payload_queue,
+      const std::shared_ptr<Payload>& payload);
   void OnStage(ModelInstance* instance_ptr);
   void OnRelease(ModelInstance* instance_ptr);
   void AttemptAllocation();
