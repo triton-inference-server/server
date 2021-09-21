@@ -143,7 +143,6 @@ RateLimiter::EnqueuePayload(
     }
   }
   if (ignore_resources_and_priority_) {
-    // Directly wake up any one of the waiting thread to process the payload.
     if (pinstance == nullptr) {
       payload_queue->cv_.notify_one();
     } else {
@@ -337,13 +336,7 @@ RateLimiter::DeferPayloadSchedule(
   }
 
   itr->second.EnqueueModelInstanceRequest(OnSchedule, triton_model_instance);
-  if (ignore_resources_and_priority_) {
-    // Directly allocate an available model instance if not using rate
-    // limiter.
-    itr->second.AllocateInstanceIfAvailable();
-  } else {
-    itr->second.StageInstanceIfAvailable();
-  }
+  itr->second.StageInstanceIfAvailable();
 
   return Status::Success;
 }
@@ -358,7 +351,6 @@ RateLimiter::SchedulePayload(
   } else {
     payload_queue->specific_queues_[tmi]->Enqueue(payload);
   }
-  // Directly schedule the payload to run
   payload->SetState(Payload::State::SCHEDULED);
 }
 
@@ -377,17 +369,9 @@ RateLimiter::OnRelease(ModelInstanceContext* instance)
 {
   auto& model_context = model_contexts_[instance->RawInstance()->Model()];
   model_context.AddAvailableInstance(instance);
-  if (!ignore_resources_and_priority_) {
-    resource_manager_->ReleaseResources(instance);
-  }
+  resource_manager_->ReleaseResources(instance);
   if (model_context.ContainsPendingRequests(instance->RawInstance()->Index())) {
-    if (ignore_resources_and_priority_) {
-      // Directly allocate an available model instance if not using rate
-      // limiter.
-      model_context.AllocateInstanceIfAvailable();
-    } else {
-      model_context.StageInstanceIfAvailable();
-    }
+    model_context.StageInstanceIfAvailable();
   }
   AttemptAllocation();
 }
@@ -398,8 +382,7 @@ RateLimiter::AttemptAllocation()
   std::lock_guard<std::recursive_mutex> lk(staged_instances_mtx_);
   if (!staged_instances_.empty()) {
     ModelInstanceContext* instance = staged_instances_.top();
-    if (ignore_resources_and_priority_ ||
-        resource_manager_->AllocateResources(instance)) {
+    if (resource_manager_->AllocateResources(instance)) {
       staged_instances_.pop();
       instance->Allocate();
     }

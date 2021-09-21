@@ -258,8 +258,6 @@ TritonModelInstance::CreateInstance(
       model, name, index, kind, device_id, profile_names, passive, host_policy,
       host_policy_message, secondary_devices));
 
-  // model->Server()->GetRateLimiter()->InitializePayloadQueues(
-  //    local_instance.get());
   TRITONBACKEND_ModelInstance* triton_instance =
       reinterpret_cast<TRITONBACKEND_ModelInstance*>(local_instance.get());
 
