@@ -125,7 +125,7 @@ DIFFERENT_SHAPE_TESTS=${DIFFERENT_SHAPE_TESTS:="test_multi_batch_not_preferred_d
                                         test_multi_batch_different_shape_allow_ragged \
                                         test_multi_batch_different_shape"}
 
-# Test with preferred batch sizes but default max_queue_delay 
+# Test with preferred batch sizes but default max_queue_delay
 PREFERRED_BATCH_ONLY_TESTS=${PREFERRED_BATCH_ONLY_TESTS:="test_preferred_batch_only_aligned \
                                                     test_preferred_batch_only_unaligned \
                                                     test_preferred_batch_only_use_biggest_preferred \
@@ -224,11 +224,6 @@ for model_type in FIXED VARIABLE; do
             LEAKCHECK_LOG="./$i.$model_type.valgrind.log"
             LEAKCHECK_ARGS="$LEAKCHECK_ARGS_BASE --log-file=$LEAKCHECK_LOG"
             run_server_leakcheck
-        elif [[ "$(< /proc/sys/kernel/osrelease)" == *Microsoft ]]; then
-            # We rely on HTTP endpoint in run_server so until HTTP is
-            # implemented for win we do this hack...
-            run_server_nowait
-            sleep 60
         else
             run_server
         fi
@@ -282,11 +277,6 @@ for model_type in FIXED VARIABLE; do
             LEAKCHECK_LOG="./$i.$model_type.valgrind.log"
             LEAKCHECK_ARGS="$LEAKCHECK_ARGS_BASE --log-file=$LEAKCHECK_LOG"
             run_server_leakcheck
-        elif [[ "$(< /proc/sys/kernel/osrelease)" == *Microsoft ]]; then
-            # We rely on HTTP endpoint in run_server so until HTTP is
-            # implemented for win we do this hack...
-            run_server_nowait
-            sleep 60
         else
             run_server
         fi
@@ -337,11 +327,6 @@ for i in $DIFFERENT_SHAPE_TESTS ; do
         LEAKCHECK_LOG="./$i.VARIABLE.valgrind.log"
         LEAKCHECK_ARGS="$LEAKCHECK_ARGS_BASE --log-file=$LEAKCHECK_LOG"
         run_server_leakcheck
-    elif [[ "$(< /proc/sys/kernel/osrelease)" == *Microsoft ]]; then
-        # We rely on HTTP endpoint in run_server so until HTTP is
-        # implemented for win we do this hack...
-        run_server_nowait
-        sleep 60
     else
         run_server
     fi
@@ -395,11 +380,6 @@ for i in \
         LEAKCHECK_LOG="./$i.VARIABLE.valgrind.log"
         LEAKCHECK_ARGS="$LEAKCHECK_ARGS_BASE --log-file=$LEAKCHECK_LOG"
         run_server_leakcheck
-    elif [[ "$(< /proc/sys/kernel/osrelease)" == *Microsoft ]]; then
-        # We rely on HTTP endpoint in run_server so until HTTP is
-        # implemented for win we do this hack...
-        run_server_nowait
-        sleep 60
     else
         run_server
     fi
@@ -453,11 +433,6 @@ for i in $PREFERRED_BATCH_ONLY_TESTS ; do
         LEAKCHECK_LOG="./$i.PREFERRED_BATCH_ONLY.valgrind.log"
         LEAKCHECK_ARGS="$LEAKCHECK_ARGS_BASE --log-file=$LEAKCHECK_LOG"
         run_server_leakcheck
-    elif [[ "$(< /proc/sys/kernel/osrelease)" == *Microsoft ]]; then
-        # We rely on HTTP endpoint in run_server so until HTTP is
-        # implemented for win we do this hack...
-        run_server_nowait
-        sleep 60
     else
         run_server
     fi
@@ -538,11 +513,6 @@ if [[ "$(< /proc/sys/kernel/osrelease)" != *Microsoft ]]; then
         LEAKCHECK_LOG="./not_preserve.valgrind.log"
         LEAKCHECK_ARGS="$LEAKCHECK_ARGS_BASE --log-file=$LEAKCHECK_LOG"
         run_server_leakcheck
-    elif [[ "$(< /proc/sys/kernel/osrelease)" == *Microsoft ]]; then
-        # We rely on HTTP endpoint in run_server so until HTTP is
-        # implemented for win we do this hack...
-        run_server_nowait
-        sleep 60
     else
         run_server
     fi
@@ -598,11 +568,6 @@ if [[ "$(< /proc/sys/kernel/osrelease)" != *Microsoft ]]; then
         LEAKCHECK_LOG="./preserve.valgrind.log"
         LEAKCHECK_ARGS="$LEAKCHECK_ARGS_BASE --log-file=$LEAKCHECK_LOG"
         run_server_leakcheck
-    elif [[ "$(< /proc/sys/kernel/osrelease)" == *Microsoft ]]; then
-        # We rely on HTTP endpoint in run_server so until HTTP is
-        # implemented for win we do this hack...
-        run_server_nowait
-        sleep 60
     else
         run_server
     fi
