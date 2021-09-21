@@ -55,16 +55,18 @@ RateLimiter::RegisterModelInstance(
     const RateLimiterConfig& rate_limiter_config)
 {
   {
-    std::lock_guard<std::mutex> lk1(model_contexts_mtx_);
-    std::lock_guard<std::mutex> lk2(model_instances_mtx_);
+    std::lock_guard<std::mutex> lk1(model_ctx_mtx_);
+    std::lock_guard<std::mutex> lk2(model_instance_ctx_mtx_);
 
     auto& model_context = model_contexts_[triton_model_instance->Model()];
-    auto& model_instances = model_instances_[triton_model_instance->Model()];
+    auto& model_instances =
+        model_instance_ctxs_[triton_model_instance->Model()];
 
-    model_instances.push_back(std::shared_ptr<ModelInstance>(new ModelInstance(
-        triton_model_instance, &model_context, rate_limiter_config,
-        [this](ModelInstance* instance) { OnStage(instance); },
-        [this](ModelInstance* instance) { OnRelease(instance); })));
+    model_instances.push_back(
+        std::shared_ptr<ModelInstanceContext>(new ModelInstanceContext(
+            triton_model_instance, &model_context, rate_limiter_config,
+            [this](ModelInstanceContext* instance) { OnStage(instance); },
+            [this](ModelInstanceContext* instance) { OnRelease(instance); })));
     model_context.AddAvailableInstance(model_instances.back().get());
     model_context.AddSpecificRequestQueue();
 
@@ -74,6 +76,8 @@ RateLimiter::RegisterModelInstance(
     }
   }
 
+  InitializePayloadQueues(triton_model_instance);
+
   return Status::Success;
 }
 
@@ -81,20 +85,20 @@ Status
 RateLimiter::UnregisterModel(const TritonModel* model)
 {
   {
-    std::lock_guard<std::mutex> lk1(model_contexts_mtx_);
-    std::lock_guard<std::mutex> lk2(model_instances_mtx_);
+    std::lock_guard<std::mutex> lk1(model_ctx_mtx_);
+    std::lock_guard<std::mutex> lk2(model_instance_ctx_mtx_);
 
     auto& model_context = model_contexts_[model];
 
     model_context.RequestRemoval();
-    for (const auto& instance : model_instances_[model]) {
+    for (const auto& instance : model_instance_ctxs_[model]) {
       instance->WaitForRemoval();
       if (!ignore_resources_and_priority_) {
         resource_manager_->RemoveModelInstance(instance.get());
       }
     }
 
-    model_instances_.erase(model);
+    model_instance_ctxs_.erase(model);
     model_contexts_.erase(model);
   }
 
@@ -107,41 +111,6 @@ RateLimiter::UnregisterModel(const TritonModel* model)
   }
 
   return Status::Success;
-}
-
-void
-RateLimiter::InitializePayloadQueues(const TritonModelInstance* instance)
-{
-  auto& config = instance->Model()->Config();
-  uint64_t max_queue_delay_microseconds;
-  if (config.has_sequence_batching()) {
-    const auto& batcher_config = config.sequence_batching();
-    if (batcher_config.has_oldest()) {
-      max_queue_delay_microseconds =
-          batcher_config.oldest().max_queue_delay_microseconds();
-    } else {
-      max_queue_delay_microseconds = 0;
-    }
-  } else if (config.has_dynamic_batching()) {
-    max_queue_delay_microseconds =
-        config.dynamic_batching().max_queue_delay_microseconds();
-  } else {
-    max_queue_delay_microseconds = 0;
-  }
-  if (payload_queues_.find(instance->Model()) == payload_queues_.end()) {
-    payload_queues_.emplace(
-        instance->Model(),
-        new PayloadQueue(
-            config.max_batch_size(), max_queue_delay_microseconds * 1000));
-  }
-  PayloadQueue* payload_queue = payload_queues_[instance->Model()].get();
-  if (payload_queue->specific_queues_.find(instance) ==
-      payload_queue->specific_queues_.end()) {
-    payload_queue->specific_queues_.emplace(
-        instance,
-        new InstanceQueue(
-            config.max_batch_size(), max_queue_delay_microseconds * 1000));
-  }
 }
 
 bool
@@ -182,8 +151,11 @@ RateLimiter::EnqueuePayload(
     }
   } else {
     StandardScheduleFunc sched_func = [this, payload_queue,
-                                       payload](ModelInstance* mi) {
-      this->SchedulePayload(mi->RawInstance(), payload_queue, payload);
+                                       payload](ModelInstanceContext* mi) {
+      {
+        std::lock_guard<std::mutex> lk(payload_queue->mu_);
+        this->SchedulePayload(mi->RawInstance(), payload_queue, payload);
+      }
       auto cb = [mi]() { mi->Release(); };
       payload->SetSecondaryCallback(cb);
       if (mi->RawInstance() == nullptr) {
@@ -248,40 +220,6 @@ RateLimiter::DequeuePayload(
   }
 }
 
-
-Status
-RateLimiter::DeferPayloadSchedule(
-    const StandardScheduleFunc& OnSchedule, const TritonModel* model,
-    TritonModelInstance* triton_model_instance)
-{
-  std::lock_guard<std::mutex> lk(model_contexts_mtx_);
-
-  auto itr = model_contexts_.find(model);
-  if (itr == model_contexts_.end()) {
-    return Status(
-        Status::Code::INTERNAL,
-        "Requested model is not yet registered with rate limiter");
-  }
-
-  if (itr->second.isRemovalInProgress()) {
-    return Status(
-        Status::Code::INTERNAL,
-        "New model requests can not be made to a model that is being "
-        "removed");
-  }
-
-  itr->second.EnqueueModelInstanceRequest(OnSchedule, triton_model_instance);
-  if (ignore_resources_and_priority_) {
-    // Directly allocate an available model instance if not using rate
-    // limiter.
-    itr->second.AllocateInstanceIfAvailable();
-  } else {
-    itr->second.StageInstanceIfAvailable();
-  }
-
-  return Status::Success;
-}
-
 std::shared_ptr<Payload>
 RateLimiter::GetPayload(
     const Payload::Operation op_type, TritonModelInstance* instance)
@@ -343,6 +281,74 @@ RateLimiter::RateLimiter(
 }
 
 void
+RateLimiter::InitializePayloadQueues(const TritonModelInstance* instance)
+{
+  auto& config = instance->Model()->Config();
+  uint64_t max_queue_delay_microseconds;
+  if (config.has_sequence_batching()) {
+    const auto& batcher_config = config.sequence_batching();
+    if (batcher_config.has_oldest()) {
+      max_queue_delay_microseconds =
+          batcher_config.oldest().max_queue_delay_microseconds();
+    } else {
+      max_queue_delay_microseconds = 0;
+    }
+  } else if (config.has_dynamic_batching()) {
+    max_queue_delay_microseconds =
+        config.dynamic_batching().max_queue_delay_microseconds();
+  } else {
+    max_queue_delay_microseconds = 0;
+  }
+  if (payload_queues_.find(instance->Model()) == payload_queues_.end()) {
+    payload_queues_.emplace(
+        instance->Model(),
+        new PayloadQueue(
+            config.max_batch_size(), max_queue_delay_microseconds * 1000));
+  }
+  PayloadQueue* payload_queue = payload_queues_[instance->Model()].get();
+  if (payload_queue->specific_queues_.find(instance) ==
+      payload_queue->specific_queues_.end()) {
+    payload_queue->specific_queues_.emplace(
+        instance,
+        new InstanceQueue(
+            config.max_batch_size(), max_queue_delay_microseconds * 1000));
+  }
+}
+
+Status
+RateLimiter::DeferPayloadSchedule(
+    const StandardScheduleFunc& OnSchedule, const TritonModel* model,
+    TritonModelInstance* triton_model_instance)
+{
+  std::lock_guard<std::mutex> lk(model_ctx_mtx_);
+
+  auto itr = model_contexts_.find(model);
+  if (itr == model_contexts_.end()) {
+    return Status(
+        Status::Code::INTERNAL,
+        "Requested model is not yet registered with rate limiter");
+  }
+
+  if (itr->second.isRemovalInProgress()) {
+    return Status(
+        Status::Code::INTERNAL,
+        "New model requests can not be made to a model that is being "
+        "removed");
+  }
+
+  itr->second.EnqueueModelInstanceRequest(OnSchedule, triton_model_instance);
+  if (ignore_resources_and_priority_) {
+    // Directly allocate an available model instance if not using rate
+    // limiter.
+    itr->second.AllocateInstanceIfAvailable();
+  } else {
+    itr->second.StageInstanceIfAvailable();
+  }
+
+  return Status::Success;
+}
+
+void
 RateLimiter::SchedulePayload(
     TritonModelInstance* tmi, PayloadQueue* payload_queue,
     const std::shared_ptr<Payload>& payload)
@@ -357,7 +363,7 @@ RateLimiter::SchedulePayload(
 }
 
 void
-RateLimiter::OnStage(ModelInstance* instance)
+RateLimiter::OnStage(ModelInstanceContext* instance)
 {
   {
     std::lock_guard<std::recursive_mutex> lk(staged_instances_mtx_);
@@ -367,7 +373,7 @@ RateLimiter::OnStage(ModelInstance* instance)
 }
 
 void
-RateLimiter::OnRelease(ModelInstance* instance)
+RateLimiter::OnRelease(ModelInstanceContext* instance)
 {
   auto& model_context = model_contexts_[instance->RawInstance()->Model()];
   model_context.AddAvailableInstance(instance);
@@ -391,7 +397,7 @@ RateLimiter::AttemptAllocation()
 {
   std::lock_guard<std::recursive_mutex> lk(staged_instances_mtx_);
   if (!staged_instances_.empty()) {
-    ModelInstance* instance = staged_instances_.top();
+    ModelInstanceContext* instance = staged_instances_.top();
     if (ignore_resources_and_priority_ ||
         resource_manager_->AllocateResources(instance)) {
       staged_instances_.pop();
@@ -411,19 +417,20 @@ RateLimiter::ModelContext::EnqueueModelInstanceRequest(
     const StandardScheduleFunc& OnSchedule,
     TritonModelInstance* triton_model_instance)
 {
-  std::lock_guard<std::recursive_mutex> lk(request_queue_mtx_);
+  std::lock_guard<std::recursive_mutex> lk(sched_request_queue_mtx_);
 
   if (triton_model_instance == nullptr) {
-    generic_request_queue_.push(OnSchedule);
+    generic_sched_request_queue_.push(OnSchedule);
   } else if (
       (uint32_t)triton_model_instance->Index() <
-      specific_request_queues_.size()) {
-    specific_request_queues_[triton_model_instance->Index()].push(OnSchedule);
+      specific_sched_request_queues_.size()) {
+    specific_sched_request_queues_[triton_model_instance->Index()].push(
+        OnSchedule);
   } else {
     return Status(
         Status::Code::INTERNAL,
         "expected instance index between 0 and " +
-            std::to_string(specific_request_queues_.size()) + ", got " +
+            std::to_string(specific_sched_request_queues_.size()) + ", got " +
             std::to_string(triton_model_instance->Index()));
   }
 
@@ -431,7 +438,7 @@ RateLimiter::ModelContext::EnqueueModelInstanceRequest(
 }
 
 void
-RateLimiter::ModelContext::AddAvailableInstance(ModelInstance* instance)
+RateLimiter::ModelContext::AddAvailableInstance(ModelInstanceContext* instance)
 {
   std::lock_guard<std::recursive_mutex> lk(avbl_instances_mtx_);
   avbl_instances_.push(instance);
@@ -442,23 +449,25 @@ RateLimiter::ModelContext::AddAvailableInstance(ModelInstance* instance)
 void
 RateLimiter::ModelContext::StageInstanceIfAvailable()
 {
-  std::lock_guard<std::recursive_mutex> lk1(request_queue_mtx_);
+  std::lock_guard<std::recursive_mutex> lk1(sched_request_queue_mtx_);
   std::lock_guard<std::recursive_mutex> lk2(avbl_instances_mtx_);
   PriorityQueue backup_queue;
   while (!avbl_instances_.empty()) {
-    ModelInstance* instance = avbl_instances_.top();
-    if (!specific_request_queues_[instance->RawInstance()->Index()].empty()) {
+    ModelInstanceContext* instance = avbl_instances_.top();
+    if (!specific_sched_request_queues_[instance->RawInstance()->Index()]
+             .empty()) {
       // Prioritize the specific requests for the available model
       // instance highest priority.
       const StandardScheduleFunc func =
-          specific_request_queues_[instance->RawInstance()->Index()].front();
-      specific_request_queues_[instance->RawInstance()->Index()].pop();
+          specific_sched_request_queues_[instance->RawInstance()->Index()]
+              .front();
+      specific_sched_request_queues_[instance->RawInstance()->Index()].pop();
       instance->Stage(func);
-    } else if (!generic_request_queue_.empty()) {
+    } else if (!generic_sched_request_queue_.empty()) {
       // If request is for generic model instance then use the
       // instance with the highest priority.
-      const StandardScheduleFunc func = generic_request_queue_.front();
-      generic_request_queue_.pop();
+      const StandardScheduleFunc func = generic_sched_request_queue_.front();
+      generic_sched_request_queue_.pop();
       instance->Stage(func);
     } else {
       // If there are requests for a specific model instance then backup
@@ -478,23 +487,25 @@ RateLimiter::ModelContext::StageInstanceIfAvailable()
 void
 RateLimiter::ModelContext::AllocateInstanceIfAvailable()
 {
-  std::lock_guard<std::recursive_mutex> lk1(request_queue_mtx_);
+  std::lock_guard<std::recursive_mutex> lk1(sched_request_queue_mtx_);
   std::lock_guard<std::recursive_mutex> lk2(avbl_instances_mtx_);
   PriorityQueue backup_queue;
   while (!avbl_instances_.empty()) {
-    ModelInstance* instance = avbl_instances_.top();
-    if (!specific_request_queues_[instance->RawInstance()->Index()].empty()) {
+    ModelInstanceContext* instance = avbl_instances_.top();
+    if (!specific_sched_request_queues_[instance->RawInstance()->Index()]
+             .empty()) {
       // Prioritize the specific requests for the available model
       // instance highest priority.
       const StandardScheduleFunc func =
-          specific_request_queues_[instance->RawInstance()->Index()].front();
-      specific_request_queues_[instance->RawInstance()->Index()].pop();
+          specific_sched_request_queues_[instance->RawInstance()->Index()]
+              .front();
+      specific_sched_request_queues_[instance->RawInstance()->Index()].pop();
       instance->DirectAllocate(func);
-    } else if (!generic_request_queue_.empty()) {
+    } else if (!generic_sched_request_queue_.empty()) {
       // If request is for generic model instance then use the
       // instance with the highest priority.
-      const StandardScheduleFunc func = generic_request_queue_.front();
-      generic_request_queue_.pop();
+      const StandardScheduleFunc func = generic_sched_request_queue_.front();
+      generic_sched_request_queue_.pop();
       instance->DirectAllocate(func);
     } else {
       // If there are requests for a specific model instance then backup
@@ -514,16 +525,16 @@ RateLimiter::ModelContext::AllocateInstanceIfAvailable()
 void
 RateLimiter::ModelContext::AddSpecificRequestQueue()
 {
-  std::lock_guard<std::recursive_mutex> lk(request_queue_mtx_);
-  specific_request_queues_.emplace_back();
+  std::lock_guard<std::recursive_mutex> lk(sched_request_queue_mtx_);
+  specific_sched_request_queues_.emplace_back();
 }
 
 bool
 RateLimiter::ModelContext::ContainsPendingRequests(int index)
 {
-  std::lock_guard<std::recursive_mutex> lk(request_queue_mtx_);
-  return (generic_request_queue_.size() != 0) ||
-         (specific_request_queues_[index].size() != 0);
+  std::lock_guard<std::recursive_mutex> lk(sched_request_queue_mtx_);
+  return (generic_sched_request_queue_.size() != 0) ||
+         (specific_sched_request_queues_[index].size() != 0);
 }
 
 void
@@ -534,10 +545,10 @@ RateLimiter::ModelContext::RequestRemoval()
 
 
 //=========================================================================
-//  ModelInstance Implementation
+//  ModelInstanceContext Implementation
 //=========================================================================
 
-RateLimiter::ModelInstance::ModelInstance(
+RateLimiter::ModelInstanceContext::ModelInstanceContext(
     TritonModelInstance* triton_model_instance,
     RateLimiter::ModelContext* model_context,
     const RateLimiter::RateLimiterConfig& rate_limiter_config,
@@ -551,14 +562,14 @@ RateLimiter::ModelInstance::ModelInstance(
 }
 
 void
-RateLimiter::ModelInstance::MarkAvailable()
+RateLimiter::ModelInstanceContext::MarkAvailable()
 {
   std::lock_guard<std::mutex> lk(state_mtx_);
   state_ = AVAILABLE;
 }
 
 Status
-RateLimiter::ModelInstance::Stage(StandardScheduleFunc OnSchedule)
+RateLimiter::ModelInstanceContext::Stage(StandardScheduleFunc OnSchedule)
 {
   {
     std::lock_guard<std::mutex> lk(state_mtx_);
@@ -579,7 +590,7 @@ RateLimiter::ModelInstance::Stage(StandardScheduleFunc OnSchedule)
 }
 
 Status
-RateLimiter::ModelInstance::Allocate()
+RateLimiter::ModelInstanceContext::Allocate()
 {
   {
     std::lock_guard<std::mutex> lk(state_mtx_);
@@ -599,7 +610,8 @@ RateLimiter::ModelInstance::Allocate()
 }
 
 Status
-RateLimiter::ModelInstance::DirectAllocate(StandardScheduleFunc OnSchedule)
+RateLimiter::ModelInstanceContext::DirectAllocate(
+    StandardScheduleFunc OnSchedule)
 {
   {
     std::lock_guard<std::mutex> lk(state_mtx_);
@@ -619,7 +631,7 @@ RateLimiter::ModelInstance::DirectAllocate(StandardScheduleFunc OnSchedule)
 }
 
 void
-RateLimiter::ModelInstance::Release()
+RateLimiter::ModelInstanceContext::Release()
 {
   if (executed_) {
     exec_count_++;
@@ -642,7 +654,7 @@ RateLimiter::ModelInstance::Release()
 }
 
 void
-RateLimiter::ModelInstance::RequestRemoval()
+RateLimiter::ModelInstanceContext::RequestRemoval()
 {
   std::lock_guard<std::mutex> lk(state_mtx_);
 
@@ -653,7 +665,7 @@ RateLimiter::ModelInstance::RequestRemoval()
 }
 
 void
-RateLimiter::ModelInstance::WaitForRemoval()
+RateLimiter::ModelInstanceContext::WaitForRemoval()
 {
   if (!model_context_->isRemovalInProgress()) {
     model_context_->RequestRemoval();
@@ -669,7 +681,7 @@ RateLimiter::ModelInstance::WaitForRemoval()
 }
 
 double
-RateLimiter::ModelInstance::ScaledPriority()
+RateLimiter::ModelInstanceContext::ScaledPriority()
 {
   // TODO: Different schemes for the prioritization of
   // model instance can be added here.
@@ -694,7 +706,7 @@ RateLimiter::ResourceManager::Create(
 
 void
 RateLimiter::ResourceManager::AddModelInstance(
-    const RateLimiter::ModelInstance* instance)
+    const ModelInstanceContext* instance)
 {
   std::lock_guard<std::mutex> lk(model_resources_mtx_);
   auto pr = model_resources_.emplace(std::make_pair(instance, ResourceMap()));
@@ -711,7 +723,7 @@ RateLimiter::ResourceManager::AddModelInstance(
 
 Status
 RateLimiter::ResourceManager::RemoveModelInstance(
-    const RateLimiter::ModelInstance* instance)
+    const ModelInstanceContext* instance)
 {
   std::lock_guard<std::mutex> lk(model_resources_mtx_);
   const auto& itr = model_resources_.find(instance);
@@ -859,7 +871,7 @@ RateLimiter::ResourceManager::ParseAndValidateExplicitResources()
 
 bool
 RateLimiter::ResourceManager::AllocateResources(
-    const RateLimiter::ModelInstance* instance)
+    const ModelInstanceContext* instance)
 {
   std::lock_guard<std::mutex> lk1(model_resources_mtx_);
   std::lock_guard<std::mutex> lk2(allocated_resources_mtx_);
@@ -905,7 +917,7 @@ RateLimiter::ResourceManager::AllocateResources(
 
 Status
 RateLimiter::ResourceManager::ReleaseResources(
-    const RateLimiter::ModelInstance* instance)
+    const ModelInstanceContext* instance)
 {
   std::lock_guard<std::mutex> lk1(model_resources_mtx_);
   std::lock_guard<std::mutex> lk2(allocated_resources_mtx_);
