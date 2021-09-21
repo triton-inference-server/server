@@ -37,9 +37,10 @@ the “sequence_id” parameter in the request and by using the
 “sequence_start” and “sequence_end” parameters to indicate the start
 and end of sequences.
 
-Because this extension is supported, Triton reports either "sequence(uint64)" 
-or "sequence(string)" in the extensions field of its Server Metadata
-depending on the type of the supplied "sequence_id" parameter. 
+Because this extension is supported, Triton reports either "sequence"
+or "sequence(string_id)" in the extensions field of its Server Metadata
+depending on whether the type of the supplied "sequence_id" parameter is
+64-bit unsigned integer or string, respectively.
 
 - "sequence_id" : a string or uint64 value that identifies the sequence to which
   a request belongs. All inference requests that belong to the same sequence
