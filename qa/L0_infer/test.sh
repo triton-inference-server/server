@@ -263,11 +263,6 @@ for TARGET in cpu gpu; do
         LEAKCHECK_LOG=$LEAKCHECK_LOG_BASE.${TARGET}.log
         LEAKCHECK_ARGS="$LEAKCHECK_ARGS_BASE --log-file=$LEAKCHECK_LOG"
         run_server_leakcheck
-    elif [[ "$(< /proc/sys/kernel/osrelease)" == *Microsoft ]]; then
-        # We rely on HTTP endpoint in run_server so until HTTP is
-        # implemented for win we do this hack...
-        run_server_nowait
-        sleep ${SERVER_TIMEOUT}
     else
         run_server
     fi
