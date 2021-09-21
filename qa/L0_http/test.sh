@@ -39,28 +39,66 @@ export CUDA_VISIBLE_DEVICES=0
 
 RET=0
 
-SIMPLE_HEALTH_CLIENT_PY=../clients/simple_http_health_metadata.py
-SIMPLE_INFER_CLIENT_PY=../clients/simple_http_infer_client.py
-SIMPLE_ASYNC_INFER_CLIENT_PY=../clients/simple_http_async_infer_client.py
-SIMPLE_STRING_INFER_CLIENT_PY=../clients/simple_http_string_infer_client.py
-SIMPLE_IMAGE_CLIENT_PY=../clients/image_client.py
-# SIMPLE_ENSEMBLE_IMAGE_CLIENT_PY=../clients/ensemble_image_client.py
-SIMPLE_SHM_STRING_CLIENT_PY=../clients/simple_http_shm_string_client.py
-SIMPLE_SHM_CLIENT_PY=../clients/simple_http_shm_client.py
-SIMPLE_CUDASHM_CLIENT_PY=../clients/simple_http_cudashm_client.py
-SIMPLE_MODEL_CONTROL_PY=../clients/simple_http_model_control.py
-SIMPLE_SEQUENCE_INFER_CLIENT_PY=../clients/simple_http_sequence_sync_infer_client.py
-SIMPLE_REUSE_INFER_OBJECTS_CLIENT_PY=../clients/reuse_infer_objects_client.py
+# On windows the paths invoked by the script (running in WSL) must use
+# /mnt/c when needed but the paths on the tritonserver command-line
+# must be C:/ style.
+if [[ "$(< /proc/sys/kernel/osrelease)" == *Microsoft ]]; then
+    SDKDIR=${SDKDIR:=C:/sdk}
+    MODELDIR=${MODELDIR:=C:/models}
+    BACKEND_DIR=${BACKEND_DIR:=C:/tritonserver/backends}
+    SERVER=${SERVER:=/mnt/c/tritonserver/bin/tritonserver.exe}
 
-SIMPLE_HEALTH_CLIENT=../clients/simple_http_health_metadata
-SIMPLE_INFER_CLIENT=../clients/simple_http_infer_client
-SIMPLE_STRING_INFER_CLIENT=../clients/simple_http_string_infer_client
-SIMPLE_ASYNC_INFER_CLIENT=../clients/simple_http_async_infer_client
-SIMPLE_MODEL_CONTROL=../clients/simple_http_model_control
-SIMPLE_SEQUENCE_INFER_CLIENT=../clients/simple_http_sequence_sync_infer_client
-SIMPLE_SHM_CLIENT=../clients/simple_http_shm_client
-SIMPLE_CUDASHM_CLIENT=../clients/simple_http_cudashm_client
-SIMPLE_REUSE_INFER_OBJECTS_CLIENT=../clients/reuse_infer_objects_client
+    SIMPLE_HEALTH_CLIENT_PY=${SDKDIR}/python/simple_http_health_metadata.py
+    SIMPLE_INFER_CLIENT_PY=${SDKDIR}/python/simple_http_infer_client.py
+    SIMPLE_ASYNC_INFER_CLIENT_PY=${SDKDIR}/python/simple_http_async_infer_client.py
+    SIMPLE_STRING_INFER_CLIENT_PY=${SDKDIR}/python/simple_http_string_infer_client.py
+    SIMPLE_IMAGE_CLIENT_PY=${SDKDIR}/python/image_client.py
+    # SIMPLE_ENSEMBLE_IMAGE_CLIENT_PY=${SDKDIR}/python/ensemble_image_client.py
+    SIMPLE_SHM_STRING_CLIENT_PY=${SDKDIR}/python/simple_http_shm_string_client.py
+    SIMPLE_SHM_CLIENT_PY=${SDKDIR}/python/simple_http_shm_client.py
+    SIMPLE_CUDASHM_CLIENT_PY=${SDKDIR}/python/simple_http_cudashm_client.py
+    SIMPLE_MODEL_CONTROL_PY=${SDKDIR}/python/simple_http_model_control.py
+    SIMPLE_SEQUENCE_INFER_CLIENT_PY=${SDKDIR}/python/simple_http_sequence_sync_infer_client.py
+    SIMPLE_REUSE_INFER_OBJECTS_CLIENT_PY=${SDKDIR}/python/reuse_infer_objects_client.py
+
+    SIMPLE_HEALTH_CLIENT=${SDKDIR}/python/simple_http_health_metadata
+    SIMPLE_INFER_CLIENT=${SDKDIR}/python/simple_http_infer_client
+    SIMPLE_STRING_INFER_CLIENT=${SDKDIR}/python/simple_http_string_infer_client
+    SIMPLE_ASYNC_INFER_CLIENT=${SDKDIR}/python/simple_http_async_infer_client
+    SIMPLE_MODEL_CONTROL=${SDKDIR}/python/simple_http_model_control
+    SIMPLE_SEQUENCE_INFER_CLIENT=${SDKDIR}/python/simple_http_sequence_sync_infer_client
+    SIMPLE_SHM_CLIENT=${SDKDIR}/python/simple_http_shm_client
+    SIMPLE_CUDASHM_CLIENT=${SDKDIR}/python/simple_http_cudashm_client
+    SIMPLE_REUSE_INFER_OBJECTS_CLIENT=${SDKDIR}/python/reuse_infer_objects_client
+else
+    MODELDIR=${MODELDIR:=`pwd`/models}
+    TRITON_DIR=${TRITON_DIR:="/opt/tritonserver"}
+    SERVER=${TRITON_DIR}/bin/tritonserver
+    BACKEND_DIR=${TRITON_DIR}/backends
+
+    SIMPLE_HEALTH_CLIENT_PY=../clients/simple_http_health_metadata.py
+    SIMPLE_INFER_CLIENT_PY=../clients/simple_http_infer_client.py
+    SIMPLE_ASYNC_INFER_CLIENT_PY=../clients/simple_http_async_infer_client.py
+    SIMPLE_STRING_INFER_CLIENT_PY=../clients/simple_http_string_infer_client.py
+    SIMPLE_IMAGE_CLIENT_PY=../clients/image_client.py
+    # SIMPLE_ENSEMBLE_IMAGE_CLIENT_PY=../clients/ensemble_image_client.py
+    SIMPLE_SHM_STRING_CLIENT_PY=../clients/simple_http_shm_string_client.py
+    SIMPLE_SHM_CLIENT_PY=../clients/simple_http_shm_client.py
+    SIMPLE_CUDASHM_CLIENT_PY=../clients/simple_http_cudashm_client.py
+    SIMPLE_MODEL_CONTROL_PY=../clients/simple_http_model_control.py
+    SIMPLE_SEQUENCE_INFER_CLIENT_PY=../clients/simple_http_sequence_sync_infer_client.py
+    SIMPLE_REUSE_INFER_OBJECTS_CLIENT_PY=../clients/reuse_infer_objects_client.py
+
+    SIMPLE_HEALTH_CLIENT=../clients/simple_http_health_metadata
+    SIMPLE_INFER_CLIENT=../clients/simple_http_infer_client
+    SIMPLE_STRING_INFER_CLIENT=../clients/simple_http_string_infer_client
+    SIMPLE_ASYNC_INFER_CLIENT=../clients/simple_http_async_infer_client
+    SIMPLE_MODEL_CONTROL=../clients/simple_http_model_control
+    SIMPLE_SEQUENCE_INFER_CLIENT=../clients/simple_http_sequence_sync_infer_client
+    SIMPLE_SHM_CLIENT=../clients/simple_http_shm_client
+    SIMPLE_CUDASHM_CLIENT=../clients/simple_http_cudashm_client
+    SIMPLE_REUSE_INFER_OBJECTS_CLIENT=../clients/reuse_infer_objects_client
+fi
 
 rm -f *.log
 rm -f *.log.*
@@ -68,9 +106,7 @@ rm -f *.log.*
 set -e
 
 CLIENT_LOG=`pwd`/client.log
-DATADIR=`pwd`/models
-SERVER=/opt/tritonserver/bin/tritonserver
-SERVER_ARGS="--model-repository=$DATADIR"
+SERVER_ARGS="--backend-directory=${BACKEND_DIR} --model-repository=${MODELDIR}"
 source ../common/util.sh
 
 run_server
@@ -195,7 +231,7 @@ set -e
 kill $SERVER_PID
 wait $SERVER_PID
 
-SERVER_ARGS="--model-repository=$DATADIR --model-control-mode=explicit"
+SERVER_ARGS="--backend-directory=${BACKEND_DIR} --model-repository=${MODELDIR} --model-control-mode=explicit"
 run_server
 if [ "$SERVER_PID" == "0" ]; then
     echo -e "\n***\n*** Failed to start $SERVER\n***"
@@ -222,7 +258,7 @@ set -e
 kill $SERVER_PID
 wait $SERVER_PID
 
-SERVER_ARGS="--model-repository=$DATADIR --model-control-mode=explicit"
+SERVER_ARGS="--backend-directory=${BACKEND_DIR} --model-repository=${MODELDIR} --model-control-mode=explicit"
 run_server
 if [ "$SERVER_PID" == "0" ]; then
     echo -e "\n***\n*** Failed to start $SERVER\n***"
