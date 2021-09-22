@@ -253,11 +253,9 @@ def core_cmake_args(components, backends, install_dir):
         cmake_enable(FLAGS.enable_gpu)))
     cargs.append('-DTRITON_MIN_COMPUTE_CAPABILITY={}'.format(
         FLAGS.min_compute_capability))
-
-    # If building the ArmNN TFLite backend set enable MALI GPU
-    if 'armnn_tflite' in backends:
-        cargs.append('-DTRITON_ENABLE_MALI_GPU:BOOL={}'.format(
-            cmake_enable(FLAGS.enable_mali_gpu)))
+    
+    cargs.append('-DTRITON_ENABLE_MALI_GPU:BOOL={}'.format(
+        cmake_enable(FLAGS.enable_mali_gpu)))
 
     cargs.append('-DTRITON_ENABLE_GRPC:BOOL={}'.format(
         cmake_enable('grpc' in FLAGS.endpoint)))
