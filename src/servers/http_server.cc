@@ -2152,10 +2152,10 @@ HTTPAPIServer::HandleInfer(
       // manager.
       trace_manager_->CaptureTimestamp(
           trace_id, TRITONSERVER_TRACE_LEVEL_MIN, "HTTP_RECV_START",
-          TIMESPEC_TO_NANOS(req->recv_start_ts));
+          req->recv_start_ns);
       trace_manager_->CaptureTimestamp(
           trace_id, TRITONSERVER_TRACE_LEVEL_MIN, "HTTP_RECV_END",
-          TIMESPEC_TO_NANOS(req->recv_end_ts));
+          req->recv_end_ns);
     }
   }
 #endif  // TRITON_ENABLE_TRACING
@@ -2295,10 +2295,10 @@ HTTPAPIServer::OKReplyCallback(evthr_t* thr, void* arg, void* shared)
       (infer_request->trace_id_ != 0)) {
     infer_request->trace_manager_->CaptureTimestamp(
         infer_request->trace_id_, TRITONSERVER_TRACE_LEVEL_MIN,
-        "HTTP_SEND_START", TIMESPEC_TO_NANOS(request->send_start_ts));
+        "HTTP_SEND_START", request->send_start_ns);
     infer_request->trace_manager_->CaptureTimestamp(
         infer_request->trace_id_, TRITONSERVER_TRACE_LEVEL_MIN, "HTTP_SEND_END",
-        TIMESPEC_TO_NANOS(request->send_end_ts));
+        request->send_end_ns);
   }
 #endif  // TRITON_ENABLE_TRACING
 
@@ -2320,10 +2320,10 @@ HTTPAPIServer::BADReplyCallback(evthr_t* thr, void* arg, void* shared)
       (infer_request->trace_id_ != 0)) {
     infer_request->trace_manager_->CaptureTimestamp(
         infer_request->trace_id_, TRITONSERVER_TRACE_LEVEL_MIN,
-        "HTTP_SEND_START", TIMESPEC_TO_NANOS(request->send_start_ts));
+        "HTTP_SEND_START", request->send_start_ns);
     infer_request->trace_manager_->CaptureTimestamp(
         infer_request->trace_id_, TRITONSERVER_TRACE_LEVEL_MIN, "HTTP_SEND_END",
-        TIMESPEC_TO_NANOS(request->send_end_ts));
+        request->send_end_ns);
   }
 #endif  // TRITON_ENABLE_TRACING
 
