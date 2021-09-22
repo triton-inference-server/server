@@ -68,19 +68,23 @@ if [ "$SERVER_PID" == "0" ]; then
 fi
 
 set +e
-python3 lifecycle_test.py > $CLIENT_LOG 2>&1 
 
-if [ $? -ne 0 ]; then
-    echo -e "\n***\n*** lifecycle_test.py FAILED. \n***"
-    RET=1
-else
-    check_test_results $TEST_RESULT_FILE $EXPECTED_NUM_TESTS
+# Run this multiple times to catch any intermittent segfault.
+for i in {0..4}; do
+    python3 lifecycle_test.py > $CLIENT_LOG 2>&1 
     if [ $? -ne 0 ]; then
-        cat $CLIENT_LOG
-        echo -e "\n***\n*** Test Result Verification Failed\n***"
+        echo -e "\n***\n*** lifecycle_test.py FAILED. \n***"
         RET=1
+    else
+        check_test_results $TEST_RESULT_FILE $EXPECTED_NUM_TESTS
+        if [ $? -ne 0 ]; then
+            cat $CLIENT_LOG
+            echo -e "\n***\n*** Test Result Verification Failed\n***"
+            RET=1
+        fi
     fi
-fi
+done
+
 set -e
 
 kill $SERVER_PID
