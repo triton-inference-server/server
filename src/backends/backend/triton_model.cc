@@ -186,16 +186,12 @@ TritonModel::Create(
 
 Status
 TritonModel::AddInstance(
-    std::unique_ptr<TritonModelInstance>&& instance, const bool passive,
-    const inference::ModelRateLimiter& rate_limiter_config)
+    std::unique_ptr<TritonModelInstance>&& instance, const bool passive)
 {
   if (passive) {
     passive_instances_.emplace_back(std::move(instance));
   } else {
-    TritonModelInstance* raw_instance = instance.get();
     instances_.emplace_back(std::move(instance));
-    RETURN_IF_ERROR(server_->GetRateLimiter()->RegisterModelInstance(
-        raw_instance, rate_limiter_config));
   }
 
   return Status::Success;
