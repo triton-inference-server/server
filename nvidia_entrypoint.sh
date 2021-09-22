@@ -69,6 +69,7 @@ else
   fi
 fi
 
+# avx instructions are only available on x86, so don't check for aarch64
 if ! cat /proc/cpuinfo | grep flags | sort -u | grep avx >& /dev/null && [[ "aarch64" != $(uname -m) ]] ; then
   echo
   echo "ERROR: This container was built for CPUs supporting at least the AVX instruction set, but"
