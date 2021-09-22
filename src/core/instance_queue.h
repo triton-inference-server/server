@@ -40,7 +40,7 @@ class InstanceQueue {
 
   size_t Size();
   bool Empty();
-  void Enqueue(std::shared_ptr<Payload>& payload);
+  void Enqueue(const std::shared_ptr<Payload>& payload);
   void Dequeue(
       std::shared_ptr<Payload>* payload,
       std::vector<std::shared_ptr<Payload>>* merged_payloads);
