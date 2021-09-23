@@ -151,7 +151,7 @@ RUN if [ "$TRITON_ENABLE_GPU" = "ON" ]; then \
     fi
 
 # Install Model Analyzer
-RUN pip3 install workspace/repos/model_analyzer
+RUN pip3 install /workspace/repos/model_analyzer
 
 ENV PATH /workspace/install/bin:${PATH}
 ENV LD_LIBRARY_PATH /workspace/install/lib:${LD_LIBRARY_PATH}

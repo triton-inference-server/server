@@ -1427,7 +1427,8 @@ if __name__ == '__main__':
         repo_install_dir = os.path.join(FLAGS.build_dir, be, 'install')
 
         mkdir(FLAGS.build_dir)
-        gitclone(FLAGS.build_dir, backend_repo(be), backends[be], be)
+        cpdir(os.path.join(FLAGS.repos_dir, backend_repo(be)), os.path.join(FLAGS.build_dir, be))
+        # gitclone(FLAGS.build_dir, backend_repo(be), backends[be], be)
         mkdir(repo_build_dir)
         cmake(
             repo_build_dir,
@@ -1447,7 +1448,8 @@ if __name__ == '__main__':
         repo_install_dir = os.path.join(FLAGS.build_dir, ra, 'install')
 
         mkdir(FLAGS.build_dir)
-        gitclone(FLAGS.build_dir, repoagent_repo(ra), repoagents[ra], ra)
+        cpdir(os.path.join(FLAGS.repos_dir, repoagent_repo(ra)), os.path.join(FLAGS.build_dir, ra))
+        # gitclone(FLAGS.build_dir, repoagent_repo(ra), repoagents[ra], ra)
         mkdir(repo_build_dir)
         cmake(repo_build_dir,
               repoagent_cmake_args(images, components, ra, repo_install_dir))
