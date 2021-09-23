@@ -267,7 +267,8 @@ enum OptionId {
   OPTION_REPOAGENT_DIR,
   OPTION_BUFFER_MANAGER_THREAD_COUNT,
   OPTION_BACKEND_CONFIG,
-  OPTION_HOST_POLICY
+  OPTION_HOST_POLICY,
+  OPTION_RESPONSE_CACHE_BYTE_SIZE
 };
 
 struct Option {
@@ -518,13 +519,21 @@ std::vector<Option> options_
        "Specify a backend-specific configuration setting. The format of this "
        "flag is --backend-config=<backend_name>,<setting>=<value>. Where "
        "<backend_name> is the name of the backend, such as 'tensorrt'."},
+      {OPTION_HOST_POLICY, "host-policy", "<string>,<string>=<string>",
+       "Specify a host policy setting associated with a policy name. The "
+       "format of this flag is --host-policy=<policy_name>,<setting>=<value>."
+       "Currently supported settings are 'numa-node', 'cpu-cores'. Note that "
+       "'numa-node' setting will affect pinned memory pool behavior, see "
+       "--pinned-memory-pool for more detail."},
   {
-    OPTION_HOST_POLICY, "host-policy", "<string>,<string>=<string>",
-        "Specify a host policy setting associated with a policy name. The "
-        "format of this flag is --host-policy=<policy_name>,<setting>=<value>."
-        "Currently supported settings are 'numa-node', 'cpu-cores'. Note that "
-        "'numa-node' setting will affect pinned memory pool behavior, see "
-        "--pinned-memory-pool for more detail."
+    OPTION_RESPONSE_CACHE_BYTE_SIZE, "response-cache-byte-size", Option::ArgInt,
+        "The size in bytes to allocate for a request/response cache. When "
+        "non-zero, Triton allocates the requested size in CPU memory and "
+        "shares the cache across all inference requests and across all models. "
+        "For a given model to use request caching, the model must enable "
+        "request caching in the model configuration. By default, no model uses "
+        "request caching even if the request cache is enabled with the "
+        "--response-cache-byte-size flag. Default is 0."
   }
 };
 
@@ -1162,6 +1171,7 @@ Parse(TRITONSERVER_ServerOptions** server_options, int argc, char** argv)
   int32_t repository_poll_secs = repository_poll_secs_;
   int64_t pinned_memory_pool_byte_size = 1 << 28;
   int32_t buffer_manager_thread_count = 0;
+  uint64_t response_cache_byte_size = 0;
 
   std::string backend_dir = "/opt/tritonserver/backends";
   std::string repoagent_dir = "/opt/tritonserver/repoagents";
@@ -1478,6 +1488,9 @@ Parse(TRITONSERVER_ServerOptions** server_options, int argc, char** argv)
       case OPTION_HOST_POLICY:
         host_policies.push_back(ParseHostPolicyOption(optarg));
         break;
+      case OPTION_RESPONSE_CACHE_BYTE_SIZE:
+        response_cache_byte_size = (uint64_t)ParseLongLongOption(optarg);
+        break;
     }
   }
 
@@ -1651,6 +1664,12 @@ Parse(TRITONSERVER_ServerOptions** server_options, int argc, char** argv)
             std::get<2>(hp).c_str()),
         "setting host policy");
   }
+
+  FAIL_IF_ERR(
+      TRITONSERVER_ServerOptionsSetResponseCacheByteSize(
+          loptions, response_cache_byte_size),
+      "setting total response cache byte size");
+
 
   return true;
 }

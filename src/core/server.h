@@ -38,6 +38,7 @@
 #include "src/core/model_repository_manager.h"
 #include "src/core/persistent_backend_manager.h"
 #include "src/core/rate_limiter.h"
+#include "src/core/response_cache.h"
 #include "src/core/status.h"
 
 namespace nvidia { namespace inferenceserver {
@@ -297,6 +298,7 @@ class InferenceServer {
   std::shared_ptr<RateLimiter> rate_limiter_;
   std::unique_ptr<ModelRepositoryManager> model_repository_manager_;
   std::shared_ptr<PersistentBackendManager> persist_backend_manager_;
+  std::shared_ptr<RequestResponseCache> response_cache_;
 };
 
 }}  // namespace nvidia::inferenceserver
