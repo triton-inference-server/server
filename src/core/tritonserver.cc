@@ -223,6 +223,8 @@ class TritonServerOptions {
   uint64_t PinnedMemoryPoolByteSize() const { return pinned_memory_pool_size_; }
   void SetPinnedMemoryPoolByteSize(uint64_t s) { pinned_memory_pool_size_ = s; }
 
+  uint64_t ResponseCacheByteSize() const { return response_cache_byte_size_; }
+  void SetResponseCacheByteSize(uint64_t s) { response_cache_byte_size_ = s; }
 
   const std::map<int, uint64_t>& CudaMemoryPoolByteSize() const
   {
@@ -313,6 +315,7 @@ class TritonServerOptions {
   uint64_t metrics_interval_;
   unsigned int exit_timeout_;
   uint64_t pinned_memory_pool_size_;
+  uint64_t response_cache_byte_size_;
   unsigned int buffer_manager_thread_count_;
   std::map<int, uint64_t> cuda_memory_pool_size_;
   double min_compute_capability_;
@@ -331,7 +334,8 @@ TritonServerOptions::TritonServerOptions()
       exit_on_error_(true), strict_model_config_(true), strict_readiness_(true),
       rate_limit_mode_(ni::RateLimitMode::RL_OFF), metrics_(true),
       gpu_metrics_(true), metrics_interval_(2000), exit_timeout_(30),
-      pinned_memory_pool_size_(1 << 28), buffer_manager_thread_count_(0),
+      pinned_memory_pool_size_(1 << 28), response_cache_byte_size_(0),
+      buffer_manager_thread_count_(0),
 #ifdef TRITON_ENABLE_GPU
       min_compute_capability_(TRITON_MIN_COMPUTE_CAPABILITY),
 #else
@@ -1262,6 +1266,16 @@ TRITONSERVER_ServerOptionsSetHostPolicy(
   TritonServerOptions* loptions =
       reinterpret_cast<TritonServerOptions*>(options);
   return loptions->SetHostPolicy(policy_name, setting, value);
+}
+
+TRITONSERVER_Error*
+TRITONSERVER_ServerOptionsSetResponseCacheByteSize(
+    TRITONSERVER_ServerOptions* options, uint64_t size)
+{
+  TritonServerOptions* loptions =
+      reinterpret_cast<TritonServerOptions*>(options);
+  loptions->SetResponseCacheByteSize(size);
+  return nullptr;  // Success
 }
 
 //
