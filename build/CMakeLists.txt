@@ -127,7 +127,8 @@ include(FetchContent)
 
 FetchContent_Declare(
   repo-third-party
-  URL ${TRITON_REPOS_DIRECTORY}/third_party
+  SOURCE_DIR "${TRITON_REPOS_DIRECTORY}/third_party"
+  DOWNLOAD_COMMAND ""
 )
 set(TRITON_THIRD_PARTY_INSTALL_PREFIX ${CMAKE_CURRENT_BINARY_DIR}/third-party)
 set(TRITON_THIRD_PARTY_SRC_INSTALL_PREFIX ${CMAKE_CURRENT_BINARY_DIR}/third-party-src)
