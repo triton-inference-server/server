@@ -78,7 +78,6 @@ if [[ "$(< /proc/sys/kernel/osrelease)" == *Microsoft ]]; then
     DATADIR=${DATADIR:="/mnt/c/data/inferenceserver/${REPO_VERSION}"}
     BACKEND_DIR=${BACKEND_DIR:=C:/tritonserver/backends}
     SERVER=${SERVER:=/mnt/c/tritonserver/bin/tritonserver.exe}
-    export USE_HTTP=0
 else
     MODELDIR=${MODELDIR:=`pwd`/models}
     DATADIR=${DATADIR:="/data/inferenceserver/${REPO_VERSION}"}
