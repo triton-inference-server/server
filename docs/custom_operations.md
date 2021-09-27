@@ -64,7 +64,7 @@ simple way to ensure you are using the correct version of TensorRT is
 to use the [NGC TensorRT
 container](https://ngc.nvidia.com/catalog/containers/nvidia:tensorrt)
 corresponding to the Triton container. For example, if you are using
-the 20.12 version of Triton, use the 20.12 version of the TensorRT
+the 21.10 version of Triton, use the 21.10 version of the TensorRT
 container.
 
 ## TensorFlow
