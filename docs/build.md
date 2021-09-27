@@ -92,17 +92,17 @@ By default, build.py does not enable any of Triton's optional features
 and so you must enable them explicitly. The following build.py
 invocation builds all features, backends, and repository agents.
 
-```
-$ ./build.py --cmake-dir=<path/to/repo>/build --build-dir=/tmp/citritonbuild --enable-logging --enable-stats --enable-tracing --enable-metrics --enable-gpu-metrics --enable-gpu --filesystem=gcs --filesystem=azure_storage --filesystem=s3 --endpoint=http --endpoint=grpc --repo-tag=common:<container tag> --repo-tag=core:<container tag> --repo-tag=backend:<container tag> --repo-tag=thirdparty:<container tag> --backend=ensemble --backend=tensorrt:<container tag> --backend=identity:<container tag> --backend=repeat:<container tag> --backend=square:<container tag> --backend=onnxruntime:<container tag> --backend=pytorch:<container tag> --backend=tensorflow1:<container tag> --backend=tensorflow2:<container tag> --backend=openvino:<container tag> --backend=python:<container tag> --backend=dali:<container tag> --backend=fil:<container tag> --repoagent=checksum:<container tag>
+```bash
+./build.py --cmake-dir=<path/to/repo>/build --build-dir=/tmp/citritonbuild --enable-logging --enable-stats --enable-tracing --enable-metrics --enable-gpu-metrics --enable-gpu --filesystem=gcs --filesystem=azure_storage --filesystem=s3 --endpoint=http --endpoint=grpc --repo-tag=common:<container tag> --repo-tag=core:<container tag> --repo-tag=backend:<container tag> --repo-tag=thirdparty:<container tag> --backend=ensemble --backend=tensorrt:<container tag> --backend=identity:<container tag> --backend=repeat:<container tag> --backend=square:<container tag> --backend=onnxruntime:<container tag> --backend=pytorch:<container tag> --backend=tensorflow1:<container tag> --backend=tensorflow2:<container tag> --backend=openvino:<container tag> --backend=python:<container tag> --backend=dali:<container tag> --backend=fil:<container tag> --repoagent=checksum:<container tag>
 ```
 
-If you are building on master/main branch then \<container tag\> will
+If you are building on master/main branch then `<container tag>` will
 default to "main". If you are building on a release branch then
-\<container tag\> will default to the branch name. For example, if you
-are building on the r21.08 branch, \<container tag\> will default to
-r21.08. Therefore, you typically do not need to provide \<container
-tag\> at all (nor the preceding colon). You can use a different
-\<container tag\> for a component to instead use the corresponding
+`<container tag>` will default to the branch name. For example, if you
+are building on the r21.09 branch, `<container tag>` will default to
+r21.09. Therefore, you typically do not need to provide `<container
+tag>` at all (nor the preceding colon). You can use a different
+`<container tag>` for a component to instead use the corresponding
 branch/tag in the build. For example, if you have a branch called
 "mybranch" in the
 [identity_backend](https://github.com/triton-inference-server/identity_backend)
@@ -155,7 +155,7 @@ will be performed during the Docker build within the
   [triton-inference-server/checksum_repository_agent/CMakeLists.txt](https://github.com/triton-inference-server/checksum_repository_agent/blob/main/CMakeLists.txt).
 
 By default build.py clones Triton repos from
-https://github.com/triton-inference-server. Use the
+<https://github.com/triton-inference-server>. Use the
 --github-organization options to select a different URL.
 
 The backends can also be built independently in each of the backend
@@ -236,8 +236,8 @@ cuDNN and TensorRT versions and place them in the local directory.
 After downloading the zip files for cuDNN and TensorRT, you build the
 min container using the following command.
 
-```
-$ docker build -t win10-py3-min -f Dockerfile.win10.min .
+```bash
+docker build -t win10-py3-min -f Dockerfile.win10.min .
 ```
 
 ### Build Triton Server
@@ -249,15 +249,15 @@ default, build.py does not enable any of Triton's optional features
 and so you must enable them explicitly. The following build.py
 invocation builds all features and backends available on windows.
 
-```
-$ python build.py --cmake-dir=<path/to/repo>/build --build-dir=/tmp/citritonbuild --no-container-pull --image=base,win10-py3-min --enable-logging --enable-stats --enable-tracing --enable-gpu --endpoint=grpc --repo-tag=common:<container tag> --repo-tag=core:<container tag> --repo-tag=backend:<container tag> --repo-tag=thirdparty:<container tag> --backend=ensemble --backend=tensorrt:<container tag> --backend=onnxruntime:<container tag>
+```bash
+python build.py --cmake-dir=<path/to/repo>/build --build-dir=/tmp/citritonbuild --no-container-pull --image=base,win10-py3-min --enable-logging --enable-stats --enable-tracing --enable-gpu --endpoint=grpc --repo-tag=common:<container tag> --repo-tag=core:<container tag> --repo-tag=backend:<container tag> --repo-tag=thirdparty:<container tag> --backend=ensemble --backend=tensorrt:<container tag> --backend=onnxruntime:<container tag>
 ```
 
 If you are building on master/main branch then \<container tag\> will
 default to "main". If you are building on a release branch then
 \<container tag\> will default to the branch name. For example, if you
-are building on the r21.08 branch, \<container tag\> will default to
-r21.08. Therefore, you typically do not need to provide \<container
+are building on the r21.09 branch, \<container tag\> will default to
+r21.09. Therefore, you typically do not need to provide \<container
 tag\> at all (nor the preceding colon). You can use a different
 \<container tag\> for a component to instead use the corresponding
 branch/tag in the build. For example, if you have a branch called
