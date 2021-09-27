@@ -164,7 +164,6 @@ class RateLimiter {
     RateLimiterConfig rate_limiter_config_;
     StandardStageFunc OnStage_;
     StandardReleaseFunc OnRelease_;
-    bool executed_;
     std::atomic<uint64_t> exec_count_;
 
     State state_;
@@ -197,7 +196,7 @@ class RateLimiter {
         const StandardScheduleFunc& OnSchedule,
         TritonModelInstance* triton_model_instance);
     void AddAvailableInstance(ModelInstanceContext* instance);
-    void StageInstanceIfAvailable();
+    void StageInstanceIfAvailable(TritonModelInstance* triton_model_instance);
     void AllocateInstanceIfAvailable();
     void AddSpecificRequestQueue();
     bool ContainsPendingRequests(int32_t index);
