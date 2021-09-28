@@ -140,7 +140,7 @@ for MODEL in \
 
     grep "TensorRT Execution Accelerator is set for '${MODEL}_param'" $SERVER_LOG
     if [ $? -ne 0 ]; then
-        echo -e "\n***\n*** Failed. Expected TensorRT Execution Accelerator is set\n***"
+        echo -e "\n***\n*** Failed. Expected TensorRT Execution Accelerator is set for '${MODEL}_param'\n***"
         RET=1
     fi
 
@@ -173,6 +173,13 @@ for MODEL in \
         echo -e "\n***\n*** Failed. Expected configurations not set for '${MODEL}_cuda_config'\n***"
         RET=1
     fi
+
+    grep "CUDA Execution Accelerator is set for '${MODEL}_cpu_config'" $SERVER_LOG
+    if [ $? -ne 0 ]; then
+        echo -e "\n***\n*** Failed. Expected CUDA Execution Accelerator is set for '${MODEL}_cpu_config'\n***"
+        RET=1
+    fi
+    
 
     set -e
 
