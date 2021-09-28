@@ -56,6 +56,7 @@ RET=0
 rm -f *.log
 rm -fr ./custom_models && mkdir ./custom_models && \
 cp -r ../custom_models/custom_zero_1_float32 ./custom_models/. && \
+cp -r ../custom_models/custom_sequence_int32 ./custom_models/. && \
 mkdir -p ./custom_models/custom_zero_1_float32/1 && \
 cp -r ./custom_models/custom_zero_1_float32 ./custom_models/custom_zero_1_float32_v2
 
@@ -300,7 +301,7 @@ kill $SERVER_PID
 wait $SERVER_PID
 
 # CASE 2: plenty resource: allows both the instances to run simultaneously
-SERVER_ARGS="--rate-limit=execution_count --model-repository=$MODELDIR/custom_models"
+SERVER_ARGS="--rate-limit=execution_count  --rate-limit-resource=resource1:6 --rate-limit-resource=resource2:2  --model-repository=$MODELDIR/custom_models"
 SERVER_LOG="./inference_server.log"
 run_server
 if [ "$SERVER_PID" == "0" ]; then
@@ -352,6 +353,91 @@ if [ $? -ne 0 ]; then
     echo -e "\n***\n*** Failed. Expected error message while loading the model \"custom_zero_1_float32\"\n***"
     RET=1
 fi
+
+##
+## Tests with dynamic batching
+##
+# Despite all the possible bs being preferred triton should always form full batches as
+# the second instance would be blocked because of the resource constraints.
+(cd custom_models/custom_zero_1_float32 && \
+        sed -i "s/.*execute_delay_ms.*/{ key: \"execute_delay_ms\"; value: { string_value: \"1000\" }}/g" config.pbtxt && \
+        echo "dynamic_batching { preferred_batch_size: [ 1, 2, 3, 4 ]" >> config.pbtxt && \
+        echo " max_queue_delay_microseconds: 5000000 }"  >> config.pbtxt)
+export TRITONSERVER_DELAY_SCHEDULER=8
+SERVER_ARGS="--rate-limit=execution_count --model-repository=$MODELDIR/custom_models"
+SERVER_LOG="./inference_server.log"
+run_server
+if [ "$SERVER_PID" == "0" ]; then
+    echo -e "\n***\n*** Failed to start $SERVER\n***"
+    cat $SERVER_LOG
+    exit 1
+fi
+
+set +e
+python3 $RATE_LIMITER_TEST RateLimiterTest.test_single_model_dynamic_batching >>$CLIENT_LOG 2>&1
+if [ $? -ne 0 ]; then
+    echo -e "\n***\n*** Test Failed\n***"
+    RET=1
+else
+    check_test_results $TEST_RESULT_FILE 1
+    if [ $? -ne 0 ]; then
+        cat $CLIENT_LOG
+        echo -e "\n***\n*** Test Result Verification Failed\n***"
+        RET=1
+    fi
+fi
+set -e
+
+kill $SERVER_PID
+wait $SERVER_PID
+
+unset TRITONSERVER_DELAY_SCHEDULER
+
+##
+## Tests with sequence batching
+##
+# Despite all the possible bs being preferred triton should always form full batches as
+# the second instance would be blocked because of the resource constraints.
+FIRST_INSTANCE_RESOURCE="rate_limiter { resources [{name: \"resource1\" count: 4 }] priority: 1}"
+(cd custom_models/custom_sequence_int32/ && \
+        sed -i "s/max_sequence_idle_microseconds:.*/max_sequence_idle_microseconds: 1000000/" config.pbtxt && \
+        sed -i "s/^max_batch_size:.*/max_batch_size: 1/" config.pbtxt && \
+        sed -i "s/kind: KIND_GPU/kind: KIND_CPU\\ncount: 1 \n${FIRST_INSTANCE_RESOURCE}/" config.pbtxt && \
+        sed -i "s/kind: KIND_CPU/kind: KIND_CPU\\ncount: 1 \n${FIRST_INSTANCE_RESOURCE}/" config.pbtxt &&\
+        echo "instance_group [{"  >> config.pbtxt && \
+        echo "kind: KIND_CPU count: 1"  >> config.pbtxt && \
+        echo "rate_limiter { resources [{name: \"resource1\" count: 2 }, {name: \"resource2\" global: True count: 2 }] priority: 2}"  >> config.pbtxt && \
+        echo "}]" >> config.pbtxt && \
+        echo "instance_group [{"  >> config.pbtxt && \
+        echo "kind: KIND_CPU count: 2"  >> config.pbtxt && \
+        echo "rate_limiter { resources [{name: \"resource1\" count: 2 }, {name: \"resource2\" global: True count: 2 }] priority: 3}"  >> config.pbtxt && \
+        echo "}]" >> config.pbtxt)
+SERVER_ARGS="--rate-limit=execution_count --model-repository=$MODELDIR/custom_models"
+SERVER_LOG="./inference_server.log"
+run_server
+if [ "$SERVER_PID" == "0" ]; then
+    echo -e "\n***\n*** Failed to start $SERVER\n***"
+    cat $SERVER_LOG
+    exit 1
+fi
+
+set +e
+python3 $RATE_LIMITER_TEST RateLimiterTest.test_single_model_sequence_batching >>$CLIENT_LOG 2>&1
+if [ $? -ne 0 ]; then
+    echo -e "\n***\n*** Test Failed\n***"
+    RET=1
+else
+    check_test_results $TEST_RESULT_FILE 1
+    if [ $? -ne 0 ]; then
+        cat $CLIENT_LOG
+        echo -e "\n***\n*** Test Result Verification Failed\n***"
+        RET=1
+    fi
+fi
+set -e
+
+kill $SERVER_PID
+wait $SERVER_PID
 
 if [ $RET -eq 0 ]; then
     echo -e "\n***\n*** Test Passed\n***"

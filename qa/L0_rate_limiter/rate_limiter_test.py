@@ -31,15 +31,18 @@ sys.path.append("../common")
 
 import functools
 import numpy as np
+import os
 import unittest
 import threading
+import time
 import infer_util as iu
 import test_util as tu
+import sequence_util as su
 import tritongrpcclient as grpcclient
 from tritonclientutils import *
 
-_inference_count = 100
-_inference_concurrency = 10
+_inference_count = 80
+_inference_concurrency = 8
 _response_wait_time_s = 10
 _finish_wait_time_s = 10
 _exit_signal = False
@@ -47,10 +50,11 @@ _exit_signal = False
 
 class AsyncGrpcRunner:
 
-    def __init__(self, tester, server_url, model_name):
+    def __init__(self, tester, server_url, model_name, delay_ms):
         self._tester = tester
         self._server_url = server_url
         self._model_name = model_name
+        self._delay_ms = delay_ms
 
         self._input_data = []
         self._shape = [1, 1]
@@ -116,6 +120,7 @@ class AsyncGrpcRunner:
                 self._num_sent_request += 1
                 if (self._num_sent_request == _inference_count):
                     _exit_signal = True
+                time.sleep(self._delay_ms / 1000.0)
 
         # wait till receive all requested data
         with self._sync:
@@ -155,15 +160,18 @@ class AsyncGrpcRunner:
         self._validate_run()
 
 
-class RateLimiterTest(tu.TestResultCollector):
+class RateLimiterTest(su.SequenceBatcherTestUtil):
 
-    def stress_models(self, model_names):
+    def stress_models(self, model_names, delay_ms=0):
         infer_counts = {}
         try:
             runners = []
             for model_name in model_names:
                 runners.append(
-                    AsyncGrpcRunner(self, "localhost:8001", model_name))
+                    AsyncGrpcRunner(self,
+                                    "localhost:8001",
+                                    model_name,
+                                    delay_ms=delay_ms))
             for r in runners:
                 r.start()
             for r in runners:
@@ -220,6 +228,65 @@ class RateLimiterTest(tu.TestResultCollector):
             10, infer_diff,
             "Got infer difference between models {}, expected closer to 0".
             format(infer_diff))
+
+    def test_single_model_dynamic_batching(self):
+        # Send all the inference requests with a delay to a model
+
+        self.assertTrue("TRITONSERVER_DELAY_SCHEDULER" in os.environ)
+        model_names = ["custom_zero_1_float32"]
+        infer_counts = self.stress_models(model_names, delay_ms=100)
+
+        self.assertEqual(infer_counts[model_names[0]], _inference_count)
+
+        # Check whether all requests used batch size of 4 or not
+        client = grpcclient.InferenceServerClient("localhost:8001")
+        stats = client.get_inference_statistics(model_names[0], "1")
+        self.assertEqual(len(stats.model_stats), 1, "expect 1 model stats")
+
+        batch_stats = stats.model_stats[0].batch_stats
+        self.assertEqual(
+            len(batch_stats), 1,
+            "expected single batch-size, got {}".format(len(batch_stats)))
+
+        for batch_stat in batch_stats:
+            self.assertEqual(
+                batch_stat.batch_size, 4,
+                "unexpected batch-size {}".format(batch_stat.batch_size))
+            bc = batch_stat.compute_infer.count
+            # Get count from one of the stats
+            self.assertEqual(
+                batch_stat.compute_infer.count, _inference_count / 4,
+                "expected model-execution-count {} for batch size {}, got {}".
+                format(_inference_count / 4, 4, batch_stat.compute_infer.count))
+
+    def test_single_model_sequence_batching(self):
+        # Send one sequence and check for correct accumulator
+        # result. The result should be returned immediately.
+        # This test checks whether all the requests are
+        # directed to the same instance.
+
+        try:
+            model_name = "custom_sequence_int32"
+            self.assertFalse("TRITONSERVER_DELAY_SCHEDULER" in os.environ)
+            self.check_sequence(
+                'custom',
+                model_name,
+                np.int32,
+                5,
+                (4000, None),
+                # (flag_str, value, (ls_ms, gt_ms), (pre_delay, post_delay))
+                (("start", 1, None, None), (None, 2, None, None),
+                 (None, 3, None, None), (None, 4, None, None),
+                 (None, 5, None, None), (None, 6, None, None),
+                 (None, 7, None, None), (None, 8, None, None),
+                 ("end", 9, None, None)),
+                45,
+                'grpc')
+
+            self.check_deferred_exception()
+            self.check_status(model_name, {1: 9}, 9, 9)
+        except Exception as ex:
+            self.assertTrue(False, "unexpected error {}".format(ex))
 
 
 if __name__ == '__main__':
