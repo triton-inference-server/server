@@ -28,6 +28,7 @@
 ARG BASE_IMAGE=nvcr.io/nvidia/tritonserver:21.08-py3-min
 
 ARG TRITON_CLIENT_REPO_SUBDIR=clientrepo
+ARG TRITON_REPOS_DIRECTORY=repos
 ARG TRITON_COMMON_REPO_TAG=main
 ARG TRITON_CORE_REPO_TAG=main
 ARG TRITON_BACKEND_REPO_TAG=main
@@ -95,6 +96,7 @@ RUN rm -f /usr/bin/python && \
 
 # Build the client library and examples
 ARG TRITON_CLIENT_REPO_SUBDIR
+ARG TRITON_REPOS_DIRECTORY
 ARG TRITON_COMMON_REPO_TAG
 ARG TRITON_CORE_REPO_TAG
 ARG TRITON_BACKEND_REPO_TAG
@@ -104,10 +106,12 @@ ARG TRITON_ENABLE_GPU
 WORKDIR /workspace
 COPY TRITON_VERSION .
 COPY ${TRITON_CLIENT_REPO_SUBDIR} client
+COPY ${TRITON_REPOS_DIRECTORY} repos
 
 WORKDIR /workspace/build
 RUN cmake -DCMAKE_INSTALL_PREFIX=/workspace/install \
           -DTRITON_VERSION=`cat /workspace/TRITON_VERSION` \
+          -DTRITON_REPOS_DIRECTORY=/workspace/repos \
           -DTRITON_COMMON_REPO_TAG=${TRITON_COMMON_REPO_TAG} \
           -DTRITON_CORE_REPO_TAG=${TRITON_CORE_REPO_TAG} \
           -DTRITON_BACKEND_REPO_TAG=${TRITON_BACKEND_REPO_TAG} \
@@ -147,9 +151,7 @@ RUN if [ "$TRITON_ENABLE_GPU" = "ON" ]; then \
     fi
 
 # Install Model Analyzer
-ARG TRITON_MODEL_ANALYZER_REPO_TAG
-ARG TRITON_MODEL_ANALYZER_REPO="https://github.com/triton-inference-server/model_analyzer@${TRITON_MODEL_ANALYZER_REPO_TAG}"
-RUN pip3 install "git+${TRITON_MODEL_ANALYZER_REPO}"
+RUN pip3 install /workspace/repos/model_analyzer
 
 ENV PATH /workspace/install/bin:${PATH}
 ENV LD_LIBRARY_PATH /workspace/install/lib:${LD_LIBRARY_PATH}

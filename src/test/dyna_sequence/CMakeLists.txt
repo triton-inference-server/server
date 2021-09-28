@@ -58,23 +58,20 @@ include(FetchContent)
 
 FetchContent_Declare(
   repo-common
-  GIT_REPOSITORY https://github.com/triton-inference-server/common.git
-  GIT_TAG ${TRITON_COMMON_REPO_TAG}
-  GIT_SHALLOW ON
+  URL ${TRITON_REPOS_DIRECTORY}/common
 )
 FetchContent_Declare(
   repo-core
-  GIT_REPOSITORY https://github.com/triton-inference-server/core.git
-  GIT_TAG ${TRITON_CORE_REPO_TAG}
-  GIT_SHALLOW ON
+  URL ${TRITON_REPOS_DIRECTORY}/core
 )
 FetchContent_Declare(
   repo-backend
-  GIT_REPOSITORY https://github.com/triton-inference-server/backend.git
-  GIT_TAG ${TRITON_BACKEND_REPO_TAG}
-  GIT_SHALLOW ON
+  URL ${TRITON_REPOS_DIRECTORY}/backend
 )
 FetchContent_MakeAvailable(repo-common repo-core repo-backend)
+# configure_file(${TRITON_REPOS_DIRECTORY}/common ${CMAKE_CURRENT_BINARY_DIR}/common COPYONLY)
+# configure_file(${TRITON_REPOS_DIRECTORY}/core ${CMAKE_CURRENT_BINARY_DIR}/core COPYONLY)
+# configure_file(${TRITON_REPOS_DIRECTORY}/backend ${CMAKE_CURRENT_BINARY_DIR}/backend COPYONLY)
 
 #
 # libtriton_dyna_sequence.so
