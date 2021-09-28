@@ -305,6 +305,9 @@ RUN GO111MODULE=off go get github.com/golang/protobuf/protoc-gen-go && \
 WORKDIR /opt/tritonserver
 COPY --chown=1000:1000 --from=sdk /workspace/qa/ qa/
 
+# Copy over repos source code to /opt/tritonserver/repos
+COPY --chown=1000:1000 --from=build /workspace/repos repos
+
 # Remove CI tests that are meant to run only on build image and
 # install the tritonserver/triton python client APIs.
 RUN rm -fr qa/L0_copyrights qa/L0_build_variants && \
