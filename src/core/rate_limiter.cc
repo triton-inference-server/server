@@ -336,7 +336,7 @@ RateLimiter::DeferPayloadSchedule(
   }
 
   itr->second.EnqueueModelInstanceRequest(OnSchedule, triton_model_instance);
-  itr->second.StageInstanceIfAvailable();
+  itr->second.StageInstanceIfAvailable(triton_model_instance);
 
   return Status::Success;
 }
@@ -371,7 +371,7 @@ RateLimiter::OnRelease(ModelInstanceContext* instance)
   model_context.AddAvailableInstance(instance);
   resource_manager_->ReleaseResources(instance);
   if (model_context.ContainsPendingRequests(instance->RawInstance()->Index())) {
-    model_context.StageInstanceIfAvailable();
+    model_context.StageInstanceIfAvailable(instance->RawInstance());
   }
   AttemptAllocation();
 }
@@ -430,13 +430,21 @@ RateLimiter::ModelContext::AddAvailableInstance(ModelInstanceContext* instance)
 
 
 void
-RateLimiter::ModelContext::StageInstanceIfAvailable()
+RateLimiter::ModelContext::StageInstanceIfAvailable(
+    TritonModelInstance* req_instance)
 {
   std::lock_guard<std::recursive_mutex> lk1(sched_request_queue_mtx_);
   std::lock_guard<std::recursive_mutex> lk2(avbl_instances_mtx_);
   PriorityQueue backup_queue;
+
   while (!avbl_instances_.empty()) {
     ModelInstanceContext* instance = avbl_instances_.top();
+    if ((req_instance != nullptr) &&
+        (instance->RawInstance() != req_instance)) {
+      backup_queue.push(instance);
+      avbl_instances_.pop();
+      continue;
+    }
     if (!specific_sched_request_queues_[instance->RawInstance()->Index()]
              .empty()) {
       // Prioritize the specific requests for the available model
@@ -616,9 +624,7 @@ RateLimiter::ModelInstanceContext::DirectAllocate(
 void
 RateLimiter::ModelInstanceContext::Release()
 {
-  if (executed_) {
-    exec_count_++;
-  }
+  exec_count_++;
 
   OnRelease_(this);
 
@@ -837,10 +843,10 @@ RateLimiter::ResourceManager::ParseAndValidateExplicitResources()
       if (resource_count < ritr.second) {
         return Status(
             Status::Code::INVALID_ARG,
-            (std::string("Resource \"") + ritr.first + "\" is limited to " +
-             std::to_string(resource_count) +
+            (std::string("Resource count for \"") + ritr.first +
+             "\" is limited to " + std::to_string(resource_count) +
              " which will prevent scheduling of one or more model "
-             "instances... the minimum expected count is " +
+             "instances, the minimum required count is " +
              std::to_string(ritr.second))
                 .c_str());
       } else {
