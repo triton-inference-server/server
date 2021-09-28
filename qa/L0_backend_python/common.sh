@@ -64,6 +64,6 @@ create_python_backend_stub() {
   rm -rf python_backend
   git clone https://github.com/triton-inference-server/python_backend -b $PYTHON_BACKEND_REPO_TAG
   (cd python_backend/ && mkdir builddir && cd builddir && \
-  cmake -DTRITON_ENABLE_GPU=ON -DTRITON_BACKEND_REPO_TAG=$TRITON_BACKEND_REPO_TAG -DTRITON_COMMON_REPO_TAG=$TRITON_COMMON_REPO_TAG -DTRITON_CORE_REPO_TAG=$TRITON_CORE_REPO_TAG ../ && \
+  cmake -DTRITON_ENABLE_GPU=ON -DTRITON_REPOS_DIRECTORY=$TRITON_REPOS_DIRECTORY -DTRITON_BACKEND_REPO_TAG=$TRITON_BACKEND_REPO_TAG -DTRITON_COMMON_REPO_TAG=$TRITON_COMMON_REPO_TAG -DTRITON_CORE_REPO_TAG=$TRITON_CORE_REPO_TAG ../ && \
   make -j18 triton-python-backend-stub)
 }
