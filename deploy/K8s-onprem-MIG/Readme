@@ -7,5 +7,6 @@ You can define your own custom metric for Kubernetes Horizontal Pod Autoscaler (
 Also you can change the minimum and maximum numbers of Replicas as you wish. 
 For example, you can use 1 and 7 respectively if you are using 5GB MIG slices on a A100.
 
-For step by step instructions, please refer to this developer blog:
-[Deploying NVIDIA Triton at Scale with MIG and Kubernetes](https://developer.nvidia.com/blog/deploying-nvidia-triton-at-scale-with-mig-and-kubernetes/). 
+For step by step instructions, please refer to this developer blog: 
+[Deploying NVIDIA Triton at Scale with MIG and Kubernetes] (https://developer.nvidia.com/blog/deploying-nvidia-triton-at-scale-with-mig-and-kubernetes/)
+
