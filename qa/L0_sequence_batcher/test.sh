@@ -83,7 +83,6 @@ if [[ "$(< /proc/sys/kernel/osrelease)" == *Microsoft ]]; then
     DATADIR=${DATADIR:="/mnt/c/data/inferenceserver/${REPO_VERSION}"}
     BACKEND_DIR=${BACKEND_DIR:=C:/tritonserver/backends}
     SERVER=${SERVER:=/mnt/c/tritonserver/bin/tritonserver.exe}
-    export USE_HTTP=0
     export WSLENV=$WSLENV:TRITONSERVER_DELAY_SCHEDULER:TRITONSERVER_BACKLOG_DELAY_SCHEDULER
 else
     MODELDIR=${MODELDIR:=`pwd`}
@@ -320,11 +319,6 @@ for model_trial in $MODEL_TRIALS; do
             LEAKCHECK_LOG="./$i.$MODEL_PATH.valgrind.log"
             LEAKCHECK_ARGS="$LEAKCHECK_ARGS_BASE --log-file=$LEAKCHECK_LOG"
             run_server_leakcheck
-        elif [[ "$(< /proc/sys/kernel/osrelease)" == *Microsoft ]]; then
-            # We rely on HTTP endpoint in run_server so until HTTP is
-            # implemented for win we do this hack...
-            run_server_nowait
-            sleep 15
         else
             run_server
         fi
@@ -385,11 +379,6 @@ for model_trial in $MODEL_TRIALS; do
             LEAKCHECK_LOG="./$i.$MODEL_PATH.valgrind.log"
             LEAKCHECK_ARGS="$LEAKCHECK_ARGS_BASE --log-file=$LEAKCHECK_LOG"
             run_server_leakcheck
-        elif [[ "$(< /proc/sys/kernel/osrelease)" == *Microsoft ]]; then
-            # We rely on HTTP endpoint in run_server so until HTTP is
-            # implemented for win we do this hack...
-            run_server_nowait
-            sleep 15
         else
             run_server
         fi
@@ -460,11 +449,6 @@ if [[ $BACKENDS == *"custom"* ]]; then
       LEAKCHECK_LOG="./$i.$MODEL_PATH.valgrind.log"
       LEAKCHECK_ARGS="$LEAKCHECK_ARGS_BASE --log-file=$LEAKCHECK_LOG"
       run_server_leakcheck
-    elif [[ "$(< /proc/sys/kernel/osrelease)" == *Microsoft ]]; then
-      # We rely on HTTP endpoint in run_server so until HTTP is
-      # implemented for win we do this hack...
-      run_server_nowait
-      sleep 15
     else
         run_server
     fi
@@ -523,11 +507,6 @@ for i in $QUEUE_DELAY_TESTS ; do
         LEAKCHECK_LOG="./$i.$MODEL_PATH.valgrind.log"
         LEAKCHECK_ARGS="$LEAKCHECK_ARGS_BASE --log-file=$LEAKCHECK_LOG"
         run_server_leakcheck
-    elif [[ "$(< /proc/sys/kernel/osrelease)" == *Microsoft ]]; then
-        # We rely on HTTP endpoint in run_server so until HTTP is
-        # implemented for win we do this hack...
-        run_server_nowait
-        sleep 15
     else
         run_server
     fi

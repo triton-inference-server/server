@@ -48,7 +48,7 @@ InstanceQueue::Empty()
 }
 
 void
-InstanceQueue::Enqueue(std::shared_ptr<Payload>& payload)
+InstanceQueue::Enqueue(const std::shared_ptr<Payload>& payload)
 {
   payload_queue_.push_back(payload);
 }

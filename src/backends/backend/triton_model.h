@@ -73,8 +73,7 @@ class TritonModel : public InferenceBackend {
   void* State() { return state_; }
   void SetState(void* state) { state_ = state; }
   Status AddInstance(
-      std::unique_ptr<TritonModelInstance>&& instance, const bool passive,
-      const inference::ModelRateLimiter& rate_limiter_config);
+      std::unique_ptr<TritonModelInstance>&& instance, const bool passive);
 
  private:
   DISALLOW_COPY_AND_ASSIGN(TritonModel);

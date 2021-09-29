@@ -98,7 +98,6 @@ Only processor and processor_params should be different from a normal EAS servic
 ## Query Triton service by python client
 ### Install triton's python client
 ```
-pip3 install nvidia-pyindex
 pip install tritonclient[all]
 ```
 ### A demo to query inception model

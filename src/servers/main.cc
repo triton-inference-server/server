@@ -24,10 +24,20 @@
 // (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
+#ifdef _WIN32
+#define NOMINMAX
+#define WIN32_LEAN_AND_MEAN
+#include <windows.h>
+#include <winsock2.h>
+#include <ws2tcpip.h>
+#pragma comment(lib, "ws2_32.lib")
+#endif
+
 #ifndef _WIN32
 #include <getopt.h>
 #include <unistd.h>
 #endif
+
 #include <stdint.h>
 #include <algorithm>
 #include <cctype>
@@ -104,6 +114,7 @@ nvidia::inferenceserver::KeepAliveOptions grpc_keepalive_options_;
 std::unique_ptr<nvidia::inferenceserver::HTTPServer> metrics_service_;
 bool allow_metrics_ = true;
 int32_t metrics_port_ = 8002;
+float metrics_interval_ms_ = 2000;
 #endif  // TRITON_ENABLE_METRICS
 
 #ifdef TRITON_ENABLE_TRACING
@@ -236,6 +247,7 @@ enum OptionId {
   OPTION_ALLOW_METRICS,
   OPTION_ALLOW_GPU_METRICS,
   OPTION_METRICS_PORT,
+  OPTION_METRICS_INTERVAL_MS,
 #endif  // TRITON_ENABLE_METRICS
 #ifdef TRITON_ENABLE_TRACING
   OPTION_TRACE_FILEPATH,
@@ -410,6 +422,9 @@ std::vector<Option> options_
        "--allow-metrics is true."},
       {OPTION_METRICS_PORT, "metrics-port", Option::ArgInt,
        "The port reporting prometheus metrics."},
+      {OPTION_METRICS_INTERVAL_MS, "metrics-interval-ms", Option::ArgFloat,
+       "Metrics will be collected once every <metrics-interval-ms> "
+       "milliseconds. Default is 2000 milliseconds."},
 #endif  // TRITON_ENABLE_METRICS
 #ifdef TRITON_ENABLE_TRACING
       {OPTION_TRACE_FILEPATH, "trace-file", Option::ArgStr,
@@ -702,6 +717,17 @@ StartEndpoints(
     const std::shared_ptr<nvidia::inferenceserver::SharedMemoryManager>&
         shm_manager)
 {
+#ifdef _WIN32
+  WSADATA wsaData;
+  int wsa_ret = WSAStartup(MAKEWORD(2,2), &wsaData);
+
+  if (wsa_ret != 0)
+  {
+    LOG_ERROR << "Error in WSAStartup " << wsa_ret;
+    return false;
+  }
+#endif
+
 #ifdef TRITON_ENABLE_GRPC
   // Enable GRPC endpoints if requested...
   if (allow_grpc_) {
@@ -805,6 +831,16 @@ StopEndpoints()
     sagemaker_service_.reset();
   }
 #endif  // TRITON_ENABLE_SAGEMAKER
+
+#ifdef _WIN32
+  int wsa_ret = WSACleanup();
+
+  if (wsa_ret != 0)
+  {
+    LOG_ERROR << "Error in WSACleanup " << wsa_ret;
+    ret = false;
+  }
+#endif
 
   return ret;
 }
@@ -1162,6 +1198,7 @@ Parse(TRITONSERVER_ServerOptions** server_options, int argc, char** argv)
 #ifdef TRITON_ENABLE_METRICS
   int32_t metrics_port = metrics_port_;
   bool allow_gpu_metrics = true;
+  float metrics_interval_ms = metrics_interval_ms_;
 #endif  // TRITON_ENABLE_METRICS
 
 #ifdef TRITON_ENABLE_TRACING
@@ -1340,6 +1377,9 @@ Parse(TRITONSERVER_ServerOptions** server_options, int argc, char** argv)
       case OPTION_METRICS_PORT:
         metrics_port = ParseIntOption(optarg);
         break;
+      case OPTION_METRICS_INTERVAL_MS:
+        metrics_interval_ms = ParseIntOption(optarg);
+        break;
 #endif  // TRITON_ENABLE_METRICS
 
 #ifdef TRITON_ENABLE_TRACING
@@ -1484,6 +1524,7 @@ Parse(TRITONSERVER_ServerOptions** server_options, int argc, char** argv)
 #ifdef TRITON_ENABLE_METRICS
   metrics_port_ = metrics_port;
   allow_gpu_metrics = allow_metrics_ ? allow_gpu_metrics : false;
+  metrics_interval_ms_ = metrics_interval_ms;
 #endif  // TRITON_ENABLE_METRICS
 
 #ifdef TRITON_ENABLE_TRACING
@@ -1582,6 +1623,10 @@ Parse(TRITONSERVER_ServerOptions** server_options, int argc, char** argv)
   FAIL_IF_ERR(
       TRITONSERVER_ServerOptionsSetGpuMetrics(loptions, allow_gpu_metrics),
       "setting GPU metrics enable");
+  FAIL_IF_ERR(
+      TRITONSERVER_ServerOptionsSetMetricsInterval(
+          loptions, metrics_interval_ms_),
+      "setting metrics interval");
 #endif  // TRITON_ENABLE_METRICS
 
   FAIL_IF_ERR(

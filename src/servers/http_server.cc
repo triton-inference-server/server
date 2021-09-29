@@ -24,6 +24,10 @@
 // (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
+#ifdef _WIN32
+#define NOMINMAX
+#endif
+
 #include "src/servers/http_server.h"
 
 #include <event2/buffer.h>
@@ -67,11 +71,13 @@ HTTPServer::Start()
     evhtp_set_gencb(htp_, HTTPServer::Dispatch, this);
     evhtp_use_threads_wexit(htp_, NULL, NULL, thread_cnt_, NULL);
     evhtp_bind_socket(htp_, "0.0.0.0", port_, 1024);
+
     // Set listening event for breaking event loop
     evutil_socketpair(AF_UNIX, SOCK_STREAM, 0, fds_);
     break_ev_ = event_new(evbase_, fds_[0], EV_READ, StopCallback, evbase_);
     event_add(break_ev_, NULL);
     worker_ = std::thread(event_base_loop, evbase_, 0);
+
     return nullptr;
   }
 
@@ -84,7 +90,7 @@ HTTPServer::Stop()
 {
   if (worker_.joinable()) {
     // Notify event loop to break via fd write
-    send(fds_[1], &evbase_, sizeof(event_base*), 0);
+    send(fds_[1], (const char*) &evbase_, sizeof(event_base*), 0);
     worker_.join();
     event_free(break_ev_);
     evutil_closesocket(fds_[0]);
@@ -100,7 +106,7 @@ HTTPServer::Stop()
 }
 
 void
-HTTPServer::StopCallback(int sock, short events, void* arg)
+HTTPServer::StopCallback(evutil_socket_t sock, short events, void* arg)
 {
   struct event_base* base = (struct event_base*)arg;
   event_base_loopbreak(base);
@@ -150,7 +156,6 @@ HTTPMetricsServer::Handle(evhtp_request_t* req)
   evhtp_send_reply(req, res);
 }
 
-#ifdef TRITON_ENABLE_METRICS
 TRITONSERVER_Error*
 HTTPMetricsServer::Create(
     const std::shared_ptr<TRITONSERVER_Server>& server, const int32_t port,
@@ -163,7 +168,6 @@ HTTPMetricsServer::Create(
 
   return nullptr;
 }
-#endif  // TRITON_ENABLE_METRICS
 
 #endif  // TRITON_ENABLE_METRICS
 
@@ -834,7 +838,7 @@ EVBufferToJson(
   std::vector<char> json_buffer;
 
   // No need to memcpy when number of iovecs is 1
-  if ((n > 0) and (v[0].iov_len >= remaining_length)) {
+  if ((n > 0) && (v[0].iov_len >= remaining_length)) {
     json_base = static_cast<char*>(v[0].iov_base);
     if (v[0].iov_len > remaining_length) {
       v[0].iov_base = static_cast<void*>(json_base + remaining_length);
@@ -2148,10 +2152,10 @@ HTTPAPIServer::HandleInfer(
       // manager.
       trace_manager_->CaptureTimestamp(
           trace_id, TRITONSERVER_TRACE_LEVEL_MIN, "HTTP_RECV_START",
-          TIMESPEC_TO_NANOS(req->recv_start_ts));
+          req->recv_start_ns);
       trace_manager_->CaptureTimestamp(
           trace_id, TRITONSERVER_TRACE_LEVEL_MIN, "HTTP_RECV_END",
-          TIMESPEC_TO_NANOS(req->recv_end_ts));
+          req->recv_end_ns);
     }
   }
 #endif  // TRITON_ENABLE_TRACING
@@ -2291,10 +2295,10 @@ HTTPAPIServer::OKReplyCallback(evthr_t* thr, void* arg, void* shared)
       (infer_request->trace_id_ != 0)) {
     infer_request->trace_manager_->CaptureTimestamp(
         infer_request->trace_id_, TRITONSERVER_TRACE_LEVEL_MIN,
-        "HTTP_SEND_START", TIMESPEC_TO_NANOS(request->send_start_ts));
+        "HTTP_SEND_START", request->send_start_ns);
     infer_request->trace_manager_->CaptureTimestamp(
         infer_request->trace_id_, TRITONSERVER_TRACE_LEVEL_MIN, "HTTP_SEND_END",
-        TIMESPEC_TO_NANOS(request->send_end_ts));
+        request->send_end_ns);
   }
 #endif  // TRITON_ENABLE_TRACING
 
@@ -2316,10 +2320,10 @@ HTTPAPIServer::BADReplyCallback(evthr_t* thr, void* arg, void* shared)
       (infer_request->trace_id_ != 0)) {
     infer_request->trace_manager_->CaptureTimestamp(
         infer_request->trace_id_, TRITONSERVER_TRACE_LEVEL_MIN,
-        "HTTP_SEND_START", TIMESPEC_TO_NANOS(request->send_start_ts));
+        "HTTP_SEND_START", request->send_start_ns);
     infer_request->trace_manager_->CaptureTimestamp(
         infer_request->trace_id_, TRITONSERVER_TRACE_LEVEL_MIN, "HTTP_SEND_END",
-        TIMESPEC_TO_NANOS(request->send_end_ts));
+        request->send_end_ns);
   }
 #endif  // TRITON_ENABLE_TRACING
 

@@ -47,6 +47,13 @@ model health, metadata and statistics. Additional endpoints allow
 model loading and unloading, and inferencing. See the KFServing and
 extension documentation for details.
 
+### HTTP Options
+Triton provides the following configuration options for server-client network transactions over HTTP protocol.
+
+#### Compression
+
+Triton allows the on-wire compression of request/response on HTTP through its clients. See [HTTP Compression](https://github.com/triton-inference-server/client/tree/main#compression) for more details.
+
 ### GRPC Options
 Triton exposes various GRPC parameters for configuring the server-client network transactions. For usage of these options, refer to the output from `tritonserver --help`.
 
@@ -70,7 +77,7 @@ Triton allows the on-wire compression of request/response messages by exposing f
 
 * `--grpc-infer-response-compression-level`
 
-For client-side documentation, see [Client-Side GRPC Compression](https://github.com/triton-inference-server/client/tree/main#compression)
+For client-side documentation, see [Client-Side GRPC Compression](https://github.com/triton-inference-server/client/tree/main#compression-1)
 
 Compression can be used to reduce the amount of bandwidth used in server-client communication. For more details, see [gRPC Compression](https://grpc.github.io/grpc/core/md_doc_compression.html). 
 

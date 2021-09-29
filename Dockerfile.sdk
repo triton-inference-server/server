@@ -38,6 +38,8 @@ ARG TRITON_ENABLE_GPU=ON
 
 FROM ${BASE_IMAGE}
 
+ARG TARGETPLATFORM
+
 # Ensure apt-get won't prompt for selecting options
 ENV DEBIAN_FRONTEND=noninteractive
 
@@ -80,7 +82,7 @@ RUN wget -O - https://apt.kitware.com/keys/kitware-archive-latest.asc 2>/dev/nul
       apt-add-repository 'deb https://apt.kitware.com/ubuntu/ focal main' && \
       apt-get update && \
       apt-get install -y --no-install-recommends \
-        cmake-data=3.18.4-0kitware1ubuntu20.04.1 cmake=3.18.4-0kitware1ubuntu20.04.1; \
+        cmake-data=3.21.1-0kitware1ubuntu20.04.1 cmake=3.21.1-0kitware1ubuntu20.04.1; \
     elif [ "$CMAKE_UBUNTU_VERSION" = "18.04" ]; then \
       apt-add-repository 'deb https://apt.kitware.com/ubuntu/ bionic main' && \
       apt-get update && \
@@ -140,17 +142,24 @@ COPY qa/images/mug.jpg images/mug.jpg
 # be used to run the client examples.
 RUN pip3 install --upgrade numpy pillow attrdict && \
     find install/python/ -maxdepth 1 -type f -name \
-    "tritonclient-*-manylinux1_x86_64.whl" | xargs printf -- '%s[all]' | \
+         "tritonclient-*linux*.whl" | xargs printf -- '%s[all]' | \
     xargs pip3 install --upgrade
 
 # Install DCGM
 RUN if [ "$TRITON_ENABLE_GPU" = "ON" ]; then \
-      apt-get update && apt-get install -y --no-install-recommends software-properties-common && \
-      wget https://developer.download.nvidia.com/compute/cuda/repos/ubuntu2004/x86_64/cuda-ubuntu2004.pin && \
-      mv cuda-ubuntu2004.pin /etc/apt/preferences.d/cuda-repository-pin-600 && \
-      apt-key adv --fetch-keys https://developer.download.nvidia.com/compute/cuda/repos/ubuntu2004/x86_64/7fa2af80.pub && \
-      add-apt-repository "deb https://developer.download.nvidia.com/compute/cuda/repos/ubuntu2004/x86_64/ /" && \
-      apt-get install -y datacenter-gpu-manager=1:${DCGM_VERSION}; \
+      if [ "$TARGETPLATFORM" = "linux/arm64" ]; then \
+        wget https://developer.download.nvidia.com/compute/cuda/repos/ubuntu2004/sbsa/cuda-ubuntu2004.pin && \
+        mv cuda-ubuntu2004.pin /etc/apt/preferences.d/cuda-repository-pin-600 && \
+        apt-key adv --fetch-keys https://developer.download.nvidia.com/compute/cuda/repos/ubuntu2004/sbsa/7fa2af80.pub && \
+        add-apt-repository "deb https://developer.download.nvidia.com/compute/cuda/repos/ubuntu2004/sbsa/ /" && \
+        apt-get update && apt-get install -y datacenter-gpu-manager=1:${DCGM_VERSION}; \
+      else \
+        wget https://developer.download.nvidia.com/compute/cuda/repos/ubuntu2004/x86_64/cuda-ubuntu2004.pin && \
+        mv cuda-ubuntu2004.pin /etc/apt/preferences.d/cuda-repository-pin-600 && \
+        apt-key adv --fetch-keys https://developer.download.nvidia.com/compute/cuda/repos/ubuntu2004/x86_64/7fa2af80.pub && \
+        add-apt-repository "deb https://developer.download.nvidia.com/compute/cuda/repos/ubuntu2004/x86_64/ /" && \
+        apt-get update && apt-get install -y datacenter-gpu-manager=1:${DCGM_VERSION}; \
+      fi \
     fi
 
 # Install Model Analyzer

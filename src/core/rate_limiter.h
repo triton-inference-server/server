@@ -40,19 +40,10 @@
 
 namespace nvidia { namespace inferenceserver {
 
-// Limits the rate at which requests are dispatched from the scheduler
+// Limits the rate at which requests are dispatched to the model instances
 class RateLimiter {
- private:
-  class ModelContext;
-
  public:
-  class ModelInstance;
-
-  using StandardReleaseFunc = std::function<void(ModelInstance*)>;
-  using StandardScheduleFunc = std::function<void(ModelInstance*)>;
-  using StandardStageFunc = std::function<void(ModelInstance*)>;
   using RateLimiterConfig = inference::ModelRateLimiter;
-
   using ResourceMap = std::map<int, std::map<std::string, size_t>>;
   enum RESOURCE_KIND_KEY {
     // Key for holding global resources
@@ -85,6 +76,7 @@ class RateLimiter {
   /// with the rate limiter.
   /// \param rate_limiter_config The rate limiter configuration associated with
   /// the model instance.
+  /// \return Status object indicating success or failure.
   Status RegisterModelInstance(
       TritonModelInstance* instance,
       const RateLimiterConfig& rate_limiter_config);
@@ -94,63 +86,63 @@ class RateLimiter {
   /// \return Status object indicating success or failure.
   Status UnregisterModel(const TritonModel* model);
 
-  void InitializePayloadQueues(const TritonModelInstance* instance);
+  /// Returns true if there is a payload slot available for the given model.
+  /// \param model The pointer to TritonModel object to be removed.
+  /// \return slot availability in boolean.
   bool PayloadSlotAvailable(const TritonModel* model);
 
+  /// Enqueues the payload to rate limiter for scheduling on the given model.
+  /// \param model The pointer to TritonModel object to be removed.
+  /// \param payload The shared pointer to the payload object.
+  /// \return Status object indicating success or failure.
   Status EnqueuePayload(
       const TritonModel* model, std::shared_ptr<Payload> payload);
 
+  /// Returns the payload that has been scheduled for the given set of model
+  /// instances. Note that this call is blocking and depends upon the
+  /// availability of payloads in the rate limiter for the triton model
+  /// instance.
+  /// \param instance The pointers to TritonModelInstance objects whose
+  /// payload is being requested.
+  /// \param payload The shared pointer to the payload object.
   void DequeuePayload(
       std::deque<TritonModelInstance*>& instance,
       std::shared_ptr<Payload>* payload);
 
-  /// Requests one of the available model instance. In future, when the
-  /// conditions are met, the callback will be invoked and a pointer to
-  /// allocated RateLimiter::ModelInstance object will be exposed as a
-  /// parameter. The user must ensure RateLimiter::ModelInstance::Release
-  /// gets called on the instance once the inference request is complete
-  /// so that the instance and its resources are returned to the available
-  /// pool. Also, note the callback should be a light-weight call and
-  /// must not itself invoke the inference execution but just be used
-  /// as a signal to proceed with the execution.
-  /// \param OnSchedule The callback function to be called when scheduling.
-  /// \param model The TritonModel object pointer to be used for running the
-  /// inference.
-  /// \param instance The TritonModelInstance object pointer to be used for
-  /// running the inference. The default value is nullptr which means that an
-  /// instance with highest priority will be selected for the execution.
-  /// \return Status object indicating success or failure.
-  Status RequestModelInstance(
-      const StandardScheduleFunc& OnSchedule, const TritonModel* model,
-      TritonModelInstance* instance = nullptr);
-
-  /// Whether or not to ignore the resource configurations and priority settings
-  /// for the rate limiter.
-  bool IgnoreResourcesAndPriority() { return ignore_resources_and_priority_; }
-
+  /// Returns a new payload object.
+  /// \param op_type The operation type for the payload.
+  /// \param instance Optional field that providess the model instance that must
+  /// be used for the execution of the payload. Default is nullptr which allows
+  /// any model instance to execute the payload.
+  /// \return The shared pointer to a new payload object.
   std::shared_ptr<Payload> GetPayload(
       const Payload::Operation op_type,
       TritonModelInstance* instance = nullptr);
+
+  /// Releases the given payload object back to the rate limiter.
+  /// \param payload The payload to release.
   void PayloadRelease(std::shared_ptr<Payload>& payload);
 
+ private:
+  class ModelInstanceContext;
+  class ModelContext;
+  struct PayloadQueue;
+  using StandardReleaseFunc = std::function<void(ModelInstanceContext*)>;
+  using StandardScheduleFunc = std::function<void(ModelInstanceContext*)>;
+  using StandardStageFunc = std::function<void(ModelInstanceContext*)>;
+
   // Holds the state of the model instance.
-  class ModelInstance {
+  class ModelInstanceContext {
    public:
     friend class RateLimiter;
     friend class ResourceManager;
     enum State { AVAILABLE, STAGED, ALLOCATED, REMOVED };
 
-    /// Should be called when the request on the model instance is
-    /// complete. This function releases the resources allocated to
-    /// the model instance and sends the instance into the available
-    /// pool so that it can serve other requests.
     void Release();
-
-    /// Returns the raw triton instance
     TritonModelInstance* RawInstance() const { return triton_model_instance_; }
 
    private:
-    ModelInstance(
+    ModelInstanceContext(
         TritonModelInstance* triton_model_instance, ModelContext* model_context,
         const RateLimiterConfig& rate_limiter_config, StandardStageFunc OnStage,
         StandardReleaseFunc OnRelease);
@@ -172,7 +164,6 @@ class RateLimiter {
     RateLimiterConfig rate_limiter_config_;
     StandardStageFunc OnStage_;
     StandardReleaseFunc OnRelease_;
-    bool executed_;
     std::atomic<uint64_t> exec_count_;
 
     State state_;
@@ -184,25 +175,17 @@ class RateLimiter {
     std::condition_variable cv_;
   };
 
- private:
-  RateLimiter(
-      const bool ignore_resources_and_priority,
-      const ResourceMap& resource_map);
-
-  void OnStage(ModelInstance* instance_ptr);
-  void OnRelease(ModelInstance* instance_ptr);
-  void AttemptAllocation();
-
   class ScaledPriorityComparator {
    public:
-    bool operator()(ModelInstance* a, ModelInstance* b)
+    bool operator()(ModelInstanceContext* a, ModelInstanceContext* b)
     {
       return a->ScaledPriority() > b->ScaledPriority();
     }
   };
 
   using PriorityQueue = std::priority_queue<
-      ModelInstance*, std::vector<ModelInstance*>, ScaledPriorityComparator>;
+      ModelInstanceContext*, std::vector<ModelInstanceContext*>,
+      ScaledPriorityComparator>;
 
   // Holds the active context to a model
   class ModelContext {
@@ -212,8 +195,8 @@ class RateLimiter {
     Status EnqueueModelInstanceRequest(
         const StandardScheduleFunc& OnSchedule,
         TritonModelInstance* triton_model_instance);
-    void AddAvailableInstance(ModelInstance* instance);
-    void StageInstanceIfAvailable();
+    void AddAvailableInstance(ModelInstanceContext* instance);
+    void StageInstanceIfAvailable(TritonModelInstance* triton_model_instance);
     void AllocateInstanceIfAvailable();
     void AddSpecificRequestQueue();
     bool ContainsPendingRequests(int32_t index);
@@ -224,9 +207,10 @@ class RateLimiter {
     bool removal_in_progress_;
 
     // Queue holding pending scheduling request
-    std::queue<StandardScheduleFunc> generic_request_queue_;
-    std::vector<std::queue<StandardScheduleFunc>> specific_request_queues_;
-    std::recursive_mutex request_queue_mtx_;
+    std::queue<StandardScheduleFunc> generic_sched_request_queue_;
+    std::vector<std::queue<StandardScheduleFunc>>
+        specific_sched_request_queues_;
+    std::recursive_mutex sched_request_queue_mtx_;
 
     // The set of instances that are available at the moment
     PriorityQueue avbl_instances_;
@@ -239,11 +223,11 @@ class RateLimiter {
     static Status Create(
         const ResourceMap& resource_map,
         std::unique_ptr<ResourceManager>* resource_manager);
-    void AddModelInstance(const RateLimiter::ModelInstance* instance);
-    Status RemoveModelInstance(const RateLimiter::ModelInstance* instance);
+    void AddModelInstance(const ModelInstanceContext* instance);
+    Status RemoveModelInstance(const ModelInstanceContext* instance);
     Status UpdateResourceLimits();
-    bool AllocateResources(const RateLimiter::ModelInstance* instance);
-    Status ReleaseResources(const RateLimiter::ModelInstance* instance);
+    bool AllocateResources(const ModelInstanceContext* instance);
+    Status ReleaseResources(const ModelInstanceContext* instance);
 
    private:
     ResourceManager(const ResourceMap& resource_map);
@@ -252,7 +236,7 @@ class RateLimiter {
 
     ResourceMap explicit_max_resources_;
 
-    std::map<const RateLimiter::ModelInstance*, ResourceMap> model_resources_;
+    std::map<const ModelInstanceContext*, ResourceMap> model_resources_;
     std::mutex model_resources_mtx_;
 
     ResourceMap max_resources_;
@@ -262,16 +246,32 @@ class RateLimiter {
     std::mutex allocated_resources_mtx_;
   };
 
+  RateLimiter(
+      const bool ignore_resources_and_priority,
+      const ResourceMap& resource_map);
+
+  void InitializePayloadQueues(const TritonModelInstance* instance);
+  Status DeferPayloadSchedule(
+      const StandardScheduleFunc& OnSchedule, const TritonModel* model,
+      TritonModelInstance* instance = nullptr);
+  void OnStage(ModelInstanceContext* instance_ptr);
+  void OnRelease(ModelInstanceContext* instance_ptr);
+  void AttemptAllocation();
+  void SchedulePayload(
+      TritonModelInstance* tmi, PayloadQueue* payload_queue,
+      const std::shared_ptr<Payload>& payload);
+
   bool ignore_resources_and_priority_;
 
-  // Instances for the models
-  std::map<const TritonModel*, std::vector<std::shared_ptr<ModelInstance>>>
-      model_instances_;
-  std::mutex model_instances_mtx_;
+  // Instance context for the models
+  std::map<
+      const TritonModel*, std::vector<std::shared_ptr<ModelInstanceContext>>>
+      model_instance_ctxs_;
+  std::mutex model_instance_ctx_mtx_;
 
   // Running context of the models
   std::map<const TritonModel*, ModelContext> model_contexts_;
-  std::mutex model_contexts_mtx_;
+  std::mutex model_ctx_mtx_;
 
   // Holds the model instances that have been staged
   PriorityQueue staged_instances_;

@@ -205,13 +205,7 @@ class TritonServerOptions {
   void SetExitOnError(bool b) { exit_on_error_ = b; }
 
   bool StrictModelConfig() const { return strict_model_config_; }
-  void SetStrictModelConfig(bool b)
-  {
-    strict_model_config_ = b;
-    // Note the condition is reverted due to setting name is different
-    AddBackendConfig(
-        std::string(), "auto-complete-config", b ? "false" : "true");
-  }
+  void SetStrictModelConfig(bool b) { strict_model_config_ = b; }
 
   ni::RateLimitMode RateLimiterMode() const { return rate_limit_mode_; }
   void SetRateLimiterMode(ni::RateLimitMode m) { rate_limit_mode_ = m; }
@@ -246,8 +240,6 @@ class TritonServerOptions {
   void SetMinSupportedComputeCapability(double c)
   {
     min_compute_capability_ = c;
-    AddBackendConfig(
-        std::string(), "min-compute-capability", std::to_string(c));
   }
 
   bool StrictReadiness() const { return strict_readiness_; }
@@ -271,12 +263,11 @@ class TritonServerOptions {
   bool GpuMetrics() const { return gpu_metrics_; }
   void SetGpuMetrics(bool b) { gpu_metrics_ = b; }
 
+  uint64_t MetricsInterval() const { return metrics_interval_; }
+  void SetMetricsInterval(uint64_t m) { metrics_interval_ = m; }
+
   const std::string& BackendDir() const { return backend_dir_; }
-  void SetBackendDir(const std::string& bd)
-  {
-    backend_dir_ = bd;
-    AddBackendConfig(std::string(), "backend-directory", bd);
-  }
+  void SetBackendDir(const std::string& bd) { backend_dir_ = bd; }
 
   const std::string& RepoAgentDir() const { return repoagent_dir_; }
   void SetRepoAgentDir(const std::string& rad) { repoagent_dir_ = rad; }
@@ -319,6 +310,7 @@ class TritonServerOptions {
   ni::RateLimiter::ResourceMap rate_limit_resource_map_;
   bool metrics_;
   bool gpu_metrics_;
+  uint64_t metrics_interval_;
   unsigned int exit_timeout_;
   uint64_t pinned_memory_pool_size_;
   unsigned int buffer_manager_thread_count_;
@@ -338,8 +330,8 @@ TritonServerOptions::TritonServerOptions()
       model_control_mode_(ni::ModelControlMode::MODE_POLL),
       exit_on_error_(true), strict_model_config_(true), strict_readiness_(true),
       rate_limit_mode_(ni::RateLimitMode::RL_OFF), metrics_(true),
-      gpu_metrics_(true), exit_timeout_(30), pinned_memory_pool_size_(1 << 28),
-      buffer_manager_thread_count_(0),
+      gpu_metrics_(true), metrics_interval_(2000), exit_timeout_(30),
+      pinned_memory_pool_size_(1 << 28), buffer_manager_thread_count_(0),
 #ifdef TRITON_ENABLE_GPU
       min_compute_capability_(TRITON_MIN_COMPUTE_CAPABILITY),
 #else
@@ -1218,6 +1210,21 @@ TRITONSERVER_ServerOptionsSetGpuMetrics(
 }
 
 TRITONSERVER_Error*
+TRITONSERVER_ServerOptionsSetMetricsInterval(
+    TRITONSERVER_ServerOptions* options, uint64_t metrics_interval_ms)
+{
+#ifdef TRITON_ENABLE_METRICS
+  TritonServerOptions* loptions =
+      reinterpret_cast<TritonServerOptions*>(options);
+  loptions->SetMetricsInterval(metrics_interval_ms);
+  return nullptr;  // Success
+#else
+  return TRITONSERVER_ErrorNew(
+      TRITONSERVER_ERROR_UNSUPPORTED, "metrics not supported");
+#endif  // TRITON_ENABLE_METRICS
+}
+
+TRITONSERVER_Error*
 TRITONSERVER_ServerOptionsSetBackendDirectory(
     TRITONSERVER_ServerOptions* options, const char* backend_dir)
 {
@@ -1705,6 +1712,7 @@ TRITONSERVER_ServerNew(
 #ifdef TRITON_ENABLE_METRICS
   if (loptions->Metrics()) {
     ni::Metrics::EnableMetrics();
+    ni::Metrics::SetMetricsInterval(loptions->MetricsInterval());
   }
 #ifdef TRITON_ENABLE_METRICS_GPU
   if (loptions->Metrics() && loptions->GpuMetrics()) {
@@ -1717,16 +1725,16 @@ TRITONSERVER_ServerNew(
   lserver->SetModelRepositoryPaths(loptions->ModelRepositoryPaths());
   lserver->SetModelControlMode(loptions->ModelControlMode());
   lserver->SetStartupModels(loptions->StartupModels());
-  lserver->SetStrictModelConfigEnabled(loptions->StrictModelConfig());
+  bool strict_model_config = loptions->StrictModelConfig();
+  lserver->SetStrictModelConfigEnabled(strict_model_config);
   lserver->SetRateLimiterMode(loptions->RateLimiterMode());
   lserver->SetRateLimiterResources(loptions->RateLimiterResources());
   lserver->SetPinnedMemoryPoolByteSize(loptions->PinnedMemoryPoolByteSize());
   lserver->SetCudaMemoryPoolByteSize(loptions->CudaMemoryPoolByteSize());
-  lserver->SetMinSupportedComputeCapability(
-      loptions->MinSupportedComputeCapability());
+  double min_compute_capability = loptions->MinSupportedComputeCapability();
+  lserver->SetMinSupportedComputeCapability(min_compute_capability);
   lserver->SetStrictReadinessEnabled(loptions->StrictReadiness());
   lserver->SetExitTimeoutSeconds(loptions->ExitTimeout());
-  lserver->SetBackendCmdlineConfig(loptions->BackendCmdlineConfigMap());
   lserver->SetHostPolicyCmdlineConfig(loptions->HostPolicyCmdlineConfigMap());
   lserver->SetRepoAgentDir(loptions->RepoAgentDir());
   lserver->SetBufferManagerThreadCount(loptions->BufferManagerThreadCount());
@@ -1737,6 +1745,20 @@ TRITONSERVER_ServerNew(
       loptions->TensorFlowSoftPlacement());
   lserver->SetTensorFlowGPUMemoryFraction(
       loptions->TensorFlowGpuMemoryFraction());
+
+  // SetBackendCmdlineConfig must be called after all AddBackendConfig calls
+  // have completed.
+  // Note that the auto complete config condition is reverted
+  // due to setting name being different
+  loptions->AddBackendConfig(
+      std::string(), "auto-complete-config",
+      strict_model_config ? "false" : "true");
+  loptions->AddBackendConfig(
+      std::string(), "min-compute-capability",
+      std::to_string(min_compute_capability));
+  loptions->AddBackendConfig(
+      std::string(), "backend-directory", loptions->BackendDir());
+  lserver->SetBackendCmdlineConfig(loptions->BackendCmdlineConfigMap());
 
   ni::Status status = lserver->Init();
   std::vector<std::string> options_headers;

@@ -58,12 +58,27 @@ ARG VS_INSTALL_PATH_WP="C:\BuildTools"
 RUN powershell.exe Start-Process -FilePath vs_buildtools.exe -ArgumentList "--wait","--quiet","--norestart","--nocache","--installPath","%VS_INSTALL_PATH_WP%","--channelUri","C:\tmp\doesnotexist.chman","--add","Microsoft.VisualStudio.Workload.VCTools`;includeRecommended","--add","Microsoft.Component.MSBuild" -Wait -PassThru
 
 WORKDIR /
-RUN git clone --depth=1 --single-branch -b 2021.04.30 https://github.com/microsoft/vcpkg.git
+# vcpkg 2021.05.12 does not contain b64 port, so checking out master branch here (commit a82c62d)
+# should be switched to next vcpkg tag when one is created
+# option --depth=1 should also be restored
+RUN git clone --single-branch -b master https://github.com/microsoft/vcpkg.git
 WORKDIR /vcpkg
+RUN git checkout a82c62d
 RUN bootstrap-vcpkg.bat
 RUN vcpkg.exe update
-RUN vcpkg.exe install openssl:x64-windows openssl-windows:x64-windows rapidjson:x64-windows re2:x64-windows boost-interprocess:x64-windows boost-stacktrace:x64-windows zlib:x64-windows
+RUN vcpkg.exe install openssl:x64-windows openssl-windows:x64-windows rapidjson:x64-windows re2:x64-windows boost-interprocess:x64-windows boost-stacktrace:x64-windows zlib:x64-windows pthread:x64-windows b64:x64-windows
 RUN vcpkg.exe integrate install
+
+# Install a recent version of cmake. The version installed with VS is
+# older and specifically we need more recent version to avoid
+# https://gitlab.kitware.com/cmake/cmake/-/issues/21492.
+ARG CMAKE_VERSION=3.21.2
+ARG CMAKE_FILE=cmake-${CMAKE_VERSION}-windows-x86_64
+WORKDIR /
+ADD https://github.com/Kitware/CMake/releases/download/v${CMAKE_VERSION}/${CMAKE_FILE}.zip ${CMAKE_FILE}.zip
+RUN unzip %CMAKE_FILE%.zip
+RUN move %CMAKE_FILE% CMake
+RUN setx PATH "c:\CMake\bin;%PATH%"
 
 ARG CUDA_MAJOR=11
 ARG CUDA_MINOR=4
@@ -117,4 +132,4 @@ ENV CMAKE_TOOLCHAIN_FILE /vcpkg/scripts/buildsystems/vcpkg.cmake
 ENV VCPKG_TARGET_TRIPLET x64-windows
 ENV TRITONBUILD_CMAKE_TOOLCHAIN_FILE /vcpkg/scripts/buildsystems/vcpkg.cmake
 ENV TRITONBUILD_VCPKG_TARGET_TRIPLET x64-windows
-ENTRYPOINT C:\BuildTools\Common7\Tools\VsDevCmd.bat &&
+ENTRYPOINT C:\BuildTools\VC\Auxiliary\Build\vcvars64.bat &&

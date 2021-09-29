@@ -146,9 +146,16 @@ if(${TRITON_ENABLE_HTTP} OR ${TRITON_ENABLE_METRICS} OR ${TRITON_ENABLE_SAGEMAKE
     PRIVATE libevhtp::evhtp
     PRIVATE protobuf::libprotobuf
     PRIVATE ${RE2_LIBRARY}
-    PRIVATE b64
-    PRIVATE z
   )
+
+  if (WIN32)
+    find_library(B64_LIBRARY NAMES b64)
+    find_library(ZLIB_LIBRARY NAMES zlib)
+    list(APPEND HTTP_ENDPOINT_LIBRARIES ${B64_LIBRARY} ${ZLIB_LIBRARY})
+  else()
+    list(APPEND HTTP_ENDPOINT_LIBRARIES b64 z)
+  endif()
+
 endif() # TRITON_ENABLE_HTTP || TRITON_ENABLE_METRICS || TRITON_ENABLE_SAGEMAKER
 
 #
@@ -219,6 +226,7 @@ add_executable(
   ${TRACING_OBJECTS}
   $<TARGET_OBJECTS:proto-library>
 )
+
 set_property(TARGET main PROPERTY OUTPUT_NAME tritonserver)
 if(${TRITON_ENABLE_GPU})
   target_include_directories(main PRIVATE ${CUDA_INCLUDE_DIRS})

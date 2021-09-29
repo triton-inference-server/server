@@ -119,7 +119,8 @@ Metrics::Metrics()
                     "started")
               .Register(*registry_)),
 #endif  // TRITON_ENABLE_METRICS_GPU
-      metrics_enabled_(false), gpu_metrics_enabled_(false)
+      metrics_enabled_(false), gpu_metrics_enabled_(false),
+      metrics_interval_ms_(2000)
 {
 }
 
@@ -186,6 +187,13 @@ Metrics::EnableGPUMetrics()
   }
 
   singleton->gpu_metrics_enabled_ = true;
+}
+
+void
+Metrics::SetMetricsInterval(uint64_t metrics_interval_ms)
+{
+  auto singleton = GetSingleton();
+  singleton->metrics_interval_ms_ = metrics_interval_ms;
 }
 
 bool
@@ -355,13 +363,15 @@ Metrics::InitializeDcgmMetrics()
         LOG_WARNING << "Cannot make field group: " << errorString(dcgmerr);
       }
       dcgmerr = dcgmWatchFields(
-          handle, groupId, fieldGroupId, 2000000 /*update period, usec*/,
+          handle, groupId, fieldGroupId,
+          metrics_interval_ms_ * 1000 /*update period, usec*/,
           5.0 /*maxKeepAge, sec*/, 5 /*maxKeepSamples*/);
       if (dcgmerr != DCGM_ST_OK) {
         LOG_WARNING << "Cannot start watching fields: " << errorString(dcgmerr);
       } else {
         while (!dcgm_thread_exit_.load()) {
-          std::this_thread::sleep_for(std::chrono::milliseconds(2000));
+          std::this_thread::sleep_for(
+              std::chrono::milliseconds(metrics_interval_ms_ / 2));
           dcgmUpdateAllFields(handle, 1 /* wait for update*/);
           for (int didx = 0; didx < available_cuda_gpu_count; ++didx) {
             uint32_t cuda_id = available_cuda_gpu_ids[didx];

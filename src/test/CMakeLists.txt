@@ -81,6 +81,23 @@ set(
 )
 
 #
+# RequestResponseCache 
+#
+set(
+  RESPONSE_CACHE_SRCS
+  ../core/logging.cc
+  ../core/status.cc
+  ../core/response_cache.cc
+)
+
+set(
+  RESPONSE_CACHE_HDRS
+  ../core/logging.h
+  ../core/status.h
+  ../core/response_cache.h
+)
+
+#
 # Memory
 #
 set(
@@ -196,6 +213,71 @@ target_link_libraries(
 )
 install(
   TARGETS pinned_memory_manager_test
+  RUNTIME DESTINATION bin
+)
+
+#
+# Unit test for RequestResponseCache
+#
+set(
+  RESPONSE_CACHE_TEST_SRCS
+  response_cache_test.cc
+  ${RESPONSE_CACHE_SRCS}
+  ${MEMORY_SRCS}
+  ${CUDA_MEMORY_MANAGER_SRCS}
+  ${PINNED_MEMORY_MANAGER_SRCS}
+
+)
+
+set(
+  RESPONSE_CACHE_TEST_HDRS
+  ${RESPONSE_CACHE_HDRS}
+  ${MEMORY_HDRS}
+  ${CUDA_MEMORY_MANAGER_HDRS}
+  ${PINNED_MEMORY_MANAGER_HDRS}
+)
+
+find_package(GTest REQUIRED)
+add_executable(
+  response_cache_test
+  ${RESPONSE_CACHE_TEST_SRCS}
+  ${RESPONSE_CACHE_TEST_HDRS}
+  $<TARGET_OBJECTS:proto-library>
+)
+set_target_properties(
+  response_cache_test
+  PROPERTIES
+    SKIP_BUILD_RPATH TRUE
+    BUILD_WITH_INSTALL_RPATH TRUE
+    INSTALL_RPATH_USE_LINK_PATH FALSE
+    INSTALL_RPATH ""
+)
+target_include_directories(
+  response_cache_test
+  PRIVATE ${GTEST_INCLUDE_DIR}
+  PRIVATE ${CUDA_INCLUDE_DIRS}
+  PRIVATE ${CNMEM_PATH}/include
+)
+target_link_libraries(
+  response_cache_test
+  PRIVATE triton-common-error        # from repo-common
+  PRIVATE triton-common-sync-queue   # from repo-common
+  PRIVATE triton-core-serverapi      # from repo-core
+  PRIVATE proto-library              # from repo-common
+  PRIVATE ${GTEST_LIBRARY}
+  PRIVATE ${GTEST_MAIN_LIBRARY}
+  PRIVATE ${CUDA_LIBRARIES}
+  PRIVATE protobuf::libprotobuf
+  PRIVATE -lpthread
+  PRIVATE -L${CNMEM_PATH}/lib
+  PRIVATE -lcnmem
+  PRIVATE numa
+)
+
+target_compile_definitions(response_cache_test PUBLIC "TRITON_ENABLE_LOGGING=1")
+
+install(
+  TARGETS response_cache_test
   RUNTIME DESTINATION bin
 )
 
@@ -406,69 +488,6 @@ install(
   TARGETS triton_repo_agent_test
   RUNTIME DESTINATION bin
 )
-
-## FIXME: Enable rate limiter testing once the feature is complete.
-##
-## RateLimiter
-##
-#
-#set(
-#  RATE_LIMITER_SRCS
-#  ../core/rate_limiter.cc
-#  ../core/status.cc
-#)
-#
-#set(
-#  RATE_LIMITER_HDRS
-#  ../core/rate_limiter.h
-#  ${MODEL_CONFIG_PROTO_HDR}
-#)
-#
-#set(
-#  RATE_LIMITER_TEST_SRCS
-#  rate_limiter_test.cc
-#  ${RATE_LIMITER_SRCS}
-#)
-#
-#set(
-#  RATE_LIMITER_TEST_HDRS
-#  ${RATE_LIMITER_HDRS}
-#)
-#
-#add_executable(
-#  rate_limiter_test
-#  ${RATE_LIMITER_TEST_SRCS}
-#  ${RATE_LIMITER_TEST_HDRS}
-#  $<TARGET_OBJECTS:proto-library>
-#)
-#set_target_properties(
-#  rate_limiter_test
-#  PROPERTIES
-#    SKIP_BUILD_RPATH TRUE
-#    BUILD_WITH_INSTALL_RPATH TRUE
-#    INSTALL_RPATH_USE_LINK_PATH FALSE
-#    INSTALL_RPATH ""
-#)
-#target_include_directories(
-#  rate_limiter_test
-#  PRIVATE ${GTEST_INCLUDE_DIR}
-#)
-#if(${TRITON_ENABLE_GPU})
-#  target_include_directories(rate_limiter_test PRIVATE ${CUDA_INCLUDE_DIRS})
-#endif() # TRITON_ENABLE_GPU
-#target_link_libraries(
-#  rate_limiter_test
-#  PRIVATE triton-common-error     # from repo-common
-#  PRIVATE triton-core-serverapi   # from repo-core
-#  PRIVATE proto-library           # from repo-common
-#  PRIVATE ${GTEST_LIBRARY}
-#  PRIVATE ${GTEST_MAIN_LIBRARY}
-#  PRIVATE protobuf::libprotobuf
-#)
-#install(
-#  TARGETS rate_limiter_test
-#  RUNTIME DESTINATION bin
-#)
 
 add_subdirectory(sequence sequence)
 add_subdirectory(dyna_sequence dyna_sequence)
