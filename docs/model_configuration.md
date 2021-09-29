@@ -511,7 +511,7 @@ specifications:
 #### Resources
 
 The set of resources required to execute a model instance. Essentially,
-a resource is just mapping of a name to its corresponding count.
+a resource is a mapping of a name to its corresponding count.
 By default, the resource counts are local to the device running the
 instance. However, a resource, with `global` flag set to `True`, will
 be shared across the system. Loaded models can not specify a resource
@@ -519,9 +519,8 @@ with the same name both as global and non-global.
 
 #### Priority
 
-Priority specifies the priority of each instance in the group. For an
-instance, priority serves as a weighting value to be used for
-prioritizing across instances. An instance with priority 2 will be
+Priority serves as a weighting value to be used for prioritizing across
+all the instances of all the models. An instance with priority 2 will be
 given 1/2 the number of scheduling chances as an instance with priority
 1.
 
