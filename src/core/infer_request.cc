@@ -391,40 +391,6 @@ InferenceRequest::AddOriginalInput(
 }
 
 Status
-InferenceRequest::TransferOutputStates(
-    std::shared_ptr<std::unordered_map<std::string, OutputState>>&
-        output_states)
-{
-  if (output_states == nullptr || output_states_ == nullptr) {
-    return Status(Status::Code::INVALID_ARG, "invalid state detected.");
-  }
-
-  // The new state size and the old state size must match.
-  if (output_states_->size() != output_states->size()) {
-    return Status(
-        Status::Code::INVALID_ARG,
-        "Expected '" + std::to_string(output_states_->size()) +
-            "' output states from the model, found '" +
-            std::to_string(output_states->size()) + "' output states.");
-  }
-
-  // Make sure that the name of the output states provided by the backend are
-  // correct.
-  for (auto& pair : *output_states_) {
-    auto& output_state_name = pair.first;
-    auto output_state_itr = output_states->find(output_state_name);
-    if (output_state_itr == output_states->end()) {
-      return Status(
-          Status::Code::INVALID_ARG,
-          "detected incorrect output state name '" + output_state_name + "'.");
-    }
-  }
-
-  output_states = std::move(output_states_);
-  return Status::Success;
-}
-
-Status
 InferenceRequest::AddOriginalInput(
     const std::string& name, const inference::DataType datatype,
     const std::vector<int64_t>& shape, InferenceRequest::Input** input)
@@ -433,34 +399,51 @@ InferenceRequest::AddOriginalInput(
 }
 
 Status
-InferenceRequest::AddOutputState(
+InferenceRequest::AddState(
     const std::string& name, const inference::DataType datatype,
     const int64_t* shape, const uint64_t dim_count,
-    InferenceRequest::OutputState** output_state)
+    InferenceRequest::State** output_state)
 {
-  const auto& pr = output_states_->emplace(
+  const auto& next_state_itr = next_states_->find(name);
+
+  // If the state name is not valid return an error.
+  if (next_state_itr == next_states_->end()) {
+    return Status(
+        Status::Code::INVALID_ARG,
+        "state '" + name + "' is not a valid state name.");
+  }
+
+  const auto& pr = states_->emplace(
       std::piecewise_construct, std::forward_as_tuple(name),
-      std::forward_as_tuple(name, datatype, shape, dim_count));
+      std::forward_as_tuple(std::unique_ptr<InferenceRequest::State>(
+          new InferenceRequest::State(name, datatype, shape, dim_count))));
   if (!pr.second) {
     return Status(
         Status::Code::INVALID_ARG,
         "state '" + name + "' already exists in request");
   }
 
+  auto& next_state = next_state_itr->second;
+  auto& current_state = pr.first->second;
+
   if (output_state != nullptr) {
-    *output_state = std::addressof(pr.first->second);
+    *output_state = pr.first->second.get();
   }
+
+  current_state->SetStateUpdateCallback([&next_state, &current_state]() {
+    next_state = std::move(current_state);
+    return Status::Success;
+  });
 
   return Status::Success;
 }
 
 Status
-InferenceRequest::AddOutputState(
+InferenceRequest::AddState(
     const std::string& name, const inference::DataType datatype,
-    const std::vector<int64_t>& shape,
-    InferenceRequest::OutputState** output_state)
+    const std::vector<int64_t>& shape, InferenceRequest::State** output_state)
 {
-  return AddOutputState(name, datatype, &shape[0], shape.size(), output_state);
+  return AddState(name, datatype, &shape[0], shape.size(), output_state);
 }
 
 Status

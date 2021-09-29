@@ -155,7 +155,6 @@ SequenceBatchScheduler::Create(
   return Status::Success;
 }
 
-
 SequenceBatchScheduler::~SequenceBatchScheduler()
 {
   // Signal the reaper thread to exit...
@@ -877,16 +876,16 @@ void
 SequenceBatch::UpdateImplicitState(
     std::unique_ptr<InferenceRequest>& irequest, const int32_t seq_slot)
 {
-  // This should be executed only if the model has an states section.
+  // This should be executed only if the model has a states section.
   if (base_->HasImplicitState()) {
-    std::shared_ptr<
-        std::unordered_map<std::string, InferenceRequest::OutputState>>&
-        states = states_[seq_slot];
+    std::shared_ptr<std::unordered_map<
+        std::string, std::unique_ptr<InferenceRequest::State>>>& states =
+        states_[seq_slot];
 
     // Create the state for the first request in the sequence.
     if (states == nullptr) {
-      states.reset(
-          new std::unordered_map<std::string, InferenceRequest::OutputState>{});
+      states.reset(new std::unordered_map<
+                   std::string, std::unique_ptr<InferenceRequest::State>>{});
       for (auto& state : base_->StateOutputConfigMap()) {
         std::shared_ptr<InferenceRequest::Input> input;
         auto& state_config = state.second;
@@ -912,23 +911,27 @@ SequenceBatch::UpdateImplicitState(
         input->SetData(data);
 
         // Insert a dummy state for the first request in the sequence.
-        states->emplace(
+        const auto& pair = states->emplace(
             std::piecewise_construct,
             std::forward_as_tuple(state_config.output_name()),
-            std::forward_as_tuple());
+            std::forward_as_tuple(new InferenceRequest::State(
+                state_config.output_name(), state.second.data_type(), dims)));
+        pair.first->second->SetData(data);
+        *pair.first->second->MutableShape() = dims;
       }
     } else {
       for (auto& state : *states) {
         std::shared_ptr<InferenceRequest::Input> input;
         auto& output_state = state.second;
-        auto state_mapping_itr = base_->StateIOMap().find(output_state.Name());
+        const auto& state_mapping_itr =
+            base_->StateIOMap().find(output_state->Name());
 
-        // If there is an unexpected state stored, log an error
-        // and stop processing other states. This should never
-        // happen because we have already checked the name of
-        // the output states in state update callback.
+        // If there is an unexpected state stored, log an error and stop
+        // processing other states. This should never happen because we have
+        // already checked the name of the states in the AddState function of
+        // inference request.
         if (state_mapping_itr == base_->StateIOMap().end()) {
-          LOG_ERROR << "Unexpected output state name '" << output_state.Name()
+          LOG_ERROR << "Unexpected output state name '" << output_state->Name()
                     << "'.";
           break;
         }
@@ -936,20 +939,12 @@ SequenceBatch::UpdateImplicitState(
         // Add the stored implicit state to the inputs of the
         // inference request.
         irequest->AddOverrideInput(
-            state_mapping_itr->second, output_state.DType(),
-            irequest->BatchSize(), output_state.Shape(), &input);
-        input->SetData(output_state.Data());
+            state_mapping_itr->second, output_state->DType(),
+            irequest->BatchSize(), output_state->Shape(), &input);
+        input->SetData(output_state->Data());
       }
     }
-
-    // Set the callback that will be called when
-    // TRITONBACKEND_RequestStateUpdate() is called. This is the place where the
-    // new state will replace the old state.  If the number of provided states
-    // is incorrect or it contains wrong output state names, the state will not
-    // be updated.
-    irequest->SetStateUpdateCallback([&states](InferenceRequest* irequest) {
-      return irequest->TransferOutputStates(states);
-    });
+    irequest->SetNextStateHolder(states);
   }
 }
 
@@ -1146,7 +1141,6 @@ DirectSequenceBatch::BatcherThread(const int nice)
                   batcher_idx_, seq_slot);
               seq_slot_correlation_ids_[seq_slot] =
                   base_->ReleaseSequenceSlot(batcher_seq_slot, &queue);
-              states_[seq_slot] = nullptr;
             }
           }
 
@@ -1317,9 +1311,6 @@ DirectSequenceBatch::BatcherThread(const int nice)
                 batcher_idx_, seq_slot);
             seq_slot_correlation_ids_[seq_slot] =
                 base_->ReleaseSequenceSlot(batcher_seq_slot, &queue);
-
-            // If the sequence is ending, set the internal state to null.
-            states_[seq_slot] = nullptr;
           }
         }
       }
@@ -1497,7 +1488,6 @@ OldestSequenceBatch::CompleteAndNext(const uint32_t seq_slot)
           base_->ReleaseSequenceSlot(batcher_seq_slot, &queue);
       states_[seq_slot] = nullptr;
       if (released_cid.InSequence()) {
-
         LOG_VERBOSE(1) << "Enqueued new sequence containing " << queue.size()
                        << " requests into OldestFirst batcher " << batcher_idx_
                        << ", slot " << seq_slot;

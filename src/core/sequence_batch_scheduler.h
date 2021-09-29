@@ -69,6 +69,7 @@ class SequenceBatchScheduler : public Scheduler {
   // by the index into 'batchers_'.
   struct BatcherSequenceSlot {
     BatcherSequenceSlot() = default;
+    BatcherSequenceSlot(const BatcherSequenceSlot&) = default;
     BatcherSequenceSlot(size_t b, uint32_t s) : batcher_idx_(b), seq_slot_(s) {}
     size_t batcher_idx_;
     uint32_t seq_slot_;
@@ -255,8 +256,8 @@ class SequenceBatch {
       seq_slot_corrid_overrides_;
 
   // For each sequence slot store the optional implicit state tensors.
-  std::vector<std::shared_ptr<
-      std::unordered_map<std::string, InferenceRequest::OutputState>>>
+  std::vector<std::shared_ptr<std::unordered_map<
+      std::string, std::unique_ptr<InferenceRequest::State>>>>
       states_;
 };
 

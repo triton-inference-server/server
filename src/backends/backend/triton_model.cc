@@ -586,11 +586,16 @@ TRITONBACKEND_RequestRelease(
   return nullptr;  // success
 }
 
+///
+/// TRITONBACKEND_State
+///
+
 TRITONSERVER_Error*
-TRITONBACKEND_RequestUpdateState(TRITONBACKEND_Request* request)
+TRITONBACKEND_StateUpdate(TRITONBACKEND_State* state)
 {
-  InferenceRequest* tr = reinterpret_cast<InferenceRequest*>(request);
-  auto status = tr->UpdateState();
+  InferenceRequest::State* ts =
+      reinterpret_cast<InferenceRequest::State*>(state);
+  auto status = ts->Update();
 
   if (!status.IsOk()) {
     return TRITONSERVER_ErrorNew(
@@ -601,34 +606,34 @@ TRITONBACKEND_RequestUpdateState(TRITONBACKEND_Request* request)
 }
 
 TRITONSERVER_Error*
-TRITONBACKEND_RequestStateNew(
-    TRITONBACKEND_Request* request, TRITONBACKEND_State** state,
+TRITONBACKEND_StateNew(
+    TRITONBACKEND_State** state, TRITONBACKEND_Request* request,
     const char* name, const TRITONSERVER_DataType datatype,
     const int64_t* shape, const uint32_t dims_count)
 {
   InferenceRequest* tr = reinterpret_cast<InferenceRequest*>(request);
   std::vector<int64_t> lshape(shape, shape + dims_count);
-  InferenceRequest::OutputState* loutput_state;
-  Status status = tr->AddOutputState(
-      name, TritonToDataType(datatype), lshape, &loutput_state);
-  *loutput_state->MutableShape() = lshape;
+  InferenceRequest::State* lstate;
+  Status status =
+      tr->AddState(name, TritonToDataType(datatype), lshape, &lstate);
+  *lstate->MutableShape() = lshape;
   if (!status.IsOk()) {
     *state = nullptr;
     return TRITONSERVER_ErrorNew(
         StatusCodeToTritonCode(status.StatusCode()), status.Message().c_str());
   }
 
-  *state = reinterpret_cast<TRITONBACKEND_State*>(loutput_state);
+  *state = reinterpret_cast<TRITONBACKEND_State*>(lstate);
   return nullptr;  // success
 }
 
 TRITONSERVER_Error*
-TRITONBACKEND_StateOutputBuffer(
+TRITONBACKEND_StateBuffer(
     TRITONBACKEND_State* state, void** buffer, const uint64_t buffer_byte_size,
     TRITONSERVER_MemoryType* memory_type, int64_t* memory_type_id)
 {
-  InferenceRequest::OutputState* to =
-      reinterpret_cast<InferenceRequest::OutputState*>(state);
+  InferenceRequest::State* to =
+      reinterpret_cast<InferenceRequest::State*>(state);
   std::shared_ptr<AllocatedMemory> memory = std::make_shared<AllocatedMemory>(
       buffer_byte_size, *memory_type, *memory_type_id);
   *buffer = memory->MutableBuffer(memory_type, memory_type_id);
