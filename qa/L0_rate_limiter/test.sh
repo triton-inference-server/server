@@ -397,8 +397,8 @@ unset TRITONSERVER_DELAY_SCHEDULER
 ## Tests with sequence batching
 ##
 # Send one sequence and check for correct accumulator result. The result should be returned immediately.
-# This test checks whether all the requests are directed to the same instance despite other instances
-# with higher priority.
+# This test checks whether all the requests are directed to the same instance despite there being other
+# instances with higher priority.
 FIRST_INSTANCE_RESOURCE="rate_limiter { resources [{name: \"resource1\" count: 4 }] priority: 1}"
 (cd custom_models/custom_sequence_int32/ && \
         sed -i "s/max_sequence_idle_microseconds:.*/max_sequence_idle_microseconds: 1000000/" config.pbtxt && \

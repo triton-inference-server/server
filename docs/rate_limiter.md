@@ -36,7 +36,7 @@ In absence of rate limiting (--rate-limit=off), Triton schedules
 execution of request (or set of requests when using batching) as
 soon as a model instance is available. This behavior is typically
 best suited for performance. However, there can be cases 
-where running all the models simultaneously place excessive load 
+where running all the models simultaneously places excessive load 
 on the server. For instance, model execution on some 
 frameworks dynamically allocate memory. Running all such models
 simultaneously may lead to system going out-of-memory.

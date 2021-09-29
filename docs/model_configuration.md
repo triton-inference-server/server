@@ -503,37 +503,49 @@ the device kind of the instance, for instance, KIND_CPU is "cpu", KIND_MODEL is
 
 ### Rate Limiter Config
 
-Instance group optionally specify rate limiter config which controls
-how [rate limiter](rate_limiter.md) operates on instances in the group.
-The rate limiter configuration includes the following specification:
+Instance group optionally specifies [rate limiter](rate_limiter.md)
+config which controls how the rate limiter operates on the instances
+in the group. The rate limiter configuration includes the following
+specifications:
 
 #### Resources
 
-The resources required to execute the request on a model instance.
-Resources are just names with corresponding count. They are replicated
-for each instance. However, resource with `global` flag set `true` will
+The set of resources required to execute a model instance. Essentially,
+a resource is just mapping of a name to its corresponding count.
+By default, the resource counts are local to the device running the
+instance. However, a resource, with `global` flag set to `True`, will
 be shared across the system. Loaded models can not specify a resource
 with the same name both as global and non-global.
 
 #### Priority
 
-The weighting value to be used for prioritizing across instances.
-An instance with priority 2 will be given 1/2 the number of
-scheduling chances as an instance_group with priority 1.
+Priority specifies the priority of each instance in the group. For an
+instance, priority serves as a weighting value to be used for
+prioritizing across instances. An instance with priority 2 will be
+given 1/2 the number of scheduling chances as an instance with priority
+1.
 
-The following example specifies the instance group requires 
-four R1 and two R2 for execution. Resource R2 is a global resource.
-Additionally, the priority of the instance_group is 2.
+The following example specifies the instances in the group requires 
+four "R1" and two "R2" for execution. Resource "R2" is a global
+resource. Additionally, the priority of the instance_group is 2.
 
 ```
   instance_group [
     {
       count: 1
       kind: KIND_GPU
+      gpus: [ 0, 1, 2 ]
       rate_limiter {
         resources [
-          {name: "resource1" count: 4 },
-          {name: "resource2" global: True count: 2 }
+          {
+            name: "R1"
+            count: 4
+          },
+          {
+            name: "R2"
+            global: True
+            count: 2 
+          }
         ] 
         priority: 2
       }
