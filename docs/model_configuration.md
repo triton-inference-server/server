@@ -471,7 +471,7 @@ GPU 0 and two execution instances on GPUs 1 and 2.
   ]
 ```
 
-The instance group setting is also used to enable exection of a model
+The instance group setting is also used to enable execution of a model
 on the CPU. A model can be executed on the CPU even if there is a GPU
 available in the system. The following places two execution instances
 on the CPU.
@@ -500,6 +500,48 @@ the device kind of the instance, for instance, KIND_CPU is "cpu", KIND_MODEL is
     }
   ]
 ```
+
+### Rate Limiter Config
+
+Instance group optionally specify rate limiter config which controls
+how [rate limiter](rate_limiter.md) operates on instances in the group.
+The rate limiter configuration includes the following specification:
+
+#### Resources
+
+The resources required to execute the request on a model instance.
+Resources are just names with corresponding count. They are replicated
+for each instance. However, resource with `global` flag set `true` will
+be shared across the system. Loaded models can not specify a resource
+with the same name both as global and non-global.
+
+#### Priority
+
+The weighting value to be used for prioritizing across instances.
+An instance with priority 2 will be given 1/2 the number of
+scheduling chances as an instance_group with priority 1.
+
+The following example specifies the instance group requires 
+four R1 and two R2 for execution. Resource R2 is a global resource.
+Additionally, the priority of the instance_group is 2.
+
+```
+  instance_group [
+    {
+      count: 1
+      kind: KIND_GPU
+      rate_limiter {
+        resources [
+          {name: "resource1" count: 4 },
+          {name: "resource2" global: True count: 2 }
+        ] 
+        priority: 2
+      }
+    }
+  ]
+```
+
+
 
 ## Scheduling And Batching
 
