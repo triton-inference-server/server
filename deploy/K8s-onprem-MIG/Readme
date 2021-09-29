@@ -1,9 +1,11 @@
-This repo provides the scripts for autoscaling Triton deployment with Kubernetes and load balacing using NGNIX Plus. The scripts are for on-prem deployment but you can also modify them for deployment on the cloud.
+This repo provides the scripts for autoscaling Triton deployment with Kubernetes and load balacing using NGNIX Plus. 
+The scripts are for on-prem deployment but you can also modify them for deployment on the cloud.
 
 You can use a whole GPU or MIG instances of A100/A30 GPUs for GPU resource.
 
 You can define your own custom metric for Kubernetes Horizontal Pod Autoscaler (HPA). 
-Also you can change the minimum and maximum numbers of Replicas as you wish. For example, you can use 1 and 7 respectively if you are using 5GB MIG slices on a A100.
+Also you can change the minimum and maximum numbers of Replicas as you wish. 
+For example, you can use 1 and 7 respectively if you are using 5GB MIG slices on a A100.
 
 For step by step instructions, please refer to this developer blog:
 
