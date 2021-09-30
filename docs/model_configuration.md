@@ -506,10 +506,11 @@ the device kind of the instance, for instance, KIND_CPU is "cpu", KIND_MODEL is
 Instance group optionally specifies [rate limiter](rate_limiter.md)
 config which controls how the rate limiter operates on the instances
 in the group. The rate limiter configuration is ignored if rate
-limiting is off. If an instance_group does not provide this
-configuration, then the execution on the model instances belonging
-to this group will never be blocked. The configuration includes
-the following specifications:
+limiting is off. If rate limiting is on and if an instance_group does
+not provide this configuration, then the execution on the model
+instances belonging to this group will not be limited in any way by
+the rate limiter. The configuration includes the following
+specifications:
 
 #### Resources
 

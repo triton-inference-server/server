@@ -41,7 +41,7 @@ load on the server. For instance, model execution on some
 frameworks dynamically allocate memory. Running all such models
 simultaneously may lead to system going out-of-memory.
 
-Rate limiter allows to post-pone the inference execution on some
+Rate limiter allows to postpone the inference execution on some
 model instances such that not all of them runs simultaneously. 
 The model priorities are used to decide which model instance
 to schedule next. 
@@ -70,9 +70,8 @@ to execute. When under execution the specified many resources are
 allocated to the model instance only to be released when the
 execution is over. The available number of resource copies
 are, by default, the max across all model instances that list that
-resource (and so must be adjusted each time a model instance is
-added/removed). For example, assume three loaded model instances
-A, B and C each specifying the following resource requirements for
+resource. For example, assume three loaded model instances A, B
+and C each specifying the following resource requirements for
 a single device:
 
 ```
