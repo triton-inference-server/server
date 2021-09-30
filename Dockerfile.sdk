@@ -48,6 +48,7 @@ ARG DCGM_VERSION=2.2.9
 
 RUN apt-get update && \
     apt-get install -y --no-install-recommends \
+            ca-certificates \
             software-properties-common \
             autoconf \
             automake \
