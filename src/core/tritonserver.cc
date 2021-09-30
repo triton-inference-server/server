@@ -1744,6 +1744,7 @@ TRITONSERVER_ServerNew(
   lserver->SetRateLimiterMode(loptions->RateLimiterMode());
   lserver->SetRateLimiterResources(loptions->RateLimiterResources());
   lserver->SetPinnedMemoryPoolByteSize(loptions->PinnedMemoryPoolByteSize());
+  lserver->SetResponseCacheByteSize(loptions->ResponseCacheByteSize());
   lserver->SetCudaMemoryPoolByteSize(loptions->CudaMemoryPoolByteSize());
   double min_compute_capability = loptions->MinSupportedComputeCapability();
   lserver->SetMinSupportedComputeCapability(min_compute_capability);
