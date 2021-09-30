@@ -143,6 +143,7 @@ describe supported GPUs.
   - [Model Analyzer](docs/model_analyzer.md)
   - [Performance Analyzer](docs/perf_analyzer.md)
 - [Metrics](docs/metrics.md)
+- [Rate Limiter](docs/rate_limiter.md)
 - [Jetson and JetPack](docs/jetson.md)
 
 The [quickstart](docs/quickstart.md) walks you through all the steps
@@ -180,8 +181,10 @@ Analyzer](docs/model_analyzer.md) to help your optimization
 efforts. Specifically, you will want to optimize [scheduling and
 batching](docs/architecture.md#models-and-schedulers) and [model
 instances](docs/model_configuration.md#instance-groups) appropriately
-for each model. You may also want to consider [ensembling multiple
-models and pre/post-processing](docs/architecture.md#ensemble-models)
+for each model. You can also enable cross-model prioritization using
+[rate limiter](docs/rate_limiter.md) which manages the rate at which
+requests are scheduled on model instances. You may also want to
+consider [ensembling multiple models and pre/post-processing](docs/architecture.md#ensemble-models)
 into a pipeline. In some cases you may find [individual inference
 request trace data](docs/trace.md) useful when optimizing. A
 [Prometheus metrics endpoint](docs/metrics.md) allows you to visualize
