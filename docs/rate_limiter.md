@@ -33,11 +33,11 @@ model instances by Triton. The rate limiter operates across all
 models loaded in Triton to allow *cross-model prioritization*.
 
 In absence of rate limiting (--rate-limit=off), Triton schedules
-execution of request (or set of requests when using batching) as
-soon as a model instance is available. This behavior is typically
-best suited for performance. However, there can be cases 
-where running all the models simultaneously places excessive load 
-on the server. For instance, model execution on some 
+execution of a request (or set of requests when using dynamic
+batching) as soon as a model instance is available. This behavior
+is typically best suited for performance. However, there can be
+cases where running all the models simultaneously places excessive
+load on the server. For instance, model execution on some
 frameworks dynamically allocate memory. Running all such models
 simultaneously may lead to system going out-of-memory.
 
@@ -48,9 +48,9 @@ to schedule next.
 
 ## Using Rate Limiter
 
-To enable rate limiting users must set `--rate-limit` server
-cli option. For more information, consult usage of the option
-emitted by `tritonserver --help`.
+To enable rate limiting users must set `--rate-limit` option when
+launching tritonserver. For more information, consult usage of
+the option emitted by `tritonserver --help`.
 
 The rate limiter is controlled by rate limiter configuration
 described in [rate limiter config](model_configuration.md#rate-limiter-config).
@@ -61,17 +61,19 @@ defined by the instance group.
 
 ### Resources
 
-Resources are just names with a corresponding count. By default
-instance uses no rate-limiter resources. By listing a 
-resource/count the instance indicates that it requests that
-many resources to be available on the instance device before
-it can be allowed to execute. When under execution the specified
-many resources are allocated to the instance only to be released
-when the execution is over. The available number of resources
-is, by default, the max across all instances that list that resource
-(and so must be adjusted each time an instance is added/removed).
-For example, assume three loaded model instances A, B and C each 
-specifying the following resource counts for a single device:
+Resources are identified by a unique name and a count indicating
+the number of copies of the resource. By default, model instance
+uses no rate-limiter resources. By listing a resource/count the
+model instance indicates that it requires that many resources to
+be available on the model instance device before it can be allowed
+to execute. When under execution the specified many resources are
+allocated to the model instance only to be released when the
+execution is over. The available number of resource copies
+are, by default, the max across all model instances that list that
+resource (and so must be adjusted each time a model instance is
+added/removed). For example, assume three loaded model instances
+A, B and C each specifying the following resource requirements for
+a single device:
 
 ```
 A: [R1: 4, R2: 4]
@@ -79,8 +81,8 @@ B: [R2: 5, R3: 10, R4: 5]
 C: [R1: 1, R3: 7, R4: 2]
 ```
 
-By default, the server will select following available resource
-counts in the system:
+By default, based on those model instance requirements, the server
+will create the following resources with the indicated copies:
 
 ```
 R1: 4
@@ -95,8 +97,30 @@ it explicitly on command-line using `--rate-limit-resource` option.
 `tritonserver --help` will provide with more detailed usage
 instructions.
 
-See [resources](model_configuration.md#resources) for more details on
+By default, the available resource copies are per-device and resource
+requirements for a model instance are enforced against corresponding
+resources associated with the device where the model instance runs.
+The `--rate-limit-resource` allows users to provide different resource
+copies to different devices. Rate limiter can also handle global
+resources. Instead of creating resource copies per-device, a global
+resource will have a single copy all across the system.
+
+Rate limiter depends upon the model configuration to determine
+whether the resource is global or not. See
+[resources](model_configuration.md#resources) for more details on
 how to specify them in model configuration.
+
+For tritonserver, running on a two device machine, invoked with
+`--rate-limit-resource=R1:10 --rate-limit-resource=R2:5:0 --rate-limit-resource=R2:8:1 --rate-limit-resource=R3:2`
+, available resource copies are:
+
+```
+GLOBAL   => [R3: 2]
+DEVICE 0 => [R1: 10, R2: 5]
+DEVICE 1 => [R1: 10, R2: 8]
+```
+
+where R3 appears as a global resource in one of the loaded model.
 
 ### Priority
 

@@ -505,17 +505,23 @@ the device kind of the instance, for instance, KIND_CPU is "cpu", KIND_MODEL is
 
 Instance group optionally specifies [rate limiter](rate_limiter.md)
 config which controls how the rate limiter operates on the instances
-in the group. The rate limiter configuration includes the following
-specifications:
+in the group. The rate limiter configuration is ignored if rate
+limiting is off. If an instance_group does not provide this
+configuration, then the execution on the model instances belonging
+to this group will never be blocked. The configuration includes
+the following specifications:
 
 #### Resources
 
-The set of resources required to execute a model instance. Essentially,
-a resource is a mapping of a name to its corresponding count.
-By default, the resource counts are local to the device running the
-instance. However, a resource, with `global` flag set to `True`, will
-be shared across the system. Loaded models can not specify a resource
-with the same name both as global and non-global.
+The set of [resources](rate_limiter.md#resources) required to execute
+a model instance. The "name" field identifies the resource and "count"
+field refers to the number of copies of the resource that the model
+instance in the group requires to run. The "global" field specifies
+whether the resource is per-device or shared globally across the system.
+Loaded models can not specify a resource with the same name both as global
+and non-global. If no resources are provided then triton assumes the
+execution of model instance does not require any resources and will
+start executing as soon as model instance is available.
 
 #### Priority
 
@@ -525,8 +531,9 @@ given 1/2 the number of scheduling chances as an instance with priority
 1.
 
 The following example specifies the instances in the group requires 
-four "R1" and two "R2" for execution. Resource "R2" is a global
-resource. Additionally, the priority of the instance_group is 2.
+four "R1" and two "R2" resources for execution. Resource "R2" is a global
+resource. Additionally, the rate-limiter priority of the instance_group
+is 2.
 
 ```
   instance_group [
@@ -552,7 +559,14 @@ resource. Additionally, the priority of the instance_group is 2.
   ]
 ```
 
-
+The above configuration creates 3 model instances, one on each device
+(0, 1 and 2). The three instances will not contend for "R1" among
+themselves as "R1" is local for their own device, however, they will
+contend for "R2" because it is specified as a global resource which
+means "R2" is shared across the system. Though these instances don't
+contend for "R1" among themsleves, but they will contend for "R1"
+with other model instances which includes "R1" in their resource
+requirements and run on the same device as them.
 
 ## Scheduling And Batching
 
