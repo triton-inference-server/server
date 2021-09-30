@@ -263,7 +263,7 @@ optimization { execution_accelerators {
 
 As Triton starts you should check the console output and wait until
 Triton prints the "Staring endpoints" message. ONNX model loading can
-be significantly slower when TensorRT optimization is enabled. In 
+be significantly slower when TensorRT optimization is enabled. In
 production you can use [model warmup](model_configuration.md#model-warmup)
 to avoid this model startup/optimization slowdown. Now
 run perf_analyzer using the same options as for the baseline.
@@ -282,6 +282,22 @@ The TensorRT optimization provided 2x throughput improvement while
 cutting latency in half. The benefit provided by TensorRT will vary
 based on the model, but in general it can provide significant
 performance improvement.
+
+### ONNX with OpenVINO Optimization
+
+ONNX models running on the CPU can also be accelerated by using
+[OpenVINO](https://docs.openvinotoolkit.org/latest/index.html).  To
+enable OpenVINO optimization for an ONNX model: stop Triton, add the
+following lines to the end of the model configuration file, and then
+restart Triton.
+
+```
+optimization { execution_accelerators {
+  cpu_execution_accelerator : [ {
+    name : "openvino"
+  }]
+}}
+```
 
 ### TensorFlow with TensorRT Optimization
 
