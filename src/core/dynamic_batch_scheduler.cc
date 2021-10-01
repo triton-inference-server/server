@@ -150,17 +150,55 @@ DynamicBatchScheduler::Enqueue(std::unique_ptr<InferenceRequest>& request)
       request->Trace(), TRITONSERVER_TRACE_QUEUE_START,
       request->QueueStartNs());
 
+  // Response cache helpers
+  bool response_cache_enabled_ = model_->Server()->ResponseCacheEnabled();
+  uint64_t request_hash = 0U;
+  bool cache_hit = false;
+
   if (!dynamic_batching_enabled_) {
-    if (preserve_ordering_) {
-      DelegateResponse(request);
+    // TODO: Move cache lookup logic to a helper method
+    std::unique_ptr<InferenceResponse> cached_response;
+    if (response_cache_enabled_) {
+      auto cache = model_->Server()->GetResponseCache();
+      if (cache != nullptr) {
+        LOG_ERROR << "Response Cache was nullptr";
+        return Status(Status::Code::INTERNAL, "ResponseCache was nullptr");
+      }
+
+      // Hash request to get key for cache lookup
+      auto status = cache->Hash(*request, &request_hash);
+      if (!status.IsOk()) {
+        LOG_ERROR << "Failed to hash input request"
+                  << status.Message();
+      }
+      // Lookup request key in cache
+      request->ResponseFactory().CreateResponse(&cached_response);
+      status = cache->Lookup(request_hash, cached_response.get());
+      if (status.IsOk() && cached_response != nullptr) {
+        cache_hit = true;
+      } else {
+        // TODO: Distinguish between error and cache miss
+        LOG_VERBOSE(1) << "Failed to lookup request in response cache:" 
+                       << status.Message();
+      }
     }
-    // If not using dynamic batching, directly enqueue the
-    // request to model for execution
-    auto payload = model_->Server()->GetRateLimiter()->GetPayload(
-        Payload::Operation::INFER_RUN, nullptr /* TritonModelInstance*/);
-    payload->AddRequest(std::move(request));
-    RETURN_IF_ERROR(
-        model_->Server()->GetRateLimiter()->EnqueuePayload(model_, payload));
+
+    if (preserve_ordering_ || response_cache_enabled_) {
+      DelegateResponse(request, request_hash, cache_hit);
+    }
+
+    if (cache_hit && cached_response != nullptr) {
+      InferenceResponse::Send(std::move(cached_response), 0 /* flags */);
+    } else {
+      // If not using dynamic batching, directly enqueue the
+      // request to model for execution
+      auto payload = model_->Server()->GetRateLimiter()->GetPayload(
+          Payload::Operation::INFER_RUN, nullptr /* TritonModelInstance*/);
+      payload->AddRequest(std::move(request));
+      RETURN_IF_ERROR(
+          model_->Server()->GetRateLimiter()->EnqueuePayload(model_, payload));
+    }
+
   } else {
     bool wake_batcher = true;
     {
@@ -300,8 +338,8 @@ DynamicBatchScheduler::BatcherThread(const int nice)
               std::unique_ptr<InferenceRequest> request;
               auto status = queue_.Dequeue(&request);
               if (status.IsOk()) {
-                if (preserve_ordering_) {
-                  DelegateResponse(request);
+                if (preserve_ordering_ || model_->Server()->ResponseCacheEnabled()) {
+                  DelegateResponse(request, 0U /* hash */, false /* cache_hit */);
                 }
                 curr_payload_->AddRequest(std::move(request));
               } else {
@@ -506,19 +544,31 @@ DynamicBatchScheduler::GetDynamicBatch()
   return wait_ns / 1000;
 }
 
+// TODO: Replace cache_hit flag with struct of cache info
+//       or use cache manager to track logic
 void
 DynamicBatchScheduler::DelegateResponse(
-    std::unique_ptr<InferenceRequest>& request)
+    std::unique_ptr<InferenceRequest>& request, uint64_t request_hash, bool cache_hit)
 {
+
   completion_queue_.emplace_back();
   auto queue_slot = &completion_queue_.back();
   request->SetResponseDelegator(
-      [this, queue_slot](
+      [this, queue_slot, request_hash, cache_hit](
           std::unique_ptr<InferenceResponse>&& response, const uint32_t flags) {
-        {
-          queue_slot->emplace_back(std::move(response), flags);
+        // Insert response in cache if enabled and not already in there
+        bool response_cache_enabled_ = model_->Server()->ResponseCacheEnabled();
+        if (response_cache_enabled_ && !cache_hit) {
+          auto cache = model_->Server()->GetResponseCache();
+          cache->Insert(request_hash, *response);
         }
-        FinalizeResponses();
+        
+        if (preserve_ordering_) {
+          queue_slot->emplace_back(std::move(response), flags);
+          FinalizeResponses();
+        } else {
+          InferenceResponse::Send(std::move(response), 0 /* flags */);
+        }
       });
 }
 

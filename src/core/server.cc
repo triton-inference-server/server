@@ -171,6 +171,15 @@ InferenceServer::Init()
     return status;
   }
 
+  // TODO: Use ResponseCacheManager here and Create() instead 
+  LOG_INFO << "Response Cache Byte Size: " << response_cache_byte_size_;
+  if (response_cache_byte_size_ > 0) {
+    response_cache_ = std::make_shared<RequestResponseCache>(response_cache_byte_size_);
+    if (response_cache_ == nullptr) {
+	LOG_ERROR << "Response cache failed to initialize";
+    }
+  } 
+
 #ifdef TRITON_ENABLE_GPU
   // Set the default CUDA memory pool size for GPUs where it is not
   // set explicitly.

@@ -27,6 +27,18 @@
 #include "src/core/response_cache.h"
 #include "src/core/logging.h"
 
+namespace {
+
+std::string
+PointerToString(void* ptr)
+{
+  std::stringstream ss;
+  ss << ptr;
+  return ss.str();
+}
+
+} // namespace
+
 namespace nvidia { namespace inferenceserver {
 
 RequestResponseCache::RequestResponseCache(const uint64_t size)
@@ -41,6 +53,11 @@ RequestResponseCache::RequestResponseCache(const uint64_t size)
   // Create cache as managed buffer
   managed_buffer_ = boost::interprocess::managed_external_buffer(
       boost::interprocess::create_only_t{}, buffer_, size);
+
+  LOG_INFO << "Response Cache is created at '"
+           << PointerToString(buffer_) << "' with size "
+           << size;
+
 }
 
 RequestResponseCache::~RequestResponseCache()
