@@ -286,10 +286,9 @@ performance improvement.
 ### ONNX with OpenVINO Optimization
 
 ONNX models running on the CPU can also be accelerated by using
-[OpenVINO](https://docs.openvinotoolkit.org/latest/index.html).  To
-enable OpenVINO optimization for an ONNX model: stop Triton, add the
-following lines to the end of the model configuration file, and then
-restart Triton.
+[OpenVINO](https://docs.openvinotoolkit.org/latest/index.html). To
+enable OpenVINO optimization for an ONNX model, add the following
+lines to the end of the model's configuration file.
 
 ```
 optimization { execution_accelerators {
