@@ -35,6 +35,7 @@
 #include "src/core/memory.h"
 #include "src/core/model_config.h"
 #include "src/core/response_allocator.h"
+#include "src/core/sequence_state.h"
 #include "src/core/status.h"
 #include "src/core/tritonserver_apis.h"
 
@@ -262,9 +263,7 @@ class InferenceRequest {
       InferenceBackend* backend, const int64_t requested_model_version)
       : needs_normalization_(true), backend_raw_(backend),
         requested_model_version_(requested_model_version), flags_(0),
-        correlation_id_(0), batch_size_(0), timeout_us_(0),
-        collect_stats_(true),
-        states_(new std::unordered_map<std::string, std::unique_ptr<State>>())
+        correlation_id_(0), batch_size_(0), timeout_us_(0), collect_stats_(true)
   {
     SetPriority(0);
   }
@@ -468,17 +467,9 @@ class InferenceRequest {
     return response_factory_.SetResponseDelegator(response_delegator_);
   }
 
-  void SetNextStateHolder(
-      std::shared_ptr<std::unordered_map<std::string, std::unique_ptr<State>>>
-          next_state)
+  void SetSequenceState(std::shared_ptr<SequenceState> sequence_state)
   {
-    next_states_ = next_state;
-  }
-
-  std::shared_ptr<std::unordered_map<std::string, std::unique_ptr<State>>>&
-  NextStateHolder()
-  {
-    return next_states_;
+    sequence_state_ = sequence_state;
   }
 
   // Prepare this request for inference.
@@ -653,6 +644,7 @@ class InferenceRequest {
 <<<<<<< HEAD
 =======
 
+<<<<<<< HEAD
   // A map storing the output states provided by the backend.
   std::shared_ptr<std::unordered_map<std::string, std::unique_ptr<State>>>
       states_;
@@ -661,6 +653,10 @@ class InferenceRequest {
   std::shared_ptr<std::unordered_map<std::string, std::unique_ptr<State>>>
       next_states_;
 >>>>>>> Update based on the new backend API
+=======
+  // Sequence I/O state used for implicit state management.
+  std::shared_ptr<SequenceState> sequence_state_;
+>>>>>>> Review edits
 };
 
 std::ostream& operator<<(std::ostream& out, const InferenceRequest& request);

@@ -33,6 +33,7 @@
 #include "src/core/logging.h"
 #include "src/core/model_config_utils.h"
 #include "src/core/numa_utils.h"
+#include "src/core/sequence_state.h"
 #include "src/core/server.h"
 #include "src/core/server_message.h"
 #include "src/core/shared_library.h"
@@ -593,8 +594,7 @@ TRITONBACKEND_RequestRelease(
 TRITONSERVER_Error*
 TRITONBACKEND_StateUpdate(TRITONBACKEND_State* state)
 {
-  InferenceRequest::State* ts =
-      reinterpret_cast<InferenceRequest::State*>(state);
+  State* ts = reinterpret_cast<State*>(state);
   auto status = ts->Update();
 
   if (!status.IsOk()) {
@@ -612,11 +612,10 @@ TRITONBACKEND_StateNew(
     const int64_t* shape, const uint32_t dims_count)
 {
   InferenceRequest* tr = reinterpret_cast<InferenceRequest*>(request);
+  State* lstate;
   std::vector<int64_t> lshape(shape, shape + dims_count);
-  InferenceRequest::State* lstate;
   Status status =
       tr->AddState(name, TritonToDataType(datatype), lshape, &lstate);
-  *lstate->MutableShape() = lshape;
   if (!status.IsOk()) {
     *state = nullptr;
     return TRITONSERVER_ErrorNew(
@@ -632,13 +631,22 @@ TRITONBACKEND_StateBuffer(
     TRITONBACKEND_State* state, void** buffer, const uint64_t buffer_byte_size,
     TRITONSERVER_MemoryType* memory_type, int64_t* memory_type_id)
 {
-  InferenceRequest::State* to =
-      reinterpret_cast<InferenceRequest::State*>(state);
-  std::shared_ptr<AllocatedMemory> memory = std::make_shared<AllocatedMemory>(
-      buffer_byte_size, *memory_type, *memory_type_id);
-  *buffer = memory->MutableBuffer(memory_type, memory_type_id);
+  State* to = reinterpret_cast<State*>(state);
+  Status status = Status::Success;
 
-  Status status = to->SetData(std::move(memory));
+  // If the buffer size exactly matches the buffer available, reuse the
+  // currently allocated buffer.
+  if (to->Data()->TotalByteSize() == buffer_byte_size) {
+    const std::shared_ptr<AllocatedMemory>& memory =
+        reinterpret_cast<const std::shared_ptr<AllocatedMemory>&>(to->Data());
+    *buffer = memory->MutableBuffer(memory_type, memory_type_id);
+  } else {
+    std::shared_ptr<AllocatedMemory> memory = std::make_shared<AllocatedMemory>(
+        buffer_byte_size, *memory_type, *memory_type_id);
+    *buffer = memory->MutableBuffer(memory_type, memory_type_id);
+    status = to->SetData(memory);
+  }
+
   if (!status.IsOk()) {
     *buffer = nullptr;
     return TRITONSERVER_ErrorNew(

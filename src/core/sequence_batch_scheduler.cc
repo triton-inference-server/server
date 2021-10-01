@@ -68,13 +68,9 @@ SequenceBatchScheduler::Create(
 
   // Implicit States
   auto& states = config.sequence_batching().state();
-  bool has_implicit_state = false;
-  if (states.size() > 0) {
-    has_implicit_state = true;
-  }
-  sched->has_implicit_state_ = has_implicit_state;
+  sched->has_implicit_state_ = states.size() > 0;
 
-  if (has_implicit_state) {
+  if (sched->has_implicit_state_) {
     for (const inference::ModelSequenceBatching_State& state : states) {
       sched->state_io_map_.emplace(state.output_name(), state.input_name());
       sched->state_output_config_map_.insert({state.output_name(), state});
@@ -878,17 +874,15 @@ SequenceBatch::UpdateImplicitState(
 {
   // This should be executed only if the model has a states section.
   if (base_->HasImplicitState()) {
-    std::shared_ptr<std::unordered_map<
-        std::string, std::unique_ptr<InferenceRequest::State>>>& states =
-        states_[seq_slot];
+    auto& io_states_map = states_[seq_slot];
 
     // Create the state for the first request in the sequence.
-    if (states == nullptr) {
-      states.reset(new std::unordered_map<
-                   std::string, std::unique_ptr<InferenceRequest::State>>{});
+    if (io_states_map == nullptr) {
+      io_states_map.reset(new SequenceState);
       for (auto& state : base_->StateOutputConfigMap()) {
-        std::shared_ptr<InferenceRequest::Input> input;
         auto& state_config = state.second;
+        auto& input_states = io_states_map->input_states_;
+        auto& output_states = io_states_map->output_states_;
 
         std::vector<int64_t> dims;
         for (auto& dim : state_config.dims()) {
@@ -899,52 +893,53 @@ SequenceBatch::UpdateImplicitState(
           }
         }
 
-        // Replace the dynamic shapes with 1 for the first inference request.
-        std::replace(dims.begin(), dims.end(), -1, 1);
-        irequest->AddOverrideInput(
-            state_config.input_name(), state.second.data_type(),
-            irequest->BatchSize(), dims, &input);
-
         const size_t state_size = GetByteSize(state.second.data_type(), dims);
         auto data = std::make_shared<AllocatedMemory>(
             state_size, TRITONSERVER_MEMORY_CPU, 0);
-        input->SetData(data);
 
-        // Insert a dummy state for the first request in the sequence.
-        const auto& pair = states->emplace(
+        const auto& input_pair = input_states.emplace(
+            std::piecewise_construct,
+            std::forward_as_tuple(state_config.input_name()),
+            std::forward_as_tuple(new State(
+                state_config.input_name(), state.second.data_type(), dims)));
+
+        if (!input_pair.second) {
+          LOG_ERROR
+              << "Detected duplicate 'input_name' in the state configuration: '"
+              << state_config.input_name()
+              << ".' This state configuration will be ignored.";
+          continue;
+        }
+        input_pair.first->second->SetData(data);
+
+        const auto& output_pair = output_states.emplace(
             std::piecewise_construct,
             std::forward_as_tuple(state_config.output_name()),
-            std::forward_as_tuple(new InferenceRequest::State(
-                state_config.output_name(), state.second.data_type(), dims)));
-        pair.first->second->SetData(data);
-        *pair.first->second->MutableShape() = dims;
-      }
-    } else {
-      for (auto& state : *states) {
-        std::shared_ptr<InferenceRequest::Input> input;
-        auto& output_state = state.second;
-        const auto& state_mapping_itr =
-            base_->StateIOMap().find(output_state->Name());
+            std::forward_as_tuple());
+        if (!output_pair.second) {
+          LOG_ERROR << "Detected duplicate 'output_name' in the state "
+                       "configuration: '"
+                    << state_config.output_name()
+                    << ".' This state configuration will be ignored.";
 
-        // If there is an unexpected state stored, log an error and stop
-        // processing other states. This should never happen because we have
-        // already checked the name of the states in the AddState function of
-        // inference request.
-        if (state_mapping_itr == base_->StateIOMap().end()) {
-          LOG_ERROR << "Unexpected output state name '" << output_state->Name()
-                    << "'.";
-          break;
+          // Remove the corresponding state from the input_states_ map
+          input_states.erase(state_config.input_name());
+          continue;
         }
-
-        // Add the stored implicit state to the inputs of the
-        // inference request.
-        irequest->AddOverrideInput(
-            state_mapping_itr->second, output_state->DType(),
-            irequest->BatchSize(), output_state->Shape(), &input);
-        input->SetData(output_state->Data());
       }
     }
-    irequest->SetNextStateHolder(states);
+
+    for (auto& input_state_pair : io_states_map->input_states_) {
+      auto& input_state = input_state_pair.second;
+
+      std::shared_ptr<InferenceRequest::Input> input;
+      irequest->AddOverrideInput(
+          input_state->Name(), input_state->DType(), irequest->BatchSize(),
+          input_state->Shape(), &input);
+      input->SetData(input_state->Data());
+    }
+
+    irequest->SetSequenceState(io_states_map);
   }
 }
 
@@ -1188,9 +1183,9 @@ DirectSequenceBatch::BatcherThread(const int nice)
           } else {
             // Compare the age of the oldest pending request to the maximum
             // batch queuing delay, and the size of the ready requests in the
-            // batch, execute now if queuing delay is exceeded or the batch size
-            // is large enough. Otherwise create a timer to wakeup a thread to
-            // check again at the maximum allowed delay.
+            // batch, execute now if queuing delay is exceeded or the batch
+            // size is large enough. Otherwise create a timer to wakeup a
+            // thread to check again at the maximum allowed delay.
             uint64_t now_ns =
                 std::chrono::duration_cast<std::chrono::nanoseconds>(
                     std::chrono::steady_clock::now().time_since_epoch())
@@ -1272,8 +1267,8 @@ DirectSequenceBatch::BatcherThread(const int nice)
                 0) {
               end_of_sequence = true;
             } else {
-              // Update the implicit state and set the input state tensors. The
-              // state update doesn't need to happen when the sequence is
+              // Update the implicit state and set the input state tensors.
+              // The state update doesn't need to happen when the sequence is
               // ending.
               UpdateImplicitState(irequest, seq_slot);
             }
@@ -1525,5 +1520,4 @@ OldestSequenceBatch::Enqueue(
     CompleteAndNext(seq_slot);
   }
 }
-
 }}  // namespace nvidia::inferenceserver

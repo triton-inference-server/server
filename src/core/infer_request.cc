@@ -401,37 +401,74 @@ InferenceRequest::AddOriginalInput(
 Status
 InferenceRequest::AddState(
     const std::string& name, const inference::DataType datatype,
-    const int64_t* shape, const uint64_t dim_count,
-    InferenceRequest::State** output_state)
+    const int64_t* shape, const uint64_t dim_count, State** output_state)
 {
-  const auto& next_state_itr = next_states_->find(name);
+  auto& output_states = sequence_state_->output_states_;
+  auto& input_states = sequence_state_->input_states_;
+  const auto& output_state_itr = output_states.find(name);
 
   // If the state name is not valid return an error.
-  if (next_state_itr == next_states_->end()) {
+  if (output_state_itr == output_states.end()) {
     return Status(
         Status::Code::INVALID_ARG,
         "state '" + name + "' is not a valid state name.");
   }
 
-  const auto& pr = states_->emplace(
-      std::piecewise_construct, std::forward_as_tuple(name),
-      std::forward_as_tuple(std::unique_ptr<InferenceRequest::State>(
-          new InferenceRequest::State(name, datatype, shape, dim_count))));
-  if (!pr.second) {
-    return Status(
-        Status::Code::INVALID_ARG,
-        "state '" + name + "' already exists in request");
+  if (output_states[name] == nullptr) {
+    output_states[name] =
+        std::unique_ptr<State>(new State(name, datatype, shape, dim_count));
+  } else {
+    std::unique_ptr<State> output_state(
+        new State(name, datatype, shape, dim_count));
+
+    // Transfer the previously allocated buffer to the new output_state.
+    output_state->SetData(output_states[name]->Data());
+    output_states[name] = std::move(output_state);
   }
 
-  auto& next_state = next_state_itr->second;
-  auto& current_state = pr.first->second;
+  auto& output_state_r = output_states[name];
+  size_t iter_advance =
+      std::distance(output_states.begin(), output_states.find(name));
+
+  // Find the input state corresponding to this output state.
+  auto input_states_itr = input_states.begin();
+  std::advance(input_states_itr, iter_advance);
+  auto& input_state_r = input_states[input_states_itr->first];
 
   if (output_state != nullptr) {
-    *output_state = pr.first->second.get();
+    *output_state = output_states[name].get();
   }
 
-  current_state->SetStateUpdateCallback([&next_state, &current_state]() {
-    next_state = std::move(current_state);
+  output_state_r->SetStateUpdateCallback([&output_state_r, &input_state_r]() {
+    // Swap the internal memory if the size of the input and output state is
+    // equal
+    if (output_state_r->Data()->TotalByteSize() ==
+        input_state_r->Data()->TotalByteSize()) {
+      std::shared_ptr<Memory> temp_memory = input_state_r->Data();
+      RETURN_IF_ERROR(input_state_r->RemoveAllData());
+      RETURN_IF_ERROR(input_state_r->SetData(output_state_r->Data()));
+      RETURN_IF_ERROR(output_state_r->RemoveAllData());
+      RETURN_IF_ERROR(output_state_r->SetData(temp_memory));
+    } else {
+      // If the size of output state is different from the input state, allocate
+      // a new memory for the input state with the same size as output state.
+      TRITONSERVER_MemoryType memory_type;
+      int64_t memory_type_id;
+
+      const std::shared_ptr<AllocatedMemory>& input_memory =
+          reinterpret_cast<const std::shared_ptr<AllocatedMemory>&>(
+              input_state_r->Data());
+
+      input_memory->MutableBuffer(&memory_type, &memory_type_id);
+      std::shared_ptr<AllocatedMemory> memory =
+          std::make_shared<AllocatedMemory>(
+              output_state_r->Data()->TotalByteSize(), memory_type,
+              memory_type_id);
+      RETURN_IF_ERROR(input_state_r->RemoveAllData());
+      RETURN_IF_ERROR(input_state_r->SetData(output_state_r->Data()));
+      RETURN_IF_ERROR(output_state_r->RemoveAllData());
+      RETURN_IF_ERROR(output_state_r->SetData(memory));
+    }
     return Status::Success;
   });
 
@@ -441,7 +478,7 @@ InferenceRequest::AddState(
 Status
 InferenceRequest::AddState(
     const std::string& name, const inference::DataType datatype,
-    const std::vector<int64_t>& shape, InferenceRequest::State** output_state)
+    const std::vector<int64_t>& shape, State** output_state)
 {
   return AddState(name, datatype, &shape[0], shape.size(), output_state);
 }

@@ -40,6 +40,7 @@
 #include "src/core/rate_limiter.h"
 #include "src/core/scheduler.h"
 #include "src/core/scheduler_utils.h"
+#include "src/core/sequence_state.h"
 #include "src/core/status.h"
 
 namespace nvidia { namespace inferenceserver {
@@ -255,10 +256,8 @@ class SequenceBatch {
   std::vector<std::shared_ptr<InferenceRequest::Input>>
       seq_slot_corrid_overrides_;
 
-  // For each sequence slot store the optional implicit state tensors.
-  std::vector<std::shared_ptr<std::unordered_map<
-      std::string, std::unique_ptr<InferenceRequest::State>>>>
-      states_;
+  // For each sequence slot store the optional state i/o tensors.
+  std::vector<std::shared_ptr<SequenceState>> states_;
 };
 
 // Scheduler that implements the Direct sequence scheduling strategy
