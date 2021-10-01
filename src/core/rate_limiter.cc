@@ -674,7 +674,7 @@ RateLimiter::ModelInstanceContext::ScaledPriority()
 {
   // TODO: Different schemes for the prioritization of
   // model instance can be added here.
-  return (exec_count_ * rate_limiter_config_.priority());
+  return (exec_count_ * std::max(rate_limiter_config_.priority(), 1u));
 }
 
 
