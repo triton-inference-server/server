@@ -1858,6 +1858,10 @@ TRITONSERVER_ServerNew(
             "}",
         std::to_string(cuda_memory_pool.second)});
   }
+  options_table.InsertRow(std::vector<std::string>{
+      "response_cache_byte_size",
+      std::to_string(lserver->ResponseCacheByteSize())});
+
   std::stringstream compute_capability_ss;
   compute_capability_ss.setf(std::ios::fixed);
   compute_capability_ss.precision(1);

@@ -89,7 +89,7 @@ class DynamicBatchScheduler : public Scheduler {
   void BatcherThread(const int nice);
   void NewPayload();
   uint64_t GetDynamicBatch();
-  void DelegateResponse(std::unique_ptr<InferenceRequest>& request);
+  void DelegateResponse(std::unique_ptr<InferenceRequest>& request, uint64_t request_hash, bool cache_hit);
   void FinalizeResponses();
 
   // FIXME: Use shared_ptr for model once InferenceBackend class is cleaned up.
