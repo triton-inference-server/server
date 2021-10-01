@@ -118,7 +118,9 @@ class RequestTracker {
 // Step contains metadata, and status for the
 // internal infer request
 struct Step {
-  Step(size_t step_idx, uint64_t correlation_id, uint32_t flags)
+  Step(
+      size_t step_idx, InferenceRequest::SequenceId& correlation_id,
+      uint32_t flags)
       : correlation_id_(correlation_id), flags_(flags), response_flags_(0),
         infer_status_(nullptr), step_idx_(step_idx)
   {
@@ -126,7 +128,7 @@ struct Step {
 
   std::shared_ptr<EnsembleContext> ctx_;
   std::unique_ptr<InferenceRequest> request_;
-  uint64_t correlation_id_;
+  InferenceRequest::SequenceId correlation_id_;
   uint32_t flags_;
 
   std::mutex output_mtx_;
@@ -154,7 +156,7 @@ struct TensorData {
     }
     Metadata(
         std::unique_ptr<InferenceRequest::Input>&& data, size_t reference_count,
-        uint64_t correlation_id, uint32_t flags)
+        InferenceRequest::SequenceId& correlation_id, uint32_t flags)
         : data_(std::move(data)), remaining_reference_count_(reference_count),
           parameter_override_(true), correlation_id_(correlation_id),
           flags_(flags)
@@ -163,7 +165,7 @@ struct TensorData {
     std::unique_ptr<InferenceRequest::Input> data_;
     size_t remaining_reference_count_;
     bool parameter_override_;
-    uint64_t correlation_id_;
+    InferenceRequest::SequenceId correlation_id_;
     uint32_t flags_;
   };
   TensorData() = default;
@@ -182,7 +184,7 @@ struct TensorData {
 
   IterationCount AddTensor(
       std::unique_ptr<InferenceRequest::Input>&& tensor,
-      uint64_t correlation_id, uint32_t flags)
+      InferenceRequest::SequenceId& correlation_id, uint32_t flags)
   {
     tensor_.emplace(
         current_iteration_,
@@ -321,7 +323,7 @@ class EnsembleContext {
   // should be applied to all internal requests
   uint32_t flags_;
   std::string request_id_;
-  uint64_t correlation_id_;
+  InferenceRequest::SequenceId correlation_id_;
   uint32_t priority_;
   uint64_t timeout_;
 
@@ -560,7 +562,7 @@ EnsembleContext::ResponseComplete(
     auto err = TRITONSERVER_InferenceResponseError(response);
     uint32_t count;
     bool parameter_override = false;
-    uint64_t correlation_id = 0;
+    InferenceRequest::SequenceId correlation_id{0};
     uint32_t flags = 0;
     if (err == nullptr) {
       err = TRITONSERVER_InferenceResponseParameterCount(response, &count);
@@ -573,14 +575,20 @@ EnsembleContext::ResponseComplete(
               response, idx, &name, &type, &vvalue);
           if (err == nullptr) {
             if (!strcmp(name, "sequence_id")) {
-              if (type != TRITONSERVER_PARAMETER_INT) {
+              if (type == TRITONSERVER_PARAMETER_INT) {
+                correlation_id = InferenceRequest::SequenceId(
+                    *reinterpret_cast<const uint64_t*>(vvalue));
+                parameter_override = true;
+              } else if (type == TRITONSERVER_PARAMETER_STRING) {
+                correlation_id = InferenceRequest::SequenceId(
+                    std::string(*reinterpret_cast<const char* const*>(vvalue)));
+                parameter_override = true;
+              } else {
                 err = TRITONSERVER_ErrorNew(
                     TRITONSERVER_ERROR_INVALID_ARG,
-                    "expect paremeter 'sequence_id' to be "
-                    "TRITONSERVER_PARAMETER_INT");
-              } else {
-                correlation_id = *reinterpret_cast<const uint64_t*>(vvalue);
-                parameter_override = true;
+                    "expected parameter 'sequence_id' to be "
+                    "TRITONSERVER_PARAMETER_INT or "
+                    "TRITONSERVER_PARAMETER_STRING");
               }
             } else if (!strcmp(name, "sequence_start")) {
               if (type != TRITONSERVER_PARAMETER_BOOL) {
@@ -1119,7 +1127,14 @@ EnsembleContext::CheckAndSetEnsembleOutput(
     releasing_tensors.emplace(&tensor_data, &tensor.remaining_reference_count_);
 
     if (tensor.parameter_override_) {
-      (*response)->AddParameter("sequence_id", (int64_t)tensor.correlation_id_);
+      if (lrequest->CorrelationId().IsString()) {
+        (*response)->AddParameter(
+            "sequence_id", tensor.correlation_id_.GetStringValue().c_str());
+      } else if (lrequest->CorrelationId().IsUnsignedInt()) {
+        (*response)->AddParameter(
+            "sequence_id",
+            (int64_t)tensor.correlation_id_.GetUnsignedIntValue());
+      }
       (*response)->AddParameter(
           "sequence_start",
           (tensor.flags_ & TRITONSERVER_REQUEST_FLAG_SEQUENCE_START) != 0);

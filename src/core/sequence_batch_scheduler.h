@@ -77,7 +77,7 @@ class SequenceBatchScheduler : public Scheduler {
 
   // Fill a sequence slot with a sequence from the backlog or show
   // that the sequence slot is no longer being used.
-  uint64_t ReleaseSequenceSlot(
+  InferenceRequest::SequenceId ReleaseSequenceSlot(
       const BatcherSequenceSlot& seq_slot,
       std::deque<std::unique_ptr<InferenceRequest>>* requests);
 
@@ -123,13 +123,14 @@ class SequenceBatchScheduler : public Scheduler {
   // Map from a request's correlation ID to the BatcherSequenceSlot
   // assigned to that correlation ID.
   using BatcherSequenceSlotMap =
-      std::unordered_map<uint64_t, BatcherSequenceSlot>;
+      std::unordered_map<InferenceRequest::SequenceId, BatcherSequenceSlot>;
   BatcherSequenceSlotMap sequence_to_batcherseqslot_map_;
 
   // Map from a request's correlation ID to the backlog queue
   // collecting requests for that correlation ID.
   using BacklogMap = std::unordered_map<
-      uint64_t, std::shared_ptr<std::deque<std::unique_ptr<InferenceRequest>>>>;
+      InferenceRequest::SequenceId,
+      std::shared_ptr<std::deque<std::unique_ptr<InferenceRequest>>>>;
   BacklogMap sequence_to_backlog_map_;
 
   // The ordered backlog of sequences waiting for a free sequenceslot.
@@ -147,7 +148,8 @@ class SequenceBatchScheduler : public Scheduler {
 
   // For each correlation ID the most recently seen timestamp, in
   // microseconds, for a request using that correlation ID.
-  std::unordered_map<uint64_t, uint64_t> correlation_id_timestamps_;
+  std::unordered_map<InferenceRequest::SequenceId, uint64_t>
+      correlation_id_timestamps_;
 
   // Used for debugging/testing.
   size_t backlog_delay_cnt_;
@@ -178,14 +180,15 @@ class SequenceBatch {
   // sequence slot. This function takes ownership of 'request' so on
   // request 'request' will be nullptr.
   virtual void Enqueue(
-      const uint32_t seq_slot, const uint64_t correlation_id,
+      const uint32_t seq_slot,
+      const InferenceRequest::SequenceId correlation_id,
       std::unique_ptr<InferenceRequest>& request) = 0;
 
  protected:
   bool CreateCorrelationIDControl(const inference::ModelConfig& config);
   void SetControlTensors(
       std::unique_ptr<InferenceRequest>& irequest, const int32_t seq_slot,
-      const uint64_t corr_id, const bool not_ready = false);
+      const InferenceRequest::SequenceId corr_id, const bool not_ready = false);
 
   // The controlling scheduler.
   SequenceBatchScheduler* const base_;
@@ -246,7 +249,8 @@ class DirectSequenceBatch : public SequenceBatch {
   ~DirectSequenceBatch();
 
   void Enqueue(
-      const uint32_t seq_slot, const uint64_t correlation_id,
+      const uint32_t seq_slot,
+      const InferenceRequest::SequenceId correlation_id,
       std::unique_ptr<InferenceRequest>& request) override;
 
  private:
@@ -270,12 +274,12 @@ class DirectSequenceBatch : public SequenceBatch {
   // that slot are enqueued to wait for inferencing.
   std::vector<std::deque<std::unique_ptr<InferenceRequest>>> queues_;
 
-  // Is each sequence slot active or not? A zero value indicates
-  // inactive, a non-zero value indicates active and is the
+  // Is each sequence slot active or not? A zero or empty value indicates
+  // inactive, a non-zero/non-empty value indicates active and is the
   // correlation ID of the sequence active in the slot. An empty
   // queue for a sequence slot does not mean it's inactive... it
   // could just not have any requests pending at the moment.
-  std::vector<uint64_t> seq_slot_correlation_ids_;
+  std::vector<InferenceRequest::SequenceId> seq_slot_correlation_ids_;
 
   // The maximum active sequence slot. A value of -1 indicates that
   // no slots are active in the backend.
@@ -308,7 +312,8 @@ class OldestSequenceBatch : public SequenceBatch {
   ~OldestSequenceBatch();
 
   void Enqueue(
-      const uint32_t seq_slot, const uint64_t correlation_id,
+      const uint32_t seq_slot,
+      const InferenceRequest::SequenceId correlation_id,
       std::unique_ptr<InferenceRequest>& request) override;
 
  private:

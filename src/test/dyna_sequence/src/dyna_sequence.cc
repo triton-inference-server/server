@@ -96,6 +96,7 @@ class ModelState : public BackendModel {
   // Get accumulator size and execution delay
   size_t AccumulatorSize() const { return accumulator_size_; }
   int ExecDelay() const { return execute_delay_ms_; }
+  std::string& CorrelationIdType() const { return corrid_dtype_; }
 
   // Validate that model configuration is supported by this backend.
   TRITONSERVER_Error* ValidateModelConfig();
@@ -108,6 +109,9 @@ class ModelState : public BackendModel {
 
   // Accumulator size
   size_t accumulator_size_;
+
+  // Correlation id type
+  std::string corrid_dtype_;
 };
 
 TRITONSERVER_Error*
@@ -127,7 +131,8 @@ ModelState::Create(TRITONBACKEND_Model* triton_model, ModelState** state)
 }
 
 ModelState::ModelState(TRITONBACKEND_Model* triton_model)
-    : BackendModel(triton_model), execute_delay_ms_(0), accumulator_size_(0)
+    : BackendModel(triton_model), execute_delay_ms_(0), accumulator_size_(0),
+      corrid_dtype_("TYPE_UINT64")
 {
 }
 
@@ -212,9 +217,11 @@ ModelState::ValidateModelConfig()
   RETURN_IF_ERROR(control_item.MemberAsString("data_type", &corrid_dtype));
 
   RETURN_ERROR_IF_FALSE(
-      corrid_dtype == "TYPE_UINT64", TRITONSERVER_ERROR_INVALID_ARG,
+      (corrid_dtype == "TYPE_UINT64" || corrid_dtype == "TYPE_STRING"),
+      TRITONSERVER_ERROR_INVALID_ARG,
       std::string("model CORRID control input must have TYPE_UINT64 "
-                  "data-type"));
+                  "or TYPE_STRING data-type"));
+  corrid_dtype_ = corrid_dtype;
 
   common::TritonJson::Value inputs, outputs;
   RETURN_IF_ERROR(model_config_.MemberAsArray("input", &inputs));
@@ -668,10 +675,19 @@ TRITONBACKEND_ModelInstanceExecute(
         responses, r, TRITONBACKEND_RequestId(request, &request_id));
 
     uint64_t correlation_id = 0;
-    GUARDED_RESPOND_IF_ERROR(
-        responses, r,
-        TRITONBACKEND_RequestCorrelationId(request, &correlation_id));
+    if (model_state->CorrelationIdType() == "TYPE_UINT64") {
+      GUARDED_RESPOND_IF_ERROR(
+          responses, r,
+          TRITONBACKEND_RequestCorrelationId(request, &correlation_id));
+    } else if (model_state->CorrelationIdType()) {
+      std::string corrid_string;
+      GUARDED_RESPOND_IF_ERROR(
+          responses, r,
+          TRITONBACKEND_RequestCorrelationIdString(request, &corrid_string));
 
+      // Require that the string be decodable into an unsigned int.
+      correlation_id = std::stoi(corrid_string);
+    }
     uint32_t input_count = 0;
     GUARDED_RESPOND_IF_ERROR(
         responses, r, TRITONBACKEND_RequestInputCount(request, &input_count));

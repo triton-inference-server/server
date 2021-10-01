@@ -25,6 +25,7 @@
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 import sys
+
 sys.path.append("../common")
 
 from builtins import range
@@ -348,13 +349,14 @@ class SequenceBatcherTest(su.SequenceBatcherTestUtil):
                                 self.assertTrue(ex.message().startswith(
                                     str("in ensemble '{}', " +
                                         "inference request to model '{}' must specify a "
-                                        + "non-zero correlation ID").format(
-                                            model_name, base_model_name)))
+                                        + "non-zero or non-empty correlation ID"
+                                       ).format(model_name, base_model_name)))
                                 return
                         self.assertTrue(ex.message().startswith(
                             str("inference request to model '{}' must specify a "
                                 +
-                                "non-zero correlation ID").format(model_name)))
+                                "non-zero or non-empty correlation ID").format(
+                                    model_name)))
 
     def test_no_sequence_start(self):
         # Send sequence without start flag for never before seen

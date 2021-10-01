@@ -1159,7 +1159,8 @@ ValidateModelConfig(
       if ((tensor_datatype != inference::DataType::TYPE_UINT64) &&
           (tensor_datatype != inference::DataType::TYPE_INT64) &&
           (tensor_datatype != inference::DataType::TYPE_UINT32) &&
-          (tensor_datatype != inference::DataType::TYPE_INT32)) {
+          (tensor_datatype != inference::DataType::TYPE_INT32) &&
+          (tensor_datatype != inference::DataType::TYPE_STRING)) {
         return Status(
             Status::Code::INVALID_ARG,
             "unexpected data type for control " +
@@ -1167,8 +1168,9 @@ ValidateModelConfig(
                     inference::ModelSequenceBatching::Control::
                         CONTROL_SEQUENCE_CORRID) +
                 " for " + config.name() +
-                ". Allowed data types are TYPE_UINT64, TYPE_INT64, TYPE_UINT32 "
-                "and TYPE_INT32");
+                ". Allowed data types are TYPE_UINT64, TYPE_INT64, "
+                "TYPE_UINT32, "
+                "TYPE_INT32 and TYPE_STRING");
       }
     }
 

@@ -63,6 +63,21 @@ cp -r ../custom_models/custom_dyna_sequence_int32 ragged_models/.
 (cd ragged_models/custom_dyna_sequence_int32 && \
         sed -i "s/name:.*\"INPUT\"/name: \"INPUT\"\\nallow_ragged_batch: true/" config.pbtxt)
 
+# Create models that expect TYPE_STRING correlation id
+for model in `ls models`; do
+    if [[ "$model" != *"nobatch"* ]]; then
+        # Construct new model name as
+        # onnx_dyna_sequence_int32 -> onnx_string_dyna_sequence_int32
+        backend=${model%%_*}
+        string_dyna_sequence_model_name="${backend}_string${model#${backend}}"
+        
+        # Copy model and edit config.pbtxt
+        cp -r models/$model models/$string_dyna_sequence_model_name
+        sed -i "s/$model/$string_dyna_sequence_model/g" models/$string_dyna_sequence_model_name/config.pbtxt
+        sed -i "/CONTROL_SEQUENCE_CORRID/{n;s/data_type:.*/data_type: TYPE_STRING/}" models/$string_dyna_sequence_model_name/config.pbtxt
+    fi
+done
+
 # Need to launch the server for each test so that the model status is
 # reset (which is used to make sure the correct batch size was used
 # for execution). Test everything with fixed-tensor-size models and

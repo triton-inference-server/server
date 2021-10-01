@@ -933,6 +933,39 @@ InferenceRequest::Input::DataBufferCountForHostPolicy(
   return data_->BufferCount();
 }
 
+InferenceRequest::SequenceId::SequenceId()
+    : sequence_label_(""), sequence_index_(0), is_string_(0)
+{
+}
+
+InferenceRequest::SequenceId::SequenceId(const std::string& sequence_label)
+    : sequence_label_(sequence_label), sequence_index_(0), is_string_(1)
+{
+}
+
+InferenceRequest::SequenceId::SequenceId(const uint64_t sequence_index)
+    : sequence_label_(""), sequence_index_(sequence_index), is_string_(0)
+{
+}
+
+InferenceRequest::SequenceId&
+InferenceRequest::SequenceId::operator=(const std::string& rhs)
+{
+  sequence_label_ = rhs;
+  sequence_index_ = 0;
+  is_string_ = true;
+  return *this;
+}
+
+InferenceRequest::SequenceId&
+InferenceRequest::SequenceId::operator=(const uint64_t rhs)
+{
+  sequence_label_ = "";
+  sequence_index_ = rhs;
+  is_string_ = false;
+  return *this;
+}
+
 std::ostream&
 operator<<(std::ostream& out, const InferenceRequest& request)
 {
@@ -987,6 +1020,39 @@ operator<<(std::ostream& out, const InferenceRequest::Input& input)
     out << ", is_shape_tensor: True";
   }
   return out;
+}
+
+std::ostream&
+operator<<(std::ostream& out, const InferenceRequest::SequenceId& sequence_id)
+{
+  if (sequence_id.IsString()) {
+    out << sequence_id.GetStringValue();
+  } else if (sequence_id.IsUnsignedInt()) {
+    out << sequence_id.GetUnsignedIntValue();
+  }
+  return out;
+}
+
+bool
+operator==(
+    const InferenceRequest::SequenceId lhs,
+    const InferenceRequest::SequenceId rhs)
+{
+  if (lhs.IsString() && rhs.IsString()) {
+    return lhs.GetStringValue() == rhs.GetStringValue();
+  } else if (lhs.IsUnsignedInt() && rhs.IsUnsignedInt()) {
+    return lhs.GetUnsignedIntValue() == rhs.GetUnsignedIntValue();
+  } else {
+    return false;
+  }
+}
+
+bool
+operator!=(
+    const InferenceRequest::SequenceId lhs,
+    const InferenceRequest::SequenceId rhs)
+{
+  return !(lhs == rhs);
 }
 
 }}  // namespace nvidia::inferenceserver

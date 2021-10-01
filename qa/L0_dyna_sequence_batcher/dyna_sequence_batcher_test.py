@@ -25,6 +25,7 @@
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 import sys
+
 sys.path.append("../common")
 
 from builtins import range
@@ -46,12 +47,16 @@ _test_cuda_shared_memory = bool(
 
 _no_batching = (int(os.environ.get('NO_BATCHING', 0)) == 1)
 
-_trials = ("custom", "savedmodel", "graphdef", "plan", "onnx", "libtorch")
+_trials = ("custom", "savedmodel", "graphdef", "plan", "onnx", "libtorch",
+           "custom_string", "savedmodel_string", "plan_string",
+           "graphdef_string", "libtorch_string", "onnx_string")
 if _no_batching:
     _trials += ("savedmodel_nobatch", "graphdef_nobatch", "plan_nobatch",
                 "onnx_nobatch", "libtorch_nobatch")
 
-_ragged_batch_supported_trials = ["custom",]
+_ragged_batch_supported_trials = [
+    "custom",
+]
 
 _protocols = ("http", "grpc")
 _max_sequence_idle_ms = 5000
@@ -80,7 +85,10 @@ class DynaSequenceBatcherTest(su.SequenceBatcherTestUtil):
                 if "start" in flag_str:
                     expected_result += 1
                 if "end" in flag_str:
-                    expected_result += corrid
+                    if isinstance(corrid, str):
+                        expected_result += int(corrid)
+                    else:
+                        expected_result += corrid
         return expected_result
 
     def test_simple_sequence(self):
@@ -100,7 +108,10 @@ class DynaSequenceBatcherTest(su.SequenceBatcherTestUtil):
                     self.assertFalse(
                         "TRITONSERVER_BACKLOG_DELAY_SCHEDULER" in os.environ)
 
-                    corrid = 52
+                    if "string" in trial:
+                        corrid = '52'
+                    else:
+                        corrid = 52
                     self.check_sequence(
                         trial,
                         model_name,
@@ -142,7 +153,10 @@ class DynaSequenceBatcherTest(su.SequenceBatcherTestUtil):
                     self.assertFalse(
                         "TRITONSERVER_BACKLOG_DELAY_SCHEDULER" in os.environ)
 
-                    corrid = 99
+                    if "string" in trial:
+                        corrid = '99'
+                    else:
+                        corrid = 99
                     self.check_sequence(
                         trial,
                         model_name,
@@ -185,7 +199,11 @@ class DynaSequenceBatcherTest(su.SequenceBatcherTestUtil):
                 self.assertFalse(
                     "TRITONSERVER_BACKLOG_DELAY_SCHEDULER" in os.environ)
 
-                corrids = [1001, 1002, 1003, 1004]
+                if "string" in trial:
+                    corrids = ['1001', '1002', '1003', '1004']
+                else:
+                    corrids = [1001, 1002, 1003, 1004]
+
                 threads = []
                 threads.append(
                     threading.Thread(
@@ -346,7 +364,10 @@ class DynaSequenceBatcherTest(su.SequenceBatcherTestUtil):
                 self.assertFalse(
                     "TRITONSERVER_BACKLOG_DELAY_SCHEDULER" in os.environ)
 
-                corrids = [1001, 1002, 1003, 1004, 1005]
+                if "string" in trial:
+                    corrids = ['1001', '1002', '1003', '1004', '1005']
+                else:
+                    corrids = [1001, 1002, 1003, 1004, 1005]
                 threads = []
                 threads.append(
                     threading.Thread(
@@ -485,8 +506,10 @@ class DynaSequenceBatcherTest(su.SequenceBatcherTestUtil):
                 self.assertFalse("TRITONSERVER_DELAY_SCHEDULER" in os.environ)
                 self.assertFalse(
                     "TRITONSERVER_BACKLOG_DELAY_SCHEDULER" in os.environ)
-
-                corrids = [1001, 1002, 1003, 1004, 1005, 1006]
+                if "string" in trial:
+                    corrids = ['1001', '1002', '1003', '1004', '1005', '1006']
+                else:
+                    corrids = [1001, 1002, 1003, 1004, 1005, 1006]
                 threads = []
                 threads.append(
                     threading.Thread(
@@ -650,7 +673,10 @@ class DynaSequenceBatcherTest(su.SequenceBatcherTestUtil):
                 self.assertFalse(
                     "TRITONSERVER_BACKLOG_DELAY_SCHEDULER" in os.environ)
 
-                corrids = [1001, 1002, 1003, 1004, 1005, 1006]
+                if "string" in trial:
+                    corrids = ['1001', '1002', '1003', '1004', '1005', '1006']
+                else:
+                    corrids = [1001, 1002, 1003, 1004, 1005, 1006]
                 threads = []
                 threads.append(
                     threading.Thread(
@@ -821,7 +847,10 @@ class DynaSequenceBatcherTest(su.SequenceBatcherTestUtil):
                 self.assertFalse(
                     "TRITONSERVER_BACKLOG_DELAY_SCHEDULER" in os.environ)
 
-                corrids = [1001, 1002, 1003, 1004, 1005]
+                if "string" in trial:
+                    corrids = ['1001', '1002', '1003', '1004', '1005']
+                else:
+                    corrids = [1001, 1002, 1003, 1004, 1005]
                 threads = []
                 threads.append(
                     threading.Thread(
