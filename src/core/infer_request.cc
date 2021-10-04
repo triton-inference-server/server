@@ -405,6 +405,15 @@ InferenceRequest::AddState(
 {
   auto& output_states = sequence_state_->output_states_;
   auto& input_states = sequence_state_->input_states_;
+
+  if (sequence_state_ == nullptr) {
+    const inference::ModelConfig& model_config = backend_raw_->Config();
+    return Status(
+        Status::Code::INVALID_ARG,
+        "state configuration is missing for model '" + model_config.name() +
+            "'.");
+  }
+
   const auto& output_state_itr = output_states.find(name);
 
   // If the state name is not valid return an error.
@@ -469,6 +478,17 @@ InferenceRequest::AddState(
       RETURN_IF_ERROR(output_state_r->RemoveAllData());
       RETURN_IF_ERROR(output_state_r->SetData(memory));
     }
+
+    // Update the shape and data type of the output state if it doesn't match
+    // the input state.
+    if (input_state_r->Shape() != output_state_r->Shape()) {
+      *input_state_r->MutableShape() = output_state_r->Shape();
+    }
+
+    if (input_state_r->DType() != output_state_r->DType()) {
+      *input_state_r->MutableDType() = output_state_r->DType();
+    }
+
     return Status::Success;
   });
 

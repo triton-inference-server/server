@@ -644,6 +644,7 @@ TRITONBACKEND_StateBuffer(
     std::shared_ptr<AllocatedMemory> memory = std::make_shared<AllocatedMemory>(
         buffer_byte_size, *memory_type, *memory_type_id);
     *buffer = memory->MutableBuffer(memory_type, memory_type_id);
+    to->RemoveAllData();
     status = to->SetData(memory);
   }
 

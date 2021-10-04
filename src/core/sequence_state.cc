@@ -54,7 +54,7 @@ State::SetData(const std::shared_ptr<Memory>& data)
   if (data_->TotalByteSize() != 0) {
     return Status(
         Status::Code::INVALID_ARG,
-        "input '" + name_ + "' already has data, can't overwrite");
+        "state '" + name_ + "' already has data, can't overwrite");
   }
 
   data_ = data;

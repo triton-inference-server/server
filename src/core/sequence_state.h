@@ -54,6 +54,9 @@ class State {
   // Data type of the state tensor.
   inference::DataType DType() const { return datatype_; }
 
+  // Mutable data type of the state tensor.
+  inference::DataType* MutableDType() { return &datatype_; }
+
   // The shape of the state tensor after normalization.
   const std::vector<int64_t>& Shape() const { return shape_; }
   std::vector<int64_t>* MutableShape() { return &shape_; }
@@ -76,7 +79,11 @@ class State {
 
   // Call the state update callback. This function will be called when
   // TRITONBACKEND_StateUpdate is called.
-  Status Update() { return state_update_cb_(); }
+  Status Update()
+  {
+    std::cout << "State update is called." << std::endl;
+    return state_update_cb_();
+  }
 
  private:
   DISALLOW_COPY_AND_ASSIGN(State);
