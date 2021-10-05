@@ -35,6 +35,9 @@ if [ -z "$REPO_VERSION" ]; then
     echo -e "\n***\n*** Test Failed\n***"
     exit 1
 fi
+if [ ! -z "$TEST_REPO_ARCH" ]; then
+    REPO_VERSION=${REPO_VERSION}_${TEST_REPO_ARCH}
+fi
 
 export CUDA_VISIBLE_DEVICES=0
 
@@ -78,7 +81,7 @@ RET=0
 for ENV_VAR in "env" "env_dummy" "config"; do
     SERVER_LOG=$SERVER_LOG_BASE.$ENV_VAR.log
     CLIENT_LOG=$CLIENT_LOG_BASE.$ENV_VAR.log
-    
+
     if [ "$ENV_VAR" == "config" ]; then
         unset AWS_ACCESS_KEY_ID
         unset AWS_SECRET_ACCESS_KEY
@@ -95,7 +98,7 @@ for ENV_VAR in "env" "env_dummy" "config"; do
 
     KIND="KIND_GPU"
 
-    # Test coverage for extra slashes 
+    # Test coverage for extra slashes
     for MAYBE_SLASH in "" "/" "//"; do
 
         ROOT_REPO="$BUCKET_URL$MAYBE_SLASH"
