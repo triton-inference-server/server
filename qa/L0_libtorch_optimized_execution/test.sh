@@ -70,7 +70,7 @@ for FLAG in true false; do
 
     set +e
 
-    python $SIMPLE_INFER_CLIENT_PY >> $CLIENT_LOG 2>&1
+    python $LIBTORCH_INFER_CLIENT_PY >> $CLIENT_LOG 2>&1
     if [ $? -ne 0 ]; then
         RET=1
     fi
