@@ -674,7 +674,10 @@ RateLimiter::ModelInstanceContext::ScaledPriority()
 {
   // TODO: Different schemes for the prioritization of
   // model instance can be added here.
-  return (exec_count_ * rate_limiter_config_.priority());
+  // The priority of instance is 1 by default. If specified
+  // as 0, the priority is still treated as 1.
+  auto priority = std::max(rate_limiter_config_.priority(), 1u);
+  return (exec_count_ * priority);
 }
 
 

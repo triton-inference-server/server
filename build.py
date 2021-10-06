@@ -151,13 +151,13 @@ def gitclone(cwd, repo, tag, subdir, org):
     if tag.startswith("pull/"):
         log_verbose('git clone of repo "{}" at ref "{}"'.format(repo, tag))
 
-        if os.path.exists(clone_dir) and FLAGS.no_force_clone:
+        if os.path.exists(clone_dir) and not FLAGS.no_force_clone:
             rmdir(clone_dir)
 
         if not os.path.exists(clone_dir):
             p = subprocess.Popen([
-                'git', 'clone', '--recursive', '--single-branch', '--depth=1',
-                '{}/{}.git'.format(org, repo), subdir
+                'git', 'clone', '--recursive', '--depth=1', '{}/{}.git'.format(
+                    org, repo), subdir
             ],
                                  cwd=cwd)
             p.wait()
@@ -165,27 +165,27 @@ def gitclone(cwd, repo, tag, subdir, org):
                 p.returncode != 0,
                 'git clone of repo "{}" at branch "main" failed'.format(repo))
 
-        log_verbose('git fetch of ref "{}"'.format(tag))
-        p = subprocess.Popen(
-            ['git', 'fetch', 'origin', '{}:tritonbuildref'.format(tag)],
-            cwd=os.path.join(cwd, subdir))
-        p.wait()
-        fail_if(p.returncode != 0, 'git fetch of ref "{}" failed'.format(tag))
+            log_verbose('git fetch of ref "{}"'.format(tag))
+            p = subprocess.Popen(
+                ['git', 'fetch', 'origin', '{}:tritonbuildref'.format(tag)],
+                cwd=os.path.join(cwd, subdir))
+            p.wait()
+            fail_if(p.returncode != 0,
+                    'git fetch of ref "{}" failed'.format(tag))
 
-        log_verbose('git checkout of tritonbuildref')
-        p = subprocess.Popen(['git', 'checkout', 'tritonbuildref'],
-                             cwd=os.path.join(cwd, subdir))
-        p.wait()
-        fail_if(p.returncode != 0,
-                'git checkout of branch "tritonbuildref" failed')
+            log_verbose('git checkout of tritonbuildref')
+            p = subprocess.Popen(['git', 'checkout', 'tritonbuildref'],
+                                 cwd=os.path.join(cwd, subdir))
+            p.wait()
+            fail_if(p.returncode != 0,
+                    'git checkout of branch "tritonbuildref" failed')
 
     else:
         log_verbose('git clone of repo "{}" at tag "{}"'.format(repo, tag))
 
-        if os.path.exists(clone_dir) and FLAGS.no_force_clone:
+        if os.path.exists(clone_dir) and not FLAGS.no_force_clone:
             rmdir(clone_dir)
 
-        print(clone_dir)
         if not os.path.exists(clone_dir):
             p = subprocess.Popen([
                 'git', 'clone', '--recursive', '--single-branch', '--depth=1',
