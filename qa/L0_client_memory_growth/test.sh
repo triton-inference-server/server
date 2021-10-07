@@ -34,6 +34,9 @@ if [ -z "$REPO_VERSION" ]; then
     echo -e "\n***\n*** Test Failed\n***"
     exit 1
 fi
+if [ ! -z "$TEST_REPO_ARCH" ]; then
+    REPO_VERSION=${REPO_VERSION}_${TEST_REPO_ARCH}
+fi
 
 # Must run on a single device or else the TRITONSERVER_DELAY_SCHEDULER
 # can fail when the requests are distributed to multiple devices.
@@ -73,7 +76,7 @@ mkdir -p $DATADIR/custom_identity_int32/1
 
 RET=0
 
-# Run test for both HTTP and GRPC, not re-using client object. 
+# Run test for both HTTP and GRPC, not re-using client object.
 for PROTOCOL in http grpc; do
     for LANG in c++ python; do
         LEAKCHECK_LOG="./valgrind.${PROTOCOL}.${LANG}.log"
@@ -90,8 +93,8 @@ for PROTOCOL in http grpc; do
                 REPETITION_CPP=$REPETITION_GRPC_CPP
                 REPETITION_PY=$REPETITION_GRPC_PY
             fi
-        fi 
-        
+        fi
+
         run_server
         if [ "$SERVER_PID" == "0" ]; then
             echo -e "\n***\n*** Failed to start $SERVER\n***"

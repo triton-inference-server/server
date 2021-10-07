@@ -34,6 +34,9 @@ if [ -z "$REPO_VERSION" ]; then
     echo -e "\n***\n*** Test Failed\n***"
     exit 1
 fi
+if [ ! -z "$TEST_REPO_ARCH" ]; then
+    REPO_VERSION=${REPO_VERSION}_${TEST_REPO_ARCH}
+fi
 
 CLIENT_LOG="./client.log"
 CLIENT=model_config_test.py
@@ -168,8 +171,8 @@ for modelpath in \
     mkdir -p $modelpath
     cp ./libtriton_repeat.so $modelpath/libtriton_repeat.so
 done
-    
-    
+
+
 
 # Copy other required models
 mkdir -p special_cases/invalid_platform/1

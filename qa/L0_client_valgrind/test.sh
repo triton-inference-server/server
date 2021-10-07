@@ -34,6 +34,9 @@ if [ -z "$REPO_VERSION" ]; then
     echo -e "\n***\n*** Test Failed\n***"
     exit 1
 fi
+if [ ! -z "$TEST_REPO_ARCH" ]; then
+    REPO_VERSION=${REPO_VERSION}_${TEST_REPO_ARCH}
+fi
 
 # Must run on a single device or else the TRITONSERVER_DELAY_SCHEDULER
 # can fail when the requests are distributed to multiple devices.
@@ -62,7 +65,7 @@ if [ "$SERVER_PID" == "0" ]; then
     exit 1
 fi
 
-# Run test for both HTTP and GRPC, re-using and not re-using client object. 
+# Run test for both HTTP and GRPC, re-using and not re-using client object.
 # 1000 inferences in each case.
 EXTRA_ARGS="-r 1000"
 for PROTOCOL in http grpc; do

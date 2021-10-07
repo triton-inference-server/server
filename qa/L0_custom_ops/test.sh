@@ -34,6 +34,9 @@ if [ -z "$REPO_VERSION" ]; then
     echo -e "\n***\n*** Test Failed\n***"
     exit 1
 fi
+if [ ! -z "$TEST_REPO_ARCH" ]; then
+    REPO_VERSION=${REPO_VERSION}_${TEST_REPO_ARCH}
+fi
 
 export CUDA_VISIBLE_DEVICES=0
 
@@ -102,7 +105,7 @@ set -e
 kill $SERVER_PID
 wait $SERVER_PID
 
-# Must set LD_LIBRARY_PATH just for the server launch so that the 
+# Must set LD_LIBRARY_PATH just for the server launch so that the
 # custom operations can find libtorch.so and other pytorch dependencies.
 LD_LIBRARY_PATH=/opt/tritonserver/backends/pytorch:$LD_LIBRARY_PATH
 
