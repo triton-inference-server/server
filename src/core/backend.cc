@@ -152,7 +152,9 @@ InferenceBackend::SetConfiguredScheduler(void* model)
     RETURN_IF_ERROR(DynamicBatchScheduler::Create(
         static_cast<TritonModel*>(model), nullptr, 0 /*nice*/,
         true /* dynamic_batching_enabled */, config_.max_batch_size(),
-        enforce_equal_shape_tensors, config_.dynamic_batching(), &scheduler));
+        enforce_equal_shape_tensors, config_.dynamic_batching(),
+        config_.response_cache_enable() /* response_cache_enable */,
+        &scheduler));
   } else {
     // Default scheduler. Use dynamic batch scheduler (with batching
     // disabled) as the default scheduler.
@@ -162,6 +164,7 @@ InferenceBackend::SetConfiguredScheduler(void* model)
         std::unordered_map<
             std::string, bool>() /* enforce_equal_shape_tensors */,
         false /* preserve_ordering */,
+        config_.response_cache_enable() /* response_cache_enable */,
         std::set<int32_t>() /* preferred_batch_sizes */,
         0 /* max_queue_delay_microseconds */, &scheduler));
   }

@@ -55,6 +55,7 @@ class DynamicBatchScheduler : public Scheduler {
       const bool dynamic_batching_enabled, const int32_t max_batch_size,
       const std::unordered_map<std::string, bool>& enforce_equal_shape_tensors,
       const bool preserve_ordering,
+      const bool response_cache_enable,
       const std::set<int32_t>& preferred_batch_sizes,
       const uint64_t max_queue_delay_microseconds,
       std::unique_ptr<Scheduler>* scheduler);
@@ -67,6 +68,7 @@ class DynamicBatchScheduler : public Scheduler {
       const bool dynamic_batching_enabled, const int32_t max_batch_size,
       const std::unordered_map<std::string, bool>& enforce_equal_shape_tensors,
       const inference::ModelDynamicBatching& batcher_config,
+      const bool response_cache_enable,
       std::unique_ptr<Scheduler>* scheduler);
 
   ~DynamicBatchScheduler();
@@ -80,6 +82,7 @@ class DynamicBatchScheduler : public Scheduler {
       const bool dynamic_batching_enabled, const int32_t max_batch_size,
       const std::unordered_map<std::string, bool>& enforce_equal_shape_tensors,
       const bool preserve_ordering,
+      const bool response_cache_enable,
       const std::set<int32_t>& preferred_batch_sizes,
       const uint64_t max_queue_delay_microseconds,
       const inference::ModelQueuePolicy& default_queue_policy,

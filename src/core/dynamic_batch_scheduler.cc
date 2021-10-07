@@ -52,7 +52,7 @@ DynamicBatchScheduler::DynamicBatchScheduler(
     TritonModel* model, TritonModelInstance* model_instance,
     const bool dynamic_batching_enabled, const int32_t max_batch_size,
     const std::unordered_map<std::string, bool>& enforce_equal_shape_tensors,
-    const bool preserve_ordering,
+    const bool preserve_ordering, const bool response_cache_enable,
     const std::set<int32_t>& preferred_batch_sizes,
     const uint64_t max_queue_delay_microseconds,
     const inference::ModelQueuePolicy& default_queue_policy,
@@ -69,7 +69,10 @@ DynamicBatchScheduler::DynamicBatchScheduler(
       preserve_ordering_(preserve_ordering)
 {
   rate_limiter_ = model_->Server()->GetRateLimiter();
-  response_cache_enabled_ = model_->Server()->ResponseCacheEnabled();
+  // Both the server and model config should specify
+  // caching enabled for model to utilize response cache.
+  response_cache_enabled_ =
+      (model_->Server()->ResponseCacheEnabled() && response_cache_enable);
   max_preferred_batch_size_ = 0;
   for (const auto size : preferred_batch_sizes_) {
     max_preferred_batch_size_ =
@@ -82,7 +85,7 @@ DynamicBatchScheduler::Create(
     TritonModel* model, TritonModelInstance* model_instance, const int nice,
     const bool dynamic_batching_enabled, const int32_t max_batch_size,
     const std::unordered_map<std::string, bool>& enforce_equal_shape_tensors,
-    const bool preserve_ordering,
+    const bool preserve_ordering, const bool response_cache_enable,
     const std::set<int32_t>& preferred_batch_sizes,
     const uint64_t max_queue_delay_microseconds,
     std::unique_ptr<Scheduler>* scheduler)
@@ -96,7 +99,8 @@ DynamicBatchScheduler::Create(
 
   return Create(
       model, model_instance, nice, dynamic_batching_enabled, max_batch_size,
-      enforce_equal_shape_tensors, batcher_config, scheduler);
+      enforce_equal_shape_tensors, batcher_config, response_cache_enable,
+      scheduler);
 }
 
 Status
@@ -105,7 +109,7 @@ DynamicBatchScheduler::Create(
     const bool dynamic_batching_enabled, const int32_t max_batch_size,
     const std::unordered_map<std::string, bool>& enforce_equal_shape_tensors,
     const inference::ModelDynamicBatching& batcher_config,
-    std::unique_ptr<Scheduler>* scheduler)
+    const bool response_cache_enable, std::unique_ptr<Scheduler>* scheduler)
 {
   std::set<int32_t> preferred_batch_sizes;
   for (const auto size : batcher_config.preferred_batch_size()) {
@@ -115,7 +119,8 @@ DynamicBatchScheduler::Create(
   DynamicBatchScheduler* dyna_sched = new DynamicBatchScheduler(
       model, model_instance, dynamic_batching_enabled, max_batch_size,
       enforce_equal_shape_tensors, batcher_config.preserve_ordering(),
-      preferred_batch_sizes, batcher_config.max_queue_delay_microseconds(),
+      response_cache_enable, preferred_batch_sizes,
+      batcher_config.max_queue_delay_microseconds(),
       batcher_config.default_queue_policy(), batcher_config.priority_levels(),
       batcher_config.priority_queue_policy());
   std::unique_ptr<DynamicBatchScheduler> sched(dyna_sched);
