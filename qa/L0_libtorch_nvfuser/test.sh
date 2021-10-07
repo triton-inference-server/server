@@ -37,7 +37,8 @@ fi
 
 export CUDA_VISIBLE_DEVICES=0
 
-LIBTORCH_INFER_CLIENT_PY=../common/libtorch_infer_client.py
+IMAGE_CLIENT=../clients/image_client.py
+IMAGE=../images/vulture.jpeg
 
 DATADIR=/data/inferenceserver/${REPO_VERSION}/libtorch_model_store
 
@@ -70,7 +71,13 @@ for FLAG in true false; do
 
     set +e
 
-    python $LIBTORCH_INFER_CLIENT_PY >> $CLIENT_LOG 2>&1
+    # Send requests of 2 different batch sizes to catch nvfuser issues.
+    python $IMAGE_CLIENT -m resnet50_libtorch -s INCEPTION -c 1 -b 1 $IMAGE >> $CLIENT_LOG 2>&1
+    if [ $? -ne 0 ]; then
+        RET=1
+    fi
+
+    python $IMAGE_CLIENT -m resnet50_libtorch -s INCEPTION -c 1 -b 8 $IMAGE >> $CLIENT_LOG 2>&1
     if [ $? -ne 0 ]; then
         RET=1
     fi
@@ -84,6 +91,11 @@ for FLAG in true false; do
 
     if [ `grep -c "$NVFUSER_LOG" $SERVER_LOG` != "1" ]; then
         echo -e "\n***\n*** Failed. Expected 1 $NVFUSER_LOG in log\n***"
+        RET=1
+    fi
+
+    if [ `grep -c VULTURE $CLIENT_LOG` != "9" ]; then
+        echo -e "\n***\n*** Failed. Expected 9 VULTURE results\n***"
         RET=1
     fi
 
