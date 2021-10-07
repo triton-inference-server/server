@@ -147,40 +147,54 @@ def gitclone(cwd, repo, tag, subdir, org):
     # If 'tag' starts with "pull/" then it must be of form
     # "pull/<pr>/head". We just clone at "main" and then fetch the
     # reference onto a new branch we name "tritonbuildref".
+    clone_dir = cwd + '/' + subdir
     if tag.startswith("pull/"):
         log_verbose('git clone of repo "{}" at ref "{}"'.format(repo, tag))
-        p = subprocess.Popen([
-            'git', 'clone', '--recursive', '--depth=1', '{}/{}.git'.format(
-                org, repo), subdir
-        ],
-                             cwd=cwd)
-        p.wait()
-        fail_if(p.returncode != 0,
+
+        if os.path.exists(clone_dir) and not FLAGS.no_force_clone:
+            rmdir(clone_dir)
+
+        if not os.path.exists(clone_dir):
+            p = subprocess.Popen([
+                'git', 'clone', '--recursive', '--depth=1', '{}/{}.git'.format(
+                    org, repo), subdir
+            ],
+                                 cwd=cwd)
+            p.wait()
+            fail_if(
+                p.returncode != 0,
                 'git clone of repo "{}" at branch "main" failed'.format(repo))
 
-        log_verbose('git fetch of ref "{}"'.format(tag))
-        p = subprocess.Popen(
-            ['git', 'fetch', 'origin', '{}:tritonbuildref'.format(tag)],
-            cwd=os.path.join(cwd, subdir))
-        p.wait()
-        fail_if(p.returncode != 0, 'git fetch of ref "{}" failed'.format(tag))
+            log_verbose('git fetch of ref "{}"'.format(tag))
+            p = subprocess.Popen(
+                ['git', 'fetch', 'origin', '{}:tritonbuildref'.format(tag)],
+                cwd=os.path.join(cwd, subdir))
+            p.wait()
+            fail_if(p.returncode != 0,
+                    'git fetch of ref "{}" failed'.format(tag))
 
-        log_verbose('git checkout of tritonbuildref')
-        p = subprocess.Popen(['git', 'checkout', 'tritonbuildref'],
-                             cwd=os.path.join(cwd, subdir))
-        p.wait()
-        fail_if(p.returncode != 0,
-                'git checkout of branch "tritonbuildref" failed')
+            log_verbose('git checkout of tritonbuildref')
+            p = subprocess.Popen(['git', 'checkout', 'tritonbuildref'],
+                                 cwd=os.path.join(cwd, subdir))
+            p.wait()
+            fail_if(p.returncode != 0,
+                    'git checkout of branch "tritonbuildref" failed')
 
     else:
         log_verbose('git clone of repo "{}" at tag "{}"'.format(repo, tag))
-        p = subprocess.Popen([
-            'git', 'clone', '--recursive', '--single-branch', '--depth=1', '-b',
-            tag, '{}/{}.git'.format(org, repo), subdir
-        ],
-                             cwd=cwd)
-        p.wait()
-        fail_if(p.returncode != 0,
+
+        if os.path.exists(clone_dir) and not FLAGS.no_force_clone:
+            rmdir(clone_dir)
+
+        if not os.path.exists(clone_dir):
+            p = subprocess.Popen([
+                'git', 'clone', '--recursive', '--single-branch', '--depth=1',
+                '-b', tag, '{}/{}.git'.format(org, repo), subdir
+            ],
+                                 cwd=cwd)
+            p.wait()
+            fail_if(
+                p.returncode != 0,
                 'git clone of repo "{}" at tag "{}" failed'.format(repo, tag))
 
 
@@ -1337,6 +1351,12 @@ if __name__ == '__main__':
         required=False,
         help=
         'Include specified repo agent in build as <repoagent-name>[:<repo-tag>]. If <repo-tag> starts with "pull/" then it refers to a pull-request reference, otherwise <repo-tag> indicates the git tag/branch to use for the build. If the version is non-development then the default <repo-tag> is the release branch matching the container version (e.g. version 21.09 -> branch r21.09); otherwise the default <repo-tag> is "main" (e.g. version 21.09dev -> branch main).'
+    )
+    parser.add_argument(
+        '--no-force-clone',
+        action="store_true",
+        default=False,
+        help='Do not create fresh clones of repos that have already been cloned.'
     )
 
     FLAGS = parser.parse_args()
