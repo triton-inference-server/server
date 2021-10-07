@@ -34,6 +34,9 @@ if [ -z "$REPO_VERSION" ]; then
     echo -e "\n***\n*** Test Failed\n***"
     exit 1
 fi
+if [ ! -z "$TEST_REPO_ARCH" ]; then
+    REPO_VERSION=${REPO_VERSION}_${TEST_REPO_ARCH}
+fi
 
 export CUDA_VISIBLE_DEVICES=0
 
@@ -42,7 +45,7 @@ TRT_CUDA_GRAPH_TEST=trt_cuda_graph_test.py
 TEST_RESULT_FILE='test_results.txt'
 DATADIR="./models"
 
-rm -rf ${DATADIR} 
+rm -rf ${DATADIR}
 mkdir -p ${DATADIR}
 
 SERVER=/opt/tritonserver/bin/tritonserver

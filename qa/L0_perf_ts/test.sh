@@ -34,6 +34,9 @@ if [ -z "$REPO_VERSION" ]; then
     echo -e "\n***\n*** Test Failed\n***"
     exit 1
 fi
+if [ ! -z "$TEST_REPO_ARCH" ]; then
+    REPO_VERSION=${REPO_VERSION}_${TEST_REPO_ARCH}
+fi
 
 apt update
 apt install -y libb64-dev curl

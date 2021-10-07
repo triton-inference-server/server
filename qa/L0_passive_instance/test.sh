@@ -35,6 +35,9 @@ if [ -z "$REPO_VERSION" ]; then
     echo -e "\n***\n*** Test Failed\n***"
     exit 1
 fi
+if [ ! -z "$TEST_REPO_ARCH" ]; then
+    REPO_VERSION=${REPO_VERSION}_${TEST_REPO_ARCH}
+fi
 
 export CUDA_VISIBLE_DEVICES=0
 
@@ -85,7 +88,7 @@ $PERF_ANALYZER -m $MODEL --concurrency-range 4 >> $CLIENT_LOG 2>&1
 if [ $? -ne 0 ]; then
     cat $CLIENT_LOG
     echo -e "\n***\n*** perf_analyzer for $MODEL failed\n***"
-    RET=1   
+    RET=1
 fi
 
 grep "(GPU device 0), executing" $SERVER_LOG

@@ -34,6 +34,9 @@ if [ -z "$REPO_VERSION" ]; then
     echo -e "\n***\n*** Test Failed\n***"
     exit 1
 fi
+if [ ! -z "$TEST_REPO_ARCH" ]; then
+    REPO_VERSION=${REPO_VERSION}_${TEST_REPO_ARCH}
+fi
 
 export CUDA_VISIBLE_DEVICES=0
 
@@ -1188,7 +1191,7 @@ for protocol in grpc http; do
     sed -i "s/plan_float32_float32_float32/simple_float32_float32_float32/" models/simple_float32_float32_float32/config.pbtxt
     cp -r $DATADIR/qa_model_repository/libtorch_float32_float32_float32 simple_float32_float32_float32
     sed -i "s/libtorch_float32_float32_float32/simple_float32_float32_float32/" simple_float32_float32_float32/config.pbtxt
-    
+
     SERVER_ARGS="--model-repository=`pwd`/models --model-control-mode=explicit \
                  --load-model=simple_float32_float32_float32 \
                  --exit-timeout-secs=5"
@@ -1221,7 +1224,7 @@ for protocol in grpc http; do
     unset TRITONSERVER_USE_GRPC
 
     LOG_IDX=$((LOG_IDX+1))
-done 
+done
 
 # Send HTTP request to control endpoint
 rm -fr models config.pbtxt.*

@@ -1,4 +1,4 @@
-#!/bin/bash  
+#!/bin/bash
 # Copyright 2020-2021, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
@@ -34,6 +34,9 @@ if [ -z "$REPO_VERSION" ]; then
   echo -e "\n***\n*** Test Failed\n***"
   exit 1
 fi
+if [ ! -z "$TEST_REPO_ARCH" ]; then
+    REPO_VERSION=${REPO_VERSION}_${TEST_REPO_ARCH}
+fi
 
 MODELDIR=`pwd`/models
 DATADIR=/data/inferenceserver/${REPO_VERSION}/qa_model_repository
@@ -61,7 +64,7 @@ set +e
 export CUDA_VISIBLE_DEVICES=0,1,2
 run_server
 if [ "$SERVER_PID" == "0" ]; then
-  echo -e "\n***\n*** Failed to start $SERVER\n***" 
+  echo -e "\n***\n*** Failed to start $SERVER\n***"
   cat $SERVER_LOG
   exit 1
 fi

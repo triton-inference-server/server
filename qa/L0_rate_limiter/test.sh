@@ -34,6 +34,9 @@ if [ -z "$REPO_VERSION" ]; then
     echo -e "\n***\n*** Test Failed\n***"
     exit 1
 fi
+if [ ! -z "$TEST_REPO_ARCH" ]; then
+    REPO_VERSION=${REPO_VERSION}_${TEST_REPO_ARCH}
+fi
 
 export CUDA_VISIBLE_DEVICES=0
 
@@ -165,7 +168,7 @@ rm -rf ./custom_models/custom_zero_1_float32_v3
 ##
 ## Tests with cross-model prioritization with various cases:
 ##
-# CASE1: Explicit limited resource: only allows one model to run at a time 
+# CASE1: Explicit limited resource: only allows one model to run at a time
 SERVER_ARGS="--rate-limit=execution_count --rate-limit-resource=resource1:4 --rate-limit-resource=resource2:2 --model-repository=$MODELDIR/custom_models"
 SERVER_LOG="./inference_server.log"
 run_server
@@ -194,7 +197,7 @@ set -e
 kill $SERVER_PID
 wait $SERVER_PID
 
-# CASE2: Implicit Limited resource: By default, server will select max resources of one of the 
+# CASE2: Implicit Limited resource: By default, server will select max resources of one of the
 # model as available resource. This means only one model will run at a time.
 SERVER_ARGS="--rate-limit=execution_count --model-repository=$MODELDIR/custom_models"
 SERVER_LOG="./inference_server.log"

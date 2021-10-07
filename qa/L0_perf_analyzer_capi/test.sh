@@ -35,6 +35,9 @@ if [ -z "$REPO_VERSION" ]; then
     echo -e "\n***\n*** Test Failed\n***"
     exit 1
 fi
+if [ ! -z "$TEST_REPO_ARCH" ]; then
+    REPO_VERSION=${REPO_VERSION}_${TEST_REPO_ARCH}
+fi
 
 export CUDA_VISIBLE_DEVICES=0
 
@@ -218,7 +221,7 @@ fi
 #     echo -e "\n***\n*** Test Failed\n***"
 #     RET=1
 # fi
-# 
+#
 # TODO: Re-enable after variable model support if fixed for CAPI
 # $PERF_ANALYZER -v -m graphdef_sequence_float32 --shape INPUT:2 \
 # --input-data=$FLOAT_DIFFSHAPE_JSONDATAFILE \

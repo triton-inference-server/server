@@ -34,6 +34,9 @@ if [ -z "$REPO_VERSION" ]; then
     echo -e "\n***\n*** Test Failed\n***"
     exit 1
 fi
+if [ ! -z "$TEST_REPO_ARCH" ]; then
+    REPO_VERSION=${REPO_VERSION}_${TEST_REPO_ARCH}
+fi
 
 # Single GPU
 export CUDA_VISIBLE_DEVICES=0
@@ -125,7 +128,7 @@ for MODEL in $(ls models); do
     CLIENT_LOG="test_$MODEL.client.log"
 
     # Enable dynamic batching, set max batch size and instance count
-    if [ "$MODEL" == "resnet50_fp32_libtorch" ]; then    
+    if [ "$MODEL" == "resnet50_fp32_libtorch" ]; then
         sed -i "s/^max_batch_size:.*/max_batch_size: 32/" test_repo/$MODEL/config.pbtxt
     else
         sed -i "s/^max_batch_size:.*/max_batch_size: ${STATIC_BATCH}/" test_repo/$MODEL/config.pbtxt
@@ -150,7 +153,7 @@ for MODEL in $(ls models); do
         if [ $? -ne 0 ]; then
             cat $CLIENT_LOG
             echo -e "\n***\n*** perf_analyzer for $MODEL failed on iteration $i\n***"
-            RET=1   
+            RET=1
         fi
     done
     TEST_DURATION=$SECONDS

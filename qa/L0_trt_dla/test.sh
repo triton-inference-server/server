@@ -34,6 +34,9 @@ if [ -z "$REPO_VERSION" ]; then
     echo -e "\n***\n*** Test Failed\n***"
     exit 1
 fi
+if [ ! -z "$TEST_REPO_ARCH" ]; then
+    REPO_VERSION=${REPO_VERSION}_${TEST_REPO_ARCH}
+fi
 
 # Need to run on only one device since only creating a single
 # PLAN. Without this test will fail on a heterogeneous system.
@@ -51,7 +54,7 @@ SERVER_ARGS="--model-repository=`pwd`/models --exit-timeout-secs=120 --backend-d
 SERVER_LOG="./inference_server.log"
 source ../common/util.sh
 
-rm -fr models && mkdir models 
+rm -fr models && mkdir models
 cp -r $DATADIR/trt_dla_model_store/resnet50_plan models/.
 rm -f *.log
 

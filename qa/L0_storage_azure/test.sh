@@ -35,6 +35,9 @@ if [ -z "$REPO_VERSION" ]; then
     echo -e "\n***\n*** Test Failed\n***"
     exit 1
 fi
+if [ ! -z "$TEST_REPO_ARCH" ]; then
+    REPO_VERSION=${REPO_VERSION}_${TEST_REPO_ARCH}
+fi
 
 if [ -z "$AZURE_STORAGE_ACCOUNT" ]; then
     echo -e "azure storage account must be specified"
@@ -116,7 +119,7 @@ sleep 10
 
 # Test 1 Scenarios:
 # 1. access blob using shared key in envs
-# 2. adding more scenarios in future 
+# 2. adding more scenarios in future
 for ENV_VAR in "shared_key"; do
     SERVER_LOG=$SERVER_LOG_BASE.$ENV_VAR.log
     CLIENT_LOG=$CLIENT_LOG_BASE.$ENV_VAR.log
@@ -130,7 +133,7 @@ for ENV_VAR in "shared_key"; do
 
     # Now start model tests
     # set server arguments
-    SERVER_ARGS="--model-repository=$MODEL_REPO --exit-timeout-secs=120"  
+    SERVER_ARGS="--model-repository=$MODEL_REPO --exit-timeout-secs=120"
 
     run_server
     if [ "$SERVER_PID" == "0" ]; then
@@ -165,7 +168,7 @@ done
 # Add test for explicit model control
 SERVER_LOG=$SERVER_LOG_BASE.explicit.log
 CLIENT_LOG=$CLIENT_LOG_BASE.explicit.log
-SERVER_ARGS="--model-repository=${AS_URL}/models --model-control-mode=explicit"  
+SERVER_ARGS="--model-repository=${AS_URL}/models --model-control-mode=explicit"
 
 run_server
 if [ "$SERVER_PID" == "0" ]; then

@@ -34,6 +34,9 @@ if [ -z "$REPO_VERSION" ]; then
     echo -e "\n***\n*** Test Failed\n***"
     exit 1
 fi
+if [ ! -z "$TEST_REPO_ARCH" ]; then
+    REPO_VERSION=${REPO_VERSION}_${TEST_REPO_ARCH}
+fi
 
 CLIENT=../clients/perf_client
 # Only use libtorch as it accepts GPU I/O and it can handle variable shape
@@ -71,7 +74,7 @@ for BACKEND in $BACKENDS; do
         (cd models/$MODEL_NAME && \
             sed -i "s/dims:.*\[.*\]/dims: \[ -1 \]/g" config.pbtxt && \
             echo "instance_group [ { kind: KIND_GPU }]" >> config.pbtxt)
-    
+
     ENSEMBLE_NAME=${BACKEND}_ensemble
     mkdir -p models/$ENSEMBLE_NAME/1 && \
         cp $ENSEMBLE_NAME.pbtxt models/$ENSEMBLE_NAME/config.pbtxt
