@@ -247,6 +247,9 @@ class InferenceRequest {
   uint64_t TimeoutMicroseconds() const { return timeout_us_; }
   void SetTimeoutMicroseconds(uint64_t t) { timeout_us_ = t; }
 
+  uint64_t CacheKey() const { return cache_key_; }
+  void SetCacheKey(uint64_t key) { cache_key_ = key; }
+
 #ifdef TRITON_ENABLE_TRACING
   const std::unique_ptr<InferenceTrace>& Trace() const { return trace_; }
   std::unique_ptr<InferenceTrace>* MutableTrace() { return &trace_; }
@@ -536,6 +539,7 @@ class InferenceRequest {
   uint32_t batch_size_;
   uint32_t priority_;
   uint64_t timeout_us_;
+  uint64_t cache_key_;
 
   std::unordered_map<std::string, Input> original_inputs_;
   std::unordered_map<std::string, std::shared_ptr<Input>> override_inputs_;

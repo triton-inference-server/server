@@ -90,10 +90,9 @@ class DynamicBatchScheduler : public Scheduler {
   void NewPayload();
   uint64_t GetDynamicBatch();
   void DelegateResponse(
-      std::unique_ptr<InferenceRequest>& request, uint64_t request_hash,
-      bool cache_hit);
+      std::unique_ptr<InferenceRequest>& request, bool cache_hit);
   void CacheLookUp(
-      std::unique_ptr<InferenceRequest>& request, uint64_t* request_hash,
+      std::unique_ptr<InferenceRequest>& request,
       std::unique_ptr<InferenceResponse>& cached_response);
   void FinalizeResponses();
 
@@ -143,6 +142,9 @@ class DynamicBatchScheduler : public Scheduler {
   // If true the ordering of responses matches the order of requests
   // even when there are multiple scheduler threads.
   const bool preserve_ordering_;
+
+  // If true, the scheduler will try to retrieve responses from cache.
+  bool response_cache_enabled_;
 
   // Per completion-id queues to store the ready responses
   std::deque<

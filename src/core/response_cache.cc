@@ -37,9 +37,18 @@ PointerToString(void* ptr)
   return ss.str();
 }
 
-} // namespace
+}  // namespace
 
 namespace nvidia { namespace inferenceserver {
+
+Status
+RequestResponseCache::Create(
+    uint64_t cache_size, std::unique_ptr<RequestResponseCache>* cache)
+{
+  cache->reset(new RequestResponseCache(cache_size));
+
+  return Status::Success;
+}
 
 RequestResponseCache::RequestResponseCache(const uint64_t size)
 {
@@ -54,10 +63,8 @@ RequestResponseCache::RequestResponseCache(const uint64_t size)
   managed_buffer_ = boost::interprocess::managed_external_buffer(
       boost::interprocess::create_only_t{}, buffer_, size);
 
-  LOG_INFO << "Response Cache is created at '"
-           << PointerToString(buffer_) << "' with size "
-           << size;
-
+  LOG_INFO << "Response Cache is created at '" << PointerToString(buffer_)
+           << "' with size " << size;
 }
 
 RequestResponseCache::~RequestResponseCache()

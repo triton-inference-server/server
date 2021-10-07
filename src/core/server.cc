@@ -171,16 +171,10 @@ InferenceServer::Init()
     return status;
   }
 
-  // TODO: Use ResponseCacheManager here and Create() instead
-  LOG_INFO << "Response Cache Byte Size: " << response_cache_byte_size_;
-  if (response_cache_byte_size_ > 0) {
-    response_cache_ =
-        std::make_shared<RequestResponseCache>(response_cache_byte_size_);
-    if (response_cache_ == nullptr) {
-      LOG_ERROR << "Response cache failed to initialize";
-    }
-  }
-  LOG_INFO << "Response Cache Address " << response_cache_;
+  std::unique_ptr<RequestResponseCache> local_response_cache;
+  status = RequestResponseCache::Create(
+      response_cache_byte_size_, &local_response_cache);
+  response_cache_ = std::move(local_response_cache);
 
 
 #ifdef TRITON_ENABLE_GPU
