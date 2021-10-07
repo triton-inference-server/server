@@ -315,12 +315,12 @@ check_status(ni::Status status)
 }
 
 void
-cache_stats(ni::RequestResponseCache& cache)
+cache_stats(std::unique_ptr<ni::RequestResponseCache>& cache)
 {
-  std::cout << "Cache entries: " << cache.NumEntries() << std::endl;
-  std::cout << "Cache free bytes: " << cache.FreeBytes() << std::endl;
-  std::cout << "Cache alloc'd bytes: " << cache.AllocatedBytes() << std::endl;
-  std::cout << "Cache total bytes: " << cache.TotalBytes() << std::endl;
+  std::cout << "Cache entries: " << cache->NumEntries() << std::endl;
+  std::cout << "Cache free bytes: " << cache->FreeBytes() << std::endl;
+  std::cout << "Cache alloc'd bytes: " << cache->AllocatedBytes() << std::endl;
+  std::cout << "Cache total bytes: " << cache->TotalBytes() << std::endl;
 }
 
 void
@@ -337,7 +337,8 @@ TEST_F(RequestResponseCacheTest, TestHashing)
   // Create cache
   std::cout << "Create cache" << std::endl;
   uint64_t cache_size = 4 * 1024 * 1024;
-  ni::RequestResponseCache cache(cache_size);
+  std::unique_ptr<ni::RequestResponseCache> cache;
+  ni::RequestResponseCache::Create(cache_size, &cache);
 
   // Create request
   std::cout << "Create request" << std::endl;
@@ -405,11 +406,11 @@ TEST_F(RequestResponseCacheTest, TestHashing)
   // Compare hashes
   std::cout << "Compare hashes" << std::endl;
   uint64_t hash0, hash1, hash2, hash3, hash4;
-  check_status(cache.Hash(request0, &hash0));
-  check_status(cache.Hash(request1, &hash1));
-  check_status(cache.Hash(request2, &hash2));
-  check_status(cache.Hash(request3, &hash3));
-  check_status(cache.Hash(request4, &hash4));
+  check_status(cache->Hash(request0, &hash0));
+  check_status(cache->Hash(request1, &hash1));
+  check_status(cache->Hash(request2, &hash2));
+  check_status(cache->Hash(request3, &hash3));
+  check_status(cache->Hash(request4, &hash4));
 
   std::cout << "hash0: " << hash0 << std::endl;
   std::cout << "hash1: " << hash1 << std::endl;
@@ -430,7 +431,8 @@ TEST_F(RequestResponseCacheTest, TestCacheTooSmall)
   // Create cache
   std::cout << "Create cache" << std::endl;
   uint64_t cache_size = 1024;
-  ni::RequestResponseCache cache(cache_size);
+  std::unique_ptr<ni::RequestResponseCache> cache;
+  ni::RequestResponseCache::Create(cache_size, &cache);
 
   // Create request
   std::cout << "Create request" << std::endl;
@@ -465,7 +467,7 @@ TEST_F(RequestResponseCacheTest, TestCacheTooSmall)
   std::memcpy(buffer, output0.data(), output_size);
 
   std::cout << "Insert response into cache with hash0" << std::endl;
-  auto status = cache.Insert(hash0, *response0);
+  auto status = cache->Insert(hash0, *response0);
   // We expect insertion to fail here since cache is too small
   std::cout << status.Message() << std::endl;
   ASSERT_FALSE(status.IsOk())
@@ -478,7 +480,8 @@ TEST_F(RequestResponseCacheTest, TestEviction)
   // Create cache
   std::cout << "Create cache" << std::endl;
   uint64_t cache_size = 1024;
-  ni::RequestResponseCache cache(cache_size);
+  std::unique_ptr<ni::RequestResponseCache> cache;
+  ni::RequestResponseCache::Create(cache_size, &cache);
   cache_stats(cache);
 
   // Create request
@@ -516,30 +519,30 @@ TEST_F(RequestResponseCacheTest, TestEviction)
   std::memcpy(buffer, output0.data(), output_size);
 
   std::cout << "Lookup hash0 in empty cache" << std::endl;
-  auto status = cache.Lookup(hash0, nullptr);
+  auto status = cache->Lookup(hash0, nullptr);
   // This hash not in cache yet
   ASSERT_FALSE(status.IsOk())
       << "hash [" + std::to_string(hash0) + "] should not be in cache";
   std::cout << "Insert response into cache with hash0" << std::endl;
-  check_status(cache.Insert(hash0, *response0));
+  check_status(cache->Insert(hash0, *response0));
   cache_stats(cache);
-  ASSERT_EQ(cache.NumEntries(), 1u);
-  ASSERT_EQ(cache.NumEvictions(), 0u);
+  ASSERT_EQ(cache->NumEntries(), 1u);
+  ASSERT_EQ(cache->NumEvictions(), 0u);
 
-  check_status(cache.Insert(hash1, *response0));
+  check_status(cache->Insert(hash1, *response0));
   cache_stats(cache);
-  ASSERT_EQ(cache.NumEntries(), 2u);
-  ASSERT_EQ(cache.NumEvictions(), 0u);
+  ASSERT_EQ(cache->NumEntries(), 2u);
+  ASSERT_EQ(cache->NumEvictions(), 0u);
 
-  check_status(cache.Insert(hash2, *response0));
+  check_status(cache->Insert(hash2, *response0));
   cache_stats(cache);
-  ASSERT_EQ(cache.NumEntries(), 2u);
-  ASSERT_EQ(cache.NumEvictions(), 1u);
+  ASSERT_EQ(cache->NumEntries(), 2u);
+  ASSERT_EQ(cache->NumEvictions(), 1u);
 
-  check_status(cache.Insert(hash3, *response0));
+  check_status(cache->Insert(hash3, *response0));
   cache_stats(cache);
-  ASSERT_EQ(cache.NumEntries(), 2u);
-  ASSERT_EQ(cache.NumEvictions(), 2u);
+  ASSERT_EQ(cache->NumEntries(), 2u);
+  ASSERT_EQ(cache->NumEvictions(), 2u);
 }
 
 
@@ -549,7 +552,8 @@ TEST_F(RequestResponseCacheTest, TestEndToEnd)
   // Create cache
   std::cout << "Create cache" << std::endl;
   uint64_t cache_size = 256;
-  ni::RequestResponseCache cache(cache_size);
+  std::unique_ptr<ni::RequestResponseCache> cache;
+  ni::RequestResponseCache::Create(cache_size, &cache);
   cache_stats(cache);
 
   // Create request
@@ -577,7 +581,7 @@ TEST_F(RequestResponseCacheTest, TestEndToEnd)
 
   // Hash input request
   uint64_t hash0;
-  check_status(cache.Hash(request0, &hash0));
+  check_status(cache->Hash(request0, &hash0));
 
   std::cout << "Create response object" << std::endl;
   std::unique_ptr<ni::InferenceResponse> response0;
@@ -603,17 +607,17 @@ TEST_F(RequestResponseCacheTest, TestEndToEnd)
   std::memcpy(buffer, output0.data(), output_size);
 
   std::cout << "Lookup hash0 in empty cache" << std::endl;
-  auto status = cache.Lookup(hash0, nullptr);
+  auto status = cache->Lookup(hash0, nullptr);
   // This hash not in cache yet
   ASSERT_FALSE(status.IsOk())
       << "hash [" + std::to_string(hash0) + "] should not be in cache";
   std::cout << "Insert response into cache with hash0" << std::endl;
   // Insertion should succeed
-  check_status(cache.Insert(hash0, *response0));
+  check_status(cache->Insert(hash0, *response0));
   cache_stats(cache);
 
   // Duplicate insertion should fail since key already exists
-  status = cache.Insert(hash0, *response0);
+  status = cache->Insert(hash0, *response0);
   ASSERT_FALSE(status.IsOk())
       << "Inserting duplicate item in cache should fail";
 
@@ -624,7 +628,7 @@ TEST_F(RequestResponseCacheTest, TestEndToEnd)
 
   // Lookup should now succeed
   std::cout << "Lookup hash0 in cache after insertion" << std::endl;
-  check_status(cache.Lookup(hash0, response_test.get()));
+  check_status(cache->Lookup(hash0, response_test.get()));
 
   // Fetch output buffer details
   const void* response_buffer = nullptr;
@@ -654,11 +658,11 @@ TEST_F(RequestResponseCacheTest, TestEndToEnd)
   }
 
   // Simple Evict() test
-  ASSERT_EQ(cache.NumEntries(), 1u);
-  ASSERT_EQ(cache.NumEvictions(), 0u);
-  cache.Evict();
-  ASSERT_EQ(cache.NumEntries(), 0u);
-  ASSERT_EQ(cache.NumEvictions(), 1u);
+  ASSERT_EQ(cache->NumEntries(), 1u);
+  ASSERT_EQ(cache->NumEvictions(), 0u);
+  cache->Evict();
+  ASSERT_EQ(cache->NumEntries(), 0u);
+  ASSERT_EQ(cache->NumEvictions(), 1u);
   std::cout << "Done!" << std::endl;
 }
 
@@ -670,7 +674,8 @@ TEST_F(RequestResponseCacheTest, TestParallelInsertion)
   // Create cache
   std::cout << "Create cache" << std::endl;
   uint64_t cache_size = 1024;
-  ni::RequestResponseCache cache(cache_size);
+  std::unique_ptr<ni::RequestResponseCache> cache;
+  ni::RequestResponseCache::Create(cache_size, &cache);
   cache_stats(cache);
 
   // Create request
@@ -709,7 +714,7 @@ TEST_F(RequestResponseCacheTest, TestParallelInsertion)
             << "] threads in parallel" << std::endl;
   for (size_t idx = 0; idx < thread_count; idx++) {
     threads.emplace_back(std::thread(
-        &ni::RequestResponseCache::Insert, &cache, idx,
+        &ni::RequestResponseCache::Insert, cache.get(), idx,
         std::ref(*response_in)));
   }
 
@@ -721,9 +726,9 @@ TEST_F(RequestResponseCacheTest, TestParallelInsertion)
   // Cache size only has room for 2 entries, so we expect 2 entries and N-2
   // evictions for N threads
   cache_stats(cache);
-  ASSERT_EQ(cache.NumEntries(), 2u) << "NumEntries: " << cache.NumEntries();
-  ASSERT_EQ(cache.NumEvictions(), (uint64_t)(thread_count - 2u))
-      << "NumEvictions: " << cache.NumEvictions();
+  ASSERT_EQ(cache->NumEntries(), 2u) << "NumEntries: " << cache->NumEntries();
+  ASSERT_EQ(cache->NumEvictions(), (uint64_t)(thread_count - 2u))
+      << "NumEvictions: " << cache->NumEvictions();
 }
 
 // Test evicting from cache with multiple threads in parallel
@@ -734,7 +739,8 @@ TEST_F(RequestResponseCacheTest, TestParallelEviction)
   // Create cache
   std::cout << "Create cache" << std::endl;
   uint64_t cache_size = 1024;
-  ni::RequestResponseCache cache(cache_size);
+  std::unique_ptr<ni::RequestResponseCache> cache;
+  ni::RequestResponseCache::Create(cache_size, &cache);
   cache_stats(cache);
 
   // Create request
@@ -771,21 +777,22 @@ TEST_F(RequestResponseCacheTest, TestParallelEviction)
 
   // Insert [thread_count] entries into cache sequentially
   for (size_t idx = 0; idx < thread_count; idx++) {
-    cache.Insert(idx, *response0);
+    cache->Insert(idx, *response0);
   }
 
   // Assert all entries were put into cache and no evictions occurred yet
   cache_stats(cache);
-  ASSERT_EQ(cache.NumEntries(), (uint64_t)thread_count)
-      << "NumEntries: " << cache.NumEntries();
-  ASSERT_EQ(cache.NumEvictions(), 0u)
-      << "NumEvictions: " << cache.NumEvictions();
+  ASSERT_EQ(cache->NumEntries(), (uint64_t)thread_count)
+      << "NumEntries: " << cache->NumEntries();
+  ASSERT_EQ(cache->NumEvictions(), 0u)
+      << "NumEvictions: " << cache->NumEvictions();
 
   // Evict [thread_count] entries from cache in parallel
   std::cout << "Evict from cache with [" << thread_count
             << "] threads in parallel" << std::endl;
   for (size_t idx = 0; idx < thread_count; idx++) {
-    threads.emplace_back(std::thread(&ni::RequestResponseCache::Evict, &cache));
+    threads.emplace_back(
+        std::thread(&ni::RequestResponseCache::Evict, cache.get()));
   }
 
   // Join threads
@@ -796,9 +803,9 @@ TEST_F(RequestResponseCacheTest, TestParallelEviction)
   // Assert all entries were evicted from cache and exactly [thread_count]
   // evictions occurred
   cache_stats(cache);
-  ASSERT_EQ(cache.NumEntries(), 0u) << "NumEntries: " << cache.NumEntries();
-  ASSERT_EQ(cache.NumEvictions(), (uint64_t)thread_count)
-      << "NumEvictions: " << cache.NumEvictions();
+  ASSERT_EQ(cache->NumEntries(), 0u) << "NumEntries: " << cache->NumEntries();
+  ASSERT_EQ(cache->NumEvictions(), (uint64_t)thread_count)
+      << "NumEvictions: " << cache->NumEvictions();
 }
 
 // Test LRU ordering of cache
@@ -807,7 +814,8 @@ TEST_F(RequestResponseCacheTest, TestLRU)
   // Create cache
   std::cout << "Create cache" << std::endl;
   uint64_t cache_size = 1024;
-  ni::RequestResponseCache cache(cache_size);
+  std::unique_ptr<ni::RequestResponseCache> cache;
+  ni::RequestResponseCache::Create(cache_size, &cache);
   cache_stats(cache);
 
   // Create request
@@ -844,57 +852,57 @@ TEST_F(RequestResponseCacheTest, TestLRU)
   check_status(request0.ResponseFactory().CreateResponse(&response_test));
 
   // Insert 3 items into cache: 0, 1, 2
-  check_status(cache.Insert(0, *response0));
-  check_status(cache.Insert(1, *response0));
-  check_status(cache.Insert(2, *response0));
+  check_status(cache->Insert(0, *response0));
+  check_status(cache->Insert(1, *response0));
+  check_status(cache->Insert(2, *response0));
 
   // Verify items 0, 1, 2, in cache
   reset_response(&response_test, &request0);
-  check_status(cache.Lookup(0, response_test.get()));
+  check_status(cache->Lookup(0, response_test.get()));
   reset_response(&response_test, &request0);
-  check_status(cache.Lookup(1, response_test.get()));
+  check_status(cache->Lookup(1, response_test.get()));
   reset_response(&response_test, &request0);
-  check_status(cache.Lookup(2, response_test.get()));
+  check_status(cache->Lookup(2, response_test.get()));
 
   // Evict item from cache, should be item 0 since it was looked up last
-  cache.Evict();
+  cache->Evict();
   // Assert Lookup for item 0 fails but items 1, 2 succeed
   reset_response(&response_test, &request0);
   ni::Status status;
-  status = cache.Lookup(0, response_test.get());
+  status = cache->Lookup(0, response_test.get());
   ASSERT_FALSE(status.IsOk());
   reset_response(&response_test, &request0);
-  check_status(cache.Lookup(1, response_test.get()));
+  check_status(cache->Lookup(1, response_test.get()));
   reset_response(&response_test, &request0);
-  check_status(cache.Lookup(2, response_test.get()));
+  check_status(cache->Lookup(2, response_test.get()));
 
   // Insert item 3, 4
-  check_status(cache.Insert(3, *response0));
-  check_status(cache.Insert(4, *response0));
+  check_status(cache->Insert(3, *response0));
+  check_status(cache->Insert(4, *response0));
 
   // Evict twice, assert items 1 and 2 were evicted
-  cache.Evict();
-  cache.Evict();
+  cache->Evict();
+  cache->Evict();
   reset_response(&response_test, &request0);
-  status = cache.Lookup(1, response_test.get());
+  status = cache->Lookup(1, response_test.get());
   ASSERT_FALSE(status.IsOk());
   reset_response(&response_test, &request0);
-  status = cache.Lookup(2, response_test.get());
+  status = cache->Lookup(2, response_test.get());
   ASSERT_FALSE(status.IsOk());
 
   // Lookup items 3 and 4
   reset_response(&response_test, &request0);
-  check_status(cache.Lookup(3, response_test.get()));
+  check_status(cache->Lookup(3, response_test.get()));
   reset_response(&response_test, &request0);
-  check_status(cache.Lookup(4, response_test.get()));
+  check_status(cache->Lookup(4, response_test.get()));
 
   // Evict, assert item 3 was evicted
-  cache.Evict();
+  cache->Evict();
   reset_response(&response_test, &request0);
-  status = cache.Lookup(3, response_test.get());
+  status = cache->Lookup(3, response_test.get());
   ASSERT_FALSE(status.IsOk());
   reset_response(&response_test, &request0);
-  check_status(cache.Lookup(4, response_test.get()));
+  check_status(cache->Lookup(4, response_test.get()));
 }
 
 // Test looking up from cache with multiple threads in parallel
@@ -904,7 +912,8 @@ TEST_F(RequestResponseCacheTest, TestParallelLookup)
   // Create cache
   std::cout << "Create cache" << std::endl;
   uint64_t cache_size = 1024;
-  ni::RequestResponseCache cache(cache_size);
+  std::unique_ptr<ni::RequestResponseCache> cache;
+  ni::RequestResponseCache::Create(cache_size, &cache);
   cache_stats(cache);
 
   // Create request
@@ -957,22 +966,23 @@ TEST_F(RequestResponseCacheTest, TestParallelLookup)
     // Copy unique data for each response to buffer inserted into cache
     std::memcpy(buffer, test_outputs[idx].data(), output_size);
     // Insert response for each thread
-    cache.Insert(idx, *response0);
+    cache->Insert(idx, *response0);
   }
 
   // Assert all entries were put into cache and no evictions occurred yet
   cache_stats(cache);
-  ASSERT_EQ(cache.NumEntries(), (uint64_t)thread_count)
-      << "NumEntries: " << cache.NumEntries();
-  ASSERT_EQ(cache.NumEvictions(), 0u)
-      << "NumEvictions: " << cache.NumEvictions();
+  ASSERT_EQ(cache->NumEntries(), (uint64_t)thread_count)
+      << "NumEntries: " << cache->NumEntries();
+  ASSERT_EQ(cache->NumEvictions(), 0u)
+      << "NumEvictions: " << cache->NumEvictions();
 
   // Evict [thread_count] entries from cache in parallel
   std::cout << "Lookup from cache with [" << thread_count
             << "] threads in parallel" << std::endl;
   for (size_t idx = 0; idx < thread_count; idx++) {
     threads.emplace_back(std::thread(
-        &ni::RequestResponseCache::Lookup, &cache, idx, responses[idx].get()));
+        &ni::RequestResponseCache::Lookup, cache.get(), idx,
+        responses[idx].get()));
   }
 
   // Join threads
