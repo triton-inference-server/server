@@ -89,8 +89,7 @@ class DynamicBatchScheduler : public Scheduler {
   void BatcherThread(const int nice);
   void NewPayload();
   uint64_t GetDynamicBatch();
-  void DelegateResponse(
-      std::unique_ptr<InferenceRequest>& request, bool cache_hit);
+  void DelegateResponse(std::unique_ptr<InferenceRequest>& request);
   void CacheLookUp(
       std::unique_ptr<InferenceRequest>& request,
       std::unique_ptr<InferenceResponse>& cached_response);

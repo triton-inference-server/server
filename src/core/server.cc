@@ -171,10 +171,12 @@ InferenceServer::Init()
     return status;
   }
 
-  std::unique_ptr<RequestResponseCache> local_response_cache;
-  status = RequestResponseCache::Create(
-      response_cache_byte_size_, &local_response_cache);
-  response_cache_ = std::move(local_response_cache);
+  if (response_cache_byte_size_ > 0) {
+    std::unique_ptr<RequestResponseCache> local_response_cache;
+    status = RequestResponseCache::Create(
+        response_cache_byte_size_, &local_response_cache);
+    response_cache_ = std::move(local_response_cache);
+  }
 
 
 #ifdef TRITON_ENABLE_GPU

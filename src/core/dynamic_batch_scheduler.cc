@@ -156,11 +156,10 @@ DynamicBatchScheduler::Enqueue(std::unique_ptr<InferenceRequest>& request)
   if (response_cache_enabled_) {
     CacheLookUp(request, cached_response);
   }
-  bool cache_hit = (cached_response.get() != nullptr);
 
-  if (cache_hit) {
+  if (cached_response.get() != nullptr) {
     if (preserve_ordering_) {
-      DelegateResponse(request, cache_hit);
+      DelegateResponse(request);
     }
     // If there was a cache hit then send the cached response and release
     // the request.
@@ -174,7 +173,7 @@ DynamicBatchScheduler::Enqueue(std::unique_ptr<InferenceRequest>& request)
 
   if (!dynamic_batching_enabled_) {
     if (preserve_ordering_ || response_cache_enabled_) {
-      DelegateResponse(request, cache_hit);
+      DelegateResponse(request);
     }
     // If not using dynamic batching, directly enqueue the
     // request to model for execution
@@ -324,7 +323,7 @@ DynamicBatchScheduler::BatcherThread(const int nice)
               auto status = queue_.Dequeue(&request);
               if (status.IsOk()) {
                 if (preserve_ordering_ || response_cache_enabled_) {
-                  DelegateResponse(request, false /* cache_hit */);
+                  DelegateResponse(request);
                 }
                 curr_payload_->AddRequest(std::move(request));
               } else {
@@ -529,20 +528,17 @@ DynamicBatchScheduler::GetDynamicBatch()
   return wait_ns / 1000;
 }
 
-// TODO: Replace cache_hit flag with struct of cache info
-//       or use cache manager to track logic
 void
 DynamicBatchScheduler::DelegateResponse(
-    std::unique_ptr<InferenceRequest>& request, bool cache_hit)
+    std::unique_ptr<InferenceRequest>& request)
 {
   completion_queue_.emplace_back();
   auto queue_slot = &completion_queue_.back();
   uint64_t request_hash = request->CacheKey();
   request->SetResponseDelegator(
-      [this, queue_slot, request_hash, cache_hit](
+      [this, queue_slot, request_hash](
           std::unique_ptr<InferenceResponse>&& response, const uint32_t flags) {
-        // Insert response in cache if enabled and not already in there
-        if (response_cache_enabled_ && !cache_hit) {
+        if (response_cache_enabled_) {
           auto cache = model_->Server()->GetResponseCache();
           cache->Insert(request_hash, *response);
         }
