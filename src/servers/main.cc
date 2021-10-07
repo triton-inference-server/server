@@ -1591,6 +1591,10 @@ Parse(TRITONSERVER_ServerOptions** server_options, int argc, char** argv)
         "setting total CUDA memory byte size");
   }
   FAIL_IF_ERR(
+      TRITONSERVER_ServerOptionsSetResponseCacheByteSize(
+          loptions, response_cache_byte_size),
+      "setting total response cache byte size");
+  FAIL_IF_ERR(
       TRITONSERVER_ServerOptionsSetMinSupportedComputeCapability(
           loptions, min_supported_compute_capability),
       "setting minimum supported CUDA compute capability");
@@ -1663,12 +1667,6 @@ Parse(TRITONSERVER_ServerOptions** server_options, int argc, char** argv)
             std::get<2>(hp).c_str()),
         "setting host policy");
   }
-
-  FAIL_IF_ERR(
-      TRITONSERVER_ServerOptionsSetResponseCacheByteSize(
-          loptions, response_cache_byte_size),
-      "setting total response cache byte size");
-
 
   return true;
 }

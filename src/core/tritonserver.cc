@@ -1085,6 +1085,16 @@ TRITONSERVER_ServerOptionsSetCudaMemoryPoolByteSize(
 }
 
 TRITONSERVER_Error*
+TRITONSERVER_ServerOptionsSetResponseCacheByteSize(
+    TRITONSERVER_ServerOptions* options, uint64_t size)
+{
+  TritonServerOptions* loptions =
+      reinterpret_cast<TritonServerOptions*>(options);
+  loptions->SetResponseCacheByteSize(size);
+  return nullptr;  // Success
+}
+
+TRITONSERVER_Error*
 TRITONSERVER_ServerOptionsSetMinSupportedComputeCapability(
     TRITONSERVER_ServerOptions* options, double cc)
 {
@@ -1268,15 +1278,6 @@ TRITONSERVER_ServerOptionsSetHostPolicy(
   return loptions->SetHostPolicy(policy_name, setting, value);
 }
 
-TRITONSERVER_Error*
-TRITONSERVER_ServerOptionsSetResponseCacheByteSize(
-    TRITONSERVER_ServerOptions* options, uint64_t size)
-{
-  TritonServerOptions* loptions =
-      reinterpret_cast<TritonServerOptions*>(options);
-  loptions->SetResponseCacheByteSize(size);
-  return nullptr;  // Success
-}
 
 //
 // TRITONSERVER_InferenceRequest
