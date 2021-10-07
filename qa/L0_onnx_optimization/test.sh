@@ -60,6 +60,20 @@ for MODEL in \
     rm -fr models/${MODEL}_test/3 && \
     (cd models/${MODEL}_test && \
             sed -i 's/_float32_float32_float32/&_test/' config.pbtxt) && \
+    # CUDA EP optimization params
+    cp -r models/${MODEL}_test models/${MODEL}_cuda_config && \
+    (cd models/${MODEL}_cuda_config && \
+            sed -i 's/_float32_test/_float32_cuda_config/' \
+                config.pbtxt && \
+            echo "parameters: { key: \"cudnn_conv_algo_search\" value: { string_value: \"1\" }} \
+            parameters: { key: \"arena_extend_strategy\" value: { string_value: \"1\" }}
+            parameters: { key: \"gpu_mem_limit\" value: { string_value: \"18446744073709551614\" }} " \ >> config.pbtxt) && \
+    # CPU EP optimization params
+    cp -r models/${MODEL}_test models/${MODEL}_cpu_config && \
+    (cd models/${MODEL}_cpu_config && \
+            sed -i 's/_float32_test/_float32_cpu_config/' \
+                config.pbtxt && \
+            echo "parameters: { key: \"intra_op_thread_count\" value: { string_value: \"1\" }} " \ >> config.pbtxt) && \
     # GPU execution accelerators with default setting
     cp -r models/${MODEL}_test models/${MODEL}_trt && \
     (cd models/${MODEL}_trt && \
@@ -126,7 +140,7 @@ for MODEL in \
 
     grep "TensorRT Execution Accelerator is set for '${MODEL}_param'" $SERVER_LOG
     if [ $? -ne 0 ]; then
-        echo -e "\n***\n*** Failed. Expected TensorRT Execution Accelerator is set\n***"
+        echo -e "\n***\n*** Failed. Expected TensorRT Execution Accelerator is set for '${MODEL}_param'\n***"
         RET=1
     fi
 
@@ -142,7 +156,7 @@ for MODEL in \
         RET=1
     fi
 
-    grep "failed to load '${MODEL}_invalid_param' version 1: Invalid argument: failed to convert 'abc' to long long integral number" $SERVER_LOG
+    grep "failed to load '${MODEL}_invalid_param' version 1: Invalid argument: failed to convert 'abc' to unsigned long long integral number" $SERVER_LOG
     if [ $? -ne 0 ]; then
         echo -e "\n***\n*** Failed. Expected invalid parameter 'abc' returns error\n***"
         RET=1
@@ -153,6 +167,19 @@ for MODEL in \
         echo -e "\n***\n*** Failed. Expected 'unknown_gpu' Execution Accelerator returns error\n***"
         RET=1
     fi
+
+    grep "memory limit: 18446744073709551614 arena_extend_strategy: 1" $SERVER_LOG
+    if [ $? -ne 0 ]; then
+        echo -e "\n***\n*** Failed. Expected configurations not set for '${MODEL}_cuda_config'\n***"
+        RET=1
+    fi
+
+    grep "CUDA Execution Accelerator is set for '${MODEL}_cpu_config'" $SERVER_LOG
+    if [ $? -ne 0 ]; then
+        echo -e "\n***\n*** Failed. Expected CUDA Execution Accelerator is set for '${MODEL}_cpu_config'\n***"
+        RET=1
+    fi
+    
 
     set -e
 

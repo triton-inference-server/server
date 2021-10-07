@@ -471,7 +471,7 @@ GPU 0 and two execution instances on GPUs 1 and 2.
   ]
 ```
 
-The instance group setting is also used to enable exection of a model
+The instance group setting is also used to enable execution of a model
 on the CPU. A model can be executed on the CPU even if there is a GPU
 available in the system. The following places two execution instances
 on the CPU.
@@ -500,6 +500,74 @@ the device kind of the instance, for instance, KIND_CPU is "cpu", KIND_MODEL is
     }
   ]
 ```
+
+### Rate Limiter Config
+
+Instance group optionally specifies [rate limiter](rate_limiter.md)
+config which controls how the rate limiter operates on the instances
+in the group. The rate limiter configuration is ignored if rate
+limiting is off. If rate limiting is on and if an instance_group does
+not provide this configuration, then the execution on the model
+instances belonging to this group will not be limited in any way by
+the rate limiter. The configuration includes the following
+specifications:
+
+#### Resources
+
+The set of [resources](rate_limiter.md#resources) required to execute
+a model instance. The "name" field identifies the resource and "count"
+field refers to the number of copies of the resource that the model
+instance in the group requires to run. The "global" field specifies
+whether the resource is per-device or shared globally across the system.
+Loaded models can not specify a resource with the same name both as global
+and non-global. If no resources are provided then triton assumes the
+execution of model instance does not require any resources and will
+start executing as soon as model instance is available.
+
+#### Priority
+
+Priority serves as a weighting value to be used for prioritizing across
+all the instances of all the models. An instance with priority 2 will be
+given 1/2 the number of scheduling chances as an instance with priority
+1.
+
+The following example specifies the instances in the group requires 
+four "R1" and two "R2" resources for execution. Resource "R2" is a global
+resource. Additionally, the rate-limiter priority of the instance_group
+is 2.
+
+```
+  instance_group [
+    {
+      count: 1
+      kind: KIND_GPU
+      gpus: [ 0, 1, 2 ]
+      rate_limiter {
+        resources [
+          {
+            name: "R1"
+            count: 4
+          },
+          {
+            name: "R2"
+            global: True
+            count: 2 
+          }
+        ] 
+        priority: 2
+      }
+    }
+  ]
+```
+
+The above configuration creates 3 model instances, one on each device
+(0, 1 and 2). The three instances will not contend for "R1" among
+themselves as "R1" is local for their own device, however, they will
+contend for "R2" because it is specified as a global resource which
+means "R2" is shared across the system. Though these instances don't
+contend for "R1" among themsleves, but they will contend for "R1"
+with other model instances which includes "R1" in their resource
+requirements and run on the same device as them.
 
 ## Scheduling And Batching
 

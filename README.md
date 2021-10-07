@@ -31,10 +31,7 @@
 # Triton Inference Server
 
 **LATEST RELEASE: You are currently on the main branch which tracks
-under-development progress towards the next release. The latest
-release of the Triton Inference Server is 2.13.0 and is available on
-branch
-[r21.08](https://github.com/triton-inference-server/server/tree/r21.08).**
+under-development progress towards the next release.**
 
 Triton Inference Server provides a cloud and edge inferencing solution
 optimized for both CPUs and GPUs. Triton supports an HTTP/REST and
@@ -44,11 +41,11 @@ available as a shared library with a C API that allows the full
 functionality of Triton to be included directly in an
 application.
 
-The current release of the Triton Inference Server is 2.13.0 and
-corresponds to the 21.08 release of the tritonserver container on
+The current release of the Triton Inference Server is 2.14.0 and
+corresponds to the 21.09 release of the tritonserver container on
 [NVIDIA GPU Cloud (NGC)](https://ngc.nvidia.com). The branch for this
 release is
-[r21.08](https://github.com/triton-inference-server/server/tree/r21.08).
+[r21.09](https://github.com/triton-inference-server/server/tree/r21.09).
 
 ## Features
 
@@ -107,8 +104,8 @@ release is
 
 **The master branch documentation tracks the upcoming,
 under-development release and so may not be accurate for the current
-release of Triton. See the [r21.08
-documentation](https://github.com/triton-inference-server/server/tree/r21.08#documentation)
+release of Triton. See the [r21.09
+documentation](https://github.com/triton-inference-server/server/tree/r21.09#documentation)
 for the current release.**
 
 [Triton Architecture](docs/architecture.md) gives a high-level
@@ -131,19 +128,20 @@ describe supported GPUs.
 
 ### User Documentation
 
-- [QuickStart](docs/quickstart.md)
-  - [Install](docs/quickstart.md#install-triton-docker-image)
-  - [Run](docs/quickstart.md#run-triton)
-- [Model Repository](docs/model_repository.md)
-- [Model Configuration](docs/model_configuration.md)
-- [Model Management](docs/model_management.md)
-- [Custom Operations](docs/custom_operations.md)
-- [Client Libraries and Examples](https://github.com/triton-inference-server/client)
-- [Optimization](docs/optimization.md)
-  - [Model Analyzer](docs/model_analyzer.md)
-  - [Performance Analyzer](docs/perf_analyzer.md)
-- [Metrics](docs/metrics.md)
-- [Jetson and JetPack](docs/jetson.md)
+* [QuickStart](docs/quickstart.md)
+  * [Install](docs/quickstart.md#install-triton-docker-image)
+  * [Run](docs/quickstart.md#run-triton)
+* [Model Repository](docs/model_repository.md)
+* [Model Configuration](docs/model_configuration.md)
+* [Model Management](docs/model_management.md)
+* [Custom Operations](docs/custom_operations.md)
+* [Client Libraries and Examples](https://github.com/triton-inference-server/client)
+* [Optimization](docs/optimization.md)
+  * [Model Analyzer](docs/model_analyzer.md)
+  * [Performance Analyzer](docs/perf_analyzer.md)
+* [Metrics](docs/metrics.md)
+* [Rate Limiter](docs/rate_limiter.md)
+* [Jetson and JetPack](docs/jetson.md)
 
 The [quickstart](docs/quickstart.md) walks you through all the steps
 required to install and run Triton with an example image
@@ -180,8 +178,10 @@ Analyzer](docs/model_analyzer.md) to help your optimization
 efforts. Specifically, you will want to optimize [scheduling and
 batching](docs/architecture.md#models-and-schedulers) and [model
 instances](docs/model_configuration.md#instance-groups) appropriately
-for each model. You may also want to consider [ensembling multiple
-models and pre/post-processing](docs/architecture.md#ensemble-models)
+for each model. You can also enable cross-model prioritization using
+[rate limiter](docs/rate_limiter.md) which manages the rate at which
+requests are scheduled on model instances. You may also want to
+consider [ensembling multiple models and pre/post-processing](docs/architecture.md#ensemble-models)
 into a pipeline. In some cases you may find [individual inference
 request trace data](docs/trace.md) useful when optimizing. A
 [Prometheus metrics endpoint](docs/metrics.md) allows you to visualize
@@ -204,11 +204,11 @@ version 2 of Triton from previously using version 1.
 
 ### Developer Documentation
 
-- [Build](docs/build.md)
-- [Protocols and APIs](docs/inference_protocols.md).
-- [Backends](https://github.com/triton-inference-server/backend)
-- [Repository Agents](docs/repository_agents.md)
-- [Test](docs/test.md)
+* [Build](docs/build.md)
+* [Protocols and APIs](docs/inference_protocols.md).
+* [Backends](https://github.com/triton-inference-server/backend)
+* [Repository Agents](docs/repository_agents.md)
+* [Test](docs/test.md)
 
 Triton can be [built using
 Docker](docs/build.md#building-triton-with-docker) or [built without
@@ -283,7 +283,7 @@ repo](https://github.com/triton-inference-server/contrib).
 
 We appreciate any feedback, questions or bug reporting regarding this
 project. When help with code is needed, follow the process outlined in
-the Stack Overflow (https://stackoverflow.com/help/mcve)
+the Stack Overflow (<https://stackoverflow.com/help/mcve>)
 document. Ensure posted examples are:
 
 * minimal – use as little code as possible that still produces the

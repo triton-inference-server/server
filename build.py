@@ -67,8 +67,8 @@ from distutils.dir_util import copy_tree
 TRITON_VERSION_MAP = {
     '2.15.0dev': (
         '21.10dev',  # triton container
-        '21.08',  # upstream container
-        '1.8.1',  # ORT
+        '21.09',  # upstream container
+        '1.9.0',  # ORT
         '2021.2.200',  # ORT OpenVINO
         '2021.2',  # Standalone OpenVINO
         '2.2.9')  # DCGM version
@@ -253,7 +253,7 @@ def core_cmake_args(components, backends, install_dir):
         cmake_enable(FLAGS.enable_gpu)))
     cargs.append('-DTRITON_MIN_COMPUTE_CAPABILITY={}'.format(
         FLAGS.min_compute_capability))
-    
+
     cargs.append('-DTRITON_ENABLE_MALI_GPU:BOOL={}'.format(
         cmake_enable(FLAGS.enable_mali_gpu)))
 
@@ -584,6 +584,7 @@ ENV DEBIAN_FRONTEND=noninteractive
 # scons is needed for armnn_tflite backend build dep
 RUN apt-get update && \
     apt-get install -y --no-install-recommends \
+            ca-certificates \
             autoconf \
             automake \
             build-essential \
@@ -640,7 +641,8 @@ COPY . .
 ENTRYPOINT []
 '''
         if FLAGS.enable_gpu:
-            df += install_dcgm_libraries(argmap['DCGM_VERSION'], target_machine())
+            df += install_dcgm_libraries(argmap['DCGM_VERSION'],
+                                         target_machine())
 
     df += '''
 ENV TRITON_SERVER_VERSION ${TRITON_VERSION}
@@ -710,7 +712,8 @@ FROM ${{BASE_IMAGE}}
 '''.format(argmap['TRITON_VERSION'], argmap['TRITON_CONTAINER_VERSION'],
            argmap['BASE_IMAGE'])
 
-    df += dockerfile_prepare_container_linux(argmap, backends, FLAGS.enable_gpu, target_machine())
+    df += dockerfile_prepare_container_linux(argmap, backends, FLAGS.enable_gpu,
+                                             target_machine())
 
     df += '''
 WORKDIR /opt/tritonserver
@@ -754,7 +757,8 @@ COPY --chown=1000:1000 --from=tritonserver_build /workspace/build/sagemaker/serv
         dfile.write(df)
 
 
-def dockerfile_prepare_container_linux(argmap, backends, enable_gpu, target_machine):
+def dockerfile_prepare_container_linux(argmap, backends, enable_gpu,
+                                       target_machine):
     gpu_enabled = 1 if enable_gpu else 0
     # Common steps to produce docker images shared by build.py and compose.py.
     # Sets enviroment variables, installs dependencies and adds entrypoint
@@ -964,9 +968,7 @@ def container_build(images, backends, repoagents, endpoints):
     # Windows docker runs in a VM and memory needs to be specified
     # explicitly.
     if target_platform() == 'windows':
-        commonargs += [
-            '--memory', FLAGS.container_memory
-        ]
+        commonargs += ['--memory', FLAGS.container_memory]
 
     log_verbose('buildbase container {}'.format(commonargs + cachefromargs))
     create_dockerfile_buildbase(FLAGS.build_dir, 'Dockerfile.buildbase',
@@ -1033,9 +1035,7 @@ def container_build(images, backends, repoagents, endpoints):
         if target_platform() == 'windows':
             # Windows docker runs in a VM and memory needs to be
             # specified explicitly.
-            dockerrunargs += [
-                '--memory', FLAGS.container_memory
-            ]
+            dockerrunargs += ['--memory', FLAGS.container_memory]
             dockerrunargs += [
                 '-v', '\\\\.\pipe\docker_engine:\\\\.\pipe\docker_engine'
             ]
@@ -1145,7 +1145,8 @@ if __name__ == '__main__':
         '--container-memory',
         default="8g",
         required=False,
-        help='Value for Docker --memory argument. Used only for windows builds.')
+        help='Value for Docker --memory argument. Used only for windows builds.'
+    )
     parser.add_argument(
         '--target-platform',
         required=False,
@@ -1321,21 +1322,21 @@ if __name__ == '__main__':
         action='append',
         required=False,
         help=
-        'Include specified backend in build as <backend-name>[:<repo-tag>]. If <repo-tag> starts with "pull/" then it refers to a pull-request reference, otherwise <repo-tag> indicates the git tag/branch to use for the build. If the version is non-development then the default <repo-tag> is the release branch matching the container version (e.g. version 21.08 -> branch r21.08); otherwise the default <repo-tag> is "main" (e.g. version 21.08dev -> branch main).'
+        'Include specified backend in build as <backend-name>[:<repo-tag>]. If <repo-tag> starts with "pull/" then it refers to a pull-request reference, otherwise <repo-tag> indicates the git tag/branch to use for the build. If the version is non-development then the default <repo-tag> is the release branch matching the container version (e.g. version 21.09 -> branch r21.09); otherwise the default <repo-tag> is "main" (e.g. version 21.09dev -> branch main).'
     )
     parser.add_argument(
         '--repo-tag',
         action='append',
         required=False,
         help=
-        'The version of a component to use in the build as <component-name>:<repo-tag>. <component-name> can be "common", "core", "backend" or "thirdparty". If <repo-tag> starts with "pull/" then it refers to a pull-request reference, otherwise <repo-tag> indicates the git tag/branch. If the version is non-development then the default <repo-tag> is the release branch matching the container version (e.g. version 21.08 -> branch r21.08); otherwise the default <repo-tag> is "main" (e.g. version 21.08dev -> branch main).'
+        'The version of a component to use in the build as <component-name>:<repo-tag>. <component-name> can be "common", "core", "backend" or "thirdparty". If <repo-tag> starts with "pull/" then it refers to a pull-request reference, otherwise <repo-tag> indicates the git tag/branch. If the version is non-development then the default <repo-tag> is the release branch matching the container version (e.g. version 21.09 -> branch r21.09); otherwise the default <repo-tag> is "main" (e.g. version 21.09dev -> branch main).'
     )
     parser.add_argument(
         '--repoagent',
         action='append',
         required=False,
         help=
-        'Include specified repo agent in build as <repoagent-name>[:<repo-tag>]. If <repo-tag> starts with "pull/" then it refers to a pull-request reference, otherwise <repo-tag> indicates the git tag/branch to use for the build. If the version is non-development then the default <repo-tag> is the release branch matching the container version (e.g. version 21.08 -> branch r21.08); otherwise the default <repo-tag> is "main" (e.g. version 21.08dev -> branch main).'
+        'Include specified repo agent in build as <repoagent-name>[:<repo-tag>]. If <repo-tag> starts with "pull/" then it refers to a pull-request reference, otherwise <repo-tag> indicates the git tag/branch to use for the build. If the version is non-development then the default <repo-tag> is the release branch matching the container version (e.g. version 21.09 -> branch r21.09); otherwise the default <repo-tag> is "main" (e.g. version 21.09dev -> branch main).'
     )
 
     FLAGS = parser.parse_args()

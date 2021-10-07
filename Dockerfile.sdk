@@ -25,7 +25,7 @@
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 # Base image on the minimum Triton container
-ARG BASE_IMAGE=nvcr.io/nvidia/tritonserver:21.08-py3-min
+ARG BASE_IMAGE=nvcr.io/nvidia/tritonserver:21.09-py3-min
 
 ARG TRITON_CLIENT_REPO_SUBDIR=clientrepo
 ARG TRITON_COMMON_REPO_TAG=main
@@ -48,6 +48,7 @@ ARG DCGM_VERSION=2.2.9
 
 RUN apt-get update && \
     apt-get install -y --no-install-recommends \
+            ca-certificates \
             software-properties-common \
             autoconf \
             automake \

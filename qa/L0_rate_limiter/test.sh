@@ -66,7 +66,7 @@ cp -r ./custom_models/custom_zero_1_float32 ./custom_models/custom_zero_1_float3
         sed -i "s/max_batch_size:.*/max_batch_size: 4/g" config.pbtxt && \
         echo "instance_group [{"  >> config.pbtxt && \
         echo "kind: KIND_GPU count: 1"  >> config.pbtxt && \
-        echo "rate_limiter { resources [{name: \"resource1\" count: 4 }] priority: 1}"  >> config.pbtxt && \
+        echo "rate_limiter { resources [{name: \"resource1\" count: 4 }]}"  >> config.pbtxt && \
         echo "}]" >> config.pbtxt && \
         echo "parameters [" >> config.pbtxt && \
         echo "{ key: \"execute_delay_ms\"; value: { string_value: \"100\" }}" >> config.pbtxt && \
@@ -396,9 +396,10 @@ unset TRITONSERVER_DELAY_SCHEDULER
 ##
 ## Tests with sequence batching
 ##
-# Despite all the possible bs being preferred triton should always form full batches as
-# the second instance would be blocked because of the resource constraints.
-FIRST_INSTANCE_RESOURCE="rate_limiter { resources [{name: \"resource1\" count: 4 }] priority: 1}"
+# Send one sequence and check for correct accumulator result. The result should be returned immediately.
+# This test checks whether all the requests are directed to the same instance despite there being other
+# instances with higher priority.
+FIRST_INSTANCE_RESOURCE="rate_limiter { resources [{name: \"resource1\" count: 4 }]}"
 (cd custom_models/custom_sequence_int32/ && \
         sed -i "s/max_sequence_idle_microseconds:.*/max_sequence_idle_microseconds: 1000000/" config.pbtxt && \
         sed -i "s/^max_batch_size:.*/max_batch_size: 1/" config.pbtxt && \
