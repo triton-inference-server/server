@@ -849,11 +849,9 @@ EnsembleContext::InitStep(
     RETURN_IF_ERROR(irequest->AddOriginalInput(
         pair.first, tensor.data_->DType(), shape, &input));
     RETURN_IF_ERROR(input->SetData(tensor.data_->Data()));
-    if (!tensor.data_->HostPolicyData().empty()) {
-      for (const auto& host_policy_data : tensor.data_->HostPolicyData()) {
-        RETURN_IF_ERROR(
-            input->SetData(host_policy_data.first, host_policy_data.second));
-      }
+    for (const auto& host_policy_data : tensor.data_->HostPolicyData()) {
+      RETURN_IF_ERROR(
+          input->SetData(host_policy_data.first, host_policy_data.second));
     }
 
     releasing_tensors.emplace(&tensor_data, &tensor.remaining_reference_count_);
