@@ -261,14 +261,14 @@ enum OptionId {
   OPTION_RATE_LIMIT_RESOURCE,
   OPTION_PINNED_MEMORY_POOL_BYTE_SIZE,
   OPTION_CUDA_MEMORY_POOL_BYTE_SIZE,
+  OPTION_RESPONSE_CACHE_BYTE_SIZE,
   OPTION_MIN_SUPPORTED_COMPUTE_CAPABILITY,
   OPTION_EXIT_TIMEOUT_SECS,
   OPTION_BACKEND_DIR,
   OPTION_REPOAGENT_DIR,
   OPTION_BUFFER_MANAGER_THREAD_COUNT,
   OPTION_BACKEND_CONFIG,
-  OPTION_HOST_POLICY,
-  OPTION_RESPONSE_CACHE_BYTE_SIZE
+  OPTION_HOST_POLICY
 };
 
 struct Option {
@@ -497,6 +497,15 @@ std::vector<Option> options_
        "<GPU device ID>:<pool byte size>. This option can be used multiple "
        "times, but only once per GPU device. Subsequent uses will overwrite "
        "previous uses for the same GPU device. Default is 64 MB."},
+      {OPTION_RESPONSE_CACHE_BYTE_SIZE, "response-cache-byte-size",
+       Option::ArgInt,
+       "The size in bytes to allocate for a request/response cache. When "
+       "non-zero, Triton allocates the requested size in CPU memory and "
+       "shares the cache across all inference requests and across all models. "
+       "For a given model to use request caching, the model must enable "
+       "request caching in the model configuration. By default, no model uses "
+       "request caching even if the request cache is enabled with the "
+       "--response-cache-byte-size flag. Default is 0."},
       {OPTION_MIN_SUPPORTED_COMPUTE_CAPABILITY,
        "min-supported-compute-capability", Option::ArgFloat,
        "The minimum supported CUDA compute capability. GPUs that don't support "
@@ -519,21 +528,13 @@ std::vector<Option> options_
        "Specify a backend-specific configuration setting. The format of this "
        "flag is --backend-config=<backend_name>,<setting>=<value>. Where "
        "<backend_name> is the name of the backend, such as 'tensorrt'."},
-      {OPTION_HOST_POLICY, "host-policy", "<string>,<string>=<string>",
-       "Specify a host policy setting associated with a policy name. The "
-       "format of this flag is --host-policy=<policy_name>,<setting>=<value>."
-       "Currently supported settings are 'numa-node', 'cpu-cores'. Note that "
-       "'numa-node' setting will affect pinned memory pool behavior, see "
-       "--pinned-memory-pool for more detail."},
   {
-    OPTION_RESPONSE_CACHE_BYTE_SIZE, "response-cache-byte-size", Option::ArgInt,
-        "The size in bytes to allocate for a request/response cache. When "
-        "non-zero, Triton allocates the requested size in CPU memory and "
-        "shares the cache across all inference requests and across all models. "
-        "For a given model to use request caching, the model must enable "
-        "request caching in the model configuration. By default, no model uses "
-        "request caching even if the request cache is enabled with the "
-        "--response-cache-byte-size flag. Default is 0."
+    OPTION_HOST_POLICY, "host-policy", "<string>,<string>=<string>",
+        "Specify a host policy setting associated with a policy name. The "
+        "format of this flag is --host-policy=<policy_name>,<setting>=<value>."
+        "Currently supported settings are 'numa-node', 'cpu-cores'. Note that "
+        "'numa-node' setting will affect pinned memory pool behavior, see "
+        "--pinned-memory-pool for more detail."
   }
 };
 
@@ -728,10 +729,9 @@ StartEndpoints(
 {
 #ifdef _WIN32
   WSADATA wsaData;
-  int wsa_ret = WSAStartup(MAKEWORD(2,2), &wsaData);
+  int wsa_ret = WSAStartup(MAKEWORD(2, 2), &wsaData);
 
-  if (wsa_ret != 0)
-  {
+  if (wsa_ret != 0) {
     LOG_ERROR << "Error in WSAStartup " << wsa_ret;
     return false;
   }
@@ -844,8 +844,7 @@ StopEndpoints()
 #ifdef _WIN32
   int wsa_ret = WSACleanup();
 
-  if (wsa_ret != 0)
-  {
+  if (wsa_ret != 0) {
     LOG_ERROR << "Error in WSACleanup " << wsa_ret;
     ret = false;
   }
@@ -1467,6 +1466,9 @@ Parse(TRITONSERVER_ServerOptions** server_options, int argc, char** argv)
       case OPTION_CUDA_MEMORY_POOL_BYTE_SIZE:
         cuda_pools.push_back(ParsePairOption<int, uint64_t>(optarg, ":"));
         break;
+      case OPTION_RESPONSE_CACHE_BYTE_SIZE:
+        response_cache_byte_size = (uint64_t)ParseLongLongOption(optarg);
+        break;
       case OPTION_MIN_SUPPORTED_COMPUTE_CAPABILITY:
         min_supported_compute_capability = ParseDoubleOption(optarg);
         break;
@@ -1487,9 +1489,6 @@ Parse(TRITONSERVER_ServerOptions** server_options, int argc, char** argv)
         break;
       case OPTION_HOST_POLICY:
         host_policies.push_back(ParseHostPolicyOption(optarg));
-        break;
-      case OPTION_RESPONSE_CACHE_BYTE_SIZE:
-        response_cache_byte_size = (uint64_t)ParseLongLongOption(optarg);
         break;
     }
   }

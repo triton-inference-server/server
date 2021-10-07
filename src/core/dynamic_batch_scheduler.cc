@@ -158,11 +158,13 @@ DynamicBatchScheduler::Enqueue(std::unique_ptr<InferenceRequest>& request)
   }
 
   if (cached_response.get() != nullptr) {
+    // If there was a cache hit then try sending the cached response
+    // and release the request.
     if (preserve_ordering_) {
+      // In order to preserve the order, the response send must be
+      // delegated.
       DelegateResponse(request);
     }
-    // If there was a cache hit then send the cached response and release
-    // the request.
     InferenceResponse::Send(
         std::move(cached_response), TRITONSERVER_RESPONSE_COMPLETE_FINAL);
     InferenceRequest::Release(
@@ -571,11 +573,8 @@ DynamicBatchScheduler::CacheLookUp(
   std::unique_ptr<InferenceResponse> local_response;
   request->ResponseFactory().CreateResponse(&local_response);
   status = cache->Lookup(request_hash, local_response.get());
-  if (status.IsOk() && local_response != nullptr) {
+  if (status.IsOk() && (local_response.get() != nullptr)) {
     cached_response = std::move(local_response);
-  } else {
-    LOG_VERBOSE(1) << "Failed to lookup request in response cache:"
-                   << status.Message();
   }
 }
 
