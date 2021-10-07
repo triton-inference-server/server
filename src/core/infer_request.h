@@ -116,9 +116,21 @@ class InferenceRequest {
     const std::shared_ptr<Memory>& Data(
         const std::string& host_policy_name) const;
 
+    // Return all host policy data set for this input
+    const std::map<std::string, std::shared_ptr<Memory>>& HostPolicyData() const
+    {
+      return host_policy_data_map_;
+    }
+
     // Set the data for this input. Error if input already has some
     // data.
     Status SetData(const std::shared_ptr<Memory>& data);
+
+    // Set the data associated with the host policy for this input.
+    // Return error if input already has some data.
+    Status SetData(
+        const std::string& host_policy_name,
+        const std::shared_ptr<Memory>& data);
 
     // Append a new buffer of data to this input.
     Status AppendData(

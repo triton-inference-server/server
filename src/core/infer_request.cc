@@ -869,6 +869,23 @@ InferenceRequest::Input::SetData(const std::shared_ptr<Memory>& data)
 }
 
 Status
+InferenceRequest::Input::SetData(
+    const std::string& host_policy_name, const std::shared_ptr<Memory>& data)
+{
+  if (host_policy_data_map_.find(host_policy_name) !=
+      host_policy_data_map_.end()) {
+    return Status(
+        Status::Code::INVALID_ARG, "input '" + name_ +
+                                       "' already has data for host policy '" +
+                                       host_policy_name + "', can't overwrite");
+  }
+
+  host_policy_data_map_.emplace(host_policy_name, data);
+
+  return Status::Success;
+}
+
+Status
 InferenceRequest::Input::RemoveAllData()
 {
   data_ = std::make_shared<MemoryReference>();
