@@ -267,6 +267,8 @@ decryption, conversion, or similar operations when a model is loaded.
 * [GPU-Accelerated Inference for Kubernetes with the NVIDIA TensorRT
   Inference Server and
   Kubeflow](https://www.kubeflow.org/blog/nvidia_tensorrt/).
+  
+* [Deploying NVIDIA Triton at Scale with MIG and Kubernetes](https://developer.nvidia.com/blog/deploying-nvidia-triton-at-scale-with-mig-and-kubernetes/). 
 
 ## Contributing
 
