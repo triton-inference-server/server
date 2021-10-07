@@ -183,9 +183,9 @@ class InferenceServer {
 
   // Get / set the response cache byte size.
   uint64_t ResponseCacheByteSize() const { return response_cache_byte_size_; }
-  void SetResponseCacheByteSize(uint64_t s) 
-  { 
-    response_cache_byte_size_ = s; 
+  void SetResponseCacheByteSize(uint64_t s)
+  {
+    response_cache_byte_size_ = s;
     response_cache_enabled_ = (s > 0) ? true : false;
   }
 
@@ -269,8 +269,11 @@ class InferenceServer {
 
   // Return the pointer to RateLimiter object.
   std::shared_ptr<RateLimiter> GetRateLimiter() { return rate_limiter_; }
-  // Return the pointer to RateLimiter object.
-  std::shared_ptr<RequestResponseCache> GetResponseCache() { return response_cache_; }
+  // Return the pointer to response cache object.
+  std::shared_ptr<RequestResponseCache> GetResponseCache()
+  {
+    return response_cache_;
+  }
 
  private:
   const std::string version_;

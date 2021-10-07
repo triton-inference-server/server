@@ -150,54 +150,37 @@ DynamicBatchScheduler::Enqueue(std::unique_ptr<InferenceRequest>& request)
       request->Trace(), TRITONSERVER_TRACE_QUEUE_START,
       request->QueueStartNs());
 
-  // Response cache helpers
   bool response_cache_enabled_ = model_->Server()->ResponseCacheEnabled();
   uint64_t request_hash = 0U;
-  bool cache_hit = false;
+  std::unique_ptr<InferenceResponse> cached_response;
+
+  if (response_cache_enabled_) {
+    CacheLookUp(request, &request_hash, cached_response);
+  }
+  bool cache_hit = (cached_response.get() != nullptr);
+
+  if (preserve_ordering_ || response_cache_enabled_) {
+    DelegateResponse(request, request_hash, cache_hit);
+  }
+
+  if (cache_hit) {
+    // If there was a cache hit then send the cached response and release
+    // the request.
+    InferenceResponse::Send(
+        std::move(cached_response), TRITONSERVER_RESPONSE_COMPLETE_FINAL);
+    InferenceRequest::Release(std::move(request), TRITONSERVER_REQUEST_RELEASE_ALL);
+
+    return Status::Success;
+  }
 
   if (!dynamic_batching_enabled_) {
-    // TODO: Move cache lookup logic to a helper method
-    std::unique_ptr<InferenceResponse> cached_response;
-    if (response_cache_enabled_) {
-      auto cache = model_->Server()->GetResponseCache();
-      if (cache != nullptr) {
-        LOG_ERROR << "Response Cache was nullptr";
-        return Status(Status::Code::INTERNAL, "ResponseCache was nullptr");
-      }
-
-      // Hash request to get key for cache lookup
-      auto status = cache->Hash(*request, &request_hash);
-      if (!status.IsOk()) {
-        LOG_ERROR << "Failed to hash input request"
-                  << status.Message();
-      }
-      // Lookup request key in cache
-      request->ResponseFactory().CreateResponse(&cached_response);
-      status = cache->Lookup(request_hash, cached_response.get());
-      if (status.IsOk() && cached_response != nullptr) {
-        cache_hit = true;
-      } else {
-        // TODO: Distinguish between error and cache miss
-        LOG_VERBOSE(1) << "Failed to lookup request in response cache:" 
-                       << status.Message();
-      }
-    }
-
-    if (preserve_ordering_ || response_cache_enabled_) {
-      DelegateResponse(request, request_hash, cache_hit);
-    }
-
-    if (cache_hit && cached_response != nullptr) {
-      InferenceResponse::Send(std::move(cached_response), 0 /* flags */);
-    } else {
-      // If not using dynamic batching, directly enqueue the
-      // request to model for execution
-      auto payload = model_->Server()->GetRateLimiter()->GetPayload(
-          Payload::Operation::INFER_RUN, nullptr /* TritonModelInstance*/);
-      payload->AddRequest(std::move(request));
-      RETURN_IF_ERROR(
-          model_->Server()->GetRateLimiter()->EnqueuePayload(model_, payload));
-    }
+    // If not using dynamic batching, directly enqueue the
+    // request to model for execution
+    auto payload = model_->Server()->GetRateLimiter()->GetPayload(
+        Payload::Operation::INFER_RUN, nullptr /* TritonModelInstance*/);
+    payload->AddRequest(std::move(request));
+    RETURN_IF_ERROR(
+        model_->Server()->GetRateLimiter()->EnqueuePayload(model_, payload));
 
   } else {
     bool wake_batcher = true;
@@ -338,9 +321,6 @@ DynamicBatchScheduler::BatcherThread(const int nice)
               std::unique_ptr<InferenceRequest> request;
               auto status = queue_.Dequeue(&request);
               if (status.IsOk()) {
-                if (preserve_ordering_ || model_->Server()->ResponseCacheEnabled()) {
-                  DelegateResponse(request, 0U /* hash */, false /* cache_hit */);
-                }
                 curr_payload_->AddRequest(std::move(request));
               } else {
                 // The queue is empty which conflicts with pending batch
@@ -548,7 +528,8 @@ DynamicBatchScheduler::GetDynamicBatch()
 //       or use cache manager to track logic
 void
 DynamicBatchScheduler::DelegateResponse(
-    std::unique_ptr<InferenceRequest>& request, uint64_t request_hash, bool cache_hit)
+    std::unique_ptr<InferenceRequest>& request, uint64_t request_hash,
+    bool cache_hit)
 {
 
   completion_queue_.emplace_back();
@@ -562,14 +543,39 @@ DynamicBatchScheduler::DelegateResponse(
           auto cache = model_->Server()->GetResponseCache();
           cache->Insert(request_hash, *response);
         }
-        
+
         if (preserve_ordering_) {
           queue_slot->emplace_back(std::move(response), flags);
           FinalizeResponses();
         } else {
-          InferenceResponse::Send(std::move(response), 0 /* flags */);
+          InferenceResponse::Send(std::move(response), flags);
         }
       });
+}
+
+void
+DynamicBatchScheduler::CacheLookUp(
+    std::unique_ptr<InferenceRequest>& request, uint64_t* request_hash,
+    std::unique_ptr<InferenceResponse>& cached_response)
+{
+  auto cache = model_->Server()->GetResponseCache();
+  // Hash request to get key for cache lookup
+  auto status = cache->Hash(*request, request_hash);
+  if (!status.IsOk()) {
+    LOG_ERROR << "Failed to hash input request" << status.Message();
+    return;
+  }
+
+  // Lookup request key in cache
+  std::unique_ptr<InferenceResponse> local_response;
+  request->ResponseFactory().CreateResponse(&local_response);
+  status = cache->Lookup(*request_hash, local_response.get());
+  if (status.IsOk() && local_response != nullptr) {
+    cached_response = std::move(local_response);
+  } else {
+    LOG_VERBOSE(1) << "Failed to lookup request in response cache:"
+                   << status.Message();
+  }
 }
 
 void
