@@ -56,7 +56,7 @@ for FLAG in true false; do
 
     echo """
     parameters: {
-        key: \"DISABLE_NVFUSER\"
+        key: \"ENABLE_NVFUSER\"
         value: {
             string_value: \"$FLAG\"
         }
@@ -84,9 +84,9 @@ for FLAG in true false; do
 
     NVFUSER_LOG="NvFuser is "
     if [ "$FLAG" == "true" ]; then
-        NVFUSER_LOG+=disabled
-    else
         NVFUSER_LOG+=enabled
+    else
+        NVFUSER_LOG+=disabled
     fi
 
     if [ `grep -c "$NVFUSER_LOG" $SERVER_LOG` != "1" ]; then
