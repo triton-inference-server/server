@@ -455,6 +455,9 @@ EnsembleContext::EnsembleContext(
               input->Name(), input->DType(), input->Shape()));
         }
         tensor->SetData(input->Data());
+        for (const auto& host_policy_data : input->HostPolicyData()) {
+          tensor->SetData(host_policy_data.first, host_policy_data.second);
+        }
         tensor_data.AddTensor(std::move(tensor));
         tensor_data.batch_size_ = lrequest->BatchSize();
       } else {
@@ -846,6 +849,12 @@ EnsembleContext::InitStep(
     RETURN_IF_ERROR(irequest->AddOriginalInput(
         pair.first, tensor.data_->DType(), shape, &input));
     RETURN_IF_ERROR(input->SetData(tensor.data_->Data()));
+    if (!tensor.data_->HostPolicyData().empty()) {
+      for (const auto& host_policy_data : tensor.data_->HostPolicyData()) {
+        RETURN_IF_ERROR(
+            input->SetData(host_policy_data.first, host_policy_data.second));
+      }
+    }
 
     releasing_tensors.emplace(&tensor_data, &tensor.remaining_reference_count_);
 
