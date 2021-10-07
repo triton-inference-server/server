@@ -157,7 +157,7 @@ DynamicBatchScheduler::Enqueue(std::unique_ptr<InferenceRequest>& request)
     CacheLookUp(request, cached_response);
   }
 
-  if (cached_response.get() != nullptr) {
+  if (cached_response != nullptr) {
     // If there was a cache hit then try sending the cached response
     // and release the request.
     if (preserve_ordering_) {
@@ -573,7 +573,7 @@ DynamicBatchScheduler::CacheLookUp(
   std::unique_ptr<InferenceResponse> local_response;
   request->ResponseFactory().CreateResponse(&local_response);
   status = cache->Lookup(request_hash, local_response.get());
-  if (status.IsOk() && (local_response.get() != nullptr)) {
+  if (status.IsOk() && (local_response != nullptr)) {
     cached_response = std::move(local_response);
   }
 }
