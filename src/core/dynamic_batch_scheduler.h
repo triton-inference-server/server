@@ -55,6 +55,7 @@ class DynamicBatchScheduler : public Scheduler {
       const bool dynamic_batching_enabled, const int32_t max_batch_size,
       const std::unordered_map<std::string, bool>& enforce_equal_shape_tensors,
       const bool preserve_ordering,
+      const bool response_cache_enable,
       const std::set<int32_t>& preferred_batch_sizes,
       const uint64_t max_queue_delay_microseconds,
       std::unique_ptr<Scheduler>* scheduler);
@@ -67,6 +68,7 @@ class DynamicBatchScheduler : public Scheduler {
       const bool dynamic_batching_enabled, const int32_t max_batch_size,
       const std::unordered_map<std::string, bool>& enforce_equal_shape_tensors,
       const inference::ModelDynamicBatching& batcher_config,
+      const bool response_cache_enable,
       std::unique_ptr<Scheduler>* scheduler);
 
   ~DynamicBatchScheduler();
@@ -80,6 +82,7 @@ class DynamicBatchScheduler : public Scheduler {
       const bool dynamic_batching_enabled, const int32_t max_batch_size,
       const std::unordered_map<std::string, bool>& enforce_equal_shape_tensors,
       const bool preserve_ordering,
+      const bool response_cache_enable,
       const std::set<int32_t>& preferred_batch_sizes,
       const uint64_t max_queue_delay_microseconds,
       const inference::ModelQueuePolicy& default_queue_policy,
@@ -90,6 +93,9 @@ class DynamicBatchScheduler : public Scheduler {
   void NewPayload();
   uint64_t GetDynamicBatch();
   void DelegateResponse(std::unique_ptr<InferenceRequest>& request);
+  void CacheLookUp(
+      std::unique_ptr<InferenceRequest>& request,
+      std::unique_ptr<InferenceResponse>& cached_response);
   void FinalizeResponses();
 
   // FIXME: Use shared_ptr for model once InferenceBackend class is cleaned up.
@@ -138,6 +144,9 @@ class DynamicBatchScheduler : public Scheduler {
   // If true the ordering of responses matches the order of requests
   // even when there are multiple scheduler threads.
   const bool preserve_ordering_;
+
+  // If true, the scheduler will try to retrieve responses from cache.
+  bool response_cache_enabled_;
 
   // Per completion-id queues to store the ready responses
   std::deque<

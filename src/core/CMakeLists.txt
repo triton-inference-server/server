@@ -139,6 +139,7 @@ set(
   payload.cc
   persistent_backend_manager.cc
   pinned_memory_manager.cc
+  response_cache.cc
   scheduler_utils.cc
   sequence_batch_scheduler.cc
   server.cc
@@ -178,6 +179,7 @@ set(
   pinned_memory_manager.h
   rate_limiter.h
   response_allocator.h
+  response_cache.h
   scheduler.h
   scheduler_utils.h
   sequence_batch_scheduler.h
