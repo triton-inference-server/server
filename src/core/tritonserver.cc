@@ -1341,14 +1341,14 @@ TRITONSERVER_InferenceRequestCorrelationId(
 {
   ni::InferenceRequest* lrequest =
       reinterpret_cast<ni::InferenceRequest*>(inference_request);
-  ni::InferenceRequest::SequenceId corr_id = lrequest->CorrelationId();
-  if (!corr_id.IsUnsignedInt()) {
+  const ni::InferenceRequest::SequenceId& corr_id = lrequest->CorrelationId();
+  if (corr_id.Type() != ni::InferenceRequest::SequenceId::DataType::UINT64) {
     return TRITONSERVER_ErrorNew(
         TRITONSERVER_ERROR_INVALID_ARG,
         std::string("given request's correlation id is not an unsigned int")
             .c_str());
   }
-  *correlation_id = corr_id.GetUnsignedIntValue();
+  *correlation_id = corr_id.UnsignedIntValue();
   return nullptr;  // Success
 }
 
@@ -1359,13 +1359,13 @@ TRITONSERVER_InferenceRequestCorrelationIdString(
 {
   ni::InferenceRequest* lrequest =
       reinterpret_cast<ni::InferenceRequest*>(inference_request);
-  ni::InferenceRequest::SequenceId corr_id = lrequest->CorrelationId();
-  if (!corr_id.IsString()) {
+  const ni::InferenceRequest::SequenceId& corr_id = lrequest->CorrelationId();
+  if (corr_id.Type() != ni::InferenceRequest::SequenceId::DataType::STRING) {
     return TRITONSERVER_ErrorNew(
         TRITONSERVER_ERROR_INVALID_ARG,
         std::string("given request's correlation id is not a string").c_str());
   }
-  *correlation_id = corr_id.GetStringValue().c_str();
+  *correlation_id = corr_id.StringValue().c_str();
   return nullptr;  // Success
 }
 
@@ -1386,6 +1386,13 @@ TRITONSERVER_InferenceRequestSetCorrelationIdString(
 {
   ni::InferenceRequest* lrequest =
       reinterpret_cast<ni::InferenceRequest*>(inference_request);
+  if (std::string(correlation_id).length() > 128) {
+    return TRITONSERVER_ErrorNew(
+        TRITONSERVER_ERROR_UNSUPPORTED,
+        std::string(
+            "string correlation ID cannot be longer than 128 characters")
+            .c_str());
+  }
   lrequest->SetCorrelationId(ni::InferenceRequest::SequenceId(correlation_id));
   return nullptr;  // Success
 }

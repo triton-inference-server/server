@@ -181,14 +181,15 @@ class SequenceBatch {
   // request 'request' will be nullptr.
   virtual void Enqueue(
       const uint32_t seq_slot,
-      const InferenceRequest::SequenceId correlation_id,
+      const InferenceRequest::SequenceId& correlation_id,
       std::unique_ptr<InferenceRequest>& request) = 0;
 
  protected:
   bool CreateCorrelationIDControl(const inference::ModelConfig& config);
   void SetControlTensors(
       std::unique_ptr<InferenceRequest>& irequest, const int32_t seq_slot,
-      const InferenceRequest::SequenceId corr_id, const bool not_ready = false);
+      const InferenceRequest::SequenceId& corr_id,
+      const bool not_ready = false);
 
   // The controlling scheduler.
   SequenceBatchScheduler* const base_;
@@ -250,7 +251,7 @@ class DirectSequenceBatch : public SequenceBatch {
 
   void Enqueue(
       const uint32_t seq_slot,
-      const InferenceRequest::SequenceId correlation_id,
+      const InferenceRequest::SequenceId& correlation_id,
       std::unique_ptr<InferenceRequest>& request) override;
 
  private:
@@ -313,7 +314,7 @@ class OldestSequenceBatch : public SequenceBatch {
 
   void Enqueue(
       const uint32_t seq_slot,
-      const InferenceRequest::SequenceId correlation_id,
+      const InferenceRequest::SequenceId& correlation_id,
       std::unique_ptr<InferenceRequest>& request) override;
 
  private:

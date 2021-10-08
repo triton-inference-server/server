@@ -96,7 +96,7 @@ class ModelState : public BackendModel {
   // Get accumulator size and execution delay
   size_t AccumulatorSize() const { return accumulator_size_; }
   int ExecDelay() const { return execute_delay_ms_; }
-  std::string& CorrelationIdType() const { return corrid_dtype_; }
+  const std::string& CorrelationIdType() const { return corrid_dtype_; }
 
   // Validate that model configuration is supported by this backend.
   TRITONSERVER_Error* ValidateModelConfig();
@@ -217,7 +217,7 @@ ModelState::ValidateModelConfig()
   RETURN_IF_ERROR(control_item.MemberAsString("data_type", &corrid_dtype));
 
   RETURN_ERROR_IF_FALSE(
-      (corrid_dtype == "TYPE_UINT64" || corrid_dtype == "TYPE_STRING"),
+      ((corrid_dtype == "TYPE_UINT64") || (corrid_dtype == "TYPE_STRING")),
       TRITONSERVER_ERROR_INVALID_ARG,
       std::string("model CORRID control input must have TYPE_UINT64 "
                   "or TYPE_STRING data-type"));
@@ -679,14 +679,25 @@ TRITONBACKEND_ModelInstanceExecute(
       GUARDED_RESPOND_IF_ERROR(
           responses, r,
           TRITONBACKEND_RequestCorrelationId(request, &correlation_id));
-    } else if (model_state->CorrelationIdType()) {
-      std::string corrid_string;
+    } else if (model_state->CorrelationIdType() == "TYPE_STRING") {
+      const char* correlation_id_str;
       GUARDED_RESPOND_IF_ERROR(
           responses, r,
-          TRITONBACKEND_RequestCorrelationIdString(request, &corrid_string));
+          TRITONBACKEND_RequestCorrelationIdString(
+              request, &correlation_id_str));
 
       // Require that the string be decodable into an unsigned int.
-      correlation_id = std::stoi(corrid_string);
+      try {
+        correlation_id = std::stoi(correlation_id_str);
+      }
+      catch (const std::invalid_argument& ia) {
+        GUARDED_RESPOND_IF_ERROR(
+            responses, r,
+            TRITONSERVER_ErrorNew(
+                TRITONSERVER_ERROR_INVALID_ARG,
+                "dyna sequence backend expects correlation ID to be decodable "
+                "into a string"));
+      }
     }
     uint32_t input_count = 0;
     GUARDED_RESPOND_IF_ERROR(
@@ -968,7 +979,31 @@ TRITONBACKEND_ModelInstanceExecute(
     const int32_t start = *reinterpret_cast<const int32_t*>(start_buffer);
     const int32_t end = *reinterpret_cast<const int32_t*>(end_buffer);
     const int32_t ready = *reinterpret_cast<const int32_t*>(ready_buffer);
-    const uint64_t corrid = *reinterpret_cast<const uint64_t*>(corrid_buffer);
+    uint64_t corrid;
+
+    if (model_state->CorrelationIdType() == "TYPE_STRING") {
+      // interpret buffer as const char* where first 4 bytes are string length
+      const char* corrid_p = reinterpret_cast<const char*>(corrid_buffer);
+      const std::string corrid_str(
+          corrid_p + sizeof(size_t), *((size_t*)corrid_p));
+
+      // String sequence ID must be decodable into int for dyna sequence backend
+      try {
+        corrid = std::stoi(corrid_str);
+      }
+      catch (const std::invalid_argument& ia) {
+        GUARDED_RESPOND_IF_ERROR(
+            responses, r,
+            TRITONSERVER_ErrorNew(
+                TRITONSERVER_ERROR_INVALID_ARG,
+                "dyna sequence backend expects correlation ID to be decodable "
+                "into a string"));
+      }
+
+    } else {
+      corrid = *reinterpret_cast<const uint64_t*>(corrid_buffer);
+    }
+
     const int32_t* ipbuffer_int =
         reinterpret_cast<const int32_t*>(input_buffer);
 

@@ -934,17 +934,20 @@ InferenceRequest::Input::DataBufferCountForHostPolicy(
 }
 
 InferenceRequest::SequenceId::SequenceId()
-    : sequence_label_(""), sequence_index_(0), is_string_(0)
+    : sequence_label_(""), sequence_index_(0),
+      id_type_(InferenceRequest::SequenceId::DataType::UINT64)
 {
 }
 
 InferenceRequest::SequenceId::SequenceId(const std::string& sequence_label)
-    : sequence_label_(sequence_label), sequence_index_(0), is_string_(1)
+    : sequence_label_(sequence_label), sequence_index_(0),
+      id_type_(InferenceRequest::SequenceId::DataType::STRING)
 {
 }
 
-InferenceRequest::SequenceId::SequenceId(const uint64_t sequence_index)
-    : sequence_label_(""), sequence_index_(sequence_index), is_string_(0)
+InferenceRequest::SequenceId::SequenceId(uint64_t sequence_index)
+    : sequence_label_(""), sequence_index_(sequence_index),
+      id_type_(InferenceRequest::SequenceId::DataType::UINT64)
 {
 }
 
@@ -953,7 +956,7 @@ InferenceRequest::SequenceId::operator=(const std::string& rhs)
 {
   sequence_label_ = rhs;
   sequence_index_ = 0;
-  is_string_ = true;
+  id_type_ = InferenceRequest::SequenceId::DataType::STRING;
   return *this;
 }
 
@@ -962,7 +965,7 @@ InferenceRequest::SequenceId::operator=(const uint64_t rhs)
 {
   sequence_label_ = "";
   sequence_index_ = rhs;
-  is_string_ = false;
+  id_type_ = InferenceRequest::SequenceId::DataType::UINT64;
   return *this;
 }
 
@@ -1025,10 +1028,16 @@ operator<<(std::ostream& out, const InferenceRequest::Input& input)
 std::ostream&
 operator<<(std::ostream& out, const InferenceRequest::SequenceId& sequence_id)
 {
-  if (sequence_id.IsString()) {
-    out << sequence_id.GetStringValue();
-  } else if (sequence_id.IsUnsignedInt()) {
-    out << sequence_id.GetUnsignedIntValue();
+  switch (sequence_id.Type()) {
+    case InferenceRequest::SequenceId::DataType::STRING:
+      out << sequence_id.StringValue();
+      break;
+    case InferenceRequest::SequenceId::DataType::UINT64:
+      out << sequence_id.UnsignedIntValue();
+      break;
+    default:
+      out << sequence_id.UnsignedIntValue();
+      break;
   }
   return out;
 }
@@ -1038,10 +1047,15 @@ operator==(
     const InferenceRequest::SequenceId lhs,
     const InferenceRequest::SequenceId rhs)
 {
-  if (lhs.IsString() && rhs.IsString()) {
-    return lhs.GetStringValue() == rhs.GetStringValue();
-  } else if (lhs.IsUnsignedInt() && rhs.IsUnsignedInt()) {
-    return lhs.GetUnsignedIntValue() == rhs.GetUnsignedIntValue();
+  if (lhs.Type() == rhs.Type()) {
+    switch (lhs.Type()) {
+      case InferenceRequest::SequenceId::DataType::STRING:
+        return lhs.StringValue() == rhs.StringValue();
+      case InferenceRequest::SequenceId::DataType::UINT64:
+        return lhs.UnsignedIntValue() == rhs.UnsignedIntValue();
+      default:
+        return lhs.UnsignedIntValue() == rhs.UnsignedIntValue();
+    }
   } else {
     return false;
   }

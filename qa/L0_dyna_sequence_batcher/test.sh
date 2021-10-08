@@ -57,26 +57,16 @@ rm -fr models && mkdir models
 cp -r ${DATADIR}/qa_dyna_sequence_model_repository/* models/.
 cp -r ../custom_models/custom_dyna_sequence_int32 models/.
 
+# Construct custom dyna_sequence_model with STRING sequence ID. Copy model and edit config.pbtxt
+cp -r models/custom_dyna_sequence_int32 models/custom_string_dyna_sequence_int32
+sed -i "s/custom_dyna_sequence_int32/custom_string_dyna_sequence_int32/g" models/custom_string_dyna_sequence_int32/config.pbtxt
+sed -i "/CONTROL_SEQUENCE_CORRID/{n;s/data_type:.*/data_type: TYPE_STRING/}" models/custom_string_dyna_sequence_int32/config.pbtxt
+
 # ragged models
 rm -fr ragged_models && mkdir ragged_models
 cp -r ../custom_models/custom_dyna_sequence_int32 ragged_models/.
 (cd ragged_models/custom_dyna_sequence_int32 && \
         sed -i "s/name:.*\"INPUT\"/name: \"INPUT\"\\nallow_ragged_batch: true/" config.pbtxt)
-
-# Create models that expect TYPE_STRING correlation id
-for model in `ls models`; do
-    if [[ "$model" != *"nobatch"* ]]; then
-        # Construct new model name as
-        # onnx_dyna_sequence_int32 -> onnx_string_dyna_sequence_int32
-        backend=${model%%_*}
-        string_dyna_sequence_model_name="${backend}_string${model#${backend}}"
-        
-        # Copy model and edit config.pbtxt
-        cp -r models/$model models/$string_dyna_sequence_model_name
-        sed -i "s/$model/$string_dyna_sequence_model/g" models/$string_dyna_sequence_model_name/config.pbtxt
-        sed -i "/CONTROL_SEQUENCE_CORRID/{n;s/data_type:.*/data_type: TYPE_STRING/}" models/$string_dyna_sequence_model_name/config.pbtxt
-    fi
-done
 
 # Need to launch the server for each test so that the model status is
 # reset (which is used to make sure the correct batch size was used
@@ -88,7 +78,7 @@ for i in \
         test_length1_sequence \
          ; do
     SERVER_LOG="./$i.serverlog"
-    SERVER_ARGS="--model-repository=`pwd`/models"
+    SERVER_ARGS="--model-repository=`pwd`/models --log-verbose 1"
     run_server
     if [ "$SERVER_PID" == "0" ]; then
         echo -e "\n***\n*** Failed to start $SERVER\n***"

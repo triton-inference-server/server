@@ -210,25 +210,25 @@ class InferenceRequest {
   // This class implements the SequenceId type
   class SequenceId {
    public:
+    enum class DataType { UINT64, STRING };
+
     SequenceId();
     SequenceId(const std::string& sequence_label);
-    SequenceId(const uint64_t sequence_index);
+    SequenceId(uint64_t sequence_index);
     SequenceId& operator=(const SequenceId& rhs) = default;
     SequenceId& operator=(const std::string& rhs);
     SequenceId& operator=(const uint64_t rhs);
 
     // Functions that help determine exact type of sequence Id
-    bool IsString() const { return is_string_; }
-    bool IsUnsignedInt() const { return !is_string_; }
+    DataType Type() const { return id_type_; }
     bool InSequence() const
     {
       return ((sequence_label_ != "") || (sequence_index_ != 0));
     }
 
     // Get the value of the SequenceId based on the type
-    const std::string& GetStringValue() const { return sequence_label_; }
-    uint64_t GetUnsignedIntValue() const { return sequence_index_; }
-
+    const std::string& StringValue() const { return sequence_label_; }
+    uint64_t UnsignedIntValue() const { return sequence_index_; }
 
    private:
     friend std::ostream& operator<<(
@@ -238,7 +238,7 @@ class InferenceRequest {
 
     std::string sequence_label_;
     uint64_t sequence_index_;
-    bool is_string_;
+    DataType id_type_;
   };
 
   // InferenceRequest
@@ -278,8 +278,8 @@ class InferenceRequest {
   uint32_t Flags() const { return flags_; }
   void SetFlags(uint32_t f) { flags_ = f; }
 
-  SequenceId CorrelationId() const { return correlation_id_; }
-  void SetCorrelationId(SequenceId c) { correlation_id_ = c; }
+  const SequenceId& CorrelationId() const { return correlation_id_; }
+  void SetCorrelationId(const SequenceId& c) { correlation_id_ = c; }
 
   // The batch size of the request, as understood by Triton. A
   // batch-size of 0 indicates that the model doesn't support batching
@@ -644,10 +644,10 @@ class hash<InferenceRequest::SequenceId> {
  public:
   size_t operator()(const InferenceRequest::SequenceId& sequence_id) const
   {
-    if (sequence_id.IsString()) {
-      return std::hash<std::string>{}(sequence_id.GetStringValue());
+    if (sequence_id.Type() == InferenceRequest::SequenceId::DataType::STRING) {
+      return std::hash<std::string>{}(sequence_id.StringValue());
     }
-    return std::hash<uint64_t>{}(sequence_id.GetUnsignedIntValue());
+    return std::hash<uint64_t>{}(sequence_id.UnsignedIntValue());
   }
 };
 }  // namespace std

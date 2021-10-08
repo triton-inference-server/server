@@ -358,7 +358,8 @@ SequenceBatchScheduler::Enqueue(std::unique_ptr<InferenceRequest>& irequest)
   // A request must have a correlation ID to be processed correctly by
   // this scheduler. A value of 0 (zero) or "" (empty) indicates that the
   // request doesn't have a correlation ID.
-  const InferenceRequest::SequenceId correlation_id = irequest->CorrelationId();
+  const InferenceRequest::SequenceId& correlation_id =
+      irequest->CorrelationId();
   if (!correlation_id.InSequence()) {
     return Status(
         Status::Code::INVALID_ARG,
@@ -386,10 +387,13 @@ SequenceBatchScheduler::Enqueue(std::unique_ptr<InferenceRequest>& irequest)
   if (!seq_start && (sb_itr == sequence_to_batcherseqslot_map_.end()) &&
       (bl_itr == sequence_to_backlog_map_.end())) {
     std::string correlation_id_str{""};
-    if (correlation_id.IsString()) {
-      correlation_id_str = correlation_id.GetStringValue();
-    } else if (correlation_id.IsUnsignedInt()) {
-      correlation_id_str = std::to_string(correlation_id.GetUnsignedIntValue());
+    if (correlation_id.Type() ==
+        InferenceRequest::SequenceId::DataType::STRING) {
+      correlation_id_str = correlation_id.StringValue();
+    } else if (
+        correlation_id.Type() ==
+        InferenceRequest::SequenceId::DataType::UINT64) {
+      correlation_id_str = std::to_string(correlation_id.UnsignedIntValue());
     }
     return Status(
         Status::Code::INVALID_ARG,
@@ -511,7 +515,7 @@ SequenceBatchScheduler::ReleaseSequenceSlot(
     backlog_queues_.pop_front();
     if (!requests->empty()) {  // should never be empty...
       const auto& irequest = requests->back();
-      const InferenceRequest::SequenceId correlation_id =
+      const InferenceRequest::SequenceId& correlation_id =
           irequest->CorrelationId();
 
       // If the last queue entry is not an END request then the entire
@@ -549,7 +553,7 @@ SequenceBatchScheduler::ReleaseSequenceSlot(
                  << ", slot " << batcher_seq_slot.seq_slot_;
 
   ready_batcher_seq_slots_.push(batcher_seq_slot);
-  return 0;
+  return InferenceRequest::SequenceId();
 }
 
 bool
@@ -623,7 +627,8 @@ SequenceBatchScheduler::ReaperThread(const int nice)
           continue;
         }
 
-        const InferenceRequest::SequenceId idle_correlation_id = cid_itr->first;
+        const InferenceRequest::SequenceId& idle_correlation_id =
+            cid_itr->first;
         LOG_VERBOSE(1) << "Reaper: CORRID " << idle_correlation_id
                        << ": max sequence idle exceeded";
 
@@ -661,7 +666,7 @@ SequenceBatchScheduler::ReaperThread(const int nice)
 
     // Enqueue force-ends outside of the lock.
     for (const auto& pr : force_end_sequences) {
-      const InferenceRequest::SequenceId idle_correlation_id = pr.first;
+      const InferenceRequest::SequenceId& idle_correlation_id = pr.first;
       const size_t batcher_idx = pr.second.batcher_idx_;
       const uint32_t seq_slot = pr.second.seq_slot_;
 
@@ -753,39 +758,42 @@ SequenceBatch::CreateCorrelationIDControl(const inference::ModelConfig& config)
     if (config.max_batch_size() != 0) {
       tensor_shape_with_batch_dim.push_back(1);
     }
-    const size_t size_p = GetDataTypeByteSize(correlation_id_datatype);
 
+    size_t size_p = GetDataTypeByteSize(correlation_id_datatype);
+    if (correlation_id_datatype == inference::DataType::TYPE_STRING) {
+      // 4 bytes for length of string plus pre-defined max string correlation id
+      // length in bytes
+      size_p =
+          4 + nvidia::inferenceserver::STRING_CORRELATION_ID_MAX_LENGTH_BYTES;
+    }
     for (size_t b = 0; b < seq_slot_cnt_; ++b) {
       auto override = std::make_shared<InferenceRequest::Input>(
           correlation_id_tensor_name, correlation_id_datatype, tensor_shape);
 
-      if (correlation_id_datatype != inference::DataType::TYPE_STRING) {
-        TRITONSERVER_MemoryType memory_type;
-        int64_t memory_type_id;
+      TRITONSERVER_MemoryType memory_type;
+      int64_t memory_type_id;
 
-        auto corrid_p = std::make_shared<AllocatedMemory>(
-            size_p, TRITONSERVER_MEMORY_CPU, 0);
-        char* corrid_p_ptr =
-            corrid_p->MutableBuffer(&memory_type, &memory_type_id);
-        if ((corrid_p_ptr == nullptr) ||
-            ((memory_type != TRITONSERVER_MEMORY_CPU) &&
-             (memory_type != TRITONSERVER_MEMORY_CPU_PINNED)) ||
-            (memory_type_id != 0)) {
-          LOG_ERROR
-              << "failed to allocate sequence CORRID control signal in CPU "
-                 "memory";
-          return false;
-        }
+      auto corrid_p =
+          std::make_shared<AllocatedMemory>(size_p, TRITONSERVER_MEMORY_CPU, 0);
+      char* corrid_p_ptr =
+          corrid_p->MutableBuffer(&memory_type, &memory_type_id);
+      if ((corrid_p_ptr == nullptr) ||
+          ((memory_type != TRITONSERVER_MEMORY_CPU) &&
+           (memory_type != TRITONSERVER_MEMORY_CPU_PINNED)) ||
+          (memory_type_id != 0)) {
+        LOG_ERROR << "failed to allocate sequence CORRID control signal in CPU "
+                     "memory";
+        return false;
+      }
 
-        *override->MutableShape() = override->OriginalShape();
-        *override->MutableShapeWithBatchDim() = tensor_shape_with_batch_dim;
-        corrid_status = override->SetData(corrid_p);
-        if (!corrid_status.IsOk()) {
-          LOG_ERROR << "failed creating CORRID control for sequence-batch "
-                       "scheduler thread "
-                    << batcher_idx_ << " for " << config.name();
-          return false;
-        }
+      *override->MutableShape() = override->OriginalShape();
+      *override->MutableShapeWithBatchDim() = tensor_shape_with_batch_dim;
+      corrid_status = override->SetData(corrid_p);
+      if (!corrid_status.IsOk()) {
+        LOG_ERROR << "failed creating CORRID control for sequence-batch "
+                     "scheduler thread "
+                  << batcher_idx_ << " for " << config.name();
+        return false;
       }
 
       seq_slot_corrid_overrides_.push_back(std::move(override));
@@ -798,7 +806,7 @@ SequenceBatch::CreateCorrelationIDControl(const inference::ModelConfig& config)
 void
 SequenceBatch::SetControlTensors(
     std::unique_ptr<InferenceRequest>& irequest, const int32_t seq_slot,
-    const InferenceRequest::SequenceId corrid, const bool not_ready)
+    const InferenceRequest::SequenceId& corrid, const bool not_ready)
 {
   const SequenceBatchScheduler::ControlInputs* controls;
 
@@ -829,44 +837,21 @@ SequenceBatch::SetControlTensors(
   if (!seq_slot_corrid_overrides_.empty()) {
     std::shared_ptr<InferenceRequest::Input>& input =
         seq_slot_corrid_overrides_[seq_slot];
-    if (corrid.IsString()) {
-      // Client and model have requested string correlation ID
-      // Need to reallocate buffer in input for the control tensor
-      std::string correlation_id = corrid.GetStringValue();
-
-      TRITONSERVER_MemoryType memory_type;
-      int64_t memory_type_id;
-
-      auto corrid_p = std::make_shared<AllocatedMemory>(
-          correlation_id.length(), TRITONSERVER_MEMORY_CPU, 0);
-      char* corrid_p_ptr =
-          corrid_p->MutableBuffer(&memory_type, &memory_type_id);
-      if ((corrid_p_ptr == nullptr) ||
-          ((memory_type != TRITONSERVER_MEMORY_CPU) &&
-           (memory_type != TRITONSERVER_MEMORY_CPU_PINNED)) ||
-          (memory_type_id != 0)) {
-        LOG_ERROR << "failed to allocate sequence CORRID control signal in CPU "
-                     "memory";
-      }
-
-      // Edit tensor shape to be length of string and set input buffer
-      (*input->MutableShape())[0] = correlation_id.length();
-      (*input->MutableShapeWithBatchDim())[0] = correlation_id.length();
-      Status corrid_status = input->SetData(corrid_p);
-      if (!corrid_status.IsOk()) {
-        LOG_ERROR << "failed creating CORRID control for sequence-batch "
-                     "scheduler thread "
-                  << batcher_idx_ << " for " << irequest->ModelName();
-      }
-
-      memcpy(corrid_p_ptr, correlation_id.c_str(), correlation_id.length());
-
-    } else if (corrid.IsUnsignedInt()) {
-      AllocatedMemory* data =
-          reinterpret_cast<AllocatedMemory*>(input->Data().get());
-      uint64_t correlation_id = corrid.GetUnsignedIntValue();
+    AllocatedMemory* data =
+        reinterpret_cast<AllocatedMemory*>(input->Data().get());
+    char* slot_corrid_ptr = data->MutableBuffer();
+    if (corrid.Type() == InferenceRequest::SequenceId::DataType::STRING) {
+      std::string correlation_id = corrid.StringValue();
+      size_t correlation_id_length = correlation_id.length();
+      memcpy(slot_corrid_ptr, &correlation_id_length, 4);
+      memcpy(
+          slot_corrid_ptr + sizeof(correlation_id_length),
+          correlation_id.c_str(),
+          nvidia::inferenceserver::STRING_CORRELATION_ID_MAX_LENGTH_BYTES);
+    } else if (
+        corrid.Type() == InferenceRequest::SequenceId::DataType::UINT64) {
+      uint64_t correlation_id = corrid.UnsignedIntValue();
       const char* corrid_p = reinterpret_cast<const char*>(&correlation_id);
-      char* slot_corrid_ptr = data->MutableBuffer();
       memcpy(slot_corrid_ptr, corrid_p, data->TotalByteSize());
     }
     irequest->AddOverrideInput(input);
@@ -944,7 +929,7 @@ DirectSequenceBatch::~DirectSequenceBatch()
 
 void
 DirectSequenceBatch::Enqueue(
-    const uint32_t seq_slot, const InferenceRequest::SequenceId correlation_id,
+    const uint32_t seq_slot, const InferenceRequest::SequenceId& correlation_id,
     std::unique_ptr<InferenceRequest>& request)
 {
   bool wake_runner = false;
@@ -1355,7 +1340,7 @@ OldestSequenceBatch::CompleteAndNext(const uint32_t seq_slot)
                        << ", slot " << seq_slot;
         release_seq_slot = true;
       } else {
-        const InferenceRequest::SequenceId correlation_id =
+        const InferenceRequest::SequenceId& correlation_id =
             irequest->CorrelationId();
 
         // After handling the last inference in a sequence we must
@@ -1399,7 +1384,7 @@ OldestSequenceBatch::CompleteAndNext(const uint32_t seq_slot)
 
       SequenceBatchScheduler::BatcherSequenceSlot batcher_seq_slot(
           batcher_idx_, seq_slot);
-      const InferenceRequest::SequenceId released_cid =
+      const InferenceRequest::SequenceId& released_cid =
           base_->ReleaseSequenceSlot(batcher_seq_slot, &queue);
       if (released_cid.InSequence()) {
         LOG_VERBOSE(1) << "Enqueued new sequence containing " << queue.size()
@@ -1420,7 +1405,7 @@ OldestSequenceBatch::CompleteAndNext(const uint32_t seq_slot)
 
 void
 OldestSequenceBatch::Enqueue(
-    const uint32_t seq_slot, const InferenceRequest::SequenceId correlation_id,
+    const uint32_t seq_slot, const InferenceRequest::SequenceId& correlation_id,
     std::unique_ptr<InferenceRequest>& request)
 {
   // Queue the new request... if there isn't already a request in

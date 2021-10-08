@@ -119,7 +119,7 @@ class RequestTracker {
 // internal infer request
 struct Step {
   Step(
-      size_t step_idx, InferenceRequest::SequenceId& correlation_id,
+      size_t step_idx, const InferenceRequest::SequenceId& correlation_id,
       uint32_t flags)
       : correlation_id_(correlation_id), flags_(flags), response_flags_(0),
         infer_status_(nullptr), step_idx_(step_idx)
@@ -156,7 +156,7 @@ struct TensorData {
     }
     Metadata(
         std::unique_ptr<InferenceRequest::Input>&& data, size_t reference_count,
-        InferenceRequest::SequenceId& correlation_id, uint32_t flags)
+        const InferenceRequest::SequenceId& correlation_id, uint32_t flags)
         : data_(std::move(data)), remaining_reference_count_(reference_count),
           parameter_override_(true), correlation_id_(correlation_id),
           flags_(flags)
@@ -184,7 +184,7 @@ struct TensorData {
 
   IterationCount AddTensor(
       std::unique_ptr<InferenceRequest::Input>&& tensor,
-      InferenceRequest::SequenceId& correlation_id, uint32_t flags)
+      const InferenceRequest::SequenceId& correlation_id, uint32_t flags)
   {
     tensor_.emplace(
         current_iteration_,
@@ -1127,13 +1127,15 @@ EnsembleContext::CheckAndSetEnsembleOutput(
     releasing_tensors.emplace(&tensor_data, &tensor.remaining_reference_count_);
 
     if (tensor.parameter_override_) {
-      if (lrequest->CorrelationId().IsString()) {
+      if (lrequest->CorrelationId().Type() ==
+          InferenceRequest::SequenceId::DataType::STRING) {
         (*response)->AddParameter(
-            "sequence_id", tensor.correlation_id_.GetStringValue().c_str());
-      } else if (lrequest->CorrelationId().IsUnsignedInt()) {
+            "sequence_id", tensor.correlation_id_.StringValue().c_str());
+      } else if (
+          lrequest->CorrelationId().Type() ==
+          InferenceRequest::SequenceId::DataType::UINT64) {
         (*response)->AddParameter(
-            "sequence_id",
-            (int64_t)tensor.correlation_id_.GetUnsignedIntValue());
+            "sequence_id", (int64_t)tensor.correlation_id_.UnsignedIntValue());
       }
       (*response)->AddParameter(
           "sequence_start",
