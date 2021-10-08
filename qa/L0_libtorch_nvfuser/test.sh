@@ -50,17 +50,19 @@ source ../common/util.sh
 
 RET=0
 
-for FLAG in true false; do
+for FLAG in true false none; do
     rm -f *.log
     mkdir -p models && cp -r $DATADIR/resnet50_libtorch models/.
 
-    echo """
-    parameters: {
-        key: \"ENABLE_NVFUSER\"
-        value: {
-            string_value: \"$FLAG\"
-        }
-    }""" >> models/resnet50_libtorch/config.pbtxt
+    if [ "$FLAG" != "none" ]; then
+        echo """
+        parameters: {
+            key: \"ENABLE_NVFUSER\"
+            value: {
+                string_value: \"$FLAG\"
+            }
+        }""" >> models/resnet50_libtorch/config.pbtxt
+    fi
 
     run_server
     if [ "$SERVER_PID" == "0" ]; then
@@ -84,9 +86,11 @@ for FLAG in true false; do
 
     NVFUSER_LOG="NvFuser is "
     if [ "$FLAG" == "true" ]; then
-        NVFUSER_LOG+=enabled
+        NVFUSER_LOG+="enabled"
+    elif [ "$FLAG" == "false" ]; then
+        NVFUSER_LOG+="disabled"
     else
-        NVFUSER_LOG+=disabled
+        NVFUSER_LOG+="not specified"
     fi
 
     if [ `grep -c "$NVFUSER_LOG" $SERVER_LOG` != "1" ]; then
