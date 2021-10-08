@@ -767,9 +767,6 @@ SequenceBatch::CreateCorrelationIDControl(const inference::ModelConfig& config)
           4 + nvidia::inferenceserver::STRING_CORRELATION_ID_MAX_LENGTH_BYTES;
     }
     for (size_t b = 0; b < seq_slot_cnt_; ++b) {
-      auto override = std::make_shared<InferenceRequest::Input>(
-          correlation_id_tensor_name, correlation_id_datatype, tensor_shape);
-
       TRITONSERVER_MemoryType memory_type;
       int64_t memory_type_id;
 
@@ -786,6 +783,8 @@ SequenceBatch::CreateCorrelationIDControl(const inference::ModelConfig& config)
         return false;
       }
 
+      auto override = std::make_shared<InferenceRequest::Input>(
+          correlation_id_tensor_name, correlation_id_datatype, tensor_shape);
       *override->MutableShape() = override->OriginalShape();
       *override->MutableShapeWithBatchDim() = tensor_shape_with_batch_dim;
       corrid_status = override->SetData(corrid_p);
@@ -835,19 +834,18 @@ SequenceBatch::SetControlTensors(
 
   // Set correlation ID control tensor if requested by the model.
   if (!seq_slot_corrid_overrides_.empty()) {
-    std::shared_ptr<InferenceRequest::Input>& input =
+    const std::shared_ptr<InferenceRequest::Input>& input =
         seq_slot_corrid_overrides_[seq_slot];
     AllocatedMemory* data =
         reinterpret_cast<AllocatedMemory*>(input->Data().get());
     char* slot_corrid_ptr = data->MutableBuffer();
     if (corrid.Type() == InferenceRequest::SequenceId::DataType::STRING) {
       std::string correlation_id = corrid.StringValue();
-      size_t correlation_id_length = correlation_id.length();
-      memcpy(slot_corrid_ptr, &correlation_id_length, 4);
+      uint32_t correlation_id_length = correlation_id.length();
+      memcpy(slot_corrid_ptr, &correlation_id_length, sizeof(uint32_t));
       memcpy(
-          slot_corrid_ptr + sizeof(correlation_id_length),
-          correlation_id.c_str(),
-          nvidia::inferenceserver::STRING_CORRELATION_ID_MAX_LENGTH_BYTES);
+          slot_corrid_ptr + sizeof(uint32_t), correlation_id.c_str(),
+          correlation_id_length);
     } else if (
         corrid.Type() == InferenceRequest::SequenceId::DataType::UINT64) {
       uint64_t correlation_id = corrid.UnsignedIntValue();

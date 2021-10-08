@@ -575,20 +575,23 @@ EnsembleContext::ResponseComplete(
               response, idx, &name, &type, &vvalue);
           if (err == nullptr) {
             if (!strcmp(name, "sequence_id")) {
-              if (type == TRITONSERVER_PARAMETER_INT) {
-                correlation_id = InferenceRequest::SequenceId(
-                    *reinterpret_cast<const uint64_t*>(vvalue));
-                parameter_override = true;
-              } else if (type == TRITONSERVER_PARAMETER_STRING) {
-                correlation_id = InferenceRequest::SequenceId(
-                    std::string(*reinterpret_cast<const char* const*>(vvalue)));
-                parameter_override = true;
-              } else {
-                err = TRITONSERVER_ErrorNew(
-                    TRITONSERVER_ERROR_INVALID_ARG,
-                    "expected parameter 'sequence_id' to be "
-                    "TRITONSERVER_PARAMETER_INT or "
-                    "TRITONSERVER_PARAMETER_STRING");
+              switch (type) {
+                case TRITONSERVER_PARAMETER_INT:
+                  correlation_id = InferenceRequest::SequenceId(
+                      *reinterpret_cast<const uint64_t*>(vvalue));
+                  parameter_override = true;
+                  break;
+                case TRITONSERVER_PARAMETER_STRING:
+                  correlation_id = InferenceRequest::SequenceId(std::string(
+                      *reinterpret_cast<const char* const*>(vvalue)));
+                  parameter_override = true;
+                  break;
+                default:
+                  err = TRITONSERVER_ErrorNew(
+                      TRITONSERVER_ERROR_INVALID_ARG,
+                      "expected parameter 'sequence_id' to be "
+                      "TRITONSERVER_PARAMETER_INT or "
+                      "TRITONSERVER_PARAMETER_STRING");
               }
             } else if (!strcmp(name, "sequence_start")) {
               if (type != TRITONSERVER_PARAMETER_BOOL) {
@@ -1127,15 +1130,21 @@ EnsembleContext::CheckAndSetEnsembleOutput(
     releasing_tensors.emplace(&tensor_data, &tensor.remaining_reference_count_);
 
     if (tensor.parameter_override_) {
-      if (lrequest->CorrelationId().Type() ==
-          InferenceRequest::SequenceId::DataType::STRING) {
-        (*response)->AddParameter(
-            "sequence_id", tensor.correlation_id_.StringValue().c_str());
-      } else if (
-          lrequest->CorrelationId().Type() ==
-          InferenceRequest::SequenceId::DataType::UINT64) {
-        (*response)->AddParameter(
-            "sequence_id", (int64_t)tensor.correlation_id_.UnsignedIntValue());
+      switch (lrequest->CorrelationId().Type()) {
+        case InferenceRequest::SequenceId::DataType::STRING:
+          (*response)->AddParameter(
+              "sequence_id", tensor.correlation_id_.StringValue().c_str());
+          break;
+        case InferenceRequest::SequenceId::DataType::UINT64:
+          (*response)->AddParameter(
+              "sequence_id",
+              (int64_t)tensor.correlation_id_.UnsignedIntValue());
+          break;
+        default:
+          (*response)->AddParameter(
+              "sequence_id",
+              (int64_t)tensor.correlation_id_.UnsignedIntValue());
+          break;
       }
       (*response)->AddParameter(
           "sequence_start",

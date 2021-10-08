@@ -696,7 +696,7 @@ TRITONBACKEND_ModelInstanceExecute(
             TRITONSERVER_ErrorNew(
                 TRITONSERVER_ERROR_INVALID_ARG,
                 "dyna sequence backend expects correlation ID to be decodable "
-                "into a string"));
+                "into an integer"));
       }
     }
     uint32_t input_count = 0;
@@ -985,7 +985,7 @@ TRITONBACKEND_ModelInstanceExecute(
       // interpret buffer as const char* where first 4 bytes are string length
       const char* corrid_p = reinterpret_cast<const char*>(corrid_buffer);
       const std::string corrid_str(
-          corrid_p + sizeof(size_t), *((size_t*)corrid_p));
+          corrid_p + sizeof(uint32_t), *((uint32_t*)corrid_p));
 
       // String sequence ID must be decodable into int for dyna sequence backend
       try {
@@ -997,7 +997,7 @@ TRITONBACKEND_ModelInstanceExecute(
             TRITONSERVER_ErrorNew(
                 TRITONSERVER_ERROR_INVALID_ARG,
                 "dyna sequence backend expects correlation ID to be decodable "
-                "into a string"));
+                "into an integer"));
       }
 
     } else {
