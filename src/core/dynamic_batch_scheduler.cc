@@ -52,7 +52,7 @@ DynamicBatchScheduler::DynamicBatchScheduler(
     TritonModel* model, TritonModelInstance* model_instance,
     const bool dynamic_batching_enabled, const int32_t max_batch_size,
     const std::unordered_map<std::string, bool>& enforce_equal_shape_tensors,
-    const bool preserve_ordering,
+    const bool preserve_ordering, const bool response_cache_enable,
     const std::set<int32_t>& preferred_batch_sizes,
     const uint64_t max_queue_delay_microseconds,
     const inference::ModelQueuePolicy& default_queue_policy,
@@ -69,6 +69,10 @@ DynamicBatchScheduler::DynamicBatchScheduler(
       preserve_ordering_(preserve_ordering)
 {
   rate_limiter_ = model_->Server()->GetRateLimiter();
+  // Both the server and model config should specify
+  // caching enabled for model to utilize response cache.
+  response_cache_enabled_ =
+      (model_->Server()->ResponseCacheEnabled() && response_cache_enable);
   max_preferred_batch_size_ = 0;
   for (const auto size : preferred_batch_sizes_) {
     max_preferred_batch_size_ =
@@ -81,7 +85,7 @@ DynamicBatchScheduler::Create(
     TritonModel* model, TritonModelInstance* model_instance, const int nice,
     const bool dynamic_batching_enabled, const int32_t max_batch_size,
     const std::unordered_map<std::string, bool>& enforce_equal_shape_tensors,
-    const bool preserve_ordering,
+    const bool preserve_ordering, const bool response_cache_enable,
     const std::set<int32_t>& preferred_batch_sizes,
     const uint64_t max_queue_delay_microseconds,
     std::unique_ptr<Scheduler>* scheduler)
@@ -95,7 +99,8 @@ DynamicBatchScheduler::Create(
 
   return Create(
       model, model_instance, nice, dynamic_batching_enabled, max_batch_size,
-      enforce_equal_shape_tensors, batcher_config, scheduler);
+      enforce_equal_shape_tensors, batcher_config, response_cache_enable,
+      scheduler);
 }
 
 Status
@@ -104,7 +109,7 @@ DynamicBatchScheduler::Create(
     const bool dynamic_batching_enabled, const int32_t max_batch_size,
     const std::unordered_map<std::string, bool>& enforce_equal_shape_tensors,
     const inference::ModelDynamicBatching& batcher_config,
-    std::unique_ptr<Scheduler>* scheduler)
+    const bool response_cache_enable, std::unique_ptr<Scheduler>* scheduler)
 {
   std::set<int32_t> preferred_batch_sizes;
   for (const auto size : batcher_config.preferred_batch_size()) {
@@ -114,7 +119,8 @@ DynamicBatchScheduler::Create(
   DynamicBatchScheduler* dyna_sched = new DynamicBatchScheduler(
       model, model_instance, dynamic_batching_enabled, max_batch_size,
       enforce_equal_shape_tensors, batcher_config.preserve_ordering(),
-      preferred_batch_sizes, batcher_config.max_queue_delay_microseconds(),
+      response_cache_enable, preferred_batch_sizes,
+      batcher_config.max_queue_delay_microseconds(),
       batcher_config.default_queue_policy(), batcher_config.priority_levels(),
       batcher_config.priority_queue_policy());
   std::unique_ptr<DynamicBatchScheduler> sched(dyna_sched);
@@ -150,8 +156,30 @@ DynamicBatchScheduler::Enqueue(std::unique_ptr<InferenceRequest>& request)
       request->Trace(), TRITONSERVER_TRACE_QUEUE_START,
       request->QueueStartNs());
 
-  if (!dynamic_batching_enabled_) {
+  std::unique_ptr<InferenceResponse> cached_response;
+
+  if (response_cache_enabled_) {
+    CacheLookUp(request, cached_response);
+  }
+
+  if (cached_response != nullptr) {
+    // If there was a cache hit then try sending the cached response
+    // and release the request.
     if (preserve_ordering_) {
+      // In order to preserve the order, the response send must be
+      // delegated.
+      DelegateResponse(request);
+    }
+    InferenceResponse::Send(
+        std::move(cached_response), TRITONSERVER_RESPONSE_COMPLETE_FINAL);
+    InferenceRequest::Release(
+        std::move(request), TRITONSERVER_REQUEST_RELEASE_ALL);
+
+    return Status::Success;
+  }
+
+  if (!dynamic_batching_enabled_) {
+    if (preserve_ordering_ || response_cache_enabled_) {
       DelegateResponse(request);
     }
     // If not using dynamic batching, directly enqueue the
@@ -161,6 +189,7 @@ DynamicBatchScheduler::Enqueue(std::unique_ptr<InferenceRequest>& request)
     payload->AddRequest(std::move(request));
     RETURN_IF_ERROR(
         model_->Server()->GetRateLimiter()->EnqueuePayload(model_, payload));
+
   } else {
     bool wake_batcher = true;
     {
@@ -300,7 +329,7 @@ DynamicBatchScheduler::BatcherThread(const int nice)
               std::unique_ptr<InferenceRequest> request;
               auto status = queue_.Dequeue(&request);
               if (status.IsOk()) {
-                if (preserve_ordering_) {
+                if (preserve_ordering_ || response_cache_enabled_) {
                   DelegateResponse(request);
                 }
                 curr_payload_->AddRequest(std::move(request));
@@ -512,14 +541,46 @@ DynamicBatchScheduler::DelegateResponse(
 {
   completion_queue_.emplace_back();
   auto queue_slot = &completion_queue_.back();
+  uint64_t request_hash = request->CacheKey();
   request->SetResponseDelegator(
-      [this, queue_slot](
+      [this, queue_slot, request_hash](
           std::unique_ptr<InferenceResponse>&& response, const uint32_t flags) {
-        {
-          queue_slot->emplace_back(std::move(response), flags);
+        if (response_cache_enabled_) {
+          auto cache = model_->Server()->GetResponseCache();
+          cache->Insert(request_hash, *response);
         }
-        FinalizeResponses();
+
+        if (preserve_ordering_) {
+          queue_slot->emplace_back(std::move(response), flags);
+          FinalizeResponses();
+        } else {
+          InferenceResponse::Send(std::move(response), flags);
+        }
       });
+}
+
+void
+DynamicBatchScheduler::CacheLookUp(
+    std::unique_ptr<InferenceRequest>& request,
+    std::unique_ptr<InferenceResponse>& cached_response)
+{
+  uint64_t request_hash;
+  auto cache = model_->Server()->GetResponseCache();
+  // Hash request to get key for cache lookup
+  auto status = cache->Hash(*request, &request_hash);
+  if (!status.IsOk()) {
+    LOG_ERROR << "Failed to hash input request" << status.Message();
+    return;
+  }
+  request->SetCacheKey(request_hash);
+
+  // Lookup request key in cache
+  std::unique_ptr<InferenceResponse> local_response;
+  request->ResponseFactory().CreateResponse(&local_response);
+  status = cache->Lookup(request_hash, local_response.get());
+  if (status.IsOk() && (local_response != nullptr)) {
+    cached_response = std::move(local_response);
+  }
 }
 
 void

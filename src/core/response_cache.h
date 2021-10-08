@@ -64,8 +64,10 @@ struct CacheEntry {
 
 class RequestResponseCache {
  public:
-  RequestResponseCache(const uint64_t cache_size);
   ~RequestResponseCache();
+  // Create the request/response cache object
+  static Status Create(
+      uint64_t cache_size, std::unique_ptr<RequestResponseCache>* cache);
   // Hash inference request to access cache and store it in "key"
   // Return Status object indicating success or failure.
   Status Hash(const InferenceRequest& request, uint64_t* key);
@@ -112,6 +114,7 @@ class RequestResponseCache {
 
 
  private:
+  explicit RequestResponseCache(const uint64_t cache_size);
   // Update LRU ordering on lookup
   void UpdateLRU(std::unordered_map<uint64_t, CacheEntry>::iterator&);
   // Build CacheEntry from InferenceResponse

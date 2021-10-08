@@ -38,6 +38,7 @@
 #include "src/core/model_repository_manager.h"
 #include "src/core/persistent_backend_manager.h"
 #include "src/core/rate_limiter.h"
+#include "src/core/response_cache.h"
 #include "src/core/status.h"
 
 namespace nvidia { namespace inferenceserver {
@@ -180,6 +181,16 @@ class InferenceServer {
     pinned_memory_pool_size_ = std::max((int64_t)0, s);
   }
 
+  // Get / set the response cache byte size.
+  uint64_t ResponseCacheByteSize() const { return response_cache_byte_size_; }
+  void SetResponseCacheByteSize(uint64_t s)
+  {
+    response_cache_byte_size_ = s;
+    response_cache_enabled_ = (s > 0) ? true : false;
+  }
+
+  bool ResponseCacheEnabled() const { return response_cache_enabled_; }
+
   // Get / set CUDA memory pool size
   const std::map<int, uint64_t>& CudaMemoryPoolByteSize() const
   {
@@ -258,6 +269,11 @@ class InferenceServer {
 
   // Return the pointer to RateLimiter object.
   std::shared_ptr<RateLimiter> GetRateLimiter() { return rate_limiter_; }
+  // Return the pointer to response cache object.
+  std::shared_ptr<RequestResponseCache> GetResponseCache()
+  {
+    return response_cache_;
+  }
 
  private:
   const std::string version_;
@@ -272,6 +288,8 @@ class InferenceServer {
   uint32_t exit_timeout_secs_;
   uint32_t buffer_manager_thread_count_;
   uint64_t pinned_memory_pool_size_;
+  uint64_t response_cache_byte_size_;
+  bool response_cache_enabled_;
   std::map<int, uint64_t> cuda_memory_pool_size_;
   double min_supported_compute_capability_;
   BackendCmdlineConfigMap backend_cmdline_config_map_;
@@ -297,6 +315,7 @@ class InferenceServer {
   std::shared_ptr<RateLimiter> rate_limiter_;
   std::unique_ptr<ModelRepositoryManager> model_repository_manager_;
   std::shared_ptr<PersistentBackendManager> persist_backend_manager_;
+  std::shared_ptr<RequestResponseCache> response_cache_;
 };
 
 }}  // namespace nvidia::inferenceserver
