@@ -57,6 +57,11 @@ rm -fr models && mkdir models
 cp -r ${DATADIR}/qa_dyna_sequence_model_repository/* models/.
 cp -r ../custom_models/custom_dyna_sequence_int32 models/.
 
+# Construct custom dyna_sequence_model with STRING sequence ID. Copy model and edit config.pbtxt
+cp -r models/custom_dyna_sequence_int32 models/custom_string_dyna_sequence_int32
+sed -i "s/custom_dyna_sequence_int32/custom_string_dyna_sequence_int32/g" models/custom_string_dyna_sequence_int32/config.pbtxt
+sed -i "/CONTROL_SEQUENCE_CORRID/{n;s/data_type:.*/data_type: TYPE_STRING/}" models/custom_string_dyna_sequence_int32/config.pbtxt
+
 # ragged models
 rm -fr ragged_models && mkdir ragged_models
 cp -r ../custom_models/custom_dyna_sequence_int32 ragged_models/.

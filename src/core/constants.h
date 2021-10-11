@@ -85,6 +85,7 @@ constexpr uint64_t NANOS_PER_MILLIS = 1000000;
 constexpr int MAX_GRPC_MESSAGE_SIZE = INT32_MAX;
 constexpr int SCHEDULER_DEFAULT_NICE = 5;
 constexpr uint64_t SEQUENCE_IDLE_DEFAULT_MICROSECONDS = 1000 * 1000;
+constexpr size_t STRING_CORRELATION_ID_MAX_LENGTH_BYTES = 128;
 
 #define TIMESPEC_TO_NANOS(TS) \
   ((TS).tv_sec * nvidia::inferenceserver::NANOS_PER_SECOND + (TS).tv_nsec)

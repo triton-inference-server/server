@@ -90,7 +90,7 @@ HTTPServer::Stop()
 {
   if (worker_.joinable()) {
     // Notify event loop to break via fd write
-    send(fds_[1], (const char*) &evbase_, sizeof(event_base*), 0);
+    send(fds_[1], (const char*)&evbase_, sizeof(event_base*), 0);
     worker_.join();
     event_free(break_ev_);
     evutil_closesocket(fds_[0]);
@@ -1835,11 +1835,19 @@ HTTPAPIServer::EVBufferToInput(
   if (request_json.Find("parameters", &params_json)) {
     triton::common::TritonJson::Value seq_json;
     if (params_json.Find("sequence_id", &seq_json)) {
+      // Try to parse sequence_id as uint64_t
       uint64_t seq_id;
-      RETURN_MSG_IF_ERR(
-          seq_json.AsUInt(&seq_id), "Unable to parse 'sequence_id'");
-      RETURN_IF_ERR(
-          TRITONSERVER_InferenceRequestSetCorrelationId(irequest, seq_id));
+      if (seq_json.AsUInt(&seq_id) != nullptr) {
+        // On failure try to parse as a string
+        std::string seq_id;
+        RETURN_MSG_IF_ERR(
+            seq_json.AsString(&seq_id), "Unable to parse 'sequence_id'");
+        RETURN_IF_ERR(TRITONSERVER_InferenceRequestSetCorrelationIdString(
+            irequest, seq_id.c_str()));
+      } else {
+        RETURN_IF_ERR(
+            TRITONSERVER_InferenceRequestSetCorrelationId(irequest, seq_id));
+      }
     }
 
     uint32_t flags = 0;

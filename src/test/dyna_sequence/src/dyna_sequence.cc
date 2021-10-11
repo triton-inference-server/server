@@ -96,6 +96,7 @@ class ModelState : public BackendModel {
   // Get accumulator size and execution delay
   size_t AccumulatorSize() const { return accumulator_size_; }
   int ExecDelay() const { return execute_delay_ms_; }
+  const std::string& CorrelationIdType() const { return corrid_dtype_; }
 
   // Validate that model configuration is supported by this backend.
   TRITONSERVER_Error* ValidateModelConfig();
@@ -108,6 +109,9 @@ class ModelState : public BackendModel {
 
   // Accumulator size
   size_t accumulator_size_;
+
+  // Correlation id type
+  std::string corrid_dtype_;
 };
 
 TRITONSERVER_Error*
@@ -127,7 +131,8 @@ ModelState::Create(TRITONBACKEND_Model* triton_model, ModelState** state)
 }
 
 ModelState::ModelState(TRITONBACKEND_Model* triton_model)
-    : BackendModel(triton_model), execute_delay_ms_(0), accumulator_size_(0)
+    : BackendModel(triton_model), execute_delay_ms_(0), accumulator_size_(0),
+      corrid_dtype_("TYPE_UINT64")
 {
 }
 
@@ -212,9 +217,11 @@ ModelState::ValidateModelConfig()
   RETURN_IF_ERROR(control_item.MemberAsString("data_type", &corrid_dtype));
 
   RETURN_ERROR_IF_FALSE(
-      corrid_dtype == "TYPE_UINT64", TRITONSERVER_ERROR_INVALID_ARG,
+      ((corrid_dtype == "TYPE_UINT64") || (corrid_dtype == "TYPE_STRING")),
+      TRITONSERVER_ERROR_INVALID_ARG,
       std::string("model CORRID control input must have TYPE_UINT64 "
-                  "data-type"));
+                  "or TYPE_STRING data-type"));
+  corrid_dtype_ = corrid_dtype;
 
   common::TritonJson::Value inputs, outputs;
   RETURN_IF_ERROR(model_config_.MemberAsArray("input", &inputs));
@@ -668,10 +675,30 @@ TRITONBACKEND_ModelInstanceExecute(
         responses, r, TRITONBACKEND_RequestId(request, &request_id));
 
     uint64_t correlation_id = 0;
-    GUARDED_RESPOND_IF_ERROR(
-        responses, r,
-        TRITONBACKEND_RequestCorrelationId(request, &correlation_id));
+    if (model_state->CorrelationIdType() == "TYPE_UINT64") {
+      GUARDED_RESPOND_IF_ERROR(
+          responses, r,
+          TRITONBACKEND_RequestCorrelationId(request, &correlation_id));
+    } else if (model_state->CorrelationIdType() == "TYPE_STRING") {
+      const char* correlation_id_str;
+      GUARDED_RESPOND_IF_ERROR(
+          responses, r,
+          TRITONBACKEND_RequestCorrelationIdString(
+              request, &correlation_id_str));
 
+      // Require that the string be decodable into an unsigned int.
+      try {
+        correlation_id = std::stoi(correlation_id_str);
+      }
+      catch (const std::invalid_argument& ia) {
+        GUARDED_RESPOND_IF_ERROR(
+            responses, r,
+            TRITONSERVER_ErrorNew(
+                TRITONSERVER_ERROR_INVALID_ARG,
+                "dyna sequence backend expects correlation ID to be decodable "
+                "into an integer"));
+      }
+    }
     uint32_t input_count = 0;
     GUARDED_RESPOND_IF_ERROR(
         responses, r, TRITONBACKEND_RequestInputCount(request, &input_count));
@@ -952,7 +979,31 @@ TRITONBACKEND_ModelInstanceExecute(
     const int32_t start = *reinterpret_cast<const int32_t*>(start_buffer);
     const int32_t end = *reinterpret_cast<const int32_t*>(end_buffer);
     const int32_t ready = *reinterpret_cast<const int32_t*>(ready_buffer);
-    const uint64_t corrid = *reinterpret_cast<const uint64_t*>(corrid_buffer);
+    uint64_t corrid;
+
+    if (model_state->CorrelationIdType() == "TYPE_STRING") {
+      // interpret buffer as const char* where first 4 bytes are string length
+      const char* corrid_p = reinterpret_cast<const char*>(corrid_buffer);
+      const std::string corrid_str(
+          corrid_p + sizeof(uint32_t), *((uint32_t*)corrid_p));
+
+      // String sequence ID must be decodable into int for dyna sequence backend
+      try {
+        corrid = std::stoi(corrid_str);
+      }
+      catch (const std::invalid_argument& ia) {
+        GUARDED_RESPOND_IF_ERROR(
+            responses, r,
+            TRITONSERVER_ErrorNew(
+                TRITONSERVER_ERROR_INVALID_ARG,
+                "dyna sequence backend expects correlation ID to be decodable "
+                "into an integer"));
+      }
+
+    } else {
+      corrid = *reinterpret_cast<const uint64_t*>(corrid_buffer);
+    }
+
     const int32_t* ipbuffer_int =
         reinterpret_cast<const int32_t*>(input_buffer);
 
