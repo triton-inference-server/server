@@ -2789,15 +2789,21 @@ SetInferenceRequestMetadata(
   for (auto param : request.parameters()) {
     if (param.first.compare("sequence_id") == 0) {
       const auto& infer_param = param.second;
-      if (infer_param.parameter_choice_case() !=
+      if (infer_param.parameter_choice_case() ==
           inference::InferParameter::ParameterChoiceCase::kInt64Param) {
+        RETURN_IF_ERR(TRITONSERVER_InferenceRequestSetCorrelationId(
+            inference_request, infer_param.int64_param()));
+      } else if (
+          infer_param.parameter_choice_case() ==
+          inference::InferParameter::ParameterChoiceCase::kStringParam) {
+        RETURN_IF_ERR(TRITONSERVER_InferenceRequestSetCorrelationIdString(
+            inference_request, infer_param.string_param().c_str()));
+      } else {
         return TRITONSERVER_ErrorNew(
             TRITONSERVER_ERROR_INVALID_ARG,
             "invalid value type for 'sequence_id' parameter, expected "
-            "int64_param.");
+            "int64_param or string_param.");
       }
-      RETURN_IF_ERR(TRITONSERVER_InferenceRequestSetCorrelationId(
-          inference_request, infer_param.int64_param()));
     } else if (param.first.compare("sequence_start") == 0) {
       const auto& infer_param = param.second;
       if (infer_param.parameter_choice_case() !=
