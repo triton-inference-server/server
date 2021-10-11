@@ -291,6 +291,24 @@ InferenceResponse::AddOutput(
   return Status::Success;
 }
 
+InferenceRequest::SequenceId::SequenceId()
+    : sequence_label_(""), sequence_index_(0),
+      id_type_(InferenceRequest::SequenceId::DataType::UINT64)
+{
+}
+
+InferenceRequest::SequenceId::SequenceId(const std::string& sequence_label)
+    : sequence_label_(sequence_label), sequence_index_(0),
+      id_type_(InferenceRequest::SequenceId::DataType::STRING)
+{
+}
+
+InferenceRequest::SequenceId::SequenceId(uint64_t sequence_index)
+    : sequence_label_(""), sequence_index_(sequence_index),
+      id_type_(InferenceRequest::SequenceId::DataType::UINT64)
+{
+}
+
 }}  // namespace nvidia::inferenceserver
 
 

@@ -410,7 +410,29 @@ TRITONSERVER_Error*
 TRITONBACKEND_RequestCorrelationId(TRITONBACKEND_Request* request, uint64_t* id)
 {
   InferenceRequest* tr = reinterpret_cast<InferenceRequest*>(request);
-  *id = tr->CorrelationId();
+  const InferenceRequest::SequenceId& correlation_id = tr->CorrelationId();
+  if (correlation_id.Type() != InferenceRequest::SequenceId::DataType::UINT64) {
+    return TRITONSERVER_ErrorNew(
+        TRITONSERVER_ERROR_INVALID_ARG,
+        std::string("correlation ID in request is not an unsigned int")
+            .c_str());
+  }
+  *id = correlation_id.UnsignedIntValue();
+  return nullptr;  // success
+}
+
+TRITONSERVER_Error*
+TRITONBACKEND_RequestCorrelationIdString(
+    TRITONBACKEND_Request* request, const char** id)
+{
+  InferenceRequest* tr = reinterpret_cast<InferenceRequest*>(request);
+  const InferenceRequest::SequenceId& correlation_id = tr->CorrelationId();
+  if (correlation_id.Type() != InferenceRequest::SequenceId::DataType::STRING) {
+    return TRITONSERVER_ErrorNew(
+        TRITONSERVER_ERROR_INVALID_ARG,
+        std::string("correlation ID in request is not a string").c_str());
+  }
+  *id = correlation_id.StringValue().c_str();
   return nullptr;  // success
 }
 
