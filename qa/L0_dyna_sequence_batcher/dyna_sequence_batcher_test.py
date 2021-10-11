@@ -25,6 +25,7 @@
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 import sys
+
 sys.path.append("../common")
 
 from builtins import range
@@ -46,12 +47,15 @@ _test_cuda_shared_memory = bool(
 
 _no_batching = (int(os.environ.get('NO_BATCHING', 0)) == 1)
 
-_trials = ("custom", "savedmodel", "graphdef", "plan", "onnx", "libtorch")
+_trials = ("custom", "savedmodel", "graphdef", "plan", "onnx", "libtorch",
+           "custom_string")
 if _no_batching:
     _trials += ("savedmodel_nobatch", "graphdef_nobatch", "plan_nobatch",
                 "onnx_nobatch", "libtorch_nobatch")
 
-_ragged_batch_supported_trials = ["custom",]
+_ragged_batch_supported_trials = [
+    "custom",
+]
 
 _protocols = ("http", "grpc")
 _max_sequence_idle_ms = 5000
@@ -80,7 +84,10 @@ class DynaSequenceBatcherTest(su.SequenceBatcherTestUtil):
                 if "start" in flag_str:
                     expected_result += 1
                 if "end" in flag_str:
-                    expected_result += corrid
+                    if isinstance(corrid, str):
+                        expected_result += int(corrid)
+                    else:
+                        expected_result += corrid
         return expected_result
 
     def test_simple_sequence(self):
@@ -100,7 +107,10 @@ class DynaSequenceBatcherTest(su.SequenceBatcherTestUtil):
                     self.assertFalse(
                         "TRITONSERVER_BACKLOG_DELAY_SCHEDULER" in os.environ)
 
-                    corrid = 52
+                    if "string" in trial:
+                        corrid = '52'
+                    else:
+                        corrid = 52
                     self.check_sequence(
                         trial,
                         model_name,
@@ -113,8 +123,8 @@ class DynaSequenceBatcherTest(su.SequenceBatcherTestUtil):
                          (None, 5, None, None), (None, 6, None, None),
                          (None, 7, None, None), (None, 8, None, None),
                          ("end", 9, None, None)),
-                        self.get_expected_result(45 + corrid, corrid, 9, trial,
-                                                 "end"),
+                        self.get_expected_result(45 + int(corrid), corrid, 9,
+                                                 trial, "end"),
                         protocol,
                         sequence_name="{}_{}".format(self._testMethodName,
                                                      protocol))
@@ -142,7 +152,10 @@ class DynaSequenceBatcherTest(su.SequenceBatcherTestUtil):
                     self.assertFalse(
                         "TRITONSERVER_BACKLOG_DELAY_SCHEDULER" in os.environ)
 
-                    corrid = 99
+                    if "string" in trial:
+                        corrid = '99'
+                    else:
+                        corrid = 99
                     self.check_sequence(
                         trial,
                         model_name,
@@ -152,8 +165,8 @@ class DynaSequenceBatcherTest(su.SequenceBatcherTestUtil):
                         # (flag_str, value, (ls_ms, gt_ms), (pre_delay, post_delay))
                         (
                             ("start,end", 42, None, None),),
-                        self.get_expected_result(42 + corrid, corrid, 42, trial,
-                                                 "start,end"),
+                        self.get_expected_result(42 + int(corrid), corrid, 42,
+                                                 trial, "start,end"),
                         protocol,
                         sequence_name="{}_{}".format(self._testMethodName,
                                                      protocol))
@@ -185,7 +198,11 @@ class DynaSequenceBatcherTest(su.SequenceBatcherTestUtil):
                 self.assertFalse(
                     "TRITONSERVER_BACKLOG_DELAY_SCHEDULER" in os.environ)
 
-                corrids = [1001, 1002, 1003, 1004]
+                if "string" in trial:
+                    corrids = ['1001', '1002', '1003', '1004']
+                else:
+                    corrids = [1001, 1002, 1003, 1004]
+
                 threads = []
                 threads.append(
                     threading.Thread(
@@ -199,8 +216,8 @@ class DynaSequenceBatcherTest(su.SequenceBatcherTestUtil):
                             # (flag_str, value, pre_delay_ms)
                             (("start", 1, None), ("end", 3, None)),
                             self.get_expected_result(
-                                4 * tensor_shapes[0] + corrids[0], corrids[0],
-                                3, trial, "end"),
+                                4 * tensor_shapes[0] + int(corrids[0]),
+                                corrids[0], 3, trial, "end"),
                             precreated_shm0_handles),
                         kwargs={
                             'sequence_name':
@@ -221,8 +238,8 @@ class DynaSequenceBatcherTest(su.SequenceBatcherTestUtil):
                             (("start", 11, None), (None, 12, None), ("end", 13,
                                                                      None)),
                             self.get_expected_result(
-                                36 * tensor_shapes[1] + corrids[1], corrids[1],
-                                13, trial, "end"),
+                                36 * tensor_shapes[1] + int(corrids[1]),
+                                corrids[1], 13, trial, "end"),
                             precreated_shm1_handles),
                         kwargs={
                             'sequence_name':
@@ -243,8 +260,8 @@ class DynaSequenceBatcherTest(su.SequenceBatcherTestUtil):
                             (("start", 111, None), (None, 112, None),
                              ("end", 113, None)),
                             self.get_expected_result(
-                                336 * tensor_shapes[2] + corrids[2], corrids[2],
-                                113, trial, "end"),
+                                336 * tensor_shapes[2] + int(corrids[2]),
+                                corrids[2], 113, trial, "end"),
                             precreated_shm2_handles),
                         kwargs={
                             'sequence_name':
@@ -265,7 +282,7 @@ class DynaSequenceBatcherTest(su.SequenceBatcherTestUtil):
                             (("start", 1111, None), (None, 1112, None),
                              ("end", 1113, None)),
                             self.get_expected_result(
-                                3336 * tensor_shapes[3] + corrids[3],
+                                3336 * tensor_shapes[3] + int(corrids[3]),
                                 corrids[3], 1113, trial, "end"),
                             precreated_shm3_handles),
                         kwargs={
@@ -346,7 +363,10 @@ class DynaSequenceBatcherTest(su.SequenceBatcherTestUtil):
                 self.assertFalse(
                     "TRITONSERVER_BACKLOG_DELAY_SCHEDULER" in os.environ)
 
-                corrids = [1001, 1002, 1003, 1004, 1005]
+                if "string" in trial:
+                    corrids = ['1001', '1002', '1003', '1004', '1005']
+                else:
+                    corrids = [1001, 1002, 1003, 1004, 1005]
                 threads = []
                 threads.append(
                     threading.Thread(
@@ -360,8 +380,9 @@ class DynaSequenceBatcherTest(su.SequenceBatcherTestUtil):
                             # (flag_str, value, pre_delay_ms)
                             (("start", 1, None), (None, 2, None), ("end", 3,
                                                                    None)),
-                            self.get_expected_result(6 + corrids[0], corrids[0],
-                                                     3, trial, "end"),
+                            self.get_expected_result(6 + int(corrids[0]),
+                                                     corrids[0], 3, trial,
+                                                     "end"),
                             precreated_shm0_handles),
                         kwargs={
                             'sequence_name': "{}".format(self._testMethodName)
@@ -378,7 +399,7 @@ class DynaSequenceBatcherTest(su.SequenceBatcherTestUtil):
                             # (flag_str, value, pre_delay_ms)
                             (("start", 11, None), (None, 12, None), ("end", 13,
                                                                      None)),
-                            self.get_expected_result(36 + corrids[1],
+                            self.get_expected_result(36 + int(corrids[1]),
                                                      corrids[1], 13, trial,
                                                      "end"),
                             precreated_shm1_handles),
@@ -397,7 +418,7 @@ class DynaSequenceBatcherTest(su.SequenceBatcherTestUtil):
                             # (flag_str, value, pre_delay_ms)
                             (("start", 111, None), (None, 112, None),
                              ("end", 113, None)),
-                            self.get_expected_result(336 + corrids[2],
+                            self.get_expected_result(336 + int(corrids[2]),
                                                      corrids[2], 113, trial,
                                                      "end"),
                             precreated_shm2_handles),
@@ -416,7 +437,7 @@ class DynaSequenceBatcherTest(su.SequenceBatcherTestUtil):
                             # (flag_str, value, pre_delay_ms)
                             (("start", 1111, None), (None, 1112, None),
                              ("end", 1113, None)),
-                            self.get_expected_result(3336 + corrids[3],
+                            self.get_expected_result(3336 + int(corrids[3]),
                                                      corrids[3], 1113, trial,
                                                      "end"),
                             precreated_shm3_handles),
@@ -435,7 +456,7 @@ class DynaSequenceBatcherTest(su.SequenceBatcherTestUtil):
                             # (flag_str, value, pre_delay_ms)
                             (("start", 11111, None), (None, 11112, None),
                              ("end", 11113, None)),
-                            self.get_expected_result(33336 + corrids[4],
+                            self.get_expected_result(33336 + int(corrids[4]),
                                                      corrids[4], 11113, trial,
                                                      "end"),
                             precreated_shm4_handles),
@@ -485,8 +506,10 @@ class DynaSequenceBatcherTest(su.SequenceBatcherTestUtil):
                 self.assertFalse("TRITONSERVER_DELAY_SCHEDULER" in os.environ)
                 self.assertFalse(
                     "TRITONSERVER_BACKLOG_DELAY_SCHEDULER" in os.environ)
-
-                corrids = [1001, 1002, 1003, 1004, 1005, 1006]
+                if "string" in trial:
+                    corrids = ['1001', '1002', '1003', '1004', '1005', '1006']
+                else:
+                    corrids = [1001, 1002, 1003, 1004, 1005, 1006]
                 threads = []
                 threads.append(
                     threading.Thread(
@@ -500,8 +523,9 @@ class DynaSequenceBatcherTest(su.SequenceBatcherTestUtil):
                             # (flag_str, value, pre_delay_ms)
                             (("start", 1, None), (None, 2, None), ("end", 3,
                                                                    None)),
-                            self.get_expected_result(6 + corrids[0], corrids[0],
-                                                     3, trial, "end"),
+                            self.get_expected_result(6 + int(corrids[0]),
+                                                     corrids[0], 3, trial,
+                                                     "end"),
                             precreated_shm0_handles),
                         kwargs={
                             'sequence_name': "{}".format(self._testMethodName)
@@ -517,7 +541,7 @@ class DynaSequenceBatcherTest(su.SequenceBatcherTestUtil):
                             (None, None),
                             # (flag_str, value, pre_delay_ms)
                             (("start", 11, None), ("end", 13, None)),
-                            self.get_expected_result(24 + corrids[1],
+                            self.get_expected_result(24 + int(corrids[1]),
                                                      corrids[1], 13, trial,
                                                      "end"),
                             precreated_shm1_handles),
@@ -535,7 +559,7 @@ class DynaSequenceBatcherTest(su.SequenceBatcherTestUtil):
                             (None, None),
                             # (flag_str, value, pre_delay_ms)
                             (("start", 111, None), ("end", 113, None)),
-                            self.get_expected_result(224 + corrids[2],
+                            self.get_expected_result(224 + int(corrids[2]),
                                                      corrids[2], 113, trial,
                                                      "end"),
                             precreated_shm2_handles),
@@ -554,7 +578,7 @@ class DynaSequenceBatcherTest(su.SequenceBatcherTestUtil):
                             # (flag_str, value, pre_delay_ms)
                             (("start", 1111, None), (None, 1112, 3000),
                              ("end", 1113, None)),
-                            self.get_expected_result(3336 + corrids[3],
+                            self.get_expected_result(3336 + int(corrids[3]),
                                                      corrids[3], 1113, trial,
                                                      "end"),
                             precreated_shm3_handles),
@@ -573,7 +597,7 @@ class DynaSequenceBatcherTest(su.SequenceBatcherTestUtil):
                             # (flag_str, value, pre_delay_ms)
                             (
                                 ("start,end", 11111, None),),
-                            self.get_expected_result(11111 + corrids[4],
+                            self.get_expected_result(11111 + int(corrids[4]),
                                                      corrids[4], 11111, trial,
                                                      "start,end"),
                             precreated_shm4_handles),
@@ -592,7 +616,7 @@ class DynaSequenceBatcherTest(su.SequenceBatcherTestUtil):
                             # (flag_str, value, pre_delay_ms)
                             (
                                 ("start,end", 22222, None),),
-                            self.get_expected_result(22222 + corrids[5],
+                            self.get_expected_result(22222 + int(corrids[5]),
                                                      corrids[5], 22222, trial,
                                                      "start,end"),
                             precreated_shm5_handles),
@@ -650,7 +674,10 @@ class DynaSequenceBatcherTest(su.SequenceBatcherTestUtil):
                 self.assertFalse(
                     "TRITONSERVER_BACKLOG_DELAY_SCHEDULER" in os.environ)
 
-                corrids = [1001, 1002, 1003, 1004, 1005, 1006]
+                if "string" in trial:
+                    corrids = ['1001', '1002', '1003', '1004', '1005', '1006']
+                else:
+                    corrids = [1001, 1002, 1003, 1004, 1005, 1006]
                 threads = []
                 threads.append(
                     threading.Thread(
@@ -664,8 +691,9 @@ class DynaSequenceBatcherTest(su.SequenceBatcherTestUtil):
                             # (flag_str, value, pre_delay_ms)
                             (("start", 1, None), (None, 2, None), ("end", 3,
                                                                    None)),
-                            self.get_expected_result(6 + corrids[0], corrids[0],
-                                                     3, trial, "end"),
+                            self.get_expected_result(6 + int(corrids[0]),
+                                                     corrids[0], 3, trial,
+                                                     "end"),
                             precreated_shm0_handles),
                         kwargs={
                             'sequence_name': "{}".format(self._testMethodName)
@@ -681,7 +709,7 @@ class DynaSequenceBatcherTest(su.SequenceBatcherTestUtil):
                             (None, None),
                             # (flag_str, value, pre_delay_ms)
                             (("start", 11, None), ("end", 13, None)),
-                            self.get_expected_result(24 + corrids[1],
+                            self.get_expected_result(24 + int(corrids[1]),
                                                      corrids[1], 13, trial,
                                                      "end"),
                             precreated_shm1_handles),
@@ -699,7 +727,7 @@ class DynaSequenceBatcherTest(su.SequenceBatcherTestUtil):
                             (None, None),
                             # (flag_str, value, pre_delay_ms)
                             (("start", 111, None), ("end", 113, None)),
-                            self.get_expected_result(224 + corrids[2],
+                            self.get_expected_result(224 + int(corrids[2]),
                                                      corrids[2], 113, trial,
                                                      "end"),
                             precreated_shm2_handles),
@@ -718,7 +746,7 @@ class DynaSequenceBatcherTest(su.SequenceBatcherTestUtil):
                             # (flag_str, value, pre_delay_ms)
                             (("start", 1111, None), (None, 1112, 3000),
                              ("end", 1113, None)),
-                            self.get_expected_result(3336 + corrids[3],
+                            self.get_expected_result(3336 + int(corrids[3]),
                                                      corrids[3], 1113, trial,
                                                      "end"),
                             precreated_shm3_handles),
@@ -737,7 +765,7 @@ class DynaSequenceBatcherTest(su.SequenceBatcherTestUtil):
                             # (flag_str, value, pre_delay_ms)
                             (
                                 ("start,end", 11111, None),),
-                            self.get_expected_result(11111 + corrids[4],
+                            self.get_expected_result(11111 + int(corrids[4]),
                                                      corrids[4], 11111, trial,
                                                      "start,end"),
                             precreated_shm4_handles),
@@ -759,7 +787,7 @@ class DynaSequenceBatcherTest(su.SequenceBatcherTestUtil):
                                 (None, 22223, None),
                                 ("end", 22224, 2000),
                             ),
-                            self.get_expected_result(66669 + corrids[5],
+                            self.get_expected_result(66669 + int(corrids[5]),
                                                      corrids[5], 22224, trial,
                                                      "end"),
                             precreated_shm5_handles),
@@ -821,7 +849,10 @@ class DynaSequenceBatcherTest(su.SequenceBatcherTestUtil):
                 self.assertFalse(
                     "TRITONSERVER_BACKLOG_DELAY_SCHEDULER" in os.environ)
 
-                corrids = [1001, 1002, 1003, 1004, 1005]
+                if "string" in trial:
+                    corrids = ['1001', '1002', '1003', '1004', '1005']
+                else:
+                    corrids = [1001, 1002, 1003, 1004, 1005]
                 threads = []
                 threads.append(
                     threading.Thread(
@@ -835,8 +866,9 @@ class DynaSequenceBatcherTest(su.SequenceBatcherTestUtil):
                             # (flag_str, value, pre_delay_ms)
                             (("start", 1, None),
                              (None, 3, _max_sequence_idle_ms + 1000)),
-                            self.get_expected_result(4 + corrids[0], corrids[0],
-                                                     3, trial, None),
+                            self.get_expected_result(4 + int(corrids[0]),
+                                                     corrids[0], 3, trial,
+                                                     None),
                             precreated_shm0_handles),
                         kwargs={
                             'sequence_name': "{}".format(self._testMethodName)
@@ -855,7 +887,7 @@ class DynaSequenceBatcherTest(su.SequenceBatcherTestUtil):
                                                    _max_sequence_idle_ms / 2),
                              (None, 12, _max_sequence_idle_ms / 2),
                              ("end", 13, _max_sequence_idle_ms / 2)),
-                            self.get_expected_result(48 + corrids[1],
+                            self.get_expected_result(48 + int(corrids[1]),
                                                      corrids[1], 13, trial,
                                                      None),
                             precreated_shm1_handles),
@@ -876,7 +908,7 @@ class DynaSequenceBatcherTest(su.SequenceBatcherTestUtil):
                                                     _max_sequence_idle_ms / 2),
                              (None, 112, _max_sequence_idle_ms / 2),
                              ("end", 113, _max_sequence_idle_ms / 2)),
-                            self.get_expected_result(448 + corrids[2],
+                            self.get_expected_result(448 + int(corrids[2]),
                                                      corrids[2], 113, trial,
                                                      None),
                             precreated_shm2_handles),
@@ -897,7 +929,7 @@ class DynaSequenceBatcherTest(su.SequenceBatcherTestUtil):
                                                      _max_sequence_idle_ms / 2),
                              (None, 1112, _max_sequence_idle_ms / 2),
                              ("end", 1113, _max_sequence_idle_ms / 2)),
-                            self.get_expected_result(4448 + corrids[3],
+                            self.get_expected_result(4448 + int(corrids[3]),
                                                      corrids[3], 1113, trial,
                                                      None),
                             precreated_shm3_handles),
@@ -915,7 +947,7 @@ class DynaSequenceBatcherTest(su.SequenceBatcherTestUtil):
                             (None, None),
                             # (flag_str, value, pre_delay_ms)
                             (("start", 11111, None), ("end", 11113, None)),
-                            self.get_expected_result(22224 + corrids[4],
+                            self.get_expected_result(22224 + int(corrids[4]),
                                                      corrids[4], 11113, trial,
                                                      "end"),
                             precreated_shm4_handles),
