@@ -35,7 +35,7 @@ We also show how to build and execute such applications on Jetson.
 
 * JetPack >= 4.6
 * OpenCV >= 4.1.1
-* TensorRT >= 7.1.3
+* TensorRT >= 8.0.1.6
 
 _NVIDIA internal:_ the versions will be updated accordingly.
 
