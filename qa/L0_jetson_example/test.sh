@@ -25,8 +25,6 @@
 # (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-cp -r docs/examples/jetson/concurrency_and_dynamic_batching .
-
 wget --content-disposition https://api.ngc.nvidia.com/v2/models/nvidia/tlt_peoplenet/versions/pruned_v2.1/zip -O tlt_peoplenet_pruned_v2.1.zip
 unzip tlt_peoplenet_pruned_v2.1.zip -d concurrency_and_dynamic_batching/tlt/models/peoplenet && rm tlt_peoplenet_pruned_v2.1.zip
 
@@ -43,13 +41,13 @@ cd concurrency_and_dynamic_batching && make
 CLIENT_LOG="./client.log"
 
 # Running the example/s
-LD_LIBRARY_PATH=$HOME/tritonserver/lib ./people_detection -m gpu -v -r trtis_model_repo_sample_1 -t 6 -s false -p $HOME/tritonserver >> ${CLIENT_LOG}.1 2>&1
+people_detection -m gpu -v -r trtis_model_repo_sample_1 -t 6 -s false -p ${HOME}/tritonserver >> ${CLIENT_LOG}.1 2>&1
 if [ $? -ne 0 ]; then
     cat $CLIENT_LOG.1
     RET=1
 fi
 
-LD_LIBRARY_PATH=$HOME/tritonserver/lib ./people_detection -m gpu -v -r trtis_model_repo_sample_2 -t 6 -s false -p $HOME/tritonserver >> ${CLIENT_LOG}.2 2>&1
+people_detection -m gpu -v -r trtis_model_repo_sample_2 -t 6 -s false -p ${HOME}/tritonserver >> ${CLIENT_LOG}.2 2>&1
 if [ $? -ne 0 ]; then
     cat $CLIENT_LOG.2
     RET=1
