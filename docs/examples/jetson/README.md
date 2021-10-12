@@ -33,7 +33,7 @@ We also show how to build and execute such applications on Jetson.
 
 ### Prerequisites
 
-* JetPack >= 4.5 
+* JetPack >= 4.6
 * OpenCV >= 4.1.1
 * TensorRT >= 7.1.3
 

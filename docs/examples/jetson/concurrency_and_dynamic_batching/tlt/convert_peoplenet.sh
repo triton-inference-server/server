@@ -1,6 +1,6 @@
 #!/bin/bash
 
-./tlt-converter \
+./tao-converter \
     -k tlt_encode \
     -d 3,544,960 \
     -i nchw \

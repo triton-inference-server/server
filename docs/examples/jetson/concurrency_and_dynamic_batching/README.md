@@ -71,14 +71,14 @@ concurrency_and_dynamic_batching
 
 After you have acquired the model file in `.etlt` format, you will need to convert the model to [TensorRT](https://developer.nvidia.com/tensorrt) format. NVIDIA TensorRT is an SDK for high-performance deep learning inference. It includes a deep learning inference optimizer and runtime that delivers low latency and high throughput for deep learning inference applications. The latest versions of JetPack include TensorRT.
 
-In order to convert an `.etlt` model to TensorRT format, you need to use the `tlt-converter` tool.
+In order to convert an `.etlt` model to TensorRT format, you need to use the `tao-converter` tool.
 
-The `tlt-converter` tool is available as a compiled release file for different platforms. The download links corresponding to your deployment system are provided among the [TLT Getting Started resources](https://developer.nvidia.com/tlt-get-started).
+The `tao-converter` tool is available as a compiled release file for different platforms. The download links corresponding to your deployment system are provided among the [TLT Getting Started resources](https://developer.nvidia.com/tlt-get-started).
 
-After you have downloaded `tlt-converter`, you might need to execute
+After you have downloaded `tao-converter`, you might need to execute
 
 ```shell
-chmod 777 tlt-converter 
+chmod 777 tao-converter 
 ``` 
 
 in the directory with the tool. 
@@ -91,7 +91,7 @@ tlt
    └── peoplenet
 ```
 
-To execute it, you can place the `tlt-converter` executable to the `tlt` directory of the project and in the same directory run
+To execute it, you can place the `tao-converter` executable to the `tlt` directory of the project and in the same directory run
 
 ```shell
 bash convert_peoplenet.sh
@@ -101,10 +101,10 @@ After you execute it, verify that a `model.plan` file was placed to to the direc
 
 Also note that this step has to be performed on the target hardware: if you are planning to execute this application on Jetson, the conversion has to be performed on Jetson.
 
-To learn more about `tlt-converter`parameters, run:
+To learn more about `tao-converter`parameters, run:
 
 ```shell
-./tlt-converter -h
+./tao-converter -h
 ```
 
 ## Building the app
@@ -113,15 +113,15 @@ To compile the sample, pull the following repositories:
 * [https://github.com/triton-inference-server/server](https://github.com/triton-inference-server/server)
 * [https://github.com/triton-inference-server/core](https://github.com/triton-inference-server/core)
 
-Make sure you copied the contents of the release you downloaded to `/opt`
+Make sure you copied the contents of the release you downloaded to `$HOME`
 
 ```shell
-sudo cp -rf tritonserver2.x.y-jetpack4.6 /opt/tritonserver
+sudo cp -rf tritonserver2.x.y-jetpack4.6 $HOME/tritonserver
 ```
 
 Open the terminal in `concurrency_and_dynamic_batching` and build the app executing
 
-```shelll
+```shell
 make
 ```
 
@@ -136,7 +136,7 @@ With Triton Inference Server, multiple models (or multiple instances of the same
 To execute from the terminal, run from the `concurrency_and_dynamic_batching` directory:
 
 ```shell
-LD_LIBRARY_PATH=/opt/tritonserver/lib ./people_detection -m gpu -v -r $(pwd)/trtis_model_repo_sample_1 -t 6 -s false
+LD_LIBRARY_PATH=$HOME/tritonserver/lib ./people_detection -m gpu -v -r $(pwd)/trtis_model_repo_sample_1 -t 6 -s false -p $HOME/tritonserver
 ```
 
 The parameter `-t` controlls the number of concurrent inference calls we want to execute. We will be executing the same model on the same sample image with the purpose of demonstrating how setting different concurency options affects the performance.
@@ -236,7 +236,7 @@ For models that support batching, Triton implements multiple scheduling and batc
 To observe the effect of dynamic batching, from the `concurrency_and_dynamic_batching` directory execute: 
 
 ```shell
-LD_LIBRARY_PATH=/opt/tritonserver/lib ./people_detection -m gpu -v -r $(pwd)/trtis_model_repo_sample_2 -t 6 -s false
+LD_LIBRARY_PATH=$HOME/tritonserver/lib ./people_detection -m gpu -v -r $(pwd)/trtis_model_repo_sample_2 -t 6 -s false -p $HOME/tritonserver
 ```
 
 ### Expected output
