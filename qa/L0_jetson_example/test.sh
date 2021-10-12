@@ -32,22 +32,24 @@ unzip tlt_peoplenet_pruned_v2.1.zip -d concurrency_and_dynamic_batching/tlt/mode
 wget --content-disposition https://developer.nvidia.com/jp46-20210820t231431z-001zip -O jp4.6-20210820T231431Z-001.zip
 unzip jp4.6-20210820T231431Z-001.zip && rm jp4.6-20210820T231431Z-001.zip
 
+cp jp4.6/tao-converter concurrency_and_dynamic_batching/tlt/tao-converter && rm -rf jp4.6
 chmod 777 concurrency_and_dynamic_batching/tlt/tao-converter
+
 (cd concurrency_and_dynamic_batching/tlt && bash convert_peoplenet.sh)
 
-# Build the example
+# Build the example and make sure permissions
 cd concurrency_and_dynamic_batching && make
 
 CLIENT_LOG="./client.log"
 
 # Running the example/s
-people_detection -m gpu -v -r trtis_model_repo_sample_1 -t 6 -s false -p ${HOME}/tritonserver >> ${CLIENT_LOG}.1 2>&1
+./people_detection -m gpu -v -r trtis_model_repo_sample_1 -t 6 -s false -p ${HOME}/tritonserver >> ${CLIENT_LOG}.1 2>&1
 if [ $? -ne 0 ]; then
     cat $CLIENT_LOG.1
     RET=1
 fi
 
-people_detection -m gpu -v -r trtis_model_repo_sample_2 -t 6 -s false -p ${HOME}/tritonserver >> ${CLIENT_LOG}.2 2>&1
+./people_detection -m gpu -v -r trtis_model_repo_sample_2 -t 6 -s false -p ${HOME}/tritonserver >> ${CLIENT_LOG}.2 2>&1
 if [ $? -ne 0 ]; then
     cat $CLIENT_LOG.2
     RET=1
