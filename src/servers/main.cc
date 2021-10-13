@@ -64,6 +64,9 @@
 #ifdef TRITON_ENABLE_SAGEMAKER
 #include "src/servers/sagemaker_server.h"
 #endif  // TRITON_ENABLE_SAGEMAKER
+#ifdef TRITON_ENABLE_VERTEX_AI
+#include "src/servers/vertex_ai_server.h"
+#endif  // TRITON_ENABLE_VERTEX_AI
 #ifdef TRITON_ENABLE_GRPC
 #include "src/servers/grpc_server.h"
 #endif  // TRITON_ENABLE_GRPC
@@ -93,10 +96,19 @@ std::unique_ptr<nvidia::inferenceserver::HTTPServer> sagemaker_service_;
 bool allow_sagemaker_ = false;
 int32_t sagemaker_port_ = 8080;
 bool sagemaker_safe_range_set_ = false;
-std::pair<int32_t, int32_t> sagemaker_safe_range_ = {0, 0};
+std::pair<int32_t, int32_t> sagemaker_safe_range_ = {-1, -1};
 // The number of threads to initialize for the SageMaker HTTP front-end.
 int sagemaker_thread_cnt_ = 8;
 #endif  // TRITON_ENABLE_SAGEMAKER
+
+#ifdef TRITON_ENABLE_VERTEX_AI
+std::unique_ptr<nvidia::inferenceserver::HTTPServer> vertex_ai_service_;
+bool allow_vertex_ai_ = false;
+int32_t vertex_ai_port_ = 8080;
+// The number of threads to initialize for the Vertex AI HTTP front-end.
+int vertex_ai_thread_cnt_ = 8;
+std::string vertex_ai_default_model_;
+#endif  // TRITON_ENABLE_VERTEX_AI
 
 #ifdef TRITON_ENABLE_GRPC
 std::unique_ptr<nvidia::inferenceserver::GRPCServer> grpc_service_;
@@ -243,6 +255,12 @@ enum OptionId {
   OPTION_SAGEMAKER_SAFE_PORT_RANGE,
   OPTION_SAGEMAKER_THREAD_COUNT,
 #endif  // TRITON_ENABLE_SAGEMAKER
+#if defined(TRITON_ENABLE_VERTEX_AI)
+  OPTION_ALLOW_VERTEX_AI,
+  OPTION_VERTEX_AI_PORT,
+  OPTION_VERTEX_AI_THREAD_COUNT,
+  OPTION_VERTEX_AI_DEFAULT_MODEL,
+#endif  // TRITON_ENABLE_VERTEX_AI
 #ifdef TRITON_ENABLE_METRICS
   OPTION_ALLOW_METRICS,
   OPTION_ALLOW_GPU_METRICS,
@@ -415,6 +433,19 @@ std::vector<Option> options_
       {OPTION_SAGEMAKER_THREAD_COUNT, "sagemaker-thread-count", Option::ArgInt,
        "Number of threads handling Sagemaker requests. Default is 8."},
 #endif  // TRITON_ENABLE_SAGEMAKER
+#if defined(TRITON_ENABLE_VERTEX_AI)
+      {OPTION_ALLOW_VERTEX_AI, "allow-vertex-ai", Option::ArgBool,
+       "Allow the server to listen for Vertex AI requests. Default is true if "
+       "AIP_MODE=PREDICTION, false otherwise."},
+      {OPTION_VERTEX_AI_PORT, "vertex-ai-port", Option::ArgInt,
+       "The port for the server to listen on for Vertex AI requests. Default "
+       "is AIP_HTTP_PORT if set, 8080 otherwise."},
+      {OPTION_VERTEX_AI_THREAD_COUNT, "vertex-ai-thread-count", Option::ArgInt,
+       "Number of threads handling Vertex AI requests. Default is 8."},
+      {OPTION_VERTEX_AI_DEFAULT_MODEL, "vertex-ai-safe-port-range",
+       Option::ArgStr,
+       "The name of the model to use for single-model inference requests."},
+#endif  // TRITON_ENABLE_VERTEX_AI
 #ifdef TRITON_ENABLE_METRICS
       {OPTION_ALLOW_METRICS, "allow-metrics", Option::ArgBool,
        "Allow the server to provide prometheus metrics."},
@@ -541,89 +572,65 @@ std::vector<Option> options_
 bool
 CheckPortCollision()
 {
-#if defined(TRITON_ENABLE_HTTP) && defined(TRITON_ENABLE_GRPC)
-  // Check if HTTP and GRPC have shared ports
-  if ((http_port_ == grpc_port_) && allow_http_ && allow_grpc_) {
-    std::cerr << "The server cannot listen to HTTP requests "
-              << "and GRPC requests at the same port" << std::endl;
-    return true;
-  }
-#endif  // TRITON_ENABLE_HTTP && TRITON_ENABLE_GRPC
-
-#if defined(TRITON_ENABLE_GRPC) && defined(TRITON_ENABLE_METRICS)
-  // Check if Metric and GRPC have shared ports
-  if ((grpc_port_ == metrics_port_) && allow_grpc_ && allow_metrics_) {
-    std::cerr << "The server cannot provide metrics on same port used for "
-              << "GRPC requests" << std::endl;
-    return true;
-  }
-#endif  // TRITON_ENABLE_GRPC && TRITON_ENABLE_METRICS
-
-#if defined(TRITON_ENABLE_HTTP) && defined(TRITON_ENABLE_METRICS)
-  // Check if Metric and HTTP have shared ports
-  if ((http_port_ == metrics_port_) && allow_http_ && allow_metrics_) {
-    std::cerr << "The server cannot provide metrics on same port used for "
-              << "HTTP requests" << std::endl;
-    return true;
-  }
-#endif  // TRITON_ENABLE_HTTP && TRITON_ENABLE_METRICS
-
-#if defined(TRITON_ENABLE_SAGEMAKER) && defined(TRITON_ENABLE_HTTP)
+  // List of enabled services and their constraints
+  std::vector<std::tuple<std::string, int32_t, bool, int32_t, int32_t>> ports;
+#ifdef TRITON_ENABLE_HTTP
   if (allow_http_) {
-    if (sagemaker_safe_range_set_ &&
-        ((http_port_ < sagemaker_safe_range_.first) ||
-         (http_port_ > sagemaker_safe_range_.second))) {
-      std::cerr << "The server cannot listen to HTTP requests at port "
-                << http_port_ << ", allowed port range is ["
-                << sagemaker_safe_range_.first << ", "
-                << sagemaker_safe_range_.second << "]" << std::endl;
-      return true;
-    }
-    if ((sagemaker_port_ == http_port_) && allow_sagemaker_) {
-      std::cerr << "The server cannot listen to SageMaker requests "
-                << "and HTTP requests at the same port" << std::endl;
-      return true;
-    }
+    ports.emplace_back("HTTP", http_port_, false, -1, -1);
   }
-#endif  // TRITON_ENABLE_SAGEMAKER && TRITON_ENABLE_HTTP
-
-#if defined(TRITON_ENABLE_SAGEMAKER) && defined(TRITON_ENABLE_GRPC)
+#endif  // TRITON_ENABLE_HTTP
+#ifdef TRITON_ENABLE_GRPC
   if (allow_grpc_) {
-    if (sagemaker_safe_range_set_ &&
-        ((grpc_port_ < sagemaker_safe_range_.first) ||
-         (grpc_port_ > sagemaker_safe_range_.second))) {
-      std::cerr << "The server cannot listen to GRPC requests at port "
-                << grpc_port_ << ", allowed port range is ["
-                << sagemaker_safe_range_.first << ", "
-                << sagemaker_safe_range_.second << "]" << std::endl;
-      return true;
-    }
-    if ((sagemaker_port_ == grpc_port_) && allow_sagemaker_) {
-      std::cerr << "The server cannot listen to SageMaker requests "
-                << "and GRPC requests at the same port" << std::endl;
-      return true;
-    }
+    ports.emplace_back("GRPC", grpc_port_, false, -1, -1);
   }
-#endif  // TRITON_ENABLE_SAGEMAKER && TRITON_ENABLE_GRPC
-
-#if defined(TRITON_ENABLE_SAGEMAKER) && defined(TRITON_ENABLE_METRICS)
+#endif  // TRITON_ENABLE_GRPC
+#ifdef TRITON_ENABLE_METRICS
   if (allow_metrics_) {
-    if (sagemaker_safe_range_set_ &&
-        ((metrics_port_ < sagemaker_safe_range_.first) ||
-         (metrics_port_ > sagemaker_safe_range_.second))) {
-      std::cerr << "The server cannot listen to metrics requests at port "
-                << metrics_port_ << ", allowed port range is ["
-                << sagemaker_safe_range_.first << ", "
-                << sagemaker_safe_range_.second << "]" << std::endl;
-      return true;
-    }
-    if ((sagemaker_port_ == metrics_port_) && allow_sagemaker_) {
-      std::cerr << "The server cannot listen to SageMaker requests "
-                << "and metrics requests at the same port" << std::endl;
-      return true;
+    ports.emplace_back("metrics", metrics_port_, false, -1, -1);
+  }
+#endif  // TRITON_ENABLE_METRICS
+#ifdef TRITON_ENABLE_SAGEMAKER
+  if (allow_sagemaker_) {
+    ports.emplace_back(
+        "SageMaker", sagemaker_port_, sagemaker_safe_range_set_,
+        sagemaker_safe_range_.first, sagemaker_safe_range_.second);
+  }
+#endif  // TRITON_ENABLE_SAGEMAKER
+#ifdef TRITON_ENABLE_VERTEX_AI
+  if (allow_vertex_ai_) {
+    ports.emplace_back("Vertex AI", vertex_ai_port_, false, -1, -1);
+  }
+#endif  // TRITON_ENABLE_VERTEX_AI
+
+  for (auto curr_it = ports.begin(); curr_it != ports.end(); ++curr_it) {
+    // If the current service doesn't specify the allow port range for other
+    // services, then we don't need to revisit the checked services
+    auto comparing_it = (std::get<2>(*curr_it)) ? ports.begin() : (curr_it + 1);
+    for (; comparing_it != ports.end(); ++comparing_it) {
+      if (comparing_it == curr_it) {
+        continue;
+      }
+      // Set range and comparing service port is out of range
+      if (std::get<2>(*curr_it) &&
+          ((std::get<1>(*comparing_it) < std::get<3>(*curr_it)) ||
+           (std::get<1>(*comparing_it) > std::get<4>(*curr_it)))) {
+        std::cerr << "The server cannot listen to "
+                  << std::get<0>(*comparing_it) << " requests at port "
+                  << std::get<1>(*comparing_it) << ", allowed port range is ["
+                  << std::get<3>(*curr_it) << ", " << std::get<4>(*curr_it)
+                  << "]" << std::endl;
+        return true;
+      }
+      if (std::get<1>(*curr_it) == std::get<1>(*comparing_it)) {
+        std::cerr << "The server cannot listen to " << std::get<0>(*curr_it)
+                  << " requests "
+                  << "and " << std::get<0>(*comparing_it)
+                  << " requests at the same port " << std::get<1>(*curr_it)
+                  << std::endl;
+        return true;
+      }
     }
   }
-#endif  // TRITON_ENABLE_SAGEMAKER && TRITON_ENABLE_METRICS
 
   return false;
 }
@@ -720,6 +727,30 @@ StartSagemakerService(
 }
 #endif  // TRITON_ENABLE_SAGEMAKER
 
+#ifdef TRITON_ENABLE_VERTEX_AI
+TRITONSERVER_Error*
+StartVertexAiService(
+    std::unique_ptr<nvidia::inferenceserver::HTTPServer>* service,
+    const std::shared_ptr<TRITONSERVER_Server>& server,
+    nvidia::inferenceserver::TraceManager* trace_manager,
+    const std::shared_ptr<nvidia::inferenceserver::SharedMemoryManager>&
+        shm_manager)
+{
+  TRITONSERVER_Error* err = nvidia::inferenceserver::VertexAiAPIServer::Create(
+      server, trace_manager, shm_manager, vertex_ai_port_,
+      vertex_ai_thread_cnt_, vertex_ai_default_model_, service);
+  if (err == nullptr) {
+    err = (*service)->Start();
+  }
+
+  if (err != nullptr) {
+    service->reset();
+  }
+
+  return err;
+}
+#endif  // TRITON_ENABLE_VERTEX_AI
+
 bool
 StartEndpoints(
     const std::shared_ptr<TRITONSERVER_Server>& server,
@@ -773,6 +804,18 @@ StartEndpoints(
     }
   }
 #endif  // TRITON_ENABLE_SAGEMAKER
+
+#ifdef TRITON_ENABLE_VERTEX_AI
+  // Enable Vertex AI endpoints if requested...
+  if (allow_vertex_ai_) {
+    TRITONSERVER_Error* err = StartVertexAiService(
+        &vertex_ai_service_, server, trace_manager, shm_manager);
+    if (err != nullptr) {
+      LOG_TRITONSERVER_ERROR(err, "failed to start Vertex AI service");
+      return false;
+    }
+  }
+#endif  // TRITON_ENABLE_VERTEX_AI
 
 #ifdef TRITON_ENABLE_METRICS
   // Enable metrics endpoint if requested...
@@ -840,6 +883,18 @@ StopEndpoints()
     sagemaker_service_.reset();
   }
 #endif  // TRITON_ENABLE_SAGEMAKER
+
+#ifdef TRITON_ENABLE_VERTEX_AI
+  if (vertex_ai_service_) {
+    TRITONSERVER_Error* err = vertex_ai_service_->Stop();
+    if (err != nullptr) {
+      LOG_TRITONSERVER_ERROR(err, "failed to stop Vertex AI service");
+      ret = false;
+    }
+
+    vertex_ai_service_.reset();
+  }
+#endif  // TRITON_ENABLE_VERTEX_AI
 
 #ifdef _WIN32
   int wsa_ret = WSACleanup();
@@ -1204,6 +1259,21 @@ Parse(TRITONSERVER_ServerOptions** server_options, int argc, char** argv)
   std::pair<int32_t, int32_t> sagemaker_safe_range = sagemaker_safe_range_;
 #endif  // TRITON_ENABLE_SAGEMAKER
 
+#if defined(TRITON_ENABLE_VERTEX_AI)
+  // Set different default value if specific flag is set
+  {
+    auto aip_mode = nvidia::inferenceserver::GetEnvironmentVariableOrDefault(
+        "AIP_MODE", "");
+    allow_vertex_ai_ = (aip_mode == "PREDICTION");
+    auto port = nvidia::inferenceserver::GetEnvironmentVariableOrDefault(
+        "AIP_HTTP_PORT", "8080");
+    vertex_ai_port_ = ParseIntOption(port);
+  }
+  int32_t vertex_ai_port = vertex_ai_port_;
+  int32_t vertex_ai_thread_cnt = vertex_ai_thread_cnt_;
+  std::string vertex_ai_default_model = vertex_ai_default_model_;
+#endif  // TRITON_ENABLE_VERTEX_AI
+
 #ifdef TRITON_ENABLE_METRICS
   int32_t metrics_port = metrics_port_;
   bool allow_gpu_metrics = true;
@@ -1305,6 +1375,21 @@ Parse(TRITONSERVER_ServerOptions** server_options, int argc, char** argv)
         sagemaker_thread_cnt = ParseIntOption(optarg);
         break;
 #endif  // TRITON_ENABLE_SAGEMAKER
+
+#if defined(TRITON_ENABLE_VERTEX_AI)
+      case OPTION_ALLOW_VERTEX_AI:
+        allow_vertex_ai_ = ParseBoolOption(optarg);
+        break;
+      case OPTION_VERTEX_AI_PORT:
+        vertex_ai_port = ParseIntOption(optarg);
+        break;
+      case OPTION_VERTEX_AI_THREAD_COUNT:
+        vertex_ai_thread_cnt = ParseIntOption(optarg);
+        break;
+      case OPTION_VERTEX_AI_DEFAULT_MODEL:
+        vertex_ai_default_model = optarg;
+        break;
+#endif  // TRITON_ENABLE_VERTEX_AI
 
 #if defined(TRITON_ENABLE_GRPC)
       case OPTION_ALLOW_GRPC:
@@ -1525,6 +1610,24 @@ Parse(TRITONSERVER_ServerOptions** server_options, int argc, char** argv)
   sagemaker_safe_range_set_ = sagemaker_safe_range_set;
   sagemaker_safe_range_ = sagemaker_safe_range;
 #endif  // TRITON_ENABLE_SAGEMAKER
+
+#if defined(TRITON_ENABLE_VERTEX_AI)
+  // Set default model repository if specific flag is set, postpone the
+  // check to after parsing so we only monitor the default repository if
+  // Vertex service is allowed
+  {
+    auto aip_storage_uri =
+        nvidia::inferenceserver::GetEnvironmentVariableOrDefault(
+            "AIP_STORAGE_URI ", "");
+    if (!aip_storage_uri.empty()) {
+      model_repository_paths.insert(aip_storage_uri);
+    }
+  }
+  vertex_ai_port_ = vertex_ai_port;
+  vertex_ai_thread_cnt_ = vertex_ai_thread_cnt;
+  vertex_ai_default_model_ = vertex_ai_default_model;
+#endif  // TRITON_ENABLE_VERTEX_AI
+
 
 #if defined(TRITON_ENABLE_GRPC)
   grpc_port_ = grpc_port;

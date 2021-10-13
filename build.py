@@ -277,6 +277,8 @@ def core_cmake_args(components, backends, install_dir):
         cmake_enable('http' in FLAGS.endpoint)))
     cargs.append('-DTRITON_ENABLE_SAGEMAKER:BOOL={}'.format(
         cmake_enable('sagemaker' in FLAGS.endpoint)))
+    cargs.append('-DTRITON_ENABLE_VERTEX_AI:BOOL={}'.format(
+        cmake_enable('vertex-ai' in FLAGS.endpoint)))
 
     cargs.append('-DTRITON_ENABLE_GCS:BOOL={}'.format(
         cmake_enable('gcs' in FLAGS.filesystem)))
@@ -1318,7 +1320,7 @@ if __name__ == '__main__':
         action='append',
         required=False,
         help=
-        'Include specified endpoint in build. Allowed values are "grpc", "http" and "sagemaker".'
+        'Include specified endpoint in build. Allowed values are "grpc", "http", "vertex-ai" and "sagemaker".'
     )
     parser.add_argument(
         '--filesystem',
