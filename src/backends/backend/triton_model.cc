@@ -625,7 +625,7 @@ TRITONBACKEND_StateNew(
             .c_str());
   }
 
-  Status status = sequence_state->GetOutputState(
+  Status status = sequence_state->OutputState(
       name, TritonToDataType(datatype), lshape, &lstate);
   if (!status.IsOk()) {
     *state = nullptr;

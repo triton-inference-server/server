@@ -87,18 +87,12 @@ class SequenceBatchScheduler : public Scheduler {
   bool DelayScheduler(
       const uint32_t batcher_idx, const size_t cnt, const size_t total);
 
-  const std::unordered_map<std::string, std::string>& StateIOMap()
-  {
-    return state_io_map_;
-  }
-
   const std::unordered_map<
       std::string, const inference::ModelSequenceBatching_State&>&
   StateOutputConfigMap()
   {
     return state_output_config_map_;
   }
-  bool HasImplicitState() { return has_implicit_state_; }
 
  private:
   void ReaperThread(const int nice);
@@ -169,16 +163,9 @@ class SequenceBatchScheduler : public Scheduler {
   size_t backlog_delay_cnt_;
   std::vector<size_t> queue_request_cnts_;
 
-  // IO mapping between the output state name and the input state name.
-  std::unordered_map<std::string, std::string> state_io_map_;
-
   // IO mapping between the output state name and the state configuration.
   std::unordered_map<std::string, const inference::ModelSequenceBatching_State&>
       state_output_config_map_;
-
-  // Cached value indicating whether the model configuration requires storing
-  // the implicit state.
-  bool has_implicit_state_;
 };
 
 // Base class for a scheduler that implements a particular scheduling

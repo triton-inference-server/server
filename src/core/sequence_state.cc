@@ -118,9 +118,9 @@ SequenceStates::Initialize(
       // Remove the corresponding state from the input_states_map
       input_states_.erase(state_config.input_name());
       LOG_WARNING << "Detected duplicate 'output_name' in the state "
-                  "configuration: '"
-               << state_config.output_name()
-               << ".' This state configuration will be ignored.";
+                     "configuration: '"
+                  << state_config.output_name()
+                  << ".' This state configuration will be ignored.";
 
       continue;
     }
@@ -130,7 +130,7 @@ SequenceStates::Initialize(
 }
 
 Status
-SequenceStates::GetOutputState(
+SequenceStates::OutputState(
     const std::string& name, const inference::DataType datatype,
     const int64_t* shape, const uint64_t dim_count,
     SequenceState** output_state)
@@ -219,12 +219,11 @@ SequenceStates::GetOutputState(
 }
 
 Status
-SequenceStates::GetOutputState(
+SequenceStates::OutputState(
     const std::string& name, const inference::DataType datatype,
     const std::vector<int64_t>& shape, SequenceState** output_state)
 {
-  return GetOutputState(
-      name, datatype, shape.data(), shape.size(), output_state);
+  return OutputState(name, datatype, shape.data(), shape.size(), output_state);
 }
 
 }}  // namespace nvidia::inferenceserver

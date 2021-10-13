@@ -107,11 +107,11 @@ class SequenceStates {
 
 
   // Get a buffer holding the output state.
-  Status GetOutputState(
+  Status OutputState(
       const std::string& name, const inference::DataType datatype,
       const int64_t* shape, const uint64_t dim_count,
       SequenceState** output_state);
-  Status GetOutputState(
+  Status OutputState(
       const std::string& name, const inference::DataType datatype,
       const std::vector<int64_t>& shape, SequenceState** output_state);
 

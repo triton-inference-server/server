@@ -68,10 +68,8 @@ SequenceBatchScheduler::Create(
 
   // Implicit States
   auto& states = config.sequence_batching().state();
-  sched->has_implicit_state_ = states.size() > 0;
 
   for (const inference::ModelSequenceBatching_State& state : states) {
-    sched->state_io_map_.emplace(state.output_name(), state.input_name());
     sched->state_output_config_map_.insert({state.output_name(), state});
   }
 
@@ -872,7 +870,7 @@ SequenceBatch::UpdateImplicitState(
     std::unique_ptr<InferenceRequest>& irequest, const int32_t seq_slot)
 {
   // This should be executed only if the model has a states section.
-  if (base_->HasImplicitState()) {
+  if (!base_->StateOutputConfigMap().empty()) {
     auto& sequence_states = sequence_states_[seq_slot];
 
     // Create the state for the first request in the sequence.
