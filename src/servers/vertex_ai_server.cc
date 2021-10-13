@@ -31,7 +31,7 @@
 namespace nvidia { namespace inferenceserver {
 
 const std::string VertexAiAPIServer::binary_mime_type_(
-    "vnd.vertex-ai-triton.binary+json;json-header-size=");
+    "application/vnd.vertex-ai-triton.binary+json;json-header-size=");
 const std::string VertexAiAPIServer::redirect_header_(
     "X-Vertex-Ai-Triton-Redirect");
 

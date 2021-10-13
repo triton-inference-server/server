@@ -442,7 +442,7 @@ std::vector<Option> options_
        "is AIP_HTTP_PORT if set, 8080 otherwise."},
       {OPTION_VERTEX_AI_THREAD_COUNT, "vertex-ai-thread-count", Option::ArgInt,
        "Number of threads handling Vertex AI requests. Default is 8."},
-      {OPTION_VERTEX_AI_DEFAULT_MODEL, "vertex-ai-safe-port-range",
+      {OPTION_VERTEX_AI_DEFAULT_MODEL, "vertex-ai-default-model",
        Option::ArgStr,
        "The name of the model to use for single-model inference requests."},
 #endif  // TRITON_ENABLE_VERTEX_AI
@@ -1618,7 +1618,7 @@ Parse(TRITONSERVER_ServerOptions** server_options, int argc, char** argv)
   {
     auto aip_storage_uri =
         nvidia::inferenceserver::GetEnvironmentVariableOrDefault(
-            "AIP_STORAGE_URI ", "");
+            "AIP_STORAGE_URI", "");
     if (!aip_storage_uri.empty()) {
       model_repository_paths.insert(aip_storage_uri);
     }
