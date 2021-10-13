@@ -63,7 +63,7 @@ class SagemakerAPIServer : public HTTPAPIServer {
       : HTTPAPIServer(server, trace_manager, shm_manager, port, thread_cnt),
         ping_regex_(R"(/ping)"), invocations_regex_(R"(/invocations)"),
         ping_mode_("ready"),
-        model_name_(SagemakerAPIServer::GetEnvironmentVariableOrDefault(
+        model_name_(GetEnvironmentVariableOrDefault(
             "SAGEMAKER_TRITON_DEFAULT_MODEL_NAME",
             "unspecified_SAGEMAKER_TRITON_DEFAULT_MODEL_NAME")),
         model_version_str_("")
