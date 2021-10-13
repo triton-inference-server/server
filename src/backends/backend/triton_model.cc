@@ -594,7 +594,7 @@ TRITONBACKEND_RequestRelease(
 TRITONSERVER_Error*
 TRITONBACKEND_StateUpdate(TRITONBACKEND_State* state)
 {
-  State* ts = reinterpret_cast<State*>(state);
+  SequenceState* ts = reinterpret_cast<SequenceState*>(state);
   auto status = ts->Update();
 
   if (!status.IsOk()) {
@@ -612,10 +612,21 @@ TRITONBACKEND_StateNew(
     const int64_t* shape, const uint32_t dims_count)
 {
   InferenceRequest* tr = reinterpret_cast<InferenceRequest*>(request);
-  State* lstate;
+  SequenceState* lstate;
   std::vector<int64_t> lshape(shape, shape + dims_count);
-  Status status =
-      tr->AddState(name, TritonToDataType(datatype), lshape, &lstate);
+  auto& sequence_state = tr->GetSequenceStates();
+
+  if (sequence_state == nullptr) {
+    return TRITONSERVER_ErrorNew(
+        TRITONSERVER_ERROR_INVALID_ARG,
+        (std::string("unable to add state '") + name +
+         "'. State configuration is missing for model '" + tr->ModelName() +
+         "'.")
+            .c_str());
+  }
+
+  Status status = sequence_state->GetOutputState(
+      name, TritonToDataType(datatype), lshape, &lstate);
   if (!status.IsOk()) {
     *state = nullptr;
     return TRITONSERVER_ErrorNew(
@@ -631,7 +642,7 @@ TRITONBACKEND_StateBuffer(
     TRITONBACKEND_State* state, void** buffer, const uint64_t buffer_byte_size,
     TRITONSERVER_MemoryType* memory_type, int64_t* memory_type_id)
 {
-  State* to = reinterpret_cast<State*>(state);
+  SequenceState* to = reinterpret_cast<SequenceState*>(state);
   Status status = Status::Success;
 
   // If the buffer size exactly matches the buffer available, reuse the

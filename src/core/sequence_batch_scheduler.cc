@@ -70,11 +70,9 @@ SequenceBatchScheduler::Create(
   auto& states = config.sequence_batching().state();
   sched->has_implicit_state_ = states.size() > 0;
 
-  if (sched->has_implicit_state_) {
-    for (const inference::ModelSequenceBatching_State& state : states) {
-      sched->state_io_map_.emplace(state.output_name(), state.input_name());
-      sched->state_output_config_map_.insert({state.output_name(), state});
-    }
+  for (const inference::ModelSequenceBatching_State& state : states) {
+    sched->state_io_map_.emplace(state.output_name(), state.input_name());
+    sched->state_output_config_map_.insert({state.output_name(), state});
   }
 
   // Get the number of candidate sequence slots to allow for each
@@ -726,7 +724,8 @@ SequenceBatch::SequenceBatch(
       end_input_overrides_(end_input_overrides),
       startend_input_overrides_(startend_input_overrides),
       continue_input_overrides_(continue_input_overrides),
-      notready_input_overrides_(notready_input_overrides), states_(seq_slot_cnt)
+      notready_input_overrides_(notready_input_overrides),
+      sequence_states_(seq_slot_cnt)
 {
 }
 
@@ -874,62 +873,16 @@ SequenceBatch::UpdateImplicitState(
 {
   // This should be executed only if the model has a states section.
   if (base_->HasImplicitState()) {
-    auto& io_states_map = states_[seq_slot];
+    auto& sequence_states = sequence_states_[seq_slot];
 
     // Create the state for the first request in the sequence.
-    if (io_states_map == nullptr) {
-      io_states_map.reset(new SequenceState);
-      for (auto& state : base_->StateOutputConfigMap()) {
-        auto& state_config = state.second;
-        auto& input_states = io_states_map->input_states_;
-        auto& output_states = io_states_map->output_states_;
-
-        std::vector<int64_t> dims;
-        for (auto& dim : state_config.dims()) {
-          if (dim == -1) {
-            dims.push_back(1);
-          } else {
-            dims.push_back(dim);
-          }
-        }
-
-        const size_t state_size = GetByteSize(state.second.data_type(), dims);
-        auto data = std::make_shared<AllocatedMemory>(
-            state_size, TRITONSERVER_MEMORY_CPU, 0);
-
-        const auto& input_pair = input_states.emplace(
-            std::piecewise_construct,
-            std::forward_as_tuple(state_config.input_name()),
-            std::forward_as_tuple(new State(
-                state_config.input_name(), state.second.data_type(), dims)));
-
-        if (!input_pair.second) {
-          LOG_ERROR
-              << "Detected duplicate 'input_name' in the state configuration: '"
-              << state_config.input_name()
-              << ".' This state configuration will be ignored.";
-          continue;
-        }
-        input_pair.first->second->SetData(data);
-
-        const auto& output_pair = output_states.emplace(
-            std::piecewise_construct,
-            std::forward_as_tuple(state_config.output_name()),
-            std::forward_as_tuple());
-        if (!output_pair.second) {
-          LOG_ERROR << "Detected duplicate 'output_name' in the state "
-                       "configuration: '"
-                    << state_config.output_name()
-                    << ".' This state configuration will be ignored.";
-
-          // Remove the corresponding state from the input_states_ map
-          input_states.erase(state_config.input_name());
-          continue;
-        }
-      }
+    if (sequence_states == nullptr) {
+      sequence_states.reset(new SequenceStates);
+      sequence_states->Initialize(base_->StateOutputConfigMap());
     }
 
-    for (auto& input_state_pair : io_states_map->input_states_) {
+    // Add the input state tensors to the request inputs.
+    for (auto& input_state_pair : sequence_states->InputStates()) {
       auto& input_state = input_state_pair.second;
 
       std::shared_ptr<InferenceRequest::Input> input;
@@ -939,7 +892,7 @@ SequenceBatch::UpdateImplicitState(
       input->SetData(input_state->Data());
     }
 
-    irequest->SetSequenceState(io_states_map);
+    irequest->SetSequenceStates(sequence_states);
   }
 }
 
@@ -1139,7 +1092,7 @@ DirectSequenceBatch::BatcherThread(const int nice)
 
               // The state for the sequence needs to be cleaned after the
               // sequence slot is released.
-              states_[seq_slot] = nullptr;
+              sequence_states_[seq_slot] = nullptr;
             }
           }
 
@@ -1310,7 +1263,7 @@ DirectSequenceBatch::BatcherThread(const int nice)
 
             // The state for the sequence needs to be cleaned after the sequence
             // slot is released.
-            states_[seq_slot] = nullptr;
+            sequence_states_[seq_slot] = nullptr;
           }
         }
       }
@@ -1489,7 +1442,7 @@ OldestSequenceBatch::CompleteAndNext(const uint32_t seq_slot)
 
       // The state for the sequence needs to be cleaned after the sequence slot
       // is released.
-      states_[seq_slot] = nullptr;
+      sequence_states_[seq_slot] = nullptr;
       if (released_cid.InSequence()) {
         LOG_VERBOSE(1) << "Enqueued new sequence containing " << queue.size()
                        << " requests into OldestFirst batcher " << batcher_idx_

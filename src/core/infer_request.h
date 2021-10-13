@@ -392,13 +392,6 @@ class InferenceRequest {
       const std::string& name, const inference::DataType datatype,
       const std::vector<int64_t>& shape, Input** input = nullptr);
 
-  Status AddState(
-      const std::string& name, const inference::DataType datatype,
-      const int64_t* shape, const uint64_t dim_count, State** state = nullptr);
-  Status AddState(
-      const std::string& name, const inference::DataType datatype,
-      const std::vector<int64_t>& shape, State** state = nullptr);
-
   // Remove a single original input or all inputs.
   Status RemoveOriginalInput(const std::string& name);
   Status RemoveAllOriginalInputs();
@@ -467,10 +460,13 @@ class InferenceRequest {
     return response_factory_.SetResponseDelegator(response_delegator_);
   }
 
-  void SetSequenceState(std::shared_ptr<SequenceState> sequence_state)
+  Status SetSequenceStates(std::shared_ptr<SequenceStates> sequence_states)
   {
-    sequence_state_ = sequence_state;
+    sequence_states_ = sequence_states;
+    return Status::Success;
   }
+
+  std::shared_ptr<SequenceStates>& GetSequenceStates() { return sequence_states_; }
 
   // Prepare this request for inference.
   Status PrepareForInference();
@@ -641,22 +637,9 @@ class InferenceRequest {
   // Inference trace associated with this request.
   std::unique_ptr<InferenceTrace> trace_;
 #endif  // TRITON_ENABLE_TRACING
-<<<<<<< HEAD
-=======
 
-<<<<<<< HEAD
-  // A map storing the output states provided by the backend.
-  std::shared_ptr<std::unordered_map<std::string, std::unique_ptr<State>>>
-      states_;
-
-  // The place where the next state should be stored.
-  std::shared_ptr<std::unordered_map<std::string, std::unique_ptr<State>>>
-      next_states_;
->>>>>>> Update based on the new backend API
-=======
-  // Sequence I/O state used for implicit state management.
-  std::shared_ptr<SequenceState> sequence_state_;
->>>>>>> Review edits
+  // Sequence I/O states used for implicit state.
+  std::shared_ptr<SequenceStates> sequence_states_;
 };
 
 std::ostream& operator<<(std::ostream& out, const InferenceRequest& request);

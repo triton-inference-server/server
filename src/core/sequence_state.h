@@ -36,15 +36,15 @@
 namespace nvidia { namespace inferenceserver {
 
 //
-// State input/output tensor
+// Sequence state tensors.
 //
-class State {
+class SequenceState {
  public:
-  State();
-  State(
+  SequenceState();
+  SequenceState(
       const std::string& name, const inference::DataType datatype,
       const std::vector<int64_t>& shape);
-  State(
+  SequenceState(
       const std::string& name, const inference::DataType datatype,
       const int64_t* shape, const uint64_t dim_count);
 
@@ -79,19 +79,16 @@ class State {
 
   // Call the state update callback. This function will be called when
   // TRITONBACKEND_StateUpdate is called.
-  Status Update()
-  {
-    std::cout << "State update is called." << std::endl;
-    return state_update_cb_();
-  }
+  Status Update() { return state_update_cb_(); }
 
  private:
-  DISALLOW_COPY_AND_ASSIGN(State);
+  DISALLOW_COPY_AND_ASSIGN(SequenceState);
   std::string name_;
   inference::DataType datatype_;
   std::vector<int64_t> shape_;
   std::shared_ptr<Memory> data_;
   std::function<Status()> state_update_cb_ = []() {
+    // By default calling the TRITONBACKEND_StateUpdate will return an error.
     return Status(
         Status::Code::INVALID_ARG,
         "TRITONBACKEND_StateUpdate called when sequence batching is disabled "
@@ -99,9 +96,33 @@ class State {
   };
 };
 
-struct SequenceState {
-  std::map<std::string, std::unique_ptr<State>> input_states_;
-  std::map<std::string, std::unique_ptr<State>> output_states_;
+class SequenceStates {
+ public:
+  // Initialize the state tensors according to the state model configuration.
+  // Will use a default value of 1 for the variable dimensions in the state
+  // tensor configuration.
+  Status Initialize(const std::unordered_map<
+                    std::string, const inference::ModelSequenceBatching_State&>&
+                        state_output_config_map);
+
+
+  // Get a buffer holding the output state.
+  Status GetOutputState(
+      const std::string& name, const inference::DataType datatype,
+      const int64_t* shape, const uint64_t dim_count,
+      SequenceState** output_state);
+  Status GetOutputState(
+      const std::string& name, const inference::DataType datatype,
+      const std::vector<int64_t>& shape, SequenceState** output_state);
+
+  const std::map<std::string, std::unique_ptr<SequenceState>>& InputStates()
+  {
+    return input_states_;
+  }
+
+ private:
+  std::map<std::string, std::unique_ptr<SequenceState>> input_states_;
+  std::map<std::string, std::unique_ptr<SequenceState>> output_states_;
 };
 
 }}  // namespace nvidia::inferenceserver

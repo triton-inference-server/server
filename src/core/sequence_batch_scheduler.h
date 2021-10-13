@@ -257,7 +257,7 @@ class SequenceBatch {
       seq_slot_corrid_overrides_;
 
   // For each sequence slot store the optional state i/o tensors.
-  std::vector<std::shared_ptr<SequenceState>> states_;
+  std::vector<std::shared_ptr<SequenceStates>> sequence_states_;
 };
 
 // Scheduler that implements the Direct sequence scheduling strategy
