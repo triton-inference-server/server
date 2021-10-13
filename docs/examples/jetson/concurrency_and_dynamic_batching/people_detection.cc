@@ -1,4 +1,4 @@
-// Copyright (c) 2021, NVIDIA CORPORATION. All rights reserved.
+// Copyright (c) 2021, NVIDIA CORPORATION& AFFILIATES.All rights reserved.
 //
 // Redistribution and use in source and binary forms, with or without
 // modification, are permitted provided that the following conditions
@@ -40,11 +40,11 @@
 
 #include "common.h"
 
-#include "opencv2/imgproc.hpp"
+#include <opencv2/dnn.hpp>
 #include "opencv2/core.hpp"
 #include "opencv2/highgui.hpp"
+#include "opencv2/imgproc.hpp"
 #include "opencv2/opencv.hpp"
-#include <opencv2/dnn.hpp>
 
 #ifdef TRITON_ENABLE_GPU
 #include <cuda_runtime_api.h>
@@ -90,10 +90,14 @@ Usage(char** argv, const std::string& msg = std::string())
             << " If not specified, inputs will be in system memory and outputs"
             << " will be based on the model's preferred type." << std::endl;
   std::cerr << "\t-v Enable verbose logging." << std::endl;
-  std::cerr << "\t-t Thread count to simulate the number of concurrent requests." << std::endl;
+  std::cerr
+      << "\t-t Thread count to simulate the number of concurrent requests."
+      << std::endl;
   std::cerr << "\t-r [model repository absolute path]." << std::endl;
-  std::cerr << "\t-s <true|false>." 
-            << " Specify whether output visualizations will be saved to the project folder." 
+  std::cerr << "\t-p [tritonserver path]." << std::endl;
+  std::cerr << "\t-s <true|false>."
+            << " Specify whether output visualizations will be saved to the "
+               "project folder."
             << " If not specified, no outputs will be saved." << std::endl;
 
   exit(1);
@@ -276,13 +280,11 @@ InferResponseComplete(
 
 
 TRITONSERVER_Error*
-ParseModelMetadata(
-    const rapidjson::Document& model_metadata)
+ParseModelMetadata(const rapidjson::Document& model_metadata)
 {
   std::string seen_data_type;
   for (const auto& input : model_metadata["inputs"].GetArray()) {
-
-    if (strcmp(input["datatype"].GetString(), "FP32") ) {
+    if (strcmp(input["datatype"].GetString(), "FP32")) {
       return TRITONSERVER_ErrorNew(
           TRITONSERVER_ERROR_UNSUPPORTED,
           "this example only supports model with data type FP32");
@@ -311,33 +313,29 @@ ParseModelMetadata(
 }
 
 
-cv::Mat 
+cv::Mat
 ResizeKeepAspectRatio(
-    const cv::Mat &input, 
-    const cv::Size &dstSize, 
-    const cv::Scalar &bgcolor, 
-    bool &fixHeight, 
-    float &ratio, 
-    int &sideCache)
+    const cv::Mat& input, const cv::Size& dstSize, const cv::Scalar& bgcolor,
+    bool& fixHeight, float& ratio, int& sideCache)
 {
   cv::Mat output;
 
   double h1 = dstSize.width * (input.rows / (double)input.cols);
   double w2 = dstSize.height * (input.cols / (double)input.rows);
-  if( h1 <= dstSize.height) {
-      cv::resize(input, output, cv::Size(dstSize.width, h1));
-      ratio = (float) dstSize.width / input.cols;
-      fixHeight = false;
-      sideCache = (int)(ratio * input.rows);
-      std::cout << "Resizing to fixed width. Ratio " << ratio << std::endl;
-      std::cout << "Height cache " << sideCache << std::endl;
+  if (h1 <= dstSize.height) {
+    cv::resize(input, output, cv::Size(dstSize.width, h1));
+    ratio = (float)dstSize.width / input.cols;
+    fixHeight = false;
+    sideCache = (int)(ratio * input.rows);
+    std::cout << "Resizing to fixed width. Ratio " << ratio << std::endl;
+    std::cout << "Height cache " << sideCache << std::endl;
   } else {
-      cv::resize(input, output, cv::Size(w2, dstSize.height));
-      ratio = (float) dstSize.height / input.rows;
-      fixHeight = true;
-      sideCache = (int)(ratio * input.cols);
-      std::cout << "Resizing to fixed height. Ratio " << ratio << std::endl;
-      std::cout << "Width cache " << sideCache << std::endl;
+    cv::resize(input, output, cv::Size(w2, dstSize.height));
+    ratio = (float)dstSize.height / input.rows;
+    fixHeight = true;
+    sideCache = (int)(ratio * input.cols);
+    std::cout << "Resizing to fixed height. Ratio " << ratio << std::endl;
+    std::cout << "Width cache " << sideCache << std::endl;
   }
 
   int top = (dstSize.height - output.rows) / 2;
@@ -345,24 +343,19 @@ ResizeKeepAspectRatio(
   int left = (dstSize.width - output.cols) / 2;
   int right = (dstSize.width - output.cols + 1) / 2;
 
-  cv::copyMakeBorder(output, output, top, down, left, right, cv::BORDER_CONSTANT, bgcolor );
+  cv::copyMakeBorder(
+      output, output, top, down, left, right, cv::BORDER_CONSTANT, bgcolor);
 
   return output;
 }
 
 
-void 
+void
 SaveOverlay(
-    std::vector<cv::Rect> &bboxes_list,
-    std::vector<int> &indexes,
-    std::vector<int64_t> & input0_shape,
-    bool &fixHeight,
-    float &ratio,
-    int &sideCache,
-    std::string imageName,
-    size_t &thread_id)
+    std::vector<cv::Rect>& bboxes_list, std::vector<int>& indexes,
+    std::vector<int64_t>& input0_shape, bool& fixHeight, float& ratio,
+    int& sideCache, std::string imageName, size_t& thread_id)
 {
-
   const int inputC = input0_shape[1];
   const int inputH = input0_shape[2];
   const int inputW = input0_shape[3];
@@ -380,13 +373,13 @@ SaveOverlay(
     ymax = bboxes_list[i].y + bboxes_list[i].height;
 
     if (fixHeight) {
-      xmin = int((xmin - (inputW - sideCache)/2)/ratio);
-      xmax = int((xmax - (inputW - sideCache)/2)/ratio);
+      xmin = int((xmin - (inputW - sideCache) / 2) / ratio);
+      xmax = int((xmax - (inputW - sideCache) / 2) / ratio);
       ymin = int(ymin / ratio);
       ymax = int(ymax / ratio);
     } else {
-      ymin = int((ymin - (inputH - sideCache)/2)/ratio);
-      ymax = int((ymax - (inputH - sideCache)/2)/ratio);
+      ymin = int((ymin - (inputH - sideCache) / 2) / ratio);
+      ymax = int((ymax - (inputH - sideCache) / 2) / ratio);
       xmin = int(xmin / ratio);
       xmax = int(xmax / ratio);
     }
@@ -400,38 +393,32 @@ SaveOverlay(
 }
 
 
-void 
-Normalize(
-    cv::Mat img, std::vector<float>*& data, int inputC) 
+void
+Normalize(cv::Mat img, std::vector<float>*& data, int inputC)
 {
-	for (int c = 0; c < inputC; ++c)
-  {
-    for (int i = 0; i < img.rows; ++i)
-    {
-      cv::Vec3b *p1 = img.ptr<cv::Vec3b>(i);
-      for (int j = 0; j < img.cols; ++j)
-      {
-        ((float*)data->data())[c * img.cols * img.rows + i * img.cols + j] = p1[j][c] / 255.f ;
+  for (int c = 0; c < inputC; ++c) {
+    for (int i = 0; i < img.rows; ++i) {
+      cv::Vec3b* p1 = img.ptr<cv::Vec3b>(i);
+      for (int j = 0; j < img.cols; ++j) {
+        ((float*)data->data())[c * img.cols * img.rows + i * img.cols + j] =
+            p1[j][c] / 255.f;
       }
     }
   }
 }
 
 
-void 
+void
 RecoverBoundingBoxes(
-    std::unordered_map<std::string, std::vector<float>> &output_data,
-    std::unordered_map<std::string, const int64_t*> &shapes,
-    std::vector<int64_t> &input0_shape,
-    std::vector<cv::Rect> &bboxes_list,
-    std::vector<float> &scores_list,
-    std::vector<int> &indexes) 
+    std::unordered_map<std::string, std::vector<float>>& output_data,
+    std::unordered_map<std::string, const int64_t*>& shapes,
+    std::vector<int64_t>& input0_shape, std::vector<cv::Rect>& bboxes_list,
+    std::vector<float>& scores_list, std::vector<int>& indexes)
 {
-
-  const float box_scale = 35.f;   
-  const float box_offset = 0.5f; 
-  const float score_threshold = 0.5f; 
-  const float nms_threshold = 0.5f; 
+  const float box_scale = 35.f;
+  const float box_offset = 0.5f;
+  const float score_threshold = 0.5f;
+  const float nms_threshold = 0.5f;
 
   int gridH = shapes["output_cov/Sigmoid"][2];
   int gridW = shapes["output_cov/Sigmoid"][3];
@@ -448,56 +435,64 @@ RecoverBoundingBoxes(
   std::cout << "modelW: " << modelW << std::endl;
 
   int cellH = modelH / gridH;
-  int cellW  = modelW  / gridW;
+  int cellW = modelW / gridW;
 
-  for (int b=0; b<batch; b++) {
-    for (int h=0; h<gridH; h++) {
-      for (int w=0; w<gridW; w++) {
-
-        //value(n, c, h, w) = n * CHW + c * HW + h * W + w
+  for (int b = 0; b < batch; b++) {
+    for (int h = 0; h < gridH; h++) {
+      for (int w = 0; w < gridW; w++) {
+        // value(n, c, h, w) = n * CHW + c * HW + h * W + w
         int idx = b * gridH * gridW + h * gridW + w;
         float val = output_data["output_cov/Sigmoid"][idx];
         if (val > score_threshold) {
-
           scores_list.push_back(val);
 
           // location of the w, h coordinate in the original image
           int mx = w * cellW;
           int my = h * cellH;
 
-          // scale the detected coordinates to original and return their location in the image
+          // scale the detected coordinates to original and return their
+          // location in the image
           int idxX1 = b * 3 * gridH * gridW + 0 * gridH * gridW + h * gridW + w;
           int idxY1 = b * 3 * gridH * gridW + 1 * gridH * gridW + h * gridW + w;
           int idxX2 = b * 3 * gridH * gridW + 2 * gridH * gridW + h * gridW + w;
           int idxY2 = b * 3 * gridH * gridW + 3 * gridH * gridW + h * gridW + w;
 
-          int rectX1 = - (output_data["output_bbox/BiasAdd"][idxX1] + box_offset) * box_scale + mx;
-          int rectY1 = - (output_data["output_bbox/BiasAdd"][idxY1] + box_offset) * box_scale + my;
-          int rectX2 = (output_data["output_bbox/BiasAdd"][idxX2] + box_offset) * box_scale + mx;
-          int rectY2 = (output_data["output_bbox/BiasAdd"][idxY2] + box_offset) * box_scale + my;
+          int rectX1 =
+              -(output_data["output_bbox/BiasAdd"][idxX1] + box_offset) *
+                  box_scale +
+              mx;
+          int rectY1 =
+              -(output_data["output_bbox/BiasAdd"][idxY1] + box_offset) *
+                  box_scale +
+              my;
+          int rectX2 =
+              (output_data["output_bbox/BiasAdd"][idxX2] + box_offset) *
+                  box_scale +
+              mx;
+          int rectY2 =
+              (output_data["output_bbox/BiasAdd"][idxY2] + box_offset) *
+                  box_scale +
+              my;
 
           // Rect ROI (x, y, width, height);
           cv::Rect bbox(rectX1, rectY1, rectX2 - rectX1, rectY2 - rectY1);
           bboxes_list.push_back(bbox);
-
         }
       }
     }
   }
-  
-  // Execute non-maximum suppression
-  cv::dnn::NMSBoxes(bboxes_list, scores_list, score_threshold, nms_threshold, indexes);
 
+  // Execute non-maximum suppression
+  cv::dnn::NMSBoxes(
+      bboxes_list, scores_list, score_threshold, nms_threshold, indexes);
 }
 
-void 
+void
 ParseDetections(
-    TRITONSERVER_InferenceResponse* response, 
-    const std::string& output0, 
+    TRITONSERVER_InferenceResponse* response, const std::string& output0,
     const std::string& output1,
-    std::unordered_map<std::string, 
-    std::vector<float>> &output_data,
-    std::unordered_map<std::string, const int64_t*> &shapes) 
+    std::unordered_map<std::string, std::vector<float>>& output_data,
+    std::unordered_map<std::string, const int64_t*>& shapes)
 {
   uint32_t output_count;
   FAIL_IF_ERR(
@@ -539,29 +534,32 @@ ParseDetections(
 
     switch (memory_type) {
       case TRITONSERVER_MEMORY_CPU: {
-        std::cout << std::endl << name << " is stored in system memory" << std::endl;
+        std::cout << std::endl
+                  << name << " is stored in system memory" << std::endl;
         const float* cbase = reinterpret_cast<const float*>(base);
         odata.assign(cbase, cbase + byte_size / sizeof(float));
         break;
       }
 
       case TRITONSERVER_MEMORY_CPU_PINNED: {
-        std::cout << std::endl << name << " is stored in pinned memory" << std::endl;
+        std::cout << std::endl
+                  << name << " is stored in pinned memory" << std::endl;
         const float* cbase = reinterpret_cast<const float*>(base);
         odata.assign(cbase, cbase + byte_size / sizeof(float));
         break;
       }
 
-  #ifdef TRITON_ENABLE_GPU
+#ifdef TRITON_ENABLE_GPU
       case TRITONSERVER_MEMORY_GPU: {
-        std::cout << std::endl << name << " is stored in GPU memory" << std::endl;
+        std::cout << std::endl
+                  << name << " is stored in GPU memory" << std::endl;
         odata.reserve(byte_size);
         FAIL_IF_CUDA_ERR(
             cudaMemcpy(&odata[0], base, byte_size, cudaMemcpyDeviceToHost),
             "getting " + name + " data from GPU memory");
         break;
       }
-  #endif
+#endif
 
       default:
         FAIL("unexpected memory type");
@@ -569,47 +567,45 @@ ParseDetections(
   }
 }
 
-void 
+void
 DetectionInferenceOutput(
-    std::vector<int> &result_indexes,
-    std::vector<cv::Rect> &bboxes_list,
+    std::vector<int>& result_indexes, std::vector<cv::Rect>& bboxes_list,
     TRITONSERVER_InferenceResponse* completed_response,
-    const std::string& output0,
-    const std::string& output1,
-    std::vector<int64_t>& input0_shape,
-    bool &fixHeight,
-    float &ratio,
-    int &sideCache,
-    size_t &thread_id,
-    bool visualize=false,
+    const std::string& output0, const std::string& output1,
+    std::vector<int64_t>& input0_shape, bool& fixHeight, float& ratio,
+    int& sideCache, size_t& thread_id, bool visualize = false,
     std::string imageName = "capture.jpg")
 {
   // Parse outputs
   std::unordered_map<std::string, std::vector<float>> output_data;
   std::unordered_map<std::string, const int64_t*> shapes;
-  ParseDetections(completed_response, output0, output1, output_data, shapes);  
+  ParseDetections(completed_response, output0, output1, output_data, shapes);
 
-  std::vector<float> scores_list;  
-  RecoverBoundingBoxes(output_data, shapes, input0_shape, bboxes_list, scores_list, result_indexes);
+  std::vector<float> scores_list;
+  RecoverBoundingBoxes(
+      output_data, shapes, input0_shape, bboxes_list, scores_list,
+      result_indexes);
 
   std::cout << "Detection finished. Indexes of detected objects: " << std::endl;
   for (auto idx : result_indexes) {
     std::cout << idx << std::endl;
     std::cout << bboxes_list[idx] << std::endl;
-  } 
+  }
 
-  if (visualize) SaveOverlay(bboxes_list, result_indexes, input0_shape, fixHeight, ratio, sideCache, imageName, thread_id);
+  if (visualize)
+    SaveOverlay(
+        bboxes_list, result_indexes, input0_shape, fixHeight, ratio, sideCache,
+        imageName, thread_id);
 }
-  
+
 
 }  // namespace
 
 
 void
 SetServerOptions(
-    TRITONSERVER_ServerOptions** server_options, 
-    bool verbose_level,
-    std::string model_repository_path)
+    TRITONSERVER_ServerOptions** server_options, bool verbose_level,
+    std::string model_repository_path, std::string tritonserver_path)
 {
   FAIL_IF_ERR(
       TRITONSERVER_ServerOptionsNew(server_options), "creating server options");
@@ -635,11 +631,11 @@ SetServerOptions(
       "failed to set model control mode to explicit");
   FAIL_IF_ERR(
       TRITONSERVER_ServerOptionsSetBackendDirectory(
-          *server_options, "/opt/tritonserver/backends"),
+          *server_options, (tritonserver_path + "/backends").c_str()),
       "setting backend directory");
   FAIL_IF_ERR(
       TRITONSERVER_ServerOptionsSetRepoAgentDirectory(
-          *server_options, "/opt/tritonserver/repoagents"),
+          *server_options, (tritonserver_path + "/repoagents").c_str()),
       "setting repository agent directory");
   FAIL_IF_ERR(
       TRITONSERVER_ServerOptionsSetStrictModelConfig(*server_options, true),
@@ -657,8 +653,7 @@ SetServerOptions(
 
 
 void
-CheckServerLiveAndReady(
-    std::shared_ptr<TRITONSERVER_Server> server)
+CheckServerLiveAndReady(std::shared_ptr<TRITONSERVER_Server> server)
 {
   size_t wait_seconds = 0;
   while (true) {
@@ -685,8 +680,7 @@ CheckServerLiveAndReady(
 
 
 void
-PrintServerStatus(
-    std::shared_ptr<TRITONSERVER_Server> server)
+PrintServerStatus(std::shared_ptr<TRITONSERVER_Server> server)
 {
   TRITONSERVER_Message* server_metadata_message;
   FAIL_IF_ERR(
@@ -710,8 +704,7 @@ PrintServerStatus(
 
 void
 AwaitModelReady(
-    std::shared_ptr<TRITONSERVER_Server> server, 
-    const std::string model_name)
+    std::shared_ptr<TRITONSERVER_Server> server, const std::string model_name)
 {
   bool is_ready = false;
   size_t wait_seconds = 0;
@@ -775,44 +768,37 @@ AwaitModelReady(
 }
 
 
-void 
+void
 LoadInputImageFromFile(
-    cv::Mat &dst,
-    std::vector<int64_t> & input0_shape,
-    bool &fixHeight,
-    float &ratio,
-    int &sideCache,
-    std::string imageName = "capture.jpg")
-{  
-
+    cv::Mat& dst, std::vector<int64_t>& input0_shape, bool& fixHeight,
+    float& ratio, int& sideCache, std::string imageName = "capture.jpg")
+{
   const int inputC = input0_shape[1];
   const int inputH = input0_shape[2];
   const int inputW = input0_shape[3];
   const int batchSize = input0_shape[0];
-  
+
   cv::Mat image = cv::imread(imageName);
 
-  if( image.empty() )
-  {
+  if (image.empty()) {
     std::cout << "Cannot open image " << imageName << std::endl;
     exit(0);
   }
 
   // resize keeping aspect ratio and pad
-  dst = ResizeKeepAspectRatio(image, cv::Size(inputW, inputH), cv::Scalar(0, 0, 0), fixHeight, ratio, sideCache);
+  dst = ResizeKeepAspectRatio(
+      image, cv::Size(inputW, inputH), cv::Scalar(0, 0, 0), fixHeight, ratio,
+      sideCache);
 
   cv::cvtColor(dst, dst, cv::COLOR_BGR2RGB);
-
 }
 
 
-void 
+void
 LoadInputData(
-    cv::Mat &dst,
-    std::vector<float>* input0_data,
-    std::vector<int64_t> & input0_shape)
-{  
-
+    cv::Mat& dst, std::vector<float>* input0_data,
+    std::vector<int64_t>& input0_shape)
+{
   const int inputC = input0_shape[1];
   const int inputH = input0_shape[2];
   const int inputW = input0_shape[3];
@@ -828,14 +814,9 @@ static std::mutex mutex;
 void
 RunInferenceAndValidate(
     std::shared_ptr<TRITONSERVER_Server> server,
-    TRITONSERVER_ResponseAllocator* allocator,
-    cv::Mat scaled_input_image,
-    bool fixHeight,
-    float ratio,
-    int sideCache,
-    std::string model_name,
-    size_t thread_id,
-    bool visualize)
+    TRITONSERVER_ResponseAllocator* allocator, cv::Mat scaled_input_image,
+    bool fixHeight, float ratio, int sideCache, std::string model_name,
+    size_t thread_id, bool visualize)
 {
   TRITONSERVER_InferenceRequest* irequest = nullptr;
   FAIL_IF_ERR(
@@ -849,7 +830,7 @@ RunInferenceAndValidate(
 
   FAIL_IF_ERR(
       TRITONSERVER_InferenceRequestSetReleaseCallback(
-          irequest, InferRequestComplete, nullptr ),
+          irequest, InferRequestComplete, nullptr),
       "setting request release callback");
 
   // Inputs
@@ -865,7 +846,7 @@ RunInferenceAndValidate(
 
   // Outputs
   auto output0 = "output_bbox/BiasAdd";
-  auto output1 = "output_cov/Sigmoid";  
+  auto output1 = "output_cov/Sigmoid";
 
   FAIL_IF_ERR(
       TRITONSERVER_InferenceRequestAddRequestedOutput(irequest, output0),
@@ -919,8 +900,7 @@ RunInferenceAndValidate(
 
   FAIL_IF_ERR(
       TRITONSERVER_InferenceRequestAppendInputData(
-          irequest, input0, input0_base, input0_size, requested_memory_type,
-          0 ),
+          irequest, input0, input0_base, input0_size, requested_memory_type, 0),
       "assigning INPUT0 data");
 
   // Perform inference...
@@ -930,13 +910,12 @@ RunInferenceAndValidate(
 
     FAIL_IF_ERR(
         TRITONSERVER_InferenceRequestSetResponseCallback(
-            irequest, allocator, nullptr ,
-            InferResponseComplete, reinterpret_cast<void*>(p)),
+            irequest, allocator, nullptr, InferResponseComplete,
+            reinterpret_cast<void*>(p)),
         "setting response callback");
 
     FAIL_IF_ERR(
-        TRITONSERVER_ServerInferAsync(
-            server.get(), irequest, nullptr),
+        TRITONSERVER_ServerInferAsync(server.get(), irequest, nullptr),
         "running inference");
 
     // Wait for the inference to complete.
@@ -949,26 +928,24 @@ RunInferenceAndValidate(
     std::unique_lock<std::mutex> lock(mutex);
 
     // Process output
-    DetectionInferenceOutput(result_indexes, bboxes_list, completed_response, output0, 
-                              output1, input0_shape, fixHeight, ratio, sideCache, thread_id, visualize);
+    DetectionInferenceOutput(
+        result_indexes, bboxes_list, completed_response, output0, output1,
+        input0_shape, fixHeight, ratio, sideCache, thread_id, visualize);
 
     FAIL_IF_ERR(
         TRITONSERVER_InferenceResponseDelete(completed_response),
         "deleting inference response");
-
   }
 
   FAIL_IF_ERR(
       TRITONSERVER_InferenceRequestDelete(irequest),
       "deleting inference request");
-
 }
 
 
 void
 PrintModelStats(
-    std::shared_ptr<TRITONSERVER_Server> server, 
-    const std::string model_name)
+    std::shared_ptr<TRITONSERVER_Server> server, const std::string model_name)
 {
   TRITONSERVER_Message* model_stats_message = nullptr;
 
@@ -995,15 +972,13 @@ PrintModelStats(
 
 void
 CreateAndRunTritonserverInstance(
-    std::string model_repository_path, 
-    bool verbose_level, 
-    int thread_count, 
-    bool visualize)
+    std::string model_repository_path, std::string tritonserver_path,
+    bool verbose_level, int thread_count, bool visualize)
 {
   TRITONSERVER_ServerOptions* server_options = nullptr;
 
   SetServerOptions(
-      &server_options, verbose_level, model_repository_path);
+      &server_options, verbose_level, model_repository_path, tritonserver_path);
 
   TRITONSERVER_Server* server_ptr = nullptr;
 
@@ -1043,9 +1018,9 @@ CreateAndRunTritonserverInstance(
 
 
   // Measure total execution time
-  using std::chrono::high_resolution_clock;
-  using std::chrono::duration_cast;
   using std::chrono::duration;
+  using std::chrono::duration_cast;
+  using std::chrono::high_resolution_clock;
   using std::chrono::milliseconds;
 
   cv::Mat scaled_input_image;
@@ -1055,7 +1030,8 @@ CreateAndRunTritonserverInstance(
   std::vector<int64_t> input0_shape({1, 3, 544, 960});
 
   // the input image is loaded only once and used for all inferences
-  LoadInputImageFromFile(scaled_input_image, input0_shape, fixHeight, ratio, sideCache);
+  LoadInputImageFromFile(
+      scaled_input_image, input0_shape, fixHeight, ratio, sideCache);
 
   auto t1 = high_resolution_clock::now();
 
@@ -1063,8 +1039,8 @@ CreateAndRunTritonserverInstance(
   std::thread inferences[thread_count];
   for (size_t i = 0; i < thread_count; i++) {
     inferences[i] = std::thread(
-        &RunInferenceAndValidate, server, allocator, scaled_input_image, fixHeight, ratio, sideCache,  model.c_str(), i, visualize
-        );
+        &RunInferenceAndValidate, server, allocator, scaled_input_image,
+        fixHeight, ratio, sideCache, model.c_str(), i, visualize);
   }
 
   for (int i = 0; i < thread_count; ++i) {
@@ -1097,13 +1073,14 @@ int
 main(int argc, char** argv)
 {
   std::string model_repository_path;
+  std::string tritonserver_path;
   int verbose_level = 0;
   int thread_count = 2;
   bool visualize = false;
 
   // Parse commandline...
   int opt;
-  while ((opt = getopt(argc, argv, "vm:r:t:s:")) != -1) {
+  while ((opt = getopt(argc, argv, "vm:r:p:t:s:")) != -1) {
     switch (opt) {
       case 'm': {
         enforce_memory_type = true;
@@ -1123,6 +1100,9 @@ main(int argc, char** argv)
       }
       case 'r':
         model_repository_path = optarg;
+        break;
+      case 'p':
+        tritonserver_path = optarg;
         break;
       case 'v':
         verbose_level = 1;
@@ -1172,7 +1152,8 @@ main(int argc, char** argv)
   }
 
   CreateAndRunTritonserverInstance(
-        model_repository_path, verbose_level, thread_count, visualize);
+      model_repository_path, tritonserver_path, verbose_level, thread_count,
+      visualize);
 
   return 0;
 }
