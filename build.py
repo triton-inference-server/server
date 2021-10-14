@@ -944,9 +944,11 @@ def container_build(images, backends, repoagents, endpoints):
         base_image = images['base']
     elif target_platform() == 'windows':
         base_image = 'mcr.microsoft.com/dotnet/framework/sdk:4.8'
-    else:
+    elif FLAGS.enable_gpu:
         base_image = 'nvcr.io/nvidia/tritonserver:{}-py3-min'.format(
             FLAGS.upstream_container_version)
+    else:
+        base_image = 'ubuntu:20.04'
 
     dockerfileargmap = {
         'NVIDIA_BUILD_REF':
