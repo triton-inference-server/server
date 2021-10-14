@@ -107,8 +107,8 @@ invocation builds all features, backends, and repository agents.
 If you are building on *main* branch then `<container tag>` will
 default to "main". If you are building on a release branch then
 `<container tag>` will default to the branch name. For example, if you
-are building on the r21.09 branch, `<container tag>` will default to
-r21.09. Therefore, you typically do not need to provide `<container
+are building on the r21.10 branch, `<container tag>` will default to
+r21.10. Therefore, you typically do not need to provide `<container
 tag>` at all (nor the preceding colon). You can use a different
 `<container tag>` for a component to instead use the corresponding
 branch/tag in the build. For example, if you have a branch called
@@ -271,8 +271,8 @@ python build.py --cmake-dir=<path/to/repo>/build --build-dir=/tmp/citritonbuild 
 If you are building on *main* branch then '<container tag>' will
 default to "main". If you are building on a release branch then
 '<container tag>' will default to the branch name. For example, if you
-are building on the r21.09 branch, '<container tag>' will default to
-r21.09. Therefore, you typically do not need to provide '<container
+are building on the r21.10 branch, '<container tag>' will default to
+r21.10. Therefore, you typically do not need to provide '<container
 tag>' at all (nor the preceding colon). You can use a different
 '<container tag>' for a component to instead use the corresponding
 branch/tag in the build. For example, if you have a branch called
