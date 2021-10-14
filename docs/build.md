@@ -33,6 +33,12 @@ information on building the Triton client libraries and examples see
 [Client Libraries and
 Examples](https://github.com/triton-inference-server/client).
 
+You can create a customized Triton Docker image that contains a subset
+of the released backends without building. For example, you may want a
+Triton image that contains only the TensorRT and Python backends. For
+this type of customization you don't need to build Triton from source
+and instead can use [the *compose* utility](compose.md).
+
 Triton server is built using the [build.py](../build.py) script. The
 build.py script currently supports building for the following
 platforms. See [Building on Unsupported
@@ -51,8 +57,7 @@ For Ubuntu-20.04, build.py supports both a Docker build and a
 non-Docker build.
 
 * [Build using Docker](#ubuntu-docker) and the TensorFlow and PyTorch
-  Docker images from [NVIDIA GPU Cloud
-  (NGC)](https://ngc.nvidia.com).
+  Docker images from [NVIDIA GPU Cloud (NGC)](https://ngc.nvidia.com).
 
 * [Build without Docker](#ubuntu-without-docker).
 
@@ -67,20 +72,23 @@ Triton will be in /opt/tritonserver/backends.
 The first step for any build is to checkout the
 [triton-inference-server/server](https://github.com/triton-inference-server/server)
 repo branch for the release you are interested in building (or the
-master/main branch to build from the development branch). Then run build.py
+*main* branch to build from the development branch). Then run build.py
 as described below. The build.py script performs these steps when
 building with Docker.
 
-* Fetch the appropriate \<xx.yy\>-py3-min image from NGC. The *min*
-  image is a minimal/base image that contains the CUDA, cuDNN,
-  TensorRT and other dependencies that are required to build Triton.
+* Fetch the appropriate minimal/base image. When building with GPU
+  support (--enable-gpu), the *min* image is the \<xx.yy\>-py3-min
+  image pulled from [NGC](https://ngc.nvidia.com) that contains the
+  CUDA, cuDNN, TensorRT and other dependencies that are required to
+  build Triton. When building without GPU support, the *min* image is
+  the standard ubuntu:20.04 image.
 
 * Create a *tritonserver_buildbase* Docker image that adds additional
   build dependencies to the *min* image.
 
 * Run build.py within the *tritonserver_buildbase* image to actually
   build Triton. See [Build without Docker](#ubuntu-without-docker) for
-  more details on that part of the build process. The result of this
+  more details on this part of the build process. The result of this
   step is a *tritonserver_build* image that contains the built Triton
   artifacts.
 
@@ -96,7 +104,7 @@ invocation builds all features, backends, and repository agents.
 ./build.py --cmake-dir=<path/to/repo>/build --build-dir=/tmp/citritonbuild --enable-logging --enable-stats --enable-tracing --enable-metrics --enable-gpu-metrics --enable-gpu --filesystem=gcs --filesystem=azure_storage --filesystem=s3 --endpoint=http --endpoint=grpc --repo-tag=common:<container tag> --repo-tag=core:<container tag> --repo-tag=backend:<container tag> --repo-tag=thirdparty:<container tag> --backend=ensemble --backend=tensorrt:<container tag> --backend=identity:<container tag> --backend=repeat:<container tag> --backend=square:<container tag> --backend=onnxruntime:<container tag> --backend=pytorch:<container tag> --backend=tensorflow1:<container tag> --backend=tensorflow2:<container tag> --backend=openvino:<container tag> --backend=python:<container tag> --backend=dali:<container tag> --backend=fil:<container tag> --repoagent=checksum:<container tag>
 ```
 
-If you are building on master/main branch then `<container tag>` will
+If you are building on *main* branch then `<container tag>` will
 default to "main". If you are building on a release branch then
 `<container tag>` will default to the branch name. For example, if you
 are building on the r21.09 branch, `<container tag>` will default to
@@ -109,12 +117,19 @@ branch/tag in the build. For example, if you have a branch called
 repo that you want to use in the build, you would specify
 --backend=identity:mybranch.
 
+If you want to build without GPU support remove the --enable-gpu and
+--enable-gpu-metrics flags. Only the following backends are available
+for a non-GPU / CPU-only build: identity, repeat, square, onnxruntime,
+openvino, and python.
+
 ### <a name="ubuntu-without-docker"></a>Building without Docker
 
 To build Triton without using Docker you must install the build
 dependencies that are handled automatically when building with Docker.
-These dependencies include [CUDA and cuDNN](#cuda-cublas-cudnn),
-[TensorRT](#tensorrt), and the dependencies listed in the
+The building with GPU support (--enable-gpu), these dependencies
+include [CUDA and cuDNN](#cuda-cublas-cudnn) and
+[TensorRT](#tensorrt). For both GPU and CPU-only builds the
+dependencies also include those listed in the
 create_dockerfile_buildbase() function of [build.py](../build.py).
 
 Once you have installed these dependencies on your build system you
@@ -127,7 +142,7 @@ without Docker.
 The first step for any build is to checkout the
 [triton-inference-server/server](https://github.com/triton-inference-server/server)
 repo branch for the release you are interested in building (or the
-master/main branch to build from the development branch). Then run build.py
+*main* branch to build from the development branch). Then run build.py
 as described below. The build.py script will perform the following
 steps (note that if you are building with Docker that these same steps
 will be performed during the Docker build within the
@@ -250,16 +265,16 @@ and so you must enable them explicitly. The following build.py
 invocation builds all features and backends available on windows.
 
 ```bash
-python build.py --cmake-dir=<path/to/repo>/build --build-dir=/tmp/citritonbuild --no-container-pull --image=base,win10-py3-min --enable-logging --enable-stats --enable-tracing --enable-gpu --endpoint=grpc --repo-tag=common:<container tag> --repo-tag=core:<container tag> --repo-tag=backend:<container tag> --repo-tag=thirdparty:<container tag> --backend=ensemble --backend=tensorrt:<container tag> --backend=onnxruntime:<container tag>
+python build.py --cmake-dir=<path/to/repo>/build --build-dir=/tmp/citritonbuild --no-container-pull --image=base,win10-py3-min --enable-logging --enable-stats --enable-tracing --enable-gpu --endpoint=grpc --endpoint=http --repo-tag=common:<container tag> --repo-tag=core:<container tag> --repo-tag=backend:<container tag> --repo-tag=thirdparty:<container tag> --backend=ensemble --backend=tensorrt:<container tag> --backend=onnxruntime:<container tag>
 ```
 
-If you are building on master/main branch then \<container tag\> will
+If you are building on *main* branch then '<container tag>' will
 default to "main". If you are building on a release branch then
-\<container tag\> will default to the branch name. For example, if you
-are building on the r21.09 branch, \<container tag\> will default to
-r21.09. Therefore, you typically do not need to provide \<container
-tag\> at all (nor the preceding colon). You can use a different
-\<container tag\> for a component to instead use the corresponding
+'<container tag>' will default to the branch name. For example, if you
+are building on the r21.09 branch, '<container tag>' will default to
+r21.09. Therefore, you typically do not need to provide '<container
+tag>' at all (nor the preceding colon). You can use a different
+'<container tag>' for a component to instead use the corresponding
 branch/tag in the build. For example, if you have a branch called
 "mybranch" in the
 [onnxruntime_backend](https://github.com/triton-inference-server/onnxruntime_backend)
