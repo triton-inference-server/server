@@ -382,6 +382,43 @@ else
   fi
 fi
 
+# Test AIP_STORAGE_URI won't be used if model repository is specified 
+SERVER_ARGS="--model-repository=single_model"
+run_server_nowait
+vertex_ai_wait_for_server_ready $SERVER_PID 10
+if [ "$WAIT_RET" != "0" ]; then
+    echo -e "\n***\n*** Failed to start $SERVER\n***"
+    kill $SERVER_PID
+    wait $SERVER_PID
+    cat $SERVER_LOG
+    exit 1
+fi
+
+set +e
+# subadd should not be loaded
+code=`curl -s -w %{http_code} -o ./curl.out -X POST -H "X-Vertex-Ai-Triton-Redirect: v2/models/subadd/ready" localhost:8080/predict`
+if [ "$code" != "400" ]; then
+    cat ./curl.out
+    echo -e "\n***\n*** Expect 'subadd' is not loaded\n***"
+    RET=1
+fi
+python $CLIENT_TEST_SCRIPT >>$CLIENT_LOG 2>&1
+if [ $? -ne 0 ]; then
+    echo -e "\n***\n*** Test Failed\n***"
+    cat $CLIENT_LOG
+    RET=1
+else
+    check_test_results $TEST_RESULT_FILE $UNIT_TEST_COUNT
+    if [ $? -ne 0 ]; then
+        cat $CLIENT_LOG
+        echo -e "\n***\n*** Test Result Verification Failed\n***"
+        RET=1
+    fi
+fi
+set -e
+kill $SERVER_PID
+wait $SERVE_PID
+
 # Test default model as well as multi model
 SERVER_ARGS="--vertex-ai-default-model=addsub"
 run_server_nowait

@@ -1619,7 +1619,7 @@ Parse(TRITONSERVER_ServerOptions** server_options, int argc, char** argv)
     auto aip_storage_uri =
         nvidia::inferenceserver::GetEnvironmentVariableOrDefault(
             "AIP_STORAGE_URI", "");
-    if (!aip_storage_uri.empty()) {
+    if (!aip_storage_uri.empty() && model_repository_paths.empty()) {
       model_repository_paths.insert(aip_storage_uri);
     }
   }
