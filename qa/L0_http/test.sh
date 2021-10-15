@@ -103,6 +103,14 @@ else
     SIMPLE_REUSE_INFER_OBJECTS_CLIENT=../clients/reuse_infer_objects_client
 fi
 
+# Add string_dyna_sequence model to repo
+cp -r ${MODELDIR}/simple_dyna_sequence ${MODELDIR}/simple_string_dyna_sequence
+sed -i "s/simple_dyna_sequence/simple_string_dyna_sequence/g" ${MODELDIR}/simple_string_dyna_sequence/config.pbtxt
+sed -i "s/^platform: .*/backend: \"dyna_sequence\"/g" ${MODELDIR}/simple_string_dyna_sequence/config.pbtxt
+sed -i "/CONTROL_SEQUENCE_CORRID/{n;s/data_type:.*/data_type: TYPE_STRING/}" ${MODELDIR}/simple_string_dyna_sequence/config.pbtxt
+rm -f ${MODELDIR}/simple_string_dyna_sequence/1/model.graphdef
+cp ../custom_models/custom_dyna_sequence_int32/1/libtriton_dyna_sequence.so ${MODELDIR}/simple_string_dyna_sequence/1/
+
 rm -f *.log
 rm -f *.log.*
 
