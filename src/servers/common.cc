@@ -63,4 +63,12 @@ GetModelVersionFromString(const std::string& version_string, int64_t* version)
   return nullptr;  // success
 }
 
+std::string
+GetEnvironmentVariableOrDefault(
+    const std::string& variable_name, const std::string& default_value)
+{
+  const char* value = getenv(variable_name.c_str());
+  return value ? value : default_value;
+}
+
 }}  // namespace nvidia::inferenceserver

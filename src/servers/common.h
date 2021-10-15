@@ -106,4 +106,12 @@ namespace nvidia { namespace inferenceserver {
 TRITONSERVER_Error* GetModelVersionFromString(
     const std::string& version_string, int64_t* version);
 
+/// Get the value of the environment variable, or default value if not set
+///
+/// \param variable_name The name of the environment variable.
+/// \param default_value The default value.
+/// \return The environment variable or the default value if not set.
+std::string GetEnvironmentVariableOrDefault(
+    const std::string& variable_name, const std::string& default_value);
+
 }}  // namespace nvidia::inferenceserver
