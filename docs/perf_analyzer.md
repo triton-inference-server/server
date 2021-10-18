@@ -181,6 +181,8 @@ Concurrency,Inferences/Second,Client Send,Network+Server Send/Recv,Server Queue,
 2,87.2,235,1973,9151,190,11346,17,0,21874,28557,29768,34766
 ```
 
+NOTE: The rows in the CSV file are sorted in an increasing order of throughput (Inferences/Second).
+
 You can import the CSV file into a spreadsheet to help visualize
 the latency vs inferences/second tradeoff as well as see some
 components of the latency. Follow these steps:
