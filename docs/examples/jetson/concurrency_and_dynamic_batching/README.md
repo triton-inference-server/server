@@ -37,30 +37,30 @@ We will be using a purpose built deployable people detection model, which we dow
 Download the pruned [PeopleNet](https://ngc.nvidia.com/catalog/models/nvidia:tlt_peoplenet) model from the NGC. This model is available as a ready-to-use model, and you can download it from NGC using either `wget` method:
 
 ```shell
-wget --content-disposition https://api.ngc.nvidia.com/v2/models/nvidia/tlt_peoplenet/versions/pruned_v2.1/zip -O tlt_peoplenet_pruned_v2.1.zip
+wget --content-disposition https://api.ngc.nvidia.com/v2/models/nvidia/tao/peoplenet/versions/pruned_v2.1/zip -O pruned_v2.1.zip
 ```
 
 or via CLI command:
 
 ```shell
-ngc registry model download-version "nvidia/tlt_peoplenet:pruned_v2.1"
+ngc registry model download-version "nvidia/tao/peoplenet:pruned_v2.1"
 ```
 
 For latter you need to setup the [NGC CLI](https://ngc.nvidia.com/setup).
 
-Having downloaded the model from the NGC, unzip the archive `tlt_peoplenet_pruned_v2.1.zip` into `concurrency_and_dynamic_batching/tlt/models/peoplenet`. 
+Having downloaded the model from the NGC, unzip the archive `peoplenet_pruned_v2.1.zip` into `concurrency_and_dynamic_batching/tao/models/peoplenet`. 
 
 If you have the zip archive in the `concurrency_and_dynamic_batching` directory, the following will automatically place the model to the correct location:
 
 ```shell
-unzip tlt_peoplenet_pruned_v2.1.zip -d $(pwd)/tlt/models/peoplenet
+unzip pruned_v2.1.zip -d $(pwd)/tao/models/peoplenet
 ```
 
 Verify that you can see the model file `resnet34_peoplenet_pruned.etlt` under
 
 ```
 concurrency_and_dynamic_batching
-└── tlt
+└── tao
        └── models
            └── peoplenet
                ├── labels.txt
@@ -83,15 +83,15 @@ chmod 777 tao-converter
 
 in the directory with the tool. 
 
-We provide a conversion script `tlt/convert_peoplenet.sh` which expects the model to be present at the location.
+We provide a conversion script `tao/convert_peoplenet.sh` which expects the model to be present at the location.
 
 ```shell
-tlt
+tao
 └──  models
    └── peoplenet
 ```
 
-To execute it, you can place the `tao-converter` executable to the `tlt` directory of the project and in the same directory run
+To execute it, you can place the `tao-converter` executable to the `tao` directory of the project and in the same directory run
 
 ```shell
 bash convert_peoplenet.sh
@@ -127,7 +127,7 @@ make
 
 An example Makefile is provided for Jetson.
 
-## Demonstration  case 1: Concurrent inference
+## Demonstration  case 1: Concurrent model execution
 
 With Triton Inference Server, multiple models (or multiple instances of the same model) can run simultaneously on the same GPU or on multiple GPUs. In this example, we are demonstrating how to run multiple instances of the same model on a single Jetson GPU.
 
@@ -136,7 +136,7 @@ With Triton Inference Server, multiple models (or multiple instances of the same
 To execute from the terminal, run from the `concurrency_and_dynamic_batching` directory:
 
 ```shell
-LD_LIBRARY_PATH=$HOME/tritonserver/lib ./people_detection -m gpu -v -r $(pwd)/trtis_model_repo_sample_1 -t 6 -s false -p $HOME/tritonserver
+LD_LIBRARY_PATH=$HOME/tritonserver/lib ./people_detection -m system -v -r $(pwd)/trtis_model_repo_sample_1 -t 6 -s false -p $HOME/tritonserver
 ```
 
 The parameter `-t` controlls the number of concurrent inference calls we want to execute. We will be executing the same model on the same sample image with the purpose of demonstrating how setting different concurency options affects the performance.
@@ -236,7 +236,7 @@ For models that support batching, Triton implements multiple scheduling and batc
 To observe the effect of dynamic batching, from the `concurrency_and_dynamic_batching` directory execute: 
 
 ```shell
-LD_LIBRARY_PATH=$HOME/tritonserver/lib ./people_detection -m gpu -v -r $(pwd)/trtis_model_repo_sample_2 -t 6 -s false -p $HOME/tritonserver
+LD_LIBRARY_PATH=$HOME/tritonserver/lib ./people_detection -m system -v -r $(pwd)/trtis_model_repo_sample_2 -t 6 -s false -p $HOME/tritonserver
 ```
 
 ### Expected output
