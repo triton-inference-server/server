@@ -28,16 +28,13 @@
 
 # Using Triton Inference Server as a shared library for execution on Jetson
 
-This project demonstrates how to run C API applications using Triton Inference Server as a shared library.
-We also show how to build and execute such applications on Jetson.
+This project demonstrates how to run C API applications using Triton Inference Server as a shared library. We also show how to build and execute such applications on Jetson.
 
 ### Prerequisites
 
 * JetPack >= 4.6
 * OpenCV >= 4.1.1
 * TensorRT >= 8.0.1.6
-
-_NVIDIA internal:_ the versions will be updated accordingly.
 
 ### Installation
 
@@ -62,4 +59,4 @@ From this directory of the repository, execute the following to evaluate model p
 ./perf_analyzer -m peoplenet -b 2 --service-kind=triton_c_api --model-repo=$(pwd)/concurrency_and_dynamic_batching/trtis_model_repo_sample_1 --triton-server-directory=/opt/tritonserver --concurrency-range 1:6 -f perf_c_api.csv
 ```
 
-In the example above we saved the results as a `.csv` file. To visualize these results, follow the steps described [here](https://github.com/triton-inference-server/server/blob/main/docs/perf_analyzer.md#visualizing-latency-vs-throughput):
+In the example above we saved the results as a `.csv` file. To visualize these results, follow the steps described [here](https://github.com/triton-inference-server/server/blob/main/docs/perf_analyzer.md#visualizing-latency-vs-throughput).

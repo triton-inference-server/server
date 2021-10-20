@@ -25,17 +25,17 @@
 # (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-wget --content-disposition https://api.ngc.nvidia.com/v2/models/nvidia/tlt_peoplenet/versions/pruned_v2.1/zip -O tlt_peoplenet_pruned_v2.1.zip
-unzip tlt_peoplenet_pruned_v2.1.zip -d concurrency_and_dynamic_batching/tlt/models/peoplenet && rm tlt_peoplenet_pruned_v2.1.zip
+wget --content-disposition https://api.ngc.nvidia.com/v2/models/nvidia/tao/peoplenet/versions/pruned_v2.1/zip -O pruned_v2.1.zip
+unzip pruned_v2.1.zip -d concurrency_and_dynamic_batching/tao/models/peoplenet && rm pruned_v2.1.zip
 
 # Use TAO convertor for JP4.6
 wget --content-disposition https://developer.nvidia.com/jp46-20210820t231431z-001zip -O jp4.6-20210820T231431Z-001.zip
 unzip jp4.6-20210820T231431Z-001.zip && rm jp4.6-20210820T231431Z-001.zip
 
-cp jp4.6/tao-converter concurrency_and_dynamic_batching/tlt/tao-converter && rm -rf jp4.6
-chmod 777 concurrency_and_dynamic_batching/tlt/tao-converter
+cp jp4.6/tao-converter concurrency_and_dynamic_batching/tao/tao-converter && rm -rf jp4.6
+chmod 777 concurrency_and_dynamic_batching/tao/tao-converter
 
-(cd concurrency_and_dynamic_batching/tlt && bash convert_peoplenet.sh)
+(cd concurrency_and_dynamic_batching/tao && bash convert_peoplenet.sh)
 
 # Build the example and make sure permissions
 cd concurrency_and_dynamic_batching && make
