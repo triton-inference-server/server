@@ -872,6 +872,9 @@ SequenceBatch::UpdateImplicitState(
   // This should be executed only if the model has a states section.
   if (!base_->StateOutputConfigMap().empty()) {
     auto& sequence_states = sequence_states_[seq_slot];
+    if ((irequest->Flags() & TRITONSERVER_REQUEST_FLAG_SEQUENCE_START) != 0) {
+      sequence_states = nullptr;
+    }
 
     // Create the state for the first request in the sequence.
     if (sequence_states == nullptr) {
@@ -1087,10 +1090,6 @@ DirectSequenceBatch::BatcherThread(const int nice)
                   batcher_idx_, seq_slot);
               seq_slot_correlation_ids_[seq_slot] =
                   base_->ReleaseSequenceSlot(batcher_seq_slot, &queue);
-
-              // The state for the sequence needs to be cleaned after the
-              // sequence slot is released.
-              sequence_states_[seq_slot] = nullptr;
             }
           }
 
@@ -1258,10 +1257,6 @@ DirectSequenceBatch::BatcherThread(const int nice)
                 batcher_idx_, seq_slot);
             seq_slot_correlation_ids_[seq_slot] =
                 base_->ReleaseSequenceSlot(batcher_seq_slot, &queue);
-
-            // The state for the sequence needs to be cleaned after the sequence
-            // slot is released.
-            sequence_states_[seq_slot] = nullptr;
           }
         }
       }
@@ -1438,9 +1433,6 @@ OldestSequenceBatch::CompleteAndNext(const uint32_t seq_slot)
       const InferenceRequest::SequenceId& released_cid =
           base_->ReleaseSequenceSlot(batcher_seq_slot, &queue);
 
-      // The state for the sequence needs to be cleaned after the sequence slot
-      // is released.
-      sequence_states_[seq_slot] = nullptr;
       if (released_cid.InSequence()) {
         LOG_VERBOSE(1) << "Enqueued new sequence containing " << queue.size()
                        << " requests into OldestFirst batcher " << batcher_idx_

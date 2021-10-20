@@ -139,6 +139,10 @@ QUEUE_DELAY_TESTS=${QUEUE_DELAY_TESTS:="test_queue_delay_no_min_util \
 ENSEMBLES=${ENSEMBLES:="1"}
 export ENSEMBLES
 
+# If IMPLICIT_STATE not specified, set to 0
+IMPLICIT_STATE=${IMPLICIT_STATE:="0"}
+export IMPLICIT_STATE
+
 # Setup non-variable-size model repositories. The same models are in each
 # repository but they are configured as:
 #   models0 - four instances with non-batching model
@@ -160,23 +164,34 @@ function get_datatype () {
   echo $dtype
 }
 
+FIXED_MODEL_REPOSITORY=''
+VAR_MODEL_REPOSITORY=''
+if [ "$IMPLICIT_STATE" == "1" ]; then
+  FIXED_MODEL_REPOSITORY="qa_sequence_implicit_model_repository"
+  VAR_MODEL_REPOSITORY="qa_variable_sequence_implicit_model_repository"
+else
+  FIXED_MODEL_REPOSITORY="qa_sequence_model_repository"
+  VAR_MODEL_REPOSITORY="qa_variable_sequence_model_repository"
+fi
+
 MODELS=""
 for BACKEND in $BACKENDS; do
   if [[ $BACKEND == "custom" ]]; then
     MODELS="$MODELS ../custom_models/custom_sequence_int32"
   else
     DTYPES=$(get_datatype $BACKEND)
+
     for DTYPE in $DTYPES; do
-      MODELS="$MODELS $DATADIR/qa_sequence_model_repository/${BACKEND}_sequence_${DTYPE}"
+      MODELS="$MODELS $DATADIR/$FIXED_MODEL_REPOSITORY/${BACKEND}_sequence_${DTYPE}"
     done
 
     if [[ $BACKEND == "graphdef" ]]; then
-      MODELS="$MODELS $DATADIR/qa_sequence_model_repository/graphdef_sequence_int32"
+      MODELS="$MODELS $DATADIR/$FIXED_MODEL_REPOSITORY/${BACKEND}_sequence_graphdef_sequence_int32"
     fi
 
     if [ "$ENSEMBLES" == "1" ]; then
       for DTYPE in $DTYPES; do
-        MODELS="$MODELS $DATADIR/qa_ensemble_model_repository/qa_sequence_model_repository/*_${BACKEND}_sequence_${DTYPE}"
+        MODELS="$MODELS $DATADIR/qa_ensemble_model_repository/$FIXED_MODEL_REPOSITORY/*_${BACKEND}_sequence_${DTYPE}"
       done
     fi
   fi
@@ -233,20 +248,20 @@ for BACKEND in $BACKENDS; do
   else
     DTYPES=$(get_datatype $BACKEND)
     for DTYPE in $DTYPES; do
-      MODELS="$MODELS $DATADIR/qa_sequence_model_repository/${BACKEND}_nobatch_sequence_${DTYPE}"
+      MODELS="$MODELS $DATADIR/$FXIED_MODEL_REPOSITORY/${BACKEND}_nobatch_sequence_${DTYPE}"
     done
 
     if [[ $BACKEND == "graphdef" ]]; then
-      MODELS="$MODELS $DATADIR/qa_sequence_model_repository/graphdef_nobatch_sequence_int32"
+      MODELS="$MODELS $DATADIR/$FIXED_MODEL_REPOSITORY/graphdef_nobatch_sequence_int32"
     fi
 
     if [ "$ENSEMBLES" == "1" ]; then
       for DTYPE in $DTYPES; do
-      MODELS="$MODELS $DATADIR/qa_ensemble_model_repository/qa_sequence_model_repository/*_${BACKEND}_nobatch_sequence_${DTYPE}"
+      MODELS="$MODELS $DATADIR/qa_ensemble_model_repository/$FIXED_MODEL_REPOSITORY/*_${BACKEND}_nobatch_sequence_${DTYPE}"
       done
 
       if [[ $BACKEND == "graphdef" ]]; then
-        MODELS="$MODELS $DATADIR/qa_ensemble_model_repository/qa_sequence_model_repository/*_graphdef_nobatch_sequence_int32"
+        MODELS="$MODELS $DATADIR/qa_ensemble_model_repository/$FIXED_MODEL_REPOSITORY/*_graphdef_nobatch_sequence_int32"
       fi
     fi
   fi
@@ -269,12 +284,12 @@ for BACKEND in $BACKENDS; do
   else
     DTYPES=$(get_datatype $BACKEND)
     for DTYPE in $DTYPES; do
-      MODELS="$MODELS $DATADIR/qa_variable_sequence_model_repository/${BACKEND}_sequence_${DTYPE}"
+      MODELS="$MODELS $DATADIR/${VAR_MODEL_REPOSITORY}/${BACKEND}_sequence_${DTYPE}"
     done
 
     if [ "$ENSEMBLES" == "1" ]; then
       for DTYPE in $DTYPES; do
-        MODELS="$MODELS $DATADIR/qa_ensemble_model_repository/qa_variable_sequence_model_repository/*_${BACKEND}_sequence_${DTYPE}"
+        MODELS="$MODELS $DATADIR/qa_ensemble_model_repository/${VAR_MODEL_REPOSITORY}/*_${BACKEND}_sequence_${DTYPE}"
         done
     fi
   fi
@@ -300,7 +315,7 @@ for model_trial in $MODEL_TRIALS; do
     MODEL_PATH=models${model_trial}
 
     if [ "$ENSEMBLES" == "1" ]; then
-      cp -r $DATADIR/qa_ensemble_model_repository/qa_sequence_model_repository/nop_* `pwd`/$MODEL_PATH/.
+      cp -r $DATADIR/qa_ensemble_model_repository/${FIXED_MODEL_REPOSITORY}/nop_* `pwd`/$MODEL_PATH/.
         create_nop_version_dir `pwd`/$MODEL_PATH
       # Must load identity backend on GPU to avoid cuda init delay during 1st run
       for NOP_MODEL in `pwd`/$MODEL_PATH/nop_*; do
