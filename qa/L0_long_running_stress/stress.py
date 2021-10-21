@@ -158,8 +158,8 @@ def stress_thread(name, seed, test_duration, correlation_id_base,
     # Weight roughly in thousandth percent
     ss = ScenarioSelector([
         (60, TimeoutScenario(name, get_trials(False), verbose=FLAGS.verbose)),
-        (80, ResNetScenario(name, get_trials(False), verbose=FLAGS.verbose)),
-        (60, CrashingScenario(name, get_trials(False), FLAGS.verbose)),
+        (80, ResNetScenario(name, verbose=FLAGS.verbose)),
+        (60, CrashingScenario(name, FLAGS.verbose)),
         (62,
          SequenceNoEndScenario(name, get_trials(), rng, is_last_used_no_end,
                                FLAGS.verbose)),

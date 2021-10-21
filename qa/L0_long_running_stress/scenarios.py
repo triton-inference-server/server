@@ -36,6 +36,7 @@ import test_util as tu
 import tritonclient.grpc as grpcclient
 from tritonclient.utils import np_to_triton_dtype
 import math
+from PIL import Image
 import os
 import subprocess
 if sys.version_info >= (3, 0):
@@ -93,21 +94,57 @@ class Scenario(metaclass=abc.ABCMeta):
 
 class ResNetScenario(Scenario):
 
-    def __init__(self, name, trials, verbose=False):
-        super().__init__(name, trials, verbose)
+    def __init__(self, name, batch_size=32, verbose=False):
+        super().__init__(name, [], verbose)
+        self.model_name_ = "resnet_v1_50_graphdef_def"
+        self.batch_size_ = batch_size
+
+        img = self.preprocess("../images/vulture.jpeg")
+        batched_img = []
+        for i in range(batch_size):
+            batched_img.append(img)
+        self.image_data_ = np.stack(batched_img, axis=0)
+
+    def preprocess(self, filename):
+        img = Image.open(filename)
+        resized_img = img.convert('RGB').resize((224, 224), Image.BILINEAR)
+        np_img = np.array(resized_img).astype(np.float32)
+        if np_img.ndim == 2:
+            np_img = np_img[:, :, np.newaxis]
+        scaled = np_img - np.asarray((123, 117, 104), dtype=np.float32)
+        return scaled
+
+    def postprocess(self, results):
+        output_array = results.as_numpy("resnet_v1_50/predictions/Softmax")
+        if len(output_array) != self.batch_size_:
+            raise Exception("expected {} results, got {}".format(
+                self.batch_size_, len(output_array)))
+
+        for results in output_array:
+            for result in results:
+                if output_array.dtype.type == np.object_:
+                    cls = "".join(chr(x) for x in result).split(':')
+                else:
+                    cls = result.split(':')
+                if cls[2] != "VULTURE":
+                    raise Exception(
+                        "expected VULTURE as classification result, got {}".
+                        format(cls[2]))
 
     def run(self, client_metadata):
-        # FIXME use Python API directly
-        image_client = "../clients/image_client.py"
-        image = "../images/vulture.jpeg"
-        model_name = "resnet_v1_50_graphdef_def"
-        resnet_result = "resnet_{}.log".format(self.name_)
+        triton_client = client_metadata[0]
 
-        os.system("{} -m {} -s VGG -c 1 -b 1 {} > {}".format(
-            image_client, model_name, image, resnet_result))
-        with open(resnet_result) as f:
-            if "VULTURE" not in f.read():
-                assert False, "resnet_model_request failed"
+        inputs = [
+            grpcclient.InferInput("input", self.image_data_.shape, "FP32")
+        ]
+        inputs[0].set_data_from_numpy(self.image_data_)
+
+        outputs = [
+            grpcclient.InferRequestedOutput("resnet_v1_50/predictions/Softmax",
+                                            class_count=1)
+        ]
+        res = triton_client.infer(self.model_name_, inputs, outputs=outputs)
+        self.postprocess(res)
         return 1
 
 
@@ -153,8 +190,8 @@ class TimeoutScenario(Scenario):
 
 class CrashingScenario(Scenario):
 
-    def __init__(self, name, trials, verbose=False):
-        super().__init__(name, trials, verbose)
+    def __init__(self, name, verbose=False):
+        super().__init__(name, [], verbose)
 
     def run(self, client_metadata):
         # Only use "custom" model as it simulates exectuion delay which
