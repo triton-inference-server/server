@@ -157,10 +157,13 @@ class CrashingScenario(Scenario):
         super().__init__(name, trials, verbose)
 
     def run(self, client_metadata):
+        # Only use "custom" model as it simulates exectuion delay which
+        # simplifies "crashing simulation" (client exits while request is being
+        # executed)
+        trial = "custom"
+
         # Call the client as subprocess to avoid crashing stress test
         # and gather logging as string variable
-        # FIXME use delay model
-        trial = self.get_trial()
         crashing_client = "crashing_client.py"
         log = subprocess.check_output(
             [sys.executable, crashing_client, "-t", trial])
