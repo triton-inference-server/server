@@ -57,7 +57,7 @@ export CI_JOB_ID=${CI_JOB_ID}
 
 MODEL_DIR=models
 
-rm -fr *.log *.txt *.serverlog models && mkdir models
+rm -fr *.csv *.log *.txt *.serverlog models && mkdir models
 
 # Get the datatype to use based on the backend
 function get_datatype () {

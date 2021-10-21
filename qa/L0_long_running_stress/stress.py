@@ -114,7 +114,6 @@ class ScenarioSelector:
         # Normalize weight
         for i in range(len(self.probs_range_)):
             self.probs_range_[i] /= total_weight
-        print("probs: {}".format(self.probs_range_))
 
     def get_scenario(self):
         return self.scenarios_[bisect.bisect_left(self.probs_range_,
@@ -159,22 +158,41 @@ def stress_thread(name, seed, test_duration, correlation_id_base,
     ss = ScenarioSelector([
         (60, TimeoutScenario(name, get_trials(False), verbose=FLAGS.verbose)),
         (80, ResNetScenario(name, verbose=FLAGS.verbose)),
-        (60, CrashingScenario(name, FLAGS.verbose)),
+        (60, CrashingScenario(name, verbose=FLAGS.verbose)),
         (62,
-         SequenceNoEndScenario(name, get_trials(), rng, is_last_used_no_end,
-                               FLAGS.verbose)),
+         SequenceNoEndScenario(name,
+                               get_trials(),
+                               rng,
+                               is_last_used_no_end,
+                               verbose=FLAGS.verbose)),
         (68,
-         SequenceValidNoEndScenario(name, get_trials(), rng,
-                                    is_last_used_no_end, FLAGS.verbose)),
+         SequenceValidNoEndScenario(name,
+                                    get_trials(),
+                                    rng,
+                                    is_last_used_no_end,
+                                    verbose=FLAGS.verbose)),
         (68,
-         SequenceValidValidScenario(name, get_trials(), rng,
-                                    is_last_used_no_end, FLAGS.verbose)),
+         SequenceValidValidScenario(name,
+                                    get_trials(),
+                                    rng,
+                                    is_last_used_no_end,
+                                    verbose=FLAGS.verbose)),
         (7,
-         SequenceNoStartScenario(name, get_trials(), rng, is_last_used_no_end,
-                                 FLAGS.verbose)),
-        (595,
-         SequenceValidScenario(name, get_trials(), rng, is_last_used_no_end,
-                               FLAGS.verbose)),
+         SequenceNoStartScenario(name,
+                                 get_trials(),
+                                 rng,
+                                 is_last_used_no_end,
+                                 verbose=FLAGS.verbose)),
+        (295,
+         SequenceValidScenario(name,
+                               get_trials(),
+                               rng,
+                               is_last_used_no_end,
+                               verbose=FLAGS.verbose)),
+        (300,
+         PerfAnalyzerScenario(
+             name, rng, get_trials(), get_trials(False),
+             verbose=FLAGS.verbose)),
     ], rng)
 
     rare_idx = 0
@@ -269,7 +287,9 @@ def generate_report(elapsed_time, _test_case_count, _failed_test_case_count,
         'ResNetScenario':
             'Send a request using resnet model.',
         'CrashingScenario':
-            'Client crashes in the middle of inferences.'
+            'Client crashes in the middle of inferences.',
+        'PerfAnalyzerScenario':
+            'Client that maintains a specific load.',
     }
 
     f = open("stress_report.txt", "w")

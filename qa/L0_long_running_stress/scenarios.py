@@ -46,6 +46,7 @@ else:
 from functools import partial
 
 import abc
+import csv
 
 DEFAULT_TIMEOUT_MS = 25000
 SEQUENCE_LENGTH_MEAN = 16
@@ -90,6 +91,122 @@ class Scenario(metaclass=abc.ABCMeta):
     @abc.abstractmethod
     def run(self, client_metadata):
         pass
+
+
+class PerfAnalyzerScenario(Scenario):
+    # Some class static variables
+    command_ = "../clients/perf_analyzer"
+
+    class ModelOption:
+        # 'concurrency_range' is a 3 element tuple/list that specifies
+        # (min_concurrency, max_concurrency, current_concurrency) to limit the
+        # allowed range of concurrency
+        #
+        # 'queue_latency_range_us' specifies the range where queue latency
+        # reported should be, otherwise, model concurrency will be adjusted
+        # within 'concurrency_range' to influence the queue latency.
+        def __init__(self,
+                     model_name,
+                     batch_size,
+                     concurrency_range,
+                     queue_latency_range_us,
+                     input_shapes=[],
+                     input_file=None,
+                     expected_output_file=None):
+            self.model_name_ = model_name
+            self.concurrency_range_ = list(concurrency_range)
+            self.batch_size_ = batch_size
+            self.input_shapes_ = input_shapes
+            self.queue_latency_range_us_ = queue_latency_range_us
+            self.input_file_ = input_file
+            self.expected_output_file_ = expected_output_file
+
+        def run(self, name, validation_run=False):
+            csv_file = "{}_{}_{}.csv".format(name, self.model_name_,
+                                             self.concurrency_range_[2])
+
+            arg_list = [PerfAnalyzerScenario.command_]
+            arg_list += ["-m", "{}".format(self.model_name_)]
+            arg_list += ["-b", "{}".format(self.batch_size_)]
+            arg_list += [
+                "--concurrency-range",
+                "{}:{}:1".format(self.concurrency_range_[2],
+                                 self.concurrency_range_[2])
+            ]
+            arg_list += ["-f", csv_file]
+            for name, shape in self.input_shapes_:
+                arg_list += ["--shape", "{}:{}".format(name, shape)]
+
+            if validation_run:
+                raise Exception(
+                    "Perf Analyzer Scenario doesn't currently support validation run"
+                )
+            else:
+                subprocess.run(arg_list, check=True)
+
+            # Read queue time and adjust concurrency
+            with open(csv_file, newline='') as csvfile:
+                reader = csv.DictReader(csvfile)
+                for row in reader:
+                    current_queue_us = int(row['Server Queue'])
+                    if current_queue_us < self.queue_latency_range_us_[0]:
+                        self.concurrency_range_[2] = min(
+                            self.concurrency_range_[2] + 1,
+                            self.concurrency_range_[1])
+                    elif current_queue_us > self.queue_latency_range_us_[0]:
+                        self.concurrency_range_[2] = max(
+                            self.concurrency_range_[2] - 1,
+                            self.concurrency_range_[0])
+                    break
+            return 1
+
+    def __init__(self,
+                 name,
+                 rng,
+                 sequence_trials,
+                 identity_trials,
+                 queue_latency_range_us=(10000, 100000),
+                 validate_frequency=0,
+                 verbose=False):
+        super().__init__(name, [], verbose)
+        self.rng_ = rng
+        self.validate_frequency_ = validate_frequency
+        # List of tuples
+        # (model_name, max_concurrency, batch_size, list(more PA options),
+        #  real_input, expected_output),
+        # FIXME 'real_input, expected_output' is None for now until PA supports it
+        self.options_ = [
+            PerfAnalyzerScenario.ModelOption("resnet_v1_50_graphdef_def", 32,
+                                             (1, 4, 1), queue_latency_range_us),
+        ]
+        for trial in sequence_trials:
+            dtype = self.get_datatype(trial)
+            # Skip string sequence model for now, it is hard for PA to generate
+            # valid input
+            if dtype == np.dtype(object):
+                continue
+            model_name = tu.get_sequence_model_name(trial, dtype)
+            # FIXME add data validation version (write the expected input and output to file and tell PA)
+            self.options_.append(
+                PerfAnalyzerScenario.ModelOption(model_name, 1, (1, 4, 1),
+                                                 queue_latency_range_us))
+        for trial in identity_trials:
+            dtype = np.float32
+            model_name = tu.get_zero_model_name(trial, 1, dtype)
+            if "libtorch" in trial:
+                input_shapes = [("INPUT__0", "16")]
+            else:
+                input_shapes = [("INPUT0", "16")]
+            # FIXME add data validation version (write the expected input and output to file and tell PA)
+            self.options_.append(
+                PerfAnalyzerScenario.ModelOption(model_name, 1, (1, 4, 1),
+                                                 queue_latency_range_us,
+                                                 input_shapes))
+
+    def run(self, client_metadata):
+        model_option = np.random.choice(self.options_)
+        return model_option.run(self.name_,
+                                self.rng_.rand() < self.validate_frequency_)
 
 
 class ResNetScenario(Scenario):
