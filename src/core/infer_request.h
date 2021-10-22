@@ -466,7 +466,12 @@ class InferenceRequest {
     return Status::Success;
   }
 
-  std::shared_ptr<SequenceStates>& GetSequenceStates() { return sequence_states_; }
+  Status LoadInputStates();
+
+  std::shared_ptr<SequenceStates>& GetSequenceStates()
+  {
+    return sequence_states_;
+  }
 
   // Prepare this request for inference.
   Status PrepareForInference();

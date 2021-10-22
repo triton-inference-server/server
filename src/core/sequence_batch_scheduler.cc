@@ -66,6 +66,8 @@ SequenceBatchScheduler::Create(
   sched->max_sequence_idle_microseconds_ =
       config.sequence_batching().max_sequence_idle_microseconds();
 
+  sched->max_batch_size_ = config.max_batch_size();
+
   // Implicit States
   auto& states = config.sequence_batching().state();
 
@@ -879,18 +881,8 @@ SequenceBatch::UpdateImplicitState(
     // Create the state for the first request in the sequence.
     if (sequence_states == nullptr) {
       sequence_states.reset(new SequenceStates);
-      sequence_states->Initialize(base_->StateOutputConfigMap());
-    }
-
-    // Add the input state tensors to the request inputs.
-    for (auto& input_state_pair : sequence_states->InputStates()) {
-      auto& input_state = input_state_pair.second;
-
-      std::shared_ptr<InferenceRequest::Input> input;
-      irequest->AddOverrideInput(
-          input_state->Name(), input_state->DType(), irequest->BatchSize(),
-          input_state->Shape(), &input);
-      input->SetData(input_state->Data());
+      sequence_states->Initialize(
+          base_->StateOutputConfigMap(), base_->MaxBatchSize());
     }
 
     irequest->SetSequenceStates(sequence_states);
@@ -1209,6 +1201,7 @@ DirectSequenceBatch::BatcherThread(const int nice)
             // just use zero for that.
             SetControlTensors(
                 ni, seq_slot, 0 /* corrid */, true /* not_ready */);
+            UpdateImplicitState(ni, seq_slot);
             curr_payload_->AddRequest(std::move(ni));
           } else {
             std::unique_ptr<InferenceRequest>& irequest = queue.front();

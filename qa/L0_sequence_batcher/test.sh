@@ -45,7 +45,7 @@ TEST_RESULT_FILE='test_results.txt'
 export CUDA_VISIBLE_DEVICES=0
 
 CLIENT_LOG="./client.log"
-BATCHER_TEST=sequence_batcher_test.py
+BATCHER_TEST=/opt/tritonserver/qa/L0_sequence_batcher/sequence_batcher_test.py
 
 if [ -z "$TEST_VALGRIND" ]; then
     TEST_VALGRIND="0"
@@ -103,11 +103,11 @@ source ../common/util.sh
 RET=0
 
 # If BACKENDS not specified, set to all
-BACKENDS=${BACKENDS:="graphdef savedmodel onnx plan custom"}
+BACKENDS=${BACKENDS:="onnx"}
 export BACKENDS
 
 # If MODEL_TRIALS not specified set to 0 1 2 4 v
-MODEL_TRIALS=${MODEL_TRIALS:="0 1 2 4 v"}
+MODEL_TRIALS=${MODEL_TRIALS:="v"}
 
 # Basic sequence batcher tests
 NO_DELAY_TESTS=${NO_DELAY_TESTS:="test_simple_sequence \
@@ -248,7 +248,7 @@ for BACKEND in $BACKENDS; do
   else
     DTYPES=$(get_datatype $BACKEND)
     for DTYPE in $DTYPES; do
-      MODELS="$MODELS $DATADIR/$FXIED_MODEL_REPOSITORY/${BACKEND}_nobatch_sequence_${DTYPE}"
+      MODELS="$MODELS $DATADIR/$FIXED_MODEL_REPOSITORY/${BACKEND}_nobatch_sequence_${DTYPE}"
     done
 
     if [[ $BACKEND == "graphdef" ]]; then

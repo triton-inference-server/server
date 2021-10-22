@@ -73,7 +73,8 @@ Status
 SequenceStates::Initialize(
     const std::unordered_map<
         std::string, const inference::ModelSequenceBatching_State&>&
-        state_output_config_map)
+        state_output_config_map,
+    const size_t max_batch_size)
 {
   input_states_.clear();
   output_states_.clear();
@@ -108,7 +109,15 @@ SequenceStates::Initialize(
           << ".' This state configuration will be ignored.";
       continue;
     }
-    RETURN_IF_ERROR(input_pair.first->second->SetData(data));
+    auto& input_tensor = input_pair.first->second;
+    RETURN_IF_ERROR(input_tensor->SetData(data));
+    if (max_batch_size != 0) {
+      std::vector<int64_t> batch_dim = {1};
+      batch_dim.insert(batch_dim.begin(), dims.begin(), dims.end());
+      *input_tensor->MutableShapeWithBatchDim() = batch_dim;
+    } else {
+      *input_tensor->MutableShapeWithBatchDim() = dims;
+    }
 
     const auto& output_pair = output_states_.emplace(
         std::piecewise_construct,
@@ -174,6 +183,7 @@ SequenceStates::OutputState(
   output_state_r->SetStateUpdateCallback([&output_state_r, &input_state_r]() {
     // Swap the internal memory if the size of the input and output state is
     // equal
+
     if (output_state_r->Data()->TotalByteSize() ==
         input_state_r->Data()->TotalByteSize()) {
       std::shared_ptr<Memory> temp_memory = input_state_r->Data();

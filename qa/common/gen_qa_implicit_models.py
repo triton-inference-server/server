@@ -216,19 +216,34 @@ def create_onnx_modelfile(models_dir, model_version, max_batch, dtype, shape):
                                                 to=onnx.TensorProto.INT32)
         internal_input2 = onnx.helper.make_node("Cast", ["READY"], ["_READY"],
                                                 to=onnx.TensorProto.INT32)
-        add = onnx.helper.make_node("Add", ["_INPUT", "_START"], ["add"])
-        add_state = onnx.helper.make_node("Add", ["add", "_INPUT_STATE"],
-                                          ["add_state"])
-
+        not_start_cast = onnx.helper.make_node("Not", ["START"],
+                                               ["_NOT_START_CAST"])
+        not_start = onnx.helper.make_node("Cast", ["_NOT_START_CAST"],
+                                          ["_NOT_START"],
+                                          to=onnx.TensorProto.INT32)
         # Take advantage of knowledge that the READY false value is 0 and true is 1
-        mul = onnx.helper.make_node("Mul", ["_READY", "add_state"], ["CAST"])
+        mul = onnx.helper.make_node("Mul", ["_READY", "_INPUT"], ["add_state"])
+        mul_state = onnx.helper.make_node("Mul",
+                                          ["_INPUT_STATE", "_NOT_START"],
+                                          ["mul_state"])
+        add = onnx.helper.make_node("Add", ["add_state", "mul_state"],
+                                    ["CAST"])
 
     else:
-        add = onnx.helper.make_node("Add", ["_INPUT", "START"], ["add"])
-        add_state = onnx.helper.make_node("Add", ["add", "_INPUT_STATE"],
-                                          ["add_state"])
+        start_cast = onnx.helper.make_node("Cast", ["START"], ["_START_CAST"],
+                                           to=onnx.TensorProto.BOOL)
+        not_start_cast = onnx.helper.make_node("Not", ["_START_CAST"],
+                                               ["_NOT_START_CAST"])
+        not_start = onnx.helper.make_node("Cast", ["_NOT_START_CAST"],
+                                          ["_NOT_START"],
+                                          to=onnx.TensorProto.INT32)
         # Take advantage of knowledge that the READY false value is 0 and true is 1
-        mul = onnx.helper.make_node("Mul", ["READY", "add_state"], ["CAST"])
+        mul = onnx.helper.make_node("Mul", ["READY", "_INPUT"], ["add_state"])
+        mul_state = onnx.helper.make_node("Mul",
+                                          ["_INPUT_STATE", "_NOT_START"],
+                                          ["mul_state"])
+        add = onnx.helper.make_node("Add", ["add_state", "mul_state"],
+                                    ["CAST"])
 
     cast = onnx.helper.make_node("Cast", ["CAST"], ["OUTPUT"], to=onnx_dtype)
     cast_output_state = onnx.helper.make_node("Cast", ["CAST"],
@@ -243,49 +258,20 @@ def create_onnx_modelfile(models_dir, model_version, max_batch, dtype, shape):
                                                   ["OUTPUT_STATE"])
 
     if onnx_control_dtype == onnx.TensorProto.BOOL:
-        start_output_state = onnx.helper.make_node(
-            "Identity",
-            ["_START"],
-            ["OUTPUT_STATE"],
-        )
-        start_output = onnx.helper.make_node("Identity", ["_START"],
-                                             ["OUTPUT"])
-    else:
-        start_output_state = onnx.helper.make_node("Identity", ["START"],
-                                                   ["OUTPUT_STATE"])
-        start_output = onnx.helper.make_node("Identity", ["START"], ["OUTPUT"])
-
-    if onnx_control_dtype == onnx.TensorProto.BOOL:
         onnx_nodes = [
             internal_input, internal_input_state, internal_input1,
-            internal_input2, add, add_state, mul, cast, cast_output_state
-        ]
-        onnx_then_branch_nodes = [
-            internal_input1, start_output, start_output_state
+            internal_input2, not_start_cast, not_start, mul, mul_state, add,
+            cast, cast_output_state
         ]
     else:
         onnx_nodes = [
-            internal_input, internal_input_state, add, add_state, mul, cast,
-            cast_output_state
+            internal_input, internal_input_state, start_cast, not_start_cast,
+            not_start, mul, mul_state, add, cast, cast_output_state
         ]
-        onnx_then_branch_nodes = [start_output, start_output_state]
 
     onnx_inputs = [onnx_input_state, onnx_input, onnx_start, onnx_ready]
     onnx_outputs = [onnx_output, onnx_output_state]
-
-    then_body = onnx.helper.make_graph(onnx_then_branch_nodes, 'then_body',
-                                       [onnx_start], onnx_outputs)
-    else_body = onnx.helper.make_graph(onnx_nodes, 'else_body', onnx_inputs,
-                                       onnx_outputs)
-    start_cond = onnx.helper.make_node('Cast', ['START'], ['_START_COND'],
-                                       to=onnx.TensorProto.BOOL)
-    if_node = onnx.helper.make_node('If',
-                                    inputs=['_START_COND'],
-                                    outputs=['OUTPUT', 'OUTPUT_STATE'],
-                                    then_branch=then_body,
-                                    else_branch=else_body)
-
-    graph_proto = onnx.helper.make_graph([start_cond, if_node], model_name, onnx_inputs,
+    graph_proto = onnx.helper.make_graph(onnx_nodes, model_name, onnx_inputs,
                                          onnx_outputs)
 
     if FLAGS.onnx_opset > 0:

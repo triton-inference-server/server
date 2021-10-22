@@ -77,6 +77,10 @@ class SequenceState {
     state_update_cb_ = std::move(state_update_cb);
   }
 
+  // The shape of state with batch dimension.
+  std::vector<int64_t>* MutableShapeWithBatchDim() { return &batch_dim_; }
+  const std::vector<int64_t>& ShapeWithBatchDim() { return batch_dim_; }
+
   // Call the state update callback. This function will be called when
   // TRITONBACKEND_StateUpdate is called.
   Status Update() { return state_update_cb_(); }
@@ -86,6 +90,7 @@ class SequenceState {
   std::string name_;
   inference::DataType datatype_;
   std::vector<int64_t> shape_;
+  std::vector<int64_t> batch_dim_;
   std::shared_ptr<Memory> data_;
   std::function<Status()> state_update_cb_ = []() {
     // By default calling the TRITONBACKEND_StateUpdate will return an error.
@@ -101,10 +106,11 @@ class SequenceStates {
   // Initialize the state tensors according to the state model configuration.
   // Will use a default value of 1 for the variable dimensions in the state
   // tensor configuration.
-  Status Initialize(const std::unordered_map<
-                    std::string, const inference::ModelSequenceBatching_State&>&
-                        state_output_config_map);
-
+  Status Initialize(
+      const std::unordered_map<
+          std::string, const inference::ModelSequenceBatching_State&>&
+          state_output_config_map,
+      const size_t max_batch_size);
 
   // Get a buffer holding the output state.
   Status OutputState(

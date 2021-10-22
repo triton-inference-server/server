@@ -94,6 +94,8 @@ class SequenceBatchScheduler : public Scheduler {
     return state_output_config_map_;
   }
 
+  size_t MaxBatchSize() { return max_batch_size_; }
+
  private:
   void ReaperThread(const int nice);
 
@@ -166,6 +168,7 @@ class SequenceBatchScheduler : public Scheduler {
   // IO mapping between the output state name and the state configuration.
   std::unordered_map<std::string, const inference::ModelSequenceBatching_State&>
       state_output_config_map_;
+  size_t max_batch_size_;
 };
 
 // Base class for a scheduler that implements a particular scheduling

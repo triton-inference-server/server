@@ -147,12 +147,6 @@ class SequenceBatcherTest(su.SequenceBatcherTestUtil):
                                      value,
                                      trial,
                                      flag_str=None):
-        # Adjust the expected_result for models that
-        # couldn't implement the full accumulator. See
-        # qa/common/gen_qa_sequence_models.py for more
-        # information.
-        if (flag_str is not None) and ("start" in flag_str):
-            expected_result += 1
         return expected_result
 
     def test_simple_sequence(self):
@@ -181,9 +175,9 @@ class SequenceBatcherTest(su.SequenceBatcherTestUtil):
                         self.assertFalse("TRITONSERVER_BACKLOG_DELAY_SCHEDULER"
                                          in os.environ)
                         expected_result = self.get_expected_result(
-                            45, 9, trial, "start"
+                            45, 9, trial, "end"
                         ) if not IMPLICIT_STATE else self.get_expected_result_implicit(
-                            45, 9, trial, "start")
+                            45, 9, trial, "end")
 
                         self.check_sequence(
                             trial,
@@ -569,7 +563,7 @@ class SequenceBatcherTest(su.SequenceBatcherTestUtil):
 
     def test_half_batch(self):
         # Test model instances that together are configured with
-        # total-batch-size 4.  Send two equal-length sequences in
+        # total-batch-size 4. Send two equal-length sequences in
         # parallel and make sure they get completely batched into
         # batch-size 2 inferences.
         for trial in _trials:
@@ -1005,6 +999,10 @@ class SequenceBatcherTest(su.SequenceBatcherTestUtil):
         # Only works with 1 model instance since want to test all
         # sequences batching together.
         if MODEL_INSTANCES != 1:
+            return
+
+        # Ragged batching does not work with implicit state: DLIS-3104
+        if IMPLICIT_STATE == 1:
             return
 
         for trial in _ragged_batch_not_supported_trials:
@@ -1646,7 +1644,7 @@ class SequenceBatcherTest(su.SequenceBatcherTestUtil):
                                 # (flag_str, value, pre_delay_ms)
                                 (("start", 1111, None), (None, 1112, None),
                                  ("end", 1113, None)),
-                                self.get_expected_result(expected_result),
+                                expected_result,
                                 precreated_shm3_handles),
                             kwargs={
                                 'sequence_name':
@@ -1668,7 +1666,7 @@ class SequenceBatcherTest(su.SequenceBatcherTestUtil):
                                 # (flag_str, value, pre_delay_ms)
                                 (
                                     ("start,end", 11111, None),),
-                                self.get_expected_result(expected_result),
+                                expected_result,
                                 precreated_shm4_handles),
                             kwargs={
                                 'sequence_name':
@@ -2646,6 +2644,10 @@ class SequenceBatcherTest(su.SequenceBatcherTestUtil):
         # execution to be a batch of 'null, seq 2'. The second execution should
         # be waited until the max queue delay is exceeded for sequence 2.
 
+        # See DLIS-3104
+        if IMPLICIT_STATE == 1:
+            return
+
         for trial in _trials:
             is_ensemble = False
             for prefix in ENSEMBLE_PREFIXES:
@@ -2752,6 +2754,11 @@ class SequenceBatcherTest(su.SequenceBatcherTestUtil):
         # request while the second sequence has two, so expecting the second
         # execution to be a batch of 'null, seq 2'. Both executions should be
         # waited until the max queue delay is exceeded.
+
+        # See DLIS-3104
+        if IMPLICIT_STATE == 1:
+            return
+
         for trial in _trials:
             is_ensemble = False
             for prefix in ENSEMBLE_PREFIXES:
