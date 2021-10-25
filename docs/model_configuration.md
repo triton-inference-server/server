@@ -809,8 +809,13 @@ the Response Cache for each model. In addition to enabling the cache in the
 model config, a non-zero `--response-cache-byte-size` must be set when starting
 the server.
 
+```
+response_cache: True
+```
+
 See the 
 [Response Cache](https://github.com/triton-inference-server/server/blob/main/docs/response_cache.md)
 and [ModelConfig
 protobuf](https://github.com/triton-inference-server/common/blob/main/protobuf/model_config.proto).
 docs for more information.
+
