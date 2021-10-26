@@ -805,7 +805,7 @@ documentation for the currently available settings.
 ## Response Cache (beta)
 
 The model configuration `response_cache` property is a boolean used to enable
-the Response Cache for each model. In addition to enabling the cache in the
+the Response Cache for this model. In addition to enabling the cache in the
 model config, a non-zero `--response-cache-byte-size` must be set when starting
 the server.
 
