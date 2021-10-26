@@ -1,5 +1,5 @@
 #!/bin/bash
-# Copyright (c) 2019-2020, NVIDIA CORPORATION. All rights reserved.
+# Copyright 2019-2021, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -82,7 +82,7 @@ for MODEL_NAME in $OPTIMIZED_MODEL_NAMES; do
 done
 
 # Tests with each model
-for FRAMEWORK in graphdef plan graphdef_trt onnx libtorch; do
+for FRAMEWORK in graphdef plan graphdef_trt libtorch; do
     MODEL_NAME=${MODEL}_${FRAMEWORK}
     if [ "$FRAMEWORK" == "plan" ]; then
         REPO=`pwd`/tensorrt_models
@@ -125,7 +125,7 @@ $TRTEXEC --uff=$REPODIR/perf_model_store/deeprecommender_graphdef/deeprecommende
          --saveEngine=tensorrt_models/deeprecommender_plan/0/model.plan
 
 # Tests with each model
-for FRAMEWORK in graphdef plan graphdef_trt onnx libtorch; do
+for FRAMEWORK in graphdef plan graphdef_trt libtorch; do
     MODEL_NAME=${MODEL}_${FRAMEWORK}
     if [ "$FRAMEWORK" == "plan" ]; then
         REPO=`pwd`/tensorrt_models
