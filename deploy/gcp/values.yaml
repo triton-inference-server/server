@@ -29,8 +29,9 @@ replicaCount: 1
 image:
   imageName: nvcr.io/nvidia/tritonserver:21.09-py3
   pullPolicy: IfNotPresent
-  modelRepositoryPath: gs://triton-inference-server-repository/model_repository
+  modelRepositoryPath: /models/docs/examples/model_repository
+  hostModelPath: /tmp
   numGpus: 1
 
 service:
-  type: LoadBalancer
+  type: NodePort
