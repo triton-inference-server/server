@@ -468,7 +468,7 @@ class InferenceRequest {
 
   Status LoadInputStates();
 
-  std::shared_ptr<SequenceStates>& GetSequenceStates()
+  const std::shared_ptr<SequenceStates>& GetSequenceStates() const
   {
     return sequence_states_;
   }

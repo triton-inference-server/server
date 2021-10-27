@@ -874,6 +874,8 @@ SequenceBatch::UpdateImplicitState(
   // This should be executed only if the model has a states section.
   if (!base_->StateOutputConfigMap().empty()) {
     auto& sequence_states = sequence_states_[seq_slot];
+
+    // Initialize the input state if the sequence is starting.
     if ((irequest->Flags() & TRITONSERVER_REQUEST_FLAG_SEQUENCE_START) != 0) {
       sequence_states = nullptr;
     }
@@ -1097,6 +1099,7 @@ DirectSequenceBatch::BatcherThread(const int nice)
             // created batch.
             if (null_irequest == nullptr) {
               null_irequest = queue.front().get();
+              UpdateImplicitState(queue.front(), seq_slot);
             }
 
             // If this is the first non-null request capture the shape
@@ -1201,7 +1204,18 @@ DirectSequenceBatch::BatcherThread(const int nice)
             // just use zero for that.
             SetControlTensors(
                 ni, seq_slot, 0 /* corrid */, true /* not_ready */);
-            UpdateImplicitState(ni, seq_slot);
+
+            // For NULL requests we will be using a dummy state instead of the
+            // real state stored in Triton. When the model is using variable
+            // dimensions and batching, the null request's input state shapes
+            // may be different from the actual shapes of the state for that
+            // sequence. We create a dummy state in order to avoid corrupting
+            // the actual state of the sequence.
+            std::shared_ptr<SequenceStates> sequence_states(new SequenceStates);
+            sequence_states->SetNullSequenceStates(
+                null_irequest->GetSequenceStates());
+            ni->SetSequenceStates(sequence_states);
+
             curr_payload_->AddRequest(std::move(ni));
           } else {
             std::unique_ptr<InferenceRequest>& irequest = queue.front();
@@ -1391,9 +1405,6 @@ OldestSequenceBatch::CompleteAndNext(const uint32_t seq_slot)
 
         // Add the appropriate control tensor values to the request.
         SetControlTensors(irequest, seq_slot, correlation_id);
-
-        // Update the implicit state and set the input state tensors.
-        UpdateImplicitState(irequest, seq_slot);
 
         LOG_VERBOSE(1) << "issue to dynamic batcher CORRID " << correlation_id
                        << " in batcher " << batcher_idx_ << ", slot "

@@ -1001,10 +1001,6 @@ class SequenceBatcherTest(su.SequenceBatcherTestUtil):
         if MODEL_INSTANCES != 1:
             return
 
-        # Ragged batching does not work with implicit state: DLIS-3104
-        if IMPLICIT_STATE == 1:
-            return
-
         for trial in _ragged_batch_not_supported_trials:
             dtypes = self.get_datatype(trial)
             for dtype in dtypes:
@@ -1047,7 +1043,7 @@ class SequenceBatcherTest(su.SequenceBatcherTestUtil):
                     expected_result = self.get_expected_result(
                         6 * 2, 3, trial, "end"
                     ) if not IMPLICIT_STATE else self.get_expected_result_implicit(
-                        6 * 2, 3, trial, "end")
+                        6, 3, trial, "end")
                     threads.append(
                         threading.Thread(
                             target=self.check_sequence_async,
@@ -1071,7 +1067,7 @@ class SequenceBatcherTest(su.SequenceBatcherTestUtil):
                     expected_result = self.get_expected_result(
                         36 * 2, 13, trial, "end"
                     ) if not IMPLICIT_STATE else self.get_expected_result_implicit(
-                        36 * 2, 13, trial, "end")
+                        36, 13, trial, "end")
                     threads.append(
                         threading.Thread(
                             target=self.check_sequence_async,
@@ -1117,7 +1113,7 @@ class SequenceBatcherTest(su.SequenceBatcherTestUtil):
                     expected_result = self.get_expected_result(
                         3336 * 3, 1113, trial, "end"
                     ) if not IMPLICIT_STATE else self.get_expected_result_implicit(
-                        3336 * 3, 1113, trial, "end")
+                        3336, 1113, trial, "end")
                     threads.append(
                         threading.Thread(
                             target=self.check_sequence_async,
@@ -2644,10 +2640,6 @@ class SequenceBatcherTest(su.SequenceBatcherTestUtil):
         # execution to be a batch of 'null, seq 2'. The second execution should
         # be waited until the max queue delay is exceeded for sequence 2.
 
-        # See DLIS-3104
-        if IMPLICIT_STATE == 1:
-            return
-
         for trial in _trials:
             is_ensemble = False
             for prefix in ENSEMBLE_PREFIXES:
@@ -2754,10 +2746,6 @@ class SequenceBatcherTest(su.SequenceBatcherTestUtil):
         # request while the second sequence has two, so expecting the second
         # execution to be a batch of 'null, seq 2'. Both executions should be
         # waited until the max queue delay is exceeded.
-
-        # See DLIS-3104
-        if IMPLICIT_STATE == 1:
-            return
 
         for trial in _trials:
             is_ensemble = False

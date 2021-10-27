@@ -482,13 +482,16 @@ InferenceRequest::LoadInputStates()
 {
   // Add the input states to the inference request.
   if (sequence_states_ != nullptr) {
+    if (sequence_states_->IsNullRequest()) {
+      sequence_states_ =
+          SequenceStates::CopyAsNull(sequence_states_->NullSequenceStates());
+    }
     for (auto& input_state_pair : sequence_states_->InputStates()) {
       auto& input_state = input_state_pair.second;
       std::shared_ptr<InferenceRequest::Input> input =
           std::make_shared<InferenceRequest::Input>(
               input_state->Name(), input_state->DType(), input_state->Shape());
-      *input->MutableShape() = input_state->Shape();
-      *input->MutableShapeWithBatchDim() = input_state->ShapeWithBatchDim();
+      *input->MutableShapeWithBatchDim() = input_state->Shape();
       input->SetData(input_state->Data());
       AddOverrideInput(input);
     }

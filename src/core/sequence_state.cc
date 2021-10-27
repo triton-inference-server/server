@@ -82,8 +82,12 @@ SequenceStates::Initialize(
   for (auto& state : state_output_config_map) {
     auto& state_config = state.second;
 
-    // Convert the variable dimensions to 1 for the first request.
     std::vector<int64_t> dims;
+    if (max_batch_size != 0) {
+      dims.push_back(1);
+    }
+
+    // Convert the variable dimensions to 1 for the first request.
     for (auto& dim : state_config.dims()) {
       if (dim == -1) {
         dims.push_back(1);
@@ -111,13 +115,6 @@ SequenceStates::Initialize(
     }
     auto& input_tensor = input_pair.first->second;
     RETURN_IF_ERROR(input_tensor->SetData(data));
-    if (max_batch_size != 0) {
-      std::vector<int64_t> batch_dim = {1};
-      batch_dim.insert(batch_dim.begin(), dims.begin(), dims.end());
-      *input_tensor->MutableShapeWithBatchDim() = batch_dim;
-    } else {
-      *input_tensor->MutableShapeWithBatchDim() = dims;
-    }
 
     const auto& output_pair = output_states_.emplace(
         std::piecewise_construct,
@@ -236,4 +233,35 @@ SequenceStates::OutputState(
   return OutputState(name, datatype, shape.data(), shape.size(), output_state);
 }
 
+std::shared_ptr<SequenceStates>
+SequenceStates::CopyAsNull(const std::shared_ptr<SequenceStates>& from)
+{
+  std::shared_ptr<SequenceStates> lsequence_states;
+  if (from != nullptr) {
+    lsequence_states.reset(new SequenceStates);
+    for (auto& from_input_state : from->InputStates()) {
+      auto& from_input_state_tensor = from_input_state.second;
+      const auto& input_pair = lsequence_states->input_states_.emplace(
+          std::piecewise_construct,
+          std::forward_as_tuple(from_input_state_tensor->Name()),
+          std::forward_as_tuple(new SequenceState(
+              from_input_state_tensor->Name(), from_input_state_tensor->DType(),
+              from_input_state_tensor->Shape())));
+
+      auto& input_tensor = input_pair.first->second;
+      std::shared_ptr<AllocatedMemory> data = std::make_shared<AllocatedMemory>(
+          from_input_state_tensor->Data()->TotalByteSize(),
+          TRITONSERVER_MEMORY_CPU, 0);
+      input_tensor->SetData(data);
+    }
+
+    for (auto& from_output_state : from->OutputStates()) {
+      lsequence_states->output_states_.emplace(
+          std::piecewise_construct,
+          std::forward_as_tuple(from_output_state.first),
+          std::forward_as_tuple());
+    }
+  }
+  return lsequence_states;
+}
 }}  // namespace nvidia::inferenceserver

@@ -103,11 +103,11 @@ source ../common/util.sh
 RET=0
 
 # If BACKENDS not specified, set to all
-BACKENDS=${BACKENDS:="onnx"}
+BACKENDS=${BACKENDS:="graphdef savedmodel onnx plan custom"}
 export BACKENDS
 
 # If MODEL_TRIALS not specified set to 0 1 2 4 v
-MODEL_TRIALS=${MODEL_TRIALS:="v"}
+MODEL_TRIALS=${MODEL_TRIALS:="0 1 2 4 v"}
 
 # Basic sequence batcher tests
 NO_DELAY_TESTS=${NO_DELAY_TESTS:="test_simple_sequence \

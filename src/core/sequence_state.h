@@ -77,10 +77,6 @@ class SequenceState {
     state_update_cb_ = std::move(state_update_cb);
   }
 
-  // The shape of state with batch dimension.
-  std::vector<int64_t>* MutableShapeWithBatchDim() { return &batch_dim_; }
-  const std::vector<int64_t>& ShapeWithBatchDim() { return batch_dim_; }
-
   // Call the state update callback. This function will be called when
   // TRITONBACKEND_StateUpdate is called.
   Status Update() { return state_update_cb_(); }
@@ -121,14 +117,38 @@ class SequenceStates {
       const std::string& name, const inference::DataType datatype,
       const std::vector<int64_t>& shape, SequenceState** output_state);
 
+  // Create a copy of the 'from' sequence states for NULL requests.
+  static std::shared_ptr<SequenceStates> CopyAsNull(
+      const std::shared_ptr<SequenceStates>& from);
+
   const std::map<std::string, std::unique_ptr<SequenceState>>& InputStates()
   {
     return input_states_;
   }
 
+  std::map<std::string, std::unique_ptr<SequenceState>>& OutputStates()
+  {
+    return output_states_;
+  }
+
+  void SetNullSequenceStates(std::shared_ptr<SequenceStates> sequence_states)
+  {
+    null_sequence_states_ = sequence_states;
+    is_null_request_ = true;
+  }
+
+  const std::shared_ptr<SequenceStates>& NullSequenceStates()
+  {
+    return null_sequence_states_;
+  }
+
+  bool IsNullRequest() { return is_null_request_; }
+
  private:
   std::map<std::string, std::unique_ptr<SequenceState>> input_states_;
   std::map<std::string, std::unique_ptr<SequenceState>> output_states_;
+  std::shared_ptr<SequenceStates> null_sequence_states_;
+  bool is_null_request_ = false;
 };
 
 }}  // namespace nvidia::inferenceserver
