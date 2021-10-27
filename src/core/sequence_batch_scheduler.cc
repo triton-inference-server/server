@@ -1205,16 +1205,20 @@ DirectSequenceBatch::BatcherThread(const int nice)
             SetControlTensors(
                 ni, seq_slot, 0 /* corrid */, true /* not_ready */);
 
-            // For NULL requests we will be using a dummy state instead of the
-            // real state stored in Triton. When the model is using variable
-            // dimensions and batching, the null request's input state shapes
-            // may be different from the actual shapes of the state for that
-            // sequence. We create a dummy state in order to avoid corrupting
-            // the actual state of the sequence.
-            std::shared_ptr<SequenceStates> sequence_states(new SequenceStates);
-            sequence_states->SetNullSequenceStates(
-                null_irequest->GetSequenceStates());
-            ni->SetSequenceStates(sequence_states);
+            // This should be executed only if the model has a states section.
+            if (!base_->StateOutputConfigMap().empty()) {
+              // For NULL requests we will be using a dummy state instead of the
+              // real state stored in Triton. When the model is using variable
+              // dimensions and batching, the null request's input state shapes
+              // may be different from the actual shapes of the state for that
+              // sequence. We create a dummy state in order to avoid corrupting
+              // the actual state of the sequence.
+              std::shared_ptr<SequenceStates> sequence_states(
+                  new SequenceStates);
+              sequence_states->SetNullSequenceStates(
+                  null_irequest->GetSequenceStates());
+              ni->SetSequenceStates(sequence_states);
+            }
 
             curr_payload_->AddRequest(std::move(ni));
           } else {

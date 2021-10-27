@@ -344,8 +344,7 @@ instance_group [
         instance_group_str=instance_group_string)
 
     config += '''
-sequence_batching
-{{
+sequence_batching {{
   max_sequence_idle_microseconds: 5000000
   control_input [
     {{

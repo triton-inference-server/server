@@ -126,7 +126,7 @@ SequenceStates::Initialize(
       LOG_WARNING << "Detected duplicate 'output_name' in the state "
                      "configuration: '"
                   << state_config.output_name()
-                  << ".' This state configuration will be ignored.";
+                  << "'. This state configuration will be ignored.";
 
       continue;
     }

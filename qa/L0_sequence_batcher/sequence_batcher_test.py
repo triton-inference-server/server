@@ -537,9 +537,9 @@ class SequenceBatcherTest(su.SequenceBatcherTestUtil):
                         self.assertFalse("TRITONSERVER_BACKLOG_DELAY_SCHEDULER"
                                          in os.environ)
                         expected_result = self.get_expected_result(
-                            51, 9, trial, "start,end"
+                            51, 9, trial, "end"
                         ) if not IMPLICIT_STATE else self.get_expected_result_implicit(
-                            51, 9, trial, "start,end")
+                            51, 9, trial, "end")
 
                         self.check_sequence(
                             trial,
