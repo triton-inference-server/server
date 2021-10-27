@@ -460,7 +460,8 @@ class InferenceRequest {
     return response_factory_.SetResponseDelegator(response_delegator_);
   }
 
-  Status SetSequenceStates(std::shared_ptr<SequenceStates> sequence_states)
+  Status SetSequenceStates(
+      const std::shared_ptr<SequenceStates>& sequence_states)
   {
     sequence_states_ = sequence_states;
     return Status::Success;
