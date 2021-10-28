@@ -40,12 +40,15 @@ spec:
     - port: 8000
       targetPort: http
       name: http-inference-server
+      nodePort: {{ .Values.service.httpNodePort }}
     - port: 8001
       targetPort: grpc
       name: grpc-inference-server
+      nodePort: {{ .Values.service.grpcNodePort }}
     - port: 8002
       targetPort: metrics
       name: metrics-inference-server
+      nodePort: {{ .Values.service.metricsNodePort }}
   selector:
     app: {{ template "triton-inference-server.name" . }}
     release: {{ .Release.Name }}

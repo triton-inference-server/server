@@ -34,6 +34,9 @@ image:
 
 service:
   type: NodePort
+  httpNodePort: 30343
+  grpcNodePort: 30344
+  metricsNodePort: 30345
 
 secret:
   region: AWS_REGION
