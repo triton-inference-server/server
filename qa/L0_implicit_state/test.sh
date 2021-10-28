@@ -30,7 +30,7 @@ BACKENDS=${BACKENDS:="onnx"}
 export BACKENDS
 export IMPLICIT_STATE=1
 
-bash -ex ../L0_sequence_batcher/test.sh
+(cd ../L0_sequence_batcher/ && bash -ex test.sh)
 RET=$?
 
 if [ $RET == 0 ]; then

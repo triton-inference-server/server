@@ -39,7 +39,7 @@ if [ ! -z "$TEST_REPO_ARCH" ]; then
 fi
 
 CLIENT_LOG="./client.log"
-BATCHER_TEST=/opt/tritonserver/qa/L0_dyna_sequence_batcher/dyna_sequence_batcher_test.py
+BATCHER_TEST=dyna_sequence_batcher_test.py
 
 DATADIR=/data/inferenceserver/${REPO_VERSION}
 

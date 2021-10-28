@@ -123,7 +123,7 @@ class DynaSequenceBatcherTest(su.SequenceBatcherTestUtil):
                         corrid = 52
 
                     expected_result = self.get_expected_result(
-                        45, corrid, 9, trial, "end"
+                        45 + int(corrid), corrid, 9, trial, "end"
                     ) if not IMPLICIT_STATE else self.get_expected_result_implicit(
                         45, corrid, 9, trial, "end")
 

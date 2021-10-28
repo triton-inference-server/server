@@ -45,7 +45,7 @@ TEST_RESULT_FILE='test_results.txt'
 export CUDA_VISIBLE_DEVICES=0
 
 CLIENT_LOG="./client.log"
-BATCHER_TEST=/opt/tritonserver/qa/L0_sequence_batcher/sequence_batcher_test.py
+BATCHER_TEST=sequence_batcher_test.py
 
 if [ -z "$TEST_VALGRIND" ]; then
     TEST_VALGRIND="0"
