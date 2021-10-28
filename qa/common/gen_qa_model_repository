@@ -88,7 +88,7 @@ rm -fr $HOST_IDENTITYDESTDIR $HOST_IDENTITYBIGDESTDIR $HOST_SHAPEDESTDIR $HOST_S
 rm -fr $HOST_SEQDESTDIR $HOST_DYNASEQDESTDIR $HOST_VARSEQDESTDIR
 rm -fr $HOST_ENSEMBLEDESTDIR $HOST_NOSHAPEDESTDIR $HOST_RESHAPEDESTDIR
 rm -fr $HOST_PLGDESTDIR $HOST_RAGGEDDESTDIR $HOST_FORMATDESTDIR
-rm -rf $HOST_IMPLICITSEQDESTDIR $HOST_VARIMPLICITSEQDESTDIR
+rm -rf $HOST_IMPLICITSEQDESTDIR $HOST_VARIMPLICITSEQDESTDIR $HOST_DYNASEQIMPLICITDESTDIR
 mkdir -p $HOST_SRCDIR
 mkdir -p $HOST_DESTDIR
 mkdir -p $HOST_VARDESTDIR
@@ -99,6 +99,7 @@ mkdir -p $HOST_SHAPEDESTDIR
 mkdir -p $HOST_RESHAPEDESTDIR
 mkdir -p $HOST_SEQDESTDIR
 mkdir -p $HOST_DYNASEQDESTDIR
+mkdir -p $HOST_DYNASEQIMPLICITDESTDIR
 mkdir -p $HOST_VARSEQDESTDIR
 mkdir -p $HOST_ENSEMBLEDESTDIR
 mkdir -p $HOST_NOSHAPEDESTDIR
@@ -128,6 +129,7 @@ cp ./gen_qa_noshape_models.py $HOST_SRCDIR/.
 cp ./gen_qa_sequence_models.py $HOST_SRCDIR/.
 cp ./gen_qa_implicit_models.py $HOST_SRCDIR/.
 cp ./gen_qa_dyna_sequence_models.py $HOST_SRCDIR/.
+cp ./gen_qa_dyna_sequence_implicit_models.py $HOST_SRCDIR/.
 cp ./gen_ensemble_model_utils.py $HOST_SRCDIR/.
 cp ./gen_qa_trt_plugin_models.py $HOST_SRCDIR/.
 cp ./gen_qa_trt_format_models.py $HOST_SRCDIR/.
@@ -153,6 +155,7 @@ SEQDESTDIR=/tmp/seqmodels
 IMPLICITSEQDESTDIR=/tmp/implicitseqmodels
 VARIMPLICITSEQDESTDIR=/tmp/varimplicitseqmodels
 DYNASEQDESTDIR=/tmp/dynaseqmodels
+DYNASEQIMPLICITDESTDIR=/tmp/dynaseqimplicitmodels
 VARSEQDESTDIR=/tmp/varseqmodels
 ENSEMBLEDESTDIR=/tmp/ensemblemodels
 NOSHAPEDESTDIR=/tmp/noshapemodels
@@ -250,6 +253,8 @@ python3 $SRCDIR/gen_qa_implicit_models.py --onnx --onnx_opset=$ONNX_OPSET --vari
 chmod -R 777 $VARIMPLICITSEQDESTDIR
 python3 $SRCDIR/gen_qa_dyna_sequence_models.py --onnx --onnx_opset=$ONNX_OPSET --models_dir=$DYNASEQDESTDIR
 chmod -R 777 $DYNASEQDESTDIR
+python3 $SRCDIR/gen_qa_dyna_sequence_implicit_models.py --onnx --onnx_opset=$ONNX_OPSET --models_dir=$DYNASEQIMPLICITDESTDIR
+chmod -R 777 $DYNASEQIMPLICITDESTDIR
 python3 $SRCDIR/gen_qa_ragged_models.py --onnx --onnx_opset=$ONNX_OPSET --models_dir=$RAGGEDDESTDIR
 chmod -R 777 $RAGGEDDESTDIR
 EOF
@@ -269,6 +274,7 @@ docker run --gpus device=$CUDA_DEVICE --rm --entrypoint $SRCDIR/$ONNXSCRIPT \
        --mount type=bind,source=$HOST_RESHAPEDESTDIR,target=$RESHAPEDESTDIR \
        --mount type=bind,source=$HOST_SEQDESTDIR,target=$SEQDESTDIR \
        --mount type=bind,source=$HOST_DYNASEQDESTDIR,target=$DYNASEQDESTDIR \
+       --mount type=bind,source=$HOST_DYNAIMPLICITSEQDESTDIR,target=$DYNAIMPLICITSEQDESTDIR \
        --mount type=bind,source=$HOST_VARSEQDESTDIR,target=$VARSEQDESTDIR \
        --mount type=bind,source=$HOST_RAGGEDDESTDIR,target=$RAGGEDDESTDIR \
        --mount type=bind,source=$HOST_VARIMPLICITSEQDESTDIR,target=$VARIMPLICITSEQDESTDIR \

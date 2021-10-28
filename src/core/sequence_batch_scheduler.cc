@@ -1410,6 +1410,9 @@ OldestSequenceBatch::CompleteAndNext(const uint32_t seq_slot)
         // Add the appropriate control tensor values to the request.
         SetControlTensors(irequest, seq_slot, correlation_id);
 
+        // Update the implicit state and set the input state tensors.
+        UpdateImplicitState(irequest, seq_slot);
+
         LOG_VERBOSE(1) << "issue to dynamic batcher CORRID " << correlation_id
                        << " in batcher " << batcher_idx_ << ", slot "
                        << seq_slot;

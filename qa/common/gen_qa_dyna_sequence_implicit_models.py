@@ -1,4 +1,4 @@
-# Copyright 2021, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright 2019-2021, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -25,12 +25,38 @@
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 import argparse
+from builtins import range
 import os
+import sys
 import numpy as np
-import gen_ensemble_model_utils as emu
 
 FLAGS = None
 np_dtype_string = np.dtype(object)
+
+
+def np_to_onnx_dtype(np_dtype):
+    if np_dtype == bool:
+        return onnx.TensorProto.BOOL
+    elif np_dtype == np.int8:
+        return onnx.TensorProto.INT8
+    elif np_dtype == np.int16:
+        return onnx.TensorProto.INT16
+    elif np_dtype == np.int32:
+        return onnx.TensorProto.INT32
+    elif np_dtype == np.int64:
+        return onnx.TensorProto.INT64
+    elif np_dtype == np.uint8:
+        return onnx.TensorProto.UINT8
+    elif np_dtype == np.uint16:
+        return onnx.TensorProto.UINT16
+    elif np_dtype == np.float16:
+        return onnx.TensorProto.FLOAT16
+    elif np_dtype == np.float32:
+        return onnx.TensorProto.FLOAT
+    elif np_dtype == np.float64:
+        return onnx.TensorProto.DOUBLE
+    elif np_dtype == np_dtype_string:
+        return onnx.TensorProto.STRING
 
 
 def np_to_model_dtype(np_dtype):
@@ -59,50 +85,27 @@ def np_to_model_dtype(np_dtype):
     return None
 
 
-def np_to_onnx_dtype(np_dtype):
-    if np_dtype == bool:
-        return onnx.TensorProto.BOOL
-    elif np_dtype == np.int8:
-        return onnx.TensorProto.INT8
-    elif np_dtype == np.int16:
-        return onnx.TensorProto.INT16
-    elif np_dtype == np.int32:
-        return onnx.TensorProto.INT32
-    elif np_dtype == np.int64:
-        return onnx.TensorProto.INT64
-    elif np_dtype == np.uint8:
-        return onnx.TensorProto.UINT8
-    elif np_dtype == np.uint16:
-        return onnx.TensorProto.UINT16
-    elif np_dtype == np.float16:
-        return onnx.TensorProto.FLOAT16
-    elif np_dtype == np.float32:
-        return onnx.TensorProto.FLOAT
-    elif np_dtype == np.float64:
-        return onnx.TensorProto.DOUBLE
-    elif np_dtype == np_dtype_string:
-        return onnx.TensorProto.STRING
-
-
 def create_onnx_modelfile(models_dir, model_version, max_batch, dtype, shape):
 
-    if not tu.validate_for_onnx_model(dtype, dtype, dtype, shape, shape, shape):
+    if not tu.validate_for_onnx_model(dtype, dtype, dtype, shape, shape,
+                                      shape):
         return
 
-    model_name = tu.get_sequence_model_name(
+    model_name = tu.get_dyna_sequence_model_name(
         "onnx_nobatch" if max_batch == 0 else "onnx", dtype)
-    model_version_dir = models_dir + "/" + model_name + "/" + str(model_version)
+    model_version_dir = models_dir + "/" + model_name + "/" + str(
+        model_version)
 
     # Create the model. For now don't implement a proper accumulator
-    # just return 0 if not-ready and 'INPUT'+'START' otherwise...  the
-    # tests know to expect this.
+    # just return 0 if not-ready and 'INPUT'+'START'*('END'*'CORRID')
+    # otherwise...  the tests know to expect this.
     onnx_dtype = np_to_onnx_dtype(dtype)
-    onnx_control_dtype = onnx_dtype
     onnx_input_shape, idx = tu.shape_to_onnx_shape(shape, 0)
     onnx_output_shape, idx = tu.shape_to_onnx_shape(shape, idx)
 
     # If the input is a string then use int32 for operation and just
     # cast to/from string for input and output.
+    onnx_control_dtype = onnx_dtype
     if onnx_dtype == onnx.TensorProto.STRING:
         onnx_control_dtype = onnx.TensorProto.INT32
 
@@ -117,10 +120,17 @@ def create_onnx_modelfile(models_dir, model_version, max_batch, dtype, shape):
         "INPUT", onnx_dtype, batch_dim + onnx_input_shape)
     onnx_input_state = onnx.helper.make_tensor_value_info(
         "INPUT_STATE", onnx_dtype, batch_dim + onnx_input_shape)
-    onnx_start = onnx.helper.make_tensor_value_info("START", onnx_control_dtype,
+    onnx_start = onnx.helper.make_tensor_value_info("START",
+                                                    onnx_control_dtype,
                                                     batch_dim + [1])
-    onnx_ready = onnx.helper.make_tensor_value_info("READY", onnx_control_dtype,
+    onnx_ready = onnx.helper.make_tensor_value_info("READY",
+                                                    onnx_control_dtype,
                                                     batch_dim + [1])
+    onnx_corrid = onnx.helper.make_tensor_value_info("CORRID",
+                                                     onnx.TensorProto.UINT64,
+                                                     batch_dim + [1])
+    onnx_end = onnx.helper.make_tensor_value_info("END", onnx_control_dtype,
+                                                  batch_dim + [1])
     onnx_output = onnx.helper.make_tensor_value_info(
         "OUTPUT", onnx_dtype, batch_dim + onnx_output_shape)
     onnx_output_state = onnx.helper.make_tensor_value_info(
@@ -131,9 +141,9 @@ def create_onnx_modelfile(models_dir, model_version, max_batch, dtype, shape):
                                                  ["_INPUT_STATE"])
     # cast int8, int16 input to higer precision int as Onnx Add/Sub operator doesn't support those type
     # Also casting String data type to int32
-    if ((onnx_dtype == onnx.TensorProto.INT8) or
-        (onnx_dtype == onnx.TensorProto.INT16) or
-        (onnx_dtype == onnx.TensorProto.STRING)):
+    if ((onnx_dtype == onnx.TensorProto.INT8)
+            or (onnx_dtype == onnx.TensorProto.INT16)
+            or (onnx_dtype == onnx.TensorProto.STRING)):
         internal_input = onnx.helper.make_node("Cast", ["INPUT"], ["_INPUT"],
                                                to=onnx.TensorProto.INT32)
         internal_input_state = onnx.helper.make_node("Cast", ["INPUT_STATE"],
@@ -160,10 +170,9 @@ def create_onnx_modelfile(models_dir, model_version, max_batch, dtype, shape):
         input_state_cond = onnx.helper.make_node("And",
                                                  ["READY", "_NOT_START_CAST"],
                                                  ["input_state_cond"])
-        input_state_cond_cast = onnx.helper.make_node("Cast",
-                                                      ["input_state_cond"],
-                                                      ["input_state_cond_cast"],
-                                                      to=onnx.TensorProto.INT32)
+        input_state_cond_cast = onnx.helper.make_node(
+            "Cast", ["input_state_cond"], ["input_state_cond_cast"],
+            to=onnx.TensorProto.INT32)
         mul_state = onnx.helper.make_node(
             "Mul", ["_INPUT_STATE", "input_state_cond_cast"], ["mul_state"])
         add = onnx.helper.make_node("Add", ["_INPUT", "mul_state"], ["CAST"])
@@ -188,10 +197,9 @@ def create_onnx_modelfile(models_dir, model_version, max_batch, dtype, shape):
         # Take advantage of knowledge that the READY false value is 0 and true is 1
         input_state_cond = onnx.helper.make_node(
             "And", ["_NOT_START_CAST", "_READY_CAST"], ["input_state_cond"])
-        input_state_cond_cast = onnx.helper.make_node("Cast",
-                                                      ["input_state_cond"],
-                                                      ["input_state_cond_cast"],
-                                                      to=onnx.TensorProto.INT32)
+        input_state_cond_cast = onnx.helper.make_node(
+            "Cast", ["input_state_cond"], ["input_state_cond_cast"],
+            to=onnx.TensorProto.INT32)
         mul_state = onnx.helper.make_node(
             "Mul", ["_INPUT_STATE", "input_state_cond_cast"], ["mul_state"])
         add = onnx.helper.make_node("Add", ["_INPUT", "mul_state"], ["CAST"])
@@ -222,7 +230,7 @@ def create_onnx_modelfile(models_dir, model_version, max_batch, dtype, shape):
             input_state_cond_cast, mul_state, add, cast, cast_output_state
         ]
 
-    onnx_inputs = [onnx_input_state, onnx_input, onnx_start, onnx_ready]
+    onnx_inputs = [onnx_end, onnx_corrid, onnx_input_state, onnx_input, onnx_start, onnx_ready]
     onnx_outputs = [onnx_output, onnx_output_state]
     graph_proto = onnx.helper.make_graph(onnx_nodes, model_name, onnx_inputs,
                                          onnx_outputs)
@@ -243,43 +251,23 @@ def create_onnx_modelfile(models_dir, model_version, max_batch, dtype, shape):
     onnx.save(model_def, model_version_dir + "/model.onnx")
 
 
-def create_onnx_modelconfig(models_dir, model_version, max_batch, dtype, shape):
+def create_onnx_modelconfig(models_dir, model_version, max_batch, dtype,
+                            shape):
 
-    if not tu.validate_for_onnx_model(dtype, dtype, dtype, shape, shape, shape):
+    if not tu.validate_for_onnx_model(dtype, dtype, dtype, shape, shape,
+                                      shape):
         return
 
-    model_name = tu.get_sequence_model_name(
+    model_name = tu.get_dyna_sequence_model_name(
         "onnx_nobatch" if max_batch == 0 else "onnx", dtype)
     config_dir = models_dir + "/" + model_name
-
-    if dtype == np.float32:
-        control_type = "fp32"
-    elif dtype == np.bool:
-        control_type = "bool"
-        dtype = np.int32
-    else:
-        control_type = "int32"
-
-    instance_group_string = '''
-instance_group [
-  {
-    kind: KIND_GPU
-  }
-]
-'''
-
-    # [TODO] move create_general_modelconfig() out of emu as it is general
-    # enough for all backends to use
-    config = emu.create_general_modelconfig(
-        model_name,
-        "onnxruntime_onnx",
-        max_batch, [dtype], [shape], [None], [dtype], [shape], [None], [None],
-        force_tensor_number_suffix=False,
-        instance_group_str=instance_group_string)
-
-    config += '''
+    config = '''
+name: "{}"
+platform: "onnxruntime_onnx"
+max_batch_size: {}
 sequence_batching {{
   max_sequence_idle_microseconds: 5000000
+  {}
   control_input [
     {{
       name: "START"
@@ -291,11 +279,29 @@ sequence_batching {{
       ]
     }},
     {{
+      name: "END"
+      control [
+        {{
+          kind: CONTROL_SEQUENCE_END
+          {type}_false_true: [ 0, 1 ]
+        }}
+      ]
+    }},
+    {{
       name: "READY"
       control [
         {{
           kind: CONTROL_SEQUENCE_READY
           {type}_false_true: [ 0, 1 ]
+        }}
+      ]
+    }},
+    {{
+      name: "CORRID"
+      control [
+        {{
+          kind: CONTROL_SEQUENCE_CORRID
+          data_type: TYPE_UINT64
         }}
       ]
     }}
@@ -309,9 +315,33 @@ sequence_batching {{
     }} 
   ]
 }}
-'''.format(type=control_type,
-           dims=tu.shape_to_dims_str(shape),
-           dtype=emu.dtype_str(dtype))
+input [
+  {{
+    name: "INPUT"
+    data_type: {dtype}
+    dims: [ {dims} ]
+  }}
+]
+output [
+  {{
+    name: "OUTPUT"
+    data_type: {dtype}
+    dims: [ {dims} ]
+  }}
+]
+instance_group [
+  {{
+    kind: KIND_CPU
+  }}
+]
+'''.format(
+        model_name,
+        max_batch,
+        "oldest { max_candidate_sequences: 6\npreferred_batch_size: [ 4 ]\nmax_queue_delay_microseconds: 0\n}"
+        if max_batch > 0 else "",
+        dtype=np_to_model_dtype(dtype),
+        dims=tu.shape_to_dims_str(shape),
+        type="fp32" if dtype == np.float32 else "int32")
 
     try:
         os.makedirs(config_dir)
@@ -378,44 +408,21 @@ if __name__ == '__main__':
                         required=False,
                         action='store_true',
                         help='Used variable-shape tensors for input/output')
-    parser.add_argument('--ensemble',
-                        required=False,
-                        action='store_true',
-                        help='Generate ensemble models against the models' +
-                        ' in all platforms. Note that the models generated' +
-                        ' are not completed.')
     FLAGS, unparsed = parser.parse_known_args()
 
     if FLAGS.onnx:
         import onnx
+
     import test_util as tu
 
     # Tests with models that accept fixed-shape input/output tensors
     if not FLAGS.variable:
-        create_models(FLAGS.models_dir, np.float32, [
-            1,
-        ])
         create_models(FLAGS.models_dir, np.int32, [
-            1,
-        ])
-        create_models(FLAGS.models_dir, np_dtype_string, [
-            1,
-        ])
-        create_models(FLAGS.models_dir, np.bool, [
             1,
         ])
 
     # Tests with models that accept variable-shape input/output tensors
     if FLAGS.variable:
         create_models(FLAGS.models_dir, np.int32, [
-            -1,
-        ], False)
-        create_models(FLAGS.models_dir, np.float32, [
-            -1,
-        ], False)
-        create_models(FLAGS.models_dir, np_dtype_string, [
-            -1,
-        ], False)
-        create_models(FLAGS.models_dir, np.bool, [
             -1,
         ], False)
