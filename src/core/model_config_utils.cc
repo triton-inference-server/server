@@ -1790,9 +1790,14 @@ ModelConfigToJson(
         RETURN_IF_ERROR(
             FixInt(config_json, direct, "max_queue_delay_microseconds"));
       }
-      triton::common::TritonJson::Value state;
-      if (sb.Find("state", &state)) {
-        RETURN_IF_ERROR(FixInt(config_json, state, "dims"));
+
+      triton::common::TritonJson::Value states;
+      if (sb.Find("state", &states)) {
+        for (size_t i = 0; i < states.ArraySize(); ++i) {
+          triton::common::TritonJson::Value state;
+          RETURN_IF_ERROR(states.IndexAsObject(i, &state));
+          RETURN_IF_ERROR(FixIntArray(config_json, state, "dims"));
+        }
       }
     }
   }
