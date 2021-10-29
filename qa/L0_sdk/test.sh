@@ -30,6 +30,8 @@ rm -fr triton_client
 mkdir triton_client
 (cd triton_client && tar xzvf /workspace/*.tar.gz)
 
+set +e
+
 RET=0
 
 # Check image_client and perf_client
@@ -193,6 +195,8 @@ if [[ ! -e "triton_client/java/examples/SimpleInferPerf.jar" ]]; then
     echo -e "*** SimpleInferPerf.jar not present\n"
     RET=1
 fi
+
+set -e
 
 if [ $RET -eq 0 ]; then
   echo -e "\n***\n*** Test Passed\n***"
