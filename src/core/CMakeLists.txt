@@ -142,6 +142,7 @@ set(
   response_cache.cc
   scheduler_utils.cc
   sequence_batch_scheduler.cc
+  sequence_state.cc
   server.cc
   shared_library.cc
   infer_stats.cc
@@ -183,6 +184,7 @@ set(
   scheduler.h
   scheduler_utils.h
   sequence_batch_scheduler.h
+  sequence_state.h
   server.h
   server_message.h
   shared_library.h

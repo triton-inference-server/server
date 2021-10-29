@@ -48,25 +48,46 @@ source ../common/util.sh
 
 export CUDA_VISIBLE_DEVICES=0
 
+# If IMPLICIT_STATE not specified, set to 0
+IMPLICIT_STATE=${IMPLICIT_STATE:="0"}
+export IMPLICIT_STATE
+
+# If BACKENDS not specified, set to all
+BACKENDS=${BACKENDS:="graphdef savedmodel libtorch onnx plan custom custom_string"}
+export BACKENDS
+
+MODEL_REPOSITORY=''
+if [ "$IMPLICIT_STATE" == "1" ]; then
+  MODEL_REPOSITORY="qa_dyna_sequence_implicit_model_repository"
+else
+  MODEL_REPOSITORY="qa_dyna_sequence_model_repository"
+fi
+
 RET=0
 
 rm -fr *.log *.serverlog
 
 # models
 rm -fr models && mkdir models
-cp -r ${DATADIR}/qa_dyna_sequence_model_repository/* models/.
-cp -r ../custom_models/custom_dyna_sequence_int32 models/.
+cp -r ${DATADIR}/$MODEL_REPOSITORY/* models/.
 
-# Construct custom dyna_sequence_model with STRING sequence ID. Copy model and edit config.pbtxt
-cp -r models/custom_dyna_sequence_int32 models/custom_string_dyna_sequence_int32
-sed -i "s/custom_dyna_sequence_int32/custom_string_dyna_sequence_int32/g" models/custom_string_dyna_sequence_int32/config.pbtxt
-sed -i "/CONTROL_SEQUENCE_CORRID/{n;s/data_type:.*/data_type: TYPE_STRING/}" models/custom_string_dyna_sequence_int32/config.pbtxt
+# Implicit state models for custom backend do not exist.
+if [ $IMPLICIT_STATE == "0" ]; then
+    cp -r ../custom_models/custom_dyna_sequence_int32 models/.
+    # Construct custom dyna_sequence_model with STRING sequence ID. Copy model and edit config.pbtxt
+    cp -r models/custom_dyna_sequence_int32 models/custom_string_dyna_sequence_int32
+    sed -i "s/custom_dyna_sequence_int32/custom_string_dyna_sequence_int32/g" models/custom_string_dyna_sequence_int32/config.pbtxt
+    sed -i "/CONTROL_SEQUENCE_CORRID/{n;s/data_type:.*/data_type: TYPE_STRING/}" models/custom_string_dyna_sequence_int32/config.pbtxt
+fi
 
-# ragged models
-rm -fr ragged_models && mkdir ragged_models
-cp -r ../custom_models/custom_dyna_sequence_int32 ragged_models/.
-(cd ragged_models/custom_dyna_sequence_int32 && \
-        sed -i "s/name:.*\"INPUT\"/name: \"INPUT\"\\nallow_ragged_batch: true/" config.pbtxt)
+# Implicit state models that support ragged batching do not exist.
+if [ $IMPLICIT_STATE == "0" ]; then
+    # ragged models
+    rm -fr ragged_models && mkdir ragged_models
+    cp -r ../custom_models/custom_dyna_sequence_int32 ragged_models/.
+    (cd ragged_models/custom_dyna_sequence_int32 && \
+            sed -i "s/name:.*\"INPUT\"/name: \"INPUT\"\\nallow_ragged_batch: true/" config.pbtxt)
+fi
 
 # Need to launch the server for each test so that the model status is
 # reset (which is used to make sure the correct batch size was used
@@ -144,43 +165,45 @@ for i in \
     wait $SERVER_PID
 done
 
-# Ragged-batch tests that require max_queue_delay_microseconds to be
-# non-zero so that batching is delayed until a full preferred batch is
-# available.
-for m in `ls ragged_models`; do
-    (cd ragged_models/$m && \
-            sed -i "s/max_candidate_sequences:.*/max_candidate_sequences:4/" config.pbtxt && \
-            sed -i "s/max_queue_delay_microseconds:.*/max_queue_delay_microseconds:5000000/" config.pbtxt)
-done
+if [ $IMPLICIT_STATE == "0" ]; then
+    # Ragged-batch tests that require max_queue_delay_microseconds to be
+    # non-zero so that batching is delayed until a full preferred batch is
+    # available.
+    for m in `ls ragged_models`; do
+        (cd ragged_models/$m && \
+                sed -i "s/max_candidate_sequences:.*/max_candidate_sequences:4/" config.pbtxt && \
+                sed -i "s/max_queue_delay_microseconds:.*/max_queue_delay_microseconds:5000000/" config.pbtxt)
+    done
 
-export NO_BATCHING=0
-for i in \
-    test_multi_sequence_different_shape_allow_ragged \
-    ; do
+    export NO_BATCHING=0
+    for i in \
+        test_multi_sequence_different_shape_allow_ragged \
+        ; do
 
-    SERVER_LOG="./$i.serverlog"
-    SERVER_ARGS="--model-repository=`pwd`/ragged_models"
-    run_server
-    if [ "$SERVER_PID" == "0" ]; then
-        echo -e "\n***\n*** Failed to start $SERVER\n***"
-        cat $SERVER_LOG
-        exit 1
-    fi
+        SERVER_LOG="./$i.serverlog"
+        SERVER_ARGS="--model-repository=`pwd`/ragged_models"
+        run_server
+        if [ "$SERVER_PID" == "0" ]; then
+            echo -e "\n***\n*** Failed to start $SERVER\n***"
+            cat $SERVER_LOG
+            exit 1
+        fi
 
-    echo "Test: $i" >>$CLIENT_LOG
+        echo "Test: $i" >>$CLIENT_LOG
 
-    set +e
-    python $BATCHER_TEST DynaSequenceBatcherTest.$i >>$CLIENT_LOG 2>&1
-    if [ $? -ne 0 ]; then
-        echo -e "\n***\n*** Test $i Failed\n***" >>$CLIENT_LOG
-        echo -e "\n***\n*** Test $i Failed\n***"
-        RET=1
-    fi
-    set -e
+        set +e
+        python $BATCHER_TEST DynaSequenceBatcherTest.$i >>$CLIENT_LOG 2>&1
+        if [ $? -ne 0 ]; then
+            echo -e "\n***\n*** Test $i Failed\n***" >>$CLIENT_LOG
+            echo -e "\n***\n*** Test $i Failed\n***"
+            RET=1
+        fi
+        set -e
 
-    kill $SERVER_PID
-    wait $SERVER_PID
-done
+        kill $SERVER_PID
+        wait $SERVER_PID
+    done
+fi
 
 # python unittest seems to swallow ImportError and still return 0 exit
 # code. So need to explicitly check CLIENT_LOG to make sure we see
