@@ -1,5 +1,5 @@
 #!/bin/bash
-# Copyright (c) 2019-2020, NVIDIA CORPORATION. All rights reserved.
+# Copyright 2019-2021, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -36,8 +36,6 @@ DATADIR=`pwd`/models
 SERVER=/opt/tritonserver/bin/tritonserver
 source ../common/util.sh
 
-HP_ARR=(8000 8005 -1)
-len=${#HP_ARR[@]}
 rm -f $CLIENT_LOG $SERVER_LOG
 
 RET=0
@@ -45,7 +43,6 @@ RET=0
 # CUSTOM CASES
 
 # allow overrules - grpc still works
-SERVER_ARGS_ADD_HTTP="--http-port -1 --allow-http 0"
 SERVER_ARGS="--model-repository=$DATADIR --http-port -1 --allow-http 0"
 run_server_nowait
 sleep 5
@@ -54,8 +51,8 @@ if [ "$SERVER_PID" == "0" ]; then
     cat $SERVER_LOG
     exit 1
 fi
-kill $SERVER_PID
-wait $SERVER_PID
+kill $SERVER_PID || true
+wait $SERVER_PID || true
 
 # overlap with grpc default
 SERVER_ARGS="--model-repository=$DATADIR --http-port 8001"
@@ -120,8 +117,8 @@ set -e
 if [ "$code" != "200" ]; then
     RET=1
 fi
-kill $SERVER_PID
-wait $SERVER_PID
+kill $SERVER_PID || true
+wait $SERVER_PID || true
 
 if [ $RET -eq 0 ]; then
   echo -e "\n***\n*** Test Passed\n***"
