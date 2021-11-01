@@ -115,7 +115,7 @@ cat >$HOST_SRCDIR/$PYTSCRIPT <<EOF
 #!/bin/bash -x
 set -e
 python3 $SRCDIR/gen_qa_custom_ops_models.py --libtorch --models_dir=$DESTDIR
-cp /root/.cache/torch_extensions/py38_cu114/custom_modulo/custom_modulo.so $DESTDIR/libtorch_modulo/.
+cp /root/.cache/torch_extensions/py38_cu115/custom_modulo/custom_modulo.so $DESTDIR/libtorch_modulo/.
 chmod -R 777 $DESTDIR
 EOF
 
