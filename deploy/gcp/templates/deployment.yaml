@@ -75,35 +75,6 @@ spec:
             httpGet:
               path: /v2/health/ready
               port: http
-          volumeMounts:
-            - mountPath: /models
-              name: model-path
-
-      initContainers:
-        - name: model-fetch-container
-          image: "{{ .Values.image.imageName }}"
-          imagePullPolicy: {{ .Values.image.pullPolicy }}
-          volumeMounts:
-            - mountPath: /models
-              name: model-path
-          command: ["/bin/bash"]
-          args:
-            - -c
-            - >-
-              mkdir -p /model
-              && cd /model/
-              && git init
-              && git config core.sparsecheckout true
-              && echo docs/examples/ >> .git/info/sparse-checkout
-              && git remote add -f origin https://github.com/triton-inference-server/server.git
-              && git pull origin r21.09
-              && cd docs/examples/
-              && ./fetch_models.sh
-
-      volumes:
-        - name: model-path
-          hostPath:
-            path: {{ .Values.image.hostModelPath }}
 
       securityContext:
         runAsUser: 1000

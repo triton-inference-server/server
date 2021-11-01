@@ -25,7 +25,7 @@
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 apiVersion: v1
-appVersion: "21.09-py3"
-description: Triton Inference Server (treyd test)
-name: triton-inference-server-treyd
-version: 1.2.1
+appVersion: "1.0"
+description: Triton Inference Server
+name: triton-inference-server
+version: 1.0.0
