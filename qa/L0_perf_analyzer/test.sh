@@ -55,6 +55,14 @@ SEQ_JSONDATAFILE=`pwd`/../common/perf_analyzer_input_data_json/seq_data.json
 SHAPETENSORADTAFILE=`pwd`/../common/perf_analyzer_input_data_json/shape_tensor_data.json
 IMAGE_JSONDATAFILE=`pwd`/../common/perf_analyzer_input_data_json/image_data.json
 
+OUTPUT_JSONDATAFILE=`pwd`/../common/perf_analyzer_input_data_json/output.json
+NON_ALIGNED_OUTPUT_JSONDATAFILE=`pwd`/../common/perf_analyzer_input_data_json/non_aligned_output.json
+WRONG_OUTPUT_JSONDATAFILE=`pwd`/../common/perf_analyzer_input_data_json/wrong_output.json
+WRONG_OUTPUT_2_JSONDATAFILE=`pwd`/../common/perf_analyzer_input_data_json/wrong_output_2.json
+
+SEQ_OUTPUT_JSONDATAFILE=`pwd`/../common/perf_analyzer_input_data_json/seq_output.json
+SEQ_WRONG_OUTPUT_JSONDATAFILE=`pwd`/../common/perf_analyzer_input_data_json/seq_wrong_output.json
+
 SERVER=/opt/tritonserver/bin/tritonserver
 SERVER_ARGS="--model-repository=${DATADIR}"
 SERVER_LOG="./inference_server.log"
@@ -131,7 +139,6 @@ if [ $(cat $CLIENT_LOG |  grep "input INPUT0 contains dynamic shape, provide sha
   echo -e "\n***\n*** Test Failed: \n***"
   RET=1
 fi
-set -e
 
 # Testing with ensemble and sequential model variants
 $PERF_ANALYZER -v -i grpc -m  simple_savedmodel_sequence_object -p 2000 -t5 --streaming \
@@ -170,6 +177,7 @@ if [ $(cat $SERVER_LOG |  grep "${SERVER_ERROR_STRING}" | wc -l) -ne 0 ]; then
     echo -e "\n***\n*** Test Failed: Sequence conflict\n***"
     RET=1
 fi
+set -e
 
 for PROTOCOL in grpc http; do
 
@@ -370,8 +378,6 @@ for PROTOCOL in grpc http; do
         echo -e "\n***\n*** Test Failed\n***"
         RET=1
     fi
-    set -e
-
     set -e
 
     # Testing with combinations of string input and shared memory types
@@ -579,7 +585,83 @@ for PROTOCOL in grpc http; do
 
 done
 
+# Test with output validation
 set +e
+$PERF_ANALYZER -v -m graphdef_int32_int32_int32 --input-data=${NON_ALIGNED_OUTPUT_JSONDATAFILE} >$CLIENT_LOG 2>&1
+if [ $? -eq 0 ]; then
+    cat $CLIENT_LOG
+    echo -e "\n***\n*** Test Failed\n***"
+    RET=1
+fi
+if [ $(cat $CLIENT_LOG |  grep "The 'validation_data' field doesn't align with 'data' field in the json file" | wc -l) -eq 0 ]; then
+    cat $CLIENT_LOG
+    echo -e "\n***\n*** Test Failed\n***"
+    RET=1
+fi
+
+$PERF_ANALYZER -v -m graphdef_int32_int32_int32 --input-data=${WRONG_OUTPUT_JSONDATAFILE} >$CLIENT_LOG 2>&1
+if [ $? -eq 0 ]; then
+    cat $CLIENT_LOG
+    echo -e "\n***\n*** Test Failed\n***"
+    RET=1
+fi
+if [ $(cat $CLIENT_LOG |  grep "Output size doesn't match expected size" | wc -l) -eq 0 ]; then
+    cat $CLIENT_LOG
+    echo -e "\n***\n*** Test Failed\n***"
+    RET=1
+fi
+
+$PERF_ANALYZER -v -m graphdef_int32_int32_int32 --input-data=${WRONG_OUTPUT_2_JSONDATAFILE} >$CLIENT_LOG 2>&1
+if [ $? -eq 0 ]; then
+    cat $CLIENT_LOG
+    echo -e "\n***\n*** Test Failed\n***"
+    RET=1
+fi
+if [ $(cat $CLIENT_LOG |  grep "Output doesn't match expected output" | wc -l) -eq 0 ]; then
+    cat $CLIENT_LOG
+    echo -e "\n***\n*** Test Failed\n***"
+    RET=1
+fi
+
+
+$PERF_ANALYZER -v -m graphdef_int32_int32_int32 --input-data=${OUTPUT_JSONDATAFILE} >$CLIENT_LOG 2>&1
+if [ $? -ne 0 ]; then
+    cat $CLIENT_LOG
+    echo -e "\n***\n*** Test Failed\n***"
+    RET=1
+fi
+if [ $(cat $CLIENT_LOG |  grep "${ERROR_STRING}" | wc -l) -ne 0 ]; then
+    cat $CLIENT_LOG
+    echo -e "\n***\n*** Test Failed\n***"
+    RET=1
+fi
+
+$PERF_ANALYZER -v -m simple_savedmodel_sequence_object -i grpc --streaming \
+--input-data=${SEQ_WRONG_OUTPUT_JSONDATAFILE} >$CLIENT_LOG 2>&1
+if [ $? -eq 0 ]; then
+    cat $CLIENT_LOG
+    echo -e "\n***\n*** Test Failed\n***"
+    RET=1
+fi
+if [ $(cat $CLIENT_LOG |  grep "Output doesn't match expected output" | wc -l) -eq 0 ]; then
+    cat $CLIENT_LOG
+    echo -e "\n***\n*** Test Failed\n***"
+    RET=1
+fi
+
+$PERF_ANALYZER -v -m simple_savedmodel_sequence_object -i grpc --streaming \
+--input-data=${SEQ_OUTPUT_JSONDATAFILE} >$CLIENT_LOG 2>&1
+if [ $? -ne 0 ]; then
+    cat $CLIENT_LOG
+    echo -e "\n***\n*** Test Failed\n***"
+    RET=1
+fi
+if [ $(cat $CLIENT_LOG |  grep "${ERROR_STRING}" | wc -l) -ne 0 ]; then
+    cat $CLIENT_LOG
+    echo -e "\n***\n*** Test Failed\n***"
+    RET=1
+fi
+set -e
 
 # Fix me: Uncomment after fixing DLIS-1054
 ## Testing with very large concurrencies and large dataset
