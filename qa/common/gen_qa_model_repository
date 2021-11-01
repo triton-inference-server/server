@@ -74,6 +74,7 @@ HOST_SHAPEDESTDIR=/tmp/$TRITON_VERSION/qa_shapetensor_model_repository
 HOST_RESHAPEDESTDIR=/tmp/$TRITON_VERSION/qa_reshape_model_repository
 HOST_SEQDESTDIR=/tmp/$TRITON_VERSION/qa_sequence_model_repository
 HOST_DYNASEQDESTDIR=/tmp/$TRITON_VERSION/qa_dyna_sequence_model_repository
+HOST_DYNASEQIMPLICITDESTDIR=/tmp/$TRITON_VERSION/qa_dyna_sequence_implicit_model_repository
 HOST_VARSEQDESTDIR=/tmp/$TRITON_VERSION/qa_variable_sequence_model_repository
 HOST_ENSEMBLEDESTDIR=/tmp/$TRITON_VERSION/qa_ensemble_model_repository
 HOST_NOSHAPEDESTDIR=/tmp/$TRITON_VERSION/qa_noshape_model_repository
@@ -274,7 +275,7 @@ docker run --gpus device=$CUDA_DEVICE --rm --entrypoint $SRCDIR/$ONNXSCRIPT \
        --mount type=bind,source=$HOST_RESHAPEDESTDIR,target=$RESHAPEDESTDIR \
        --mount type=bind,source=$HOST_SEQDESTDIR,target=$SEQDESTDIR \
        --mount type=bind,source=$HOST_DYNASEQDESTDIR,target=$DYNASEQDESTDIR \
-       --mount type=bind,source=$HOST_DYNAIMPLICITSEQDESTDIR,target=$DYNAIMPLICITSEQDESTDIR \
+       --mount type=bind,source=$HOST_DYNASEQIMPLICITDESTDIR,target=$DYNASEQIMPLICITDESTDIR \
        --mount type=bind,source=$HOST_VARSEQDESTDIR,target=$VARSEQDESTDIR \
        --mount type=bind,source=$HOST_RAGGEDDESTDIR,target=$RAGGEDDESTDIR \
        --mount type=bind,source=$HOST_VARIMPLICITSEQDESTDIR,target=$VARIMPLICITSEQDESTDIR \
