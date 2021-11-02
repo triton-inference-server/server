@@ -522,6 +522,7 @@ for PROTOCOL in grpc http; do
         set -e
     done
 
+    set +e
     $PERF_ANALYZER -v -i $PROTOCOL -m  simple_savedmodel_sequence_object -p 2000 -t5 --sync \
     --input-data=$SEQ_JSONDATAFILE >$CLIENT_LOG 2>&1
     if [ $? -ne 0 ]; then

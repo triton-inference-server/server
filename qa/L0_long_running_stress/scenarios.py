@@ -47,6 +47,7 @@ from functools import partial
 
 import abc
 import csv
+import json
 
 DEFAULT_TIMEOUT_MS = 25000
 SEQUENCE_LENGTH_MEAN = 16
@@ -111,17 +112,15 @@ class PerfAnalyzerScenario(Scenario):
                      concurrency_range,
                      queue_latency_range_us,
                      input_shapes=[],
-                     input_file=None,
-                     expected_output_file=None):
+                     input_file=None):
             self.model_name_ = model_name
             self.concurrency_range_ = list(concurrency_range)
             self.batch_size_ = batch_size
             self.input_shapes_ = input_shapes
             self.queue_latency_range_us_ = queue_latency_range_us
             self.input_file_ = input_file
-            self.expected_output_file_ = expected_output_file
 
-        def run(self, name, validation_run=False):
+        def run(self, name, sequence_id_range):
             csv_file = "{}_{}_{}.csv".format(name, self.model_name_,
                                              self.concurrency_range_[2])
 
@@ -136,13 +135,15 @@ class PerfAnalyzerScenario(Scenario):
             arg_list += ["-f", csv_file]
             for name, shape in self.input_shapes_:
                 arg_list += ["--shape", "{}:{}".format(name, shape)]
+            if self.input_file_ is not None:
+                arg_list += ["--input-data", self.input_file_]
+            if sequence_id_range is not None:
+                arg_list += [
+                    "--sequence-id-range",
+                    "{}:{}".format(sequence_id_range[0], sequence_id_range[1])
+                ]
 
-            if validation_run:
-                raise Exception(
-                    "Perf Analyzer Scenario doesn't currently support validation run"
-                )
-            else:
-                subprocess.run(arg_list, check=True)
+            subprocess.run(arg_list, check=True)
 
             # Read queue time and adjust concurrency
             with open(csv_file, newline='') as csvfile:
@@ -166,19 +167,20 @@ class PerfAnalyzerScenario(Scenario):
                  sequence_trials,
                  identity_trials,
                  queue_latency_range_us=(10000, 100000),
-                 validate_frequency=0,
+                 sequence_id_range=None,
                  verbose=False):
         super().__init__(name, [], verbose)
         self.rng_ = rng
-        self.validate_frequency_ = validate_frequency
+        self.sequence_id_range_ = sequence_id_range
         # List of tuples
         # (model_name, max_concurrency, batch_size, list(more PA options),
-        #  real_input, expected_output),
-        # FIXME 'real_input, expected_output' is None for now until PA supports it
-        self.options_ = [
+        #  real_data_file),
+        self.options_ = []
+
+        # Add no validation models
+        self.options_.append(
             PerfAnalyzerScenario.ModelOption("resnet_v1_50_graphdef_def", 32,
-                                             (1, 4, 1), queue_latency_range_us),
-        ]
+                                             (1, 4, 1), queue_latency_range_us))
         for trial in sequence_trials:
             dtype = self.get_datatype(trial)
             # Skip string sequence model for now, it is hard for PA to generate
@@ -186,7 +188,6 @@ class PerfAnalyzerScenario(Scenario):
             if dtype == np.dtype(object):
                 continue
             model_name = tu.get_sequence_model_name(trial, dtype)
-            # FIXME add data validation version (write the expected input and output to file and tell PA)
             self.options_.append(
                 PerfAnalyzerScenario.ModelOption(model_name, 1, (1, 4, 1),
                                                  queue_latency_range_us))
@@ -197,16 +198,110 @@ class PerfAnalyzerScenario(Scenario):
                 input_shapes = [("INPUT__0", "16")]
             else:
                 input_shapes = [("INPUT0", "16")]
-            # FIXME add data validation version (write the expected input and output to file and tell PA)
             self.options_.append(
                 PerfAnalyzerScenario.ModelOption(model_name, 1, (1, 4, 1),
                                                  queue_latency_range_us,
                                                  input_shapes))
 
+        # Add output validation version of the models
+        # Skip resnet as the output data has variation which makes exact
+        # matching hard
+        for trial in sequence_trials:
+            dtype = self.get_datatype(trial)
+            model_name = tu.get_sequence_model_name(trial, dtype)
+            data_file = os.path.join("validation_data",
+                                     "{}.json".format(model_name))
+            self.generate_sequence_data(trial, dtype, data_file)
+            self.options_.append(
+                PerfAnalyzerScenario.ModelOption(model_name,
+                                                 1, (1, 4, 1),
+                                                 queue_latency_range_us,
+                                                 input_file=data_file))
+        for trial in identity_trials:
+            dtype = np.float32
+            model_name = tu.get_zero_model_name(trial, 1, dtype)
+            data_file = os.path.join("validation_data",
+                                     "{}.json".format(model_name))
+            self.generate_identity_data(trial, dtype, data_file)
+            self.options_.append(
+                PerfAnalyzerScenario.ModelOption(model_name,
+                                                 1, (1, 4, 1),
+                                                 queue_latency_range_us,
+                                                 input_file=data_file))
+
+    def generate_sequence_data(self, trial, dtype, data_filename):
+        input0 = "INPUT" if "libtorch" not in trial else "INPUT__0"
+        input_data = []
+        for i in range(3):
+            if dtype == np.float32:
+                res = float(i)
+            elif dtype == np.int32:
+                res = i
+            elif dtype == np.dtype(object):
+                res = str(i)
+            input_data.append({input0: [res]})
+        output0 = "OUTPUT" if "libtorch" not in trial else "OUTPUT__0"
+        output_data = []
+        if ("savedmodel" in trial) and ("nobatch" in trial):
+            # Special case where the model is accumulator
+            sum = 0
+            for i in range(3):
+                sum += i
+                if dtype == np.float32:
+                    res = float(sum)
+                elif dtype == np.int32:
+                    res = sum
+                elif dtype == np.dtype(object):
+                    res = str(sum)
+                output_data.append({output0: [res]})
+        else:
+            for i in range(3):
+                res = 1 if i == 0 else i
+                if dtype == np.float32:
+                    res = float(res)
+                elif dtype == np.int32:
+                    res = res
+                elif dtype == np.dtype(object):
+                    res = str(res)
+                output_data.append(
+                    {output0: [res if dtype != np.dtype(object) else str(res)]})
+        data = {"data": [input_data]}
+        data["validation_data"] = [output_data]
+        with open(data_filename, 'w') as f:
+            json.dump(data, f)
+
+    def generate_identity_data(self, trial, dtype, data_filename):
+        input0 = "INPUT0" if "libtorch" not in trial else "INPUT__0"
+        output0 = "OUTPUT0" if "libtorch" not in trial else "OUTPUT__0"
+        io_data = []
+        for i in range(16):
+            if dtype == np.float32:
+                res = float(i)
+            elif dtype == np.int32:
+                res = i
+            elif dtype == np.dtype(object):
+                res = str(i)
+            io_data.append(res)
+        data = {
+            "data": [{
+                input0: {
+                    "content": io_data,
+                    "shape": [16]
+                }
+            }],
+            "validation_data": [{
+                output0: {
+                    "content": io_data,
+                    "shape": [16]
+                }
+            }]
+        }
+        with open(data_filename, 'w') as f:
+            json.dump(data, f)
+
     def run(self, client_metadata):
         model_option = np.random.choice(self.options_)
-        return model_option.run(self.name_,
-                                self.rng_.rand() < self.validate_frequency_)
+        return model_option.run(self.name_, self.sequence_id_range_)
 
 
 class ResNetScenario(Scenario):

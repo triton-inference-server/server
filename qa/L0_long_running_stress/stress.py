@@ -153,6 +153,8 @@ def stress_thread(name, seed, test_duration, correlation_id_base,
             (grpcclient.InferenceServerClient("localhost:8001",
                                               verbose=FLAGS.verbose),
              correlation_id_base + c))
+    pa_start_seq_id = correlation_id_base + common_cnt + rare_cnt
+    pa_end_seq_id = pa_start_seq_id + CORRELATION_ID_BLOCK_SIZE
 
     # Weight roughly in thousandth percent
     ss = ScenarioSelector([
@@ -191,7 +193,11 @@ def stress_thread(name, seed, test_duration, correlation_id_base,
                                verbose=FLAGS.verbose)),
         (300,
          PerfAnalyzerScenario(
-             name, rng, get_trials(), get_trials(False),
+             name,
+             rng,
+             get_trials(),
+             get_trials(False),
+             sequence_id_range=(pa_start_seq_id, pa_end_seq_id),
              verbose=FLAGS.verbose)),
     ], rng)
 
