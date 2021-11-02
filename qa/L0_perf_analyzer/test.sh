@@ -664,26 +664,25 @@ if [ $(cat $CLIENT_LOG |  grep "${ERROR_STRING}" | wc -l) -ne 0 ]; then
 fi
 set -e
 
-# Fix me: Uncomment after fixing DLIS-1054
 ## Testing with very large concurrencies and large dataset
-#INPUT_DATA_OPTION="--input-data $SEQ_JSONDATAFILE "
-#for i in {1..9}; do
-#    INPUT_DATA_OPTION=" ${INPUT_DATA_OPTION} ${INPUT_DATA_OPTION}"
-#done
-#set +e
-#$PERF_ANALYZER -v -m  simple_savedmodel_sequence_object -p 10000 --concurrency-range 1500:2500:500 -i grpc --streaming \
-#${INPUT_DATA_OPTION} >$CLIENT_LOG 2>&1
-#if [ $? -ne 0 ]; then
-#    cat $CLIENT_LOG
-#    echo -e "\n***\n*** Test Failed\n***"
-#    RET=1
-#fi
-#if [ $(cat $CLIENT_LOG |  grep "${ERROR_STRING}" | wc -l) -ne 0 ]; then
-#    cat $CLIENT_LOG
-#    echo -e "\n***\n*** Test Failed\n***"
-#    RET=1
-#fi
-#set -e
+INPUT_DATA_OPTION="--input-data $SEQ_JSONDATAFILE "
+for i in {1..9}; do
+   INPUT_DATA_OPTION=" ${INPUT_DATA_OPTION} ${INPUT_DATA_OPTION}"
+done
+set +e
+$PERF_ANALYZER -v -m  simple_savedmodel_sequence_object -p 10000 --concurrency-range 1500:2000:250 -i grpc --streaming \
+${INPUT_DATA_OPTION} >$CLIENT_LOG 2>&1
+if [ $? -ne 0 ]; then
+   cat $CLIENT_LOG
+   echo -e "\n***\n*** Test Failed\n***"
+   RET=1
+fi
+if [ $(cat $CLIENT_LOG |  grep "${ERROR_STRING}" | wc -l) -ne 0 ]; then
+   cat $CLIENT_LOG
+   echo -e "\n***\n*** Test Failed\n***"
+   RET=1
+fi
+set -e
 
 kill $SERVER_PID
 wait $SERVER_PID
