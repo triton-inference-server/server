@@ -446,6 +446,8 @@ docker run --gpus device=$CUDA_DEVICE --rm --entrypoint $SRCDIR/$TRTSCRIPT \
        --mount type=bind,source=$HOST_PLGDESTDIR,target=$PLGDESTDIR \
        --mount type=bind,source=$HOST_RAGGEDDESTDIR,target=$RAGGEDDESTDIR \
        --mount type=bind,source=$HOST_FORMATDESTDIR,target=$FORMATDESTDIR \
+       --mount type=bind,source=$HOST_VARIMPLICITSEQDESTDIR,target=$VARIMPLICITSEQDESTDIR \
+       --mount type=bind,source=$HOST_IMPLICITSEQDESTDIR,target=$IMPLICITSEQDESTDIR \
        $TENSORRT_IMAGE
 if [ $? -ne 0 ]; then
     echo -e "Failed"
