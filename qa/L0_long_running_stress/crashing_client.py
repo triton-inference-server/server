@@ -38,13 +38,10 @@ from tritonclientutils import np_to_triton_dtype
 
 def crashing_client(model_name,
                     dtype,
+                    tensor_shape,
                     shm_name,
                     triton_client,
-                    tensor_shape=(1000,),
                     input_name="INPUT0"):
-    if "plan" in model_name:
-        tensor_shape = (32,)
-
     in0 = np.random.random(tensor_shape).astype(dtype)
     if "libtorch" in model_name:
         input_name = "INPUT__0"
@@ -57,11 +54,11 @@ def crashing_client(model_name,
     # Run in a loop so that it is guaranteed that
     # the inference will not have completed when being terminated.
     while True:
-        results = triton_client.infer(model_name, inputs)
         existing_shm = shared_memory.SharedMemory(shm_name)
         count = np.ndarray((1,), dtype=np.int32, buffer=existing_shm.buf)
         count[0] += 1
         existing_shm.close()
+        results = triton_client.infer(model_name, inputs)
 
 
 if __name__ == '__main__':
@@ -76,6 +73,7 @@ if __name__ == '__main__':
 
     dtype = np.float32
     model_name = tu.get_zero_model_name(trial, 1, dtype)
+    tensor_shape = (1,) if "nobatch" in trial else (1, 1)
 
     triton_client = grpcclient.InferenceServerClient(url="localhost:8001",
                                                      verbose=True)
@@ -89,6 +87,7 @@ if __name__ == '__main__':
                 args=(
                     model_name,
                     dtype,
+                    tensor_shape,
                     shm.name,
                     triton_client,
                 ))

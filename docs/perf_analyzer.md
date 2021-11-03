@@ -402,6 +402,41 @@ The following is the example to provide contents as base64 string with explicit 
 }
 ```
 
+### Output Validation
+
+When real input data is provided, it is optional to request perf analyzer to
+validate the inference output for the input data.
+
+Validation output can be specified in "validation_data" field in the same format
+as "data" field for real input. Note that the entries in "validation_data" must
+align with "data" for proper mapping. The following example describes validation
+data for a model with inputs named, INPUT0 and INPUT1, outputs named, OUTPUT0
+and OUTPUT1, all tensors have shape [4, 4] and data type INT32:
+
+```
+  {
+    "data" :
+     [
+        {
+          "INPUT0" : [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
+          "INPUT1" : [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1]
+        }
+        ...
+      ],
+    "validation_data" :
+     [
+        {
+          "OUTPUT0" : [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+          "OUTPUT1" : [2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2]
+        }
+        ...
+      ]
+  }
+```
+
+Besides the above example, the validation outputs can be specified in the same
+variations described in "real input data" section.
+
 ## Shared Memory
 
 By default perf_analyzer sends input tensor data and receives output

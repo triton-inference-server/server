@@ -25,6 +25,8 @@
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 import sys
+
+from scenarios import *
 sys.path.append("../common")
 
 import argparse
@@ -44,496 +46,78 @@ from tritonclientutils import np_to_triton_dtype
 import prettytable
 import subprocess
 
-if sys.version_info >= (3, 0):
-    import queue
-else:
-    import Queue as queue
+from collections import OrderedDict
+import bisect
 
 FLAGS = None
 CORRELATION_ID_BLOCK_SIZE = 1024 * 1024
-DEFAULT_TIMEOUT_MS = 25000
-SEQUENCE_LENGTH_MEAN = 16
-SEQUENCE_LENGTH_STDEV = 8
 BACKENDS = os.environ.get('BACKENDS', "graphdef savedmodel onnx plan")
 
 _thread_exceptions = []
 _thread_exceptions_mutex = threading.Lock()
 
 
-class UserData:
-
-    def __init__(self):
-        self._completed_requests = queue.Queue()
-
-
-# Callback function used for async_stream_infer()
-def completion_callback(user_data, result, error):
-    # passing error raise and handling out
-    user_data._completed_requests.put((result, error))
-
-
-class TimeoutException(Exception):
-    pass
-
-
-def check_sequence_async(client_metadata,
-                         trial,
-                         model_name,
-                         input_dtype,
-                         steps,
-                         timeout_ms=DEFAULT_TIMEOUT_MS,
-                         batch_size=1,
-                         sequence_name="<unknown>",
-                         test_case_name="<unknown>",
-                         sequence_request_count={},
-                         tensor_shape=(1,),
-                         input_name="INPUT",
-                         output_name="OUTPUT"):
-    """Perform sequence of inferences using async run. The 'steps' holds
-    a list of tuples, one for each inference with format:
-
-    (flag_str, value, expected_result, delay_ms)
-
-    """
-    if (("savedmodel" not in trial) and ("graphdef" not in trial) and
-        ("custom" not in trial) and ("onnx" not in trial) and
-        ("libtorch" not in trial) and ("plan" not in trial)):
-        assert False, "unknown trial type: " + trial
-
-    if "nobatch" not in trial:
-        tensor_shape = (batch_size,) + tensor_shape
-    if "libtorch" in trial:
-        input_name = "INPUT__0"
-        output_name = "OUTPUT__0"
-
-    triton_client = client_metadata[0]
-    sequence_id = client_metadata[1]
-
-    # Execute the sequence of inference...
-    seq_start_ms = int(round(time.time() * 1000))
-    user_data = UserData()
-    # Ensure there is no running stream
-    triton_client.stop_stream()
-    triton_client.start_stream(partial(completion_callback, user_data))
-
-    sent_count = 0
-    for flag_str, value, expected_result, delay_ms in steps:
-        seq_start = False
-        seq_end = False
-        if flag_str is not None:
-            seq_start = ("start" in flag_str)
-            seq_end = ("end" in flag_str)
-
-        if input_dtype == np.object_:
-            in0 = np.full(tensor_shape, value, dtype=np.int32)
-            in0n = np.array([str(x) for x in in0.reshape(in0.size)],
-                            dtype=object)
-            in0 = in0n.reshape(tensor_shape)
-        else:
-            in0 = np.full(tensor_shape, value, dtype=input_dtype)
-
-        inputs = [
-            grpcclient.InferInput(input_name, tensor_shape,
-                                  np_to_triton_dtype(input_dtype)),
-        ]
-        inputs[0].set_data_from_numpy(in0)
-
-        triton_client.async_stream_infer(model_name,
-                                         inputs,
-                                         sequence_id=sequence_id,
-                                         sequence_start=seq_start,
-                                         sequence_end=seq_end)
-        count_sequence_request(test_case_name, sequence_request_count)
-        sent_count += 1
-
-        if delay_ms is not None:
-            time.sleep(delay_ms / 1000.0)
-
-    # Process the results in order that they were sent
-    result = None
-    processed_count = 0
-    while processed_count < sent_count:
-        (results, error) = user_data._completed_requests.get()
-        if error is not None:
-            raise error
-
-        (_, value, expected, _) = steps[processed_count]
-        processed_count += 1
-        if timeout_ms != None:
-            now_ms = int(round(time.time() * 1000))
-            if (now_ms - seq_start_ms) > timeout_ms:
-                raise TimeoutException(
-                    "Timeout expired for {}, got {} ms".format(
-                        sequence_name, (now_ms - seq_start_ms)))
-
-        result = results.as_numpy(
-            output_name)[0] if "nobatch" in trial else results.as_numpy(
-                output_name)[0][0]
-        if FLAGS.verbose:
-            print("{} {}: + {} = {}".format(sequence_name, sequence_id, value,
-                                            result))
-
-        if expected is not None:
-            if input_dtype == np.object_:
-                assert int(
-                    result
-                ) == expected, "{}: expected result {}, got {} {} {}".format(
-                    sequence_name, expected, int(result), trial, model_name)
-            else:
-                assert result == expected, "{}: expected result {}, got {} {} {}".format(
-                    sequence_name, expected, result, trial, model_name)
-    triton_client.stop_stream()
-
-
-def get_datatype(trial):
-    # Get the datatype to use based on what models are available (see test.sh)
-    if ("plan" in trial) or ("savedmodel" in trial):
-        return np.float32
-    if "graphdef" in trial:
-        return np.dtype(object)
-    return np.int32
-
-
-def get_expected_result(expected_result, value, trial, flag_str=None):
-    # Adjust the expected_result for models that
-    # couldn't implement the full accumulator. See
-    # qa/common/gen_qa_sequence_models.py for more
-    # information.
-    if (("nobatch" not in trial and
-         ("custom" not in trial)) or ("graphdef" in trial) or
-        ("plan" in trial) or ("onnx" in trial)) or ("libtorch" in trial):
-        expected_result = value
-        if (flag_str is not None) and ("start" in flag_str):
-            expected_result += 1
-    return expected_result
-
-
-def get_trial(is_sequence=True):
-    # Randomly pick one trial for each thread
+def get_trials(is_sequence=True):
+    _trials = ()
     if is_sequence:
-        _trials = ()
         for backend in BACKENDS.split(' '):
             if (backend != "libtorch") and (backend != 'savedmodel'):
                 _trials += (backend + "_nobatch",)
             _trials += (backend,)
-        return np.random.choice(_trials)
     else:
         _trials = ()
         for backend in BACKENDS.split(' '):
             if (backend != "libtorch"):
                 _trials += (backend + "_nobatch",)
-        return np.random.choice(_trials)
+    return _trials
 
 
-def count_test_case(test_case_name, test_case_count):
-    # Count the times each test case runs
-    if test_case_name in test_case_count:
-        test_case_count[test_case_name] += 1
+def update_test_count(test_case_count,
+                      failed_test_case_count,
+                      request_count,
+                      test_case_name,
+                      success=True,
+                      count=1):
+    if success:
+        # Count the times each test case runs
+        if test_case_name in test_case_count:
+            test_case_count[test_case_name] += 1
+        else:
+            test_case_count[test_case_name] = 1
+
+        # Count the number of requests were sent for each test case
+        if test_case_name in request_count:
+            request_count[test_case_name] += count
+        else:
+            request_count[test_case_name] = count
     else:
-        test_case_count[test_case_name] = 1
+        # Count the times each test case fails
+        if test_case_name in failed_test_case_count:
+            failed_test_case_count[test_case_name] += 1
+        else:
+            failed_test_case_count[test_case_name] = 1
 
 
-def count_failed_test_case(test_case_name, failed_test_case_count):
-    # Count the times each test case fails
-    if test_case_name in failed_test_case_count:
-        failed_test_case_count[test_case_name] += 1
-    else:
-        failed_test_case_count[test_case_name] = 1
+class ScenarioSelector:
 
+    def __init__(self, probs, rng):
+        self.rng_ = rng
+        self.probs_range_ = []
+        self.scenarios_ = []
 
-def count_sequence_request(test_case_name, sequence_request_count, count=1):
-    # Count the number of requests were sent for each test case
-    if test_case_name in sequence_request_count:
-        sequence_request_count[test_case_name] += count
-    else:
-        sequence_request_count[test_case_name] = count
+        # probs is a list/dict of scenario weights and types
+        total_weight = 0
+        for weight, scenario in probs:
+            total_weight += weight
+            self.scenarios_.append(scenario)
+            self.probs_range_.append(float(total_weight))
+        # Normalize weight
+        for i in range(len(self.probs_range_)):
+            self.probs_range_[i] /= total_weight
 
-
-def sequence_valid(client_metadata, rng, trial, model_name, dtype, len_mean,
-                   len_stddev, sequence_name, sequence_request_count):
-    # Create a variable length sequence with "start" and "end" flags.
-    seqlen = max(1, int(rng.normal(len_mean, len_stddev)))
-    print("{} {}: valid seqlen = {}".format(sequence_name, client_metadata[1],
-                                            seqlen))
-
-    values = rng.randint(0, 1024 * 1024, size=seqlen).astype(dtype)
-
-    steps = []
-    expected_result = 0
-
-    for idx, step in enumerate(range(seqlen)):
-        flags = ""
-        if idx == 0:
-            flags += ",start"
-        if idx == (seqlen - 1):
-            flags += ",end"
-
-        val = values[idx]
-        delay_ms = None
-        expected_result += val
-        expected_result = get_expected_result(expected_result, val, trial,
-                                              flags)
-
-        # (flag_str, value, expected_result, delay_ms)
-        steps.append((flags, val, expected_result, delay_ms),)
-
-    check_sequence_async(client_metadata,
-                         trial,
-                         model_name,
-                         dtype,
-                         steps,
-                         sequence_name=sequence_name,
-                         test_case_name="sequence_valid",
-                         sequence_request_count=sequence_request_count)
-
-
-def sequence_valid_valid(client_metadata, rng, trial, model_name, dtype,
-                         len_mean, len_stddev, sequence_name,
-                         sequence_request_count):
-    # Create two variable length sequences with "start" and "end"
-    # flags, where both sequences use the same correlation ID and are
-    # sent back-to-back.
-    seqlen = [
-        max(1, int(rng.normal(len_mean, len_stddev))),
-        max(1, int(rng.normal(len_mean, len_stddev)))
-    ]
-    print("{} {}: valid-valid seqlen[0] = {}, seqlen[1] = {}".format(
-        sequence_name, client_metadata[1], seqlen[0], seqlen[1]))
-
-    values = [
-        rng.randint(0, 1024 * 1024, size=seqlen[0]).astype(dtype),
-        rng.randint(0, 1024 * 1024, size=seqlen[1]).astype(dtype)
-    ]
-
-    for p in [0, 1]:
-        steps = []
-        expected_result = 0
-
-        for idx, step in enumerate(range(seqlen[p])):
-            flags = ""
-            if idx == 0:
-                flags += ",start"
-            if idx == (seqlen[p] - 1):
-                flags += ",end"
-
-            val = values[p][idx]
-            delay_ms = None
-            expected_result += val
-            expected_result = get_expected_result(expected_result, val, trial,
-                                                  flags)
-
-            # (flag_str, value, expected_result, delay_ms)
-            steps.append((flags, val, expected_result, delay_ms),)
-
-    check_sequence_async(client_metadata,
-                         trial,
-                         model_name,
-                         dtype,
-                         steps,
-                         sequence_name=sequence_name,
-                         test_case_name="sequence_valid_valid",
-                         sequence_request_count=sequence_request_count)
-
-
-def sequence_valid_no_end(client_metadata, rng, trial, model_name, dtype,
-                          len_mean, len_stddev, sequence_name,
-                          sequence_request_count):
-    # Create two variable length sequences, the first with "start" and
-    # "end" flags and the second with no "end" flag, where both
-    # sequences use the same correlation ID and are sent back-to-back.
-    seqlen = [
-        max(1, int(rng.normal(len_mean, len_stddev))),
-        max(1, int(rng.normal(len_mean, len_stddev)))
-    ]
-    print("{} {}: valid-no-end seqlen[0] = {}, seqlen[1] = {}".format(
-        sequence_name, client_metadata[1], seqlen[0], seqlen[1]))
-
-    values = [
-        rng.randint(0, 1024 * 1024, size=seqlen[0]).astype(dtype),
-        rng.randint(0, 1024 * 1024, size=seqlen[1]).astype(dtype)
-    ]
-
-    for p in [0, 1]:
-        steps = []
-        expected_result = 0
-
-        for idx, step in enumerate(range(seqlen[p])):
-            flags = ""
-            if idx == 0:
-                flags += ",start"
-            if (p == 0) and (idx == (seqlen[p] - 1)):
-                flags += ",end"
-
-            val = values[p][idx]
-            delay_ms = None
-            expected_result += val
-            expected_result = get_expected_result(expected_result, val, trial,
-                                                  flags)
-
-            # (flag_str, value, expected_result, delay_ms)
-            steps.append((flags, val, expected_result, delay_ms),)
-
-    check_sequence_async(client_metadata,
-                         trial,
-                         model_name,
-                         dtype,
-                         steps,
-                         sequence_name=sequence_name,
-                         test_case_name="sequence_valid_no_end",
-                         sequence_request_count=sequence_request_count)
-
-
-def sequence_no_start(client_metadata, rng, trial, model_name, dtype,
-                      sequence_name, sequence_request_count):
-    # Create a sequence without a "start" flag. Sequence should get an
-    # error from the server.
-    seqlen = 1
-    print("{} {}: no-start seqlen = {}".format(sequence_name,
-                                               client_metadata[1], seqlen))
-
-    values = rng.randint(0, 1024 * 1024, size=seqlen).astype(dtype)
-
-    steps = []
-
-    for idx, step in enumerate(range(seqlen)):
-        flags = None
-        val = values[idx]
-        delay_ms = None
-
-        # (flag_str, value, expected_result, delay_ms)
-        steps.append((flags, val, None, delay_ms),)
-
-    try:
-        check_sequence_async(client_metadata,
-                             trial,
-                             model_name,
-                             dtype,
-                             steps,
-                             sequence_name=sequence_name,
-                             test_case_name="sequence_no_start",
-                             sequence_request_count=sequence_request_count)
-        assert False, "expected inference failure from missing START flag"
-    except Exception as ex:
-        if "must specify the START flag" not in ex.message():
-            raise
-
-
-def sequence_no_end(client_metadata, rng, trial, model_name, dtype, len_mean,
-                    len_stddev, sequence_name, sequence_request_count):
-    # Create a variable length sequence with "start" flag but that
-    # never ends. The sequence should be aborted by the server and its
-    # slot reused for another sequence.
-    seqlen = max(1, int(rng.normal(len_mean, len_stddev)))
-    print("{} {}: no-end seqlen = {}".format(sequence_name, client_metadata[1],
-                                             seqlen))
-
-    values = rng.randint(0, 1024 * 1024, size=seqlen).astype(dtype)
-
-    steps = []
-    expected_result = 0
-
-    for idx, step in enumerate(range(seqlen)):
-        flags = ""
-        if idx == 0:
-            flags = "start"
-
-        val = values[idx]
-        delay_ms = None
-        expected_result += val
-        expected_result = get_expected_result(expected_result, val, trial,
-                                              flags)
-
-        # (flag_str, value, expected_result, delay_ms)
-        steps.append((flags, val, expected_result, delay_ms),)
-
-    check_sequence_async(client_metadata,
-                         trial,
-                         model_name,
-                         dtype,
-                         steps,
-                         sequence_name=sequence_name,
-                         test_case_name="sequence_no_end",
-                         sequence_request_count=sequence_request_count)
-
-
-def timeout_client(client_metadata=[],
-                   sequence_name="<unknown>",
-                   input_dtype=np.float32,
-                   input_name="INPUT0",
-                   sequence_request_count={}):
-    trial = get_trial(is_sequence=False)
-    model_name = tu.get_zero_model_name(trial, 1, input_dtype)
-    triton_client = client_metadata[0]
-    if "librotch" in trial:
-        input_name = "INPUT__0"
-
-    tensor_shape = (math.trunc(1 * (1024 * 1024 * 1024) //
-                               np.dtype(input_dtype).itemsize),)
-    in0 = np.random.random(tensor_shape).astype(input_dtype)
-    inputs = [
-        grpcclient.InferInput(input_name, tensor_shape,
-                              np_to_triton_dtype(input_dtype)),
-    ]
-    inputs[0].set_data_from_numpy(in0)
-
-    # Expect an exception for small timeout values.
-    try:
-        count_sequence_request('timeout_client', sequence_request_count)
-        results = triton_client.infer(model_name, inputs, client_timeout=0.1)
-        assert False, "expected inference failure from deadline exceeded"
-    except Exception as ex:
-        if "Deadline Exceeded" not in ex.message():
-            assert False, "timeout_client failed {}".format(sequence_name)
-
-
-def resnet_model_request(sequence_name, sequence_request_count):
-    image_client = "../clients/image_client.py"
-    image = "../images/vulture.jpeg"
-    model_name = "resnet_v1_50_graphdef_def"
-    resnet_result = "resnet_{}.log".format(sequence_name)
-
-    os.system("{} -m {} -s VGG -c 1 -b 1 {} > {}".format(
-        image_client, model_name, image, resnet_result))
-    count_sequence_request('resnet_model_request', sequence_request_count)
-    with open(resnet_result) as f:
-        if "VULTURE" not in f.read():
-            assert False, "resnet_model_request failed"
-
-
-def get_crashing_client_request_result(log):
-    # Get result from the log
-    request_count = 0
-    is_server_live = "false"
-
-    if "request_count:" in log:
-        idx_start = log.rindex("request_count:")
-        idx_start = log.find(" ", idx_start)
-        idx_end = log.find('\n', idx_start)
-        request_count = int(log[idx_start + 1:idx_end])
-
-    if "live:" in log:
-        idx_start = log.rindex("live:")
-        idx_start = log.find(" ", idx_start)
-        idx_end = log.find('\n', idx_start)
-        is_server_live = log[idx_start + 1:idx_end]
-
-    return (request_count, is_server_live == "true")
-
-
-def crashing_client(sequence_name, sequence_request_count):
-    trial = get_trial(is_sequence=False)
-
-    # Client will be terminated after 3 seconds
-    crashing_client = "crashing_client.py"
-    log = subprocess.check_output(
-        [sys.executable, crashing_client, "-t", trial])
-    result = get_crashing_client_request_result(log.decode("utf-8"))
-
-    count_sequence_request("crashing_client",
-                           sequence_request_count,
-                           count=int(result[0]))
-    if not result[1]:
-        assert False, "crashing_client failed {}".format(sequence_name)
+    def get_scenario(self):
+        return self.scenarios_[bisect.bisect_left(self.probs_range_,
+                                                  self.rng_.rand())]
 
 
 def stress_thread(name, seed, test_duration, correlation_id_base,
@@ -546,6 +130,7 @@ def stress_thread(name, seed, test_duration, correlation_id_base,
     print("Starting thread {} with seed {}".format(name, seed))
     rng = np.random.RandomState(seed)
 
+    # FIXME revisit to check if it is necessary
     client_metadata_list = []
 
     # Must use streaming GRPC context to ensure each sequences'
@@ -561,195 +146,81 @@ def stress_thread(name, seed, test_duration, correlation_id_base,
     rare_cnt = 8
     is_last_used_no_end = {}
 
+    update_counter_fn = partial(update_test_count, test_case_count,
+                                failed_test_case_count, sequence_request_count)
     for c in range(common_cnt + rare_cnt):
         client_metadata_list.append(
             (grpcclient.InferenceServerClient("localhost:8001",
                                               verbose=FLAGS.verbose),
              correlation_id_base + c))
+    pa_start_seq_id = correlation_id_base + common_cnt + rare_cnt
+    pa_end_seq_id = pa_start_seq_id + CORRELATION_ID_BLOCK_SIZE
+
+    # Weight roughly in thousandth percent
+    ss = ScenarioSelector([
+        (60, TimeoutScenario(name, get_trials(False), verbose=FLAGS.verbose)),
+        (80, ResNetScenario(name, verbose=FLAGS.verbose)),
+        (60, CrashingScenario(name, verbose=FLAGS.verbose)),
+        (62,
+         SequenceNoEndScenario(name,
+                               get_trials(),
+                               rng,
+                               is_last_used_no_end,
+                               verbose=FLAGS.verbose)),
+        (68,
+         SequenceValidNoEndScenario(name,
+                                    get_trials(),
+                                    rng,
+                                    is_last_used_no_end,
+                                    verbose=FLAGS.verbose)),
+        (68,
+         SequenceValidValidScenario(name,
+                                    get_trials(),
+                                    rng,
+                                    is_last_used_no_end,
+                                    verbose=FLAGS.verbose)),
+        (7,
+         SequenceNoStartScenario(name,
+                                 get_trials(),
+                                 rng,
+                                 is_last_used_no_end,
+                                 verbose=FLAGS.verbose)),
+        (295,
+         SequenceValidScenario(name,
+                               get_trials(),
+                               rng,
+                               is_last_used_no_end,
+                               verbose=FLAGS.verbose)),
+        (300,
+         PerfAnalyzerScenario(
+             name,
+             rng,
+             get_trials(),
+             get_trials(False),
+             sequence_id_range=(pa_start_seq_id, pa_end_seq_id),
+             verbose=FLAGS.verbose)),
+    ], rng)
 
     rare_idx = 0
+    common_idx = 0
     start_time = time.time()
-
     while time.time() - start_time < test_duration:
+        scenario = ss.get_scenario()
+        # FIXME generating 'is_rare' for now as some scenario uses it to select
+        # client context, but we may not need this if we roll forward the sequence id
+        if rng.rand() < 0.1:
+            client_idx = common_cnt + rare_idx
+            rare_idx = (rare_idx + 1) % rare_cnt
+        else:
+            client_idx = common_idx
+            common_idx = (common_idx + 1) % common_cnt
+
         try:
-            trial = get_trial()
-            dtype = get_datatype(trial)
-            model_name = tu.get_sequence_model_name(trial, dtype)
-            # Common or rare context?
-            if rng.rand() < 0.1:
-                # Rare context...
-                choice = rng.rand()
-                client_idx = common_cnt + rare_idx
-
-                # Send a no-end, valid-no-end or valid-valid
-                # sequence... because it is a rare context this should
-                # exercise the idle sequence path of the sequence
-                # scheduler
-                if choice < 0.33:
-                    count_test_case("sequence_no_end", test_case_count)
-                    is_last_used_no_end[model_name] = True
-                    last_choice = "sequence_no_end"
-                    sequence_no_end(
-                        client_metadata_list[client_idx],
-                        rng,
-                        trial,
-                        model_name,
-                        dtype,
-                        SEQUENCE_LENGTH_MEAN,
-                        SEQUENCE_LENGTH_STDEV,
-                        sequence_name=name,
-                        sequence_request_count=sequence_request_count)
-                elif choice < 0.66:
-                    count_test_case("sequence_valid_no_end", test_case_count)
-                    is_last_used_no_end[model_name] = True
-                    last_choice = "sequence_valid_no_end"
-                    sequence_valid_no_end(
-                        client_metadata_list[client_idx],
-                        rng,
-                        trial,
-                        model_name,
-                        dtype,
-                        SEQUENCE_LENGTH_MEAN,
-                        SEQUENCE_LENGTH_STDEV,
-                        sequence_name=name,
-                        sequence_request_count=sequence_request_count)
-                else:
-                    count_test_case("sequence_valid_valid", test_case_count)
-                    is_last_used_no_end[model_name] = False
-                    last_choice = "sequence_valid_valid"
-                    sequence_valid_valid(
-                        client_metadata_list[client_idx],
-                        rng,
-                        trial,
-                        model_name,
-                        dtype,
-                        SEQUENCE_LENGTH_MEAN,
-                        SEQUENCE_LENGTH_STDEV,
-                        sequence_name=name,
-                        sequence_request_count=sequence_request_count)
-
-                rare_idx = (rare_idx + 1) % rare_cnt
-            elif rng.rand() < 0.8:
-                # Common context...
-                client_idx = 0
-                client_metadata = client_metadata_list[client_idx]
-
-                choice = rng.rand()
-
-                # no-start cannot follow no-end since the server will
-                # just assume that the no-start is a continuation of
-                # the no-end sequence instead of being a sequence
-                # missing start flag.
-                if model_name in is_last_used_no_end:
-                    if ((not is_last_used_no_end[model_name]) and
-                        (choice < 0.01)):
-                        count_test_case("sequence_no_start", test_case_count)
-                        is_last_used_no_end[model_name] = False
-                        last_choice = "sequence_no_start"
-                        sequence_no_start(
-                            client_metadata,
-                            rng,
-                            trial,
-                            model_name,
-                            dtype,
-                            sequence_name=name,
-                            sequence_request_count=sequence_request_count)
-                    else:
-                        if choice < 0.01:
-                            count_test_case("sequence_no_start",
-                                            test_case_count)
-                            is_last_used_no_end[model_name] = False
-                            last_choice = "sequence_no_start"
-                            sequence_no_start(
-                                client_metadata,
-                                rng,
-                                trial,
-                                model_name,
-                                dtype,
-                                sequence_name=name,
-                                sequence_request_count=sequence_request_count)
-                elif choice < 0.05:
-                    count_test_case("sequence_no_end", test_case_count)
-                    is_last_used_no_end[model_name] = True
-                    last_choice = "sequence_no_end"
-                    sequence_no_end(
-                        client_metadata,
-                        rng,
-                        trial,
-                        model_name,
-                        dtype,
-                        SEQUENCE_LENGTH_MEAN,
-                        SEQUENCE_LENGTH_STDEV,
-                        sequence_name=name,
-                        sequence_request_count=sequence_request_count)
-                elif choice < 0.10:
-                    count_test_case("sequence_valid_no_end", test_case_count)
-                    is_last_used_no_end[model_name] = True
-                    last_choice = "sequence_valid_no_end"
-                    sequence_valid_no_end(
-                        client_metadata,
-                        rng,
-                        trial,
-                        model_name,
-                        dtype,
-                        SEQUENCE_LENGTH_MEAN,
-                        SEQUENCE_LENGTH_STDEV,
-                        sequence_name=name,
-                        sequence_request_count=sequence_request_count)
-                elif choice < 0.15:
-                    count_test_case("sequence_valid_valid", test_case_count)
-                    is_last_used_no_end[model_name] = False
-                    last_choice = "sequence_valid_valid"
-                    sequence_valid_valid(
-                        client_metadata,
-                        rng,
-                        trial,
-                        model_name,
-                        dtype,
-                        SEQUENCE_LENGTH_MEAN,
-                        SEQUENCE_LENGTH_STDEV,
-                        sequence_name=name,
-                        sequence_request_count=sequence_request_count)
-                else:
-                    count_test_case("sequence_valid", test_case_count)
-                    is_last_used_no_end[model_name] = False
-                    last_choice = "sequence_valid"
-                    sequence_valid(
-                        client_metadata,
-                        rng,
-                        trial,
-                        model_name,
-                        dtype,
-                        SEQUENCE_LENGTH_MEAN,
-                        SEQUENCE_LENGTH_STDEV,
-                        sequence_name=name,
-                        sequence_request_count=sequence_request_count)
-            else:
-                client_idx = 1
-                client_metadata = client_metadata_list[client_idx]
-                choice = rng.rand()
-
-                if choice < 0.3:
-                    count_test_case("timeout_client", test_case_count)
-                    last_choice = "timeout_client"
-                    timeout_client(
-                        client_metadata=client_metadata_list[client_idx],
-                        sequence_name=name,
-                        sequence_request_count=sequence_request_count)
-                elif choice < 0.7:
-                    count_test_case("resnet_model_request", test_case_count)
-                    last_choice = "resnet_model_request"
-                    resnet_model_request(
-                        sequence_name=name,
-                        sequence_request_count=sequence_request_count)
-                else:
-                    count_test_case("crashing_client", test_case_count)
-                    last_choice = "crashing_client"
-                    crashing_client(
-                        sequence_name=name,
-                        sequence_request_count=sequence_request_count)
+            res = scenario.run(client_metadata_list[client_idx])
+            if res is not None:
+                update_counter_fn(scenario.scenario_name(), count=res)
         except Exception as ex:
-            count_failed_test_case(last_choice, failed_test_case_count)
+            update_counter_fn(scenario.scenario_name(), False)
             _thread_exceptions_mutex.acquire()
             try:
                 _thread_exceptions.append(traceback.format_exc())
@@ -764,14 +235,6 @@ def stress_thread(name, seed, test_duration, correlation_id_base,
         c.close()
 
     print("Exiting thread {}".format(name))
-    check_status(model_name)
-
-
-def check_status(model_name):
-    client = grpcclient.InferenceServerClient("localhost:8001",
-                                              verbose=FLAGS.verbose)
-    stats = client.get_inference_statistics(model_name)
-    print(stats)
 
 
 def format_content(content, max_line_length):
@@ -809,24 +272,30 @@ def generate_report(elapsed_time, _test_case_count, _failed_test_case_count,
     secs = elapsed_time % 60
 
     test_case_description = {
-        'sequence_valid': 'Send a sequence with "start" and "end" flags.',
-        'sequence_valid_valid':
+        'SequenceValidScenario':
+            'Send a sequence with "start" and "end" flags.',
+        'SequenceValidValidScenario':
             'Send two sequences back to back using the same correlation ID'
             ' with "start" and "end" flags.',
-        'sequence_valid_no_end':
+        'SequenceValidNoEndScenario':
             'Send two sequences back to back using the same correlation ID.'
             ' The first with "start" and "end" flags, and the second with no'
             ' "end" flag.',
-        'sequence_no_start':
+        'SequenceNoStartScenario':
             'Send a sequence without a "start" flag. Sequence should get an'
             ' error from the server.',
-        'sequence_no_end':
+        'SequenceNoEndScenario':
             'Send a sequence with "start" flag but that never ends. The'
             ' sequence should be aborted by the server and its slot reused'
             ' for another sequence.',
-        'timeout_client': 'Expect an exception for small timeout values.',
-        'resnet_model_request': 'Send a request using resnet model.',
-        'crashing_client': 'Client crashes in the middle of inferences.'
+        'TimeoutScenario':
+            'Expect an exception for small timeout values.',
+        'ResNetScenario':
+            'Send a request using resnet model.',
+        'CrashingScenario':
+            'Client crashes in the middle of inferences.',
+        'PerfAnalyzerScenario':
+            'Client that maintains a specific load.',
     }
 
     f = open("stress_report.txt", "w")

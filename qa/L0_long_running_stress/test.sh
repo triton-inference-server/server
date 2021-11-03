@@ -57,7 +57,7 @@ export CI_JOB_ID=${CI_JOB_ID}
 
 MODEL_DIR=models
 
-rm -fr *.log *.txt *.serverlog models && mkdir models
+rm -fr *.csv *.log *.txt *.serverlog models validation_data && mkdir models validation_data
 
 # Get the datatype to use based on the backend
 function get_datatype () {
@@ -112,6 +112,12 @@ for MODEL in $MODELS; do
         echo "{ key: \"execute_delay_ms\"; value: { string_value: \"1000\" }}" >> config.pbtxt && \
         echo "]" >> config.pbtxt)
 done
+cp -r ../custom_models/custom_zero_1_float32 $MODEL_DIR/custom_zero_1_float32 && \
+  mkdir $MODEL_DIR/custom_zero_1_float32/1 && \
+  (cd $MODEL_DIR/custom_zero_1_float32 && \
+    echo "parameters [" >> config.pbtxt && \
+        echo "{ key: \"execute_delay_ms\"; value: { string_value: \"10000\" }}" >> config.pbtxt && \
+        echo "]" >> config.pbtxt)
 
 cp -r $DATADIR/tf_model_store/resnet_v1_50_graphdef $MODEL_DIR/resnet_v1_50_graphdef_def && \
   (cd $MODEL_DIR/resnet_v1_50_graphdef_def && \
