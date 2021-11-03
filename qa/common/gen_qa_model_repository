@@ -408,10 +408,14 @@ python3 $SRCDIR/gen_qa_reshape_models.py --tensorrt --variable --models_dir=$RES
 chmod -R 777 $RESHAPEDESTDIR
 python3 $SRCDIR/gen_qa_sequence_models.py --tensorrt --models_dir=$SEQDESTDIR
 chmod -R 777 $SEQDESTDIR
+python3 $SRCDIR/gen_qa_implicit_models.py --tensorrt --models_dir=$IMPLICITSEQDESTDIR
+chmod -R 777 $IMPLICITSEQDESTDIR
 python3 $SRCDIR/gen_qa_dyna_sequence_models.py --tensorrt --models_dir=$DYNASEQDESTDIR
 chmod -R 777 $DYNASEQDESTDIR
 python3 $SRCDIR/gen_qa_sequence_models.py --tensorrt --variable --models_dir=$VARSEQDESTDIR
 chmod -R 777 $VARSEQDESTDIR
+python3 $SRCDIR/gen_qa_dyna_sequence_implicit_models.py --tensorrt --models_dir=$DYNASEQIMPLICITDESTDIR
+chmod -R 777 $DYNASEQIMPLICITDESTDIR
 python3 $SRCDIR/gen_qa_ragged_models.py --tensorrt --models_dir=$RAGGEDDESTDIR
 chmod -R 777 $RAGGEDDESTDIR
 python3 $SRCDIR/gen_qa_trt_format_models.py --models_dir=$FORMATDESTDIR
@@ -444,6 +448,9 @@ docker run --gpus device=$CUDA_DEVICE --rm --entrypoint $SRCDIR/$TRTSCRIPT \
        --mount type=bind,source=$HOST_PLGDESTDIR,target=$PLGDESTDIR \
        --mount type=bind,source=$HOST_RAGGEDDESTDIR,target=$RAGGEDDESTDIR \
        --mount type=bind,source=$HOST_FORMATDESTDIR,target=$FORMATDESTDIR \
+       --mount type=bind,source=$HOST_VARIMPLICITSEQDESTDIR,target=$VARIMPLICITSEQDESTDIR \
+       --mount type=bind,source=$HOST_DYNASEQIMPLICITDESTDIR,target=$DYNASEQIMPLICITDESTDIR \
+       --mount type=bind,source=$HOST_IMPLICITSEQDESTDIR,target=$IMPLICITSEQDESTDIR \
        $TENSORRT_IMAGE
 if [ $? -ne 0 ]; then
     echo -e "Failed"
