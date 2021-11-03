@@ -170,11 +170,17 @@ TritonModel::Create(
   }
   local_model->initialized_ = true;
 
-  // NOTE, we don't use device blocking transaction policy for
-  // sequence batching models.
-  const bool device_blocking = (local_model->backend_->ExecutionPolicy() ==
-                                TRITONBACKEND_EXECUTION_DEVICE_BLOCKING) &&
-                               (!model_config.has_sequence_batching());
+  bool device_blocking = false;
+  if (local_model->backend_->ExecutionPolicy() ==
+      TRITONBACKEND_EXECUTION_DEVICE_BLOCKING) {
+    if (model_config.has_sequence_batching()) {
+      LOG_INFO << "Overriding execution policy to "
+                  "\"TRITONBACKEND_EXECUTION_BLOCKING\" for sequence model \""
+               << model_config.name() << "\"";
+    } else {
+      device_blocking = true;
+    }
+  }
 
   // Create and initialize the model instances for this model.
   RETURN_IF_ERROR(TritonModelInstance::CreateInstances(
