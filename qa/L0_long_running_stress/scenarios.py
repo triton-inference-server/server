@@ -48,6 +48,7 @@ from functools import partial
 import abc
 import csv
 import json
+import re
 
 DEFAULT_TIMEOUT_MS = 25000
 SEQUENCE_LENGTH_MEAN = 16
@@ -143,7 +144,10 @@ class PerfAnalyzerScenario(Scenario):
                     "{}:{}".format(sequence_id_range[0], sequence_id_range[1])
                 ]
 
-            subprocess.run(arg_list, check=True)
+            completed_process = subprocess.run(arg_list,
+                                               check=True,
+                                               text=True,
+                                               stdout=subprocess.PIPE)
 
             # Read queue time and adjust concurrency
             with open(csv_file, newline='') as csvfile:
@@ -159,7 +163,8 @@ class PerfAnalyzerScenario(Scenario):
                             self.concurrency_range_[2] - 1,
                             self.concurrency_range_[0])
                     break
-            return 1
+            m = re.search(r'Request count: ([0-9]+)', completed_process.stdout)
+            return int(m.group(1))
 
     def __init__(self,
                  name,
@@ -357,7 +362,7 @@ class ResNetScenario(Scenario):
         ]
         res = triton_client.infer(self.model_name_, inputs, outputs=outputs)
         self.postprocess(res)
-        return 1
+        return self.batch_size_
 
 
 class TimeoutScenario(Scenario):
