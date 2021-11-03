@@ -84,6 +84,20 @@ def np_to_onnx_dtype(np_dtype):
         return onnx.TensorProto.STRING
 
 
+def np_to_trt_dtype(np_dtype):
+    if np_dtype == bool:
+        return trt.bool
+    elif np_dtype == np.int8:
+        return trt.int8
+    elif np_dtype == np.int32:
+        return trt.int32
+    elif np_dtype == np.float16:
+        return trt.float16
+    elif np_dtype == np.float32:
+        return trt.float32
+    return None
+
+
 def create_onnx_modelfile(models_dir, model_version, max_batch, dtype, shape):
 
     if not tu.validate_for_onnx_model(dtype, dtype, dtype, shape, shape, shape):
@@ -322,6 +336,226 @@ sequence_batching {{
         cfile.write(config)
 
 
+def create_plan_fixed_modelfile(models_dir, model_version, max_batch, dtype,
+                                shape):
+    trt_dtype = np_to_trt_dtype(dtype)
+    TRT_LOGGER = trt.Logger(trt.Logger.INFO)
+    builder = trt.Builder(TRT_LOGGER)
+    network = builder.create_network()
+    in0 = network.add_input("INPUT", trt_dtype, shape)
+    in_state0 = network.add_input("INPUT_STATE", trt_dtype, shape)
+    start0 = network.add_input("START", trt_dtype, [1 for i in shape])
+    ready0 = network.add_input("READY", trt_dtype, [1 for i in shape])
+    constant_1_data = trt.Weights(np.ones([1 for i in shape], dtype=dtype))
+    constant_1 = network.add_constant([1 for i in shape], constant_1_data)
+    not_start = network.add_elementwise(constant_1.get_output(0), start0, trt.ElementWiseOperation.SUB)
+    not_start.set_output_type(0, trt_dtype)
+
+    internal_state = network.add_elementwise(in_state0, not_start.get_output(0), trt.ElementWiseOperation.PROD)
+    out0 = network.add_elementwise(internal_state.get_output(0), in0,
+                                   trt.ElementWiseOperation.SUM)
+    out0_state = network.add_elementwise(internal_state.get_output(0), in0,
+                                   trt.ElementWiseOperation.SUM)
+
+    out0.get_output(0).name = "OUTPUT"
+    network.mark_output(out0.get_output(0))
+
+    out0_state.get_output(0).name = "OUTPUT_STATE"
+    network.mark_output(out0_state.get_output(0))
+
+    config = builder.create_builder_config()
+    config.max_workspace_size = 1 << 20
+    builder.max_batch_size = max(1, max_batch)
+    try:
+        engine_bytes = builder.build_serialized_network(network, config)
+    except AttributeError:
+        engine = builder.build_engine(network, config)
+        engine_bytes = engine.serialize()
+        del engine
+    del network
+
+    model_name = tu.get_sequence_model_name(
+        "plan_nobatch" if max_batch == 0 else "plan", dtype)
+    model_version_dir = models_dir + "/" + model_name + "/" + str(model_version)
+
+    try:
+        os.makedirs(model_version_dir)
+    except OSError as ex:
+        pass  # ignore existing dir
+
+    with open(model_version_dir + "/model.plan", "wb") as f:
+        f.write(engine_bytes)
+
+    del builder
+
+
+def create_plan_fixed_rf_modelfile(models_dir, model_version, max_batch, dtype,
+                                   shape):
+    trt_dtype = np_to_trt_dtype(dtype)
+    trt_memory_format = trt.TensorFormat.LINEAR
+
+    TRT_LOGGER = trt.Logger(trt.Logger.INFO)
+    builder = trt.Builder(TRT_LOGGER)
+    network = builder.create_network()
+    in0 = network.add_input("INPUT", trt_dtype, shape)
+    in_state0 = network.add_input("INPUT_STATE", trt_dtype, shape)
+    start0 = network.add_input("START", trt_dtype, [1 for i in shape])
+    ready0 = network.add_input("READY", trt_dtype, [1 for i in shape])
+    constant_1_data = trt.Weights(np.ones([1 for i in shape], dtype=dtype))
+    constant_1 = network.add_constant([1 for i in shape], constant_1_data)
+    not_start = network.add_elementwise(constant_1.get_output(0), start0, trt.ElementWiseOperation.SUB)
+    not_start.set_output_type(0, trt_dtype)
+
+    internal_state = network.add_elementwise(in_state0, not_start.get_output(0), trt.ElementWiseOperation.PROD)
+    out0 = network.add_elementwise(internal_state.get_output(0), in0,
+                                   trt.ElementWiseOperation.SUM)
+    out0_state = network.add_elementwise(internal_state.get_output(0), in0,
+                                   trt.ElementWiseOperation.SUM)
+
+    out0.get_output(0).name = "OUTPUT"
+    network.mark_output(out0.get_output(0))
+    out0.get_output(0).dtype = trt_dtype
+
+    out0_state.get_output(0).name = "OUTPUT_STATE"
+    network.mark_output(out0_state.get_output(0))
+    out0_state.get_output(0).dtype = trt_dtype
+
+    in0.allowed_formats = 1 << int(trt_memory_format)
+    in_state0.allowed_formats = 1 << int(trt_memory_format)
+    start0.allowed_formats = 1 << int(trt_memory_format)
+    ready0.allowed_formats = 1 << int(trt_memory_format)
+    out0.get_output(0).allowed_formats = 1 << int(trt_memory_format)
+    out0_state.get_output(0).allowed_formats = 1 << int(trt_memory_format)
+
+    if (trt_dtype == trt.int8):
+        in0.dynamic_range = (-128.0, 127.0)
+        in_state0.dynamic_range = (-128.0, 127.0)
+        out0.dynamic_range = (-128.0, 127.0)
+        out0_state.dynamic_range = (-128.0, 127.0)
+        start0.dynamic_range = (-128.0, 127.0)
+        ready0.dynamic_range = (-128.0, 127.0)
+
+    flags = 1 << int(trt.BuilderFlag.STRICT_TYPES)
+
+    if (trt_dtype == trt.int8):
+        flags |= 1 << int(trt.BuilderFlag.INT8)
+    elif (trt_dtype == trt.float16):
+        flags |= 1 << int(trt.BuilderFlag.FP16)
+
+    config = builder.create_builder_config()
+    config.flags = flags
+    config.max_workspace_size = 1 << 20
+    builder.max_batch_size = max(1, max_batch)
+    try:
+        engine_bytes = builder.build_serialized_network(network, config)
+    except AttributeError:
+        engine = builder.build_engine(network, config)
+        engine_bytes = engine.serialize()
+        del engine
+
+    model_name = tu.get_sequence_model_name(
+        "plan_nobatch" if max_batch == 0 else "plan", dtype)
+    model_version_dir = models_dir + "/" + model_name + "/" + str(model_version)
+
+    try:
+        os.makedirs(model_version_dir)
+    except OSError as ex:
+        pass  # ignore existing dir
+
+    with open(model_version_dir + "/model.plan", "wb") as f:
+        f.write(engine_bytes)
+
+    del builder
+
+
+def create_plan_modelfile(models_dir, model_version, max_batch, dtype, shape):
+
+    if not tu.validate_for_trt_model(dtype, dtype, dtype, shape, shape, shape):
+        return
+
+    if dtype != np.float32:
+        create_plan_fixed_rf_modelfile(models_dir, model_version, max_batch,
+                                           dtype, shape)
+    else:
+        create_plan_fixed_modelfile(models_dir, model_version, max_batch,
+                                    dtype, shape)
+
+
+def create_plan_modelconfig(models_dir, model_version, max_batch, dtype, shape):
+
+    if not tu.validate_for_trt_model(dtype, dtype, dtype, shape, shape, shape):
+        return
+
+    model_name = tu.get_sequence_model_name(
+        "plan_nobatch" if max_batch == 0 else "plan", dtype)
+    config_dir = models_dir + "/" + model_name
+    config = '''
+name: "{}"
+platform: "tensorrt_plan"
+max_batch_size: {}
+sequence_batching {{
+  max_sequence_idle_microseconds: 5000000
+  control_input [
+    {{
+      name: "START"
+      control [
+        {{
+          kind: CONTROL_SEQUENCE_START
+          {}_false_true: [ 0, 1 ]
+        }}
+      ]
+    }},
+    {{
+      name: "READY"
+      control [
+        {{
+          kind: CONTROL_SEQUENCE_READY
+          {}_false_true: [ 0, 1 ]
+        }}
+      ]
+    }}
+  ]
+  state [
+    {{
+      input_name: "INPUT_STATE"
+      output_name: "OUTPUT_STATE"
+      data_type: {dtype}
+      dims: {shape}
+    }} 
+  ]
+}}
+input [
+  {{
+    name: "INPUT"
+    data_type: {dtype}
+    dims: [ {shape} ]
+  }}
+]
+output [
+  {{
+    name: "OUTPUT"
+    data_type: {dtype}
+    dims: [ {shape} ]
+  }}
+]
+instance_group [
+  {{
+    kind: KIND_GPU
+  }}
+]
+'''.format(model_name, max_batch, "int32" if dtype == np.int32 else "fp32",
+           "int32" if dtype == np.int32 else "fp32", dtype=np_to_model_dtype(dtype),
+           shape=tu.shape_to_dims_str(shape))
+
+    try:
+        os.makedirs(config_dir)
+    except OSError as ex:
+        pass  # ignore existing dir
+
+    with open(config_dir + "/config.pbtxt", "w") as cfile:
+        cfile.write(config)
+
+
 def create_models(models_dir, dtype, shape, no_batch=True):
     model_version = 1
 
@@ -331,6 +565,23 @@ def create_models(models_dir, dtype, shape, no_batch=True):
         if no_batch:
             create_onnx_modelconfig(models_dir, model_version, 0, dtype, shape)
             create_onnx_modelfile(models_dir, model_version, 0, dtype, shape)
+
+    if FLAGS.tensorrt:
+        if dtype == np.bool:
+            return
+        suffix = []
+        if dtype == np.int8:
+            suffix = [1, 1]
+
+        create_plan_modelconfig(models_dir, model_version, 8, dtype,
+                                shape + suffix)
+        create_plan_modelfile(models_dir, model_version, 8, dtype,
+                              shape + suffix)
+        if no_batch:
+            create_plan_modelconfig(models_dir, model_version, 0, dtype,
+                                    shape + suffix)
+            create_plan_modelfile(models_dir, model_version, 0, dtype,
+                                  shape + suffix)
 
 
 if __name__ == '__main__':
@@ -388,6 +639,10 @@ if __name__ == '__main__':
 
     if FLAGS.onnx:
         import onnx
+
+    if FLAGS.tensorrt:
+        import tensorrt as trt
+
     import test_util as tu
 
     # Tests with models that accept fixed-shape input/output tensors
