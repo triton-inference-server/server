@@ -85,6 +85,11 @@ class MetricModelReporter {
   {
     return *metric_inf_compute_output_duration_us_;
   }
+  prometheus::Gauge& MetricCacheNumEntries() const
+  {
+    return *metric_cache_num_entries_;
+  }
+
 
  private:
   MetricModelReporter(
@@ -98,6 +103,10 @@ class MetricModelReporter {
   prometheus::Counter* CreateCounterMetric(
       prometheus::Family<prometheus::Counter>& family,
       const std::map<std::string, std::string>& labels);
+  prometheus::Gauge* CreateGaugeMetric(
+      prometheus::Family<prometheus::Gauge>& family,
+      const std::map<std::string, std::string>& labels);
+
 
   prometheus::Counter* metric_inf_success_;
   prometheus::Counter* metric_inf_failure_;
@@ -108,6 +117,7 @@ class MetricModelReporter {
   prometheus::Counter* metric_inf_compute_input_duration_us_;
   prometheus::Counter* metric_inf_compute_infer_duration_us_;
   prometheus::Counter* metric_inf_compute_output_duration_us_;
+  prometheus::Gauge* metric_cache_num_entries_;
 #endif  // TRITON_ENABLE_METRICS
 };
 

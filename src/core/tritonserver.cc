@@ -1769,6 +1769,7 @@ TRITONSERVER_ServerNew(
 #ifdef TRITON_ENABLE_METRICS
   if (loptions->Metrics()) {
     ni::Metrics::EnableMetrics();
+    // TODO: EnableCacheMetrics?
     ni::Metrics::SetMetricsInterval(loptions->MetricsInterval());
   }
 #ifdef TRITON_ENABLE_METRICS_GPU
@@ -2297,6 +2298,19 @@ TRITONSERVER_ServerModelStatistics(
           "inference_count", backend->StatsAggregator().InferenceCount()));
       RETURN_IF_STATUS_ERROR(model_stat.AddUInt(
           "execution_count", backend->StatsAggregator().ExecutionCount()));
+
+      /* Response Cache */
+      // TODO
+      /*if (lserver->response_cache_ != nullptr) {
+        RETURN_IF_STATUS_ERROR(model_stat.AddUInt(
+          "cache_bytes_free", lserver->response_cache_->FreeBytes()));
+        RETURN_IF_STATUS_ERROR(model_stat.AddUInt(
+          "cache_bytes_used", lserver->response_cache_->AllocatedBytes()));
+        RETURN_IF_STATUS_ERROR(model_stat.AddUInt(
+          "cache_evictions", lserver->response_cache_->NumEvictions()));
+        RETURN_IF_STATUS_ERROR(model_stat.AddUInt(
+          "cache_entries", lserver->response_cache_->NumEntries()));
+      }*/
 
       RETURN_IF_STATUS_ERROR(
           model_stat.Add("inference_stats", std::move(inference_stats)));

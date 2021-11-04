@@ -128,6 +128,16 @@ class Metrics {
     return GetSingleton()->inf_compute_output_duration_us_family_;
   }
 
+  // TODO
+  // Metric family of cumulative inference compute durations, in
+  // microseconds
+  static prometheus::Family<prometheus::Gauge>&
+  FamilyCacheNumEntries()
+  {
+    return GetSingleton()->cache_num_entries_family_;
+  }
+
+
  private:
   Metrics();
   virtual ~Metrics();
@@ -151,6 +161,8 @@ class Metrics {
       inf_compute_infer_duration_us_family_;
   prometheus::Family<prometheus::Counter>&
       inf_compute_output_duration_us_family_;
+  // Response Cache Metrics
+  prometheus::Family<prometheus::Gauge>& cache_num_entries_family_;
 #ifdef TRITON_ENABLE_METRICS_GPU
   prometheus::Family<prometheus::Gauge>& gpu_utilization_family_;
   prometheus::Family<prometheus::Gauge>& gpu_memory_total_family_;

@@ -48,6 +48,9 @@ InferenceStatsAggregator::UpdateFailure(
 #ifdef TRITON_ENABLE_METRICS
   if (metric_reporter != nullptr) {
     metric_reporter->MetricInferenceFailure().Increment(1);
+    // TODO: How to access server->cache->NumEntries() here?
+    //metric_reporter->MetricCacheNumEntries().Set(server->response_cache->NumEntries());
+    metric_reporter->MetricCacheNumEntries().Increment(1);
   }
 #endif  // TRITON_ENABLE_METRICS
 }
@@ -109,6 +112,10 @@ InferenceStatsAggregator::UpdateSuccessWithDuration(
         compute_infer_duration_ns / 1000);
     metric_reporter->MetricInferenceComputeOutputDuration().Increment(
         compute_output_duration_ns / 1000);
+    // TODO: How to access server->cache->NumEntries() here?
+    metric_reporter->MetricCacheNumEntries().Increment(1);
+    //metric_reporter->MetricCacheNumEntries().Set(server->response_cache->NumEntries());
+
   }
 #endif  // TRITON_ENABLE_METRICS
 }
@@ -160,6 +167,7 @@ InferenceStatsAggregator::UpdateInferBatchStatsWithDuration(
 #ifdef TRITON_ENABLE_METRICS
   if (metric_reporter != nullptr) {
     metric_reporter->MetricInferenceExecutionCount().Increment(1);
+    // TODO: Cache metrics here too?
   }
 #endif  // TRITON_ENABLE_METRICS
 }

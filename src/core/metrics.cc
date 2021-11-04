@@ -91,6 +91,11 @@ Metrics::Metrics()
               .Help("Cummulative inference compute output duration in "
                     "microseconds")
               .Register(*registry_)),
+      cache_num_entries_family_(
+          prometheus::BuildGauge()
+              .Name("nv_cache_num_entries")
+              .Help("Number of responses stored in response cache")
+              .Register(*registry_)),
 #ifdef TRITON_ENABLE_METRICS_GPU
       gpu_utilization_family_(prometheus::BuildGauge()
                                   .Name("nv_gpu_utilization")
