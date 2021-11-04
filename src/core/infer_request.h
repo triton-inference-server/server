@@ -35,6 +35,7 @@
 #include "src/core/memory.h"
 #include "src/core/model_config.h"
 #include "src/core/response_allocator.h"
+#include "src/core/sequence_state.h"
 #include "src/core/status.h"
 #include "src/core/tritonserver_apis.h"
 
@@ -459,6 +460,20 @@ class InferenceRequest {
     return response_factory_.SetResponseDelegator(response_delegator_);
   }
 
+  Status SetSequenceStates(
+      const std::shared_ptr<SequenceStates>& sequence_states)
+  {
+    sequence_states_ = sequence_states;
+    return Status::Success;
+  }
+
+  Status LoadInputStates();
+
+  const std::shared_ptr<SequenceStates>& GetSequenceStates() const
+  {
+    return sequence_states_;
+  }
+
   // Prepare this request for inference.
   Status PrepareForInference();
 
@@ -628,6 +643,9 @@ class InferenceRequest {
   // Inference trace associated with this request.
   std::unique_ptr<InferenceTrace> trace_;
 #endif  // TRITON_ENABLE_TRACING
+
+  // Sequence I/O states used for implicit state.
+  std::shared_ptr<SequenceStates> sequence_states_;
 };
 
 std::ostream& operator<<(std::ostream& out, const InferenceRequest& request);

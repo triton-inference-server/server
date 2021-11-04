@@ -801,3 +801,23 @@ depending on the framework backend, and it will cause Triton to be
 less responsive to model update, so the users should experiment and
 choose the configuration that suits their need.  See the protobuf
 documentation for the currently available settings.
+
+## Response Cache (beta)
+
+The model configuration `response_cache` section has an `enable` boolean used to
+enable the Response Cache for this model. In addition to enabling the cache in
+the model config, a non-zero `--response-cache-byte-size` must be set when
+starting the server.
+
+```
+response_cache { 
+  enable: True 
+}
+```
+
+See the [Response
+Cache](https://github.com/triton-inference-server/server/blob/main/docs/response_cache.md)
+and [ModelConfig
+protobuf](https://github.com/triton-inference-server/common/blob/main/protobuf/model_config.proto).
+docs for more information.
+

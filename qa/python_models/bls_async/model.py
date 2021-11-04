@@ -26,6 +26,8 @@
 
 import numpy as np
 import triton_python_backend_utils as pb_utils
+import torch
+from torch.utils.dlpack import from_dlpack, to_dlpack
 import asyncio
 
 
@@ -39,27 +41,56 @@ def verify_add_sub_results(input0, input1, infer_response):
     if (output0 is None) or (output1 is None):
         return False
 
-    expected_output_0 = input0.as_numpy() + input1.as_numpy()
-    expected_output_1 = input0.as_numpy() - input1.as_numpy()
+    if not input0.is_cpu():
+        input0 = from_dlpack(input0.to_dlpack()).to('cpu').cpu().detach().numpy()
+    else:
+        input0 = input0.as_numpy()
 
-    if not np.all(expected_output_0 == output0.as_numpy()):
+    if not input1.is_cpu():
+        input1 = from_dlpack(input1.to_dlpack()).to('cpu').cpu().detach().numpy()
+    else:
+        input1 = input1.as_numpy()
+
+    if not output0.is_cpu():
+       output0 = from_dlpack(output0.to_dlpack()).to('cpu').cpu().detach().numpy()
+    else:
+       output0 = output0.as_numpy()
+
+    if not output1.is_cpu():
+       output1 = from_dlpack(output1.to_dlpack()).to('cpu').cpu().detach().numpy()
+    else:
+       output1 = output1.as_numpy()
+
+    expected_output_0 = input0 + input1
+    expected_output_1 = input0 - input1
+
+    if not np.all(expected_output_0 == output0):
+        print(f'For OUTPUT0 expected {expected_output_0} found {output0}')
         return False
 
-    if not np.all(expected_output_1 == output1.as_numpy()):
+    if not np.all(expected_output_1 == output1):
+        print(f'For OUTPUT1 expected {expected_output_1} found {output1}')
         return False
 
     return True
 
 
-def create_addsub_inference_request():
-    input0_np = np.random.randn(16)
-    input1_np = np.random.randn(16)
-    input0_np = input0_np.astype(np.float32)
-    input1_np = input1_np.astype(np.float32)
-    input0 = pb_utils.Tensor('INPUT0', input0_np)
-    input1 = pb_utils.Tensor('INPUT1', input1_np)
+def create_addsub_inference_request(gpu=False):
+    if not gpu:
+        input0_np = np.random.randn(16)
+        input1_np = np.random.randn(16)
+        input0_np = input0_np.astype(np.float32)
+        input1_np = input1_np.astype(np.float32)
+        input0 = pb_utils.Tensor('INPUT0', input0_np)
+        input1 = pb_utils.Tensor('INPUT1', input1_np)
+    else:
+        input0_pytorch = torch.rand(16).to('cuda')
+        input1_pytorch = torch.rand(16).to('cuda')
+        input0 = pb_utils.Tensor.from_dlpack('INPUT0', to_dlpack(input0_pytorch))
+        input1 = pb_utils.Tensor.from_dlpack('INPUT1', to_dlpack(input1_pytorch))
+
     infer_request = pb_utils.InferenceRequest(
-        model_name='add_sub',
+        model_name='dlpack_add_sub',
         inputs=[input0, input1],
         requested_output_names=['OUTPUT0', 'OUTPUT1'])
     return input0, input1, infer_request
@@ -81,17 +112,21 @@ async def async_bls_add_sub():
     return True
 
 
-async def multiple_async_bls():
+async def multiple_async_bls(gpu):
     infer_request_aws = []
-    input0, input1, infer_request = create_addsub_inference_request()
-    for i in range(10):
+    inputs = []
+    for _ in range(10):
+        input0, input1, infer_request = create_addsub_inference_request(gpu)
+        inputs.append((input0, input1))
         infer_request_aws.append(infer_request.async_exec())
+
     infer_responses = await asyncio.gather(*infer_request_aws)
-    for infer_response in infer_responses:
+    for infer_response, input_pair in zip(infer_responses, inputs):
         if infer_response.has_error():
+            print('Async BLS failed:', infer_response.error().message(), flush=True)
             return False
 
-        result_correct = verify_add_sub_results(input0, input1, infer_response)
+        result_correct = verify_add_sub_results(input_pair[0], input_pair[1], infer_response)
         if not result_correct:
             return False
 
@@ -102,12 +137,13 @@ class TritonPythonModel:
     async def execute(self, requests):
         responses = []
         for _ in requests:
-            test1 = await multiple_async_bls()
-            test2 = await async_bls_add_sub()
+            test1 = await multiple_async_bls(gpu=True)
+            test2 = await multiple_async_bls(gpu=False)
+            test3 = await async_bls_add_sub()
 
             responses.append(
                 pb_utils.InferenceResponse(output_tensors=[
-                    pb_utils.Tensor('OUTPUT0', np.array([test1 & test2]))
+                    pb_utils.Tensor('OUTPUT0', np.array([test1 & test2 & test3]))
                 ]))
 
         return responses

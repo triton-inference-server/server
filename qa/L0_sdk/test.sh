@@ -30,6 +30,8 @@ rm -fr triton_client
 mkdir triton_client
 (cd triton_client && tar xzvf /workspace/*.tar.gz)
 
+set +e
+
 RET=0
 
 # Check image_client and perf_client
@@ -152,11 +154,18 @@ fi
 
 # Check wheels
 WHLVERSION=`cat /workspace/TRITON_VERSION | sed 's/dev/\.dev0/'`
-WHLS="tritonclient-${WHLVERSION}-py3-none-any.whl \
-      tritonclient-${WHLVERSION}-py3-none-manylinux1_x86_64.whl"
+if [[ "aarch64" != $(uname -m) ]] ; then
+    WHLS="tritonclient-${WHLVERSION}-py3-none-any.whl \
+          tritonclient-${WHLVERSION}-py3-none-manylinux1_x86_64.whl"
+else
+    WHLS="tritonclient-${WHLVERSION}-py3-none-any.whl \
+          tritonclient-${WHLVERSION}-py3-none-manylinux2014_aarch64.whl"
+fi
 for l in $WHLS; do
     if [[ ! -f "triton_client/python/$l" ]]; then
         echo -e "*** wheel $l not present\n"
+        echo -e "*** available wheels in triton_client/python\n"
+        ls -ltr triton_client/python
         RET=1
     fi
 done
@@ -167,6 +176,7 @@ python -c """import tritonclient; import tritonclient.grpc; import tritonclient.
           import tritonclient.grpc.service_pb2; import tritonclient.grpc.service_pb2_grpc; \
           import tritonclient.utils.cuda_shared_memory; import tritonclient.utils.shared_memory"""
 RET=$(($RET+$?))
+
 EXECUTABLES="perf_analyzer perf_client"
 for l in $EXECUTABLES; do
   if [ $(which -a $l | grep "/usr/local/bin/$l" | wc -l) -ne 1 ]; then
@@ -193,6 +203,8 @@ if [[ ! -e "triton_client/java/examples/SimpleInferPerf.jar" ]]; then
     echo -e "*** SimpleInferPerf.jar not present\n"
     RET=1
 fi
+
+set -e
 
 if [ $RET -eq 0 ]; then
   echo -e "\n***\n*** Test Passed\n***"

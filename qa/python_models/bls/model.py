@@ -27,6 +27,8 @@
 import numpy as np
 import unittest
 import triton_python_backend_utils as pb_utils
+import torch
+from torch.utils.dlpack import from_dlpack, to_dlpack
 from multiprocessing import Pool
 
 
@@ -86,6 +88,42 @@ class PBBLSTest(unittest.TestCase):
 
         with self.assertRaises(TypeError):
             pb_utils.InferenceRequest(model_name='add_sub', inputs=[])
+
+    def _test_gpu_bls_add_sub(self, is_input0_gpu, is_input1_gpu):
+        input0 = torch.rand(16)
+        input1 = torch.rand(16)
+
+        if is_input0_gpu:
+            input0 = input0.to('cuda')
+
+        if is_input1_gpu:
+            input1 = input1.to('cuda')
+
+        input0_pb = pb_utils.Tensor.from_dlpack('INPUT0', to_dlpack(input0))
+        input1_pb = pb_utils.Tensor.from_dlpack('INPUT1', to_dlpack(input1))
+
+        infer_request = pb_utils.InferenceRequest(
+            model_name='dlpack_add_sub',
+            inputs=[input0_pb, input1_pb],
+            requested_output_names=['OUTPUT0', 'OUTPUT1'])
+        infer_response = infer_request.exec()
+        self.assertFalse(infer_response.has_error())
+
+        output0 = pb_utils.get_output_tensor_by_name(infer_response, 'OUTPUT0')
+        output1 = pb_utils.get_output_tensor_by_name(infer_response, 'OUTPUT1')
+        self.assertIsNotNone(output0)
+        self.assertIsNotNone(output1)
+
+        expected_output_0 = from_dlpack(input0_pb.to_dlpack()).to('cpu') + from_dlpack(input1_pb.to_dlpack()).to('cpu')
+        expected_output_1 = from_dlpack(input0_pb.to_dlpack()).to('cpu') - from_dlpack(input1_pb.to_dlpack()).to('cpu')
+
+        self.assertTrue(torch.all(expected_output_0 == from_dlpack(output0.to_dlpack()).to('cpu')))
+        self.assertTrue(torch.all(expected_output_1 == from_dlpack(output1.to_dlpack()).to('cpu')))
+
+    def test_gpu_bls(self):
+        for input0_device in [True, False]:
+            for input1_device in [True, False]:
+                self._test_gpu_bls_add_sub(input0_device, input1_device)
 
     def test_multiprocess(self):
         # Test multiprocess Pool with sync BLS

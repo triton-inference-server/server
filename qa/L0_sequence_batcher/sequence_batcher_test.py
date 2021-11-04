@@ -60,6 +60,7 @@ ENSEMBLES = bool(int(os.environ.get('ENSEMBLES', 1)))
 
 NO_BATCHING = (int(os.environ['NO_BATCHING']) == 1)
 MODEL_INSTANCES = int(os.environ['MODEL_INSTANCES'])
+IMPLICIT_STATE = (int(os.environ['IMPLICIT_STATE']) == 1)
 
 _trials = ()
 if NO_BATCHING:
@@ -141,6 +142,13 @@ class SequenceBatcherTest(su.SequenceBatcherTestUtil):
                 expected_result += 1
         return expected_result
 
+    def get_expected_result_implicit(self,
+                                     expected_result,
+                                     value,
+                                     trial,
+                                     flag_str=None):
+        return expected_result
+
     def test_simple_sequence(self):
         # Send one sequence and check for correct accumulator
         # result. The result should be returned immediately.
@@ -166,6 +174,10 @@ class SequenceBatcherTest(su.SequenceBatcherTestUtil):
                             "TRITONSERVER_DELAY_SCHEDULER" in os.environ)
                         self.assertFalse("TRITONSERVER_BACKLOG_DELAY_SCHEDULER"
                                          in os.environ)
+                        expected_result = self.get_expected_result(
+                            45, 9, trial, "end"
+                        ) if not IMPLICIT_STATE else self.get_expected_result_implicit(
+                            45, 9, trial, "end")
 
                         self.check_sequence(
                             trial,
@@ -179,7 +191,7 @@ class SequenceBatcherTest(su.SequenceBatcherTestUtil):
                              (None, 5, None, None), (None, 6, None, None),
                              (None, 7, None, None), (None, 8, None, None),
                              ("end", 9, None, None)),
-                            self.get_expected_result(45, 9, trial, "end"),
+                            expected_result,
                             protocol,
                             sequence_name="{}_{}".format(
                                 self._testMethodName, protocol))
@@ -215,6 +227,10 @@ class SequenceBatcherTest(su.SequenceBatcherTestUtil):
                             "TRITONSERVER_DELAY_SCHEDULER" in os.environ)
                         self.assertFalse("TRITONSERVER_BACKLOG_DELAY_SCHEDULER"
                                          in os.environ)
+                        expected_result = self.get_expected_result(
+                            42, 42, trial, "start,end"
+                        ) if not IMPLICIT_STATE else self.get_expected_result_implicit(
+                            42, 42, trial, "start,end")
 
                         self.check_sequence(
                             trial,
@@ -225,8 +241,7 @@ class SequenceBatcherTest(su.SequenceBatcherTestUtil):
                             # (flag_str, value, (ls_ms, gt_ms), (pre_delay, post_delay))
                             (
                                 ("start,end", 42, None, None),),
-                            self.get_expected_result(42, 42, trial,
-                                                     "start,end"),
+                            expected_result,
                             protocol,
                             sequence_name="{}_{}".format(
                                 self._testMethodName, protocol))
@@ -268,6 +283,10 @@ class SequenceBatcherTest(su.SequenceBatcherTestUtil):
                             "TRITONSERVER_DELAY_SCHEDULER" in os.environ)
                         self.assertFalse("TRITONSERVER_BACKLOG_DELAY_SCHEDULER"
                                          in os.environ)
+                        expected_result = self.get_expected_result(
+                            10, 9, trial, "end"
+                        ) if not IMPLICIT_STATE else self.get_expected_result_implicit(
+                            10, 9, trial, "end")
 
                         self.check_sequence(
                             trial,
@@ -277,7 +296,7 @@ class SequenceBatcherTest(su.SequenceBatcherTestUtil):
                             (4000, None),
                             # (flag_str, value, (ls_ms, gt_ms), (pre_delay, post_delay))
                             (("start", 1, None, None), ("end", 9, None, None)),
-                            self.get_expected_result(10, 9, trial, "end"),
+                            expected_result,
                             protocol,
                             batch_size=2,
                             sequence_name="{}_{}".format(
@@ -326,6 +345,10 @@ class SequenceBatcherTest(su.SequenceBatcherTestUtil):
                             "TRITONSERVER_DELAY_SCHEDULER" in os.environ)
                         self.assertFalse("TRITONSERVER_BACKLOG_DELAY_SCHEDULER"
                                          in os.environ)
+                        expected_result = self.get_expected_result(
+                            10, 9, trial, "end"
+                        ) if not IMPLICIT_STATE else self.get_expected_result_implicit(
+                            10, 9, trial, "end")
 
                         self.check_sequence(
                             trial,
@@ -335,7 +358,7 @@ class SequenceBatcherTest(su.SequenceBatcherTestUtil):
                             (4000, None),
                             # (flag_str, value, (ls_ms, gt_ms), (pre_delay, post_delay))
                             (("start", 1, None, None), ("end", 9, None, None)),
-                            self.get_expected_result(10, 9, trial, "end"),
+                            expected_result,
                             protocol,
                             sequence_name="{}_{}".format(
                                 self._testMethodName, protocol))
@@ -383,6 +406,10 @@ class SequenceBatcherTest(su.SequenceBatcherTestUtil):
                         self.assertFalse("TRITONSERVER_BACKLOG_DELAY_SCHEDULER"
                                          in os.environ)
 
+                        expected_result = self.get_expected_result(
+                            6, 3, trial, "end"
+                        ) if not IMPLICIT_STATE else self.get_expected_result_implicit(
+                            6, 3, trial, "end")
                         self.check_sequence(
                             trial,
                             model_name,
@@ -392,7 +419,7 @@ class SequenceBatcherTest(su.SequenceBatcherTestUtil):
                             # (flag_str, value, (ls_ms, gt_ms), (pre_delay, post_delay))
                             ((None, 1, None, None), (None, 2, None, None),
                              ("end", 3, None, None)),
-                            self.get_expected_result(6, 3, trial, "end"),
+                            expected_result,
                             protocol,
                             sequence_name="{}_{}".format(
                                 self._testMethodName, protocol))
@@ -443,6 +470,10 @@ class SequenceBatcherTest(su.SequenceBatcherTestUtil):
                             "TRITONSERVER_DELAY_SCHEDULER" in os.environ)
                         self.assertFalse("TRITONSERVER_BACKLOG_DELAY_SCHEDULER"
                                          in os.environ)
+                        expected_result = self.get_expected_result(
+                            6, 3, trial, None
+                        ) if not IMPLICIT_STATE else self.get_expected_result_implicit(
+                            6, 3, trial, None)
 
                         self.check_sequence(
                             trial,
@@ -453,7 +484,7 @@ class SequenceBatcherTest(su.SequenceBatcherTestUtil):
                             # (flag_str, value, (ls_ms, gt_ms), (pre_delay, post_delay))
                             (("start", 1, None, None), (None, 2, None, None),
                              ("end", 3, None, None), (None, 55, None, None)),
-                            self.get_expected_result(6, 3, trial, None),
+                            expected_result,
                             protocol,
                             sequence_name="{}_{}".format(
                                 self._testMethodName, protocol))
@@ -505,6 +536,10 @@ class SequenceBatcherTest(su.SequenceBatcherTestUtil):
                             "TRITONSERVER_DELAY_SCHEDULER" in os.environ)
                         self.assertFalse("TRITONSERVER_BACKLOG_DELAY_SCHEDULER"
                                          in os.environ)
+                        expected_result = self.get_expected_result(
+                            51, 9, trial, "end"
+                        ) if not IMPLICIT_STATE else self.get_expected_result_implicit(
+                            51, 9, trial, "end")
 
                         self.check_sequence(
                             trial,
@@ -515,7 +550,7 @@ class SequenceBatcherTest(su.SequenceBatcherTestUtil):
                             # (flag_str, value, (ls_ms, gt_ms), (pre_delay, post_delay))
                             (("start", 1, None, None), (None, 2, None, None),
                              ("start", 42, None, None), ("end", 9, None, None)),
-                            self.get_expected_result(51, 9, trial, "end"),
+                            expected_result,
                             protocol,
                             sequence_name="{}_{}".format(
                                 self._testMethodName, protocol))
@@ -528,7 +563,7 @@ class SequenceBatcherTest(su.SequenceBatcherTestUtil):
 
     def test_half_batch(self):
         # Test model instances that together are configured with
-        # total-batch-size 4.  Send two equal-length sequences in
+        # total-batch-size 4. Send two equal-length sequences in
         # parallel and make sure they get completely batched into
         # batch-size 2 inferences.
         for trial in _trials:
@@ -565,6 +600,11 @@ class SequenceBatcherTest(su.SequenceBatcherTestUtil):
                         int(os.environ["TRITONSERVER_BACKLOG_DELAY_SCHEDULER"]),
                         0)
 
+                    expected_result = self.get_expected_result(
+                        10, 4, trial, "end"
+                    ) if not IMPLICIT_STATE else self.get_expected_result_implicit(
+                        10, 4, trial, "end")
+
                     threads = []
                     threads.append(
                         threading.Thread(
@@ -578,12 +618,16 @@ class SequenceBatcherTest(su.SequenceBatcherTestUtil):
                                 # (flag_str, value, pre_delay_ms)
                                 (("start", 1, None), (None, 2, None),
                                  (None, 3, None), ("end", 4, None)),
-                                self.get_expected_result(10, 4, trial, "end"),
+                                expected_result,
                                 precreated_shm0_handles),
                             kwargs={
                                 'sequence_name':
                                     "{}".format(self._testMethodName)
                             }))
+                    expected_result = self.get_expected_result(
+                        27, 13, trial, "end"
+                    ) if not IMPLICIT_STATE else self.get_expected_result_implicit(
+                        27, 13, trial, "end")
                     threads.append(
                         threading.Thread(
                             target=self.check_sequence_async,
@@ -596,7 +640,7 @@ class SequenceBatcherTest(su.SequenceBatcherTestUtil):
                                 # (flag_str, value, pre_delay_ms)
                                 (("start", 0, None), (None, 9, None),
                                  (None, 5, None), ("end", 13, None)),
-                                self.get_expected_result(27, 13, trial, "end"),
+                                expected_result,
                                 precreated_shm1_handles),
                             kwargs={
                                 'sequence_name':
@@ -669,6 +713,10 @@ class SequenceBatcherTest(su.SequenceBatcherTestUtil):
                         0)
 
                     threads = []
+                    expected_result = self.get_expected_result(
+                        4, 3, trial, "end"
+                    ) if not IMPLICIT_STATE else self.get_expected_result_implicit(
+                        4, 3, trial, "end")
                     threads.append(
                         threading.Thread(
                             target=self.check_sequence_async,
@@ -680,12 +728,16 @@ class SequenceBatcherTest(su.SequenceBatcherTestUtil):
                                 (None, None),
                                 # (flag_str, value, pre_delay_ms)
                                 (("start", 1, None), ("end", 3, None)),
-                                self.get_expected_result(4, 3, trial, "end"),
+                                expected_result,
                                 precreated_shm0_handles),
                             kwargs={
                                 'sequence_name':
                                     "{}".format(self._testMethodName)
                             }))
+                    expected_result = self.get_expected_result(
+                        50, 14, trial, "end"
+                    ) if not IMPLICIT_STATE else self.get_expected_result_implicit(
+                        50, 14, trial, "end")
                     threads.append(
                         threading.Thread(
                             target=self.check_sequence_async,
@@ -698,12 +750,16 @@ class SequenceBatcherTest(su.SequenceBatcherTestUtil):
                                 # (flag_str, value, pre_delay_ms)
                                 (("start", 11, None), (None, 12, None),
                                  (None, 13, None), ("end", 14, None)),
-                                self.get_expected_result(50, 14, trial, "end"),
+                                expected_result,
                                 precreated_shm1_handles),
                             kwargs={
                                 'sequence_name':
                                     "{}".format(self._testMethodName)
                             }))
+                    expected_result = self.get_expected_result(
+                        224, 113, trial, "end"
+                    ) if not IMPLICIT_STATE else self.get_expected_result_implicit(
+                        224, 113, trial, "end")
                     threads.append(
                         threading.Thread(
                             target=self.check_sequence_async,
@@ -715,13 +771,16 @@ class SequenceBatcherTest(su.SequenceBatcherTestUtil):
                                 (None, None),
                                 # (flag_str, value, pre_delay_ms)
                                 (("start", 111, None), ("end", 113, None)),
-                                self.get_expected_result(
-                                    224, 113, trial, "end"),
+                                expected_result,
                                 precreated_shm2_handles),
                             kwargs={
                                 'sequence_name':
                                     "{}".format(self._testMethodName)
                             }))
+                    expected_result = self.get_expected_result(
+                        4450, 1114, trial, "end"
+                    ) if not IMPLICIT_STATE else self.get_expected_result_implicit(
+                        4450, 1114, trial, "end")
                     threads.append(
                         threading.Thread(
                             target=self.check_sequence_async,
@@ -734,8 +793,7 @@ class SequenceBatcherTest(su.SequenceBatcherTestUtil):
                                 # (flag_str, value, pre_delay_ms)
                                 (("start", 1111, None), (None, 1112, None),
                                  (None, 1113, None), ("end", 1114, None)),
-                                self.get_expected_result(
-                                    4450, 1114, trial, "end"),
+                                expected_result,
                                 precreated_shm3_handles),
                             kwargs={
                                 'sequence_name':
@@ -818,6 +876,10 @@ class SequenceBatcherTest(su.SequenceBatcherTestUtil):
                         int(os.environ["TRITONSERVER_BACKLOG_DELAY_SCHEDULER"]),
                         0)
 
+                    expected_result = self.get_expected_result(
+                        6, 3, trial, "end"
+                    ) if not IMPLICIT_STATE else self.get_expected_result_implicit(
+                        6, 3, trial, "end")
                     threads = []
                     threads.append(
                         threading.Thread(
@@ -831,12 +893,17 @@ class SequenceBatcherTest(su.SequenceBatcherTestUtil):
                                 # (flag_str, value, pre_delay_ms)
                                 (("start", 1, None), (None, 2, None), ("end", 3,
                                                                        None)),
-                                self.get_expected_result(6, 3, trial, "end"),
+                                expected_result,
                                 precreated_shm0_handles),
                             kwargs={
                                 'sequence_name':
                                     "{}".format(self._testMethodName)
                             }))
+
+                    expected_result = self.get_expected_result(
+                        36, 13, trial, "end"
+                    ) if not IMPLICIT_STATE else self.get_expected_result_implicit(
+                        36, 13, trial, "end")
                     threads.append(
                         threading.Thread(
                             target=self.check_sequence_async,
@@ -849,12 +916,17 @@ class SequenceBatcherTest(su.SequenceBatcherTestUtil):
                                 # (flag_str, value, pre_delay_ms)
                                 (("start", 11, None), (None, 12, None),
                                  ("end", 13, None)),
-                                self.get_expected_result(36, 13, trial, "end"),
+                                expected_result,
                                 precreated_shm1_handles),
                             kwargs={
                                 'sequence_name':
                                     "{}".format(self._testMethodName)
                             }))
+
+                    expected_result = self.get_expected_result(
+                        336, 113, trial, "end"
+                    ) if not IMPLICIT_STATE else self.get_expected_result_implicit(
+                        336, 113, trial, "end")
                     threads.append(
                         threading.Thread(
                             target=self.check_sequence_async,
@@ -867,13 +939,16 @@ class SequenceBatcherTest(su.SequenceBatcherTestUtil):
                                 # (flag_str, value, pre_delay_ms)
                                 (("start", 111, None), (None, 112, None),
                                  ("end", 113, None)),
-                                self.get_expected_result(
-                                    336, 113, trial, "end"),
+                                expected_result,
                                 precreated_shm2_handles),
                             kwargs={
                                 'sequence_name':
                                     "{}".format(self._testMethodName)
                             }))
+                    expected_result = self.get_expected_result(
+                        3336, 1113, trial, "end"
+                    ) if not IMPLICIT_STATE else self.get_expected_result_implicit(
+                        3336, 1113, trial, "end")
                     threads.append(
                         threading.Thread(
                             target=self.check_sequence_async,
@@ -886,8 +961,7 @@ class SequenceBatcherTest(su.SequenceBatcherTestUtil):
                                 # (flag_str, value, pre_delay_ms)
                                 (("start", 1111, None), (None, 1112, None),
                                  ("end", 1113, None)),
-                                self.get_expected_result(
-                                    3336, 1113, trial, "end"),
+                                expected_result,
                                 precreated_shm3_handles),
                             kwargs={
                                 'sequence_name':
@@ -966,6 +1040,10 @@ class SequenceBatcherTest(su.SequenceBatcherTestUtil):
                         0)
 
                     threads = []
+                    expected_result = self.get_expected_result(
+                        6 * 2, 3, trial, "end"
+                    ) if not IMPLICIT_STATE else self.get_expected_result_implicit(
+                        6, 3, trial, "end")
                     threads.append(
                         threading.Thread(
                             target=self.check_sequence_async,
@@ -978,14 +1056,18 @@ class SequenceBatcherTest(su.SequenceBatcherTestUtil):
                                 # (flag_str, value, pre_delay_ms)
                                 (("start", 1, None), (None, 2, None), ("end", 3,
                                                                        None)),
-                                self.get_expected_result(
-                                    6 * 2, 3, trial, "end"),
+                                expected_result,
                                 precreated_shm0_handles),
                             kwargs={
                                 'sequence_name':
                                     "{}".format(self._testMethodName),
                                 'tensor_shape': (2,)
                             }))
+
+                    expected_result = self.get_expected_result(
+                        36 * 2, 13, trial, "end"
+                    ) if not IMPLICIT_STATE else self.get_expected_result_implicit(
+                        36, 13, trial, "end")
                     threads.append(
                         threading.Thread(
                             target=self.check_sequence_async,
@@ -998,14 +1080,17 @@ class SequenceBatcherTest(su.SequenceBatcherTestUtil):
                                 # (flag_str, value, pre_delay_ms)
                                 (("start", 11, None), (None, 12, None),
                                  ("end", 13, None)),
-                                self.get_expected_result(
-                                    36 * 2, 13, trial, "end"),
+                                expected_result,
                                 precreated_shm1_handles),
                             kwargs={
                                 'sequence_name':
                                     "{}".format(self._testMethodName),
                                 'tensor_shape': (2,)
                             }))
+                    expected_result = self.get_expected_result(
+                        336, 113, trial, "end"
+                    ) if not IMPLICIT_STATE else self.get_expected_result_implicit(
+                        336, 113, trial, "end")
                     threads.append(
                         threading.Thread(
                             target=self.check_sequence_async,
@@ -1018,14 +1103,17 @@ class SequenceBatcherTest(su.SequenceBatcherTestUtil):
                                 # (flag_str, value, pre_delay_ms)
                                 (("start", 111, None), (None, 112, None),
                                  ("end", 113, None)),
-                                self.get_expected_result(
-                                    336, 113, trial, "end"),
+                                expected_result,
                                 precreated_shm2_handles),
                             kwargs={
                                 'sequence_name':
                                     "{}".format(self._testMethodName),
                                 'tensor_shape': (1,)
                             }))
+                    expected_result = self.get_expected_result(
+                        3336 * 3, 1113, trial, "end"
+                    ) if not IMPLICIT_STATE else self.get_expected_result_implicit(
+                        3336, 1113, trial, "end")
                     threads.append(
                         threading.Thread(
                             target=self.check_sequence_async,
@@ -1038,8 +1126,7 @@ class SequenceBatcherTest(su.SequenceBatcherTestUtil):
                                 # (flag_str, value, pre_delay_ms)
                                 (("start", 1111, None), (None, 1112, None),
                                  ("end", 1113, None)),
-                                self.get_expected_result(
-                                    3336 * 3, 1113, trial, "end"),
+                                expected_result,
                                 precreated_shm3_handles),
                             kwargs={
                                 'sequence_name':
@@ -1119,6 +1206,11 @@ class SequenceBatcherTest(su.SequenceBatcherTestUtil):
                         0)
 
                     threads = []
+
+                    expected_result = self.get_expected_result(
+                        6 * 2, 3, trial, "end"
+                    ) if not IMPLICIT_STATE else self.get_expected_result_implicit(
+                        6 * 2, 3, trial, "end")
                     threads.append(
                         threading.Thread(
                             target=self.check_sequence_async,
@@ -1131,14 +1223,18 @@ class SequenceBatcherTest(su.SequenceBatcherTestUtil):
                                 # (flag_str, value, pre_delay_ms)
                                 (("start", 1, None), (None, 2, None), ("end", 3,
                                                                        None)),
-                                self.get_expected_result(
-                                    6 * 2, 3, trial, "end"),
+                                expected_result,
                                 precreated_shm0_handles),
                             kwargs={
                                 'sequence_name':
                                     "{}".format(self._testMethodName),
                                 'tensor_shape': (2,)
                             }))
+
+                    expected_result = self.get_expected_result(
+                        36 * 2, 13, trial, "end"
+                    ) if not IMPLICIT_STATE else self.get_expected_result_implicit(
+                        36 * 2, 13, trial, "end")
                     threads.append(
                         threading.Thread(
                             target=self.check_sequence_async,
@@ -1151,14 +1247,17 @@ class SequenceBatcherTest(su.SequenceBatcherTestUtil):
                                 # (flag_str, value, pre_delay_ms)
                                 (("start", 11, None), (None, 12, None),
                                  ("end", 13, None)),
-                                self.get_expected_result(
-                                    36 * 2, 13, trial, "end"),
+                                expected_result,
                                 precreated_shm1_handles),
                             kwargs={
                                 'sequence_name':
                                     "{}".format(self._testMethodName),
                                 'tensor_shape': (2,)
                             }))
+                    expected_result = self.get_expected_result(
+                        336, 113, trial, "end"
+                    ) if not IMPLICIT_STATE else self.get_expected_result_implicit(
+                        336, 113, trial, "end")
                     threads.append(
                         threading.Thread(
                             target=self.check_sequence_async,
@@ -1171,14 +1270,17 @@ class SequenceBatcherTest(su.SequenceBatcherTestUtil):
                                 # (flag_str, value, pre_delay_ms)
                                 (("start", 111, None), (None, 112, None),
                                  ("end", 113, None)),
-                                self.get_expected_result(
-                                    336, 113, trial, "end"),
+                                expected_result,
                                 precreated_shm2_handles),
                             kwargs={
                                 'sequence_name':
                                     "{}".format(self._testMethodName),
                                 'tensor_shape': (1,)
                             }))
+                    expected_result = self.get_expected_result(
+                        3336 * 3, 1113, trial, "end"
+                    ) if not IMPLICIT_STATE else self.get_expected_result_implicit(
+                        3336 * 3, 1113, trial, "end")
                     threads.append(
                         threading.Thread(
                             target=self.check_sequence_async,
@@ -1191,8 +1293,7 @@ class SequenceBatcherTest(su.SequenceBatcherTestUtil):
                                 # (flag_str, value, pre_delay_ms)
                                 (("start", 1111, None), (None, 1112, None),
                                  ("end", 1113, None)),
-                                self.get_expected_result(
-                                    3336 * 3, 1113, trial, "end"),
+                                expected_result,
                                 precreated_shm3_handles),
                             kwargs={
                                 'sequence_name':
@@ -1266,6 +1367,10 @@ class SequenceBatcherTest(su.SequenceBatcherTestUtil):
                         0)
 
                     threads = []
+                    expected_result = self.get_expected_result(
+                        6, 3, trial, "end"
+                    ) if not IMPLICIT_STATE else self.get_expected_result_implicit(
+                        6, 3, trial, "end")
                     threads.append(
                         threading.Thread(
                             target=self.check_sequence_async,
@@ -1278,12 +1383,16 @@ class SequenceBatcherTest(su.SequenceBatcherTestUtil):
                                 # (flag_str, value, pre_delay_ms)
                                 (("start", 1, None), (None, 2, None), ("end", 3,
                                                                        None)),
-                                self.get_expected_result(6, 3, trial, "end"),
+                                expected_result,
                                 precreated_shm0_handles),
                             kwargs={
                                 'sequence_name':
                                     "{}".format(self._testMethodName)
                             }))
+                    expected_result = self.get_expected_result(
+                        36, 13, trial, "end"
+                    ) if not IMPLICIT_STATE else self.get_expected_result_implicit(
+                        36, 13, trial, "end")
                     threads.append(
                         threading.Thread(
                             target=self.check_sequence_async,
@@ -1296,12 +1405,16 @@ class SequenceBatcherTest(su.SequenceBatcherTestUtil):
                                 # (flag_str, value, pre_delay_ms)
                                 (("start", 11, None), (None, 12, None),
                                  ("end", 13, None)),
-                                self.get_expected_result(36, 13, trial, "end"),
+                                expected_result,
                                 precreated_shm1_handles),
                             kwargs={
                                 'sequence_name':
                                     "{}".format(self._testMethodName)
                             }))
+                    expected_result = self.get_expected_result(
+                        336, 113, trial, "end"
+                    ) if not IMPLICIT_STATE else self.get_expected_result_implicit(
+                        336, 113, trial, "end")
                     threads.append(
                         threading.Thread(
                             target=self.check_sequence_async,
@@ -1314,13 +1427,16 @@ class SequenceBatcherTest(su.SequenceBatcherTestUtil):
                                 # (flag_str, value, pre_delay_ms)
                                 (("start", 111, None), (None, 112, None),
                                  ("end", 113, None)),
-                                self.get_expected_result(
-                                    336, 113, trial, "end"),
+                                expected_result,
                                 precreated_shm2_handles),
                             kwargs={
                                 'sequence_name':
                                     "{}".format(self._testMethodName)
                             }))
+                    expected_result = self.get_expected_result(
+                        3336, 1113, trial, "end"
+                    ) if not IMPLICIT_STATE else self.get_expected_result_implicit(
+                        3336, 1113, trial, "end")
                     threads.append(
                         threading.Thread(
                             target=self.check_sequence_async,
@@ -1333,13 +1449,17 @@ class SequenceBatcherTest(su.SequenceBatcherTestUtil):
                                 # (flag_str, value, pre_delay_ms)
                                 (("start", 1111, None), (None, 1112, None),
                                  ("end", 1113, None)),
-                                self.get_expected_result(
-                                    3336, 1113, trial, "end"),
+                                expected_result,
                                 precreated_shm3_handles),
                             kwargs={
                                 'sequence_name':
                                     "{}".format(self._testMethodName)
                             }))
+
+                    expected_result = self.get_expected_result(
+                        33336, 11113, trial, "end"
+                    ) if not IMPLICIT_STATE else self.get_expected_result_implicit(
+                        33336, 11113, trial, "end")
                     threads.append(
                         threading.Thread(
                             target=self.check_sequence_async,
@@ -1352,8 +1472,7 @@ class SequenceBatcherTest(su.SequenceBatcherTestUtil):
                                 # (flag_str, value, pre_delay_ms)
                                 (("start", 11111, None), (None, 11112, None),
                                  ("end", 11113, None)),
-                                self.get_expected_result(
-                                    33336, 11113, trial, "end"),
+                                expected_result,
                                 precreated_shm4_handles),
                             kwargs={
                                 'sequence_name':
@@ -1441,6 +1560,10 @@ class SequenceBatcherTest(su.SequenceBatcherTestUtil):
                         2)
 
                     threads = []
+                    expected_result = self.get_expected_result(
+                        6, 3, trial, "end"
+                    ) if not IMPLICIT_STATE else self.get_expected_result_implicit(
+                        6, 3, trial, "end")
                     threads.append(
                         threading.Thread(
                             target=self.check_sequence_async,
@@ -1453,12 +1576,16 @@ class SequenceBatcherTest(su.SequenceBatcherTestUtil):
                                 # (flag_str, value, pre_delay_ms)
                                 (("start", 1, None), (None, 2, None), ("end", 3,
                                                                        None)),
-                                self.get_expected_result(6, 3, trial, "end"),
+                                expected_result,
                                 precreated_shm0_handles),
                             kwargs={
                                 'sequence_name':
                                     "{}".format(self._testMethodName)
                             }))
+                    expected_result = self.get_expected_result(
+                        24, 13, trial, "end"
+                    ) if not IMPLICIT_STATE else self.get_expected_result_implicit(
+                        24, 13, trial, "end")
                     threads.append(
                         threading.Thread(
                             target=self.check_sequence_async,
@@ -1470,12 +1597,16 @@ class SequenceBatcherTest(su.SequenceBatcherTestUtil):
                                 (None, None),
                                 # (flag_str, value, pre_delay_ms)
                                 (("start", 11, None), ("end", 13, None)),
-                                self.get_expected_result(24, 13, trial, "end"),
+                                expected_result,
                                 precreated_shm1_handles),
                             kwargs={
                                 'sequence_name':
                                     "{}".format(self._testMethodName)
                             }))
+                    expected_result = self.get_expected_result(
+                        224, 113, trial, "end"
+                    ) if not IMPLICIT_STATE else self.get_expected_result_implicit(
+                        224, 113, trial, "end")
                     threads.append(
                         threading.Thread(
                             target=self.check_sequence_async,
@@ -1487,13 +1618,16 @@ class SequenceBatcherTest(su.SequenceBatcherTestUtil):
                                 (None, None),
                                 # (flag_str, value, pre_delay_ms)
                                 (("start", 111, None), ("end", 113, None)),
-                                self.get_expected_result(
-                                    224, 113, trial, "end"),
+                                expected_result,
                                 precreated_shm2_handles),
                             kwargs={
                                 'sequence_name':
                                     "{}".format(self._testMethodName)
                             }))
+                    expected_result = self.get_expected_result(
+                        3336, 1113, trial, "end"
+                    ) if not IMPLICIT_STATE else self.get_expected_result_implicit(
+                        3336, 1113, trial, "end")
                     threads.append(
                         threading.Thread(
                             target=self.check_sequence_async,
@@ -1506,13 +1640,16 @@ class SequenceBatcherTest(su.SequenceBatcherTestUtil):
                                 # (flag_str, value, pre_delay_ms)
                                 (("start", 1111, None), (None, 1112, None),
                                  ("end", 1113, None)),
-                                self.get_expected_result(
-                                    3336, 1113, trial, "end"),
+                                expected_result,
                                 precreated_shm3_handles),
                             kwargs={
                                 'sequence_name':
                                     "{}".format(self._testMethodName)
                             }))
+                    expected_result = self.get_expected_result(
+                        11111, 11111, trial, "start,end"
+                    ) if not IMPLICIT_STATE else self.get_expected_result_implicit(
+                        11111, 11111, trial, "start,end")
                     threads.append(
                         threading.Thread(
                             target=self.check_sequence_async,
@@ -1525,13 +1662,16 @@ class SequenceBatcherTest(su.SequenceBatcherTestUtil):
                                 # (flag_str, value, pre_delay_ms)
                                 (
                                     ("start,end", 11111, None),),
-                                self.get_expected_result(
-                                    11111, 11111, trial, "start,end"),
+                                expected_result,
                                 precreated_shm4_handles),
                             kwargs={
                                 'sequence_name':
                                     "{}".format(self._testMethodName)
                             }))
+                    expected_result = self.get_expected_result(
+                        22222, 22222, trial, "start,end"
+                    ) if not IMPLICIT_STATE else self.get_expected_result_implicit(
+                        22222, 22222, trial, "start,end")
                     threads.append(
                         threading.Thread(
                             target=self.check_sequence_async,
@@ -1544,8 +1684,7 @@ class SequenceBatcherTest(su.SequenceBatcherTestUtil):
                                 # (flag_str, value, pre_delay_ms)
                                 (
                                     ("start,end", 22222, None),),
-                                self.get_expected_result(
-                                    22222, 22222, trial, "start,end"),
+                                expected_result,
                                 precreated_shm5_handles),
                             kwargs={
                                 'sequence_name':
@@ -1635,6 +1774,10 @@ class SequenceBatcherTest(su.SequenceBatcherTestUtil):
                         3)
 
                     threads = []
+                    expected_result = self.get_expected_result(
+                        6, 3, trial, "end"
+                    ) if not IMPLICIT_STATE else self.get_expected_result_implicit(
+                        6, 3, trial, "end")
                     threads.append(
                         threading.Thread(
                             target=self.check_sequence_async,
@@ -1647,12 +1790,16 @@ class SequenceBatcherTest(su.SequenceBatcherTestUtil):
                                 # (flag_str, value, pre_delay_ms)
                                 (("start", 1, None), (None, 2, None), ("end", 3,
                                                                        None)),
-                                self.get_expected_result(6, 3, trial, "end"),
+                                expected_result,
                                 precreated_shm0_handles),
                             kwargs={
                                 'sequence_name':
                                     "{}".format(self._testMethodName)
                             }))
+                    expected_result = self.get_expected_result(
+                        24, 13, trial, "end"
+                    ) if not IMPLICIT_STATE else self.get_expected_result_implicit(
+                        24, 13, trial, "end")
                     threads.append(
                         threading.Thread(
                             target=self.check_sequence_async,
@@ -1664,12 +1811,16 @@ class SequenceBatcherTest(su.SequenceBatcherTestUtil):
                                 (None, None),
                                 # (flag_str, value, pre_delay_ms)
                                 (("start", 11, None), ("end", 13, None)),
-                                self.get_expected_result(24, 13, trial, "end"),
+                                expected_result,
                                 precreated_shm1_handles),
                             kwargs={
                                 'sequence_name':
                                     "{}".format(self._testMethodName)
                             }))
+                    expected_result = self.get_expected_result(
+                        224, 113, trial, "end"
+                    ) if not IMPLICIT_STATE else self.get_expected_result_implicit(
+                        224, 113, trial, "end")
                     threads.append(
                         threading.Thread(
                             target=self.check_sequence_async,
@@ -1681,13 +1832,16 @@ class SequenceBatcherTest(su.SequenceBatcherTestUtil):
                                 (None, None),
                                 # (flag_str, value, pre_delay_ms)
                                 (("start", 111, None), ("end", 113, None)),
-                                self.get_expected_result(
-                                    224, 113, trial, "end"),
+                                expected_result,
                                 precreated_shm2_handles),
                             kwargs={
                                 'sequence_name':
                                     "{}".format(self._testMethodName)
                             }))
+                    expected_result = self.get_expected_result(
+                        3336, 1113, trial, "end"
+                    ) if not IMPLICIT_STATE else self.get_expected_result_implicit(
+                        3336, 1113, trial, "end")
                     threads.append(
                         threading.Thread(
                             target=self.check_sequence_async,
@@ -1700,13 +1854,16 @@ class SequenceBatcherTest(su.SequenceBatcherTestUtil):
                                 # (flag_str, value, pre_delay_ms)
                                 (("start", 1111, None), (None, 1112, None),
                                  ("end", 1113, None)),
-                                self.get_expected_result(
-                                    3336, 1113, trial, "end"),
+                                expected_result,
                                 precreated_shm3_handles),
                             kwargs={
                                 'sequence_name':
                                     "{}".format(self._testMethodName)
                             }))
+                    expected_result = self.get_expected_result(
+                        11111, 11111, trial, "start,end"
+                    ) if not IMPLICIT_STATE else self.get_expected_result_implicit(
+                        11111, 11111, trial, "end")
                     threads.append(
                         threading.Thread(
                             target=self.check_sequence_async,
@@ -1719,13 +1876,16 @@ class SequenceBatcherTest(su.SequenceBatcherTestUtil):
                                 # (flag_str, value, pre_delay_ms)
                                 (
                                     ("start,end", 11111, None),),
-                                self.get_expected_result(
-                                    11111, 11111, trial, "start,end"),
+                                expected_result,
                                 precreated_shm4_handles),
                             kwargs={
                                 'sequence_name':
                                     "{}".format(self._testMethodName)
                             }))
+                    expected_result = self.get_expected_result(
+                        66669, 22224, trial, "end"
+                    ) if not IMPLICIT_STATE else self.get_expected_result_implicit(
+                        66669, 22224, trial, "end")
                     threads.append(
                         threading.Thread(
                             target=self.check_sequence_async,
@@ -1741,8 +1901,7 @@ class SequenceBatcherTest(su.SequenceBatcherTestUtil):
                                     (None, 22223, None),
                                     ("end", 22224, 2000),
                                 ),
-                                self.get_expected_result(
-                                    66669, 22224, trial, "end"),
+                                expected_result,
                                 precreated_shm5_handles),
                             kwargs={
                                 'sequence_name':
@@ -1829,6 +1988,10 @@ class SequenceBatcherTest(su.SequenceBatcherTestUtil):
                         2)
 
                     threads = []
+                    expected_result = self.get_expected_result(
+                        6, 3, trial, "end"
+                    ) if not IMPLICIT_STATE else self.get_expected_result_implicit(
+                        6, 3, trial, "end")
                     threads.append(
                         threading.Thread(
                             target=self.check_sequence_async,
@@ -1841,12 +2004,16 @@ class SequenceBatcherTest(su.SequenceBatcherTestUtil):
                                 # (flag_str, value, pre_delay_ms)
                                 (("start", 1, None), (None, 2, None), ("end", 3,
                                                                        None)),
-                                self.get_expected_result(6, 3, trial, "end"),
+                                expected_result,
                                 precreated_shm0_handles),
                             kwargs={
                                 'sequence_name':
                                     "{}".format(self._testMethodName)
                             }))
+                    expected_result = self.get_expected_result(
+                        36, 13, trial, "end"
+                    ) if not IMPLICIT_STATE else self.get_expected_result_implicit(
+                        36, 13, trial, "end")
                     threads.append(
                         threading.Thread(
                             target=self.check_sequence_async,
@@ -1859,12 +2026,16 @@ class SequenceBatcherTest(su.SequenceBatcherTestUtil):
                                 # (flag_str, value, pre_delay_ms)
                                 (("start", 11, None), (None, 12, None),
                                  ("end", 13, None)),
-                                self.get_expected_result(36, 13, trial, "end"),
+                                expected_result,
                                 precreated_shm1_handles),
                             kwargs={
                                 'sequence_name':
                                     "{}".format(self._testMethodName)
                             }))
+                    expected_result = self.get_expected_result(
+                        336, 113, trial, "end"
+                    ) if not IMPLICIT_STATE else self.get_expected_result_implicit(
+                        336, 113, trial, "end")
                     threads.append(
                         threading.Thread(
                             target=self.check_sequence_async,
@@ -1877,13 +2048,16 @@ class SequenceBatcherTest(su.SequenceBatcherTestUtil):
                                 # (flag_str, value, pre_delay_ms)
                                 (("start", 111, None), (None, 112, None),
                                  ("end", 113, None)),
-                                self.get_expected_result(
-                                    336, 113, trial, "end"),
+                                expected_result,
                                 precreated_shm2_handles),
                             kwargs={
                                 'sequence_name':
                                     "{}".format(self._testMethodName)
                             }))
+                    expected_result = self.get_expected_result(
+                        3336, 1113, trial, "end"
+                    ) if not IMPLICIT_STATE else self.get_expected_result_implicit(
+                        3336, 1113, trial, "end")
                     threads.append(
                         threading.Thread(
                             target=self.check_sequence_async,
@@ -1896,13 +2070,16 @@ class SequenceBatcherTest(su.SequenceBatcherTestUtil):
                                 # (flag_str, value, pre_delay_ms)
                                 (("start", 1111, None), (None, 1112, None),
                                  ("end", 1113, None)),
-                                self.get_expected_result(
-                                    3336, 1113, trial, "end"),
+                                expected_result,
                                 precreated_shm3_handles),
                             kwargs={
                                 'sequence_name':
                                     "{}".format(self._testMethodName)
                             }))
+                    expected_result = self.get_expected_result(
+                        22224, 11113, trial, "end"
+                    ) if not IMPLICIT_STATE else self.get_expected_result_implicit(
+                        22224, 11113, trial, "end")
                     threads.append(
                         threading.Thread(
                             target=self.check_sequence_async,
@@ -1914,8 +2091,7 @@ class SequenceBatcherTest(su.SequenceBatcherTestUtil):
                                 (None, None),
                                 # (flag_str, value, pre_delay_ms)
                                 (("start", 11111, None), ("end", 11113, None)),
-                                self.get_expected_result(
-                                    22224, 11113, trial, "end"),
+                                expected_result,
                                 precreated_shm4_handles),
                             kwargs={
                                 'sequence_name':
@@ -2010,6 +2186,10 @@ class SequenceBatcherTest(su.SequenceBatcherTestUtil):
                         0)
 
                     threads = []
+                    expected_result = self.get_expected_result(
+                        4, 3, trial, None
+                    ) if not IMPLICIT_STATE else self.get_expected_result_implicit(
+                        4, 3, trial, None)
                     threads.append(
                         threading.Thread(
                             target=self.check_sequence_async,
@@ -2021,12 +2201,16 @@ class SequenceBatcherTest(su.SequenceBatcherTestUtil):
                                 (None, None),
                                 # (flag_str, value, pre_delay_ms)
                                 (("start", 1, None), (None, 3, None)),
-                                self.get_expected_result(4, 3, trial, None),
+                                expected_result,
                                 precreated_shm0_handles),
                             kwargs={
                                 'sequence_name':
                                     "{}".format(self._testMethodName)
                             }))
+                    expected_result = self.get_expected_result(
+                        48, 13, trial, "end"
+                    ) if not IMPLICIT_STATE else self.get_expected_result_implicit(
+                        48, 13, trial, "end")
                     threads.append(
                         threading.Thread(
                             target=self.check_sequence_async,
@@ -2039,12 +2223,16 @@ class SequenceBatcherTest(su.SequenceBatcherTestUtil):
                                 # (flag_str, value, pre_delay_ms)
                                 (("start", 11, None), (None, 12, None),
                                  (None, 12, None), ("end", 13, None)),
-                                self.get_expected_result(48, 13, trial, "end"),
+                                expected_result,
                                 precreated_shm1_handles),
                             kwargs={
                                 'sequence_name':
                                     "{}".format(self._testMethodName)
                             }))
+                    expected_result = self.get_expected_result(
+                        448, 113, trial, "end"
+                    ) if not IMPLICIT_STATE else self.get_expected_result_implicit(
+                        448, 113, trial, "end")
                     threads.append(
                         threading.Thread(
                             target=self.check_sequence_async,
@@ -2057,13 +2245,16 @@ class SequenceBatcherTest(su.SequenceBatcherTestUtil):
                                 # (flag_str, value, pre_delay_ms)
                                 (("start", 111, None), (None, 112, None),
                                  (None, 112, None), ("end", 113, None)),
-                                self.get_expected_result(
-                                    448, 113, trial, "end"),
+                                expected_result,
                                 precreated_shm2_handles),
                             kwargs={
                                 'sequence_name':
                                     "{}".format(self._testMethodName)
                             }))
+                    expected_result = self.get_expected_result(
+                        4448, 1113, trial, "end"
+                    ) if not IMPLICIT_STATE else self.get_expected_result_implicit(
+                        4448, 1113, trial, "end")
                     threads.append(
                         threading.Thread(
                             target=self.check_sequence_async,
@@ -2076,13 +2267,16 @@ class SequenceBatcherTest(su.SequenceBatcherTestUtil):
                                 # (flag_str, value, pre_delay_ms)
                                 (("start", 1111, None), (None, 1112, None),
                                  (None, 1112, None), ("end", 1113, None)),
-                                self.get_expected_result(
-                                    4448, 1113, trial, "end"),
+                                expected_result,
                                 precreated_shm3_handles),
                             kwargs={
                                 'sequence_name':
                                     "{}".format(self._testMethodName)
                             }))
+                    expected_result = self.get_expected_result(
+                        22224, 11113, trial, "end"
+                    ) if not IMPLICIT_STATE else self.get_expected_result_implicit(
+                        22224, 11113, trial, "end")
                     threads.append(
                         threading.Thread(
                             target=self.check_sequence_async,
@@ -2094,8 +2288,7 @@ class SequenceBatcherTest(su.SequenceBatcherTestUtil):
                                 (None, None),
                                 # (flag_str, value, pre_delay_ms)
                                 (("start", 11111, None), ("end", 11113, None)),
-                                self.get_expected_result(
-                                    22224, 11113, trial, "end"),
+                                expected_result,
                                 precreated_shm4_handles),
                             kwargs={
                                 'sequence_name':
@@ -2182,6 +2375,10 @@ class SequenceBatcherTest(su.SequenceBatcherTestUtil):
                         0)
 
                     threads = []
+                    expected_result = self.get_expected_result(
+                        4, 3, trial, None
+                    ) if not IMPLICIT_STATE else self.get_expected_result_implicit(
+                        4, 3, trial, None)
                     threads.append(
                         threading.Thread(
                             target=self.check_sequence_async,
@@ -2194,12 +2391,16 @@ class SequenceBatcherTest(su.SequenceBatcherTestUtil):
                                 # (flag_str, value, pre_delay_ms)
                                 (("start", 1, None),
                                  (None, 3, _max_sequence_idle_ms + 1000)),
-                                self.get_expected_result(4, 3, trial, None),
+                                expected_result,
                                 precreated_shm0_handles),
                             kwargs={
                                 'sequence_name':
                                     "{}".format(self._testMethodName)
                             }))
+                    expected_result = self.get_expected_result(
+                        48, 13, trial, None
+                    ) if not IMPLICIT_STATE else self.get_expected_result_implicit(
+                        48, 13, trial, None)
                     threads.append(
                         threading.Thread(
                             target=self.check_sequence_async,
@@ -2214,12 +2415,16 @@ class SequenceBatcherTest(su.SequenceBatcherTestUtil):
                                   None), (None, 12, _max_sequence_idle_ms / 2),
                                  (None, 12, _max_sequence_idle_ms / 2),
                                  ("end", 13, _max_sequence_idle_ms / 2)),
-                                self.get_expected_result(48, 13, trial, None),
+                                expected_result,
                                 precreated_shm1_handles),
                             kwargs={
                                 'sequence_name':
                                     "{}".format(self._testMethodName)
                             }))
+                    expected_result = self.get_expected_result(
+                        448, 113, trial, None
+                    ) if not IMPLICIT_STATE else self.get_expected_result_implicit(
+                        448, 113, trial, None)
                     threads.append(
                         threading.Thread(
                             target=self.check_sequence_async,
@@ -2234,12 +2439,16 @@ class SequenceBatcherTest(su.SequenceBatcherTestUtil):
                                   None), (None, 112, _max_sequence_idle_ms / 2),
                                  (None, 112, _max_sequence_idle_ms / 2),
                                  ("end", 113, _max_sequence_idle_ms / 2)),
-                                self.get_expected_result(448, 113, trial, None),
+                                expected_result,
                                 precreated_shm2_handles),
                             kwargs={
                                 'sequence_name':
                                     "{}".format(self._testMethodName)
                             }))
+                    expected_result = self.get_expected_result(
+                        4448, 1113, trial, None
+                    ) if not IMPLICIT_STATE else self.get_expected_result_implicit(
+                        4448, 1113, trial, None)
                     threads.append(
                         threading.Thread(
                             target=self.check_sequence_async,
@@ -2254,13 +2463,16 @@ class SequenceBatcherTest(su.SequenceBatcherTestUtil):
                                  (None, 1112, _max_sequence_idle_ms / 2),
                                  (None, 1112, _max_sequence_idle_ms / 2),
                                  ("end", 1113, _max_sequence_idle_ms / 2)),
-                                self.get_expected_result(
-                                    4448, 1113, trial, None),
+                                expected_result,
                                 precreated_shm3_handles),
                             kwargs={
                                 'sequence_name':
                                     "{}".format(self._testMethodName)
                             }))
+                    expected_result = self.get_expected_result(
+                        22224, 11113, trial, "end"
+                    ) if not IMPLICIT_STATE else self.get_expected_result_implicit(
+                        22224, 11113, trial, "end")
                     threads.append(
                         threading.Thread(
                             target=self.check_sequence_async,
@@ -2272,8 +2484,7 @@ class SequenceBatcherTest(su.SequenceBatcherTestUtil):
                                 (None, None),
                                 # (flag_str, value, pre_delay_ms)
                                 (("start", 11111, None), ("end", 11113, None)),
-                                self.get_expected_result(
-                                    22224, 11113, trial, "end"),
+                                expected_result,
                                 precreated_shm4_handles),
                             kwargs={
                                 'sequence_name':
@@ -2359,6 +2570,10 @@ class SequenceBatcherTest(su.SequenceBatcherTestUtil):
                         0)
 
                     threads = []
+                    expected_result = self.get_expected_result(
+                        1, 1, trial, "start"
+                    ) if not IMPLICIT_STATE else self.get_expected_result_implicit(
+                        1, 1, trial, "start")
                     threads.append(
                         threading.Thread(
                             target=self.check_sequence_async,
@@ -2371,12 +2586,16 @@ class SequenceBatcherTest(su.SequenceBatcherTestUtil):
                                 # (flag_str, value, pre_delay_ms)
                                 (
                                     ("start", 1, None),),
-                                self.get_expected_result(1, 1, trial, "start"),
+                                expected_result,
                                 precreated_shm0_handles),
                             kwargs={
                                 'sequence_name':
                                     "{}".format(self._testMethodName)
                             }))
+                    expected_result = self.get_expected_result(
+                        23, 12, trial, None
+                    ) if not IMPLICIT_STATE else self.get_expected_result_implicit(
+                        23, 12, trial, None)
                     threads.append(
                         threading.Thread(
                             target=self.check_sequence_async,
@@ -2391,7 +2610,7 @@ class SequenceBatcherTest(su.SequenceBatcherTestUtil):
                                     ("start", 11, None),
                                     (None, 12, None),
                                 ),
-                                self.get_expected_result(23, 12, trial, None),
+                                expected_result,
                                 precreated_shm1_handles),
                             kwargs={
                                 'sequence_name':
@@ -2458,6 +2677,10 @@ class SequenceBatcherTest(su.SequenceBatcherTestUtil):
                         0)
 
                     threads = []
+                    expected_result = self.get_expected_result(
+                        1, 1, trial, "start"
+                    ) if not IMPLICIT_STATE else self.get_expected_result_implicit(
+                        1, 1, trial, "start")
                     threads.append(
                         threading.Thread(
                             target=self.check_sequence_async,
@@ -2470,12 +2693,16 @@ class SequenceBatcherTest(su.SequenceBatcherTestUtil):
                                 # (flag_str, value, pre_delay_ms)
                                 (
                                     ("start", 1, None),),
-                                self.get_expected_result(1, 1, trial, "start"),
+                                expected_result,
                                 precreated_shm0_handles),
                             kwargs={
                                 'sequence_name':
                                     "{}".format(self._testMethodName)
                             }))
+                    expected_result = self.get_expected_result(
+                        23, 12, trial, None
+                    ) if not IMPLICIT_STATE else self.get_expected_result_implicit(
+                        23, 12, trial, None)
                     threads.append(
                         threading.Thread(
                             target=self.check_sequence_async,
@@ -2490,7 +2717,7 @@ class SequenceBatcherTest(su.SequenceBatcherTestUtil):
                                     ("start", 11, None),
                                     (None, 12, None),
                                 ),
-                                self.get_expected_result(23, 12, trial, None),
+                                expected_result,
                                 precreated_shm1_handles),
                             kwargs={
                                 'sequence_name':
@@ -2519,6 +2746,7 @@ class SequenceBatcherTest(su.SequenceBatcherTestUtil):
         # request while the second sequence has two, so expecting the second
         # execution to be a batch of 'null, seq 2'. Both executions should be
         # waited until the max queue delay is exceeded.
+
         for trial in _trials:
             is_ensemble = False
             for prefix in ENSEMBLE_PREFIXES:
@@ -2556,6 +2784,10 @@ class SequenceBatcherTest(su.SequenceBatcherTestUtil):
                         0)
 
                     threads = []
+                    expected_result = self.get_expected_result(
+                        1, 1, trial, "start"
+                    ) if not IMPLICIT_STATE else self.get_expected_result_implicit(
+                        1, 1, trial, "start")
                     threads.append(
                         threading.Thread(
                             target=self.check_sequence_async,
@@ -2568,12 +2800,16 @@ class SequenceBatcherTest(su.SequenceBatcherTestUtil):
                                 # (flag_str, value, pre_delay_ms)
                                 (
                                     ("start", 1, None),),
-                                self.get_expected_result(1, 1, trial, "start"),
+                                expected_result,
                                 precreated_shm0_handles),
                             kwargs={
                                 'sequence_name':
                                     "{}".format(self._testMethodName)
                             }))
+                    expected_result = self.get_expected_result(
+                        23, 12, trial, None
+                    ) if not IMPLICIT_STATE else self.get_expected_result_implicit(
+                        23, 12, trial, None)
                     threads.append(
                         threading.Thread(
                             target=self.check_sequence_async,
@@ -2588,7 +2824,7 @@ class SequenceBatcherTest(su.SequenceBatcherTestUtil):
                                     ("start", 11, None),
                                     (None, 12, 2000),
                                 ),
-                                self.get_expected_result(23, 12, trial, None),
+                                expected_result,
                                 precreated_shm1_handles),
                             kwargs={
                                 'sequence_name':

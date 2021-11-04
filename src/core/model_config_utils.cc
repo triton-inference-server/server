@@ -1567,6 +1567,7 @@ ValidateModelConfigInt64()
       "ModelConfig::dynamic_batching::priority_queue_policy::value::default_"
       "timeout_microseconds",
       "ModelConfig::sequence_batching::direct::max_queue_delay_microseconds",
+      "ModelConfig::sequence_batching::state::dims",
       "ModelConfig::sequence_batching::oldest::max_queue_delay_microseconds",
       "ModelConfig::sequence_batching::max_sequence_idle_microseconds",
       "ModelConfig::ensemble_scheduling::step::model_version",
@@ -1788,6 +1789,15 @@ ModelConfigToJson(
       if (sb.Find("direct", &direct)) {
         RETURN_IF_ERROR(
             FixInt(config_json, direct, "max_queue_delay_microseconds"));
+      }
+
+      triton::common::TritonJson::Value states;
+      if (sb.Find("state", &states)) {
+        for (size_t i = 0; i < states.ArraySize(); ++i) {
+          triton::common::TritonJson::Value state;
+          RETURN_IF_ERROR(states.IndexAsObject(i, &state));
+          RETURN_IF_ERROR(FixIntArray(config_json, state, "dims"));
+        }
       }
     }
   }

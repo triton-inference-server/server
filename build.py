@@ -67,7 +67,7 @@ from distutils.dir_util import copy_tree
 TRITON_VERSION_MAP = {
     '2.16.0dev': (
         '21.11dev',  # triton container
-        '21.09',  # upstream container
+        '21.10',  # upstream container
         '1.9.0',  # ORT
         '2021.2.200',  # ORT OpenVINO
         '2021.2',  # Standalone OpenVINO
@@ -681,7 +681,7 @@ COPY --from=build /tmp/tritonbuild /tmp/tritonbuild
     # Triton Windows is not delivered as a container (and tar not
     # available) so skip for windows platform.
     if target_platform() != 'windows':
-        if not FLAGS.no_container_source:
+        if not FLAGS.no_core_build and not FLAGS.no_container_source:
             df += '''
 RUN mkdir -p /tmp/tritonbuild/install/third-party-src && \
     (cd /tmp/tritonbuild/tritonserver/build && \
@@ -736,6 +736,10 @@ WORKDIR /opt/tritonserver
 COPY --chown=1000:1000 LICENSE .
 COPY --chown=1000:1000 TRITON_VERSION .
 COPY --chown=1000:1000 NVIDIA_Deep_Learning_Container_License.pdf .
+'''
+
+    if not FLAGS.no_core_build:
+        df += '''
 COPY --chown=1000:1000 --from=tritonserver_build /tmp/tritonbuild/install/bin/tritonserver bin/
 COPY --chown=1000:1000 --from=tritonserver_build /tmp/tritonbuild/install/lib/libtritonserver.so lib/
 COPY --chown=1000:1000 --from=tritonserver_build /tmp/tritonbuild/install/include/triton/core include/triton/core
@@ -745,10 +749,17 @@ COPY --chown=1000:1000 --from=tritonserver_build /tmp/tritonbuild/install/includ
 RUN chown -R triton-server:triton-server include
 '''
 
-    # If requested, include the source code for all OSS used to build Triton
-    if not FLAGS.no_container_source:
-        df += '''
+        # If requested, include the source code for all OSS used to build Triton
+        if not FLAGS.no_container_source:
+            df += '''
 COPY --chown=1000:1000 --from=tritonserver_build /tmp/tritonbuild/install/third-party-src third-party-src
+'''
+
+        # Add feature labels for SageMaker endpoint
+        if 'sagemaker' in endpoints:
+            df += '''
+LABEL com.amazonaws.sagemaker.capabilities.accept-bind-to-port=true
+COPY --chown=1000:1000 --from=tritonserver_build /workspace/build/sagemaker/serve /usr/bin/.
 '''
 
     for noncore in NONCORE_BACKENDS:
@@ -762,12 +773,7 @@ COPY --chown=1000:1000 --from=tritonserver_build /tmp/tritonbuild/install/backen
         df += '''
 COPY --chown=1000:1000 --from=tritonserver_build /tmp/tritonbuild/install/repoagents repoagents
 '''
-    # Add feature labels for SageMaker endpoint
-    if 'sagemaker' in endpoints:
-        df += '''
-LABEL com.amazonaws.sagemaker.capabilities.accept-bind-to-port=true
-COPY --chown=1000:1000 --from=tritonserver_build /workspace/build/sagemaker/serve /usr/bin/.
-'''
+
     mkdir(ddir)
     with open(os.path.join(ddir, dockerfile_name), "w") as dfile:
         dfile.write(df)
@@ -794,7 +800,7 @@ ENV TF_ADJUST_HUE_FUSED         1
 ENV TF_ADJUST_SATURATION_FUSED  1
 ENV TF_ENABLE_WINOGRAD_NONFUSED 1
 ENV TF_AUTOTUNE_THRESHOLD       2
-ENV TRITON_SERVER_GPU_ENABLED    {gpu_enabled}        
+ENV TRITON_SERVER_GPU_ENABLED    {gpu_enabled}
 
 # Create a user that can be used to run triton as
 # non-root. Make sure that this user to given ID 1000. All server
@@ -1340,21 +1346,21 @@ if __name__ == '__main__':
         action='append',
         required=False,
         help=
-        'Include specified backend in build as <backend-name>[:<repo-tag>]. If <repo-tag> starts with "pull/" then it refers to a pull-request reference, otherwise <repo-tag> indicates the git tag/branch to use for the build. If the version is non-development then the default <repo-tag> is the release branch matching the container version (e.g. version 21.09 -> branch r21.09); otherwise the default <repo-tag> is "main" (e.g. version 21.09dev -> branch main).'
+        'Include specified backend in build as <backend-name>[:<repo-tag>]. If <repo-tag> starts with "pull/" then it refers to a pull-request reference, otherwise <repo-tag> indicates the git tag/branch to use for the build. If the version is non-development then the default <repo-tag> is the release branch matching the container version (e.g. version 21.10 -> branch r21.10); otherwise the default <repo-tag> is "main" (e.g. version 21.10dev -> branch main).'
     )
     parser.add_argument(
         '--repo-tag',
         action='append',
         required=False,
         help=
-        'The version of a component to use in the build as <component-name>:<repo-tag>. <component-name> can be "common", "core", "backend" or "thirdparty". If <repo-tag> starts with "pull/" then it refers to a pull-request reference, otherwise <repo-tag> indicates the git tag/branch. If the version is non-development then the default <repo-tag> is the release branch matching the container version (e.g. version 21.09 -> branch r21.09); otherwise the default <repo-tag> is "main" (e.g. version 21.09dev -> branch main).'
+        'The version of a component to use in the build as <component-name>:<repo-tag>. <component-name> can be "common", "core", "backend" or "thirdparty". If <repo-tag> starts with "pull/" then it refers to a pull-request reference, otherwise <repo-tag> indicates the git tag/branch. If the version is non-development then the default <repo-tag> is the release branch matching the container version (e.g. version 21.10 -> branch r21.10); otherwise the default <repo-tag> is "main" (e.g. version 21.10dev -> branch main).'
     )
     parser.add_argument(
         '--repoagent',
         action='append',
         required=False,
         help=
-        'Include specified repo agent in build as <repoagent-name>[:<repo-tag>]. If <repo-tag> starts with "pull/" then it refers to a pull-request reference, otherwise <repo-tag> indicates the git tag/branch to use for the build. If the version is non-development then the default <repo-tag> is the release branch matching the container version (e.g. version 21.09 -> branch r21.09); otherwise the default <repo-tag> is "main" (e.g. version 21.09dev -> branch main).'
+        'Include specified repo agent in build as <repoagent-name>[:<repo-tag>]. If <repo-tag> starts with "pull/" then it refers to a pull-request reference, otherwise <repo-tag> indicates the git tag/branch to use for the build. If the version is non-development then the default <repo-tag> is the release branch matching the container version (e.g. version 21.10 -> branch r21.10); otherwise the default <repo-tag> is "main" (e.g. version 21.10dev -> branch main).'
     )
     parser.add_argument(
         '--no-force-clone',

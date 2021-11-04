@@ -41,11 +41,11 @@ available as a shared library with a C API that allows the full
 functionality of Triton to be included directly in an
 application.
 
-The current release of the Triton Inference Server is 2.14.0 and
-corresponds to the 21.09 release of the tritonserver container on
+The current release of the Triton Inference Server is 2.15.0 and
+corresponds to the 21.10 release of the tritonserver container on
 [NVIDIA GPU Cloud (NGC)](https://ngc.nvidia.com). The branch for this
 release is
-[r21.09](https://github.com/triton-inference-server/server/tree/r21.09).
+[r21.10](https://github.com/triton-inference-server/server/tree/r21.10).
 
 ## Features
 
@@ -104,8 +104,8 @@ release is
 
 **The master branch documentation tracks the upcoming,
 under-development release and so may not be accurate for the current
-release of Triton. See the [r21.09
-documentation](https://github.com/triton-inference-server/server/tree/r21.09#documentation)
+release of Triton. See the [r21.10
+documentation](https://github.com/triton-inference-server/server/tree/r21.10#documentation)
 for the current release.**
 
 [Triton Architecture](docs/architecture.md) gives a high-level
