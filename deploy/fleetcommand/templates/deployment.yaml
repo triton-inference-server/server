@@ -56,10 +56,11 @@ spec:
             limits:
               nvidia.com/gpu: {{ .Values.image.numGpus }}
 
-          args: ["tritonserver", "--model-store={{ .Values.image.modelRepositoryPath }}", 
+          args: ["tritonserver", "--model-store={{ .Values.image.modelRepositoryPath }}",
                  "--model-control-mode=poll",
                  "--repository-poll-secs=5"]
 
+{{- if .Values.secret }}
           env:
           - name: AWS_DEFAULT_REGION
             valueFrom:
@@ -76,6 +77,7 @@ spec:
               secretKeyRef:
                 name: aws-credentials
                 key: AWS_SECRET_ACCESS_KEY
+{{- end }}
 
           ports:
             - containerPort: 8000
@@ -94,7 +96,7 @@ spec:
             httpGet:
               path: /v2/health/ready
               port: http
-              
+
       securityContext:
         runAsUser: 1000
         fsGroup: 1000

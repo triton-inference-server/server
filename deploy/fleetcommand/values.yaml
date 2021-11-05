@@ -29,16 +29,21 @@ replicaCount: 1
 image:
   imageName: nvcr.io/nvidia/tritonserver:21.09-py3
   pullPolicy: IfNotPresent
+  # to specify a non-AWS s3 endpoint, use the form
+  # s3://https://your-s3-endpoint:443/bucket/model_repository
   modelRepositoryPath: s3://triton-inference-server-repository/model_repository
   numGpus: 1
 
 service:
+  # for Fleet Command, type should be NodePort
   type: NodePort
+  # the following ports will be the external port opened for each service
   httpNodePort: 30343
   grpcNodePort: 30344
   metricsNodePort: 30345
 
 secret:
+  # update the following with base64 encoded parameters
   region: AWS_REGION
   id: AWS_SECRET_KEY_ID
   key: AWS_SECRET_ACCESS_KEY
