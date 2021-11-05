@@ -109,7 +109,7 @@ to get the meta-data of the inference server from the HTTP endpoint.  For
 example, if a system in your location has the IP `34.83.9.133`:
 
 ```
-$ curl 34.83.9.133:8000/v2
+$ curl 34.83.9.133:30343/v2
 ```
 
 Follow the [QuickStart](../../docs/quickstart.md) to get the example
