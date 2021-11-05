@@ -1,4 +1,4 @@
-// Copyright (c) 2020-2021, NVIDIA CORPORATION. All rights reserved.
+// Copyright 2020-2021, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 //
 // Redistribution and use in source and binary forms, with or without
 // modification, are permitted provided that the following conditions
@@ -24,6 +24,7 @@
 // (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
+#include <iostream>
 #include "http_client.h"
 
 namespace tc = triton::client;
@@ -32,12 +33,21 @@ int
 main(int argc, char* argv[])
 {
   std::unique_ptr<tc::InferenceServerHttpClient> client;
-  tc::InferenceServerHttpClient::Create(&client, "localhost:8001");
-  bool live;
-  client->IsServerLive(&live);
+  tc::Error err = tc::InferenceServerHttpClient::Create(&client, "localhost:8000");
+  if (!err.IsOk()) {
+    std::cerr << "InferenceServerHttpClient::Create failed: "
+              << err.Message() << std::endl;
+    return 1;
+  }
 
-  if (live == 0) {
+  // No server is running so expect liveness call to fail
+  bool live;
+  err = client->IsServerLive(&live);
+  if (!err.IsOk()) {
+    std::cerr << "InferenceServerHttpClient::IsServerLive expected fail: "
+              << err.Message() << std::endl;
     return 0;
   }
+
   return 1;
 }

@@ -38,11 +38,18 @@ DATADIR=${DATADIR:="/data/inferenceserver/${REPO_VERSION}"}
 RET=0
 rm -fr *.log ./models
 
+pip3 uninstall -y torch
+pip3 install torch==1.9.0+cu111 torchvision==0.10.0+cu111 torchaudio==0.9.0 -f https://download.pytorch.org/whl/torch_stable.html
+
 source ../../common/util.sh
 
 mkdir -p models/bls/1/
 cp ../../python_models/bls/model.py models/bls/1/
 cp ../../python_models/bls/config.pbtxt models/bls
+
+mkdir -p models/dlpack_add_sub/1/
+cp ../../python_models/dlpack_add_sub/model.py models/dlpack_add_sub/1/
+cp ../../python_models/dlpack_add_sub/config.pbtxt models/dlpack_add_sub
 
 mkdir -p models/bls_async/1/
 cp ../../python_models/bls_async/model.py models/bls_async/1/

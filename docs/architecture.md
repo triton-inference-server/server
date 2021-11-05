@@ -87,10 +87,10 @@ instance-group](model_configuration.md#instance-groups) that allows
 each model to specify how many parallel executions of that model
 should be allowed. Each such enabled parallel execution is referred to
 as an *instance*. By default, Triton gives each model a single
-instance, which means that only a single execution of the model is
-allowed to be in progress at a time as shown in the above figure. By
-using instance-group the number of execution instances for a model can
-be increased. The following figure shows model execution when model1
+instance for each available GPU in the system. By
+using the instance_group field in the model configuration, the number
+of execution instances for a model can
+be changed. The following figure shows model execution when model1
 is configured to allow three instances. As shown in the figure, the
 first three model1 inference requests are immediately executed in
 parallel. The fourth model1 inference request must wait until one of

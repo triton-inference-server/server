@@ -507,6 +507,8 @@ TritonModelInstance::Schedule(
   thread_local std::vector<TRITONBACKEND_Request*> triton_requests(1024);
   triton_requests.clear();
   for (auto& r : requests) {
+    // Load the input states for the inference request.
+    r->LoadInputStates();
     triton_requests.push_back(
         reinterpret_cast<TRITONBACKEND_Request*>(r.release()));
   }

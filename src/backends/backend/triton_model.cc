@@ -33,6 +33,7 @@
 #include "src/core/logging.h"
 #include "src/core/model_config_utils.h"
 #include "src/core/numa_utils.h"
+#include "src/core/sequence_state.h"
 #include "src/core/server.h"
 #include "src/core/server_message.h"
 #include "src/core/shared_library.h"
@@ -169,9 +170,17 @@ TritonModel::Create(
   }
   local_model->initialized_ = true;
 
-  const bool device_blocking =
-      (local_model->backend_->ExecutionPolicy() ==
-       TRITONBACKEND_EXECUTION_DEVICE_BLOCKING);
+  bool device_blocking = false;
+  if (local_model->backend_->ExecutionPolicy() ==
+      TRITONBACKEND_EXECUTION_DEVICE_BLOCKING) {
+    if (model_config.has_sequence_batching()) {
+      LOG_INFO << "Overriding execution policy to "
+                  "\"TRITONBACKEND_EXECUTION_BLOCKING\" for sequence model \""
+               << model_config.name() << "\"";
+    } else {
+      device_blocking = true;
+    }
+  }
 
   // Create and initialize the model instances for this model.
   RETURN_IF_ERROR(TritonModelInstance::CreateInstances(
@@ -583,6 +592,86 @@ TRITONBACKEND_RequestRelease(
   InferenceRequest* tr = reinterpret_cast<InferenceRequest*>(request);
   std::unique_ptr<InferenceRequest> ur(tr);
   InferenceRequest::Release(std::move(ur), release_flags);
+  return nullptr;  // success
+}
+
+///
+/// TRITONBACKEND_State
+///
+
+TRITONSERVER_Error*
+TRITONBACKEND_StateUpdate(TRITONBACKEND_State* state)
+{
+  SequenceState* ts = reinterpret_cast<SequenceState*>(state);
+  auto status = ts->Update();
+
+  if (!status.IsOk()) {
+    return TRITONSERVER_ErrorNew(
+        StatusCodeToTritonCode(status.StatusCode()), status.Message().c_str());
+  }
+
+  return nullptr;  // success
+}
+
+TRITONSERVER_Error*
+TRITONBACKEND_StateNew(
+    TRITONBACKEND_State** state, TRITONBACKEND_Request* request,
+    const char* name, const TRITONSERVER_DataType datatype,
+    const int64_t* shape, const uint32_t dims_count)
+{
+  InferenceRequest* tr = reinterpret_cast<InferenceRequest*>(request);
+  SequenceState* lstate;
+  std::vector<int64_t> lshape(shape, shape + dims_count);
+  auto& sequence_state = tr->GetSequenceStates();
+
+  if (sequence_state == nullptr) {
+    return TRITONSERVER_ErrorNew(
+        TRITONSERVER_ERROR_INVALID_ARG,
+        (std::string("unable to add state '") + name +
+         "'. State configuration is missing for model '" + tr->ModelName() +
+         "'.")
+            .c_str());
+  }
+
+  Status status = sequence_state->OutputState(
+      name, TritonToDataType(datatype), lshape, &lstate);
+  if (!status.IsOk()) {
+    *state = nullptr;
+    return TRITONSERVER_ErrorNew(
+        StatusCodeToTritonCode(status.StatusCode()), status.Message().c_str());
+  }
+
+  *state = reinterpret_cast<TRITONBACKEND_State*>(lstate);
+  return nullptr;  // success
+}
+
+TRITONSERVER_Error*
+TRITONBACKEND_StateBuffer(
+    TRITONBACKEND_State* state, void** buffer, const uint64_t buffer_byte_size,
+    TRITONSERVER_MemoryType* memory_type, int64_t* memory_type_id)
+{
+  SequenceState* to = reinterpret_cast<SequenceState*>(state);
+  Status status = Status::Success;
+
+  // If the buffer size exactly matches the buffer available, reuse the
+  // currently allocated buffer.
+  if (to->Data()->TotalByteSize() == buffer_byte_size) {
+    const std::shared_ptr<AllocatedMemory>& memory =
+        reinterpret_cast<const std::shared_ptr<AllocatedMemory>&>(to->Data());
+    *buffer = memory->MutableBuffer(memory_type, memory_type_id);
+  } else {
+    std::shared_ptr<AllocatedMemory> memory = std::make_shared<AllocatedMemory>(
+        buffer_byte_size, *memory_type, *memory_type_id);
+    *buffer = memory->MutableBuffer(memory_type, memory_type_id);
+    to->RemoveAllData();
+    status = to->SetData(memory);
+  }
+
+  if (!status.IsOk()) {
+    *buffer = nullptr;
+    return TRITONSERVER_ErrorNew(
+        StatusCodeToTritonCode(status.StatusCode()), status.Message().c_str());
+  }
   return nullptr;  // success
 }
 
