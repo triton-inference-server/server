@@ -204,6 +204,11 @@ property must be used if there is a mismatch between the output shape
 produced by the model and the shape that Triton returns in a response
 to an inference request.
 
+Model inputs can specify `allow_ragged_batch` to indicate that the
+input is a [ragged input](ragged_batching.md#ragged-batching). The field is
+used with [dynamic batcher](#dynamic-batcher) to allow batching without
+enforcing the input to have the same shape in all requests.
+
 ## Auto-Generated Model Configuration
 
 By default, the model configuration file containing the required
