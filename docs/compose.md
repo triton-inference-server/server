@@ -95,7 +95,7 @@ Method 1 and 2 will result in the same composed container. Furthermore, `--image
 
 ### CPU-only container composition
 
-CPU-only containers are not yet available for customization. Please see [build.py README](https://github.com/triton-inference-server/server/blob/main/docs/build.md) for instructions to build a full CPU-only container.
+CPU-only containers are not yet available for customization. Please see [build documentation](https://github.com/triton-inference-server/server/blob/main/docs/build.md) for instructions to build a full CPU-only container.
 
 ## Build it yourself
 
