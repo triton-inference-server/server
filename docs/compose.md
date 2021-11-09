@@ -42,16 +42,16 @@ from source to get more exact customization.
 ## Use the compose.py script
 
 The `compose.py` script can be found in the [server repository](https://github.com/triton-inference-server/server).
-Simply clone the repository and run `compose.py` to create a custom container. 
-Note: Created container version will depend on the branch that was cloned. 
-For example branch [r21.09](https://github.com/triton-inference-server/server/tree/r21.09) 
-should be used to create a image based on the NGC 21.09 Triton release. 
+Simply clone the repository and run `compose.py` to create a custom container.
+Note: Created container version will depend on the branch that was cloned.
+For example branch [r21.09](https://github.com/triton-inference-server/server/tree/r21.09)
+should be used to create a image based on the NGC 21.09 Triton release.
 
-`compose.py` provides `--backend`, `--repoagent` options that allow you to 
-specify which backends and repository agents to include in the custom image. 
+`compose.py` provides `--backend`, `--repoagent` options that allow you to
+specify which backends and repository agents to include in the custom image.
 The `--enable-gpu` flag indicates that you want to create an image that supports
-NVIDIA GPUs. For example, the following creates a new docker image that 
-contains only the TensorFlow 1 and TensorFlow 2 backends and the checksum 
+NVIDIA GPUs. For example, the following creates a new docker image that
+contains only the TensorFlow 1 and TensorFlow 2 backends and the checksum
 repository agent.
 
 Example:
@@ -63,22 +63,22 @@ will provide a container `tritonserver` locally. You can access the container wi
 $ docker run -it tritonserver:latest
 ```
 
-Note: If `compose.py` is run on release versions `r21.09` and earlier, 
-the resulting container will have DCGM version 2.2.3 installed. 
+Note: If `compose.py` is run on release versions `r21.09` and earlier,
+the resulting container will have DCGM version 2.2.3 installed.
 This may result in different GPU statistic reporting behavior.
 
 ### Compose a specific version of Triton
 
-`compose.py` requires two containers: a `min` container which is the 
-base the compose container is built from and a `full` container from which the 
-script will extract components. The version of the `min` and `full` container 
-is determined by the branch of Triton `compose.py` is on. 
+`compose.py` requires two containers: a `min` container which is the
+base the compose container is built from and a `full` container from which the
+script will extract components. The version of the `min` and `full` container
+is determined by the branch of Triton `compose.py` is on.
 For example, running
 ```
 python3 compose.py --backend tensorflow1 --repoagent checksum --enable-gpu
 ```
 on branch [r21.09](https://github.com/triton-inference-server/server/tree/r21.09) pulls:
-- `min` container `nvcr.io/nvidia/tritonserver:21.09-py3-min` 
+- `min` container `nvcr.io/nvidia/tritonserver:21.09-py3-min`
 - `full` container `nvcr.io/nvidia/tritonserver:21.09-py3`
 
 Alternatively, users can specify the version of Triton container to pull from any branch by either:
@@ -86,8 +86,8 @@ Alternatively, users can specify the version of Triton container to pull from an
 ```
 python3 compose.py --backend tensorflow1 --repoagent checksum --container-version 21.09 --enable-gpu
 ```
-2. Specifying `--image min,<min container image name> --image full,<full container image name>`. 
-   The user is responsible for specifying compatible `min` and `full` containers. 
+2. Specifying `--image min,<min container image name> --image full,<full container image name>`.
+   The user is responsible for specifying compatible `min` and `full` containers.
 ```
 python3 compose.py --backend tensorflow1 --repoagent checksum --image min,nvcr.io/nvidia/tritonserver:21.09-py3-min --image full,nvcr.io/nvidia/tritonserver:21.09-py3 --enable-gpu
 ```
@@ -99,7 +99,7 @@ CPU-only containers are not yet available for customization. Please see [build.p
 
 ## Build it yourself
 
-If you would like to do what `compose.py` is doing under the hood yourself, you can run `compose.py` with the `--dry-run` option and then modify the `Dockerfile.compose` file to satisfy your needs. 
+If you would like to do what `compose.py` is doing under the hood yourself, you can run `compose.py` with the `--dry-run` option and then modify the `Dockerfile.compose` file to satisfy your needs.
 
 
 ### Triton with Unsupported and Custom Backends
