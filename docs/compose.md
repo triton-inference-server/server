@@ -93,17 +93,9 @@ python3 compose.py --backend tensorflow1 --repoagent checksum --image min,nvcr.i
 ```
 Method 1 and 2 will result in the same composed container. Furthermore, `--image` flag overrides the `--container-version` flag when both are specified.
 
-### CPU only container composition
+### CPU-only container composition
 
-To compose a container that is built for only cpu usage, simply remove the 
-`--enable-gpu` flag when running `compose.py`. 
-
-This will build a container using `ubuntu:20.04` docker as the `min` container 
-and `nvcr.io/nvidia/tritonserver:<upstream-container-version>-cpu-only-py3` as the `full` container.
-Note: 
-1. When composing a CPU only container, both `min` and `full` containers should be built for CPU only and not have CUDA installed.
-2. CPU only containers are only available for Triton versions > `21.09` 
-3. CPU only "full" containers are build with less backends then the GPU enabled containers. Currently supported backends are `onnxruntime`, `openvino` and `python`.
+CPU-only containers are not yet available for customization. Please see [build.py README](https://github.com/triton-inference-server/server/blob/main/docs/build.md) for instructions to build a full CPU-only container.
 
 ## Build it yourself
 
