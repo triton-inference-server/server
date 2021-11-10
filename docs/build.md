@@ -117,10 +117,12 @@ branch/tag in the build. For example, if you have a branch called
 repo that you want to use in the build, you would specify
 --backend=identity:mybranch.
 
-If you want to build without GPU support remove the --enable-gpu and
---enable-gpu-metrics flags. Only the following backends are available
-for a non-GPU / CPU-only build: identity, repeat, square, onnxruntime,
-openvino, and python.
+#### CPU-only container
+
+If you want to build without GPU support remove the `--enable-gpu` and
+`--enable-gpu-metrics` flags. Only the following backends are available
+for a non-GPU / CPU-only build: `identity`, `repeat`, `square`, `onnxruntime`,
+`openvino`, and `python`.
 
 ### <a name="ubuntu-without-docker"></a>Building without Docker
 
