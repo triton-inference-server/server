@@ -2732,7 +2732,7 @@ InferGRPCToInput(
           byte_size = io.contents().fp64_contents_size() * elem_byte_size;
         }
 
-        if (io.contents().byte_contents_size() != 0) {
+        if (io.contents().bytes_contents_size() != 0) {
           RETURN_IF_ERR(InferGRPCToInputHelper(
               io.name(), request.model_name(), TRITONSERVER_TYPE_BYTES, dtype,
               byte_size));
@@ -2743,7 +2743,7 @@ InferGRPCToInput(
           // Serialize the output tensor strings. Each string is
           // serialized as a 4-byte length followed by the string itself
           // with no null-terminator.
-          for (const auto& element : io.contents().byte_contents()) {
+          for (const auto& element : io.contents().bytes_contents()) {
             uint32_t len{(uint32_t)element.size()};
             serialized.append(
                 reinterpret_cast<const char*>(&len), sizeof(uint32_t));
