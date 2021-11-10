@@ -193,17 +193,25 @@ class InferTest(tu.TestResultCollector):
         if tu.validate_for_libtorch_model(input_dtype, output0_dtype,
                                           output1_dtype, (input_size,),
                                           (input_size,), (input_size,)):
-            for prefix in ensemble_prefix:
-                if 'libtorch' in BACKENDS:
-                    _infer_exact_helper(self,
-                                        prefix + 'libtorch', (input_size,),
-                                        8,
-                                        input_dtype,
-                                        output0_dtype,
-                                        output1_dtype,
-                                        output0_raw=output0_raw,
-                                        output1_raw=output1_raw,
-                                        swap=swap)
+            # Due to PyTorch bug
+            # https://github.com/pytorch/pytorch/issues/66930 we can't
+            # run this test with int8 input and int32 outputs.
+            if ((input_dtype == np.int8) and (output0_dtype == np.int32) and
+                (output1_dtype == np.int32)):
+                print('skipping pytorch test for int8_int32_int32')
+            else:
+                for prefix in ensemble_prefix:
+                    if 'libtorch' in BACKENDS:
+                        _infer_exact_helper(self,
+                                            prefix + 'libtorch', (input_size,),
+                                            8,
+                                            input_dtype,
+                                            output0_dtype,
+                                            output1_dtype,
+                                            output0_raw=output0_raw,
+                                            output1_raw=output1_raw,
+                                            swap=swap)
+
         for prefix in ensemble_prefix:
             if prefix != "":
                 continue
