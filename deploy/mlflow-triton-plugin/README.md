@@ -1,5 +1,5 @@
 <!--
-# Copyright 2018-2021, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright 2021, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -48,7 +48,11 @@ python setup.py install
 ## Quick Start
 
 In this documentation, we will use the files in `examples` to showcase how
-the plugin interacts with Triton Infernce Server.
+the plugin interacts with Triton Infernce Server. The `onnx_float32_int32_int32`
+model in `examples` is a simple model that takes two float32 inputs, INPUT0 and
+INPUT1, with shape [-1, 16], and produces two int32 outputs, OUTPUT0 and
+OUTPUT1, where OUTPUT0 is the element-wise summation of INPUT0 and INPUT1 and
+OUTPUT1 is the element-wise subtraction of INPUT0 and INPUT1.
 
 ### Start Triton Inference Server in EXPLICIT mode
 
@@ -71,18 +75,25 @@ following the [model layout](https://github.com/triton-inference-server/server/b
 Below is an example usage:
 
 ```
-cd /mlflow/scripts
+cd /scripts
 
 python publish_model_to_mlflow.py --model_name onnx_float32_int32_int32 --model_directory <path-to-the-examples-directory>/onnx_float32_int32_int32 --flavor triton
 ```
 
 ### Deploy models tracked in MLflow to Triton
 
+Once a model is published and tracked in MLflow, it can be deployed to Triton
+via MLflow's deployments command, the following command will download the model
+to Triton's model repository and request Triton to load the model.
+
 ```
 mlflow deployments create -t triton --flavor triton --name onnx_float32_int32_int32 -m models:/onnx_float32_int32_int32/1
 ```
 
 ### Perform inference
+
+After the model is deployed, the following command is the CLI usage to send
+inference request to a deployment.
 
 ```
 mlflow deployments predict -t triton --name onnx_float32_int32_int32 --input-path <path-to-the-examples-directory>/input_file --output-path output_file
@@ -93,18 +104,24 @@ with the results in `expected_output`
 
 ## MLflow Deployments
 
-The following deployment functions are implemented within the plugin.
+"MLflow Deployments" is a set of MLflow APIs for deploying MLflow models to
+custom serving tools. The MLflow Triton plugin implements the following
+deployment functions to support the interaction with Triton server in MLflow.
 
 ### Create Deployment
 
-To create a deployment use the following command
+MLflow deployments create API deploys a model to the Triton target, which will
+download the model to Triton's model repository and request Triton to load the
+model.
 
-##### CLI
+To create a MLflow deployment using CLI:
+
 ```
 mlflow deployments create -t triton --flavor triton --name model_name -m models:/model_name/1
 ```
 
-##### Python API
+To create a MLflow deployment using Python API:
+
 ```
 from mlflow.deployments import get_deploy_client
 client = get_deploy_client('triton')
@@ -113,61 +130,95 @@ client.create_deployment("model_name", "models:/model_name/1", flavor="triton")
 
 ### Delete Deployment
 
-##### CLI
+MLflow deployments delete API removes an existing deployment from the Triton
+target, which will remove the model in Triton's model repository and request
+Triton to unload the model.
+
+To delete a MLflow deployment using CLI
+
 ```
 mlflow deployments delete -t triton --name model_name
 ```
 
-##### Python API
+To delete a MLflow deployment using CLI
+
 ```
+from mlflow.deployments import get_deploy_client
+client = get_deploy_client('triton')
 client.delete_deployment("model_name")
 ```
 
 ### Update Deployment
 
-##### CLI
+MLflow deployments update API updates an existing deployment with another model
+(version) tracked in MLflow, which will overwrite the model in Triton's model
+repository and request Triton to reload the model.
+
+To update a MLflow deployment using CLI
+
 ```
 mlflow deployments update -t triton --flavor triton --name model_name -m models:/model_name/2
 ```
 
-##### Python API
+To update a MLflow deployment using Python API
+
 ```
+from mlflow.deployments import get_deploy_client
+client = get_deploy_client('triton')
 client.update_deployment("model_name", "models:/model_name/2", flavor="triton")
 ```
 
 ### List Deployments
 
-##### CLI
+MLflow deployments list API lists all existing deployments in Triton target.
+
+To list all MLflow deployments using CLI
+
 ```
 mlflow deployments list -t triton
 ```
 
-##### Python API
+To list all MLflow deployments using Python API
+
 ```
+from mlflow.deployments import get_deploy_client
+client = get_deploy_client('triton')
 client.list_deployments()
 ```
 
 ### Get Deployment
 
-##### CLI
+MLflow deployments get API returns information regarding a specific deployments
+in Triton target.
+
+To list a specific MLflow deployment using CLI
 ```
 mlflow deployments get -t triton --name model_name
 ```
 
-##### Python API
+To list a specific MLflow deployment using Python API
 ```
+from mlflow.deployments import get_deploy_client
+client = get_deploy_client('triton')
 client.get_deployment("model_name")
 ```
 
 ### Run Inference on Deployments
 
-##### CLI
+MLflow deployments predict API runs inference by preparing and sending the
+request to Triton and returns the Triton response.
+
+To run inference using CLI
+
 ```
 mlflow deployments predict -t triton --name model_name --input-path input_file --output-path output_file
 
 ```
 
-##### Python API
+To run inference using Python API
+
 ```
+from mlflow.deployments import get_deploy_client
+client = get_deploy_client('triton')
 client.predict("model_name", inputs)
 ```
