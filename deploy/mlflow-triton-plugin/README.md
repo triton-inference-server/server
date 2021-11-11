@@ -96,11 +96,11 @@ After the model is deployed, the following command is the CLI usage to send
 inference request to a deployment.
 
 ```
-mlflow deployments predict -t triton --name onnx_float32_int32_int32 --input-path <path-to-the-examples-directory>/input_file --output-path output_file
+mlflow deployments predict -t triton --name onnx_float32_int32_int32 --input-path <path-to-the-examples-directory>/input.json --output-path output.json
 ```
 
-The inference result will be written in `output_file` and you may compare it
-with the results in `expected_output`
+The inference result will be written in `output.json` and you may compare it
+with the results in `expected_output.json`
 
 ## MLflow Deployments
 
