@@ -52,3 +52,5 @@ Note that [perf_analyzer](perf_analyzer.md) is supported on Jetson, while the [m
 ```shell
 perf_analyzer -m graphdef_int32_int32_int32 --service-kind=triton_c_api --triton-server-directory=/opt/tritonserver --model-repository=/workspace/qa/L0_perf_analyzer_capi/models
 ```
+
+Refer to these [examples](examples/jetson) that demonstrate how to use Triton Inference Server on Jetson.
