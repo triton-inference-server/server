@@ -205,6 +205,7 @@ GetByteSize(const inference::ModelOutput& mio)
   return GetByteSize(mio.data_type(), mio.dims());
 }
 
+// FIXME the below shouldn't be needed
 Platform
 GetPlatform(const std::string& platform_str)
 {

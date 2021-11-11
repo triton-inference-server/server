@@ -26,234 +26,176 @@
 
 #include "src/core/autofill.h"
 
-#ifdef TRITON_ENABLE_TENSORFLOW
-#include "src/backends/tensorflow/autofill.h"
-#endif  // TRITON_ENABLE_TENSORFLOW
-#ifdef TRITON_ENABLE_TENSORRT
-#include "src/backends/tensorrt/autofill.h"
-#endif  // TRITON_ENABLE_TENSORRT
-#ifdef TRITON_ENABLE_ONNXRUNTIME
-#include "src/backends/onnx/autofill.h"
-#endif  // TRITON_ENABLE_ONNXRUNTIME
-#ifdef TRITON_ENABLE_PYTORCH
-#include "src/backends/pytorch/autofill.h"
-#endif  // TRITON_ENABLE_PYTORCH
+#include <set>
 #include "src/core/constants.h"
+#include "src/core/filesystem.h"
 #include "src/core/logging.h"
 #include "src/core/model_config.h"
 
 namespace nvidia { namespace inferenceserver {
 
-//
-// AutoFillNull
-//
-class AutoFillNull : public AutoFill {
- public:
-  static Status Create(std::unique_ptr<AutoFill>* autofill);
-  Status Fix(inference::ModelConfig* config);
-
- private:
-  AutoFillNull() : AutoFill(std::string()) {}
-};
-
 Status
-AutoFillNull::Create(std::unique_ptr<AutoFill>* autofill)
+AutoFill::Fix(
+    const std::string& model_name, const std::string& model_path,
+    inference::ModelConfig* config)
 {
-  autofill->reset(new AutoFillNull);
-  return Status::Success;
-}
+  std::set<std::string> version_dirs;
+  RETURN_IF_ERROR(GetDirectorySubdirs(model_path, &version_dirs));
 
-Status
-AutoFillNull::Fix(inference::ModelConfig* config)
-{
-  return Status::Success;
-}
+  // There must be at least one version directory that we can inspect to
+  // attempt to determine the platform. If not, we skip autofill with file name.
+  // For now we allow multiple versions and only inspect the first verison
+  // directory to ensure it is valid. We can add more aggressive checks later.
+  const bool has_version = (version_dirs.size() != 0);
+  const auto version_path =
+      has_version ? JoinPath({model_path, *(version_dirs.begin())}) : "";
+  std::set<std::string> version_dir_content;
+  if (has_version) {
+    RETURN_IF_ERROR(GetDirectoryContents(version_path, &version_dir_content));
+  }
 
-//
-// AutoFillSimple
-//
-class AutoFillSimple : public AutoFill {
- public:
-  static Status Create(
-      const std::string& model_name, std::unique_ptr<AutoFill>* autofill);
-  Status Fix(inference::ModelConfig* config);
-
- private:
-  AutoFillSimple(const std::string& model_name) : AutoFill(model_name) {}
-};
-
-Status
-AutoFillSimple::Create(
-    const std::string& model_name, std::unique_ptr<AutoFill>* autofill)
-{
-  autofill->reset(new AutoFillSimple(model_name));
-  return Status::Success;
-}
-
-Status
-AutoFillSimple::Fix(inference::ModelConfig* config)
-{
-  // Set name if not already set.
   if (config->name().empty()) {
-    config->set_name(model_name_);
+    config->set_name(model_name);
   }
 
-  return Status::Success;
-}
-
-//
-// AutoFill
-//
-Status
-AutoFill::Create(
-    const std::string& model_name, const BackendConfigMap& backend_config_map,
-    const std::string& model_path, const inference::ModelConfig& config,
-    std::unique_ptr<AutoFill>* autofill)
-{
-  autofill->reset();
-
-  // If the config specifies a platform use it to create the
-  // appropriate autofill object, otherwise just try creating each
-  // autofill object to see if one can detect the platform.
-#if defined(TRITON_ENABLE_TENSORFLOW) || defined(TRITON_ENABLE_TENSORRT) || \
-    defined(TRITON_ENABLE_ONNXRUNTIME) || defined(TRITON_ENABLE_PYTORCH)
-  const Platform platform = GetPlatform(config.platform());
-  const BackendType backend_type = GetBackendType(config.backend());
-  bool unknown_model =
-      ((platform == Platform::PLATFORM_UNKNOWN) &&
-       (backend_type == BackendType::BACKEND_TYPE_UNKNOWN));
-#endif
-
-  Status status;
-
+  // Trying to fill the 'backend', 'default_model_filename' field.
 #ifdef TRITON_ENABLE_TENSORFLOW
-  if ((platform == Platform::PLATFORM_TENSORFLOW_SAVEDMODEL) ||
-      (backend_type == BackendType::BACKEND_TYPE_TENSORFLOW) || unknown_model) {
-    // FIXME drop the AutoFillXXX once autofill for all backends is merely
-    // filling platform / backend
-    std::unique_ptr<AutoFill> afsm;
-    std::shared_ptr<BackendConfig> backend_config;
-    status = AutoFillSavedModel::Create(
-        model_name, backend_config, model_path, &afsm);
-    LOG_VERBOSE(1) << "TensorFlow SavedModel autofill: " << status.AsString();
-    if (status.IsOk()) {
-      *autofill = std::move(afsm);
-      return Status::Success;
-    }
-  }
-
-  if ((platform == Platform::PLATFORM_TENSORFLOW_GRAPHDEF) ||
-      (backend_type == BackendType::BACKEND_TYPE_TENSORFLOW) || unknown_model) {
-    // FIXME drop the AutoFillXXX once autofill for all backends is merely
-    // filling platform / backend
-    std::unique_ptr<AutoFill> afgd;
-    status = AutoFillGraphDef::Create(model_name, model_path, &afgd);
-    LOG_VERBOSE(1) << "TensorFlow GraphDef autofill: " << status.AsString();
-    if (status.IsOk()) {
-      *autofill = std::move(afgd);
-      return Status::Success;
-    }
-  }
-#endif  // TRITON_ENABLE_TENSORFLOW
-
-#ifdef TRITON_ENABLE_PYTORCH
-  if ((platform == Platform::PLATFORM_PYTORCH_LIBTORCH) ||
-      (backend_type == BackendType::BACKEND_TYPE_PYTORCH) || unknown_model) {
-    std::unique_ptr<AutoFill> afpt;
-    status = AutoFillPyTorch::Create(model_name, model_path, &afpt);
-    LOG_VERBOSE(1) << "PyTorch autofill: " << status.AsString();
-    if (status.IsOk()) {
-      *autofill = std::move(afpt);
-      return Status::Success;
-    }
-  }
-#endif  // TRITON_ENABLE_PYTORCH
-
-#ifdef TRITON_ENABLE_ONNXRUNTIME
-  // Check for ONNX model must be done before check for TensorRT plan
-  // because TensorRT deserializeCudaEngine() function will cause program
-  // to exit when it tries to deserialize an ONNX model.
-  // However this is not bulletproof as ONNX Runtime does not support
-  // ONNX models with opset < 8, thus under AutoFillOnnx class, there
-  // is additional check on reason of loading failure.
-  //
-  // [TODO] remove additional checking once TensorRT provides
-  // an elegent way to handle passing incorrect model format (i.e. ONNX model)
-  // to deserializeCudaEngine()
-  if ((platform == Platform::PLATFORM_ONNXRUNTIME_ONNX) ||
-      (backend_type == BackendType::BACKEND_TYPE_ONNXRUNTIME) ||
-      unknown_model) {
-    std::unique_ptr<AutoFill> afox;
-
-    // If model operations is specified, use it to set the session options for
-    // ONNX.
-    auto model_ops = config.model_operations();
-    std::vector<std::string> op_libraries;
-    for (const auto& lib_filename : model_ops.op_library_filename()) {
-      op_libraries.push_back(lib_filename);
-    }
-    status = AutoFillOnnx::Create(model_name, model_path, &afox, op_libraries);
-    LOG_VERBOSE(1) << "ONNX autofill: " << status.AsString();
-    if (status.IsOk()) {
-      *autofill = std::move(afox);
-      return Status::Success;
-    }
-  }
-#endif  // TRITON_ENABLE_ONNXRUNTIME
-
-#ifdef TRITON_ENABLE_TENSORRT
-  if ((platform == Platform::PLATFORM_TENSORRT_PLAN) ||
-      (backend_type == BackendType::BACKEND_TYPE_TENSORRT) || unknown_model) {
-    std::unique_ptr<AutoFill> afp;
-    status = AutoFillPlan::Create(model_name, model_path, &afp);
-    LOG_VERBOSE(1) << "TensorRT autofill: " << status.AsString();
-    if (status.IsOk()) {
-      *autofill = std::move(afp);
-      return Status::Success;
-    }
-  }
-#endif  // TRITON_ENABLE_TENSORRT
-
-  // Unable to determine the platform so just use the simple autofill,
-  // or null if that fails.
-  {
-#if defined(TRITON_ENABLE_TENSORFLOW) || defined(TRITON_ENABLE_TENSORRT) || \
-    defined(TRITON_ENABLE_ONNXRUNTIME) || defined(TRITON_ENABLE_PYTORCH)
-    bool print_warning = true;
-    if (!LOG_VERBOSE_IS_ON(1)) {
-      if (platform == Platform::PLATFORM_UNKNOWN) {
-        LOG_WARNING << "Autofiller failed to detect the platform for "
-                    << model_name
-                    << " (verify contents of model directory or use "
-                       "--log-verbose=1 for more details)";
-      } else {
-#ifdef TRITON_ENABLE_ENSEMBLE
-        if (platform == Platform::PLATFORM_ENSEMBLE) {
-          print_warning = false;
+  // For TF backend, the platform is required
+  if (config->platform().empty()) {
+    // Check 'backend', 'default_model_filename', and the actual directory
+    // to determine the platform
+    if (config->backend().empty() ||
+        (config->backend() == kTensorFlowBackend)) {
+      if (config->default_model_filename() == kTensorFlowSavedModelFilename) {
+        config->set_platform(kTensorFlowSavedModelPlatform);
+      } else if (
+          config->default_model_filename() == kTensorFlowGraphDefFilename) {
+        config->set_platform(kTensorFlowGraphDefPlatform);
+      } else if (config->default_model_filename().empty() && has_version) {
+        bool is_dir = false;
+        if (version_dir_content.find(kTensorFlowSavedModelFilename) !=
+            version_dir_content.end()) {
+          RETURN_IF_ERROR(IsDirectory(
+              JoinPath({version_path, kTensorFlowSavedModelFilename}),
+              &is_dir));
+          if (is_dir) {
+            config->set_platform(kTensorFlowSavedModelPlatform);
+          }
         }
-#endif
-
-        if (print_warning) {
-          LOG_WARNING << "Autofiller failed to retrieve model. Error Details: "
-                      << status.AsString();
+        if (version_dir_content.find(kTensorFlowGraphDefFilename) !=
+            version_dir_content.end()) {
+          RETURN_IF_ERROR(IsDirectory(
+              JoinPath({version_path, kTensorFlowGraphDefFilename}), &is_dir));
+          if (!is_dir) {
+            config->set_platform(kTensorFlowGraphDefPlatform);
+          }
         }
       }
     }
-    if (print_warning) {
-      LOG_WARNING << "Proceeding with simple config for now";
+  }
+  // Fill 'backend' and 'default_model_filename' if missing
+  if ((config->platform() == kTensorFlowSavedModelPlatform) ||
+      (config->platform() == kTensorFlowGraphDefPlatform)) {
+    if (config->backend().empty()) {
+      config->set_backend(kTensorFlowBackend);
     }
-#endif
-    std::unique_ptr<AutoFill> afs;
-    status = AutoFillSimple::Create(model_name, &afs);
-    if (status.IsOk()) {
-      *autofill = std::move(afs);
-    } else {
-      std::unique_ptr<AutoFill> afn;
-      RETURN_IF_ERROR(AutoFillNull::Create(&afn));
-      *autofill = std::move(afn);
+    if (config->default_model_filename().empty()) {
+      if (config->platform() == kTensorFlowSavedModelPlatform) {
+        config->set_default_model_filename(kTensorFlowSavedModelFilename);
+      } else {
+        config->set_default_model_filename(kTensorFlowGraphDefFilename);
+      }
+    }
+    return Status::Success;
+  }
+#endif  // TRITON_ENABLE_TENSORFLOW
+#ifdef TRITON_ENABLE_TENSORRT
+  if (config->backend().empty()) {
+    if ((config->platform() == kTensorRTPlanPlatform) ||
+        (config->default_model_filename() == kTensorRTPlanFilename)) {
+      config->set_backend(kTensorRTBackend);
+    } else if (
+        config->platform().empty() &&
+        config->default_model_filename().empty() && has_version) {
+      bool is_dir = false;
+      if (version_dir_content.find(kTensorRTPlanFilename) !=
+          version_dir_content.end()) {
+        RETURN_IF_ERROR(IsDirectory(
+            JoinPath({version_path, kTensorRTPlanFilename}), &is_dir));
+        if (!is_dir) {
+          config->set_backend(kTensorRTBackend);
+        }
+      }
     }
   }
-
+  if (config->backend() == kTensorRTBackend) {
+    if (config->platform().empty()) {
+      config->set_platform(kTensorRTPlanPlatform);
+    }
+    if (config->default_model_filename().empty()) {
+      config->set_default_model_filename(kTensorRTPlanFilename);
+    }
+    return Status::Success;
+  }
+#endif  // TRITON_ENABLE_TENSORRT
+#ifdef TRITON_ENABLE_ONNXRUNTIME
+  if (config->backend().empty()) {
+    if ((config->platform() == kOnnxRuntimeOnnxPlatform) ||
+        (config->default_model_filename() == kOnnxRuntimeOnnxFilename)) {
+      config->set_backend(kOnnxRuntimeBackend);
+    } else if (
+        config->platform().empty() &&
+        config->default_model_filename().empty() && has_version) {
+      bool is_dir = false;
+      if (version_dir_content.find(kOnnxRuntimeOnnxFilename) !=
+          version_dir_content.end()) {
+        RETURN_IF_ERROR(IsDirectory(
+            JoinPath({version_path, kOnnxRuntimeOnnxFilename}), &is_dir));
+        if (!is_dir) {
+          config->set_backend(kOnnxRuntimeBackend);
+        }
+      }
+    }
+  }
+  if (config->backend() == kOnnxRuntimeBackend) {
+    if (config->platform().empty()) {
+      config->set_platform(kOnnxRuntimeOnnxPlatform);
+    }
+    if (config->default_model_filename().empty()) {
+      config->set_default_model_filename(kOnnxRuntimeOnnxFilename);
+    }
+    return Status::Success;
+  }
+#endif  // TRITON_ENABLE_ONNXRUNTIME
+#ifdef TRITON_ENABLE_PYTORCH
+  if (config->backend().empty()) {
+    if ((config->platform() == kPyTorchLibTorchPlatform) ||
+        (config->default_model_filename() == kPyTorchLibTorchFilename)) {
+      config->set_backend(kPyTorchBackend);
+    } else if (
+        config->platform().empty() &&
+        config->default_model_filename().empty() && has_version) {
+      bool is_dir = false;
+      if (version_dir_content.find(kPyTorchLibTorchFilename) !=
+          version_dir_content.end()) {
+        RETURN_IF_ERROR(IsDirectory(
+            JoinPath({version_path, kPyTorchLibTorchFilename}), &is_dir));
+        if (!is_dir) {
+          config->set_backend(kPyTorchBackend);
+        }
+      }
+    }
+  }
+  if (config->backend() == kPyTorchBackend) {
+    if (config->platform().empty()) {
+      config->set_platform(kPyTorchLibTorchPlatform);
+    }
+    if (config->default_model_filename().empty()) {
+      config->set_default_model_filename(kPyTorchLibTorchFilename);
+    }
+    return Status::Success;
+  }
+#endif  // TRITON_ENABLE_PYTORCH
   return Status::Success;
 }
 
