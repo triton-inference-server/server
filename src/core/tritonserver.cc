@@ -1785,23 +1785,6 @@ TRITONSERVER_ServerNew(
   lserver->SetRepoAgentDir(loptions->RepoAgentDir());
   lserver->SetBufferManagerThreadCount(loptions->BufferManagerThreadCount());
 
-#ifdef TRITON_ENABLE_METRICS
-  if (loptions->Metrics()) {
-    ni::Metrics::EnableMetrics();
-    ni::Metrics::SetMetricsInterval(loptions->MetricsInterval());
-    // TODO: Must be check after ResponseCacheByteSize set above or change this
-    //       to check ResponseCacheByteSize() instead of ResponseCacheEnabled()
-    if (lserver->ResponseCacheEnabled()) {
-      ni::Metrics::EnableCacheMetrics(lserver->GetResponseCache());
-    }
-  }
-#ifdef TRITON_ENABLE_METRICS_GPU
-  if (loptions->Metrics() && loptions->GpuMetrics()) {
-    ni::Metrics::EnableGPUMetrics();
-  }
-#endif  // TRITON_ENABLE_METRICS_GPU
-#endif  // TRITON_ENABLE_METRICS
-
   // FIXME these should be removed once all backends use
   // BackendConfig.
   lserver->SetTensorFlowSoftPlacementEnabled(
@@ -1823,7 +1806,26 @@ TRITONSERVER_ServerNew(
       std::string(), "backend-directory", loptions->BackendDir());
   lserver->SetBackendCmdlineConfig(loptions->BackendCmdlineConfigMap());
 
+  // Initialize server
   ni::Status status = lserver->Init();
+
+#ifdef TRITON_ENABLE_METRICS
+  if (loptions->Metrics()) {
+    ni::Metrics::EnableMetrics();
+    ni::Metrics::SetMetricsInterval(loptions->MetricsInterval());
+    // TODO: Cache metrics must be started after cache is initialized in Init()
+    if (lserver->ResponseCacheEnabled()) {
+      ni::Metrics::EnableCacheMetrics(lserver->GetResponseCache());
+    }
+  }
+#ifdef TRITON_ENABLE_METRICS_GPU
+  if (loptions->Metrics() && loptions->GpuMetrics()) {
+    ni::Metrics::EnableGPUMetrics();
+  }
+#endif  // TRITON_ENABLE_METRICS_GPU
+#endif  // TRITON_ENABLE_METRICS
+
+  // Setup tritonserver options table
   std::vector<std::string> options_headers;
   options_headers.emplace_back("Option");
   options_headers.emplace_back("Value");
