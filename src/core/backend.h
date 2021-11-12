@@ -123,9 +123,7 @@ class InferenceBackend {
     return label_provider_;
   }
 
-  Status Init(
-      const std::string& path, const inference::ModelConfig& config,
-      const std::string& platform);
+  Status Init(const std::string& path, const inference::ModelConfig& config);
 
   // Enqueue a request for execution. If Status::Success is returned
   // then the backend has taken ownership of the request object and so
