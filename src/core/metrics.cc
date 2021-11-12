@@ -248,8 +248,18 @@ Metrics::InitializeCacheMetrics(std::shared_ptr<RequestResponseCache> response_c
       // TODO: Why interval/2 instead of interval?
       std::this_thread::sleep_for(
         std::chrono::milliseconds(metrics_interval_ms_ / 2));
-      // Update cache metrics
+      // Update global cache metrics
       cache_num_entries_global_->Set(response_cache->NumEntries()); 
+      // TODO: Add global cache hits to cache class and query here, not sure
+      //       how per-model will be handled yet. Maybe handle per-model and
+      //       sum for global instead
+      //cache_hits_global_->Set(response_cache->CacheHits()); 
+      // TODO: Query cache utilization
+      //cache_util_global_->Set(response_cache->CacheUtilization()); 
+      // TODO: Query cache lookups 
+      //cache_lookups_global_->Set(response_cache->CacheLookups()); 
+      // TODO: Total cache lookup latency:
+      //       Probably should be updated per-request with other latencies
     }
   }));
 
