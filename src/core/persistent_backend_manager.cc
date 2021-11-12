@@ -61,8 +61,7 @@ Status
 PersistentBackendManager::InitPersistentBackends(
     const BackendCmdlineConfigMap& config_map)
 {
-  // [DO NOT MERGE] skipping TF backend for debugging
-  for (const auto& be : {"pytorch", "onnxruntime"}) {
+  for (const auto& be : {"pytorch", "tensorflow", "onnxruntime", "openvino"}) {
     RETURN_IF_ERROR(InitPersistentBackend(be, config_map));
   }
 
