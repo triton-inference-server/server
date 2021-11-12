@@ -101,9 +101,10 @@ $ bash -x ./test.sh
 Many tests require that you use a complete Triton build, with all
 backends and other features enabled. There are three sanity tests that
 are parameterized so that you can run them even if you have built a
-Triton that contains only a subset of Triton backends. These tests are
-L0_infer, L0_batcher and L0_sequence_batcher. For these tests the
-following envvars are available to control how the tests behave:
+Triton that contains only a subset of all supported Triton
+backends. These tests are L0_infer, L0_batcher and
+L0_sequence_batcher. For these tests the following envvars are
+available to control how the tests behave:
 
 * BACKENDS: Control which backends are tested. Look in the test.sh
   file of the test to see the default and allowed values.
@@ -121,5 +122,8 @@ For example, if you build a Triton that has only the TensorRT backend
 you can run L0_infer as follows:
 
 ```
-$ BACKENDS="plan" ENSEMBLES=0 bash -x ./test.sh
+$ BACKENDS="plan" ENSEMBLES=0 EXPECTED_NUM_TESTS=<expected> bash -x ./test.sh
 ```
+
+Where '<expected>' is the number of sub-tests expected to be run for
+just TensorRT testing and no ensembles.
