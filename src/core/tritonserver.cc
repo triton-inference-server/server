@@ -1813,7 +1813,7 @@ TRITONSERVER_ServerNew(
   if (loptions->Metrics()) {
     ni::Metrics::EnableMetrics();
     ni::Metrics::SetMetricsInterval(loptions->MetricsInterval());
-    // TODO: Cache metrics must be started after cache is initialized in Init()
+    // NOTE: Cache metrics must be after cache initialized in server->Init()
     if (lserver->ResponseCacheEnabled()) {
       ni::Metrics::EnableCacheMetrics(lserver->GetResponseCache());
     }
