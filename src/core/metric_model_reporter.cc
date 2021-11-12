@@ -94,9 +94,9 @@ MetricModelReporter::MetricModelReporter(
       Metrics::FamilyInferenceComputeInferDuration(), labels);
   metric_inf_compute_output_duration_us_ = CreateCounterMetric(
       Metrics::FamilyInferenceComputeOutputDuration(), labels);
-  // Response Cache Metrics
+  /*// TODO: Response Cache Metrics per-model
   metric_cache_num_entries_ = CreateGaugeMetric(
-      Metrics::FamilyCacheNumEntries(), labels);
+      Metrics::FamilyCacheNumEntries(), labels);*/
 }
 
 MetricModelReporter::~MetricModelReporter()
@@ -114,9 +114,9 @@ MetricModelReporter::~MetricModelReporter()
       metric_inf_compute_infer_duration_us_);
   Metrics::FamilyInferenceComputeOutputDuration().Remove(
       metric_inf_compute_output_duration_us_);
-  // Response Cache Metrics
+  /*// Response Cache Metrics
   Metrics::FamilyCacheNumEntries().Remove(
-      metric_cache_num_entries_);
+      metric_cache_num_entries_);*/
 
 }
 

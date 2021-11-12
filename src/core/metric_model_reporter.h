@@ -85,10 +85,11 @@ class MetricModelReporter {
   {
     return *metric_inf_compute_output_duration_us_;
   }
+  /*// TODO: Per-model cache metrics
   prometheus::Gauge& MetricCacheNumEntries() const
   {
     return *metric_cache_num_entries_;
-  }
+  }*/
 
 
  private:
@@ -117,7 +118,8 @@ class MetricModelReporter {
   prometheus::Counter* metric_inf_compute_input_duration_us_;
   prometheus::Counter* metric_inf_compute_infer_duration_us_;
   prometheus::Counter* metric_inf_compute_output_duration_us_;
-  prometheus::Gauge* metric_cache_num_entries_;
+  /*// TODO: Per-model cache metrics
+  prometheus::Gauge* metric_cache_num_entries_;*/
 #endif  // TRITON_ENABLE_METRICS
 };
 
