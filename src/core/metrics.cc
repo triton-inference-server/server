@@ -124,7 +124,7 @@ Metrics::Metrics()
                     "started")
               .Register(*registry_)),
 #endif  // TRITON_ENABLE_METRICS_GPU
-      metrics_enabled_(false), gpu_metrics_enabled_(false),
+      metrics_enabled_(false), gpu_metrics_enabled_(false), cache_metrics_enabled_(false),
       metrics_interval_ms_(2000)
 {
 }
@@ -137,6 +137,12 @@ Metrics::HashLabels(const std::map<std::string, std::string>& labels)
 
 Metrics::~Metrics()
 {
+  // Signal the cache thread to exit and then wait for it...
+  if (cache_thread_ != nullptr) {
+    cache_thread_exit_.store(true);
+    cache_thread_->join();
+  }
+
 #ifdef TRITON_ENABLE_METRICS_GPU
   // Signal the DCGM thread to exit and then wait for it...
   if (dcgm_thread_ != nullptr) {
@@ -177,6 +183,25 @@ Metrics::EnableMetrics()
 }
 
 void
+Metrics::EnableCacheMetrics(std::shared_ptr<RequestResponseCache> response_cache)
+{
+  auto singleton = GetSingleton();
+  // TODO: Might not need a separate flag for cache metrics, but would
+  //       need to pass cache/server ptr to EnableMetrics() or similar instead
+  // Ensure thread-safe enabling of Cache Metrics
+  std::lock_guard<std::mutex> lock(singleton->cache_metrics_enabling_);
+  if (singleton->cache_metrics_enabled_) {
+    return;
+  }
+
+  // Start thread for cache metrics
+  singleton->InitializeCacheMetrics(response_cache);
+
+  // Toggle flag so this function is only executed once
+  singleton->cache_metrics_enabled_ = true;
+}
+
+void
 Metrics::EnableGPUMetrics()
 {
   auto singleton = GetSingleton();
@@ -199,6 +224,36 @@ Metrics::SetMetricsInterval(uint64_t metrics_interval_ms)
 {
   auto singleton = GetSingleton();
   singleton->metrics_interval_ms_ = metrics_interval_ms;
+}
+
+bool
+Metrics::InitializeCacheMetrics(std::shared_ptr<RequestResponseCache> response_cache)
+{
+  if (response_cache == nullptr) {
+     LOG_WARNING << "error initializing cache metrics, cache metrics will not be "
+                << "available: cache was nullptr";
+    return false;  
+  }
+
+  // TODO: Populate labels
+  const std::map<std::string, std::string> cache_labels;
+  cache_num_entries_global_ = &cache_num_entries_family_.Add(cache_labels);
+  cache_thread_exit_.store(false);
+
+  // Start a separate thread for updating cache metrics at specified interval
+  cache_thread_.reset(new std::thread([this, response_cache] {
+    // Thread will update metrics indefinitely until exit flag set
+    while (!cache_thread_exit_.load()) {
+      // Sleep for metric interval
+      // TODO: Why interval/2 instead of interval?
+      std::this_thread::sleep_for(
+        std::chrono::milliseconds(metrics_interval_ms_ / 2));
+      // Update cache metrics
+      cache_num_entries_global_->Set(response_cache->NumEntries()); 
+    }
+  }));
+
+  return true;
 }
 
 bool

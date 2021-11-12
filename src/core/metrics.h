@@ -34,6 +34,7 @@
 #include "prometheus/registry.h"
 #include "prometheus/serializer.h"
 #include "prometheus/text_serializer.h"
+#include "src/core/response_cache.h"
 
 #ifdef TRITON_ENABLE_METRICS_GPU
 #include <dcgm_agent.h>
@@ -54,6 +55,9 @@ class Metrics {
 
   // Enable reporting of GPU metrics
   static void EnableGPUMetrics();
+
+  // Enable reporting of Cache metrics
+  static void EnableCacheMetrics(std::shared_ptr<RequestResponseCache>);
 
   // Set the time interval in secs at which metrics are collected
   static void SetMetricsInterval(uint64_t metrics_interval_ms);
@@ -143,6 +147,7 @@ class Metrics {
   virtual ~Metrics();
   static Metrics* GetSingleton();
   bool InitializeDcgmMetrics();
+  bool InitializeCacheMetrics(std::shared_ptr<RequestResponseCache> response_cache);
   std::string dcgmValueToErrorMessage(double val);
   std::string dcgmValueToErrorMessage(int64_t val);
 
@@ -163,6 +168,10 @@ class Metrics {
       inf_compute_output_duration_us_family_;
   // Response Cache Metrics
   prometheus::Family<prometheus::Gauge>& cache_num_entries_family_;
+  // Gauge for server-wide cache metrics
+  prometheus::Gauge* cache_num_entries_global_;
+  std::unique_ptr<std::thread> cache_thread_;
+  std::atomic<bool> cache_thread_exit_;
 #ifdef TRITON_ENABLE_METRICS_GPU
   prometheus::Family<prometheus::Gauge>& gpu_utilization_family_;
   prometheus::Family<prometheus::Gauge>& gpu_memory_total_family_;
@@ -187,7 +196,9 @@ class Metrics {
 
   bool metrics_enabled_;
   bool gpu_metrics_enabled_;
+  bool cache_metrics_enabled_;
   std::mutex gpu_metrics_enabling_;
+  std::mutex cache_metrics_enabling_;
   uint64_t metrics_interval_ms_;
 };
 

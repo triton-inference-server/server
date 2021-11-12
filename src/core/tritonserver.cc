@@ -1766,19 +1766,6 @@ TRITONSERVER_ServerNew(
 
   NVTX_INITIALIZE;
 
-#ifdef TRITON_ENABLE_METRICS
-  if (loptions->Metrics()) {
-    ni::Metrics::EnableMetrics();
-    // TODO: EnableCacheMetrics?
-    ni::Metrics::SetMetricsInterval(loptions->MetricsInterval());
-  }
-#ifdef TRITON_ENABLE_METRICS_GPU
-  if (loptions->Metrics() && loptions->GpuMetrics()) {
-    ni::Metrics::EnableGPUMetrics();
-  }
-#endif  // TRITON_ENABLE_METRICS_GPU
-#endif  // TRITON_ENABLE_METRICS
-
   lserver->SetId(loptions->ServerId());
   lserver->SetModelRepositoryPaths(loptions->ModelRepositoryPaths());
   lserver->SetModelControlMode(loptions->ModelControlMode());
@@ -1797,6 +1784,23 @@ TRITONSERVER_ServerNew(
   lserver->SetHostPolicyCmdlineConfig(loptions->HostPolicyCmdlineConfigMap());
   lserver->SetRepoAgentDir(loptions->RepoAgentDir());
   lserver->SetBufferManagerThreadCount(loptions->BufferManagerThreadCount());
+
+#ifdef TRITON_ENABLE_METRICS
+  if (loptions->Metrics()) {
+    ni::Metrics::EnableMetrics();
+    ni::Metrics::SetMetricsInterval(loptions->MetricsInterval());
+    // TODO: Must be check after ResponseCacheByteSize set above or change this
+    //       to check ResponseCacheByteSize() instead of ResponseCacheEnabled()
+    if (lserver->ResponseCacheEnabled()) {
+      ni::Metrics::EnableCacheMetrics(lserver->GetResponseCache());
+    }
+  }
+#ifdef TRITON_ENABLE_METRICS_GPU
+  if (loptions->Metrics() && loptions->GpuMetrics()) {
+    ni::Metrics::EnableGPUMetrics();
+  }
+#endif  // TRITON_ENABLE_METRICS_GPU
+#endif  // TRITON_ENABLE_METRICS
 
   // FIXME these should be removed once all backends use
   // BackendConfig.
