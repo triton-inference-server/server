@@ -103,7 +103,7 @@ source ../common/util.sh
 RET=0
 
 # If BACKENDS not specified, set to all
-BACKENDS=${BACKENDS:="graphdef savedmodel onnx plan custom"}
+BACKENDS=${BACKENDS:="graphdef savedmodel onnx plan libtorch custom"}
 export BACKENDS
 
 # If MODEL_TRIALS not specified set to 0 1 2 4 v

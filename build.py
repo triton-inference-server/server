@@ -65,8 +65,8 @@ from distutils.dir_util import copy_tree
 # incorrectly load the other version of the openvino libraries.
 #
 TRITON_VERSION_MAP = {
-    '2.16.0dev': (
-        '21.11dev',  # triton container
+    '2.17.0dev': (
+        '21.12dev',  # triton container
         '21.10',  # upstream container
         '1.9.0',  # ORT
         '2021.2.200',  # ORT OpenVINO
@@ -795,6 +795,10 @@ LABEL com.nvidia.tritonserver.version="${TRITON_SERVER_VERSION}"
 ENV PATH /opt/tritonserver/bin:${PATH}
 '''
     ort_dependencies = "libgomp1" if 'onnxruntime' in backends else ""
+    pytorch_dependencies = ""
+    if ('pytorch' in backends) and (target_machine == 'aarch64'):
+        pytorch_dependencies = "libgfortran5"
+
     df += '''
 ENV TF_ADJUST_HUE_FUSED         1
 ENV TF_ADJUST_SATURATION_FUSED  1
@@ -828,9 +832,10 @@ RUN apt-get update && \
             dirmngr \
             libnuma-dev \
             curl \
-            {ort_dependencies} && \
+            {ort_dependencies} {pytorch_dependencies} && \
     rm -rf /var/lib/apt/lists/*
-'''.format(gpu_enabled=gpu_enabled, ort_dependencies=ort_dependencies)
+'''.format(gpu_enabled=gpu_enabled, ort_dependencies=ort_dependencies,
+           pytorch_dependencies=pytorch_dependencies)
 
     if enable_gpu:
         df += install_dcgm_libraries(argmap['DCGM_VERSION'], target_machine)
