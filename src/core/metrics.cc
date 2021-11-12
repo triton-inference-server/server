@@ -242,6 +242,8 @@ Metrics::InitializeCacheMetrics(std::shared_ptr<RequestResponseCache> response_c
 
   // Start a separate thread for updating cache metrics at specified interval
   cache_thread_.reset(new std::thread([this, response_cache] {
+    // TODO: Remove this
+    uint64_t dummy_cache_entries = 0;
     // Thread will update metrics indefinitely until exit flag set
     while (!cache_thread_exit_.load()) {
       // Sleep for metric interval
@@ -249,7 +251,8 @@ Metrics::InitializeCacheMetrics(std::shared_ptr<RequestResponseCache> response_c
       std::this_thread::sleep_for(
         std::chrono::milliseconds(metrics_interval_ms_ / 2));
       // Update global cache metrics
-      cache_num_entries_global_->Set(response_cache->NumEntries()); 
+      //cache_num_entries_global_->Set(response_cache->NumEntries()); 
+      cache_num_entries_global_->Set(dummy_cache_entries++);
       // TODO: Add global cache hits to cache class and query here, not sure
       //       how per-model will be handled yet. Maybe handle per-model and
       //       sum for global instead

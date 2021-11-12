@@ -132,16 +132,6 @@ class Metrics {
     return GetSingleton()->inf_compute_output_duration_us_family_;
   }
 
-  // TODO
-  // Metric family of cumulative inference compute durations, in
-  // microseconds
-  static prometheus::Family<prometheus::Gauge>&
-  FamilyCacheNumEntries()
-  {
-    return GetSingleton()->cache_num_entries_family_;
-  }
-
-
  private:
   Metrics();
   virtual ~Metrics();

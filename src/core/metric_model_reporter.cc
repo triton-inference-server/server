@@ -94,9 +94,6 @@ MetricModelReporter::MetricModelReporter(
       Metrics::FamilyInferenceComputeInferDuration(), labels);
   metric_inf_compute_output_duration_us_ = CreateCounterMetric(
       Metrics::FamilyInferenceComputeOutputDuration(), labels);
-  /*// TODO: Response Cache Metrics per-model
-  metric_cache_num_entries_ = CreateGaugeMetric(
-      Metrics::FamilyCacheNumEntries(), labels);*/
 }
 
 MetricModelReporter::~MetricModelReporter()
@@ -114,10 +111,6 @@ MetricModelReporter::~MetricModelReporter()
       metric_inf_compute_infer_duration_us_);
   Metrics::FamilyInferenceComputeOutputDuration().Remove(
       metric_inf_compute_output_duration_us_);
-  /*// Response Cache Metrics
-  Metrics::FamilyCacheNumEntries().Remove(
-      metric_cache_num_entries_);*/
-
 }
 
 void
@@ -149,14 +142,6 @@ MetricModelReporter::GetMetricLabels(
 prometheus::Counter*
 MetricModelReporter::CreateCounterMetric(
     prometheus::Family<prometheus::Counter>& family,
-    const std::map<std::string, std::string>& labels)
-{
-  return &family.Add(labels);
-}
-
-prometheus::Gauge*
-MetricModelReporter::CreateGaugeMetric(
-    prometheus::Family<prometheus::Gauge>& family,
     const std::map<std::string, std::string>& labels)
 {
   return &family.Add(labels);
