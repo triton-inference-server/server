@@ -648,9 +648,11 @@ GetNormalizedModelConfig(
   // on the model path.
   const std::string model_name(BaseName(path));
 
-  // Server side autofill only tries to determine the backend of the model, and
-  // it is only for baackends known by Triton. Because extracting more detailed
-  // information is backend dependent and Triton doesn't know how to fill it.
+  // Server-side autofill only sets certain backend fields for the models that
+  // belong to limited backends for backwards-compatibility. See TensorRT
+  // backend, ONNX Runtime backend, TensorFLow backend, and PyTorch backend.
+  // Extracting detailed information is delegated to the backend implementation
+  // to auto-complete.
   RETURN_IF_ERROR(
       AutoCompleteBackendFields(model_name, std::string(path), config));
   LOG_VERBOSE(1) << "Server side auto-completed config: "
