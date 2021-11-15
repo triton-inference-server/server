@@ -174,11 +174,9 @@ InferenceBackend::SetConfiguredScheduler(void* model)
 
 Status
 InferenceBackend::Init(
-    const std::string& path, const inference::ModelConfig& config,
-    const std::string& platform)
+    const std::string& path, const inference::ModelConfig& config)
 {
-  RETURN_IF_ERROR(
-      ValidateModelConfig(config, platform, min_compute_capability_));
+  RETURN_IF_ERROR(ValidateModelConfig(config, min_compute_capability_));
   RETURN_IF_ERROR(ValidateModelIOConfig(config));
   RETURN_IF_ERROR(SetModelConfig(path, config));
 

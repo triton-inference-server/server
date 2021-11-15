@@ -410,14 +410,16 @@ class ModelRepositoryManager::BackendLifeCycle {
         const std::string& repository_path, const ModelReadyState state,
         const ActionType next_action,
         const inference::ModelConfig& model_config)
-        : repository_path_(repository_path),
-          platform_(GetPlatform(model_config.platform())), state_(state),
+        : repository_path_(repository_path), is_ensemble_(false), state_(state),
           next_action_(next_action), model_config_(model_config)
     {
+#ifdef TRITON_ENABLE_ENSEMBLE
+      is_ensemble_ = (model_config.platform() == kEnsemblePlatform);
+#endif  // TRITON_ENABLE_ENSEMBLE
     }
 
     std::string repository_path_;
-    Platform platform_;
+    bool is_ensemble_;
 
     std::recursive_mutex mtx_;
     ModelReadyState state_;
@@ -794,7 +796,10 @@ ModelRepositoryManager::BackendLifeCycle::AsyncLoad(
       backend_info->repository_path_ = repository_path;
       backend_info->model_config_ = model_config;
       backend_info->next_action_ = ActionType::LOAD;
-      backend_info->platform_ = GetPlatform(model_config.platform());
+#ifdef TRITON_ENABLE_ENSEMBLE
+      backend_info->is_ensemble_ =
+          (model_config.platform() == kEnsemblePlatform);
+#endif  // TRITON_ENABLE_ENSEMBLE
       backend_info->agent_model_list_ = agent_model_list;
     } else {
       load_tracker->defer_unload_set_.emplace(version);
@@ -1101,49 +1106,44 @@ ModelRepositoryManager::BackendLifeCycle::CreateInferenceBackend(
     status = triton_backend_factory_->CreateBackend(
         backend_info->repository_path_, model_name, version, model_config, &is);
   } else {
-    switch (backend_info->platform_) {
 #ifdef TRITON_ENABLE_ENSEMBLE
-      case Platform::PLATFORM_ENSEMBLE: {
-        status = ensemble_factory_->CreateBackend(
-            version_path, model_config, min_compute_capability_, &is);
-        // Complete label provider with label information from involved backends
-        // Must be done here because involved backends may not be able to
-        // obtained from server because this may happen during server
-        // initialization.
-        if (status.IsOk()) {
-          std::set<std::string> no_label_outputs;
-          const auto& label_provider = is->GetLabelProvider();
-          for (const auto& output : model_config.output()) {
-            if (label_provider->GetLabel(output.name(), 0).empty()) {
-              no_label_outputs.emplace(output.name());
-            }
+    if (backend_info->is_ensemble_) {
+      status = ensemble_factory_->CreateBackend(
+          version_path, model_config, min_compute_capability_, &is);
+      // Complete label provider with label information from involved backends
+      // Must be done here because involved backends may not be able to
+      // obtained from server because this may happen during server
+      // initialization.
+      if (status.IsOk()) {
+        std::set<std::string> no_label_outputs;
+        const auto& label_provider = is->GetLabelProvider();
+        for (const auto& output : model_config.output()) {
+          if (label_provider->GetLabel(output.name(), 0).empty()) {
+            no_label_outputs.emplace(output.name());
           }
-          for (const auto& element :
-               model_config.ensemble_scheduling().step()) {
-            for (const auto& pair : element.output_map()) {
-              // Found model that produce one of the missing output
-              if (no_label_outputs.find(pair.second) !=
-                  no_label_outputs.end()) {
-                std::shared_ptr<InferenceBackend> backend;
-                // Safe to obtain backend because the ensemble can't be loaded
-                // until the involved backends are ready
-                GetInferenceBackend(
-                    element.model_name(), element.model_version(), &backend);
-                label_provider->AddLabels(
-                    pair.second,
-                    backend->GetLabelProvider()->GetLabels(pair.first));
-              }
+        }
+        for (const auto& element : model_config.ensemble_scheduling().step()) {
+          for (const auto& pair : element.output_map()) {
+            // Found model that produce one of the missing output
+            if (no_label_outputs.find(pair.second) != no_label_outputs.end()) {
+              std::shared_ptr<InferenceBackend> backend;
+              // Safe to obtain backend because the ensemble can't be loaded
+              // until the involved backends are ready
+              GetInferenceBackend(
+                  element.model_name(), element.model_version(), &backend);
+              label_provider->AddLabels(
+                  pair.second,
+                  backend->GetLabelProvider()->GetLabels(pair.first));
             }
           }
         }
-        break;
       }
+    } else
 #endif  // TRITON_ENABLE_ENSEMBLE
-      default:
-        status = Status(
-            Status::Code::INVALID_ARG,
-            "unknown platform '" + model_config.platform() + "'");
-        break;
+    {
+      status = Status(
+          Status::Code::INVALID_ARG,
+          "unknown platform '" + model_config.platform() + "'");
     }
   }
 
@@ -1835,8 +1835,7 @@ ModelRepositoryManager::Poll(
         // Note that the model inputs and outputs are not validated until
         // the model backend is intialized as they may not be auto-completed
         // until backend is intialized.
-        status = ValidateModelConfig(
-            model_config, std::string(), min_compute_capability_);
+        status = ValidateModelConfig(model_config, min_compute_capability_);
         if (status.IsOk() && (!autofill_)) {
           status = ValidateModelIOConfig(model_config);
         }

@@ -147,8 +147,7 @@ TritonModel::Create(
   if (auto_complete_config) {
     RETURN_IF_ERROR(local_model->SetModelConfig(version_path, model_config));
   } else {
-    RETURN_IF_ERROR(
-        local_model->Init(version_path, model_config, "" /* platform */));
+    RETURN_IF_ERROR(local_model->Init(version_path, model_config));
   }
 
   TritonModel* raw_local_model = local_model.get();
@@ -231,8 +230,7 @@ TritonModel::UpdateModelConfig(
   *outputs_config = updated_config.output();
 
   RETURN_IF_ERROR(Init(
-      JoinPath({LocalizedModelPath(), std::to_string(Version())}), config,
-      "" /* platform */));
+      JoinPath({LocalizedModelPath(), std::to_string(Version())}), config));
   return Status::Success;
 }
 

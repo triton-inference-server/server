@@ -403,7 +403,6 @@ set(
   ../core/filesystem.cc
   ../core/model_config_utils.cc
   ../core/model_config.cc
-  ../core/autofill.cc
 )
 
 set(
