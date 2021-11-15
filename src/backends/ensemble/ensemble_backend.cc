@@ -39,7 +39,7 @@ EnsembleBackend::Init(
     InferenceServer* const server, const std::string& path,
     const inference::ModelConfig& config)
 {
-  RETURN_IF_ERROR(InferenceBackend::Init(path, config, kEnsemblePlatform));
+  RETURN_IF_ERROR(InferenceBackend::Init(path, config));
 
   std::unique_ptr<Scheduler> scheduler;
   RETURN_IF_ERROR(EnsembleScheduler::Create(

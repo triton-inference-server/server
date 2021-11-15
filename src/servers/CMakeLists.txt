@@ -437,18 +437,6 @@ endif() # NOT WIN32
 #
 # libtritonserver.so
 #
-if(${TRITON_ENABLE_TENSORFLOW})
-  set(BACKEND_OBJS ${BACKEND_OBJS} $<TARGET_OBJECTS:tensorflow-backend-library>)
-endif() # TRITON_ENABLE_TENSORFLOW
-if(${TRITON_ENABLE_TENSORRT})
-  set(BACKEND_OBJS ${BACKEND_OBJS} $<TARGET_OBJECTS:tensorrt-backend-library>)
-endif() # TRITON_ENABLE_TENSORRT
-if(${TRITON_ENABLE_ONNXRUNTIME})
-  set(BACKEND_OBJS ${BACKEND_OBJS} $<TARGET_OBJECTS:onnxruntime-backend-library>)
-endif() # TRITON_ENABLE_ONNXRUNTIME
-if(${TRITON_ENABLE_PYTORCH})
-  set(BACKEND_OBJS ${BACKEND_OBJS} $<TARGET_OBJECTS:libtorch-backend-library>)
-endif() # TRITON_ENABLE_PYTORCH
 if(${TRITON_ENABLE_ENSEMBLE})
   set(BACKEND_OBJS ${BACKEND_OBJS} $<TARGET_OBJECTS:ensemble-backend-library>)
 endif() # TRITON_ENABLE_ENSEMBLE

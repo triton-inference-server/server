@@ -205,45 +205,6 @@ GetByteSize(const inference::ModelOutput& mio)
   return GetByteSize(mio.data_type(), mio.dims());
 }
 
-Platform
-GetPlatform(const std::string& platform_str)
-{
-#ifdef TRITON_ENABLE_TENSORFLOW
-  if (platform_str == kTensorFlowGraphDefPlatform) {
-    return Platform::PLATFORM_TENSORFLOW_GRAPHDEF;
-  }
-  if (platform_str == kTensorFlowSavedModelPlatform) {
-    return Platform::PLATFORM_TENSORFLOW_SAVEDMODEL;
-  }
-#endif  // TRITON_ENABLE_TENSORFLOW
-
-#ifdef TRITON_ENABLE_TENSORRT
-  if (platform_str == kTensorRTPlanPlatform) {
-    return Platform::PLATFORM_TENSORRT_PLAN;
-  }
-#endif  // TRITON_ENABLE_TENSORRT
-
-#ifdef TRITON_ENABLE_ONNXRUNTIME
-  if (platform_str == kOnnxRuntimeOnnxPlatform) {
-    return Platform::PLATFORM_ONNXRUNTIME_ONNX;
-  }
-#endif  // TRITON_ENABLE_ONNXRUNTIME
-
-#ifdef TRITON_ENABLE_PYTORCH
-  if (platform_str == kPyTorchLibTorchPlatform) {
-    return Platform::PLATFORM_PYTORCH_LIBTORCH;
-  }
-#endif  // TRITON_ENABLE_PYTORCH
-
-#ifdef TRITON_ENABLE_ENSEMBLE
-  if (platform_str == kEnsemblePlatform) {
-    return Platform::PLATFORM_ENSEMBLE;
-  }
-#endif  // TRITON_ENABLE_ENSEMBLE
-
-  return Platform::PLATFORM_UNKNOWN;
-}
-
 BackendType
 GetBackendTypeFromPlatform(const std::string& platform_name)
 {

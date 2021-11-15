@@ -199,12 +199,6 @@ int64_t GetByteSize(const inference::ModelInput& mio);
 /// unable to determine the size.
 int64_t GetByteSize(const inference::ModelOutput& mio);
 
-/// Get the Platform value for a platform name.
-/// \param platform_name The platform name.
-/// \return The Platform or Platform::UNKNOWN if the platform string
-/// is not recognized.
-Platform GetPlatform(const std::string& platform_name);
-
 /// Get the BackendType value for a platform name.
 /// \param platform_name The platform name.
 /// \return The BackendType or BackendType::UNKNOWN if the platform string
