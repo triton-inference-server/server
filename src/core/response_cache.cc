@@ -161,6 +161,7 @@ RequestResponseCache::Lookup(const uint64_t key, InferenceResponse* ptr)
 {
   // Lock on cache lookup
   std::lock_guard<std::recursive_mutex> lk(cache_mtx_);
+  LOG_VERBOSE(1) << "Looking up key [" + std::to_string(key) + "] in cache.";
 
   auto iter = cache_.find(key);
   if (iter == cache_.end()) {
@@ -174,6 +175,7 @@ RequestResponseCache::Lookup(const uint64_t key, InferenceResponse* ptr)
   // Update this key to front of LRU list
   UpdateLRU(iter);
 
+  LOG_VERBOSE(1) << "Using cached response for key [" + std::to_string(key) + "].";
   return Status::Success;
 }
 
