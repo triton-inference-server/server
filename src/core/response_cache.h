@@ -133,7 +133,8 @@ class RequestResponseCache {
   double TotalUtilization()
   {
     std::lock_guard<std::recursive_mutex> lk(buffer_mtx_);
-    return static_cast<double>(AllocatedBytes()) / static_cast<double>(TotalBytes());
+    return static_cast<double>(AllocatedBytes()) /
+           static_cast<double>(TotalBytes());
   }
 
  private:

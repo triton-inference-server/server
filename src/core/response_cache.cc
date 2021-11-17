@@ -182,7 +182,8 @@ RequestResponseCache::Lookup(const uint64_t key, InferenceResponse* ptr)
   // Update this key to front of LRU list
   UpdateLRU(iter);
 
-  LOG_VERBOSE(1) << "Using cached response for key [" + std::to_string(key) + "].";
+  LOG_VERBOSE(1) << "Using cached response for key [" + std::to_string(key) +
+                        "].";
   return Status::Success;
 }
 
@@ -265,21 +266,23 @@ RequestResponseCache::BuildCacheEntry(
       // NOTE: FreeBytes() doesn't account for allocator overhead so allocation
       //       may fail even if response_byte_size is less than FreeBytes()
       while (response_byte_size > FreeBytes()) {
-        LOG_VERBOSE(1) << "EVICT: Response larger than remaining available memory, attempting to evict from cache.";
+        LOG_VERBOSE(1) << "EVICT: Response larger than remaining available "
+                          "memory, attempting to evict from cache.";
         RETURN_IF_ERROR(Evict());
       }
 
       // Attempt to allocate buffer until success or eviction from cache fails
       while (cache_output.buffer_ == nullptr) {
-          // Allocate buffer for response output in cache entry
-          cache_output.buffer_ =
-              managed_buffer_.allocate(response_byte_size, std::nothrow_t{});
-          // Attempt to evict if allocation fails
-          if (cache_output.buffer_ == nullptr) {
-            LOG_VERBOSE(1) << "FAILED to allocate buffer in cache. Attempting to evict an entry.";
-            // Exit out if Eviction fails
-            RETURN_IF_ERROR(Evict());
-          }
+        // Allocate buffer for response output in cache entry
+        cache_output.buffer_ =
+            managed_buffer_.allocate(response_byte_size, std::nothrow_t{});
+        // Attempt to evict if allocation fails
+        if (cache_output.buffer_ == nullptr) {
+          LOG_VERBOSE(1) << "FAILED to allocate buffer in cache. Attempting to "
+                            "evict an entry.";
+          // Exit out if Eviction fails
+          RETURN_IF_ERROR(Evict());
+        }
       }
 
       // Copy data from response buffer to cache entry output buffer
@@ -376,9 +379,7 @@ RequestResponseCache::Evict()
 
   // Nothing to evict if cache is empty
   if (NumEntries() == 0) {
-    return Status(
-        Status::Code::INTERNAL,
-        "Cache is empty, nothing to evict.");
+    return Status(Status::Code::INTERNAL, "Cache is empty, nothing to evict.");
   }
 
   // Least recently used key in back of LRU list

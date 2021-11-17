@@ -137,7 +137,8 @@ class Metrics {
   virtual ~Metrics();
   static Metrics* GetSingleton();
   bool InitializeDcgmMetrics();
-  bool InitializeCacheMetrics(std::shared_ptr<RequestResponseCache> response_cache);
+  bool InitializeCacheMetrics(
+      std::shared_ptr<RequestResponseCache> response_cache);
   std::string dcgmValueToErrorMessage(double val);
   std::string dcgmValueToErrorMessage(int64_t val);
 
