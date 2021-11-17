@@ -129,7 +129,12 @@ class RequestResponseCache {
     std::lock_guard<std::recursive_mutex> lk(buffer_mtx_);
     return managed_buffer_.get_size() - managed_buffer_.get_free_memory();
   }
-
+  // Returns fraction of bytes allocated over total cache size between [0, 1]
+  double TotalUtilization()
+  {
+    std::lock_guard<std::recursive_mutex> lk(buffer_mtx_);
+    return static_cast<double>(AllocatedBytes()) / static_cast<double>(TotalBytes());
+  }
 
  private:
   explicit RequestResponseCache(const uint64_t cache_size);

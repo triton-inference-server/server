@@ -99,7 +99,7 @@ Metrics::Metrics()
       cache_num_lookups_family_(
           prometheus::BuildGauge()
               .Name("nv_cache_num_lookups")
-              .Help("Number of lookups on response cache")
+              .Help("Number of cache lookups in response cache")
               .Register(*registry_)),
       cache_num_hits_family_(
           prometheus::BuildGauge()
@@ -111,6 +111,17 @@ Metrics::Metrics()
               .Name("nv_cache_num_misses")
               .Help("Number of cache misses in response cache")
               .Register(*registry_)),
+      cache_num_evictions_family_(
+          prometheus::BuildGauge()
+              .Name("nv_cache_num_evictions")
+              .Help("Number of cache evictions in response cache")
+              .Register(*registry_)),
+      cache_util_family_(
+          prometheus::BuildGauge()
+              .Name("nv_cache_util")
+              .Help("Cache utilization [0.0 - 1.0]")
+              .Register(*registry_)),
+
 #ifdef TRITON_ENABLE_METRICS_GPU
       gpu_utilization_family_(prometheus::BuildGauge()
                                   .Name("nv_gpu_utilization")
@@ -256,15 +267,15 @@ Metrics::InitializeCacheMetrics(std::shared_ptr<RequestResponseCache> response_c
   cache_num_lookups_global_ = &cache_num_lookups_family_.Add(cache_labels);
   cache_num_hits_global_ = &cache_num_hits_family_.Add(cache_labels);
   cache_num_misses_global_ = &cache_num_misses_family_.Add(cache_labels);
+  cache_num_evictions_global_ = &cache_num_evictions_family_.Add(cache_labels);
+  cache_util_global_ = &cache_util_family_.Add(cache_labels);
   cache_thread_exit_.store(false);
 
   // Start a separate thread for updating cache metrics at specified interval
   cache_thread_.reset(new std::thread([this, response_cache] {
-    // TODO: Remove this
     // Thread will update metrics indefinitely until exit flag set
     while (!cache_thread_exit_.load()) {
       // Sleep for metric interval
-      // TODO: Why interval/2 instead of interval?
       std::this_thread::sleep_for(
         std::chrono::milliseconds(metrics_interval_ms_ / 2));
       // Update global cache metrics
@@ -272,8 +283,8 @@ Metrics::InitializeCacheMetrics(std::shared_ptr<RequestResponseCache> response_c
       cache_num_lookups_global_->Set(response_cache->NumLookups()); 
       cache_num_hits_global_->Set(response_cache->NumHits()); 
       cache_num_misses_global_->Set(response_cache->NumMisses()); 
-      // TODO: Query cache utilization
-      //cache_util_global_->Set(response_cache->CacheUtilization()); 
+      cache_num_evictions_global_->Set(response_cache->NumEvictions()); 
+      cache_util_global_->Set(response_cache->TotalUtilization()); 
       // TODO: Total cache lookup latency:
       //       Probably should be updated per-request with other latencies
     }
