@@ -116,7 +116,6 @@ class InferenceBackend {
   // The minimum supported CUDA compute capability.
   const double min_compute_capability_;
 
-
   // Version of the model that this backend represents.
   int64_t version_;
 

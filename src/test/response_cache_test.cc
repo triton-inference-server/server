@@ -25,6 +25,7 @@
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include "gtest/gtest.h"
 
+#include <thread>
 #include "src/core/logging.h"
 #include "src/core/memory.h"
 #include "src/core/response_cache.h"
