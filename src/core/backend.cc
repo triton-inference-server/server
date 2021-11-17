@@ -29,12 +29,10 @@
 #include <chrono>
 #include <future>
 #include "src/core/constants.h"
-#include "src/core/dynamic_batch_scheduler.h"
 #include "src/core/filesystem.h"
 #include "src/core/infer_request.h"
 #include "src/core/logging.h"
 #include "src/core/model_config_utils.h"
-#include "src/core/sequence_batch_scheduler.h"
 
 namespace nvidia { namespace inferenceserver {
 
@@ -90,8 +88,8 @@ InferenceBackend::SetScheduler(std::unique_ptr<Scheduler> scheduler)
 Status
 InferenceBackend::Init()
 {
-  RETURN_IF_ERROR(ValidateModelConfig(config, min_compute_capability_));
-  RETURN_IF_ERROR(ValidateModelIOConfig(config));
+  RETURN_IF_ERROR(ValidateModelConfig(config_, min_compute_capability_));
+  RETURN_IF_ERROR(ValidateModelIOConfig(config_));
 
   // Initialize the input map
   for (const auto& io : config_.input()) {

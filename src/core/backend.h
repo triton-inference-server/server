@@ -43,8 +43,8 @@ class InferenceBackend {
   explicit InferenceBackend(
       const double min_compute_capability, const std::string& model_dir,
       const int64_t version, const inference::ModelConfig& config)
-      : min_compute_capability_(min_compute_capability), config_(config),
-        version_(version), model_dir_(model_dir),
+      : config_(config), min_compute_capability_(min_compute_capability),
+        version_(version), model_dir_(model_dir)
   {
   }
   virtual ~InferenceBackend() {}
@@ -109,12 +109,13 @@ class InferenceBackend {
   // The scheduler to use for this backend.
   std::unique_ptr<Scheduler> scheduler_;
 
+  // Configuration of the model that this backend represents.
+  inference::ModelConfig config_;
+
  private:
   // The minimum supported CUDA compute capability.
   const double min_compute_capability_;
 
-  // Configuration of the model that this backend represents.
-  inference::ModelConfig config_;
 
   // Version of the model that this backend represents.
   int64_t version_;

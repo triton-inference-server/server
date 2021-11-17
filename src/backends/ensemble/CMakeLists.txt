@@ -31,13 +31,11 @@ cmake_minimum_required (VERSION 3.18)
 #
 set(
   ENSEMBLE_SRCS
-  ensemble_backend_factory.cc
   ensemble_backend.cc
 )
 
 set(
   ENSEMBLE_HDRS
-  ensemble_backend_factory.h
   ensemble_backend.h
 )
 

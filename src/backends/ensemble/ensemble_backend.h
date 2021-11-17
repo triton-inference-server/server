@@ -36,18 +36,23 @@ class InferenceServer;
 
 class EnsembleBackend : public InferenceBackend {
  public:
+  EnsembleBackend(EnsembleBackend&&) = default;
+
+  static Status Create(
+      InferenceServer* server, const std::string& path, const int64_t version,
+      const inference::ModelConfig& model_config,
+      const double min_compute_capability,
+      std::unique_ptr<InferenceBackend>* backend);
+
+ private:
+  DISALLOW_COPY_AND_ASSIGN(EnsembleBackend);
+
   explicit EnsembleBackend(
       const double min_compute_capability, const std::string& model_dir,
       const int64_t version, const inference::ModelConfig& config)
       : InferenceBackend(min_compute_capability, model_dir, version, config)
   {
   }
-  EnsembleBackend(EnsembleBackend&&) = default;
-
-  Status Init(InferenceServer* const server);
-
- private:
-  DISALLOW_COPY_AND_ASSIGN(EnsembleBackend);
   friend std::ostream& operator<<(std::ostream&, const EnsembleBackend&);
 };
 

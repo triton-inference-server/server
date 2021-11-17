@@ -29,10 +29,12 @@
 #include <vector>
 #include "src/backends/backend/triton_backend_config.h"
 #include "src/backends/backend/triton_model_instance.h"
+#include "src/core/dynamic_batch_scheduler.h"
 #include "src/core/filesystem.h"
 #include "src/core/logging.h"
 #include "src/core/model_config_utils.h"
 #include "src/core/numa_utils.h"
+#include "src/core/sequence_batch_scheduler.h"
 #include "src/core/sequence_state.h"
 #include "src/core/server.h"
 #include "src/core/server_message.h"
@@ -176,8 +178,7 @@ TritonModel::Create(
   RETURN_IF_ERROR(TritonModelInstance::CreateInstances(
       raw_local_model, host_policy_map, model_config, device_blocking));
 
-  RETURN_IF_ERROR(
-      local_model->SetConfiguredScheduler(static_cast<void*>(raw_local_model)));
+  RETURN_IF_ERROR(local_model->SetConfiguredScheduler());
 
   *model = std::move(local_model);
   return Status::Success;

@@ -46,6 +46,7 @@
 #include "src/core/model_repository_manager.h"
 #include "src/core/pinned_memory_manager.h"
 #include "src/core/triton_repo_agent.h"
+#include "triton/common/async_work_queue.h"
 #include "triton/common/table_printer.h"
 
 #ifdef TRITON_ENABLE_GPU

@@ -220,8 +220,7 @@ class ModelRepositoryManager {
   using NodeSet = std::set<DependencyNode*>;
 
   ModelRepositoryManager(
-      const std::set<std::string>& repository_paths,
-      const BackendConfigMap& backend_config_map, const bool autofill,
+      const std::set<std::string>& repository_paths, const bool autofill,
       const bool polling_enabled, const bool model_control_enabled,
       const double min_compute_capability,
       std::unique_ptr<BackendLifeCycle> life_cycle);

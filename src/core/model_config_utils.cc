@@ -630,9 +630,8 @@ GetTypedSequenceControlProperties(
 
 Status
 GetNormalizedModelConfig(
-    const std::string& path, const BackendConfigMap& backend_config_map,
-    const bool autofill, const double min_compute_capability,
-    inference::ModelConfig* config)
+    const std::string& path, const bool autofill,
+    const double min_compute_capability, inference::ModelConfig* config)
 {
   // If 'autofill' then the configuration file can be empty.
   const auto config_path = JoinPath({path, kModelConfigPbTxt});

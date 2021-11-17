@@ -44,9 +44,9 @@
 #include <cuda_runtime_api.h>
 #endif
 
-#include "src/backends/backend/backend_factory.h"
+#include "src/backends/backend/triton_model.h"
 #ifdef TRITON_ENABLE_ENSEMBLE
-#include "src/backends/ensemble/ensemble_backend_factory.h"
+#include "src/backends/ensemble/ensemble_backend.h"
 #endif  // TRITON_ENABLE_ENSEMBLE
 
 namespace nvidia { namespace inferenceserver {
@@ -235,22 +235,6 @@ VersionsToLoad(
   return Status::Success;
 }
 
-void
-BuildBackendConfigMap(
-    const std::string& version, const bool strict_model_config,
-    const float tf_gpu_memory_fraction, const bool tf_allow_soft_placement,
-    BackendConfigMap* backend_configs)
-{
-#ifdef TRITON_ENABLE_ENSEMBLE
-  //// Ensemble
-  {
-    auto ensemble_config = std::make_shared<EnsembleBackendFactory::Config>();
-    (*backend_configs)[kEnsemblePlatform] = ensemble_config;
-  }
-#endif  // TRITON_ENABLE_ENSEMBLE
-  ;     // Need this semicolon to keep code formatter from freaking out
-}
-
 int64_t
 GetModifiedTime(const std::string& path)
 {
@@ -360,7 +344,6 @@ class ModelRepositoryManager::BackendLifeCycle {
  public:
   static Status Create(
       InferenceServer* server, const double min_compute_capability,
-      const BackendConfigMap& backend_config_map,
       const BackendCmdlineConfigMap& backend_cmdline_config_map,
       const HostPolicyCmdlineConfigMap& host_policy_map,
       std::unique_ptr<BackendLifeCycle>* life_cycle);
@@ -437,8 +420,13 @@ class ModelRepositoryManager::BackendLifeCycle {
     std::shared_ptr<InferenceBackend> backend_;
   };
 
-  BackendLifeCycle(const double min_compute_capability)
-      : min_compute_capability_(min_compute_capability)
+  BackendLifeCycle(
+      const double min_compute_capability, InferenceServer* server,
+      const BackendCmdlineConfigMap& backend_cmdline_config_map,
+      const HostPolicyCmdlineConfigMap& host_policy_map)
+      : min_compute_capability_(min_compute_capability), server_(server),
+        cmdline_config_map_(backend_cmdline_config_map),
+        host_policy_map_(host_policy_map)
   {
   }
 
@@ -472,35 +460,21 @@ class ModelRepositoryManager::BackendLifeCycle {
   std::map<uintptr_t, std::unique_ptr<BackendInfo>> unloading_backends_;
   std::recursive_mutex map_mtx_;
 
-  std::unique_ptr<TritonBackendFactory> triton_backend_factory_;
-#ifdef TRITON_ENABLE_ENSEMBLE
-  std::unique_ptr<EnsembleBackendFactory> ensemble_factory_;
-#endif  // TRITON_ENABLE_ENSEMBLE
+  InferenceServer* server_;
+  const BackendCmdlineConfigMap cmdline_config_map_;
+  const HostPolicyCmdlineConfigMap host_policy_map_;
 };
 
 Status
 ModelRepositoryManager::BackendLifeCycle::Create(
     InferenceServer* server, const double min_compute_capability,
-    const BackendConfigMap& backend_config_map,
     const BackendCmdlineConfigMap& backend_cmdline_config_map,
     const HostPolicyCmdlineConfigMap& host_policy_map,
     std::unique_ptr<BackendLifeCycle>* life_cycle)
 {
-  std::unique_ptr<BackendLifeCycle> local_life_cycle(
-      new BackendLifeCycle(min_compute_capability));
-  {
-    RETURN_IF_ERROR(TritonBackendFactory::Create(
-        server, backend_cmdline_config_map, host_policy_map,
-        &(local_life_cycle->triton_backend_factory_)));
-  }
-#ifdef TRITON_ENABLE_ENSEMBLE
-  {
-    const std::shared_ptr<BackendConfig>& config =
-        backend_config_map.find(kEnsemblePlatform)->second;
-    RETURN_IF_ERROR(EnsembleBackendFactory::Create(
-        server, config, &(local_life_cycle->ensemble_factory_)));
-  }
-#endif  // TRITON_ENABLE_ENSEMBLE
+  std::unique_ptr<BackendLifeCycle> local_life_cycle(new BackendLifeCycle(
+      min_compute_capability, server, backend_cmdline_config_map,
+      host_policy_map));
 
   *life_cycle = std::move(local_life_cycle);
   return Status::Success;
@@ -1103,13 +1077,17 @@ ModelRepositoryManager::BackendLifeCycle::CreateInferenceBackend(
   // If 'backend' is specified in the config then use the new triton
   // backend.
   if (!model_config.backend().empty()) {
-    status = triton_backend_factory_->CreateBackend(
-        backend_info->repository_path_, model_name, version, model_config, &is);
+    std::unique_ptr<TritonModel> model;
+    status = TritonModel::Create(
+        server_, backend_info->repository_path_, cmdline_config_map_,
+        host_policy_map_, model_name, version, model_config, &model);
+    is.reset(model.release());
   } else {
 #ifdef TRITON_ENABLE_ENSEMBLE
     if (backend_info->is_ensemble_) {
-      status = ensemble_factory_->CreateBackend(
-          model_path, version, model_config, min_compute_capability_, &is);
+      status = EnsembleBackend::Create(
+          server_, model_path, version, model_config, min_compute_capability_,
+          &is);
       // Complete label provider with label information from involved backends
       // Must be done here because involved backends may not be able to
       // obtained from server because this may happen during server
@@ -1195,13 +1173,11 @@ ModelRepositoryManager::BackendLifeCycle::CreateInferenceBackend(
 }
 
 ModelRepositoryManager::ModelRepositoryManager(
-    const std::set<std::string>& repository_paths,
-    const BackendConfigMap& backend_config_map, const bool autofill,
+    const std::set<std::string>& repository_paths, const bool autofill,
     const bool polling_enabled, const bool model_control_enabled,
     const double min_compute_capability,
     std::unique_ptr<BackendLifeCycle> life_cycle)
-    : repository_paths_(repository_paths),
-      backend_config_map_(backend_config_map), autofill_(autofill),
+    : repository_paths_(repository_paths), autofill_(autofill),
       polling_enabled_(polling_enabled),
       model_control_enabled_(model_control_enabled),
       min_compute_capability_(min_compute_capability),
@@ -1240,22 +1216,16 @@ ModelRepositoryManager::Create(
         "cannot enable both polling and explicit model control");
   }
 
-  BackendConfigMap backend_config_map;
-
-  BuildBackendConfigMap(
-      server_version, strict_model_config, tf_gpu_memory_fraction,
-      tf_allow_soft_placement, &backend_config_map);
-
   std::unique_ptr<BackendLifeCycle> life_cycle;
   RETURN_IF_ERROR(BackendLifeCycle::Create(
-      server, min_compute_capability, backend_config_map,
-      backend_cmdline_config_map, host_policy_map, &life_cycle));
+      server, min_compute_capability, backend_cmdline_config_map,
+      host_policy_map, &life_cycle));
 
   // Not setting the smart pointer directly to simplify clean up
   std::unique_ptr<ModelRepositoryManager> local_manager(
       new ModelRepositoryManager(
-          repository_paths, backend_config_map, !strict_model_config,
-          polling_enabled, model_control_enabled, min_compute_capability,
+          repository_paths, !strict_model_config, polling_enabled,
+          model_control_enabled, min_compute_capability,
           std::move(life_cycle)));
 
   bool all_models_polled = true;
@@ -1828,8 +1798,7 @@ ModelRepositoryManager::Poll(
         // the model configuration (autofill) from the model
         // definition. In all cases normalize and validate the config.
         status = GetNormalizedModelConfig(
-            full_path, backend_config_map_, autofill_, min_compute_capability_,
-            &model_config);
+            full_path, autofill_, min_compute_capability_, &model_config);
       }
       if (status.IsOk()) {
         // Note that the model inputs and outputs are not validated until

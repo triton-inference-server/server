@@ -35,17 +35,29 @@
 namespace nvidia { namespace inferenceserver {
 
 Status
-EnsembleBackend::Init(InferenceServer* const server)
+EnsembleBackend::Create(
+    InferenceServer* server, const std::string& path, const int64_t version,
+    const inference::ModelConfig& model_config,
+    const double min_compute_capability,
+    std::unique_ptr<InferenceBackend>* backend)
 {
-  RETURN_IF_ERROR(InferenceBackend::Init());
+  // Create the backend for the model and all the execution contexts
+  // requested for this model.
+  std::unique_ptr<EnsembleBackend> local_backend(
+      new EnsembleBackend(min_compute_capability, path, version, model_config));
+
+  RETURN_IF_ERROR(local_backend->Init());
 
   std::unique_ptr<Scheduler> scheduler;
   RETURN_IF_ERROR(EnsembleScheduler::Create(
-      MutableStatsAggregator(), server, config, &scheduler));
-  RETURN_IF_ERROR(SetScheduler(std::move(scheduler)));
+      local_backend->MutableStatsAggregator(), server, model_config,
+      &scheduler));
+  RETURN_IF_ERROR(local_backend->SetScheduler(std::move(scheduler)));
 
-  LOG_VERBOSE(1) << "ensemble backend for " << Name() << std::endl << *this;
+  LOG_VERBOSE(1) << "ensemble backend for " << local_backend->Name()
+                 << std::endl;
 
+  *backend = std::move(local_backend);
   return Status::Success;
 }
 
