@@ -30,24 +30,17 @@ from scenarios import *
 sys.path.append("../common")
 
 import argparse
+import bisect
 from builtins import range
 from builtins import str
-from future.utils import iteritems
 import os
 import time
-import math
 import threading
 import traceback
 import numpy as np
-import test_util as tu
 from functools import partial
 import tritongrpcclient as grpcclient
-from tritonclientutils import np_to_triton_dtype
 import prettytable
-import subprocess
-
-from collections import OrderedDict
-import bisect
 
 FLAGS = None
 CORRELATION_ID_BLOCK_SIZE = 1024 * 1024

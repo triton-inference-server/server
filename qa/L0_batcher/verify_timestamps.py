@@ -104,8 +104,6 @@ def verify_timestamps(traces, preserve):
         # before large delay batch regardless of the ordering in scheduler
         return 0 if response_request_after_large_delay_count == 0 else 1
 
-    return 0
-
 
 def summarize(protocol, traces):
     for trace in filtered_traces:

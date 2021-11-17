@@ -139,7 +139,8 @@ if __name__ == '__main__':
 
     if FLAGS.csv is not None:
         if len(data) != 1:
-            raise ('--csv requires that json data have a single array entry')
+            raise Exception(
+                "--csv requires that json data have a single array entry")
         annotate_csv(data[0], FLAGS.csv)
         if FLAGS.verbose:
             print("*** Annotate CSV ***")
