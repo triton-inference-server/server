@@ -82,7 +82,12 @@ class TritonModel : public InferenceBackend {
       InferenceServer* server,
       const std::shared_ptr<LocalizedDirectory>& localized_model_dir,
       const std::shared_ptr<TritonBackend>& backend,
-      const double min_compute_capability, const bool auto_complete_config);
+      const double min_compute_capability, const int64_t version,
+      const inference::ModelConfig& config, const bool auto_complete_config);
+
+  // Set the scheduler based on the model configuration. The scheduler
+  // can only be set once for a backend.
+  Status SetConfiguredScheduler();
 
   Status Initialize();
   Status WarmUp();
@@ -109,9 +114,6 @@ class TritonModel : public InferenceBackend {
 
   // Opaque state associated with this model.
   void* state_;
-
-  // Whether the model is initialized.
-  bool initialized_;
 };
 
 }}  // namespace nvidia::inferenceserver

@@ -1086,8 +1086,8 @@ ModelRepositoryManager::BackendLifeCycle::CreateInferenceBackend(
 {
   LOG_VERBOSE(1) << "CreateInferenceBackend() '" << model_name << "' version "
                  << version;
-  const auto version_path = JoinPath(
-      {backend_info->repository_path_, model_name, std::to_string(version)});
+  const auto model_path =
+      JoinPath({backend_info->repository_path_, model_name});
   // make copy of the current model config in case model config in backend info
   // is updated (another poll) during the creation of backend handle
   inference::ModelConfig model_config;
@@ -1109,7 +1109,7 @@ ModelRepositoryManager::BackendLifeCycle::CreateInferenceBackend(
 #ifdef TRITON_ENABLE_ENSEMBLE
     if (backend_info->is_ensemble_) {
       status = ensemble_factory_->CreateBackend(
-          version_path, model_config, min_compute_capability_, &is);
+          model_path, version, model_config, min_compute_capability_, &is);
       // Complete label provider with label information from involved backends
       // Must be done here because involved backends may not be able to
       // obtained from server because this may happen during server

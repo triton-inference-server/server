@@ -54,15 +54,16 @@ EnsembleBackendFactory::Create(
 
 Status
 EnsembleBackendFactory::CreateBackend(
-    const std::string& path, const inference::ModelConfig& model_config,
+    const std::string& path, const int64_t version,
+    const inference::ModelConfig& model_config,
     const double min_compute_capability,
     std::unique_ptr<InferenceBackend>* backend)
 {
   // Create the backend for the model and all the execution contexts
   // requested for this model.
   std::unique_ptr<EnsembleBackend> local_backend(
-      new EnsembleBackend(min_compute_capability));
-  RETURN_IF_ERROR(local_backend->Init(server_, path, model_config));
+      new EnsembleBackend(min_compute_capability, path, version, model_config));
+  RETURN_IF_ERROR(local_backend->Init(server_));
 
   *backend = std::move(local_backend);
   return Status::Success;

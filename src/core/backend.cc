@@ -69,21 +69,38 @@ InferenceBackend::GetOutput(
 }
 
 Status
-InferenceBackend::SetModelConfig(
-    const std::string& path, const inference::ModelConfig& config)
+InferenceBackend::SetModelConfig(const inference::ModelConfig& config)
 {
   config_ = config;
-  RETURN_IF_ERROR(GetModelVersionFromPath(path, &version_));
+  return Status::Success;
+}
+
+Status
+InferenceBackend::SetScheduler(std::unique_ptr<Scheduler> scheduler)
+{
+  if (scheduler_ != nullptr) {
+    return Status(
+        Status::Code::INTERNAL, "Attempt to change scheduler not allowed");
+  }
+
+  scheduler_ = std::move(scheduler);
+  return Status::Success;
+}
+
+Status
+InferenceBackend::Init()
+{
+  RETURN_IF_ERROR(ValidateModelConfig(config, min_compute_capability_));
+  RETURN_IF_ERROR(ValidateModelIOConfig(config));
 
   // Initialize the input map
-  for (const auto& io : config.input()) {
+  for (const auto& io : config_.input()) {
     input_map_.insert(std::make_pair(io.name(), io));
   }
 
   // Initialize the output map and label provider for each output
   label_provider_ = std::make_shared<LabelProvider>();
-  model_dir_ = DirName(path);
-  for (const auto& io : config.output()) {
+  for (const auto& io : config_.output()) {
     output_map_.insert(std::make_pair(io.name(), io));
 
     if (!io.label_filename().empty()) {
@@ -106,103 +123,6 @@ InferenceBackend::SetModelConfig(
   }
 
   return Status::Success;
-}
-
-Status
-InferenceBackend::SetScheduler(std::unique_ptr<Scheduler> scheduler)
-{
-  if (scheduler_ != nullptr) {
-    return Status(
-        Status::Code::INTERNAL, "Attempt to change scheduler not allowed");
-  }
-
-  scheduler_ = std::move(scheduler);
-  return Status::Success;
-}
-
-Status
-InferenceBackend::SetConfiguredScheduler(void* model)
-{
-  std::unique_ptr<Scheduler> scheduler;
-
-  // Need to enforce equal shape batches (i.e. non-ragged batches) if
-  // the model 1) allows one or more variable-size input tensors that
-  // are not marked as 'allow_ragged_batch' or 2) has one or more
-  // shape-tensor inputs. This is not needed if all input shapes are
-  // non-variable and if there are no shape tensors... so we don't
-  // enable it in that case for efficiency reasons.
-  std::unordered_map<std::string, bool> enforce_equal_shape_tensors;
-  for (const auto input : config_.input()) {
-    if (input.is_shape_tensor()) {
-      enforce_equal_shape_tensors.insert({input.name(), true});
-    } else if (!input.allow_ragged_batch() && (GetElementCount(input) == -1)) {
-      enforce_equal_shape_tensors.insert({input.name(), false});
-    }
-  }
-
-  // If 'sequence_batching' is configured use the SequenceBatchScheduler,
-  // otherwise use the default DynamicBatchScheduler.
-  if (config_.has_sequence_batching()) {
-    // Sequence batcher
-    RETURN_IF_ERROR(SequenceBatchScheduler::Create(
-        static_cast<TritonModel*>(model), enforce_equal_shape_tensors,
-        &scheduler));
-  } else if (config_.has_dynamic_batching()) {
-    // Dynamic batcher
-    RETURN_IF_ERROR(DynamicBatchScheduler::Create(
-        static_cast<TritonModel*>(model), nullptr, 0 /*nice*/,
-        true /* dynamic_batching_enabled */, config_.max_batch_size(),
-        enforce_equal_shape_tensors, config_.dynamic_batching(),
-        config_.response_cache().enable() /* response_cache_enable */,
-        &scheduler));
-  } else {
-    // Default scheduler. Use dynamic batch scheduler (with batching
-    // disabled) as the default scheduler.
-    RETURN_IF_ERROR(DynamicBatchScheduler::Create(
-        static_cast<TritonModel*>(model), nullptr, 0 /*nice*/,
-        false /* dynamic_batching_enabled */, 1 /* max_batch_size */,
-        std::unordered_map<
-            std::string, bool>() /* enforce_equal_shape_tensors */,
-        false /* preserve_ordering */,
-        config_.response_cache().enable() /* response_cache_enable */,
-        std::set<int32_t>() /* preferred_batch_sizes */,
-        0 /* max_queue_delay_microseconds */, &scheduler));
-  }
-
-  return SetScheduler(std::move(scheduler));
-}
-
-Status
-InferenceBackend::Init(
-    const std::string& path, const inference::ModelConfig& config)
-{
-  RETURN_IF_ERROR(ValidateModelConfig(config, min_compute_capability_));
-  RETURN_IF_ERROR(ValidateModelIOConfig(config));
-  RETURN_IF_ERROR(SetModelConfig(path, config));
-
-  return Status::Success;
-}
-
-void
-InferenceBackend::Run(
-    uint32_t runner_idx,
-    std::vector<std::unique_ptr<InferenceRequest>>&& requests)
-{
-  // Each runner executes using the corresponding context...  If the
-  // runner_idx is invalid then the scheduler has done something badly
-  // wrong so fail and release all requests.
-  if (runner_idx >= contexts_.size()) {
-    InferenceRequest::RespondIfError(
-        requests,
-        Status(
-            Status::Code::INTERNAL,
-            "unexpected runner index" + std::to_string(runner_idx) +
-                ", max allowed " + std::to_string(contexts_.size())),
-        true /*release_requests */);
-    return;
-  }
-
-  contexts_[runner_idx]->Run(this, std::move(requests));
 }
 
 }}  // namespace nvidia::inferenceserver

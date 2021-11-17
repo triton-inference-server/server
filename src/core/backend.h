@@ -26,56 +26,12 @@
 #pragma once
 
 #include "model_config.pb.h"
-#include "src/core/backend_context.h"
 #include "src/core/infer_stats.h"
 #include "src/core/label_provider.h"
 #include "src/core/scheduler.h"
 #include "src/core/status.h"
 
 namespace nvidia { namespace inferenceserver {
-
-#ifdef TRITON_ENABLE_STATS
-#define FAIL_ALL_AND_RETURN_IF_ERROR(REQUESTS, RESPONSES, MR, S, LOG_MSG)    \
-  do {                                                                       \
-    const auto& status__ = (S);                                              \
-    if (!status__.IsOk()) {                                                  \
-      for (auto& response : (RESPONSES)) {                                   \
-        if (response != nullptr) {                                           \
-          const auto& response_status__ = InferenceResponse::SendWithStatus( \
-              std::move(response), TRITONSERVER_RESPONSE_COMPLETE_FINAL,     \
-              status__);                                                     \
-          LOG_STATUS_ERROR(response_status__, (LOG_MSG));                    \
-        }                                                                    \
-      }                                                                      \
-      for (auto& request : (REQUESTS)) {                                     \
-        request->ReportStatistics(MR, false /* success */, 0, 0, 0, 0);      \
-        InferenceRequest::Release(                                           \
-            std::move(request), TRITONSERVER_REQUEST_RELEASE_ALL);           \
-      }                                                                      \
-      return;                                                                \
-    }                                                                        \
-  } while (false)
-#else
-#define FAIL_ALL_AND_RETURN_IF_ERROR(REQUESTS, RESPONSES, MR, S, LOG_MSG)    \
-  do {                                                                       \
-    const auto& status__ = (S);                                              \
-    if (!status__.IsOk()) {                                                  \
-      for (auto& response : (RESPONSES)) {                                   \
-        if (response != nullptr) {                                           \
-          const auto& response_status__ = InferenceResponse::SendWithStatus( \
-              std::move(response), TRITONSERVER_RESPONSE_COMPLETE_FINAL,     \
-              status__);                                                     \
-          LOG_STATUS_ERROR(response_status__, (LOG_MSG));                    \
-        }                                                                    \
-      }                                                                      \
-      for (auto& request : (REQUESTS)) {                                     \
-        InferenceRequest::Release(                                           \
-            std::move(request), TRITONSERVER_REQUEST_RELEASE_ALL);           \
-      }                                                                      \
-      return;                                                                \
-    }                                                                        \
-  } while (false)
-#endif  // TRITON_ENABLE_STATS
 
 class InferenceRequest;
 
@@ -84,8 +40,11 @@ class InferenceRequest;
 //
 class InferenceBackend {
  public:
-  explicit InferenceBackend(const double min_compute_capability)
-      : min_compute_capability_(min_compute_capability)
+  explicit InferenceBackend(
+      const double min_compute_capability, const std::string& model_dir,
+      const int64_t version, const inference::ModelConfig& config)
+      : min_compute_capability_(min_compute_capability), config_(config),
+        version_(version), model_dir_(model_dir),
   {
   }
   virtual ~InferenceBackend() {}
@@ -123,7 +82,8 @@ class InferenceBackend {
     return label_provider_;
   }
 
-  Status Init(const std::string& path, const inference::ModelConfig& config);
+  // Initialize the instance for Triton core usage
+  Status Init();
 
   // Enqueue a request for execution. If Status::Success is returned
   // then the backend has taken ownership of the request object and so
@@ -138,37 +98,13 @@ class InferenceBackend {
 
   uint32_t MaxPriorityLevel() const { return max_priority_level_; }
 
-  bool DecoupledTransactionPolicy()
-  {
-    return config_.model_transaction_policy().decoupled();
-  }
-
  protected:
-  // Run model on the context associated with 'runner_idx' to execute
-  // for one or more requests. This function takes ownership of
-  // 'requests' and is responsible for generating responses and
-  // releasing the requests.
-  virtual void Run(
-      uint32_t runner_idx,
-      std::vector<std::unique_ptr<InferenceRequest>>&& requests);
-
   // Set the configuration of the model being served.
-  Status SetModelConfig(
-      const std::string& path, const inference::ModelConfig& config);
+  Status SetModelConfig(const inference::ModelConfig& config);
 
   // Explicitly set the scheduler to use for inference requests to the
   // model. The scheduler can only be set once for a backend.
   Status SetScheduler(std::unique_ptr<Scheduler> scheduler);
-
-  // Set the scheduler based on the model configuration. The scheduler
-  // can only be set once for a backend.
-  // FIXME: Change pointer to the type TritonModel* in future.
-  Status SetConfiguredScheduler(void* model);
-
-  // Get the raw pointer to the scheduler of this backend.
-  Scheduler* BackendScheduler() { return scheduler_.get(); }
-
-  std::vector<std::unique_ptr<BackendContext>> contexts_;
 
   // The scheduler to use for this backend.
   std::unique_ptr<Scheduler> scheduler_;

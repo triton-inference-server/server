@@ -36,22 +36,15 @@ class InferenceServer;
 
 class EnsembleBackend : public InferenceBackend {
  public:
-  explicit EnsembleBackend(const double min_compute_capability)
-      : InferenceBackend(min_compute_capability)
+  explicit EnsembleBackend(
+      const double min_compute_capability, const std::string& model_dir,
+      const int64_t version, const inference::ModelConfig& config)
+      : InferenceBackend(min_compute_capability, model_dir, version, config)
   {
   }
   EnsembleBackend(EnsembleBackend&&) = default;
 
-  Status Init(
-      InferenceServer* const server, const std::string& path,
-      const inference::ModelConfig& config);
-
- private:
-  // Override InferenceBackend::Run() to return proper error if
-  // Run() is called for ensemble model.
-  void Run(
-      uint32_t runner_idx,
-      std::vector<std::unique_ptr<InferenceRequest>>&& requests) override;
+  Status Init(InferenceServer* const server);
 
  private:
   DISALLOW_COPY_AND_ASSIGN(EnsembleBackend);
