@@ -96,6 +96,21 @@ Metrics::Metrics()
               .Name("nv_cache_num_entries")
               .Help("Number of responses stored in response cache")
               .Register(*registry_)),
+      cache_num_lookups_family_(
+          prometheus::BuildGauge()
+              .Name("nv_cache_num_lookups")
+              .Help("Number of lookups on response cache")
+              .Register(*registry_)),
+      cache_num_hits_family_(
+          prometheus::BuildGauge()
+              .Name("nv_cache_num_hits")
+              .Help("Number of cache hits in response cache")
+              .Register(*registry_)),
+      cache_num_misses_family_(
+          prometheus::BuildGauge()
+              .Name("nv_cache_num_misses")
+              .Help("Number of cache misses in response cache")
+              .Register(*registry_)),
 #ifdef TRITON_ENABLE_METRICS_GPU
       gpu_utilization_family_(prometheus::BuildGauge()
                                   .Name("nv_gpu_utilization")
@@ -238,6 +253,9 @@ Metrics::InitializeCacheMetrics(std::shared_ptr<RequestResponseCache> response_c
   // TODO: Populate labels
   const std::map<std::string, std::string> cache_labels;
   cache_num_entries_global_ = &cache_num_entries_family_.Add(cache_labels);
+  cache_num_lookups_global_ = &cache_num_lookups_family_.Add(cache_labels);
+  cache_num_hits_global_ = &cache_num_hits_family_.Add(cache_labels);
+  cache_num_misses_global_ = &cache_num_misses_family_.Add(cache_labels);
   cache_thread_exit_.store(false);
 
   // Start a separate thread for updating cache metrics at specified interval
@@ -251,14 +269,11 @@ Metrics::InitializeCacheMetrics(std::shared_ptr<RequestResponseCache> response_c
         std::chrono::milliseconds(metrics_interval_ms_ / 2));
       // Update global cache metrics
       cache_num_entries_global_->Set(response_cache->NumEntries()); 
-      // TODO: Add global cache hits to cache class and query here, not sure
-      //       how per-model will be handled yet. Maybe handle per-model and
-      //       sum for global instead
-      //cache_hits_global_->Set(response_cache->CacheHits()); 
+      cache_num_lookups_global_->Set(response_cache->NumLookups()); 
+      cache_num_hits_global_->Set(response_cache->NumHits()); 
+      cache_num_misses_global_->Set(response_cache->NumMisses()); 
       // TODO: Query cache utilization
       //cache_util_global_->Set(response_cache->CacheUtilization()); 
-      // TODO: Query cache lookups 
-      //cache_lookups_global_->Set(response_cache->CacheLookups()); 
       // TODO: Total cache lookup latency:
       //       Probably should be updated per-request with other latencies
     }

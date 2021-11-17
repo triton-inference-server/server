@@ -158,8 +158,14 @@ class Metrics {
       inf_compute_output_duration_us_family_;
   // Response Cache Metrics
   prometheus::Family<prometheus::Gauge>& cache_num_entries_family_;
-  // Gauge for server-wide cache metrics
+  prometheus::Family<prometheus::Gauge>& cache_num_lookups_family_;
+  prometheus::Family<prometheus::Gauge>& cache_num_hits_family_;
+  prometheus::Family<prometheus::Gauge>& cache_num_misses_family_;
+  // Gauges for server-wide cache metrics
   prometheus::Gauge* cache_num_entries_global_;
+  prometheus::Gauge* cache_num_lookups_global_;
+  prometheus::Gauge* cache_num_hits_global_;
+  prometheus::Gauge* cache_num_misses_global_;
   std::unique_ptr<std::thread> cache_thread_;
   std::atomic<bool> cache_thread_exit_;
 #ifdef TRITON_ENABLE_METRICS_GPU

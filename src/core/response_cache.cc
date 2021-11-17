@@ -162,11 +162,15 @@ RequestResponseCache::Lookup(const uint64_t key, InferenceResponse* ptr)
   // Lock on cache lookup
   std::lock_guard<std::recursive_mutex> lk(cache_mtx_);
   LOG_VERBOSE(1) << "Looking up key [" + std::to_string(key) + "] in cache.";
+  num_lookups_++;
 
   auto iter = cache_.find(key);
   if (iter == cache_.end()) {
+    num_misses_++;
     return Status(Status::Code::INTERNAL, "key not found in cache");
   }
+  // If find succeeds, it's a cache hit
+  num_hits_++;
   // Populate passed-in "ptr" from cache entry
   auto entry = iter->second;
   // Build InferenceResponse from CacheEntry
