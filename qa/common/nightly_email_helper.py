@@ -30,7 +30,6 @@ import smtplib
 from email.mime.multipart import MIMEMultipart
 from email.mime.base import MIMEBase
 from email.mime.text import MIMEText
-import base64
 import glob
 import os
 import sys

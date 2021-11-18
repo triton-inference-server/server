@@ -32,7 +32,6 @@ import json
 import os
 import requests
 import socket
-import sys
 
 FLAGS = None
 
