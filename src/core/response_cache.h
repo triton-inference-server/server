@@ -111,6 +111,12 @@ class RequestResponseCache {
     std::lock_guard<std::recursive_mutex> lk(cache_mtx_);
     return num_misses_;
   }
+  // Returns the total lookup latency (nanoseconds) of all lookups in cache lifespan
+  uint64_t TotalLookupLatencyNs()
+  {
+    std::lock_guard<std::recursive_mutex> lk(cache_mtx_);
+    return total_lookup_latency_ns_;
+  }
   // Returns total number of bytes allocated for cache
   size_t TotalBytes()
   {
@@ -164,6 +170,7 @@ class RequestResponseCache {
   size_t num_lookups_ = 0;
   size_t num_hits_ = 0;
   size_t num_misses_ = 0;
+  uint64_t total_lookup_latency_ns_ = 0;
   // Mutex for buffer synchronization
   std::recursive_mutex buffer_mtx_;
   // Mutex for cache synchronization

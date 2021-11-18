@@ -25,6 +25,7 @@
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 #include "src/core/response_cache.h"
+#include "src/core/infer_stats.h"
 #include "src/core/logging.h"
 
 namespace {
@@ -161,15 +162,26 @@ RequestResponseCache::Lookup(const uint64_t key, InferenceResponse* ptr)
 {
   // Lock on cache lookup
   std::lock_guard<std::recursive_mutex> lk(cache_mtx_);
-  LOG_VERBOSE(1) << "Looking up key [" + std::to_string(key) + "] in cache.";
-  num_lookups_++;
 
+  // Capture start lookup latency
+  uint64_t lookup_start_ns = 0;
+  uint64_t lookup_end_ns = 0;
+  INFER_STATS_SET_TIMESTAMP(lookup_start_ns);
+
+  num_lookups_++;
+  LOG_VERBOSE(1) << "Looking up key [" + std::to_string(key) + "] in cache.";
+
+  // Search cache for request hash key
   auto iter = cache_.find(key);
   if (iter == cache_.end()) {
     num_misses_++;
     LOG_VERBOSE(1) << "MISS for key [" + std::to_string(key) + "] in cache.";
+    // Capture end lookup latency on miss and update total latency
+    INFER_STATS_SET_TIMESTAMP(lookup_end_ns);
+    total_lookup_latency_ns_ += (lookup_end_ns - lookup_start_ns);
     return Status(Status::Code::INTERNAL, "key not found in cache");
   }
+
   // If find succeeds, it's a cache hit
   num_hits_++;
   LOG_VERBOSE(1) << "HIT for key [" + std::to_string(key) + "] in cache.";
@@ -184,6 +196,10 @@ RequestResponseCache::Lookup(const uint64_t key, InferenceResponse* ptr)
 
   LOG_VERBOSE(1) << "Using cached response for key [" + std::to_string(key) +
                         "].";
+
+  // Capture end lookup latency on hit and update total latency
+  INFER_STATS_SET_TIMESTAMP(lookup_end_ns);
+  total_lookup_latency_ns_ += (lookup_end_ns - lookup_start_ns);
   return Status::Success;
 }
 
