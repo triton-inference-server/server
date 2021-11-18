@@ -128,10 +128,6 @@ class ModelRepositoryManager {
   /// information in each model configuration.
   /// \param backend_cmdline_config_map The backend configuration setting
   /// specified on the command-line.
-  /// \param tf_gpu_memory_fraction The portion of GPU memory to be reserved
-  /// for TensorFlow models.
-  /// \param tf_allow_soft_placement If true instruct TensorFlow to use CPU
-  /// implementation of an operation when a GPU implementation is not available
   /// \param polling_enabled If true, then PollAndUpdate() is allowed.
   /// Otherwise, it is not allowed.
   /// \param model_control_enabled If true, then LoadUnloadModel() is allowed
@@ -149,7 +145,6 @@ class ModelRepositoryManager {
       const std::set<std::string>& startup_models,
       const bool strict_model_config,
       const BackendCmdlineConfigMap& backend_cmdline_config_map,
-      const float tf_gpu_memory_fraction, const bool tf_allow_soft_placement,
       const bool polling_enabled, const bool model_control_enabled,
       const double min_compute_capability,
       const HostPolicyCmdlineConfigMap& host_policy_map,

@@ -294,12 +294,6 @@ class TritonServerOptions {
     return host_policy_map_;
   }
 
-  bool TensorFlowSoftPlacement() const { return tf_soft_placement_; }
-  void SetTensorFlowSoftPlacement(bool b) { tf_soft_placement_ = b; }
-
-  float TensorFlowGpuMemoryFraction() const { return tf_gpu_mem_fraction_; }
-  void SetTensorFlowGpuMemoryFraction(float f) { tf_gpu_mem_fraction_ = f; }
-
  private:
   std::string server_id_;
   std::set<std::string> repo_paths_;
@@ -323,9 +317,6 @@ class TritonServerOptions {
   std::string repoagent_dir_;
   ni::BackendCmdlineConfigMap backend_cmdline_config_map_;
   ni::HostPolicyCmdlineConfigMap host_policy_map_;
-
-  bool tf_soft_placement_;
-  float tf_gpu_mem_fraction_;
 };
 
 TritonServerOptions::TritonServerOptions()
@@ -342,8 +333,7 @@ TritonServerOptions::TritonServerOptions()
       min_compute_capability_(0),
 #endif  // TRITON_ENABLE_GPU
       backend_dir_("/opt/tritonserver/backends"),
-      repoagent_dir_("/opt/tritonserver/repoagents"), tf_soft_placement_(true),
-      tf_gpu_mem_fraction_(0)
+      repoagent_dir_("/opt/tritonserver/repoagents")
 {
 #ifndef TRITON_ENABLE_METRICS
   metrics_ = false;
@@ -353,42 +343,6 @@ TritonServerOptions::TritonServerOptions()
 #ifndef TRITON_ENABLE_METRICS_GPU
   gpu_metrics_ = false;
 #endif  // TRITON_ENABLE_METRICS_GPU
-}
-
-TRITONSERVER_Error*
-ParseBoolOption(std::string arg, bool* val)
-{
-  std::transform(arg.begin(), arg.end(), arg.begin(), [](unsigned char c) {
-    return std::tolower(c);
-  });
-
-  if ((arg == "true") || (arg == "on") || (arg == "1")) {
-    *val = true;
-    return nullptr;  // success
-  }
-  if ((arg == "false") || (arg == "off") || (arg == "0")) {
-    *val = false;
-    return nullptr;  // success
-  }
-
-  return TRITONSERVER_ErrorNew(
-      TRITONSERVER_ERROR_INVALID_ARG,
-      std::string("invalid value for bool option: '" + arg + "'").c_str());
-}
-
-TRITONSERVER_Error*
-ParseFloatOption(const std::string arg, float* val)
-{
-  try {
-    *val = std::stof(arg);
-  }
-  catch (const std::invalid_argument& ia) {
-    return TRITONSERVER_ErrorNew(
-        TRITONSERVER_ERROR_INVALID_ARG,
-        std::string("invalid value for float option: '" + arg + "'").c_str());
-  }
-
-  return nullptr;  // success
 }
 
 TRITONSERVER_Error*
@@ -421,17 +375,6 @@ TritonServerOptions::AddBackendConfig(
 {
   ni::BackendCmdlineConfig& cc = backend_cmdline_config_map_[backend_name];
   cc.push_back(std::make_pair(setting, value));
-
-  // FIXME this TF specific parsing and option setting and also the
-  // corresponding functions in InferenceServer should be removed or
-  // moved to backend once TF backend is moved to TritonBackend.
-  if (backend_name == "tensorflow") {
-    if (setting == "allow-soft-placement") {
-      return ParseBoolOption(value, &tf_soft_placement_);
-    } else if (setting == "gpu-memory-fraction") {
-      return ParseFloatOption(value, &tf_gpu_mem_fraction_);
-    }
-  }
 
   return nullptr;  // success
 }
@@ -1795,13 +1738,6 @@ TRITONSERVER_ServerNew(
   lserver->SetHostPolicyCmdlineConfig(loptions->HostPolicyCmdlineConfigMap());
   lserver->SetRepoAgentDir(loptions->RepoAgentDir());
   lserver->SetBufferManagerThreadCount(loptions->BufferManagerThreadCount());
-
-  // FIXME these should be removed once all backends use
-  // BackendConfig.
-  lserver->SetTensorFlowSoftPlacementEnabled(
-      loptions->TensorFlowSoftPlacement());
-  lserver->SetTensorFlowGPUMemoryFraction(
-      loptions->TensorFlowGpuMemoryFraction());
 
   // SetBackendCmdlineConfig must be called after all AddBackendConfig calls
   // have completed.

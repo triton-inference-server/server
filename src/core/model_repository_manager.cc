@@ -1181,7 +1181,6 @@ ModelRepositoryManager::Create(
     const std::set<std::string>& repository_paths,
     const std::set<std::string>& startup_models, const bool strict_model_config,
     const BackendCmdlineConfigMap& backend_cmdline_config_map,
-    const float tf_gpu_memory_fraction, const bool tf_allow_soft_placement,
     const bool polling_enabled, const bool model_control_enabled,
     const double min_compute_capability,
     const HostPolicyCmdlineConfigMap& host_policy_map,

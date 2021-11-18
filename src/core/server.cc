@@ -107,9 +107,6 @@ InferenceServer::InferenceServer()
   min_supported_compute_capability_ = 0.0;
 #endif  // TRITON_ENABLE_GPU
 
-  tf_soft_placement_enabled_ = true;
-  tf_gpu_memory_fraction_ = 0.0;
-
   inflight_request_counter_ = 0;
 }
 
@@ -215,8 +212,7 @@ InferenceServer::Init()
       (model_control_mode_ == ModelControlMode::MODE_EXPLICIT);
   status = ModelRepositoryManager::Create(
       this, version_, model_repository_paths_, startup_models_,
-      strict_model_config_, backend_cmdline_config_map_,
-      tf_gpu_memory_fraction_, tf_soft_placement_enabled_, polling_enabled,
+      strict_model_config_, backend_cmdline_config_map_, polling_enabled,
       model_control_enabled, min_supported_compute_capability_,
       host_policy_map_, &model_repository_manager_);
   if (!status.IsOk()) {

@@ -238,23 +238,6 @@ class InferenceServer {
 
   void SetRepoAgentDir(const std::string& d) { repoagent_dir_ = d; }
 
-  // FIXME TF specific functions should be removed once all backends
-  // use BackendConfig.
-
-  // Get / set Tensorflow soft placement enable.
-  bool TensorFlowSoftPlacementEnabled() const
-  {
-    return tf_soft_placement_enabled_;
-  }
-  void SetTensorFlowSoftPlacementEnabled(bool e)
-  {
-    tf_soft_placement_enabled_ = e;
-  }
-
-  // Get / set Tensorflow GPU memory fraction.
-  float TensorFlowGPUMemoryFraction() const { return tf_gpu_memory_fraction_; }
-  void SetTensorFlowGPUMemoryFraction(float f) { tf_gpu_memory_fraction_ = f; }
-
   // Return the requested model object.
   Status GetModel(
       const std::string& model_name, const int64_t model_version,
@@ -298,10 +281,6 @@ class InferenceServer {
   RateLimitMode rate_limit_mode_;
   RateLimiter::ResourceMap rate_limit_resource_map_;
 
-  // FIXME, remove once all backends use backend config.
-  // Tensorflow options
-  bool tf_soft_placement_enabled_;
-  float tf_gpu_memory_fraction_;
 
   // Current state of the inference server.
   ServerReadyState ready_state_;
