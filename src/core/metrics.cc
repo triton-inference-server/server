@@ -115,10 +115,11 @@ Metrics::Metrics()
               .Name("nv_cache_num_evictions")
               .Help("Number of cache evictions in response cache")
               .Register(*registry_)),
-      cache_lookup_latency_us_family_(prometheus::BuildGauge()
-                             .Name("nv_cache_lookup_latency")
-                             .Help("Total cache lookup latency, in microseconds")
-                             .Register(*registry_)),
+      cache_lookup_latency_us_family_(
+          prometheus::BuildGauge()
+              .Name("nv_cache_lookup_latency")
+              .Help("Total cache lookup latency, in microseconds")
+              .Register(*registry_)),
       cache_util_family_(prometheus::BuildGauge()
                              .Name("nv_cache_util")
                              .Help("Cache utilization [0.0 - 1.0]")
@@ -273,7 +274,8 @@ Metrics::InitializeCacheMetrics(
   cache_num_hits_global_ = &cache_num_hits_family_.Add(cache_labels);
   cache_num_misses_global_ = &cache_num_misses_family_.Add(cache_labels);
   cache_num_evictions_global_ = &cache_num_evictions_family_.Add(cache_labels);
-  cache_lookup_latency_us_global_ = &cache_lookup_latency_us_family_.Add(cache_labels);
+  cache_lookup_latency_us_global_ =
+      &cache_lookup_latency_us_family_.Add(cache_labels);
   cache_util_global_ = &cache_util_family_.Add(cache_labels);
   cache_thread_exit_.store(false);
 
@@ -290,7 +292,8 @@ Metrics::InitializeCacheMetrics(
       cache_num_hits_global_->Set(response_cache->NumHits());
       cache_num_misses_global_->Set(response_cache->NumMisses());
       cache_num_evictions_global_->Set(response_cache->NumEvictions());
-      cache_lookup_latency_us_global_->Set(response_cache->TotalLookupLatencyNs() / 1000);
+      cache_lookup_latency_us_global_->Set(
+          response_cache->TotalLookupLatencyNs() / 1000);
       cache_util_global_->Set(response_cache->TotalUtilization());
     }
   }));

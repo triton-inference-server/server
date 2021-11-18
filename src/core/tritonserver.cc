@@ -1820,7 +1820,8 @@ TRITONSERVER_ServerNew(
 
 #ifdef TRITON_ENABLE_METRICS
   if (loptions->Metrics() && lserver->ResponseCacheEnabled()) {
-    // NOTE: Cache metrics must be enabled after cache initialized in server->Init()
+    // NOTE: Cache metrics must be enabled after cache initialized in
+    // server->Init()
     ni::Metrics::EnableCacheMetrics(lserver->GetResponseCache());
   }
 #ifdef TRITON_ENABLE_METRICS_GPU

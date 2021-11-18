@@ -111,7 +111,8 @@ class RequestResponseCache {
     std::lock_guard<std::recursive_mutex> lk(cache_mtx_);
     return num_misses_;
   }
-  // Returns the total lookup latency (nanoseconds) of all lookups in cache lifespan
+  // Returns the total lookup latency (nanoseconds) of all lookups in cache
+  // lifespan
   uint64_t TotalLookupLatencyNs()
   {
     std::lock_guard<std::recursive_mutex> lk(cache_mtx_);
