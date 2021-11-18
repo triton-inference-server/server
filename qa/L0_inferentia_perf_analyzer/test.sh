@@ -36,7 +36,7 @@ if [ "$#" -ge 1 ]; then
 fi
 
 CLIENT_LOG="./perf_analyzer.log"
-PERF_ANALYZER=perf_analyzer
+PERF_ANALYZER=/opt/tritonserver/qa/clients/perf_analyzer
 
 DATADIR=${TRITON_PATH}/models
 rm -rf $DATADIR
@@ -91,7 +91,7 @@ if [ $? -eq 0 ]; then
     echo -e "\n***\n*** Test Failed\n***"
     RET=1
 fi
-if [ $(cat $CLIENT_LOG |  grep "Output size doesn't match expected size" | wc -l) -eq 0 ]; then
+if [ $(cat $CLIENT_LOG |  grep "Output doesn't match expected output" | wc -l) -eq 0 ]; then
     cat $CLIENT_LOG
     echo -e "\n***\n*** Test Failed\n***"
     RET=1
