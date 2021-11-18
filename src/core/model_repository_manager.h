@@ -36,7 +36,7 @@
 namespace nvidia { namespace inferenceserver {
 
 class InferenceServer;
-class InferenceBackend;
+class Model;
 
 /// Predefined reason strings
 #define MODEL_READY_REASON_DUPLICATE "model appears in two or more repositories"
@@ -179,11 +179,11 @@ class ModelRepositoryManager {
   /// ready version will be considered as live. Otherwise, the models that
   /// have loading / unloading versions will also be live.
   /// \return the state of all versions of all live models.
-  const ModelStateMap LiveBackendStates(bool strict_readiness = false);
+  const ModelStateMap LiveModelStates(bool strict_readiness = false);
 
   /// \return the state of all versions of all models that have every
   /// been (attempted) loaded over the lifetime of the server.
-  const ModelStateMap BackendStates();
+  const ModelStateMap ModelStates();
 
   /// \return the states of all versions of a specific model.
   const VersionStateMap VersionStates(const std::string& model_name);
@@ -199,18 +199,18 @@ class ModelRepositoryManager {
   /// \return error status.
   Status RepositoryIndex(const bool ready_only, std::vector<ModelIndex>* index);
 
-  /// Obtain the specified backend.
-  /// \param model_name The model name of the backend handle.
-  /// \param model_version The model version of the backend handle.
-  /// \param backend Return the inference backend object.
+  /// Obtain the specified model.
+  /// \param model_name The name of the model.
+  /// \param model_version The version of the model.
+  /// \param model Return the model object.
   /// \return error status.
-  Status GetInferenceBackend(
+  Status GetModel(
       const std::string& model_name, const int64_t model_version,
-      std::shared_ptr<InferenceBackend>* backend);
+      std::shared_ptr<Model>* model);
 
  private:
   struct ModelInfo;
-  class BackendLifeCycle;
+  class ModelLifeCycle;
 
   // Map from model name to information about the model.
   using ModelInfoMap =
@@ -223,7 +223,7 @@ class ModelRepositoryManager {
       const std::set<std::string>& repository_paths, const bool autofill,
       const bool polling_enabled, const bool model_control_enabled,
       const double min_compute_capability,
-      std::unique_ptr<BackendLifeCycle> life_cycle);
+      std::unique_ptr<ModelLifeCycle> life_cycle);
 
   /// The internal function that are called in Create() and PollAndUpdate().
   Status PollAndUpdateInternal(bool* all_models_polled);
@@ -310,7 +310,6 @@ class ModelRepositoryManager {
       DependencyNode* current_node, const DependencyNode* start_node);
 
   const std::set<std::string> repository_paths_;
-  const BackendConfigMap backend_config_map_;
   const bool autofill_;
   const bool polling_enabled_;
   const bool model_control_enabled_;
@@ -324,7 +323,7 @@ class ModelRepositoryManager {
   std::unordered_map<std::string, std::unique_ptr<DependencyNode>>
       missing_nodes_;
 
-  std::unique_ptr<BackendLifeCycle> backend_life_cycle_;
+  std::unique_ptr<ModelLifeCycle> model_life_cycle_;
 };
 
 }}  // namespace nvidia::inferenceserver

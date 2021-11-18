@@ -438,7 +438,7 @@ endif() # NOT WIN32
 # libtritonserver.so
 #
 if(${TRITON_ENABLE_ENSEMBLE})
-  set(BACKEND_OBJS ${BACKEND_OBJS} $<TARGET_OBJECTS:ensemble-backend-library>)
+  set(BACKEND_OBJS ${BACKEND_OBJS} $<TARGET_OBJECTS:ensemble-library>)
 endif() # TRITON_ENABLE_ENSEMBLE
 
 set(BACKEND_OBJS ${BACKEND_OBJS} $<TARGET_OBJECTS:triton-backend-library>)

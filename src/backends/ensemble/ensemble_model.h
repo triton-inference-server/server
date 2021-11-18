@@ -26,7 +26,7 @@
 #pragma once
 
 #include "model_config.pb.h"
-#include "src/core/backend.h"
+#include "src/core/model.h"
 #include "src/core/scheduler.h"
 #include "src/core/status.h"
 
@@ -34,28 +34,27 @@ namespace nvidia { namespace inferenceserver {
 
 class InferenceServer;
 
-class EnsembleBackend : public InferenceBackend {
+class EnsembleModel : public Model {
  public:
-  EnsembleBackend(EnsembleBackend&&) = default;
+  EnsembleModel(EnsembleModel&&) = default;
 
   static Status Create(
       InferenceServer* server, const std::string& path, const int64_t version,
       const inference::ModelConfig& model_config,
-      const double min_compute_capability,
-      std::unique_ptr<InferenceBackend>* backend);
+      const double min_compute_capability, std::unique_ptr<Model>* model);
 
  private:
-  DISALLOW_COPY_AND_ASSIGN(EnsembleBackend);
+  DISALLOW_COPY_AND_ASSIGN(EnsembleModel);
 
-  explicit EnsembleBackend(
+  explicit EnsembleModel(
       const double min_compute_capability, const std::string& model_dir,
       const int64_t version, const inference::ModelConfig& config)
-      : InferenceBackend(min_compute_capability, model_dir, version, config)
+      : Model(min_compute_capability, model_dir, version, config)
   {
   }
-  friend std::ostream& operator<<(std::ostream&, const EnsembleBackend&);
+  friend std::ostream& operator<<(std::ostream&, const EnsembleModel&);
 };
 
-std::ostream& operator<<(std::ostream& out, const EnsembleBackend& pb);
+std::ostream& operator<<(std::ostream& out, const EnsembleModel& pb);
 
 }}  // namespace nvidia::inferenceserver

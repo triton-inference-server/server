@@ -47,8 +47,7 @@ class MetricModelReporter {
 
   ~MetricModelReporter();
 
-  // Get a metric for the backend specialized for the given model,
-  // version and GPU index.
+  // Get a metric for the given model, version and GPU index.
   prometheus::Counter& MetricInferenceSuccess() const
   {
     return *metric_inf_success_;

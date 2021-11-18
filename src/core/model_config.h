@@ -51,15 +51,6 @@ using BackendCmdlineConfig = std::vector<std::pair<std::string, std::string>>;
 using BackendCmdlineConfigMap =
     std::unordered_map<std::string, BackendCmdlineConfig>;
 
-/// The type from platform name to the backend configuration for that
-/// platform. The configuration is determined primarily by
-/// command-line options and is the same for every backend created for
-/// a given platform.
-struct BackendConfig {
-};
-using BackendConfigMap =
-    std::unordered_map<std::string, std::shared_ptr<BackendConfig>>;
-
 /// The value for a dimension in a shape that indicates that that
 /// dimension can take on any size.
 constexpr int WILDCARD_DIM = -1;

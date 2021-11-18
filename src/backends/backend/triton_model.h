@@ -29,9 +29,9 @@
 #include <string>
 #include "model_config.pb.h"
 #include "src/backends/backend/triton_backend_manager.h"
-#include "src/core/backend.h"
 #include "src/core/filesystem.h"
 #include "src/core/infer_request.h"
+#include "src/core/model.h"
 #include "src/core/status.h"
 
 namespace nvidia { namespace inferenceserver {
@@ -42,10 +42,9 @@ class TritonModelInstance;
 //
 // Represents a model.
 //
-// Inheriting from InferenceBackend (which is misnamed) required for
-// now to interface with legacy arch.
+// Inheriting from Model to implement backend APIs
 //
-class TritonModel : public InferenceBackend {
+class TritonModel : public Model {
  public:
   static Status Create(
       InferenceServer* server, const std::string& model_repository_path,

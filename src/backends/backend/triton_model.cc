@@ -297,7 +297,7 @@ TritonModel::TritonModel(
     const std::shared_ptr<TritonBackend>& backend,
     const double min_compute_capability, const int64_t version,
     const inference::ModelConfig& config, const bool auto_complete_config)
-    : InferenceBackend(
+    : Model(
           min_compute_capability, localized_model_dir->Path(), version, config),
       server_(server), auto_complete_config_(auto_complete_config),
       localized_model_dir_(localized_model_dir), backend_(backend),
@@ -307,13 +307,6 @@ TritonModel::TritonModel(
 
 TritonModel::~TritonModel()
 {
-  // Need to explicitly delete the scheduler from InferenceBackend
-  // base class to make sure that all scheduler threads have returned
-  // from running in the backend code... This convoluted flow will be
-  // cleaned up once legacy InferenceBackend is completed replaced by
-  // TritonModel.
-  scheduler_.reset();
-
   // Explicitly delete/finalize all model instances before finalizing
   // the model itself.
   instances_.clear();

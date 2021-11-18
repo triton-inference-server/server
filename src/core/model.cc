@@ -24,7 +24,7 @@
 // (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-#include "src/core/backend.h"
+#include "src/core/model.h"
 
 #include <chrono>
 #include <future>
@@ -37,7 +37,7 @@
 namespace nvidia { namespace inferenceserver {
 
 Status
-InferenceBackend::GetInput(
+Model::GetInput(
     const std::string& name, const inference::ModelInput** input) const
 {
   const auto itr = input_map_.find(name);
@@ -52,7 +52,7 @@ InferenceBackend::GetInput(
 }
 
 Status
-InferenceBackend::GetOutput(
+Model::GetOutput(
     const std::string& name, const inference::ModelOutput** output) const
 {
   const auto itr = output_map_.find(name);
@@ -67,14 +67,14 @@ InferenceBackend::GetOutput(
 }
 
 Status
-InferenceBackend::SetModelConfig(const inference::ModelConfig& config)
+Model::SetModelConfig(const inference::ModelConfig& config)
 {
   config_ = config;
   return Status::Success;
 }
 
 Status
-InferenceBackend::SetScheduler(std::unique_ptr<Scheduler> scheduler)
+Model::SetScheduler(std::unique_ptr<Scheduler> scheduler)
 {
   if (scheduler_ != nullptr) {
     return Status(
@@ -86,7 +86,7 @@ InferenceBackend::SetScheduler(std::unique_ptr<Scheduler> scheduler)
 }
 
 Status
-InferenceBackend::Init()
+Model::Init()
 {
   RETURN_IF_ERROR(ValidateModelConfig(config_, min_compute_capability_));
   RETURN_IF_ERROR(ValidateModelIOConfig(config_));

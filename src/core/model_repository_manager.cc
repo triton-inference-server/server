@@ -32,11 +32,11 @@
 #include <future>
 #include <stdexcept>
 #include <thread>
-#include "src/core/backend.h"
 #include "src/core/constants.h"
 #include "src/core/ensemble_utils.h"
 #include "src/core/filesystem.h"
 #include "src/core/logging.h"
+#include "src/core/model.h"
 #include "src/core/model_config_utils.h"
 #include "src/core/triton_repo_agent.h"
 
@@ -46,7 +46,7 @@
 
 #include "src/backends/backend/triton_model.h"
 #ifdef TRITON_ENABLE_ENSEMBLE
-#include "src/backends/ensemble/ensemble_backend.h"
+#include "src/backends/ensemble/ensemble_model.h"
 #endif  // TRITON_ENABLE_ENSEMBLE
 
 namespace nvidia { namespace inferenceserver {
@@ -294,32 +294,32 @@ IsModified(const std::string& path, int64_t* last_ns)
 
 // Use smart pointer with custom deleter so that model state will be updated
 // to UNAVAILABLE if all smart pointer copies are out of scope
-struct BackendDeleter {
-  BackendDeleter(std::function<void()> OnDestroyBackend)
-      : OnDestroyBackend_(std::move(OnDestroyBackend))
+struct ModelDeleter {
+  ModelDeleter(std::function<void()> OnDestroyModel)
+      : OnDestroyModel_(std::move(OnDestroyModel))
   {
   }
 
-  void operator()(InferenceBackend* backend)
+  void operator()(Model* model)
   {
     // The actual model object must be destroyed in a different
     // thread. This thread could have a callstack that includes the
-    // model/backend itself because this deleter could be triggered by
-    // a request release or response send in the backend. Following
+    // model itself because this deleter could be triggered by
+    // a request release or response send in the model. Following
     // delete will lead to the model destructor which may wait on this
     // same thread... so deadlock if we don't use a different thread
     // here.
-    std::function<void()> destroy_fn = OnDestroyBackend_;
-    std::thread dthd([backend, destroy_fn]() {
-      delete backend;
+    std::function<void()> destroy_fn = OnDestroyModel_;
+    std::thread dthd([model, destroy_fn]() {
+      delete model;
       destroy_fn();
     });
 
     dthd.detach();
   }
 
-  // Use to inform the BackendLifeCycle that the backend handle is destroyed
-  std::function<void()> OnDestroyBackend_;
+  // Use to inform the ModelLifeCycle that the model handle is destroyed
+  std::function<void()> OnDestroyModel_;
 };
 
 }  // namespace
@@ -335,22 +335,22 @@ struct ModelRepositoryManager::ModelInfo {
   inference::ModelConfig model_config_;
   std::string model_repository_path_;
   // Temporary location to hold agent model list before creating the model
-  // backend, the ownership must transfer to BackendLifeCycle to ensure
+  // model, the ownership must transfer to ModelLifeCycle to ensure
   // the list's life cycle is handled properly.
   std::shared_ptr<TritonRepoAgentModelList> agent_model_list_;
 };
 
-class ModelRepositoryManager::BackendLifeCycle {
+class ModelRepositoryManager::ModelLifeCycle {
  public:
   static Status Create(
       InferenceServer* server, const double min_compute_capability,
       const BackendCmdlineConfigMap& backend_cmdline_config_map,
       const HostPolicyCmdlineConfigMap& host_policy_map,
-      std::unique_ptr<BackendLifeCycle>* life_cycle);
+      std::unique_ptr<ModelLifeCycle>* life_cycle);
 
-  ~BackendLifeCycle() { map_.clear(); }
+  ~ModelLifeCycle() { map_.clear(); }
 
-  // Start loading model backends with specified versions asynchronously.
+  // Start loading model with specified versions asynchronously.
   // If 'defer_unload' is false, all versions that are being served will
   // be unloaded before loading the specified versions. Otherwise, the versions
   // not specified in the load will be unloaded after the load is finished.
@@ -360,24 +360,24 @@ class ModelRepositoryManager::BackendLifeCycle {
       const std::shared_ptr<TritonRepoAgentModelList>& agent_model_list,
       std::function<void(Status)> OnComplete);
 
-  // Unload model backends asynchronously.
+  // Unload model asynchronously.
   Status AsyncUnload(const std::string& model_name);
 
-  // Get specified model version's backend. Latest ready version will
+  // Get specified version of the model. Latest ready version will
   // be retrieved if 'version' is -1. Return error if the version specified is
   // not found or it is not ready.
-  Status GetInferenceBackend(
+  Status GetModel(
       const std::string& model_name, const int64_t version,
-      std::shared_ptr<InferenceBackend>* backend);
+      std::shared_ptr<Model>* model);
 
-  // Get the ModelStateMap representation of the live backends. A backend is
+  // Get the ModelStateMap representation of the live models. A model is
   // live if at least one of the versions is not unknown nor unavailable.
-  // If 'strict_readiness' is true, a backend is only live if
+  // If 'strict_readiness' is true, a model is only live if
   // at least one of the versions is ready.
-  const ModelStateMap LiveBackendStates(bool strict_readiness = false);
+  const ModelStateMap LiveModelStates(bool strict_readiness = false);
 
-  // Get the ModelStateMap representation of the backends.
-  const ModelStateMap BackendStates();
+  // Get the ModelStateMap representation of the models.
+  const ModelStateMap ModelStates();
 
   // Get the VersionStateMap representation of the specified model.
   const VersionStateMap VersionStates(const std::string& model_name);
@@ -388,8 +388,8 @@ class ModelRepositoryManager::BackendLifeCycle {
       ModelReadyState* state);
 
  private:
-  struct BackendInfo {
-    BackendInfo(
+  struct ModelInfo {
+    ModelInfo(
         const std::string& repository_path, const ModelReadyState state,
         const ActionType next_action,
         const inference::ModelConfig& model_config)
@@ -409,7 +409,7 @@ class ModelRepositoryManager::BackendLifeCycle {
     std::string state_reason_;
 
     // next_action will be set in the case where a load / unload is requested
-    // while the backend is already in loading / unloading state. Then the new
+    // while the model is already in loading / unloading state. Then the new
     // load / unload will be postponed as next action.
     ActionType next_action_;
     // callback function that will be triggered when there is no next action
@@ -417,10 +417,10 @@ class ModelRepositoryManager::BackendLifeCycle {
     inference::ModelConfig model_config_;
 
     std::shared_ptr<TritonRepoAgentModelList> agent_model_list_;
-    std::shared_ptr<InferenceBackend> backend_;
+    std::shared_ptr<Model> model_;
   };
 
-  BackendLifeCycle(
+  ModelLifeCycle(
       const double min_compute_capability, InferenceServer* server,
       const BackendCmdlineConfigMap& backend_cmdline_config_map,
       const HostPolicyCmdlineConfigMap& host_policy_map)
@@ -430,34 +430,34 @@ class ModelRepositoryManager::BackendLifeCycle {
   {
   }
 
-  // Function called after backend state / next action is updated.
-  // Caller must obtain the mutex of 'backend_info' before calling this function
+  // Function called after model state / next action is updated.
+  // Caller must obtain the mutex of 'model_info' before calling this function
   Status TriggerNextAction(
       const std::string& model_name, const int64_t version,
-      BackendInfo* backend_info);
+      ModelInfo* model_info);
 
   // Helper function called by TriggerNextAction()
   Status Load(
       const std::string& model_name, const int64_t version,
-      BackendInfo* backend_info);
+      ModelInfo* model_info);
 
   // Helper function called by TriggerNextAction()
   Status Unload(
       const std::string& model_name, const int64_t version,
-      BackendInfo* backend_info);
+      ModelInfo* model_info);
 
-  Status CreateInferenceBackend(
+  Status CreateModel(
       const std::string& model_name, const int64_t version,
-      BackendInfo* backend_info);
+      ModelInfo* model_info);
 
   const double min_compute_capability_;
 
   using VersionMap = std::map<
       int64_t,
-      std::pair<std::unique_ptr<BackendInfo>, std::unique_ptr<BackendInfo>>>;
-  using BackendMap = std::map<std::string, VersionMap>;
-  BackendMap map_;
-  std::map<uintptr_t, std::unique_ptr<BackendInfo>> unloading_backends_;
+      std::pair<std::unique_ptr<ModelInfo>, std::unique_ptr<ModelInfo>>>;
+  using ModelMap = std::map<std::string, VersionMap>;
+  ModelMap map_;
+  std::map<uintptr_t, std::unique_ptr<ModelInfo>> unloading_models_;
   std::recursive_mutex map_mtx_;
 
   InferenceServer* server_;
@@ -466,13 +466,13 @@ class ModelRepositoryManager::BackendLifeCycle {
 };
 
 Status
-ModelRepositoryManager::BackendLifeCycle::Create(
+ModelRepositoryManager::ModelLifeCycle::Create(
     InferenceServer* server, const double min_compute_capability,
     const BackendCmdlineConfigMap& backend_cmdline_config_map,
     const HostPolicyCmdlineConfigMap& host_policy_map,
-    std::unique_ptr<BackendLifeCycle>* life_cycle)
+    std::unique_ptr<ModelLifeCycle>* life_cycle)
 {
-  std::unique_ptr<BackendLifeCycle> local_life_cycle(new BackendLifeCycle(
+  std::unique_ptr<ModelLifeCycle> local_life_cycle(new ModelLifeCycle(
       min_compute_capability, server, backend_cmdline_config_map,
       host_policy_map));
 
@@ -481,67 +481,66 @@ ModelRepositoryManager::BackendLifeCycle::Create(
 }
 
 const ModelRepositoryManager::ModelStateMap
-ModelRepositoryManager::BackendLifeCycle::LiveBackendStates(
-    bool strict_readiness)
+ModelRepositoryManager::ModelLifeCycle::LiveModelStates(bool strict_readiness)
 {
-  LOG_VERBOSE(1) << "LiveBackendStates()";
+  LOG_VERBOSE(1) << "LiveModelStates()";
   std::lock_guard<std::recursive_mutex> map_lock(map_mtx_);
-  ModelStateMap live_backend_states;
+  ModelStateMap live_model_states;
   for (auto& model_version : map_) {
     bool live = false;
     VersionStateMap version_map;
 
-    for (auto& version_backend : model_version.second) {
+    for (auto& version_model : model_version.second) {
       std::lock_guard<std::recursive_mutex> lock(
-          version_backend.second.first->mtx_);
+          version_model.second.first->mtx_);
       if (strict_readiness &&
-          version_backend.second.first->state_ != ModelReadyState::READY) {
+          version_model.second.first->state_ != ModelReadyState::READY) {
         continue;
       }
 
       // At lease one version is live (ready / loading / unloading)
-      if ((version_backend.second.first->state_ != ModelReadyState::UNKNOWN) &&
-          (version_backend.second.first->state_ !=
+      if ((version_model.second.first->state_ != ModelReadyState::UNKNOWN) &&
+          (version_model.second.first->state_ !=
            ModelReadyState::UNAVAILABLE)) {
         live = true;
-        version_map[version_backend.first] = std::make_pair(
-            version_backend.second.first->state_,
-            version_backend.second.first->state_reason_);
+        version_map[version_model.first] = std::make_pair(
+            version_model.second.first->state_,
+            version_model.second.first->state_reason_);
       }
     }
 
     if (live) {
-      live_backend_states[model_version.first] = std::move(version_map);
+      live_model_states[model_version.first] = std::move(version_map);
     }
   }
-  return live_backend_states;
+  return live_model_states;
 }
 
 const ModelRepositoryManager::ModelStateMap
-ModelRepositoryManager::BackendLifeCycle::BackendStates()
+ModelRepositoryManager::ModelLifeCycle::ModelStates()
 {
-  LOG_VERBOSE(1) << "BackendStates()";
+  LOG_VERBOSE(1) << "ModelStates()";
   std::lock_guard<std::recursive_mutex> map_lock(map_mtx_);
-  ModelStateMap backend_states;
+  ModelStateMap model_states;
   for (auto& model_version : map_) {
     VersionStateMap version_map;
 
-    for (auto& version_backend : model_version.second) {
+    for (auto& version_model : model_version.second) {
       std::lock_guard<std::recursive_mutex> lock(
-          version_backend.second.first->mtx_);
-      version_map[version_backend.first] = std::make_pair(
-          version_backend.second.first->state_,
-          version_backend.second.first->state_reason_);
+          version_model.second.first->mtx_);
+      version_map[version_model.first] = std::make_pair(
+          version_model.second.first->state_,
+          version_model.second.first->state_reason_);
     }
 
-    backend_states[model_version.first] = std::move(version_map);
+    model_states[model_version.first] = std::move(version_map);
   }
 
-  return backend_states;
+  return model_states;
 }
 
 const ModelRepositoryManager::VersionStateMap
-ModelRepositoryManager::BackendLifeCycle::VersionStates(
+ModelRepositoryManager::ModelLifeCycle::VersionStates(
     const std::string& model_name)
 {
   LOG_VERBOSE(1) << "VersionStates() '" << model_name << "'";
@@ -549,12 +548,12 @@ ModelRepositoryManager::BackendLifeCycle::VersionStates(
   VersionStateMap version_map;
   auto mit = map_.find(model_name);
   if (mit != map_.end()) {
-    for (auto& version_backend : mit->second) {
+    for (auto& version_model : mit->second) {
       std::lock_guard<std::recursive_mutex> lock(
-          version_backend.second.first->mtx_);
-      version_map[version_backend.first] = std::make_pair(
-          version_backend.second.first->state_,
-          version_backend.second.first->state_reason_);
+          version_model.second.first->mtx_);
+      version_map[version_model.first] = std::make_pair(
+          version_model.second.first->state_,
+          version_model.second.first->state_reason_);
     }
   }
 
@@ -562,7 +561,7 @@ ModelRepositoryManager::BackendLifeCycle::VersionStates(
 }
 
 Status
-ModelRepositoryManager::BackendLifeCycle::ModelState(
+ModelRepositoryManager::ModelLifeCycle::ModelState(
     const std::string& model_name, const int64_t model_version,
     ModelReadyState* state)
 {
@@ -584,12 +583,11 @@ ModelRepositoryManager::BackendLifeCycle::ModelState(
 }
 
 Status
-ModelRepositoryManager::BackendLifeCycle::GetInferenceBackend(
+ModelRepositoryManager::ModelLifeCycle::GetModel(
     const std::string& model_name, const int64_t version,
-    std::shared_ptr<InferenceBackend>* backend)
+    std::shared_ptr<Model>* model)
 {
-  LOG_VERBOSE(1) << "GetInferenceBackend() '" << model_name << "' version "
-                 << version;
+  LOG_VERBOSE(1) << "GetModel() '" << model_name << "' version " << version;
   std::lock_guard<std::recursive_mutex> map_lock(map_mtx_);
   auto mit = map_.find(model_name);
   if (mit == map_.end()) {
@@ -601,17 +599,17 @@ ModelRepositoryManager::BackendLifeCycle::GetInferenceBackend(
     // In case the request is asking for latest version
     int64_t latest = -1;
     if (version == -1) {
-      for (auto& version_backend : mit->second) {
-        if (version_backend.first > latest) {
+      for (auto& version_model : mit->second) {
+        if (version_model.first > latest) {
           std::lock_guard<std::recursive_mutex> lock(
-              version_backend.second.first->mtx_);
-          if (version_backend.second.first->state_ == ModelReadyState::READY) {
-            latest = version_backend.first;
+              version_model.second.first->mtx_);
+          if (version_model.second.first->state_ == ModelReadyState::READY) {
+            latest = version_model.first;
             // Tedious, but have to set handle for any "latest" version
             // at the moment to avoid edge case like the following:
             // "versions : 1 3 2", version 3 is latest but is requested
             // to be unloaded when the iterator is examining version 2.
-            *backend = version_backend.second.first->backend_;
+            *model = version_model.second.first->model_;
           }
         }
       }
@@ -629,7 +627,7 @@ ModelRepositoryManager::BackendLifeCycle::GetInferenceBackend(
   } else {
     std::lock_guard<std::recursive_mutex> lock(vit->second.first->mtx_);
     if (vit->second.first->state_ == ModelReadyState::READY) {
-      *backend = vit->second.first->backend_;
+      *model = vit->second.first->model_;
     } else {
       return Status(
           Status::Code::UNAVAILABLE, "'" + model_name + "' version " +
@@ -641,7 +639,7 @@ ModelRepositoryManager::BackendLifeCycle::GetInferenceBackend(
 }
 
 Status
-ModelRepositoryManager::BackendLifeCycle::AsyncUnload(
+ModelRepositoryManager::ModelLifeCycle::AsyncUnload(
     const std::string& model_name)
 {
   LOG_VERBOSE(1) << "AsyncUnload() '" << model_name << "'";
@@ -653,10 +651,10 @@ ModelRepositoryManager::BackendLifeCycle::AsyncUnload(
   }
 
   // Get the existing agent models and notify the unload action
-  for (auto& version_backend : it->second) {
-    BackendInfo* backend_info = version_backend.second.first.get();
-    if (backend_info->agent_model_list_ != nullptr) {
-      auto unloading_agent_model_list = backend_info->agent_model_list_;
+  for (auto& version : it->second) {
+    ModelInfo* model_info = version.second.first.get();
+    if (model_info->agent_model_list_ != nullptr) {
+      auto unloading_agent_model_list = model_info->agent_model_list_;
       // Only log the error because the model should be unloaded regardless
       auto status = unloading_agent_model_list->InvokeAgentModels(
           TRITONREPOAGENT_ACTION_UNLOAD);
@@ -665,7 +663,7 @@ ModelRepositoryManager::BackendLifeCycle::AsyncUnload(
             << "Agent model returns error on TRITONREPOAGENT_ACTION_UNLOAD: "
             << status.AsString();
       }
-      backend_info->OnComplete_ = [this, unloading_agent_model_list]() {
+      model_info->OnComplete_ = [this, unloading_agent_model_list]() {
         auto status = unloading_agent_model_list->InvokeAgentModels(
             TRITONREPOAGENT_ACTION_UNLOAD_COMPLETE);
         if (!status.IsOk()) {
@@ -679,11 +677,11 @@ ModelRepositoryManager::BackendLifeCycle::AsyncUnload(
   }
 
   Status status = Status::Success;
-  for (auto& version_backend : it->second) {
-    auto version = version_backend.first;
-    BackendInfo* backend_info = version_backend.second.first.get();
-    backend_info->next_action_ = ActionType::UNLOAD;
-    Status action_status = TriggerNextAction(model_name, version, backend_info);
+  for (auto& version_model : it->second) {
+    ModelInfo* model_info = version_model.second.first.get();
+    model_info->next_action_ = ActionType::UNLOAD;
+    Status action_status =
+        TriggerNextAction(model_name, version_model.first, model_info);
     if (!action_status.IsOk()) {
       status = action_status;
     }
@@ -693,7 +691,7 @@ ModelRepositoryManager::BackendLifeCycle::AsyncUnload(
 }
 
 Status
-ModelRepositoryManager::BackendLifeCycle::AsyncLoad(
+ModelRepositoryManager::ModelLifeCycle::AsyncLoad(
     const std::string& repository_path, const std::string& model_name,
     const inference::ModelConfig& model_config,
     const std::shared_ptr<TritonRepoAgentModelList>& agent_model_list,
@@ -722,18 +720,18 @@ ModelRepositoryManager::BackendLifeCycle::AsyncLoad(
     auto res = it->second.emplace(std::make_pair(
         version,
         std::make_pair(
-            std::unique_ptr<BackendInfo>(), std::unique_ptr<BackendInfo>())));
+            std::unique_ptr<ModelInfo>(), std::unique_ptr<ModelInfo>())));
     if (res.second) {
-      res.first->second.first.reset(new BackendInfo(
+      res.first->second.first.reset(new ModelInfo(
           repository_path, ModelReadyState::UNKNOWN, ActionType::NO_ACTION,
           model_config));
     } else {
-      auto& serving_backend = res.first->second.first;
-      std::lock_guard<std::recursive_mutex> lock(serving_backend->mtx_);
-      // If the version backend is being served, the re-load of the version
+      auto& serving_model = res.first->second.first;
+      std::lock_guard<std::recursive_mutex> lock(serving_model->mtx_);
+      // If the version model is being served, the re-load of the version
       // should be performed in background to avoid version down-time
-      if (serving_backend->state_ == ModelReadyState::READY) {
-        res.first->second.second.reset(new BackendInfo(
+      if (serving_model->state_ == ModelReadyState::READY) {
+        res.first->second.second.reset(new ModelInfo(
             repository_path, ModelReadyState::UNKNOWN, ActionType::NO_ACTION,
             model_config));
       }
@@ -753,28 +751,27 @@ ModelRepositoryManager::BackendLifeCycle::AsyncLoad(
     std::string reason_;
     size_t completed_version_cnt_;
     size_t affected_version_cnt_;
-    std::map<int64_t, BackendInfo*> load_set_;
+    std::map<int64_t, ModelInfo*> load_set_;
     // The set of model versions to be unloaded after the load is completed
     std::set<int64_t> defer_unload_set_;
     std::mutex mtx_;
   };
   std::shared_ptr<LoadTracker> load_tracker(new LoadTracker(versions.size()));
-  for (auto& version_backend : it->second) {
-    auto version = version_backend.first;
-    BackendInfo* backend_info = (version_backend.second.second == nullptr)
-                                    ? version_backend.second.first.get()
-                                    : version_backend.second.second.get();
+  for (auto& version_model : it->second) {
+    auto version = version_model.first;
+    ModelInfo* model_info = (version_model.second.second == nullptr)
+                                ? version_model.second.first.get()
+                                : version_model.second.second.get();
 
-    std::lock_guard<std::recursive_mutex> lock(backend_info->mtx_);
+    std::lock_guard<std::recursive_mutex> lock(model_info->mtx_);
     if (versions.find(version) != versions.end()) {
-      backend_info->repository_path_ = repository_path;
-      backend_info->model_config_ = model_config;
-      backend_info->next_action_ = ActionType::LOAD;
+      model_info->repository_path_ = repository_path;
+      model_info->model_config_ = model_config;
+      model_info->next_action_ = ActionType::LOAD;
 #ifdef TRITON_ENABLE_ENSEMBLE
-      backend_info->is_ensemble_ =
-          (model_config.platform() == kEnsemblePlatform);
+      model_info->is_ensemble_ = (model_config.platform() == kEnsemblePlatform);
 #endif  // TRITON_ENABLE_ENSEMBLE
-      backend_info->agent_model_list_ = agent_model_list;
+      model_info->agent_model_list_ = agent_model_list;
     } else {
       load_tracker->defer_unload_set_.emplace(version);
       continue;
@@ -782,16 +779,16 @@ ModelRepositoryManager::BackendLifeCycle::AsyncLoad(
 
     // set version-wise callback before triggering next action
     if (OnComplete != nullptr) {
-      backend_info->OnComplete_ = [this, model_name, version, backend_info,
-                                   OnComplete, load_tracker]() {
+      model_info->OnComplete_ = [this, model_name, version, model_info,
+                                 OnComplete, load_tracker]() {
         std::lock_guard<std::mutex> tracker_lock(load_tracker->mtx_);
         ++load_tracker->completed_version_cnt_;
-        load_tracker->load_set_[version] = backend_info;
-        if (backend_info->state_ != ModelReadyState::READY) {
+        load_tracker->load_set_[version] = model_info;
+        if (model_info->state_ != ModelReadyState::READY) {
           load_tracker->load_failed_ = true;
           load_tracker->reason_ +=
               ("version " + std::to_string(version) + ": " +
-               backend_info->state_reason_ + ";");
+               model_info->state_reason_ + ";");
         }
         // Check if all versions are completed and finish the load
         if (load_tracker->completed_version_cnt_ ==
@@ -801,8 +798,8 @@ ModelRepositoryManager::BackendLifeCycle::AsyncLoad(
           if (load_tracker->load_failed_) {
             // If any of the versions fails to load, abort the load and unload
             // all newly loaded versions
-            if (backend_info->agent_model_list_) {
-              auto status = backend_info->agent_model_list_->InvokeAgentModels(
+            if (model_info->agent_model_list_) {
+              auto status = model_info->agent_model_list_->InvokeAgentModels(
                   TRITONREPOAGENT_ACTION_LOAD_FAIL);
               if (!status.IsOk()) {
                 LOG_ERROR << "Agent model returns error on "
@@ -814,15 +811,15 @@ ModelRepositoryManager::BackendLifeCycle::AsyncLoad(
               std::lock_guard<std::recursive_mutex> lock(loaded.second->mtx_);
               if (loaded.second->state_ == ModelReadyState::READY) {
                 auto vit = it->second.find(loaded.first);
-                // Check if the version backend is loaded in background, if so,
-                // move the backend to 'unloading_backends_' and unload it.
+                // Check if the version model is loaded in background, if so,
+                // move the model to 'unloading_models_' and unload it.
                 if (vit->second.second.get() == loaded.second) {
-                  unloading_backends_[(uintptr_t)loaded.second] =
+                  unloading_models_[(uintptr_t)loaded.second] =
                       std::move(vit->second.second);
-                  auto unload_backend = loaded.second;
-                  loaded.second->OnComplete_ = [this, unload_backend]() {
+                  auto unload_model = loaded.second;
+                  loaded.second->OnComplete_ = [this, unload_model]() {
                     std::lock_guard<std::recursive_mutex> map_lock(map_mtx_);
-                    unloading_backends_.erase((uintptr_t)unload_backend);
+                    unloading_models_.erase((uintptr_t)unload_model);
                   };
                 } else {
                   loaded.second->OnComplete_ = nullptr;
@@ -832,8 +829,8 @@ ModelRepositoryManager::BackendLifeCycle::AsyncLoad(
               }
             }
           } else {
-            if (backend_info->agent_model_list_) {
-              auto status = backend_info->agent_model_list_->InvokeAgentModels(
+            if (model_info->agent_model_list_) {
+              auto status = model_info->agent_model_list_->InvokeAgentModels(
                   TRITONREPOAGENT_ACTION_LOAD_COMPLETE);
               if (!status.IsOk()) {
                 LOG_ERROR << "Agent model returns error on "
@@ -844,19 +841,18 @@ ModelRepositoryManager::BackendLifeCycle::AsyncLoad(
             bool notified_agent = false;
             for (auto& loaded : load_tracker->load_set_) {
               auto vit = it->second.find(loaded.first);
-              // Check if the version backend is loaded in background, if so,
-              // replace the current version backend and unload it.
+              // Check if the version model is loaded in background, if so,
+              // replace the current version model and unload it.
               if (vit->second.second.get() == loaded.second) {
                 vit->second.second.swap(vit->second.first);
-                auto unload_backend = vit->second.second.get();
-                unloading_backends_[(uintptr_t)unload_backend] =
+                auto unload_model = vit->second.second.get();
+                unloading_models_[(uintptr_t)unload_model] =
                     std::move(vit->second.second);
-                std::lock_guard<std::recursive_mutex> lock(
-                    unload_backend->mtx_);
-                unload_backend->next_action_ = ActionType::UNLOAD;
-                if (unload_backend->agent_model_list_ && !notified_agent) {
+                std::lock_guard<std::recursive_mutex> lock(unload_model->mtx_);
+                unload_model->next_action_ = ActionType::UNLOAD;
+                if (unload_model->agent_model_list_ && !notified_agent) {
                   auto unloading_agent_model_list =
-                      unload_backend->agent_model_list_;
+                      unload_model->agent_model_list_;
                   auto status = unloading_agent_model_list->InvokeAgentModels(
                       TRITONREPOAGENT_ACTION_UNLOAD);
                   if (!status.IsOk()) {
@@ -864,8 +860,8 @@ ModelRepositoryManager::BackendLifeCycle::AsyncLoad(
                                  "TRITONREPOAGENT_ACTION_UNLOAD: "
                               << status.AsString();
                   }
-                  unload_backend->OnComplete_ = [this, unload_backend,
-                                                 unloading_agent_model_list]() {
+                  unload_model->OnComplete_ = [this, unload_model,
+                                               unloading_agent_model_list]() {
                     auto status = unloading_agent_model_list->InvokeAgentModels(
                         TRITONREPOAGENT_ACTION_UNLOAD_COMPLETE);
                     if (!status.IsOk()) {
@@ -874,28 +870,28 @@ ModelRepositoryManager::BackendLifeCycle::AsyncLoad(
                                 << status.AsString();
                     }
                     std::lock_guard<std::recursive_mutex> map_lock(map_mtx_);
-                    unloading_backends_.erase((uintptr_t)unload_backend);
+                    unloading_models_.erase((uintptr_t)unload_model);
                   };
                   notified_agent = true;
                 } else {
-                  unload_backend->OnComplete_ = [this, unload_backend]() {
+                  unload_model->OnComplete_ = [this, unload_model]() {
                     std::lock_guard<std::recursive_mutex> map_lock(map_mtx_);
-                    unloading_backends_.erase((uintptr_t)unload_backend);
+                    unloading_models_.erase((uintptr_t)unload_model);
                   };
                 }
-                TriggerNextAction(model_name, version, unload_backend);
+                TriggerNextAction(model_name, version, unload_model);
               }
             }
             // Unload the deferred versions
             for (const auto deferred_version :
                  load_tracker->defer_unload_set_) {
               auto vit = it->second.find(deferred_version);
-              auto unload_backend = vit->second.first.get();
-              std::lock_guard<std::recursive_mutex> lock(unload_backend->mtx_);
-              unload_backend->next_action_ = ActionType::UNLOAD;
-              if (unload_backend->agent_model_list_ && !notified_agent) {
+              auto unload_model = vit->second.first.get();
+              std::lock_guard<std::recursive_mutex> lock(unload_model->mtx_);
+              unload_model->next_action_ = ActionType::UNLOAD;
+              if (unload_model->agent_model_list_ && !notified_agent) {
                 auto unloading_agent_model_list =
-                    unload_backend->agent_model_list_;
+                    unload_model->agent_model_list_;
                 auto status = unloading_agent_model_list->InvokeAgentModels(
                     TRITONREPOAGENT_ACTION_UNLOAD);
                 if (!status.IsOk()) {
@@ -903,8 +899,8 @@ ModelRepositoryManager::BackendLifeCycle::AsyncLoad(
                                "TRITONREPOAGENT_ACTION_UNLOAD: "
                             << status.AsString();
                 }
-                unload_backend->OnComplete_ = [this,
-                                               unloading_agent_model_list]() {
+                unload_model->OnComplete_ = [this,
+                                             unloading_agent_model_list]() {
                   auto status = unloading_agent_model_list->InvokeAgentModels(
                       TRITONREPOAGENT_ACTION_UNLOAD_COMPLETE);
                   if (!status.IsOk()) {
@@ -915,9 +911,9 @@ ModelRepositoryManager::BackendLifeCycle::AsyncLoad(
                 };
                 notified_agent = true;
               } else {
-                unload_backend->OnComplete_ = nullptr;
+                unload_model->OnComplete_ = nullptr;
               }
-              TriggerNextAction(model_name, deferred_version, unload_backend);
+              TriggerNextAction(model_name, deferred_version, unload_model);
             }
           }
           OnComplete(
@@ -927,7 +923,7 @@ ModelRepositoryManager::BackendLifeCycle::AsyncLoad(
         }
       };
     }
-    Status action_status = TriggerNextAction(model_name, version, backend_info);
+    Status action_status = TriggerNextAction(model_name, version, model_info);
     if (!action_status.IsOk()) {
       status = action_status;
     }
@@ -937,70 +933,67 @@ ModelRepositoryManager::BackendLifeCycle::AsyncLoad(
 }
 
 Status
-ModelRepositoryManager::BackendLifeCycle::TriggerNextAction(
-    const std::string& model_name, const int64_t version,
-    BackendInfo* backend_info)
+ModelRepositoryManager::ModelLifeCycle::TriggerNextAction(
+    const std::string& model_name, const int64_t version, ModelInfo* model_info)
 {
   LOG_VERBOSE(1) << "TriggerNextAction() '" << model_name << "' version "
-                 << version << ": "
-                 << std::to_string(backend_info->next_action_);
-  ActionType next_action = backend_info->next_action_;
-  backend_info->next_action_ = ActionType::NO_ACTION;
+                 << version << ": " << std::to_string(model_info->next_action_);
+  ActionType next_action = model_info->next_action_;
+  model_info->next_action_ = ActionType::NO_ACTION;
   Status status = Status::Success;
   switch (next_action) {
     case ActionType::LOAD:
-      status = Load(model_name, version, backend_info);
+      status = Load(model_name, version, model_info);
       break;
     case ActionType::UNLOAD:
-      status = Unload(model_name, version, backend_info);
+      status = Unload(model_name, version, model_info);
       break;
     default:
-      if (backend_info->OnComplete_ != nullptr) {
+      if (model_info->OnComplete_ != nullptr) {
         LOG_VERBOSE(1) << "no next action, trigger OnComplete()";
-        backend_info->OnComplete_();
-        backend_info->OnComplete_ = nullptr;
+        model_info->OnComplete_();
+        model_info->OnComplete_ = nullptr;
       }
       break;
   }
 
   // If status is not ok, "next action" path ends here and thus need to
   // invoke callback by this point
-  if ((!status.IsOk()) && (backend_info->OnComplete_ != nullptr)) {
+  if ((!status.IsOk()) && (model_info->OnComplete_ != nullptr)) {
     LOG_VERBOSE(1) << "failed to execute next action, trigger OnComplete()";
-    backend_info->OnComplete_();
-    backend_info->OnComplete_ = nullptr;
+    model_info->OnComplete_();
+    model_info->OnComplete_ = nullptr;
   }
 
   return status;
 }
 
 Status
-ModelRepositoryManager::BackendLifeCycle::Load(
-    const std::string& model_name, const int64_t version,
-    BackendInfo* backend_info)
+ModelRepositoryManager::ModelLifeCycle::Load(
+    const std::string& model_name, const int64_t version, ModelInfo* model_info)
 {
   LOG_VERBOSE(1) << "Load() '" << model_name << "' version " << version;
   Status status = Status::Success;
 
-  backend_info->next_action_ = ActionType::NO_ACTION;
+  model_info->next_action_ = ActionType::NO_ACTION;
 
-  switch (backend_info->state_) {
+  switch (model_info->state_) {
     case ModelReadyState::READY:
       LOG_INFO << "re-loading: " << model_name << ":" << version;
-      backend_info->state_ = ModelReadyState::UNLOADING;
-      backend_info->state_reason_.clear();
-      backend_info->next_action_ = ActionType::LOAD;
+      model_info->state_ = ModelReadyState::UNLOADING;
+      model_info->state_reason_.clear();
+      model_info->next_action_ = ActionType::LOAD;
       // The load will be triggered once the unload is done (deleter is called)
-      backend_info->backend_.reset();
+      model_info->model_.reset();
       break;
     case ModelReadyState::LOADING:
     case ModelReadyState::UNLOADING:
-      backend_info->next_action_ = ActionType::LOAD;
+      model_info->next_action_ = ActionType::LOAD;
       break;
     default:
       LOG_INFO << "loading: " << model_name << ":" << version;
-      backend_info->state_ = ModelReadyState::LOADING;
-      backend_info->state_reason_.clear();
+      model_info->state_ = ModelReadyState::LOADING;
+      model_info->state_reason_.clear();
       {
         // FIXME WAR for glibc bug when spawning threads too
         // quickly. https://sourceware.org/bugzilla/show_bug.cgi?id=19329
@@ -1009,8 +1002,8 @@ ModelRepositoryManager::BackendLifeCycle::Load(
         // parallelism. DLIS-1833.
         std::this_thread::sleep_for(std::chrono::milliseconds(100));
         std::thread worker(
-            &ModelRepositoryManager::BackendLifeCycle::CreateInferenceBackend,
-            this, model_name, version, backend_info);
+            &ModelRepositoryManager::ModelLifeCycle::CreateModel, this,
+            model_name, version, model_info);
         worker.detach();
       }
       break;
@@ -1020,33 +1013,32 @@ ModelRepositoryManager::BackendLifeCycle::Load(
 }
 
 Status
-ModelRepositoryManager::BackendLifeCycle::Unload(
-    const std::string& model_name, const int64_t version,
-    BackendInfo* backend_info)
+ModelRepositoryManager::ModelLifeCycle::Unload(
+    const std::string& model_name, const int64_t version, ModelInfo* model_info)
 {
   LOG_VERBOSE(1) << "Unload() '" << model_name << "' version " << version;
   Status status = Status::Success;
 
-  backend_info->next_action_ = ActionType::NO_ACTION;
+  model_info->next_action_ = ActionType::NO_ACTION;
 
-  switch (backend_info->state_) {
+  switch (model_info->state_) {
     case ModelReadyState::READY:
       LOG_INFO << "unloading: " << model_name << ":" << version;
-      backend_info->state_ = ModelReadyState::UNLOADING;
-      backend_info->state_reason_.clear();
-      backend_info->backend_.reset();
-      backend_info->agent_model_list_.reset();
+      model_info->state_ = ModelReadyState::UNLOADING;
+      model_info->state_reason_.clear();
+      model_info->model_.reset();
+      model_info->agent_model_list_.reset();
       break;
     case ModelReadyState::LOADING:
     case ModelReadyState::UNLOADING:
-      backend_info->next_action_ = ActionType::UNLOAD;
+      model_info->next_action_ = ActionType::UNLOAD;
       break;
     default:
       status = Status(
           Status::Code::NOT_FOUND,
           "tried to unload model '" + model_name + "' version " +
               std::to_string(version) + " which is at model state: " +
-              ModelReadyStateString(backend_info->state_));
+              ModelReadyStateString(model_info->state_));
       break;
   }
 
@@ -1054,42 +1046,39 @@ ModelRepositoryManager::BackendLifeCycle::Unload(
 }
 
 Status
-ModelRepositoryManager::BackendLifeCycle::CreateInferenceBackend(
-    const std::string& model_name, const int64_t version,
-    BackendInfo* backend_info)
+ModelRepositoryManager::ModelLifeCycle::CreateModel(
+    const std::string& model_name, const int64_t version, ModelInfo* model_info)
 {
-  LOG_VERBOSE(1) << "CreateInferenceBackend() '" << model_name << "' version "
-                 << version;
-  const auto model_path =
-      JoinPath({backend_info->repository_path_, model_name});
-  // make copy of the current model config in case model config in backend info
-  // is updated (another poll) during the creation of backend handle
+  LOG_VERBOSE(1) << "CreateModel() '" << model_name << "' version " << version;
+  const auto model_path = JoinPath({model_info->repository_path_, model_name});
+  // make copy of the current model config in case model config in model info
+  // is updated (another poll) during the creation of the model
   inference::ModelConfig model_config;
   {
-    std::lock_guard<std::recursive_mutex> lock(backend_info->mtx_);
-    model_config = backend_info->model_config_;
+    std::lock_guard<std::recursive_mutex> lock(model_info->mtx_);
+    model_config = model_info->model_config_;
   }
 
-  // Create backend
+  // Create model
   Status status;
-  std::unique_ptr<InferenceBackend> is;
+  std::unique_ptr<Model> is;
 
   // If 'backend' is specified in the config then use the new triton
   // backend.
   if (!model_config.backend().empty()) {
     std::unique_ptr<TritonModel> model;
     status = TritonModel::Create(
-        server_, backend_info->repository_path_, cmdline_config_map_,
+        server_, model_info->repository_path_, cmdline_config_map_,
         host_policy_map_, model_name, version, model_config, &model);
     is.reset(model.release());
   } else {
 #ifdef TRITON_ENABLE_ENSEMBLE
-    if (backend_info->is_ensemble_) {
-      status = EnsembleBackend::Create(
+    if (model_info->is_ensemble_) {
+      status = EnsembleModel::Create(
           server_, model_path, version, model_config, min_compute_capability_,
           &is);
-      // Complete label provider with label information from involved backends
-      // Must be done here because involved backends may not be able to
+      // Complete label provider with label information from involved models
+      // Must be done here because involved models may not be able to
       // obtained from server because this may happen during server
       // initialization.
       if (status.IsOk()) {
@@ -1104,14 +1093,13 @@ ModelRepositoryManager::BackendLifeCycle::CreateInferenceBackend(
           for (const auto& pair : element.output_map()) {
             // Found model that produce one of the missing output
             if (no_label_outputs.find(pair.second) != no_label_outputs.end()) {
-              std::shared_ptr<InferenceBackend> backend;
-              // Safe to obtain backend because the ensemble can't be loaded
-              // until the involved backends are ready
-              GetInferenceBackend(
-                  element.model_name(), element.model_version(), &backend);
+              std::shared_ptr<Model> model;
+              // Safe to obtain model because the ensemble can't be loaded
+              // until the involved models are ready
+              GetModel(element.model_name(), element.model_version(), &model);
               label_provider->AddLabels(
                   pair.second,
-                  backend->GetLabelProvider()->GetLabels(pair.first));
+                  model->GetLabelProvider()->GetLabels(pair.first));
             }
           }
         }
@@ -1125,10 +1113,10 @@ ModelRepositoryManager::BackendLifeCycle::CreateInferenceBackend(
     }
   }
 
-  // Update backend state
-  std::lock_guard<std::recursive_mutex> lock(backend_info->mtx_);
+  // Update model state
+  std::lock_guard<std::recursive_mutex> lock(model_info->mtx_);
   // Sanity check
-  if (backend_info->backend_ != nullptr) {
+  if (model_info->model_ != nullptr) {
     LOG_ERROR << "trying to load model '" << model_name << "' version "
               << version << " while it is being served";
   } else {
@@ -1136,52 +1124,52 @@ ModelRepositoryManager::BackendLifeCycle::CreateInferenceBackend(
       // Unless the handle is nullptr, always reset handle out of the mutex,
       // otherwise the handle's destructor will try to acquire the mutex and
       // cause deadlock.
-      backend_info->backend_.reset(
+      model_info->model_.reset(
           is.release(),
-          BackendDeleter([this, model_name, version, backend_info]() mutable {
+          ModelDeleter([this, model_name, version, model_info]() mutable {
             LOG_VERBOSE(1) << "OnDestroy callback() '" << model_name
                            << "' version " << version;
             LOG_INFO << "successfully unloaded '" << model_name << "' version "
                      << version;
             // Use recursive mutex as this deleter is likely to to be called
-            // within BackendLifeCycle class where the same mutex is being hold.
+            // within ModelLifeCycle class where the same mutex is being hold.
             // However, mutex acquisition is needed here for the case where
-            // the backend is requested to be unloaded while there are inflight
+            // the model is requested to be unloaded while there are inflight
             // requests, then the deleter will be called from the request thread
             {
-              std::lock_guard<std::recursive_mutex> lock(backend_info->mtx_);
-              backend_info->state_ = ModelReadyState::UNAVAILABLE;
-              backend_info->state_reason_ = "unloaded";
+              std::lock_guard<std::recursive_mutex> lock(model_info->mtx_);
+              model_info->state_ = ModelReadyState::UNAVAILABLE;
+              model_info->state_reason_ = "unloaded";
               // Check if next action is requested
-              this->TriggerNextAction(model_name, version, backend_info);
+              this->TriggerNextAction(model_name, version, model_info);
             }
           }));
-      backend_info->state_ = ModelReadyState::READY;
-      backend_info->state_reason_.clear();
+      model_info->state_ = ModelReadyState::READY;
+      model_info->state_reason_.clear();
       LOG_INFO << "successfully loaded '" << model_name << "' version "
                << version;
     } else {
       LOG_ERROR << "failed to load '" << model_name << "' version " << version
                 << ": " << status.AsString();
-      backend_info->state_ = ModelReadyState::UNAVAILABLE;
-      backend_info->state_reason_ = status.AsString();
+      model_info->state_ = ModelReadyState::UNAVAILABLE;
+      model_info->state_reason_ = status.AsString();
     }
   }
 
   // Check if next action is requested
-  return TriggerNextAction(model_name, version, backend_info);
+  return TriggerNextAction(model_name, version, model_info);
 }
 
 ModelRepositoryManager::ModelRepositoryManager(
     const std::set<std::string>& repository_paths, const bool autofill,
     const bool polling_enabled, const bool model_control_enabled,
     const double min_compute_capability,
-    std::unique_ptr<BackendLifeCycle> life_cycle)
+    std::unique_ptr<ModelLifeCycle> life_cycle)
     : repository_paths_(repository_paths), autofill_(autofill),
       polling_enabled_(polling_enabled),
       model_control_enabled_(model_control_enabled),
       min_compute_capability_(min_compute_capability),
-      backend_life_cycle_(std::move(life_cycle))
+      model_life_cycle_(std::move(life_cycle))
 {
 }
 
@@ -1216,8 +1204,8 @@ ModelRepositoryManager::Create(
         "cannot enable both polling and explicit model control");
   }
 
-  std::unique_ptr<BackendLifeCycle> life_cycle;
-  RETURN_IF_ERROR(BackendLifeCycle::Create(
+  std::unique_ptr<ModelLifeCycle> life_cycle;
+  RETURN_IF_ERROR(ModelLifeCycle::Create(
       server, min_compute_capability, backend_cmdline_config_map,
       host_policy_map, &life_cycle));
 
@@ -1248,7 +1236,7 @@ ModelRepositoryManager::Create(
   for (const auto& model : (*model_repository_manager)->infos_) {
     const auto version_states =
         (*model_repository_manager)
-            ->backend_life_cycle_->VersionStates(model.first);
+            ->model_life_cycle_->VersionStates(model.first);
     // Return general error message, detail of each model's loading state
     // is logged separately.
     if (version_states.empty()) {
@@ -1315,7 +1303,7 @@ ModelRepositoryManager::PollAndUpdateInternal(bool* all_models_polled)
   UpdateDependencyGraph(added, deleted, modified);
 
   for (const auto& name : deleted) {
-    backend_life_cycle_->AsyncUnload(name);
+    model_life_cycle_->AsyncUnload(name);
   }
 
   // model loading / unloading error will be printed but ignored
@@ -1341,7 +1329,7 @@ ModelRepositoryManager::LoadModelByDependency()
     loaded_models.clear();
     // Unload invalid models first
     for (auto& invalid_model : set_pair.second) {
-      backend_life_cycle_->AsyncUnload(invalid_model->model_name_);
+      model_life_cycle_->AsyncUnload(invalid_model->model_name_);
       LOG_ERROR << invalid_model->status_.AsString();
       invalid_model->loaded_versions_ = std::set<int64_t>();
       loaded_models.emplace(invalid_model);
@@ -1352,7 +1340,7 @@ ModelRepositoryManager::LoadModelByDependency()
       model_states.emplace_back(new ModelState(valid_model));
       auto model_state = model_states.back().get();
       const auto itr = infos_.find(valid_model->model_name_);
-      auto status = backend_life_cycle_->AsyncLoad(
+      auto status = model_life_cycle_->AsyncLoad(
           itr->second->model_repository_path_, valid_model->model_name_,
           valid_model->model_config_, itr->second->agent_model_list_,
           [model_state](Status load_status) {
@@ -1371,7 +1359,7 @@ ModelRepositoryManager::LoadModelByDependency()
       model_state->ready_.get_future().wait();
       res[model_state->node_->model_name_] = model_state->status_;
       const auto version_state =
-          backend_life_cycle_->VersionStates(model_state->node_->model_name_);
+          model_life_cycle_->VersionStates(model_state->node_->model_name_);
       model_state->node_->loaded_versions_.clear();
       for (const auto& vs : version_state) {
         if (vs.second.first == ModelReadyState::READY) {
@@ -1407,7 +1395,7 @@ ModelRepositoryManager::LoadUnloadModel(
       LoadUnloadModels({model_name}, type, unload_dependents, &polled));
 
   // Check if model is loaded / unloaded properly
-  const auto version_states = backend_life_cycle_->VersionStates(model_name);
+  const auto version_states = model_life_cycle_->VersionStates(model_name);
   if (type == ActionType::LOAD) {
     if (version_states.empty()) {
       return Status(
@@ -1519,7 +1507,7 @@ ModelRepositoryManager::LoadUnloadModels(
   // In all cases, should unload them and remove from 'infos_' explicitly.
   for (const auto& name : (unload_dependents ? deleted_dependents : deleted)) {
     infos_.erase(name);
-    backend_life_cycle_->AsyncUnload(name);
+    model_life_cycle_->AsyncUnload(name);
   }
 
   // load / unload the models affected, and check the load status of
@@ -1550,7 +1538,7 @@ ModelRepositoryManager::UnloadAllModels()
 {
   Status status;
   for (const auto& name_info : infos_) {
-    Status unload_status = backend_life_cycle_->AsyncUnload(name_info.first);
+    Status unload_status = model_life_cycle_->AsyncUnload(name_info.first);
     if (!unload_status.IsOk()) {
       status = Status(
           Status::Code::INTERNAL,
@@ -1561,21 +1549,21 @@ ModelRepositoryManager::UnloadAllModels()
 }
 
 const ModelRepositoryManager::ModelStateMap
-ModelRepositoryManager::LiveBackendStates(bool strict_readiness)
+ModelRepositoryManager::LiveModelStates(bool strict_readiness)
 {
-  return backend_life_cycle_->LiveBackendStates(strict_readiness);
+  return model_life_cycle_->LiveModelStates(strict_readiness);
 }
 
 const ModelRepositoryManager::ModelStateMap
-ModelRepositoryManager::BackendStates()
+ModelRepositoryManager::ModelStates()
 {
-  return backend_life_cycle_->BackendStates();
+  return model_life_cycle_->ModelStates();
 }
 
 const ModelRepositoryManager::VersionStateMap
 ModelRepositoryManager::VersionStates(const std::string& model_name)
 {
-  return backend_life_cycle_->VersionStates(model_name);
+  return model_life_cycle_->VersionStates(model_name);
 }
 
 Status
@@ -1583,7 +1571,7 @@ ModelRepositoryManager::ModelState(
     const std::string& model_name, const int64_t model_version,
     ModelReadyState* state)
 {
-  return backend_life_cycle_->ModelState(model_name, model_version, state);
+  return model_life_cycle_->ModelState(model_name, model_version, state);
 }
 
 Status
@@ -1604,7 +1592,7 @@ ModelRepositoryManager::RepositoryIndex(
     }
   }
 
-  ModelStateMap states = BackendStates();
+  ModelStateMap states = ModelStates();
 
   for (const auto& model : seen_models) {
     // If the same model appears in multiple repostories then show it
@@ -1637,14 +1625,13 @@ ModelRepositoryManager::RepositoryIndex(
 }
 
 Status
-ModelRepositoryManager::GetInferenceBackend(
+ModelRepositoryManager::GetModel(
     const std::string& model_name, const int64_t model_version,
-    std::shared_ptr<InferenceBackend>* backend)
+    std::shared_ptr<Model>* model)
 {
-  Status status = backend_life_cycle_->GetInferenceBackend(
-      model_name, model_version, backend);
+  Status status = model_life_cycle_->GetModel(model_name, model_version, model);
   if (!status.IsOk()) {
-    backend->reset();
+    model->reset();
     status = Status(
         Status::Code::UNAVAILABLE,
         "Request for unknown model: " + status.Message());
@@ -1774,7 +1761,7 @@ ModelRepositoryManager::Poll(
             TRITONREPOAGENT_ArtifactType artifact_type;
             RETURN_IF_ERROR(model_info->agent_model_list_->Back()->Location(
                 &artifact_type, &location));
-            // RepoAgentModel uses model path while backend creation needs
+            // RepoAgentModel uses model path while model creation needs
             // repository path, so need to go up one level.
             // [FIXME] Should just passing model path directly as we don't
             // really look at the repository path but just create model path
@@ -1802,8 +1789,8 @@ ModelRepositoryManager::Poll(
       }
       if (status.IsOk()) {
         // Note that the model inputs and outputs are not validated until
-        // the model backend is intialized as they may not be auto-completed
-        // until backend is intialized.
+        // the model model is intialized as they may not be auto-completed
+        // until model is intialized.
         status = ValidateModelConfig(model_config, min_compute_capability_);
         if (status.IsOk() && (!autofill_)) {
           status = ValidateModelIOConfig(model_config);

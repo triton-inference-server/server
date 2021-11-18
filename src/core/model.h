@@ -36,18 +36,18 @@ namespace nvidia { namespace inferenceserver {
 class InferenceRequest;
 
 //
-// Interface for backends that handle inference requests.
+// Interface for models that handle inference requests.
 //
-class InferenceBackend {
+class Model {
  public:
-  explicit InferenceBackend(
+  explicit Model(
       const double min_compute_capability, const std::string& model_dir,
       const int64_t version, const inference::ModelConfig& config)
       : config_(config), min_compute_capability_(min_compute_capability),
         version_(version), model_dir_(model_dir)
   {
   }
-  virtual ~InferenceBackend() {}
+  virtual ~Model() {}
 
   // Get the name of model being served.
   const std::string& Name() const { return config_.name(); }
@@ -86,7 +86,7 @@ class InferenceBackend {
   Status Init();
 
   // Enqueue a request for execution. If Status::Success is returned
-  // then the backend has taken ownership of the request object and so
+  // then the model has taken ownership of the request object and so
   // 'request' will be nullptr. If non-success is returned then the
   // caller still retains ownership of 'request'.
   Status Enqueue(std::unique_ptr<InferenceRequest>& request)
@@ -103,23 +103,23 @@ class InferenceBackend {
   Status SetModelConfig(const inference::ModelConfig& config);
 
   // Explicitly set the scheduler to use for inference requests to the
-  // model. The scheduler can only be set once for a backend.
+  // model. The scheduler can only be set once for a model.
   Status SetScheduler(std::unique_ptr<Scheduler> scheduler);
 
-  // The scheduler to use for this backend.
+  // The scheduler to use for this model.
   std::unique_ptr<Scheduler> scheduler_;
 
-  // Configuration of the model that this backend represents.
+  // Configuration of the model.
   inference::ModelConfig config_;
 
  private:
   // The minimum supported CUDA compute capability.
   const double min_compute_capability_;
 
-  // Version of the model that this backend represents.
+  // Version of the model.
   int64_t version_;
 
-  // The stats collector for the model that this backend represents.
+  // The stats collector for the model.
   InferenceStatsAggregator stats_aggregator_;
 
   // Label provider for this model.
@@ -134,10 +134,10 @@ class InferenceBackend {
   // Path to model
   std::string model_dir_;
 
-  // The default priority level for the backend.
+  // The default priority level for the model.
   uint32_t default_priority_level_;
 
-  // The largest priority value for the backend.
+  // The largest priority value for the model.
   uint32_t max_priority_level_;
 };
 

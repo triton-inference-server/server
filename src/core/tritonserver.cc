@@ -26,7 +26,6 @@
 
 #include <string>
 #include <vector>
-#include "src/core/backend.h"
 #include "src/core/cuda_utils.h"
 #include "src/core/infer_parameter.h"
 #include "src/core/infer_request.h"
@@ -34,6 +33,7 @@
 #include "src/core/infer_stats.h"
 #include "src/core/logging.h"
 #include "src/core/metrics.h"
+#include "src/core/model.h"
 #include "src/core/model_config.h"
 #include "src/core/model_config_utils.h"
 #include "src/core/model_repository_manager.h"
@@ -1290,12 +1290,11 @@ TRITONSERVER_InferenceRequestNew(
 {
   ni::InferenceServer* lserver = reinterpret_cast<ni::InferenceServer*>(server);
 
-  std::shared_ptr<ni::InferenceBackend> backend;
-  RETURN_IF_STATUS_ERROR(
-      lserver->GetInferenceBackend(model_name, model_version, &backend));
+  std::shared_ptr<ni::Model> model;
+  RETURN_IF_STATUS_ERROR(lserver->GetModel(model_name, model_version, &model));
 
   *inference_request = reinterpret_cast<TRITONSERVER_InferenceRequest*>(
-      new ni::InferenceRequest(backend, model_version));
+      new ni::InferenceRequest(model, model_version));
 
   return nullptr;  // Success
 }
@@ -2003,11 +2002,10 @@ TRITONSERVER_ServerModelBatchProperties(
     *voidp = nullptr;
   }
 
-  std::shared_ptr<ni::InferenceBackend> backend;
-  RETURN_IF_STATUS_ERROR(
-      lserver->GetInferenceBackend(model_name, model_version, &backend));
+  std::shared_ptr<ni::Model> model;
+  RETURN_IF_STATUS_ERROR(lserver->GetModel(model_name, model_version, &model));
 
-  if (backend->Config().max_batch_size() > 0) {
+  if (model->Config().max_batch_size() > 0) {
     *flags = TRITONSERVER_BATCH_FIRST_DIM;
   } else {
     *flags = TRITONSERVER_BATCH_UNKNOWN;
@@ -2029,11 +2027,10 @@ TRITONSERVER_ServerModelTransactionProperties(
 
   *txn_flags = 0;
 
-  std::shared_ptr<ni::InferenceBackend> backend;
-  RETURN_IF_STATUS_ERROR(
-      lserver->GetInferenceBackend(model_name, model_version, &backend));
+  std::shared_ptr<ni::Model> model;
+  RETURN_IF_STATUS_ERROR(lserver->GetModel(model_name, model_version, &model));
 
-  if (backend->Config().model_transaction_policy().decoupled()) {
+  if (model->Config().model_transaction_policy().decoupled()) {
     *txn_flags = TRITONSERVER_TXN_DECOUPLED;
   } else {
     *txn_flags = TRITONSERVER_TXN_ONE_TO_ONE;
@@ -2079,9 +2076,8 @@ TRITONSERVER_ServerModelMetadata(
 {
   ni::InferenceServer* lserver = reinterpret_cast<ni::InferenceServer*>(server);
 
-  std::shared_ptr<ni::InferenceBackend> backend;
-  RETURN_IF_STATUS_ERROR(
-      lserver->GetInferenceBackend(model_name, model_version, &backend));
+  std::shared_ptr<ni::Model> model;
+  RETURN_IF_STATUS_ERROR(lserver->GetModel(model_name, model_version, &model));
 
   std::vector<int64_t> ready_versions;
   RETURN_IF_STATUS_ERROR(
@@ -2109,7 +2105,7 @@ TRITONSERVER_ServerModelMetadata(
 
   RETURN_IF_STATUS_ERROR(metadata.Add("versions", std::move(versions)));
 
-  const auto& model_config = backend->Config();
+  const auto& model_config = model->Config();
   if (!model_config.platform().empty()) {
     RETURN_IF_STATUS_ERROR(
         metadata.AddStringRef("platform", model_config.platform().c_str()));
@@ -2237,13 +2233,11 @@ TRITONSERVER_ServerModelStatistics(
       metadata, triton::common::TritonJson::ValueType::ARRAY);
   for (const auto& mv_pair : ready_model_versions) {
     for (const auto& version : mv_pair.second) {
-      std::shared_ptr<ni::InferenceBackend> backend;
-      RETURN_IF_STATUS_ERROR(
-          lserver->GetInferenceBackend(mv_pair.first, version, &backend));
-      const auto& infer_stats =
-          backend->StatsAggregator().ImmutableInferStats();
+      std::shared_ptr<ni::Model> model;
+      RETURN_IF_STATUS_ERROR(lserver->GetModel(mv_pair.first, version, &model));
+      const auto& infer_stats = model->StatsAggregator().ImmutableInferStats();
       const auto& infer_batch_stats =
-          backend->StatsAggregator().ImmutableInferBatchStats();
+          model->StatsAggregator().ImmutableInferBatchStats();
 
       triton::common::TritonJson::Value inference_stats(
           metadata, triton::common::TritonJson::ValueType::OBJECT);
@@ -2292,11 +2286,11 @@ TRITONSERVER_ServerModelStatistics(
           model_stat.AddString("version", std::move(std::to_string(version))));
 
       RETURN_IF_STATUS_ERROR(model_stat.AddUInt(
-          "last_inference", backend->StatsAggregator().LastInferenceMs()));
+          "last_inference", model->StatsAggregator().LastInferenceMs()));
       RETURN_IF_STATUS_ERROR(model_stat.AddUInt(
-          "inference_count", backend->StatsAggregator().InferenceCount()));
+          "inference_count", model->StatsAggregator().InferenceCount()));
       RETURN_IF_STATUS_ERROR(model_stat.AddUInt(
-          "execution_count", backend->StatsAggregator().ExecutionCount()));
+          "execution_count", model->StatsAggregator().ExecutionCount()));
 
       RETURN_IF_STATUS_ERROR(
           model_stat.Add("inference_stats", std::move(inference_stats)));
@@ -2324,13 +2318,12 @@ TRITONSERVER_ServerModelConfig(
 {
   ni::InferenceServer* lserver = reinterpret_cast<ni::InferenceServer*>(server);
 
-  std::shared_ptr<ni::InferenceBackend> backend;
-  RETURN_IF_STATUS_ERROR(
-      lserver->GetInferenceBackend(model_name, model_version, &backend));
+  std::shared_ptr<ni::Model> model;
+  RETURN_IF_STATUS_ERROR(lserver->GetModel(model_name, model_version, &model));
 
   std::string model_config_json;
   RETURN_IF_STATUS_ERROR(ni::ModelConfigToJson(
-      backend->Config(), config_version, &model_config_json));
+      model->Config(), config_version, &model_config_json));
 
   *model_config = reinterpret_cast<TRITONSERVER_Message*>(
       new ni::TritonServerMessage(std::move(model_config_json)));

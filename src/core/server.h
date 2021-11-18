@@ -43,7 +43,7 @@
 
 namespace nvidia { namespace inferenceserver {
 
-class InferenceBackend;
+class Model;
 class InferenceRequest;
 
 enum class ModelControlMode { MODE_NONE, MODE_POLL, MODE_EXPLICIT };
@@ -255,16 +255,16 @@ class InferenceServer {
   float TensorFlowGPUMemoryFraction() const { return tf_gpu_memory_fraction_; }
   void SetTensorFlowGPUMemoryFraction(float f) { tf_gpu_memory_fraction_ = f; }
 
-  // Return the requested InferenceBackend object.
-  Status GetInferenceBackend(
+  // Return the requested model object.
+  Status GetModel(
       const std::string& model_name, const int64_t model_version,
-      std::shared_ptr<InferenceBackend>* backend)
+      std::shared_ptr<Model>* model)
   {
     if (ready_state_ != ServerReadyState::SERVER_READY) {
       return Status(Status::Code::UNAVAILABLE, "Server not ready");
     }
-    return model_repository_manager_->GetInferenceBackend(
-        model_name, model_version, backend);
+    return model_repository_manager_->GetModel(
+        model_name, model_version, model);
   }
 
   // Return the pointer to RateLimiter object.
@@ -309,7 +309,7 @@ class InferenceServer {
   // Number of in-flight, non-inference requests. During shutdown we
   // attempt to wait for all in-flight non-inference requests to
   // complete before exiting (also wait for in-flight inference
-  // requests but that is determined by backend shared_ptr).
+  // requests but that is determined by model shared_ptr).
   std::atomic<uint64_t> inflight_request_counter_;
 
   std::shared_ptr<RateLimiter> rate_limiter_;
