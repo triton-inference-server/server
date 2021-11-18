@@ -1010,6 +1010,40 @@ def container_build(images, backends, repoagents, endpoints):
         p.wait()
         fail_if(p.returncode != 0, 'docker build tritonserver_buildbase failed')
 
+        # Need to extract env from the base image so that we can
+        # access library versions.
+        buildbase_env_filepath = os.path.join(FLAGS.build_dir, 'buildbase_env');
+        with open(buildbase_env_filepath, 'w') as f:
+            if target_platform() == 'windows':
+                envargs = ['docker', 'run', '--rm', 'tritonserver_buildbase',
+                           'cmd.exe', '/c', 'set']
+            else:
+                envargs = ['docker', 'run', '--rm', 'tritonserver_buildbase', 'env']
+            log_verbose('buildbase env {}'.format(envargs))
+            p = subprocess.Popen(envargs, stdout=f)
+            p.wait()
+            fail_if(p.returncode != 0,
+                    'extracting tritonserver_buildbase env failed')
+
+        buildbase_env = {}
+        with open(buildbase_env_filepath, 'r') as f:
+            for line in f:
+                kv = line.strip().split('=', 1)
+                if len(kv) == 2:
+                    key, value = kv
+                    buildbase_env[key] = value
+
+        # We set the following env in the build docker container
+        # launch below to pass necessary versions into the build. By
+        # prepending the envvars with TRITONBUILD_ prefix we indicate
+        # that the build.py execution within the container should set
+        # the corresponding variables in cmake invocation.
+        dockerrunenvargs = []
+        for k in [ 'TRT_VERSION', 'DALI_VERSION' ]:
+            if k in buildbase_env:
+                dockerrunenvargs += [ '--env',
+                                      'TRITONBUILD_{}={}'.format(k, buildbase_env[k]) ]
+
         # Before attempting to run the new image, make sure any
         # previous 'tritonserver_builder' container is removed.
         client = docker.from_env(timeout=3600)
@@ -1070,6 +1104,7 @@ def container_build(images, backends, repoagents, endpoints):
             ]
         else:
             dockerrunargs += ['-v', '/var/run/docker.sock:/var/run/docker.sock']
+        dockerrunargs += dockerrunenvargs
         dockerrunargs += [
             'tritonserver_buildbase',
         ]
@@ -1096,7 +1131,7 @@ def container_build(images, backends, repoagents, endpoints):
         #untar(FLAGS.install_dir, tarfilename)
 
         # Build is complete, save the container as the
-        # tritonserver_build image. We must to this in two steps:
+        # tritonserver_build image. We must do this in two steps:
         #
         #   1. Commit the container as image
         #   "tritonserver_builder_image". This image can't be used
