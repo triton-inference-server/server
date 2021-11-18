@@ -55,12 +55,13 @@ rm -f $SERVER_LOG $CLIENT_LOG
 
 # Setup models
 cd ${TRITON_PATH}
-python ${TEST_JSON_REPO}/simple-model.py
+python ${TEST_REPO}/simple-model.py
 python ${TRITON_PATH}/python_backend/inferentia/scripts/gen_triton_model.py \
     --triton_input INPUT__0,INT64,4 INPUT__1,INT64,4 \
     --triton_output OUTPUT__0,INT64,4 OUTPUT__1,INT64,4 \
     --compiled_model $PWD/add_sub_model.pt \
-    --triton_model_dir models/add-sub-1x4 --neuron_core_range 0:0
+    --triton_model_dir models/add-sub-1x4 \
+    --triton_model_instance_count 3 --neuron_core_range 0:5
 
 RET=0
 

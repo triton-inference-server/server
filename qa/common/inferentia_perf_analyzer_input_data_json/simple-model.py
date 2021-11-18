@@ -47,16 +47,3 @@ batch_size = 1
 example_inputs = torch.zeros([4], dtype=torch.int64), torch.zeros([4], dtype=torch.int64)
 model_neuron = torch.neuron.trace(model, example_inputs, dynamic_batch_size=True)
 model_neuron.save('add_sub_model.pt')
-
-'''
-python /home/ubuntu/python_backend/inferentia/scripts/gen_triton_model.py \
-    --triton_input INPUT__0,INT64,4 INPUT__1,INT64,4 \
-    --triton_output OUTPUT__0,INT64,4 OUTPUT__1,INT64,4 \
-    --compiled_model $PWD/add_sub_model.pt \
-    --triton_model_dir models/add-sub-1x4 --neuron_core_range 0:0
-
-
-docker buildx build --progress=plain --pull --push -t tritonsdk -f Dockerfile.sdk --build-arg "TRITON_CLIENT_REPO_SUBDIR=clientrepo"
-docker run -v /home/ubuntu:/home/ubuntu --net host -ti tritonsdk:latest /bin/bash
-perf_analyzer -v -m add-sub-1x4 --input-data=/home/ubuntu/python_backend/inferentia/test_data.json
-'''
