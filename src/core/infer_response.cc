@@ -41,7 +41,7 @@ InferenceResponseFactory::CreateResponse(
 {
   response->reset(new InferenceResponse(
       backend_, id_, allocator_, alloc_userp_, response_fn_, response_userp_,
-      response_delegator_));
+      response_delegator_, trace_));
 
   return Status::Success;
 }
@@ -74,6 +74,31 @@ InferenceResponse::InferenceResponse(
       alloc_userp_(alloc_userp), response_fn_(response_fn),
       response_userp_(response_userp), response_delegator_(delegator),
       null_response_(false)
+{
+  // If the allocator has a start_fn then invoke it.
+  TRITONSERVER_ResponseAllocatorStartFn_t start_fn = allocator_->StartFn();
+  if (start_fn != nullptr) {
+    LOG_TRITONSERVER_ERROR(
+        start_fn(
+            reinterpret_cast<TRITONSERVER_ResponseAllocator*>(
+                const_cast<ResponseAllocator*>(allocator_)),
+            alloc_userp_),
+        "response allocation start failed");
+  }
+}
+
+InferenceResponse::InferenceResponse(
+    const std::shared_ptr<InferenceBackend>& backend, const std::string& id,
+    const ResponseAllocator* allocator, void* alloc_userp,
+    TRITONSERVER_InferenceResponseCompleteFn_t response_fn,
+    void* response_userp,
+    const std::function<
+        void(std::unique_ptr<InferenceResponse>&&, const uint32_t)>& delegator,
+    std::shared_ptr<InferenceTrace> trace)
+    : backend_(backend), id_(id), allocator_(allocator),
+      alloc_userp_(alloc_userp), response_fn_(response_fn),
+      response_userp_(response_userp), response_delegator_(delegator),
+      null_response_(false), trace_(trace)
 {
   // If the allocator has a start_fn then invoke it.
   TRITONSERVER_ResponseAllocatorStartFn_t start_fn = allocator_->StartFn();
@@ -200,6 +225,10 @@ Status
 InferenceResponse::Send(
     std::unique_ptr<InferenceResponse>&& response, const uint32_t flags)
 {
+#ifdef TRITON_ENABLE_TRACING
+  response->TraceTensor();
+#endif  // TRITON_ENABLE_TRACING
+
   if (response->response_delegator_ != nullptr) {
     auto ldelegator = std::move(response->response_delegator_);
     ldelegator(std::move(response), flags);
@@ -225,6 +254,40 @@ InferenceResponse::SendWithStatus(
   response->status_ = status;
   return InferenceResponse::Send(std::move(response), flags);
 }
+
+#ifdef TRITON_ENABLE_TRACING
+void
+InferenceResponse::TraceTensor()
+{
+  if (this->trace_ == nullptr) {
+    return;
+  }
+
+  uint32_t output_count;
+  TRITONSERVER_InferenceResponse* response =
+      reinterpret_cast<TRITONSERVER_InferenceResponse*>(this);
+  TRITONSERVER_InferenceResponseOutputCount(response, &output_count);
+
+  for (uint32_t idx = 0; idx < output_count; ++idx) {
+    const char* cname;
+    TRITONSERVER_DataType datatype;
+    const int64_t* shape;
+    uint64_t dim_count;
+    const void* base;
+    size_t byte_size;
+    TRITONSERVER_MemoryType memory_type;
+    int64_t memory_type_id;
+    void* userp;
+    TRITONSERVER_InferenceResponseOutput(
+        response, idx, &cname, &datatype, &shape, &dim_count, &base, &byte_size,
+        &memory_type, &memory_type_id, &userp);
+
+    INFER_TRACE_TENSOR_ACTIVITY(
+        this->trace_, TRITONSERVER_TRACE_TENSOR_OUTPUT, cname, datatype, base,
+        byte_size, shape, dim_count, memory_type, memory_type_id);
+  }
+}
+#endif  // TRITON_ENABLE_TRACING
 
 //
 // InferenceResponse::Output

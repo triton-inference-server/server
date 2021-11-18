@@ -37,8 +37,17 @@ std::atomic<uint64_t> InferenceTrace::next_id_(1);
 std::unique_ptr<InferenceTrace>
 InferenceTrace::SpawnChildTrace()
 {
-  std::unique_ptr<InferenceTrace> ltrace(
-      new InferenceTrace(level_, id_, activity_fn_, release_fn_, userp_));
+  std::unique_ptr<InferenceTrace> ltrace(new InferenceTrace(
+      level_, id_, activity_fn_, tensor_activity_fn_, release_fn_, userp_));
+  return ltrace;
+}
+
+std::shared_ptr<InferenceTrace>
+InferenceTrace::CopyTrace()
+{
+  std::shared_ptr<InferenceTrace> ltrace(new InferenceTrace(
+      level_, id_, parent_id_, activity_fn_, tensor_activity_fn_, release_fn_,
+      userp_));
   return ltrace;
 }
 

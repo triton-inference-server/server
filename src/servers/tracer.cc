@@ -26,7 +26,9 @@
 
 #include "src/servers/tracer.h"
 
+#include <iostream>  //TODO
 #include <unordered_map>
+
 #include "src/core/constants.h"
 #include "src/core/logging.h"
 
@@ -104,9 +106,9 @@ TraceManager::SampleTrace(void** userp)
   std::unique_ptr<TraceStreams> luserp(new TraceStreams(this));
 
   TRITONSERVER_InferenceTrace* trace;
-  TRITONSERVER_Error* err = TRITONSERVER_InferenceTraceNew(
-      &trace, level_, 0 /* parent_id */, TraceActivity, TraceRelease,
-      luserp.get());
+  TRITONSERVER_Error* err = TRITONSERVER_InferenceTraceTensorNew(
+      &trace, level_, 0 /* parent_id */, TraceActivity, TraceTensorActivity,
+      TraceRelease, luserp.get());
   if (err != nullptr) {
     LOG_TRITONSERVER_ERROR(err, "creating inference trace object");
     return nullptr;
@@ -242,4 +244,71 @@ TraceManager::TraceActivity(
       << "\",\"ns\":" << timestamp_ns << "}]}";
 }
 
+void
+TraceManager::TraceTensorActivity(
+    TRITONSERVER_InferenceTrace* trace,
+    TRITONSERVER_InferenceTraceActivity activity, const char* name,
+    TRITONSERVER_DataType datatype, const void* base, size_t byte_size,
+    const int64_t* shape, uint64_t dim_count,
+    TRITONSERVER_MemoryType memory_type, int64_t memory_type_id, void* userp)
+{
+  if ((activity != TRITONSERVER_TRACE_TENSOR_INPUT) &&
+      (activity != TRITONSERVER_TRACE_TENSOR_OUTPUT)) {
+    return;
+  }
+
+  if (memory_type != TRITONSERVER_MEMORY_CPU) {
+    return;
+  }
+
+  uint64_t id;
+  LOG_TRITONSERVER_ERROR(
+      TRITONSERVER_InferenceTraceId(trace, &id), "getting trace id");
+
+  // The function may be called with different traces but the same 'userp',
+  // group the activity of the same trace together for more readable output.
+  auto ts = reinterpret_cast<TraceStreams*>(userp);
+  std::stringstream* ss = nullptr;
+  {
+    if (activity == TRITONSERVER_TRACE_REQUEST_START) {
+      std::unique_ptr<std::stringstream> stream(new std::stringstream());
+      ss = stream.get();
+      std::lock_guard<std::mutex> lk(ts->mtx_);
+      ts->streams_.emplace(id, std::move(stream));
+    } else {
+      std::lock_guard<std::mutex> lk(ts->mtx_);
+      ss = ts->streams_[id].get();
+    }
+  }
+
+  std::stringstream ss_tmp;
+
+  // collect and serialize trace details.
+  ss_tmp << ",{\"id\":" << id << ",\"activity\":\"" << activity << "\"";
+  // collect tensor
+  ss_tmp << ",\"tensor\":{";
+  // collect tensor name
+  ss_tmp << "\"name\":\"" << std::string(name) << "\"";
+  // collect tensor data
+  ss_tmp << ",\"data\":\"";
+  const float* fp32_vals = static_cast<const float*>(base);
+  size_t val_count = byte_size / 4;
+  for (size_t i = 0; i < val_count; i++) {
+    ss_tmp << fp32_vals[i];
+    if (i < (val_count - 1)) {
+      ss_tmp << ",";
+    }
+  }
+  ss_tmp << "\",\"shape\":\"";
+  for (uint64_t i = 0; i < dim_count; i++) {
+    ss_tmp << shape[i];
+    if (i < (dim_count - 1)) {
+      ss_tmp << ",";
+    }
+  }
+  ss_tmp << "\",\"dtype\":\"" << datatype << "\"}";
+  ss_tmp << "}";
+
+  *ss << ss_tmp.str();
+}
 }}  // namespace nvidia::inferenceserver

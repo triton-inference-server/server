@@ -62,8 +62,9 @@ FetchContent_Declare(
 )
 FetchContent_Declare(
   repo-core
-  GIT_REPOSITORY https://github.com/triton-inference-server/core.git
-  GIT_TAG ${TRITON_CORE_REPO_TAG}
+  #GIT_REPOSITORY https://github.com/triton-inference-server/core.git
+  #GIT_TAG ${TRITON_CORE_REPO_TAG}
+  URL /root/robertzhu/triton_dev/core
 )
 FetchContent_Declare(
   repo-backend

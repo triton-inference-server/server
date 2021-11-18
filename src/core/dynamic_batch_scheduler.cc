@@ -31,6 +31,8 @@
 #include <sys/syscall.h>
 #include <unistd.h>
 #endif
+#include <iostream>  // TODO
+
 #include "src/core/constants.h"
 #include "src/core/logging.h"
 #include "src/core/model_config.h"
@@ -156,6 +158,8 @@ DynamicBatchScheduler::Enqueue(std::unique_ptr<InferenceRequest>& request)
       request->Trace(), TRITONSERVER_TRACE_QUEUE_START,
       request->QueueStartNs());
 
+  request->TraceTensor();
+
   std::unique_ptr<InferenceResponse> cached_response;
 
   if (response_cache_enabled_) {
@@ -203,13 +207,13 @@ DynamicBatchScheduler::Enqueue(std::unique_ptr<InferenceRequest>& request)
 
       // If there are any idle runners and the queued batch size is greater or
       // equal to next preferred batch size, then wake batcher up to service
-      // this request. We do the actual wake outside of the lock to avoid having
-      // the woken thread immediately block on the lock
+      // this request. We do the actual wake outside of the lock to avoid
+      // having the woken thread immediately block on the lock
       wake_batcher =
           model_->Server()->GetRateLimiter()->PayloadSlotAvailable(model_);
 
-      // We may wake up runner less often if we don't enforce equal shape within
-      // a batch, otherwise must always wake up runner to check it
+      // We may wake up runner less often if we don't enforce equal shape
+      // within a batch, otherwise must always wake up runner to check it
       if (enforce_equal_shape_tensors_.empty()) {
         std::lock_guard<std::mutex> exec_lock(*(curr_payload_->GetExecMutex()));
         auto payload_state = curr_payload_->GetState();

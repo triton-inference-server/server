@@ -26,6 +26,7 @@
 
 #include <string>
 #include <vector>
+
 #include "src/core/backend.h"
 #include "src/core/cuda_utils.h"
 #include "src/core/infer_parameter.h"
@@ -118,6 +119,7 @@ TritonServerError::Create(TRITONSERVER_Error_Code code, const char* msg)
   return reinterpret_cast<TRITONSERVER_Error*>(
       new TritonServerError(code, msg));
 }
+
 
 TRITONSERVER_Error*
 TritonServerError::Create(TRITONSERVER_Error_Code code, const std::string& msg)
@@ -832,6 +834,10 @@ TRITONSERVER_InferenceTraceActivityString(
       return "COMPUTE_END";
     case TRITONSERVER_TRACE_REQUEST_END:
       return "REQUEST_END";
+    case TRITONSERVER_TRACE_TENSOR_INPUT:
+      return "TENSOR_INPUT";
+    case TRITONSERVER_TRACE_TENSOR_OUTPUT:
+      return "TENSOR_OUTPUT";
   }
 
   return "<unknown>";
@@ -846,6 +852,26 @@ TRITONSERVER_InferenceTraceNew(
 #ifdef TRITON_ENABLE_TRACING
   ni::InferenceTrace* ltrace = new ni::InferenceTrace(
       level, parent_id, activity_fn, release_fn, trace_userp);
+  *trace = reinterpret_cast<TRITONSERVER_InferenceTrace*>(ltrace);
+  return nullptr;  // Success
+#else
+  *trace = nullptr;
+  return TRITONSERVER_ErrorNew(
+      TRITONSERVER_ERROR_UNSUPPORTED, "inference tracing not supported");
+#endif  // TRITON_ENABLE_TRACING
+}
+
+TRITONSERVER_DECLSPEC TRITONSERVER_Error*
+TRITONSERVER_InferenceTraceTensorNew(
+    TRITONSERVER_InferenceTrace** trace, TRITONSERVER_InferenceTraceLevel level,
+    uint64_t parent_id, TRITONSERVER_InferenceTraceActivityFn_t activity_fn,
+    TRITONSERVER_InferenceTraceTensorActivityFn_t tensor_activity_fn,
+    TRITONSERVER_InferenceTraceReleaseFn_t release_fn, void* trace_userp)
+{
+#ifdef TRITON_ENABLE_TRACING
+  ni::InferenceTrace* ltrace = new ni::InferenceTrace(
+      level, parent_id, activity_fn, tensor_activity_fn, release_fn,
+      trace_userp);
   *trace = reinterpret_cast<TRITONSERVER_InferenceTrace*>(ltrace);
   return nullptr;  // Success
 #else
@@ -1063,7 +1089,6 @@ TRITONSERVER_ServerOptionsAddRateLimiterResource(
   return loptions->AddRateLimiterResource(name, count, device);
 }
 
-
 TRITONSERVER_Error*
 TRITONSERVER_ServerOptionsSetPinnedMemoryPoolByteSize(
     TRITONSERVER_ServerOptions* options, uint64_t size)
@@ -1277,7 +1302,6 @@ TRITONSERVER_ServerOptionsSetHostPolicy(
       reinterpret_cast<TritonServerOptions*>(options);
   return loptions->SetHostPolicy(policy_name, setting, value);
 }
-
 
 //
 // TRITONSERVER_InferenceRequest
@@ -1518,7 +1542,6 @@ TRITONSERVER_InferenceRequestAppendInputDataWithHostPolicy(
 
   return nullptr;  // Success
 }
-
 
 TRITONSERVER_Error*
 TRITONSERVER_InferenceRequestRemoveAllInputData(

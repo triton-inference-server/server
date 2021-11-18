@@ -26,9 +26,11 @@
 #pragma once
 
 #include <functional>
+#include <iostream>
 #include <string>
 #include <unordered_map>
 #include <vector>
+
 #include "src/core/infer_response.h"
 #include "src/core/infer_stats.h"
 #include "src/core/infer_trace.h"
@@ -304,7 +306,12 @@ class InferenceRequest {
   void SetTrace(std::unique_ptr<InferenceTrace>&& trace)
   {
     trace_ = std::move(trace);
+#ifdef TRITON_ENABLE_TRACING
+    response_factory_.SetTrace(std::move(trace_->CopyTrace()));
+#endif  // TRITON_ENABLE_TRACING
   }
+
+  void TraceTensor();
 #endif  // TRITON_ENABLE_TRACING
 
   // The original inputs are the inputs added to the request before

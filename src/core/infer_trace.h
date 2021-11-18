@@ -27,7 +27,9 @@
 
 #include <atomic>
 #include <chrono>
+#include <iostream>  // TOOD
 #include <memory>
+
 #include "src/core/constants.h"
 #include "src/core/status.h"
 #include "src/core/tritonserver_apis.h"
@@ -52,7 +54,31 @@ class InferenceTrace {
   {
   }
 
+  InferenceTrace(
+      const TRITONSERVER_InferenceTraceLevel level, const uint64_t parent_id,
+      TRITONSERVER_InferenceTraceActivityFn_t activity_fn,
+      TRITONSERVER_InferenceTraceTensorActivityFn_t tensor_activity_fn,
+      TRITONSERVER_InferenceTraceReleaseFn_t release_fn, void* userp)
+      : level_(level), id_(next_id_++), parent_id_(parent_id),
+        activity_fn_(activity_fn), tensor_activity_fn_(tensor_activity_fn),
+        release_fn_(release_fn), userp_(userp)
+  {
+  }
+
+  InferenceTrace(
+      const TRITONSERVER_InferenceTraceLevel level, const uint64_t id,
+      const uint64_t parent_id,
+      TRITONSERVER_InferenceTraceActivityFn_t activity_fn,
+      TRITONSERVER_InferenceTraceTensorActivityFn_t tensor_activity_fn,
+      TRITONSERVER_InferenceTraceReleaseFn_t release_fn, void* userp)
+      : level_(level), id_(id), parent_id_(parent_id),
+        activity_fn_(activity_fn), tensor_activity_fn_(tensor_activity_fn),
+        release_fn_(release_fn), userp_(userp)
+  {
+  }
+
   std::unique_ptr<InferenceTrace> SpawnChildTrace();
+  std::shared_ptr<InferenceTrace> CopyTrace();
 
   int64_t Id() const { return id_; }
   int64_t ParentId() const { return parent_id_; }
@@ -81,6 +107,21 @@ class InferenceTrace {
                       .count());
   }
 
+  // Report tensor trace activity.
+  void ReportTensor(
+      const TRITONSERVER_InferenceTraceActivity activity, const char* name,
+      TRITONSERVER_DataType datatype, const void* base, size_t byte_size,
+      const int64_t* shape, uint64_t dim_count,
+      TRITONSERVER_MemoryType memory_type, int64_t memory_type_id)
+  {
+    // std::cout << "before ReportTensor" << std::endl;
+    tensor_activity_fn_(
+        reinterpret_cast<TRITONSERVER_InferenceTrace*>(this), activity, name,
+        datatype, base, byte_size, shape, dim_count, memory_type,
+        memory_type_id, userp_);
+    // std::cout << "after ReportTensor" << std::endl;
+  }
+
   // Release the trace. Call the trace release callback and transfer
   // ownership of the trace to the callback. On return 'trace' is
   // nullptr.
@@ -92,6 +133,7 @@ class InferenceTrace {
   const uint64_t parent_id_;
 
   TRITONSERVER_InferenceTraceActivityFn_t activity_fn_;
+  TRITONSERVER_InferenceTraceTensorActivityFn_t tensor_activity_fn_;
   TRITONSERVER_InferenceTraceReleaseFn_t release_fn_;
   void* userp_;
 
@@ -124,9 +166,16 @@ class InferenceTrace {
       trace->ReportNow(A);             \
     }                                  \
   }
+#define INFER_TRACE_TENSOR_ACTIVITY(T, A, N, D, BA, BY, S, DI, MT, MTI) \
+  {                                                                     \
+    const auto& trace = (T);                                            \
+    if (trace != nullptr) {                                             \
+      trace->ReportTensor(A, N, D, BA, BY, S, DI, MT, MTI);             \
+    }                                                                   \
+  }
 #else
 #define INFER_TRACE_ACTIVITY(T, A, TS_NS)
 #define INFER_TRACE_ACTIVITY_NOW(T, A)
+#define INFER_TRACE_TENSOR_ACTIVITY(T, A, N, D, BA, BY, S, DI, MT, MTI)
 #endif  // TRITON_ENABLE_TRACING
-
-}}  // namespace nvidia::inferenceserver
+}}      // namespace nvidia::inferenceserver
