@@ -49,7 +49,7 @@ ERROR_STRING="error | Request count: 0 | : 0 infer/sec"
 SERVER=/opt/tritonserver/bin/tritonserver
 SERVER_ARGS="--model-repository=${DATADIR} --log-verbose=1"
 SERVER_LOG="./inference_server.log"
-source ../common/util.sh
+source /opt/tritonserver/qa/common/util.sh
 
 rm -f $SERVER_LOG $CLIENT_LOG
 
@@ -57,6 +57,7 @@ rm -f $SERVER_LOG $CLIENT_LOG
 cd ${TRITON_PATH}
 python ${TEST_JSON_REPO}/simple-model.py
 python ${TRITON_PATH}/python_backend/inferentia/scripts/gen_triton_model.py \
+    --model_type "pytorch" \
     --triton_input INPUT__0,INT64,4 INPUT__1,INT64,4 \
     --triton_output OUTPUT__0,INT64,4 OUTPUT__1,INT64,4 \
     --compiled_model $PWD/add_sub_model.pt \
