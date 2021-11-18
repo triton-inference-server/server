@@ -28,22 +28,29 @@ import torch
 from torch import nn
 import torch_neuron
 
+
 class AddSubNet(nn.Module):
     """
     Simple AddSub network in PyTorch. This network outputs the sum and
     subtraction of the inputs.
     """
+
     def __init__(self):
         super(AddSubNet, self).__init__()
-        
 
     def forward(self, input0, input1):
-        return torch.sub(input0, input1, alpha=-1), torch.sub(input0, input1, alpha=1)
+        return torch.sub(input0, input1, alpha=-1), torch.sub(input0,
+                                                              input1,
+                                                              alpha=1)
 
 
 model = AddSubNet()
 model.eval()
 batch_size = 1
-example_inputs = torch.zeros([4], dtype=torch.int64), torch.zeros([4], dtype=torch.int64)
-model_neuron = torch.neuron.trace(model, example_inputs, dynamic_batch_size=True)
+example_inputs = torch.zeros([4],
+                             dtype=torch.int64), torch.zeros([4],
+                                                             dtype=torch.int64)
+model_neuron = torch.neuron.trace(model,
+                                  example_inputs,
+                                  dynamic_batch_size=True)
 model_neuron.save('add_sub_model.pt')
