@@ -86,7 +86,7 @@ for TEST_TYPE in $TEST_TYPES; do
         exit 1
     fi
     set +e
-    $PERF_ANALYZER -v -m add-sub-1x4 --input-data=${NON_ALIGNED_OUTPUT_JSONDATAFILE} >$CLIENT_LOG 2>&1
+    $PERF_ANALYZER -v -m add-sub-1x4 --concurrency-range 1:10:5 --input-data=${NON_ALIGNED_OUTPUT_JSONDATAFILE} >$CLIENT_LOG 2>&1
     if [ $? -eq 0 ]; then
         cat $CLIENT_LOG
         echo -e "\n***\n*** Test Failed\n***"
@@ -98,7 +98,7 @@ for TEST_TYPE in $TEST_TYPES; do
         RET=1
     fi
 
-    $PERF_ANALYZER -v -m add-sub-1x4 --input-data=${WRONG_OUTPUT_JSONDATAFILE} >$CLIENT_LOG 2>&1
+    $PERF_ANALYZER -v -m add-sub-1x4 --concurrency-range 1:10:5 --input-data=${WRONG_OUTPUT_JSONDATAFILE} >$CLIENT_LOG 2>&1
     if [ $? -eq 0 ]; then
         cat $CLIENT_LOG
         echo -e "\n***\n*** Test Failed\n***"
@@ -110,7 +110,7 @@ for TEST_TYPE in $TEST_TYPES; do
         RET=1
     fi
 
-    $PERF_ANALYZER -v -m add-sub-1x4 --input-data=${OUTPUT_JSONDATAFILE} >$CLIENT_LOG 2>&1
+    $PERF_ANALYZER -v -m add-sub-1x4 --concurrency-range 1:10:5 --input-data=${OUTPUT_JSONDATAFILE} >$CLIENT_LOG 2>&1
     if [ $? -ne 0 ]; then
         cat $CLIENT_LOG
         echo -e "\n***\n*** Test Failed\n***"
