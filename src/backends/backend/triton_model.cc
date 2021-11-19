@@ -240,7 +240,7 @@ TritonModel::SetConfiguredScheduler()
     }
   }
 
-  // If 'sequence_batching' is configured use the SequenceBatchScheduler,
+  // If 'sequence_batching' is configured, then use the SequenceBatchScheduler,
   // otherwise use the default DynamicBatchScheduler.
   if (config_.has_sequence_batching()) {
     // Sequence batcher
