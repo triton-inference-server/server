@@ -1,3 +1,4 @@
+#!/usr/bin/env python
 # Copyright (c) 2021, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
@@ -28,7 +29,6 @@ import torch
 from torch import nn
 import torch_neuron
 
-
 class AddSubNet(nn.Module):
     """
     Simple AddSub network in PyTorch. This network outputs the sum and
@@ -42,7 +42,6 @@ class AddSubNet(nn.Module):
         return torch.sub(input0, input1, alpha=-1), torch.sub(input0,
                                                               input1,
                                                               alpha=1)
-
 
 model = AddSubNet()
 model.eval()

@@ -29,7 +29,6 @@
 source ${TRITON_PATH}/python_backend/inferentia/scripts/setup.sh -p
 echo "done setting up enviroment"
 
-
 REPO_VERSION=${NVIDIA_TRITON_SERVER_VERSION}
 if [ "$#" -ge 1 ]; then
     REPO_VERSION=$1
@@ -38,20 +37,16 @@ fi
 CLIENT_LOG="./perf_analyzer.log"
 PERF_ANALYZER=/opt/tritonserver/qa/clients/perf_analyzer
 
-DATADIR=${TRITON_PATH}/models
-rm -rf $DATADIR
-OUTPUT_JSONDATAFILE=${TEST_JSON_REPO}/output.json
-NON_ALIGNED_OUTPUT_JSONDATAFILE=${TEST_JSON_REPO}/non_aligned_output.json
-WRONG_OUTPUT_JSONDATAFILE=${TEST_JSON_REPO}/wrong_output.json
+OUTPUT_JSONDATAFILE=${TEST_JSON_REPO}/validation.json
+NON_ALIGNED_OUTPUT_JSONDATAFILE=${TEST_JSON_REPO}/non_aligned_validation.json
+WRONG_OUTPUT_JSONDATAFILE=${TEST_JSON_REPO}/wrong_validation.json
 
 ERROR_STRING="error | Request count: 0 | : 0 infer/sec"
 
 SERVER=/opt/tritonserver/bin/tritonserver
-SERVER_ARGS="--model-repository=${DATADIR} --log-verbose=1"
 SERVER_LOG="./inference_server.log"
 source /opt/tritonserver/qa/common/util.sh
-
-rm -f $SERVER_LOG $CLIENT_LOG
+TEST_TYPES="single multiple"
 
 # Setup models
 cd ${TRITON_PATH}
@@ -61,57 +56,80 @@ python ${TRITON_PATH}/python_backend/inferentia/scripts/gen_triton_model.py \
     --triton_input INPUT__0,INT64,4 INPUT__1,INT64,4 \
     --triton_output OUTPUT__0,INT64,4 OUTPUT__1,INT64,4 \
     --compiled_model $PWD/add_sub_model.pt \
-    --triton_model_dir models/add-sub-1x4 --neuron_core_range 0:0
+    --triton_model_dir models_single/add-sub-1x4 --neuron_core_range 0:0
+
+cd ${TRITON_PATH}
+python ${TEST_JSON_REPO}/simple-model.py
+python ${TRITON_PATH}/python_backend/inferentia/scripts/gen_triton_model.py \
+    --model_type "pytorch" \
+    --triton_input INPUT__0,INT64,4 INPUT__1,INT64,4 \
+    --triton_output OUTPUT__0,INT64,4 OUTPUT__1,INT64,4 \
+    --compiled_model $PWD/add_sub_model.pt \
+    --triton_model_dir models_multiple/add-sub-1x4 \
+    --triton_model_instance_count 3 --neuron_core_range 0:7
 
 RET=0
 
-run_server
-if [ "$SERVER_PID" == "0" ]; then
-    echo -e "\n***\n*** Failed to start $SERVER\n***"
-    cat $SERVER_LOG
-    exit 1
-fi
+for TEST_TYPE in $TEST_TYPES; do
 
-# Test with output validation
-set +e
-$PERF_ANALYZER -v -m add-sub-1x4 --input-data=${NON_ALIGNED_OUTPUT_JSONDATAFILE} >$CLIENT_LOG 2>&1
-if [ $? -eq 0 ]; then
-    cat $CLIENT_LOG
-    echo -e "\n***\n*** Test Failed\n***"
-    RET=1
-fi
-if [ $(cat $CLIENT_LOG |  grep "The 'validation_data' field doesn't align with 'data' field in the json file" | wc -l) -eq 0 ]; then
-    cat $CLIENT_LOG
-    echo -e "\n***\n*** Test Failed\n***"
-    RET=1
-fi
+    DATADIR=${TRITON_PATH}/"models_${TEST_TYPE}"
+    rm -rf $DATADIR
 
-$PERF_ANALYZER -v -m add-sub-1x4 --input-data=${WRONG_OUTPUT_JSONDATAFILE} >$CLIENT_LOG 2>&1
-if [ $? -eq 0 ]; then
-    cat $CLIENT_LOG
-    echo -e "\n***\n*** Test Failed\n***"
-    RET=1
-fi
-if [ $(cat $CLIENT_LOG |  grep "Output doesn't match expected output" | wc -l) -eq 0 ]; then
-    cat $CLIENT_LOG
-    echo -e "\n***\n*** Test Failed\n***"
-    RET=1
-fi
+    SERVER_ARGS="--model-repository=${DATADIR} --log-verbose=1"
+    rm -f $SERVER_LOG $CLIENT_LOG
 
-$PERF_ANALYZER -v -m add-sub-1x4 --input-data=${OUTPUT_JSONDATAFILE} >$CLIENT_LOG 2>&1
-if [ $? -ne 0 ]; then
-    cat $CLIENT_LOG
-    echo -e "\n***\n*** Test Failed\n***"
-    RET=1
-fi
-if [ $(cat $CLIENT_LOG |  grep "${ERROR_STRING}" | wc -l) -ne 0 ]; then
-    cat $CLIENT_LOG
-    echo -e "\n***\n*** Test Failed\n***"
-    RET=1
-fi
+    run_server
+    if [ "$SERVER_PID" == "0" ]; then
+        echo -e "\n***\n*** Failed to start $SERVER\n***"
+        cat $SERVER_LOG
+        exit 1
+    fi
 
-kill $SERVER_PID
-wait $SERVER_PID
+    set +e
+    $PERF_ANALYZER -v -m add-sub-1x4 --input-data=${NON_ALIGNED_OUTPUT_JSONDATAFILE} >$CLIENT_LOG 2>&1
+    if [ $? -eq 0 ]; then
+        cat $CLIENT_LOG
+        echo -e "\n***\n*** Test Failed\n***"
+        RET=1
+    fi
+    if [ $(cat $CLIENT_LOG |  grep "The 'validation_data' field doesn't align with 'data' field in the json file" | wc -l) -eq 0 ]; then
+        cat $CLIENT_LOG
+        echo -e "\n***\n*** Test Failed\n***"
+        RET=1
+    fi
+    set -e
+
+    set +e 
+    $PERF_ANALYZER -v -m add-sub-1x4 --input-data=${WRONG_OUTPUT_JSONDATAFILE} >$CLIENT_LOG 2>&1
+    if [ $? -eq 0 ]; then
+        cat $CLIENT_LOG
+        echo -e "\n***\n*** Test Failed\n***"
+        RET=1
+    fi
+    if [ $(cat $CLIENT_LOG |  grep "Output doesn't match expected output" | wc -l) -eq 0 ]; then
+        cat $CLIENT_LOG
+        echo -e "\n***\n*** Test Failed\n***"
+        RET=1
+    fi
+    set -e
+
+    set +e
+    $PERF_ANALYZER -v -m add-sub-1x4 --input-data=${OUTPUT_JSONDATAFILE} >$CLIENT_LOG 2>&1
+    if [ $? -ne 0 ]; then
+        cat $CLIENT_LOG
+        echo -e "\n***\n*** Test Failed\n***"
+        RET=1
+    fi
+    if [ $(cat $CLIENT_LOG |  grep "${ERROR_STRING}" | wc -l) -ne 0 ]; then
+        cat $CLIENT_LOG
+        echo -e "\n***\n*** Test Failed\n***"
+        RET=1
+    fi
+    set -e
+
+    kill $SERVER_PID
+    wait $SERVER_PID
+done
 
 if [ $RET -eq 0 ]; then
   echo -e "\n***\n*** Test Passed\n***"
