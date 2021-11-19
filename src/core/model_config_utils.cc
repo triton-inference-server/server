@@ -901,7 +901,6 @@ AutoCompleteBackendFields(
     } else if (
         config->platform().empty() &&
         config->default_model_filename().empty() && has_version) {
-      bool is_dir = false;
       if (version_dir_content.find(kOnnxRuntimeOnnxFilename) !=
           version_dir_content.end()) {
         // ONNX model can be a file or a directory in the case of large model
