@@ -1829,6 +1829,12 @@ TRITONSERVER_ServerNew(
     ni::Metrics::EnableGPUMetrics();
   }
 #endif  // TRITON_ENABLE_METRICS_GPU
+
+  if (loptions->Metrics() && 
+     (lserver->ResponseCacheEnabled() || loptions->GpuMetrics())) {
+    // Start thread to poll enabled metrics periodically
+    ni::Metrics::StartPollingThread(lserver->GetResponseCache());
+  }
 #endif  // TRITON_ENABLE_METRICS
 
 

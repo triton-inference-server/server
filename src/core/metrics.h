@@ -57,7 +57,10 @@ class Metrics {
   static void EnableGPUMetrics();
 
   // Enable reporting of Cache metrics
-  static void EnableCacheMetrics(std::shared_ptr<RequestResponseCache>);
+  static void EnableCacheMetrics(std::shared_ptr<RequestResponseCache> response_cache);
+
+  // Start a thread for polling enabled metrics if any
+  bool StartPollingThread(std::shared_ptr<RequestResponseCache> response_cache);
 
   // Set the time interval in secs at which metrics are collected
   static void SetMetricsInterval(uint64_t metrics_interval_ms);
@@ -139,6 +142,12 @@ class Metrics {
   bool InitializeDcgmMetrics();
   bool InitializeCacheMetrics(
       std::shared_ptr<RequestResponseCache> response_cache);
+  bool PollCacheMetrics(std::shared_ptr<RequestResponseCache> response_cache);
+  bool PollGPUMetrics(std::vector<uint32_t> available_cuda_gpu_ids,
+                      std::map<uint32_t, uint32_t> cuda_ids_to_dcgm_ids,
+                      dcgmHandle_t handle,
+                      dcgmGpuGrp_t groupId);
+
   std::string dcgmValueToErrorMessage(double val);
   std::string dcgmValueToErrorMessage(int64_t val);
 
@@ -173,8 +182,9 @@ class Metrics {
   prometheus::Gauge* cache_num_evictions_global_;
   prometheus::Gauge* cache_lookup_latency_us_global_;
   prometheus::Gauge* cache_util_global_;
-  std::unique_ptr<std::thread> cache_thread_;
-  std::atomic<bool> cache_thread_exit_;
+  // Thread for polling cache/gpu metrics periodically
+  std::unique_ptr<std::thread> poll_thread_;
+  std::atomic<bool> poll_thread_exit_;
 #ifdef TRITON_ENABLE_METRICS_GPU
   prometheus::Family<prometheus::Gauge>& gpu_utilization_family_;
   prometheus::Family<prometheus::Gauge>& gpu_memory_total_family_;
@@ -191,9 +201,9 @@ class Metrics {
   std::vector<prometheus::Counter*> gpu_energy_consumption_;
 
   dcgmHandle_t dcgm_handle_;
-  std::unique_ptr<std::thread> dcgm_thread_;
-  std::atomic<bool> dcgm_thread_exit_;
   dcgmGpuGrp_t groupId_;
+  std::map<uint32_t, uint32_t> cuda_ids_to_dcgm_ids_;
+  std::vector<uint32_t> available_cuda_gpu_ids_;
   bool standalone_ = false;
 #endif  // TRITON_ENABLE_METRICS_GPU
 
