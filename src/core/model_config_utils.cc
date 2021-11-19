@@ -904,11 +904,8 @@ AutoCompleteBackendFields(
       bool is_dir = false;
       if (version_dir_content.find(kOnnxRuntimeOnnxFilename) !=
           version_dir_content.end()) {
-        RETURN_IF_ERROR(IsDirectory(
-            JoinPath({version_path, kOnnxRuntimeOnnxFilename}), &is_dir));
-        if (!is_dir) {
-          config->set_backend(kOnnxRuntimeBackend);
-        }
+        // ONNX model can be a file or a directory in the case of large model
+        config->set_backend(kOnnxRuntimeBackend);
       }
     }
   }
