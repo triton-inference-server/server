@@ -49,6 +49,10 @@ source /opt/tritonserver/qa/common/util.sh
 TEST_TYPES="single multiple"
 
 # Setup models
+for TEST_TYPE in $TEST_TYPES; do
+    DATADIR="${TRITON_PATH}/models_${TEST_TYPE}"
+    rm -rf DATADIR
+done
 cd ${TRITON_PATH}
 python ${TEST_JSON_REPO}/simple-model.py
 python ${TRITON_PATH}/python_backend/inferentia/scripts/gen_triton_model.py \
@@ -71,10 +75,7 @@ python ${TRITON_PATH}/python_backend/inferentia/scripts/gen_triton_model.py \
 RET=0
 
 for TEST_TYPE in $TEST_TYPES; do
-
-    DATADIR=${TRITON_PATH}/"models_${TEST_TYPE}"
-    rm -rf $DATADIR
-
+    DATADIR="${TRITON_PATH}/models_${TEST_TYPE}"
     SERVER_ARGS="--model-repository=${DATADIR} --log-verbose=1"
     rm -f $SERVER_LOG $CLIENT_LOG
 
@@ -84,7 +85,6 @@ for TEST_TYPE in $TEST_TYPES; do
         cat $SERVER_LOG
         exit 1
     fi
-
     set +e
     $PERF_ANALYZER -v -m add-sub-1x4 --input-data=${NON_ALIGNED_OUTPUT_JSONDATAFILE} >$CLIENT_LOG 2>&1
     if [ $? -eq 0 ]; then
@@ -97,9 +97,7 @@ for TEST_TYPE in $TEST_TYPES; do
         echo -e "\n***\n*** Test Failed\n***"
         RET=1
     fi
-    set -e
 
-    set +e 
     $PERF_ANALYZER -v -m add-sub-1x4 --input-data=${WRONG_OUTPUT_JSONDATAFILE} >$CLIENT_LOG 2>&1
     if [ $? -eq 0 ]; then
         cat $CLIENT_LOG
@@ -111,9 +109,7 @@ for TEST_TYPE in $TEST_TYPES; do
         echo -e "\n***\n*** Test Failed\n***"
         RET=1
     fi
-    set -e
 
-    set +e
     $PERF_ANALYZER -v -m add-sub-1x4 --input-data=${OUTPUT_JSONDATAFILE} >$CLIENT_LOG 2>&1
     if [ $? -ne 0 ]; then
         cat $CLIENT_LOG
@@ -126,9 +122,7 @@ for TEST_TYPE in $TEST_TYPES; do
         RET=1
     fi
     set -e
-
-    kill $SERVER_PID
-    wait $SERVER_PID
+    kill_server
 done
 
 if [ $RET -eq 0 ]; then
