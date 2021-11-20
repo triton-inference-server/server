@@ -970,6 +970,10 @@ HTTPAPIServer::HTTPAPIServer(
           &allocator_, InferResponseAlloc, InferResponseFree,
           nullptr /* start_fn */),
       "creating response allocator");
+  FAIL_IF_ERR(
+      TRITONSERVER_ResponseAllocatorSetQueryFunction(
+          allocator_, OutputBufferQuery),
+      "setting allocator's query function");
 }
 
 HTTPAPIServer::~HTTPAPIServer()
@@ -1073,6 +1077,42 @@ HTTPAPIServer::InferResponseAlloc(
   }
 
   *buffer_userp = reinterpret_cast<void*>(info);
+
+  return nullptr;  // Success
+}
+
+TRITONSERVER_Error*
+HTTPAPIServer::OutputBufferQuery(
+    TRITONSERVER_ResponseAllocator* allocator, void* userp,
+    const char* tensor_name, size_t* byte_size,
+    TRITONSERVER_MemoryType* memory_type, int64_t* memory_type_id)
+{
+  AllocPayload* payload = reinterpret_cast<AllocPayload*>(userp);
+
+  if (tensor_name != nullptr) {
+    auto pr = payload->output_map_.find(tensor_name);
+    if ((pr != payload->output_map_.end()) &&
+        (pr->second->kind_ == AllocPayload::OutputInfo::SHM)) {
+      // The output is in shared memory so check that shared memory
+      // size is at least large enough for the output, if byte size is provided
+      if ((byte_size != nullptr) && (*byte_size > pr->second->byte_size_)) {
+        // Don't return error yet and just set to the default properties for
+        // GRPC buffer, error will be raised when allocation happens
+        *memory_type = TRITONSERVER_MEMORY_CPU;
+        *memory_type_id = 0;
+      } else {
+        *memory_type = pr->second->memory_type_;
+        *memory_type_id = pr->second->device_id_;
+      }
+      return nullptr;  // Success
+    }
+  }
+
+  // Not using shared memory so a evhtp buffer will be used,
+  // and the type will be CPU.
+  *memory_type = TRITONSERVER_MEMORY_CPU;
+  *memory_type_id = 0;
+  return nullptr;  // Success
 
   return nullptr;  // Success
 }

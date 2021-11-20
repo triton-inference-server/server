@@ -2295,6 +2295,38 @@ ResponseAllocatorHelper(
 }
 
 TRITONSERVER_Error*
+OutputBufferQueryHelper(
+    TRITONSERVER_ResponseAllocator* allocator, const char* tensor_name,
+    size_t* byte_size, const TensorShmMap& shm_map,
+    TRITONSERVER_MemoryType* memory_type, int64_t* memory_type_id)
+{
+  // Check if shared memory is used if named tensor is provided
+  if (tensor_name != nullptr) {
+    const auto& pr = shm_map.find(tensor_name);
+    if (pr != shm_map.end()) {
+      // The output is in shared memory so check that shared memory
+      // size is at least large enough for the output, if byte size is provided
+      if ((byte_size != nullptr) && (*byte_size > pr->second.byte_size_)) {
+        // Don't return error yet and just set to the default properties for
+        // GRPC buffer, error will be raised when allocation happens
+        *memory_type = TRITONSERVER_MEMORY_CPU;
+        *memory_type_id = 0;
+      } else {
+        *memory_type = pr->second.memory_type_;
+        *memory_type_id = pr->second.memory_type_id_;
+      }
+      return nullptr;  // Success
+    }
+  }
+
+  // Not using shared memory so a buffer created directly in
+  // the response protobuf will be used, and the type will be CPU.
+  *memory_type = TRITONSERVER_MEMORY_CPU;
+  *memory_type_id = 0;
+  return nullptr;  // Success
+}
+
+TRITONSERVER_Error*
 InferResponseAlloc(
     TRITONSERVER_ResponseAllocator* allocator, const char* tensor_name,
     size_t byte_size, TRITONSERVER_MemoryType preferred_memory_type,
@@ -2313,6 +2345,20 @@ InferResponseAlloc(
       allocator, tensor_name, byte_size, preferred_memory_type,
       preferred_memory_type_id, response, payload->shm_map_, buffer,
       buffer_userp, actual_memory_type, actual_memory_type_id);
+}
+
+TRITONSERVER_Error*
+OutputBufferQuery(
+    TRITONSERVER_ResponseAllocator* allocator, void* userp,
+    const char* tensor_name, size_t* byte_size,
+    TRITONSERVER_MemoryType* memory_type, int64_t* memory_type_id)
+{
+  AllocPayload<inference::ModelInferResponse>* payload =
+      reinterpret_cast<AllocPayload<inference::ModelInferResponse>*>(userp);
+
+  return OutputBufferQueryHelper(
+      allocator, tensor_name, byte_size, payload->shm_map_, memory_type,
+      memory_type_id);
 }
 
 TRITONSERVER_Error*
@@ -3096,6 +3142,10 @@ class ModelInferHandler
             &allocator_, InferResponseAlloc, InferResponseFree,
             InferResponseStart),
         "creating inference response allocator");
+    FAIL_IF_ERR(
+        TRITONSERVER_ResponseAllocatorSetQueryFunction(
+            allocator_, OutputBufferQuery),
+        "setting allocator's query function");
   }
 
   ~ModelInferHandler()
@@ -3417,6 +3467,20 @@ StreamInferResponseAlloc(
       actual_memory_type_id);
 }
 
+TRITONSERVER_Error*
+StreamOutputBufferQuery(
+    TRITONSERVER_ResponseAllocator* allocator, void* userp,
+    const char* tensor_name, size_t* byte_size,
+    TRITONSERVER_MemoryType* memory_type, int64_t* memory_type_id)
+{
+  AllocPayload<inference::ModelStreamInferResponse>* payload =
+      reinterpret_cast<AllocPayload<inference::ModelStreamInferResponse>*>(
+          userp);
+  return OutputBufferQueryHelper(
+      allocator, tensor_name, byte_size, payload->shm_map_, memory_type,
+      memory_type_id);
+}
+
 //
 // ModelStreamInferHandler
 //
@@ -3447,6 +3511,10 @@ class ModelStreamInferHandler
             &allocator_, StreamInferResponseAlloc, InferResponseFree,
             StreamInferResponseStart),
         "creating response allocator");
+    FAIL_IF_ERR(
+        TRITONSERVER_ResponseAllocatorSetQueryFunction(
+            allocator_, StreamOutputBufferQuery),
+        "setting allocator's query function");
   }
 
   ~ModelStreamInferHandler()
