@@ -263,7 +263,7 @@ class RateLimiterTest(su.SequenceBatcherTestUtil):
 
         try:
             model_name = "custom_sequence_int32"
-            self.assertIn("TRITONSERVER_DELAY_SCHEDULER", os.environ)
+            self.assertNotIn("TRITONSERVER_DELAY_SCHEDULER", os.environ)
             self.check_sequence(
                 'custom',
                 model_name,
