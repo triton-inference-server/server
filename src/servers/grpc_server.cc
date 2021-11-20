@@ -1746,6 +1746,26 @@ class ResponseQueue {
 };
 
 //
+// ShmInfo
+//
+// Simple structure that carries the shared memory information
+//
+struct ShmInfo {
+  ShmInfo(
+      void* base, size_t byte_size, TRITONSERVER_MemoryType memory_type,
+      int64_t memory_type_id)
+      : base_(base), byte_size_(byte_size), memory_type_(memory_type),
+        memory_type_id_(memory_type_id)
+  {
+  }
+  void* base_;
+  size_t byte_size_;
+  TRITONSERVER_MemoryType memory_type_;
+  int64_t memory_type_id_;
+};
+using TensorShmMap = std::unordered_map<std::string, ShmInfo>;
+
+//
 // AllocPayload
 //
 // Simple structure that carries the userp payload needed for
@@ -1753,21 +1773,6 @@ class ResponseQueue {
 //
 template <typename ResponseType>
 struct AllocPayload {
-  struct ShmInfo {
-    ShmInfo(
-        void* base, size_t byte_size, TRITONSERVER_MemoryType memory_type,
-        int64_t memory_type_id)
-        : base_(base), byte_size_(byte_size), memory_type_(memory_type),
-          memory_type_id_(memory_type_id)
-    {
-    }
-    void* base_;
-    size_t byte_size_;
-    TRITONSERVER_MemoryType memory_type_;
-    int64_t memory_type_id_;
-  };
-
-  using TensorShmMap = std::unordered_map<std::string, ShmInfo>;
   using ClassificationMap = std::unordered_map<std::string, uint32_t>;
 
   explicit AllocPayload() : response_queue_(nullptr) {}
@@ -2219,13 +2224,12 @@ InferHandler<
 //
 // Infer utilities
 //
-template <typename ShmMapType>
 TRITONSERVER_Error*
 ResponseAllocatorHelper(
     TRITONSERVER_ResponseAllocator* allocator, const char* tensor_name,
     size_t byte_size, TRITONSERVER_MemoryType preferred_memory_type,
     int64_t preferred_memory_type_id, inference::ModelInferResponse* response,
-    const ShmMapType& shm_map, void** buffer, void** buffer_userp,
+    const TensorShmMap& shm_map, void** buffer, void** buffer_userp,
     TRITONSERVER_MemoryType* actual_memory_type, int64_t* actual_memory_type_id)
 {
   *buffer = nullptr;
@@ -2305,8 +2309,7 @@ InferResponseAlloc(
   // will be creating and using just one response object.
   inference::ModelInferResponse* response =
       payload->response_queue_->GetNonDecoupledResponse();
-  return ResponseAllocatorHelper<
-      AllocPayload<inference::ModelInferResponse>::TensorShmMap>(
+  return ResponseAllocatorHelper(
       allocator, tensor_name, byte_size, preferred_memory_type,
       preferred_memory_type_id, response, payload->shm_map_, buffer,
       buffer_userp, actual_memory_type, actual_memory_type_id);
@@ -2510,8 +2513,7 @@ InferAllocatorPayload(
           region_name, offset, &base, &memory_type, &memory_type_id));
 
       alloc_payload->shm_map_.emplace(
-          io.name(), typename AllocPayload<ResponseType>::ShmInfo(
-                         base, byte_size, memory_type, memory_type_id));
+          io.name(), ShmInfo(base, byte_size, memory_type, memory_type_id));
     } else if (has_classification) {
       alloc_payload->classification_map_.emplace(
           io.name(), classification_count);
@@ -3408,8 +3410,7 @@ StreamInferResponseAlloc(
         "Unable to access the last allocated response");
   }
 
-  return ResponseAllocatorHelper<
-      AllocPayload<inference::ModelStreamInferResponse>::TensorShmMap>(
+  return ResponseAllocatorHelper(
       allocator, tensor_name, byte_size, preferred_memory_type,
       preferred_memory_type_id, response->mutable_infer_response(),
       payload->shm_map_, buffer, buffer_userp, actual_memory_type,
