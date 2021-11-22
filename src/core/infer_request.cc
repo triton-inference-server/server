@@ -111,10 +111,13 @@ InferenceRequest::SetPriority(uint32_t p)
   }
 }
 
-#ifdef TRITON_ENABLE_TRACING
 void
 InferenceRequest::TraceTensor()
 {
+  if (this->trace_ == nullptr)
+    return;
+
+#ifdef TRITON_ENABLE_TRACING
   const auto& inputs = this->ImmutableInputs();
 
   for (const auto& pr : inputs) {
@@ -128,8 +131,8 @@ InferenceRequest::TraceTensor()
     const int64_t* shape;
     uint32_t dim_count;
     uint32_t buffer_count;
-    TRITONSERVER_MemoryType memory_type = TRITONSERVER_MEMORY_CPU;
-    int64_t memory_type_id = 0;
+    TRITONSERVER_MemoryType memory_type;
+    int64_t memory_type_id;
 
     TRITONBACKEND_InputProperties(
         in_api, nullptr, &datatype, &shape, &dim_count, &byte_size,
@@ -137,15 +140,31 @@ InferenceRequest::TraceTensor()
 
     std::vector<char> in_buffer(byte_size);
     base = in_buffer.data();
-    size_t output_buffer_offset = 0;
+    size_t offset = 0;
     for (uint32_t b = 0; b < buffer_count; ++b) {
       const void* input_buffer = nullptr;
       uint64_t input_buffer_byte_size = 0;
       TRITONBACKEND_InputBuffer(
           in_api, b, &input_buffer, &input_buffer_byte_size, &memory_type,
           &memory_type_id);
-      memcpy(base + output_buffer_offset, input_buffer, input_buffer_byte_size);
-      output_buffer_offset += input_buffer_byte_size;
+      if (memory_type == TRITONSERVER_MEMORY_GPU) {
+#ifdef TRITON_ENABLE_GPU
+        cudaMemcpy(
+            base + offset, input_buffer, input_buffer_byte_size,
+            cudaMemcpyDeviceToHost);
+
+#else
+        return;
+#endif  // TRITON_ENABLE_GPU
+      } else {
+        memcpy(base + offset, input_buffer, input_buffer_byte_size);
+      }
+      offset += input_buffer_byte_size;
+    }
+
+    if (memory_type == TRITONSERVER_MEMORY_GPU) {
+      memory_type = TRITONSERVER_MEMORY_CPU;
+      memory_type_id = 0;
     }
 
     INFER_TRACE_TENSOR_ACTIVITY(
@@ -153,8 +172,8 @@ InferenceRequest::TraceTensor()
         static_cast<void*>(base), byte_size, shape, dim_count, memory_type,
         memory_type_id);
   }
-}
 #endif  // TRITON_ENABLE_TRACING
+}
 
 Status
 InferenceRequest::Run(std::unique_ptr<InferenceRequest>& request)

@@ -157,7 +157,6 @@ DynamicBatchScheduler::Enqueue(std::unique_ptr<InferenceRequest>& request)
   INFER_TRACE_ACTIVITY(
       request->Trace(), TRITONSERVER_TRACE_QUEUE_START,
       request->QueueStartNs());
-
   request->TraceTensor();
 
   std::unique_ptr<InferenceResponse> cached_response;

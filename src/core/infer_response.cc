@@ -255,10 +255,13 @@ InferenceResponse::SendWithStatus(
   return InferenceResponse::Send(std::move(response), flags);
 }
 
-#ifdef TRITON_ENABLE_TRACING
 void
 InferenceResponse::TraceTensor()
 {
+  if (this->trace_ == nullptr)
+    return;
+
+#ifdef TRITON_ENABLE_TRACING
   if (this->trace_ == nullptr) {
     return;
   }
@@ -286,8 +289,8 @@ InferenceResponse::TraceTensor()
         this->trace_, TRITONSERVER_TRACE_TENSOR_OUTPUT, cname, datatype, base,
         byte_size, shape, dim_count, memory_type, memory_type_id);
   }
-}
 #endif  // TRITON_ENABLE_TRACING
+}
 
 //
 // InferenceResponse::Output

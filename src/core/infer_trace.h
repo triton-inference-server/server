@@ -114,12 +114,10 @@ class InferenceTrace {
       const int64_t* shape, uint64_t dim_count,
       TRITONSERVER_MemoryType memory_type, int64_t memory_type_id)
   {
-    // std::cout << "before ReportTensor" << std::endl;
     tensor_activity_fn_(
         reinterpret_cast<TRITONSERVER_InferenceTrace*>(this), activity, name,
         datatype, base, byte_size, shape, dim_count, memory_type,
         memory_type_id, userp_);
-    // std::cout << "after ReportTensor" << std::endl;
   }
 
   // Release the trace. Call the trace release callback and transfer
