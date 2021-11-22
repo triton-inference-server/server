@@ -1,4 +1,4 @@
-// Copyright (c) 2020, NVIDIA CORPORATION. All rights reserved.
+// Copyright 2020-2021, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 //
 // Redistribution and use in source and binary forms, with or without
 // modification, are permitted provided that the following conditions
@@ -26,8 +26,8 @@
 
 #include "src/core/infer_response.h"
 
-#include "src/core/backend.h"
 #include "src/core/logging.h"
+#include "src/core/model.h"
 #include "src/core/server.h"
 
 namespace nvidia { namespace inferenceserver {
@@ -40,7 +40,7 @@ InferenceResponseFactory::CreateResponse(
     std::unique_ptr<InferenceResponse>* response) const
 {
   response->reset(new InferenceResponse(
-      backend_, id_, allocator_, alloc_userp_, response_fn_, response_userp_,
+      model_, id_, allocator_, alloc_userp_, response_fn_, response_userp_,
       response_delegator_));
 
   return Status::Success;
@@ -64,16 +64,15 @@ InferenceResponseFactory::SendFlags(const uint32_t flags) const
 // InferenceResponse
 //
 InferenceResponse::InferenceResponse(
-    const std::shared_ptr<InferenceBackend>& backend, const std::string& id,
+    const std::shared_ptr<Model>& model, const std::string& id,
     const ResponseAllocator* allocator, void* alloc_userp,
     TRITONSERVER_InferenceResponseCompleteFn_t response_fn,
     void* response_userp,
     const std::function<
         void(std::unique_ptr<InferenceResponse>&&, const uint32_t)>& delegator)
-    : backend_(backend), id_(id), allocator_(allocator),
-      alloc_userp_(alloc_userp), response_fn_(response_fn),
-      response_userp_(response_userp), response_delegator_(delegator),
-      null_response_(false)
+    : model_(model), id_(id), allocator_(allocator), alloc_userp_(alloc_userp),
+      response_fn_(response_fn), response_userp_(response_userp),
+      response_delegator_(delegator), null_response_(false)
 {
   // If the allocator has a start_fn then invoke it.
   TRITONSERVER_ResponseAllocatorStartFn_t start_fn = allocator_->StartFn();
@@ -99,13 +98,13 @@ const std::string&
 InferenceResponse::ModelName() const
 {
   static const std::string unknown("<unknown>");
-  return (backend_ == nullptr) ? unknown : backend_->Name();
+  return (model_ == nullptr) ? unknown : model_->Name();
 }
 
 int64_t
 InferenceResponse::ActualModelVersion() const
 {
-  return (backend_ == nullptr) ? -1 : backend_->Version();
+  return (model_ == nullptr) ? -1 : model_->Version();
 }
 
 Status
@@ -138,11 +137,11 @@ InferenceResponse::AddOutput(
 
   LOG_VERBOSE(1) << "add response output: " << outputs_.back();
 
-  if (backend_ != nullptr) {
+  if (model_ != nullptr) {
     const inference::ModelOutput* output_config;
-    RETURN_IF_ERROR(backend_->GetOutput(name, &output_config));
+    RETURN_IF_ERROR(model_->GetOutput(name, &output_config));
     if (output_config->has_reshape()) {
-      const bool has_batch_dim = (backend_->Config().max_batch_size() > 0);
+      const bool has_batch_dim = (model_->Config().max_batch_size() > 0);
       outputs_.back().Reshape(has_batch_dim, output_config);
     }
   }
@@ -164,11 +163,11 @@ InferenceResponse::AddOutput(
 
   LOG_VERBOSE(1) << "add response output: " << outputs_.back();
 
-  if (backend_ != nullptr) {
+  if (model_ != nullptr) {
     const inference::ModelOutput* output_config;
-    RETURN_IF_ERROR(backend_->GetOutput(name, &output_config));
+    RETURN_IF_ERROR(model_->GetOutput(name, &output_config));
     if (output_config->has_reshape()) {
-      const bool has_batch_dim = (backend_->Config().max_batch_size() > 0);
+      const bool has_batch_dim = (model_->Config().max_batch_size() > 0);
       outputs_.back().Reshape(has_batch_dim, output_config);
     }
   }
@@ -185,7 +184,7 @@ InferenceResponse::ClassificationLabel(
     const InferenceResponse::Output& output, const uint32_t class_index,
     const char** label) const
 {
-  const auto& label_provider = backend_->GetLabelProvider();
+  const auto& label_provider = model_->GetLabelProvider();
   const std::string& l = label_provider->GetLabel(output.Name(), class_index);
   if (l.empty()) {
     *label = nullptr;

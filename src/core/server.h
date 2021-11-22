@@ -43,7 +43,7 @@
 
 namespace nvidia { namespace inferenceserver {
 
-class InferenceBackend;
+class Model;
 class InferenceRequest;
 
 enum class ModelControlMode { MODE_NONE, MODE_POLL, MODE_EXPLICIT };
@@ -238,33 +238,16 @@ class InferenceServer {
 
   void SetRepoAgentDir(const std::string& d) { repoagent_dir_ = d; }
 
-  // FIXME TF specific functions should be removed once all backends
-  // use BackendConfig.
-
-  // Get / set Tensorflow soft placement enable.
-  bool TensorFlowSoftPlacementEnabled() const
-  {
-    return tf_soft_placement_enabled_;
-  }
-  void SetTensorFlowSoftPlacementEnabled(bool e)
-  {
-    tf_soft_placement_enabled_ = e;
-  }
-
-  // Get / set Tensorflow GPU memory fraction.
-  float TensorFlowGPUMemoryFraction() const { return tf_gpu_memory_fraction_; }
-  void SetTensorFlowGPUMemoryFraction(float f) { tf_gpu_memory_fraction_ = f; }
-
-  // Return the requested InferenceBackend object.
-  Status GetInferenceBackend(
+  // Return the requested model object.
+  Status GetModel(
       const std::string& model_name, const int64_t model_version,
-      std::shared_ptr<InferenceBackend>* backend)
+      std::shared_ptr<Model>* model)
   {
     if (ready_state_ != ServerReadyState::SERVER_READY) {
       return Status(Status::Code::UNAVAILABLE, "Server not ready");
     }
-    return model_repository_manager_->GetInferenceBackend(
-        model_name, model_version, backend);
+    return model_repository_manager_->GetModel(
+        model_name, model_version, model);
   }
 
   // Return the pointer to RateLimiter object.
@@ -298,10 +281,6 @@ class InferenceServer {
   RateLimitMode rate_limit_mode_;
   RateLimiter::ResourceMap rate_limit_resource_map_;
 
-  // FIXME, remove once all backends use backend config.
-  // Tensorflow options
-  bool tf_soft_placement_enabled_;
-  float tf_gpu_memory_fraction_;
 
   // Current state of the inference server.
   ServerReadyState ready_state_;
@@ -309,7 +288,7 @@ class InferenceServer {
   // Number of in-flight, non-inference requests. During shutdown we
   // attempt to wait for all in-flight non-inference requests to
   // complete before exiting (also wait for in-flight inference
-  // requests but that is determined by backend shared_ptr).
+  // requests but that is determined by model shared_ptr).
   std::atomic<uint64_t> inflight_request_counter_;
 
   std::shared_ptr<RateLimiter> rate_limiter_;

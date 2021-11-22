@@ -27,37 +27,35 @@
 cmake_minimum_required (VERSION 3.18)
 
 #
-# Ensemble backend
+# Ensemble
 #
 set(
   ENSEMBLE_SRCS
-  ensemble_backend_factory.cc
-  ensemble_backend.cc
+  ensemble_model.cc
 )
 
 set(
   ENSEMBLE_HDRS
-  ensemble_backend_factory.h
-  ensemble_backend.h
+  ensemble_model.h
 )
 
 add_library(
-  ensemble-backend-library EXCLUDE_FROM_ALL OBJECT
+  ensemble-library EXCLUDE_FROM_ALL OBJECT
   ${ENSEMBLE_SRCS} ${ENSEMBLE_HDRS}
 )
 
 if(${TRITON_ENABLE_GPU})
-  target_include_directories(ensemble-backend-library PRIVATE ${CUDA_INCLUDE_DIRS})
+  target_include_directories(ensemble-library PRIVATE ${CUDA_INCLUDE_DIRS})
 endif() # TRITON_ENABLE_GPU
 if(${TRITON_ENABLE_METRICS})
   target_include_directories(
-    ensemble-backend-library
+    ensemble-library
     PRIVATE $<TARGET_PROPERTY:prometheus-cpp::core,INTERFACE_INCLUDE_DIRECTORIES>
   )
 endif() # TRITON_ENABLE_METRICS
 
 target_link_libraries(
-  ensemble-backend-library
+  ensemble-library
   PRIVATE
     proto-library             # from repo-common
   PUBLIC

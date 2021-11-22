@@ -949,7 +949,7 @@ DirectSequenceBatch::~DirectSequenceBatch()
   cv_.notify_one();
 
   // It is possible for the scheduler thread to be the last holder of
-  // a backend object, and when that scheduler thread releases the
+  // a model object, and when that scheduler thread releases the
   // object the scheduler thread itself will destroy this
   // SequenceBatch object. So we need to check to make sure the
   // scheduler thread does not join it against itself and instead
@@ -1290,7 +1290,7 @@ DirectSequenceBatch::BatcherThread(const int nice)
     }
 
     if (curr_payload_->GetState() == Payload::State::READY) {
-      // Run the backend...
+      // Run the model...
       model_instance_->Model()->Server()->GetRateLimiter()->EnqueuePayload(
           model_instance_->Model(), curr_payload_);
       NewPayload();
