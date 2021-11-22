@@ -28,7 +28,6 @@
 
 #include <stdlib.h>
 
-#include <iostream>  //TODO
 #include <unordered_map>
 
 #include "src/core/constants.h"
@@ -254,7 +253,6 @@ TraceManager::TraceTensorActivity(
     const int64_t* shape, uint64_t dim_count,
     TRITONSERVER_MemoryType memory_type, int64_t memory_type_id, void* userp)
 {
-  std::cout << "TraceTensorActivity start:" << name << std::endl;
   if ((activity != TRITONSERVER_TRACE_TENSOR_INPUT) &&
       (activity != TRITONSERVER_TRACE_TENSOR_OUTPUT)) {
     return;
@@ -278,10 +276,6 @@ TraceManager::TraceTensorActivity(
   uint64_t id;
   LOG_TRITONSERVER_ERROR(
       TRITONSERVER_InferenceTraceId(trace, &id), "getting trace id");
-
-  std::cout << "TraceTensorActivity process:" << name
-            << " activity:" << activity << " memory_type:" << memory_type
-            << " trace_id:" << id << std::endl;
 
   // The function may be called with different traces but the same 'userp',
   // group the activity of the same trace together for more readable output.
@@ -452,8 +446,6 @@ TraceManager::TraceTensorActivity(
   ss_tmp << "}";
 
   *ss << ss_tmp.str();
-
-  std::cout << "TraceTensorActivity end:" << ss_tmp.str() << std::endl;
 
   if (memory_type == TRITONSERVER_MEMORY_GPU) {
 #ifdef TRITON_ENABLE_GPU

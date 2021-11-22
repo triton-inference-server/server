@@ -31,7 +31,6 @@
 #include <sys/syscall.h>
 #include <unistd.h>
 #endif
-#include <iostream>  // TODO
 
 #include "src/core/constants.h"
 #include "src/core/logging.h"

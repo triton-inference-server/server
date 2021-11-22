@@ -27,7 +27,6 @@
 
 #include <atomic>
 #include <chrono>
-#include <iostream>  // TOOD
 #include <memory>
 
 #include "src/core/constants.h"
