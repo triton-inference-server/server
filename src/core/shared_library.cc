@@ -108,10 +108,10 @@ SharedLibrary::OpenLibraryHandle(const std::string& path, void** handle)
   LOG_VERBOSE(1) << "OpenLibraryHandle: " << path;
 
 #ifdef _WIN32
-  // Need to put backend directory on the DLL path so that any
-  // dependencies of the backend shared library are found
-  const std::string backend_dir = DirName(path);
-  RETURN_IF_ERROR(SetLibraryDirectory(backend_dir));
+  // Need to put shared library directory on the DLL path so that any
+  // dependencies of the shared library are found
+  const std::string library_dir = DirName(path);
+  RETURN_IF_ERROR(SetLibraryDirectory(library_dir));
 
   // HMODULE is typedef of void*
   // https://docs.microsoft.com/en-us/windows/win32/winprog/windows-data-types
@@ -133,14 +133,14 @@ SharedLibrary::OpenLibraryHandle(const std::string& path, void** handle)
     LocalFree(err_buffer);
 
     return Status(
-        Status::Code::NOT_FOUND, "unable to load backend library: " + errstr);
+        Status::Code::NOT_FOUND, "unable to load shared library: " + errstr);
   }
 #else
   *handle = dlopen(path.c_str(), RTLD_NOW | RTLD_LOCAL);
   if (*handle == nullptr) {
     return Status(
         Status::Code::NOT_FOUND,
-        "unable to load backend library: " + std::string(dlerror()));
+        "unable to load shared library: " + std::string(dlerror()));
   }
 #endif
 
@@ -162,14 +162,13 @@ SharedLibrary::CloseLibraryHandle(void* handle)
       std::string errstr(err_buffer, size);
       LocalFree(err_buffer);
       return Status(
-          Status::Code::INTERNAL,
-          "unable to unload backend library: " + errstr);
+          Status::Code::INTERNAL, "unable to unload shared library: " + errstr);
     }
 #else
     if (dlclose(handle) != 0) {
       return Status(
           Status::Code::INTERNAL,
-          "unable to unload backend library: " + std::string(dlerror()));
+          "unable to unload shared library: " + std::string(dlerror()));
     }
 #endif
   }
@@ -211,7 +210,7 @@ SharedLibrary::GetEntrypoint(
     std::string errstr(dlsym_error);  // need copy as dlclose overwrites
     return Status(
         Status::Code::NOT_FOUND, "unable to find required entrypoint '" + name +
-                                     "' in backend library: " + errstr);
+                                     "' in shared library: " + errstr);
   }
 
   if (fn == nullptr) {
@@ -221,7 +220,7 @@ SharedLibrary::GetEntrypoint(
 
     return Status(
         Status::Code::NOT_FOUND,
-        "unable to find required entrypoint '" + name + "' in backend library");
+        "unable to find required entrypoint '" + name + "' in shared library");
   }
 #endif
 

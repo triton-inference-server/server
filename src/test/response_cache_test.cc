@@ -25,6 +25,7 @@
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include "gtest/gtest.h"
 
+#include <thread>
 #include "src/core/logging.h"
 #include "src/core/memory.h"
 #include "src/core/response_cache.h"
@@ -42,7 +43,7 @@ InferenceResponseFactory::CreateResponse(
     std::unique_ptr<InferenceResponse>* response) const
 {
   response->reset(new InferenceResponse(
-      backend_, id_, allocator_, alloc_userp_, response_fn_, response_userp_,
+      model_, id_, allocator_, alloc_userp_, response_fn_, response_userp_,
       response_delegator_));
 
   return Status::Success;
@@ -61,19 +62,19 @@ InferenceRequest::Input::Input(
 }
 
 // Use const global var as locals can't be returned in ModelName(),
-// and we don't care about the backend for the unit test
-const std::string BACKEND = "backend";
+// and we don't care about the model for the unit test
+const std::string MODEL = "model";
 
 const std::string&
 InferenceRequest::ModelName() const
 {
-  return BACKEND;
+  return MODEL;
 }
 
 int64_t
 InferenceRequest::ActualModelVersion() const
 {
-  // Not using backend in unit test mock
+  // Not using model in unit test mock
   return requested_model_version_;
 }
 
@@ -167,16 +168,15 @@ InferenceRequest::Input::AppendData(
 //
 
 InferenceResponse::InferenceResponse(
-    const std::shared_ptr<InferenceBackend>& backend, const std::string& id,
+    const std::shared_ptr<Model>& model, const std::string& id,
     const ResponseAllocator* allocator, void* alloc_userp,
     TRITONSERVER_InferenceResponseCompleteFn_t response_fn,
     void* response_userp,
     const std::function<
         void(std::unique_ptr<InferenceResponse>&&, const uint32_t)>& delegator)
-    : backend_(backend), id_(id), allocator_(allocator),
-      alloc_userp_(alloc_userp), response_fn_(response_fn),
-      response_userp_(response_userp), response_delegator_(delegator),
-      null_response_(false)
+    : model_(model), id_(id), allocator_(allocator), alloc_userp_(alloc_userp),
+      response_fn_(response_fn), response_userp_(response_userp),
+      response_delegator_(delegator), null_response_(false)
 {
   // Skip allocator logic / references in unit test
 }
@@ -275,11 +275,11 @@ InferenceResponse::AddOutput(
 
   // LOG_VERBOSE(1) << "add response output: " << outputs_.back();
 
-  /*if (backend_ != nullptr) {
+  /*if (model_ != nullptr) {
     const inference::ModelOutput* output_config;
-    RETURN_IF_ERROR(backend_->GetOutput(name, &output_config));
+    RETURN_IF_ERROR(model_->GetOutput(name, &output_config));
     if (output_config->has_reshape()) {
-      const bool has_batch_dim = (backend_->Config().max_batch_size() > 0);
+      const bool has_batch_dim = (model_->Config().max_batch_size() > 0);
       outputs_.back().Reshape(has_batch_dim, output_config);
     }
   }*/
@@ -321,7 +321,7 @@ class RequestResponseCacheTest : public ::testing::Test {
   void TearDown() override {}
 
  public:
-  ni::InferenceBackend* backend = nullptr;
+  ni::Model* model = nullptr;
   uint64_t model_version = 1;
 };
 
@@ -360,11 +360,11 @@ TEST_F(RequestResponseCacheTest, TestHashing)
 
   // Create request
   std::cout << "Create request" << std::endl;
-  ni::InferenceRequest request0(backend, model_version);
-  ni::InferenceRequest request1(backend, model_version);
-  ni::InferenceRequest request2(backend, model_version);
-  ni::InferenceRequest request3(backend, model_version);
-  ni::InferenceRequest request4(backend, model_version);
+  ni::InferenceRequest request0(model, model_version);
+  ni::InferenceRequest request1(model, model_version);
+  ni::InferenceRequest request2(model, model_version);
+  ni::InferenceRequest request3(model, model_version);
+  ni::InferenceRequest request4(model, model_version);
 
   // Create inputs
   std::cout << "Create inputs" << std::endl;
@@ -454,7 +454,7 @@ TEST_F(RequestResponseCacheTest, TestCacheTooSmall)
 
   // Create request
   std::cout << "Create request" << std::endl;
-  ni::InferenceRequest request0(backend, model_version);
+  ni::InferenceRequest request0(model, model_version);
 
   inference::DataType dtype = inference::DataType::TYPE_INT32;
   std::vector<int64_t> shape{1, 1025};
@@ -504,7 +504,7 @@ TEST_F(RequestResponseCacheTest, TestEviction)
 
   // Create request
   std::cout << "Create request" << std::endl;
-  ni::InferenceRequest request0(backend, model_version);
+  ni::InferenceRequest request0(model, model_version);
 
   inference::DataType dtype = inference::DataType::TYPE_INT32;
   std::vector<int64_t> shape{1, 100};
@@ -576,7 +576,7 @@ TEST_F(RequestResponseCacheTest, TestEndToEnd)
 
   // Create request
   std::cout << "Create request" << std::endl;
-  ni::InferenceRequest request0(backend, model_version);
+  ni::InferenceRequest request0(model, model_version);
 
   // Create input
   std::cout << "Create inputs" << std::endl;
@@ -698,7 +698,7 @@ TEST_F(RequestResponseCacheTest, TestParallelInsertion)
 
   // Create request
   std::cout << "Create request" << std::endl;
-  ni::InferenceRequest request0(backend, model_version);
+  ni::InferenceRequest request0(model, model_version);
 
   inference::DataType dtype = inference::DataType::TYPE_INT32;
   std::vector<int64_t> shape{1, 100};
@@ -763,7 +763,7 @@ TEST_F(RequestResponseCacheTest, TestParallelEviction)
 
   // Create request
   std::cout << "Create request" << std::endl;
-  ni::InferenceRequest request0(backend, model_version);
+  ni::InferenceRequest request0(model, model_version);
 
   inference::DataType dtype = inference::DataType::TYPE_INT32;
   std::vector<int64_t> shape{1, 4};
@@ -838,7 +838,7 @@ TEST_F(RequestResponseCacheTest, TestLRU)
 
   // Create request
   std::cout << "Create request" << std::endl;
-  ni::InferenceRequest request0(backend, model_version);
+  ni::InferenceRequest request0(model, model_version);
 
   inference::DataType dtype = inference::DataType::TYPE_INT32;
   std::vector<int64_t> shape{1, 4};
@@ -936,7 +936,7 @@ TEST_F(RequestResponseCacheTest, TestParallelLookup)
 
   // Create request
   std::cout << "Create request" << std::endl;
-  ni::InferenceRequest request0(backend, model_version);
+  ni::InferenceRequest request0(model, model_version);
 
   inference::DataType dtype = inference::DataType::TYPE_INT32;
   std::vector<int64_t> shape{1, 4};

@@ -1,4 +1,4 @@
-// Copyright (c) 2019, NVIDIA CORPORATION. All rights reserved.
+// Copyright 2019-2021, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 //
 // Redistribution and use in source and binary forms, with or without
 // modification, are permitted provided that the following conditions
@@ -23,41 +23,45 @@
 // OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 // (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
-#pragma once
 
-#include "model_config.pb.h"
-#include "src/core/backend.h"
-#include "src/core/scheduler.h"
-#include "src/core/status.h"
+#include "src/backends/ensemble/ensemble_model.h"
+
+#include <stdint.h>
+#include "src/core/constants.h"
+#include "src/core/ensemble_scheduler.h"
+#include "src/core/logging.h"
+#include "src/core/model_config_utils.h"
 
 namespace nvidia { namespace inferenceserver {
 
-class InferenceServer;
+Status
+EnsembleModel::Create(
+    InferenceServer* server, const std::string& path, const int64_t version,
+    const inference::ModelConfig& model_config,
+    const double min_compute_capability, std::unique_ptr<Model>* model)
+{
+  // Create the ensemble model.
+  std::unique_ptr<EnsembleModel> local_model(
+      new EnsembleModel(min_compute_capability, path, version, model_config));
 
-class EnsembleBackend : public InferenceBackend {
- public:
-  explicit EnsembleBackend(const double min_compute_capability)
-      : InferenceBackend(min_compute_capability)
-  {
-  }
-  EnsembleBackend(EnsembleBackend&&) = default;
+  RETURN_IF_ERROR(local_model->Init());
 
-  Status Init(
-      InferenceServer* const server, const std::string& path,
-      const inference::ModelConfig& config);
+  std::unique_ptr<Scheduler> scheduler;
+  RETURN_IF_ERROR(EnsembleScheduler::Create(
+      local_model->MutableStatsAggregator(), server, model_config, &scheduler));
+  RETURN_IF_ERROR(local_model->SetScheduler(std::move(scheduler)));
 
- private:
-  // Override InferenceBackend::Run() to return proper error if
-  // Run() is called for ensemble model.
-  void Run(
-      uint32_t runner_idx,
-      std::vector<std::unique_ptr<InferenceRequest>>&& requests) override;
+  LOG_VERBOSE(1) << "ensemble model for " << local_model->Name() << std::endl;
 
- private:
-  DISALLOW_COPY_AND_ASSIGN(EnsembleBackend);
-  friend std::ostream& operator<<(std::ostream&, const EnsembleBackend&);
-};
+  *model = std::move(local_model);
+  return Status::Success;
+}
 
-std::ostream& operator<<(std::ostream& out, const EnsembleBackend& pb);
+std::ostream&
+operator<<(std::ostream& out, const EnsembleModel& pb)
+{
+  out << "name=" << pb.Name() << std::endl;
+  return out;
+}
 
 }}  // namespace nvidia::inferenceserver

@@ -1,4 +1,4 @@
-// Copyright (c) 2020, NVIDIA CORPORATION. All rights reserved.
+// Copyright 2020-2021, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 //
 // Redistribution and use in source and binary forms, with or without
 // modification, are permitted provided that the following conditions
@@ -41,7 +41,7 @@
 
 namespace nvidia { namespace inferenceserver {
 
-class InferenceBackend;
+class Model;
 class InferenceServer;
 class MetricModelReporter;
 
@@ -244,24 +244,23 @@ class InferenceRequest {
 
   // InferenceRequest
   //
-  // The two constructors are identical except one takes backend as a
+  // The two constructors are identical except one takes model as a
   // shared pointer and the other as a raw pointer. The shared pointer
-  // version is the primary one and acts to keep the backend alive as
+  // version is the primary one and acts to keep the model alive as
   // long as the request is in flight. The raw pointer version is used
-  // only for cases where the backend itself is issuing a request
-  // (e.g. warmup) and no shared pointer version of the backend exists
+  // only for cases where the model itself is issuing a request
+  // (e.g. warmup) and no shared pointer version of the model exists
   // (because we aren't using shared_from_this).
   InferenceRequest(
-      const std::shared_ptr<InferenceBackend>& backend,
+      const std::shared_ptr<Model>& model,
       const int64_t requested_model_version)
-      : InferenceRequest(backend.get(), requested_model_version)
+      : InferenceRequest(model.get(), requested_model_version)
   {
-    backend_shared_ = backend;
+    model_shared_ = model;
   }
 
-  InferenceRequest(
-      InferenceBackend* backend, const int64_t requested_model_version)
-      : needs_normalization_(true), backend_raw_(backend),
+  InferenceRequest(Model* model, const int64_t requested_model_version)
+      : needs_normalization_(true), model_raw_(model),
         requested_model_version_(requested_model_version), flags_(0),
         correlation_id_(0), batch_size_(0), timeout_us_(0), collect_stats_(true)
   {
@@ -435,8 +434,8 @@ class InferenceRequest {
       void* response_userp)
   {
     response_factory_ = InferenceResponseFactory(
-        backend_shared_, id_, allocator, alloc_userp, response_fn,
-        response_userp, response_delegator_);
+        model_shared_, id_, allocator, alloc_userp, response_fn, response_userp,
+        response_delegator_);
     return Status::Success;
   }
 
@@ -477,7 +476,7 @@ class InferenceRequest {
   // Prepare this request for inference.
   Status PrepareForInference();
 
-  // Run this inference request using the backend associated with the
+  // Run this inference request using the model associated with the
   // request. If Status::Success is returned then the call has taken
   // ownership of the request object and so 'request' will be
   // nullptr. If non-success is returned then the caller still retains
@@ -557,7 +556,7 @@ class InferenceRequest {
       const uint64_t compute_output_duration_ns);
 
   // Statistics for each request are aggregated into the corresponding
-  // backend's statistics. Optionally this function may be used to
+  // model's statistics. Optionally this function may be used to
   // add an additional aggregator where statistics are also aggregated.
   void SetSecondaryStatsAggregator(
       InferenceStatsAggregator* secondary_stats_aggregator)
@@ -578,16 +577,16 @@ class InferenceRequest {
   // for inference.
   bool needs_normalization_;
 
-  // The backend associated with this request. For most requests
-  // backend_shared_ will be non-null and will act to keep the backend
-  // alive as long as this request is live. In this case backend_raw_
+  // The model associated with this request. For most requests
+  // model_shared_ will be non-null and will act to keep the model
+  // alive as long as this request is live. In this case model_raw_
   // will be the raw pointer from the shared pointer. For cases where
-  // the backend itself created the request (like running requests for
-  // warmup), backend_shared_ will be nullptr, but backend_raw_ will
-  // still be defined. Thus backend_raw_ is always defined and should
-  // always to used to access the backend.
-  std::shared_ptr<InferenceBackend> backend_shared_;
-  InferenceBackend* backend_raw_;
+  // the model itself created the request (like running requests for
+  // warmup), model_shared_ will be nullptr, but model_raw_ will
+  // still be defined. Thus model_raw_ is always defined and should
+  // always to used to access the model.
+  std::shared_ptr<Model> model_shared_;
+  Model* model_raw_;
 
   // The model version as requested and based on version policy the
   // specific version that is actually used for inference.
