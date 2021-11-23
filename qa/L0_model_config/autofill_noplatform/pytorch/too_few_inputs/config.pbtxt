@@ -1,0 +1,14 @@
+max_batch_size: 1
+output [
+  {
+    name: "OUTPUT__0"
+    data_type: TYPE_INT8
+    dims: [ 16 ]
+  },
+  {
+    name: "OUTPUT__1"
+    data_type: TYPE_INT8
+    dims: [ 16 ]
+  }
+]
+backend: "pytorch"

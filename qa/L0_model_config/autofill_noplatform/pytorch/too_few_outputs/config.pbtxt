@@ -1,0 +1,9 @@
+max_batch_size: 1
+input [
+  {
+    name: "INPUT__0"
+    data_type: TYPE_INT32
+    dims: [ 16 ]
+  }
+]
+backend: "pytorch"
