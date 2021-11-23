@@ -2326,6 +2326,7 @@ OutputBufferQueryHelper(
   return nullptr;  // Success
 }
 
+// Make sure to keep InferResponseAlloc and OutputBufferQuery logic in sync
 TRITONSERVER_Error*
 InferResponseAlloc(
     TRITONSERVER_ResponseAllocator* allocator, const char* tensor_name,
@@ -2347,6 +2348,7 @@ InferResponseAlloc(
       buffer_userp, actual_memory_type, actual_memory_type_id);
 }
 
+// Make sure to keep InferResponseAlloc and OutputBufferQuery logic in sync
 TRITONSERVER_Error*
 OutputBufferQuery(
     TRITONSERVER_ResponseAllocator* allocator, void* userp,
@@ -3440,6 +3442,7 @@ StreamInferResponseStart(TRITONSERVER_ResponseAllocator* allocator, void* userp)
   return nullptr;  // success
 }
 
+// Make sure to keep InferResponseAlloc and OutputBufferQuery logic in sync
 TRITONSERVER_Error*
 StreamInferResponseAlloc(
     TRITONSERVER_ResponseAllocator* allocator, const char* tensor_name,
@@ -3467,6 +3470,7 @@ StreamInferResponseAlloc(
       actual_memory_type_id);
 }
 
+// Make sure to keep InferResponseAlloc and OutputBufferQuery logic in sync
 TRITONSERVER_Error*
 StreamOutputBufferQuery(
     TRITONSERVER_ResponseAllocator* allocator, void* userp,

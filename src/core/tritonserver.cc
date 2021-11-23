@@ -663,7 +663,6 @@ TRITONSERVER_ResponseAllocatorNew(
   return nullptr;  // Success
 }
 
-// FIXME set it in frontends
 TRITONSERVER_Error*
 TRITONSERVER_ResponseAllocatorSetQueryFunction(
     TRITONSERVER_ResponseAllocator* allocator,

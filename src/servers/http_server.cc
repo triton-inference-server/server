@@ -986,6 +986,7 @@ HTTPAPIServer::~HTTPAPIServer()
       "deleting response allocator");
 }
 
+// Make sure to keep InferResponseAlloc and OutputBufferQuery logic in sync
 TRITONSERVER_Error*
 HTTPAPIServer::InferResponseAlloc(
     TRITONSERVER_ResponseAllocator* allocator, const char* tensor_name,
@@ -1081,6 +1082,7 @@ HTTPAPIServer::InferResponseAlloc(
   return nullptr;  // Success
 }
 
+// Make sure to keep InferResponseAlloc and OutputBufferQuery logic in sync
 TRITONSERVER_Error*
 HTTPAPIServer::OutputBufferQuery(
     TRITONSERVER_ResponseAllocator* allocator, void* userp,
