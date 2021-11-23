@@ -32,9 +32,8 @@ from mlflow_triton.config import Config
 import tritonclient.http as tritonhttpclient
 from tritonclient.utils import InferenceServerException, np_to_triton_dtype, triton_to_np_dtype
 
-from mlflow.deployments import BaseDeploymentClient, get_deploy_client
+from mlflow.deployments import BaseDeploymentClient
 from mlflow.tracking.artifact_utils import _download_artifact_from_uri
-from mlflow.models.model import Model
 from mlflow.exceptions import MlflowException
 
 import glob
@@ -222,8 +221,6 @@ class TritonPlugin(BaseDeploymentClient):
 
         inputs = []
         if single_input_np is not None:
-            model_metadata = self.triton_client.get_model_metadata(
-                deployment_name)
             raise MlflowException("Unnamed input is not currently supported")
         else:
             if isinstance(df, pd.DataFrame):

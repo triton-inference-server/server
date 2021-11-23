@@ -36,7 +36,6 @@ class TritonPythonModel:
         for request in requests:
             input_tensor = pb_utils.get_input_tensor_by_name(request, "INPUT0")
             input_numpy = input_tensor.as_numpy()
-            input_shape = input_numpy.shape
             output0 = pb_utils.Tensor("OUTPUT0",
                                       input_numpy.reshape(new_shape))
             # Transpose the tensor to create a non-contiguous tensor.
