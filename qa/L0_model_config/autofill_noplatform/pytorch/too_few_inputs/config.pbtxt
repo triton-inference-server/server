@@ -1,12 +1,12 @@
 max_batch_size: 1
 output [
   {
-    name: "OUTPUT0"
+    name: "OUTPUT__0"
     data_type: TYPE_INT8
     dims: [ 16 ]
   },
   {
-    name: "OUTPUT1"
+    name: "OUTPUT__1"
     data_type: TYPE_INT8
     dims: [ 16 ]
   }
