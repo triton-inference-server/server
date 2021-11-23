@@ -409,7 +409,9 @@ def pytorch_cmake_args(images):
     return [
         '-DTRITON_PYTORCH_DOCKER_IMAGE={}'.format(image),
     ]
-
+    if FLAGS.enable_gpu:
+        cargs.append('-DTRITON_PYTORCH_ENABLE_TORCHTRT=ON')
+    return cargs
 
 def onnxruntime_cmake_args(images, library_paths):
     cargs = [
