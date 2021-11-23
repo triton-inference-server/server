@@ -26,75 +26,74 @@
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 import argparse
 
-import torch
-from torch import nn
 
-import os
-import shutil
-import tensorflow as tf
-import tensorflow.neuron as tfn
+def genTorchModel(name, batch_size):
+    class PyAddSubNet(nn.Module):
+        """
+        Simple AddSub network in PyTorch. This network outputs the sum and
+        subtraction of the inputs.
+        """
 
-class PyAddSubNet(nn.Module):
-    """
-    Simple AddSub network in PyTorch. This network outputs the sum and
-    subtraction of the inputs.
-    """
-    def __init__(self):
-        super(PyAddSubNet, self).__init__()
+        def __init__(self):
+            super(PyAddSubNet, self).__init__()
 
-    def forward(self, input0, input1):
-        return torch.sub(input0, input1, alpha=-1), torch.sub(input0,
-                                                                input1,
-                                                                alpha=1)
+        def forward(self, input0, input1):
+            return torch.sub(input0, input1, alpha=-1), torch.sub(input0,
+                                                                  input1,
+                                                                  alpha=1)
 
-def genTorchModel(batch_size):
     model = PyAddSubNet()
     model.eval()
     batch_size = 1
-    example_inputs = torch.zeros([4],
-                                dtype=torch.int64), torch.zeros([4],
-                                                                dtype=torch.int64)
+    example_inputs = torch.zeros([4], dtype=torch.int64), torch.zeros(
+        [4], dtype=torch.int64)
     model_neuron = torch.neuron.trace(model,
-                                    example_inputs,
-                                    dynamic_batch_size=True)
-    model_neuron.save('add_sub_model.pt')
+                                      example_inputs,
+                                      dynamic_batch_size=True)
+    model_neuron.save('{}.pt'.format(name))
 
 
-class TFAddSubNet(tf.Module):
-    """
-    Simple AddSub network in Tensorflow. This network outputs the sum and
-    subtraction of the inputs.
-    """
-    def __init__(self):
-        super(TFAddSubNet, self).__init__()
-    
-    @tf.function
-    def __call__(self, input0, input1):
-        output0=tf.add(input0, input1)
-        output1=tf.subtract(input0, input1)
-        return output0, output1
-
-def genTFModel(batch_size, tfVersion):
-    model = TFAddSubNet()
+def genTFModel(name, batch_size, tfVersion):
     # Set up model directory
-    model_dir = os.path.join('$PWD', 'add_sub_model')
-    compiled_model_dir = os.path.join('$PWD', 'add_sub_neuron')
+    model_dir ='add_sub_model'
+    compiled_model_dir = name
     shutil.rmtree(model_dir, ignore_errors=True)
     shutil.rmtree(compiled_model_dir, ignore_errors=True)
     if (tfVersion == 1):
-        # Export SavedModel
-        tf.saved_model.save(model, model_dir)
+        with tf.Session() as sess:
+            # Export SavedModel
+            input0 = tf.placeholder(tf.int64, [4], "INPUT__0")
+            input1 = tf.placeholder(tf.int64, [4], "INPUT__1")    
+            output0 = tf.add(input0, input1, "OUTPUT__0")
+            output1 = tf.subtract(input0, input1, "OUTPUT__1")
+            tf.compat.v1.saved_model.simple_save(session=sess,
+                                                    export_dir=model_dir,
+                                                    inputs={
+                                                        "INPUT__0": input0,
+                                                        "INPUT__1": input1
+                                                    },
+                                                    outputs={
+                                                        "OUTPUT__0": output0,
+                                                        "OUTPUT__1": output1
+                                                    })
         # Compile using Neuron
-        tfn.saved_model.compile(model_dir, compiled_model_dir,
-            batch_size=batch_size,
-            dynamic_batch_size=True)
+        tfn.saved_model.compile(model_dir,
+                                compiled_model_dir,
+                                batch_size=batch_size,
+                                dynamic_batch_size=True)
     elif (tfVersion == 2):
-        example_inputs = tf.zeros([4], dtype=tf.dtypes.int64), tf.zeros([4], dtype=tf.dtypes.int64)
+        input0 = tf.keras.layers.Input(dtype=tf.int64, shape=4, name="INPUT__0")
+        input1 = tf.keras.layers.Input(dtype=tf.int64, shape=4, name="INPUT__1")
+        output0 = tf.add(input0, input1, "OUTPUT__0")
+        output1 = tf.subtract(input0, input1, "OUTPUT__1")
+        model = tf.keras.Model(inputs=[input0, input1], outputs=[output0, output1])
+        example_inputs = tf.zeros([4], dtype=tf.dtypes.int64), tf.zeros(
+            [4], dtype=tf.dtypes.int64)
         model_neuron = tfn.trace(model, example_inputs)  # trace
         model_neuron.save(compiled_model_dir)
-    
     else:
         raise Exception("Unrecognized Tensorflow version: {}".format(tfVersion))
+
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
@@ -104,27 +103,32 @@ if __name__ == '__main__':
                         choices=['pytorch', 'tensorflow'],
                         help='''The type of the compiled model. Currently,
                         only supports \"pytorch\" and \"tensorflow\".''')
-    parser.add_argument(
-        '--name',
-        type=str,
-        required=True,
-        help='The name of the compiled model')
-    parser.add_argument(
-        '--tf_version',
-        type=int,
-        choices=[1, 2],
-        help='Version of tensorflow for compiled model')
-    parser.add_argument(
-        '--batch_size',
-        type=int,
-        default=1,
-        help='The batch size for the compiled model')
+    parser.add_argument('--name',
+                        type=str,
+                        required=True,
+                        help='The name of the compiled model')
+    parser.add_argument('--tf_version',
+                        type=int,
+                        choices=[1, 2],
+                        help='Version of tensorflow for compiled model')
+    parser.add_argument('--batch_size',
+                        type=int,
+                        default=1,
+                        help='The batch size for the compiled model')
 
     FLAGS, unparsed = parser.parse_known_args()
     if len(unparsed) > 0:
         raise Exception("Unrecognized options: {}".format(unparsed))
     if FLAGS.model_type == 'tensorflow':
-        genTFModel(FLAGS.batch_size, FLAGS.tf_version)
+        import os
+        import shutil
+        import tensorflow as tf
+        import tensorflow.neuron as tfn
+        print("name is {}".format(FLAGS.name))
+        genTFModel(FLAGS.name, FLAGS.batch_size, FLAGS.tf_version)
     elif FLAGS.model_type == 'pytorch':
-        genTorchModel(FLAGS.batch_size)
-    
+        import torch
+        from torch import nn
+        import torch_neuron
+        print("name is {}".format(FLAGS.name))
+        genTorchModel(FLAGS.name, FLAGS.batch_size)
