@@ -58,7 +58,7 @@ class IOTest(tu.TestResultCollector):
                         inputs[1].set_data_from_numpy(gpu_output)
                         result = client.infer(model_name, inputs)
                         output0 = result.as_numpy('OUTPUT0')
-                        self.assertTrue(output0 is not None)
+                        self.assertIsNotNone(output0)
                         self.assertTrue(np.all(output0 == input0))
 
 

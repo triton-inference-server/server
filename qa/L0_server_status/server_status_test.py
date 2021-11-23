@@ -290,7 +290,6 @@ class ServerMetadataTest(tu.TestResultCollector):
 
     def test_model_specific_infer(self):
         input_size = 16
-        tensor_shape = (1, input_size)
 
         # There are 3 versions of *_float32_float32_float32 but only
         # versions 1 and 3 should be available.

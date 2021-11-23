@@ -28,7 +28,7 @@ import sys
 sys.path.append("../common")
 
 import numpy as np
-from multiprocessing import Process, Value, shared_memory
+from multiprocessing import Process, shared_memory
 import time
 import test_util as tu
 import argparse

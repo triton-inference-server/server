@@ -45,7 +45,7 @@ class PythonUnittest(tu.TestResultCollector):
 
             # The model returns 1 if the tests were sucessfully passed.
             # Otherwise, it will return 0.
-            self.assertTrue(output0 == [1])
+            self.assertEqual(output0, [1])
 
 
 if __name__ == '__main__':

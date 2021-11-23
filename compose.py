@@ -143,7 +143,7 @@ def get_container_version_if_not_specified():
         with open('TRITON_VERSION', "r") as vfile:
             version = vfile.readline().strip()
         import build
-        current_container_version, FLAGS.container_version = build.get_container_versions(
+        _, FLAGS.container_version = build.get_container_versions(
             version, None, FLAGS.container_version)
         log('version {}'.format(version))
     log('using container version {}'.format(FLAGS.container_version))
@@ -184,7 +184,7 @@ def create_argmap(images):
         # min container needs to be GPU enabled if the build is GPU build
         vars = pm_path.stdout
         e = re.search("CUDA_VERSION", vars)
-        gpu_enabled = False if e == None else True
+        gpu_enabled = False if e is None else True
         fail_if(
             not gpu_enabled,
             '\'enable-gpu\' flag specified but min container provided does not have CUDA installed'
@@ -216,20 +216,20 @@ def create_argmap(images):
         'Error: full container provided was build with \'enable_gpu\' as {} and you are composing container with \'enable_gpu\' as {}'
         .format(gpu_enabled, enable_gpu))
     e = re.search("TRITON_SERVER_VERSION=([\S]{6,}) ", vars)
-    version = "" if e == None else e.group(1)
+    version = "" if e is None else e.group(1)
     fail_if(
         len(version) == 0,
         'docker inspect to find triton server version failed, {}'.format(
             p_path.stderr))
     e = re.search("NVIDIA_TRITON_SERVER_VERSION=([\S]{5,}) ", vars)
-    container_version = "" if e == None else e.group(1)
+    container_version = "" if e is None else e.group(1)
     fail_if(
         len(container_version) == 0,
         'docker inspect to find triton container version failed, {}'.format(
             vars))
     dcgm_ver = re.search("DCGM_VERSION=([\S]{4,}) ", vars)
     dcgm_version = ""
-    if dcgm_ver == None:
+    if dcgm_ver is None:
         dcgm_version = "2.2.3"
         log("WARNING: DCGM version not found from image, installing the earlierst version {}"
             .format(dcgm_version))
