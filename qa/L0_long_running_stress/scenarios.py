@@ -263,8 +263,7 @@ class PerfAnalyzerScenario(Scenario):
                 if dtype == np.float32:
                     res = float(res)
                 elif dtype == np.int32:
-                    # Do nothing
-                    pass
+                    res = int(res)
                 elif dtype == np.dtype(object):
                     res = str(res)
                 output_data.append(
