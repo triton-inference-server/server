@@ -1,0 +1,35 @@
+apiVersion: traefik.containo.us/v1alpha1
+kind: IngressRoute
+metadata:
+  name: {{ template "triton-inference-server-ingressroute-http.name" . }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+    app: {{ template "triton-inference-server.name" . }}
+    chart: {{ template "triton-inference-server.chart" . }}
+    release: {{ .Release.Name }}
+    heritage: {{ .Release.Service }}
+spec:
+  entryPoints:
+    - triton-http
+  routes:
+    - match: PathPrefix(`/`)
+      kind: Rule
+      services:
+        - name: {{ template "triton-inference-server.fullname" . }}
+          port: 8000
+---
+apiVersion: traefik.containo.us/v1alpha1
+kind: IngressRoute
+metadata:
+  name: {{ template "triton-inference-server-ingressroute-grpc.name" . }}
+  namespace: {{ .Release.Namespace }}
+spec:
+  entryPoints:
+    - triton-grpc
+  routes:
+    - match: PathPrefix(`/`)
+      kind: Rule
+      services:
+        - name: {{ template "triton-inference-server.fullname" . }}
+          port: 8001
+          scheme: h2c

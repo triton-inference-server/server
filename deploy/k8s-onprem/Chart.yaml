@@ -29,3 +29,9 @@ appVersion: "1.0"
 description: Triton Inference Server
 name: triton-inference-server
 version: 1.0.0
+dependencies:
+  - name: traefik
+    version: "~10.6.2"
+    repository: "https://helm.traefik.io/traefik"
+
+

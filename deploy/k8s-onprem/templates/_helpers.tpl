@@ -85,6 +85,21 @@ If release name contains chart name it will be used as a full name.
 {{- end -}}
 
 {{/*
+  Create ingressroute names derived from above and truncated appropriately
+*/}}
+{{- define "triton-inference-server-ingressroute-http.name" -}}
+{{- $basename := include "triton-inference-server.name" . -}}
+{{- $basename_trimmed := $basename | trunc 50 | trimSuffix "-" -}}
+{{- printf "%s-%s" $basename_trimmed "ingress-http" -}}
+{{- end -}}
+
+{{- define "triton-inference-server-ingressroute-grpc.name" -}}
+{{- $basename := include "triton-inference-server.name" . -}}
+{{- $basename_trimmed := $basename | trunc 50 | trimSuffix "-" -}}
+{{- printf "%s-%s" $basename_trimmed "ingress-grpc" -}}
+{{- end -}}
+
+{{/*
 Create chart name and version as used by the chart label.
 */}}
 {{- define "triton-inference-server.chart" -}}

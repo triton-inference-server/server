@@ -24,14 +24,27 @@
 # (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-replicaCount: 1
+replicaCount: 2
 
 image:
   imageName: nvcr.io/nvidia/tritonserver:21.10-py3
   pullPolicy: IfNotPresent
-  modelRepositoryServer:
-  modelRepositoryPath: gs://triton-inference-server-repository/model_repository
+  modelRepositoryServer: 10.0.0.35
+  modelRepositoryPath: /srv/models
   numGpus: 1
 
 service:
-  type: LoadBalancer
+  type: ClusterIP
+
+traefik:
+  ports:
+    triton-http:
+      port: 18000
+      exposedPort: 8000
+      expose: true
+      protocol: TCP
+    triton-grpc:
+      port: 18001
+      exposedPort: 8001
+      expose: true
+      protocol: TCP

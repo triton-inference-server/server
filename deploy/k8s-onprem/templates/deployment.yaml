@@ -51,7 +51,7 @@ spec:
         - name: models
           nfs:
             server: {{ .Values.image.modelRepositoryServer }}
-            path: {{ .Vales.image.modelRepositoryPath }}
+            path: {{ .Values.image.modelRepositoryPath }}
             readOnly: false
       containers:
         - name: {{ .Chart.Name }}
@@ -65,7 +65,7 @@ spec:
             limits:
               nvidia.com/gpu: {{ .Values.image.numGpus }}
 
-          args: ["tritonserver", "--model-repository=/models "]
+          args: ["tritonserver", "--model-repository=/models"]
 
           ports:
             - containerPort: 8000
