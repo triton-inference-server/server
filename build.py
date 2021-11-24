@@ -248,7 +248,7 @@ def cmake_core_arg(name, type, value):
         type = ''
     else:
         type = ':{}'.format(type)
-    return '-D{}{}="{}"'.format(name, type, value)
+    return '-D{}{}={}'.format(name, type, value)
 
 
 def cmake_core_enable(name, flag):
@@ -265,7 +265,7 @@ def cmake_core_enable(name, flag):
 def cmake_core_extra_args():
     args = []
     for k, v in EXTRA_CORE_CMAKE_FLAGS.items():
-        args.append('-D{}="{}"'.format(k, v))
+        args.append('-D{}={}'.format(k, v))
     return args
 
 
@@ -279,7 +279,7 @@ def cmake_backend_arg(backend, name, type, value):
         type = ''
     else:
         type = ':{}'.format(type)
-    return '-D{}{}="{}"'.format(name, type, value)
+    return '-D{}{}={}'.format(name, type, value)
 
 
 def cmake_backend_enable(backend, name, flag):
@@ -299,7 +299,7 @@ def cmake_backend_extra_args(backend):
     args = []
     if backend in EXTRA_BACKEND_CMAKE_FLAGS:
         for k, v in EXTRA_BACKEND_CMAKE_FLAGS[backend].items():
-            args.append('-D{}="{}"'.format(k, v))
+            args.append('-D{}={}'.format(k, v))
     return args
 
 
@@ -309,7 +309,7 @@ def cmake_repoagent_arg(name, type, value):
         type = ''
     else:
         type = ':{}'.format(type)
-    return '-D{}{}="{}"'.format(name, type, value)
+    return '-D{}{}={}'.format(name, type, value)
 
 
 def cmake_repoagent_enable(name, flag):
