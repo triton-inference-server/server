@@ -406,7 +406,7 @@ def pytorch_cmake_args(images):
     else:
         image = 'nvcr.io/nvidia/pytorch:{}-py3'.format(
             FLAGS.upstream_container_version)
-    return [
+    cargs = [
         '-DTRITON_PYTORCH_DOCKER_IMAGE={}'.format(image),
     ]
     if FLAGS.enable_gpu:
