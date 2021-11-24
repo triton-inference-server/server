@@ -260,7 +260,7 @@ Metrics::StartPollingThreadSingleton(
     return;
   }
 
-  // Start thread for cache metrics
+  // Start thread for polling cache/dcgm metrics
   singleton->StartPollingThread(response_cache);
 
   // Toggle flag so this function is only executed once
