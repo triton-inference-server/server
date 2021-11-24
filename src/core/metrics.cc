@@ -171,13 +171,13 @@ Metrics::~Metrics()
     poll_thread_exit_.store(true);
     poll_thread_->join();
 #ifdef TRITON_ENABLE_METRICS_GPU
-    dcgmGroupDestroy(dcgm_handle_, groupId_);
+    dcgmGroupDestroy(dcgm_metadata_.dcgm_handle_, dcgm_metadata_.groupId_);
     // Stop and shutdown DCGM
     dcgmReturn_t derr;
-    if (standalone_) {
-      derr = dcgmDisconnect(dcgm_handle_);
+    if (dcgm_metadata_.standalone_) {
+      derr = dcgmDisconnect(dcgm_metadata_.dcgm_handle_);
     } else {
-      derr = dcgmStopEmbedded(dcgm_handle_);
+      derr = dcgmStopEmbedded(dcgm_metadata_.dcgm_handle_);
     }
     if (derr != DCGM_ST_OK) {
       LOG_WARNING << "Unable to stop DCGM: " << errorString(derr);
@@ -216,7 +216,7 @@ Metrics::EnableCacheMetrics(
     return;
   }
 
-  // Start thread for cache metrics
+  // Setup metric families for cache metrics
   singleton->InitializeCacheMetrics(response_cache);
 
   // Toggle flag so this function is only executed once
@@ -248,36 +248,39 @@ Metrics::SetMetricsInterval(uint64_t metrics_interval_ms)
   singleton->metrics_interval_ms_ = metrics_interval_ms;
 }
 
+void
+Metrics::StartPollingThreadSingleton(
+    std::shared_ptr<RequestResponseCache> response_cache)
+{
+  auto singleton = GetSingleton();
+
+  // Ensure thread-safe start of polling thread
+  std::lock_guard<std::mutex> lock(singleton->poll_thread_starting_);
+  if (singleton->poll_thread_started_) {
+    return;
+  }
+
+  // Start thread for cache metrics
+  singleton->StartPollingThread(response_cache);
+
+  // Toggle flag so this function is only executed once
+  singleton->poll_thread_started_ = true;
+}
+
 bool
 Metrics::StartPollingThread(
     std::shared_ptr<RequestResponseCache> response_cache)
 {
-  auto singleton = GetSingleton();
-  singleton->poll_thread_exit_.store(false);
-  bool cache_metrics_enabled = singleton->cache_metrics_enabled_;
-  bool gpu_metrics_enabled = singleton->gpu_metrics_enabled_;
-  // TODO: Do all member vars have to be accessed via singleton or local var in thread?
-  //uint64_t metrics_interval_ms = singleton->metrics_interval_ms_;
-
   // Nothing to poll if no polling metrics enabled, don't spawn a thread
-  if (!cache_metrics_enabled && !gpu_metrics_enabled) {
+  if (!cache_metrics_enabled_ && !gpu_metrics_enabled_) {
+    LOG_WARNING << "Neither cache metrics nor gpu metrics are enabled. Not "
+                   "polling for them.";
     return false;
   }
-
-#ifdef TRITON_ENABLE_METRICS_GPU
-  // Setup local DCGM variables to pass to thread
-  std::vector<uint32_t> available_cuda_gpu_ids = singleton->available_cuda_gpu_ids_;
-  std::map<uint32_t, uint32_t> cuda_ids_to_dcgm_ids = singleton->cuda_ids_to_dcgm_ids_;
-  dcgmHandle_t handle = singleton->dcgm_handle_;
-  dcgmGpuGrp_t groupId = singleton->groupId_;
-#endif  // TRITON_ENABLE_METRICS_GPU
+  poll_thread_exit_.store(false);
 
   // Start a separate thread for polling metrics at specified interval
-  poll_thread_.reset(new std::thread([this, cache_metrics_enabled, gpu_metrics_enabled, response_cache
-#ifdef TRITON_ENABLE_METRICS_GPU
-    , available_cuda_gpu_ids, cuda_ids_to_dcgm_ids, handle, groupId
-#endif  // TRITON_ENABLE_METRICS_GPU
-    ] {
+  poll_thread_.reset(new std::thread([this, response_cache] {
     // Thread will update metrics indefinitely until exit flag set
     while (!poll_thread_exit_.load()) {
       // Sleep for metric interval
@@ -285,14 +288,15 @@ Metrics::StartPollingThread(
           std::chrono::milliseconds(metrics_interval_ms_ / 2));
 
       // Poll Response Cache metrics
-      if (cache_metrics_enabled && response_cache != nullptr) {
-          PollCacheMetrics(response_cache);
+      if (cache_metrics_enabled_ && response_cache != nullptr) {
+        PollCacheMetrics(response_cache);
       }
 
 #ifdef TRITON_ENABLE_METRICS_GPU
       // Poll DCGM GPU metrics
-      if (gpu_metrics_enabled && available_cuda_gpu_ids.size() > 0) {
-          PollGPUMetrics(available_cuda_gpu_ids, cuda_ids_to_dcgm_ids, handle, groupId);
+      if (gpu_metrics_enabled_ &&
+          dcgm_metadata_.available_cuda_gpu_ids_.size() > 0) {
+        PollDcgmMetrics();
       }
 #endif  // TRITON_ENABLE_METRICS_GPU
     }
@@ -305,9 +309,8 @@ bool
 Metrics::PollCacheMetrics(std::shared_ptr<RequestResponseCache> response_cache)
 {
   if (response_cache == nullptr) {
-    LOG_WARNING
-        << "error polling cache metrics, cache metrics will not be "
-        << "available: cache was nullptr";
+    LOG_WARNING << "error polling cache metrics, cache metrics will not be "
+                << "available: cache was nullptr";
     return false;
   }
 
@@ -324,187 +327,142 @@ Metrics::PollCacheMetrics(std::shared_ptr<RequestResponseCache> response_cache)
 }
 
 bool
-Metrics::PollGPUMetrics(std::vector<uint32_t> available_cuda_gpu_ids,
-                        std::map<uint32_t, uint32_t> cuda_ids_to_dcgm_ids,
-                        dcgmHandle_t handle,
-                        dcgmGpuGrp_t groupId)
+Metrics::PollDcgmMetrics()
 {
 #ifndef TRITON_ENABLE_METRICS_GPU
   return false;
 #else
 
-  int available_cuda_gpu_count = available_cuda_gpu_ids.size();
-  // Stop attempting metrics if they fail multiple consecutive
-  // times for a device.
-  constexpr int fail_threshold = 3;
-  std::vector<int> power_limit_fail_cnt(available_cuda_gpu_count);
-  std::vector<int> power_usage_fail_cnt(available_cuda_gpu_count);
-  std::vector<int> energy_fail_cnt(available_cuda_gpu_count);
-  std::vector<int> util_fail_cnt(available_cuda_gpu_count);
-  std::vector<int> mem_fail_cnt(available_cuda_gpu_count);
-  std::vector<int> cuda_available_cnt(available_cuda_gpu_count);
-
-  unsigned long long last_energy[available_cuda_gpu_count];
-  for (int didx = 0; didx < available_cuda_gpu_count; ++didx) {
-    last_energy[didx] = 0;
+  if (dcgm_metadata_.available_cuda_gpu_ids_.size() == 0) {
+    LOG_WARNING << "error polling GPU metrics, GPU metrics will not be "
+                << "available: no available gpus to poll";
+    return false;
   }
-  size_t field_count = 6;
-  unsigned short util_flag =
-      standalone_ ? DCGM_FI_PROF_GR_ENGINE_ACTIVE : DCGM_FI_DEV_GPU_UTIL;
-  unsigned short fields[field_count] = {
-      DCGM_FI_DEV_POWER_MGMT_LIMIT,          // power limit, watts
-      DCGM_FI_DEV_POWER_USAGE,               // power usage, watts
-      DCGM_FI_DEV_TOTAL_ENERGY_CONSUMPTION,  // Total energy consumption, mJ
-      util_flag,                             // util ratio, 1 = 1%
-      DCGM_FI_DEV_FB_USED,                   // Frame buffer used, MiB
-      DCGM_FI_DEV_FB_TOTAL,                  // Frame buffer used, MiB
-  };
 
-  char fieldName[] = "field_group";
-  dcgmFieldGrp_t fieldGroupId;
-  dcgmReturn_t dcgmerr = dcgmFieldGroupCreate(
-      handle, field_count, &fields[0], fieldName, &fieldGroupId);
-  if (dcgmerr != DCGM_ST_OK) {
-    LOG_WARNING << "Cannot make field group: " << errorString(dcgmerr);
-  }
-  dcgmerr = dcgmWatchFields(
-      handle, groupId, fieldGroupId,
-      metrics_interval_ms_ * 1000 /*update period, usec*/,
-      5.0 /*maxKeepAge, sec*/, 5 /*maxKeepSamples*/);
-  if (dcgmerr != DCGM_ST_OK) {
-    LOG_WARNING << "Cannot start watching fields: " << errorString(dcgmerr);
-  } else {
-    while (!dcgm_thread_exit_.load()) {
-      std::this_thread::sleep_for(
-          std::chrono::milliseconds(metrics_interval_ms_ / 2));
-      dcgmUpdateAllFields(handle, 1 /* wait for update*/);
-      for (int didx = 0; didx < available_cuda_gpu_count; ++didx) {
-        uint32_t cuda_id = available_cuda_gpu_ids[didx];
-        if (cuda_ids_to_dcgm_ids.count(cuda_id) <= 0) {
-          LOG_WARNING << "Cannot find DCGM id for CUDA id " << cuda_id;
-          continue;
-        }
-        uint32_t dcgm_id = cuda_ids_to_dcgm_ids.at(cuda_id);
-        dcgmFieldValue_v1 field_values[field_count];
-        dcgmReturn_t dcgmerr = dcgmGetLatestValuesForFields(
-            handle, dcgm_id, fields, field_count, field_values);
+  dcgmUpdateAllFields(dcgm_metadata_.dcgm_handle_, 1 /* wait for update*/);
+  for (unsigned int didx = 0;
+       didx < dcgm_metadata_.available_cuda_gpu_ids_.size(); ++didx) {
+    uint32_t cuda_id = dcgm_metadata_.available_cuda_gpu_ids_[didx];
+    if (dcgm_metadata_.cuda_ids_to_dcgm_ids_.count(cuda_id) <= 0) {
+      LOG_WARNING << "Cannot find DCGM id for CUDA id " << cuda_id;
+      continue;
+    }
+    uint32_t dcgm_id = dcgm_metadata_.cuda_ids_to_dcgm_ids_.at(cuda_id);
+    dcgmFieldValue_v1 field_values[dcgm_metadata_.field_count_];
+    dcgmReturn_t dcgmerr = dcgmGetLatestValuesForFields(
+        dcgm_metadata_.dcgm_handle_, dcgm_id, dcgm_metadata_.fields_.data(),
+        dcgm_metadata_.field_count_, field_values);
 
-        if (dcgmerr != DCGM_ST_OK) {
-          power_limit_fail_cnt[didx]++;
-          power_usage_fail_cnt[didx]++;
-          energy_fail_cnt[didx]++;
-          util_fail_cnt[didx]++;
-          mem_fail_cnt[didx]++;
-          LOG_WARNING << "Unable to get field values for GPU ID " << cuda_id
-                      << ": " << errorString(dcgmerr);
+    if (dcgmerr != DCGM_ST_OK) {
+      dcgm_metadata_.power_limit_fail_cnt_[didx]++;
+      dcgm_metadata_.power_usage_fail_cnt_[didx]++;
+      dcgm_metadata_.energy_fail_cnt_[didx]++;
+      dcgm_metadata_.util_fail_cnt_[didx]++;
+      dcgm_metadata_.mem_fail_cnt_[didx]++;
+      LOG_WARNING << "Unable to get field values for GPU ID " << cuda_id << ": "
+                  << errorString(dcgmerr);
+    } else {
+      // Power limit
+      if (dcgm_metadata_.power_limit_fail_cnt_[didx] <
+          dcgm_metadata_.fail_threshold_) {
+        double power_limit = field_values[0].value.dbl;
+        if ((field_values[0].status == DCGM_ST_OK) &&
+            (!DCGM_FP64_IS_BLANK(power_limit))) {
+          dcgm_metadata_.power_limit_fail_cnt_[didx] = 0;
         } else {
-          // Power limit
-          if (power_limit_fail_cnt[didx] < fail_threshold) {
-            double power_limit = field_values[0].value.dbl;
-            if ((field_values[0].status == DCGM_ST_OK) &&
-                (!DCGM_FP64_IS_BLANK(power_limit))) {
-              power_limit_fail_cnt[didx] = 0;
-            } else {
-              power_limit_fail_cnt[didx]++;
-              power_limit = 0;
-              dcgmReturn_t status = dcgmReturn_t(field_values[0].status);
-              LOG_WARNING
-                  << "Unable to get power limit for GPU " << cuda_id
-                  << ". Status:" << errorString(status)
-                  << ", value:" << dcgmValueToErrorMessage(power_limit);
-            }
-            gpu_power_limit_[didx]->Set(power_limit);
-          }
-
-          // Power usage
-          if (power_usage_fail_cnt[didx] < fail_threshold) {
-            double power_usage = field_values[1].value.dbl;
-            if ((field_values[1].status == DCGM_ST_OK) &&
-                (!DCGM_FP64_IS_BLANK(power_usage))) {
-              power_usage_fail_cnt[didx] = 0;
-            } else {
-              power_usage_fail_cnt[didx]++;
-              power_usage = 0;
-              dcgmReturn_t status = dcgmReturn_t(field_values[1].status);
-              LOG_WARNING
-                  << "Unable to get power usage for GPU " << cuda_id
-                  << ". Status:" << errorString(status)
-                  << ", value:" << dcgmValueToErrorMessage(power_usage);
-            }
-            gpu_power_usage_[didx]->Set(power_usage);
-          }
-
-          // Energy Consumption
-          if (energy_fail_cnt[didx] < fail_threshold) {
-            int64_t energy = field_values[2].value.i64;
-            if ((field_values[2].status == DCGM_ST_OK) &&
-                (!DCGM_INT64_IS_BLANK(energy))) {
-              energy_fail_cnt[didx] = 0;
-              if (last_energy[didx] == 0) {
-                last_energy[didx] = energy;
-              }
-              gpu_energy_consumption_[didx]->Increment(
-                  (double)(energy - last_energy[didx]) * 0.001);
-              last_energy[didx] = energy;
-            } else {
-              energy_fail_cnt[didx]++;
-              energy = 0;
-              dcgmReturn_t status = dcgmReturn_t(field_values[2].status);
-              LOG_WARNING << "Unable to get energy consumption for "
-                          << "GPU " << cuda_id
-                          << ". Status:" << errorString(status)
-                          << ", value:" << dcgmValueToErrorMessage(energy);
-            }
-          }
-
-          // Utilization
-          if (util_fail_cnt[didx] < fail_threshold) {
-            int64_t util = field_values[3].value.i64;
-            if ((field_values[3].status == DCGM_ST_OK) &&
-                (!DCGM_INT64_IS_BLANK(util))) {
-              util_fail_cnt[didx] = 0;
-            } else {
-              util_fail_cnt[didx]++;
-              util = 0;
-              dcgmReturn_t status = dcgmReturn_t(field_values[3].status);
-              LOG_WARNING << "Unable to get GPU utilization for GPU "
-                          << cuda_id << ". Status:" << errorString(status)
-                          << ", value:" << dcgmValueToErrorMessage(util);
-            }
-            gpu_utilization_[didx]->Set((double)util * 0.01);
-          }
-
-          // Memory Usage
-          if (mem_fail_cnt[didx] < fail_threshold) {
-            int64_t memory_used = field_values[4].value.i64;
-            int64_t memory_total = field_values[5].value.i64;
-            if ((field_values[4].status == DCGM_ST_OK) &&
-                (!DCGM_INT64_IS_BLANK(memory_used)) &&
-                (field_values[5].status == DCGM_ST_OK) &&
-                (!DCGM_INT64_IS_BLANK(memory_total))) {
-              mem_fail_cnt[didx] = 0;
-            } else {
-              memory_total = 0;
-              memory_used = 0;
-              mem_fail_cnt[didx]++;
-              dcgmReturn_t usageStatus =
-                  dcgmReturn_t(field_values[4].status);
-              dcgmReturn_t memoryTotaltatus =
-                  dcgmReturn_t(field_values[5].status);
-              LOG_WARNING
-                  << "Unable to get memory usage for GPU " << cuda_id
-                  << ". Memory usage status:" << errorString(usageStatus)
-                  << ", value:" << dcgmValueToErrorMessage(memory_used)
-                  << ". Memory total status:"
-                  << errorString(memoryTotaltatus)
-                  << ", value:" << dcgmValueToErrorMessage(memory_total);
-            }
-            gpu_memory_total_[didx]->Set(
-                memory_total * 1024 * 1024);  // bytes
-            gpu_memory_used_[didx]->Set(
-                memory_used * 1024 * 1024);  // bytes
-          }
+          dcgm_metadata_.power_limit_fail_cnt_[didx]++;
+          power_limit = 0;
+          dcgmReturn_t status = dcgmReturn_t(field_values[0].status);
+          LOG_WARNING << "Unable to get power limit for GPU " << cuda_id
+                      << ". Status:" << errorString(status)
+                      << ", value:" << dcgmValueToErrorMessage(power_limit);
         }
+        gpu_power_limit_[didx]->Set(power_limit);
+      }
+
+      // Power usage
+      if (dcgm_metadata_.power_usage_fail_cnt_[didx] <
+          dcgm_metadata_.fail_threshold_) {
+        double power_usage = field_values[1].value.dbl;
+        if ((field_values[1].status == DCGM_ST_OK) &&
+            (!DCGM_FP64_IS_BLANK(power_usage))) {
+          dcgm_metadata_.power_usage_fail_cnt_[didx] = 0;
+        } else {
+          dcgm_metadata_.power_usage_fail_cnt_[didx]++;
+          power_usage = 0;
+          dcgmReturn_t status = dcgmReturn_t(field_values[1].status);
+          LOG_WARNING << "Unable to get power usage for GPU " << cuda_id
+                      << ". Status:" << errorString(status)
+                      << ", value:" << dcgmValueToErrorMessage(power_usage);
+        }
+        gpu_power_usage_[didx]->Set(power_usage);
+      }
+
+      // Energy Consumption
+      if (dcgm_metadata_.energy_fail_cnt_[didx] <
+          dcgm_metadata_.fail_threshold_) {
+        int64_t energy = field_values[2].value.i64;
+        if ((field_values[2].status == DCGM_ST_OK) &&
+            (!DCGM_INT64_IS_BLANK(energy))) {
+          dcgm_metadata_.energy_fail_cnt_[didx] = 0;
+          if (dcgm_metadata_.last_energy_[didx] == 0) {
+            dcgm_metadata_.last_energy_[didx] = energy;
+          }
+          gpu_energy_consumption_[didx]->Increment(
+              (double)(energy - dcgm_metadata_.last_energy_[didx]) * 0.001);
+          dcgm_metadata_.last_energy_[didx] = energy;
+        } else {
+          dcgm_metadata_.energy_fail_cnt_[didx]++;
+          energy = 0;
+          dcgmReturn_t status = dcgmReturn_t(field_values[2].status);
+          LOG_WARNING << "Unable to get energy consumption for "
+                      << "GPU " << cuda_id << ". Status:" << errorString(status)
+                      << ", value:" << dcgmValueToErrorMessage(energy);
+        }
+      }
+
+      // Utilization
+      if (dcgm_metadata_.util_fail_cnt_[didx] <
+          dcgm_metadata_.fail_threshold_) {
+        int64_t util = field_values[3].value.i64;
+        if ((field_values[3].status == DCGM_ST_OK) &&
+            (!DCGM_INT64_IS_BLANK(util))) {
+          dcgm_metadata_.util_fail_cnt_[didx] = 0;
+        } else {
+          dcgm_metadata_.util_fail_cnt_[didx]++;
+          util = 0;
+          dcgmReturn_t status = dcgmReturn_t(field_values[3].status);
+          LOG_WARNING << "Unable to get GPU utilization for GPU " << cuda_id
+                      << ". Status:" << errorString(status)
+                      << ", value:" << dcgmValueToErrorMessage(util);
+        }
+        gpu_utilization_[didx]->Set((double)util * 0.01);
+      }
+
+      // Memory Usage
+      if (dcgm_metadata_.mem_fail_cnt_[didx] < dcgm_metadata_.fail_threshold_) {
+        int64_t memory_used = field_values[4].value.i64;
+        int64_t memory_total = field_values[5].value.i64;
+        if ((field_values[4].status == DCGM_ST_OK) &&
+            (!DCGM_INT64_IS_BLANK(memory_used)) &&
+            (field_values[5].status == DCGM_ST_OK) &&
+            (!DCGM_INT64_IS_BLANK(memory_total))) {
+          dcgm_metadata_.mem_fail_cnt_[didx] = 0;
+        } else {
+          memory_total = 0;
+          memory_used = 0;
+          dcgm_metadata_.mem_fail_cnt_[didx]++;
+          dcgmReturn_t usageStatus = dcgmReturn_t(field_values[4].status);
+          dcgmReturn_t memoryTotaltatus = dcgmReturn_t(field_values[5].status);
+          LOG_WARNING << "Unable to get memory usage for GPU " << cuda_id
+                      << ". Memory usage status:" << errorString(usageStatus)
+                      << ", value:" << dcgmValueToErrorMessage(memory_used)
+                      << ". Memory total status:"
+                      << errorString(memoryTotaltatus)
+                      << ", value:" << dcgmValueToErrorMessage(memory_total);
+        }
+        gpu_memory_total_[didx]->Set(memory_total * 1024 * 1024);  // bytes
+        gpu_memory_used_[didx]->Set(memory_used * 1024 * 1024);    // bytes
       }
     }
   }
@@ -549,21 +507,22 @@ Metrics::InitializeDcgmMetrics()
     return false;
   }
 
-  if (standalone_) {
+  if (dcgm_metadata_.standalone_) {
     char hostIpAddress[16] = {0};
     std::string ipAddress = "127.0.0.1";
     strncpy(hostIpAddress, ipAddress.c_str(), 15);
-    dcgmerr = dcgmConnect(hostIpAddress, &dcgm_handle_);
+    dcgmerr = dcgmConnect(hostIpAddress, &dcgm_metadata_.dcgm_handle_);
   } else {
-    dcgmerr = dcgmStartEmbedded(DCGM_OPERATION_MODE_MANUAL, &dcgm_handle_);
+    dcgmerr = dcgmStartEmbedded(
+        DCGM_OPERATION_MODE_MANUAL, &dcgm_metadata_.dcgm_handle_);
   }
   if (dcgmerr != DCGM_ST_OK) {
     LOG_WARNING << "DCGM unable to start: " << errorString(dcgmerr);
     return false;
   }
 
-  if (standalone_) {
-    dcgmerr = dcgmUpdateAllFields(dcgm_handle_, 1);
+  if (dcgm_metadata_.standalone_) {
+    dcgmerr = dcgmUpdateAllFields(dcgm_metadata_.dcgm_handle_, 1);
     if (dcgmerr != DCGM_ST_OK) {
       LOG_WARNING << "DCGM unable to update all fields, GPU metrics will "
                      "not be available: "
@@ -574,7 +533,8 @@ Metrics::InitializeDcgmMetrics()
 
   unsigned int dcgm_gpu_ids[DCGM_MAX_NUM_DEVICES];
   int dcgm_gpu_count;
-  dcgmerr = dcgmGetAllDevices(dcgm_handle_, dcgm_gpu_ids, &dcgm_gpu_count);
+  dcgmerr = dcgmGetAllDevices(
+      dcgm_metadata_.dcgm_handle_, dcgm_gpu_ids, &dcgm_gpu_count);
   if (dcgmerr != DCGM_ST_OK) {
     LOG_WARNING << "DCGM unable to get device info and count, GPU "
                    "metrics will not be available: "
@@ -593,7 +553,7 @@ Metrics::InitializeDcgmMetrics()
   for (int i = 0; i < dcgm_gpu_count; i++) {
     gpu_attributes[i].version = dcgmDeviceAttributes_version;
     dcgmerr = dcgmGetDeviceAttributes(
-        dcgm_handle_, dcgm_gpu_ids[i], &gpu_attributes[i]);
+        dcgm_metadata_.dcgm_handle_, dcgm_gpu_ids[i], &gpu_attributes[i]);
     if (dcgmerr != DCGM_ST_OK) {
       LOG_WARNING << "DCGM unable to get device properties for DCGM device "
                   << dcgm_gpu_ids[i]
@@ -644,8 +604,8 @@ Metrics::InitializeDcgmMetrics()
       gpu_energy_consumption_.push_back(
           &gpu_energy_consumption_family_.Add(gpu_labels));
       uint32_t dcgm_id = pci_bus_id_to_dcgm_id[pci_bus_id];
-      cuda_ids_to_dcgm_ids[i] = dcgm_id;
-      available_cuda_gpu_ids.emplace_back(i);
+      dcgm_metadata_.cuda_ids_to_dcgm_ids_[i] = dcgm_id;
+      dcgm_metadata_.available_cuda_gpu_ids_.emplace_back(i);
     } else {
       LOG_WARNING << "GPU metrics will not be available for device:" << i;
     }
@@ -653,10 +613,54 @@ Metrics::InitializeDcgmMetrics()
 
   // create a gpu group
   char groupName[] = "dcgm_group";
-  dcgmerr =
-      dcgmGroupCreate(dcgm_handle_, DCGM_GROUP_DEFAULT, groupName, &groupId_);
+  dcgmerr = dcgmGroupCreate(
+      dcgm_metadata_.dcgm_handle_, DCGM_GROUP_DEFAULT, groupName,
+      &dcgm_metadata_.groupId_);
   if (dcgmerr != DCGM_ST_OK) {
     LOG_WARNING << "Cannot make GPU group: " << errorString(dcgmerr);
+  }
+
+  // Initialize tracking vectors
+  for (unsigned int didx = 0;
+       didx < dcgm_metadata_.available_cuda_gpu_ids_.size(); ++didx) {
+    dcgm_metadata_.power_limit_fail_cnt_.push_back(0);
+    dcgm_metadata_.power_usage_fail_cnt_.push_back(0);
+    dcgm_metadata_.energy_fail_cnt_.push_back(0);
+    dcgm_metadata_.util_fail_cnt_.push_back(0);
+    dcgm_metadata_.mem_fail_cnt_.push_back(0);
+    dcgm_metadata_.last_energy_.push_back(0);
+  }
+
+  // Number of fields for DCGM to use from fields_ below
+  dcgm_metadata_.field_count_ = 6;
+  unsigned short util_flag = dcgm_metadata_.standalone_
+                                 ? DCGM_FI_PROF_GR_ENGINE_ACTIVE
+                                 : DCGM_FI_DEV_GPU_UTIL;
+  dcgm_metadata_.fields_ = {
+      DCGM_FI_DEV_POWER_MGMT_LIMIT,          // power limit, watts
+      DCGM_FI_DEV_POWER_USAGE,               // power usage, watts
+      DCGM_FI_DEV_TOTAL_ENERGY_CONSUMPTION,  // Total energy consumption, mJ
+      util_flag,                             // util ratio, 1 = 1%
+      DCGM_FI_DEV_FB_USED,                   // Frame buffer used, MiB
+      DCGM_FI_DEV_FB_TOTAL,                  // Frame buffer used, MiB
+  };
+
+  char fieldName[] = "field_group";
+  dcgmFieldGrp_t fieldGroupId;
+  dcgmerr = dcgmFieldGroupCreate(
+      dcgm_metadata_.dcgm_handle_, dcgm_metadata_.field_count_,
+      dcgm_metadata_.fields_.data(), fieldName, &fieldGroupId);
+  if (dcgmerr != DCGM_ST_OK) {
+    LOG_WARNING << "Cannot make field group: " << errorString(dcgmerr);
+  }
+
+  dcgmerr = dcgmWatchFields(
+      dcgm_metadata_.dcgm_handle_, dcgm_metadata_.groupId_, fieldGroupId,
+      metrics_interval_ms_ * 1000 /*update period, usec*/,
+      5.0 /*maxKeepAge, sec*/, 5 /*maxKeepSamples*/);
+  if (dcgmerr != DCGM_ST_OK) {
+    LOG_WARNING << "Cannot start watching fields: " << errorString(dcgmerr);
+    return false;
   }
 
   return true;
@@ -725,7 +729,7 @@ Metrics::UUIDForCudaDevice(int cuda_device, std::string* uuid)
   dcgmDeviceAttributes_t gpu_attributes;
   gpu_attributes.version = dcgmDeviceAttributes_version;
   dcgmReturn_t dcgmerr = dcgmGetDeviceAttributes(
-      singleton->dcgm_handle_, cuda_device, &gpu_attributes);
+      singleton->dcgm_metadata_.dcgm_handle_, cuda_device, &gpu_attributes);
   if (dcgmerr != DCGM_ST_OK) {
     LOG_ERROR << "Unable to get device UUID: " << errorString(dcgmerr);
     return false;
