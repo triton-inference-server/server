@@ -73,6 +73,16 @@ DynamicBatchScheduler::DynamicBatchScheduler(
   // caching enabled for model to utilize response cache.
   response_cache_enabled_ =
       (model_->Server()->ResponseCacheEnabled() && response_cache_enable);
+  // Initialize metric reporter for cache statistics if cache enabled
+  if (response_cache_enabled_) {
+    // The cache isn't tied to any specific model instance or GPU device,
+    // so we use device=-2 to indicate caching for now. -1 is currently
+    // used for CPU
+    const int id = -2;
+    MetricModelReporter::Create(
+        model_->Name(), model_->Version(), id, model_->Config().metric_tags(),
+        &reporter_);
+  }
   max_preferred_batch_size_ = 0;
   for (const auto size : preferred_batch_sizes_) {
     max_preferred_batch_size_ =
@@ -582,14 +592,9 @@ DynamicBatchScheduler::CacheLookUp(
   status = cache->Lookup(request_hash, local_response.get(), request.get());
   if (status.IsOk() && (local_response != nullptr)) {
     cached_response = std::move(local_response);
-
-    // TODO: Remove this
-    if (model_instance_ == nullptr) {
-      LOG_INFO << "[dynamic_scheduler] CacheLookUp: MODEL INSTANCE WAS NULLPTR IN Scheduler CacheLookUp";
-    }
-    // TODO: IFDEF metrics/stats here?
-    // Update model metrics/stats
-    request->ReportStatisticsCacheHit(model_instance_->MetricReporter());
+    // Update model metrics/stats on cache hits
+    // Backends will update metrics as normal on cache misses
+    request->ReportStatisticsCacheHit(reporter_.get());
   }
 }
 

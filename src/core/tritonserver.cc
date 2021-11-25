@@ -2267,6 +2267,10 @@ TRITONSERVER_ServerModelStatistics(
 
       triton::common::TritonJson::Value inference_stats(
           metadata, triton::common::TritonJson::ValueType::OBJECT);
+      // Compute figures only calculated when not going through cache, so
+      // subtract cache_hit count from success count. Cache hit count will
+      // simply be 0 when cache is disabled.
+      uint64_t compute_count = infer_stats.success_count_ - infer_stats.cache_hit_count_;
       SetDurationStat(
           metadata, inference_stats, "success", infer_stats.success_count_,
           infer_stats.request_duration_ns_);
@@ -2278,13 +2282,18 @@ TRITONSERVER_ServerModelStatistics(
           infer_stats.queue_duration_ns_);
       SetDurationStat(
           metadata, inference_stats, "compute_input",
-          infer_stats.success_count_, infer_stats.compute_input_duration_ns_);
+          compute_count, infer_stats.compute_input_duration_ns_);
       SetDurationStat(
           metadata, inference_stats, "compute_infer",
-          infer_stats.success_count_, infer_stats.compute_infer_duration_ns_);
+          compute_count, infer_stats.compute_infer_duration_ns_);
       SetDurationStat(
           metadata, inference_stats, "compute_output",
-          infer_stats.success_count_, infer_stats.compute_output_duration_ns_);
+          compute_count, infer_stats.compute_output_duration_ns_);
+      // NOTE: cache_lookup_duration_ns_ is not the same as time spent on cache
+      //       hits as cache misses are included lookup duration as well
+      SetDurationStat(
+          metadata, inference_stats, "cache_hit",
+          infer_stats.cache_hit_count_, infer_stats.cache_lookup_duration_ns_);
 
       triton::common::TritonJson::Value batch_stats(
           metadata, triton::common::TritonJson::ValueType::ARRAY);

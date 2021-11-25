@@ -136,6 +136,15 @@ class Metrics {
   {
     return GetSingleton()->inf_compute_output_duration_us_family_;
   }
+  static prometheus::Family<prometheus::Counter>& FamilyCacheHitCount()
+  {
+    return GetSingleton()->cache_num_hits_model_family_;
+  }
+  static prometheus::Family<prometheus::Counter>&
+  FamilyCacheLookupDuration()
+  {
+    return GetSingleton()->cache_lookup_duration_us_model_family_;
+  }
 
  private:
   Metrics();
@@ -166,22 +175,25 @@ class Metrics {
       inf_compute_infer_duration_us_family_;
   prometheus::Family<prometheus::Counter>&
       inf_compute_output_duration_us_family_;
-  // Response Cache Metrics
+  // Global Response Cache metrics
   prometheus::Family<prometheus::Gauge>& cache_num_entries_family_;
   prometheus::Family<prometheus::Gauge>& cache_num_lookups_family_;
   prometheus::Family<prometheus::Gauge>& cache_num_hits_family_;
   prometheus::Family<prometheus::Gauge>& cache_num_misses_family_;
   prometheus::Family<prometheus::Gauge>& cache_num_evictions_family_;
-  prometheus::Family<prometheus::Gauge>& cache_lookup_latency_us_family_;
+  prometheus::Family<prometheus::Gauge>& cache_lookup_duration_us_family_;
   prometheus::Family<prometheus::Gauge>& cache_util_family_;
-  // Gauges for server-wide cache metrics
+  // Gauges for Global Response Cache metrics
   prometheus::Gauge* cache_num_entries_global_;
   prometheus::Gauge* cache_num_lookups_global_;
   prometheus::Gauge* cache_num_hits_global_;
   prometheus::Gauge* cache_num_misses_global_;
   prometheus::Gauge* cache_num_evictions_global_;
-  prometheus::Gauge* cache_lookup_latency_us_global_;
+  prometheus::Gauge* cache_lookup_duration_us_global_;
   prometheus::Gauge* cache_util_global_;
+  // Per-model Response Cache metrics
+  prometheus::Family<prometheus::Counter>& cache_num_hits_model_family_;
+  prometheus::Family<prometheus::Counter>& cache_lookup_duration_us_model_family_;
 #ifdef TRITON_ENABLE_METRICS_GPU
   prometheus::Family<prometheus::Gauge>& gpu_utilization_family_;
   prometheus::Family<prometheus::Gauge>& gpu_memory_total_family_;

@@ -51,7 +51,8 @@ class InferenceStatsAggregator {
         : failure_count_(0), failure_duration_ns_(0), success_count_(0),
           request_duration_ns_(0), queue_duration_ns_(0),
           compute_input_duration_ns_(0), compute_infer_duration_ns_(0),
-          compute_output_duration_ns_(0)
+          compute_output_duration_ns_(0), cache_hit_count_(0),
+          cache_lookup_duration_ns_(0)
     {
     }
     uint64_t failure_count_;
@@ -63,6 +64,9 @@ class InferenceStatsAggregator {
     uint64_t compute_input_duration_ns_;
     uint64_t compute_infer_duration_ns_;
     uint64_t compute_output_duration_ns_;
+
+    uint64_t cache_hit_count_;
+    uint64_t cache_lookup_duration_ns_;
   };
 
   struct InferBatchStats {

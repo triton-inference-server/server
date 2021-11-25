@@ -115,15 +115,25 @@ Metrics::Metrics()
               .Name("nv_cache_num_evictions")
               .Help("Number of cache evictions in response cache")
               .Register(*registry_)),
-      cache_lookup_latency_us_family_(
+      cache_lookup_duration_us_family_(
           prometheus::BuildGauge()
-              .Name("nv_cache_lookup_latency")
-              .Help("Total cache lookup latency, in microseconds")
+              .Name("nv_cache_lookup_duration")
+              .Help("Total cache lookup duration, in microseconds")
               .Register(*registry_)),
       cache_util_family_(prometheus::BuildGauge()
                              .Name("nv_cache_util")
                              .Help("Cache utilization [0.0 - 1.0]")
                              .Register(*registry_)),
+      cache_num_hits_model_family_(
+          prometheus::BuildCounter()
+              .Name("nv_cache_num_hits_per_model")
+              .Help("Number of cache hits per model")
+              .Register(*registry_)),
+      cache_lookup_duration_us_model_family_(
+          prometheus::BuildCounter()
+              .Name("nv_cache_lookup_duration_per_model")
+              .Help("Total cache lookup duration per model, in microseconds")
+              .Register(*registry_)),
 
 #ifdef TRITON_ENABLE_METRICS_GPU
       gpu_utilization_family_(prometheus::BuildGauge()
@@ -320,7 +330,7 @@ Metrics::PollCacheMetrics(std::shared_ptr<RequestResponseCache> response_cache)
   cache_num_hits_global_->Set(response_cache->NumHits());
   cache_num_misses_global_->Set(response_cache->NumMisses());
   cache_num_evictions_global_->Set(response_cache->NumEvictions());
-  cache_lookup_latency_us_global_->Set(
+  cache_lookup_duration_us_global_->Set(
       response_cache->TotalLookupLatencyNs() / 1000);
   cache_util_global_->Set(response_cache->TotalUtilization());
   return true;
@@ -488,8 +498,8 @@ Metrics::InitializeCacheMetrics(
   cache_num_hits_global_ = &cache_num_hits_family_.Add(cache_labels);
   cache_num_misses_global_ = &cache_num_misses_family_.Add(cache_labels);
   cache_num_evictions_global_ = &cache_num_evictions_family_.Add(cache_labels);
-  cache_lookup_latency_us_global_ =
-      &cache_lookup_latency_us_family_.Add(cache_labels);
+  cache_lookup_duration_us_global_ =
+      &cache_lookup_duration_us_family_.Add(cache_labels);
   cache_util_global_ = &cache_util_family_.Add(cache_labels);
   return true;
 }

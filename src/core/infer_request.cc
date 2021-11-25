@@ -800,9 +800,6 @@ void
 InferenceRequest::ReportStatisticsCacheHit(
     MetricModelReporter* metric_reporter)
 {
-  // TODO: Remove this
-  LOG_INFO << "Reporting Cache Hit Statistics in infer_request.cc...";
-
   // Capture end of request time
   INFER_STATS_DECL_TIMESTAMP(request_end_ns);
 

@@ -167,8 +167,6 @@ RequestResponseCache::Lookup(const uint64_t key, InferenceResponse* ptr, Inferen
     return Status(Status::Code::INTERNAL, "Cache Lookup passed a nullptr request");
   }
 
-  // TODO: Remove this
-  LOG_INFO << "Capturing cache lookup start";
   // Capture start lookup latency
   request->CaptureCacheLookupStartNs();
 
@@ -180,8 +178,6 @@ RequestResponseCache::Lookup(const uint64_t key, InferenceResponse* ptr, Inferen
   if (iter == cache_.end()) {
     num_misses_++;
     LOG_VERBOSE(1) << "MISS for key [" + std::to_string(key) + "] in cache.";
-    // TODO: Remove this
-    LOG_INFO << "Capturing cache lookup end";
     // Capture end lookup latency on miss and update total latency
     request->CaptureCacheLookupEndNs();
     total_lookup_latency_ns_ += (request->CacheLookupEndNs() - request->CacheLookupStartNs());
@@ -202,9 +198,6 @@ RequestResponseCache::Lookup(const uint64_t key, InferenceResponse* ptr, Inferen
 
   LOG_VERBOSE(1) << "Using cached response for key [" + std::to_string(key) +
                         "].";
-
-  // TODO: Remove this
-  LOG_INFO << "Capturing cache lookup end";
 
   // Capture end lookup latency on hit and update total latency
   request->CaptureCacheLookupEndNs();
