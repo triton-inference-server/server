@@ -684,6 +684,37 @@ if [ $(cat $CLIENT_LOG |  grep "${ERROR_STRING}" | wc -l) -ne 0 ]; then
 fi
 set -e
 
+## Test count_windows mode
+set +e
+
+# Send incorrect shape and make sure that perf_analyzer doesn't hang
+$PERF_ANALYZER -v -m graphdef_object_int32_int32 --measurement-mode "count_windows" \
+    --shape INPUT0:1,8,100 --shape INPUT1:2,8 --string-data=1 >$CLIENT_LOG 2>&1
+if [ $? -eq 0 ]; then
+   cat $CLIENT_LOG
+   echo -e "\n***\n*** Test Failed\n***"
+   RET=1
+fi
+if [ $(cat $CLIENT_LOG |  grep "unexpected shape for input 'INPUT0' for model" | wc -l) -eq 0 ]; then
+    cat $CLIENT_LOG
+    echo -e "\n***\n*** Test Failed\n***"
+    RET=1
+fi
+
+$PERF_ANALYZER -v -m graphdef_object_int32_int32 --measurement-mode "count_windows" \
+    --shape INPUT0:2,8 --shape INPUT1:2,8 --string-data=1 >$CLIENT_LOG 2>&1
+if [ $? -ne 0 ]; then
+   cat $CLIENT_LOG
+   echo -e "\n***\n*** Test Failed\n***"
+   RET=1
+fi
+if [ $(cat $CLIENT_LOG |  grep "${ERROR_STRING}" | wc -l) -ne 0 ]; then
+   cat $CLIENT_LOG
+   echo -e "\n***\n*** Test Failed\n***"
+   RET=1
+fi
+set -e
+
 kill $SERVER_PID
 wait $SERVER_PID
 
