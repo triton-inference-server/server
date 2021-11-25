@@ -73,6 +73,7 @@ DynamicBatchScheduler::DynamicBatchScheduler(
   // caching enabled for model to utilize response cache.
   response_cache_enabled_ =
       (model_->Server()->ResponseCacheEnabled() && response_cache_enable);
+#ifdef TRITON_ENABLE_METRICS
   // Initialize metric reporter for cache statistics if cache enabled
   if (response_cache_enabled_) {
     // The cache isn't tied to any specific model instance or GPU device,
@@ -83,6 +84,7 @@ DynamicBatchScheduler::DynamicBatchScheduler(
         model_->Name(), model_->Version(), id, model_->Config().metric_tags(),
         &reporter_);
   }
+#endif  // TRITON_ENABLE_METRICS
   max_preferred_batch_size_ = 0;
   for (const auto size : preferred_batch_sizes_) {
     max_preferred_batch_size_ =
@@ -592,9 +594,11 @@ DynamicBatchScheduler::CacheLookUp(
   status = cache->Lookup(request_hash, local_response.get(), request.get());
   if (status.IsOk() && (local_response != nullptr)) {
     cached_response = std::move(local_response);
+#ifdef TRITON_ENABLE_METRICS
     // Update model metrics/stats on cache hits
     // Backends will update metrics as normal on cache misses
     request->ReportStatisticsCacheHit(reporter_.get());
+#endif  // TRITON_ENABLE_METRICS
   }
 }
 

@@ -113,12 +113,15 @@ InferenceStatsAggregator::UpdateSuccessWithDuration(
 #endif  // TRITON_ENABLE_METRICS
 }
 
+// Currently cache hits will not go to the inference backend where metrics
+// are typically updated, so this method allows us to update relevant metrics
+// from a metric reporter rather than going through the backend.
 void
 InferenceStatsAggregator::UpdateSuccessCacheHit(
     MetricModelReporter* metric_reporter, const size_t batch_size,
     const uint64_t request_start_ns, const uint64_t queue_start_ns,
     const uint64_t cache_lookup_start_ns, const uint64_t request_end_ns,
-    const uint64_t cache_lookup_duration_ns)
+    const uint64_t cache_hit_lookup_duration_ns)
 {
   const uint64_t request_duration_ns = request_end_ns - request_start_ns;
   const uint64_t queue_duration_ns = cache_lookup_start_ns - queue_start_ns;
@@ -129,7 +132,7 @@ InferenceStatsAggregator::UpdateSuccessCacheHit(
   infer_stats_.request_duration_ns_ += request_duration_ns;
   infer_stats_.queue_duration_ns_ += queue_duration_ns;
   infer_stats_.cache_hit_count_++;
-  infer_stats_.cache_lookup_duration_ns_ += cache_lookup_duration_ns;
+  infer_stats_.cache_hit_lookup_duration_ns_ += cache_hit_lookup_duration_ns;
 
 #ifdef TRITON_ENABLE_METRICS
   if (metric_reporter != nullptr) {
@@ -139,8 +142,8 @@ InferenceStatsAggregator::UpdateSuccessCacheHit(
     metric_reporter->MetricInferenceQueueDuration().Increment(
         queue_duration_ns / 1000);
     metric_reporter->MetricCacheHitCount().Increment(1);
-    metric_reporter->MetricCacheLookupDuration().Increment(
-        cache_lookup_duration_ns / 1000);
+    metric_reporter->MetricCacheHitLookupDuration().Increment(
+        cache_hit_lookup_duration_ns / 1000);
   }
 #endif  // TRITON_ENABLE_METRICS
 }

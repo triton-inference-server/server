@@ -140,9 +140,9 @@ class Metrics {
   {
     return GetSingleton()->cache_num_hits_model_family_;
   }
-  static prometheus::Family<prometheus::Counter>& FamilyCacheLookupDuration()
+  static prometheus::Family<prometheus::Counter>& FamilyCacheHitLookupDuration()
   {
-    return GetSingleton()->cache_lookup_duration_us_model_family_;
+    return GetSingleton()->cache_hit_lookup_duration_us_model_family_;
   }
 
  private:
@@ -193,7 +193,7 @@ class Metrics {
   // Per-model Response Cache metrics
   prometheus::Family<prometheus::Counter>& cache_num_hits_model_family_;
   prometheus::Family<prometheus::Counter>&
-      cache_lookup_duration_us_model_family_;
+      cache_hit_lookup_duration_us_model_family_;
 #ifdef TRITON_ENABLE_METRICS_GPU
   prometheus::Family<prometheus::Gauge>& gpu_utilization_family_;
   prometheus::Family<prometheus::Gauge>& gpu_memory_total_family_;

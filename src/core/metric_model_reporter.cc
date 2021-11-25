@@ -96,8 +96,8 @@ MetricModelReporter::MetricModelReporter(
       Metrics::FamilyInferenceComputeOutputDuration(), labels);
   metric_cache_hit_count_ =
       CreateCounterMetric(Metrics::FamilyCacheHitCount(), labels);
-  metric_cache_lookup_duration_us_ =
-      CreateCounterMetric(Metrics::FamilyCacheLookupDuration(), labels);
+  metric_cache_hit_lookup_duration_us_ =
+      CreateCounterMetric(Metrics::FamilyCacheHitLookupDuration(), labels);
 }
 
 MetricModelReporter::~MetricModelReporter()
@@ -116,7 +116,8 @@ MetricModelReporter::~MetricModelReporter()
   Metrics::FamilyInferenceComputeOutputDuration().Remove(
       metric_inf_compute_output_duration_us_);
   Metrics::FamilyCacheHitCount().Remove(metric_cache_hit_count_);
-  Metrics::FamilyCacheLookupDuration().Remove(metric_cache_lookup_duration_us_);
+  Metrics::FamilyCacheHitLookupDuration().Remove(
+      metric_cache_hit_lookup_duration_us_);
 }
 
 void

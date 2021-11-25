@@ -2290,11 +2290,9 @@ TRITONSERVER_ServerModelStatistics(
       SetDurationStat(
           metadata, inference_stats, "compute_output", compute_count,
           infer_stats.compute_output_duration_ns_);
-      // NOTE: cache_lookup_duration_ns_ is not the same as time spent on cache
-      //       hits as cache misses are included lookup duration as well
       SetDurationStat(
           metadata, inference_stats, "cache_hit", infer_stats.cache_hit_count_,
-          infer_stats.cache_lookup_duration_ns_);
+          infer_stats.cache_hit_lookup_duration_ns_);
 
       triton::common::TritonJson::Value batch_stats(
           metadata, triton::common::TritonJson::ValueType::ARRAY);
