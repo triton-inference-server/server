@@ -534,18 +534,20 @@ class InferenceRequest {
   uint64_t CacheLookupStartNs() const { return cache_lookup_start_ns_; }
   uint64_t CaptureCacheLookupStartNs()
   {
-    cache_lookup_start_ns_ = std::chrono::duration_cast<std::chrono::nanoseconds>(
-                            std::chrono::steady_clock::now().time_since_epoch())
-                            .count();
+    cache_lookup_start_ns_ =
+        std::chrono::duration_cast<std::chrono::nanoseconds>(
+            std::chrono::steady_clock::now().time_since_epoch())
+            .count();
     return cache_lookup_start_ns_;
   }
 
   uint64_t CacheLookupEndNs() const { return cache_lookup_end_ns_; }
   uint64_t CaptureCacheLookupEndNs()
   {
-    cache_lookup_end_ns_ = std::chrono::duration_cast<std::chrono::nanoseconds>(
-                            std::chrono::steady_clock::now().time_since_epoch())
-                            .count();
+    cache_lookup_end_ns_ =
+        std::chrono::duration_cast<std::chrono::nanoseconds>(
+            std::chrono::steady_clock::now().time_since_epoch())
+            .count();
     return cache_lookup_end_ns_;
   }
 

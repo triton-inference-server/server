@@ -124,11 +124,10 @@ Metrics::Metrics()
                              .Name("nv_cache_util")
                              .Help("Cache utilization [0.0 - 1.0]")
                              .Register(*registry_)),
-      cache_num_hits_model_family_(
-          prometheus::BuildCounter()
-              .Name("nv_cache_num_hits_per_model")
-              .Help("Number of cache hits per model")
-              .Register(*registry_)),
+      cache_num_hits_model_family_(prometheus::BuildCounter()
+                                       .Name("nv_cache_num_hits_per_model")
+                                       .Help("Number of cache hits per model")
+                                       .Register(*registry_)),
       cache_lookup_duration_us_model_family_(
           prometheus::BuildCounter()
               .Name("nv_cache_lookup_duration_per_model")

@@ -797,28 +797,28 @@ InferenceRequest::ReportStatisticsWithDuration(
 }
 
 void
-InferenceRequest::ReportStatisticsCacheHit(
-    MetricModelReporter* metric_reporter)
+InferenceRequest::ReportStatisticsCacheHit(MetricModelReporter* metric_reporter)
 {
   // Capture end of request time
   INFER_STATS_DECL_TIMESTAMP(request_end_ns);
 
   if (cache_lookup_start_ns_ == 0 || cache_lookup_end_ns_ == 0) {
-      LOG_WARNING
-          << "Cache lookup timestamps were not set correctly. Cache lookup duration stats may be incorrect.";
+    LOG_WARNING << "Cache lookup timestamps were not set correctly. Cache "
+                   "lookup duration stats may be incorrect.";
   }
-  const uint64_t cache_lookup_duration_ns = cache_lookup_end_ns_ - cache_lookup_start_ns_;
+  const uint64_t cache_lookup_duration_ns =
+      cache_lookup_end_ns_ - cache_lookup_start_ns_;
 
   // Cache hit is always success
   backend_raw_->MutableStatsAggregator()->UpdateSuccessCacheHit(
-        metric_reporter, std::max(1U, batch_size_), request_start_ns_,
-        queue_start_ns_, cache_lookup_start_ns_, request_end_ns,
-        cache_lookup_duration_ns);
+      metric_reporter, std::max(1U, batch_size_), request_start_ns_,
+      queue_start_ns_, cache_lookup_start_ns_, request_end_ns,
+      cache_lookup_duration_ns);
   if (secondary_stats_aggregator_ != nullptr) {
-      secondary_stats_aggregator_->UpdateSuccessCacheHit(
-          nullptr /* metric_reporter */, std::max(1U, batch_size_),
-          request_start_ns_, queue_start_ns_, cache_lookup_start_ns_, request_end_ns,
-          cache_lookup_duration_ns);
+    secondary_stats_aggregator_->UpdateSuccessCacheHit(
+        nullptr /* metric_reporter */, std::max(1U, batch_size_),
+        request_start_ns_, queue_start_ns_, cache_lookup_start_ns_,
+        request_end_ns, cache_lookup_duration_ns);
   }
 }
 #endif  // TRITON_ENABLE_STATS

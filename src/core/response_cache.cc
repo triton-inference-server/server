@@ -158,13 +158,15 @@ RequestResponseCache::Hash(const InferenceRequest& request, uint64_t* key)
 }
 
 Status
-RequestResponseCache::Lookup(const uint64_t key, InferenceResponse* ptr, InferenceRequest* request)
+RequestResponseCache::Lookup(
+    const uint64_t key, InferenceResponse* ptr, InferenceRequest* request)
 {
   // Lock on cache lookup
   std::lock_guard<std::recursive_mutex> lk(cache_mtx_);
 
   if (request == nullptr) {
-    return Status(Status::Code::INTERNAL, "Cache Lookup passed a nullptr request");
+    return Status(
+        Status::Code::INTERNAL, "Cache Lookup passed a nullptr request");
   }
 
   // Capture start lookup latency
@@ -180,7 +182,8 @@ RequestResponseCache::Lookup(const uint64_t key, InferenceResponse* ptr, Inferen
     LOG_VERBOSE(1) << "MISS for key [" + std::to_string(key) + "] in cache.";
     // Capture end lookup latency on miss and update total latency
     request->CaptureCacheLookupEndNs();
-    total_lookup_latency_ns_ += (request->CacheLookupEndNs() - request->CacheLookupStartNs());
+    total_lookup_latency_ns_ +=
+        (request->CacheLookupEndNs() - request->CacheLookupStartNs());
     return Status(Status::Code::INTERNAL, "key not found in cache");
   }
 
@@ -201,7 +204,8 @@ RequestResponseCache::Lookup(const uint64_t key, InferenceResponse* ptr, Inferen
 
   // Capture end lookup latency on hit and update total latency
   request->CaptureCacheLookupEndNs();
-  total_lookup_latency_ns_ += (request->CacheLookupEndNs() - request->CacheLookupStartNs());
+  total_lookup_latency_ns_ +=
+      (request->CacheLookupEndNs() - request->CacheLookupStartNs());
   return Status::Success;
 }
 
