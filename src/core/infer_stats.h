@@ -114,6 +114,14 @@ class InferenceStatsAggregator {
       const uint64_t compute_infer_duration_ns,
       const uint64_t compute_output_duration_ns);
 
+  // Add durations to infer stats for a successful cached response.
+  void
+  UpdateSuccessCacheHit(
+      MetricModelReporter* metric_reporter, const size_t batch_size,
+      const uint64_t request_start_ns, const uint64_t queue_start_ns,
+      const uint64_t cache_lookup_start_ns, const uint64_t request_end_ns,
+      const uint64_t cache_lookup_duration_ns);
+
   // Add durations to batch infer stats for a batch execution.
   // 'success_request_count' is the number of sucess requests in the
   // batch that have infer_stats attached.

@@ -170,6 +170,8 @@ DynamicBatchScheduler::Enqueue(std::unique_ptr<InferenceRequest>& request)
       // delegated.
       DelegateResponse(request);
     }
+
+    // Send cached response and release request
     InferenceResponse::Send(
         std::move(cached_response), TRITONSERVER_RESPONSE_COMPLETE_FINAL);
     InferenceRequest::Release(
@@ -577,9 +579,17 @@ DynamicBatchScheduler::CacheLookUp(
   // Lookup request key in cache
   std::unique_ptr<InferenceResponse> local_response;
   request->ResponseFactory().CreateResponse(&local_response);
-  status = cache->Lookup(request_hash, local_response.get());
+  status = cache->Lookup(request_hash, local_response.get(), request.get());
   if (status.IsOk() && (local_response != nullptr)) {
     cached_response = std::move(local_response);
+
+    // TODO: Remove this
+    if (model_instance_ == nullptr) {
+      LOG_INFO << "[dynamic_scheduler] CacheLookUp: MODEL INSTANCE WAS NULLPTR IN Scheduler CacheLookUp";
+    }
+    // TODO: IFDEF metrics/stats here?
+    // Update model metrics/stats
+    request->ReportStatisticsCacheHit(model_instance_->MetricReporter());
   }
 }
 

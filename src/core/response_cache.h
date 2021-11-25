@@ -74,7 +74,7 @@ class RequestResponseCache {
   // Lookup 'key' in cache and return the inference response in 'ptr' on cache
   // hit or nullptr on cache miss Return Status object indicating success or
   // failure.
-  Status Lookup(const uint64_t key, InferenceResponse* ptr);
+  Status Lookup(const uint64_t key, InferenceResponse* ptr, InferenceRequest* request);
   // Insert response into cache, evict entries to make space if necessary
   // Return Status object indicating success or failure.
   Status Insert(const uint64_t key, const InferenceResponse& response);

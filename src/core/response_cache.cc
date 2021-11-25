@@ -158,15 +158,19 @@ RequestResponseCache::Hash(const InferenceRequest& request, uint64_t* key)
 }
 
 Status
-RequestResponseCache::Lookup(const uint64_t key, InferenceResponse* ptr)
+RequestResponseCache::Lookup(const uint64_t key, InferenceResponse* ptr, InferenceRequest* request)
 {
   // Lock on cache lookup
   std::lock_guard<std::recursive_mutex> lk(cache_mtx_);
 
+  if (request == nullptr) {
+    return Status(Status::Code::INTERNAL, "Cache Lookup passed a nullptr request");
+  }
+
+  // TODO: Remove this
+  LOG_INFO << "Capturing cache lookup start";
   // Capture start lookup latency
-  uint64_t lookup_start_ns = 0;
-  uint64_t lookup_end_ns = 0;
-  INFER_STATS_SET_TIMESTAMP(lookup_start_ns);
+  request->CaptureCacheLookupStartNs();
 
   num_lookups_++;
   LOG_VERBOSE(1) << "Looking up key [" + std::to_string(key) + "] in cache.";
@@ -176,9 +180,11 @@ RequestResponseCache::Lookup(const uint64_t key, InferenceResponse* ptr)
   if (iter == cache_.end()) {
     num_misses_++;
     LOG_VERBOSE(1) << "MISS for key [" + std::to_string(key) + "] in cache.";
+    // TODO: Remove this
+    LOG_INFO << "Capturing cache lookup end";
     // Capture end lookup latency on miss and update total latency
-    INFER_STATS_SET_TIMESTAMP(lookup_end_ns);
-    total_lookup_latency_ns_ += (lookup_end_ns - lookup_start_ns);
+    request->CaptureCacheLookupEndNs();
+    total_lookup_latency_ns_ += (request->CacheLookupEndNs() - request->CacheLookupStartNs());
     return Status(Status::Code::INTERNAL, "key not found in cache");
   }
 
@@ -197,9 +203,12 @@ RequestResponseCache::Lookup(const uint64_t key, InferenceResponse* ptr)
   LOG_VERBOSE(1) << "Using cached response for key [" + std::to_string(key) +
                         "].";
 
+  // TODO: Remove this
+  LOG_INFO << "Capturing cache lookup end";
+
   // Capture end lookup latency on hit and update total latency
-  INFER_STATS_SET_TIMESTAMP(lookup_end_ns);
-  total_lookup_latency_ns_ += (lookup_end_ns - lookup_start_ns);
+  request->CaptureCacheLookupEndNs();
+  total_lookup_latency_ns_ += (request->CacheLookupEndNs() - request->CacheLookupStartNs());
   return Status::Success;
 }
 
