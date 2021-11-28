@@ -26,7 +26,6 @@
 
 import argparse
 import os
-import sys
 import numpy as np
 import tensorrt as trt
 import test_util as tu

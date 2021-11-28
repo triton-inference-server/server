@@ -28,7 +28,6 @@ import numpy as np
 
 import torch
 import torch.nn as nn
-import torchvision.models as models
 import torch.nn.functional as F
 
 import triton_python_backend_utils as pb_utils

@@ -27,13 +27,9 @@
 import sys
 sys.path.append("../common")
 
-from builtins import range
-from future.utils import iteritems
 import numpy as np
 import os
 import unittest
-import json
-import requests
 import infer_util as iu
 import test_util as tu
 import tritongrpcclient as grpcclient

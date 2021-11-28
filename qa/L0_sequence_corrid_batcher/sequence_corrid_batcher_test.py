@@ -27,13 +27,9 @@
 import sys
 sys.path.append("../common")
 
-from builtins import range
-from builtins import str
-from future.utils import iteritems
 import os
 import time
 import threading
-import traceback
 import unittest
 import numpy as np
 import test_util as tu

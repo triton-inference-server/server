@@ -24,12 +24,9 @@
 # (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-import sys
-import os
 import numpy as np
 from ctypes import *
 
-import tritonclient.grpc as grpcclient
 import tritonclient.http as httpclient
 from tritonclient.utils import *
 
