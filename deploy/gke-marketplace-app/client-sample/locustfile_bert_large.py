@@ -24,11 +24,9 @@
 # (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-import time
 from locust import HttpUser, task, between
 from locust import LoadTestShape
 import json
-from math import sin, pi
 
 class ProfileLoad(LoadTestShape):
     '''

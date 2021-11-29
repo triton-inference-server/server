@@ -102,11 +102,11 @@ class SequenceCorrIDBatcherTest(su.SequenceBatcherTestUtil):
 
                 # Need scheduler to wait for queue to contain all
                 # inferences for both sequences.
-                self.assertTrue("TRITONSERVER_DELAY_SCHEDULER" in os.environ)
+                self.assertIn("TRITONSERVER_DELAY_SCHEDULER", os.environ)
                 self.assertEqual(
                     int(os.environ["TRITONSERVER_DELAY_SCHEDULER"]), 12)
-                self.assertTrue(
-                    "TRITONSERVER_BACKLOG_DELAY_SCHEDULER" in os.environ)
+                self.assertIn(
+                    "TRITONSERVER_BACKLOG_DELAY_SCHEDULER", os.environ)
                 self.assertEqual(
                     int(os.environ["TRITONSERVER_BACKLOG_DELAY_SCHEDULER"]), 0)
 
