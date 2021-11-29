@@ -810,7 +810,7 @@ InferenceRequest::ReportStatisticsCacheHit(MetricModelReporter* metric_reporter)
       cache_lookup_end_ns_ - cache_lookup_start_ns_;
 
   // Cache hit is always success
-  backend_raw_->MutableStatsAggregator()->UpdateSuccessCacheHit(
+  model_raw_->MutableStatsAggregator()->UpdateSuccessCacheHit(
       metric_reporter, std::max(1U, batch_size_), request_start_ns_,
       queue_start_ns_, cache_lookup_start_ns_, request_end_ns,
       cache_lookup_duration_ns);
