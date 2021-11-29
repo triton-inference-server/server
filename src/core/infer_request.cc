@@ -28,11 +28,9 @@
 
 #include <algorithm>
 #include <deque>
-
 #include "src/core/logging.h"
 #include "src/core/model.h"
 #include "src/core/server.h"
-
 #ifdef TRITON_ENABLE_GPU
 #include <cuda_runtime_api.h>
 #endif  // TRITON_ENABLE_GPU

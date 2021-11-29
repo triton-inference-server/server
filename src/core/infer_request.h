@@ -29,7 +29,6 @@
 #include <string>
 #include <unordered_map>
 #include <vector>
-
 #include "src/core/infer_response.h"
 #include "src/core/infer_stats.h"
 #include "src/core/infer_trace.h"

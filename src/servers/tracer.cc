@@ -27,12 +27,9 @@
 #include "src/servers/tracer.h"
 
 #include <stdlib.h>
-
 #include <unordered_map>
-
 #include "src/core/constants.h"
 #include "src/core/logging.h"
-
 #ifdef TRITON_ENABLE_GPU
 #include <cuda_runtime_api.h>
 #endif  // TRITON_ENABLE_GPU

@@ -29,7 +29,6 @@
 #include <functional>
 #include <string>
 #include <vector>
-
 #include "src/core/constants.h"
 #include "src/core/infer_parameter.h"
 #include "src/core/infer_trace.h"

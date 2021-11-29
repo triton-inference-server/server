@@ -26,7 +26,6 @@
 
 #include <string>
 #include <vector>
-
 #include "src/core/cuda_utils.h"
 #include "src/core/infer_parameter.h"
 #include "src/core/infer_request.h"

@@ -31,7 +31,6 @@
 #include <mutex>
 #include <sstream>
 #include <string>
-
 #include "triton/core/tritonserver.h"
 
 namespace nvidia { namespace inferenceserver {

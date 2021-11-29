@@ -31,7 +31,6 @@
 #include <sys/syscall.h>
 #include <unistd.h>
 #endif
-
 #include "src/core/constants.h"
 #include "src/core/logging.h"
 #include "src/core/model_config.h"
