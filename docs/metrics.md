@@ -54,14 +54,37 @@ The following table describes the available metrics.
 |              |GPU Utilization |GPU utilization rate (0.0 - 1.0)       |Per GPU    |Per second   |
 |GPU Memory    |GPU Total Memory|Total GPU memory, in bytes             |Per GPU    |Per second   |
 |              |GPU Used Memory |Used GPU memory, in bytes              |Per GPU    |Per second   |
-|Count         |Request Count   |Number of inference requests received by Triton (each request is counted as 1, even if the request contains a batch) |Per model  |Per request  |
+|Count         |Success Count   |Number of successful inference requests received by Triton (each request is counted as 1, even if the request contains a batch) |Per model  |Per request  |
+|              |Failure Count   |Number of failed inference requests received by Triton (each request is counted as 1, even if the request contains a batch) |Per model  |Per request  |
 |              |Inference Count |Number of inferences performed (a batch of "n" is counted as "n" inferences)|Per model|Per request|
 |              |Execution Count |Number of inference batch executions (see [Count Metrics](#count-metrics))|Per model|Per request|
-|Latency       |Request Time    |Cumulative end-to-end inference request handling time    |Per model  |Per request  |
-|              |Queue Time      |Cumulative time requests spend waiting in the scheduling queue     |Per model  |Per request  |
-|              |Compute Input Time|Cumulative time requests spend processing inference inputs (in the framework backend)     |Per model  |Per request  |
-|              |Compute Time    |Cumulative time requests spend executing the inference model (in the framework backend)     |Per model  |Per request  |
-|              |Compute Output Time|Cumulative time requests spend processing inference outputs (in the framework backend)     |Per model  |Per request  |
+|Latency       |Request Time    |Cumulative end-to-end inference request handling time (includes cached requests) |Per model  |Per request  |
+|              |Queue Time      |Cumulative time requests spend waiting in the scheduling queue (includes cached requests) |Per model  |Per request  |
+|              |Compute Input Time|Cumulative time requests spend processing inference inputs (in the framework backend, does not include cached requests)     |Per model  |Per request  |
+|              |Compute Time    |Cumulative time requests spend executing the inference model (in the framework backend, does not include cached requests)     |Per model  |Per request  |
+|              |Compute Output Time|Cumulative time requests spend processing inference outputs (in the framework backend, does not include cached requests)     |Per model  |Per request  |
+|Response Cache|Total Cache Entry Count |Number of responses currently stored in response cache |Server-wide |Per second |
+|              |Total Cache Lookup Count |Number of response cache lookups done by Triton |Server-wide |Per second |
+|              |Total Cache Hit Count |Number of response cache hits |Server-wide |Per second |
+|              |Total Cache Miss Count |Number of response cache misses |Server-wide |Per second |
+|              |Total Cache Eviction Count |Number of response cache evictions |Server-wide |Per second |
+|              |Total Cache Lookup Time |Cumulative time requests spend checking for a cached response (microseconds) |Server-wide |Per second |
+|              |Total Cache Utilization |Response Cache utilization rate (0.0 - 1.0) |Server-wide |Per second |
+|              |Cache Hit Count |Number of response cache hits per model |Per model |Per request |
+|              |Cache Hit Lookup Time |Cumulative time requests spend checking for a cached response (microseconds) per model |Per model |Per request |
+
+## Response Cache
+
+Compute latency metrics in the table above are calculated for the
+time spent in model inference backends. If the response cache is enabled for a
+given model (and a non-zero `--response-cache-byte-size` is defined for the
+server), total inference times may be affected by response cache lookup times.
+
+On cache hits, the cached response will be used instead of going through the
+inference backend, so compute times will not be recorded.
+
+On cache misses, the request will still go through to the inference backend and
+update compute time metrics accordingly.
 
 ## Count Metrics
 
