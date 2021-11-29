@@ -47,37 +47,24 @@ class InferenceTrace {
   InferenceTrace(
       const TRITONSERVER_InferenceTraceLevel level, const uint64_t parent_id,
       TRITONSERVER_InferenceTraceActivityFn_t activity_fn,
-      TRITONSERVER_InferenceTraceReleaseFn_t release_fn, void* userp)
-      : level_(level), id_(next_id_++), parent_id_(parent_id),
-        activity_fn_(activity_fn), release_fn_(release_fn), userp_(userp)
-  {
-  }
-
-  InferenceTrace(
-      const TRITONSERVER_InferenceTraceLevel level, const uint64_t parent_id,
-      TRITONSERVER_InferenceTraceActivityFn_t activity_fn,
-      TRITONSERVER_InferenceTraceTensorActivityFn_t tensor_activity_fn,
-      TRITONSERVER_InferenceTraceReleaseFn_t release_fn, void* userp)
+      TRITONSERVER_InferenceTraceReleaseFn_t release_fn, void* userp,
+      TRITONSERVER_InferenceTraceTensorActivityFn_t tensor_activity_fn =
+          nullptr)
       : level_(level), id_(next_id_++), parent_id_(parent_id),
         activity_fn_(activity_fn), tensor_activity_fn_(tensor_activity_fn),
         release_fn_(release_fn), userp_(userp)
   {
   }
 
-  InferenceTrace(
-      const TRITONSERVER_InferenceTraceLevel level, const uint64_t id,
-      const uint64_t parent_id,
-      TRITONSERVER_InferenceTraceActivityFn_t activity_fn,
-      TRITONSERVER_InferenceTraceTensorActivityFn_t tensor_activity_fn,
-      TRITONSERVER_InferenceTraceReleaseFn_t release_fn, void* userp)
-      : level_(level), id_(id), parent_id_(parent_id),
-        activity_fn_(activity_fn), tensor_activity_fn_(tensor_activity_fn),
-        release_fn_(release_fn), userp_(userp)
+  ~InferenceTrace()
   {
+    // Release the trace. Call the trace release callback and transfer
+    // ownership of the trace to the callback. On return 'trace' is
+    // nullptr.
+    release_fn_(reinterpret_cast<TRITONSERVER_InferenceTrace*>(this), userp_);
   }
 
-  std::unique_ptr<InferenceTrace> SpawnChildTrace();
-  std::shared_ptr<InferenceTrace> CopyTrace();
+  std::shared_ptr<InferenceTrace> SpawnChildTrace();
 
   int64_t Id() const { return id_; }
   int64_t ParentId() const { return parent_id_; }
@@ -118,11 +105,6 @@ class InferenceTrace {
         datatype, base, byte_size, shape, dim_count, memory_type,
         memory_type_id, userp_);
   }
-
-  // Release the trace. Call the trace release callback and transfer
-  // ownership of the trace to the callback. On return 'trace' is
-  // nullptr.
-  static void Release(std::unique_ptr<InferenceTrace>&& trace);
 
  private:
   const TRITONSERVER_InferenceTraceLevel level_;

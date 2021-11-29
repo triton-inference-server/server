@@ -812,8 +812,8 @@ TRITONSERVER_InferenceTraceTensorNew(
 {
 #ifdef TRITON_ENABLE_TRACING
   ni::InferenceTrace* ltrace = new ni::InferenceTrace(
-      level, parent_id, activity_fn, tensor_activity_fn, release_fn,
-      trace_userp);
+      level, parent_id, activity_fn, release_fn, trace_userp,
+      tensor_activity_fn);
   *trace = reinterpret_cast<TRITONSERVER_InferenceTrace*>(ltrace);
   return nullptr;  // Success
 #else
@@ -2422,16 +2422,16 @@ TRITONSERVER_ServerInferAsync(
   // Run inference...
   ni::Status status = lserver->InferAsync(ureq);
 
-  // If there is an error then must explicitly release any trace
-  // object associated with the inference request above.
-#ifdef TRITON_ENABLE_TRACING
-  if (!status.IsOk()) {
-    std::unique_ptr<ni::InferenceTrace>* trace = ureq->MutableTrace();
-    if (*trace != nullptr) {
-      ni::InferenceTrace::Release(std::move(*trace));
-    }
-  }
-#endif  // TRITON_ENABLE_TRACING
+  //   // If there is an error then must explicitly release any trace
+  //   // object associated with the inference request above.
+  // #ifdef TRITON_ENABLE_TRACING
+  //   if (!status.IsOk()) {
+  //     std::unique_ptr<ni::InferenceTrace>* trace = ureq->MutableTrace();
+  //     if (*trace != nullptr) {
+  //       ni::InferenceTrace::Release(std::move(*trace));
+  //     }
+  //   }
+  // #endif  // TRITON_ENABLE_TRACING
 
   // If there is an error then ureq will still have 'lrequest' and we
   // must release it from unique_ptr since the caller should retain

@@ -33,6 +33,10 @@
 #include "src/core/model.h"
 #include "src/core/server.h"
 
+#ifdef TRITON_ENABLE_GPU
+#include <cuda_runtime_api.h>
+#endif  // TRITON_ENABLE_GPU
+
 namespace nvidia { namespace inferenceserver {
 
 namespace {
@@ -245,7 +249,7 @@ InferenceRequest::Release(
   // and the callback may interact with upper level trace.
   if (request->trace_ != nullptr) {
     request->trace_->ReportNow(TRITONSERVER_TRACE_REQUEST_END);
-    InferenceTrace::Release(std::move(request->trace_));
+    // InferenceTrace::Release(std::move(request->trace_));
   }
 #endif  // TRITON_ENABLE_TRACING
 

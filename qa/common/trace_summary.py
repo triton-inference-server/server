@@ -335,11 +335,11 @@ def print_tensor_by_id(id, traces, tab_num):
                 tabs, trace["model_version"]))
         # print data
         if "id" in trace and "activity" in trace:
-            if trace["id"] == id and trace["activity"] == "7":
+            if trace["id"] == id and trace["activity"] == "TENSOR_INPUT":
                 print("{0}{1}:".format(tabs, "INPUT"))
                 print("{0}\t{1}: {2}".format(tabs, trace["tensor"]["name"],
                       get_numpy_array(trace["tensor"])))
-            elif trace["id"] == id and trace["activity"] == "8":
+            elif trace["id"] == id and trace["activity"] == "TENSOR_OUTPUT":
                 print("{0}{1}:".format(tabs, "OUTPUT"))
                 print("{0}\t{1}: {2}".format(tabs, trace["tensor"]["name"],
                       get_numpy_array(trace["tensor"])))
@@ -347,24 +347,24 @@ def print_tensor_by_id(id, traces, tab_num):
 
 
 TRITON_TYPE_TO_NUMPY = {
-    1: bool,
-    2: np.uint8,
-    3: np.uint16,
-    4: np.uint32,
-    5: np.uint64,
-    6: np.int8,
-    7: np.int16,
-    8: np.int32,
-    9: np.int64,
-    10: np.float16,
-    11: np.float32,
-    12: np.float64,
-    13: np.object_
+    "BOOL": bool,
+    "UINT8": np.uint8,
+    "UINT16": np.uint16,
+    "UINT32": np.uint32,
+    "UINT64": np.uint64,
+    "INT8": np.int8,
+    "INT16": np.int16,
+    "INT32": np.int32,
+    "INT64": np.int64,
+    "FP16": np.float16,
+    "FP32": np.float32,
+    "FP64": np.float64,
+    "BYTES": np.object_
 }
 
 
 def get_numpy_array(tensor):
-    dtype = TRITON_TYPE_TO_NUMPY[int(tensor["dtype"])]
+    dtype = TRITON_TYPE_TO_NUMPY[tensor["dtype"]]
     value = map(float, tensor["data"].split(","))
     shape = map(int, tensor["shape"].split(","))
     array = np.array(value, dtype=dtype)

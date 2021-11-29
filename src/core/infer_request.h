@@ -40,10 +40,6 @@
 #include "src/core/status.h"
 #include "src/core/tritonserver_apis.h"
 
-#ifdef TRITON_ENABLE_GPU
-#include <cuda_runtime_api.h>
-#endif  // TRITON_ENABLE_GPU
-
 namespace nvidia { namespace inferenceserver {
 
 class Model;
@@ -303,13 +299,13 @@ class InferenceRequest {
   void SetCacheKey(uint64_t key) { cache_key_ = key; }
 
 #ifdef TRITON_ENABLE_TRACING
-  const std::unique_ptr<InferenceTrace>& Trace() const { return trace_; }
-  std::unique_ptr<InferenceTrace>* MutableTrace() { return &trace_; }
-  void SetTrace(std::unique_ptr<InferenceTrace>&& trace)
+  const std::shared_ptr<InferenceTrace>& Trace() const { return trace_; }
+  std::shared_ptr<InferenceTrace>* MutableTrace() { return &trace_; }
+  void SetTrace(std::shared_ptr<InferenceTrace>&& trace)
   {
     trace_ = std::move(trace);
 #ifdef TRITON_ENABLE_TRACING
-    response_factory_.SetTrace(std::move(trace_->CopyTrace()));
+    response_factory_.SetTrace(trace_);
 #endif  // TRITON_ENABLE_TRACING
   }
 
@@ -650,7 +646,7 @@ class InferenceRequest {
 
 #ifdef TRITON_ENABLE_TRACING
   // Inference trace associated with this request.
-  std::unique_ptr<InferenceTrace> trace_;
+  std::shared_ptr<InferenceTrace> trace_;
 #endif  // TRITON_ENABLE_TRACING
 
   // Sequence I/O states used for implicit state.

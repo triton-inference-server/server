@@ -33,6 +33,10 @@
 #include "src/core/constants.h"
 #include "src/core/logging.h"
 
+#ifdef TRITON_ENABLE_GPU
+#include <cuda_runtime_api.h>
+#endif  // TRITON_ENABLE_GPU
+
 namespace nvidia { namespace inferenceserver {
 
 namespace {
@@ -185,8 +189,8 @@ TraceManager::TraceRelease(TRITONSERVER_InferenceTrace* trace, void* userp)
     delete ts;
   }
 
-  LOG_TRITONSERVER_ERROR(
-      TRITONSERVER_InferenceTraceDelete(trace), "deleting trace");
+  // LOG_TRITONSERVER_ERROR(
+  //     TRITONSERVER_InferenceTraceDelete(trace), "deleting trace");
 }
 
 void
@@ -296,7 +300,8 @@ TraceManager::TraceTensorActivity(
   std::stringstream ss_tmp;
 
   // collect and serialize trace details.
-  ss_tmp << ",{\"id\":" << id << ",\"activity\":\"" << activity << "\"";
+  ss_tmp << ",{\"id\":" << id << ",\"activity\":\""
+         << TRITONSERVER_InferenceTraceActivityString(activity) << "\"";
   // collect tensor
   ss_tmp << ",\"tensor\":{";
   // collect tensor name
@@ -442,7 +447,7 @@ TraceManager::TraceTensorActivity(
       ss_tmp << ",";
     }
   }
-  ss_tmp << "\",\"dtype\":\"" << datatype << "\"}";
+  ss_tmp << "\",\"dtype\":\"" << TRITONSERVER_DataTypeString(datatype) << "\"}";
   ss_tmp << "}";
 
   *ss << ss_tmp.str();

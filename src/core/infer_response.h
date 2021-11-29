@@ -79,10 +79,7 @@ class InferenceResponseFactory {
 
 #ifdef TRITON_ENABLE_TRACING
   const std::shared_ptr<InferenceTrace>& Trace() const { return trace_; }
-  void SetTrace(std::shared_ptr<InferenceTrace>&& trace)
-  {
-    trace_ = std::move(trace);
-  }
+  void SetTrace(std::shared_ptr<InferenceTrace> trace) { trace_ = trace; }
 #endif  // TRITON_ENABLE_TRACING
 
  private:
@@ -218,15 +215,6 @@ class InferenceResponse {
   // InferenceResponse
   InferenceResponse(
       const std::shared_ptr<Model>& model, const std::string& id,
-      const ResponseAllocator* allocator, void* alloc_userp,
-      TRITONSERVER_InferenceResponseCompleteFn_t response_fn,
-      void* response_userp,
-      const std::function<void(
-          std::unique_ptr<InferenceResponse>&&, const uint32_t)>& delegator);
-
-  // InferenceResponse
-  InferenceResponse(
-      const std::shared_ptr<InferenceBackend>& backend, const std::string& id,
       const ResponseAllocator* allocator, void* alloc_userp,
       TRITONSERVER_InferenceResponseCompleteFn_t response_fn,
       void* response_userp,
