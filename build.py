@@ -510,11 +510,16 @@ def pytorch_cmake_args(images):
         image = 'nvcr.io/nvidia/pytorch:{}-py3'.format(
             FLAGS.upstream_container_version)
     cargs = [
-        '-DTRITON_PYTORCH_DOCKER_IMAGE={}'.format(image),
+        cmake_backend_arg('pytorch', 'TRITON_PYTORCH_DOCKER_IMAGE', None,
+                          image),
     ]
+
     if FLAGS.enable_gpu:
-        cargs.append('-DTRITON_PYTORCH_ENABLE_TORCHTRT=ON')
+        cargs.append(
+            cmake_backend_enable('pytorch', 'TRITON_PYTORCH_ENABLE_TORCHTRT',
+                                 True))
     return cargs
+
 
 def onnxruntime_cmake_args(images, library_paths):
     cargs = [
