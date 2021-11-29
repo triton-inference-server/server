@@ -40,7 +40,6 @@ set(
 
 set(
   BACKEND_HDRS
-  backend_factory.h
   triton_backend_config.h
   triton_backend_manager.h
   triton_memory_manager.h

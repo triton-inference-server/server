@@ -26,7 +26,6 @@
 
 import sys
 
-from tritonclient.grpc.model_config_pb2 import ModelEnsembling
 sys.path.append("../common")
 
 import functools
@@ -35,8 +34,6 @@ import os
 import unittest
 import threading
 import time
-import infer_util as iu
-import test_util as tu
 import sequence_util as su
 import tritongrpcclient as grpcclient
 from tritonclientutils import *
@@ -232,7 +229,7 @@ class RateLimiterTest(su.SequenceBatcherTestUtil):
     def test_single_model_dynamic_batching(self):
         # Send all the inference requests with a delay to a model
 
-        self.assertTrue("TRITONSERVER_DELAY_SCHEDULER" in os.environ)
+        self.assertIn("TRITONSERVER_DELAY_SCHEDULER", os.environ)
         model_names = ["custom_zero_1_float32"]
         infer_counts = self.stress_models(model_names, delay_ms=100)
 
@@ -252,7 +249,6 @@ class RateLimiterTest(su.SequenceBatcherTestUtil):
             self.assertEqual(
                 batch_stat.batch_size, 4,
                 "unexpected batch-size {}".format(batch_stat.batch_size))
-            bc = batch_stat.compute_infer.count
             # Get count from one of the stats
             self.assertEqual(
                 batch_stat.compute_infer.count, _inference_count / 4,
@@ -267,7 +263,7 @@ class RateLimiterTest(su.SequenceBatcherTestUtil):
 
         try:
             model_name = "custom_sequence_int32"
-            self.assertFalse("TRITONSERVER_DELAY_SCHEDULER" in os.environ)
+            self.assertNotIn("TRITONSERVER_DELAY_SCHEDULER", os.environ)
             self.check_sequence(
                 'custom',
                 model_name,

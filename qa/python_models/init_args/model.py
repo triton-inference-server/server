@@ -55,7 +55,7 @@ class TritonPythonModel:
                 correct_keys += 1
 
         responses = []
-        for request in requests:
+        for _ in requests:
             out_args = pb_utils.Tensor(
                 "OUT", np.array([correct_keys], dtype=np.float32))
             responses.append(pb_utils.InferenceResponse([out_args]))

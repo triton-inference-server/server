@@ -30,7 +30,6 @@ import smtplib
 from email.mime.multipart import MIMEMultipart
 from email.mime.base import MIMEBase
 from email.mime.text import MIMEText
-import base64
 import glob
 import os
 import sys
@@ -39,7 +38,7 @@ import tarfile
 
 def send(subject: str,
          content: str,
-         attachments=[],
+         attachments=None,
          files_to_tar=None,
          is_html=False):
     FROM = os.environ.get('TRITON_FROM', '')
@@ -62,6 +61,8 @@ def send(subject: str,
         with tarfile.open(subject + ".tgz", "w:gz") as csv_tar:
             for filename in glob.glob(files_to_tar):
                 csv_tar.add(filename)
+        if attachments is None:
+            attachments = []
         attachments.append(subject + ".tgz")
 
     for fname in attachments:

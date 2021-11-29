@@ -33,7 +33,6 @@ sys.path.append("../common")
 import unittest
 import numpy as np
 import test_util as tu
-import os
 import requests as httpreq
 
 from tritonclient.utils import *
@@ -177,7 +176,7 @@ class PythonTest(tu.TestResultCollector):
             inputs[0].set_data_from_numpy(input_data)
             result = client.infer(model_name, inputs)
             output0 = result.as_numpy('OUTPUT0')
-            self.assertTrue(output0 is not None)
+            self.assertIsNotNone(output0)
             self.assertTrue(np.all(output0 == input_data))
 
     def test_infer_pytorch(self):
@@ -234,7 +233,7 @@ class PythonTest(tu.TestResultCollector):
                 inputs[0].set_data_from_numpy(input_data)
                 result = client.infer(model_name, inputs)
                 output0 = result.as_numpy('OUTPUT0')
-                self.assertTrue(output0 is not None)
+                self.assertIsNotNone(output0)
                 self.assertTrue(output0[0] == input_data)
 
     def test_string(self):
@@ -251,12 +250,12 @@ class PythonTest(tu.TestResultCollector):
                 inputs[0].set_data_from_numpy(input_data)
                 result = client.infer(model_name, inputs)
                 output0 = result.as_numpy('OUTPUT0')
-                self.assertTrue(output0 is not None)
+                self.assertIsNotNone(output0)
 
                 if i % 2 == 0:
                     self.assertTrue(output0[0] == input_data.astype(np.bytes_))
                 else:
-                    self.assertTrue(output0.size == 0)
+                    self.assertEqual(output0.size, 0)
 
 
     def test_non_contiguous(self):

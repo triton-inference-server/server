@@ -96,7 +96,6 @@ class DynamicBatchScheduler : public Scheduler {
       std::unique_ptr<InferenceResponse>& cached_response);
   void FinalizeResponses();
 
-  // FIXME: Use shared_ptr for model once InferenceBackend class is cleaned up.
   TritonModel* model_;
   TritonModelInstance* model_instance_;
 

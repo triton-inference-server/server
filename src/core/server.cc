@@ -37,15 +37,16 @@
 
 #include "model_config.pb.h"
 #include "src/backends/backend/triton_backend_manager.h"
-#include "src/core/backend.h"
 #include "src/core/constants.h"
 #include "src/core/cuda_utils.h"
 #include "src/core/logging.h"
+#include "src/core/model.h"
 #include "src/core/model_config.h"
 #include "src/core/model_config_utils.h"
 #include "src/core/model_repository_manager.h"
 #include "src/core/pinned_memory_manager.h"
 #include "src/core/triton_repo_agent.h"
+#include "triton/common/async_work_queue.h"
 #include "triton/common/table_printer.h"
 
 #ifdef TRITON_ENABLE_GPU
@@ -105,9 +106,6 @@ InferenceServer::InferenceServer()
 #else
   min_supported_compute_capability_ = 0.0;
 #endif  // TRITON_ENABLE_GPU
-
-  tf_soft_placement_enabled_ = true;
-  tf_gpu_memory_fraction_ = 0.0;
 
   inflight_request_counter_ = 0;
 }
@@ -214,8 +212,7 @@ InferenceServer::Init()
       (model_control_mode_ == ModelControlMode::MODE_EXPLICIT);
   status = ModelRepositoryManager::Create(
       this, version_, model_repository_paths_, startup_models_,
-      strict_model_config_, backend_cmdline_config_map_,
-      tf_gpu_memory_fraction_, tf_soft_placement_enabled_, polling_enabled,
+      strict_model_config_, backend_cmdline_config_map_, polling_enabled,
       model_control_enabled, min_supported_compute_capability_,
       host_policy_map_, &model_repository_manager_);
   if (!status.IsOk()) {
@@ -262,7 +259,7 @@ InferenceServer::Stop(const bool force)
   uint32_t exit_timeout_iters = exit_timeout_secs_;
 
   while (true) {
-    const auto& live_models = model_repository_manager_->LiveBackendStates();
+    const auto& live_models = model_repository_manager_->LiveModelStates();
 
     LOG_INFO << "Timeout " << exit_timeout_iters << ": Found "
              << live_models.size() << " live models and "
@@ -344,7 +341,7 @@ InferenceServer::IsReady(bool* ready)
   if (*ready && strict_readiness_) {
     // Strict readiness... get the model status and make sure all
     // models are ready.
-    const auto model_versions = model_repository_manager_->BackendStates();
+    const auto model_versions = model_repository_manager_->ModelStates();
 
     for (const auto& mv : model_versions) {
       // If a model status is present but no version status,
@@ -380,11 +377,11 @@ InferenceServer::ModelIsReady(
 
   ScopedAtomicIncrement inflight(inflight_request_counter_);
 
-  std::shared_ptr<InferenceBackend> backend;
-  if (GetInferenceBackend(model_name, model_version, &backend).IsOk()) {
+  std::shared_ptr<Model> model;
+  if (GetModel(model_name, model_version, &model).IsOk()) {
     ModelReadyState state;
     if (model_repository_manager_
-            ->ModelState(model_name, backend->Version(), &state)
+            ->ModelState(model_name, model->Version(), &state)
             .IsOk()) {
       *ready = (state == ModelReadyState::READY);
     }
@@ -425,7 +422,7 @@ InferenceServer::ModelReadyVersions(
   ScopedAtomicIncrement inflight(inflight_request_counter_);
 
   const auto model_versions =
-      model_repository_manager_->LiveBackendStates(true /* strict_readiness */);
+      model_repository_manager_->LiveModelStates(true /* strict_readiness */);
 
   ready_model_versions->clear();
   std::vector<int64_t> versions;
@@ -549,7 +546,7 @@ InferenceServer::PrintBackendAndModelSummary()
   LOG_INFO << backends_table_string;
 
   // Models Summary
-  auto model_states = model_repository_manager_->BackendStates();
+  auto model_states = model_repository_manager_->ModelStates();
 
   std::vector<std::string> model_headers;
   model_headers.emplace_back("Model");
