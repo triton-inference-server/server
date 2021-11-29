@@ -49,7 +49,7 @@ $ ./gen_qa_custom_ops
 ```
 
 This will create multiple model repositories in /tmp/<version>/qa_*
-(for example /tmp/21.09/qa_model_repository).  The TensorRT models
+(for example /tmp/21.11/qa_model_repository).  The TensorRT models
 will be created for the GPU on the system that CUDA considers device 0
 (zero). If you have multiple GPUs on your system see the documentation
 in the scripts for how to target a specific GPU.
@@ -79,9 +79,9 @@ Lastly, build the actual QA image.
 $ docker build -t tritonserver_qa -f Dockerfile.QA .
 ```
 
-## Run QA Container
+## Run QA Tests
 
-Now run the QA container and mount the QA model repositories into the
+Now run the QA image and mount the QA model repositories into the
 container so the tests will be able to access them.
 
 ```
@@ -89,9 +89,41 @@ $ docker run --gpus=all -it --rm -v/tmp:/data/inferenceserver tritonserver_qa
 ```
 
 Within the container the QA tests are in /opt/tritonserver/qa. To run
-a test simply change directory to the test and run the test.sh script.
+a test, change directory to the test and run the test.sh script.
 
 ```
 $ cd <test directory>
 $ bash -x ./test.sh
 ```
+
+### Sanity Tests
+
+Many tests require that you use a complete Triton build, with all
+backends and other features enabled. There are three sanity tests that
+are parameterized so that you can run them even if you have built a
+Triton that contains only a subset of all supported Triton
+backends. These tests are L0_infer, L0_batcher and
+L0_sequence_batcher. For these tests the following envvars are
+available to control how the tests behave:
+
+* BACKENDS: Control which backends are tested. Look in the test.sh
+  file of the test to see the default and allowed values.
+
+* ENSEMBLES: Enable testing of ensembles. Set to "0" to disable, set
+  to "1" to enable. If enabled you must have the *identity* backend
+  included in your Triton build.
+
+* EXPECTED_NUM_TESTS: The tests perform a check of the total number of
+  test sub-cases. The exact number of sub-cases that run will depend
+  on the values you use for BACKENDS and ENSEMBLES. So you will need
+  to adjust this as appropriate for your testing.
+
+For example, if you build a Triton that has only the TensorRT backend
+you can run L0_infer as follows:
+
+```
+$ BACKENDS="plan" ENSEMBLES=0 EXPECTED_NUM_TESTS=<expected> bash -x ./test.sh
+```
+
+Where '<expected>' is the number of sub-tests expected to be run for
+just TensorRT testing and no ensembles.

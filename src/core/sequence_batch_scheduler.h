@@ -305,7 +305,7 @@ class DirectSequenceBatch : public SequenceBatch {
   std::vector<InferenceRequest::SequenceId> seq_slot_correlation_ids_;
 
   // The maximum active sequence slot. A value of -1 indicates that
-  // no slots are active in the backend.
+  // no slots are active in the model.
   int32_t max_active_seq_slot_;
 
   size_t max_batch_size_;

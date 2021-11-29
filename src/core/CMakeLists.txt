@@ -116,9 +116,7 @@ endif() # TRITON_ENABLE_GPU
 
 set(
   SERVER_SRCS
-  autofill.cc
-  backend.cc
-  backend_context.cc
+  model.cc
   cuda_utils.cc
   dynamic_batch_scheduler.cc
   ensemble_scheduler.cc
@@ -154,9 +152,7 @@ set(
 
 set(
   SERVER_HDRS
-  autofill.h
-  backend.h
-  backend_context.h
+  model.h
   constants.h
   cuda_utils.h
   dynamic_batch_scheduler.h

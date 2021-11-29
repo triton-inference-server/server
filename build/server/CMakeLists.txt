@@ -253,8 +253,4 @@ endif() # TRITON_ENABLE_METRICS
 add_subdirectory(../../src/core src/core)
 add_subdirectory(../../src/backends/backend src/backends/backend)
 add_subdirectory(../../src/backends/ensemble src/backends/ensemble)
-add_subdirectory(../../src/backends/onnx src/backends/onnx)
-add_subdirectory(../../src/backends/pytorch src/backends/pytorch)
-add_subdirectory(../../src/backends/tensorflow src/backends/tensorflow)
-add_subdirectory(../../src/backends/tensorrt src/backends/tensorrt)
 add_subdirectory(../../src/servers src/servers)

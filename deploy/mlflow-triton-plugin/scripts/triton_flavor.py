@@ -38,16 +38,10 @@ import sys
 
 from mlflow.models import Model
 from mlflow.models.model import MLMODEL_FILE_NAME
-import mlflow.tracking
 from mlflow.exceptions import MlflowException
-from mlflow.models.signature import ModelSignature
-from mlflow.models.utils import ModelInputExample
 from mlflow.protos.databricks_pb2 import RESOURCE_ALREADY_EXISTS
 from mlflow.utils.annotations import experimental
-from mlflow.utils.model_utils import _get_flavor_configuration
 from mlflow.tracking._model_registry import DEFAULT_AWAIT_MAX_SLEEP_SECONDS
-
-import triton_flavor
 
 FLAVOR_NAME = "triton"
 

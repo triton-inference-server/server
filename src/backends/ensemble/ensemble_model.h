@@ -1,4 +1,4 @@
-// Copyright (c) 2018-2019, NVIDIA CORPORATION. All rights reserved.
+// Copyright 2019-2021, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 //
 // Redistribution and use in source and binary forms, with or without
 // modification, are permitted provided that the following conditions
@@ -25,19 +25,36 @@
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #pragma once
 
-#include <memory>
-#include <string>
+#include "model_config.pb.h"
+#include "src/core/model.h"
+#include "src/core/scheduler.h"
 #include "src/core/status.h"
 
 namespace nvidia { namespace inferenceserver {
 
-class AutoFill;
+class InferenceServer;
 
-class AutoFillPyTorch {
+class EnsembleModel : public Model {
  public:
+  EnsembleModel(EnsembleModel&&) = default;
+
   static Status Create(
-      const std::string& model_name, const std::string& model_path,
-      std::unique_ptr<AutoFill>* autofill);
+      InferenceServer* server, const std::string& path, const int64_t version,
+      const inference::ModelConfig& model_config,
+      const double min_compute_capability, std::unique_ptr<Model>* model);
+
+ private:
+  DISALLOW_COPY_AND_ASSIGN(EnsembleModel);
+
+  explicit EnsembleModel(
+      const double min_compute_capability, const std::string& model_dir,
+      const int64_t version, const inference::ModelConfig& config)
+      : Model(min_compute_capability, model_dir, version, config)
+  {
+  }
+  friend std::ostream& operator<<(std::ostream&, const EnsembleModel&);
 };
+
+std::ostream& operator<<(std::ostream& out, const EnsembleModel& pb);
 
 }}  // namespace nvidia::inferenceserver

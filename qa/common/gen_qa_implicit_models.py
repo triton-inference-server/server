@@ -345,7 +345,7 @@ def create_plan_fixed_modelfile(models_dir, model_version, max_batch, dtype,
     in0 = network.add_input("INPUT", trt_dtype, shape)
     in_state0 = network.add_input("INPUT_STATE", trt_dtype, shape)
     start0 = network.add_input("START", trt_dtype, [1 for i in shape])
-    ready0 = network.add_input("READY", trt_dtype, [1 for i in shape])
+    network.add_input("READY", trt_dtype, [1 for i in shape])
     constant_1_data = trt.Weights(np.ones([1 for i in shape], dtype=dtype))
     constant_1 = network.add_constant([1 for i in shape], constant_1_data)
     not_start = network.add_elementwise(constant_1.get_output(0), start0, trt.ElementWiseOperation.SUB)
@@ -385,8 +385,6 @@ def create_plan_fixed_modelfile(models_dir, model_version, max_batch, dtype,
 
     with open(model_version_dir + "/model.plan", "wb") as f:
         f.write(engine_bytes)
-
-    del builder
 
 
 def create_plan_fixed_rf_modelfile(models_dir, model_version, max_batch, dtype,
@@ -464,8 +462,6 @@ def create_plan_fixed_rf_modelfile(models_dir, model_version, max_batch, dtype,
 
     with open(model_version_dir + "/model.plan", "wb") as f:
         f.write(engine_bytes)
-
-    del builder
 
 
 def create_plan_modelfile(models_dir, model_version, max_batch, dtype, shape):

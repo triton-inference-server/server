@@ -68,8 +68,6 @@ Status GetTypedSequenceControlProperties(
 /// Read a ModelConfig and normalize it as expected by model backends.
 /// \param path The full-path to the directory containing the
 /// model configuration.
-/// \param backend_config_map Map from platform name to the backend
-/// configuration for that platform.
 /// \param autofill If true attempt to determine any missing required
 /// configuration from the model definition.
 /// \param min_compute_capability The minimum support CUDA compute
@@ -77,23 +75,31 @@ Status GetTypedSequenceControlProperties(
 /// \param config Returns the normalized model configuration.
 /// \return The error status.
 Status GetNormalizedModelConfig(
-    const std::string& path, const BackendConfigMap& backend_config_map,
-    const bool autofill, const double min_compute_capability,
+    const std::string& path, const bool autofill,
+    const double min_compute_capability, inference::ModelConfig* config);
+
+/// Auto-complete backend related fields (platform, backend and default model
+/// filename) if not set, note that only Triton recognized backends will be
+/// checked.
+/// \param model_path The name of the model.
+/// \param model_path The full-path to the directory containing the
+/// model configuration.
+/// \param config Returns the auto-completed model configuration.
+/// \return The error status.
+Status AutoCompleteBackendFields(
+    const std::string& model_name, const std::string& model_path,
     inference::ModelConfig* config);
 
 /// Validate that a model is specified correctly, except for model inputs
 /// and outputs. ValidateModelIOConfig() should be called to
 /// validate model inputs and outputs.
 /// \param config The model configuration to validate.
-/// \param expected_platform If non-empty the model will be checked
-/// to make sure its platform matches this value.
 /// \param min_compute_capability The minimum support CUDA compute
 /// capability.
 /// \return The error status. A non-OK status indicates the configuration
 /// is not valid.
 Status ValidateModelConfig(
-    const inference::ModelConfig& config, const std::string& expected_platform,
-    const double min_compute_capability);
+    const inference::ModelConfig& config, const double min_compute_capability);
 
 /// Validate that a model inputs and outputs are specified correctly.
 /// \param config The model configuration to validate.

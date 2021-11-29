@@ -31,7 +31,6 @@ sys.path.append("../common")
 import os
 import nightly_email_helper
 
-import glob
 from datetime import date
 
 CI_JOB_ID = os.environ.get('CI_JOB_ID', '')

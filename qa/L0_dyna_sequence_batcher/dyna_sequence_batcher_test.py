@@ -28,13 +28,10 @@ import sys
 
 sys.path.append("../common")
 
-from builtins import range
 from builtins import str
-from future.utils import iteritems
 import os
 import time
 import threading
-import traceback
 import unittest
 import numpy as np
 import test_util as tu
@@ -112,10 +109,10 @@ class DynaSequenceBatcherTest(su.SequenceBatcherTestUtil):
                     model_name = tu.get_dyna_sequence_model_name(trial, dtype)
 
                     self.check_setup(model_name)
-                    self.assertFalse(
-                        "TRITONSERVER_DELAY_SCHEDULER" in os.environ)
-                    self.assertFalse(
-                        "TRITONSERVER_BACKLOG_DELAY_SCHEDULER" in os.environ)
+                    self.assertNotIn(
+                        "TRITONSERVER_DELAY_SCHEDULER", os.environ)
+                    self.assertNotIn(
+                        "TRITONSERVER_BACKLOG_DELAY_SCHEDULER", os.environ)
 
                     if "string" in trial:
                         corrid = '52'
@@ -162,10 +159,10 @@ class DynaSequenceBatcherTest(su.SequenceBatcherTestUtil):
                     model_name = tu.get_dyna_sequence_model_name(trial, dtype)
 
                     self.check_setup(model_name)
-                    self.assertFalse(
-                        "TRITONSERVER_DELAY_SCHEDULER" in os.environ)
-                    self.assertFalse(
-                        "TRITONSERVER_BACKLOG_DELAY_SCHEDULER" in os.environ)
+                    self.assertNotIn(
+                        "TRITONSERVER_DELAY_SCHEDULER", os.environ)
+                    self.assertNotIn(
+                        "TRITONSERVER_BACKLOG_DELAY_SCHEDULER", os.environ)
 
                     if "string" in trial:
                         corrid = '99'
@@ -217,9 +214,9 @@ class DynaSequenceBatcherTest(su.SequenceBatcherTestUtil):
                 model_name = tu.get_dyna_sequence_model_name(trial, dtype)
 
                 self.check_setup(model_name)
-                self.assertFalse("TRITONSERVER_DELAY_SCHEDULER" in os.environ)
-                self.assertFalse(
-                    "TRITONSERVER_BACKLOG_DELAY_SCHEDULER" in os.environ)
+                self.assertNotIn("TRITONSERVER_DELAY_SCHEDULER", os.environ)
+                self.assertNotIn(
+                    "TRITONSERVER_BACKLOG_DELAY_SCHEDULER", os.environ)
 
                 if "string" in trial:
                     corrids = ['1001', '1002', '1003', '1004']
@@ -393,9 +390,9 @@ class DynaSequenceBatcherTest(su.SequenceBatcherTestUtil):
                 model_name = tu.get_dyna_sequence_model_name(trial, dtype)
 
                 self.check_setup(model_name)
-                self.assertFalse("TRITONSERVER_DELAY_SCHEDULER" in os.environ)
-                self.assertFalse(
-                    "TRITONSERVER_BACKLOG_DELAY_SCHEDULER" in os.environ)
+                self.assertNotIn("TRITONSERVER_DELAY_SCHEDULER", os.environ)
+                self.assertNotIn(
+                    "TRITONSERVER_BACKLOG_DELAY_SCHEDULER", os.environ)
 
                 if "string" in trial:
                     corrids = ['1001', '1002', '1003', '1004', '1005']
@@ -553,9 +550,9 @@ class DynaSequenceBatcherTest(su.SequenceBatcherTestUtil):
                 model_name = tu.get_dyna_sequence_model_name(trial, dtype)
 
                 self.check_setup(model_name)
-                self.assertFalse("TRITONSERVER_DELAY_SCHEDULER" in os.environ)
-                self.assertFalse(
-                    "TRITONSERVER_BACKLOG_DELAY_SCHEDULER" in os.environ)
+                self.assertNotIn("TRITONSERVER_DELAY_SCHEDULER", os.environ)
+                self.assertNotIn(
+                    "TRITONSERVER_BACKLOG_DELAY_SCHEDULER", os.environ)
                 if "string" in trial:
                     corrids = ['1001', '1002', '1003', '1004', '1005', '1006']
                 else:
@@ -735,9 +732,9 @@ class DynaSequenceBatcherTest(su.SequenceBatcherTestUtil):
                 model_name = tu.get_dyna_sequence_model_name(trial, dtype)
 
                 self.check_setup(model_name)
-                self.assertFalse("TRITONSERVER_DELAY_SCHEDULER" in os.environ)
-                self.assertFalse(
-                    "TRITONSERVER_BACKLOG_DELAY_SCHEDULER" in os.environ)
+                self.assertNotIn("TRITONSERVER_DELAY_SCHEDULER", os.environ)
+                self.assertNotIn(
+                    "TRITONSERVER_BACKLOG_DELAY_SCHEDULER", os.environ)
 
                 if "string" in trial:
                     corrids = ['1001', '1002', '1003', '1004', '1005', '1006']
@@ -923,9 +920,9 @@ class DynaSequenceBatcherTest(su.SequenceBatcherTestUtil):
                 model_name = tu.get_dyna_sequence_model_name(trial, dtype)
 
                 self.check_setup(model_name)
-                self.assertFalse("TRITONSERVER_DELAY_SCHEDULER" in os.environ)
-                self.assertFalse(
-                    "TRITONSERVER_BACKLOG_DELAY_SCHEDULER" in os.environ)
+                self.assertNotIn("TRITONSERVER_DELAY_SCHEDULER", os.environ)
+                self.assertNotIn(
+                    "TRITONSERVER_BACKLOG_DELAY_SCHEDULER", os.environ)
 
                 if "string" in trial:
                     corrids = ['1001', '1002', '1003', '1004', '1005']
