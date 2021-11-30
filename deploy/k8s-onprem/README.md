@@ -110,7 +110,7 @@ following commands.
 
 ```
 $ cd <directory containing Chart.yaml>
-$ helm install --name example .
+$ helm install example .
 ```
 
 Use kubectl to see status and wait until the inference server pods are

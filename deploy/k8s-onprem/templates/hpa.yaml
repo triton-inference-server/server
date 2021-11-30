@@ -1,0 +1,18 @@
+apiVersion: autoscaling/v2beta2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: triton-hpa
+  namespace: {{ .Release.Namespace }}
+  labels:
+    app: {{ template "triton-inference-server.name" . }}
+    chart: {{ template "triton-inference-server.chart" . }}
+    release: {{ .Release.Name }}
+    heritage: {{ .Release.Service }}
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: {{ template "triton-inference-server.fullname" . }}
+  minReplicas: {{ .Values.autoscaler.minReplicas }}
+  maxReplicas: {{ .Values.autoscaler.maxReplicas }}
+  metrics: {{ toYaml .Values.autoscaler.metrics | nindent 2}}

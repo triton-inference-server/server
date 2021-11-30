@@ -35,7 +35,7 @@ metadata:
     release: {{ .Release.Name }}
     heritage: {{ .Release.Service }}
 spec:
-  replicas: {{ .Values.replicaCount }}
+  replicas: {{ .Values.autoscaler.minReplicas }}
   selector:
     matchLabels:
       app: {{ template "triton-inference-server.name" . }}
