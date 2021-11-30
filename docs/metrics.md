@@ -63,8 +63,8 @@ The following table describes the available metrics.
 |              |Compute Input Time|Cumulative time requests spend processing inference inputs (in the framework backend, does not include cached requests)     |Per model  |Per request  |
 |              |Compute Time    |Cumulative time requests spend executing the inference model (in the framework backend, does not include cached requests)     |Per model  |Per request  |
 |              |Compute Output Time|Cumulative time requests spend processing inference outputs (in the framework backend, does not include cached requests)     |Per model  |Per request  |
-|Response Cache|Total Cache Entry Count |Number of responses currently stored in response cache |Server-wide |Per second |
-|              |Total Cache Lookup Count |Number of response cache lookups done by Triton |Server-wide |Per second |
+|Response Cache|Total Cache Entry Count |Total number of responses stored in response cache across all models |Server-wide |Per second |
+|              |Total Cache Lookup Count |Total number of response cache lookups done by Triton across all models |Server-wide |Per second |
 |              |Total Cache Hit Count |Total number of response cache hits across all models |Server-wide |Per second |
 |              |Total Cache Miss Count |Total number of response cache misses across all models |Server-wide |Per second |
 |              |Total Cache Eviction Count |Total number of response cache evictions across all models |Server-wide |Per second |
