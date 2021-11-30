@@ -45,12 +45,17 @@ RET=0
 TEST_LOG="./query_test.log"
 CLIENT_LOG="./query_client.log"
 TEST_EXEC=./query_test
-TEST_EXEC=./query_e2e.py
+TEST_PY=./query_e2e.py
+EXPECTED_NUM_TESTS="6"
+TEST_RESULT_FILE='test_results.txt'
 
 
 export CUDA_VISIBLE_DEVICES=0
 
 rm -fr *.log
+
+unset TEST_FAIL_WITH_QUERY_RESULT
+unset TEST_BYTE_SIZE
 
 set +e
 $TEST_EXEC >>$TEST_LOG 2>&1
@@ -59,6 +64,9 @@ if [ $? -ne 0 ]; then
     RET=1
 fi
 set -e
+
+export TEST_FAIL_WITH_QUERY_RESULT=1
+export TEST_BYTE_SIZE=4
 
 SERVER=/opt/tritonserver/bin/tritonserver
 SERVER_ARGS="--model-repository=`pwd`/models"
@@ -84,6 +92,9 @@ else
 fi
 set -e
 
+unset TEST_FAIL_WITH_QUERY_RESULT
+unset TEST_BYTE_SIZE
+
 kill $SERVER_PID
 wait $SERVER_PID
 
@@ -91,6 +102,7 @@ if [ $RET -eq 0 ]; then
     echo -e "\n***\n*** Test Passed\n***"
 else
     cat $TEST_LOG
+    cat $CLIENT_LOG
     cat $SERVER_LOG
     echo -e "\n***\n*** Test FAILED\n***"
 fi

@@ -280,12 +280,12 @@ TEST_F(QueryTest, DefaultQuery)
   const auto& output_0 = output_info_.second["OUTPUT0"];
   EXPECT_EQ(std::get<0>(output_0), TRITONSERVER_MEMORY_CPU);
   EXPECT_EQ(std::get<1>(output_0), int64_t(0));
-  EXPECT_EQ(std::get<2>(output_0), size_t(1));
+  EXPECT_EQ(std::get<2>(output_0), size_t(2));
 
   const auto& output_1 = output_info_.second["OUTPUT1"];
   EXPECT_EQ(std::get<0>(output_1), TRITONSERVER_MEMORY_CPU);
   EXPECT_EQ(std::get<1>(output_1), int64_t(0));
-  EXPECT_EQ(std::get<2>(output_1), size_t(1));
+  EXPECT_EQ(std::get<2>(output_1), size_t(2));
 }
 
 TEST_F(QueryTest, NoQueryFn)
