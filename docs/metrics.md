@@ -65,13 +65,13 @@ The following table describes the available metrics.
 |              |Compute Output Time|Cumulative time requests spend processing inference outputs (in the framework backend, does not include cached requests)     |Per model  |Per request  |
 |Response Cache|Total Cache Entry Count |Number of responses currently stored in response cache |Server-wide |Per second |
 |              |Total Cache Lookup Count |Number of response cache lookups done by Triton |Server-wide |Per second |
-|              |Total Cache Hit Count |Number of response cache hits |Server-wide |Per second |
-|              |Total Cache Miss Count |Number of response cache misses |Server-wide |Per second |
-|              |Total Cache Eviction Count |Number of response cache evictions |Server-wide |Per second |
-|              |Total Cache Lookup Time |Cumulative time requests spend checking for a cached response (microseconds) |Server-wide |Per second |
+|              |Total Cache Hit Count |Total number of response cache hits across all models |Server-wide |Per second |
+|              |Total Cache Miss Count |Total number of response cache misses across all models |Server-wide |Per second |
+|              |Total Cache Eviction Count |Total number of response cache evictions across all models |Server-wide |Per second |
+|              |Total Cache Lookup Time |Cumulative time requests spend checking for a cached response across all models (microseconds) |Server-wide |Per second |
 |              |Total Cache Utilization |Response Cache utilization rate (0.0 - 1.0) |Server-wide |Per second |
 |              |Cache Hit Count |Number of response cache hits per model |Per model |Per request |
-|              |Cache Hit Lookup Time |Cumulative time requests spend checking for a cached response (microseconds) per model |Per model |Per request |
+|              |Cache Hit Lookup Time |Cumulative time requests spend retrieving a cached response per-model on cache hits, does not include cache misses (microseconds) |Per model |Per request |
 
 ## Response Cache
 
@@ -83,7 +83,7 @@ server), total inference times may be affected by response cache lookup times.
 On cache hits, the cached response will be used instead of going through the
 inference backend, so compute times will not be recorded.
 
-On cache misses, the request will still go through to the inference backend and
+On cache misses, the request will fallback to the inference backend and
 update compute time metrics accordingly.
 
 ## Count Metrics
