@@ -59,11 +59,13 @@ Metrics::Metrics()
               .Register(*registry_)),
       inf_count_family_(prometheus::BuildCounter()
                             .Name("nv_inference_count")
-                            .Help("Number of inferences performed")
+                            .Help("Number of inferences performed (does not "
+                                  "include cached requests)")
                             .Register(*registry_)),
       inf_count_exec_family_(prometheus::BuildCounter()
                                  .Name("nv_inference_exec_count")
-                                 .Help("Number of model executions performed")
+                                 .Help("Number of model executions performed "
+                                       "(does not include cached requests)")
                                  .Register(*registry_)),
       inf_request_duration_us_family_(
           prometheus::BuildCounter()
