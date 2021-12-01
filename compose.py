@@ -181,13 +181,13 @@ def create_argmap(images):
             pm_path.returncode != 0,
             'docker inspect to find triton enviroment variables for min container failed, {}'
             .format(pm_path.stderr))
-        # min container needs to be GPU enabled if the build is GPU build
+        # min container needs to be GPU support  enabled if the build is GPU build
         vars = pm_path.stdout
         e = re.search("CUDA_VERSION", vars)
         gpu_enabled = False if e is None else True
         fail_if(
             not gpu_enabled,
-            'Composing container with gpu enabled but min container provided does not have CUDA installed'
+            'Composing container with gpu support enabled but min container provided does not have CUDA installed'
         )
 
     # Check full container enviroment variables
