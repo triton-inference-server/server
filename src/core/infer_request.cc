@@ -248,7 +248,6 @@ InferenceRequest::Release(
   // and the callback may interact with upper level trace.
   if (request->trace_ != nullptr) {
     request->trace_->ReportNow(TRITONSERVER_TRACE_REQUEST_END);
-    // InferenceTrace::Release(std::move(request->trace_));
   }
 #endif  // TRITON_ENABLE_TRACING
 
