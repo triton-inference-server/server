@@ -58,7 +58,7 @@ unset TEST_FAIL_WITH_QUERY_RESULT
 unset TEST_BYTE_SIZE
 
 set +e
-$TEST_EXEC >>$TEST_LOG 2>&1
+LD_LIBRARY_PATH=/opt/tritonserver/lib:$LD_LIBRARY_PATH $TEST_EXEC >>$TEST_LOG 2>&1
 if [ $? -ne 0 ]; then
     echo -e "\n***\n*** Query Unit Test Failed\n***"
     RET=1
