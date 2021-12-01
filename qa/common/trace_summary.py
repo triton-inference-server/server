@@ -267,7 +267,6 @@ def summarize_dataflow(traces):
     #   - child input
     #     - ...
     #   - child output
-    # - parent output
     print("Data Flow:")
 
     # Order traces by id to be more intuitive if 'show_trace'
@@ -329,7 +328,7 @@ def print_tensor_by_id(id, traces, tab_num):
     for trace in traces:
         # print model name and version
         if "id" in trace and "model_name" in trace and "model_version" in trace and "timestamps" in trace and trace["id"] == id:
-            print("{0}Name:{1}".format(
+            print("{0}Name:   {1}".format(
                 tabs, trace["model_name"]))
             print("{0}Version:{1}".format(
                 tabs, trace["model_version"]))

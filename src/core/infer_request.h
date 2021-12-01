@@ -300,15 +300,13 @@ class InferenceRequest {
 #ifdef TRITON_ENABLE_TRACING
   const std::shared_ptr<InferenceTrace>& Trace() const { return trace_; }
   std::shared_ptr<InferenceTrace>* MutableTrace() { return &trace_; }
-  void SetTrace(std::shared_ptr<InferenceTrace>&& trace)
+  void SetTrace(const std::shared_ptr<InferenceTrace>& trace)
   {
-    trace_ = std::move(trace);
-#ifdef TRITON_ENABLE_TRACING
-    response_factory_.SetTrace(trace_);
-#endif  // TRITON_ENABLE_TRACING
+    trace_ = trace;
+    response_factory_.SetTrace(trace);
   }
 
-  void TraceTensor();
+  Status TraceTensor(const std::string& msg);
 #endif  // TRITON_ENABLE_TRACING
 
   // The original inputs are the inputs added to the request before

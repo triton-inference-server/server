@@ -31,9 +31,9 @@
 #include "src/core/logging.h"
 #include "src/core/model.h"
 #include "src/core/server.h"
-#ifdef TRITON_ENABLE_GPU
-#include <cuda_runtime_api.h>
-#endif  // TRITON_ENABLE_GPU
+#ifdef TRITON_ENABLE_TRACING
+#include "src/core/cuda_utils.h"
+#endif  // TRITON_ENABLE_TRACING
 
 namespace nvidia { namespace inferenceserver {
 
@@ -113,69 +113,70 @@ InferenceRequest::SetPriority(uint32_t p)
   }
 }
 
-void
-InferenceRequest::TraceTensor()
-{
-  if (this->trace_ == nullptr)
-    return;
-
 #ifdef TRITON_ENABLE_TRACING
+Status
+InferenceRequest::TraceTensor(const std::string& msg)
+{
+  TRITONSERVER_MemoryType dst_memory_type = TRITONSERVER_MEMORY_CPU;
+  int64_t dst_memory_type_id = 0;
+
   const auto& inputs = this->ImmutableInputs();
 
   for (const auto& pr : inputs) {
-    InferenceRequest::Input* in = pr.second;
-    TRITONBACKEND_Input* in_api = reinterpret_cast<TRITONBACKEND_Input*>(in);
+    InferenceRequest::Input* ti = pr.second;
 
-    const std::string& name = in->Name();
-    TRITONSERVER_DataType datatype;
+    // input data
+    const std::string& name = ti->Name();
+    TRITONSERVER_DataType datatype = DataTypeToTriton(ti->DType());
+    uint64_t byte_size = ti->Data()->TotalByteSize();
+    const int64_t* shape = ti->ShapeWithBatchDim().data();
+    uint32_t dim_count = ti->ShapeWithBatchDim().size();
+    uint32_t buffer_count = ti->DataBufferCount();
     char* base;
-    uint64_t byte_size;
-    const int64_t* shape;
-    uint32_t dim_count;
-    uint32_t buffer_count;
-    TRITONSERVER_MemoryType memory_type;
-    int64_t memory_type_id;
-
-    TRITONBACKEND_InputProperties(
-        in_api, nullptr, &datatype, &shape, &dim_count, &byte_size,
-        &buffer_count);
-
+    // chunk buffer
+    const void* buffer;
+    uint64_t buffer_size;
+    TRITONSERVER_MemoryType src_memory_type;
+    int64_t src_memory_type_id;
+    bool cuda_used;
+    // input buffer
     std::vector<char> in_buffer(byte_size);
     base = in_buffer.data();
     size_t offset = 0;
+    // status
+    Status status;
+
     for (uint32_t b = 0; b < buffer_count; ++b) {
-      const void* input_buffer = nullptr;
-      uint64_t input_buffer_byte_size = 0;
-      TRITONBACKEND_InputBuffer(
-          in_api, b, &input_buffer, &input_buffer_byte_size, &memory_type,
-          &memory_type_id);
-      if (memory_type == TRITONSERVER_MEMORY_GPU) {
-#ifdef TRITON_ENABLE_GPU
-        cudaMemcpy(
-            base + offset, input_buffer, input_buffer_byte_size,
-            cudaMemcpyDeviceToHost);
-
-#else
-        return;
-#endif  // TRITON_ENABLE_GPU
-      } else {
-        memcpy(base + offset, input_buffer, input_buffer_byte_size);
+      status = ti->DataBuffer(
+          b, &buffer, &buffer_size, &src_memory_type, &src_memory_type_id);
+      if (!status.IsOk()) {
+        LOG_STATUS_ERROR(
+            status, msg + ": fail to get data buffer: " + status.Message());
+        return status;
       }
-      offset += input_buffer_byte_size;
-    }
 
-    if (memory_type == TRITONSERVER_MEMORY_GPU) {
-      memory_type = TRITONSERVER_MEMORY_CPU;
-      memory_type_id = 0;
+      status = CopyBuffer(
+          "InferenceRequest TraceTensor", src_memory_type, src_memory_type_id,
+          dst_memory_type, dst_memory_type_id, buffer_size, buffer,
+          base + offset, nullptr, &cuda_used);
+      if (!status.IsOk()) {
+        LOG_STATUS_ERROR(
+            status, msg + ": fail to copy buffer: " + status.Message());
+        return status;
+      }
+
+      offset += buffer_size;
     }
 
     INFER_TRACE_TENSOR_ACTIVITY(
         this->trace_, TRITONSERVER_TRACE_TENSOR_INPUT, name.c_str(), datatype,
-        static_cast<void*>(base), byte_size, shape, dim_count, memory_type,
-        memory_type_id);
+        static_cast<void*>(base), byte_size, shape, dim_count, dst_memory_type,
+        dst_memory_type_id);
   }
-#endif  // TRITON_ENABLE_TRACING
+
+  return Status::Success;
 }
+#endif  // TRITON_ENABLE_TRACING
 
 Status
 InferenceRequest::Run(std::unique_ptr<InferenceRequest>& request)

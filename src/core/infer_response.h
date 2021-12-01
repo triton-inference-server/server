@@ -78,7 +78,10 @@ class InferenceResponseFactory {
 
 #ifdef TRITON_ENABLE_TRACING
   const std::shared_ptr<InferenceTrace>& Trace() const { return trace_; }
-  void SetTrace(std::shared_ptr<InferenceTrace> trace) { trace_ = trace; }
+  void SetTrace(const std::shared_ptr<InferenceTrace>& trace)
+  {
+    trace_ = trace;
+  }
 #endif  // TRITON_ENABLE_TRACING
 
  private:
@@ -111,7 +114,7 @@ class InferenceResponseFactory {
       response_delegator_;
 
 #ifdef TRITON_ENABLE_TRACING
-  // Inference trace associated with this request.
+  // Inference trace associated with this response.
   std::shared_ptr<InferenceTrace> trace_;
 #endif  // TRITON_ENABLE_TRACING
 };
@@ -277,7 +280,7 @@ class InferenceResponse {
       const Status& status);
 
 #ifdef TRITON_ENABLE_TRACING
-  void TraceTensor();
+  Status TraceTensor(const std::string& msg);
 #endif  // TRITON_ENABLE_TRACING
 
  private:
@@ -322,7 +325,7 @@ class InferenceResponse {
   bool null_response_;
 
 #ifdef TRITON_ENABLE_TRACING
-  // Inference trace associated with this request.
+  // Inference trace associated with this response.
   std::shared_ptr<InferenceTrace> trace_;
 #endif  // TRITON_ENABLE_TRACING
 };

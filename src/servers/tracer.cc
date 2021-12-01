@@ -30,9 +30,6 @@
 #include <unordered_map>
 #include "src/core/constants.h"
 #include "src/core/logging.h"
-#ifdef TRITON_ENABLE_GPU
-#include <cuda_runtime_api.h>
-#endif  // TRITON_ENABLE_GPU
 
 namespace nvidia { namespace inferenceserver {
 
@@ -256,23 +253,19 @@ TraceManager::TraceTensorActivity(
 {
   if ((activity != TRITONSERVER_TRACE_TENSOR_INPUT) &&
       (activity != TRITONSERVER_TRACE_TENSOR_OUTPUT)) {
+    LOG_ERROR << "Unsupported activity: "
+              << TRITONSERVER_InferenceTraceActivityString(activity);
     return;
   }
 
-  void* buffer_base = nullptr;
-  if (memory_type == TRITONSERVER_MEMORY_GPU) {
-#ifdef TRITON_ENABLE_GPU
-    buffer_base = malloc(byte_size);
-    if (buffer_base == nullptr) {
-      return;
-    }
-    cudaMemcpy(buffer_base, base, byte_size, cudaMemcpyDeviceToHost);
-#else
+  if ((memory_type != TRITONSERVER_MEMORY_CPU) &&
+      (memory_type != TRITONSERVER_MEMORY_CPU_PINNED)) {
+    LOG_ERROR << "Unsupported memory type: "
+              << TRITONSERVER_MemoryTypeString(memory_type);
     return;
-#endif  // TRITON_ENABLE_GPU
-  } else {
-    buffer_base = const_cast<void*>(base);
   }
+
+  void* buffer_base = const_cast<void*>(base);
 
   uint64_t id;
   LOG_TRITONSERVER_ERROR(
@@ -448,13 +441,5 @@ TraceManager::TraceTensorActivity(
   ss_tmp << "}";
 
   *ss << ss_tmp.str();
-
-  if (memory_type == TRITONSERVER_MEMORY_GPU) {
-#ifdef TRITON_ENABLE_GPU
-    if (buffer_base != nullptr) {
-      free(buffer_base);
-    }
-#endif  // TRITON_ENABLE_GPU
-  }
 }
 }}  // namespace nvidia::inferenceserver

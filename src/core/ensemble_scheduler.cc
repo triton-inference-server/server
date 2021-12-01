@@ -913,7 +913,7 @@ EnsembleContext::InitStep(
 #ifdef TRITON_ENABLE_TRACING
   auto& parent_trace = request_tracker_->Request()->Trace();
   if (parent_trace != nullptr) {
-    irequest->SetTrace(std::move(parent_trace->SpawnChildTrace()));
+    irequest->SetTrace(parent_trace->SpawnChildTrace());
     irequest->Trace()->SetModelName(irequest->ModelName());
     irequest->Trace()->SetModelVersion(irequest->ActualModelVersion());
   }
@@ -1222,7 +1222,9 @@ EnsembleScheduler::Enqueue(std::unique_ptr<InferenceRequest>& request)
   INFER_TRACE_ACTIVITY(
       request->Trace(), TRITONSERVER_TRACE_QUEUE_START,
       request->QueueStartNs());
-  request->TraceTensor();
+#ifdef TRITON_ENABLE_TRACING
+  request->TraceTensor("EnsembleScheduler Queue Start");
+#endif  // TRITON_ENABLE_TRACING
 
   std::shared_ptr<EnsembleContext> context(new EnsembleContext(
       metric_reporter_.get(), stats_aggregator_, is_, info_.get(), request,

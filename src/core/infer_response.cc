@@ -29,6 +29,9 @@
 #include "src/core/logging.h"
 #include "src/core/model.h"
 #include "src/core/server.h"
+#ifdef TRITON_ENABLE_TRACING
+#include "src/core/cuda_utils.h"
+#endif  // TRITON_ENABLE_TRACING
 
 namespace nvidia { namespace inferenceserver {
 
@@ -201,7 +204,7 @@ InferenceResponse::Send(
     std::unique_ptr<InferenceResponse>&& response, const uint32_t flags)
 {
 #ifdef TRITON_ENABLE_TRACING
-  response->TraceTensor();
+  response->TraceTensor("InferenceResponse Send");
 #endif  // TRITON_ENABLE_TRACING
 
   if (response->response_delegator_ != nullptr) {
@@ -230,38 +233,64 @@ InferenceResponse::SendWithStatus(
   return InferenceResponse::Send(std::move(response), flags);
 }
 
-void
-InferenceResponse::TraceTensor()
-{
-  if (this->trace_ == nullptr)
-    return;
-
 #ifdef TRITON_ENABLE_TRACING
-  uint32_t output_count;
-  TRITONSERVER_InferenceResponse* response =
-      reinterpret_cast<TRITONSERVER_InferenceResponse*>(this);
-  TRITONSERVER_InferenceResponseOutputCount(response, &output_count);
+Status
+InferenceResponse::TraceTensor(const std::string& msg)
+{
+  TRITONSERVER_MemoryType dst_memory_type = TRITONSERVER_MEMORY_CPU;
+  int64_t dst_memory_type_id = 0;
+
+  const auto& outputs = this->Outputs();
+  uint32_t output_count = outputs.size();
 
   for (uint32_t idx = 0; idx < output_count; ++idx) {
-    const char* cname;
-    TRITONSERVER_DataType datatype;
-    const int64_t* shape;
-    uint64_t dim_count;
+    const Output& output = outputs[idx];
+
+    // output data
+    const char* cname = output.Name().c_str();
+    TRITONSERVER_DataType datatype = DataTypeToTriton(output.DType());
+    const std::vector<int64_t>& oshape = output.Shape();
+    const int64_t* shape = &oshape[0];
+    uint64_t dim_count = oshape.size();
     const void* base;
     size_t byte_size;
-    TRITONSERVER_MemoryType memory_type;
-    int64_t memory_type_id;
+    TRITONSERVER_MemoryType src_memory_type;
+    int64_t src_memory_type_id;
     void* userp;
-    TRITONSERVER_InferenceResponseOutput(
-        response, idx, &cname, &datatype, &shape, &dim_count, &base, &byte_size,
-        &memory_type, &memory_type_id, &userp);
+    bool cuda_used;
+    // status
+    Status status;
+
+    status = output.DataBuffer(
+        &base, &byte_size, &src_memory_type, &src_memory_type_id, &userp);
+    if (!status.IsOk()) {
+      LOG_STATUS_ERROR(
+          status, msg + ": fail to get data buffer: " + status.Message());
+      return status;
+    }
+
+    // ouput buffer
+    std::vector<char> out_buffer(byte_size);
+    void* buffer = out_buffer.data();
+
+    status = CopyBuffer(
+        "InferenceResponse TraceTensor", src_memory_type, src_memory_type_id,
+        dst_memory_type, dst_memory_type_id, byte_size, base, buffer, nullptr,
+        &cuda_used);
+    if (!status.IsOk()) {
+      LOG_STATUS_ERROR(
+          status, msg + ": fail to copy buffer: " + status.Message());
+      return status;
+    }
 
     INFER_TRACE_TENSOR_ACTIVITY(
-        this->trace_, TRITONSERVER_TRACE_TENSOR_OUTPUT, cname, datatype, base,
-        byte_size, shape, dim_count, memory_type, memory_type_id);
+        this->trace_, TRITONSERVER_TRACE_TENSOR_OUTPUT, cname, datatype, buffer,
+        byte_size, shape, dim_count, dst_memory_type, dst_memory_type_id);
   }
-#endif  // TRITON_ENABLE_TRACING
+
+  return Status::Success;
 }
+#endif  // TRITON_ENABLE_TRACING
 
 //
 // InferenceResponse::Output

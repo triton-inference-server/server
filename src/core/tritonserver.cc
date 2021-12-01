@@ -792,7 +792,7 @@ TRITONSERVER_InferenceTraceNew(
 {
 #ifdef TRITON_ENABLE_TRACING
   ni::InferenceTrace* ltrace = new ni::InferenceTrace(
-      level, parent_id, activity_fn, release_fn, trace_userp);
+      level, parent_id, activity_fn, nullptr, release_fn, trace_userp);
   *trace = reinterpret_cast<TRITONSERVER_InferenceTrace*>(ltrace);
   return nullptr;  // Success
 #else
@@ -811,8 +811,8 @@ TRITONSERVER_InferenceTraceTensorNew(
 {
 #ifdef TRITON_ENABLE_TRACING
   ni::InferenceTrace* ltrace = new ni::InferenceTrace(
-      level, parent_id, activity_fn, release_fn, trace_userp,
-      tensor_activity_fn);
+      level, parent_id, activity_fn, tensor_activity_fn, release_fn,
+      trace_userp);
   *trace = reinterpret_cast<TRITONSERVER_InferenceTrace*>(ltrace);
   return nullptr;  // Success
 #else
@@ -2406,8 +2406,8 @@ TRITONSERVER_ServerInferAsync(
     ltrace->SetModelName(lrequest->ModelName());
     ltrace->SetModelVersion(lrequest->ActualModelVersion());
 
-    std::unique_ptr<ni::InferenceTrace> utrace(ltrace);
-    lrequest->SetTrace(std::move(utrace));
+    std::shared_ptr<ni::InferenceTrace> strace(ltrace);
+    lrequest->SetTrace(strace);
 #else
     return TRITONSERVER_ErrorNew(
         TRITONSERVER_ERROR_UNSUPPORTED, "inference tracing not supported");
