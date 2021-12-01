@@ -56,8 +56,8 @@ The following table describes the available metrics.
 |              |GPU Used Memory |Used GPU memory, in bytes              |Per GPU    |Per second   |
 |Count         |Success Count   |Number of successful inference requests received by Triton (each request is counted as 1, even if the request contains a batch) |Per model  |Per request  |
 |              |Failure Count   |Number of failed inference requests received by Triton (each request is counted as 1, even if the request contains a batch) |Per model  |Per request  |
-|              |Inference Count |Number of inferences performed (a batch of "n" is counted as "n" inferences)|Per model|Per request|
-|              |Execution Count |Number of inference batch executions (see [Count Metrics](#count-metrics))|Per model|Per request|
+|              |Inference Count |Number of inferences performed (a batch of "n" is counted as "n" inferences, does not include cached requests)|Per model|Per request|
+|              |Execution Count |Number of inference batch executions (see [Count Metrics](#count-metrics), does not include cached requests)|Per model|Per request|
 |Latency       |Request Time    |Cumulative end-to-end inference request handling time (includes cached requests) |Per model  |Per request  |
 |              |Queue Time      |Cumulative time requests spend waiting in the scheduling queue (includes cached requests) |Per model  |Per request  |
 |              |Compute Input Time|Cumulative time requests spend processing inference inputs (in the framework backend, does not include cached requests)     |Per model  |Per request  |
