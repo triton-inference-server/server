@@ -69,9 +69,9 @@ The following table describes the available metrics.
 |              |Total Cache Miss Count |Total number of response cache misses across all models |Server-wide |Per second |
 |              |Total Cache Eviction Count |Total number of response cache evictions across all models |Server-wide |Per second |
 |              |Total Cache Lookup Time |Cumulative time requests spend checking for a cached response across all models (microseconds) |Server-wide |Per second |
-|              |Total Cache Utilization |Response Cache utilization rate (0.0 - 1.0) |Server-wide |Per second |
+|              |Total Cache Utilization |Total Response Cache utilization rate (0.0 - 1.0) |Server-wide |Per second |
 |              |Cache Hit Count |Number of response cache hits per model |Per model |Per request |
-|              |Cache Hit Lookup Time |Cumulative time requests spend retrieving a cached response per-model on cache hits, does not include cache misses (microseconds) |Per model |Per request |
+|              |Cache Hit Lookup Time |Cumulative time requests spend retrieving a cached response per model on cache hits, does not include cache misses (microseconds) |Per model |Per request |
 
 ## Response Cache
 
