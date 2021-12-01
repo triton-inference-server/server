@@ -2421,17 +2421,6 @@ TRITONSERVER_ServerInferAsync(
   // Run inference...
   ni::Status status = lserver->InferAsync(ureq);
 
-  //   // If there is an error then must explicitly release any trace
-  //   // object associated with the inference request above.
-  // #ifdef TRITON_ENABLE_TRACING
-  //   if (!status.IsOk()) {
-  //     std::unique_ptr<ni::InferenceTrace>* trace = ureq->MutableTrace();
-  //     if (*trace != nullptr) {
-  //       ni::InferenceTrace::Release(std::move(*trace));
-  //     }
-  //   }
-  // #endif  // TRITON_ENABLE_TRACING
-
   // If there is an error then ureq will still have 'lrequest' and we
   // must release it from unique_ptr since the caller should retain
   // ownership when there is error. If there is not an error then ureq

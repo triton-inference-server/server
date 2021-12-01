@@ -182,9 +182,6 @@ TraceManager::TraceRelease(TRITONSERVER_InferenceTrace* trace, void* userp)
   if (parent_id == 0) {
     delete ts;
   }
-
-  // LOG_TRITONSERVER_ERROR(
-  //     TRITONSERVER_InferenceTraceDelete(trace), "deleting trace");
 }
 
 void
