@@ -68,28 +68,32 @@ Metrics::Metrics()
       inf_request_duration_us_family_(
           prometheus::BuildCounter()
               .Name("nv_inference_request_duration_us")
-              .Help("Cummulative inference request duration in microseconds")
+              .Help("Cumulative inference request duration in microseconds "
+                    "(includes cached requests)")
               .Register(*registry_)),
       inf_queue_duration_us_family_(
           prometheus::BuildCounter()
               .Name("nv_inference_queue_duration_us")
-              .Help("Cummulative inference queuing duration in microseconds")
+              .Help("Cumulative inference queuing duration in microseconds "
+                    "(includes cached requests)")
               .Register(*registry_)),
       inf_compute_input_duration_us_family_(
           prometheus::BuildCounter()
               .Name("nv_inference_compute_input_duration_us")
-              .Help("Cummulative compute input duration in microseconds")
+              .Help("Cumulative compute input duration in microseconds (does "
+                    "not include cached requests)")
               .Register(*registry_)),
       inf_compute_infer_duration_us_family_(
           prometheus::BuildCounter()
               .Name("nv_inference_compute_infer_duration_us")
-              .Help("Cummulative compute inference duration in microseconds")
+              .Help("Cumulative compute inference duration in microseconds "
+                    "(does not include cached requests)")
               .Register(*registry_)),
       inf_compute_output_duration_us_family_(
           prometheus::BuildCounter()
               .Name("nv_inference_compute_output_duration_us")
-              .Help("Cummulative inference compute output duration in "
-                    "microseconds")
+              .Help("Cumulative inference compute output duration in "
+                    "microseconds (does not include cached requests)")
               .Register(*registry_)),
       cache_num_entries_family_(
           prometheus::BuildGauge()
