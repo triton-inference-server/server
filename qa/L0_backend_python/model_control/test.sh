@@ -51,10 +51,10 @@ if [ "$SERVER_PID" == "0" ]; then
 fi
 
 set +e
-python3 explicit_model_test.py 2>&1 > $CLIENT_LOG
+python3 model_control_test.py 2>&1 > $CLIENT_LOG
 
 if [ $? -ne 0 ]; then
-    echo -e "\n***\n*** explicit_model_test.py FAILED. \n***"
+    echo -e "\n***\n*** model_control_test.py FAILED. \n***"
     RET=1
 else
     check_test_results $TEST_RESULT_FILE $EXPECTED_NUM_TESTS
@@ -71,7 +71,7 @@ wait $SERVER_PID
 
 if [ $RET -eq 1 ]; then
     cat $CLIENT_LOG
-    echo -e "\n***\n*** Explicit test FAILED. \n***"
+    echo -e "\n***\n*** model_control_test FAILED. \n***"
 else
-    echo -e "\n***\n*** Explicit test PASSED. \n***"
+    echo -e "\n***\n*** model_control_test PASSED. \n***"
 fi

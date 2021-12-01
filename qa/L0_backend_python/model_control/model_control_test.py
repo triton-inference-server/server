@@ -54,6 +54,7 @@ class ExplicitModelTest(tu.TestResultCollector):
         model_name = "identity_fp32"
         with httpclient.InferenceServerClient("localhost:8000") as client:
             for _ in range(5):
+                self.assertFalse(client.is_model_ready(model_name))
                 client.load_model(model_name)
                 self.assertTrue(client.is_model_ready(model_name))
                 self.send_identity_request(client, model_name)
