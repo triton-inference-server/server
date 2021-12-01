@@ -187,7 +187,7 @@ def create_argmap(images):
         gpu_enabled = False if e is None else True
         fail_if(
             not gpu_enabled,
-            '\'enable-gpu\' flag specified but min container provided does not have CUDA installed'
+            'Composing container with gpu enabled but min container provided does not have CUDA installed'
         )
 
     # Check full container enviroment variables
@@ -318,7 +318,9 @@ if __name__ == '__main__':
                         nargs='?',
                         type=lambda x: (str(x).lower() == 'true'),
                         const=True,
-                        required=True)
+                        default=True,
+                        required=False,
+                        help=argparse.SUPPRESS)
     parser.add_argument(
         '--backend',
         action='append',
