@@ -182,21 +182,29 @@ Metrics::~Metrics()
     poll_thread_exit_.store(true);
     poll_thread_->join();
 #ifdef TRITON_ENABLE_METRICS_GPU
-    dcgmGroupDestroy(dcgm_metadata_.dcgm_handle_, dcgm_metadata_.groupId_);
-    // Stop and shutdown DCGM
-    dcgmReturn_t derr;
-    if (dcgm_metadata_.standalone_) {
-      derr = dcgmDisconnect(dcgm_metadata_.dcgm_handle_);
-    } else {
-      derr = dcgmStopEmbedded(dcgm_metadata_.dcgm_handle_);
-    }
-    if (derr != DCGM_ST_OK) {
-      LOG_WARNING << "Unable to stop DCGM: " << errorString(derr);
-    }
+    if (dcgm_metadata_.dcgm_initialized_) {
+      dcgmReturn_t derr;
+      // Group destroy will return an error if groupId invalid or dcgm not
+      // initialized or configured correctly
+      derr = dcgmGroupDestroy(
+          dcgm_metadata_.dcgm_handle_, dcgm_metadata_.groupId_);
+      if (derr != DCGM_ST_OK) {
+        LOG_WARNING << "Unable to destroy DCGM group: " << errorString(derr);
+      }
 
-    derr = dcgmShutdown();
-    if (derr != DCGM_ST_OK) {
-      LOG_WARNING << "Unable to shutdown DCGM: " << errorString(derr);
+      // Stop and shutdown DCGM
+      if (dcgm_metadata_.standalone_) {
+        derr = dcgmDisconnect(dcgm_metadata_.dcgm_handle_);
+      } else {
+        derr = dcgmStopEmbedded(dcgm_metadata_.dcgm_handle_);
+      }
+      if (derr != DCGM_ST_OK) {
+        LOG_WARNING << "Unable to stop DCGM: " << errorString(derr);
+      }
+      derr = dcgmShutdown();
+      if (derr != DCGM_ST_OK) {
+        LOG_WARNING << "Unable to shutdown DCGM: " << errorString(derr);
+      }
     }
 #endif  // TRITON_ENABLE_METRICS_GPU
   }
@@ -530,6 +538,9 @@ Metrics::InitializeDcgmMetrics()
   if (dcgmerr != DCGM_ST_OK) {
     LOG_WARNING << "DCGM unable to start: " << errorString(dcgmerr);
     return false;
+  } else {
+    // Set this flag to signal DCGM cleanup in destructor
+    dcgm_metadata_.dcgm_initialized_ = true;
   }
 
   if (dcgm_metadata_.standalone_) {
