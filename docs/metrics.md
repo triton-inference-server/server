@@ -77,14 +77,17 @@ The following table describes the available metrics.
 
 Compute latency metrics in the table above are calculated for the
 time spent in model inference backends. If the response cache is enabled for a
-given model (and a non-zero `--response-cache-byte-size` is defined for the
-server), total inference times may be affected by response cache lookup times.
+given model (see [Response Cache](https://github.com/triton-inference-server/server/blob/main/docs/response_cache.md)
+docs for more info), total inference times may be affected by response cache
+lookup times.
 
-On cache hits, the cached response will be used instead of going through the
-inference backend, so compute times will not be recorded.
+On cache hits, "Cache Hit Lookup Time" indicates the time spent looking up the
+response, and "Compute Input Time" /  "Compute Time" / "Compute Output Time"
+are not recorded.
 
-On cache misses, the request will fallback to the inference backend and
-update compute time metrics accordingly.
+On cache misses, "Cache Hit Lookup Time" will not be recorded, and
+"Compute Input Time" /  "Compute Time" / "Compute Output Time" will be
+recorded as usual.
 
 ## Count Metrics
 
