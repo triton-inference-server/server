@@ -293,13 +293,15 @@ class TritonPlugin(BaseDeploymentClient):
         elif flavor == "onnx":
             # Look for model file via MLModel metadata or iterating dir
             model_file = None
+            config_file = None
             for file in artifact_path.iterdir():
                 if file.name == 'MLmodel':
                     mlmodel = Model.load(file)
                     onnx_meta_data = mlmodel.flavors.get("onnx", None)
                     if onnx_meta_data is not None:
                         model_file = onnx_meta_data.get('data', None)
-                    break
+                elif file.name == 'config.pbtxt':
+                    config_file = file.name
             if model_file is None:
                 for file in artifact_path.iterdir():
                     if file.suffix == '.onnx':
@@ -309,15 +311,21 @@ class TritonPlugin(BaseDeploymentClient):
                 artifact_path, model_file)
             copy_paths['model_path']['to'] = os.path.join(
                 triton_deployment_dir, "1")
-            # Provide a minimum config file so Triton knows what backend
-            # should be performing the auto-completion
-            config = '''
+
+            if config_file is not None:
+                copy_paths['config_path']['from'] = os.path.join(
+                    artifact_path, config_file)
+                copy_paths['config_path']['to'] = triton_deployment_dir
+            else:
+                # Provide a minimum config file so Triton knows what backend
+                # should be performing the auto-completion
+                config = '''
 backend: "onnx"
 default_model_filename: "{}"
 '''.format(model_file)
-            with open(os.path.join(triton_deployment_dir, "config.pbtxt"),
-                      "w") as cfile:
-                cfile.write(config)
+                with open(os.path.join(triton_deployment_dir, "config.pbtxt"),
+                          "w") as cfile:
+                    cfile.write(config)
         return copy_paths
 
     def _copy_files_to_triton_repo(self, artifact_path, name, flavor):
