@@ -35,6 +35,7 @@ from tritonclient.utils import InferenceServerException, np_to_triton_dtype, tri
 from mlflow.deployments import BaseDeploymentClient
 from mlflow.tracking.artifact_utils import _download_artifact_from_uri
 from mlflow.exceptions import MlflowException
+from mlflow.models import Model
 
 import glob
 import json
@@ -55,7 +56,7 @@ class TritonPlugin(BaseDeploymentClient):
         super(TritonPlugin, self).__init__(target_uri=uri)
         self.server_config = Config()
         triton_url, self.triton_model_repo = self._get_triton_server_config()
-        self.supported_flavors = ['triton']  # need to add other flavors
+        self.supported_flavors = ['triton', 'onnx']  # need to add other flavors
         # URL cleaning for constructing Triton client
         ssl = False
         if triton_url.startswith("http:#"):
@@ -99,16 +100,10 @@ class TritonPlugin(BaseDeploymentClient):
                 "Unable to create deployment for name %s because it already exists."
                 % (name))
 
-        # When flavor is 'triton', the model is assumed to be preconfigured
-        # with proper model versions and version strategy, which may differ from
-        # the versioning in MLFlow
-        if flavor == 'triton':
-            # Get the path of the artifact
-            path = Path(_download_artifact_from_uri(model_uri))
-
-            self._copy_files_to_triton_repo(path, name)
-
-            self._generate_mlflow_meta_file(name, flavor, model_uri)
+        # Get the path of the artifact
+        path = Path(_download_artifact_from_uri(model_uri))
+        self._copy_files_to_triton_repo(path, name, flavor)
+        self._generate_mlflow_meta_file(name, flavor, model_uri)
 
         try:
             self.triton_client.load_model(name)
@@ -166,7 +161,7 @@ class TritonPlugin(BaseDeploymentClient):
         # Get the path of the artifact
         path = Path(_download_artifact_from_uri(model_uri))
 
-        self._copy_files_to_triton_repo(path, name)
+        self._copy_files_to_triton_repo(path, name, flavor)
 
         self._generate_mlflow_meta_file(name, flavor, model_uri)
 
@@ -283,23 +278,59 @@ class TritonPlugin(BaseDeploymentClient):
 
         return mlflow_meta_dict
 
-    def _get_copy_paths(self, artifact_path, name):
+    def _get_copy_paths(self, artifact_path, name, flavor):
         copy_paths = {}
         copy_paths['model_path'] = {}
-        for file in artifact_path.iterdir():
-            if file.name not in ['MLmodel', 'conda.yaml']:
-                copy_paths['model_path']['from'] = file
-
-        triton_deployment_dir = "{}/{}".format(self.triton_model_repo, name)
-        copy_paths['model_path']['to'] = triton_deployment_dir
+        triton_deployment_dir = os.path.join(self.triton_model_repo, name)
+        if flavor == "triton":
+            # When flavor is 'triton', the model is assumed to be preconfigured
+            # with proper model versions and version strategy, which may differ from
+            # the versioning in MLFlow
+            for file in artifact_path.iterdir():
+                if file.name not in ['MLmodel', 'conda.yaml']:
+                    copy_paths['model_path']['from'] = file
+            copy_paths['model_path']['to'] = triton_deployment_dir
+        elif flavor == "onnx":
+            # Look for model file via MLModel metadata or iterating dir
+            model_file = None
+            for file in artifact_path.iterdir():
+                if file.name == 'MLmodel':
+                    mlmodel = Model.load(file)
+                    onnx_meta_data = mlmodel.flavors.get("onnx", None)
+                    if onnx_meta_data is not None:
+                        model_file = onnx_meta_data.get('data', None)
+                    break
+            if model_file is None:
+                for file in artifact_path.iterdir():
+                    if file.suffix == '.onnx':
+                        model_file = file.name
+                        break
+            copy_paths['model_path']['from'] = os.path.join(
+                artifact_path, model_file)
+            copy_paths['model_path']['to'] = os.path.join(
+                triton_deployment_dir, "1")
+            # Provide a minimum config file so Triton knows what backend
+            # should be performing the auto-completion
+            config = '''
+backend: "onnx"
+default_model_filename: "{}"
+'''.format(model_file)
+            with open(os.path.join(triton_deployment_dir, "config.pbtxt"),
+                      "w") as cfile:
+                cfile.write(config)
         return copy_paths
 
-    def _copy_files_to_triton_repo(self, artifact_path, name):
-        copy_paths = self._get_copy_paths(artifact_path, name)
+    def _copy_files_to_triton_repo(self, artifact_path, name, flavor):
+        copy_paths = self._get_copy_paths(artifact_path, name, flavor)
         for key in copy_paths:
-            if os.path.isdir(copy_paths[key]['to']):
-                shutil.rmtree(copy_paths[key]['to'])
-            shutil.copytree(copy_paths[key]['from'], copy_paths[key]['to'])
+            if os.path.isdir(copy_paths[key]['from']):
+                if os.path.isdir(copy_paths[key]['to']):
+                    shutil.rmtree(copy_paths[key]['to'])
+                shutil.copytree(copy_paths[key]['from'], copy_paths[key]['to'])
+            else:
+                if not os.path.isdir(copy_paths[key]['to']):
+                    os.makedirs(copy_paths[key]['to'])
+                shutil.copy(copy_paths[key]['from'], copy_paths[key]['to'])
             print("Copied", copy_paths[key]['from'], "to",
                   copy_paths[key]['to'])
         return copy_paths
