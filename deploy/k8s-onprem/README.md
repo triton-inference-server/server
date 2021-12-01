@@ -30,30 +30,34 @@
 
 # Kubernetes Deploy: Triton Inference Server Cluster
 
-A helm chart for installing a single cluster of Triton Inference
-Server is provided. By default the cluster contains a single instance
-of the inference server but the *replicaCount* configuration parameter
-can be set to create a cluster of any size, as described below.
+This repository includes a helm chart and instructions for installing NVIDIA Triton
+Inference Server on an on-premises Kubernetes cluster. You can also use this
+repository to enable load balancing and autoscaling for your Triton cluster.
 
 This guide assumes you already have a functional Kubernetes cluster
 and helm installed (see below for instructions on installing
 helm). Note the following requirements:
 
-* The helm chart deploys Prometheus and Grafana to collect and display Triton metrics. Your cluster must contain sufficient CPU resources to support these services. At a minimum you will likely require 2 CPU nodes with machine type of n1-standard-2 or greater.
+* The helm chart deploys Prometheus and Grafana to collect and display Triton metrics. Your cluster must contain sufficient CPU resources to support these services.
 
 * If you want Triton Server to use GPUs for inferencing, your cluster
 must be configured to contain the desired number of GPU nodes with
 support for the NVIDIA driver and CUDA version required by the version
-of the inference server you are using.
+of the inference server you are using. See the
+[NVIDIA GPU Operator documentation](https://docs.nvidia.com/datacenter/cloud-native/gpu-operator/overview.html)
+for details on how to enable GPU access in your kubernetes cluster.
+
+* To enable autoscaling, your cluster's kube-apiserver must have the [aggregation layer
+enabled](https://kubernetes.io/docs/tasks/extend-kubernetes/configure-aggregation-layer/).
+This will allow the horizontal pod autoscaler to read custom metrics from the prometheus adapter.
 
 This helm chart is available from [Triton Inference Server
-GitHub](https://github.com/triton-inference-server/server) or from the
-[NVIDIA GPU Cloud (NGC)](https://ngc.nvidia.com).
+GitHub](https://github.com/triton-inference-server/server)
 
-The steps below describe how to set-up a model repository, use helm to
+<!-- The steps below describe how to set-up a model repository, use helm to
 launch the inference server, and then send inference requests to the
 running server. You can access a Grafana endpoint to see real-time
-metrics reported by the inference server.
+metrics reported by the inference server. -->
 
 
 ## Installing Helm
@@ -68,7 +72,26 @@ give you a quick setup.
 If you're currently using Helm v2 and would like to migrate to Helm v3,
 please see the [official migration guide](https://helm.sh/docs/topics/v2_v3_migration/).
 
-## TODO: Model Repository
+## Model Repository
+If you already have a model repository you may use that with this helm
+chart. If you do not have a model repository, you can checkout a local
+copy of the inference server source repository to create an example
+model repository:
+
+```
+$ git clone https://github.com/triton-inference-server/server.git
+```
+
+Triton Server needs a repository of models that it will make available
+for inferencing. For this example, we are using a pre-existing NFS server and
+placing our model files there. See the
+[Model Repository documentation](../../docs/model_repository.md) for other
+supported locations.
+
+Following the [QuickStart](../../docs/quickstart.md) download the
+example model repository to your system, and copy it onto your NFS server.
+Then, add the url or ip address of your NFS server and the server path of your
+model repository to `values.yaml`.
 
 
 ## Deploy Prometheus and Grafana
@@ -78,7 +101,7 @@ by Grafana. The inference server helm chart assumes that Prometheus
 and Grafana are available so this step must be followed even if you
 don't want to use Grafana.
 
-Use the prometheus-operator to install these components. The
+Use the [kube-prometheus-stack](https://github.com/prometheus-community/helm-charts/tree/main/charts/kube-prometheus-stack) helm chart to install these components. The
 *serviceMonitorSelectorNilUsesHelmValues* flag is needed so that
 Prometheus can find the inference server metrics in the *example*
 release deployed below.
@@ -103,10 +126,41 @@ password=prom-operator to login.
 An example Grafana dashboard is available in dashboard.json. Use the
 import function in Grafana to import and view this dashboard.
 
+## Enable Autoscaling
+To enable autoscaling, ensure that autoscaling tag in `values.yaml`is set to `true`.
+This will do two things:
+
+1. Deploy a Horizontal Pod Autoscaler that will scale replicas of the triton-inference-server
+based on the information included in `values.yaml`.
+
+2. Install the [prometheus-adapter](https://github.com/prometheus-community/helm-charts/tree/main/charts/prometheus-adapter) helm chart, allowing the Horizontal Pod Autoscaler to scale
+based on custom metrics from prometheus.
+
+The included configuration will scale triton pods based on the average queue time,
+as described in [this blog post](https://developer.nvidia.com/blog/deploying-nvidia-triton-at-scale-with-mig-and-kubernetes/). To customize this,
+you may replace or add to the list of custom rules in `values.yaml`. If you change
+the custom metric, be sure to change the values in autoscaling.metrics.
+
+If autoscaling is disabled, the number of triton server pods is set to the minReplicas
+variable in `values.yaml`.
+
+## Enable Load Balancing
+To enable load balancing, ensure that the loadBalancing tag in `values.yaml`
+is set to to `true`. This will do two things:
+
+1. Deploy a Traefik reverse proxy through the [Traefik Helm Chart](https://github.com/traefik/traefik-helm-chart).
+
+2. Configure two Traefik [IngressRoutes](https://doc.traefik.io/traefik/providers/kubernetes-crd/),
+one for http and one for grpc. This will allow the Traefik service to expose two
+ports that will be forwarded to and balanced across the Triton pods.
+
+To choose the port numbers exposed, or to disable either http or grpc, edit the
+configured variables in `values.yaml`.
+
 ## Deploy the Inference Server
 
-Deploy the inference server using the default configuration with the
-following commands.
+Deploy the inference server, autoscaler, and load balancer using the default
+configuration with the following commands.
 
 ```
 $ cd <directory containing Chart.yaml>
@@ -128,11 +182,11 @@ documentation](https://helm.sh/docs/using_helm/#customizing-the-chart-before-ins
 
 You can edit the values.yaml file directly or you can use the *--set*
 option to override a single parameter with the CLI. For example, to
-deploy a cluster of four inference servers use *--set* to set the
-replicaCount parameter.
+deploy a cluster with a minimum of two inference servers use *--set* to
+set the autoscaler.minReplicas parameter.
 
 ```
-$ helm install --name example --set replicaCount=4 .
+$ helm install --name example --set autoscaler.minReplicas=2 .
 ```
 
 You can also write your own "config.yaml" file with the values you
@@ -151,25 +205,34 @@ $ helm install --name example -f config.yaml .
 ## Using Triton Inference Server
 
 Now that the inference server is running you can send HTTP or GRPC
-requests to it to perform inferencing. By default, the inferencing
-service is exposed with a LoadBalancer service type. Use the following
-to find the external IP for the inference server. In this case it is
-34.83.9.133.
+requests to it to perform inferencing. By default, this chart deploys [Traefik](traefik.io)
+and uses [IngressRoutes](https://doc.traefik.io/traefik/providers/kubernetes-crd/)
+to balance requests across all available nodes.
+
+To send requests through the Traefik proxy, use the Cluster IP of the
+traefik service deployed by the helm chart. In this case it is 10.111.128.124.
 
 ```
 $ kubectl get services
-NAME                             TYPE           CLUSTER-IP     EXTERNAL-IP   PORT(S)                                        AGE
+NAME                              TYPE           CLUSTER-IP       EXTERNAL-IP   PORT(S)                                                    AGE
 ...
-example-triton-inference-server  LoadBalancer   10.18.13.28    34.83.9.133   8000:30249/TCP,8001:30068/TCP,8002:32723/TCP   47m
+example-traefik                   LoadBalancer   10.111.128.124   <pending>     8001:31752/TCP,8000:31941/TCP,80:30692/TCP,443:30303/TCP   74m
+example-triton-inference-server   ClusterIP      None             <none>        8000/TCP,8001/TCP,8002/TCP                                 74m
 ```
 
-The inference server exposes an HTTP endpoint on port 8000, and GRPC
+Use the following command to easily refer to the Cluster IP
+```
+cluster_ip=`kubectl get svc -l app.kubernetes.io/name=traefik -o=jsonpath='{.items[0].spec.clusterIP}'`
+```
+
+
+The Traefik reverse-proxy exposes an HTTP endpoint on port 8000, and GRPC
 endpoint on port 8001 and a Prometheus metrics endpoint on
 port 8002. You can use curl to get the meta-data of the inference server
 from the HTTP endpoint.
 
 ```
-$ curl 34.83.9.133:8000/v2
+$ curl $cluster_ip:8000/v2
 ```
 
 Follow the [QuickStart](../../docs/quickstart.md) to get the example
@@ -178,13 +241,26 @@ using image classification models being served by the inference
 server. For example,
 
 ```
-$ image_client -u 34.83.9.133:8000 -m inception_graphdef -s INCEPTION -c3 mug.jpg
+$ image_client -u $cluster_ip:8000 -m inception_graphdef -s INCEPTION -c3 mug.jpg
 Request 0, batch size 1
 Image 'images/mug.jpg':
     504 (COFFEE MUG) = 0.723992
     968 (CUP) = 0.270953
     967 (ESPRESSO) = 0.00115997
 ```
+
+## Testing Load Balancing and Autoscaling
+Once you've confirmed that your Triton cluster is operational and can perform inference,
+you can test the Load Balancing and Autoscaling features by sending a heavy load of requests.
+One option for doing this is using the [perf_analyzer](../../docs/perf_analyzer.md) application.
+
+You can apply a progressively increasing load with a command like
+```
+perf_analyzer -m simple -u $cluster_ip:8000 --concurrency-range 1:10
+```
+
+From your Grafana dashboard, you should be able to see the number of pods increase
+as the load increases, with requests being routed evenly to the new pods.
 
 ## Cleanup
 
@@ -206,11 +282,4 @@ CRDs](https://github.com/helm/charts/tree/master/stable/prometheus-operator#unin
 
 ```
 $ kubectl delete crd alertmanagers.monitoring.coreos.com servicemonitors.monitoring.coreos.com podmonitors.monitoring.coreos.com prometheuses.monitoring.coreos.com prometheusrules.monitoring.coreos.com
-```
-
-You may also want to delete the GCS bucket you created to hold the
-model repository.
-
-```
-$ gsutil rm -r gs://triton-inference-server-repository
 ```
