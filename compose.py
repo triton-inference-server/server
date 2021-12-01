@@ -73,7 +73,7 @@ FROM {}
 
     import build
     df += build.dockerfile_prepare_container_linux(argmap, backends,
-                                                   not FLAGS.disable_gpu,
+                                                   FLAGS.enable_gpu,
                                                    platform.machine().lower())
     # Copy over files
     df += '''
@@ -154,7 +154,7 @@ def create_argmap(images):
     # use
     full_docker_image = images["full"]
     min_docker_image = images["min"]
-    enable_gpu = not FLAGS.disable_gpu
+    enable_gpu = FLAGS.enable_gpu
     # Docker inspect enviroment variables
     base_run_args = ['docker', 'inspect', '-f']
     import re  # parse all PATH enviroment variables
@@ -187,7 +187,7 @@ def create_argmap(images):
         gpu_enabled = False if e is None else True
         fail_if(
             not gpu_enabled,
-            '\'disable-gpu\' flag not specified but min container provided does not have CUDA installed'
+            '\'enable-gpu\' flag specified but min container provided does not have CUDA installed'
         )
 
     # Check full container enviroment variables
@@ -314,10 +314,11 @@ if __name__ == '__main__':
         help=
         'Use specified Docker image to generate Docker image. Specified as <image-name>,<full-image-name>. <image-name> can be "min" or "full". Both "min" and "full" need to be specified at the same time. This will override "--container-version".'
     )
-    parser.add_argument('--disable-gpu',
-                        action="store_true",
-                        required=False,
-                        help='Generate a cpu-only Triton image.')
+    parser.add_argument('--enable-gpu',
+                        nargs='?',
+                        type=lambda x: (str(x).lower() == 'true'),
+                        const=True,
+                        required=True)
     parser.add_argument(
         '--backend',
         action='append',
@@ -367,7 +368,7 @@ if __name__ == '__main__':
             images[parts[0]] = parts[1]
     else:
         get_container_version_if_not_specified()
-        if (not FLAGS.disable_gpu):
+        if (FLAGS.enable_gpu):
             images = {
                 "full":
                     "nvcr.io/nvidia/tritonserver:{}-py3".format(
