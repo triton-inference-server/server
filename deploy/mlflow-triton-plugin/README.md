@@ -38,7 +38,7 @@ substitute the flavor specification in the example below according to the model
 to be deployed.
 
 * onnx
-* flavor
+* triton
 
 ## Requirements
 
