@@ -306,7 +306,8 @@ class InferenceRequest {
     response_factory_.SetTrace(trace);
   }
 
-  Status TraceTensor(const std::string& msg);
+  Status TraceTensor(
+      TRITONSERVER_InferenceTraceActivity activity, const std::string& msg);
 #endif  // TRITON_ENABLE_TRACING
 
   // The original inputs are the inputs added to the request before

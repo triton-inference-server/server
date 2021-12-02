@@ -29,9 +29,6 @@
 #include "src/core/logging.h"
 #include "src/core/model.h"
 #include "src/core/server.h"
-#ifdef TRITON_ENABLE_TRACING
-#include "src/core/cuda_utils.h"
-#endif  // TRITON_ENABLE_TRACING
 
 namespace nvidia { namespace inferenceserver {
 
@@ -204,7 +201,8 @@ InferenceResponse::Send(
     std::unique_ptr<InferenceResponse>&& response, const uint32_t flags)
 {
 #ifdef TRITON_ENABLE_TRACING
-  response->TraceTensor("InferenceResponse Send");
+  response->TraceTensor(
+      TRITONSERVER_TRACE_TENSOR_BACKEND_OUTPUT, "InferenceResponse Send");
 #endif  // TRITON_ENABLE_TRACING
 
   if (response->response_delegator_ != nullptr) {
@@ -235,11 +233,9 @@ InferenceResponse::SendWithStatus(
 
 #ifdef TRITON_ENABLE_TRACING
 Status
-InferenceResponse::TraceTensor(const std::string& msg)
+InferenceResponse::TraceTensor(
+    TRITONSERVER_InferenceTraceActivity activity, const std::string& msg)
 {
-  TRITONSERVER_MemoryType dst_memory_type = TRITONSERVER_MEMORY_CPU;
-  int64_t dst_memory_type_id = 0;
-
   const auto& outputs = this->Outputs();
   uint32_t output_count = outputs.size();
 
@@ -254,38 +250,23 @@ InferenceResponse::TraceTensor(const std::string& msg)
     uint64_t dim_count = oshape.size();
     const void* base;
     size_t byte_size;
-    TRITONSERVER_MemoryType src_memory_type;
-    int64_t src_memory_type_id;
+    TRITONSERVER_MemoryType memory_type;
+    int64_t memory_type_id;
     void* userp;
-    bool cuda_used;
-    // status
-    Status status;
 
-    status = output.DataBuffer(
-        &base, &byte_size, &src_memory_type, &src_memory_type_id, &userp);
+    Status status = output.DataBuffer(
+        &base, &byte_size, &memory_type, &memory_type_id, &userp);
     if (!status.IsOk()) {
       LOG_STATUS_ERROR(
-          status, msg + ": fail to get data buffer: " + status.Message());
-      return status;
-    }
-
-    // ouput buffer
-    std::vector<char> out_buffer(byte_size);
-    void* buffer = out_buffer.data();
-
-    status = CopyBuffer(
-        "InferenceResponse TraceTensor", src_memory_type, src_memory_type_id,
-        dst_memory_type, dst_memory_type_id, byte_size, base, buffer, nullptr,
-        &cuda_used);
-    if (!status.IsOk()) {
-      LOG_STATUS_ERROR(
-          status, msg + ": fail to copy buffer: " + status.Message());
+          status,
+          std::string(TRITONSERVER_InferenceTraceActivityString(activity)) +
+              ": " + msg + ": fail to get data buffer: " + status.Message());
       return status;
     }
 
     INFER_TRACE_TENSOR_ACTIVITY(
-        this->trace_, TRITONSERVER_TRACE_TENSOR_OUTPUT, cname, datatype, buffer,
-        byte_size, shape, dim_count, dst_memory_type, dst_memory_type_id);
+        this->trace_, activity, cname, datatype, base, byte_size, shape,
+        dim_count, memory_type, memory_type_id);
   }
 
   return Status::Success;

@@ -280,7 +280,8 @@ class InferenceResponse {
       const Status& status);
 
 #ifdef TRITON_ENABLE_TRACING
-  Status TraceTensor(const std::string& msg);
+  Status TraceTensor(
+      TRITONSERVER_InferenceTraceActivity activity, const std::string& msg);
 #endif  // TRITON_ENABLE_TRACING
 
  private:

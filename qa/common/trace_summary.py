@@ -252,7 +252,7 @@ def summarize(frontend, traces):
             print("\t\tCompute (avg): {}us".format(
                 model_span_map[key]["COMPUTE"] / (cnt * 1000)))
         if ("COMPUTE_INPUT" in model_span_map[key]
-                ) and "COMPUTE_OUTPUT" in model_span_map[key]:
+            ) and "COMPUTE_OUTPUT" in model_span_map[key]:
             print("\t\t\tInput (avg): {}us".format(
                 model_span_map[key]["COMPUTE_INPUT"] / (cnt * 1000)))
             print("\t\t\tInfer (avg): {}us".format(
@@ -286,45 +286,50 @@ def summarize_dataflow(traces):
 
     # {3: {4: {7: None}, 5: None, 6: None}}
     dataflow_tree_map = dict()
+    depth = [0]
     append_dataflow_tensor(dataflow_tree_map,
                            first_parent_id,
                            dataflow_parent_map,
-                           traces)
+                           traces,
+                           depth)
 
-    print_dataflow_tensor(dataflow_tree_map, traces, tab_num=0)
+    print_dataflow_tensor(dataflow_tree_map, traces, depth[0], tab_num=0)
 
 
 def append_dataflow_tensor(dataflow_tensor_map,
                            parent_id,
                            dataflow_tree_map,
-                           traces):
+                           traces,
+                           depth):
     if parent_id not in dataflow_tree_map:
         dataflow_tensor_map[parent_id] = None
         return
 
     child_tensor_map = dict()
     dataflow_tensor_map[parent_id] = child_tensor_map
+    depth[0] = depth[0] + 1
 
     child_ids = dataflow_tree_map[parent_id]
     for child_id in child_ids:
         append_dataflow_tensor(child_tensor_map, child_id,
-                               dataflow_tree_map, traces)
+                               dataflow_tree_map, traces, depth)
 
 
-def print_dataflow_tensor(dataflow_tree_map, traces, tab_num):
+def print_dataflow_tensor(dataflow_tree_map, traces, depth, tab_num):
     for parent_id in dataflow_tree_map:
-        print_tensor_by_id(parent_id, traces, tab_num)
+        print_tensor_by_id(parent_id, traces, depth, tab_num)
 
         if dataflow_tree_map[parent_id] is None:
             continue
 
-        print_dataflow_tensor(dataflow_tree_map[parent_id], traces, tab_num+1)
+        print_dataflow_tensor(
+            dataflow_tree_map[parent_id], traces, depth, tab_num+1)
 
 
-def print_tensor_by_id(id, traces, tab_num):
+def print_tensor_by_id(id, traces, depth, tab_num):
     tabs = "\t"*(tab_num+1)
 
-    print("{0}{1}".format(tabs, "*"*50))
+    print("{0}{1}".format(tabs, "="*(50+8*(depth-tab_num))))
     for trace in traces:
         # print model name and version
         if "id" in trace and "model_name" in trace and "model_version" in trace and "timestamps" in trace and trace["id"] == id:
@@ -334,15 +339,19 @@ def print_tensor_by_id(id, traces, tab_num):
                 tabs, trace["model_version"]))
         # print data
         if "id" in trace and "activity" in trace:
-            if trace["id"] == id and trace["activity"] == "TENSOR_INPUT":
-                print("{0}{1}:".format(tabs, "INPUT"))
+            if trace["id"] == id and trace["activity"] == "TENSOR_QUEUE_INPUT":
+                print("{0}{1}:".format(tabs, "QUEUE_INPUT"))
                 print("{0}\t{1}: {2}".format(tabs, trace["tensor"]["name"],
                       get_numpy_array(trace["tensor"])))
-            elif trace["id"] == id and trace["activity"] == "TENSOR_OUTPUT":
-                print("{0}{1}:".format(tabs, "OUTPUT"))
+            elif trace["id"] == id and trace["activity"] == "TENSOR_BACKEND_INPUT":
+                print("{0}{1}:".format(tabs, "BACKEND_INPUT"))
                 print("{0}\t{1}: {2}".format(tabs, trace["tensor"]["name"],
                       get_numpy_array(trace["tensor"])))
-    print("{0}{1}".format(tabs, "*"*50))
+            elif trace["id"] == id and trace["activity"] == "TENSOR_BACKEND_OUTPUT":
+                print("{0}{1}:".format(tabs, "BACKEND_OUTPUT"))
+                print("{0}\t{1}: {2}".format(tabs, trace["tensor"]["name"],
+                      get_numpy_array(trace["tensor"])))
+    print("{0}{1}".format(tabs, "="*(50+8*(depth-tab_num))))
 
 
 TRITON_TYPE_TO_NUMPY = {

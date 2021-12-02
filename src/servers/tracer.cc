@@ -30,6 +30,10 @@
 #include <unordered_map>
 #include "src/core/constants.h"
 #include "src/core/logging.h"
+#ifdef TRITON_ENABLE_GPU
+#include <cuda_runtime_api.h>
+#include "src/servers/common.h"
+#endif  // TRITON_ENABLE_GPU
 
 namespace nvidia { namespace inferenceserver {
 
@@ -197,15 +201,15 @@ TraceManager::TraceActivity(
   // The function may be called with different traces but the same 'userp',
   // group the activity of the same trace together for more readable output.
   auto ts = reinterpret_cast<TraceStreams*>(userp);
+  std::lock_guard<std::mutex> lk(ts->mtx_);
+
   std::stringstream* ss = nullptr;
   {
     if (activity == TRITONSERVER_TRACE_REQUEST_START) {
       std::unique_ptr<std::stringstream> stream(new std::stringstream());
       ss = stream.get();
-      std::lock_guard<std::mutex> lk(ts->mtx_);
       ts->streams_.emplace(id, std::move(stream));
     } else {
-      std::lock_guard<std::mutex> lk(ts->mtx_);
       ss = ts->streams_[id].get();
     }
   }
@@ -248,21 +252,30 @@ TraceManager::TraceTensorActivity(
     const int64_t* shape, uint64_t dim_count,
     TRITONSERVER_MemoryType memory_type, int64_t memory_type_id, void* userp)
 {
-  if ((activity != TRITONSERVER_TRACE_TENSOR_INPUT) &&
-      (activity != TRITONSERVER_TRACE_TENSOR_OUTPUT)) {
+  if ((activity != TRITONSERVER_TRACE_TENSOR_QUEUE_INPUT) &&
+      (activity != TRITONSERVER_TRACE_TENSOR_BACKEND_INPUT) &&
+      (activity != TRITONSERVER_TRACE_TENSOR_BACKEND_OUTPUT)) {
     LOG_ERROR << "Unsupported activity: "
               << TRITONSERVER_InferenceTraceActivityString(activity);
     return;
   }
 
-  if ((memory_type != TRITONSERVER_MEMORY_CPU) &&
-      (memory_type != TRITONSERVER_MEMORY_CPU_PINNED)) {
-    LOG_ERROR << "Unsupported memory type: "
-              << TRITONSERVER_MemoryTypeString(memory_type);
-    return;
-  }
-
   void* buffer_base = const_cast<void*>(base);
+  if (memory_type == TRITONSERVER_MEMORY_GPU) {
+#ifdef TRITON_ENABLE_GPU
+    buffer_base = malloc(byte_size);
+    if (buffer_base == nullptr) {
+      LOG_ERROR << "Failed to malloc CPU buffer";
+      return;
+    }
+    FAIL_IF_CUDA_ERR(
+        cudaMemcpy(buffer_base, base, byte_size, cudaMemcpyDeviceToHost),
+        "copying buffer into CPU memory");
+#else
+    LOG_ERROR << "GPU buffer is unsupported";
+    return;
+#endif  // TRITON_ENABLE_GPU
+  }
 
   uint64_t id;
   LOG_TRITONSERVER_ERROR(
@@ -271,30 +284,28 @@ TraceManager::TraceTensorActivity(
   // The function may be called with different traces but the same 'userp',
   // group the activity of the same trace together for more readable output.
   auto ts = reinterpret_cast<TraceStreams*>(userp);
+  std::lock_guard<std::mutex> lk(ts->mtx_);
+
   std::stringstream* ss = nullptr;
   {
-    if (activity == TRITONSERVER_TRACE_REQUEST_START) {
+    if (ts->streams_.find(id) == ts->streams_.end()) {
       std::unique_ptr<std::stringstream> stream(new std::stringstream());
       ss = stream.get();
-      std::lock_guard<std::mutex> lk(ts->mtx_);
       ts->streams_.emplace(id, std::move(stream));
     } else {
-      std::lock_guard<std::mutex> lk(ts->mtx_);
       ss = ts->streams_[id].get();
     }
   }
 
-  std::stringstream ss_tmp;
-
   // collect and serialize trace details.
-  ss_tmp << ",{\"id\":" << id << ",\"activity\":\""
-         << TRITONSERVER_InferenceTraceActivityString(activity) << "\"";
+  *ss << ",{\"id\":" << id << ",\"activity\":\""
+      << TRITONSERVER_InferenceTraceActivityString(activity) << "\"";
   // collect tensor
-  ss_tmp << ",\"tensor\":{";
+  *ss << ",\"tensor\":{";
   // collect tensor name
-  ss_tmp << "\"name\":\"" << std::string(name) << "\"";
+  *ss << "\"name\":\"" << std::string(name) << "\"";
   // collect tensor data
-  ss_tmp << ",\"data\":\"";
+  *ss << ",\"data\":\"";
   size_t element_count = 1;
   for (uint64_t i = 0; i < dim_count; i++) {
     element_count *= shape[i];
@@ -303,81 +314,81 @@ TraceManager::TraceTensorActivity(
     case TRITONSERVER_TYPE_BOOL: {
       const uint8_t* bool_base = reinterpret_cast<const uint8_t*>(buffer_base);
       for (size_t e = 0; e < element_count; ++e) {
-        ss_tmp << ((bool_base[e] == 0) ? false : true);
+        *ss << ((bool_base[e] == 0) ? false : true);
         if (e < (element_count - 1))
-          ss_tmp << ",";
+          *ss << ",";
       }
       break;
     }
     case TRITONSERVER_TYPE_UINT8: {
       const uint8_t* cbase = reinterpret_cast<const uint8_t*>(buffer_base);
       for (size_t e = 0; e < element_count; ++e) {
-        ss_tmp << cbase[e];
+        *ss << cbase[e];
         if (e < (element_count - 1))
-          ss_tmp << ",";
+          *ss << ",";
       }
       break;
     }
     case TRITONSERVER_TYPE_UINT16: {
       const uint16_t* cbase = reinterpret_cast<const uint16_t*>(buffer_base);
       for (size_t e = 0; e < element_count; ++e) {
-        ss_tmp << cbase[e];
+        *ss << cbase[e];
         if (e < (element_count - 1))
-          ss_tmp << ",";
+          *ss << ",";
       }
       break;
     }
     case TRITONSERVER_TYPE_UINT32: {
       const uint32_t* cbase = reinterpret_cast<const uint32_t*>(buffer_base);
       for (size_t e = 0; e < element_count; ++e) {
-        ss_tmp << cbase[e];
+        *ss << cbase[e];
         if (e < (element_count - 1))
-          ss_tmp << ",";
+          *ss << ",";
       }
       break;
     }
     case TRITONSERVER_TYPE_UINT64: {
       const uint64_t* cbase = reinterpret_cast<const uint64_t*>(buffer_base);
       for (size_t e = 0; e < element_count; ++e) {
-        ss_tmp << cbase[e];
+        *ss << cbase[e];
         if (e < (element_count - 1))
-          ss_tmp << ",";
+          *ss << ",";
       }
       break;
     }
     case TRITONSERVER_TYPE_INT8: {
       const int8_t* cbase = reinterpret_cast<const int8_t*>(buffer_base);
       for (size_t e = 0; e < element_count; ++e) {
-        ss_tmp << cbase[e];
+        *ss << cbase[e];
         if (e < (element_count - 1))
-          ss_tmp << ",";
+          *ss << ",";
       }
       break;
     }
     case TRITONSERVER_TYPE_INT16: {
       const int16_t* cbase = reinterpret_cast<const int16_t*>(buffer_base);
       for (size_t e = 0; e < element_count; ++e) {
-        ss_tmp << cbase[e];
+        *ss << cbase[e];
         if (e < (element_count - 1))
-          ss_tmp << ",";
+          *ss << ",";
       }
       break;
     }
     case TRITONSERVER_TYPE_INT32: {
       const int32_t* cbase = reinterpret_cast<const int32_t*>(buffer_base);
       for (size_t e = 0; e < element_count; ++e) {
-        ss_tmp << cbase[e];
+        *ss << cbase[e];
         if (e < (element_count - 1))
-          ss_tmp << ",";
+          *ss << ",";
       }
       break;
     }
     case TRITONSERVER_TYPE_INT64: {
       const int64_t* cbase = reinterpret_cast<const int64_t*>(buffer_base);
       for (size_t e = 0; e < element_count; ++e) {
-        ss_tmp << cbase[e];
+        *ss << cbase[e];
         if (e < (element_count - 1))
-          ss_tmp << ",";
+          *ss << ",";
       }
       break;
     }
@@ -387,18 +398,18 @@ TraceManager::TraceTensorActivity(
     case TRITONSERVER_TYPE_FP32: {
       const float* cbase = reinterpret_cast<const float*>(buffer_base);
       for (size_t e = 0; e < element_count; ++e) {
-        ss_tmp << cbase[e];
+        *ss << cbase[e];
         if (e < (element_count - 1))
-          ss_tmp << ",";
+          *ss << ",";
       }
       break;
     }
     case TRITONSERVER_TYPE_FP64: {
       const double* cbase = reinterpret_cast<const double*>(buffer_base);
       for (size_t e = 0; e < element_count; ++e) {
-        ss_tmp << cbase[e];
+        *ss << cbase[e];
         if (e < (element_count - 1))
-          ss_tmp << ",";
+          *ss << ",";
       }
       break;
     }
@@ -415,11 +426,11 @@ TraceManager::TraceTensorActivity(
           return;
         }
         std::string str(cbase + offset, len);
-        ss_tmp << "\"" << str << "\"";
+        *ss << "\"" << str << "\"";
         offset += len;
 
         if (e < (element_count - 1))
-          ss_tmp << ",";
+          *ss << ",";
       }
       break;
     }
@@ -427,16 +438,22 @@ TraceManager::TraceTensorActivity(
       return;
     }
   }
-  ss_tmp << "\",\"shape\":\"";
+  *ss << "\",\"shape\":\"";
   for (uint64_t i = 0; i < dim_count; i++) {
-    ss_tmp << shape[i];
+    *ss << shape[i];
     if (i < (dim_count - 1)) {
-      ss_tmp << ",";
+      *ss << ",";
     }
   }
-  ss_tmp << "\",\"dtype\":\"" << TRITONSERVER_DataTypeString(datatype) << "\"}";
-  ss_tmp << "}";
+  *ss << "\",\"dtype\":\"" << TRITONSERVER_DataTypeString(datatype) << "\"}";
+  *ss << "}";
 
-  *ss << ss_tmp.str();
+  if (memory_type == TRITONSERVER_MEMORY_GPU) {
+#ifdef TRITON_ENABLE_GPU
+    if (buffer_base != nullptr) {
+      free(buffer_base);
+    }
+#endif  // TRITON_ENABLE_GPU
+  }
 }
 }}  // namespace nvidia::inferenceserver

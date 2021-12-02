@@ -775,10 +775,12 @@ TRITONSERVER_InferenceTraceActivityString(
       return "COMPUTE_END";
     case TRITONSERVER_TRACE_REQUEST_END:
       return "REQUEST_END";
-    case TRITONSERVER_TRACE_TENSOR_INPUT:
-      return "TENSOR_INPUT";
-    case TRITONSERVER_TRACE_TENSOR_OUTPUT:
-      return "TENSOR_OUTPUT";
+    case TRITONSERVER_TRACE_TENSOR_QUEUE_INPUT:
+      return "TENSOR_QUEUE_INPUT";
+    case TRITONSERVER_TRACE_TENSOR_BACKEND_INPUT:
+      return "TENSOR_BACKEND_INPUT";
+    case TRITONSERVER_TRACE_TENSOR_BACKEND_OUTPUT:
+      return "TENSOR_BACKEND_OUTPUT";
   }
 
   return "<unknown>";
@@ -2420,6 +2422,17 @@ TRITONSERVER_ServerInferAsync(
 
   // Run inference...
   ni::Status status = lserver->InferAsync(ureq);
+
+  // If there is an error then must explicitly release any trace
+  // object associated with the inference request above.
+#ifdef TRITON_ENABLE_TRACING
+  if (!status.IsOk()) {
+    std::shared_ptr<ni::InferenceTrace>* trace = ureq->MutableTrace();
+    if (*trace != nullptr) {
+      *trace = nullptr;
+    }
+  }
+#endif  // TRITON_ENABLE_TRACING
 
   // If there is an error then ureq will still have 'lrequest' and we
   // must release it from unique_ptr since the caller should retain
