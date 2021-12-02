@@ -30,14 +30,10 @@ sys.path.append("../common")
 
 import os
 from builtins import range
-from future.utils import iteritems
-import unittest
-import numpy as np
 
 from tensorflow.python.framework import ops
 from tensorflow.python.saved_model import builder
 from tensorflow.python.saved_model import signature_constants
-from tensorflow.python.saved_model import signature_def_utils
 from tensorflow.python.saved_model import tag_constants
 import tensorflow.compat.v1 as tf
 import gen_ensemble_model_utils as gu

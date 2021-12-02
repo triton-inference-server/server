@@ -1619,7 +1619,7 @@ if __name__ == '__main__':
 
     if FLAGS.graphdef or FLAGS.savedmodel:
         import tensorflow as tf
-        from tensorflow.python.framework import graph_io, graph_util
+        from tensorflow.python.framework import graph_io
     if FLAGS.tensorrt or FLAGS.tensorrt_shape_io:
         import tensorrt as trt
     if FLAGS.onnx:

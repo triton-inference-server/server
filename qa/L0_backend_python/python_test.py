@@ -234,7 +234,7 @@ class PythonTest(tu.TestResultCollector):
                 result = client.infer(model_name, inputs)
                 output0 = result.as_numpy('OUTPUT0')
                 self.assertIsNotNone(output0)
-                self.assertTrue(output0[0] == input_data)
+                self.assertEqual(output0[0], input_data)
 
     def test_string(self):
         model_name = "string_fixed"
@@ -253,7 +253,7 @@ class PythonTest(tu.TestResultCollector):
                 self.assertIsNotNone(output0)
 
                 if i % 2 == 0:
-                    self.assertTrue(output0[0] == input_data.astype(np.bytes_))
+                    self.assertEqual(output0[0], input_data.astype(np.bytes_))
                 else:
                     self.assertEqual(output0.size, 0)
 
