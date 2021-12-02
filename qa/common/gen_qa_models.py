@@ -27,7 +27,6 @@
 import argparse
 from builtins import range
 import os
-import sys
 import numpy as np
 import gen_ensemble_model_utils as emu
 
@@ -1693,7 +1692,7 @@ if __name__ == '__main__':
 
     if FLAGS.graphdef or FLAGS.savedmodel:
         import tensorflow as tf
-        from tensorflow.python.framework import graph_io, graph_util
+        from tensorflow.python.framework import graph_io
     if FLAGS.tensorrt:
         import tensorrt as trt
     if FLAGS.onnx:

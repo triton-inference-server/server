@@ -30,8 +30,6 @@ sys.path.append("../common")
 import argparse
 from builtins import range
 from builtins import str
-from future.utils import iteritems
-import os
 import time
 import threading
 import traceback

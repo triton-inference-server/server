@@ -27,7 +27,6 @@
 
 import torch
 from torch import nn
-import torch_neuron
 
 class AddSubNet(nn.Module):
     """
