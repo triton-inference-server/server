@@ -181,13 +181,13 @@ def create_argmap(images):
             pm_path.returncode != 0,
             'docker inspect to find triton enviroment variables for min container failed, {}'
             .format(pm_path.stderr))
-        # min container needs to be GPU enabled if the build is GPU build
+        # min container needs to be GPU support  enabled if the build is GPU build
         vars = pm_path.stdout
         e = re.search("CUDA_VERSION", vars)
         gpu_enabled = False if e is None else True
         fail_if(
             not gpu_enabled,
-            '\'enable-gpu\' flag specified but min container provided does not have CUDA installed'
+            'Composing container with gpu support enabled but min container provided does not have CUDA installed'
         )
 
     # Check full container enviroment variables
@@ -213,7 +213,7 @@ def create_argmap(images):
         gpu_enabled = True
     fail_if(
         gpu_enabled != enable_gpu,
-        'Error: full container provided was build with \'enable_gpu\' as {} and you are composing container with \'enable_gpu\' as {}'
+        'Error: full container provided was build with \'TRITON_SERVER_GPU_ENABLED\' as {} and you are composing container with \'TRITON_SERVER_GPU_ENABLED\' as {}'
         .format(gpu_enabled, enable_gpu))
     e = re.search("TRITON_SERVER_VERSION=([\S]{6,}) ", vars)
     version = "" if e is None else e.group(1)
@@ -315,9 +315,12 @@ if __name__ == '__main__':
         'Use specified Docker image to generate Docker image. Specified as <image-name>,<full-image-name>. <image-name> can be "min" or "full". Both "min" and "full" need to be specified at the same time. This will override "--container-version".'
     )
     parser.add_argument('--enable-gpu',
-                        action="store_true",
+                        nargs='?',
+                        type=lambda x: (str(x).lower() == 'true'),
+                        const=True,
+                        default=True,
                         required=False,
-                        help='Generate a Triton image that supports GPU.')
+                        help=argparse.SUPPRESS)
     parser.add_argument(
         '--backend',
         action='append',
