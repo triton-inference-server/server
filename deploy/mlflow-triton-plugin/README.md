@@ -27,9 +27,18 @@
 -->
 # MLflow Triton
 
-MLflow plugin for deploying your models from MLflow to Triton Inference Server. Scripts
-are included for publishing models, which are in Triton recognized structure,
-to your MLflow Model Registry.
+MLflow plugin for deploying your models from MLflow to Triton Inference Server.
+Scripts are included for publishing models, which are in Triton recognized
+structure, to your MLflow Model Registry.
+
+### Supported flavors
+
+MLFlow Triton plugin currently supports the following flavors, you may
+substitute the flavor specification in the example below according to the model
+to be deployed.
+
+* onnx
+* triton
 
 ## Requirements
 
@@ -69,9 +78,30 @@ can interact with the server properly:
 
 ### Publish models to MLflow
 
-The `publish_model_to_mlflow.py` script is used to publish `triton` flavor models
-to MLflow. A `triton` flavor model is a directory containing the model files
-following the [model layout](https://github.com/triton-inference-server/server/blob/main/docs/model_repository.md#repository-layout).
+#### ONNX flavor
+
+The MLFlow ONNX built-in functionalities can be used to publish `onnx` flavor
+models to MLFlow directly, and the MLFlow Triton plugin will prepare the model
+to the format expected by Triton. You may also log
+[`config.pbtxt`](](https://github.com/triton-inference-server/server/blob/main/docs/protocol/extension_model_configuration.md))
+as additonal artifact which Triton will be used to serve the model. Otherwise,
+the server should be run with auto-complete feature enabled
+(`--strict-model-config=false`) to generate the model configuration.
+
+```
+import mlflow.onnx
+import onnx
+model = onnx.load("examples/onnx_float32_int32_int32/1/model.onnx")
+mlflow.onnx.log_model(model, "triton", registered_model_name="onnx_float32_int32_int32")
+```
+
+#### Triton flavor
+
+For other model frameworks that Triton supports but not yet recognized by
+the MLFlow Triton plugin, the `publish_model_to_mlflow.py` script can be used to
+publish `triton` flavor models to MLflow. A `triton` flavor model is a directory
+containing the model files following the
+[model layout](https://github.com/triton-inference-server/server/blob/main/docs/model_repository.md#repository-layout).
 Below is an example usage:
 
 ```
