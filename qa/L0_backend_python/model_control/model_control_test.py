@@ -52,14 +52,22 @@ class ExplicitModelTest(tu.TestResultCollector):
 
     def test_model_reload(self):
         model_name = "identity_fp32"
+        ensemble_model_name = 'simple_' + "identity_fp32"
         with httpclient.InferenceServerClient("localhost:8000") as client:
             for _ in range(5):
                 self.assertFalse(client.is_model_ready(model_name))
+                # Load the model before the ensemble model to make sure reloading the
+                # model works properly in Python backend.
                 client.load_model(model_name)
+                client.load_model(ensemble_model_name)
                 self.assertTrue(client.is_model_ready(model_name))
+                self.assertTrue(client.is_model_ready(ensemble_model_name))
                 self.send_identity_request(client, model_name)
+                self.send_identity_request(client, ensemble_model_name)
+                client.unload_model(ensemble_model_name)
                 client.unload_model(model_name)
                 self.assertFalse(client.is_model_ready(model_name))
+                self.assertFalse(client.is_model_ready(ensemble_model_name))
 
 
 if __name__ == '__main__':
