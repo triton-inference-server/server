@@ -111,6 +111,25 @@ InferenceRequest::SetPriority(uint32_t p)
 }
 
 Status
+InferenceRequest::OutputBufferProperties(
+    const char* name, size_t* byte_size, TRITONSERVER_MemoryType* memory_type,
+    int64_t* memory_type_id)
+{
+  const auto allocator = response_factory_.Allocator();
+  if ((allocator == nullptr) || (allocator->QueryFn() == nullptr)) {
+    return Status(
+        Status::Code::UNAVAILABLE, "Output properties are not available");
+  } else {
+    RETURN_IF_TRITONSERVER_ERROR(allocator->QueryFn()(
+        reinterpret_cast<TRITONSERVER_ResponseAllocator*>(
+            const_cast<ResponseAllocator*>(allocator)),
+        response_factory_.AllocatorUserp(), name, byte_size, memory_type,
+        memory_type_id));
+  }
+  return Status::Success;
+}
+
+Status
 InferenceRequest::Run(std::unique_ptr<InferenceRequest>& request)
 {
   return request->model_raw_->Enqueue(request);
