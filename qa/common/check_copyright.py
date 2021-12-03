@@ -41,6 +41,7 @@ SKIP_PATHS = (
     'deploy/gke-marketplace-app/.gitignore',
     'deploy/gke-marketplace-app/server-deployer/chart/.helmignore',
     'deploy/gcp/.helmignore', 'deploy/aws/.helmignore',
+    'deploy/fleetcommand/.helmignore',
     'docs/examples/model_repository', 'docs/examples/jetson',
     'qa/common/cuda_op_kernel.cu.cc.patch',
     'qa/ensemble_models/mix_platform_float32_float32_float32/output0_labels.txt',
