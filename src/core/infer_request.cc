@@ -132,17 +132,53 @@ InferenceRequest::TraceTensor(
     const int64_t* shape = ti->ShapeWithBatchDim().data();
     uint32_t dim_count = ti->ShapeWithBatchDim().size();
     uint32_t buffer_count = ti->DataBufferCount();
-    // input buffer
-    std::vector<char> in_buffer(byte_size);
-    char* base = in_buffer.data();
     // chunk buffer
+    Status status;
     const void* buffer;
     uint64_t buffer_size;
     TRITONSERVER_MemoryType src_memory_type;
     int64_t src_memory_type_id;
     bool cuda_used;
 
-    Status status;
+    if (buffer_count == 0) {
+      LOG_STATUS_ERROR(
+          status,
+          std::string(TRITONSERVER_InferenceTraceActivityString(activity)) +
+              ": " + msg + ": tensor: " + name + ": no buffer chunk");
+      continue;
+    }
+
+    if (buffer_count == 1) {
+      status = ti->DataBuffer(
+          0, &buffer, &buffer_size, &src_memory_type, &src_memory_type_id);
+      if (!status.IsOk()) {
+        LOG_STATUS_ERROR(
+            status,
+            std::string(TRITONSERVER_InferenceTraceActivityString(activity)) +
+                ": " + msg + ": tensor: " + name +
+                ": fail to get data buffer: " + status.Message());
+        return status;
+      }
+
+      if (buffer_size != byte_size) {
+        LOG_STATUS_ERROR(
+            status,
+            std::string(TRITONSERVER_InferenceTraceActivityString(activity)) +
+                ": " + msg + ": tensor: " + name + ": truncated buffer");
+        continue;
+      }
+
+      INFER_TRACE_TENSOR_ACTIVITY(
+          this->trace_, activity, name.c_str(), datatype,
+          const_cast<void*>(buffer), buffer_size, shape, dim_count,
+          src_memory_type, src_memory_type_id);
+
+      continue;
+    }
+
+    // input buffer
+    std::vector<char> in_buffer(byte_size);
+    char* base = in_buffer.data();
     size_t offset = 0;
     for (uint32_t b = 0; b < buffer_count; ++b) {
       status = ti->DataBuffer(
@@ -151,7 +187,8 @@ InferenceRequest::TraceTensor(
         LOG_STATUS_ERROR(
             status,
             std::string(TRITONSERVER_InferenceTraceActivityString(activity)) +
-                ": " + msg + ": fail to get data buffer: " + status.Message());
+                ": " + msg + ": tensor: " + name +
+                ": fail to get data buffer: " + status.Message());
         return status;
       }
 
@@ -163,7 +200,8 @@ InferenceRequest::TraceTensor(
         LOG_STATUS_ERROR(
             status,
             std::string(TRITONSERVER_InferenceTraceActivityString(activity)) +
-                ": " + msg + ": fail to copy buffer: " + status.Message());
+                ": " + msg + ": tensor: " + name +
+                ": fail to copy buffer: " + status.Message());
         return status;
       }
 
