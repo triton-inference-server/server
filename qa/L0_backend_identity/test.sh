@@ -83,7 +83,7 @@ for i in "byte_size = 0, 6", \
          "byte_size = 20, 2", \
          "byte_size = 160, 2" \
          ; do set -- $i; \
-    if [[ $(cat $SERVER_LOG | grep $1 | wc -l) -ne $2 ]]; then
+    if [[ $(cat $SERVER_LOG | grep -a $1 | wc -l) -ne $2 ]]; then
         echo -e "\n***\n*** Test Failed $1 $2\n***"
         RET=1
     fi
