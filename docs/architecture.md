@@ -285,15 +285,16 @@ the input tensor that will contain the input state. The *output_name* field
 describes the name of the output tensor produced by the model that contains
 output state. The output state provided by the model in the *i<sup>th</sup>*
 request in the sequence will be used as the input state in the
-*i+1<sup>th</sup>* request.  The *dims* field specifies the dimensions of the
+*i+1<sup>th</sup>* request. The *dims* field specifies the dimensions of the
 state tensors. When the *dims* field contains variable-sized dimensions, the
 shape of the input state and output state does not have to match.
 
 For debugging purposes, the client can request the output state. In order to
-allow the client to request the output state, the *output* section of the model
-configuration must list the output state as one of the model outputs. Note that
-requesting the output state from the client can increase the request latency
-because of the additional tensors that have to be transferred.
+allow the client to request the output state, the
+[*output* section of the model configuration](./model_configuration.md#inputs-and-outputs)
+must list the output state as one of the model outputs. Note that requesting the
+output state from the client can increase the request latency because of the
+additional tensors that have to be transferred.
 
 Implicit state management requires backend support. Currently, only
 [onnxruntime_backend](https://github.com/triton-inference-server/onnxruntime_backend)
@@ -309,7 +310,13 @@ in the model output. If the *dims* section in the *state* description of the
 model contains variable-sized dimensions, Triton will use *1* for every
 variable-sized dimension for the starting request. For other non-starting
 requests in the sequence, the input state is the output state of the previous
-request in the sequence.
+request in the sequence. For an example ONNX model that uses implicit state
+ou can refer to [this ONNX model](../qa/common/gen_qa_implicit_models.py#L101).
+This is a simple accumulator model that stores the partial sum of the requests
+in a sequence in Triton using implicit state. For state initialization, if the
+request is starting, the model sets the "OUTPUT\_STATE" to be equal to the
+"INPUT" tensor. For non-starting requests, it sets the "OUTPUT\_STATE" tensor
+to the sum of "INPUT" and "INPUT\_STATE" tensors.
 
 #### Scheduling Strategies
 
