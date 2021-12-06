@@ -62,8 +62,8 @@ def genTFModel(name, batch_size, tfVersion):
     if (tfVersion == 1):
         with tf.Session() as sess:
             # Export SavedModel
-            input0 = tf.placeholder(tf.int64, [4], "INPUT__0")
-            input1 = tf.placeholder(tf.int64, [4], "INPUT__1")    
+            input0 = tf.placeholder(tf.int64,[None, 4], "INPUT__0")
+            input1 = tf.placeholder(tf.int64,[None, 4], "INPUT__1")    
             output0 = tf.add(input0, input1, "OUTPUT__0")
             output1 = tf.subtract(input0, input1, "OUTPUT__1")
             tf.compat.v1.saved_model.simple_save(session=sess,
@@ -82,15 +82,8 @@ def genTFModel(name, batch_size, tfVersion):
                                 batch_size=batch_size,
                                 dynamic_batch_size=True)
     elif (tfVersion == 2):
-        input0 = tf.keras.layers.Input(dtype=tf.int64, shape=4, name="INPUT__0")
-        input1 = tf.keras.layers.Input(dtype=tf.int64, shape=4, name="INPUT__1")
-        output0 = tf.add(input0, input1, "OUTPUT__0")
-        output1 = tf.subtract(input0, input1, "OUTPUT__1")
-        model = tf.keras.Model(inputs=[input0, input1], outputs=[output0, output1])
-        example_inputs = tf.zeros([4], dtype=tf.dtypes.int64), tf.zeros(
-            [4], dtype=tf.dtypes.int64)
-        model_neuron = tfn.trace(model, example_inputs)  # trace
-        model_neuron.save(compiled_model_dir)
+        # TODO: ADD tests for tensorflow2
+        raise Exception("TensorFlow2 not yet supported")
     else:
         raise Exception("Unrecognized Tensorflow version: {}".format(tfVersion))
 
