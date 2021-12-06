@@ -83,6 +83,8 @@ for i in "byte_size = 0, 6", \
          "byte_size = 20, 2", \
          "byte_size = 160, 2" \
          ; do set -- $i; \
+    # $SERVER_LOG is recorded as a binary file. Using -a option
+    # to correctly grep the pattern in the server log.
     if [[ $(cat $SERVER_LOG | grep -a $1 | wc -l) -ne $2 ]]; then
         echo -e "\n***\n*** Test Failed $1 $2\n***"
         RET=1
