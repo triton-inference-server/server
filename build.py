@@ -513,7 +513,7 @@ def pytorch_cmake_args(images):
                 'include/torch', 'include/torch/torch/csrc/api/include',
                 'include/torchvision'
         ]:
-            pt_include_paths += ";" + library_paths['pytorch'] + suffix
+            pt_include_paths += library_paths['pytorch'] + '/' + suffix + ';'
         cargs = [
             cmake_backend_arg('pytorch', 'TRITON_PYTORCH_INCLUDE_PATHS', None,
                               pt_include_paths),
