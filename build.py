@@ -509,14 +509,22 @@ def pytorch_cmake_args(images):
     if target_platform() == 'jetpack':
         pt_lib_path = library_paths['pytorch'] + "/lib"
         pt_include_paths = ""
-        for suffix in ['include/torch', 'include/torch/torch/csrc/api/include', 'include/torchvision']:
-            pt_include_paths = pt_include_paths + ";" + library_paths['pytorch'] + suffix
+        for suffix in [
+                'include/torch',
+                'include/torch/torch/csrc/api/include',
+        ]:
+            pt_include_paths += ";" + library_paths['pytorch'] + suffix
         cargs = [
-            cmake_backend_arg('pytorch', 'TRITON_PYTORCH_INCLUDE_PATHS',
-                              None, pt_include_paths),
-            cmake_backend_arg('pytorch', 'TRITON_PYTORCH_LIB_PATHS',
-                              None, pt_lib_path),
+            cmake_backend_arg('pytorch', 'TRITON_PYTORCH_INCLUDE_PATHS', None,
+                              pt_include_paths),
+            cmake_backend_arg('pytorch', 'TRITON_PYTORCH_LIB_PATHS', None,
+                              pt_lib_path),
         ]
+
+        # Torchvision is disabled for now on Jetpack
+        cargs.append(
+            cmake_backend_enable('pytorch', 'TRITON_PYTORCH_ENABLE_TORCHVISION',
+                                 False))
     else:
         if "pytorch" in images:
             image = images["pytorch"]
@@ -525,13 +533,13 @@ def pytorch_cmake_args(images):
                 FLAGS.upstream_container_version)
         cargs = [
             cmake_backend_arg('pytorch', 'TRITON_PYTORCH_DOCKER_IMAGE', None,
-                            image),
+                              image),
         ]
 
         if FLAGS.enable_gpu:
             cargs.append(
-                cmake_backend_enable('pytorch', 'TRITON_PYTORCH_ENABLE_TORCHTRT',
-                                    True))
+                cmake_backend_enable('pytorch',
+                                     'TRITON_PYTORCH_ENABLE_TORCHTRT', True))
     return cargs
 
 
