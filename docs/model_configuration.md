@@ -1,5 +1,5 @@
 <!--
-# Copyright (c) 2018-2020, NVIDIA CORPORATION. All rights reserved.
+# Copyright 2018-2021, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -288,7 +288,6 @@ For Numpy each value is in the numpy module. For example, numpy.float32
 is the 32-bit floating-point datatype.
 
 ## Reshape
--------
 
 The *ModelTensorReshape* property on a model configuration input or
 output is used to indicate that the input or output shape accepted by
@@ -442,6 +441,8 @@ model configuration *ModelInstanceGroup* property is used to specify
 the number of execution instances that should be made available and
 what compute resource should be used for those instances.
 
+### Multiple Model Instances
+
 By default, a single execution instance of the model is created for
 each GPU available in the system. The instance-group setting can be
 used to place multiple execution instances of a model on every GPU or
@@ -476,6 +477,8 @@ GPU 0 and two execution instances on GPUs 1 and 2.
   ]
 ```
 
+### CPU Model Instance
+
 The instance group setting is also used to enable execution of a model
 on the CPU. A model can be executed on the CPU even if there is a GPU
 available in the system. The following places two execution instances
@@ -489,6 +492,8 @@ on the CPU.
     }
   ]
 ```
+
+### Host Policy
 
 The instance group setting is associated with a host policy. The following
 configuration will associate all instances created by the instance group setting
@@ -506,13 +511,13 @@ the device kind of the instance, for instance, KIND_CPU is "cpu", KIND_MODEL is
   ]
 ```
 
-### Rate Limiter Config
+### Rate Limiter Configuration
 
 Instance group optionally specifies [rate limiter](rate_limiter.md)
-config which controls how the rate limiter operates on the instances
-in the group. The rate limiter configuration is ignored if rate
-limiting is off. If rate limiting is on and if an instance_group does
-not provide this configuration, then the execution on the model
+configuration which controls how the rate limiter operates on the
+instances in the group. The rate limiter configuration is ignored if
+rate limiting is off. If rate limiting is on and if an instance_group
+does not provide this configuration, then the execution on the model
 instances belonging to this group will not be limited in any way by
 the rate limiter. The configuration includes the following
 specifications:
@@ -614,6 +619,8 @@ delayed in the scheduler to allow other requests to join the dynamic
 batch, and queue properties such a queue size, priorities, and
 time-outs.
 
+#### Recommended Configuration Process
+
 The individual settings are described in detail below. The following
 steps are the recommended process for tuning the dynamic batcher for
 each model. It is also possible to use the [Model
@@ -653,9 +660,12 @@ dynamic batcher configurations.
 #### Preferred Batch Sizes
 
 The *preferred_batch_size* property indicates the batch sizes that the
-dynamic batcher should attempt to create. For example, the following
-configuration enables dynamic batching with preferred batch sizes of 4
-and 8.
+dynamic batcher should attempt to create. For most models,
+*preferred_batch_size* should not be specified, as described in
+(#recommended-configuration-process).
+
+The following example shows the configuration that enables dynamic
+batching with preferred batch sizes of 4 and 8.
 
 ```
   dynamic_batching {
@@ -727,7 +737,7 @@ using the *default_priority_level* property.
 The dynamic batcher provides several settings that control how
 requests are queued for batching.
 
-When *priority_levels* is not defined the *ModelQueuePolicy* for the
+When *priority_levels* is not defined, the *ModelQueuePolicy* for the
 single queue can be set with *default_queue_policy*.  When
 *priority_levels* is defined, each priority level can have a different
 *ModelQueuePolicy* as specified by *default_queue_policy* and *priority_queue_policy*.
@@ -807,7 +817,7 @@ less responsive to model update, so the users should experiment and
 choose the configuration that suits their need.  See the protobuf
 documentation for the currently available settings.
 
-## Response Cache (beta)
+## Response Cache
 
 The model configuration `response_cache` section has an `enable` boolean used to
 enable the Response Cache for this model. In addition to enabling the cache in
