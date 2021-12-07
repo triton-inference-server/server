@@ -510,8 +510,8 @@ def pytorch_cmake_args(images):
         pt_lib_path = library_paths['pytorch'] + "/lib"
         pt_include_paths = ""
         for suffix in [
-                'include/torch',
-                'include/torch/torch/csrc/api/include',
+                'include/torch', 'include/torch/torch/csrc/api/include',
+                'include/torchvision'
         ]:
             pt_include_paths += ";" + library_paths['pytorch'] + suffix
         cargs = [
@@ -520,11 +520,6 @@ def pytorch_cmake_args(images):
             cmake_backend_arg('pytorch', 'TRITON_PYTORCH_LIB_PATHS', None,
                               pt_lib_path),
         ]
-
-        # Torchvision is disabled for now on Jetpack
-        cargs.append(
-            cmake_backend_enable('pytorch', 'TRITON_PYTORCH_ENABLE_TORCHVISION',
-                                 False))
     else:
         if "pytorch" in images:
             image = images["pytorch"]
