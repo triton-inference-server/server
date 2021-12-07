@@ -604,8 +604,8 @@ TRITONBACKEND_ModelInstanceExecute(
        " requests")
           .c_str());
 
-  bool supports_batching = false;
-  RETURN_IF_ERROR(model_state->SupportsFirstDimBatching(&supports_batching));
+  bool supports_batching =
+      model_state->SupportsFirstDimBatching(&supports_batching);
 
   // Each request represents a different sequence, which corresponds
   // to the accumulator at the same index. Each request must have
