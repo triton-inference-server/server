@@ -29,12 +29,12 @@
 if [ ${USE_TENSORFLOW} == "1" ] ; then
     echo "Setting up enviroment with tensorflow 1"
     source ${TRITON_PATH}/python_backend/inferentia/scripts/setup.sh -t 1
-elif [ ${USE_TENSORFLOW} == "2" ] ; then
-    echo "Setting up enviroment with tensorflow 2"
-    source ${TRITON_PATH}/python_backend/inferentia/scripts/setup.sh -t 2
-else 
+elif [ ${USE_TENSORFLOW} == "0" ] ; then
     echo "Setting up enviroment with pytorch"
     source ${TRITON_PATH}/python_backend/inferentia/scripts/setup.sh -p
+else 
+    echo "Tensorflow version ${USE_TENSORFLOW} not supported. Only TF1 and Pytorch are supported."
+    exit 0
 fi
 echo "done setting up enviroment"
 
@@ -73,41 +73,19 @@ if [ ${USE_TENSORFLOW} == "1" ]; then
     python ${TRITON_PATH}/python_backend/inferentia/scripts/gen_triton_model.py \
         --model_type "tensorflow" \
         --compiled_model $PWD/add_sub_model_tf1 \
-        --triton_input INPUT__0,INT64,4 INPUT__1,INT64,4 \
-        --triton_output OUTPUT__0,INT64,4 OUTPUT__1,INT64,4 \
+        --triton_input INPUT__0,INT64,-1x4 INPUT__1,INT64,-1x4 \
+        --triton_output OUTPUT__0,INT64,-1x4 OUTPUT__1,INT64,-1x4 \
         --triton_model_dir models_single_tf1/add-sub-1x4 \
         --neuron_core_range 0:0
     python ${TRITON_PATH}/python_backend/inferentia/scripts/gen_triton_model.py \
         --model_type "tensorflow" \
         --compiled_model $PWD/add_sub_model_tf1 \
-        --triton_input INPUT__0,INT64,4 INPUT__1,INT64,4 \
-        --triton_output OUTPUT__0,INT64,4 OUTPUT__1,INT64,4 \
+        --triton_input INPUT__0,INT64,-1x4 INPUT__1,INT64,-1x4 \
+        --triton_output OUTPUT__0,INT64,-1x4 OUTPUT__1,INT64,-1x4 \
         --triton_model_dir models_multiple_tf1/add-sub-1x4 \
         --triton_model_instance_count 3 \
         --neuron_core_range 0:7
-elif [ ${USE_TENSORFLOW} == "2" ]; then
-    TEST_FRAMEWORK="tf2"
-    for TEST_TYPE in $TEST_TYPES; do
-        DATADIR="${TRITON_PATH}/models_${TEST_TYPE}_${TEST_FRAMEWORK}"
-        rm -rf DATADIR
-    done
-    python ${TEST_JSON_REPO}/simple-model.py \
-        --name add_sub_model_tf2 \
-        --model_type tensorflow \
-        --tf_version 2 \
-        --batch_size 1
-    python ${TRITON_PATH}/python_backend/inferentia/scripts/gen_triton_model.py \
-        --model_type "tensorflow" \
-        --compiled_model $PWD/add_sub_model_tf2 \
-        --triton_model_dir models_single_tf2/add-sub-1x4 \
-        --neuron_core_range 0:0
-    python ${TRITON_PATH}/python_backend/inferentia/scripts/gen_triton_model.py \
-        --model_type "tensorflow" \
-        --compiled_model $PWD/add_sub_model_tf2 \
-        --triton_model_dir models_multiple_tf2/add-sub-1x4 \
-        --triton_model_instance_count 3 \
-        --neuron_core_range 0:7
-else
+elif [ ${USE_TENSORFLOW} == "0" ]; then
     TEST_FRAMEWORK="pyt"
     for TEST_TYPE in $TEST_TYPES; do
         DATADIR="${TRITON_PATH}/models_${TEST_TYPE}_${TEST_FRAMEWORK}"
@@ -120,14 +98,14 @@ else
         --batch_size 1
     python ${TRITON_PATH}/python_backend/inferentia/scripts/gen_triton_model.py \
         --model_type "pytorch" \
-        --triton_input INPUT__0,INT64,4 INPUT__1,INT64,4 \
-        --triton_output OUTPUT__0,INT64,4 OUTPUT__1,INT64,4 \
+        --triton_input INPUT__0,INT64,-1x4 INPUT__1,INT64,-1x4 \
+        --triton_output OUTPUT__0,INT64,-1x4 OUTPUT__1,INT64,-1x4 \
         --compiled_model $PWD/add_sub_model_pyt.pt \
         --triton_model_dir models_single_pyt/add-sub-1x4 --neuron_core_range 0:0
     python ${TRITON_PATH}/python_backend/inferentia/scripts/gen_triton_model.py \
         --model_type "pytorch" \
-        --triton_input INPUT__0,INT64,4 INPUT__1,INT64,4 \
-        --triton_output OUTPUT__0,INT64,4 OUTPUT__1,INT64,4 \
+        --triton_input INPUT__0,INT64,-1x4 INPUT__1,INT64,-1x4 \
+        --triton_output OUTPUT__0,INT64,-1x4 OUTPUT__1,INT64,-1x4 \
         --compiled_model $PWD/add_sub_model_pyt.pt \
         --triton_model_dir models_multiple_pyt/add-sub-1x4 \
         --triton_model_instance_count 3 --neuron_core_range 0:7

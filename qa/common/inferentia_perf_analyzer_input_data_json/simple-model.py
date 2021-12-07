@@ -45,8 +45,8 @@ def genTorchModel(name, batch_size):
     model = PyAddSubNet()
     model.eval()
     batch_size = 1
-    example_inputs = torch.zeros([4], dtype=torch.int64), torch.zeros(
-        [4], dtype=torch.int64)
+    example_inputs = torch.zeros([8, 4], dtype=torch.int64), torch.zeros(
+        [8, 4], dtype=torch.int64)
     model_neuron = torch.neuron.trace(model,
                                       example_inputs,
                                       dynamic_batch_size=True)
