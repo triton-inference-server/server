@@ -133,11 +133,12 @@ class PBBLSTest(unittest.TestCase):
         output1_dlpack = None
         rc_after_del_dlpack_output0 = sys.getrefcount(output0)
         rc_after_del_dlpack_output1 = sys.getrefcount(output1)
-        self.assertEqual(rc_after_del_dlpack_output0 - rc_after_dlpack_output0, -1)
-        self.assertEqual(rc_after_del_dlpack_output1 - rc_after_dlpack_output1, -1)
+        self.assertEqual(rc_after_del_dlpack_output0 - rc_after_dlpack_output0,
+                         -1)
+        self.assertEqual(rc_after_del_dlpack_output1 - rc_after_dlpack_output1,
+                         -1)
 
         return output0.to_dlpack(), output1.to_dlpack()
-
 
     def _test_gpu_bls_add_sub(self, is_input0_gpu, is_input1_gpu):
         input0 = torch.rand(16)
@@ -151,13 +152,22 @@ class PBBLSTest(unittest.TestCase):
 
         input0_pb = pb_utils.Tensor.from_dlpack('INPUT0', to_dlpack(input0))
         input1_pb = pb_utils.Tensor.from_dlpack('INPUT1', to_dlpack(input1))
-        output0_dlpack, output1_dlpack = self._get_gpu_bls_outputs(input0_pb, input1_pb)
+        output0_dlpack, output1_dlpack = self._get_gpu_bls_outputs(
+            input0_pb, input1_pb)
 
-        expected_output_0 = from_dlpack(input0_pb.to_dlpack()).to('cpu') + from_dlpack(input1_pb.to_dlpack()).to('cpu')
-        expected_output_1 = from_dlpack(input0_pb.to_dlpack()).to('cpu') - from_dlpack(input1_pb.to_dlpack()).to('cpu')
+        expected_output_0 = from_dlpack(
+            input0_pb.to_dlpack()).to('cpu') + from_dlpack(
+                input1_pb.to_dlpack()).to('cpu')
+        expected_output_1 = from_dlpack(
+            input0_pb.to_dlpack()).to('cpu') - from_dlpack(
+                input1_pb.to_dlpack()).to('cpu')
 
-        self.assertTrue(torch.all(expected_output_0 == from_dlpack(output0_dlpack).to('cpu')))
-        self.assertTrue(torch.all(expected_output_1 == from_dlpack(output1_dlpack).to('cpu')))
+        self.assertTrue(
+            torch.all(
+                expected_output_0 == from_dlpack(output0_dlpack).to('cpu')))
+        self.assertTrue(
+            torch.all(
+                expected_output_1 == from_dlpack(output1_dlpack).to('cpu')))
 
     def test_gpu_bls(self):
         for input0_device in [True, False]:
@@ -199,6 +209,7 @@ class PBBLSTest(unittest.TestCase):
 
 
 class TritonPythonModel:
+
     def execute(self, requests):
         responses = []
         for _ in requests:

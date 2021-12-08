@@ -167,8 +167,7 @@ class ServerMetadataTest(tu.TestResultCollector):
                         self.assertEqual(model_name, model_metadata['name'])
                         self.assertEqual(len(model_metadata['versions']), 3)
                         for v in (1, 2, 3):
-                            self.assertIn(
-                                str(v), model_metadata['versions'])
+                            self.assertIn(str(v), model_metadata['versions'])
                     else:
                         self.assertEqual(model_name, model_metadata.name)
                         self.assertEqual(len(model_metadata.versions), 3)

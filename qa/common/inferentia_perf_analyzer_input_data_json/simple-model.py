@@ -28,6 +28,7 @@
 import torch
 from torch import nn
 
+
 class AddSubNet(nn.Module):
     """
     Simple AddSub network in PyTorch. This network outputs the sum and
@@ -41,6 +42,7 @@ class AddSubNet(nn.Module):
         return torch.sub(input0, input1, alpha=-1), torch.sub(input0,
                                                               input1,
                                                               alpha=1)
+
 
 model = AddSubNet()
 model.eval()

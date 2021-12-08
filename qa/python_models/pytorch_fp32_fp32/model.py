@@ -34,6 +34,7 @@ import triton_python_backend_utils as pb_utils
 
 
 class Net(nn.Module):
+
     def __init__(self):
         super(Net, self).__init__()
         self.conv1 = nn.Conv2d(1, 32, 3, 1)
@@ -60,6 +61,7 @@ class Net(nn.Module):
 
 
 class TritonPythonModel:
+
     def initialize(self, args):
         torch.manual_seed(0)
         self.model = Net()

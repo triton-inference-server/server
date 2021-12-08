@@ -109,7 +109,6 @@ if __name__ == '__main__':
         for leak in leak_records:
             print(leak)
         print(
-            f"\n***\n*** Test Failed: {len(leak_records)} leaks detected.\n***"
-        )
+            f"\n***\n*** Test Failed: {len(leak_records)} leaks detected.\n***")
         sys.exit(1)
     sys.exit(0)

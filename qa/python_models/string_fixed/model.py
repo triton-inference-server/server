@@ -32,6 +32,7 @@ class TritonPythonModel:
     """
     This model returns a constant string on every inference request.
     """
+
     def initialize(self, args):
         self._index = 0
         self._dtypes = [np.bytes_, np.object_, np.object]
