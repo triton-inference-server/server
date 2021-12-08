@@ -26,14 +26,17 @@
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 # First need to set up enviroment
-if [ ${USE_TENSORFLOW} == "1" ] ; then
+if [ ${USE_TENSORFLOW} == "1" ] && [ ${USE_PYTORCH} == "1" ] ; then
+    echo " Unsupported test configuration. Only one of USE_TENSORFLOW and USE_PYTORCH can be set to 1."
+    exit 0
+elif [ ${USE_TENSORFLOW} == "1" ] ; then
     echo "Setting up enviroment with tensorflow 1"
-    source ${TRITON_PATH}/python_backend/inferentia/scripts/setup.sh -t 1
-elif [ ${USE_TENSORFLOW} == "0" ] ; then
+    source ${TRITON_PATH}/python_backend/inferentia/scripts/setup.sh -t --tensorflow-version 1
+elif [ ${USE_PYTORCH} == "1" ] ; then
     echo "Setting up enviroment with pytorch"
     source ${TRITON_PATH}/python_backend/inferentia/scripts/setup.sh -p
 else 
-    echo "Tensorflow version ${USE_TENSORFLOW} not supported. Only TF1 and Pytorch are supported."
+    echo " Unsupported test configuration. USE_TENSORFLOW flag is: ${USE_TENSORFLOW} and USE_PYTORCH flag is: ${USE_PYTORCH}. Only one of them can be set to 1."
     exit 0
 fi
 echo "done setting up enviroment"
@@ -56,7 +59,6 @@ SERVER=/opt/tritonserver/bin/tritonserver
 SERVER_LOG="./inference_server.log"
 source /opt/tritonserver/qa/common/util.sh
 TEST_TYPES="single multiple"
-TEST_FRAMEWORKS=""
 
 # Setup models
 if [ ${USE_TENSORFLOW} == "1" ]; then
@@ -85,7 +87,7 @@ if [ ${USE_TENSORFLOW} == "1" ]; then
         --triton_model_dir models_multiple_tf1/add-sub-1x4 \
         --triton_model_instance_count 3 \
         --neuron_core_range 0:7
-elif [ ${USE_TENSORFLOW} == "0" ]; then
+elif [ ${USE_PYTORCH} == "1" ]; then
     TEST_FRAMEWORK="pyt"
     for TEST_TYPE in $TEST_TYPES; do
         DATADIR="${TRITON_PATH}/models_${TEST_TYPE}_${TEST_FRAMEWORK}"
