@@ -62,6 +62,9 @@ class TraceManager {
 
   static void TraceRelease(TRITONSERVER_InferenceTrace* trace, void* userp);
 
+  static void TraceStreamRelease(
+      TRITONSERVER_InferenceTrace* trace, void* userp);
+
  private:
   TraceManager(
       const TRITONSERVER_InferenceTraceLevel level, const uint32_t rate,
