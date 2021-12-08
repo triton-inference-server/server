@@ -34,6 +34,7 @@ class TritonPythonModel:
     This Python identity model passes the DLPack tensors as is. "OUTPUT_IS_GPU"
     input controls whether the model should put the output in GPU or in CPU.
     """
+
     def initialize(self, args):
         self._model_name = args['model_name']
 
@@ -62,8 +63,7 @@ class TritonPythonModel:
                     output0 = pb_utils.Tensor.from_dlpack(
                         "OUTPUT0", to_dlpack(outptu0_pytorch))
 
-            next_gpu_output = pb_utils.Tensor("NEXT_GPU_OUTPUT",
-                                              gpu_output[1:])
+            next_gpu_output = pb_utils.Tensor("NEXT_GPU_OUTPUT", gpu_output[1:])
 
             # Do not perform BLS inference if it is the first
             # model in the pipeline.

@@ -348,14 +348,16 @@ def create_plan_fixed_modelfile(models_dir, model_version, max_batch, dtype,
     network.add_input("READY", trt_dtype, [1 for i in shape])
     constant_1_data = trt.Weights(np.ones([1 for i in shape], dtype=dtype))
     constant_1 = network.add_constant([1 for i in shape], constant_1_data)
-    not_start = network.add_elementwise(constant_1.get_output(0), start0, trt.ElementWiseOperation.SUB)
+    not_start = network.add_elementwise(constant_1.get_output(0), start0,
+                                        trt.ElementWiseOperation.SUB)
     not_start.set_output_type(0, trt_dtype)
 
-    internal_state = network.add_elementwise(in_state0, not_start.get_output(0), trt.ElementWiseOperation.PROD)
+    internal_state = network.add_elementwise(in_state0, not_start.get_output(0),
+                                             trt.ElementWiseOperation.PROD)
     out0 = network.add_elementwise(internal_state.get_output(0), in0,
                                    trt.ElementWiseOperation.SUM)
     out0_state = network.add_elementwise(internal_state.get_output(0), in0,
-                                   trt.ElementWiseOperation.SUM)
+                                         trt.ElementWiseOperation.SUM)
 
     out0.get_output(0).name = "OUTPUT"
     network.mark_output(out0.get_output(0))
@@ -401,14 +403,16 @@ def create_plan_fixed_rf_modelfile(models_dir, model_version, max_batch, dtype,
     ready0 = network.add_input("READY", trt_dtype, [1 for i in shape])
     constant_1_data = trt.Weights(np.ones([1 for i in shape], dtype=dtype))
     constant_1 = network.add_constant([1 for i in shape], constant_1_data)
-    not_start = network.add_elementwise(constant_1.get_output(0), start0, trt.ElementWiseOperation.SUB)
+    not_start = network.add_elementwise(constant_1.get_output(0), start0,
+                                        trt.ElementWiseOperation.SUB)
     not_start.set_output_type(0, trt_dtype)
 
-    internal_state = network.add_elementwise(in_state0, not_start.get_output(0), trt.ElementWiseOperation.PROD)
+    internal_state = network.add_elementwise(in_state0, not_start.get_output(0),
+                                             trt.ElementWiseOperation.PROD)
     out0 = network.add_elementwise(internal_state.get_output(0), in0,
                                    trt.ElementWiseOperation.SUM)
     out0_state = network.add_elementwise(internal_state.get_output(0), in0,
-                                   trt.ElementWiseOperation.SUM)
+                                         trt.ElementWiseOperation.SUM)
 
     out0.get_output(0).name = "OUTPUT"
     network.mark_output(out0.get_output(0))
@@ -471,10 +475,10 @@ def create_plan_modelfile(models_dir, model_version, max_batch, dtype, shape):
 
     if dtype != np.float32:
         create_plan_fixed_rf_modelfile(models_dir, model_version, max_batch,
-                                           dtype, shape)
+                                       dtype, shape)
     else:
-        create_plan_fixed_modelfile(models_dir, model_version, max_batch,
-                                    dtype, shape)
+        create_plan_fixed_modelfile(models_dir, model_version, max_batch, dtype,
+                                    shape)
 
 
 def create_plan_modelconfig(models_dir, model_version, max_batch, dtype, shape):
@@ -539,8 +543,11 @@ instance_group [
     kind: KIND_GPU
   }}
 ]
-'''.format(model_name, max_batch, "int32" if dtype == np.int32 else "fp32",
-           "int32" if dtype == np.int32 else "fp32", dtype=np_to_model_dtype(dtype),
+'''.format(model_name,
+           max_batch,
+           "int32" if dtype == np.int32 else "fp32",
+           "int32" if dtype == np.int32 else "fp32",
+           dtype=np_to_model_dtype(dtype),
            shape=tu.shape_to_dims_str(shape))
 
     try:

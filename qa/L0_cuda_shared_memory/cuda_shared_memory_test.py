@@ -47,8 +47,8 @@ class CudaSharedMemoryTest(tu.TestResultCollector):
                 "dummy_data", -1, 0)
             cshm.destroy_shared_memory_region(shm_op0_handle)
         except Exception as ex:
-            self.assertEqual(
-                str(ex), "unable to create cuda shared memory handle")
+            self.assertEqual(str(ex),
+                             "unable to create cuda shared memory handle")
 
     def test_valid_create_set_register(self):
         # Create a valid cuda shared memory region, fill data in it and register
@@ -114,8 +114,7 @@ class CudaSharedMemoryTest(tu.TestResultCollector):
                 "dummy_data", cshm.get_raw_handle(shm_op0_handle), 0, 8)
         except Exception as ex:
             self.assertIn(
-                "shared memory region 'dummy_data' already in manager", str(
-                    ex))
+                "shared memory region 'dummy_data' already in manager", str(ex))
         shm_status = triton_client.get_cuda_shared_memory_status()
         if _protocol == "http":
             self.assertEqual(len(shm_status), 1)

@@ -72,7 +72,7 @@ if __name__ == '__main__':
     with client_util.InferenceServerClient(FLAGS.url,
                                            verbose=FLAGS.verbose) as client:
         for model_name, np_dtype, shape in (
-            # yapf: disable
+                # yapf: disable
             ("identity_int32", np.int32, [0]),
             ("identity_int32", np.int32, [7])):
             # yapf: enable
