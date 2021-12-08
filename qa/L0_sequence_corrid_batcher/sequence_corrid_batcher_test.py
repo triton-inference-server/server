@@ -105,8 +105,8 @@ class SequenceCorrIDBatcherTest(su.SequenceBatcherTestUtil):
                 self.assertIn("TRITONSERVER_DELAY_SCHEDULER", os.environ)
                 self.assertEqual(
                     int(os.environ["TRITONSERVER_DELAY_SCHEDULER"]), 12)
-                self.assertIn(
-                    "TRITONSERVER_BACKLOG_DELAY_SCHEDULER", os.environ)
+                self.assertIn("TRITONSERVER_BACKLOG_DELAY_SCHEDULER",
+                              os.environ)
                 self.assertEqual(
                     int(os.environ["TRITONSERVER_BACKLOG_DELAY_SCHEDULER"]), 0)
 

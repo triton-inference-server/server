@@ -32,6 +32,7 @@ class TritonPythonModel:
     """This model loops through different dtypes to make sure that
     serialize_byte_tensor works correctly in the Python backend.
     """
+
     def initialize(self, args):
         self._index = 0
         self._dtypes = [np.bytes_, np.object_, np.object]

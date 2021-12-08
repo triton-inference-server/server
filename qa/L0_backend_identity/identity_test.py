@@ -61,9 +61,8 @@ if __name__ == '__main__':
 
     FLAGS = parser.parse_args()
     if (FLAGS.protocol != "http") and (FLAGS.protocol != "grpc"):
-        print(
-            "unexpected protocol \"{}\", expects \"http\" or \"grpc\"".format(
-                FLAGS.protocol))
+        print("unexpected protocol \"{}\", expects \"http\" or \"grpc\"".format(
+            FLAGS.protocol))
         exit(1)
 
     client_util = httpclient if FLAGS.protocol == "http" else grpcclient
@@ -78,19 +77,17 @@ if __name__ == '__main__':
         model_name = "identity_uint32"
         request_parallelism = 4
         shape = [2, 2]
-        with client_util.InferenceServerClient(
-                FLAGS.url, concurrency=request_parallelism,
-                verbose=FLAGS.verbose) as client:
+        with client_util.InferenceServerClient(FLAGS.url,
+                                               concurrency=request_parallelism,
+                                               verbose=FLAGS.verbose) as client:
             input_datas = []
             requests = []
             for i in range(request_parallelism):
-                input_data = (16384 * np.random.randn(*shape)).astype(
-                    np.uint32)
+                input_data = (16384 * np.random.randn(*shape)).astype(np.uint32)
                 input_datas.append(input_data)
                 inputs = [
-                    client_util.InferInput(
-                        "INPUT0", input_data.shape,
-                        np_to_triton_dtype(input_data.dtype))
+                    client_util.InferInput("INPUT0", input_data.shape,
+                                           np_to_triton_dtype(input_data.dtype))
                 ]
                 inputs[0].set_data_from_numpy(input_data)
                 requests.append(client.async_infer(model_name, inputs))
@@ -119,8 +116,7 @@ if __name__ == '__main__':
                 sys.exit(1)
 
             stat = stats['model_stats'][0]
-            if (stat['inference_count'] != 8) or (stat['execution_count'] !=
-                                                  1):
+            if (stat['inference_count'] != 8) or (stat['execution_count'] != 1):
                 print(
                     "error: expected execution_count == 1 and inference_count == 8, got {} and {}"
                     .format(stat['execution_count'], stat['inference_count']))
@@ -219,8 +215,7 @@ if __name__ == '__main__':
 
             if param0 != "an example string parameter":
                 print(
-                    "error: expected 'param0' == 'an example string parameter'"
-                )
+                    "error: expected 'param0' == 'an example string parameter'")
                 sys.exit(1)
             if param1 != 42:
                 print("error: expected 'param1' == 42")

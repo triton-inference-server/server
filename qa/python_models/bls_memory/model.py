@@ -30,6 +30,7 @@ import triton_python_backend_utils as pb_utils
 
 
 class PBBLSMemoryTest(unittest.TestCase):
+
     def _send_identity_tensor(self, size):
         tensor_size = [1, size]
         input0_np = np.random.randn(*tensor_size)
@@ -70,6 +71,7 @@ class PBBLSMemoryTest(unittest.TestCase):
 
 
 class TritonPythonModel:
+
     def execute(self, requests):
         responses = []
         for _ in requests:

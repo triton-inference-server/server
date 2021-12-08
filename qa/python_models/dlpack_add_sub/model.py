@@ -32,6 +32,7 @@ import json
 
 
 class TritonPythonModel:
+
     def initialize(self, args):
         self.model_config = model_config = json.loads(args['model_config'])
 

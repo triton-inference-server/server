@@ -36,6 +36,7 @@ import unittest
 
 
 class IOTest(tu.TestResultCollector):
+
     def test_ensemble_io(self):
         model_name = "ensemble_io"
         with httpclient.InferenceServerClient("localhost:8000") as client:
