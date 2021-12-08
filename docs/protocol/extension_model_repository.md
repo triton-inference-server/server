@@ -148,7 +148,7 @@ $repository_unload_request =
 
 - "parameters" : An object containing zero or more parameters for this
   request expressed as key/value pairs. See
-  [Parameters](https://github.com/kubeflow/kfserving/blob/master/docs/predict-api/v2/required_api.md#parameters)
+  [Parameters](https://github.com/kserve/kserve/blob/master/docs/predict-api/v2/required_api.md#parameters)
   for more information.
 
 The unload API accepts the following parameters:
