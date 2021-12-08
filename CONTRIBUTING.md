@@ -47,10 +47,11 @@ proposed change so that the Triton team can provide feedback.
   will provide guidance about how and where your enhancement should be
   implemented.
 
-- Testing is a critical part of any Triton enhancement. You should
-  plan on spending significant time on creating tests for your
-  change. The Triton team will help you to design your testing so that
-  it is compatible with existing testing infrastructure.
+- [Testing](docs/test.md) is a critical part of any Triton
+  enhancement. You should plan on spending significant time on
+  creating tests for your change. The Triton team will help you to
+  design your testing so that it is compatible with existing testing
+  infrastructure.
 
 - If your enhancement provides a user visible feature then you need to
   provide documentation.
@@ -83,8 +84,8 @@ proposed change so that the Triton team can provide feedback.
 - Make sure all `L0_*` tests pass:
 
   - In the `qa/` directory, there are basic sanity tests scripted in
-    directories named `L0_...`.  See the Testing section in the
-    Developer Guide for instructions on running these tests.
+    directories named `L0_...`.  See the [Test](docs/test.md)
+    documentation for instructions on running these tests.
 
 - Triton Inference Server's default build assumes recent versions of
   dependencies (CUDA, TensorFlow, PyTorch, TensorRT,
