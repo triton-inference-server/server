@@ -24,7 +24,6 @@
 # (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-import numpy as np
 import sys
 import json
 
@@ -35,6 +34,7 @@ import triton_python_backend_utils as pb_utils
 class TritonPythonModel:
     """This model always returns the input that it has received.
     """
+
     def initialize(self, args):
         self.model_config = json.loads(args['model_config'])
 
@@ -45,8 +45,6 @@ class TritonPythonModel:
         responses = []
         for request in requests:
             in_0 = pb_utils.get_input_tensor_by_name(request, "INPUT0")
-            out_tensor_0 = pb_utils.Tensor(
-                "OUTPUT0",
-                in_0.as_numpy())
+            out_tensor_0 = pb_utils.Tensor("OUTPUT0", in_0.as_numpy())
             responses.append(pb_utils.InferenceResponse([out_tensor_0]))
         return responses

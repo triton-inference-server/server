@@ -27,7 +27,6 @@
 import argparse
 from builtins import range
 import os
-import sys
 import numpy as np
 import gen_ensemble_model_utils as emu
 
@@ -500,7 +499,9 @@ output [
 def create_openvino_modelfile(models_dir, model_version, io_cnt, max_batch,
                               dtype, shape):
 
-    batch_dim = [] if max_batch == 0 else [max_batch,]
+    batch_dim = [] if max_batch == 0 else [
+        max_batch,
+    ]
     if not tu.validate_for_openvino_model(dtype, dtype, dtype,
                                           batch_dim + shape, batch_dim + shape,
                                           batch_dim + shape):
@@ -536,7 +537,9 @@ def create_openvino_modelfile(models_dir, model_version, io_cnt, max_batch,
 def create_openvino_modelconfig(models_dir, model_version, io_cnt, max_batch,
                                 dtype, shape):
 
-    batch_dim = [] if max_batch == 0 else [max_batch,]
+    batch_dim = [] if max_batch == 0 else [
+        max_batch,
+    ]
     if not tu.validate_for_openvino_model(dtype, dtype, dtype,
                                           batch_dim + shape, batch_dim + shape,
                                           batch_dim + shape):
@@ -1116,7 +1119,7 @@ if __name__ == '__main__':
 
     if FLAGS.graphdef or FLAGS.savedmodel:
         import tensorflow as tf
-        from tensorflow.python.framework import graph_io, graph_util
+        from tensorflow.python.framework import graph_io
     if FLAGS.onnx:
         import onnx
     if FLAGS.libtorch:
@@ -1125,7 +1128,7 @@ if __name__ == '__main__':
     if FLAGS.tensorrt or FLAGS.tensorrt_big or FLAGS.tensorrt_shape_io:
         import tensorrt as trt
     if FLAGS.openvino:
-        from openvino.inference_engine import IECore, IENetwork
+        from openvino.inference_engine import IENetwork
         import ngraph as ng
 
     import test_util as tu

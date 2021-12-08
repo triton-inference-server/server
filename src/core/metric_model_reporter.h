@@ -1,4 +1,4 @@
-// Copyright (c) 2019-2020, NVIDIA CORPORATION. All rights reserved.
+// Copyright 2019-2021, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 //
 // Redistribution and use in source and binary forms, with or without
 // modification, are permitted provided that the following conditions
@@ -47,8 +47,7 @@ class MetricModelReporter {
 
   ~MetricModelReporter();
 
-  // Get a metric for the backend specialized for the given model,
-  // version and GPU index.
+  // Get a metric for the given model, version and GPU index.
   prometheus::Counter& MetricInferenceSuccess() const
   {
     return *metric_inf_success_;

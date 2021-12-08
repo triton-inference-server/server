@@ -32,6 +32,7 @@ import triton_python_backend_utils as pb_utils
 
 
 class PBTensorTest(unittest.TestCase):
+
     def test_pytorch_dlpack(self):
         # Test different dtypes
         pytorch_dtypes = [
@@ -130,6 +131,7 @@ class PBTensorTest(unittest.TestCase):
 
 
 class TritonPythonModel:
+
     def execute(self, requests):
         responses = []
         for _ in requests:

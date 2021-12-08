@@ -1,5 +1,5 @@
 <!--
-# Copyright (c) 2018-2021, NVIDIA CORPORATION. All rights reserved.
+# Copyright 2018-2021, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -41,27 +41,33 @@ available as a shared library with a C API that allows the full
 functionality of Triton to be included directly in an
 application.
 
-The current release of the Triton Inference Server is 2.15.0 and
-corresponds to the 21.10 release of the tritonserver container on
+The current release of the Triton Inference Server is 2.16.0 and
+corresponds to the 21.11 release of the tritonserver container on
 [NVIDIA GPU Cloud (NGC)](https://ngc.nvidia.com). The branch for this
 release is
-[r21.10](https://github.com/triton-inference-server/server/tree/r21.10).
+[r21.11](https://github.com/triton-inference-server/server/tree/r21.11).
 
 ## Features
 
-* [Multiple deep-learning
-  frameworks](https://github.com/triton-inference-server/backend). Triton
-  can manage any number and mix of models (limited by system disk and
-  memory resources). Triton supports TensorRT, TensorFlow GraphDef,
-  TensorFlow SavedModel, ONNX, PyTorch TorchScript and OpenVINO model
+* [Deep learning
+  frameworks](https://github.com/triton-inference-server/backend).
+  Triton supports TensorRT, TensorFlow GraphDef, TensorFlow
+  SavedModel, ONNX, PyTorch TorchScript and OpenVINO model
   formats. Both TensorFlow 1.x and TensorFlow 2.x are
-  supported. Triton also supports TensorFlow-TensorRT and
-  ONNX-TensorRT integrated models.
+  supported. Triton also supports TensorFlow-TensorRT, ONNX-TensorRT
+  and PyTorch-TensorRT integrated models.
+
+* [Machine learning
+  frameworks](https://github.com/triton-inference-server/fil_backend).
+  Triton supports popular machine learning frameworks such as XGBoost,
+  LightGBM, Scikit-Learn and cuML using the [RAPIDS Forest Inference
+  Library](https://medium.com/rapids-ai/rapids-forest-inference-library-prediction-at-100-million-rows-per-second-19558890bc35).
 
 * [Concurrent model
-  execution](docs/architecture.md#concurrent-model-execution). Multiple
-  models (or multiple instances of the same model) can run
-  simultaneously on the same GPU or on multiple GPUs.
+  execution](docs/architecture.md#concurrent-model-execution). Triton
+  can simultaneously run multiple models (or multiple instances of the
+  same model) using the same or different deep-learning and
+  machine-learning frameworks.
 
 * [Dynamic batching](docs/architecture.md#models-and-schedulers). For
   models that support batching, Triton implements multiple scheduling
@@ -78,19 +84,23 @@ release is
   [Python](https://github.com/triton-inference-server/python_backend)
   or
   [C++](https://github.com/triton-inference-server/backend/blob/main/README.md#triton-backend-api),
-  while still benefiting from the CPU and GPU support, concurrent
+  while still benefiting from full CPU and GPU support, concurrent
   execution, dynamic batching and other features provided by Triton.
 
-* [Model pipelines](docs/architecture.md#ensemble-models). Triton
-  *ensembles* represents a pipeline of one or more models and the
-  connection of input and output tensors between those models. A
-  single inference request to an ensemble will trigger the execution
-  of the entire pipeline.
+* Model pipelines using
+  [Ensembling](docs/architecture.md#ensemble-models) or [Business
+  Logic Scripting
+  (BLS)](https://github.com/triton-inference-server/python_backend#business-logic-scripting).
+  A Triton *ensemble* represents a pipeline of one or more models and
+  the connection of input and output tensors between those
+  models. *BLS* allows a pipeline along with extra business logic to
+  be represented in Python. In both cases a single inference request
+  will trigger the execution of the entire pipeline.
 
 * [HTTP/REST and GRPC inference
   protocols](docs/inference_protocols.md) based on the community
-  developed [KFServing
-  protocol](https://github.com/kubeflow/kfserving/tree/master/docs/predict-api/v2).
+  developed [KServe
+  protocol](https://github.com/kserve/kserve/tree/master/docs/predict-api/v2).
 
 * A [C API](docs/inference_protocols.md#c-api) allows Triton to be
   linked directly into your application for edge and other in-process
@@ -104,8 +114,8 @@ release is
 
 **The master branch documentation tracks the upcoming,
 under-development release and so may not be accurate for the current
-release of Triton. See the [r21.10
-documentation](https://github.com/triton-inference-server/server/tree/r21.10#documentation)
+release of Triton. See the [r21.11
+documentation](https://github.com/triton-inference-server/server/tree/r21.11#documentation)
 for the current release.**
 
 [Triton Architecture](docs/architecture.md) gives a high-level
@@ -129,18 +139,76 @@ describe supported GPUs.
 ### User Documentation
 
 * [QuickStart](docs/quickstart.md)
-  * [Install](docs/quickstart.md#install-triton-docker-image)
-  * [Run](docs/quickstart.md#run-triton)
+  * [Install Triton](docs/quickstart.md#install-triton-docker-image)
+  * [Create Model Repository](docs/quickstart.md#create-a-model-repository)
+  * [Run Triton](docs/quickstart.md#run-triton)
 * [Model Repository](docs/model_repository.md)
+  * [Cloud Storage](docs/model_repository.md#model-repository-locations)
+  * [File Organization](docs/model_repository.md#model-files)
+  * [Model Versioning](docs/model_repository.md#model-versions)
 * [Model Configuration](docs/model_configuration.md)
+  * [Required Model Configuration](docs/model_configuration.md#minimal-model-configuration)
+    * [Maximum Batch Size - Batching and Non-Batching Models](docs/model_configuration.md#maximum-batch-size)
+    * [Input and Output Tensors](docs/model_configuration.md#inputs-and-outputs)
+      * [Tensor Datatypes](docs/model_configuration.md#datatypes)
+      * [Tensor Reshape](docs/model_configuration.md#reshape)
+      * [Shape Tensor](docs/model_configuration.md#shape-tensors)
+  * [Auto-Generate Required Model Configuration](docs/model_configuration.md#auto-generated-model-configuration)
+  * [Version Policy](docs/model_configuration.md#version-policy)
+  * [Instance Groups](docs/model_configuration.md#instance-groups)
+    * [Specifying Multiple Model Instances](docs/model_configuration.md#multiple-model-instances)
+    * [CPU and GPU Instances](docs/model_configuration.md#cpu-model-instance)
+    * [Configuring Rate Limiter](docs/model_configuration.md#rate-limiter-configuration)
+  * [Optimization Settings](docs/model_configuration.md#optimization_policy)
+    * [Framework-Specific Optimization](docs/optimization.md#framework-specific-optimization)
+      * [ONNX-TensorRT](docs/optimization.md#onnx-with-tensorrt-optimization)
+      * [ONNX-OpenVINO](docs/optimization.md#onnx-with-openvino-optimization)
+      * [TensorFlow-TensorRT](docs/optimization.md#tensorflow-with-tensorrt-optimization)
+      * [TensorFlow-Mixed-Precision](docs/optimization.md#tensorflow-automatic-fp16-optimization)
+    * [NUMA Optimization](docs/optimization.md#numa-optimization)
+  * [Scheduling and Batching](docs/model_configuration.md#scheduling-and-batching)
+    * [Default Scheduler - Non-Batching](docs/model_configuration.md#default-scheduler)
+    * [Dynamic Batcher](docs/model_configuration.md#dynamic-batcher)
+      * [How to Configure Dynamic Batcher](docs/model_configuration.md#recommended-configuration-process)
+        * [Delayed Batching](docs/model_configuration.md#delayed-batching)
+        * [Preferred Batch Size](docs/model_configuration.md#preferred-batch-sizes)
+      * [Preserving Request Ordering](docs/model_configuration.md#preserve-ordering)
+      * [Priority Levels](docs/model_configuration.md#priority-levels)
+      * [Queuing Policies](docs/model_configuration.md#queue-policy)
+      * [Ragged Batching](docs/ragged_batching.md)
+    * [Sequence Batcher](docs/model_configuration.md#sequence-batcher)
+      * [Stateful Models](docs/architecture.md#stateful-models)
+      * [Control Inputs](docs/architecture.md#control-inputs)
+      * [Implicit State - Stateful Inference Using a Stateless Model](docs/architecture.md#implicit-state-management)
+      * [Sequence Scheduling Strategies](docs/architecture.md#scheduling-strateties)
+        * [Direct](docs/architecture.md#direct)
+        * [Oldest](docs/architecture.md#oldest)
+    * [Rate Limiter](docs/rate_limiter.md)
+  * [Model Warmup](docs/model_configuration.md#model-warmup)
+  * [Inference Request/Response Cache](docs/model_configuration.md#response-cache)
+* Model Pipeline
+  * [Model Ensemble](docs/architecture.md#ensemble-models)
+  * [Business Logic Scripting (BLS)](https://github.com/triton-inference-server/python_backend#business-logic-scripting)
 * [Model Management](docs/model_management.md)
-* [Custom Operations](docs/custom_operations.md)
+  * [Explicit Model Loading and Unloading](docs/model_management.md#model-control-mode-explicit)
+  * [Modifying the Model Repository](docs/model_management.md#modifying-the-model-repository)
+* [Metrics](docs/metrics.md)
+* [Framework Custom Operations](docs/custom_operations.md)
+  * [TensorRT](docs/custom_operations.md#tensorrt)
+  * [TensorFlow](docs/custom_operations.md#tensorflow)
+  * [PyTorch](docs/custom_operations.md#pytorch)
+  * [ONNX](docs/custom_operations.md#onnx)
 * [Client Libraries and Examples](https://github.com/triton-inference-server/client)
-* [Optimization](docs/optimization.md)
+  * [C++ HTTP/GRPC Libraries](https://github.com/triton-inference-server/client#client-library-apis)
+  * [Python HTTP/GRPC Libraries](https://github.com/triton-inference-server/client#client-library-apis)
+  * [Java HTTP Library](https://github.com/triton-inference-server/client/src/java)
+  * GRPC Generated Libraries
+    * [go](https://github.com/triton-inference-server/client/tree/main/src/grpc_generated/go)
+    * [Java/Scala](https://github.com/triton-inference-server/client/tree/main/src/grpc_generated/java)
+* [Performance Analysis](docs/optimization.md)
   * [Model Analyzer](docs/model_analyzer.md)
   * [Performance Analyzer](docs/perf_analyzer.md)
-* [Metrics](docs/metrics.md)
-* [Rate Limiter](docs/rate_limiter.md)
+  * [Inference Request Tracing](docs/trace.md)
 * [Jetson and JetPack](docs/jetson.md)
 
 The [quickstart](docs/quickstart.md) walks you through all the steps
@@ -179,11 +247,12 @@ efforts. Specifically, you will want to optimize [scheduling and
 batching](docs/architecture.md#models-and-schedulers) and [model
 instances](docs/model_configuration.md#instance-groups) appropriately
 for each model. You can also enable cross-model prioritization using
-[rate limiter](docs/rate_limiter.md) which manages the rate at which
-requests are scheduled on model instances. You may also want to
-consider [ensembling multiple models and pre/post-processing](docs/architecture.md#ensemble-models)
-into a pipeline. In some cases you may find [individual inference
-request trace data](docs/trace.md) useful when optimizing. A
+the [rate limiter](docs/rate_limiter.md) which manages the rate at
+which requests are scheduled on model instances. You may also want to
+consider combining multiple models and pre/post-processing into a
+pipeline using [ensembling](docs/architecture.md#ensemble-models) or
+[Business Logic Scripting
+(BLS)](https://github.com/triton-inference-server/python_backend#business-logic-scripting). A
 [Prometheus metrics endpoint](docs/metrics.md) allows you to visualize
 and monitor aggregate inference metrics.
 
@@ -195,8 +264,9 @@ As part of your deployment strategy you may want to [explicitly manage
 what models are available by loading and unloading
 models](docs/model_management.md) from a running Triton server. If you
 are using Kubernetes for deployment there are simple examples of how
-to deploy Triton using Kubernetes and Helm, one for
-[GCP](deploy/gcp/README.md) and one for [AWS](deploy/aws/README.md).
+to deploy Triton using Kubernetes and Helm:
+[GCP](deploy/gcp/README.md), [AWS](deploy/aws/README.md), and [NVIDIA
+FleetCommand](deploy/fleetcommand/README.md)
 
 The [version 1 to version 2 migration
 information](docs/v1_to_v2.md) is helpful if you are moving to

@@ -42,24 +42,28 @@ def verify_add_sub_results(input0, input1, infer_response):
         return False
 
     if not input0.is_cpu():
-        input0 = from_dlpack(input0.to_dlpack()).to('cpu').cpu().detach().numpy()
+        input0 = from_dlpack(
+            input0.to_dlpack()).to('cpu').cpu().detach().numpy()
     else:
         input0 = input0.as_numpy()
 
     if not input1.is_cpu():
-        input1 = from_dlpack(input1.to_dlpack()).to('cpu').cpu().detach().numpy()
+        input1 = from_dlpack(
+            input1.to_dlpack()).to('cpu').cpu().detach().numpy()
     else:
         input1 = input1.as_numpy()
 
     if not output0.is_cpu():
-       output0 = from_dlpack(output0.to_dlpack()).to('cpu').cpu().detach().numpy()
+        output0 = from_dlpack(
+            output0.to_dlpack()).to('cpu').cpu().detach().numpy()
     else:
-       output0 = output0.as_numpy()
+        output0 = output0.as_numpy()
 
     if not output1.is_cpu():
-       output1 = from_dlpack(output1.to_dlpack()).to('cpu').cpu().detach().numpy()
+        output1 = from_dlpack(
+            output1.to_dlpack()).to('cpu').cpu().detach().numpy()
     else:
-       output1 = output1.as_numpy()
+        output1 = output1.as_numpy()
 
     expected_output_0 = input0 + input1
     expected_output_1 = input0 - input1
@@ -86,8 +90,10 @@ def create_addsub_inference_request(gpu=False):
     else:
         input0_pytorch = torch.rand(16).to('cuda')
         input1_pytorch = torch.rand(16).to('cuda')
-        input0 = pb_utils.Tensor.from_dlpack('INPUT0', to_dlpack(input0_pytorch))
-        input1 = pb_utils.Tensor.from_dlpack('INPUT1', to_dlpack(input1_pytorch))
+        input0 = pb_utils.Tensor.from_dlpack('INPUT0',
+                                             to_dlpack(input0_pytorch))
+        input1 = pb_utils.Tensor.from_dlpack('INPUT1',
+                                             to_dlpack(input1_pytorch))
 
     infer_request = pb_utils.InferenceRequest(
         model_name='dlpack_add_sub',
@@ -104,8 +110,7 @@ async def async_bls_add_sub():
         return False
 
     infer_response_sync = infer_request.exec()
-    result_correct = verify_add_sub_results(input0, input1,
-                                            infer_response_sync)
+    result_correct = verify_add_sub_results(input0, input1, infer_response_sync)
     if not result_correct:
         return False
 
@@ -123,10 +128,13 @@ async def multiple_async_bls(gpu):
     infer_responses = await asyncio.gather(*infer_request_aws)
     for infer_response, input_pair in zip(infer_responses, inputs):
         if infer_response.has_error():
-            print('Async BLS failed:', infer_response.error().message(), flush=True)
+            print('Async BLS failed:',
+                  infer_response.error().message(),
+                  flush=True)
             return False
 
-        result_correct = verify_add_sub_results(input_pair[0], input_pair[1], infer_response)
+        result_correct = verify_add_sub_results(input_pair[0], input_pair[1],
+                                                infer_response)
         if not result_correct:
             return False
 
@@ -134,6 +142,7 @@ async def multiple_async_bls(gpu):
 
 
 class TritonPythonModel:
+
     async def execute(self, requests):
         responses = []
         for _ in requests:
@@ -143,7 +152,8 @@ class TritonPythonModel:
 
             responses.append(
                 pb_utils.InferenceResponse(output_tensors=[
-                    pb_utils.Tensor('OUTPUT0', np.array([test1 & test2 & test3]))
+                    pb_utils.Tensor('OUTPUT0', np.array([test1 & test2 &
+                                                         test3]))
                 ]))
 
         return responses

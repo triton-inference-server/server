@@ -1,4 +1,4 @@
-// Copyright (c) 2020, NVIDIA CORPORATION. All rights reserved.
+// Copyright 2020-2021, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 //
 // Redistribution and use in source and binary forms, with or without
 // modification, are permitted provided that the following conditions
@@ -38,7 +38,7 @@
 
 namespace nvidia { namespace inferenceserver {
 
-class InferenceBackend;
+class Model;
 class InferenceResponse;
 
 //
@@ -48,17 +48,20 @@ class InferenceResponseFactory {
  public:
   InferenceResponseFactory() = default;
   InferenceResponseFactory(
-      const std::shared_ptr<InferenceBackend>& backend, const std::string& id,
+      const std::shared_ptr<Model>& model, const std::string& id,
       const ResponseAllocator* allocator, void* alloc_userp,
       TRITONSERVER_InferenceResponseCompleteFn_t response_fn,
       void* response_userp,
       const std::function<void(
           std::unique_ptr<InferenceResponse>&&, const uint32_t)>& delegator)
-      : backend_(backend), id_(id), allocator_(allocator),
+      : model_(model), id_(id), allocator_(allocator),
         alloc_userp_(alloc_userp), response_fn_(response_fn),
         response_userp_(response_userp), response_delegator_(delegator)
   {
   }
+
+  const ResponseAllocator* Allocator() { return allocator_; }
+  void* AllocatorUserp() { return alloc_userp_; }
 
   Status SetResponseDelegator(
       const std::function<void(
@@ -75,13 +78,13 @@ class InferenceResponseFactory {
   Status SendFlags(const uint32_t flags) const;
 
  private:
-  // The backend associated with this factory. For normal
+  // The model associated with this factory. For normal
   // requests/responses this will always be defined and acts to keep
-  // the backend loaded as long as this factory is live. It may be
-  // nullptr for cases where the backend itself created the request
+  // the model loaded as long as this factory is live. It may be
+  // nullptr for cases where the model itself created the request
   // (like running requests for warmup) and so must protect any uses
   // to handle the nullptr case.
-  std::shared_ptr<InferenceBackend> backend_;
+  std::shared_ptr<Model> model_;
 
   // The ID of the corresponding request that should be included in
   // every response.
@@ -201,7 +204,7 @@ class InferenceResponse {
 
   // InferenceResponse
   InferenceResponse(
-      const std::shared_ptr<InferenceBackend>& backend, const std::string& id,
+      const std::shared_ptr<Model>& model, const std::string& id,
       const ResponseAllocator* allocator, void* alloc_userp,
       TRITONSERVER_InferenceResponseCompleteFn_t response_fn,
       void* response_userp,
@@ -268,13 +271,13 @@ class InferenceResponse {
   friend std::ostream& operator<<(
       std::ostream& out, const InferenceResponse& response);
 
-  // The backend associated with this factory. For normal
+  // The model associated with this factory. For normal
   // requests/responses this will always be defined and acts to keep
-  // the backend loaded as long as this factory is live. It may be
-  // nullptr for cases where the backend itself created the request
+  // the model loaded as long as this factory is live. It may be
+  // nullptr for cases where the model itself created the request
   // (like running requests for warmup) and so must protect any uses
   // to handle the nullptr case.
-  std::shared_ptr<InferenceBackend> backend_;
+  std::shared_ptr<Model> model_;
 
   // The ID of the corresponding request that should be included in
   // every response.

@@ -28,8 +28,8 @@
 
 #include <algorithm>
 #include <deque>
-#include "src/core/backend.h"
 #include "src/core/logging.h"
+#include "src/core/model.h"
 #include "src/core/server.h"
 
 namespace nvidia { namespace inferenceserver {
@@ -91,29 +91,48 @@ NullRequestComplete(
 const std::string&
 InferenceRequest::ModelName() const
 {
-  return backend_raw_->Name();
+  return model_raw_->Name();
 }
 
 int64_t
 InferenceRequest::ActualModelVersion() const
 {
-  return backend_raw_->Version();
+  return model_raw_->Version();
 }
 
 void
 InferenceRequest::SetPriority(uint32_t p)
 {
-  if ((p == 0) || (p > backend_raw_->MaxPriorityLevel())) {
-    priority_ = backend_raw_->DefaultPriorityLevel();
+  if ((p == 0) || (p > model_raw_->MaxPriorityLevel())) {
+    priority_ = model_raw_->DefaultPriorityLevel();
   } else {
     priority_ = p;
   }
 }
 
 Status
+InferenceRequest::OutputBufferProperties(
+    const char* name, size_t* byte_size, TRITONSERVER_MemoryType* memory_type,
+    int64_t* memory_type_id)
+{
+  const auto allocator = response_factory_.Allocator();
+  if ((allocator == nullptr) || (allocator->QueryFn() == nullptr)) {
+    return Status(
+        Status::Code::UNAVAILABLE, "Output properties are not available");
+  } else {
+    RETURN_IF_TRITONSERVER_ERROR(allocator->QueryFn()(
+        reinterpret_cast<TRITONSERVER_ResponseAllocator*>(
+            const_cast<ResponseAllocator*>(allocator)),
+        response_factory_.AllocatorUserp(), name, byte_size, memory_type,
+        memory_type_id));
+  }
+  return Status::Success;
+}
+
+Status
 InferenceRequest::Run(std::unique_ptr<InferenceRequest>& request)
 {
-  return request->backend_raw_->Enqueue(request);
+  return request->model_raw_->Enqueue(request);
 }
 
 void
@@ -198,7 +217,7 @@ InferenceRequest::CopyAsNull(const InferenceRequest& from)
   // outputs. Maybe more efficient to share inputs and other metadata,
   // but that binds the Null request with 'from' request's lifecycle.
   std::unique_ptr<InferenceRequest> lrequest(
-      new InferenceRequest(from.backend_raw_, from.requested_model_version_));
+      new InferenceRequest(from.model_raw_, from.requested_model_version_));
   lrequest->needs_normalization_ = false;
   lrequest->batch_size_ = from.batch_size_;
   lrequest->collect_stats_ = false;
@@ -552,7 +571,7 @@ InferenceRequest::PrepareForInference()
 Status
 InferenceRequest::Normalize()
 {
-  const inference::ModelConfig& model_config = backend_raw_->Config();
+  const inference::ModelConfig& model_config = model_raw_->Config();
 
   // Initialize the requested outputs to be used during inference. If
   // original_requested_outputs_ is empty assume all outputs specified
@@ -567,7 +586,7 @@ InferenceRequest::Normalize()
     // model configuration.
     for (const auto& output_name : original_requested_outputs_) {
       const inference::ModelOutput* output_config;
-      RETURN_IF_ERROR(backend_raw_->GetOutput(output_name, &output_config));
+      RETURN_IF_ERROR(model_raw_->GetOutput(output_name, &output_config));
     }
   }
 
@@ -602,7 +621,7 @@ InferenceRequest::Normalize()
       // For a shape tensor, keep the tensor's shape as it is and mark
       // that the input is a shape tensor.
       const inference::ModelInput* input_config;
-      RETURN_IF_ERROR(backend_raw_->GetInput(pr.first, &input_config));
+      RETURN_IF_ERROR(model_raw_->GetInput(pr.first, &input_config));
       if (input_config->is_shape_tensor()) {
         *input.MutableShape() = input.OriginalShape();
         input.SetIsShapeTensor(true);
@@ -646,7 +665,7 @@ InferenceRequest::Normalize()
   // adjustments for reshapes and find the total tensor size.
   for (auto& pr : original_inputs_) {
     const inference::ModelInput* input_config;
-    RETURN_IF_ERROR(backend_raw_->GetInput(pr.first, &input_config));
+    RETURN_IF_ERROR(model_raw_->GetInput(pr.first, &input_config));
 
     auto& input = pr.second;
     auto shape = input.MutableShape();
@@ -739,7 +758,7 @@ InferenceRequest::ReportStatistics(
   INFER_STATS_DECL_TIMESTAMP(request_end_ns);
 
   if (success) {
-    backend_raw_->MutableStatsAggregator()->UpdateSuccess(
+    model_raw_->MutableStatsAggregator()->UpdateSuccess(
         metric_reporter, std::max(1U, batch_size_), request_start_ns_,
         queue_start_ns_, compute_start_ns, compute_input_end_ns,
         compute_output_start_ns, compute_end_ns, request_end_ns);
@@ -751,7 +770,7 @@ InferenceRequest::ReportStatistics(
           request_end_ns);
     }
   } else {
-    backend_raw_->MutableStatsAggregator()->UpdateFailure(
+    model_raw_->MutableStatsAggregator()->UpdateFailure(
         metric_reporter, request_start_ns_, request_end_ns);
     if (secondary_stats_aggregator_ != nullptr) {
       secondary_stats_aggregator_->UpdateFailure(
@@ -774,7 +793,7 @@ InferenceRequest::ReportStatisticsWithDuration(
   INFER_STATS_DECL_TIMESTAMP(request_end_ns);
 
   if (success) {
-    backend_raw_->MutableStatsAggregator()->UpdateSuccessWithDuration(
+    model_raw_->MutableStatsAggregator()->UpdateSuccessWithDuration(
         metric_reporter, std::max(1U, batch_size_), request_start_ns_,
         queue_start_ns_, compute_start_ns, request_end_ns,
         compute_input_duration_ns, compute_infer_duration_ns,
@@ -787,7 +806,7 @@ InferenceRequest::ReportStatisticsWithDuration(
           compute_output_duration_ns);
     }
   } else {
-    backend_raw_->MutableStatsAggregator()->UpdateFailure(
+    model_raw_->MutableStatsAggregator()->UpdateFailure(
         metric_reporter, request_start_ns_, request_end_ns);
     if (secondary_stats_aggregator_ != nullptr) {
       secondary_stats_aggregator_->UpdateFailure(

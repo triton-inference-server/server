@@ -40,6 +40,7 @@ import test_util as tu
 
 
 class ClientStringTest(tu.TestResultCollector):
+
     def _test_infer_unicode(self, model_name, client, input_):
         # Send inference request to the inference server. Get results for
         # both output tensors.
@@ -139,8 +140,7 @@ class ClientStringTest(tu.TestResultCollector):
         self._test_infer_unicode(model_name, client, in0)
 
     def _test_str_dtype(self, client, model_name, dtype=np.object_):
-        in0_bytes = np.array([str(i) for i in range(10000, 10008)],
-                             dtype=dtype)
+        in0_bytes = np.array([str(i) for i in range(10000, 10008)], dtype=dtype)
         self._test_infer_non_unicode(model_name, client, in0_bytes)
 
         in0_bytes = np.array([i for i in range(10000, 10008)], dtype=dtype)

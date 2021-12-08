@@ -25,9 +25,7 @@
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 import argparse
-from builtins import range
 import os
-import sys
 import numpy as np
 import gen_ensemble_model_utils as emu
 
@@ -482,8 +480,6 @@ def create_plan_shape_tensor_modelfile(models_dir, model_version, max_batch,
     with open(model_version_dir + "/model.plan", "wb") as f:
         f.write(engine_bytes)
 
-    del builder
-
 
 def create_plan_fixed_modelfile(models_dir, model_version, max_batch, dtype,
                                 shape):
@@ -526,8 +522,6 @@ def create_plan_fixed_modelfile(models_dir, model_version, max_batch, dtype,
 
     with open(model_version_dir + "/model.plan", "wb") as f:
         f.write(engine_bytes)
-
-    del builder
 
 
 def create_plan_fixed_rf_modelfile(models_dir, model_version, max_batch, dtype,
@@ -592,8 +586,6 @@ def create_plan_fixed_rf_modelfile(models_dir, model_version, max_batch, dtype,
 
     with open(model_version_dir + "/model.plan", "wb") as f:
         f.write(engine_bytes)
-
-    del builder
 
 
 def create_plan_dynamic_modelfile(models_dir, model_version, max_batch, dtype,
@@ -673,8 +665,6 @@ def create_plan_dynamic_modelfile(models_dir, model_version, max_batch, dtype,
 
     with open(model_version_dir + "/model.plan", "wb") as f:
         f.write(engine_bytes)
-
-    del builder
 
 
 def create_plan_dynamic_rf_modelfile(models_dir, model_version, max_batch,
@@ -778,8 +768,6 @@ def create_plan_dynamic_rf_modelfile(models_dir, model_version, max_batch,
 
     with open(model_version_dir + "/model.plan", "wb") as f:
         f.write(engine_bytes)
-
-    del builder
 
 
 def create_plan_modelfile(models_dir, model_version, max_batch, dtype, shape):
@@ -1236,8 +1224,6 @@ instance_group [
 ]
 '''.format(model_name, max_batch, control_type, control_type,
            np_to_model_dtype(dtype), tu.shape_to_dims_str(shape),
-           np_to_model_dtype(dtype), tu.shape_to_dims_str(shape),
-           np_to_model_dtype(dtype), tu.shape_to_dims_str(shape),
            np_to_model_dtype(dtype))
 
     try:
@@ -1345,8 +1331,6 @@ instance_group [
 ]
 '''.format(model_name, max_batch, "int32" if dtype == np.int32 else "fp32",
            "int32" if dtype == np.int32 else "fp32", np_to_model_dtype(dtype),
-           tu.shape_to_dims_str(shape), np_to_model_dtype(dtype),
-           tu.shape_to_dims_str(shape), np_to_model_dtype(dtype),
            tu.shape_to_dims_str(shape), np_to_model_dtype(dtype))
 
     try:
@@ -1513,7 +1497,7 @@ if __name__ == '__main__':
 
     if FLAGS.graphdef or FLAGS.savedmodel:
         import tensorflow as tf
-        from tensorflow.python.framework import graph_io, graph_util
+        from tensorflow.python.framework import graph_io
     if FLAGS.tensorrt or FLAGS.tensorrt_shape_io:
         import tensorrt as trt
     if FLAGS.onnx:
@@ -1522,7 +1506,7 @@ if __name__ == '__main__':
         import torch
         from torch import nn
     if FLAGS.openvino:
-        from openvino.inference_engine import IECore, IENetwork
+        from openvino.inference_engine import IENetwork
         import ngraph as ng
 
     import test_util as tu

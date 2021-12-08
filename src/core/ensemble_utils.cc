@@ -1,4 +1,4 @@
-// Copyright (c) 2018-2020, NVIDIA CORPORATION. All rights reserved.
+// Copyright 2018-2021, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 //
 // Redistribution and use in source and binary forms, with or without
 // modification, are permitted provided that the following conditions
@@ -29,9 +29,9 @@
 #include "src/core/ensemble_utils.h"
 
 #include <set>
-#include "src/core/backend.h"
 #include "src/core/constants.h"
 #include "src/core/logging.h"
+#include "src/core/model.h"
 #include "src/core/model_config_utils.h"
 
 namespace nvidia { namespace inferenceserver {
@@ -271,11 +271,11 @@ ValidateEnsembleConfig(
     inference::ModelConfig model_config;
     for (auto& node : ensemble->upstreams_) {
       if (model_name == node.first->model_name_) {
-        // Obtain completed config from backend instance
-        std::shared_ptr<InferenceBackend> backend;
-        RETURN_IF_ERROR(model_repository_manager->GetInferenceBackend(
-            model_name, -1, &backend));
-        model_config = backend->Config();
+        // Obtain completed config from model instance
+        std::shared_ptr<Model> model;
+        RETURN_IF_ERROR(
+            model_repository_manager->GetModel(model_name, -1, &model));
+        model_config = model->Config();
         break;
       }
     }

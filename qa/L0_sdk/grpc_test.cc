@@ -35,10 +35,11 @@ main(int argc, char* argv[])
   std::unique_ptr<tc::InferenceServerGrpcClient> client;
   // Add a symbol from protobufs to verify correct linking
   inference::ModelConfigResponse model_config;
-  tc::Error err = tc::InferenceServerGrpcClient::Create(&client, "localhost:8001");
+  tc::Error err =
+      tc::InferenceServerGrpcClient::Create(&client, "localhost:8001");
   if (!err.IsOk()) {
-    std::cerr << "InferenceServerGrpcClient::Create failed: "
-              << err.Message() << std::endl;
+    std::cerr << "InferenceServerGrpcClient::Create failed: " << err.Message()
+              << std::endl;
     return 1;
   }
 

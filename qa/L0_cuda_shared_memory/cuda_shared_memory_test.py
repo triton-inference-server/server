@@ -47,8 +47,8 @@ class CudaSharedMemoryTest(tu.TestResultCollector):
                 "dummy_data", -1, 0)
             cshm.destroy_shared_memory_region(shm_op0_handle)
         except Exception as ex:
-            self.assertTrue(
-                str(ex) == "unable to create cuda shared memory handle")
+            self.assertEqual(str(ex),
+                             "unable to create cuda shared memory handle")
 
     def test_valid_create_set_register(self):
         # Create a valid cuda shared memory region, fill data in it and register
@@ -63,9 +63,9 @@ class CudaSharedMemoryTest(tu.TestResultCollector):
             "dummy_data", cshm.get_raw_handle(shm_op0_handle), 0, 8)
         shm_status = triton_client.get_cuda_shared_memory_status()
         if _protocol == "http":
-            self.assertTrue(len(shm_status) == 1)
+            self.assertEqual(len(shm_status), 1)
         else:
-            self.assertTrue(len(shm_status.regions) == 1)
+            self.assertEqual(len(shm_status.regions), 1)
         cshm.destroy_shared_memory_region(shm_op0_handle)
 
     def test_unregister_before_register(self):
@@ -78,9 +78,9 @@ class CudaSharedMemoryTest(tu.TestResultCollector):
         triton_client.unregister_cuda_shared_memory("dummy_data")
         shm_status = triton_client.get_cuda_shared_memory_status()
         if _protocol == "http":
-            self.assertTrue(len(shm_status) == 0)
+            self.assertEqual(len(shm_status), 0)
         else:
-            self.assertTrue(len(shm_status.regions) == 0)
+            self.assertEqual(len(shm_status.regions), 0)
         cshm.destroy_shared_memory_region(shm_op0_handle)
 
     def test_unregister_after_register(self):
@@ -95,9 +95,9 @@ class CudaSharedMemoryTest(tu.TestResultCollector):
         triton_client.unregister_cuda_shared_memory("dummy_data")
         shm_status = triton_client.get_cuda_shared_memory_status()
         if _protocol == "http":
-            self.assertTrue(len(shm_status) == 0)
+            self.assertEqual(len(shm_status), 0)
         else:
-            self.assertTrue(len(shm_status.regions) == 0)
+            self.assertEqual(len(shm_status.regions), 0)
         cshm.destroy_shared_memory_region(shm_op0_handle)
 
     def test_reregister_after_register(self):
@@ -113,14 +113,13 @@ class CudaSharedMemoryTest(tu.TestResultCollector):
             triton_client.register_cuda_shared_memory(
                 "dummy_data", cshm.get_raw_handle(shm_op0_handle), 0, 8)
         except Exception as ex:
-            self.assertTrue(
-                "shared memory region 'dummy_data' already in manager" in str(
-                    ex))
+            self.assertIn(
+                "shared memory region 'dummy_data' already in manager", str(ex))
         shm_status = triton_client.get_cuda_shared_memory_status()
         if _protocol == "http":
-            self.assertTrue(len(shm_status) == 1)
+            self.assertEqual(len(shm_status), 1)
         else:
-            self.assertTrue(len(shm_status.regions) == 1)
+            self.assertEqual(len(shm_status.regions), 1)
         cshm.destroy_shared_memory_region(shm_op0_handle)
 
     def _configure_sever(self):
@@ -222,9 +221,9 @@ class CudaSharedMemoryTest(tu.TestResultCollector):
         triton_client.unregister_cuda_shared_memory("output0_data")
         shm_status = triton_client.get_cuda_shared_memory_status()
         if _protocol == "http":
-            self.assertTrue(len(shm_status) == 3)
+            self.assertEqual(len(shm_status), 3)
         else:
-            self.assertTrue(len(shm_status.regions) == 3)
+            self.assertEqual(len(shm_status.regions), 3)
         self._cleanup_server(shm_handles)
 
     def test_register_after_inference(self):
@@ -244,9 +243,9 @@ class CudaSharedMemoryTest(tu.TestResultCollector):
             "input2_data", cshm.get_raw_handle(shm_ip2_handle), 0, 64)
         shm_status = triton_client.get_cuda_shared_memory_status()
         if _protocol == "http":
-            self.assertTrue(len(shm_status) == 5)
+            self.assertEqual(len(shm_status), 5)
         else:
-            self.assertTrue(len(shm_status.regions) == 5)
+            self.assertEqual(len(shm_status.regions), 5)
         shm_handles.append(shm_ip2_handle)
         self._cleanup_server(shm_handles)
 
@@ -264,9 +263,9 @@ class CudaSharedMemoryTest(tu.TestResultCollector):
         self._basic_inference(shm_handles[0], shm_ip2_handle, shm_handles[2],
                               shm_handles[3], error_msg, "input2_data", 128)
         if len(error_msg) > 0:
-            self.assertTrue(
-                "unexpected total byte size 128 for input 'INPUT1', expecting 64"
-                in error_msg[-1])
+            self.assertIn(
+                "unexpected total byte size 128 for input 'INPUT1', expecting 64",
+                error_msg[-1])
         shm_handles.append(shm_ip2_handle)
         self._cleanup_server(shm_handles)
 
@@ -290,15 +289,15 @@ class CudaSharedMemoryTest(tu.TestResultCollector):
             triton_client = grpcclient.InferenceServerClient(_url, verbose=True)
         status_before = triton_client.get_cuda_shared_memory_status()
         if _protocol == "http":
-            self.assertTrue(len(status_before) == 4)
+            self.assertEqual(len(status_before), 4)
         else:
-            self.assertTrue(len(status_before.regions) == 4)
+            self.assertEqual(len(status_before.regions), 4)
         triton_client.unregister_cuda_shared_memory()
         status_after = triton_client.get_cuda_shared_memory_status()
         if _protocol == "http":
-            self.assertTrue(len(status_after) == 0)
+            self.assertEqual(len(status_after), 0)
         else:
-            self.assertTrue(len(status_after.regions) == 0)
+            self.assertEqual(len(status_after.regions), 0)
         self._cleanup_server(shm_handles)
 
 

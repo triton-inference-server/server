@@ -25,9 +25,7 @@
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 import argparse
-from builtins import range
 import os
-import sys
 
 import numpy as np
 import tensorrt as trt

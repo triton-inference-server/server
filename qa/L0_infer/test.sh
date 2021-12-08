@@ -119,8 +119,12 @@ export ENSEMBLES
 
 for BACKEND in $BACKENDS; do
     if [ "$BACKEND" == "python_dlpack" ]; then
-        pip3 install torch==1.9.0+cpu torchvision==0.10.0+cpu torchaudio==0.9.0 -f https://download.pytorch.org/whl/torch_stable.html
-	break
+        if [[ "aarch64" != $(uname -m) ]] ; then
+            pip3 install torch==1.9.0+cpu torchvision==0.10.0+cpu torchaudio==0.9.0 -f https://download.pytorch.org/whl/torch_stable.html
+        else
+            pip3 install torch==1.9.0 torchvision==0.10.0 torchaudio==0.9.0 -f https://download.pytorch.org/whl/torch_stable.html
+        fi
+        break
     fi
 done
 

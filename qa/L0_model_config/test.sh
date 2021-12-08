@@ -172,7 +172,14 @@ for modelpath in \
     cp ./libtriton_repeat.so $modelpath/libtriton_repeat.so
 done
 
-
+# Copy PyTorch models into the test model repositories.
+for modelpath in \
+        autofill_noplatform/pytorch/too_few_inputs/1 \
+        autofill_noplatform/pytorch/too_few_outputs/1 ; do
+    mkdir -p $modelpath
+    cp /data/inferenceserver/${REPO_VERSION}/qa_model_repository/libtorch_float32_float32_float32/1/model.pt \
+       $modelpath/.
+done
 
 # Copy other required models
 mkdir -p special_cases/invalid_platform/1

@@ -27,13 +27,9 @@
 import sys
 sys.path.append("../common")
 
-from builtins import range
-from future.utils import iteritems
 import numpy as np
 import os
 import unittest
-import json
-import requests
 import infer_util as iu
 import test_util as tu
 import tritongrpcclient as grpcclient
@@ -71,7 +67,7 @@ class ServerMetadataTest(tu.TestResultCollector):
                                      server_metadata['version'])
                     self.assertEqual("triton", server_metadata['name'])
                     for ext in extensions:
-                        self.assertTrue(ext in server_metadata['extensions'])
+                        self.assertIn(ext, server_metadata['extensions'])
 
                     self.assertEqual(model_name, model_metadata['name'])
                 else:
@@ -79,7 +75,7 @@ class ServerMetadataTest(tu.TestResultCollector):
                                      server_metadata.version)
                     self.assertEqual("triton", server_metadata.name)
                     for ext in extensions:
-                        self.assertTrue(ext in server_metadata.extensions)
+                        self.assertIn(ext, server_metadata.extensions)
 
                     self.assertEqual(model_name, model_metadata.name)
         except InferenceServerException as ex:
@@ -171,13 +167,12 @@ class ServerMetadataTest(tu.TestResultCollector):
                         self.assertEqual(model_name, model_metadata['name'])
                         self.assertEqual(len(model_metadata['versions']), 3)
                         for v in (1, 2, 3):
-                            self.assertTrue(
-                                str(v) in model_metadata['versions'])
+                            self.assertIn(str(v), model_metadata['versions'])
                     else:
                         self.assertEqual(model_name, model_metadata.name)
                         self.assertEqual(len(model_metadata.versions), 3)
                         for v in (1, 2, 3):
-                            self.assertTrue(str(v) in model_metadata.versions)
+                            self.assertIn(str(v), model_metadata.versions)
 
                     # verify contents of model metadata
                     if pair[1] == "http":
@@ -202,7 +197,7 @@ class ServerMetadataTest(tu.TestResultCollector):
                             input_dtype = model_input.datatype
                             input_shape = model_input.shape
                             input_name = model_input.name
-                        self.assertTrue(input_name in ["INPUT0", "INPUT1"])
+                        self.assertIn(input_name, ["INPUT0", "INPUT1"])
                         self.assertEqual(input_dtype, "INT32")
                         self.assertEqual(input_shape, [-1, 16])
 
@@ -215,7 +210,7 @@ class ServerMetadataTest(tu.TestResultCollector):
                             output_dtype = model_output.datatype
                             output_shape = model_output.shape
                             output_name = model_output.name
-                        self.assertTrue(output_name in ["OUTPUT0", "OUTPUT1"])
+                        self.assertIn(output_name, ["OUTPUT0", "OUTPUT1"])
                         self.assertEqual(output_dtype, "INT32")
                         self.assertEqual(output_shape, [-1, 16])
 
@@ -290,7 +285,6 @@ class ServerMetadataTest(tu.TestResultCollector):
 
     def test_model_specific_infer(self):
         input_size = 16
-        tensor_shape = (1, input_size)
 
         # There are 3 versions of *_float32_float32_float32 but only
         # versions 1 and 3 should be available.
@@ -537,9 +531,9 @@ class ModelMetadataTest(tu.TestResultCollector):
                                     "unexpected infer stats for the model that is not ready"
                                 )
                             except InferenceServerException as ex:
-                                self.assertTrue(
-                                    "requested model version is not available for model"
-                                    in str(ex))
+                                self.assertIn(
+                                    "requested model version is not available for model",
+                                    str(ex))
 
             except InferenceServerException as ex:
                 self.assertTrue(False, "unexpected error {}".format(ex))

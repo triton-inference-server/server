@@ -34,6 +34,7 @@ SERVER_LOG="./inference_server.log"
 
 DATADIR=`pwd`/models
 SERVER=/opt/tritonserver/bin/tritonserver
+SERVER_TIMEOUT=15
 source ../common/util.sh
 
 rm -f $CLIENT_LOG $SERVER_LOG
@@ -42,83 +43,162 @@ RET=0
 
 # CUSTOM CASES
 
-# allow overrules - grpc still works
-SERVER_ARGS="--model-repository=$DATADIR --http-port -1 --allow-http 0"
-run_server_nowait
-sleep 5
-if [ "$SERVER_PID" == "0" ]; then
-    echo -e "\n***\n*** Failed to start $SERVER\n***"
-    cat $SERVER_LOG
-    exit 1
-fi
-kill $SERVER_PID || true
-wait $SERVER_PID || true
+for p in http grpc; do
+    # allow illegal http/grpc port if disabled
+    SERVER_ARGS="--model-repository=$DATADIR --${p}-port -47 --allow-${p} 0"
+    run_server_nowait
+    sleep 15
+    if [ "$SERVER_PID" == "0" ]; then
+        echo -e "\n***\n*** Failed to start $SERVER\n***"
+        cat $SERVER_LOG
+        exit 1
+    fi
+    kill $SERVER_PID
+    wait $SERVER_PID
 
-# overlap with grpc default
-SERVER_ARGS="--model-repository=$DATADIR --http-port 8001"
-set +e
-run_server_nowait
-sleep 5
-if kill $SERVER_PID && wait $SERVER_PID ; then
-    echo -e "\n***\n*** Should not have started $SERVER\n***"
-    RET=1
-    cat $SERVER_LOG
-fi
-set -e
+    # allow http/grpc port overlap with grpc/http default if disabled
+    if [ "$p" == "http" ]; then
+        SERVER_ARGS="--model-repository=$DATADIR --http-port 8001 --allow-http 0"
+        run_server_nowait
+        sleep 15
+    else
+        SERVER_ARGS="--model-repository=$DATADIR --grpc-port 8000 --allow-grpc 0"
+        run_server
+    fi
+    if [ "$SERVER_PID" == "0" ]; then
+        echo -e "\n***\n*** Failed to start $SERVER\n***"
+        cat $SERVER_LOG
+        exit 1
+    fi
+    kill $SERVER_PID
+    wait $SERVER_PID
 
-# overlap with http default
-SERVER_ARGS="--model-repository=$DATADIR --grpc-port 8000"
-set +e
-run_server_nowait
-sleep 5
-if kill $SERVER_PID && wait $SERVER_PID ; then
-    echo -e "\n***\n*** Should not have started $SERVER\n***"
-    RET=1
-    cat $SERVER_LOG
-fi
-set -e
+    # error if http/grpc port overlaps with grpc/http default port
+    if [ "$p" == "http" ]; then
+        SERVER_ARGS="--model-repository=$DATADIR --http-port 8001"
+    else
+        SERVER_ARGS="--model-repository=$DATADIR --grpc-port 8000"
+    fi
+    run_server
+    if [ "$SERVER_PID" != "0" ]; then
+        set +e
+        kill $SERVER_PID
+        wait $SERVER_PID
+        if [ "$?" == "0" ]; then
+            echo -e "\n***\n*** unexpected start $SERVER\n***"
+            cat $SERVER_LOG
+            exit 1
+        fi
+        set -e
+    fi
 
-# overlap with metrics default
-SERVER_ARGS="--model-repository=$DATADIR --http-port 8002"
-set +e
-run_server_nowait
-sleep 5
-if kill $SERVER_PID && wait $SERVER_PID ; then
-    echo -e "\n***\n*** Should not have started $SERVER\n***"
-    RET=1
-    cat $SERVER_LOG
-fi
-set -e
+    # allow http/grpc port overlap with grpc/http explicit if disabled
+    if [ "$p" == "http" ]; then
+        SERVER_ARGS="--model-repository=$DATADIR --http-port 8007 --grpc-port 8007 --allow-http 0"
+    else
+        SERVER_ARGS="--model-repository=$DATADIR --grpc-port 8007 --http-port 8007 --allow-grpc 0"
+    fi
+    run_server_nowait
+    sleep 15
+    if [ "$SERVER_PID" == "0" ]; then
+        echo -e "\n***\n*** Failed to start $SERVER\n***"
+        cat $SERVER_LOG
+        exit 1
+    fi
+    kill $SERVER_PID
+    wait $SERVER_PID
 
-# overlap with metrics default
-SERVER_ARGS="--model-repository=$DATADIR --grpc-port 8002"
-set +e
-run_server_nowait
-sleep 5
-if kill $SERVER_PID && wait $SERVER_PID ; then
-    echo -e "\n***\n*** Should not have started $SERVER\n***"
-    RET=1
-    cat $SERVER_LOG
-fi
-set -e
+    # error if http/grpc port overlaps with grpc/http explicit port
+    if [ "$p" == "http" ]; then
+        SERVER_ARGS="--model-repository=$DATADIR --http-port 8003 --grpc-port 8003"
+        run_server_nowait
+        sleep 15
+        if [ "$SERVER_PID" != "0" ]; then
+            set +e
+            kill $SERVER_PID
+            wait $SERVER_PID
+            if [ "$?" == "0" ]; then
+                echo -e "\n***\n*** unexpected start $SERVER\n***"
+                cat $SERVER_LOG
+                exit 1
+            fi
+            set -e
+        fi
+    else
+        # skip, same as http case
+        true
+    fi
 
-# disable metrics - no overlap with metrics default
-SERVER_ARGS="--model-repository=$DATADIR --http-port 8002 --allow-metrics 0"
-run_server_nowait
-sleep 5
-if [ "$SERVER_PID" == "0" ]; then
-    echo -e "\n***\n*** Failed to start $SERVER\n***"
-    cat $SERVER_LOG
-    exit 1
-fi
-set +e
-code=`curl -s -w %{http_code} -o ./curl.out localhost:8002/v2/health/ready`
-set -e
-if [ "$code" != "200" ]; then
-    RET=1
-fi
-kill $SERVER_PID || true
-wait $SERVER_PID || true
+    # allow http/grpc port overlap with metrics default port if disabled
+    if [ "$p" == "http" ]; then
+        SERVER_ARGS="--model-repository=$DATADIR --http-port 8002 --allow-http 0"
+        run_server_nowait
+        sleep 15
+    else
+        SERVER_ARGS="--model-repository=$DATADIR --grpc-port 8002 --allow-grpc 0"
+        run_server
+    fi
+    if [ "$SERVER_PID" == "0" ]; then
+        echo -e "\n***\n*** Failed to start $SERVER\n***"
+        cat $SERVER_LOG
+        exit 1
+    fi
+    kill $SERVER_PID
+    wait $SERVER_PID
+
+    # error if http/grpc port overlaps with metrics default port
+    if [ "$p" == "http" ]; then
+        SERVER_ARGS="--model-repository=$DATADIR --http-port 8002"
+    else
+        SERVER_ARGS="--model-repository=$DATADIR --grpc-port 8002"
+    fi
+    run_server
+    if [ "$SERVER_PID" != "0" ]; then
+        set +e
+        kill $SERVER_PID
+        wait $SERVER_PID
+        if [ "$?" == "0" ]; then
+            echo -e "\n***\n*** unexpected start $SERVER\n***"
+            cat $SERVER_LOG
+            exit 1
+        fi
+        set -e
+    fi
+
+    # allow metrics port overlap with http/grpc default port if disabled
+    if [ "$p" == "http" ]; then
+        SERVER_ARGS="--model-repository=$DATADIR --metrics-port 8000 --allow-metrics 0"
+    else
+        SERVER_ARGS="--model-repository=$DATADIR --metrics-port 8001 --allow-metrics 0"
+    fi
+    run_server
+    if [ "$SERVER_PID" == "0" ]; then
+        echo -e "\n***\n*** Failed to start $SERVER\n***"
+        cat $SERVER_LOG
+        exit 1
+    fi
+    kill $SERVER_PID
+    wait $SERVER_PID
+
+    # error if metrics port overlaps with http/grpc default port
+    if [ "$p" == "http" ]; then
+        SERVER_ARGS="--model-repository=$DATADIR --metrics-port 8000"
+    else
+        SERVER_ARGS="--model-repository=$DATADIR --metrics-port 8001"
+    fi
+    run_server
+    if [ "$SERVER_PID" != "0" ]; then
+        set +e
+        kill $SERVER_PID
+        wait $SERVER_PID
+        if [ "$?" == "0" ]; then
+            echo -e "\n***\n*** unexpected start $SERVER\n***"
+            cat $SERVER_LOG
+            exit 1
+        fi
+        set -e
+    fi
+done
 
 if [ $RET -eq 0 ]; then
   echo -e "\n***\n*** Test Passed\n***"

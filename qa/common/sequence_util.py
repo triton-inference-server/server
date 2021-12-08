@@ -30,7 +30,6 @@ import os
 import sys
 import time
 import threading
-import unittest
 import numpy as np
 import infer_util as iu
 import test_util as tu

@@ -25,9 +25,7 @@
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 import argparse
-from builtins import range
 import os
-import sys
 
 FLAGS = None
 
@@ -501,7 +499,7 @@ if __name__ == '__main__':
 
     if FLAGS.graphdef or FLAGS.savedmodel:
         import tensorflow as tf
-        from tensorflow.python.framework import graph_io, graph_util
+        from tensorflow.python.framework import graph_io
         create_zero_out_models(FLAGS.models_dir)
         create_cuda_op_models(FLAGS.models_dir)
         create_busy_op_models(FLAGS.models_dir)
@@ -509,8 +507,6 @@ if __name__ == '__main__':
     if FLAGS.libtorch:
         import torch
         from torch import nn
-        from torchvision import ops
-        from torch.nn.modules.utils import _pair
         import torch.utils.cpp_extension
         create_modulo_op_models(FLAGS.models_dir)
         create_vision_op_models(FLAGS.models_dir)

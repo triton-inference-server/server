@@ -107,8 +107,8 @@ invocation builds all features, backends, and repository agents.
 If you are building on *main* branch then `<container tag>` will
 default to "main". If you are building on a release branch then
 `<container tag>` will default to the branch name. For example, if you
-are building on the r21.10 branch, `<container tag>` will default to
-r21.10. Therefore, you typically do not need to provide `<container
+are building on the r21.11 branch, `<container tag>` will default to
+r21.11. Therefore, you typically do not need to provide `<container
 tag>` at all (nor the preceding colon). You can use a different
 `<container tag>` for a component to instead use the corresponding
 branch/tag in the build. For example, if you have a branch called
@@ -117,10 +117,12 @@ branch/tag in the build. For example, if you have a branch called
 repo that you want to use in the build, you would specify
 --backend=identity:mybranch.
 
-If you want to build without GPU support remove the --enable-gpu and
---enable-gpu-metrics flags. Only the following backends are available
-for a non-GPU / CPU-only build: identity, repeat, square, onnxruntime,
-openvino, and python.
+#### CPU-only container
+
+If you want to build without GPU support remove the `--enable-gpu` and
+`--enable-gpu-metrics` flags. Only the following backends are available
+for a non-GPU / CPU-only build: `identity`, `repeat`, `square`, `onnxruntime`,
+`openvino`, and `python`.
 
 ### <a name="ubuntu-without-docker"></a>Building without Docker
 
@@ -271,8 +273,8 @@ python build.py --cmake-dir=<path/to/repo>/build --build-dir=/tmp/citritonbuild 
 If you are building on *main* branch then '<container tag>' will
 default to "main". If you are building on a release branch then
 '<container tag>' will default to the branch name. For example, if you
-are building on the r21.10 branch, '<container tag>' will default to
-r21.10. Therefore, you typically do not need to provide '<container
+are building on the r21.11 branch, '<container tag>' will default to
+r21.11. Therefore, you typically do not need to provide '<container
 tag>' at all (nor the preceding colon). You can use a different
 '<container tag>' for a component to instead use the corresponding
 branch/tag in the build. For example, if you have a branch called
