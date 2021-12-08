@@ -44,7 +44,7 @@ export CUDA_VISIBLE_DEVICES=0
 DATADIR=/data/inferenceserver/${REPO_VERSION}
 
 CLIENT_LOG="./client.log"
-UNKNOWN_RANK_TEST=unknown_rank_test.py
+UNKNOWN_RANK_TEST=tf_unknown_rank_test.py
 
 SERVER=/opt/tritonserver/bin/tritonserver
 SERVER_ARGS="--model-repository=`pwd`/models"
@@ -78,9 +78,6 @@ else
         RET=1
     fi
 fi
-set -e
-
-set +e
 
 python $UNKNOWN_RANK_TEST UnknownRankTest.test_wrong_output >> $CLIENT_LOG 2>&1
 if [ $? -ne 0 ]; then
@@ -100,6 +97,25 @@ set -e
 
 kill $SERVER_PID
 wait $SERVER_PID
+
+# Try to load model with scalar tensor. The server should fail to load the model.
+rm -rf scalar_repo; mkdir scalar_repo
+cp -r $DATADIR/tf_model_store2/scalar_model scalar_repo/
+SERVER_ARGS="--model-repository=`pwd`/scalar_repo --strict-model-config=false"
+run_server
+if [ "$SERVER_PID" != "0" ]; then
+    echo -e "*** FAILED: unexpected success starting $SERVER" >> $CLIENT_LOG
+    RET=1
+    kill $SERVER_PID
+    wait $SERVER_PID
+else
+    ERROR_MESSAGE="unable to autofill for 'scalar_model': the rank of model tensor 'x' is 0 which is not supported"
+    if [[ $(cat $SERVER_LOG | grep ${ERROR_MESSAGE} | wc -l) -ne 2 ]]; then
+        echo -e "\n***\n*** Test Failed: ${ERROR_MESSAGE} not found\n***"
+        RET=1
+    fi
+fi
+
 
 if [ $RET -eq 0 ]; then
     echo -e "\n***\n*** Test Passed\n***"
