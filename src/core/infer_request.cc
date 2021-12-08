@@ -590,14 +590,17 @@ InferenceRequest::Normalize()
     }
   }
 
-  // Make sure that the request is providing the same number of inputs
+  // Make sure that the request is providing the number of inputs
   // as is expected by the model.
-  if (original_inputs_.size() != (size_t)model_config.input_size()) {
+  if ((original_inputs_.size() > (size_t)model_config.input_size()) ||
+      (original_inputs_.size() < model_raw_->RequiredInputCount())) {
     return Status(
         Status::Code::INVALID_ARG,
-        "expected " + std::to_string(model_config.input_size()) +
-            " inputs but got " + std::to_string(original_inputs_.size()) +
-            " inputs for model '" + ModelName() + "'");
+        "expected number of inputs between [" +
+            std::to_string(model_raw_->RequiredInputCount()) + ", " +
+            std::to_string(model_config.input_size()) + "] but got " +
+            std::to_string(original_inputs_.size()) + " inputs for model '" +
+            ModelName() + "'");
   }
 
   // Determine the batch size and shape of each input.
@@ -669,6 +672,7 @@ InferenceRequest::Normalize()
 
     auto& input = pr.second;
     auto shape = input.MutableShape();
+    input.SetIsOptional(input_config->optional());
 
     if (input.DType() != input_config->data_type()) {
       return Status(
@@ -829,7 +833,8 @@ InferenceRequest::Input::Input(
     const int64_t* shape, const uint64_t dim_count)
     : name_(name), datatype_(datatype),
       original_shape_(shape, shape + dim_count), is_shape_tensor_(false),
-      data_(new MemoryReference), has_host_policy_specific_data_(false)
+      data_(new MemoryReference), optional_(false),
+      has_host_policy_specific_data_(false)
 {
 }
 
@@ -837,7 +842,7 @@ InferenceRequest::Input::Input(
     const std::string& name, const inference::DataType datatype,
     const std::vector<int64_t>& shape)
     : name_(name), datatype_(datatype), original_shape_(shape),
-      is_shape_tensor_(false), data_(new MemoryReference),
+      is_shape_tensor_(false), data_(new MemoryReference), optional_(false),
       has_host_policy_specific_data_(false)
 {
 }
