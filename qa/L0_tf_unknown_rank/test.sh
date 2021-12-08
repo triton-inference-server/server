@@ -100,7 +100,7 @@ wait $SERVER_PID
 
 # Try to load model with scalar tensor. The server should fail to load the model.
 rm -rf scalar_repo; mkdir scalar_repo
-cp -r $DATADIR/tf_model_store2/scalar_model scalar_repo/
+cp -r $DATADIR/tf_model_store3/scalar_model scalar_repo/
 SERVER_ARGS="--model-repository=`pwd`/scalar_repo --strict-model-config=false"
 run_server
 if [ "$SERVER_PID" != "0" ]; then
