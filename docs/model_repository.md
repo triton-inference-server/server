@@ -29,7 +29,7 @@
 # Model Repository
 
 The Triton Inference Server serves models from one or more model
-repositories that are specified when the server is stated. While
+repositories that are specified when the server is started. While
 Triton is running, the models being served can be modified as
 described in [Model Management](model_management.md).
 
