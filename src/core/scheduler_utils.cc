@@ -70,48 +70,46 @@ CompareWithRequiredEqualInputs(
   for (const auto& pr : request->ImmutableInputs()) {
     const InferenceRequest::Input* input = pr.second;
     const auto itr = required_equal_inputs.find(input->Name());
-    if (itr != required_equal_inputs.end()) {
-      if (itr->second.first == nullptr) {
-        // The current request contains input that is not in the first request.
+    if (itr == required_equal_inputs.end()) {
+      // The current request contains input that is not in the first request.
+      return false;
+    } else if (itr->second.first != nullptr) {
+      // Make sure shape of input tensors is equal.
+      if (!CompareDims(itr->second.first->Shape(), input->Shape())) {
         return false;
-      } else {
-        // Make sure shape of input tensors is equal.
-        if (!CompareDims(itr->second.first->Shape(), input->Shape())) {
+      }
+
+      // If necessary compare the contents as well...
+      if (itr->second.second) {
+        const auto& d1 = itr->second.first->Data();
+        const auto& d2 = input->Data();
+
+        // For now being conservative and assuming that content
+        // comparison is for shape tensors which are likely to always
+        // be in a single buffer.
+        if ((d1->BufferCount() != 1) || (d2->BufferCount() != 1)) {
           return false;
         }
 
-        // If necessary compare the contents as well...
-        if (itr->second.second) {
-          const auto& d1 = itr->second.first->Data();
-          const auto& d2 = input->Data();
+        size_t d1_byte_size, d2_byte_size;
+        TRITONSERVER_MemoryType d1_memory_type, d2_memory_type;
+        int64_t d1_memory_id, d2_memory_id;
+        const char* d1_buffer = d1->BufferAt(
+            0 /* idx */, &d1_byte_size, &d1_memory_type, &d1_memory_id);
+        const char* d2_buffer = d2->BufferAt(
+            0 /* idx */, &d2_byte_size, &d2_memory_type, &d2_memory_id);
 
-          // For now being conservative and assuming that content
-          // comparison is for shape tensors which are likely to always
-          // be in a single buffer.
-          if ((d1->BufferCount() != 1) || (d2->BufferCount() != 1)) {
-            return false;
-          }
+        // Tensor must be same size and in in CPU memory so that it
+        // can be easily compared. If not return false conservatively.
+        if ((d1_byte_size != d2_byte_size) || (d1_buffer == nullptr) ||
+            (d2_buffer == nullptr) ||
+            (d1_memory_type == TRITONSERVER_MEMORY_GPU) ||
+            (d2_memory_type == TRITONSERVER_MEMORY_GPU)) {
+          return false;
+        }
 
-          size_t d1_byte_size, d2_byte_size;
-          TRITONSERVER_MemoryType d1_memory_type, d2_memory_type;
-          int64_t d1_memory_id, d2_memory_id;
-          const char* d1_buffer = d1->BufferAt(
-              0 /* idx */, &d1_byte_size, &d1_memory_type, &d1_memory_id);
-          const char* d2_buffer = d2->BufferAt(
-              0 /* idx */, &d2_byte_size, &d2_memory_type, &d2_memory_id);
-
-          // Tensor must be same size and in in CPU memory so that it
-          // can be easily compared. If not return false conservatively.
-          if ((d1_byte_size != d2_byte_size) || (d1_buffer == nullptr) ||
-              (d2_buffer == nullptr) ||
-              (d1_memory_type == TRITONSERVER_MEMORY_GPU) ||
-              (d2_memory_type == TRITONSERVER_MEMORY_GPU)) {
-            return false;
-          }
-
-          if (strncmp(d1_buffer, d2_buffer, d1_byte_size) != 0) {
-            return false;
-          }
+        if (strncmp(d1_buffer, d2_buffer, d1_byte_size) != 0) {
+          return false;
         }
       }
     }
