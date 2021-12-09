@@ -67,7 +67,7 @@ if [ ${USE_TENSORFLOW} == "1" ]; then
         DATADIR="${TRITON_PATH}/models_${TEST_TYPE}_${TEST_FRAMEWORK}"
         rm -rf DATADIR
     done
-    python ${TEST_JSON_REPO}/simple-model.py \
+    python ${TEST_JSON_REPO}/simple_model.py \
         --name add_sub_model_tf1 \
         --model_type tensorflow \
         --tf_version 1 \
@@ -94,7 +94,7 @@ elif [ ${USE_PYTORCH} == "1" ]; then
         rm -rf DATADIR
     done
     # Pytorch
-    python ${TEST_JSON_REPO}/simple-model.py \
+    python ${TEST_JSON_REPO}/simple_model.py \
         --name add_sub_model_pyt \
         --model_type pytorch \
         --batch_size 1
@@ -165,7 +165,6 @@ for TEST_TYPE in $TEST_TYPES; do
     set -e
     kill_server
 done
-
 
 if [ $RET -eq 0 ]; then
   echo -e "\n***\n*** Test Passed\n***"

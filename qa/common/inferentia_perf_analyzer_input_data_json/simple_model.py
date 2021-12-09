@@ -27,7 +27,7 @@
 import argparse
 
 
-def genTorchModel(name, batch_size):
+def gen_pytorch_model(name, batch_size):
     class PyAddSubNet(nn.Module):
         """
         Simple AddSub network in PyTorch. This network outputs the sum and
@@ -53,13 +53,13 @@ def genTorchModel(name, batch_size):
     model_neuron.save('{}.pt'.format(name))
 
 
-def genTFModel(name, batch_size, tfVersion):
+def gen_tf_model(name, batch_size, tf_version):
     # Set up model directory
     model_dir ='add_sub_model'
     compiled_model_dir = name
     shutil.rmtree(model_dir, ignore_errors=True)
     shutil.rmtree(compiled_model_dir, ignore_errors=True)
-    if (tfVersion == 1):
+    if (tf_version == 1):
         with tf.Session() as sess:
             # Export SavedModel
             input0 = tf.placeholder(tf.int64,[None, 4], "INPUT__0")
@@ -81,11 +81,11 @@ def genTFModel(name, batch_size, tfVersion):
                                 compiled_model_dir,
                                 batch_size=batch_size,
                                 dynamic_batch_size=True)
-    elif (tfVersion == 2):
+    elif (tf_version == 2):
         # TODO: ADD tests for tensorflow2
         raise Exception("TensorFlow2 not yet supported")
     else:
-        raise Exception("Unrecognized Tensorflow version: {}".format(tfVersion))
+        raise Exception("Unrecognized Tensorflow version: {}".format(tf_version))
 
 
 if __name__ == '__main__':
@@ -118,10 +118,10 @@ if __name__ == '__main__':
         import tensorflow as tf
         import tensorflow.neuron as tfn
         print("name is {}".format(FLAGS.name))
-        genTFModel(FLAGS.name, FLAGS.batch_size, FLAGS.tf_version)
+        gen_tf_model(FLAGS.name, FLAGS.batch_size, FLAGS.tf_version)
     elif FLAGS.model_type == 'pytorch':
         import torch
         from torch import nn
         import torch_neuron
         print("name is {}".format(FLAGS.name))
-        genTorchModel(FLAGS.name, FLAGS.batch_size)
+        gen_pytorch_model(FLAGS.name, FLAGS.batch_size)
