@@ -187,7 +187,7 @@ VersionsToLoad(
   RETURN_IF_ERROR(GetDirectorySubdirs(model_path, &subdirs));
   std::set<int64_t, std::greater<int64_t>> existing_versions;
   for (const auto& subdir : subdirs) {
-    if (subdir == kWarmupDataFolder) {
+    if (subdir == kWarmupDataFolder || subdir == kInitialStateFolder) {
       continue;
     }
     if ((subdir.length() > 1) && (subdir.front() == '0')) {
