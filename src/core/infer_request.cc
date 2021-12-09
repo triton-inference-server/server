@@ -672,7 +672,6 @@ InferenceRequest::Normalize()
 
     auto& input = pr.second;
     auto shape = input.MutableShape();
-    input.SetIsOptional(input_config->optional());
 
     if (input.DType() != input_config->data_type()) {
       return Status(

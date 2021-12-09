@@ -86,10 +86,6 @@ class InferenceRequest {
     const std::vector<int64_t>& Shape() const { return shape_; }
     std::vector<int64_t>* MutableShape() { return &shape_; }
 
-    // [FIXME] not needed?
-    bool IsOptional() const { return optional_; }
-    void SetIsOptional(const bool is_optional) { optional_ = is_optional; }
-
     // FIXME. Should not need these functions. All shapes kept here
     // should include the batch dimension instead of breaking the same
     // into batch + shape.
