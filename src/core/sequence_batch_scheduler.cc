@@ -170,7 +170,6 @@ SequenceBatchScheduler::GenerateInitialStateData(
     const inference::ModelSequenceBatching_InitialState& initial_state,
     const inference::ModelSequenceBatching_State& state, TritonModel* model)
 {
-  std::cout << "Generating initial state for data!!!!" << std::endl;
   if (initial_state.data_type() != state.data_type()) {
     return Status(
         Status::Code::INVALID_ARG,
@@ -235,8 +234,6 @@ SequenceBatchScheduler::GenerateInitialStateData(
           JoinPath({model->LocalizedModelPath(), kInitialStateFolder,
                     (initial_state.data_file())}),
           file_input));
-      std::cout << "File input size is " << file_input->size() << std::endl;
-      std::cout << "Total byte size is " << total_byte_size << std::endl;
       if (initial_state.data_type() == inference::DataType::TYPE_STRING) {
         total_byte_size = file_input->size();
       } else if (total_byte_size > file_input->size()) {
