@@ -110,8 +110,8 @@ if [ "$SERVER_PID" != "0" ]; then
     wait $SERVER_PID
 else
     ERROR_MESSAGE="unable to autofill for 'scalar_model': the rank of model tensor 'x' is 0 which is not supported"
-    if [[ $(cat $SERVER_LOG | grep ${ERROR_MESSAGE} | wc -l) -ne 2 ]]; then
-        echo -e "\n***\n*** Test Failed: ${ERROR_MESSAGE} not found\n***"
+    if [[ $(cat $SERVER_LOG | grep "${ERROR_MESSAGE}" | wc -l) -ne 2 ]]; then
+        echo -e "\n***\n*** Test Failed: "${ERROR_MESSAGE}" not found\n***"
         RET=1
     fi
 fi
