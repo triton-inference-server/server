@@ -504,20 +504,37 @@ def backend_cmake_args(images, components, be, install_dir, library_paths):
 
 
 def pytorch_cmake_args(images):
-    if "pytorch" in images:
-        image = images["pytorch"]
-    else:
-        image = 'nvcr.io/nvidia/pytorch:{}-py3'.format(
-            FLAGS.upstream_container_version)
-    cargs = [
-        cmake_backend_arg('pytorch', 'TRITON_PYTORCH_DOCKER_IMAGE', None,
-                          image),
-    ]
 
-    if FLAGS.enable_gpu:
-        cargs.append(
-            cmake_backend_enable('pytorch', 'TRITON_PYTORCH_ENABLE_TORCHTRT',
-                                 True))
+    # If platform is jetpack do not use docker based build
+    if target_platform() == 'jetpack':
+        pt_lib_path = library_paths['pytorch'] + "/lib"
+        pt_include_paths = ""
+        for suffix in [
+                'include/torch', 'include/torch/torch/csrc/api/include',
+                'include/torchvision'
+        ]:
+            pt_include_paths += library_paths['pytorch'] + '/' + suffix + ';'
+        cargs = [
+            cmake_backend_arg('pytorch', 'TRITON_PYTORCH_INCLUDE_PATHS', None,
+                              pt_include_paths),
+            cmake_backend_arg('pytorch', 'TRITON_PYTORCH_LIB_PATHS', None,
+                              pt_lib_path),
+        ]
+    else:
+        if "pytorch" in images:
+            image = images["pytorch"]
+        else:
+            image = 'nvcr.io/nvidia/pytorch:{}-py3'.format(
+                FLAGS.upstream_container_version)
+        cargs = [
+            cmake_backend_arg('pytorch', 'TRITON_PYTORCH_DOCKER_IMAGE', None,
+                              image),
+        ]
+
+        if FLAGS.enable_gpu:
+            cargs.append(
+                cmake_backend_enable('pytorch',
+                                     'TRITON_PYTORCH_ENABLE_TORCHTRT', True))
     return cargs
 
 
