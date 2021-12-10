@@ -1019,6 +1019,20 @@ CommonHandler::SetUpAllRequests()
                   ->set_ns(ucnt);
             }
 
+            {
+              triton::common::TritonJson::Value cache_hit_json;
+              err = infer_stats_json.MemberAsObject("cache_hit", &cache_hit_json);
+              GOTO_IF_ERR(err, earlyexit);
+
+              err = cache_hit_json.MemberAsUInt("count", &ucnt);
+              GOTO_IF_ERR(err, earlyexit);
+              statistics->mutable_inference_stats()
+                  ->mutable_cache_hit()
+                  ->set_count(ucnt);
+              err = cache_hit_json.MemberAsUInt("ns", &ucnt);
+              GOTO_IF_ERR(err, earlyexit);
+              statistics->mutable_inference_stats()->mutable_cache_hit()->set_ns(ucnt);
+            }
 
             triton::common::TritonJson::Value batches_json;
             err = model_stat.MemberAsArray("batch_stats", &batches_json);
