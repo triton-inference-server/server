@@ -32,8 +32,8 @@ from multiprocessing import Process, shared_memory
 import time
 import test_util as tu
 import argparse
-import tritongrpcclient as grpcclient
-from tritonclientutils import np_to_triton_dtype
+import tritonclient.grpc as grpcclient
+from tritonclient.utils import np_to_triton_dtype
 
 
 def crashing_client(model_name,

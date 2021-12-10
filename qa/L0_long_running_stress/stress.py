@@ -39,7 +39,7 @@ import threading
 import traceback
 import numpy as np
 from functools import partial
-import tritongrpcclient as grpcclient
+import tritonclient.grpc as grpcclient
 import prettytable
 
 FLAGS = None
