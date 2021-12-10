@@ -51,7 +51,6 @@ class OptionalInputTest(tu.TestResultCollector):
 
         # The helper client for setup will be GRPC for simplicity.
         self.triton_client_ = grpcclient.InferenceServerClient("localhost:8001")
-        self.dtype_ = np.float32
         self.model_name_ = 'identity_2_float32'
         self.tensor_shape_ = (1, 1)
         self.inputs_ = {
@@ -59,11 +58,11 @@ class OptionalInputTest(tu.TestResultCollector):
             "INPUT1": grpcclient.InferInput('INPUT1', [1, 1], "FP32")
         }
         self.input_data_ = {
-            "INPUT0": np.ones(shape=(1, 1), dtype=np.fp32),
-            "INPUT1": np.zeros(shape=(1, 1), dtype=np.fp32)
+            "INPUT0": np.ones(shape=(1, 1), dtype=np.float32),
+            "INPUT1": np.zeros(shape=(1, 1), dtype=np.float32)
         }
         self.inputs_["INPUT0"].set_data_from_numpy(self.input_data_["INPUT0"])
-        self.inputs_["INPUT1"].set_data_from_numpy(self.input_data_["INPUT0"])
+        self.inputs_["INPUT1"].set_data_from_numpy(self.input_data_["INPUT1"])
         self.outputs_ = {
             "INPUT0": grpcclient.InferRequestedOutput('OUTPUT0'),
             "INPUT1": grpcclient.InferRequestedOutput('OUTPUT1')
@@ -104,10 +103,10 @@ class OptionalInputTest(tu.TestResultCollector):
                 self.assertTrue(
                     np.array_equal(output_data, expected),
                     "{}, {}, expected: {}, got {}".format(
-                        model_name, output_name, expected, output_data))
+                        self.model_name_, output_name, expected, output_data))
 
-            lt_ms = thresholds[0]
-            gt_ms = thresholds[1]
+            gt_ms = thresholds[0]
+            lt_ms = thresholds[1]
             if lt_ms is not None:
                 self.assertTrue(
                     (end_ms - start_ms) < lt_ms,
@@ -172,12 +171,10 @@ class OptionalInputTest(tu.TestResultCollector):
             threads = []
             threads.append(
                 threading.Thread(target=self.check_response,
-                                 args=(self, (4000, None)),
-                                 kwargs={}))
+                                 args=((4000, None),)))
             threads.append(
                 threading.Thread(target=self.check_response,
-                                 args=(self, (4000, None)),
-                                 kwargs={}))
+                                 args=((4000, None),)))
             threads[0].start()
             threads[1].start()
             for t in threads:
@@ -195,11 +192,11 @@ class OptionalInputTest(tu.TestResultCollector):
             threads = []
             threads.append(
                 threading.Thread(target=self.check_response,
-                                 args=(self, (4000, None)),
+                                 args=((4000, None),),
                                  kwargs={'provided_inputs': ("INPUT1",)}))
             threads.append(
                 threading.Thread(target=self.check_response,
-                                 args=(self, (4000, None)),
+                                 args=((4000, None),),
                                  kwargs={'provided_inputs': ("INPUT1",)}))
             threads[0].start()
             threads[1].start()
@@ -219,20 +216,20 @@ class OptionalInputTest(tu.TestResultCollector):
             threads = []
             threads.append(
                 threading.Thread(target=self.check_response,
-                                 args=(self, (0, 4000)),
+                                 args=((0, 4000),),
                                  kwargs={'provided_inputs': ("INPUT0",)}))
             threads.append(
                 threading.Thread(target=self.check_response,
-                                 args=(self, (0, 4000)),
+                                 args=((0, 4000),),
                                  kwargs={'provided_inputs': ("INPUT1",)}))
 
             threads.append(
                 threading.Thread(target=self.check_response,
-                                 args=(self, (0, 4000)),
+                                 args=((0, 4000),),
                                  kwargs={'provided_inputs': ("INPUT0",)}))
             threads.append(
                 threading.Thread(target=self.check_response,
-                                 args=(self, (4000, None)),
+                                 args=((4000, None),),
                                  kwargs={'provided_inputs': ("INPUT1",)}))
             for t in threads:
                 t.start()
@@ -254,21 +251,18 @@ class OptionalInputTest(tu.TestResultCollector):
             threads = []
             threads.append(
                 threading.Thread(target=self.check_response,
-                                 args=(self, (0, 4000)),
+                                 args=((0, 4000),),
                                  kwargs={'provided_inputs': ("INPUT0",)}))
             threads.append(
-                threading.Thread(target=self.check_response,
-                                 args=(self, (0, 4000)),
-                                 kwargs={}))
+                threading.Thread(target=self.check_response, args=((0, 4000),)))
 
             threads.append(
                 threading.Thread(target=self.check_response,
-                                 args=(self, (0, 4000)),
+                                 args=((0, 4000),),
                                  kwargs={'provided_inputs': ("INPUT0",)}))
             threads.append(
                 threading.Thread(target=self.check_response,
-                                 args=(self, (4000, None)),
-                                 kwargs={}))
+                                 args=((4000, None),)))
             for t in threads:
                 t.start()
                 time.sleep(0.5)

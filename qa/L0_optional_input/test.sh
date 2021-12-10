@@ -28,7 +28,7 @@
 export CUDA_VISIBLE_DEVICES=0
 
 TEST_PY=./optional_input_test.py
-TEST_LOG="./client.log"
+TEST_LOG="./test.log"
 TEST_RESULT_FILE='test_results.txt'
 
 SERVER=/opt/tritonserver/bin/tritonserver
@@ -38,7 +38,7 @@ source ../common/util.sh
 
 rm -fr *.log
 
-mkdir -p ./models/custom_zero_1_float32/1
+mkdir -p ./models/identity_2_float32/1
 
 # Basic test cases
 TEST_CASES=${TEST_CASES:="test_all_inputs \
@@ -63,7 +63,6 @@ for i in $TEST_CASES ; do
     python $TEST_PY OptionalInputTest.$i >>$TEST_LOG 2>&1
     if [ $? -ne 0 ]; then
         echo -e "\n***\n*** Test Failed\n***"
-        cat $TEST_LOG
         RET=1
     else
         check_test_results $TEST_RESULT_FILE 1
@@ -83,7 +82,7 @@ if [ $RET -eq 0 ]; then
   echo -e "\n***\n*** Test Passed\n***"
 else
     cat $SERVER_LOG
-    cat $CLIENT_LOG
+    cat $TEST_LOG
     echo -e "\n***\n*** Test FAILED\n***"
 fi
 

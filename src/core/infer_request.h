@@ -201,7 +201,6 @@ class InferenceRequest {
     std::vector<int64_t> shape_with_batch_dim_;
     bool is_shape_tensor_;
     std::shared_ptr<Memory> data_;
-    bool optional_;
 
     bool has_host_policy_specific_data_;
     // A map of host policy to input data memory

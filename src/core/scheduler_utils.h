@@ -40,10 +40,11 @@ using RequiredEqualInputs = std::unordered_map<
 Status InitRequiredEqualInputs(
     const std::unique_ptr<InferenceRequest>& request,
     const std::unordered_map<std::string, bool>& enforce_equal_shape_tensors,
-    RequiredEqualInputs* required_equal_inputs);
+    const bool has_optional_input, RequiredEqualInputs* required_equal_inputs);
 
 bool CompareWithRequiredEqualInputs(
     const std::unique_ptr<InferenceRequest>& request,
+    const bool has_optional_input,
     const RequiredEqualInputs& required_equal_inputs);
 
 //
