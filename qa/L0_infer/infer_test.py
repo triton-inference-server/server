@@ -45,8 +45,9 @@ USE_GRPC = (os.environ.get('USE_GRPC', 1) != "0")
 USE_HTTP = (os.environ.get('USE_HTTP', 1) != "0")
 assert USE_GRPC or USE_HTTP, "USE_GRPC or USE_HTTP must be non-zero"
 
-BACKENDS = os.environ.get('BACKENDS',
-                          "graphdef savedmodel onnx libtorch plan python python_dlpack openvino")
+BACKENDS = os.environ.get(
+    'BACKENDS',
+    "graphdef savedmodel onnx libtorch plan python python_dlpack openvino")
 ENSEMBLES = bool(int(os.environ.get('ENSEMBLES', 1)))
 
 np_dtype_string = np.dtype(object)
@@ -193,17 +194,25 @@ class InferTest(tu.TestResultCollector):
         if tu.validate_for_libtorch_model(input_dtype, output0_dtype,
                                           output1_dtype, (input_size,),
                                           (input_size,), (input_size,)):
-            for prefix in ensemble_prefix:
-                if 'libtorch' in BACKENDS:
-                    _infer_exact_helper(self,
-                                        prefix + 'libtorch', (input_size,),
-                                        8,
-                                        input_dtype,
-                                        output0_dtype,
-                                        output1_dtype,
-                                        output0_raw=output0_raw,
-                                        output1_raw=output1_raw,
-                                        swap=swap)
+            # Due to PyTorch bug
+            # https://github.com/pytorch/pytorch/issues/66930 we can't
+            # run this test with int8 input and int32 outputs.
+            if ((input_dtype == np.int8) and (output0_dtype == np.int32) and
+                (output1_dtype == np.int32)):
+                print('skipping pytorch test for int8_int32_int32')
+            else:
+                for prefix in ensemble_prefix:
+                    if 'libtorch' in BACKENDS:
+                        _infer_exact_helper(self,
+                                            prefix + 'libtorch', (input_size,),
+                                            8,
+                                            input_dtype,
+                                            output0_dtype,
+                                            output1_dtype,
+                                            output0_raw=output0_raw,
+                                            output1_raw=output1_raw,
+                                            swap=swap)
+
         for prefix in ensemble_prefix:
             if prefix != "":
                 continue
@@ -824,7 +833,9 @@ class InferTest(tu.TestResultCollector):
                         use_system_shared_memory=TEST_SYSTEM_SHARED_MEMORY,
                         use_cuda_shared_memory=TEST_CUDA_SHARED_MEMORY)
 
-        if all(x in BACKENDS for x in ['graphdef',]):
+        if all(x in BACKENDS for x in [
+                'graphdef',
+        ]):
 
             def test_ensemble_mix_batch_nobatch(self):
                 base_names = ["batch_to_nobatch", "nobatch_to_batch"]

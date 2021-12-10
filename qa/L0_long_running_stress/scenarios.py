@@ -26,11 +26,9 @@
 
 import math
 import sys
-from traceback import clear_frames
 sys.path.append("../common")
 
 import numpy as np
-from multiprocessing import Process, Value, shared_memory
 import time
 import test_util as tu
 import tritonclient.grpc as grpcclient
@@ -265,7 +263,8 @@ class PerfAnalyzerScenario(Scenario):
                 if dtype == np.float32:
                     res = float(res)
                 elif dtype == np.int32:
-                    res = res
+                    # Do nothing
+                    pass
                 elif dtype == np.dtype(object):
                     res = str(res)
                 output_data.append(

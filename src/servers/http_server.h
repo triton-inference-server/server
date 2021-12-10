@@ -245,6 +245,10 @@ class HTTPAPIServer : public HTTPServer {
       int64_t preferred_memory_type_id, void* userp, void** buffer,
       void** buffer_userp, TRITONSERVER_MemoryType* actual_memory_type,
       int64_t* actual_memory_type_id);
+  static TRITONSERVER_Error* OutputBufferQuery(
+      TRITONSERVER_ResponseAllocator* allocator, void* userp,
+      const char* tensor_name, size_t* byte_size,
+      TRITONSERVER_MemoryType* memory_type, int64_t* memory_type_id);
   static TRITONSERVER_Error* InferResponseFree(
       TRITONSERVER_ResponseAllocator* allocator, void* buffer,
       void* buffer_userp, size_t byte_size, TRITONSERVER_MemoryType memory_type,

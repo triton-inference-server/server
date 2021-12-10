@@ -319,9 +319,7 @@ class LifeCycleTest(tu.TestResultCollector):
                 self.assertFalse(triton_client.is_server_ready())
 
                 # one model uses sequence batcher while the other uses dynamic batcher
-                model_names = [
-                    "onnx_sequence_int32", "onnx_int32_int32_int32"
-                ]
+                model_names = ["onnx_sequence_int32", "onnx_int32_int32_int32"]
                 for model_name in model_names:
                     self.assertFalse(triton_client.is_model_ready(model_name))
 
@@ -1500,7 +1498,6 @@ class LifeCycleTest(tu.TestResultCollector):
         except Exception as ex:
             self.assertTrue(False, "unexpected error {}".format(ex))
 
-
     def test_model_control_ensemble(self):
         model_shape = (1, 16)
         onnx_name = tu.get_model_name('onnx', np.float32, np.float32,
@@ -1541,7 +1538,6 @@ class LifeCycleTest(tu.TestResultCollector):
         ], (1, 3),
                                    model_shape,
                                    swap=True)
-
 
         # Unload the ensemble with unload_dependents flag. all models should be unloaded
         try:
@@ -1590,13 +1586,10 @@ class LifeCycleTest(tu.TestResultCollector):
                     triton_client.is_model_ready(ensemble_name, "1"))
                 self.assertFalse(
                     triton_client.is_model_ready(ensemble_name, "3"))
-                self.assertTrue(
-                    triton_client.is_model_ready(onnx_name, "1"))
-                self.assertTrue(
-                    triton_client.is_model_ready(onnx_name, "3"))
+                self.assertTrue(triton_client.is_model_ready(onnx_name, "1"))
+                self.assertTrue(triton_client.is_model_ready(onnx_name, "3"))
         except Exception as ex:
             self.assertTrue(False, "unexpected error {}".format(ex))
-
 
     def test_load_same_model_different_platform(self):
         model_shape = (1, 16)

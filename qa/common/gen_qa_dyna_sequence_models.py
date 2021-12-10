@@ -25,9 +25,7 @@
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 import argparse
-from builtins import range
 import os
-import sys
 import numpy as np
 
 FLAGS = None
@@ -506,8 +504,6 @@ def create_plan_shape_tensor_modelfile(models_dir, model_version, max_batch,
     with open(model_version_dir + "/model.plan", "wb") as f:
         f.write(engine_bytes)
 
-    del builder
-
 
 def create_plan_fixed_modelfile(models_dir, model_version, max_batch, dtype,
                                 shape):
@@ -555,8 +551,6 @@ def create_plan_fixed_modelfile(models_dir, model_version, max_batch, dtype,
 
     with open(model_version_dir + "/model.plan", "wb") as f:
         f.write(engine_bytes)
-
-    del builder
 
 
 def create_plan_fixed_rf_modelfile(models_dir, model_version, max_batch, dtype,
@@ -629,8 +623,6 @@ def create_plan_fixed_rf_modelfile(models_dir, model_version, max_batch, dtype,
 
     with open(model_version_dir + "/model.plan", "wb") as f:
         f.write(engine_bytes)
-
-    del builder
 
 
 def create_plan_dynamic_modelfile(models_dir, model_version, max_batch, dtype,
@@ -723,8 +715,6 @@ def create_plan_dynamic_modelfile(models_dir, model_version, max_batch, dtype,
 
     with open(model_version_dir + "/model.plan", "wb") as f:
         f.write(engine_bytes)
-
-    del builder
 
 
 def create_plan_dynamic_rf_modelfile(models_dir, model_version, max_batch,
@@ -841,8 +831,6 @@ def create_plan_dynamic_rf_modelfile(models_dir, model_version, max_batch,
 
     with open(model_version_dir + "/model.plan", "wb") as f:
         f.write(engine_bytes)
-
-    del builder
 
 
 def create_plan_modelfile(models_dir, model_version, max_batch, dtype, shape):
@@ -1366,7 +1354,6 @@ instance_group [
         if max_batch > 0 else "", "int32" if dtype == np.int32 else "fp32",
         "int32" if dtype == np.int32 else "fp32",
         "int32" if dtype == np.int32 else "fp32", np_to_model_dtype(dtype),
-        tu.shape_to_dims_str(shape), np_to_model_dtype(dtype),
         tu.shape_to_dims_str(shape), np_to_model_dtype(dtype))
 
     try:
@@ -1381,7 +1368,9 @@ instance_group [
 def create_openvino_modelfile(models_dir, model_version, max_batch, dtype,
                               shape):
 
-    batch_dim = [] if max_batch == 0 else [max_batch,]
+    batch_dim = [] if max_batch == 0 else [
+        max_batch,
+    ]
     if not tu.validate_for_openvino_model(dtype, dtype, dtype,
                                           batch_dim + shape, batch_dim + shape,
                                           batch_dim + shape):
@@ -1418,7 +1407,9 @@ def create_openvino_modelfile(models_dir, model_version, max_batch, dtype,
 def create_openvino_modelconfig(models_dir, model_version, max_batch, dtype,
                                 shape):
 
-    batch_dim = [] if max_batch == 0 else [max_batch,]
+    batch_dim = [] if max_batch == 0 else [
+        max_batch,
+    ]
     if not tu.validate_for_openvino_model(dtype, dtype, dtype,
                                           batch_dim + shape, batch_dim + shape,
                                           batch_dim + shape):
@@ -1498,7 +1489,6 @@ instance_group [
         if max_batch > 0 else "", "int32" if dtype == np.int32 else "fp32",
         "int32" if dtype == np.int32 else "fp32",
         "int32" if dtype == np.int32 else "fp32", np_to_model_dtype(dtype),
-        tu.shape_to_dims_str(shape), np_to_model_dtype(dtype),
         tu.shape_to_dims_str(shape), np_to_model_dtype(dtype))
 
     try:
@@ -1633,7 +1623,7 @@ if __name__ == '__main__':
 
     if FLAGS.graphdef or FLAGS.savedmodel:
         import tensorflow as tf
-        from tensorflow.python.framework import graph_io, graph_util
+        from tensorflow.python.framework import graph_io
     if FLAGS.tensorrt or FLAGS.tensorrt_shape_io:
         import tensorrt as trt
     if FLAGS.onnx:
@@ -1642,7 +1632,7 @@ if __name__ == '__main__':
         import torch
         from torch import nn
     if FLAGS.openvino:
-        from openvino.inference_engine import IECore, IENetwork
+        from openvino.inference_engine import IENetwork
         import ngraph as ng
 
     import test_util as tu

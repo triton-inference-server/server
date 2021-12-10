@@ -98,6 +98,48 @@ set(
 )
 
 #
+# Query
+#
+set(
+  QUERY_TEST_SRCS
+  query_test.cc
+)
+
+set(
+  QUERY_TEST_HDRS
+)
+
+find_package(GTest REQUIRED)
+add_executable(
+  query_test
+  ${QUERY_TEST_SRCS}
+  ${QUERY_TEST_HDRS}
+)
+set_target_properties(
+  query_test
+  PROPERTIES
+    SKIP_BUILD_RPATH TRUE
+    BUILD_WITH_INSTALL_RPATH TRUE
+    INSTALL_RPATH_USE_LINK_PATH FALSE
+    INSTALL_RPATH ""
+)
+target_include_directories(query_test PRIVATE ${GTEST_INCLUDE_DIR})
+target_link_libraries(
+  query_test
+  PRIVATE triton-common-async-work-queue  # from repo-common
+  PRIVATE triton-common-error             # from repo-common
+  PRIVATE triton-core-serverapi           # from repo-core
+  PRIVATE triton-core-serverstub
+  PRIVATE ${GTEST_LIBRARY}
+  PRIVATE ${GTEST_MAIN_LIBRARY}
+  )
+
+install(
+  TARGETS query_test
+  RUNTIME DESTINATION bin
+)
+
+#
 # Memory
 #
 set(
@@ -403,7 +445,6 @@ set(
   ../core/filesystem.cc
   ../core/model_config_utils.cc
   ../core/model_config.cc
-  ../core/autofill.cc
 )
 
 set(
@@ -492,4 +533,5 @@ install(
 add_subdirectory(sequence sequence)
 add_subdirectory(dyna_sequence dyna_sequence)
 add_subdirectory(distributed_addsub distributed_addsub)
+add_subdirectory(query_backend query_backend)
 add_subdirectory(repoagent/relocation_repoagent repoagent/relocation_repoagent)

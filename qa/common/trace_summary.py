@@ -28,7 +28,6 @@
 
 import argparse
 import json
-import sys
 
 FLAGS = None
 

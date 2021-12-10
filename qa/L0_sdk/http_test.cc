@@ -33,10 +33,11 @@ int
 main(int argc, char* argv[])
 {
   std::unique_ptr<tc::InferenceServerHttpClient> client;
-  tc::Error err = tc::InferenceServerHttpClient::Create(&client, "localhost:8000");
+  tc::Error err =
+      tc::InferenceServerHttpClient::Create(&client, "localhost:8000");
   if (!err.IsOk()) {
-    std::cerr << "InferenceServerHttpClient::Create failed: "
-              << err.Message() << std::endl;
+    std::cerr << "InferenceServerHttpClient::Create failed: " << err.Message()
+              << std::endl;
     return 1;
   }
 

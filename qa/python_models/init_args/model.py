@@ -29,6 +29,7 @@ import triton_python_backend_utils as pb_utils
 
 
 class TritonPythonModel:
+
     def initialize(self, args):
         self.args = args
         if args['model_name'] != 'init_args' or args[
@@ -55,7 +56,7 @@ class TritonPythonModel:
                 correct_keys += 1
 
         responses = []
-        for request in requests:
+        for _ in requests:
             out_args = pb_utils.Tensor(
                 "OUT", np.array([correct_keys], dtype=np.float32))
             responses.append(pb_utils.InferenceResponse([out_args]))

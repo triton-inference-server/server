@@ -93,7 +93,7 @@ Changes to the model repository may not be detected immediately
 because Triton polls the repository periodically. You can control the
 polling interval with the --repository-poll-secs option. The console
 log or the [model ready
-protocol](https://github.com/kubeflow/kfserving/blob/master/docs/predict-api/v2/required_api.md)
+protocol](https://github.com/kserve/kserve/blob/master/docs/predict-api/v2/required_api.md)
 or the index operation of the [model control
 protocol](protocol/extension_model_repository.md) can be used to
 determine when model repository changes have taken effect.
@@ -155,7 +155,6 @@ how Triton is using that model. The state of a model can be determined
 by using the [model
 metadata](inference_protocols.md#inference-protocols-and-apis) or
 [repository index](protocol/extension_model_repository.md#index) APIs.
-
 
 * If the model is actively loading or unloading, no files or
 directories within that sub-directory must be added, removed or

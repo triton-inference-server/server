@@ -48,7 +48,7 @@
 ##
 ############################################################################
 
-TRITON_VERSION=21.10
+TRITON_VERSION=21.11
 
 # ONNX. Use ONNX_OPSET 0 to use the default for ONNX version
 ONNX_VERSION=1.7.0
@@ -68,7 +68,7 @@ HOST_SRCDIR=/tmp/gen_srcdir
 HOST_DESTDIR=/tmp/$TRITON_VERSION/qa_model_repository
 HOST_VARDESTDIR=/tmp/$TRITON_VERSION/qa_variable_model_repository
 HOST_IDENTITYDESTDIR=/tmp/$TRITON_VERSION/qa_identity_model_repository
-HOST_SIGDEFDESTDIR=/tmp/$TRITON_VERSION/qa_tf_tag_sigdef_repository 
+HOST_SIGDEFDESTDIR=/tmp/$TRITON_VERSION/qa_tf_tag_sigdef_repository
 HOST_IDENTITYBIGDESTDIR=/tmp/$TRITON_VERSION/qa_identity_big_model_repository
 HOST_SHAPEDESTDIR=/tmp/$TRITON_VERSION/qa_shapetensor_model_repository
 HOST_RESHAPEDESTDIR=/tmp/$TRITON_VERSION/qa_reshape_model_repository
@@ -165,6 +165,10 @@ RAGGEDDESTDIR=/tmp/raggedmodels
 FORMATDESTDIR=/tmp/formatmodels
 
 # OPENVINO
+#
+# OpenVINO is not available on ARM so skip
+if [[ "aarch64" != $(uname -m) ]] ; then
+
 cat >$HOST_SRCDIR/$OPENVINOSCRIPT <<EOF
 #!/bin/bash
 set -e
@@ -224,6 +228,8 @@ if [ $? -ne 0 ]; then
     echo -e "Failed"
     exit 1
 fi
+
+fi # [[ "aarch64" != $(uname -m) ]]
 
 # ONNX
 cat >$HOST_SRCDIR/$ONNXSCRIPT <<EOF

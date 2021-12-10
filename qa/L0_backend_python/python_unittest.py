@@ -36,6 +36,7 @@ import os
 
 
 class PythonUnittest(tu.TestResultCollector):
+
     def test_python_unittest(self):
         model_name = os.environ['MODEL_NAME']
         with grpcclient.InferenceServerClient("localhost:8001") as client:
@@ -45,7 +46,7 @@ class PythonUnittest(tu.TestResultCollector):
 
             # The model returns 1 if the tests were sucessfully passed.
             # Otherwise, it will return 0.
-            self.assertTrue(output0 == [1])
+            self.assertEqual(output0, [1])
 
 
 if __name__ == '__main__':

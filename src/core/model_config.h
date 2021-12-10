@@ -1,4 +1,4 @@
-// Copyright (c) 2018-2019, NVIDIA CORPORATION. All rights reserved.
+// Copyright 2018-2021, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 //
 // Redistribution and use in source and binary forms, with or without
 // modification, are permitted provided that the following conditions
@@ -50,15 +50,6 @@ using HostPolicyCmdlineConfigMap =
 using BackendCmdlineConfig = std::vector<std::pair<std::string, std::string>>;
 using BackendCmdlineConfigMap =
     std::unordered_map<std::string, BackendCmdlineConfig>;
-
-/// The type from platform name to the backend configuration for that
-/// platform. The configuration is determined primarily by
-/// command-line options and is the same for every backend created for
-/// a given platform.
-struct BackendConfig {
-};
-using BackendConfigMap =
-    std::unordered_map<std::string, std::shared_ptr<BackendConfig>>;
 
 /// The value for a dimension in a shape that indicates that that
 /// dimension can take on any size.
@@ -198,12 +189,6 @@ int64_t GetByteSize(const inference::ModelInput& mio);
 /// \return The size, in bytes, of the corresponding tensor, or -1 if
 /// unable to determine the size.
 int64_t GetByteSize(const inference::ModelOutput& mio);
-
-/// Get the Platform value for a platform name.
-/// \param platform_name The platform name.
-/// \return The Platform or Platform::UNKNOWN if the platform string
-/// is not recognized.
-Platform GetPlatform(const std::string& platform_name);
 
 /// Get the BackendType value for a platform name.
 /// \param platform_name The platform name.

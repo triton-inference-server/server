@@ -50,9 +50,9 @@ class VertexAiTest(tu.TestResultCollector):
 
     def setUp(self):
         port = os.getenv('AIP_HTTP_PORT', '8080')
-        predict_endpoint = os.getenv('AIP_PREDICT_ROUTE', 'predict')
+        predict_endpoint = os.getenv('AIP_PREDICT_ROUTE', '/predict')
         self.model_ = os.getenv('TEST_EXPLICIT_MODEL_NAME', 'addsub')
-        self.url_ = "http://localhost:{}/{}".format(port, predict_endpoint)
+        self.url_ = "http://localhost:{}{}".format(port, predict_endpoint)
         self.input_data_ = [
             0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15
         ]

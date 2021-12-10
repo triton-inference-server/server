@@ -33,7 +33,6 @@ sys.path.append("../common")
 import unittest
 import numpy as np
 import test_util as tu
-import os
 import requests as httpreq
 
 from tritonclient.utils import *
@@ -41,6 +40,7 @@ import tritonclient.http as httpclient
 
 
 class PythonTest(tu.TestResultCollector):
+
     def _infer_help(self, model_name, shape, data_type):
         with httpclient.InferenceServerClient("localhost:8000") as client:
             input_data_0 = np.array(np.random.randn(*shape), dtype=data_type)
@@ -177,7 +177,7 @@ class PythonTest(tu.TestResultCollector):
             inputs[0].set_data_from_numpy(input_data)
             result = client.infer(model_name, inputs)
             output0 = result.as_numpy('OUTPUT0')
-            self.assertTrue(output0 is not None)
+            self.assertIsNotNone(output0)
             self.assertTrue(np.all(output0 == input_data))
 
     def test_infer_pytorch(self):
@@ -234,8 +234,8 @@ class PythonTest(tu.TestResultCollector):
                 inputs[0].set_data_from_numpy(input_data)
                 result = client.infer(model_name, inputs)
                 output0 = result.as_numpy('OUTPUT0')
-                self.assertTrue(output0 is not None)
-                self.assertTrue(output0[0] == input_data)
+                self.assertIsNotNone(output0)
+                self.assertEqual(output0[0], input_data)
 
     def test_string(self):
         model_name = "string_fixed"
@@ -251,13 +251,12 @@ class PythonTest(tu.TestResultCollector):
                 inputs[0].set_data_from_numpy(input_data)
                 result = client.infer(model_name, inputs)
                 output0 = result.as_numpy('OUTPUT0')
-                self.assertTrue(output0 is not None)
+                self.assertIsNotNone(output0)
 
                 if i % 2 == 0:
-                    self.assertTrue(output0[0] == input_data.astype(np.bytes_))
+                    self.assertEqual(output0[0], input_data.astype(np.bytes_))
                 else:
-                    self.assertTrue(output0.size == 0)
-
+                    self.assertEqual(output0.size, 0)
 
     def test_non_contiguous(self):
         model_name = 'non_contiguous'

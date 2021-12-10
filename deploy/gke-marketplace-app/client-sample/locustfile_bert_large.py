@@ -24,11 +24,10 @@
 # (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-import time
 from locust import HttpUser, task, between
 from locust import LoadTestShape
 import json
-from math import sin, pi
+
 
 class ProfileLoad(LoadTestShape):
     '''
@@ -38,12 +37,12 @@ class ProfileLoad(LoadTestShape):
     until time_limit is reached.
     '''
 
-    target_users   = 1000
-    step_users     = 50      # ramp users each step
-    time_limit     = 3600   # seconds
+    target_users = 1000
+    step_users = 50  # ramp users each step
+    time_limit = 3600  # seconds
 
     def tick(self):
-        num_steps = self.target_users/self.step_users
+        num_steps = self.target_users / self.step_users
         run_time = round(self.get_run_time())
 
         if run_time < self.time_limit:
@@ -51,9 +50,10 @@ class ProfileLoad(LoadTestShape):
                 user_count = num_steps * self.step_users
             else:
                 user_count = self.target_users
-            return (user_count,self.step_users)
+            return (user_count, self.step_users)
         else:
             return None
+
 
 class TritonUser(HttpUser):
     wait_time = between(0.2, 0.2)
@@ -61,12 +61,10 @@ class TritonUser(HttpUser):
     @task()
     def bert(self):
         response = self.client.post(self.url1, data=json.dumps(self.data))
-    
+
     def on_start(self):
         with open('bert_request.json') as f:
             self.data = json.load(f)
 
-        self.url1 = '{}/v2/models/{}/infer'.format(
-            self.environment.host,
-            'bert_large')
-
+        self.url1 = '{}/v2/models/{}/infer'.format(self.environment.host,
+                                                   'bert_large')

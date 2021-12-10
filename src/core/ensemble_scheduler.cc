@@ -1,4 +1,4 @@
-// Copyright (c) 2019-2021, NVIDIA CORPORATION. All rights reserved.
+// Copyright 2019-2021, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 //
 // Redistribution and use in source and binary forms, with or without
 // modification, are permitted provided that the following conditions
@@ -29,10 +29,10 @@
 #include "src/core/ensemble_scheduler.h"
 
 #include <mutex>
-#include "src/core/backend.h"
 #include "src/core/cuda_utils.h"
 #include "src/core/logging.h"
 #include "src/core/metrics.h"
+#include "src/core/model.h"
 #include "src/core/server.h"
 
 namespace nvidia { namespace inferenceserver {
@@ -237,6 +237,10 @@ class EnsembleContext {
       TRITONSERVER_ResponseAllocator* allocator, void* buffer,
       void* buffer_userp, size_t byte_size, TRITONSERVER_MemoryType memory_type,
       int64_t memory_type_id);
+  static TRITONSERVER_Error* OutputBufferQuery(
+      TRITONSERVER_ResponseAllocator* allocator, void* userp,
+      const char* tensor_name, size_t* byte_size,
+      TRITONSERVER_MemoryType* memory_type, int64_t* memory_type_id);
   static void RequestComplete(
       TRITONSERVER_InferenceRequest* request, const uint32_t flags,
       void* userp);
@@ -245,8 +249,7 @@ class EnsembleContext {
       void* userp);
 
   using StepList = std::vector<std::unique_ptr<Step>>;
-  using VersionMap =
-      std::unordered_map<int64_t, std::shared_ptr<InferenceBackend>>;
+  using VersionMap = std::unordered_map<int64_t, std::shared_ptr<Model>>;
 
   // Helper function to reshape the given tensor according to the
   // config shape and batching info and its actual shape and batching info.
@@ -316,7 +319,7 @@ class EnsembleContext {
   std::unordered_map<std::string, std::set<size_t>> pruned_tensor_to_step_;
   std::unordered_map<std::string, TensorData> tensor_data_;
 
-  // Handle to all backend that may be used in the ensemble
+  // Handle to all models that may be used in the ensemble
   std::unordered_map<std::string, VersionMap> handles_;
 
   // Request specific information that obtained from ensemble request and
@@ -354,7 +357,7 @@ EnsembleContext::EnsembleContext(
 
   auto& lrequest = request_tracker_->Request();
 
-  // Obtain backend handles of all models in ensemble request such that
+  // Obtain model handles of all models in ensemble request such that
   // they have the same lifetime as the ensemble request to avoid unloading
   // while the ensemble is executing.
   for (const auto& step_info : info_->steps_) {
@@ -365,14 +368,14 @@ EnsembleContext::EnsembleContext(
     }
     auto ver_it = it->second.find(step_info.model_version_);
     if (ver_it == it->second.end()) {
-      std::shared_ptr<InferenceBackend> backend = nullptr;
-      ensemble_status_ = is_->GetInferenceBackend(
-          step_info.model_name_, step_info.model_version_, &backend);
+      std::shared_ptr<Model> model = nullptr;
+      ensemble_status_ = is_->GetModel(
+          step_info.model_name_, step_info.model_version_, &model);
       if (!ensemble_status_.IsOk()) {
         break;
       }
 
-      it->second.emplace(std::make_pair(step_info.model_version_, backend));
+      it->second.emplace(std::make_pair(step_info.model_version_, model));
     }
   }
 
@@ -474,6 +477,10 @@ EnsembleContext::EnsembleContext(
   TRITONSERVER_ResponseAllocator* allocator;
   TRITONSERVER_Error* err = TRITONSERVER_ResponseAllocatorNew(
       &allocator, ResponseAlloc, ResponseRelease, nullptr /* start_fn */);
+  if (err == nullptr) {
+    err = TRITONSERVER_ResponseAllocatorSetQueryFunction(
+        allocator, OutputBufferQuery);
+  }
   if (err != nullptr) {
     ensemble_status_ = Status(
         TritonCodeToStatusCode(TRITONSERVER_ErrorCode(err)),
@@ -533,6 +540,16 @@ EnsembleContext::ResponseRelease(
 
   // Don't do anything when releasing a buffer since ResponseAlloc
   // passes the ownership of the data to ensemble context.
+  return nullptr;  // Success
+}
+
+TRITONSERVER_Error*
+EnsembleContext::OutputBufferQuery(
+    TRITONSERVER_ResponseAllocator* allocator, void* userp,
+    const char* tensor_name, size_t* byte_size,
+    TRITONSERVER_MemoryType* memory_type, int64_t* memory_type_id)
+{
+  // Ensemble will always attempt to satisfy any output buffer request
   return nullptr;  // Success
 }
 
@@ -827,12 +844,12 @@ EnsembleContext::InitStep(
 {
   const auto& istep = info_->steps_[step_idx];
   auto& version_map = handles_[istep.model_name_];
-  auto& backend = version_map[istep.model_version_];
+  auto& model = version_map[istep.model_version_];
 
-  const bool allow_batching = (backend->Config().max_batch_size() > 0);
+  const bool allow_batching = (model->Config().max_batch_size() > 0);
 
   auto irequest = std::unique_ptr<InferenceRequest>(
-      new InferenceRequest(backend, istep.model_version_));
+      new InferenceRequest(model, istep.model_version_));
 
   // Store the pointers to tensors used so that we can prune them afterward.
   // Can't prune the tensor in the input loop below as it may be used by
@@ -851,7 +868,7 @@ EnsembleContext::InitStep(
     // If the actual shape and config shape agree with each other without
     // considering batch size, non-batch / batch conversion are not required.
     const inference::ModelInput* input_config;
-    backend->GetInput(pair.first, &input_config);
+    model->GetInput(pair.first, &input_config);
     auto shape = ReshapeTensorDims(
         input_config->dims(), allow_batching, tensor_data.batch_size_,
         tensor.data_->OriginalShape());

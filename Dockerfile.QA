@@ -111,6 +111,9 @@ RUN mkdir -p qa/common && \
     cp /tmp/tritonbuild/tritonserver/build/test-util/install/bin/pinned_memory_manager_test qa/L0_memory/. && \
     cp /tmp/tritonbuild/tritonserver/build/test-util/install/bin/triton_repo_agent_test qa/L0_triton_repo_agent/. && \
     cp /tmp/tritonbuild/tritonserver/build/test-util/install/lib/libtritonrepoagent_relocation.so qa/L0_triton_repo_agent/. && \
+    mkdir qa/L0_query/models/query/1 && \
+    cp /tmp/tritonbuild/tritonserver/build/test-util/install/backends/query/libtriton_query.so qa/L0_query/models/query/1/. && \
+    cp /tmp/tritonbuild/tritonserver/build/test-util/install/bin/query_test qa/L0_query/. && \
     cp /tmp/tritonbuild/tritonserver/build/test-util/install/bin/async_work_queue_test qa/L0_async_work_queue/. && \
     mkdir qa/L0_data_compression/models && \
     cp -r /workspace/docs/examples/model_repository/simple qa/L0_data_compression/models && \
@@ -165,6 +168,8 @@ RUN cp /tmp/tritonbuild/identity/install/backends/identity/libtriton_identity.so
     cp -r qa/L0_infer/. qa/L0_infer_valgrind && \
     mkdir -p qa/L0_infer_tf2 && \
     cp -r qa/L0_infer/. qa/L0_infer_tf2 && \
+    mkdir -p qa/L0_tf_image_models_tf2 && \
+    cp -r qa/L0_tf_image_models/. qa/L0_tf_image_models_tf2 && \
     mkdir -p qa/L0_trt_shape_tensors_shm && \
     cp -r qa/L0_trt_shape_tensors/. qa/L0_trt_shape_tensors_shm && \
     mkdir -p qa/L0_trt_shape_tensors_cudashm && \

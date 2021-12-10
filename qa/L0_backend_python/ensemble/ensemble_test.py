@@ -35,6 +35,7 @@ import unittest
 
 
 class EnsembleTest(tu.TestResultCollector):
+
     def test_ensemble(self):
         model_name = "ensemble"
         shape = [16]
@@ -78,6 +79,7 @@ class EnsembleTest(tu.TestResultCollector):
 
             self.assertTrue(np.allclose(output0, 2 * input_data_0))
             self.assertTrue(np.allclose(output1, 2 * input_data_1))
+
 
 if __name__ == '__main__':
     unittest.main()

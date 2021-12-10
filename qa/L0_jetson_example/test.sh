@@ -32,7 +32,7 @@ unzip pruned_v2.1.zip -d concurrency_and_dynamic_batching/tao/models/peoplenet &
 wget --content-disposition https://developer.nvidia.com/jp46-20210820t231431z-001zip -O jp4.6-20210820T231431Z-001.zip
 unzip jp4.6-20210820T231431Z-001.zip && rm jp4.6-20210820T231431Z-001.zip
 
-cp jp4.6/tao-converter concurrency_and_dynamic_batching/tao/tao-converter && rm -rf jp4.6
+cp tao-converter-jp46-trt8.0.1.6/tao-converter concurrency_and_dynamic_batching/tao/tao-converter && rm -rf jp4.6
 chmod 777 concurrency_and_dynamic_batching/tao/tao-converter
 
 (cd concurrency_and_dynamic_batching/tao && bash convert_peoplenet.sh)
