@@ -323,7 +323,7 @@ done
     
 if [ "$INITIAL_STATE_FILE" == "1" ]; then
   # Create the input_state_data file.
-  rm input_state_data
+  rm -rf input_state_data
   echo -n -e \\x64\\x00\\x00\\x00 > input_state_data
 fi
 
