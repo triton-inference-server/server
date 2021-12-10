@@ -126,7 +126,8 @@ $inference_stats =
   "queue" : $duration_stat,
   "compute_input" : $duration_stat,
   "compute_infer" : $duration_stat,
-  "compute_output" : $duration_stat
+  "compute_output" : $duration_stat,
+  "cache_hit": $duration_stat
 }
 ```
 
@@ -151,6 +152,11 @@ $inference_stats =
   output tensor data produced by the model framework / backend. For
   example, this duration should include the time to copy output tensor
   data from the GPU.
+
+- "cache_hit" : The count of response cache hits and cumulative duration to
+  lookup and extract output tensor data from the Response Cache on a cache hit.
+  For example, this duration should include the time to copy output tensor data
+  from the Response Cache to the response object.
 
 ```
 $batch_stats =
