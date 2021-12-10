@@ -95,7 +95,7 @@ $model_stat =
   single inference request with batch size 64, "inference_count" will
   be incremented by 64. Similarly, if a clients sends 64 individual
   requests each with batch size 1, "inference_count" will be
-  incremented by 64.
+  incremented by 64. This DOES NOT include cache hits.
 
 - "execution_count" : The cumulative count of the number of successful
   inference executions performed for the model. When dynamic batching
@@ -106,7 +106,7 @@ $model_stat =
   "execution_count" will be incremented by 1. If, on the other hand,
   the dynamic batcher is not enabled for that each of the 64
   individual requests is executed independently, then
-  "execution_count" will be incremented by 64.
+  "execution_count" will be incremented by 64. This DOES NOT include cache hits.
 
 - "inference_stats" : The aggregate statistics for the
   model/version. So, for example, "inference_stats":"success"
@@ -132,26 +132,26 @@ $inference_stats =
 ```
 
 - “success” : The count and cumulative duration for all successful
-  inference requests.
+  inference requests. This includes cache hits.
 
 - “fail” : The count and cumulative duration for all failed inference
   requests.
 
 - “queue” : The count and cumulative duration that inference requests
-  wait in scheduling or other queues.
+  wait in scheduling or other queues. This includes cache hits.
 
 - “compute_input” : The count and cumulative duration to prepare input
   tensor data as required by the model framework / backend. For
   example, this duration should include the time to copy input tensor
-  data to the GPU.
+  data to the GPU. This DOES NOT include cache hits.
 
 - “compute_infer” : The count and cumulative duration to execute the
-  model.
+  model. This DOES NOT include cache hits.
 
 - “compute_output” : The count and cumulative duration to extract
   output tensor data produced by the model framework / backend. For
   example, this duration should include the time to copy output tensor
-  data from the GPU.
+  data from the GPU. This DOES NOT include cache hits.
 
 - "cache_hit" : The count of response cache hits and cumulative duration to
   lookup and extract output tensor data from the Response Cache on a cache hit.
@@ -290,7 +290,7 @@ message ModelStatistics
   // inference request with batch size 64, "inference_count" will be
   // incremented by 64. Similarly, if a clients sends 64 individual
   // requests each with batch size 1, "inference_count" will be
-  // incremented by 64.
+  // incremented by 64. This DOES NOT include cache hits.
   uint64 inference_count = 4;
 
   // The cumulative count of the number of successful inference executions
@@ -302,6 +302,7 @@ message ModelStatistics
   // incremented by 1. If, on the other hand, the dynamic batcher is not
   // enabled for that each of the 64 individual requests is executed
   // independently, then "execution_count" will be incremented by 64.
+  // This DOES NOT include cache hits.
   uint64 execution_count = 5;
 
   // The aggregate statistics for the model/version.
@@ -317,28 +318,38 @@ message ModelStatistics
 // Inference statistics.
 message InferStatistics
 {
-  // Cumulative count and duration for successful inference requests,
+  // Cumulative count and duration for successful inference requests. This
+  // includes cache hits.
   StatisticDuration success = 1;
 
-  // Cumulative count and duration for failed inference requests,
+  // Cumulative count and duration for failed inference requests.
   StatisticDuration fail = 2;
 
   // The count and cumulative duration that inference requests wait in
-  // scheduling or other queues.
+  // scheduling or other queues. This includes cache hits.
   StatisticDuration queue = 3;
 
   // The count and cumulative duration to prepare input tensor data as
   // required by the model framework / backend. For example, this duration
-  // should include the time to copy input tensor data to the GPU.
+  // should include the time to copy input tensor data to the GPU. This DOES
+  // NOT include cache hits.
   StatisticDuration compute_input = 4;
 
-  // The count and cumulative duration to execute the model.
+  // The count and cumulative duration to execute the model. This DOES NOT
+  // include cache hits.
   StatisticDuration compute_infer = 5;
 
   // The count and cumulative duration to extract output tensor data
   // produced by the model framework / backend. For example, this duration
-  // should include the time to copy output tensor data from the GPU.
+  // should include the time to copy output tensor data from the GPU. This
+  // DOES NOT include cache hits.
   StatisticDuration compute_output = 6;
+
+  // The count of response cache hits and cumulative duration to lookup and
+  // extract output tensor data from the Response Cache on a cache hit. For
+  // example, this duration should include the time to copy output tensor data
+  // from the Response Cache to the response object.
+  StatisticDuration cache_hit = 7;
 }
 
 // Inference batch statistics.
