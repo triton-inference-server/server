@@ -124,6 +124,9 @@ class PerfAnalyzerScenario(Scenario):
                                              self.concurrency_range_[2])
 
             arg_list = [PerfAnalyzerScenario.command_]
+            # Always use GRPC streaming feature to ensure requests are handled
+            # in order
+            arg_list += ["-i", "grpc", "--streaming"]
             arg_list += ["-m", "{}".format(self.model_name_)]
             arg_list += ["-b", "{}".format(self.batch_size_)]
             arg_list += [
