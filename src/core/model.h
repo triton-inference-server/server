@@ -44,7 +44,7 @@ class Model {
       const double min_compute_capability, const std::string& model_dir,
       const int64_t version, const inference::ModelConfig& config)
       : config_(config), min_compute_capability_(min_compute_capability),
-        version_(version), model_dir_(model_dir)
+        version_(version), required_input_count_(0), model_dir_(model_dir)
   {
   }
   virtual ~Model() {}
@@ -57,6 +57,9 @@ class Model {
 
   // Get the configuration of model being served.
   const inference::ModelConfig& Config() const { return config_; }
+
+  // Get the number of required inputs
+  size_t RequiredInputCount() const { return required_input_count_; }
 
   // Get the stats collector for the model being served.
   InferenceStatsAggregator* MutableStatsAggregator()
@@ -124,6 +127,8 @@ class Model {
 
   // Label provider for this model.
   std::shared_ptr<LabelProvider> label_provider_;
+
+  size_t required_input_count_;
 
   // Map from input name to the model configuration for that input.
   std::unordered_map<std::string, inference::ModelInput> input_map_;

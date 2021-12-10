@@ -36,7 +36,7 @@ Status
 InitRequiredEqualInputs(
     const std::unique_ptr<InferenceRequest>& request,
     const std::unordered_map<std::string, bool>& enforce_equal_shape_tensors,
-    RequiredEqualInputs* required_equal_inputs)
+    const bool has_optional_input, RequiredEqualInputs* required_equal_inputs)
 {
   required_equal_inputs->clear();
 
@@ -48,6 +48,13 @@ InitRequiredEqualInputs(
           std::piecewise_construct, std::forward_as_tuple(input->Name()),
           std::forward_as_tuple(input, itr->second));
     }
+    // When the model has optional inputs, overload 'required_equal_inputs'
+    // to track the inputs involved in the batch
+    else if (has_optional_input) {
+      required_equal_inputs->emplace(
+          std::piecewise_construct, std::forward_as_tuple(input->Name()),
+          std::forward_as_tuple(nullptr, false));
+    }
   }
 
   return Status::Success;
@@ -56,50 +63,63 @@ InitRequiredEqualInputs(
 bool
 CompareWithRequiredEqualInputs(
     const std::unique_ptr<InferenceRequest>& request,
+    const bool has_optional_input,
     const RequiredEqualInputs& required_equal_inputs)
 {
+  // If current request has different number of inputs, then dynamic batching
+  // shouldn't be applied.
+  if (has_optional_input &&
+      (request->ImmutableInputs().size() != required_equal_inputs.size())) {
+    return false;
+  }
   for (const auto& pr : request->ImmutableInputs()) {
     const InferenceRequest::Input* input = pr.second;
     const auto itr = required_equal_inputs.find(input->Name());
     if (itr != required_equal_inputs.end()) {
-      // Make sure shape of input tensors is equal.
-      if (!CompareDims(itr->second.first->Shape(), input->Shape())) {
-        return false;
+      if (itr->second.first != nullptr) {
+        // Make sure shape of input tensors is equal.
+        if (!CompareDims(itr->second.first->Shape(), input->Shape())) {
+          return false;
+        }
+
+        // If necessary compare the contents as well...
+        if (itr->second.second) {
+          const auto& d1 = itr->second.first->Data();
+          const auto& d2 = input->Data();
+
+          // For now being conservative and assuming that content
+          // comparison is for shape tensors which are likely to always
+          // be in a single buffer.
+          if ((d1->BufferCount() != 1) || (d2->BufferCount() != 1)) {
+            return false;
+          }
+
+          size_t d1_byte_size, d2_byte_size;
+          TRITONSERVER_MemoryType d1_memory_type, d2_memory_type;
+          int64_t d1_memory_id, d2_memory_id;
+          const char* d1_buffer = d1->BufferAt(
+              0 /* idx */, &d1_byte_size, &d1_memory_type, &d1_memory_id);
+          const char* d2_buffer = d2->BufferAt(
+              0 /* idx */, &d2_byte_size, &d2_memory_type, &d2_memory_id);
+
+          // Tensor must be same size and in in CPU memory so that it
+          // can be easily compared. If not return false conservatively.
+          if ((d1_byte_size != d2_byte_size) || (d1_buffer == nullptr) ||
+              (d2_buffer == nullptr) ||
+              (d1_memory_type == TRITONSERVER_MEMORY_GPU) ||
+              (d2_memory_type == TRITONSERVER_MEMORY_GPU)) {
+            return false;
+          }
+
+          if (strncmp(d1_buffer, d2_buffer, d1_byte_size) != 0) {
+            return false;
+          }
+        }
       }
-
-      // If necessary compare the contents as well...
-      if (itr->second.second) {
-        const auto& d1 = itr->second.first->Data();
-        const auto& d2 = input->Data();
-
-        // For now being conservative and assuming that content
-        // comparison is for shape tensors which are likely to always
-        // be in a single buffer.
-        if ((d1->BufferCount() != 1) || (d2->BufferCount() != 1)) {
-          return false;
-        }
-
-        size_t d1_byte_size, d2_byte_size;
-        TRITONSERVER_MemoryType d1_memory_type, d2_memory_type;
-        int64_t d1_memory_id, d2_memory_id;
-        const char* d1_buffer = d1->BufferAt(
-            0 /* idx */, &d1_byte_size, &d1_memory_type, &d1_memory_id);
-        const char* d2_buffer = d2->BufferAt(
-            0 /* idx */, &d2_byte_size, &d2_memory_type, &d2_memory_id);
-
-        // Tensor must be same size and in in CPU memory so that it
-        // can be easily compared. If not return false conservatively.
-        if ((d1_byte_size != d2_byte_size) || (d1_buffer == nullptr) ||
-            (d2_buffer == nullptr) ||
-            (d1_memory_type == TRITONSERVER_MEMORY_GPU) ||
-            (d2_memory_type == TRITONSERVER_MEMORY_GPU)) {
-          return false;
-        }
-
-        if (strncmp(d1_buffer, d2_buffer, d1_byte_size) != 0) {
-          return false;
-        }
-      }
+    } else if (has_optional_input) {
+      // If the model has optional inputs, the current request must contains all
+      // inputs that in the first request (tracked in 'required_equal_inputs').
+      return false;
     }
   }
 
