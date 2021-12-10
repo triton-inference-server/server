@@ -27,12 +27,33 @@
 replicaCount: 1
 
 image:
-  imageName: nvcr.io/nvidia/tritonserver:21.09-py3
+  imageName: nvcr.io/nvidia/tritonserver:21.11-py3
   pullPolicy: IfNotPresent
-  # to specify a non-AWS s3 endpoint, use the form
-  # s3://https://your-s3-endpoint:443/bucket/model_repository
-  modelRepositoryPath: s3://triton-inference-server-repository/model_repository
   numGpus: 1
+  serverCommand: tritonserver
+  serverArgs:
+    # Model Repository Configuration (REQUIRED)
+    #
+    # Configure sources for model repository below.  Multiple repositories
+    # can be specified
+    #
+    # To download models from an S3 bucket, uncomment and configure below
+    # To specify a non-AWS S3 endpoint, use the form
+    #  s3://https://your-s3-endpoint:443/bucket/model_repository
+    #
+    #- --model-repository=s3://triton-inference-server-repository/model_repository
+    #
+    # Model Control Mode (Optional, default: none)
+    #
+    # To set model control mode, uncomment and configure below
+    # See https://github.com/triton-inference-server/server/blob/r21.11/docs/model_management.md
+    #  for more details
+    #- --model-control-mode=explicit|poll|none
+    #
+    # Additional server args
+    #
+    # see https://github.com/triton-inference-server/server/blob/r21.11/README.md
+    #  for more details
 
 service:
   # for Fleet Command, type should be NodePort
@@ -42,8 +63,9 @@ service:
   grpcNodePort: 30344
   metricsNodePort: 30345
 
-secret:
+# AWS
+#secret:
   # update the following with base64 encoded parameters
-  region: AWS_REGION
-  id: AWS_SECRET_KEY_ID
-  key: AWS_SECRET_ACCESS_KEY
+#  region: AWS_REGION
+#  id: AWS_SECRET_KEY_ID
+#  key: AWS_SECRET_ACCESS_KEY
