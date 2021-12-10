@@ -664,6 +664,16 @@ TRITONSERVER_ResponseAllocatorNew(
 }
 
 TRITONSERVER_Error*
+TRITONSERVER_ResponseAllocatorSetQueryFunction(
+    TRITONSERVER_ResponseAllocator* allocator,
+    TRITONSERVER_ResponseAllocatorQueryFn_t query_fn)
+{
+  reinterpret_cast<ni::ResponseAllocator*>(allocator)->SetQueryFunction(
+      query_fn);
+  return nullptr;
+}
+
+TRITONSERVER_Error*
 TRITONSERVER_ResponseAllocatorDelete(TRITONSERVER_ResponseAllocator* allocator)
 {
   ni::ResponseAllocator* lalloc =

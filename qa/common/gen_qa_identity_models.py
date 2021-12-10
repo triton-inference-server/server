@@ -499,7 +499,9 @@ output [
 def create_openvino_modelfile(models_dir, model_version, io_cnt, max_batch,
                               dtype, shape):
 
-    batch_dim = [] if max_batch == 0 else [max_batch,]
+    batch_dim = [] if max_batch == 0 else [
+        max_batch,
+    ]
     if not tu.validate_for_openvino_model(dtype, dtype, dtype,
                                           batch_dim + shape, batch_dim + shape,
                                           batch_dim + shape):
@@ -535,7 +537,9 @@ def create_openvino_modelfile(models_dir, model_version, io_cnt, max_batch,
 def create_openvino_modelconfig(models_dir, model_version, io_cnt, max_batch,
                                 dtype, shape):
 
-    batch_dim = [] if max_batch == 0 else [max_batch,]
+    batch_dim = [] if max_batch == 0 else [
+        max_batch,
+    ]
     if not tu.validate_for_openvino_model(dtype, dtype, dtype,
                                           batch_dim + shape, batch_dim + shape,
                                           batch_dim + shape):

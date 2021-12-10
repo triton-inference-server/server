@@ -65,10 +65,10 @@ from distutils.dir_util import copy_tree
 # incorrectly load the other version of the openvino libraries.
 #
 TRITON_VERSION_MAP = {
-    '2.17.0dev': (
-        '21.12dev',  # triton container
+    '2.18.0dev': (
+        '22.01dev',  # triton container
         '21.11',  # upstream container
-        '1.9.0',  # ORT
+        '1.10.0', # ORT
         '2021.2.200',  # ORT OpenVINO
         '2021.2',  # Standalone OpenVINO
         '2.2.9')  # DCGM version
@@ -504,15 +504,38 @@ def backend_cmake_args(images, components, be, install_dir, library_paths):
 
 
 def pytorch_cmake_args(images):
-    if "pytorch" in images:
-        image = images["pytorch"]
+
+    # If platform is jetpack do not use docker based build
+    if target_platform() == 'jetpack':
+        pt_lib_path = library_paths['pytorch'] + "/lib"
+        pt_include_paths = ""
+        for suffix in [
+                'include/torch', 'include/torch/torch/csrc/api/include',
+                'include/torchvision'
+        ]:
+            pt_include_paths += library_paths['pytorch'] + '/' + suffix + ';'
+        cargs = [
+            cmake_backend_arg('pytorch', 'TRITON_PYTORCH_INCLUDE_PATHS', None,
+                              pt_include_paths),
+            cmake_backend_arg('pytorch', 'TRITON_PYTORCH_LIB_PATHS', None,
+                              pt_lib_path),
+        ]
     else:
-        image = 'nvcr.io/nvidia/pytorch:{}-py3'.format(
-            FLAGS.upstream_container_version)
-    return [
-        cmake_backend_arg('pytorch', 'TRITON_PYTORCH_DOCKER_IMAGE', None,
-                          image),
-    ]
+        if "pytorch" in images:
+            image = images["pytorch"]
+        else:
+            image = 'nvcr.io/nvidia/pytorch:{}-py3'.format(
+                FLAGS.upstream_container_version)
+        cargs = [
+            cmake_backend_arg('pytorch', 'TRITON_PYTORCH_DOCKER_IMAGE', None,
+                              image),
+        ]
+
+        if FLAGS.enable_gpu:
+            cargs.append(
+                cmake_backend_enable('pytorch',
+                                     'TRITON_PYTORCH_ENABLE_TORCHTRT', True))
+    return cargs
 
 
 def onnxruntime_cmake_args(images, library_paths):

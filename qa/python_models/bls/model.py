@@ -30,6 +30,7 @@ import triton_python_backend_utils as pb_utils
 import torch
 from torch.utils.dlpack import from_dlpack, to_dlpack
 from multiprocessing import Pool
+import sys
 
 
 def bls_add_sub(_=None):
@@ -89,19 +90,11 @@ class PBBLSTest(unittest.TestCase):
         with self.assertRaises(TypeError):
             pb_utils.InferenceRequest(model_name='add_sub', inputs=[])
 
-    def _test_gpu_bls_add_sub(self, is_input0_gpu, is_input1_gpu):
-        input0 = torch.rand(16)
-        input1 = torch.rand(16)
-
-        if is_input0_gpu:
-            input0 = input0.to('cuda')
-
-        if is_input1_gpu:
-            input1 = input1.to('cuda')
-
-        input0_pb = pb_utils.Tensor.from_dlpack('INPUT0', to_dlpack(input0))
-        input1_pb = pb_utils.Tensor.from_dlpack('INPUT1', to_dlpack(input1))
-
+    def _get_gpu_bls_outputs(self, input0_pb, input1_pb):
+        """
+        This function is created to test that the DLPack container works
+        properly when the inference response and outputs go out of scope.
+        """
         infer_request = pb_utils.InferenceRequest(
             model_name='dlpack_add_sub',
             inputs=[input0_pb, input1_pb],
@@ -114,11 +107,67 @@ class PBBLSTest(unittest.TestCase):
         self.assertIsNotNone(output0)
         self.assertIsNotNone(output1)
 
-        expected_output_0 = from_dlpack(input0_pb.to_dlpack()).to('cpu') + from_dlpack(input1_pb.to_dlpack()).to('cpu')
-        expected_output_1 = from_dlpack(input0_pb.to_dlpack()).to('cpu') - from_dlpack(input1_pb.to_dlpack()).to('cpu')
+        # When one of the inputs is in GPU the output returned by the model must
+        # be in GPU, otherwise the outputs will be in CPU.
+        if not input0_pb.is_cpu() or not input1_pb.is_cpu():
+            self.assertTrue((not output0.is_cpu()) and (not output1.is_cpu()))
+        else:
+            self.assertTrue((output0.is_cpu()) and (output1.is_cpu()))
 
-        self.assertTrue(torch.all(expected_output_0 == from_dlpack(output0.to_dlpack()).to('cpu')))
-        self.assertTrue(torch.all(expected_output_1 == from_dlpack(output1.to_dlpack()).to('cpu')))
+        # Make sure that the reference count is increased by one when DLPack
+        # representation is created.
+        rc_before_dlpack_output0 = sys.getrefcount(output0)
+        rc_before_dlpack_output1 = sys.getrefcount(output1)
+
+        output0_dlpack = output0.to_dlpack()
+        output1_dlpack = output1.to_dlpack()
+
+        rc_after_dlpack_output0 = sys.getrefcount(output0)
+        rc_after_dlpack_output1 = sys.getrefcount(output1)
+
+        self.assertEqual(rc_after_dlpack_output0 - rc_before_dlpack_output0, 1)
+        self.assertEqual(rc_after_dlpack_output1 - rc_before_dlpack_output1, 1)
+
+        # Make sure that reference count decreases after destroying the DLPack
+        output0_dlpack = None
+        output1_dlpack = None
+        rc_after_del_dlpack_output0 = sys.getrefcount(output0)
+        rc_after_del_dlpack_output1 = sys.getrefcount(output1)
+        self.assertEqual(rc_after_del_dlpack_output0 - rc_after_dlpack_output0,
+                         -1)
+        self.assertEqual(rc_after_del_dlpack_output1 - rc_after_dlpack_output1,
+                         -1)
+
+        return output0.to_dlpack(), output1.to_dlpack()
+
+    def _test_gpu_bls_add_sub(self, is_input0_gpu, is_input1_gpu):
+        input0 = torch.rand(16)
+        input1 = torch.rand(16)
+
+        if is_input0_gpu:
+            input0 = input0.to('cuda')
+
+        if is_input1_gpu:
+            input1 = input1.to('cuda')
+
+        input0_pb = pb_utils.Tensor.from_dlpack('INPUT0', to_dlpack(input0))
+        input1_pb = pb_utils.Tensor.from_dlpack('INPUT1', to_dlpack(input1))
+        output0_dlpack, output1_dlpack = self._get_gpu_bls_outputs(
+            input0_pb, input1_pb)
+
+        expected_output_0 = from_dlpack(
+            input0_pb.to_dlpack()).to('cpu') + from_dlpack(
+                input1_pb.to_dlpack()).to('cpu')
+        expected_output_1 = from_dlpack(
+            input0_pb.to_dlpack()).to('cpu') - from_dlpack(
+                input1_pb.to_dlpack()).to('cpu')
+
+        self.assertTrue(
+            torch.all(
+                expected_output_0 == from_dlpack(output0_dlpack).to('cpu')))
+        self.assertTrue(
+            torch.all(
+                expected_output_1 == from_dlpack(output1_dlpack).to('cpu')))
 
     def test_gpu_bls(self):
         for input0_device in [True, False]:
@@ -160,6 +209,7 @@ class PBBLSTest(unittest.TestCase):
 
 
 class TritonPythonModel:
+
     def execute(self, requests):
         responses = []
         for _ in requests:

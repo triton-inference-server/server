@@ -28,11 +28,7 @@
 
 import argparse
 import numpy as np
-import os
-import re
 import sys
-import requests as httpreq
-from builtins import range
 import tritongrpcclient as grpcclient
 import tritonhttpclient as httpclient
 from tritonclientutils import np_to_triton_dtype
@@ -76,7 +72,7 @@ if __name__ == '__main__':
     with client_util.InferenceServerClient(FLAGS.url,
                                            verbose=FLAGS.verbose) as client:
         for model_name, np_dtype, shape in (
-            # yapf: disable
+                # yapf: disable
             ("identity_int32", np.int32, [0]),
             ("identity_int32", np.int32, [7])):
             # yapf: enable

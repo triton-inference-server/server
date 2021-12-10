@@ -286,7 +286,9 @@ ValidateIOShape(
       (max_batch_size == 0)) {
     return Status(
         Status::Code::INVALID_ARG,
-        message_prefix + "cannot have empty reshape for non-batching model");
+        message_prefix +
+            "cannot have empty reshape for non-batching model as scalar "
+            "tensors are not supported");
   }
 
   for (auto dim : io.dims()) {

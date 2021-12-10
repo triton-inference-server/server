@@ -72,6 +72,7 @@ async def test_bls_out_of_memory():
 
 
 class TritonPythonModel:
+
     async def execute(self, requests):
         responses = []
         for _ in requests:
@@ -79,9 +80,7 @@ class TritonPythonModel:
             result = await test_bls_out_of_memory()
             responses.append(
                 pb_utils.InferenceResponse([
-                    pb_utils.Tensor(
-                        'OUTPUT0',
-                        np.array([result],
-                                 dtype=np.float16))
+                    pb_utils.Tensor('OUTPUT0',
+                                    np.array([result], dtype=np.float16))
                 ]))
         return responses

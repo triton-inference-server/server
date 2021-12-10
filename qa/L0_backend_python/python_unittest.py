@@ -36,6 +36,7 @@ import os
 
 
 class PythonUnittest(tu.TestResultCollector):
+
     def test_python_unittest(self):
         model_name = os.environ['MODEL_NAME']
         with grpcclient.InferenceServerClient("localhost:8001") as client:

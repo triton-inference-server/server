@@ -439,6 +439,17 @@ class InferenceRequest {
     return Status::Success;
   }
 
+  // Returns the preferred memory type and memory type ID of the output buffer
+  // for the request. 'name' and 'byte_size' are optional and set to nullptr
+  // if not specified, if provided, they give the allocator more information.
+  // 'memory_type' and 'memory_type_id' are also used as input to provide types
+  // preferred by the caller.
+  // Status::Code::UNAVAILABLE will be returned if output properties are not
+  // available.
+  Status OutputBufferProperties(
+      const char* name, size_t* byte_size, TRITONSERVER_MemoryType* memory_type,
+      int64_t* memory_type_id);
+
   // Add a callback to be invoked on releasing the request object from Triton.
   // Multile callbacks can be added by calling this function in order,
   // and they will be invoked in reversed order.

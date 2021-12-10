@@ -38,11 +38,18 @@ class ResponseAllocator {
       TRITONSERVER_ResponseAllocatorAllocFn_t alloc_fn,
       TRITONSERVER_ResponseAllocatorReleaseFn_t release_fn,
       TRITONSERVER_ResponseAllocatorStartFn_t start_fn)
-      : alloc_fn_(alloc_fn), release_fn_(release_fn), start_fn_(start_fn)
+      : alloc_fn_(alloc_fn), query_fn_(nullptr), release_fn_(release_fn),
+        start_fn_(start_fn)
   {
   }
 
+  void SetQueryFunction(TRITONSERVER_ResponseAllocatorQueryFn_t query_fn)
+  {
+    query_fn_ = query_fn;
+  }
+
   TRITONSERVER_ResponseAllocatorAllocFn_t AllocFn() const { return alloc_fn_; }
+  TRITONSERVER_ResponseAllocatorQueryFn_t QueryFn() const { return query_fn_; }
   TRITONSERVER_ResponseAllocatorReleaseFn_t ReleaseFn() const
   {
     return release_fn_;
@@ -51,6 +58,7 @@ class ResponseAllocator {
 
  private:
   TRITONSERVER_ResponseAllocatorAllocFn_t alloc_fn_;
+  TRITONSERVER_ResponseAllocatorQueryFn_t query_fn_;
   TRITONSERVER_ResponseAllocatorReleaseFn_t release_fn_;
   TRITONSERVER_ResponseAllocatorStartFn_t start_fn_;
 };

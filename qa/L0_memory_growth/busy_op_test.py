@@ -28,8 +28,6 @@
 
 import argparse
 import numpy as np
-import os
-import sys
 from builtins import range
 import tritongrpcclient as grpcclient
 import tritonhttpclient as httpclient

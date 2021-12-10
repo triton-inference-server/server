@@ -111,6 +111,25 @@ InferenceRequest::SetPriority(uint32_t p)
 }
 
 Status
+InferenceRequest::OutputBufferProperties(
+    const char* name, size_t* byte_size, TRITONSERVER_MemoryType* memory_type,
+    int64_t* memory_type_id)
+{
+  const auto allocator = response_factory_.Allocator();
+  if ((allocator == nullptr) || (allocator->QueryFn() == nullptr)) {
+    return Status(
+        Status::Code::UNAVAILABLE, "Output properties are not available");
+  } else {
+    RETURN_IF_TRITONSERVER_ERROR(allocator->QueryFn()(
+        reinterpret_cast<TRITONSERVER_ResponseAllocator*>(
+            const_cast<ResponseAllocator*>(allocator)),
+        response_factory_.AllocatorUserp(), name, byte_size, memory_type,
+        memory_type_id));
+  }
+  return Status::Success;
+}
+
+Status
 InferenceRequest::Run(std::unique_ptr<InferenceRequest>& request)
 {
   return request->model_raw_->Enqueue(request);
@@ -570,15 +589,27 @@ InferenceRequest::Normalize()
       RETURN_IF_ERROR(model_raw_->GetOutput(output_name, &output_config));
     }
   }
-
-  // Make sure that the request is providing the same number of inputs
+  // Make sure that the request is providing the number of inputs
   // as is expected by the model.
-  if (original_inputs_.size() != (size_t)model_config.input_size()) {
-    return Status(
-        Status::Code::INVALID_ARG,
-        "expected " + std::to_string(model_config.input_size()) +
-            " inputs but got " + std::to_string(original_inputs_.size()) +
-            " inputs for model '" + ModelName() + "'");
+  if ((original_inputs_.size() > (size_t)model_config.input_size()) ||
+      (original_inputs_.size() < model_raw_->RequiredInputCount())) {
+    // If no input is marked as optional, then use exact match error message
+    // for consistency / backward compatibility
+    if ((size_t)model_config.input_size() == model_raw_->RequiredInputCount()) {
+      return Status(
+          Status::Code::INVALID_ARG,
+          "expected " + std::to_string(model_config.input_size()) +
+              " inputs but got " + std::to_string(original_inputs_.size()) +
+              " inputs for model '" + ModelName() + "'");
+    } else {
+      return Status(
+          Status::Code::INVALID_ARG,
+          "expected number of inputs between " +
+              std::to_string(model_raw_->RequiredInputCount()) + " and " +
+              std::to_string(model_config.input_size()) + " but got " +
+              std::to_string(original_inputs_.size()) + " inputs for model '" +
+              ModelName() + "'");
+    }
   }
 
   // Determine the batch size and shape of each input.

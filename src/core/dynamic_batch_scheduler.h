@@ -139,6 +139,9 @@ class DynamicBatchScheduler : public Scheduler {
   // the batch.
   const std::unordered_map<std::string, bool> enforce_equal_shape_tensors_;
 
+  // Store information on whether the model contains optional inputs.
+  bool has_optional_input_;
+
   // If true the ordering of responses matches the order of requests
   // even when there are multiple scheduler threads.
   const bool preserve_ordering_;

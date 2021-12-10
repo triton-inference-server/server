@@ -44,6 +44,8 @@ rm -rf *.tar.gz
 install_build_deps
 install_conda
 
+# Tensorflow 2.1.0 only works with Python 3.4 - 3.7. Successful execution of
+# the Python model indicates that the environment has been setup correctly.
 # Create a model with python 3.7 version
 create_conda_env "3.7" "python-3-7"
 conda install numpy=1.20.1 -y
@@ -61,6 +63,8 @@ cp python_backend/builddir/triton_python_backend_stub ./models/python_3_7
 conda deactivate
 
 # Create a model with python 3.6 version
+# Tensorflow 2.1.0 only works with Python 3.4 - 3.7. Successful execution of
+# the Python model indicates that the environment has been setup correctly.
 create_conda_env "3.6" "python-3-6"
 conda install numpy=1.18.1 -y
 conda install tensorflow=2.1.0 -y
@@ -75,9 +79,24 @@ cp python3.6.tar.gz models/python_3_6/python_3_6_environment.tar.gz
 (cd models/python_3_6 && \
           sed -i "s/^name:.*/name: \"python_3_6\"/" config.pbtxt && \
           echo "parameters: {key: \"EXECUTION_ENV_PATH\", value: {string_value: \"$path_to_conda_pack\"}}" >> config.pbtxt)
-rm -rf ./miniconda
 cp ../../python_models/python_version/model.py ./models/python_3_6/1/
 cp python_backend/builddir/triton_python_backend_stub ./models/python_3_6
+
+# Test conda env without custom Python backend stub
+# Tensorflow 2.3.0 only works with Python 3.5 - 3.8.
+path_to_conda_pack='$$TRITON_MODEL_DIRECTORY/python_3_8_environment.tar.gz'
+create_conda_env "3.8" "python-3-8"
+conda install numpy=1.19.1 -y
+conda install tensorflow=2.3.0 -y
+conda-pack -o python3.8.tar.gz
+mkdir -p models/python_3_8/1/
+cp ../../python_models/python_version/config.pbtxt ./models/python_3_8
+cp python3.8.tar.gz models/python_3_8/python_3_8_environment.tar.gz
+(cd models/python_3_8 && \
+          sed -i "s/^name:.*/name: \"python_3_8\"/" config.pbtxt && \
+          echo "parameters: {key: \"EXECUTION_ENV_PATH\", value: {string_value: \"$path_to_conda_pack\"}}" >> config.pbtxt)
+cp ../../python_models/python_version/model.py ./models/python_3_8/1/
+rm -rf ./miniconda
 
 run_server
 if [ "$SERVER_PID" == "0" ]; then
@@ -101,6 +120,13 @@ grep "Python version is 3.7, NumPy version is 1.20.1, and Tensorflow version is 
 if [ $? -ne 0 ]; then
     cat $SERVER_LOG
     echo -e "\n***\n*** Python version is 3.7, NumPy version is 1.20.1, and Tensorflow version is 2.1.0 was not found in Triton logs. \n***"
+    RET=1
+fi
+
+grep "Python version is 3.8, NumPy version is 1.19.1, and Tensorflow version is 2.3.0" $SERVER_LOG
+if [ $? -ne 0 ]; then
+    cat $SERVER_LOG
+    echo -e "\n***\n*** Python version is 3.8, NumPy version is 1.19.1, and Tensorflow version is 2.3.0 was not found in Triton logs. \n***"
     RET=1
 fi
 

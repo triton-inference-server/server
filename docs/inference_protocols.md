@@ -35,16 +35,16 @@ protocol, or by a C API.
 
 Triton exposes both HTTP/REST and GRPC endpoints based on [standard
 inference
-protocols](https://github.com/kubeflow/kfserving/tree/master/docs/predict-api/v2)
-that have been proposed by the [KFServing
-project](https://github.com/kubeflow/kfserving). To fully enable all
-capabilities Triton also implements a number [HTTP/REST and GRPC
-extensions](https://github.com/triton-inference-server/server/tree/main/docs/protocol).
-to the KFServing inference protocol.
+protocols](https://github.com/kserve/kserve/tree/master/docs/predict-api/v2)
+that have been proposed by the [KServe
+project](https://github.com/kserve). To fully enable all capabilities
+Triton also implements a number [HTTP/REST and GRPC
+extensions](https://github.com/triton-inference-server/server/tree/main/docs/protocol)
+to the KServe inference protocol.
 
 The HTTP/REST and GRPC protcols provide endpoints to check server and
 model health, metadata and statistics. Additional endpoints allow
-model loading and unloading, and inferencing. See the KFServing and
+model loading and unloading, and inferencing. See the KServe and
 extension documentation for details.
 
 ### HTTP Options

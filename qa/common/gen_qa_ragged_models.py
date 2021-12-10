@@ -25,9 +25,7 @@
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 import argparse
-from builtins import range
 import os
-import sys
 
 import numpy as np
 
@@ -525,7 +523,7 @@ if __name__ == '__main__':
         import tensorrt as trt
     if FLAGS.graphdef or FLAGS.savedmodel:
         import tensorflow as tf
-        from tensorflow.python.framework import graph_io, graph_util
+        from tensorflow.python.framework import graph_util
     if FLAGS.onnx:
         import onnx
 

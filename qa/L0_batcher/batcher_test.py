@@ -1361,9 +1361,7 @@ class BatcherTest(tu.TestResultCollector):
                 model_name = tu.get_model_name(trial, np.float32, np.float32,
                                                np.float32)
 
-                self.check_setup(model_name, [
-                    4, 6
-                ], 0)
+                self.check_setup(model_name, [4, 6], 0)
 
                 # Need scheduler to wait for queue to contain 4 requests
                 self.assertTrue("TRITONSERVER_DELAY_SCHEDULER" in os.environ)
@@ -1440,9 +1438,7 @@ class BatcherTest(tu.TestResultCollector):
                 model_name = tu.get_model_name(trial, np.float32, np.float32,
                                                np.float32)
 
-                self.check_setup(model_name, [
-                    4, 6
-                ], 0)
+                self.check_setup(model_name, [4, 6], 0)
 
                 # Need scheduler to wait for queue to contain 3 requests
                 self.assertTrue("TRITONSERVER_DELAY_SCHEDULER" in os.environ)
@@ -1667,6 +1663,7 @@ class BatcherTest(tu.TestResultCollector):
                 self.check_status(model_name, {3: 1}, 3, 3)
             except Exception as ex:
                 self.assertTrue(False, "unexpected error {}".format(ex))
+
 
 if __name__ == '__main__':
     unittest.main()
