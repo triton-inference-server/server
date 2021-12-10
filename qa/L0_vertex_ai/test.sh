@@ -173,9 +173,13 @@ else
 fi
 
 # Default true
+# Note that when default true, HTTP / GRPC endpoints will be disabled,
+# check those endpoints by enabling one of them at a time and greping keywords
 export AIP_MODE=PREDICTION
-SERVER_ARGS=${BASE_SERVER_ARGS}
-run_server
+SERVER_ARGS="${BASE_SERVER_ARGS} --allow-grpc=true"
+# Using nowait as 'run_server' requires HTTP endpoint enabled
+run_server_nowait
+sleep 10
 if [ "$SERVER_PID" == "0" ]; then
     echo -e "\n***\n*** Failed to start $SERVER\n***"
     cat $SERVER_LOG
@@ -189,10 +193,26 @@ if [ $? -ne 0 ]; then
     echo -e "\n***\n*** Failed. Expected Vertex AI service is enabled\n***"
     RET=1
 fi
+grep "Started GRPCInferenceService at" $SERVER_LOG
+if [ $? -ne 0 ]; then
+    echo -e "\n***\n*** Failed. Expected GRPC service is enabled\n***"
+    RET=1
+fi
+# Expect no message regarding HTTP as it is disabled
+grep "failed to start HTTP service" $SERVER_LOG
+if [ $? -eq 0 ]; then
+    echo -e "\n***\n*** Failed. Expected HTTP service is disabled\n***"
+    RET=1
+fi
+grep "Started HTTPService at" $SERVER_LOG
+if [ $? -eq 0 ]; then
+    echo -e "\n***\n*** Failed. Expected HTTP service is disabled\n***"
+    RET=1
+fi
 set -e
 
 # Disable
-SERVER_ARGS="${BASE_SERVER_ARGS} --allow-vertex-ai=false"
+SERVER_ARGS="${BASE_SERVER_ARGS} --allow-vertex-ai=false --allow-http=true"
 run_server
 if [ "$SERVER_PID" == "0" ]; then
     echo -e "\n***\n*** Failed to start $SERVER\n***"
@@ -211,6 +231,22 @@ fi
 grep "Started Vertex AI HTTPService at" $SERVER_LOG
 if [ $? -eq 0 ]; then
     echo -e "\n***\n*** Failed. Expected Vertex AI service is disabled\n***"
+    RET=1
+fi
+grep "Started HTTPService at" $SERVER_LOG
+if [ $? -ne 0 ]; then
+    echo -e "\n***\n*** Failed. Expected HTTP service is enabled\n***"
+    RET=1
+fi
+# Expect no message regarding GRPC as it is disabled
+grep "failed to start GRPC service" $SERVER_LOG
+if [ $? -eq 0 ]; then
+    echo -e "\n***\n*** Failed. Expected GRPC service is disabled\n***"
+    RET=1
+fi
+grep "Started GRPCInferenceService at" $SERVER_LOG
+if [ $? -eq 0 ]; then
+    echo -e "\n***\n*** Failed. Expected GRPC service is disabled\n***"
     RET=1
 fi
 set -e
