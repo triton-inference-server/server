@@ -90,9 +90,13 @@ echo -n 'SECRET_ACCESS_KEY' | base64
 
 Deploy the inference server to your Location in Fleet Command by creating a
 Deployment.  You can specify configuration parameters to override the default
-[values.yaml](values.yaml) in the Application Configuration section.  See [Fleet
-Command
-documentation](https://docs.nvidia.com/fleet-command/prod_fleet-command/prod_fleet-command/ug-deploying-to-the-edge.html)
+[values.yaml](values.yaml) in the Application Configuration section.  
+
+*Note:* You _must_ provide a `--model-repository` parameter with a path to your
+prepared model repository in your S3 bucket.  Otherwise, the Triton Inference
+Server will not start.
+
+See [Fleet Command documentation](https://docs.nvidia.com/fleet-command/prod_fleet-command/prod_fleet-command/ug-deploying-to-the-edge.html)
 for more info.
 
 ## Using Triton Inference Server
