@@ -179,6 +179,7 @@ class SequenceBatch {
       SequenceBatchScheduler* base, const uint32_t batcher_idx,
       const size_t seq_slot_cnt,
       const std::unordered_map<std::string, bool>& enforce_equal_shape_tensors,
+      const bool has_optional_input,
       const std::shared_ptr<SequenceBatchScheduler::ControlInputs>&
           start_input_overrides,
       const std::shared_ptr<SequenceBatchScheduler::ControlInputs>&
@@ -228,6 +229,9 @@ class SequenceBatch {
   // the batch.
   const std::unordered_map<std::string, bool> enforce_equal_shape_tensors_;
 
+  // Store information on whether the model contains optional inputs.
+  bool has_optional_input_;
+
   // The control values, delivered as input tensors, that should be
   // used when starting a sequence, continuing a sequence, ending a
   // sequence, and showing that a sequence has not input available.
@@ -258,6 +262,7 @@ class DirectSequenceBatch : public SequenceBatch {
       SequenceBatchScheduler* base, const uint32_t batcher_idx,
       const size_t seq_slot_cnt, TritonModelInstance* model_instance,
       const std::unordered_map<std::string, bool>& enforce_equal_shape_tensors,
+      const bool has_optional_input,
       const std::shared_ptr<SequenceBatchScheduler::ControlInputs>&
           start_input_overrides,
       const std::shared_ptr<SequenceBatchScheduler::ControlInputs>&
@@ -321,6 +326,7 @@ class OldestSequenceBatch : public SequenceBatch {
       SequenceBatchScheduler* base, const uint32_t batcher_idx,
       const size_t seq_slot_cnt, TritonModelInstance* model_instance,
       const std::unordered_map<std::string, bool>& enforce_equal_shape_tensors,
+      const bool has_optional_input,
       const std::shared_ptr<SequenceBatchScheduler::ControlInputs>&
           start_input_overrides,
       const std::shared_ptr<SequenceBatchScheduler::ControlInputs>&

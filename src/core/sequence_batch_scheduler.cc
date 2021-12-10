@@ -96,6 +96,14 @@ SequenceBatchScheduler::Create(
   RETURN_IF_ERROR(sched->CreateBooleanControlTensors(
       config, &start, &end, &startend, &cont, &notready));
 
+  bool has_optional_input = false;
+  for (const auto& input : config.input()) {
+    if (input.optional()) {
+      has_optional_input = true;
+      break;
+    }
+  }
+
   // Create one SequenceBatch object for each requested runner. The
   // SequenceBatch object has a thread that manages the batch of
   // requests.
@@ -110,13 +118,13 @@ SequenceBatchScheduler::Create(
     if (config.sequence_batching().has_oldest()) {
       sb.reset(new OldestSequenceBatch(
           sched.get(), index, seq_slot_cnt, instance.get(),
-          enforce_equal_shape_tensors, start, end, startend, cont, notready,
-          &init_state));
+          enforce_equal_shape_tensors, has_optional_input, start, end, startend,
+          cont, notready, &init_state));
     } else {
       sb.reset(new DirectSequenceBatch(
           sched.get(), index, seq_slot_cnt, instance.get(),
-          enforce_equal_shape_tensors, start, end, startend, cont, notready,
-          &init_state));
+          enforce_equal_shape_tensors, has_optional_input, start, end, startend,
+          cont, notready, &init_state));
     }
 
     if (init_state) {
@@ -708,6 +716,7 @@ SequenceBatch::SequenceBatch(
     SequenceBatchScheduler* base, const uint32_t batcher_idx,
     const size_t seq_slot_cnt,
     const std::unordered_map<std::string, bool>& enforce_equal_shape_tensors,
+    const bool has_optional_input,
     const std::shared_ptr<SequenceBatchScheduler::ControlInputs>&
         start_input_overrides,
     const std::shared_ptr<SequenceBatchScheduler::ControlInputs>&
@@ -720,6 +729,7 @@ SequenceBatch::SequenceBatch(
         notready_input_overrides)
     : base_(base), batcher_idx_(batcher_idx), seq_slot_cnt_(seq_slot_cnt),
       enforce_equal_shape_tensors_(enforce_equal_shape_tensors),
+      has_optional_input_(has_optional_input),
       start_input_overrides_(start_input_overrides),
       end_input_overrides_(end_input_overrides),
       startend_input_overrides_(startend_input_overrides),
@@ -895,6 +905,7 @@ DirectSequenceBatch::DirectSequenceBatch(
     SequenceBatchScheduler* base, const uint32_t batcher_idx,
     const size_t seq_slot_cnt, TritonModelInstance* model_instance,
     const std::unordered_map<std::string, bool>& enforce_equal_shape_tensors,
+    const bool has_optional_input,
     const std::shared_ptr<SequenceBatchScheduler::ControlInputs>&
         start_input_overrides,
     const std::shared_ptr<SequenceBatchScheduler::ControlInputs>&
@@ -908,8 +919,9 @@ DirectSequenceBatch::DirectSequenceBatch(
     bool* is_initialized)
     : SequenceBatch(
           base, batcher_idx, seq_slot_cnt, enforce_equal_shape_tensors,
-          start_input_overrides, end_input_overrides, startend_input_overrides,
-          continue_input_overrides, notready_input_overrides),
+          has_optional_input, start_input_overrides, end_input_overrides,
+          startend_input_overrides, continue_input_overrides,
+          notready_input_overrides),
       model_instance_(model_instance), scheduler_thread_exit_(false),
       scheduler_idle_(false), queues_(seq_slot_cnt),
       seq_slot_correlation_ids_(seq_slot_cnt, 0), max_active_seq_slot_(-1)
@@ -1027,6 +1039,10 @@ DirectSequenceBatch::BatcherThread(const int nice)
 
   NewPayload();
 
+  // When there is optional input or input shape must be enforced,
+  // the inputs in the requests must be examined for forming a batch
+  const bool check_input =
+      !enforce_equal_shape_tensors_.empty() || has_optional_input_;
   while (!scheduler_thread_exit_) {
     uint64_t wait_microseconds = default_wait_microseconds;
 
@@ -1105,11 +1121,10 @@ DirectSequenceBatch::BatcherThread(const int nice)
             // If this is the first non-null request capture the shape
             // of the tensors that don't support ragged so we can
             // compare them to later requests.
-            if (required_equal_inputs.empty() &&
-                !enforce_equal_shape_tensors_.empty()) {
+            if (required_equal_inputs.empty() && check_input) {
               Status status = InitRequiredEqualInputs(
                   queue.front(), enforce_equal_shape_tensors_,
-                  &required_equal_inputs);
+                  has_optional_input_, &required_equal_inputs);
               if (!status.IsOk()) {
                 LOG_ERROR
                     << "internal: unexpecting failure initializing shape: "
@@ -1184,11 +1199,10 @@ DirectSequenceBatch::BatcherThread(const int nice)
           // If there are one or more tensors that don't support
           // ragged batch, then don't allow a request into an existing
           // batch if shape differs.
-          else if (
-              !required_equal_inputs.empty() &&
-              !enforce_equal_shape_tensors_.empty()) {
+          else if (!required_equal_inputs.empty() && check_input) {
             if (!CompareWithRequiredEqualInputs(
-                    queue.front(), required_equal_inputs)) {
+                    queue.front(), has_optional_input_,
+                    required_equal_inputs)) {
               use_null_request = true;
             }
           }
@@ -1305,6 +1319,7 @@ OldestSequenceBatch::OldestSequenceBatch(
     SequenceBatchScheduler* base, const uint32_t batcher_idx,
     const size_t seq_slot_cnt, TritonModelInstance* model_instance,
     const std::unordered_map<std::string, bool>& enforce_equal_shape_tensors,
+    const bool has_optional_input,
     const std::shared_ptr<SequenceBatchScheduler::ControlInputs>&
         start_input_overrides,
     const std::shared_ptr<SequenceBatchScheduler::ControlInputs>&
@@ -1318,8 +1333,9 @@ OldestSequenceBatch::OldestSequenceBatch(
     bool* is_initialized)
     : SequenceBatch(
           base, batcher_idx, seq_slot_cnt, enforce_equal_shape_tensors,
-          start_input_overrides, end_input_overrides, startend_input_overrides,
-          continue_input_overrides, notready_input_overrides),
+          has_optional_input, start_input_overrides, end_input_overrides,
+          startend_input_overrides, continue_input_overrides,
+          notready_input_overrides),
       in_flight_(seq_slot_cnt, false), queues_(seq_slot_cnt)
 {
   // Initialize to handle CORRID control. If error just exit

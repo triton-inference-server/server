@@ -31,6 +31,8 @@
 
 namespace nvidia { namespace inferenceserver {
 
+// A collection of inputs in the request, an nullptr for InferenceRequest::Input
+// indicates that the inputs doesn't require equality check
 using RequiredEqualInputs = std::unordered_map<
     std::string,
     std::pair<const InferenceRequest::Input*, bool /* compare contents */>>;
@@ -38,10 +40,11 @@ using RequiredEqualInputs = std::unordered_map<
 Status InitRequiredEqualInputs(
     const std::unique_ptr<InferenceRequest>& request,
     const std::unordered_map<std::string, bool>& enforce_equal_shape_tensors,
-    RequiredEqualInputs* required_equal_inputs);
+    const bool has_optional_input, RequiredEqualInputs* required_equal_inputs);
 
 bool CompareWithRequiredEqualInputs(
     const std::unique_ptr<InferenceRequest>& request,
+    const bool has_optional_input,
     const RequiredEqualInputs& required_equal_inputs);
 
 //

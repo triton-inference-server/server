@@ -66,7 +66,7 @@ DynamicBatchScheduler::DynamicBatchScheduler(
       pending_batch_size_(0), queued_batch_size_(0),
       next_preferred_batch_size_(0),
       enforce_equal_shape_tensors_(enforce_equal_shape_tensors),
-      preserve_ordering_(preserve_ordering)
+      has_optional_input_(false), preserve_ordering_(preserve_ordering)
 {
   rate_limiter_ = model_->Server()->GetRateLimiter();
   // Both the server and model config should specify
@@ -77,6 +77,13 @@ DynamicBatchScheduler::DynamicBatchScheduler(
   for (const auto size : preferred_batch_sizes_) {
     max_preferred_batch_size_ =
         std::max(max_preferred_batch_size_, (size_t)size);
+  }
+
+  for (const auto& input : model_->Config().input()) {
+    if (input.optional()) {
+      has_optional_input_ = true;
+      break;
+    }
   }
 }
 
@@ -406,6 +413,10 @@ DynamicBatchScheduler::GetDynamicBatch()
   size_t best_preferred_batch_size = 0;
   queued_batch_size_ -= queue_.ApplyPolicyAtCursor();
 
+  // When there is optional input or input shape must be enforced,
+  // the inputs in the requests must be examined for forming a batch
+  const bool check_input =
+      !enforce_equal_shape_tensors_.empty() || has_optional_input_;
   auto payload_batch_size = curr_payload_->BatchSize();
   while (!queue_.CursorEnd()) {
     const auto batch_size = std::max(1U, queue_.RequestAtCursor()->BatchSize());
@@ -414,10 +425,10 @@ DynamicBatchScheduler::GetDynamicBatch()
     // new batch.
     if ((payload_batch_size + queue_.PendingBatchCount()) == 0) {
       // Get the shape of the new batch that is being started...
-      if (!enforce_equal_shape_tensors_.empty()) {
+      if (check_input) {
         if (!InitRequiredEqualInputs(
                  queue_.RequestAtCursor(), enforce_equal_shape_tensors_,
-                 &required_equal_inputs_)
+                 has_optional_input_, &required_equal_inputs_)
                  .IsOk()) {
           send_now = true;
           break;
@@ -443,9 +454,9 @@ DynamicBatchScheduler::GetDynamicBatch()
 
       // There is a pending batch and it has a different shape then
       // this request, so send the pending batch as it is.
-      if (!enforce_equal_shape_tensors_.empty() &&
-          !CompareWithRequiredEqualInputs(
-              queue_.RequestAtCursor(), required_equal_inputs_)) {
+      if (check_input && !CompareWithRequiredEqualInputs(
+                             queue_.RequestAtCursor(), has_optional_input_,
+                             required_equal_inputs_)) {
         send_now = true;
         break;
       }
