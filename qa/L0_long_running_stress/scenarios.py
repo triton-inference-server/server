@@ -242,6 +242,9 @@ class PerfAnalyzerScenario(Scenario):
                 res = i
             elif dtype == np.dtype(object):
                 res = str(i)
+            else:
+                raise Exception(
+                    "unexpected sequence data type {}".format(dtype))
             input_data.append({input0: [res]})
         output0 = "OUTPUT" if "libtorch" not in trial else "OUTPUT__0"
         output_data = []
@@ -256,6 +259,9 @@ class PerfAnalyzerScenario(Scenario):
                     res = sum
                 elif dtype == np.dtype(object):
                     res = str(sum)
+                else:
+                    raise Exception(
+                        "unexpected sequence data type {}".format(dtype))
                 output_data.append({output0: [res]})
         else:
             for i in range(3):
@@ -266,6 +272,9 @@ class PerfAnalyzerScenario(Scenario):
                     res = int(res)
                 elif dtype == np.dtype(object):
                     res = str(res)
+                else:
+                    raise Exception(
+                        "unexpected sequence data type {}".format(dtype))
                 output_data.append(
                     {output0: [res if dtype != np.dtype(object) else str(res)]})
         data = {"data": [input_data]}
@@ -284,6 +293,9 @@ class PerfAnalyzerScenario(Scenario):
                 res = i
             elif dtype == np.dtype(object):
                 res = str(i)
+            else:
+                raise Exception(
+                    "unexpected identity data type {}".format(dtype))
             io_data.append(res)
         data = {
             "data": [{
