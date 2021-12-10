@@ -56,11 +56,14 @@ spec:
             limits:
               nvidia.com/gpu: {{ .Values.image.numGpus }}
 
-          args: ["tritonserver", "--model-store={{ .Values.image.modelRepositoryPath }}",
-                 "--model-control-mode=poll",
-                 "--repository-poll-secs=5"]
+          args:
+            - {{ .Values.image.serverCommand }}
+            {{- $args := required "image.serverArgs, at least --model-repository, is required!" .Values.image.serverArgs }}
+            {{- range $args }}
+            - {{ . -}}
+            {{ end }}
 
-{{- if .Values.secret }}
+{{ if .Values.secret }}
           env:
           - name: AWS_DEFAULT_REGION
             valueFrom:
