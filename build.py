@@ -64,6 +64,11 @@ from distutils.dir_util import copy_tree
 # different versions are used then one backend or the other will
 # incorrectly load the other version of the openvino libraries.
 #
+# Adding another openvino version. Take note of the above issue
+# when loading mulitple backends with different openvino versions.
+# To use openvino_21_4, the model configuration should specify
+# the "openvino_21_4" in the "backend" field.
+#
 TRITON_VERSION_MAP = {
     '2.18.0dev': (
         '22.01dev',  # triton container
@@ -71,14 +76,16 @@ TRITON_VERSION_MAP = {
         '1.10.0', # ORT
         '2021.2.200',  # ORT OpenVINO
         '2021.2',  # Standalone OpenVINO
-        '2.2.9')  # DCGM version
+        '2.2.9', # DCGM version
+        '2021.4.582') # Standalone OpenVINO for openvino_21_4
 }
 
 EXAMPLE_BACKENDS = ['identity', 'square', 'repeat']
 CORE_BACKENDS = ['ensemble']
 NONCORE_BACKENDS = [
     'tensorflow1', 'tensorflow2', 'onnxruntime', 'python', 'dali', 'pytorch',
-    'openvino', 'fil', 'fastertransformer', 'tensorrt', 'armnn_tflite'
+    'openvino', 'fil', 'fastertransformer', 'tensorrt', 'armnn_tflite',
+    'openvino_21_4'
 ]
 EXAMPLE_REPOAGENTS = ['checksum']
 FLAGS = None
@@ -441,14 +448,16 @@ def repoagent_cmake_args(images, components, ra, install_dir):
 def backend_repo(be):
     if (be == 'tensorflow1') or (be == 'tensorflow2'):
         return 'tensorflow_backend'
+    if (be == 'openvino_21_4'):
+        return 'openvino_backend'
     return '{}_backend'.format(be)
 
 
 def backend_cmake_args(images, components, be, install_dir, library_paths):
     if be == 'onnxruntime':
         args = onnxruntime_cmake_args(images, library_paths)
-    elif be == 'openvino':
-        args = openvino_cmake_args()
+    elif be.startswith('openvino'):
+        args = openvino_cmake_args(be)
     elif be == 'tensorflow1':
         args = tensorflow_cmake_args(1, images, library_paths)
     elif be == 'tensorflow2':
@@ -594,27 +603,37 @@ def onnxruntime_cmake_args(images, library_paths):
     return cargs
 
 
-def openvino_cmake_args():
+def openvino_cmake_args(be):
+    if be == "openvino":
+        ov_version = TRITON_VERSION_MAP[FLAGS.version][4]
+    else:
+        ov_version = TRITON_VERSION_MAP[FLAGS.version][6]
     cargs = [
-        cmake_backend_arg('openvino', 'TRITON_BUILD_OPENVINO_VERSION', None,
-                          TRITON_VERSION_MAP[FLAGS.version][4]),
-    ]
-
+            cmake_backend_arg(be, 'TRITON_BUILD_OPENVINO_VERSION', None,
+                              ov_version),
+            ]
+    cargs.append(cmake_backend_arg(be, 'TRITON_OPENVINO_BACKEND_INSTALLDIR', None,
+                              be))
     if target_platform() == 'windows':
         if 'base' in images:
             cargs.append(
-                cmake_backend_arg('openvino', 'TRITON_BUILD_CONTAINER', None,
+                cmake_backend_arg(be, 'TRITON_BUILD_CONTAINER', None,
                                   images['base']))
     else:
         if 'base' in images:
             cargs.append(
-                cmake_backend_arg('openvino', 'TRITON_BUILD_CONTAINER', None,
+                cmake_backend_arg(be, 'TRITON_BUILD_CONTAINER', None,
                                   images['base']))
         else:
             cargs.append(
-                cmake_backend_arg('openvino', 'TRITON_BUILD_CONTAINER_VERSION',
+                cmake_backend_arg(be, 'TRITON_BUILD_CONTAINER_VERSION',
                                   None, TRITON_VERSION_MAP[FLAGS.version][1]))
-
+        # Use prebuilt openvino by default for openvino_21_4. This option can be
+        # modified with command line option.
+        cargs.append(
+                    cmake_backend_enable(be,
+                                         'TRITON_BUILD_USE_PREBUILT_OPENVINO',
+                                         (be == "openvino_21_4")))
     return cargs
 
 
