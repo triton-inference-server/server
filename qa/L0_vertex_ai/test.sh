@@ -176,7 +176,7 @@ fi
 # Note that when default true, HTTP / GRPC endpoints will be disabled,
 # check those endpoints by enabling one of them at a time and greping keywords
 export AIP_MODE=PREDICTION
-SERVER_ARGS="${BASE_SERVER_ARGS} --allow-grpc=true"
+SERVER_ARGS=" --model-repository=single_model --allow-grpc=true"
 # Using nowait as 'run_server' requires HTTP endpoint enabled
 run_server_nowait
 sleep 10
