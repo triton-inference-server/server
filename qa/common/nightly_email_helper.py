@@ -1,5 +1,5 @@
 #!/usr/bin/env python
-# Copyright (c) 2021, NVIDIA CORPORATION. All rights reserved.
+# Copyright (c) 2021, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -57,12 +57,13 @@ def send(subject: str,
         mime_text = MIMEText(content)
     msg.attach(mime_text)
 
+    if attachments is None:
+        attachments = []
+
     if files_to_tar is not None:
         with tarfile.open(subject + ".tgz", "w:gz") as csv_tar:
             for filename in glob.glob(files_to_tar):
                 csv_tar.add(filename)
-        if attachments is None:
-            attachments = []
         attachments.append(subject + ".tgz")
 
     for fname in attachments:
