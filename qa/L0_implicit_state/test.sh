@@ -29,36 +29,12 @@ export ENSEMBLES=0
 BACKENDS=${BACKENDS:="onnx plan"}
 export BACKENDS
 export IMPLICIT_STATE=1
-unset INITIAL_STATE_ZERO
-unset INITIAL_STATE_FILE
+INITIAL_STATE_ZERO=${INITIAL_STATE_ZERO:="0"}
+INITIAL_STATE_FILE=${INITIAL_STATE_FILE:="0"}
 
-(cd ../L0_sequence_batcher/ && bash -ex test.sh)
-RET=$?
+export INITIAL_STATE_ZERO
+export INITIAL_STATE_FILE
 
-if [ $RET == 0 ]; then
-    echo -e "\n***\n*** Implicit State Passed\n***"
-else
-    echo -e "\n***\n*** Implicit State FAILED\n***"
-    exit 1
-fi
-
-# Test setting initial state from zeros
-BACKENDS="onnx"
-export BACKENDS
-export INITIAL_STATE_ZERO=1
-(cd ../L0_sequence_batcher/ && bash -ex test.sh)
-RET=$?
-
-if [ $RET == 0 ]; then
-    echo -e "\n***\n*** Implicit State Passed\n***"
-else
-    echo -e "\n***\n*** Implicit State FAILED\n***"
-    exit 1
-fi
-
-# Test setting initial state from file
-unset INITIAL_STATE_ZERO
-export INITIAL_STATE_FILE=1
 (cd ../L0_sequence_batcher/ && bash -ex test.sh)
 RET=$?
 
