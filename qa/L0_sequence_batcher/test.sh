@@ -215,6 +215,12 @@ for BACKEND in $BACKENDS; do
   fi
 done
 
+if [ "$INITIAL_STATE_FILE" == "1" ]; then
+  # Create the input_state_data file.
+  rm -rf input_state_data
+  echo -n -e "\\x64\\x00\\x00\\x00" > input_state_data
+fi
+
 for MODEL in $MODELS; do
   if [[ ! "$TEST_VALGRIND" -eq 1 ]]; then
     cp -r $MODEL models1/. && \
@@ -257,8 +263,8 @@ for MODEL in $MODELS; do
         sed -i "s/sequence_batching {/sequence_batching {\\ndirect {\\nmax_queue_delay_microseconds: 3000000\\nminimum_slot_utilization: 0\\n}/" config.pbtxt && \
         sed -i "s/minimum_slot_utilization: 0/minimum_slot_utilization: 1/" config.pbtxt)
   fi
-
 done
+
 # Adjust the model repository for reading initial state for implicit state from file
 if [ "$INITIAL_STATE_FILE" == "1" ]; then
   for MODEL in $MODELS; do
@@ -294,7 +300,6 @@ if [ "$INITIAL_STATE_FILE" == "1" ]; then
   done
 fi
 
-
 MODELS=""
 for BACKEND in $BACKENDS; do
   if [[ $BACKEND == "custom" ]]; then
@@ -320,12 +325,6 @@ for BACKEND in $BACKENDS; do
     fi
   fi
 done
-    
-if [ "$INITIAL_STATE_FILE" == "1" ]; then
-  # Create the input_state_data file.
-  rm -rf input_state_data
-  echo -n -e \\x64\\x00\\x00\\x00 > input_state_data
-fi
 
 for MODEL in $MODELS; do
     cp -r $MODEL models0/. && \

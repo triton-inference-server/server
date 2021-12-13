@@ -107,7 +107,6 @@ class SequenceStates {
 
     std::string state_init_name_;
     std::shared_ptr<MutableMemory> data_;
-    std::shared_ptr<std::string> file_data_;
   };
 
   // Initialize the state tensors according to the state model configuration.
