@@ -288,12 +288,6 @@ class LifeCycleTest(tu.TestResultCollector):
                 self.assertIn(
                     "Request for unknown model: 'graphdef_float32_float32_float32' is not found",
                     ex.message())
-                with open(os.environ["SERVER_LOG"]) as log:
-                    log_text = log.read()
-                    self.assertIn("failed to open text file for read", log_text)
-                    self.assertIn(
-                        "{}/config.pbtxt: No such file or directory".format(
-                            model_name), log_text)
 
         # And other models should be loaded successfully
         try:
@@ -611,8 +605,8 @@ class LifeCycleTest(tu.TestResultCollector):
                 "expected error for unavailable model " + savedmodel_name)
         except Exception as ex:
             self.assertIn(
-                "Request for unknown model: 'savedmodel_float32_float32_float32' has no available versions",
-                ex.message())
+                "Request for unknown model: '{}' has no available versions".
+                format(savedmodel_name), ex.message())
 
         # Add back the same model. The status/stats should be reset.
         try:
@@ -1862,10 +1856,6 @@ class LifeCycleTest(tu.TestResultCollector):
         except Exception as ex:
             self.assertIn("version 2: Internal: GPU instances not supported",
                           ex.message())
-            with open(os.environ["SERVER_LOG"]) as log:
-                self.assertIn(
-                    "failed to load '{}' version 2: Internal: GPU instances not supported"
-                    .format(model_name), log.read())
 
         # Make sure version 1 of the model is available, and version 2 is not
         try:
