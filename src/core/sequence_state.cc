@@ -74,7 +74,8 @@ SequenceStates::Initialize(
     const std::unordered_map<
         std::string, const inference::ModelSequenceBatching_State&>&
         state_output_config_map,
-    const size_t max_batch_size)
+    const size_t max_batch_size,
+    const std::unordered_map<std::string, InitialStateData>& initial_state)
 {
   input_states_.clear();
   output_states_.clear();
@@ -96,9 +97,28 @@ SequenceStates::Initialize(
       }
     }
 
-    const size_t state_size = GetByteSize(state.second.data_type(), dims);
-    auto data = std::make_shared<AllocatedMemory>(
-        state_size, TRITONSERVER_MEMORY_CPU, 0);
+    std::shared_ptr<AllocatedMemory> data;
+    auto initial_state_it = initial_state.find(state_config.input_name());
+    if (initial_state_it != initial_state.end()) {
+      data = std::make_shared<AllocatedMemory>(
+          initial_state_it->second.data_->TotalByteSize(),
+          TRITONSERVER_MEMORY_CPU, 0);
+
+      TRITONSERVER_MemoryType memory_type;
+      int64_t memory_type_id;
+      char* dst_buffer = data->MutableBuffer(&memory_type, &memory_type_id);
+      char* initial_state_buffer =
+          initial_state_it->second.data_->MutableBuffer(
+              &memory_type, &memory_type_id);
+
+      memcpy(
+          dst_buffer, initial_state_buffer,
+          initial_state_it->second.data_->TotalByteSize());
+    } else {
+      const size_t state_size = GetByteSize(state.second.data_type(), dims);
+      data = std::make_shared<AllocatedMemory>(
+          state_size, TRITONSERVER_MEMORY_CPU, 0);
+    }
 
     const auto& input_pair = input_states_.emplace(
         std::piecewise_construct,
@@ -194,8 +214,8 @@ SequenceStates::OutputState(
       TRITONSERVER_MemoryType memory_type;
       int64_t memory_type_id;
 
-      const std::shared_ptr<AllocatedMemory>& input_memory =
-          reinterpret_cast<const std::shared_ptr<AllocatedMemory>&>(
+      const std::shared_ptr<MutableMemory>& input_memory =
+          reinterpret_cast<const std::shared_ptr<MutableMemory>&>(
               input_state_r->Data());
 
       input_memory->MutableBuffer(&memory_type, &memory_type_id);
