@@ -240,8 +240,8 @@ def stress_thread(name, seed, correlation_id_base, test_case_count,
                 update_counter_fn(scenario.scenario_name(), False)
                 _thread_exceptions_mutex.acquire()
                 try:
-                    _thread_exceptions.append(
-                        (scenario.scenario_name(), traceback.format_exc()))
+                    _thread_exceptions.append((name, scenario.scenario_name(),
+                                               traceback.format_exc()))
                 finally:
                     _thread_exceptions_mutex.release()
 
@@ -347,7 +347,11 @@ def generate_report(elapsed_time, _test_case_count, _failed_test_case_count,
         description = test_case_description[c]
         # Add additional description on scenarios that allow failure
         if c in ALLOW_FAILURE_SCENARIO:
-            description += " Note that this scenario is marked to allow failure due to subtle edge cases that will be investigated in the future. However, only a minimal failure count is expected and we should take action if the number is concerning."
+            description += " Note that this scenario is marked to allow " \
+                           "failure due to subtle edge cases that will be " \
+                           "investigated in the future. However, only a " \
+                           "minimal failure count is expected and we should " \
+                           "take action if the number is concerning."
         t.add_row([
             c, acc_failed_test_case_count[c] if c in acc_failed_test_case_count
             else 0, acc_test_case_count[c] if c in acc_test_case_count else 0,
@@ -469,8 +473,9 @@ if __name__ == '__main__':
     _thread_exceptions_mutex.acquire()
     try:
         if len(_thread_exceptions) > 0:
-            for scenario, ex in _thread_exceptions:
-                print("*********\n{}".format(ex))
+            for thread, scenario, ex in _thread_exceptions:
+                print("*********\n* {} {}\n{}*********\n".format(
+                    thread, scenario, ex))
                 if scenario not in ALLOW_FAILURE_SCENARIO:
                     exit_code = 1
     finally:
