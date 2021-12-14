@@ -187,6 +187,42 @@ wait $SERVER_PID
 awslocal $ENDPOINT_FLAG s3 rm s3://demo-bucket1.0 --recursive --include "*" && \
     awslocal $ENDPOINT_FLAG s3 rb s3://demo-bucket1.0
 
+# Test with Polling, no model configuration file - with strict model config disabled
+rm -rf models && mkdir models
+cp -r $DATADIR/savedmodel_float32_float32_float32 models/.
+rm models/savedmodel_float32_float32_float32/config.pbtxt
+# touch models/savedmodel_float32_float32_float32/config.pbtxt
+
+awslocal $ENDPOINT_FLAG s3 mb s3://demo-bucket1.0 && \
+    awslocal $ENDPOINT_FLAG s3 sync models s3://demo-bucket1.0
+
+SERVER_ARGS="--model-repository=s3://localhost:4572/demo-bucket1.0 --model-control-mode=poll --strict-model-config=false"
+SERVER_LOG="./inference_server_noconfig.log"
+
+run_server
+if [ "$SERVER_PID" == "0" ]; then
+    echo -e "\n***\n*** Failed to start $SERVER\n***"
+    cat $SERVER_LOG
+    # Kill minio server
+    kill $MINIO_PID
+    wait $MINIO_PID
+    exit 1
+fi
+
+$PERF_CLIENT -m savedmodel_float32_float32_float32 -p 3000 -t 1 > $CLIENT_LOG 2>&1
+if [ $? -ne 0 ]; then
+    echo -e "\n***\n*** Test Failed\n***"
+    cat $CLIENT_LOG
+    RET=1
+fi
+
+kill $SERVER_PID
+wait $SERVER_PID
+
+# Destroy bucket
+awslocal $ENDPOINT_FLAG s3 rm s3://demo-bucket1.0 --recursive --include "*" && \
+    awslocal $ENDPOINT_FLAG s3 rb s3://demo-bucket1.0
+
 # Kill minio server
 kill $MINIO_PID
 wait $MINIO_PID
