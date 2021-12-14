@@ -83,13 +83,14 @@ HOST_RAGGEDDESTDIR=/tmp/$TRITON_VERSION/qa_ragged_model_repository
 HOST_FORMATDESTDIR=/tmp/$TRITON_VERSION/qa_trt_format_model_repository
 HOST_IMPLICITSEQDESTDIR=/tmp/$TRITON_VERSION/qa_sequence_implicit_model_repository
 HOST_VARIMPLICITSEQDESTDIR=/tmp/$TRITON_VERSION/qa_variable_sequence_implicit_model_repository
+HOST_INITIALSTATEIMPLICITSEQDESTDIR=/tmp/$TRITON_VERSION/qa_sequence_initial_state_implicit_model_repository
 
 rm -fr $HOST_SRCDIR $HOST_DESTDIR $HOST_VARDESTDIR
 rm -fr $HOST_IDENTITYDESTDIR $HOST_IDENTITYBIGDESTDIR $HOST_SHAPEDESTDIR $HOST_SIGDEFDESTDIR
 rm -fr $HOST_SEQDESTDIR $HOST_DYNASEQDESTDIR $HOST_VARSEQDESTDIR
 rm -fr $HOST_ENSEMBLEDESTDIR $HOST_NOSHAPEDESTDIR $HOST_RESHAPEDESTDIR
 rm -fr $HOST_PLGDESTDIR $HOST_RAGGEDDESTDIR $HOST_FORMATDESTDIR
-rm -rf $HOST_IMPLICITSEQDESTDIR $HOST_VARIMPLICITSEQDESTDIR $HOST_DYNASEQIMPLICITDESTDIR
+rm -rf $HOST_IMPLICITSEQDESTDIR $HOST_VARIMPLICITSEQDESTDIR $HOST_DYNASEQIMPLICITDESTDIR $HOST_INITIALSTATEIMPLICITSEQDESTDIR
 mkdir -p $HOST_SRCDIR
 mkdir -p $HOST_DESTDIR
 mkdir -p $HOST_VARDESTDIR
@@ -109,6 +110,7 @@ mkdir -p $HOST_RAGGEDDESTDIR
 mkdir -p $HOST_FORMATDESTDIR
 mkdir -p $HOST_IMPLICITSEQDESTDIR
 mkdir -p $HOST_VARIMPLICITSEQDESTDIR
+mkdir -p $HOST_INITIALSTATEIMPLICITSEQDESTDIR
 
 # Since the models required by ensemble models may not be available
 # at this point, storing ensemble models separately so that other qa directories
@@ -154,7 +156,9 @@ SHAPEDESTDIR=/tmp/shapetensormodels
 RESHAPEDESTDIR=/tmp/reshapemodels
 SEQDESTDIR=/tmp/seqmodels
 IMPLICITSEQDESTDIR=/tmp/implicitseqmodels
+INITIALSTATEIMPLICITSEQDESTDIR=/tmp/initialstateimplicitseqmodels
 VARIMPLICITSEQDESTDIR=/tmp/varimplicitseqmodels
+VARINITIALSTATEIMPLICITSEQDESTDIR=/tmp/varinitialstateimplicitseqmodels
 DYNASEQDESTDIR=/tmp/dynaseqmodels
 DYNASEQIMPLICITDESTDIR=/tmp/dynaseqimplicitmodels
 VARSEQDESTDIR=/tmp/varseqmodels
@@ -254,6 +258,10 @@ python3 $SRCDIR/gen_qa_sequence_models.py --onnx --onnx_opset=$ONNX_OPSET --mode
 chmod -R 777 $SEQDESTDIR
 python3 $SRCDIR/gen_qa_sequence_models.py --onnx --onnx_opset=$ONNX_OPSET --variable --models_dir=$VARSEQDESTDIR
 chmod -R 777 $VARSEQDESTDIR
+python3 $SRCDIR/gen_qa_implicit_models.py --onnx --initial-state zero --onnx_opset=$ONNX_OPSET --models_dir=$INITIALSTATEIMPLICITSEQDESTDIR
+chmod -R 777 $INITIALSTATEIMPLICITSEQDESTDIR
+python3 $SRCDIR/gen_qa_implicit_models.py --onnx --initial-state zero --onnx_opset=$ONNX_OPSET --variable --models_dir=$VARINITIALSTATEIMPLICITSEQDESTDIR
+chmod -R 777 $VARINITIALSTATEIMPLICITSEQDESTDIR
 python3 $SRCDIR/gen_qa_implicit_models.py --onnx --onnx_opset=$ONNX_OPSET --models_dir=$IMPLICITSEQDESTDIR
 chmod -R 777 $IMPLICITSEQDESTDIR
 python3 $SRCDIR/gen_qa_implicit_models.py --onnx --onnx_opset=$ONNX_OPSET --variable --models_dir=$VARIMPLICITSEQDESTDIR
@@ -286,6 +294,8 @@ docker run --gpus device=$CUDA_DEVICE --rm --entrypoint $SRCDIR/$ONNXSCRIPT \
        --mount type=bind,source=$HOST_RAGGEDDESTDIR,target=$RAGGEDDESTDIR \
        --mount type=bind,source=$HOST_VARIMPLICITSEQDESTDIR,target=$VARIMPLICITSEQDESTDIR \
        --mount type=bind,source=$HOST_IMPLICITSEQDESTDIR,target=$IMPLICITSEQDESTDIR \
+       --mount type=bind,source=$HOST_VARINITIALSTATEIMPLICITSEQDESTDIR,target=$VARINITIALSTATEIMPLICITSEQDESTDIR \
+       --mount type=bind,source=$HOST_INITIALSTATEIMPLICITSEQDESTDIR,target=$INITIALSTATEIMPLICITSEQDESTDIR \
        $UBUNTU_IMAGE
 if [ $? -ne 0 ]; then
     echo -e "Failed"

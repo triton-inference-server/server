@@ -73,6 +73,23 @@ SequenceBatchScheduler::Create(
 
   for (const inference::ModelSequenceBatching_State& state : states) {
     sched->state_output_config_map_.insert({state.output_name(), state});
+
+    if (state.initial_state_size() > 1) {
+      return Status(
+          Status::Code::INVALID_ARG,
+          std::string(
+              std::string("initial_state field for state input '") +
+              state.input_name() +
+              "' must contain exactly one or zero element. Found '" +
+              std::to_string(state.initial_state_size()) + "' elements."));
+    }
+
+    // If the model configuration has initial_state field.
+    if (state.initial_state_size() == 1) {
+      auto& initial_state = state.initial_state(0);
+      RETURN_IF_ERROR(
+          sched->GenerateInitialStateData(initial_state, state, model));
+    }
   }
 
   // Get the number of candidate sequence slots to allow for each
@@ -157,6 +174,139 @@ SequenceBatchScheduler::Create(
   return Status::Success;
 }
 
+Status
+SequenceBatchScheduler::GenerateInitialStateData(
+    const inference::ModelSequenceBatching_InitialState& initial_state,
+    const inference::ModelSequenceBatching_State& state, TritonModel* model)
+{
+  if (initial_state.data_type() != state.data_type()) {
+    return Status(
+        Status::Code::INVALID_ARG,
+        std::string("The data type used for 'initial_state' field of state '") +
+            state.input_name() + "' does not match the state data type.");
+  }
+
+  if (initial_state.name().size() == 0) {
+    return Status(
+        Status::Code::INVALID_ARG,
+        std::string("Field 'name' must be set when using initial_state for "
+                    "state input '") +
+            state.input_name() + "'.");
+  }
+
+  auto initial_state_itr = initial_state_.find(state.input_name());
+  if (initial_state_itr != initial_state_.end()) {
+    return Status(
+        Status::Code::INVALID_ARG, std::string("State input name '") +
+                                       state.input_name() +
+                                       "' specified more than once.");
+  }
+
+  if (initial_state.dims().size() != state.dims().size()) {
+    return Status(
+        Status::Code::INVALID_ARG,
+        std::string(
+            "Number of dimensions in 'initial_state' doesn't match the size of"
+            " 'state' dimensions for state input '") +
+            state.input_name() + "'. " +
+            std::to_string(initial_state.dims().size()) +
+            " != " + std::to_string(state.dims().size()));
+  }
+
+  // Check the dimensions to make sure it doesn't have variable-sized dims and
+  // matches the state description.
+  auto initial_state_dim = initial_state.dims().begin();
+  auto state_dim = state.dims().begin();
+  for (; initial_state_dim != initial_state.dims().end();
+       initial_state_dim++, state_dim++) {
+    if (*initial_state_dim == -1) {
+      return Status(
+          Status::Code::INVALID_ARG,
+          std::string("'initial_state' field for state input name '") +
+              state.input_name() + "' contains variable dimensions.");
+    } else {
+      if (*state_dim != -1 && *initial_state_dim != *state_dim) {
+        return Status(
+            Status::Code::INVALID_ARG,
+            std::string("'initial_state' dim for input name '") +
+                state.input_name() +
+                "' doesn't match 'state' dim description. " +
+                std::to_string(*initial_state_dim) +
+                " != " + std::to_string(*state_dim));
+      }
+    }
+  }
+
+  const auto& initial_state_pair = initial_state_.emplace(
+      std::piecewise_construct, std::forward_as_tuple(state.input_name()),
+      std::forward_as_tuple(initial_state.name()));
+  auto& initial_state_data = initial_state_pair.first->second;
+
+  // Calculate total memory byte size
+  auto element_count = GetElementCount(initial_state.dims());
+  size_t dtype_byte_size = GetDataTypeByteSize(initial_state.data_type());
+  size_t total_byte_size = element_count * dtype_byte_size;
+
+  // Custom handling for TYPE_BYTES
+  if (dtype_byte_size == 0) {
+    total_byte_size = sizeof(int32_t) * element_count;
+  }
+
+  switch (initial_state.state_data_case()) {
+    case inference::ModelSequenceBatching_InitialState::StateDataCase::
+        kZeroData: {
+      initial_state_data.data_ = std::make_shared<AllocatedMemory>(
+          total_byte_size, TRITONSERVER_MEMORY_CPU /* memory_type */,
+          0 /* memory_type_id */);
+
+      TRITONSERVER_MemoryType memory_type;
+      int64_t memory_type_id;
+      char* data_ptr = initial_state_data.data_->MutableBuffer(
+          &memory_type, &memory_type_id);
+      memset(data_ptr, 0, total_byte_size);
+      break;
+    }
+    case inference::ModelSequenceBatching_InitialState::StateDataCase::
+        kDataFile: {
+      std::string file_input;
+      RETURN_IF_ERROR(ReadTextFile(
+          JoinPath({model->LocalizedModelPath(), kInitialStateFolder,
+                    (initial_state.data_file())}),
+          &file_input));
+      if (initial_state.data_type() == inference::DataType::TYPE_STRING) {
+        total_byte_size = file_input.size();
+      } else if (total_byte_size > file_input.size()) {
+        return Status(
+            Status::Code::INVALID_ARG,
+            "initial_state setting expects " + std::to_string(total_byte_size) +
+                " bytes, but the data "
+                "provided from " +
+                initial_state.data_file() + "only has " +
+                std::to_string(file_input.size()) + " bytes.");
+      }
+
+      TRITONSERVER_MemoryType memory_type;
+      int64_t memory_type_id;
+
+      initial_state_data.data_ = std::make_shared<AllocatedMemory>(
+          total_byte_size, TRITONSERVER_MEMORY_CPU /* memory_type */,
+          0 /* memory_type_id */);
+      char* data_ptr = initial_state_data.data_->MutableBuffer(
+          &memory_type, &memory_type_id);
+      memcpy(data_ptr, file_input.data(), total_byte_size);
+
+      break;
+    }
+    default:
+      return Status(
+          Status::Code::INVALID_ARG,
+          std::string("initial_state setting expects state'") +
+              state.input_name() + "' to have state_data set");
+  }
+
+  return Status::Success;
+}
+
 SequenceBatchScheduler::~SequenceBatchScheduler()
 {
   // Signal the reaper thread to exit...
@@ -170,6 +320,7 @@ SequenceBatchScheduler::~SequenceBatchScheduler()
     reaper_thread_->join();
   }
 }
+
 
 namespace {
 
@@ -894,7 +1045,8 @@ SequenceBatch::UpdateImplicitState(
     if (sequence_states == nullptr) {
       sequence_states.reset(new SequenceStates);
       sequence_states->Initialize(
-          base_->StateOutputConfigMap(), base_->MaxBatchSize());
+          base_->StateOutputConfigMap(), base_->MaxBatchSize(),
+          base_->InitialState());
     }
 
     irequest->SetSequenceStates(sequence_states);
