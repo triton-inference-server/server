@@ -1406,6 +1406,8 @@ fi
 kill $SERVER_PID
 wait $SERVER_PID
 
+rm -f $CLIENT_LOG
+
 if [ $RET -eq 0 ]; then
   echo -e "\n***\n*** Test Passed\n***"
 fi
