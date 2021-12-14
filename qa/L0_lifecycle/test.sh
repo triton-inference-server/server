@@ -280,7 +280,7 @@ rm models/graphdef_float32_float32_float32/config.pbtxt
 
 SERVER_ARGS="--model-repository=`pwd`/models --model-repository=`pwd`/models_0 \
              --exit-on-error=false --exit-timeout-secs=5"
-SERVER_LOG="./inference_server_$LOG_IDX.log"
+export SERVER_LOG="./inference_server_$LOG_IDX.log"
 run_server_tolive
 if [ "$SERVER_PID" == "0" ]; then
     echo -e "\n***\n*** Failed to start $SERVER\n***"
@@ -1151,7 +1151,7 @@ SERVER_ARGS="--model-repository=`pwd`/models --model-control-mode=explicit \
              --exit-timeout-secs=5 --strict-model-config=false \
              --load-model=identity_zero_1_int32 \
              --strict-readiness=false"
-SERVER_LOG="./inference_server_$LOG_IDX.log"
+export SERVER_LOG="./inference_server_$LOG_IDX.log"
 run_server
 if [ "$SERVER_PID" == "0" ]; then
     echo -e "\n***\n*** Failed to start $SERVER\n***"

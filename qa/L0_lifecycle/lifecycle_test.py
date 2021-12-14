@@ -25,6 +25,7 @@
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 import sys
+
 sys.path.append("../common")
 
 from builtins import range
@@ -178,9 +179,9 @@ class LifeCycleTest(tu.TestResultCollector):
             self.assertTrue(
                 False, "expected error for unavailable model " + model_name)
         except Exception as ex:
-            self.assertTrue(ex.message().startswith(
-                "Request for unknown model: 'graphdef_float32_float32_float32' has no available versions"
-            ))
+            self.assertIn(
+                "Request for unknown model: 'graphdef_float32_float32_float32' has no available versions",
+                ex.message())
 
         # And other models should be loaded successfully
         try:
@@ -235,9 +236,9 @@ class LifeCycleTest(tu.TestResultCollector):
             self.assertTrue(
                 False, "expected error for unavailable model " + model_name)
         except Exception as ex:
-            self.assertTrue(ex.message().startswith(
-                "Request for unknown model: 'graphdef_float32_float32_float32' has no available versions"
-            ))
+            self.assertIn(
+                "Request for unknown model: 'graphdef_float32_float32_float32' has no available versions",
+                ex.message())
 
         # And other models should be loaded successfully
         try:
@@ -284,9 +285,15 @@ class LifeCycleTest(tu.TestResultCollector):
                     "' to be ignored due to polling failure")
 
             except Exception as ex:
-                self.assertTrue(ex.message().startswith(
-                    "Request for unknown model: 'graphdef_float32_float32_float32' is not found"
-                ))
+                self.assertIn(
+                    "Request for unknown model: 'graphdef_float32_float32_float32' is not found",
+                    ex.message())
+                with open(os.environ["SERVER_LOG"]) as log:
+                    log_text = log.read()
+                    self.assertIn("failed to open text file for read", log_text)
+                    self.assertIn(
+                        "{}/config.pbtxt: No such file or directory".format(
+                            model_name), log_text)
 
         # And other models should be loaded successfully
         try:
@@ -411,9 +418,9 @@ class LifeCycleTest(tu.TestResultCollector):
             self.assertTrue(
                 False, "expected error for unavailable model " + model_name)
         except Exception as ex:
-            self.assertTrue(ex.message().startswith(
-                "Request for unknown model: 'graphdef_float32_float32_float32' has no available versions"
-            ))
+            self.assertIn(
+                "Request for unknown model: 'graphdef_float32_float32_float32' has no available versions",
+                ex.message())
 
     def test_parse_ignore_zero_prefixed_version(self):
         tensor_shape = (1, 16)
@@ -603,9 +610,9 @@ class LifeCycleTest(tu.TestResultCollector):
                 False,
                 "expected error for unavailable model " + savedmodel_name)
         except Exception as ex:
-            self.assertTrue(ex.message().startswith(
-                "Request for unknown model: 'savedmodel_float32_float32_float32' has no available versions"
-            ))
+            self.assertIn(
+                "Request for unknown model: 'savedmodel_float32_float32_float32' has no available versions",
+                ex.message())
 
         # Add back the same model. The status/stats should be reset.
         try:
@@ -684,9 +691,9 @@ class LifeCycleTest(tu.TestResultCollector):
             self.assertTrue(False,
                             "expected error for unavailable model " + onnx_name)
         except Exception as ex:
-            self.assertTrue(ex.message().startswith(
-                "Request for unknown model: 'onnx_float32_float32_float32' has no available versions"
-            ))
+            self.assertIn(
+                "Request for unknown model: 'onnx_float32_float32_float32' has no available versions",
+                ex.message())
 
     def test_dynamic_model_load_unload_disabled(self):
         tensor_shape = (1, 16)
@@ -747,9 +754,9 @@ class LifeCycleTest(tu.TestResultCollector):
                 False,
                 "expected error for unavailable model " + savedmodel_name)
         except Exception as ex:
-            self.assertTrue(ex.message().startswith(
-                "Request for unknown model: 'savedmodel_float32_float32_float32' is not found"
-            ))
+            self.assertIn(
+                "Request for unknown model: 'savedmodel_float32_float32_float32' is not found",
+                ex.message())
 
         # Remove one of the original models from the model repository.
         # Unloading is disabled so it should remain available in the status.
@@ -890,9 +897,9 @@ class LifeCycleTest(tu.TestResultCollector):
             self.assertTrue(
                 False, "expected error for unavailable model " + graphdef_name)
         except Exception as ex:
-            self.assertTrue(ex.message().startswith(
-                "Request for unknown model: 'graphdef_int32_int32_int32' version 1 is not at ready state"
-            ))
+            self.assertIn(
+                "Request for unknown model: 'graphdef_int32_int32_int32' version 1 is not at ready state",
+                ex.message())
 
         # Add another version to the model repository.
         try:
@@ -1087,8 +1094,7 @@ class LifeCycleTest(tu.TestResultCollector):
                 self.assertTrue(
                     False, "expected error for unavailable model " + model_name)
             except Exception as ex:
-                self.assertTrue(
-                    ex.message().startswith("Request for unknown model"))
+                self.assertIn("Request for unknown model", ex.message())
 
         # Version 3 should continue to work...
         for model_name, model_shape in zip(models_base, models_shape):
@@ -1197,8 +1203,7 @@ class LifeCycleTest(tu.TestResultCollector):
                     False,
                     "expected error for unavailable model " + graphdef_name)
             except Exception as ex:
-                self.assertTrue(
-                    ex.message().startswith("Request for unknown model"))
+                self.assertIn("Request for unknown model", ex.message())
 
     def test_multiple_model_repository_polling(self):
         model_shape = (1, 16)
@@ -1301,8 +1306,8 @@ class LifeCycleTest(tu.TestResultCollector):
                                                              verbose=True)
             triton_client.load_model(savedmodel_name)
         except Exception as ex:
-            self.assertTrue(ex.message().startswith(
-                "failed to load '{}'".format(savedmodel_name)))
+            self.assertIn("failed to load '{}'".format(savedmodel_name),
+                          ex.message())
 
         try:
             for triton_client in (httpclient.InferenceServerClient(
@@ -1330,8 +1335,8 @@ class LifeCycleTest(tu.TestResultCollector):
                                                              verbose=True)
             triton_client.load_model(savedmodel_name)
         except Exception as ex:
-            self.assertTrue(ex.message().startswith(
-                "failed to load '{}'".format(savedmodel_name)))
+            self.assertIn("failed to load '{}'".format(savedmodel_name),
+                          ex.message())
 
         self._infer_success_models(['savedmodel', 'graphdef', 'onnx'], (1, 3),
                                    model_shape)
@@ -1369,8 +1374,9 @@ class LifeCycleTest(tu.TestResultCollector):
                 triton_client.load_model("unknown_model")
                 self.assertTrue(False, "expected unknown model failure")
             except Exception as ex:
-                self.assertTrue(ex.message().startswith(
-                    "failed to load 'unknown_model', no version is available"))
+                self.assertIn(
+                    "failed to load 'unknown_model', no version is available",
+                    ex.message())
 
         # Load ensemble model, the dependent model should be polled and loaded
         try:
@@ -1854,7 +1860,12 @@ class LifeCycleTest(tu.TestResultCollector):
             triton_client.load_model(model_name)
             self.assertTrue(False, "expecting load failure")
         except Exception as ex:
-            pass
+            self.assertIn("version 2: Internal: GPU instances not supported",
+                          ex.message())
+            with open(os.environ["SERVER_LOG"]) as log:
+                self.assertIn(
+                    "failed to load '{}' version 2: Internal: GPU instances not supported"
+                    .format(model_name), log.read())
 
         # Make sure version 1 of the model is available, and version 2 is not
         try:
@@ -1919,8 +1930,9 @@ class LifeCycleTest(tu.TestResultCollector):
                 triton_client.load_model("unknown_model")
                 self.assertTrue(False, "expected unknown model failure")
             except Exception as ex:
-                self.assertTrue(ex.message().startswith(
-                    "failed to load 'unknown_model', no version is available"))
+                self.assertIn(
+                    "failed to load 'unknown_model', no version is available",
+                    ex.message())
 
         # Load plan ensemble model, the dependent model is already
         # loaded via command-line
