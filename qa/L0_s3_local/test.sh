@@ -191,7 +191,6 @@ awslocal $ENDPOINT_FLAG s3 rm s3://demo-bucket1.0 --recursive --include "*" && \
 rm -rf models && mkdir models
 cp -r $DATADIR/savedmodel_float32_float32_float32 models/.
 rm models/savedmodel_float32_float32_float32/config.pbtxt
-# touch models/savedmodel_float32_float32_float32/config.pbtxt
 
 awslocal $ENDPOINT_FLAG s3 mb s3://demo-bucket1.0 && \
     awslocal $ENDPOINT_FLAG s3 sync models s3://demo-bucket1.0
