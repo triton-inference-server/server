@@ -81,13 +81,13 @@ fi
 
 echo
 
-if [[ $# -eq 0 ]]; then
-  # If detect Vertex AI environment, launch tritonserver with supplied arguments
-  if [[ ! -z "$AIP_MODE" ]]; then
-    exec "tritonserver $@"
-  else
-    exec "/bin/bash"
-  fi
+# If detect Vertex AI environment, launch tritonserver with supplied arguments
+if [[ ! -z "$AIP_MODE" ]]; then
+  exec "tritonserver $@"
 else
-  exec "$@"
+  if [[ $# -eq 0 ]]; then
+    exec "/bin/bash"
+  else
+    exec "$@"
+  fi
 fi
