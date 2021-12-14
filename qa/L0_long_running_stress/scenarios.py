@@ -37,6 +37,7 @@ import math
 from PIL import Image
 import os
 import subprocess
+import threading
 if sys.version_info >= (3, 0):
     import queue
 else:
@@ -65,10 +66,11 @@ def completion_callback(user_data, result, error):
 
 class Scenario(metaclass=abc.ABCMeta):
 
-    def __init__(self, name, trials, verbose=False):
+    def __init__(self, name, trials, verbose=False, out_stream=sys.stdout):
         self.name_ = name
         self.trials_ = trials
         self.verbose_ = verbose
+        self.out_stream_ = out_stream
 
     def scenario_name(self):
         return type(self).__name__
@@ -96,6 +98,7 @@ class Scenario(metaclass=abc.ABCMeta):
 class PerfAnalyzerScenario(Scenario):
     # Some class static variables
     command_ = "../clients/perf_analyzer"
+    generation_mutex_ = threading.Lock()
 
     class ModelOption:
         # 'concurrency_range' is a 3 element tuple/list that specifies
@@ -119,11 +122,15 @@ class PerfAnalyzerScenario(Scenario):
             self.queue_latency_range_us_ = queue_latency_range_us
             self.input_file_ = input_file
 
-        def run(self, name, sequence_id_range):
-            csv_file = "{}_{}_{}.csv".format(name, self.model_name_,
-                                             self.concurrency_range_[2])
+        def run(self, name, sequence_id_range, out_stream):
+            csv_file = os.path.join(
+                "csv_dir", "{}_{}_{}.csv".format(name, self.model_name_,
+                                                 self.concurrency_range_[2]))
 
             arg_list = [PerfAnalyzerScenario.command_]
+            # Always use GRPC streaming feature to ensure requests are handled
+            # in order
+            arg_list += ["-i", "grpc", "--streaming"]
             arg_list += ["-m", "{}".format(self.model_name_)]
             arg_list += ["-b", "{}".format(self.batch_size_)]
             arg_list += [
@@ -143,9 +150,12 @@ class PerfAnalyzerScenario(Scenario):
                 ]
 
             completed_process = subprocess.run(arg_list,
-                                               check=True,
                                                text=True,
-                                               stdout=subprocess.PIPE)
+                                               stdout=subprocess.PIPE,
+                                               stderr=subprocess.STDOUT)
+            # Write output to file before checking return code
+            print(completed_process.stdout, file=out_stream)
+            completed_process.check_returncode()
 
             # Read queue time and adjust concurrency
             with open(csv_file, newline='') as csvfile:
@@ -171,8 +181,9 @@ class PerfAnalyzerScenario(Scenario):
                  identity_trials,
                  queue_latency_range_us=(10000, 100000),
                  sequence_id_range=None,
-                 verbose=False):
-        super().__init__(name, [], verbose)
+                 verbose=False,
+                 out_stream=sys.stdout):
+        super().__init__(name, [], verbose, out_stream)
         self.rng_ = rng
         self.sequence_id_range_ = sequence_id_range
         # List of tuples
@@ -242,6 +253,9 @@ class PerfAnalyzerScenario(Scenario):
                 res = i
             elif dtype == np.dtype(object):
                 res = str(i)
+            else:
+                raise Exception(
+                    "unexpected sequence data type {}".format(dtype))
             input_data.append({input0: [res]})
         output0 = "OUTPUT" if "libtorch" not in trial else "OUTPUT__0"
         output_data = []
@@ -256,6 +270,9 @@ class PerfAnalyzerScenario(Scenario):
                     res = sum
                 elif dtype == np.dtype(object):
                     res = str(sum)
+                else:
+                    raise Exception(
+                        "unexpected sequence data type {}".format(dtype))
                 output_data.append({output0: [res]})
         else:
             for i in range(3):
@@ -263,16 +280,23 @@ class PerfAnalyzerScenario(Scenario):
                 if dtype == np.float32:
                     res = float(res)
                 elif dtype == np.int32:
-                    # Do nothing
-                    pass
+                    res = int(res)
                 elif dtype == np.dtype(object):
                     res = str(res)
+                else:
+                    raise Exception(
+                        "unexpected sequence data type {}".format(dtype))
                 output_data.append(
                     {output0: [res if dtype != np.dtype(object) else str(res)]})
         data = {"data": [input_data]}
         data["validation_data"] = [output_data]
-        with open(data_filename, 'w') as f:
-            json.dump(data, f)
+
+        # Only write to a file if there isn't validation file for the model
+        PerfAnalyzerScenario.generation_mutex_.acquire()
+        if not os.path.exists(data_filename):
+            with open(data_filename, 'w') as f:
+                json.dump(data, f)
+        PerfAnalyzerScenario.generation_mutex_.release()
 
     def generate_identity_data(self, trial, dtype, data_filename):
         input0 = "INPUT0" if "libtorch" not in trial else "INPUT__0"
@@ -285,6 +309,9 @@ class PerfAnalyzerScenario(Scenario):
                 res = i
             elif dtype == np.dtype(object):
                 res = str(i)
+            else:
+                raise Exception(
+                    "unexpected identity data type {}".format(dtype))
             io_data.append(res)
         data = {
             "data": [{
@@ -300,18 +327,27 @@ class PerfAnalyzerScenario(Scenario):
                 }
             }]
         }
-        with open(data_filename, 'w') as f:
-            json.dump(data, f)
+        # Only write to a file if there isn't validation file for the model
+        PerfAnalyzerScenario.generation_mutex_.acquire()
+        if not os.path.exists(data_filename):
+            with open(data_filename, 'w') as f:
+                json.dump(data, f)
+        PerfAnalyzerScenario.generation_mutex_.release()
 
     def run(self, client_metadata):
         model_option = np.random.choice(self.options_)
-        return model_option.run(self.name_, self.sequence_id_range_)
+        return model_option.run(self.name_, self.sequence_id_range_,
+                                self.out_stream_)
 
 
 class ResNetScenario(Scenario):
 
-    def __init__(self, name, batch_size=32, verbose=False):
-        super().__init__(name, [], verbose)
+    def __init__(self,
+                 name,
+                 batch_size=32,
+                 verbose=False,
+                 out_stream=sys.stdout):
+        super().__init__(name, [], verbose, out_stream)
         self.model_name_ = "resnet_v1_50_graphdef_def"
         self.batch_size_ = batch_size
 
@@ -371,8 +407,9 @@ class TimeoutScenario(Scenario):
                  trials,
                  input_dtype=np.float32,
                  input_name="INPUT0",
-                 verbose=False):
-        super().__init__(name, trials, verbose)
+                 verbose=False,
+                 out_stream=sys.stdout):
+        super().__init__(name, trials, verbose, out_stream)
         self.input_dtype_ = input_dtype
         self.input_name_ = input_name
 
@@ -406,8 +443,8 @@ class TimeoutScenario(Scenario):
 
 class CrashingScenario(Scenario):
 
-    def __init__(self, name, verbose=False):
-        super().__init__(name, [], verbose)
+    def __init__(self, name, verbose=False, out_stream=sys.stdout):
+        super().__init__(name, [], verbose, out_stream)
 
     def run(self, client_metadata):
         # Only use "custom" model as it simulates exectuion delay which
@@ -460,8 +497,14 @@ class SequenceScenario(Scenario):
     def check_constraints(self, model_name, sequence_id):
         pass
 
-    def __init__(self, name, trials, rng, sequence_constraints, verbose=False):
-        super().__init__(name, trials, verbose)
+    def __init__(self,
+                 name,
+                 trials,
+                 rng,
+                 sequence_constraints,
+                 verbose=False,
+                 out_stream=sys.stdout):
+        super().__init__(name, trials, verbose, out_stream)
         self.rng_ = rng
         self.sequence_constraints_ = sequence_constraints
 
@@ -571,7 +614,8 @@ class SequenceScenario(Scenario):
                     output_name)[0][0]
             if self.verbose_:
                 print("{} {}: + {} = {}".format(sequence_name, sequence_id,
-                                                value, result))
+                                                value, result),
+                      file=self.out_stream_)
 
             if expected is not None:
                 if input_dtype == np.object_:
@@ -588,8 +632,15 @@ class SequenceScenario(Scenario):
 
 class SequenceNoEndScenario(SequenceScenario):
 
-    def __init__(self, name, trials, rng, sequence_constraints, verbose=False):
-        super().__init__(name, trials, rng, sequence_constraints, verbose)
+    def __init__(self,
+                 name,
+                 trials,
+                 rng,
+                 sequence_constraints,
+                 verbose=False,
+                 out_stream=sys.stdout):
+        super().__init__(name, trials, rng, sequence_constraints, verbose,
+                         out_stream)
 
     def check_constraints(self, model_name, sequence_id):
         # The scenario can always be run regardless of the previous runs
@@ -615,7 +666,8 @@ class SequenceNoEndScenario(SequenceScenario):
         # slot reused for another sequence.
         seqlen = max(1, int(self.rng_.normal(len_mean, len_stddev)))
         print("{} {}: no-end seqlen = {}".format(self.name_, client_metadata[1],
-                                                 seqlen))
+                                                 seqlen),
+              file=self.out_stream_)
 
         values = self.rng_.randint(0, 1024 * 1024, size=seqlen).astype(dtype)
 
@@ -646,8 +698,15 @@ class SequenceNoEndScenario(SequenceScenario):
 
 class SequenceValidNoEndScenario(SequenceScenario):
 
-    def __init__(self, name, trials, rng, sequence_constraints, verbose=False):
-        super().__init__(name, trials, rng, sequence_constraints, verbose)
+    def __init__(self,
+                 name,
+                 trials,
+                 rng,
+                 sequence_constraints,
+                 verbose=False,
+                 out_stream=sys.stdout):
+        super().__init__(name, trials, rng, sequence_constraints, verbose,
+                         out_stream)
 
     def check_constraints(self, model_name, sequence_id):
         # The scenario can always be run regardless of the previous runs
@@ -676,7 +735,8 @@ class SequenceValidNoEndScenario(SequenceScenario):
             max(1, int(self.rng_.normal(len_mean, len_stddev)))
         ]
         print("{} {}: valid-no-end seqlen[0] = {}, seqlen[1] = {}".format(
-            self.name_, client_metadata[1], seqlen[0], seqlen[1]))
+            self.name_, client_metadata[1], seqlen[0], seqlen[1]),
+              file=self.out_stream_)
 
         values = [
             self.rng_.randint(0, 1024 * 1024, size=seqlen[0]).astype(dtype),
@@ -713,8 +773,15 @@ class SequenceValidNoEndScenario(SequenceScenario):
 
 class SequenceValidValidScenario(SequenceScenario):
 
-    def __init__(self, name, trials, rng, sequence_constraints, verbose=False):
-        super().__init__(name, trials, rng, sequence_constraints, verbose)
+    def __init__(self,
+                 name,
+                 trials,
+                 rng,
+                 sequence_constraints,
+                 verbose=False,
+                 out_stream=sys.stdout):
+        super().__init__(name, trials, rng, sequence_constraints, verbose,
+                         out_stream)
 
     def check_constraints(self, model_name, sequence_id):
         # The scenario can always be run regardless of the previous runs
@@ -743,7 +810,8 @@ class SequenceValidValidScenario(SequenceScenario):
             max(1, int(self.rng_.normal(len_mean, len_stddev)))
         ]
         print("{} {}: valid-valid seqlen[0] = {}, seqlen[1] = {}".format(
-            self.name_, client_metadata[1], seqlen[0], seqlen[1]))
+            self.name_, client_metadata[1], seqlen[0], seqlen[1]),
+              file=self.out_stream_)
 
         values = [
             self.rng_.randint(0, 1024 * 1024, size=seqlen[0]).astype(dtype),
@@ -780,8 +848,15 @@ class SequenceValidValidScenario(SequenceScenario):
 
 class SequenceNoStartScenario(SequenceScenario):
 
-    def __init__(self, name, trials, rng, sequence_constraints, verbose=False):
-        super().__init__(name, trials, rng, sequence_constraints, verbose)
+    def __init__(self,
+                 name,
+                 trials,
+                 rng,
+                 sequence_constraints,
+                 verbose=False,
+                 out_stream=sys.stdout):
+        super().__init__(name, trials, rng, sequence_constraints, verbose,
+                         out_stream)
 
     def check_constraints(self, model_name, sequence_id):
         # no-start cannot follow no-end since the server will
@@ -809,7 +884,8 @@ class SequenceNoStartScenario(SequenceScenario):
         # error from the server.
         seqlen = 1
         print("{} {}: no-start seqlen = {}".format(self.name_,
-                                                   client_metadata[1], seqlen))
+                                                   client_metadata[1], seqlen),
+              file=self.out_stream_)
 
         values = self.rng_.randint(0, 1024 * 1024, size=seqlen).astype(dtype)
 
@@ -839,8 +915,15 @@ class SequenceNoStartScenario(SequenceScenario):
 
 class SequenceValidScenario(SequenceScenario):
 
-    def __init__(self, name, trials, rng, sequence_constraints, verbose=False):
-        super().__init__(name, trials, rng, sequence_constraints, verbose)
+    def __init__(self,
+                 name,
+                 trials,
+                 rng,
+                 sequence_constraints,
+                 verbose=False,
+                 out_stream=sys.stdout):
+        super().__init__(name, trials, rng, sequence_constraints, verbose,
+                         out_stream)
 
     def check_constraints(self, model_name, sequence_id):
         # The scenario can always be run regardless of the previous runs
@@ -864,7 +947,8 @@ class SequenceValidScenario(SequenceScenario):
         # Create a variable length sequence with "start" and "end" flags.
         seqlen = max(1, int(self.rng_.normal(len_mean, len_stddev)))
         print("{} {}: valid seqlen = {}".format(self.name_, client_metadata[1],
-                                                seqlen))
+                                                seqlen),
+              file=self.out_stream_)
 
         values = self.rng_.randint(0, 1024 * 1024, size=seqlen).astype(dtype)
 
