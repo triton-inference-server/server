@@ -497,6 +497,9 @@ GCSFileSystem::FileExists(const std::string& path, bool* exists)
   google::cloud::StatusOr<gcs::ObjectMetadata> object_metadata =
       client_->GetObjectMetadata(bucket, object);
 
+  LOG_ERROR << path
+            << " object_metadata.status(): " << object_metadata.status().code();
+
   if (object_metadata) {
     *exists = true;
     return Status::Success;
