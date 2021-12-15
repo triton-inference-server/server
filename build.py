@@ -69,8 +69,17 @@ from distutils.dir_util import copy_tree
 # package version is specified, then backend will be built with pre-built
 # openVINO release from Intel. If the package version is specified as None,
 # then openVINO for the backend is built from source with openMP support.
-# By default, only the first version is built. To build the second version
-# use --build-multiple-openvino.
+# By default, only the first version is built. To build the all the versions
+# in list use --build-multiple-openvino. Triton will use the first version
+# for inference by default. In order to use different version, Triton should
+# be invoked with appropriate backend configuration:
+# (--backend-config=openvino,version=<version_str>)
+# The version string can be obtained as follows:
+# <major_version>_<minor_version>[_pre] 
+# Append '_pre' only if the openVINO backend was built with prebuilt openVINO
+# library. In other words, when the second element of the pair is not None.
+# To use ('2021.2', None) version_str should be `2021_2'.
+# To use ('2021.4', '2021.4.582') version_str should be `2021_4_pre'.
 #
 TRITON_VERSION_MAP = {
     '2.18.0dev': (
