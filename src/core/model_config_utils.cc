@@ -638,13 +638,8 @@ GetNormalizedModelConfig(
   // If 'autofill' then the configuration file can be empty.
   const auto config_path = JoinPath({path, kModelConfigPbTxt});
 
-  // Cloud file systems may report error when config file is missing. As a
-  // workaround, we assume that an error indicates that the file is missing.
   bool model_config_exists;
-  Status status = FileExists(config_path, &model_config_exists);
-  if (!status.IsOk()) {
-    model_config_exists = false;
-  }
+  RETURN_IF_ERROR(FileExists(config_path, &model_config_exists));
 
   if (autofill && !model_config_exists) {
     config->Clear();
