@@ -64,28 +64,29 @@ from distutils.dir_util import copy_tree
 # different versions are used then one backend or the other will
 # incorrectly load the other version of the openvino libraries.
 #
-# Adding another openvino version. Take note of the above issue
-# when loading mulitple backends with different openvino versions.
-# To use openvino_21_4, the model configuration should specify
-# the "openvino_21_4" in the "backend" field.
+# The standalone openVINO describes multiple versions where each version
+# is a pair of openVINO version and openVINO package version. When openVINO
+# package version is specified, then backend will be built with pre-built
+# openVINO release from Intel. If the package version is specified as None,
+# then openVINO for the backend is built from source with openMP support.
+# By default, only the first version is built. To build the second version
+# use --build-multiple-openvino.
 #
 TRITON_VERSION_MAP = {
     '2.18.0dev': (
         '22.01dev',  # triton container
         '21.11',  # upstream container
-        '1.10.0', # ORT
+        '1.10.0',  # ORT
         '2021.2.200',  # ORT OpenVINO
-        '2021.2',  # Standalone OpenVINO
-        '2.2.9', # DCGM version
-        '2021.4.582') # Standalone OpenVINO for openvino_21_4
+        (('2021.2', None), ('2021.4', '2021.4.582')),  # Standalone OpenVINO
+        '2.2.9')  # DCGM version
 }
 
 EXAMPLE_BACKENDS = ['identity', 'square', 'repeat']
 CORE_BACKENDS = ['ensemble']
 NONCORE_BACKENDS = [
     'tensorflow1', 'tensorflow2', 'onnxruntime', 'python', 'dali', 'pytorch',
-    'openvino', 'fil', 'fastertransformer', 'tensorrt', 'armnn_tflite',
-    'openvino_21_4'
+    'openvino', 'fil', 'fastertransformer', 'tensorrt', 'armnn_tflite'
 ]
 EXAMPLE_REPOAGENTS = ['checksum']
 FLAGS = None
@@ -448,16 +449,17 @@ def repoagent_cmake_args(images, components, ra, install_dir):
 def backend_repo(be):
     if (be == 'tensorflow1') or (be == 'tensorflow2'):
         return 'tensorflow_backend'
-    if (be == 'openvino_21_4'):
+    if be.startswith("openvino"):
         return 'openvino_backend'
     return '{}_backend'.format(be)
 
 
-def backend_cmake_args(images, components, be, install_dir, library_paths):
+def backend_cmake_args(images, components, be, install_dir, library_paths,
+                       variant_index):
     if be == 'onnxruntime':
         args = onnxruntime_cmake_args(images, library_paths)
     elif be.startswith('openvino'):
-        args = openvino_cmake_args(be)
+        args = openvino_cmake_args(be, variant_index)
     elif be == 'tensorflow1':
         args = tensorflow_cmake_args(1, images, library_paths)
     elif be == 'tensorflow2':
@@ -603,17 +605,20 @@ def onnxruntime_cmake_args(images, library_paths):
     return cargs
 
 
-def openvino_cmake_args(be):
-    if be == "openvino":
-        ov_version = TRITON_VERSION_MAP[FLAGS.version][4]
+def openvino_cmake_args(be, variant_index):
+    ov_version = TRITON_VERSION_MAP[FLAGS.version][4][variant_index][1]
+    if ov_version:
+        use_prebuilt_ov = True
     else:
-        ov_version = TRITON_VERSION_MAP[FLAGS.version][6]
+        # If the OV package version is None, then we are not using prebuilt package
+        ov_version = TRITON_VERSION_MAP[FLAGS.version][4][variant_index][0]
+        use_prebuilt_ov = False
     cargs = [
-            cmake_backend_arg(be, 'TRITON_BUILD_OPENVINO_VERSION', None,
-                              ov_version),
-            ]
-    cargs.append(cmake_backend_arg(be, 'TRITON_OPENVINO_BACKEND_INSTALLDIR', None,
-                              be))
+        cmake_backend_arg(be, 'TRITON_BUILD_OPENVINO_VERSION', None,
+                          ov_version),
+    ]
+    cargs.append(
+        cmake_backend_arg(be, 'TRITON_OPENVINO_BACKEND_INSTALLDIR', None, be))
     if target_platform() == 'windows':
         if 'base' in images:
             cargs.append(
@@ -626,14 +631,11 @@ def openvino_cmake_args(be):
                                   images['base']))
         else:
             cargs.append(
-                cmake_backend_arg(be, 'TRITON_BUILD_CONTAINER_VERSION',
-                                  None, TRITON_VERSION_MAP[FLAGS.version][1]))
-        # Use prebuilt openvino by default for openvino_21_4. This option can be
-        # modified with command line option.
+                cmake_backend_arg(be, 'TRITON_BUILD_CONTAINER_VERSION', None,
+                                  TRITON_VERSION_MAP[FLAGS.version][1]))
         cargs.append(
-                    cmake_backend_enable(be,
-                                         'TRITON_BUILD_USE_PREBUILT_OPENVINO',
-                                         (be == "openvino_21_4")))
+            cmake_backend_enable(be, 'TRITON_BUILD_USE_PREBUILT_OPENVINO',
+                                 use_prebuilt_ov))
     return cargs
 
 
@@ -1364,6 +1366,42 @@ def container_build(images, backends, repoagents, endpoints):
         fail('container build failed')
 
 
+def build_backend(be,
+                  tag,
+                  build_dir,
+                  install_dir,
+                  github_organization,
+                  images,
+                  components,
+                  library_paths,
+                  variant_index=0):
+    repo_build_dir = os.path.join(build_dir, be, 'build')
+    repo_install_dir = os.path.join(build_dir, be, 'install')
+
+    mkdir(build_dir)
+    gitclone(build_dir, backend_repo(be), tag, be, github_organization)
+    mkdir(repo_build_dir)
+    cmake(
+        repo_build_dir,
+        backend_cmake_args(images, components, be, repo_install_dir,
+                           library_paths, variant_index))
+    makeinstall(repo_build_dir)
+
+    backend_install_dir = os.path.join(install_dir, 'backends', be)
+    rmdir(backend_install_dir)
+    mkdir(backend_install_dir)
+    cpdir(os.path.join(repo_install_dir, 'backends', be), backend_install_dir)
+
+
+def get_tagged_backend(be, version):
+    tagged_be = be
+    if be == 'openvino':
+        tagged_be += "_" + version[0].replace('.', '_')
+        if version[1] and target_platform() != 'windows':
+            tagged_be += "_pre"
+    return tagged_be
+
+
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
 
@@ -1570,6 +1608,13 @@ if __name__ == '__main__':
         required=False,
         help=
         'Include specified backend in build as <backend-name>[:<repo-tag>]. If <repo-tag> starts with "pull/" then it refers to a pull-request reference, otherwise <repo-tag> indicates the git tag/branch to use for the build. If the version is non-development then the default <repo-tag> is the release branch matching the container version (e.g. version 21.11 -> branch r21.11); otherwise the default <repo-tag> is "main" (e.g. version 21.11dev -> branch main).'
+    )
+    parser.add_argument(
+        '--build-multiple-openvino',
+        action="store_true",
+        default=False,
+        help=
+        'Build multiple openVINO versions as specified in TRITON_VERSION_MAP. Be aware that loading backends with different openvino versions simultaneously in triton can cause conflicts'
     )
     parser.add_argument(
         '--repo-tag',
@@ -1782,7 +1827,7 @@ if __name__ == '__main__':
             '--override-backend-cmake-arg specifies backend "{}" which is not included in build'
             .format(be))
         log('backend "{}" CMake override "-D{}={}"'.format(
-            ve, parts[0], parts[1]))
+            be, parts[0], parts[1]))
         if be not in OVERRIDE_BACKEND_CMAKE_FLAGS:
             OVERRIDE_BACKEND_CMAKE_FLAGS[be] = {}
         OVERRIDE_BACKEND_CMAKE_FLAGS[be][parts[0]] = parts[1]
@@ -1851,29 +1896,33 @@ if __name__ == '__main__':
         if (be in CORE_BACKENDS):
             continue
 
-        repo_build_dir = os.path.join(FLAGS.build_dir, be, 'build')
-        repo_install_dir = os.path.join(FLAGS.build_dir, be, 'install')
-
-        mkdir(FLAGS.build_dir)
+        tagged_be_list = []
+        if (be == 'openvino'):
+            tagged_be_list.append(
+                get_tagged_backend(be, TRITON_VERSION_MAP[FLAGS.version][4][0]))
+            if (FLAGS.build_multiple_openvino):
+                skip = True
+                for ver in TRITON_VERSION_MAP[FLAGS.version][4]:
+                    if not skip:
+                        tagged_be_list.append(get_tagged_backend(be, ver))
+                    skip = False
         # If armnn_tflite backend, source from external repo for git clone
         if be == 'armnn_tflite':
-            gitclone(FLAGS.build_dir, backend_repo(be), backends[be], be,
-                     'https://gitlab.com/arm-research/smarter/')
+            github_organization = 'https://gitlab.com/arm-research/smarter/'
         else:
-            gitclone(FLAGS.build_dir, backend_repo(be), backends[be], be,
-                     FLAGS.github_organization)
-        mkdir(repo_build_dir)
-        cmake(
-            repo_build_dir,
-            backend_cmake_args(images, components, be, repo_install_dir,
-                               library_paths))
-        makeinstall(repo_build_dir)
+            github_organization = FLAGS.github_organization
 
-        backend_install_dir = os.path.join(FLAGS.install_dir, 'backends', be)
-        rmdir(backend_install_dir)
-        mkdir(backend_install_dir)
-        cpdir(os.path.join(repo_install_dir, 'backends', be),
-              backend_install_dir)
+        if not tagged_be_list:
+            build_backend(be, backends[be], FLAGS.build_dir, FLAGS.install_dir,
+                          github_organization, images, components,
+                          library_paths)
+        else:
+            variant_index = 0
+            for tagged_be in tagged_be_list:
+                build_backend(tagged_be, backends[be], FLAGS.build_dir,
+                              FLAGS.install_dir, github_organization, images,
+                              components, library_paths, variant_index)
+                variant_index += 1
 
     # Build each repo agent...
     for ra in repoagents:
