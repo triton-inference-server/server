@@ -707,6 +707,18 @@ InferenceRequest::Normalize()
               ", got " + DimsListToString(input.OriginalShape()));
     }
 
+    // Must make sure input shape is specified which is not checked in
+    // compare function above
+    for (const auto& dim : input.OriginalShape()) {
+      if (dim == WILDCARD_DIM) {
+        return Status(
+            Status::Code::INVALID_ARG,
+            "All input dimensions should be specified for input '" + pr.first +
+                "' for model '" + ModelName() + "', got " +
+                DimsListToString(input.OriginalShape()));
+      }
+    }
+
     // If there is a reshape for this input then adjust them to
     // match the reshape. As reshape may have variable-size
     // dimensions, we need to record corresponding value so that we
