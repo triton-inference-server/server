@@ -692,19 +692,44 @@ InferenceRequest::Normalize()
               "' for '" + ModelName() + "'");
     }
 
-    if (!CompareDimsWithWildcard(input_config->dims(), *shape)) {
-      DimsList full_dims;
-      if (model_config.max_batch_size() > 0) {
-        full_dims.Add(WILDCARD_DIM);
+    // Validate input shape
+    {
+      bool match_config = true;
+      const auto& config_dims = input_config->dims();
+      const auto& input_dims = *shape;
+      if (config_dims.size() != (int64_t)input_dims.size()) {
+        match_config = false;
+      } else {
+        for (int i = 0; i < config_dims.size(); ++i) {
+          if (input_dims[i] == WILDCARD_DIM) {
+            return Status(
+                Status::Code::INVALID_ARG,
+                "All input dimensions should be specified for input '" +
+                    pr.first + "' for model '" + ModelName() + "', got " +
+                    DimsListToString(input.OriginalShape()));
+          } else if (
+              (config_dims[i] != WILDCARD_DIM) &&
+              (config_dims[i] != input_dims[i])) {
+            match_config = false;
+            break;
+          }
+        }
       }
-      for (int i = 0; i < input_config->dims_size(); ++i) {
-        full_dims.Add(input_config->dims(i));
+
+      if (!match_config) {
+        DimsList full_dims;
+        if (model_config.max_batch_size() > 0) {
+          full_dims.Add(WILDCARD_DIM);
+        }
+        for (int i = 0; i < input_config->dims_size(); ++i) {
+          full_dims.Add(input_config->dims(i));
+        }
+        return Status(
+            Status::Code::INVALID_ARG,
+            "unexpected shape for input '" + pr.first + "' for model '" +
+                ModelName() + "'. Expected " + DimsListToString(full_dims) +
+                ", got " + DimsListToString(input.OriginalShape()));
       }
-      return Status(
-          Status::Code::INVALID_ARG,
-          "unexpected shape for input '" + pr.first + "' for model '" +
-              ModelName() + "'. Expected " + DimsListToString(full_dims) +
-              ", got " + DimsListToString(input.OriginalShape()));
     }
 
     // If there is a reshape for this input then adjust them to
