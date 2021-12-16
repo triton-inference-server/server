@@ -541,7 +541,7 @@ all the instances of all the models. An instance with priority 2 will be
 given 1/2 the number of scheduling chances as an instance with priority
 1.
 
-The following example specifies the instances in the group requires 
+The following example specifies the instances in the group requires
 four "R1" and two "R2" resources for execution. Resource "R2" is a global
 resource. Additionally, the rate-limiter priority of the instance_group
 is 2.
@@ -561,9 +561,9 @@ is 2.
           {
             name: "R2"
             global: True
-            count: 2 
+            count: 2
           }
-        ] 
+        ]
         priority: 2
       }
     }
@@ -697,21 +697,21 @@ maximum delay time of 100 microseconds for a request.
 
 ```
   dynamic_batching {
-    preferred_batch_size: [ 4, 8 ]
     max_queue_delay_microseconds: 100
   }
 ```
 
 The *max_queue_delay_microseconds* property setting changes the
-dynamic batcher behavior when a batch of a preferred size cannot be
-created. When a batch of a preferred size cannot be created from the
-available requests, the dynamic batcher will delay sending the batch
-as long as no request is delayed longer than the configured
-*max_queue_delay_microseconds* value. If a new request arrives during
-this delay and allows the dynamic batcher to form a batch of a
-preferred batch size, then that batch is sent immediately for
-inferencing. If the delay expires the dynamic batcher sends the batch
-as is, even though it is not a preferred size.
+dynamic batcher behavior when a maximum size (or preferred size) batch
+cannot be created. When a batch of a maximum or preferred size cannot
+be created from the available requests, the dynamic batcher will delay
+sending the batch as long as no request is delayed longer than the
+configured *max_queue_delay_microseconds* value. If a new request
+arrives during this delay and allows the dynamic batcher to form a
+batch of a maximum or preferred batch size, then that batch is sent
+immediately for inferencing. If the delay expires the dynamic batcher
+sends the batch as is, even though it is not a maximum or preferred
+size.
 
 #### Preserve Ordering
 
@@ -825,8 +825,8 @@ the model config, a non-zero `--response-cache-byte-size` must be set when
 starting the server.
 
 ```
-response_cache { 
-  enable: True 
+response_cache {
+  enable: True
 }
 ```
 
@@ -835,4 +835,3 @@ Cache](https://github.com/triton-inference-server/server/blob/main/docs/response
 and [ModelConfig
 protobuf](https://github.com/triton-inference-server/common/blob/main/protobuf/model_config.proto).
 docs for more information.
-

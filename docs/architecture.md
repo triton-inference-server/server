@@ -554,7 +554,6 @@ sequence_batching {
   oldest
     {
       max_candidate_sequences: 4
-      preferred_batch_size: [ 2 ]
     }
   control_input [
     {
