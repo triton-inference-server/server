@@ -637,10 +637,8 @@ GetNormalizedModelConfig(
 {
   // If 'autofill' then the configuration file can be empty.
   const auto config_path = JoinPath({path, kModelConfigPbTxt});
-
   bool model_config_exists;
   RETURN_IF_ERROR(FileExists(config_path, &model_config_exists));
-
   if (autofill && !model_config_exists) {
     config->Clear();
   } else {
