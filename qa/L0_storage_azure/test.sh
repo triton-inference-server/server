@@ -200,6 +200,7 @@ wait $SERVER_PID
 
 # Clean up container
 az storage container delete --name ${CONTAINER_NAME} --account-name ${ACCOUNT_NAME} --account-key ${ACCOUNT_KEY}
+sleep 10
 
 # Test with Polling, no model configuration file - with strict model config disabled
 SERVER_LOG=$SERVER_LOG_BASE.noconfig.log
