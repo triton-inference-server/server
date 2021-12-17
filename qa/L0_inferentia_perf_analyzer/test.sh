@@ -60,14 +60,17 @@ SERVER_LOG="./inference_server.log"
 source /opt/tritonserver/qa/common/util.sh
 TEST_TYPES="single multiple"
 BATCHED_FLAGS="_ _batched_"
+DISABLE_DEFAULT_BATCHING_FLAGS="_default_batch _no_batch"
 
 # Setup models
 if [ ${USE_TENSORFLOW} == "1" ]; then
     TEST_FRAMEWORK="tf1"
-    for BATCHED_FLAG in ${BATCHED_FLAGS}; do
-        for TEST_TYPE in ${TEST_TYPES}; do
-            DATADIR="${TRITON_PATH}/models_${TEST_TYPE}${BATCHED_FLAG}${TEST_FRAMEWORK}"
-            rm -rf DATADIR
+    for DISABLE_DEFAULT_BATCHING_FLAG in ${DISABLE_DEFAULT_BATCHING_FLAGS}; do
+        for BATCHED_FLAG in ${BATCHED_FLAGS}; do
+            for TEST_TYPE in ${TEST_TYPES}; do
+                DATADIR="${TRITON_PATH}/models_${TEST_TYPE}${BATCHED_FLAG}${TEST_FRAMEWORK}${DISABLE_DEFAULT_BATCHING_FLAG}"
+                rm -rf DATADIR
+            done
         done
     done
     python ${TEST_JSON_REPO}/simple_model.py \
@@ -80,22 +83,82 @@ if [ ${USE_TENSORFLOW} == "1" ]; then
         --compiled_model $PWD/add_sub_model_tf1 \
         --triton_input INPUT__0,INT64,-1x4 INPUT__1,INT64,-1x4 \
         --triton_output OUTPUT__0,INT64,-1x4 OUTPUT__1,INT64,-1x4 \
-        --triton_model_dir models_single_tf1/add-sub-1x4 \
+        --triton_model_dir models_single_tf1_default_batch/add-sub-1x4 \
         --neuron_core_range 0:0
     python ${TRITON_PATH}/python_backend/inferentia/scripts/gen_triton_model.py \
         --model_type "tensorflow" \
         --compiled_model $PWD/add_sub_model_tf1 \
         --triton_input INPUT__0,INT64,-1x4 INPUT__1,INT64,-1x4 \
         --triton_output OUTPUT__0,INT64,-1x4 OUTPUT__1,INT64,-1x4 \
-        --triton_model_dir models_multiple_tf1/add-sub-1x4 \
+        --triton_model_dir models_multiple_tf1_default_batch/add-sub-1x4 \
         --triton_model_instance_count 3 \
         --neuron_core_range 0:7
+    python ${TRITON_PATH}/python_backend/inferentia/scripts/gen_triton_model.py \
+        --model_type "tensorflow" \
+        --max_batch_size 1000 \
+        --preferred_batch_size 8 \
+        --compiled_model $PWD/add_sub_model_tf1 \
+        --triton_input INPUT__0,INT64,-1x4 INPUT__1,INT64,-1x4 \
+        --triton_output OUTPUT__0,INT64,-1x4 OUTPUT__1,INT64,-1x4 \
+        --triton_model_dir models_single_batched_tf1_default_batch/add-sub-1x4 \
+        --neuron_core_range 0:0
+    python ${TRITON_PATH}/python_backend/inferentia/scripts/gen_triton_model.py \
+        --model_type "tensorflow" \
+        --max_batch_size 1000 \
+        --preferred_batch_size 8 \
+        --compiled_model $PWD/add_sub_model_tf1 \
+        --triton_input INPUT__0,INT64,-1x4 INPUT__1,INT64,-1x4 \
+        --triton_output OUTPUT__0,INT64,-1x4 OUTPUT__1,INT64,-1x4 \
+        --triton_model_dir models_multiple_batched_tf1_default_batch/add-sub-1x4 \
+        --triton_model_instance_count 3 \
+        --neuron_core_range 0:7
+
+    python ${TRITON_PATH}/python_backend/inferentia/scripts/gen_triton_model.py \
+        --model_type "tensorflow" \
+        --compiled_model $PWD/add_sub_model_tf1 \
+        --triton_input INPUT__0,INT64,-1x4 INPUT__1,INT64,-1x4 \
+        --triton_output OUTPUT__0,INT64,-1x4 OUTPUT__1,INT64,-1x4 \
+        --triton_model_dir models_single_tf1_no_batch/add-sub-1x4 \
+        --neuron_core_range 0:0\
+        --disable_batch_requests_to_neuron
+    python ${TRITON_PATH}/python_backend/inferentia/scripts/gen_triton_model.py \
+        --model_type "tensorflow" \
+        --compiled_model $PWD/add_sub_model_tf1 \
+        --triton_input INPUT__0,INT64,-1x4 INPUT__1,INT64,-1x4 \
+        --triton_output OUTPUT__0,INT64,-1x4 OUTPUT__1,INT64,-1x4 \
+        --triton_model_dir models_multiple_tf1_no_batch/add-sub-1x4 \
+        --triton_model_instance_count 3 \
+        --neuron_core_range 0:7 \
+        --disable_batch_requests_to_neuron
+    python ${TRITON_PATH}/python_backend/inferentia/scripts/gen_triton_model.py \
+        --model_type "tensorflow" \
+        --max_batch_size 1000 \
+        --preferred_batch_size 8 \
+        --compiled_model $PWD/add_sub_model_tf1 \
+        --triton_input INPUT__0,INT64,-1x4 INPUT__1,INT64,-1x4 \
+        --triton_output OUTPUT__0,INT64,-1x4 OUTPUT__1,INT64,-1x4 \
+        --triton_model_dir models_single_batched_tf1_no_batch/add-sub-1x4 \
+        --neuron_core_range 0:0 \
+        --disable_batch_requests_to_neuron
+    python ${TRITON_PATH}/python_backend/inferentia/scripts/gen_triton_model.py \
+        --model_type "tensorflow" \
+        --max_batch_size 1000 \
+        --preferred_batch_size 8 \
+        --compiled_model $PWD/add_sub_model_tf1 \
+        --triton_input INPUT__0,INT64,-1x4 INPUT__1,INT64,-1x4 \
+        --triton_output OUTPUT__0,INT64,-1x4 OUTPUT__1,INT64,-1x4 \
+        --triton_model_dir models_multiple_batched_tf1_no_batch/add-sub-1x4 \
+        --triton_model_instance_count 3 \
+        --neuron_core_range 0:7 \
+        --disable_batch_requests_to_neuron
 elif [ ${USE_PYTORCH} == "1" ]; then
     TEST_FRAMEWORK="pyt"
-    for BATCHED_FLAG in ${BATCHED_FLAGS}; do
-        for TEST_TYPE in ${TEST_TYPES}; do
-            DATADIR="${TRITON_PATH}/models_${TEST_TYPE}${BATCHED_FLAG}${TEST_FRAMEWORK}"
-            rm -rf DATADIR
+    for DISABLE_DEFAULT_BATCHING_FLAG in ${DISABLE_DEFAULT_BATCHING_FLAGS}; do
+        for BATCHED_FLAG in ${BATCHED_FLAGS}; do
+            for TEST_TYPE in ${TEST_TYPES}; do
+                DATADIR="${TRITON_PATH}/models_${TEST_TYPE}${BATCHED_FLAG}${TEST_FRAMEWORK}${DISABLE_DEFAULT_BATCHING_FLAG}"
+                rm -rf DATADIR
+            done
         done
     done
     # Pytorch
@@ -108,13 +171,13 @@ elif [ ${USE_PYTORCH} == "1" ]; then
         --triton_input INPUT__0,INT64,-1x4 INPUT__1,INT64,-1x4 \
         --triton_output OUTPUT__0,INT64,-1x4 OUTPUT__1,INT64,-1x4 \
         --compiled_model $PWD/add_sub_model_pyt.pt \
-        --triton_model_dir models_single_pyt/add-sub-1x4 --neuron_core_range 0:0
+        --triton_model_dir models_single_pyt_default_batch/add-sub-1x4 --neuron_core_range 0:0
     python ${TRITON_PATH}/python_backend/inferentia/scripts/gen_triton_model.py \
         --model_type "pytorch" \
         --triton_input INPUT__0,INT64,-1x4 INPUT__1,INT64,-1x4 \
         --triton_output OUTPUT__0,INT64,-1x4 OUTPUT__1,INT64,-1x4 \
         --compiled_model $PWD/add_sub_model_pyt.pt \
-        --triton_model_dir models_multiple_pyt/add-sub-1x4 \
+        --triton_model_dir models_multiple_pyt_default_batch/add-sub-1x4 \
         --triton_model_instance_count 3 --neuron_core_range 0:7
     python ${TRITON_PATH}/python_backend/inferentia/scripts/gen_triton_model.py \
         --model_type "pytorch" \
@@ -123,7 +186,7 @@ elif [ ${USE_PYTORCH} == "1" ]; then
         --triton_input INPUT__0,INT64,-1x4 INPUT__1,INT64,-1x4 \
         --triton_output OUTPUT__0,INT64,-1x4 OUTPUT__1,INT64,-1x4 \
         --compiled_model $PWD/add_sub_model_pyt.pt \
-        --triton_model_dir models_single_batched_pyt/add-sub-1x4 --neuron_core_range 0:0
+        --triton_model_dir models_single_batched_pyt_default_batch/add-sub-1x4 --neuron_core_range 0:0
     python ${TRITON_PATH}/python_backend/inferentia/scripts/gen_triton_model.py \
         --model_type "pytorch" \
         --max_batch_size 1000 \
@@ -133,60 +196,97 @@ elif [ ${USE_PYTORCH} == "1" ]; then
         --compiled_model $PWD/add_sub_model_pyt.pt \
         --triton_model_dir models_multiple_batched_pyt/add-sub-1x4 \
         --triton_model_instance_count 3 --neuron_core_range 0:7
+    
+    python ${TRITON_PATH}/python_backend/inferentia/scripts/gen_triton_model.py \
+        --model_type "pytorch" \
+        --triton_input INPUT__0,INT64,-1x4 INPUT__1,INT64,-1x4 \
+        --triton_output OUTPUT__0,INT64,-1x4 OUTPUT__1,INT64,-1x4 \
+        --compiled_model $PWD/add_sub_model_pyt.pt \
+        --triton_model_dir models_single_pyt_no_batch/add-sub-1x4 --neuron_core_range 0:0 \
+        --disable_batch_requests_to_neuron
+    python ${TRITON_PATH}/python_backend/inferentia/scripts/gen_triton_model.py \
+        --model_type "pytorch" \
+        --triton_input INPUT__0,INT64,-1x4 INPUT__1,INT64,-1x4 \
+        --triton_output OUTPUT__0,INT64,-1x4 OUTPUT__1,INT64,-1x4 \
+        --compiled_model $PWD/add_sub_model_pyt.pt \
+        --triton_model_dir models_multiple_pyt_no_batch/add-sub-1x4 \
+        --triton_model_instance_count 3 --neuron_core_range 0:7 \
+        --disable_batch_requests_to_neuron
+    python ${TRITON_PATH}/python_backend/inferentia/scripts/gen_triton_model.py \
+        --model_type "pytorch" \
+        --max_batch_size 1000 \
+        --preferred_batch_size 8 \
+        --triton_input INPUT__0,INT64,-1x4 INPUT__1,INT64,-1x4 \
+        --triton_output OUTPUT__0,INT64,-1x4 OUTPUT__1,INT64,-1x4 \
+        --compiled_model $PWD/add_sub_model_pyt.pt \
+        --triton_model_dir models_single_batched_pyt_no_batch/add-sub-1x4 --neuron_core_range 0:0 \
+        --disable_batch_requests_to_neuron
+    python ${TRITON_PATH}/python_backend/inferentia/scripts/gen_triton_model.py \
+        --model_type "pytorch" \
+        --max_batch_size 1000 \
+        --preferred_batch_size 8 \
+        --triton_input INPUT__0,INT64,-1x4 INPUT__1,INT64,-1x4 \
+        --triton_output OUTPUT__0,INT64,-1x4 OUTPUT__1,INT64,-1x4 \
+        --compiled_model $PWD/add_sub_model_pyt.pt \
+        --triton_model_dir models_multiple_batched_pyt_no_batch/add-sub-1x4 \
+        --triton_model_instance_count 3 --neuron_core_range 0:7 \
+        --disable_batch_requests_to_neuron
 fi
 
 
 RET=0
-for BATCHED_FLAG in ${BATCHED_FLAGS}; do
-    for TEST_TYPE in $TEST_TYPES; do
-        DATADIR="${TRITON_PATH}/models_${TEST_TYPE}${BATCHED_FLAG}${TEST_FRAMEWORK}"
-        SERVER_ARGS="--model-repository=${DATADIR} --log-verbose=1"
-        rm -f $SERVER_LOG $CLIENT_LOG
+for DISABLE_DEFAULT_BATCHING_FLAG in ${DISABLE_DEFAULT_BATCHING_FLAGS}; do
+    for BATCHED_FLAG in ${BATCHED_FLAGS}; do
+        for TEST_TYPE in $TEST_TYPES; do
+            DATADIR="${TRITON_PATH}/models_${TEST_TYPE}${BATCHED_FLAG}${TEST_FRAMEWORK}${DISABLE_DEFAULT_BATCHING_FLAG}"
+            SERVER_ARGS="--model-repository=${DATADIR} --log-verbose=1"
+            rm -f $SERVER_LOG $CLIENT_LOG
 
-        run_server
-        if [ "$SERVER_PID" == "0" ]; then
-            echo -e "\n***\n*** Failed to start $SERVER\n***"
-            cat $SERVER_LOG
-            exit 1
-        fi
-        set +e
-        $PERF_ANALYZER -v -m add-sub-1x4 --concurrency-range 1:10:4 --input-data=${NON_ALIGNED_OUTPUT_JSONDATAFILE} >$CLIENT_LOG 2>&1
-        if [ $? -eq 0 ]; then
-            cat $CLIENT_LOG
-            echo -e "\n***\n*** Test Failed\n***"
-            RET=1
-        fi
-        if [ $(cat $CLIENT_LOG |  grep "The 'validation_data' field doesn't align with 'data' field in the json file" | wc -l) -eq 0 ]; then
-            cat $CLIENT_LOG
-            echo -e "\n***\n*** Test Failed\n***"
-            RET=1
-        fi
+            run_server
+            if [ "$SERVER_PID" == "0" ]; then
+                echo -e "\n***\n*** Failed to start $SERVER\n***"
+                cat $SERVER_LOG
+                exit 1
+            fi
+            set +e
+            $PERF_ANALYZER -v -m add-sub-1x4 --concurrency-range 1:10:4 --input-data=${NON_ALIGNED_OUTPUT_JSONDATAFILE} >$CLIENT_LOG 2>&1
+            if [ $? -eq 0 ]; then
+                cat $CLIENT_LOG
+                echo -e "\n***\n*** Test Failed\n***"
+                RET=1
+            fi
+            if [ $(cat $CLIENT_LOG |  grep "The 'validation_data' field doesn't align with 'data' field in the json file" | wc -l) -eq 0 ]; then
+                cat $CLIENT_LOG
+                echo -e "\n***\n*** Test Failed\n***"
+                RET=1
+            fi
 
-        $PERF_ANALYZER -v -m add-sub-1x4 --concurrency-range 1:10:4 --input-data=${WRONG_OUTPUT_JSONDATAFILE} >$CLIENT_LOG 2>&1
-        if [ $? -eq 0 ]; then
-            cat $CLIENT_LOG
-            echo -e "\n***\n*** Test Failed\n***"
-            RET=1
-        fi
-        if [ $(cat $CLIENT_LOG |  grep "Output doesn't match expected output" | wc -l) -eq 0 ]; then
-            cat $CLIENT_LOG
-            echo -e "\n***\n*** Test Failed\n***"
-            RET=1
-        fi
+            $PERF_ANALYZER -v -m add-sub-1x4 --concurrency-range 1:10:4 --input-data=${WRONG_OUTPUT_JSONDATAFILE} >$CLIENT_LOG 2>&1
+            if [ $? -eq 0 ]; then
+                cat $CLIENT_LOG
+                echo -e "\n***\n*** Test Failed\n***"
+                RET=1
+            fi
+            if [ $(cat $CLIENT_LOG |  grep "Output doesn't match expected output" | wc -l) -eq 0 ]; then
+                cat $CLIENT_LOG
+                echo -e "\n***\n*** Test Failed\n***"
+                RET=1
+            fi
 
-        $PERF_ANALYZER -v -m add-sub-1x4 --concurrency-range 1:10:4 --input-data=${OUTPUT_JSONDATAFILE} >$CLIENT_LOG 2>&1
-        if [ $? -ne 0 ]; then
-            cat $CLIENT_LOG
-            echo -e "\n***\n*** Test Failed\n***"
-            RET=1
-        fi
-        if [ $(cat $CLIENT_LOG |  grep "${ERROR_STRING}" | wc -l) -ne 0 ]; then
-            cat $CLIENT_LOG
-            echo -e "\n***\n*** Test Failed\n***"
-            RET=1
-        fi
-        set -e
-        kill_server
+            $PERF_ANALYZER -v -m add-sub-1x4 --concurrency-range 1:10:4 --input-data=${OUTPUT_JSONDATAFILE} >$CLIENT_LOG 2>&1
+            if [ $? -ne 0 ]; then
+                cat $CLIENT_LOG
+                echo -e "\n***\n*** Test Failed\n***"
+                RET=1
+            fi
+            if [ $(cat $CLIENT_LOG |  grep "${ERROR_STRING}" | wc -l) -ne 0 ]; then
+                cat $CLIENT_LOG
+                echo -e "\n***\n*** Test Failed\n***"
+                RET=1
+            fi
+            set -e
+            kill_server
+        done
     done
 done
 
