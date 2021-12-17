@@ -99,6 +99,13 @@ Server will not start.
 See [Fleet Command documentation](https://docs.nvidia.com/fleet-command/prod_fleet-command/prod_fleet-command/ug-deploying-to-the-edge.html)
 for more info.
 
+### Prometheus ServiceMonitor Support
+
+If you have `prometheus-operator` deployed, you can enable the ServiceMonitor
+for the Triton Inference Server by setting `serviceMonitor: true` in Application
+Configuration.  Otherwise, server metrics can be scraped by pointing an external
+prometheus instance at the `metricsNodePort` in the values.
+
 ## Using Triton Inference Server
 
 Now that the inference server is running you can send HTTP or GRPC requests to
