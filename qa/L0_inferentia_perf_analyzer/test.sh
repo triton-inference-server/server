@@ -194,7 +194,7 @@ elif [ ${USE_PYTORCH} == "1" ]; then
         --triton_input INPUT__0,INT64,-1x4 INPUT__1,INT64,-1x4 \
         --triton_output OUTPUT__0,INT64,-1x4 OUTPUT__1,INT64,-1x4 \
         --compiled_model $PWD/add_sub_model_pyt.pt \
-        --triton_model_dir models_multiple_batched_pyt/add-sub-1x4 \
+        --triton_model_dir models_multiple_batched_pyt_default_batch/add-sub-1x4 \
         --triton_model_instance_count 3 --neuron_core_range 0:7
     
     python ${TRITON_PATH}/python_backend/inferentia/scripts/gen_triton_model.py \
