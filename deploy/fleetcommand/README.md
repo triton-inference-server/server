@@ -102,9 +102,9 @@ for more info.
 ### Prometheus ServiceMonitor Support
 
 If you have `prometheus-operator` deployed, you can enable the ServiceMonitor
-for the Triton Inference Server by setting `serviceMonitor: true` in Application
-Configuration.  Otherwise, server metrics can be scraped by pointing an external
-prometheus instance at the `metricsNodePort` in the values.
+for the Triton Inference Server by setting `serviceMonitor.enabled: true` in
+Application Configuration.  Otherwise, server metrics can be scraped by pointing
+an external prometheus instance at the `metricsNodePort` in the values.
 
 ## Using Triton Inference Server
 

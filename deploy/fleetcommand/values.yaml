@@ -71,6 +71,7 @@ service:
 #  key: AWS_SECRET_ACCESS_KEY
 
 # Prometheus-Operator ServiceMonitor support
-# change this to 'true' to enable a ServiceMonitor if your cluster has
+# change enabled to 'true' to enable a ServiceMonitor if your cluster has
 #  Prometheus-Operator installed
-serviceMonitor: false
+serviceMonitor:
+  enabled: false
