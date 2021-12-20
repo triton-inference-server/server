@@ -61,10 +61,8 @@ source /opt/tritonserver/qa/common/util.sh
 TEST_TYPES="single multiple"
 BATCHED_FLAGS="_ _batched_"
 DISABLE_DEFAULT_BATCHING_FLAGS="_default_batch _no_batch"
-
-# Setup models
-if [ ${USE_TENSORFLOW} == "1" ]; then
-    TEST_FRAMEWORK="tf1"
+# Helper function for generating models
+function clear_model_dir () {
     for DISABLE_DEFAULT_BATCHING_FLAG in ${DISABLE_DEFAULT_BATCHING_FLAGS}; do
         for BATCHED_FLAG in ${BATCHED_FLAGS}; do
             for TEST_TYPE in ${TEST_TYPES}; do
@@ -73,164 +71,67 @@ if [ ${USE_TENSORFLOW} == "1" ]; then
             done
         done
     done
+}
+function create_inferentia_models () {
+    for DISABLE_DEFAULT_BATCHING_FLAG in ${DISABLE_DEFAULT_BATCHING_FLAGS}; do
+        for BATCHED_FLAG in ${BATCHED_FLAGS}; do
+            for TEST_TYPE in ${TEST_TYPES}; do
+                CURR_GEN_SCRIPT="${GEN_SCRIPT} --model_type ${MODEL_TYPE}  
+                --triton_input INPUT__0,INT64,-1x4 INPUT__1,INT64,-1x4 
+                --triton_output OUTPUT__0,INT64,-1x4 OUTPUT__1,INT64,-1x4 
+                --triton_model_dir ${TRITON_PATH}/models_${TEST_TYPE}${BATCHED_FLAG}${TEST_FRAMEWORK}${DISABLE_DEFAULT_BATCHING_FLAG}/add-sub-1x4 
+                --compiled_model ${COMPILED_MODEL}"
+                if [ ${DISABLE_DEFAULT_BATCHING_FLAG} == "_no_batch" ]; then
+                    CURR_GEN_SCRIPT="${CURR_GEN_SCRIPT} 
+                    --disable_batch_requests_to_neuron"
+                fi
+                if [ ${BATCHED_FLAG} == "_batched_" ]; then
+                    CURR_GEN_SCRIPT="${CURR_GEN_SCRIPT}          
+                    --enable_dynamic_batching 
+                    --max_batch_size 1000 
+                    --preferred_batch_size 8 
+                    --max_queue_delay_microseconds 100"
+                fi
+                if [ ${TEST_TYPE} == "single" ]; then
+                    CURR_GEN_SCRIPT="${CURR_GEN_SCRIPT}   
+                    --neuron_core_range 0:0"
+                elif [ ${TEST_TYPE} == "multiple" ]; then
+                    CURR_GEN_SCRIPT="${CURR_GEN_SCRIPT} 
+                    --triton_model_instance_count 3 
+                    --neuron_core_range 0:7"
+                fi
+                echo ${CURR_GEN_SCRIPT}
+                eval ${CURR_GEN_SCRIPT}
+            done
+        done
+    done
+}
+
+# Setup models
+if [ ${USE_TENSORFLOW} == "1" ]; then
+    TEST_FRAMEWORK="tf1"
+    clear_model_dir
     python ${TEST_JSON_REPO}/simple_model.py \
         --name add_sub_model_tf1 \
         --model_type tensorflow \
         --tf_version 1 \
         --batch_size 1
-    python ${TRITON_PATH}/python_backend/inferentia/scripts/gen_triton_model.py \
-        --model_type "tensorflow" \
-        --compiled_model $PWD/add_sub_model_tf1 \
-        --triton_input INPUT__0,INT64,-1x4 INPUT__1,INT64,-1x4 \
-        --triton_output OUTPUT__0,INT64,-1x4 OUTPUT__1,INT64,-1x4 \
-        --triton_model_dir models_single_tf1_default_batch/add-sub-1x4 \
-        --neuron_core_range 0:0
-    python ${TRITON_PATH}/python_backend/inferentia/scripts/gen_triton_model.py \
-        --model_type "tensorflow" \
-        --compiled_model $PWD/add_sub_model_tf1 \
-        --triton_input INPUT__0,INT64,-1x4 INPUT__1,INT64,-1x4 \
-        --triton_output OUTPUT__0,INT64,-1x4 OUTPUT__1,INT64,-1x4 \
-        --triton_model_dir models_multiple_tf1_default_batch/add-sub-1x4 \
-        --triton_model_instance_count 3 \
-        --neuron_core_range 0:7
-    python ${TRITON_PATH}/python_backend/inferentia/scripts/gen_triton_model.py \
-        --model_type "tensorflow" \
-        --max_batch_size 1000 \
-        --preferred_batch_size 8 \
-        --compiled_model $PWD/add_sub_model_tf1 \
-        --triton_input INPUT__0,INT64,-1x4 INPUT__1,INT64,-1x4 \
-        --triton_output OUTPUT__0,INT64,-1x4 OUTPUT__1,INT64,-1x4 \
-        --triton_model_dir models_single_batched_tf1_default_batch/add-sub-1x4 \
-        --neuron_core_range 0:0
-    python ${TRITON_PATH}/python_backend/inferentia/scripts/gen_triton_model.py \
-        --model_type "tensorflow" \
-        --max_batch_size 1000 \
-        --preferred_batch_size 8 \
-        --compiled_model $PWD/add_sub_model_tf1 \
-        --triton_input INPUT__0,INT64,-1x4 INPUT__1,INT64,-1x4 \
-        --triton_output OUTPUT__0,INT64,-1x4 OUTPUT__1,INT64,-1x4 \
-        --triton_model_dir models_multiple_batched_tf1_default_batch/add-sub-1x4 \
-        --triton_model_instance_count 3 \
-        --neuron_core_range 0:7
+    GEN_SCRIPT="python ${TRITON_PATH}/python_backend/inferentia/scripts/gen_triton_model.py"
+    MODEL_TYPE="tensorflow"
+    COMPILED_MODEL="${PWD}/add_sub_model_tf1"
+    create_inferentia_models
 
-    python ${TRITON_PATH}/python_backend/inferentia/scripts/gen_triton_model.py \
-        --model_type "tensorflow" \
-        --compiled_model $PWD/add_sub_model_tf1 \
-        --triton_input INPUT__0,INT64,-1x4 INPUT__1,INT64,-1x4 \
-        --triton_output OUTPUT__0,INT64,-1x4 OUTPUT__1,INT64,-1x4 \
-        --triton_model_dir models_single_tf1_no_batch/add-sub-1x4 \
-        --neuron_core_range 0:0\
-        --disable_batch_requests_to_neuron
-    python ${TRITON_PATH}/python_backend/inferentia/scripts/gen_triton_model.py \
-        --model_type "tensorflow" \
-        --compiled_model $PWD/add_sub_model_tf1 \
-        --triton_input INPUT__0,INT64,-1x4 INPUT__1,INT64,-1x4 \
-        --triton_output OUTPUT__0,INT64,-1x4 OUTPUT__1,INT64,-1x4 \
-        --triton_model_dir models_multiple_tf1_no_batch/add-sub-1x4 \
-        --triton_model_instance_count 3 \
-        --neuron_core_range 0:7 \
-        --disable_batch_requests_to_neuron
-    python ${TRITON_PATH}/python_backend/inferentia/scripts/gen_triton_model.py \
-        --model_type "tensorflow" \
-        --max_batch_size 1000 \
-        --preferred_batch_size 8 \
-        --compiled_model $PWD/add_sub_model_tf1 \
-        --triton_input INPUT__0,INT64,-1x4 INPUT__1,INT64,-1x4 \
-        --triton_output OUTPUT__0,INT64,-1x4 OUTPUT__1,INT64,-1x4 \
-        --triton_model_dir models_single_batched_tf1_no_batch/add-sub-1x4 \
-        --neuron_core_range 0:0 \
-        --disable_batch_requests_to_neuron
-    python ${TRITON_PATH}/python_backend/inferentia/scripts/gen_triton_model.py \
-        --model_type "tensorflow" \
-        --max_batch_size 1000 \
-        --preferred_batch_size 8 \
-        --compiled_model $PWD/add_sub_model_tf1 \
-        --triton_input INPUT__0,INT64,-1x4 INPUT__1,INT64,-1x4 \
-        --triton_output OUTPUT__0,INT64,-1x4 OUTPUT__1,INT64,-1x4 \
-        --triton_model_dir models_multiple_batched_tf1_no_batch/add-sub-1x4 \
-        --triton_model_instance_count 3 \
-        --neuron_core_range 0:7 \
-        --disable_batch_requests_to_neuron
 elif [ ${USE_PYTORCH} == "1" ]; then
     TEST_FRAMEWORK="pyt"
-    for DISABLE_DEFAULT_BATCHING_FLAG in ${DISABLE_DEFAULT_BATCHING_FLAGS}; do
-        for BATCHED_FLAG in ${BATCHED_FLAGS}; do
-            for TEST_TYPE in ${TEST_TYPES}; do
-                DATADIR="${TRITON_PATH}/models_${TEST_TYPE}${BATCHED_FLAG}${TEST_FRAMEWORK}${DISABLE_DEFAULT_BATCHING_FLAG}"
-                rm -rf DATADIR
-            done
-        done
-    done
-    # Pytorch
+    clear_model_dir
     python ${TEST_JSON_REPO}/simple_model.py \
         --name add_sub_model_pyt \
         --model_type pytorch \
         --batch_size 1
-    python ${TRITON_PATH}/python_backend/inferentia/scripts/gen_triton_model.py \
-        --model_type "pytorch" \
-        --triton_input INPUT__0,INT64,-1x4 INPUT__1,INT64,-1x4 \
-        --triton_output OUTPUT__0,INT64,-1x4 OUTPUT__1,INT64,-1x4 \
-        --compiled_model $PWD/add_sub_model_pyt.pt \
-        --triton_model_dir models_single_pyt_default_batch/add-sub-1x4 --neuron_core_range 0:0
-    python ${TRITON_PATH}/python_backend/inferentia/scripts/gen_triton_model.py \
-        --model_type "pytorch" \
-        --triton_input INPUT__0,INT64,-1x4 INPUT__1,INT64,-1x4 \
-        --triton_output OUTPUT__0,INT64,-1x4 OUTPUT__1,INT64,-1x4 \
-        --compiled_model $PWD/add_sub_model_pyt.pt \
-        --triton_model_dir models_multiple_pyt_default_batch/add-sub-1x4 \
-        --triton_model_instance_count 3 --neuron_core_range 0:7
-    python ${TRITON_PATH}/python_backend/inferentia/scripts/gen_triton_model.py \
-        --model_type "pytorch" \
-        --max_batch_size 1000 \
-        --preferred_batch_size 8 \
-        --triton_input INPUT__0,INT64,-1x4 INPUT__1,INT64,-1x4 \
-        --triton_output OUTPUT__0,INT64,-1x4 OUTPUT__1,INT64,-1x4 \
-        --compiled_model $PWD/add_sub_model_pyt.pt \
-        --triton_model_dir models_single_batched_pyt_default_batch/add-sub-1x4 --neuron_core_range 0:0
-    python ${TRITON_PATH}/python_backend/inferentia/scripts/gen_triton_model.py \
-        --model_type "pytorch" \
-        --max_batch_size 1000 \
-        --preferred_batch_size 8 \
-        --triton_input INPUT__0,INT64,-1x4 INPUT__1,INT64,-1x4 \
-        --triton_output OUTPUT__0,INT64,-1x4 OUTPUT__1,INT64,-1x4 \
-        --compiled_model $PWD/add_sub_model_pyt.pt \
-        --triton_model_dir models_multiple_batched_pyt_default_batch/add-sub-1x4 \
-        --triton_model_instance_count 3 --neuron_core_range 0:7
-    
-    python ${TRITON_PATH}/python_backend/inferentia/scripts/gen_triton_model.py \
-        --model_type "pytorch" \
-        --triton_input INPUT__0,INT64,-1x4 INPUT__1,INT64,-1x4 \
-        --triton_output OUTPUT__0,INT64,-1x4 OUTPUT__1,INT64,-1x4 \
-        --compiled_model $PWD/add_sub_model_pyt.pt \
-        --triton_model_dir models_single_pyt_no_batch/add-sub-1x4 --neuron_core_range 0:0 \
-        --disable_batch_requests_to_neuron
-    python ${TRITON_PATH}/python_backend/inferentia/scripts/gen_triton_model.py \
-        --model_type "pytorch" \
-        --triton_input INPUT__0,INT64,-1x4 INPUT__1,INT64,-1x4 \
-        --triton_output OUTPUT__0,INT64,-1x4 OUTPUT__1,INT64,-1x4 \
-        --compiled_model $PWD/add_sub_model_pyt.pt \
-        --triton_model_dir models_multiple_pyt_no_batch/add-sub-1x4 \
-        --triton_model_instance_count 3 --neuron_core_range 0:7 \
-        --disable_batch_requests_to_neuron
-    python ${TRITON_PATH}/python_backend/inferentia/scripts/gen_triton_model.py \
-        --model_type "pytorch" \
-        --max_batch_size 1000 \
-        --preferred_batch_size 8 \
-        --triton_input INPUT__0,INT64,-1x4 INPUT__1,INT64,-1x4 \
-        --triton_output OUTPUT__0,INT64,-1x4 OUTPUT__1,INT64,-1x4 \
-        --compiled_model $PWD/add_sub_model_pyt.pt \
-        --triton_model_dir models_single_batched_pyt_no_batch/add-sub-1x4 --neuron_core_range 0:0 \
-        --disable_batch_requests_to_neuron
-    python ${TRITON_PATH}/python_backend/inferentia/scripts/gen_triton_model.py \
-        --model_type "pytorch" \
-        --max_batch_size 1000 \
-        --preferred_batch_size 8 \
-        --triton_input INPUT__0,INT64,-1x4 INPUT__1,INT64,-1x4 \
-        --triton_output OUTPUT__0,INT64,-1x4 OUTPUT__1,INT64,-1x4 \
-        --compiled_model $PWD/add_sub_model_pyt.pt \
-        --triton_model_dir models_multiple_batched_pyt_no_batch/add-sub-1x4 \
-        --triton_model_instance_count 3 --neuron_core_range 0:7 \
-        --disable_batch_requests_to_neuron
+    GEN_SCRIPT="python ${TRITON_PATH}/python_backend/inferentia/scripts/gen_triton_model.py"
+    MODEL_TYPE="pytorch"
+    COMPILED_MODEL="$PWD/add_sub_model_pyt.pt"
+    create_inferentia_models
 fi
 
 
