@@ -40,7 +40,9 @@ class TritonPythonModel:
         # Tensorflow uses a shared library which is common with
         # bash.
         os.system('/bin/bash --help')
-        print(f'Python version is {sys.version_info.major}.{sys.version_info.minor}, NumPy version is {np.version.version}, and Tensorflow version is {tensorflow.__version__}', flush=True)
+        print(
+            f'Python version is {sys.version_info.major}.{sys.version_info.minor}, NumPy version is {np.version.version}, and Tensorflow version is {tensorflow.__version__}',
+            flush=True)
 
     def execute(self, requests):
         """ This function is called on inference request.

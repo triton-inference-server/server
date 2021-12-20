@@ -62,6 +62,9 @@ class InferenceResponseFactory {
   {
   }
 
+  const ResponseAllocator* Allocator() { return allocator_; }
+  void* AllocatorUserp() { return alloc_userp_; }
+
   Status SetResponseDelegator(
       const std::function<void(
           std::unique_ptr<InferenceResponse>&&, const uint32_t)>& delegator)

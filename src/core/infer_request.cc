@@ -219,6 +219,25 @@ InferenceRequest::TraceTensor(
 #endif  // TRITON_ENABLE_TRACING
 
 Status
+InferenceRequest::OutputBufferProperties(
+    const char* name, size_t* byte_size, TRITONSERVER_MemoryType* memory_type,
+    int64_t* memory_type_id)
+{
+  const auto allocator = response_factory_.Allocator();
+  if ((allocator == nullptr) || (allocator->QueryFn() == nullptr)) {
+    return Status(
+        Status::Code::UNAVAILABLE, "Output properties are not available");
+  } else {
+    RETURN_IF_TRITONSERVER_ERROR(allocator->QueryFn()(
+        reinterpret_cast<TRITONSERVER_ResponseAllocator*>(
+            const_cast<ResponseAllocator*>(allocator)),
+        response_factory_.AllocatorUserp(), name, byte_size, memory_type,
+        memory_type_id));
+  }
+  return Status::Success;
+}
+
+Status
 InferenceRequest::Run(std::unique_ptr<InferenceRequest>& request)
 {
   return request->model_raw_->Enqueue(request);
@@ -678,15 +697,27 @@ InferenceRequest::Normalize()
       RETURN_IF_ERROR(model_raw_->GetOutput(output_name, &output_config));
     }
   }
-
-  // Make sure that the request is providing the same number of inputs
+  // Make sure that the request is providing the number of inputs
   // as is expected by the model.
-  if (original_inputs_.size() != (size_t)model_config.input_size()) {
-    return Status(
-        Status::Code::INVALID_ARG,
-        "expected " + std::to_string(model_config.input_size()) +
-            " inputs but got " + std::to_string(original_inputs_.size()) +
-            " inputs for model '" + ModelName() + "'");
+  if ((original_inputs_.size() > (size_t)model_config.input_size()) ||
+      (original_inputs_.size() < model_raw_->RequiredInputCount())) {
+    // If no input is marked as optional, then use exact match error message
+    // for consistency / backward compatibility
+    if ((size_t)model_config.input_size() == model_raw_->RequiredInputCount()) {
+      return Status(
+          Status::Code::INVALID_ARG,
+          "expected " + std::to_string(model_config.input_size()) +
+              " inputs but got " + std::to_string(original_inputs_.size()) +
+              " inputs for model '" + ModelName() + "'");
+    } else {
+      return Status(
+          Status::Code::INVALID_ARG,
+          "expected number of inputs between " +
+              std::to_string(model_raw_->RequiredInputCount()) + " and " +
+              std::to_string(model_config.input_size()) + " but got " +
+              std::to_string(original_inputs_.size()) + " inputs for model '" +
+              ModelName() + "'");
+    }
   }
 
   // Determine the batch size and shape of each input.
@@ -769,19 +800,44 @@ InferenceRequest::Normalize()
               "' for '" + ModelName() + "'");
     }
 
-    if (!CompareDimsWithWildcard(input_config->dims(), *shape)) {
-      DimsList full_dims;
-      if (model_config.max_batch_size() > 0) {
-        full_dims.Add(WILDCARD_DIM);
+    // Validate input shape
+    {
+      bool match_config = true;
+      const auto& config_dims = input_config->dims();
+      const auto& input_dims = *shape;
+      if (config_dims.size() != (int64_t)input_dims.size()) {
+        match_config = false;
+      } else {
+        for (int i = 0; i < config_dims.size(); ++i) {
+          if (input_dims[i] == WILDCARD_DIM) {
+            return Status(
+                Status::Code::INVALID_ARG,
+                "All input dimensions should be specified for input '" +
+                    pr.first + "' for model '" + ModelName() + "', got " +
+                    DimsListToString(input.OriginalShape()));
+          } else if (
+              (config_dims[i] != WILDCARD_DIM) &&
+              (config_dims[i] != input_dims[i])) {
+            match_config = false;
+            break;
+          }
+        }
       }
-      for (int i = 0; i < input_config->dims_size(); ++i) {
-        full_dims.Add(input_config->dims(i));
+
+      if (!match_config) {
+        DimsList full_dims;
+        if (model_config.max_batch_size() > 0) {
+          full_dims.Add(WILDCARD_DIM);
+        }
+        for (int i = 0; i < input_config->dims_size(); ++i) {
+          full_dims.Add(input_config->dims(i));
+        }
+        return Status(
+            Status::Code::INVALID_ARG,
+            "unexpected shape for input '" + pr.first + "' for model '" +
+                ModelName() + "'. Expected " + DimsListToString(full_dims) +
+                ", got " + DimsListToString(input.OriginalShape()));
       }
-      return Status(
-          Status::Code::INVALID_ARG,
-          "unexpected shape for input '" + pr.first + "' for model '" +
-              ModelName() + "'. Expected " + DimsListToString(full_dims) +
-              ", got " + DimsListToString(input.OriginalShape()));
     }
 
     // If there is a reshape for this input then adjust them to

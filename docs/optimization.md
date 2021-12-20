@@ -121,26 +121,16 @@ With eight concurrent requests the dynamic batcher allows Triton to
 provide 272 inferences per second without increasing latency
 compared to not using the dynamic batcher.
 
-You can also explicitly specify what batch sizes you would like the
-dynamic batcher to prefer when creating batches. For example, to
-indicate that you would like the dynamic batcher to prefer size 4
-batches you can modify the model configuration like this (multiple
-preferred sizes can be given but in this case we just have one).
-
-```
-dynamic_batching { preferred_batch_size: [ 4 ]}
-```
-
 Instead of having perf_analyzer collect data for a range of request
 concurrency values we can instead use a couple of simple rules that
 typically applies when perf_analyzer is running on the same system as
 Triton. The first rule is that for minimum latency set the request
 concurrency to 1 and disable the dynamic batcher and use only 1 [model
 instance](#model-instances). The second rule is that for maximum
-throughput set the request concurrency to be `2 * <preferred batch
-size> * <model instance count>`. We will discuss model instances
+throughput set the request concurrency to be `2 * <maximum batch size>
+* <model instance count>`. We will discuss model instances
 [below](#model-instances), for now we are working with one model
-instance. So for preferred-batch-size 4 we want to run perf_analyzer
+instance. So for maximum-batch-size 4 we want to run perf_analyzer
 with request concurrency of `2 * 4 * 1 = 8`.
 
 ```
@@ -197,7 +187,7 @@ instances, for example, change the model configuration file to include
 the following.
 
 ```
-dynamic_batching { preferred_batch_size: [ 4 ] }
+dynamic_batching { }
 instance_group [ { count: 2 }]
 ```
 

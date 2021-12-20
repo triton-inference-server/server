@@ -26,7 +26,19 @@
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 # First need to set up enviroment
-source ${TRITON_PATH}/python_backend/inferentia/scripts/setup.sh -p
+if [ ${USE_TENSORFLOW} == "1" ] && [ ${USE_PYTORCH} == "1" ] ; then
+    echo " Unsupported test configuration. Only one of USE_TENSORFLOW and USE_PYTORCH can be set to 1."
+    exit 0
+elif [ ${USE_TENSORFLOW} == "1" ] ; then
+    echo "Setting up enviroment with tensorflow 1"
+    source ${TRITON_PATH}/python_backend/inferentia/scripts/setup.sh -t --tensorflow-version 1
+elif [ ${USE_PYTORCH} == "1" ] ; then
+    echo "Setting up enviroment with pytorch"
+    source ${TRITON_PATH}/python_backend/inferentia/scripts/setup.sh -p
+else 
+    echo " Unsupported test configuration. USE_TENSORFLOW flag is: ${USE_TENSORFLOW} and USE_PYTORCH flag is: ${USE_PYTORCH}. Only one of them can be set to 1."
+    exit 0
+fi
 echo "done setting up enviroment"
 
 REPO_VERSION=${NVIDIA_TRITON_SERVER_VERSION}
@@ -49,33 +61,62 @@ source /opt/tritonserver/qa/common/util.sh
 TEST_TYPES="single multiple"
 
 # Setup models
-for TEST_TYPE in $TEST_TYPES; do
-    DATADIR="${TRITON_PATH}/models_${TEST_TYPE}"
-    rm -rf DATADIR
-done
-cd ${TRITON_PATH}
-python ${TEST_JSON_REPO}/simple-model.py
-python ${TRITON_PATH}/python_backend/inferentia/scripts/gen_triton_model.py \
-    --model_type "pytorch" \
-    --triton_input INPUT__0,INT64,4 INPUT__1,INT64,4 \
-    --triton_output OUTPUT__0,INT64,4 OUTPUT__1,INT64,4 \
-    --compiled_model $PWD/add_sub_model.pt \
-    --triton_model_dir models_single/add-sub-1x4 --neuron_core_range 0:0
+if [ ${USE_TENSORFLOW} == "1" ]; then
+    TEST_FRAMEWORK="tf1"
+    for TEST_TYPE in $TEST_TYPES; do
+        DATADIR="${TRITON_PATH}/models_${TEST_TYPE}_${TEST_FRAMEWORK}"
+        rm -rf DATADIR
+    done
+    python ${TEST_JSON_REPO}/simple_model.py \
+        --name add_sub_model_tf1 \
+        --model_type tensorflow \
+        --tf_version 1 \
+        --batch_size 1
+    python ${TRITON_PATH}/python_backend/inferentia/scripts/gen_triton_model.py \
+        --model_type "tensorflow" \
+        --compiled_model $PWD/add_sub_model_tf1 \
+        --triton_input INPUT__0,INT64,-1x4 INPUT__1,INT64,-1x4 \
+        --triton_output OUTPUT__0,INT64,-1x4 OUTPUT__1,INT64,-1x4 \
+        --triton_model_dir models_single_tf1/add-sub-1x4 \
+        --neuron_core_range 0:0
+    python ${TRITON_PATH}/python_backend/inferentia/scripts/gen_triton_model.py \
+        --model_type "tensorflow" \
+        --compiled_model $PWD/add_sub_model_tf1 \
+        --triton_input INPUT__0,INT64,-1x4 INPUT__1,INT64,-1x4 \
+        --triton_output OUTPUT__0,INT64,-1x4 OUTPUT__1,INT64,-1x4 \
+        --triton_model_dir models_multiple_tf1/add-sub-1x4 \
+        --triton_model_instance_count 3 \
+        --neuron_core_range 0:7
+elif [ ${USE_PYTORCH} == "1" ]; then
+    TEST_FRAMEWORK="pyt"
+    for TEST_TYPE in $TEST_TYPES; do
+        DATADIR="${TRITON_PATH}/models_${TEST_TYPE}_${TEST_FRAMEWORK}"
+        rm -rf DATADIR
+    done
+    # Pytorch
+    python ${TEST_JSON_REPO}/simple_model.py \
+        --name add_sub_model_pyt \
+        --model_type pytorch \
+        --batch_size 1
+    python ${TRITON_PATH}/python_backend/inferentia/scripts/gen_triton_model.py \
+        --model_type "pytorch" \
+        --triton_input INPUT__0,INT64,-1x4 INPUT__1,INT64,-1x4 \
+        --triton_output OUTPUT__0,INT64,-1x4 OUTPUT__1,INT64,-1x4 \
+        --compiled_model $PWD/add_sub_model_pyt.pt \
+        --triton_model_dir models_single_pyt/add-sub-1x4 --neuron_core_range 0:0
+    python ${TRITON_PATH}/python_backend/inferentia/scripts/gen_triton_model.py \
+        --model_type "pytorch" \
+        --triton_input INPUT__0,INT64,-1x4 INPUT__1,INT64,-1x4 \
+        --triton_output OUTPUT__0,INT64,-1x4 OUTPUT__1,INT64,-1x4 \
+        --compiled_model $PWD/add_sub_model_pyt.pt \
+        --triton_model_dir models_multiple_pyt/add-sub-1x4 \
+        --triton_model_instance_count 3 --neuron_core_range 0:7
+fi
 
-cd ${TRITON_PATH}
-python ${TEST_JSON_REPO}/simple-model.py
-python ${TRITON_PATH}/python_backend/inferentia/scripts/gen_triton_model.py \
-    --model_type "pytorch" \
-    --triton_input INPUT__0,INT64,4 INPUT__1,INT64,4 \
-    --triton_output OUTPUT__0,INT64,4 OUTPUT__1,INT64,4 \
-    --compiled_model $PWD/add_sub_model.pt \
-    --triton_model_dir models_multiple/add-sub-1x4 \
-    --triton_model_instance_count 3 --neuron_core_range 0:7
 
 RET=0
-
 for TEST_TYPE in $TEST_TYPES; do
-    DATADIR="${TRITON_PATH}/models_${TEST_TYPE}"
+    DATADIR="${TRITON_PATH}/models_${TEST_TYPE}_${TEST_FRAMEWORK}"
     SERVER_ARGS="--model-repository=${DATADIR} --log-verbose=1"
     rm -f $SERVER_LOG $CLIENT_LOG
 

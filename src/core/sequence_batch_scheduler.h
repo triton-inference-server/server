@@ -95,6 +95,11 @@ class SequenceBatchScheduler : public Scheduler {
   }
 
   size_t MaxBatchSize() { return max_batch_size_; }
+  const std::unordered_map<std::string, SequenceStates::InitialStateData>&
+  InitialState()
+  {
+    return initial_state_;
+  }
 
  private:
   void ReaperThread(const int nice);
@@ -107,7 +112,10 @@ class SequenceBatchScheduler : public Scheduler {
       std::shared_ptr<ControlInputs>* continue_input_overrides,
       std::shared_ptr<ControlInputs>* notready_input_overrides);
 
- private:
+  Status GenerateInitialStateData(
+      const inference::ModelSequenceBatching_InitialState& initial_state,
+      const inference::ModelSequenceBatching_State& state, TritonModel* model);
+
   struct BatcherSequenceSlotCompare {
     bool operator()(
         const BatcherSequenceSlot& a, const BatcherSequenceSlot& b) const
@@ -169,6 +177,10 @@ class SequenceBatchScheduler : public Scheduler {
   std::unordered_map<std::string, const inference::ModelSequenceBatching_State&>
       state_output_config_map_;
   size_t max_batch_size_;
+
+  // Initial state used for implicit state.
+  std::unordered_map<std::string, SequenceStates::InitialStateData>
+      initial_state_;
 };
 
 // Base class for a scheduler that implements a particular scheduling
@@ -179,6 +191,7 @@ class SequenceBatch {
       SequenceBatchScheduler* base, const uint32_t batcher_idx,
       const size_t seq_slot_cnt,
       const std::unordered_map<std::string, bool>& enforce_equal_shape_tensors,
+      const bool has_optional_input,
       const std::shared_ptr<SequenceBatchScheduler::ControlInputs>&
           start_input_overrides,
       const std::shared_ptr<SequenceBatchScheduler::ControlInputs>&
@@ -228,6 +241,9 @@ class SequenceBatch {
   // the batch.
   const std::unordered_map<std::string, bool> enforce_equal_shape_tensors_;
 
+  // Store information on whether the model contains optional inputs.
+  bool has_optional_input_;
+
   // The control values, delivered as input tensors, that should be
   // used when starting a sequence, continuing a sequence, ending a
   // sequence, and showing that a sequence has not input available.
@@ -258,6 +274,7 @@ class DirectSequenceBatch : public SequenceBatch {
       SequenceBatchScheduler* base, const uint32_t batcher_idx,
       const size_t seq_slot_cnt, TritonModelInstance* model_instance,
       const std::unordered_map<std::string, bool>& enforce_equal_shape_tensors,
+      const bool has_optional_input,
       const std::shared_ptr<SequenceBatchScheduler::ControlInputs>&
           start_input_overrides,
       const std::shared_ptr<SequenceBatchScheduler::ControlInputs>&
@@ -321,6 +338,7 @@ class OldestSequenceBatch : public SequenceBatch {
       SequenceBatchScheduler* base, const uint32_t batcher_idx,
       const size_t seq_slot_cnt, TritonModelInstance* model_instance,
       const std::unordered_map<std::string, bool>& enforce_equal_shape_tensors,
+      const bool has_optional_input,
       const std::shared_ptr<SequenceBatchScheduler::ControlInputs>&
           start_input_overrides,
       const std::shared_ptr<SequenceBatchScheduler::ControlInputs>&

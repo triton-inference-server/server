@@ -1368,7 +1368,9 @@ instance_group [
 def create_openvino_modelfile(models_dir, model_version, max_batch, dtype,
                               shape):
 
-    batch_dim = [] if max_batch == 0 else [max_batch,]
+    batch_dim = [] if max_batch == 0 else [
+        max_batch,
+    ]
     if not tu.validate_for_openvino_model(dtype, dtype, dtype,
                                           batch_dim + shape, batch_dim + shape,
                                           batch_dim + shape):
@@ -1405,7 +1407,9 @@ def create_openvino_modelfile(models_dir, model_version, max_batch, dtype,
 def create_openvino_modelconfig(models_dir, model_version, max_batch, dtype,
                                 shape):
 
-    batch_dim = [] if max_batch == 0 else [max_batch,]
+    batch_dim = [] if max_batch == 0 else [
+        max_batch,
+    ]
     if not tu.validate_for_openvino_model(dtype, dtype, dtype,
                                           batch_dim + shape, batch_dim + shape,
                                           batch_dim + shape):
@@ -1619,7 +1623,7 @@ if __name__ == '__main__':
 
     if FLAGS.graphdef or FLAGS.savedmodel:
         import tensorflow as tf
-        from tensorflow.python.framework import graph_io, graph_util
+        from tensorflow.python.framework import graph_io
     if FLAGS.tensorrt or FLAGS.tensorrt_shape_io:
         import tensorrt as trt
     if FLAGS.onnx:

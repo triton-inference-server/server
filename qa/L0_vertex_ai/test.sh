@@ -77,9 +77,9 @@ function vertex_ai_wait_for_server_ready() {
 
     WAIT_RET=0
 
-    ping_address="localhost:8080/${AIP_HEALTH_ROUTE}"
+    ping_address="localhost:8080${AIP_HEALTH_ROUTE}"
     if [ -n "$AIP_HTTP_PORT" ]; then
-        ping_address="localhost:${AIP_HTTP_PORT}/${AIP_HEALTH_ROUTE}"
+        ping_address="localhost:${AIP_HTTP_PORT}${AIP_HEALTH_ROUTE}"
     fi
 
     local wait_secs=$wait_time_secs
@@ -122,8 +122,8 @@ unset_vertex_variables
 
 # Enable HTTP endpoint to check server readiness in the case of disabling Vertex AI
 BASE_SERVER_ARGS="--allow-http true --model-repository=single_model"
-export AIP_HEALTH_ROUTE=health
-export AIP_PREDICT_ROUTE=predict
+export AIP_HEALTH_ROUTE="/health"
+export AIP_PREDICT_ROUTE="/predict"
 
 # Default false
 SERVER_ARGS=${BASE_SERVER_ARGS}
@@ -173,9 +173,13 @@ else
 fi
 
 # Default true
+# Note that when default true, HTTP / GRPC endpoints will be disabled,
+# check those endpoints by enabling one of them at a time and greping keywords
 export AIP_MODE=PREDICTION
-SERVER_ARGS=${BASE_SERVER_ARGS}
-run_server
+SERVER_ARGS="--model-repository=single_model --allow-grpc=true"
+# Using nowait as 'run_server' requires HTTP endpoint enabled
+run_server_nowait
+sleep 10
 if [ "$SERVER_PID" == "0" ]; then
     echo -e "\n***\n*** Failed to start $SERVER\n***"
     cat $SERVER_LOG
@@ -189,10 +193,26 @@ if [ $? -ne 0 ]; then
     echo -e "\n***\n*** Failed. Expected Vertex AI service is enabled\n***"
     RET=1
 fi
+grep "Started GRPCInferenceService at" $SERVER_LOG
+if [ $? -ne 0 ]; then
+    echo -e "\n***\n*** Failed. Expected GRPC service is enabled\n***"
+    RET=1
+fi
+# Expect no message regarding HTTP as it is disabled
+grep "failed to start HTTP service" $SERVER_LOG
+if [ $? -eq 0 ]; then
+    echo -e "\n***\n*** Failed. Expected HTTP service is disabled\n***"
+    RET=1
+fi
+grep "Started HTTPService at" $SERVER_LOG
+if [ $? -eq 0 ]; then
+    echo -e "\n***\n*** Failed. Expected HTTP service is disabled\n***"
+    RET=1
+fi
 set -e
 
 # Disable
-SERVER_ARGS="${BASE_SERVER_ARGS} --allow-vertex-ai=false"
+SERVER_ARGS="${BASE_SERVER_ARGS} --allow-vertex-ai=false --allow-http=true"
 run_server
 if [ "$SERVER_PID" == "0" ]; then
     echo -e "\n***\n*** Failed to start $SERVER\n***"
@@ -213,13 +233,29 @@ if [ $? -eq 0 ]; then
     echo -e "\n***\n*** Failed. Expected Vertex AI service is disabled\n***"
     RET=1
 fi
+grep "Started HTTPService at" $SERVER_LOG
+if [ $? -ne 0 ]; then
+    echo -e "\n***\n*** Failed. Expected HTTP service is enabled\n***"
+    RET=1
+fi
+# Expect no message regarding GRPC as it is disabled
+grep "failed to start GRPC service" $SERVER_LOG
+if [ $? -eq 0 ]; then
+    echo -e "\n***\n*** Failed. Expected GRPC service is disabled\n***"
+    RET=1
+fi
+grep "Started GRPCInferenceService at" $SERVER_LOG
+if [ $? -eq 0 ]; then
+    echo -e "\n***\n*** Failed. Expected GRPC service is disabled\n***"
+    RET=1
+fi
 set -e
 
 #
 # Test missing route
 #
 unset_vertex_variables
-export AIP_HEALTH_ROUTE=health
+export AIP_HEALTH_ROUTE="/health"
 
 SERVER_ARGS="--allow-vertex-ai=true --model-repository=single_model"
 run_server_nowait
@@ -240,7 +276,7 @@ else
 fi
 
 unset_vertex_variables
-export AIP_PREDICT_ROUTE=predict
+export AIP_PREDICT_ROUTE="/predict"
 run_server_nowait
 vertex_ai_wait_for_server_ready $SERVER_PID 10
 if [ "$WAIT_RET" == "0" ]; then
@@ -262,8 +298,8 @@ fi
 # Test endpoints
 #
 unset_vertex_variables
-export AIP_PREDICT_ROUTE=predict
-export AIP_HEALTH_ROUTE=health
+export AIP_PREDICT_ROUTE="/predict"
+export AIP_HEALTH_ROUTE="/health"
 
 SERVER_ARGS="--allow-vertex-ai=true --model-repository=single_model"
 run_server_nowait
@@ -301,8 +337,8 @@ wait $SERVE_PID
 # AIP_STORAGE_URI / AIP_HTTP_PORT
 #
 unset_vertex_variables
-export AIP_PREDICT_ROUTE=predict
-export AIP_HEALTH_ROUTE=health
+export AIP_PREDICT_ROUTE="/predict"
+export AIP_HEALTH_ROUTE="/health"
 export AIP_STORAGE_URI=single_model
 export AIP_HTTP_PORT=5234
 
@@ -341,8 +377,8 @@ wait $SERVE_PID
 #
 unset_vertex_variables
 export AIP_MODE=PREDICTION
-export AIP_PREDICT_ROUTE=predict
-export AIP_HEALTH_ROUTE=health
+export AIP_PREDICT_ROUTE="/predict"
+export AIP_HEALTH_ROUTE="/health"
 
 export AIP_STORAGE_URI=single_model
 SERVER_ARGS="--vertex-ai-default-model=subadd"

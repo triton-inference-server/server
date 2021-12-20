@@ -338,6 +338,11 @@ if [ $? -ne 0 ]; then
   RET=1
 fi
 
+(cd model_control && bash -ex test.sh)
+if [ $? -ne 0 ]; then
+  RET=1
+fi
+
 (cd examples && bash -ex test.sh)
 if [ $? -ne 0 ]; then
   RET=1

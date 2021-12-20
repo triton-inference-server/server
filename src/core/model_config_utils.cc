@@ -286,7 +286,9 @@ ValidateIOShape(
       (max_batch_size == 0)) {
     return Status(
         Status::Code::INVALID_ARG,
-        message_prefix + "cannot have empty reshape for non-batching model");
+        message_prefix +
+            "cannot have empty reshape for non-batching model as scalar "
+            "tensors are not supported");
   }
 
   for (auto dim : io.dims()) {
@@ -1624,6 +1626,7 @@ ValidateModelConfigInt64()
       "timeout_microseconds",
       "ModelConfig::sequence_batching::direct::max_queue_delay_microseconds",
       "ModelConfig::sequence_batching::state::dims",
+      "ModelConfig::sequence_batching::state::initial_state::dims",
       "ModelConfig::sequence_batching::oldest::max_queue_delay_microseconds",
       "ModelConfig::sequence_batching::max_sequence_idle_microseconds",
       "ModelConfig::ensemble_scheduling::step::model_version",
@@ -1853,6 +1856,11 @@ ModelConfigToJson(
           triton::common::TritonJson::Value state;
           RETURN_IF_ERROR(states.IndexAsObject(i, &state));
           RETURN_IF_ERROR(FixIntArray(config_json, state, "dims"));
+
+          triton::common::TritonJson::Value initial_state;
+          if (sb.Find("initial_state", &initial_state)) {
+            RETURN_IF_ERROR(FixIntArray(config_json, initial_state, "dims"));
+          }
         }
       }
     }

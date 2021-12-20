@@ -52,11 +52,12 @@ To enable rate limiting users must set `--rate-limit` option when
 launching tritonserver. For more information, consult usage of
 the option emitted by `tritonserver --help`.
 
-The rate limiter is controlled by rate limiter configuration
-described in [rate limiter config](model_configuration.md#rate-limiter-config).
-The rate limiter configuration includes 
+The rate limiter is controlled by the rate limiter configuration given
+for each model instance, as described in [rate limiter
+configuration](model_configuration.md#rate-limiter-configuration).
+The rate limiter configuration includes
 [resources](model_configuration.md#resources) and
-[priority](model_configuration.md#priority) for the instances
+[priority](model_configuration.md#priority) for the model instances
 defined by the instance group.
 
 ### Resources

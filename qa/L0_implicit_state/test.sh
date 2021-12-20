@@ -29,14 +29,21 @@ export ENSEMBLES=0
 BACKENDS=${BACKENDS:="onnx plan"}
 export BACKENDS
 export IMPLICIT_STATE=1
+INITIAL_STATE_ZERO=${INITIAL_STATE_ZERO:="0"}
+INITIAL_STATE_FILE=${INITIAL_STATE_FILE:="0"}
+
+export INITIAL_STATE_ZERO
+export INITIAL_STATE_FILE
 
 (cd ../L0_sequence_batcher/ && bash -ex test.sh)
 RET=$?
 
 if [ $RET == 0 ]; then
-    echo -e "\n***\n*** Test Passed\n***"
+    echo -e "\n***\n*** Implicit State Passed\n***"
 else
-    echo -e "\n***\n*** Test FAILED\n***"
+    echo -e "\n***\n*** Implicit State FAILED\n***"
+    exit 1
 fi
 
 exit $RET
+

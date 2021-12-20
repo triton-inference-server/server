@@ -237,6 +237,10 @@ class EnsembleContext {
       TRITONSERVER_ResponseAllocator* allocator, void* buffer,
       void* buffer_userp, size_t byte_size, TRITONSERVER_MemoryType memory_type,
       int64_t memory_type_id);
+  static TRITONSERVER_Error* OutputBufferQuery(
+      TRITONSERVER_ResponseAllocator* allocator, void* userp,
+      const char* tensor_name, size_t* byte_size,
+      TRITONSERVER_MemoryType* memory_type, int64_t* memory_type_id);
   static void RequestComplete(
       TRITONSERVER_InferenceRequest* request, const uint32_t flags,
       void* userp);
@@ -473,6 +477,10 @@ EnsembleContext::EnsembleContext(
   TRITONSERVER_ResponseAllocator* allocator;
   TRITONSERVER_Error* err = TRITONSERVER_ResponseAllocatorNew(
       &allocator, ResponseAlloc, ResponseRelease, nullptr /* start_fn */);
+  if (err == nullptr) {
+    err = TRITONSERVER_ResponseAllocatorSetQueryFunction(
+        allocator, OutputBufferQuery);
+  }
   if (err != nullptr) {
     ensemble_status_ = Status(
         TritonCodeToStatusCode(TRITONSERVER_ErrorCode(err)),
@@ -532,6 +540,16 @@ EnsembleContext::ResponseRelease(
 
   // Don't do anything when releasing a buffer since ResponseAlloc
   // passes the ownership of the data to ensemble context.
+  return nullptr;  // Success
+}
+
+TRITONSERVER_Error*
+EnsembleContext::OutputBufferQuery(
+    TRITONSERVER_ResponseAllocator* allocator, void* userp,
+    const char* tensor_name, size_t* byte_size,
+    TRITONSERVER_MemoryType* memory_type, int64_t* memory_type_id)
+{
+  // Ensemble will always attempt to satisfy any output buffer request
   return nullptr;  // Success
 }
 

@@ -32,6 +32,46 @@
 
 namespace nvidia { namespace inferenceserver {
 
+namespace {
+
+Status
+GetTFSpecializedBackendName(
+    const BackendCmdlineConfigMap& config_map, std::string* specialized_name)
+{
+  std::string tf_version_str = "1";
+  const auto& itr = config_map.find("tensorflow");
+  if (itr != config_map.end()) {
+    if (BackendConfiguration(itr->second, "version", &tf_version_str).IsOk()) {
+      if ((tf_version_str != "1") && (tf_version_str != "2")) {
+        return Status(
+            Status::Code::INVALID_ARG,
+            "unexpected TensorFlow library version '" + tf_version_str +
+                "', expects 1 or 2.");
+      }
+    }
+  }
+
+  *specialized_name += tf_version_str;
+
+  return Status::Success;
+}
+
+Status
+GetOVSpecializedBackendName(
+    const BackendCmdlineConfigMap& config_map, std::string* specialized_name)
+{
+  std::string ov_version_str = "2021_2";
+  const auto& itr = config_map.find("openvino");
+  if (itr != config_map.end()) {
+    BackendConfiguration(itr->second, "version", &ov_version_str);
+  }
+
+  *specialized_name += ("_" + ov_version_str);
+
+  return Status::Success;
+}
+}  // namespace
+
 Status
 BackendConfiguration(
     const BackendCmdlineConfig& config, const std::string& key,
@@ -151,21 +191,9 @@ BackendConfigurationSpecializeBackendName(
 {
   *specialized_name = backend_name;
   if (backend_name == "tensorflow") {
-    std::string tf_version_str = "1";
-    const auto& itr = config_map.find("tensorflow");
-    if (itr != config_map.end()) {
-      if (BackendConfiguration(itr->second, "version", &tf_version_str)
-              .IsOk()) {
-        if ((tf_version_str != "1") && (tf_version_str != "2")) {
-          return Status(
-              Status::Code::INVALID_ARG,
-              "unexpected TensorFlow library version '" + tf_version_str +
-                  "', expects 1 or 2.");
-        }
-      }
-    }
-
-    *specialized_name += tf_version_str;
+    RETURN_IF_ERROR(GetTFSpecializedBackendName(config_map, specialized_name));
+  } else if (backend_name == "openvino") {
+    RETURN_IF_ERROR(GetOVSpecializedBackendName(config_map, specialized_name));
   }
 
   return Status::Success;

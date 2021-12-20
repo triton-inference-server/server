@@ -1,5 +1,5 @@
 #!/bin/bash
-# Copyright (c) 2020, NVIDIA CORPORATION. All rights reserved.
+# Copyright (c) 2021, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -38,23 +38,39 @@ if [ ! -z "$TEST_REPO_ARCH" ]; then
     REPO_VERSION=${REPO_VERSION}_${TEST_REPO_ARCH}
 fi
 
+source ../common/util.sh
+
+RET=0
+
+TEST_LOG="./query_test.log"
+CLIENT_LOG="./query_client.log"
+TEST_EXEC=./query_test
+TEST_PY=./query_e2e.py
+EXPECTED_NUM_TESTS="6"
 TEST_RESULT_FILE='test_results.txt'
+
+
 export CUDA_VISIBLE_DEVICES=0
 
-DATADIR=/data/inferenceserver/${REPO_VERSION}
+rm -fr *.log
 
-CLIENT_LOG="./client.log"
-UNKNOWN_RANK_TEST=unknown_rank_test.py
+unset TEST_FAIL_WITH_QUERY_RESULT
+unset TEST_BYTE_SIZE
+
+set +e
+LD_LIBRARY_PATH=/opt/tritonserver/lib:$LD_LIBRARY_PATH $TEST_EXEC >>$TEST_LOG 2>&1
+if [ $? -ne 0 ]; then
+    echo -e "\n***\n*** Query Unit Test Failed\n***"
+    RET=1
+fi
+set -e
+
+export TEST_FAIL_WITH_QUERY_RESULT=1
+export TEST_BYTE_SIZE=4
 
 SERVER=/opt/tritonserver/bin/tritonserver
 SERVER_ARGS="--model-repository=`pwd`/models"
 SERVER_LOG="./inference_server.log"
-source ../common/util.sh
-
-rm -f ./*.log
-rm -fr models && mkdir -p models
-cp -r $DATADIR/tf_model_store2/unknown_rank_* models/
-
 run_server
 if [ "$SERVER_PID" == "0" ]; then
     echo -e "\n***\n*** Failed to start $SERVER\n***"
@@ -62,16 +78,12 @@ if [ "$SERVER_PID" == "0" ]; then
     exit 1
 fi
 
-RET=0
-
 set +e
-python $UNKNOWN_RANK_TEST UnknownRankTest.test_success >> $CLIENT_LOG 2>&1
+python $TEST_PY >>$CLIENT_LOG 2>&1
 if [ $? -ne 0 ]; then
-    echo -e "\n***\n*** Test Failed\n***"
-    cat $CLIENT_LOG
     RET=1
 else
-    check_test_results $TEST_RESULT_FILE 1
+    check_test_results $TEST_RESULT_FILE $EXPECTED_NUM_TESTS
     if [ $? -ne 0 ]; then
         cat $CLIENT_LOG
         echo -e "\n***\n*** Test Result Verification Failed\n***"
@@ -80,23 +92,8 @@ else
 fi
 set -e
 
-set +e
-
-python $UNKNOWN_RANK_TEST UnknownRankTest.test_wrong_output >> $CLIENT_LOG 2>&1
-if [ $? -ne 0 ]; then
-    echo -e "\n***\n*** Test Failed\n***"
-    cat $CLIENT_LOG
-    RET=1
-else
-    check_test_results $TEST_RESULT_FILE 1
-    if [ $? -ne 0 ]; then
-        cat $CLIENT_LOG
-        echo -e "\n***\n*** Test Result Verification Failed\n***"
-        RET=1
-    fi
-fi
-
-set -e
+unset TEST_FAIL_WITH_QUERY_RESULT
+unset TEST_BYTE_SIZE
 
 kill $SERVER_PID
 wait $SERVER_PID
@@ -104,6 +101,9 @@ wait $SERVER_PID
 if [ $RET -eq 0 ]; then
     echo -e "\n***\n*** Test Passed\n***"
 else
+    cat $TEST_LOG
+    cat $CLIENT_LOG
+    cat $SERVER_LOG
     echo -e "\n***\n*** Test FAILED\n***"
 fi
 

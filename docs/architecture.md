@@ -257,6 +257,124 @@ sequence_batching {
   the batch-size. Each element in the tensor indicates the correlation
   ID of the sequence in the corresponding batch slot.
 
+#### Implicit State Management
+
+Implicit state management allows a stateful model to store its state inside
+Triton. When using implicit state, the stateful model does not need to store
+the state required for inference inside the model.
+
+Below is a portion of the model configuration that indicates the model
+is using implicit state.
+
+```
+sequence_batching {
+  state [
+    {
+      input_name: "INPUT_STATE"
+      output_name: "OUTPUT_STATE"
+      data_type: TYPE_INT32
+      dims: [ -1 ]
+    }
+  ]
+}
+```
+
+The *state* section in the sequence_batching setting is used to indicate that
+the model is using implicit state. The *input_name* field specifies the name of
+the input tensor that will contain the input state. The *output_name* field
+describes the name of the output tensor produced by the model that contains
+output state. The output state provided by the model in the *i<sup>th</sup>*
+request in the sequence will be used as the input state in the
+*i+1<sup>th</sup>* request. The *dims* field specifies the dimensions of the
+state tensors. When the *dims* field contains variable-sized dimensions, the
+shape of the input state and output state does not have to match.
+
+For debugging purposes, the client can request the output state. In order to
+allow the client to request the output state, the
+[*output* section of the model configuration](./model_configuration.md#inputs-and-outputs)
+must list the output state as one of the model outputs. Note that requesting the
+output state from the client can increase the request latency because of the
+additional tensors that have to be transferred.
+
+Implicit state management requires backend support. Currently, only
+[onnxruntime_backend](https://github.com/triton-inference-server/onnxruntime_backend)
+and [tensorrt_backend](https://github.com/triton-inference-server/tensorrt_backend)
+support implicit state.
+
+##### State Initialization
+
+By default, the starting request in the sequence contains uninitialized data for
+the input state. The model can use the start flag in the request to detect the
+beginning of a new sequence and initialize the model state by providing the
+initial state in the model output. If the *dims* section in the *state*
+description of the model contains variable-sized dimensions, Triton will use *1*
+for every variable-sized dimension for the starting request. For other
+non-starting requests in the sequence, the input state is the output state of
+the previous request in the sequence. For an example ONNX model that uses
+implicit state you can refer to
+[this ONNX model](../qa/common/gen_qa_implicit_models.py#L101).
+This is a simple accumulator model that stores the partial sum of the requests
+in a sequence in Triton using implicit state. For state initialization, if the
+request is starting, the model sets the "OUTPUT\_STATE" to be equal to the
+"INPUT" tensor. For non-starting requests, it sets the "OUTPUT\_STATE" tensor
+to the sum of "INPUT" and "INPUT\_STATE" tensors.
+
+In addition to the default state initilization discussed above, Triton provides
+two other mechanisms for initilizing state.
+
+###### Initializing State from Zero.
+
+Below is an example of initializing state from zero.
+
+```
+sequence_batching {
+  state [
+    {
+      input_name: "INPUT_STATE"
+      output_name: "OUTPUT_STATE"
+      data_type: TYPE_INT32
+      dims: [ -1 ]
+      initial_state: {
+       data_type: TYPE_INT32
+       dims: [ 1 ]
+       zero_data: true
+       name: "initial state"
+      }
+    }
+  ]
+}
+```
+
+Note that in the example above variable dimensions in the state description are
+converted to fixed size dimensions.
+
+###### Initializing State from File
+
+For initializing state from file, you need to create a directory named
+"initial\_state" under the model directory. The file that contains the initial
+state under this directory needs to be provided in the *data_file* field. 
+The data stored in this file will be used in row-major order as the initial
+state. Below is an example state description initializing state from file.
+
+```
+sequence_batching {
+  state [
+    {
+      input_name: "INPUT_STATE"
+      output_name: "OUTPUT_STATE"
+      data_type: TYPE_INT32
+      dims: [ -1 ]
+      initial_state: {
+       data_type: TYPE_INT32
+       dims: [ 1 ]
+       data_file: "initial_state_data"
+       name: "initial state"
+      }
+    }
+  ]
+}
+```
+
 #### Scheduling Strategies
 
 The sequence batcher can employ one of two scheduling strategies when
@@ -436,7 +554,6 @@ sequence_batching {
   oldest
     {
       max_candidate_sequences: 4
-      preferred_batch_size: [ 2 ]
     }
   control_input [
     {

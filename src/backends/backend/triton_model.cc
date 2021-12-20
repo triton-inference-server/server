@@ -616,6 +616,21 @@ TRITONBACKEND_RequestOutputName(
 }
 
 TRITONSERVER_Error*
+TRITONBACKEND_RequestOutputBufferProperties(
+    TRITONBACKEND_Request* request, const char* name, size_t* byte_size,
+    TRITONSERVER_MemoryType* memory_type, int64_t* memory_type_id)
+{
+  InferenceRequest* tr = reinterpret_cast<InferenceRequest*>(request);
+  auto status =
+      tr->OutputBufferProperties(name, byte_size, memory_type, memory_type_id);
+  if (!status.IsOk()) {
+    return TRITONSERVER_ErrorNew(
+        StatusCodeToTritonCode(status.StatusCode()), status.Message().c_str());
+  }
+  return nullptr;  // success
+}
+
+TRITONSERVER_Error*
 TRITONBACKEND_RequestRelease(
     TRITONBACKEND_Request* request, uint32_t release_flags)
 {
