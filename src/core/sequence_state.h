@@ -99,6 +99,16 @@ class SequenceState {
 
 class SequenceStates {
  public:
+  struct InitialStateData {
+    InitialStateData(const std::string& state_init_name)
+        : state_init_name_(state_init_name)
+    {
+    }
+
+    std::string state_init_name_;
+    std::shared_ptr<MutableMemory> data_;
+  };
+
   // Initialize the state tensors according to the state model configuration.
   // Will use a default value of 1 for the variable dimensions in the state
   // tensor configuration.
@@ -106,7 +116,8 @@ class SequenceStates {
       const std::unordered_map<
           std::string, const inference::ModelSequenceBatching_State&>&
           state_output_config_map,
-      const size_t max_batch_size);
+      const size_t max_batch_size,
+      const std::unordered_map<std::string, InitialStateData>& initial_state);
 
   // Get a buffer holding the output state.
   Status OutputState(

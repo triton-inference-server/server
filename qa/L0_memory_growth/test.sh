@@ -204,47 +204,55 @@ GRAPH_LOG="memory_growth_busyop.log"
 LEAKCHECK_ARGS="$LEAKCHECK_ARGS_BASE --massif-out-file=$MASSIF_LOG --max-threads=3000 --log-file=$LEAKCHECK_LOG"
 SERVER_LOG="test_busyop.server.log"
 CLIENT_LOG="test_busyop.client.log"
+SKIP_BUSYOP=0
 
 # Run server
 run_server_leakcheck
 if [ "$SERVER_PID" == "0" ]; then
-    echo -e "\n***\n*** Failed to start $SERVER\n***"
     cat $SERVER_LOG
-    exit 1
+    if [ `grep -c "provided PTX was compiled" $SERVER_LOG` != "0" ]; then
+        echo -e "\n***\n*** Failed to start $SERVER due to PTX issue\n***"
+        SKIP_BUSYOP=1
+    else
+        echo -e "\n***\n*** Failed to start $SERVER\n***"
+        exit 1
+    fi
 fi
 
 set +e
 
-# Run the busy_op test
-SECONDS=0
-python $BUSY_OP_TEST -v -m graphdef_busyop -d $DELAY_CYCLES -n $NUM_REQUESTS > $CLIENT_LOG 2>&1
-TEST_DURATION=$SECONDS
-if [ $? -ne 0 ]; then
-    cat $CLIENT_LOG
-    echo -e "\n***\n*** Test graphdef_busyop Failed\n***"
-    RET=1
-fi
-set -e
+# Run the busy_op test if no PTX issue was observed when launching server
+if [ $SKIP_BUSYOP -ne 1 ]; then
+    SECONDS=0
+    python $BUSY_OP_TEST -v -m graphdef_busyop -d $DELAY_CYCLES -n $NUM_REQUESTS > $CLIENT_LOG 2>&1
+    TEST_DURATION=$SECONDS
+    if [ $? -ne 0 ]; then
+        cat $CLIENT_LOG
+        echo -e "\n***\n*** Test graphdef_busyop Failed\n***"
+        RET=1
+    fi
+    set -e
 
-# Stop Server
-kill $SERVER_PID
-wait $SERVER_PID
+    # Stop Server
+    kill $SERVER_PID
+    wait $SERVER_PID
 
-set +e
+    set +e
 
-# Log test duration and the graph for memory growth
-hrs=$(printf "%02d" $((TEST_DURATION / 3600)))
-mins=$(printf "%02d" $(((TEST_DURATION / 60) % 60)))
-secs=$(printf "%02d" $((TEST_DURATION % 60)))
-echo -e "Test Duration: $hrs:$mins:$secs (HH:MM:SS)" >> ${GRAPH_LOG}
-ms_print ${MASSIF_LOG} | head -n35 >> ${GRAPH_LOG}
-cat ${GRAPH_LOG}
-# Check the massif output
-python $MASSIF_TEST $MASSIF_LOG $MAX_ALLOWED_ALLOC --start-from-middle >> $CLIENT_LOG 2>&1
-if [ $? -ne 1 ]; then
-    cat $CLIENT_LOG
-    echo -e "\n***\n*** Test for graphdef_busyop Failed\n***"
-    RET=1
+    # Log test duration and the graph for memory growth
+    hrs=$(printf "%02d" $((TEST_DURATION / 3600)))
+    mins=$(printf "%02d" $(((TEST_DURATION / 60) % 60)))
+    secs=$(printf "%02d" $((TEST_DURATION % 60)))
+    echo -e "Test Duration: $hrs:$mins:$secs (HH:MM:SS)" >> ${GRAPH_LOG}
+    ms_print ${MASSIF_LOG} | head -n35 >> ${GRAPH_LOG}
+    cat ${GRAPH_LOG}
+    # Check the massif output
+    python $MASSIF_TEST $MASSIF_LOG $MAX_ALLOWED_ALLOC --start-from-middle >> $CLIENT_LOG 2>&1
+    if [ $? -ne 1 ]; then
+        cat $CLIENT_LOG
+        echo -e "\n***\n*** Test for graphdef_busyop Failed\n***"
+        RET=1
+    fi
 fi
 set -e
 

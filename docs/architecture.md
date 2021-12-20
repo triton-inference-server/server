@@ -303,20 +303,77 @@ support implicit state.
 
 ##### State Initialization
 
-The starting request in the sequence contains uninitialized data for the input
-state. The model can use the start flag in the request to detect the beginning
-of a new sequence and initialize the model state by providing the initial state
-in the model output. If the *dims* section in the *state* description of the
-model contains variable-sized dimensions, Triton will use *1* for every
-variable-sized dimension for the starting request. For other non-starting
-requests in the sequence, the input state is the output state of the previous
-request in the sequence. For an example ONNX model that uses implicit state
-ou can refer to [this ONNX model](../qa/common/gen_qa_implicit_models.py#L101).
+By default, the starting request in the sequence contains uninitialized data for
+the input state. The model can use the start flag in the request to detect the
+beginning of a new sequence and initialize the model state by providing the
+initial state in the model output. If the *dims* section in the *state*
+description of the model contains variable-sized dimensions, Triton will use *1*
+for every variable-sized dimension for the starting request. For other
+non-starting requests in the sequence, the input state is the output state of
+the previous request in the sequence. For an example ONNX model that uses
+implicit state you can refer to
+[this ONNX model](../qa/common/gen_qa_implicit_models.py#L101).
 This is a simple accumulator model that stores the partial sum of the requests
 in a sequence in Triton using implicit state. For state initialization, if the
 request is starting, the model sets the "OUTPUT\_STATE" to be equal to the
 "INPUT" tensor. For non-starting requests, it sets the "OUTPUT\_STATE" tensor
 to the sum of "INPUT" and "INPUT\_STATE" tensors.
+
+In addition to the default state initilization discussed above, Triton provides
+two other mechanisms for initilizing state.
+
+###### Initializing State from Zero.
+
+Below is an example of initializing state from zero.
+
+```
+sequence_batching {
+  state [
+    {
+      input_name: "INPUT_STATE"
+      output_name: "OUTPUT_STATE"
+      data_type: TYPE_INT32
+      dims: [ -1 ]
+      initial_state: {
+       data_type: TYPE_INT32
+       dims: [ 1 ]
+       zero_data: true
+       name: "initial state"
+      }
+    }
+  ]
+}
+```
+
+Note that in the example above variable dimensions in the state description are
+converted to fixed size dimensions.
+
+###### Initializing State from File
+
+For initializing state from file, you need to create a directory named
+"initial\_state" under the model directory. The file that contains the initial
+state under this directory needs to be provided in the *data_file* field. 
+The data stored in this file will be used in row-major order as the initial
+state. Below is an example state description initializing state from file.
+
+```
+sequence_batching {
+  state [
+    {
+      input_name: "INPUT_STATE"
+      output_name: "OUTPUT_STATE"
+      data_type: TYPE_INT32
+      dims: [ -1 ]
+      initial_state: {
+       data_type: TYPE_INT32
+       dims: [ 1 ]
+       data_file: "initial_state_data"
+       name: "initial state"
+      }
+    }
+  ]
+}
+```
 
 #### Scheduling Strategies
 
@@ -497,7 +554,6 @@ sequence_batching {
   oldest
     {
       max_candidate_sequences: 4
-      preferred_batch_size: [ 2 ]
     }
   control_input [
     {
