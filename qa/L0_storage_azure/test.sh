@@ -1,5 +1,5 @@
 #!/bin/bash
-# Copyright (c) 2020-2021, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright 2020-2021, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -111,7 +111,7 @@ for dir in `ls models/`; do
     done
 done
 
-# copy contents of /models into container.
+# copy contents of models into container.
 for file in `find models -type f` ;do
     az storage blob upload --container-name ${CONTAINER_NAME} --account-name ${ACCOUNT_NAME} --account-key ${ACCOUNT_KEY} --file $file --name $file
 done
@@ -193,6 +193,48 @@ for BACKEND in $BACKENDS; do
         RET=1
     fi
 done
+set -e
+
+kill $SERVER_PID
+wait $SERVER_PID
+
+# Clean up container
+az storage container delete --name ${CONTAINER_NAME} --account-name ${ACCOUNT_NAME} --account-key ${ACCOUNT_KEY}
+sleep 60
+
+# Test with Polling, no model configuration file - with strict model config disabled
+SERVER_LOG=$SERVER_LOG_BASE.noconfig.log
+CLIENT_LOG=$CLIENT_LOG_BASE.noconfig.log
+SERVER_ARGS="--model-repository=${AS_URL}/models --model-control-mode=poll --strict-model-config=false"
+
+# create test container
+az storage container create --name ${CONTAINER_NAME} --account-name ${ACCOUNT_NAME} --account-key ${ACCOUNT_KEY}
+sleep 10
+
+rm -rf models && mkdir -p models
+cp -r /data/inferenceserver/${REPO_VERSION}/qa_model_repository/savedmodel_float32_float32_float32 models/
+rm models/savedmodel_float32_float32_float32/config.pbtxt
+
+# copy contents of models into container.
+for file in `find models -type f` ;do
+    az storage blob upload --container-name ${CONTAINER_NAME} --account-name ${ACCOUNT_NAME} --account-key ${ACCOUNT_KEY} --file $file --name $file
+done
+sleep 10
+
+run_server
+if [ "$SERVER_PID" == "0" ]; then
+    echo -e "\n***\n*** Failed to start $SERVER\n***"
+    cat $SERVER_LOG
+    exit 1
+fi
+
+set +e
+$PERF_CLIENT -m savedmodel_float32_float32_float32 -p 3000 -t 1 >$CLIENT_LOG 2>&1
+if [ $? -ne 0 ]; then
+    echo -e "\n***\n*** Test Failed\n***"
+    cat $CLIENT_LOG
+    RET=1
+fi
 set -e
 
 kill $SERVER_PID
