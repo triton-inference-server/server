@@ -2408,8 +2408,9 @@ TRITONSERVER_ServerInferAsync(
     ltrace->SetModelName(lrequest->ModelName());
     ltrace->SetModelVersion(lrequest->ActualModelVersion());
 
-    std::shared_ptr<ni::InferenceTrace> strace(ltrace);
-    lrequest->SetTrace(strace);
+    ni::InferenceTraceProxy* trace_proxy = new ni::InferenceTraceProxy(ltrace);
+    std::shared_ptr<ni::InferenceTraceProxy> strace_proxy(trace_proxy);
+    lrequest->SetTrace(strace_proxy);
 #else
     return TRITONSERVER_ErrorNew(
         TRITONSERVER_ERROR_UNSUPPORTED, "inference tracing not supported");
@@ -2427,7 +2428,7 @@ TRITONSERVER_ServerInferAsync(
   // object associated with the inference request above.
 #ifdef TRITON_ENABLE_TRACING
   if (!status.IsOk()) {
-    std::shared_ptr<ni::InferenceTrace>* trace = ureq->MutableTrace();
+    std::shared_ptr<ni::InferenceTraceProxy>* trace = ureq->MutableTrace();
     if (*trace != nullptr) {
       *trace = nullptr;
     }

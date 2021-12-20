@@ -111,7 +111,7 @@ TraceManager::SampleTrace(void** userp)
   TRITONSERVER_InferenceTrace* trace;
   TRITONSERVER_Error* err = TRITONSERVER_InferenceTraceTensorNew(
       &trace, level_, 0 /* parent_id */, TraceActivity, TraceTensorActivity,
-      TraceStreamRelease, luserp.get());
+      TraceRelease, luserp.get());
   if (err != nullptr) {
     LOG_TRITONSERVER_ERROR(err, "creating inference trace object");
     return nullptr;
@@ -164,14 +164,6 @@ TraceManager::CaptureTimestamp(
 void
 TraceManager::TraceRelease(TRITONSERVER_InferenceTrace* trace, void* userp)
 {
-  LOG_TRITONSERVER_ERROR(
-      TRITONSERVER_InferenceTraceDelete(trace), "deleting trace");
-}
-
-void
-TraceManager::TraceStreamRelease(
-    TRITONSERVER_InferenceTrace* trace, void* userp)
-{
   auto ts = reinterpret_cast<TraceStreams*>(userp);
   std::stringstream* ss = nullptr;
   {
@@ -194,6 +186,9 @@ TraceManager::TraceStreamRelease(
   if (parent_id == 0) {
     delete ts;
   }
+
+  LOG_TRITONSERVER_ERROR(
+      TRITONSERVER_InferenceTraceDelete(trace), "deleting trace");
 }
 
 void

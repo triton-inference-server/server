@@ -54,15 +54,7 @@ class InferenceTrace {
   {
   }
 
-  ~InferenceTrace()
-  {
-    // Release the trace. Call the trace release callback and transfer
-    // ownership of the trace to the callback. On return 'trace' is
-    // nullptr.
-    release_fn_(reinterpret_cast<TRITONSERVER_InferenceTrace*>(this), userp_);
-  }
-
-  std::shared_ptr<InferenceTrace> SpawnChildTrace();
+  InferenceTrace* SpawnChildTrace();
 
   int64_t Id() const { return id_; }
   int64_t ParentId() const { return parent_id_; }
@@ -104,6 +96,11 @@ class InferenceTrace {
         memory_type_id, userp_);
   }
 
+  // Release the trace. Call the trace release callback and transfer
+  // ownership of the trace to the callback. On return 'trace' is
+  // nullptr.
+  void Release();
+
  private:
   const TRITONSERVER_InferenceTraceLevel level_;
   const uint64_t id_;
@@ -120,6 +117,52 @@ class InferenceTrace {
   // Maintain next id statically so that trace id is unique even
   // across traces
   static std::atomic<uint64_t> next_id_;
+};
+
+//
+// InferenceTraceProxy
+//
+// Object attached as shared_ptr to InferenceRequest and
+// InferenceResponse(s) being traced as part of a single inference
+// request.
+//
+class InferenceTraceProxy {
+ public:
+  InferenceTraceProxy(InferenceTrace* trace) : trace_(trace) {}
+  ~InferenceTraceProxy() { trace_->Release(); }
+  int64_t Id() const { return trace_->Id(); }
+  int64_t ParentId() const { return trace_->ParentId(); }
+  const std::string& ModelName() const { return trace_->ModelName(); }
+  int64_t ModelVersion() const { return trace_->ModelVersion(); }
+  void SetModelName(const std::string& n) { trace_->SetModelName(n); }
+  void SetModelVersion(int64_t v) { trace_->SetModelVersion(v); }
+
+  void Report(
+      const TRITONSERVER_InferenceTraceActivity activity, uint64_t timestamp_ns)
+  {
+    trace_->Report(activity, timestamp_ns);
+  }
+
+  void ReportNow(const TRITONSERVER_InferenceTraceActivity activity)
+  {
+    trace_->ReportNow(activity);
+  }
+
+  void ReportTensor(
+      const TRITONSERVER_InferenceTraceActivity activity, const char* name,
+      TRITONSERVER_DataType datatype, const void* base, size_t byte_size,
+      const int64_t* shape, uint64_t dim_count,
+      TRITONSERVER_MemoryType memory_type, int64_t memory_type_id)
+  {
+    trace_->ReportTensor(
+        activity, name, datatype, base, byte_size, shape, dim_count,
+        memory_type, memory_type_id);
+  }
+
+  std::shared_ptr<InferenceTraceProxy> SpawnChildTrace();
+
+ private:
+  InferenceTrace* trace_;
 };
 
 #endif  // TRITON_ENABLE_TRACING

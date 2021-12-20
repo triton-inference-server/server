@@ -34,12 +34,27 @@ namespace nvidia { namespace inferenceserver {
 // parent.
 std::atomic<uint64_t> InferenceTrace::next_id_(1);
 
-std::shared_ptr<InferenceTrace>
+InferenceTrace*
 InferenceTrace::SpawnChildTrace()
 {
-  std::shared_ptr<InferenceTrace> ltrace(new InferenceTrace(
-      level_, id_, activity_fn_, tensor_activity_fn_, release_fn_, userp_));
-  return ltrace;
+  InferenceTrace* trace = new InferenceTrace(
+      level_, id_, activity_fn_, tensor_activity_fn_, release_fn_, userp_);
+  return trace;
+}
+
+void
+InferenceTrace::Release()
+{
+  release_fn_(reinterpret_cast<TRITONSERVER_InferenceTrace*>(this), userp_);
+}
+
+std::shared_ptr<InferenceTraceProxy>
+InferenceTraceProxy::SpawnChildTrace()
+{
+  InferenceTrace* child_trace = trace_->SpawnChildTrace();
+  InferenceTraceProxy* trace_proxy = new InferenceTraceProxy(child_trace);
+  std::shared_ptr<InferenceTraceProxy> strace_proxy(trace_proxy);
+  return strace_proxy;
 }
 
 #endif  // TRITON_ENABLE_TRACING

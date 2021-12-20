@@ -77,8 +77,8 @@ class InferenceResponseFactory {
   Status SendFlags(const uint32_t flags) const;
 
 #ifdef TRITON_ENABLE_TRACING
-  const std::shared_ptr<InferenceTrace>& Trace() const { return trace_; }
-  void SetTrace(const std::shared_ptr<InferenceTrace>& trace)
+  const std::shared_ptr<InferenceTraceProxy>& Trace() const { return trace_; }
+  void SetTrace(const std::shared_ptr<InferenceTraceProxy>& trace)
   {
     trace_ = trace;
   }
@@ -115,7 +115,7 @@ class InferenceResponseFactory {
 
 #ifdef TRITON_ENABLE_TRACING
   // Inference trace associated with this response.
-  std::shared_ptr<InferenceTrace> trace_;
+  std::shared_ptr<InferenceTraceProxy> trace_;
 #endif  // TRITON_ENABLE_TRACING
 };
 
@@ -222,7 +222,7 @@ class InferenceResponse {
       void* response_userp,
       const std::function<void(
           std::unique_ptr<InferenceResponse>&&, const uint32_t)>& delegator,
-      std::shared_ptr<InferenceTrace> trace);
+      std::shared_ptr<InferenceTraceProxy> trace);
 
   // "null" InferenceResponse is a special instance of InferenceResponse which
   // contains minimal information for calling InferenceResponse::Send,
@@ -327,7 +327,7 @@ class InferenceResponse {
 
 #ifdef TRITON_ENABLE_TRACING
   // Inference trace associated with this response.
-  std::shared_ptr<InferenceTrace> trace_;
+  std::shared_ptr<InferenceTraceProxy> trace_;
 #endif  // TRITON_ENABLE_TRACING
 };
 

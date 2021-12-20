@@ -70,7 +70,7 @@ InferenceResponse::InferenceResponse(
     void* response_userp,
     const std::function<
         void(std::unique_ptr<InferenceResponse>&&, const uint32_t)>& delegator,
-    std::shared_ptr<InferenceTrace> trace)
+    std::shared_ptr<InferenceTraceProxy> trace)
     : model_(model), id_(id), allocator_(allocator), alloc_userp_(alloc_userp),
       response_fn_(response_fn), response_userp_(response_userp),
       response_delegator_(delegator), null_response_(false), trace_(trace)
