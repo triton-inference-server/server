@@ -46,7 +46,7 @@ class TritonPythonModel:
         self.output1_dtype = pb_utils.triton_string_to_numpy(
             output1_config['data_type'])
         self.numpy_to_pytorch_dtype = {
-            np.bool: torch.bool,
+            np.bool_: torch.bool,
             np.uint8: torch.uint8,
             np.int8: torch.int8,
             np.int16: torch.int16,
