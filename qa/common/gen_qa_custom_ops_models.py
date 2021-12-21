@@ -1,4 +1,4 @@
-# Copyright (c) 2019-2020, NVIDIA CORPORATION. All rights reserved.
+# Copyright 2019-2021, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -357,7 +357,7 @@ def create_visionop_modelfile(models_dir, model_version):
             super(CustomVisionNet, self).__init__()
 
         def forward(self, input, boxes):
-            return torch.ops.torchvision.roi_align(input, boxes, 1.0, 5, 5, -1,
+            return torchvision.ops.roi_align(input, boxes, [5,5], 1.0, -1,
                                                    False)
 
     visionCustomModel = CustomVisionNet()
@@ -509,8 +509,7 @@ if __name__ == '__main__':
     if FLAGS.libtorch:
         import torch
         from torch import nn
-        from torchvision import ops
-        from torch.nn.modules.utils import _pair
+        import torchvision
         import torch.utils.cpp_extension
         create_modulo_op_models(FLAGS.models_dir)
         create_vision_op_models(FLAGS.models_dir)
