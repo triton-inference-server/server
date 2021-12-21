@@ -86,7 +86,7 @@ output [
     name: "OUTPUT__0"
     data_type: TYPE_FP32
     dims: [ 1000 ]
-    label_filename: "output0_labels.txt"
+    label_filename: "resnet50_labels.txt"
   }}
 ]
 '''.format(model_name, max_batch)
