@@ -124,10 +124,10 @@ class SequenceBatcherTest(su.SequenceBatcherTestUtil):
         if ("custom" in trial):
             return (np.int32,)
         if ("savedmodel" in trial):
-            return (np.float32, np.bool)
+            return (np.float32, np.bool_)
         if ("graphdef" in trial):
-            return (np.dtype(object), np.bool)
-        return (np.int32, np.bool)
+            return (np.dtype(object), np.bool_)
+        return (np.int32, np.bool_)
 
     def get_expected_result(self, expected_result, value, trial, flag_str=None):
         # Adjust the expected_result for models that
@@ -167,10 +167,10 @@ class SequenceBatcherTest(su.SequenceBatcherTestUtil):
                     model_name = tu.get_sequence_model_name(trial, dtype)
                     # Skip bool type ensemble models
                     if (any(word in trial for word in ENSEMBLE_PREFIXES)) and (
-                            dtype == np.bool):
+                            dtype == np.bool_):
                         continue
                     # For bool type control models, use int32 as I/O types
-                    if dtype == np.bool:
+                    if dtype == np.bool_:
                         dtype = np.int32
 
                     self.clear_deferred_exceptions()
@@ -220,10 +220,10 @@ class SequenceBatcherTest(su.SequenceBatcherTestUtil):
                     model_name = tu.get_sequence_model_name(trial, dtype)
                     # Skip bool type ensemble models
                     if (any(word in trial for word in ENSEMBLE_PREFIXES)) and (
-                            dtype == np.bool):
+                            dtype == np.bool_):
                         continue
                     # For bool type control models, use int32 as I/O types
-                    if dtype == np.bool:
+                    if dtype == np.bool_:
                         dtype = np.int32
 
                     self.clear_deferred_exceptions()
@@ -276,10 +276,10 @@ class SequenceBatcherTest(su.SequenceBatcherTestUtil):
                     model_name = tu.get_sequence_model_name(trial, dtype)
                     # Skip bool type ensemble models
                     if (any(word in trial for word in ENSEMBLE_PREFIXES)) and (
-                            dtype == np.bool):
+                            dtype == np.bool_):
                         continue
                     # For bool type control models, use int32 as I/O types
-                    if dtype == np.bool:
+                    if dtype == np.bool_:
                         dtype = np.int32
 
                     self.clear_deferred_exceptions()
@@ -338,10 +338,10 @@ class SequenceBatcherTest(su.SequenceBatcherTestUtil):
                     model_name = tu.get_sequence_model_name(trial, dtype)
                     # Skip bool type ensemble models
                     if (any(word in trial for word in ENSEMBLE_PREFIXES)) and (
-                            dtype == np.bool):
+                            dtype == np.bool_):
                         continue
                     # For bool type control models, use int32 as I/O types
-                    if dtype == np.bool:
+                    if dtype == np.bool_:
                         dtype = np.int32
 
                     self.clear_deferred_exceptions()
@@ -398,10 +398,10 @@ class SequenceBatcherTest(su.SequenceBatcherTestUtil):
                     model_name = tu.get_sequence_model_name(trial, dtype)
                     # Skip bool type ensemble models
                     if (any(word in trial for word in ENSEMBLE_PREFIXES)) and (
-                            dtype == np.bool):
+                            dtype == np.bool_):
                         continue
                     # For bool type control models, use int32 as I/O types
-                    if dtype == np.bool:
+                    if dtype == np.bool_:
                         dtype = np.int32
 
                     self.clear_deferred_exceptions()
@@ -463,10 +463,10 @@ class SequenceBatcherTest(su.SequenceBatcherTestUtil):
                     model_name = tu.get_sequence_model_name(trial, dtype)
                     # Skip bool type ensemble models
                     if (any(word in trial for word in ENSEMBLE_PREFIXES)) and (
-                            dtype == np.bool):
+                            dtype == np.bool_):
                         continue
                     # For bool type control models, use int32 as I/O types
-                    if dtype == np.bool:
+                    if dtype == np.bool_:
                         dtype = np.int32
 
                     self.clear_deferred_exceptions()
@@ -529,10 +529,10 @@ class SequenceBatcherTest(su.SequenceBatcherTestUtil):
                     model_name = tu.get_sequence_model_name(trial, dtype)
                     # Skip bool type ensemble models
                     if (any(word in trial for word in ENSEMBLE_PREFIXES)) and (
-                            dtype == np.bool):
+                            dtype == np.bool_):
                         continue
                     # For bool type control models, use int32 as I/O types
-                    if dtype == np.bool:
+                    if dtype == np.bool_:
                         dtype = np.int32
 
                     self.clear_deferred_exceptions()
@@ -578,10 +578,10 @@ class SequenceBatcherTest(su.SequenceBatcherTestUtil):
                 model_name = tu.get_sequence_model_name(trial, dtype)
                 # Skip bool type ensemble models
                 if (any(word in trial
-                        for word in ENSEMBLE_PREFIXES)) and (dtype == np.bool):
+                        for word in ENSEMBLE_PREFIXES)) and (dtype == np.bool_):
                     continue
                 # For bool type control models, use int32 as I/O types
-                if dtype == np.bool:
+                if dtype == np.bool_:
                     dtype = np.int32
 
                 self.clear_deferred_exceptions()
@@ -686,10 +686,10 @@ class SequenceBatcherTest(su.SequenceBatcherTestUtil):
                 model_name = tu.get_sequence_model_name(trial, dtype)
                 # Skip bool type ensemble models
                 if (any(word in trial
-                        for word in ENSEMBLE_PREFIXES)) and (dtype == np.bool):
+                        for word in ENSEMBLE_PREFIXES)) and (dtype == np.bool_):
                     continue
                 # For bool type control models, use int32 as I/O types
-                if dtype == np.bool:
+                if dtype == np.bool_:
                     dtype = np.int32
 
                 self.clear_deferred_exceptions()
@@ -850,10 +850,10 @@ class SequenceBatcherTest(su.SequenceBatcherTestUtil):
                 model_name = tu.get_sequence_model_name(trial, dtype)
                 # Skip bool type ensemble models
                 if (any(word in trial
-                        for word in ENSEMBLE_PREFIXES)) and (dtype == np.bool):
+                        for word in ENSEMBLE_PREFIXES)) and (dtype == np.bool_):
                     continue
                 # For bool type control models, use int32 as I/O types
-                if dtype == np.bool:
+                if dtype == np.bool_:
                     dtype = np.int32
 
                 self.clear_deferred_exceptions()
@@ -1013,10 +1013,10 @@ class SequenceBatcherTest(su.SequenceBatcherTestUtil):
                 model_name = tu.get_sequence_model_name(trial, dtype)
                 # Skip bool type ensemble models
                 if (any(word in trial
-                        for word in ENSEMBLE_PREFIXES)) and (dtype == np.bool):
+                        for word in ENSEMBLE_PREFIXES)) and (dtype == np.bool_):
                     continue
                 # For bool type control models, use int32 as I/O types
-                if dtype == np.bool:
+                if dtype == np.bool_:
                     dtype = np.int32
 
                 self.clear_deferred_exceptions()
@@ -1180,10 +1180,10 @@ class SequenceBatcherTest(su.SequenceBatcherTestUtil):
                 model_name = tu.get_sequence_model_name(trial, dtype)
                 # Skip bool type ensemble models
                 if (any(word in trial
-                        for word in ENSEMBLE_PREFIXES)) and (dtype == np.bool):
+                        for word in ENSEMBLE_PREFIXES)) and (dtype == np.bool_):
                     continue
                 # For bool type control models, use int32 as I/O types
-                if dtype == np.bool:
+                if dtype == np.bool_:
                     dtype = np.int32
 
                 self.clear_deferred_exceptions()
@@ -1338,10 +1338,10 @@ class SequenceBatcherTest(su.SequenceBatcherTestUtil):
                 model_name = tu.get_sequence_model_name(trial, dtype)
                 # Skip bool type ensemble models
                 if (any(word in trial
-                        for word in ENSEMBLE_PREFIXES)) and (dtype == np.bool):
+                        for word in ENSEMBLE_PREFIXES)) and (dtype == np.bool_):
                     continue
                 # For bool type control models, use int32 as I/O types
-                if dtype == np.bool:
+                if dtype == np.bool_:
                     dtype = np.int32
 
                 self.clear_deferred_exceptions()
@@ -1529,10 +1529,10 @@ class SequenceBatcherTest(su.SequenceBatcherTestUtil):
                 model_name = tu.get_sequence_model_name(trial, dtype)
                 # Skip bool type ensemble models
                 if (any(word in trial
-                        for word in ENSEMBLE_PREFIXES)) and (dtype == np.bool):
+                        for word in ENSEMBLE_PREFIXES)) and (dtype == np.bool_):
                     continue
                 # For bool type control models, use int32 as I/O types
-                if dtype == np.bool:
+                if dtype == np.bool_:
                     dtype = np.int32
 
                 self.clear_deferred_exceptions()
@@ -1743,10 +1743,10 @@ class SequenceBatcherTest(su.SequenceBatcherTestUtil):
                 model_name = tu.get_sequence_model_name(trial, dtype)
                 # Skip bool type ensemble models
                 if (any(word in trial
-                        for word in ENSEMBLE_PREFIXES)) and (dtype == np.bool):
+                        for word in ENSEMBLE_PREFIXES)) and (dtype == np.bool_):
                     continue
                 # For bool type control models, use int32 as I/O types
-                if dtype == np.bool:
+                if dtype == np.bool_:
                     dtype = np.int32
 
                 self.clear_deferred_exceptions()
@@ -1959,10 +1959,10 @@ class SequenceBatcherTest(su.SequenceBatcherTestUtil):
                 model_name = tu.get_sequence_model_name(trial, dtype)
                 # Skip bool type ensemble models
                 if (any(word in trial
-                        for word in ENSEMBLE_PREFIXES)) and (dtype == np.bool):
+                        for word in ENSEMBLE_PREFIXES)) and (dtype == np.bool_):
                     continue
                 # For bool type control models, use int32 as I/O types
-                if dtype == np.bool:
+                if dtype == np.bool_:
                     dtype = np.int32
 
                 self.clear_deferred_exceptions()
@@ -2158,10 +2158,10 @@ class SequenceBatcherTest(su.SequenceBatcherTestUtil):
                 model_name = tu.get_sequence_model_name(trial, dtype)
                 # Skip bool type ensemble models
                 if (any(word in trial
-                        for word in ENSEMBLE_PREFIXES)) and (dtype == np.bool):
+                        for word in ENSEMBLE_PREFIXES)) and (dtype == np.bool_):
                     continue
                 # For bool type control models, use int32 as I/O types
-                if dtype == np.bool:
+                if dtype == np.bool_:
                     dtype = np.int32
 
                 self.clear_deferred_exceptions()
@@ -2347,10 +2347,10 @@ class SequenceBatcherTest(su.SequenceBatcherTestUtil):
                 model_name = tu.get_sequence_model_name(trial, dtype)
                 # Skip bool type ensemble models
                 if (any(word in trial
-                        for word in ENSEMBLE_PREFIXES)) and (dtype == np.bool):
+                        for word in ENSEMBLE_PREFIXES)) and (dtype == np.bool_):
                     continue
                 # For bool type control models, use int32 as I/O types
-                if dtype == np.bool:
+                if dtype == np.bool_:
                     dtype = np.int32
 
                 self.clear_deferred_exceptions()
@@ -2552,7 +2552,7 @@ class SequenceBatcherTest(su.SequenceBatcherTestUtil):
             for dtype in dtypes:
                 model_name = tu.get_sequence_model_name(trial, dtype)
                 # For bool type control models, use int32 as I/O types
-                if dtype == np.bool:
+                if dtype == np.bool_:
                     dtype = np.int32
 
                 self.clear_deferred_exceptions()
@@ -2659,7 +2659,7 @@ class SequenceBatcherTest(su.SequenceBatcherTestUtil):
             for dtype in dtypes:
                 model_name = tu.get_sequence_model_name(trial, dtype) + "_half"
                 # For bool type control models, use int32 as I/O types
-                if dtype == np.bool:
+                if dtype == np.bool_:
                     dtype = np.int32
 
                 self.clear_deferred_exceptions()
@@ -2766,7 +2766,7 @@ class SequenceBatcherTest(su.SequenceBatcherTestUtil):
             for dtype in dtypes:
                 model_name = tu.get_sequence_model_name(trial, dtype) + "_full"
                 # For bool type control models, use int32 as I/O types
-                if dtype == np.bool:
+                if dtype == np.bool_:
                     dtype = np.int32
 
                 self.clear_deferred_exceptions()

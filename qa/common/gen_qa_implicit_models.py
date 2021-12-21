@@ -370,7 +370,7 @@ def create_onnx_modelconfig(models_dir, model_version, max_batch, dtype, shape, 
 
     if dtype == np.float32:
         control_type = "fp32"
-    elif dtype == np.bool:
+    elif dtype == np.bool_:
         control_type = "bool"
         dtype = np.int32
     else:
@@ -764,7 +764,7 @@ def create_models(models_dir, dtype, shape, initial_state, no_batch=True):
             create_onnx_modelfile(models_dir, model_version, 0, dtype, shape, initial_state)
 
     if FLAGS.tensorrt:
-        if dtype == np.bool:
+        if dtype == np.bool_:
             return
         suffix = []
         if dtype == np.int8:
@@ -857,7 +857,7 @@ if __name__ == '__main__':
         create_models(FLAGS.models_dir, np_dtype_string, [
             1,
         ], FLAGS.initial_state)
-        create_models(FLAGS.models_dir, np.bool, [
+        create_models(FLAGS.models_dir, np.bool_, [
             1,
         ], FLAGS.initial_state)
 
@@ -872,6 +872,6 @@ if __name__ == '__main__':
         create_models(FLAGS.models_dir, np_dtype_string, [
             -1,
         ], FLAGS.initial_state, False)
-        create_models(FLAGS.models_dir, np.bool, [
+        create_models(FLAGS.models_dir, np.bool_, [
             -1,
         ], FLAGS.initial_state, False)

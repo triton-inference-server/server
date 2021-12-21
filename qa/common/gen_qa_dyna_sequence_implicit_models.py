@@ -642,7 +642,7 @@ def create_models(models_dir, dtype, shape, no_batch=True):
             create_onnx_modelfile(models_dir, model_version, 0, dtype, shape)
 
     if FLAGS.tensorrt:
-        if dtype == np.bool:
+        if dtype == np.bool_:
             return
 
         create_plan_modelconfig(models_dir, model_version, 8, dtype, shape)
