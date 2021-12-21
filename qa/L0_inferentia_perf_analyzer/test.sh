@@ -61,7 +61,7 @@ source /opt/tritonserver/qa/common/util.sh
 TEST_TYPES="single multiple"
 BATCHED_FLAGS="_ _batched_"
 DISABLE_DEFAULT_BATCHING_FLAGS="_default_batch _no_batch"
-# Helper function for generating models
+# Helper function for clearing out existing model directories
 function clear_model_dir () {
     for DISABLE_DEFAULT_BATCHING_FLAG in ${DISABLE_DEFAULT_BATCHING_FLAGS}; do
         for BATCHED_FLAG in ${BATCHED_FLAGS}; do
@@ -72,6 +72,7 @@ function clear_model_dir () {
         done
     done
 }
+# Helper function for generating models
 function create_inferentia_models () {
     for DISABLE_DEFAULT_BATCHING_FLAG in ${DISABLE_DEFAULT_BATCHING_FLAGS}; do
         for BATCHED_FLAG in ${BATCHED_FLAGS}; do
