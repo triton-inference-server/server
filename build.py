@@ -84,7 +84,7 @@ from distutils.dir_util import copy_tree
 TRITON_VERSION_MAP = {
     '2.18.0dev': (
         '22.01dev',  # triton container
-        '21.11',  # upstream container
+        '21.12',  # upstream container
         '1.10.0',  # ORT
         '2021.2.200',  # ORT OpenVINO
         (('2021.2', None), ('2021.4', '2021.4.582')),  # Standalone OpenVINO
