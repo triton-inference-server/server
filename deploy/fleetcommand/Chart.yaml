@@ -26,6 +26,6 @@
 
 apiVersion: v1
 appVersion: "21.11-py3"
-description: Triton Inference Server (Fleet Command Testing)
+description: Triton Inference Server (Fleet Command)
 name: triton-inference-server
-version: 1.2.1
+version: 1.2.2
