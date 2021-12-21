@@ -1,3 +1,4 @@
+#!/bin/bash
 # Copyright (c) 2021, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
@@ -24,25 +25,65 @@
 # (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-export REGISTRY=gcr.io/$(gcloud config get-value project | tr ':' '/')
-export APP_NAME=tritonserver
-export MAJOR_VERSION=2.17
-export MINOR_VERSION=2.17.0
-export NGC_VERSION=21.12-py3
+export CUDA_VISIBLE_DEVICES=0
 
-docker pull nvcr.io/nvidia/$APP_NAME:$NGC_VERSION
+TEST_PY=./optional_input_test.py
+TEST_LOG="./test.log"
+TEST_RESULT_FILE='test_results.txt'
 
-docker tag nvcr.io/nvidia/$APP_NAME:$NGC_VERSION $REGISTRY/$APP_NAME:$MAJOR_VERSION
-docker tag nvcr.io/nvidia/$APP_NAME:$NGC_VERSION $REGISTRY/$APP_NAME:$MINOR_VERSION
-docker tag nvcr.io/nvidia/$APP_NAME:$NGC_VERSION $REGISTRY/$APP_NAME:$NGC_VERSION
+SERVER=/opt/tritonserver/bin/tritonserver
+SERVER_ARGS="--model-repository=`pwd`/models --log-verbose=1"
+SERVER_LOG="./inference_server.log"
+source ../common/util.sh
 
-docker push $REGISTRY/$APP_NAME:$MINOR_VERSION
-docker push $REGISTRY/$APP_NAME:$MAJOR_VERSION
-docker push $REGISTRY/$APP_NAME:$NGC_VERSION
+rm -fr *.log
 
-docker build --tag $REGISTRY/$APP_NAME/deployer .
+mkdir -p ./models/identity_2_float32/1
 
-docker tag $REGISTRY/$APP_NAME/deployer $REGISTRY/$APP_NAME/deployer:$MAJOR_VERSION
-docker tag $REGISTRY/$APP_NAME/deployer $REGISTRY/$APP_NAME/deployer:$MINOR_VERSION
-docker push $REGISTRY/$APP_NAME/deployer:$MAJOR_VERSION
-docker push $REGISTRY/$APP_NAME/deployer:$MINOR_VERSION
+# Basic test cases
+TEST_CASES=${TEST_CASES:="test_all_inputs \
+                            test_optional_same_input \
+                            test_optional_mix_inputs \
+                            test_optional_mix_inputs_2"}
+
+for i in $TEST_CASES ; do
+    # Restart server for every test to clear model stats
+    run_server
+    if [ "$SERVER_PID" == "0" ]; then
+        echo -e "\n***\n*** Failed to start $SERVER\n***"
+        cat $SERVER_LOG
+        exit 1
+    fi
+
+    RET=0
+
+    echo "Test: $i" >>$TEST_LOG
+
+    set +e
+    python $TEST_PY OptionalInputTest.$i >>$TEST_LOG 2>&1
+    if [ $? -ne 0 ]; then
+        echo -e "\n***\n*** Test Failed\n***"
+        RET=1
+    else
+        check_test_results $TEST_RESULT_FILE 1
+        if [ $? -ne 0 ]; then
+            cat $TEST_LOG
+            echo -e "\n***\n*** Test Result Verification Failed\n***"
+            RET=1
+        fi
+    fi
+    set -e
+
+    kill $SERVER_PID
+    wait $SERVER_PID
+done
+
+if [ $RET -eq 0 ]; then
+  echo -e "\n***\n*** Test Passed\n***"
+else
+    cat $SERVER_LOG
+    cat $TEST_LOG
+    echo -e "\n***\n*** Test FAILED\n***"
+fi
+
+exit $RET

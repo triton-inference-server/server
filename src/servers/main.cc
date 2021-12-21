@@ -1264,7 +1264,17 @@ Parse(TRITONSERVER_ServerOptions** server_options, int argc, char** argv)
   {
     auto aip_mode = nvidia::inferenceserver::GetEnvironmentVariableOrDefault(
         "AIP_MODE", "");
-    allow_vertex_ai_ = (aip_mode == "PREDICTION");
+    // Enable Vertex AI service and disable HTTP / GRPC service by default
+    // if detecting Vertex AI environment
+    if (aip_mode == "PREDICTION") {
+      allow_vertex_ai_ = true;
+#ifdef TRITON_ENABLE_HTTP
+      allow_http_ = false;
+#endif  // TRITON_ENABLE_HTTP
+#ifdef TRITON_ENABLE_GRPC
+      allow_grpc_ = false;
+#endif  // TRITON_ENABLE_GRPC
+    }
     auto port = nvidia::inferenceserver::GetEnvironmentVariableOrDefault(
         "AIP_HTTP_PORT", "8080");
     vertex_ai_port_ = ParseIntOption(port);

@@ -1,5 +1,5 @@
 #!/bin/bash
-# Copyright (c) 2020, NVIDIA CORPORATION. All rights reserved.
+# Copyright 2020-2021, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -44,15 +44,19 @@ CLIENT_LOG="./client.log"
 PERF_CLIENT=../clients/perf_client
 
 DATADIR="/data/inferenceserver/${REPO_VERSION}/qa_model_repository"
+BACKENDS="graphdef libtorch onnx plan savedmodel"
 
-MODELDIR="models"
-rm -rf ./$MODELDIR && mkdir $MODELDIR
-cp -r $DATADIR/*_float32_float32_float32 $MODELDIR/.
+rm -rf models && mkdir models
+for BACKEND in $BACKENDS; do
+    cp -r $DATADIR/${BACKEND}_float32_float32_float32 models/.
+    # Remove version policy from config.pbtxt
+    sed -i '/^version_policy/d' models/${BACKEND}_float32_float32_float32/config.pbtxt
+done
 
 # Create model with name that has all types of allowed characters
 DUMMY_MODEL="Model_repo-1.0"
-cp -r $MODELDIR/libtorch_float32_float32_float32 $MODELDIR/$DUMMY_MODEL
-sed -i 's/libtorch_float32_float32_float32/Model_repo-1.0/g' $MODELDIR/$DUMMY_MODEL/config.pbtxt
+cp -r models/libtorch_float32_float32_float32 models/$DUMMY_MODEL
+sed -i 's/libtorch_float32_float32_float32/Model_repo-1.0/g' models/$DUMMY_MODEL/config.pbtxt
 
 SERVER=/opt/tritonserver/bin/tritonserver
 source ../common/util.sh
@@ -93,15 +97,60 @@ awslocal $ENDPOINT_FLAG s3 rm s3://demo-bucket1.0 --recursive --include "*" && \
 
 # Create and add data to bucket
 awslocal $ENDPOINT_FLAG s3 mb s3://demo-bucket1.0 && \
-    awslocal $ENDPOINT_FLAG s3 sync $MODELDIR s3://demo-bucket1.0
+    awslocal $ENDPOINT_FLAG s3 sync models s3://demo-bucket1.0
 
 RET=0
 
-# Test with hostname
-SERVER_ARGS="--model-repository=s3://localhost:4572/demo-bucket1.0 --model-control-mode=explicit"
-SERVER_LOG="./inference_server_hostname.log"
+# Test with hostname and IP address
+for HOST in "127.0.0.1" "localhost"; do
+    SERVER_ARGS="--model-repository=s3://$HOST:4572/demo-bucket1.0 --model-control-mode=explicit"
+    if [ "$HOST" = "127.0.0.1" ]; then
+        SERVER_LOG="./inference_server_hostname.log"
+    else
+        SERVER_LOG="./inference_server_ip.log"
+    fi
 
-BACKENDS="graphdef libtorch onnx plan savedmodel"
+    run_server
+    if [ "$SERVER_PID" == "0" ]; then
+        echo -e "\n***\n*** Failed to start $SERVER\n***"
+        cat $SERVER_LOG
+        # Kill minio server
+        kill $MINIO_PID
+        wait $MINIO_PID
+        exit 1
+    fi
+
+    set +e
+    for BACKEND in $BACKENDS; do
+        code=`curl -s -w %{http_code} -X POST localhost:8000/v2/repository/models/${BACKEND}_float32_float32_float32/load`
+        if [ "$code" != "200" ]; then
+            echo -e "\n***\n*** Test Failed\n***"
+            RET=1
+        fi
+
+        $PERF_CLIENT -m ${BACKEND}_float32_float32_float32 -p 3000 -t 1 >$CLIENT_LOG 2>&1
+        if [ $? -ne 0 ]; then
+            echo -e "\n***\n*** Test Failed\n***"
+            cat $CLIENT_LOG
+            RET=1
+        fi
+    done
+
+    # Try to load model with name that checks for all types of allowed characters
+    code=`curl -s -w %{http_code} -X POST localhost:8000/v2/repository/models/${DUMMY_MODEL}/load`
+    if [ "$code" != "200" ]; then
+        echo -e "\n***\n*** Test Failed\n***"
+        RET=1
+    fi
+    set -e
+
+    kill $SERVER_PID
+    wait $SERVER_PID
+done
+
+# Test with Polling
+SERVER_ARGS="--model-repository=s3://localhost:4572/demo-bucket1.0 --model-control-mode=poll"
+SERVER_LOG="./inference_server_poll.log"
 
 run_server
 if [ "$SERVER_PID" == "0" ]; then
@@ -113,26 +162,20 @@ if [ "$SERVER_PID" == "0" ]; then
     exit 1
 fi
 
-set +e
-for BACKEND in $BACKENDS; do
-    code=`curl -s -w %{http_code} -X POST localhost:8000/v2/repository/models/${BACKEND}_float32_float32_float32/load`
-    if [ "$code" != "200" ]; then
-        echo -e "\n***\n*** Test Failed\n***"
-        RET=1
-    fi
+cp -r models/libtorch_float32_float32_float32/1 models/libtorch_float32_float32_float32/4
+awslocal $ENDPOINT_FLAG s3 sync models s3://demo-bucket1.0
 
-    $PERF_CLIENT -m ${BACKEND}_float32_float32_float32 -p 3000 -t 1 >$CLIENT_LOG 2>&1
-    if [ $? -ne 0 ]; then
-        echo -e "\n***\n*** Test Failed\n***"
-        cat $CLIENT_LOG
-        RET=1
-    fi
-done
+sleep 20
 
-# try to load model with name that checks for all types of allowed characters
-code=`curl -s -w %{http_code} -X POST localhost:8000/v2/repository/models/${DUMMY_MODEL}/load`
-if [ "$code" != "200" ]; then
-    echo -e "\n***\n*** Test Failed\n***"
+set + e
+CURL_LOG=$(curl -X POST localhost:8000/v2/repository/index)
+if [[ "$CURL_LOG" != *"{\"name\":\"libtorch_float32_float32_float32\",\"version\":\"3\",\"state\":\"UNAVAILABLE\",\"reason\":\"unloaded\"}"* ]]; then
+    echo -e "\n***\n*** Failed. Server did not unload libtorch_float32_float32_float32 version 3\n***"
+    RET=1
+fi
+
+if [[ "$CURL_LOG" != *"{\"name\":\"libtorch_float32_float32_float32\",\"version\":\"4\",\"state\":\"READY\"}"* ]]; then
+    echo -e "\n***\n*** Failed. Server did not load libtorch_float32_float32_float32 version 4\n***"
     RET=1
 fi
 set -e
@@ -140,9 +183,20 @@ set -e
 kill $SERVER_PID
 wait $SERVER_PID
 
-# Test with IP
-SERVER_ARGS="--model-repository=s3://127.0.0.1:4572/demo-bucket1.0 --model-control-mode=explicit"
-SERVER_LOG="./inference_server_ip.log"
+# Destroy bucket
+awslocal $ENDPOINT_FLAG s3 rm s3://demo-bucket1.0 --recursive --include "*" && \
+    awslocal $ENDPOINT_FLAG s3 rb s3://demo-bucket1.0
+
+# Test with Polling, no model configuration file - with strict model config disabled
+rm -rf models && mkdir models
+cp -r $DATADIR/savedmodel_float32_float32_float32 models/.
+rm models/savedmodel_float32_float32_float32/config.pbtxt
+
+awslocal $ENDPOINT_FLAG s3 mb s3://demo-bucket1.0 && \
+    awslocal $ENDPOINT_FLAG s3 sync models s3://demo-bucket1.0
+
+SERVER_ARGS="--model-repository=s3://localhost:4572/demo-bucket1.0 --model-control-mode=poll --strict-model-config=false"
+SERVER_LOG="./inference_server_noconfig.log"
 
 run_server
 if [ "$SERVER_PID" == "0" ]; then
@@ -154,29 +208,12 @@ if [ "$SERVER_PID" == "0" ]; then
     exit 1
 fi
 
-set +e
-for BACKEND in $BACKENDS; do
-    code=`curl -s -w %{http_code} -X POST localhost:8000/v2/repository/models/${BACKEND}_float32_float32_float32/load`
-    if [ "$code" != "200" ]; then
-        echo -e "\n***\n*** Test Failed\n***"
-        RET=1
-    fi
-
-    $PERF_CLIENT -m ${BACKEND}_float32_float32_float32 -p 3000 -t 1 >$CLIENT_LOG 2>&1
-    if [ $? -ne 0 ]; then
-        echo -e "\n***\n*** Test Failed\n***"
-        cat $CLIENT_LOG
-        RET=1
-    fi
-done
-
-# try to load model with name that checks for all types of allowed characters
-code=`curl -s -w %{http_code} -X POST localhost:8000/v2/repository/models/${DUMMY_MODEL}/load`
-if [ "$code" != "200" ]; then
+$PERF_CLIENT -m savedmodel_float32_float32_float32 -p 3000 -t 1 > $CLIENT_LOG 2>&1
+if [ $? -ne 0 ]; then
     echo -e "\n***\n*** Test Failed\n***"
+    cat $CLIENT_LOG
     RET=1
 fi
-set -e
 
 kill $SERVER_PID
 wait $SERVER_PID

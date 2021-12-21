@@ -94,6 +94,9 @@ Model::Init()
   // Initialize the input map
   for (const auto& io : config_.input()) {
     input_map_.insert(std::make_pair(io.name(), io));
+    if (!io.optional()) {
+      ++required_input_count_;
+    }
   }
 
   // Initialize the output map and label provider for each output

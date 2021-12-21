@@ -59,6 +59,9 @@ NO_BATCHING = (int(os.environ['NO_BATCHING']) == 1)
 MODEL_INSTANCES = int(os.environ['MODEL_INSTANCES'])
 IMPLICIT_STATE = (int(os.environ['IMPLICIT_STATE']) == 1)
 
+# Use initial state for implicit state
+INITIAL_STATE_FILE = (int(os.environ['INITIAL_STATE_FILE']) == 1)
+
 _trials = ()
 if NO_BATCHING:
     for backend in BACKENDS.split(' '):
@@ -144,7 +147,13 @@ class SequenceBatcherTest(su.SequenceBatcherTestUtil):
                                      value,
                                      trial,
                                      flag_str=None):
-        return expected_result
+        if INITIAL_STATE_FILE:
+            # When the INITIAL_STATE_FILE is set the initial value
+            # used for sequence will be 100 instead of zero and the
+            # results will be offset by the same amount.
+            return expected_result + 100
+        else:
+            return expected_result
 
     def test_simple_sequence(self):
         # Send one sequence and check for correct accumulator

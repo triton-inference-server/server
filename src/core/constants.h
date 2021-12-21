@@ -79,6 +79,7 @@ constexpr char kMetricsLabelModelVersion[] = "version";
 constexpr char kMetricsLabelGpuUuid[] = "gpu_uuid";
 
 constexpr char kWarmupDataFolder[] = "warmup";
+constexpr char kInitialStateFolder[] = "initial_state";
 
 constexpr uint64_t NANOS_PER_SECOND = 1000000000;
 constexpr uint64_t NANOS_PER_MILLIS = 1000000;
