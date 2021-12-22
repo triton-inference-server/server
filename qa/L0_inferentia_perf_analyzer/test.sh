@@ -78,8 +78,6 @@ function create_inferentia_models () {
         for BATCHED_FLAG in ${BATCHED_FLAGS}; do
             for TEST_TYPE in ${TEST_TYPES}; do
                 CURR_GEN_SCRIPT="${GEN_SCRIPT} --model_type ${MODEL_TYPE}  
-                --triton_input INPUT__0,INT64,-1x4 INPUT__1,INT64,-1x4 
-                --triton_output OUTPUT__0,INT64,-1x4 OUTPUT__1,INT64,-1x4 
                 --triton_model_dir ${TRITON_PATH}/models_${TEST_TYPE}${BATCHED_FLAG}${TEST_FRAMEWORK}${DISABLE_DEFAULT_BATCHING_FLAG}/add-sub-1x4 
                 --compiled_model ${COMPILED_MODEL}"
                 if [ ${DISABLE_DEFAULT_BATCHING_FLAG} == "_no_batch" ]; then
@@ -87,11 +85,17 @@ function create_inferentia_models () {
                     --disable_batch_requests_to_neuron"
                 fi
                 if [ ${BATCHED_FLAG} == "_batched_" ]; then
-                    CURR_GEN_SCRIPT="${CURR_GEN_SCRIPT}          
+                    CURR_GEN_SCRIPT="${CURR_GEN_SCRIPT}
+                    --triton_input INPUT__0,INT64,4 INPUT__1,INT64,4 
+                    --triton_output OUTPUT__0,INT64,4 OUTPUT__1,INT64,4          
                     --enable_dynamic_batching 
                     --max_batch_size 1000 
                     --preferred_batch_size 8 
                     --max_queue_delay_microseconds 100"
+                else
+                    CURR_GEN_SCRIPT="${CURR_GEN_SCRIPT}
+                    --triton_input INPUT__0,INT64,-1x4 INPUT__1,INT64,-1x4 
+                    --triton_output OUTPUT__0,INT64,-1x4 OUTPUT__1,INT64,-1x4"
                 fi
                 if [ ${TEST_TYPE} == "single" ]; then
                     CURR_GEN_SCRIPT="${CURR_GEN_SCRIPT}   
@@ -142,6 +146,10 @@ for DISABLE_DEFAULT_BATCHING_FLAG in ${DISABLE_DEFAULT_BATCHING_FLAGS}; do
         for TEST_TYPE in $TEST_TYPES; do
             DATADIR="${TRITON_PATH}/models_${TEST_TYPE}${BATCHED_FLAG}${TEST_FRAMEWORK}${DISABLE_DEFAULT_BATCHING_FLAG}"
             SERVER_ARGS="--model-repository=${DATADIR} --log-verbose=1"
+            PERF_ANALYZER_EXTRA_ARGS=""
+            if [ ${BATCHED_FLAG} == "_batched_" ]; then
+                PERF_ANALYZER_EXTRA_ARGS="-b 6"
+            fi
             rm -f $SERVER_LOG $CLIENT_LOG
 
             run_server
@@ -151,7 +159,7 @@ for DISABLE_DEFAULT_BATCHING_FLAG in ${DISABLE_DEFAULT_BATCHING_FLAGS}; do
                 exit 1
             fi
             set +e
-            $PERF_ANALYZER -v -m add-sub-1x4 --concurrency-range 1:10:4 --input-data=${NON_ALIGNED_OUTPUT_JSONDATAFILE} >$CLIENT_LOG 2>&1
+            $PERF_ANALYZER -v -m add-sub-1x4 --concurrency-range 1:10:4 --input-data=${NON_ALIGNED_OUTPUT_JSONDATAFILE} ${PERF_ANALYZER_EXTRA_ARGS} >$CLIENT_LOG 2>&1
             if [ $? -eq 0 ]; then
                 cat $CLIENT_LOG
                 echo -e "\n***\n*** Test Failed\n***"
@@ -163,7 +171,7 @@ for DISABLE_DEFAULT_BATCHING_FLAG in ${DISABLE_DEFAULT_BATCHING_FLAGS}; do
                 RET=1
             fi
 
-            $PERF_ANALYZER -v -m add-sub-1x4 --concurrency-range 1:10:4 --input-data=${WRONG_OUTPUT_JSONDATAFILE} >$CLIENT_LOG 2>&1
+            $PERF_ANALYZER -v -m add-sub-1x4 --concurrency-range 1:10:4 --input-data=${WRONG_OUTPUT_JSONDATAFILE} ${PERF_ANALYZER_EXTRA_ARGS} >$CLIENT_LOG 2>&1
             if [ $? -eq 0 ]; then
                 cat $CLIENT_LOG
                 echo -e "\n***\n*** Test Failed\n***"
@@ -175,7 +183,7 @@ for DISABLE_DEFAULT_BATCHING_FLAG in ${DISABLE_DEFAULT_BATCHING_FLAGS}; do
                 RET=1
             fi
 
-            $PERF_ANALYZER -v -m add-sub-1x4 --concurrency-range 1:10:4 --input-data=${OUTPUT_JSONDATAFILE} >$CLIENT_LOG 2>&1
+            $PERF_ANALYZER -v -m add-sub-1x4 --concurrency-range 1:10:4 --input-data=${OUTPUT_JSONDATAFILE} ${PERF_ANALYZER_EXTRA_ARGS} >$CLIENT_LOG 2>&1
             if [ $? -ne 0 ]; then
                 cat $CLIENT_LOG
                 echo -e "\n***\n*** Test Failed\n***"
