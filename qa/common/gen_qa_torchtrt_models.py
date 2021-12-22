@@ -71,7 +71,7 @@ def create_resnet50_torchtrt_modelconfig(models_dir, max_batch):
     config_dir = models_dir + "/" + model_name
     config = '''
 name: "{}"
-platform: "pytorch_libtorch"
+backend: "pytorch"
 max_batch_size: {}
 input [
   {{
