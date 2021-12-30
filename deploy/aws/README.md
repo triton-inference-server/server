@@ -95,7 +95,7 @@ for inferencing. For this example you will place the model repository
 in an AWS S3 Storage bucket.
 
 ```
-$ aws mb s3://triton-inference-server-repository
+$ aws s3 mb s3://triton-inference-server-repository
 ```
 
 Following the [QuickStart](../../docs/quickstart.md) download the
@@ -103,7 +103,7 @@ example model repository to your system and copy it into the AWS S3
 bucket.
 
 ```
-$ aws cp -r docs/examples/model_repository s3://triton-inference-server-repository/model_repository
+$ aws s3 cp --recursive docs/examples/model_repository s3://triton-inference-server-repository/model_repository
 ```
 
 ### AWS Model Repository
