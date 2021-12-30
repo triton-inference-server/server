@@ -96,9 +96,7 @@ class InferenceTrace {
         memory_type_id, userp_);
   }
 
-  // Release the trace. Call the trace release callback and transfer
-  // ownership of the trace to the callback. On return 'trace' is
-  // nullptr.
+  // Release the trace. Call the trace release callback.
   void Release();
 
  private:

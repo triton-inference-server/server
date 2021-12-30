@@ -115,7 +115,7 @@ InferenceRequest::SetPriority(uint32_t p)
 
 #ifdef TRITON_ENABLE_TRACING
 Status
-InferenceRequest::TraceTensor(
+InferenceRequest::TraceInputTensors(
     TRITONSERVER_InferenceTraceActivity activity, const std::string& msg)
 {
   const auto& inputs = this->ImmutableInputs();
@@ -193,9 +193,9 @@ InferenceRequest::TraceTensor(
       }
 
       status = CopyBuffer(
-          "InferenceRequest TraceTensor", src_memory_type, src_memory_type_id,
-          dst_memory_type, dst_memory_type_id, buffer_size, buffer,
-          base + offset, nullptr, &cuda_used);
+          "InferenceRequest TraceInputTensors", src_memory_type,
+          src_memory_type_id, dst_memory_type, dst_memory_type_id, buffer_size,
+          buffer, base + offset, nullptr, &cuda_used);
       if (!status.IsOk()) {
         LOG_STATUS_ERROR(
             status,
@@ -307,7 +307,7 @@ InferenceRequest::Release(
   // and the callback may interact with upper level trace.
   if (request->trace_ != nullptr) {
     request->trace_->ReportNow(TRITONSERVER_TRACE_REQUEST_END);
-    request->trace_ = nullptr;
+    request->ReleaseTrace();
   }
 #endif  // TRITON_ENABLE_TRACING
 

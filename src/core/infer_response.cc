@@ -201,7 +201,7 @@ InferenceResponse::Send(
     std::unique_ptr<InferenceResponse>&& response, const uint32_t flags)
 {
 #ifdef TRITON_ENABLE_TRACING
-  response->TraceTensor(
+  response->TraceOutputTensors(
       TRITONSERVER_TRACE_TENSOR_BACKEND_OUTPUT, "InferenceResponse Send");
 #endif  // TRITON_ENABLE_TRACING
 
@@ -233,7 +233,7 @@ InferenceResponse::SendWithStatus(
 
 #ifdef TRITON_ENABLE_TRACING
 Status
-InferenceResponse::TraceTensor(
+InferenceResponse::TraceOutputTensors(
     TRITONSERVER_InferenceTraceActivity activity, const std::string& msg)
 {
   const auto& outputs = this->Outputs();

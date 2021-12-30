@@ -85,6 +85,7 @@ class InferenceResponseFactory {
   {
     trace_ = trace;
   }
+  void ReleaseTrace() { trace_ = nullptr; }
 #endif  // TRITON_ENABLE_TRACING
 
  private:
@@ -282,15 +283,15 @@ class InferenceResponse {
       std::unique_ptr<InferenceResponse>&& response, const uint32_t flags,
       const Status& status);
 
-#ifdef TRITON_ENABLE_TRACING
-  Status TraceTensor(
-      TRITONSERVER_InferenceTraceActivity activity, const std::string& msg);
-#endif  // TRITON_ENABLE_TRACING
-
  private:
   DISALLOW_COPY_AND_ASSIGN(InferenceResponse);
   friend std::ostream& operator<<(
       std::ostream& out, const InferenceResponse& response);
+
+#ifdef TRITON_ENABLE_TRACING
+  Status TraceOutputTensors(
+      TRITONSERVER_InferenceTraceActivity activity, const std::string& msg);
+#endif  // TRITON_ENABLE_TRACING
 
   // The model associated with this factory. For normal
   // requests/responses this will always be defined and acts to keep

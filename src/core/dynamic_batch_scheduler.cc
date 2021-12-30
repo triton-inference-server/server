@@ -163,7 +163,7 @@ DynamicBatchScheduler::Enqueue(std::unique_ptr<InferenceRequest>& request)
       request->Trace(), TRITONSERVER_TRACE_QUEUE_START,
       request->QueueStartNs());
 #ifdef TRITON_ENABLE_TRACING
-  request->TraceTensor(
+  request->TraceInputTensors(
       TRITONSERVER_TRACE_TENSOR_QUEUE_INPUT, "DynamicBatchScheduler Enqueue");
 #endif  // TRITON_ENABLE_TRACING
 

@@ -305,8 +305,13 @@ class InferenceRequest {
     trace_ = trace;
     response_factory_.SetTrace(trace);
   }
+  void ReleaseTrace()
+  {
+    trace_ = nullptr;
+    response_factory_.ReleaseTrace();
+  }
 
-  Status TraceTensor(
+  Status TraceInputTensors(
       TRITONSERVER_InferenceTraceActivity activity, const std::string& msg);
 #endif  // TRITON_ENABLE_TRACING
 

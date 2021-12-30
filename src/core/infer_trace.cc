@@ -51,9 +51,8 @@ InferenceTrace::Release()
 std::shared_ptr<InferenceTraceProxy>
 InferenceTraceProxy::SpawnChildTrace()
 {
-  InferenceTrace* child_trace = trace_->SpawnChildTrace();
-  InferenceTraceProxy* trace_proxy = new InferenceTraceProxy(child_trace);
-  std::shared_ptr<InferenceTraceProxy> strace_proxy(trace_proxy);
+  std::shared_ptr<InferenceTraceProxy> strace_proxy =
+      std::make_shared<InferenceTraceProxy>(trace_->SpawnChildTrace());
   return strace_proxy;
 }
 
