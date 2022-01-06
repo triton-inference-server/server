@@ -1,0 +1,11 @@
+{{- if .Values.serviceMonitor.enabled }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ .Release.Name }}-dashboard-configmap
+  labels:
+    grafana_dashboard: "1"
+data:
+  dashboard.json: |-
+{{ .Files.Get "dashboard.json" | indent 4}}
+{{- end }}
