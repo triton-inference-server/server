@@ -1,4 +1,4 @@
-# Copyright 2021, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright 2021-2022, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -370,7 +370,7 @@ def create_onnx_modelconfig(models_dir, model_version, max_batch, dtype, shape, 
 
     if dtype == np.float32:
         control_type = "fp32"
-    elif dtype == np.bool_:
+    elif dtype == bool:
         control_type = "bool"
         dtype = np.int32
     else:
@@ -764,7 +764,7 @@ def create_models(models_dir, dtype, shape, initial_state, no_batch=True):
             create_onnx_modelfile(models_dir, model_version, 0, dtype, shape, initial_state)
 
     if FLAGS.tensorrt:
-        if dtype == np.bool_:
+        if dtype == bool:
             return
         suffix = []
         if dtype == np.int8:
@@ -857,7 +857,7 @@ if __name__ == '__main__':
         create_models(FLAGS.models_dir, np_dtype_string, [
             1,
         ], FLAGS.initial_state)
-        create_models(FLAGS.models_dir, np.bool_, [
+        create_models(FLAGS.models_dir, bool, [
             1,
         ], FLAGS.initial_state)
 
@@ -872,6 +872,6 @@ if __name__ == '__main__':
         create_models(FLAGS.models_dir, np_dtype_string, [
             -1,
         ], FLAGS.initial_state, False)
-        create_models(FLAGS.models_dir, np.bool_, [
+        create_models(FLAGS.models_dir, bool, [
             -1,
         ], FLAGS.initial_state, False)
