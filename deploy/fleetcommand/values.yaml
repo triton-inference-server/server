@@ -69,3 +69,10 @@ service:
 #  region: AWS_REGION
 #  id: AWS_SECRET_KEY_ID
 #  key: AWS_SECRET_ACCESS_KEY
+#  token: AWS_SESSION_TOKEN
+
+# Prometheus-Operator ServiceMonitor support
+# change enabled to 'true' to enable a ServiceMonitor if your cluster has
+#  Prometheus-Operator installed
+serviceMonitor:
+  enabled: false
