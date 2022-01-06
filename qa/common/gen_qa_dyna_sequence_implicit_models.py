@@ -1,4 +1,4 @@
-# Copyright 2019-2021, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright 2019-2022, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -642,7 +642,7 @@ def create_models(models_dir, dtype, shape, no_batch=True):
             create_onnx_modelfile(models_dir, model_version, 0, dtype, shape)
 
     if FLAGS.tensorrt:
-        if dtype == np.bool_:
+        if dtype == bool:
             return
 
         create_plan_modelconfig(models_dir, model_version, 8, dtype, shape)
