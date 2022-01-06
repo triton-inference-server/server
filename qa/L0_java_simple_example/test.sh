@@ -26,13 +26,15 @@
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 MODEL_REPO=`pwd`/../L0_simple_ensemble/models
+SAMPLES_REPO=/opt/tritonserver/javacpp-presets/tritonserver/samples
+BASE_COMMAND="mvn compile -f $SAMPLES_REPO exec:java -Djavacpp.platform=linux-x86_64"
 source ../common/util.sh
 
 rm -f *.log
 RET=0
 
 # Run with default settings
-mvn compile -f /opt/tritonserver/javacpp-presets/tritonserver/samples exec:java -Djavacpp.platform=linux-x86_64 -Dexec.args="-r $MODEL_REPO" >>client.log 2>&1
+$BASE_COMMAND -Dexec.args="-r $MODEL_REPO" >>client.log 2>&1
 if [ $? -ne 0 ]; then
     RET=1
 fi
@@ -43,7 +45,7 @@ if [ `grep -c "1 - 1 = 0" client.log` != "18" ]; then
 fi
 
 # Run with verbose logging
-mvn compile -f /opt/tritonserver/javacpp-presets/tritonserver/samples exec:java -Djavacpp.platform=linux-x86_64 -Dexec.args="-r $MODEL_REPO -v" >>client.log 2>&1
+$BASE_COMMAND -Dexec.args="-r $MODEL_REPO -v" >>client.log 2>&1
 if [ $? -ne 0 ]; then
     RET=1
 fi
@@ -54,7 +56,7 @@ if [ `grep -c "Server side auto-completed config" client.log` != "2" ]; then
 fi
 
 # Run with memory set to system
-mvn compile -f /opt/tritonserver/javacpp-presets/tritonserver/samples exec:java -Djavacpp.platform=linux-x86_64 -Dexec.args="-r $MODEL_REPO -m system" >>client.log 2>&1
+$BASE_COMMAND -Dexec.args="-r $MODEL_REPO -m system" >>client.log 2>&1
 if [ $? -ne 0 ]; then
     RET=1
 fi
@@ -67,7 +69,7 @@ fi
 # Run with FP32 datatype
 sed -i 's/TYPE_INT32/TYPE_FP32/g' $MODEL_REPO/simple/config.pbtxt
 sed -i 's/TYPE_INT32/TYPE_FP32/g' $MODEL_REPO/ensemble_add_sub_int32_int32_int32/config.pbtxt
-mvn compile -f /opt/tritonserver/javacpp-presets/tritonserver/samples exec:java -Djavacpp.platform=linux-x86_64 -Dexec.args="-r $MODEL_REPO -v" >>client.log 2>&1
+$BASE_COMMAND -Dexec.args="-r $MODEL_REPO -v" >>client.log 2>&1
 sed -i 's/TYPE_FP32/TYPE_INT32/g' $MODEL_REPO/simple/config.pbtxt
 sed -i 's/TYPE_FP32/TYPE_INT32/g' $MODEL_REPO/ensemble_add_sub_int32_int32_int32/config.pbtxt
 if [ $? -ne 0 ]; then
@@ -81,7 +83,7 @@ fi
 
 # Run ensemble
 sed -i 's/"simple"/"ensemble_add_sub_int32_int32_int32"/g' /opt/tritonserver/javacpp-presets/tritonserver/samples/Simple.java
-mvn compile -f /opt/tritonserver/javacpp-presets/tritonserver/samples exec:java -Djavacpp.platform=linux-x86_64 -Dexec.args="-r $MODEL_REPO -v" >>client.log 2>&1
+$BASE_COMMAND -Dexec.args="-r $MODEL_REPO -v" >>client.log 2>&1
 sed -i 's/"ensemble_add_sub_int32_int32_int32"/"simple"/g' /opt/tritonserver/javacpp-presets/tritonserver/samples/Simple.java
 if [ $? -ne 0 ]; then
     RET=1
