@@ -1,5 +1,5 @@
 <!--
-# Copyright 2018-2021, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright 2018-2022, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -31,7 +31,9 @@
 This section gives an overview of how to build the Triton server. For
 information on building the Triton client libraries and examples see
 [Client Libraries and
-Examples](https://github.com/triton-inference-server/client).
+Examples](https://github.com/triton-inference-server/client). For
+information on building the Triton SDK container see
+[Build SDK Image](test.md#build-sdk-image).
 
 You can create a customized Triton Docker image that contains a subset
 of the released backends without building. For example, you may want a
