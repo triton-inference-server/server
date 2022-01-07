@@ -25,9 +25,13 @@
 # (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
+# Set up test files
+git clone https://github.com/bytedeco/javacpp-presets.git
+cp -f `pwd`/pom.xml `pwd`/javacpp-presets/tritonserver/samples/pom.xml
+
 MODEL_REPO=`pwd`/../L0_simple_ensemble/models
-SAMPLES_REPO=/opt/tritonserver/javacpp-presets/tritonserver/samples
-BASE_COMMAND="mvn compile -f $SAMPLES_REPO exec:java -Djavacpp.platform=linux-x86_64"
+SAMPLES_REPO=`pwd`/javacpp-presets/tritonserver/samples
+BASE_COMMAND="mvn clean compile -f $SAMPLES_REPO exec:java -Djavacpp.platform=linux-x86_64"
 source ../common/util.sh
 
 rm -f *.log
@@ -82,9 +86,9 @@ if [ `grep -c "data_type: TYPE_FP32" client.log` != "8" ]; then
 fi
 
 # Run ensemble
-sed -i 's/"simple"/"ensemble_add_sub_int32_int32_int32"/g' /opt/tritonserver/javacpp-presets/tritonserver/samples/Simple.java
+sed -i 's/"simple"/"ensemble_add_sub_int32_int32_int32"/g' $SAMPLES_REPO/Simple.java
 $BASE_COMMAND -Dexec.args="-r $MODEL_REPO -v" >>client.log 2>&1
-sed -i 's/"ensemble_add_sub_int32_int32_int32"/"simple"/g' /opt/tritonserver/javacpp-presets/tritonserver/samples/Simple.java
+sed -i 's/"ensemble_add_sub_int32_int32_int32"/"simple"/g' $SAMPLES_REPO/Simple.java
 if [ $? -ne 0 ]; then
     RET=1
 fi
