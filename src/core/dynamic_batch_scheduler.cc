@@ -594,7 +594,7 @@ DynamicBatchScheduler::CacheLookUp(
   // Hash request to get key for cache lookup
   auto status = cache->Hash(*request, &request_hash);
   if (!status.IsOk()) {
-    LOG_ERROR << "Failed to hash input request" << status.Message();
+    LOG_ERROR << "Failed to hash input request: " << status.Message();
     return;
   }
   request->SetCacheKey(request_hash);

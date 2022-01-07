@@ -108,7 +108,8 @@ RequestResponseCache::HashInputBuffers(
         &src_memory_type_id));
 
     // TODO: Handle other memory types
-    if (src_memory_type != TRITONSERVER_MEMORY_CPU) {
+    if (src_memory_type != TRITONSERVER_MEMORY_CPU &&
+        src_memory_type != TRITONSERVER_MEMORY_CPU_PINNED) {
       return Status(
           Status::Code::INTERNAL,
           "Only input buffers in CPU memory are allowed in cache currently");
@@ -261,7 +262,8 @@ RequestResponseCache::BuildCacheEntry(
         &response_memory_type_id, &userp));
 
     // TODO: Handle other memory types
-    if (response_memory_type != TRITONSERVER_MEMORY_CPU) {
+    if (response_memory_type != TRITONSERVER_MEMORY_CPU &&
+        response_memory_type != TRITONSERVER_MEMORY_CPU_PINNED) {
       return Status(
           Status::Code::INTERNAL,
           "Only input buffers in CPU memory are allowed in cache currently");
@@ -368,7 +370,8 @@ RequestResponseCache::BuildInferenceResponse(
           &buffer, cache_output.buffer_size_, &memory_type, &memory_type_id));
 
       // TODO: Handle other memory types
-      if (memory_type != TRITONSERVER_MEMORY_CPU) {
+      if (memory_type != TRITONSERVER_MEMORY_CPU &&
+          memory_type != TRITONSERVER_MEMORY_CPU_PINNED) {
         return Status(
             Status::Code::INTERNAL,
             "Only input buffers in CPU memory are allowed in cache currently");
