@@ -106,6 +106,9 @@ release is
   linked directly into your application for edge and other in-process
   use cases.
 
+* A [Java API](docs/inference_protocols.md#java-api) is similar to C API and
+  allows Triton to be linked directly into your Java application.
+
 * [Metrics](docs/metrics.md) indicating GPU utilization, server
   throughput, and server latency. The metrics are provided in
   Prometheus data format.
