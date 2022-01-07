@@ -761,6 +761,10 @@ TRITONSERVER_InferenceTraceLevelString(TRITONSERVER_InferenceTraceLevel level)
       return "MIN";
     case TRITONSERVER_TRACE_LEVEL_MAX:
       return "MAX";
+    case TRITONSERVER_TRACE_LEVEL_TIMESTAMPS:
+      return "TIMESTAMPS";
+    case TRITONSERVER_TRACE_LEVEL_TENSORS:
+      return "TENSORS";
   }
 
   return "<unknown>";
