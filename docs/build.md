@@ -1,5 +1,5 @@
 <!--
-# Copyright 2018-2021, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright 2018-2022, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -31,7 +31,9 @@
 This section gives an overview of how to build the Triton server. For
 information on building the Triton client libraries and examples see
 [Client Libraries and
-Examples](https://github.com/triton-inference-server/client).
+Examples](https://github.com/triton-inference-server/client). For
+information on building the Triton SDK container see
+[Build SDK Image](test.md#build-sdk-image).
 
 You can create a customized Triton Docker image that contains a subset
 of the released backends without building. For example, you may want a
@@ -107,8 +109,8 @@ invocation builds all features, backends, and repository agents.
 If you are building on *main* branch then `<container tag>` will
 default to "main". If you are building on a release branch then
 `<container tag>` will default to the branch name. For example, if you
-are building on the r21.11 branch, `<container tag>` will default to
-r21.11. Therefore, you typically do not need to provide `<container
+are building on the r21.12 branch, `<container tag>` will default to
+r21.12. Therefore, you typically do not need to provide `<container
 tag>` at all (nor the preceding colon). You can use a different
 `<container tag>` for a component to instead use the corresponding
 branch/tag in the build. For example, if you have a branch called
@@ -273,8 +275,8 @@ python build.py --cmake-dir=<path/to/repo>/build --build-dir=/tmp/citritonbuild 
 If you are building on *main* branch then '<container tag>' will
 default to "main". If you are building on a release branch then
 '<container tag>' will default to the branch name. For example, if you
-are building on the r21.11 branch, '<container tag>' will default to
-r21.11. Therefore, you typically do not need to provide '<container
+are building on the r21.12 branch, '<container tag>' will default to
+r21.12. Therefore, you typically do not need to provide '<container
 tag>' at all (nor the preceding colon). You can use a different
 '<container tag>' for a component to instead use the corresponding
 branch/tag in the build. For example, if you have a branch called
