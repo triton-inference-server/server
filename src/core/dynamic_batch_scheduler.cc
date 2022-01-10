@@ -43,7 +43,6 @@ bool
 IsStaleState(Payload::State payload_state)
 {
   return (
-      (payload_state == Payload::State::SCHEDULED) ||
       (payload_state == Payload::State::EXECUTING) ||
       (payload_state == Payload::State::RELEASED));
 }
