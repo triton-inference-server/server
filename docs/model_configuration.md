@@ -388,14 +388,17 @@ Each model can have one or more
 set one of the following policies.
 
 * *All*: All versions of the model that are available in the model
-  repository are available for inferencing.
+  repository are available for inferencing.  
+  ```version_policy: { all: {}}```
 
 * *Latest*: Only the latest ‘n’ versions of the model in the
   repository are available for inferencing. The latest versions of the
-  model are the numerically greatest version numbers.
+  model are the numerically greatest version numbers.  
+  ```version_policy: { latest: { num_versions: 2}}```
 
 * *Specific*: Only the specifically listed versions of the model are
-  available for inferencing.
+  available for inferencing.  
+  ```version_policy: { specific: { versions: [1,3]}}```
 
 If no version policy is specified, then *Latest* (with n=1) is used as
 the default, indicating that only the most recent version of the model
