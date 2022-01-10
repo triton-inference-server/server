@@ -122,9 +122,10 @@ repo that you want to use in the build, you would specify
 #### CPU-only container
 
 If you want to build without GPU support remove the `--enable-gpu` and
-`--enable-gpu-metrics` flags. Only the following backends are available
-for a non-GPU / CPU-only build: `identity`, `repeat`, `square`, `onnxruntime`,
-`openvino`, and `python`.
+`--enable-gpu-metrics` flags. Only the following backends are
+available for a non-GPU / CPU-only build: `identity`, `repeat`,
+`square`, `tensorflow2`, `onnxruntime`, `openvino`, `python` and
+`fil`.
 
 ### <a name="ubuntu-without-docker"></a>Building without Docker
 
