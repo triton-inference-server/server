@@ -70,6 +70,26 @@ SequenceState::RemoveAllData()
 }
 
 Status
+SequenceState::SetStringDataToZero()
+{
+  if (Data()->TotalByteSize() % 4 != 0) {
+    return Status(
+        Status::Code::INVALID_ARG,
+        "Incorrect data size for setting the string data to zero.");
+  }
+
+  TRITONSERVER_MemoryType memory_type;
+  int64_t memory_type_id;
+
+  const std::shared_ptr<MutableMemory>& memory =
+      reinterpret_cast<const std::shared_ptr<MutableMemory>&>(Data());
+  char* buffer = memory->MutableBuffer(&memory_type, &memory_type_id);
+  memset(buffer, 0, Data()->TotalByteSize());
+
+  return Status::Success;
+}
+
+Status
 SequenceStates::Initialize(
     const std::unordered_map<
         std::string, const inference::ModelSequenceBatching_State&>&
@@ -115,7 +135,15 @@ SequenceStates::Initialize(
           dst_buffer, initial_state_buffer,
           initial_state_it->second.data_->TotalByteSize());
     } else {
-      const size_t state_size = GetByteSize(state.second.data_type(), dims);
+      size_t state_size;
+      if (state.second.data_type() == inference::DataType::TYPE_STRING) {
+        auto element_count = GetElementCount(state.second.dims());
+        // Total number of bytes required is equal to the element count
+        // multiplied by 4.
+        state_size = 4 * element_count;
+      } else {
+        state_size = GetByteSize(state.second.data_type(), dims);
+      }
       data = std::make_shared<AllocatedMemory>(
           state_size, TRITONSERVER_MEMORY_CPU, 0);
     }
@@ -133,8 +161,12 @@ SequenceStates::Initialize(
           << ".' This state configuration will be ignored.";
       continue;
     }
+
     auto& input_tensor = input_pair.first->second;
     RETURN_IF_ERROR(input_tensor->SetData(data));
+    if (input_tensor->DType() == inference::DataType::TYPE_STRING) {
+      RETURN_IF_ERROR(input_tensor->SetStringDataToZero());
+    }
 
     const auto& output_pair = output_states_.emplace(
         std::piecewise_construct,
@@ -269,10 +301,24 @@ SequenceStates::CopyAsNull(const std::shared_ptr<SequenceStates>& from)
               from_input_state_tensor->Shape())));
 
       auto& input_tensor = input_pair.first->second;
-      std::shared_ptr<AllocatedMemory> data = std::make_shared<AllocatedMemory>(
-          from_input_state_tensor->Data()->TotalByteSize(),
-          TRITONSERVER_MEMORY_CPU, 0);
+      std::shared_ptr<AllocatedMemory> data;
+      if (from_input_state_tensor->DType() ==
+          inference::DataType::TYPE_STRING) {
+        // Use all-zero input states for null requests.
+        auto element_count = GetElementCount(from_input_state_tensor->Shape());
+        auto state_size = 4 * element_count;
+        data = std::make_shared<AllocatedMemory>(
+            state_size, TRITONSERVER_MEMORY_CPU, 0);
+      } else {
+        data = std::make_shared<AllocatedMemory>(
+            from_input_state_tensor->Data()->TotalByteSize(),
+            TRITONSERVER_MEMORY_CPU, 0);
+      }
+
       input_tensor->SetData(data);
+      if (input_tensor->DType() == inference::DataType::TYPE_STRING) {
+        input_tensor->SetStringDataToZero();
+      }
     }
 
     for (auto& from_output_state : from->OutputStates()) {
