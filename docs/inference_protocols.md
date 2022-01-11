@@ -1,5 +1,5 @@
 <!--
-# Copyright (c) 2018-2021, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright (c) 2018-2022, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -118,11 +118,12 @@ The Triton Inference Server uses [Java CPP](https://github.com/bytedeco/javacpp)
 to create bindings around Tritonserver to create Java API. It requires the user
 to link a pre-built library to their application using Maven.   
 
-The API is documented in
-[tritonserver.h](https://github.com/triton-inference-server/core/blob/main/include/triton/core/tritonserver.h).
-And the respective java version is [tritonserver.java](https://github.com/bytedeco/javacpp-presets/blob/master/tritonserver/src/gen/java/org/bytedeco/tritonserver/global/tritonserver.java).
+The API is documented in 
+[tritonserver.java](https://github.com/bytedeco/javacpp-presets/blob/master/tritonserver/src/gen/java/org/bytedeco/tritonserver/global/tritonserver.java).
+Alternatively, the user can refer to the web version [API docs](http://bytedeco.org/javacpp-presets/tritonserver/apidocs/)
+generated from `tritonserver.java`.
 A simple example using the Java API can be found in
 [Samples folder](https://github.com/bytedeco/javacpp-presets/tree/master/tritonserver/samples)
-which includes `simple.java` which is similar to `simple.cc`. Please refer to
+which includes `Simple.java` which is similar to `simple.cc`. Please refer to
 [sample usage documentation](https://github.com/bytedeco/javacpp-presets/tree/master/tritonserver#sample-usage)
-to learn about how to build and run `simple.java`
+to learn about how to build and run `Simple.java`
