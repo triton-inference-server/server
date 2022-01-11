@@ -486,7 +486,6 @@ DynamicBatchScheduler::GetDynamicBatch()
   if ((best_preferred_batch_size != 0) && !delay_is_exceeded) {
     pending_batch_size_ = best_preferred_batch_size;
     queue_.SetCursorToMark();
-    payload_saturated_ = true;
     return 0;
   }
 
