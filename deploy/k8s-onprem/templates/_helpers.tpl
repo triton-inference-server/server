@@ -26,6 +26,10 @@
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */}}
 
+# Defines a set of helper functions that produce templated values for other files.
+# Mostly for things like names and labels. This file does not produce any
+# kubernetes resources by itself
+
 {{/* vim: set filetype=mustache: */}}
 {{/*
 Create inference server name.

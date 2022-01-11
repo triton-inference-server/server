@@ -24,6 +24,10 @@
 # (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
+# Creates a deployment for the Triton Inference Server pods
+# Each pod contains a Triton container and an nfs mount as specified in
+# values.yaml for the model repository
+
 apiVersion: apps/v1
 kind: Deployment
 metadata:
