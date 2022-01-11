@@ -1666,6 +1666,9 @@ class BatcherTest(tu.TestResultCollector):
                 self.assertTrue(False, "unexpected error {}".format(ex))
 
     def test_max_queue_delay_only_non_default(self):
+        # Send 12 requests with batch size 1. The max_queue_delay is set
+        # to non-zero. Depending upon the timing of the requests arrival
+        # there can be either 1 or 2 model executions.
         model_base = "custom"
         dtype = np.float32
         shapes = ([
@@ -1714,6 +1717,10 @@ class BatcherTest(tu.TestResultCollector):
             self.assertTrue(False, "unexpected error {}".format(ex))
 
     def test_max_queue_delay_only_default(self):
+        # Send 12 requests with batch size 1. The max_queue_delay is set
+        # to default value of 0. There should be two distinct model
+        # executions. The first few requests will form a first batch
+        # and the remaining requests will form the second batch.
         model_base = "custom"
         dtype = np.float32
         shapes = ([
