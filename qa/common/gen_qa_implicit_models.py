@@ -98,7 +98,8 @@ def np_to_trt_dtype(np_dtype):
     return None
 
 
-def create_onnx_modelfile_wo_initial_state(models_dir, model_version, max_batch, dtype, shape):
+def create_onnx_modelfile_wo_initial_state(models_dir, model_version, max_batch,
+                                           dtype, shape):
 
     if not tu.validate_for_onnx_model(dtype, dtype, dtype, shape, shape, shape):
         return
@@ -137,101 +138,151 @@ def create_onnx_modelfile_wo_initial_state(models_dir, model_version, max_batch,
     onnx_output_state = onnx.helper.make_tensor_value_info(
         "OUTPUT_STATE", onnx_dtype, batch_dim + onnx_output_shape)
 
-    internal_input = onnx.helper.make_node("Identity", ["INPUT"], ["_INPUT"])
+    internal_input = onnx.helper.make_node("Identity", ["INPUT"], ["_INPUT"],
+                                           name="7")
     internal_input_state = onnx.helper.make_node("Identity", ["INPUT_STATE"],
-                                                 ["_INPUT_STATE"])
+                                                 ["_INPUT_STATE"],
+                                                 name="8")
     # cast int8, int16 input to higer precision int as Onnx Add/Sub operator doesn't support those type
     # Also casting String data type to int32
     if ((onnx_dtype == onnx.TensorProto.INT8) or
-        (onnx_dtype == onnx.TensorProto.INT16) or
-        (onnx_dtype == onnx.TensorProto.STRING)):
+        (onnx_dtype == onnx.TensorProto.INT16)):
+
         internal_input = onnx.helper.make_node("Cast", ["INPUT"], ["_INPUT"],
-                                               to=onnx.TensorProto.INT32)
+                                               to=onnx.TensorProto.INT32,
+                                               name="9")
         internal_input_state = onnx.helper.make_node("Cast", ["INPUT_STATE"],
                                                      ["_INPUT_STATE"],
-                                                     to=onnx.TensorProto.INT32)
+                                                     to=onnx.TensorProto.INT32,
+                                                     name="10")
 
     # Convert boolean value to int32 value
     if onnx_control_dtype == onnx.TensorProto.BOOL:
-        internal_input1 = onnx.helper.make_node("Cast", ["START"], ["_START"],
-                                                to=onnx.TensorProto.INT32)
-        internal_input2 = onnx.helper.make_node("Cast", ["READY"], ["_READY"],
-                                                to=onnx.TensorProto.INT32)
-        not_start_cast = onnx.helper.make_node("Not", ["START"],
-                                               ["_NOT_START_CAST"])
-        not_start = onnx.helper.make_node("Cast", ["_NOT_START_CAST"],
-                                          ["_NOT_START"],
-                                          to=onnx.TensorProto.INT32)
-        not_ready_cast = onnx.helper.make_node("Not", ["START"],
-                                               ["_NOT_READY_CAST"])
-        not_ready = onnx.helper.make_node("Cast", ["_NOT_READY_CAST"],
-                                          ["_NOT_READY"],
-                                          to=onnx.TensorProto.INT32)
 
-        input_state_cond = onnx.helper.make_node("And",
-                                                 ["READY", "_NOT_START_CAST"],
-                                                 ["input_state_cond"])
-        input_state_cond_cast = onnx.helper.make_node("Cast",
-                                                      ["input_state_cond"],
-                                                      ["input_state_cond_cast"],
-                                                      to=onnx.TensorProto.INT32)
-        mul_state = onnx.helper.make_node(
-            "Mul", ["_INPUT_STATE", "input_state_cond_cast"], ["mul_state"])
-        add = onnx.helper.make_node("Add", ["_INPUT", "mul_state"], ["CAST"])
+        if onnx_dtype != onnx.TensorProto.STRING:
+            internal_input1 = onnx.helper.make_node("Cast", ["START"],
+                                                    ["_START"],
+                                                    to=onnx.TensorProto.INT32,
+                                                    name="11")
+            internal_input2 = onnx.helper.make_node("Cast", ["READY"],
+                                                    ["_READY"],
+                                                    to=onnx.TensorProto.INT32,
+                                                    name="12")
+            not_start_cast = onnx.helper.make_node("Not", ["START"],
+                                                   ["_NOT_START_CAST"],
+                                                   name="13")
+            not_start = onnx.helper.make_node("Cast", ["_NOT_START_CAST"],
+                                              ["_NOT_START"],
+                                              to=onnx.TensorProto.INT32,
+                                              name="14")
+            not_ready_cast = onnx.helper.make_node("Not", ["START"],
+                                                   ["_NOT_READY_CAST"],
+                                                   name="15")
+            not_ready = onnx.helper.make_node("Cast", ["_NOT_READY_CAST"],
+                                              ["_NOT_READY"],
+                                              to=onnx.TensorProto.INT32,
+                                              name="16")
+            input_state_cond = onnx.helper.make_node(
+                "And", ["READY", "_NOT_START_CAST"], ["input_state_cond"],
+                name="17")
+            input_state_cond_cast = onnx.helper.make_node(
+                "Cast", ["input_state_cond"], ["input_state_cond_cast"],
+                to=onnx.TensorProto.INT32,
+                name="18")
+            mul_state = onnx.helper.make_node(
+                "Mul", ["_INPUT_STATE", "input_state_cond_cast"], ["mul_state"],
+                name="19")
+            add = onnx.helper.make_node("Add", ["_INPUT", "mul_state"],
+                                        ["CAST"],
+                                        name="20")
 
     else:
-        start_cast = onnx.helper.make_node("Cast", ["START"], ["_START_CAST"],
-                                           to=onnx.TensorProto.BOOL)
-        not_start_cast = onnx.helper.make_node("Not", ["_START_CAST"],
-                                               ["_NOT_START_CAST"])
-        not_start = onnx.helper.make_node("Cast", ["_NOT_START_CAST"],
-                                          ["_NOT_START"],
-                                          to=onnx.TensorProto.INT32)
 
-        ready_cast = onnx.helper.make_node("Cast", ["READY"], ["_READY_CAST"],
-                                           to=onnx.TensorProto.BOOL)
-        not_ready_cast = onnx.helper.make_node("Not", ["_READY_CAST"],
-                                               ["_NOT_READY_CAST"])
-        not_ready = onnx.helper.make_node("Cast", ["_NOT_READY_CAST"],
-                                          ["_NOT_READY"],
-                                          to=onnx.TensorProto.INT32)
+        if onnx_dtype != onnx.TensorProto.STRING:
+            start_cast = onnx.helper.make_node("Cast", ["START"],
+                                               ["_START_CAST"],
+                                               to=onnx.TensorProto.BOOL,
+                                               name="22")
+            not_start_cast = onnx.helper.make_node("Not", ["_START_CAST"],
+                                                   ["_NOT_START_CAST"],
+                                                   name="23")
+            not_start = onnx.helper.make_node("Cast", ["_NOT_START_CAST"],
+                                              ["_NOT_START"],
+                                              to=onnx.TensorProto.INT32,
+                                              name="24")
 
-        # Take advantage of knowledge that the READY false value is 0 and true is 1
-        input_state_cond = onnx.helper.make_node(
-            "And", ["_NOT_START_CAST", "_READY_CAST"], ["input_state_cond"])
-        input_state_cond_cast = onnx.helper.make_node("Cast",
-                                                      ["input_state_cond"],
-                                                      ["input_state_cond_cast"],
-                                                      to=onnx.TensorProto.INT32)
-        mul_state = onnx.helper.make_node(
-            "Mul", ["_INPUT_STATE", "input_state_cond_cast"], ["mul_state"])
-        add = onnx.helper.make_node("Add", ["_INPUT", "mul_state"], ["CAST"])
+            ready_cast = onnx.helper.make_node("Cast", ["READY"],
+                                               ["_READY_CAST"],
+                                               to=onnx.TensorProto.BOOL,
+                                               name="25")
+            not_ready_cast = onnx.helper.make_node("Not", ["_READY_CAST"],
+                                                   ["_NOT_READY_CAST"],
+                                                   name="26")
+            not_ready = onnx.helper.make_node("Cast", ["_NOT_READY_CAST"],
+                                              ["_NOT_READY"],
+                                              to=onnx.TensorProto.INT32,
+                                              name="27")
+            # Take advantage of knowledge that the READY false value is 0 and true is 1
+            input_state_cond = onnx.helper.make_node(
+                "And", ["_NOT_START_CAST", "_READY_CAST"], ["input_state_cond"])
+            input_state_cond_cast = onnx.helper.make_node(
+                "Cast", ["input_state_cond"], ["input_state_cond_cast"],
+                to=onnx.TensorProto.INT32,
+                name="28")
+            mul_state = onnx.helper.make_node(
+                "Mul", ["_INPUT_STATE", "input_state_cond_cast"], ["mul_state"],
+                name="29")
+            add = onnx.helper.make_node("Add", ["_INPUT", "mul_state"],
+                                        ["CAST"],
+                                        name="30")
 
-    cast = onnx.helper.make_node("Cast", ["CAST"], ["OUTPUT"], to=onnx_dtype)
-    cast_output_state = onnx.helper.make_node("Cast", ["CAST"],
-                                              ["OUTPUT_STATE"],
-                                              to=onnx_dtype)
-
-    # Avoid cast from float16 to float16
-    # (bug in Onnx Runtime, cast from float16 to float16 will become cast from float16 to float32)
-    if onnx_dtype == onnx.TensorProto.FLOAT16:
-        cast = onnx.helper.make_node("Identity", ["CAST"], ["OUTPUT"])
+    if onnx_dtype == onnx.TensorProto.STRING:
+        cast = onnx.helper.make_node("Identity", ["_INPUT"], ["OUTPUT"],
+                                     name="32")
+        cast_output_state = onnx.helper.make_node("Identity", ["_INPUT"],
+                                                  ["OUTPUT_STATE"],
+                                                  name="33")
+    elif onnx_dtype == onnx.TensorProto.FLOAT16:
+        # Avoid cast from float16 to float16
+        # (bug in Onnx Runtime, cast from float16 to float16 will become cast from float16 to float32)
+        cast = onnx.helper.make_node("Identity", ["CAST"], ["OUTPUT"],
+                                     name="34")
         cast_output_state = onnx.helper.make_node("Identity", ["CAST"],
-                                                  ["OUTPUT_STATE"])
+                                                  ["OUTPUT_STATE"],
+                                                  name="35")
+    else:
+        cast = onnx.helper.make_node("Cast", ["CAST"], ["OUTPUT"],
+                                     to=onnx_dtype,
+                                     name="32")
+        cast_output_state = onnx.helper.make_node("Cast", ["CAST"],
+                                                  ["OUTPUT_STATE"],
+                                                  to=onnx_dtype,
+                                                  name="33")
 
     if onnx_control_dtype == onnx.TensorProto.BOOL:
-        onnx_nodes = [
-            internal_input, internal_input_state, internal_input1,
-            internal_input2, not_start_cast, not_start, not_ready_cast,
-            not_ready, input_state_cond, input_state_cond_cast, mul_state, add,
-            cast, cast_output_state
-        ]
+        if onnx_dtype != onnx.TensorProto.STRING:
+            onnx_nodes = [
+                internal_input, internal_input_state, internal_input1,
+                internal_input2, not_start_cast, not_start, not_ready_cast,
+                not_ready, input_state_cond, input_state_cond_cast, mul_state,
+                add, cast, cast_output_state
+            ]
+        else:
+            onnx_nodes = [
+                internal_input, internal_input_state, cast, cast_output_state
+            ]
     else:
-        onnx_nodes = [
-            internal_input, internal_input_state, start_cast, not_start_cast,
-            not_start, ready_cast, not_ready_cast, not_ready, input_state_cond,
-            input_state_cond_cast, mul_state, add, cast, cast_output_state
-        ]
+        if onnx_dtype != onnx.TensorProto.STRING:
+            onnx_nodes = [
+                internal_input, internal_input_state, start_cast,
+                not_start_cast, not_start, ready_cast, not_ready_cast,
+                not_ready, input_state_cond, input_state_cond_cast, mul_state,
+                add, cast, cast_output_state
+            ]
+        else:
+            onnx_nodes = [
+                internal_input, internal_input_state, cast, cast_output_state
+            ]
 
     onnx_inputs = [onnx_input_state, onnx_input, onnx_start, onnx_ready]
     onnx_outputs = [onnx_output, onnx_output_state]
@@ -254,7 +305,8 @@ def create_onnx_modelfile_wo_initial_state(models_dir, model_version, max_batch,
     onnx.save(model_def, model_version_dir + "/model.onnx")
 
 
-def create_onnx_modelfile_with_initial_state(models_dir, model_version, max_batch, dtype, shape):
+def create_onnx_modelfile_with_initial_state(models_dir, model_version,
+                                             max_batch, dtype, shape):
     if not tu.validate_for_onnx_model(dtype, dtype, dtype, shape, shape, shape):
         return
 
@@ -321,13 +373,11 @@ def create_onnx_modelfile_with_initial_state(models_dir, model_version, max_batc
 
     if onnx_control_dtype == onnx.TensorProto.BOOL:
         onnx_nodes = [
-            internal_input, internal_input_state, add,
-            cast, cast_output_state
+            internal_input, internal_input_state, add, cast, cast_output_state
         ]
     else:
         onnx_nodes = [
-            internal_input, internal_input_state,
-            add, cast, cast_output_state
+            internal_input, internal_input_state, add, cast, cast_output_state
         ]
 
     onnx_inputs = [onnx_input_state, onnx_input, onnx_start, onnx_ready]
@@ -350,16 +400,21 @@ def create_onnx_modelfile_with_initial_state(models_dir, model_version, max_batc
 
     onnx.save(model_def, model_version_dir + "/model.onnx")
 
-def create_onnx_modelfile(models_dir, model_version, max_batch, dtype, shape, initial_state):
+
+def create_onnx_modelfile(models_dir, model_version, max_batch, dtype, shape,
+                          initial_state):
 
     if initial_state is None:
-        create_onnx_modelfile_wo_initial_state(models_dir, model_version, max_batch, dtype, shape)
+        create_onnx_modelfile_wo_initial_state(models_dir, model_version,
+                                               max_batch, dtype, shape)
     else:
         # This model assumes that the initial state contains correct data
-        create_onnx_modelfile_with_initial_state(models_dir, model_version, max_batch, dtype, shape)
+        create_onnx_modelfile_with_initial_state(models_dir, model_version,
+                                                 max_batch, dtype, shape)
 
 
-def create_onnx_modelconfig(models_dir, model_version, max_batch, dtype, shape, initial_state):
+def create_onnx_modelconfig(models_dir, model_version, max_batch, dtype, shape,
+                            initial_state):
 
     if not tu.validate_for_onnx_model(dtype, dtype, dtype, shape, shape, shape):
         return
@@ -392,7 +447,7 @@ instance_group [
         max_batch, [dtype], [shape], [None], [dtype], [shape], [None], [None],
         force_tensor_number_suffix=False,
         instance_group_str=instance_group_string)
-    
+
     # Prepare the shapes for initial state initialization
     shape_without_variable_dims = []
     for dim in shape:
@@ -400,7 +455,7 @@ instance_group [
             shape_without_variable_dims.append(1)
         else:
             shape_without_variable_dims.append(dim)
-    
+
     if initial_state is None:
         config += '''
     sequence_batching {{
@@ -519,7 +574,8 @@ instance_group [
     '''.format(type=control_type,
                dims=tu.shape_to_dims_str(shape),
                dtype=emu.dtype_str(dtype),
-               shape_without_variable_dims=tu.shape_to_dims_str(shape_without_variable_dims))
+               shape_without_variable_dims=tu.shape_to_dims_str(
+                   shape_without_variable_dims))
 
     try:
         os.makedirs(config_dir)
@@ -757,11 +813,15 @@ def create_models(models_dir, dtype, shape, initial_state, no_batch=True):
     model_version = 1
 
     if FLAGS.onnx:
-        create_onnx_modelconfig(models_dir, model_version, 8, dtype, shape, initial_state)
-        create_onnx_modelfile(models_dir, model_version, 8, dtype, shape, initial_state)
+        create_onnx_modelconfig(models_dir, model_version, 8, dtype, shape,
+                                initial_state)
+        create_onnx_modelfile(models_dir, model_version, 8, dtype, shape,
+                              initial_state)
         if no_batch:
-            create_onnx_modelconfig(models_dir, model_version, 0, dtype, shape, initial_state)
-            create_onnx_modelfile(models_dir, model_version, 0, dtype, shape, initial_state)
+            create_onnx_modelconfig(models_dir, model_version, 0, dtype, shape,
+                                    initial_state)
+            create_onnx_modelfile(models_dir, model_version, 0, dtype, shape,
+                                  initial_state)
 
     if FLAGS.tensorrt:
         if dtype == bool:

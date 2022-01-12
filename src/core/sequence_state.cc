@@ -137,7 +137,7 @@ SequenceStates::Initialize(
     } else {
       size_t state_size;
       if (state.second.data_type() == inference::DataType::TYPE_STRING) {
-        auto element_count = GetElementCount(state.second.dims());
+        auto element_count = GetElementCount(dims);
         // Total number of bytes required is equal to the element count
         // multiplied by 4.
         state_size = 4 * element_count;
