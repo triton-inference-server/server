@@ -126,4 +126,27 @@ A simple example using the Java API can be found in
 [Samples folder](https://github.com/bytedeco/javacpp-presets/tree/master/tritonserver/samples)
 which includes `Simple.java` which is similar to `simple.cc`. Please refer to
 [sample usage documentation](https://github.com/bytedeco/javacpp-presets/tree/master/tritonserver#sample-usage)
-to learn about how to build and run `Simple.java`
+to learn about how to build and run `Simple.java`.
+
+### Java API setup instructions
+
+The current snapshot is based on Triton container version `21.12`. To setup your
+enviroment with Triton Java API, please follow the following steps:
+1. First run Docker container:
+```
+ $ docker run -it --gpus=all -v ${pwd}:/workspace nvcr.io/nvidia/tritonserver:21.12-py3 bash
+```
+2. Then install `java sdk` and `maven`:
+```
+ $ apt update && apt install -y openjdk-11-jdk
+ $ wget https://archive.apache.org/dist/maven/maven-3/3.8.4/binaries/apache-maven-3.8.4-bin.tar.gz
+ $ tar zxvf apache-maven-3.8.4-bin.tar.gz
+ $ export PATH=/opt/tritonserver/apache-maven-3.8.4/bin:$PATH
+```
+3. Maven requires a `pom.xml` file to compile. The pre-built snapshots are hosted
+   in [oss.sonatype.org](https://oss.sonatype.org/content/repositories/snapshots/org/bytedeco/tritonserver/).
+   The snapshot to use is [2.17-1.5.7-SNAPSHOT](https://oss.sonatype.org/content/repositories/snapshots/org/bytedeco/tritonserver/2.17-1.5.7-SNAPSHOT/).
+   After creating your `pom.xml` file you can build your application with:
+```
+ $ mvn compile exec:java -Djavacpp.platform=linux-x86_64 -Dexec.args="<your input args>"
+```
