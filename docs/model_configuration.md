@@ -665,8 +665,9 @@ dynamic batcher configurations.
 The *preferred_batch_size* property indicates the batch sizes that the
 dynamic batcher should attempt to create. For most models,
 *preferred_batch_size* should not be specified, as described in
-(#recommended-configuration-process). An exception is TensorRT models
-that specify multiple optimization profiles for different batch
+[Recommended Configuration
+Process](#recommended-configuration-process). An exception is TensorRT
+models that specify multiple optimization profiles for different batch
 sizes. In this case, bacause some optimization profiles may give
 significant performance improvement compared to others, it may make
 sense to use *preferred_batch_size* for the batch sizes supported by
