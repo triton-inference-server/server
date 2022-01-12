@@ -807,6 +807,10 @@ TRITONSERVER_InferenceTraceNew(
     TRITONSERVER_InferenceTraceReleaseFn_t release_fn, void* trace_userp)
 {
 #ifdef TRITON_ENABLE_TRACING
+  if ((level == TRITONSERVER_TRACE_LEVEL_MIN) ||
+      (level == TRITONSERVER_TRACE_LEVEL_MAX)) {
+    level = TRITONSERVER_TRACE_LEVEL_TIMESTAMPS;
+  }
   ni::InferenceTrace* ltrace = new ni::InferenceTrace(
       level, parent_id, activity_fn, nullptr, release_fn, trace_userp);
   *trace = reinterpret_cast<TRITONSERVER_InferenceTrace*>(ltrace);
@@ -826,6 +830,10 @@ TRITONSERVER_InferenceTraceTensorNew(
     TRITONSERVER_InferenceTraceReleaseFn_t release_fn, void* trace_userp)
 {
 #ifdef TRITON_ENABLE_TRACING
+  if ((level == TRITONSERVER_TRACE_LEVEL_MIN) ||
+      (level == TRITONSERVER_TRACE_LEVEL_MAX)) {
+    level = TRITONSERVER_TRACE_LEVEL_TIMESTAMPS;
+  }
   ni::InferenceTrace* ltrace = new ni::InferenceTrace(
       level, parent_id, activity_fn, tensor_activity_fn, release_fn,
       trace_userp);

@@ -69,26 +69,22 @@ class InferenceTrace {
   void Report(
       const TRITONSERVER_InferenceTraceActivity activity, uint64_t timestamp_ns)
   {
-    if (level_ < TRITONSERVER_TRACE_LEVEL_TIMESTAMPS) {
-      return;
+    if ((level_ & TRITONSERVER_TRACE_LEVEL_TIMESTAMPS) > 0) {
+      activity_fn_(
+          reinterpret_cast<TRITONSERVER_InferenceTrace*>(this), activity,
+          timestamp_ns, userp_);
     }
-
-    activity_fn_(
-        reinterpret_cast<TRITONSERVER_InferenceTrace*>(this), activity,
-        timestamp_ns, userp_);
   }
 
   // Report trace activity at the current time.
   void ReportNow(const TRITONSERVER_InferenceTraceActivity activity)
   {
-    if (level_ < TRITONSERVER_TRACE_LEVEL_TIMESTAMPS) {
-      return;
+    if ((level_ & TRITONSERVER_TRACE_LEVEL_TIMESTAMPS) > 0) {
+      Report(
+          activity, std::chrono::duration_cast<std::chrono::nanoseconds>(
+                        std::chrono::steady_clock::now().time_since_epoch())
+                        .count());
     }
-
-    Report(
-        activity, std::chrono::duration_cast<std::chrono::nanoseconds>(
-                      std::chrono::steady_clock::now().time_since_epoch())
-                      .count());
   }
 
   // Report tensor trace activity.
@@ -98,14 +94,12 @@ class InferenceTrace {
       const int64_t* shape, uint64_t dim_count,
       TRITONSERVER_MemoryType memory_type, int64_t memory_type_id)
   {
-    if (level_ < TRITONSERVER_TRACE_LEVEL_TENSORS) {
-      return;
+    if ((level_ & TRITONSERVER_TRACE_LEVEL_TENSORS) > 0) {
+      tensor_activity_fn_(
+          reinterpret_cast<TRITONSERVER_InferenceTrace*>(this), activity, name,
+          datatype, base, byte_size, shape, dim_count, memory_type,
+          memory_type_id, userp_);
     }
-
-    tensor_activity_fn_(
-        reinterpret_cast<TRITONSERVER_InferenceTrace*>(this), activity, name,
-        datatype, base, byte_size, shape, dim_count, memory_type,
-        memory_type_id, userp_);
   }
 
   // Release the trace. Call the trace release callback.

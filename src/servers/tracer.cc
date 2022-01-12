@@ -146,7 +146,7 @@ TraceManager::CaptureTimestamp(
     const uint64_t trace_id, TRITONSERVER_InferenceTraceLevel level,
     const std::string& name, uint64_t timestamp_ns)
 {
-  if ((trace_id != 0) && (level <= level_)) {
+  if ((trace_id != 0) && ((level & level_) > 0)) {
     if (timestamp_ns == 0) {
       timestamp_ns = std::chrono::duration_cast<std::chrono::nanoseconds>(
                          std::chrono::steady_clock::now().time_since_epoch())

@@ -462,9 +462,8 @@ std::vector<Option> options_
       {OPTION_TRACE_FILEPATH, "trace-file", Option::ArgStr,
        "Set the file where trace output will be saved."},
       {OPTION_TRACE_LEVEL, "trace-level", Option::ArgStr,
-       "Set the trace level. OFF to disable tracing, TIMESTAMPES to trace "
-       "timestamps, TENSORS to trace both timestamps and tensors. Default is "
-       "OFF."},
+       "Specify a trace level. OFF to disable tracing, TIMESTAMPES to "
+       "trace timestamps, TENSORS to trace tensors. Default is OFF."},
       {OPTION_TRACE_RATE, "trace-rate", Option::ArgInt,
        "Set the trace sampling rate. Default is 1000."},
 #endif  // TRITON_ENABLE_TRACING
@@ -1294,7 +1293,8 @@ Parse(TRITONSERVER_ServerOptions** server_options, int argc, char** argv)
 
 #ifdef TRITON_ENABLE_TRACING
   std::string trace_filepath = trace_filepath_;
-  TRITONSERVER_InferenceTraceLevel trace_level = trace_level_;
+  std::vector<TRITONSERVER_InferenceTraceLevel> trace_level_settings = {
+      trace_level_};
   int32_t trace_rate = trace_rate_;
 #endif  // TRITON_ENABLE_TRACING
 
@@ -1493,7 +1493,7 @@ Parse(TRITONSERVER_ServerOptions** server_options, int argc, char** argv)
         trace_filepath = optarg;
         break;
       case OPTION_TRACE_LEVEL:
-        trace_level = ParseTraceLevelOption(optarg);
+        trace_level_settings.push_back(ParseTraceLevelOption(optarg));
         break;
       case OPTION_TRACE_RATE:
         trace_rate = ParseIntOption(optarg);
@@ -1656,7 +1656,10 @@ Parse(TRITONSERVER_ServerOptions** server_options, int argc, char** argv)
 
 #ifdef TRITON_ENABLE_TRACING
   trace_filepath_ = trace_filepath;
-  trace_level_ = trace_level;
+  for (auto& trace_level : trace_level_settings) {
+    trace_level_ = static_cast<TRITONSERVER_InferenceTraceLevel>(
+        trace_level_ | trace_level);
+  }
   trace_rate_ = trace_rate;
 #endif  // TRITON_ENABLE_TRACING
 
