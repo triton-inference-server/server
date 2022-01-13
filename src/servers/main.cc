@@ -463,7 +463,8 @@ std::vector<Option> options_
        "Set the file where trace output will be saved."},
       {OPTION_TRACE_LEVEL, "trace-level", Option::ArgStr,
        "Specify a trace level. OFF to disable tracing, TIMESTAMPES to "
-       "trace timestamps, TENSORS to trace tensors. Default is OFF."},
+       "trace timestamps, TENSORS to trace tensors. It may be specified "
+       "multiple times to trace multiple informations. Default is OFF."},
       {OPTION_TRACE_RATE, "trace-rate", Option::ArgInt,
        "Set the trace sampling rate. Default is 1000."},
 #endif  // TRITON_ENABLE_TRACING
