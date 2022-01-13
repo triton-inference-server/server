@@ -61,6 +61,8 @@
 #include "src/servers/tracer.h"
 #endif  // TRITON_ENABLE_TRACING
 
+#define REGISTER_GRPC_INFER_REQUEST_COUNT 2
+
 namespace nvidia { namespace inferenceserver {
 namespace {
 
@@ -2188,8 +2190,7 @@ InferHandler<
   auto barrier = std::make_shared<Barrier>(2);
 
   thread_.reset(new std::thread([this, barrier] {
-    size_t registered_infer_request_count = 2;
-    for (size_t i = 0; i < registered_infer_request_count; ++i) {
+    for (int i = 0; i < REGISTER_GRPC_INFER_REQUEST_COUNT; ++i) {
       StartNewRequest();
     }
     barrier->Wait();
