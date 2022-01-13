@@ -169,6 +169,13 @@ function get_datatype () {
   elif [[ $1 == "graphdef" ]]; then
     dtype="object bool"
   fi
+
+  # Add type string to the onnx model tests only for implicit state.
+  if [ "$IMPLICIT_STATE" == "1" ]; then
+    if [[ $1 == "onnx" ]]; then
+        dtype="object int32 bool"
+    fi
+  fi
   echo $dtype
 }
 
