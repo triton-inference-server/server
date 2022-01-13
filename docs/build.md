@@ -127,6 +127,10 @@ available for a non-GPU / CPU-only build: `identity`, `repeat`,
 `square`, `tensorflow2`, `onnxruntime`, `openvino`, `python` and
 `fil`.
 
+To include the TensorFlow2 backend in your CPU-only build, you must
+provide this additional flag to build.py:
+`--extra-backend-cmake-arg=tensorflow2:TRITON_TENSORFLOW_INSTALL_EXTRA_DEPS=ON`.
+
 ### <a name="ubuntu-without-docker"></a>Building without Docker
 
 To build Triton without using Docker you must install the build
