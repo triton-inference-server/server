@@ -2188,7 +2188,10 @@ InferHandler<
   auto barrier = std::make_shared<Barrier>(2);
 
   thread_.reset(new std::thread([this, barrier] {
-    StartNewRequest();
+    size_t registered_infer_request_count = 2;
+    for (size_t i = 0; i < registered_infer_request_count; ++i) {
+      StartNewRequest();
+    }
     barrier->Wait();
 
     void* tag;
