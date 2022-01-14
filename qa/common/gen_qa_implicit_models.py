@@ -180,6 +180,7 @@ def create_onnx_modelfile_wo_initial_state(models_dir, model_version, max_batch,
                                         ["CAST"])
 
     else:
+
         if onnx_dtype != onnx.TensorProto.STRING:
             start_cast = onnx.helper.make_node("Cast", ["START"],
                                                ["_START_CAST"],
