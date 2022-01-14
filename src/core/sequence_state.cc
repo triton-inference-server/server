@@ -75,7 +75,8 @@ SequenceState::SetStringDataToZero()
   if (Data()->TotalByteSize() % 4 != 0) {
     return Status(
         Status::Code::INVALID_ARG,
-        "Incorrect data size for setting the string data to zero.");
+        "The total byte size must be a multiple of 4 when setting the "
+        "sequence state to zero.");
   }
 
   TRITONSERVER_MemoryType memory_type;

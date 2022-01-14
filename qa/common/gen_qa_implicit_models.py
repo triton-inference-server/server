@@ -144,7 +144,6 @@ def create_onnx_modelfile_wo_initial_state(models_dir, model_version, max_batch,
     # cast int8, int16 input to higer precision int as Onnx Add/Sub operator doesn't support those type
     if ((onnx_dtype == onnx.TensorProto.INT8) or
         (onnx_dtype == onnx.TensorProto.INT16)):
-
         internal_input = onnx.helper.make_node("Cast", ["INPUT"], ["_INPUT"],
                                                to=onnx.TensorProto.INT32)
         internal_input_state = onnx.helper.make_node("Cast", ["INPUT_STATE"],
@@ -153,7 +152,6 @@ def create_onnx_modelfile_wo_initial_state(models_dir, model_version, max_batch,
 
     # Convert boolean value to int32 value
     if onnx_control_dtype == onnx.TensorProto.BOOL:
-
         if onnx_dtype != onnx.TensorProto.STRING:
             internal_input1 = onnx.helper.make_node("Cast", ["START"],
                                                     ["_START"],
@@ -182,7 +180,6 @@ def create_onnx_modelfile_wo_initial_state(models_dir, model_version, max_batch,
                                         ["CAST"])
 
     else:
-
         if onnx_dtype != onnx.TensorProto.STRING:
             start_cast = onnx.helper.make_node("Cast", ["START"],
                                                ["_START_CAST"],
