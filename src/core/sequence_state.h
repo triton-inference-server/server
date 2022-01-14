@@ -68,6 +68,9 @@ class SequenceState {
   // data.
   Status SetData(const std::shared_ptr<Memory>& data);
 
+  // Sets state tensors that have type string to zero
+  Status SetStringDataToZero();
+
   // Remove all existing data for the state.
   Status RemoveAllData();
 
