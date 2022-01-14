@@ -64,7 +64,7 @@ InstanceQueue::Dequeue(
     std::lock_guard<std::mutex> exec_lock(*((*payload)->GetExecMutex()));
     (*payload)->SetState(Payload::State::EXECUTING);
     if ((!payload_queue_.empty()) && (max_queue_delay_ns_ > 0) &&
-        (max_batch_size_ > 1)) {
+        (max_batch_size_ > 1) && (!(*payload)->IsSaturated())) {
       bool continue_merge;
       do {
         continue_merge = false;
@@ -74,6 +74,7 @@ InstanceQueue::Dequeue(
                 .count();
         size_t batch_size = (*payload)->BatchSize();
         if ((!payload_queue_.empty()) &&
+            (!payload_queue_.front()->IsSaturated()) &&
             (now_ns - payload_queue_.front()->QueueStartNs()) >
                 max_queue_delay_ns_) {
           std::lock_guard<std::mutex> exec_lock(

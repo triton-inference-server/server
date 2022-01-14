@@ -133,6 +133,10 @@ PREFERRED_BATCH_ONLY_TESTS=${PREFERRED_BATCH_ONLY_TESTS:="test_preferred_batch_o
                                                     test_preferred_batch_only_use_biggest_preferred \
                                                     test_preferred_batch_only_use_no_preferred_size"}
 
+# Tests with varying delay for max queue but no preferred batch size
+MAX_QUEUE_DELAY_ONLY_TESTS=${MAX_QUEUE_DELAY_ONLY_TESTS:="test_max_queue_delay_only_default \
+                                                    test_max_queue_delay_only_non_default"}
+
 # Setup non-variable-size model repository
 rm -fr *.log *.serverlog models && mkdir models
 for BACKEND in $BACKENDS; do
@@ -465,6 +469,73 @@ for i in $PREFERRED_BATCH_ONLY_TESTS ; do
     unset TRITONSERVER_DELAY_SCHEDULER
     kill_server
 
+    set +e
+    if [ "$TEST_VALGRIND" -eq 1 ]; then
+        python3 ../common/check_valgrind_log.py -f $LEAKCHECK_LOG
+        if [ $? -ne 0 ]; then
+            RET=1
+        fi
+    fi
+    set -e
+done
+
+# Test cases that checks the runtime batches created with max_queue_delay
+# specification only.
+rm -fr ./custom_models && mkdir ./custom_models && \
+cp -r ../custom_models/custom_zero_1_float32 ./custom_models/. && \
+mkdir -p ./custom_models/custom_zero_1_float32/1
+
+# Provide sufficient delay to allow forming of next batch.
+(cd custom_models/custom_zero_1_float32 && \
+        sed -i "s/dims:.*\[.*\]/dims: \[ -1 \]/g" config.pbtxt && \
+        sed -i "s/max_batch_size:.*/max_batch_size: 100/g" config.pbtxt && \
+        echo "dynamic_batching { max_queue_delay_microseconds: 0}" >> config.pbtxt && \
+        echo "instance_group [ { kind: KIND_GPU } ]" >> config.pbtxt && \
+        echo "parameters [" >> config.pbtxt && \
+        echo "{ key: \"execute_delay_ms\"; value: { string_value: \"100\" }}" >> config.pbtxt && \
+        echo "]" >> config.pbtxt)
+
+for i in $MAX_QUEUE_DELAY_ONLY_TESTS ; do
+    export MAX_QUEUE_DELAY_MICROSECONDS=20000 &&
+        [[ "$i" != "test_max_queue_delay_only_non_default" ]] && export MAX_QUEUE_DELAY_MICROSECONDS=0
+    (cd custom_models/custom_zero_1_float32 && \
+        sed -i "s/max_queue_delay_microseconds:.*\[.*\]/max_queue_delay_microseconds: ${MAX_QUEUE_DELAY_MICROSECONDS}/g" config.pbtxt )
+
+    SERVER_ARGS="--model-repository=$MODELDIR/custom_models ${SERVER_ARGS_EXTRA}"
+    SERVER_LOG="./$i.MAX_QUEUE_DELAY_ONLY.serverlog"
+
+    if [ "$TEST_VALGRIND" -eq 1 ]; then
+        LEAKCHECK_LOG="./$i.MAX_QUEUE_DELAY_ONLY.valgrind.log"
+        LEAKCHECK_ARGS="$LEAKCHECK_ARGS_BASE --log-file=$LEAKCHECK_LOG"
+        run_server_leakcheck
+    else
+        run_server
+    fi
+
+    if [ "$SERVER_PID" == "0" ]; then
+        echo -e "\n***\n*** Failed to start $SERVER\n***"
+        cat $SERVER_LOG
+        exit 1
+    fi
+
+    echo "Test: $i" >>$CLIENT_LOG
+
+    set +e
+    python3 $BATCHER_TEST BatcherTest.$i >>$CLIENT_LOG 2>&1
+    if [ $? -ne 0 ]; then
+        echo -e "\n***\n*** Test Failed\n***"
+        RET=1
+    else
+        check_test_results $TEST_RESULT_FILE 1
+        if [ $? -ne 0 ]; then
+            cat $CLIENT_LOG
+            echo -e "\n***\n*** Test Result Verification Failed\n***"
+            RET=1
+        fi
+    fi
+    set -e
+    kill_server
+    unset MAX_QUEUE_DELAY_MICROSECONDS
     set +e
     if [ "$TEST_VALGRIND" -eq 1 ]; then
         python3 ../common/check_valgrind_log.py -f $LEAKCHECK_LOG
