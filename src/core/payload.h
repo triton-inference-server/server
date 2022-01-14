@@ -70,6 +70,9 @@ class Payload {
   void SecondaryCallback();
   void SetInstance(TritonModelInstance* model_instance);
   TritonModelInstance* GetInstance() { return instance_; }
+  void MarkSaturated();
+  bool IsSaturated() { return saturated_; }
+
 
   State GetState() { return state_; }
   void SetState(State state);
@@ -87,6 +90,8 @@ class Payload {
   std::unique_ptr<std::promise<Status>> status_;
   std::unique_ptr<std::mutex> exec_mu_;
   uint64_t queue_start_ns_;
+
+  bool saturated_;
 };
 
 }}  // namespace nvidia::inferenceserver

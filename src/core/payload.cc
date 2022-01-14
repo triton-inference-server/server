@@ -32,7 +32,7 @@ Payload::Payload()
     : op_type_(Operation::INFER_RUN),
       requests_(std::vector<std::unique_ptr<InferenceRequest>>()),
       OnCallback_([]() {}), OnSecondaryCallback_([]() {}), instance_(nullptr),
-      state_(State::UNINITIALIZED), queue_start_ns_(0)
+      state_(State::UNINITIALIZED), queue_start_ns_(0), saturated_(true)
 {
   exec_mu_.reset(new std::mutex());
 }
@@ -133,6 +133,12 @@ void
 Payload::SetSecondaryCallback(std::function<void()> OnSecondaryCallback)
 {
   OnSecondaryCallback_ = OnSecondaryCallback;
+}
+
+void
+Payload::MarkSaturated()
+{
+  saturated_ = true;
 }
 
 void
