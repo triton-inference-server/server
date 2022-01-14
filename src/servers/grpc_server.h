@@ -122,8 +122,8 @@ class GRPCServer {
   std::unique_ptr<grpc::Server> grpc_server_;
 
   std::unique_ptr<HandlerBase> common_handler_;
-  std::unique_ptr<HandlerBase> model_infer_handler_;
-  std::unique_ptr<HandlerBase> model_stream_infer_handler_;
+  std::vector<std::unique_ptr<HandlerBase>> model_infer_handlers_;
+  std::vector<std::unique_ptr<HandlerBase>> model_stream_infer_handlers_;
 
   inference::GRPCInferenceService::AsyncService service_;
   bool running_;
