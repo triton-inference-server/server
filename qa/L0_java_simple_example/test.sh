@@ -27,7 +27,10 @@
 
 # Set up test files
 git clone https://github.com/bytedeco/javacpp-presets.git
-cp -f `pwd`/pom.xml `pwd`/javacpp-presets/tritonserver/samples/pom.xml
+cd javacpp-presets
+mvn clean install --projects .,tritonserver
+mvn clean install -f platform --projects ../tritonserver/platform -Djavacpp.platform.host
+cd ..
 
 MODEL_REPO=`pwd`/../L0_simple_ensemble/models
 SAMPLES_REPO=`pwd`/javacpp-presets/tritonserver/samples
