@@ -61,6 +61,8 @@
 #include "src/servers/tracer.h"
 #endif  // TRITON_ENABLE_TRACING
 
+#define REGISTER_GRPC_INFER_THREAD_COUNT 2
+
 namespace nvidia { namespace inferenceserver {
 namespace {
 
@@ -4169,22 +4171,24 @@ GRPCServer::Start()
   common_handler_.reset(hcommon);
 
   // Handler for model inference requests.
-  ModelInferHandler* hmodelinfer = new ModelInferHandler(
-      "ModelInferHandler", server_, trace_manager_, shm_manager_, &service_,
-      model_infer_cq_.get(),
-      infer_allocation_pool_size_ /* max_state_bucket_count */,
-      compression_level_);
-  hmodelinfer->Start();
-  model_infer_handler_.reset(hmodelinfer);
+  for (int i = 0; i < REGISTER_GRPC_INFER_THREAD_COUNT; ++i) {
+    ModelInferHandler* hmodelinfer = new ModelInferHandler(
+        "ModelInferHandler", server_, trace_manager_, shm_manager_, &service_,
+        model_infer_cq_.get(),
+        infer_allocation_pool_size_ /* max_state_bucket_count */,
+        compression_level_);
+    hmodelinfer->Start();
+    model_infer_handlers_.emplace_back(hmodelinfer);
 
-  // Handler for streaming inference requests.
-  ModelStreamInferHandler* hmodelstreaminfer = new ModelStreamInferHandler(
-      "ModelStreamInferHandler", server_, trace_manager_, shm_manager_,
-      &service_, model_stream_infer_cq_.get(),
-      infer_allocation_pool_size_ /* max_state_bucket_count */,
-      compression_level_);
-  hmodelstreaminfer->Start();
-  model_stream_infer_handler_.reset(hmodelstreaminfer);
+    // Handler for streaming inference requests.
+    ModelStreamInferHandler* hmodelstreaminfer = new ModelStreamInferHandler(
+        "ModelStreamInferHandler", server_, trace_manager_, shm_manager_,
+        &service_, model_stream_infer_cq_.get(),
+        infer_allocation_pool_size_ /* max_state_bucket_count */,
+        compression_level_);
+    hmodelstreaminfer->Start();
+    model_stream_infer_handlers_.emplace_back(hmodelstreaminfer);
+  }
 
   running_ = true;
   LOG_INFO << "Started GRPCInferenceService at " << server_addr_;
@@ -4209,9 +4213,13 @@ GRPCServer::Stop()
   // Must stop all handlers explicitly to wait for all the handler
   // threads to join since they are referencing completion queue, etc.
   dynamic_cast<CommonHandler*>(common_handler_.get())->Stop();
-  dynamic_cast<ModelInferHandler*>(model_infer_handler_.get())->Stop();
-  dynamic_cast<ModelStreamInferHandler*>(model_stream_infer_handler_.get())
-      ->Stop();
+  for (const auto& model_infer_handler : model_infer_handlers_) {
+    dynamic_cast<ModelInferHandler*>(model_infer_handler.get())->Stop();
+  }
+  for (const auto& model_stream_infer_handler : model_stream_infer_handlers_) {
+    dynamic_cast<ModelStreamInferHandler*>(model_stream_infer_handler.get())
+        ->Stop();
+  }
 
   running_ = false;
   return nullptr;  // success
