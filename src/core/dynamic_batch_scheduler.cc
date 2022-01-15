@@ -43,7 +43,6 @@ bool
 IsStaleState(Payload::State payload_state)
 {
   return (
-      (payload_state == Payload::State::SCHEDULED) ||
       (payload_state == Payload::State::EXECUTING) ||
       (payload_state == Payload::State::RELEASED));
 }
@@ -457,6 +456,7 @@ DynamicBatchScheduler::GetDynamicBatch()
       if (check_input && !CompareWithRequiredEqualInputs(
                              queue_.RequestAtCursor(), has_optional_input_,
                              required_equal_inputs_)) {
+        curr_payload_->MarkSaturated();
         send_now = true;
         break;
       }
@@ -485,6 +485,9 @@ DynamicBatchScheduler::GetDynamicBatch()
   // If we found a preferred batch size and the queue delay hasn't been
   // exceeded, then execute that.
   if ((best_preferred_batch_size != 0) && !delay_is_exceeded) {
+    if (pending_batch_delay_ns_ == 0) {
+      payload_saturated_ = true;
+    }
     pending_batch_size_ = best_preferred_batch_size;
     queue_.SetCursorToMark();
     return 0;
