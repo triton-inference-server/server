@@ -1830,7 +1830,6 @@ if __name__ == '__main__':
             len(parts) != 2,
             '--override-backend-cmake-arg must specify <backend>:<name>=<value>'
         )
-        parts = cf.split(':')
         fail_if(
             be not in backends,
             '--override-backend-cmake-arg specifies backend "{}" which is not included in build'
