@@ -375,8 +375,8 @@ def get_numpy_array(tensor):
     dtype = TRITON_TYPE_TO_NUMPY[tensor["dtype"]]
     value = map(float, tensor["data"].split(","))
     shape = map(int, tensor["shape"].split(","))
-    array = np.array(value, dtype=dtype)
-    array = array.reshape(shape)
+    array = np.array(list(value), dtype=dtype)
+    array = array.reshape(list(shape))
     return array
 
 

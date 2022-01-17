@@ -462,7 +462,7 @@ std::vector<Option> options_
       {OPTION_TRACE_FILEPATH, "trace-file", Option::ArgStr,
        "Set the file where trace output will be saved."},
       {OPTION_TRACE_LEVEL, "trace-level", Option::ArgStr,
-       "Specify a trace level. OFF to disable tracing, TIMESTAMPES to "
+       "Specify a trace level. OFF to disable tracing, TIMESTAMPS to "
        "trace timestamps, TENSORS to trace tensors. It may be specified "
        "multiple times to trace multiple informations. Default is OFF."},
       {OPTION_TRACE_RATE, "trace-rate", Option::ArgInt,
