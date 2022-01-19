@@ -1,4 +1,4 @@
-# Copyright 2021, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright 2021-2022, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -76,6 +76,59 @@ class PBBLSTest(unittest.TestCase):
             requested_output_names=['OUTPUT0', 'OUTPUT1'])
         infer_response = infer_request.exec()
         self.assertTrue(infer_response.has_error())
+
+    def test_bls_sequence(self):
+        # Start request
+        input = pb_utils.Tensor('INPUT', np.array([1000], dtype=np.int32))
+        correlation_id = 1
+
+        infer_request = pb_utils.InferenceRequest(
+            model_name='onnx_nobatch_sequence_int32',
+            inputs=[input],
+            requested_output_names=['OUTPUT'],
+            sequence_start=True,
+            sequence_end=False,
+            correlation_id=correlation_id)
+        infer_response = infer_request.exec()
+        self.assertFalse(infer_response.has_error())
+        output = pb_utils.get_output_tensor_by_name(infer_response, 'OUTPUT')
+        self.assertEqual(output.as_numpy()[0], input.as_numpy()[0])
+
+        for i in range(10):
+            input = pb_utils.Tensor('INPUT', np.array([i], dtype=np.int32))
+            correlation_id = 1
+
+            infer_request = pb_utils.InferenceRequest(
+                model_name='onnx_nobatch_sequence_int32',
+                inputs=[input],
+                requested_output_names=['OUTPUT'],
+                sequence_start=False,
+                sequence_end=False,
+                correlation_id=correlation_id)
+            infer_response = infer_request.exec()
+            self.assertFalse(infer_response.has_error())
+
+            # The new output is the previous output + the current input
+            expected_output = output.as_numpy()[0] + i
+            output = pb_utils.get_output_tensor_by_name(infer_response,
+                                                        'OUTPUT')
+            self.assertEqual(output.as_numpy()[0], expected_output)
+
+        # Final request
+        input = pb_utils.Tensor('INPUT', np.array([2000], dtype=np.int32))
+
+        infer_request = pb_utils.InferenceRequest(
+            model_name='onnx_nobatch_sequence_int32',
+            inputs=[input],
+            sequence_start=False,
+            sequence_end=True,
+            requested_output_names=['OUTPUT'],
+            correlation_id=correlation_id)
+        infer_response = infer_request.exec()
+        self.assertFalse(infer_response.has_error())
+        expected_output = output.as_numpy()[0] + input.as_numpy()[0]
+        output = pb_utils.get_output_tensor_by_name(infer_response, 'OUTPUT')
+        self.assertEqual(output.as_numpy()[0], expected_output)
 
     def test_bls_incorrect_args(self):
         with self.assertRaises(TypeError):
