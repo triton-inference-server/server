@@ -152,7 +152,7 @@ enviroment with Triton Java API, please follow the following steps:
  $ git clone https://github.com/bytedeco/javacpp-presets.git
  $ cd javacpp-presets
  $ mvn clean install --projects .,tritonserver
- $ mvn clean install -f platform --projects ../tritonserver/platform -Djavacpp.platform.host
+ $ mvn clean install -f platform --projects ../tritonserver/platform -Djavacpp.platform=linux-x86_64
 ```
 4. Maven requires a `pom.xml` file to compile. Please refer to 
    [samples/pom.xml](https://github.com/bytedeco/javacpp-presets/blob/master/tritonserver/samples/pom.xml)
