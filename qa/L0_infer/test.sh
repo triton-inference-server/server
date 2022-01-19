@@ -1,5 +1,5 @@
 #!/bin/bash
-# Copyright 2018-2021, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright 2018-2022, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -43,7 +43,7 @@ export CUDA_VISIBLE_DEVICES=0
 TEST_RESULT_FILE='test_results.txt'
 CLIENT_LOG_BASE="./client"
 INFER_TEST=infer_test.py
-SERVER_TIMEOUT=240
+SERVER_TIMEOUT=360
 
 if [ -z "$TEST_SYSTEM_SHARED_MEMORY" ]; then
     TEST_SYSTEM_SHARED_MEMORY="0"
@@ -72,6 +72,7 @@ else
 fi
 
 TF_VERSION=${TF_VERSION:=1}
+TEST_JETSON=${TEST_JETSON:=0}
 
 # On windows the paths invoked by the script (running in WSL) must use
 # /mnt/c when needed but the paths on the tritonserver command-line
@@ -117,16 +118,15 @@ export BACKENDS
 ENSEMBLES=${ENSEMBLES:="1"}
 export ENSEMBLES
 
-for BACKEND in $BACKENDS; do
-    if [ "$BACKEND" == "python_dlpack" ]; then
+if [[ $BACKENDS == *"python_dlpack"* ]]; then
+    if [ "$TEST_JETSON" == "0" ]; then
         if [[ "aarch64" != $(uname -m) ]] ; then
-            pip3 install torch==1.9.0+cpu torchvision==0.10.0+cpu torchaudio==0.9.0 -f https://download.pytorch.org/whl/torch_stable.html
+            pip3 install torch==1.9.0+cpu -f https://download.pytorch.org/whl/torch_stable.html
         else
-            pip3 install torch==1.9.0 torchvision==0.10.0 torchaudio==0.9.0 -f https://download.pytorch.org/whl/torch_stable.html
+            pip3 install torch==1.9.0 -f https://download.pytorch.org/whl/torch_stable.html
         fi
-        break
     fi
-done
+fi
 
 
 for TARGET in cpu gpu; do
@@ -237,11 +237,11 @@ for TARGET in cpu gpu; do
 
     KIND="KIND_GPU" && [[ "$TARGET" == "cpu" ]] && KIND="KIND_CPU"
     for FW in $BACKENDS; do
-      if [ "$FW" != "plan" ] && [ "$FW" != "python" ] && [ "$FW" != "openvino" ];then
+      if [ "$FW" != "plan" ] && [ "$FW" != "python" ] && [ "$FW" =! "python_dlpack" ] && [ "$FW" != "openvino" ];then
         for MC in `ls models/${FW}*/config.pbtxt`; do
             echo "instance_group [ { kind: ${KIND} }]" >> $MC
         done
-      elif [ "$FW" == "python" ] || [ "$FW" == "openvino" ]; then
+      elif [ "$FW" == "python" ] || [ "$FW" == "python_dlpack" ] || [ "$FW" == "openvino" ]; then
         for MC in `ls models/${FW}*/config.pbtxt`; do
             echo "instance_group [ { kind: KIND_CPU }]" >> $MC
         done
