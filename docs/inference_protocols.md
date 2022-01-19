@@ -1,5 +1,5 @@
 <!--
-# Copyright (c) 2018-2021, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright (c) 2018-2022, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -100,7 +100,7 @@ For client-side documentation, see [Client-Side GRPC KeepAlive](https://github.c
 ## C API
 
 The Triton Inference Server provides a backwards-compatible C API that
-allows Triton to be linked directly into a C/C++ application. The API
+allows Triton to be linked directly to a C/C++ application. The API
 is documented in
 [tritonserver.h](https://github.com/triton-inference-server/core/blob/main/include/triton/core/tritonserver.h).
 
@@ -111,3 +111,53 @@ endpoints for Triton. These endpoints use the C API to communicate
 with the core of Triton. The primary source files for the endpoints
 are [grpc_server.cc](../src/servers/grpc_server.cc) and
 [http_server.cc](../src/servers/http_server.cc).
+
+## Java API (pre-release)
+
+The Triton Inference Server uses [Java CPP](https://github.com/bytedeco/javacpp)
+to create bindings around Tritonserver to create Java API. It requires the user
+to link a pre-built library to their application using Maven.   
+
+The API is documented in 
+[tritonserver.java](https://github.com/bytedeco/javacpp-presets/blob/master/tritonserver/src/gen/java/org/bytedeco/tritonserver/global/tritonserver.java).
+Alternatively, the user can refer to the web version [API docs](http://bytedeco.org/javacpp-presets/tritonserver/apidocs/)
+generated from `tritonserver.java`.
+A simple example using the Java API can be found in
+[Samples folder](https://github.com/bytedeco/javacpp-presets/tree/master/tritonserver/samples)
+which includes `Simple.java` which is similar to 
+[`simple.cc`](https://github.com/triton-inference-server/server/blob/main/src/servers/simple.cc). 
+Please refer to
+[sample usage documentation](https://github.com/bytedeco/javacpp-presets/tree/master/tritonserver#sample-usage)
+to learn about how to build and run `Simple.java`.
+
+### Java API setup instructions
+
+The current snapshot is based on Triton container version `21.12`. To set up your
+enviroment with Triton Java API, please follow the following steps:
+1. First run Docker container:
+```
+ $ docker run -it --gpus=all -v ${pwd}:/workspace nvcr.io/nvidia/tritonserver:21.12-py3 bash
+```
+2. Then install `java sdk` and `maven`:
+```
+ $ cd /opt/tritonserver
+ $ apt update && apt install -y openjdk-11-jdk
+ $ wget https://archive.apache.org/dist/maven/maven-3/3.8.4/binaries/apache-maven-3.8.4-bin.tar.gz
+ $ tar zxvf apache-maven-3.8.4-bin.tar.gz
+ $ export PATH=/opt/tritonserver/apache-maven-3.8.4/bin:$PATH
+```
+3. Then you can create the JNI binaries in your local repository (`/root/.m2/repository`) 
+   with [`javacpp-presets/tritonserver`](https://github.com/bytedeco/javacpp-presets/tree/master/tritonserver)
+```
+ $ git clone https://github.com/bytedeco/javacpp-presets.git
+ $ cd javacpp-presets
+ $ mvn clean install --projects .,tritonserver
+ $ mvn clean install -f platform --projects ../tritonserver/platform -Djavacpp.platform=linux-x86_64
+```
+4. Maven requires a `pom.xml` file to compile. Please refer to 
+   [samples/pom.xml](https://github.com/bytedeco/javacpp-presets/blob/master/tritonserver/samples/pom.xml)
+   as reference for how to create your pom file.
+5. After creating your `pom.xml` file you can build your application with:
+```
+ $ mvn compile exec:java -Djavacpp.platform=linux-x86_64 -Dexec.args="<your input args>"
+```
