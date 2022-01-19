@@ -4188,16 +4188,17 @@ GRPCServer::Start()
         compression_level_);
     hmodelinfer->Start();
     model_infer_handlers_.emplace_back(hmodelinfer);
-
-    // Handler for streaming inference requests.
-    ModelStreamInferHandler* hmodelstreaminfer = new ModelStreamInferHandler(
-        "ModelStreamInferHandler", server_, trace_manager_, shm_manager_,
-        &service_, model_stream_infer_cq_.get(),
-        infer_allocation_pool_size_ /* max_state_bucket_count */,
-        compression_level_);
-    hmodelstreaminfer->Start();
-    model_stream_infer_handlers_.emplace_back(hmodelstreaminfer);
   }
+
+  // Handler for streaming inference requests. Keeps one handler for streaming
+  // to avoid possible concurrent writes which is not allowed
+  ModelStreamInferHandler* hmodelstreaminfer = new ModelStreamInferHandler(
+      "ModelStreamInferHandler", server_, trace_manager_, shm_manager_,
+      &service_, model_stream_infer_cq_.get(),
+      infer_allocation_pool_size_ /* max_state_bucket_count */,
+      compression_level_);
+  hmodelstreaminfer->Start();
+  model_stream_infer_handlers_.emplace_back(hmodelstreaminfer);
 
   running_ = true;
   LOG_INFO << "Started GRPCInferenceService at " << server_addr_;
