@@ -1,5 +1,5 @@
 <!--
-# Copyright 2018-2021, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright 2018-2022, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -103,8 +103,11 @@ release is
   protocol](https://github.com/kserve/kserve/tree/master/docs/predict-api/v2).
 
 * A [C API](docs/inference_protocols.md#c-api) allows Triton to be
-  linked directly into your application for edge and other in-process
+  linked directly to your application for edge and other in-process
   use cases.
+
+* A [Java API](docs/inference_protocols.md#java-api) is similar to C API and
+  allows Triton to be linked directly to your Java application.
 
 * [Metrics](docs/metrics.md) indicating GPU utilization, server
   throughput, and server latency. The metrics are provided in
