@@ -1,5 +1,5 @@
 #!/bin/bash
-# Copyright (c) 2019-2021, NVIDIA CORPORATION. All rights reserved.
+# Copyright (c) 2019-2022, NVIDIA CORPORATION. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -302,16 +302,18 @@ if [ `grep -c "COMPUTE_INPUT_END" summary_ensemble.log` != "7" ]; then
     echo -e "Ensemble trace log expects 7 compute"
     RET=1
 fi
+# For GRPC frontend, its handlers will occupy one trace ID on creation
+GRPC_ID_OFFSET=3
 for trace_str in \
-        "{\"id\":3,\"model_name\":\"simple\",\"model_version\":1}" \
-        "{\"id\":4,\"model_name\":\"nop_TYPE_INT32_-1\",\"model_version\":1,\"parent_id\":3}" \
-        "{\"id\":5,\"model_name\":\"fan_${MODELBASE}\",\"model_version\":1,\"parent_id\":3}" \
-        "{\"id\":6,\"model_name\":\"nop_TYPE_INT32_-1\",\"model_version\":1,\"parent_id\":5}" \
-        "{\"id\":7,\"model_name\":\"${MODELBASE}\",\"model_version\":1,\"parent_id\":5}" \
-        "{\"id\":8,\"model_name\":\"nop_TYPE_INT32_-1\",\"model_version\":1,\"parent_id\":5}" \
-        "{\"id\":9,\"model_name\":\"nop_TYPE_INT32_-1\",\"model_version\":1,\"parent_id\":5}" \
-        "{\"id\":10,\"model_name\":\"nop_TYPE_INT32_-1\",\"model_version\":1,\"parent_id\":3}" \
-        "{\"id\":11,\"model_name\":\"nop_TYPE_INT32_-1\",\"model_version\":1,\"parent_id\":3}" ; do
+        "{\"id\":$((GRPC_ID_OFFSET+1)),\"model_name\":\"simple\",\"model_version\":1}" \
+        "{\"id\":$((GRPC_ID_OFFSET+2)),\"model_name\":\"nop_TYPE_INT32_-1\",\"model_version\":1,\"parent_id\":$((GRPC_ID_OFFSET+1))}" \
+        "{\"id\":$((GRPC_ID_OFFSET+3)),\"model_name\":\"fan_${MODELBASE}\",\"model_version\":1,\"parent_id\":$((GRPC_ID_OFFSET+1))}" \
+        "{\"id\":$((GRPC_ID_OFFSET+4)),\"model_name\":\"nop_TYPE_INT32_-1\",\"model_version\":1,\"parent_id\":$((GRPC_ID_OFFSET+3))}" \
+        "{\"id\":$((GRPC_ID_OFFSET+5)),\"model_name\":\"${MODELBASE}\",\"model_version\":1,\"parent_id\":$((GRPC_ID_OFFSET+3))}" \
+        "{\"id\":$((GRPC_ID_OFFSET+6)),\"model_name\":\"nop_TYPE_INT32_-1\",\"model_version\":1,\"parent_id\":$((GRPC_ID_OFFSET+3))}" \
+        "{\"id\":$((GRPC_ID_OFFSET+7)),\"model_name\":\"nop_TYPE_INT32_-1\",\"model_version\":1,\"parent_id\":$((GRPC_ID_OFFSET+3))}" \
+        "{\"id\":$((GRPC_ID_OFFSET+8)),\"model_name\":\"nop_TYPE_INT32_-1\",\"model_version\":1,\"parent_id\":$((GRPC_ID_OFFSET+1))}" \
+        "{\"id\":$((GRPC_ID_OFFSET+9)),\"model_name\":\"nop_TYPE_INT32_-1\",\"model_version\":1,\"parent_id\":$((GRPC_ID_OFFSET+1))}" ; do
     if [ `grep -c ${trace_str} trace_ensemble.log` != "1" ]; then
         echo -e "Ensemble trace log expects trace: ${trace_str}"
         RET=1
