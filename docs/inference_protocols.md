@@ -307,11 +307,20 @@ is documented in
 [tritonserver.h](https://github.com/triton-inference-server/core/blob/main/include/triton/core/tritonserver.h).
 
 A simple example using the C API can be found in
+<<<<<<< HEAD
 be found in the source that implements the HTTP/REST and GRPC
 endpoints for Triton. These endpoints use the C API to communicate
 with the core of Triton. The primary source files for the endpoints
 are [grpc_server.cc](../src/servers/grpc_server.cc) and
 [http_server.cc](../src/servers/http_server.cc).
+=======
+[simple.cc](../src/simple.cc).  A more complicated example can be
+found in the source that implements the HTTP/REST and GRPC endpoints
+for Triton. These endpoints use the C API to communicate with the core
+of Triton. The primary source files for the endpoints are
+[grpc_server.cc](../src/grpc_server.cc) and
+[http_server.cc](../src/http_server.cc).
+>>>>>>> Java cpp readme (#3792)
 
 ## Java bindings for In-Process Triton Server API
 
