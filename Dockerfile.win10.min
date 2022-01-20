@@ -1,4 +1,4 @@
-# Copyright (c) 2021, NVIDIA CORPORATION. All rights reserved.
+# Copyright 2021, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -81,8 +81,8 @@ RUN move %CMAKE_FILE% CMake
 RUN setx PATH "c:\CMake\bin;%PATH%"
 
 ARG CUDA_MAJOR=11
-ARG CUDA_MINOR=4
-ARG CUDA_PATCH=2
+ARG CUDA_MINOR=5
+ARG CUDA_PATCH=0
 ARG CUDA_VERSION=${CUDA_MAJOR}.${CUDA_MINOR}.${CUDA_PATCH}
 ARG CUDA_PACKAGES="nvcc_${CUDA_MAJOR}.${CUDA_MINOR} \
                    cudart_${CUDA_MAJOR}.${CUDA_MINOR} \
@@ -96,11 +96,11 @@ ARG CUDA_PACKAGES="nvcc_${CUDA_MAJOR}.${CUDA_MINOR} \
                    visual_studio_integration_${CUDA_MAJOR}.${CUDA_MINOR}"
 ARG CUDA_INSTALL_ROOT_WP="C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v${CUDA_MAJOR}.${CUDA_MINOR}"
 
-ARG TENSORRT_VERSION=8.0.3.4
-ARG TENSORRT_ZIP=TensorRT-${TENSORRT_VERSION}.Windows10.x86_64.cuda-11.3.cudnn8.2.zip
+ARG TENSORRT_VERSION=8.2.2.1
+ARG TENSORRT_ZIP=TensorRT-${TENSORRT_VERSION}.Windows10.x86_64.cuda-11.4.cudnn8.2.zip
 
-ARG CUDNN_VERSION=8.2.4.15
-ARG CUDNN_ZIP=cudnn-11.4-windows-x64-v${CUDNN_VERSION}.zip
+ARG CUDNN_VERSION=8.3.2.44
+ARG CUDNN_ZIP=cudnn-11.5-windows-x64-v${CUDNN_VERSION}.zip
 
 WORKDIR /tmp
 ADD https://developer.download.nvidia.com/compute/cuda/${CUDA_VERSION}/network_installers/cuda_${CUDA_VERSION}_win10_network.exe cuda_${CUDA_VERSION}_win10_network.exe
@@ -115,9 +115,9 @@ ENV TRT_VERSION ${TENSORRT_VERSION}
 WORKDIR /tmp
 RUN cuda_%CUDA_VERSION%_win10_network.exe -s %CUDA_PACKAGES%
 RUN unzip %CUDNN_ZIP%
-RUN copy cuda\bin\cudnn*.dll "%CUDA_INSTALL_ROOT_WP%\bin\."
-RUN copy cuda\lib\x64\cudnn*.lib "%CUDA_INSTALL_ROOT_WP%\lib\x64\."
-RUN copy cuda\include\cudnn*.h "%CUDA_INSTALL_ROOT_WP%\include\."
+RUN copy libcudnn\bin\cudnn*.dll "%CUDA_INSTALL_ROOT_WP%\bin\."
+RUN copy libcudnn_dev\lib\x64\cudnn*.lib "%CUDA_INSTALL_ROOT_WP%\lib\x64\."
+RUN copy libcudnn_dev\include\cudnn*.h "%CUDA_INSTALL_ROOT_WP%\include\."
 
 # Copy the CUDA visualstudio integration from where is was installed
 # into the appropriate place in BuildTools

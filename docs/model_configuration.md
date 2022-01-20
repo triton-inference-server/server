@@ -389,13 +389,16 @@ set one of the following policies.
 
 * *All*: All versions of the model that are available in the model
   repository are available for inferencing.
+  ```version_policy: { all: {}}```
 
 * *Latest*: Only the latest ‘n’ versions of the model in the
   repository are available for inferencing. The latest versions of the
   model are the numerically greatest version numbers.
+  ```version_policy: { latest: { num_versions: 2}}```
 
 * *Specific*: Only the specifically listed versions of the model are
   available for inferencing.
+  ```version_policy: { specific: { versions: [1,3]}}```
 
 If no version policy is specified, then *Latest* (with n=1) is used as
 the default, indicating that only the most recent version of the model
@@ -662,7 +665,13 @@ dynamic batcher configurations.
 The *preferred_batch_size* property indicates the batch sizes that the
 dynamic batcher should attempt to create. For most models,
 *preferred_batch_size* should not be specified, as described in
-(#recommended-configuration-process).
+[Recommended Configuration
+Process](#recommended-configuration-process). An exception is TensorRT
+models that specify multiple optimization profiles for different batch
+sizes. In this case, bacause some optimization profiles may give
+significant performance improvement compared to others, it may make
+sense to use *preferred_batch_size* for the batch sizes supported by
+those higher-performance optimization profiles.
 
 The following example shows the configuration that enables dynamic
 batching with preferred batch sizes of 4 and 8.

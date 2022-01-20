@@ -27,7 +27,7 @@
 
 CLIENT_PY=./lifecycle_test.py
 CLIENT_LOG="./client.log"
-EXPECTED_NUM_TESTS="2"
+EXPECTED_NUM_TESTS="3"
 TEST_RESULT_FILE='test_results.txt'
 source ../common.sh
 source ../../common/util.sh
@@ -50,6 +50,10 @@ cp ../../python_models/execute_error/config.pbtxt ./models/execute_error/
           sed -i "s/^name:.*/name: \"execute_error\"/" config.pbtxt && \
           sed -i "s/^max_batch_size:.*/max_batch_size: 8/" config.pbtxt && \
           echo "dynamic_batching { preferred_batch_size: [8], max_queue_delay_microseconds: 12000000 }" >> config.pbtxt)
+
+mkdir -p models/execute_return_error/1/
+cp ../../python_models/execute_return_error/model.py ./models/execute_return_error/1/
+cp ../../python_models/execute_return_error/config.pbtxt ./models/execute_return_error/
 
 mkdir -p models/wrong_model/1/
 cp ../../python_models/wrong_model/model.py ./models/wrong_model/1/

@@ -49,7 +49,7 @@ if __name__ == '__main__':
     html_content += "<p>The busyop test is by design to show that actual memory growth is correctly detected and displayed.</p>"
 
     # When we see PTX failures in CI, the busyop memory graph is not created.
-    if not len(memory_graphs_busyop):
+    if len(memory_graphs_busyop):
         write_up = "<p><b>&#8226 What to look for</b><br>The memory usage should increase continually over time, and a linear growth should be observed in the graph below.</p>"
         html_content += "</pre><pre style=\"font-size:11pt;font-family:Arial, sans-serif;\">" + write_up + "</pre><pre style=\"font-size:11pt;font-family:Consolas;\">"
         for mem_graph in sorted(memory_graphs_busyop):

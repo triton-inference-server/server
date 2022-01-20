@@ -81,6 +81,7 @@ spec:
     app: {{ template "triton-inference-server.name" . }}
     release: {{ .Release.Name }}
 ---
+{{- if .Values.serviceMonitor.enabled }}
 apiVersion: monitoring.coreos.com/v1
 kind: ServiceMonitor
 metadata:
@@ -98,3 +99,4 @@ spec:
   endpoints:
   - port: metrics
     interval: 15s
+{{- end }}

@@ -1406,11 +1406,16 @@ S3FileSystem::FileExists(const std::string& path, bool* exists)
 
   auto head_object_outcome = client_.HeadObject(head_request);
   if (!head_object_outcome.IsSuccess()) {
-    return Status(
-        Status::Code::INTERNAL,
-        "Could not get MetaData for object at " + path + " due to exception: " +
-            head_object_outcome.GetError().GetExceptionName() +
-            ", error message: " + head_object_outcome.GetError().GetMessage());
+    if (head_object_outcome.GetError().GetErrorType() !=
+        s3::S3Errors::RESOURCE_NOT_FOUND) {
+      return Status(
+          Status::Code::INTERNAL,
+          "Could not get MetaData for object at " + path +
+              " due to exception: " +
+              head_object_outcome.GetError().GetExceptionName() +
+              ", error message: " +
+              head_object_outcome.GetError().GetMessage());
+    }
   } else {
     *exists = true;
   }

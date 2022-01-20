@@ -1,4 +1,4 @@
-# Copyright 2019-2021, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright 2019-2022, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -292,7 +292,7 @@ def create_tf_modelconfig(create_savedmodel, models_dir, model_version,
 
     if dtype == np.float32:
         control_type = "fp32"
-    elif dtype == np.bool:
+    elif dtype == bool:
         control_type = "bool"
         dtype = np.int32
     else:
@@ -1046,7 +1046,7 @@ def create_onnx_modelconfig(models_dir, model_version, max_batch, dtype, shape):
 
     if dtype == np.float32:
         control_type = "fp32"
-    elif dtype == np.bool:
+    elif dtype == bool:
         control_type = "bool"
         dtype = np.int32
     else:
@@ -1169,7 +1169,7 @@ def create_libtorch_modelconfig(models_dir, model_version, max_batch, dtype,
 
     if dtype == np.float32:
         control_type = "fp32"
-    elif dtype == np.bool:
+    elif dtype == bool:
         control_type = "bool"
         dtype = np.int32
     else:
@@ -1376,7 +1376,7 @@ def create_models(models_dir, dtype, shape, no_batch=True):
                                 shape)
 
     if FLAGS.tensorrt:
-        if dtype == np.bool:
+        if dtype == bool:
             return
         suffix = []
         if dtype == np.int8:
@@ -1418,7 +1418,7 @@ def create_models(models_dir, dtype, shape, no_batch=True):
                                       shape)
 
     if FLAGS.ensemble:
-        if dtype == np.bool:
+        if dtype == bool:
             return
         for pair in emu.platform_types_and_validation():
             config_shape = shape
@@ -1527,7 +1527,7 @@ if __name__ == '__main__':
             create_models(FLAGS.models_dir, np_dtype_string, [
                 1,
             ])
-            create_models(FLAGS.models_dir, np.bool, [
+            create_models(FLAGS.models_dir, bool, [
                 1,
             ])
 
@@ -1542,7 +1542,7 @@ if __name__ == '__main__':
             create_models(FLAGS.models_dir, np_dtype_string, [
                 -1,
             ], False)
-            create_models(FLAGS.models_dir, np.bool, [
+            create_models(FLAGS.models_dir, bool, [
                 -1,
             ], False)
 

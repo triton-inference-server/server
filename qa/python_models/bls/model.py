@@ -140,6 +140,20 @@ class PBBLSTest(unittest.TestCase):
 
         return output0.to_dlpack(), output1.to_dlpack()
 
+    def test_zero_length_io(self):
+        model_name = 'identity_fp32'
+        input0 = np.zeros([1, 0], dtype=np.float32)
+        input0_pb = pb_utils.Tensor('INPUT0', input0)
+        infer_request = pb_utils.InferenceRequest(
+            model_name=model_name,
+            inputs=[input0_pb],
+            requested_output_names=['OUTPUT0'])
+        infer_response = infer_request.exec()
+        self.assertFalse(infer_response.has_error())
+
+        output0 = pb_utils.get_output_tensor_by_name(infer_response, 'OUTPUT0')
+        self.assertTrue(np.all(output0 == input0))
+
     def _test_gpu_bls_add_sub(self, is_input0_gpu, is_input1_gpu):
         input0 = torch.rand(16)
         input1 = torch.rand(16)
