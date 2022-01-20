@@ -38,7 +38,7 @@ class LifecycleTest(tu.TestResultCollector):
 
     def test_batch_error(self):
         # The execute_error model returns an error for the first request and
-        # sucessfully processes the second request.  This is making sure that
+        # sucessfully processes the second request. This is making sure that
         # an error in a single request does not completely fail the batch.
         model_name = "execute_error"
         shape = [2, 2]

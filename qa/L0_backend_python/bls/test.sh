@@ -1,5 +1,5 @@
 #!/bin/bash
-# Copyright (c) 2021, NVIDIA CORPORATION. All rights reserved.
+# Copyright 2021-2022, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -25,12 +25,16 @@
 # (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-SERVER=/opt/tritonserver/bin/tritonserver
-SERVER_ARGS="--model-repository=`pwd`/models --log-verbose=1"
 CLIENT_PY=../python_unittest.py
 CLIENT_LOG="./client.log"
 EXPECTED_NUM_TESTS="1"
 TEST_RESULT_FILE='test_results.txt'
+source ../../common/util.sh
+
+TRITON_DIR=${TRITON_DIR:="/opt/tritonserver"}
+SERVER=${TRITON_DIR}/bin/tritonserver
+BACKEND_DIR=${TRITON_DIR}/backends
+SERVER_ARGS="--model-repository=`pwd`/models --backend-directory=${BACKEND_DIR} --log-verbose=1"
 SERVER_LOG="./inference_server.log"
 REPO_VERSION=${NVIDIA_TRITON_SERVER_VERSION}
 DATADIR=${DATADIR:="/data/inferenceserver/${REPO_VERSION}"}
@@ -39,9 +43,7 @@ RET=0
 rm -fr *.log ./models
 
 pip3 uninstall -y torch
-pip3 install torch==1.9.0+cu111 torchvision==0.10.0+cu111 torchaudio==0.9.0 -f https://download.pytorch.org/whl/torch_stable.html
-
-source ../../common/util.sh
+pip3 install torch==1.9.0+cu111 -f https://download.pytorch.org/whl/torch_stable.html
 
 mkdir -p models/bls/1/
 cp ../../python_models/bls/model.py models/bls/1/
@@ -102,7 +104,7 @@ else
 fi
 
 export MODEL_NAME='bls_memory'
-python3 $CLIENT_PY > $CLIENT_LOG 2>&1 
+python3 $CLIENT_PY >> $CLIENT_LOG 2>&1 
 if [ $? -ne 0 ]; then
     echo -e "\n***\n*** 'bls_memory' test FAILED. \n***"
     cat $CLIENT_LOG

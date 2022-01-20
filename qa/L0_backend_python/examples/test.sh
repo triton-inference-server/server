@@ -1,5 +1,5 @@
 #!/bin/bash
-# Copyright (c) 2021, NVIDIA CORPORATION. All rights reserved.
+# Copyright 2021-2022, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -28,7 +28,10 @@
 source ../common.sh
 source ../../common/util.sh
 
-SERVER=/opt/tritonserver/bin/tritonserver
+TRITON_DIR=${TRITON_DIR:="/opt/tritonserver"}
+SERVER=${TRITON_DIR}/bin/tritonserver
+BACKEND_DIR=${TRITON_DIR}/backends
+SERVER_ARGS="--model-repository=`pwd`/python_backend/models --backend-directory=${BACKEND_DIR} --log-verbose=1"
 SERVER_LOG="./inference_server.log"
 REPO_VERSION=${NVIDIA_TRITON_SERVER_VERSION}
 DATADIR=${DATADIR:="/data/inferenceserver/${REPO_VERSION}"}
@@ -36,12 +39,14 @@ DATADIR=${DATADIR:="/data/inferenceserver/${REPO_VERSION}"}
 RET=0
 rm -fr *.log python_backend/
 
-pip3 uninstall -y torch
-pip3 install torch==1.9.0+cu111 torchvision==0.10.0+cu111 torchaudio==0.9.0 -f https://download.pytorch.org/whl/torch_stable.html
+# # Skip torch install on Jetson since it is already installed.
+if [ "$TEST_JETSON" == "0" ]; then
+    pip3 uninstall -y torch
+    pip3 install torch==1.9.0+cu111 -f https://download.pytorch.org/whl/torch_stable.html
+fi
 
 git clone https://github.com/triton-inference-server/python_backend -b $PYTHON_BACKEND_REPO_TAG
 cd python_backend
-SERVER_ARGS="--model-repository=`pwd`/models --log-verbose=1"
 
 # Example 1
 mkdir -p models/add_sub/1/
@@ -64,7 +69,7 @@ fi
 grep "PASS" add_sub_client.log
 if [ $? -ne 0 ]; then
     echo -e "\n***\n*** Failed to verify pytorch example. \n***"
-    cat pytorch_client.log
+    cat add_sub_client.log
     RET=1
 fi
 set -e
