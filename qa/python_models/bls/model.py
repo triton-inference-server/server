@@ -86,9 +86,10 @@ class PBBLSTest(unittest.TestCase):
             model_name='onnx_nobatch_sequence_int32',
             inputs=[input],
             requested_output_names=['OUTPUT'],
-            sequence_start=True,
-            sequence_end=False,
+            flags=pb_utils.TRITONSERVER_REQUEST_FLAG_SEQUENCE_START,
             correlation_id=correlation_id)
+        self.assertTrue(infer_request.flags(),
+                        pb_utils.TRITONSERVER_REQUEST_FLAG_SEQUENCE_START)
         infer_response = infer_request.exec()
         self.assertFalse(infer_response.has_error())
         output = pb_utils.get_output_tensor_by_name(infer_response, 'OUTPUT')
@@ -102,8 +103,6 @@ class PBBLSTest(unittest.TestCase):
                 model_name='onnx_nobatch_sequence_int32',
                 inputs=[input],
                 requested_output_names=['OUTPUT'],
-                sequence_start=False,
-                sequence_end=False,
                 correlation_id=correlation_id)
             infer_response = infer_request.exec()
             self.assertFalse(infer_response.has_error())
@@ -120,10 +119,12 @@ class PBBLSTest(unittest.TestCase):
         infer_request = pb_utils.InferenceRequest(
             model_name='onnx_nobatch_sequence_int32',
             inputs=[input],
-            sequence_start=False,
-            sequence_end=True,
             requested_output_names=['OUTPUT'],
             correlation_id=correlation_id)
+        infer_request.set_flags(pb_utils.TRITONSERVER_REQUEST_FLAG_SEQUENCE_END)
+        self.assertTrue(infer_request.flags(),
+                        pb_utils.TRITONSERVER_REQUEST_FLAG_SEQUENCE_END)
+
         infer_response = infer_request.exec()
         self.assertFalse(infer_response.has_error())
         expected_output = output.as_numpy()[0] + input.as_numpy()[0]
