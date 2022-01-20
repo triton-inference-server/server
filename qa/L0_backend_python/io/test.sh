@@ -32,8 +32,6 @@ TEST_RESULT_FILE='test_results.txt'
 source ../common.sh
 source ../../common/util.sh
 
-REPO_VERSION=${NVIDIA_TRITON_SERVER_VERSION}
-DATADIR=${DATADIR:="/data/inferenceserver/${REPO_VERSION}"}
 TRITON_DIR=${TRITON_DIR:="/opt/tritonserver"}
 SERVER=${TRITON_DIR}/bin/tritonserver
 BACKEND_DIR=${TRITON_DIR}/backends

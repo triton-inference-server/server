@@ -36,8 +36,6 @@ SERVER=${TRITON_DIR}/bin/tritonserver
 BACKEND_DIR=${TRITON_DIR}/backends
 SERVER_ARGS="--model-repository=`pwd`/models --backend-directory=${BACKEND_DIR} --log-verbose=1"
 SERVER_LOG="./inference_server.log"
-REPO_VERSION=${NVIDIA_TRITON_SERVER_VERSION}
-DATADIR=${DATADIR:="/data/inferenceserver/${REPO_VERSION}"}
 
 RET=0
 rm -fr *.log ./models

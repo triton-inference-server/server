@@ -32,8 +32,6 @@ CLIENT_LOG="./client.log"
 EXPECTED_NUM_TESTS="1"
 TEST_RESULT_FILE='test_results.txt'
 SERVER_LOG="./inference_server.log"
-REPO_VERSION=${NVIDIA_TRITON_SERVER_VERSION}
-DATADIR=${DATADIR:="/data/inferenceserver/${REPO_VERSION}"}
 
 RET=0
 rm -fr *.log ./models

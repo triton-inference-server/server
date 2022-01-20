@@ -25,17 +25,6 @@
 # (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-REPO_VERSION=${NVIDIA_TRITON_SERVER_VERSION}
-if [ "$#" -ge 1 ]; then
-    REPO_VERSION=$1
-fi
-if [ -z "$REPO_VERSION" ]; then
-    echo -e "Repository version must be specified"
-    echo -e "\n***\n*** Test Failed\n***"
-    exit 1
-fi
-
-DATADIR=${DATADIR:="/data/inferenceserver/${REPO_VERSION}"}
 export TRITON_DIR=${TRITON_DIR:="/opt/tritonserver"}
 SERVER=${TRITON_DIR}/bin/tritonserver
 export BACKEND_DIR=${TRITON_DIR}/backends
