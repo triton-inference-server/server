@@ -1,4 +1,4 @@
-// Copyright 2018-2021, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+// Copyright 2018-2022, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 //
 // Redistribution and use in source and binary forms, with or without
 // modification, are permitted provided that the following conditions
@@ -155,12 +155,19 @@ DynamicBatchScheduler::~DynamicBatchScheduler()
 Status
 DynamicBatchScheduler::Enqueue(std::unique_ptr<InferenceRequest>& request)
 {
-  // Queue timer starts at the beginning of the queueing and
-  // scheduling process
-  request->CaptureQueueStartNs();
-  INFER_TRACE_ACTIVITY(
-      request->Trace(), TRITONSERVER_TRACE_QUEUE_START,
-      request->QueueStartNs());
+  // If queue start timestamp hasn't been set, queue timer starts at
+  // the beginning of the queueing and scheduling process. Otherwise,
+  // dynamic batcher is used as component of another batcher and should not
+  // overwrite the queue start timestamp.
+  if (request->QueueStartNs() == 0) {
+    request->CaptureQueueStartNs();
+    INFER_TRACE_ACTIVITY(
+        request->Trace(), TRITONSERVER_TRACE_QUEUE_START,
+        request->QueueStartNs());
+  }
+
+  // Record time at the beginning of the batcher queueing
+  request->CaptureBatcherStartNs();
 
   std::unique_ptr<InferenceResponse> cached_response;
 
