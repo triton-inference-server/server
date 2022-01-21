@@ -75,6 +75,8 @@ mkdir -p models/identity_fp32/1/
 cp ../../python_models/identity_fp32/model.py models/identity_fp32/1/
 cp ../../python_models/identity_fp32/config.pbtxt models/identity_fp32
 
+cp -r ${DATADIR}/qa_sequence_implicit_model_repository/onnx_nobatch_sequence_int32/ ./models
+
 run_server
 if [ "$SERVER_PID" == "0" ]; then
     echo -e "\n***\n*** Failed to start $SERVER\n***"

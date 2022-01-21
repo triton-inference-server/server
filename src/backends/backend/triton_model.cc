@@ -461,6 +461,14 @@ TRITONBACKEND_RequestCorrelationId(TRITONBACKEND_Request* request, uint64_t* id)
 }
 
 TRITONSERVER_Error*
+TRITONBACKEND_RequestFlags(TRITONBACKEND_Request* request, uint32_t* flags)
+{
+  InferenceRequest* tr = reinterpret_cast<InferenceRequest*>(request);
+  *flags = tr->Flags();
+  return nullptr;  // success
+}
+
+TRITONSERVER_Error*
 TRITONBACKEND_RequestCorrelationIdString(
     TRITONBACKEND_Request* request, const char** id)
 {
