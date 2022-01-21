@@ -138,43 +138,43 @@ set -e
 kill $SERVER_PID
 wait $SERVER_PID
 
+#
 # BLS Async
-# Use python3.7 for async BLS since async not supported with python 3.6
+#
+# Skip async BLS on Jetson since it is not supported with python3.6
+# Having multiple python versions lead to build issues.
+# Anaconda is not officially supported on Jetson.
 if [ "$TEST_JETSON" == "0" ]; then
-    PYTHON_VER="python3"
-else
-    PYTHON_VER="python3.7"
+    CLIENT_LOG="./async_client.log"
+    mkdir -p models/bls_async/1
+    cp examples/bls/async_model.py models/bls_async/1/model.py
+    cp examples/bls/async_config.pbtxt models/bls_async/config.pbtxt
+    run_server
+    if [ "$SERVER_PID" == "0" ]; then
+        echo -e "\n***\n*** Failed to start $SERVER\n***"
+        cat $SERVER_LOG
+        RET=1
+    fi
+
+    set +e
+    $PYTHON_VER examples/bls/async_client.py > $CLIENT_LOG
+    if [ $? -ne 0 ]; then
+        echo -e "\n***\n*** Failed to verify BLS async example. \n***"
+        RET=1
+    fi
+
+    grep "PASS" $CLIENT_LOG
+    if [ $? -ne 0 ]; then
+        echo -e "\n***\n*** Failed to verify BLS async example. \n***"
+        cat $CLIENT_LOG
+        RET=1
+    fi
+
+    set -e
+
+    kill $SERVER_PID
+    wait $SERVER_PID
 fi
-
-CLIENT_LOG="./async_client.log"
-mkdir -p models/bls_async/1
-cp examples/bls/async_model.py models/bls_async/1/model.py
-cp examples/bls/async_config.pbtxt models/bls_async/config.pbtxt
-run_server
-if [ "$SERVER_PID" == "0" ]; then
-    echo -e "\n***\n*** Failed to start $SERVER\n***"
-    cat $SERVER_LOG
-    RET=1
-fi
-
-set +e
-$PYTHON_VER examples/bls/async_client.py > $CLIENT_LOG
-if [ $? -ne 0 ]; then
-    echo -e "\n***\n*** Failed to verify BLS async example. \n***"
-    RET=1
-fi
-
-grep "PASS" $CLIENT_LOG
-if [ $? -ne 0 ]; then
-    echo -e "\n***\n*** Failed to verify BLS async example. \n***"
-    cat $CLIENT_LOG
-    RET=1
-fi
-
-set -e
-
-kill $SERVER_PID
-wait $SERVER_PID
 
 if [ $RET -eq 0 ]; then
     echo -e "\n***\n*** Example verification test PASSED.\n***"
