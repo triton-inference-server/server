@@ -1,4 +1,4 @@
-// Copyright 2018-2021, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+// Copyright 2018-2022, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 //
 // Redistribution and use in source and binary forms, with or without
 // modification, are permitted provided that the following conditions
@@ -512,6 +512,9 @@ SequenceBatchScheduler::Enqueue(std::unique_ptr<InferenceRequest>& irequest)
   INFER_TRACE_ACTIVITY(
       irequest->Trace(), TRITONSERVER_TRACE_QUEUE_START,
       irequest->QueueStartNs());
+
+  // Record time at the beginning of the batcher queueing
+  irequest->CaptureBatcherStartNs();
 
   // For now the request must have batch-size 1 since the sequence
   // batcher does not yet support requests that are statically
@@ -1286,7 +1289,7 @@ DirectSequenceBatch::BatcherThread(const int nice)
             }
 
             earliest_enqueue_time_ns = std::min(
-                earliest_enqueue_time_ns, queue.front()->QueueStartNs());
+                earliest_enqueue_time_ns, queue.front()->BatcherStartNs());
             ready_cnt++;
             max_seq_slot = seq_slot;
           }

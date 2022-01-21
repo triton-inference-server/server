@@ -1,4 +1,4 @@
-// Copyright (c) 2020, NVIDIA CORPORATION. All rights reserved.
+// Copyright 2020-2022, NVIDIA CORPORATION. All rights reserved.
 //
 // Redistribution and use in source and binary forms, with or without
 // modification, are permitted provided that the following conditions
@@ -397,7 +397,7 @@ PriorityQueue::AdvanceCursor()
 
   uint64_t curr_enqueue_time_ns =
       pending_cursor_.curr_it_->second.At(pending_cursor_.queue_idx_)
-          ->QueueStartNs();
+          ->BatcherStartNs();
   if (pending_cursor_.pending_batch_oldest_enqueue_time_ns_ != 0) {
     pending_cursor_.pending_batch_oldest_enqueue_time_ns_ = std::min(
         pending_cursor_.pending_batch_oldest_enqueue_time_ns_,

@@ -1,4 +1,4 @@
-// Copyright 2021, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+// Copyright 2021-2022, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 //
 // Redistribution and use in source and binary forms, with or without
 // modification, are permitted provided that the following conditions
@@ -63,7 +63,7 @@ class Payload {
   {
     return requests_;
   }
-  uint64_t QueueStartNs() { return queue_start_ns_; }
+  uint64_t BatcherStartNs() { return batcher_start_ns_; }
   void SetCallback(std::function<void()> OnCallback);
   void Callback();
   void SetSecondaryCallback(std::function<void()> OnRelease);
@@ -89,7 +89,7 @@ class Payload {
   State state_;
   std::unique_ptr<std::promise<Status>> status_;
   std::unique_ptr<std::mutex> exec_mu_;
-  uint64_t queue_start_ns_;
+  uint64_t batcher_start_ns_;
 
   bool saturated_;
 };
