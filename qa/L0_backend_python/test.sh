@@ -308,21 +308,15 @@ done
 kill $SERVER_PID
 wait $SERVER_PID
 
-# Disable env test for Jetson since non-dockerized testing might cause issues during failure.
+# Disable env test for Jetson since build is non-dockerized and cloud storage repos are not supported
+# Disable ensemble, unittest, io and bls tests for Jetson since GPU Tensors are not supported
+# Disable variants test for Jetson since already built without GPU Tensor support
 if [ "$TEST_JETSON" == "0" ]; then
   (cd env && bash -ex test.sh)
   if [ $? -ne 0 ]; then
     RET=1
   fi
-fi
 
-(cd lifecycle && bash -ex test.sh)
-if [ $? -ne 0 ]; then
-  RET=1
-fi
-
-# Disable ensemble, unittest, io and bls tests for Jetson since GPU Tensors are not supported
-if [ "$TEST_JETSON" == "0" ]; then
   (cd ensemble && bash -ex test.sh)
   if [ $? -ne 0 ]; then
     RET=1
@@ -342,19 +336,21 @@ if [ "$TEST_JETSON" == "0" ]; then
   if [ $? -ne 0 ]; then
     RET=1
   fi
+
+  (cd variants && bash -ex test.sh)
+  if [ $? -ne 0 ]; then
+    RET=1
+  fi
+fi
+
+(cd lifecycle && bash -ex test.sh)
+if [ $? -ne 0 ]; then
+  RET=1
 fi
 
 (cd restart && bash -ex test.sh)
 if [ $? -ne 0 ]; then
   RET=1
-fi
-
-# Skip variants for Jetson since already built without GPU Tensors support
-if [ "$TEST_JETSON" == "0" ]; then
-  (cd variants && bash -ex test.sh)
-  if [ $? -ne 0 ]; then
-    RET=1
-  fi
 fi
 
 (cd model_control && bash -ex test.sh)

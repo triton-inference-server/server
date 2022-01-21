@@ -47,6 +47,7 @@ git clone https://github.com/triton-inference-server/python_backend -b $PYTHON_B
 cd python_backend
 
 # Example 1
+CLIENT_LOG="./add_sub_client.log"
 mkdir -p models/add_sub/1/
 cp examples/add_sub/model.py models/add_sub/1/model.py
 cp examples/add_sub/config.pbtxt models/add_sub/config.pbtxt
@@ -58,16 +59,16 @@ if [ "$SERVER_PID" == "0" ]; then
 fi
 
 set +e
-python3 examples/add_sub/client.py > add_sub_client.log
+python3 examples/add_sub/client.py > $CLIENT_LOG
 if [ $? -ne 0 ]; then
     echo -e "\n***\n*** Failed to verify add_sub example. \n***"
     RET=1
 fi
 
-grep "PASS" add_sub_client.log
+grep "PASS" $CLIENT_LOG
 if [ $? -ne 0 ]; then
     echo -e "\n***\n*** Failed to verify pytorch example. \n***"
-    cat add_sub_client.log
+    cat $CLIENT_LOG
     RET=1
 fi
 set -e
@@ -76,6 +77,7 @@ kill $SERVER_PID
 wait $SERVER_PID
 
 # Example 2
+CLIENT_LOG="./pytorch_client.log"
 mkdir -p models/pytorch/1/
 cp examples/pytorch/model.py models/pytorch/1/model.py
 cp examples/pytorch/config.pbtxt models/pytorch/config.pbtxt
@@ -87,16 +89,16 @@ if [ "$SERVER_PID" == "0" ]; then
 fi
 
 set +e
-python3 examples/pytorch/client.py > pytorch_client.log
+python3 examples/pytorch/client.py > $CLIENT_LOG
 if [ $? -ne 0 ]; then
     echo -e "\n***\n*** Failed to verify pytorch example. \n***"
     RET=1
 fi
 
-grep "PASS" pytorch_client.log
+grep "PASS" $CLIENT_LOG
 if [ $? -ne 0 ]; then
     echo -e "\n***\n*** Failed to verify pytorch example. \n***"
-    cat pytorch_client.log
+    cat $CLIENT_LOG
     RET=1
 fi
 set -e
@@ -107,6 +109,7 @@ wait $SERVER_PID
 # Example 3
 
 # BLS Sync
+CLIENT_LOG="./sync_client.log"
 mkdir -p models/bls_sync/1
 cp examples/bls/sync_model.py models/bls_sync/1/model.py
 cp examples/bls/sync_config.pbtxt models/bls_sync/config.pbtxt
@@ -118,16 +121,16 @@ if [ "$SERVER_PID" == "0" ]; then
 fi
 
 set +e
-python3 examples/bls/sync_client.py > sync_client.log
+python3 examples/bls/sync_client.py > $CLIENT_LOG
 if [ $? -ne 0 ]; then
     echo -e "\n***\n*** Failed to verify BLS sync example. \n***"
     RET=1
 fi
 
-grep "PASS" sync_client.log
+grep "PASS" $CLIENT_LOG
 if [ $? -ne 0 ]; then
     echo -e "\n***\n*** Failed to verify BLS sync example. \n***"
-    cat sync_client.log
+    cat $CLIENT_LOG
     RET=1
 fi
 set -e
@@ -136,6 +139,7 @@ kill $SERVER_PID
 wait $SERVER_PID
 
 # BLS Async
+CLIENT_LOG="./async_client.log"
 mkdir -p models/bls_async/1
 cp examples/bls/async_model.py models/bls_async/1/model.py
 cp examples/bls/async_config.pbtxt models/bls_async/config.pbtxt
@@ -147,17 +151,16 @@ if [ "$SERVER_PID" == "0" ]; then
 fi
 
 set +e
-python3 examples/bls/async_client.py > async_client.log
+python3 examples/bls/async_client.py > $CLIENT_LOG
 if [ $? -ne 0 ]; then
     echo -e "\n***\n*** Failed to verify BLS sync example. \n***"
-    cat async_client.log
     RET=1
 fi
 
-grep "PASS" async_client.log
+grep "PASS" $CLIENT_LOG
 if [ $? -ne 0 ]; then
     echo -e "\n***\n*** Failed to verify BLS sync example. \n***"
-    cat async_client.log
+    cat $CLIENT_LOG
     RET=1
 fi
 
