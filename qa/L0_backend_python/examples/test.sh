@@ -139,6 +139,13 @@ kill $SERVER_PID
 wait $SERVER_PID
 
 # BLS Async
+# Use python3.7 for async BLS since async not supported with python 3.6
+if [ "$TEST_JETSON" == "0" ]; then
+    PYTHON_VER="python3"
+else
+    PYTHON_VER="python3.7"
+fi
+
 CLIENT_LOG="./async_client.log"
 mkdir -p models/bls_async/1
 cp examples/bls/async_model.py models/bls_async/1/model.py
@@ -151,15 +158,15 @@ if [ "$SERVER_PID" == "0" ]; then
 fi
 
 set +e
-python3 examples/bls/async_client.py > $CLIENT_LOG
+$PYTHON_VER examples/bls/async_client.py > $CLIENT_LOG
 if [ $? -ne 0 ]; then
-    echo -e "\n***\n*** Failed to verify BLS sync example. \n***"
+    echo -e "\n***\n*** Failed to verify BLS async example. \n***"
     RET=1
 fi
 
 grep "PASS" $CLIENT_LOG
 if [ $? -ne 0 ]; then
-    echo -e "\n***\n*** Failed to verify BLS sync example. \n***"
+    echo -e "\n***\n*** Failed to verify BLS async example. \n***"
     cat $CLIENT_LOG
     RET=1
 fi
