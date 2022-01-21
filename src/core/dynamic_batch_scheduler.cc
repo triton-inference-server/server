@@ -166,7 +166,11 @@ DynamicBatchScheduler::Enqueue(std::unique_ptr<InferenceRequest>& request)
         request->QueueStartNs());
   }
 
-  // Record time at the beginning of the batcher queueing
+  // Record time at the beginning of the batcher queueing. In the case of
+  // oldest sequence batcher, this will overwrite the value that was previously
+  // set by sequence batcher, which is okay as by this point, the previous
+  // batcher won't be needing this value and it can be safely reused by
+  // the dynamic batcher.
   request->CaptureBatcherStartNs();
 
   std::unique_ptr<InferenceResponse> cached_response;
