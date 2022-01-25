@@ -1202,7 +1202,7 @@ DirectSequenceBatch::BatcherThread(const int nice)
   while (!scheduler_thread_exit_) {
     uint64_t wait_microseconds = default_wait_microseconds;
 
-    // Wait till execution of the last enqueued payload is not
+    // Wait till execution of the last enqueued payload is
     // complete.
     {
       std::unique_lock<std::mutex> lk(payload_mu_);
