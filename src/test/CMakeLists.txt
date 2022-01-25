@@ -140,48 +140,6 @@ install(
 )
 
 #
-# Implicit State
-#
-set(
-  IMPLICIT_STATE_SRCS
-  implicit_state_test.cc
-)
-
-set(
-  IMPLICIT_STATE_HDRS
-)
-
-find_package(GTest REQUIRED)
-add_executable(
-  implicit_state_test
-  ${IMPLICIT_STATE_SRCS}
-  ${IMPLICIT_STATE_HDRS}
-)
-set_target_properties(
-  implicit_state_test
-  PROPERTIES
-    SKIP_BUILD_RPATH TRUE
-    BUILD_WITH_INSTALL_RPATH TRUE
-    INSTALL_RPATH_USE_LINK_PATH FALSE
-    INSTALL_RPATH ""
-)
-target_include_directories(implicit_state_test PRIVATE ${GTEST_INCLUDE_DIRS})
-target_link_libraries(
-  implicit_state_test
-  PRIVATE triton-common-async-work-queue  # from repo-common
-  PRIVATE triton-common-error             # from repo-common
-  PRIVATE triton-core-serverapi           # from repo-core
-  PRIVATE triton-core-serverstub
-  PRIVATE ${GTEST_LIBRARY}
-  PRIVATE ${GTEST_MAIN_LIBRARY}
-  )
-
-install(
-  TARGETS implicit_state_test
-  RUNTIME DESTINATION bin
-)
-
-#
 # Memory
 #
 set(
