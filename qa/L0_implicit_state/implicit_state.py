@@ -37,6 +37,7 @@ import tritonclient.http as tritonhttpclient
 from tritonclient.utils import InferenceServerException
 import unittest
 import test_util as tu
+BACKENDS = os.environ.get('BACKENDS', "onnx plan")
 
 
 class ImplicitStateTest(tu.TestResultCollector):
@@ -86,6 +87,47 @@ class ImplicitStateTest(tu.TestResultCollector):
 
         result_start = triton_client.infer(model_name="no_state_update", inputs=inputs, sequence_id=correlation_id, sequence_end=True)
         self.assertEqual(result.as_numpy('OUTPUT')[0], 1)
+
+    def test_request_output_not_allowed(self):
+        triton_client = tritonhttpclient.InferenceServerClient("localhost:8000")
+        inputs = []
+        inputs.append(tritonhttpclient.InferInput('INPUT', [1], 'INT32'))
+        inputs[0].set_data_from_numpy(np.asarray([1], dtype=np.int32))
+
+        outputs = []
+        outputs.append(tritonhttpclient.InferRequestedOutput('OUTPUT_STATE'))
+
+        for backend in BACKENDS.split(" "):
+            with self.assertRaises(InferenceServerException) as e:
+                triton_client.infer(
+                    model_name=f"{backend}_nobatch_sequence_int32",
+                    inputs=inputs,
+                    outputs=outputs,
+                    sequence_id=1,
+                    sequence_start=True,
+                    sequence_end=True)
+            self.assertTrue(str(e.exception).startswith("unexpected inference output 'OUTPUT_STATE' for model"))
+
+    def test_request_output(self):
+        triton_client = tritonhttpclient.InferenceServerClient("localhost:8000")
+        inputs = []
+        inputs.append(tritonhttpclient.InferInput('INPUT', [1], 'INT32'))
+        inputs[0].set_data_from_numpy(np.asarray([1], dtype=np.int32))
+
+        outputs = []
+        outputs.append(tritonhttpclient.InferRequestedOutput('OUTPUT_STATE'))
+        outputs.append(tritonhttpclient.InferRequestedOutput('OUTPUT'))
+
+        for backend in BACKENDS.split(" "):
+            result = triton_client.infer(
+                    model_name=f"{backend}_nobatch_sequence_int32_output",
+                    inputs=inputs,
+                    outputs=outputs,
+                    sequence_id=1,
+                    sequence_start=True,
+                    sequence_end=True)
+            self.assertTrue(result.as_numpy('OUTPUT_STATE')[0], 1)
+            self.assertTrue(result.as_numpy('OUTPUT')[0], 1)
 
 
 if __name__ == '__main__':
