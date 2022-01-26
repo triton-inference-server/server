@@ -1476,7 +1476,7 @@ DirectSequenceBatch::BatcherThread(const int nice)
         }
         payload_cv_.notify_one();
       };
-      curr_payload_->SetSecondaryCallback(callback);
+      curr_payload_->AddInternalReleaseCallback(callback);
 
       // Enqueue the payload to RateLimiter
       model_instance_->Model()->Server()->GetRateLimiter()->EnqueuePayload(

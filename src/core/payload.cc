@@ -31,8 +31,8 @@ namespace nvidia { namespace inferenceserver {
 Payload::Payload()
     : op_type_(Operation::INFER_RUN),
       requests_(std::vector<std::unique_ptr<InferenceRequest>>()),
-      OnCallback_([]() {}), OnSecondaryCallback_([]() {}), instance_(nullptr),
-      state_(State::UNINITIALIZED), batcher_start_ns_(0), saturated_(true)
+      OnCallback_([]() {}), instance_(nullptr), state_(State::UNINITIALIZED),
+      batcher_start_ns_(0), saturated_(true)
 {
   exec_mu_.reset(new std::mutex());
 }
@@ -73,7 +73,7 @@ Payload::Reset(const Operation op_type, TritonModelInstance* instance)
   op_type_ = op_type;
   requests_.clear();
   OnCallback_ = []() {};
-  OnSecondaryCallback_ = []() {};
+  release_callbacks_.clear();
   instance_ = instance;
   state_ = State::UNINITIALIZED;
   status_.reset(new std::promise<Status>());
@@ -86,7 +86,7 @@ Payload::Release()
   op_type_ = Operation::INFER_RUN;
   requests_.clear();
   OnCallback_ = []() {};
-  OnSecondaryCallback_ = []() {};
+  release_callbacks_.clear();
   instance_ = nullptr;
   state_ = State::RELEASED;
   batcher_start_ns_ = 0;
@@ -131,9 +131,9 @@ Payload::SetInstance(TritonModelInstance* model_instance)
 }
 
 void
-Payload::SetSecondaryCallback(std::function<void()> OnSecondaryCallback)
+Payload::AddInternalReleaseCallback(std::function<void()>&& callback)
 {
-  OnSecondaryCallback_ = OnSecondaryCallback;
+  release_callbacks_.emplace_back(std::move(callback));
 }
 
 void
@@ -161,9 +161,15 @@ Payload::Callback()
 }
 
 void
-Payload::SecondaryCallback()
+Payload::OnRelease()
 {
-  OnSecondaryCallback_();
+  // Invoke the release callbacks added internally before releasing the
+  // request to user provided callback.
+  for (auto it = release_callbacks_.rbegin(); it != release_callbacks_.rend();
+       it++) {
+    (*it)();
+  }
+  release_callbacks_.clear();
 }
 
 void
