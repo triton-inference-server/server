@@ -1193,6 +1193,7 @@ DirectSequenceBatch::BatcherThread(const int nice)
   const uint64_t default_wait_microseconds = 500 * 1000;
 
   NewPayload();
+  exec_complete_ = true;
 
   // When there is optional input or input shape must be enforced,
   // the inputs in the requests must be examined for forming a batch
@@ -1200,6 +1201,13 @@ DirectSequenceBatch::BatcherThread(const int nice)
       !enforce_equal_shape_tensors_.empty() || has_optional_input_;
   while (!scheduler_thread_exit_) {
     uint64_t wait_microseconds = default_wait_microseconds;
+
+    // Wait till execution of the last enqueued payload is
+    // complete.
+    {
+      std::unique_lock<std::mutex> lk(payload_mu_);
+      payload_cv_.wait(lk, [this] { return exec_complete_; });
+    }
 
     // Hold the lock for as short a time as possible.
     {
@@ -1459,7 +1467,18 @@ DirectSequenceBatch::BatcherThread(const int nice)
     }
 
     if (curr_payload_->GetState() == Payload::State::READY) {
-      // Run the model...
+      // Add callback to signal the execution completion
+      exec_complete_ = false;
+      auto callback = [this]() {
+        {
+          std::unique_lock<std::mutex> lk(payload_mu_);
+          exec_complete_ = true;
+        }
+        payload_cv_.notify_one();
+      };
+      curr_payload_->AddInternalReleaseCallback(callback);
+
+      // Enqueue the payload to RateLimiter
       model_instance_->Model()->Server()->GetRateLimiter()->EnqueuePayload(
           model_instance_->Model(), curr_payload_);
       NewPayload();
