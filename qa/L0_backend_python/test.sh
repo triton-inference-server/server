@@ -1,5 +1,5 @@
 #!/bin/bash
-# Copyright 2020-2021, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright 2020-2022, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -25,17 +25,20 @@
 # (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
+export TRITON_DIR=${TRITON_DIR:="/opt/tritonserver"}
+SERVER=${TRITON_DIR}/bin/tritonserver
+export BACKEND_DIR=${TRITON_DIR}/backends
+export TEST_JETSON=${TEST_JETSON:=0}
+
+BASE_SERVER_ARGS="--model-repository=`pwd`/models --backend-directory=${BACKEND_DIR} --log-verbose=1"
+SERVER_ARGS=$BASE_SERVER_ARGS
+
+PYTHON_BACKEND_BRANCH=$PYTHON_BACKEND_REPO_TAG
 CLIENT_PY=./python_test.py
 CLIENT_LOG="./client.log"
 EXPECTED_NUM_TESTS="8"
-SERVER=/opt/tritonserver/bin/tritonserver
-BASE_SERVER_ARGS="--model-repository=`pwd`/models --log-verbose=1"
-PYTHON_BACKEND_BRANCH=$PYTHON_BACKEND_REPO_TAG
-SERVER_ARGS=$BASE_SERVER_ARGS
 TEST_RESULT_FILE='test_results.txt'
 SERVER_LOG="./inference_server.log"
-REPO_VERSION=${NVIDIA_TRITON_SERVER_VERSION}
-DATADIR=${DATADIR:="/data/inferenceserver/${REPO_VERSION}"}
 source ../common/util.sh
 source ./common.sh
 
@@ -104,7 +107,13 @@ mkdir -p models/string_fixed/1/
 cp ../python_models/string_fixed/model.py ./models/string_fixed/1/
 cp ../python_models/string_fixed/config.pbtxt ./models/string_fixed
 
-pip3 install torch==1.6.0+cpu torchvision==0.7.0+cpu -f https://download.pytorch.org/whl/torch_stable.html
+# Skip torch install on Jetson since it is already installed.
+if [ "$TEST_JETSON" == "0" ]; then
+  pip3 install torch==1.6.0+cpu -f https://download.pytorch.org/whl/torch_stable.html
+else
+  # test_growth_error is skipped on jetson
+  EXPECTED_NUM_TESTS=7
+fi
 
 prev_num_pages=`get_shm_pages`
 run_server
@@ -115,8 +124,9 @@ if [ "$SERVER_PID" == "0" ]; then
 fi
 
 set +e
-python3 $CLIENT_PY >>$CLIENT_LOG 2>&1
+python3 $CLIENT_PY >> $CLIENT_LOG 2>&1
 if [ $? -ne 0 ]; then
+    cat $CLIENT_LOG
     RET=1
 else
     check_test_results $TEST_RESULT_FILE $EXPECTED_NUM_TESTS
@@ -173,37 +183,41 @@ for triton_proc in $triton_procs; do
 done
 set -e
 
+#
 # Test KIND_GPU
-rm -rf models/
-mkdir -p models/add_sub_gpu/1/
-cp ../python_models/add_sub/model.py ./models/add_sub_gpu/1/
-cp ../python_models/add_sub_gpu/config.pbtxt ./models/add_sub_gpu/
+# Disable env test for Jetson since GPU Tensors are not supported
+if [ "$TEST_JETSON" == "0" ]; then
+  rm -rf models/
+  mkdir -p models/add_sub_gpu/1/
+  cp ../python_models/add_sub/model.py ./models/add_sub_gpu/1/
+  cp ../python_models/add_sub_gpu/config.pbtxt ./models/add_sub_gpu/
 
-prev_num_pages=`get_shm_pages`
-run_server
-if [ "$SERVER_PID" == "0" ]; then
-    echo -e "\n***\n*** Failed to start $SERVER\n***"
-    cat $SERVER_LOG
-    exit 1
-fi
+  prev_num_pages=`get_shm_pages`
+  run_server
+  if [ "$SERVER_PID" == "0" ]; then
+      echo -e "\n***\n*** Failed to start $SERVER\n***"
+      cat $SERVER_LOG
+      exit 1
+  fi
 
-if [ $? -ne 0 ]; then
-    cat $SERVER_LOG
-    echo -e "\n***\n*** KIND_GPU model test failed \n***"
-    RET=1
-fi
+  if [ $? -ne 0 ]; then
+      cat $SERVER_LOG
+      echo -e "\n***\n*** KIND_GPU model test failed \n***"
+      RET=1
+  fi
 
-kill $SERVER_PID
-wait $SERVER_PID
+  kill $SERVER_PID
+  wait $SERVER_PID
 
-current_num_pages=`get_shm_pages`
-if [ $current_num_pages -ne $prev_num_pages ]; then
-    cat $CLIENT_LOG
-    ls /dev/shm
-    echo -e "\n***\n*** Test Failed. Shared memory pages where not cleaned properly.
-Shared memory pages before starting triton equals to $prev_num_pages
-and shared memory pages after starting triton equals to $current_num_pages \n***"
-    exit 1
+  current_num_pages=`get_shm_pages`
+  if [ $current_num_pages -ne $prev_num_pages ]; then
+      cat $CLIENT_LOG
+      ls /dev/shm
+      echo -e "\n***\n*** Test Failed. Shared memory pages where not cleaned properly.
+  Shared memory pages before starting triton equals to $prev_num_pages
+  and shared memory pages after starting triton equals to $current_num_pages \n***"
+      exit 1
+  fi
 fi
 
 # Test Multi file models
@@ -286,6 +300,9 @@ if [ "$SERVER_PID" == "0" ]; then
 fi
 
 for shm_page in `ls /dev/shm/`; do
+    if [[ $shm_page !=  triton_python_backend_shm* ]]; then
+        continue
+    fi
     page_size=`ls -l /dev/shm/$shm_page 2>&1 | awk '{print $5}'`
     if [ $page_size -ne $shm_default_byte_size ]; then
         echo -e "Shared memory region size is not equal to
@@ -298,9 +315,39 @@ done
 kill $SERVER_PID
 wait $SERVER_PID
 
-(cd env && bash -ex test.sh)
-if [ $? -ne 0 ]; then
-  RET=1
+# Disable env test for Jetson since build is non-dockerized and cloud storage repos are not supported
+# Disable ensemble, unittest, io and bls tests for Jetson since GPU Tensors are not supported
+# Disable variants test for Jetson since already built without GPU Tensor support
+if [ "$TEST_JETSON" == "0" ]; then
+  (cd env && bash -ex test.sh)
+  if [ $? -ne 0 ]; then
+    RET=1
+  fi
+
+  (cd ensemble && bash -ex test.sh)
+  if [ $? -ne 0 ]; then
+    RET=1
+  fi
+
+  (cd unittest && bash -ex test.sh)
+  if [ $? -ne 0 ]; then
+    RET=1
+  fi
+
+  (cd io && bash -ex test.sh)
+  if [ $? -ne 0 ]; then
+    RET=1
+  fi
+
+  (cd bls && bash -ex test.sh)
+  if [ $? -ne 0 ]; then
+    RET=1
+  fi
+
+  (cd variants && bash -ex test.sh)
+  if [ $? -ne 0 ]; then
+    RET=1
+  fi
 fi
 
 (cd lifecycle && bash -ex test.sh)
@@ -308,32 +355,7 @@ if [ $? -ne 0 ]; then
   RET=1
 fi
 
-(cd ensemble && bash -ex test.sh)
-if [ $? -ne 0 ]; then
-  RET=1
-fi
-
 (cd restart && bash -ex test.sh)
-if [ $? -ne 0 ]; then
-  RET=1
-fi
-
-(cd unittest && bash -ex test.sh)
-if [ $? -ne 0 ]; then
-  RET=1
-fi
-
-(cd io && bash -ex test.sh)
-if [ $? -ne 0 ]; then
-  RET=1
-fi
-
-(cd variants && bash -ex test.sh)
-if [ $? -ne 0 ]; then
-  RET=1
-fi
-
-(cd bls && bash -ex test.sh)
 if [ $? -ne 0 ]; then
   RET=1
 fi
