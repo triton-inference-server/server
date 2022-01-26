@@ -300,6 +300,9 @@ if [ "$SERVER_PID" == "0" ]; then
 fi
 
 for shm_page in `ls /dev/shm/`; do
+    if [[ $shm_page !=  triton_python_backend_shm* ]]; then
+        continue
+    fi
     page_size=`ls -l /dev/shm/$shm_page 2>&1 | awk '{print $5}'`
     if [ $page_size -ne $shm_default_byte_size ]; then
         echo -e "Shared memory region size is not equal to
