@@ -42,12 +42,14 @@ indicates an optional JSON field.
 Triton exposes the trace endpoint at the following URL. The client may use
 HTTP GET request to retrieve the current trace setting. A HTTP POST request
 will modify the trace setting, and the endpoint will return the updated trace
-setting on success or an error in the case of failure. 
+setting on success or an error in the case of failure. Optional model name and
+model version can be provided to get or to set the trace settings for specific
+model or model version.
 
 ```
-GET v2/trace
+GET v2/models[/${MODEL_NAME}[/versions/${MODEL_VERSION}]]/trace
 
-POST v2/trace
+POST v2/models[/${MODEL_NAME}[/versions/${MODEL_VERSION}]]/trace
 ```
 
 ### Trace Response JSON Object
@@ -62,19 +64,21 @@ $trace_response =
   $trace_setting, ...
 }
 
-$trace_setting = $string : $string
+$trace_setting = $string : $string | [ $string, ...]
 ```
 
 Each $trace_setting JSON describes a “name”/”value” pair, where the “name” is
 the name of the trace setting and the “value” is a $string representation of the
-setting value. Currently the following trace setting are defined:
+setting value, or an array of $string for some settings. Currently the following
+trace settings are defined:
 
 - "trace_file" : the file where the trace output will be saved. If
 "log frequency" is set, this will be the prefix of the files to save the
 trace output, resulting files in name "${trace_file}.0", "${trace_file}.1"...,
 see trace setting "log frequency" below for detail.
 - "trace_level" : the trace level. "OFF" to disable tracing,
- MIN" for minimal tracing, "MAX" for maximal tracing.
+TIMESTAMPS" to trace timestamps, "TENSORS" to trace tensors.
+It may be specified multiple times to trace multiple informations.
 - "trace_rate" : the trace sampling rate. The value represents how many requests
 will one trace be sampled from. For example, if the trace rate is "1000",
 1 trace will be sampled for every 1000 requests.
@@ -151,6 +155,14 @@ message TraceRequest
   // The new setting values to be updated,
   // settings that are not specified will remain unchanged.
   map<string, string> settings = 1;
+
+  // The name of the model to apply the new trace settings.
+  // If not given, the new settings will be applied globally.
+  string name = 1;
+
+  // The version of the model to apply the new trace settings.
+  // If not given, the new settings will be applied to all version of the model.
+  string version = 2;
 }
 
 message TraceResponse

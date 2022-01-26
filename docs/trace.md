@@ -42,7 +42,7 @@ this example every 100-th inference request will be traced. The
 --trace-level option indicates the level of trace detail that should
 be collected. Use the --help option to get more information.
 
-In addition to configure trace setting in command line arguments, The user may
+In addition to configure trace settings in command line arguments, The user may
 modify the trace setting when Triton server
 is running via the trace APIs, more information can be found in [trace
 protocol](protocol/extension_trace.md).
