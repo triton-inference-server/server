@@ -460,13 +460,23 @@ std::vector<Option> options_
 #endif  // TRITON_ENABLE_METRICS
 #ifdef TRITON_ENABLE_TRACING
       {OPTION_TRACE_FILEPATH, "trace-file", Option::ArgStr,
-       "Set the file where trace output will be saved."},
+       "Set the file where trace output will be saved. If --trace-log-frequency"
+       " is also specified, this argument value will be the prefix of the files"
+       " to save the trace output. See --trace-log-frequency for detail."},
       {OPTION_TRACE_LEVEL, "trace-level", Option::ArgStr,
        "Specify a trace level. OFF to disable tracing, TIMESTAMPS to "
        "trace timestamps, TENSORS to trace tensors. It may be specified "
        "multiple times to trace multiple informations. Default is OFF."},
       {OPTION_TRACE_RATE, "trace-rate", Option::ArgInt,
        "Set the trace sampling rate. Default is 1000."},
+      {OPTION_TRACE_LOG_FREQUENCY, "trace-log-frequency", Option::ArgInt,
+       "Set the trace log frequency. If the value is 0, Triton will only log "
+       "the trace output to <trace-file> when shutting down. Otherwise, Triton "
+       "will log the trace output to <trace-file>.<idx> when it collects the "
+       "specified number of traces. For example, if the log frequency is 100, "
+       "when Triton collects the 100-th trace, it logs the traces to file "
+       "<trace-file>.0, and when it collects the 200-th trace, it logs the "
+       "101-th to the 200-th traces to file <trace-file>.1. Default is 0."},
 #endif  // TRITON_ENABLE_TRACING
       {OPTION_MODEL_CONTROL_MODE, "model-control-mode", Option::ArgStr,
        "Specify the mode for model management. Options are \"none\", \"poll\" "
@@ -1499,6 +1509,7 @@ Parse(TRITONSERVER_ServerOptions** server_options, int argc, char** argv)
       case OPTION_TRACE_RATE:
         trace_rate = ParseIntOption(optarg);
         break;
+        // [WIP]: add new arguments
 #endif  // TRITON_ENABLE_TRACING
 
       case OPTION_POLL_REPO_SECS:

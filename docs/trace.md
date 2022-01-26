@@ -1,5 +1,5 @@
 <!--
-# Copyright (c) 2019-2020, NVIDIA CORPORATION. All rights reserved.
+# Copyright 2019-2022, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -41,6 +41,11 @@ written. The --trace-rate option specifies the sampling rate. In
 this example every 100-th inference request will be traced. The
 --trace-level option indicates the level of trace detail that should
 be collected. Use the --help option to get more information.
+
+In addition to configure trace setting in command line arguments, The user may
+modify the trace setting when Triton server
+is running via the trace APIs, more information can be found in [trace
+protocol](protocol/extension_trace.md).
 
 ## JSON Trace Output
 
