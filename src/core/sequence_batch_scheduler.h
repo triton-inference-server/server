@@ -309,6 +309,13 @@ class DirectSequenceBatch : public SequenceBatch {
   std::mutex mu_;
   std::condition_variable cv_;
 
+  // Execution state of the last enqueued payload
+  bool exec_complete_;
+
+  // Mutex protecting execution state of payload
+  std::mutex payload_mu_;
+  std::condition_variable payload_cv_;
+
   // Queues holding inference requests. There are 'seq_slot_cnt'
   // queues, one for each sequence slot where requests assigned to
   // that slot are enqueued to wait for inferencing.
