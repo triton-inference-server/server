@@ -61,6 +61,10 @@ cp ./libtriton_implicit_state.so models/no_implicit_state/
 cp ./libtriton_implicit_state.so models/no_state_update/
 cp ./libtriton_implicit_state.so models/wrong_internal_state/
 
+mkdir -p models/no_implicit_state/1/
+mkdir -p models/no_state_update/1/
+mkdir -p models/wrong_internal_state/1/
+
 for BACKEND in $BACKENDS; do
     dtype="int32"
     model_name=${BACKEND}_nobatch_sequence_${dtype}
