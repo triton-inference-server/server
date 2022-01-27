@@ -243,14 +243,16 @@ the Windows build. The Windows min container is
 [Dockerfile.win10.min](../Dockerfile.win10.min).
 
 Before building the min container you must download the appropriate
-cuDNN and TensorRT versions and place them in the local directory.
+cuDNN and TensorRT versions and place them in the same directory as
+Dockerfile.win10.min.
 
-* For cuDNN the CUDNN_VERSION and CUDNN_ZIP arguments indicate the
-  version of cuDNN that your should download from
-  https://developer.nvidia.com/rdp/cudnn-download.
+* For cuDNN the CUDNN_VERSION and CUDNN_ZIP arguments defined in
+  Dockerfile.win10.min indicate the version of cuDNN that your should
+  download from https://developer.nvidia.com/rdp/cudnn-download.
 
-* For TensorRT the TENSORRT_VERSION and TENSORRT_ZIP arguments
-  indicate the version of TensorRT that your should download from
+* For TensorRT the TENSORRT_VERSION and TENSORRT_ZIP arguments defined
+  in Dockerfile.win10.min indicate the version of TensorRT that your
+  should download from
   https://developer.nvidia.com/nvidia-tensorrt-download.
 
 After downloading the zip files for cuDNN and TensorRT, you build the
@@ -270,7 +272,7 @@ and so you must enable them explicitly. The following build.py
 invocation builds all features and backends available on windows.
 
 ```bash
-python build.py --cmake-dir=<path/to/repo>/build --build-dir=/tmp/citritonbuild --no-container-pull --image=base,win10-py3-min --enable-logging --enable-stats --enable-tracing --enable-gpu --endpoint=grpc --endpoint=http --repo-tag=common:<container tag> --repo-tag=core:<container tag> --repo-tag=backend:<container tag> --repo-tag=thirdparty:<container tag> --backend=ensemble --backend=tensorrt:<container tag> --backend=onnxruntime:<container tag>
+python build.py --cmake-dir=<path/to/repo>/build --build-dir=/tmp/citritonbuild --no-container-pull --image=base,win10-py3-min --enable-logging --enable-stats --enable-tracing --enable-gpu --endpoint=grpc --endpoint=http --repo-tag=common:<container tag> --repo-tag=core:<container tag> --repo-tag=backend:<container tag> --repo-tag=thirdparty:<container tag> --backend=ensemble --backend=tensorrt:<container tag> --backend=onnxruntime:<container tag> --backend=openvino:<container tag>
 ```
 
 If you are building on *main* branch then '<container tag>' will
