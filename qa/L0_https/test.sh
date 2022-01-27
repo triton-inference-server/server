@@ -43,6 +43,7 @@ export CUDA_VISIBLE_DEVICES=0
 RET=0
 
 SIMPLE_INFER_CLIENT_PY=../clients/simple_http_infer_client.py
+TEST_CLIENT=../clients/simple_http_infer_client
 
 NGINX_CONF=`pwd`/nginx.conf
 CLIENT_LOG=`pwd`/client.log
@@ -103,10 +104,22 @@ if [ $? -ne 0 ]; then
     RET=1
 fi
 
+$TEST_CLIENT -v -u https://localhost:443 --keyfile client.key --certfile client.crt --cacerts ca.crt >> ${CLIENT_LOG}.c++.ssl_infer 2>&1
+if [ $? -ne 0 ]; then
+    cat ${CLIENT_LOG}.c++.ssl_infer
+    RET=1
+fi
+
 # Test basic inference on https without peer verification
 python $SIMPLE_INFER_CLIENT_PY -v -u localhost --ssl --insecure >> ${CLIENT_LOG}.ssl_infer_insecure 2>&1
 if [ $? -ne 0 ]; then
-    cat ${CLIENT_LOG}.ssl_infer
+    cat ${CLIENT_LOG}.ssl_infer_insecure
+    RET=1
+fi
+
+$TEST_CLIENT -v -u https://localhost:443 --verifyhost 0 --verifypeer 0 >> ${CLIENT_LOG}.c++.ssl_infer_insecure 2>&1
+if [ $? -ne 0 ]; then
+    cat ${CLIENT_LOG}.c++.ssl_infer_insecure
     RET=1
 fi
 
@@ -120,11 +133,27 @@ else
     RET=1
 fi
 
+$TEST_CLIENT -v -u https://localhost:443 >> ${CLIENT_LOG}.c++.no_ssl_fail_infer 2>&1
+if [ $? -ne 0 ]; then
+    cat ${CLIENT_LOG}.c++.no_ssl_fail_infer
+    echo -e "\n***\n*** Expected test failure\n***"
+else
+    RET=1
+fi
+
 
 # Try with incorrect key
 $SIMPLE_INFER_CLIENT_PY -v -u localhost --ssl --keyfile client2.key --certfile client.crt --cacerts ca.crt >> ${CLIENT_LOG}.ssl_wrong_key 2>&1
 if [ $? -ne 0 ]; then
     cat ${CLIENT_LOG}.ssl_wrong_key
+    echo -e "\n***\n*** Expected test failure\n***"
+else
+    RET=1
+fi
+
+$TEST_CLIENT -v -u https://localhost:443 --keyfile client2.key --certfile client.crt --cacerts ca.crt >> ${CLIENT_LOG}.c++.ssl_wrong_key 2>&1
+if [ $? -ne 0 ]; then
+    cat ${CLIENT_LOG}.c++.ssl_wrong_key
     echo -e "\n***\n*** Expected test failure\n***"
 else
     RET=1
