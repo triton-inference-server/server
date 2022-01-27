@@ -333,7 +333,7 @@ public class Simple {
     {
       // Input size is 3 * 224 * 224
       input0_data[0] = new FloatPointer(150528);
-      for (int i = 0; i < 16; ++i) {
+      for (int i = 0; i < 150528; ++i) {
         input0_data[0].put(i, 1);
       }
     }
