@@ -44,12 +44,14 @@ HTTP GET request to retrieve the current trace setting. A HTTP POST request
 will modify the trace setting, and the endpoint will return the updated trace
 setting on success or an error in the case of failure. Optional model name and
 model version can be provided to get or to set the trace settings for specific
-model or model version.
+model or model version. Note that when a model or model version is specified
+without providing any trace settings in the request body, it will be a request
+to remove the specification. 
 
 ```
-GET v2/models[/${MODEL_NAME}[/versions/${MODEL_VERSION}]]/trace
+GET v2[/models/${MODEL_NAME}[/versions/${MODEL_VERSION}]]/trace
 
-POST v2/models[/${MODEL_NAME}[/versions/${MODEL_VERSION}]]/trace
+POST v2[/models/${MODEL_NAME}[/versions/${MODEL_VERSION}]]/trace
 ```
 
 ### Trace Response JSON Object
@@ -114,8 +116,7 @@ A trace configure request is made with a HTTP POST to
 the trace endpoint. In the corresponding response the HTTP body contains the
 response JSON. A successful request is indicated by a 200 HTTP status code.
 
-The request object, identified as
-$trace_request must be provided in the HTTP
+The request object, identified as $trace_request must be provided in the HTTP
 body.
 
 ```
@@ -127,7 +128,10 @@ $trace_request =
 
 The $trace_setting JSON is defined in
 [Trace Response JSON Object](#Trace-Response-JSON-bject), only the specified
-settings will be updated.
+settings will be updated. Note that if this is the first request to initalize
+a model (version) trace settings, for the trace settings that are not specified
+in the request, the value will be copied from the current setting in the
+following order: version settings, model settings, global settings.
 
 ## GRPC
 
@@ -158,11 +162,12 @@ message TraceRequest
 
   // The name of the model to apply the new trace settings.
   // If not given, the new settings will be applied globally.
-  string name = 1;
+  string model_name = 1;
 
   // The version of the model to apply the new trace settings.
   // If not given, the new settings will be applied to all version of the model.
-  string version = 2;
+  // 'model_version' is ignored if 'model_name' is not specified.
+  string model_version = 2;
 }
 
 message TraceResponse
@@ -174,3 +179,7 @@ message TraceResponse
 
 The trace settings are mentioned in
 [Trace Response JSON Object](#Trace-Response-JSON-bject).
+Note that if this is the first request to initalize
+a model (version) trace settings, for the trace settings that are not specified
+in the request, the value will be copied from the current setting in the
+following order: version settings, model settings, global settings.
