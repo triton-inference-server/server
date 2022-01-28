@@ -77,6 +77,8 @@ RUN mkdir -p qa/common && \
     cp -r docs/examples/model_repository/simple qa/L0_simple_go_client/models/. && \
     mkdir qa/L0_backend_release/simple_models && \
     cp -r docs/examples/model_repository/simple qa/L0_backend_release/simple_models/. && \
+    mkdir qa/L0_simple_nodejs_client/models && \
+    cp -r docs/examples/model_repository/simple qa/L0_simple_nodejs_client/models/. && \
     mkdir qa/L0_backend_release/simple_seq_models && \
     cp -r /workspace/docs/examples/model_repository/simple_sequence qa/L0_backend_release/simple_seq_models/. && \
     mkdir qa/L0_shared_memory/models && \
@@ -236,6 +238,8 @@ RUN mkdir -p qa/clients && mkdir -p qa/pkgs && \
     cp install/python/triton*.whl qa/pkgs/. && \
     cp install/java/examples/*.jar qa/clients/.
 RUN cp client/src/grpc_generated/go/*.go qa/L0_simple_go_client/. && \
+    cp client/src/grpc_generated/javascript/*.js qa/L0_simple_nodejs_client/. && \
+    cp client/src/grpc_generated/javascript/*.json qa/L0_simple_nodejs_client/. && \
     cp -r client/src/grpc_generated/java qa/L0_client_java/.
 
 ############################################################################
@@ -270,14 +274,15 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
                               libarchive-dev \
                               libopencv-core-dev \
                               libzmq3-dev \
+                              maven \
+                              nginx \
+                              npm \
+                              protobuf-compiler \
                               python3-dev \
                               python3-pip \
                               python3-protobuf \
                               python3-setuptools \
                               swig \
-                              nginx \
-                              protobuf-compiler \
-                              maven \
                               valgrind && \
     rm -rf /var/lib/apt/lists/*
 
