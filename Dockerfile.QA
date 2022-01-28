@@ -115,6 +115,7 @@ RUN mkdir -p qa/common && \
     cp /tmp/tritonbuild/tritonserver/build/test-util/install/backends/query/libtriton_query.so qa/L0_query/models/query/1/. && \
     cp /tmp/tritonbuild/tritonserver/build/test-util/install/bin/query_test qa/L0_query/. && \
     cp /tmp/tritonbuild/tritonserver/build/test-util/install/bin/async_work_queue_test qa/L0_async_work_queue/. && \
+    cp /tmp/tritonbuild/tritonserver/build/test-util/install/backends/implicit_state/libtriton_implicit_state.so qa/L0_implicit_state/. && \
     mkdir qa/L0_data_compression/models && \
     cp -r /workspace/docs/examples/model_repository/simple qa/L0_data_compression/models && \
     cp /tmp/tritonbuild/tritonserver/build/test-util/install/bin/data_compressor_test qa/L0_data_compression/.
