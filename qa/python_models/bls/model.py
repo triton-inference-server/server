@@ -90,6 +90,7 @@ class PBBLSTest(unittest.TestCase):
             requested_output_names=['OUTPUT0', 'OUTPUT1'])
         infer_response = infer_request.exec()
         self.assertTrue(infer_response.has_error())
+        self.assertTrue(len(infer_response.output_tensors()) == 0)
 
     def _send_bls_sequence_requests(self, correlation_id):
         # Start request
@@ -305,6 +306,7 @@ class PBBLSTest(unittest.TestCase):
                                                   requested_output_names=[])
         infer_response = infer_request.exec()
         self.assertTrue(infer_response.has_error())
+        self.assertTrue(len(infer_response.output_tensors()) == 0)
 
     def test_multiple_bls(self):
         # Test running multiple BLS requests together
