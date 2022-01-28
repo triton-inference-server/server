@@ -1,4 +1,4 @@
-// Copyright 2021, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+// Copyright 2021-2022, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 //
 // Redistribution and use in source and binary forms, with or without
 // modification, are permitted provided that the following conditions
@@ -63,11 +63,11 @@ class Payload {
   {
     return requests_;
   }
-  uint64_t QueueStartNs() { return queue_start_ns_; }
+  uint64_t BatcherStartNs() { return batcher_start_ns_; }
   void SetCallback(std::function<void()> OnCallback);
   void Callback();
-  void SetSecondaryCallback(std::function<void()> OnRelease);
-  void SecondaryCallback();
+  void AddInternalReleaseCallback(std::function<void()>&& callback);
+  void OnRelease();
   void SetInstance(TritonModelInstance* model_instance);
   TritonModelInstance* GetInstance() { return instance_; }
   void MarkSaturated();
@@ -84,12 +84,12 @@ class Payload {
   Operation op_type_;
   std::vector<std::unique_ptr<InferenceRequest>> requests_;
   std::function<void()> OnCallback_;
-  std::function<void()> OnSecondaryCallback_;
+  std::vector<std::function<void()>> release_callbacks_;
   TritonModelInstance* instance_;
   State state_;
   std::unique_ptr<std::promise<Status>> status_;
   std::unique_ptr<std::mutex> exec_mu_;
-  uint64_t queue_start_ns_;
+  uint64_t batcher_start_ns_;
 
   bool saturated_;
 };

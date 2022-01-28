@@ -1,4 +1,4 @@
-// Copyright 2020-2021, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+// Copyright 2020-2022, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 //
 // Redistribution and use in source and binary forms, with or without
 // modification, are permitted provided that the following conditions
@@ -550,6 +550,15 @@ class InferenceRequest {
     return queue_start_ns_;
   }
 
+  uint64_t BatcherStartNs() const { return batcher_start_ns_; }
+  uint64_t CaptureBatcherStartNs()
+  {
+    batcher_start_ns_ = std::chrono::duration_cast<std::chrono::nanoseconds>(
+                            std::chrono::steady_clock::now().time_since_epoch())
+                            .count();
+    return batcher_start_ns_;
+  }
+
 #ifdef TRITON_ENABLE_STATS
   uint64_t RequestStartNs() const { return request_start_ns_; }
   uint64_t CaptureRequestStartNs()
@@ -649,6 +658,11 @@ class InferenceRequest {
   // Request timestamps. Queue start is needed for schedulers even
   // when statistics are not being collected.
   uint64_t queue_start_ns_;
+
+  // Dedicated timestamp for batcher internal which can diverge from
+  // queue start timestamp to provide accurate queue time without affecting
+  // batcher functionalities.
+  uint64_t batcher_start_ns_;
 
   // Whether the stats of the request should be collected.
   bool collect_stats_;

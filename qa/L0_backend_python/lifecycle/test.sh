@@ -1,5 +1,5 @@
 #!/bin/bash
-# Copyright (c) 2021, NVIDIA CORPORATION. All rights reserved.
+# Copyright 2021-2022, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -32,13 +32,11 @@ TEST_RESULT_FILE='test_results.txt'
 source ../common.sh
 source ../../common/util.sh
 
-SERVER=/opt/tritonserver/bin/tritonserver
-BASE_SERVER_ARGS="--model-repository=`pwd`/models --log-verbose=1"
-PYTHON_BACKEND_BRANCH=$PYTHON_BACKEND_REPO_TAG
-SERVER_ARGS=$BASE_SERVER_ARGS
+TRITON_DIR=${TRITON_DIR:="/opt/tritonserver"}
+SERVER=${TRITON_DIR}/bin/tritonserver
+BACKEND_DIR=${TRITON_DIR}/backends
+SERVER_ARGS="--model-repository=`pwd`/models --backend-directory=${BACKEND_DIR} --log-verbose=1"
 SERVER_LOG="./inference_server.log"
-REPO_VERSION=${NVIDIA_TRITON_SERVER_VERSION}
-DATADIR=${DATADIR:="/data/inferenceserver/${REPO_VERSION}"}
 
 RET=0
 rm -fr *.log ./models
@@ -77,6 +75,7 @@ set +e
 for i in {0..4}; do
     python3 lifecycle_test.py > $CLIENT_LOG 2>&1 
     if [ $? -ne 0 ]; then
+        cat $CLIENT_LOG
         echo -e "\n***\n*** lifecycle_test.py FAILED. \n***"
         RET=1
     else
@@ -118,7 +117,6 @@ run_server_nowait
 wait $SERVER_PID
 current_num_pages=`get_shm_pages`
 if [ $current_num_pages -ne $prev_num_pages ]; then
-    cat $CLIENT_LOG
     ls /dev/shm
     echo -e "\n***\n*** Test Failed. Shared memory pages where not cleaned properly.
 Shared memory pages before starting triton equals to $prev_num_pages
@@ -129,7 +127,7 @@ fi
 grep "name 'lorem_ipsum' is not defined" $SERVER_LOG
 
 if [ $? -ne 0 ]; then
-    cat $CLIENT_LOG
+    cat $SERVER_LOG
     echo -e "\n***\n*** init_error model test failed \n***"
     RET=1
 fi

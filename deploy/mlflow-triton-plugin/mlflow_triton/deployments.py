@@ -59,10 +59,10 @@ class TritonPlugin(BaseDeploymentClient):
         self.supported_flavors = ['triton', 'onnx']  # need to add other flavors
         # URL cleaning for constructing Triton client
         ssl = False
-        if triton_url.startswith("http:#"):
-            triton_url = triton_url[len("http:#"):]
-        elif triton_url.startswith("https:#"):
-            triton_url = triton_url[len("https:#"):]
+        if triton_url.startswith("http://"):
+            triton_url = triton_url[len("http://"):]
+        elif triton_url.startswith("https://"):
+            triton_url = triton_url[len("https://"):]
             ssl = True
         self.triton_client = tritonhttpclient.InferenceServerClient(
             url=triton_url, ssl=ssl)

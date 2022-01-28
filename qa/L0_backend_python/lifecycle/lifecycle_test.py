@@ -28,52 +28,66 @@ import sys
 sys.path.append("../../common")
 
 import test_util as tu
+from functools import partial
 import tritonclient.http as httpclient
+import tritonclient.grpc as grpcclient
 from tritonclient.utils import *
 import numpy as np
 import unittest
+import queue
+
+
+class UserData:
+
+    def __init__(self):
+        self._completed_requests = queue.Queue()
+
+
+def callback(user_data, result, error):
+    if error:
+        user_data._completed_requests.put(error)
+    else:
+        user_data._completed_requests.put(result)
 
 
 class LifecycleTest(tu.TestResultCollector):
 
     def test_batch_error(self):
         # The execute_error model returns an error for the first request and
-        # sucessfully processes the second request.  This is making sure that
+        # sucessfully processes the second request. This is making sure that
         # an error in a single request does not completely fail the batch.
         model_name = "execute_error"
         shape = [2, 2]
-        request_parallelism = 2
+        number_of_requests = 2
+        user_data = UserData()
+        triton_client = grpcclient.InferenceServerClient("localhost:8001")
+        triton_client.start_stream(callback=partial(callback, user_data))
 
-        with httpclient.InferenceServerClient(
-                "localhost:8000", concurrency=request_parallelism) as client:
-            input_datas = []
-            requests = []
-            for i in range(request_parallelism):
-                input_data = np.random.randn(*shape).astype(np.float32)
-                input_datas.append(input_data)
-                inputs = [
-                    httpclient.InferInput("IN", input_data.shape,
-                                          np_to_triton_dtype(input_data.dtype))
-                ]
-                inputs[0].set_data_from_numpy(input_data)
-                requests.append(client.async_infer(model_name, inputs))
+        input_datas = []
+        for i in range(number_of_requests):
+            input_data = np.random.randn(*shape).astype(np.float32)
+            input_datas.append(input_data)
+            inputs = [
+                grpcclient.InferInput("IN", input_data.shape,
+                                      np_to_triton_dtype(input_data.dtype))
+            ]
+            inputs[0].set_data_from_numpy(input_data)
+            triton_client.async_stream_infer(model_name=model_name,
+                                             inputs=inputs)
 
-            for i in range(request_parallelism):
-                results = None
-                if i == 0:
-                    with self.assertRaises(InferenceServerException):
-                        results = requests[i].get_result()
-                    continue
-                else:
-                    results = requests[i].get_result()
+        for i in range(number_of_requests):
+            result = user_data._completed_requests.get()
+            if i == 0:
+                self.assertIs(type(result), InferenceServerException)
+                continue
 
-                print(results)
-                output_data = results.as_numpy("OUT")
-                self.assertIsNotNone(output_data, "error: expected 'OUT'")
-                self.assertTrue(
-                    np.array_equal(output_data, input_datas[i]),
-                    "error: expected output {} to match input {}".format(
-                        output_data, input_datas[i]))
+            print(result)
+            output_data = result.as_numpy("OUT")
+            self.assertIsNotNone(output_data, "error: expected 'OUT'")
+            self.assertTrue(
+                np.array_equal(output_data, input_datas[i]),
+                "error: expected output {} to match input {}".format(
+                    output_data, input_datas[i]))
 
     def test_infer_pymodel_error(self):
         model_name = "wrong_model"

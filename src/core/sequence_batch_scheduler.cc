@@ -1,4 +1,4 @@
-// Copyright 2018-2021, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+// Copyright 2018-2022, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 //
 // Redistribution and use in source and binary forms, with or without
 // modification, are permitted provided that the following conditions
@@ -512,6 +512,9 @@ SequenceBatchScheduler::Enqueue(std::unique_ptr<InferenceRequest>& irequest)
   INFER_TRACE_ACTIVITY(
       irequest->Trace(), TRITONSERVER_TRACE_QUEUE_START,
       irequest->QueueStartNs());
+
+  // Record time at the beginning of the batcher queueing
+  irequest->CaptureBatcherStartNs();
 
   // For now the request must have batch-size 1 since the sequence
   // batcher does not yet support requests that are statically
@@ -1190,6 +1193,7 @@ DirectSequenceBatch::BatcherThread(const int nice)
   const uint64_t default_wait_microseconds = 500 * 1000;
 
   NewPayload();
+  exec_complete_ = true;
 
   // When there is optional input or input shape must be enforced,
   // the inputs in the requests must be examined for forming a batch
@@ -1197,6 +1201,13 @@ DirectSequenceBatch::BatcherThread(const int nice)
       !enforce_equal_shape_tensors_.empty() || has_optional_input_;
   while (!scheduler_thread_exit_) {
     uint64_t wait_microseconds = default_wait_microseconds;
+
+    // Wait till execution of the last enqueued payload is
+    // complete.
+    {
+      std::unique_lock<std::mutex> lk(payload_mu_);
+      payload_cv_.wait(lk, [this] { return exec_complete_; });
+    }
 
     // Hold the lock for as short a time as possible.
     {
@@ -1286,7 +1297,7 @@ DirectSequenceBatch::BatcherThread(const int nice)
             }
 
             earliest_enqueue_time_ns = std::min(
-                earliest_enqueue_time_ns, queue.front()->QueueStartNs());
+                earliest_enqueue_time_ns, queue.front()->BatcherStartNs());
             ready_cnt++;
             max_seq_slot = seq_slot;
           }
@@ -1456,7 +1467,18 @@ DirectSequenceBatch::BatcherThread(const int nice)
     }
 
     if (curr_payload_->GetState() == Payload::State::READY) {
-      // Run the model...
+      // Add callback to signal the execution completion
+      exec_complete_ = false;
+      auto callback = [this]() {
+        {
+          std::unique_lock<std::mutex> lk(payload_mu_);
+          exec_complete_ = true;
+        }
+        payload_cv_.notify_one();
+      };
+      curr_payload_->AddInternalReleaseCallback(callback);
+
+      // Enqueue the payload to RateLimiter
       model_instance_->Model()->Server()->GetRateLimiter()->EnqueuePayload(
           model_instance_->Model(), curr_payload_);
       NewPayload();
