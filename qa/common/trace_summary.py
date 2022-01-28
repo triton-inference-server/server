@@ -267,7 +267,6 @@ def summarize_dataflow(traces):
     #   - child input
     #     - ...
     #   - child output
-    print("Data Flow:")
 
     # Order traces by id to be more intuitive if 'show_trace'
     traces = sorted(traces, key=lambda t: t.get('id', -1))
@@ -282,6 +281,16 @@ def summarize_dataflow(traces):
                 dataflow_parent_map[trace["parent_id"]] = []
             dataflow_parent_map[trace["parent_id"]].append(trace["id"])
 
+    if len(dataflow_parent_map) == 0:
+        # print the tensors of model
+        first_id = find_first_id_with_tensor(traces)
+        if first_id != 0:
+            print("Data Flow:")
+        print_tensor_by_id(first_id, traces, 0, 0)
+        return
+
+    # print the tensors of ensemble
+    print("Data Flow:")
     first_parent_id = list(dataflow_parent_map.items())[0][0]
 
     # {3: {4: {7: None}, 5: None, 6: None}}
@@ -293,7 +302,7 @@ def summarize_dataflow(traces):
                            traces,
                            depth)
 
-    print_dataflow_tensor(dataflow_tree_map, traces, depth[0], tab_num=0)
+    print_dataflow_tensor(dataflow_tree_map, traces, depth[0], step=0)
 
 
 def append_dataflow_tensor(dataflow_tensor_map,
@@ -315,21 +324,24 @@ def append_dataflow_tensor(dataflow_tensor_map,
                                dataflow_tree_map, traces, depth)
 
 
-def print_dataflow_tensor(dataflow_tree_map, traces, depth, tab_num):
+def print_dataflow_tensor(dataflow_tree_map, traces, depth, step):
     for parent_id in dataflow_tree_map:
-        print_tensor_by_id(parent_id, traces, depth, tab_num)
+        print_tensor_by_id(parent_id, traces, depth, step)
 
         if dataflow_tree_map[parent_id] is None:
             continue
 
         print_dataflow_tensor(
-            dataflow_tree_map[parent_id], traces, depth, tab_num+1)
+            dataflow_tree_map[parent_id], traces, depth, step+1)
 
 
-def print_tensor_by_id(id, traces, depth, tab_num):
-    tabs = "\t"*(tab_num+1)
+def print_tensor_by_id(id, traces, depth, step):
+    if id == 0:
+        return
 
-    print("{0}{1}".format(tabs, "="*(50+8*(depth-tab_num))))
+    tabs = "\t"*(step+1)
+
+    print("{0}{1}".format(tabs, "="*(50+8*(depth-step))))
     for trace in traces:
         # print model name and version
         if "id" in trace and "model_name" in trace and "model_version" in trace and "timestamps" in trace and trace["id"] == id:
@@ -351,7 +363,14 @@ def print_tensor_by_id(id, traces, depth, tab_num):
                 print("{0}{1}:".format(tabs, "BACKEND_OUTPUT"))
                 print("{0}\t{1}: {2}".format(tabs, trace["tensor"]["name"],
                       get_numpy_array(trace["tensor"])))
-    print("{0}{1}".format(tabs, "="*(50+8*(depth-tab_num))))
+    print("{0}{1}".format(tabs, "="*(50+8*(depth-step))))
+
+
+def find_first_id_with_tensor(traces):
+    for trace in traces:
+        if "activity" in trace and (trace["activity"] == "TENSOR_QUEUE_INPUT" or trace["activity"] == "TENSOR_BACKEND_INPUT" or trace["activity"] == "TENSOR_BACKEND_OUTPUT"):
+            return trace["id"]
+    return 0
 
 
 TRITON_TYPE_TO_NUMPY = {
