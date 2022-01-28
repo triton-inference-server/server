@@ -69,8 +69,7 @@ if NO_BATCHING:
             _trials += (backend + "_nobatch",)
 elif os.environ['BATCHER_TYPE'] == "VARIABLE":
     for backend in BACKENDS.split(' '):
-        if (backend != "libtorch") and (backend != 'custom') and (backend !=
-                                                                  'plan'):
+        if (backend != "libtorch") and (backend != 'custom'):
             _trials += (backend,)
 else:
     _trials = BACKENDS.split(' ')
