@@ -157,7 +157,7 @@ if [ "$TEST_JETSON" == "0" ]; then
     fi
 
     set +e
-    $PYTHON_VER examples/bls/async_client.py > $CLIENT_LOG
+    python3 examples/bls/async_client.py > $CLIENT_LOG
     if [ $? -ne 0 ]; then
         echo -e "\n***\n*** Failed to verify BLS async example. \n***"
         RET=1
