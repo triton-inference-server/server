@@ -1843,7 +1843,8 @@ class InferHandlerState {
 #ifdef TRITON_ENABLE_TRACING
       if ((state->trace_manager_ != nullptr) && (state->trace_id_ != 0)) {
         state->trace_manager_->CaptureTimestamp(
-            state->trace_id_, TRITONSERVER_TRACE_LEVEL_MIN, "GRPC_SEND_START");
+            state->trace_id_, TRITONSERVER_TRACE_LEVEL_TIMESTAMPS,
+            "GRPC_SEND_START");
       }
 #endif  // TRITON_ENABLE_TRACING
       state->step_ = Steps::WRITTEN;
@@ -1896,7 +1897,8 @@ class InferHandlerState {
 #ifdef TRITON_ENABLE_TRACING
       if ((state->trace_manager_ != nullptr) && (state->trace_id_ != 0)) {
         state->trace_manager_->CaptureTimestamp(
-            state->trace_id_, TRITONSERVER_TRACE_LEVEL_MIN, "GRPC_SEND_START");
+            state->trace_id_, TRITONSERVER_TRACE_LEVEL_TIMESTAMPS,
+            "GRPC_SEND_START");
       }
 #endif  // TRITON_ENABLE_TRACING
 
@@ -3193,7 +3195,7 @@ ModelInferHandler::StartNewRequest()
       state->trace_manager_ = trace_manager_;
       TRITONSERVER_InferenceTraceId(state->trace_, &state->trace_id_);
       trace_manager_->CaptureTimestamp(
-          state->trace_id_, TRITONSERVER_TRACE_LEVEL_MIN,
+          state->trace_id_, TRITONSERVER_TRACE_LEVEL_TIMESTAMPS,
           "GRPC_WAITREAD_START");
     }
   }
@@ -3236,7 +3238,8 @@ ModelInferHandler::Process(InferHandler::State* state, bool rpc_ok)
 #ifdef TRITON_ENABLE_TRACING
     if ((state->trace_manager_ != nullptr) && (state->trace_id_ != 0)) {
       state->trace_manager_->CaptureTimestamp(
-          state->trace_id_, TRITONSERVER_TRACE_LEVEL_MIN, "GRPC_WAITREAD_END");
+          state->trace_id_, TRITONSERVER_TRACE_LEVEL_TIMESTAMPS,
+          "GRPC_WAITREAD_END");
     }
 #endif  // TRITON_ENABLE_TRACING
 
@@ -3331,7 +3334,8 @@ ModelInferHandler::Process(InferHandler::State* state, bool rpc_ok)
 #ifdef TRITON_ENABLE_TRACING
       if ((state->trace_manager_ != nullptr) && (state->trace_id_ != 0)) {
         state->trace_manager_->CaptureTimestamp(
-            state->trace_id_, TRITONSERVER_TRACE_LEVEL_MIN, "GRPC_SEND_START");
+            state->trace_id_, TRITONSERVER_TRACE_LEVEL_TIMESTAMPS,
+            "GRPC_SEND_START");
       }
 #endif  // TRITON_ENABLE_TRACING
 
@@ -3342,7 +3346,8 @@ ModelInferHandler::Process(InferHandler::State* state, bool rpc_ok)
 #ifdef TRITON_ENABLE_TRACING
     if ((state->trace_manager_ != nullptr) && (state->trace_id_ != 0)) {
       state->trace_manager_->CaptureTimestamp(
-          state->trace_id_, TRITONSERVER_TRACE_LEVEL_MIN, "GRPC_SEND_END");
+          state->trace_id_, TRITONSERVER_TRACE_LEVEL_TIMESTAMPS,
+          "GRPC_SEND_END");
     }
 #endif  // TRITON_ENABLE_TRACING
 
@@ -3417,7 +3422,8 @@ ModelInferHandler::InferResponseComplete(
 #ifdef TRITON_ENABLE_TRACING
   if ((state->trace_manager_ != nullptr) && (state->trace_id_ != 0)) {
     state->trace_manager_->CaptureTimestamp(
-        state->trace_id_, TRITONSERVER_TRACE_LEVEL_MIN, "GRPC_SEND_START");
+        state->trace_id_, TRITONSERVER_TRACE_LEVEL_TIMESTAMPS,
+        "GRPC_SEND_START");
   }
 #endif  // TRITON_ENABLE_TRACING
 
@@ -3565,7 +3571,7 @@ ModelStreamInferHandler::StartNewRequest()
       state->trace_manager_ = trace_manager_;
       TRITONSERVER_InferenceTraceId(state->trace_, &state->trace_id_);
       state->trace_manager_->CaptureTimestamp(
-          state->trace_id_, TRITONSERVER_TRACE_LEVEL_MIN,
+          state->trace_id_, TRITONSERVER_TRACE_LEVEL_TIMESTAMPS,
           "GRPC_WAITREAD_START");
     }
   }
@@ -3614,7 +3620,8 @@ ModelStreamInferHandler::Process(InferHandler::State* state, bool rpc_ok)
 #ifdef TRITON_ENABLE_TRACING
     if ((state->trace_manager_ != nullptr) && (state->trace_id_ != 0)) {
       state->trace_manager_->CaptureTimestamp(
-          state->trace_id_, TRITONSERVER_TRACE_LEVEL_MIN, "GRPC_WAITREAD_END");
+          state->trace_id_, TRITONSERVER_TRACE_LEVEL_TIMESTAMPS,
+          "GRPC_WAITREAD_END");
     }
 #endif  // TRITON_ENABLE_TRACING
 
@@ -3779,7 +3786,7 @@ ModelStreamInferHandler::Process(InferHandler::State* state, bool rpc_ok)
         TRITONSERVER_InferenceTraceId(
             next_read_state->trace_, &next_read_state->trace_id_);
         next_read_state->trace_manager_->CaptureTimestamp(
-            next_read_state->trace_id_, TRITONSERVER_TRACE_LEVEL_MIN,
+            next_read_state->trace_id_, TRITONSERVER_TRACE_LEVEL_TIMESTAMPS,
             "GRPC_WAITREAD_START");
       }
     }
@@ -3809,7 +3816,8 @@ ModelStreamInferHandler::Process(InferHandler::State* state, bool rpc_ok)
 #ifdef TRITON_ENABLE_TRACING
       if ((state->trace_manager_ != nullptr) && (state->trace_id_ != 0)) {
         state->trace_manager_->CaptureTimestamp(
-            state->trace_id_, TRITONSERVER_TRACE_LEVEL_MIN, "GRPC_SEND_END");
+            state->trace_id_, TRITONSERVER_TRACE_LEVEL_TIMESTAMPS,
+            "GRPC_SEND_END");
       }
 #endif  // TRITON_ENABLE_TRACING
 
@@ -3859,7 +3867,8 @@ ModelStreamInferHandler::Process(InferHandler::State* state, bool rpc_ok)
 #ifdef TRITON_ENABLE_TRACING
       if ((state->trace_manager_ != nullptr) && (state->trace_id_ != 0)) {
         state->trace_manager_->CaptureTimestamp(
-            state->trace_id_, TRITONSERVER_TRACE_LEVEL_MIN, "GRPC_SEND_END");
+            state->trace_id_, TRITONSERVER_TRACE_LEVEL_TIMESTAMPS,
+            "GRPC_SEND_END");
       }
 #endif  // TRITON_ENABLE_TRACING
 
