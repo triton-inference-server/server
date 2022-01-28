@@ -98,13 +98,13 @@ service nginx restart
 set +e
 
 # Test basic inference with https
-python $SIMPLE_INFER_CLIENT_PY -v -u localhost --ssl --keyfile client.key --certfile client.crt --cacerts ca.crt >> ${CLIENT_LOG}.ssl_infer 2>&1
+python $SIMPLE_INFER_CLIENT_PY -v -u localhost --ssl --key-file client.key --cert-file client.crt --ca-certs ca.crt >> ${CLIENT_LOG}.ssl_infer 2>&1
 if [ $? -ne 0 ]; then
     cat ${CLIENT_LOG}.ssl_infer
     RET=1
 fi
 
-$TEST_CLIENT -v -u https://localhost:443 --keyfile client.key --certfile client.crt --cacerts ca.crt >> ${CLIENT_LOG}.c++.ssl_infer 2>&1
+$TEST_CLIENT -v -u https://localhost:443 --key-file client.key --cert-file client.crt --ca-certs ca.crt >> ${CLIENT_LOG}.c++.ssl_infer 2>&1
 if [ $? -ne 0 ]; then
     cat ${CLIENT_LOG}.c++.ssl_infer
     RET=1
@@ -117,7 +117,7 @@ if [ $? -ne 0 ]; then
     RET=1
 fi
 
-$TEST_CLIENT -v -u https://localhost:443 --verifyhost 0 --verifypeer 0 >> ${CLIENT_LOG}.c++.ssl_infer_insecure 2>&1
+$TEST_CLIENT -v -u https://localhost:443 --verify-host 0 --verify-peer 0 >> ${CLIENT_LOG}.c++.ssl_infer_insecure 2>&1
 if [ $? -ne 0 ]; then
     cat ${CLIENT_LOG}.c++.ssl_infer_insecure
     RET=1
@@ -143,7 +143,7 @@ fi
 
 
 # Try with incorrect key
-$SIMPLE_INFER_CLIENT_PY -v -u localhost --ssl --keyfile client2.key --certfile client.crt --cacerts ca.crt >> ${CLIENT_LOG}.ssl_wrong_key 2>&1
+$SIMPLE_INFER_CLIENT_PY -v -u localhost --ssl --key-file client2.key --cert-file client.crt --ca-certs ca.crt >> ${CLIENT_LOG}.ssl_wrong_key 2>&1
 if [ $? -ne 0 ]; then
     cat ${CLIENT_LOG}.ssl_wrong_key
     echo -e "\n***\n*** Expected test failure\n***"
@@ -151,7 +151,7 @@ else
     RET=1
 fi
 
-$TEST_CLIENT -v -u https://localhost:443 --keyfile client2.key --certfile client.crt --cacerts ca.crt >> ${CLIENT_LOG}.c++.ssl_wrong_key 2>&1
+$TEST_CLIENT -v -u https://localhost:443 --key-file client2.key --cert-file client.crt --ca-certs ca.crt >> ${CLIENT_LOG}.c++.ssl_wrong_key 2>&1
 if [ $? -ne 0 ]; then
     cat ${CLIENT_LOG}.c++.ssl_wrong_key
     echo -e "\n***\n*** Expected test failure\n***"
