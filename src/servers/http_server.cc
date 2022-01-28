@@ -2201,10 +2201,10 @@ HTTPAPIServer::HandleInfer(
       // since this is the first place where we have access to trace
       // manager.
       trace_manager_->CaptureTimestamp(
-          trace_id, TRITONSERVER_TRACE_LEVEL_MIN, "HTTP_RECV_START",
+          trace_id, TRITONSERVER_TRACE_LEVEL_TIMESTAMPS, "HTTP_RECV_START",
           req->recv_start_ns);
       trace_manager_->CaptureTimestamp(
-          trace_id, TRITONSERVER_TRACE_LEVEL_MIN, "HTTP_RECV_END",
+          trace_id, TRITONSERVER_TRACE_LEVEL_TIMESTAMPS, "HTTP_RECV_END",
           req->recv_end_ns);
     }
   }
@@ -2344,11 +2344,11 @@ HTTPAPIServer::OKReplyCallback(evthr_t* thr, void* arg, void* shared)
   if ((infer_request->trace_manager_ != nullptr) &&
       (infer_request->trace_id_ != 0)) {
     infer_request->trace_manager_->CaptureTimestamp(
-        infer_request->trace_id_, TRITONSERVER_TRACE_LEVEL_MIN,
+        infer_request->trace_id_, TRITONSERVER_TRACE_LEVEL_TIMESTAMPS,
         "HTTP_SEND_START", request->send_start_ns);
     infer_request->trace_manager_->CaptureTimestamp(
-        infer_request->trace_id_, TRITONSERVER_TRACE_LEVEL_MIN, "HTTP_SEND_END",
-        request->send_end_ns);
+        infer_request->trace_id_, TRITONSERVER_TRACE_LEVEL_TIMESTAMPS,
+        "HTTP_SEND_END", request->send_end_ns);
   }
 #endif  // TRITON_ENABLE_TRACING
 
@@ -2369,11 +2369,11 @@ HTTPAPIServer::BADReplyCallback(evthr_t* thr, void* arg, void* shared)
   if ((infer_request->trace_manager_ != nullptr) &&
       (infer_request->trace_id_ != 0)) {
     infer_request->trace_manager_->CaptureTimestamp(
-        infer_request->trace_id_, TRITONSERVER_TRACE_LEVEL_MIN,
+        infer_request->trace_id_, TRITONSERVER_TRACE_LEVEL_TIMESTAMPS,
         "HTTP_SEND_START", request->send_start_ns);
     infer_request->trace_manager_->CaptureTimestamp(
-        infer_request->trace_id_, TRITONSERVER_TRACE_LEVEL_MIN, "HTTP_SEND_END",
-        request->send_end_ns);
+        infer_request->trace_id_, TRITONSERVER_TRACE_LEVEL_TIMESTAMPS,
+        "HTTP_SEND_END", request->send_end_ns);
   }
 #endif  // TRITON_ENABLE_TRACING
 

@@ -105,7 +105,102 @@ fi
 set -e
 
 # trace-rate == 1, trace-level=MIN make sure every request is traced
-SERVER_ARGS="--trace-file=trace_1.log --trace-level=MIN --trace-rate=1 --model-repository=$MODELSDIR"
+SERVER_ARGS="--trace-file=trace_min.log --trace-level=MIN --trace-rate=1 --model-repository=$MODELSDIR"
+SERVER_LOG="./inference_server_min.log"
+run_server
+if [ "$SERVER_PID" == "0" ]; then
+    echo -e "\n***\n*** Failed to start $SERVER\n***"
+    cat $SERVER_LOG
+    exit 1
+fi
+
+set +e
+
+for p in {1..10}; do
+    $SIMPLE_HTTP_CLIENT >> client_min.log 2>&1
+    if [ $? -ne 0 ]; then
+        RET=1
+    fi
+
+    $SIMPLE_GRPC_CLIENT >> client_min.log 2>&1
+    if [ $? -ne 0 ]; then
+        RET=1
+    fi
+done
+
+set -e
+
+kill $SERVER_PID
+wait $SERVER_PID
+
+set +e
+
+$TRACE_SUMMARY -t trace_min.log > summary_min.log
+
+if [ `grep -c "COMPUTE_INPUT_END" summary_min.log` != "20" ]; then
+    cat summary_min.log
+    echo -e "\n***\n*** Test Failed\n***"
+    RET=1
+fi
+
+if [ `grep -c ^simple summary_min.log` != "20" ]; then
+    cat summary_min.log
+    echo -e "\n***\n*** Test Failed\n***"
+    RET=1
+fi
+
+set -e
+
+# trace-rate == 9, trace-level=MAX
+SERVER_ARGS="--http-thread-count=1 --trace-file=trace_max.log \
+             --trace-level=MAX --trace-rate=9 --model-repository=$MODELSDIR"
+SERVER_LOG="./inference_server_max.log"
+run_server
+if [ "$SERVER_PID" == "0" ]; then
+    echo -e "\n***\n*** Failed to start $SERVER\n***"
+    cat $SERVER_LOG
+    exit 1
+fi
+
+set +e
+
+for p in {1..10}; do
+    $SIMPLE_HTTP_CLIENT >> client_max.log 2>&1
+    if [ $? -ne 0 ]; then
+        RET=1
+    fi
+
+    $SIMPLE_GRPC_CLIENT >> client_max.log 2>&1
+    if [ $? -ne 0 ]; then
+        RET=1
+    fi
+done
+
+set -e
+
+kill $SERVER_PID
+wait $SERVER_PID
+
+set +e
+
+$TRACE_SUMMARY -t trace_max.log > summary_max.log
+
+if [ `grep -c "COMPUTE_INPUT_END" summary_max.log` != "2" ]; then
+    cat summary_max.log
+    echo -e "\n***\n*** Test Failed\n***"
+    RET=1
+fi
+
+if [ `grep -c ^simple summary_max.log` != "2" ]; then
+    cat summary_max.log
+    echo -e "\n***\n*** Test Failed\n***"
+    RET=1
+fi
+
+set -e
+
+# trace-rate == 1, trace-level=TIMESTAMPS make sure every request is traced
+SERVER_ARGS="--trace-file=trace_1.log --trace-level=TIMESTAMPS --trace-rate=1 --model-repository=$MODELSDIR"
 SERVER_LOG="./inference_server_1.log"
 run_server
 if [ "$SERVER_PID" == "0" ]; then
@@ -151,9 +246,9 @@ fi
 
 set -e
 
-# trace-rate == 6, trace-level=MIN
+# trace-rate == 6, trace-level=TIMESTAMPS
 SERVER_ARGS="--http-thread-count=1 --trace-file=trace_6.log \
-             --trace-level=MIN --trace-rate=6 --model-repository=$MODELSDIR"
+             --trace-level=TIMESTAMPS --trace-rate=6 --model-repository=$MODELSDIR"
 SERVER_LOG="./inference_server_6.log"
 run_server
 if [ "$SERVER_PID" == "0" ]; then
@@ -199,9 +294,9 @@ fi
 
 set -e
 
-# trace-rate == 9, trace-level=MAX
+# trace-rate == 9, trace-level=TIMESTAMPS
 SERVER_ARGS="--http-thread-count=1 --trace-file=trace_9.log \
-             --trace-level=MAX --trace-rate=9 --model-repository=$MODELSDIR"
+             --trace-level=TIMESTAMPS --trace-rate=9 --model-repository=$MODELSDIR"
 SERVER_LOG="./inference_server_9.log"
 run_server
 if [ "$SERVER_PID" == "0" ]; then
@@ -269,9 +364,9 @@ mkdir -p $MODELSDIR/simple/1 && \
 cp -r $ENSEMBLEDIR/nop_TYPE_INT32_-1 $MODELSDIR/. && \
     mkdir -p $MODELSDIR/nop_TYPE_INT32_-1/1
 
-# trace-rate == 1, trace-level=MAX
+# trace-rate == 1, trace-level=TIMESTAMPS
 SERVER_ARGS="--http-thread-count=1 --trace-file=trace_ensemble.log \
-             --trace-level=MAX --trace-rate=1 --model-repository=$MODELSDIR"
+             --trace-level=TIMESTAMPS --trace-rate=1 --model-repository=$MODELSDIR"
 SERVER_LOG="./inference_server_ensemble.log"
 run_server
 if [ "$SERVER_PID" == "0" ]; then
@@ -334,5 +429,91 @@ if [ $RET -eq 0 ]; then
 else
     echo -e "\n***\n*** Test FAILED\n***"
 fi
+
+# trace-rate == 1, trace-level=TIMESTAMPS, trace-level=TENSORS
+SERVER_ARGS="--http-thread-count=1 --trace-file=trace_ensemble_tensor.log \
+             --trace-level=TIMESTAMPS --trace-level=TENSORS --trace-rate=1 --model-repository=$MODELSDIR"
+SERVER_LOG="./inference_server_ensemble_tensor.log"
+run_server
+if [ "$SERVER_PID" == "0" ]; then
+    echo -e "\n***\n*** Failed to start $SERVER\n***"
+    cat $SERVER_LOG
+    exit 1
+fi
+
+set +e
+
+$SIMPLE_HTTP_CLIENT >> client_ensemble_tensor.log 2>&1
+if [ $? -ne 0 ]; then
+    echo -e "\n***\n*** Test Failed\n***"
+    RET=1
+fi
+
+set -e
+
+kill $SERVER_PID
+wait $SERVER_PID
+
+set +e
+
+$TRACE_SUMMARY -t trace_ensemble_tensor.log > summary_ensemble_tensor.log
+
+# Check if the traces are captured with proper hierarchy
+if [ `grep -c "COMPUTE_INPUT_END" summary_ensemble_tensor.log` != "7" ]; then
+    echo -e "Ensemble trace tensors log expects 7 compute"
+    RET=1
+fi
+for trace_str in \
+        "{\"id\":$((GRPC_ID_OFFSET+1)),\"model_name\":\"simple\",\"model_version\":1}" \
+        "{\"id\":$((GRPC_ID_OFFSET+2)),\"model_name\":\"nop_TYPE_INT32_-1\",\"model_version\":1,\"parent_id\":$((GRPC_ID_OFFSET+1))}" \
+        "{\"id\":$((GRPC_ID_OFFSET+3)),\"model_name\":\"fan_${MODELBASE}\",\"model_version\":1,\"parent_id\":$((GRPC_ID_OFFSET+1))}" \
+        "{\"id\":$((GRPC_ID_OFFSET+4)),\"model_name\":\"nop_TYPE_INT32_-1\",\"model_version\":1,\"parent_id\":$((GRPC_ID_OFFSET+3))}" \
+        "{\"id\":$((GRPC_ID_OFFSET+5)),\"model_name\":\"${MODELBASE}\",\"model_version\":1,\"parent_id\":$((GRPC_ID_OFFSET+3))}" \
+        "{\"id\":$((GRPC_ID_OFFSET+6)),\"model_name\":\"nop_TYPE_INT32_-1\",\"model_version\":1,\"parent_id\":$((GRPC_ID_OFFSET+3))}" \
+        "{\"id\":$((GRPC_ID_OFFSET+7)),\"model_name\":\"nop_TYPE_INT32_-1\",\"model_version\":1,\"parent_id\":$((GRPC_ID_OFFSET+3))}" \
+        "{\"id\":$((GRPC_ID_OFFSET+8)),\"model_name\":\"nop_TYPE_INT32_-1\",\"model_version\":1,\"parent_id\":$((GRPC_ID_OFFSET+1))}" \
+        "{\"id\":$((GRPC_ID_OFFSET+9)),\"model_name\":\"nop_TYPE_INT32_-1\",\"model_version\":1,\"parent_id\":$((GRPC_ID_OFFSET+1))}" ; do
+    if [ `grep -c ${trace_str} trace_ensemble_tensor.log` != "1" ]; then
+        echo -e "Ensemble trace tensors log expects trace: ${trace_str}"
+        RET=1
+    fi
+done
+
+if [ `grep -c ^simple summary_ensemble_tensor.log` != "1" ]; then
+    cat summary_ensemble_tensor.log
+    echo -e "\n***\n*** Test Failed\n***"
+    RET=1
+fi
+
+if [ `grep -o TENSOR_QUEUE_INPUT trace_ensemble_tensor.log | wc -l` != "18" ]; then
+    echo -e "Ensemble trace tensors log expects 18 TENSOR_QUEUE_INPUTs"
+    RET=1
+fi
+
+if [ `grep -o TENSOR_BACKEND_OUTPUT trace_ensemble_tensor.log | wc -l` != "14" ]; then
+    echo -e "Ensemble trace tensors log expects 14 TENSOR_BACKEND_OUTPUTs"
+    RET=1
+fi
+
+for trace_str in \
+        "{\"id\":$((GRPC_ID_OFFSET+1)),\"activity\":\"TENSOR_QUEUE_INPUT\",\"tensor\":{\"name\":\"INPUT0\",\"data\":\"0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15\",\"shape\":\"1,16\",\"dtype\":\"INT32\"}}" \
+        "{\"id\":$((GRPC_ID_OFFSET+1)),\"activity\":\"TENSOR_QUEUE_INPUT\",\"tensor\":{\"name\":\"INPUT1\",\"data\":\"1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1\",\"shape\":\"1,16\",\"dtype\":\"INT32\"}}" \
+        "{\"id\":$((GRPC_ID_OFFSET+1)),\"activity\":\"TENSOR_BACKEND_OUTPUT\",\"tensor\":{\"name\":\"OUTPUT0\",\"data\":\"1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16\",\"shape\":\"1,16\",\"dtype\":\"INT32\"}}" \
+        "{\"id\":$((GRPC_ID_OFFSET+1)),\"activity\":\"TENSOR_BACKEND_OUTPUT\",\"tensor\":{\"name\":\"OUTPUT1\",\"data\":\"-1,0,1,2,3,4,5,6,7,8,9,10,11,12,13,14\",\"shape\":\"1,16\",\"dtype\":\"INT32\"}}" ; do
+    if [ `grep -c ${trace_str} trace_ensemble_tensor.log` != "1" ]; then
+        echo -e "Ensemble trace tensors log expects trace: ${trace_str}"
+        RET=1
+    fi
+done
+
+set -e
+
+
+if [ $RET -eq 0 ]; then
+    echo -e "\n***\n*** Test Passed\n***"
+else
+    echo -e "\n***\n*** Test FAILED\n***"
+fi
+
 
 exit $RET
