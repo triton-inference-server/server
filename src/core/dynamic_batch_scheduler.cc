@@ -164,6 +164,10 @@ DynamicBatchScheduler::Enqueue(std::unique_ptr<InferenceRequest>& request)
     INFER_TRACE_ACTIVITY(
         request->Trace(), TRITONSERVER_TRACE_QUEUE_START,
         request->QueueStartNs());
+#ifdef TRITON_ENABLE_TRACING
+    request->TraceInputTensors(
+        TRITONSERVER_TRACE_TENSOR_QUEUE_INPUT, "DynamicBatchScheduler Enqueue");
+#endif  // TRITON_ENABLE_TRACING
   }
 
   // Record time at the beginning of the batcher queueing. In the case of
@@ -172,11 +176,6 @@ DynamicBatchScheduler::Enqueue(std::unique_ptr<InferenceRequest>& request)
   // batcher won't be needing this value and it can be safely reused by
   // the dynamic batcher.
   request->CaptureBatcherStartNs();
-
-#ifdef TRITON_ENABLE_TRACING
-  request->TraceInputTensors(
-      TRITONSERVER_TRACE_TENSOR_QUEUE_INPUT, "DynamicBatchScheduler Enqueue");
-#endif  // TRITON_ENABLE_TRACING
 
   std::unique_ptr<InferenceResponse> cached_response;
 
