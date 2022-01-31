@@ -256,11 +256,9 @@ class SequenceBatch {
   std::shared_ptr<SequenceBatchScheduler::ControlInputs>
       notready_input_overrides_;
 
-  // For each sequence slot the correlation ID input for that
-  // slot. Empty if model does not specify the CONTROL_SEQUENCE_CORRID
-  // control.
-  std::vector<std::shared_ptr<InferenceRequest::Input>>
-      seq_slot_corrid_overrides_;
+  // The correlation ID override. Empty if model does not specify the
+  // CONTROL_SEQUENCE_CORRID control.
+  std::shared_ptr<InferenceRequest::Input> seq_slot_corrid_override_;
 
   // For each sequence slot store the optional state i/o tensors.
   std::vector<std::shared_ptr<SequenceStates>> sequence_states_;

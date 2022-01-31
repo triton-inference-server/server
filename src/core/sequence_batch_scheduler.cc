@@ -934,44 +934,12 @@ SequenceBatch::CreateCorrelationIDControl(const inference::ModelConfig& config)
       tensor_shape_with_batch_dim.push_back(1);
     }
 
-    size_t size_p = GetDataTypeByteSize(correlation_id_datatype);
-    if (correlation_id_datatype == inference::DataType::TYPE_STRING) {
-      // 4 bytes for length of string plus pre-defined max string correlation id
-      // length in bytes
-      size_p =
-          4 + nvidia::inferenceserver::STRING_CORRELATION_ID_MAX_LENGTH_BYTES;
-    }
-    for (size_t b = 0; b < seq_slot_cnt_; ++b) {
-      TRITONSERVER_MemoryType memory_type;
-      int64_t memory_type_id;
+    auto override = std::make_shared<InferenceRequest::Input>(
+        correlation_id_tensor_name, correlation_id_datatype, tensor_shape);
+    *override->MutableShape() = override->OriginalShape();
+    *override->MutableShapeWithBatchDim() = tensor_shape_with_batch_dim;
 
-      auto corrid_p =
-          std::make_shared<AllocatedMemory>(size_p, TRITONSERVER_MEMORY_CPU, 0);
-      char* corrid_p_ptr =
-          corrid_p->MutableBuffer(&memory_type, &memory_type_id);
-      if ((corrid_p_ptr == nullptr) ||
-          ((memory_type != TRITONSERVER_MEMORY_CPU) &&
-           (memory_type != TRITONSERVER_MEMORY_CPU_PINNED)) ||
-          (memory_type_id != 0)) {
-        LOG_ERROR << "failed to allocate sequence CORRID control signal in CPU "
-                     "memory";
-        return false;
-      }
-
-      auto override = std::make_shared<InferenceRequest::Input>(
-          correlation_id_tensor_name, correlation_id_datatype, tensor_shape);
-      *override->MutableShape() = override->OriginalShape();
-      *override->MutableShapeWithBatchDim() = tensor_shape_with_batch_dim;
-      corrid_status = override->SetData(corrid_p);
-      if (!corrid_status.IsOk()) {
-        LOG_ERROR << "failed creating CORRID control for sequence-batch "
-                     "scheduler thread "
-                  << batcher_idx_ << " for " << config.name();
-        return false;
-      }
-
-      seq_slot_corrid_overrides_.push_back(std::move(override));
-    }
+    seq_slot_corrid_override_ = std::move(override);
   }
 
   return true;
@@ -1008,26 +976,56 @@ SequenceBatch::SetControlTensors(
   }
 
   // Set correlation ID control tensor if requested by the model.
-  if (!seq_slot_corrid_overrides_.empty()) {
-    const std::shared_ptr<InferenceRequest::Input>& input =
-        seq_slot_corrid_overrides_[seq_slot];
-    AllocatedMemory* data =
-        reinterpret_cast<AllocatedMemory*>(input->Data().get());
-    char* slot_corrid_ptr = data->MutableBuffer();
+  if (seq_slot_corrid_override_ != nullptr) {
+    auto& seq_corr_id = seq_slot_corrid_override_;
+    size_t size_p = GetDataTypeByteSize(seq_corr_id->DType());
+    if (seq_corr_id->DType() == inference::DataType::TYPE_STRING) {
+      // 4 bytes for length of string plus pre-defined max string correlation id
+      // length in bytes
+      size_p =
+          4 + nvidia::inferenceserver::STRING_CORRELATION_ID_MAX_LENGTH_BYTES;
+    }
+
+    TRITONSERVER_MemoryType memory_type;
+    int64_t memory_type_id;
+    auto corrid_p =
+        std::make_shared<AllocatedMemory>(size_p, TRITONSERVER_MEMORY_CPU, 0);
+    char* corrid_p_ptr = corrid_p->MutableBuffer(&memory_type, &memory_type_id);
+    if ((corrid_p_ptr == nullptr) ||
+        ((memory_type != TRITONSERVER_MEMORY_CPU) &&
+         (memory_type != TRITONSERVER_MEMORY_CPU_PINNED)) ||
+        (memory_type_id != 0)) {
+      LOG_ERROR << "failed to allocate sequence CORRID control signal in CPU "
+                   "memory";
+      return;
+    }
+
+    auto override = std::make_shared<InferenceRequest::Input>(
+        seq_corr_id->Name(), seq_corr_id->DType(), seq_corr_id->Shape());
+    *override->MutableShape() = override->OriginalShape();
+    *override->MutableShapeWithBatchDim() = seq_corr_id->ShapeWithBatchDim();
+    Status corrid_status = override->SetData(corrid_p);
+    if (!corrid_status.IsOk()) {
+      LOG_ERROR << "failed creating CORRID control for sequence-batch "
+                   "scheduler thread "
+                << batcher_idx_ << " for " << seq_corr_id->Name();
+      return;
+    }
+
     if (corrid.Type() == InferenceRequest::SequenceId::DataType::STRING) {
       std::string correlation_id = corrid.StringValue();
       uint32_t correlation_id_length = correlation_id.length();
-      memcpy(slot_corrid_ptr, &correlation_id_length, sizeof(uint32_t));
+      memcpy(corrid_p_ptr, &correlation_id_length, sizeof(uint32_t));
       memcpy(
-          slot_corrid_ptr + sizeof(uint32_t), correlation_id.c_str(),
+          corrid_p_ptr + sizeof(uint32_t), correlation_id.c_str(),
           correlation_id_length);
     } else if (
         corrid.Type() == InferenceRequest::SequenceId::DataType::UINT64) {
       uint64_t correlation_id = corrid.UnsignedIntValue();
-      const char* corrid_p = reinterpret_cast<const char*>(&correlation_id);
-      memcpy(slot_corrid_ptr, corrid_p, data->TotalByteSize());
+      const char* corrid_ptr = reinterpret_cast<const char*>(&correlation_id);
+      memcpy(corrid_p_ptr, corrid_ptr, size_p);
     }
-    irequest->AddOverrideInput(input);
+    irequest->AddOverrideInput(override);
   }
 }
 
@@ -1402,8 +1400,7 @@ DirectSequenceBatch::BatcherThread(const int nice)
             std::unique_ptr<InferenceRequest>& irequest = queue.front();
 
             // Set the control tensor values in the request.
-            SetControlTensors(
-                irequest, seq_slot, seq_slot_correlation_ids_[seq_slot]);
+            SetControlTensors(irequest, seq_slot, irequest->CorrelationId());
 
             // Update the implicit state and set the input state tensors.
             UpdateImplicitState(irequest, seq_slot);
