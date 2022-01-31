@@ -127,11 +127,11 @@ typically applies when perf_analyzer is running on the same system as
 Triton. The first rule is that for minimum latency set the request
 concurrency to 1 and disable the dynamic batcher and use only 1 [model
 instance](#model-instances). The second rule is that for maximum
-throughput set the request concurrency to be `2 * <maximum batch size>
-* <model instance count>`. We will discuss model instances
-[below](#model-instances), for now we are working with one model
-instance. So for maximum-batch-size 4 we want to run perf_analyzer
-with request concurrency of `2 * 4 * 1 = 8`.
+throughput set the request concurrency to be
+`2 * <maximum batch size> * <model instance count>`. We will discuss
+model instances [below](#model-instances), for now we are working with
+one model instance. So for maximum-batch-size 4 we want to run
+perf_analyzer with request concurrency of `2 * 4 * 1 = 8`.
 
 ```
 $ perf_analyzer -m inception_graphdef --percentile=95 --concurrency-range 8
