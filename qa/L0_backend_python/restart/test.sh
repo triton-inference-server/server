@@ -1,4 +1,5 @@
-# Copyright (c) 2021, NVIDIA CORPORATION. All rights reserved.
+#!/bin/bash
+# Copyright 2021-2022, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -24,16 +25,13 @@
 # (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-CLIENT_PY=./python_test.py
 CLIENT_LOG="./client.log"
 EXPECTED_NUM_TESTS="7"
-SERVER=/opt/tritonserver/bin/tritonserver
-BASE_SERVER_ARGS="--model-repository=`pwd`/models --log-verbose=1"
-PYTHON_BACKEND_BRANCH=$PYTHON_BACKEND_REPO_TAG
-SERVER_ARGS=$BASE_SERVER_ARGS
+TRITON_DIR=${TRITON_DIR:="/opt/tritonserver"}
+SERVER=${TRITON_DIR}/bin/tritonserver
+BACKEND_DIR=${TRITON_DIR}/backends
+SERVER_ARGS="--model-repository=`pwd`/models --backend-directory=${BACKEND_DIR} --log-verbose=1"
 SERVER_LOG="./inference_server.log"
-REPO_VERSION=${NVIDIA_TRITON_SERVER_VERSION}
-DATADIR=${DATADIR:="/data/inferenceserver/${REPO_VERSION}"}
 source ../../common/util.sh
 source ../common.sh
 

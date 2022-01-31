@@ -711,7 +711,25 @@ TRITONBACKEND_StateBuffer(
   if (to->Data()->TotalByteSize() == buffer_byte_size) {
     const std::shared_ptr<AllocatedMemory>& memory =
         reinterpret_cast<const std::shared_ptr<AllocatedMemory>&>(to->Data());
-    *buffer = memory->MutableBuffer(memory_type, memory_type_id);
+
+    TRITONSERVER_MemoryType current_memory_type;
+    int64_t current_memory_type_id;
+    void* lbuffer =
+        memory->MutableBuffer(&current_memory_type, &current_memory_type_id);
+
+    // If the requested memory type doesn't match the current buffer, allocate a
+    // new buffer with the requested memory type and memory type id.
+    if (current_memory_type == *memory_type &&
+        current_memory_type_id == *memory_type_id) {
+      *buffer = lbuffer;
+    } else {
+      std::shared_ptr<AllocatedMemory> memory =
+          std::make_shared<AllocatedMemory>(
+              buffer_byte_size, *memory_type, *memory_type_id);
+      *buffer = memory->MutableBuffer(memory_type, memory_type_id);
+      to->RemoveAllData();
+      status = to->SetData(memory);
+    }
   } else {
     std::shared_ptr<AllocatedMemory> memory = std::make_shared<AllocatedMemory>(
         buffer_byte_size, *memory_type, *memory_type_id);

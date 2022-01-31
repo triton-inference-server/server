@@ -66,6 +66,7 @@ def save_model(
         raise MlflowException(message="Path '{}' already exists".format(path),
                               error_code=RESOURCE_ALREADY_EXISTS)
     os.makedirs(path)
+    triton_model_path = os.path.normpath(triton_model_path)
     model_data_subpath = os.path.basename(triton_model_path)
     model_data_path = os.path.join(path, model_data_subpath)
 

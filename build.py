@@ -75,7 +75,7 @@ from distutils.dir_util import copy_tree
 # be invoked with appropriate backend configuration:
 # (--backend-config=openvino,version=<version_str>)
 # The version string can be obtained as follows:
-# <major_version>_<minor_version>[_pre] 
+# <major_version>_<minor_version>[_pre]
 # Append '_pre' only if the openVINO backend was built with prebuilt openVINO
 # library. In other words, when the second element of the pair is not None.
 # To use ('2021.2', None) version_str should be `2021_2'.
@@ -238,7 +238,7 @@ def makeinstall(cwd, target='install'):
     log_verbose('make {}'.format(target))
 
     if target_platform() == 'windows':
-        verbose_flag = '-v:detailed' if FLAGS.verbose else '-clp:ErrorsOnly'
+        verbose_flag = '' if FLAGS.verbose else '-clp:ErrorsOnly'
         buildtype_flag = '-p:Configuration={}'.format(FLAGS.build_type)
         p = subprocess.Popen([
             'msbuild.exe', '-m:{}'.format(str(FLAGS.build_parallel)),

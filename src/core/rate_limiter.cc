@@ -156,7 +156,7 @@ RateLimiter::EnqueuePayload(
         this->SchedulePayload(mi->RawInstance(), payload_queue, payload);
       }
       auto cb = [mi]() { mi->Release(); };
-      payload->SetSecondaryCallback(cb);
+      payload->AddInternalReleaseCallback(cb);
       if (mi->RawInstance() == nullptr) {
         payload_queue->cv_.notify_one();
       } else {
@@ -253,7 +253,7 @@ RateLimiter::GetPayload(
 void
 RateLimiter::PayloadRelease(std::shared_ptr<Payload>& payload)
 {
-  payload->SecondaryCallback();
+  payload->OnRelease();
   if (max_payload_bucket_count_ > 0) {
     std::lock_guard<std::mutex> lock(alloc_mu_);
 

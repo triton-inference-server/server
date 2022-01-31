@@ -761,6 +761,10 @@ TRITONSERVER_InferenceTraceLevelString(TRITONSERVER_InferenceTraceLevel level)
       return "MIN";
     case TRITONSERVER_TRACE_LEVEL_MAX:
       return "MAX";
+    case TRITONSERVER_TRACE_LEVEL_TIMESTAMPS:
+      return "TIMESTAMPS";
+    case TRITONSERVER_TRACE_LEVEL_TENSORS:
+      return "TENSORS";
   }
 
   return "<unknown>";
@@ -785,6 +789,12 @@ TRITONSERVER_InferenceTraceActivityString(
       return "COMPUTE_END";
     case TRITONSERVER_TRACE_REQUEST_END:
       return "REQUEST_END";
+    case TRITONSERVER_TRACE_TENSOR_QUEUE_INPUT:
+      return "TENSOR_QUEUE_INPUT";
+    case TRITONSERVER_TRACE_TENSOR_BACKEND_INPUT:
+      return "TENSOR_BACKEND_INPUT";
+    case TRITONSERVER_TRACE_TENSOR_BACKEND_OUTPUT:
+      return "TENSOR_BACKEND_OUTPUT";
   }
 
   return "<unknown>";
@@ -797,8 +807,48 @@ TRITONSERVER_InferenceTraceNew(
     TRITONSERVER_InferenceTraceReleaseFn_t release_fn, void* trace_userp)
 {
 #ifdef TRITON_ENABLE_TRACING
+  if ((level & TRITONSERVER_TRACE_LEVEL_MIN) > 0) {
+    level = static_cast<TRITONSERVER_InferenceTraceLevel>(
+        (level ^ TRITONSERVER_TRACE_LEVEL_MIN) |
+        TRITONSERVER_TRACE_LEVEL_TIMESTAMPS);
+  }
+  if ((level & TRITONSERVER_TRACE_LEVEL_MAX) > 0) {
+    level = static_cast<TRITONSERVER_InferenceTraceLevel>(
+        (level ^ TRITONSERVER_TRACE_LEVEL_MAX) |
+        TRITONSERVER_TRACE_LEVEL_TIMESTAMPS);
+  }
   ni::InferenceTrace* ltrace = new ni::InferenceTrace(
-      level, parent_id, activity_fn, release_fn, trace_userp);
+      level, parent_id, activity_fn, nullptr, release_fn, trace_userp);
+  *trace = reinterpret_cast<TRITONSERVER_InferenceTrace*>(ltrace);
+  return nullptr;  // Success
+#else
+  *trace = nullptr;
+  return TRITONSERVER_ErrorNew(
+      TRITONSERVER_ERROR_UNSUPPORTED, "inference tracing not supported");
+#endif  // TRITON_ENABLE_TRACING
+}
+
+TRITONSERVER_DECLSPEC TRITONSERVER_Error*
+TRITONSERVER_InferenceTraceTensorNew(
+    TRITONSERVER_InferenceTrace** trace, TRITONSERVER_InferenceTraceLevel level,
+    uint64_t parent_id, TRITONSERVER_InferenceTraceActivityFn_t activity_fn,
+    TRITONSERVER_InferenceTraceTensorActivityFn_t tensor_activity_fn,
+    TRITONSERVER_InferenceTraceReleaseFn_t release_fn, void* trace_userp)
+{
+#ifdef TRITON_ENABLE_TRACING
+  if ((level & TRITONSERVER_TRACE_LEVEL_MIN) > 0) {
+    level = static_cast<TRITONSERVER_InferenceTraceLevel>(
+        (level ^ TRITONSERVER_TRACE_LEVEL_MIN) |
+        TRITONSERVER_TRACE_LEVEL_TIMESTAMPS);
+  }
+  if ((level & TRITONSERVER_TRACE_LEVEL_MAX) > 0) {
+    level = static_cast<TRITONSERVER_InferenceTraceLevel>(
+        (level ^ TRITONSERVER_TRACE_LEVEL_MAX) |
+        TRITONSERVER_TRACE_LEVEL_TIMESTAMPS);
+  }
+  ni::InferenceTrace* ltrace = new ni::InferenceTrace(
+      level, parent_id, activity_fn, tensor_activity_fn, release_fn,
+      trace_userp);
   *trace = reinterpret_cast<TRITONSERVER_InferenceTrace*>(ltrace);
   return nullptr;  // Success
 #else
@@ -1016,7 +1066,6 @@ TRITONSERVER_ServerOptionsAddRateLimiterResource(
   return loptions->AddRateLimiterResource(name, count, device);
 }
 
-
 TRITONSERVER_Error*
 TRITONSERVER_ServerOptionsSetPinnedMemoryPoolByteSize(
     TRITONSERVER_ServerOptions* options, uint64_t size)
@@ -1230,7 +1279,6 @@ TRITONSERVER_ServerOptionsSetHostPolicy(
       reinterpret_cast<TritonServerOptions*>(options);
   return loptions->SetHostPolicy(policy_name, setting, value);
 }
-
 
 //
 // TRITONSERVER_InferenceRequest
@@ -1470,7 +1518,6 @@ TRITONSERVER_InferenceRequestAppendInputDataWithHostPolicy(
 
   return nullptr;  // Success
 }
-
 
 TRITONSERVER_Error*
 TRITONSERVER_InferenceRequestRemoveAllInputData(
@@ -2395,8 +2442,7 @@ TRITONSERVER_ServerInferAsync(
     ltrace->SetModelName(lrequest->ModelName());
     ltrace->SetModelVersion(lrequest->ActualModelVersion());
 
-    std::unique_ptr<ni::InferenceTrace> utrace(ltrace);
-    lrequest->SetTrace(std::move(utrace));
+    lrequest->SetTrace(std::make_shared<ni::InferenceTraceProxy>(ltrace));
 #else
     return TRITONSERVER_ErrorNew(
         TRITONSERVER_ERROR_UNSUPPORTED, "inference tracing not supported");
@@ -2414,10 +2460,7 @@ TRITONSERVER_ServerInferAsync(
   // object associated with the inference request above.
 #ifdef TRITON_ENABLE_TRACING
   if (!status.IsOk()) {
-    std::unique_ptr<ni::InferenceTrace>* trace = ureq->MutableTrace();
-    if (*trace != nullptr) {
-      ni::InferenceTrace::Release(std::move(*trace));
-    }
+    ureq->ReleaseTrace();
   }
 #endif  // TRITON_ENABLE_TRACING
 

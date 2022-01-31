@@ -1,5 +1,5 @@
 #!/bin/bash
-# Copyright 2021-2022, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright (c) 2022, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -25,58 +25,47 @@
 # (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-UNITTEST_PY=./io_test.py
-CLIENT_LOG="./client.log"
-EXPECTED_NUM_TESTS="1"
-TEST_RESULT_FILE='test_results.txt'
-source ../common.sh
-source ../../common/util.sh
+export CUDA_VISIBLE_DEVICES=0
 
-TRITON_DIR=${TRITON_DIR:="/opt/tritonserver"}
-SERVER=${TRITON_DIR}/bin/tritonserver
-BACKEND_DIR=${TRITON_DIR}/backends
+TRITON_COMMON_REPO_TAG=${TRITON_COMMON_REPO_TAG:="main"}
 
-SERVER_ARGS="--model-repository=`pwd`/models --backend-directory=${BACKEND_DIR} --log-verbose=1"
+SIMPLE_NODEJS_CLIENT=client.js
+
+SERVER=/opt/tritonserver/bin/tritonserver
+SERVER_ARGS=--model-repository=`pwd`/models
 SERVER_LOG="./inference_server.log"
+source ../common/util.sh
 
-RET=0
-rm -fr *.log ./models
-
-pip3 uninstall -y torch
-pip3 install torch==1.9.0+cu111 -f https://download.pytorch.org/whl/torch_stable.html
-
-for i in {1..3}; do
-    model_name=dlpack_io_identity_$i
-    mkdir -p models/$model_name/1/
-    cp ../../python_models/dlpack_io_identity/model.py ./models/$model_name/1/
-    cp ../../python_models/dlpack_io_identity/config.pbtxt ./models/$model_name/
-    (cd models/$model_name && \
-              sed -i "s/^name:.*/name: \"$model_name\"/" config.pbtxt)
-done
-
-mkdir -p models/ensemble_io/1/
-cp ../../python_models/ensemble_io/config.pbtxt ./models/ensemble_io
+rm -f *.log
 
 run_server
 if [ "$SERVER_PID" == "0" ]; then
     echo -e "\n***\n*** Failed to start $SERVER\n***"
     cat $SERVER_LOG
+    exit 1
+fi
+
+RET=0
+
+# Get the proto files from the common repo
+rm -fr common
+git clone --single-branch --depth=1 -b $TRITON_COMMON_REPO_TAG \
+    https://github.com/triton-inference-server/common.git
+mkdir proto && cp common/protobuf/*.proto proto/.
+
+npm install
+
+set +e
+
+# Runs test for GRPC variant of nodejs client
+node $SIMPLE_NODEJS_CLIENT >> client.log 2>&1
+if [ $? -ne 0 ]; then
     RET=1
 fi
 
-set +e
-python3 $UNITTEST_PY > $CLIENT_LOG
-if [ $? -ne 0 ]; then
-    echo -e "\n***\n*** io_test.py FAILED. \n***"
-    cat $CLIENT_LOG
+if [ `grep -c "Checking Inference Output" client.log` != "1" ]; then
+    echo -e "\n***\n*** Failed. Unable to run inference.\n***"
     RET=1
-else
-    check_test_results $TEST_RESULT_FILE $EXPECTED_NUM_TESTS
-    if [ $? -ne 0 ]; then
-        cat $CLIENT_LOG
-        echo -e "\n***\n*** Test Result Verification Failed\n***"
-        RET=1
-    fi
 fi
 
 set -e
@@ -85,9 +74,9 @@ kill $SERVER_PID
 wait $SERVER_PID
 
 if [ $RET -eq 0 ]; then
-    echo -e "\n***\n*** IO test PASSED.\n***"
+    echo -e "\n***\n*** Test Passed\n***"
 else
-    echo -e "\n***\n*** IO test FAILED.\n***"
+    echo -e "\n***\n*** Test FAILED\n***"
 fi
 
 exit $RET

@@ -1,5 +1,5 @@
 #!/bin/bash
-# Copyright 2021, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright 2021-2022, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -32,8 +32,6 @@ CLIENT_LOG="./client.log"
 EXPECTED_NUM_TESTS="1"
 TEST_RESULT_FILE='test_results.txt'
 SERVER_LOG="./inference_server.log"
-REPO_VERSION=${NVIDIA_TRITON_SERVER_VERSION}
-DATADIR=${DATADIR:="/data/inferenceserver/${REPO_VERSION}"}
 
 RET=0
 rm -fr *.log ./models
@@ -42,7 +40,7 @@ source ../../common/util.sh
 
 # Uninstall the non CUDA version of PyTorch
 pip3 uninstall -y torch
-pip3 install torch==1.9.0+cu111 torchvision==0.10.0+cu111 torchaudio==0.9.0 -f https://download.pytorch.org/whl/torch_stable.html
+pip3 install torch==1.9.0+cu111 -f https://download.pytorch.org/whl/torch_stable.html
 pip3 install tensorflow
 
 rm -fr *.log ./models

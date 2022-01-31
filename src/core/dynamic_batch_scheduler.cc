@@ -164,6 +164,10 @@ DynamicBatchScheduler::Enqueue(std::unique_ptr<InferenceRequest>& request)
     INFER_TRACE_ACTIVITY(
         request->Trace(), TRITONSERVER_TRACE_QUEUE_START,
         request->QueueStartNs());
+#ifdef TRITON_ENABLE_TRACING
+    request->TraceInputTensors(
+        TRITONSERVER_TRACE_TENSOR_QUEUE_INPUT, "DynamicBatchScheduler Enqueue");
+#endif  // TRITON_ENABLE_TRACING
   }
 
   // Record time at the beginning of the batcher queueing. In the case of
@@ -220,13 +224,13 @@ DynamicBatchScheduler::Enqueue(std::unique_ptr<InferenceRequest>& request)
 
       // If there are any idle runners and the queued batch size is greater or
       // equal to next preferred batch size, then wake batcher up to service
-      // this request. We do the actual wake outside of the lock to avoid having
-      // the woken thread immediately block on the lock
+      // this request. We do the actual wake outside of the lock to avoid
+      // having the woken thread immediately block on the lock
       wake_batcher =
           model_->Server()->GetRateLimiter()->PayloadSlotAvailable(model_);
 
-      // We may wake up runner less often if we don't enforce equal shape within
-      // a batch, otherwise must always wake up runner to check it
+      // We may wake up runner less often if we don't enforce equal shape
+      // within a batch, otherwise must always wake up runner to check it
       if (enforce_equal_shape_tensors_.empty()) {
         std::lock_guard<std::mutex> exec_lock(*(curr_payload_->GetExecMutex()));
         auto payload_state = curr_payload_->GetState();

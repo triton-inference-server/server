@@ -34,9 +34,12 @@ import unittest
 import numpy as np
 import test_util as tu
 import requests as httpreq
+import os
 
 from tritonclient.utils import *
 import tritonclient.http as httpclient
+
+TEST_JETSON = bool(int(os.environ.get('TEST_JETSON', 0)))
 
 
 class PythonTest(tu.TestResultCollector):
@@ -53,36 +56,40 @@ class PythonTest(tu.TestResultCollector):
             output0 = result.as_numpy('OUTPUT0')
             self.assertTrue(np.all(input_data_0 == output0))
 
-    def test_growth_error(self):
-        # 2 MiBs
-        total_byte_size = 2 * 1024 * 1024
-        shape = [total_byte_size]
-        model_name = 'identity_uint8_nobatch'
-        dtype = np.uint8
-        self._infer_help(model_name, shape, dtype)
+    # We do not use a docker on Jetson so it does not impose a shared memory allocation limit of 1GB.
+    # This means test will pass without the expected error on jetson and is hence unnecessary.
+    if not TEST_JETSON:
 
-        # 1 GiB payload leads to error in the main Python backned process.
-        # Total shared memory available is 1GiB.
-        total_byte_size = 1024 * 1024 * 1024
-        shape = [total_byte_size]
-        with self.assertRaises(InferenceServerException) as ex:
+        def test_growth_error(self):
+            # 2 MiBs
+            total_byte_size = 2 * 1024 * 1024
+            shape = [total_byte_size]
+            model_name = 'identity_uint8_nobatch'
+            dtype = np.uint8
             self._infer_help(model_name, shape, dtype)
-        self.assertIn("Failed to increase the shared memory pool size",
-                      str(ex.exception))
 
-        # 512 MiBs payload leads to error in the Python stub process.
-        total_byte_size = 512 * 1024 * 1024
-        shape = [total_byte_size]
-        with self.assertRaises(InferenceServerException) as ex:
+            # 1 GiB payload leads to error in the main Python backned process.
+            # Total shared memory available is 1GiB.
+            total_byte_size = 1024 * 1024 * 1024
+            shape = [total_byte_size]
+            with self.assertRaises(InferenceServerException) as ex:
+                self._infer_help(model_name, shape, dtype)
+            self.assertIn("Failed to increase the shared memory pool size",
+                          str(ex.exception))
+
+            # 512 MiBs payload leads to error in the Python stub process.
+            total_byte_size = 512 * 1024 * 1024
+            shape = [total_byte_size]
+            with self.assertRaises(InferenceServerException) as ex:
+                self._infer_help(model_name, shape, dtype)
+            self.assertIn("Failed to increase the shared memory pool size",
+                          str(ex.exception))
+
+            # 2 MiBs
+            # Send a small paylaod to make sure it is still working properly
+            total_byte_size = 2 * 1024 * 1024
+            shape = [total_byte_size]
             self._infer_help(model_name, shape, dtype)
-        self.assertIn("Failed to increase the shared memory pool size",
-                      str(ex.exception))
-
-        # 2 MiBs
-        # Send a small paylaod to make sure it is still working properly
-        total_byte_size = 2 * 1024 * 1024
-        shape = [total_byte_size]
-        self._infer_help(model_name, shape, dtype)
 
     def test_async_infer(self):
         model_name = "identity_uint8"

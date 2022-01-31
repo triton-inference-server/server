@@ -241,7 +241,16 @@ add_executable(
   $<TARGET_OBJECTS:proto-library>
 )
 
-set_property(TARGET main PROPERTY OUTPUT_NAME tritonserver)
+# On windows a *.lib file can be generated for a exe. When creating
+# tritonserver.exe if we try to create tritonserver.lib it will fail
+# because there is already a trtionserver.lib for tritonserver.dll,
+# this causes the build to fail. To avoid we keep the build name as
+# main.exe and then for windows after installing we rename it to
+# tritonserver.exe (below in the install steps).
+if (NOT WIN32)
+  set_property(TARGET main PROPERTY OUTPUT_NAME tritonserver)
+endif()
+
 if(${TRITON_ENABLE_GPU})
   target_include_directories(main PRIVATE ${CUDA_INCLUDE_DIRS})
 endif() # TRITON_ENABLE_GPU
@@ -277,10 +286,23 @@ target_link_libraries(
   PRIVATE ${CUDA_LIBRARIES}
 )
 endif() # TRITON_ENABLE_GPU
+
+if (NOT WIN32)
 install(
   TARGETS main
   RUNTIME DESTINATION bin
 )
+else()
+  # See explanation above as to why we need to rename main.exe to
+  # tritonserver.exe as part of the install process on windows.
+  install(
+    PROGRAMS ${CMAKE_CURRENT_BINARY_DIR}/${CMAKE_BUILD_TYPE}/main.exe
+    DESTINATION bin
+    RENAME tritonserver.exe
+  )
+endif()
+
+
 
 if (NOT WIN32)
 #
