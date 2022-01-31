@@ -160,6 +160,7 @@ class RateLimiter {
     void WaitForRemoval();
 
     TritonModelInstance* triton_model_instance_;
+    size_t index_;
     ModelContext* model_context_;
     RateLimiterConfig rate_limiter_config_;
     StandardStageFunc OnStage_;

@@ -546,6 +546,7 @@ RateLimiter::ModelInstanceContext::ModelInstanceContext(
     RateLimiter::StandardStageFunc OnStage,
     RateLimiter::StandardReleaseFunc OnRelease)
     : triton_model_instance_(triton_model_instance),
+      index_(triton_model_instance->Index()),
       model_context_(model_context), rate_limiter_config_(rate_limiter_config),
       OnStage_(OnStage), OnRelease_(OnRelease), exec_count_(0),
       state_(AVAILABLE)
@@ -631,8 +632,7 @@ RateLimiter::ModelInstanceContext::Release()
   {
     std::lock_guard<std::mutex> lk(state_mtx_);
     if ((model_context_->isRemovalInProgress()) && (state_ == AVAILABLE) &&
-        (!model_context_->ContainsPendingRequests(
-            triton_model_instance_->Index()))) {
+        (!model_context_->ContainsPendingRequests(index_))) {
       state_ = REMOVED;
     }
   }
@@ -647,8 +647,7 @@ RateLimiter::ModelInstanceContext::RequestRemoval()
 {
   std::lock_guard<std::mutex> lk(state_mtx_);
 
-  if ((state_ == AVAILABLE) && (!model_context_->ContainsPendingRequests(
-                                   triton_model_instance_->Index()))) {
+  if ((state_ == AVAILABLE) && (!model_context_->ContainsPendingRequests(index_))) {
     state_ = REMOVED;
   }
 }
