@@ -54,9 +54,11 @@ mvn clean install --projects .,tritonserver
 mvn clean install -f platform --projects ../tritonserver/platform -Djavacpp.platform.host
 cd ..
 
+CLIENT_LOG="client.log"
 MODEL_REPO=`pwd`/models
 SAMPLES_REPO=`pwd`/javacpp-presets/tritonserver/samples
 BASE_COMMAND="mvn clean compile -f $SAMPLES_REPO exec:java -Djavacpp.platform=linux-x86_64"
+
 source ../common/util.sh
 
 cp Simple.java $SAMPLES_REPO
@@ -64,13 +66,13 @@ rm -f *.log
 RET=0
 
 # Run with default settings
-$BASE_COMMAND -Dexec.args="-r $MODEL_REPO" >>client.log 2>&1
+$BASE_COMMAND -Dexec.args="-r $MODEL_REPO" >>$CLIENT_LOG 2>&1
 if [ $? -ne 0 ]; then
     RET=1
 fi
 
 for BACKEND in ONNX TORCH TF; do
-    if [ `grep -c "${BACKEND} test PASSED" client.log` != "1" ]; then
+    if [ `grep -c "${BACKEND} test PASSED" ${CLIENT_LOG}` != "1" ]; then
         echo -e "\n***\n*** ${BACKEND} backend test FAILED. Expected '${BACKEND} test PASSED'\n***"
         RET=1
     fi
@@ -79,6 +81,7 @@ done
 if [ $RET -eq 0 ]; then
     echo -e "\n***\n*** Test Passed\n***"
 else
+    cat $CLIENT_LOG
     echo -e "\n***\n*** Test FAILED\n***"
 fi
 
