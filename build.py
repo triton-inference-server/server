@@ -88,7 +88,8 @@ TRITON_VERSION_MAP = {
         '1.10.0',  # ORT
         '2021.2.200',  # ORT OpenVINO
         (('2021.2', None), ('2021.4', '2021.4.582')),  # Standalone OpenVINO
-        '2.2.9')  # DCGM version
+        '2.2.9',  # DCGM version
+        '1.10')  # DALI version
 }
 
 EXAMPLE_BACKENDS = ['identity', 'square', 'repeat']
@@ -691,6 +692,7 @@ def tensorflow_cmake_args(ver, images, library_paths):
 def dali_cmake_args():
     return [
         cmake_backend_enable('dali', 'TRITON_DALI_SKIP_DOWNLOAD', False),
+        cmake_backend_arg('dali', 'DALI_VERSION', None, TRITON_VERSION_MAP[FLAGS.version][6]),
     ]
 
 
