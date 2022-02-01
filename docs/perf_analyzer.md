@@ -459,6 +459,7 @@ perf_analyzer can be used to benchmark Triton service behind SSL/TLS-enabled end
 
 For gRPC, see the following options:
 
+* `--ssl-grpc-use-ssl`
 * `--ssl-grpc-root-certifications-file`
 * `--ssl-grpc-private-key-file`
 * `--ssl-grpc-certificate-chain-file`
@@ -469,13 +470,13 @@ The [inference protocol gRPC SSL/TLS section](inference_protocols.md#ssltls) des
 
 For HTTPS, the following options are exposed:
 
-* `--ssl-http-verify-peer`
-* `--ssl-http-verify-host`
-* `--ssl-http-ca-certificates-file`
-* `--ssl-http-client-certificate-file`
-* `--ssl-http-client-certificate-type`
-* `--ssl-http-private-key-file`
-* `--ssl-http-private-key-type`
+* `--ssl-https-verify-peer`
+* `--ssl-https-verify-host`
+* `--ssl-https-ca-certificates-file`
+* `--ssl-https-client-certificate-file`
+* `--ssl-https-client-certificate-type`
+* `--ssl-https-private-key-file`
+* `--ssl-https-private-key-type`
 
 See `--help` for full documentation.
 
