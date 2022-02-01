@@ -69,25 +69,12 @@ if [ $? -ne 0 ]; then
     RET=1
 fi
 
-# TODO: Create one loop with all framework checking
-
-# Check ONNX Runtime passed
-if [ `grep -c "ONNX test PASSED" client.log` != "1" ]; then
-    echo -e "\n***\n*** ONNX test FAILED. Expected 'ONNX test PASSED'\n***"
-    RET=1
-fi
-
-# Check PyTorch passed
-if [ `grep -c "TORCH test PASSED" client.log` != "1" ]; then
-    echo -e "\n***\n*** PyTorch test FAILED.Expected 'TORCH test PASSED''\n***"
-    RET=1
-fi
-
-# Check TensorFlow passed
-if [ `grep -c "TF test PASSED" client.log` != "1" ]; then
-    echo -e "\n***\n*** TensorFlow test FAILED.Expected 'TF test PASSED''\n***"
-    RET=1
-fi
+for BACKEND in ONNX TORCH TF; do
+    if [ `grep -c "${BACKEND} test PASSED" client.log` != "1" ]; then
+        echo -e "\n***\n*** ${BACKEND} backend test FAILED. Expected '${BACKEND} test PASSED'\n***"
+        RET=1
+    fi
+done
 
 if [ $RET -eq 0 ]; then
     echo -e "\n***\n*** Test Passed\n***"
