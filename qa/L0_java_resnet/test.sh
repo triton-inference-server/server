@@ -58,7 +58,6 @@ CLIENT_LOG="client.log"
 MODEL_REPO=`pwd`/models
 SAMPLES_REPO=`pwd`/javacpp-presets/tritonserver/samples
 BASE_COMMAND="mvn clean compile -f $SAMPLES_REPO exec:java -Djavacpp.platform=linux-x86_64"
-
 source ../common/util.sh
 
 cp Simple.java $SAMPLES_REPO
