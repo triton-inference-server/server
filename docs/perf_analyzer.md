@@ -455,15 +455,19 @@ protocol can be specificed with the -i option. If GRPC is selected the
 
 ### SSL/TLS Support
 
-perf_analyzer allows communication accross a secured channel using both gRPC and HTTP protocols. Just setting the perf_analyzer SSL options does not ensure the secure communication. For gRPC, the Triton Server supports running with SSL/TLS enabled. For HTTP, the Triton server should be running behind `https://` proxy such as nginx. perf_analyzer can then establish a secure channel to the proxy.
+perf_analyzer can be used to benchmark Triton service behind SSL/TLS-enabled endpoints. These options can help in establishing secure connection with the endpoint and profile the server.
 
-When running perf_analyzer with gRPC protocol, use any of the below options:
+For gRPC, see the following options:
 
 * `--ssl-grpc-root-certifications-file`
 * `--ssl-grpc-private-key-file`
 * `--ssl-grpc-certificate-chain-file`
 
-When running perf_analyzer with HTTP protocol, use any of the below options:
+More details here: https://grpc.github.io/grpc/cpp/structgrpc_1_1_ssl_credentials_options.html
+
+The [inference protocol gRPC SSL/TLS section](inference_protocols.md#ssltls) describes server-side options to configure SSL/TLS in Triton's gRPC endpoint.
+
+For HTTPS, the following options are exposed:
 
 * `--ssl-http-verify-peer`
 * `--ssl-http-verify-host`
@@ -474,6 +478,10 @@ When running perf_analyzer with HTTP protocol, use any of the below options:
 * `--ssl-http-private-key-type`
 
 See `--help` for full documentation.
+
+Unlike gRPC, Triton's HTTP server endpoint can not be configured with SSL/TLS support.
+
+Note: Just providing these `--ssl-http-*` options to perf_analyzer does not ensure the SSL/TLS is used in communication. If SSL/TLS is not enabled on the service endpoint, these options have no effect. The intent of exposing these options to a user of perf_analyzer is to allow them to configure perf_analyzer to benchmark Triton service behind SSL/TLS-enabled endpoints. In other words, if Triton is running behind a HTTPS server proxy, then these options would allow perf_analyzer to profile Triton via exposed HTTPS proxy.
 
 ## Benchmarking Triton directly via C API
 
