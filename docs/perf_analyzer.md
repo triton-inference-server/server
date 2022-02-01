@@ -1,5 +1,5 @@
 <!--
-# Copyright (c) 2020-2021, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright (c) 2020-2022, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -452,6 +452,28 @@ can achieve by using shared memory in your application. Use
 By default perf_analyzer uses HTTP to communicate with Triton. The GRPC
 protocol can be specificed with the -i option. If GRPC is selected the
 --streaming option can also be specified for GRPC streaming.
+
+### SSL/TLS Support
+
+perf_analyzer allows communication accross a secured channel using both gRPC and HTTP protocols. Just setting the perf_analyzer SSL options does not ensure the secure communication. For gRPC, the Triton Server supports running with SSL/TLS enabled. For HTTP, the Triton server should be running behind `https://` proxy such as nginx. perf_analyzer can then establish a secure channel to the proxy.
+
+When running perf_analyzer with gRPC protocol, use any of the below options:
+
+* `--ssl-grpc-root-certifications-file`
+* `--ssl-grpc-private-key-file`
+* `--ssl-grpc-certificate-chain-file`
+
+When running perf_analyzer with HTTP protocol, use any of the below options:
+
+* `--ssl-http-verify-peer`
+* `--ssl-http-verify-host`
+* `--ssl-http-ca-certificates-file`
+* `--ssl-http-client-certificate-file`
+* `--ssl-http-client-certificate-type`
+* `--ssl-http-private-key-file`
+* `--ssl-http-private-key-type`
+
+See `--help` for full documentation.
 
 ## Benchmarking Triton directly via C API
 
