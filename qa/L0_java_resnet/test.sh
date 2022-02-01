@@ -71,23 +71,23 @@ fi
 
 # TODO: Create one loop with all framework checking
 
-# Check PyTorch passed
-if [ `grep -c "PyTorch test passed" client.log` != "1" ]; then
-    echo -e "\n***\n*** Failed. Expected 'PyTorch test passed''\n***"
+# Check ONNX Runtime passed
+if [ `grep -c "ONNX test PASSED" client.log` != "1" ]; then
+    echo -e "\n***\n*** ONNX test FAILED. Expected 'ONNX test PASSED'\n***"
     RET=1
 fi
 
-# # Check TensorFlow passed
-# if [ `grep -c "TensorFlow test passed" client.log` != "1" ]; then
-#     echo -e "\n***\n*** Failed. Expected 'TensorFlow test passed''\n***"
-#     RET=1
-# fi
+# Check PyTorch passed
+if [ `grep -c "TORCH test PASSED" client.log` != "1" ]; then
+    echo -e "\n***\n*** PyTorch test FAILED.Expected 'TORCH test PASSED''\n***"
+    RET=1
+fi
 
-# # Check ONNX Runtime passed
-# if [ `grep -c "ONNX test passed" client.log` != "1" ]; then
-#     echo -e "\n***\n*** Failed. Expected 'ONNX test passed'\n***"
-#     RET=1
-# fi
+# Check TensorFlow passed
+if [ `grep -c "TF test PASSED" client.log` != "1" ]; then
+    echo -e "\n***\n*** TensorFlow test FAILED.Expected 'TF test PASSED''\n***"
+    RET=1
+fi
 
 if [ $RET -eq 0 ]; then
     echo -e "\n***\n*** Test Passed\n***"

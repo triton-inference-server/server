@@ -35,7 +35,20 @@ import static org.bytedeco.cuda.global.cudart.*;
 import static org.bytedeco.tritonserver.global.tritonserver.*;
 
 public class Simple {
-    static final double TRITON_MIN_COMPUTE_CAPABILITY = 6.0;
+    // Maximum allowed difference from expected model outputs
+    private static final float ALLOWED_DELTA = .001f;
+    private static final String[] MODELS = {
+      "resnet50_fp32_libtorch",
+      "resnet50_fp32_onnx",
+      "resnet50v1.5_fp16_savedmodel",
+      };
+    private static final double TRITON_MIN_COMPUTE_CAPABILITY = 6.0;
+    private enum Backend {
+      NONE,
+      ONNX,
+      TF,
+      TORCH,
+    }
 
     static void FAIL(String MSG) {
         System.err.println("Cuda failure: " + MSG);
@@ -285,78 +298,42 @@ public class Simple {
     static InferRequestComplete inferRequestComplete = new InferRequestComplete();
     static InferResponseComplete inferResponseComplete = new InferResponseComplete();
 
-    static TRITONSERVER_Error
-    ParseModelMetadata(
-        JsonObject model_metadata, boolean[] is_torch_model)
-    {
-      String seen_data_type = null;
-      for (JsonElement input_element : model_metadata.get("inputs").getAsJsonArray()) {
-        JsonObject input = input_element.getAsJsonObject();
-        if (!input.get("datatype").getAsString().equals("INT32") &&
-            !input.get("datatype").getAsString().equals("FP32")) {
-          return TRITONSERVER_ErrorNew(
-              TRITONSERVER_ERROR_UNSUPPORTED,
-              "simple lib example only supports model with data type INT32 or " +
-              "FP32");
-        }
-        if (seen_data_type == null) {
-          seen_data_type = input.get("datatype").getAsString();
-        } else if (!seen_data_type.equals(input.get("datatype").getAsString())) {
-          return TRITONSERVER_ErrorNew(
-              TRITONSERVER_ERROR_INVALID_ARG,
-              "the inputs and outputs of 'simple' model must have the data type");
-        }
-      }
-      for (JsonElement output_element : model_metadata.get("outputs").getAsJsonArray()) {
-        JsonObject output = output_element.getAsJsonObject();
-        if (!output.get("datatype").getAsString().equals("INT32") &&
-            !output.get("datatype").getAsString().equals("FP32")) {
-          return TRITONSERVER_ErrorNew(
-              TRITONSERVER_ERROR_UNSUPPORTED,
-              "simple lib example only supports model with data type INT32 or " +
-              "FP32");
-        } else if (!seen_data_type.equals(output.get("datatype").getAsString())) {
-          return TRITONSERVER_ErrorNew(
-              TRITONSERVER_ERROR_INVALID_ARG,
-              "the inputs and outputs of 'simple' model must have the data type");
-        }
-      }
-
-      is_torch_model[0] =
-          model_metadata.get("platform").getAsString().equals("pytorch_libtorch");
-      return null;
-    }
-
     static void
     GenerateInputData(
-        FloatPointer[] input0_data)
+        FloatPointer[] input_data)
     {
       // Input size is 3 * 224 * 224
-      input0_data[0] = new FloatPointer(150528);
+      input_data[0] = new FloatPointer(150528);
       for (int i = 0; i < 150528; ++i) {
-        input0_data[0].put(i, 1);
+        input_data[0].put(i, 1);
       }
     }
 
-    static void
-    CompareResult(
-        String model_name, FloatPointer output0, FloatPointer expected_output)
+    static boolean
+    AreValidResults(
+        String model_name, FloatPointer output, FloatPointer expected_output)
     {
-      for (int i = 0; i < 1000; ++i) {
-        if (output0.get(i) != expected_output.get(i)) {
-          for(int j = 0; j < 1000; ++j) {
-            System.out.println(output0.get(j));
-          }
-          FAIL("incorrect output in " + model_name + ", index " + i);
+      int output_length = model_name.contains("tensorflow") ? 1001 : 1000;
+      for (int i = 0; i < output_length; ++i) {
+        float difference = output.get(i) - expected_output.get(i);
+        if (difference > ALLOWED_DELTA) {
+          System.out.println(model_name + "inference failure: unexpected output " +
+          "in " + model_name + ", index " + i);
+
+          System.out.println("Value: " + output.get(i) + ", expected " +
+          expected_output.get(i));
+
+          return false; // Failure
         }
       }
+      return true; // Success
     }
 
     static void
     Check(
-        String model_name,
+        String model_name, Backend backend,
         TRITONSERVER_InferenceResponse response,
-        Pointer input0_data, String output0,
+        Pointer input_data, String output,
         int expected_datatype) throws Exception
     {
       HashMap<String, Pointer> output_data = new HashMap<>();
@@ -391,11 +368,14 @@ public class Simple {
         }
 
         String name = cname.getString();
-        if (!name.equals(output0)) {
+        if (!name.equals(output)) {
           FAIL("unexpected output '" + name + "'");
         }
 
-        if ((dim_count.get() != 2) || (shape.get(0) != 1) || (shape.get(1) != 1000)) {
+        int output_length = backend == backend.TF ? 1001: 1000;
+
+        if ((dim_count.get() != 2) || (shape.get(0) != 1)
+        || shape.get(1) != output_length) {
           FAIL("unexpected shape for '" + name + "'");
         }
 
@@ -445,18 +425,224 @@ public class Simple {
       }
 
       // Expected output for model
-      Scanner scanner = new Scanner(new File("expected_output_pytorch.txt"));
-      FloatPointer output_data_pytorch = new FloatPointer(1000);
-      for (int i = 0; i < 1000; ++i) {
-        output_data_pytorch.put(i, scanner.nextFloat());
+      String file_name = "expected_output_";
+      switch (backend) {
+        case ONNX:
+          file_name += "onnx";
+          break;
+        case TF:
+          file_name += "tensorflow";
+          break;
+        case TORCH:
+          file_name += "pytorch";
+          break;
+        default:
+          FAIL("Unsupported model type");
+          break;
+      }
+      file_name += ".txt";
+      
+      int output_length = backend == backend.TF ? 1001: 1000;
+      FloatPointer expected_output = new FloatPointer(output_length);
+
+      try (Scanner scanner = new Scanner(new File(file_name))) {
+        for (int i = 0; i < output_length; ++i) {
+          expected_output.put(i, scanner.nextFloat());
+        } 
       }
 
-      CompareResult(
-          model_name, new FloatPointer(output_data.get(output0)),
-          output_data_pytorch);
-      System.out.println("PyTorch test passed");
+      boolean correct_results = AreValidResults(
+          model_name, new FloatPointer(output_data.get(output)),
+          expected_output);
+
+      if(correct_results){
+        System.out.println(backend.name() + " test PASSED");
+      } else {
+        System.out.println(backend.name() + " test FAILED");
+      }
     }
 
+    static void
+    PerformInference(
+      TRITONSERVER_ServerDeleter server, String model_name) throws Exception
+    {
+      // Get type of model
+      Backend backend = Backend.NONE;
+      if(model_name.contains("onnx")) {
+        backend = Backend.ONNX;
+      } else if (model_name.contains("savedmodel")) {
+        backend = Backend.TF;
+      } else if (model_name.contains("torch")) {
+        backend = Backend.TORCH;
+      } else {
+        FAIL("Supported model types (Onnx, TensorFlow, Torch) " +
+        "cannot be inferred from model name " + model_name);
+      }
+
+      // Wait for the model to become available.
+      boolean[] is_ready = {false};
+      int health_iters = 0;
+      while (!is_ready[0]) {
+        FAIL_IF_ERR(
+            TRITONSERVER_ServerModelIsReady(
+                server, model_name, 1, is_ready),
+            "unable to get model readiness");
+        if (!is_ready[0]) {
+          if (++health_iters >= 10) {
+            FAIL(model_name + " model failed to be ready in 10 iterations");
+          }
+          Thread.sleep(500);
+          continue;
+        }
+      }
+
+      // Create the allocator that will be used to allocate buffers for
+      // the result tensors.
+      TRITONSERVER_ResponseAllocator allocator = new TRITONSERVER_ResponseAllocator(null);
+      FAIL_IF_ERR(
+          TRITONSERVER_ResponseAllocatorNew(
+              allocator, responseAlloc, responseRelease, null /* start_fn */),
+          "creating response allocator");
+
+      // Inference
+      TRITONSERVER_InferenceRequest irequest = new TRITONSERVER_InferenceRequest(null);
+      FAIL_IF_ERR(
+          TRITONSERVER_InferenceRequestNew(
+              irequest, server, model_name, -1 /* model_version */),
+          "creating inference request");
+
+      FAIL_IF_ERR(
+          TRITONSERVER_InferenceRequestSetId(irequest, "my_request_id"),
+          "setting ID for the request");
+
+      FAIL_IF_ERR(
+          TRITONSERVER_InferenceRequestSetReleaseCallback(
+              irequest, inferRequestComplete, null /* request_release_userp */),
+          "setting request release callback");
+
+      
+      // Model inputs
+      String input = "";
+      String output = "";
+      long[] input_shape = {1, 224, 224, 3};
+
+      switch (backend) {
+        case ONNX:
+          input = "import/input:0";
+          output = "import/resnet_v1_50/predictions/Softmax:0";
+          break;
+        case TF:
+          input = "input";
+          output = "probabilities";
+          break;
+        case TORCH:
+          input = "INPUT__0";
+          input_shape[1] = 3;
+          input_shape[3] = 224;
+          output = "OUTPUT__0";
+          break;
+        default:
+          FAIL("Unsupported model type");
+          break;
+      }
+
+      int datatype = TRITONSERVER_TYPE_FP32;
+
+      FAIL_IF_ERR(
+          TRITONSERVER_InferenceRequestAddInput(
+              irequest, input, datatype, input_shape, input_shape.length),
+          "setting input 0 meta-data for the request");
+
+      FAIL_IF_ERR(
+          TRITONSERVER_InferenceRequestAddRequestedOutput(irequest, output),
+          "requesting output 0 for the request");
+
+      // Create the data for the two input tensors. Initialize the first
+      // to unique values and the second to all ones.
+      BytePointer input_data;
+      FloatPointer[] p0 = {null};
+      GenerateInputData(p0);
+      input_data = p0[0].getPointer(BytePointer.class);
+
+      long input_size = input_data.limit();
+
+      Pointer input_base = input_data;
+      CudaDataDeleter input_gpu = new CudaDataDeleter();
+      boolean use_cuda_memory =
+          (enforce_memory_type &&
+           (requested_memory_type != TRITONSERVER_MEMORY_CPU));
+      if (use_cuda_memory) {
+        FAIL_IF_CUDA_ERR(cudaSetDevice(0), "setting CUDA device to device 0");
+        if (requested_memory_type != TRITONSERVER_MEMORY_CPU_PINNED) {
+          Pointer dst = new Pointer();
+          FAIL_IF_CUDA_ERR(
+              cudaMalloc(dst, input_size),
+              "allocating GPU memory for INPUT data");
+          input_gpu.reset(dst);
+          FAIL_IF_CUDA_ERR(
+              cudaMemcpy(dst, input_data, input_size, cudaMemcpyHostToDevice),
+              "setting INPUT data in GPU memory");
+        } else {
+          Pointer dst = new Pointer();
+          FAIL_IF_CUDA_ERR(
+              cudaHostAlloc(dst, input_size, cudaHostAllocPortable),
+              "allocating pinned memory for INPUT data");
+          input_gpu.reset(dst);
+          FAIL_IF_CUDA_ERR(
+              cudaMemcpy(dst, input_data, input_size, cudaMemcpyHostToHost),
+              "setting INPUT data in pinned memory");
+        }
+      }
+
+      input_base = use_cuda_memory ? input_gpu : input_data;
+
+      FAIL_IF_ERR(
+          TRITONSERVER_InferenceRequestAppendInputData(
+              irequest, input, input_base, input_size, requested_memory_type,
+              0 /* memory_type_id */),
+          "assigning INPUT data");
+
+      // Perform inference...
+      {
+        CompletableFuture<TRITONSERVER_InferenceResponse> completed = new CompletableFuture<>();
+        futures.put(irequest, completed);
+
+        FAIL_IF_ERR(
+            TRITONSERVER_InferenceRequestSetResponseCallback(
+                irequest, allocator, null /* response_allocator_userp */,
+                inferResponseComplete, irequest),
+            "setting response callback");
+
+        FAIL_IF_ERR(
+            TRITONSERVER_ServerInferAsync(
+                server, irequest, null /* trace */),
+            "running inference");
+
+        // Wait for the inference to complete.
+        TRITONSERVER_InferenceResponse completed_response = completed.get();
+        futures.remove(irequest);
+
+        FAIL_IF_ERR(
+            TRITONSERVER_InferenceResponseError(completed_response),
+            "response status");
+
+        Check(
+            model_name, backend, completed_response, input_data, output, datatype);
+
+        FAIL_IF_ERR(
+            TRITONSERVER_InferenceResponseDelete(completed_response),
+            "deleting inference response");
+      }
+
+      FAIL_IF_ERR(
+          TRITONSERVER_InferenceRequestDelete(irequest),
+          "deleting inference request");
+
+      FAIL_IF_ERR(
+          TRITONSERVER_ResponseAllocatorDelete(allocator),
+          "deleting response allocator");
+    }
+    
     public static void
     main(String[] args) throws Exception
     {
@@ -592,197 +778,9 @@ public class Simple {
             "deleting status metadata");
       }
 
-      String model_name = "resnet50_fp32_libtorch";
-
-      // Wait for the model to become available.
-      boolean[] is_torch_model = {false};
-      boolean[] is_ready = {false};
-      health_iters = 0;
-      while (!is_ready[0]) {
-        FAIL_IF_ERR(
-            TRITONSERVER_ServerModelIsReady(
-                server, model_name, 1, is_ready),
-            "unable to get model readiness");
-        if (!is_ready[0]) {
-          if (++health_iters >= 10) {
-            FAIL("model failed to be ready in 10 iterations");
-          }
-          Thread.sleep(500);
-          continue;
-        }
-
-        TRITONSERVER_Message model_metadata_message = new TRITONSERVER_Message(null);
-        FAIL_IF_ERR(
-            TRITONSERVER_ServerModelMetadata(
-                server, model_name, 1, model_metadata_message),
-            "unable to get model metadata message");
-        BytePointer buffer = new BytePointer((Pointer)null);
-        SizeTPointer byte_size = new SizeTPointer(1);
-        FAIL_IF_ERR(
-            TRITONSERVER_MessageSerializeToJson(
-                model_metadata_message, buffer, byte_size),
-            "unable to serialize model status protobuf");
-
-        JsonParser parser = new JsonParser();
-        JsonObject model_metadata = null;
-        try {
-          model_metadata = parser.parse(buffer.limit(byte_size.get()).getString()).getAsJsonObject();
-        } catch (Exception e) {
-          FAIL("error: failed to parse model metadata from JSON: " + e);
-        }
-
-        FAIL_IF_ERR(
-            TRITONSERVER_MessageDelete(model_metadata_message),
-            "deleting status protobuf");
-
-        if (!model_metadata.get("name").getAsString().equals(model_name)) {
-          FAIL("unable to find metadata for model");
-        }
-
-        boolean found_version = false;
-        if (model_metadata.has("versions")) {
-          for (JsonElement version : model_metadata.get("versions").getAsJsonArray()) {
-            if (version.getAsString().equals("1")) {
-              found_version = true;
-              break;
-            }
-          }
-        }
-        if (!found_version) {
-          FAIL("unable to find version 1 status for model");
-        }
-
-        FAIL_IF_ERR(
-            ParseModelMetadata(model_metadata, is_torch_model),
-            "parsing model metadata");
+      for(String model : MODELS) {
+        PerformInference(server, model);
       }
-
-      // Create the allocator that will be used to allocate buffers for
-      // the result tensors.
-      TRITONSERVER_ResponseAllocator allocator = new TRITONSERVER_ResponseAllocator(null);
-      FAIL_IF_ERR(
-          TRITONSERVER_ResponseAllocatorNew(
-              allocator, responseAlloc, responseRelease, null /* start_fn */),
-          "creating response allocator");
-
-      // Inference
-      TRITONSERVER_InferenceRequest irequest = new TRITONSERVER_InferenceRequest(null);
-      FAIL_IF_ERR(
-          TRITONSERVER_InferenceRequestNew(
-              irequest, server, model_name, -1 /* model_version */),
-          "creating inference request");
-
-      FAIL_IF_ERR(
-          TRITONSERVER_InferenceRequestSetId(irequest, "my_request_id"),
-          "setting ID for the request");
-
-      FAIL_IF_ERR(
-          TRITONSERVER_InferenceRequestSetReleaseCallback(
-              irequest, inferRequestComplete, null /* request_release_userp */),
-          "setting request release callback");
-
-      // Inputs
-      String input0 = is_torch_model[0] ? "INPUT__0" : "INPUT0";
-
-      long[] input0_shape = {1, 3, 224, 224};
-
-      int datatype = TRITONSERVER_TYPE_FP32;
-
-      FAIL_IF_ERR(
-          TRITONSERVER_InferenceRequestAddInput(
-              irequest, input0, datatype, input0_shape, input0_shape.length),
-          "setting input 0 meta-data for the request");
-
-      String output0 = is_torch_model[0] ? "OUTPUT__0" : "OUTPUT0";
-
-      FAIL_IF_ERR(
-          TRITONSERVER_InferenceRequestAddRequestedOutput(irequest, output0),
-          "requesting output 0 for the request");
-
-      // Create the data for the two input tensors. Initialize the first
-      // to unique values and the second to all ones.
-      BytePointer input0_data;
-      FloatPointer[] p0 = {null};
-      GenerateInputData(p0);
-      input0_data = p0[0].getPointer(BytePointer.class);
-
-      long input0_size = input0_data.limit();
-
-      Pointer input0_base = input0_data;
-      CudaDataDeleter input0_gpu = new CudaDataDeleter();
-      boolean use_cuda_memory =
-          (enforce_memory_type &&
-           (requested_memory_type != TRITONSERVER_MEMORY_CPU));
-      if (use_cuda_memory) {
-        FAIL_IF_CUDA_ERR(cudaSetDevice(0), "setting CUDA device to device 0");
-        if (requested_memory_type != TRITONSERVER_MEMORY_CPU_PINNED) {
-          Pointer dst = new Pointer();
-          FAIL_IF_CUDA_ERR(
-              cudaMalloc(dst, input0_size),
-              "allocating GPU memory for INPUT0 data");
-          input0_gpu.reset(dst);
-          FAIL_IF_CUDA_ERR(
-              cudaMemcpy(dst, input0_data, input0_size, cudaMemcpyHostToDevice),
-              "setting INPUT0 data in GPU memory");
-        } else {
-          Pointer dst = new Pointer();
-          FAIL_IF_CUDA_ERR(
-              cudaHostAlloc(dst, input0_size, cudaHostAllocPortable),
-              "allocating pinned memory for INPUT0 data");
-          input0_gpu.reset(dst);
-          FAIL_IF_CUDA_ERR(
-              cudaMemcpy(dst, input0_data, input0_size, cudaMemcpyHostToHost),
-              "setting INPUT0 data in pinned memory");
-        }
-      }
-
-      input0_base = use_cuda_memory ? input0_gpu : input0_data;
-
-      FAIL_IF_ERR(
-          TRITONSERVER_InferenceRequestAppendInputData(
-              irequest, input0, input0_base, input0_size, requested_memory_type,
-              0 /* memory_type_id */),
-          "assigning INPUT0 data");
-
-      // Perform inference...
-      {
-        CompletableFuture<TRITONSERVER_InferenceResponse> completed = new CompletableFuture<>();
-        futures.put(irequest, completed);
-
-        FAIL_IF_ERR(
-            TRITONSERVER_InferenceRequestSetResponseCallback(
-                irequest, allocator, null /* response_allocator_userp */,
-                inferResponseComplete, irequest),
-            "setting response callback");
-
-        FAIL_IF_ERR(
-            TRITONSERVER_ServerInferAsync(
-                server, irequest, null /* trace */),
-            "running inference");
-
-        // Wait for the inference to complete.
-        TRITONSERVER_InferenceResponse completed_response = completed.get();
-        futures.remove(irequest);
-
-        FAIL_IF_ERR(
-            TRITONSERVER_InferenceResponseError(completed_response),
-            "response status");
-
-        Check(
-            model_name, completed_response, input0_data, output0, datatype);
-
-        FAIL_IF_ERR(
-            TRITONSERVER_InferenceResponseDelete(completed_response),
-            "deleting inference response");
-      }
-
-      FAIL_IF_ERR(
-          TRITONSERVER_InferenceRequestDelete(irequest),
-          "deleting inference request");
-
-      FAIL_IF_ERR(
-          TRITONSERVER_ResponseAllocatorDelete(allocator),
-          "deleting response allocator");
 
       System.exit(0);
     }
