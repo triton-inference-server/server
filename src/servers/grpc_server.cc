@@ -1841,11 +1841,8 @@ class InferHandlerState {
     void DecoupledWriteResponse(InferHandlerStateType* state)
     {
 #ifdef TRITON_ENABLE_TRACING
-      if ((state->trace_manager_ != nullptr) && (state->trace_id_ != 0)) {
-        state->trace_manager_->CaptureTimestamp(
-            state->trace_id_, TRITONSERVER_TRACE_LEVEL_TIMESTAMPS,
-            "GRPC_SEND_START");
-      }
+      state->trace_timestamps_.emplace_back(
+          std::make_pair("GRPC_SEND_START", TraceManager::CaptureTimestamp()));
 #endif  // TRITON_ENABLE_TRACING
       state->step_ = Steps::WRITTEN;
       ResponseType* response = state->response_queue_->GetCurrentResponse();
@@ -1895,11 +1892,8 @@ class InferHandlerState {
       }
 
 #ifdef TRITON_ENABLE_TRACING
-      if ((state->trace_manager_ != nullptr) && (state->trace_id_ != 0)) {
-        state->trace_manager_->CaptureTimestamp(
-            state->trace_id_, TRITONSERVER_TRACE_LEVEL_TIMESTAMPS,
-            "GRPC_SEND_START");
-      }
+      state->trace_timestamps_.emplace_back(
+          std::make_pair("GRPC_SEND_START", TraceManager::CaptureTimestamp()));
 #endif  // TRITON_ENABLE_TRACING
 
       state->step_ = Steps::WRITTEN;
@@ -1974,13 +1968,6 @@ class InferHandlerState {
       const std::shared_ptr<Context>& context, Steps start_step = Steps::START)
       : tritonserver_(tritonserver)
   {
-#ifdef TRITON_ENABLE_TRACING
-    trace_manager_ = nullptr;
-    trace_ = nullptr;
-    trace_id_ = 0;
-    trace_userp_ = nullptr;
-#endif  // TRITON_ENABLE_TRACING
-
     // For debugging and testing,
     const char* dstr = getenv("TRITONSERVER_DELAY_GRPC_RESPONSE");
     delay_response_ms_ = 0;
@@ -1995,9 +1982,9 @@ class InferHandlerState {
   {
 #ifdef TRITON_ENABLE_TRACING
     if (trace_ != nullptr) {
-      TraceManager::TraceRelease(trace_, trace_userp_);
-      trace_ = nullptr;
-      trace_userp_ = nullptr;
+      for (const auto& timestamp : trace_timestamps_) {
+        trace_->CaptureTimestamp(timestamp.first, timestamp.second);
+      }
     }
 #endif  // TRITON_ENABLE_TRACING
   }
@@ -2013,16 +2000,21 @@ class InferHandlerState {
     complete_ = false;
     request_.Clear();
     response_queue_->Reset();
+  }
+
+  void Release()
+  {
+    context_ = nullptr;
 #ifdef TRITON_ENABLE_TRACING
     if (trace_ != nullptr) {
-      TraceManager::TraceRelease(trace_, trace_userp_);
-      trace_ = nullptr;
-      trace_userp_ = nullptr;
+      for (const auto& timestamp : trace_timestamps_) {
+        trace_->CaptureTimestamp(timestamp.first, timestamp.second);
+      }
+      trace_timestamps_.clear();
+      trace_.reset();
     }
 #endif  // TRITON_ENABLE_TRACING
   }
-
-  void Release() { context_ = nullptr; }
 
 
   // Returns whether all the responses from the state
@@ -2042,10 +2034,9 @@ class InferHandlerState {
   std::mutex step_mtx_;
 
 #ifdef TRITON_ENABLE_TRACING
-  TraceManager* trace_manager_;
-  TRITONSERVER_InferenceTrace* trace_;
-  uint64_t trace_id_;
-  void* trace_userp_;
+  std::unique_ptr<TraceManager::Trace> trace_;
+  // Additional timestamps that are captured before a trace stream is acquired
+  std::deque<std::pair<std::string, uint64_t>> trace_timestamps_;
 #endif  // TRITON_ENABLE_TRACING
 
   bool is_decoupled_;
@@ -3185,19 +3176,11 @@ ModelInferHandler::StartNewRequest()
   State* state = StateNew(tritonserver_.get(), context);
 
 #ifdef TRITON_ENABLE_TRACING
-  state->trace_manager_ = nullptr;
-  state->trace_ = nullptr;
-  state->trace_id_ = 0;
-  state->trace_userp_ = nullptr;
   if (trace_manager_ != nullptr) {
-    state->trace_ = trace_manager_->SampleTrace(&state->trace_userp_);
-    if (state->trace_ != nullptr) {
-      state->trace_manager_ = trace_manager_;
-      TRITONSERVER_InferenceTraceId(state->trace_, &state->trace_id_);
-      trace_manager_->CaptureTimestamp(
-          state->trace_id_, TRITONSERVER_TRACE_LEVEL_TIMESTAMPS,
-          "GRPC_WAITREAD_START");
-    }
+    // Can't create trace as we don't know the model to be requested,
+    // track timestamps in 'state'
+    state->trace_timestamps_.emplace_back(std::make_pair(
+        "GRPC_WAITREAD_START", TraceManager::CaptureTimestamp()));
   }
 #endif  // TRITON_ENABLE_TRACING
 
@@ -3236,11 +3219,10 @@ ModelInferHandler::Process(InferHandler::State* state, bool rpc_ok)
   if (state->step_ == Steps::START) {
     TRITONSERVER_Error* err = nullptr;
 #ifdef TRITON_ENABLE_TRACING
-    if ((state->trace_manager_ != nullptr) && (state->trace_id_ != 0)) {
-      state->trace_manager_->CaptureTimestamp(
-          state->trace_id_, TRITONSERVER_TRACE_LEVEL_TIMESTAMPS,
-          "GRPC_WAITREAD_END");
-    }
+    // Can't create trace as we don't know the model to be requested,
+    // track timestamps in 'state'
+    state->trace_timestamps_.emplace_back(
+        std::make_pair("GRPC_WAITREAD_END", TraceManager::CaptureTimestamp()));
 #endif  // TRITON_ENABLE_TRACING
 
     // Start a new request to replace this one...
@@ -3304,15 +3286,20 @@ ModelInferHandler::Process(InferHandler::State* state, bool rpc_ok)
           InferResponseComplete, reinterpret_cast<void*>(state));
     }
     if (err == nullptr) {
-      TRITONSERVER_InferenceTrace* trace = nullptr;
+      TRITONSERVER_InferenceTrace* triton_trace = nullptr;
 #ifdef TRITON_ENABLE_TRACING
-      trace = state->trace_;
-      // Ownership of TRITONSERVER_InferenceTrace will be transferred
-      state->trace_ = nullptr;
+      if (trace_manager_ != nullptr) {
+        state->trace_ =
+            std::move(trace_manager_->SampleTrace(request.model_name()));
+        if (state->trace_ != nullptr) {
+          triton_trace = state->trace_->trace_.release();
+        }
+      }
 #endif  // TRITON_ENABLE_TRACING
 
       state->step_ = ISSUED;
-      err = TRITONSERVER_ServerInferAsync(tritonserver_.get(), irequest, trace);
+      err = TRITONSERVER_ServerInferAsync(
+          tritonserver_.get(), irequest, triton_trace);
     }
 
     // If not error then state->step_ == ISSUED and inference request
@@ -3332,11 +3319,8 @@ ModelInferHandler::Process(InferHandler::State* state, bool rpc_ok)
       inference::ModelInferResponse error_response;
 
 #ifdef TRITON_ENABLE_TRACING
-      if ((state->trace_manager_ != nullptr) && (state->trace_id_ != 0)) {
-        state->trace_manager_->CaptureTimestamp(
-            state->trace_id_, TRITONSERVER_TRACE_LEVEL_TIMESTAMPS,
-            "GRPC_SEND_START");
-      }
+      state->trace_timestamps_.emplace_back(
+          std::make_pair("GRPC_SEND_START", TraceManager::CaptureTimestamp()));
 #endif  // TRITON_ENABLE_TRACING
 
       state->step_ = COMPLETE;
@@ -3344,11 +3328,8 @@ ModelInferHandler::Process(InferHandler::State* state, bool rpc_ok)
     }
   } else if (state->step_ == Steps::COMPLETE) {
 #ifdef TRITON_ENABLE_TRACING
-    if ((state->trace_manager_ != nullptr) && (state->trace_id_ != 0)) {
-      state->trace_manager_->CaptureTimestamp(
-          state->trace_id_, TRITONSERVER_TRACE_LEVEL_TIMESTAMPS,
-          "GRPC_SEND_END");
-    }
+    state->trace_timestamps_.emplace_back(
+        std::make_pair("GRPC_SEND_END", TraceManager::CaptureTimestamp()));
 #endif  // TRITON_ENABLE_TRACING
 
     state->step_ = Steps::FINISH;
@@ -3420,11 +3401,8 @@ ModelInferHandler::InferResponseComplete(
       "deleting GRPC inference response");
 
 #ifdef TRITON_ENABLE_TRACING
-  if ((state->trace_manager_ != nullptr) && (state->trace_id_ != 0)) {
-    state->trace_manager_->CaptureTimestamp(
-        state->trace_id_, TRITONSERVER_TRACE_LEVEL_TIMESTAMPS,
-        "GRPC_SEND_START");
-  }
+  state->trace_timestamps_.emplace_back(
+      std::make_pair("GRPC_SEND_START", TraceManager::CaptureTimestamp()));
 #endif  // TRITON_ENABLE_TRACING
 
   state->step_ = COMPLETE;
@@ -3561,19 +3539,11 @@ ModelStreamInferHandler::StartNewRequest()
   State* state = StateNew(tritonserver_.get(), context);
 
 #ifdef TRITON_ENABLE_TRACING
-  state->trace_manager_ = nullptr;
-  state->trace_ = nullptr;
-  state->trace_id_ = 0;
-  state->trace_userp_ = nullptr;
   if (trace_manager_ != nullptr) {
-    state->trace_ = trace_manager_->SampleTrace(&state->trace_userp_);
-    if (state->trace_ != nullptr) {
-      state->trace_manager_ = trace_manager_;
-      TRITONSERVER_InferenceTraceId(state->trace_, &state->trace_id_);
-      state->trace_manager_->CaptureTimestamp(
-          state->trace_id_, TRITONSERVER_TRACE_LEVEL_TIMESTAMPS,
-          "GRPC_WAITREAD_START");
-    }
+    // Can't create trace as we don't know the model to be requested,
+    // track timestamps in 'state'
+    state->trace_timestamps_.emplace_back(std::make_pair(
+        "GRPC_WAITREAD_START", TraceManager::CaptureTimestamp()));
   }
 #endif  // TRITON_ENABLE_TRACING
 
@@ -3618,11 +3588,8 @@ ModelStreamInferHandler::Process(InferHandler::State* state, bool rpc_ok)
     TRITONSERVER_Error* err = nullptr;
     const inference::ModelInferRequest& request = state->request_;
 #ifdef TRITON_ENABLE_TRACING
-    if ((state->trace_manager_ != nullptr) && (state->trace_id_ != 0)) {
-      state->trace_manager_->CaptureTimestamp(
-          state->trace_id_, TRITONSERVER_TRACE_LEVEL_TIMESTAMPS,
-          "GRPC_WAITREAD_END");
-    }
+    state->trace_timestamps_.emplace_back(
+        std::make_pair("GRPC_WAITREAD_END", TraceManager::CaptureTimestamp()));
 #endif  // TRITON_ENABLE_TRACING
 
     // If done reading and no in-flight requests then can finish the
@@ -3717,15 +3684,20 @@ ModelStreamInferHandler::Process(InferHandler::State* state, bool rpc_ok)
           StreamInferResponseComplete, reinterpret_cast<void*>(state));
     }
     if (err == nullptr) {
-      TRITONSERVER_InferenceTrace* trace = nullptr;
+      TRITONSERVER_InferenceTrace* triton_trace = nullptr;
 #ifdef TRITON_ENABLE_TRACING
-      trace = state->trace_;
-      // Ownership of TRITONSERVER_InferenceTrace will be transferred
-      state->trace_ = nullptr;
+      if (trace_manager_ != nullptr) {
+        state->trace_ =
+            std::move(trace_manager_->SampleTrace(request.model_name()));
+        if (state->trace_ != nullptr) {
+          triton_trace = state->trace_->trace_.release();
+        }
+      }
 #endif  // TRITON_ENABLE_TRACING
 
       state->step_ = ISSUED;
-      err = TRITONSERVER_ServerInferAsync(tritonserver_.get(), irequest, trace);
+      err = TRITONSERVER_ServerInferAsync(
+          tritonserver_.get(), irequest, triton_trace);
     }
 
     // If there was not an error in issuing the 'state' request then
@@ -3774,21 +3746,11 @@ ModelStreamInferHandler::Process(InferHandler::State* state, bool rpc_ok)
 #ifdef TRITON_ENABLE_TRACING
     // Capture a timestamp for the time when we start waiting for this
     // next request to read.
-    next_read_state->trace_manager_ = nullptr;
-    next_read_state->trace_ = nullptr;
-    next_read_state->trace_id_ = 0;
-    next_read_state->trace_userp_ = nullptr;
     if (trace_manager_ != nullptr) {
-      next_read_state->trace_ =
-          trace_manager_->SampleTrace(&next_read_state->trace_userp_);
-      if (next_read_state->trace_ != nullptr) {
-        next_read_state->trace_manager_ = trace_manager_;
-        TRITONSERVER_InferenceTraceId(
-            next_read_state->trace_, &next_read_state->trace_id_);
-        next_read_state->trace_manager_->CaptureTimestamp(
-            next_read_state->trace_id_, TRITONSERVER_TRACE_LEVEL_TIMESTAMPS,
-            "GRPC_WAITREAD_START");
-      }
+      // Can't create trace as we don't know the model to be requested,
+      // track timestamps in 'state'
+      next_read_state->trace_timestamps_.emplace_back(std::make_pair(
+          "GRPC_WAITREAD_START", TraceManager::CaptureTimestamp()));
     }
 #endif  // TRITON_ENABLE_TRACING
 
@@ -3814,11 +3776,8 @@ ModelStreamInferHandler::Process(InferHandler::State* state, bool rpc_ok)
     if (state->step_ == Steps::WRITTEN) {
       state->context_->ongoing_write_ = false;
 #ifdef TRITON_ENABLE_TRACING
-      if ((state->trace_manager_ != nullptr) && (state->trace_id_ != 0)) {
-        state->trace_manager_->CaptureTimestamp(
-            state->trace_id_, TRITONSERVER_TRACE_LEVEL_TIMESTAMPS,
-            "GRPC_SEND_END");
-      }
+      state->trace_timestamps_.emplace_back(
+          std::make_pair("GRPC_SEND_END", TraceManager::CaptureTimestamp()));
 #endif  // TRITON_ENABLE_TRACING
 
       // If the write failed (for example, client closed the stream)
@@ -3865,11 +3824,8 @@ ModelStreamInferHandler::Process(InferHandler::State* state, bool rpc_ok)
     if (state->step_ == Steps::WRITTEN) {
       state->context_->ongoing_write_ = false;
 #ifdef TRITON_ENABLE_TRACING
-      if ((state->trace_manager_ != nullptr) && (state->trace_id_ != 0)) {
-        state->trace_manager_->CaptureTimestamp(
-            state->trace_id_, TRITONSERVER_TRACE_LEVEL_TIMESTAMPS,
-            "GRPC_SEND_END");
-      }
+      state->trace_timestamps_.emplace_back(
+          std::make_pair("GRPC_SEND_END", TraceManager::CaptureTimestamp()));
 #endif  // TRITON_ENABLE_TRACING
 
       // If the write failed (for example, client closed the stream)

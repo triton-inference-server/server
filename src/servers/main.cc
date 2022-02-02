@@ -1,4 +1,4 @@
-// Copyright 2018-2021, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+// Copyright 2018-2022, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 //
 // Redistribution and use in source and binary forms, with or without
 // modification, are permitted provided that the following conditions
@@ -134,6 +134,7 @@ std::string trace_filepath_;
 TRITONSERVER_InferenceTraceLevel trace_level_ =
     TRITONSERVER_TRACE_LEVEL_DISABLED;
 int32_t trace_rate_ = 1000;
+int32_t trace_log_frequency_ = 0;
 #endif  // TRITON_ENABLE_TRACING
 
 #if defined(TRITON_ENABLE_GRPC)
@@ -271,6 +272,7 @@ enum OptionId {
   OPTION_TRACE_FILEPATH,
   OPTION_TRACE_LEVEL,
   OPTION_TRACE_RATE,
+  OPTION_TRACE_LOG_FREQUENCY,
 #endif  // TRITON_ENABLE_TRACING
   OPTION_MODEL_CONTROL_MODE,
   OPTION_POLL_REPO_SECS,
@@ -925,16 +927,15 @@ StartTracing(nvidia::inferenceserver::TraceManager** trace_manager)
   *trace_manager = nullptr;
 
 #ifdef TRITON_ENABLE_TRACING
-  TRITONSERVER_Error* err = nullptr;
-
-  // Configure tracing if host is specified.
-  if (trace_level_ != TRITONSERVER_TRACE_LEVEL_DISABLED) {
-    err = nvidia::inferenceserver::TraceManager::Create(
-        trace_manager, trace_level_, trace_rate_, trace_filepath_);
-  }
+  TRITONSERVER_Error* err = nvidia::inferenceserver::TraceManager::Create(
+      trace_manager, trace_level_, trace_rate_, trace_log_frequency_,
+      trace_filepath_);
 
   if (err != nullptr) {
     LOG_TRITONSERVER_ERROR(err, "failed to configure tracing");
+    if (*trace_manager != nullptr) {
+      delete (*trace_manager);
+    }
     *trace_manager = nullptr;
     return false;
   }
@@ -1307,6 +1308,7 @@ Parse(TRITONSERVER_ServerOptions** server_options, int argc, char** argv)
   std::vector<TRITONSERVER_InferenceTraceLevel> trace_level_settings = {
       trace_level_};
   int32_t trace_rate = trace_rate_;
+  int32_t trace_log_frequency = trace_log_frequency_;
 #endif  // TRITON_ENABLE_TRACING
 
   TRITONSERVER_ModelControlMode control_mode = TRITONSERVER_MODEL_CONTROL_NONE;
@@ -1509,7 +1511,9 @@ Parse(TRITONSERVER_ServerOptions** server_options, int argc, char** argv)
       case OPTION_TRACE_RATE:
         trace_rate = ParseIntOption(optarg);
         break;
-        // [WIP]: add new arguments
+      case OPTION_TRACE_LOG_FREQUENCY:
+        trace_log_frequency = ParseIntOption(optarg);
+        break;
 #endif  // TRITON_ENABLE_TRACING
 
       case OPTION_POLL_REPO_SECS:
@@ -1673,6 +1677,7 @@ Parse(TRITONSERVER_ServerOptions** server_options, int argc, char** argv)
         trace_level_ | trace_level);
   }
   trace_rate_ = trace_rate;
+  trace_log_frequency_ = trace_log_frequency;
 #endif  // TRITON_ENABLE_TRACING
 
   // Check if HTTP, GRPC and metrics port clash

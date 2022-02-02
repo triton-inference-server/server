@@ -1,5 +1,5 @@
 #!/bin/bash
-# Copyright (c) 2019-2022, NVIDIA CORPORATION. All rights reserved.
+# Copyright 2019-2022, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -397,18 +397,17 @@ if [ `grep -c "COMPUTE_INPUT_END" summary_ensemble.log` != "7" ]; then
     echo -e "Ensemble trace log expects 7 compute"
     RET=1
 fi
-# For GRPC frontend, its handlers will occupy one trace ID on creation
-GRPC_ID_OFFSET=3
+
 for trace_str in \
-        "{\"id\":$((GRPC_ID_OFFSET+1)),\"model_name\":\"simple\",\"model_version\":1}" \
-        "{\"id\":$((GRPC_ID_OFFSET+2)),\"model_name\":\"nop_TYPE_INT32_-1\",\"model_version\":1,\"parent_id\":$((GRPC_ID_OFFSET+1))}" \
-        "{\"id\":$((GRPC_ID_OFFSET+3)),\"model_name\":\"fan_${MODELBASE}\",\"model_version\":1,\"parent_id\":$((GRPC_ID_OFFSET+1))}" \
-        "{\"id\":$((GRPC_ID_OFFSET+4)),\"model_name\":\"nop_TYPE_INT32_-1\",\"model_version\":1,\"parent_id\":$((GRPC_ID_OFFSET+3))}" \
-        "{\"id\":$((GRPC_ID_OFFSET+5)),\"model_name\":\"${MODELBASE}\",\"model_version\":1,\"parent_id\":$((GRPC_ID_OFFSET+3))}" \
-        "{\"id\":$((GRPC_ID_OFFSET+6)),\"model_name\":\"nop_TYPE_INT32_-1\",\"model_version\":1,\"parent_id\":$((GRPC_ID_OFFSET+3))}" \
-        "{\"id\":$((GRPC_ID_OFFSET+7)),\"model_name\":\"nop_TYPE_INT32_-1\",\"model_version\":1,\"parent_id\":$((GRPC_ID_OFFSET+3))}" \
-        "{\"id\":$((GRPC_ID_OFFSET+8)),\"model_name\":\"nop_TYPE_INT32_-1\",\"model_version\":1,\"parent_id\":$((GRPC_ID_OFFSET+1))}" \
-        "{\"id\":$((GRPC_ID_OFFSET+9)),\"model_name\":\"nop_TYPE_INT32_-1\",\"model_version\":1,\"parent_id\":$((GRPC_ID_OFFSET+1))}" ; do
+        "{\"id\":1,\"model_name\":\"simple\",\"model_version\":1}" \
+        "{\"id\":2,\"model_name\":\"nop_TYPE_INT32_-1\",\"model_version\":1,\"parent_id\":1}" \
+        "{\"id\":3,\"model_name\":\"fan_${MODELBASE}\",\"model_version\":1,\"parent_id\":1}" \
+        "{\"id\":4,\"model_name\":\"nop_TYPE_INT32_-1\",\"model_version\":1,\"parent_id\":3}" \
+        "{\"id\":5,\"model_name\":\"${MODELBASE}\",\"model_version\":1,\"parent_id\":3}" \
+        "{\"id\":6,\"model_name\":\"nop_TYPE_INT32_-1\",\"model_version\":1,\"parent_id\":3}" \
+        "{\"id\":7,\"model_name\":\"nop_TYPE_INT32_-1\",\"model_version\":1,\"parent_id\":3}" \
+        "{\"id\":8,\"model_name\":\"nop_TYPE_INT32_-1\",\"model_version\":1,\"parent_id\":1}" \
+        "{\"id\":9,\"model_name\":\"nop_TYPE_INT32_-1\",\"model_version\":1,\"parent_id\":1}" ; do
     if [ `grep -c ${trace_str} trace_ensemble.log` != "1" ]; then
         echo -e "Ensemble trace log expects trace: ${trace_str}"
         RET=1
@@ -464,15 +463,15 @@ if [ `grep -c "COMPUTE_INPUT_END" summary_ensemble_tensor.log` != "7" ]; then
     RET=1
 fi
 for trace_str in \
-        "{\"id\":$((GRPC_ID_OFFSET+1)),\"model_name\":\"simple\",\"model_version\":1}" \
-        "{\"id\":$((GRPC_ID_OFFSET+2)),\"model_name\":\"nop_TYPE_INT32_-1\",\"model_version\":1,\"parent_id\":$((GRPC_ID_OFFSET+1))}" \
-        "{\"id\":$((GRPC_ID_OFFSET+3)),\"model_name\":\"fan_${MODELBASE}\",\"model_version\":1,\"parent_id\":$((GRPC_ID_OFFSET+1))}" \
-        "{\"id\":$((GRPC_ID_OFFSET+4)),\"model_name\":\"nop_TYPE_INT32_-1\",\"model_version\":1,\"parent_id\":$((GRPC_ID_OFFSET+3))}" \
-        "{\"id\":$((GRPC_ID_OFFSET+5)),\"model_name\":\"${MODELBASE}\",\"model_version\":1,\"parent_id\":$((GRPC_ID_OFFSET+3))}" \
-        "{\"id\":$((GRPC_ID_OFFSET+6)),\"model_name\":\"nop_TYPE_INT32_-1\",\"model_version\":1,\"parent_id\":$((GRPC_ID_OFFSET+3))}" \
-        "{\"id\":$((GRPC_ID_OFFSET+7)),\"model_name\":\"nop_TYPE_INT32_-1\",\"model_version\":1,\"parent_id\":$((GRPC_ID_OFFSET+3))}" \
-        "{\"id\":$((GRPC_ID_OFFSET+8)),\"model_name\":\"nop_TYPE_INT32_-1\",\"model_version\":1,\"parent_id\":$((GRPC_ID_OFFSET+1))}" \
-        "{\"id\":$((GRPC_ID_OFFSET+9)),\"model_name\":\"nop_TYPE_INT32_-1\",\"model_version\":1,\"parent_id\":$((GRPC_ID_OFFSET+1))}" ; do
+        "{\"id\":1,\"model_name\":\"simple\",\"model_version\":1}" \
+        "{\"id\":2,\"model_name\":\"nop_TYPE_INT32_-1\",\"model_version\":1,\"parent_id\":1}" \
+        "{\"id\":3,\"model_name\":\"fan_${MODELBASE}\",\"model_version\":1,\"parent_id\":1}" \
+        "{\"id\":4,\"model_name\":\"nop_TYPE_INT32_-1\",\"model_version\":1,\"parent_id\":3}" \
+        "{\"id\":5,\"model_name\":\"${MODELBASE}\",\"model_version\":1,\"parent_id\":3}" \
+        "{\"id\":6,\"model_name\":\"nop_TYPE_INT32_-1\",\"model_version\":1,\"parent_id\":3}" \
+        "{\"id\":7,\"model_name\":\"nop_TYPE_INT32_-1\",\"model_version\":1,\"parent_id\":3}" \
+        "{\"id\":8,\"model_name\":\"nop_TYPE_INT32_-1\",\"model_version\":1,\"parent_id\":1}" \
+        "{\"id\":9,\"model_name\":\"nop_TYPE_INT32_-1\",\"model_version\":1,\"parent_id\":1}" ; do
     if [ `grep -c ${trace_str} trace_ensemble_tensor.log` != "1" ]; then
         echo -e "Ensemble trace tensors log expects trace: ${trace_str}"
         RET=1
@@ -496,10 +495,10 @@ if [ `grep -o TENSOR_BACKEND_OUTPUT trace_ensemble_tensor.log | wc -l` != "14" ]
 fi
 
 for trace_str in \
-        "{\"id\":$((GRPC_ID_OFFSET+1)),\"activity\":\"TENSOR_QUEUE_INPUT\",\"tensor\":{\"name\":\"INPUT0\",\"data\":\"0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15\",\"shape\":\"1,16\",\"dtype\":\"INT32\"}}" \
-        "{\"id\":$((GRPC_ID_OFFSET+1)),\"activity\":\"TENSOR_QUEUE_INPUT\",\"tensor\":{\"name\":\"INPUT1\",\"data\":\"1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1\",\"shape\":\"1,16\",\"dtype\":\"INT32\"}}" \
-        "{\"id\":$((GRPC_ID_OFFSET+1)),\"activity\":\"TENSOR_BACKEND_OUTPUT\",\"tensor\":{\"name\":\"OUTPUT0\",\"data\":\"1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16\",\"shape\":\"1,16\",\"dtype\":\"INT32\"}}" \
-        "{\"id\":$((GRPC_ID_OFFSET+1)),\"activity\":\"TENSOR_BACKEND_OUTPUT\",\"tensor\":{\"name\":\"OUTPUT1\",\"data\":\"-1,0,1,2,3,4,5,6,7,8,9,10,11,12,13,14\",\"shape\":\"1,16\",\"dtype\":\"INT32\"}}" ; do
+        "{\"id\":1,\"activity\":\"TENSOR_QUEUE_INPUT\",\"tensor\":{\"name\":\"INPUT0\",\"data\":\"0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15\",\"shape\":\"1,16\",\"dtype\":\"INT32\"}}" \
+        "{\"id\":1,\"activity\":\"TENSOR_QUEUE_INPUT\",\"tensor\":{\"name\":\"INPUT1\",\"data\":\"1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1\",\"shape\":\"1,16\",\"dtype\":\"INT32\"}}" \
+        "{\"id\":1,\"activity\":\"TENSOR_BACKEND_OUTPUT\",\"tensor\":{\"name\":\"OUTPUT0\",\"data\":\"1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16\",\"shape\":\"1,16\",\"dtype\":\"INT32\"}}" \
+        "{\"id\":1,\"activity\":\"TENSOR_BACKEND_OUTPUT\",\"tensor\":{\"name\":\"OUTPUT1\",\"data\":\"-1,0,1,2,3,4,5,6,7,8,9,10,11,12,13,14\",\"shape\":\"1,16\",\"dtype\":\"INT32\"}}" ; do
     if [ `grep -c ${trace_str} trace_ensemble_tensor.log` != "1" ]; then
         echo -e "Ensemble trace tensors log expects trace: ${trace_str}"
         RET=1

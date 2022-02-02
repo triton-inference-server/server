@@ -79,7 +79,8 @@ trace output, resulting files in name "${trace_file}.0", "${trace_file}.1"...,
 see trace setting "log frequency" below for detail.
 - "trace_level" : the trace level. "OFF" to disable tracing,
 TIMESTAMPS" to trace timestamps, "TENSORS" to trace tensors.
-It may be specified multiple times to trace multiple informations.
+This value is an array of string whhere user may specify multiple levels to
+trace multiple informations.
 - "trace_rate" : the trace sampling rate. The value represents how many requests
 will one trace be sampled from. For example, if the trace rate is "1000",
 1 trace will be sampled for every 1000 requests.
@@ -154,19 +155,29 @@ response messages for Trace are:
 ```
 message TraceRequest
 {
+  message SettingValue
+  {
+    repeated string value = 3;
+  }
+
   // The new setting values to be updated,
   // settings that are not specified will remain unchanged.
-  map<string, string> settings = 1;
+  map<string, SettingValue> settings = 1;
 
   // The name of the model to apply the new trace settings.
   // If not given, the new settings will be applied globally.
-  string model_name = 1;
+  string model_name = 2;
 }
 
 message TraceResponse
 {
+  message SettingValue
+  {
+    repeated string value = 2;
+  }
+
   // The latest trace settings.
-  map<string, string> settings = 1;
+  map<string, SettingValue> settings = 1;
 }
 ```
 
