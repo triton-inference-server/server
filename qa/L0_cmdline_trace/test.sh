@@ -294,6 +294,68 @@ fi
 
 set -e
 
+# trace-rate == 6, trace-level=TIMESTAMPS, trace-log-frequency == 2
+SERVER_ARGS="--http-thread-count=1 --trace-file=trace_frequency.log \
+             --trace-level=TIMESTAMPS --trace-rate=6 \
+             --trace-log-frequency=2 --model-repository=$MODELSDIR"
+SERVER_LOG="./inference_server_frequency.log"
+run_server
+if [ "$SERVER_PID" == "0" ]; then
+    echo -e "\n***\n*** Failed to start $SERVER\n***"
+    cat $SERVER_LOG
+    exit 1
+fi
+
+set +e
+
+for p in {1..10}; do
+    $SIMPLE_HTTP_CLIENT >> client_frequency.log 2>&1
+    if [ $? -ne 0 ]; then
+        RET=1
+    fi
+
+    $SIMPLE_GRPC_CLIENT >> client_frequency.log 2>&1
+    if [ $? -ne 0 ]; then
+        RET=1
+    fi
+done
+
+set -e
+
+kill $SERVER_PID
+wait $SERVER_PID
+
+set +e
+
+# Two trace files
+$TRACE_SUMMARY -t trace_frequency.log.0 > summary_frequency.log.0
+if [ `grep -c "COMPUTE_INPUT_END" summary_frequency.log.0` != "2" ]; then
+    cat summary_frequency.log.0
+    echo -e "\n***\n*** Test Failed\n***"
+    RET=1
+fi
+
+if [ `grep -c ^simple summary_frequency.log.0` != "2" ]; then
+    cat summary_frequency.log.0
+    echo -e "\n***\n*** Test Failed\n***"
+    RET=1
+fi
+
+$TRACE_SUMMARY -t trace_frequency.log.1 > summary_frequency.log.1
+if [ `grep -c "COMPUTE_INPUT_END" summary_frequency.log.1` != "1" ]; then
+    cat summary_frequency.log.1
+    echo -e "\n***\n*** Test Failed\n***"
+    RET=1
+fi
+
+if [ `grep -c ^simple summary_frequency.log.1` != "1" ]; then
+    cat summary_frequency.log.1
+    echo -e "\n***\n*** Test Failed\n***"
+    RET=1
+fi
+
+set -e
+
 # trace-rate == 9, trace-level=TIMESTAMPS
 SERVER_ARGS="--http-thread-count=1 --trace-file=trace_9.log \
              --trace-level=TIMESTAMPS --trace-rate=9 --model-repository=$MODELSDIR"

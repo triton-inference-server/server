@@ -951,7 +951,7 @@ HTTPAPIServer::HTTPAPIServer(
       trace_manager_(trace_manager), shm_manager_(shm_manager),
       allocator_(nullptr), server_regex_(R"(/v2(?:/health/(live|ready))?)"),
       model_regex_(
-          R"(/v2/models/([^/]+)(?:/versions/([0-9]+))?(?:/(infer|ready|config|stats))?)"),
+          R"(/v2/models/([^/]+)(?:/versions/([0-9]+))?(?:/(infer|ready|config|stats|trace))?)"),
       modelcontrol_regex_(
           R"(/v2/repository(?:/([^/]+))?/(index|models/([^/]+)/(load|unload)))"),
       systemsharedmemory_regex_(
@@ -1508,7 +1508,7 @@ HTTPAPIServer::HandleModelStats(
 void
 HTTPAPIServer::HandleTrace(evhtp_request_t* req, const std::string& model_name)
 {
-  if ((req->method != htp_method_GET) || (req->method != htp_method_POST)) {
+  if ((req->method != htp_method_GET) && (req->method != htp_method_POST)) {
     evhtp_send_reply(req, EVHTP_RES_METHNALLOWED);
     return;
   }
@@ -1599,7 +1599,7 @@ HTTPAPIServer::HandleTrace(evhtp_request_t* req, const std::string& model_name)
       }
       if (request.Find("trace_rate", &setting_json)) {
         std::string rate_str;
-        HTTP_RESPOND_IF_ERR(req, setting_json.AsString(&filepath));
+        HTTP_RESPOND_IF_ERR(req, setting_json.AsString(&rate_str));
         try {
           rate = std::stoi(rate_str);
           rate_ptr = &rate;
@@ -1615,7 +1615,7 @@ HTTPAPIServer::HandleTrace(evhtp_request_t* req, const std::string& model_name)
       }
       if (request.Find("log_frequency", &setting_json)) {
         std::string frequency_str;
-        HTTP_RESPOND_IF_ERR(req, setting_json.AsString(&filepath));
+        HTTP_RESPOND_IF_ERR(req, setting_json.AsString(&frequency_str));
         try {
           log_frequency = std::stoi(frequency_str);
           log_frequency_ptr = &log_frequency;
@@ -1640,7 +1640,8 @@ HTTPAPIServer::HandleTrace(evhtp_request_t* req, const std::string& model_name)
   // has been updated above as some values may not be provided in the request.
   trace_manager_->GetTraceSetting(
       lmodel_name, &level, &rate, &log_frequency, &filepath);
-  triton::common::TritonJson::Value trace_response;
+  triton::common::TritonJson::Value trace_response(
+      triton::common::TritonJson::ValueType::OBJECT);
   // level
   {
     triton::common::TritonJson::Value level_array(

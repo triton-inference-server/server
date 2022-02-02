@@ -84,9 +84,11 @@ TraceManager::UpdateTraceSetting(
   // First try to get the previous setting, if 'ref == nullptr',
   // this is adding new model setting
   std::shared_ptr<TraceSetting> ref;
-  auto it = model_settings_.find(model_name);
-  if (it != model_settings_.end()) {
-    ref = it->second;
+  if (!model_name.empty()) {
+    auto it = model_settings_.find(model_name);
+    if (it != model_settings_.end()) {
+      ref = it->second;
+    }
   } else {
     ref = global_setting_;
   }
@@ -115,8 +117,9 @@ TraceManager::UpdateTraceSetting(
   }
 
   // Prepare the updated setting
-  std::shared_ptr<TraceSetting> lts(
-      new TraceSetting(level, rate, log_frequency, file, *ref));
+  std::shared_ptr<TraceSetting> lts(new TraceSetting(
+      level, rate, log_frequency, file,
+      (ref == nullptr) ? *global_setting_ : *ref));
   // The only invalid setting allowed is if it is turned off explicitly
   if ((!lts->Valid()) &&
       ((level == nullptr) || (*level != TRITONSERVER_TRACE_LEVEL_DISABLED))) {
@@ -133,21 +136,21 @@ TraceManager::UpdateTraceSetting(
     if (model_name.empty()) {
       // global update
       trace_files_.erase(global_setting_->file_->FileName());
-      global_setting_ = std::move(lts);
+      global_setting_ = lts;
     } else {
       auto it = model_settings_.find(model_name);
       if (it != model_settings_.end()) {
         // Model update
         trace_files_.erase(it->second->file_->FileName());
-        it->second = std::move(lts);
+        it->second = lts;
       } else {
         // Model init
-        model_settings_.emplace(model_name, std::move(lts));
+        model_settings_.emplace(model_name, lts);
       }
     }
   }
 
-  trace_files_.emplace(file->FileName());
+  trace_files_.emplace(lts->file_->FileName());
   return nullptr;
 }
 
@@ -514,7 +517,8 @@ TraceManager::TraceFile::SaveTraces(
     std::stringstream& trace_stream, const bool to_index_file)
 {
   if (to_index_file) {
-    std::string file_name = file_name_ + std::to_string(index_.fetch_add(1));
+    std::string file_name =
+        file_name_ + "." + std::to_string(index_.fetch_add(1));
     // Don't need lock because unique index ensure exclusive access
     // [WIP] exception handling
     std::ofstream file_stream;
