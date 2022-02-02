@@ -382,8 +382,9 @@ python3 $SRCDIR/gen_qa_reshape_models.py --ensemble --models_dir=$ENSEMBLEDESTDI
 python3 $SRCDIR/gen_qa_identity_models.py --ensemble --models_dir=$ENSEMBLEDESTDIR/qa_identity_model_repository
 python3 $SRCDIR/gen_qa_sequence_models.py --ensemble --models_dir=$ENSEMBLEDESTDIR/qa_sequence_model_repository
 python3 $SRCDIR/gen_qa_sequence_models.py --ensemble --variable --models_dir=$ENSEMBLEDESTDIR/qa_variable_sequence_model_repository
-python3 $SRCDIR/gen_tag_sigdef.py --dir $SIGDEFDESTDIR
 chmod -R 777 $ENSEMBLEDESTDIR
+python3 $SRCDIR/gen_tag_sigdef.py --dir $SIGDEFDESTDIR
+chmod -R 777 $SIGDEFDESTDIR
 EOF
 
 chmod a+x $HOST_SRCDIR/$TFSCRIPT
