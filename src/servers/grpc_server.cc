@@ -353,6 +353,7 @@ class CommonHandler : public GRPCServer::HandlerBase {
       const std::string& name,
       const std::shared_ptr<TRITONSERVER_Server>& tritonserver,
       const std::shared_ptr<SharedMemoryManager>& shm_manager,
+      TraceManager* trace_manager,
       inference::GRPCInferenceService::AsyncService* service,
       grpc::ServerCompletionQueue* cq);
 
@@ -372,6 +373,7 @@ class CommonHandler : public GRPCServer::HandlerBase {
   std::shared_ptr<TRITONSERVER_Server> tritonserver_;
 
   std::shared_ptr<SharedMemoryManager> shm_manager_;
+  TraceManager* trace_manager_;
 
   inference::GRPCInferenceService::AsyncService* service_;
   grpc::ServerCompletionQueue* cq_;
@@ -382,10 +384,11 @@ CommonHandler::CommonHandler(
     const std::string& name,
     const std::shared_ptr<TRITONSERVER_Server>& tritonserver,
     const std::shared_ptr<SharedMemoryManager>& shm_manager,
+    TraceManager* trace_manager,
     inference::GRPCInferenceService::AsyncService* service,
     grpc::ServerCompletionQueue* cq)
     : name_(name), tritonserver_(tritonserver), shm_manager_(shm_manager),
-      service_(service), cq_(cq)
+      trace_manager_(trace_manager), service_(service), cq_(cq)
 {
 }
 
@@ -1100,6 +1103,177 @@ CommonHandler::SetUpAllRequests()
       inference::ModelStatisticsRequest, inference::ModelStatisticsResponse>(
       "ModelStatistics", 0, OnRegisterModelStatistics, OnExecuteModelStatistics,
       false /* async */, cq_);
+
+  //
+  //  Trace
+  //
+  auto OnRegisterTrace =
+      [this](
+          grpc::ServerContext* ctx, inference::TraceRequest* request,
+          grpc::ServerAsyncResponseWriter<inference::TraceResponse>* responder,
+          void* tag) {
+        this->service_->RequestTrace(
+            ctx, request, responder, this->cq_, this->cq_, tag);
+      };
+
+  auto OnExecuteTrace = [this](
+                            inference::TraceRequest& request,
+                            inference::TraceResponse* response,
+                            grpc::Status* status) {
+    TRITONSERVER_Error* err = nullptr;
+#ifdef TRITON_ENABLE_TRACING
+    TRITONSERVER_InferenceTraceLevel level = TRITONSERVER_TRACE_LEVEL_DISABLED;
+    uint32_t rate;
+    uint32_t log_frequency;
+    std::string filepath;
+    // Update trace setting
+    if ((request.clear_setting()) && !request.model_name().empty()) {
+      trace_manager_->ClearTraceSetting(request.model_name());
+    } else {
+      TRITONSERVER_InferenceTraceLevel* level_ptr = nullptr;
+      uint32_t* rate_ptr = nullptr;
+      uint32_t* log_frequency_ptr = nullptr;
+      {
+        static std::string setting_name = "trace_file";
+        auto it = request.settings().find(setting_name);
+        if (it != request.settings().end()) {
+          if (it->second.value().size() == 1) {
+            filepath = it->second.value()[0];
+          } else {
+            err = TRITONSERVER_ErrorNew(
+                TRITONSERVER_ERROR_INVALID_ARG,
+                (std::string("expect only 1 value for '") + setting_name + "'")
+                    .c_str());
+            GOTO_IF_ERR(err, earlyexit);
+          }
+        }
+      }
+      {
+        static std::string setting_name = "trace_level";
+        auto it = request.settings().find(setting_name);
+        if (it != request.settings().end()) {
+          for (const auto& level_str : it->second.value()) {
+            if (level_str == "OFF") {
+              if (it->second.value().size() == 1) {
+                level = TRITONSERVER_TRACE_LEVEL_DISABLED;
+                level_ptr = &level;
+              } else {
+                err = TRITONSERVER_ErrorNew(
+                    TRITONSERVER_ERROR_INVALID_ARG,
+                    "Expect only one trace level 'OFF' is specified");
+                GOTO_IF_ERR(err, earlyexit);
+              }
+            } else if (level_str == "TIMESTAMPS") {
+              level = static_cast<TRITONSERVER_InferenceTraceLevel>(
+                  level | TRITONSERVER_TRACE_LEVEL_TIMESTAMPS);
+              level_ptr = &level;
+            } else if (level_str == "TENSORS") {
+              level = static_cast<TRITONSERVER_InferenceTraceLevel>(
+                  level | TRITONSERVER_TRACE_LEVEL_TENSORS);
+              level_ptr = &level;
+            }
+          }
+        }
+      }
+      {
+        static std::string setting_name = "trace_rate";
+        auto it = request.settings().find(setting_name);
+        if (it != request.settings().end()) {
+          if (it->second.value().size() == 1) {
+            try {
+              rate = std::stoi(it->second.value()[0]);
+              rate_ptr = &rate;
+            }
+            catch (const std::invalid_argument& ia) {
+              err = TRITONSERVER_ErrorNew(
+                  TRITONSERVER_ERROR_INVALID_ARG,
+                  (std::string("Unable to parse '") + setting_name +
+                   "', got: " + it->second.value()[0])
+                      .c_str());
+              GOTO_IF_ERR(err, earlyexit);
+            }
+          } else {
+            err = TRITONSERVER_ErrorNew(
+                TRITONSERVER_ERROR_INVALID_ARG,
+                (std::string("expect only 1 value for '") + setting_name + "'")
+                    .c_str());
+            GOTO_IF_ERR(err, earlyexit);
+          }
+        }
+      }
+      {
+        static std::string setting_name = "log_frequency";
+        auto it = request.settings().find(setting_name);
+        if (it != request.settings().end()) {
+          if (it->second.value().size() == 1) {
+            try {
+              log_frequency = std::stoi(it->second.value()[0]);
+              log_frequency_ptr = &log_frequency;
+            }
+            catch (const std::invalid_argument& ia) {
+              err = TRITONSERVER_ErrorNew(
+                  TRITONSERVER_ERROR_INVALID_ARG,
+                  (std::string("Unable to parse '") + setting_name +
+                   "', got: " + it->second.value()[0])
+                      .c_str());
+              GOTO_IF_ERR(err, earlyexit);
+            }
+          } else {
+            err = TRITONSERVER_ErrorNew(
+                TRITONSERVER_ERROR_INVALID_ARG,
+                (std::string("expect only 1 value for '") + setting_name + "'")
+                    .c_str());
+            GOTO_IF_ERR(err, earlyexit);
+          }
+        }
+      }
+
+      err = trace_manager_->UpdateTraceSetting(
+          request.model_name(), level_ptr, rate_ptr, log_frequency_ptr,
+          filepath);
+      GOTO_IF_ERR(err, earlyexit);
+    }
+
+    // Get current trace setting, this is needed even if the setting
+    // has been updated above as some values may not be provided in the request.
+    trace_manager_->GetTraceSetting(
+        request.model_name(), &level, &rate, &log_frequency, &filepath);
+    // level
+    {
+      inference::TraceResponse::SettingValue level_setting;
+      if (level == TRITONSERVER_TRACE_LEVEL_DISABLED) {
+        level_setting.add_value("OFF");
+      } else {
+        if (level & TRITONSERVER_TRACE_LEVEL_TIMESTAMPS) {
+          level_setting.add_value("TIMESTAMPS");
+        }
+        if (level & TRITONSERVER_TRACE_LEVEL_TENSORS) {
+          level_setting.add_value("TENSORS");
+        }
+      }
+      (*response->mutable_settings())["trace_level"] = level_setting;
+    }
+    (*response->mutable_settings())["trace_rate"].add_value(
+        std::to_string(rate));
+    (*response->mutable_settings())["log_frequency"].add_value(
+        std::to_string(log_frequency));
+    (*response->mutable_settings())["trace_file"].add_value(filepath);
+
+  earlyexit:
+    GrpcStatusUtil::Create(status, err);
+    TRITONSERVER_ErrorDelete(err);
+#else
+    auto err = TRITONSERVER_ErrorNew(
+        TRITONSERVER_ERROR_UNAVAILABLE, "the server does not suppport trace");
+    GrpcStatusUtil::Create(status, err);
+    TRITONSERVER_ErrorDelete(err);
+#endif
+  };
+
+  new CommonCallData<
+      grpc::ServerAsyncResponseWriter<inference::TraceResponse>,
+      inference::TraceRequest, inference::TraceResponse>(
+      "Trace", 0, OnRegisterTrace, OnExecuteTrace, false /* async */, cq_);
 
 
   //
@@ -4121,7 +4295,8 @@ GRPCServer::Start()
 
   // A common Handler for other non-inference requests
   CommonHandler* hcommon = new CommonHandler(
-      "CommonHandler", server_, shm_manager_, &service_, common_cq_.get());
+      "CommonHandler", server_, shm_manager_, trace_manager_, &service_,
+      common_cq_.get());
   hcommon->Start();
   common_handler_.reset(hcommon);
 

@@ -1518,9 +1518,6 @@ HTTPAPIServer::HandleTrace(evhtp_request_t* req, const std::string& model_name)
       evhtp_header_new(kContentTypeHeader, "application/json", 1, 1));
 
 #ifdef TRITON_ENABLE_TRACING
-  // In clear case, model name will be clear to retrieve global setting
-  // for the cleared model.
-  std::string lmodel_name = model_name;
   TRITONSERVER_InferenceTraceLevel level = TRITONSERVER_TRACE_LEVEL_DISABLED;
   uint32_t rate;
   uint32_t log_frequency;
@@ -1555,9 +1552,8 @@ HTTPAPIServer::HandleTrace(evhtp_request_t* req, const std::string& model_name)
     std::vector<std::string> members;
     HTTP_RESPOND_IF_ERR(req, request.Members(&members));
     if (members.size() == 0) {
-      if (!lmodel_name.empty()) {
-        trace_manager_->ClearTraceSetting(lmodel_name);
-        lmodel_name.clear();
+      if (!model_name.empty()) {
+        trace_manager_->ClearTraceSetting(model_name);
       } else {
         HTTP_RESPOND_IF_ERR(
             req, TRITONSERVER_ErrorNew(
@@ -1632,14 +1628,14 @@ HTTPAPIServer::HandleTrace(evhtp_request_t* req, const std::string& model_name)
       HTTP_RESPOND_IF_ERR(
           req,
           trace_manager_->UpdateTraceSetting(
-              lmodel_name, level_ptr, rate_ptr, log_frequency_ptr, filepath));
+              model_name, level_ptr, rate_ptr, log_frequency_ptr, filepath));
     }
   }
 
   // Get current trace setting, this is needed even if the setting
   // has been updated above as some values may not be provided in the request.
   trace_manager_->GetTraceSetting(
-      lmodel_name, &level, &rate, &log_frequency, &filepath);
+      model_name, &level, &rate, &log_frequency, &filepath);
   triton::common::TritonJson::Value trace_response(
       triton::common::TritonJson::ValueType::OBJECT);
   // level

@@ -167,6 +167,11 @@ message TraceRequest
   // The name of the model to apply the new trace settings.
   // If not given, the new settings will be applied globally.
   string model_name = 2;
+
+  // Clear the current model specific setting if specified, and
+  // any new setting values will not be applied.
+  // This option will be ignored if 'model_name' is not given.
+  bool clear_setting = 3;
 }
 
 message TraceResponse
