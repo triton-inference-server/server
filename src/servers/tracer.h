@@ -42,8 +42,10 @@ namespace nvidia { namespace inferenceserver {
 // Manager for tracing to a file.
 //
 class TraceManager {
- public:
+ private:
   class TraceSetting;
+
+ public:
   class Trace;
   // Create a trace manager that appends trace information
   // to a specified file as global setting.
@@ -123,8 +125,6 @@ class TraceManager {
       const int64_t* shape, uint64_t dim_count,
       TRITONSERVER_MemoryType memory_type, int64_t memory_type_id, void* userp);
 
-  // [FIXME] below should be private (need to fix TraceStream)
- public:
   class TraceFile {
    public:
     TraceFile(const std::string& file_name)
@@ -184,10 +184,12 @@ class TraceManager {
 
     std::unique_ptr<Trace> SampleTrace();
 
-    TRITONSERVER_InferenceTraceLevel level_;
-    uint32_t rate_;
-    uint32_t log_frequency_;
-    std::shared_ptr<TraceFile> file_;
+    const TRITONSERVER_InferenceTraceLevel level_;
+    const uint32_t rate_;
+    const uint32_t log_frequency_;
+    const std::shared_ptr<TraceFile> file_;
+
+   private:
     std::string invalid_reason_;
 
     std::mutex mu_;
@@ -199,8 +201,7 @@ class TraceManager {
     uint32_t count_;
     std::stringstream trace_stream_;
   };
-  // [FIXME] above should be private
- private:
+
   // Trace settings
   std::shared_ptr<TraceSetting> global_setting_;
   std::unordered_map<std::string, std::shared_ptr<TraceSetting>>

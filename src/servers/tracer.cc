@@ -516,27 +516,32 @@ void
 TraceManager::TraceFile::SaveTraces(
     std::stringstream& trace_stream, const bool to_index_file)
 {
-  if (to_index_file) {
-    std::string file_name =
-        file_name_ + "." + std::to_string(index_.fetch_add(1));
-    // Don't need lock because unique index ensure exclusive access
-    // [WIP] exception handling
-    std::ofstream file_stream;
-    file_stream.open(file_name);
-    file_stream << "[";
-    file_stream << trace_stream.rdbuf();
-    file_stream << "]";
-  } else {
-    std::lock_guard<std::mutex> lock(mu_);
-    if (first_write_) {
-      // [FIXME] may raise exception so need to catch it
-      trace_file_.open(file_name_);
-      trace_file_ << "[";
-      first_write_ = false;
+  try {
+    if (to_index_file) {
+      std::string file_name =
+          file_name_ + "." + std::to_string(index_.fetch_add(1));
+      std::ofstream file_stream;
+      file_stream.open(file_name);
+      file_stream << "[";
+      file_stream << trace_stream.rdbuf();
+      file_stream << "]";
     } else {
-      trace_file_ << ",";
+      std::lock_guard<std::mutex> lock(mu_);
+      if (first_write_) {
+        trace_file_.open(file_name_);
+        trace_file_ << "[";
+        first_write_ = false;
+      } else {
+        trace_file_ << ",";
+      }
+      trace_file_ << trace_stream.rdbuf();
     }
-    trace_file_ << trace_stream.rdbuf();
+  }
+  catch (const std::ofstream::failure& e) {
+    LOG_ERROR << "failed creating trace file: " << e.what();
+  }
+  catch (...) {
+    LOG_ERROR << "failed creating trace file: reason unknown";
   }
 }
 
@@ -618,13 +623,12 @@ TraceManager::TraceSetting::TraceSetting(
     const TRITONSERVER_InferenceTraceLevel* level, const uint32_t* rate,
     const uint32_t* log_frequency, const std::shared_ptr<TraceFile>& file,
     const TraceSetting& ref)
-    : sample_(0), count_(0)
+    : level_((level == nullptr) ? ref.level_ : *level),
+      rate_((rate == nullptr) ? ref.rate_ : *rate),
+      log_frequency_(
+          (log_frequency == nullptr) ? ref.log_frequency_ : *log_frequency),
+      file_((file == nullptr) ? ref.file_ : file), sample_(0), count_(0)
 {
-  level_ = (level == nullptr) ? ref.level_ : *level;
-  rate_ = (rate == nullptr) ? ref.rate_ : *rate;
-  log_frequency_ =
-      (log_frequency == nullptr) ? ref.log_frequency_ : *log_frequency;
-  file_ = (file == nullptr) ? ref.file_ : file;
   if (level_ == TRITONSERVER_TRACE_LEVEL_DISABLED) {
     invalid_reason_ = "tracing is disabled";
   } else if (rate_ == 0) {
