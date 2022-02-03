@@ -131,7 +131,7 @@ Please refer to
 to learn about how to build and run `Simple.java`.
 
 In the [QA folder](../qa), folders starting with L0_java include Java API tests.
-These may be useful to reference for getting started, such as the
+These can be useful references for getting started, such as the
 [ResNet50 test](../qa/L0_java_resnet).
 
 ### Java API setup instructions
