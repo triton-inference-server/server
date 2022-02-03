@@ -312,7 +312,10 @@ TritonModel::~TritonModel()
   instances_.clear();
   passive_instances_.clear();
 
-  // Unregister itself from the rate limiter
+  // Unregister itself from the rate limiter. Note this should happen
+  // after all instances are destructed. Destrucing instances ensures
+  // there are no instance threads waiting on rate limiter for
+  // receiving their payloads.
   server_->GetRateLimiter()->UnregisterModel(this);
 
   // Model finalization is optional... The TRITONBACKEND_Model

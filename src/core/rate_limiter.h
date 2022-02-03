@@ -1,4 +1,4 @@
-// Copyright 2020-2021, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+// Copyright 2020-2022, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 //
 // Redistribution and use in source and binary forms, with or without
 // modification, are permitted provided that the following conditions
@@ -160,6 +160,7 @@ class RateLimiter {
     void WaitForRemoval();
 
     TritonModelInstance* triton_model_instance_;
+    size_t index_;
     ModelContext* model_context_;
     RateLimiterConfig rate_limiter_config_;
     StandardStageFunc OnStage_;
