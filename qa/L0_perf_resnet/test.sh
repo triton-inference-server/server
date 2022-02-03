@@ -209,21 +209,21 @@ done
 # https://jirasw.nvidia.com/browse/DLIS-2933.
 #
 # Needs this additional test configuration for comparing against TFS.
-#if [ "$ARCH" == "x86_64" ]; then
-#    MODEL_NAME=${TF_MODEL_NAME}
-#    REPO=$REPODIR/perf_model_store
-#    STATIC_BATCH=128
-#    INSTANCE_CNT=1
-#    CONCURRENCY=1
-#    FRAMEWORK=$(echo ${MODEL_NAME} | cut -d '_' -f 3)
-#    MODEL_NAME=${MODEL_NAME} \
-#        MODEL_FRAMEWORK=${FRAMEWORK} \
-#        MODEL_PATH="$REPO/${MODEL_NAME}" \
-#        STATIC_BATCH=${STATIC_BATCH} \
-#        PERF_CLIENT_PROTOCOL="grpc" \
-#        INSTANCE_CNT=${INSTANCE_CNT} \
-#        CONCURRENCY=${CONCURRENCY} \
-#        ARCH=${ARCH} \
-#        BACKEND_CONFIG=" --backend-config=tensorflow,version=2" \
-#        bash -x run_test.sh
-#fi
+if [ "$ARCH" == "x86_64" ]; then
+   MODEL_NAME=${TF_MODEL_NAME}
+   REPO=$REPODIR/perf_model_store
+   STATIC_BATCH=128
+   INSTANCE_CNT=1
+   CONCURRENCY=1
+   FRAMEWORK=$(echo ${MODEL_NAME} | cut -d '_' -f 3)
+   MODEL_NAME=${MODEL_NAME} \
+       MODEL_FRAMEWORK=${FRAMEWORK} \
+       MODEL_PATH="$REPO/${MODEL_NAME}" \
+       STATIC_BATCH=${STATIC_BATCH} \
+       PERF_CLIENT_PROTOCOL="grpc" \
+       INSTANCE_CNT=${INSTANCE_CNT} \
+       CONCURRENCY=${CONCURRENCY} \
+       ARCH=${ARCH} \
+       BACKEND_CONFIG=" --backend-config=tensorflow,version=2" \
+       bash -x run_test.sh
+fi

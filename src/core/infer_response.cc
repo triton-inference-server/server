@@ -42,7 +42,9 @@ InferenceResponseFactory::CreateResponse(
   response->reset(new InferenceResponse(
       model_, id_, allocator_, alloc_userp_, response_fn_, response_userp_,
       response_delegator_));
-
+#ifdef TRITON_ENABLE_TRACING
+  (*response)->SetTrace(trace_);
+#endif  // TRITON_ENABLE_TRACING
   return Status::Success;
 }
 
@@ -200,6 +202,11 @@ InferenceResponse::Send(
     std::unique_ptr<InferenceResponse>&& response, const uint32_t flags)
 {
   LOG_VERBOSE(1) << "[InferenceResponse::Send] 111" << std::endl;
+#ifdef TRITON_ENABLE_TRACING
+  response->TraceOutputTensors(
+      TRITONSERVER_TRACE_TENSOR_BACKEND_OUTPUT, "InferenceResponse Send");
+#endif  // TRITON_ENABLE_TRACING
+
   if (response->response_delegator_ != nullptr) {
     LOG_VERBOSE(1) << "[InferenceResponse::Send] 222" << std::endl;
     auto ldelegator = std::move(response->response_delegator_);
@@ -230,6 +237,48 @@ InferenceResponse::SendWithStatus(
   response->status_ = status;
   return InferenceResponse::Send(std::move(response), flags);
 }
+
+#ifdef TRITON_ENABLE_TRACING
+Status
+InferenceResponse::TraceOutputTensors(
+    TRITONSERVER_InferenceTraceActivity activity, const std::string& msg)
+{
+  const auto& outputs = this->Outputs();
+  uint32_t output_count = outputs.size();
+
+  for (uint32_t idx = 0; idx < output_count; ++idx) {
+    const Output& output = outputs[idx];
+
+    // output data
+    const char* cname = output.Name().c_str();
+    TRITONSERVER_DataType datatype = DataTypeToTriton(output.DType());
+    const std::vector<int64_t>& oshape = output.Shape();
+    const int64_t* shape = &oshape[0];
+    uint64_t dim_count = oshape.size();
+    const void* base;
+    size_t byte_size;
+    TRITONSERVER_MemoryType memory_type;
+    int64_t memory_type_id;
+    void* userp;
+
+    Status status = output.DataBuffer(
+        &base, &byte_size, &memory_type, &memory_type_id, &userp);
+    if (!status.IsOk()) {
+      LOG_STATUS_ERROR(
+          status,
+          std::string(TRITONSERVER_InferenceTraceActivityString(activity)) +
+              ": " + msg + ": fail to get data buffer: " + status.Message());
+      return status;
+    }
+
+    INFER_TRACE_TENSOR_ACTIVITY(
+        this->trace_, activity, cname, datatype, base, byte_size, shape,
+        dim_count, memory_type, memory_type_id);
+  }
+
+  return Status::Success;
+}
+#endif  // TRITON_ENABLE_TRACING
 
 //
 // InferenceResponse::Output

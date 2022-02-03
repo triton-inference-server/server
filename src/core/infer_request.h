@@ -1,4 +1,4 @@
-// Copyright 2020-2021, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+// Copyright 2020-2022, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 //
 // Redistribution and use in source and binary forms, with or without
 // modification, are permitted provided that the following conditions
@@ -298,12 +298,21 @@ class InferenceRequest {
   void SetCacheKey(uint64_t key) { cache_key_ = key; }
 
 #ifdef TRITON_ENABLE_TRACING
-  const std::unique_ptr<InferenceTrace>& Trace() const { return trace_; }
-  std::unique_ptr<InferenceTrace>* MutableTrace() { return &trace_; }
-  void SetTrace(std::unique_ptr<InferenceTrace>&& trace)
+  const std::shared_ptr<InferenceTraceProxy>& Trace() const { return trace_; }
+  std::shared_ptr<InferenceTraceProxy>* MutableTrace() { return &trace_; }
+  void SetTrace(const std::shared_ptr<InferenceTraceProxy>& trace)
   {
-    trace_ = std::move(trace);
+    trace_ = trace;
+    response_factory_.SetTrace(trace);
   }
+  void ReleaseTrace()
+  {
+    trace_ = nullptr;
+    response_factory_.ReleaseTrace();
+  }
+
+  Status TraceInputTensors(
+      TRITONSERVER_InferenceTraceActivity activity, const std::string& msg);
 #endif  // TRITON_ENABLE_TRACING
 
   // The original inputs are the inputs added to the request before
@@ -561,6 +570,15 @@ class InferenceRequest {
     return cache_lookup_end_ns_;
   }
 
+  uint64_t BatcherStartNs() const { return batcher_start_ns_; }
+  uint64_t CaptureBatcherStartNs()
+  {
+    batcher_start_ns_ = std::chrono::duration_cast<std::chrono::nanoseconds>(
+                            std::chrono::steady_clock::now().time_since_epoch())
+                            .count();
+    return batcher_start_ns_;
+  }
+
 #ifdef TRITON_ENABLE_STATS
   uint64_t RequestStartNs() const { return request_start_ns_; }
   uint64_t CaptureRequestStartNs()
@@ -670,6 +688,11 @@ class InferenceRequest {
   uint64_t cache_lookup_start_ns_;
   uint64_t cache_lookup_end_ns_;
 
+  // Dedicated timestamp for batcher internal which can diverge from
+  // queue start timestamp to provide accurate queue time without affecting
+  // batcher functionalities.
+  uint64_t batcher_start_ns_;
+
   // Whether the stats of the request should be collected.
   bool collect_stats_;
 
@@ -680,7 +703,7 @@ class InferenceRequest {
 
 #ifdef TRITON_ENABLE_TRACING
   // Inference trace associated with this request.
-  std::unique_ptr<InferenceTrace> trace_;
+  std::shared_ptr<InferenceTraceProxy> trace_;
 #endif  // TRITON_ENABLE_TRACING
 
   // Sequence I/O states used for implicit state.

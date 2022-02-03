@@ -1,5 +1,5 @@
 #!/bin/bash
-# Copyright 2019-2021, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright 2019-2022, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -56,7 +56,7 @@ LD_LIBRARY_PATH=/opt/tritonserver/lib:$LD_LIBRARY_PATH
 rm -f $CLIENT_LOG.*
 
 # PyTorch is required for the Python backend dlpack add sub models
-pip3 install torch==1.9.0+cu111 torchvision==0.10.0+cu111 torchaudio==0.9.0 -f https://download.pytorch.org/whl/torch_stable.html
+pip3 install torch==1.9.0+cu111 -f https://download.pytorch.org/whl/torch_stable.html
 RET=0
 
 # Prepare float32 models with basic config

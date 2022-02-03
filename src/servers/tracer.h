@@ -74,6 +74,13 @@ class TraceManager {
       TRITONSERVER_InferenceTraceActivity activity, uint64_t timestamp_ns,
       void* userp);
 
+  static void TraceTensorActivity(
+      TRITONSERVER_InferenceTrace* trace,
+      TRITONSERVER_InferenceTraceActivity activity, const char* name,
+      TRITONSERVER_DataType datatype, const void* base, size_t byte_size,
+      const int64_t* shape, uint64_t dim_count,
+      TRITONSERVER_MemoryType memory_type, int64_t memory_type_id, void* userp);
+
   const TRITONSERVER_InferenceTraceLevel level_;
   const uint32_t rate_;
   std::unique_ptr<std::ofstream> trace_file_;

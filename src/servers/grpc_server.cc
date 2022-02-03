@@ -1,4 +1,4 @@
-// Copyright 2019-2021, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+// Copyright 2019-2022, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 //
 // Redistribution and use in source and binary forms, with or without
 // modification, are permitted provided that the following conditions
@@ -60,6 +60,8 @@
 #ifdef TRITON_ENABLE_TRACING
 #include "src/servers/tracer.h"
 #endif  // TRITON_ENABLE_TRACING
+
+#define REGISTER_GRPC_INFER_THREAD_COUNT 2
 
 namespace nvidia { namespace inferenceserver {
 namespace {
@@ -1855,7 +1857,8 @@ class InferHandlerState {
 #ifdef TRITON_ENABLE_TRACING
       if ((state->trace_manager_ != nullptr) && (state->trace_id_ != 0)) {
         state->trace_manager_->CaptureTimestamp(
-            state->trace_id_, TRITONSERVER_TRACE_LEVEL_MIN, "GRPC_SEND_START");
+            state->trace_id_, TRITONSERVER_TRACE_LEVEL_TIMESTAMPS,
+            "GRPC_SEND_START");
       }
 #endif  // TRITON_ENABLE_TRACING
       state->step_ = Steps::WRITTEN;
@@ -1908,7 +1911,8 @@ class InferHandlerState {
 #ifdef TRITON_ENABLE_TRACING
       if ((state->trace_manager_ != nullptr) && (state->trace_id_ != 0)) {
         state->trace_manager_->CaptureTimestamp(
-            state->trace_id_, TRITONSERVER_TRACE_LEVEL_MIN, "GRPC_SEND_START");
+            state->trace_id_, TRITONSERVER_TRACE_LEVEL_TIMESTAMPS,
+            "GRPC_SEND_START");
       }
 #endif  // TRITON_ENABLE_TRACING
 
@@ -3205,7 +3209,7 @@ ModelInferHandler::StartNewRequest()
       state->trace_manager_ = trace_manager_;
       TRITONSERVER_InferenceTraceId(state->trace_, &state->trace_id_);
       trace_manager_->CaptureTimestamp(
-          state->trace_id_, TRITONSERVER_TRACE_LEVEL_MIN,
+          state->trace_id_, TRITONSERVER_TRACE_LEVEL_TIMESTAMPS,
           "GRPC_WAITREAD_START");
     }
   }
@@ -3248,7 +3252,8 @@ ModelInferHandler::Process(InferHandler::State* state, bool rpc_ok)
 #ifdef TRITON_ENABLE_TRACING
     if ((state->trace_manager_ != nullptr) && (state->trace_id_ != 0)) {
       state->trace_manager_->CaptureTimestamp(
-          state->trace_id_, TRITONSERVER_TRACE_LEVEL_MIN, "GRPC_WAITREAD_END");
+          state->trace_id_, TRITONSERVER_TRACE_LEVEL_TIMESTAMPS,
+          "GRPC_WAITREAD_END");
     }
 #endif  // TRITON_ENABLE_TRACING
 
@@ -3343,7 +3348,8 @@ ModelInferHandler::Process(InferHandler::State* state, bool rpc_ok)
 #ifdef TRITON_ENABLE_TRACING
       if ((state->trace_manager_ != nullptr) && (state->trace_id_ != 0)) {
         state->trace_manager_->CaptureTimestamp(
-            state->trace_id_, TRITONSERVER_TRACE_LEVEL_MIN, "GRPC_SEND_START");
+            state->trace_id_, TRITONSERVER_TRACE_LEVEL_TIMESTAMPS,
+            "GRPC_SEND_START");
       }
 #endif  // TRITON_ENABLE_TRACING
 
@@ -3354,7 +3360,8 @@ ModelInferHandler::Process(InferHandler::State* state, bool rpc_ok)
 #ifdef TRITON_ENABLE_TRACING
     if ((state->trace_manager_ != nullptr) && (state->trace_id_ != 0)) {
       state->trace_manager_->CaptureTimestamp(
-          state->trace_id_, TRITONSERVER_TRACE_LEVEL_MIN, "GRPC_SEND_END");
+          state->trace_id_, TRITONSERVER_TRACE_LEVEL_TIMESTAMPS,
+          "GRPC_SEND_END");
     }
 #endif  // TRITON_ENABLE_TRACING
 
@@ -3429,7 +3436,8 @@ ModelInferHandler::InferResponseComplete(
 #ifdef TRITON_ENABLE_TRACING
   if ((state->trace_manager_ != nullptr) && (state->trace_id_ != 0)) {
     state->trace_manager_->CaptureTimestamp(
-        state->trace_id_, TRITONSERVER_TRACE_LEVEL_MIN, "GRPC_SEND_START");
+        state->trace_id_, TRITONSERVER_TRACE_LEVEL_TIMESTAMPS,
+        "GRPC_SEND_START");
   }
 #endif  // TRITON_ENABLE_TRACING
 
@@ -3577,7 +3585,7 @@ ModelStreamInferHandler::StartNewRequest()
       state->trace_manager_ = trace_manager_;
       TRITONSERVER_InferenceTraceId(state->trace_, &state->trace_id_);
       state->trace_manager_->CaptureTimestamp(
-          state->trace_id_, TRITONSERVER_TRACE_LEVEL_MIN,
+          state->trace_id_, TRITONSERVER_TRACE_LEVEL_TIMESTAMPS,
           "GRPC_WAITREAD_START");
     }
   }
@@ -3626,7 +3634,8 @@ ModelStreamInferHandler::Process(InferHandler::State* state, bool rpc_ok)
 #ifdef TRITON_ENABLE_TRACING
     if ((state->trace_manager_ != nullptr) && (state->trace_id_ != 0)) {
       state->trace_manager_->CaptureTimestamp(
-          state->trace_id_, TRITONSERVER_TRACE_LEVEL_MIN, "GRPC_WAITREAD_END");
+          state->trace_id_, TRITONSERVER_TRACE_LEVEL_TIMESTAMPS,
+          "GRPC_WAITREAD_END");
     }
 #endif  // TRITON_ENABLE_TRACING
 
@@ -3791,7 +3800,7 @@ ModelStreamInferHandler::Process(InferHandler::State* state, bool rpc_ok)
         TRITONSERVER_InferenceTraceId(
             next_read_state->trace_, &next_read_state->trace_id_);
         next_read_state->trace_manager_->CaptureTimestamp(
-            next_read_state->trace_id_, TRITONSERVER_TRACE_LEVEL_MIN,
+            next_read_state->trace_id_, TRITONSERVER_TRACE_LEVEL_TIMESTAMPS,
             "GRPC_WAITREAD_START");
       }
     }
@@ -3821,7 +3830,8 @@ ModelStreamInferHandler::Process(InferHandler::State* state, bool rpc_ok)
 #ifdef TRITON_ENABLE_TRACING
       if ((state->trace_manager_ != nullptr) && (state->trace_id_ != 0)) {
         state->trace_manager_->CaptureTimestamp(
-            state->trace_id_, TRITONSERVER_TRACE_LEVEL_MIN, "GRPC_SEND_END");
+            state->trace_id_, TRITONSERVER_TRACE_LEVEL_TIMESTAMPS,
+            "GRPC_SEND_END");
       }
 #endif  // TRITON_ENABLE_TRACING
 
@@ -3871,7 +3881,8 @@ ModelStreamInferHandler::Process(InferHandler::State* state, bool rpc_ok)
 #ifdef TRITON_ENABLE_TRACING
       if ((state->trace_manager_ != nullptr) && (state->trace_id_ != 0)) {
         state->trace_manager_->CaptureTimestamp(
-            state->trace_id_, TRITONSERVER_TRACE_LEVEL_MIN, "GRPC_SEND_END");
+            state->trace_id_, TRITONSERVER_TRACE_LEVEL_TIMESTAMPS,
+            "GRPC_SEND_END");
       }
 #endif  // TRITON_ENABLE_TRACING
 
@@ -4183,22 +4194,25 @@ GRPCServer::Start()
   common_handler_.reset(hcommon);
 
   // Handler for model inference requests.
-  ModelInferHandler* hmodelinfer = new ModelInferHandler(
-      "ModelInferHandler", server_, trace_manager_, shm_manager_, &service_,
-      model_infer_cq_.get(),
-      infer_allocation_pool_size_ /* max_state_bucket_count */,
-      compression_level_);
-  hmodelinfer->Start();
-  model_infer_handler_.reset(hmodelinfer);
+  for (int i = 0; i < REGISTER_GRPC_INFER_THREAD_COUNT; ++i) {
+    ModelInferHandler* hmodelinfer = new ModelInferHandler(
+        "ModelInferHandler", server_, trace_manager_, shm_manager_, &service_,
+        model_infer_cq_.get(),
+        infer_allocation_pool_size_ /* max_state_bucket_count */,
+        compression_level_);
+    hmodelinfer->Start();
+    model_infer_handlers_.emplace_back(hmodelinfer);
+  }
 
-  // Handler for streaming inference requests.
+  // Handler for streaming inference requests. Keeps one handler for streaming
+  // to avoid possible concurrent writes which is not allowed
   ModelStreamInferHandler* hmodelstreaminfer = new ModelStreamInferHandler(
       "ModelStreamInferHandler", server_, trace_manager_, shm_manager_,
       &service_, model_stream_infer_cq_.get(),
       infer_allocation_pool_size_ /* max_state_bucket_count */,
       compression_level_);
   hmodelstreaminfer->Start();
-  model_stream_infer_handler_.reset(hmodelstreaminfer);
+  model_stream_infer_handlers_.emplace_back(hmodelstreaminfer);
 
   running_ = true;
   LOG_INFO << "Started GRPCInferenceService at " << server_addr_;
@@ -4223,9 +4237,13 @@ GRPCServer::Stop()
   // Must stop all handlers explicitly to wait for all the handler
   // threads to join since they are referencing completion queue, etc.
   dynamic_cast<CommonHandler*>(common_handler_.get())->Stop();
-  dynamic_cast<ModelInferHandler*>(model_infer_handler_.get())->Stop();
-  dynamic_cast<ModelStreamInferHandler*>(model_stream_infer_handler_.get())
-      ->Stop();
+  for (const auto& model_infer_handler : model_infer_handlers_) {
+    dynamic_cast<ModelInferHandler*>(model_infer_handler.get())->Stop();
+  }
+  for (const auto& model_stream_infer_handler : model_stream_infer_handlers_) {
+    dynamic_cast<ModelStreamInferHandler*>(model_stream_infer_handler.get())
+        ->Stop();
+  }
 
   running_ = false;
   return nullptr;  // success

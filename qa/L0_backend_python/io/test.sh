@@ -1,5 +1,5 @@
 #!/bin/bash
-# Copyright (c) 2021, NVIDIA CORPORATION. All rights reserved.
+# Copyright 2021-2022, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -32,17 +32,18 @@ TEST_RESULT_FILE='test_results.txt'
 source ../common.sh
 source ../../common/util.sh
 
-SERVER=/opt/tritonserver/bin/tritonserver
-SERVER_ARGS="--model-repository=`pwd`/models --log-verbose=1"
+TRITON_DIR=${TRITON_DIR:="/opt/tritonserver"}
+SERVER=${TRITON_DIR}/bin/tritonserver
+BACKEND_DIR=${TRITON_DIR}/backends
+
+SERVER_ARGS="--model-repository=`pwd`/models --backend-directory=${BACKEND_DIR} --log-verbose=1"
 SERVER_LOG="./inference_server.log"
-REPO_VERSION=${NVIDIA_TRITON_SERVER_VERSION}
-DATADIR=${DATADIR:="/data/inferenceserver/${REPO_VERSION}"}
 
 RET=0
 rm -fr *.log ./models
 
 pip3 uninstall -y torch
-pip3 install torch==1.9.0+cu111 torchvision==0.10.0+cu111 torchaudio==0.9.0 -f https://download.pytorch.org/whl/torch_stable.html
+pip3 install torch==1.9.0+cu111 -f https://download.pytorch.org/whl/torch_stable.html
 
 for i in {1..3}; do
     model_name=dlpack_io_identity_$i

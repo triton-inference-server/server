@@ -123,7 +123,7 @@ set_target_properties(
     INSTALL_RPATH_USE_LINK_PATH FALSE
     INSTALL_RPATH ""
 )
-target_include_directories(query_test PRIVATE ${GTEST_INCLUDE_DIR})
+target_include_directories(query_test PRIVATE ${GTEST_INCLUDE_DIRS})
 target_link_libraries(
   query_test
   PRIVATE triton-common-async-work-queue  # from repo-common
@@ -185,7 +185,7 @@ set_target_properties(
 )
 target_include_directories(
   memory_test
-  PRIVATE ${GTEST_INCLUDE_DIR}
+  PRIVATE ${GTEST_INCLUDE_DIRS}
   PRIVATE ${CUDA_INCLUDE_DIRS}
   PRIVATE ${CNMEM_PATH}/include
 )
@@ -195,8 +195,8 @@ target_link_libraries(
   PRIVATE triton-common-sync-queue   # from repo-common
   PRIVATE triton-core-serverapi      # from repo-core
   PRIVATE proto-library              # from repo-common
-  PRIVATE ${GTEST_LIBRARY}
-  PRIVATE ${GTEST_MAIN_LIBRARY}
+  PRIVATE GTest::gtest
+  PRIVATE GTest::gtest_main
   PRIVATE ${CUDA_LIBRARIES}
   PRIVATE -lpthread
   PRIVATE protobuf::libprotobuf
@@ -237,7 +237,6 @@ set_target_properties(
 )
 target_include_directories(
   pinned_memory_manager_test
-  PRIVATE ${GTEST_INCLUDE_DIR}
   PRIVATE ${CUDA_INCLUDE_DIRS}
 )
 target_link_libraries(
@@ -246,8 +245,8 @@ target_link_libraries(
   PRIVATE triton-common-sync-queue   # from repo-common
   PRIVATE triton-core-serverapi      # from repo-core
   PRIVATE proto-library              # from repo-common
-  PRIVATE ${GTEST_LIBRARY}
-  PRIVATE ${GTEST_MAIN_LIBRARY}
+  PRIVATE GTest::gtest
+  PRIVATE GTest::gtest_main
   PRIVATE ${CUDA_LIBRARIES}
   PRIVATE protobuf::libprotobuf
   PRIVATE -lpthread
@@ -296,7 +295,7 @@ set_target_properties(
 )
 target_include_directories(
   response_cache_test
-  PRIVATE ${GTEST_INCLUDE_DIR}
+  PRIVATE ${GTEST_INCLUDE_DIRS}
   PRIVATE ${CUDA_INCLUDE_DIRS}
   PRIVATE ${CNMEM_PATH}/include
 )
@@ -306,8 +305,8 @@ target_link_libraries(
   PRIVATE triton-common-sync-queue   # from repo-common
   PRIVATE triton-core-serverapi      # from repo-core
   PRIVATE proto-library              # from repo-common
-  PRIVATE ${GTEST_LIBRARY}
-  PRIVATE ${GTEST_MAIN_LIBRARY}
+  PRIVATE GTest::gtest
+  PRIVATE GTest::gtest_main
   PRIVATE ${CUDA_LIBRARIES}
   PRIVATE protobuf::libprotobuf
   PRIVATE -lpthread
@@ -363,7 +362,7 @@ set_target_properties(
 )
 target_include_directories(
   async_work_queue_test
-  PRIVATE ${GTEST_INCLUDE_DIR}
+  PRIVATE ${GTEST_INCLUDE_DIRS}
 )
 target_link_libraries(
   async_work_queue_test
@@ -371,8 +370,8 @@ target_link_libraries(
   PRIVATE triton-common-sync-queue         # from repo-common
   PRIVATE triton-common-async-work-queue   # from repo-common
   PRIVATE triton-common-error              # from repo-common
-  PRIVATE ${GTEST_LIBRARY}
-  PRIVATE ${GTEST_MAIN_LIBRARY}
+  PRIVATE GTest::gtest
+  PRIVATE GTest::gtest_main
   PRIVATE -lpthread
 )
 install(
@@ -417,14 +416,14 @@ set_target_properties(
 )
 target_include_directories(
   data_compressor_test
-  PRIVATE ${GTEST_INCLUDE_DIR}
+  PRIVATE ${GTEST_INCLUDE_DIRS}
 )
 target_link_libraries(
   data_compressor_test
   PRIVATE triton-core-serverapi  # from repo-core
   PRIVATE proto-library          # from repo-common
-  PRIVATE ${GTEST_LIBRARY}
-  PRIVATE ${GTEST_MAIN_LIBRARY}
+  PRIVATE GTest::gtest
+  PRIVATE GTest::gtest_main
   PRIVATE ${LIBEVENT_LIBRARIES}
   PRIVATE protobuf::libprotobuf
   PRIVATE -lpthread
@@ -487,7 +486,7 @@ set_target_properties(
 )
 target_include_directories(
   triton_repo_agent_test
-  PRIVATE ${GTEST_INCLUDE_DIR}
+  PRIVATE ${GTEST_INCLUDE_DIRS}
 )
 target_link_libraries(
   triton_repo_agent_test
@@ -496,8 +495,8 @@ target_link_libraries(
   PRIVATE triton-common-error       # from repo-common
   PRIVATE triton-common-json        # from repo-common
   PRIVATE proto-library             # from repo-common
-  PRIVATE ${GTEST_LIBRARY}
-  PRIVATE ${GTEST_MAIN_LIBRARY}
+  PRIVATE GTest::gtest
+  PRIVATE GTest::gtest_main
   PRIVATE protobuf::libprotobuf
   PRIVATE -lpthread
   PRIVATE -ldl
@@ -535,3 +534,4 @@ add_subdirectory(dyna_sequence dyna_sequence)
 add_subdirectory(distributed_addsub distributed_addsub)
 add_subdirectory(query_backend query_backend)
 add_subdirectory(repoagent/relocation_repoagent repoagent/relocation_repoagent)
+add_subdirectory(implicit_state implicit_state)

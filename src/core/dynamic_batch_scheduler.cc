@@ -1,4 +1,4 @@
-// Copyright 2018-2021, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+// Copyright 2018-2022, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 //
 // Redistribution and use in source and binary forms, with or without
 // modification, are permitted provided that the following conditions
@@ -43,7 +43,6 @@ bool
 IsStaleState(Payload::State payload_state)
 {
   return (
-      (payload_state == Payload::State::SCHEDULED) ||
       (payload_state == Payload::State::EXECUTING) ||
       (payload_state == Payload::State::RELEASED));
 }
@@ -168,12 +167,27 @@ DynamicBatchScheduler::~DynamicBatchScheduler()
 Status
 DynamicBatchScheduler::Enqueue(std::unique_ptr<InferenceRequest>& request)
 {
-  // Queue timer starts at the beginning of the queueing and
-  // scheduling process
-  request->CaptureQueueStartNs();
-  INFER_TRACE_ACTIVITY(
-      request->Trace(), TRITONSERVER_TRACE_QUEUE_START,
-      request->QueueStartNs());
+  // If queue start timestamp hasn't been set, queue timer starts at
+  // the beginning of the queueing and scheduling process. Otherwise,
+  // dynamic batcher is used as component of another batcher and should not
+  // overwrite the queue start timestamp.
+  if (request->QueueStartNs() == 0) {
+    request->CaptureQueueStartNs();
+    INFER_TRACE_ACTIVITY(
+        request->Trace(), TRITONSERVER_TRACE_QUEUE_START,
+        request->QueueStartNs());
+#ifdef TRITON_ENABLE_TRACING
+    request->TraceInputTensors(
+        TRITONSERVER_TRACE_TENSOR_QUEUE_INPUT, "DynamicBatchScheduler Enqueue");
+#endif  // TRITON_ENABLE_TRACING
+  }
+
+  // Record time at the beginning of the batcher queueing. In the case of
+  // oldest sequence batcher, this will overwrite the value that was previously
+  // set by sequence batcher, which is okay as by this point, the previous
+  // batcher won't be needing this value and it can be safely reused by
+  // the dynamic batcher.
+  request->CaptureBatcherStartNs();
 
   std::unique_ptr<InferenceResponse> cached_response;
 
@@ -224,13 +238,13 @@ DynamicBatchScheduler::Enqueue(std::unique_ptr<InferenceRequest>& request)
 
       // If there are any idle runners and the queued batch size is greater or
       // equal to next preferred batch size, then wake batcher up to service
-      // this request. We do the actual wake outside of the lock to avoid having
-      // the woken thread immediately block on the lock
+      // this request. We do the actual wake outside of the lock to avoid
+      // having the woken thread immediately block on the lock
       wake_batcher =
           model_->Server()->GetRateLimiter()->PayloadSlotAvailable(model_);
 
-      // We may wake up runner less often if we don't enforce equal shape within
-      // a batch, otherwise must always wake up runner to check it
+      // We may wake up runner less often if we don't enforce equal shape
+      // within a batch, otherwise must always wake up runner to check it
       if (enforce_equal_shape_tensors_.empty()) {
         std::lock_guard<std::mutex> exec_lock(*(curr_payload_->GetExecMutex()));
         auto payload_state = curr_payload_->GetState();
@@ -471,6 +485,7 @@ DynamicBatchScheduler::GetDynamicBatch()
       if (check_input && !CompareWithRequiredEqualInputs(
                              queue_.RequestAtCursor(), has_optional_input_,
                              required_equal_inputs_)) {
+        curr_payload_->MarkSaturated();
         send_now = true;
         break;
       }
@@ -499,6 +514,9 @@ DynamicBatchScheduler::GetDynamicBatch()
   // If we found a preferred batch size and the queue delay hasn't been
   // exceeded, then execute that.
   if ((best_preferred_batch_size != 0) && !delay_is_exceeded) {
+    if (pending_batch_delay_ns_ == 0) {
+      payload_saturated_ = true;
+    }
     pending_batch_size_ = best_preferred_batch_size;
     queue_.SetCursorToMark();
     return 0;

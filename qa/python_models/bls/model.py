@@ -1,4 +1,4 @@
-# Copyright 2021, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright 2021-2022, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -29,8 +29,12 @@ import unittest
 import triton_python_backend_utils as pb_utils
 import torch
 from torch.utils.dlpack import from_dlpack, to_dlpack
+import threading
 from multiprocessing import Pool
 import sys
+
+_deferred_exceptions_lock = threading.Lock()
+_deferred_exceptions = []
 
 
 def bls_add_sub(_=None):
@@ -67,6 +71,16 @@ def bls_add_sub(_=None):
 
 class PBBLSTest(unittest.TestCase):
 
+    def add_deferred_exception(self, ex):
+        global _deferred_exceptions
+        with _deferred_exceptions_lock:
+            _deferred_exceptions.append(ex)
+
+    def check_deferred_exception(self):
+        with _deferred_exceptions_lock:
+            if len(_deferred_exceptions) > 0:
+                raise _deferred_exceptions[0]
+
     def test_bls_wrong_inputs(self):
         input0 = pb_utils.Tensor('INPUT0', np.random.randn(*[1, 16]))
 
@@ -76,6 +90,83 @@ class PBBLSTest(unittest.TestCase):
             requested_output_names=['OUTPUT0', 'OUTPUT1'])
         infer_response = infer_request.exec()
         self.assertTrue(infer_response.has_error())
+        self.assertTrue(len(infer_response.output_tensors()) == 0)
+
+    def _send_bls_sequence_requests(self, correlation_id):
+        # Start request
+        try:
+            input = pb_utils.Tensor('INPUT', np.array([1000], dtype=np.int32))
+
+            infer_request = pb_utils.InferenceRequest(
+                model_name='onnx_nobatch_sequence_int32',
+                inputs=[input],
+                requested_output_names=['OUTPUT'],
+                flags=pb_utils.TRITONSERVER_REQUEST_FLAG_SEQUENCE_START,
+                correlation_id=correlation_id)
+            self.assertTrue(infer_request.flags(),
+                            pb_utils.TRITONSERVER_REQUEST_FLAG_SEQUENCE_START)
+            infer_response = infer_request.exec()
+            self.assertFalse(infer_response.has_error())
+            output = pb_utils.get_output_tensor_by_name(infer_response,
+                                                        'OUTPUT')
+            self.assertEqual(output.as_numpy()[0], input.as_numpy()[0])
+
+            for i in range(10):
+                input = pb_utils.Tensor('INPUT', np.array([i], dtype=np.int32))
+                infer_request = pb_utils.InferenceRequest(
+                    model_name='onnx_nobatch_sequence_int32',
+                    inputs=[input],
+                    requested_output_names=['OUTPUT'],
+                    correlation_id=correlation_id)
+                infer_response = infer_request.exec()
+                self.assertFalse(infer_response.has_error())
+
+                # The new output is the previous output + the current input
+                expected_output = output.as_numpy()[0] + i
+                output = pb_utils.get_output_tensor_by_name(
+                    infer_response, 'OUTPUT')
+                self.assertEqual(output.as_numpy()[0], expected_output)
+
+            # Final request
+            input = pb_utils.Tensor('INPUT', np.array([2000], dtype=np.int32))
+
+            infer_request = pb_utils.InferenceRequest(
+                model_name='onnx_nobatch_sequence_int32',
+                inputs=[input],
+                requested_output_names=['OUTPUT'],
+                correlation_id=correlation_id)
+            infer_request.set_flags(
+                pb_utils.TRITONSERVER_REQUEST_FLAG_SEQUENCE_END)
+            self.assertTrue(infer_request.flags(),
+                            pb_utils.TRITONSERVER_REQUEST_FLAG_SEQUENCE_END)
+
+            infer_response = infer_request.exec()
+            self.assertFalse(infer_response.has_error())
+            expected_output = output.as_numpy()[0] + input.as_numpy()[0]
+            output = pb_utils.get_output_tensor_by_name(infer_response,
+                                                        'OUTPUT')
+            self.assertEqual(output.as_numpy()[0], expected_output)
+        except Exception as e:
+            self.add_deferred_exception(e)
+
+    def test_bls_sequence(self):
+        # Send 2 sequence of BLS requests simultaneously and check the responses.
+        threads = []
+        thread1 = threading.Thread(target=self._send_bls_sequence_requests,
+                                   args=(1000,))
+        threads.append(thread1)
+        thread2 = threading.Thread(target=self._send_bls_sequence_requests,
+                                   args=(1001,))
+        threads.append(thread2)
+
+        for thread in threads:
+            thread.start()
+
+        for thread in threads:
+            thread.join()
+
+        # Check if any of the threads had an exception
+        self.check_deferred_exception()
 
     def test_bls_incorrect_args(self):
         with self.assertRaises(TypeError):
@@ -215,6 +306,7 @@ class PBBLSTest(unittest.TestCase):
                                                   requested_output_names=[])
         infer_response = infer_request.exec()
         self.assertTrue(infer_response.has_error())
+        self.assertTrue(len(infer_response.output_tensors()) == 0)
 
     def test_multiple_bls(self):
         # Test running multiple BLS requests together

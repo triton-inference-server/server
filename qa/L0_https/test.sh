@@ -43,6 +43,7 @@ export CUDA_VISIBLE_DEVICES=0
 RET=0
 
 SIMPLE_INFER_CLIENT_PY=../clients/simple_http_infer_client.py
+TEST_CLIENT=../clients/simple_http_infer_client
 
 NGINX_CONF=`pwd`/nginx.conf
 CLIENT_LOG=`pwd`/client.log
@@ -51,23 +52,31 @@ SERVER=/opt/tritonserver/bin/tritonserver
 SERVER_ARGS="--model-repository=$DATADIR"
 source ../common/util.sh
 
+rm -f *.key *.crt ${CLIENT_LOG}.* server.log
 
-# Generate a passphrase
-openssl rand -base64 48 > passphrase.txt
+# Generate valid CA
+openssl genrsa -passout pass:1234 -des3 -out ca.key 4096
+openssl req -passin pass:1234 -new -x509 -days 365 -key ca.key -out ca.crt -subj  "/C=SP/ST=Spain/L=Valdepenias/O=Test/OU=Test/CN=Root CA"
 
-# Generate a Private Key
-openssl genrsa -aes128 -passout file:passphrase.txt -out server.key 2048
+# Generate valid Server Key/Cert
+openssl genrsa -passout pass:1234 -des3 -out server.key 4096
+openssl req -passin pass:1234 -new -key server.key -out server.csr -subj  "/C=SP/ST=Spain/L=Valdepenias/O=Test/OU=Server/CN=localhost"
+openssl x509 -req -passin pass:1234 -days 365 -in server.csr -CA ca.crt -CAkey ca.key -set_serial 01 -out server.crt
 
-# Generate a CSR (Certificate Signing Request)
-openssl req -new -passin file:passphrase.txt -key server.key -out server.csr \
-    -subj "/C=FR/O=krkr/OU=Domain Control Validated/CN=*.krkr.io"
+# Remove passphrase from the Server Key
+openssl rsa -passin pass:1234 -in server.key -out server.key
 
-# Remove Passphrase from Key
-cp server.key server.key.org
-openssl rsa -in server.key.org -passin file:passphrase.txt -out server.key
+# Generate valid Client Key/Cert
+openssl genrsa -passout pass:1234 -des3 -out client.key 4096
+openssl req -passin pass:1234 -new -key client.key -out client.csr -subj  "/C=SP/ST=Spain/L=Valdepenias/O=Test/OU=Client/CN=localhost"
+openssl x509 -passin pass:1234 -req -days 365 -in client.csr -CA ca.crt -CAkey ca.key -set_serial 01 -out client.crt
 
-# Generating a Self-Signed Certificate for 100 years
-openssl x509 -req -days 36500 -in server.csr -signkey server.key -out server.crt
+# Remove passphrase from Client Key
+openssl rsa -passin pass:1234 -in client.key -out client.key
+
+# Create mutated client key (Make first char of each like capital)
+cp client.key client2.key && sed -i "s/\b\(.\)/\u\1/g" client2.key
+cp client.crt client2.crt && sed -i "s/\b\(.\)/\u\1/g" client2.crt
 
 mv server.crt /etc/nginx/cert.crt
 mv server.key /etc/nginx/cert.key
@@ -89,9 +98,64 @@ service nginx restart
 set +e
 
 # Test basic inference with https
-python $SIMPLE_INFER_CLIENT_PY -v -u localhost --ssl >> ${CLIENT_LOG}.ssl_infer 2>&1
+python $SIMPLE_INFER_CLIENT_PY -v -u localhost --ssl --key-file client.key --cert-file client.crt --ca-certs ca.crt >> ${CLIENT_LOG}.ssl_infer 2>&1
 if [ $? -ne 0 ]; then
     cat ${CLIENT_LOG}.ssl_infer
+    RET=1
+fi
+
+$TEST_CLIENT -v -u https://localhost:443 --key-file client.key --cert-file client.crt --ca-certs ca.crt >> ${CLIENT_LOG}.c++.ssl_infer 2>&1
+if [ $? -ne 0 ]; then
+    cat ${CLIENT_LOG}.c++.ssl_infer
+    RET=1
+fi
+
+# Test basic inference on https without peer verification
+python $SIMPLE_INFER_CLIENT_PY -v -u localhost --ssl --insecure >> ${CLIENT_LOG}.ssl_infer_insecure 2>&1
+if [ $? -ne 0 ]; then
+    cat ${CLIENT_LOG}.ssl_infer_insecure
+    RET=1
+fi
+
+$TEST_CLIENT -v -u https://localhost:443 --verify-host 0 --verify-peer 0 >> ${CLIENT_LOG}.c++.ssl_infer_insecure 2>&1
+if [ $? -ne 0 ]; then
+    cat ${CLIENT_LOG}.c++.ssl_infer_insecure
+    RET=1
+fi
+
+# Test failure cases for SSL
+# Try without SSL 
+$SIMPLE_INFER_CLIENT_PY -v -u localhost >> ${CLIENT_LOG}.no_ssl_fail_infer 2>&1
+if [ $? -ne 0 ]; then
+    cat ${CLIENT_LOG}.no_ssl_fail_infer
+    echo -e "\n***\n*** Expected test failure\n***"
+else
+    RET=1
+fi
+
+$TEST_CLIENT -v -u https://localhost:443 >> ${CLIENT_LOG}.c++.no_ssl_fail_infer 2>&1
+if [ $? -ne 0 ]; then
+    cat ${CLIENT_LOG}.c++.no_ssl_fail_infer
+    echo -e "\n***\n*** Expected test failure\n***"
+else
+    RET=1
+fi
+
+
+# Try with incorrect key
+$SIMPLE_INFER_CLIENT_PY -v -u localhost --ssl --key-file client2.key --cert-file client.crt --ca-certs ca.crt >> ${CLIENT_LOG}.ssl_wrong_key 2>&1
+if [ $? -ne 0 ]; then
+    cat ${CLIENT_LOG}.ssl_wrong_key
+    echo -e "\n***\n*** Expected test failure\n***"
+else
+    RET=1
+fi
+
+$TEST_CLIENT -v -u https://localhost:443 --key-file client2.key --cert-file client.crt --ca-certs ca.crt >> ${CLIENT_LOG}.c++.ssl_wrong_key 2>&1
+if [ $? -ne 0 ]; then
+    cat ${CLIENT_LOG}.c++.ssl_wrong_key
+    echo -e "\n***\n*** Expected test failure\n***"
+else
     RET=1
 fi
 
