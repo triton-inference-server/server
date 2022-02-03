@@ -130,6 +130,10 @@ Please refer to
 [sample usage documentation](https://github.com/bytedeco/javacpp-presets/tree/master/tritonserver#sample-usage)
 to learn about how to build and run `Simple.java`.
 
+In the [QA folder](../qa), folders starting with L0_java include Java API tests.
+These can be useful references for getting started, such as the
+[ResNet50 test](../qa/L0_java_resnet).
+
 ### Java API setup instructions
 
 The current snapshot is based on Triton container version `21.12`. To set up your
