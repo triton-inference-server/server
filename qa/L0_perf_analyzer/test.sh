@@ -1,5 +1,5 @@
 #!/bin/bash
-# Copyright (c) 2020-2021, NVIDIA CORPORATION. All rights reserved.
+# Copyright (c) 2020-2022, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -713,6 +713,113 @@ if [ $(cat $CLIENT_LOG |  grep "${ERROR_STRING}" | wc -l) -ne 0 ]; then
    echo -e "\n***\n*** Test Failed\n***"
    RET=1
 fi
+set -e
+
+kill $SERVER_PID
+wait $SERVER_PID
+
+# Generate valid CA
+openssl genrsa -passout pass:1234 -des3 -out ca.key 4096
+openssl req -passin pass:1234 -new -x509 -days 365 -key ca.key -out ca.crt -subj  "/C=SP/ST=Spain/L=Valdepenias/O=Test/OU=Test/CN=Root CA"
+
+# Generate valid Server Key/Cert
+openssl genrsa -passout pass:1234 -des3 -out server.key 4096
+openssl req -passin pass:1234 -new -key server.key -out server.csr -subj  "/C=SP/ST=Spain/L=Valdepenias/O=Test/OU=Server/CN=localhost"
+openssl x509 -req -passin pass:1234 -days 365 -in server.csr -CA ca.crt -CAkey ca.key -set_serial 01 -out server.crt
+
+# Remove passphrase from the Server Key
+openssl rsa -passin pass:1234 -in server.key -out server.key
+
+# Generate valid Client Key/Cert
+openssl genrsa -passout pass:1234 -des3 -out client.key 4096
+openssl req -passin pass:1234 -new -key client.key -out client.csr -subj  "/C=SP/ST=Spain/L=Valdepenias/O=Test/OU=Client/CN=localhost"
+openssl x509 -passin pass:1234 -req -days 365 -in client.csr -CA ca.crt -CAkey ca.key -set_serial 01 -out client.crt
+
+# Remove passphrase from Client Key
+openssl rsa -passin pass:1234 -in client.key -out client.key
+
+# Create mutated client key (Make first char of each like capital)
+cp client.key client2.key && sed -i "s/\b\(.\)/\u\1/g" client2.key
+cp client.crt client2.crt && sed -i "s/\b\(.\)/\u\1/g" client2.crt
+
+cp server.crt /etc/nginx/cert.crt
+cp server.key /etc/nginx/cert.key
+
+SERVER_ARGS="--model-repository=${DATADIR} --grpc-use-ssl=1 --grpc-server-cert=server.crt --grpc-server-key=server.key --grpc-root-cert=ca.crt"
+
+run_server
+if [ "$SERVER_PID" == "0" ]; then
+    echo -e "\n***\n*** Failed to start $SERVER\n***"
+    cat $SERVER_LOG
+    exit 1
+fi
+
+# Setup the new configuration for the proxy. The HTTPS traffic will be
+# redirected to the running instance of server at localhost:8000
+cp nginx.conf /etc/nginx/sites-available/default
+
+# Start the proxy server
+service nginx restart
+
+# Test SSL
+set +e
+
+# Test that gRPC protocol with SSL works correctly
+$PERF_ANALYZER -v -i grpc -m graphdef_int16_int16_int16 --percentile=95 \
+  --ssl-grpc-use-ssl \
+  --ssl-grpc-root-certifications-file=ca.crt \
+  --ssl-grpc-private-key-file=client.key \
+  --ssl-grpc-certificate-chain-file=client.crt \
+  > ${CLIENT_LOG}.grpc_success 2>&1
+if [ $? -ne 0 ]; then
+    cat ${CLIENT_LOG}.grpc_success
+    RET=1
+fi
+
+# Test that gRPC protocol with SSL fails with incorrect key
+$PERF_ANALYZER -v -i grpc -m graphdef_int16_int16_int16 --percentile=95 \
+    --ssl-grpc-use-ssl \
+    --ssl-grpc-root-certifications-file=ca.crt \
+    --ssl-grpc-private-key-file=client.key \
+    --ssl-grpc-certificate-chain-file=client2.crt \
+    > ${CLIENT_LOG}.grpc_failure 2>&1
+if [ $? -eq 0 ]; then
+    cat ${CLIENT_LOG}.grpc_failure
+    echo -e "\n***\n*** Expected test failure\n***"
+    RET=1
+fi
+
+# Test that HTTP protocol with SSL works correctly
+$PERF_ANALYZER -v -u https://localhost:443 -i http -m graphdef_int16_int16_int16 --percentile=95 \
+    --ssl-https-verify-peer 1 \
+    --ssl-https-verify-host 2 \
+    --ssl-https-ca-certificates-file ca.crt \
+    --ssl-https-client-certificate-file client.crt \
+    --ssl-https-client-certificate-type PEM \
+    --ssl-https-private-key-file client.key \
+    --ssl-https-private-key-type PEM \
+    > ${CLIENT_LOG}.https_success 2>&1
+if [ $? -ne 0 ]; then
+    cat ${CLIENT_LOG}.https_success
+    RET=1
+fi
+
+# Test that HTTP protocol with SSL fails with incorrect key
+$PERF_ANALYZER -v -u https://localhost:443 -i http -m graphdef_int16_int16_int16 --percentile=95 \
+    --ssl-https-verify-peer 1 \
+    --ssl-https-verify-host 2 \
+    --ssl-https-ca-certificates-file ca.crt \
+    --ssl-https-client-certificate-file client.crt \
+    --ssl-https-client-certificate-type PEM \
+    --ssl-https-private-key-file client2.key \
+    --ssl-https-private-key-type PEM \
+    > ${CLIENT_LOG}.https_failure 2>&1
+if [ $? -eq 0 ]; then
+    cat ${CLIENT_LOG}.https_failure
+    echo -e "\n***\n*** Expected test failure\n***"
+    RET=1
+fi
+
 set -e
 
 kill $SERVER_PID
