@@ -184,10 +184,12 @@ void
 InferenceRequest::Release(
     std::unique_ptr<InferenceRequest>&& request, const uint32_t release_flags)
 {
+  LOG_VERBOSE(1) << "Release";
   // Invoke the release callbacks added internally before releasing the
   // request to user provided callback.
   for (auto it = request->release_callbacks_.rbegin();
        it != request->release_callbacks_.rend(); it++) {
+    LOG_VERBOSE(1) << "Release callback invoked";
     (*it)();
   }
   request->release_callbacks_.clear();
@@ -198,11 +200,13 @@ InferenceRequest::Release(
   // is properly layered, as the request may be nested in an ensemble
   // and the callback may interact with upper level trace.
   if (request->trace_ != nullptr) {
+    LOG_VERBOSE(1) << "Release request trace";
     request->trace_->ReportNow(TRITONSERVER_TRACE_REQUEST_END);
     InferenceTrace::Release(std::move(request->trace_));
   }
 #endif  // TRITON_ENABLE_TRACING
 
+  LOG_VERBOSE(1) << "Release call release_fn";
   void* userp = request->release_userp_;
   auto& release_fn = request->release_fn_;
   release_fn(

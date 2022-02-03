@@ -199,20 +199,26 @@ Status
 InferenceResponse::Send(
     std::unique_ptr<InferenceResponse>&& response, const uint32_t flags)
 {
+  LOG_VERBOSE(1) << "[InferenceResponse::Send] 111" << std::endl;
   if (response->response_delegator_ != nullptr) {
+    LOG_VERBOSE(1) << "[InferenceResponse::Send] 222" << std::endl;
     auto ldelegator = std::move(response->response_delegator_);
     ldelegator(std::move(response), flags);
     return Status::Success;
   }
+  LOG_VERBOSE(1) << "[InferenceResponse::Send] 333" << std::endl;
   void* userp = response->response_userp_;
   if (response->null_response_) {
+    LOG_VERBOSE(1) << "[InferenceResponse::Send] 444" << std::endl;
     response->response_fn_(nullptr /* response */, flags, userp);
   } else {
+    LOG_VERBOSE(1) << "[InferenceResponse::Send] 555" << std::endl;
     auto& response_fn = response->response_fn_;
     response_fn(
         reinterpret_cast<TRITONSERVER_InferenceResponse*>(response.release()),
         flags, userp);
   }
+  LOG_VERBOSE(1) << "[InferenceResponse::Send] 666" << std::endl;
   return Status::Success;
 }
 
