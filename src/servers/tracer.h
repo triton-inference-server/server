@@ -82,7 +82,7 @@ class TraceManager {
 
   // Return a trace that should be used to collected trace activities
   // for an inference request. Return nullptr if no tracing should occur.
-  std::unique_ptr<Trace> SampleTrace(const std::string& model_name);
+  std::shared_ptr<Trace> SampleTrace(const std::string& model_name);
 
   // Update global setting if 'model_name' is empty, otherwise, model setting is
   // updated.
@@ -104,21 +104,20 @@ class TraceManager {
   static void TraceRelease(TRITONSERVER_InferenceTrace* trace, void* userp);
 
   struct Trace {
-    Trace() : trace_(nullptr, TRITONSERVER_InferenceTraceDelete), trace_id_(0)
-    {
-    }
+    Trace() : trace_(nullptr), trace_id_(0) {}
     ~Trace();
     std::shared_ptr<TraceSetting> setting_;
     // Group the spawned traces by trace ID for better formatting
     std::mutex mtx_;
     std::unordered_map<uint64_t, std::unique_ptr<std::stringstream>> streams_;
     // Triton trace object that this trace is assosicated with,
-    // user must call release() to release the ownership of the trace object
-    // when
-    std::unique_ptr<
-        TRITONSERVER_InferenceTrace,
-        decltype(&TRITONSERVER_InferenceTraceDelete)>
-        trace_;
+    // 'Trace' object does not take ownership of 'trace_'. The caller of
+    // SampleTrace() must call TraceManager::TraceRelease() with 'trace_userp_'
+    // to properly release the resources if 'trace_' is not passed to a
+    // TRITONSERVER_ServerInferAsync() call.
+    TRITONSERVER_InferenceTrace* trace_;
+    void* trace_userp_;
+
     uint64_t trace_id_;
 
     // Capture a timestamp generated outside of triton and associate it
@@ -202,7 +201,7 @@ class TraceManager {
         const std::unordered_map<uint64_t, std::unique_ptr<std::stringstream>>&
             streams);
 
-    std::unique_ptr<Trace> SampleTrace();
+    std::shared_ptr<Trace> SampleTrace();
 
     const TRITONSERVER_InferenceTraceLevel level_;
     const uint32_t rate_;

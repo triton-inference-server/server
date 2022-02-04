@@ -193,7 +193,7 @@ class HTTPAPIServer : public HTTPServer {
     uint32_t IncrementResponseCount();
 
 #ifdef TRITON_ENABLE_TRACING
-    std::unique_ptr<TraceManager::Trace> trace_;
+    std::shared_ptr<TraceManager::Trace> trace_;
 #endif  // TRITON_ENABLE_TRACING
 
     AllocPayload alloc_payload_;
@@ -202,9 +202,6 @@ class HTTPAPIServer : public HTTPServer {
     // serialized. Hold that data here so that its lifetime spans the
     // lifetime of the request.
     std::list<std::vector<char>> serialized_data_;
-
-    std::atomic<uint32_t> complete_count_;
-    evbuffer* decompressed_request_buffer_;
 
    protected:
     TRITONSERVER_Server* server_;

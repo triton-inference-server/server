@@ -1525,7 +1525,6 @@ HTTPAPIServer::HandleTrace(evhtp_request_t* req, const std::string& model_name)
 
   // Perform trace setting update if requested
   if (req->method == htp_method_POST) {
-    // [WIP] clear model setting
     struct evbuffer_iovec* v = nullptr;
     int v_idx = 0;
     int n = evbuffer_peek(req->buffer_in, -1, NULL, NULL, 0);
@@ -2371,12 +2370,12 @@ HTTPAPIServer::HandleInfer(
 
   // If tracing is enabled see if this request should be traced.
   TRITONSERVER_InferenceTrace* triton_trace = nullptr;
-  std::unique_ptr<TraceManager::Trace> trace;
+  std::shared_ptr<TraceManager::Trace> trace;
 #ifdef TRITON_ENABLE_TRACING
   if (err == nullptr) {
     trace = std::move(trace_manager_->SampleTrace(model_name));
     if (trace != nullptr) {
-      triton_trace = trace->trace_.release();
+      triton_trace = trace->trace_;
 
       // Timestamps from evhtp are capture in 'req'. We record here
       // since this is the first place where we have access to trace
@@ -2460,9 +2459,8 @@ HTTPAPIServer::HandleInfer(
     connection_paused = true;
 
     auto infer_request = CreateInferRequest(req);
-    infer_request->decompressed_request_buffer_ = decompressed_buffer;
 #ifdef TRITON_ENABLE_TRACING
-    infer_request->trace_ = std::move(trace);
+    infer_request->trace_ = trace;
 #endif  // TRITON_ENABLE_TRACING
 
     if (err == nullptr) {
@@ -2475,7 +2473,7 @@ HTTPAPIServer::HandleInfer(
     if (err == nullptr) {
       err = TRITONSERVER_InferenceRequestSetReleaseCallback(
           irequest, InferRequestClass::InferRequestComplete,
-          reinterpret_cast<void*>(infer_request.get()));
+          decompressed_buffer);
       if (err == nullptr) {
         err = TRITONSERVER_InferenceRequestSetResponseCallback(
             irequest, allocator_,
@@ -2486,6 +2484,9 @@ HTTPAPIServer::HandleInfer(
       if (err == nullptr) {
         err = TRITONSERVER_ServerInferAsync(
             server_.get(), irequest, triton_trace);
+        if (trace != nullptr) {
+          trace->trace_ = nullptr;
+        }
       }
       if (err == nullptr) {
         infer_request.release();
@@ -2504,6 +2505,11 @@ HTTPAPIServer::HandleInfer(
       evhtp_request_resume(req);
     }
     TRITONSERVER_ErrorDelete(err);
+
+    // If HTTP server still owns Triton trace
+    if ((trace != nullptr) && (trace->trace_ != nullptr)) {
+      TraceManager::TraceRelease(trace->trace_, trace->trace_userp_);
+    }
 
     LOG_TRITONSERVER_ERROR(
         TRITONSERVER_InferenceRequestDelete(irequest),
@@ -2530,10 +2536,7 @@ HTTPAPIServer::OKReplyCallback(evthr_t* thr, void* arg, void* shared)
   }
 #endif  // TRITON_ENABLE_TRACING
 
-  // Has been released on the request side
-  if (infer_request->complete_count_.fetch_sub(1) == 1) {
-    delete infer_request;
-  }
+  delete infer_request;
 }
 
 void
@@ -2555,17 +2558,13 @@ HTTPAPIServer::BADReplyCallback(evthr_t* thr, void* arg, void* shared)
   }
 #endif  // TRITON_ENABLE_TRACING
 
-  // Has been released on the request side
-  if (infer_request->complete_count_.fetch_sub(1) == 1) {
-    delete infer_request;
-  }
+  delete infer_request;
 }
 
 HTTPAPIServer::InferRequestClass::InferRequestClass(
     TRITONSERVER_Server* server, evhtp_request_t* req,
     DataCompressor::Type response_compression_type)
-    : complete_count_(2), decompressed_request_buffer_(nullptr),
-      server_(server), req_(req),
+    : server_(server), req_(req),
       response_compression_type_(response_compression_type), response_count_(0)
 {
   evhtp_connection_t* htpconn = evhtp_request_get_connection(req);
@@ -2582,14 +2581,7 @@ HTTPAPIServer::InferRequestClass::InferRequestComplete(
 
   if ((flags & TRITONSERVER_REQUEST_RELEASE_ALL) != 0) {
     if (userp != nullptr) {
-      auto infer_request = reinterpret_cast<InferRequestClass*>(userp);
-      if (infer_request->decompressed_request_buffer_ != nullptr) {
-        evbuffer_free(infer_request->decompressed_request_buffer_);
-      }
-      // Has been released on the request side
-      if (infer_request->complete_count_.fetch_sub(1) == 1) {
-        delete infer_request;
-      }
+      evbuffer_free(reinterpret_cast<evbuffer*>(userp));
     }
     LOG_TRITONSERVER_ERROR(
         TRITONSERVER_InferenceRequestDelete(request),

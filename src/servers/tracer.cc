@@ -245,7 +245,7 @@ TraceManager::GetTraceSetting(
   *filepath = trace_setting->file_->FileName();
 }
 
-std::unique_ptr<TraceManager::Trace>
+std::shared_ptr<TraceManager::Trace>
 TraceManager::SampleTrace(const std::string& model_name)
 {
   std::shared_ptr<TraceSetting> trace_setting;
@@ -258,7 +258,7 @@ TraceManager::SampleTrace(const std::string& model_name)
   if (!trace_setting->Valid()) {
     return nullptr;
   }
-  std::unique_ptr<Trace> ts = trace_setting->SampleTrace();
+  std::shared_ptr<Trace> ts = trace_setting->SampleTrace();
   if (ts != nullptr) {
     ts->setting_ = trace_setting;
   }
@@ -298,6 +298,15 @@ TraceManager::Trace::CaptureTimestamp(
 void
 TraceManager::TraceRelease(TRITONSERVER_InferenceTrace* trace, void* userp)
 {
+  uint64_t parent_id;
+  LOG_TRITONSERVER_ERROR(
+      TRITONSERVER_InferenceTraceParentId(trace, &parent_id),
+      "getting trace parent id");
+  // The userp will be shared with the trace children, so only delete it
+  // if the root trace is being released
+  if (parent_id == 0) {
+    delete reinterpret_cast<std::shared_ptr<TraceManager::Trace>*>(userp);
+  }
   LOG_TRITONSERVER_ERROR(
       TRITONSERVER_InferenceTraceDelete(trace), "deleting trace");
 }
@@ -314,7 +323,8 @@ TraceManager::TraceActivity(
 
   // The function may be called with different traces but the same 'userp',
   // group the activity of the same trace together for more readable output.
-  auto ts = reinterpret_cast<Trace*>(userp);
+  auto ts =
+      reinterpret_cast<std::shared_ptr<TraceManager::Trace>*>(userp)->get();
 
   std::lock_guard<std::mutex> lk(ts->mtx_);
   std::stringstream* ss = nullptr;
@@ -400,7 +410,8 @@ TraceManager::TraceTensorActivity(
 
   // The function may be called with different traces but the same 'userp',
   // group the activity of the same trace together for more readable output.
-  auto ts = reinterpret_cast<Trace*>(userp);
+  auto ts =
+      reinterpret_cast<std::shared_ptr<TraceManager::Trace>*>(userp)->get();
 
   std::lock_guard<std::mutex> lk(ts->mtx_);
   std::stringstream* ss = nullptr;
@@ -617,7 +628,7 @@ TraceManager::TraceFile::SaveTraces(
   }
 }
 
-std::unique_ptr<TraceManager::Trace>
+std::shared_ptr<TraceManager::Trace>
 TraceManager::TraceSetting::SampleTrace()
 {
   bool create_trace = false;
@@ -626,16 +637,21 @@ TraceManager::TraceSetting::SampleTrace()
     create_trace = (((++sample_) % rate_) == 0);
   }
   if (create_trace) {
-    std::unique_ptr<TraceManager::Trace> lts(new Trace());
+    std::shared_ptr<TraceManager::Trace> lts(new Trace());
+    // Split 'Trace' management to frontend and Triton trace separately
+    // to avoid dependency between frontend request and Triton trace's liveness
+    auto trace_userp = new std::shared_ptr<TraceManager::Trace>(lts);
     TRITONSERVER_InferenceTrace* trace;
     TRITONSERVER_Error* err = TRITONSERVER_InferenceTraceTensorNew(
         &trace, level_, 0 /* parent_id */, TraceActivity, TraceTensorActivity,
-        TraceRelease, lts.get());
+        TraceRelease, trace_userp);
     if (err != nullptr) {
       LOG_TRITONSERVER_ERROR(err, "creating inference trace object");
+      delete trace_userp;
       return nullptr;
     }
-    lts->trace_.reset(trace);
+    lts->trace_ = trace;
+    lts->trace_userp_ = trace_userp;
     LOG_TRITONSERVER_ERROR(
         TRITONSERVER_InferenceTraceId(trace, &lts->trace_id_),
         "getting trace id");
