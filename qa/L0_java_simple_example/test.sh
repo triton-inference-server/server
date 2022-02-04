@@ -27,9 +27,8 @@
 
 # Set up test files based on installation instructions
 # https://github.com/bytedeco/javacpp-presets/blob/master/tritonserver/README.md
-# TODO: Uncomment
-# rm -r javacpp-presets
-# git clone https://github.com/bytedeco/javacpp-presets.git
+rm -r javacpp-presets
+git clone https://github.com/bytedeco/javacpp-presets.git
 cd javacpp-presets
 mvn clean install --projects .,tritonserver
 mvn clean install -f platform --projects ../tritonserver/platform -Djavacpp.platform.host
@@ -98,14 +97,14 @@ function run_cpu_tests() {
 echo -e "\nRunning Simple CPU-Only Tests\n"
 
 sed -i 's/"Simple"/"SimpleCPUOnly"/g' $SAMPLES_REPO/pom.xml
-# run_cpu_tests
+run_cpu_tests
 
 # Run ensemble
-sed -i 's/"simple"/"ensemblasdasde_add_sub_int32_int32_int32"/g' $SAMPLES_REPO/SimpleCPUOnly.java
-# $BASE_COMMAND -Dexec.args="-r $MODEL_REPO -v" >>$CLIENT_LOG 2>&1
+sed -i 's/"simple"/"ensemble_add_sub_int32_int32_int32"/g' $SAMPLES_REPO/SimpleCPUOnly.java
+$BASE_COMMAND -Dexec.args="-r $MODEL_REPO -v" >>$CLIENT_LOG 2>&1
 echo -e $BASE_COMMAND -Dexec.args="-r $MODEL_REPO -v" >>$CLIENT_LOG 2>&1
 cat $SAMPLES_REPO/SimpleCPUOnly.java>>$CLIENT_LOG 2>&1
-# sed -i 's/"ensemble_add_sub_int32_int32_int32"/"simple"/g' $SAMPLES_REPO/SimpleCPUOnly.java
+sed -i 's/"ensemble_add_sub_int32_int32_int32"/"simple"/g' $SAMPLES_REPO/SimpleCPUOnly.java
 if [ $? -ne 0 ]; then
     RET=1
 fi
@@ -117,36 +116,36 @@ fi
 
 sed -i 's/"SimpleCPUOnly"/"Simple"/g' $SAMPLES_REPO/pom.xml
 
-# # Run tests on full simple example
-# echo -e "\nRunning Simple Tests\n"
-# CLIENT_LOG="client.log"
-# # run_cpu_tests
+# Run tests on full simple example
+echo -e "\nRunning Simple Tests\n"
+CLIENT_LOG="client.log"
+# run_cpu_tests
 
-# INDEX=1
-# for MEMORY_TYPE in pinned gpu; do
-#     $BASE_COMMAND -Dexec.args="-r $MODEL_REPO -m $MEMORY_TYPE" >>$CLIENT_LOG 2>&1
-#     if [ $? -ne 0 ]; then
-#         RET=1
-#     fi
+INDEX=1
+for MEMORY_TYPE in pinned gpu; do
+    $BASE_COMMAND -Dexec.args="-r $MODEL_REPO -m $MEMORY_TYPE" >>$CLIENT_LOG 2>&1
+    if [ $? -ne 0 ]; then
+        RET=1
+    fi
 
-#     if [ `grep -ic "OUTPUT0 is stored in ${MEMORY_TYPE} memory" ${CLIENT_LOG}` != "2" ]; then
-#         echo -e "\n***\n*** Failed. Expected 2 'OUTPUT0 is stored in ${MEMORY_TYPE} memory'\n***"
-#         RET=1
-#     fi
+    if [ `grep -ic "OUTPUT0 is stored in ${MEMORY_TYPE} memory" ${CLIENT_LOG}` != "2" ]; then
+        echo -e "\n***\n*** Failed. Expected 2 'OUTPUT0 is stored in ${MEMORY_TYPE} memory'\n***"
+        RET=1
+    fi
 
-#     sed -i 's/"simple"/"ensemble_add_sub_int32_int32_int32"/g' $SAMPLES_REPO/Simple.java
-#     $BASE_COMMAND -Dexec.args="-r $MODEL_REPO -v -m ${MEMORY_TYPE}" >>$CLIENT_LOG 2>&1
-#     sed -i 's/"ensemble_add_sub_int32_int32_int32"/"simple"/g' $SAMPLES_REPO/Simple.java
-#     if [ $? -ne 0 ]; then
-#         RET=1
-#     fi
+    sed -i 's/"simple"/"ensemble_add_sub_int32_int32_int32"/g' $SAMPLES_REPO/Simple.java
+    $BASE_COMMAND -Dexec.args="-r $MODEL_REPO -v -m ${MEMORY_TYPE}" >>$CLIENT_LOG 2>&1
+    sed -i 's/"ensemble_add_sub_int32_int32_int32"/"simple"/g' $SAMPLES_REPO/Simple.java
+    if [ $? -ne 0 ]; then
+        RET=1
+    fi
 
-#     if [ `grep -c "request id: my_request_id, model: ensemble_add_sub_int32_int32_int32" ${CLIENT_LOG}` != $((INDEX*2)) ]; then
-#         echo -e "\n***\n*** Failed. Expected $((INDEX*2)) 'request id: my_request_id, model: ensemble_add_sub_int32_int32_int32'\n***"
-#         RET=1
-#     fi
-#     let INDEX++
-# done
+    if [ `grep -c "request id: my_request_id, model: ensemble_add_sub_int32_int32_int32" ${CLIENT_LOG}` != $((INDEX*2)) ]; then
+        echo -e "\n***\n*** Failed. Expected $((INDEX*2)) 'request id: my_request_id, model: ensemble_add_sub_int32_int32_int32'\n***"
+        RET=1
+    fi
+    let INDEX++
+done
 
 
 if [ $RET -eq 0 ]; then
