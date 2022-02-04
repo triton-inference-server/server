@@ -96,14 +96,13 @@ function run_cpu_tests() {
 # Run tests on CPU-only simple example
 echo -e "\nRunning Simple CPU-Only Tests\n"
 
-sed -i 's/"Simple"/"SimpleCPUOnly"/g' $SAMPLES_REPO/pom.xml
+sed -i 's/Simple/SimpleCPUOnly/g' $SAMPLES_REPO/pom.xml
 run_cpu_tests
 
 # Run ensemble
 sed -i 's/"simple"/"ensemble_add_sub_int32_int32_int32"/g' $SAMPLES_REPO/SimpleCPUOnly.java
+cat $SAMPLES_REPO/pom.xml >>$CLIENT_LOG 2>&1
 $BASE_COMMAND -Dexec.args="-r $MODEL_REPO -v" >>$CLIENT_LOG 2>&1
-echo -e $BASE_COMMAND -Dexec.args="-r $MODEL_REPO -v" >>$CLIENT_LOG 2>&1
-cat $SAMPLES_REPO/SimpleCPUOnly.java>>$CLIENT_LOG 2>&1
 sed -i 's/"ensemble_add_sub_int32_int32_int32"/"simple"/g' $SAMPLES_REPO/SimpleCPUOnly.java
 if [ $? -ne 0 ]; then
     RET=1
@@ -114,12 +113,12 @@ if [ `grep -c "request id: my_request_id, model: ensemble_add_sub_int32_int32_in
     RET=1
 fi
 
-sed -i 's/"SimpleCPUOnly"/"Simple"/g' $SAMPLES_REPO/pom.xml
+sed -i 's/SimpleCPUOnly/Simple/g' $SAMPLES_REPO/pom.xml
 
 # Run tests on full simple example
 echo -e "\nRunning Simple Tests\n"
 CLIENT_LOG="client.log"
-# run_cpu_tests
+run_cpu_tests
 
 INDEX=1
 for MEMORY_TYPE in pinned gpu; do
@@ -134,7 +133,7 @@ for MEMORY_TYPE in pinned gpu; do
     fi
 
     sed -i 's/"simple"/"ensemble_add_sub_int32_int32_int32"/g' $SAMPLES_REPO/Simple.java
-    $BASE_COMMAND -Dexec.args="-r $MODEL_REPO -v -m ${MEMORY_TYPE}" >>$CLIENT_LOG 2>&1
+    $BASE_COMMAND -Dexec.args="-r $MODEL_REPO -v -m $MEMORY_TYPE" >>$CLIENT_LOG 2>&1
     sed -i 's/"ensemble_add_sub_int32_int32_int32"/"simple"/g' $SAMPLES_REPO/Simple.java
     if [ $? -ne 0 ]; then
         RET=1
