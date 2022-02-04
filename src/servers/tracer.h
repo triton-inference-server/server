@@ -53,15 +53,19 @@ class TraceManager {
   struct NewSetting {
     NewSetting()
         : clear_level_(false), level_(nullptr), clear_rate_(false),
-          rate_(nullptr), clear_log_frequency_(false), log_frequency_(nullptr),
+          rate_(nullptr), clear_count_(false), count_(nullptr),
+          clear_log_frequency_(false), log_frequency_(nullptr),
           clear_filepath_(false), filepath_(nullptr)
     {
     }
     bool clear_level_;
-    TRITONSERVER_InferenceTraceLevel* level_;
+    const TRITONSERVER_InferenceTraceLevel* level_;
 
     bool clear_rate_;
     const uint32_t* rate_;
+
+    bool clear_count_;
+    const uint32_t* count_;
 
     bool clear_log_frequency_;
     const uint32_t* log_frequency_;
@@ -75,7 +79,7 @@ class TraceManager {
   // to a specified file as global setting.
   static TRITONSERVER_Error* Create(
       TraceManager** manager, const TRITONSERVER_InferenceTraceLevel level,
-      const uint32_t rate, const uint32_t log_frequency,
+      const uint32_t rate, const uint32_t count, const uint32_t log_frequency,
       const std::string& filepath);
 
   ~TraceManager() = default;
@@ -91,7 +95,8 @@ class TraceManager {
 
   void GetTraceSetting(
       const std::string& model_name, TRITONSERVER_InferenceTraceLevel* level,
-      uint32_t* rate, uint32_t* log_frequency, std::string* filepath);
+      uint32_t* rate, uint32_t* count, uint32_t* log_frequency,
+      std::string* filepath);
 
   // Return the current timestamp.
   static uint64_t CaptureTimestamp()
@@ -128,7 +133,8 @@ class TraceManager {
  private:
   TraceManager(
       const TRITONSERVER_InferenceTraceLevel level, const uint32_t rate,
-      const uint32_t log_frequency, const std::string& filepath);
+      const uint32_t count, const uint32_t log_frequency,
+      const std::string& filepath);
 
   static void TraceActivity(
       TRITONSERVER_InferenceTrace* trace,
@@ -146,6 +152,10 @@ class TraceManager {
   // if global setting is being updated
   TRITONSERVER_Error* UpdateTraceSettingInternal(
       const std::string& model_name, const NewSetting& new_setting);
+
+  void DisableTraceInternal(
+      const std::string& model_name,
+      const TRITONSERVER_InferenceTraceLevel current_level);
 
   class TraceFile {
    public:
@@ -179,22 +189,28 @@ class TraceManager {
   class TraceSetting {
    public:
     TraceSetting()
-        : level_(TRITONSERVER_TRACE_LEVEL_DISABLED), rate_(0),
+        : level_(TRITONSERVER_TRACE_LEVEL_DISABLED), rate_(0), count_(0),
           log_frequency_(0), level_specified_(false), rate_specified_(false),
-          log_frequency_specified_(false), filepath_specified_(false),
-          sample_(0), count_(0)
+          count_specified_(false), log_frequency_specified_(false),
+          filepath_specified_(false), sample_(0), remaining_count_(0),
+          sample_in_stream_(0)
     {
       invalid_reason_ = "Setting hasn't been initialized";
     }
     TraceSetting(
         const TRITONSERVER_InferenceTraceLevel level, const uint32_t rate,
-        const uint32_t log_frequency, const std::shared_ptr<TraceFile>& file,
-        const bool level_specified, const bool rate_specified,
+        const uint32_t count, const uint32_t log_frequency,
+        const std::shared_ptr<TraceFile>& file, const bool level_specified,
+        const bool rate_specified, const bool count_specified,
         const bool log_frequency_specified, const bool filepath_specified);
 
     ~TraceSetting();
 
-    bool Valid() { return invalid_reason_.empty(); }
+    bool Valid()
+    {
+      return invalid_reason_.empty() &&
+             ((count_ == 0) || (remaining_count_ != 0));
+    }
     const std::string& Reason() { return invalid_reason_; }
 
     void WriteTrace(
@@ -205,12 +221,14 @@ class TraceManager {
 
     const TRITONSERVER_InferenceTraceLevel level_;
     const uint32_t rate_;
+    const uint32_t count_;
     const uint32_t log_frequency_;
     const std::shared_ptr<TraceFile> file_;
 
     // Whether the field value is specified or mirror from upper level setting
     const bool level_specified_;
     const bool rate_specified_;
+    const bool count_specified_;
     const bool log_frequency_specified_;
     const bool filepath_specified_;
 
@@ -222,8 +240,11 @@ class TraceManager {
     // use to sample a trace based on sampling rate.
     uint64_t sample_;
 
+    // Remaining trace count
+    uint32_t remaining_count_;
+
     // Tracking traces that haven't been saved to file
-    uint32_t count_;
+    uint32_t sample_in_stream_;
     std::stringstream trace_stream_;
   };
 

@@ -30,9 +30,9 @@
 #include <unordered_map>
 #include "src/core/constants.h"
 #include "src/core/logging.h"
+#include "src/servers/common.h"
 #ifdef TRITON_ENABLE_GPU
 #include <cuda_runtime_api.h>
-#include "src/servers/common.h"
 #endif  // TRITON_ENABLE_GPU
 
 namespace nvidia { namespace inferenceserver {
@@ -40,25 +40,28 @@ namespace nvidia { namespace inferenceserver {
 TRITONSERVER_Error*
 TraceManager::Create(
     TraceManager** manager, const TRITONSERVER_InferenceTraceLevel level,
-    const uint32_t rate, const uint32_t log_frequency,
+    const uint32_t rate, const uint32_t count, const uint32_t log_frequency,
     const std::string& filepath)
 {
   // Always create TraceManager regardless of the global setting as they
   // can be updated at runtime even if tracing is not enable at start.
   // No trace should be sampled if the setting is not valid.
-  *manager = new TraceManager(level, rate, log_frequency, filepath);
+  *manager = new TraceManager(level, rate, count, log_frequency, filepath);
   return nullptr;  // success
 }
 
 TraceManager::TraceManager(
     const TRITONSERVER_InferenceTraceLevel level, const uint32_t rate,
-    const uint32_t log_frequency, const std::string& filepath)
+    const uint32_t count, const uint32_t log_frequency,
+    const std::string& filepath)
 {
   std::shared_ptr<TraceFile> file(new TraceFile(filepath));
   global_default_.reset(new TraceSetting(
-      level, rate, log_frequency, file, false, false, false, false));
+      level, rate, count, log_frequency, file, false, false, false, false,
+      false));
   global_setting_.reset(new TraceSetting(
-      level, rate, log_frequency, file, false, false, false, false));
+      level, rate, count, log_frequency, file, false, false, false, false,
+      false));
   trace_files_.emplace(filepath, file);
 }
 
@@ -67,7 +70,22 @@ TraceManager::UpdateTraceSetting(
     const std::string& model_name, const NewSetting& new_setting)
 {
   std::lock_guard<std::mutex> w_lk(w_mu_);
-  return UpdateTraceSettingInternal(model_name, new_setting);
+
+  RETURN_IF_ERR(UpdateTraceSettingInternal(model_name, new_setting));
+  // If updating global setting, must check and update the model settings
+  // that are (partially) mirroring global setting.
+  if (model_name.empty()) {
+    // Default constructed setting means no active update,
+    // only the unspecified fields will be checked and updated.
+    NewSetting setting;
+    // Make a copy of the set as UpdateTraceSettingInternal() may modify
+    // 'fallback_used_models_'
+    auto fallback_models = fallback_used_models_;
+    for (const auto& name : fallback_models) {
+      RETURN_IF_ERR(UpdateTraceSettingInternal(name, setting));
+    }
+  }
+  return nullptr;
 }
 
 TRITONSERVER_Error*
@@ -95,6 +113,7 @@ TraceManager::UpdateTraceSettingInternal(
   //    use the specified value
   TRITONSERVER_InferenceTraceLevel level = fallback_setting->level_;
   uint32_t rate = fallback_setting->rate_;
+  uint32_t count = fallback_setting->count_;
   uint32_t log_frequency = fallback_setting->log_frequency_;
   std::string filepath = fallback_setting->file_->FileName();
 
@@ -111,6 +130,11 @@ TraceManager::UpdateTraceSettingInternal(
                                : (((current_setting != nullptr) &&
                                    current_setting->rate_specified_) ||
                                   (new_setting.rate_ != nullptr)));
+  const bool count_specified =
+      (new_setting.clear_count_ ? false
+                                : (((current_setting != nullptr) &&
+                                    current_setting->count_specified_) ||
+                                   (new_setting.count_ != nullptr)));
   const bool log_frequency_specified =
       (new_setting.clear_log_frequency_
            ? false
@@ -130,6 +154,10 @@ TraceManager::UpdateTraceSettingInternal(
     rate = (new_setting.rate_ != nullptr) ? *new_setting.rate_
                                           : current_setting->rate_;
   }
+  if (count_specified) {
+    count = (new_setting.count_ != nullptr) ? *new_setting.count_
+                                            : current_setting->count_;
+  }
   if (log_frequency_specified) {
     log_frequency = (new_setting.log_frequency_ != nullptr)
                         ? *new_setting.log_frequency_
@@ -144,11 +172,11 @@ TraceManager::UpdateTraceSettingInternal(
   // Some special case when updating model setting
   if (!model_name.empty()) {
     bool all_specified =
-        (level_specified & rate_specified & log_frequency_specified &
-         filepath_specified);
+        (level_specified & rate_specified & count_specified &
+         log_frequency_specified & filepath_specified);
     bool none_specified =
-        !(level_specified | rate_specified | log_frequency_specified |
-          filepath_specified);
+        !(level_specified | rate_specified | count_specified |
+          log_frequency_specified | filepath_specified);
     if (all_specified) {
       fallback_used_models_.erase(model_name);
     } else if (none_specified) {
@@ -177,8 +205,8 @@ TraceManager::UpdateTraceSettingInternal(
   }
 
   std::shared_ptr<TraceSetting> lts(new TraceSetting(
-      level, rate, log_frequency, file, level_specified, rate_specified,
-      log_frequency_specified, filepath_specified));
+      level, rate, count, log_frequency, file, level_specified, rate_specified,
+      count_specified, log_frequency_specified, filepath_specified));
   // The only invalid setting allowed is if it disables tracing
   if ((!lts->Valid()) && (level != TRITONSERVER_TRACE_LEVEL_DISABLED)) {
     return TRITONSERVER_ErrorNew(
@@ -209,27 +237,14 @@ TraceManager::UpdateTraceSettingInternal(
     }
   }
 
-  // If updating global setting, must check and update the model settings
-  // that are (partially) mirroring global setting.
-  if (model_name.empty()) {
-    // Default constructed setting means no active update,
-    // only the unspecified fields will be checked and updated.
-    NewSetting setting;
-    // Make a copy of the set as UpdateTraceSettingInternal() may modify
-    // 'fallback_used_models_'
-    auto fallback_models = fallback_used_models_;
-    for (const auto& name : fallback_models) {
-      UpdateTraceSettingInternal(name, setting);
-    }
-  }
-
   return nullptr;
 }
 
 void
 TraceManager::GetTraceSetting(
     const std::string& model_name, TRITONSERVER_InferenceTraceLevel* level,
-    uint32_t* rate, uint32_t* log_frequency, std::string* filepath)
+    uint32_t* rate, uint32_t* count, uint32_t* log_frequency,
+    std::string* filepath)
 {
   std::shared_ptr<TraceSetting> trace_setting;
   {
@@ -241,6 +256,7 @@ TraceManager::GetTraceSetting(
 
   *level = trace_setting->level_;
   *rate = trace_setting->rate_;
+  *count = trace_setting->count_;
   *log_frequency = trace_setting->log_frequency_;
   *filepath = trace_setting->file_->FileName();
 }
@@ -255,14 +271,53 @@ TraceManager::SampleTrace(const std::string& model_name)
     trace_setting =
         (m_it == model_settings_.end()) ? global_setting_ : m_it->second;
   }
-  if (!trace_setting->Valid()) {
-    return nullptr;
-  }
   std::shared_ptr<Trace> ts = trace_setting->SampleTrace();
   if (ts != nullptr) {
     ts->setting_ = trace_setting;
+    // If the current setting is marked invalid after a new trace is sampled,
+    // the trace limit is reached and update trace level to OFF
+    if (!trace_setting->Valid()) {
+      std::lock_guard<std::mutex> w_lk(w_mu_);
+      // Check if we should update global setting
+      std::string actual_name =
+          (trace_setting == global_setting_) ? "" : model_name;
+      DisableTraceInternal(actual_name, trace_setting->level_);
+    }
   }
   return ts;
+}
+
+void
+TraceManager::DisableTraceInternal(
+    const std::string& model_name,
+    const TRITONSERVER_InferenceTraceLevel current_level)
+{
+  auto level_off = TRITONSERVER_TRACE_LEVEL_DISABLED;
+  NewSetting setting;
+  setting.level_ = &level_off;
+  LOG_TRITONSERVER_ERROR(
+      UpdateTraceSettingInternal(model_name, setting), "Disabling trace");
+  // If updating global setting, must check and update the model settings
+  // that are (partially) mirroring global setting.
+  if (model_name.empty()) {
+    // Explicitly set the level model setting so they are not affected by
+    // this disabling.
+    setting.level_ = &current_level;
+    // Make a copy of the set as UpdateTraceSettingInternal() may modify
+    // 'fallback_used_models_'
+    auto fallback_models = fallback_used_models_;
+    for (const auto& name : fallback_models) {
+      auto m_it = model_settings_.find(model_name);
+      // Only perfom the update if the model setting doesn't have level
+      // specified
+      if ((m_it != model_settings_.end()) &&
+          (!m_it->second->level_specified_)) {
+        LOG_TRITONSERVER_ERROR(
+            UpdateTraceSettingInternal(name, setting),
+            "Decoupling model specific trace level from global update");
+      }
+    }
+  }
 }
 
 TraceManager::Trace::~Trace()
@@ -634,7 +689,13 @@ TraceManager::TraceSetting::SampleTrace()
   bool create_trace = false;
   {
     std::lock_guard<std::mutex> lk(mu_);
+    if (!Valid()) {
+      return nullptr;
+    }
     create_trace = (((++sample_) % rate_) == 0);
+    if (create_trace && (remaining_count_ != 0)) {
+      --remaining_count_;
+    }
   }
   if (create_trace) {
     std::shared_ptr<TraceManager::Trace> lts(new Trace());
@@ -667,10 +728,10 @@ TraceManager::TraceSetting::WriteTrace(
 {
   std::unique_lock<std::mutex> lock(mu_);
 
-  if (count_ != 0) {
+  if (sample_in_stream_ != 0) {
     trace_stream_ << ",";
   }
-  count_++;
+  sample_in_stream_++;
 
   size_t stream_count = 0;
   for (const auto& stream : streams) {
@@ -681,9 +742,9 @@ TraceManager::TraceSetting::WriteTrace(
       trace_stream_ << ",";
     }
   }
-  if ((log_frequency_ != 0) && (count_ >= log_frequency_)) {
+  if ((log_frequency_ != 0) && (sample_in_stream_ >= log_frequency_)) {
     // Reset variables and release lock before saving to file
-    count_ = 0;
+    sample_in_stream_ = 0;
     std::stringstream stream;
     trace_stream_.swap(stream);
     lock.unlock();
@@ -694,13 +755,16 @@ TraceManager::TraceSetting::WriteTrace(
 
 TraceManager::TraceSetting::TraceSetting(
     const TRITONSERVER_InferenceTraceLevel level, const uint32_t rate,
-    const uint32_t log_frequency, const std::shared_ptr<TraceFile>& file,
-    const bool level_specified, const bool rate_specified,
+    const uint32_t count, const uint32_t log_frequency,
+    const std::shared_ptr<TraceFile>& file, const bool level_specified,
+    const bool rate_specified, const bool count_specified,
     const bool log_frequency_specified, const bool filepath_specified)
-    : level_(level), rate_(rate), log_frequency_(log_frequency), file_(file),
-      level_specified_(level_specified), rate_specified_(rate_specified),
+    : level_(level), rate_(rate), count_(count), log_frequency_(log_frequency),
+      file_(file), level_specified_(level_specified),
+      rate_specified_(rate_specified), count_specified_(count_specified),
       log_frequency_specified_(log_frequency_specified),
-      filepath_specified_(filepath_specified), sample_(0), count_(0)
+      filepath_specified_(filepath_specified), sample_(0),
+      remaining_count_(count), sample_in_stream_(0)
 {
   if (level_ == TRITONSERVER_TRACE_LEVEL_DISABLED) {
     invalid_reason_ = "tracing is disabled";
@@ -714,7 +778,7 @@ TraceManager::TraceSetting::TraceSetting(
 TraceManager::TraceSetting::~TraceSetting()
 {
   // If log frequency is set, should log the remaining traces to indexed file.
-  if (count_ != 0) {
+  if (sample_in_stream_ != 0) {
     file_->SaveTraces(trace_stream_, (log_frequency_ != 0));
   }
 }

@@ -1520,6 +1520,7 @@ HTTPAPIServer::HandleTrace(evhtp_request_t* req, const std::string& model_name)
 #ifdef TRITON_ENABLE_TRACING
   TRITONSERVER_InferenceTraceLevel level = TRITONSERVER_TRACE_LEVEL_DISABLED;
   uint32_t rate;
+  uint32_t count;
   uint32_t log_frequency;
   std::string filepath;
 
@@ -1607,6 +1608,26 @@ HTTPAPIServer::HandleTrace(evhtp_request_t* req, const std::string& model_name)
         }
       }
     }
+    if (request.Find("trace_count", &setting_json)) {
+      if (setting_json.IsNull()) {
+        new_setting.clear_count_ = true;
+      } else {
+        std::string count_str;
+        HTTP_RESPOND_IF_ERR(req, setting_json.AsString(&count_str));
+        try {
+          count = std::stoi(count_str);
+          new_setting.count_ = &count;
+        }
+        catch (const std::invalid_argument& ia) {
+          HTTP_RESPOND_IF_ERR(
+              req, TRITONSERVER_ErrorNew(
+                       TRITONSERVER_ERROR_INVALID_ARG,
+                       (std::string("Unable to parse 'trace_count', got: ") +
+                        count_str)
+                           .c_str()));
+        }
+      }
+    }
     if (request.Find("log_frequency", &setting_json)) {
       if (setting_json.IsNull()) {
         new_setting.clear_log_frequency_ = true;
@@ -1634,7 +1655,7 @@ HTTPAPIServer::HandleTrace(evhtp_request_t* req, const std::string& model_name)
   // Get current trace setting, this is needed even if the setting
   // has been updated above as some values may not be provided in the request.
   trace_manager_->GetTraceSetting(
-      model_name, &level, &rate, &log_frequency, &filepath);
+      model_name, &level, &rate, &count, &log_frequency, &filepath);
   triton::common::TritonJson::Value trace_response(
       triton::common::TritonJson::ValueType::OBJECT);
   // level
@@ -1656,6 +1677,8 @@ HTTPAPIServer::HandleTrace(evhtp_request_t* req, const std::string& model_name)
   }
   HTTP_RESPOND_IF_ERR(
       req, trace_response.AddString("trace_rate", std::to_string(rate)));
+  HTTP_RESPOND_IF_ERR(
+      req, trace_response.AddString("trace_count", std::to_string(count)));
   HTTP_RESPOND_IF_ERR(
       req,
       trace_response.AddString("log_frequency", std::to_string(log_frequency)));

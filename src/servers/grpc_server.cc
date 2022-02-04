@@ -1124,6 +1124,7 @@ CommonHandler::SetUpAllRequests()
 #ifdef TRITON_ENABLE_TRACING
     TRITONSERVER_InferenceTraceLevel level = TRITONSERVER_TRACE_LEVEL_DISABLED;
     uint32_t rate;
+    uint32_t count;
     uint32_t log_frequency;
     std::string filepath;
     // Update trace setting
@@ -1207,6 +1208,34 @@ CommonHandler::SetUpAllRequests()
         }
       }
       {
+        static std::string setting_name = "trace_count";
+        auto it = request.settings().find(setting_name);
+        if (it != request.settings().end()) {
+          if (it->second.value().size() == 0) {
+            new_setting.clear_count_ = true;
+          } else if (it->second.value().size() == 1) {
+            try {
+              count = std::stoi(it->second.value()[0]);
+              new_setting.count_ = &count;
+            }
+            catch (const std::invalid_argument& ia) {
+              err = TRITONSERVER_ErrorNew(
+                  TRITONSERVER_ERROR_INVALID_ARG,
+                  (std::string("Unable to parse '") + setting_name +
+                   "', got: " + it->second.value()[0])
+                      .c_str());
+              GOTO_IF_ERR(err, earlyexit);
+            }
+          } else {
+            err = TRITONSERVER_ErrorNew(
+                TRITONSERVER_ERROR_INVALID_ARG,
+                (std::string("expect only 1 value for '") + setting_name + "'")
+                    .c_str());
+            GOTO_IF_ERR(err, earlyexit);
+          }
+        }
+      }
+      {
         static std::string setting_name = "log_frequency";
         auto it = request.settings().find(setting_name);
         if (it != request.settings().end()) {
@@ -1243,7 +1272,7 @@ CommonHandler::SetUpAllRequests()
     // Get current trace setting, this is needed even if the setting
     // has been updated above as some values may not be provided in the request.
     trace_manager_->GetTraceSetting(
-        request.model_name(), &level, &rate, &log_frequency, &filepath);
+        request.model_name(), &level, &rate, &count, &log_frequency, &filepath);
     // level
     {
       inference::TraceResponse::SettingValue level_setting;
@@ -1261,6 +1290,8 @@ CommonHandler::SetUpAllRequests()
     }
     (*response->mutable_settings())["trace_rate"].add_value(
         std::to_string(rate));
+    (*response->mutable_settings())["trace_count"].add_value(
+        std::to_string(count));
     (*response->mutable_settings())["log_frequency"].add_value(
         std::to_string(log_frequency));
     (*response->mutable_settings())["trace_file"].add_value(filepath);

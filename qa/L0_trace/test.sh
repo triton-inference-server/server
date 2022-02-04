@@ -209,6 +209,9 @@ fi
 if [ `grep -c "\"trace_rate\":\"6\"" ./curl.out` != "1" ]; then
     RET=1
 fi
+if [ `grep -c "\"trace_count\":\"0\"" ./curl.out` != "1" ]; then
+    RET=1
+fi
 if [ `grep -c "\"log_frequency\":\"2\"" ./curl.out` != "1" ]; then
     RET=1
 fi
@@ -310,6 +313,9 @@ fi
 if [ `grep -c "\"trace_rate\":\"1\"" ./curl.out` != "1" ]; then
     RET=1
 fi
+if [ `grep -c "\"trace_count\":\"0\"" ./curl.out` != "1" ]; then
+    RET=1
+fi
 if [ `grep -c "\"log_frequency\":\"0\"" ./curl.out` != "1" ]; then
     RET=1
 fi
@@ -349,6 +355,9 @@ if [ `grep -c "\"trace_level\":\[\"TIMESTAMPS\"\]" ./curl.out` != "1" ]; then
     RET=1
 fi
 if [ `grep -c "\"trace_rate\":\"1\"" ./curl.out` != "1" ]; then
+    RET=1
+fi
+if [ `grep -c "\"trace_count\":\"0\"" ./curl.out` != "1" ]; then
     RET=1
 fi
 if [ `grep -c "\"log_frequency\":\"0\"" ./curl.out` != "1" ]; then
@@ -393,6 +402,95 @@ fi
 
 if [ `grep -c ^simple summary_global_trace.log` != "10" ]; then
     cat summary_global_trace.log
+    echo -e "\n***\n*** Test Failed\n***"
+    RET=1
+fi
+
+set -e
+
+# Update trace count
+SERVER_ARGS="--trace-file=global_count.log --trace-level=TIMESTAMPS --trace-rate=1 --model-repository=$MODELSDIR"
+SERVER_LOG="./inference_server_off.log"
+run_server
+if [ "$SERVER_PID" == "0" ]; then
+    echo -e "\n***\n*** Failed to start $SERVER\n***"
+    cat $SERVER_LOG
+    exit 1
+fi
+
+set +e
+
+# Send requests without trace count
+for p in {1..10}; do
+    $SIMPLE_HTTP_CLIENT >> client_update.log 2>&1
+    if [ $? -ne 0 ]; then
+        RET=1
+    fi
+
+    $SIMPLE_GRPC_CLIENT >> client_update.log 2>&1
+    if [ $? -ne 0 ]; then
+        RET=1
+    fi
+done
+
+# Set trace count
+rm -f ./curl.out
+set +e
+code=`curl -s -w %{http_code} -o ./curl.out -d'{"trace_count":"5"}' localhost:8000/v2/trace`
+set -e
+if [ "$code" != "200" ]; then
+    cat ./curl.out
+    echo -e "\n***\n*** Test Failed\n***"
+    RET=1
+fi
+
+# Check if the current setting is returned
+if [ `grep -c "\"trace_level\":\[\"TIMESTAMPS\"\]" ./curl.out` != "1" ]; then
+    RET=1
+fi
+if [ `grep -c "\"trace_rate\":\"1\"" ./curl.out` != "1" ]; then
+    RET=1
+fi
+if [ `grep -c "\"trace_count\":\"5\"" ./curl.out` != "1" ]; then
+    RET=1
+fi
+if [ `grep -c "\"log_frequency\":\"0\"" ./curl.out` != "1" ]; then
+    RET=1
+fi
+if [ `grep -c "\"trace_file\":\"global_count.log\"" ./curl.out` != "1" ]; then
+    RET=1
+fi
+
+# Send requests to simple where trace is explicitly disabled
+for p in {1..10}; do
+    $SIMPLE_HTTP_CLIENT >> client_update.log 2>&1
+    if [ $? -ne 0 ]; then
+        RET=1
+    fi
+
+    $SIMPLE_GRPC_CLIENT >> client_update.log 2>&1
+    if [ $? -ne 0 ]; then
+        RET=1
+    fi
+done
+
+set -e
+
+kill $SERVER_PID
+wait $SERVER_PID
+
+set +e
+
+$TRACE_SUMMARY -t global_count.log > summary_global_count.log
+
+if [ `grep -c "COMPUTE_INPUT_END" summary_global_count.log` != "25" ]; then
+    cat summary_global_count.log
+    echo -e "\n***\n*** Test Failed\n***"
+    RET=1
+fi
+
+if [ `grep -c ^simple summary_global_count.log` != "25" ]; then
+    cat summary_global_count.log
     echo -e "\n***\n*** Test Failed\n***"
     RET=1
 fi

@@ -134,6 +134,7 @@ std::string trace_filepath_;
 TRITONSERVER_InferenceTraceLevel trace_level_ =
     TRITONSERVER_TRACE_LEVEL_DISABLED;
 int32_t trace_rate_ = 1000;
+int32_t trace_count_ = 0;
 int32_t trace_log_frequency_ = 0;
 #endif  // TRITON_ENABLE_TRACING
 
@@ -272,6 +273,7 @@ enum OptionId {
   OPTION_TRACE_FILEPATH,
   OPTION_TRACE_LEVEL,
   OPTION_TRACE_RATE,
+  OPTION_TRACE_COUNT,
   OPTION_TRACE_LOG_FREQUENCY,
 #endif  // TRITON_ENABLE_TRACING
   OPTION_MODEL_CONTROL_MODE,
@@ -471,6 +473,11 @@ std::vector<Option> options_
        "multiple times to trace multiple informations. Default is OFF."},
       {OPTION_TRACE_RATE, "trace-rate", Option::ArgInt,
        "Set the trace sampling rate. Default is 1000."},
+      {OPTION_TRACE_COUNT, "trace-count", Option::ArgInt,
+       "Set the number of traces to be sampled. Once the specified number "
+       "of traces are sampled, 'trace_level' will be set to OFF to disable "
+       "tracing. If the value is 0, the number of traces to be sampled will "
+       "not be limited. Default is 0."},
       {OPTION_TRACE_LOG_FREQUENCY, "trace-log-frequency", Option::ArgInt,
        "Set the trace log frequency. If the value is 0, Triton will only log "
        "the trace output to <trace-file> when shutting down. Otherwise, Triton "
@@ -928,8 +935,8 @@ StartTracing(nvidia::inferenceserver::TraceManager** trace_manager)
 
 #ifdef TRITON_ENABLE_TRACING
   TRITONSERVER_Error* err = nvidia::inferenceserver::TraceManager::Create(
-      trace_manager, trace_level_, trace_rate_, trace_log_frequency_,
-      trace_filepath_);
+      trace_manager, trace_level_, trace_rate_, trace_count_,
+      trace_log_frequency_, trace_filepath_);
 
   if (err != nullptr) {
     LOG_TRITONSERVER_ERROR(err, "failed to configure tracing");
@@ -1308,6 +1315,7 @@ Parse(TRITONSERVER_ServerOptions** server_options, int argc, char** argv)
   std::vector<TRITONSERVER_InferenceTraceLevel> trace_level_settings = {
       trace_level_};
   int32_t trace_rate = trace_rate_;
+  int32_t trace_count = trace_count_;
   int32_t trace_log_frequency = trace_log_frequency_;
 #endif  // TRITON_ENABLE_TRACING
 
@@ -1511,6 +1519,9 @@ Parse(TRITONSERVER_ServerOptions** server_options, int argc, char** argv)
       case OPTION_TRACE_RATE:
         trace_rate = ParseIntOption(optarg);
         break;
+      case OPTION_TRACE_COUNT:
+        trace_count = ParseIntOption(optarg);
+        break;
       case OPTION_TRACE_LOG_FREQUENCY:
         trace_log_frequency = ParseIntOption(optarg);
         break;
@@ -1677,6 +1688,7 @@ Parse(TRITONSERVER_ServerOptions** server_options, int argc, char** argv)
         trace_level_ | trace_level);
   }
   trace_rate_ = trace_rate;
+  trace_count_ = trace_count;
   trace_log_frequency_ = trace_log_frequency;
 #endif  // TRITON_ENABLE_TRACING
 
