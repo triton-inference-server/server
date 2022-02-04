@@ -350,7 +350,6 @@ EnsembleContext::EnsembleContext(
     : is_(is), info_(info), stream_(stream), inflight_step_counter_(0),
       allocator_(nullptr, TRITONSERVER_ResponseAllocatorDelete)
 {
-  LOG_VERBOSE(1) << "EnsembleContext constructor";
   uint64_t compute_start_ns = 0;
   INFER_STATS_SET_TIMESTAMP(compute_start_ns);
   request_tracker_ = new RequestTracker(
@@ -500,7 +499,6 @@ EnsembleContext::ResponseAlloc(
     void** buffer_userp, TRITONSERVER_MemoryType* allocated_memory_type,
     int64_t* allocated_memory_type_id)
 {
-  LOG_VERBOSE(1) << "ResponseAlloc";
   *buffer = nullptr;
   *buffer_userp = nullptr;
 
@@ -537,7 +535,6 @@ EnsembleContext::ResponseRelease(
     size_t byte_size, TRITONSERVER_MemoryType memory_type,
     int64_t memory_type_id)
 {
-  LOG_VERBOSE(1) << "ResponseRelease";
   LOG_VERBOSE(1) << "Internal response release: "
                  << "size " << byte_size << ", addr " << buffer;
 
@@ -560,41 +557,33 @@ void
 EnsembleContext::RequestComplete(
     TRITONSERVER_InferenceRequest* request, const uint32_t flags, void* userp)
 {
-  LOG_VERBOSE(1) << "RequestComplete";
   if ((flags & TRITONSERVER_REQUEST_RELEASE_ALL) != 0) {
-    LOG_VERBOSE(1) << "RequestComplete deleting ensemble inference request";
     LOG_TRITONSERVER_ERROR(
         TRITONSERVER_InferenceRequestDelete(request),
         "deleting ensemble inference request");
-    LOG_VERBOSE(1) << "RequestComplete DONE deleting ensemble inference request";
     auto request_tracker = reinterpret_cast<RequestTracker*>(userp);
     if (request_tracker->DecrementCounter()) {
       delete request_tracker;
     }
   }
-  LOG_VERBOSE(1) << "RequestComplete done";
 }
 
 void
 EnsembleContext::ResponseComplete(
     TRITONSERVER_InferenceResponse* response, const uint32_t flags, void* userp)
 {
-  LOG_VERBOSE(1) << "ResponseComplete";
   auto step_ptr = std::unique_ptr<Step>(reinterpret_cast<Step*>(userp));
   step_ptr->response_flags_ = flags;
 
   if (response != nullptr) {
-    LOG_VERBOSE(1) << "ResponseComplete not empty";
     auto err = TRITONSERVER_InferenceResponseError(response);
     uint32_t count;
     bool parameter_override = false;
     InferenceRequest::SequenceId correlation_id{0};
     uint32_t flags = 0;
     if (err == nullptr) {
-      LOG_VERBOSE(1) << "ResponseComplete error not nullptr 1";
       err = TRITONSERVER_InferenceResponseParameterCount(response, &count);
       if (err == nullptr) {
-        LOG_VERBOSE(1) << "ResponseComplete error not nullptr 2";
         for (uint32_t idx = 0; idx < count; idx++) {
           const char* name;
           TRITONSERVER_ParameterType type;
@@ -602,7 +591,6 @@ EnsembleContext::ResponseComplete(
           err = TRITONSERVER_InferenceResponseParameter(
               response, idx, &name, &type, &vvalue);
           if (err == nullptr) {
-            LOG_VERBOSE(1) << "ResponseComplete error not nullptr 3";
             if (!strcmp(name, "sequence_id")) {
               switch (type) {
                 case TRITONSERVER_PARAMETER_INT:
@@ -652,13 +640,9 @@ EnsembleContext::ResponseComplete(
       }
     }
     if (err == nullptr) {
-      LOG_VERBOSE(1) << "ResponseComplete error not nullptr 4a";
       err = TRITONSERVER_InferenceResponseOutputCount(response, &count);
-      LOG_VERBOSE(1) << "ResponseComplete error not nullptr 4b";
       if (err == nullptr) {
-        LOG_VERBOSE(1) << "ResponseComplete error not nullptr 5a - trying to acquire lock";
         std::lock_guard<std::mutex> lock(step_ptr->ctx_->mutex_);
-        LOG_VERBOSE(1) << "ResponseComplete error not nullptr 5b - lock acquired";
         auto& output_to_tensor =
             step_ptr->ctx_->info_->steps_[step_ptr->step_idx_]
                 .output_to_tensor_;
@@ -676,7 +660,6 @@ EnsembleContext::ResponseComplete(
               response, idx, &name, &datatype, &shape, &dim_count, &base,
               &byte_size, &memory_type, &memory_type_id, &userp);
           if (err == nullptr) {
-            LOG_VERBOSE(1) << "ResponseComplete error not nullptr 6";
             auto it = output_to_tensor.find(name);
             if (it != output_to_tensor.end()) {
               std::unique_ptr<InferenceRequest::Input> tensor(
@@ -686,7 +669,6 @@ EnsembleContext::ResponseComplete(
 
               if (byte_size != 0) {
                 std::lock_guard<std::mutex> output_lk(step_ptr->output_mtx_);
-                LOG_VERBOSE(1) << "ResponseComplete byte size NON zero";
                 if (memory_type == TRITONSERVER_MEMORY_GPU) {
                   auto& gpu_output_map =
                       step_ptr->gpu_output_map_[memory_type_id];
@@ -695,7 +677,6 @@ EnsembleContext::ResponseComplete(
                   tensor->SetData(std::move(it->second));
                   gpu_output_map.erase(it);
                 } else {
-                  LOG_VERBOSE(1) << "ResponseComplete byte size IS zero";
                   auto it = step_ptr->cpu_output_map_.find(
                       reinterpret_cast<uintptr_t>(base));
                   tensor->SetData(std::move(it->second));
@@ -705,12 +686,10 @@ EnsembleContext::ResponseComplete(
 
               auto& tensor_data = step_ptr->ctx_->tensor_data_[it->second];
               if (parameter_override) {
-                LOG_VERBOSE(1) << "ResponseComplete parameter override TRUE";
                 step_ptr->updated_tensors_.emplace(
                     it->second, tensor_data.AddTensor(
                                     std::move(tensor), correlation_id, flags));
               } else {
-                LOG_VERBOSE(1) << "ResponseComplete parameter override FALSE";
                 step_ptr->updated_tensors_.emplace(
                     it->second,
                     tensor_data.AddTensor(
@@ -725,25 +704,18 @@ EnsembleContext::ResponseComplete(
             }
           }
           if (err != nullptr) {
-            LOG_VERBOSE(1) << "ResponseComplete error not nullptr 7";
             break;
           }
         }
-      } else {
-        LOG_VERBOSE(1) << "ResponseComplete error was ? nullptr 10";
       }
     }
-    LOG_VERBOSE(1) << "ResponseComplete error not nullptr 9";
 
     if (err != nullptr) {
-      LOG_VERBOSE(1) << "ResponseComplete error not nullptr 8";
       step_ptr->infer_status_ = err;
     }
-    LOG_VERBOSE(1) << "ResponseComplete deleting response";
     LOG_TRITONSERVER_ERROR(
         TRITONSERVER_InferenceResponseDelete(response),
         "deleting inference response");
-    LOG_VERBOSE(1) << "ResponseComplete deleted";
   }
 
   EnsembleContext::Proceed(step_ptr->ctx_, step_ptr);
@@ -758,7 +730,6 @@ EnsembleContext::Proceed(
     const std::shared_ptr<EnsembleContext>& context,
     const std::unique_ptr<Step>& completed_step)
 {
-  LOG_VERBOSE(1) << "Proceed";
   StepList ready_steps;
   Status status = context->PrepareSteps(completed_step, &ready_steps);
   if (status.IsOk()) {
@@ -772,7 +743,6 @@ EnsembleContext::PrepareSteps(
 {
   {
     std::lock_guard<std::mutex> lock(mutex_);
-    LOG_VERBOSE(1) << "PrepareSteps";
 
     // Initialization error, ensemble status will be not ok since the beginning
     if (completed_step == nullptr && !ensemble_status_.IsOk()) {
@@ -807,7 +777,6 @@ EnsembleContext::UpdateEnsembleState(
     const std::unique_ptr<Step>& completed_step,
     std::set<std::pair<std::string, IterationCount>>* updated_tensors)
 {
-  LOG_VERBOSE(1) << "UpdateEnsembleState";
   updated_tensors->clear();
   if (completed_step == nullptr) {
     for (const auto& tensor_data : tensor_data_) {
@@ -831,7 +800,6 @@ EnsembleContext::GetNextSteps(
     const std::set<std::pair<std::string, IterationCount>>& updated_tensors,
     StepList* steps)
 {
-  LOG_VERBOSE(1) << "GetNextSteps";
   steps->clear();
 
   std::set<std::pair<size_t, IterationCount>> next_step_idx;
@@ -874,7 +842,6 @@ EnsembleContext::InitStep(
     const size_t step_idx, const IterationCount iteration_count,
     std::unique_ptr<Step>* step)
 {
-  LOG_VERBOSE(1) << "InitStep";
   const auto& istep = info_->steps_[step_idx];
   auto& version_map = handles_[istep.model_name_];
   auto& model = version_map[istep.model_version_];
@@ -1026,7 +993,6 @@ EnsembleContext::ReshapeTensorDims(
 Status
 EnsembleContext::FinishEnsemble(std::unique_ptr<InferenceResponse>&& response)
 {
-  LOG_VERBOSE(1) << "FinishEnsemble";
   // Do nothing if the ensemble is finished
   if (request_tracker_ == nullptr) {
     return ensemble_status_;
@@ -1079,7 +1045,6 @@ EnsembleContext::CheckAndSetEnsembleOutput(
     const std::set<std::pair<std::string, IterationCount>>& updated_tensors,
     std::unique_ptr<InferenceResponse>* response)
 {
-  LOG_VERBOSE(1) << "CheckAndSetEnsembleOutput";
   IterationCount iteration_count = 0;
   // Check if updated tensor is one of the ensemble output and if all outputs
   // have tensor of the same iteration count
@@ -1227,37 +1192,6 @@ EnsembleContext::CheckAndSetEnsembleOutput(
   return Status::Success;
 }
 
-/*
-void
-EnsembleContext::ScheduleSteps(
-    const std::shared_ptr<EnsembleContext>& context, StepList&& steps)
-{
-  LOG_VERBOSE(1) << "ScheduleSteps";
-  for (auto& step : steps) {
-    step->ctx_ = context;
-    {
-      std::lock_guard<std::mutex> lock(context->mutex_);
-
-      // Need to check the ensemble_status_ to ensure the FinishEnsemble()
-      // is called only once.
-      if (context->ensemble_status_.IsOk()) {
-        context->request_tracker_->IncrementCounter();
-        context->ensemble_status_ = context->is_->InferAsync(step->request_);
-        if (!context->ensemble_status_.IsOk()) {
-          // The request is not sent to server properly, shouldn't expect its
-          // release function get called.
-          context->request_tracker_->DecrementCounter();
-          context->ensemble_status_ = context->FinishEnsemble();
-          break;
-        }
-      }
-      step.release();
-    }
-  }
-}
-*/
-
-// Guan FIX
 void
 EnsembleContext::ScheduleSteps(
     const std::shared_ptr<EnsembleContext>& context, StepList&& steps)
@@ -1276,7 +1210,10 @@ EnsembleContext::ScheduleSteps(
       }
     }
     if (should_schedule) {
-      auto step_status = context->is_->InferAsync(step->request_);
+      // TODO: Move ownership of request out of ensemble step to avoid
+      // issues with double release on request on cache hits
+      std::unique_ptr<InferenceRequest> request = std::move(step->request_);
+      auto step_status = context->is_->InferAsync(request);
       if (!step_status.IsOk()) {
         std::lock_guard<std::mutex> lock(context->mutex_);
         context->ensemble_status_ = step_status;
@@ -1306,7 +1243,6 @@ EnsembleScheduler::Create(
 Status
 EnsembleScheduler::Enqueue(std::unique_ptr<InferenceRequest>& request)
 {
-  LOG_VERBOSE(1) << "Enqueue";
   // Queue timer starts at the beginning of the queueing and
   // scheduling process
   request->CaptureQueueStartNs();
