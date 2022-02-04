@@ -755,7 +755,7 @@ fi
 set +e
 
 # Test that gRPC protocol with SSL works correctly
-$PERF_ANALYZER -v -i grpc -m graphdef_int16_int16_int16 \
+$PERF_ANALYZER -v -i grpc -m graphdef_int32_int32_int32 \
   --ssl-grpc-use-ssl \
   --ssl-grpc-root-certifications-file=ca.crt \
   --ssl-grpc-private-key-file=client.key \
@@ -767,7 +767,7 @@ if [ $? -ne 0 ]; then
 fi
 
 # Test that gRPC protocol with SSL fails with incorrect key
-$PERF_ANALYZER -v -i grpc -m graphdef_int16_int16_int16 \
+$PERF_ANALYZER -v -i grpc -m graphdef_int32_int32_int32 \
     --ssl-grpc-use-ssl \
     --ssl-grpc-root-certifications-file=ca.crt \
     --ssl-grpc-private-key-file=client.key \
@@ -807,7 +807,7 @@ service nginx restart
 set +e
 
 # Test that HTTP protocol with SSL works correctly with certificates
-$PERF_ANALYZER -v -u https://localhost:443 -i http -m graphdef_int16_int16_int16 \
+$PERF_ANALYZER -v -u https://localhost:443 -i http -m graphdef_int32_int32_int32 \
     --ssl-https-verify-peer 1 \
     --ssl-https-verify-host 2 \
     --ssl-https-ca-certificates-file ca.crt \
@@ -822,7 +822,7 @@ if [ $? -ne 0 ]; then
 fi
 
 # Test that HTTP protocol with SSL works correctly without certificates
-$PERF_ANALYZER -v -u https://localhost:443 -i http -m graphdef_int16_int16_int16 \
+$PERF_ANALYZER -v -u https://localhost:443 -i http -m graphdef_int32_int32_int32 \
     --ssl-https-verify-peer 0 \
     --ssl-https-verify-host 0
     > ${CLIENT_LOG}.https_success 2>&1
@@ -832,7 +832,7 @@ if [ $? -ne 0 ]; then
 fi
 
 # Test that HTTP protocol with SSL fails with incorrect key
-$PERF_ANALYZER -v -u https://localhost:443 -i http -m graphdef_int16_int16_int16 \
+$PERF_ANALYZER -v -u https://localhost:443 -i http -m graphdef_int32_int32_int32 \
     --ssl-https-verify-peer 1 \
     --ssl-https-verify-host 2 \
     --ssl-https-ca-certificates-file ca.crt \
