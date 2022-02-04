@@ -76,10 +76,16 @@ CLIENT_BS=8
 # Set the number of repetitions in nightly and weekly tests
 # Set the email subject for nightly and weekly tests
 if [ "$TRITON_PERF_WEEKLY" == 1 ]; then
-    # Run the test for each model approximately 1.5 hours
-    # All tests are run cumulatively for 7 hours
-    REPETITION=200
-    EMAIL_SUBJECT="Weekly"
+    if [ "$TRITON_PERF_LONG" == 1 ]; then
+        # 70 hours (~ 3 days)
+        REPETITION=2000
+        EMAIL_SUBJECT="Weekly Long"
+    else
+        # Run the test for each model approximately 1.5 hours
+        # All tests are run cumulatively for 7 hours
+        REPETITION=200
+        EMAIL_SUBJECT="Weekly"
+    fi
 else
     REPETITION=3
     EMAIL_SUBJECT="Nightly"

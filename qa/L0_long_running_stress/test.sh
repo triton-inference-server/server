@@ -47,6 +47,18 @@ DATADIR=${DATADIR:="/data/inferenceserver/${REPO_VERSION}"}
 SERVER=/opt/tritonserver/bin/tritonserver
 source ../common/util.sh
 
+# If the test should be run in long and high load setting
+if [ "$TRITON_PERF_LONG" == 1 ]; then
+    TEST_DURATION=60
+    # ~ 4 days
+    # TEST_DURATION=345600
+    LOAD_THREAD_COUNT=2
+else
+    # ~ 7 hours
+    TEST_DURATION=25000
+    LOAD_THREAD_COUNT=0
+fi
+
 RET=0
 
 # If BACKENDS not specified, set to all
@@ -136,7 +148,7 @@ if [ "$SERVER_PID" == "0" ]; then
 fi
 
 set +e
-python $STRESS_TEST >>$CLIENT_LOG 2>&1
+python $STRESS_TEST -d ${TEST_DURATION} --load-thread ${LOAD_THREAD_COUNT} >>$CLIENT_LOG 2>&1
 if [ $? -ne 0 ]; then
     echo -e "\n***\n*** Test Failed\n***"
     RET=1

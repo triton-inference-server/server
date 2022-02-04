@@ -1,4 +1,4 @@
-# Copyright 2021, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright 2021-2022, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -255,6 +255,55 @@ def stress_thread(name, seed, correlation_id_base, test_case_count,
         print("Exiting thread {}".format(name), file=out_file)
 
 
+def load_thread(name, seed, correlation_id_base, test_case_count,
+                failed_test_case_count, sequence_request_count):
+    # Thread responsible for generating sequences of inference
+    # requests.
+    global _thread_exceptions
+
+    # Write any thread output to dedicated file
+    with open("{}.log".format(name), 'w') as out_file:
+        print("Starting thread {} with seed {}".format(name, seed),
+              file=out_file)
+        rng = np.random.RandomState(seed)
+
+        update_counter_fn = partial(update_test_count, test_case_count,
+                                    failed_test_case_count,
+                                    sequence_request_count)
+        pa_start_seq_id = correlation_id_base
+        pa_end_seq_id = correlation_id_base + CORRELATION_ID_BLOCK_SIZE
+
+        # Create PerfAnalyzerScenario with no additional trial,
+        # the default model 'resnet', more compute intense than the simple
+        # models, will be the only choice for generating load
+        ss = ScenarioSelector([
+            (1,
+             PerfAnalyzerScenario(
+                 name,
+                 rng, [], [],
+                 sequence_id_range=(pa_start_seq_id, pa_end_seq_id),
+                 verbose=FLAGS.verbose,
+                 out_stream=out_file)),
+        ], rng)
+
+        while not STOP_STRESS_THREAD:
+            scenario = ss.get_scenario()
+            try:
+                res = scenario.run(None)
+                if res is not None:
+                    update_counter_fn(scenario.scenario_name(), count=res)
+            except Exception as ex:
+                update_counter_fn(scenario.scenario_name(), False)
+                _thread_exceptions_mutex.acquire()
+                try:
+                    _thread_exceptions.append((name, scenario.scenario_name(),
+                                               traceback.format_exc()))
+                finally:
+                    _thread_exceptions_mutex.release()
+
+        print("Exiting thread {}".format(name), file=out_file)
+
+
 def format_content(content, max_line_length):
     # Accumulated line length
     ACC_length = 0
@@ -392,6 +441,12 @@ if __name__ == '__main__':
                         required=False,
                         default=8,
                         help='Request concurrency. Default is 8.')
+    parser.add_argument('--load-thread',
+                        type=int,
+                        required=False,
+                        default=0,
+                        help='Number of dedicated threads that keep compute '
+                        'device (i.e. GPU/CPUs) under load. Default is 0.')
     parser.add_argument(
         '-d',
         '--test-duration',
@@ -416,13 +471,19 @@ if __name__ == '__main__':
     print("test duration = {}".format(FLAGS.test_duration))
 
     # Create hashes for each thread for generating report
-    _test_case_count = [dict() for x in range(FLAGS.concurrency)]
-    _failed_test_case_count = [dict() for x in range(FLAGS.concurrency)]
-    _sequence_request_count = [dict() for x in range(FLAGS.concurrency)]
+    _test_case_count = [
+        dict() for x in range(FLAGS.concurrency + FLAGS.load_thread)
+    ]
+    _failed_test_case_count = [
+        dict() for x in range(FLAGS.concurrency + FLAGS.load_thread)
+    ]
+    _sequence_request_count = [
+        dict() for x in range(FLAGS.concurrency + FLAGS.load_thread)
+    ]
 
     threads = []
 
-    for idx, thd in enumerate(range(FLAGS.concurrency)):
+    for idx in range(FLAGS.concurrency):
         thread_name = "thread_{}".format(idx)
 
         # Create the seed for the thread. Since these are created in
@@ -436,6 +497,26 @@ if __name__ == '__main__':
 
         threads.append(
             threading.Thread(target=stress_thread,
+                             args=(thread_name, seed, correlation_id_base,
+                                   _test_case_count[idx],
+                                   _failed_test_case_count[idx],
+                                   _sequence_request_count[idx])))
+
+    for idx in range(FLAGS.load_thread):
+        thread_name = "load_thread_{}".format(idx)
+
+        # Create the seed for the thread. Since these are created in
+        # reproducible order off of the initial seed we will get
+        # reproducible results when given the same seed.
+        seed = np.random.randint(2**32)
+
+        # Each thread is reserved a block of correlation IDs or size
+        # CORRELATION_ID_BLOCK_SIZE
+        correlation_id_base = 1 + (
+            (FLAGS.concurrency + idx) * CORRELATION_ID_BLOCK_SIZE)
+
+        threads.append(
+            threading.Thread(target=load_thread,
                              args=(thread_name, seed, correlation_id_base,
                                    _test_case_count[idx],
                                    _failed_test_case_count[idx],

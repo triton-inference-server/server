@@ -59,13 +59,22 @@ source ../common/util.sh
 # Set the number of repetitions in nightly and weekly tests
 # Set the email subject for nightly and weekly tests
 if [ "$TRITON_PERF_WEEKLY" == 1 ]; then
-    # Run the test for each case approximately 1.5 hours
-    # All tests are run cumulatively for 7 hours
-    REPETITION_HTTP_CPP=1300000
-    REPETITION_HTTP_PY=2100000
-    REPETITION_GRPC_CPP=10000000
-    REPETITION_GRPC_PY=1500000
-    EMAIL_SUBJECT="Weekly"
+    if [ "$TRITON_PERF_LONG" == 1 ]; then
+        # 70 hours (~ 3 days)
+        REPETITION_HTTP_CPP=13000000
+        REPETITION_HTTP_PY=21000000
+        REPETITION_GRPC_CPP=100000000
+        REPETITION_GRPC_PY=15000000
+        EMAIL_SUBJECT="Weekly Long"
+    else
+        # Run the test for each case approximately 1.5 hours
+        # All tests are run cumulatively for 7 hours
+        REPETITION_HTTP_CPP=1300000
+        REPETITION_HTTP_PY=2100000
+        REPETITION_GRPC_CPP=10000000
+        REPETITION_GRPC_PY=1500000
+        EMAIL_SUBJECT="Weekly"
+    fi
 else
     REPETITION_CPP=100000
     REPETITION_PY=10000
