@@ -168,17 +168,26 @@ fi
 set +e
 
 # Add trace setting for 'simple' via trace API, first use the same trace file
-# and expect to be rejected
 rm -f ./curl.out
 set +e
 code=`curl -s -w %{http_code} -o ./curl.out -d'{"trace_file":"global_trace.log"}' localhost:8000/v2/models/simple/trace`
 set -e
-if [ "$code" != "400" ]; then
+if [ "$code" != "200" ]; then
     cat ./curl.out
     echo -e "\n***\n*** Test Failed\n***"
     RET=1
 fi
-if [ `grep -c "Trace file name 'global_trace.log' has been used by another trace setting" ./curl.out` != "1" ]; then
+# Check if the current setting is returned (not specified setting from global) 
+if [ `grep -c "\"trace_level\":\[\"TIMESTAMPS\"\]" ./curl.out` != "1" ]; then
+    RET=1
+fi
+if [ `grep -c "\"trace_rate\":\"6\"" ./curl.out` != "1" ]; then
+    RET=1
+fi
+if [ `grep -c "\"log_frequency\":\"0\"" ./curl.out` != "1" ]; then
+    RET=1
+fi
+if [ `grep -c "\"trace_file\":\"global_trace.log\"" ./curl.out` != "1" ]; then
     RET=1
 fi
 
@@ -284,7 +293,6 @@ if [ "$code" != "200" ]; then
     RET=1
 fi
 
-# Note that the same file name is okay as it is the setting to be updated
 rm -f ./curl.out
 set +e
 code=`curl -s -w %{http_code} -o ./curl.out -d'{"trace_file":"update_trace.log", "trace_level":["OFF"]}' localhost:8000/v2/models/simple/trace`
@@ -322,23 +330,13 @@ for p in {1..10}; do
     fi
 done
 
-# Clear trace
 rm -f ./curl.out
 set +e
-code=`curl -s -w %{http_code} -o ./curl.out -d'{}' localhost:8000/v2/trace`
-set -e
-if [ "$code" != "400" ]; then
-    cat ./curl.out
-    echo -e "\n***\n*** Test Failed\n***"
-    RET=1
-fi
-if [ `grep -c "only model specific setting can be cleared" ./curl.out` != "1" ]; then
-    RET=1
-fi
 
+# Clear trace setting by explicitly asking removal for every feild except 'trace_rate'
 rm -f ./curl.out
 set +e
-code=`curl -s -w %{http_code} -o ./curl.out -d'{}' localhost:8000/v2/models/simple/trace`
+code=`curl -s -w %{http_code} -o ./curl.out -d'{"trace_file":null, "trace_level":null}' localhost:8000/v2/models/simple/trace`
 set -e
 if [ "$code" != "200" ]; then
     cat ./curl.out
@@ -350,7 +348,7 @@ fi
 if [ `grep -c "\"trace_level\":\[\"TIMESTAMPS\"\]" ./curl.out` != "1" ]; then
     RET=1
 fi
-if [ `grep -c "\"trace_rate\":\"6\"" ./curl.out` != "1" ]; then
+if [ `grep -c "\"trace_rate\":\"1\"" ./curl.out` != "1" ]; then
     RET=1
 fi
 if [ `grep -c "\"log_frequency\":\"0\"" ./curl.out` != "1" ]; then
@@ -387,13 +385,13 @@ fi
 
 $TRACE_SUMMARY -t global_trace.log > summary_global_trace.log
 
-if [ `grep -c "COMPUTE_INPUT_END" summary_global_trace.log` != "1" ]; then
+if [ `grep -c "COMPUTE_INPUT_END" summary_global_trace.log` != "10" ]; then
     cat summary_global_trace.log
     echo -e "\n***\n*** Test Failed\n***"
     RET=1
 fi
 
-if [ `grep -c ^simple summary_global_trace.log` != "1" ]; then
+if [ `grep -c ^simple summary_global_trace.log` != "10" ]; then
     cat summary_global_trace.log
     echo -e "\n***\n*** Test Failed\n***"
     RET=1

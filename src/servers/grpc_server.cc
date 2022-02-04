@@ -1127,36 +1127,37 @@ CommonHandler::SetUpAllRequests()
     uint32_t log_frequency;
     std::string filepath;
     // Update trace setting
-    if ((request.clear_setting()) && !request.model_name().empty()) {
-      trace_manager_->ClearTraceSetting(request.model_name());
-    } else {
-      TRITONSERVER_InferenceTraceLevel* level_ptr = nullptr;
-      uint32_t* rate_ptr = nullptr;
-      uint32_t* log_frequency_ptr = nullptr;
-      {
-        static std::string setting_name = "trace_file";
-        auto it = request.settings().find(setting_name);
-        if (it != request.settings().end()) {
-          if (it->second.value().size() == 1) {
-            filepath = it->second.value()[0];
-          } else {
-            err = TRITONSERVER_ErrorNew(
-                TRITONSERVER_ERROR_INVALID_ARG,
-                (std::string("expect only 1 value for '") + setting_name + "'")
-                    .c_str());
-            GOTO_IF_ERR(err, earlyexit);
-          }
+    TraceManager::NewSetting new_setting;
+    {
+      static std::string setting_name = "trace_file";
+      auto it = request.settings().find(setting_name);
+      if (it != request.settings().end()) {
+        if (it->second.value().size() == 0) {
+          new_setting.clear_filepath_ = true;
+        } else if (it->second.value().size() == 1) {
+          filepath = it->second.value()[0];
+          new_setting.filepath_ = &filepath;
+        } else {
+          err = TRITONSERVER_ErrorNew(
+              TRITONSERVER_ERROR_INVALID_ARG,
+              (std::string("expect only 1 value for '") + setting_name + "'")
+                  .c_str());
+          GOTO_IF_ERR(err, earlyexit);
         }
       }
-      {
-        static std::string setting_name = "trace_level";
-        auto it = request.settings().find(setting_name);
-        if (it != request.settings().end()) {
+    }
+    {
+      static std::string setting_name = "trace_level";
+      auto it = request.settings().find(setting_name);
+      if (it != request.settings().end()) {
+        if (it->second.value().size() == 0) {
+          new_setting.clear_level_ = true;
+        } else {
           for (const auto& level_str : it->second.value()) {
             if (level_str == "OFF") {
               if (it->second.value().size() == 1) {
                 level = TRITONSERVER_TRACE_LEVEL_DISABLED;
-                level_ptr = &level;
+                new_setting.level_ = &level;
               } else {
                 err = TRITONSERVER_ErrorNew(
                     TRITONSERVER_ERROR_INVALID_ARG,
@@ -1166,73 +1167,75 @@ CommonHandler::SetUpAllRequests()
             } else if (level_str == "TIMESTAMPS") {
               level = static_cast<TRITONSERVER_InferenceTraceLevel>(
                   level | TRITONSERVER_TRACE_LEVEL_TIMESTAMPS);
-              level_ptr = &level;
+              new_setting.level_ = &level;
             } else if (level_str == "TENSORS") {
               level = static_cast<TRITONSERVER_InferenceTraceLevel>(
                   level | TRITONSERVER_TRACE_LEVEL_TENSORS);
-              level_ptr = &level;
+              new_setting.level_ = &level;
             }
           }
         }
       }
-      {
-        static std::string setting_name = "trace_rate";
-        auto it = request.settings().find(setting_name);
-        if (it != request.settings().end()) {
-          if (it->second.value().size() == 1) {
-            try {
-              rate = std::stoi(it->second.value()[0]);
-              rate_ptr = &rate;
-            }
-            catch (const std::invalid_argument& ia) {
-              err = TRITONSERVER_ErrorNew(
-                  TRITONSERVER_ERROR_INVALID_ARG,
-                  (std::string("Unable to parse '") + setting_name +
-                   "', got: " + it->second.value()[0])
-                      .c_str());
-              GOTO_IF_ERR(err, earlyexit);
-            }
-          } else {
-            err = TRITONSERVER_ErrorNew(
-                TRITONSERVER_ERROR_INVALID_ARG,
-                (std::string("expect only 1 value for '") + setting_name + "'")
-                    .c_str());
-            GOTO_IF_ERR(err, earlyexit);
-          }
-        }
-      }
-      {
-        static std::string setting_name = "log_frequency";
-        auto it = request.settings().find(setting_name);
-        if (it != request.settings().end()) {
-          if (it->second.value().size() == 1) {
-            try {
-              log_frequency = std::stoi(it->second.value()[0]);
-              log_frequency_ptr = &log_frequency;
-            }
-            catch (const std::invalid_argument& ia) {
-              err = TRITONSERVER_ErrorNew(
-                  TRITONSERVER_ERROR_INVALID_ARG,
-                  (std::string("Unable to parse '") + setting_name +
-                   "', got: " + it->second.value()[0])
-                      .c_str());
-              GOTO_IF_ERR(err, earlyexit);
-            }
-          } else {
-            err = TRITONSERVER_ErrorNew(
-                TRITONSERVER_ERROR_INVALID_ARG,
-                (std::string("expect only 1 value for '") + setting_name + "'")
-                    .c_str());
-            GOTO_IF_ERR(err, earlyexit);
-          }
-        }
-      }
-
-      err = trace_manager_->UpdateTraceSetting(
-          request.model_name(), level_ptr, rate_ptr, log_frequency_ptr,
-          filepath);
-      GOTO_IF_ERR(err, earlyexit);
     }
+    {
+      static std::string setting_name = "trace_rate";
+      auto it = request.settings().find(setting_name);
+      if (it != request.settings().end()) {
+        if (it->second.value().size() == 0) {
+          new_setting.clear_rate_ = true;
+        } else if (it->second.value().size() == 1) {
+          try {
+            rate = std::stoi(it->second.value()[0]);
+            new_setting.rate_ = &rate;
+          }
+          catch (const std::invalid_argument& ia) {
+            err = TRITONSERVER_ErrorNew(
+                TRITONSERVER_ERROR_INVALID_ARG,
+                (std::string("Unable to parse '") + setting_name +
+                 "', got: " + it->second.value()[0])
+                    .c_str());
+            GOTO_IF_ERR(err, earlyexit);
+          }
+        } else {
+          err = TRITONSERVER_ErrorNew(
+              TRITONSERVER_ERROR_INVALID_ARG,
+              (std::string("expect only 1 value for '") + setting_name + "'")
+                  .c_str());
+          GOTO_IF_ERR(err, earlyexit);
+        }
+      }
+    }
+    {
+      static std::string setting_name = "log_frequency";
+      auto it = request.settings().find(setting_name);
+      if (it != request.settings().end()) {
+        if (it->second.value().size() == 0) {
+          new_setting.clear_log_frequency_ = true;
+        } else if (it->second.value().size() == 1) {
+          try {
+            log_frequency = std::stoi(it->second.value()[0]);
+            new_setting.log_frequency_ = &log_frequency;
+          }
+          catch (const std::invalid_argument& ia) {
+            err = TRITONSERVER_ErrorNew(
+                TRITONSERVER_ERROR_INVALID_ARG,
+                (std::string("Unable to parse '") + setting_name +
+                 "', got: " + it->second.value()[0])
+                    .c_str());
+            GOTO_IF_ERR(err, earlyexit);
+          }
+        } else {
+          err = TRITONSERVER_ErrorNew(
+              TRITONSERVER_ERROR_INVALID_ARG,
+              (std::string("expect only 1 value for '") + setting_name + "'")
+                  .c_str());
+          GOTO_IF_ERR(err, earlyexit);
+        }
+      }
+    }
+
+    err = trace_manager_->UpdateTraceSetting(request.model_name(), new_setting);
+    GOTO_IF_ERR(err, earlyexit);
 
     // Get current trace setting, this is needed even if the setting
     // has been updated above as some values may not be provided in the request.

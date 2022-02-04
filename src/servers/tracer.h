@@ -46,7 +46,31 @@ class TraceManager {
   class TraceSetting;
 
  public:
-  class Trace;
+  // The new field values for a setting, 'clear_xxx_' indicates
+  // whether to clear the previously specified filed value.
+  // If false, 'xxx_' will be used as the new field value.
+  // If 'xxx_' is nullptr, the field value will not be updated.
+  struct NewSetting {
+    NewSetting()
+        : clear_level_(false), level_(nullptr), clear_rate_(false),
+          rate_(nullptr), clear_log_frequency_(false), log_frequency_(nullptr),
+          clear_filepath_(false), filepath_(nullptr)
+    {
+    }
+    bool clear_level_;
+    TRITONSERVER_InferenceTraceLevel* level_;
+
+    bool clear_rate_;
+    const uint32_t* rate_;
+
+    bool clear_log_frequency_;
+    const uint32_t* log_frequency_;
+
+    bool clear_filepath_;
+    const std::string* filepath_;
+  };
+
+  struct Trace;
   // Create a trace manager that appends trace information
   // to a specified file as global setting.
   static TRITONSERVER_Error* Create(
@@ -61,19 +85,13 @@ class TraceManager {
   std::unique_ptr<Trace> SampleTrace(const std::string& model_name);
 
   // Update global setting if 'model_name' is empty, otherwise, model setting is
-  // updated. 'nullptr' is used to indicate the setting should not be updated.
+  // updated.
   TRITONSERVER_Error* UpdateTraceSetting(
-      const std::string& model_name,
-      const TRITONSERVER_InferenceTraceLevel* level, const uint32_t* rate,
-      const uint32_t* log_frequency, const std::string& filepath);
+      const std::string& model_name, const NewSetting& new_setting);
 
   void GetTraceSetting(
       const std::string& model_name, TRITONSERVER_InferenceTraceLevel* level,
       uint32_t* rate, uint32_t* log_frequency, std::string* filepath);
-
-  // Clear the trace setting for 'model_name', global setting will be used when
-  // sampling trace for 'model_name'
-  void ClearTraceSetting(const std::string& model_name);
 
   // Return the current timestamp.
   static uint64_t CaptureTimestamp()
@@ -125,6 +143,11 @@ class TraceManager {
       const int64_t* shape, uint64_t dim_count,
       TRITONSERVER_MemoryType memory_type, int64_t memory_type_id, void* userp);
 
+  // Helper function for UpdateTraceSetting() as recursive update may be needed
+  // if global setting is being updated
+  TRITONSERVER_Error* UpdateTraceSettingInternal(
+      const std::string& model_name, const NewSetting& new_setting);
+
   class TraceFile {
    public:
     TraceFile(const std::string& file_name)
@@ -158,20 +181,17 @@ class TraceManager {
    public:
     TraceSetting()
         : level_(TRITONSERVER_TRACE_LEVEL_DISABLED), rate_(0),
-          log_frequency_(0), sample_(0), count_(0)
+          log_frequency_(0), level_specified_(false), rate_specified_(false),
+          log_frequency_specified_(false), filepath_specified_(false),
+          sample_(0), count_(0)
     {
       invalid_reason_ = "Setting hasn't been initialized";
     }
     TraceSetting(
         const TRITONSERVER_InferenceTraceLevel level, const uint32_t rate,
-        const uint32_t log_frequency, const std::shared_ptr<TraceFile>& file);
-
-    // Constructor with reference setting, setting values are optional and if
-    // not provided, the value in 'ref' will be used
-    TraceSetting(
-        const TRITONSERVER_InferenceTraceLevel* level, const uint32_t* rate,
-        const uint32_t* log_frequency, const std::shared_ptr<TraceFile>& file,
-        const TraceSetting& ref);
+        const uint32_t log_frequency, const std::shared_ptr<TraceFile>& file,
+        const bool level_specified, const bool rate_specified,
+        const bool log_frequency_specified, const bool filepath_specified);
 
     ~TraceSetting();
 
@@ -189,6 +209,12 @@ class TraceManager {
     const uint32_t log_frequency_;
     const std::shared_ptr<TraceFile> file_;
 
+    // Whether the field value is specified or mirror from upper level setting
+    const bool level_specified_;
+    const bool rate_specified_;
+    const bool log_frequency_specified_;
+    const bool filepath_specified_;
+
    private:
     std::string invalid_reason_;
 
@@ -203,13 +229,20 @@ class TraceManager {
   };
 
   // Trace settings
+  // Note that 'global_default_' doesn't use for actual trace sampling,
+  // it is used to revert the field values when clearing fields in
+  // 'global_setting_'
+  std::unique_ptr<TraceSetting> global_default_;
   std::shared_ptr<TraceSetting> global_setting_;
   std::unordered_map<std::string, std::shared_ptr<TraceSetting>>
       model_settings_;
+  // The collection of models that have their own trace setting while
+  // some of the fields are mirroring global setting.
+  std::set<std::string> fallback_used_models_;
 
   // The collection of files that are used in trace settings, use to
-  // prevent multiple settings writing to the same file.
-  std::set<std::string> trace_files_;
+  // avoid creating duplicate TraceFile objects for the same file path.
+  std::unordered_map<std::string, std::weak_ptr<TraceFile>> trace_files_;
 
   // lock for accessing trace setting. 'w_mu_' for write and
   // 'r_mu_' for read / write

@@ -55,74 +55,132 @@ TraceManager::TraceManager(
     const uint32_t log_frequency, const std::string& filepath)
 {
   std::shared_ptr<TraceFile> file(new TraceFile(filepath));
-  global_setting_.reset(new TraceSetting(level, rate, log_frequency, file));
-  trace_files_.emplace(filepath);
-}
-
-void
-TraceManager::ClearTraceSetting(const std::string& model_name)
-{
-  std::lock_guard<std::mutex> w_lk(w_mu_);
-  if (!model_name.empty()) {
-    auto it = model_settings_.find(model_name);
-    if (it != model_settings_.end()) {
-      trace_files_.erase(it->second->file_->FileName());
-      std::lock_guard<std::mutex> r_lk(r_mu_);
-      model_settings_.erase(model_name);
-    }
-  }
+  global_default_.reset(new TraceSetting(
+      level, rate, log_frequency, file, false, false, false, false));
+  global_setting_.reset(new TraceSetting(
+      level, rate, log_frequency, file, false, false, false, false));
+  trace_files_.emplace(filepath, file);
 }
 
 TRITONSERVER_Error*
 TraceManager::UpdateTraceSetting(
-    const std::string& model_name,
-    const TRITONSERVER_InferenceTraceLevel* level, const uint32_t* rate,
-    const uint32_t* log_frequency, const std::string& filepath)
+    const std::string& model_name, const NewSetting& new_setting)
 {
   std::lock_guard<std::mutex> w_lk(w_mu_);
+  return UpdateTraceSettingInternal(model_name, new_setting);
+}
 
-  // First try to get the previous setting, if 'ref == nullptr',
-  // this is adding new model setting
-  std::shared_ptr<TraceSetting> ref;
+TRITONSERVER_Error*
+TraceManager::UpdateTraceSettingInternal(
+    const std::string& model_name, const NewSetting& new_setting)
+{
+  // First try to get the current setting and fallback setting,
+  // current setting may be 'nullptr' if the setting is newly added
+  const TraceSetting* current_setting = nullptr;
+  const TraceSetting* fallback_setting = nullptr;
   if (!model_name.empty()) {
     auto it = model_settings_.find(model_name);
     if (it != model_settings_.end()) {
-      ref = it->second;
+      current_setting = it->second.get();
     }
+    fallback_setting = global_setting_.get();
   } else {
-    ref = global_setting_;
+    current_setting = global_setting_.get();
+    fallback_setting = global_default_.get();
   }
 
-  // check if there is filename collision and prepare TraceFile object
-  std::shared_ptr<TraceFile> file;
-  if (!filepath.empty()) {
-    auto f_it = trace_files_.find(filepath);
-    // There may be a collision, check if the updating setting is the one
-    // with the same filename
-    if (f_it != trace_files_.end()) {
-      // If it is updating the setting and the same file name will be used,
-      // then the collision is false alarm.
-      if ((ref != nullptr) && (ref->file_->FileName() == filepath)) {
-        file = ref->file_;
-      } else {
-        return TRITONSERVER_ErrorNew(
-            TRITONSERVER_ERROR_INVALID_ARG,
-            (std::string("Trace file name '") + filepath +
-             "' has been used by another trace setting")
-                .c_str());
-      }
+  // Prepare the updated setting, use two passes for simplicity:
+  // 1. Set all fields based on 'fallback_setting'
+  // 2. If there are specified fields based on current and new setting,
+  //    use the specified value
+  TRITONSERVER_InferenceTraceLevel level = fallback_setting->level_;
+  uint32_t rate = fallback_setting->rate_;
+  uint32_t log_frequency = fallback_setting->log_frequency_;
+  std::string filepath = fallback_setting->file_->FileName();
+
+  // Whether the field value is specified:
+  // if clear then it is not specified, otherwise,
+  // it is specified if it is being updated, or it was previously specified
+  const bool level_specified =
+      (new_setting.clear_level_ ? false
+                                : (((current_setting != nullptr) &&
+                                    current_setting->level_specified_) ||
+                                   (new_setting.level_ != nullptr)));
+  const bool rate_specified =
+      (new_setting.clear_rate_ ? false
+                               : (((current_setting != nullptr) &&
+                                   current_setting->rate_specified_) ||
+                                  (new_setting.rate_ != nullptr)));
+  const bool log_frequency_specified =
+      (new_setting.clear_log_frequency_
+           ? false
+           : (((current_setting != nullptr) &&
+               current_setting->log_frequency_specified_) ||
+              (new_setting.log_frequency_ != nullptr)));
+  const bool filepath_specified =
+      (new_setting.clear_filepath_ ? false
+                                   : (((current_setting != nullptr) &&
+                                       current_setting->filepath_specified_) ||
+                                      (new_setting.filepath_ != nullptr)));
+  if (level_specified) {
+    level = (new_setting.level_ != nullptr) ? *new_setting.level_
+                                            : current_setting->level_;
+  }
+  if (rate_specified) {
+    rate = (new_setting.rate_ != nullptr) ? *new_setting.rate_
+                                          : current_setting->rate_;
+  }
+  if (log_frequency_specified) {
+    log_frequency = (new_setting.log_frequency_ != nullptr)
+                        ? *new_setting.log_frequency_
+                        : current_setting->log_frequency_;
+  }
+  if (filepath_specified) {
+    filepath = (new_setting.filepath_ != nullptr)
+                   ? *new_setting.filepath_
+                   : current_setting->file_->FileName();
+  }
+
+  // Some special case when updating model setting
+  if (!model_name.empty()) {
+    bool all_specified =
+        (level_specified & rate_specified & log_frequency_specified &
+         filepath_specified);
+    bool none_specified =
+        !(level_specified | rate_specified | log_frequency_specified |
+          filepath_specified);
+    if (all_specified) {
+      fallback_used_models_.erase(model_name);
+    } else if (none_specified) {
+      // Simply let the model uses global setting
+      std::lock_guard<std::mutex> r_lk(r_mu_);
+      model_settings_.erase(model_name);
+      return nullptr;
     } else {
-      file.reset(new TraceFile(filepath));
+      fallback_used_models_.emplace(model_name);
     }
   }
 
-  // Prepare the updated setting
+  // Create TraceSetting object with the updated setting
+  std::shared_ptr<TraceFile> file;
+  const auto it = trace_files_.find(filepath);
+  if (it != trace_files_.end()) {
+    file = it->second.lock();
+    // The TraceFile object is no longer valid
+    if (file == nullptr) {
+      trace_files_.erase(it);
+    }
+  }
+  if (file == nullptr) {
+    file.reset(new TraceFile(filepath));
+    trace_files_.emplace(filepath, file);
+  }
+
   std::shared_ptr<TraceSetting> lts(new TraceSetting(
-      level, rate, log_frequency, file,
-      (ref == nullptr) ? *global_setting_ : *ref));
-  // The only invalid setting allowed is if it is turned off explicitly
-  if ((!lts->Valid()) &&
-      ((level == nullptr) || (*level != TRITONSERVER_TRACE_LEVEL_DISABLED))) {
+      level, rate, log_frequency, file, level_specified, rate_specified,
+      log_frequency_specified, filepath_specified));
+  // The only invalid setting allowed is if it disables tracing
+  if ((!lts->Valid()) && (level != TRITONSERVER_TRACE_LEVEL_DISABLED)) {
     return TRITONSERVER_ErrorNew(
         TRITONSERVER_ERROR_INVALID_ARG,
         (std::string("Attempting to set invalid trace setting :") +
@@ -130,19 +188,20 @@ TraceManager::UpdateTraceSetting(
             .c_str());
   }
 
-  // Update / Init the setting in read lock to exclude reader access
+  // Update / Init the setting in read lock to exclude reader access,
+  // we replace the object instead of modifying the existing object in case
+  // of there are ongoing traces. This makes sure those traces are referring
+  // to the setting when the traces are sampled.
   {
     std::lock_guard<std::mutex> r_lk(r_mu_);
     if (model_name.empty()) {
       // global update
-      trace_files_.erase(global_setting_->file_->FileName());
-      global_setting_ = lts;
+      global_setting_ = std::move(lts);
     } else {
       auto it = model_settings_.find(model_name);
       if (it != model_settings_.end()) {
         // Model update
-        trace_files_.erase(it->second->file_->FileName());
-        it->second = lts;
+        it->second = std::move(lts);
       } else {
         // Model init
         model_settings_.emplace(model_name, lts);
@@ -150,7 +209,20 @@ TraceManager::UpdateTraceSetting(
     }
   }
 
-  trace_files_.emplace(lts->file_->FileName());
+  // If updating global setting, must check and update the model settings
+  // that are (partially) mirroring global setting.
+  if (model_name.empty()) {
+    // Default constructed setting means no active update,
+    // only the unspecified fields will be checked and updated.
+    NewSetting setting;
+    // Make a copy of the set as UpdateTraceSettingInternal() may modify
+    // 'fallback_used_models_'
+    auto fallback_models = fallback_used_models_;
+    for (const auto& name : fallback_models) {
+      UpdateTraceSettingInternal(name, setting);
+    }
+  }
+
   return nullptr;
 }
 
@@ -606,28 +678,13 @@ TraceManager::TraceSetting::WriteTrace(
 
 TraceManager::TraceSetting::TraceSetting(
     const TRITONSERVER_InferenceTraceLevel level, const uint32_t rate,
-    const uint32_t log_frequency, const std::shared_ptr<TraceFile>& file)
+    const uint32_t log_frequency, const std::shared_ptr<TraceFile>& file,
+    const bool level_specified, const bool rate_specified,
+    const bool log_frequency_specified, const bool filepath_specified)
     : level_(level), rate_(rate), log_frequency_(log_frequency), file_(file),
-      sample_(0), count_(0)
-{
-  if (level_ == TRITONSERVER_TRACE_LEVEL_DISABLED) {
-    invalid_reason_ = "tracing is disabled";
-  } else if (rate_ == 0) {
-    invalid_reason_ = "sample rate must be non-zero";
-  } else if (file_->FileName().empty()) {
-    invalid_reason_ = "trace file name is not given";
-  }
-}
-
-TraceManager::TraceSetting::TraceSetting(
-    const TRITONSERVER_InferenceTraceLevel* level, const uint32_t* rate,
-    const uint32_t* log_frequency, const std::shared_ptr<TraceFile>& file,
-    const TraceSetting& ref)
-    : level_((level == nullptr) ? ref.level_ : *level),
-      rate_((rate == nullptr) ? ref.rate_ : *rate),
-      log_frequency_(
-          (log_frequency == nullptr) ? ref.log_frequency_ : *log_frequency),
-      file_((file == nullptr) ? ref.file_ : file), sample_(0), count_(0)
+      level_specified_(level_specified), rate_specified_(rate_specified),
+      log_frequency_specified_(log_frequency_specified),
+      filepath_specified_(filepath_specified), sample_(0), count_(0)
 {
   if (level_ == TRITONSERVER_TRACE_LEVEL_DISABLED) {
     invalid_reason_ = "tracing is disabled";

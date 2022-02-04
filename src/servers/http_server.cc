@@ -1540,32 +1540,26 @@ HTTPAPIServer::HandleTrace(evhtp_request_t* req, const std::string& model_name)
       }
     }
 
-    TRITONSERVER_InferenceTraceLevel* level_ptr = nullptr;
-    uint32_t* rate_ptr = nullptr;
-    uint32_t* log_frequency_ptr = nullptr;
     triton::common::TritonJson::Value request;
     size_t buffer_len = evbuffer_get_length(req->buffer_in);
     HTTP_RESPOND_IF_ERR(
         req, EVBufferToJson(&request, v, &v_idx, buffer_len, n));
 
-    // Check if this is a clear request
-    std::vector<std::string> members;
-    HTTP_RESPOND_IF_ERR(req, request.Members(&members));
-    if (members.size() == 0) {
-      if (!model_name.empty()) {
-        trace_manager_->ClearTraceSetting(model_name);
+    TraceManager::NewSetting new_setting;
+
+    triton::common::TritonJson::Value setting_json;
+    if (request.Find("trace_file", &setting_json)) {
+      if (setting_json.IsNull()) {
+        new_setting.clear_filepath_ = true;
       } else {
-        HTTP_RESPOND_IF_ERR(
-            req, TRITONSERVER_ErrorNew(
-                     TRITONSERVER_ERROR_INVALID_ARG,
-                     "only model specific setting can be cleared"));
-      }
-    } else {
-      triton::common::TritonJson::Value setting_json;
-      if (request.Find("trace_file", &setting_json)) {
         HTTP_RESPOND_IF_ERR(req, setting_json.AsString(&filepath));
+        new_setting.filepath_ = &filepath;
       }
-      if (request.Find("trace_level", &setting_json)) {
+    }
+    if (request.Find("trace_level", &setting_json)) {
+      if (setting_json.IsNull()) {
+        new_setting.clear_level_ = true;
+      } else {
         triton::common::TritonJson::Value level_array;
         HTTP_RESPOND_IF_ERR(
             req, request.MemberAsArray("trace_level", &level_array));
@@ -1575,7 +1569,7 @@ HTTPAPIServer::HandleTrace(evhtp_request_t* req, const std::string& model_name)
           if (level_str == "OFF") {
             if (level_array.ArraySize() == 1) {
               level = TRITONSERVER_TRACE_LEVEL_DISABLED;
-              level_ptr = &level;
+              new_setting.level_ = &level;
             } else {
               HTTP_RESPOND_IF_ERR(
                   req, TRITONSERVER_ErrorNew(
@@ -1585,20 +1579,24 @@ HTTPAPIServer::HandleTrace(evhtp_request_t* req, const std::string& model_name)
           } else if (level_str == "TIMESTAMPS") {
             level = static_cast<TRITONSERVER_InferenceTraceLevel>(
                 level | TRITONSERVER_TRACE_LEVEL_TIMESTAMPS);
-            level_ptr = &level;
+            new_setting.level_ = &level;
           } else if (level_str == "TENSORS") {
             level = static_cast<TRITONSERVER_InferenceTraceLevel>(
                 level | TRITONSERVER_TRACE_LEVEL_TENSORS);
-            level_ptr = &level;
+            new_setting.level_ = &level;
           }
         }
       }
-      if (request.Find("trace_rate", &setting_json)) {
+    }
+    if (request.Find("trace_rate", &setting_json)) {
+      if (setting_json.IsNull()) {
+        new_setting.clear_rate_ = true;
+      } else {
         std::string rate_str;
         HTTP_RESPOND_IF_ERR(req, setting_json.AsString(&rate_str));
         try {
           rate = std::stoi(rate_str);
-          rate_ptr = &rate;
+          new_setting.rate_ = &rate;
         }
         catch (const std::invalid_argument& ia) {
           HTTP_RESPOND_IF_ERR(
@@ -1609,12 +1607,16 @@ HTTPAPIServer::HandleTrace(evhtp_request_t* req, const std::string& model_name)
                            .c_str()));
         }
       }
-      if (request.Find("log_frequency", &setting_json)) {
+    }
+    if (request.Find("log_frequency", &setting_json)) {
+      if (setting_json.IsNull()) {
+        new_setting.clear_log_frequency_ = true;
+      } else {
         std::string frequency_str;
         HTTP_RESPOND_IF_ERR(req, setting_json.AsString(&frequency_str));
         try {
           log_frequency = std::stoi(frequency_str);
-          log_frequency_ptr = &log_frequency;
+          new_setting.log_frequency_ = &log_frequency;
         }
         catch (const std::invalid_argument& ia) {
           HTTP_RESPOND_IF_ERR(
@@ -1625,11 +1627,9 @@ HTTPAPIServer::HandleTrace(evhtp_request_t* req, const std::string& model_name)
                            .c_str()));
         }
       }
-      HTTP_RESPOND_IF_ERR(
-          req,
-          trace_manager_->UpdateTraceSetting(
-              model_name, level_ptr, rate_ptr, log_frequency_ptr, filepath));
     }
+    HTTP_RESPOND_IF_ERR(
+        req, trace_manager_->UpdateTraceSetting(model_name, new_setting));
   }
 
   // Get current trace setting, this is needed even if the setting

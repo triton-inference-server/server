@@ -44,8 +44,6 @@ HTTP GET request to retrieve the current trace setting. A HTTP POST request
 will modify the trace setting, and the endpoint will return the updated trace
 setting on success or an error in the case of failure. Optional model name
 can be provided to get or to set the trace settings for specific model.
-Note that when a model is specified without providing any trace settings
-in the request body, it will be a request to remove the specification. 
 
 ```
 GET v2[/models/${MODEL_NAME}]/trace
@@ -128,9 +126,12 @@ $trace_request =
 
 The $trace_setting JSON is defined in
 [Trace Response JSON Object](#Trace-Response-JSON-bject), only the specified
-settings will be updated. Note that if this is the first request to initalize
-a model trace settings, for the trace settings that are not specified
-in the request, the value will be copied from the current global settings.
+settings will be updated. In additon to the values mentioned in response JSON
+object, JSON null value may be used to remove the specification of
+the trace setting. In such case, the current global setting will be used.
+Similarly, if this is the first request to initalize a model trace settings,
+for the trace settings that are not specified in the request, the current global
+setting will be used.
 
 ## GRPC
 
@@ -155,9 +156,12 @@ response messages for Trace are:
 ```
 message TraceRequest
 {
+  // The values to be associated with a trace setting.
+  // If no value is provided, the setting will be clear and
+  // the global setting value will be used.
   message SettingValue
   {
-    repeated string value = 3;
+    repeated string value = 1;
   }
 
   // The new setting values to be updated,
@@ -167,18 +171,13 @@ message TraceRequest
   // The name of the model to apply the new trace settings.
   // If not given, the new settings will be applied globally.
   string model_name = 2;
-
-  // Clear the current model specific setting if specified, and
-  // any new setting values will not be applied.
-  // This option will be ignored if 'model_name' is not given.
-  bool clear_setting = 3;
 }
 
 message TraceResponse
 {
   message SettingValue
   {
-    repeated string value = 2;
+    repeated string value = 1;
   }
 
   // The latest trace settings.
