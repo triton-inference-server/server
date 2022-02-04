@@ -38,16 +38,15 @@ if [ ! -z "$TEST_REPO_ARCH" ]; then
     REPO_VERSION=${REPO_VERSION}_${TEST_REPO_ARCH}
 fi
 
-export CUDA_VISIBLE_DEVICES=0,1,2,3
+export CUDA_VISIBLE_DEVICES=0,1,2,3,4,5,6,7
 
 IO_TEST_UTIL=./memory_alloc
+PEER_ACCESS_UTIL=./peer_access
 CLIENT_LOG="./client.log"
 MODELSDIR=`pwd`/models
 
 DATADIR=/data/inferenceserver/${REPO_VERSION}/qa_model_repository
 ENSEMBLEDIR=/data/inferenceserver/${REPO_VERSION}/qa_ensemble_model_repository/qa_model_repository
-
-export CUDA_VISIBLE_DEVICES=0,1
 
 # Must explicitly set LD_LIBRARY_PATH so that IO_TEST_UTIL can find
 # libtritonserver.so.
@@ -61,6 +60,15 @@ RET=0
 
 # Prepare float32 models with basic config
 rm -rf $MODELSDIR
+
+GPUS=(`$PEER_ACCESS_UTIL`)
+
+if [ $? != 0 ]; then
+   echo -e "\n***\n*** Running the ./peer_access utility failed. \n***"
+   exit 1
+fi
+
+echo "GPUs ${GPUS[0]} and ${GPUS[1]} will be used for the test.\n"
 
 for trial in graphdef savedmodel onnx libtorch plan python python_dlpack; do
     full=${trial}_float32_float32_float32
@@ -152,11 +160,11 @@ cp -r $MODELSDIR/fan_graphdef_float32_float32_float32 $MODELSDIR/fan_${full} && 
 cp -r $ENSEMBLEDIR/nop_TYPE_FP32_-1 $MODELSDIR/. && \
     mkdir -p $MODELSDIR/nop_TYPE_FP32_-1/1
 
-for input_device in -1 0 1; do
-    for output_device in -1 0 1; do
+for input_device in -1 ${GPUS[0]} ${GPUS[1]}; do
+    for output_device in -1 ${GPUS[0]} ${GPUS[1]}; do
         for trial in graphdef savedmodel onnx libtorch plan python python_dlpack; do
             # TensorRT Plan should only be deployed on GPU device
-            model_devices="-1 0 1" && [[ "$trial" == "plan" ]] && model_devices="0 1"
+            model_devices="-1 ${GPUS[0]} ${GPUS[1]}" && [[ "$trial" == "plan" ]] && model_devices="${GPUS[0]} ${GPUS[1]}"
             for model_device in $model_devices; do
                 full=${trial}_float32_float32_float32
                 full_log=$CLIENT_LOG.$full.$input_device.$output_device.$model_device
@@ -212,7 +220,7 @@ for input_device in -1 0 1; do
         done
 
         for trial in graphdef savedmodel onnx; do
-            model_devices="-1 0 1"
+            model_devices="-1 ${GPUS[0]} ${GPUS[1]}"
             for model_device in $model_devices; do
                 full=${trial}_object_object_object
                 full_log=$CLIENT_LOG.$full.$input_device.$output_device.$model_device
