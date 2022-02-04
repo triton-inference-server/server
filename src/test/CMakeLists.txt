@@ -45,6 +45,20 @@ install(
 endif() # TRITON_ENABLE_TENSORRT
 
 #
+# peer_access
+#
+add_executable(peer_access peer_access.cc)
+target_include_directories(peer_access PRIVATE ${CUDA_INCLUDE_DIRS})
+target_link_libraries(
+  peer_access
+  PRIVATE ${CUDA_LIBRARIES}
+)
+install(
+  TARGETS peer_access
+  RUNTIME DESTINATION bin
+)
+
+#
 # CudaMemoryManger
 #
 set(
