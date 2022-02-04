@@ -474,10 +474,8 @@ std::vector<Option> options_
       {OPTION_TRACE_RATE, "trace-rate", Option::ArgInt,
        "Set the trace sampling rate. Default is 1000."},
       {OPTION_TRACE_COUNT, "trace-count", Option::ArgInt,
-       "Set the number of traces to be sampled. Once the specified number "
-       "of traces are sampled, 'trace_level' will be set to OFF to disable "
-       "tracing. If the value is -1, the number of traces to be sampled will "
-       "not be limited. Default is -1."},
+       "Set the number of traces to be sampled. If the value is -1, the number "
+       "of traces to be sampled will not be limited. Default is -1."},
       {OPTION_TRACE_LOG_FREQUENCY, "trace-log-frequency", Option::ArgInt,
        "Set the trace log frequency. If the value is 0, Triton will only log "
        "the trace output to <trace-file> when shutting down. Otherwise, Triton "
