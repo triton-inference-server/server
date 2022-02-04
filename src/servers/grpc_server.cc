@@ -1109,16 +1109,17 @@ CommonHandler::SetUpAllRequests()
   //
   auto OnRegisterTrace =
       [this](
-          grpc::ServerContext* ctx, inference::TraceRequest* request,
-          grpc::ServerAsyncResponseWriter<inference::TraceResponse>* responder,
+          grpc::ServerContext* ctx, inference::TraceSettingRequest* request,
+          grpc::ServerAsyncResponseWriter<inference::TraceSettingResponse>*
+              responder,
           void* tag) {
-        this->service_->RequestTrace(
+        this->service_->RequestTraceSetting(
             ctx, request, responder, this->cq_, this->cq_, tag);
       };
 
   auto OnExecuteTrace = [this](
-                            inference::TraceRequest& request,
-                            inference::TraceResponse* response,
+                            inference::TraceSettingRequest& request,
+                            inference::TraceSettingResponse* response,
                             grpc::Status* status) {
     TRITONSERVER_Error* err = nullptr;
 #ifdef TRITON_ENABLE_TRACING
@@ -1275,7 +1276,7 @@ CommonHandler::SetUpAllRequests()
         request.model_name(), &level, &rate, &count, &log_frequency, &filepath);
     // level
     {
-      inference::TraceResponse::SettingValue level_setting;
+      inference::TraceSettingResponse::SettingValue level_setting;
       if (level == TRITONSERVER_TRACE_LEVEL_DISABLED) {
         level_setting.add_value("OFF");
       } else {
@@ -1308,8 +1309,8 @@ CommonHandler::SetUpAllRequests()
   };
 
   new CommonCallData<
-      grpc::ServerAsyncResponseWriter<inference::TraceResponse>,
-      inference::TraceRequest, inference::TraceResponse>(
+      grpc::ServerAsyncResponseWriter<inference::TraceSettingResponse>,
+      inference::TraceSettingRequest, inference::TraceSettingResponse>(
       "Trace", 0, OnRegisterTrace, OnExecuteTrace, false /* async */, cq_);
 
 

@@ -98,7 +98,7 @@ done
 # Enable via trace API and send again
 rm -f ./curl.out
 set +e
-code=`curl -s -w %{http_code} -o ./curl.out -d'{"trace_level":["TIMESTAMPS"]}' localhost:8000/v2/trace`
+code=`curl -s -w %{http_code} -o ./curl.out -d'{"trace_level":["TIMESTAMPS"]}' localhost:8000/v2/trace/setting`
 set -e
 if [ "$code" != "200" ]; then
     cat ./curl.out
@@ -170,7 +170,7 @@ set +e
 # Add trace setting for 'simple' via trace API, first use the same trace file
 rm -f ./curl.out
 set +e
-code=`curl -s -w %{http_code} -o ./curl.out -d'{"trace_file":"global_trace.log"}' localhost:8000/v2/models/simple/trace`
+code=`curl -s -w %{http_code} -o ./curl.out -d'{"trace_file":"global_trace.log"}' localhost:8000/v2/models/simple/trace/setting`
 set -e
 if [ "$code" != "200" ]; then
     cat ./curl.out
@@ -194,7 +194,7 @@ fi
 # Use a different name
 rm -f ./curl.out
 set +e
-code=`curl -s -w %{http_code} -o ./curl.out -d'{"trace_file":"simple_trace.log","log_frequency":"2"}' localhost:8000/v2/models/simple/trace`
+code=`curl -s -w %{http_code} -o ./curl.out -d'{"trace_file":"simple_trace.log","log_frequency":"2"}' localhost:8000/v2/models/simple/trace/setting`
 set -e
 if [ "$code" != "200" ]; then
     cat ./curl.out
@@ -288,7 +288,7 @@ set +e
 # Add model setting and update it
 rm -f ./curl.out
 set +e
-code=`curl -s -w %{http_code} -o ./curl.out -d'{"trace_file":"update_trace.log", "trace_rate":"1"}' localhost:8000/v2/models/simple/trace`
+code=`curl -s -w %{http_code} -o ./curl.out -d'{"trace_file":"update_trace.log", "trace_rate":"1"}' localhost:8000/v2/models/simple/trace/setting`
 set -e
 if [ "$code" != "200" ]; then
     cat ./curl.out
@@ -298,7 +298,7 @@ fi
 
 rm -f ./curl.out
 set +e
-code=`curl -s -w %{http_code} -o ./curl.out -d'{"trace_file":"update_trace.log", "trace_level":["OFF"]}' localhost:8000/v2/models/simple/trace`
+code=`curl -s -w %{http_code} -o ./curl.out -d'{"trace_file":"update_trace.log", "trace_level":["OFF"]}' localhost:8000/v2/models/simple/trace/setting`
 set -e
 if [ "$code" != "200" ]; then
     cat ./curl.out
@@ -342,7 +342,7 @@ set +e
 # Clear trace setting by explicitly asking removal for every feild except 'trace_rate'
 rm -f ./curl.out
 set +e
-code=`curl -s -w %{http_code} -o ./curl.out -d'{"trace_file":null, "trace_level":null}' localhost:8000/v2/models/simple/trace`
+code=`curl -s -w %{http_code} -o ./curl.out -d'{"trace_file":null, "trace_level":null}' localhost:8000/v2/models/simple/trace/setting`
 set -e
 if [ "$code" != "200" ]; then
     cat ./curl.out
@@ -436,7 +436,7 @@ done
 # Check the current setting
 rm -f ./curl.out
 set +e
-code=`curl -s -w %{http_code} -o ./curl.out localhost:8000/v2/models/simple/trace`
+code=`curl -s -w %{http_code} -o ./curl.out localhost:8000/v2/models/simple/trace/setting`
 set -e
 if [ "$code" != "200" ]; then
     cat ./curl.out
@@ -462,7 +462,7 @@ fi
 # Set trace count
 rm -f ./curl.out
 set +e
-code=`curl -s -w %{http_code} -o ./curl.out -d'{"trace_count":"5"}' localhost:8000/v2/trace`
+code=`curl -s -w %{http_code} -o ./curl.out -d'{"trace_count":"5"}' localhost:8000/v2/trace/setting`
 set -e
 if [ "$code" != "200" ]; then
     cat ./curl.out
@@ -503,7 +503,7 @@ done
 # Check the current setting agian and expect 'trace_count' becomes 0
 rm -f ./curl.out
 set +e
-code=`curl -s -w %{http_code} -o ./curl.out localhost:8000/v2/models/simple/trace`
+code=`curl -s -w %{http_code} -o ./curl.out localhost:8000/v2/models/simple/trace/setting`
 set -e
 if [ "$code" != "200" ]; then
     cat ./curl.out

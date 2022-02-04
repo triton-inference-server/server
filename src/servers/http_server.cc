@@ -951,14 +951,14 @@ HTTPAPIServer::HTTPAPIServer(
       trace_manager_(trace_manager), shm_manager_(shm_manager),
       allocator_(nullptr), server_regex_(R"(/v2(?:/health/(live|ready))?)"),
       model_regex_(
-          R"(/v2/models/([^/]+)(?:/versions/([0-9]+))?(?:/(infer|ready|config|stats|trace))?)"),
+          R"(/v2/models/([^/]+)(?:/versions/([0-9]+))?(?:/(infer|ready|config|stats|trace/setting))?)"),
       modelcontrol_regex_(
           R"(/v2/repository(?:/([^/]+))?/(index|models/([^/]+)/(load|unload)))"),
       systemsharedmemory_regex_(
           R"(/v2/systemsharedmemory(?:/region/([^/]+))?/(status|register|unregister))"),
       cudasharedmemory_regex_(
           R"(/v2/cudasharedmemory(?:/region/([^/]+))?/(status|register|unregister))"),
-      trace_regex_(R"(/v2/trace)")
+      trace_regex_(R"(/v2/trace/setting)")
 {
   // FIXME, don't cache server metadata. The http endpoint should
   // not be deciding that server metadata will not change during
@@ -2999,7 +2999,7 @@ HTTPAPIServer::Handle(evhtp_request_t* req)
       // model statistics
       HandleModelStats(req, model_name, version);
       return;
-    } else if (kind == "trace") {
+    } else if (kind == "trace/setting") {
       // Trace with specific model, there is no specification on versioning
       // so fall out and return bad request error if version is specified
       if (version.empty()) {

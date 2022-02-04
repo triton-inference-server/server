@@ -46,19 +46,19 @@ setting on success or an error in the case of failure. Optional model name
 can be provided to get or to set the trace settings for specific model.
 
 ```
-GET v2[/models/${MODEL_NAME}]/trace
+GET v2[/models/${MODEL_NAME}]/trace/setting
 
-POST v2[/models/${MODEL_NAME}]/trace
+POST v2[/models/${MODEL_NAME}]/trace/setting
 ```
 
-### Trace Response JSON Object
+### Trace Setting Response JSON Object
 
-A successful trace request is indicated by a 200 HTTP status
-code. The response object, identified as $trace_response, is
-returned in the HTTP body for every successful trace request.
+A successful trace setting request is indicated by a 200 HTTP status
+code. The response object, identified as $trace_setting_response, is
+returned in the HTTP body for every successful trace setting request.
 
 ```
-$trace_response =
+$trace_setting_response =
 {
   $trace_setting, ...
 }
@@ -96,14 +96,14 @@ the 200-th traces to file "${trace_file}.1". Note that the file index will be
 reset to 0 when "trace_file" setting is updated.
 
 
-### Trace Response JSON Error Object
+### Trace Setting Response JSON Error Object
 
-A failed trace request will be indicated by an HTTP error status
+A failed trace setting request will be indicated by an HTTP error status
 (typically 400). The HTTP body must contain the
-$trace_error_response object.
+$trace_setting_error_response object.
 
 ```
-$trace_error_response =
+$trace_setting_error_response =
 {
   "error": $string
 }
@@ -111,24 +111,24 @@ $trace_error_response =
 
 - “error” : The descriptive message for the error.
 
-#### Trace Request JSON Object
+#### Trace Setting Request JSON Object
 
-A trace configure request is made with a HTTP POST to
+A trace setting request is made with a HTTP POST to
 the trace endpoint. In the corresponding response the HTTP body contains the
 response JSON. A successful request is indicated by a 200 HTTP status code.
 
-The request object, identified as $trace_request must be provided in the HTTP
+The request object, identified as $trace_setting_request must be provided in the HTTP
 body.
 
 ```
-$trace_request =
+$trace_setting_request =
 {
   $trace_setting, ...
 }
 ```
 
 The $trace_setting JSON is defined in
-[Trace Response JSON Object](#Trace-Response-JSON-bject), only the specified
+[Trace Setting Response JSON Object](#Trace-Setting-Response-JSON-bject), only the specified
 settings will be updated. In additon to the values mentioned in response JSON
 object, JSON null value may be used to remove the specification of
 the trace setting. In such case, the current global setting will be used.
@@ -146,18 +146,18 @@ service GRPCInferenceService
   …
 
   // Update and get the trace setting of the Triton server.
-  rpc Trace(TraceRequest)
-          returns (TraceResponse) {}
+  rpc TraceSetting(TraceSettingRequest)
+          returns (TraceSettingResponse) {}
 }
 ```
 
-The Trace API returns the latest trace settings. Errors are indicated
+The Trace Setting API returns the latest trace settings. Errors are indicated
 by the google.rpc.Status returned for the request. The OK code
 indicates success and other codes indicate failure. The request and
-response messages for Trace are:
+response messages for Trace Setting are:
 
 ```
-message TraceRequest
+message TraceSettingRequest
 {
   // The values to be associated with a trace setting.
   // If no value is provided, the setting will be clear and
@@ -176,7 +176,7 @@ message TraceRequest
   string model_name = 2;
 }
 
-message TraceResponse
+message TraceSettingResponse
 {
   message SettingValue
   {
@@ -189,7 +189,7 @@ message TraceResponse
 ```
 
 The trace settings are mentioned in
-[Trace Response JSON Object](#Trace-Response-JSON-bject).
+[Trace Setting Response JSON Object](#Trace-Setting-Response-JSON-bject).
 Note that if this is the first request to initalize
 a model trace settings, for the trace settings that are not specified
 in the request, the value will be copied from the current global settings.
