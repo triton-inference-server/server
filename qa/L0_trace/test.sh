@@ -209,7 +209,7 @@ fi
 if [ `grep -c "\"trace_rate\":\"6\"" ./curl.out` != "1" ]; then
     RET=1
 fi
-if [ `grep -c "\"trace_count\":\"0\"" ./curl.out` != "1" ]; then
+if [ `grep -c "\"trace_count\":\"-1\"" ./curl.out` != "1" ]; then
     RET=1
 fi
 if [ `grep -c "\"log_frequency\":\"2\"" ./curl.out` != "1" ]; then
@@ -313,7 +313,7 @@ fi
 if [ `grep -c "\"trace_rate\":\"1\"" ./curl.out` != "1" ]; then
     RET=1
 fi
-if [ `grep -c "\"trace_count\":\"0\"" ./curl.out` != "1" ]; then
+if [ `grep -c "\"trace_count\":\"-1\"" ./curl.out` != "1" ]; then
     RET=1
 fi
 if [ `grep -c "\"log_frequency\":\"0\"" ./curl.out` != "1" ]; then
@@ -357,7 +357,7 @@ fi
 if [ `grep -c "\"trace_rate\":\"1\"" ./curl.out` != "1" ]; then
     RET=1
 fi
-if [ `grep -c "\"trace_count\":\"0\"" ./curl.out` != "1" ]; then
+if [ `grep -c "\"trace_count\":\"-1\"" ./curl.out` != "1" ]; then
     RET=1
 fi
 if [ `grep -c "\"log_frequency\":\"0\"" ./curl.out` != "1" ]; then
@@ -433,6 +433,32 @@ for p in {1..10}; do
     fi
 done
 
+# Check the current setting
+rm -f ./curl.out
+set +e
+code=`curl -s -w %{http_code} -o ./curl.out localhost:8000/v2/models/simple/trace`
+set -e
+if [ "$code" != "200" ]; then
+    cat ./curl.out
+    echo -e "\n***\n*** Test Failed\n***"
+    RET=1
+fi
+if [ `grep -c "\"trace_level\":\[\"TIMESTAMPS\"\]" ./curl.out` != "1" ]; then
+    RET=1
+fi
+if [ `grep -c "\"trace_rate\":\"1\"" ./curl.out` != "1" ]; then
+    RET=1
+fi
+if [ `grep -c "\"trace_count\":\"-1\"" ./curl.out` != "1" ]; then
+    RET=1
+fi
+if [ `grep -c "\"log_frequency\":\"0\"" ./curl.out` != "1" ]; then
+    RET=1
+fi
+if [ `grep -c "\"trace_file\":\"global_count.log\"" ./curl.out` != "1" ]; then
+    RET=1
+fi
+
 # Set trace count
 rm -f ./curl.out
 set +e
@@ -473,6 +499,32 @@ for p in {1..10}; do
         RET=1
     fi
 done
+
+# Check the current setting agian and expect 'trace_count' becomes 0
+rm -f ./curl.out
+set +e
+code=`curl -s -w %{http_code} -o ./curl.out localhost:8000/v2/models/simple/trace`
+set -e
+if [ "$code" != "200" ]; then
+    cat ./curl.out
+    echo -e "\n***\n*** Test Failed\n***"
+    RET=1
+fi
+if [ `grep -c "\"trace_level\":\[\"TIMESTAMPS\"\]" ./curl.out` != "1" ]; then
+    RET=1
+fi
+if [ `grep -c "\"trace_rate\":\"1\"" ./curl.out` != "1" ]; then
+    RET=1
+fi
+if [ `grep -c "\"trace_count\":\"0\"" ./curl.out` != "1" ]; then
+    RET=1
+fi
+if [ `grep -c "\"log_frequency\":\"0\"" ./curl.out` != "1" ]; then
+    RET=1
+fi
+if [ `grep -c "\"trace_file\":\"global_count.log\"" ./curl.out` != "1" ]; then
+    RET=1
+fi
 
 set -e
 

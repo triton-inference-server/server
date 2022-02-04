@@ -134,7 +134,7 @@ std::string trace_filepath_;
 TRITONSERVER_InferenceTraceLevel trace_level_ =
     TRITONSERVER_TRACE_LEVEL_DISABLED;
 int32_t trace_rate_ = 1000;
-int32_t trace_count_ = 0;
+int32_t trace_count_ = -1;
 int32_t trace_log_frequency_ = 0;
 #endif  // TRITON_ENABLE_TRACING
 
@@ -476,8 +476,8 @@ std::vector<Option> options_
       {OPTION_TRACE_COUNT, "trace-count", Option::ArgInt,
        "Set the number of traces to be sampled. Once the specified number "
        "of traces are sampled, 'trace_level' will be set to OFF to disable "
-       "tracing. If the value is 0, the number of traces to be sampled will "
-       "not be limited. Default is 0."},
+       "tracing. If the value is -1, the number of traces to be sampled will "
+       "not be limited. Default is -1."},
       {OPTION_TRACE_LOG_FREQUENCY, "trace-log-frequency", Option::ArgInt,
        "Set the trace log frequency. If the value is 0, Triton will only log "
        "the trace output to <trace-file> when shutting down. Otherwise, Triton "

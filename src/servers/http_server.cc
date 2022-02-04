@@ -1520,7 +1520,7 @@ HTTPAPIServer::HandleTrace(evhtp_request_t* req, const std::string& model_name)
 #ifdef TRITON_ENABLE_TRACING
   TRITONSERVER_InferenceTraceLevel level = TRITONSERVER_TRACE_LEVEL_DISABLED;
   uint32_t rate;
-  uint32_t count;
+  int32_t count;
   uint32_t log_frequency;
   std::string filepath;
 

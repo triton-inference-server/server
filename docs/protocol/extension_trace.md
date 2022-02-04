@@ -82,9 +82,9 @@ trace multiple informations.
 - "trace_rate" : the trace sampling rate. The value represents how many requests
 will one trace be sampled from. For example, if the trace rate is "1000",
 1 trace will be sampled for every 1000 requests.
-- "trace_count" : the number of traces to be sampled. Once the specified number
-of traces are sampled, 'trace_level' will be set to "OFF" to disable tracing.
-If the value is "0", the number of traces to be sampled will not be limited.
+- "trace_count" : the number of remaining traces to be sampled. Once the value
+becomes "0", no more traces will be sampled for the trace setting.
+If the value is "-1", the number of traces to be sampled will not be limited.
 - "log_frequency" : the frequency that Triton will log the
 trace output to the files. If the value is "0", Triton will only log
 the trace output to ${trace_file} when shutting down. Otherwise, Triton will log
