@@ -742,9 +742,6 @@ openssl rsa -passin pass:1234 -in client.key -out client.key
 cp client.key client2.key && sed -i "s/\b\(.\)/\u\1/g" client2.key
 cp client.crt client2.crt && sed -i "s/\b\(.\)/\u\1/g" client2.crt
 
-cp server.crt /etc/nginx/cert.crt
-cp server.key /etc/nginx/cert.key
-
 SERVER_ARGS="--model-repository=${DATADIR} --grpc-use-ssl=1 --grpc-server-cert=server.crt --grpc-server-key=server.key --grpc-root-cert=ca.crt"
 
 run_server
@@ -754,14 +751,7 @@ if [ "$SERVER_PID" == "0" ]; then
     exit 1
 fi
 
-# Setup the new configuration for the proxy. The HTTPS traffic will be
-# redirected to the running instance of server at localhost:8000
-cp nginx.conf /etc/nginx/sites-available/default
-
-# Start the proxy server
-service nginx restart
-
-# Test SSL
+# Test gRPC SSL
 set +e
 
 # Test that gRPC protocol with SSL works correctly
@@ -788,6 +778,33 @@ if [ $? -eq 0 ]; then
     echo -e "\n***\n*** Expected test failure\n***"
     RET=1
 fi
+
+set -e
+
+kill $SERVER_PID
+wait $SERVER_PID
+
+cp server.crt /etc/nginx/cert.crt
+cp server.key /etc/nginx/cert.key
+
+SERVER_ARGS="--model-repository=${DATADIR}"
+
+run_server
+if [ "$SERVER_PID" == "0" ]; then
+    echo -e "\n***\n*** Failed to start $SERVER\n***"
+    cat $SERVER_LOG
+    exit 1
+fi
+
+# Setup the new configuration for the proxy. The HTTPS traffic will be
+# redirected to the running instance of server at localhost:8000
+cp nginx.conf /etc/nginx/sites-available/default
+
+# Start the proxy server
+service nginx restart
+
+# Test HTTP SSL
+set +e
 
 # Test that HTTP protocol with SSL works correctly
 $PERF_ANALYZER -v -u https://localhost:443 -i http -m graphdef_int16_int16_int16 --percentile=95 \
