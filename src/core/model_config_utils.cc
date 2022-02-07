@@ -191,6 +191,14 @@ ValidateEnsembleSchedulingConfig(const inference::ModelConfig& config)
   // check data flow
   std::deque<EnsembleTensor*> ready_queue;
   for (const auto& input : config.input()) {
+    // [FIXME] return error if there is optional input for now until
+    // ensemble scheduling is improved to support optional input
+    if (input.optional()) {
+      return Status(
+          Status::Code::INVALID_ARG, "ensemble input '" + input.name() +
+                                         "' is optional, optional ensemble "
+                                         "input is not currently supported");
+    }
     auto it = tensors.find(input.name());
     if (it == tensors.end()) {
       return Status(
