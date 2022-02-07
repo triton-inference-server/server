@@ -83,7 +83,9 @@ trace multiple informations.
 will one trace be sampled from. For example, if the trace rate is "1000",
 1 trace will be sampled for every 1000 requests.
 - "trace_count" : the number of remaining traces to be sampled. Once the value
-becomes "0", no more traces will be sampled for the trace setting.
+becomes "0", no more traces will be sampled for the trace setting, and the
+collected traces will be written to indexed trace file in the format described
+in "log_frequency", regardless of the "log_frequencey" status.
 If the value is "-1", the number of traces to be sampled will not be limited.
 - "log_frequency" : the frequency that Triton will log the
 trace output to the files. If the value is "0", Triton will only log

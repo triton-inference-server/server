@@ -188,7 +188,8 @@ class TraceManager {
         : level_(TRITONSERVER_TRACE_LEVEL_DISABLED), rate_(0), count_(-1),
           log_frequency_(0), level_specified_(false), rate_specified_(false),
           count_specified_(false), log_frequency_specified_(false),
-          filepath_specified_(false), sample_(0), sample_in_stream_(0)
+          filepath_specified_(false), sample_(0), created_(0), collected_(0),
+          sample_in_stream_(0)
     {
       invalid_reason_ = "Setting hasn't been initialized";
     }
@@ -230,6 +231,10 @@ class TraceManager {
 
     // use to sample a trace based on sampling rate.
     uint64_t sample_;
+
+    // use to track the status of trace count feature
+    uint64_t created_;
+    uint64_t collected_;
 
     // Tracking traces that haven't been saved to file
     uint32_t sample_in_stream_;

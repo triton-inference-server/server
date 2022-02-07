@@ -653,6 +653,7 @@ TraceManager::TraceSetting::SampleTrace()
     create_trace = (((++sample_) % rate_) == 0);
     if (create_trace && (count_ > 0)) {
       --count_;
+      ++created_;
     }
   }
   if (create_trace) {
@@ -689,7 +690,8 @@ TraceManager::TraceSetting::WriteTrace(
   if (sample_in_stream_ != 0) {
     trace_stream_ << ",";
   }
-  sample_in_stream_++;
+  ++sample_in_stream_;
+  ++collected_;
 
   size_t stream_count = 0;
   for (const auto& stream : streams) {
@@ -700,7 +702,11 @@ TraceManager::TraceSetting::WriteTrace(
       trace_stream_ << ",";
     }
   }
-  if ((log_frequency_ != 0) && (sample_in_stream_ >= log_frequency_)) {
+  // Write to file with index when one of the following is true
+  // 1. trace_count is specified and that number of traces has been collected
+  // 2. log_frequency is specified and that number of traces has been collected
+  if (((count_ == 0) && (collected_ == sample_)) ||
+      ((log_frequency_ != 0) && (sample_in_stream_ >= log_frequency_))) {
     // Reset variables and release lock before saving to file
     sample_in_stream_ = 0;
     std::stringstream stream;
@@ -721,7 +727,8 @@ TraceManager::TraceSetting::TraceSetting(
       file_(file), level_specified_(level_specified),
       rate_specified_(rate_specified), count_specified_(count_specified),
       log_frequency_specified_(log_frequency_specified),
-      filepath_specified_(filepath_specified), sample_(0), sample_in_stream_(0)
+      filepath_specified_(filepath_specified), sample_(0), created_(0),
+      collected_(0), sample_in_stream_(0)
 {
   if (level_ == TRITONSERVER_TRACE_LEVEL_DISABLED) {
     invalid_reason_ = "tracing is disabled";

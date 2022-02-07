@@ -526,6 +526,12 @@ if [ `grep -c "\"trace_file\":\"global_count.log\"" ./curl.out` != "1" ]; then
     RET=1
 fi
 
+# Check if the indexed file has been generated when trace count reaches 0
+if [ -f ./global_trace.log.0 ]; then
+    echo -e "\n***\n*** Test Failed, expect generation of global_trace.log.0 before stopping server\n***"
+    RET=1
+fi
+
 set -e
 
 kill $SERVER_PID
@@ -533,16 +539,32 @@ wait $SERVER_PID
 
 set +e
 
+# There should be two trace files for trace counted requests and before trace
+# counted requests
 $TRACE_SUMMARY -t global_count.log > summary_global_count.log
 
-if [ `grep -c "COMPUTE_INPUT_END" summary_global_count.log` != "25" ]; then
+if [ `grep -c "COMPUTE_INPUT_END" summary_global_count.log` != "20" ]; then
     cat summary_global_count.log
     echo -e "\n***\n*** Test Failed\n***"
     RET=1
 fi
 
-if [ `grep -c ^simple summary_global_count.log` != "25" ]; then
+if [ `grep -c ^simple summary_global_count.log` != "20" ]; then
     cat summary_global_count.log
+    echo -e "\n***\n*** Test Failed\n***"
+    RET=1
+fi
+
+$TRACE_SUMMARY -t global_count.log.0 > summary_global_count.log.0
+
+if [ `grep -c "COMPUTE_INPUT_END" summary_global_count.log.0` != "5" ]; then
+    cat summary_global_count.log.0
+    echo -e "\n***\n*** Test Failed\n***"
+    RET=1
+fi
+
+if [ `grep -c ^simple summary_global_count.log.0` != "5" ]; then
+    cat summary_global_count.log.0
     echo -e "\n***\n*** Test Failed\n***"
     RET=1
 fi
