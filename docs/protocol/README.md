@@ -42,6 +42,7 @@ plus several extensions that are defined in the following documents:
 - [Sequence extension](./extension_sequence.md)
 - [Shared-memory extension](./extension_shared_memory.md)
 - [Statistics extension](./extension_statistics.md)
+- [Trace extension](./extension_trace.md)
 
 For the GRPC protocol the [protobuf
 specification](https://github.com/triton-inference-server/common/blob/main/protobuf/grpc_service.proto)
