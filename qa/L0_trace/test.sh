@@ -29,6 +29,11 @@ SIMPLE_HTTP_CLIENT=../clients/simple_http_infer_client
 SIMPLE_GRPC_CLIENT=../clients/simple_grpc_infer_client
 TRACE_SUMMARY=../common/trace_summary.py
 
+CLIENT_TEST=trace_endpoint_test.py
+CLIENT_LOG="client.log"
+TEST_RESULT_FILE="test_results.txt"
+EXPECTED_NUM_TESTS="6"
+
 REPO_VERSION=${NVIDIA_TRITON_SERVER_VERSION}
 if [ "$#" -ge 1 ]; then
     REPO_VERSION=$1
@@ -67,9 +72,6 @@ rm -fr $MODELSDIR && mkdir -p $MODELSDIR && \
             sed -i "s/^name:.*/name: \"global_simple\"/" config.pbtxt) && \
 
 RET=0
-
-# [FIXME] currently the client support has not implemented, call to HTTP API
-# via curl directly. Should call HTTP / GRPC API via client
 
 # start with trace-level=OFF
 SERVER_ARGS="--trace-file=trace_off_to_min.log --trace-level=OFF --trace-rate=1 --model-repository=$MODELSDIR"
@@ -433,6 +435,8 @@ for p in {1..10}; do
     fi
 done
 
+set -e
+
 # Check the current setting
 rm -f ./curl.out
 set +e
@@ -570,6 +574,38 @@ if [ `grep -c ^simple summary_global_count.log.0` != "5" ]; then
 fi
 
 set -e
+
+# Test Python client library
+SERVER_ARGS="--trace-file=global_unittest.log --trace-level=TIMESTAMPS --trace-rate=1 --model-repository=$MODELSDIR"
+SERVER_LOG="./inference_server_unittest.log"
+run_server
+if [ "$SERVER_PID" == "0" ]; then
+    echo -e "\n***\n*** Failed to start $SERVER\n***"
+    cat $SERVER_LOG
+    exit 1
+fi
+
+RET=0
+
+set +e
+
+python $CLIENT_TEST >>$CLIENT_LOG 2>&1
+if [ $? -ne 0 ]; then
+    cat $CLIENT_LOG
+    RET=1
+else
+    check_test_results $TEST_RESULT_FILE $EXPECTED_NUM_TESTS
+    if [ $? -ne 0 ]; then
+        cat $CLIENT_LOG
+        echo -e "\n***\n*** Test Result Verification Failed\n***"
+        RET=1
+    fi
+fi
+
+set -e
+
+kill $SERVER_PID
+wait $SERVER_PID
 
 if [ $RET -eq 0 ]; then
     echo -e "\n***\n*** Test Passed\n***"
