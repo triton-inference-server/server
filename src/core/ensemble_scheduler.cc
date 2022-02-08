@@ -1199,6 +1199,9 @@ EnsembleContext::ScheduleSteps(
   for (auto& step : steps) {
     step->ctx_ = context;
     bool should_schedule = false;
+    // Must release lock before InferAsync to avoid deadlock, as the same thread
+    // will be calling request/response callbacks which will attempt to acquire
+    // the lock already held
     {
       std::lock_guard<std::mutex> lock(context->mutex_);
 
@@ -1210,8 +1213,12 @@ EnsembleContext::ScheduleSteps(
       }
     }
     if (should_schedule) {
-      // TODO: Move ownership of request out of ensemble step to avoid
-      // issues with double release on request on cache hits
+      // On a successful call to InferAsync(), the step will be released by
+      // the response callback. When the response callback is invoked, the
+      // step must not own (and release) the request as the request should be
+      // transferred and managed by Triton core. In the case of cache hit, the
+      // request hasn't been transferred and can cause double-free, so moving
+      // the request ownership out of step here to avoid that
       std::unique_ptr<InferenceRequest> request = std::move(step->request_);
       auto step_status = context->is_->InferAsync(request);
       if (!step_status.IsOk()) {
