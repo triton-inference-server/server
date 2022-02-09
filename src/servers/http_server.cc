@@ -2393,8 +2393,8 @@ HTTPAPIServer::HandleInfer(
 
   // If tracing is enabled see if this request should be traced.
   TRITONSERVER_InferenceTrace* triton_trace = nullptr;
-  std::shared_ptr<TraceManager::Trace> trace;
 #ifdef TRITON_ENABLE_TRACING
+  std::shared_ptr<TraceManager::Trace> trace;
   if (err == nullptr) {
     trace = std::move(trace_manager_->SampleTrace(model_name));
     if (trace != nullptr) {
@@ -2507,9 +2507,11 @@ HTTPAPIServer::HandleInfer(
       if (err == nullptr) {
         err = TRITONSERVER_ServerInferAsync(
             server_.get(), irequest, triton_trace);
+#ifdef TRITON_ENABLE_TRACING
         if (trace != nullptr) {
           trace->trace_ = nullptr;
         }
+#endif  // TRITON_ENABLE_TRACING
       }
       if (err == nullptr) {
         infer_request.release();
@@ -2528,11 +2530,12 @@ HTTPAPIServer::HandleInfer(
       evhtp_request_resume(req);
     }
     TRITONSERVER_ErrorDelete(err);
-
+#ifdef TRITON_ENABLE_TRACING
     // If HTTP server still owns Triton trace
     if ((trace != nullptr) && (trace->trace_ != nullptr)) {
       TraceManager::TraceRelease(trace->trace_, trace->trace_userp_);
     }
+#endif  // TRITON_ENABLE_TRACING
 
     LOG_TRITONSERVER_ERROR(
         TRITONSERVER_InferenceRequestDelete(irequest),
