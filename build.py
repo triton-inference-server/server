@@ -771,7 +771,7 @@ FROM ${BASE_IMAGE}
 ARG TRITON_VERSION
 ARG TRITON_CONTAINER_VERSION
 '''
-    # Install the windows- or linux-specific buildbase dependencies
+    # Install the windows or linux-specific buildbase dependencies
     if target_platform() == 'windows':
         df += '''
 SHELL ["cmd", "/S", "/C"]
@@ -781,11 +781,8 @@ SHELL ["cmd", "/S", "/C"]
 # Ensure apt-get won't prompt for selecting options
 ENV DEBIAN_FRONTEND=noninteractive
 
-# libcurl4-openSSL-dev is needed for GCS
 # python3-dev is needed by Torchvision
 # python3-pip and libarchive-dev is needed by python backend
-# uuid-dev and pkg-config is needed for Azure Storage
-# scons is needed for armnn_tflite backend build dep
 RUN apt-get update && \
     apt-get install -y --no-install-recommends \
             ca-certificates \
@@ -798,26 +795,51 @@ RUN apt-get update && \
             libssl-dev \
             libtool \
             libboost-dev \
-            libcurl4-openssl-dev \
             libb64-dev \
             patchelf \
             python3-dev \
             python3-pip \
             python3-setuptools \
             rapidjson-dev \
-            scons \
             software-properties-common \
             unzip \
             wget \
             zlib1g-dev \
             libarchive-dev \
             pkg-config \
-            uuid-dev \
             libnuma-dev && \
     rm -rf /var/lib/apt/lists/*
 
 RUN pip3 install --upgrade pip && \
     pip3 install --upgrade wheel setuptools docker
+'''       
+        if target_platform() == 'jetpack':
+            df += '''
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends \
+            g++-8 \
+            gcc-8 \
+            clang-8 \
+            lld-8 && \
+    rm -rf /var/lib/apt/lists/*
+
+# Server build requires recent version of CMake (FetchContent required)
+RUN apt remove cmake && \
+    wget https://cmake.org/files/v3.21/cmake-3.21.0.tar.gz && \
+    tar -xf cmake-3.21.0.tar.gz && \
+    cd cmake-3.21.0 && ./configure && make install
+'''
+        else:
+            df += '''
+# libcurl4-openSSL-dev is needed for GCS
+# uuid-dev and pkg-config is needed for Azure Storage
+# scons is needed for armnn_tflite backend build dep
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends \
+            libcurl4-openssl-dev \
+            scons \
+            uuid-dev && \
+    rm -rf /var/lib/apt/lists/*
 
 # Server build requires recent version of CMake (FetchContent required)
 RUN wget -O - https://apt.kitware.com/keys/kitware-archive-latest.asc 2>/dev/null | \
@@ -844,7 +866,7 @@ RUN rm -fr *
 COPY . .
 ENTRYPOINT []
 '''
-        if FLAGS.enable_gpu:
+        if FLAGS.enable_gpu and (target_platform() != 'jetpack'):
             df += install_dcgm_libraries(argmap['DCGM_VERSION'],
                                          target_machine())
 
@@ -878,7 +900,7 @@ COPY --from=build /workspace/build/server/README.third-party-src /tmp/tritonbuil
 '''
 
     if 'onnxruntime' in backends:
-        if target_platform() != 'windows':
+        if (target_platform() != 'windows') and (target_platform() != 'jetpack'):
             df += '''
 # Copy ONNX custom op library and model (needed for testing)
 RUN if [ -d /tmp/tritonbuild/onnxruntime ]; then \
@@ -1146,6 +1168,8 @@ def container_build(images, backends, repoagents, endpoints):
         base_image = images['base']
     elif target_platform() == 'windows':
         base_image = 'mcr.microsoft.com/dotnet/framework/sdk:4.8'
+    elif target_platform() == 'jetpack':
+        base_image = 'nvcr.io/nvidia/l4t-tensorrt:r8.0.1-runtime'
     elif FLAGS.enable_gpu:
         base_image = 'nvcr.io/nvidia/tritonserver:{}-py3-min'.format(
             FLAGS.upstream_container_version)
