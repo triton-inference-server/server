@@ -812,7 +812,7 @@ RUN apt-get update && \
 
 RUN pip3 install --upgrade pip && \
     pip3 install --upgrade wheel setuptools docker
-'''       
+'''
         if target_platform() == 'jetpack':
             df += '''
 RUN apt-get update && \
@@ -900,7 +900,8 @@ COPY --from=build /workspace/build/server/README.third-party-src /tmp/tritonbuil
 '''
 
     if 'onnxruntime' in backends:
-        if (target_platform() != 'windows') and (target_platform() != 'jetpack'):
+        if (target_platform() != 'windows') and (target_platform() !=
+                                                 'jetpack'):
             df += '''
 # Copy ONNX custom op library and model (needed for testing)
 RUN if [ -d /tmp/tritonbuild/onnxruntime ]; then \
@@ -972,7 +973,7 @@ LABEL com.amazonaws.sagemaker.capabilities.accept-bind-to-port=true
 COPY --chown=1000:1000 --from=tritonserver_build /workspace/build/sagemaker/serve /usr/bin/.
 '''
 
-    for noncore in NONCORE_BACKENDS:
+    for noncore in (NONCORE_BACKENDS + EXAMPLE_BACKENDS):
         if noncore in backends:
             df += '''
 COPY --chown=1000:1000 --from=tritonserver_build /tmp/tritonbuild/install/backends backends
@@ -1009,6 +1010,11 @@ ENV PATH /opt/tritonserver/bin:${PATH}
     if ('pytorch' in backends) and (target_machine == 'aarch64'):
         pytorch_dependencies = "libgfortran5"
 
+    if target_platform() == 'jetpack':
+        libre2_version = "libre2-4"
+    else:
+        libre2_version = "libre2-5"
+
     df += '''
 ENV TF_ADJUST_HUE_FUSED         1
 ENV TF_ADJUST_SATURATION_FUSED  1
@@ -1037,7 +1043,7 @@ RUN apt-get update && \
             software-properties-common \
             libb64-0d \
             libcurl4-openssl-dev \
-            libre2-5 \
+            {libre2_version} \
             git \
             dirmngr \
             libnuma-dev \
@@ -1046,7 +1052,8 @@ RUN apt-get update && \
     rm -rf /var/lib/apt/lists/*
 '''.format(gpu_enabled=gpu_enabled,
            ort_dependencies=ort_dependencies,
-           pytorch_dependencies=pytorch_dependencies)
+           pytorch_dependencies=pytorch_dependencies,
+           libre2_version=libre2_version)
 
     if enable_gpu:
         df += install_dcgm_libraries(argmap['DCGM_VERSION'], target_machine)
@@ -1151,7 +1158,7 @@ LABEL com.nvidia.build.ref={}
         dfile.write(df)
 
 
-def container_build(images, backends, repoagents, endpoints):
+def container_build(images, backends, repoagents, endpoints, mount_paths):
     # The cmake, build and install directories within the container.
     build_dir = os.path.join(os.sep, 'tmp', 'tritonbuild')
     install_dir = os.path.join(os.sep, 'tmp', 'tritonbuild', 'install')
@@ -1322,6 +1329,8 @@ def container_build(images, backends, repoagents, endpoints):
             ]
         else:
             dockerrunargs += ['-v', '/var/run/docker.sock:/var/run/docker.sock']
+        for path_pair in mount_paths:
+            dockerrunargs += ['-v', "{}:{}".format(path_pair[0], path_pair[1])]
         dockerrunargs += dockerrunenvargs
         dockerrunargs += [
             'tritonserver_buildbase',
@@ -1513,6 +1522,14 @@ if __name__ == '__main__':
         default=None,
         help=
         'Specify library paths for respective backends in build as <backend-name>[:<library_path>].'
+    )
+    parser.add_argument(
+        '--mount-paths',
+        action='append',
+        required=False,
+        default=None,
+        help=
+        'Mount a directory from the host system on the build container as <host_path>:<container_path>.'
     )
     parser.add_argument(
         '--build-type',
@@ -1714,6 +1731,8 @@ if __name__ == '__main__':
         FLAGS.repoagent = []
     if FLAGS.library_paths is None:
         FLAGS.library_paths = []
+    if FLAGS.mount_paths is None:
+        FLAGS.mount_paths = []
     if FLAGS.extra_core_cmake_arg is None:
         FLAGS.extra_core_cmake_arg = []
     if FLAGS.override_core_cmake_arg is None:
@@ -1806,6 +1825,15 @@ if __name__ == '__main__':
             log('backend "{}" library path "{}"'.format(parts[0], parts[1]))
             library_paths[parts[0]] = parts[1]
 
+    # Initialize mount paths for build container.
+    mount_paths = []
+    for lpath in FLAGS.mount_paths:
+        parts = lpath.split(':')
+        if len(parts) == 2:
+            log('mounting host path "{}" in container as "{}"'.format(
+                parts[0], parts[1]))
+            mount_paths.append((parts[0], parts[1]))
+
     # Parse any explicitly specified cmake arguments
     for cf in FLAGS.extra_core_cmake_arg:
         parts = cf.split('=')
@@ -1870,7 +1898,8 @@ if __name__ == '__main__':
     if not FLAGS.no_container_build:
         import docker
 
-        container_build(images, backends, repoagents, FLAGS.endpoint)
+        container_build(images, backends, repoagents, FLAGS.endpoint,
+                        mount_paths)
         sys.exit(0)
 
     # If there is a container pre-build command assume this invocation
