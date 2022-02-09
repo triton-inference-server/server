@@ -973,12 +973,10 @@ LABEL com.amazonaws.sagemaker.capabilities.accept-bind-to-port=true
 COPY --chown=1000:1000 --from=tritonserver_build /workspace/build/sagemaker/serve /usr/bin/.
 '''
 
-    for noncore in (NONCORE_BACKENDS + EXAMPLE_BACKENDS):
-        if noncore in backends:
-            df += '''
+    if set(backends.keys()) & (NONCORE_BACKENDS + EXAMPLE_BACKENDS):
+        df += '''
 COPY --chown=1000:1000 --from=tritonserver_build /tmp/tritonbuild/install/backends backends
 '''
-            break
 
     if len(repoagents) > 0:
         df += '''
@@ -1138,12 +1136,10 @@ COPY --from=tritonserver_build /tmp/tritonbuild/install/lib/tritonserver.lib lib
 COPY --from=tritonserver_build /tmp/tritonbuild/install/include/triton/core include/triton/core
 '''
 
-    for noncore in NONCORE_BACKENDS:
-        if noncore in backends:
-            df += '''
+    if set(backends.keys()) & (NONCORE_BACKENDS + EXAMPLE_BACKENDS):
+        df += '''
 COPY --from=tritonserver_build /tmp/tritonbuild/install/backends backends
 '''
-            break
 
     df += '''
 ENTRYPOINT []
