@@ -27,12 +27,12 @@
 
 # Set up test files based on installation instructions
 # https://github.com/bytedeco/javacpp-presets/blob/master/tritonserver/README.md
-rm -r javacpp-presets
-git clone https://github.com/bytedeco/javacpp-presets.git
-cd javacpp-presets
-mvn clean install --projects .,tritonserver
-mvn clean install -f platform --projects ../tritonserver/platform -Djavacpp.platform.host
-cd ..
+# rm -r javacpp-presets
+# git clone https://github.com/bytedeco/javacpp-presets.git
+# cd javacpp-presets
+# mvn clean install --projects .,tritonserver
+# mvn clean install -f platform --projects ../tritonserver/platform -Djavacpp.platform.host
+# cd ..
 
 MODEL_REPO=`pwd`/../L0_simple_ensemble/models
 SAMPLES_REPO=`pwd`/javacpp-presets/tritonserver/samples
@@ -44,7 +44,7 @@ rm -f *.log
 RET=0
 
 # Run with default settings
-$BASE_COMMAND -Dexec.args="-r $MODEL_REPO" >>client.log 2>&1
+$BASE_COMMAND -Dexec.args="-r $MODEL_REPO -i 1000000" >>client.log 2>&1
 if [ $? -ne 0 ]; then
     RET=1
 fi

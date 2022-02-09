@@ -109,6 +109,7 @@ public class Simple {
       }
 
       System.err.println("Usage: java " + Simple.class.getSimpleName() + " [options]");
+      System.err.println("\t-i Set number of iterations");
       System.err.println("\t-m <\"system\"|\"pinned\"|gpu>"
                        + " Enforce the memory type for input and output tensors."
                        + " If not specified, inputs will be in system memory and outputs"
@@ -795,14 +796,23 @@ public class Simple {
     public static void
     main(String[] args) throws Exception
     {
-
+      int num_iterations = 1000000;
       String model_repository_path = null;
       int verbose_level = 0;
 
       // Parse commandline...
       for (int i = 0; i < args.length; i++) {
         switch (args[i]) {
-          case "-m": {
+          case "-i":
+            i++;
+            try {
+              num_iterations = Integer.parseInt(args[i]);
+            } catch (NumberFormatException e){
+              Usage(
+                  "-i must be used to specify number of iterations");
+            }
+            break;
+          case "-m":
             enforce_memory_type = true;
             i++;
             if (args[i].equals("system")) {
@@ -817,7 +827,6 @@ public class Simple {
                   " <\"system\"|\"pinned\"|gpu>");
             }
             break;
-          }
           case "-r":
             model_repository_path = args[++i];
             break;
@@ -1005,7 +1014,7 @@ public class Simple {
       Thread memory_thread = new Thread(runnable);
       memory_thread.start();
 
-      for(int i = 0; i < 1000000; i++){
+      for(int i = 0; i < num_iterations; i++){
         RunInference(server, model_name, is_int, is_torch_model);
       }
       
