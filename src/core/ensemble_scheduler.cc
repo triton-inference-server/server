@@ -1,4 +1,4 @@
-// Copyright (c) 2019-2022, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+// Copyright 2019-2022, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 //
 // Redistribution and use in source and binary forms, with or without
 // modification, are permitted provided that the following conditions
@@ -1200,8 +1200,8 @@ EnsembleContext::ScheduleSteps(
     step->ctx_ = context;
     bool should_schedule = false;
     // Must release lock before InferAsync to avoid deadlock, as the same thread
-    // will be calling request/response callbacks which will attempt to acquire
-    // the lock already held
+    // will be calling request/response callbacks on cache hits, which will
+    // attempt to acquire the lock already held
     {
       std::lock_guard<std::mutex> lock(context->mutex_);
 
