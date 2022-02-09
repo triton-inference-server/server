@@ -1,4 +1,4 @@
-// Copyright (c) 2021, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+// Copyright 2021-2022, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 //
 // Redistribution and use in source and binary forms, with or without
 // modification, are permitted provided that the following conditions
@@ -537,7 +537,7 @@ TEST_F(RequestResponseCacheTest, TestEviction)
   std::memcpy(buffer, output0.data(), output_size);
 
   std::cout << "Lookup hash0 in empty cache" << std::endl;
-  auto status = cache->Lookup(hash0, nullptr);
+  auto status = cache->Lookup(hash0, nullptr, &request0);
   // This hash not in cache yet
   ASSERT_FALSE(status.IsOk())
       << "hash [" + std::to_string(hash0) + "] should not be in cache";
@@ -625,7 +625,7 @@ TEST_F(RequestResponseCacheTest, TestEndToEnd)
   std::memcpy(buffer, output0.data(), output_size);
 
   std::cout << "Lookup hash0 in empty cache" << std::endl;
-  auto status = cache->Lookup(hash0, nullptr);
+  auto status = cache->Lookup(hash0, nullptr, &request0);
   // This hash not in cache yet
   ASSERT_FALSE(status.IsOk())
       << "hash [" + std::to_string(hash0) + "] should not be in cache";
@@ -646,7 +646,7 @@ TEST_F(RequestResponseCacheTest, TestEndToEnd)
 
   // Lookup should now succeed
   std::cout << "Lookup hash0 in cache after insertion" << std::endl;
-  check_status(cache->Lookup(hash0, response_test.get()));
+  check_status(cache->Lookup(hash0, response_test.get(), &request0));
 
   // Fetch output buffer details
   const void* response_buffer = nullptr;
@@ -876,23 +876,23 @@ TEST_F(RequestResponseCacheTest, TestLRU)
 
   // Verify items 0, 1, 2, in cache
   reset_response(&response_test, &request0);
-  check_status(cache->Lookup(0, response_test.get()));
+  check_status(cache->Lookup(0, response_test.get(), &request0));
   reset_response(&response_test, &request0);
-  check_status(cache->Lookup(1, response_test.get()));
+  check_status(cache->Lookup(1, response_test.get(), &request0));
   reset_response(&response_test, &request0);
-  check_status(cache->Lookup(2, response_test.get()));
+  check_status(cache->Lookup(2, response_test.get(), &request0));
 
   // Evict item from cache, should be item 0 since it was looked up last
   cache->Evict();
   // Assert Lookup for item 0 fails but items 1, 2 succeed
   reset_response(&response_test, &request0);
   ni::Status status;
-  status = cache->Lookup(0, response_test.get());
+  status = cache->Lookup(0, response_test.get(), &request0);
   ASSERT_FALSE(status.IsOk());
   reset_response(&response_test, &request0);
-  check_status(cache->Lookup(1, response_test.get()));
+  check_status(cache->Lookup(1, response_test.get(), &request0));
   reset_response(&response_test, &request0);
-  check_status(cache->Lookup(2, response_test.get()));
+  check_status(cache->Lookup(2, response_test.get(), &request0));
 
   // Insert item 3, 4
   check_status(cache->Insert(3, *response0));
@@ -902,25 +902,25 @@ TEST_F(RequestResponseCacheTest, TestLRU)
   cache->Evict();
   cache->Evict();
   reset_response(&response_test, &request0);
-  status = cache->Lookup(1, response_test.get());
+  status = cache->Lookup(1, response_test.get(), &request0);
   ASSERT_FALSE(status.IsOk());
   reset_response(&response_test, &request0);
-  status = cache->Lookup(2, response_test.get());
+  status = cache->Lookup(2, response_test.get(), &request0);
   ASSERT_FALSE(status.IsOk());
 
   // Lookup items 3 and 4
   reset_response(&response_test, &request0);
-  check_status(cache->Lookup(3, response_test.get()));
+  check_status(cache->Lookup(3, response_test.get(), &request0));
   reset_response(&response_test, &request0);
-  check_status(cache->Lookup(4, response_test.get()));
+  check_status(cache->Lookup(4, response_test.get(), &request0));
 
   // Evict, assert item 3 was evicted
   cache->Evict();
   reset_response(&response_test, &request0);
-  status = cache->Lookup(3, response_test.get());
+  status = cache->Lookup(3, response_test.get(), &request0);
   ASSERT_FALSE(status.IsOk());
   reset_response(&response_test, &request0);
-  check_status(cache->Lookup(4, response_test.get()));
+  check_status(cache->Lookup(4, response_test.get(), &request0));
 }
 
 // Test looking up from cache with multiple threads in parallel
@@ -1000,7 +1000,7 @@ TEST_F(RequestResponseCacheTest, TestParallelLookup)
   for (size_t idx = 0; idx < thread_count; idx++) {
     threads.emplace_back(std::thread(
         &ni::RequestResponseCache::Lookup, cache.get(), idx,
-        responses[idx].get()));
+        responses[idx].get(), &request0));
   }
 
   // Join threads

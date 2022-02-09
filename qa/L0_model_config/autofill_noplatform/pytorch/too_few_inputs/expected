@@ -1,1 +1,1 @@
-model configuration must contain at least one input, none were specified
+unable to load model 'too_few_inputs', configuration expects 0 inputs, model provides 2

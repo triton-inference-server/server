@@ -1,6 +1,6 @@
 #!/usr/bin/python
 
-# Copyright (c) 2019-2020, NVIDIA CORPORATION. All rights reserved.
+# Copyright 2019-2022, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -136,14 +136,11 @@ def summarize(frontend, traces):
 
     # Filter the trace that is not for the requested frontend
     match_frontend_id_set = set()
-    # Filter the trace that is not meaningful and group them by 'id'
-    filtered_traces = dict()
     for trace in traces:
         if "id" not in trace:
             continue
 
         # Trace without a parent must contain frontend timestamps
-        add_trace = False
         if "parent_id" not in trace:
             if frontend.filter_timestamp is None:
                 continue
@@ -151,14 +148,16 @@ def summarize(frontend, traces):
                 for ts in trace["timestamps"]:
                     if frontend.filter_timestamp in ts["name"]:
                         match_frontend_id_set.add(trace["id"])
-            if trace["id"] in match_frontend_id_set:
-                add_trace = True
         # Otherwise need to check whether parent is filtered
         elif trace["parent_id"] in match_frontend_id_set:
             match_frontend_id_set.add(trace["id"])
-            add_trace = True
 
-        if add_trace:
+    # Filter the trace that is not meaningful and group them by 'id'
+    filtered_traces = dict()
+    for trace in traces:
+        if "id" not in trace:
+            continue
+        if trace["id"] in match_frontend_id_set:
             if (trace['id'] in filtered_traces.keys()):
                 rep_trace = filtered_traces[trace['id']]
                 # Apend the timestamp to the trace representing this 'id'
@@ -252,7 +251,7 @@ def summarize(frontend, traces):
             print("\t\tCompute (avg): {}us".format(
                 model_span_map[key]["COMPUTE"] / (cnt * 1000)))
         if ("COMPUTE_INPUT" in model_span_map[key]
-            ) and "COMPUTE_OUTPUT" in model_span_map[key]:
+           ) and "COMPUTE_OUTPUT" in model_span_map[key]:
             print("\t\t\tInput (avg): {}us".format(
                 model_span_map[key]["COMPUTE_INPUT"] / (cnt * 1000)))
             print("\t\t\tInfer (avg): {}us".format(
@@ -296,20 +295,14 @@ def summarize_dataflow(traces):
     # {3: {4: {7: None}, 5: None, 6: None}}
     dataflow_tree_map = dict()
     depth = [0]
-    append_dataflow_tensor(dataflow_tree_map,
-                           first_parent_id,
-                           dataflow_parent_map,
-                           traces,
-                           depth)
+    append_dataflow_tensor(dataflow_tree_map, first_parent_id,
+                           dataflow_parent_map, traces, depth)
 
     print_dataflow_tensor(dataflow_tree_map, traces, depth[0], step=0)
 
 
-def append_dataflow_tensor(dataflow_tensor_map,
-                           parent_id,
-                           dataflow_tree_map,
-                           traces,
-                           depth):
+def append_dataflow_tensor(dataflow_tensor_map, parent_id, dataflow_tree_map,
+                           traces, depth):
     if parent_id not in dataflow_tree_map:
         dataflow_tensor_map[parent_id] = None
         return
@@ -320,8 +313,8 @@ def append_dataflow_tensor(dataflow_tensor_map,
 
     child_ids = dataflow_tree_map[parent_id]
     for child_id in child_ids:
-        append_dataflow_tensor(child_tensor_map, child_id,
-                               dataflow_tree_map, traces, depth)
+        append_dataflow_tensor(child_tensor_map, child_id, dataflow_tree_map,
+                               traces, depth)
 
 
 def print_dataflow_tensor(dataflow_tree_map, traces, depth, step):
@@ -331,44 +324,48 @@ def print_dataflow_tensor(dataflow_tree_map, traces, depth, step):
         if dataflow_tree_map[parent_id] is None:
             continue
 
-        print_dataflow_tensor(
-            dataflow_tree_map[parent_id], traces, depth, step+1)
+        print_dataflow_tensor(dataflow_tree_map[parent_id], traces, depth,
+                              step + 1)
 
 
 def print_tensor_by_id(id, traces, depth, step):
     if id == 0:
         return
 
-    tabs = "\t"*(step+1)
+    tabs = "\t" * (step + 1)
 
-    print("{0}{1}".format(tabs, "="*(50+8*(depth-step))))
+    print("{0}{1}".format(tabs, "=" * (50 + 8 * (depth - step))))
     for trace in traces:
         # print model name and version
-        if "id" in trace and "model_name" in trace and "model_version" in trace and "timestamps" in trace and trace["id"] == id:
-            print("{0}Name:   {1}".format(
-                tabs, trace["model_name"]))
-            print("{0}Version:{1}".format(
-                tabs, trace["model_version"]))
+        if "id" in trace and "model_name" in trace and "model_version" in trace and "timestamps" in trace and trace[
+                "id"] == id:
+            print("{0}Name:   {1}".format(tabs, trace["model_name"]))
+            print("{0}Version:{1}".format(tabs, trace["model_version"]))
         # print data
         if "id" in trace and "activity" in trace:
             if trace["id"] == id and trace["activity"] == "TENSOR_QUEUE_INPUT":
                 print("{0}{1}:".format(tabs, "QUEUE_INPUT"))
                 print("{0}\t{1}: {2}".format(tabs, trace["tensor"]["name"],
-                      get_numpy_array(trace["tensor"])))
-            elif trace["id"] == id and trace["activity"] == "TENSOR_BACKEND_INPUT":
+                                             get_numpy_array(trace["tensor"])))
+            elif trace["id"] == id and trace[
+                    "activity"] == "TENSOR_BACKEND_INPUT":
                 print("{0}{1}:".format(tabs, "BACKEND_INPUT"))
                 print("{0}\t{1}: {2}".format(tabs, trace["tensor"]["name"],
-                      get_numpy_array(trace["tensor"])))
-            elif trace["id"] == id and trace["activity"] == "TENSOR_BACKEND_OUTPUT":
+                                             get_numpy_array(trace["tensor"])))
+            elif trace["id"] == id and trace[
+                    "activity"] == "TENSOR_BACKEND_OUTPUT":
                 print("{0}{1}:".format(tabs, "BACKEND_OUTPUT"))
                 print("{0}\t{1}: {2}".format(tabs, trace["tensor"]["name"],
-                      get_numpy_array(trace["tensor"])))
-    print("{0}{1}".format(tabs, "="*(50+8*(depth-step))))
+                                             get_numpy_array(trace["tensor"])))
+    print("{0}{1}".format(tabs, "=" * (50 + 8 * (depth - step))))
 
 
 def find_first_id_with_tensor(traces):
     for trace in traces:
-        if "activity" in trace and (trace["activity"] == "TENSOR_QUEUE_INPUT" or trace["activity"] == "TENSOR_BACKEND_INPUT" or trace["activity"] == "TENSOR_BACKEND_OUTPUT"):
+        if "activity" in trace and (
+                trace["activity"] == "TENSOR_QUEUE_INPUT" or
+                trace["activity"] == "TENSOR_BACKEND_INPUT" or
+                trace["activity"] == "TENSOR_BACKEND_OUTPUT"):
             return trace["id"]
     return 0
 

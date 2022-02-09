@@ -1,4 +1,4 @@
-// Copyright 2019-2021, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+// Copyright 2019-2022, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 //
 // Redistribution and use in source and binary forms, with or without
 // modification, are permitted provided that the following conditions
@@ -60,6 +60,17 @@ extern "C" {
 #endif  // TRITON_ENABLE_TRACING
 
 namespace nvidia { namespace inferenceserver {
+
+#define HTTP_RESPOND_IF_ERR(REQ, X)                   \
+  do {                                                \
+    TRITONSERVER_Error* err__ = (X);                  \
+    if (err__ != nullptr) {                           \
+      EVBufferAddErrorJson((REQ)->buffer_out, err__); \
+      evhtp_send_reply((REQ), EVHTP_RES_BADREQ);      \
+      TRITONSERVER_ErrorDelete(err__);                \
+      return;                                         \
+    }                                                 \
+  } while (false)
 
 TRITONSERVER_Error*
 HTTPServer::Start()
@@ -940,13 +951,14 @@ HTTPAPIServer::HTTPAPIServer(
       trace_manager_(trace_manager), shm_manager_(shm_manager),
       allocator_(nullptr), server_regex_(R"(/v2(?:/health/(live|ready))?)"),
       model_regex_(
-          R"(/v2/models/([^/]+)(?:/versions/([0-9]+))?(?:/(infer|ready|config|stats))?)"),
+          R"(/v2/models/([^/]+)(?:/versions/([0-9]+))?(?:/(infer|ready|config|stats|trace/setting))?)"),
       modelcontrol_regex_(
           R"(/v2/repository(?:/([^/]+))?/(index|models/([^/]+)/(load|unload)))"),
       systemsharedmemory_regex_(
           R"(/v2/systemsharedmemory(?:/region/([^/]+))?/(status|register|unregister))"),
       cudasharedmemory_regex_(
-          R"(/v2/cudasharedmemory(?:/region/([^/]+))?/(status|register|unregister))")
+          R"(/v2/cudasharedmemory(?:/region/([^/]+))?/(status|register|unregister))"),
+      trace_regex_(R"(/v2/trace/setting)")
 {
   // FIXME, don't cache server metadata. The http endpoint should
   // not be deciding that server metadata will not change during
@@ -1491,6 +1503,197 @@ HTTPAPIServer::HandleModelStats(
     evhtp_send_reply(req, EVHTP_RES_BADREQ);
     TRITONSERVER_ErrorDelete(err);
   }
+}
+
+void
+HTTPAPIServer::HandleTrace(evhtp_request_t* req, const std::string& model_name)
+{
+  if ((req->method != htp_method_GET) && (req->method != htp_method_POST)) {
+    evhtp_send_reply(req, EVHTP_RES_METHNALLOWED);
+    return;
+  }
+
+  evhtp_headers_add_header(
+      req->headers_out,
+      evhtp_header_new(kContentTypeHeader, "application/json", 1, 1));
+
+#ifdef TRITON_ENABLE_TRACING
+  TRITONSERVER_InferenceTraceLevel level = TRITONSERVER_TRACE_LEVEL_DISABLED;
+  uint32_t rate;
+  int32_t count;
+  uint32_t log_frequency;
+  std::string filepath;
+
+  // Perform trace setting update if requested
+  if (req->method == htp_method_POST) {
+    struct evbuffer_iovec* v = nullptr;
+    int v_idx = 0;
+    int n = evbuffer_peek(req->buffer_in, -1, NULL, NULL, 0);
+    if (n > 0) {
+      v = static_cast<struct evbuffer_iovec*>(
+          alloca(sizeof(struct evbuffer_iovec) * n));
+      if (evbuffer_peek(req->buffer_in, -1, NULL, v, n) != n) {
+        HTTP_RESPOND_IF_ERR(
+            req, TRITONSERVER_ErrorNew(
+                     TRITONSERVER_ERROR_INTERNAL,
+                     "unexpected error getting trace request buffers"));
+      }
+    }
+
+    triton::common::TritonJson::Value request;
+    size_t buffer_len = evbuffer_get_length(req->buffer_in);
+    HTTP_RESPOND_IF_ERR(
+        req, EVBufferToJson(&request, v, &v_idx, buffer_len, n));
+
+    TraceManager::NewSetting new_setting;
+
+    triton::common::TritonJson::Value setting_json;
+    if (request.Find("trace_file", &setting_json)) {
+      if (setting_json.IsNull()) {
+        new_setting.clear_filepath_ = true;
+      } else {
+        HTTP_RESPOND_IF_ERR(req, setting_json.AsString(&filepath));
+        new_setting.filepath_ = &filepath;
+      }
+    }
+    if (request.Find("trace_level", &setting_json)) {
+      if (setting_json.IsNull()) {
+        new_setting.clear_level_ = true;
+      } else {
+        triton::common::TritonJson::Value level_array;
+        HTTP_RESPOND_IF_ERR(
+            req, request.MemberAsArray("trace_level", &level_array));
+        for (size_t i = 0; i < level_array.ArraySize(); ++i) {
+          std::string level_str;
+          HTTP_RESPOND_IF_ERR(req, level_array.IndexAsString(i, &level_str));
+          if (level_str == "OFF") {
+            if (level_array.ArraySize() == 1) {
+              level = TRITONSERVER_TRACE_LEVEL_DISABLED;
+              new_setting.level_ = &level;
+            } else {
+              HTTP_RESPOND_IF_ERR(
+                  req, TRITONSERVER_ErrorNew(
+                           TRITONSERVER_ERROR_INVALID_ARG,
+                           "Expect only one trace level 'OFF' is specified"));
+            }
+          } else if (level_str == "TIMESTAMPS") {
+            level = static_cast<TRITONSERVER_InferenceTraceLevel>(
+                level | TRITONSERVER_TRACE_LEVEL_TIMESTAMPS);
+            new_setting.level_ = &level;
+          } else if (level_str == "TENSORS") {
+            level = static_cast<TRITONSERVER_InferenceTraceLevel>(
+                level | TRITONSERVER_TRACE_LEVEL_TENSORS);
+            new_setting.level_ = &level;
+          }
+        }
+      }
+    }
+    if (request.Find("trace_rate", &setting_json)) {
+      if (setting_json.IsNull()) {
+        new_setting.clear_rate_ = true;
+      } else {
+        std::string rate_str;
+        HTTP_RESPOND_IF_ERR(req, setting_json.AsString(&rate_str));
+        try {
+          rate = std::stoi(rate_str);
+          new_setting.rate_ = &rate;
+        }
+        catch (const std::invalid_argument& ia) {
+          HTTP_RESPOND_IF_ERR(
+              req, TRITONSERVER_ErrorNew(
+                       TRITONSERVER_ERROR_INVALID_ARG,
+                       (std::string("Unable to parse 'trace_rate', got: ") +
+                        rate_str)
+                           .c_str()));
+        }
+      }
+    }
+    if (request.Find("trace_count", &setting_json)) {
+      if (setting_json.IsNull()) {
+        new_setting.clear_count_ = true;
+      } else {
+        std::string count_str;
+        HTTP_RESPOND_IF_ERR(req, setting_json.AsString(&count_str));
+        try {
+          count = std::stoi(count_str);
+          new_setting.count_ = &count;
+        }
+        catch (const std::invalid_argument& ia) {
+          HTTP_RESPOND_IF_ERR(
+              req, TRITONSERVER_ErrorNew(
+                       TRITONSERVER_ERROR_INVALID_ARG,
+                       (std::string("Unable to parse 'trace_count', got: ") +
+                        count_str)
+                           .c_str()));
+        }
+      }
+    }
+    if (request.Find("log_frequency", &setting_json)) {
+      if (setting_json.IsNull()) {
+        new_setting.clear_log_frequency_ = true;
+      } else {
+        std::string frequency_str;
+        HTTP_RESPOND_IF_ERR(req, setting_json.AsString(&frequency_str));
+        try {
+          log_frequency = std::stoi(frequency_str);
+          new_setting.log_frequency_ = &log_frequency;
+        }
+        catch (const std::invalid_argument& ia) {
+          HTTP_RESPOND_IF_ERR(
+              req, TRITONSERVER_ErrorNew(
+                       TRITONSERVER_ERROR_INVALID_ARG,
+                       (std::string("Unable to parse 'log_frequency', got: ") +
+                        frequency_str)
+                           .c_str()));
+        }
+      }
+    }
+    HTTP_RESPOND_IF_ERR(
+        req, trace_manager_->UpdateTraceSetting(model_name, new_setting));
+  }
+
+  // Get current trace setting, this is needed even if the setting
+  // has been updated above as some values may not be provided in the request.
+  trace_manager_->GetTraceSetting(
+      model_name, &level, &rate, &count, &log_frequency, &filepath);
+  triton::common::TritonJson::Value trace_response(
+      triton::common::TritonJson::ValueType::OBJECT);
+  // level
+  {
+    triton::common::TritonJson::Value level_array(
+        triton::common::TritonJson::ValueType::ARRAY);
+    if (level == TRITONSERVER_TRACE_LEVEL_DISABLED) {
+      HTTP_RESPOND_IF_ERR(req, level_array.AppendString("OFF"));
+    } else {
+      if (level & TRITONSERVER_TRACE_LEVEL_TIMESTAMPS) {
+        HTTP_RESPOND_IF_ERR(req, level_array.AppendString("TIMESTAMPS"));
+      }
+      if (level & TRITONSERVER_TRACE_LEVEL_TENSORS) {
+        HTTP_RESPOND_IF_ERR(req, level_array.AppendString("TENSORS"));
+      }
+    }
+    HTTP_RESPOND_IF_ERR(
+        req, trace_response.Add("trace_level", std::move(level_array)));
+  }
+  HTTP_RESPOND_IF_ERR(
+      req, trace_response.AddString("trace_rate", std::to_string(rate)));
+  HTTP_RESPOND_IF_ERR(
+      req, trace_response.AddString("trace_count", std::to_string(count)));
+  HTTP_RESPOND_IF_ERR(
+      req,
+      trace_response.AddString("log_frequency", std::to_string(log_frequency)));
+  HTTP_RESPOND_IF_ERR(req, trace_response.AddString("trace_file", filepath));
+
+  triton::common::TritonJson::WriteBuffer buffer;
+  HTTP_RESPOND_IF_ERR(req, trace_response.Write(&buffer));
+  evbuffer_add(req->buffer_out, buffer.Base(), buffer.Size());
+  evhtp_send_reply(req, EVHTP_RES_OK);
+#else
+  HTTP_RESPOND_IF_ERR(
+      req, TRITONSERVER_ErrorNew(
+               TRITONSERVER_ERROR_UNAVAILABLE,
+               "the server does not suppport tracing"));
+#endif
 }
 
 void
@@ -2189,23 +2392,22 @@ HTTPAPIServer::HandleInfer(
   }
 
   // If tracing is enabled see if this request should be traced.
-  TRITONSERVER_InferenceTrace* trace = nullptr;
+  TRITONSERVER_InferenceTrace* triton_trace = nullptr;
+  std::shared_ptr<TraceManager::Trace> trace;
 #ifdef TRITON_ENABLE_TRACING
-  uint64_t trace_id = 0;
-  if ((err == nullptr) && (trace_manager_ != nullptr)) {
-    trace = trace_manager_->SampleTrace();
+  if (err == nullptr) {
+    trace = std::move(trace_manager_->SampleTrace(model_name));
     if (trace != nullptr) {
-      TRITONSERVER_InferenceTraceId(trace, &trace_id);
+      triton_trace = trace->trace_;
 
       // Timestamps from evhtp are capture in 'req'. We record here
       // since this is the first place where we have access to trace
       // manager.
-      trace_manager_->CaptureTimestamp(
-          trace_id, TRITONSERVER_TRACE_LEVEL_TIMESTAMPS, "HTTP_RECV_START",
-          req->recv_start_ns);
-      trace_manager_->CaptureTimestamp(
-          trace_id, TRITONSERVER_TRACE_LEVEL_TIMESTAMPS, "HTTP_RECV_END",
-          req->recv_end_ns);
+      trace->CaptureTimestamp("HTTP_RECV_START", req->recv_start_ns);
+      // [FIXME] the 'recv_end_ns' timestamp is not captured properly in
+      // evhtp Triton patch, WAR is to capture the current timestamp
+      trace->CaptureTimestamp(
+          "HTTP_RECV_END", TraceManager::CaptureTimestamp());
     }
   }
 #endif  // TRITON_ENABLE_TRACING
@@ -2281,8 +2483,7 @@ HTTPAPIServer::HandleInfer(
 
     auto infer_request = CreateInferRequest(req);
 #ifdef TRITON_ENABLE_TRACING
-    infer_request->trace_manager_ = trace_manager_;
-    infer_request->trace_id_ = trace_id;
+    infer_request->trace_ = trace;
 #endif  // TRITON_ENABLE_TRACING
 
     if (err == nullptr) {
@@ -2304,7 +2505,11 @@ HTTPAPIServer::HandleInfer(
             reinterpret_cast<void*>(infer_request.get()));
       }
       if (err == nullptr) {
-        err = TRITONSERVER_ServerInferAsync(server_.get(), irequest, trace);
+        err = TRITONSERVER_ServerInferAsync(
+            server_.get(), irequest, triton_trace);
+        if (trace != nullptr) {
+          trace->trace_ = nullptr;
+        }
       }
       if (err == nullptr) {
         infer_request.release();
@@ -2324,6 +2529,11 @@ HTTPAPIServer::HandleInfer(
     }
     TRITONSERVER_ErrorDelete(err);
 
+    // If HTTP server still owns Triton trace
+    if ((trace != nullptr) && (trace->trace_ != nullptr)) {
+      TraceManager::TraceRelease(trace->trace_, trace->trace_userp_);
+    }
+
     LOG_TRITONSERVER_ERROR(
         TRITONSERVER_InferenceRequestDelete(irequest),
         "deleting HTTP/REST inference request");
@@ -2341,13 +2551,10 @@ HTTPAPIServer::OKReplyCallback(evthr_t* thr, void* arg, void* shared)
   evhtp_request_resume(request);
 
 #ifdef TRITON_ENABLE_TRACING
-  if ((infer_request->trace_manager_ != nullptr) &&
-      (infer_request->trace_id_ != 0)) {
-    infer_request->trace_manager_->CaptureTimestamp(
-        infer_request->trace_id_, TRITONSERVER_TRACE_LEVEL_TIMESTAMPS,
+  if (infer_request->trace_ != nullptr) {
+    infer_request->trace_->CaptureTimestamp(
         "HTTP_SEND_START", request->send_start_ns);
-    infer_request->trace_manager_->CaptureTimestamp(
-        infer_request->trace_id_, TRITONSERVER_TRACE_LEVEL_TIMESTAMPS,
+    infer_request->trace_->CaptureTimestamp(
         "HTTP_SEND_END", request->send_end_ns);
   }
 #endif  // TRITON_ENABLE_TRACING
@@ -2366,13 +2573,10 @@ HTTPAPIServer::BADReplyCallback(evthr_t* thr, void* arg, void* shared)
   evhtp_request_resume(request);
 
 #ifdef TRITON_ENABLE_TRACING
-  if ((infer_request->trace_manager_ != nullptr) &&
-      (infer_request->trace_id_ != 0)) {
-    infer_request->trace_manager_->CaptureTimestamp(
-        infer_request->trace_id_, TRITONSERVER_TRACE_LEVEL_TIMESTAMPS,
+  if (infer_request->trace_ != nullptr) {
+    infer_request->trace_->CaptureTimestamp(
         "HTTP_SEND_START", request->send_start_ns);
-    infer_request->trace_manager_->CaptureTimestamp(
-        infer_request->trace_id_, TRITONSERVER_TRACE_LEVEL_TIMESTAMPS,
+    infer_request->trace_->CaptureTimestamp(
         "HTTP_SEND_END", request->send_end_ns);
   }
 #endif  // TRITON_ENABLE_TRACING
@@ -2795,6 +2999,13 @@ HTTPAPIServer::Handle(evhtp_request_t* req)
       // model statistics
       HandleModelStats(req, model_name, version);
       return;
+    } else if (kind == "trace/setting") {
+      // Trace with specific model, there is no specification on versioning
+      // so fall out and return bad request error if version is specified
+      if (version.empty()) {
+        HandleTrace(req, model_name);
+        return;
+      }
     } else if (kind == "") {
       // model metadata
       HandleModelMetadata(req, model_name, version);
@@ -2835,6 +3046,10 @@ HTTPAPIServer::Handle(evhtp_request_t* req)
       HandleRepositoryControl(req, repo_name, model_name, action);
       return;
     }
+  } else if (RE2::FullMatch(std::string(req->uri->path->full), trace_regex_)) {
+    // trace request on global settings
+    HandleTrace(req);
+    return;
   }
 
   LOG_VERBOSE(1) << "HTTP error: " << req->method << " " << req->uri->path->full

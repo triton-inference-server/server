@@ -1,4 +1,4 @@
-// Copyright 2019-2021, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+// Copyright 2019-2022, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 //
 // Redistribution and use in source and binary forms, with or without
 // modification, are permitted provided that the following conditions
@@ -1766,15 +1766,11 @@ TRITONSERVER_ServerNew(
   NVTX_INITIALIZE;
 
 #ifdef TRITON_ENABLE_METRICS
+  // NOTE: Metrics must be enabled before backends are setup
   if (loptions->Metrics()) {
     ni::Metrics::EnableMetrics();
     ni::Metrics::SetMetricsInterval(loptions->MetricsInterval());
   }
-#ifdef TRITON_ENABLE_METRICS_GPU
-  if (loptions->Metrics() && loptions->GpuMetrics()) {
-    ni::Metrics::EnableGPUMetrics();
-  }
-#endif  // TRITON_ENABLE_METRICS_GPU
 #endif  // TRITON_ENABLE_METRICS
 
   lserver->SetId(loptions->ServerId());
@@ -1810,7 +1806,31 @@ TRITONSERVER_ServerNew(
       std::string(), "backend-directory", loptions->BackendDir());
   lserver->SetBackendCmdlineConfig(loptions->BackendCmdlineConfigMap());
 
+  // Initialize server
   ni::Status status = lserver->Init();
+
+
+#ifdef TRITON_ENABLE_METRICS
+  if (loptions->Metrics() && lserver->ResponseCacheEnabled()) {
+    // NOTE: Cache metrics must be enabled after cache initialized in
+    // server->Init()
+    ni::Metrics::EnableCacheMetrics(lserver->GetResponseCache());
+  }
+#ifdef TRITON_ENABLE_METRICS_GPU
+  if (loptions->Metrics() && loptions->GpuMetrics()) {
+    ni::Metrics::EnableGPUMetrics();
+  }
+#endif  // TRITON_ENABLE_METRICS_GPU
+
+  if (loptions->Metrics() &&
+      (lserver->ResponseCacheEnabled() || loptions->GpuMetrics())) {
+    // Start thread to poll enabled metrics periodically
+    ni::Metrics::StartPollingThreadSingleton(lserver->GetResponseCache());
+  }
+#endif  // TRITON_ENABLE_METRICS
+
+
+  // Setup tritonserver options table
   std::vector<std::string> options_headers;
   options_headers.emplace_back("Option");
   options_headers.emplace_back("Value");
@@ -2234,6 +2254,11 @@ TRITONSERVER_ServerModelStatistics(
 
       triton::common::TritonJson::Value inference_stats(
           metadata, triton::common::TritonJson::ValueType::OBJECT);
+      // Compute figures only calculated when not going through cache, so
+      // subtract cache_hit count from success count. Cache hit count will
+      // simply be 0 when cache is disabled.
+      uint64_t compute_count =
+          infer_stats.success_count_ - infer_stats.cache_hit_count_;
       SetDurationStat(
           metadata, inference_stats, "success", infer_stats.success_count_,
           infer_stats.request_duration_ns_);
@@ -2244,14 +2269,17 @@ TRITONSERVER_ServerModelStatistics(
           metadata, inference_stats, "queue", infer_stats.success_count_,
           infer_stats.queue_duration_ns_);
       SetDurationStat(
-          metadata, inference_stats, "compute_input",
-          infer_stats.success_count_, infer_stats.compute_input_duration_ns_);
+          metadata, inference_stats, "compute_input", compute_count,
+          infer_stats.compute_input_duration_ns_);
       SetDurationStat(
-          metadata, inference_stats, "compute_infer",
-          infer_stats.success_count_, infer_stats.compute_infer_duration_ns_);
+          metadata, inference_stats, "compute_infer", compute_count,
+          infer_stats.compute_infer_duration_ns_);
       SetDurationStat(
-          metadata, inference_stats, "compute_output",
-          infer_stats.success_count_, infer_stats.compute_output_duration_ns_);
+          metadata, inference_stats, "compute_output", compute_count,
+          infer_stats.compute_output_duration_ns_);
+      SetDurationStat(
+          metadata, inference_stats, "cache_hit", infer_stats.cache_hit_count_,
+          infer_stats.cache_hit_lookup_duration_ns_);
 
       triton::common::TritonJson::Value batch_stats(
           metadata, triton::common::TritonJson::ValueType::ARRAY);

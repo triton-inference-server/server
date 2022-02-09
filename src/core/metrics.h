@@ -34,12 +34,42 @@
 #include "prometheus/registry.h"
 #include "prometheus/serializer.h"
 #include "prometheus/text_serializer.h"
+#include "src/core/response_cache.h"
 
 #ifdef TRITON_ENABLE_METRICS_GPU
 #include <dcgm_agent.h>
 #endif  // TRITON_ENABLE_METRICS_GPU
 
 namespace nvidia { namespace inferenceserver {
+
+#ifdef TRITON_ENABLE_METRICS_GPU
+struct DcgmMetadata {
+  // DCGM handles for initialization and destruction
+  dcgmHandle_t dcgm_handle_ = 0;
+  dcgmGpuGrp_t groupId_ = 0;
+  // DCGM Flags
+  bool standalone_ = false;
+  // DCGM Fields
+  size_t field_count_ = 0;
+  std::vector<unsigned short> fields_;
+  // GPU Device Mapping
+  std::map<uint32_t, uint32_t> cuda_ids_to_dcgm_ids_;
+  std::vector<uint32_t> available_cuda_gpu_ids_;
+  // Stop attempting metrics if they fail multiple consecutive
+  // times for a device.
+  const int fail_threshold_ = 3;
+  // DCGM Failure Tracking
+  std::vector<int> power_limit_fail_cnt_;
+  std::vector<int> power_usage_fail_cnt_;
+  std::vector<int> energy_fail_cnt_;
+  std::vector<int> util_fail_cnt_;
+  std::vector<int> mem_fail_cnt_;
+  // DCGM Energy Tracking
+  std::vector<unsigned long long> last_energy_;
+  // Track if DCGM handle initialized successfully
+  bool dcgm_initialized_ = false;
+};
+#endif  // TRITON_ENABLE_METRICS_GPU
 
 class Metrics {
  public:
@@ -54,6 +84,14 @@ class Metrics {
 
   // Enable reporting of GPU metrics
   static void EnableGPUMetrics();
+
+  // Enable reporting of Cache metrics
+  static void EnableCacheMetrics(
+      std::shared_ptr<RequestResponseCache> response_cache);
+
+  // Start a thread for polling enabled metrics if any
+  static void StartPollingThreadSingleton(
+      std::shared_ptr<RequestResponseCache> response_cache);
 
   // Set the time interval in secs at which metrics are collected
   static void SetMetricsInterval(uint64_t metrics_interval_ms);
@@ -127,12 +165,26 @@ class Metrics {
   {
     return GetSingleton()->inf_compute_output_duration_us_family_;
   }
+  static prometheus::Family<prometheus::Counter>& FamilyCacheHitCount()
+  {
+    return GetSingleton()->cache_num_hits_model_family_;
+  }
+  static prometheus::Family<prometheus::Counter>& FamilyCacheHitLookupDuration()
+  {
+    return GetSingleton()->cache_hit_lookup_duration_us_model_family_;
+  }
 
  private:
   Metrics();
   virtual ~Metrics();
   static Metrics* GetSingleton();
   bool InitializeDcgmMetrics();
+  bool InitializeCacheMetrics(
+      std::shared_ptr<RequestResponseCache> response_cache);
+  bool StartPollingThread(std::shared_ptr<RequestResponseCache> response_cache);
+  bool PollCacheMetrics(std::shared_ptr<RequestResponseCache> response_cache);
+  bool PollDcgmMetrics();
+
   std::string dcgmValueToErrorMessage(double val);
   std::string dcgmValueToErrorMessage(int64_t val);
 
@@ -151,6 +203,26 @@ class Metrics {
       inf_compute_infer_duration_us_family_;
   prometheus::Family<prometheus::Counter>&
       inf_compute_output_duration_us_family_;
+  // Global Response Cache metrics
+  prometheus::Family<prometheus::Gauge>& cache_num_entries_family_;
+  prometheus::Family<prometheus::Gauge>& cache_num_lookups_family_;
+  prometheus::Family<prometheus::Gauge>& cache_num_hits_family_;
+  prometheus::Family<prometheus::Gauge>& cache_num_misses_family_;
+  prometheus::Family<prometheus::Gauge>& cache_num_evictions_family_;
+  prometheus::Family<prometheus::Gauge>& cache_lookup_duration_us_family_;
+  prometheus::Family<prometheus::Gauge>& cache_util_family_;
+  // Gauges for Global Response Cache metrics
+  prometheus::Gauge* cache_num_entries_global_;
+  prometheus::Gauge* cache_num_lookups_global_;
+  prometheus::Gauge* cache_num_hits_global_;
+  prometheus::Gauge* cache_num_misses_global_;
+  prometheus::Gauge* cache_num_evictions_global_;
+  prometheus::Gauge* cache_lookup_duration_us_global_;
+  prometheus::Gauge* cache_util_global_;
+  // Per-model Response Cache metrics
+  prometheus::Family<prometheus::Counter>& cache_num_hits_model_family_;
+  prometheus::Family<prometheus::Counter>&
+      cache_hit_lookup_duration_us_model_family_;
 #ifdef TRITON_ENABLE_METRICS_GPU
   prometheus::Family<prometheus::Gauge>& gpu_utilization_family_;
   prometheus::Family<prometheus::Gauge>& gpu_memory_total_family_;
@@ -166,16 +238,19 @@ class Metrics {
   std::vector<prometheus::Gauge*> gpu_power_limit_;
   std::vector<prometheus::Counter*> gpu_energy_consumption_;
 
-  dcgmHandle_t dcgm_handle_;
-  std::unique_ptr<std::thread> dcgm_thread_;
-  std::atomic<bool> dcgm_thread_exit_;
-  dcgmGpuGrp_t groupId_;
-  bool standalone_ = false;
+  DcgmMetadata dcgm_metadata_;
 #endif  // TRITON_ENABLE_METRICS_GPU
 
+  // Thread for polling cache/gpu metrics periodically
+  std::unique_ptr<std::thread> poll_thread_;
+  std::atomic<bool> poll_thread_exit_;
   bool metrics_enabled_;
   bool gpu_metrics_enabled_;
+  bool cache_metrics_enabled_;
+  bool poll_thread_started_;
   std::mutex gpu_metrics_enabling_;
+  std::mutex cache_metrics_enabling_;
+  std::mutex poll_thread_starting_;
   uint64_t metrics_interval_ms_;
 };
 
