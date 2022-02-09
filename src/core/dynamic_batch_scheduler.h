@@ -1,4 +1,4 @@
-// Copyright 2018-2021, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+// Copyright 2018-2022, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 //
 // Redistribution and use in source and binary forms, with or without
 // modification, are permitted provided that the following conditions
@@ -73,6 +73,8 @@ class DynamicBatchScheduler : public Scheduler {
 
   // \see Scheduler::Enqueue()
   Status Enqueue(std::unique_ptr<InferenceRequest>& request) override;
+
+  MetricModelReporter* MetricReporter() const { return reporter_.get(); }
 
  private:
   DynamicBatchScheduler(
@@ -153,6 +155,9 @@ class DynamicBatchScheduler : public Scheduler {
       completion_queue_;
   // Lock to protect the completion_queues_
   std::mutex completion_queue_mtx_;
+
+  // Reporter for metrics, or nullptr if no metrics should be reported
+  std::shared_ptr<MetricModelReporter> reporter_;
 };
 
 }}  // namespace nvidia::inferenceserver

@@ -1,4 +1,4 @@
-// Copyright (c) 2020, NVIDIA CORPORATION. All rights reserved.
+// Copyright 2020-2022, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 //
 // Redistribution and use in source and binary forms, with or without
 // modification, are permitted provided that the following conditions
@@ -51,7 +51,8 @@ class InferenceStatsAggregator {
         : failure_count_(0), failure_duration_ns_(0), success_count_(0),
           request_duration_ns_(0), queue_duration_ns_(0),
           compute_input_duration_ns_(0), compute_infer_duration_ns_(0),
-          compute_output_duration_ns_(0)
+          compute_output_duration_ns_(0), cache_hit_count_(0),
+          cache_hit_lookup_duration_ns_(0)
     {
     }
     uint64_t failure_count_;
@@ -63,6 +64,10 @@ class InferenceStatsAggregator {
     uint64_t compute_input_duration_ns_;
     uint64_t compute_infer_duration_ns_;
     uint64_t compute_output_duration_ns_;
+
+    uint64_t cache_hit_count_;
+    // Cache lookup time taken only for cache hits
+    uint64_t cache_hit_lookup_duration_ns_;
   };
 
   struct InferBatchStats {
@@ -113,6 +118,13 @@ class InferenceStatsAggregator {
       const uint64_t compute_input_duration_ns,
       const uint64_t compute_infer_duration_ns,
       const uint64_t compute_output_duration_ns);
+
+  // Add durations to infer stats for a successful cached response.
+  void UpdateSuccessCacheHit(
+      MetricModelReporter* metric_reporter, const size_t batch_size,
+      const uint64_t request_start_ns, const uint64_t queue_start_ns,
+      const uint64_t cache_lookup_start_ns, const uint64_t request_end_ns,
+      const uint64_t cache_lookup_duration_ns);
 
   // Add durations to batch infer stats for a batch execution.
   // 'success_request_count' is the number of sucess requests in the

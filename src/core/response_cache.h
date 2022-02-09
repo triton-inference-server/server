@@ -74,7 +74,8 @@ class RequestResponseCache {
   // Lookup 'key' in cache and return the inference response in 'ptr' on cache
   // hit or nullptr on cache miss Return Status object indicating success or
   // failure.
-  Status Lookup(const uint64_t key, InferenceResponse* ptr);
+  Status Lookup(
+      const uint64_t key, InferenceResponse* ptr, InferenceRequest* request);
   // Insert response into cache, evict entries to make space if necessary
   // Return Status object indicating success or failure.
   Status Insert(const uint64_t key, const InferenceResponse& response);
@@ -87,11 +88,36 @@ class RequestResponseCache {
     std::lock_guard<std::recursive_mutex> lk(cache_mtx_);
     return cache_.size();
   }
-  // Returns number of items evicted in lifespan of cache
+  // Returns number of items evicted in cache lifespan
   size_t NumEvictions()
   {
     std::lock_guard<std::recursive_mutex> lk(cache_mtx_);
     return num_evictions_;
+  }
+  // Returns number of lookups in cache lifespan, should sum to hits + misses
+  size_t NumLookups()
+  {
+    std::lock_guard<std::recursive_mutex> lk(cache_mtx_);
+    return num_lookups_;
+  }
+  // Returns number of cache hits in cache lifespan
+  size_t NumHits()
+  {
+    std::lock_guard<std::recursive_mutex> lk(cache_mtx_);
+    return num_hits_;
+  }
+  // Returns number of cache hits in cache lifespan
+  size_t NumMisses()
+  {
+    std::lock_guard<std::recursive_mutex> lk(cache_mtx_);
+    return num_misses_;
+  }
+  // Returns the total lookup latency (nanoseconds) of all lookups in cache
+  // lifespan
+  uint64_t TotalLookupLatencyNs()
+  {
+    std::lock_guard<std::recursive_mutex> lk(cache_mtx_);
+    return total_lookup_latency_ns_;
   }
   // Returns total number of bytes allocated for cache
   size_t TotalBytes()
@@ -111,7 +137,13 @@ class RequestResponseCache {
     std::lock_guard<std::recursive_mutex> lk(buffer_mtx_);
     return managed_buffer_.get_size() - managed_buffer_.get_free_memory();
   }
-
+  // Returns fraction of bytes allocated over total cache size between [0, 1]
+  double TotalUtilization()
+  {
+    std::lock_guard<std::recursive_mutex> lk(buffer_mtx_);
+    return static_cast<double>(AllocatedBytes()) /
+           static_cast<double>(TotalBytes());
+  }
 
  private:
   explicit RequestResponseCache(const uint64_t cache_size);
@@ -135,8 +167,12 @@ class RequestResponseCache {
   std::unordered_map<uint64_t, CacheEntry> cache_;
   // List of keys sorted from most to least recently used
   std::list<uint64_t> lru_;
-  // Track number of evictions
+  // Cache metrics
   size_t num_evictions_ = 0;
+  size_t num_lookups_ = 0;
+  size_t num_hits_ = 0;
+  size_t num_misses_ = 0;
+  uint64_t total_lookup_latency_ns_ = 0;
   // Mutex for buffer synchronization
   std::recursive_mutex buffer_mtx_;
   // Mutex for cache synchronization
