@@ -72,6 +72,18 @@ DynamicBatchScheduler::DynamicBatchScheduler(
   // caching enabled for model to utilize response cache.
   response_cache_enabled_ =
       (model_->Server()->ResponseCacheEnabled() && response_cache_enable);
+#ifdef TRITON_ENABLE_METRICS
+  // Initialize metric reporter for cache statistics if cache enabled
+  if (response_cache_enabled_) {
+    // The cache isn't tied to any specific model instance or GPU device,
+    // so we use device=-2 to indicate caching for now. -1 is currently
+    // used for CPU
+    const int id = -2;
+    MetricModelReporter::Create(
+        model_->Name(), model_->Version(), id, model_->Config().metric_tags(),
+        &reporter_);
+  }
+#endif  // TRITON_ENABLE_METRICS
   max_preferred_batch_size_ = 0;
   for (const auto size : preferred_batch_sizes_) {
     max_preferred_batch_size_ =
@@ -191,6 +203,8 @@ DynamicBatchScheduler::Enqueue(std::unique_ptr<InferenceRequest>& request)
       // delegated.
       DelegateResponse(request);
     }
+
+    // Send cached response and release request
     InferenceResponse::Send(
         std::move(cached_response), TRITONSERVER_RESPONSE_COMPLETE_FINAL);
     InferenceRequest::Release(
@@ -598,7 +612,7 @@ DynamicBatchScheduler::CacheLookUp(
   // Hash request to get key for cache lookup
   auto status = cache->Hash(*request, &request_hash);
   if (!status.IsOk()) {
-    LOG_ERROR << "Failed to hash input request" << status.Message();
+    LOG_ERROR << "Failed to hash input request: " << status.Message();
     return;
   }
   request->SetCacheKey(request_hash);
@@ -606,9 +620,14 @@ DynamicBatchScheduler::CacheLookUp(
   // Lookup request key in cache
   std::unique_ptr<InferenceResponse> local_response;
   request->ResponseFactory().CreateResponse(&local_response);
-  status = cache->Lookup(request_hash, local_response.get());
+  status = cache->Lookup(request_hash, local_response.get(), request.get());
   if (status.IsOk() && (local_response != nullptr)) {
     cached_response = std::move(local_response);
+#ifdef TRITON_ENABLE_METRICS
+    // Update model metrics/stats on cache hits
+    // Backends will update metrics as normal on cache misses
+    request->ReportStatisticsCacheHit(reporter_.get());
+#endif  // TRITON_ENABLE_METRICS
   }
 }
 

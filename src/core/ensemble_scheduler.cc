@@ -1,4 +1,4 @@
-// Copyright 2019-2021, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+// Copyright 2019-2022, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 //
 // Redistribution and use in source and binary forms, with or without
 // modification, are permitted provided that the following conditions
@@ -1198,6 +1198,10 @@ EnsembleContext::ScheduleSteps(
 {
   for (auto& step : steps) {
     step->ctx_ = context;
+    bool should_schedule = false;
+    // Must release lock before InferAsync to avoid deadlock, as the same thread
+    // will be calling request/response callbacks on cache hits, which will
+    // attempt to acquire the lock already held
     {
       std::lock_guard<std::mutex> lock(context->mutex_);
 
@@ -1205,17 +1209,29 @@ EnsembleContext::ScheduleSteps(
       // is called only once.
       if (context->ensemble_status_.IsOk()) {
         context->request_tracker_->IncrementCounter();
-        context->ensemble_status_ = context->is_->InferAsync(step->request_);
-        if (!context->ensemble_status_.IsOk()) {
-          // The request is not sent to server properly, shouldn't expect its
-          // release function get called.
-          context->request_tracker_->DecrementCounter();
-          context->ensemble_status_ = context->FinishEnsemble();
-          break;
-        }
+        should_schedule = true;
       }
-      step.release();
     }
+    if (should_schedule) {
+      // On a successful call to InferAsync(), the step will be released by
+      // the response callback. When the response callback is invoked, the
+      // step must not own (and release) the request as the request should be
+      // transferred and managed by Triton core. In the case of cache hit, the
+      // request hasn't been transferred and can cause double-free, so moving
+      // the request ownership out of step here to avoid that
+      std::unique_ptr<InferenceRequest> request = std::move(step->request_);
+      auto step_status = context->is_->InferAsync(request);
+      if (!step_status.IsOk()) {
+        std::lock_guard<std::mutex> lock(context->mutex_);
+        context->ensemble_status_ = step_status;
+        // The request is not sent to server properly, shouldn't expect its
+        // release function get called.
+        context->request_tracker_->DecrementCounter();
+        context->ensemble_status_ = context->FinishEnsemble();
+        break;
+      }
+    }
+    step.release();
   }
 }
 
