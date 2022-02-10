@@ -114,9 +114,11 @@ cp -r "/data/inferenceserver/${REPO_VERSION}/qa_ensemble_model_repository/qa_mod
 cp -r "/data/inferenceserver/${REPO_VERSION}/qa_model_repository/${COMPOSING_MODEL}" "${MODEL_DIR}/${COMPOSING_MODEL_CACHE_ENABLED}"
 cp -r "/data/inferenceserver/${REPO_VERSION}/qa_model_repository/${COMPOSING_MODEL}" "${MODEL_DIR}/${COMPOSING_MODEL_CACHE_DISABLED}"
 
-## Remove "name" line from each config to use directory name for simplicity
 for model in ${MODELS}; do
+    # Remove "name" line from each config to use directory name for simplicity
     sed -i "/^name:/d" ${MODEL_DIR}/${model}/config.pbtxt
+    # Add version directory to each model if non-existent
+    mkdir -p "${MODEL_DIR}/${model}/1"
 done
 
 ## Update "model_name" lines in each ensemble model config ensemble steps
@@ -128,12 +130,6 @@ echo "response_cache { enable: True }" >> "${MODEL_DIR}/${ENSEMBLE_MODEL_CACHE_E
 echo "response_cache { enable: False }" >> "${MODEL_DIR}/${ENSEMBLE_MODEL_CACHE_DISABLED}/config.pbtxt"
 echo "response_cache { enable: True }" >> "${MODEL_DIR}/${COMPOSING_MODEL_CACHE_ENABLED}/config.pbtxt"
 echo "response_cache { enable: False }" >> "${MODEL_DIR}/${COMPOSING_MODEL_CACHE_DISABLED}/config.pbtxt"
-
-## Add version directory to each model if non-existent
-mkdir -p "${MODEL_DIR}/${ENSEMBLE_MODEL_CACHE_ENABLED}/1"
-mkdir -p "${MODEL_DIR}/${ENSEMBLE_MODEL_CACHE_DISABLED}/1"
-mkdir -p "${MODEL_DIR}/${COMPOSING_MODEL_CACHE_ENABLED}/1"
-mkdir -p "${MODEL_DIR}/${COMPOSING_MODEL_CACHE_DISABLED}/1"
 
 # Run server
 run_server
