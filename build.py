@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-# Copyright (c) 2020-2021, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright (c) 2020-2022, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -824,10 +824,13 @@ RUN apt-get update && \
     rm -rf /var/lib/apt/lists/*
 
 # Server build requires recent version of CMake (FetchContent required)
-RUN apt remove cmake && \
-    wget https://cmake.org/files/v3.21/cmake-3.21.0.tar.gz && \
-    tar -xf cmake-3.21.0.tar.gz && \
-    cd cmake-3.21.0 && ./configure && make install
+RUN wget -O - https://apt.kitware.com/keys/kitware-archive-latest.asc 2>/dev/null | \
+      gpg --dearmor - | \
+      tee /etc/apt/trusted.gpg.d/kitware.gpg >/dev/null && \
+    apt-add-repository 'deb https://apt.kitware.com/ubuntu/ bionic main' && \
+    apt-get update && \
+    apt-get install -y --no-install-recommends \
+        cmake-data=3.21.0-0kitware1ubuntu18.04.1 cmake=3.21.0-0kitware1ubuntu18.04.1
 '''
         else:
             df += '''
@@ -843,7 +846,7 @@ RUN apt-get update && \
 
 # Server build requires recent version of CMake (FetchContent required)
 RUN wget -O - https://apt.kitware.com/keys/kitware-archive-latest.asc 2>/dev/null | \
-      gpg --dearmor - |  \
+      gpg --dearmor - | \
       tee /etc/apt/trusted.gpg.d/kitware.gpg >/dev/null && \
     apt-add-repository 'deb https://apt.kitware.com/ubuntu/ focal main' && \
     apt-get update && \
