@@ -40,19 +40,6 @@ fi
 
 source ../common/util.sh
 
-# Setup server
-export CUDA_VISIBLE_DEVICES=0
-SERVER=/opt/tritonserver/bin/tritonserver
-# --response-cache-byte-size must be non-zero to test models with cache enabled
-SERVER_ARGS="--model-repository=`pwd`/models --response-cache-byte-size=8192"
-SERVER_LOG="./inference_server.log"
-run_server
-if [ "${SERVER_PID}" == "0" ]; then
-    echo -e "\n***\n*** Failed to start ${SERVER}\n***"
-    cat ${SERVER_LOG}
-    exit 1
-fi
-
 # Setup client/perf_analyzer
 CLIENT_LOG="./perf_analyzer.log"
 PERF_ANALYZER=../clients/perf_analyzer
@@ -100,11 +87,66 @@ function check_cache_output {
     fi
 }
 
+# Setup server
+export CUDA_VISIBLE_DEVICES=0
+SERVER=/opt/tritonserver/bin/tritonserver
+# --response-cache-byte-size must be non-zero to test models with cache enabled
+SERVER_ARGS="--model-repository=`pwd`/models --response-cache-byte-size=8192"
+SERVER_LOG="./inference_server.log"
+
+# Setup model repository from existing qa_model_repository
+rm -f $SERVER_LOG $CLIENT_LOG
+MODEL_DIR="./models"
+rm -fr ${MODEL_DIR} && mkdir ${MODEL_DIR}
+ENSEMBLE_MODEL="simple_onnx_float32_float32_float32"
+COMPOSING_MODEL="onnx_float32_float32_float32"
+ENSEMBLE_MODEL_CACHE_ENABLED="${ENSEMBLE_MODEL}_cache_enabled"
+ENSEMBLE_MODEL_CACHE_DISABLED="${ENSEMBLE_MODEL}_cache_disabled"
+COMPOSING_MODEL_CACHE_ENABLED="${COMPOSING_MODEL}_cache_enabled"
+COMPOSING_MODEL_CACHE_DISABLED="${COMPOSING_MODEL}_cache_disabled"
+MODELS="${ENSEMBLE_MODEL_CACHE_ENABLED} ${ENSEMBLE_MODEL_CACHE_DISABLED} ${COMPOSING_MODEL_CACHE_ENABLED} ${COMPOSING_MODEL_CACHE_DISABLED}"
+
+## Setup ensemble models, one with cache enabled and one with cache disabled
+cp -r "/data/inferenceserver/${REPO_VERSION}/qa_ensemble_model_repository/qa_model_repository/${ENSEMBLE_MODEL}" "${MODEL_DIR}/${ENSEMBLE_MODEL_CACHE_ENABLED}"
+cp -r "/data/inferenceserver/${REPO_VERSION}/qa_ensemble_model_repository/qa_model_repository/${ENSEMBLE_MODEL}" "${MODEL_DIR}/${ENSEMBLE_MODEL_CACHE_DISABLED}"
+
+## Setup composing models, one with cache enabled and one with cache disabled
+cp -r "/data/inferenceserver/${REPO_VERSION}/qa_model_repository/${COMPOSING_MODEL}" "${MODEL_DIR}/${COMPOSING_MODEL_CACHE_ENABLED}"
+cp -r "/data/inferenceserver/${REPO_VERSION}/qa_model_repository/${COMPOSING_MODEL}" "${MODEL_DIR}/${COMPOSING_MODEL_CACHE_DISABLED}"
+
+## Remove "name" line from each config to use directory name for simplicity
+for model in ${MODELS}; do
+    sed -i "/^name:/d" ${MODEL_DIR}/${model}/config.pbtxt
+done
+
+## Update "model_name" lines in each ensemble model config ensemble steps
+sed -i "s/${COMPOSING_MODEL}/${COMPOSING_MODEL_CACHE_ENABLED}/g" "${MODEL_DIR}/${ENSEMBLE_MODEL_CACHE_ENABLED}/config.pbtxt"
+sed -i "s/${COMPOSING_MODEL}/${COMPOSING_MODEL_CACHE_DISABLED}/g" "${MODEL_DIR}/${ENSEMBLE_MODEL_CACHE_DISABLED}/config.pbtxt"
+
+## Append cache config to each model config 
+echo "response_cache { enable: True }" >> "${MODEL_DIR}/${ENSEMBLE_MODEL_CACHE_ENABLED}/config.pbtxt"
+echo "response_cache { enable: False }" >> "${MODEL_DIR}/${ENSEMBLE_MODEL_CACHE_DISABLED}/config.pbtxt"
+echo "response_cache { enable: True }" >> "${MODEL_DIR}/${COMPOSING_MODEL_CACHE_ENABLED}/config.pbtxt"
+echo "response_cache { enable: False }" >> "${MODEL_DIR}/${COMPOSING_MODEL_CACHE_DISABLED}/config.pbtxt"
+
+## Add version directory to each model if non-existent
+mkdir -p "${MODEL_DIR}/${ENSEMBLE_MODEL_CACHE_ENABLED}/1"
+mkdir -p "${MODEL_DIR}/${ENSEMBLE_MODEL_CACHE_DISABLED}/1"
+mkdir -p "${MODEL_DIR}/${COMPOSING_MODEL_CACHE_ENABLED}/1"
+mkdir -p "${MODEL_DIR}/${COMPOSING_MODEL_CACHE_DISABLED}/1"
+
+# Run server
+run_server
+if [ "${SERVER_PID}" == "0" ]; then
+    echo -e "\n***\n*** Failed to start ${SERVER}\n***"
+    cat ${SERVER_LOG}
+    exit 1
+fi
+
 # Run perf_analyzer
 set +e
 RET=0
 PROTOCOLS="http grpc"
-MODELS="identity_onnx_cache_on identity_onnx_cache_off ensemble_identity_onnx_cache_on ensemble_identity_onnx_cache_off"
 for protocol in ${PROTOCOLS}; do
     for model in ${MODELS}; do
 	echo "================================================================"
@@ -115,7 +157,7 @@ for protocol in ${PROTOCOLS}; do
         check_perf_analyzer_error $?
 
 	# Check response cache outputs
-	if [[ ${model} == *"cache_on"* ]]; then
+	if [[ ${model} == *"cache_enabled"* ]]; then
 	  check_cache_output
 	fi
     done;
