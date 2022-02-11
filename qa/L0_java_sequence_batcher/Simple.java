@@ -208,7 +208,6 @@ public class Simple {
       FAIL_IF_ERR(
           TRITONSERVER_InferenceRequestSetCorrelationId(
               irequest, correlation_id), "Unable to set correlation ID");
-      
       if(sequence_start) {
         FAIL_IF_ERR(
             TRITONSERVER_InferenceRequestSetFlags(
@@ -596,14 +595,15 @@ public class Simple {
                 irequest, input0, input0_data, input0_size, requested_memory_type,
                 0 /* memory_type_id */),
             "assigning INPUT0 data");
-      SetSequenceMetadata(irequest, correlation_id, sequence_start, sequence_end);
-      sequence_start = false;
 
       for(int i=0; i < iterations; i++) {
-        if(i == iterations - 1){
-          sequence_end = true;
-          SetSequenceMetadata(irequest, correlation_id, sequence_start, sequence_end);
+        if(i == 1) {
+          sequence_start = false;
         }
+        if(i == iterations - 1) {
+          sequence_end = true;
+        }
+        SetSequenceMetadata(irequest, correlation_id, sequence_start, sequence_end);
         
         p0[0].put(0, i+1);
         // Perform inference...
