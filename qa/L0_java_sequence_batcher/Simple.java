@@ -163,7 +163,7 @@ public class Simple {
 
     static TRITONSERVER_Error
     ParseModelMetadata(
-        JsonObject model_metadata, boolean[] is_int,
+        JsonObject model_metadata,
         boolean[] is_torch_model)
     {
       String seen_data_type = null;
@@ -195,7 +195,6 @@ public class Simple {
         }
       }
 
-      is_int[0] = seen_data_type.equals("INT32");
       is_torch_model[0] =
           model_metadata.get("platform").getAsString().equals("pytorch_libtorch");
       return null;
@@ -213,15 +212,17 @@ public class Simple {
       if(sequence_start) {
         FAIL_IF_ERR(
             TRITONSERVER_InferenceRequestSetFlags(
-                irequest, TRITONSERVER_REQUEST_FLAG_SEQUENCE_START));
+                irequest, TRITONSERVER_REQUEST_FLAG_SEQUENCE_START),
+                "Unable to set sequence start");
       } else if (sequence_end){
         FAIL_IF_ERR(
           TRITONSERVER_InferenceRequestSetFlags(
-              irequest, TRITONSERVER_REQUEST_FLAG_SEQUENCE_END));
+              irequest, TRITONSERVER_REQUEST_FLAG_SEQUENCE_END),
+              "Unable to set sequence end");
       } else {
         FAIL_IF_ERR(
           TRITONSERVER_InferenceRequestSetFlags(
-              irequest, 0));
+              irequest, 0), "Unable to clear sequence");
       }
 
     } 
@@ -287,8 +288,8 @@ public class Simple {
       FAIL_IF_ERR(
           TRITONSERVER_InferenceResponseOutputCount(response, output_count),
           "getting number of response outputs");
-      if (output_count[0] != 2) {
-        FAIL("expecting 2 response outputs, got " + output_count[0]);
+      if (output_count[0] != 1) {
+        FAIL("expecting 1 response outputs, got " + output_count[0]);
       }
 
       for (int idx = 0; idx < output_count[0]; ++idx) {
@@ -471,11 +472,10 @@ public class Simple {
             "deleting status metadata");
       }
 
-      String model_name = "libtorch_sequence_int32";
+      String model_name = "libtorch_nobatch_sequence_int32";
 
       // Wait for the model to become available.
       boolean[] is_torch_model = {false};
-      boolean[] is_int = {true};
       boolean[] is_ready = {false};
       health_iters = 0;
       while (!is_ready[0]) {
@@ -533,7 +533,7 @@ public class Simple {
         }
 
         FAIL_IF_ERR(
-            ParseModelMetadata(model_metadata, is_int, is_torch_model),
+            ParseModelMetadata(model_metadata, is_torch_model),
             "parsing model metadata");
       }
 
@@ -566,8 +566,7 @@ public class Simple {
 
       long[] input0_shape = {1};
 
-      int datatype =
-          (is_int[0]) ? TRITONSERVER_TYPE_INT32 : TRITONSERVER_TYPE_FP32;
+      int datatype = TRITONSERVER_TYPE_INT32;
 
       FAIL_IF_ERR(
           TRITONSERVER_InferenceRequestAddInput(
@@ -588,12 +587,8 @@ public class Simple {
       // Create the initial data for the input tensor.
       BytePointer input0_data;
       IntPointer[] p0 = {new IntPointer(1)};
-      if (is_int[0]) {
-          p0[0].put(0, 1);
-          input0_data = p0[0].getPointer(BytePointer.class);
-      } else {
-          FAIL("Only INT32 supported"); //TODO: Make true
-      }
+      p0[0].put(0, 1);
+      input0_data = p0[0].getPointer(BytePointer.class);
       long input0_size = input0_data.limit();
 
       FAIL_IF_ERR(

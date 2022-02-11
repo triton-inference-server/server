@@ -43,7 +43,7 @@ DATADIR=/data/inferenceserver/${REPO_VERSION}
 
 # Create local model repository
 mkdir -p models/
-cp -r $DATADIR/qa_sequence_model_repository/libtorch_sequence_int32/ models/
+cp -r $DATADIR/qa_sequence_model_repository/libtorch_nobatch_sequence_int32/ models/
 
 # Set up test files based on installation instructions
 # https://github.com/bytedeco/javacpp-presets/blob/master/tritonserver/README.md
