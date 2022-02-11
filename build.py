@@ -82,8 +82,8 @@ from distutils.dir_util import copy_tree
 # To use ('2021.4', '2021.4.582') version_str should be `2021_4_pre'.
 #
 TRITON_VERSION_MAP = {
-    '2.19.0dev': (
-        '22.02dev',  # triton container
+    '2.20.0dev': (
+        '22.03dev',  # triton container
         '22.01',  # upstream container
         '1.10.0',  # ORT
         '2021.2.200',  # ORT OpenVINO
