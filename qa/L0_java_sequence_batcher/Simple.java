@@ -584,10 +584,8 @@ public class Simple {
       boolean sequence_start = true, sequence_end = false;
 
       // Create the initial data for the input tensor.
-      BytePointer input0_data;
       IntPointer[] p0 = {new IntPointer(1)};
-      p0[0].put(0, 1);
-      input0_data = p0[0].getPointer(BytePointer.class);
+      BytePointer input0_data = p0[0].getPointer(BytePointer.class);
       long input0_size = input0_data.limit();
 
       FAIL_IF_ERR(
@@ -596,7 +594,11 @@ public class Simple {
                 0 /* memory_type_id */),
             "assigning INPUT0 data");
 
-      for(int i=0; i < iterations; i++) {
+      for(int i = 0; i < iterations; i++) {
+        // Update input value
+        p0[0].put(0, i+1);
+
+        // Set sequence metadata
         if(i == 1) {
           sequence_start = false;
         }
@@ -605,7 +607,6 @@ public class Simple {
         }
         SetSequenceMetadata(irequest, correlation_id, sequence_start, sequence_end);
         
-        p0[0].put(0, i+1);
         // Perform inference...
         CompletableFuture<TRITONSERVER_InferenceResponse> completed = new CompletableFuture<>();
         futures.put(irequest, completed);
