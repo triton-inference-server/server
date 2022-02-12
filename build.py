@@ -1053,8 +1053,8 @@ RUN apt-get update && \
     df += '''
 WORKDIR /opt/tritonserver
 RUN rm -fr /opt/tritonserver/*
-COPY --chown=1000:1000 nvidia_entrypoint.sh .
-ENTRYPOINT ["/opt/tritonserver/nvidia_entrypoint.sh"]
+ENV NVIDIA_PRODUCT_NAME="Triton Server"
+COPY docker/entrypoint.d/ /opt/nvidia/entrypoint.d/
 '''
     df += '''
 ENV NVIDIA_BUILD_ID {}
