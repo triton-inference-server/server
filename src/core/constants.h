@@ -88,6 +88,13 @@ constexpr int SCHEDULER_DEFAULT_NICE = 5;
 constexpr uint64_t SEQUENCE_IDLE_DEFAULT_MICROSECONDS = 1000 * 1000;
 constexpr size_t STRING_CORRELATION_ID_MAX_LENGTH_BYTES = 128;
 
+#ifdef TRITON_ENABLE_METRICS
+// MetricModelReporter expects a device ID for GPUs, but we reuse this device
+// ID for other metrics as well such as for CPU and Response Cache metrics
+constexpr int METRIC_REPORTER_ID_CPU = -1;
+constexpr int METRIC_REPORTER_ID_RESPONSE_CACHE = -2;
+#endif
+
 #define TIMESPEC_TO_NANOS(TS) \
   ((TS).tv_sec * nvidia::inferenceserver::NANOS_PER_SECOND + (TS).tv_nsec)
 #define TIMESPEC_TO_MILLIS(TS) \
