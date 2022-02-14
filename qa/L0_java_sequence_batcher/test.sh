@@ -60,11 +60,11 @@ cp Simple.java $SAMPLES_REPO
 rm -f *.log
 RET=0
 
-for PLATFORM in graphdef libtorch onnx savedmodel; do
+for BACKEND in graphdef libtorch onnx savedmodel; do
     # Create local model repository
     rm -r models/
     mkdir -p models/
-    MODEL=${PLATFORM}_nobatch_sequence_int32
+    MODEL=${BACKEND}_nobatch_sequence_int32
     cp -r $DATADIR/qa_sequence_model_repository/${MODEL}/ models/
 
     # Run with default settings
@@ -75,7 +75,7 @@ for PLATFORM in graphdef libtorch onnx savedmodel; do
 
     # Check results
     if [ `grep -c "${MODEL} test PASSED" ${CLIENT_LOG}` != "1" ]; then
-        echo -e "\n***\n*** ${PLATFORM} sequence batcher test FAILED. Expected '${MODEL} test PASSED'\n***"
+        echo -e "\n***\n*** ${BACKEND} sequence batcher test FAILED. Expected '${MODEL} test PASSED'\n***"
         RET=1
     fi
 done
