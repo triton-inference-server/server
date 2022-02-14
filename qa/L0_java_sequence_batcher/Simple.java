@@ -67,6 +67,7 @@ public class Simple {
       }
 
       System.err.println("Usage: java " + Simple.class.getSimpleName() + " [options]");
+      System.err.println("\t-m [model name]");
       System.err.println("\t-v Enable verbose logging");
       System.err.println("\t-r [model repository absolute path]");
 
@@ -271,15 +272,28 @@ public class Simple {
       }
     }
 
+    static int
+    GetExpectedResult(String model_name, int expected_result, int value, String flag){
+      // Adjust expected_result for models that couldn't
+      // implement the full accumulator
+      if((!model_name.contains("nobatch") && !model_name.contains("custom")) ||
+          model_name.contains("graphdef") || model_name.contains("plan") ||
+          model_name.contains("onnx") || model_name.contains("libtorch")){
+            expected_result = value;
+            if(flag != null && flag.contains("start")){
+              expected_result++;
+            }
+        }
+        return expected_result;
+    }
+
     static void
     Check(
+        String model_name,
         TRITONSERVER_InferenceResponse response,
-        Pointer input0_data,
-        String output0,
-        long expected_byte_size,
-        int expected_datatype,
-        boolean sequence_end,
-        int expected_value)
+        int input_value, String output0,
+        long expected_byte_size, int expected_datatype,
+        boolean sequence_end, int expected_result)
     {
       HashMap<String, Pointer> output_data = new HashMap<>();
 
@@ -354,8 +368,12 @@ public class Simple {
       int out = new IntPointer(output_data.get(output0)).get(0);
       System.out.println("Value: " + out);
       if(sequence_end){
-        if(out != expected_value){
-          FAIL("Expected accumulated value: " + expected_value + ", got " + out);
+        expected_result = GetExpectedResult(model_name, expected_result,
+            input_value, "end");
+        if(out != expected_result){
+          FAIL("Expected result: " + expected_result + ", got " + out);
+        } else {
+          System.out.println(model_name + " test PASSED");
         }
       }
     }
@@ -364,11 +382,15 @@ public class Simple {
     main(String[] args) throws Exception
     {
       String model_repository_path = null;
+      String model_name = null;
       int verbose_level = 0;
 
       // Parse commandline...
       for (int i = 0; i < args.length; i++) {
         switch (args[i]) {
+          case "-m":
+            model_name = args[++i];
+            break;
           case "-r":
             model_repository_path = args[++i];
             break;
@@ -381,6 +403,9 @@ public class Simple {
         }
       }
 
+      if(model_name == null) {
+        Usage("-m must be used to specify model name");
+      }
       if (model_repository_path == null) {
         Usage("-r must be used to specify model repository path");
       }
@@ -471,8 +496,6 @@ public class Simple {
             "deleting status metadata");
       }
 
-      String model_name = "libtorch_nobatch_sequence_int32";
-
       // Wait for the model to become available.
       boolean[] is_torch_model = {false};
       boolean[] is_ready = {false};
@@ -561,7 +584,7 @@ public class Simple {
           "setting request release callback");
 
       // Inputs
-      String input0 = is_torch_model[0] ? "INPUT__0" : "INPUT0";
+      String input0 = is_torch_model[0] ? "INPUT__0" : "INPUT";
 
       long[] input0_shape = {1};
 
@@ -572,15 +595,15 @@ public class Simple {
               irequest, input0, datatype, input0_shape, input0_shape.length),
           "setting input 0 meta-data for the request");
 
-      String output0 = is_torch_model[0] ? "OUTPUT__0" : "OUTPUT0";
+      String output0 = is_torch_model[0] ? "OUTPUT__0" : "OUTPUT";
 
       FAIL_IF_ERR(
           TRITONSERVER_InferenceRequestAddRequestedOutput(irequest, output0),
           "requesting output 0 for the request");
 
-      long correlation_id = 1;
+      long correlation_id = 5;
       int iterations = 9;
-      int expected_value = 45;
+      int expected_result = 45;
       boolean sequence_start = true, sequence_end = false;
 
       // Create the initial data for the input tensor.
@@ -596,7 +619,8 @@ public class Simple {
 
       for(int i = 0; i < iterations; i++) {
         // Update input value
-        p0[0].put(0, i+1);
+        int input = i + 1;
+        p0[0].put(0, input);
 
         // Set sequence metadata
         if(i == 1) {
@@ -631,8 +655,8 @@ public class Simple {
             "response status");
 
         Check(
-            completed_response, input0_data, output0, input0_size,
-            datatype, sequence_end, expected_value);
+            model_name, completed_response, input, output0, input0_size,
+            datatype, sequence_end, expected_result);
 
         FAIL_IF_ERR(
             TRITONSERVER_InferenceResponseDelete(completed_response),
