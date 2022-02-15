@@ -27,18 +27,23 @@
 
 # Set up test files based on installation instructions
 # https://github.com/bytedeco/javacpp-presets/blob/master/tritonserver/README.md
-# rm -r javacpp-presets
-# git clone https://github.com/bytedeco/javacpp-presets.git
-# cd javacpp-presets
-# mvn clean install --projects .,tritonserver
-# mvn clean install -f platform --projects ../tritonserver/platform -Djavacpp.platform.host
-# cd ..
+rm -r javacpp-presets
+git clone https://github.com/bytedeco/javacpp-presets.git
+cd javacpp-presets
+mvn clean install --projects .,tritonserver
+mvn clean install -f platform --projects ../tritonserver/platform -Djavacpp.platform.host
+cd ..
 
-MODEL_REPO=`pwd`/../L0_simple_ensemble/models
+MODEL_REPO=`pwd`/models
 SAMPLES_REPO=`pwd`/javacpp-presets/tritonserver/samples
 cp Simple.java $SAMPLES_REPO
 BASE_COMMAND="mvn clean compile -f $SAMPLES_REPO exec:java -Djavacpp.platform=linux-x86_64"
 source ../common/util.sh
+
+# Create local model repository
+rm -r models
+cp -r `pwd`/../L0_simple_ensemble/models .
+mkdir ${MODEL_REPO}/ensemble_add_sub_int32_int32_int32/1
 
 rm -f *.log
 RET=0

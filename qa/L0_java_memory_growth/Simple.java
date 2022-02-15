@@ -499,6 +499,7 @@ public class Simple {
       long num_snapshots = 0;
       DoubleSummaryStatistics stats = new DoubleSummaryStatistics();
       while(!done){
+        System.gc();
         double memory = Runtime.getRuntime().totalMemory() - Runtime.getRuntime().freeMemory();
         stats.accept(memory);
         System.out.println("Memory allocated (MB):" + memory/1E6);
