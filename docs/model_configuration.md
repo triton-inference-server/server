@@ -109,17 +109,35 @@ zero.
 ### Inputs and Outputs
 
 Each model input and output must specify a name, datatype, and shape.
-
 The name specified for an input or output tensor must match the name
-expected by the model. **TorchScript Naming Convention:** Due to the
-absence of names for inputs and outputs in a TorchScript model, the
-"name" attribute of both the inputs and outputs in the configuration
-must follow a specific naming convention i.e. "\<name\>__\<index\>".
+expected by the model.
+
+#### Special conventions for PyTorch Backend
+
+***Naming Convention:*** Due to the absence of names for inputs and outputs
+in a TorchScript model, the "name" attribute of both the inputs and outputs
+in the configuration must follow a specific naming convention i.e. "\<name\>__\<index\>".
 Where \<name\> can be any string and \<index\> refers to the position of
 the corresponding input/output. This means if there are two inputs and
 two outputs they must be named as: "INPUT__0", "INPUT__1" and
 "OUTPUT__0", "OUTPUT__1" such that "INPUT__0" refers to first input
 and INPUT__1 refers to the second input, etc.
+
+***Dictionary of Tensors as Input:*** The PyTorch Backend supports passing
+the inputs to the model in the form of a Dictionary of Tensors. This is only
+supported when there is a *single* input to the model of type Dictionary that
+contains a mapping from a string to a tensor. As an example, if there is a 
+model that expects the input of the form:
+
+```
+{'A': tensor1, 'B': tensor2}
+```
+
+Then the input fields in the configuration do not need to follow the "\<name\>__\<index\>" 
+convention. Instead, the names of the inputs in this case must map to the string
+value 'key' for that specific tensor. In this case the inputs would be "A" and "B",
+where input "A" refers to value corresponding to tensor1 and "B" refers to the
+value corresponding to tensor2.
 
 The datatypes allowed for input and output tensors varies based on the
 type of the model. Section [Datatypes](#datatypes) describes the
