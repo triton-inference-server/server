@@ -75,13 +75,9 @@ DynamicBatchScheduler::DynamicBatchScheduler(
 #ifdef TRITON_ENABLE_METRICS
   // Initialize metric reporter for cache statistics if cache enabled
   if (response_cache_enabled_) {
-    // The cache isn't tied to any specific model instance or GPU device,
-    // so we use device=-2 to indicate caching for now. -1 is currently
-    // used for CPU
-    const int id = -2;
     MetricModelReporter::Create(
-        model_->Name(), model_->Version(), id, model_->Config().metric_tags(),
-        &reporter_);
+        model_->Name(), model_->Version(), METRIC_REPORTER_ID_RESPONSE_CACHE,
+        model_->Config().metric_tags(), &reporter_);
   }
 #endif  // TRITON_ENABLE_METRICS
   max_preferred_batch_size_ = 0;
