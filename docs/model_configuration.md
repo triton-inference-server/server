@@ -112,7 +112,7 @@ Each model input and output must specify a name, datatype, and shape.
 The name specified for an input or output tensor must match the name
 expected by the model.
 
-#### Special conventions for PyTorch Backend
+#### Special Conventions for PyTorch Backend
 
 ***Naming Convention:*** Due to the absence of names for inputs and outputs
 in a TorchScript model, the "name" attribute of both the inputs and outputs
@@ -138,6 +138,8 @@ convention. Instead, the names of the inputs in this case must map to the string
 value 'key' for that specific tensor. In this case the inputs would be "A" and "B",
 where input "A" refers to value corresponding to tensor1 and "B" refers to the
 value corresponding to tensor2.
+
+<br>
 
 The datatypes allowed for input and output tensors varies based on the
 type of the model. Section [Datatypes](#datatypes) describes the
