@@ -87,7 +87,9 @@ TRITON_VERSION_MAP = {
         '22.01',  # upstream container
         '1.10.0',  # ORT
         '2021.2.200',  # ORT OpenVINO
-        (('2021.2', None), ('2021.4', '2021.4.582')),  # Standalone OpenVINO
+        (('2021.2', None),
+         ('2021.4', '2021.4.582'),
+         ('SPECIFIC','f2f281e6')),  # Standalone OpenVINO
         '2.2.9')  # DCGM version
 }
 
@@ -615,17 +617,30 @@ def onnxruntime_cmake_args(images, library_paths):
 
 
 def openvino_cmake_args(be, variant_index):
+    using_specific_commit = False
+    if TRITON_VERSION_MAP[FLAGS.version][4][variant_index][0] == 'SPECIFIC':
+        using_specific_commit = True
+
     ov_version = TRITON_VERSION_MAP[FLAGS.version][4][variant_index][1]
     if ov_version:
-        use_prebuilt_ov = True
+        if using_specific_commit:
+            use_prebuilt_ov = False
+        else:
+            use_prebuilt_ov = True
     else:
         # If the OV package version is None, then we are not using prebuilt package
         ov_version = TRITON_VERSION_MAP[FLAGS.version][4][variant_index][0]
         use_prebuilt_ov = False
-    cargs = [
-        cmake_backend_arg(be, 'TRITON_BUILD_OPENVINO_VERSION', None,
-                          ov_version),
-    ]
+    if using_specific_commit:
+        cargs = [
+            cmake_backend_arg(be, 'TRITON_BUILD_OPENVINO_COMMIT_VERSION', None,
+                            ov_version),
+        ]
+    else:
+        cargs = [
+            cmake_backend_arg(be, 'TRITON_BUILD_OPENVINO_VERSION', None,
+                            ov_version),
+        ]
     cargs.append(
         cmake_backend_arg(be, 'TRITON_OPENVINO_BACKEND_INSTALLDIR', None, be))
     if target_platform() == 'windows':
