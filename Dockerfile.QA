@@ -321,6 +321,9 @@ RUN GO111MODULE=off go get github.com/golang/protobuf/protoc-gen-go && \
 # user.
 WORKDIR /opt/tritonserver
 COPY --chown=1000:1000 --from=sdk /workspace/qa/ qa/
+# Copy Java API jar
+COPY --from=sdk /workspace/install/java-api-bindings/tritonserver-java-bindings.jar qa/pkgs/.
+
 
 # Remove CI tests that are meant to run only on build image and
 # install the tritonserver/triton python client APIs.

@@ -35,10 +35,12 @@ ARG TRITON_THIRD_PARTY_REPO_TAG=main
 ARG TRITON_MODEL_ANALYZER_REPO_TAG=main
 ARG CMAKE_UBUNTU_VERSION=20.04
 ARG TRITON_ENABLE_GPU=ON
+ARG JAVA_API_IMAGE=java_api_build
 
 ARG NVIDIA_TRITON_SERVER_SDK_VERSION=unknown
 ARG NVIDIA_BUILD_ID=unknown
 
+FROM ${JAVA_API_IMAGE} AS java-api-build
 FROM ${BASE_IMAGE}
 
 ARG TARGETPLATFORM
@@ -186,3 +188,11 @@ ENV NVIDIA_BUILD_ID=${NVIDIA_BUILD_ID}
 
 ENV PATH /workspace/install/bin:${PATH}
 ENV LD_LIBRARY_PATH /workspace/install/lib:${LD_LIBRARY_PATH}
+
+############################################################################
+### COPY jar file from Java API Image build
+############################################################################
+WORKDIR /workspace/install/java-api-bindings
+ARG JAVA_API_IMAGE
+RUN echo $JAVA_API_IMAGE
+COPY --from=java-api-build /opt/tritonserver/tritonserver-java-bindings.jar .
