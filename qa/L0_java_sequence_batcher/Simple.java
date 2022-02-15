@@ -209,21 +209,16 @@ public class Simple {
       FAIL_IF_ERR(
           TRITONSERVER_InferenceRequestSetCorrelationId(
               irequest, correlation_id), "Unable to set correlation ID");
+      int flags = 0;
       if(sequence_start) {
-        FAIL_IF_ERR(
-            TRITONSERVER_InferenceRequestSetFlags(
-                irequest, TRITONSERVER_REQUEST_FLAG_SEQUENCE_START),
-                "Unable to set sequence start");
-      } else if (sequence_end){
-        FAIL_IF_ERR(
-          TRITONSERVER_InferenceRequestSetFlags(
-              irequest, TRITONSERVER_REQUEST_FLAG_SEQUENCE_END),
-              "Unable to set sequence end");
-      } else {
-        FAIL_IF_ERR(
-          TRITONSERVER_InferenceRequestSetFlags(
-              irequest, 0), "Unable to clear sequence");
+        flags += TRITONSERVER_REQUEST_FLAG_SEQUENCE_START;
       }
+      if(sequence_end) {
+        flags += TRITONSERVER_REQUEST_FLAG_SEQUENCE_END;
+      }
+      FAIL_IF_ERR(
+        TRITONSERVER_InferenceRequestSetFlags(
+            irequest, flags), "Unable to set flags");
 
     } 
 
