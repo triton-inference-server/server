@@ -135,7 +135,7 @@ MetricModelReporter::GetMetricLabels(
         "_" + tag.first, tag.second));
   }
 
-  // 'device' can be -1 to indicate that the GPU is not known. In
+  // 'device' can be < 0 to indicate that the GPU is not known. In
   // that case use a metric that doesn't have the gpu_uuid label.
   if (device >= 0) {
     std::string uuid;
