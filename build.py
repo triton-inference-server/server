@@ -1420,9 +1420,12 @@ def build_backend(be,
 def get_tagged_backend(be, version):
     tagged_be = be
     if be == 'openvino':
-        tagged_be += "_" + version[0].replace('.', '_')
-        if version[1] and target_platform() != 'windows':
-            tagged_be += "_pre"
+        if version[0] == 'SPECIFIC':
+            tagged_be += "_" + version[1]
+        else:
+            tagged_be += "_" + version[0].replace('.', '_')
+            if version[1] and target_platform() != 'windows':
+                tagged_be += "_pre"
     return tagged_be
 
 
