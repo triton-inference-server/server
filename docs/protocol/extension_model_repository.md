@@ -116,8 +116,29 @@ $repository_index_error_response =
 
 The load API requests that a model be loaded into Triton, or reloaded
 if the model is already loaded. A load request is made with an HTTP
-POST to a load endpoint. The HTTP body must be empty. A successful
-load request is indicated by a 200 HTTP status.
+POST to a load endpoint.  The HTTP body may be empty or may contain
+the load request object, identified as $repository_load_request.
+A successful load request is indicated by a 200 HTTP status.
+
+
+```
+$repository_load_request =
+{
+  "parameters" : $parameters #optional
+}
+```
+
+- "parameters" : An object containing zero or more parameters for this
+  request expressed as key/value pairs. See
+  [Parameters](https://github.com/kserve/kserve/blob/master/docs/predict-api/v2/required_api.md#parameters)
+  for more information.
+
+The load API accepts the following parameters:
+
+- "config" : string parameter that contains a JSON representation of the model
+configuration, which must be able to be parsed into [ModelConfig message from
+model_config.proto](https://github.com/triton-inference-server/common/blob/main/protobuf/model_config.proto). This config will be used for loading the model instead of the one in
+the model directory.
 
 A failed load request must be indicated by an HTTP error status
 (typically 400). The HTTP body must contain the
@@ -270,12 +291,22 @@ message RepositoryModelLoadRequest
 
   // The name of the model to load, or reload.
   string model_name = 2;
+
+  // Optional parameters.
+  map<string, ModelRepositoryParameter> parameters = 3;
 }
 
 message RepositoryModelLoadResponse
 {
 }
 ```
+
+The RepositoryModelLoad API accepts the following parameters:
+
+- "config" : string parameter that contains a JSON representation of the model
+configuration, which must be able to be parsed into [ModelConfig message from
+model_config.proto](https://github.com/triton-inference-server/common/blob/main/protobuf/model_config.proto). This config will be used for loading the model instead of the one in
+the model directory.
 
 ### Unload
 
@@ -303,3 +334,10 @@ message RepositoryModelUnloadResponse
 {
 }
 ```
+
+The RepositoryModelUnload API accepts the following parameters:
+
+- "unload_dependents" : boolean parameter indicating that in addition
+  to unloading the requested model, also unload any dependent model
+  that was loaded along with the requested model (for example, the
+  models composing an ensemble).
