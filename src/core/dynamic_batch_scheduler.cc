@@ -553,11 +553,14 @@ DynamicBatchScheduler::GetDynamicBatch()
     next_preferred_batch_size_ -= payload_batch_size;
   }
 
-  // By this point, we have not seen the batch that should be executed
-  // immediately. However, if we have scheduled a payload that can be grown,
-  // we should move the pending batch over to ensure the model instance will
-  // pick up largest available batch even if it is not the preferred batch
-  if (!payload_saturated_ && (payload_batch_size != 0)) {
+  // By this point, we have not seen the pending batch that should be executed
+  // immediately. However, if we have scheduled a payload that can be grown and
+  // not yet in preferred batch size, we should move the pending batch over to
+  // ensure the model instance will pick up largest available batch even if it
+  // is not the preferred batch.
+  if (!payload_saturated_ && (payload_batch_size != 0) &&
+      (preferred_batch_sizes_.find(payload_batch_size) ==
+       preferred_batch_sizes_.end())) {
     return 0;
   }
 
