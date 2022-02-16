@@ -35,7 +35,7 @@ if(CMAKE_CXX_COMPILER_ID STREQUAL "MSVC")
   message("Using MSVC as compiler, default target on Windows 10. "
 		  "If the target system is not Windows 10, please update _WIN32_WINNT "
 		  "to corresponding value.")
-  set(CMAKE_CXX_FLAGS "/W4 /D_WIN32_WINNT=0x0A00 /EHsc")
+  set(CMAKE_CXX_FLAGS "/W0 /D_WIN32_WINNT=0x0A00 /EHsc")
   set(CMAKE_WINDOWS_EXPORT_ALL_SYMBOLS TRUE)
 else()
   # Disable Triton kernel if on "aarch64" platform
