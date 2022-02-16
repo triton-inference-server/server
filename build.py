@@ -620,13 +620,13 @@ def onnxruntime_cmake_args(images, library_paths):
 
 
 def openvino_cmake_args(be, variant_index):
-    using_specific_commit = False
+    using_specific_commit_sha = False
     if TRITON_VERSION_MAP[FLAGS.version][4][variant_index][0] == 'SPECIFIC':
-        using_specific_commit = True
+        using_specific_commit_sha = True
 
     ov_version = TRITON_VERSION_MAP[FLAGS.version][4][variant_index][1]
     if ov_version:
-        if using_specific_commit:
+        if using_specific_commit_sha:
             use_prebuilt_ov = False
         else:
             use_prebuilt_ov = True
@@ -634,9 +634,9 @@ def openvino_cmake_args(be, variant_index):
         # If the OV package version is None, then we are not using prebuilt package
         ov_version = TRITON_VERSION_MAP[FLAGS.version][4][variant_index][0]
         use_prebuilt_ov = False
-    if using_specific_commit:
+    if using_specific_commit_sha:
         cargs = [
-            cmake_backend_arg(be, 'TRITON_BUILD_OPENVINO_COMMIT_VERSION', None,
+            cmake_backend_arg(be, 'TRITON_BUILD_OPENVINO_COMMIT_SHA', None,
                             ov_version),
         ]
     else:
