@@ -80,6 +80,9 @@ from distutils.dir_util import copy_tree
 # library. In other words, when the second element of the pair is not None.
 # To use ('2021.2', None) version_str should be `2021_2'.
 # To use ('2021.4', '2021.4.582') version_str should be `2021_4_pre'.
+# User can also build openvino backend from specific commit sha of openVINO
+# repository. The pair should be (`SPECIFIC`, <commit_sha_of_ov_repo>).
+# Note: Not all sha ids would successfuly compile and work.
 #
 TRITON_VERSION_MAP = {
     '2.19.0dev': (
