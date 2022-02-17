@@ -80,6 +80,9 @@ from distutils.dir_util import copy_tree
 # library. In other words, when the second element of the pair is not None.
 # To use ('2021.2', None) version_str should be `2021_2'.
 # To use ('2021.4', '2021.4.582') version_str should be `2021_4_pre'.
+# User can also build openvino backend from specific commit sha of openVINO
+# repository. The pair should be (`SPECIFIC`, <commit_sha_of_ov_repo>).
+# Note: Not all sha ids would successfuly compile and work.
 #
 TRITON_VERSION_MAP = {
     '2.19.0dev': (
@@ -87,7 +90,9 @@ TRITON_VERSION_MAP = {
         '22.01',  # upstream container
         '1.10.0',  # ORT
         '2021.2.200',  # ORT OpenVINO
-        (('2021.2', None), ('2021.4', '2021.4.582')),  # Standalone OpenVINO
+        (('2021.2', None),
+         ('2021.4', '2021.4.582'),
+         ('SPECIFIC','f2f281e6')),  # Standalone OpenVINO
         '2.2.9')  # DCGM version
 }
 
@@ -615,17 +620,30 @@ def onnxruntime_cmake_args(images, library_paths):
 
 
 def openvino_cmake_args(be, variant_index):
+    using_specific_commit_sha = False
+    if TRITON_VERSION_MAP[FLAGS.version][4][variant_index][0] == 'SPECIFIC':
+        using_specific_commit_sha = True
+
     ov_version = TRITON_VERSION_MAP[FLAGS.version][4][variant_index][1]
     if ov_version:
-        use_prebuilt_ov = True
+        if using_specific_commit_sha:
+            use_prebuilt_ov = False
+        else:
+            use_prebuilt_ov = True
     else:
         # If the OV package version is None, then we are not using prebuilt package
         ov_version = TRITON_VERSION_MAP[FLAGS.version][4][variant_index][0]
         use_prebuilt_ov = False
-    cargs = [
-        cmake_backend_arg(be, 'TRITON_BUILD_OPENVINO_VERSION', None,
-                          ov_version),
-    ]
+    if using_specific_commit_sha:
+        cargs = [
+            cmake_backend_arg(be, 'TRITON_BUILD_OPENVINO_COMMIT_SHA', None,
+                            ov_version),
+        ]
+    else:
+        cargs = [
+            cmake_backend_arg(be, 'TRITON_BUILD_OPENVINO_VERSION', None,
+                            ov_version),
+        ]
     cargs.append(
         cmake_backend_arg(be, 'TRITON_OPENVINO_BACKEND_INSTALLDIR', None, be))
     if target_platform() == 'windows':
@@ -1405,9 +1423,12 @@ def build_backend(be,
 def get_tagged_backend(be, version):
     tagged_be = be
     if be == 'openvino':
-        tagged_be += "_" + version[0].replace('.', '_')
-        if version[1] and target_platform() != 'windows':
-            tagged_be += "_pre"
+        if version[0] == 'SPECIFIC':
+            tagged_be += "_" + version[1]
+        else:
+            tagged_be += "_" + version[0].replace('.', '_')
+            if version[1] and target_platform() != 'windows':
+                tagged_be += "_pre"
     return tagged_be
 
 
