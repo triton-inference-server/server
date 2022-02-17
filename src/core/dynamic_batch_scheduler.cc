@@ -578,6 +578,7 @@ void
 DynamicBatchScheduler::DelegateResponse(
     std::unique_ptr<InferenceRequest>& request)
 {
+  std::lock_guard<std::mutex> lock(completion_queue_mtx_);
   completion_queue_.emplace_back();
   auto queue_slot = &completion_queue_.back();
   uint64_t request_hash = request->CacheKey();
@@ -590,7 +591,10 @@ DynamicBatchScheduler::DelegateResponse(
         }
 
         if (preserve_ordering_) {
-          queue_slot->emplace_back(std::move(response), flags);
+          {
+            std::lock_guard<std::mutex> lock(completion_queue_mtx_);
+            queue_slot->emplace_back(std::move(response), flags);
+          }
           FinalizeResponses();
         } else {
           InferenceResponse::Send(std::move(response), flags);
@@ -638,6 +642,7 @@ DynamicBatchScheduler::FinalizeResponses()
   std::deque<std::pair<std::unique_ptr<InferenceResponse>, const uint32_t>>
       responses;
   {
+    std::lock_guard<std::mutex> queue_lock(completion_queue_mtx_);
     while (!completion_queue_.empty() && !completion_queue_.front().empty()) {
       bool response_complete = false;
       for (auto& response_pair : completion_queue_.front()) {
