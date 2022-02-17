@@ -40,7 +40,15 @@ ARG JAVA_API_IMAGE=java_api_build
 ARG NVIDIA_TRITON_SERVER_SDK_VERSION=unknown
 ARG NVIDIA_BUILD_ID=unknown
 
-FROM ${JAVA_API_IMAGE} AS java-api-build
+FROM ${JAVA_API_IMAGE} as java-api-image
+ARG TARGETPLATFORM
+WORKDIR /workspace
+# Copy Java API jar
+RUN if [ "$TARGETPLATFORM" != "linux/arm64" ]; then \
+        mkdir -p install/java-api-bindings && \
+        cp /opt/tritonserver/tritonserver-java-bindings.jar install/java-api-bindings/tritonserver-java-bindings.jar ;\
+    fi
+ 
 FROM ${BASE_IMAGE}
 
 ARG TARGETPLATFORM
@@ -169,6 +177,9 @@ RUN if [ "$TRITON_ENABLE_GPU" = "ON" ]; then \
       fi \
     fi
 
+# Copy jar from multistage build
+COPY --from=java-api-image /workspace/install /workspace/install/
+
 # Install Model Analyzer
 ARG TRITON_MODEL_ANALYZER_REPO_TAG
 ARG TRITON_MODEL_ANALYZER_REPO="https://github.com/triton-inference-server/model_analyzer@${TRITON_MODEL_ANALYZER_REPO_TAG}"
@@ -189,14 +200,3 @@ ENV NVIDIA_BUILD_ID=${NVIDIA_BUILD_ID}
 ENV PATH /workspace/install/bin:${PATH}
 ENV LD_LIBRARY_PATH /workspace/install/lib:${LD_LIBRARY_PATH}
 
-############################################################################
-### COPY jar file from Java API Image build
-############################################################################
-FROM ${JAVA_API_IMAGE}
-ARG TARGETPLATFORM
-
-# Copy Java API jar
-RUN if [ "$TARGETPLATFORM" = "linux/arm64" ]; then \
-        mkdir /workspace/install/java-api-bindings; && \
-        cp /opt/tritonserver/tritonserver-java-bindings.jar . ;\
-    fi
