@@ -49,8 +49,8 @@ protocol](protocol/extension_trace.md).
 
 ## Supported Trace Level Option
 
-- `TIMESTAMPS`: Trace execution timestamps of each request.
-- `TENSORS`: Trace input and output tensors during the execution. 
+- `TIMESTAMPS`: Tracing execution timestamps of each request.
+- `TENSORS`: Tracing input and output tensors during the execution. 
 
 ## JSON Trace Output
 
@@ -283,6 +283,6 @@ The meaning of the trace timestamps is:
 
   * Version: The version of model.
 
-  * QUEUE_INPUT: The tensor entering the queue of model to wait for scheduling.
+  * QUEUE_INPUT: The tensor entering the queue of a backend to wait for scheduling.
 
   * BACKEND_OUTPUT: The tensor in the response of a backend.
