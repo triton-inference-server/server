@@ -34,6 +34,7 @@ import static org.bytedeco.tritonserver.global.tritonserver.*;
 
 public class Simple {
 
+    // Boilerplate code for setting up Triton
     static void FAIL(String MSG) {
         System.err.println("Failure: " + MSG);
         System.exit(1);
@@ -201,6 +202,8 @@ public class Simple {
       return null;
     }
 
+    // Custom function to set metadata required for
+    // sequence batcher
     static void
     SetSequenceMetadata(TRITONSERVER_InferenceRequest irequest, long correlation_id, boolean sequence_start, boolean sequence_end)
     throws Exception
@@ -222,10 +225,11 @@ public class Simple {
 
     }
 
+    // Custom function for adjusting sequence batcher
+    // expected results for backends that do not implement
+    // full accumulator
     static int
     GetExpectedResult(String model_name, int expected_result, int value, String flag){
-      // Adjust expected_result for models that couldn't
-      // implement the full accumulator
       if((!model_name.contains("nobatch") && !model_name.contains("custom")) ||
           model_name.contains("graphdef") || model_name.contains("plan") ||
           model_name.contains("onnx") || model_name.contains("libtorch")){
@@ -237,6 +241,9 @@ public class Simple {
         return expected_result;
     }
 
+    // Standard function for checking response parameters,
+    // plus customized check that final sequence result
+    // "out" matches expected result
     static void
     Check(
         String model_name,
@@ -328,6 +335,9 @@ public class Simple {
       }
     }
 
+    // Boilerplate main function to run inference
+    // for provided model, custom setting of
+    // sequence metadata
     public static void
     main(String[] args) throws Exception
     {
