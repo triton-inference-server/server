@@ -44,7 +44,7 @@ FROM ${JAVA_API_IMAGE} as java-api-image
 ARG TARGETPLATFORM
 WORKDIR /workspace
 # Copy Java API jar
-RUN if [ "$TARGETPLATFORM" != "linux/arm64" ]; then \
+RUN if [ "$TARGETPLATFORM" = "linux/amd64" ]; then \
         mkdir -p install/java-api-bindings && \
         cp /opt/tritonserver/tritonserver-java-bindings.jar install/java-api-bindings/tritonserver-java-bindings.jar ;\
     fi
