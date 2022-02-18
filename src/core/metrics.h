@@ -226,6 +226,7 @@ class Metrics {
   prometheus::Family<prometheus::Gauge>& cache_num_misses_family_;
   prometheus::Family<prometheus::Gauge>& cache_num_evictions_family_;
   prometheus::Family<prometheus::Gauge>& cache_lookup_duration_us_family_;
+  prometheus::Family<prometheus::Gauge>& cache_insertion_duration_us_family_;
   prometheus::Family<prometheus::Gauge>& cache_util_family_;
   // Gauges for Global Response Cache metrics
   prometheus::Gauge* cache_num_entries_global_;
@@ -234,6 +235,7 @@ class Metrics {
   prometheus::Gauge* cache_num_misses_global_;
   prometheus::Gauge* cache_num_evictions_global_;
   prometheus::Gauge* cache_lookup_duration_us_global_;
+  prometheus::Gauge* cache_insertion_duration_us_global_;
   prometheus::Gauge* cache_util_global_;
   // Per-model Response Cache metrics
   prometheus::Family<prometheus::Counter>& cache_num_hits_model_family_;

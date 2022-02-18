@@ -127,6 +127,12 @@ Metrics::Metrics()
               .Help(
                   "Total cache lookup duration (hit and miss), in microseconds")
               .Register(*registry_)),
+      cache_insertion_duration_us_family_(
+          prometheus::BuildGauge()
+              .Name("nv_cache_insertion_duration")
+              .Help(
+                  "Total cache insertion duration, in microseconds")
+              .Register(*registry_)),
       cache_util_family_(prometheus::BuildGauge()
                              .Name("nv_cache_util")
                              .Help("Cache utilization [0.0 - 1.0]")
@@ -365,6 +371,8 @@ Metrics::PollCacheMetrics(std::shared_ptr<RequestResponseCache> response_cache)
   cache_num_evictions_global_->Set(response_cache->NumEvictions());
   cache_lookup_duration_us_global_->Set(
       response_cache->TotalLookupLatencyNs() / 1000);
+  cache_insertion_duration_us_global_->Set(
+      response_cache->TotalInsertionLatencyNs() / 1000);
   cache_util_global_->Set(response_cache->TotalUtilization());
   return true;
 }
@@ -532,6 +540,8 @@ Metrics::InitializeCacheMetrics(
   cache_num_evictions_global_ = &cache_num_evictions_family_.Add(cache_labels);
   cache_lookup_duration_us_global_ =
       &cache_lookup_duration_us_family_.Add(cache_labels);
+  cache_insertion_duration_us_global_ =
+      &cache_insertion_duration_us_family_.Add(cache_labels);
   cache_util_global_ = &cache_util_family_.Add(cache_labels);
   return true;
 }
