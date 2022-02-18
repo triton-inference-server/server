@@ -1,4 +1,4 @@
-// Copyright 2020-2021, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+// Copyright 2020-2022, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 //
 // Redistribution and use in source and binary forms, with or without
 // modification, are permitted provided that the following conditions
@@ -31,6 +31,9 @@
 #include "src/core/logging.h"
 #include "src/core/model.h"
 #include "src/core/server.h"
+#ifdef TRITON_ENABLE_TRACING
+#include "src/core/cuda_utils.h"
+#endif  // TRITON_ENABLE_TRACING
 
 namespace nvidia { namespace inferenceserver {
 
@@ -109,6 +112,111 @@ InferenceRequest::SetPriority(uint32_t p)
     priority_ = p;
   }
 }
+
+#ifdef TRITON_ENABLE_TRACING
+Status
+InferenceRequest::TraceInputTensors(
+    TRITONSERVER_InferenceTraceActivity activity, const std::string& msg)
+{
+  const auto& inputs = this->ImmutableInputs();
+  TRITONSERVER_MemoryType dst_memory_type = TRITONSERVER_MEMORY_CPU;
+  int64_t dst_memory_type_id = 0;
+
+  for (const auto& pr : inputs) {
+    InferenceRequest::Input* ti = pr.second;
+
+    // input data
+    const std::string& name = ti->Name();
+    TRITONSERVER_DataType datatype = DataTypeToTriton(ti->DType());
+    uint64_t byte_size = ti->Data()->TotalByteSize();
+    const int64_t* shape = ti->ShapeWithBatchDim().data();
+    uint32_t dim_count = ti->ShapeWithBatchDim().size();
+    uint32_t buffer_count = ti->DataBufferCount();
+    // chunk buffer
+    Status status;
+    const void* buffer;
+    uint64_t buffer_size;
+    TRITONSERVER_MemoryType src_memory_type;
+    int64_t src_memory_type_id;
+    bool cuda_used;
+
+    if (buffer_count == 0) {
+      LOG_STATUS_ERROR(
+          status,
+          std::string(TRITONSERVER_InferenceTraceActivityString(activity)) +
+              ": " + msg + ": tensor: " + name + ": no buffer chunk");
+      continue;
+    }
+
+    if (buffer_count == 1) {
+      status = ti->DataBuffer(
+          0, &buffer, &buffer_size, &src_memory_type, &src_memory_type_id);
+      if (!status.IsOk()) {
+        LOG_STATUS_ERROR(
+            status,
+            std::string(TRITONSERVER_InferenceTraceActivityString(activity)) +
+                ": " + msg + ": tensor: " + name +
+                ": fail to get data buffer: " + status.Message());
+        return status;
+      }
+
+      if (buffer_size != byte_size) {
+        LOG_STATUS_ERROR(
+            status,
+            std::string(TRITONSERVER_InferenceTraceActivityString(activity)) +
+                ": " + msg + ": tensor: " + name + ": truncated buffer");
+        continue;
+      }
+
+      INFER_TRACE_TENSOR_ACTIVITY(
+          this->trace_, activity, name.c_str(), datatype,
+          const_cast<void*>(buffer), buffer_size, shape, dim_count,
+          src_memory_type, src_memory_type_id);
+
+      continue;
+    }
+
+    // input buffer
+    std::vector<char> in_buffer(byte_size);
+    char* base = in_buffer.data();
+    size_t offset = 0;
+    for (uint32_t b = 0; b < buffer_count; ++b) {
+      status = ti->DataBuffer(
+          b, &buffer, &buffer_size, &src_memory_type, &src_memory_type_id);
+      if (!status.IsOk()) {
+        LOG_STATUS_ERROR(
+            status,
+            std::string(TRITONSERVER_InferenceTraceActivityString(activity)) +
+                ": " + msg + ": tensor: " + name +
+                ": fail to get data buffer: " + status.Message());
+        return status;
+      }
+
+      status = CopyBuffer(
+          "InferenceRequest TraceInputTensors", src_memory_type,
+          src_memory_type_id, dst_memory_type, dst_memory_type_id, buffer_size,
+          buffer, base + offset, nullptr, &cuda_used);
+      if (!status.IsOk()) {
+        LOG_STATUS_ERROR(
+            status,
+            std::string(TRITONSERVER_InferenceTraceActivityString(activity)) +
+                ": " + msg + ": tensor: " + name +
+                ": fail to copy buffer: " + status.Message());
+        return status;
+      }
+
+      offset += buffer_size;
+    }
+
+    INFER_TRACE_TENSOR_ACTIVITY(
+        this->trace_, activity, name.c_str(), datatype,
+        static_cast<void*>(base), byte_size, shape, dim_count, dst_memory_type,
+        dst_memory_type_id);
+  }
+
+  return Status::Success;
+}
+#endif  // TRITON_ENABLE_TRACING
 
 Status
 InferenceRequest::OutputBufferProperties(
@@ -199,7 +307,7 @@ InferenceRequest::Release(
   // and the callback may interact with upper level trace.
   if (request->trace_ != nullptr) {
     request->trace_->ReportNow(TRITONSERVER_TRACE_REQUEST_END);
-    InferenceTrace::Release(std::move(request->trace_));
+    request->ReleaseTrace();
   }
 #endif  // TRITON_ENABLE_TRACING
 
@@ -559,6 +667,7 @@ InferenceRequest::PrepareForInference()
 
   // Clear the timestamps
   queue_start_ns_ = 0;
+  batcher_start_ns_ = 0;
 #ifdef TRITON_ENABLE_STATS
   request_start_ns_ = 0;
 #endif  // TRITON_ENABLE_STATS
@@ -849,6 +958,32 @@ InferenceRequest::ReportStatisticsWithDuration(
       secondary_stats_aggregator_->UpdateFailure(
           nullptr /* metric_reporter */, request_start_ns_, request_end_ns);
     }
+  }
+}
+
+void
+InferenceRequest::ReportStatisticsCacheHit(MetricModelReporter* metric_reporter)
+{
+  // Capture end of request time
+  INFER_STATS_DECL_TIMESTAMP(request_end_ns);
+
+  if (cache_lookup_start_ns_ == 0 || cache_lookup_end_ns_ == 0) {
+    LOG_WARNING << "Cache lookup timestamps were not set correctly. Cache "
+                   "lookup duration stats may be incorrect.";
+  }
+  const uint64_t cache_lookup_duration_ns =
+      cache_lookup_end_ns_ - cache_lookup_start_ns_;
+
+  // Cache hit is always success
+  model_raw_->MutableStatsAggregator()->UpdateSuccessCacheHit(
+      metric_reporter, std::max(1U, batch_size_), request_start_ns_,
+      queue_start_ns_, cache_lookup_start_ns_, request_end_ns,
+      cache_lookup_duration_ns);
+  if (secondary_stats_aggregator_ != nullptr) {
+    secondary_stats_aggregator_->UpdateSuccessCacheHit(
+        nullptr /* metric_reporter */, std::max(1U, batch_size_),
+        request_start_ns_, queue_start_ns_, cache_lookup_start_ns_,
+        request_end_ns, cache_lookup_duration_ns);
   }
 }
 #endif  // TRITON_ENABLE_STATS

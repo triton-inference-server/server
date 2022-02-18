@@ -1,4 +1,4 @@
-// Copyright (c) 2021, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+// Copyright 2021-2022, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 //
 // Redistribution and use in source and binary forms, with or without
 // modification, are permitted provided that the following conditions
@@ -25,6 +25,7 @@
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 #include "src/core/response_cache.h"
+#include "src/core/infer_stats.h"
 #include "src/core/logging.h"
 
 namespace {
@@ -107,7 +108,8 @@ RequestResponseCache::HashInputBuffers(
         &src_memory_type_id));
 
     // TODO: Handle other memory types
-    if (src_memory_type != TRITONSERVER_MEMORY_CPU) {
+    if (src_memory_type != TRITONSERVER_MEMORY_CPU &&
+        src_memory_type != TRITONSERVER_MEMORY_CPU_PINNED) {
       return Status(
           Status::Code::INTERNAL,
           "Only input buffers in CPU memory are allowed in cache currently");
@@ -157,15 +159,39 @@ RequestResponseCache::Hash(const InferenceRequest& request, uint64_t* key)
 }
 
 Status
-RequestResponseCache::Lookup(const uint64_t key, InferenceResponse* ptr)
+RequestResponseCache::Lookup(
+    const uint64_t key, InferenceResponse* ptr, InferenceRequest* request)
 {
   // Lock on cache lookup
   std::lock_guard<std::recursive_mutex> lk(cache_mtx_);
 
+  if (request == nullptr) {
+    return Status(
+        Status::Code::INTERNAL, "Cache Lookup passed a nullptr request");
+  }
+
+  // Capture start lookup latency
+  request->CaptureCacheLookupStartNs();
+
+  num_lookups_++;
+  LOG_VERBOSE(1) << "Looking up key [" + std::to_string(key) + "] in cache.";
+
+  // Search cache for request hash key
   auto iter = cache_.find(key);
   if (iter == cache_.end()) {
+    num_misses_++;
+    LOG_VERBOSE(1) << "MISS for key [" + std::to_string(key) + "] in cache.";
+    // Capture end lookup latency on miss and update total latency
+    request->CaptureCacheLookupEndNs();
+    total_lookup_latency_ns_ +=
+        (request->CacheLookupEndNs() - request->CacheLookupStartNs());
     return Status(Status::Code::INTERNAL, "key not found in cache");
   }
+
+  // If find succeeds, it's a cache hit
+  num_hits_++;
+  LOG_VERBOSE(1) << "HIT for key [" + std::to_string(key) + "] in cache.";
+
   // Populate passed-in "ptr" from cache entry
   auto entry = iter->second;
   // Build InferenceResponse from CacheEntry
@@ -174,6 +200,13 @@ RequestResponseCache::Lookup(const uint64_t key, InferenceResponse* ptr)
   // Update this key to front of LRU list
   UpdateLRU(iter);
 
+  LOG_VERBOSE(1) << "Using cached response for key [" + std::to_string(key) +
+                        "].";
+
+  // Capture end lookup latency on hit and update total latency
+  request->CaptureCacheLookupEndNs();
+  total_lookup_latency_ns_ +=
+      (request->CacheLookupEndNs() - request->CacheLookupStartNs());
   return Status::Success;
 }
 
@@ -229,7 +262,8 @@ RequestResponseCache::BuildCacheEntry(
         &response_memory_type_id, &userp));
 
     // TODO: Handle other memory types
-    if (response_memory_type != TRITONSERVER_MEMORY_CPU) {
+    if (response_memory_type != TRITONSERVER_MEMORY_CPU &&
+        response_memory_type != TRITONSERVER_MEMORY_CPU_PINNED) {
       return Status(
           Status::Code::INTERNAL,
           "Only input buffers in CPU memory are allowed in cache currently");
@@ -252,31 +286,38 @@ RequestResponseCache::BuildCacheEntry(
             "Cache entry is larger than total cache size");
       }
 
-      // If cache doesn't enough space, evict until enough is available
-      while (response_byte_size > managed_buffer_.get_free_memory()) {
+      // If cache doesn't have enough space, evict until enough space available
+      // NOTE: FreeBytes() doesn't account for allocator overhead so allocation
+      //       may fail even if response_byte_size is less than FreeBytes()
+      while (response_byte_size > FreeBytes()) {
+        LOG_VERBOSE(1) << "EVICT: Response larger than remaining available "
+                          "memory, attempting to evict from cache.";
         RETURN_IF_ERROR(Evict());
       }
+
+      // Attempt to allocate buffer until success or eviction from cache fails
+      while (cache_output.buffer_ == nullptr) {
+        // Allocate buffer for response output in cache entry
+        cache_output.buffer_ =
+            managed_buffer_.allocate(response_byte_size, std::nothrow_t{});
+        // Attempt to evict if allocation fails
+        if (cache_output.buffer_ == nullptr) {
+          LOG_VERBOSE(1) << "FAILED to allocate buffer in cache. Attempting to "
+                            "evict an entry.";
+          // Exit out if Eviction fails
+          RETURN_IF_ERROR(Evict());
+        }
+      }
+
+      // Copy data from response buffer to cache entry output buffer
+      // TODO: Handle different memory types: GPU, SHM, Pinned, etc.
+      std::memcpy(cache_output.buffer_, response_buffer, response_byte_size);
 
       // Set output metadata
       cache_output.name_ = response_output.Name();
       cache_output.dtype_ = response_output.DType();
       cache_output.shape_ = response_output.Shape();
       cache_output.buffer_size_ = static_cast<uint64_t>(response_byte_size);
-
-      // Allocate buffer for response output in cache entry
-      cache_output.buffer_ =
-          managed_buffer_.allocate(response_byte_size, std::nothrow_t{});
-      // Exit early if we fail to allocate from managed buffer
-      if (cache_output.buffer_ == nullptr) {
-        return Status(
-            Status::Code::INTERNAL,
-            "Failed to allocate buffer from managed buffer");
-      }
-
-      // Copy data from response buffer to cache entry output buffer
-      // TODO: How to differently handle different memory types?
-      //       GPU vs. CPU memory, etc.
-      std::memcpy(cache_output.buffer_, response_buffer, response_byte_size);
     }
 
     // Add each output to cache entry
@@ -329,7 +370,8 @@ RequestResponseCache::BuildInferenceResponse(
           &buffer, cache_output.buffer_size_, &memory_type, &memory_type_id));
 
       // TODO: Handle other memory types
-      if (memory_type != TRITONSERVER_MEMORY_CPU) {
+      if (memory_type != TRITONSERVER_MEMORY_CPU &&
+          memory_type != TRITONSERVER_MEMORY_CPU_PINNED) {
         return Status(
             Status::Code::INTERNAL,
             "Only input buffers in CPU memory are allowed in cache currently");
@@ -359,6 +401,11 @@ RequestResponseCache::Evict()
 {
   // Lock on cache eviction
   std::lock_guard<std::recursive_mutex> lk(cache_mtx_);
+
+  // Nothing to evict if cache is empty
+  if (NumEntries() == 0) {
+    return Status(Status::Code::INTERNAL, "Cache is empty, nothing to evict.");
+  }
 
   // Least recently used key in back of LRU list
   uint64_t lru_key = lru_.back();

@@ -1,4 +1,4 @@
-// Copyright 2019-2021, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+// Copyright 2019-2022, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 //
 // Redistribution and use in source and binary forms, with or without
 // modification, are permitted provided that the following conditions
@@ -931,7 +931,7 @@ EnsembleContext::InitStep(
 #ifdef TRITON_ENABLE_TRACING
   auto& parent_trace = request_tracker_->Request()->Trace();
   if (parent_trace != nullptr) {
-    irequest->SetTrace(std::move(parent_trace->SpawnChildTrace()));
+    irequest->SetTrace(parent_trace->SpawnChildTrace());
     irequest->Trace()->SetModelName(irequest->ModelName());
     irequest->Trace()->SetModelVersion(irequest->ActualModelVersion());
   }
@@ -1198,6 +1198,10 @@ EnsembleContext::ScheduleSteps(
 {
   for (auto& step : steps) {
     step->ctx_ = context;
+    bool should_schedule = false;
+    // Must release lock before InferAsync to avoid deadlock, as the same thread
+    // will be calling request/response callbacks on cache hits, which will
+    // attempt to acquire the lock already held
     {
       std::lock_guard<std::mutex> lock(context->mutex_);
 
@@ -1205,17 +1209,29 @@ EnsembleContext::ScheduleSteps(
       // is called only once.
       if (context->ensemble_status_.IsOk()) {
         context->request_tracker_->IncrementCounter();
-        context->ensemble_status_ = context->is_->InferAsync(step->request_);
-        if (!context->ensemble_status_.IsOk()) {
-          // The request is not sent to server properly, shouldn't expect its
-          // release function get called.
-          context->request_tracker_->DecrementCounter();
-          context->ensemble_status_ = context->FinishEnsemble();
-          break;
-        }
+        should_schedule = true;
       }
-      step.release();
     }
+    if (should_schedule) {
+      // On a successful call to InferAsync(), the step will be released by
+      // the response callback. When the response callback is invoked, the
+      // step must not own (and release) the request as the request should be
+      // transferred and managed by Triton core. In the case of cache hit, the
+      // request hasn't been transferred and can cause double-free, so moving
+      // the request ownership out of step here to avoid that
+      std::unique_ptr<InferenceRequest> request = std::move(step->request_);
+      auto step_status = context->is_->InferAsync(request);
+      if (!step_status.IsOk()) {
+        std::lock_guard<std::mutex> lock(context->mutex_);
+        context->ensemble_status_ = step_status;
+        // The request is not sent to server properly, shouldn't expect its
+        // release function get called.
+        context->request_tracker_->DecrementCounter();
+        context->ensemble_status_ = context->FinishEnsemble();
+        break;
+      }
+    }
+    step.release();
   }
 }
 
@@ -1240,6 +1256,11 @@ EnsembleScheduler::Enqueue(std::unique_ptr<InferenceRequest>& request)
   INFER_TRACE_ACTIVITY(
       request->Trace(), TRITONSERVER_TRACE_QUEUE_START,
       request->QueueStartNs());
+#ifdef TRITON_ENABLE_TRACING
+  request->TraceInputTensors(
+      TRITONSERVER_TRACE_TENSOR_QUEUE_INPUT, "EnsembleScheduler Enqueue");
+#endif  // TRITON_ENABLE_TRACING
+
   std::shared_ptr<EnsembleContext> context(new EnsembleContext(
       metric_reporter_.get(), stats_aggregator_, is_, info_.get(), request,
       stream_));
@@ -1265,7 +1286,8 @@ EnsembleScheduler::EnsembleScheduler(
 #ifdef TRITON_ENABLE_METRICS
   if (Metrics::Enabled()) {
     MetricModelReporter::Create(
-        config.name(), 1, -1, config.metric_tags(), &metric_reporter_);
+        config.name(), 1, METRIC_REPORTER_ID_CPU, config.metric_tags(),
+        &metric_reporter_);
   }
 #endif  // TRITON_ENABLE_METRICS
 

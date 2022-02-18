@@ -48,10 +48,10 @@
 ##
 ############################################################################
 
-TRITON_VERSION=21.12
+TRITON_VERSION=22.01
 
 # ONNX. Use ONNX_OPSET 0 to use the default for ONNX version
-ONNX_VERSION=1.7.0
+ONNX_VERSION=1.10.1
 ONNX_OPSET=0
 
 # OPENVINO version
@@ -382,8 +382,9 @@ python3 $SRCDIR/gen_qa_reshape_models.py --ensemble --models_dir=$ENSEMBLEDESTDI
 python3 $SRCDIR/gen_qa_identity_models.py --ensemble --models_dir=$ENSEMBLEDESTDIR/qa_identity_model_repository
 python3 $SRCDIR/gen_qa_sequence_models.py --ensemble --models_dir=$ENSEMBLEDESTDIR/qa_sequence_model_repository
 python3 $SRCDIR/gen_qa_sequence_models.py --ensemble --variable --models_dir=$ENSEMBLEDESTDIR/qa_variable_sequence_model_repository
-python3 $SRCDIR/gen_tag_sigdef.py --dir $SIGDEFDESTDIR
 chmod -R 777 $ENSEMBLEDESTDIR
+python3 $SRCDIR/gen_tag_sigdef.py --dir $SIGDEFDESTDIR
+chmod -R 777 $SIGDEFDESTDIR
 EOF
 
 chmod a+x $HOST_SRCDIR/$TFSCRIPT
@@ -436,6 +437,8 @@ python3 $SRCDIR/gen_qa_sequence_models.py --tensorrt --models_dir=$SEQDESTDIR
 chmod -R 777 $SEQDESTDIR
 python3 $SRCDIR/gen_qa_implicit_models.py --tensorrt --models_dir=$IMPLICITSEQDESTDIR
 chmod -R 777 $IMPLICITSEQDESTDIR
+python3 $SRCDIR/gen_qa_implicit_models.py --tensorrt --variable --models_dir=$VARIMPLICITSEQDESTDIR
+chmod -R 777 $VARIMPLICITSEQDESTDIR
 python3 $SRCDIR/gen_qa_dyna_sequence_models.py --tensorrt --models_dir=$DYNASEQDESTDIR
 chmod -R 777 $DYNASEQDESTDIR
 python3 $SRCDIR/gen_qa_sequence_models.py --tensorrt --variable --models_dir=$VARSEQDESTDIR

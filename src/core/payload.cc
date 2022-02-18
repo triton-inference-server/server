@@ -1,4 +1,4 @@
-// Copyright 2021, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+// Copyright 2021-2022, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 //
 // Redistribution and use in source and binary forms, with or without
 // modification, are permitted provided that the following conditions
@@ -31,8 +31,8 @@ namespace nvidia { namespace inferenceserver {
 Payload::Payload()
     : op_type_(Operation::INFER_RUN),
       requests_(std::vector<std::unique_ptr<InferenceRequest>>()),
-      OnCallback_([]() {}), OnSecondaryCallback_([]() {}), instance_(nullptr),
-      state_(State::UNINITIALIZED), queue_start_ns_(0)
+      OnCallback_([]() {}), instance_(nullptr), state_(State::UNINITIALIZED),
+      batcher_start_ns_(0), saturated_(false)
 {
   exec_mu_.reset(new std::mutex());
 }
@@ -73,11 +73,12 @@ Payload::Reset(const Operation op_type, TritonModelInstance* instance)
   op_type_ = op_type;
   requests_.clear();
   OnCallback_ = []() {};
-  OnSecondaryCallback_ = []() {};
+  release_callbacks_.clear();
   instance_ = instance;
   state_ = State::UNINITIALIZED;
   status_.reset(new std::promise<Status>());
-  queue_start_ns_ = 0;
+  batcher_start_ns_ = 0;
+  saturated_ = false;
 }
 
 void
@@ -86,10 +87,11 @@ Payload::Release()
   op_type_ = Operation::INFER_RUN;
   requests_.clear();
   OnCallback_ = []() {};
-  OnSecondaryCallback_ = []() {};
+  release_callbacks_.clear();
   instance_ = nullptr;
   state_ = State::RELEASED;
-  queue_start_ns_ = 0;
+  batcher_start_ns_ = 0;
+  saturated_ = false;
 }
 
 size_t
@@ -111,8 +113,9 @@ Payload::ReserveRequests(size_t size)
 void
 Payload::AddRequest(std::unique_ptr<InferenceRequest> request)
 {
-  if ((queue_start_ns_ == 0) || (queue_start_ns_ > request->QueueStartNs())) {
-    queue_start_ns_ = request->QueueStartNs();
+  if ((batcher_start_ns_ == 0) ||
+      (batcher_start_ns_ > request->BatcherStartNs())) {
+    batcher_start_ns_ = request->BatcherStartNs();
   }
   requests_.push_back(std::move(request));
 }
@@ -130,9 +133,15 @@ Payload::SetInstance(TritonModelInstance* model_instance)
 }
 
 void
-Payload::SetSecondaryCallback(std::function<void()> OnSecondaryCallback)
+Payload::AddInternalReleaseCallback(std::function<void()>&& callback)
 {
-  OnSecondaryCallback_ = OnSecondaryCallback;
+  release_callbacks_.emplace_back(std::move(callback));
+}
+
+void
+Payload::MarkSaturated()
+{
+  saturated_ = true;
 }
 
 void
@@ -154,9 +163,15 @@ Payload::Callback()
 }
 
 void
-Payload::SecondaryCallback()
+Payload::OnRelease()
 {
-  OnSecondaryCallback_();
+  // Invoke the release callbacks added internally before releasing the
+  // request to user provided callback.
+  for (auto it = release_callbacks_.rbegin(); it != release_callbacks_.rend();
+       it++) {
+    (*it)();
+  }
+  release_callbacks_.clear();
 }
 
 void

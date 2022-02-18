@@ -1,5 +1,5 @@
 #!/bin/bash
-# Copyright (c) 2021, NVIDIA CORPORATION. All rights reserved.
+# Copyright 2021-2022, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -28,22 +28,26 @@
 source ../common.sh
 source ../../common/util.sh
 
-SERVER=/opt/tritonserver/bin/tritonserver
+TRITON_DIR=${TRITON_DIR:="/opt/tritonserver"}
+SERVER=${TRITON_DIR}/bin/tritonserver
+BACKEND_DIR=${TRITON_DIR}/backends
+SERVER_ARGS="--model-repository=`pwd`/python_backend/models --backend-directory=${BACKEND_DIR} --log-verbose=1"
 SERVER_LOG="./inference_server.log"
-REPO_VERSION=${NVIDIA_TRITON_SERVER_VERSION}
-DATADIR=${DATADIR:="/data/inferenceserver/${REPO_VERSION}"}
 
 RET=0
 rm -fr *.log python_backend/
 
-pip3 uninstall -y torch
-pip3 install torch==1.9.0+cu111 torchvision==0.10.0+cu111 torchaudio==0.9.0 -f https://download.pytorch.org/whl/torch_stable.html
+# # Skip torch install on Jetson since it is already installed.
+if [ "$TEST_JETSON" == "0" ]; then
+    pip3 uninstall -y torch
+    pip3 install torch==1.9.0+cu111 -f https://download.pytorch.org/whl/torch_stable.html
+fi
 
 git clone https://github.com/triton-inference-server/python_backend -b $PYTHON_BACKEND_REPO_TAG
 cd python_backend
-SERVER_ARGS="--model-repository=`pwd`/models --log-verbose=1"
 
 # Example 1
+CLIENT_LOG="./add_sub_client.log"
 mkdir -p models/add_sub/1/
 cp examples/add_sub/model.py models/add_sub/1/model.py
 cp examples/add_sub/config.pbtxt models/add_sub/config.pbtxt
@@ -55,16 +59,16 @@ if [ "$SERVER_PID" == "0" ]; then
 fi
 
 set +e
-python3 examples/add_sub/client.py > add_sub_client.log
+python3 examples/add_sub/client.py > $CLIENT_LOG
 if [ $? -ne 0 ]; then
     echo -e "\n***\n*** Failed to verify add_sub example. \n***"
     RET=1
 fi
 
-grep "PASS" add_sub_client.log
+grep "PASS" $CLIENT_LOG
 if [ $? -ne 0 ]; then
     echo -e "\n***\n*** Failed to verify pytorch example. \n***"
-    cat pytorch_client.log
+    cat $CLIENT_LOG
     RET=1
 fi
 set -e
@@ -73,6 +77,7 @@ kill $SERVER_PID
 wait $SERVER_PID
 
 # Example 2
+CLIENT_LOG="./pytorch_client.log"
 mkdir -p models/pytorch/1/
 cp examples/pytorch/model.py models/pytorch/1/model.py
 cp examples/pytorch/config.pbtxt models/pytorch/config.pbtxt
@@ -84,16 +89,16 @@ if [ "$SERVER_PID" == "0" ]; then
 fi
 
 set +e
-python3 examples/pytorch/client.py > pytorch_client.log
+python3 examples/pytorch/client.py > $CLIENT_LOG
 if [ $? -ne 0 ]; then
     echo -e "\n***\n*** Failed to verify pytorch example. \n***"
     RET=1
 fi
 
-grep "PASS" pytorch_client.log
+grep "PASS" $CLIENT_LOG
 if [ $? -ne 0 ]; then
     echo -e "\n***\n*** Failed to verify pytorch example. \n***"
-    cat pytorch_client.log
+    cat $CLIENT_LOG
     RET=1
 fi
 set -e
@@ -104,6 +109,7 @@ wait $SERVER_PID
 # Example 3
 
 # BLS Sync
+CLIENT_LOG="./sync_client.log"
 mkdir -p models/bls_sync/1
 cp examples/bls/sync_model.py models/bls_sync/1/model.py
 cp examples/bls/sync_config.pbtxt models/bls_sync/config.pbtxt
@@ -115,16 +121,16 @@ if [ "$SERVER_PID" == "0" ]; then
 fi
 
 set +e
-python3 examples/bls/sync_client.py > sync_client.log
+python3 examples/bls/sync_client.py > $CLIENT_LOG
 if [ $? -ne 0 ]; then
     echo -e "\n***\n*** Failed to verify BLS sync example. \n***"
     RET=1
 fi
 
-grep "PASS" sync_client.log
+grep "PASS" $CLIENT_LOG
 if [ $? -ne 0 ]; then
     echo -e "\n***\n*** Failed to verify BLS sync example. \n***"
-    cat sync_client.log
+    cat $CLIENT_LOG
     RET=1
 fi
 set -e
@@ -132,36 +138,43 @@ set -e
 kill $SERVER_PID
 wait $SERVER_PID
 
+#
 # BLS Async
-mkdir -p models/bls_async/1
-cp examples/bls/async_model.py models/bls_async/1/model.py
-cp examples/bls/async_config.pbtxt models/bls_async/config.pbtxt
-run_server
-if [ "$SERVER_PID" == "0" ]; then
-    echo -e "\n***\n*** Failed to start $SERVER\n***"
-    cat $SERVER_LOG
-    RET=1
+#
+# Skip async BLS on Jetson since it is not supported with python3.6
+# Having multiple python versions lead to build issues.
+# Anaconda is not officially supported on Jetson.
+if [ "$TEST_JETSON" == "0" ]; then
+    CLIENT_LOG="./async_client.log"
+    mkdir -p models/bls_async/1
+    cp examples/bls/async_model.py models/bls_async/1/model.py
+    cp examples/bls/async_config.pbtxt models/bls_async/config.pbtxt
+    run_server
+    if [ "$SERVER_PID" == "0" ]; then
+        echo -e "\n***\n*** Failed to start $SERVER\n***"
+        cat $SERVER_LOG
+        RET=1
+    fi
+
+    set +e
+    python3 examples/bls/async_client.py > $CLIENT_LOG
+    if [ $? -ne 0 ]; then
+        echo -e "\n***\n*** Failed to verify BLS async example. \n***"
+        RET=1
+    fi
+
+    grep "PASS" $CLIENT_LOG
+    if [ $? -ne 0 ]; then
+        echo -e "\n***\n*** Failed to verify BLS async example. \n***"
+        cat $CLIENT_LOG
+        RET=1
+    fi
+
+    set -e
+
+    kill $SERVER_PID
+    wait $SERVER_PID
 fi
-
-set +e
-python3 examples/bls/async_client.py > async_client.log
-if [ $? -ne 0 ]; then
-    echo -e "\n***\n*** Failed to verify BLS sync example. \n***"
-    cat async_client.log
-    RET=1
-fi
-
-grep "PASS" async_client.log
-if [ $? -ne 0 ]; then
-    echo -e "\n***\n*** Failed to verify BLS sync example. \n***"
-    cat async_client.log
-    RET=1
-fi
-
-set -e
-
-kill $SERVER_PID
-wait $SERVER_PID
 
 if [ $RET -eq 0 ]; then
     echo -e "\n***\n*** Example verification test PASSED.\n***"

@@ -256,11 +256,9 @@ class SequenceBatch {
   std::shared_ptr<SequenceBatchScheduler::ControlInputs>
       notready_input_overrides_;
 
-  // For each sequence slot the correlation ID input for that
-  // slot. Empty if model does not specify the CONTROL_SEQUENCE_CORRID
-  // control.
-  std::vector<std::shared_ptr<InferenceRequest::Input>>
-      seq_slot_corrid_overrides_;
+  // The correlation ID override. Empty if model does not specify the
+  // CONTROL_SEQUENCE_CORRID control.
+  std::shared_ptr<InferenceRequest::Input> seq_slot_corrid_override_;
 
   // For each sequence slot store the optional state i/o tensors.
   std::vector<std::shared_ptr<SequenceStates>> sequence_states_;
@@ -308,6 +306,13 @@ class DirectSequenceBatch : public SequenceBatch {
   // Mutex protecting correlation queues, etc.
   std::mutex mu_;
   std::condition_variable cv_;
+
+  // Execution state of the last enqueued payload
+  bool exec_complete_;
+
+  // Mutex protecting execution state of payload
+  std::mutex payload_mu_;
+  std::condition_variable payload_cv_;
 
   // Queues holding inference requests. There are 'seq_slot_cnt'
   // queues, one for each sequence slot where requests assigned to

@@ -95,6 +95,9 @@ InferenceServer::InferenceServer()
 #ifdef TRITON_ENABLE_STATS
   extensions_.push_back("statistics");
 #endif  // TRITON_ENABLE_STATS
+#ifdef TRITON_ENABLE_TRACING
+  extensions_.push_back("trace");
+#endif  // TRITON_ENABLE_TRACING
 
   strict_model_config_ = true;
   strict_readiness_ = true;

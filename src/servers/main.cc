@@ -1,4 +1,4 @@
-// Copyright 2018-2021, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+// Copyright 2018-2022, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 //
 // Redistribution and use in source and binary forms, with or without
 // modification, are permitted provided that the following conditions
@@ -134,6 +134,8 @@ std::string trace_filepath_;
 TRITONSERVER_InferenceTraceLevel trace_level_ =
     TRITONSERVER_TRACE_LEVEL_DISABLED;
 int32_t trace_rate_ = 1000;
+int32_t trace_count_ = -1;
+int32_t trace_log_frequency_ = 0;
 #endif  // TRITON_ENABLE_TRACING
 
 #if defined(TRITON_ENABLE_GRPC)
@@ -271,6 +273,8 @@ enum OptionId {
   OPTION_TRACE_FILEPATH,
   OPTION_TRACE_LEVEL,
   OPTION_TRACE_RATE,
+  OPTION_TRACE_COUNT,
+  OPTION_TRACE_LOG_FREQUENCY,
 #endif  // TRITON_ENABLE_TRACING
   OPTION_MODEL_CONTROL_MODE,
   OPTION_POLL_REPO_SECS,
@@ -460,12 +464,26 @@ std::vector<Option> options_
 #endif  // TRITON_ENABLE_METRICS
 #ifdef TRITON_ENABLE_TRACING
       {OPTION_TRACE_FILEPATH, "trace-file", Option::ArgStr,
-       "Set the file where trace output will be saved."},
+       "Set the file where trace output will be saved. If --trace-log-frequency"
+       " is also specified, this argument value will be the prefix of the files"
+       " to save the trace output. See --trace-log-frequency for detail."},
       {OPTION_TRACE_LEVEL, "trace-level", Option::ArgStr,
-       "Set the trace level. OFF to disable tracing, MIN for minimal tracing, "
-       "MAX for maximal tracing. Default is OFF."},
+       "Specify a trace level. OFF to disable tracing, TIMESTAMPS to "
+       "trace timestamps, TENSORS to trace tensors. It may be specified "
+       "multiple times to trace multiple informations. Default is OFF."},
       {OPTION_TRACE_RATE, "trace-rate", Option::ArgInt,
        "Set the trace sampling rate. Default is 1000."},
+      {OPTION_TRACE_COUNT, "trace-count", Option::ArgInt,
+       "Set the number of traces to be sampled. If the value is -1, the number "
+       "of traces to be sampled will not be limited. Default is -1."},
+      {OPTION_TRACE_LOG_FREQUENCY, "trace-log-frequency", Option::ArgInt,
+       "Set the trace log frequency. If the value is 0, Triton will only log "
+       "the trace output to <trace-file> when shutting down. Otherwise, Triton "
+       "will log the trace output to <trace-file>.<idx> when it collects the "
+       "specified number of traces. For example, if the log frequency is 100, "
+       "when Triton collects the 100-th trace, it logs the traces to file "
+       "<trace-file>.0, and when it collects the 200-th trace, it logs the "
+       "101-th to the 200-th traces to file <trace-file>.1. Default is 0."},
 #endif  // TRITON_ENABLE_TRACING
       {OPTION_MODEL_CONTROL_MODE, "model-control-mode", Option::ArgStr,
        "Specify the mode for model management. Options are \"none\", \"poll\" "
@@ -914,16 +932,15 @@ StartTracing(nvidia::inferenceserver::TraceManager** trace_manager)
   *trace_manager = nullptr;
 
 #ifdef TRITON_ENABLE_TRACING
-  TRITONSERVER_Error* err = nullptr;
-
-  // Configure tracing if host is specified.
-  if (trace_level_ != TRITONSERVER_TRACE_LEVEL_DISABLED) {
-    err = nvidia::inferenceserver::TraceManager::Create(
-        trace_manager, trace_level_, trace_rate_, trace_filepath_);
-  }
+  TRITONSERVER_Error* err = nvidia::inferenceserver::TraceManager::Create(
+      trace_manager, trace_level_, trace_rate_, trace_count_,
+      trace_log_frequency_, trace_filepath_);
 
   if (err != nullptr) {
     LOG_TRITONSERVER_ERROR(err, "failed to configure tracing");
+    if (*trace_manager != nullptr) {
+      delete (*trace_manager);
+    }
     *trace_manager = nullptr;
     return false;
   }
@@ -1076,11 +1093,12 @@ ParseTraceLevelOption(std::string arg)
   if ((arg == "false") || (arg == "off")) {
     return TRITONSERVER_TRACE_LEVEL_DISABLED;
   }
-  if ((arg == "true") || (arg == "on") || (arg == "min")) {
-    return TRITONSERVER_TRACE_LEVEL_MIN;
+  if ((arg == "true") || (arg == "on") || (arg == "min") || (arg == "max") ||
+      (arg == "timestamps")) {
+    return TRITONSERVER_TRACE_LEVEL_TIMESTAMPS;
   }
-  if (arg == "max") {
-    return TRITONSERVER_TRACE_LEVEL_MAX;
+  if (arg == "tensors") {
+    return TRITONSERVER_TRACE_LEVEL_TENSORS;
   }
 
   std::cerr << "invalid value for trace level option: " << arg << std::endl;
@@ -1292,8 +1310,11 @@ Parse(TRITONSERVER_ServerOptions** server_options, int argc, char** argv)
 
 #ifdef TRITON_ENABLE_TRACING
   std::string trace_filepath = trace_filepath_;
-  TRITONSERVER_InferenceTraceLevel trace_level = trace_level_;
+  std::vector<TRITONSERVER_InferenceTraceLevel> trace_level_settings = {
+      trace_level_};
   int32_t trace_rate = trace_rate_;
+  int32_t trace_count = trace_count_;
+  int32_t trace_log_frequency = trace_log_frequency_;
 #endif  // TRITON_ENABLE_TRACING
 
   TRITONSERVER_ModelControlMode control_mode = TRITONSERVER_MODEL_CONTROL_NONE;
@@ -1491,10 +1512,16 @@ Parse(TRITONSERVER_ServerOptions** server_options, int argc, char** argv)
         trace_filepath = optarg;
         break;
       case OPTION_TRACE_LEVEL:
-        trace_level = ParseTraceLevelOption(optarg);
+        trace_level_settings.push_back(ParseTraceLevelOption(optarg));
         break;
       case OPTION_TRACE_RATE:
         trace_rate = ParseIntOption(optarg);
+        break;
+      case OPTION_TRACE_COUNT:
+        trace_count = ParseIntOption(optarg);
+        break;
+      case OPTION_TRACE_LOG_FREQUENCY:
+        trace_log_frequency = ParseIntOption(optarg);
         break;
 #endif  // TRITON_ENABLE_TRACING
 
@@ -1654,8 +1681,13 @@ Parse(TRITONSERVER_ServerOptions** server_options, int argc, char** argv)
 
 #ifdef TRITON_ENABLE_TRACING
   trace_filepath_ = trace_filepath;
-  trace_level_ = trace_level;
+  for (auto& trace_level : trace_level_settings) {
+    trace_level_ = static_cast<TRITONSERVER_InferenceTraceLevel>(
+        trace_level_ | trace_level);
+  }
   trace_rate_ = trace_rate;
+  trace_count_ = trace_count;
+  trace_log_frequency_ = trace_log_frequency;
 #endif  // TRITON_ENABLE_TRACING
 
   // Check if HTTP, GRPC and metrics port clash

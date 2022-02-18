@@ -1,4 +1,4 @@
-// Copyright (c) 2019-2020, NVIDIA CORPORATION. All rights reserved.
+// Copyright 2019-2022, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 //
 // Redistribution and use in source and binary forms, with or without
 // modification, are permitted provided that the following conditions
@@ -94,6 +94,10 @@ MetricModelReporter::MetricModelReporter(
       Metrics::FamilyInferenceComputeInferDuration(), labels);
   metric_inf_compute_output_duration_us_ = CreateCounterMetric(
       Metrics::FamilyInferenceComputeOutputDuration(), labels);
+  metric_cache_hit_count_ =
+      CreateCounterMetric(Metrics::FamilyCacheHitCount(), labels);
+  metric_cache_hit_lookup_duration_us_ =
+      CreateCounterMetric(Metrics::FamilyCacheHitLookupDuration(), labels);
 }
 
 MetricModelReporter::~MetricModelReporter()
@@ -111,6 +115,9 @@ MetricModelReporter::~MetricModelReporter()
       metric_inf_compute_infer_duration_us_);
   Metrics::FamilyInferenceComputeOutputDuration().Remove(
       metric_inf_compute_output_duration_us_);
+  Metrics::FamilyCacheHitCount().Remove(metric_cache_hit_count_);
+  Metrics::FamilyCacheHitLookupDuration().Remove(
+      metric_cache_hit_lookup_duration_us_);
 }
 
 void
@@ -128,7 +135,7 @@ MetricModelReporter::GetMetricLabels(
         "_" + tag.first, tag.second));
   }
 
-  // 'device' can be -1 to indicate that the GPU is not known. In
+  // 'device' can be < 0 to indicate that the GPU is not known. In
   // that case use a metric that doesn't have the gpu_uuid label.
   if (device >= 0) {
     std::string uuid;

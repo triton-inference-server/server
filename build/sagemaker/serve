@@ -39,6 +39,18 @@ fi
 if [ -n "$SAGEMAKER_TRITON_THREAD_COUNT" ]; then
     SAGEMAKER_ARGS="${SAGEMAKER_ARGS} --sagemaker-thread-count=${SAGEMAKER_TRITON_THREAD_COUNT}"
 fi
+if [ -n "$SAGEMAKER_TRITON_LOG_VERBOSE" ]; then
+    SAGEMAKER_ARGS="${SAGEMAKER_ARGS} --log-verbose=${SAGEMAKER_TRITON_LOG_VERBOSE}"
+fi
+if [ -n "$SAGEMAKER_TRITON_LOG_INFO" ]; then
+    SAGEMAKER_ARGS="${SAGEMAKER_ARGS} --log-info=${SAGEMAKER_TRITON_LOG_INFO}"
+fi
+if [ -n "$SAGEMAKER_TRITON_LOG_WARNING" ]; then
+    SAGEMAKER_ARGS="${SAGEMAKER_ARGS} --log-warning=${SAGEMAKER_TRITON_LOG_WARNING}"
+fi
+if [ -n "$SAGEMAKER_TRITON_LOG_ERROR" ]; then
+    SAGEMAKER_ARGS="${SAGEMAKER_ARGS} --log-error=${SAGEMAKER_TRITON_LOG_ERROR}"
+fi
 
 if [ -f "${SAGEMAKER_SINGLE_MODEL_REPO}/config.pbtxt" ]; then
     echo "ERROR: Incorrect directory structure."

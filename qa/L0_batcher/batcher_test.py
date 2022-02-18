@@ -194,7 +194,7 @@ class BatcherTest(tu.TestResultCollector):
         self.assertEqual(bconfig.max_queue_delay_microseconds,
                          max_queue_delay_us)
 
-    def check_status(self, model_name, batch_exec, request_cnt, infer_cnt):
+    def check_status(self, model_name, batch_exec, request_cnt, infer_cnt, exec_count):
         stats = self.triton_client_.get_inference_statistics(model_name, "1")
         self.assertEqual(len(stats.model_stats), 1, "expect 1 model stats")
         self.assertEqual(stats.model_stats[0].name, model_name,
@@ -203,22 +203,23 @@ class BatcherTest(tu.TestResultCollector):
             stats.model_stats[0].version, "1",
             "expect model stats for model {} version 1".format(model_name))
 
-        batch_stats = stats.model_stats[0].batch_stats
-        self.assertEqual(
-            len(batch_stats), len(batch_exec),
-            "expected {} different batch-sizes, got {}".format(
-                len(batch_exec), len(batch_stats)))
-
-        for batch_stat in batch_stats:
-            bs = batch_stat.batch_size
-            bc = batch_stat.compute_infer.count
-            self.assertTrue(bs in batch_exec,
-                            "unexpected batch-size {}".format(bs))
-            # Get count from one of the stats
+        if batch_exec:
+            batch_stats = stats.model_stats[0].batch_stats
             self.assertEqual(
-                bc, batch_exec[bs],
-                "expected model-execution-count {} for batch size {}, got {}".
-                format(batch_exec[bs], bs, bc))
+                len(batch_stats), len(batch_exec),
+                "expected {} different batch-sizes, got {}".format(
+                    len(batch_exec), len(batch_stats)))
+
+            for batch_stat in batch_stats:
+                bs = batch_stat.batch_size
+                bc = batch_stat.compute_infer.count
+                self.assertTrue(bs in batch_exec,
+                                "unexpected batch-size {}".format(bs))
+                # Get count from one of the stats
+                self.assertEqual(
+                    bc, batch_exec[bs],
+                    "expected model-execution-count {} for batch size {}, got {}".
+                    format(batch_exec[bs], bs, bc))
 
         actual_request_cnt = stats.model_stats[0].inference_stats.success.count
         self.assertEqual(
@@ -227,8 +228,8 @@ class BatcherTest(tu.TestResultCollector):
                 request_cnt, actual_request_cnt))
 
         actual_exec_cnt = stats.model_stats[0].execution_count
-        self.assertEqual(
-            actual_request_cnt, request_cnt,
+        self.assertIn(
+            actual_exec_cnt, exec_count,
             "expected model-exec-count {}, got {}".format(
                 request_cnt, actual_exec_cnt))
 
@@ -260,7 +261,7 @@ class BatcherTest(tu.TestResultCollector):
                     6, (3000, None),
                     precreated_shm_regions=precreated_shm_regions)
                 self.check_deferred_exception()
-                self.check_status(model_name, {2: 1, 6: 1}, 2, 8)
+                self.check_status(model_name, {2: 1, 6: 1}, 2, 8, (2,))
             except Exception as ex:
                 self.assertTrue(False, "unexpected error {}".format(ex))
 
@@ -282,7 +283,7 @@ class BatcherTest(tu.TestResultCollector):
                     1, (_max_queue_delay_ms * 1.5, _max_queue_delay_ms),
                     precreated_shm_regions=precreated_shm_regions)
                 self.check_deferred_exception()
-                self.check_status(model_name, {1: 1}, 1, 1)
+                self.check_status(model_name, {1: 1}, 1, 1, (1,))
             except Exception as ex:
                 self.assertTrue(False, "unexpected error {}".format(ex))
 
@@ -304,7 +305,7 @@ class BatcherTest(tu.TestResultCollector):
                     3, (_max_queue_delay_ms * 1.5, _max_queue_delay_ms),
                     precreated_shm_regions=precreated_shm_regions)
                 self.check_deferred_exception()
-                self.check_status(model_name, {3: 1}, 1, 3)
+                self.check_status(model_name, {3: 1}, 1, 3, (1,))
             except Exception as ex:
                 self.assertTrue(False, "unexpected error {}".format(ex))
 
@@ -326,7 +327,7 @@ class BatcherTest(tu.TestResultCollector):
                     7, (3000, None),
                     precreated_shm_regions=precreated_shm_regions)
                 self.check_deferred_exception()
-                self.check_status(model_name, {7: 1}, 1, 7)
+                self.check_status(model_name, {7: 1}, 1, 7, (1,))
             except Exception as ex:
                 self.assertTrue(False, "unexpected error {}".format(ex))
 
@@ -369,7 +370,7 @@ class BatcherTest(tu.TestResultCollector):
                 for t in threads:
                     t.join()
                 self.check_deferred_exception()
-                self.check_status(model_name, {2: 1}, 2, 2)
+                self.check_status(model_name, {2: 1}, 2, 2, (1,))
             except Exception as ex:
                 self.assertTrue(False, "unexpected error {}".format(ex))
 
@@ -422,7 +423,7 @@ class BatcherTest(tu.TestResultCollector):
                 for t in threads:
                     t.join()
                 self.check_deferred_exception()
-                self.check_status(model_name, {1: 2}, 2, 2)
+                self.check_status(model_name, {1: 2}, 2, 2, (2,))
             except Exception as ex:
                 self.assertTrue(False, "unexpected error {}".format(ex))
 
@@ -473,7 +474,7 @@ class BatcherTest(tu.TestResultCollector):
                 for t in threads:
                     t.join()
                 self.check_deferred_exception()
-                self.check_status(model_name, {4: 1}, 2, 4)
+                self.check_status(model_name, {4: 1}, 2, 4, (1,))
             except Exception as ex:
                 self.assertTrue(False, "unexpected error {}".format(ex))
 
@@ -536,7 +537,7 @@ class BatcherTest(tu.TestResultCollector):
                 for t in threads:
                     t.join()
                 self.check_deferred_exception()
-                self.check_status(model_name, {1: 1, 4: 1}, 3, 5)
+                self.check_status(model_name, {1: 1, 4: 1}, 3, 5, (2,))
             except Exception as ex:
                 self.assertTrue(False, "unexpected error {}".format(ex))
 
@@ -613,7 +614,7 @@ class BatcherTest(tu.TestResultCollector):
                 for t in threads:
                     t.join()
                 self.check_deferred_exception()
-                self.check_status(model_name, {4: 1, 6: 1}, 4, 10)
+                self.check_status(model_name, {4: 1, 6: 1}, 4, 10, (2,))
             except Exception as ex:
                 self.assertTrue(False, "unexpected error {}".format(ex))
 
@@ -662,7 +663,7 @@ class BatcherTest(tu.TestResultCollector):
                 for t in threads:
                     t.join()
                 self.check_deferred_exception()
-                self.check_status(model_name, {3: 1, 7: 1}, 2, 10)
+                self.check_status(model_name, {3: 1, 7: 1}, 2, 10, (2,))
             except Exception as ex:
                 self.assertTrue(False, "unexpected error {}".format(ex))
 
@@ -715,7 +716,7 @@ class BatcherTest(tu.TestResultCollector):
                 for t in threads:
                     t.join()
                 self.check_deferred_exception()
-                self.check_status(model_name, {3: 1, 4: 1}, 2, 7)
+                self.check_status(model_name, {3: 1, 4: 1}, 2, 7, (2,))
             except Exception as ex:
                 self.assertTrue(False, "unexpected error {}".format(ex))
 
@@ -764,7 +765,7 @@ class BatcherTest(tu.TestResultCollector):
                 for t in threads:
                     t.join()
                 self.check_deferred_exception()
-                self.check_status(model_name, {2: 1}, 2, 2)
+                self.check_status(model_name, {2: 1}, 2, 2, (1,))
             except Exception as ex:
                 self.assertTrue(False, "unexpected error {}".format(ex))
 
@@ -813,7 +814,7 @@ class BatcherTest(tu.TestResultCollector):
                 for t in threads:
                     t.join()
                 self.check_deferred_exception()
-                self.check_status(model_name, {2: 1}, 2, 2)
+                self.check_status(model_name, {2: 1}, 2, 2, (1,))
             except Exception as ex:
                 self.assertTrue(False, "unexpected error {}".format(ex))
 
@@ -863,7 +864,7 @@ class BatcherTest(tu.TestResultCollector):
                 for t in threads:
                     t.join()
                 self.check_deferred_exception()
-                self.check_status(model_name, {2: 1}, 2, 2)
+                self.check_status(model_name, {2: 1}, 2, 2, (1,))
             except Exception as ex:
                 self.assertTrue(False, "unexpected error {}".format(ex))
 
@@ -908,7 +909,7 @@ class BatcherTest(tu.TestResultCollector):
                 for t in threads:
                     t.join()
                 self.check_deferred_exception()
-                self.check_status(model_name, {2: 1}, 2, 2)
+                self.check_status(model_name, {2: 1}, 2, 2, (1,))
             except Exception as ex:
                 self.assertTrue(False, "unexpected error {}".format(ex))
 
@@ -965,7 +966,7 @@ class BatcherTest(tu.TestResultCollector):
                 for t in threads:
                     t.join()
                 self.check_deferred_exception()
-                self.check_status(model_name, {3: 1, 4: 1}, 2, 7)
+                self.check_status(model_name, {3: 1, 4: 1}, 2, 7, (2,))
             except Exception as ex:
                 self.assertTrue(False, "unexpected error {}".format(ex))
 
@@ -1037,7 +1038,7 @@ class BatcherTest(tu.TestResultCollector):
                 for t in threads:
                     t.join()
                 self.check_deferred_exception()
-                self.check_status(model_name, {8: 1}, 3, 8)
+                self.check_status(model_name, {8: 1}, 3, 8, (1,))
             except Exception as ex:
                 self.assertTrue(False, "unexpected error {}".format(ex))
 
@@ -1120,7 +1121,7 @@ class BatcherTest(tu.TestResultCollector):
                 for t in threads:
                     t.join()
                 self.check_deferred_exception()
-                self.check_status(model_name, {4: 1, 6: 1}, 4, 10)
+                self.check_status(model_name, {4: 1, 6: 1}, 4, 10, (2,))
             except Exception as ex:
                 self.assertTrue(False, "unexpected error {}".format(ex))
 
@@ -1216,7 +1217,7 @@ class BatcherTest(tu.TestResultCollector):
                 for t in threads:
                     t.join()
                 self.check_deferred_exception()
-                self.check_status(model_name, {6: 1}, 6, 6)
+                self.check_status(model_name, {6: 1}, 6, 6, (1,))
             except Exception as ex:
                 self.assertTrue(False, "unexpected error {}".format(ex))
 
@@ -1284,7 +1285,7 @@ class BatcherTest(tu.TestResultCollector):
                 for t in threads:
                     t.join()
                 self.check_deferred_exception()
-                self.check_status(model_name, {2: 1, 1: 1}, 3, 3)
+                self.check_status(model_name, {2: 1, 1: 1}, 3, 3, (2,))
             except Exception as ex:
                 self.assertTrue(False, "unexpected error {}".format(ex))
 
@@ -1332,7 +1333,7 @@ class BatcherTest(tu.TestResultCollector):
                 t.join()
             self.check_deferred_exception()
             model_name = tu.get_zero_model_name(model_base, len(shapes), dtype)
-            self.check_status(model_name, {4: 3}, 12, 12)
+            self.check_status(model_name, {4: 3}, 12, 12, (3,))
         except Exception as ex:
             self.assertTrue(False, "unexpected error {}".format(ex))
 
@@ -1406,7 +1407,7 @@ class BatcherTest(tu.TestResultCollector):
                 for t in threads:
                     t.join()
                 self.check_deferred_exception()
-                self.check_status(model_name, {4: 1}, 4, 4)
+                self.check_status(model_name, {4: 1}, 4, 4, (1,))
             except Exception as ex:
                 self.assertTrue(False, "unexpected error {}".format(ex))
 
@@ -1491,7 +1492,7 @@ class BatcherTest(tu.TestResultCollector):
                 for t in threads:
                     t.join()
                 self.check_deferred_exception()
-                self.check_status(model_name, {4: 1, 1: 1}, 5, 5)
+                self.check_status(model_name, {4: 1, 1: 1}, 5, 5, (2,))
             except Exception as ex:
                 self.assertTrue(False, "unexpected error {}".format(ex))
 
@@ -1598,7 +1599,7 @@ class BatcherTest(tu.TestResultCollector):
                 for t in threads:
                     t.join()
                 self.check_deferred_exception()
-                self.check_status(model_name, {6: 1, 1: 1}, 7, 7)
+                self.check_status(model_name, {6: 1, 1: 1}, 7, 7, (2,))
             except Exception as ex:
                 self.assertTrue(False, "unexpected error {}".format(ex))
 
@@ -1625,7 +1626,7 @@ class BatcherTest(tu.TestResultCollector):
 
                 self.check_setup(model_name, [4, 6], 0)
 
-                # Need scheduler to wait for queue to contain 6 request
+                # Need scheduler to wait for queue to contain 3 request
                 self.assertTrue("TRITONSERVER_DELAY_SCHEDULER" in os.environ)
                 self.assertEqual(
                     int(os.environ["TRITONSERVER_DELAY_SCHEDULER"]), 3)
@@ -1660,10 +1661,112 @@ class BatcherTest(tu.TestResultCollector):
                 for t in threads:
                     t.join()
                 self.check_deferred_exception()
-                self.check_status(model_name, {3: 1}, 3, 3)
+                self.check_status(model_name, {3: 1}, 3, 3, (1,))
             except Exception as ex:
                 self.assertTrue(False, "unexpected error {}".format(ex))
 
+    def test_max_queue_delay_only_non_default(self):
+        # Send 12 requests with batch size 1. The max_queue_delay is set
+        # to non-zero. Depending upon the timing of the requests arrival
+        # there can be either 1 or 2 model executions.
+        model_base = "custom"
+        dtype = np.float32
+        shapes = ([
+            1,
+            1,
+        ],)
+
+        try:
+            # use threads to send 12 requests without waiting for response
+            threads = []
+            for i in range(12):
+                if TEST_SYSTEM_SHARED_MEMORY or TEST_CUDA_SHARED_MEMORY:
+                    shm_region_name_prefix = [
+                        "input" + str(i), "output" + str(i)
+                    ]
+                else:
+                    shm_region_name_prefix = None
+                threads.append(
+                    threading.Thread(target=iu.infer_zero,
+                                     args=(self, model_base, 1, dtype, shapes,
+                                           shapes),
+                                     kwargs={
+                                         'use_grpc':
+                                             USE_GRPC,
+                                         'use_http':
+                                             USE_HTTP,
+                                         'use_http_json_tensors':
+                                             False,
+                                         'use_streaming':
+                                             False,
+                                         'shm_region_name_prefix':
+                                             shm_region_name_prefix,
+                                         'use_system_shared_memory':
+                                             TEST_SYSTEM_SHARED_MEMORY,
+                                         'use_cuda_shared_memory':
+                                             TEST_CUDA_SHARED_MEMORY
+                                     }))
+            for t in threads:
+                t.start()
+            for t in threads:
+                t.join()
+            self.check_deferred_exception()
+            model_name = tu.get_zero_model_name(model_base, len(shapes), dtype)
+            self.check_status(model_name, None, 12, 12, (1,2))
+        except Exception as ex:
+            self.assertTrue(False, "unexpected error {}".format(ex))
+
+    def test_max_queue_delay_only_default(self):
+        # Send 12 requests with batch size 1. The max_queue_delay is set
+        # to default value of 0. There should be two distinct model
+        # executions. The first few requests will form a first batch
+        # and the remaining requests will form the second batch.
+        model_base = "custom"
+        dtype = np.float32
+        shapes = ([
+            1,
+            1,
+        ],)
+
+        try:
+            # use threads to send 12 requests without waiting for response
+            threads = []
+            for i in range(12):
+                if TEST_SYSTEM_SHARED_MEMORY or TEST_CUDA_SHARED_MEMORY:
+                    shm_region_name_prefix = [
+                        "input" + str(i), "output" + str(i)
+                    ]
+                else:
+                    shm_region_name_prefix = None
+                threads.append(
+                    threading.Thread(target=iu.infer_zero,
+                                     args=(self, model_base, 1, dtype, shapes,
+                                           shapes),
+                                     kwargs={
+                                         'use_grpc':
+                                             USE_GRPC,
+                                         'use_http':
+                                             USE_HTTP,
+                                         'use_http_json_tensors':
+                                             False,
+                                         'use_streaming':
+                                             False,
+                                         'shm_region_name_prefix':
+                                             shm_region_name_prefix,
+                                         'use_system_shared_memory':
+                                             TEST_SYSTEM_SHARED_MEMORY,
+                                         'use_cuda_shared_memory':
+                                             TEST_CUDA_SHARED_MEMORY
+                                     }))
+            for t in threads:
+                t.start()
+            for t in threads:
+                t.join()
+            self.check_deferred_exception()
+            model_name = tu.get_zero_model_name(model_base, len(shapes), dtype)
+            self.check_status(model_name, None, 12, 12, (2,))
+        except Exception as ex:
+            self.assertTrue(False, "unexpected error {}".format(ex))
 
 if __name__ == '__main__':
     unittest.main()

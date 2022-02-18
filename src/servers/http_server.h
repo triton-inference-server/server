@@ -1,4 +1,4 @@
-// Copyright (c) 2020-2021, NVIDIA CORPORATION. All rights reserved.
+// Copyright 2020-2022, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 //
 // Redistribution and use in source and binary forms, with or without
 // modification, are permitted provided that the following conditions
@@ -193,8 +193,7 @@ class HTTPAPIServer : public HTTPServer {
     uint32_t IncrementResponseCount();
 
 #ifdef TRITON_ENABLE_TRACING
-    TraceManager* trace_manager_;
-    uint64_t trace_id_;
+    std::shared_ptr<TraceManager::Trace> trace_;
 #endif  // TRITON_ENABLE_TRACING
 
     AllocPayload alloc_payload_;
@@ -281,6 +280,7 @@ class HTTPAPIServer : public HTTPServer {
   void HandleCudaSharedMemory(
       evhtp_request_t* req, const std::string& region_name,
       const std::string& action);
+  void HandleTrace(evhtp_request_t* req, const std::string& model_name = "");
 
   TRITONSERVER_Error* EVBufferToInput(
       const std::string& model_name, TRITONSERVER_InferenceRequest* irequest,
@@ -308,6 +308,7 @@ class HTTPAPIServer : public HTTPServer {
   re2::RE2 modelcontrol_regex_;
   re2::RE2 systemsharedmemory_regex_;
   re2::RE2 cudasharedmemory_regex_;
+  re2::RE2 trace_regex_;
 };
 
 }}  // namespace nvidia::inferenceserver

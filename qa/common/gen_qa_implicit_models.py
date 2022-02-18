@@ -144,7 +144,6 @@ def create_onnx_modelfile_wo_initial_state(models_dir, model_version, max_batch,
     # cast int8, int16 input to higer precision int as Onnx Add/Sub operator doesn't support those type
     if ((onnx_dtype == onnx.TensorProto.INT8) or
         (onnx_dtype == onnx.TensorProto.INT16)):
-
         internal_input = onnx.helper.make_node("Cast", ["INPUT"], ["_INPUT"],
                                                to=onnx.TensorProto.INT32)
         internal_input_state = onnx.helper.make_node("Cast", ["INPUT_STATE"],
@@ -153,7 +152,6 @@ def create_onnx_modelfile_wo_initial_state(models_dir, model_version, max_batch,
 
     # Convert boolean value to int32 value
     if onnx_control_dtype == onnx.TensorProto.BOOL:
-
         if onnx_dtype != onnx.TensorProto.STRING:
             internal_input1 = onnx.helper.make_node("Cast", ["START"],
                                                     ["_START"],
@@ -576,7 +574,6 @@ def create_plan_fixed_modelfile(models_dir, model_version, max_batch, dtype,
     not_start = network.add_elementwise(constant_1.get_output(0), start0,
                                         trt.ElementWiseOperation.SUB)
     not_start.set_output_type(0, trt_dtype)
-
     internal_state = network.add_elementwise(in_state0, not_start.get_output(0),
                                              trt.ElementWiseOperation.PROD)
     out0 = network.add_elementwise(internal_state.get_output(0), in0,
@@ -693,17 +690,236 @@ def create_plan_fixed_rf_modelfile(models_dir, model_version, max_batch, dtype,
         f.write(engine_bytes)
 
 
+def create_plan_dynamic_modelfile(models_dir, model_version, max_batch, dtype,
+                                  shape):
+    trt_dtype = np_to_trt_dtype(dtype)
+    TRT_LOGGER = trt.Logger(trt.Logger.INFO)
+    builder = trt.Builder(TRT_LOGGER)
+
+    # EXPLICIT_BATCH must be used when the dimension is variable
+    network = builder.create_network(
+        1 << int(trt.NetworkDefinitionCreationFlag.EXPLICIT_BATCH))
+
+    unit_shape = ([1] * len(shape))
+    if max_batch != 0:
+        in0 = network.add_input("INPUT", trt_dtype, [-1] + shape)
+        start0 = network.add_input("START", trt_dtype, [-1] + unit_shape)
+        ready0 = network.add_input("READY", trt_dtype, [-1] + unit_shape)
+        in_state0 = network.add_input("INPUT_STATE", trt_dtype, [-1] + shape)
+    else:
+        in0 = network.add_input("INPUT", trt_dtype, shape)
+        start0 = network.add_input("START", trt_dtype, unit_shape)
+        ready0 = network.add_input("READY", trt_dtype, unit_shape)
+        in_state0 = network.add_input("INPUT_STATE", trt_dtype, shape)
+
+    # Append the dimension by 1 so that broadcasting works properly
+    constant_1_data = trt.Weights(np.ones(unit_shape + [1], dtype=dtype))
+    constant_1 = network.add_constant(unit_shape + [1], constant_1_data)
+    not_start = network.add_elementwise(constant_1.get_output(0), start0,
+                                        trt.ElementWiseOperation.SUB)
+    not_start.set_output_type(0, trt_dtype)
+    internal_state = network.add_elementwise(in_state0, not_start.get_output(0),
+                                             trt.ElementWiseOperation.PROD)
+    out0 = network.add_elementwise(internal_state.get_output(0), in0,
+                                   trt.ElementWiseOperation.SUM)
+    out0_state = network.add_elementwise(internal_state.get_output(0), in0,
+                                         trt.ElementWiseOperation.SUM)
+
+    out0.get_output(0).name = "OUTPUT"
+    network.mark_output(out0.get_output(0))
+
+    out0_state.get_output(0).name = "OUTPUT_STATE"
+    network.mark_output(out0_state.get_output(0))
+
+    min_shape = []
+    opt_shape = []
+    max_shape = []
+    if max_batch != 0:
+        min_shape = min_shape + [1]
+        opt_shape = opt_shape + [max(1, max_batch)]
+        max_shape = max_shape + [max(1, max_batch)]
+    for i in shape:
+        if i == -1:
+            min_shape = min_shape + [1]
+            opt_shape = opt_shape + [8]
+            max_shape = max_shape + [32]
+        else:
+            min_shape = min_shape + [i]
+            opt_shape = opt_shape + [i]
+            max_shape = max_shape + [i]
+
+    profile = builder.create_optimization_profile()
+    profile.set_shape("INPUT", min_shape, opt_shape, max_shape)
+    profile.set_shape("INPUT_STATE", min_shape, opt_shape, max_shape)
+    if max_batch != 0:
+        profile.set_shape("START", [1] + unit_shape, [max_batch] + unit_shape,
+                          [max_batch] + unit_shape)
+        profile.set_shape("READY", [1] + unit_shape, [max_batch] + unit_shape,
+                          [max_batch] + unit_shape)
+    else:
+        profile.set_shape("START", unit_shape, unit_shape, unit_shape)
+        profile.set_shape("READY", unit_shape, unit_shape, unit_shape)
+    config = builder.create_builder_config()
+    config.add_optimization_profile(profile)
+
+    config.max_workspace_size = 1 << 20
+    try:
+        engine_bytes = builder.build_serialized_network(network, config)
+    except AttributeError:
+        engine = builder.build_engine(network, config)
+        engine_bytes = engine.serialize()
+        del engine
+
+    model_name = tu.get_sequence_model_name(
+        "plan_nobatch" if max_batch == 0 else "plan", dtype)
+    model_version_dir = models_dir + "/" + model_name + "/" + str(model_version)
+
+    try:
+        os.makedirs(model_version_dir)
+    except OSError as ex:
+        pass  # ignore existing dir
+
+    with open(model_version_dir + "/model.plan", "wb") as f:
+        f.write(engine_bytes)
+
+
+def create_plan_dynamic_rf_modelfile(models_dir, model_version, max_batch,
+                                     dtype, shape):
+    trt_dtype = np_to_trt_dtype(dtype)
+    trt_memory_format = trt.TensorFormat.LINEAR
+
+    TRT_LOGGER = trt.Logger(trt.Logger.INFO)
+    builder = trt.Builder(TRT_LOGGER)
+
+    # EXPLICIT_BATCH must be used when the dimension is variable
+    network = builder.create_network(
+        1 << int(trt.NetworkDefinitionCreationFlag.EXPLICIT_BATCH))
+
+    unit_shape = ([1] * len(shape))
+    if max_batch != 0:
+        in0 = network.add_input("INPUT", trt_dtype, [-1] + shape)
+        start0 = network.add_input("START", trt_dtype, [-1] + unit_shape)
+        ready0 = network.add_input("READY", trt_dtype, [-1] + unit_shape)
+        in_state0 = network.add_input("INPUT_STATE", trt_dtype, [-1] + shape)
+    else:
+        in0 = network.add_input("INPUT", trt_dtype, shape)
+        start0 = network.add_input("START", trt_dtype, unit_shape)
+        ready0 = network.add_input("READY", trt_dtype, unit_shape)
+        in_state0 = network.add_input("INPUT_STATE", trt_dtype, [-1] + shape)
+
+    # Append the dimension by 1 so that broadcasting works properly
+    constant_1_data = trt.Weights(np.ones(unit_shape + [1], dtype=dtype))
+    constant_1 = network.add_constant(unit_shape + [1], constant_1_data)
+    not_start = network.add_elementwise(constant_1.get_output(0), start0,
+                                        trt.ElementWiseOperation.SUB)
+    not_start.set_output_type(0, trt_dtype)
+    internal_state = network.add_elementwise(in_state0, not_start.get_output(0),
+                                             trt.ElementWiseOperation.PROD)
+    out0 = network.add_elementwise(internal_state.get_output(0), in0,
+                                   trt.ElementWiseOperation.SUM)
+    out0_state = network.add_elementwise(internal_state.get_output(0), in0,
+                                         trt.ElementWiseOperation.SUM)
+    out0.get_output(0).name = "OUTPUT"
+    network.mark_output(out0.get_output(0))
+
+    out0_state.get_output(0).name = "OUTPUT_STATE"
+    network.mark_output(out0_state.get_output(0))
+
+    out0.get_output(0).dtype = trt_dtype
+    out0_state.get_output(0).dtype = trt_dtype
+
+    in0.allowed_formats = 1 << int(trt_memory_format)
+    start0.allowed_formats = 1 << int(trt_memory_format)
+    ready0.allowed_formats = 1 << int(trt_memory_format)
+    out0.get_output(0).allowed_formats = 1 << int(trt_memory_format)
+
+    if (trt_dtype == trt.int8):
+        in0.dynamic_range = (-128.0, 127.0)
+        in_state0.dynamic_range = (-128.0, 127.0)
+        out0.dynamic_range = (-128.0, 127.0)
+        start0.dynamic_range = (-128.0, 127.0)
+        ready0.dynamic_range = (-128.0, 127.0)
+
+    flags = 1 << int(trt.BuilderFlag.STRICT_TYPES)
+
+    if (trt_dtype == trt.int8):
+        flags |= 1 << int(trt.BuilderFlag.INT8)
+    elif (trt_dtype == trt.float16):
+        flags |= 1 << int(trt.BuilderFlag.FP16)
+
+    min_shape = []
+    opt_shape = []
+    max_shape = []
+    if max_batch != 0:
+        min_shape = min_shape + [1]
+        opt_shape = opt_shape + [max(1, max_batch)]
+        max_shape = max_shape + [max(1, max_batch)]
+    for i in shape:
+        if i == -1:
+            min_shape = min_shape + [1]
+            opt_shape = opt_shape + [8]
+            max_shape = max_shape + [32]
+        else:
+            min_shape = min_shape + [i]
+            opt_shape = opt_shape + [i]
+            max_shape = max_shape + [i]
+
+    profile = builder.create_optimization_profile()
+    profile.set_shape("INPUT", min_shape, opt_shape, max_shape)
+    profile.set_shape("INPUT_STATE", min_shape, opt_shape, max_shape)
+    if max_batch != 0:
+        profile.set_shape("START", [1] + unit_shape, [max_batch] + unit_shape,
+                          [max_batch] + unit_shape)
+        profile.set_shape("READY", [1] + unit_shape, [max_batch] + unit_shape,
+                          [max_batch] + unit_shape)
+    else:
+        profile.set_shape("START", unit_shape, unit_shape, unit_shape)
+        profile.set_shape("READY", unit_shape, unit_shape, unit_shape)
+
+    config = builder.create_builder_config()
+    config.flags = flags
+    config.add_optimization_profile(profile)
+
+    config.max_workspace_size = 1 << 20
+    try:
+        engine_bytes = builder.build_serialized_network(network, config)
+    except AttributeError:
+        engine = builder.build_engine(network, config)
+        engine_bytes = engine.serialize()
+        del engine
+
+    model_name = tu.get_sequence_model_name(
+        "plan_nobatch" if max_batch == 0 else "plan", dtype)
+    model_version_dir = models_dir + "/" + model_name + "/" + str(model_version)
+
+    try:
+        os.makedirs(model_version_dir)
+    except OSError as ex:
+        pass  # ignore existing dir
+
+    with open(model_version_dir + "/model.plan", "wb") as f:
+        f.write(engine_bytes)
+
+
 def create_plan_modelfile(models_dir, model_version, max_batch, dtype, shape):
 
     if not tu.validate_for_trt_model(dtype, dtype, dtype, shape, shape, shape):
         return
 
     if dtype != np.float32:
-        create_plan_fixed_rf_modelfile(models_dir, model_version, max_batch,
-                                       dtype, shape)
+        if (not tu.shape_is_fixed(shape)):
+            create_plan_dynamic_rf_modelfile(models_dir, model_version,
+                                             max_batch, dtype, shape)
+        else:
+            create_plan_fixed_rf_modelfile(models_dir, model_version, max_batch,
+                                           dtype, shape)
     else:
-        create_plan_fixed_modelfile(models_dir, model_version, max_batch, dtype,
-                                    shape)
+        if (not tu.shape_is_fixed(shape)):
+            create_plan_dynamic_modelfile(models_dir, model_version, max_batch,
+                                          dtype, shape)
+        else:
+            create_plan_fixed_modelfile(models_dir, model_version, max_batch,
+                                        dtype, shape)
 
 
 def create_plan_modelconfig(models_dir, model_version, max_batch, dtype, shape):

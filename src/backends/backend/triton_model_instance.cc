@@ -122,9 +122,11 @@ TritonModelInstance::TritonModelInstance(
 #ifdef TRITON_ENABLE_METRICS
   if (Metrics::Enabled()) {
     // Use an ID in the metric only for GPU instances. Otherwise use
-    // -1 to indicate no device should be reported in the metric.
-    const int id =
-        (kind_ == TRITONSERVER_INSTANCEGROUPKIND_GPU) ? device_id_ : -1;
+    // METRIC_REPORTER_ID_CPU to indicate no device should be reported in the
+    // metric.
+    const int id = (kind_ == TRITONSERVER_INSTANCEGROUPKIND_GPU)
+                       ? device_id_
+                       : METRIC_REPORTER_ID_CPU;
     MetricModelReporter::Create(
         model_->Name(), model_->Version(), id, model_->Config().metric_tags(),
         &reporter_);

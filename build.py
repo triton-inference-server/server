@@ -75,19 +75,24 @@ from distutils.dir_util import copy_tree
 # be invoked with appropriate backend configuration:
 # (--backend-config=openvino,version=<version_str>)
 # The version string can be obtained as follows:
-# <major_version>_<minor_version>[_pre] 
+# <major_version>_<minor_version>[_pre]
 # Append '_pre' only if the openVINO backend was built with prebuilt openVINO
 # library. In other words, when the second element of the pair is not None.
 # To use ('2021.2', None) version_str should be `2021_2'.
 # To use ('2021.4', '2021.4.582') version_str should be `2021_4_pre'.
+# User can also build openvino backend from specific commit sha of openVINO
+# repository. The pair should be (`SPECIFIC`, <commit_sha_of_ov_repo>).
+# Note: Not all sha ids would successfuly compile and work.
 #
 TRITON_VERSION_MAP = {
-    '2.18.0dev': (
-        '22.01dev',  # triton container
-        '21.12',  # upstream container
+    '2.20.0dev': (
+        '22.03dev',  # triton container
+        '22.01',  # upstream container
         '1.10.0',  # ORT
         '2021.2.200',  # ORT OpenVINO
-        (('2021.2', None), ('2021.4', '2021.4.582')),  # Standalone OpenVINO
+        (('2021.2', None),
+         ('2021.4', '2021.4.582'),
+         ('SPECIFIC','f2f281e6')),  # Standalone OpenVINO
         '2.2.9')  # DCGM version
 }
 
@@ -238,7 +243,7 @@ def makeinstall(cwd, target='install'):
     log_verbose('make {}'.format(target))
 
     if target_platform() == 'windows':
-        verbose_flag = '-v:detailed' if FLAGS.verbose else '-clp:ErrorsOnly'
+        verbose_flag = '' if FLAGS.verbose else '-clp:ErrorsOnly'
         buildtype_flag = '-p:Configuration={}'.format(FLAGS.build_type)
         p = subprocess.Popen([
             'msbuild.exe', '-m:{}'.format(str(FLAGS.build_parallel)),
@@ -615,17 +620,30 @@ def onnxruntime_cmake_args(images, library_paths):
 
 
 def openvino_cmake_args(be, variant_index):
+    using_specific_commit_sha = False
+    if TRITON_VERSION_MAP[FLAGS.version][4][variant_index][0] == 'SPECIFIC':
+        using_specific_commit_sha = True
+
     ov_version = TRITON_VERSION_MAP[FLAGS.version][4][variant_index][1]
     if ov_version:
-        use_prebuilt_ov = True
+        if using_specific_commit_sha:
+            use_prebuilt_ov = False
+        else:
+            use_prebuilt_ov = True
     else:
         # If the OV package version is None, then we are not using prebuilt package
         ov_version = TRITON_VERSION_MAP[FLAGS.version][4][variant_index][0]
         use_prebuilt_ov = False
-    cargs = [
-        cmake_backend_arg(be, 'TRITON_BUILD_OPENVINO_VERSION', None,
-                          ov_version),
-    ]
+    if using_specific_commit_sha:
+        cargs = [
+            cmake_backend_arg(be, 'TRITON_BUILD_OPENVINO_COMMIT_SHA', None,
+                            ov_version),
+        ]
+    else:
+        cargs = [
+            cmake_backend_arg(be, 'TRITON_BUILD_OPENVINO_VERSION', None,
+                            ov_version),
+        ]
     cargs.append(
         cmake_backend_arg(be, 'TRITON_OPENVINO_BACKEND_INSTALLDIR', None, be))
     if target_platform() == 'windows':
@@ -1405,9 +1423,12 @@ def build_backend(be,
 def get_tagged_backend(be, version):
     tagged_be = be
     if be == 'openvino':
-        tagged_be += "_" + version[0].replace('.', '_')
-        if version[1] and target_platform() != 'windows':
-            tagged_be += "_pre"
+        if version[0] == 'SPECIFIC':
+            tagged_be += "_" + version[1]
+        else:
+            tagged_be += "_" + version[0].replace('.', '_')
+            if version[1] and target_platform() != 'windows':
+                tagged_be += "_pre"
     return tagged_be
 
 
@@ -1616,7 +1637,7 @@ if __name__ == '__main__':
         action='append',
         required=False,
         help=
-        'Include specified backend in build as <backend-name>[:<repo-tag>]. If <repo-tag> starts with "pull/" then it refers to a pull-request reference, otherwise <repo-tag> indicates the git tag/branch to use for the build. If the version is non-development then the default <repo-tag> is the release branch matching the container version (e.g. version 21.12 -> branch r21.12); otherwise the default <repo-tag> is "main" (e.g. version 21.12dev -> branch main).'
+        'Include specified backend in build as <backend-name>[:<repo-tag>]. If <repo-tag> starts with "pull/" then it refers to a pull-request reference, otherwise <repo-tag> indicates the git tag/branch to use for the build. If the version is non-development then the default <repo-tag> is the release branch matching the container version (e.g. version 22.01 -> branch r22.01); otherwise the default <repo-tag> is "main" (e.g. version 22.01dev -> branch main).'
     )
     parser.add_argument(
         '--build-multiple-openvino',
@@ -1630,14 +1651,14 @@ if __name__ == '__main__':
         action='append',
         required=False,
         help=
-        'The version of a component to use in the build as <component-name>:<repo-tag>. <component-name> can be "common", "core", "backend" or "thirdparty". If <repo-tag> starts with "pull/" then it refers to a pull-request reference, otherwise <repo-tag> indicates the git tag/branch. If the version is non-development then the default <repo-tag> is the release branch matching the container version (e.g. version 21.12 -> branch r21.12); otherwise the default <repo-tag> is "main" (e.g. version 21.12dev -> branch main).'
+        'The version of a component to use in the build as <component-name>:<repo-tag>. <component-name> can be "common", "core", "backend" or "thirdparty". If <repo-tag> starts with "pull/" then it refers to a pull-request reference, otherwise <repo-tag> indicates the git tag/branch. If the version is non-development then the default <repo-tag> is the release branch matching the container version (e.g. version 22.01 -> branch r22.01); otherwise the default <repo-tag> is "main" (e.g. version 22.01dev -> branch main).'
     )
     parser.add_argument(
         '--repoagent',
         action='append',
         required=False,
         help=
-        'Include specified repo agent in build as <repoagent-name>[:<repo-tag>]. If <repo-tag> starts with "pull/" then it refers to a pull-request reference, otherwise <repo-tag> indicates the git tag/branch to use for the build. If the version is non-development then the default <repo-tag> is the release branch matching the container version (e.g. version 21.12 -> branch r21.12); otherwise the default <repo-tag> is "main" (e.g. version 21.12dev -> branch main).'
+        'Include specified repo agent in build as <repoagent-name>[:<repo-tag>]. If <repo-tag> starts with "pull/" then it refers to a pull-request reference, otherwise <repo-tag> indicates the git tag/branch to use for the build. If the version is non-development then the default <repo-tag> is the release branch matching the container version (e.g. version 22.01 -> branch r22.01); otherwise the default <repo-tag> is "main" (e.g. version 22.01dev -> branch main).'
     )
     parser.add_argument(
         '--no-force-clone',
@@ -1830,7 +1851,6 @@ if __name__ == '__main__':
             len(parts) != 2,
             '--override-backend-cmake-arg must specify <backend>:<name>=<value>'
         )
-        parts = cf.split(':')
         fail_if(
             be not in backends,
             '--override-backend-cmake-arg specifies backend "{}" which is not included in build'

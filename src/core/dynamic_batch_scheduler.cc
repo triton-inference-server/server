@@ -1,4 +1,4 @@
-// Copyright 2018-2021, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+// Copyright 2018-2022, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 //
 // Redistribution and use in source and binary forms, with or without
 // modification, are permitted provided that the following conditions
@@ -43,7 +43,6 @@ bool
 IsStaleState(Payload::State payload_state)
 {
   return (
-      (payload_state == Payload::State::SCHEDULED) ||
       (payload_state == Payload::State::EXECUTING) ||
       (payload_state == Payload::State::RELEASED));
 }
@@ -73,6 +72,14 @@ DynamicBatchScheduler::DynamicBatchScheduler(
   // caching enabled for model to utilize response cache.
   response_cache_enabled_ =
       (model_->Server()->ResponseCacheEnabled() && response_cache_enable);
+#ifdef TRITON_ENABLE_METRICS
+  // Initialize metric reporter for cache statistics if cache enabled
+  if (response_cache_enabled_) {
+    MetricModelReporter::Create(
+        model_->Name(), model_->Version(), METRIC_REPORTER_ID_RESPONSE_CACHE,
+        model_->Config().metric_tags(), &reporter_);
+  }
+#endif  // TRITON_ENABLE_METRICS
   max_preferred_batch_size_ = 0;
   for (const auto size : preferred_batch_sizes_) {
     max_preferred_batch_size_ =
@@ -156,12 +163,27 @@ DynamicBatchScheduler::~DynamicBatchScheduler()
 Status
 DynamicBatchScheduler::Enqueue(std::unique_ptr<InferenceRequest>& request)
 {
-  // Queue timer starts at the beginning of the queueing and
-  // scheduling process
-  request->CaptureQueueStartNs();
-  INFER_TRACE_ACTIVITY(
-      request->Trace(), TRITONSERVER_TRACE_QUEUE_START,
-      request->QueueStartNs());
+  // If queue start timestamp hasn't been set, queue timer starts at
+  // the beginning of the queueing and scheduling process. Otherwise,
+  // dynamic batcher is used as component of another batcher and should not
+  // overwrite the queue start timestamp.
+  if (request->QueueStartNs() == 0) {
+    request->CaptureQueueStartNs();
+    INFER_TRACE_ACTIVITY(
+        request->Trace(), TRITONSERVER_TRACE_QUEUE_START,
+        request->QueueStartNs());
+#ifdef TRITON_ENABLE_TRACING
+    request->TraceInputTensors(
+        TRITONSERVER_TRACE_TENSOR_QUEUE_INPUT, "DynamicBatchScheduler Enqueue");
+#endif  // TRITON_ENABLE_TRACING
+  }
+
+  // Record time at the beginning of the batcher queueing. In the case of
+  // oldest sequence batcher, this will overwrite the value that was previously
+  // set by sequence batcher, which is okay as by this point, the previous
+  // batcher won't be needing this value and it can be safely reused by
+  // the dynamic batcher.
+  request->CaptureBatcherStartNs();
 
   std::unique_ptr<InferenceResponse> cached_response;
 
@@ -177,6 +199,8 @@ DynamicBatchScheduler::Enqueue(std::unique_ptr<InferenceRequest>& request)
       // delegated.
       DelegateResponse(request);
     }
+
+    // Send cached response and release request
     InferenceResponse::Send(
         std::move(cached_response), TRITONSERVER_RESPONSE_COMPLETE_FINAL);
     InferenceRequest::Release(
@@ -210,13 +234,13 @@ DynamicBatchScheduler::Enqueue(std::unique_ptr<InferenceRequest>& request)
 
       // If there are any idle runners and the queued batch size is greater or
       // equal to next preferred batch size, then wake batcher up to service
-      // this request. We do the actual wake outside of the lock to avoid having
-      // the woken thread immediately block on the lock
+      // this request. We do the actual wake outside of the lock to avoid
+      // having the woken thread immediately block on the lock
       wake_batcher =
           model_->Server()->GetRateLimiter()->PayloadSlotAvailable(model_);
 
-      // We may wake up runner less often if we don't enforce equal shape within
-      // a batch, otherwise must always wake up runner to check it
+      // We may wake up runner less often if we don't enforce equal shape
+      // within a batch, otherwise must always wake up runner to check it
       if (enforce_equal_shape_tensors_.empty()) {
         std::lock_guard<std::mutex> exec_lock(*(curr_payload_->GetExecMutex()));
         auto payload_state = curr_payload_->GetState();
@@ -457,6 +481,7 @@ DynamicBatchScheduler::GetDynamicBatch()
       if (check_input && !CompareWithRequiredEqualInputs(
                              queue_.RequestAtCursor(), has_optional_input_,
                              required_equal_inputs_)) {
+        curr_payload_->MarkSaturated();
         send_now = true;
         break;
       }
@@ -485,6 +510,9 @@ DynamicBatchScheduler::GetDynamicBatch()
   // If we found a preferred batch size and the queue delay hasn't been
   // exceeded, then execute that.
   if ((best_preferred_batch_size != 0) && !delay_is_exceeded) {
+    if (pending_batch_delay_ns_ == 0) {
+      payload_saturated_ = true;
+    }
     pending_batch_size_ = best_preferred_batch_size;
     queue_.SetCursorToMark();
     return 0;
@@ -521,6 +549,17 @@ DynamicBatchScheduler::GetDynamicBatch()
     next_preferred_batch_size_ -= payload_batch_size;
   }
 
+  // By this point, we have not seen the pending batch that should be executed
+  // immediately. However, if we have scheduled a payload that can be grown and
+  // not yet in preferred batch size, we should move the pending batch over to
+  // ensure the model instance will pick up largest available batch even if it
+  // is not the preferred batch.
+  if (!payload_saturated_ && (payload_batch_size != 0) &&
+      (preferred_batch_sizes_.find(payload_batch_size) ==
+       preferred_batch_sizes_.end())) {
+    return 0;
+  }
+
   uint64_t wait_ns = pending_batch_delay_ns_ - delay_ns;
   // Note that taking request timeout into consideration allows us to reset
   // pending batch as soon as it is invalidated. But the cost is that in edge
@@ -550,6 +589,7 @@ void
 DynamicBatchScheduler::DelegateResponse(
     std::unique_ptr<InferenceRequest>& request)
 {
+  std::lock_guard<std::mutex> lock(completion_queue_mtx_);
   completion_queue_.emplace_back();
   auto queue_slot = &completion_queue_.back();
   uint64_t request_hash = request->CacheKey();
@@ -562,7 +602,10 @@ DynamicBatchScheduler::DelegateResponse(
         }
 
         if (preserve_ordering_) {
-          queue_slot->emplace_back(std::move(response), flags);
+          {
+            std::lock_guard<std::mutex> lock(completion_queue_mtx_);
+            queue_slot->emplace_back(std::move(response), flags);
+          }
           FinalizeResponses();
         } else {
           InferenceResponse::Send(std::move(response), flags);
@@ -580,7 +623,7 @@ DynamicBatchScheduler::CacheLookUp(
   // Hash request to get key for cache lookup
   auto status = cache->Hash(*request, &request_hash);
   if (!status.IsOk()) {
-    LOG_ERROR << "Failed to hash input request" << status.Message();
+    LOG_ERROR << "Failed to hash input request: " << status.Message();
     return;
   }
   request->SetCacheKey(request_hash);
@@ -588,9 +631,14 @@ DynamicBatchScheduler::CacheLookUp(
   // Lookup request key in cache
   std::unique_ptr<InferenceResponse> local_response;
   request->ResponseFactory().CreateResponse(&local_response);
-  status = cache->Lookup(request_hash, local_response.get());
+  status = cache->Lookup(request_hash, local_response.get(), request.get());
   if (status.IsOk() && (local_response != nullptr)) {
     cached_response = std::move(local_response);
+#ifdef TRITON_ENABLE_METRICS
+    // Update model metrics/stats on cache hits
+    // Backends will update metrics as normal on cache misses
+    request->ReportStatisticsCacheHit(reporter_.get());
+#endif  // TRITON_ENABLE_METRICS
   }
 }
 
@@ -605,6 +653,7 @@ DynamicBatchScheduler::FinalizeResponses()
   std::deque<std::pair<std::unique_ptr<InferenceResponse>, const uint32_t>>
       responses;
   {
+    std::lock_guard<std::mutex> queue_lock(completion_queue_mtx_);
     while (!completion_queue_.empty() && !completion_queue_.front().empty()) {
       bool response_complete = false;
       for (auto& response_pair : completion_queue_.front()) {
