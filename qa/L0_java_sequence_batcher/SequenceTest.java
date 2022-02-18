@@ -563,8 +563,9 @@ public class SequenceTest {
 
       // Non-zero ID for the sequence requests
       long correlation_id = 5;
+      // Number of requests in the sequence
       int num_requests = 9;
-      // The expected_result is  1+2+3+...+num_requests
+      // Expected_result is  1+2+3+...+num_requests
       int expected_result = num_requests * (1 + num_requests) / 2;
       boolean sequence_start = true;
       boolean sequence_end = false;
