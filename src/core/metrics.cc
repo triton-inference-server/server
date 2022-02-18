@@ -131,6 +131,7 @@ Metrics::Metrics()
                              .Name("nv_cache_util")
                              .Help("Cache utilization [0.0 - 1.0]")
                              .Register(*registry_)),
+      // Per-model cache metric families
       cache_num_hits_model_family_(prometheus::BuildCounter()
                                        .Name("nv_cache_num_hits_per_model")
                                        .Help("Number of cache hits per model")
@@ -140,6 +141,23 @@ Metrics::Metrics()
               .Name("nv_cache_hit_lookup_duration_per_model")
               .Help(
                   "Total cache hit lookup duration per model, in microseconds")
+              .Register(*registry_)),
+      cache_num_misses_model_family_(
+          prometheus::BuildCounter()
+              .Name("nv_cache_num_misses_per_model")
+              .Help("Number of cache misses per model")
+              .Register(*registry_)),
+      cache_miss_lookup_duration_us_model_family_(
+          prometheus::BuildCounter()
+              .Name("nv_cache_miss_lookup_duration_per_model")
+              .Help(
+                  "Total cache miss lookup duration per model, in microseconds")
+              .Register(*registry_)),
+      cache_miss_insertion_duration_us_model_family_(
+          prometheus::BuildCounter()
+              .Name("nv_cache_miss_insertion_duration_per_model")
+              .Help("Total cache miss insertion duration per model, in "
+                    "microseconds")
               .Register(*registry_)),
 
 #ifdef TRITON_ENABLE_METRICS_GPU

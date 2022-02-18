@@ -148,6 +148,41 @@ InferenceStatsAggregator::UpdateSuccessCacheHit(
 #endif  // TRITON_ENABLE_METRICS
 }
 
+// Cache misses will go to the inference backend where metrics are typically
+// updated, but cache insertion happens after the inference backend finishes.
+// So we use this method to update cache miss stats and adjust the request
+// duration to include cache insertion time.
+void
+InferenceStatsAggregator::UpdateSuccessCacheMiss(
+    MetricModelReporter* metric_reporter,
+    const uint64_t cache_miss_lookup_duration_ns,
+    const uint64_t cache_miss_insertion_duration_ns)
+{
+  std::lock_guard<std::mutex> lock(mu_);
+
+  infer_stats_.request_duration_ns_ += cache_miss_insertion_duration_ns;
+  infer_stats_.cache_miss_count_++;
+  infer_stats_.cache_miss_lookup_duration_ns_ += cache_miss_lookup_duration_ns;
+  infer_stats_.cache_miss_insertion_duration_ns_ +=
+      cache_miss_insertion_duration_ns;
+
+#ifdef TRITON_ENABLE_METRICS
+  if (metric_reporter != nullptr) {
+    // Add cache insertion time to request duration since insertion
+    // happens after inference backend sets the request duration, and
+    // cache lookup time was already included before the inference backend
+    // was called
+    metric_reporter->MetricInferenceRequestDuration().Increment(
+        cache_miss_insertion_duration_ns / 1000);
+    metric_reporter->MetricCacheMissCount().Increment(1);
+    metric_reporter->MetricCacheMissLookupDuration().Increment(
+        cache_miss_lookup_duration_ns / 1000);
+    metric_reporter->MetricCacheMissInsertionDuration().Increment(
+        cache_miss_insertion_duration_ns / 1000);
+  }
+#endif  // TRITON_ENABLE_METRICS
+}
+
 void
 InferenceStatsAggregator::UpdateInferBatchStats(
     MetricModelReporter* metric_reporter, const size_t batch_size,

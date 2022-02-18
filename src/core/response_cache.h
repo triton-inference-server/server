@@ -78,7 +78,9 @@ class RequestResponseCache {
       const uint64_t key, InferenceResponse* ptr, InferenceRequest* request);
   // Insert response into cache, evict entries to make space if necessary
   // Return Status object indicating success or failure.
-  Status Insert(const uint64_t key, const InferenceResponse& response);
+  Status Insert(
+      const uint64_t key, const InferenceResponse& response,
+      InferenceRequest* request);
   // Evict entry from cache based on policy
   // Return Status object indicating success or failure.
   Status Evict();
@@ -119,6 +121,13 @@ class RequestResponseCache {
     std::lock_guard<std::recursive_mutex> lk(cache_mtx_);
     return total_lookup_latency_ns_;
   }
+
+  uint64_t TotalInsertionLatencyNs()
+  {
+    std::lock_guard<std::recursive_mutex> lk(cache_mtx_);
+    return total_insertion_latency_ns_;
+  }
+
   // Returns total number of bytes allocated for cache
   size_t TotalBytes()
   {
@@ -173,6 +182,7 @@ class RequestResponseCache {
   size_t num_hits_ = 0;
   size_t num_misses_ = 0;
   uint64_t total_lookup_latency_ns_ = 0;
+  uint64_t total_insertion_latency_ns_ = 0;
   // Mutex for buffer synchronization
   std::recursive_mutex buffer_mtx_;
   // Mutex for cache synchronization

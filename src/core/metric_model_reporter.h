@@ -92,6 +92,18 @@ class MetricModelReporter {
   {
     return *metric_cache_hit_lookup_duration_us_;
   }
+  prometheus::Counter& MetricCacheMissCount() const
+  {
+    return *metric_cache_miss_count_;
+  }
+  prometheus::Counter& MetricCacheMissLookupDuration() const
+  {
+    return *metric_cache_miss_lookup_duration_us_;
+  }
+  prometheus::Counter& MetricCacheMissInsertionDuration() const
+  {
+    return *metric_cache_miss_insertion_duration_us_;
+  }
 
  private:
   MetricModelReporter(
@@ -117,6 +129,9 @@ class MetricModelReporter {
   prometheus::Counter* metric_inf_compute_output_duration_us_;
   prometheus::Counter* metric_cache_hit_count_;
   prometheus::Counter* metric_cache_hit_lookup_duration_us_;
+  prometheus::Counter* metric_cache_miss_count_;
+  prometheus::Counter* metric_cache_miss_lookup_duration_us_;
+  prometheus::Counter* metric_cache_miss_insertion_duration_us_;
 #endif  // TRITON_ENABLE_METRICS
 };
 

@@ -207,21 +207,31 @@ RequestResponseCache::Lookup(
   request->CaptureCacheLookupEndNs();
   total_lookup_latency_ns_ +=
       (request->CacheLookupEndNs() - request->CacheLookupStartNs());
+
   return Status::Success;
 }
 
 Status
 RequestResponseCache::Insert(
-    const uint64_t key, const InferenceResponse& response)
+    const uint64_t key, const InferenceResponse& response,
+    InferenceRequest* request)
 {
   // Lock on cache insertion
   std::lock_guard<std::recursive_mutex> lk(cache_mtx_);
 
+  // Capture start insertion latency
+  request->CaptureCacheInsertionStartNs();
+
   // Exit early if key already exists in cache
   auto iter = cache_.find(key);
   if (iter != cache_.end()) {
+    // Capture end insertion latency on miss and update total latency
+    request->CaptureCacheInsertionEndNs();
+    total_insertion_latency_ns_ +=
+        (request->CacheInsertionEndNs() - request->CacheInsertionStartNs());
+
     return Status(
-        Status::Code::INTERNAL,
+        Status::Code::ALREADY_EXISTS,
         "key [" + std::to_string(key) + "] already exists in cache");
   }
 
@@ -239,6 +249,12 @@ RequestResponseCache::Insert(
   // Update LRU with new cache entry
   auto cache_iter = cache_pair.first;
   UpdateLRU(cache_iter);
+
+  // Capture end insertion latency on miss and update total latency
+  request->CaptureCacheInsertionEndNs();
+  total_insertion_latency_ns_ +=
+      (request->CacheInsertionEndNs() - request->CacheInsertionStartNs());
+
   return Status::Success;
 }
 
