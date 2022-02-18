@@ -561,10 +561,13 @@ public class SequenceTest {
           TRITONSERVER_InferenceRequestAddRequestedOutput(irequest, output0),
           "requesting output 0 for the request");
 
+      // Non-zero ID for the sequence requests
       long correlation_id = 5;
-      int iterations = 9;
-      int expected_result = 45;
-      boolean sequence_start = true, sequence_end = false;
+      int num_requests = 9;
+      // The expected_result is  1+2+3+...+num_requests
+      int expected_result = num_requests * (1 + num_requests) / 2;
+      boolean sequence_start = true;
+      boolean sequence_end = false;
 
       // Create the initial data for the input tensor.
       IntPointer[] p0 = {new IntPointer(1)};
@@ -577,7 +580,7 @@ public class SequenceTest {
                 0 /* memory_type_id */),
             "assigning INPUT0 data");
 
-      for(int i = 0; i < iterations; i++) {
+      for(int i = 0; i < num_requests; i++) {
         // Update input value
         int input = i + 1;
         p0[0].put(0, input);
@@ -586,7 +589,7 @@ public class SequenceTest {
         if(i == 1) {
           sequence_start = false;
         }
-        if(i == iterations - 1) {
+        if(i == num_requests - 1) {
           sequence_end = true;
         }
         SetSequenceMetadata(irequest, correlation_id, sequence_start, sequence_end);
