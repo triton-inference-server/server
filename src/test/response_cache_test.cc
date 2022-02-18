@@ -485,7 +485,7 @@ TEST_F(RequestResponseCacheTest, TestCacheTooSmall)
   std::memcpy(buffer, output0.data(), output_size);
 
   std::cout << "Insert response into cache with hash0" << std::endl;
-  auto status = cache->Insert(hash0, *response0);
+  auto status = cache->Insert(hash0, *response0, &request0);
   // We expect insertion to fail here since cache is too small
   std::cout << status.Message() << std::endl;
   ASSERT_FALSE(status.IsOk())
@@ -542,22 +542,22 @@ TEST_F(RequestResponseCacheTest, TestEviction)
   ASSERT_FALSE(status.IsOk())
       << "hash [" + std::to_string(hash0) + "] should not be in cache";
   std::cout << "Insert response into cache with hash0" << std::endl;
-  check_status(cache->Insert(hash0, *response0));
+  check_status(cache->Insert(hash0, *response0, &request0));
   cache_stats(cache);
   ASSERT_EQ(cache->NumEntries(), 1u);
   ASSERT_EQ(cache->NumEvictions(), 0u);
 
-  check_status(cache->Insert(hash1, *response0));
+  check_status(cache->Insert(hash1, *response0, &request0));
   cache_stats(cache);
   ASSERT_EQ(cache->NumEntries(), 2u);
   ASSERT_EQ(cache->NumEvictions(), 0u);
 
-  check_status(cache->Insert(hash2, *response0));
+  check_status(cache->Insert(hash2, *response0, &request0));
   cache_stats(cache);
   ASSERT_EQ(cache->NumEntries(), 2u);
   ASSERT_EQ(cache->NumEvictions(), 1u);
 
-  check_status(cache->Insert(hash3, *response0));
+  check_status(cache->Insert(hash3, *response0, &request0));
   cache_stats(cache);
   ASSERT_EQ(cache->NumEntries(), 2u);
   ASSERT_EQ(cache->NumEvictions(), 2u);
@@ -631,11 +631,11 @@ TEST_F(RequestResponseCacheTest, TestEndToEnd)
       << "hash [" + std::to_string(hash0) + "] should not be in cache";
   std::cout << "Insert response into cache with hash0" << std::endl;
   // Insertion should succeed
-  check_status(cache->Insert(hash0, *response0));
+  check_status(cache->Insert(hash0, *response0, &request0));
   cache_stats(cache);
 
   // Duplicate insertion should fail since key already exists
-  status = cache->Insert(hash0, *response0);
+  status = cache->Insert(hash0, *response0, &request0);
   ASSERT_FALSE(status.IsOk())
       << "Inserting duplicate item in cache should fail";
 
@@ -795,7 +795,7 @@ TEST_F(RequestResponseCacheTest, TestParallelEviction)
 
   // Insert [thread_count] entries into cache sequentially
   for (size_t idx = 0; idx < thread_count; idx++) {
-    cache->Insert(idx, *response0);
+    cache->Insert(idx, *response0, &request0);
   }
 
   // Assert all entries were put into cache and no evictions occurred yet
@@ -870,9 +870,9 @@ TEST_F(RequestResponseCacheTest, TestLRU)
   check_status(request0.ResponseFactory().CreateResponse(&response_test));
 
   // Insert 3 items into cache: 0, 1, 2
-  check_status(cache->Insert(0, *response0));
-  check_status(cache->Insert(1, *response0));
-  check_status(cache->Insert(2, *response0));
+  check_status(cache->Insert(0, *response0, &request0));
+  check_status(cache->Insert(1, *response0, &request0));
+  check_status(cache->Insert(2, *response0, &request0));
 
   // Verify items 0, 1, 2, in cache
   reset_response(&response_test, &request0);
@@ -895,8 +895,8 @@ TEST_F(RequestResponseCacheTest, TestLRU)
   check_status(cache->Lookup(2, response_test.get(), &request0));
 
   // Insert item 3, 4
-  check_status(cache->Insert(3, *response0));
-  check_status(cache->Insert(4, *response0));
+  check_status(cache->Insert(3, *response0, &request0));
+  check_status(cache->Insert(4, *response0, &request0));
 
   // Evict twice, assert items 1 and 2 were evicted
   cache->Evict();
@@ -984,7 +984,7 @@ TEST_F(RequestResponseCacheTest, TestParallelLookup)
     // Copy unique data for each response to buffer inserted into cache
     std::memcpy(buffer, test_outputs[idx].data(), output_size);
     // Insert response for each thread
-    cache->Insert(idx, *response0);
+    cache->Insert(idx, *response0, &request0);
   }
 
   // Assert all entries were put into cache and no evictions occurred yet
