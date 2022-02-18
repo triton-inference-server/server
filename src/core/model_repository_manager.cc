@@ -1221,8 +1221,13 @@ ModelRepositoryManager::Create(
     // model loading / unloading error will be printed but ignored
     RETURN_IF_ERROR(local_manager->PollAndUpdateInternal(&all_models_polled));
   } else {
+    std::unordered_map<std::string, std::vector<const InferenceParameter*>>
+        models;
+    for (const auto& model_name : startup_models) {
+      models[model_name];
+    }
     RETURN_IF_ERROR(local_manager->LoadUnloadModels(
-        startup_models, ActionType::LOAD, false, &all_models_polled));
+        models, ActionType::LOAD, false, &all_models_polled));
   }
 
   *model_repository_manager = std::move(local_manager);
@@ -1277,7 +1282,8 @@ ModelRepositoryManager::PollAndUpdateInternal(bool* all_models_polled)
 
   // Each subdirectory of repository path is a model directory from
   // which we read the model configuration.
-  std::set<std::string> subdirs;
+  std::unordered_map<std::string, std::vector<const InferenceParameter*>>
+      subdirs;
   RETURN_IF_ERROR(Poll(
       subdirs, &added, &deleted, &modified, &unmodified, &new_infos,
       all_models_polled));
@@ -1377,8 +1383,9 @@ ModelRepositoryManager::LoadModelByDependency()
 
 Status
 ModelRepositoryManager::LoadUnloadModel(
-    const std::string& model_name, const ActionType type,
-    const bool unload_dependents)
+    const std::unordered_map<
+        std::string, std::vector<const InferenceParameter*>>& models,
+    const ActionType type, const bool unload_dependents)
 {
   if (!model_control_enabled_) {
     return Status(
@@ -1386,14 +1393,20 @@ ModelRepositoryManager::LoadUnloadModel(
         "explicit model load / unload is not allowed if polling is enabled");
   }
 
+  if (models.size() > 1) {
+    return Status(
+        Status::Code::UNSUPPORTED,
+        "explicit load / unload multiple models is not currently supported");
+  }
+
   // Serialize all operations that change model state
   std::lock_guard<std::mutex> lock(poll_mu_);
 
   bool polled = true;
-  RETURN_IF_ERROR(
-      LoadUnloadModels({model_name}, type, unload_dependents, &polled));
+  RETURN_IF_ERROR(LoadUnloadModels(models, type, unload_dependents, &polled));
 
   // Check if model is loaded / unloaded properly
+  const auto& model_name = models.begin()->first;
   const auto version_states = model_life_cycle_->VersionStates(model_name);
   if (type == ActionType::LOAD) {
     if (version_states.empty()) {
@@ -1430,8 +1443,10 @@ ModelRepositoryManager::LoadUnloadModel(
 
 Status
 ModelRepositoryManager::LoadUnloadModels(
-    const std::set<std::string>& model_names, const ActionType type,
-    const bool unload_dependents, bool* all_models_polled)
+    const std::unordered_map<
+        std::string, std::vector<const InferenceParameter*>>& models,
+    const ActionType type, const bool unload_dependents,
+    bool* all_models_polled)
 {
   auto status = Status::Success;
   *all_models_polled = true;
@@ -1439,12 +1454,15 @@ ModelRepositoryManager::LoadUnloadModels(
   std::set<std::string> added, deleted, modified, unmodified;
   {
     if (type == ActionType::UNLOAD) {
-      for (const auto& model_name : model_names) {
-        deleted.insert(model_name);
+      for (const auto& model : models) {
+        deleted.insert(model.first);
       }
     } else {
-      std::set<std::string> checked_modes = model_names;
-      std::set<std::string> models = model_names;
+      std::set<std::string> current_models, checked_models;
+      for (const auto& model : models) {
+        current_models.emplace(model.first);
+        checked_models.emplace(model.first);
+      }
 
       ModelInfoMap new_infos;
 #ifdef TRITON_ENABLE_ENSEMBLE
@@ -1460,7 +1478,7 @@ ModelRepositoryManager::LoadUnloadModels(
         // More models should be polled if the polled models are ensembles
         std::set<std::string> next_models;
 #ifdef TRITON_ENABLE_ENSEMBLE
-        for (const auto& model : models) {
+        for (const auto& model : current_models) {
           auto it = new_infos.find(model);
           // Some models may be marked as deleted and not in 'new_infos'
           if (it != new_infos.end()) {
@@ -1469,7 +1487,7 @@ ModelRepositoryManager::LoadUnloadModels(
             if (config.has_ensemble_scheduling()) {
               for (const auto& step : config.ensemble_scheduling().step()) {
                 bool need_poll =
-                    checked_modes.emplace(step.model_name()).second;
+                    checked_models.emplace(step.model_name()).second;
                 if (need_poll) {
                   next_models.emplace(step.model_name());
                 }
@@ -1479,7 +1497,7 @@ ModelRepositoryManager::LoadUnloadModels(
         }
         first_iteration = false;
 #endif  // TRITON_ENABLE_ENSEMBLE
-        models.swap(next_models);
+        current_models.swap(next_models);
       }
 
       // Only update the infos when all validation is completed
@@ -1514,13 +1532,13 @@ ModelRepositoryManager::LoadUnloadModels(
   const auto& load_status = LoadModelByDependency();
   if (status.IsOk() && (type == ActionType::LOAD)) {
     std::string load_error_message = "";
-    for (const auto& model_name : model_names) {
-      auto it = load_status.find(model_name);
-      // If 'model_name' not in load status, it means the (re-)load is not
+    for (const auto& model : models) {
+      auto it = load_status.find(model.first);
+      // If 'model.first' not in load status, it means the (re-)load is not
       // necessary because there is no change in the model's directory
       if ((it != load_status.end()) && !it->second.IsOk()) {
         load_error_message +=
-            ("load failed for model '" + model_name +
+            ("load failed for model '" + model.first +
              "': " + it->second.Message() + "\n");
       }
     }
@@ -1640,10 +1658,11 @@ ModelRepositoryManager::GetModel(
 
 Status
 ModelRepositoryManager::Poll(
-    const std::set<std::string>& models, std::set<std::string>* added,
-    std::set<std::string>* deleted, std::set<std::string>* modified,
-    std::set<std::string>* unmodified, ModelInfoMap* updated_infos,
-    bool* all_models_polled)
+    const std::unordered_map<
+        std::string, std::vector<const InferenceParameter*>>& models,
+    std::set<std::string>* added, std::set<std::string>* deleted,
+    std::set<std::string>* modified, std::set<std::string>* unmodified,
+    ModelInfoMap* updated_infos, bool* all_models_polled)
 {
   *all_models_polled = true;
   std::map<std::string, std::string> model_to_repository;
@@ -1676,24 +1695,27 @@ ModelRepositoryManager::Poll(
                 << "': not unique across all model repositories";
     }
   } else {
+    // [DLIS-3487] Model doesn't need to be in repository if model files
+    // are provided in flight.
     for (const auto& model : models) {
       bool exists = false;
       for (const auto repository_path : repository_paths_) {
         bool exists_in_this_repo = false;
-        const auto full_path = JoinPath({repository_path, model});
+        const auto full_path = JoinPath({repository_path, model.first});
         Status status = FileExists(full_path, &exists_in_this_repo);
         if (!status.IsOk()) {
           LOG_ERROR << "failed to poll model repository '" << repository_path
-                    << "' for model '" << model << "': " << status.Message();
+                    << "' for model '" << model.first
+                    << "': " << status.Message();
           *all_models_polled = false;
         } else if (exists_in_this_repo) {
-          auto res = model_to_repository.emplace(model, repository_path);
+          auto res = model_to_repository.emplace(model.first, repository_path);
           if (res.second) {
             exists = true;
           } else {
             exists = false;
             model_to_repository.erase(res.first);
-            LOG_ERROR << "failed to poll model '" << model
+            LOG_ERROR << "failed to poll model '" << model.first
                       << "': not unique across all model repositories";
             *all_models_polled = false;
             break;
@@ -1701,7 +1723,7 @@ ModelRepositoryManager::Poll(
         }
       }
       if (!exists) {
-        deleted->insert(model);
+        deleted->insert(model.first);
       }
     }
   }
@@ -1724,6 +1746,7 @@ ModelRepositoryManager::Poll(
     auto model_poll_state = STATE_UNMODIFIED;
     auto full_path = JoinPath({repository, child});
 
+    const auto& mit = models.find(child);
 
     std::unique_ptr<ModelInfo> model_info;
     const auto iitr = infos_.find(child);
@@ -1742,7 +1765,36 @@ ModelRepositoryManager::Poll(
     }
 
     Status status = Status::Success;
-    if (model_poll_state != STATE_UNMODIFIED) {
+
+    // Check if there is config override
+    std::string override_config;
+    if ((mit != models.end()) && (!mit->second.empty())) {
+      for (const auto& override_parameter : mit->second) {
+        if ((override_parameter->Name() == "config") &&
+            (override_parameter->Type() == TRITONSERVER_PARAMETER_STRING)) {
+          override_config = std::string(reinterpret_cast<const char*>(
+              override_parameter->ValuePointer()));
+          // When override happens, make modification time be less than
+          // the actual time in file system so that next load without override
+          // will trigger re-load to undo the override while the files may still
+          // be unchanged.
+          mtime_ns -= 1;
+          if (model_poll_state != STATE_ADDED) {
+            model_poll_state = STATE_MODIFIED;
+          }
+        } else {
+          status = Status(
+              Status::Code::INVALID_ARG,
+              "Unrecognized load parameter '" + override_parameter->Name() +
+                  "' with type '" +
+                  TRITONSERVER_ParameterTypeString(override_parameter->Type()) +
+                  "'");
+          break;
+        }
+      }
+    }
+
+    if (status.IsOk() && (model_poll_state != STATE_UNMODIFIED)) {
       model_info.reset(new ModelInfo(mtime_ns, repository));
       inference::ModelConfig& model_config = model_info->model_config_;
 
@@ -1750,8 +1802,18 @@ ModelRepositoryManager::Poll(
       // this must be done before normalizing model config as agents might
       // redirect to use the model config at a different location
       {
-        const auto config_path = JoinPath({full_path, kModelConfigPbTxt});
-        if (ReadTextProto(config_path, &model_config).IsOk()) {
+        bool parsed_config = false;
+        if (override_config.empty()) {
+          // ReadTextProto() is allowed to fail because model config may not be
+          // provided
+          const auto config_path = JoinPath({full_path, kModelConfigPbTxt});
+          parsed_config = ReadTextProto(config_path, &model_config).IsOk();
+        } else {
+          status = JsonToModelConfig(
+              override_config, 1 /* config_version */, &model_config);
+          parsed_config = status.IsOk();
+        }
+        if (parsed_config) {
           status = CreateAgentModelListWithLoadAction(
               model_config, full_path, &model_info->agent_model_list_);
           if (status.IsOk() && model_info->agent_model_list_ != nullptr) {
@@ -1809,13 +1871,13 @@ ModelRepositoryManager::Poll(
                   "', directory name must equal model name");
         }
       }
+    }
 
-      if (!status.IsOk()) {
-        if (model_poll_state == STATE_MODIFIED) {
-          model_poll_state = STATE_UNMODIFIED;
-        } else {
-          model_poll_state = STATE_INVALID;
-        }
+    if (!status.IsOk()) {
+      if (model_poll_state == STATE_MODIFIED) {
+        model_poll_state = STATE_UNMODIFIED;
+      } else {
+        model_poll_state = STATE_INVALID;
       }
     }
 
@@ -1873,7 +1935,7 @@ ModelRepositoryManager::UpdateDependencyGraph(
         // remove this node from its upstreams
         for (auto& upstream : it->second->upstreams_) {
           upstream.first->downstreams_.erase(it->second.get());
-          // Check if the upstream should be removed aas well
+          // Check if the upstream should be removed as well
           if ((deleted_dependents != nullptr) &&
               (upstream.first->downstreams_.empty()) &&
               (!upstream.first->explicitly_load_)) {

@@ -1265,7 +1265,8 @@ HTTPAPIServer::HandleRepositoryControl(
         "'repository_name' specification is not supported");
   } else {
     if (action == "load") {
-      err = TRITONSERVER_ServerLoadModel(server_.get(), model_name.c_str());
+      err = TRITONSERVER_ServerLoadModelWithParameters(
+          server_.get(), model_name.c_str(), nullptr, 0);
     } else if (action == "unload") {
       // Check if the dependent models should be removed
       bool unload_dependents = false;

@@ -30,6 +30,7 @@
 #include <map>
 #include <mutex>
 #include "model_config.pb.h"
+#include "src/core/infer_parameter.h"
 #include "src/core/model_config.h"
 #include "src/core/status.h"
 
@@ -156,15 +157,16 @@ class ModelRepositoryManager {
   Status PollAndUpdate();
 
   /// Load or unload a specified model.
-  /// \parm model_name The name of the model to be loaded or unloaded
+  /// \parm models The models and the parameters to be loaded or unloaded
   /// \parm type The type action to be performed. If the action is LOAD and
   /// the model has been loaded, the model will be re-loaded.
   /// \return error status. Return "NOT_FOUND" if it tries to load
   /// a non-existing model or if it tries to unload a model that hasn't been
   /// loaded.
   Status LoadUnloadModel(
-      const std::string& model_name, const ActionType type,
-      const bool unload_dependents);
+      const std::unordered_map<
+          std::string, std::vector<const InferenceParameter*>>& models,
+      const ActionType type, const bool unload_dependents);
 
   /// Unload all models. This function should be called before shutting down
   /// the model repository manager.
@@ -225,14 +227,17 @@ class ModelRepositoryManager {
 
   /// The internal function that load or unload a set of models.
   Status LoadUnloadModels(
-      const std::set<std::string>& models, const ActionType type,
-      const bool unload_dependents, bool* all_models_polled);
+      const std::unordered_map<
+          std::string, std::vector<const InferenceParameter*>>& models,
+      const ActionType type, const bool unload_dependents,
+      bool* all_models_polled);
 
   /// Poll the requested models in the model repository and
   /// compare with the current set. Return the additions, deletions,
   /// and modifications that have occurred. This function will not updated
   /// the current model info, it is caller's responsibility to do so.
-  /// \param models The set of models to be polled
+  /// \param models The map from models to be polled to their associated
+  /// parameters.
   /// \param added The names of the models added to the repository.
   /// \param deleted The names of the models removed from the repository.
   /// \param modified The names of the models remaining in the
@@ -246,10 +251,11 @@ class ModelRepositoryManager {
   /// will stay in the previous state.
   /// \return The error status.
   Status Poll(
-      const std::set<std::string>& models, std::set<std::string>* added,
-      std::set<std::string>* deleted, std::set<std::string>* modified,
-      std::set<std::string>* unmodified, ModelInfoMap* updated_infos,
-      bool* all_models_polled);
+      const std::unordered_map<
+          std::string, std::vector<const InferenceParameter*>>& models,
+      std::set<std::string>* added, std::set<std::string>* deleted,
+      std::set<std::string>* modified, std::set<std::string>* unmodified,
+      ModelInfoMap* updated_infos, bool* all_models_polled);
 
   /// Load models based on the dependency graph. The function will iteratively
   /// load models that all the models they depend on has been loaded, and unload

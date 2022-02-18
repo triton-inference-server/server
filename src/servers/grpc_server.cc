@@ -1741,8 +1741,8 @@ CommonHandler::SetUpAllRequests()
           grpc::Status* status) {
         TRITONSERVER_Error* err = nullptr;
         if (request.repository_name().empty()) {
-          err = TRITONSERVER_ServerLoadModel(
-              tritonserver_.get(), request.model_name().c_str());
+          err = TRITONSERVER_ServerLoadModelWithParameters(
+              tritonserver_.get(), request.model_name().c_str(), nullptr, 0);
         } else {
           err = TRITONSERVER_ErrorNew(
               TRITONSERVER_ERROR_UNSUPPORTED,

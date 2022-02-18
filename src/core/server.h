@@ -34,6 +34,7 @@
 #include <vector>
 
 #include "model_config.pb.h"
+#include "src/core/infer_parameter.h"
 #include "src/core/model_config.h"
 #include "src/core/model_repository_manager.h"
 #include "src/core/persistent_backend_manager.h"
@@ -118,7 +119,9 @@ class InferenceServer {
   Status InferAsync(std::unique_ptr<InferenceRequest>& request);
 
   // Load the corresponding model. Reload the model if it has been loaded.
-  Status LoadModel(const std::string& model_name);
+  Status LoadModel(
+      const std::unordered_map<
+          std::string, std::vector<const InferenceParameter*>>& models);
 
   // Unload the corresponding model.
   Status UnloadModel(
