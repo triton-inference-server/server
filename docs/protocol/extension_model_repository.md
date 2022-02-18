@@ -139,7 +139,9 @@ The load API accepts the following parameters:
 configuration, which must be able to be parsed into [ModelConfig message from
 model_config.proto](https://github.com/triton-inference-server/common/blob/main/protobuf/model_config.proto).
 This config will be used for loading the model instead of the one in
-the model directory.
+the model directory. If config is provided, the (re-)load will be triggered as
+the model metadata has been updated, and the same (re-)load behavior will be
+applied.
 
 A failed load request must be indicated by an HTTP error status
 (typically 400). The HTTP body must contain the
@@ -177,8 +179,8 @@ The unload API accepts the following parameters:
 
 - "unload_dependents" : boolean parameter indicating that in addition
   to unloading the requested model, also unload any dependent model
-  that was loaded along with the requested model (for example, the
-  models composing an ensemble).
+  that was loaded along with the requested model. For example, request to
+  unload the models composing an ensemble will unload the ensemble as well.
 
 A failed unload request must be indicated by an HTTP error status
 (typically 400). The HTTP body must contain the
@@ -308,7 +310,9 @@ The RepositoryModelLoad API accepts the following parameters:
 configuration, which must be able to be parsed into [ModelConfig message from
 model_config.proto](https://github.com/triton-inference-server/common/blob/main/protobuf/model_config.proto).
 This config will be used for loading the model instead of the one in
-the model directory.
+the model directory. If config is provided, the (re-)load will be triggered as
+the model metadata has been updated, and the same (re-)load behavior will be
+applied.
 
 ### Unload
 
@@ -341,5 +345,5 @@ The RepositoryModelUnload API accepts the following parameters:
 
 - "unload_dependents" : boolean parameter indicating that in addition
   to unloading the requested model, also unload any dependent model
-  that was loaded along with the requested model (for example, the
-  models composing an ensemble).
+  that was loaded along with the requested model. For example, request to
+  unload the models composing an ensemble will unload the ensemble as well.
