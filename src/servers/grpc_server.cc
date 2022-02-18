@@ -1741,8 +1741,38 @@ CommonHandler::SetUpAllRequests()
           grpc::Status* status) {
         TRITONSERVER_Error* err = nullptr;
         if (request.repository_name().empty()) {
-          err = TRITONSERVER_ServerLoadModelWithParameters(
-              tritonserver_.get(), request.model_name().c_str(), nullptr, 0);
+          std::vector<const TRITONSERVER_Parameter*> params;
+          for (auto param_proto : request.parameters()) {
+            if (param_proto.first.compare("config") == 0) {
+              if (param_proto.second.parameter_choice_case() !=
+                  inference::ModelRepositoryParameter::ParameterChoiceCase::
+                      kStringParam) {
+                err = TRITONSERVER_ErrorNew(
+                    TRITONSERVER_ERROR_INVALID_ARG,
+                    "invalid value type for 'unload_dependents' parameter, "
+                    "expected "
+                    "string_param.");
+                break;
+              } else {
+                auto param = TRITONSERVER_ParameterNew(
+                    "config", TRITONSERVER_PARAMETER_STRING,
+                    param_proto.second.string_param().c_str());
+                if (param != nullptr) {
+                  params.emplace_back(param);
+                } else {
+                  err = TRITONSERVER_ErrorNew(
+                      TRITONSERVER_ERROR_INTERNAL,
+                      "unexpected error on creating Triton parameter");
+                  break;
+                }
+              }
+            }
+          }
+          if (err == nullptr) {
+            err = TRITONSERVER_ServerLoadModelWithParameters(
+                tritonserver_.get(), request.model_name().c_str(),
+                params.data(), params.size());
+          }
         } else {
           err = TRITONSERVER_ErrorNew(
               TRITONSERVER_ERROR_UNSUPPORTED,

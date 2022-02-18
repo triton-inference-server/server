@@ -824,7 +824,7 @@ ValidateOutputParameter(triton::common::TritonJson::Value& io)
 
       triton::common::TritonJson::Value binary_data_json;
       if (params_json.Find("binary_data", &binary_data_json)) {
-        bool is_binary;
+        bool is_binary = false;
         RETURN_MSG_IF_ERR(
             binary_data_json.AsBool(&is_binary), "Unable to set 'binary_data'");
         if (is_binary) {
@@ -1265,8 +1265,48 @@ HTTPAPIServer::HandleRepositoryControl(
         "'repository_name' specification is not supported");
   } else {
     if (action == "load") {
+      struct evbuffer_iovec* v = nullptr;
+      int v_idx = 0;
+      int n = evbuffer_peek(req->buffer_in, -1, NULL, NULL, 0);
+      if (n > 0) {
+        v = static_cast<struct evbuffer_iovec*>(
+            alloca(sizeof(struct evbuffer_iovec) * n));
+        if (evbuffer_peek(req->buffer_in, -1, NULL, v, n) != n) {
+          HTTP_RESPOND_IF_ERR(
+              req, TRITONSERVER_ErrorNew(
+                       TRITONSERVER_ERROR_INTERNAL,
+                       "unexpected error getting load model request buffers"));
+        }
+      }
+      std::vector<const TRITONSERVER_Parameter*> params;
+      size_t buffer_len = evbuffer_get_length(req->buffer_in);
+      if (buffer_len > 0) {
+        triton::common::TritonJson::Value request;
+        HTTP_RESPOND_IF_ERR(
+            req, EVBufferToJson(&request, v, &v_idx, buffer_len, n));
+
+        // Parse request body for parameters
+        triton::common::TritonJson::Value param_json;
+        if (request.Find("parameters", &param_json)) {
+          triton::common::TritonJson::Value param;
+          if (param_json.Find("config", &param)) {
+            std::string config;
+            HTTP_RESPOND_IF_ERR(req, param.AsString(&config));
+            auto param = TRITONSERVER_ParameterNew(
+                "config", TRITONSERVER_PARAMETER_STRING, config.c_str());
+            if (param != nullptr) {
+              params.emplace_back(param);
+            } else {
+              HTTP_RESPOND_IF_ERR(
+                  req, TRITONSERVER_ErrorNew(
+                           TRITONSERVER_ERROR_INTERNAL,
+                           "unexpected error on creating Triton parameter"));
+            }
+          }
+        }
+      }
       err = TRITONSERVER_ServerLoadModelWithParameters(
-          server_.get(), model_name.c_str(), nullptr, 0);
+          server_.get(), model_name.c_str(), params.data(), params.size());
     } else if (action == "unload") {
       // Check if the dependent models should be removed
       bool unload_dependents = false;

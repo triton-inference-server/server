@@ -1458,9 +1458,9 @@ ModelRepositoryManager::LoadUnloadModels(
         deleted.insert(model.first);
       }
     } else {
-      std::set<std::string> current_models, checked_models;
+      std::set<std::string> checked_models;
+      auto current_models = models;
       for (const auto& model : models) {
-        current_models.emplace(model.first);
         checked_models.emplace(model.first);
       }
 
@@ -1468,18 +1468,19 @@ ModelRepositoryManager::LoadUnloadModels(
 #ifdef TRITON_ENABLE_ENSEMBLE
       bool first_iteration = true;
 #endif  // TRITON_ENABLE_ENSEMBLE
-      while (!models.empty()) {
+      while (!current_models.empty()) {
         bool polled = true;
         RETURN_IF_ERROR(Poll(
-            models, &added, &deleted, &modified, &unmodified, &new_infos,
-            &polled));
+            current_models, &added, &deleted, &modified, &unmodified,
+            &new_infos, &polled));
         *all_models_polled &= polled;
 
         // More models should be polled if the polled models are ensembles
-        std::set<std::string> next_models;
+        std::unordered_map<std::string, std::vector<const InferenceParameter*>>
+            next_models;
 #ifdef TRITON_ENABLE_ENSEMBLE
         for (const auto& model : current_models) {
-          auto it = new_infos.find(model);
+          auto it = new_infos.find(model.first);
           // Some models may be marked as deleted and not in 'new_infos'
           if (it != new_infos.end()) {
             it->second->explicitly_load_ = first_iteration;
@@ -1489,7 +1490,7 @@ ModelRepositoryManager::LoadUnloadModels(
                 bool need_poll =
                     checked_models.emplace(step.model_name()).second;
                 if (need_poll) {
-                  next_models.emplace(step.model_name());
+                  next_models[step.model_name()];
                 }
               }
             }
