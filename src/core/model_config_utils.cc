@@ -1,4 +1,4 @@
-// Copyright 2018-2021, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+// Copyright 2018-2022, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 //
 // Redistribution and use in source and binary forms, with or without
 // modification, are permitted provided that the following conditions
@@ -643,16 +643,6 @@ GetNormalizedModelConfig(
     const std::string& path, const bool autofill,
     const double min_compute_capability, inference::ModelConfig* config)
 {
-  // If 'autofill' then the configuration file can be empty.
-  const auto config_path = JoinPath({path, kModelConfigPbTxt});
-  bool model_config_exists;
-  RETURN_IF_ERROR(FileExists(config_path, &model_config_exists));
-  if (autofill && !model_config_exists) {
-    config->Clear();
-  } else {
-    RETURN_IF_ERROR(ReadTextProto(config_path, config));
-  }
-
   // If the model name is not given in the configuration, set if based
   // on the model path.
   const std::string model_name(BaseName(path));

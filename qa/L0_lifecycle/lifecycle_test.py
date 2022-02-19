@@ -1,4 +1,4 @@
-# Copyright (c) 2018-2021, NVIDIA CORPORATION. All rights reserved.
+# Copyright 2018-2022, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -75,7 +75,7 @@ class LifeCycleTest(tu.TestResultCollector):
                                    np.float32,
                                    np.float32,
                                    model_version=v,
-                                   swap=(swap or (v == 3)))
+                                   swap=(swap or (v != 1)))
             except Exception as ex:
                 self.assertTrue(False, "unexpected error {}".format(ex))
 
@@ -2120,6 +2120,84 @@ class LifeCycleTest(tu.TestResultCollector):
 
         except Exception as ex:
             self.assertTrue(False, "unexpected error {}".format(ex))
+
+    def test_config_override(self):
+        model_shape = (1, 16)
+
+        for triton_client in (httpclient.InferenceServerClient("localhost:8000",
+                                                               verbose=True),
+                              grpcclient.InferenceServerClient("localhost:8001",
+                                                               verbose=True)):
+            for base in (('onnx', 'onnxruntime'),):
+                model_name = tu.get_model_name(base[0], np.float32, np.float32,
+                                               np.float32)
+                try:
+                    self.assertTrue(triton_client.is_server_live())
+                    self.assertFalse(
+                        triton_client.is_model_ready(model_name, "1"))
+                    self.assertFalse(
+                        triton_client.is_model_ready(model_name, "2"))
+                    self.assertFalse(
+                        triton_client.is_model_ready(model_name, "3"))
+                except Exception as ex:
+                    self.assertTrue(False, "unexpected error {}".format(ex))
+
+                # Request to load the model as is and expect the model fails
+                # to load with default config
+                try:
+                    triton_client.load_model(model_name)
+                    self.assertTrue(
+                        False, "expected fail to load '{}'".format(model_name))
+                except Exception as ex:
+                    self.assertIn(
+                        "load failed for model '{}'".format(model_name),
+                        ex.message())
+
+                # Request to load the model with provided "correct" config
+                try:
+                    triton_client.load_model(model_name,
+                                             config="""
+{{"backend":"{backend}","version_policy":{{"specific" : {{ "versions": [2] }} }} }}
+""".format(backend=base[1]))
+                except Exception as ex:
+                    self.assertTrue(False, "unexpected error {}".format(ex))
+                self.assertFalse(triton_client.is_model_ready(model_name, "1"))
+                self.assertTrue(triton_client.is_model_ready(model_name, "2"))
+                self.assertFalse(triton_client.is_model_ready(model_name, "3"))
+
+                # And loaded models work properly
+                self._infer_success_models([
+                    base[0],
+                ], (2,), model_shape)
+
+                # request without additional config will load with default
+                # config and expect to fail, and version 2 will not be unloaded.
+                try:
+                    triton_client.load_model(model_name)
+                    self.assertTrue(
+                        False, "expected fail to load '{}'".format(model_name))
+                except Exception as ex:
+                    self.assertIn(
+                        "load failed for model '{}'".format(model_name),
+                        ex.message())
+                    self.assertFalse(
+                        triton_client.is_model_ready(model_name, "1"))
+                    self.assertTrue(
+                        triton_client.is_model_ready(model_name, "2"))
+                    self.assertFalse(
+                        triton_client.is_model_ready(model_name, "3"))
+
+                # Unload model for the next client iteration
+                try:
+                    triton_client.unload_model(model_name)
+                    self.assertFalse(
+                        triton_client.is_model_ready(model_name, "1"))
+                    self.assertFalse(
+                        triton_client.is_model_ready(model_name, "2"))
+                    self.assertFalse(
+                        triton_client.is_model_ready(model_name, "3"))
+                except Exception as ex:
+                    self.assertTrue(False, "unexpected error {}".format(ex))
 
 
 if __name__ == '__main__':
