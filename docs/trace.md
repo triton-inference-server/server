@@ -40,7 +40,8 @@ The --trace-file option indicates where the trace output should be
 written. The --trace-rate option specifies the sampling rate. In
 this example every 100-th inference request will be traced. The
 --trace-level option indicates the level of trace detail that should
-be collected. --trace-level option may be specified multiple times to trace multiple informations. Use the --help option to get more information.
+be collected. --trace-level option may be specified multiple times to 
+trace multiple informations. Use the --help option to get more information.
 
 In addition to configure trace settings in command line arguments, The user may
 modify the trace setting when Triton server
@@ -77,13 +78,15 @@ version of the inference request. If the trace is from a
 model run as part of an ensemble, the "parent_id" will indicate the
 "id" of the containing ensemble.  
 
-Each `TIMESTAMPS` trace will have one or more
-"timestamps" with each timestamp having a name and the timestamp in
-nanoseconds ("ns"). For example,
+Each `TIMESTAMPS` trace will have one or more "timestamps" with 
+each timestamp having a name and the timestamp innanoseconds ("ns"). 
+For example:
 
 ```
 [
   {
+    "model_name": "simple",
+    "model_version": -1,
     "id":1,
     "timestamps" : [
       { "name": "http recv start", "ns": 2259961222771924 },
@@ -100,14 +103,16 @@ nanoseconds ("ns"). For example,
 ]
 ```
 
-Each `TENSORS` trace will contain an "activity" and a "tensor". "activity" indicates 
-the type of tensor, including "TENSOR_QUEUE_INPUT" and "TENSOR_BACKEND_OUTPUT" by now.
-"tensor" has the detail of tensor, including its "name", "data" and "dtype". 
-For example,
+Each `TENSORS` trace will contain an "activity" and a "tensor". 
+"activity" indicates the type of tensor, including "TENSOR_QUEUE_INPUT" 
+and "TENSOR_BACKEND_OUTPUT" by now. "tensor" has the detail of tensor, 
+including its "name", "data" and "dtype". For example:
 
 ```
 [
   {
+    "model_name": "simple",
+    "model_version": -1,
     "id":1,
     "activity":"TENSOR_QUEUE_INPUT",
     "tensor":{
@@ -283,6 +288,7 @@ The meaning of the trace timestamps is:
 
   * Version: The version of model.
 
-  * QUEUE_INPUT: The tensor entering the queue of a backend to wait for scheduling.
+  * QUEUE_INPUT: The tensor entering the queue of a backend to wait for 
+    scheduling.
 
   * BACKEND_OUTPUT: The tensor in the response of a backend.
