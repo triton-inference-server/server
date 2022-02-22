@@ -30,7 +30,7 @@
 
 A release of Triton for [JetPack 4.6.1](https://developer.nvidia.com/embedded/jetpack)
 is provided in the attached tar file in the release notes:
-[tritonserver2.18.0-jetpack4.6.1.tgz](https://github.com/triton-inference-server/server/releases/download/v2.18.0/tritonserver2.18.0-jetpack4.6.1.tgz).
+[tritonserver2.19.0-jetpack4.6.1.tgz](https://github.com/triton-inference-server/server/releases/download/v2.19.0/tritonserver2.19.0-jetpack4.6.1.tgz).
 
 ![Triton on Jetson Diagram](images/triton_on_jetson.png)
 
@@ -153,7 +153,7 @@ apt-get install -y --no-install-recommends \
 The wheel for the Python client library is present in the tar file and can be installed by running the following command:
 
 ```
-python3 -m pip install --upgrade clients/python/tritonclient-2.18.0-py3-none-manylinux2014_aarch64.whl[all]
+python3 -m pip install --upgrade clients/python/tritonclient-2.19.0-py3-none-manylinux2014_aarch64.whl[all]
 ```
 
 **Note**: On Jetson, the backend directory must be explicitly specified using the
