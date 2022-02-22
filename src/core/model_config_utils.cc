@@ -640,8 +640,8 @@ GetTypedSequenceControlProperties(
 
 Status
 GetNormalizedModelConfig(
-    const std::string& path, const bool autofill,
-    const double min_compute_capability, inference::ModelConfig* config)
+    const std::string& path, const double min_compute_capability,
+    inference::ModelConfig* config)
 {
   // If the model name is not given in the configuration, set if based
   // on the model path.

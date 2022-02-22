@@ -116,7 +116,7 @@ $repository_index_error_response =
 
 The load API requests that a model be loaded into Triton, or reloaded
 if the model is already loaded. A load request is made with an HTTP
-POST to a load endpoint.  The HTTP body may be empty or may contain
+POST to a load endpoint. The HTTP body may be empty or may contain
 the load request object, identified as $repository_load_request.
 A successful load request is indicated by a 200 HTTP status.
 

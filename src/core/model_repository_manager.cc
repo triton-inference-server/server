@@ -1805,10 +1805,18 @@ ModelRepositoryManager::Poll(
       {
         bool parsed_config = false;
         if (override_config.empty()) {
-          // ReadTextProto() is allowed to fail because model config may not be
-          // provided
           const auto config_path = JoinPath({full_path, kModelConfigPbTxt});
-          parsed_config = ReadTextProto(config_path, &model_config).IsOk();
+          bool model_config_exists;
+          status = FileExists(config_path, &model_config_exists);
+          if (status.IsOk()) {
+            // model config can be missing if auto fill is set
+            if (autofill_ && !model_config_exists) {
+              model_config.Clear();
+            } else {
+              status = ReadTextProto(config_path, &model_config);
+              parsed_config = status.IsOk();
+            }
+          }
         } else {
           status = JsonToModelConfig(
               override_config, 1 /* config_version */, &model_config);
@@ -1847,7 +1855,7 @@ ModelRepositoryManager::Poll(
         // the model configuration (autofill) from the model
         // definition. In all cases normalize and validate the config.
         status = GetNormalizedModelConfig(
-            full_path, autofill_, min_compute_capability_, &model_config);
+            full_path, min_compute_capability_, &model_config);
       }
       if (status.IsOk()) {
         // Note that the model inputs and outputs are not validated until
