@@ -24,6 +24,7 @@
 # (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
+SERVER_IPADDR=${TRITONSERVER_IPADDR:=localhost}
 SERVER_LOG=${SERVER_LOG:=./server.log}
 SERVER_TIMEOUT=${SERVER_TIMEOUT:=120}
 SERVER_LD_PRELOAD=${SERVER_LD_PRELOAD:=""}
@@ -74,7 +75,7 @@ function wait_for_server_ready() {
         sleep 1;
 
         set +e
-        code=`curl -s -w %{http_code} localhost:8000/v2/health/ready`
+        code=`curl -s -w %{http_code} ${SERVER_IPADDR}:8000/v2/health/ready`
         set -e
         if [ "$code" == "200" ]; then
             return
@@ -106,7 +107,7 @@ function wait_for_server_live() {
         sleep 1;
 
         set +e
-        code=`curl -s -w %{http_code} localhost:8000/v2/health/live`
+        code=`curl -s -w %{http_code} ${SERVER_IPADDR}:8000/v2/health/live`
         set -e
         if [ "$code" == "200" ]; then
             return
@@ -131,8 +132,8 @@ function wait_for_model_stable() {
         sleep 1;
 
         set +e
-        total_count=`curl -s -X POST localhost:8000/v2/repository/index | json_pp | grep "state" | wc -l`
-        stable_count=`curl -s -X POST localhost:8000/v2/repository/index | json_pp | grep "READY\|UNAVAILABLE" | wc -l`
+        total_count=`curl -s -X POST ${SERVER_IPADDR}:8000/v2/repository/index | json_pp | grep "state" | wc -l`
+        stable_count=`curl -s -X POST ${SERVER_IPADDR}:8000/v2/repository/index | json_pp | grep "READY\|UNAVAILABLE" | wc -l`
         count=$((total_count - stable_count))
         set -e
         if [ "$count" == "0" ]; then
