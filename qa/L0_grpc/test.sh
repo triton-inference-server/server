@@ -45,7 +45,7 @@ RET=0
 # On windows the paths invoked by the script (running in WSL) must use
 # /mnt/c when needed but the paths on the tritonserver command-line
 # must be C:/ style.
-if [[ "$(< /proc/sys/kernel/osrelease)" == *Microsoft ]]; then
+if [[ "$(< /proc/sys/kernel/osrelease)" == *microsoft* ]]; then
     SDKDIR=${SDKDIR:=C:/sdk}
     MODELDIR=${MODELDIR:=C:/models}
     BACKEND_DIR=${BACKEND_DIR:=C:/tritonserver/backends}

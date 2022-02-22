@@ -79,7 +79,7 @@ TF_VERSION=${TF_VERSION:=1}
 # On windows the paths invoked by the script (running in WSL) must use
 # /mnt/c when needed but the paths on the tritonserver command-line
 # must be C:/ style.
-if [[ "$(< /proc/sys/kernel/osrelease)" == *Microsoft ]]; then
+if [[ "$(< /proc/sys/kernel/osrelease)" == *microsoft* ]]; then
     MODELDIR=${MODELDIR:=C:/models}
     DATADIR=${DATADIR:="/mnt/c/data/inferenceserver/${REPO_VERSION}"}
     BACKEND_DIR=${BACKEND_DIR:=C:/tritonserver/backends}
@@ -552,7 +552,7 @@ done
 TEST_CASE=test_multi_batch_preserve_ordering
 
 # Skip test for Windows. Trace file concats at 8192 chars on Windows.
-if [[ "$(< /proc/sys/kernel/osrelease)" != *Microsoft ]]; then
+if [[ "$(< /proc/sys/kernel/osrelease)" != *microsoft* ]]; then
     rm -fr ./custom_models && mkdir ./custom_models && \
         cp -r ../custom_models/custom_zero_1_float32 ./custom_models/. && \
         mkdir -p ./custom_models/custom_zero_1_float32/1

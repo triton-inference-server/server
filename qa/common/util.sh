@@ -224,7 +224,7 @@ function run_server_nowait () {
         return
     fi
 
-    if [[ "$(< /proc/sys/kernel/osrelease)" == *Microsoft ]]; then
+    if [[ "$(< /proc/sys/kernel/osrelease)" == *microsoft* ]]; then
         # LD_PRELOAD not yet supported on windows
         if [ -z "$SERVER_LD_PRELOAD" ]; then
             echo "=== Running $SERVER $SERVER_ARGS"
@@ -296,16 +296,16 @@ function kill_server () {
     # causes the entire WSL shell to just exit. So instead we must use
     # taskkill.exe which can only forcefully kill tritonserver which
     # means that it does not gracefully exit.
-    if [[ "$(< /proc/sys/kernel/osrelease)" == *Microsoft ]]; then
+    if [[ "$(< /proc/sys/kernel/osrelease)" == *microsoft* ]]; then
         # Disable -x as it makes output below hard to read
         oldstate="$(set +o)"; [[ -o errexit ]] && oldstate="$oldstate; set -e"
         set +x
         set +e
-        
+
         tasklist=$(/mnt/c/windows/system32/tasklist.exe /FI 'IMAGENAME eq tritonserver.exe' /FO CSV)
         echo "=== Windows tritonserver tasks"
         echo "$tasklist"
-        
+
         taskcount=$(echo "$tasklist" | grep -c tritonserver)
         if (( $taskcount > 0 )); then
             echo "$tasklist" | while IFS=, read -r taskname taskpid taskrest; do
@@ -318,7 +318,7 @@ function kill_server () {
                 fi
             done
         fi
-        
+
         set +vx; eval "$oldstate"
     else
         # Non-windows...
@@ -326,7 +326,7 @@ function kill_server () {
         wait $SERVER_PID
     fi
 }
-          
+
 # Run nvidia-smi to monitor GPU utilization.
 # Writes utilization into MONITOR_LOG. If MONITOR_ID is specified only
 # that GPU PCI bus ID is monitored.
