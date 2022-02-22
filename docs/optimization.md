@@ -305,7 +305,7 @@ optimization { execution_accelerators {
 ```
 
 The options are described in detail in the
-[ModelOptimizationPolicy](../src/core/model_configuration.proto)
+[ModelOptimizationPolicy](https://github.com/triton-inference-server/common/blob/main/protobuf/model_config.proto)
 section of the model configuration protobuf.
 
 As an example of TensorRT optimization applied to a TensorFlow model,
