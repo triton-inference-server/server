@@ -29,16 +29,13 @@
 # Triton Inference Server Support for Jetson and JetPack
 
 A release of Triton for [JetPack 4.6.1](https://developer.nvidia.com/embedded/jetpack)
-is provided in the attached tar file in the release notes:
-[tritonserver2.19.0-jetpack4.6.1.tgz](https://github.com/triton-inference-server/server/releases/download/v2.19.0/tritonserver2.19.0-jetpack4.6.1.tgz).
+is provided in the attached tar file in the [release notes](https://github.com/triton-inference-server/server/releases).
 
 ![Triton on Jetson Diagram](images/triton_on_jetson.png)
 
 Triton Inference Server support on JetPack includes:
 
 * Running models on GPU and NVDLA
-* This release supports **TensorFlow** 2.7.0, **TensorFlow** 1.15.5, **TensorRT** 8.2.1.8,
-**Onnx Runtime** 1.10.0, **PyTorch** 1.11.0, **Python** 3.6 and as well as *ensembles*.
 * [Concurrent model execution](architecture.md#concurrent-model-execution)
 * [Dynamic batching](architecture.md#models-and-schedulers)
 * [Model pipelines](architecture.md#ensemble-models)
@@ -149,12 +146,6 @@ apt-get install -y --no-install-recommends \
 ```
 
 **Note**: OpenCV 4.1.1 is installed as a part of JetPack. It is one of the dependencies for the client build.
-
-The wheel for the Python client library is present in the tar file and can be installed by running the following command:
-
-```
-python3 -m pip install --upgrade clients/python/tritonclient-2.19.0-py3-none-manylinux2014_aarch64.whl[all]
-```
 
 **Note**: On Jetson, the backend directory must be explicitly specified using the
 `--backend-directory` flag. Triton defaults to using TensorFlow 1.x and a version string
