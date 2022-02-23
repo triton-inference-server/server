@@ -1,4 +1,4 @@
-// Copyright 2018-2021, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+// Copyright 2018-2022, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 //
 // Redistribution and use in source and binary forms, with or without
 // modification, are permitted provided that the following conditions
@@ -68,15 +68,13 @@ Status GetTypedSequenceControlProperties(
 /// Read a ModelConfig and normalize it as expected by model backends.
 /// \param path The full-path to the directory containing the
 /// model configuration.
-/// \param autofill If true attempt to determine any missing required
-/// configuration from the model definition.
 /// \param min_compute_capability The minimum support CUDA compute
 /// capability.
 /// \param config Returns the normalized model configuration.
 /// \return The error status.
 Status GetNormalizedModelConfig(
-    const std::string& path, const bool autofill,
-    const double min_compute_capability, inference::ModelConfig* config);
+    const std::string& path, const double min_compute_capability,
+    inference::ModelConfig* config);
 
 /// Auto-complete backend related fields (platform, backend and default model
 /// filename) if not set, note that only Triton recognized backends will be
