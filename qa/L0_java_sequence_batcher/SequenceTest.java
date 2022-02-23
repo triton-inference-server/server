@@ -202,11 +202,9 @@ public class SequenceTest {
       return null;
     }
 
-    // Custom function to set metadata required for
-    // sequence batcher
+    // Custom function to set metadata required for sequence batcher
     static void
     SetSequenceMetadata(TRITONSERVER_InferenceRequest irequest, long correlation_id, boolean sequence_start, boolean sequence_end)
-    throws Exception
     {
 
       FAIL_IF_ERR(
