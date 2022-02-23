@@ -89,9 +89,8 @@ TRITON_VERSION_MAP = {
         '22.03dev',  # triton container
         '22.02',  # upstream container
         '1.10.0',  # ORT
-        '2021.2.200',  # ORT OpenVINO
-        (('2021.2', None), ('2021.4', '2021.4.582'),
-         ('SPECIFIC', 'f2f281e6')),  # Standalone OpenVINO
+        '2021.4.582',  # ORT OpenVINO
+        (('2021.4', '2021.4.582'), ('SPECIFIC', 'f2f281e6')),  # Standalone OpenVINO
         '2.2.9')  # DCGM version
 }
 
