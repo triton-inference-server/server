@@ -63,7 +63,9 @@ as well as the C++ and Python client libraries and examples.
 
 ## Installation and Usage
 
-The following dependencies must be installed before building / running Triton server:
+### Build Dependencies for Triton
+
+The following dependencies must be installed before building Triton server:
 
 ```
 apt-get update && \
@@ -85,11 +87,17 @@ apt-get update && \
             libarchive-dev \
             zlib1g-dev \
             python3 \
-            python3-pip \
-            python3-dev
+            python3-dev \
+            python3-pip
 ```
 
-Additional PyTorch dependencies:
+Additional Onnx Runtime dependencies must be installed to build the Onnx Runtime backend:
+
+```
+pip3 install --upgrade flake8 flatbuffers
+```
+
+Additional PyTorch dependencies must be installed to build (and run) the PyTorch backend:
 
 ```
 apt-get -y install autoconf \
@@ -102,19 +110,27 @@ apt-get -y install autoconf \
 pip3 install --upgrade expecttest xmlrunner hypothesis aiohttp pyyaml scipy ninja typing_extensions protobuf
 ```
 
-In addition to the above Pytorch dependencies, the PyTorch wheel corresponding to this release must also be installed:
+Apart from these PyTorch dependencies, the PyTorch wheel corresponding to the release must also be installed (for build and runtime):
 
 ```
 pip3 install --upgrade https://developer.download.nvidia.com/compute/redist/jp/v461/pytorch/torch-1.11.0a0+17540c5-cp36-cp36m-linux_aarch64.whl
 ```
 
-**Note**: The PyTorch backend depends on libomp.so, which is not loaded automatically.
-If using the PyTorch backend in Triton, you need to set the LD_LIBRARY_PATH to allow
-libomp.so to be loaded as needed before launching Triton.
+**Note**: Seeing a core dump when using numpy 1.19.5 on Jetson is a [known issue](https://github.com/numpy/numpy/issues/18131).
+We recommend using numpy version 1.19.4 or earlier to work around this issue.
+
+The following dependencies must be installed before building Triton client libraries/examples:
 
 ```
-LD_LIBRARY_PATH="$LD_LIBRARY_PATH:/usr/lib/llvm-8/lib"
+apt-get install -y --no-install-recommends \
+            curl \
+            jq
+
+pip3 install --upgrade wheel setuptools cython && \
+    pip3 install --upgrade grpcio-tools numpy==1.19.4 attrdict pillow
 ```
+
+**Note**: OpenCV 4.1.1 is installed as a part of JetPack. It is one of the dependencies for the client build.
 
 **Note**: When building Triton on Jetson, you will require a recent version of cmake. 
 We recommend using cmake 3.21.0. Below is a script to upgrade your cmake version to 3.21.0.
@@ -130,22 +146,48 @@ wget -O - https://apt.kitware.com/keys/kitware-archive-latest.asc 2>/dev/null | 
         cmake-data=3.21.0-0kitware1ubuntu18.04.1 cmake=3.21.0-0kitware1ubuntu18.04.1
 ```
 
-**Note**: Seeing a core dump when using numpy 1.19.5 on Jetson is a [known issue](https://github.com/numpy/numpy/issues/18131).
-We recommend using numpy version 1.19.4 or earlier to work around this issue.
+### Runtime Dependencies for Triton
 
-To build / run the Triton client libraries and examples on Jetson, the following dependencies must also be installed.
+The following runtime dependencies must be installed before running Triton server:
 
 ```
-apt-get install -y --no-install-recommends \
-            curl \
-            jq
-
-    pip3 install --upgrade wheel setuptools cython && \
-    pip3 install --upgrade grpcio-tools numpy==1.19.4 future attrdict
-    pip3 install --upgrade six requests flake8 flatbuffers pillow
+apt-get update && \
+        apt-get install -y --no-install-recommends \
+        libb64-0d \
+        libre2-5 \
+        libssl1.1 \
+        rapidjson-dev \
+        libopenblas-dev \
+        libarchive-dev \
+        zlib1g \
+        python3 \
+        python3-dev \
+        python3-pip
 ```
 
-**Note**: OpenCV 4.1.1 is installed as a part of JetPack. It is one of the dependencies for the client build.
+The following runtime dependencies must be installed before running Triton client:
+
+```
+apt-get update && \
+        apt-get install -y --no-install-recommends \
+        curl \
+        jq
+
+pip3 install --upgrade wheel setuptools && \
+    pip3 install --upgrade grpcio-tools numpy==1.19.4 attrdict pillow
+```
+
+The PyTorch runtime depenencies are the same as the build dependencies listed above.
+
+### Usage
+
+**Note**: The PyTorch backend depends on libomp.so, which is not loaded automatically.
+If using the PyTorch backend in Triton, you need to set the LD_LIBRARY_PATH to allow
+libomp.so to be loaded as needed before launching Triton.
+
+```
+LD_LIBRARY_PATH="$LD_LIBRARY_PATH:/usr/lib/llvm-8/lib"
+```
 
 **Note**: On Jetson, the backend directory must be explicitly specified using the
 `--backend-directory` flag. Triton defaults to using TensorFlow 1.x and a version string
