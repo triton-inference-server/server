@@ -32,7 +32,7 @@ Payload::Payload()
     : op_type_(Operation::INFER_RUN),
       requests_(std::vector<std::unique_ptr<InferenceRequest>>()),
       OnCallback_([]() {}), instance_(nullptr), state_(State::UNINITIALIZED),
-      batcher_start_ns_(0), saturated_(true)
+      batcher_start_ns_(0), saturated_(false)
 {
   exec_mu_.reset(new std::mutex());
 }
@@ -78,6 +78,7 @@ Payload::Reset(const Operation op_type, TritonModelInstance* instance)
   state_ = State::UNINITIALIZED;
   status_.reset(new std::promise<Status>());
   batcher_start_ns_ = 0;
+  saturated_ = false;
 }
 
 void
@@ -90,6 +91,7 @@ Payload::Release()
   instance_ = nullptr;
   state_ = State::RELEASED;
   batcher_start_ns_ = 0;
+  saturated_ = false;
 }
 
 size_t

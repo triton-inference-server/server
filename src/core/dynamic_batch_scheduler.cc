@@ -549,6 +549,17 @@ DynamicBatchScheduler::GetDynamicBatch()
     next_preferred_batch_size_ -= payload_batch_size;
   }
 
+  // By this point, we have not seen the pending batch that should be executed
+  // immediately. However, if we have scheduled a payload that can be grown and
+  // not yet in preferred batch size, we should move the pending batch over to
+  // ensure the model instance will pick up largest available batch even if it
+  // is not the preferred batch.
+  if (!payload_saturated_ && (payload_batch_size != 0) &&
+      (preferred_batch_sizes_.find(payload_batch_size) ==
+       preferred_batch_sizes_.end())) {
+    return 0;
+  }
+
   uint64_t wait_ns = pending_batch_delay_ns_ - delay_ns;
   // Note that taking request timeout into consideration allows us to reset
   // pending batch as soon as it is invalidated. But the cost is that in edge

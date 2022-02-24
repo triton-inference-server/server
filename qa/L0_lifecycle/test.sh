@@ -1,5 +1,5 @@
 #!/bin/bash
-# Copyright (c) 2018-2021, NVIDIA CORPORATION. All rights reserved.
+# Copyright 2018-2022, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -1402,6 +1402,47 @@ if [ "$code" != "400" ]; then
     echo -e "\n***\n*** Test Failed\n***"
     RET=1
 fi
+
+kill $SERVER_PID
+wait $SERVER_PID
+
+LOG_IDX=$((LOG_IDX+1))
+
+# LifeCycleTest.test_config_override
+rm -fr models config.pbtxt.*
+mkdir models
+cp -r $DATADIR/qa_model_repository/onnx_float32_float32_float32 models/.
+# Make only version 2 is valid version directory while config requests 1, 3
+rm models/onnx_float32_float32_float32/1/*
+rm models/onnx_float32_float32_float32/3/*
+
+SERVER_ARGS="--model-repository=`pwd`/models --model-repository=`pwd`/models \
+             --model-control-mode=explicit \
+             --strict-model-config=false"
+SERVER_LOG="./inference_server_$LOG_IDX.log"
+run_server
+if [ "$SERVER_PID" == "0" ]; then
+    echo -e "\n***\n*** Failed to start $SERVER\n***"
+    cat $SERVER_LOG
+    exit 1
+fi
+
+rm -f $CLIENT_LOG
+set +e
+python $LC_TEST LifeCycleTest.test_config_override >>$CLIENT_LOG 2>&1
+if [ $? -ne 0 ]; then
+    cat $CLIENT_LOG
+    echo -e "\n***\n*** Test Failed\n***"
+    RET=1
+else
+    check_test_results $TEST_RESULT_FILE 1
+    if [ $? -ne 0 ]; then
+        cat $CLIENT_LOG
+        echo -e "\n***\n*** Test Result Verification Failed\n***"
+        RET=1
+    fi
+fi
+set -e
 
 kill $SERVER_PID
 wait $SERVER_PID

@@ -523,7 +523,7 @@ TRITONSERVER_MemoryTypeString(TRITONSERVER_MemoryType memtype)
 }
 
 //
-// TRITONSERVER_ParameterType
+// TRITONSERVER_Parameter
 //
 const char*
 TRITONSERVER_ParameterTypeString(TRITONSERVER_ParameterType paramtype)
@@ -540,6 +540,36 @@ TRITONSERVER_ParameterTypeString(TRITONSERVER_ParameterType paramtype)
   }
 
   return "<invalid>";
+}
+
+TRITONSERVER_Parameter*
+TRITONSERVER_ParameterNew(
+    const char* name, const TRITONSERVER_ParameterType type, const void* value)
+{
+  std::unique_ptr<ni::InferenceParameter> lparam;
+  switch (type) {
+    case TRITONSERVER_PARAMETER_STRING:
+      lparam.reset(new ni::InferenceParameter(
+          name, reinterpret_cast<const char*>(value)));
+      break;
+    case TRITONSERVER_PARAMETER_INT:
+      lparam.reset(new ni::InferenceParameter(
+          name, *reinterpret_cast<const int64_t*>(value)));
+      break;
+    case TRITONSERVER_PARAMETER_BOOL:
+      lparam.reset(new ni::InferenceParameter(
+          name, *reinterpret_cast<const bool*>(value)));
+      break;
+    default:
+      break;
+  }
+  return reinterpret_cast<TRITONSERVER_Parameter*>(lparam.release());
+}
+
+void
+TRITONSERVER_ParameterDelete(TRITONSERVER_Parameter* parameter)
+{
+  delete reinterpret_cast<ni::InferenceParameter*>(parameter);
 }
 
 //
@@ -2197,7 +2227,7 @@ TRITONSERVER_ServerModelStatistics(
   ni::InferenceServer* lserver = reinterpret_cast<ni::InferenceServer*>(server);
 
   auto model_name_string = std::string(model_name);
-  std::map<std::string, std::vector<int64_t> > ready_model_versions;
+  std::map<std::string, std::vector<int64_t>> ready_model_versions;
   if (model_name_string.empty()) {
     RETURN_IF_STATUS_ERROR(lserver->ModelReadyVersions(&ready_model_versions));
   } else {
@@ -2408,7 +2438,33 @@ TRITONSERVER_ServerLoadModel(
 {
   ni::InferenceServer* lserver = reinterpret_cast<ni::InferenceServer*>(server);
 
-  RETURN_IF_STATUS_ERROR(lserver->LoadModel(std::string(model_name)));
+  RETURN_IF_STATUS_ERROR(lserver->LoadModel({{std::string(model_name), {}}}));
+
+  return nullptr;  // success
+}
+
+TRITONSERVER_Error*
+TRITONSERVER_ServerLoadModelWithParameters(
+    TRITONSERVER_Server* server, const char* model_name,
+    const TRITONSERVER_Parameter** parameters, const uint64_t parameter_count)
+{
+  if ((parameters == nullptr) && (parameter_count != 0)) {
+    return TRITONSERVER_ErrorNew(
+        TRITONSERVER_ERROR_INVALID_ARG,
+        "load parameters are not provided while parameter count is non-zero");
+  }
+
+  ni::InferenceServer* lserver = reinterpret_cast<ni::InferenceServer*>(server);
+
+  std::unordered_map<std::string, std::vector<const ni::InferenceParameter*>>
+      models;
+  std::vector<const ni::InferenceParameter*> mp;
+  for (size_t i = 0; i < parameter_count; ++i) {
+    mp.emplace_back(
+        reinterpret_cast<const ni::InferenceParameter*>(parameters[i]));
+  }
+  models[model_name] = std::move(mp);
+  RETURN_IF_STATUS_ERROR(lserver->LoadModel(models));
 
   return nullptr;  // success
 }

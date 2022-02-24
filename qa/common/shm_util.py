@@ -1,4 +1,4 @@
-# Copyright (c) 2018-2021, NVIDIA CORPORATION. All rights reserved.
+# Copyright 2018-2022, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -24,11 +24,16 @@
 # (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
+import os
 import numpy as np
 from ctypes import *
 
 import tritonclient.http as httpclient
 from tritonclient.utils import *
+
+# By default, find tritonserver on "localhost", but can be overridden
+# with TRITONSERVER_IPADDR envvar
+_tritonserver_ipaddr = os.environ.get('TRITONSERVER_IPADDR', 'localhost')
 
 
 def _range_repr_dtype(dtype):
@@ -224,7 +229,7 @@ def unregister_cleanup_shm_regions(shm_regions, shm_handles,
     if not (use_system_shared_memory or use_cuda_shared_memory):
         return None
 
-    triton_client = httpclient.InferenceServerClient("localhost:8000")
+    triton_client = httpclient.InferenceServerClient(f"{_tritonserver_ipaddr}:8000")
 
     if use_cuda_shared_memory:
         triton_client.unregister_cuda_shared_memory(shm_regions[0] + '_data')
