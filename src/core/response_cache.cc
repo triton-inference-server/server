@@ -93,72 +93,6 @@ RequestResponseCache::~RequestResponseCache()
 }
 
 Status
-RequestResponseCache::HashInputBuffers(
-    const InferenceRequest::Input* input, size_t* seed)
-{
-  // Iterate over each data buffer in input in case of non-contiguous memory
-  for (size_t idx = 0; idx < input->DataBufferCount(); ++idx) {
-    const void* src_buffer;
-    size_t src_byte_size;
-    TRITONSERVER_MemoryType src_memory_type;
-    int64_t src_memory_type_id;
-
-    RETURN_IF_ERROR(input->DataBuffer(
-        idx, &src_buffer, &src_byte_size, &src_memory_type,
-        &src_memory_type_id));
-
-    // TODO: Handle other memory types
-    if (src_memory_type != TRITONSERVER_MEMORY_CPU &&
-        src_memory_type != TRITONSERVER_MEMORY_CPU_PINNED) {
-      return Status(
-          Status::Code::INTERNAL,
-          "Only input buffers in CPU memory are allowed in cache currently");
-    }
-
-    // Add each byte of input buffer chunk to hash
-    const unsigned char* tmp = static_cast<const unsigned char*>(src_buffer);
-    for (uint64_t byte = 0; byte < src_byte_size; byte++) {
-      boost::hash_combine(*seed, tmp[byte]);
-    }
-  }
-
-  return Status::Success;
-}
-
-
-Status
-RequestResponseCache::HashInputs(const InferenceRequest& request, size_t* seed)
-{
-  const auto& inputs = request.ImmutableInputs();
-  // Convert inputs to ordered map for consistency in hashing
-  // inputs sorted by key (input) name
-  std::map<std::string, InferenceRequest::Input*> ordered_inputs(
-      inputs.begin(), inputs.end());
-  for (const auto& input : ordered_inputs) {
-    // Add input name to hash
-    boost::hash_combine(*seed, input.second->Name());
-    // Fetch input buffer for hashing raw data
-    RETURN_IF_ERROR(HashInputBuffers(input.second, seed));
-  }
-
-  return Status::Success;
-}
-
-
-Status
-RequestResponseCache::Hash(const InferenceRequest& request, uint64_t* key)
-{
-  std::size_t seed = 0;
-  // Add request model name to hash
-  boost::hash_combine(seed, request.ModelName());
-  // Add request model version to hash
-  boost::hash_combine(seed, request.ActualModelVersion());
-  RETURN_IF_ERROR(HashInputs(request, &seed));
-  *key = static_cast<uint64_t>(seed);
-  return Status::Success;
-}
-
-Status
 RequestResponseCache::Lookup(
     const uint64_t key, InferenceResponse* ptr, InferenceRequest* request)
 {
@@ -181,10 +115,7 @@ RequestResponseCache::Lookup(
   if (iter == cache_.end()) {
     num_misses_++;
     LOG_VERBOSE(1) << "MISS for key [" + std::to_string(key) + "] in cache.";
-    // Capture end lookup latency on miss and update total latency
-    request->CaptureCacheLookupEndNs();
-    total_lookup_latency_ns_ +=
-        (request->CacheLookupEndNs() - request->CacheLookupStartNs());
+    CaptureLookupEndTime(request);
     return Status(Status::Code::INTERNAL, "key not found in cache");
   }
 
@@ -195,19 +126,17 @@ RequestResponseCache::Lookup(
   // Populate passed-in "ptr" from cache entry
   auto entry = iter->second;
   // Build InferenceResponse from CacheEntry
-  RETURN_IF_ERROR(BuildInferenceResponse(entry, ptr));
+  auto status = BuildInferenceResponse(entry, ptr);
+  if (!status.IsOk()) {
+    CaptureLookupEndTime(request);
+    return status;
+  }
 
   // Update this key to front of LRU list
   UpdateLRU(iter);
-
   LOG_VERBOSE(1) << "Using cached response for key [" + std::to_string(key) +
                         "].";
-
-  // Capture end lookup latency on hit and update total latency
-  request->CaptureCacheLookupEndNs();
-  total_lookup_latency_ns_ +=
-      (request->CacheLookupEndNs() - request->CacheLookupStartNs());
-
+  CaptureLookupEndTime(request);
   return Status::Success;
 }
 
@@ -225,11 +154,7 @@ RequestResponseCache::Insert(
   // Exit early if key already exists in cache
   auto iter = cache_.find(key);
   if (iter != cache_.end()) {
-    // Capture end insertion latency on miss and update total latency
-    request->CaptureCacheInsertionEndNs();
-    total_insertion_latency_ns_ +=
-        (request->CacheInsertionEndNs() - request->CacheInsertionStartNs());
-
+    CaptureInsertionEndTime(request);
     return Status(
         Status::Code::ALREADY_EXISTS,
         "key [" + std::to_string(key) + "] already exists in cache");
@@ -237,25 +162,94 @@ RequestResponseCache::Insert(
 
   // Construct cache entry from response
   auto entry = CacheEntry();
-  RETURN_IF_ERROR(BuildCacheEntry(response, &entry));
+  auto status = BuildCacheEntry(response, &entry);
+  if (!status.IsOk()) {
+    CaptureInsertionEndTime(request);
+    return status;
+  }
 
   // Insert entry into cache
   LOG_VERBOSE(1) << "Inserting key [" + std::to_string(key) + "] into cache.";
   auto cache_pair = cache_.insert({key, entry});
   // Exit early if cache insertion failed
   if (!cache_pair.second) {
+    CaptureInsertionEndTime(request);
     return Status(Status::Code::INTERNAL, "Cache insertion failed");
   }
   // Update LRU with new cache entry
   auto cache_iter = cache_pair.first;
   UpdateLRU(cache_iter);
 
-  // Capture end insertion latency on miss and update total latency
-  request->CaptureCacheInsertionEndNs();
-  total_insertion_latency_ns_ +=
-      (request->CacheInsertionEndNs() - request->CacheInsertionStartNs());
+  CaptureInsertionEndTime(request);
+  return Status::Success;
+}
+
+// LRU
+Status
+RequestResponseCache::Evict()
+{
+  // Lock on cache eviction
+  std::lock_guard<std::recursive_mutex> lk(cache_mtx_);
+
+  // Nothing to evict if cache is empty
+  if (NumEntries() == 0) {
+    return Status(Status::Code::INTERNAL, "Cache is empty, nothing to evict.");
+  }
+
+  // Least recently used key in back of LRU list
+  uint64_t lru_key = lru_.back();
+  LOG_VERBOSE(1) << "Evicting key [" + std::to_string(lru_key) +
+                        "] from cache.";
+
+  // Find cache entry for least recently used key
+  auto iter = cache_.find(lru_key);
+  // Error check if key isn't in cache, but this shouldn't happen in evict
+  // and probably indicates a bug
+  if (iter == cache_.end()) {
+    return Status(
+        Status::Code::INTERNAL,
+        "key [" + std::to_string(lru_key) +
+            "] not found in cache during eviction: this indicates a bug in the "
+            "code");
+  }
+  // Get size of cache entry being evicted to update available size
+  auto entry = iter->second;
+  // Free managed memory used in cache entry's outputs
+  for (auto& output : entry.outputs_) {
+    // Lock on buffer deallocation
+    std::lock_guard<std::recursive_mutex> lk(buffer_mtx_);
+    managed_buffer_.deallocate(output.buffer_);
+  }
+
+  // Remove LRU entry from cache
+  cache_.erase(lru_key);
+  // Remove LRU key from LRU list
+  lru_.pop_back();
+  // Increment number of evictions
+  num_evictions_++;
 
   return Status::Success;
+}
+
+// Helpers
+void
+RequestResponseCache::UpdateLRU(
+    std::unordered_map<uint64_t, CacheEntry>::iterator& cache_iter)
+{
+  // Lock on cache update
+  std::lock_guard<std::recursive_mutex> lk(cache_mtx_);
+
+  const auto& key = cache_iter->first;
+  auto& cache_entry = cache_iter->second;
+  // Remove key from LRU list if it was already in there
+  auto lru_iter = std::find(lru_.begin(), lru_.end(), key);
+  if (lru_iter != lru_.end()) {
+    lru_.erase(lru_iter);
+  }
+  // Add key to front of LRU list since it's most recently used
+  lru_.push_front(key);
+  // Set CacheEntry LRU iterator to new LRU key location
+  cache_entry.lru_iter_ = lru_.begin();
 }
 
 Status
@@ -411,72 +405,88 @@ RequestResponseCache::BuildInferenceResponse(
   return Status::Success;
 }
 
-// LRU
 Status
-RequestResponseCache::Evict()
+RequestResponseCache::HashInputBuffers(
+    const InferenceRequest::Input* input, size_t* seed)
 {
-  // Lock on cache eviction
-  std::lock_guard<std::recursive_mutex> lk(cache_mtx_);
+  // Iterate over each data buffer in input in case of non-contiguous memory
+  for (size_t idx = 0; idx < input->DataBufferCount(); ++idx) {
+    const void* src_buffer;
+    size_t src_byte_size;
+    TRITONSERVER_MemoryType src_memory_type;
+    int64_t src_memory_type_id;
 
-  // Nothing to evict if cache is empty
-  if (NumEntries() == 0) {
-    return Status(Status::Code::INTERNAL, "Cache is empty, nothing to evict.");
+    RETURN_IF_ERROR(input->DataBuffer(
+        idx, &src_buffer, &src_byte_size, &src_memory_type,
+        &src_memory_type_id));
+
+    // TODO: Handle other memory types
+    if (src_memory_type != TRITONSERVER_MEMORY_CPU &&
+        src_memory_type != TRITONSERVER_MEMORY_CPU_PINNED) {
+      return Status(
+          Status::Code::INTERNAL,
+          "Only input buffers in CPU memory are allowed in cache currently");
+    }
+
+    // Add each byte of input buffer chunk to hash
+    const unsigned char* tmp = static_cast<const unsigned char*>(src_buffer);
+    for (uint64_t byte = 0; byte < src_byte_size; byte++) {
+      boost::hash_combine(*seed, tmp[byte]);
+    }
   }
-
-  // Least recently used key in back of LRU list
-  uint64_t lru_key = lru_.back();
-  LOG_VERBOSE(1) << "Evicting key [" + std::to_string(lru_key) +
-                        "] from cache.";
-
-  // Find cache entry for least recently used key
-  auto iter = cache_.find(lru_key);
-  // Error check if key isn't in cache, but this shouldn't happen in evict
-  // and probably indicates a bug
-  if (iter == cache_.end()) {
-    return Status(
-        Status::Code::INTERNAL,
-        "key [" + std::to_string(lru_key) +
-            "] not found in cache during eviction: this indicates a bug in the "
-            "code");
-  }
-  // Get size of cache entry being evicted to update available size
-  auto entry = iter->second;
-  // Free managed memory used in cache entry's outputs
-  for (auto& output : entry.outputs_) {
-    // Lock on buffer deallocation
-    std::lock_guard<std::recursive_mutex> lk(buffer_mtx_);
-    managed_buffer_.deallocate(output.buffer_);
-  }
-
-  // Remove LRU entry from cache
-  cache_.erase(lru_key);
-  // Remove LRU key from LRU list
-  lru_.pop_back();
-  // Increment number of evictions
-  num_evictions_++;
 
   return Status::Success;
 }
 
-// LRU
-void
-RequestResponseCache::UpdateLRU(
-    std::unordered_map<uint64_t, CacheEntry>::iterator& cache_iter)
-{
-  // Lock on cache update
-  std::lock_guard<std::recursive_mutex> lk(cache_mtx_);
 
-  const auto& key = cache_iter->first;
-  auto& cache_entry = cache_iter->second;
-  // Remove key from LRU list if it was already in there
-  auto lru_iter = std::find(lru_.begin(), lru_.end(), key);
-  if (lru_iter != lru_.end()) {
-    lru_.erase(lru_iter);
+Status
+RequestResponseCache::HashInputs(const InferenceRequest& request, size_t* seed)
+{
+  const auto& inputs = request.ImmutableInputs();
+  // Convert inputs to ordered map for consistency in hashing
+  // inputs sorted by key (input) name
+  std::map<std::string, InferenceRequest::Input*> ordered_inputs(
+      inputs.begin(), inputs.end());
+  for (const auto& input : ordered_inputs) {
+    // Add input name to hash
+    boost::hash_combine(*seed, input.second->Name());
+    // Fetch input buffer for hashing raw data
+    RETURN_IF_ERROR(HashInputBuffers(input.second, seed));
   }
-  // Add key to front of LRU list since it's most recently used
-  lru_.push_front(key);
-  // Set CacheEntry LRU iterator to new LRU key location
-  cache_entry.lru_iter_ = lru_.begin();
+
+  return Status::Success;
+}
+
+
+Status
+RequestResponseCache::Hash(const InferenceRequest& request, uint64_t* key)
+{
+  std::size_t seed = 0;
+  // Add request model name to hash
+  boost::hash_combine(seed, request.ModelName());
+  // Add request model version to hash
+  boost::hash_combine(seed, request.ActualModelVersion());
+  RETURN_IF_ERROR(HashInputs(request, &seed));
+  *key = static_cast<uint64_t>(seed);
+  return Status::Success;
+}
+
+void
+RequestResponseCache::CaptureLookupEndTime(InferenceRequest* request)
+{
+  // Capture end lookup latency on hit and update total latency
+  request->CaptureCacheLookupEndNs();
+  total_lookup_latency_ns_ +=
+      (request->CacheLookupEndNs() - request->CacheLookupStartNs());
+}
+
+void
+RequestResponseCache::CaptureInsertionEndTime(InferenceRequest* request)
+{
+  // Capture end insertion latency on miss and update total latency
+  request->CaptureCacheInsertionEndNs();
+  total_insertion_latency_ns_ +=
+      (request->CacheInsertionEndNs() - request->CacheInsertionStartNs());
 }
 
 }}  // namespace nvidia::inferenceserver

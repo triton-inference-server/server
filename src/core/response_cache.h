@@ -167,6 +167,9 @@ class RequestResponseCache {
   Status HashInputBuffers(const InferenceRequest::Input* input, size_t* seed);
   // Helper function to hash each input in "request"
   Status HashInputs(const InferenceRequest& request, size_t* seed);
+  // Helpers to update request stats even if exiting early
+  void CaptureLookupEndTime(InferenceRequest* request);
+  void CaptureInsertionEndTime(InferenceRequest* request);
 
   // Cache buffer
   void* buffer_;
