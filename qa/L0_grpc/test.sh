@@ -419,7 +419,7 @@ if [ "$SERVER_PID" == "0" ]; then
 fi
 
 set +e
-$CC_UNIT_TEST >> ${CLIENT_LOG} 2>&1
+$CC_UNIT_TEST --gtest_filter=GRPC* >> ${CLIENT_LOG} 2>&1
 if [ $? -ne 0 ]; then
     cat ${CLIENT_LOG}
     RET=1
