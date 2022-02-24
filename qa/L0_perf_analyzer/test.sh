@@ -387,17 +387,17 @@ for PROTOCOL in grpc http; do
     -m graphdef_int32_int32_int32 -b 1 >$CLIENT_LOG 2>&1 &
     PA_PID=$!
     if [ "$PA_PID" == "0" ]; then
-    echo -e "\n***\n*** Failed to start $PERF_ANALYZER\n***"
-    cat $CLIENT_LOG_LOG
-    exit 1
+        echo -e "\n***\n*** Failed to start $PERF_ANALYZER\n***"
+        cat $CLIENT_LOG
+        RET=1
     fi
     # wait for PA to finish running
-    sleep 240;
-    if [ "$PA_PID" != "0" ]; then
-    echo -e "\n***\n*** $PERF_ANALYZER is hanging after 240 s\n***"
-    cat $CLIENT_LOG_LOG
-    kill $PA_PID
-    exit 1
+    sleep 200;
+    if ! ps -p $PA_PID > /dev/null; then
+        cat $CLIENT_LOG
+        echo -e "\n***\n*** $PERF_ANALYZER is hanging after 200 s\n***"
+        kill $PA_PID
+        RET=1
     fi
     if [ $? -ne 0 ]; then
         cat $CLIENT_LOG
