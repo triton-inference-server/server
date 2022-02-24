@@ -1079,12 +1079,23 @@ RUN apt-get update && \
     pip3 install --upgrade numpy && \
     rm -rf /var/lib/apt/lists/*
 '''
+
     df += '''
 WORKDIR /opt/tritonserver
 RUN rm -fr /opt/tritonserver/*
 ENV NVIDIA_PRODUCT_NAME="Triton Server"
 COPY docker/entrypoint.d/ /opt/nvidia/entrypoint.d/
 '''
+
+    # The cpu-only build uses ubuntu as the base image, and so the
+    # entrypoint files are not available in /opt/nvidia in the base
+    # image, so we must provide them outselves.
+    if not enable_gpu:
+        df += '''
+COPY docker/cpu_only/ /opt/nvidia/
+ENTRYPOINT ["/opt/nvidia/nvidia_entrypoint.sh"]
+'''
+
     df += '''
 ENV NVIDIA_BUILD_ID {}
 LABEL com.nvidia.build.id={}
