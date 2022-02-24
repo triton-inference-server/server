@@ -594,9 +594,12 @@ DynamicBatchScheduler::DelegateResponse(
           // computed the inference response first in the case of cache miss
           auto cache = model_->Server()->GetResponseCache();
           auto status = cache->Insert(request_hash, *response, raw_request_ptr);
-          if (status.StatusCode() == Status::Code::ALREADY_EXISTS) {
+          if (status.IsOk()) {
+            // Cache miss
             raw_request_ptr->ReportStatisticsCacheMiss(reporter_.get());
-          } else if (!status.IsOk()) {
+          } else if (status.StatusCode() == Status::Code::ALREADY_EXISTS) {
+            // Cache hit
+          } else {
             LOG_ERROR << "Failed to insert request_hash [" << request_hash
                       << "] into response cache.";
           }

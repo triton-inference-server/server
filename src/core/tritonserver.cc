@@ -2280,7 +2280,7 @@ TRITONSERVER_ServerModelStatistics(
       SetDurationStat(
           metadata, inference_stats, "cache_hit", infer_stats.cache_hit_count_,
           infer_stats.cache_hit_lookup_duration_ns_);
-      // NOTE: cache_miss_count_ should equal compute_count
+      // NOTE: cache_miss_count_ should equal compute_count if non-zero
       SetDurationStat(
           metadata, inference_stats, "cache_miss",
           infer_stats.cache_miss_count_,
