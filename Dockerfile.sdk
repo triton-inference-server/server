@@ -1,4 +1,4 @@
-# Copyright (c) 2019-2021, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright 2019-2022, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -25,7 +25,7 @@
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 # Base image on the minimum Triton container
-ARG BASE_IMAGE=nvcr.io/nvidia/tritonserver:22.01-py3-min
+ARG BASE_IMAGE=nvcr.io/nvidia/tritonserver:22.02-py3-min
 
 ARG TRITON_CLIENT_REPO_SUBDIR=clientrepo
 ARG TRITON_COMMON_REPO_TAG=main
@@ -35,6 +35,9 @@ ARG TRITON_THIRD_PARTY_REPO_TAG=main
 ARG TRITON_MODEL_ANALYZER_REPO_TAG=main
 ARG CMAKE_UBUNTU_VERSION=20.04
 ARG TRITON_ENABLE_GPU=ON
+
+ARG NVIDIA_TRITON_SERVER_SDK_VERSION=unknown
+ARG NVIDIA_BUILD_ID=unknown
 
 FROM ${BASE_IMAGE}
 
@@ -170,11 +173,15 @@ ARG TRITON_MODEL_ANALYZER_REPO="https://github.com/triton-inference-server/model
 RUN pip3 install "git+${TRITON_MODEL_ANALYZER_REPO}"
 
 # Entrypoint Banner
-ARG NVIDIA_TRITON_INFERENCE_SERVER_SDK_VERSION=unknown
-ARG NVIDIA_BUILD_ID=unknown
+ENV NVIDIA_PRODUCT_NAME="Triton Server SDK"
+COPY docker/entrypoint.d/ /opt/nvidia/entrypoint.d/
+RUN sed 's/Server/Server SDK/' /opt/nvidia/entrypoint.d/10-banner.txt | \
+    sed 's/^===/=======/' > /opt/nvidia/entrypoint.d/10-banner.new && \
+    mv /opt/nvidia/entrypoint.d/10-banner.new /opt/nvidia/entrypoint.d/10-banner.txt
 
-ENV NVIDIA_PRODUCT_NAME="Triton Inference Server SDK"
-ENV NVIDIA_TRITON_INFERENCE_SERVER_SDK_VERSION=${NVIDIA_TRITON_INFERENCE_SERVER_SDK_VERSION}
+ARG NVIDIA_TRITON_SERVER_SDK_VERSION
+ARG NVIDIA_BUILD_ID
+ENV NVIDIA_TRITON_SERVER_SDK_VERSION=${NVIDIA_TRITON_SERVER_SDK_VERSION}
 ENV NVIDIA_BUILD_ID=${NVIDIA_BUILD_ID}
 
 ENV PATH /workspace/install/bin:${PATH}

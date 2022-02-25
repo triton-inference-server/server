@@ -1,4 +1,5 @@
-# Copyright (c) 2019-2021, NVIDIA CORPORATION. All rights reserved.
+#!/bin/bash
+# Copyright 2016-2022, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -24,18 +25,26 @@
 # (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-replicaCount: 1
+# Gather parts in alpha order
+shopt -s nullglob extglob
+SCRIPT_DIR="$(dirname "$(readlink -f "${BASH_SOURCE[0]}")")"
+declare -a PARTS=( "${SCRIPT_DIR}/entrypoint.d"/*@(.txt|.sh) )
+shopt -u nullglob extglob
 
-image:
-  imageName: nvcr.io/nvidia/tritonserver:22.02-py3
-  pullPolicy: IfNotPresent
-  modelRepositoryPath: s3://triton-inference-server-repository/model_repository
-  numGpus: 1
+# Execute the entrypoint parts
+for file in "${PARTS[@]}"; do
+  case "${file}" in
+    *.txt) cat "${file}";;
+    *.sh)  source "${file}";;
+  esac
+done
 
-service:
-  type: LoadBalancer
+echo
 
-secret:
-  region: AWS_REGION
-  id: AWS_SECRET_KEY_ID
-  key: AWS_SECRET_ACCESS_KEY
+# This script can either be a wrapper around arbitrary command lines,
+# or it will simply exec bash if no arguments were given
+if [[ $# -eq 0 ]]; then
+  exec "/bin/bash"
+else
+  exec "$@"
+fi

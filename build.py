@@ -1079,12 +1079,23 @@ RUN apt-get update && \
     pip3 install --upgrade numpy && \
     rm -rf /var/lib/apt/lists/*
 '''
+
     df += '''
 WORKDIR /opt/tritonserver
 RUN rm -fr /opt/tritonserver/*
-COPY --chown=1000:1000 nvidia_entrypoint.sh .
-ENTRYPOINT ["/opt/tritonserver/nvidia_entrypoint.sh"]
+ENV NVIDIA_PRODUCT_NAME="Triton Server"
+COPY docker/entrypoint.d/ /opt/nvidia/entrypoint.d/
 '''
+
+    # The cpu-only build uses ubuntu as the base image, and so the
+    # entrypoint files are not available in /opt/nvidia in the base
+    # image, so we must provide them outselves.
+    if not enable_gpu:
+        df += '''
+COPY docker/cpu_only/ /opt/nvidia/
+ENTRYPOINT ["/opt/nvidia/nvidia_entrypoint.sh"]
+'''
+
     df += '''
 ENV NVIDIA_BUILD_ID {}
 LABEL com.nvidia.build.id={}
@@ -1648,8 +1659,7 @@ if __name__ == '__main__':
         action='append',
         required=False,
         help=
-        'Include specified backend in build as <backend-name>[:<repo-tag>]. If <repo-tag> starts with "pull/" then it refers to a pull-request reference, otherwise <repo-tag> indicates the git tag/branch to use for the build. If the version is non-development then the default <repo-tag> is the release branch matching the container version (e.g. version 22.01 -> branch r22.01); otherwise the default <repo-tag> is "main" (e.g. version 22.01dev -> branch main).'
-    )
+        'Include specified backend in build as <backend-name>[:<repo-tag>]. If <repo-tag> starts with "pull/" then it refers to a pull-request reference, otherwise <repo-tag> indicates the git tag/branch to use for the build. If the version is non-development then the default <repo-tag> is the release branch matching the container version (e.g. version 22.02 -> branch r22.02); otherwise the default <repo-tag> is "main" (e.g. version 22.02dev -> branch main).'    )
     parser.add_argument(
         '--build-multiple-openvino',
         action="store_true",
@@ -1662,14 +1672,14 @@ if __name__ == '__main__':
         action='append',
         required=False,
         help=
-        'The version of a component to use in the build as <component-name>:<repo-tag>. <component-name> can be "common", "core", "backend" or "thirdparty". If <repo-tag> starts with "pull/" then it refers to a pull-request reference, otherwise <repo-tag> indicates the git tag/branch. If the version is non-development then the default <repo-tag> is the release branch matching the container version (e.g. version 22.01 -> branch r22.01); otherwise the default <repo-tag> is "main" (e.g. version 22.01dev -> branch main).'
+        'The version of a component to use in the build as <component-name>:<repo-tag>. <component-name> can be "common", "core", "backend" or "thirdparty". If <repo-tag> starts with "pull/" then it refers to a pull-request reference, otherwise <repo-tag> indicates the git tag/branch. If the version is non-development then the default <repo-tag> is the release branch matching the container version (e.g. version 22.02 -> branch r22.02); otherwise the default <repo-tag> is "main" (e.g. version 22.02dev -> branch main).'
     )
     parser.add_argument(
         '--repoagent',
         action='append',
         required=False,
         help=
-        'Include specified repo agent in build as <repoagent-name>[:<repo-tag>]. If <repo-tag> starts with "pull/" then it refers to a pull-request reference, otherwise <repo-tag> indicates the git tag/branch to use for the build. If the version is non-development then the default <repo-tag> is the release branch matching the container version (e.g. version 22.01 -> branch r22.01); otherwise the default <repo-tag> is "main" (e.g. version 22.01dev -> branch main).'
+        'Include specified repo agent in build as <repoagent-name>[:<repo-tag>]. If <repo-tag> starts with "pull/" then it refers to a pull-request reference, otherwise <repo-tag> indicates the git tag/branch to use for the build. If the version is non-development then the default <repo-tag> is the release branch matching the container version (e.g. version 22.02 -> branch r22.02); otherwise the default <repo-tag> is "main" (e.g. version 22.02dev -> branch main).'
     )
     parser.add_argument(
         '--no-force-clone',
