@@ -167,6 +167,9 @@ wait $SERVER_PID
 if [ $RET -eq 0 ]; then
   echo -e "\n***\n*** Test Passed\n***"
 else
+  echo "=== START SERVER LOG ==="
+  cat ${SERVER_LOG}
+  echo "=== END SERVER LOG ==="
   echo -e "\n***\n*** Test FAILED\n***"
 fi
 
