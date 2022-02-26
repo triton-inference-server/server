@@ -609,10 +609,10 @@ DynamicBatchScheduler::DelegateResponse(
             // Cache miss
             raw_request_ptr->ReportStatisticsCacheMiss(reporter_.get());
           } else if (status.StatusCode() == Status::Code::ALREADY_EXISTS) {
-            // Cache hit
+            /* Cache hit */
           } else {
             LOG_ERROR << "Failed to insert request_hash [" << request_hash
-                      << "] into response cache.";
+                      << "] into response cache: " << status.Message();
           }
         }
 

@@ -164,6 +164,7 @@ RequestResponseCache::Insert(
   auto entry = CacheEntry();
   auto status = BuildCacheEntry(response, &entry);
   if (!status.IsOk()) {
+    LOG_ERROR << "Failed to build cache entry.";
     CaptureInsertionEndTime(request);
     return status;
   }
@@ -173,6 +174,7 @@ RequestResponseCache::Insert(
   auto cache_pair = cache_.insert({key, entry});
   // Exit early if cache insertion failed
   if (!cache_pair.second) {
+    LOG_ERROR << "Failed to insert key into map.";
     CaptureInsertionEndTime(request);
     return Status(Status::Code::INTERNAL, "Cache insertion failed");
   }
