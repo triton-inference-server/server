@@ -128,6 +128,7 @@ RequestResponseCache::Lookup(
   // Build InferenceResponse from CacheEntry
   auto status = BuildInferenceResponse(entry, ptr);
   if (!status.IsOk()) {
+    LOG_ERROR << "Failed to build inference response: " << status.Message();
     CaptureLookupEndTime(request);
     return status;
   }
@@ -164,7 +165,7 @@ RequestResponseCache::Insert(
   auto entry = CacheEntry();
   auto status = BuildCacheEntry(response, &entry);
   if (!status.IsOk()) {
-    LOG_ERROR << "Failed to build cache entry.";
+    LOG_ERROR << "Failed to build cache entry: " << status.Message();
     CaptureInsertionEndTime(request);
     return status;
   }
