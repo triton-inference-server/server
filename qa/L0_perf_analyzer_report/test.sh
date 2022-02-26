@@ -116,9 +116,11 @@ cp -r "/data/inferenceserver/${REPO_VERSION}/qa_model_repository/${COMPOSING_MOD
 
 for model in ${MODELS}; do
     # Remove "name" line from each config to use directory name for simplicity
-    sed -i "/^name:/d" ${MODEL_DIR}/${model}/config.pbtxt
+    sed -i "/^name:/d" "${MODEL_DIR}/${model}/config.pbtxt"
     # Add version directory to each model if non-existent
     mkdir -p "${MODEL_DIR}/${model}/1"
+    # Force CPU memory since cache doesn't currently support GPU memory
+    echo "instance_group [{ kind: KIND_CPU }]" >> "${MODEL_DIR}/${model}/config.pbtxt"
 done
 
 ## Update "model_name" lines in each ensemble model config ensemble steps
