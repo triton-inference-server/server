@@ -119,8 +119,6 @@ for model in ${MODELS}; do
     sed -i "/^name:/d" "${MODEL_DIR}/${model}/config.pbtxt"
     # Add version directory to each model if non-existent
     mkdir -p "${MODEL_DIR}/${model}/1"
-    # Force CPU memory since cache doesn't currently support GPU memory
-    echo "instance_group [{ kind: KIND_CPU }]" >> "${MODEL_DIR}/${model}/config.pbtxt"
 done
 
 ## Update "model_name" lines in each ensemble model config ensemble steps
@@ -132,6 +130,9 @@ echo "response_cache { enable: True }" >> "${MODEL_DIR}/${ENSEMBLE_MODEL_CACHE_E
 echo "response_cache { enable: False }" >> "${MODEL_DIR}/${ENSEMBLE_MODEL_CACHE_DISABLED}/config.pbtxt"
 echo "response_cache { enable: True }" >> "${MODEL_DIR}/${COMPOSING_MODEL_CACHE_ENABLED}/config.pbtxt"
 echo "response_cache { enable: False }" >> "${MODEL_DIR}/${COMPOSING_MODEL_CACHE_DISABLED}/config.pbtxt"
+# Force CPU memory for composing models since cache doesn't currently support GPU memory
+echo "instance_group [{ kind: KIND_CPU }]" >> "${MODEL_DIR}/${COMPOSING_MODEL_CACHE_ENABLED}/config.pbtxt"
+echo "instance_group [{ kind: KIND_CPU }]" >> "${MODEL_DIR}/${COMPOSING_MODEL_CACHE_DISABLED}/config.pbtxt"
 
 # Run server
 run_server
