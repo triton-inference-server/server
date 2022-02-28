@@ -78,6 +78,7 @@ def np_to_trt_dtype(np_dtype):
 
 def get_trt_plugin(plugin_name):
     plugin = None
+    field_collection = None
     for plugin_creator in PLUGIN_CREATORS:
         if (plugin_creator.name == "Normalize_TRT") and \
                 (plugin_name == "Normalize_TRT"):
@@ -91,8 +92,6 @@ def get_trt_plugin(plugin_name):
                                       trt.PluginFieldType.FLOAT32)
             field_collection = trt.PluginFieldCollection(
                 [weights, eps, nbWeights])
-            plugin = plugin_creator.create_plugin(
-                name=plugin_name, field_collection=field_collection)
             break
         elif (plugin_creator.name
               == "CustomGeluPluginDynamic") and (plugin_name
@@ -102,11 +101,6 @@ def get_trt_plugin(plugin_name):
             bias = trt.PluginField("bias", np.array([[[1]]], np.float32),
                                    trt.PluginFieldType.FLOAT32)
             field_collection = trt.PluginFieldCollection([type_id, bias])
-<<<<<<< HEAD
-            plugin = plugin_creator.create_plugin(
-                name=plugin_name, field_collection=field_collection)
-            break
-=======
             break
         elif (plugin_creator.name
               == "CustomClipPlugin") and (plugin_name == "CustomClipPlugin"):
@@ -122,7 +116,6 @@ def get_trt_plugin(plugin_name):
     plugin = plugin_creator.create_plugin(name=plugin_name,
                                           field_collection=field_collection)
 
->>>>>>> 8eea3e7e (Added warning when plugin not found.)
     return plugin
 
 
@@ -273,7 +266,7 @@ def create_plugin_models(models_dir):
                           "CustomGeluPluginDynamic", (16, 1, 1), (16, 1, 1),
                           np.float32, np.float32)
 
-    # custom Normalize_TRT
+    # default Normalize_TRT
     create_plan_modelconfig(models_dir, 8, model_version, "Normalize_TRT", (
         16,
         16,
@@ -292,6 +285,12 @@ def create_plugin_models(models_dir):
         16,
         16,
     ), np.float32, np.float32)
+
+    # custom CustomClipPlugin
+    create_plan_modelconfig(models_dir, 8, model_version, "CustomClipPlugin",
+                            (16,), (16,), np.float32, np.float32)
+    create_plan_modelfile(models_dir, 8, model_version, "CustomClipPlugin",
+                          (16,), (16,), np.float32, np.float32)
 
 
 if __name__ == '__main__':
