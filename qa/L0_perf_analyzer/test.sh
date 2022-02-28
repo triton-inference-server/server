@@ -392,10 +392,10 @@ for PROTOCOL in grpc http; do
         RET=1
     fi
     # wait for PA to finish running
-    sleep 200;
+    sleep 500;
     if ! ps -p $PA_PID > /dev/null; then
         cat $CLIENT_LOG
-        echo -e "\n***\n*** $PERF_ANALYZER is hanging after 200 s\n***"
+        echo -e "\n***\n*** $PERF_ANALYZER is hanging after 500 s\n***"
         kill $PA_PID
         RET=1
     fi
