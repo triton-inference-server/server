@@ -1,4 +1,4 @@
-# Copyright (c) 2020-2021, NVIDIA CORPORATION. All rights reserved.
+# Copyright 2020-2022, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -241,6 +241,93 @@ class BatchInputTest(tu.TestResultCollector):
                     output_data.shape, (1, 4),
                     "Expect response {} to have shape to represent max element count {} among the batch , got {}"
                     .format(idx, 4, output_data.shape))
+        except InferenceServerException as ex:
+            self.assertTrue(False, "unexpected error {}".format(ex))
+
+    def test_batch_item_shape_flatten(self):
+        # Use 4 set of inputs with shape
+        # [1, 4, 1], [1, 1, 2], [1, 1, 2], [1, 2, 2]
+        self.inputs = []
+        for value in [[1, 4, 1], [1, 1, 2], [1, 1, 2], [1, 2, 2]]:
+            self.inputs.append(
+                [tritonhttpclient.InferInput('RAGGED_INPUT', value, "FP32")])
+            self.inputs[-1][0].set_data_from_numpy(
+                np.full(value, value[0], np.float32))
+        self.client = tritonhttpclient.InferenceServerClient(
+            url="localhost:8000", concurrency=len(self.inputs))
+
+        model_name = "batch_item_flatten"
+
+        output_name = 'BATCH_OUTPUT'
+        outputs = [tritonhttpclient.InferRequestedOutput(output_name)]
+
+        async_requests = []
+        try:
+            for inputs in self.inputs:
+                # Asynchronous inference call.
+                async_requests.append(
+                    self.client.async_infer(model_name=model_name,
+                                            inputs=inputs,
+                                            outputs=outputs))
+
+            expected_value = np.asarray([[4, 1, 1, 2, 1, 2, 2, 2]], np.float32)
+            for idx in range(len(async_requests)):
+                # Get the result from the initiated asynchronous inference request.
+                # Note the call will block till the server responds.
+                result = async_requests[idx].get_result()
+
+                # Validate the results by comparing with precomputed values.
+                output_data = result.as_numpy(output_name)
+                self.assertTrue(
+                    np.array_equal(output_data, expected_value),
+                    "Expect response {} to have value {}, got {}".format(
+                        idx, expected_value, output_data))
+        except InferenceServerException as ex:
+            self.assertTrue(False, "unexpected error {}".format(ex))
+
+    def test_batch_item_shape(self):
+        # Use 3 set of inputs with shape [2, 1, 2], [1, 1, 2], [1, 2, 2]
+        inputs = []
+        for value in [[2, 1, 2], [1, 1, 2], [1, 2, 2]]:
+            inputs.append(
+                [tritonhttpclient.InferInput('RAGGED_INPUT', value, "FP32")])
+            inputs[-1][0].set_data_from_numpy(
+                np.full(value, value[0], np.float32))
+        client = tritonhttpclient.InferenceServerClient(url="localhost:8000",
+                                                        concurrency=len(inputs))
+
+        expected_outputs = [
+            np.array([[1.0, 2.0], [1.0, 2.0]]),
+            np.array([[1.0, 2.0]]),
+            np.array([[2.0, 2.0]]),
+        ]
+
+        model_name = "batch_item"
+
+        output_name = 'BATCH_OUTPUT'
+        outputs = [tritonhttpclient.InferRequestedOutput(output_name)]
+
+        async_requests = []
+        try:
+            for request_inputs in inputs:
+                # Asynchronous inference call.
+                async_requests.append(
+                    client.async_infer(model_name=model_name,
+                                       inputs=request_inputs,
+                                       outputs=outputs))
+
+            for idx in range(len(async_requests)):
+                # Get the result from the initiated asynchronous inference request.
+                # Note the call will block till the server responds.
+                result = async_requests[idx].get_result()
+
+                # Validate the results by comparing with precomputed values.
+                output_data = result.as_numpy(output_name)
+                self.assertTrue(
+                    np.allclose(output_data, expected_outputs[idx]),
+                    "Expect response to have value:\n{}, got:\n{}\nEqual matrix:\n{}"
+                    .format(expected_outputs[idx], output_data,
+                            np.isclose(expected_outputs[idx], output_data)))
         except InferenceServerException as ex:
             self.assertTrue(False, "unexpected error {}".format(ex))
 
