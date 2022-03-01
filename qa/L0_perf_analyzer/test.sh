@@ -380,7 +380,7 @@ for PROTOCOL in grpc http; do
         RET=1
     fi
     set -e
-     
+    
     # Binary search for concurrency range mode and make sure it doesn't hang
     $PERF_ANALYZER -v -a --request-distribution "poisson" --shared-memory none \
     --percentile 99 --binary-search --concurrency-range 1:8:2 -l 5 \
@@ -392,10 +392,10 @@ for PROTOCOL in grpc http; do
         RET=1
     fi
     # wait for PA to finish running
-    sleep 500;
-    if ! ps -p $PA_PID > /dev/null; then
+    sleep 200
+    if ps -p $PA_PID > /dev/null; then
         cat $CLIENT_LOG
-        echo -e "\n***\n*** $PERF_ANALYZER is hanging after 500 s\n***"
+        echo -e "\n***\n*** $PERF_ANALYZER is hanging after 200 s\n***"
         kill $PA_PID
         RET=1
     fi
