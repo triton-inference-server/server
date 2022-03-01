@@ -201,10 +201,11 @@ describe supported GPUs.
 * [Client Libraries and Examples](https://github.com/triton-inference-server/client)
   * [C++ HTTP/GRPC Libraries](https://github.com/triton-inference-server/client#client-library-apis)
   * [Python HTTP/GRPC Libraries](https://github.com/triton-inference-server/client#client-library-apis)
-  * [Java HTTP Library](https://github.com/triton-inference-server/client/src/java)
+  * [Java HTTP Library](https://github.com/triton-inference-server/client/tree/main/src/java)
   * GRPC Generated Libraries
     * [go](https://github.com/triton-inference-server/client/tree/main/src/grpc_generated/go)
     * [Java/Scala](https://github.com/triton-inference-server/client/tree/main/src/grpc_generated/java)
+    * [Javascript](https://github.com/triton-inference-server/client/tree/main/src/grpc_generated/javascript)
 * [Performance Analysis](docs/optimization.md)
   * [Model Analyzer](docs/model_analyzer.md)
   * [Performance Analyzer](docs/perf_analyzer.md)
@@ -337,8 +338,8 @@ decryption, conversion, or similar operations when a model is loaded.
 * [GPU-Accelerated Inference for Kubernetes with the NVIDIA TensorRT
   Inference Server and
   Kubeflow](https://www.kubeflow.org/blog/nvidia_tensorrt/).
-  
-* [Deploying NVIDIA Triton at Scale with MIG and Kubernetes](https://developer.nvidia.com/blog/deploying-nvidia-triton-at-scale-with-mig-and-kubernetes/). 
+
+* [Deploying NVIDIA Triton at Scale with MIG and Kubernetes](https://developer.nvidia.com/blog/deploying-nvidia-triton-at-scale-with-mig-and-kubernetes/).
 
 ## Contributing
 
