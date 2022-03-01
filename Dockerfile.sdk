@@ -35,20 +35,10 @@ ARG TRITON_THIRD_PARTY_REPO_TAG=main
 ARG TRITON_MODEL_ANALYZER_REPO_TAG=main
 ARG CMAKE_UBUNTU_VERSION=20.04
 ARG TRITON_ENABLE_GPU=ON
-ARG JAVA_API_IMAGE=java_api_build
 
 ARG NVIDIA_TRITON_SERVER_SDK_VERSION=unknown
 ARG NVIDIA_BUILD_ID=unknown
 
-FROM ${JAVA_API_IMAGE} as java-api-image
-ARG TARGETPLATFORM
-WORKDIR /workspace/install
-# Copy Java API jar
-RUN if [ "$TARGETPLATFORM" = "linux/amd64" ]; then \
-        mkdir -p java-api-bindings && \
-        cp /opt/tritonserver/tritonserver-java-bindings.jar java-api-bindings/tritonserver-java-bindings.jar ;\
-    fi
- 
 FROM ${BASE_IMAGE}
 
 ARG TARGETPLATFORM
@@ -176,9 +166,6 @@ RUN if [ "$TRITON_ENABLE_GPU" = "ON" ]; then \
         apt-get update && apt-get install -y datacenter-gpu-manager=1:${DCGM_VERSION}; \
       fi \
     fi
-
-# Copy jar from multistage build
-COPY --from=java-api-image /workspace/install /workspace/install/
 
 # Install Model Analyzer
 ARG TRITON_MODEL_ANALYZER_REPO_TAG
