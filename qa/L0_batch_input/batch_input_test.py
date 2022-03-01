@@ -247,6 +247,8 @@ class BatchInputTest(tu.TestResultCollector):
     def test_batch_item_shape_flatten(self):
         # Use 4 set of inputs with shape
         # [1, 4, 1], [1, 1, 2], [1, 1, 2], [1, 2, 2]
+        # Note that the test only checks the formation of "BATCH_INPUT" where
+        # the value of "RAGGED_INPUT" is irrelevant, only the shape matters
         self.inputs = []
         for value in [[1, 4, 1], [1, 1, 2], [1, 1, 2], [1, 2, 2]]:
             self.inputs.append(
@@ -287,6 +289,8 @@ class BatchInputTest(tu.TestResultCollector):
 
     def test_batch_item_shape(self):
         # Use 3 set of inputs with shape [2, 1, 2], [1, 1, 2], [1, 2, 2]
+        # Note that the test only checks the formation of "BATCH_INPUT" where
+        # the value of "RAGGED_INPUT" is irrelevant, only the shape matters
         inputs = []
         for value in [[2, 1, 2], [1, 1, 2], [1, 2, 2]]:
             inputs.append(

@@ -419,7 +419,6 @@ backend: "{}"
 platform: "{}_{}"
 '''.format(backend, platform)
 
-    # Use a different model name for the non-batching variant
     model_name = "{}_batch_input".format(platform)
     config_dir = models_dir + "/" + model_name
     config = '''
@@ -645,7 +644,6 @@ backend: "{}"
 platform: "{}_{}"
 '''.format(backend, platform)
 
-    # Use a different model name for the non-batching variant
     model_name = "{}_batch_item".format(platform)
     config_dir = models_dir + "/" + model_name
     config = '''
