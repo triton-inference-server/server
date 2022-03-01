@@ -69,6 +69,17 @@ The trace output is a JSON file with the following schema.
       ...
     ]
   },
+  {
+    "model_name": $string,
+    "model_version": $number,
+    "id": $number
+    "activity": $string,
+    "tensor":{
+      "name": $string,
+      "data": $string,
+      "dtype": $string
+    }
+  },
   ...
 ]
 ```
@@ -87,7 +98,7 @@ For example:
   {
     "model_name": "simple",
     "model_version": -1,
-    "id":1,
+    "id": 1,
     "timestamps" : [
       { "name": "http recv start", "ns": 2259961222771924 },
       { "name": "http recv end", "ns": 2259961222820985 },
@@ -113,12 +124,12 @@ including its "name", "data" and "dtype". For example:
   {
     "model_name": "simple",
     "model_version": -1,
-    "id":1,
-    "activity":"TENSOR_QUEUE_INPUT",
+    "id": 1,
+    "activity": "TENSOR_QUEUE_INPUT",
     "tensor":{
       "name": "input",
       "data": "0.1,0.1,0.1,...",
-      "dtype":"FP32"
+      "dtype": "FP32"
     }
   }
 ]
