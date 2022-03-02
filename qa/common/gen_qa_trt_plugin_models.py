@@ -241,6 +241,12 @@ output [
 def create_plugin_models(models_dir):
     model_version = 1
 
+    # custom CustomClipPlugin
+    create_plan_modelconfig(models_dir, 8, model_version, "CustomClipPlugin",
+                            (16,), (16,), np.float32, np.float32)
+    create_plan_modelfile(models_dir, 8, model_version, "CustomClipPlugin",
+                          (16,), (16,), np.float32, np.float32)
+                          
     # default CustomGeluPluginDynamic plugin
     create_plan_modelconfig(models_dir, 0, model_version,
                             "CustomGeluPluginDynamic", (16, 1, 1), (16, 1, 1),

@@ -61,8 +61,12 @@ class PluginModelTest(tu.TestResultCollector):
 
         output0_data = results.as_numpy('OUTPUT0')
 
-        # Verify values of Normalize and GELU
-        if plugin_name == 'CustomGeluPluginDynamic':
+        # Verify values of Clip, GELU, and Normalize
+        if plugin_name == 'CustomClipPlugin':
+            # Clip data to minimum of .1, maximum of .5
+            test_output = np.clip(input0_data, 0.1, 0.5)
+            self.assertTrue(np.isclose(output0_data, test_output).all())
+        elif plugin_name == 'CustomGeluPluginDynamic':
             # Add bias
             input0_data += 1
             # Calculate Gelu activation
@@ -70,10 +74,17 @@ class PluginModelTest(tu.TestResultCollector):
                            0.5) * (1 + np.tanh((0.797885 * input0_data) +
                                                (0.035677 * (input0_data**3))))
             self.assertTrue(np.isclose(output0_data, test_output).all())
-        else:
+        elif plugin_name == 'Normalize_TRT':
             # L2 norm is sqrt(sum([1]*16)))
             test_output = input0_data / np.sqrt(sum([1] * 16))
             self.assertTrue(np.isclose(output0_data, test_output).all())
+        else:
+            self.assertTrue(False, "Unexpected plugin: " + plugin_name)
+
+    def test_raw_fff_clip(self):
+        for bs in (1, 8):
+            self._full_exact('plan_float32_float32_float32',
+                            'CustomClipPlugin', (bs, 16, ))
 
     def test_raw_fff_gelu(self):
         self._full_exact('plan_nobatch_float32_float32_float32',

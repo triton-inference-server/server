@@ -48,7 +48,7 @@ EXPECTED_NUM_TESTS="2"
 DATADIR=/data/inferenceserver/${REPO_VERSION}/qa_trt_plugin_model_repository
 
 SERVER=/opt/tritonserver/bin/tritonserver
-SERVER_ARGS="--model-repository=$DATADIR --exit-timeout-secs=120"
+SERVER_ARGS="--model-repository=$DATADIR --exit-timeout-secs=120 --backend-config=tensorrt,plugins=$DATADIR/libclipplugin.so"
 SERVER_LOG="./inference_server.log"
 source ../common/util.sh
 
