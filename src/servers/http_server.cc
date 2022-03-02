@@ -2445,10 +2445,7 @@ HTTPAPIServer::HandleInfer(
       // since this is the first place where we have access to trace
       // manager.
       trace->CaptureTimestamp("HTTP_RECV_START", req->recv_start_ns);
-      // [FIXME] the 'recv_end_ns' timestamp is not captured properly in
-      // evhtp Triton patch, WAR is to capture the current timestamp
-      trace->CaptureTimestamp(
-          "HTTP_RECV_END", TraceManager::CaptureTimestamp());
+      trace->CaptureTimestamp("HTTP_RECV_END", req->recv_end_ns);
     }
   }
 #endif  // TRITON_ENABLE_TRACING
