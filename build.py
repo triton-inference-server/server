@@ -85,9 +85,9 @@ from distutils.dir_util import copy_tree
 # Note: Not all sha ids would successfuly compile and work.
 #
 TRITON_VERSION_MAP = {
-    '2.20.0dev': (
-        '22.03dev',  # triton container
-        '22.02',  # upstream container
+    '2.20.0': (
+        '22.03',  # triton container
+        '22.03',  # upstream container
         '1.10.0',  # ORT
         '2021.4.582',  # ORT OpenVINO
         (('2021.4', None), ('2021.4', '2021.4.582'),
@@ -1659,7 +1659,7 @@ if __name__ == '__main__':
         action='append',
         required=False,
         help=
-        'Include specified backend in build as <backend-name>[:<repo-tag>]. If <repo-tag> starts with "pull/" then it refers to a pull-request reference, otherwise <repo-tag> indicates the git tag/branch to use for the build. If the version is non-development then the default <repo-tag> is the release branch matching the container version (e.g. version 22.02 -> branch r22.02); otherwise the default <repo-tag> is "main" (e.g. version 22.02dev -> branch main).'    )
+        'Include specified backend in build as <backend-name>[:<repo-tag>]. If <repo-tag> starts with "pull/" then it refers to a pull-request reference, otherwise <repo-tag> indicates the git tag/branch to use for the build. If the version is non-development then the default <repo-tag> is the release branch matching the container version (e.g. version 22.03 -> branch r22.03); otherwise the default <repo-tag> is "main" (e.g. version 22.03dev -> branch main).'    )
     parser.add_argument(
         '--build-multiple-openvino',
         action="store_true",
@@ -1672,14 +1672,14 @@ if __name__ == '__main__':
         action='append',
         required=False,
         help=
-        'The version of a component to use in the build as <component-name>:<repo-tag>. <component-name> can be "common", "core", "backend" or "thirdparty". If <repo-tag> starts with "pull/" then it refers to a pull-request reference, otherwise <repo-tag> indicates the git tag/branch. If the version is non-development then the default <repo-tag> is the release branch matching the container version (e.g. version 22.02 -> branch r22.02); otherwise the default <repo-tag> is "main" (e.g. version 22.02dev -> branch main).'
+        'The version of a component to use in the build as <component-name>:<repo-tag>. <component-name> can be "common", "core", "backend" or "thirdparty". If <repo-tag> starts with "pull/" then it refers to a pull-request reference, otherwise <repo-tag> indicates the git tag/branch. If the version is non-development then the default <repo-tag> is the release branch matching the container version (e.g. version 22.03 -> branch r22.03); otherwise the default <repo-tag> is "main" (e.g. version 22.03dev -> branch main).'
     )
     parser.add_argument(
         '--repoagent',
         action='append',
         required=False,
         help=
-        'Include specified repo agent in build as <repoagent-name>[:<repo-tag>]. If <repo-tag> starts with "pull/" then it refers to a pull-request reference, otherwise <repo-tag> indicates the git tag/branch to use for the build. If the version is non-development then the default <repo-tag> is the release branch matching the container version (e.g. version 22.02 -> branch r22.02); otherwise the default <repo-tag> is "main" (e.g. version 22.02dev -> branch main).'
+        'Include specified repo agent in build as <repoagent-name>[:<repo-tag>]. If <repo-tag> starts with "pull/" then it refers to a pull-request reference, otherwise <repo-tag> indicates the git tag/branch to use for the build. If the version is non-development then the default <repo-tag> is the release branch matching the container version (e.g. version 22.03 -> branch r22.03); otherwise the default <repo-tag> is "main" (e.g. version 22.03dev -> branch main).'
     )
     parser.add_argument(
         '--no-force-clone',
