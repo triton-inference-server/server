@@ -30,6 +30,47 @@
 
 namespace {
 
+namespace ni = nvidia::inferenceserver;
+enum class ScopedTimerType { INSERTION, LOOKUP };
+
+class ScopedTimer {
+ public:
+  explicit ScopedTimer(
+      ni::InferenceRequest& request, uint64_t& duration, ScopedTimerType type)
+      : request_(request), duration_(duration), type_(type)
+  {
+    switch (type_) {
+      case ScopedTimerType::LOOKUP:
+        request_.CaptureCacheLookupStartNs();
+        break;
+      case ScopedTimerType::INSERTION:
+        request_.CaptureCacheInsertionStartNs();
+        break;
+    }
+  }
+
+  ~ScopedTimer()
+  {
+    switch (type_) {
+      case ScopedTimerType::LOOKUP:
+        request_.CaptureCacheLookupEndNs();
+        duration_ +=
+            request_.CacheLookupEndNs() - request_.CacheLookupStartNs();
+        break;
+      case ScopedTimerType::INSERTION:
+        request_.CaptureCacheInsertionEndNs();
+        duration_ +=
+            request_.CacheInsertionEndNs() - request_.CacheInsertionStartNs();
+        break;
+    }
+  }
+
+ private:
+  ni::InferenceRequest& request_;
+  uint64_t& duration_;
+  ScopedTimerType type_;
+};
+
 std::string
 PointerToString(void* ptr)
 {
@@ -104,8 +145,9 @@ RequestResponseCache::Lookup(
         Status::Code::INTERNAL, "Cache Lookup passed a nullptr request");
   }
 
-  // Capture start lookup latency
-  request->CaptureCacheLookupStartNs();
+  // Capture start latency now and end latency when timer goes out of scope
+  ScopedTimer timer(
+      *request, total_lookup_latency_ns_, ScopedTimerType::LOOKUP);
 
   num_lookups_++;
   LOG_VERBOSE(1) << "Looking up key [" + std::to_string(key) + "] in cache.";
@@ -115,7 +157,6 @@ RequestResponseCache::Lookup(
   if (iter == cache_.end()) {
     num_misses_++;
     LOG_VERBOSE(1) << "MISS for key [" + std::to_string(key) + "] in cache.";
-    CaptureLookupEndTime(request);
     return Status(Status::Code::INTERNAL, "key not found in cache");
   }
 
@@ -129,7 +170,6 @@ RequestResponseCache::Lookup(
   auto status = BuildInferenceResponse(entry, ptr);
   if (!status.IsOk()) {
     LOG_ERROR << "Failed to build inference response: " << status.Message();
-    CaptureLookupEndTime(request);
     return status;
   }
 
@@ -137,7 +177,6 @@ RequestResponseCache::Lookup(
   UpdateLRU(iter);
   LOG_VERBOSE(1) << "Using cached response for key [" + std::to_string(key) +
                         "].";
-  CaptureLookupEndTime(request);
   return Status::Success;
 }
 
@@ -149,13 +188,18 @@ RequestResponseCache::Insert(
   // Lock on cache insertion
   std::lock_guard<std::recursive_mutex> lk(cache_mtx_);
 
-  // Capture start insertion latency
-  request->CaptureCacheInsertionStartNs();
+  if (request == nullptr) {
+    return Status(
+        Status::Code::INTERNAL, "Cache Insert passed a nullptr request");
+  }
+
+  // Capture start latency now and end latency when timer goes out of scope
+  ScopedTimer timer(
+      *request, total_insertion_latency_ns_, ScopedTimerType::INSERTION);
 
   // Exit early if key already exists in cache
   auto iter = cache_.find(key);
   if (iter != cache_.end()) {
-    CaptureInsertionEndTime(request);
     return Status(
         Status::Code::ALREADY_EXISTS,
         "key [" + std::to_string(key) + "] already exists in cache");
@@ -166,7 +210,6 @@ RequestResponseCache::Insert(
   auto status = BuildCacheEntry(response, &entry);
   if (!status.IsOk()) {
     LOG_ERROR << "Failed to build cache entry: " << status.Message();
-    CaptureInsertionEndTime(request);
     return status;
   }
 
@@ -176,14 +219,12 @@ RequestResponseCache::Insert(
   // Exit early if cache insertion failed
   if (!cache_pair.second) {
     LOG_ERROR << "Failed to insert key into map.";
-    CaptureInsertionEndTime(request);
     return Status(Status::Code::INTERNAL, "Cache insertion failed");
   }
   // Update LRU with new cache entry
   auto cache_iter = cache_pair.first;
   UpdateLRU(cache_iter);
 
-  CaptureInsertionEndTime(request);
   return Status::Success;
 }
 
@@ -472,24 +513,6 @@ RequestResponseCache::Hash(const InferenceRequest& request, uint64_t* key)
   RETURN_IF_ERROR(HashInputs(request, &seed));
   *key = static_cast<uint64_t>(seed);
   return Status::Success;
-}
-
-void
-RequestResponseCache::CaptureLookupEndTime(InferenceRequest* request)
-{
-  // Capture end lookup latency on hit and update total latency
-  request->CaptureCacheLookupEndNs();
-  total_lookup_latency_ns_ +=
-      (request->CacheLookupEndNs() - request->CacheLookupStartNs());
-}
-
-void
-RequestResponseCache::CaptureInsertionEndTime(InferenceRequest* request)
-{
-  // Capture end insertion latency on miss and update total latency
-  request->CaptureCacheInsertionEndNs();
-  total_insertion_latency_ns_ +=
-      (request->CacheInsertionEndNs() - request->CacheInsertionStartNs());
 }
 
 }}  // namespace nvidia::inferenceserver
