@@ -167,11 +167,7 @@ RequestResponseCache::Lookup(
   // Populate passed-in "ptr" from cache entry
   auto entry = iter->second;
   // Build InferenceResponse from CacheEntry
-  auto status = BuildInferenceResponse(entry, ptr);
-  if (!status.IsOk()) {
-    LOG_ERROR << "Failed to build inference response: " << status.Message();
-    return status;
-  }
+  RETURN_IF_ERROR(BuildInferenceResponse(entry, ptr));
 
   // Update this key to front of LRU list
   UpdateLRU(iter);
@@ -207,11 +203,7 @@ RequestResponseCache::Insert(
 
   // Construct cache entry from response
   auto entry = CacheEntry();
-  auto status = BuildCacheEntry(response, &entry);
-  if (!status.IsOk()) {
-    LOG_ERROR << "Failed to build cache entry: " << status.Message();
-    return status;
-  }
+  RETURN_IF_ERROR(BuildCacheEntry(response, &entry));
 
   // Insert entry into cache
   LOG_VERBOSE(1) << "Inserting key [" + std::to_string(key) + "] into cache.";
