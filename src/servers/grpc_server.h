@@ -27,8 +27,8 @@
 
 #include <grpc++/grpc++.h>
 #include "grpc_service.grpc.pb.h"
-#include "src/servers/shared_memory_manager.h"
-#include "src/servers/tracer.h"
+#include "shared_memory_manager.h"
+#include "tracer.h"
 #include "triton/core/tritonserver.h"
 
 namespace nvidia { namespace inferenceserver {

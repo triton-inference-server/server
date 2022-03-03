@@ -46,29 +46,29 @@
 #include <list>
 #include <set>
 #include <sstream>
-#include "src/servers/signal.h"
+#include "signal.h"
 
 #ifdef TRITON_ENABLE_ASAN
 #include <sanitizer/lsan_interface.h>
 #endif  // TRITON_ENABLE_ASAN
 
-#include "src/core/logging.h"
-#include "src/servers/common.h"
-#include "src/servers/shared_memory_manager.h"
-#include "src/servers/tracer.h"
+#include "triton/common/logging.h"
+#include "common.h"
+#include "shared_memory_manager.h"
+#include "tracer.h"
 #include "triton/core/tritonserver.h"
 
 #if defined(TRITON_ENABLE_HTTP) || defined(TRITON_ENABLE_METRICS)
-#include "src/servers/http_server.h"
+#include "http_server.h"
 #endif  // TRITON_ENABLE_HTTP|| TRITON_ENABLE_METRICS
 #ifdef TRITON_ENABLE_SAGEMAKER
-#include "src/servers/sagemaker_server.h"
+#include "sagemaker_server.h"
 #endif  // TRITON_ENABLE_SAGEMAKER
 #ifdef TRITON_ENABLE_VERTEX_AI
-#include "src/servers/vertex_ai_server.h"
+#include "vertex_ai_server.h"
 #endif  // TRITON_ENABLE_VERTEX_AI
 #ifdef TRITON_ENABLE_GRPC
-#include "src/servers/grpc_server.h"
+#include "grpc_server.h"
 #endif  // TRITON_ENABLE_GRPC
 
 #ifdef TRITON_ENABLE_GPU

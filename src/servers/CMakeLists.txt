@@ -1,4 +1,4 @@
-# Copyright (c) 2019-2021, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright 2019-2022, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -26,65 +26,359 @@
 
 cmake_minimum_required (VERSION 3.18)
 
+project(tritonserverexe LANGUAGES C CXX)
+
+include(GNUInstallDirs)
+
+#
+# Dependencies
+#
+# We must include the transitive closure of all repos so that we can
+# override the tag.
+#
+include(FetchContent)
+
+FetchContent_Declare(
+  repo-common
+  GIT_REPOSITORY https://github.com/triton-inference-server/common.git
+  GIT_TAG ${TRITON_COMMON_REPO_TAG}
+)
+FetchContent_Declare(
+  repo-core
+  GIT_REPOSITORY https://github.com/triton-inference-server/core.git
+  GIT_TAG ${TRITON_CORE_REPO_TAG}
+)
+
+if(TRITON_ENABLE_GRPC)
+  set(TRITON_COMMON_ENABLE_PROTOBUF ON)
+  set(TRITON_COMMON_ENABLE_GRPC ON)
+endif() # TRITON_ENABLE_GRPC
+
+FetchContent_MakeAvailable(repo-common repo-core)
+
+# CUDA
+#
+if(${TRITON_ENABLE_GPU})
+  find_package(CUDAToolkit REQUIRED)
+  message(STATUS "Using CUDA ${CUDA_VERSION}")
+endif() # TRITON_ENABLE_GPU
+
+# GRPC
+#
+if(${TRITON_ENABLE_GRPC})
+  find_package(gRPC CONFIG REQUIRED)
+  message(STATUS "Using gRPC ${gRPC_VERSION}")
+endif()
+
+# libevent
+#
+if(${TRITON_ENABLE_HTTP} OR ${TRITON_ENABLE_METRICS} OR
+    ${TRITON_ENABLE_SAGEMAKER} OR ${TRITON_ENABLE_VERTEX_AI})
+  find_package(Libevent CONFIG REQUIRED)
+  message(STATUS "Using libevent ${Libevent_VERSION}")
+endif()
+
+# re2
+#
 find_library(RE2_LIBRARY NAMES re2)
 
 #
-# grpc endpoint
+# tritonserver executable
 #
-set(GRPC_ENDPOINT_OBJECTS "")
-set(GRPC_ENDPOINT_LIBRARIES "")
+add_executable(
+  main
+  classification.cc
+  common.cc
+  main.cc
+  shared_memory_manager.cc
+  signal.cc
+  classification.h
+  common.h
+  shared_memory_manager.h
+  signal.h
+)
+
+# On windows a *.lib file can be generated for a exe. When creating
+# tritonserver.exe if we try to create tritonserver.lib it will fail
+# because there is already a trtionserver.lib for tritonserver.dll,
+# this causes the build to fail. To avoid we keep the build name as
+# main.exe and then for windows after installing we rename it to
+# tritonserver.exe (below in the install steps).
+if (NOT WIN32)
+  set_property(TARGET main PROPERTY OUTPUT_NAME tritonserver)
+endif()
+
+target_compile_features(main PRIVATE cxx_std_11)
+if(CMAKE_CXX_COMPILER_ID STREQUAL "MSVC")
+  message("Using MSVC as compiler, default target on Windows 10. "
+    "If the target system is not Windows 10, please update _WIN32_WINNT "
+    "to corresponding value.")
+  target_compile_options(
+    main
+    PRIVATE
+      /W1 /D_WIN32_WINNT=0x0A00 /EHsc
+  )
+else()
+  target_compile_options(
+    main
+    PRIVATE
+      -Wall -Wextra -Wno-unused-parameter -Wno-deprecated-declarations -Werror
+  )
+endif()
+
+set_target_properties(
+  main
+  PROPERTIES
+    POSITION_INDEPENDENT_CODE ON
+    SKIP_BUILD_RPATH TRUE
+    BUILD_WITH_INSTALL_RPATH TRUE
+    INSTALL_RPATH_USE_LINK_PATH FALSE
+    INSTALL_RPATH "$\{ORIGIN\}/../lib"
+)
+
+if(${TRITON_ENABLE_ASAN})
+  set(CMAKE_BUILD_TYPE Debug)
+  target_compile_definitions(
+    main
+    PRIVATE TRITON_ENABLE_ASAN=1
+  )
+  set(_ASAN_FLAGS "-static-libstdc++ -static-libasan -fno-omit-frame-pointer -fsanitize=address")
+  set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} ${_ASAN_FLAGS}")
+  set(CMAKE_LINKER_FLAGS_DEBUG "${CMAKE_LINKER_FLAGS_DEBUG} ${_ASAN_FLAGS}")
+endif() # TRITON_ENABLE_ASAN
+
+if(${TRITON_ENABLE_GPU})
+  target_compile_definitions(
+    main
+    PRIVATE TRITON_ENABLE_GPU=1
+    PRIVATE TRITON_MIN_COMPUTE_CAPABILITY=${TRITON_MIN_COMPUTE_CAPABILITY}
+  )
+
+  target_link_libraries(
+    main
+    PRIVATE
+      CUDA::cudart
+  )
+endif() # TRITON_ENABLE_GPU
+
+if(${TRITON_ENABLE_HTTP} OR ${TRITON_ENABLE_METRICS} OR
+    ${TRITON_ENABLE_SAGEMAKER} OR ${TRITON_ENABLE_VERTEX_AI})
+  target_include_directories(
+    main
+    PRIVATE
+      ${LIBEVENT_INCLUDE_DIRS}
+  )
+endif()
 
 if(${TRITON_ENABLE_GRPC})
-  list(APPEND
-    GRPC_ENDPOINT_SRCS
-    grpc_server.cc
-    )
+  target_include_directories(
+    main
+    PRIVATE
+      $<TARGET_PROPERTY:gRPC::grpc,INTERFACE_INCLUDE_DIRECTORIES>
+  )
 
-  list(APPEND
-    GRPC_ENDPOINT_HDRS
-    grpc_server.h
-    )
+  target_compile_definitions(
+    main
+    PRIVATE TRITON_ENABLE_GRPC=1
+  )
+endif() # TRITON_ENABLE_GRPC
 
+if(${TRITON_ENABLE_HTTP})
+  target_compile_definitions(
+    main
+    PRIVATE TRITON_ENABLE_HTTP=1
+  )
+endif() # TRITON_ENABLE_HTTP
+
+if(${TRITON_ENABLE_SAGEMAKER})
+  target_compile_definitions(
+    main
+    PRIVATE TRITON_ENABLE_SAGEMAKER=1
+  )
+endif() # TRITON_ENABLE_SAGEMAKER
+
+if(${TRITON_ENABLE_VERTEX_AI})
+  target_compile_definitions(
+    main
+    PRIVATE TRITON_ENABLE_VERTEX_AI=1
+  )
+endif() # TRITON_ENABLE_VERTEX_AI
+
+if(${TRITON_ENABLE_LOGGING})
+  target_compile_definitions(
+    main
+    PRIVATE TRITON_ENABLE_LOGGING=1
+  )
+endif() # TRITON_ENABLE_LOGGING
+
+if(${TRITON_ENABLE_METRICS})
+  target_compile_definitions(
+    main
+    PRIVATE TRITON_ENABLE_METRICS=1
+  )
+endif() # TRITON_ENABLE_METRICS
+
+if(${TRITON_ENABLE_STATS})
+  target_compile_definitions(
+    main
+    PRIVATE TRITON_ENABLE_STATS=1
+  )
+endif() # TRITON_ENABLE_STATS
+
+if(${TRITON_ENABLE_TRACING})
+  target_compile_definitions(
+    main
+    PRIVATE TRITON_ENABLE_TRACING=1
+  )
+endif() # TRITON_ENABLE_TRACING
+
+target_link_directories(
+  main
+  PRIVATE
+    ${CMAKE_INSTALL_PREFIX}/${CMAKE_INSTALL_LIBDIR}
+)
+
+target_link_libraries(
+  main
+  PRIVATE
+    triton-common-async-work-queue  # from repo-common
+    triton-common-constants         # from repo-common
+    triton-common-error             # from repo-common
+    triton-common-logging           # from repo-common
+    triton-core-serverapi           # from repo-core
+    -ltritonserver
+)
+
+if (NOT WIN32)
+  target_link_libraries(
+    main
+    PRIVATE
+      rt
+      dl
+  )
+endif() # NOT WIN32
+
+if(${TRITON_ENABLE_GPU})
+  target_compile_definitions(
+    main
+    PRIVATE TRITON_ENABLE_GPU=1
+    PRIVATE TRITON_MIN_COMPUTE_CAPABILITY=${TRITON_MIN_COMPUTE_CAPABILITY}
+  )
+
+  target_link_libraries(
+    main
+    PRIVATE
+      CUDA::cudart
+  )
+endif() # TRITON_ENABLE_GPU
+
+if (NOT WIN32)
+  install(
+    TARGETS main
+    RUNTIME DESTINATION bin
+  )
+else()
+  # See explanation above as to why we need to rename main.exe to
+  # tritonserver.exe as part of the install process on windows.
+  install(
+    PROGRAMS ${CMAKE_CURRENT_BINARY_DIR}/${CMAKE_BUILD_TYPE}/main.exe
+    DESTINATION bin
+    RENAME tritonserver.exe
+  )
+endif()
+
+# grpc endpoint
+#
+if(${TRITON_ENABLE_GRPC})
   add_library(
-    grpc-endpoint-library EXCLUDE_FROM_ALL OBJECT
-    ${GRPC_ENDPOINT_SRCS} ${GRPC_ENDPOINT_HDRS}
+    grpc-endpoint-library EXCLUDE_FROM_ALL
+    grpc_server.cc
+    grpc_server.h
+  )
+
+  target_compile_features(grpc-endpoint-library PRIVATE cxx_std_11)
+  if(CMAKE_CXX_COMPILER_ID STREQUAL "MSVC")
+    target_compile_options(
+      grpc-endpoint-library
+      PRIVATE
+        /W1 /D_WIN32_WINNT=0x0A00 /EHsc
+    )
+  else()
+    target_compile_options(
+      grpc-endpoint-library
+      PRIVATE
+        -Wall -Wextra -Wno-unused-parameter -Wno-deprecated-declarations -Werror
+    )
+  endif()
+
+  set_target_properties(
+    grpc-endpoint-library
+    PROPERTIES
+      POSITION_INDEPENDENT_CODE ON
+  )
+
+  target_include_directories(
+    grpc-endpoint-library
+    PRIVATE
+      $<TARGET_PROPERTY:gRPC::grpc,INTERFACE_INCLUDE_DIRECTORIES>
+  )
+
+  target_compile_definitions(
+    grpc-endpoint-library
+    PRIVATE TRITON_ENABLE_GRPC=1
   )
 
   if(${TRITON_ENABLE_GPU})
-    target_include_directories(grpc-endpoint-library PRIVATE ${CUDA_INCLUDE_DIRS})
+    target_compile_definitions(
+      grpc-endpoint-library
+      PRIVATE TRITON_ENABLE_GPU=1
+      PRIVATE TRITON_MIN_COMPUTE_CAPABILITY=${TRITON_MIN_COMPUTE_CAPABILITY}
+    )
+
+    target_link_libraries(
+      grpc-endpoint-library
+      PRIVATE
+        CUDA::cudart
+    )
   endif() # TRITON_ENABLE_GPU
+
+  if(${TRITON_ENABLE_STATS})
+    target_compile_definitions(
+      grpc-endpoint-library
+      PRIVATE TRITON_ENABLE_STATS=1
+    )
+  endif() # TRITON_ENABLE_STATS
+
+  if(${TRITON_ENABLE_TRACING})
+    target_compile_definitions(
+      grpc-endpoint-library
+      PRIVATE TRITON_ENABLE_TRACING=1
+    )
+  endif() # TRITON_ENABLE_TRACING
 
   target_link_libraries(
     grpc-endpoint-library
-    PUBLIC
-      grpc-service-library
+    PRIVATE
       proto-library           # from repo-common
       triton-core-serverapi   # from repo-core
+      triton-common-constants # from repo-common
       triton-common-json      # from repo-common
+      gRPC::grpc++
+      gRPC::grpc
+    PUBLIC
+      grpc-service-library    # from repo-common
+      protobuf::libprotobuf
   )
 
-  set(
-    GRPC_ENDPOINT_OBJECTS
-    $<TARGET_OBJECTS:grpc-endpoint-library>
-    $<TARGET_OBJECTS:grpc-service-library>
-    $<TARGET_OBJECTS:proto-library>
-    )
-
-  set(
-    GRPC_ENDPOINT_LIBRARIES
-    PRIVATE grpc-service-library
-    PRIVATE gRPC::grpc++
-    PRIVATE gRPC::grpc
-    PRIVATE protobuf::libprotobuf
-    )
+  target_link_libraries(
+    main
+    PRIVATE
+      grpc-endpoint-library
+  )
 endif() # TRITON_ENABLE_GRPC
 
-#
 # http endpoint
 #
-set(HTTP_ENDPOINT_OBJECTS "")
-set(HTTP_ENDPOINT_LIBRARIES "")
-
 if(${TRITON_ENABLE_HTTP}
       OR ${TRITON_ENABLE_METRICS}
       OR ${TRITON_ENABLE_SAGEMAKER}
@@ -125,473 +419,360 @@ if(${TRITON_ENABLE_HTTP}
   endif() # TRITON_ENABLE_VERTEX_AI
 
   add_library(
-    http-endpoint-library EXCLUDE_FROM_ALL OBJECT
+    http-endpoint-library EXCLUDE_FROM_ALL
     ${HTTP_ENDPOINT_SRCS} ${HTTP_ENDPOINT_HDRS}
   )
 
-  if(${TRITON_ENABLE_GPU})
-    target_include_directories(http-endpoint-library PRIVATE ${CUDA_INCLUDE_DIRS})
-  endif() # TRITON_ENABLE_GPU
+  target_compile_features(http-endpoint-library PRIVATE cxx_std_11)
+  if(CMAKE_CXX_COMPILER_ID STREQUAL "MSVC")
+    target_compile_options(
+      http-endpoint-library
+      PRIVATE
+        /W1 /D_WIN32_WINNT=0x0A00 /EHsc
+    )
+  else()
+    target_compile_options(
+      http-endpoint-library
+      PRIVATE
+        -Wall -Wextra -Wno-unused-parameter -Wno-deprecated-declarations -Werror
+    )
+  endif()
+
+  set_target_properties(
+    http-endpoint-library
+    PROPERTIES
+      POSITION_INDEPENDENT_CODE ON
+  )
 
   target_include_directories(
     http-endpoint-library
     PRIVATE $<TARGET_PROPERTY:libevhtp::evhtp,INTERFACE_INCLUDE_DIRECTORIES>
   )
 
+  target_compile_definitions(
+    http-endpoint-library
+    PRIVATE TRITON_ENABLE_HTTP=1
+  )
+
+  if(${TRITON_ENABLE_GPU})
+    target_compile_definitions(
+      http-endpoint-library
+      PRIVATE TRITON_ENABLE_GPU=1
+      PRIVATE TRITON_MIN_COMPUTE_CAPABILITY=${TRITON_MIN_COMPUTE_CAPABILITY}
+    )
+
+    target_link_libraries(
+      http-endpoint-library
+      PRIVATE
+        CUDA::cudart
+    )
+  endif() # TRITON_ENABLE_GPU
+
+  if(${TRITON_ENABLE_METRICS})
+    target_compile_definitions(
+      http-endpoint-library
+      PRIVATE TRITON_ENABLE_METRICS=1
+    )
+  endif() # TRITON_ENABLE_METRICS
+
+  if(${TRITON_ENABLE_STATS})
+    target_compile_definitions(
+      http-endpoint-library
+      PRIVATE TRITON_ENABLE_STATS=1
+    )
+  endif() # TRITON_ENABLE_STATS
+
+  if(${TRITON_ENABLE_TRACING})
+    target_compile_definitions(
+      http-endpoint-library
+      PRIVATE TRITON_ENABLE_TRACING=1
+    )
+  endif() # TRITON_ENABLE_TRACING
+
   target_link_libraries(
     http-endpoint-library
     PRIVATE
-      proto-library           # from repo-common
-    PUBLIC
       triton-core-serverapi   # from repo-core
+      triton-common-constants # from repo-common
       triton-common-json      # from repo-common
-  )
-
-  set(
-    HTTP_ENDPOINT_OBJECTS
-    $<TARGET_OBJECTS:http-endpoint-library>
-    $<TARGET_OBJECTS:proto-library>
-    $<TARGET_OBJECTS:model-config-library>
-  )
-
-  set(
-    HTTP_ENDPOINT_LIBRARIES
-    PRIVATE ${LIBEVENT_LIBRARIES}
-    PRIVATE libevhtp::evhtp
-    PRIVATE protobuf::libprotobuf
-    PRIVATE ${RE2_LIBRARY}
+      ${LIBEVENT_LIBRARIES}
+      ${RE2_LIBRARY}
+    PUBLIC
+      libevhtp::evhtp
   )
 
   if (WIN32)
     find_library(B64_LIBRARY NAMES b64)
     find_library(ZLIB_LIBRARY NAMES zlib)
-    list(APPEND HTTP_ENDPOINT_LIBRARIES ${B64_LIBRARY} ${ZLIB_LIBRARY})
+    target_link_libraries(
+      http-endpoint-library
+      PRIVATE
+        ${B64_LIBRARY}
+        ${ZLIB_LIBRARY}
+    )
   else()
-    list(APPEND HTTP_ENDPOINT_LIBRARIES b64 z)
+    target_link_libraries(
+      http-endpoint-library
+      PRIVATE
+        b64
+        z
+    )
   endif()
 
-endif() # TRITON_ENABLE_HTTP || TRITON_ENABLE_METRICS || TRITON_ENABLE_SAGEMAKER || TRITON_ENABLE_VERTEX_AI
+  target_link_libraries(
+    main
+    PRIVATE
+      http-endpoint-library
+  )
+endif() # TRITON_ENABLE_HTTP || TRITON_ENABLE_METRICS ||
+        # TRITON_ENABLE_SAGEMAKER || TRITON_ENABLE_VERTEX_AI
 
-#
 # tracing
 #
-set(TRACING_OBJECTS "")
-set(TRACING_LIBRARIES "")
-
 if(${TRITON_ENABLE_TRACING})
   message(STATUS "Using tracing ${TRITON_TRACE_INSTALL_PATH}")
 
-  set(
-    TRACING_SRCS
-    tracer.cc
-  )
-
-  set(
-    TRACING_HDRS
-    tracer.h
-  )
-
   add_library(
-    tracing-library EXCLUDE_FROM_ALL OBJECT
-    ${TRACING_SRCS} ${TRACING_HDRS}
+    tracing-library EXCLUDE_FROM_ALL
+    tracer.cc tracer.h
   )
+
+  target_compile_definitions(
+    tracing-library
+    PRIVATE TRITON_ENABLE_TRACING=1
+  )
+
   if(${TRITON_ENABLE_GPU})
-    target_include_directories(tracing-library PRIVATE ${CUDA_INCLUDE_DIRS})
+    target_compile_definitions(
+      tracing-library
+      PRIVATE TRITON_ENABLE_GPU=1
+      PRIVATE TRITON_MIN_COMPUTE_CAPABILITY=${TRITON_MIN_COMPUTE_CAPABILITY}
+    )
+
+    target_link_libraries(
+      tracing-library
+      PRIVATE
+        CUDA::cudart
+    )
   endif() # TRITON_ENABLE_GPU
+
   target_link_libraries(
     tracing-library
-    PRIVATE triton-core-serverapi
+    PRIVATE
+      triton-common-constants         # from repo-common
+      triton-core-serverapi
   )
 
-  set(
-    TRACING_OBJECTS
-    $<TARGET_OBJECTS:tracing-library>
+  target_link_libraries(
+    main
+    PRIVATE
+      tracing-library
   )
 endif() # TRITON_ENABLE_TRACING
 
-#
-# tritonserver
-#
-set(
-  TRITONSERVER_SRCS
-  classification.cc
-  common.cc
-  main.cc
-  shared_memory_manager.cc
-  signal.cc
-  ../core/logging.cc
-)
-
-set(
-  TRITONSERVER_HDRS
-  classification.h
-  common.h
-  shared_memory_manager.h
-  signal.h
-  ../core/logging.h
-)
-
-add_executable(
-  main
-  ${TRITONSERVER_SRCS}
-  ${TRITONSERVER_HDRS}
-  ${HTTP_ENDPOINT_OBJECTS}
-  ${GRPC_ENDPOINT_OBJECTS}
-  ${TRACING_OBJECTS}
-  $<TARGET_OBJECTS:proto-library>
-)
-
-# On windows a *.lib file can be generated for a exe. When creating
-# tritonserver.exe if we try to create tritonserver.lib it will fail
-# because there is already a trtionserver.lib for tritonserver.dll,
-# this causes the build to fail. To avoid we keep the build name as
-# main.exe and then for windows after installing we rename it to
-# tritonserver.exe (below in the install steps).
 if (NOT WIN32)
-  set_property(TARGET main PROPERTY OUTPUT_NAME tritonserver)
-endif()
-
-if(${TRITON_ENABLE_GPU})
-  target_include_directories(main PRIVATE ${CUDA_INCLUDE_DIRS})
-endif() # TRITON_ENABLE_GPU
-set_target_properties(
-  main
-  PROPERTIES
-    SKIP_BUILD_RPATH TRUE
-    BUILD_WITH_INSTALL_RPATH TRUE
-    INSTALL_RPATH_USE_LINK_PATH FALSE
-    INSTALL_RPATH "$\{ORIGIN\}/../lib"
-)
-target_link_libraries(
-  main
-  ${HTTP_ENDPOINT_LIBRARIES}
-  ${GRPC_ENDPOINT_LIBRARIES}
-  ${TRACING_LIBRARIES}
-  PRIVATE protobuf::libprotobuf
-  PRIVATE triton-common-async-work-queue
-  PRIVATE triton-common-error
-  PRIVATE triton-core-serverapi
-  PRIVATE tritonserver
-)
-if (NOT WIN32)
-target_link_libraries(
-  main
-  PRIVATE rt
-  PRIVATE dl
-)
-endif()
-if(${TRITON_ENABLE_GPU})
-target_link_libraries(
-  main
-  PRIVATE ${CUDA_LIBRARIES}
-)
-endif() # TRITON_ENABLE_GPU
-
-if (NOT WIN32)
-install(
-  TARGETS main
-  RUNTIME DESTINATION bin
-)
-else()
-  # See explanation above as to why we need to rename main.exe to
-  # tritonserver.exe as part of the install process on windows.
-  install(
-    PROGRAMS ${CMAKE_CURRENT_BINARY_DIR}/${CMAKE_BUILD_TYPE}/main.exe
-    DESTINATION bin
-    RENAME tritonserver.exe
-  )
-endif()
-
-
-
-if (NOT WIN32)
-#
-# simple
-#
-set(
-  SIMPLE_SRCS
-  simple.cc
-)
-
-set(
-  SIMPLE_HDRS
-)
-
-add_executable(
-  simple
-  ${SIMPLE_SRCS}
-  ${SIMPLE_HDRS}
-  $<TARGET_OBJECTS:proto-library>
-)
-set_target_properties(
-  simple
-  PROPERTIES
-    COMPILE_FLAGS "-Wno-type-limits"
-    SKIP_BUILD_RPATH TRUE
-    BUILD_WITH_INSTALL_RPATH TRUE
-    INSTALL_RPATH_USE_LINK_PATH FALSE
-    INSTALL_RPATH ""
-)
-target_link_libraries(
-  simple
-  PRIVATE triton-common-async-work-queue  # from repo-common
-  PRIVATE triton-common-error             # from repo-common
-  PRIVATE triton-core-serverapi           # from repo-core
-  PRIVATE tritonserver
-  PRIVATE protobuf::libprotobuf
+  #
+  # simple
+  #
+  add_executable(
+    simple
+    simple.cc
   )
 
-if(${TRITON_ENABLE_GPU})
-target_include_directories(simple PRIVATE ${CUDA_INCLUDE_DIRS})
-target_link_libraries(
-  simple
-  PRIVATE ${CUDA_LIBRARIES}
-)
-endif() # TRITON_ENABLE_GPU
+  target_compile_features(simple PRIVATE cxx_std_11)
+  if(CMAKE_CXX_COMPILER_ID STREQUAL "MSVC")
+    message("Using MSVC as compiler, default target on Windows 10. "
+            "If the target system is not Windows 10, please update _WIN32_WINNT "
+            "to corresponding value.")
+    target_compile_options(
+      simple
+      PRIVATE
+        /W1 /D_WIN32_WINNT=0x0A00 /EHsc
+    )
+  else()
+    target_compile_options(
+      simple
+      PRIVATE
+        -Wall -Wextra -Wno-type-limits -Wno-unused-parameter -Wno-deprecated-declarations -Werror
+    )
+  endif()
 
-if(${TRITON_ENABLE_METRICS_GPU})
+  set_target_properties(
+    simple
+    PROPERTIES
+      POSITION_INDEPENDENT_CODE ON
+      SKIP_BUILD_RPATH TRUE
+      BUILD_WITH_INSTALL_RPATH TRUE
+      INSTALL_RPATH_USE_LINK_PATH FALSE
+      INSTALL_RPATH ""
+  )
+
+  target_link_directories(
+    simple
+    PRIVATE
+      ${CMAKE_INSTALL_PREFIX}/${CMAKE_INSTALL_LIBDIR}
+  )
+
   target_link_libraries(
     simple
-    PUBLIC -ldcgm
-  )
-endif() # TRITON_ENABLE_METRICS_GPU
+    PRIVATE
+      triton-common-async-work-queue  # from repo-common
+      triton-common-error             # from repo-common
+      triton-core-serverapi           # from repo-core
+      -ltritonserver
+    )
 
-install(
-  TARGETS simple
-  RUNTIME DESTINATION bin
-)
+  if(${TRITON_ENABLE_GPU})
+    target_compile_definitions(
+      simple
+      PRIVATE TRITON_ENABLE_GPU=1
+      PRIVATE TRITON_MIN_COMPUTE_CAPABILITY=${TRITON_MIN_COMPUTE_CAPABILITY}
+    )
 
-#
-# multi_server
-#
-set(
-  MULTISERVER_SRCS
-  multi_server.cc
-)
+    target_link_libraries(
+      simple
+      PRIVATE
+        CUDA::cudart
+    )
+  endif() # TRITON_ENABLE_GPU
 
-add_executable(
-  multi_server
-  ${MULTISERVER_SRCS}
-  $<TARGET_OBJECTS:proto-library>
-)
-set_target_properties(
-  multi_server
-  PROPERTIES
-    COMPILE_FLAGS "-Wno-type-limits"
-    SKIP_BUILD_RPATH TRUE
-    BUILD_WITH_INSTALL_RPATH TRUE
-    INSTALL_RPATH_USE_LINK_PATH FALSE
-    INSTALL_RPATH ""
-)
-target_link_libraries(
-  multi_server
-  PRIVATE triton-common-async-work-queue # from repo-common
-  PRIVATE triton-common-error             # from repo-common
-  PRIVATE triton-core-serverapi          # from repo-core
-  PRIVATE tritonserver
-  PRIVATE protobuf::libprotobuf
+  install(
+    TARGETS simple
+    RUNTIME DESTINATION bin
   )
 
-if(${TRITON_ENABLE_GPU})
-target_include_directories(multi_server PRIVATE ${CUDA_INCLUDE_DIRS})
-target_link_libraries(
-  multi_server
-  PUBLIC -L/usr/local/cuda/lib64/stubs
-  PUBLIC -lnvidia-ml
-  PRIVATE ${CUDA_LIBRARIES}
-)
-endif() # TRITON_ENABLE_GPU
-install(
-  TARGETS multi_server
-  RUNTIME DESTINATION bin
-)
+  #
+  # multi_server example
+  #
+  add_executable(
+    multi_server
+    multi_server.cc
+  )
 
-#
-# memory_alloc
-#
-if(${TRITON_ENABLE_GPU})
-set(
-  MEMORY_ALLOC_SRCS
-  memory_alloc.cc
-)
+  target_compile_features(multi_server PRIVATE cxx_std_11)
+  if(CMAKE_CXX_COMPILER_ID STREQUAL "MSVC")
+    message("Using MSVC as compiler, default target on Windows 10. "
+            "If the target system is not Windows 10, please update _WIN32_WINNT "
+            "to corresponding value.")
+    target_compile_options(
+      multi_server
+      PRIVATE
+        /W1 /D_WIN32_WINNT=0x0A00 /EHsc
+    )
+  else()
+    target_compile_options(
+      multi_server
+      PRIVATE
+        -Wall -Wextra -Wno-type-limits -Wno-unused-parameter -Wno-deprecated-declarations -Werror
+    )
+  endif()
 
-set(
-  MEMORY_ALLOC_HDRS
-)
+  set_target_properties(
+    multi_server
+    PROPERTIES
+      POSITION_INDEPENDENT_CODE ON
+      SKIP_BUILD_RPATH TRUE
+      BUILD_WITH_INSTALL_RPATH TRUE
+      INSTALL_RPATH_USE_LINK_PATH FALSE
+      INSTALL_RPATH ""
+  )
 
-add_executable(
-  memory_alloc
-  ${MEMORY_ALLOC_SRCS}
-  ${MEMORY_ALLOC_HDRS}
-  $<TARGET_OBJECTS:proto-library>
-)
-target_include_directories(memory_alloc PRIVATE ${CUDA_INCLUDE_DIRS})
-set_target_properties(
-  memory_alloc
-  PROPERTIES
-    SKIP_BUILD_RPATH TRUE
-    BUILD_WITH_INSTALL_RPATH TRUE
-    INSTALL_RPATH_USE_LINK_PATH FALSE
-    INSTALL_RPATH ""
-)
-target_link_libraries(
-  memory_alloc
-  PRIVATE ${CUDA_LIBRARIES}
-  PRIVATE triton-core-serverapi   # from repo-core
-  PRIVATE tritonserver
-  PRIVATE protobuf::libprotobuf
-)
+  target_link_directories(
+    multi_server
+    PRIVATE
+      ${CMAKE_INSTALL_PREFIX}/${CMAKE_INSTALL_LIBDIR}
+  )
 
-if(${TRITON_ENABLE_METRICS_GPU})
   target_link_libraries(
-    memory_alloc
-    PUBLIC -ldcgm
-  )
-endif() # TRITON_ENABLE_METRICS_GPU
+    multi_server
+    PRIVATE
+      triton-common-async-work-queue  # from repo-common
+      triton-common-error             # from repo-common
+      triton-core-serverapi           # from repo-core
+      -ltritonserver
+    )
 
-install(
-  TARGETS memory_alloc
-  RUNTIME DESTINATION bin
-)
-endif() # TRITON_ENABLE_GPU
+  if(${TRITON_ENABLE_GPU})
+    target_compile_definitions(
+      multi_server
+      PRIVATE TRITON_ENABLE_GPU=1
+      PRIVATE TRITON_MIN_COMPUTE_CAPABILITY=${TRITON_MIN_COMPUTE_CAPABILITY}
+    )
+
+    target_link_libraries(
+      multi_server
+      PRIVATE
+        CUDA::cudart
+    )
+  endif() # TRITON_ENABLE_GPU
+
+  install(
+    TARGETS multi_server
+    RUNTIME DESTINATION bin
+  )
+
+  if(${TRITON_ENABLE_GPU})
+    #
+    # memory_alloc example
+    #
+    add_executable(
+      memory_alloc
+      memory_alloc.cc
+    )
+
+    target_compile_features(memory_alloc PRIVATE cxx_std_11)
+    if(CMAKE_CXX_COMPILER_ID STREQUAL "MSVC")
+      message("Using MSVC as compiler, default target on Windows 10. "
+              "If the target system is not Windows 10, please update _WIN32_WINNT "
+              "to corresponding value.")
+      target_compile_options(
+        memory_alloc
+        PRIVATE
+          /W1 /D_WIN32_WINNT=0x0A00 /EHsc
+      )
+    else()
+      target_compile_options(
+        memory_alloc
+        PRIVATE
+          -Wall -Wextra -Wno-type-limits -Wno-unused-parameter -Wno-deprecated-declarations -Werror
+      )
+    endif()
+
+    set_target_properties(
+      memory_alloc
+      PROPERTIES
+        POSITION_INDEPENDENT_CODE ON
+        SKIP_BUILD_RPATH TRUE
+        BUILD_WITH_INSTALL_RPATH TRUE
+        INSTALL_RPATH_USE_LINK_PATH FALSE
+        INSTALL_RPATH ""
+    )
+
+    target_link_directories(
+      memory_alloc
+      PRIVATE
+        ${CMAKE_INSTALL_PREFIX}/${CMAKE_INSTALL_LIBDIR}
+    )
+
+    target_link_libraries(
+      memory_alloc
+      PRIVATE
+        triton-common-async-work-queue  # from repo-common
+        triton-common-error             # from repo-common
+        triton-core-serverapi           # from repo-core
+        -ltritonserver
+        CUDA::cudart
+      )
+
+    target_compile_definitions(
+      memory_alloc
+      PRIVATE TRITON_ENABLE_GPU=1
+      PRIVATE TRITON_MIN_COMPUTE_CAPABILITY=${TRITON_MIN_COMPUTE_CAPABILITY}
+    )
+
+    install(
+      TARGETS memory_alloc
+      RUNTIME DESTINATION bin
+    )
+  endif() # TRITON_ENABLE_GPU
 endif() # NOT WIN32
-
-#
-# libtritonserver.so
-#
-if(${TRITON_ENABLE_ENSEMBLE})
-  set(BACKEND_OBJS ${BACKEND_OBJS} $<TARGET_OBJECTS:ensemble-library>)
-endif() # TRITON_ENABLE_ENSEMBLE
-
-set(BACKEND_OBJS ${BACKEND_OBJS} $<TARGET_OBJECTS:triton-backend-library>)
-set(REPOAGENT_OBJS ${REPOAGENT_OBJS} $<TARGET_OBJECTS:triton-repoagent-library>)
-
-set(CUDA_OBJS "")
-if(${TRITON_ENABLE_GPU})
-  set(CUDA_OBJS $<TARGET_OBJECTS:model-config-cuda-library>)
-endif() # TRITON_ENABLE_GPU
-
-configure_file(libtritonserver.ldscript libtritonserver.ldscript COPYONLY)
-
-add_library(
-  tritonserver SHARED
-  $<TARGET_OBJECTS:server-library>
-  $<TARGET_OBJECTS:model-config-library>
-  $<TARGET_OBJECTS:proto-library>
-  ${CUDA_OBJS}
-  ${BACKEND_OBJS}
-  ${REPOAGENT_OBJS}
-)
-# FIXME need to check how Windows exposes symbols
-if (WIN32)
-set_target_properties(
-  tritonserver
-  PROPERTIES
-    SKIP_BUILD_RPATH TRUE
-    BUILD_WITH_INSTALL_RPATH TRUE
-    INSTALL_RPATH_USE_LINK_PATH FALSE
-    INSTALL_RPATH "$\{ORIGIN\}:$\{ORIGIN\}/pytorch"
-)
-else ()
-set_target_properties(
-  tritonserver
-  PROPERTIES
-    SKIP_BUILD_RPATH TRUE
-    BUILD_WITH_INSTALL_RPATH TRUE
-    INSTALL_RPATH_USE_LINK_PATH FALSE
-    INSTALL_RPATH "$\{ORIGIN\}:$\{ORIGIN\}/pytorch"
-    LINK_DEPENDS ${CMAKE_CURRENT_BINARY_DIR}/libtritonserver.ldscript
-    LINK_FLAGS "-Wl,--version-script libtritonserver.ldscript"
-)
-target_link_libraries(
-  tritonserver
-  PRIVATE dl
-  PRIVATE numa
-)
-endif()
-target_link_libraries(
-  tritonserver
-  PRIVATE triton-core-backendapi
-  PRIVATE triton-core-repoagentapi
-  PRIVATE triton-core-serverapi
-  PRIVATE triton-common-async-work-queue
-  PRIVATE triton-common-error
-  PRIVATE triton-common-json
-  PRIVATE triton-common-table-printer
-  PRIVATE ${TRITON_EXTRA_LDFLAGS}
-  PRIVATE protobuf::libprotobuf
-)
-
-if(${TRITON_ENABLE_TENSORRT})
-  find_library(NVINFER_LIBRARY NAMES nvinfer)
-  find_library(NVINFER_PLUGIN_LIBRARY NAMES nvinfer_plugin)
-  target_link_libraries(
-    tritonserver
-    PUBLIC ${NVINFER_LIBRARY}
-    PUBLIC ${NVINFER_PLUGIN_LIBRARY}
-  )
-endif() # TRITON_ENABLE_TENSORRT
-
-if(${TRITON_ENABLE_METRICS})
-  find_package(prometheus-cpp CONFIG REQUIRED)
-  message(STATUS "Using prometheus-cpp ${prometheus-cpp_VERSION}")
-  target_link_libraries(
-    tritonserver
-    PRIVATE prometheus-cpp::core
-  )
-endif() # TRITON_ENABLE_METRICS
-
-if(${TRITON_ENABLE_GCS})
-  find_package(storage_client REQUIRED)
-  message(STATUS "Using google-cloud-cpp ${storage_client_VERSION}")
-  target_link_libraries(
-    tritonserver
-    PRIVATE storage_client
-  )
-endif() # TRITON_ENABLE_GCS
-
-if(${TRITON_ENABLE_S3})
-  find_package(AWSSDK REQUIRED COMPONENTS s3)
-  message(STATUS "Using aws-cpp-sdk-s3 ${AWSSDK_VERSION}")
-  target_link_libraries(
-    tritonserver
-    PRIVATE aws-cpp-sdk-s3
-    PRIVATE ${RE2_LIBRARY}
-  )
-endif() # TRITON_ENABLE_S3
-
-if(${TRITON_ENABLE_AZURE_STORAGE})
-  target_link_libraries(
-    tritonserver
-    PRIVATE -L${azure-storage-cpplite_DIR}/lib
-    PRIVATE -lazure-storage-lite
-    PRIVATE -lre2
-    PRIVATE -luuid
-    PRIVATE -lcurl
-  )
-endif() # TRITON_ENABLE_AZURE_STORAGE
-
-if(${TRITON_ENABLE_GPU})
-  find_library(CNMEM_LIBRARY NAMES cnmem PATHS ${CNMEM_PATH}/lib)
-  target_link_libraries(
-    tritonserver
-    PRIVATE ${CUDA_LIBRARIES}
-    PRIVATE ${CNMEM_LIBRARY}
-  )
-  target_link_libraries(
-    tritonserver
-    PRIVATE kernel-library
-  )
-endif() # TRITON_ENABLE_GPU
-
-if(${TRITON_ENABLE_METRICS_GPU})
-  target_link_libraries(
-    tritonserver
-    PUBLIC -ldcgm
-  )
-endif() # TRITON_ENABLE_METRICS_GPU
-
-install(
-  TARGETS tritonserver
-  LIBRARY DESTINATION lib
-)

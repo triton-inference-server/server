@@ -24,7 +24,7 @@
 // (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-#include "src/servers/shared_memory_manager.h"
+#include "shared_memory_manager.h"
 
 // Not supporting shared memory for now
 #ifdef _WIN32
@@ -121,8 +121,8 @@ SharedMemoryManager::UnregisterHelper(
 #include <fcntl.h>
 #include <sys/mman.h>
 #include <unistd.h>
-#include "src/core/logging.h"
-#include "src/servers/common.h"
+#include "triton/common/logging.h"
+#include "common.h"
 
 namespace nvidia { namespace inferenceserver {
 

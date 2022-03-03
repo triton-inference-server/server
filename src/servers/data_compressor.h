@@ -34,7 +34,7 @@
 
 #include <event2/buffer.h>
 #include <zlib.h>
-#include "src/servers/common.h"
+#include "common.h"
 #include "triton/core/tritonserver.h"
 
 namespace nvidia { namespace inferenceserver {

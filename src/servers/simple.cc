@@ -35,7 +35,7 @@
 #include <thread>
 #include <unordered_map>
 #include <vector>
-#include "src/servers/common.h"
+#include "common.h"
 #include "triton/core/tritonserver.h"
 
 #ifdef TRITON_ENABLE_GPU

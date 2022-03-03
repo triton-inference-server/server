@@ -1,4 +1,4 @@
-# Copyright (c) 2019-2021, NVIDIA CORPORATION. All rights reserved.
+# Copyright 2020-2022, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -24,12 +24,11 @@
 # (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-cmake_minimum_required (VERSION 3.18)
-project (triton-inference-server LANGUAGES C CXX)
+cmake_minimum_required(VERSION 3.18)
+
+project(tritonserver LANGUAGES C CXX)
 
 include(CMakeDependentOption)
-include(ExternalProject)
-include(GNUInstallDirs)
 
 # Backends
 option(TRITON_ENABLE_TENSORRT "Include TensorRT backend in server" OFF)
@@ -65,6 +64,8 @@ set(TRITON_PYTORCH_INCLUDE_PATHS "" CACHE PATH "Paths to PyTorch includes")
 set(TRITON_TENSORRT_INCLUDE_PATHS "" CACHE PATH "Paths to TensorRT includes")
 set(TRITON_EXTRA_LIB_PATHS "" CACHE PATH "Extra library paths for Triton Server build")
 
+set(TRITON_VERSION "0.0.0" CACHE STRING "The version of the Triton shared library" )
+
 option(TRITON_ENABLE_LOGGING "Include logging support in server" ON)
 option(TRITON_ENABLE_STATS "Include statistics collections in server" ON)
 option(TRITON_ENABLE_TRACING "Include tracing support in server" OFF)
@@ -78,11 +79,11 @@ set(TRITON_MIN_COMPUTE_CAPABILITY "6.0" CACHE STRING
 # Repo tags
 set(TRITON_COMMON_REPO_TAG "main" CACHE STRING "Tag for triton-inference-server/common repo")
 set(TRITON_CORE_REPO_TAG "main" CACHE STRING "Tag for triton-inference-server/core repo")
-set(TRITON_BACKEND_REPO_TAG "main" CACHE STRING "Tag for triton-inference-server/backend repo")
 set(TRITON_THIRD_PARTY_REPO_TAG "main" CACHE STRING "Tag for triton-inference-server/third_party repo")
 
-# Version
-file(STRINGS "${CMAKE_CURRENT_SOURCE_DIR}/../TRITON_VERSION" TRITON_VERSION)
+# Third-party location
+set(TRITON_THIRD_PARTY_INSTALL_PREFIX "${CMAKE_CURRENT_BINARY_DIR}/third-party" CACHE STRING "Location of third-party build")
+set(TRITON_THIRD_PARTY_SRC_INSTALL_PREFIX "${CMAKE_CURRENT_BINARY_DIR}/third-party-src" CACHE STRING "Location of third-party source")
 
 if(TRITON_ENABLE_METRICS AND NOT TRITON_ENABLE_STATS)
   message(FATAL_ERROR "TRITON_ENABLE_METRICS=ON requires TRITON_ENABLE_STATS=ON")
@@ -125,13 +126,28 @@ endif()
 include(FetchContent)
 
 FetchContent_Declare(
+  repo-core
+  GIT_REPOSITORY https://github.com/triton-inference-server/core.git
+  GIT_TAG ${TRITON_CORE_REPO_TAG}
+)
+FetchContent_Declare(
   repo-third-party
   GIT_REPOSITORY https://github.com/triton-inference-server/third_party.git
   GIT_TAG ${TRITON_THIRD_PARTY_REPO_TAG}
 )
-set(TRITON_THIRD_PARTY_INSTALL_PREFIX ${CMAKE_CURRENT_BINARY_DIR}/third-party)
-set(TRITON_THIRD_PARTY_SRC_INSTALL_PREFIX ${CMAKE_CURRENT_BINARY_DIR}/third-party-src)
-FetchContent_MakeAvailable(repo-third-party)
+
+set(TRITON_CORE_HEADERS_ONLY OFF)
+
+FetchContent_MakeAvailable(repo-third-party repo-core)
+
+#
+# Triton server executable and examples
+#
+
+# Need to use ExternalProject for our builds so that we can get the
+# correct dependencies between Triton executable and the
+# ExternalProject dependencies (found in the third_party repo)
+include(ExternalProject)
 
 # If CMAKE_TOOLCHAIN_FILE is set, propagate that hint path to the external
 # projects.
@@ -162,34 +178,96 @@ else()
   set(_FINDPACKAGE_PROTOBUF_CONFIG_DIR "${TRITON_THIRD_PARTY_INSTALL_PREFIX}/protobuf/lib/cmake/protobuf")
 endif()
 
-#
-# Build Triton Server test utilities
-#
 if (CMAKE_INSTALL_PREFIX_INITIALIZED_TO_DEFAULT)
-  set(TRITON_TEST_UTILS_INSTALL_PREFIX ${CMAKE_CURRENT_BINARY_DIR}/test-util/install)
+  set(TRITON_INSTALL_PREFIX ${CMAKE_CURRENT_BINARY_DIR}/install)
 else()
-  set(TRITON_TEST_UTILS_INSTALL_PREFIX ${CMAKE_INSTALL_PREFIX})
+  set(TRITON_INSTALL_PREFIX ${CMAKE_INSTALL_PREFIX})
 endif()
 
-ExternalProject_Add(test-util
-  PREFIX test-util
-  SOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/test-util"
-  BINARY_DIR "${CMAKE_CURRENT_BINARY_DIR}/test-util"
-  BUILD_ALWAYS 1
+set(TRITON_DEPENDS triton-core protobuf)
+if(${TRITON_ENABLE_GCS})
+  set(TRITON_DEPENDS ${TRITON_DEPENDS} google-cloud-cpp)
+endif() # TRITON_ENABLE_GCS
+if(${TRITON_ENABLE_S3})
+  set(TRITON_DEPENDS ${TRITON_DEPENDS} aws-sdk-cpp)
+endif() # TRITON_ENABLE_S3
+if(${TRITON_ENABLE_AZURE_STORAGE})
+  set(TRITON_DEPENDS ${TRITON_DEPENDS} azure-storage-cpplite)
+endif() # TRITON_ENABLE_AZURE_STORAGE
+if(${TRITON_ENABLE_HTTP} OR ${TRITON_ENABLE_METRICS} OR ${TRITON_ENABLE_SAGEMAKER} OR ${TRITON_ENABLE_VERTEX_AI})
+  set(TRITON_DEPENDS ${TRITON_DEPENDS} libevent libevhtp)
+endif() # TRITON_ENABLE_HTTP || TRITON_ENABLE_METRICS || TRITON_ENABLE_SAGEMAKER || TRITON_ENABLE_VERTEX_AI
+if(${TRITON_ENABLE_GRPC})
+  set(TRITON_DEPENDS ${TRITON_DEPENDS} grpc)
+endif() # TRITON_ENABLE_GRPC
+if(${TRITON_ENABLE_METRICS})
+  set(TRITON_DEPENDS ${TRITON_DEPENDS} prometheus-cpp)
+endif() # TRITON_ENABLE_METRICS
+if(${TRITON_ENABLE_GPU})
+  set(TRITON_DEPENDS ${TRITON_DEPENDS} cnmem)
+endif() # TRITON_ENABLE_GPU
+
+ExternalProject_Add(triton-server
+  PREFIX triton-server
+  SOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/src/servers"
+  BINARY_DIR "${CMAKE_CURRENT_BINARY_DIR}/triton-server"
   CMAKE_CACHE_ARGS
+    -DProtobuf_DIR:PATH=${_FINDPACKAGE_PROTOBUF_CONFIG_DIR}
+    ${_CMAKE_ARGS_OPENSSL_ROOT_DIR}
     ${_CMAKE_ARGS_CMAKE_TOOLCHAIN_FILE}
     ${_CMAKE_ARGS_VCPKG_TARGET_TRIPLET}
-    -DProtobuf_DIR:PATH=${_FINDPACKAGE_PROTOBUF_CONFIG_DIR}
-    -DGTEST_ROOT:PATH=${TRITON_THIRD_PARTY_INSTALL_PREFIX}/googletest
+    -DgRPC_DIR:PATH=${TRITON_THIRD_PARTY_INSTALL_PREFIX}/grpc/lib/cmake/grpc
+    -Dc-ares_DIR:PATH=${TRITON_THIRD_PARTY_INSTALL_PREFIX}/c-ares/lib/cmake/c-ares
+    -Dabsl_DIR:PATH=${TRITON_THIRD_PARTY_INSTALL_PREFIX}/absl/lib/cmake/absl
+    -Dnlohmann_json_DIR:PATH=${TRITON_THIRD_PARTY_INSTALL_PREFIX}/nlohmann_json/lib/cmake/nlohmann_json
     -DLibevent_DIR:PATH=${TRITON_THIRD_PARTY_INSTALL_PREFIX}/libevent/lib/cmake/libevent
+    -Dlibevhtp_DIR:PATH=${TRITON_THIRD_PARTY_INSTALL_PREFIX}/libevhtp/lib/cmake/libevhtp
+    -Dprometheus-cpp_DIR:PATH=${TRITON_THIRD_PARTY_INSTALL_PREFIX}/prometheus-cpp/lib/cmake/prometheus-cpp
+    -Dstorage_client_DIR:PATH=${TRITON_THIRD_PARTY_INSTALL_PREFIX}/google-cloud-cpp/lib/cmake/storage_client
+    -Dazure-storage-cpplite_DIR:PATH=${TRITON_THIRD_PARTY_INSTALL_PREFIX}/azure-storage-cpplite
+    -Dgoogle_cloud_cpp_common_DIR:PATH=${TRITON_THIRD_PARTY_INSTALL_PREFIX}/google-cloud-cpp/lib/cmake/google_cloud_cpp_common
+    -DCrc32c_DIR:PATH=${TRITON_THIRD_PARTY_INSTALL_PREFIX}/crc32c/lib/cmake/Crc32c
+    -DAWSSDK_DIR:PATH=${TRITON_THIRD_PARTY_INSTALL_PREFIX}/aws-sdk-cpp/lib/cmake/AWSSDK
+    -Daws-cpp-sdk-core_DIR:PATH=${TRITON_THIRD_PARTY_INSTALL_PREFIX}/aws-sdk-cpp/lib/cmake/aws-cpp-sdk-core
+    -Daws-cpp-sdk-s3_DIR:PATH=${TRITON_THIRD_PARTY_INSTALL_PREFIX}/aws-sdk-cpp/lib/cmake/aws-cpp-sdk-s3
+    -Daws-c-event-stream_DIR:PATH=${TRITON_THIRD_PARTY_INSTALL_PREFIX}/aws-sdk-cpp/lib/aws-c-event-stream/cmake
+    -Daws-c-common_DIR:PATH=${TRITON_THIRD_PARTY_INSTALL_PREFIX}/aws-sdk-cpp/lib/aws-c-common/cmake
+    -Daws-checksums_DIR:PATH=${TRITON_THIRD_PARTY_INSTALL_PREFIX}/aws-sdk-cpp/lib/aws-checksums/cmake
     -DCNMEM_PATH:PATH=${TRITON_THIRD_PARTY_INSTALL_PREFIX}/cnmem
     -DTRITON_COMMON_REPO_TAG:STRING=${TRITON_COMMON_REPO_TAG}
     -DTRITON_CORE_REPO_TAG:STRING=${TRITON_CORE_REPO_TAG}
-    -DTRITON_BACKEND_REPO_TAG:STRING=${TRITON_BACKEND_REPO_TAG}
+    -DTRITON_THIRD_PARTY_REPO_TAG:STRING=${TRITON_THIRD_PARTY_REPO_TAG}
+    -DTRITON_ONNXRUNTIME_INCLUDE_PATHS:PATH=${TRITON_ONNXRUNTIME_INCLUDE_PATHS}
+    -DTRITON_PYTORCH_INCLUDE_PATHS:PATH=${TRITON_PYTORCH_INCLUDE_PATHS}
+    -DTRITON_TENSORRT_INCLUDE_PATHS:PATH=${TRITON_TENSORRT_INCLUDE_PATHS}
+    -DTRITON_EXTRA_LIB_PATHS:PATH=${TRITON_EXTRA_LIB_PATHS}
+    -DTRITON_ENABLE_ASAN:BOOL=${TRITON_ENABLE_ASAN}
+    -DTRITON_ENABLE_NVTX:BOOL=${TRITON_ENABLE_NVTX}
+    -DTRITON_ENABLE_TRACING:BOOL=${TRITON_ENABLE_TRACING}
+    -DTRITON_ENABLE_LOGGING:BOOL=${TRITON_ENABLE_LOGGING}
+    -DTRITON_ENABLE_STATS:BOOL=${TRITON_ENABLE_STATS}
     -DTRITON_ENABLE_GPU:BOOL=${TRITON_ENABLE_GPU}
+    -DTRITON_ENABLE_MALI_GPU:BOOL=${TRITON_ENABLE_MALI_GPU}
+    -DTRITON_ENABLE_HTTP:BOOL=${TRITON_ENABLE_HTTP}
+    -DTRITON_ENABLE_SAGEMAKER:BOOL=${TRITON_ENABLE_SAGEMAKER}
+    -DTRITON_ENABLE_VERTEX_AI:BOOL=${TRITON_ENABLE_VERTEX_AI}
+    -DTRITON_ENABLE_GRPC:BOOL=${TRITON_ENABLE_GRPC}
     -DTRITON_MIN_COMPUTE_CAPABILITY:STRING=${TRITON_MIN_COMPUTE_CAPABILITY}
+    -DTRITON_ENABLE_METRICS:BOOL=${TRITON_ENABLE_METRICS}
+    -DTRITON_ENABLE_METRICS_GPU:BOOL=${TRITON_ENABLE_METRICS_GPU}
+    -DTRITON_ENABLE_GCS:BOOL=${TRITON_ENABLE_GCS}
+    -DTRITON_ENABLE_AZURE_STORAGE:BOOL=${TRITON_ENABLE_AZURE_STORAGE}
+    -DTRITON_ENABLE_S3:BOOL=${TRITON_ENABLE_S3}
+    -DTRITON_ENABLE_TENSORFLOW:BOOL=${TRITON_ENABLE_TENSORFLOW}
+    -DTRITON_ENABLE_PYTHON:BOOL=${TRITON_ENABLE_PYTHON}
     -DTRITON_ENABLE_TENSORRT:BOOL=${TRITON_ENABLE_TENSORRT}
+    -DTRITON_ENABLE_ONNXRUNTIME:BOOL=${TRITON_ENABLE_ONNXRUNTIME}
+    -DTRITON_ENABLE_ONNXRUNTIME_TENSORRT:BOOL=${TRITON_ENABLE_ONNXRUNTIME_TENSORRT}
+    -DTRITON_ENABLE_ONNXRUNTIME_OPENVINO:BOOL=${TRITON_ENABLE_ONNXRUNTIME_OPENVINO}
+    -DTRITON_ENABLE_PYTORCH:BOOL=${TRITON_ENABLE_PYTORCH}
+    -DTRITON_ENABLE_ENSEMBLE:BOOL=${TRITON_ENABLE_ENSEMBLE}
     -DCMAKE_BUILD_TYPE:STRING=${CMAKE_BUILD_TYPE}
-    -DCMAKE_INSTALL_PREFIX:PATH=${TRITON_TEST_UTILS_INSTALL_PREFIX}
-  DEPENDS protobuf googletest cnmem libevent
+    -DCMAKE_INSTALL_PREFIX:PATH=${TRITON_INSTALL_PREFIX}
+    -DTRITON_VERSION:STRING=${TRITON_VERSION}
+  DEPENDS ${TRITON_DEPENDS}
 )
