@@ -25,6 +25,12 @@
 # (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
+# Create local model repository
+MODEL_REPO=`pwd`/models
+rm -r models
+cp -r `pwd`/../L0_simple_ensemble/models .
+mkdir ${MODEL_REPO}/ensemble_add_sub_int32_int32_int32/1
+
 # Set up test files based on installation instructions
 # https://github.com/bytedeco/javacpp-presets/blob/master/tritonserver/README.md
 rm -r javacpp-presets
@@ -34,28 +40,15 @@ mvn clean install --projects .,tritonserver
 mvn clean install -f platform --projects ../tritonserver/platform -Djavacpp.platform.host
 cd ..
 
-MODEL_REPO=`pwd`/models
 SAMPLES_REPO=`pwd`/javacpp-presets/tritonserver/samples
 cp Simple.java $SAMPLES_REPO
-BASE_COMMAND="mvn clean compile -f $SAMPLES_REPO exec:java -Djavacpp.platform=linux-x86_64"
-source ../common/util.sh
-
-# Create local model repository
-rm -r models
-cp -r `pwd`/../L0_simple_ensemble/models .
-mkdir ${MODEL_REPO}/ensemble_add_sub_int32_int32_int32/1
-
 rm -f *.log
 RET=0
 
-# Run with default settings
-$BASE_COMMAND -Dexec.args="-r $MODEL_REPO -i 1000000" >>client.log 2>&1
+# Run test
+# If program runs successfully, there was no out of memory error with the specified constraints
+mvn compile exec:java -f $SAMPLES_REPO/pom.xml -DargLine="-Xms128m -Xmx768m" -Dexec.mainClass=Simple -Djavacpp.platform=linux-x86_64 -Dexec.args="-r ${MODEL_REPO} -i 1000000" >>client.log 2>&1
 if [ $? -ne 0 ]; then
-    RET=1
-fi
-
-if [ `grep -c "Memory growth test passed" client.log` != "1" ]; then
-    echo -e "\n***\n*** Failed. Expected 1 'Memory growth test passed'\n***"
     RET=1
 fi
 

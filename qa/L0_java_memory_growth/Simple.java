@@ -36,7 +36,6 @@ import static org.bytedeco.tritonserver.global.tritonserver.*;
 
 public class Simple {
     static final double TRITON_MIN_COMPUTE_CAPABILITY = 6.0;
-    private static boolean done = false;
 
     static void FAIL(String MSG) {
         System.err.println("Cuda failure: " + MSG);
@@ -485,49 +484,6 @@ public class Simple {
         CompareResult(
             output0, output1, new FloatPointer(input0_data), new FloatPointer(input1_data),
             new FloatPointer(output_data.get(output0)), new FloatPointer(output_data.get(output1)));
-      }
-    }
-
-    /**
-    Returns whether the memory growth is within the acceptable range
-    @param  max_allowed     Parameter to represent the maximum allowed percentage growth
-     */
-    static boolean
-    ValidateMemoryGrowth(float max_allowed){
-      double max_mem = 0;
-      double avg_mem = 0;
-      long num_snapshots = 0;
-      DoubleSummaryStatistics stats = new DoubleSummaryStatistics();
-      while(!done){
-        System.gc();
-        double memory = Runtime.getRuntime().totalMemory() - Runtime.getRuntime().freeMemory();
-        stats.accept(memory);
-        System.out.println("Memory allocated (MB):" + memory/1E6);
-        try {
-          Thread.sleep(2000);
-        } catch (InterruptedException e){
-          System.out.println("Memory growth validation interrupted.");
-        }
-      };
-      if(stats.getCount() < 5){
-        System.out.println("Error: Not enough snapshots, " + stats.getCount());
-        return false;
-      }
-
-      // Measure difference between mean and maximum memory usage
-      // Compute change in memory allocation
-      double memory_allocation_delta = stats.getMax() - stats.getAverage();
-      double memory_allocation_delta_mb = memory_allocation_delta / 1E6;
-      double memory_allocation_delta_percent = memory_allocation_delta / stats.getMax();
-
-      System.out.println("Change in memory allocation (MB): " +
-          memory_allocation_delta_mb + ", " +
-          memory_allocation_delta_percent + "%");
-
-      if(memory_allocation_delta_percent <= max_allowed){
-        return true;
-      } else {
-        return false;
       }
     }
 
@@ -1004,23 +960,11 @@ public class Simple {
             "parsing model metadata");
       }
 
-      Runnable runnable =
-        () -> { 
-          if(ValidateMemoryGrowth(.1f)){
-            System.out.println("Memory growth test passed");
-          } else {
-            System.out.println("Memory growth test FAILED");
-          }
-        };
-      Thread memory_thread = new Thread(runnable);
-      memory_thread.start();
-
       for(int i = 0; i < num_iterations; i++){
         RunInference(server, model_name, is_int, is_torch_model);
       }
-      
-      done = true;
-      memory_thread.join();
+
+      System.out.println("Memory growth test passed");
 
       System.exit(0);
     }
