@@ -104,6 +104,14 @@ cp -r /data/inferenceserver/${REPO_VERSION}/tf_model_store/inception_v1_graphdef
 # Copy resnet50v1.5_fp16
 cp -r /data/inferenceserver/${REPO_VERSION}/perf_model_store/resnet50v1.5_fp16_savedmodel $DATADIR
 
+# Copy and customize custom_zero_1_float32
+cp -r ../custom_models/custom_zero_1_float32 $DATADIR && \
+  mkdir $DATADIR/custom_zero_1_float32/1 && \
+  (cd $DATADIR/custom_zero_1_float32 && \
+    echo "parameters [" >> config.pbtxt && \
+        echo "{ key: \"execute_delay_ms\"; value: { string_value: \"100\" }}" >> config.pbtxt && \
+        echo "]" >> config.pbtxt)
+
 # Generating test data
 mkdir -p $TESTDATADIR
 for INPUT in INPUT0 INPUT1; do
@@ -750,19 +758,38 @@ set -e
 set +e
 mpiexec --allow-run-as-root \
   -n 1 --merge-stderr-to-stdout --output-filename . --tag-output --timestamp-output \
-    $PERF_ANALYZER -v -m graphdef_float16_float32_float32 \
+    $PERF_ANALYZER -v -m graphdef_int32_int32_int32 \
       --measurement-mode count_windows -s 50 : \
   -n 1 --merge-stderr-to-stdout --output-filename . --tag-output --timestamp-output \
-    $PERF_ANALYZER -v -m libtorch_float32_int32_int32 \
+    $PERF_ANALYZER -v -m graphdef_nobatch_int32_int32_int32 \
       --measurement-mode count_windows -s 50 : \
   -n 1 --merge-stderr-to-stdout --output-filename . --tag-output --timestamp-output \
-    $PERF_ANALYZER -v -m savedmodel_nobatch_float32_int32_int32 \
+    $PERF_ANALYZER -v -m custom_zero_1_float32 \
       --measurement-mode count_windows -s 50
 if [ $? -ne 0 ]; then
    cat 1/rank.0/stdout 1/rank.2/stdout 1/rank.2/stdout
+   echo -e "\n***\n*** Perf Analyzer returned non-zero exit code\n***"
    echo -e "\n***\n*** Test Failed\n***"
    RET=1
 else
+  is_synchronized() {
+    local TIMESTAMP_RANK_0_STABLE=$(grep -oP "^\K[^$]+(?=\[1,0\]<stdout>:All models on all MPI ranks are stable)" 1/rank.0/stdout | tail -1 | sed -n 1p | date "+%s" -f -)
+    local TIMESTAMP_RANK_1_STABLE=$(grep -oP "^\K[^$]+(?=\[1,1\]<stdout>:All models on all MPI ranks are stable)" 1/rank.1/stdout | tail -1 | sed -n 1p | date "+%s" -f -)
+    local TIMESTAMP_RANK_2_STABLE=$(grep -oP "^\K[^$]+(?=\[1,2\]<stdout>:All models on all MPI ranks are stable)" 1/rank.2/stdout | tail -1 | sed -n 1p | date "+%s" -f -)
+    local TIMESTAMP_MIN=$(echo -e "${TIMESTAMP_RANK_0_STABLE}\n${TIMESTAMP_RANK_1_STABLE}\n${TIMESTAMP_RANK_2_STABLE}" | sort -n | head -1)
+    local TIMESTAMP_MAX=$(echo -e "${TIMESTAMP_RANK_0_STABLE}\n${TIMESTAMP_RANK_1_STABLE}\n${TIMESTAMP_RANK_2_STABLE}" | sort -n | tail -1)
+    local TIMESTAMP_MAX_MIN_DIFFERENCE=$((${TIMESTAMP_MAX}-${TIMESTAMP_MIN}))
+    local ALLOWABLE_SECONDS_BETWEEN_WINDOWS="5"
+    echo $(($TIMESTAMP_MAX_MIN_DIFFERENCE <= $ALLOWABLE_SECONDS_BETWEEN_WINDOWS))
+  }
+
+  if [ $(is_synchronized) -eq 0 ]; then
+    cat 1/rank.0/stdout 1/rank.2/stdout 1/rank.2/stdout
+    echo -e "\n***\n*** All models did not finish profiling at almost the same time\n***"
+    echo -e "\n***\n*** Test Failed\n***"
+    RET=1
+  fi
+
   is_stable() {
     local RANK=$1
     local IS_THROUGHPUT=$2
@@ -799,6 +826,7 @@ else
 
   if [ $ALL_STABLE -eq 0 ]; then
     cat 1/rank.0/stdout 1/rank.2/stdout 1/rank.2/stdout
+    echo -e "\n***\n*** All models were not stable\n***"
     echo -e "\n***\n*** Test Failed\n***"
     RET=1
   fi
