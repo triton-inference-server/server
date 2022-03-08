@@ -325,12 +325,15 @@ struct ModelDeleter {
 }  // namespace
 
 struct ModelRepositoryManager::ModelInfo {
-  ModelInfo(const int64_t mtime_nsec, const std::string& model_repository_path)
-      : mtime_nsec_(mtime_nsec), explicitly_load_(true),
-        model_repository_path_(model_repository_path)
+  ModelInfo(
+      const int64_t mtime_nsec, const int64_t prev_mtime_ns,
+      const std::string& model_repository_path)
+      : mtime_nsec_(mtime_nsec), prev_mtime_ns_(prev_mtime_ns),
+        explicitly_load_(true), model_repository_path_(model_repository_path)
   {
   }
   int64_t mtime_nsec_;
+  int64_t prev_mtime_ns_;
   bool explicitly_load_;
   inference::ModelConfig model_config_;
   std::string model_repository_path_;
@@ -1371,6 +1374,13 @@ ModelRepositoryManager::LoadModelByDependency()
           model_state->node_->loaded_versions_.emplace(vs.first);
         }
       }
+      // If the model failed to load, should revert the timestamp to
+      // ensure the next load request will attempt to load the model again
+      // for operation consistency.
+      if (!model_state->status_.IsOk()) {
+        auto& model_info = infos_.find(model_state->node_->model_name_)->second;
+        model_info->mtime_nsec_ = model_info->prev_mtime_ns_;
+      }
     }
     set_pair = ModelsToLoadUnload(loaded_models);
   }
@@ -1755,11 +1765,13 @@ ModelRepositoryManager::Poll(
     // modified since the last time it was polled, then need to
     // (re)load, normalize and validate the configuration.
     int64_t mtime_ns;
+    int64_t prev_mtime_ns = 0;
     if (iitr == infos_.end()) {
       mtime_ns = GetModifiedTime(std::string(full_path));
       model_poll_state = STATE_ADDED;
     } else {
       mtime_ns = iitr->second->mtime_nsec_;
+      prev_mtime_ns = mtime_ns;
       if (IsModified(std::string(full_path), &mtime_ns)) {
         model_poll_state = STATE_MODIFIED;
       }
@@ -1796,7 +1808,7 @@ ModelRepositoryManager::Poll(
     }
 
     if (status.IsOk() && (model_poll_state != STATE_UNMODIFIED)) {
-      model_info.reset(new ModelInfo(mtime_ns, repository));
+      model_info.reset(new ModelInfo(mtime_ns, prev_mtime_ns, repository));
       inference::ModelConfig& model_config = model_info->model_config_;
 
       // Create the associated repo agent models when a model is to be loaded,
