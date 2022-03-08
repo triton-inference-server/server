@@ -773,14 +773,14 @@ if [ $? -ne 0 ]; then
    RET=1
 else
   is_synchronized() {
-    local TIMESTAMP_RANK_0_STABLE=$(grep -oP "^\K[^$]+(?=\[1,0\]<stdout>:All models on all MPI ranks are stable)" 1/rank.0/stdout | tail -1 | sed -n 1p | date "+%s" -f -)
-    local TIMESTAMP_RANK_1_STABLE=$(grep -oP "^\K[^$]+(?=\[1,1\]<stdout>:All models on all MPI ranks are stable)" 1/rank.1/stdout | tail -1 | sed -n 1p | date "+%s" -f -)
-    local TIMESTAMP_RANK_2_STABLE=$(grep -oP "^\K[^$]+(?=\[1,2\]<stdout>:All models on all MPI ranks are stable)" 1/rank.2/stdout | tail -1 | sed -n 1p | date "+%s" -f -)
+    local TIMESTAMP_RANK_0_STABLE=$(grep -oP "^\K[^$]+(?=\[1,0\]<stdout>:All models on all MPI ranks are stable)" 1/rank.0/stdout | date "+%s" -f -)
+    local TIMESTAMP_RANK_1_STABLE=$(grep -oP "^\K[^$]+(?=\[1,1\]<stdout>:All models on all MPI ranks are stable)" 1/rank.1/stdout | date "+%s" -f -)
+    local TIMESTAMP_RANK_2_STABLE=$(grep -oP "^\K[^$]+(?=\[1,2\]<stdout>:All models on all MPI ranks are stable)" 1/rank.2/stdout | date "+%s" -f -)
     local TIMESTAMP_MIN=$(echo -e "${TIMESTAMP_RANK_0_STABLE}\n${TIMESTAMP_RANK_1_STABLE}\n${TIMESTAMP_RANK_2_STABLE}" | sort -n | head -1)
     local TIMESTAMP_MAX=$(echo -e "${TIMESTAMP_RANK_0_STABLE}\n${TIMESTAMP_RANK_1_STABLE}\n${TIMESTAMP_RANK_2_STABLE}" | sort -n | tail -1)
     local TIMESTAMP_MAX_MIN_DIFFERENCE=$((${TIMESTAMP_MAX}-${TIMESTAMP_MIN}))
-    local ALLOWABLE_SECONDS_BETWEEN_WINDOWS="5"
-    echo $(($TIMESTAMP_MAX_MIN_DIFFERENCE <= $ALLOWABLE_SECONDS_BETWEEN_WINDOWS))
+    local ALLOWABLE_SECONDS_BETWEEN_PROFILES_FINISHING="5"
+    echo $(($TIMESTAMP_MAX_MIN_DIFFERENCE <= $ALLOWABLE_SECONDS_BETWEEN_PROFILES_FINISHING))
   }
 
   if [ $(is_synchronized) -eq 0 ]; then
@@ -826,7 +826,7 @@ else
 
   if [ $ALL_STABLE -eq 0 ]; then
     cat 1/rank.0/stdout 1/rank.2/stdout 1/rank.2/stdout
-    echo -e "\n***\n*** All models were not stable\n***"
+    echo -e "\n***\n*** All models did not stabilize\n***"
     echo -e "\n***\n*** Test Failed\n***"
     RET=1
   fi
