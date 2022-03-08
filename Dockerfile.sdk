@@ -142,10 +142,8 @@ RUN if [ "$TARGETPLATFORM" = "linux/amd64" ]; then \
         --jar-install-path /workspace/install/java-api-bindings; \
     fi
 
-# For CI testing need to install a test script.
-COPY qa/L0_sdk/test.sh /tmp/test.sh
-COPY qa/L0_sdk/grpc_test.cc /tmp/grpc_test.cc
-COPY qa/L0_sdk/http_test.cc /tmp/http_test.cc
+# For CI testing need to copy over L0_sdk test.
+COPY qa/L0_sdk L0_sdk
 
 # Install an image needed by the quickstart and other documentation.
 COPY qa/images/mug.jpg images/mug.jpg
