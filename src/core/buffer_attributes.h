@@ -1,4 +1,4 @@
-// Copyright (c) 2020, NVIDIA CORPORATION. All rights reserved.
+// Copyright (c) 2022, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 //
 // Redistribution and use in source and binary forms, with or without
 // modification, are permitted provided that the following conditions
@@ -23,55 +23,56 @@
 // OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 // (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
-#pragma once
 
+#include <vector>
 #include "src/core/tritonserver_apis.h"
 
+#pragma once
+
 namespace nvidia { namespace inferenceserver {
-
 //
-// Implementation for TRITONSERVER_ResponseAllocator.
+// A class to hold information about the buffer allocation.
 //
-class ResponseAllocator {
+class BufferAttributes {
  public:
-  explicit ResponseAllocator(
-      TRITONSERVER_ResponseAllocatorAllocFn_t alloc_fn,
-      TRITONSERVER_ResponseAllocatorReleaseFn_t release_fn,
-      TRITONSERVER_ResponseAllocatorStartFn_t start_fn)
-      : alloc_fn_(alloc_fn), buffer_attributes_fn_(nullptr), query_fn_(nullptr),
-        release_fn_(release_fn), start_fn_(start_fn)
+  BufferAttributes(
+      size_t byte_size, TRITONSERVER_MemoryType memory_type,
+      int64_t memory_type_id, char cuda_ipc_handle[64]);
+  BufferAttributes()
   {
+    memory_type_ = TRITONSERVER_MEMORY_CPU;
+    memory_type_id_ = 0;
+    cuda_ipc_handle_.reserve(64);
   }
 
-  void SetQueryFunction(TRITONSERVER_ResponseAllocatorQueryFn_t query_fn)
-  {
-    query_fn_ = query_fn;
-  }
+  // Set the buffer byte size
+  void SetByteSize(const size_t& byte_size);
 
-  void SetBufferAttributesFunction(
-      TRITONSERVER_ResponseAllocatorBufferAttributesFn_t buffer_attributes_fn)
-  {
-    buffer_attributes_fn_ = buffer_attributes_fn;
-  }
+  // Set the buffer memory_type
+  void SetMemoryType(const TRITONSERVER_MemoryType& memory_type);
 
-  TRITONSERVER_ResponseAllocatorAllocFn_t AllocFn() const { return alloc_fn_; }
-  TRITONSERVER_ResponseAllocatorBufferAttributesFn_t BufferAttributesFn() const
-  {
-    return buffer_attributes_fn_;
-  }
-  TRITONSERVER_ResponseAllocatorQueryFn_t QueryFn() const { return query_fn_; }
-  TRITONSERVER_ResponseAllocatorReleaseFn_t ReleaseFn() const
-  {
-    return release_fn_;
-  }
-  TRITONSERVER_ResponseAllocatorStartFn_t StartFn() const { return start_fn_; }
+  // Set the buffer memory type id
+  void SetMemoryTypeId(const int64_t& memory_type_id);
+
+  // Set the cuda ipc handle
+  void SetCudaIpcHandle(void* cuda_ipc_handle);
+
+  // Get the cuda ipc handle
+  void* CudaIpcHandle();
+
+  // Get the byte size
+  size_t ByteSize() const;
+
+  // Get the memory type
+  TRITONSERVER_MemoryType MemoryType() const;
+
+  // Get the memory type id
+  int64_t MemoryTypeId() const;
 
  private:
-  TRITONSERVER_ResponseAllocatorAllocFn_t alloc_fn_;
-  TRITONSERVER_ResponseAllocatorBufferAttributesFn_t buffer_attributes_fn_;
-  TRITONSERVER_ResponseAllocatorQueryFn_t query_fn_;
-  TRITONSERVER_ResponseAllocatorReleaseFn_t release_fn_;
-  TRITONSERVER_ResponseAllocatorStartFn_t start_fn_;
+  size_t byte_size_;
+  TRITONSERVER_MemoryType memory_type_;
+  int64_t memory_type_id_;
+  std::vector<char> cuda_ipc_handle_;
 };
-
 }}  // namespace nvidia::inferenceserver

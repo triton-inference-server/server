@@ -26,6 +26,7 @@
 
 #include <string>
 #include <vector>
+#include "src/core/buffer_attributes.h"
 #include "src/core/cuda_utils.h"
 #include "src/core/infer_parameter.h"
 #include "src/core/infer_request.h"
@@ -700,7 +701,17 @@ TRITONSERVER_ResponseAllocatorSetQueryFunction(
 {
   reinterpret_cast<ni::ResponseAllocator*>(allocator)->SetQueryFunction(
       query_fn);
-  return nullptr;
+  return nullptr;  // success
+}
+
+TRITONSERVER_Error*
+TRITONSERVER_ResponseAllocatorSetBufferAttributesFunction(
+    TRITONSERVER_ResponseAllocator* allocator,
+    TRITONSERVER_ResponseAllocatorBufferAttributesFn_t buffer_attributes_fn)
+{
+  reinterpret_cast<ni::ResponseAllocator*>(allocator)
+      ->SetBufferAttributesFunction(buffer_attributes_fn);
+  return nullptr;  // success
 }
 
 TRITONSERVER_Error*
@@ -1550,6 +1561,24 @@ TRITONSERVER_InferenceRequestAppendInputDataWithHostPolicy(
 }
 
 TRITONSERVER_Error*
+TRITONSERVER_InferenceRequestAppendInputDataWithBufferAttributes(
+    TRITONSERVER_InferenceRequest* inference_request, const char* name,
+    const void* base, TRITONSERVER_BufferAttributes* buffer_attributes)
+{
+  ni::InferenceRequest* lrequest =
+      reinterpret_cast<ni::InferenceRequest*>(inference_request);
+  ni::BufferAttributes* lbuffer_attributes =
+      reinterpret_cast<ni::BufferAttributes*>(buffer_attributes);
+
+  ni::InferenceRequest::Input* input;
+  RETURN_IF_STATUS_ERROR(lrequest->MutableOriginalInput(name, &input));
+  RETURN_IF_STATUS_ERROR(
+      input->AppendDataWithBufferAttributes(base, lbuffer_attributes));
+
+  return nullptr;  // Success
+}
+
+TRITONSERVER_Error*
 TRITONSERVER_InferenceRequestRemoveAllInputData(
     TRITONSERVER_InferenceRequest* inference_request, const char* name)
 {
@@ -1780,6 +1809,121 @@ TRITONSERVER_InferenceResponseOutputClassificationLabel(
       lresponse->ClassificationLabel(output, class_index, label));
 
   return nullptr;  // Success
+}
+
+//
+// TRITONSERVER_BufferAttributes
+//
+TRITONSERVER_Error*
+TRITONSERVER_BufferAttributesNew(
+    TRITONSERVER_BufferAttributes** buffer_attributes)
+{
+  ni::BufferAttributes* lbuffer_attributes = new ni::BufferAttributes();
+  *buffer_attributes =
+      reinterpret_cast<TRITONSERVER_BufferAttributes*>(lbuffer_attributes);
+
+  return nullptr;  // success
+}
+
+TRITONSERVER_Error*
+TRITONSERVER_BufferAttributesDelete(
+    TRITONSERVER_BufferAttributes* buffer_attributes)
+{
+  ni::BufferAttributes* lbuffer_attributes =
+      reinterpret_cast<ni::BufferAttributes*>(buffer_attributes);
+  delete lbuffer_attributes;
+
+  return nullptr;  // success
+}
+
+TRITONSERVER_Error*
+TRITONSERVER_BufferAttributesSetMemoryTypeId(
+    TRITONSERVER_BufferAttributes* buffer_attributes, int64_t memory_type_id)
+{
+  ni::BufferAttributes* lbuffer_attributes =
+      reinterpret_cast<ni::BufferAttributes*>(buffer_attributes);
+  lbuffer_attributes->SetMemoryTypeId(memory_type_id);
+
+  return nullptr;  // success
+}
+
+TRITONSERVER_Error*
+TRITONSERVER_BufferAttributesSetMemoryType(
+    TRITONSERVER_BufferAttributes* buffer_attributes,
+    TRITONSERVER_MemoryType memory_type)
+{
+  ni::BufferAttributes* lbuffer_attributes =
+      reinterpret_cast<ni::BufferAttributes*>(buffer_attributes);
+  lbuffer_attributes->SetMemoryType(memory_type);
+
+  return nullptr;  // success
+}
+
+TRITONSERVER_Error*
+TRITONSERVER_BufferAttributesSetCudaIpcHandle(
+    TRITONSERVER_BufferAttributes* buffer_attributes, void* cuda_ipc_handle)
+{
+  ni::BufferAttributes* lbuffer_attributes =
+      reinterpret_cast<ni::BufferAttributes*>(buffer_attributes);
+  lbuffer_attributes->SetCudaIpcHandle(cuda_ipc_handle);
+
+  return nullptr;  // success
+}
+
+TRITONSERVER_Error*
+TRITONSERVER_BufferAttributesSetByteSize(
+    TRITONSERVER_BufferAttributes* buffer_attributes, size_t byte_size)
+{
+  ni::BufferAttributes* lbuffer_attributes =
+      reinterpret_cast<ni::BufferAttributes*>(buffer_attributes);
+  lbuffer_attributes->SetByteSize(byte_size);
+
+  return nullptr;  // success
+}
+
+TRITONSERVER_Error*
+TRITONSERVER_BufferAttributesMemoryTypeId(
+    TRITONSERVER_BufferAttributes* buffer_attributes, int64_t* memory_type_id)
+{
+  ni::BufferAttributes* lbuffer_attributes =
+      reinterpret_cast<ni::BufferAttributes*>(buffer_attributes);
+  *memory_type_id = lbuffer_attributes->MemoryTypeId();
+
+  return nullptr;  // success
+}
+
+TRITONSERVER_Error*
+TRITONSERVER_BufferAttributesMemoryType(
+    TRITONSERVER_BufferAttributes* buffer_attributes,
+    TRITONSERVER_MemoryType* memory_type)
+{
+  ni::BufferAttributes* lbuffer_attributes =
+      reinterpret_cast<ni::BufferAttributes*>(buffer_attributes);
+  *memory_type = lbuffer_attributes->MemoryType();
+
+  return nullptr;  // success
+}
+
+TRITONSERVER_Error*
+TRITONSERVER_BufferAttributesCudaIpcHandle(
+    TRITONSERVER_BufferAttributes* buffer_attributes, void** cuda_ipc_handle)
+{
+  ni::BufferAttributes* lbuffer_attributes =
+      reinterpret_cast<ni::BufferAttributes*>(buffer_attributes);
+  *cuda_ipc_handle = lbuffer_attributes->CudaIpcHandle();
+
+  return nullptr;  // success
+}
+
+TRITONSERVER_Error*
+TRITONSERVER_BufferAttributesByteSize(
+    TRITONSERVER_BufferAttributes* buffer_attributes, size_t* byte_size)
+{
+  ni::BufferAttributes* lbuffer_attributes =
+      reinterpret_cast<ni::BufferAttributes*>(buffer_attributes);
+  *byte_size = lbuffer_attributes->ByteSize();
+
+  return nullptr;  // success
 }
 
 //

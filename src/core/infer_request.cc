@@ -1075,6 +1075,17 @@ InferenceRequest::Input::AppendData(
 }
 
 Status
+InferenceRequest::Input::AppendDataWithBufferAttributes(
+    const void* base, BufferAttributes* buffer_attributes)
+{
+  if (buffer_attributes->ByteSize() > 0) {
+    std::static_pointer_cast<MemoryReference>(data_)->AddBuffer(
+        static_cast<const char*>(base), buffer_attributes);
+  }
+  return Status::Success;
+}
+
+Status
 InferenceRequest::Input::AppendDataWithHostPolicy(
     const void* base, size_t byte_size, TRITONSERVER_MemoryType memory_type,
     int64_t memory_type_id, const char* host_policy_name)
@@ -1142,6 +1153,16 @@ InferenceRequest::Input::DataBuffer(
     TRITONSERVER_MemoryType* memory_type, int64_t* memory_type_id) const
 {
   *base = data_->BufferAt(idx, byte_size, memory_type, memory_type_id);
+
+  return Status::Success;
+}
+
+Status
+InferenceRequest::Input::DataBufferAttributes(
+    const size_t idx, const void** base,
+    BufferAttributes** buffer_attributes) const
+{
+  *base = data_->BufferAt(idx, buffer_attributes);
 
   return Status::Success;
 }

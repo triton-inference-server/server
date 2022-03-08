@@ -26,6 +26,7 @@
 #pragma once
 
 #include <vector>
+#include "src/core/buffer_attributes.h"
 #include "src/core/constants.h"
 #include "src/core/status.h"
 
@@ -48,6 +49,10 @@ class Memory {
   virtual const char* BufferAt(
       size_t idx, size_t* byte_size, TRITONSERVER_MemoryType* memory_type,
       int64_t* memory_type_id) const = 0;
+
+  // Similar to the above BufferAt but with BufferAttributes.
+  virtual const char* BufferAt(
+      size_t idx, BufferAttributes** buffer_attributes) = 0;
 
   // Get the number of contiguous buffers composing the memory.
   size_t BufferCount() const { return buffer_count_; }
@@ -74,25 +79,33 @@ class MemoryReference : public Memory {
       size_t idx, size_t* byte_size, TRITONSERVER_MemoryType* memory_type,
       int64_t* memory_type_id) const override;
 
+  const char* BufferAt(
+      size_t idx, BufferAttributes** buffer_attributes) override;
+
   // Add a 'buffer' with 'byte_size' as part of this data buffer
   // Return the index of the buffer
   size_t AddBuffer(
       const char* buffer, size_t byte_size, TRITONSERVER_MemoryType memory_type,
       int64_t memory_type_id);
 
+  size_t AddBuffer(const char* buffer, BufferAttributes* buffer_attributes);
+
  private:
   struct Block {
     Block(
         const char* buffer, size_t byte_size,
         TRITONSERVER_MemoryType memory_type, int64_t memory_type_id)
-        : buffer_(buffer), byte_size_(byte_size), memory_type_(memory_type),
-          memory_type_id_(memory_type_id)
+        : buffer_(buffer), buffer_attributes_(BufferAttributes(
+                               byte_size, memory_type, memory_type_id, nullptr))
+    {
+    }
+
+    Block(const char* buffer, BufferAttributes* buffer_attributes)
+        : buffer_(buffer), buffer_attributes_(*buffer_attributes)
     {
     }
     const char* buffer_;
-    size_t byte_size_;
-    TRITONSERVER_MemoryType memory_type_;
-    int64_t memory_type_id_;
+    BufferAttributes buffer_attributes_;
   };
   std::vector<Block> buffer_;
 };
@@ -114,6 +127,10 @@ class MutableMemory : public Memory {
       size_t idx, size_t* byte_size, TRITONSERVER_MemoryType* memory_type,
       int64_t* memory_type_id) const override;
 
+  //\see Memory::BufferAt()
+  const char* BufferAt(
+      size_t idx, BufferAttributes** buffer_attributes) override;
+
   // Return a pointer to the base address of the mutable buffer. If
   // non-null 'memory_type' returns the memory type of the chunk of
   // bytes. If non-null 'memory_type_id' returns the memory type id of
@@ -128,8 +145,7 @@ class MutableMemory : public Memory {
   MutableMemory() : Memory() {}
 
   char* buffer_;
-  TRITONSERVER_MemoryType memory_type_;
-  int64_t memory_type_id_;
+  BufferAttributes buffer_attributes_;
 };
 
 //

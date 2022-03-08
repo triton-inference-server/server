@@ -92,6 +92,17 @@ class SharedMemoryManager {
       const std::string& name, size_t offset, void** shm_mapped_addr,
       TRITONSERVER_MemoryType* memory_type, int64_t* device_id);
 
+#ifdef TRITON_ENABLE_GPU
+  /// Get the CUDA memory handle associated with the block name.
+  /// Return TRITONSERVER_ERROR_NOT_FOUND if named block doesn't exist.
+  /// \param name The name of the shared memory block to get.
+  /// \param cuda_mem_handle Returns the cuda memory handle with the memory
+  /// block.
+  /// \return a TRITONSERVER_Error indicating success or failure.
+  TRITONSERVER_Error* GetCUDAHandle(
+      const std::string& name, cudaIpcMemHandle_t** cuda_mem_handle);
+#endif
+
   /// Populates the status of active system/CUDA shared memory regions
   /// in the status JSON. If 'name' is empty then return status of all
   /// active system/CUDA shared memory regions as specified by 'memory_type'.
@@ -148,6 +159,24 @@ class SharedMemoryManager {
     int64_t device_id_;
   };
 
+#ifdef TRITON_ENABLE_GPU
+  struct CUDASharedMemoryInfo : SharedMemoryInfo {
+    CUDASharedMemoryInfo(
+        const std::string& name, const std::string& shm_key,
+        const size_t offset, const size_t byte_size, int shm_fd,
+        void* mapped_addr, const TRITONSERVER_MemoryType kind,
+        const int64_t device_id, const cudaIpcMemHandle_t* cuda_ipc_handle)
+        : SharedMemoryInfo(
+              name, shm_key, offset, byte_size, shm_fd, mapped_addr, kind,
+              device_id),
+          cuda_ipc_handle_(*cuda_ipc_handle)
+    {
+    }
+
+    cudaIpcMemHandle_t cuda_ipc_handle_;
+  };
+#endif
+
   using SharedMemoryStateMap =
       std::map<std::string, std::unique_ptr<SharedMemoryInfo>>;
   // A map between the name and the details of the associated
@@ -156,5 +185,4 @@ class SharedMemoryManager {
   // A mutex to protect the concurrent access to shared_memory_map_
   std::mutex mu_;
 };
-
 }}  // namespace nvidia::inferenceserver

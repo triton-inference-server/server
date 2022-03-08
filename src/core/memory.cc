@@ -52,9 +52,21 @@ MemoryReference::BufferAt(
     *memory_type_id = 0;
     return nullptr;
   }
-  *memory_type = buffer_[idx].memory_type_;
-  *memory_type_id = buffer_[idx].memory_type_id_;
-  *byte_size = buffer_[idx].byte_size_;
+  *memory_type = buffer_[idx].buffer_attributes_.MemoryType();
+  *memory_type_id = buffer_[idx].buffer_attributes_.MemoryTypeId();
+  *byte_size = buffer_[idx].buffer_attributes_.ByteSize();
+  return buffer_[idx].buffer_;
+}
+
+const char*
+MemoryReference::BufferAt(size_t idx, BufferAttributes** buffer_attributes)
+{
+  if (idx >= buffer_.size()) {
+    *buffer_attributes = nullptr;
+    return nullptr;
+  }
+
+  *buffer_attributes = &(buffer_[idx].buffer_attributes_);
   return buffer_[idx].buffer_;
 }
 
@@ -69,14 +81,25 @@ MemoryReference::AddBuffer(
   return buffer_.size() - 1;
 }
 
+size_t
+MemoryReference::AddBuffer(
+    const char* buffer, BufferAttributes* buffer_attributes)
+{
+  total_byte_size_ += buffer_attributes->ByteSize();
+  buffer_count_++;
+  buffer_.emplace_back(buffer, buffer_attributes);
+  return buffer_.size() - 1;
+}
+
 //
 // MutableMemory
 //
 MutableMemory::MutableMemory(
     char* buffer, size_t byte_size, TRITONSERVER_MemoryType memory_type,
     int64_t memory_type_id)
-    : Memory(), buffer_(buffer), memory_type_(memory_type),
-      memory_type_id_(memory_type_id)
+    : Memory(), buffer_(buffer),
+      buffer_attributes_(
+          BufferAttributes(byte_size, memory_type, memory_type_id, nullptr))
 {
   total_byte_size_ = byte_size;
   buffer_count_ = (byte_size == 0) ? 0 : 1;
@@ -94,8 +117,20 @@ MutableMemory::BufferAt(
     return nullptr;
   }
   *byte_size = total_byte_size_;
-  *memory_type = memory_type_;
-  *memory_type_id = memory_type_id_;
+  *memory_type = buffer_attributes_.MemoryType();
+  *memory_type_id = buffer_attributes_.MemoryTypeId();
+  return buffer_;
+}
+
+const char*
+MutableMemory::BufferAt(size_t idx, BufferAttributes** buffer_attributes)
+{
+  if (idx != 0) {
+    *buffer_attributes = nullptr;
+    return nullptr;
+  }
+
+  *buffer_attributes = &buffer_attributes_;
   return buffer_;
 }
 
@@ -104,10 +139,10 @@ MutableMemory::MutableBuffer(
     TRITONSERVER_MemoryType* memory_type, int64_t* memory_type_id)
 {
   if (memory_type != nullptr) {
-    *memory_type = memory_type_;
+    *memory_type = buffer_attributes_.MemoryType();
   }
   if (memory_type_id != nullptr) {
-    *memory_type_id = memory_type_id_;
+    *memory_type_id = buffer_attributes_.MemoryTypeId();
   }
 
   return buffer_;
@@ -124,11 +159,12 @@ AllocatedMemory::AllocatedMemory(
   if (total_byte_size_ != 0) {
     // Allocate memory with the following fallback policy:
     // CUDA memory -> pinned system memory -> non-pinned system memory
-    switch (memory_type_) {
+    switch (buffer_attributes_.MemoryType()) {
 #ifdef TRITON_ENABLE_GPU
       case TRITONSERVER_MEMORY_GPU: {
         auto status = CudaMemoryManager::Alloc(
-            (void**)&buffer_, total_byte_size_, memory_type_id_);
+            (void**)&buffer_, total_byte_size_,
+            buffer_attributes_.MemoryTypeId());
         if (!status.IsOk()) {
           static bool warning_logged = false;
           if (!warning_logged) {
@@ -144,8 +180,10 @@ AllocatedMemory::AllocatedMemory(
       pinned_memory_allocation:
 #endif  // TRITON_ENABLE_GPU
       default: {
+        TRITONSERVER_MemoryType memory_type = buffer_attributes_.MemoryType();
         auto status = PinnedMemoryManager::Alloc(
-            (void**)&buffer_, total_byte_size_, &memory_type_, true);
+            (void**)&buffer_, total_byte_size_, &memory_type, true);
+        buffer_attributes_.SetMemoryType(memory_type);
         if (!status.IsOk()) {
           LOG_ERROR << status.Message();
           buffer_ = nullptr;
@@ -160,10 +198,11 @@ AllocatedMemory::AllocatedMemory(
 AllocatedMemory::~AllocatedMemory()
 {
   if (buffer_ != nullptr) {
-    switch (memory_type_) {
+    switch (buffer_attributes_.MemoryType()) {
       case TRITONSERVER_MEMORY_GPU: {
 #ifdef TRITON_ENABLE_GPU
-        auto status = CudaMemoryManager::Free(buffer_, memory_type_id_);
+        auto status =
+            CudaMemoryManager::Free(buffer_, buffer_attributes_.MemoryTypeId());
         if (!status.IsOk()) {
           LOG_ERROR << status.Message();
         }

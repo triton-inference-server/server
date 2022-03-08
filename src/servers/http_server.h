@@ -122,7 +122,31 @@ class HTTPAPIServer : public HTTPServer {
   struct AllocPayload {
     struct OutputInfo {
       enum Kind { JSON, BINARY, SHM };
+
       Kind kind_;
+      void* base_;
+      uint64_t byte_size_;
+      TRITONSERVER_MemoryType memory_type_;
+      int64_t device_id_;
+      uint32_t class_cnt_;
+      evbuffer* evbuffer_;
+      char* cuda_ipc_handle_;
+
+      // For non-shared memory
+      OutputInfo(Kind k, uint32_t class_cnt)
+          : kind_(k), class_cnt_(class_cnt), evbuffer_(nullptr)
+      {
+      }
+
+      // For shared memory
+      OutputInfo(
+          void* base, uint64_t byte_size, TRITONSERVER_MemoryType memory_type,
+          int64_t device_id, char* cuda_ipc_handle)
+          : kind_(SHM), base_(base), byte_size_(byte_size),
+            memory_type_(memory_type), device_id_(device_id),
+            evbuffer_(nullptr), cuda_ipc_handle_(cuda_ipc_handle)
+      {
+      }
 
       ~OutputInfo()
       {
@@ -130,25 +154,6 @@ class HTTPAPIServer : public HTTPServer {
           evbuffer_free(evbuffer_);
         }
       }
-
-      // For shared memory
-      OutputInfo(void* b, uint64_t s, TRITONSERVER_MemoryType m, int64_t i)
-          : kind_(SHM), base_(b), byte_size_(s), memory_type_(m), device_id_(i),
-            evbuffer_(nullptr)
-      {
-      }
-      void* base_;
-      uint64_t byte_size_;
-      TRITONSERVER_MemoryType memory_type_;
-      int64_t device_id_;
-
-      // For non-shared memory
-      OutputInfo(Kind k, uint32_t class_cnt)
-          : kind_(k), class_cnt_(class_cnt), evbuffer_(nullptr)
-      {
-      }
-      uint32_t class_cnt_;
-      evbuffer* evbuffer_;
     };
 
     ~AllocPayload()
@@ -248,6 +253,9 @@ class HTTPAPIServer : public HTTPServer {
       TRITONSERVER_ResponseAllocator* allocator, void* userp,
       const char* tensor_name, size_t* byte_size,
       TRITONSERVER_MemoryType* memory_type, int64_t* memory_type_id);
+  static TRITONSERVER_Error* OutputBufferAttributes(
+      TRITONSERVER_ResponseAllocator* allocator, const char* tensor_name,
+      TRITONSERVER_BufferAttributes* buffer_attributes, void* userp);
   static TRITONSERVER_Error* InferResponseFree(
       TRITONSERVER_ResponseAllocator* allocator, void* buffer,
       void* buffer_userp, size_t byte_size, TRITONSERVER_MemoryType memory_type,
