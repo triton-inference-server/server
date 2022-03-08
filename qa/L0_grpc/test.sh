@@ -84,7 +84,7 @@ if [[ "$(< /proc/sys/kernel/osrelease)" == *microsoft* ]]; then
     # SIMPLE_ENSEMBLE_IMAGE_CLIENT=${SDKDIR}/python/ensemble_image_client
     SIMPLE_REUSE_INFER_OBJECTS_CLIENT=${SDKDIR}/python/reuse_infer_objects_client
     # [FIXME] point to proper client
-    CC_UNIT_TEST=${SDKDIR}/python/cc_unit_test
+    CC_UNIT_TEST=${SDKDIR}/python/cc_client_test
 else
     MODELDIR=${MODELDIR:=`pwd`/models}
     DATADIR=${DATADIR:="/data/inferenceserver/${REPO_VERSION}"}
@@ -123,7 +123,7 @@ else
     SIMPLE_IMAGE_CLIENT=../clients/image_client
     # SIMPLE_ENSEMBLE_IMAGE_CLIENT=../clients/ensemble_image_client
     SIMPLE_REUSE_INFER_OBJECTS_CLIENT=../clients/reuse_infer_objects_client
-    CC_UNIT_TEST=../clients/cc_unit_test
+    CC_UNIT_TEST=../clients/cc_client_test
 fi
 
 # Add string_dyna_sequence model to repo
