@@ -136,32 +136,36 @@ These can be useful references for getting started, such as the
 
 ### Java API setup instructions
 
-The current snapshot is based on Triton container version `21.12`. To set up your
-enviroment with Triton Java API, please follow the following steps:
-1. First run Docker container:
-```
- $ docker run -it --gpus=all -v ${pwd}:/workspace nvcr.io/nvidia/tritonserver:21.12-py3 bash
-```
-2. Then install `java sdk` and `maven`:
-```
- $ cd /opt/tritonserver
- $ apt update && apt install -y openjdk-11-jdk
- $ wget https://archive.apache.org/dist/maven/maven-3/3.8.4/binaries/apache-maven-3.8.4-bin.tar.gz
- $ tar zxvf apache-maven-3.8.4-bin.tar.gz
- $ export PATH=/opt/tritonserver/apache-maven-3.8.4/bin:$PATH
-```
-3. Then you can create the JNI binaries in your local repository (`/root/.m2/repository`) 
-   with [`javacpp-presets/tritonserver`](https://github.com/bytedeco/javacpp-presets/tree/master/tritonserver)
-```
- $ git clone https://github.com/bytedeco/javacpp-presets.git
- $ cd javacpp-presets
- $ mvn clean install --projects .,tritonserver
- $ mvn clean install -f platform --projects ../tritonserver/platform -Djavacpp.platform=linux-x86_64
-```
-4. Maven requires a `pom.xml` file to compile. Please refer to 
-   [samples/pom.xml](https://github.com/bytedeco/javacpp-presets/blob/master/tritonserver/samples/pom.xml)
-   as reference for how to create your pom file.
-5. After creating your `pom.xml` file you can build your application with:
-```
- $ mvn compile exec:java -Djavacpp.platform=linux-x86_64 -Dexec.args="<your input args>"
-```
+To use the Tritonserver Java API, you will need to have the Tritonserver library
+and dependencies installed in your enviroment. There are two ways to do this:
+
+1. Use a Tritonserver docker container
+2. Build Triton from your enviroment without Docker (not recommended)
+
+After ensuring that Tritonserver and dependencies are installed, you can run your
+java program with the Java bindings with the following steps:
+
+1. Place Java bindings into your enviroment. You can do this by either:
+   
+   a. Building Java API bindings with provided build script:
+      ```bash
+      # Clone Triton client repo. Recommended client repo tag is: main
+      $ git clone --single-branch --depth=1 -b <client repo tag>
+                     https://github.com/triton-inference-server/client.git clientrepo
+      # Run build script
+      $ source clientrepo/src/java-api-bindings/scripts/install_dependencies_and_build.sh
+      ```
+      This will install the Java bindings to `/workspace/install/java-api-bindings/tritonserver-java-bindings.jar`
+   
+   *or*
+
+   b. Copying "Uber Jar" from Triton SDK container to your enviroment
+      ```bash
+      $ id=$(docker run -dit nvcr.io/nvidia/tritonserver:<triton container version>-py3-sdk bash)
+      $ docker cp ${id}:/workspace/install/java-api-bindings/tritonserver-java-bindings.jar <Uber Jar directory>/tritonserver-java-bindings.jar
+      $ docker stop ${id}
+      ``` 
+2. Use the built "Uber Jar" that contains the Java bindings
+   ```bash
+   $ java -cp <Uber Jar directory>/tritonserver-java-bindings.jar <your Java program>
+   ```
