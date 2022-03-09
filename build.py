@@ -1528,7 +1528,7 @@ if __name__ == '__main__':
     parser.add_argument(
         '--tmp-dir',
         type=str,
-        required=True,
+        required=False,
         default=os.path.join(os.sep, 'tmp', 'tritonbuild'),
         help=
         'Temporary parent directory used for building inside docker. Default is '
