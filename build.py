@@ -78,7 +78,7 @@ from distutils.dir_util import copy_tree
 # <major_version>_<minor_version>[_pre]
 # Append '_pre' only if the openVINO backend was built with prebuilt openVINO
 # library. In other words, when the second element of the pair is not None.
-# To use ('2021.2', None) version_str should be `2021_2'.
+# To use ('2021.4', None) version_str should be `2021_4'.
 # To use ('2021.4', '2021.4.582') version_str should be `2021_4_pre'.
 # User can also build openvino backend from specific commit sha of openVINO
 # repository. The pair should be (`SPECIFIC`, <commit_sha_of_ov_repo>).
@@ -87,10 +87,10 @@ from distutils.dir_util import copy_tree
 TRITON_VERSION_MAP = {
     '2.20.0dev': (
         '22.03dev',  # triton container
-        '22.01',  # upstream container
+        '22.02',  # upstream container
         '1.10.0',  # ORT
-        '2021.2.200',  # ORT OpenVINO
-        (('2021.2', None), ('2021.4', '2021.4.582'),
+        '2021.4.582',  # ORT OpenVINO
+        (('2021.4', None), ('2021.4', '2021.4.582'),
          ('SPECIFIC', 'f2f281e6')),  # Standalone OpenVINO
         '2.2.9')  # DCGM version
 }

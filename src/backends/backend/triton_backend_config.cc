@@ -60,7 +60,7 @@ Status
 GetOVSpecializedBackendName(
     const BackendCmdlineConfigMap& config_map, std::string* specialized_name)
 {
-  std::string ov_version_str = "2021_2";
+  std::string ov_version_str = "2021_4";
   const auto& itr = config_map.find("openvino");
   if (itr != config_map.end()) {
     BackendConfiguration(itr->second, "version", &ov_version_str);
