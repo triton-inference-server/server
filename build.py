@@ -891,8 +891,8 @@ def create_dockerfile_build(ddir, dockerfile_name, backends):
     df = '''
 FROM tritonserver_builder_image AS build
 FROM tritonserver_buildbase
-COPY --from=build ${FLAGS.tmp_dir} ${FLAGS.tmp_dir}
-'''
+COPY --from=build {0} {0}
+'''.format(FLAGS.tmp_dir)
 
     # If requested, package the source code for all OSS used to build
     # Triton Windows is not delivered as a container (and tar not
@@ -900,21 +900,21 @@ COPY --from=build ${FLAGS.tmp_dir} ${FLAGS.tmp_dir}
     if target_platform() != 'windows':
         if not FLAGS.no_core_build and not FLAGS.no_container_source:
             df += '''
-RUN mkdir -p ${FLAGS.tmp_dir}/install/third-party-src && \
-    (cd ${FLAGS.tmp_dir}/tritonserver/build && \
-     tar zcf ${FLAGS.tmp_dir}/install/third-party-src/src.tar.gz third-party-src)
-COPY --from=build /workspace/build/server/README.third-party-src ${FLAGS.tmp_dir}/install/third-party-src/README
-'''
+RUN mkdir -p {0}/install/third-party-src && \
+    (cd {0}/tritonserver/build && \
+     tar zcf {0}/install/third-party-src/src.tar.gz third-party-src)
+COPY --from=build /workspace/build/server/README.third-party-src {0}/install/third-party-src/README
+'''.format(FLAGS.tmp_dir)
 
     if 'onnxruntime' in backends:
         if target_platform() != 'windows':
             df += '''
 # Copy ONNX custom op library and model (needed for testing)
-RUN if [ -d ${FLAGS.tmp_dir}/onnxruntime ]; then \
-      cp ${FLAGS.tmp_dir}/onnxruntime/install/test/libcustom_op_library.so /workspace/qa/L0_custom_ops/.; \
-      cp ${FLAGS.tmp_dir}/onnxruntime/install/test/custom_op_test.onnx /workspace/qa/L0_custom_ops/.; \
+RUN if [ -d {0}/onnxruntime ]; then \
+      cp {0}/onnxruntime/install/test/libcustom_op_library.so /workspace/qa/L0_custom_ops/.; \
+      cp {0}/onnxruntime/install/test/custom_op_test.onnx /workspace/qa/L0_custom_ops/.; \
     fi
-'''
+'''.format(FLAGS.tmp_dir)
 
     mkdir(ddir)
     with open(os.path.join(ddir, dockerfile_name), "w") as dfile:
@@ -957,20 +957,20 @@ COPY --chown=1000:1000 NVIDIA_Deep_Learning_Container_License.pdf .
 
     if not FLAGS.no_core_build:
         df += '''
-COPY --chown=1000:1000 --from=tritonserver_build ${FLAGS.tmp_dir}/install/bin/tritonserver bin/
-COPY --chown=1000:1000 --from=tritonserver_build ${FLAGS.tmp_dir}/install/lib/libtritonserver.so lib/
-COPY --chown=1000:1000 --from=tritonserver_build ${FLAGS.tmp_dir}/install/include/triton/core include/triton/core
+COPY --chown=1000:1000 --from=tritonserver_build {0}/install/bin/tritonserver bin/
+COPY --chown=1000:1000 --from=tritonserver_build {0}/install/lib/libtritonserver.so lib/
+COPY --chown=1000:1000 --from=tritonserver_build {0}/install/include/triton/core include/triton/core
 
 # Top-level include/core not copied so --chown does not set it correctly,
 # so explicit set on all of include
 RUN chown -R triton-server:triton-server include
-'''
+'''.format(FLAGS.tmp_dir)
 
         # If requested, include the source code for all OSS used to build Triton
         if not FLAGS.no_container_source:
             df += '''
-COPY --chown=1000:1000 --from=tritonserver_build ${FLAGS.tmp_dir}/install/third-party-src third-party-src
-'''
+COPY --chown=1000:1000 --from=tritonserver_build {0}/install/third-party-src third-party-src
+'''.format(FLAGS.tmp_dir)
 
         # Add feature labels for SageMaker endpoint
         if 'sagemaker' in endpoints:
@@ -982,14 +982,14 @@ COPY --chown=1000:1000 --from=tritonserver_build /workspace/build/sagemaker/serv
     for noncore in NONCORE_BACKENDS:
         if noncore in backends:
             df += '''
-COPY --chown=1000:1000 --from=tritonserver_build ${FLAGS.tmp_dir}/install/backends backends
-'''
+COPY --chown=1000:1000 --from=tritonserver_build {0}/install/backends backends
+'''.format(FLAGS.tmp_dir)
             break
 
     if len(repoagents) > 0:
         df += '''
-COPY --chown=1000:1000 --from=tritonserver_build ${FLAGS.tmp_dir}/install/repoagents repoagents
-'''
+COPY --chown=1000:1000 --from=tritonserver_build {0}/install/repoagents repoagents
+'''.format(FLAGS.tmp_dir)
 
     mkdir(ddir)
     with open(os.path.join(ddir, dockerfile_name), "w") as dfile:
@@ -1144,16 +1144,16 @@ RUN rmdir /S/Q * || exit 0
 COPY LICENSE .
 COPY TRITON_VERSION .
 COPY NVIDIA_Deep_Learning_Container_License.pdf .
-COPY --from=tritonserver_build ${FLAGS.tmp_dir}/install/bin bin
-COPY --from=tritonserver_build ${FLAGS.tmp_dir}/install/lib/tritonserver.lib lib/
-COPY --from=tritonserver_build ${FLAGS.tmp_dir}/install/include/triton/core include/triton/core
+COPY --from=tritonserver_build {0}/install/bin bin
+COPY --from=tritonserver_build {0}/install/lib/tritonserver.lib lib/
+COPY --from=tritonserver_build {0}/install/include/triton/core include/triton/core
 '''
 
     for noncore in NONCORE_BACKENDS:
         if noncore in backends:
             df += '''
-COPY --from=tritonserver_build ${FLAGS.tmp_dir}/install/backends backends
-'''
+COPY --from=tritonserver_build {0}/install/backends backends
+'''.format(FLAGS.tmp_dir)
             break
 
     df += '''
