@@ -47,6 +47,7 @@ FROM ${BUILD_IMAGE} AS build
 # Ensure apt-get won't prompt for selecting options
 ENV DEBIAN_FRONTEND=noninteractive
 
+ARG TRITONBUILD_DIR
 WORKDIR ${TRITONBUILD_DIR}/tritonserver/build
 ARG TRITON_COMMON_REPO_TAG
 ARG TRITON_CORE_REPO_TAG
