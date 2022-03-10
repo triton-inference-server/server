@@ -1147,7 +1147,7 @@ COPY NVIDIA_Deep_Learning_Container_License.pdf .
 COPY --from=tritonserver_build {0}/install/bin bin
 COPY --from=tritonserver_build {0}/install/lib/tritonserver.lib lib/
 COPY --from=tritonserver_build {0}/install/include/triton/core include/triton/core
-'''
+'''.format(FLAGS.tmp_dir)
 
     for noncore in NONCORE_BACKENDS:
         if noncore in backends:
