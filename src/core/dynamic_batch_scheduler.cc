@@ -593,12 +593,27 @@ DynamicBatchScheduler::DelegateResponse(
   completion_queue_.emplace_back();
   auto queue_slot = &completion_queue_.back();
   uint64_t request_hash = request->CacheKey();
+  // Pass raw ptr to lambda for tracking stats from cache and updating
+  // metric reporter on cache miss stats after insertion
+  InferenceRequest* raw_request_ptr = request.get();
+
   request->SetResponseDelegator(
-      [this, queue_slot, request_hash](
+      [this, queue_slot, request_hash, raw_request_ptr](
           std::unique_ptr<InferenceResponse>&& response, const uint32_t flags) {
         if (response_cache_enabled_) {
+          // Cache insertion happens here because we need the backend to have
+          // computed the inference response first in the case of cache miss
           auto cache = model_->Server()->GetResponseCache();
-          cache->Insert(request_hash, *response);
+          auto status = cache->Insert(request_hash, *response, raw_request_ptr);
+          if (status.IsOk()) {
+            // Cache miss
+            raw_request_ptr->ReportStatisticsCacheMiss(reporter_.get());
+          } else if (status.StatusCode() == Status::Code::ALREADY_EXISTS) {
+            /* Cache hit */
+          } else {
+            LOG_ERROR << "Failed to insert request_hash [" << request_hash
+                      << "] into response cache: " << status.Message();
+          }
         }
 
         if (preserve_ordering_) {

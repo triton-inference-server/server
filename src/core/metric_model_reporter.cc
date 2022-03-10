@@ -98,6 +98,12 @@ MetricModelReporter::MetricModelReporter(
       CreateCounterMetric(Metrics::FamilyCacheHitCount(), labels);
   metric_cache_hit_lookup_duration_us_ =
       CreateCounterMetric(Metrics::FamilyCacheHitLookupDuration(), labels);
+  metric_cache_miss_count_ =
+      CreateCounterMetric(Metrics::FamilyCacheMissCount(), labels);
+  metric_cache_miss_lookup_duration_us_ =
+      CreateCounterMetric(Metrics::FamilyCacheMissLookupDuration(), labels);
+  metric_cache_miss_insertion_duration_us_ =
+      CreateCounterMetric(Metrics::FamilyCacheMissInsertionDuration(), labels);
 }
 
 MetricModelReporter::~MetricModelReporter()
@@ -118,6 +124,9 @@ MetricModelReporter::~MetricModelReporter()
   Metrics::FamilyCacheHitCount().Remove(metric_cache_hit_count_);
   Metrics::FamilyCacheHitLookupDuration().Remove(
       metric_cache_hit_lookup_duration_us_);
+  Metrics::FamilyCacheMissCount().Remove(metric_cache_miss_count_);
+  Metrics::FamilyCacheMissInsertionDuration().Remove(
+      metric_cache_miss_insertion_duration_us_);
 }
 
 void

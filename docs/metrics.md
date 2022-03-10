@@ -1,5 +1,5 @@
 <!--
-# Copyright 2018-2021, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright 2018-2022, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -71,7 +71,11 @@ The following table describes the available metrics.
 |              |Total Cache Lookup Time |Cumulative time requests spend checking for a cached response across all models (microseconds) |Server-wide |Per second |
 |              |Total Cache Utilization |Total Response Cache utilization rate (0.0 - 1.0) |Server-wide |Per second |
 |              |Cache Hit Count |Number of response cache hits per model |Per model |Per request |
-|              |Cache Hit Lookup Time |Cumulative time requests spend retrieving a cached response per model on cache hits, does not include cache misses (microseconds) |Per model |Per request |
+|              |Cache Hit Lookup Time |Cumulative time requests spend retrieving a cached response per model on cache hits (microseconds) |Per model |Per request |
+|              |Cache Miss Count |Number of response cache misses per model |Per model |Per request |
+|              |Cache Miss Lookup Time |Cumulative time requests spend looking up a request hash on a cache miss (microseconds) |Per model |Per request |
+|              |Cache Miss Insertion Time |Cumulative time requests spend inserting responses into the cache on a cache miss (microseconds) |Per model |Per request |
+
 
 ## Response Cache
 
@@ -85,9 +89,10 @@ On cache hits, "Cache Hit Lookup Time" indicates the time spent looking up the
 response, and "Compute Input Time" /  "Compute Time" / "Compute Output Time"
 are not recorded.
 
-On cache misses, "Cache Hit Lookup Time" will not be recorded, and
-"Compute Input Time" /  "Compute Time" / "Compute Output Time" will be
-recorded as usual.
+On cache misses, "Cache Miss Lookup Time" indicates the time spent looking up
+the request hash and "Cache Miss Insertion Time" indicates the time spent
+inserting the computed output tensor data into the cache. Otherwise, "Compute
+Input Time" /  "Compute Time" / "Compute Output Time" will be recorded as usual.
 
 ## Count Metrics
 
