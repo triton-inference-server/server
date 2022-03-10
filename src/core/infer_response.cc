@@ -348,6 +348,13 @@ InferenceResponse::Output::AllocateDataBuffer(
   int64_t actual_memory_type_id = *memory_type_id;
   void* alloc_buffer_userp = nullptr;
 
+  RETURN_IF_TRITONSERVER_ERROR(allocator_->AllocFn()(
+      reinterpret_cast<TRITONSERVER_ResponseAllocator*>(
+          const_cast<ResponseAllocator*>(allocator_)),
+      name_.c_str(), buffer_byte_size, *memory_type, *memory_type_id,
+      alloc_userp_, buffer, &alloc_buffer_userp, &actual_memory_type,
+      &actual_memory_type_id));
+
   // Only call the buffer attributes API if it is set.
   if (allocator_->BufferAttributesFn() != nullptr) {
     RETURN_IF_TRITONSERVER_ERROR(allocator_->BufferAttributesFn()(
@@ -355,15 +362,8 @@ InferenceResponse::Output::AllocateDataBuffer(
             const_cast<ResponseAllocator*>(allocator_)),
         name_.c_str(),
         reinterpret_cast<TRITONSERVER_BufferAttributes*>(&buffer_attributes_),
-        alloc_userp_));
+        alloc_userp_, alloc_buffer_userp));
   }
-
-  RETURN_IF_TRITONSERVER_ERROR(allocator_->AllocFn()(
-      reinterpret_cast<TRITONSERVER_ResponseAllocator*>(
-          const_cast<ResponseAllocator*>(allocator_)),
-      name_.c_str(), buffer_byte_size, *memory_type, *memory_type_id,
-      alloc_userp_, buffer, &alloc_buffer_userp, &actual_memory_type,
-      &actual_memory_type_id));
 
   allocated_buffer_ = *buffer;
   buffer_attributes_.SetByteSize(buffer_byte_size);

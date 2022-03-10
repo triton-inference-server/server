@@ -143,7 +143,7 @@ class HTTPAPIServer : public HTTPServer {
           void* base, uint64_t byte_size, TRITONSERVER_MemoryType memory_type,
           int64_t device_id, char* cuda_ipc_handle)
           : kind_(SHM), base_(base), byte_size_(byte_size),
-            memory_type_(memory_type), device_id_(device_id),
+            memory_type_(memory_type), device_id_(device_id), class_cnt_(0),
             evbuffer_(nullptr), cuda_ipc_handle_(cuda_ipc_handle)
       {
       }
@@ -255,7 +255,8 @@ class HTTPAPIServer : public HTTPServer {
       TRITONSERVER_MemoryType* memory_type, int64_t* memory_type_id);
   static TRITONSERVER_Error* OutputBufferAttributes(
       TRITONSERVER_ResponseAllocator* allocator, const char* tensor_name,
-      TRITONSERVER_BufferAttributes* buffer_attributes, void* userp);
+      TRITONSERVER_BufferAttributes* buffer_attributes, void* userp,
+      void* buffer_userp);
   static TRITONSERVER_Error* InferResponseFree(
       TRITONSERVER_ResponseAllocator* allocator, void* buffer,
       void* buffer_userp, size_t byte_size, TRITONSERVER_MemoryType memory_type,

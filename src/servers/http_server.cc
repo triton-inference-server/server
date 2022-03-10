@@ -1056,9 +1056,7 @@ HTTPAPIServer::InferResponseAlloc(
     *buffer = const_cast<void*>(info->base_);
     *actual_memory_type = info->memory_type_;
     *actual_memory_type_id = info->device_id_;
-
-    // Don't need info for shared-memory output...
-    delete info;
+    *buffer_userp = reinterpret_cast<void*>(info);
 
     LOG_VERBOSE(1) << "HTTP: using shared-memory for '" << tensor_name
                    << "', size: " << byte_size << ", addr: " << *buffer;
@@ -1104,18 +1102,19 @@ HTTPAPIServer::InferResponseAlloc(
 TRITONSERVER_Error*
 HTTPAPIServer::OutputBufferAttributes(
     TRITONSERVER_ResponseAllocator* allocator, const char* tensor_name,
-    TRITONSERVER_BufferAttributes* buffer_attributes, void* userp)
+    TRITONSERVER_BufferAttributes* buffer_attributes, void* userp,
+    void* buffer_userp)
 {
-  AllocPayload* payload = reinterpret_cast<AllocPayload*>(userp);
+  AllocPayload::OutputInfo* info =
+      reinterpret_cast<AllocPayload::OutputInfo*>(buffer_userp);
 
   // We only need to set the cuda ipc handle here. The rest of the buffer
   // attributes have been properly populated by triton core.
   if (tensor_name != nullptr) {
-    auto pr = payload->output_map_.find(tensor_name);
-    if ((pr != payload->output_map_.end()) &&
-        (pr->second->kind_ == AllocPayload::OutputInfo::SHM)) {
+    if (info->kind_ == AllocPayload::OutputInfo::SHM &&
+        info->memory_type_ == TRITONSERVER_MEMORY_GPU) {
       RETURN_IF_ERR(TRITONSERVER_BufferAttributesSetCudaIpcHandle(
-          buffer_attributes, pr->second->cuda_ipc_handle_));
+          buffer_attributes, info->cuda_ipc_handle_));
     }
   }
 
@@ -2950,30 +2949,27 @@ HTTPAPIServer::InferRequestClass::FinalizeResponse(
       RETURN_IF_ERR(output_json.Add("shape", std::move(shape_json)));
     }
 
-    // Add JSON data, or collect binary data. If 'info' is nullptr
-    // then using shared memory so don't need this step.
-    if (info != nullptr) {
-      if (info->kind_ == AllocPayload::OutputInfo::BINARY) {
-        triton::common::TritonJson::Value parameters_json;
-        if (!output_json.Find("parameters", &parameters_json)) {
-          parameters_json = triton::common::TritonJson::Value(
-              response_json, triton::common::TritonJson::ValueType::OBJECT);
-          RETURN_IF_ERR(parameters_json.AddUInt("binary_data_size", byte_size));
-          RETURN_IF_ERR(
-              output_json.Add("parameters", std::move(parameters_json)));
-        } else {
-          RETURN_IF_ERR(parameters_json.AddUInt("binary_data_size", byte_size));
-        }
-        if (byte_size > 0) {
-          ordered_buffers.push_back(info->evbuffer_);
-        }
+    // Add JSON data, or collect binary data.
+    if (info->kind_ == AllocPayload::OutputInfo::BINARY) {
+      triton::common::TritonJson::Value parameters_json;
+      if (!output_json.Find("parameters", &parameters_json)) {
+        parameters_json = triton::common::TritonJson::Value(
+            response_json, triton::common::TritonJson::ValueType::OBJECT);
+        RETURN_IF_ERR(parameters_json.AddUInt("binary_data_size", byte_size));
+        RETURN_IF_ERR(
+            output_json.Add("parameters", std::move(parameters_json)));
       } else {
-        triton::common::TritonJson::Value data_json(
-            response_json, triton::common::TritonJson::ValueType::ARRAY);
-        RETURN_IF_ERR(WriteDataToJson(
-            &data_json, cname, datatype, base, byte_size, element_count));
-        RETURN_IF_ERR(output_json.Add("data", std::move(data_json)));
+        RETURN_IF_ERR(parameters_json.AddUInt("binary_data_size", byte_size));
       }
+      if (byte_size > 0) {
+        ordered_buffers.push_back(info->evbuffer_);
+      }
+    } else if (info->kind_ == AllocPayload::OutputInfo::JSON) {
+      triton::common::TritonJson::Value data_json(
+          response_json, triton::common::TritonJson::ValueType::ARRAY);
+      RETURN_IF_ERR(WriteDataToJson(
+          &data_json, cname, datatype, base, byte_size, element_count));
+      RETURN_IF_ERR(output_json.Add("data", std::move(data_json)));
     }
 
     RETURN_IF_ERR(response_outputs.Append(std::move(output_json)));

@@ -90,7 +90,7 @@ BufferAttributes::BufferAttributes(
     size_t byte_size, TRITONSERVER_MemoryType memory_type,
     int64_t memory_type_id, char* cuda_ipc_handle)
     : byte_size_(byte_size), memory_type_(memory_type),
-      memory_type_id_(memory_type)
+      memory_type_id_(memory_type_id)
 {
   // cuda ipc handle size
   cuda_ipc_handle_.reserve(CUDA_IPC_STRUCT_SIZE);
