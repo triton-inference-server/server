@@ -25,7 +25,7 @@
 # (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-REPO_VERSION=22.02dev
+REPO_VERSION=${NVIDIA_TRITON_SERVER_VERSION}
 
 if [ "$#" -ge 1 ]; then
     REPO_VERSION=$1
@@ -46,7 +46,7 @@ CLIENT_LOG="./client.log"
 PLUGIN_TEST=trt_plugin_test.py
 EXPECTED_NUM_TESTS="2"
 
-DATADIR=/data/inferenceserver/${REPO_VERSION}/qa_trt_plugin_model_repository
+DATADIR=/data/inferenceserver/${REPO_VERSION}dev/qa_trt_plugin_model_repository
 
 # TODO: Remove temp commands, making model dir below
 rm -r models
