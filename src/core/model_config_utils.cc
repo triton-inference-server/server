@@ -992,7 +992,9 @@ ValidateBatchIO(const inference::ModelConfig& config)
       case inference::BatchInput::BATCH_ELEMENT_COUNT:
       case inference::BatchInput::BATCH_ACCUMULATED_ELEMENT_COUNT:
       case inference::BatchInput::BATCH_ACCUMULATED_ELEMENT_COUNT_WITH_ZERO:
-      case inference::BatchInput::BATCH_MAX_ELEMENT_COUNT_AS_SHAPE: {
+      case inference::BatchInput::BATCH_MAX_ELEMENT_COUNT_AS_SHAPE:
+      case inference::BatchInput::BATCH_ITEM_SHAPE:
+      case inference::BatchInput::BATCH_ITEM_SHAPE_FLATTEN: {
         if (batch_io.source_input_size() != 1) {
           return Status(
               Status::Code::INVALID_ARG,

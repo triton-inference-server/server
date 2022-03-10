@@ -1,5 +1,5 @@
 #!/bin/bash
-# Copyright (c) 2020-2021, NVIDIA CORPORATION. All rights reserved.
+# Copyright 2020-2022, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -42,7 +42,7 @@ export CUDA_VISIBLE_DEVICES=0
 
 CLIENT_LOG="./client.log"
 BATCH_INPUT_TEST=batch_input_test.py
-EXPECTED_NUM_TESTS="6"
+EXPECTED_NUM_TESTS="8"
 
 DATADIR=/data/inferenceserver/${REPO_VERSION}/qa_ragged_model_repository
 IDENTITY_DATADIR=/data/inferenceserver/${REPO_VERSION}/qa_identity_model_repository
@@ -69,6 +69,15 @@ for BACKEND in $BACKENDS; do
           sed -i "s/${BACKEND}_batch_input/ragged_acc_shape/" config.pbtxt && \
           sed -i "s/BATCH_ELEMENT_COUNT/BATCH_ACCUMULATED_ELEMENT_COUNT/" config.pbtxt && \
           sed -i "s/BATCH_ACCUMULATED_ELEMENT_COUNT_WITH_ZERO/BATCH_MAX_ELEMENT_COUNT_AS_SHAPE/" config.pbtxt)
+    cp -r $DATADIR/${BACKEND}_batch_input models/batch_item_flatten
+    (cd models/batch_item_flatten && \
+          sed -i "s/${BACKEND}_batch_input/batch_item_flatten/" config.pbtxt && \
+          sed -i "0,/-1/{s/-1/-1, -1/}" config.pbtxt && \
+          sed -i "s/BATCH_ELEMENT_COUNT/BATCH_ACCUMULATED_ELEMENT_COUNT/" config.pbtxt && \
+          sed -i "s/BATCH_ACCUMULATED_ELEMENT_COUNT_WITH_ZERO/BATCH_ITEM_SHAPE_FLATTEN/" config.pbtxt)
+    cp -r $DATADIR/${BACKEND}_batch_item models/batch_item
+    (cd models/batch_item && \
+          sed -i "s/${BACKEND}_batch_item/batch_item/" config.pbtxt)
     # Use nobatch model to showcase ragged input, identity model to verify
     # batch input is generated properly
     cp -r $IDENTITY_DATADIR/${BACKEND}_nobatch_zero_1_float32 models/ragged_io
