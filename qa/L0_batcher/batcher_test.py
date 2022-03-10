@@ -35,8 +35,15 @@ import unittest
 import numpy as np
 import infer_util as iu
 import test_util as tu
+from functools import partial
 
 import tritonclient.grpc as grpcclient
+from tritonclient.utils import *
+
+if sys.version_info >= (3, 0):
+    import queue
+else:
+    import Queue as queue
 
 # By default, find tritonserver on "localhost", but can be overridden
 # with TRITONSERVER_IPADDR envvar
@@ -75,6 +82,16 @@ _max_queue_delay_ms = 10000
 _deferred_exceptions_lock = threading.Lock()
 _deferred_exceptions = []
 
+class UserData:
+
+    def __init__(self):
+        self._completed_requests = queue.Queue()
+
+
+# Callback function used for async_stream_infer()
+def completion_callback(user_data, result, error):
+    # passing error raise and handling out
+    user_data._completed_requests.put((result, error))
 
 class BatcherTest(tu.TestResultCollector):
 
@@ -242,6 +259,112 @@ class BatcherTest(tu.TestResultCollector):
             actual_infer_cnt, infer_cnt,
             "expected model-inference-count {}, got {}".format(
                 infer_cnt, actual_infer_cnt))
+
+    def send_streaming_requests(self,
+                       model_name,
+                       input_dtype,
+                       values,
+                       tensor_shape=(1,1)):
+        """Perform sequence of inferences. The 'values' holds a list of
+        values for the tensors in the request. 
+
+        """
+        triton_client = grpcclient.InferenceServerClient(f"{_tritonserver_ipaddr}:8001")
+
+        if TEST_SYSTEM_SHARED_MEMORY or TEST_CUDA_SHARED_MEMORY:
+            triton_client.unregister_system_shared_memory()
+            triton_client.unregister_cuda_shared_memory()
+            shm_ip_handles = []
+            shm_op_handles = []
+
+        user_data = UserData()
+        triton_client.start_stream(
+            partial(completion_callback, user_data))
+        # Execute the sequence of inference...
+        try:
+            INPUT = "INPUT0"
+            OUTPUT = "OUTPUT0"
+            for value in values:
+                # Construct request IOs
+                inputs = []
+                outputs = []
+                inputs.append(
+                    grpcclient.InferInput(
+                        INPUT, tensor_shape, np_to_triton_dtype(input_dtype)))
+                outputs.append(grpcclient.InferRequestedOutput(OUTPUT))
+                if input_dtype == np.object_:
+                    in0 = np.full(tensor_shape, value, dtype=np.int32)
+                    in0n = np.array([str(x) for x in in0.reshape(in0.size)],
+                                    dtype=object)
+                    in0 = in0n.reshape(tensor_shape)
+                else:
+                    in0 = np.full(tensor_shape, value, dtype=input_dtype)
+
+                # create input shared memory and copy input data values into it
+                if TEST_SYSTEM_SHARED_MEMORY or TEST_CUDA_SHARED_MEMORY:
+                    if input_dtype == np.object_:
+                        input_list_tmp = iu.serialize_byte_tensor_list(
+                            [in0])
+                        input_byte_size = sum([
+                            serialized_byte_size(i0)
+                            for i0 in input_list_tmp
+                        ])
+                    else:
+                        input_list_tmp = [in0]
+                        input_byte_size = sum(
+                            [i0.nbytes for i0 in input_list_tmp])
+                    ip_name = "ip{}".format(len(shm_ip_handles))
+                    op_name = "op{}".format(len(shm_op_handles))
+                    if TEST_SYSTEM_SHARED_MEMORY:
+                        shm_ip_handles.append(
+                            shm.create_shared_memory_region(
+                                ip_name, "/" + ip_name, input_byte_size))
+                        shm.set_shared_memory_region(
+                            shm_ip_handles[-1], input_list_tmp)
+                        triton_client.register_system_shared_memory(
+                            ip_name, "/" + ip_name, input_byte_size)
+                        shm_op_handles.append(
+                            shm.create_shared_memory_region(
+                                op_name, "/" + op_name, input_byte_size))
+                        triton_client.register_system_shared_memory(
+                            op_name, "/" + op_name, input_byte_size)
+                    elif TEST_CUDA_SHARED_MEMORY:
+                        shm_ip_handles.append(
+                            cudashm.create_shared_memory_region(
+                                ip_name, input_byte_size, 0))
+                        cudashm.set_shared_memory_region(
+                            shm_ip_handles[-1], input_list_tmp)
+                        triton_client.register_cuda_shared_memory(
+                            ip_name,
+                            cudashm.get_raw_handle(shm_ip_handles[-1]), 0,
+                            input_byte_size)
+                        shm_op_handles.append(
+                            cudashm.create_shared_memory_region(
+                                op_name, input_byte_size, 0))
+                        triton_client.register_cuda_shared_memory(
+                            op_name, cudashm.get_raw_handle(shm_op_handles[-1]), 0, input_byte_size)
+
+                    inputs[0].set_shared_memory(ip_name, input_byte_size)
+                    outputs[0].set_shared_memory(op_name, input_byte_size)
+                else:
+                    inputs[0].set_data_from_numpy(in0)
+
+                triton_client.async_stream_infer(
+                        model_name,
+                        inputs,
+                        request_id="{}".format(value),
+                        outputs=outputs)
+                
+            # Wait for all the responses
+            for value in values:
+                (results, error) = user_data._completed_requests.get()
+                if error is not None:
+                    raise error
+
+        except Exception as ex:
+            self.add_deferred_exception(ex)
+
+        triton_client.stop_stream()
 
     def test_static_batch_preferred(self):
         # Send two requests with static batch sizes == preferred
@@ -1296,47 +1419,11 @@ class BatcherTest(tu.TestResultCollector):
     def test_multi_batch_preserve_ordering(self):
         model_base = "custom"
         dtype = np.float32
-        shapes = ([
-            1,
-            1,
-        ],)
 
         try:
-            # use threads to send 12 requests without waiting for response
-            threads = []
-            for i in range(12):
-                if TEST_SYSTEM_SHARED_MEMORY or TEST_CUDA_SHARED_MEMORY:
-                    shm_region_name_prefix = [
-                        "input" + str(i), "output" + str(i)
-                    ]
-                else:
-                    shm_region_name_prefix = None
-                threads.append(
-                    threading.Thread(target=iu.infer_zero,
-                                     args=(self, model_base, 1, dtype, shapes,
-                                           shapes),
-                                     kwargs={
-                                         'use_grpc':
-                                             USE_GRPC,
-                                         'use_http':
-                                             USE_HTTP,
-                                         'use_http_json_tensors':
-                                             False,
-                                         'use_streaming':
-                                             False,
-                                         'shm_region_name_prefix':
-                                             shm_region_name_prefix,
-                                         'use_system_shared_memory':
-                                             TEST_SYSTEM_SHARED_MEMORY,
-                                         'use_cuda_shared_memory':
-                                             TEST_CUDA_SHARED_MEMORY
-                                     }))
-            for t in threads:
-                t.start()
-            for t in threads:
-                t.join()
+            model_name = tu.get_zero_model_name(model_base, 1, dtype)
+            self.send_streaming_requests(model_name, dtype, list(range(12)))
             self.check_deferred_exception()
-            model_name = tu.get_zero_model_name(model_base, len(shapes), dtype)
             self.check_status(model_name, {4: 3}, 12, 12, (3,))
         except Exception as ex:
             self.assertTrue(False, "unexpected error {}".format(ex))
