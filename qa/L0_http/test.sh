@@ -48,6 +48,7 @@ RET=0
 if [[ "$(< /proc/sys/kernel/osrelease)" == *microsoft* ]]; then
     SDKDIR=${SDKDIR:=C:/sdk}
     MODELDIR=${MODELDIR:=C:/models}
+    DATADIR=${DATADIR:="/mnt/c/data/inferenceserver/${REPO_VERSION}"}
     BACKEND_DIR=${BACKEND_DIR:=C:/tritonserver/backends}
     SERVER=${SERVER:=/mnt/c/tritonserver/bin/tritonserver.exe}
 
@@ -73,8 +74,11 @@ if [[ "$(< /proc/sys/kernel/osrelease)" == *microsoft* ]]; then
     SIMPLE_SHM_CLIENT=${SDKDIR}/python/simple_http_shm_client
     SIMPLE_CUDASHM_CLIENT=${SDKDIR}/python/simple_http_cudashm_client
     SIMPLE_REUSE_INFER_OBJECTS_CLIENT=${SDKDIR}/python/reuse_infer_objects_client
+    # [FIXME] point to proper client
+    CC_UNIT_TEST=${SDKDIR}/python/cc_client_test
 else
     MODELDIR=${MODELDIR:=`pwd`/models}
+    DATADIR=${DATADIR:="/data/inferenceserver/${REPO_VERSION}"}
     TRITON_DIR=${TRITON_DIR:="/opt/tritonserver"}
     SERVER=${TRITON_DIR}/bin/tritonserver
     BACKEND_DIR=${TRITON_DIR}/backends
@@ -101,6 +105,7 @@ else
     SIMPLE_SHM_CLIENT=../clients/simple_http_shm_client
     SIMPLE_CUDASHM_CLIENT=../clients/simple_http_cudashm_client
     SIMPLE_REUSE_INFER_OBJECTS_CLIENT=../clients/reuse_infer_objects_client
+    CC_UNIT_TEST=../clients/cc_client_test
 fi
 
 # Add string_dyna_sequence model to repo
@@ -461,6 +466,29 @@ fi
 kill $SERVER_PID
 wait $SERVER_PID
 
+# Run cpp client unit test
+rm -r ${MODELDIR}/* && cp -r $DATADIR/qa_model_repository/onnx_int32_int32_int32 ${MODELDIR}/.
+
+SERVER_ARGS="--backend-directory=${BACKEND_DIR} --model-repository=${MODELDIR}"
+SERVER_LOG="./inference_server_cc_unit_test.log"
+CLIENT_LOG="./cc_unit_test.log"
+run_server
+if [ "$SERVER_PID" == "0" ]; then
+    echo -e "\n***\n*** Failed to start $SERVER\n***"
+    cat $SERVER_LOG
+    exit 1
+fi
+
+set +e
+$CC_UNIT_TEST --gtest_filter=HTTP* >> ${CLIENT_LOG} 2>&1
+if [ $? -ne 0 ]; then
+    cat ${CLIENT_LOG}
+    RET=1
+fi
+set -e
+
+kill $SERVER_PID
+wait $SERVER_PID
 
 if [ $RET -eq 0 ]; then
     echo -e "\n***\n*** Test Passed\n***"
