@@ -1,4 +1,4 @@
-// Copyright 2018-2021, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+// Copyright 2018-2022, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 //
 // Redistribution and use in source and binary forms, with or without
 // modification, are permitted provided that the following conditions
@@ -165,6 +165,7 @@ class Metrics {
   {
     return GetSingleton()->inf_compute_output_duration_us_family_;
   }
+  // Metric families of per-model response cache metrics
   static prometheus::Family<prometheus::Counter>& FamilyCacheHitCount()
   {
     return GetSingleton()->cache_num_hits_model_family_;
@@ -173,6 +174,21 @@ class Metrics {
   {
     return GetSingleton()->cache_hit_lookup_duration_us_model_family_;
   }
+  static prometheus::Family<prometheus::Counter>& FamilyCacheMissCount()
+  {
+    return GetSingleton()->cache_num_misses_model_family_;
+  }
+  static prometheus::Family<prometheus::Counter>&
+  FamilyCacheMissLookupDuration()
+  {
+    return GetSingleton()->cache_miss_lookup_duration_us_model_family_;
+  }
+  static prometheus::Family<prometheus::Counter>&
+  FamilyCacheMissInsertionDuration()
+  {
+    return GetSingleton()->cache_miss_insertion_duration_us_model_family_;
+  }
+
 
  private:
   Metrics();
@@ -210,6 +226,7 @@ class Metrics {
   prometheus::Family<prometheus::Gauge>& cache_num_misses_family_;
   prometheus::Family<prometheus::Gauge>& cache_num_evictions_family_;
   prometheus::Family<prometheus::Gauge>& cache_lookup_duration_us_family_;
+  prometheus::Family<prometheus::Gauge>& cache_insertion_duration_us_family_;
   prometheus::Family<prometheus::Gauge>& cache_util_family_;
   // Gauges for Global Response Cache metrics
   prometheus::Gauge* cache_num_entries_global_;
@@ -218,11 +235,18 @@ class Metrics {
   prometheus::Gauge* cache_num_misses_global_;
   prometheus::Gauge* cache_num_evictions_global_;
   prometheus::Gauge* cache_lookup_duration_us_global_;
+  prometheus::Gauge* cache_insertion_duration_us_global_;
   prometheus::Gauge* cache_util_global_;
   // Per-model Response Cache metrics
   prometheus::Family<prometheus::Counter>& cache_num_hits_model_family_;
   prometheus::Family<prometheus::Counter>&
       cache_hit_lookup_duration_us_model_family_;
+  prometheus::Family<prometheus::Counter>& cache_num_misses_model_family_;
+  prometheus::Family<prometheus::Counter>&
+      cache_miss_lookup_duration_us_model_family_;
+  prometheus::Family<prometheus::Counter>&
+      cache_miss_insertion_duration_us_model_family_;
+
 #ifdef TRITON_ENABLE_METRICS_GPU
   prometheus::Family<prometheus::Gauge>& gpu_utilization_family_;
   prometheus::Family<prometheus::Gauge>& gpu_memory_total_family_;

@@ -1,5 +1,5 @@
 <!--
-# Copyright (c) 2020, NVIDIA CORPORATION. All rights reserved.
+# Copyright 2020-2022, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -128,7 +128,8 @@ $inference_stats =
   "compute_input" : $duration_stat,
   "compute_infer" : $duration_stat,
   "compute_output" : $duration_stat,
-  "cache_hit": $duration_stat
+  "cache_hit": $duration_stat,
+  "cache_miss": $duration_stat
 }
 ```
 
@@ -163,6 +164,12 @@ $inference_stats =
   lookup and extract output tensor data from the Response Cache on a cache hit.
   For example, this duration should include the time to copy output tensor data
   from the Response Cache to the response object.
+
+- "cache_miss" : The count of response cache misses and cumulative duration to
+  lookup and insert output tensor data to the Response Cache on a cache miss.
+  For example, this duration should include the time to copy output tensor data
+  from the response object to the Response Cache.
+
 
 ```
 $batch_stats =
@@ -324,39 +331,67 @@ message ModelStatistics
 // Inference statistics.
 message InferStatistics
 {
-  // Cumulative count and duration for successful inference requests. The
-  // "success" count and cumulative duration includes cache hits.
+  // Cumulative count and duration for successful inference
+  // request. The "success" count and cumulative duration includes
+  // cache hits.
   StatisticDuration success = 1;
 
-  // Cumulative count and duration for failed inference requests.
+  // Cumulative count and duration for failed inference
+  // request.
   StatisticDuration fail = 2;
 
   // The count and cumulative duration that inference requests wait in
-  // scheduling or other queues. The "queue" count and cumulative duration
-  // includes cache hits.
+  // scheduling or other queues. The "queue" count and cumulative 
+  // duration includes cache hits.
   StatisticDuration queue = 3;
 
   // The count and cumulative duration to prepare input tensor data as
   // required by the model framework / backend. For example, this duration
-  // should include the time to copy input tensor data to the GPU. The
-  // "compute_input" count and cumulative duration DO NOT include cache hits.
+  // should include the time to copy input tensor data to the GPU.
+  // The "compute_input" count and cumulative duration do not account for
+  // requests that were a cache hit. See the "cache_hit" field for more
+  // info.
   StatisticDuration compute_input = 4;
 
-  // The count and cumulative duration to execute the model. The 
-  // "compute_infer" count and cumulative duration DO NOT include cache hits.
+  // The count and cumulative duration to execute the model.
+  // The "compute_infer" count and cumulative duration do not account for
+  // requests that were a cache hit. See the "cache_hit" field for more
+  // info.
   StatisticDuration compute_infer = 5;
 
   // The count and cumulative duration to extract output tensor data
   // produced by the model framework / backend. For example, this duration
-  // should include the time to copy output tensor data from the GPU. The
-  // "compute_output" count and cumulative duration DO NOT include cache hits.
+  // should include the time to copy output tensor data from the GPU.
+  // The "compute_output" count and cumulative duration do not account for
+  // requests that were a cache hit. See the "cache_hit" field for more
+  // info.
   StatisticDuration compute_output = 6;
 
-  // The count of response cache hits and cumulative duration to lookup and
-  // extract output tensor data from the Response Cache on a cache hit. For
-  // example, this duration should include the time to copy output tensor data
-  // from the Response Cache to the response object.
+  // The count of response cache hits and cumulative duration to lookup
+  // and extract output tensor data from the Response Cache on a cache
+  // hit. For example, this duration should include the time to copy
+  // output tensor data from the Response Cache to the response object.
+  // On cache hits, triton does not need to go to the model/backend 
+  // for the output tensor data, so the "compute_input", "compute_infer",
+  // and "compute_output" fields are not updated. Assuming the response
+  // cache is enabled for a given model, a cache hit occurs for a
+  // request to that model when the request metadata (model name,
+  // model version, model inputs) hashes to an existing entry in the
+  // cache. On a cache miss, the request hash and response output tensor
+  // data is added to the cache. See response cache docs for more info:
+  // https://github.com/triton-inference-server/server/blob/main/docs/response_cache.md
   StatisticDuration cache_hit = 7;
+
+  // The count of response cache misses and cumulative duration to lookup
+  // and insert output tensor data from the computed response to the cache
+  // For example, this duration should include the time to copy
+  // output tensor data from the resposne object to the Response Cache.
+  // Assuming the response cache is enabled for a given model, a cache
+  // miss occurs for a request to that model when the request metadata
+  // does NOT hash to an existing entry in the cache. See the response
+  // cache docs for more info:
+  // https://github.com/triton-inference-server/server/blob/main/docs/response_cache.md
+  StatisticDuration cache_miss = 8;
 }
 
 // Inference batch statistics.

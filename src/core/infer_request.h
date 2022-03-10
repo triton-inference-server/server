@@ -570,6 +570,26 @@ class InferenceRequest {
     return cache_lookup_end_ns_;
   }
 
+  uint64_t CacheInsertionStartNs() const { return cache_insertion_start_ns_; }
+  uint64_t CaptureCacheInsertionStartNs()
+  {
+    cache_insertion_start_ns_ =
+        std::chrono::duration_cast<std::chrono::nanoseconds>(
+            std::chrono::steady_clock::now().time_since_epoch())
+            .count();
+    return cache_insertion_start_ns_;
+  }
+
+  uint64_t CacheInsertionEndNs() const { return cache_insertion_end_ns_; }
+  uint64_t CaptureCacheInsertionEndNs()
+  {
+    cache_insertion_end_ns_ =
+        std::chrono::duration_cast<std::chrono::nanoseconds>(
+            std::chrono::steady_clock::now().time_since_epoch())
+            .count();
+    return cache_insertion_end_ns_;
+  }
+
   uint64_t BatcherStartNs() const { return batcher_start_ns_; }
   uint64_t CaptureBatcherStartNs()
   {
@@ -607,6 +627,11 @@ class InferenceRequest {
   // Report the statistics to stats collectors associated with the request on
   // response cache hits.
   void ReportStatisticsCacheHit(MetricModelReporter* metric_reporter);
+
+  // Report the statistics to stats collectors associated with the request on
+  // response cache misses and update request duration to include cache
+  // insertion time.
+  void ReportStatisticsCacheMiss(MetricModelReporter* metric_reporter);
 
   // Statistics for each request are aggregated into the corresponding
   // model's statistics. Optionally this function may be used to
@@ -687,6 +712,11 @@ class InferenceRequest {
   // when statistics are not being colleceted.
   uint64_t cache_lookup_start_ns_;
   uint64_t cache_lookup_end_ns_;
+
+  // Cache insertion start/end timestamps. Cache manages its own stats even
+  // when statistics are not being colleceted.
+  uint64_t cache_insertion_start_ns_;
+  uint64_t cache_insertion_end_ns_;
 
   // Dedicated timestamp for batcher internal which can diverge from
   // queue start timestamp to provide accurate queue time without affecting

@@ -52,7 +52,9 @@ class InferenceStatsAggregator {
           request_duration_ns_(0), queue_duration_ns_(0),
           compute_input_duration_ns_(0), compute_infer_duration_ns_(0),
           compute_output_duration_ns_(0), cache_hit_count_(0),
-          cache_hit_lookup_duration_ns_(0)
+          cache_hit_lookup_duration_ns_(0), cache_miss_count_(0),
+          cache_miss_lookup_duration_ns_(0),
+          cache_miss_insertion_duration_ns_(0)
     {
     }
     uint64_t failure_count_;
@@ -65,9 +67,13 @@ class InferenceStatsAggregator {
     uint64_t compute_infer_duration_ns_;
     uint64_t compute_output_duration_ns_;
 
+    // Cache hit stats
     uint64_t cache_hit_count_;
-    // Cache lookup time taken only for cache hits
     uint64_t cache_hit_lookup_duration_ns_;
+    // Cache miss stats
+    uint64_t cache_miss_count_;
+    uint64_t cache_miss_lookup_duration_ns_;
+    uint64_t cache_miss_insertion_duration_ns_;
   };
 
   struct InferBatchStats {
@@ -124,7 +130,14 @@ class InferenceStatsAggregator {
       MetricModelReporter* metric_reporter, const size_t batch_size,
       const uint64_t request_start_ns, const uint64_t queue_start_ns,
       const uint64_t cache_lookup_start_ns, const uint64_t request_end_ns,
-      const uint64_t cache_lookup_duration_ns);
+      const uint64_t cache_hit_lookup_duration_ns);
+
+  // Add durations to infer stats for a cache miss and update request duration
+  // to account for cache insertion after backend computes the response.
+  void UpdateSuccessCacheMiss(
+      MetricModelReporter* metric_reporter,
+      const uint64_t cache_miss_lookup_duration_ns,
+      const uint64_t cache_miss_insertion_duration_ns);
 
   // Add durations to batch infer stats for a batch execution.
   // 'success_request_count' is the number of sucess requests in the
