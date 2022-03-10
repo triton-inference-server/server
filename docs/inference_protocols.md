@@ -143,7 +143,7 @@ and dependencies installed in your enviroment. There are two ways to do this:
 2. Build Triton from your enviroment without Docker (not recommended)
 
 After ensuring that Tritonserver and dependencies are installed, you can run your
-java program with the Java bindings with the following steps:
+Java program with the Java bindings with the following steps:
 
 1. Place Java bindings into your enviroment. You can do this by either:
    
