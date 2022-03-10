@@ -134,6 +134,14 @@ RUN cd install && \
     export VERSION=`cat /workspace/TRITON_VERSION` && \
     tar zcf /workspace/v$VERSION.clients.tar.gz *
 
+# Install Java API Bindings
+RUN if [ "$TARGETPLATFORM" = "linux/amd64" ]; then \
+        source client/src/java-api-bindings/scripts/install_dependencies_and_build.sh \
+        --maven-version 3.8.4 \
+        --core-tag ${TRITON_CORE_REPO_TAG} \
+        --jar-install-path /workspace/install/java-api-bindings; \
+    fi
+
 # For CI testing need to install a test script.
 COPY qa/L0_sdk/test.sh /tmp/test.sh
 COPY qa/L0_sdk/grpc_test.cc /tmp/grpc_test.cc
