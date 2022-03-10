@@ -1529,10 +1529,10 @@ if __name__ == '__main__':
         '--tmp-dir',
         type=str,
         required=False,
-        default=os.path.join(os.sep, 'tmp', 'tritonbuild'),
+        default="/tmp/tritonbuild",
         help=
-        'Temporary parent directory used for building inside docker. Default is '
-        + os.path.join(os.sep, 'tmp', 'tritonbuild') + '.')
+        'Temporary parent directory used for building inside docker. Default is "/tmp/tritonbuild".'
+    )
     parser.add_argument(
         '--library-paths',
         action='append',
