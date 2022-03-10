@@ -82,6 +82,7 @@ _max_queue_delay_ms = 10000
 _deferred_exceptions_lock = threading.Lock()
 _deferred_exceptions = []
 
+
 class UserData:
 
     def __init__(self):
@@ -93,11 +94,13 @@ def completion_callback(user_data, result, error):
     # passing error raise and handling out
     user_data._completed_requests.put((result, error))
 
+
 class BatcherTest(tu.TestResultCollector):
 
     def setUp(self):
         # The helper client for setup will be GRPC for simplicity.
-        self.triton_client_ = grpcclient.InferenceServerClient(f"{_tritonserver_ipaddr}:8001")
+        self.triton_client_ = grpcclient.InferenceServerClient(
+            f"{_tritonserver_ipaddr}:8001")
         self.precreated_shm_regions_ = []
         global _deferred_exceptions
         _deferred_exceptions = []
@@ -215,7 +218,8 @@ class BatcherTest(tu.TestResultCollector):
         self.assertEqual(bconfig.max_queue_delay_microseconds,
                          max_queue_delay_us)
 
-    def check_status(self, model_name, batch_exec, request_cnt, infer_cnt, exec_count):
+    def check_status(self, model_name, batch_exec, request_cnt, infer_cnt,
+                     exec_count):
         stats = self.triton_client_.get_inference_statistics(model_name, "1")
         self.assertEqual(len(stats.model_stats), 1, "expect 1 model stats")
         self.assertEqual(stats.model_stats[0].name, model_name,
@@ -239,8 +243,8 @@ class BatcherTest(tu.TestResultCollector):
                 # Get count from one of the stats
                 self.assertEqual(
                     bc, batch_exec[bs],
-                    "expected model-execution-count {} for batch size {}, got {}".
-                    format(batch_exec[bs], bs, bc))
+                    "expected model-execution-count {} for batch size {}, got {}"
+                    .format(batch_exec[bs], bs, bc))
 
         actual_request_cnt = stats.model_stats[0].inference_stats.success.count
         self.assertEqual(
@@ -260,16 +264,17 @@ class BatcherTest(tu.TestResultCollector):
             "expected model-inference-count {}, got {}".format(
                 infer_cnt, actual_infer_cnt))
 
-    def send_streaming_requests(self,
-                       model_name,
-                       input_dtype,
-                       values,
-                       tensor_shape=(1,1)):
+    def send_concurrent_requests(self,
+                                 model_name,
+                                 input_dtype,
+                                 values,
+                                 tensor_shape=(1, 1)):
         """Perform sequence of inferences. The 'values' holds a list of
         values for the tensors in the request. 
 
         """
-        triton_client = grpcclient.InferenceServerClient(f"{_tritonserver_ipaddr}:8001")
+        triton_client = grpcclient.InferenceServerClient(
+            f"{_tritonserver_ipaddr}:8001")
 
         if TEST_SYSTEM_SHARED_MEMORY or TEST_CUDA_SHARED_MEMORY:
             triton_client.unregister_system_shared_memory()
@@ -278,8 +283,6 @@ class BatcherTest(tu.TestResultCollector):
             shm_op_handles = []
 
         user_data = UserData()
-        triton_client.start_stream(
-            partial(completion_callback, user_data))
         # Execute the sequence of inference...
         try:
             INPUT = "INPUT0"
@@ -289,8 +292,8 @@ class BatcherTest(tu.TestResultCollector):
                 inputs = []
                 outputs = []
                 inputs.append(
-                    grpcclient.InferInput(
-                        INPUT, tensor_shape, np_to_triton_dtype(input_dtype)))
+                    grpcclient.InferInput(INPUT, tensor_shape,
+                                          np_to_triton_dtype(input_dtype)))
                 outputs.append(grpcclient.InferRequestedOutput(OUTPUT))
                 if input_dtype == np.object_:
                     in0 = np.full(tensor_shape, value, dtype=np.int32)
@@ -303,12 +306,9 @@ class BatcherTest(tu.TestResultCollector):
                 # create input shared memory and copy input data values into it
                 if TEST_SYSTEM_SHARED_MEMORY or TEST_CUDA_SHARED_MEMORY:
                     if input_dtype == np.object_:
-                        input_list_tmp = iu.serialize_byte_tensor_list(
-                            [in0])
-                        input_byte_size = sum([
-                            serialized_byte_size(i0)
-                            for i0 in input_list_tmp
-                        ])
+                        input_list_tmp = iu.serialize_byte_tensor_list([in0])
+                        input_byte_size = sum(
+                            [serialized_byte_size(i0) for i0 in input_list_tmp])
                     else:
                         input_list_tmp = [in0]
                         input_byte_size = sum(
@@ -319,8 +319,8 @@ class BatcherTest(tu.TestResultCollector):
                         shm_ip_handles.append(
                             shm.create_shared_memory_region(
                                 ip_name, "/" + ip_name, input_byte_size))
-                        shm.set_shared_memory_region(
-                            shm_ip_handles[-1], input_list_tmp)
+                        shm.set_shared_memory_region(shm_ip_handles[-1],
+                                                     input_list_tmp)
                         triton_client.register_system_shared_memory(
                             ip_name, "/" + ip_name, input_byte_size)
                         shm_op_handles.append(
@@ -335,26 +335,27 @@ class BatcherTest(tu.TestResultCollector):
                         cudashm.set_shared_memory_region(
                             shm_ip_handles[-1], input_list_tmp)
                         triton_client.register_cuda_shared_memory(
-                            ip_name,
-                            cudashm.get_raw_handle(shm_ip_handles[-1]), 0,
-                            input_byte_size)
+                            ip_name, cudashm.get_raw_handle(shm_ip_handles[-1]),
+                            0, input_byte_size)
                         shm_op_handles.append(
                             cudashm.create_shared_memory_region(
                                 op_name, input_byte_size, 0))
                         triton_client.register_cuda_shared_memory(
-                            op_name, cudashm.get_raw_handle(shm_op_handles[-1]), 0, input_byte_size)
+                            op_name, cudashm.get_raw_handle(shm_op_handles[-1]),
+                            0, input_byte_size)
 
                     inputs[0].set_shared_memory(ip_name, input_byte_size)
                     outputs[0].set_shared_memory(op_name, input_byte_size)
                 else:
                     inputs[0].set_data_from_numpy(in0)
 
-                triton_client.async_stream_infer(
-                        model_name,
-                        inputs,
-                        request_id="{}".format(value),
-                        outputs=outputs)
-                
+                triton_client.async_infer(model_name,
+                                          inputs,
+                                          partial(completion_callback,
+                                                  user_data),
+                                          request_id="{}".format(value),
+                                          outputs=outputs)
+
             # Wait for all the responses
             for value in values:
                 (results, error) = user_data._completed_requests.get()
@@ -363,8 +364,6 @@ class BatcherTest(tu.TestResultCollector):
 
         except Exception as ex:
             self.add_deferred_exception(ex)
-
-        triton_client.stop_stream()
 
     def test_static_batch_preferred(self):
         # Send two requests with static batch sizes == preferred
@@ -1422,7 +1421,7 @@ class BatcherTest(tu.TestResultCollector):
 
         try:
             model_name = tu.get_zero_model_name(model_base, 1, dtype)
-            self.send_streaming_requests(model_name, dtype, list(range(12)))
+            self.send_concurrent_requests(model_name, dtype, list(range(12)))
             self.check_deferred_exception()
             self.check_status(model_name, {4: 3}, 12, 12, (3,))
         except Exception as ex:
@@ -1803,7 +1802,7 @@ class BatcherTest(tu.TestResultCollector):
                 t.join()
             self.check_deferred_exception()
             model_name = tu.get_zero_model_name(model_base, len(shapes), dtype)
-            self.check_status(model_name, None, 12, 12, (1,2))
+            self.check_status(model_name, None, 12, 12, (1, 2))
         except Exception as ex:
             self.assertTrue(False, "unexpected error {}".format(ex))
 
@@ -1858,6 +1857,7 @@ class BatcherTest(tu.TestResultCollector):
             self.check_status(model_name, None, 12, 12, (2,))
         except Exception as ex:
             self.assertTrue(False, "unexpected error {}".format(ex))
+
 
 if __name__ == '__main__':
     unittest.main()
