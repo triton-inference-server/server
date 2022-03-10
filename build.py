@@ -85,8 +85,8 @@ from distutils.dir_util import copy_tree
 # Note: Not all sha ids would successfuly compile and work.
 #
 TRITON_VERSION_MAP = {
-    '2.20.0dev': (
-        '22.03dev',  # triton container
+    '2.21.0dev': (
+        '22.04dev',  # triton container
         '22.02',  # upstream container
         '1.10.0',  # ORT
         '2021.4.582',  # ORT OpenVINO
