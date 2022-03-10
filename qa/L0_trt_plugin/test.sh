@@ -25,7 +25,8 @@
 # (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-REPO_VERSION=${NVIDIA_TRITON_SERVER_VERSION}
+REPO_VERSION=22.02dev
+
 if [ "$#" -ge 1 ]; then
     REPO_VERSION=$1
 fi
@@ -47,8 +48,17 @@ EXPECTED_NUM_TESTS="2"
 
 DATADIR=/data/inferenceserver/${REPO_VERSION}/qa_trt_plugin_model_repository
 
+# TODO: Remove temp commands, making model dir below
+rm -r models
+mkdir models
+cp -r $DATADIR/* `pwd`/models
+DATADIR=`pwd`/models
+# rm -r ${DATADIR}/plan_float32_float32_float32_CustomClipPlugin
+# SERVER_LD_PRELOAD=$DATADIR/libclipplugin.so
+
 SERVER=/opt/tritonserver/bin/tritonserver
-SERVER_ARGS="--model-repository=$DATADIR --exit-timeout-secs=120 --backend-config=tensorrt,plugins=$DATADIR/libclipplugin.so"
+# SERVER_ARGS="--model-repository=$DATADIR --exit-timeout-secs=120"
+SERVER_ARGS="--model-repository=$DATADIR --exit-timeout-secs=120 --backend-config=tensorrt,plugins=$DATADIR/libclipplugin.so --log-verbose=1"
 SERVER_LOG="./inference_server.log"
 source ../common/util.sh
 
