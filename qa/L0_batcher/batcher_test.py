@@ -38,7 +38,7 @@ import test_util as tu
 from functools import partial
 
 import tritonclient.grpc as grpcclient
-from tritonclient.utils import *
+from tritonclient.utils import np_to_triton_dtype
 
 if sys.version_info >= (3, 0):
     import queue
