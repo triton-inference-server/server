@@ -1,4 +1,4 @@
-# Copyright 2018-2021, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright 2018-2022, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -231,6 +231,7 @@ RUN mkdir -p qa/L0_passive_instance/models/distributed_int32_int32_int32/1 && \
 ############################################################################
 FROM ${SDK_IMAGE} AS sdk
 
+ARG TARGETPLATFORM
 WORKDIR /workspace
 COPY --from=build /workspace/qa/ qa/
 RUN mkdir -p qa/clients && mkdir -p qa/pkgs && \
@@ -245,6 +246,10 @@ RUN cp client/src/grpc_generated/go/*.go qa/L0_simple_go_client/. && \
     cp client/src/grpc_generated/javascript/*.json qa/L0_simple_nodejs_client/. && \
     cp -r client/src/grpc_generated/java qa/L0_client_java/.
 
+# Copy Java API jar
+RUN if [ "$TARGETPLATFORM" = "linux/amd64" ]; then \
+        cp install/java-api-bindings/tritonserver-java-bindings.jar qa/pkgs/.; \
+    fi
 ############################################################################
 ## Create CI enabled image
 ############################################################################
