@@ -43,6 +43,7 @@ export TRITON_DIR=${TRITON_DIR:="/opt/tritonserver"}
 SERVER=${TRITON_DIR}/bin/tritonserver
 export BACKEND_DIR=${TRITON_DIR}/backends
 export TEST_JETSON=${TEST_JETSON:=0}
+export CUDA_VISIBLE_DEVICES=0
 
 BASE_SERVER_ARGS="--model-repository=`pwd`/models --backend-directory=${BACKEND_DIR} --log-verbose=1"
 SERVER_ARGS=$BASE_SERVER_ARGS
