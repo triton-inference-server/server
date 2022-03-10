@@ -48,13 +48,18 @@ FetchContent_Declare(
   GIT_REPOSITORY https://github.com/triton-inference-server/core.git
   GIT_TAG ${TRITON_CORE_REPO_TAG}
 )
+FetchContent_Declare(
+  repo-backend
+  GIT_REPOSITORY https://github.com/triton-inference-server/backend.git
+  GIT_TAG ${TRITON_BACKEND_REPO_TAG}
+)
 
 if(TRITON_ENABLE_GRPC)
   set(TRITON_COMMON_ENABLE_PROTOBUF ON)
   set(TRITON_COMMON_ENABLE_GRPC ON)
 endif() # TRITON_ENABLE_GRPC
 
-FetchContent_MakeAvailable(repo-common repo-core)
+FetchContent_MakeAvailable(repo-common repo-core repo-backend)
 
 # CUDA
 #
@@ -91,11 +96,11 @@ add_executable(
   common.cc
   main.cc
   shared_memory_manager.cc
-  signal.cc
+  triton_signal.cc
   classification.h
   common.h
   shared_memory_manager.h
-  signal.h
+  triton_signal.h
 )
 
 # On windows a *.lib file can be generated for a exe. When creating
@@ -134,6 +139,17 @@ set_target_properties(
     BUILD_WITH_INSTALL_RPATH TRUE
     INSTALL_RPATH_USE_LINK_PATH FALSE
     INSTALL_RPATH "$\{ORIGIN\}/../lib"
+)
+
+target_link_libraries(
+  main
+  PRIVATE
+    triton-common-async-work-queue  # from repo-common
+    triton-common-constants         # from repo-common
+    triton-common-error             # from repo-common
+    triton-common-logging           # from repo-common
+    triton-core-serverapi           # from repo-core
+    triton-core-serverstub          # from repo-core
 )
 
 if(${TRITON_ENABLE_ASAN})
@@ -232,23 +248,6 @@ if(${TRITON_ENABLE_TRACING})
   )
 endif() # TRITON_ENABLE_TRACING
 
-target_link_directories(
-  main
-  PRIVATE
-    ${CMAKE_INSTALL_PREFIX}/${CMAKE_INSTALL_LIBDIR}
-)
-
-target_link_libraries(
-  main
-  PRIVATE
-    triton-common-async-work-queue  # from repo-common
-    triton-common-constants         # from repo-common
-    triton-common-error             # from repo-common
-    triton-common-logging           # from repo-common
-    triton-core-serverapi           # from repo-core
-    -ltritonserver
-)
-
 if (NOT WIN32)
   target_link_libraries(
     main
@@ -257,20 +256,6 @@ if (NOT WIN32)
       dl
   )
 endif() # NOT WIN32
-
-if(${TRITON_ENABLE_GPU})
-  target_compile_definitions(
-    main
-    PRIVATE TRITON_ENABLE_GPU=1
-    PRIVATE TRITON_MIN_COMPUTE_CAPABILITY=${TRITON_MIN_COMPUTE_CAPABILITY}
-  )
-
-  target_link_libraries(
-    main
-    PRIVATE
-      CUDA::cudart
-  )
-endif() # TRITON_ENABLE_GPU
 
 if (NOT WIN32)
   install(
@@ -317,6 +302,22 @@ if(${TRITON_ENABLE_GRPC})
       POSITION_INDEPENDENT_CODE ON
   )
 
+  target_link_libraries(
+    grpc-endpoint-library
+    PRIVATE
+      proto-library           # from repo-common
+      triton-common-constants # from repo-common
+      triton-common-json      # from repo-common
+      triton-core-serverapi   # from repo-core
+      triton-core-serverstub  # from repo-core
+      gRPC::grpc++
+      gRPC::grpc
+
+    PUBLIC
+      grpc-service-library    # from repo-common
+      protobuf::libprotobuf
+  )
+
   target_include_directories(
     grpc-endpoint-library
     PRIVATE
@@ -355,20 +356,6 @@ if(${TRITON_ENABLE_GRPC})
       PRIVATE TRITON_ENABLE_TRACING=1
     )
   endif() # TRITON_ENABLE_TRACING
-
-  target_link_libraries(
-    grpc-endpoint-library
-    PRIVATE
-      proto-library           # from repo-common
-      triton-core-serverapi   # from repo-core
-      triton-common-constants # from repo-common
-      triton-common-json      # from repo-common
-      gRPC::grpc++
-      gRPC::grpc
-    PUBLIC
-      grpc-service-library    # from repo-common
-      protobuf::libprotobuf
-  )
 
   target_link_libraries(
     main
@@ -444,6 +431,19 @@ if(${TRITON_ENABLE_HTTP}
       POSITION_INDEPENDENT_CODE ON
   )
 
+  target_link_libraries(
+    http-endpoint-library
+    PRIVATE
+      triton-common-constants # from repo-common
+      triton-common-json      # from repo-common
+      triton-core-serverapi   # from repo-core
+      triton-core-serverstub  # from repo-core
+      ${LIBEVENT_LIBRARIES}
+      ${RE2_LIBRARY}
+    PUBLIC
+      libevhtp::evhtp
+  )
+
   target_include_directories(
     http-endpoint-library
     PRIVATE $<TARGET_PROPERTY:libevhtp::evhtp,INTERFACE_INCLUDE_DIRECTORIES>
@@ -489,18 +489,6 @@ if(${TRITON_ENABLE_HTTP}
     )
   endif() # TRITON_ENABLE_TRACING
 
-  target_link_libraries(
-    http-endpoint-library
-    PRIVATE
-      triton-core-serverapi   # from repo-core
-      triton-common-constants # from repo-common
-      triton-common-json      # from repo-common
-      ${LIBEVENT_LIBRARIES}
-      ${RE2_LIBRARY}
-    PUBLIC
-      libevhtp::evhtp
-  )
-
   if (WIN32)
     find_library(B64_LIBRARY NAMES b64)
     find_library(ZLIB_LIBRARY NAMES zlib)
@@ -537,6 +525,14 @@ if(${TRITON_ENABLE_TRACING})
     tracer.cc tracer.h
   )
 
+  target_link_libraries(
+    tracing-library
+    PRIVATE
+      triton-common-constants  # from repo-common
+      triton-core-serverapi    # from repo-core
+      triton-core-serverstub   # from repo-core
+  )
+
   target_compile_definitions(
     tracing-library
     PRIVATE TRITON_ENABLE_TRACING=1
@@ -555,13 +551,6 @@ if(${TRITON_ENABLE_TRACING})
         CUDA::cudart
     )
   endif() # TRITON_ENABLE_GPU
-
-  target_link_libraries(
-    tracing-library
-    PRIVATE
-      triton-common-constants         # from repo-common
-      triton-core-serverapi
-  )
 
   target_link_libraries(
     main
@@ -607,19 +596,13 @@ if (NOT WIN32)
       INSTALL_RPATH ""
   )
 
-  target_link_directories(
-    simple
-    PRIVATE
-      ${CMAKE_INSTALL_PREFIX}/${CMAKE_INSTALL_LIBDIR}
-  )
-
   target_link_libraries(
     simple
     PRIVATE
       triton-common-async-work-queue  # from repo-common
       triton-common-error             # from repo-common
       triton-core-serverapi           # from repo-core
-      -ltritonserver
+      triton-core-serverstub          # from repo-core
     )
 
   if(${TRITON_ENABLE_GPU})
@@ -677,19 +660,13 @@ if (NOT WIN32)
       INSTALL_RPATH ""
   )
 
-  target_link_directories(
-    multi_server
-    PRIVATE
-      ${CMAKE_INSTALL_PREFIX}/${CMAKE_INSTALL_LIBDIR}
-  )
-
   target_link_libraries(
     multi_server
     PRIVATE
       triton-common-async-work-queue  # from repo-common
       triton-common-error             # from repo-common
       triton-core-serverapi           # from repo-core
-      -ltritonserver
+      triton-core-serverstub          # from repo-core
     )
 
   if(${TRITON_ENABLE_GPU})
@@ -748,10 +725,10 @@ if (NOT WIN32)
         INSTALL_RPATH ""
     )
 
-    target_link_directories(
+    target_compile_definitions(
       memory_alloc
-      PRIVATE
-        ${CMAKE_INSTALL_PREFIX}/${CMAKE_INSTALL_LIBDIR}
+      PRIVATE TRITON_ENABLE_GPU=1
+      PRIVATE TRITON_MIN_COMPUTE_CAPABILITY=${TRITON_MIN_COMPUTE_CAPABILITY}
     )
 
     target_link_libraries(
@@ -760,19 +737,18 @@ if (NOT WIN32)
         triton-common-async-work-queue  # from repo-common
         triton-common-error             # from repo-common
         triton-core-serverapi           # from repo-core
-        -ltritonserver
+        triton-core-serverstub          # from repo-core
         CUDA::cudart
       )
-
-    target_compile_definitions(
-      memory_alloc
-      PRIVATE TRITON_ENABLE_GPU=1
-      PRIVATE TRITON_MIN_COMPUTE_CAPABILITY=${TRITON_MIN_COMPUTE_CAPABILITY}
-    )
 
     install(
       TARGETS memory_alloc
       RUNTIME DESTINATION bin
     )
   endif() # TRITON_ENABLE_GPU
+endif() # NOT WIN32
+
+# Currently unit tests do not build for windows...
+if (NOT WIN32)
+  add_subdirectory(test test)
 endif() # NOT WIN32

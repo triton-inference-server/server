@@ -46,7 +46,7 @@
 #include <list>
 #include <set>
 #include <sstream>
-#include "signal.h"
+#include "triton_signal.h"
 
 #ifdef TRITON_ENABLE_ASAN
 #include <sanitizer/lsan_interface.h>

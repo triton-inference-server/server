@@ -1,4 +1,4 @@
-// Copyright (c) 2021, NVIDIA CORPORATION. All rights reserved.
+// Copyright 2021-2022, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 //
 // Redistribution and use in source and binary forms, with or without
 // modification, are permitted provided that the following conditions
@@ -24,15 +24,13 @@
 // (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-#include "src/servers/data_compressor.h"
+#include "gtest/gtest.h"
 
 // Undefine the FAIL() macro inside Triton code to avoid redefine error
 // from gtest. Okay as FAIL() is not used in data_compressor
 #ifdef FAIL
 #undef FAIL
 #endif
-
-#include "gtest/gtest.h"
 
 #include <event2/buffer.h>
 #include <chrono>
@@ -45,6 +43,7 @@
 #include <string>
 #include <thread>
 #include <vector>
+#include "data_compressor.h"
 
 namespace ni = nvidia::inferenceserver;
 
