@@ -563,7 +563,6 @@ if [[ "$(< /proc/sys/kernel/osrelease)" != *microsoft* ]]; then
             sed -i "s/dims:.*\[.*\]/dims: \[ -1 \]/g" config.pbtxt && \
             sed -i "s/max_batch_size:.*/max_batch_size: 4/g" config.pbtxt && \
             echo "dynamic_batching { preferred_batch_size: [ 4 ] }" >> config.pbtxt && \
-            echo "model_transaction_policy { decoupled: True }" >> config.pbtxt && \
             echo "instance_group [ { kind: KIND_GPU count: 2 }]" >> config.pbtxt && \
             echo "parameters [" >> config.pbtxt && \
             echo "{ key: \"execute_delay_ms\"; value: { string_value: \"100\" }}," >> config.pbtxt && \
