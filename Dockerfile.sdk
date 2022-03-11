@@ -143,7 +143,8 @@ RUN if [ "$TARGETPLATFORM" = "linux/amd64" ]; then \
     fi
 
 # For CI testing need to copy over L0_sdk test.
-COPY qa/L0_sdk L0_sdk
+RUN mkdir qa
+COPY qa/L0_sdk qa/L0_sdk
 
 # Install an image needed by the quickstart and other documentation.
 COPY qa/images/mug.jpg images/mug.jpg
