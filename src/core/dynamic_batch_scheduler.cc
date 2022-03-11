@@ -606,8 +606,10 @@ DynamicBatchScheduler::DelegateResponse(
           auto cache = model_->Server()->GetResponseCache();
           auto status = cache->Insert(request_hash, *response, raw_request_ptr);
           if (status.IsOk()) {
+#ifdef TRITON_ENABLE_STATS
             // Cache miss
             raw_request_ptr->ReportStatisticsCacheMiss(reporter_.get());
+#endif  // TRITON_ENABLE_STATS
           } else if (status.StatusCode() == Status::Code::ALREADY_EXISTS) {
             /* Cache hit */
           } else {
@@ -649,11 +651,11 @@ DynamicBatchScheduler::CacheLookUp(
   status = cache->Lookup(request_hash, local_response.get(), request.get());
   if (status.IsOk() && (local_response != nullptr)) {
     cached_response = std::move(local_response);
-#ifdef TRITON_ENABLE_METRICS
+#ifdef TRITON_ENABLE_STATS
     // Update model metrics/stats on cache hits
     // Backends will update metrics as normal on cache misses
     request->ReportStatisticsCacheHit(reporter_.get());
-#endif  // TRITON_ENABLE_METRICS
+#endif  // TRITON_ENABLE_STATS
   }
 }
 
