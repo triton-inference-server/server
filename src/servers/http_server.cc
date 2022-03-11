@@ -2345,6 +2345,10 @@ HTTPAPIServer::EVBufferToInput(
               TRITONSERVER_InferenceRequestAppendInputDataWithBufferAttributes(
                   irequest, input_name, base, buffer_attributes));
 #endif
+        } else {
+          RETURN_IF_ERR(TRITONSERVER_InferenceRequestAppendInputData(
+              irequest, input_name, base, byte_size, memory_type,
+              memory_type_id));
         }
       } else {
         const int64_t element_cnt = GetElementCount(shape_vec);
