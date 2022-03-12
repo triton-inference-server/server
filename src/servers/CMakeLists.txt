@@ -248,6 +248,13 @@ if(${TRITON_ENABLE_TRACING})
   )
 endif() # TRITON_ENABLE_TRACING
 
+if(${TRITON_ENABLE_NVTX})
+  target_compile_definitions(
+    main
+    PRIVATE TRITON_ENABLE_NVTX=1
+  )
+endif() # TRITON_ENABLE_NVTX
+
 if (NOT WIN32)
   target_link_libraries(
     main
@@ -304,17 +311,15 @@ if(${TRITON_ENABLE_GRPC})
 
   target_link_libraries(
     grpc-endpoint-library
-    PRIVATE
+    PUBLIC
       proto-library           # from repo-common
       triton-common-constants # from repo-common
       triton-common-json      # from repo-common
+      grpc-service-library    # from repo-common
       triton-core-serverapi   # from repo-core
       triton-core-serverstub  # from repo-core
       gRPC::grpc++
       gRPC::grpc
-
-    PUBLIC
-      grpc-service-library    # from repo-common
       protobuf::libprotobuf
   )
 
@@ -338,10 +343,24 @@ if(${TRITON_ENABLE_GRPC})
 
     target_link_libraries(
       grpc-endpoint-library
-      PRIVATE
+      PUBLIC
         CUDA::cudart
     )
   endif() # TRITON_ENABLE_GPU
+
+  if(${TRITON_ENABLE_METRICS})
+    target_compile_definitions(
+      grpc-endpoint-library
+      PRIVATE TRITON_ENABLE_METRICS=1
+    )
+  endif() # TRITON_ENABLE_METRICS
+
+  if(${TRITON_ENABLE_LOGGING})
+    target_compile_definitions(
+      grpc-endpoint-library
+      PRIVATE TRITON_ENABLE_LOGGING=1
+    )
+  endif() # TRITON_ENABLE_LOGGING
 
   if(${TRITON_ENABLE_STATS})
     target_compile_definitions(
@@ -357,7 +376,14 @@ if(${TRITON_ENABLE_GRPC})
     )
   endif() # TRITON_ENABLE_TRACING
 
-  target_link_libraries(
+  if(${TRITON_ENABLE_NVTX})
+    target_compile_definitions(
+      grpc-endpoint-library
+      PRIVATE TRITON_ENABLE_NVTX=1
+    )
+  endif() # TRITON_ENABLE_NVTX
+
+target_link_libraries(
     main
     PRIVATE
       grpc-endpoint-library
@@ -433,25 +459,19 @@ if(${TRITON_ENABLE_HTTP}
 
   target_link_libraries(
     http-endpoint-library
-    PRIVATE
+    PUBLIC
       triton-common-constants # from repo-common
       triton-common-json      # from repo-common
       triton-core-serverapi   # from repo-core
       triton-core-serverstub  # from repo-core
       ${LIBEVENT_LIBRARIES}
-      ${RE2_LIBRARY}
-    PUBLIC
       libevhtp::evhtp
+      ${RE2_LIBRARY}
   )
 
   target_include_directories(
     http-endpoint-library
     PRIVATE $<TARGET_PROPERTY:libevhtp::evhtp,INTERFACE_INCLUDE_DIRECTORIES>
-  )
-
-  target_compile_definitions(
-    http-endpoint-library
-    PRIVATE TRITON_ENABLE_HTTP=1
   )
 
   if(${TRITON_ENABLE_GPU})
@@ -463,10 +483,31 @@ if(${TRITON_ENABLE_HTTP}
 
     target_link_libraries(
       http-endpoint-library
-      PRIVATE
+      PUBLIC
         CUDA::cudart
     )
   endif() # TRITON_ENABLE_GPU
+
+  if(${TRITON_ENABLE_HTTP})
+    target_compile_definitions(
+      http-endpoint-library
+      PRIVATE TRITON_ENABLE_HTTP=1
+    )
+  endif() # TRITON_ENABLE_HTTP
+
+  if(${TRITON_ENABLE_SAGEMAKER})
+    target_compile_definitions(
+      http-endpoint-library
+      PRIVATE TRITON_ENABLE_SAGEMAKER=1
+    )
+  endif() # TRITON_ENABLE_SAGEMAKER
+
+  if(${TRITON_ENABLE_VERTEX_AI})
+    target_compile_definitions(
+      http-endpoint-library
+      PRIVATE TRITON_ENABLE_VERTEX_AI=1
+    )
+  endif() # TRITON_ENABLE_VERTEX_AI
 
   if(${TRITON_ENABLE_METRICS})
     target_compile_definitions(
@@ -474,6 +515,13 @@ if(${TRITON_ENABLE_HTTP}
       PRIVATE TRITON_ENABLE_METRICS=1
     )
   endif() # TRITON_ENABLE_METRICS
+
+  if(${TRITON_ENABLE_LOGGING})
+    target_compile_definitions(
+      http-endpoint-library
+      PRIVATE TRITON_ENABLE_LOGGING=1
+    )
+  endif() # TRITON_ENABLE_LOGGING
 
   if(${TRITON_ENABLE_STATS})
     target_compile_definitions(
@@ -489,19 +537,26 @@ if(${TRITON_ENABLE_HTTP}
     )
   endif() # TRITON_ENABLE_TRACING
 
+  if(${TRITON_ENABLE_NVTX})
+    target_compile_definitions(
+      http-endpoint-library
+      PRIVATE TRITON_ENABLE_NVTX=1
+    )
+  endif() # TRITON_ENABLE_NVTX
+
   if (WIN32)
     find_library(B64_LIBRARY NAMES b64)
     find_library(ZLIB_LIBRARY NAMES zlib)
     target_link_libraries(
       http-endpoint-library
-      PRIVATE
+      PUBLIC
         ${B64_LIBRARY}
         ${ZLIB_LIBRARY}
     )
   else()
     target_link_libraries(
       http-endpoint-library
-      PRIVATE
+      PUBLIC
         b64
         z
     )
@@ -527,7 +582,7 @@ if(${TRITON_ENABLE_TRACING})
 
   target_link_libraries(
     tracing-library
-    PRIVATE
+    PUBLIC
       triton-common-constants  # from repo-common
       triton-core-serverapi    # from repo-core
       triton-core-serverstub   # from repo-core
@@ -547,10 +602,38 @@ if(${TRITON_ENABLE_TRACING})
 
     target_link_libraries(
       tracing-library
-      PRIVATE
+      PUBLIC
         CUDA::cudart
     )
   endif() # TRITON_ENABLE_GPU
+
+  if(${TRITON_ENABLE_METRICS})
+    target_compile_definitions(
+      tracing-library
+      PRIVATE TRITON_ENABLE_METRICS=1
+    )
+  endif() # TRITON_ENABLE_METRICS
+
+  if(${TRITON_ENABLE_LOGGING})
+    target_compile_definitions(
+      tracing-library
+      PRIVATE TRITON_ENABLE_LOGGING=1
+    )
+  endif() # TRITON_ENABLE_LOGGING
+
+  if(${TRITON_ENABLE_STATS})
+    target_compile_definitions(
+      tracing-library
+      PRIVATE TRITON_ENABLE_STATS=1
+    )
+  endif() # TRITON_ENABLE_STATS
+
+  if(${TRITON_ENABLE_NVTX})
+    target_compile_definitions(
+      tracing-library
+      PRIVATE TRITON_ENABLE_NVTX=1
+    )
+  endif() # TRITON_ENABLE_NVTX
 
   target_link_libraries(
     main
