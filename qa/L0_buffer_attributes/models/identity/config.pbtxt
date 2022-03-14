@@ -42,4 +42,10 @@ output [
   }
 ]
 instance_group [{ kind: KIND_GPU }]
-parameters: { key: "FORCE_CPU_ONLY_INPUT_TENSORS" value: {string_value:"no"}}
+
+parameters: {
+  key: "FORCE_CPU_ONLY_INPUT_TENSORS"
+  value: {
+    string_value: "no"
+  }
+}
