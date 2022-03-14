@@ -1171,6 +1171,8 @@ LABEL com.nvidia.build.ref={}
 
 def container_build(images, backends, repoagents, endpoints):
     # The cmake, build and install directories within the container.
+    # Windows uses "\" for the path separator but Docker expects "/" 
+    # (unix style) separator. We use replace to fix the path for docker usage.
     build_dir = os.path.join(FLAGS.tmp_dir, 'tritonbuild').replace("\\", "/")
     install_dir = os.path.join(build_dir, 'install')
     if target_platform() == 'windows':
