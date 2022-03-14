@@ -887,12 +887,12 @@ ENV NVIDIA_TRITON_SERVER_VERSION ${TRITON_CONTAINER_VERSION}
         dfile.write(df)
 
 
-def create_dockerfile_build(ddir, dockerfile_name, backends):
+def create_dockerfile_build(ddir, dockerfile_name, backends, build_dir):
     df = '''
 FROM tritonserver_builder_image AS build
 FROM tritonserver_buildbase
-COPY --from=build /tmp/tritonbuild /tmp/tritonbuild
-'''
+COPY --from=build {0} {0}
+'''.format(build_dir)
 
     # If requested, package the source code for all OSS used to build
     # Triton Windows is not delivered as a container (and tar not
@@ -900,21 +900,21 @@ COPY --from=build /tmp/tritonbuild /tmp/tritonbuild
     if target_platform() != 'windows':
         if not FLAGS.no_core_build and not FLAGS.no_container_source:
             df += '''
-RUN mkdir -p /tmp/tritonbuild/install/third-party-src && \
-    (cd /tmp/tritonbuild/tritonserver/build && \
-     tar zcf /tmp/tritonbuild/install/third-party-src/src.tar.gz third-party-src)
-COPY --from=build /workspace/build/server/README.third-party-src /tmp/tritonbuild/install/third-party-src/README
-'''
+RUN mkdir -p {0}/install/third-party-src && \
+    (cd {0}/tritonserver/build && \
+     tar zcf {0}/install/third-party-src/src.tar.gz third-party-src)
+COPY --from=build /workspace/build/server/README.third-party-src {0}/install/third-party-src/README
+'''.format(build_dir)
 
     if 'onnxruntime' in backends:
         if target_platform() != 'windows':
             df += '''
 # Copy ONNX custom op library and model (needed for testing)
-RUN if [ -d /tmp/tritonbuild/onnxruntime ]; then \
-      cp /tmp/tritonbuild/onnxruntime/install/test/libcustom_op_library.so /workspace/qa/L0_custom_ops/.; \
-      cp /tmp/tritonbuild/onnxruntime/install/test/custom_op_test.onnx /workspace/qa/L0_custom_ops/.; \
+RUN if [ -d {0}/onnxruntime ]; then \
+      cp {0}/onnxruntime/install/test/libcustom_op_library.so /workspace/qa/L0_custom_ops/.; \
+      cp {0}/onnxruntime/install/test/custom_op_test.onnx /workspace/qa/L0_custom_ops/.; \
     fi
-'''
+'''.format(build_dir)
 
     mkdir(ddir)
     with open(os.path.join(ddir, dockerfile_name), "w") as dfile:
@@ -922,7 +922,7 @@ RUN if [ -d /tmp/tritonbuild/onnxruntime ]; then \
 
 
 def create_dockerfile_linux(ddir, dockerfile_name, argmap, backends, repoagents,
-                            endpoints):
+                            endpoints, build_dir):
     df = '''
 #
 # Multistage build.
@@ -957,20 +957,20 @@ COPY --chown=1000:1000 NVIDIA_Deep_Learning_Container_License.pdf .
 
     if not FLAGS.no_core_build:
         df += '''
-COPY --chown=1000:1000 --from=tritonserver_build /tmp/tritonbuild/install/bin/tritonserver bin/
-COPY --chown=1000:1000 --from=tritonserver_build /tmp/tritonbuild/install/lib/libtritonserver.so lib/
-COPY --chown=1000:1000 --from=tritonserver_build /tmp/tritonbuild/install/include/triton/core include/triton/core
+COPY --chown=1000:1000 --from=tritonserver_build {0}/install/bin/tritonserver bin/
+COPY --chown=1000:1000 --from=tritonserver_build {0}/install/lib/libtritonserver.so lib/
+COPY --chown=1000:1000 --from=tritonserver_build {0}/install/include/triton/core include/triton/core
 
 # Top-level include/core not copied so --chown does not set it correctly,
 # so explicit set on all of include
 RUN chown -R triton-server:triton-server include
-'''
+'''.format(build_dir)
 
         # If requested, include the source code for all OSS used to build Triton
         if not FLAGS.no_container_source:
             df += '''
-COPY --chown=1000:1000 --from=tritonserver_build /tmp/tritonbuild/install/third-party-src third-party-src
-'''
+COPY --chown=1000:1000 --from=tritonserver_build {0}/install/third-party-src third-party-src
+'''.format(build_dir)
 
         # Add feature labels for SageMaker endpoint
         if 'sagemaker' in endpoints:
@@ -982,14 +982,14 @@ COPY --chown=1000:1000 --from=tritonserver_build /workspace/build/sagemaker/serv
     for noncore in NONCORE_BACKENDS:
         if noncore in backends:
             df += '''
-COPY --chown=1000:1000 --from=tritonserver_build /tmp/tritonbuild/install/backends backends
-'''
+COPY --chown=1000:1000 --from=tritonserver_build {0}/install/backends backends
+'''.format(build_dir)
             break
 
     if len(repoagents) > 0:
         df += '''
-COPY --chown=1000:1000 --from=tritonserver_build /tmp/tritonbuild/install/repoagents repoagents
-'''
+COPY --chown=1000:1000 --from=tritonserver_build {0}/install/repoagents repoagents
+'''.format(build_dir)
 
     mkdir(ddir)
     with open(os.path.join(ddir, dockerfile_name), "w") as dfile:
@@ -1107,7 +1107,7 @@ LABEL com.nvidia.build.ref={}
 
 
 def create_dockerfile_windows(ddir, dockerfile_name, argmap, backends,
-                              repoagents):
+                              repoagents, build_dir):
     df = '''
 #
 # Multistage build.
@@ -1144,16 +1144,16 @@ RUN rmdir /S/Q * || exit 0
 COPY LICENSE .
 COPY TRITON_VERSION .
 COPY NVIDIA_Deep_Learning_Container_License.pdf .
-COPY --from=tritonserver_build /tmp/tritonbuild/install/bin bin
-COPY --from=tritonserver_build /tmp/tritonbuild/install/lib/tritonserver.lib lib/
-COPY --from=tritonserver_build /tmp/tritonbuild/install/include/triton/core include/triton/core
-'''
+COPY --from=tritonserver_build {0}/install/bin bin
+COPY --from=tritonserver_build {0}/install/lib/tritonserver.lib lib/
+COPY --from=tritonserver_build {0}/install/include/triton/core include/triton/core
+'''.format(build_dir)
 
     for noncore in NONCORE_BACKENDS:
         if noncore in backends:
             df += '''
-COPY --from=tritonserver_build /tmp/tritonbuild/install/backends backends
-'''
+COPY --from=tritonserver_build {0}/install/backends backends
+'''.format(build_dir)
             break
 
     df += '''
@@ -1171,9 +1171,12 @@ LABEL com.nvidia.build.ref={}
 
 def container_build(images, backends, repoagents, endpoints):
     # The cmake, build and install directories within the container.
-    build_dir = os.path.join(os.sep, 'tmp', 'tritonbuild')
-    install_dir = os.path.join(os.sep, 'tmp', 'tritonbuild', 'install')
+    # Windows uses "\" for the path separator but Docker expects "/" 
+    # (unix style) separator. We use replace to fix the path for docker usage.
+    build_dir = os.path.join(FLAGS.tmp_dir, 'tritonbuild').replace("\\", "/")
+    install_dir = os.path.join(build_dir, 'install')
     if target_platform() == 'windows':
+        install_dir = os.path.normpath(install_dir)
         cmake_dir = os.path.normpath('c:/workspace/build')
     else:
         cmake_dir = '/workspace/build'
@@ -1322,7 +1325,10 @@ def container_build(images, backends, repoagents, endpoints):
             ]
 
         runargs += ['--cmake-dir', cmake_dir]
-        runargs += ['--build-dir', build_dir]
+        if target_platform() == 'windows':
+            runargs += ['--build-dir', os.path.normpath(build_dir)]
+        else:
+            runargs += ['--build-dir', build_dir]
         runargs += ['--install-dir', install_dir]
 
         dockerrunargs = [
@@ -1385,7 +1391,8 @@ def container_build(images, backends, repoagents, endpoints):
         container.commit('tritonserver_builder_image', 'latest')
         container.remove(force=True)
 
-        create_dockerfile_build(FLAGS.build_dir, 'Dockerfile.build', backends)
+        create_dockerfile_build(FLAGS.build_dir, 'Dockerfile.build', backends,
+                                build_dir)
         p = subprocess.Popen([
             'docker', 'build', '-t', 'tritonserver_build', '-f',
             os.path.join(FLAGS.build_dir, 'Dockerfile.build'), '.'
@@ -1398,11 +1405,12 @@ def container_build(images, backends, repoagents, endpoints):
         # container.
         if target_platform() == 'windows':
             create_dockerfile_windows(FLAGS.build_dir, 'Dockerfile',
-                                      dockerfileargmap, backends, repoagents)
+                                      dockerfileargmap, backends, repoagents,
+                                      build_dir)
         else:
             create_dockerfile_linux(FLAGS.build_dir, 'Dockerfile',
                                     dockerfileargmap, backends, repoagents,
-                                    endpoints)
+                                    endpoints, build_dir)
         p = subprocess.Popen([
             'docker', 'build', '-f',
             os.path.join(FLAGS.build_dir, 'Dockerfile')
@@ -1525,6 +1533,14 @@ if __name__ == '__main__':
         type=str,
         required=False,
         help='Directory containing the CMakeLists.txt file for Triton server.')
+    parser.add_argument(
+        '--tmp-dir',
+        type=str,
+        required=False,
+        default='/tmp',
+        help=
+        'Temporary parent directory used for building inside docker. Default is /tmp.'
+    )
     parser.add_argument(
         '--library-paths',
         action='append',
@@ -1659,7 +1675,8 @@ if __name__ == '__main__':
         action='append',
         required=False,
         help=
-        'Include specified backend in build as <backend-name>[:<repo-tag>]. If <repo-tag> starts with "pull/" then it refers to a pull-request reference, otherwise <repo-tag> indicates the git tag/branch to use for the build. If the version is non-development then the default <repo-tag> is the release branch matching the container version (e.g. version 22.02 -> branch r22.02); otherwise the default <repo-tag> is "main" (e.g. version 22.02dev -> branch main).'    )
+        'Include specified backend in build as <backend-name>[:<repo-tag>]. If <repo-tag> starts with "pull/" then it refers to a pull-request reference, otherwise <repo-tag> indicates the git tag/branch to use for the build. If the version is non-development then the default <repo-tag> is the release branch matching the container version (e.g. version 22.02 -> branch r22.02); otherwise the default <repo-tag> is "main" (e.g. version 22.02dev -> branch main).'
+    )
     parser.add_argument(
         '--build-multiple-openvino',
         action="store_true",
