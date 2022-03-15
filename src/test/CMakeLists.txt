@@ -145,11 +145,13 @@ install(
 set(
   MEMORY_SRCS
   ../core/memory.cc
+  ../core/buffer_attributes.cc
 )
 
 set(
   MEMORY_HDRS
   ../core/memory.h
+  ../core/buffer_attributes.h
   ../core/constants.h
 )
 

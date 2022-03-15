@@ -310,9 +310,9 @@ SharedMemoryManager::RegisterCUDASharedMemory(
   }
 
   shared_memory_map_.insert(std::make_pair(
-      name, std::unique_ptr<SharedMemoryInfo>(new SharedMemoryInfo(
+      name, std::unique_ptr<CUDASharedMemoryInfo>(new CUDASharedMemoryInfo(
                 name, "", 0, byte_size, 0, mapped_addr, TRITONSERVER_MEMORY_GPU,
-                device_id))));
+                device_id, cuda_shm_handle))));
 
   return nullptr;  // success
 }
@@ -342,6 +342,26 @@ SharedMemoryManager::GetMemoryInfo(
 
   return nullptr;
 }
+
+#ifdef TRITON_ENABLE_GPU
+TRITONSERVER_Error*
+SharedMemoryManager::GetCUDAHandle(
+    const std::string& name, cudaIpcMemHandle_t** cuda_mem_handle)
+{
+  auto it = shared_memory_map_.find(name);
+  if (it == shared_memory_map_.end()) {
+    return TRITONSERVER_ErrorNew(
+        TRITONSERVER_ERROR_NOT_FOUND,
+        std::string("Unable to find shared memory region: '" + name + "'")
+            .c_str());
+  }
+  CUDASharedMemoryInfo& shm_info =
+      reinterpret_cast<CUDASharedMemoryInfo&>(*(it->second));
+  *cuda_mem_handle = &(shm_info.cuda_ipc_handle_);
+
+  return nullptr;
+}
+#endif
 
 TRITONSERVER_Error*
 SharedMemoryManager::GetStatus(

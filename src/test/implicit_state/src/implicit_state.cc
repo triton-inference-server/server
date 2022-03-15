@@ -841,6 +841,7 @@ TRITONBACKEND_ModelInstanceExecute(
                 response_state, reinterpret_cast<void**>(&buffer),
                 sizeof(int32_t), &actual_memory_type, &actual_memory_type_id));
 
+
         if ((responses[r] == nullptr) ||
             (actual_memory_type == TRITONSERVER_MEMORY_CPU)) {
           GUARDED_RESPOND_IF_ERROR(
@@ -865,6 +866,7 @@ TRITONBACKEND_ModelInstanceExecute(
                 response_state, reinterpret_cast<void**>(&buffer),
                 sizeof(int32_t), &actual_memory_type, &actual_memory_type_id));
 
+
         if ((responses[r] == nullptr) ||
             (actual_memory_type == TRITONSERVER_MEMORY_GPU)) {
           GUARDED_RESPOND_IF_ERROR(
@@ -876,6 +878,50 @@ TRITONBACKEND_ModelInstanceExecute(
               TRITONSERVER_LOG_ERROR,
               (std::string("request ") + std::to_string(r) +
                ": failed to create the state buffer in CPU memory, error "
+               "response sent")
+                  .c_str());
+          continue;
+        }
+
+        TRITONSERVER_BufferAttributes* buffer_attributes;
+        GUARDED_RESPOND_IF_ERROR(
+            responses, r, request,
+            TRITONBACKEND_StateBufferAttributes(
+                response_state, &buffer_attributes));
+
+        // Testing for the StateBuffer attributes
+        TRITONSERVER_MemoryType ba_memory_type;
+        int64_t ba_memory_type_id;
+        size_t ba_byte_size;
+
+        GUARDED_RESPOND_IF_ERROR(
+            responses, r, request,
+            TRITONSERVER_BufferAttributesMemoryType(
+                buffer_attributes, &ba_memory_type));
+
+        GUARDED_RESPOND_IF_ERROR(
+            responses, r, request,
+            TRITONSERVER_BufferAttributesMemoryTypeId(
+                buffer_attributes, &ba_memory_type_id));
+
+        GUARDED_RESPOND_IF_ERROR(
+            responses, r, request,
+            TRITONSERVER_BufferAttributesByteSize(
+                buffer_attributes, &ba_byte_size));
+
+        if (!((actual_memory_type == ba_memory_type) &&
+              (sizeof(int32_t) == ba_byte_size) &&
+              (ba_memory_type_id == actual_memory_type_id)) ||
+            responses[r] == nullptr) {
+          GUARDED_RESPOND_IF_ERROR(
+              responses, r, request,
+              TRITONSERVER_ErrorNew(
+                  TRITONSERVER_ERROR_UNSUPPORTED,
+                  "State buffer attributes are not set correctly."));
+          LOG_MESSAGE(
+              TRITONSERVER_LOG_ERROR,
+              (std::string("request ") + std::to_string(r) +
+               ": State buffer attributes are not set correctly., error "
                "response sent")
                   .c_str());
           continue;

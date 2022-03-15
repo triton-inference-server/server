@@ -749,6 +749,18 @@ TRITONBACKEND_StateBuffer(
   return nullptr;  // success
 }
 
+TRITONSERVER_Error*
+TRITONBACKEND_StateBufferAttributes(
+    TRITONBACKEND_State* state,
+    TRITONSERVER_BufferAttributes** buffer_attributes)
+{
+  SequenceState* to = reinterpret_cast<SequenceState*>(state);
+  to->Data()->BufferAt(
+      0, reinterpret_cast<BufferAttributes**>(buffer_attributes));
+
+  return nullptr;  // success
+}
+
 //
 // TRITONBACKEND_ResponseFactory
 //
@@ -1013,6 +1025,24 @@ TRITONBACKEND_InputBuffer(
 }
 
 TRITONSERVER_Error*
+TRITONBACKEND_InputBufferAttributes(
+    TRITONBACKEND_Input* input, const uint32_t index, const void** buffer,
+    TRITONSERVER_BufferAttributes** buffer_attributes)
+{
+  InferenceRequest::Input* ti =
+      reinterpret_cast<InferenceRequest::Input*>(input);
+  Status status = ti->DataBufferAttributes(
+      index, buffer, reinterpret_cast<BufferAttributes**>(buffer_attributes));
+  if (!status.IsOk()) {
+    *buffer = nullptr;
+    *buffer_attributes = nullptr;
+    return TRITONSERVER_ErrorNew(
+        StatusCodeToTritonCode(status.StatusCode()), status.Message().c_str());
+  }
+  return nullptr;  // success
+}
+
+TRITONSERVER_Error*
 TRITONBACKEND_InputBufferForHostPolicy(
     TRITONBACKEND_Input* input, const char* host_policy_name,
     const uint32_t index, const void** buffer, uint64_t* buffer_byte_size,
@@ -1058,6 +1088,18 @@ TRITONBACKEND_OutputBuffer(
   return nullptr;  // success
 }
 
+TRITONSERVER_Error*
+TRITONBACKEND_OutputBufferAttributes(
+    TRITONBACKEND_Output* output,
+    TRITONSERVER_BufferAttributes** buffer_attributes)
+{
+  InferenceResponse::Output* to =
+      reinterpret_cast<InferenceResponse::Output*>(output);
+
+  *buffer_attributes = reinterpret_cast<TRITONSERVER_BufferAttributes*>(
+      to->GetBufferAttributes());
+  return nullptr;  // success
+}
 }  // extern C
 
 }}  // namespace nvidia::inferenceserver

@@ -118,6 +118,7 @@ set(
   SERVER_SRCS
   model.cc
   cuda_utils.cc
+  buffer_attributes.cc
   dynamic_batch_scheduler.cc
   ensemble_scheduler.cc
   ensemble_utils.cc
@@ -153,6 +154,7 @@ set(
 set(
   SERVER_HDRS
   model.h
+  buffer_attributes.h
   constants.h
   cuda_utils.h
   dynamic_batch_scheduler.h

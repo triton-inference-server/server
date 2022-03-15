@@ -2025,15 +2025,16 @@ class ResponseQueue {
 struct ShmInfo {
   ShmInfo(
       void* base, size_t byte_size, TRITONSERVER_MemoryType memory_type,
-      int64_t memory_type_id)
+      int64_t memory_type_id, char* cuda_ipc_handle)
       : base_(base), byte_size_(byte_size), memory_type_(memory_type),
-        memory_type_id_(memory_type_id)
+        memory_type_id_(memory_type_id), cuda_ipc_handle_(cuda_ipc_handle)
   {
   }
   void* base_;
   size_t byte_size_;
   TRITONSERVER_MemoryType memory_type_;
   int64_t memory_type_id_;
+  char* cuda_ipc_handle_;
 };
 using TensorShmMap = std::unordered_map<std::string, ShmInfo>;
 
@@ -2560,6 +2561,28 @@ ResponseAllocatorHelper(
 }
 
 TRITONSERVER_Error*
+OutputBufferAttributesHelper(
+    TRITONSERVER_ResponseAllocator* allocator, const char* tensor_name,
+    const TensorShmMap& shm_map,
+    TRITONSERVER_BufferAttributes* buffer_attributes)
+{
+  // We only need to set the cuda ipc handle here. The rest of the buffer
+  // attributes have been properly populated by triton core.
+  if (tensor_name != nullptr) {
+    const auto& pr = shm_map.find(tensor_name);
+
+    if (pr != shm_map.end()) {
+      if (pr->second.memory_type_ == TRITONSERVER_MEMORY_GPU) {
+        RETURN_IF_ERR(TRITONSERVER_BufferAttributesSetCudaIpcHandle(
+            buffer_attributes, pr->second.cuda_ipc_handle_));
+      }
+    }
+  }
+
+  return nullptr;  // Success
+}
+
+TRITONSERVER_Error*
 OutputBufferQueryHelper(
     TRITONSERVER_ResponseAllocator* allocator, const char* tensor_name,
     size_t* byte_size, const TensorShmMap& shm_map,
@@ -2626,6 +2649,22 @@ OutputBufferQuery(
   return OutputBufferQueryHelper(
       allocator, tensor_name, byte_size, payload->shm_map_, memory_type,
       memory_type_id);
+}
+
+// Make sure to keep InferResponseAlloc, OutputBufferQuery, and
+// OutputBufferAttributes logic in sync
+TRITONSERVER_Error*
+OutputBufferAttributes(
+    TRITONSERVER_ResponseAllocator* allocator, const char* tensor_name,
+    TRITONSERVER_BufferAttributes* buffer_attributes, void* userp,
+    void* buffer_userp)
+{
+  AllocPayload<inference::ModelInferResponse>* payload =
+      reinterpret_cast<AllocPayload<inference::ModelInferResponse>*>(userp);
+
+  return OutputBufferAttributesHelper(
+      allocator, tensor_name, payload->shm_map_, buffer_attributes);
+  return nullptr;  // Success
 }
 
 TRITONSERVER_Error*
@@ -2744,7 +2783,6 @@ ParseSharedMemoryParams(
   return nullptr;
 }
 
-
 TRITONSERVER_Error*
 ParseClassificationParams(
     const inference::ModelInferRequest::InferRequestedOutputTensor& output,
@@ -2825,8 +2863,21 @@ InferAllocatorPayload(
       RETURN_IF_ERR(shm_manager->GetMemoryInfo(
           region_name, offset, &base, &memory_type, &memory_type_id));
 
-      alloc_payload->shm_map_.emplace(
-          io.name(), ShmInfo(base, byte_size, memory_type, memory_type_id));
+      if (memory_type == TRITONSERVER_MEMORY_GPU) {
+#ifdef TRITON_ENABLE_GPU
+        char* cuda_handle;
+        RETURN_IF_ERR(shm_manager->GetCUDAHandle(
+            region_name, reinterpret_cast<cudaIpcMemHandle_t**>(&cuda_handle)));
+        alloc_payload->shm_map_.emplace(
+            io.name(),
+            ShmInfo(base, byte_size, memory_type, memory_type_id, cuda_handle));
+#endif
+      } else {
+        alloc_payload->shm_map_.emplace(
+            io.name(), ShmInfo(
+                           base, byte_size, memory_type, memory_type_id,
+                           nullptr /* cuda_ipc_handle */));
+      }
     } else if (has_classification) {
       alloc_payload->classification_map_.emplace(
           io.name(), classification_count);
@@ -2890,6 +2941,17 @@ InferGRPCToInput(
         ParseSharedMemoryParams<inference::ModelInferRequest::InferInputTensor>(
             io, &has_shared_memory, &region_name, &offset, &byte_size));
 
+    TRITONSERVER_BufferAttributes* buffer_attributes;
+    RETURN_IF_ERR(TRITONSERVER_BufferAttributesNew(&buffer_attributes));
+    auto buffer_attributes_del =
+        [](TRITONSERVER_BufferAttributes* buffer_attributes) {
+          TRITONSERVER_BufferAttributesDelete(buffer_attributes);
+        };
+    std::unique_ptr<
+        TRITONSERVER_BufferAttributes, decltype(buffer_attributes_del)>
+        buffer_attrsl(buffer_attributes, buffer_attributes_del);
+    char* cuda_ipc_handle = nullptr;
+
     if (has_shared_memory) {
       if (io.has_contents()) {
         return TRITONSERVER_ErrorNew(
@@ -2905,6 +2967,13 @@ InferGRPCToInput(
       RETURN_IF_ERR(shm_manager->GetMemoryInfo(
           region_name, offset, &tmp, &memory_type, &memory_type_id));
       base = tmp;
+      if (memory_type == TRITONSERVER_MEMORY_GPU) {
+#ifdef TRITON_ENABLE_GPU
+        RETURN_IF_ERR(shm_manager->GetCUDAHandle(
+            region_name,
+            reinterpret_cast<cudaIpcMemHandle_t**>(&cuda_ipc_handle)));
+#endif
+      }
     } else {
       if (io.has_contents() && (!request.raw_input_contents().empty())) {
         return TRITONSERVER_ErrorNew(
@@ -3084,9 +3153,20 @@ InferGRPCToInput(
       }
     }
 
-    RETURN_IF_ERR(TRITONSERVER_InferenceRequestAppendInputData(
-        inference_request, io.name().c_str(), base, byte_size, memory_type,
-        memory_type_id));
+    if (cuda_ipc_handle != nullptr) {
+      RETURN_IF_ERR(TRITONSERVER_BufferAttributesSetCudaIpcHandle(
+          buffer_attributes, reinterpret_cast<void*>(cuda_ipc_handle)));
+    }
+
+    RETURN_IF_ERR(TRITONSERVER_BufferAttributesSetMemoryType(
+        buffer_attributes, memory_type));
+    RETURN_IF_ERR(TRITONSERVER_BufferAttributesSetMemoryTypeId(
+        buffer_attributes, memory_type_id));
+    RETURN_IF_ERR(
+        TRITONSERVER_BufferAttributesSetByteSize(buffer_attributes, byte_size));
+    RETURN_IF_ERR(
+        TRITONSERVER_InferenceRequestAppendInputDataWithBufferAttributes(
+            inference_request, io.name().c_str(), base, buffer_attributes));
   }
 
   return nullptr;  // success
@@ -3413,6 +3493,10 @@ class ModelInferHandler
         TRITONSERVER_ResponseAllocatorSetQueryFunction(
             allocator_, OutputBufferQuery),
         "setting allocator's query function");
+    FAIL_IF_ERR(
+        TRITONSERVER_ResponseAllocatorSetBufferAttributesFunction(
+            allocator_, OutputBufferAttributes),
+        "setting allocator's output buffer attributes function");
   }
 
   ~ModelInferHandler()
@@ -3737,6 +3821,22 @@ StreamOutputBufferQuery(
       memory_type_id);
 }
 
+// Make sure to keep InferResponseAlloc, OutputBufferQuery, and
+// OutputBufferAttributes logic in sync
+TRITONSERVER_Error*
+StreamOutputBufferAttributes(
+    TRITONSERVER_ResponseAllocator* allocator, const char* tensor_name,
+    TRITONSERVER_BufferAttributes* buffer_attributes, void* userp,
+    void* buffer_userp)
+{
+  AllocPayload<inference::ModelStreamInferResponse>* payload =
+      reinterpret_cast<AllocPayload<inference::ModelStreamInferResponse>*>(
+          userp);
+
+  return OutputBufferAttributesHelper(
+      allocator, tensor_name, payload->shm_map_, buffer_attributes);
+}
+
 //
 // ModelStreamInferHandler
 //
@@ -3771,6 +3871,10 @@ class ModelStreamInferHandler
         TRITONSERVER_ResponseAllocatorSetQueryFunction(
             allocator_, StreamOutputBufferQuery),
         "setting allocator's query function");
+    FAIL_IF_ERR(
+        TRITONSERVER_ResponseAllocatorSetBufferAttributesFunction(
+            allocator_, StreamOutputBufferAttributes),
+        "setting allocator's output buffer attribute query function");
   }
 
   ~ModelStreamInferHandler()

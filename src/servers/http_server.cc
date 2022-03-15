@@ -986,6 +986,10 @@ HTTPAPIServer::HTTPAPIServer(
       TRITONSERVER_ResponseAllocatorSetQueryFunction(
           allocator_, OutputBufferQuery),
       "setting allocator's query function");
+  FAIL_IF_ERR(
+      TRITONSERVER_ResponseAllocatorSetBufferAttributesFunction(
+          allocator_, OutputBufferAttributes),
+      "setting allocator's buffer attributes function");
 }
 
 HTTPAPIServer::~HTTPAPIServer()
@@ -998,7 +1002,8 @@ HTTPAPIServer::~HTTPAPIServer()
       "deleting response allocator");
 }
 
-// Make sure to keep InferResponseAlloc and OutputBufferQuery logic in sync
+// Make sure to keep InferResponseAlloc, OutputBufferQuery, and
+// OutputBufferAttributes logic in sync
 TRITONSERVER_Error*
 HTTPAPIServer::InferResponseAlloc(
     TRITONSERVER_ResponseAllocator* allocator, const char* tensor_name,
@@ -1051,9 +1056,7 @@ HTTPAPIServer::InferResponseAlloc(
     *buffer = const_cast<void*>(info->base_);
     *actual_memory_type = info->memory_type_;
     *actual_memory_type_id = info->device_id_;
-
-    // Don't need info for shared-memory output...
-    delete info;
+    *buffer_userp = reinterpret_cast<void*>(info);
 
     LOG_VERBOSE(1) << "HTTP: using shared-memory for '" << tensor_name
                    << "', size: " << byte_size << ", addr: " << *buffer;
@@ -1094,6 +1097,30 @@ HTTPAPIServer::InferResponseAlloc(
   return nullptr;  // Success
 }
 
+// Make sure to keep InferResponseAlloc, OutputBufferQuery, and
+// OutputBufferAttributes logic in sync
+TRITONSERVER_Error*
+HTTPAPIServer::OutputBufferAttributes(
+    TRITONSERVER_ResponseAllocator* allocator, const char* tensor_name,
+    TRITONSERVER_BufferAttributes* buffer_attributes, void* userp,
+    void* buffer_userp)
+{
+  AllocPayload::OutputInfo* info =
+      reinterpret_cast<AllocPayload::OutputInfo*>(buffer_userp);
+
+  // We only need to set the cuda ipc handle here. The rest of the buffer
+  // attributes have been properly populated by triton core.
+  if (tensor_name != nullptr) {
+    if (info->kind_ == AllocPayload::OutputInfo::SHM &&
+        info->memory_type_ == TRITONSERVER_MEMORY_GPU) {
+      RETURN_IF_ERR(TRITONSERVER_BufferAttributesSetCudaIpcHandle(
+          buffer_attributes, info->cuda_ipc_handle_));
+    }
+  }
+
+  return nullptr;  // Success
+}
+
 // Make sure to keep InferResponseAlloc and OutputBufferQuery logic in sync
 TRITONSERVER_Error*
 HTTPAPIServer::OutputBufferQuery(
@@ -1126,8 +1153,6 @@ HTTPAPIServer::OutputBufferQuery(
   // and the type will be CPU.
   *memory_type = TRITONSERVER_MEMORY_CPU;
   *memory_type_id = 0;
-  return nullptr;  // Success
-
   return nullptr;  // Success
 }
 
@@ -2294,9 +2319,37 @@ HTTPAPIServer::EVBufferToInput(
         int64_t memory_type_id;
         RETURN_IF_ERR(shm_manager_->GetMemoryInfo(
             shm_region, shm_offset, &base, &memory_type, &memory_type_id));
-        RETURN_IF_ERR(TRITONSERVER_InferenceRequestAppendInputData(
-            irequest, input_name, base, byte_size, memory_type,
-            memory_type_id));
+        if (memory_type == TRITONSERVER_MEMORY_GPU) {
+#ifdef TRITON_ENABLE_GPU
+          cudaIpcMemHandle_t* cuda_handle;
+          RETURN_IF_ERR(shm_manager_->GetCUDAHandle(shm_region, &cuda_handle));
+          TRITONSERVER_BufferAttributes* buffer_attributes;
+          RETURN_IF_ERR(TRITONSERVER_BufferAttributesNew(&buffer_attributes));
+          auto buffer_attributes_del =
+              [](TRITONSERVER_BufferAttributes* buffer_attributes) {
+                TRITONSERVER_BufferAttributesDelete(buffer_attributes);
+              };
+
+          std::unique_ptr<
+              TRITONSERVER_BufferAttributes, decltype(buffer_attributes_del)>
+              buffer_attrsl(buffer_attributes, buffer_attributes_del);
+          RETURN_IF_ERR(TRITONSERVER_BufferAttributesSetMemoryType(
+              buffer_attributes, memory_type));
+          RETURN_IF_ERR(TRITONSERVER_BufferAttributesSetMemoryTypeId(
+              buffer_attributes, memory_type_id));
+          RETURN_IF_ERR(TRITONSERVER_BufferAttributesSetCudaIpcHandle(
+              buffer_attributes, reinterpret_cast<void*>(cuda_handle)));
+          RETURN_IF_ERR(TRITONSERVER_BufferAttributesSetByteSize(
+              buffer_attributes, byte_size));
+          RETURN_IF_ERR(
+              TRITONSERVER_InferenceRequestAppendInputDataWithBufferAttributes(
+                  irequest, input_name, base, buffer_attributes));
+#endif
+        } else {
+          RETURN_IF_ERR(TRITONSERVER_InferenceRequestAppendInputData(
+              irequest, input_name, base, byte_size, memory_type,
+              memory_type_id));
+        }
       } else {
         const int64_t element_cnt = GetElementCount(shape_vec);
 
@@ -2381,10 +2434,23 @@ HTTPAPIServer::EVBufferToInput(
         RETURN_IF_ERR(shm_manager_->GetMemoryInfo(
             shm_region, offset, &base, &memory_type, &memory_type_id));
 
-        infer_req->alloc_payload_.output_map_.emplace(
-            std::piecewise_construct, std::forward_as_tuple(output_name),
-            std::forward_as_tuple(new AllocPayload::OutputInfo(
-                base, byte_size, memory_type, memory_type_id)));
+        if (memory_type == TRITONSERVER_MEMORY_GPU) {
+#ifdef TRITON_ENABLE_GPU
+          cudaIpcMemHandle_t* cuda_handle;
+          RETURN_IF_ERR(shm_manager_->GetCUDAHandle(shm_region, &cuda_handle));
+          infer_req->alloc_payload_.output_map_.emplace(
+              std::piecewise_construct, std::forward_as_tuple(output_name),
+              std::forward_as_tuple(new AllocPayload::OutputInfo(
+                  base, byte_size, memory_type, memory_type_id,
+                  reinterpret_cast<char*>(cuda_handle))));
+#endif
+        } else {
+          infer_req->alloc_payload_.output_map_.emplace(
+              std::piecewise_construct, std::forward_as_tuple(output_name),
+              std::forward_as_tuple(new AllocPayload::OutputInfo(
+                  base, byte_size, memory_type, memory_type_id,
+                  nullptr /* cuda ipc handle */)));
+        }
       } else {
         bool use_binary;
         RETURN_IF_ERR(CheckBinaryOutputData(request_output, &use_binary));
@@ -2887,30 +2953,27 @@ HTTPAPIServer::InferRequestClass::FinalizeResponse(
       RETURN_IF_ERR(output_json.Add("shape", std::move(shape_json)));
     }
 
-    // Add JSON data, or collect binary data. If 'info' is nullptr
-    // then using shared memory so don't need this step.
-    if (info != nullptr) {
-      if (info->kind_ == AllocPayload::OutputInfo::BINARY) {
-        triton::common::TritonJson::Value parameters_json;
-        if (!output_json.Find("parameters", &parameters_json)) {
-          parameters_json = triton::common::TritonJson::Value(
-              response_json, triton::common::TritonJson::ValueType::OBJECT);
-          RETURN_IF_ERR(parameters_json.AddUInt("binary_data_size", byte_size));
-          RETURN_IF_ERR(
-              output_json.Add("parameters", std::move(parameters_json)));
-        } else {
-          RETURN_IF_ERR(parameters_json.AddUInt("binary_data_size", byte_size));
-        }
-        if (byte_size > 0) {
-          ordered_buffers.push_back(info->evbuffer_);
-        }
+    // Add JSON data, or collect binary data.
+    if (info->kind_ == AllocPayload::OutputInfo::BINARY) {
+      triton::common::TritonJson::Value parameters_json;
+      if (!output_json.Find("parameters", &parameters_json)) {
+        parameters_json = triton::common::TritonJson::Value(
+            response_json, triton::common::TritonJson::ValueType::OBJECT);
+        RETURN_IF_ERR(parameters_json.AddUInt("binary_data_size", byte_size));
+        RETURN_IF_ERR(
+            output_json.Add("parameters", std::move(parameters_json)));
       } else {
-        triton::common::TritonJson::Value data_json(
-            response_json, triton::common::TritonJson::ValueType::ARRAY);
-        RETURN_IF_ERR(WriteDataToJson(
-            &data_json, cname, datatype, base, byte_size, element_count));
-        RETURN_IF_ERR(output_json.Add("data", std::move(data_json)));
+        RETURN_IF_ERR(parameters_json.AddUInt("binary_data_size", byte_size));
       }
+      if (byte_size > 0) {
+        ordered_buffers.push_back(info->evbuffer_);
+      }
+    } else if (info->kind_ == AllocPayload::OutputInfo::JSON) {
+      triton::common::TritonJson::Value data_json(
+          response_json, triton::common::TritonJson::ValueType::ARRAY);
+      RETURN_IF_ERR(WriteDataToJson(
+          &data_json, cname, datatype, base, byte_size, element_count));
+      RETURN_IF_ERR(output_json.Add("data", std::move(data_json)));
     }
 
     RETURN_IF_ERR(response_outputs.Append(std::move(output_json)));
