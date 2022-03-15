@@ -1011,10 +1011,13 @@ LABEL com.nvidia.tritonserver.version="${TRITON_SERVER_VERSION}"
 
 ENV PATH /opt/tritonserver/bin:${PATH}
 '''
+
+    # TODO Remove once the ORT-OpenVINO "Exception while Reading network" is fixed
     if 'onnxruntime' in backends:
         df += '''
 ENV LD_LIBRARY_PATH /opt/tritonserver/backends/onnxruntime:${LD_LIBRARY_PATH}
 '''
+
     ort_dependencies = "libgomp1" if 'onnxruntime' in backends else ""
     pytorch_dependencies = ""
     if ('pytorch' in backends) and (target_machine == 'aarch64'):
