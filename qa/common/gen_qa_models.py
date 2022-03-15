@@ -689,8 +689,10 @@ def create_plan_dynamic_modelfile(models_dir, max_batch, model_version,
     if max_batch != 0:
         for i in range(max_batch):
             profile.append(builder.create_optimization_profile())
-            profile[10 + i].set_shape("INPUT0", [1 + i] + min_shape, [1 + i] + opt_shape, [1 + i] + max_shape)
-            profile[10 + i].set_shape("INPUT1", [1 + i] + min_shape, [1 + i] + opt_shape, [1 + i] + max_shape)
+            profile[10 + i].set_shape("INPUT0", [1 + i] + min_shape,
+                                      [1 + i] + opt_shape, [1 + i] + max_shape)
+            profile[10 + i].set_shape("INPUT1", [1 + i] + min_shape,
+                                      [1 + i] + opt_shape, [1 + i] + max_shape)
             config.add_optimization_profile(profile[10 + i])
 
     config.max_workspace_size = 1 << 20
