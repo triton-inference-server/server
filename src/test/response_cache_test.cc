@@ -193,25 +193,15 @@ InferenceResponse::Output::~Output()
 Status
 InferenceResponse::Output::ReleaseDataBuffer()
 {
-  // TRITONSERVER_Error* err = nullptr;
-
   if (allocated_buffer_ != nullptr) {
     free(allocated_buffer_);
-
-    /*err = allocator_->ReleaseFn()(
-        reinterpret_cast<TRITONSERVER_ResponseAllocator*>(
-            const_cast<ResponseAllocator*>(allocator_)),
-        allocated_buffer_, allocated_userp_, allocated_buffer_byte_size_,
-        allocated_memory_type_, allocated_memory_type_id_);*/
   }
 
   allocated_buffer_ = nullptr;
-  allocated_buffer_byte_size_ = 0;
-  allocated_memory_type_ = TRITONSERVER_MEMORY_CPU;
-  allocated_memory_type_id_ = 0;
+  buffer_attributes_.SetByteSize(0);
+  buffer_attributes_.SetMemoryType(TRITONSERVER_MEMORY_CPU);
+  buffer_attributes_.SetMemoryTypeId(0);
   allocated_userp_ = nullptr;
-
-  // RETURN_IF_TRITONSERVER_ERROR(err);
 
   return Status::Success;
 }
@@ -224,9 +214,9 @@ InferenceResponse::Output::DataBuffer(
     void** userp) const
 {
   *buffer = allocated_buffer_;
-  *buffer_byte_size = allocated_buffer_byte_size_;
-  *memory_type = allocated_memory_type_;
-  *memory_type_id = allocated_memory_type_id_;
+  *buffer_byte_size = buffer_attributes_.ByteSize();
+  *memory_type = buffer_attributes_.MemoryType();
+  *memory_type_id = buffer_attributes_.MemoryTypeId();
   *userp = allocated_userp_;
   return Status::Success;
 }
@@ -258,11 +248,10 @@ InferenceResponse::Output::AllocateDataBuffer(
 
   // Set relevant member variables for DataBuffer() to return
   allocated_buffer_ = *buffer;
-  allocated_buffer_byte_size_ = buffer_byte_size;
-  allocated_memory_type_ = *memory_type;
-  allocated_memory_type_id_ = *memory_type_id;
+  buffer_attributes_.SetByteSize(buffer_byte_size);
+  buffer_attributes_.SetMemoryType(*memory_type);
+  buffer_attributes_.SetMemoryTypeId(*memory_type_id);
   allocated_userp_ = nullptr;
-  std::cout << "Done in AllocateDataBuffer" << std::endl;
   return Status::Success;
 }
 
@@ -995,11 +984,10 @@ TEST_F(RequestResponseCacheTest, TestEndToEnd)
   std::cout << "Total lookup latency: " << total_lookup_latency << std::endl;
   std::cout << "Total insertion latency: " << total_insertion_latency
             << std::endl;
-  ASSERT_TRUE(
-      total_lookup_latency > 0) << "ERROR: Total lookup latency should be non-zero";
-  ASSERT_TRUE(
-      total_insertion_latency > 0) <<
-      "ERROR: Total insertion latency should be non-zero";
+  ASSERT_TRUE(total_lookup_latency > 0)
+      << "ERROR: Total lookup latency should be non-zero";
+  ASSERT_TRUE(total_insertion_latency > 0)
+      << "ERROR: Total insertion latency should be non-zero";
 
   // Duplicate insertion should fail since key already exists
   status = cache->Insert(hash0, *response0, &request0);
@@ -1021,12 +1009,10 @@ TEST_F(RequestResponseCacheTest, TestEndToEnd)
   std::cout << "Total lookup latency2: " << total_lookup_latency2 << std::endl;
   std::cout << "Total insertion latency2: " << total_insertion_latency2
             << std::endl;
-  ASSERT_TRUE(
-      total_lookup_latency2 > total_lookup_latency) <<
-      "ERROR: Total lookup latency should increase";
-  ASSERT_TRUE(
-      total_insertion_latency2 > total_insertion_latency) <<
-      "ERROR: Total insertion latency should increase";
+  ASSERT_TRUE(total_lookup_latency2 > total_lookup_latency)
+      << "ERROR: Total lookup latency should increase";
+  ASSERT_TRUE(total_insertion_latency2 > total_insertion_latency)
+      << "ERROR: Total insertion latency should increase";
 
   // Fetch output buffer details
   const void* response_buffer = nullptr;

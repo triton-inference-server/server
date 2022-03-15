@@ -326,9 +326,9 @@ InferenceResponse::Output::DataBuffer(
     void** userp) const
 {
   *buffer = allocated_buffer_;
-  *buffer_byte_size = allocated_buffer_byte_size_;
-  *memory_type = allocated_memory_type_;
-  *memory_type_id = allocated_memory_type_id_;
+  *buffer_byte_size = buffer_attributes_.ByteSize();
+  *memory_type = buffer_attributes_.MemoryType();
+  *memory_type_id = buffer_attributes_.MemoryTypeId();
   *userp = allocated_userp_;
   return Status::Success;
 }
@@ -355,12 +355,22 @@ InferenceResponse::Output::AllocateDataBuffer(
       alloc_userp_, buffer, &alloc_buffer_userp, &actual_memory_type,
       &actual_memory_type_id));
 
-  allocated_buffer_ = *buffer;
-  allocated_buffer_byte_size_ = buffer_byte_size;
-  allocated_memory_type_ = actual_memory_type;
-  allocated_memory_type_id_ = actual_memory_type_id;
-  allocated_userp_ = alloc_buffer_userp;
+  // Only call the buffer attributes API if it is set.
+  if (allocator_->BufferAttributesFn() != nullptr) {
+    RETURN_IF_TRITONSERVER_ERROR(allocator_->BufferAttributesFn()(
+        reinterpret_cast<TRITONSERVER_ResponseAllocator*>(
+            const_cast<ResponseAllocator*>(allocator_)),
+        name_.c_str(),
+        reinterpret_cast<TRITONSERVER_BufferAttributes*>(&buffer_attributes_),
+        alloc_userp_, alloc_buffer_userp));
+  }
 
+  allocated_buffer_ = *buffer;
+  buffer_attributes_.SetByteSize(buffer_byte_size);
+  buffer_attributes_.SetMemoryType(actual_memory_type);
+  buffer_attributes_.SetMemoryTypeId(actual_memory_type_id);
+
+  allocated_userp_ = alloc_buffer_userp;
   *memory_type = actual_memory_type;
   *memory_type_id = actual_memory_type_id;
 
@@ -376,14 +386,14 @@ InferenceResponse::Output::ReleaseDataBuffer()
     err = allocator_->ReleaseFn()(
         reinterpret_cast<TRITONSERVER_ResponseAllocator*>(
             const_cast<ResponseAllocator*>(allocator_)),
-        allocated_buffer_, allocated_userp_, allocated_buffer_byte_size_,
-        allocated_memory_type_, allocated_memory_type_id_);
+        allocated_buffer_, allocated_userp_, buffer_attributes_.ByteSize(),
+        buffer_attributes_.MemoryType(), buffer_attributes_.MemoryTypeId());
   }
 
   allocated_buffer_ = nullptr;
-  allocated_buffer_byte_size_ = 0;
-  allocated_memory_type_ = TRITONSERVER_MEMORY_CPU;
-  allocated_memory_type_id_ = 0;
+  buffer_attributes_.SetByteSize(0);
+  buffer_attributes_.SetMemoryType(TRITONSERVER_MEMORY_CPU);
+  buffer_attributes_.SetMemoryTypeId(0);
   allocated_userp_ = nullptr;
 
   RETURN_IF_TRITONSERVER_ERROR(err);

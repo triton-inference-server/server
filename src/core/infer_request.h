@@ -29,6 +29,7 @@
 #include <string>
 #include <unordered_map>
 #include <vector>
+#include "src/core/buffer_attributes.h"
 #include "src/core/infer_response.h"
 #include "src/core/infer_stats.h"
 #include "src/core/infer_trace.h"
@@ -142,6 +143,9 @@ class InferenceRequest {
         const void* base, size_t byte_size, TRITONSERVER_MemoryType memory_type,
         int64_t memory_type_id, const char* host_policy_name);
 
+    Status AppendDataWithBufferAttributes(
+        const void* base, BufferAttributes* buffer_attributes);
+
     // Remove all existing data for the input.
     Status RemoveAllData();
 
@@ -171,6 +175,10 @@ class InferenceRequest {
         const size_t idx, const void** base, size_t* byte_size,
         TRITONSERVER_MemoryType* memory_type, int64_t* memory_type_id) const;
 
+    // Get the buffer attributes associated with 'idx' buffer.
+    Status DataBufferAttributes(
+        const size_t idx, const void** base,
+        BufferAttributes** buffer_attributes) const;
 
     // Get the 'idx' buffer containing a contiguous chunk of bytes for
     // the input. Return error is 'idx' refers to a buffer that does

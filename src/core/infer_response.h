@@ -29,6 +29,7 @@
 #include <functional>
 #include <string>
 #include <vector>
+#include "src/core/buffer_attributes.h"
 #include "src/core/constants.h"
 #include "src/core/infer_parameter.h"
 #include "src/core/infer_trace.h"
@@ -161,6 +162,8 @@ class InferenceResponse {
     // The shape of the output tensor.
     const std::vector<int64_t>& Shape() const { return shape_; }
 
+    BufferAttributes* GetBufferAttributes() { return &buffer_attributes_; }
+
     // Reshape the output tensor. This function must only be called
     // for outputs that have respace specified in the model
     // configuration.
@@ -212,9 +215,7 @@ class InferenceResponse {
     // AllocateDataBuffer(). This information is needed by
     // DataBuffer() and ReleaseDataBuffer().
     void* allocated_buffer_;
-    size_t allocated_buffer_byte_size_;
-    TRITONSERVER_MemoryType allocated_memory_type_;
-    int64_t allocated_memory_type_id_;
+    BufferAttributes buffer_attributes_;
     void* allocated_userp_;
   };
 
