@@ -139,7 +139,7 @@ ModelState::ValidateModelConfig()
   for (size_t io_index = 0; io_index < control_inputs.ArraySize(); io_index++) {
     common::TritonJson::Value control_input;
     RETURN_IF_ERROR(control_inputs.IndexAsObject(io_index, &control_input));
-    const char* input_name;
+    const char* input_name = nullptr;
     size_t input_name_len;
     RETURN_IF_ERROR(
         control_input.MemberAsString("name", &input_name, &input_name_len));
