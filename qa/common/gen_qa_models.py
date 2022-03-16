@@ -1,4 +1,4 @@
-# Copyright 2018-2021, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright 2018-2022, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -684,6 +684,16 @@ def create_plan_dynamic_modelfile(models_dir, max_batch, model_version,
             profile[7 + i].set_shape("INPUT1", full_static_shape,
                                      full_static_shape, full_static_shape)
         config.add_optimization_profile(profile[7 + i])
+
+    # Add profiles where each profile supports a specific batch size
+    if max_batch != 0:
+        for i in range(max_batch):
+            profile.append(builder.create_optimization_profile())
+            profile[10 + i].set_shape("INPUT0", [1 + i] + min_shape,
+                                      [1 + i] + opt_shape, [1 + i] + max_shape)
+            profile[10 + i].set_shape("INPUT1", [1 + i] + min_shape,
+                                      [1 + i] + opt_shape, [1 + i] + max_shape)
+            config.add_optimization_profile(profile[10 + i])
 
     config.max_workspace_size = 1 << 20
     try:
