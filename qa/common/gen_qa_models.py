@@ -1198,9 +1198,9 @@ def create_libtorch_modelfile(models_dir,
                 self.torch_output1_dtype = args[0][1]
                 super(AddSubNet, self).__init__()
 
-            def forward(self, input0, input1):
-                return (input0 + input1).to(self.torch_output0_dtype), \
-                    (input0 - input1).to(self.torch_output1_dtype)
+            def forward(self, INPUT0, INPUT1):
+                return (INPUT0 + INPUT1).to(self.torch_output0_dtype), \
+                    (INPUT0 - INPUT1).to(self.torch_output1_dtype)
 
         addSubModel = AddSubNet((torch_output0_dtype, torch_output1_dtype))
         example_input = torch.zeros(input_shape, dtype=torch_input_dtype)
@@ -1214,9 +1214,9 @@ def create_libtorch_modelfile(models_dir,
                 self.torch_output1_dtype = args[0][1]
                 super(SubAddNet, self).__init__()
 
-            def forward(self, input0, input1):
-                return (input0 - input1).to(self.torch_output0_dtype), \
-                    (input0 + input1).to(self.torch_output1_dtype)
+            def forward(self, INPUT0, INPUT1):
+                return (INPUT0 - INPUT1).to(self.torch_output0_dtype), \
+                    (INPUT0 + INPUT1).to(self.torch_output1_dtype)
 
         subAddModel = SubAddNet((torch_output0_dtype, torch_output1_dtype))
         example_input = torch.zeros(input_shape, dtype=torch_input_dtype)
@@ -1266,12 +1266,12 @@ max_batch_size: {}
 version_policy: {}
 input [
   {{
-    name: "INPUT__0"
+    name: "INPUT0"
     data_type: {}
     dims: [ {} ]
   }},
   {{
-    name: "INPUT__1"
+    name: "INPUT1"
     data_type: {}
     dims: [ {} ]
   }}

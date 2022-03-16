@@ -1,4 +1,4 @@
-# Copyright (c) 2019-2021, NVIDIA CORPORATION. All rights reserved.
+# Copyright (c) 2019-2022, NVIDIA CORPORATION. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -97,8 +97,8 @@ class AddSubEnsembleSchedule:
     def _get_simple_ensemble_schedule(cls, base_model_name, input_shape,
                                       output0_shape, output1_shape, input_dtype,
                                       output0_dtype, output1_dtype):
-        # libtorch model uses other naming convention
-        index_delimiter = "__" if "libtorch" in base_model_name else ""
+        # libtorch model uses other naming convention for outputs
+        output_index_delimiter = "__" if "libtorch" in base_model_name else ""
         # ensemble input -> addsub -> ensemble output
         schedule = '''
 ensemble_scheduling {{
@@ -107,11 +107,11 @@ ensemble_scheduling {{
       model_name: "{}"
       model_version: -1
       input_map {{
-        key: "INPUT{delimiter}0"
+        key: "INPUT0"
         value: "INPUT0"
       }}
       input_map {{
-        key: "INPUT{delimiter}1"
+        key: "INPUT1"
         value: "INPUT1"
       }}
       output_map {{
@@ -125,7 +125,7 @@ ensemble_scheduling {{
     }}
   ]
 }}
-'''.format(base_model_name, delimiter=index_delimiter)
+'''.format(base_model_name, delimiter=output_index_delimiter)
         return schedule
 
     @classmethod
@@ -133,8 +133,8 @@ ensemble_scheduling {{
                                         output0_shape, output1_shape,
                                         input_dtype, output0_dtype,
                                         output1_dtype):
-        # libtorch model uses other naming convention
-        index_delimiter = "__" if "libtorch" in base_model_name else ""
+        # libtorch model uses other naming convention for outputs
+        output_index_delimiter = "__" if "libtorch" in base_model_name else ""
         # ensemble input -> nop -> addsub -> ensemble output
         nop_input_shape = fixed_to_variable_size(input_shape)
         schedule = '''
@@ -164,11 +164,11 @@ ensemble_scheduling {{
       model_name: "{}"
       model_version: -1
       input_map {{
-        key: "INPUT{delimiter}0"
+        key: "INPUT0"
         value: "same_input0"
       }}
       input_map {{
-        key: "INPUT{delimiter}1"
+        key: "INPUT1"
         value: "same_input1"
       }}
       output_map {{
@@ -185,15 +185,15 @@ ensemble_scheduling {{
 '''.format(input_dtype,
            tu.shape_to_dims_str(nop_input_shape),
            base_model_name,
-           delimiter=index_delimiter)
+           delimiter=output_index_delimiter)
         return schedule
 
     @classmethod
     def _get_fan_ensemble_schedule(cls, base_model_name, input_shape,
                                    output0_shape, output1_shape, input_dtype,
                                    output0_dtype, output1_dtype):
-        # libtorch model uses other naming convention
-        index_delimiter = "__" if "libtorch" in base_model_name else ""
+        # libtorch model uses other naming convention for outputs
+        output_index_delimiter = "__" if "libtorch" in base_model_name else ""
 
         # ensemble input -> nop -> addsub ->
         # nop (fan out, one output send to one nop) -> ensemble output (fan in)
@@ -227,11 +227,11 @@ ensemble_scheduling {{
       model_name: "{}"
       model_version: -1
       input_map {{
-        key: "INPUT{delimiter}0"
+        key: "INPUT0"
         value: "same_input0"
       }}
       input_map {{
-        key: "INPUT{delimiter}1"
+        key: "INPUT1"
         value: "same_input1"
       }}
       output_map {{
@@ -284,7 +284,7 @@ ensemble_scheduling {{
            tu.shape_to_dims_str(nop_output0_shape),
            output1_dtype,
            tu.shape_to_dims_str(nop_output1_shape),
-           delimiter=index_delimiter)
+           delimiter=output_index_delimiter)
         return schedule
 
 

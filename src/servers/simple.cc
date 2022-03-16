@@ -694,8 +694,8 @@ main(int argc, char** argv)
       "setting request release callback");
 
   // Inputs
-  auto input0 = is_torch_model ? "INPUT__0" : "INPUT0";
-  auto input1 = is_torch_model ? "INPUT__1" : "INPUT1";
+  auto input0 = "INPUT0";
+  auto input1 = "INPUT1";
 
   std::vector<int64_t> input0_shape({1, 16});
   std::vector<int64_t> input1_shape({1, 16});
