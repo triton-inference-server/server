@@ -53,6 +53,16 @@ SharedMemoryManager::RegisterCUDASharedMemory(
       std::string("Shared memory feature is currently not supported on Windows")
           .c_str());
 }
+
+TRITONSERVER_Error*
+SharedMemoryManager::GetCUDAHandle(
+    const std::string& name, cudaIpcMemHandle_t** cuda_mem_handle)
+{
+  return TRITONSERVER_ErrorNew(
+      TRITONSERVER_ERROR_UNSUPPORTED,
+      std::string("Shared memory feature is currently not supported on Windows")
+          .c_str());
+}
 #endif  // TRITON_ENABLE_GPU
 
 TRITONSERVER_Error*
