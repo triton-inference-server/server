@@ -77,7 +77,10 @@ HTTPServer::Start()
     evhtp_enable_flag(htp_, EVHTP_FLAG_ENABLE_NODELAY);
     evhtp_set_gencb(htp_, HTTPServer::Dispatch, this);
     evhtp_use_threads_wexit(htp_, NULL, NULL, thread_cnt_, NULL);
-    evhtp_bind_socket(htp_, "0.0.0.0", port_, 1024);
+    int success = evhtp_bind_socket(htp_, "0.0.0.0", port_, 1024);
+    if (success != 0){
+      //TODO: Throw Triton error
+    }
 
     // Set listening event for breaking event loop
     evutil_socketpair(AF_UNIX, SOCK_STREAM, 0, fds_);
