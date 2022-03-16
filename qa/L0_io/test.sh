@@ -123,10 +123,6 @@ for trial in graphdef savedmodel onnx libtorch plan python python_dlpack; do
         (cd $MODELSDIR/fan_${full} && \
                 sed -i -e '{
                     N
-                    s/key: "INPUT\([0-9]\)"\n\(.*\)value: "same_input/key: "INPUT__\1"\n\2value: "same_input/
-                }' config.pbtxt && \
-                sed -i -e '{
-                    N
                     s/key: "OUTPUT\([0-9]\)"\n\(.*\)value: "same_output/key: "OUTPUT__\1"\n\2value: "same_output/
                 }' config.pbtxt)
     fi

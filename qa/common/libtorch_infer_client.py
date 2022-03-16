@@ -54,8 +54,8 @@ class InferTest(tu.TestResultCollector):
 
         inputs = []
         outputs = []
-        inputs.append(httpclient.InferInput('INPUT__0', [1, 16], "INT32"))
-        inputs.append(httpclient.InferInput('INPUT__1', [1, 16], "INT32"))
+        inputs.append(httpclient.InferInput('INPUT0', [1, 16], "INT32"))
+        inputs.append(httpclient.InferInput('INPUT1', [1, 16], "INT32"))
 
         # Create the data for the two input tensors. Initialize the first
         # to unique integers and the second to all ones.

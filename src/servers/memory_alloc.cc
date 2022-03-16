@@ -684,8 +684,8 @@ main(int argc, char** argv)
     GenerateStringInputData(&input0_data, &input1_data);
   }
 
-  auto input0 = is_torch_model ? "INPUT__0" : "INPUT0";
-  auto input1 = is_torch_model ? "INPUT__1" : "INPUT1";
+  auto input0 = "INPUT0";
+  auto input1 = "INPUT1";
 
   // Get the size of the input tensors
   size_t input0_size = input0_data.size();

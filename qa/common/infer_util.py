@@ -231,16 +231,15 @@ def infer_exact(tester,
         metadata = metadata_client.get_model_metadata(model_name)
         platform = metadata.platform
 
+    INPUT0 = "INPUT0"
+    INPUT1 = "INPUT1"
+
     if platform == "pytorch_libtorch":
         OUTPUT0 = "OUTPUT__0"
         OUTPUT1 = "OUTPUT__1"
-        INPUT0 = "INPUT__0"
-        INPUT1 = "INPUT__1"
     else:
         OUTPUT0 = "OUTPUT0"
         OUTPUT1 = "OUTPUT1"
-        INPUT0 = "INPUT0"
-        INPUT1 = "INPUT1"
 
     if output0_dtype == np.object_:
         output0_byte_size = sum(

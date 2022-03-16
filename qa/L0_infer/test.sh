@@ -237,7 +237,7 @@ for TARGET in cpu gpu; do
 
     KIND="KIND_GPU" && [[ "$TARGET" == "cpu" ]] && KIND="KIND_CPU"
     for FW in $BACKENDS; do
-      if [ "$FW" != "plan" ] && [ "$FW" != "python" ] && [ "$FW" =! "python_dlpack" ] && [ "$FW" != "openvino" ];then
+      if [ "$FW" != "plan" ] && [ "$FW" != "python" ] && [ "$FW" != "python_dlpack" ] && [ "$FW" != "openvino" ];then
         for MC in `ls models/${FW}*/config.pbtxt`; do
             echo "instance_group [ { kind: ${KIND} }]" >> $MC
         done
