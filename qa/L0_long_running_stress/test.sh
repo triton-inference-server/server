@@ -53,10 +53,12 @@ if [ "$TRITON_PERF_LONG" == 1 ]; then
     # ~ 4 days
     # TEST_DURATION=345600
     LOAD_THREAD_COUNT=2
+    EMAIL_SUBJECT="Long"
 else
     # ~ 7 hours
     TEST_DURATION=25000
     LOAD_THREAD_COUNT=0
+    EMAIL_SUBJECT=""
 fi
 
 RET=0
@@ -167,7 +169,7 @@ fi
 
 # Run only if both TRITON_FROM and TRITON_TO_DL are set
 if [[ ! -z "$TRITON_FROM" ]] || [[ ! -z "$TRITON_TO_DL" ]]; then
-    python stress_mail.py
+    python stress_mail.py $EMAIL_SUBJECT
 fi
 
 exit $RET

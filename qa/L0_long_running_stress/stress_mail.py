@@ -37,7 +37,8 @@ CI_JOB_ID = os.environ.get('CI_JOB_ID', '')
 
 if __name__ == '__main__':
     today = date.today().strftime("%Y-%m-%d")
-    subject = "Triton Long-Running Stress Test Summary: " + today
+    subject = "Triton Long-Running Stress Test " + sys.argv[
+        1] + " Summary: " + today
     stress_report = "stress_report.txt"
     link = "https://gitlab-master.nvidia.com/dl/dgx/tritonserver/-/jobs/" + CI_JOB_ID
     write_up = "<p>The table below includes results from long-running stress test. Please refer to the description of each test case to see what different kinds of inference requests were sent. Request concurrency is set to 8.</p>"
