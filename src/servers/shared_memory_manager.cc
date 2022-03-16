@@ -1,4 +1,4 @@
-// Copyright (c) 2019-2020, NVIDIA CORPORATION. All rights reserved.
+// Copyright 2019-2022, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 //
 // Redistribution and use in source and binary forms, with or without
 // modification, are permitted provided that the following conditions
@@ -47,6 +47,16 @@ TRITONSERVER_Error*
 SharedMemoryManager::RegisterCUDASharedMemory(
     const std::string& name, const cudaIpcMemHandle_t* cuda_shm_handle,
     const size_t byte_size, const int device_id)
+{
+  return TRITONSERVER_ErrorNew(
+      TRITONSERVER_ERROR_UNSUPPORTED,
+      std::string("Shared memory feature is currently not supported on Windows")
+          .c_str());
+}
+
+TRITONSERVER_Error*
+SharedMemoryManager::GetCUDAHandle(
+    const std::string& name, cudaIpcMemHandle_t** cuda_mem_handle)
 {
   return TRITONSERVER_ErrorNew(
       TRITONSERVER_ERROR_UNSUPPORTED,
