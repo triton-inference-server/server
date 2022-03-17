@@ -2468,13 +2468,25 @@ HTTPAPIServer::EVBufferToRawInput(
   RETURN_IF_ERR(
       TRITONSERVER_InferenceRequestAddRawInput(irequest, raw_input_name));
 
-  int32_t byte_size = evbuffer_get_length(input_buffer);
+  size_t byte_size = evbuffer_get_length(input_buffer);
   // zero-shape tensor
   if (byte_size == 0) {
     RETURN_IF_ERR(TRITONSERVER_InferenceRequestAppendInputData(
         irequest, raw_input_name, nullptr, 0 /* byte_size */,
         TRITONSERVER_MEMORY_CPU, 0 /* memory_type_id */));
   } else {
+    struct evbuffer_iovec* v = nullptr;
+    int v_idx = 0;
+    int n = evbuffer_peek(input_buffer, -1, NULL, NULL, 0);
+    if (n > 0) {
+      v = static_cast<struct evbuffer_iovec*>(
+          alloca(sizeof(struct evbuffer_iovec) * n));
+      if (evbuffer_peek(input_buffer, -1, NULL, v, n) != n) {
+        return TRITONSERVER_ErrorNew(
+            TRITONSERVER_ERROR_INTERNAL,
+            "unexpected error getting input buffers");
+      }
+    }
     // Process one block at a time
     while ((byte_size > 0) && (v_idx < n)) {
       char* base = static_cast<char*>(v[v_idx].iov_base);
@@ -2495,6 +2507,7 @@ HTTPAPIServer::EVBufferToRawInput(
           0 /* memory_type_id */));
     }
   }
+  return nullptr;  // success
 }
 
 void
