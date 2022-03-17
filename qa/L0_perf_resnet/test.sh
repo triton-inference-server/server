@@ -1,5 +1,5 @@
 #!/bin/bash
-# Copyright 2019-2021, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright 2019-2022, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -70,7 +70,7 @@ CONCURRENCY=1
 if [ "$ARCH" == "aarch64" ]; then
     MODEL_NAMES="${TRT_MODEL_NAME} ${TF_MODEL_NAME} ${ONNX_MODEL_NAME} ${PYT_MODEL_NAME}"
     OPTIMIZED_MODEL_NAMES="${TFAMP_MODEL_NAME} ${ONNXTRT_MODEL_NAME}"
-    CAFFE2PLAN=${TRITON_DIR}/test-util/bin/caffe2plan
+    CAFFE2PLAN=${TRITON_DIR}/bin/caffe2plan
 else
     MODEL_NAMES="${TRT_MODEL_NAME} ${TF_MODEL_NAME} ${ONNX_MODEL_NAME} ${PYT_MODEL_NAME}"
     OPTIMIZED_MODEL_NAMES="${TFTRT_MODEL_NAME} ${TFAMP_MODEL_NAME} ${ONNXTRT_MODEL_NAME}"
