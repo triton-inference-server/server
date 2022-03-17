@@ -906,7 +906,7 @@ COPY --from=build {0} {0}
 RUN mkdir -p {0}/install/third-party-src && \
     (cd {0}/tritonserver/build && \
      tar zcf {0}/install/third-party-src/src.tar.gz third-party-src)
-COPY --from=build /workspace/build/server/README.third-party-src {0}/install/third-party-src/README
+COPY --from=build /workspace/docker/README.third-party-src {0}/install/third-party-src/README
 '''.format(build_dir)
 
     if 'onnxruntime' in backends:
@@ -979,7 +979,7 @@ COPY --chown=1000:1000 --from=tritonserver_build {0}/install/third-party-src thi
         if 'sagemaker' in endpoints:
             df += '''
 LABEL com.amazonaws.sagemaker.capabilities.accept-bind-to-port=true
-COPY --chown=1000:1000 --from=tritonserver_build /workspace/build/sagemaker/serve /usr/bin/.
+COPY --chown=1000:1000 --from=tritonserver_build /workspace/docker/sagemaker/serve /usr/bin/.
 '''
 
     for noncore in NONCORE_BACKENDS:
@@ -1181,7 +1181,7 @@ LABEL com.nvidia.build.ref={}
 
 def container_build(images, backends, repoagents, endpoints):
     # The cmake, build and install directories within the container.
-    # Windows uses "\" for the path separator but Docker expects "/" 
+    # Windows uses "\" for the path separator but Docker expects "/"
     # (unix style) separator. We use replace to fix the path for docker usage.
     build_dir = os.path.join(FLAGS.tmp_dir, 'tritonbuild').replace("\\", "/")
     install_dir = os.path.join(build_dir, 'install')
