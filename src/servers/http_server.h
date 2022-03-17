@@ -32,12 +32,12 @@
 #include <string>
 #include <thread>
 #include <unordered_map>
-#include "src/core/constants.h"
-#include "src/core/logging.h"
-#include "src/servers/common.h"
-#include "src/servers/data_compressor.h"
-#include "src/servers/shared_memory_manager.h"
-#include "src/servers/tracer.h"
+#include "triton/common/constants.h"
+#include "triton/common/logging.h"
+#include "common.h"
+#include "data_compressor.h"
+#include "shared_memory_manager.h"
+#include "tracer.h"
 #include "triton/core/tritonserver.h"
 
 #include <evhtp/evhtp.h>

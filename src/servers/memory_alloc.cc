@@ -34,7 +34,7 @@
 #include <string>
 #include <thread>
 #include <vector>
-#include "src/servers/common.h"
+#include "common.h"
 #include "triton/core/tritonserver.h"
 
 static_assert(
