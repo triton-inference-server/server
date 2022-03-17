@@ -41,7 +41,7 @@
 #include <cuda_runtime_api.h>
 #endif  // TRITON_ENABLE_GPU
 
-namespace nvidia { namespace inferenceserver {
+namespace triton { namespace server {
 
 class SharedMemoryManager {
  public:
@@ -185,4 +185,4 @@ class SharedMemoryManager {
   // A mutex to protect the concurrent access to shared_memory_map_
   std::mutex mu_;
 };
-}}  // namespace nvidia::inferenceserver
+}}  // namespace triton::server

@@ -30,7 +30,7 @@
 #include <vector>
 #include "triton/core/tritonserver.h"
 
-namespace nvidia { namespace inferenceserver {
+namespace triton { namespace server {
 
 /// The value for a dimension in a shape that indicates that that
 /// dimension can take on any size.
@@ -126,4 +126,4 @@ std::string GetEnvironmentVariableOrDefault(
 /// wilcard dimensions.
 int64_t GetElementCount(const std::vector<int64_t>& dims);
 
-}}  // namespace nvidia::inferenceserver
+}}  // namespace triton::server

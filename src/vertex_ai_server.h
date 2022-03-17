@@ -27,14 +27,14 @@
 
 #include "http_server.h"
 
-namespace nvidia { namespace inferenceserver {
+namespace triton { namespace server {
 
 // Handle Vertex HTTP requests to inference server APIs
 class VertexAiAPIServer : public HTTPAPIServer {
  public:
   static TRITONSERVER_Error* Create(
       const std::shared_ptr<TRITONSERVER_Server>& server,
-      nvidia::inferenceserver::TraceManager* trace_manager,
+      triton::server::TraceManager* trace_manager,
       const std::shared_ptr<SharedMemoryManager>& smb_manager,
       const int32_t port, const int thread_cnt, std::string default_model_name,
       std::unique_ptr<HTTPServer>* vertex_ai_server);
@@ -42,7 +42,7 @@ class VertexAiAPIServer : public HTTPAPIServer {
  private:
   explicit VertexAiAPIServer(
       const std::shared_ptr<TRITONSERVER_Server>& server,
-      nvidia::inferenceserver::TraceManager* trace_manager,
+      triton::server::TraceManager* trace_manager,
       const std::shared_ptr<SharedMemoryManager>& shm_manager,
       const int32_t port, const int thread_cnt,
       const std::string& prediction_route, const std::string& health_route,
@@ -78,4 +78,4 @@ class VertexAiAPIServer : public HTTPAPIServer {
   static const std::string redirect_header_;
 };
 
-}}  // namespace nvidia::inferenceserver
+}}  // namespace triton::server
