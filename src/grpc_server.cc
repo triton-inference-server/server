@@ -62,7 +62,7 @@
 
 #define REGISTER_GRPC_INFER_THREAD_COUNT 2
 
-namespace nvidia { namespace inferenceserver {
+namespace triton { namespace server {
 namespace {
 
 // Unique IDs are only needed when debugging. They only appear in
@@ -4382,7 +4382,7 @@ ReadFile(const std::string& filename, std::string& data)
 //
 GRPCServer::GRPCServer(
     const std::shared_ptr<TRITONSERVER_Server>& server,
-    nvidia::inferenceserver::TraceManager* trace_manager,
+    triton::server::TraceManager* trace_manager,
     const std::shared_ptr<SharedMemoryManager>& shm_manager,
     const std::string& server_addr, bool use_ssl, const SslOptions& ssl_options,
     const int infer_allocation_pool_size,
@@ -4404,7 +4404,7 @@ GRPCServer::~GRPCServer()
 TRITONSERVER_Error*
 GRPCServer::Create(
     const std::shared_ptr<TRITONSERVER_Server>& server,
-    nvidia::inferenceserver::TraceManager* trace_manager,
+    triton::server::TraceManager* trace_manager,
     const std::shared_ptr<SharedMemoryManager>& shm_manager, int32_t port,
     bool use_ssl, const SslOptions& ssl_options, int infer_allocation_pool_size,
     grpc_compression_level compression_level,
@@ -4555,4 +4555,4 @@ GRPCServer::Stop()
   return nullptr;  // success
 }
 
-}}  // namespace nvidia::inferenceserver
+}}  // namespace triton::server

@@ -45,7 +45,7 @@
 #include <vector>
 #include "data_compressor.h"
 
-namespace ni = nvidia::inferenceserver;
+namespace ni = triton::server;
 
 namespace {
 

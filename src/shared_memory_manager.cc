@@ -28,7 +28,7 @@
 
 // Not supporting shared memory for now
 #ifdef _WIN32
-namespace nvidia { namespace inferenceserver {
+namespace triton { namespace server {
 SharedMemoryManager::~SharedMemoryManager() {}
 
 TRITONSERVER_Error*
@@ -115,7 +115,7 @@ SharedMemoryManager::UnregisterHelper(
       std::string("Shared memory feature is currently not supported on Windows")
           .c_str());
 }
-}}  // namespace nvidia::inferenceserver
+}}  // namespace triton::server
 #else
 #include <errno.h>
 #include <fcntl.h>
@@ -124,7 +124,7 @@ SharedMemoryManager::UnregisterHelper(
 #include "triton/common/logging.h"
 #include "common.h"
 
-namespace nvidia { namespace inferenceserver {
+namespace triton { namespace server {
 
 namespace {
 
@@ -543,5 +543,5 @@ SharedMemoryManager::UnregisterHelper(
   return nullptr;
 }
 
-}}  // namespace nvidia::inferenceserver
+}}  // namespace triton::server
 #endif

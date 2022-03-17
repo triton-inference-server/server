@@ -29,14 +29,14 @@
 
 #include "common.h"
 
-namespace nvidia { namespace inferenceserver {
+namespace triton { namespace server {
 
 // Handle Sagemaker HTTP requests to inference server APIs
 class SagemakerAPIServer : public HTTPAPIServer {
  public:
   static TRITONSERVER_Error* Create(
       const std::shared_ptr<TRITONSERVER_Server>& server,
-      nvidia::inferenceserver::TraceManager* trace_manager,
+      triton::server::TraceManager* trace_manager,
       const std::shared_ptr<SharedMemoryManager>& smb_manager,
       const int32_t port, const int thread_cnt,
       std::unique_ptr<HTTPServer>* sagemaker_server);
@@ -57,7 +57,7 @@ class SagemakerAPIServer : public HTTPAPIServer {
  private:
   explicit SagemakerAPIServer(
       const std::shared_ptr<TRITONSERVER_Server>& server,
-      nvidia::inferenceserver::TraceManager* trace_manager,
+      triton::server::TraceManager* trace_manager,
       const std::shared_ptr<SharedMemoryManager>& shm_manager,
       const int32_t port, const int thread_cnt)
       : HTTPAPIServer(server, trace_manager, shm_manager, port, thread_cnt),
@@ -104,4 +104,4 @@ class SagemakerAPIServer : public HTTPAPIServer {
   static const std::string binary_mime_type_;
 };
 
-}}  // namespace nvidia::inferenceserver
+}}  // namespace triton::server

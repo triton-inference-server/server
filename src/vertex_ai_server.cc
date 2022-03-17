@@ -28,7 +28,7 @@
 #include <memory>
 #include "common.h"
 
-namespace nvidia { namespace inferenceserver {
+namespace triton { namespace server {
 
 const std::string VertexAiAPIServer::binary_mime_type_(
     "application/vnd.vertex-ai-triton.binary+json;json-header-size=");
@@ -37,7 +37,7 @@ const std::string VertexAiAPIServer::redirect_header_(
 
 VertexAiAPIServer::VertexAiAPIServer(
     const std::shared_ptr<TRITONSERVER_Server>& server,
-    nvidia::inferenceserver::TraceManager* trace_manager,
+    triton::server::TraceManager* trace_manager,
     const std::shared_ptr<SharedMemoryManager>& shm_manager, const int32_t port,
     const int thread_cnt, const std::string& prediction_route,
     const std::string& health_route, const std::string& default_model_name)
@@ -261,7 +261,7 @@ VertexAiAPIServer::HandleMetrics(evhtp_request_t* req)
 TRITONSERVER_Error*
 VertexAiAPIServer::Create(
     const std::shared_ptr<TRITONSERVER_Server>& server,
-    nvidia::inferenceserver::TraceManager* trace_manager,
+    triton::server::TraceManager* trace_manager,
     const std::shared_ptr<SharedMemoryManager>& shm_manager, const int32_t port,
     const int thread_cnt, std::string default_model_name,
     std::unique_ptr<HTTPServer>* http_server)
@@ -347,4 +347,4 @@ VertexAiAPIServer::Create(
   return nullptr;
 }
 
-}}  // namespace nvidia::inferenceserver
+}}  // namespace triton::server
