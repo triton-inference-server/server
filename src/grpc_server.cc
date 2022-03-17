@@ -4447,13 +4447,13 @@ GRPCServer::Start()
     credentials = grpc::InsecureServerCredentials();
   }
 
-  int bound_port = 0;
-  grpc_builder_.AddListeningPort(server_addr_, credentials, &bound_port);
+  grpc_builder_.AddListeningPort(server_addr_, credentials);
   grpc_builder_.SetMaxMessageSize(MAX_GRPC_MESSAGE_SIZE);
   grpc_builder_.RegisterService(&service_);
   // GRPC KeepAlive Docs: https://grpc.github.io/grpc/cpp/md_doc_keepalive.html
   // NOTE: In order to work properly, the client-side settings should
   // be in agreement with server-side settings.
+  grpc_builder_.AddChannelArgument(GRPC_ARG_ALLOW_REUSEPORT, 0);
   grpc_builder_.AddChannelArgument(
       GRPC_ARG_KEEPALIVE_TIME_MS, keepalive_options_.keepalive_time_ms);
   grpc_builder_.AddChannelArgument(
@@ -4492,7 +4492,7 @@ GRPCServer::Start()
   model_stream_infer_cq_ = grpc_builder_.AddCompletionQueue();
   grpc_server_ = grpc_builder_.BuildAndStart();
   //Check if binding port failed
-  if(bound_port == 0){
+  if(grpc_server_ == nullptr){
     return TRITONSERVER_ErrorNew(
       TRITONSERVER_ERROR_UNAVAILABLE, (std::string("Port '")
                   + server_addr_ + "' already in use ")
