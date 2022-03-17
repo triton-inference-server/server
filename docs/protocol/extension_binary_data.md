@@ -162,7 +162,10 @@ To send a raw binary request, the Inference-Header-Content-Length header must be
 provided with value 0 to indicate that the request body doesn't include the
 inference header.
 
-Note that because the inference header is omitted, all the model output will be requested to be returned in binary tensor form as described in the previous section.
+Note that because the inference header is omitted, the request will be treated
+as batch-1 request if the model supports batching, and all the model output will
+be requested to be returned in binary tensor form as described in the previous
+section.
 
 ### Examples
 
