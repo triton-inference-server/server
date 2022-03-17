@@ -211,7 +211,7 @@ endif() # TRITON_ENABLE_GPU
 
 ExternalProject_Add(triton-server
   PREFIX triton-server
-  SOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/src/servers"
+  SOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/src"
   BINARY_DIR "${CMAKE_CURRENT_BINARY_DIR}/triton-server"
   CMAKE_CACHE_ARGS
     -DProtobuf_DIR:PATH=${_FINDPACKAGE_PROTOBUF_CONFIG_DIR}
