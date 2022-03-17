@@ -30,7 +30,7 @@
 #include <numeric>
 #include "common.h"
 
-namespace nvidia { namespace inferenceserver {
+namespace triton { namespace server {
 
 namespace {
 
@@ -126,4 +126,4 @@ TopkClassifications(
   return nullptr;  // success
 }
 
-}}  // namespace nvidia::inferenceserver
+}}  // namespace triton::server

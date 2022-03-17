@@ -86,13 +86,13 @@ int32_t repository_poll_secs_ = 15;
 // The HTTP, GRPC and metrics service/s and ports. Initialized to
 // default values and modifyied based on command-line args.
 #ifdef TRITON_ENABLE_HTTP
-std::unique_ptr<nvidia::inferenceserver::HTTPServer> http_service_;
+std::unique_ptr<triton::server::HTTPServer> http_service_;
 bool allow_http_ = true;
 int32_t http_port_ = 8000;
 #endif  // TRITON_ENABLE_HTTP
 
 #ifdef TRITON_ENABLE_SAGEMAKER
-std::unique_ptr<nvidia::inferenceserver::HTTPServer> sagemaker_service_;
+std::unique_ptr<triton::server::HTTPServer> sagemaker_service_;
 bool allow_sagemaker_ = false;
 int32_t sagemaker_port_ = 8080;
 bool sagemaker_safe_range_set_ = false;
@@ -102,7 +102,7 @@ int sagemaker_thread_cnt_ = 8;
 #endif  // TRITON_ENABLE_SAGEMAKER
 
 #ifdef TRITON_ENABLE_VERTEX_AI
-std::unique_ptr<nvidia::inferenceserver::HTTPServer> vertex_ai_service_;
+std::unique_ptr<triton::server::HTTPServer> vertex_ai_service_;
 bool allow_vertex_ai_ = false;
 int32_t vertex_ai_port_ = 8080;
 // The number of threads to initialize for the Vertex AI HTTP front-end.
@@ -111,19 +111,19 @@ std::string vertex_ai_default_model_;
 #endif  // TRITON_ENABLE_VERTEX_AI
 
 #ifdef TRITON_ENABLE_GRPC
-std::unique_ptr<nvidia::inferenceserver::GRPCServer> grpc_service_;
+std::unique_ptr<triton::server::GRPCServer> grpc_service_;
 bool allow_grpc_ = true;
 int32_t grpc_port_ = 8001;
 bool grpc_use_ssl_ = false;
-nvidia::inferenceserver::SslOptions grpc_ssl_options_;
+triton::server::SslOptions grpc_ssl_options_;
 grpc_compression_level grpc_response_compression_level_ =
     GRPC_COMPRESS_LEVEL_NONE;
 // KeepAlive defaults: https://grpc.github.io/grpc/cpp/md_doc_keepalive.html
-nvidia::inferenceserver::KeepAliveOptions grpc_keepalive_options_;
+triton::server::KeepAliveOptions grpc_keepalive_options_;
 #endif  // TRITON_ENABLE_GRPC
 
 #ifdef TRITON_ENABLE_METRICS
-std::unique_ptr<nvidia::inferenceserver::HTTPServer> metrics_service_;
+std::unique_ptr<triton::server::HTTPServer> metrics_service_;
 bool allow_metrics_ = true;
 int32_t metrics_port_ = 8002;
 float metrics_interval_ms_ = 2000;
@@ -656,13 +656,13 @@ CheckPortCollision()
 #ifdef TRITON_ENABLE_GRPC
 TRITONSERVER_Error*
 StartGrpcService(
-    std::unique_ptr<nvidia::inferenceserver::GRPCServer>* service,
+    std::unique_ptr<triton::server::GRPCServer>* service,
     const std::shared_ptr<TRITONSERVER_Server>& server,
-    nvidia::inferenceserver::TraceManager* trace_manager,
-    const std::shared_ptr<nvidia::inferenceserver::SharedMemoryManager>&
+    triton::server::TraceManager* trace_manager,
+    const std::shared_ptr<triton::server::SharedMemoryManager>&
         shm_manager)
 {
-  TRITONSERVER_Error* err = nvidia::inferenceserver::GRPCServer::Create(
+  TRITONSERVER_Error* err = triton::server::GRPCServer::Create(
       server, trace_manager, shm_manager, grpc_port_, grpc_use_ssl_,
       grpc_ssl_options_, grpc_infer_allocation_pool_size_,
       grpc_response_compression_level_, grpc_keepalive_options_, service);
@@ -681,13 +681,13 @@ StartGrpcService(
 #ifdef TRITON_ENABLE_HTTP
 TRITONSERVER_Error*
 StartHttpService(
-    std::unique_ptr<nvidia::inferenceserver::HTTPServer>* service,
+    std::unique_ptr<triton::server::HTTPServer>* service,
     const std::shared_ptr<TRITONSERVER_Server>& server,
-    nvidia::inferenceserver::TraceManager* trace_manager,
-    const std::shared_ptr<nvidia::inferenceserver::SharedMemoryManager>&
+    triton::server::TraceManager* trace_manager,
+    const std::shared_ptr<triton::server::SharedMemoryManager>&
         shm_manager)
 {
-  TRITONSERVER_Error* err = nvidia::inferenceserver::HTTPAPIServer::Create(
+  TRITONSERVER_Error* err = triton::server::HTTPAPIServer::Create(
       server, trace_manager, shm_manager, http_port_, http_thread_cnt_,
       service);
   if (err == nullptr) {
@@ -705,10 +705,10 @@ StartHttpService(
 #ifdef TRITON_ENABLE_METRICS
 TRITONSERVER_Error*
 StartMetricsService(
-    std::unique_ptr<nvidia::inferenceserver::HTTPServer>* service,
+    std::unique_ptr<triton::server::HTTPServer>* service,
     const std::shared_ptr<TRITONSERVER_Server>& server)
 {
-  TRITONSERVER_Error* err = nvidia::inferenceserver::HTTPMetricsServer::Create(
+  TRITONSERVER_Error* err = triton::server::HTTPMetricsServer::Create(
       server, metrics_port_, 1 /* HTTP thread count */, service);
   if (err == nullptr) {
     err = (*service)->Start();
@@ -724,13 +724,13 @@ StartMetricsService(
 #ifdef TRITON_ENABLE_SAGEMAKER
 TRITONSERVER_Error*
 StartSagemakerService(
-    std::unique_ptr<nvidia::inferenceserver::HTTPServer>* service,
+    std::unique_ptr<triton::server::HTTPServer>* service,
     const std::shared_ptr<TRITONSERVER_Server>& server,
-    nvidia::inferenceserver::TraceManager* trace_manager,
-    const std::shared_ptr<nvidia::inferenceserver::SharedMemoryManager>&
+    triton::server::TraceManager* trace_manager,
+    const std::shared_ptr<triton::server::SharedMemoryManager>&
         shm_manager)
 {
-  TRITONSERVER_Error* err = nvidia::inferenceserver::SagemakerAPIServer::Create(
+  TRITONSERVER_Error* err = triton::server::SagemakerAPIServer::Create(
       server, trace_manager, shm_manager, sagemaker_port_,
       sagemaker_thread_cnt_, service);
   if (err == nullptr) {
@@ -748,13 +748,13 @@ StartSagemakerService(
 #ifdef TRITON_ENABLE_VERTEX_AI
 TRITONSERVER_Error*
 StartVertexAiService(
-    std::unique_ptr<nvidia::inferenceserver::HTTPServer>* service,
+    std::unique_ptr<triton::server::HTTPServer>* service,
     const std::shared_ptr<TRITONSERVER_Server>& server,
-    nvidia::inferenceserver::TraceManager* trace_manager,
-    const std::shared_ptr<nvidia::inferenceserver::SharedMemoryManager>&
+    triton::server::TraceManager* trace_manager,
+    const std::shared_ptr<triton::server::SharedMemoryManager>&
         shm_manager)
 {
-  TRITONSERVER_Error* err = nvidia::inferenceserver::VertexAiAPIServer::Create(
+  TRITONSERVER_Error* err = triton::server::VertexAiAPIServer::Create(
       server, trace_manager, shm_manager, vertex_ai_port_,
       vertex_ai_thread_cnt_, vertex_ai_default_model_, service);
   if (err == nullptr) {
@@ -772,8 +772,8 @@ StartVertexAiService(
 bool
 StartEndpoints(
     const std::shared_ptr<TRITONSERVER_Server>& server,
-    nvidia::inferenceserver::TraceManager* trace_manager,
-    const std::shared_ptr<nvidia::inferenceserver::SharedMemoryManager>&
+    triton::server::TraceManager* trace_manager,
+    const std::shared_ptr<triton::server::SharedMemoryManager>&
         shm_manager)
 {
 #ifdef _WIN32
@@ -927,12 +927,12 @@ StopEndpoints()
 }
 
 bool
-StartTracing(nvidia::inferenceserver::TraceManager** trace_manager)
+StartTracing(triton::server::TraceManager** trace_manager)
 {
   *trace_manager = nullptr;
 
 #ifdef TRITON_ENABLE_TRACING
-  TRITONSERVER_Error* err = nvidia::inferenceserver::TraceManager::Create(
+  TRITONSERVER_Error* err = triton::server::TraceManager::Create(
       trace_manager, trace_level_, trace_rate_, trace_count_,
       trace_log_frequency_, trace_filepath_);
 
@@ -950,7 +950,7 @@ StartTracing(nvidia::inferenceserver::TraceManager** trace_manager)
 }
 
 bool
-StopTracing(nvidia::inferenceserver::TraceManager** trace_manager)
+StopTracing(triton::server::TraceManager** trace_manager)
 {
 #ifdef TRITON_ENABLE_TRACING
   // We assume that at this point Triton has been stopped gracefully,
@@ -1280,7 +1280,7 @@ Parse(TRITONSERVER_ServerOptions** server_options, int argc, char** argv)
 #if defined(TRITON_ENABLE_VERTEX_AI)
   // Set different default value if specific flag is set
   {
-    auto aip_mode = nvidia::inferenceserver::GetEnvironmentVariableOrDefault(
+    auto aip_mode = triton::server::GetEnvironmentVariableOrDefault(
         "AIP_MODE", "");
     // Enable Vertex AI service and disable HTTP / GRPC service by default
     // if detecting Vertex AI environment
@@ -1293,7 +1293,7 @@ Parse(TRITONSERVER_ServerOptions** server_options, int argc, char** argv)
       allow_grpc_ = false;
 #endif  // TRITON_ENABLE_GRPC
     }
-    auto port = nvidia::inferenceserver::GetEnvironmentVariableOrDefault(
+    auto port = triton::server::GetEnvironmentVariableOrDefault(
         "AIP_HTTP_PORT", "8080");
     vertex_ai_port_ = ParseIntOption(port);
   }
@@ -1654,7 +1654,7 @@ Parse(TRITONSERVER_ServerOptions** server_options, int argc, char** argv)
   // Vertex service is allowed
   {
     auto aip_storage_uri =
-        nvidia::inferenceserver::GetEnvironmentVariableOrDefault(
+        triton::server::GetEnvironmentVariableOrDefault(
             "AIP_STORAGE_URI", "");
     if (!aip_storage_uri.empty() && model_repository_paths.empty()) {
       model_repository_paths.insert(aip_storage_uri);
@@ -1829,11 +1829,11 @@ main(int argc, char** argv)
   }
 
   // Trace manager.
-  nvidia::inferenceserver::TraceManager* trace_manager;
+  triton::server::TraceManager* trace_manager;
 
   // Manager for shared memory blocks.
   auto shm_manager =
-      std::make_shared<nvidia::inferenceserver::SharedMemoryManager>();
+      std::make_shared<triton::server::SharedMemoryManager>();
 
   // Create the server...
   TRITONSERVER_Server* server_ptr = nullptr;
@@ -1853,7 +1853,7 @@ main(int argc, char** argv)
 
   // Trap SIGINT and SIGTERM to allow server to exit gracefully
   TRITONSERVER_Error* signal_err =
-      nvidia::inferenceserver::RegisterSignalHandler();
+      triton::server::RegisterSignalHandler();
   if (signal_err != nullptr) {
     LOG_TRITONSERVER_ERROR(signal_err, "failed to register signal handler");
     exit(1);
@@ -1865,7 +1865,7 @@ main(int argc, char** argv)
   }
 
   // Wait until a signal terminates the server...
-  while (!nvidia::inferenceserver::signal_exiting_) {
+  while (!triton::server::signal_exiting_) {
     // If enabled, poll the model repository to see if there have been
     // any changes.
     if (repository_poll_secs_ > 0) {
@@ -1876,10 +1876,10 @@ main(int argc, char** argv)
 
     // Wait for the polling interval (or a long time if polling is not
     // enabled). Will be woken if the server is exiting.
-    std::unique_lock<std::mutex> lock(nvidia::inferenceserver::signal_exit_mu_);
+    std::unique_lock<std::mutex> lock(triton::server::signal_exit_mu_);
     std::chrono::seconds wait_timeout(
         (repository_poll_secs_ == 0) ? 3600 : repository_poll_secs_);
-    nvidia::inferenceserver::signal_exit_cv_.wait_for(lock, wait_timeout);
+    triton::server::signal_exit_cv_.wait_for(lock, wait_timeout);
   }
 
   TRITONSERVER_Error* stop_err = TRITONSERVER_ServerStop(server_ptr);

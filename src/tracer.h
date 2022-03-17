@@ -36,7 +36,7 @@
 #include <unordered_map>
 #include "triton/core/tritonserver.h"
 
-namespace nvidia { namespace inferenceserver {
+namespace triton { namespace server {
 
 //
 // Manager for tracing to a file.
@@ -263,4 +263,4 @@ class TraceManager {
   std::mutex r_mu_;
 };
 
-}}  // namespace nvidia::inferenceserver
+}}  // namespace triton::server

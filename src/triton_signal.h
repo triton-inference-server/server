@@ -29,7 +29,7 @@
 #include <mutex>
 #include "triton/core/tritonserver.h"
 
-namespace nvidia { namespace inferenceserver {
+namespace triton { namespace server {
 
 // Exit mutex and cv used to signal the main thread that it should
 // close the server and exit.
@@ -40,4 +40,4 @@ extern std::condition_variable signal_exit_cv_;
 // Register signal handler. Return true if success, false if failure.
 TRITONSERVER_Error* RegisterSignalHandler();
 
-}}  // namespace nvidia::inferenceserver
+}}  // namespace triton::server

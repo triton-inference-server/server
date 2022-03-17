@@ -41,7 +41,7 @@ static_assert(
     TRITON_MIN_COMPUTE_CAPABILITY >= 1.0,
     "Invalid TRITON_MIN_COMPUTE_CAPABILITY specified");
 
-namespace ni = nvidia::inferenceserver;
+namespace ni = triton::server;
 
 namespace {
 

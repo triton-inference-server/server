@@ -42,7 +42,7 @@
 #include <cuda_runtime_api.h>
 #endif  // TRITON_ENABLE_GPU
 
-namespace ni = nvidia::inferenceserver;
+namespace ni = triton::server;
 
 namespace {
 
