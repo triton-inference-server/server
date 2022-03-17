@@ -64,8 +64,8 @@ RUN mkdir -p inception_graphdef/1 && \
 # Update the qa/ directory with test executables, models, etc.
 WORKDIR /workspace
 RUN mkdir -p qa/common && \
-    cp -r /workspace/src/servers/test/models/repeat_int32 qa/L0_decoupled/models/ && \
-    cp -r /workspace/src/servers/test/models/square_int32 qa/L0_decoupled/models/ && \
+    cp -r /workspace/src/test/models/repeat_int32 qa/L0_decoupled/models/ && \
+    cp -r /workspace/src/test/models/square_int32 qa/L0_decoupled/models/ && \
     mkdir qa/L0_simple_example/models && \
     cp -r docs/examples/model_repository/simple qa/L0_simple_example/models/. && \
     mkdir qa/L0_simple_go_client/models && \
@@ -133,7 +133,7 @@ RUN mkdir -p qa/L0_simple_ensemble/models/simple/1 && \
         qa/L0_multiple_ports/models/simple/1/.
 
 RUN mkdir -p qa/L0_backend_identity/models && \
-    cp -r src/servers/test/models/identity_fp32 qa/L0_backend_identity/models/. && \
+    cp -r src/test/models/identity_fp32 qa/L0_backend_identity/models/. && \
     mkdir -p qa/L0_backend_identity/models/identity_fp32/1
 
 RUN mkdir -p qa/custom_models/custom_sequence_int32/1 && \
