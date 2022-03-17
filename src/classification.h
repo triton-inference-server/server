@@ -29,7 +29,7 @@
 #include <vector>
 #include "triton/core/tritonserver.h"
 
-namespace nvidia { namespace inferenceserver {
+namespace triton { namespace server {
 
 TRITONSERVER_Error* TopkClassifications(
     TRITONSERVER_InferenceResponse* response, const uint32_t output_idx,
@@ -37,4 +37,4 @@ TRITONSERVER_Error* TopkClassifications(
     const TRITONSERVER_DataType datatype, const uint32_t req_class_count,
     std::vector<std::string>* class_strs);
 
-}}  // namespace nvidia::inferenceserver
+}}  // namespace triton::server

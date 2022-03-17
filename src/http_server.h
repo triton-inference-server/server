@@ -42,7 +42,7 @@
 
 #include <evhtp/evhtp.h>
 
-namespace nvidia { namespace inferenceserver {
+namespace triton { namespace server {
 
 // Generic HTTP server using evhtp
 class HTTPServer {
@@ -107,7 +107,7 @@ class HTTPAPIServer : public HTTPServer {
  public:
   static TRITONSERVER_Error* Create(
       const std::shared_ptr<TRITONSERVER_Server>& server,
-      nvidia::inferenceserver::TraceManager* trace_manager,
+      triton::server::TraceManager* trace_manager,
       const std::shared_ptr<SharedMemoryManager>& smb_manager,
       const int32_t port, const int thread_cnt,
       std::unique_ptr<HTTPServer>* http_server);
@@ -222,7 +222,7 @@ class HTTPAPIServer : public HTTPServer {
  protected:
   explicit HTTPAPIServer(
       const std::shared_ptr<TRITONSERVER_Server>& server,
-      nvidia::inferenceserver::TraceManager* trace_manager,
+      triton::server::TraceManager* trace_manager,
       const std::shared_ptr<SharedMemoryManager>& shm_manager,
       const int32_t port, const int thread_cnt);
   virtual void Handle(evhtp_request_t* req) override;
@@ -320,4 +320,4 @@ class HTTPAPIServer : public HTTPServer {
   re2::RE2 trace_regex_;
 };
 
-}}  // namespace nvidia::inferenceserver
+}}  // namespace triton::server

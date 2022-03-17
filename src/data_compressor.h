@@ -37,7 +37,11 @@
 #include "common.h"
 #include "triton/core/tritonserver.h"
 
-namespace nvidia { namespace inferenceserver {
+namespace triton { namespace server {
+
+//
+// DataCompressor
+//
 class DataCompressor {
  public:
   enum class Type { UNKNOWN, IDENTITY, GZIP, DEFLATE };
@@ -302,4 +306,4 @@ class DataCompressor {
   }
 };
 
-}}  // namespace nvidia::inferenceserver
+}}  // namespace triton::server

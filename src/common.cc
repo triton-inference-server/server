@@ -28,7 +28,7 @@
 
 #include "triton/core/tritonserver.h"
 
-namespace nvidia { namespace inferenceserver {
+namespace triton { namespace server {
 
 TRITONSERVER_Error*
 GetModelVersionFromString(const std::string& version_string, int64_t* version)
@@ -92,4 +92,4 @@ GetElementCount(const std::vector<int64_t>& dims)
   return cnt;
 }
 
-}}  // namespace nvidia::inferenceserver
+}}  // namespace triton::server

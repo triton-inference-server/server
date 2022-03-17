@@ -37,7 +37,7 @@
 #define BOOST_STACKTRACE_USE_ADDR2LINE
 #include <boost/stacktrace.hpp>
 
-namespace nvidia { namespace inferenceserver {
+namespace triton { namespace server {
 
 // Exit mutex and cv used to signal the main thread that it should
 // close the server and exit.
@@ -142,4 +142,4 @@ RegisterSignalHandler()
 
 #endif
 
-}}  // namespace nvidia::inferenceserver
+}}  // namespace triton::server

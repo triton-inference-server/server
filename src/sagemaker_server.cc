@@ -25,7 +25,7 @@
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include "sagemaker_server.h"
 
-namespace nvidia { namespace inferenceserver {
+namespace triton { namespace server {
 
 const std::string SagemakerAPIServer::binary_mime_type_(
     "application/vnd.sagemaker-triton.binary+json;json-header-size=");
@@ -123,7 +123,7 @@ SagemakerAPIServer::Handle(evhtp_request_t* req)
 TRITONSERVER_Error*
 SagemakerAPIServer::Create(
     const std::shared_ptr<TRITONSERVER_Server>& server,
-    nvidia::inferenceserver::TraceManager* trace_manager,
+    triton::server::TraceManager* trace_manager,
     const std::shared_ptr<SharedMemoryManager>& shm_manager, const int32_t port,
     const int thread_cnt, std::unique_ptr<HTTPServer>* http_server)
 {
@@ -136,4 +136,4 @@ SagemakerAPIServer::Create(
   return nullptr;
 }
 
-}}  // namespace nvidia::inferenceserver
+}}  // namespace triton::server

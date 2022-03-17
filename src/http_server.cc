@@ -56,7 +56,7 @@ extern "C" {
 #include "tracer.h"
 #endif  // TRITON_ENABLE_TRACING
 
-namespace nvidia { namespace inferenceserver {
+namespace triton { namespace server {
 
 #define HTTP_RESPOND_IF_ERR(REQ, X)                   \
   do {                                                \
@@ -941,7 +941,7 @@ CompressionTypeUsed(const std::string accept_encoding)
 
 HTTPAPIServer::HTTPAPIServer(
     const std::shared_ptr<TRITONSERVER_Server>& server,
-    nvidia::inferenceserver::TraceManager* trace_manager,
+    triton::server::TraceManager* trace_manager,
     const std::shared_ptr<SharedMemoryManager>& shm_manager, const int32_t port,
     const int thread_cnt)
     : HTTPServer(port, thread_cnt), server_(server),
@@ -3162,7 +3162,7 @@ HTTPAPIServer::Handle(evhtp_request_t* req)
 TRITONSERVER_Error*
 HTTPAPIServer::Create(
     const std::shared_ptr<TRITONSERVER_Server>& server,
-    nvidia::inferenceserver::TraceManager* trace_manager,
+    triton::server::TraceManager* trace_manager,
     const std::shared_ptr<SharedMemoryManager>& shm_manager, const int32_t port,
     const int thread_cnt, std::unique_ptr<HTTPServer>* http_server)
 {
@@ -3175,4 +3175,4 @@ HTTPAPIServer::Create(
   return nullptr;
 }
 
-}}  // namespace nvidia::inferenceserver
+}}  // namespace triton::server
