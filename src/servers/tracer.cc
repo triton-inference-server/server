@@ -24,13 +24,13 @@
 // (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-#include "src/servers/tracer.h"
+#include "tracer.h"
 
 #include <stdlib.h>
 #include <unordered_map>
-#include "src/core/constants.h"
-#include "src/core/logging.h"
-#include "src/servers/common.h"
+#include "triton/common/constants.h"
+#include "triton/common/logging.h"
+#include "common.h"
 #ifdef TRITON_ENABLE_GPU
 #include <cuda_runtime_api.h>
 #endif  // TRITON_ENABLE_GPU

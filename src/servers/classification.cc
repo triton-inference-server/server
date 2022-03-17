@@ -24,11 +24,11 @@
 // (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-#include "src/servers/classification.h"
+#include "classification.h"
 
 #include <algorithm>
 #include <numeric>
-#include "src/servers/common.h"
+#include "common.h"
 
 namespace nvidia { namespace inferenceserver {
 

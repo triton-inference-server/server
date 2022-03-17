@@ -24,7 +24,7 @@
 // (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-#include "src/servers/grpc_server.h"
+#include "grpc_server.h"
 
 #include <google/protobuf/arena.h>
 #include <grpc++/alarm.h>
@@ -44,11 +44,10 @@
 #include "grpc++/server_builder.h"
 #include "grpc++/server_context.h"
 #include "grpc++/support/status.h"
-#include "src/core/constants.h"
-#include "src/core/logging.h"
-#include "src/core/model_config.h"
-#include "src/servers/classification.h"
-#include "src/servers/common.h"
+#include "triton/common/constants.h"
+#include "triton/common/logging.h"
+#include "classification.h"
+#include "common.h"
 #include "triton/core/tritonserver.h"
 
 #define TRITONJSON_STATUSTYPE TRITONSERVER_Error*
@@ -58,7 +57,7 @@
 #include "triton/common/triton_json.h"
 
 #ifdef TRITON_ENABLE_TRACING
-#include "src/servers/tracer.h"
+#include "tracer.h"
 #endif  // TRITON_ENABLE_TRACING
 
 #define REGISTER_GRPC_INFER_THREAD_COUNT 2

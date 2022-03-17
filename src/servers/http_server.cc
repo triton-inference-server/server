@@ -28,20 +28,17 @@
 #define NOMINMAX
 #endif
 
-#include "src/servers/http_server.h"
+#include "http_server.h"
 
 #include <event2/buffer.h>
-#include <google/protobuf/text_format.h>
-#include <google/protobuf/util/json_util.h>
 #include <re2/re2.h>
 #include <algorithm>
 #include <list>
 #include <thread>
-#include "src/core/constants.h"
-#include "src/core/logging.h"
-#include "src/core/model_config.h"
-#include "src/servers/classification.h"
-#include "src/servers/data_compressor.h"
+#include "triton/common/constants.h"
+#include "triton/common/logging.h"
+#include "classification.h"
+#include "data_compressor.h"
 
 #define TRITONJSON_STATUSTYPE TRITONSERVER_Error*
 #define TRITONJSON_STATUSRETURN(M) \
@@ -56,7 +53,7 @@ extern "C" {
 #endif  // TRITON_ENABLE_GPU
 
 #ifdef TRITON_ENABLE_TRACING
-#include "src/servers/tracer.h"
+#include "tracer.h"
 #endif  // TRITON_ENABLE_TRACING
 
 namespace nvidia { namespace inferenceserver {

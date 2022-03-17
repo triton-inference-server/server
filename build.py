@@ -36,6 +36,7 @@ import subprocess
 import sys
 import traceback
 from distutils.dir_util import copy_tree
+from inspect import getsourcefile
 
 #
 # Build Triton Inference Server.
@@ -108,6 +109,7 @@ OVERRIDE_CORE_CMAKE_FLAGS = {}
 EXTRA_BACKEND_CMAKE_FLAGS = {}
 OVERRIDE_BACKEND_CMAKE_FLAGS = {}
 
+SCRIPT_DIR = os.path.dirname(os.path.abspath(getsourcefile(lambda:0)))
 
 def log(msg, force=False):
     if force or not FLAGS.quiet:
@@ -349,6 +351,7 @@ def core_cmake_args(components, backends, install_dir):
     cargs = [
         cmake_core_arg('CMAKE_BUILD_TYPE', None, FLAGS.build_type),
         cmake_core_arg('CMAKE_INSTALL_PREFIX', 'PATH', install_dir),
+        cmake_core_arg('TRITON_VERSION', 'STRING', FLAGS.version),
         cmake_core_arg('TRITON_COMMON_REPO_TAG', 'STRING',
                        components['common']),
         cmake_core_arg('TRITON_CORE_REPO_TAG', 'STRING', components['core']),
@@ -1184,9 +1187,9 @@ def container_build(images, backends, repoagents, endpoints):
     install_dir = os.path.join(build_dir, 'install')
     if target_platform() == 'windows':
         install_dir = os.path.normpath(install_dir)
-        cmake_dir = os.path.normpath('c:/workspace/build')
+        cmake_dir = os.path.normpath('c:/workspace')
     else:
-        cmake_dir = '/workspace/build'
+        cmake_dir = '/workspace'
 
     # We can't use docker module for building container because it
     # doesn't stream output and it also seems to handle cache-from
@@ -1676,7 +1679,7 @@ if __name__ == '__main__':
     parser.add_argument('--no-core-build',
                         action="store_true",
                         required=False,
-                        help='Do not build Triton core library.')
+                        help='Do not build Triton core sharead library or executable.')
     parser.add_argument(
         '--backend',
         action='append',
@@ -1765,22 +1768,27 @@ if __name__ == '__main__':
     if FLAGS.extra_backend_cmake_arg is None:
         FLAGS.extra_backend_cmake_arg = []
 
-    # FLAGS.cmake_dir is required for non-container builds. For
-    # container builds it is set above to the value appropriate for
-    # building within the buildbase container.
-    if FLAGS.no_container_build:
-        if FLAGS.cmake_dir is None:
-            fail('--cmake-dir required for Triton core build')
+    if FLAGS.install_dir is None:
+        FLAGS.install_dir = os.path.join(FLAGS.build_dir, "opt", "tritonserver")
+
+    # FLAGS.cmake_dir defaults to the directory containing build.py.
+    if FLAGS.cmake_dir is None:
+        from inspect import getsourcefile
+        FLAGS.cmake_dir = SCRIPT_DIR
 
     # Determine the versions. Start with Triton version, if --version
     # is not explicitly specified read from TRITON_VERSION file.
     if FLAGS.version is None:
-        with open('TRITON_VERSION', "r") as vfile:
+        with open(os.path.join(SCRIPT_DIR, 'TRITON_VERSION'), "r") as vfile:
             FLAGS.version = vfile.readline().strip()
 
+    log('Building Triton Inference Server')
     log('platform {}'.format(target_platform()))
     log('machine {}'.format(target_machine()))
     log('version {}'.format(FLAGS.version))
+    log('cmake dir {}'.format(FLAGS.cmake_dir))
+    log('build dir {}'.format(FLAGS.build_dir))
+    log('install dir {}'.format(FLAGS.install_dir))
 
     # Determine the default repo-tag that should be used for images,
     # backends and repo-agents if a repo-tag is not given
@@ -1921,10 +1929,6 @@ if __name__ == '__main__':
     if (FLAGS.container_prebuild_command):
         prebuild_command()
 
-    log('Building Triton Inference Server')
-
-    if FLAGS.install_dir is None:
-        FLAGS.install_dir = os.path.join(FLAGS.build_dir, "opt", "tritonserver")
     if FLAGS.build_parallel is None:
         FLAGS.build_parallel = multiprocessing.cpu_count() * 2
 
@@ -1948,8 +1952,7 @@ if __name__ == '__main__':
     for c in components:
         log('component "{}" at tag/branch "{}"'.format(c, components[c]))
 
-    # Build the core server. For now the core is contained in this
-    # repo so we just build in place
+    # Build the core shared library and the server executable.
     if not FLAGS.no_core_build:
         repo_build_dir = os.path.join(FLAGS.build_dir, 'tritonserver', 'build')
         repo_install_dir = os.path.join(FLAGS.build_dir, 'tritonserver',
@@ -1958,7 +1961,7 @@ if __name__ == '__main__':
         mkdir(repo_build_dir)
         cmake(repo_build_dir,
               core_cmake_args(components, backends, repo_install_dir))
-        makeinstall(repo_build_dir, target='server')
+        makeinstall(repo_build_dir)
 
         core_install_dir = FLAGS.install_dir
         mkdir(core_install_dir)

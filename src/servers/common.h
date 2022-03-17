@@ -1,4 +1,4 @@
-// Copyright (c) 2019-2020, NVIDIA CORPORATION. All rights reserved.
+// Copyright 2019-2022, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 //
 // Redistribution and use in source and binary forms, with or without
 // modification, are permitted provided that the following conditions
@@ -27,9 +27,14 @@
 
 #include <iostream>
 #include <string>
+#include <vector>
 #include "triton/core/tritonserver.h"
 
 namespace nvidia { namespace inferenceserver {
+
+/// The value for a dimension in a shape that indicates that that
+/// dimension can take on any size.
+constexpr int WILDCARD_DIM = -1;
 
 #define RETURN_IF_ERR(X)             \
   do {                               \
@@ -113,5 +118,12 @@ TRITONSERVER_Error* GetModelVersionFromString(
 /// \return The environment variable or the default value if not set.
 std::string GetEnvironmentVariableOrDefault(
     const std::string& variable_name, const std::string& default_value);
+
+/// Get the number of elements in a shape.
+/// \param dims The shape.
+/// \return The number of elements, or -1 if the number of elements
+/// cannot be determined because the shape contains one or more
+/// wilcard dimensions.
+int64_t GetElementCount(const std::vector<int64_t>& dims);
 
 }}  // namespace nvidia::inferenceserver

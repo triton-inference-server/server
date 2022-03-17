@@ -1,4 +1,4 @@
-// Copyright (c) 2020, NVIDIA CORPORATION. All rights reserved.
+// Copyright 2020-2022, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 //
 // Redistribution and use in source and binary forms, with or without
 // modification, are permitted provided that the following conditions
@@ -24,7 +24,7 @@
 // (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-#include "src/servers/common.h"
+#include "common.h"
 
 #include "triton/core/tritonserver.h"
 
@@ -69,6 +69,27 @@ GetEnvironmentVariableOrDefault(
 {
   const char* value = getenv(variable_name.c_str());
   return value ? value : default_value;
+}
+
+int64_t
+GetElementCount(const std::vector<int64_t>& dims)
+{
+  bool first = true;
+  int64_t cnt = 0;
+  for (auto dim : dims) {
+    if (dim == WILDCARD_DIM) {
+      return -1;
+    }
+
+    if (first) {
+      cnt = dim;
+      first = false;
+    } else {
+      cnt *= dim;
+    }
+  }
+
+  return cnt;
 }
 
 }}  // namespace nvidia::inferenceserver
