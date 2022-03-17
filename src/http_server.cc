@@ -77,9 +77,11 @@ HTTPServer::Start()
     evhtp_enable_flag(htp_, EVHTP_FLAG_ENABLE_NODELAY);
     evhtp_set_gencb(htp_, HTTPServer::Dispatch, this);
     evhtp_use_threads_wexit(htp_, NULL, NULL, thread_cnt_, NULL);
-    int success = evhtp_bind_socket(htp_, "0.0.0.0", port_, 1024);
-    if (success != 0){
-      //TODO: Throw Triton error
+    if (evhtp_bind_socket(htp_, "0.0.0.0", port_, 1024) != 0){
+      return TRITONSERVER_ErrorNew(
+        TRITONSERVER_ERROR_UNAVAILABLE, (std::string("Port '")
+                    + std::to_string(port_) + "' already in use ")
+                    .c_str());
     }
 
     // Set listening event for breaking event loop

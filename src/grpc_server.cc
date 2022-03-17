@@ -4449,14 +4449,6 @@ GRPCServer::Start()
 
   int bound_port = 0;
   grpc_builder_.AddListeningPort(server_addr_, credentials, &bound_port);
-  if(bound_port == 0){
-    // Binding port failed
-    // TODO: FAIL here, clean up as needed
-    return TRITONSERVER_ErrorNew(
-        TRITONSERVER_ERROR_UNAVAILABLE, (std::string("Port '")
-                    + server_addr_ + " already in use ")
-                    .c_str());
-  }
   grpc_builder_.SetMaxMessageSize(MAX_GRPC_MESSAGE_SIZE);
   grpc_builder_.RegisterService(&service_);
   // GRPC KeepAlive Docs: https://grpc.github.io/grpc/cpp/md_doc_keepalive.html
@@ -4499,7 +4491,14 @@ GRPCServer::Start()
   model_infer_cq_ = grpc_builder_.AddCompletionQueue();
   model_stream_infer_cq_ = grpc_builder_.AddCompletionQueue();
   grpc_server_ = grpc_builder_.BuildAndStart();
-
+  //Check if binding port failed
+  if(bound_port == 0){
+    return TRITONSERVER_ErrorNew(
+      TRITONSERVER_ERROR_UNAVAILABLE, (std::string("Port '")
+                  + server_addr_ + "' already in use ")
+                  .c_str());
+  }
+  
   // A common Handler for other non-inference requests
   CommonHandler* hcommon = new CommonHandler(
       "CommonHandler", server_, shm_manager_, trace_manager_, &service_,
