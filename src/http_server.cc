@@ -2507,6 +2507,8 @@ HTTPAPIServer::EVBufferToRawInput(
           0 /* memory_type_id */));
     }
   }
+  infer_req->alloc_payload_.default_output_kind_ =
+      AllocPayload::OutputInfo::BINARY;
   return nullptr;  // success
 }
 
