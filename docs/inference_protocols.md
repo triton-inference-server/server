@@ -1,5 +1,5 @@
 <!--
-# Copyright (c) 2018-2021, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright 2018-2022, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -79,7 +79,7 @@ Triton allows the on-wire compression of request/response messages by exposing f
 
 For client-side documentation, see [Client-Side GRPC Compression](https://github.com/triton-inference-server/client/tree/main#compression-1)
 
-Compression can be used to reduce the amount of bandwidth used in server-client communication. For more details, see [gRPC Compression](https://grpc.github.io/grpc/core/md_doc_compression.html). 
+Compression can be used to reduce the amount of bandwidth used in server-client communication. For more details, see [gRPC Compression](https://grpc.github.io/grpc/core/md_doc_compression.html).
 
 #### GRPC KeepAlive
 
@@ -105,9 +105,9 @@ is documented in
 [tritonserver.h](https://github.com/triton-inference-server/core/blob/main/include/triton/core/tritonserver.h).
 
 A simple example using the C API can be found in
-[simple.cc](../src/servers/simple.cc).  A more complicated example can
-be found in the source that implements the HTTP/REST and GRPC
-endpoints for Triton. These endpoints use the C API to communicate
-with the core of Triton. The primary source files for the endpoints
-are [grpc_server.cc](../src/servers/grpc_server.cc) and
-[http_server.cc](../src/servers/http_server.cc).
+[simple.cc](../src/simple.cc).  A more complicated example can be
+found in the source that implements the HTTP/REST and GRPC endpoints
+for Triton. These endpoints use the C API to communicate with the core
+of Triton. The primary source files for the endpoints are
+[grpc_server.cc](../src/grpc_server.cc) and
+[http_server.cc](../src/http_server.cc).
