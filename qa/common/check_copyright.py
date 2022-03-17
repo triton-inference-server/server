@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 
-# Copyright (c) 2018-2021, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright 2018-2022, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -36,8 +36,6 @@ SKIP_EXTS = ('jpeg', 'jpg', 'pgm', 'png', 'log', 'serverlog', 'preprocessed',
              'jmx', 'gz', 'json', 'pdf', 'so', 'onnx')
 REPO_PATH_FROM_THIS_FILE = '../..'
 SKIP_PATHS = (
-    'builddir', 'build/libdcgm', 'build/libevhtp', 'build/onnxruntime',
-    'build/server/README.third-party-src',
     'deploy/gke-marketplace-app/.gitignore',
     'deploy/gke-marketplace-app/server-deployer/chart/.helmignore',
     'deploy/gcp/.helmignore', 'deploy/aws/.helmignore',
