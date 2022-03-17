@@ -1099,11 +1099,26 @@ COPY docker/entrypoint.d/ /opt/nvidia/entrypoint.d/
 
     # The cpu-only build uses ubuntu as the base image, and so the
     # entrypoint files are not available in /opt/nvidia in the base
-    # image, so we must provide them outselves.
+    # image, so we must provide them ourselves.
     if not enable_gpu:
         df += '''
 COPY docker/cpu_only/ /opt/nvidia/
 ENTRYPOINT ["/opt/nvidia/nvidia_entrypoint.sh"]
+'''
+
+    # The cpu-only build uses ubuntu as the base image, and so the
+    # cuda, openmpi, nccl and cudnn files are not available in /opt/nvidia in the base
+    # image, so we must copy them from the min container outselves.
+    if not enable_gpu and ('pytorch' in backends):
+        df += '''
+FROM gitlab-master.nvidia.com:5005/dl/dgx/tritonserver:22.03-py3-min as min_container
+
+COPY --from=build /usr/local/cuda /usr/local/cuda
+COPY --from=build /usr/lib/x86_64-linux-gnu/libmpi.so.40 /usr/lib/x86_64-linux-gnu/libmpi.so.40
+COPY --from=build /usr/lib/x86_64-linux-gnu/libnccl.so.2 /usr/lib/x86_64-linux-gnu/libnccl.so.2
+COPY --from=build /usr/lib/x86_64-linux-gnu/libcudnn.so.8 /usr/lib/x86_64-linux-gnu/libcudnn.so.8
+
+ENV LD_LIBRARY_PATH /usr/local/cuda/targets/x86_64-linux/lib:${LD_LIBRARY_PATH}
 '''
 
     df += '''
