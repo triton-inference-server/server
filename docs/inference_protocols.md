@@ -307,7 +307,6 @@ is documented in
 [tritonserver.h](https://github.com/triton-inference-server/core/blob/main/include/triton/core/tritonserver.h).
 
 A simple example using the C API can be found in
-[simple.cc](../src/servers/simple.cc).  A more complicated example can
 be found in the source that implements the HTTP/REST and GRPC
 endpoints for Triton. These endpoints use the C API to communicate
 with the core of Triton. The primary source files for the endpoints

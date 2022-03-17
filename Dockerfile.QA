@@ -81,8 +81,8 @@ RUN mkdir -p inception_graphdef/1 && \
 # Update the qa/ directory with test executables, models, etc.
 WORKDIR /workspace
 RUN mkdir -p qa/common && \
-    cp -r src/test/models/repeat_int32 qa/L0_decoupled/models/ && \
-    cp -r src/test/models/square_int32 qa/L0_decoupled/models/ && \
+    cp -r /workspace/src/test/models/repeat_int32 qa/L0_decoupled/models/ && \
+    cp -r /workspace/src/test/models/square_int32 qa/L0_decoupled/models/ && \
     mkdir qa/L0_simple_example/models && \
     cp -r docs/examples/model_repository/simple qa/L0_simple_example/models/. && \
     mkdir qa/L0_simple_go_client/models && \
