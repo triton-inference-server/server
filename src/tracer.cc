@@ -28,7 +28,6 @@
 
 #include <stdlib.h>
 #include <unordered_map>
-#include "triton/common/constants.h"
 #include "triton/common/logging.h"
 #include "common.h"
 #ifdef TRITON_ENABLE_GPU

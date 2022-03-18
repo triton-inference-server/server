@@ -44,7 +44,6 @@
 #include "grpc++/server_builder.h"
 #include "grpc++/server_context.h"
 #include "grpc++/support/status.h"
-#include "triton/common/constants.h"
 #include "triton/common/logging.h"
 #include "classification.h"
 #include "common.h"
