@@ -32,7 +32,6 @@
 #include <string>
 #include <thread>
 #include <unordered_map>
-#include "triton/common/constants.h"
 #include "triton/common/logging.h"
 #include "common.h"
 #include "data_compressor.h"

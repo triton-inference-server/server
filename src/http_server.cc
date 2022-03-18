@@ -35,7 +35,6 @@
 #include <algorithm>
 #include <list>
 #include <thread>
-#include "triton/common/constants.h"
 #include "triton/common/logging.h"
 #include "classification.h"
 #include "data_compressor.h"

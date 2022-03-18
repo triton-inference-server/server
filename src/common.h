@@ -32,6 +32,15 @@
 
 namespace triton { namespace server {
 
+constexpr char kInferHeaderContentLengthHTTPHeader[] =
+    "Inference-Header-Content-Length";
+constexpr char kAcceptEncodingHTTPHeader[] = "Accept-Encoding";
+constexpr char kContentEncodingHTTPHeader[] = "Content-Encoding";
+constexpr char kContentTypeHeader[] = "Content-Type";
+constexpr char kContentLengthHeader[] = "Content-Length";
+
+constexpr int MAX_GRPC_MESSAGE_SIZE = INT32_MAX;
+
 /// The value for a dimension in a shape that indicates that that
 /// dimension can take on any size.
 constexpr int WILDCARD_DIM = -1;
