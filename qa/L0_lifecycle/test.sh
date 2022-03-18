@@ -25,7 +25,7 @@
 # (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-REPO_VERSION=22.03dev
+REPO_VERSION=${NVIDIA_TRITON_SERVER_VERSION}
 if [ "$#" -ge 1 ]; then
     REPO_VERSION=$1
 fi
@@ -211,7 +211,7 @@ fi
 SAVED_SERVER_PID=$SERVER_PID
 SERVER_ARGS="--model-repository=`pwd`/models --http-port 8003 --metrics-port 8004"
 run_server
-sleep 5
+sleep 10
 # check server log for the warning messages
 if [ `grep -c "failed to start GRPC service: Unavailable - Port '0.0.0.0:8001' already in use" $SERVER_LOG` != "1" ]; then
     echo -e "\n***\n*** Server log ${SERVER_LOG} did not report GRPC port collision\n***"
