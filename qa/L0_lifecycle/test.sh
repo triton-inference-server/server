@@ -222,8 +222,6 @@ if [ `grep -c "failed to start GRPC service: Unavailable - Port '0.0.0.0:8001' a
 fi
 
 SERVER_PID=$SAVED_SERVER_PID
-set -e
-
 kill $SERVER_PID
 wait $SERVER_PID
 
@@ -254,7 +252,6 @@ if [ `grep -c "failed to start HTTP service: Unavailable - Port '0.0.0.0:8000' a
 fi
 
 SERVER_PID=$SAVED_SERVER_PID
-set -e
 
 kill $SERVER_PID
 wait $SERVER_PID
@@ -286,7 +283,6 @@ if [ `grep -c "failed to start Metrics service: Unavailable - Port '0.0.0.0:8002
 fi
 
 SERVER_PID=$SAVED_SERVER_PID
-set -e
 
 kill $SERVER_PID
 wait $SERVER_PID
@@ -306,13 +302,13 @@ if [ "$SERVER_PID" == "0" ]; then
 fi
 SAVED_SERVER_PID=$SERVER_PID
 SERVER_ARGS="--model-repository=`pwd`/models --grpc-port 8003 --http-port 8004 --metrics-port 8005"
-run_server
+# Use nowait to avoid curl to port 8000
+run_server_nowait
 if [ "$SERVER_PID" == "0" ]; then
     echo -e "\n***\n*** Failed to start $SERVER\n***"
     cat $SERVER_LOG
     exit 1
 fi
-set -e
 
 kill $SERVER_PID
 wait $SERVER_PID

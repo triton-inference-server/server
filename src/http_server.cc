@@ -36,8 +36,6 @@
 #include <list>
 #include <thread>
 #include "classification.h"
-#include "data_compressor.h"
-#include "triton/common/logging.h"
 
 #define TRITONJSON_STATUSTYPE TRITONSERVER_Error*
 #define TRITONJSON_STATUSRETURN(M) \

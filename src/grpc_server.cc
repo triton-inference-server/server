@@ -4448,7 +4448,8 @@ GRPCServer::Start()
     credentials = grpc::InsecureServerCredentials();
   }
 
-  grpc_builder_.AddListeningPort(server_addr_, credentials);
+  int bound_port = 0;
+  grpc_builder_.AddListeningPort(server_addr_, credentials, &bound_port);
   grpc_builder_.SetMaxMessageSize(MAX_GRPC_MESSAGE_SIZE);
   grpc_builder_.RegisterService(&service_);
   // GRPC KeepAlive Docs: https://grpc.github.io/grpc/cpp/md_doc_keepalive.html
@@ -4493,7 +4494,7 @@ GRPCServer::Start()
   model_stream_infer_cq_ = grpc_builder_.AddCompletionQueue();
   grpc_server_ = grpc_builder_.BuildAndStart();
   // Check if binding port failed
-  if (grpc_server_ == nullptr) {
+  if (bound_port == 0) {
     return TRITONSERVER_ErrorNew(
         TRITONSERVER_ERROR_UNAVAILABLE,
         (std::string("Port '") + server_addr_ + "' already in use ").c_str());
