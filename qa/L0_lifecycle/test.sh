@@ -25,7 +25,7 @@
 # (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-REPO_VERSION=${NVIDIA_TRITON_SERVER_VERSION}
+REPO_VERSION=22.03dev
 if [ "$#" -ge 1 ]; then
     REPO_VERSION=$1
 fi
@@ -194,6 +194,130 @@ set -e
 
 kill $SERVER_PID
 wait $SERVER_PID
+
+LOG_IDX=$((LOG_IDX+1))
+
+# GRPC Port Collision Test
+rm -rf models
+mkdir models
+SERVER_ARGS="--model-repository=`pwd`/models"
+SERVER_LOG="./inference_server_$LOG_IDX.log"
+run_server
+if [ "$SERVER_PID" == "0" ]; then
+    echo -e "\n***\n*** Failed to start $SERVER\n***"
+    cat $SERVER_LOG
+    exit 1
+fi
+SAVED_SERVER_PID=$SERVER_PID
+SERVER_ARGS="--model-repository=`pwd`/models --http-port 8003 --metrics-port 8004"
+run_server
+sleep 5
+# check server log for the warning messages
+if [ `grep -c "failed to start GRPC service: Unavailable - Port '0.0.0.0:8001' already in use" $SERVER_LOG` != "1" ]; then
+    echo -e "\n***\n*** Server log ${SERVER_LOG} did not report GRPC port collision\n***"
+    echo -e "\n***\n*** Test Failed\n***"
+    kill $SERVER_PID
+    wait $SERVER_PID
+    RET=1
+fi
+
+SERVER_PID=$SAVED_SERVER_PID
+set -e
+
+kill $SERVER_PID
+wait $SERVER_PID
+
+LOG_IDX=$((LOG_IDX+1))
+
+# HTTP Port Collision Test
+rm -rf models
+mkdir models
+SERVER_ARGS="--model-repository=`pwd`/models"
+SERVER_LOG="./inference_server_$LOG_IDX.log"
+run_server
+if [ "$SERVER_PID" == "0" ]; then
+    echo -e "\n***\n*** Failed to start $SERVER\n***"
+    cat $SERVER_LOG
+    exit 1
+fi
+SAVED_SERVER_PID=$SERVER_PID
+SERVER_ARGS="--model-repository=`pwd`/models --grpc-port 8003 --metrics-port 8004"
+run_server
+sleep 10
+# check server log for the warning messages
+if [ `grep -c "failed to start HTTP service: Unavailable - Port '0.0.0.0:8000' already in use" $SERVER_LOG` != "1" ]; then
+    echo -e "\n***\n*** Server log ${SERVER_LOG} did not report HTTP port collision\n***"
+    echo -e "\n***\n*** Test Failed\n***"
+    kill $SERVER_PID
+    wait $SERVER_PID
+    RET=1
+fi
+
+SERVER_PID=$SAVED_SERVER_PID
+set -e
+
+kill $SERVER_PID
+wait $SERVER_PID
+
+LOG_IDX=$((LOG_IDX+1))
+
+# Metrics Port Collision Test
+rm -rf models
+mkdir models
+SERVER_ARGS="--model-repository=`pwd`/models"
+SERVER_LOG="./inference_server_$LOG_IDX.log"
+run_server
+if [ "$SERVER_PID" == "0" ]; then
+    echo -e "\n***\n*** Failed to start $SERVER\n***"
+    cat $SERVER_LOG
+    exit 1
+fi
+SAVED_SERVER_PID=$SERVER_PID
+SERVER_ARGS="--model-repository=`pwd`/models --grpc-port 8003 --http-port 8004"
+run_server
+sleep 10
+# check server log for the warning messages
+if [ `grep -c "failed to start Metrics service: Unavailable - Port '0.0.0.0:8002' already in use" $SERVER_LOG` != "1" ]; then
+    echo -e "\n***\n*** Server log ${SERVER_LOG} did not report metrics port collision\n***"
+    echo -e "\n***\n*** Test Failed\n***"
+    kill $SERVER_PID
+    wait $SERVER_PID
+    RET=1
+fi
+
+SERVER_PID=$SAVED_SERVER_PID
+set -e
+
+kill $SERVER_PID
+wait $SERVER_PID
+
+LOG_IDX=$((LOG_IDX+1))
+
+# No Port Collision Test
+rm -rf models
+mkdir models
+SERVER_ARGS="--model-repository=`pwd`/models"
+SERVER_LOG="./inference_server_$LOG_IDX.log"
+run_server
+if [ "$SERVER_PID" == "0" ]; then
+    echo -e "\n***\n*** Failed to start $SERVER\n***"
+    cat $SERVER_LOG
+    exit 1
+fi
+SAVED_SERVER_PID=$SERVER_PID
+SERVER_ARGS="--model-repository=`pwd`/models --grpc-port 8003 --http-port 8004 --metrics-port 8005"
+run_server
+if [ "$SERVER_PID" == "0" ]; then
+    echo -e "\n***\n*** Failed to start $SERVER\n***"
+    cat $SERVER_LOG
+    exit 1
+fi
+set -e
+
+kill $SERVER_PID
+wait $SERVER_PID
+kill $SAVED_SERVER_PID
+wait $SAVED_SERVER_PID
 
 LOG_IDX=$((LOG_IDX+1))
 

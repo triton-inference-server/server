@@ -38,6 +38,8 @@
 #include <queue>
 #include <sstream>
 #include <thread>
+#include "classification.h"
+#include "common.h"
 #include "grpc++/grpc++.h"
 #include "grpc++/security/server_credentials.h"
 #include "grpc++/server.h"
@@ -45,8 +47,6 @@
 #include "grpc++/server_context.h"
 #include "grpc++/support/status.h"
 #include "triton/common/logging.h"
-#include "classification.h"
-#include "common.h"
 #include "triton/core/tritonserver.h"
 
 #define TRITONJSON_STATUSTYPE TRITONSERVER_Error*
@@ -1042,8 +1042,9 @@ CommonHandler::SetUpAllRequests()
 
           err = cache_miss_json.MemberAsUInt("count", &ucnt);
           GOTO_IF_ERR(err, earlyexit);
-          statistics->mutable_inference_stats()->mutable_cache_miss()->set_count(
-              ucnt);
+          statistics->mutable_inference_stats()
+              ->mutable_cache_miss()
+              ->set_count(ucnt);
           err = cache_miss_json.MemberAsUInt("ns", &ucnt);
           GOTO_IF_ERR(err, earlyexit);
           statistics->mutable_inference_stats()->mutable_cache_miss()->set_ns(
@@ -4491,14 +4492,13 @@ GRPCServer::Start()
   model_infer_cq_ = grpc_builder_.AddCompletionQueue();
   model_stream_infer_cq_ = grpc_builder_.AddCompletionQueue();
   grpc_server_ = grpc_builder_.BuildAndStart();
-  //Check if binding port failed
-  if(grpc_server_ == nullptr){
+  // Check if binding port failed
+  if (grpc_server_ == nullptr) {
     return TRITONSERVER_ErrorNew(
-      TRITONSERVER_ERROR_UNAVAILABLE, (std::string("Port '")
-                  + server_addr_ + "' already in use ")
-                  .c_str());
+        TRITONSERVER_ERROR_UNAVAILABLE,
+        (std::string("Port '") + server_addr_ + "' already in use ").c_str());
   }
-  
+
   // A common Handler for other non-inference requests
   CommonHandler* hcommon = new CommonHandler(
       "CommonHandler", server_, shm_manager_, trace_manager_, &service_,
