@@ -1114,7 +1114,8 @@ ENTRYPOINT ["/opt/nvidia/nvidia_entrypoint.sh"]
 FROM gitlab-master.nvidia.com:5005/dl/dgx/tritonserver:22.03-py3-min as min_container
 
 COPY --from=build /usr/local/cuda /usr/local/cuda
-COPY --from=build /usr/lib/x86_64-linux-gnu/libmpi.so.40 /usr/lib/x86_64-linux-gnu/libmpi.so.40
+RUN apt-get update && \
+        apt-get install -y --no-install-recommends openmpi-bin
 COPY --from=build /usr/lib/x86_64-linux-gnu/libnccl.so.2 /usr/lib/x86_64-linux-gnu/libnccl.so.2
 COPY --from=build /usr/lib/x86_64-linux-gnu/libcudnn.so.8 /usr/lib/x86_64-linux-gnu/libcudnn.so.8
 
