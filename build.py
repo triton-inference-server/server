@@ -1109,7 +1109,7 @@ ENTRYPOINT ["/opt/nvidia/nvidia_entrypoint.sh"]
     # The cpu-only build uses ubuntu as the base image, and so the
     # cuda, openmpi, nccl and cudnn files are not available in /opt/nvidia in the base
     # image, so we must copy them from the min container outselves.
-    if not enable_gpu and ('pytorch' in backends):
+    if not enable_gpu:
         df += '''
 FROM gitlab-master.nvidia.com:5005/dl/dgx/tritonserver:22.03-py3-min as min_container
 
