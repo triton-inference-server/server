@@ -34,7 +34,7 @@ include(GNUInstallDirs)
 # Dependencies
 #
 # We must include the transitive closure of all repos so that we can
-# override the tag.
+# override the tag. The backend repo is needed for the tests.
 #
 include(FetchContent)
 
@@ -145,7 +145,6 @@ target_link_libraries(
   main
   PRIVATE
     triton-common-async-work-queue  # from repo-common
-    triton-common-constants         # from repo-common
     triton-common-error             # from repo-common
     triton-common-logging           # from repo-common
     triton-core-serverapi           # from repo-core
@@ -313,7 +312,7 @@ if(${TRITON_ENABLE_GRPC})
     grpc-endpoint-library
     PUBLIC
       proto-library           # from repo-common
-      triton-common-constants # from repo-common
+      triton-common-logging   # from repo-common
       triton-common-json      # from repo-common
       grpc-service-library    # from repo-common
       triton-core-serverapi   # from repo-core
@@ -460,8 +459,8 @@ if(${TRITON_ENABLE_HTTP}
   target_link_libraries(
     http-endpoint-library
     PUBLIC
-      triton-common-constants # from repo-common
       triton-common-json      # from repo-common
+      triton-common-logging   # from repo-common
       triton-core-serverapi   # from repo-core
       triton-core-serverstub  # from repo-core
       ${LIBEVENT_LIBRARIES}
@@ -583,7 +582,7 @@ if(${TRITON_ENABLE_TRACING})
   target_link_libraries(
     tracing-library
     PUBLIC
-      triton-common-constants  # from repo-common
+      triton-common-logging    # from repo-common
       triton-core-serverapi    # from repo-core
       triton-core-serverstub   # from repo-core
   )
