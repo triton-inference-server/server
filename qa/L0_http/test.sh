@@ -491,7 +491,15 @@ kill $SERVER_PID
 wait $SERVER_PID
 
 # Run python unit test
-rm -r ${MODELDIR}/* && cp -r $DATADIR/qa_identity_model_repository/onnx_zero_1_float32 ${MODELDIR}/.
+rm -r ${MODELDIR}/*
+cp -r $DATADIR/qa_identity_model_repository/onnx_zero_1_float32 ${MODELDIR}/.
+cp -r $DATADIR/qa_identity_model_repository/onnx_zero_1_object ${MODELDIR}/.
+cp -r $DATADIR/qa_identity_model_repository/onnx_zero_1_float16 ${MODELDIR}/.
+cp -r $DATADIR/qa_identity_model_repository/onnx_zero_3_float32 ${MODELDIR}/.
+cp -r ${MODELDIR}/onnx_zero_1_object ${MODELDIR}/onnx_zero_1_object_1_element && \
+    (cd models/onnx_zero_1_object_1_element && \
+        sed -i "s/onnx_zero_1_object/onnx_zero_1_object_1_element/" config.pbtxt && \
+        sed -i "0,/-1/{s/-1/1/}" config.pbtxt)
 
 SERVER_ARGS="--backend-directory=${BACKEND_DIR} --model-repository=${MODELDIR}"
 SERVER_LOG="./inference_server_http_test.log"
@@ -505,7 +513,7 @@ fi
 
 TEST_RESULT_FILE='test_results.txt'
 PYTHON_TEST=http_test.py
-EXPECTED_NUM_TESTS=2
+EXPECTED_NUM_TESTS=6
 set +e
 python3 $PYTHON_TEST >$CLIENT_LOG 2>&1
 if [ $? -ne 0 ]; then

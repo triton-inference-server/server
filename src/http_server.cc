@@ -35,9 +35,10 @@
 #include <algorithm>
 #include <list>
 #include <thread>
-#include "triton/common/logging.h"
 #include "classification.h"
 #include "data_compressor.h"
+#include "triton/common/constants.h"
+#include "triton/common/logging.h"
 
 #define TRITONJSON_STATUSTYPE TRITONSERVER_Error*
 #define TRITONJSON_STATUSRETURN(M) \
@@ -2021,7 +2022,8 @@ TRITONSERVER_Error*
 HTTPAPIServer::GetInferenceHeaderLength(
     evhtp_request_t* req, int32_t content_length, size_t* header_length)
 {
-  // Find Inference-Header-Content-Length in header. If missing set to 0
+  // Find Inference-Header-Content-Length in header.
+  // Set to content length in case that the header is not specified
   *header_length = content_length;
   const char* header_length_c_str =
       evhtp_kv_find(req->headers_in, kInferHeaderContentLengthHTTPHeader);
