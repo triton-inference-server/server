@@ -155,17 +155,18 @@ header. In other words, the request body only contains the binary data of the
 tensor. Below is the constraints for the qualified models:
 
 1. Only has 1 input
-2. If the input data type is non-byte, the number of variable size dimensions is
-at most 1. If the data type is byte, the shape must be [1].
+2. If the input data type is non-BYTE, the number of variable size dimensions is
+at most 1. If the data type is BYTE, the shape must be [1]. The supported data
+types can be found [here](https://github.com/kserve/kserve/blob/master/docs/predict-api/v2/required_api.md#tensor-data-types)
 
 To send a raw binary request, the Inference-Header-Content-Length header must be
 provided with value 0 to indicate that the request body doesn't include the
 inference header.
 
-Note that because the inference header is omitted, the request will be treated
-as batch-1 request if the model supports batching, and all the model output will
-be requested to be returned in binary tensor form as described in the previous
-section.
+Note: if the model supports batching, the request will be treated as batch-1
+request because the inference header is omitted. Additionally, all the model
+output will be requested to be returned in binary tensor form as described in
+the previous section.
 
 ### Examples
 
