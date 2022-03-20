@@ -1,5 +1,5 @@
 #!/bin/bash
-# Copyright (c) 2021 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright 2021-2022 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -44,24 +44,27 @@ DATADIR=/data/inferenceserver/${REPO_VERSION}/libtorch_model_store
 
 SERVER=/opt/tritonserver/bin/tritonserver
 SERVER_ARGS="--model-repository=models --log-verbose=1"
-SERVER_LOG="./inference_server.log"
-CLIENT_LOG="./client.log"
+SERVER_LOG_PREFIX="./inference_server.log"
+CLIENT_LOG_PREFIX="./client.log"
 source ../common/util.sh
+
+rm -f *.log.*
 
 RET=0
 
 for FLAG in true false none; do
-    rm -f *.log
+    CLIENT_LOG=$CLIENT_LOG_PREFIX.$FLAG
+    SERVER_LOG=$SERVER_LOG_PREFIX.$FLAG
     mkdir -p models && cp -r $DATADIR/resnet50_libtorch models/.
 
     if [ "$FLAG" != "none" ]; then
         echo """
-        parameters: {
-            key: \"ENABLE_NVFUSER\"
-            value: {
-                string_value: \"$FLAG\"
-            }
-        }""" >> models/resnet50_libtorch/config.pbtxt
+parameters: {
+    key: \"ENABLE_NVFUSER\"
+    value: {
+        string_value: \"$FLAG\"
+    }
+}""" >> models/resnet50_libtorch/config.pbtxt
     fi
 
     run_server
@@ -76,17 +79,20 @@ for FLAG in true false none; do
     # Send requests of 2 different batch sizes to catch nvfuser issues.
     python $IMAGE_CLIENT -m resnet50_libtorch -s INCEPTION -c 1 -b 1 $IMAGE >> $CLIENT_LOG 2>&1
     if [ $? -ne 0 ]; then
+        FAILED_LOG=$CLIENT_LOG
         RET=1
     fi
 
     python $IMAGE_CLIENT -m resnet50_libtorch -s INCEPTION -c 1 -b 8 $IMAGE >> $CLIENT_LOG 2>&1
     if [ $? -ne 0 ]; then
+        FAILED_LOG=$CLIENT_LOG
         RET=1
     fi
 
     NVFUSER_LOG="NvFuser is "
     if [ "$FLAG" == "true" ]; then
-        NVFUSER_LOG+="enabled"
+        # NvFuser support has been disabled. Change to 'enabled' when fixed.
+        NVFUSER_LOG+="disabled"
     elif [ "$FLAG" == "false" ]; then
         NVFUSER_LOG+="disabled"
     else
@@ -100,6 +106,7 @@ for FLAG in true false none; do
 
     if [ `grep -c VULTURE $CLIENT_LOG` != "9" ]; then
         echo -e "\n***\n*** Failed. Expected 9 VULTURE results\n***"
+        FAILED_LOG=$CLIENT_LOG
         RET=1
     fi
 
@@ -114,7 +121,7 @@ done
 if [ $RET -eq 0 ]; then
     echo -e "\n***\n*** Test Passed\n***"
 else
-    cat $CLIENT_LOG
+    cat $FAILED_LOG
     echo -e "\n***\n*** Test FAILED\n***"
 fi
 
