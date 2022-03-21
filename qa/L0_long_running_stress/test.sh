@@ -138,8 +138,6 @@ cp -r $DATADIR/tf_model_store/resnet_v1_50_graphdef $MODEL_DIR/resnet_v1_50_grap
     sed -i 's/^name: "resnet_v1_50_graphdef"/name: "resnet_v1_50_graphdef_def"/' config.pbtxt && \
     echo "optimization { }" >> config.pbtxt)
 
-python -m pip install -U prettytable
-
 SERVER_ARGS="--model-repository=`pwd`/$MODEL_DIR"
 SERVER_LOG="./serverlog"
 run_server
