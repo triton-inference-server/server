@@ -40,13 +40,12 @@ fi
 
 export CUDA_VISIBLE_DEVICES=0
 
-TEST_RESULT_FILE='test_results.txt'
 CLIENT_LOG="./client.log"
-LC_TEST=lifecycle_test.py
-
 DATADIR=/data/inferenceserver/${REPO_VERSION}
-
+LC_TEST=lifecycle_test.py
+SLEEP_TIME=10
 SERVER=/opt/tritonserver/bin/tritonserver
+TEST_RESULT_FILE='test_results.txt'
 source ../common/util.sh
 
 RET=0
@@ -70,7 +69,7 @@ if [ "$SERVER_PID" == "0" ]; then
     cat $SERVER_LOG
     exit 1
 fi
-sleep 10
+sleep $SLEEP_TIME
 
 rm -f $CLIENT_LOG
 set +e
@@ -104,7 +103,7 @@ if [ "$SERVER_PID" == "0" ]; then
     cat $SERVER_LOG
     exit 1
 fi
-sleep 10
+sleep $SLEEP_TIME
 
 
 rm -f $CLIENT_LOG
@@ -141,7 +140,7 @@ if [ "$SERVER_PID" == "0" ]; then
     cat $SERVER_LOG
     exit 1
 fi
-sleep 10
+sleep $SLEEP_TIME
 
 
 rm -f $CLIENT_LOG
@@ -178,7 +177,7 @@ if [ "$SERVER_PID" == "0" ]; then
     cat $SERVER_LOG
     exit 1
 fi
-sleep 10
+sleep $SLEEP_TIME
 
 
 rm -f $CLIENT_LOG
@@ -217,7 +216,7 @@ fi
 SAVED_SERVER_PID=$SERVER_PID
 SERVER_ARGS="--model-repository=`pwd`/models --http-port 8003 --metrics-port 8004"
 run_server
-sleep 10
+sleep $SLEEP_TIME
 # check server log for the warning messages
 if [ `grep -c "failed to start GRPC service: Unavailable - Port '0.0.0.0:8001' already in use" $SERVER_LOG` != "1" ]; then
     echo -e "\n***\n*** Server log ${SERVER_LOG} did not report GRPC port collision\n***"
@@ -247,7 +246,7 @@ fi
 SAVED_SERVER_PID=$SERVER_PID
 SERVER_ARGS="--model-repository=`pwd`/models --grpc-port 8003 --metrics-port 8004"
 run_server
-sleep 10
+sleep $SLEEP_TIME
 # check server log for the warning messages
 if [ `grep -c "failed to start HTTP service: Unavailable - Port '0.0.0.0:8000' already in use" $SERVER_LOG` != "1" ]; then
     echo -e "\n***\n*** Server log ${SERVER_LOG} did not report HTTP port collision\n***"
@@ -278,7 +277,7 @@ fi
 SAVED_SERVER_PID=$SERVER_PID
 SERVER_ARGS="--model-repository=`pwd`/models --grpc-port 8003 --http-port 8004"
 run_server
-sleep 10
+sleep $SLEEP_TIME
 # check server log for the warning messages
 if [ `grep -c "failed to start Metrics service: Unavailable - Port '0.0.0.0:8002' already in use" $SERVER_LOG` != "1" ]; then
     echo -e "\n***\n*** Server log ${SERVER_LOG} did not report metrics port collision\n***"
@@ -308,7 +307,7 @@ if [ "$SERVER_PID" == "0" ]; then
 fi
 SAVED_SERVER_PID=$SERVER_PID
 run_server
-sleep 10
+sleep $SLEEP_TIME
 # check server log for the warning messages
 if [ `grep -c "failed to start.*service: Unavailable - Port '.*' already in use" $SERVER_LOG` == "0" ]; then
     echo -e "\n***\n*** Server log ${SERVER_LOG} did not report port collision\n***"
@@ -343,7 +342,7 @@ SERVER_LOG="./inference_server_$LOG_IDX.log"
 SAVED_SERVER_PID=$SERVER_PID
 SERVER_ARGS="--model-repository=`pwd`/models --grpc-port 8003 --http-port 8004 --metrics-port 8005"
 run_server
-sleep 10
+sleep $SLEEP_TIME
 if [ "$SERVER_PID" == "0" ]; then
     echo -e "\n***\n*** Failed to start $SERVER\n***"
     cat $SERVER_LOG
