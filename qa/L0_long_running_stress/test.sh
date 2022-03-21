@@ -150,6 +150,7 @@ fi
 set +e
 python $STRESS_TEST -d ${TEST_DURATION} --load-thread ${LOAD_THREAD_COUNT} >>$CLIENT_LOG 2>&1
 if [ $? -ne 0 ]; then
+    cat $CLIENT_LOG
     echo -e "\n***\n*** Test Failed\n***"
     RET=1
 fi
