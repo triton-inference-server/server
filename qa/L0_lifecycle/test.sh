@@ -54,6 +54,12 @@ rm -fr *.log
 
 LOG_IDX=0
 
+if [ `ps | grep -c "tritonserver"` != "0" ]; then
+    echo -e "Tritonserver already running"
+    echo -e `ps | grep tritonserver`
+    exit 1
+fi
+
 # LifeCycleTest.test_parse_error_noexit_strict
 SERVER_ARGS="--model-repository=/tmp/xyzx --strict-readiness=true \
              --exit-on-error=false"
@@ -289,7 +295,7 @@ wait $SERVER_PID
 
 LOG_IDX=$((LOG_IDX+1))
 
-# No Port Collision Test
+# Multiple Port Collisions Test
 rm -rf models
 mkdir models
 SERVER_ARGS="--model-repository=`pwd`/models"
@@ -301,9 +307,43 @@ if [ "$SERVER_PID" == "0" ]; then
     exit 1
 fi
 SAVED_SERVER_PID=$SERVER_PID
+run_server
+sleep 10
+# check server log for the warning messages
+if [ `grep -c "failed to start.*service: Unavailable - Port '.*' already in use" $SERVER_LOG` == "0" ]; then
+    echo -e "\n***\n*** Server log ${SERVER_LOG} did not report port collision\n***"
+    echo -e "\n***\n*** Test Failed\n***"
+    kill $SERVER_PID
+    wait $SERVER_PID
+    RET=1
+fi
+
+SERVER_PID=$SAVED_SERVER_PID
+
+kill $SERVER_PID
+wait $SERVER_PID
+
+LOG_IDX=$((LOG_IDX+1))
+
+# No Port Collision Test
+rm -rf models
+mkdir models
+SERVER_ARGS="--model-repository=`pwd`/models"
+SERVER_LOG="./inference_server_$LOG_IDX.log"
+run_server
+if [ "$SERVER_PID" == "0" ]; then
+    echo -e "\n***\n*** Failed to start $SERVER\n***"
+    cat $SERVER_LOG
+    exit 1
+fi
+
+LOG_IDX=$((LOG_IDX+1))
+SERVER_LOG="./inference_server_$LOG_IDX.log"
+
+SAVED_SERVER_PID=$SERVER_PID
 SERVER_ARGS="--model-repository=`pwd`/models --grpc-port 8003 --http-port 8004 --metrics-port 8005"
-# Use nowait to avoid curl to port 8000
-run_server_nowait
+run_server
+sleep 10
 if [ "$SERVER_PID" == "0" ]; then
     echo -e "\n***\n*** Failed to start $SERVER\n***"
     cat $SERVER_LOG
