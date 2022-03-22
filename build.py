@@ -109,7 +109,8 @@ OVERRIDE_CORE_CMAKE_FLAGS = {}
 EXTRA_BACKEND_CMAKE_FLAGS = {}
 OVERRIDE_BACKEND_CMAKE_FLAGS = {}
 
-SCRIPT_DIR = os.path.dirname(os.path.abspath(getsourcefile(lambda:0)))
+SCRIPT_DIR = os.path.dirname(os.path.abspath(getsourcefile(lambda: 0)))
+
 
 def log(msg, force=False):
     if force or not FLAGS.quiet:
@@ -879,6 +880,20 @@ ENTRYPOINT []
         if FLAGS.enable_gpu:
             df += install_dcgm_libraries(argmap['DCGM_VERSION'],
                                          target_machine())
+        elif 'pytorch' in backends:
+            # The cpu-only build uses ubuntu as the base image, and so the cuda,
+            # openmpi, nccl and cudnn libs are not available. We must copy them from the Triton min container ourselves.
+            df += '''
+FROM {} as min_container
+
+COPY --from=min_container /usr/local/cuda /usr/local/cuda
+RUN apt-get update && \
+        apt-get install -y --no-install-recommends openmpi-bin
+COPY --from=min_container /usr/lib/x86_64-linux-gnu/libnccl.so.2 /usr/lib/x86_64-linux-gnu/libnccl.so.2
+COPY --from=min_container /usr/lib/x86_64-linux-gnu/libcudnn.so.8 /usr/lib/x86_64-linux-gnu/libcudnn.so.8
+
+ENV LD_LIBRARY_PATH /usr/local/cuda/targets/x86_64-linux/lib:${{LD_LIBRARY_PATH}}
+'''.format(argmap['GPU_BASE_IMAGE'])
 
     df += '''
 ENV TRITON_SERVER_VERSION ${TRITON_VERSION}
@@ -1106,24 +1121,6 @@ COPY docker/cpu_only/ /opt/nvidia/
 ENTRYPOINT ["/opt/nvidia/nvidia_entrypoint.sh"]
 '''
 
-    # The cpu-only build uses ubuntu as the base image, and so the
-    # cuda, openmpi, nccl and cudnn files are not available in /opt/nvidia in the base
-    # image, so we must copy them from the Triton min container ourselves.
-    if not enable_gpu:
-        base_image = 'nvcr.io/nvidia/tritonserver:{}-py3-min'.format(
-            FLAGS.upstream_container_version)
-        df += '''
-FROM {} as min_container
-
-COPY --from=min_container /usr/local/cuda /usr/local/cuda
-RUN apt-get update && \
-        apt-get install -y --no-install-recommends openmpi-bin
-COPY --from=min_container /usr/lib/x86_64-linux-gnu/libnccl.so.2 /usr/lib/x86_64-linux-gnu/libnccl.so.2
-COPY --from=min_container /usr/lib/x86_64-linux-gnu/libcudnn.so.8 /usr/lib/x86_64-linux-gnu/libcudnn.so.8
-
-ENV LD_LIBRARY_PATH /usr/local/cuda/targets/x86_64-linux/lib:${{LD_LIBRARY_PATH}}
-'''.format(base_image)
-
     df += '''
 ENV NVIDIA_BUILD_ID {}
 LABEL com.nvidia.build.id={}
@@ -1238,6 +1235,14 @@ def container_build(images, backends, repoagents, endpoints):
             '' if FLAGS.version is None or FLAGS.version
             not in TRITON_VERSION_MAP else TRITON_VERSION_MAP[FLAGS.version][5],
     }
+
+    # For cpu-only image we need to copy some cuda libraries and dependencies
+    # since we are using a PyTorch container that is not CPU-only
+    if not FLAGS.enable_gpu and ('pytorch' in backends) and \
+            (target_platform() != 'windows'):
+        dockerfileargmap[
+            'GPU_BASE_IMAGE'] = 'nvcr.io/nvidia/tritonserver:{}-py3-min'.format(
+                FLAGS.upstream_container_version)
 
     cachefrommap = [
         'tritonserver_buildbase', 'tritonserver_buildbase_cache0',
@@ -1694,10 +1699,11 @@ if __name__ == '__main__':
         help=
         'Include specified filesystem in build. Allowed values are "gcs", "azure_storage" and "s3".'
     )
-    parser.add_argument('--no-core-build',
-                        action="store_true",
-                        required=False,
-                        help='Do not build Triton core sharead library or executable.')
+    parser.add_argument(
+        '--no-core-build',
+        action="store_true",
+        required=False,
+        help='Do not build Triton core sharead library or executable.')
     parser.add_argument(
         '--backend',
         action='append',
