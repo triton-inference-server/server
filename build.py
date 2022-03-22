@@ -798,6 +798,14 @@ ARG BASE_IMAGE={}
 '''.format(argmap['TRITON_VERSION'], argmap['TRITON_CONTAINER_VERSION'],
            argmap['BASE_IMAGE'])
 
+
+    if not FLAGS.enable_gpu and ('pytorch' in backends) and \
+            (target_platform() != 'windows'):
+        df += '''
+FROM {} AS min_container
+
+'''.format(argmap['GPU_BASE_IMAGE'])
+
     df += '''
 FROM ${BASE_IMAGE}
 
@@ -884,16 +892,15 @@ ENTRYPOINT []
             # The cpu-only build uses ubuntu as the base image, and so the cuda,
             # openmpi, nccl and cudnn libs are not available. We must copy them from the Triton min container ourselves.
             df += '''
-FROM {} as min_container
-
 COPY --from=min_container /usr/local/cuda /usr/local/cuda
-RUN apt-get update && \
-        apt-get install -y --no-install-recommends openmpi-bin
 COPY --from=min_container /usr/lib/x86_64-linux-gnu/libnccl.so.2 /usr/lib/x86_64-linux-gnu/libnccl.so.2
 COPY --from=min_container /usr/lib/x86_64-linux-gnu/libcudnn.so.8 /usr/lib/x86_64-linux-gnu/libcudnn.so.8
 
-ENV LD_LIBRARY_PATH /usr/local/cuda/targets/x86_64-linux/lib:${{LD_LIBRARY_PATH}}
-'''.format(argmap['GPU_BASE_IMAGE'])
+RUN apt-get update && \
+        apt-get install -y --no-install-recommends openmpi-bin
+
+ENV LD_LIBRARY_PATH /usr/local/cuda/targets/x86_64-linux/lib:${LD_LIBRARY_PATH}
+'''
 
     df += '''
 ENV TRITON_SERVER_VERSION ${TRITON_VERSION}
