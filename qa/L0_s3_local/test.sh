@@ -1,5 +1,5 @@
 #!/bin/bash
-# Copyright 2020-2021, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright 2020-2022, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -85,7 +85,7 @@ MINIO_PID=$!
 export AWS_ACCESS_KEY_ID=minio && \
     export AWS_SECRET_ACCESS_KEY=miniostorage
 
-# Force version to 0.7 to prevent failures due to version changes
+# Force version to 0.07 to prevent failures due to version changes
 python -m pip install awscli-local==0.07
 
 # Needed to set correct port for awscli-local
@@ -221,6 +221,91 @@ wait $SERVER_PID
 # Destroy bucket
 awslocal $ENDPOINT_FLAG s3 rm s3://demo-bucket1.0 --recursive --include "*" && \
     awslocal $ENDPOINT_FLAG s3 rb s3://demo-bucket1.0
+
+# Test for multiple model stores using S3 cloud repositories
+BACKENDS1="graphdef libtorch"
+BACKENDS2="onnx plan savedmodel"
+BACKENDS="$BACKENDS1 $BACKENDS2"
+
+rm -rf models1 && mkdir models1
+for BACKEND in $BACKENDS1; do
+    cp -r $DATADIR/${BACKEND}_float32_float32_float32 models1/.
+    # Remove version policy from config.pbtxt
+    sed -i '/^version_policy/d' models1/${BACKEND}_float32_float32_float32/config.pbtxt
+done
+
+rm -rf models2 && mkdir models2
+for BACKEND in $BACKENDS2; do
+    cp -r $DATADIR/${BACKEND}_float32_float32_float32 models2/.
+    # Remove version policy from config.pbtxt
+    sed -i '/^version_policy/d' models2/${BACKEND}_float32_float32_float32/config.pbtxt
+done
+
+BUCKET_NAME="demo-bucket"
+for BUCKET_SUFFIX in 1 2; do
+    # Cleanup bucket if exists
+    awslocal $ENDPOINT_FLAG s3 rm s3://$BUCKET_NAME$BUCKET_SUFFIX --recursive --include "*" && \
+        awslocal $ENDPOINT_FLAG s3 rb s3://$BUCKET_NAME$BUCKET_SUFFIX || true
+
+    # Create and add data to bucket
+    awslocal $ENDPOINT_FLAG s3 mb s3://$BUCKET_NAME$BUCKET_SUFFIX && \
+        awslocal $ENDPOINT_FLAG s3 sync models$BUCKET_SUFFIX s3://$BUCKET_NAME$BUCKET_SUFFIX
+done
+
+SERVER_ARGS="--model-repository=s3://localhost:4572/demo-bucket1 --model-repository=s3://localhost:4572/demo-bucket2 --model-control-mode=explicit --log-verbose=1"
+SERVER_LOG="./inference_server.multi.log"
+
+run_server
+if [ "$SERVER_PID" == "0" ]; then
+    echo -e "\n***\n*** Failed to start $SERVER\n***"
+    cat $SERVER_LOG
+    # Kill minio server
+    kill $MINIO_PID
+    wait $MINIO_PID
+    exit 1
+fi
+
+set +e
+for BACKEND in $BACKENDS1; do
+    code=`curl -s -w %{http_code} -X POST localhost:8000/v2/repository/models/${BACKEND}_float32_float32_float32/load`
+    if [ "$code" != "200" ]; then
+        echo -e "\n***\n*** Test Failed\n***"
+        RET=1
+    fi
+
+    $PERF_CLIENT -m ${BACKEND}_float32_float32_float32 -p 3000 -t 1 >$CLIENT_LOG 2>&1
+    if [ $? -ne 0 ]; then
+        echo -e "\n***\n*** Test Failed\n***"
+        cat $CLIENT_LOG
+        RET=1
+    fi
+done
+
+for BACKEND in $BACKENDS2; do
+    code=`curl -s -w %{http_code} -X POST localhost:8000/v2/repository/models/${BACKEND}_float32_float32_float32/load`
+    if [ "$code" != "200" ]; then
+        echo -e "\n***\n*** Test Failed\n***"
+        RET=1
+    fi
+
+    $PERF_CLIENT -m ${BACKEND}_float32_float32_float32 -p 3000 -t 1 >$CLIENT_LOG 2>&1
+    if [ $? -ne 0 ]; then
+        echo -e "\n***\n*** Test Failed\n***"
+        cat $CLIENT_LOG
+        RET=1
+    fi
+done
+
+set -e
+
+kill $SERVER_PID
+wait $SERVER_PID
+
+# Destroy buckets
+for BUCKET_SUFFIX in 1 2; do
+    awslocal $ENDPOINT_FLAG s3 rm s3://demo-bucket$BUCKET_SUFFIX --recursive --include "*" && \
+        awslocal $ENDPOINT_FLAG s3 rb s3://demo-bucket$BUCKET_SUFFIX
+done
 
 # Kill minio server
 kill $MINIO_PID
