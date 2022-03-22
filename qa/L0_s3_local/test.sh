@@ -266,7 +266,7 @@ if [ "$SERVER_PID" == "0" ]; then
 fi
 
 set +e
-for BACKEND in $BACKENDS1; do
+for BACKEND in $BACKENDS; do
     code=`curl -s -w %{http_code} -X POST localhost:8000/v2/repository/models/${BACKEND}_float32_float32_float32/load`
     if [ "$code" != "200" ]; then
         echo -e "\n***\n*** Test Failed\n***"
@@ -280,22 +280,6 @@ for BACKEND in $BACKENDS1; do
         RET=1
     fi
 done
-
-for BACKEND in $BACKENDS2; do
-    code=`curl -s -w %{http_code} -X POST localhost:8000/v2/repository/models/${BACKEND}_float32_float32_float32/load`
-    if [ "$code" != "200" ]; then
-        echo -e "\n***\n*** Test Failed\n***"
-        RET=1
-    fi
-
-    $PERF_CLIENT -m ${BACKEND}_float32_float32_float32 -p 3000 -t 1 >$CLIENT_LOG 2>&1
-    if [ $? -ne 0 ]; then
-        echo -e "\n***\n*** Test Failed\n***"
-        cat $CLIENT_LOG
-        RET=1
-    fi
-done
-
 set -e
 
 kill $SERVER_PID
