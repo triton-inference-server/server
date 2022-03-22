@@ -76,7 +76,10 @@ for MODEL in \
     (cd models/${MODEL}_cpu_config && \
             sed -i 's/_float32_test/_float32_cpu_config/' \
                 config.pbtxt && \
-            echo "parameters: { key: \"intra_op_thread_count\" value: { string_value: \"1\" }} " \ >> config.pbtxt) && \
+            echo "parameters: { key: \"intra_op_thread_count\" value: { string_value: \"1\" }} \
+            parameters: { key: \"enable_mem_arena\" value: { string_value: \"1\" }}
+            parameters: { key: \"enable_mem_pattern\" value: { string_value: \"1\" }}
+            parameters: { key: \"memory.enable_memory_arena_shrinkage\" value: { string_value: \"cpu:0\" }} " \ >> config.pbtxt) && \
     # GPU execution accelerators with default setting
     cp -r models/${MODEL}_test models/${MODEL}_trt && \
     (cd models/${MODEL}_trt && \
@@ -183,6 +186,24 @@ for MODEL in \
         RET=1
     fi
 
+    # arena configs
+    grep "Configuring enable_mem_arena to 1" $SERVER_LOG
+    if [ $? -ne 0 ]; then
+        echo -e "\n***\n*** Failed. Expected Configuring enable_mem_arena to 1\n***"
+        RET=1
+    fi
+
+    grep "Configuring enable_mem_pattern to 1" $SERVER_LOG
+    if [ $? -ne 0 ]; then
+        echo -e "\n***\n*** Failed. Expected Configuring enable_mem_pattern to 1\n***"
+        RET=1
+    fi
+
+    grep "Configuring memory.enable_memory_arena_shrinkage to cpu:0" $SERVER_LOG
+    if [ $? -ne 0 ]; then
+        echo -e "\n***\n*** Failed. Expected Configuring memory.enable_memory_arena_shrinkage to cpu:0\n***"
+        RET=1
+    fi
 
     set -e
 
