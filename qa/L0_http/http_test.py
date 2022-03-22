@@ -143,7 +143,7 @@ class HttpTest(tu.TestResultCollector):
             "Expected error code {} returned for the request; got: {}".format(
                 400, r.status_code))
         self.assertIn(
-            "Raw request must only have 1 input to be deduced but got 3 inputs for model",
+            "Raw request must only have 1 input (found 1) to be deduced but got 3 inputs in",
             r.content.decode())
 
 
