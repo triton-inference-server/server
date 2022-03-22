@@ -35,9 +35,9 @@
 #include <algorithm>
 #include <list>
 #include <thread>
-#include "triton/common/logging.h"
 #include "classification.h"
 #include "data_compressor.h"
+#include "triton/common/logging.h"
 
 #define TRITONJSON_STATUSTYPE TRITONSERVER_Error*
 #define TRITONJSON_STATUSRETURN(M) \
@@ -2021,8 +2021,9 @@ TRITONSERVER_Error*
 HTTPAPIServer::GetInferenceHeaderLength(
     evhtp_request_t* req, int32_t content_length, size_t* header_length)
 {
-  // Find Inference-Header-Content-Length in header. If missing set to 0
-  *header_length = 0;
+  // Find Inference-Header-Content-Length in header.
+  // Set to content length in case that the header is not specified
+  *header_length = content_length;
   const char* header_length_c_str =
       evhtp_kv_find(req->headers_in, kInferHeaderContentLengthHTTPHeader);
   if (header_length_c_str != NULL) {
@@ -2111,17 +2112,11 @@ HTTPAPIServer::EVBufferToInput(
     }
   }
 
-  // Extract just the json header from the HTTP body. 'header_length'
-  // == 0 means that the entire HTTP body should be parsed as json.
+  // Extract just the json header from the HTTP body. 'header_length == 0' means
+  // that the entire HTTP body should be input data for a raw binary request.
   triton::common::TritonJson::Value request_json;
-  int json_header_len = 0;
-  if (header_length == 0) {
-    json_header_len = evbuffer_get_length(input_buffer);
-  } else {
-    json_header_len = header_length;
-  }
 
-  RETURN_IF_ERR(EVBufferToJson(&request_json, v, &v_idx, json_header_len, n));
+  RETURN_IF_ERR(EVBufferToJson(&request_json, v, &v_idx, header_length, n));
 
   // Set InferenceRequest request_id
   triton::common::TritonJson::Value id_json;
@@ -2465,6 +2460,59 @@ HTTPAPIServer::EVBufferToInput(
   return nullptr;  // success
 }
 
+TRITONSERVER_Error*
+HTTPAPIServer::EVBufferToRawInput(
+    const std::string& model_name, TRITONSERVER_InferenceRequest* irequest,
+    evbuffer* input_buffer, InferRequestClass* infer_req)
+{
+  static const char* raw_input_name = "raw_input";
+  RETURN_IF_ERR(
+      TRITONSERVER_InferenceRequestAddRawInput(irequest, raw_input_name));
+
+  size_t byte_size = evbuffer_get_length(input_buffer);
+  // zero-shape tensor
+  if (byte_size == 0) {
+    RETURN_IF_ERR(TRITONSERVER_InferenceRequestAppendInputData(
+        irequest, raw_input_name, nullptr, 0 /* byte_size */,
+        TRITONSERVER_MEMORY_CPU, 0 /* memory_type_id */));
+  } else {
+    struct evbuffer_iovec* v = nullptr;
+    int v_idx = 0;
+    int n = evbuffer_peek(input_buffer, -1, NULL, NULL, 0);
+    if (n > 0) {
+      v = static_cast<struct evbuffer_iovec*>(
+          alloca(sizeof(struct evbuffer_iovec) * n));
+      if (evbuffer_peek(input_buffer, -1, NULL, v, n) != n) {
+        return TRITONSERVER_ErrorNew(
+            TRITONSERVER_ERROR_INTERNAL,
+            "unexpected error getting input buffers");
+      }
+    }
+    // Process one block at a time
+    while ((byte_size > 0) && (v_idx < n)) {
+      char* base = static_cast<char*>(v[v_idx].iov_base);
+      size_t base_size;
+      if (v[v_idx].iov_len > byte_size) {
+        base_size = byte_size;
+        v[v_idx].iov_base = static_cast<void*>(base + byte_size);
+        v[v_idx].iov_len -= byte_size;
+        byte_size = 0;
+      } else {
+        base_size = v[v_idx].iov_len;
+        byte_size -= v[v_idx].iov_len;
+        v_idx++;
+      }
+
+      RETURN_IF_ERR(TRITONSERVER_InferenceRequestAppendInputData(
+          irequest, raw_input_name, base, base_size, TRITONSERVER_MEMORY_CPU,
+          0 /* memory_type_id */));
+    }
+  }
+  infer_req->alloc_payload_.default_output_kind_ =
+      AllocPayload::OutputInfo::BINARY;
+  return nullptr;  // success
+}
+
 void
 HTTPAPIServer::HandleInfer(
     evhtp_request_t* req, const std::string& model_name,
@@ -2550,8 +2598,8 @@ HTTPAPIServer::HandleInfer(
   // Get the header length
   size_t header_length;
   if (err == nullptr) {
-    // Set to large value in case there is no Content-Length to compare with
-    int32_t content_length = INT32_MAX;
+    // Set to body size in case there is no Content-Length to compare with
+    int32_t content_length = evbuffer_get_length(req->buffer_in);
     if (decompressed_buffer == nullptr) {
       const char* content_length_c_str =
           evhtp_kv_find(req->headers_in, kContentLengthHeader);
@@ -2587,11 +2635,19 @@ HTTPAPIServer::HandleInfer(
 #endif  // TRITON_ENABLE_TRACING
 
     if (err == nullptr) {
-      err = EVBufferToInput(
-          model_name, irequest,
-          (decompressed_buffer == nullptr) ? req->buffer_in
-                                           : decompressed_buffer,
-          infer_request.get(), header_length);
+      if (header_length != 0) {
+        err = EVBufferToInput(
+            model_name, irequest,
+            (decompressed_buffer == nullptr) ? req->buffer_in
+                                             : decompressed_buffer,
+            infer_request.get(), header_length);
+      } else {
+        err = EVBufferToRawInput(
+            model_name, irequest,
+            (decompressed_buffer == nullptr) ? req->buffer_in
+                                             : decompressed_buffer,
+            infer_request.get());
+      }
     }
     if (err == nullptr) {
       err = TRITONSERVER_InferenceRequestSetReleaseCallback(
