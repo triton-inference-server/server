@@ -47,12 +47,7 @@ EXPECTED_NUM_TESTS="2"
 
 DATADIR=/data/inferenceserver/${REPO_VERSION}/qa_trt_plugin_model_repository
 
-# TODO: Remove temp commands, making model dir below
-rm -r models
-mkdir models
-cp -r $DATADIR/* `pwd`/models
-DATADIR=`pwd`/models
-# rm -r ${DATADIR}/plan_float32_float32_float32_CustomClipPlugin
+# TODO: Add Preload example
 # SERVER_LD_PRELOAD=$DATADIR/libclipplugin.so
 
 SERVER=/opt/tritonserver/bin/tritonserver
