@@ -43,22 +43,20 @@ export CUDA_VISIBLE_DEVICES=0
 
 CLIENT_LOG="./client.log"
 PLUGIN_TEST=trt_plugin_test.py
-EXPECTED_NUM_TESTS="2"
+EXPECTED_NUM_TESTS="3"
 
 DATADIR=/data/inferenceserver/${REPO_VERSION}/qa_trt_plugin_model_repository
-
-# TODO: Add Preload example
-# SERVER_LD_PRELOAD=$DATADIR/libclipplugin.so
-
 SERVER=/opt/tritonserver/bin/tritonserver
-# SERVER_ARGS="--model-repository=$DATADIR --exit-timeout-secs=120"
-SERVER_ARGS="--model-repository=$DATADIR --exit-timeout-secs=120 --backend-config=tensorrt,plugins=$DATADIR/libclipplugin.so --log-verbose=1"
-SERVER_LOG="./inference_server.log"
 source ../common/util.sh
 
-rm -f $SERVER_LOG $CLIENT_LOG
-
 RET=0
+rm -fr *.log
+
+LOG_IDX=0
+
+## Plugin Tests Without LD_PRELOAD
+SERVER_ARGS="--model-repository=$DATADIR --exit-timeout-secs=120 --backend-config=tensorrt,plugins=$DATADIR/libclipplugin.so"
+SERVER_LOG="./inference_server_$LOG_IDX.log"
 
 run_server
 if [ "$SERVER_PID" == "0" ]; then
@@ -74,7 +72,7 @@ if [ $? -ne 0 ]; then
     echo -e "\n***\n*** Test Failed\n***"
     RET=1
 else
-    check_test_results $TEST_RESULT_FILE $EXPECTED_NUM_TESTS
+    check_test_results $TEST_RESULT_FILE 3
     if [ $? -ne 0 ]; then
         cat $CLIENT_LOG
         echo -e "\n***\n*** Test Result Verification Failed\n***"
@@ -86,10 +84,66 @@ set -e
 kill $SERVER_PID
 wait $SERVER_PID
 
+LOG_IDX=$((LOG_IDX+1))
+
+## LD_PRELOAD Custom Plugin Test
+## Success test
+SERVER_LD_PRELOAD=$DATADIR/libclipplugin.so
+SERVER_ARGS="--model-repository=$DATADIR --exit-timeout-secs=120"
+SERVER_LOG="./inference_server_$LOG_IDX.log"
+
+run_server
+if [ "$SERVER_PID" == "0" ]; then
+    echo -e "\n***\n*** Failed to start $SERVER\n***"
+    cat $SERVER_LOG
+    exit 1
+fi
+
+rm -f $CLIENT_LOG
+set +e
+python $PLUGIN_TEST PluginModelTest.test_raw_fff_clip >>$CLIENT_LOG 2>&1
+if [ $? -ne 0 ]; then
+    cat $CLIENT_LOG
+    echo -e "\n***\n*** Test Failed\n***"
+    RET=1
+else
+    check_test_results $TEST_RESULT_FILE 1
+    if [ $? -ne 0 ]; then
+        cat $CLIENT_LOG
+        echo -e "\n***\n*** Test Result Verification Failed\n***"
+        RET=1
+    fi
+fi
+set -e
+
+kill $SERVER_PID
+wait $SERVER_PID
+
+LOG_IDX=$((LOG_IDX+1))
+
+## LD_PRELOAD Custom Plugin Test
+## Failure test
+
+unset SERVER_LD_PRELOAD
+SERVER_LOG="./inference_server_$LOG_IDX.log"
+
+run_server
+set +e
+if [ "$SERVER_PID" != "0" ]; then
+    echo -e "\n***\n*** Test Failed\n"
+    echo -e "Unexpected successful server start $SERVER\n***"
+    cat $SERVER_LOG
+    kill $SERVER_PID
+    wait $SERVER_PID
+    exit 1
+fi
+set -e
+
+rm -f $CLIENT_LOG
+
 if [ $RET -eq 0 ]; then
     echo -e "\n***\n*** Test Passed\n***"
 else
-    cat $CLIENT_LOG
     echo -e "\n***\n*** Test FAILED\n***"
 fi
 
