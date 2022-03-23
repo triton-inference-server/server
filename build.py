@@ -798,14 +798,6 @@ ARG BASE_IMAGE={}
 '''.format(argmap['TRITON_VERSION'], argmap['TRITON_CONTAINER_VERSION'],
            argmap['BASE_IMAGE'])
 
-
-    if not FLAGS.enable_gpu and ('pytorch' in backends) and \
-            (target_platform() != 'windows'):
-        df += '''
-FROM {} AS min_container
-
-'''.format(argmap['GPU_BASE_IMAGE'])
-
     df += '''
 FROM ${BASE_IMAGE}
 
@@ -888,19 +880,6 @@ ENTRYPOINT []
         if FLAGS.enable_gpu:
             df += install_dcgm_libraries(argmap['DCGM_VERSION'],
                                          target_machine())
-        elif 'pytorch' in backends:
-            # The cpu-only build uses ubuntu as the base image, and so the cuda,
-            # openmpi, nccl and cudnn libs are not available. We must copy them from the Triton min container ourselves.
-            df += '''
-COPY --from=min_container /usr/local/cuda /usr/local/cuda
-COPY --from=min_container /usr/lib/x86_64-linux-gnu/libnccl.so.2 /usr/lib/x86_64-linux-gnu/libnccl.so.2
-COPY --from=min_container /usr/lib/x86_64-linux-gnu/libcudnn.so.8 /usr/lib/x86_64-linux-gnu/libcudnn.so.8
-
-RUN apt-get update && \
-        apt-get install -y --no-install-recommends openmpi-bin
-
-ENV LD_LIBRARY_PATH /usr/local/cuda/targets/x86_64-linux/lib:${LD_LIBRARY_PATH}
-'''
 
     df += '''
 ENV TRITON_SERVER_VERSION ${TRITON_VERSION}
@@ -963,12 +942,27 @@ ARG BUILD_IMAGE=tritonserver_build
 ############################################################################
 FROM ${{BUILD_IMAGE}} AS tritonserver_build
 
+'''.format(argmap['TRITON_VERSION'], argmap['TRITON_CONTAINER_VERSION'],
+           argmap['BASE_IMAGE'])
+
+    # PyTorch backend needs extra CUDA and other dependencies during runtime
+    # that are missing in the CPU only base container. These dependencies
+    # must be copied from the Triton Min image
+    if not FLAGS.enable_gpu and ('pytorch' in backends):
+        df += '''
+############################################################################
+##  Triton Min image
+############################################################################
+FROM {} AS min_container
+
+'''.format(argmap['GPU_BASE_IMAGE'])
+
+    df += '''
 ############################################################################
 ##  Production stage: Create container with just inference server executable
 ############################################################################
-FROM ${{BASE_IMAGE}}
-'''.format(argmap['TRITON_VERSION'], argmap['TRITON_CONTAINER_VERSION'],
-           argmap['BASE_IMAGE'])
+FROM ${BASE_IMAGE}
+'''
 
     df += dockerfile_prepare_container_linux(argmap, backends, FLAGS.enable_gpu,
                                              target_machine())
@@ -1095,6 +1089,33 @@ RUN ln -sf ${_CUDA_COMPAT_PATH}/lib.real ${_CUDA_COMPAT_PATH}/lib \
  && echo ${_CUDA_COMPAT_PATH}/lib > /etc/ld.so.conf.d/00-cuda-compat.conf \
  && ldconfig \
  && rm -f ${_CUDA_COMPAT_PATH}/lib
+'''
+
+    elif 'pytorch' in backends:
+        # The cpu-only build uses ubuntu as the base image, and so the cuda,
+        # openmpi, nccl and cudnn libs are not available. We must copy these
+        # pytorch dependencies from the Triton min container ourselves.
+        df += '''
+RUN mkdir -p /usr/local/cuda/lib64/stubs
+COPY --from=min_container /usr/local/cuda/lib64/stubs/libcusparse.so /usr/local/cuda/lib64/stubs/libcusparse.so.11
+COPY --from=min_container /usr/local/cuda/lib64/stubs/libcusolver.so /usr/local/cuda/lib64/stubs/libcusolver.so.11
+COPY --from=min_container /usr/local/cuda/lib64/stubs/libcurand.so /usr/local/cuda/lib64/stubs/libcurand.so.10
+COPY --from=min_container /usr/local/cuda/lib64/stubs/libcufft.so /usr/local/cuda/lib64/stubs/libcufft.so.10
+COPY --from=min_container /usr/local/cuda/lib64/stubs/libcublas.so /usr/local/cuda/lib64/stubs/libcublas.so.11
+COPY --from=min_container /usr/local/cuda/lib64/stubs/libcublasLt.so /usr/local/cuda/lib64/stubs/libcublasLt.so.11
+
+RUN mkdir -p /usr/local/cuda/targets/x86_64-linux/lib
+COPY --from=min_container /usr/local/cuda-11.6/targets/x86_64-linux/lib/libcudart.so.11.0 /usr/local/cuda/targets/x86_64-linux/lib/.
+COPY --from=min_container /usr/local/cuda-11.6/targets/x86_64-linux/lib/libcupti.so.11.6 /usr/local/cuda/targets/x86_64-linux/lib/.
+COPY --from=min_container /usr/local/cuda-11.6/targets/x86_64-linux/lib/libnvToolsExt.so.1 /usr/local/cuda/targets/x86_64-linux/lib/.
+
+COPY --from=min_container /usr/lib/x86_64-linux-gnu/libnccl.so.2 /usr/lib/x86_64-linux-gnu/libnccl.so.2
+COPY --from=min_container /usr/lib/x86_64-linux-gnu/libcudnn.so.8 /usr/lib/x86_64-linux-gnu/libcudnn.so.8
+
+RUN apt-get update && \
+        apt-get install -y --no-install-recommends openmpi-bin
+
+ENV LD_LIBRARY_PATH /usr/local/cuda/targets/x86_64-linux/lib:/usr/local/cuda/lib64/stubs:${LD_LIBRARY_PATH}
 '''
 
     # Add dependencies needed for python backend
