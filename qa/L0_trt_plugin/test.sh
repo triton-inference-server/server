@@ -63,13 +63,14 @@ source ../common/util.sh
 RET=0
 rm -f ./*.log
 
+LOG_IDX=0
+
+## Default Plugin Tests
+
 ## Create model folder with default plugin models
 rm -fr models && mkdir -p models
 find $DATADIR/qa_trt_plugin_model_repository/ -mindepth 1 -maxdepth 1 ! -iname '*clipplugin*' -exec cp -r {} models \;
 
-LOG_IDX=0
-
-## Default Plugin Tests
 SERVER_ARGS="--model-repository=${MODELDIR}"
 SERVER_LOG="./inference_server_$LOG_IDX.log"
 
@@ -123,7 +124,7 @@ find $DATADIR/qa_trt_plugin_model_repository/ -maxdepth 1 -iname '*clipplugin*' 
 LOG_IDX=$((LOG_IDX+1))
 
 ## Baseline Failure Test
-## No plugin loaded
+## Plugin library not loaded
 SERVER_ARGS="--model-repository=${MODELDIR}"
 SERVER_LOG="./inference_server_$LOG_IDX.log"
 
