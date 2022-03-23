@@ -44,7 +44,18 @@ export CUDA_VISIBLE_DEVICES=0
 CLIENT_LOG="./client.log"
 PLUGIN_TEST=trt_plugin_test.py
 
-DATADIR=/data/inferenceserver/${REPO_VERSION}/qa_trt_plugin_model_repository
+# On windows the paths invoked by the script (running in WSL) must use
+# /mnt/c when needed but the paths on the tritonserver command-line
+# must be C:/ style.
+if [[ "$(< /proc/sys/kernel/osrelease)" == *microsoft* ]]; then
+    DATADIR=${DATADIR:="/mnt/c/data/inferenceserver/${REPO_VERSION}/qa_trt_plugin_model_repository"}
+    SERVER=${SERVER:=/mnt/c/tritonserver/bin/tritonserver.exe}
+else
+    DATADIR=${DATADIR:="/data/inferenceserver/${REPO_VERSION}/qa_trt_plugin_model_repository"}
+    TRITON_DIR=${TRITON_DIR:="/opt/tritonserver"}
+    SERVER=${TRITON_DIR}/bin/tritonserver
+fi
+
 SERVER=/opt/tritonserver/bin/tritonserver
 source ../common/util.sh
 
