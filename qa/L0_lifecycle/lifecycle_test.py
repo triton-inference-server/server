@@ -39,9 +39,9 @@ import infer_util as iu
 import test_util as tu
 import threading
 
-import tritongrpcclient as grpcclient
-import tritonhttpclient as httpclient
-from tritonclientutils import InferenceServerException
+import tritonclient.grpc as grpcclient
+import tritonclient.http as httpclient
+from tritonclient.utils import InferenceServerException
 
 
 class LifeCycleTest(tu.TestResultCollector):

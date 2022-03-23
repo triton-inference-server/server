@@ -38,6 +38,8 @@
 #include <queue>
 #include <sstream>
 #include <thread>
+#include "classification.h"
+#include "common.h"
 #include "grpc++/grpc++.h"
 #include "grpc++/security/server_credentials.h"
 #include "grpc++/server.h"
@@ -45,8 +47,6 @@
 #include "grpc++/server_context.h"
 #include "grpc++/support/status.h"
 #include "triton/common/logging.h"
-#include "classification.h"
-#include "common.h"
 #include "triton/core/tritonserver.h"
 
 #define TRITONJSON_STATUSTYPE TRITONSERVER_Error*
@@ -1042,8 +1042,9 @@ CommonHandler::SetUpAllRequests()
 
           err = cache_miss_json.MemberAsUInt("count", &ucnt);
           GOTO_IF_ERR(err, earlyexit);
-          statistics->mutable_inference_stats()->mutable_cache_miss()->set_count(
-              ucnt);
+          statistics->mutable_inference_stats()
+              ->mutable_cache_miss()
+              ->set_count(ucnt);
           err = cache_miss_json.MemberAsUInt("ns", &ucnt);
           GOTO_IF_ERR(err, earlyexit);
           statistics->mutable_inference_stats()->mutable_cache_miss()->set_ns(
@@ -4447,12 +4448,14 @@ GRPCServer::Start()
     credentials = grpc::InsecureServerCredentials();
   }
 
-  grpc_builder_.AddListeningPort(server_addr_, credentials);
+  int bound_port = 0;
+  grpc_builder_.AddListeningPort(server_addr_, credentials, &bound_port);
   grpc_builder_.SetMaxMessageSize(MAX_GRPC_MESSAGE_SIZE);
   grpc_builder_.RegisterService(&service_);
   // GRPC KeepAlive Docs: https://grpc.github.io/grpc/cpp/md_doc_keepalive.html
   // NOTE: In order to work properly, the client-side settings should
   // be in agreement with server-side settings.
+  grpc_builder_.AddChannelArgument(GRPC_ARG_ALLOW_REUSEPORT, 0);
   grpc_builder_.AddChannelArgument(
       GRPC_ARG_KEEPALIVE_TIME_MS, keepalive_options_.keepalive_time_ms);
   grpc_builder_.AddChannelArgument(
@@ -4490,6 +4493,12 @@ GRPCServer::Start()
   model_infer_cq_ = grpc_builder_.AddCompletionQueue();
   model_stream_infer_cq_ = grpc_builder_.AddCompletionQueue();
   grpc_server_ = grpc_builder_.BuildAndStart();
+  // Check if binding port failed
+  if (bound_port == 0) {
+    return TRITONSERVER_ErrorNew(
+        TRITONSERVER_ERROR_UNAVAILABLE,
+        (std::string("Port '") + server_addr_ + "' already in use ").c_str());
+  }
 
   // A common Handler for other non-inference requests
   CommonHandler* hcommon = new CommonHandler(
