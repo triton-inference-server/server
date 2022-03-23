@@ -48,24 +48,29 @@ PLUGIN_TEST=trt_plugin_test.py
 # /mnt/c when needed but the paths on the tritonserver command-line
 # must be C:/ style.
 if [[ "$(< /proc/sys/kernel/osrelease)" == *microsoft* ]]; then
-    DATADIR=${DATADIR:="/mnt/c/data/inferenceserver/${REPO_VERSION}/qa_trt_plugin_model_repository"}
+    MODELDIR=${MODELDIR:=C:/models}
+    DATADIR=${DATADIR:="/mnt/c/data/inferenceserver/${REPO_VERSION}"}
     SERVER=${SERVER:=/mnt/c/tritonserver/bin/tritonserver.exe}
 else
-    DATADIR=${DATADIR:="/data/inferenceserver/${REPO_VERSION}/qa_trt_plugin_model_repository"}
+    MODELDIR=${MODELDIR:=`pwd`/models}
+    DATADIR=${DATADIR:="/data/inferenceserver/${REPO_VERSION}"}
     TRITON_DIR=${TRITON_DIR:="/opt/tritonserver"}
     SERVER=${TRITON_DIR}/bin/tritonserver
 fi
 
-SERVER=/opt/tritonserver/bin/tritonserver
 source ../common/util.sh
 
 RET=0
-rm -fr *.log
+rm -f ./*.log
+
+## Create model folder with default plugin models
+rm -fr models && mkdir -p models
+find $DATADIR/qa_trt_plugin_model_repository/ -mindepth 1 -maxdepth 1 ! -iname '*clipplugin*' -exec cp -r {} models \;
 
 LOG_IDX=0
 
-## Plugin Tests Without LD_PRELOAD
-SERVER_ARGS="--model-repository=$DATADIR --exit-timeout-secs=120 --backend-config=tensorrt,plugins=$DATADIR/libclipplugin.so"
+## Default Plugin Tests
+SERVER_ARGS="--model-repository=${MODELDIR}"
 SERVER_LOG="./inference_server_$LOG_IDX.log"
 
 run_server
@@ -75,14 +80,87 @@ if [ "$SERVER_PID" == "0" ]; then
     exit 1
 fi
 
+rm -f $CLIENT_LOG
 set +e
-python $PLUGIN_TEST >$CLIENT_LOG 2>&1
+python $PLUGIN_TEST PluginModelTest.test_raw_fff_gelu >>$CLIENT_LOG 2>&1
 if [ $? -ne 0 ]; then
     cat $CLIENT_LOG
     echo -e "\n***\n*** Test Failed\n***"
     RET=1
 else
-    check_test_results $TEST_RESULT_FILE 3
+    check_test_results $TEST_RESULT_FILE 1
+    if [ $? -ne 0 ]; then
+        cat $CLIENT_LOG
+        echo -e "\n***\n*** Test Result Verification Failed\n***"
+        RET=1
+    fi
+fi
+rm -f $CLIENT_LOG
+python $PLUGIN_TEST PluginModelTest.test_raw_fff_norm >>$CLIENT_LOG 2>&1
+if [ $? -ne 0 ]; then
+    cat $CLIENT_LOG
+    echo -e "\n***\n*** Test Failed\n***"
+    RET=1
+else
+    check_test_results $TEST_RESULT_FILE 1
+    if [ $? -ne 0 ]; then
+        cat $CLIENT_LOG
+        echo -e "\n***\n*** Test Result Verification Failed\n***"
+        RET=1
+    fi
+fi
+set -e
+
+kill $SERVER_PID
+wait $SERVER_PID
+
+## Custom Plugin Tests
+
+## Create model folder with custom plugin models for remaining tests
+rm -fr models && mkdir -p models
+find $DATADIR/qa_trt_plugin_model_repository/ -maxdepth 1 -iname '*clipplugin*' -exec cp -r {} models \;
+
+LOG_IDX=$((LOG_IDX+1))
+
+## Baseline Failure Test
+## No plugin loaded
+SERVER_ARGS="--model-repository=${MODELDIR}"
+SERVER_LOG="./inference_server_$LOG_IDX.log"
+
+run_server
+set +e
+if [ "$SERVER_PID" != "0" ]; then
+    echo -e "\n***\n*** Test Failed\n"
+    echo -e "Unexpected successful server start $SERVER\n***"
+    cat $SERVER_LOG
+    kill $SERVER_PID
+    wait $SERVER_PID
+    exit 1
+fi
+set -e
+
+LOG_IDX=$((LOG_IDX+1))
+
+## Backend Config, Single Plugin Test
+SERVER_ARGS="--model-repository=${MODELDIR} --backend-config=tensorrt,plugins=${MODELDIR}/libclipplugin.so"
+SERVER_LOG="./inference_server_$LOG_IDX.log"
+
+run_server
+if [ "$SERVER_PID" == "0" ]; then
+    echo -e "\n***\n*** Failed to start $SERVER\n***"
+    cat $SERVER_LOG
+    exit 1
+fi
+
+rm -f $CLIENT_LOG
+set +e
+python $PLUGIN_TEST PluginModelTest.test_raw_fff_clip
+if [ $? -ne 0 ]; then
+    cat $CLIENT_LOG
+    echo -e "\n***\n*** Test Failed\n***"
+    RET=1
+else
+    check_test_results $TEST_RESULT_FILE 1
     if [ $? -ne 0 ]; then
         cat $CLIENT_LOG
         echo -e "\n***\n*** Test Result Verification Failed\n***"
@@ -96,10 +174,8 @@ wait $SERVER_PID
 
 LOG_IDX=$((LOG_IDX+1))
 
-## LD_PRELOAD Custom Plugin Test
-## Success test
-SERVER_LD_PRELOAD=$DATADIR/libclipplugin.so
-SERVER_ARGS="--model-repository=$DATADIR --exit-timeout-secs=120"
+## Backend Config, Multiple Plugins Test
+SERVER_ARGS="--model-repository=${MODELDIR} --backend-config=tensorrt,plugins=${MODELDIR}/libclipplugin.so;${MODELDIR}/libclipplugin.so\""
 SERVER_LOG="./inference_server_$LOG_IDX.log"
 
 run_server
@@ -131,25 +207,39 @@ wait $SERVER_PID
 
 LOG_IDX=$((LOG_IDX+1))
 
-## LD_PRELOAD Custom Plugin Test
-## Failure test
-
-unset SERVER_LD_PRELOAD
+## LD_PRELOAD, Single Plugin Test
+SERVER_LD_PRELOAD=$MODELDIR/libclipplugin.so
+SERVER_ARGS="--model-repository=${MODELDIR}"
 SERVER_LOG="./inference_server_$LOG_IDX.log"
 
 run_server
-set +e
-if [ "$SERVER_PID" != "0" ]; then
-    echo -e "\n***\n*** Test Failed\n"
-    echo -e "Unexpected successful server start $SERVER\n***"
+if [ "$SERVER_PID" == "0" ]; then
+    echo -e "\n***\n*** Failed to start $SERVER\n***"
     cat $SERVER_LOG
-    kill $SERVER_PID
-    wait $SERVER_PID
     exit 1
+fi
+
+rm -f $CLIENT_LOG
+set +e
+python $PLUGIN_TEST PluginModelTest.test_raw_fff_clip >>$CLIENT_LOG 2>&1
+if [ $? -ne 0 ]; then
+    cat $CLIENT_LOG
+    echo -e "\n***\n*** Test Failed\n***"
+    RET=1
+else
+    check_test_results $TEST_RESULT_FILE 1
+    if [ $? -ne 0 ]; then
+        cat $CLIENT_LOG
+        echo -e "\n***\n*** Test Result Verification Failed\n***"
+        RET=1
+    fi
 fi
 set -e
 
-rm -f $CLIENT_LOG
+kill $SERVER_PID
+wait $SERVER_PID
+
+LOG_IDX=$((LOG_IDX+1))
 
 if [ $RET -eq 0 ]; then
     echo -e "\n***\n*** Test Passed\n***"
