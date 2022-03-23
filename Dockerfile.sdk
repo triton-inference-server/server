@@ -39,6 +39,7 @@ ARG TRITON_THIRD_PARTY_REPO_TAG=main
 ARG TRITON_MODEL_ANALYZER_REPO_TAG=main
 ARG CMAKE_UBUNTU_VERSION=20.04
 ARG TRITON_ENABLE_GPU=ON
+ARG JAVA_BINDINGS_MAVEN_VERSION=3.8.4
 
 # DCGM version to install for Model Analyzer
 ARG DCGM_VERSION=2.2.9
@@ -77,8 +78,8 @@ RUN apt-get update && \
             vim \
             wget \
             python3-pdfkit \
-            maven \
-            default-jdk && \
+            openjdk-11-jdk \
+            maven && \
     pip3 install --upgrade wheel setuptools && \
     pip3 install --upgrade grpcio-tools && \
     pip3 install --upgrade pip
@@ -114,6 +115,7 @@ ARG TRITON_CORE_REPO_TAG
 ARG TRITON_BACKEND_REPO_TAG
 ARG TRITON_THIRD_PARTY_REPO_TAG
 ARG TRITON_ENABLE_GPU
+ARG JAVA_BINDINGS_MAVEN_VERSION
 
 WORKDIR /workspace
 COPY TRITON_VERSION .
@@ -182,7 +184,7 @@ RUN cd install && \
 # Install Java API Bindings
 RUN if [ "$TARGETPLATFORM" = "linux/amd64" ]; then \
         source client/src/java-api-bindings/scripts/install_dependencies_and_build.sh \
-        --maven-version 3.8.4 \
+        --maven-version ${JAVA_BINDINGS_MAVEN_VERSION} \
         --core-tag ${TRITON_CORE_REPO_TAG} \
         --jar-install-path /workspace/install/java-api-bindings; \
     fi

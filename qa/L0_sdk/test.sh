@@ -186,6 +186,15 @@ for l in $EXECUTABLES; do
   fi
 done
 
+# Install java http client
+JAVA_CLIENT_SRC="triton_client/src/java"
+PROJECT_JAR="java-api-0.0.1.jar"
+mkdir -p triton_client/java
+mvn clean install -Ddir=${JAVA_CLIENT_SRC}/examples
+cp -r ${JAVA_CLIENT_SRC}/target/examples triton_client/java
+cp -r ${JAVA_CLIENT_SRC}/target/${PROJECT_JAR} triton_client/java
+rm -rf /root/.m2/repository
+
 # Check java client
 if [[ ! -e "triton_client/java/java-api-0.0.1.jar" ]]; then
     echo -e "*** java-api-0.0.1.jar not present\n"
