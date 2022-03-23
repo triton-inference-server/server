@@ -102,9 +102,28 @@ def get_trt_plugin(plugin_name):
             bias = trt.PluginField("bias", np.array([[[1]]], np.float32),
                                    trt.PluginFieldType.FLOAT32)
             field_collection = trt.PluginFieldCollection([type_id, bias])
+<<<<<<< HEAD
             plugin = plugin_creator.create_plugin(
                 name=plugin_name, field_collection=field_collection)
             break
+=======
+            break
+        elif (plugin_creator.name
+              == "CustomClipPlugin") and (plugin_name == "CustomClipPlugin"):
+            min_clip = trt.PluginField("clipMin", np.array([0.1],\
+                dtype=np.float32), trt.PluginFieldType.FLOAT32)
+            max_clip = trt.PluginField("clipMax", np.array([0.5],\
+                dtype=np.float32), trt.PluginFieldType.FLOAT32)
+            field_collection = trt.PluginFieldCollection([min_clip, max_clip])
+            break
+
+    if (field_collection is not None):
+        plugin = plugin_creator.create_plugin(name=plugin_name,
+                                              field_collection=field_collection)
+    else:
+        raise RuntimeError("Plugin not found: " + plugin_name)
+
+>>>>>>> 8eea3e7e (Added warning when plugin not found.)
     return plugin
 
 
@@ -246,7 +265,7 @@ def create_plugin_models(models_dir):
                             (16,), (16,), np.float32, np.float32)
     create_plan_modelfile(models_dir, 8, model_version, "CustomClipPlugin",
                           (16,), (16,), np.float32, np.float32)
-                          
+
     # default CustomGeluPluginDynamic plugin
     create_plan_modelconfig(models_dir, 0, model_version,
                             "CustomGeluPluginDynamic", (16, 1, 1), (16, 1, 1),
