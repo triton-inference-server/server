@@ -1092,9 +1092,10 @@ RUN ln -sf ${_CUDA_COMPAT_PATH}/lib.real ${_CUDA_COMPAT_PATH}/lib \
 '''
 
     elif 'pytorch' in backends:
-        # The cpu-only build uses ubuntu as the base image, and so the cuda,
-        # openmpi, nccl and cudnn libs are not available. We must copy these
-        # pytorch dependencies from the Triton min container ourselves.
+        # Add dependencies for pytorch backend. Note: Even though the build is
+        # cpu-only, the version of pytorch we are using depends upon libraries
+        # like cuda and cudnn. Since these dependencies are not present in ubuntu 
+        # base image, we must copy these from the Triton min container ourselves.
         df += '''
 RUN mkdir -p /usr/local/cuda/lib64/stubs
 COPY --from=min_container /usr/local/cuda/lib64/stubs/libcusparse.so /usr/local/cuda/lib64/stubs/libcusparse.so.11
