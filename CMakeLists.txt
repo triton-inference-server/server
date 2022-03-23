@@ -30,16 +30,19 @@ project(tritonserver LANGUAGES C CXX)
 
 include(CMakeDependentOption)
 
-# Backends
-option(TRITON_ENABLE_TENSORRT "Include TensorRT backend in server" OFF)
-option(TRITON_ENABLE_TENSORFLOW "Include TensorFlow backend in server" OFF)
-option(TRITON_ENABLE_ONNXRUNTIME "Include ONNXRuntime backend in server" OFF)
-option(TRITON_ENABLE_ONNXRUNTIME_TENSORRT
-  "Enable TensorRT execution provider for ONNXRuntime backend in server" OFF)
-option(TRITON_ENABLE_ONNXRUNTIME_OPENVINO
-  "Enable OpenVINO execution provider for ONNXRuntime backend in server" OFF)
-option(TRITON_ENABLE_PYTORCH "Include PyTorch backend in server" OFF)
-option(TRITON_ENABLE_PYTHON "Include Python backend in server" OFF)
+set(TRITON_VERSION "0.0.0" CACHE STRING "The version of the Triton shared library" )
+
+option(TRITON_ENABLE_LOGGING "Include logging support in server" ON)
+option(TRITON_ENABLE_STATS "Include statistics collections in server" ON)
+option(TRITON_ENABLE_TRACING "Include tracing support in server" OFF)
+option(TRITON_ENABLE_NVTX "Include NVTX support in server" OFF)
+option(TRITON_ENABLE_GPU "Enable GPU support in server" ON)
+option(TRITON_ENABLE_MALI_GPU "Enable Arm Mali GPU support in server" OFF)
+set(TRITON_MIN_COMPUTE_CAPABILITY "6.0" CACHE STRING
+    "The minimum CUDA compute capability supported by Triton" )
+set(TRITON_EXTRA_LIB_PATHS "" CACHE PATH "Extra library paths for Triton Server build")
+
+# Ensemble
 option(TRITON_ENABLE_ENSEMBLE "Include ensemble support in server" OFF)
 
 # Endpoints
@@ -47,6 +50,8 @@ option(TRITON_ENABLE_HTTP "Include HTTP API in server" ON)
 option(TRITON_ENABLE_GRPC "Include GRPC API in server" ON)
 option(TRITON_ENABLE_SAGEMAKER "Include AWS SageMaker API in server" OFF)
 option(TRITON_ENABLE_VERTEX_AI "Include Vertex AI API in server" OFF)
+
+# Metrics
 option(TRITON_ENABLE_METRICS "Include metrics support in server" ON)
 option(TRITON_ENABLE_METRICS_GPU "Include GPU metrics support in server" ON)
 
@@ -55,26 +60,11 @@ option(TRITON_ENABLE_GCS "Include GCS Filesystem support in server" OFF)
 option(TRITON_ENABLE_S3 "Include S3 Filesystem support in server" OFF)
 option(TRITON_ENABLE_AZURE_STORAGE "Include Azure Storage Filesystem support in server" OFF)
 
-# Multiple paths may be specified by separating them with semicolon
-set(TRITON_ONNXRUNTIME_INCLUDE_PATHS "" CACHE PATH "Paths to ONNXRuntime includes")
-set(TRITON_PYTORCH_INCLUDE_PATHS "" CACHE PATH "Paths to PyTorch includes")
-# Used for the case where TensorRT is not installed under default search path,
-# i.e. Windows build, this flag should be able to remove once TensorRT backend
-# is ported to use backend API
-set(TRITON_TENSORRT_INCLUDE_PATHS "" CACHE PATH "Paths to TensorRT includes")
-set(TRITON_EXTRA_LIB_PATHS "" CACHE PATH "Extra library paths for Triton Server build")
+# Need to know if TensorRT is available when building unit tests
+option(TRITON_ENABLE_TENSORRT "Include TensorRT backend in server" OFF)
 
-set(TRITON_VERSION "0.0.0" CACHE STRING "The version of the Triton shared library" )
-
-option(TRITON_ENABLE_LOGGING "Include logging support in server" ON)
-option(TRITON_ENABLE_STATS "Include statistics collections in server" ON)
-option(TRITON_ENABLE_TRACING "Include tracing support in server" OFF)
-option(TRITON_ENABLE_NVTX "Include NVTX support in server" OFF)
+# ASAN
 option(TRITON_ENABLE_ASAN "Build with address sanitizer" OFF)
-option(TRITON_ENABLE_GPU "Enable GPU support in server" ON)
-option(TRITON_ENABLE_MALI_GPU "Enable Arm Mali GPU support in server" OFF)
-set(TRITON_MIN_COMPUTE_CAPABILITY "6.0" CACHE STRING
-    "The minimum CUDA compute capability supported by Triton" )
 
 # Repo tags
 set(TRITON_THIRD_PARTY_REPO_TAG "main" CACHE STRING
@@ -95,27 +85,12 @@ if(TRITON_ENABLE_TRACING AND NOT TRITON_ENABLE_STATS)
   message(FATAL_ERROR "TRITON_ENABLE_TRACING=ON requires TRITON_ENABLE_STATS=ON")
 endif()
 
-if(TRITON_ENABLE_TENSORRT AND NOT TRITON_ENABLE_GPU)
-  message(FATAL_ERROR "TRITON_ENABLE_TENSORRT=ON requires TRITON_ENABLE_GPU=ON")
-endif()
-
 if (TRITON_ENABLE_METRICS_GPU AND NOT TRITON_ENABLE_METRICS)
   message(FATAL_ERROR "TRITON_ENABLE_METRICS_GPU=ON requires TRITON_ENABLE_METRICS=ON")
 endif()
 
 if (TRITON_ENABLE_METRICS_GPU AND NOT TRITON_ENABLE_GPU)
   message(FATAL_ERROR "TRITON_ENABLE_METRICS_GPU=ON requires TRITON_ENABLE_GPU=ON")
-endif()
-
-if(TRITON_ENABLE_ONNXRUNTIME_TENSORRT AND NOT TRITON_ENABLE_ONNXRUNTIME)
-  message(FATAL_ERROR "TRITON_ENABLE_ONNXRUNTIME_TENSORRT=ON requires TRITON_ENABLE_ONNXRUNTIME=ON")
-endif()
-if(TRITON_ENABLE_ONNXRUNTIME_TENSORRT AND NOT TRITON_ENABLE_TENSORRT)
-  message(FATAL_ERROR "TRITON_ENABLE_ONNXRUNTIME_TENSORRT=ON requires TRITON_ENABLE_TENSORRT=ON")
-endif()
-
-if(TRITON_ENABLE_ONNXRUNTIME_OPENVINO AND NOT TRITON_ENABLE_ONNXRUNTIME)
-  message(FATAL_ERROR "TRITON_ENABLE_ONNXRUNTIME_OPENVINO=ON requires TRITON_ENABLE_ONNXRUNTIME=ON")
 endif()
 
 if(TRITON_ENABLE_ASAN AND TRITON_ENABLE_GPU)
@@ -202,12 +177,6 @@ endif() # TRITON_ENABLE_HTTP || TRITON_ENABLE_METRICS || TRITON_ENABLE_SAGEMAKER
 if(${TRITON_ENABLE_GRPC})
   set(TRITON_DEPENDS ${TRITON_DEPENDS} grpc)
 endif() # TRITON_ENABLE_GRPC
-if(${TRITON_ENABLE_METRICS})
-  set(TRITON_DEPENDS ${TRITON_DEPENDS} prometheus-cpp)
-endif() # TRITON_ENABLE_METRICS
-if(${TRITON_ENABLE_GPU})
-  set(TRITON_DEPENDS ${TRITON_DEPENDS} cnmem)
-endif() # TRITON_ENABLE_GPU
 
 ExternalProject_Add(triton-server
   PREFIX triton-server
@@ -225,7 +194,6 @@ ExternalProject_Add(triton-server
     -Dnlohmann_json_DIR:PATH=${TRITON_THIRD_PARTY_INSTALL_PREFIX}/nlohmann_json/lib/cmake/nlohmann_json
     -DLibevent_DIR:PATH=${TRITON_THIRD_PARTY_INSTALL_PREFIX}/libevent/lib/cmake/libevent
     -Dlibevhtp_DIR:PATH=${TRITON_THIRD_PARTY_INSTALL_PREFIX}/libevhtp/lib/cmake/libevhtp
-    -Dprometheus-cpp_DIR:PATH=${TRITON_THIRD_PARTY_INSTALL_PREFIX}/prometheus-cpp/lib/cmake/prometheus-cpp
     -Dstorage_client_DIR:PATH=${TRITON_THIRD_PARTY_INSTALL_PREFIX}/google-cloud-cpp/lib/cmake/storage_client
     -Dazure-storage-cpplite_DIR:PATH=${TRITON_THIRD_PARTY_INSTALL_PREFIX}/azure-storage-cpplite
     -Dgoogle_cloud_cpp_common_DIR:PATH=${TRITON_THIRD_PARTY_INSTALL_PREFIX}/google-cloud-cpp/lib/cmake/google_cloud_cpp_common
@@ -236,14 +204,10 @@ ExternalProject_Add(triton-server
     -Daws-c-event-stream_DIR:PATH=${TRITON_THIRD_PARTY_INSTALL_PREFIX}/aws-sdk-cpp/lib/aws-c-event-stream/cmake
     -Daws-c-common_DIR:PATH=${TRITON_THIRD_PARTY_INSTALL_PREFIX}/aws-sdk-cpp/lib/aws-c-common/cmake
     -Daws-checksums_DIR:PATH=${TRITON_THIRD_PARTY_INSTALL_PREFIX}/aws-sdk-cpp/lib/aws-checksums/cmake
-    -DCNMEM_PATH:PATH=${TRITON_THIRD_PARTY_INSTALL_PREFIX}/cnmem
     -DTRITON_THIRD_PARTY_REPO_TAG:STRING=${TRITON_THIRD_PARTY_REPO_TAG}
     -DTRITON_COMMON_REPO_TAG:STRING=${TRITON_COMMON_REPO_TAG}
     -DTRITON_CORE_REPO_TAG:STRING=${TRITON_CORE_REPO_TAG}
     -DTRITON_BACKEND_REPO_TAG:STRING=${TRITON_BACKEND_REPO_TAG}
-    -DTRITON_ONNXRUNTIME_INCLUDE_PATHS:PATH=${TRITON_ONNXRUNTIME_INCLUDE_PATHS}
-    -DTRITON_PYTORCH_INCLUDE_PATHS:PATH=${TRITON_PYTORCH_INCLUDE_PATHS}
-    -DTRITON_TENSORRT_INCLUDE_PATHS:PATH=${TRITON_TENSORRT_INCLUDE_PATHS}
     -DTRITON_EXTRA_LIB_PATHS:PATH=${TRITON_EXTRA_LIB_PATHS}
     -DTRITON_ENABLE_ASAN:BOOL=${TRITON_ENABLE_ASAN}
     -DTRITON_ENABLE_NVTX:BOOL=${TRITON_ENABLE_NVTX}
@@ -262,13 +226,7 @@ ExternalProject_Add(triton-server
     -DTRITON_ENABLE_GCS:BOOL=${TRITON_ENABLE_GCS}
     -DTRITON_ENABLE_AZURE_STORAGE:BOOL=${TRITON_ENABLE_AZURE_STORAGE}
     -DTRITON_ENABLE_S3:BOOL=${TRITON_ENABLE_S3}
-    -DTRITON_ENABLE_TENSORFLOW:BOOL=${TRITON_ENABLE_TENSORFLOW}
-    -DTRITON_ENABLE_PYTHON:BOOL=${TRITON_ENABLE_PYTHON}
     -DTRITON_ENABLE_TENSORRT:BOOL=${TRITON_ENABLE_TENSORRT}
-    -DTRITON_ENABLE_ONNXRUNTIME:BOOL=${TRITON_ENABLE_ONNXRUNTIME}
-    -DTRITON_ENABLE_ONNXRUNTIME_TENSORRT:BOOL=${TRITON_ENABLE_ONNXRUNTIME_TENSORRT}
-    -DTRITON_ENABLE_ONNXRUNTIME_OPENVINO:BOOL=${TRITON_ENABLE_ONNXRUNTIME_OPENVINO}
-    -DTRITON_ENABLE_PYTORCH:BOOL=${TRITON_ENABLE_PYTORCH}
     -DTRITON_ENABLE_ENSEMBLE:BOOL=${TRITON_ENABLE_ENSEMBLE}
     -DCMAKE_BUILD_TYPE:STRING=${CMAKE_BUILD_TYPE}
     -DCMAKE_INSTALL_PREFIX:PATH=${TRITON_INSTALL_PREFIX}

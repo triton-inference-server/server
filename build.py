@@ -402,22 +402,9 @@ def core_cmake_args(components, backends, install_dir):
                           in FLAGS.filesystem))
 
     cargs.append(
-        cmake_core_enable('TRITON_ENABLE_TENSORFLOW',
-                          ('tensorflow1' in backends) or
-                          ('tensorflow2' in backends)))
-
-    for be in (CORE_BACKENDS + NONCORE_BACKENDS):
-        if not be.startswith('tensorflow'):
-            cargs.append(
-                cmake_core_enable('TRITON_ENABLE_{}'.format(be.upper()), be
-                                  in backends))
-        if be == 'tensorrt':
-            cargs += tensorrt_cmake_args()
-        if (be in CORE_BACKENDS) and (be in backends):
-            if be == 'ensemble':
-                pass
-            else:
-                fail('unknown core backend {}'.format(be))
+        cmake_core_enable('TRITON_ENABLE_ENSEMBLE', 'ensemble' in backends))
+    cargs.append(
+        cmake_core_enable('TRITON_ENABLE_TENSORRT', 'tensorrt' in backends))
 
     # If TRITONBUILD_* is defined in the env then we use it to set
     # corresponding cmake value.
