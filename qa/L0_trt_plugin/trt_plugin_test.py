@@ -59,18 +59,12 @@ class PluginModelTest(tu.TestResultCollector):
                                       inputs,
                                       outputs=outputs)
 
-        ##TODO: Debug if all zeros on input somehow... pointing to wrong memory? Otherwise ask TRT about custom clip
-
         output0_data = results.as_numpy('OUTPUT0')
 
         # Verify values of Clip, GELU, and Normalize
         if plugin_name == 'CustomClipPlugin':
             # Clip data to minimum of .1, maximum of .5
             test_output = np.clip(input0_data, 0.1, 0.5)
-            print("OUTPUT0_data: ")
-            print(output0_data)
-            print("test_output: ")
-            print(test_output)
             self.assertTrue(np.isclose(output0_data, test_output).all())
         elif plugin_name == 'CustomGeluPluginDynamic':
             # Add bias
@@ -89,18 +83,18 @@ class PluginModelTest(tu.TestResultCollector):
 
     def test_raw_fff_clip(self):
         for bs in (1, 8):
-            self._full_exact('plan_float32_float32_float32',
-                            'CustomClipPlugin', (bs, 16))
+            self._full_exact('plan_float32_float32_float32', 'CustomClipPlugin',
+                             (bs, 16))
 
-    # def test_raw_fff_gelu(self):
-    #     self._full_exact('plan_nobatch_float32_float32_float32',
-    #                      'CustomGeluPluginDynamic', (16, 1, 1))
+    def test_raw_fff_gelu(self):
+        self._full_exact('plan_nobatch_float32_float32_float32',
+                         'CustomGeluPluginDynamic', (16, 1, 1))
 
-    # def test_raw_fff_norm(self):
-    #     # model that supports batching
-    #     for bs in (1, 8):
-    #         self._full_exact('plan_float32_float32_float32', 'Normalize_TRT',
-    #                          (bs, 16, 16, 16))
+    def test_raw_fff_norm(self):
+        # model that supports batching
+        for bs in (1, 8):
+            self._full_exact('plan_float32_float32_float32', 'Normalize_TRT',
+                             (bs, 16, 16, 16))
 
 
 if __name__ == '__main__':
