@@ -49,8 +49,6 @@ ARG NVIDIA_BUILD_ID=unknown
 
 FROM ${BASE_IMAGE} AS sdk_build
 
-ARG TARGETPLATFORM
-
 # Ensure apt-get won't prompt for selecting options
 ENV DEBIAN_FRONTEND=noninteractive
 
@@ -145,8 +143,13 @@ ENV DEBIAN_FRONTEND=noninteractive
 # DCGM version to install for Model Analyzer
 ARG DCGM_VERSION=2.2.9
 
+ARG TRITON_CORE_REPO_TAG
+ARG TARGETPLATFORM
+ARG TRITON_ENABLE_GPU
+
 RUN apt-get update && \
     apt-get install -y --no-install-recommends \
+            software-properties-common \
             curl \
             git \
             libb64-dev \
