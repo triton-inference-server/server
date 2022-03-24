@@ -53,7 +53,8 @@ if [[ "$(< /proc/sys/kernel/osrelease)" == *microsoft* ]]; then
     SERVER=${SERVER:=/mnt/c/tritonserver/bin/tritonserver.exe}
 else
     MODELDIR=${MODELDIR:=`pwd`/models}
-    DATADIR=${DATADIR:="/data/inferenceserver/${REPO_VERSION}"}
+    # TODO: Remove "_davidy" once passes in Windows, update model repo.
+    DATADIR=${DATADIR:="/data/inferenceserver/${REPO_VERSION}_davidy"}
     TRITON_DIR=${TRITON_DIR:="/opt/tritonserver"}
     SERVER=${TRITON_DIR}/bin/tritonserver
 fi
