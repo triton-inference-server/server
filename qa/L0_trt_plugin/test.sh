@@ -83,7 +83,7 @@ fi
 
 rm -f $CLIENT_LOG
 set +e
-python $PLUGIN_TEST PluginModelTest.test_raw_fff_gelu >>$CLIENT_LOG 2>&1
+python3 $PLUGIN_TEST PluginModelTest.test_raw_fff_gelu >>$CLIENT_LOG 2>&1
 if [ $? -ne 0 ]; then
     cat $CLIENT_LOG
     echo -e "\n***\n*** Test Failed\n***"
@@ -97,7 +97,7 @@ else
     fi
 fi
 rm -f $CLIENT_LOG
-python $PLUGIN_TEST PluginModelTest.test_raw_fff_norm >>$CLIENT_LOG 2>&1
+python3 $PLUGIN_TEST PluginModelTest.test_raw_fff_norm >>$CLIENT_LOG 2>&1
 if [ $? -ne 0 ]; then
     cat $CLIENT_LOG
     echo -e "\n***\n*** Test Failed\n***"
@@ -155,7 +155,7 @@ fi
 
 rm -f $CLIENT_LOG
 set +e
-python $PLUGIN_TEST PluginModelTest.test_raw_fff_clip
+python3 $PLUGIN_TEST PluginModelTest.test_raw_fff_clip >>$CLIENT_LOG 2>&1
 if [ $? -ne 0 ]; then
     cat $CLIENT_LOG
     echo -e "\n***\n*** Test Failed\n***"
@@ -188,7 +188,7 @@ fi
 
 rm -f $CLIENT_LOG
 set +e
-python $PLUGIN_TEST PluginModelTest.test_raw_fff_clip >>$CLIENT_LOG 2>&1
+python3 $PLUGIN_TEST PluginModelTest.test_raw_fff_clip >>$CLIENT_LOG 2>&1
 if [ $? -ne 0 ]; then
     cat $CLIENT_LOG
     echo -e "\n***\n*** Test Failed\n***"
@@ -222,7 +222,7 @@ fi
 
 rm -f $CLIENT_LOG
 set +e
-python $PLUGIN_TEST PluginModelTest.test_raw_fff_clip >>$CLIENT_LOG 2>&1
+python3 $PLUGIN_TEST PluginModelTest.test_raw_fff_clip >>$CLIENT_LOG 2>&1
 if [ $? -ne 0 ]; then
     cat $CLIENT_LOG
     echo -e "\n***\n*** Test Failed\n***"
