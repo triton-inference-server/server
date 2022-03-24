@@ -1,5 +1,5 @@
 #!/bin/bash
-# Copyright (c) 2019-2021, NVIDIA CORPORATION. All rights reserved.
+# Copyright (c) 2019-2022, NVIDIA CORPORATION. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -65,7 +65,8 @@ for BACKEND in ${BACKENDS}; do
     cp -r /data/inferenceserver/${REPO_VERSION}/qa_model_repository/${BACKEND}_float32_float32_float32 models/. && \
     cp -r /data/inferenceserver/${REPO_VERSION}/qa_sequence_model_repository/${BACKEND}_sequence_int32 models/.
 
-    INPUT_PREFIX="INPUT" && [ "$BACKEND" == "libtorch" ] && INPUT_PREFIX="INPUT__"
+    INPUT_PREFIX="INPUT"
+    IDENTITY_INPUT_PREFIX="INPUT" && [ "$BACKEND" == "libtorch" ] && IDENTITY_INPUT_PREFIX="INPUT__"
     SEQ_INPUT="INPUT" && [ "$BACKEND" == "libtorch" ] && SEQ_INPUT="INPUT__0"
     START="START" && [ "$BACKEND" == "libtorch" ] && START="START__1"
     READY="READY" && [ "$BACKEND" == "libtorch" ] && READY="READY__2"
@@ -174,7 +175,7 @@ for BACKEND in ${BACKENDS}; do
             echo "    name : \"zero string stateless\"" >> config.pbtxt && \
             echo "    batch_size: 1" >> config.pbtxt && \
             echo "    inputs {" >> config.pbtxt && \
-            echo "        key: \"${INPUT_PREFIX}0\"" >> config.pbtxt && \
+            echo "        key: \"${IDENTITY_INPUT_PREFIX}0\"" >> config.pbtxt && \
             echo "        value: {" >> config.pbtxt && \
             echo "            data_type: TYPE_STRING" >> config.pbtxt && \
             echo "            dims: 16" >> config.pbtxt && \
@@ -186,7 +187,7 @@ for BACKEND in ${BACKENDS}; do
             echo "    name : \"random string stateless\"" >> config.pbtxt && \
             echo "    batch_size: 1" >> config.pbtxt && \
             echo "    inputs {" >> config.pbtxt && \
-            echo "        key: \"${INPUT_PREFIX}0\"" >> config.pbtxt && \
+            echo "        key: \"${IDENTITY_INPUT_PREFIX}0\"" >> config.pbtxt && \
             echo "        value: {" >> config.pbtxt && \
             echo "            data_type: TYPE_STRING" >> config.pbtxt && \
             echo "            dims: 16" >> config.pbtxt && \
