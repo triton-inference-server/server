@@ -134,7 +134,7 @@ RUN cmake -DCMAKE_INSTALL_PREFIX=/workspace/install \
           -DTRITON_ENABLE_PERF_ANALYZER=ON \
           -DTRITON_ENABLE_EXAMPLES=ON -DTRITON_ENABLE_TESTS=ON \
           -DTRITON_ENABLE_GPU=${TRITON_ENABLE_GPU} /workspace/client
-RUN make -j16 cc-clients python-clients java-clients && \
+RUN make -j16 cc-clients python-clients && \
     rm -fr ~/.m2
 
 ############################################################################
