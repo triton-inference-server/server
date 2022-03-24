@@ -35,11 +35,8 @@ SERVER_LOG="./inference_server.log"
 source ../../common/util.sh
 source ../common.sh
 
-rm -fr *.log ./models
+rm -fr *.log free_memory.txt
 
-mkdir -p models/identity_fp32/1/
-cp ../../python_models/identity_fp32/model.py ./models/identity_fp32/1/model.py
-cp ../../python_models/identity_fp32/config.pbtxt ./models/identity_fp32/config.pbtxt
 RET=0
 
 prev_num_pages=`get_shm_pages`
@@ -50,6 +47,16 @@ if [ "$SERVER_PID" == "0" ]; then
     exit 1
 fi
 
+set +e
+python3 restart_test.py RestartTest.test_infer >> $CLIENT_LOG 2>&1
+if [ $? -ne 0 ]; then
+    cat $CLIENT_LOG
+    cat $SERVER_LOG
+    echo -e "\n***\n*** test_infer test FAILED. \n***"
+    RET=1
+fi
+set -e
+
 triton_procs=`pgrep --parent $SERVER_PID`
 echo $triton_procs
 
@@ -58,11 +65,11 @@ for proc in $triton_procs; do
     kill -9 $proc
 done
 
-python3 restart_test.py > $CLIENT_LOG 2>&1
+python3 restart_test.py RestartTest.test_restart >> $CLIENT_LOG 2>&1
 if [ $? -ne 0 ]; then
     cat $CLIENT_LOG
     cat $SERVER_LOG
-    echo -e "\n***\n*** restart_test.py test FAILED. \n***"
+    echo -e "\n***\n*** test_restart test FAILED. \n***"
     RET=1
 fi
 set -e
