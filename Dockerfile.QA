@@ -289,7 +289,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
                               libopencv-core-dev \
                               libzmq3-dev \
                               maven \
-                              mpi \
+                              libopenmpi-dev \
                               nginx \
                               npm \
                               protobuf-compiler \
