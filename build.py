@@ -1094,7 +1094,7 @@ RUN ln -sf ${_CUDA_COMPAT_PATH}/lib.real ${_CUDA_COMPAT_PATH}/lib \
     elif 'pytorch' in backends:
         # Add dependencies for pytorch backend. Note: Even though the build is
         # cpu-only, the version of pytorch we are using depends upon libraries
-        # like cuda and cudnn. Since these dependencies are not present in ubuntu 
+        # like cuda and cudnn. Since these dependencies are not present in ubuntu
         # base image, we must copy these from the Triton min container ourselves.
         df += '''
 RUN mkdir -p /usr/local/cuda/lib64/stubs
