@@ -1,4 +1,4 @@
-// Copyright (c) 2021, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+// Copyright 2021-2022, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 //
 // Redistribution and use in source and binary forms, with or without
 // modification, are permitted provided that the following conditions
@@ -34,8 +34,9 @@ TRITONSERVER_Error*
 SagemakerAPIServer::GetInferenceHeaderLength(
     evhtp_request_t* req, int32_t content_length, size_t* header_length)
 {
-  // Check mime type and set inference header length. If missing set to 0
-  *header_length = 0;
+  // Check mime type and set inference header length.
+  // Set to content length in case that it is not specified
+  *header_length = content_length;
   const char* content_type_c_str =
       evhtp_kv_find(req->headers_in, kContentTypeHeader);
   if (content_type_c_str != NULL) {
