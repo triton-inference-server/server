@@ -70,6 +70,7 @@ LOG_IDX=0
 
 ## Create model folder with default plugin models
 rm -fr models && mkdir -p models
+set -e
 find $DATADIR/qa_trt_plugin_model_repository/ -mindepth 1 -maxdepth 1 ! -iname '*clipplugin*' -exec cp -r {} models \;
 
 SERVER_ARGS="--model-repository=${MODELDIR}"
@@ -130,7 +131,6 @@ SERVER_ARGS="--model-repository=${MODELDIR}"
 SERVER_LOG="./inference_server_$LOG_IDX.log"
 
 run_server
-set +e
 if [ "$SERVER_PID" != "0" ]; then
     echo -e "\n***\n*** Test Failed\n"
     echo -e "Unexpected successful server start $SERVER\n***"
@@ -139,7 +139,6 @@ if [ "$SERVER_PID" != "0" ]; then
     wait $SERVER_PID
     exit 1
 fi
-set -e
 
 LOG_IDX=$((LOG_IDX+1))
 
