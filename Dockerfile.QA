@@ -106,7 +106,7 @@ RUN mkdir -p qa/common && \
     cp ${TRITONTMP_DIR}/tritonbuild/install/bin/multi_server qa/L0_multi_server/. && \
     cp ${TRITONTMP_DIR}/tritonbuild/tritonserver/install/bin/memory_test qa/L0_memory/. && \
     cp ${TRITONTMP_DIR}/tritonbuild/tritonserver/install/bin/pinned_memory_manager_test qa/L0_memory/. && \
-    cp ${TRITONTMP_DIR}/tritonbuild/tritonserver/install/bin/triton_repo_agent_test qa/L0_triton_repo_agent/. && \
+    cp ${TRITONTMP_DIR}/tritonbuild/tritonserver/install/bin/repo_agent_test qa/L0_triton_repo_agent/. && \
     cp ${TRITONTMP_DIR}/tritonbuild/tritonserver/install/lib/libtritonrepoagent_relocation.so qa/L0_triton_repo_agent/. && \
     mkdir qa/L0_query/models/query/1 && \
     cp ${TRITONTMP_DIR}/tritonbuild/tritonserver/install/backends/query/libtriton_query.so qa/L0_query/models/query/1/. && \
