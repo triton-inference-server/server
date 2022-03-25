@@ -48,14 +48,16 @@ PLUGIN_TEST=trt_plugin_test.py
 # /mnt/c when needed but the paths on the tritonserver command-line
 # must be C:/ style.
 if [[ "$(< /proc/sys/kernel/osrelease)" == *microsoft* ]]; then
-    MODELDIR=${MODELDIR:=C:/models}
     DATADIR=${DATADIR:="/mnt/c/data/inferenceserver/${REPO_VERSION}"}
+    MODELDIR=${MODELDIR:=C:/models}
+    BACKEND_DIR=${BACKEND_DIR:=C:/tritonserver/backends}
     SERVER=${SERVER:=/mnt/c/tritonserver/bin/tritonserver.exe}
 else
-    MODELDIR=${MODELDIR:=`pwd`/models}
     # TODO: Remove "_davidy" once passes in Windows, update model repo.
     DATADIR=${DATADIR:="/data/inferenceserver/${REPO_VERSION}_davidy"}
+    MODELDIR=${MODELDIR:=`pwd`/models}
     TRITON_DIR=${TRITON_DIR:="/opt/tritonserver"}
+    BACKEND_DIR=${TRITON_DIR}/backends
     SERVER=${TRITON_DIR}/bin/tritonserver
 fi
 
@@ -63,6 +65,8 @@ source ../common/util.sh
 
 RET=0
 rm -f ./*.log
+
+SERVER_ARGS_BASE="--model-repository=${MODELDIR} --backend-directory=${BACKEND_DIR}"
 
 LOG_IDX=0
 
@@ -73,7 +77,7 @@ rm -fr models && mkdir -p models
 set -e
 find $DATADIR/qa_trt_plugin_model_repository/ -mindepth 1 -maxdepth 1 ! -iname '*clipplugin*' -exec cp -r {} models \;
 
-SERVER_ARGS="--model-repository=${MODELDIR}"
+SERVER_ARGS=$SERVER_ARGS_BASE
 SERVER_LOG="./inference_server_$LOG_IDX.log"
 
 run_server
@@ -127,7 +131,7 @@ LOG_IDX=$((LOG_IDX+1))
 
 ## Baseline Failure Test
 ## Plugin library not loaded
-SERVER_ARGS="--model-repository=${MODELDIR}"
+SERVER_ARGS=$SERVER_ARGS_BASE
 SERVER_LOG="./inference_server_$LOG_IDX.log"
 
 run_server
@@ -143,7 +147,7 @@ fi
 LOG_IDX=$((LOG_IDX+1))
 
 ## Backend Config, Single Plugin Test
-SERVER_ARGS="--model-repository=${MODELDIR} --backend-config=tensorrt,plugins=${MODELDIR}/libclipplugin.so"
+SERVER_ARGS="${SERVER_ARGS_BASE} --backend-config=tensorrt,plugins=${MODELDIR}/libclipplugin.so"
 SERVER_LOG="./inference_server_$LOG_IDX.log"
 
 run_server
@@ -176,7 +180,7 @@ wait $SERVER_PID
 LOG_IDX=$((LOG_IDX+1))
 
 ## Backend Config, Multiple Plugins Test
-SERVER_ARGS="--model-repository=${MODELDIR} --backend-config=tensorrt,plugins=${MODELDIR}/libclipplugin.so;${MODELDIR}/libclipplugin.so\""
+SERVER_ARGS="${SERVER_ARGS_BASE} --backend-config=tensorrt,plugins=${MODELDIR}/libclipplugin.so;${MODELDIR}/libclipplugin.so\""
 SERVER_LOG="./inference_server_$LOG_IDX.log"
 
 run_server
@@ -210,7 +214,7 @@ LOG_IDX=$((LOG_IDX+1))
 
 ## LD_PRELOAD, Single Plugin Test
 SERVER_LD_PRELOAD=$MODELDIR/libclipplugin.so
-SERVER_ARGS="--model-repository=${MODELDIR}"
+SERVER_ARGS=$SERVER_ARGS_BASE
 SERVER_LOG="./inference_server_$LOG_IDX.log"
 
 run_server
