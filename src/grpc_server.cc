@@ -3707,6 +3707,11 @@ ModelInferHandler::InferResponseComplete(
     return;
   }
 
+#ifdef TRITON_ENABLE_TRACING
+  state->trace_timestamps_.emplace_back(std::make_pair(
+      "INFER_RESPONSE_COMPLETE", TraceManager::CaptureTimestamp()));
+#endif  // TRITON_ENABLE_TRACING
+
   TRITONSERVER_Error* err = nullptr;
   // This callback is expected to be called exactly once for each request.
   // Will use the single response object in the response list to hold the
@@ -4292,6 +4297,11 @@ ModelStreamInferHandler::StreamInferResponseComplete(
                  << state->context_->unique_id_ << ", " << state->unique_id_
                  << " step " << state->step_ << ", callback index "
                  << state->cb_count_ << ", flags " << flags;
+
+#ifdef TRITON_ENABLE_TRACING
+  state->trace_timestamps_.emplace_back(std::make_pair(
+      "INFER_RESPONSE_COMPLETE", TraceManager::CaptureTimestamp()));
+#endif  // TRITON_ENABLE_TRACING
 
   // Log appropriate errors
   if (!state->is_decoupled_) {
