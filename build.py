@@ -1037,10 +1037,14 @@ ENV PATH /opt/tritonserver/bin:${PATH}
 ENV LD_LIBRARY_PATH /opt/tritonserver/backends/onnxruntime:${LD_LIBRARY_PATH}
 '''
 
-    ort_dependencies = "libgomp1" if 'onnxruntime' in backends else ""
-    pytorch_dependencies = ""
+    backend_dependencies = ""
+    # libgomp1 is needed by both onnxruntime and pytorch backends
+    if ('onnxruntime' in backends) or ('pytorch' in backends):
+        backend_dependencies = "libgomp1"
+
+    # libgfortran5 is needed by pytorch backend on ARM
     if ('pytorch' in backends) and (target_machine == 'aarch64'):
-        pytorch_dependencies = "libgfortran5"
+        backend_dependencies += " libgfortran5"
 
     df += '''
 ENV TF_ADJUST_HUE_FUSED         1
@@ -1075,11 +1079,9 @@ RUN apt-get update && \
             dirmngr \
             libnuma-dev \
             curl \
-            {ort_dependencies} {pytorch_dependencies} && \
+            {backend_dependencies} && \
     rm -rf /var/lib/apt/lists/*
-'''.format(gpu_enabled=gpu_enabled,
-           ort_dependencies=ort_dependencies,
-           pytorch_dependencies=pytorch_dependencies)
+'''.format(gpu_enabled=gpu_enabled, backend_dependencies=backend_dependencies)
 
     if enable_gpu:
         df += install_dcgm_libraries(argmap['DCGM_VERSION'], target_machine)
@@ -1094,7 +1096,7 @@ RUN ln -sf ${_CUDA_COMPAT_PATH}/lib.real ${_CUDA_COMPAT_PATH}/lib \
     elif 'pytorch' in backends:
         # Add dependencies for pytorch backend. Note: Even though the build is
         # cpu-only, the version of pytorch we are using depends upon libraries
-        # like cuda and cudnn. Since these dependencies are not present in ubuntu 
+        # like cuda and cudnn. Since these dependencies are not present in ubuntu
         # base image, we must copy these from the Triton min container ourselves.
         df += '''
 RUN mkdir -p /usr/local/cuda/lib64/stubs

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-# Copyright 2021, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright 2021-2022, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -66,10 +66,22 @@ def start_dockerfile(ddir, images, argmap, dockerfile_name, backends):
 ARG TRITON_VERSION={}
 ARG TRITON_CONTAINER_VERSION={}
 
-FROM {} as full
-FROM {}
+FROM {} AS full
 '''.format(argmap['TRITON_VERSION'], argmap['TRITON_CONTAINER_VERSION'],
-           images["full"], images["min"])
+           images["full"])
+
+    # PyTorch backend needs extra CUDA and other dependencies during runtime
+    # that are missing in the CPU only base container. These dependencies
+    # must be copied from the Triton Min image
+    if not FLAGS.enable_gpu and ('pytorch' in backends):
+        df += '''
+FROM {} AS min_container
+
+'''.format(images["gpu_min"])
+
+    df += '''
+FROM {}
+'''.format(images["min"])
 
     import build
     df += build.dockerfile_prepare_container_linux(argmap, backends,
@@ -374,7 +386,7 @@ if __name__ == '__main__':
             images[parts[0]] = parts[1]
     else:
         get_container_version_if_not_specified()
-        if (FLAGS.enable_gpu):
+        if FLAGS.enable_gpu:
             images = {
                 "full":
                     "nvcr.io/nvidia/tritonserver:{}-py3".format(
@@ -394,6 +406,12 @@ if __name__ == '__main__':
     fail_if(
         len(images) != 2,
         "Need to both specify 'full' and 'min' images if at all")
+
+    # For cpu-only image we need to copy some cuda libraries and dependencies
+    # since we are using a PyTorch container that is not CPU-only
+    if 'pytorch' in FLAGS.backend:
+        images["gpu_min"] = "nvcr.io/nvidia/tritonserver:{}-py3-min".format(
+            FLAGS.container_version)
 
     argmap = create_argmap(images)
 
