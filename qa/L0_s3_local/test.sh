@@ -222,7 +222,7 @@ wait $SERVER_PID
 awslocal $ENDPOINT_FLAG s3 rm s3://demo-bucket1.0 --recursive --include "*" && \
     awslocal $ENDPOINT_FLAG s3 rb s3://demo-bucket1.0
 
-# Test for multiple model stores using S3 cloud repositories
+# Test for multiple model repositories using S3 cloud storage
 BACKENDS1="graphdef libtorch"
 BACKENDS2="onnx plan savedmodel"
 BACKENDS="$BACKENDS1 $BACKENDS2"
@@ -242,6 +242,7 @@ for BACKEND in $BACKENDS2; do
 done
 
 BUCKET_NAME="demo-bucket"
+MODEL_REPO_ARGS=""
 for BUCKET_SUFFIX in 1 2; do
     # Cleanup bucket if exists
     awslocal $ENDPOINT_FLAG s3 rm s3://$BUCKET_NAME$BUCKET_SUFFIX --recursive --include "*" && \
@@ -250,9 +251,11 @@ for BUCKET_SUFFIX in 1 2; do
     # Create and add data to bucket
     awslocal $ENDPOINT_FLAG s3 mb s3://$BUCKET_NAME$BUCKET_SUFFIX && \
         awslocal $ENDPOINT_FLAG s3 sync models$BUCKET_SUFFIX s3://$BUCKET_NAME$BUCKET_SUFFIX
+
+    MODEL_REPO_ARGS="$MODEL_REPO_ARGS --model-repository=s3://localhost:4572/$BUCKET_NAME$BUCKET_SUFFIX"
 done
 
-SERVER_ARGS="--model-repository=s3://localhost:4572/demo-bucket1 --model-repository=s3://localhost:4572/demo-bucket2 --model-control-mode=explicit --log-verbose=1"
+SERVER_ARGS="$MODEL_REPO_ARGS --model-control-mode=explicit"
 SERVER_LOG="./inference_server.multi.log"
 
 run_server
@@ -287,8 +290,8 @@ wait $SERVER_PID
 
 # Destroy buckets
 for BUCKET_SUFFIX in 1 2; do
-    awslocal $ENDPOINT_FLAG s3 rm s3://demo-bucket$BUCKET_SUFFIX --recursive --include "*" && \
-        awslocal $ENDPOINT_FLAG s3 rb s3://demo-bucket$BUCKET_SUFFIX
+    awslocal $ENDPOINT_FLAG s3 rm s3://$BUCKET_NAME$BUCKET_SUFFIX --recursive --include "*" && \
+        awslocal $ENDPOINT_FLAG s3 rb s3://$BUCKET_NAME$BUCKET_SUFFIX || true
 done
 
 # Kill minio server
