@@ -81,6 +81,7 @@ SERVER_ARGS=$SERVER_ARGS_BASE
 SERVER_LOG="./inference_server_$LOG_IDX.log"
 
 run_server
+cat $SERVER_LOG
 if [ "$SERVER_PID" == "0" ]; then
     echo -e "\n***\n*** Failed to start $SERVER\n***"
     cat $SERVER_LOG
@@ -135,6 +136,7 @@ SERVER_ARGS=$SERVER_ARGS_BASE
 SERVER_LOG="./inference_server_$LOG_IDX.log"
 
 run_server
+cat $SERVER_LOG
 if [ "$SERVER_PID" != "0" ]; then
     echo -e "\n***\n*** Test Failed\n"
     echo -e "Unexpected successful server start $SERVER\n***"
@@ -151,6 +153,7 @@ SERVER_ARGS="${SERVER_ARGS_BASE} --backend-config=tensorrt,plugins=${MODELDIR}/l
 SERVER_LOG="./inference_server_$LOG_IDX.log"
 
 run_server
+cat $SERVER_LOG
 if [ "$SERVER_PID" == "0" ]; then
     echo -e "\n***\n*** Failed to start $SERVER\n***"
     cat $SERVER_LOG
@@ -184,6 +187,7 @@ SERVER_ARGS="${SERVER_ARGS_BASE} --backend-config=tensorrt,plugins=${MODELDIR}/l
 SERVER_LOG="./inference_server_$LOG_IDX.log"
 
 run_server
+cat $SERVER_LOG
 if [ "$SERVER_PID" == "0" ]; then
     echo -e "\n***\n*** Failed to start $SERVER\n***"
     cat $SERVER_LOG
@@ -218,6 +222,7 @@ SERVER_ARGS=$SERVER_ARGS_BASE
 SERVER_LOG="./inference_server_$LOG_IDX.log"
 
 run_server
+cat $SERVER_LOG
 if [ "$SERVER_PID" == "0" ]; then
     echo -e "\n***\n*** Failed to start $SERVER\n***"
     cat $SERVER_LOG
