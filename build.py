@@ -1037,14 +1037,14 @@ ENV PATH /opt/tritonserver/bin:${PATH}
 ENV LD_LIBRARY_PATH /opt/tritonserver/backends/onnxruntime:${LD_LIBRARY_PATH}
 '''
 
-    # libgomp is needed by both onnxruntime and pytorch backends
-    openmp_dependencies = ""
+    # libgomp1 is needed by both onnxruntime and pytorch backends
+    backend_dependencies = ""
     if ('onnxruntime' in backends) or ('pytorch' in backends):
-        openmp_dependencies = "libgomp1"
+        backend_dependencies = "libgomp1"
 
-    pytorch_dependencies = ""
+    # libgfortran5 is needed by pytorch backend on ARM
     if ('pytorch' in backends) and (target_machine == 'aarch64'):
-        pytorch_dependencies = "libgfortran5"
+        backend_dependencies += " libgfortran5"
 
     df += '''
 ENV TF_ADJUST_HUE_FUSED         1
@@ -1079,11 +1079,10 @@ RUN apt-get update && \
             dirmngr \
             libnuma-dev \
             curl \
-            {openmp_dependencies} {pytorch_dependencies} && \
+            {backend_dependencies} && \
     rm -rf /var/lib/apt/lists/*
 '''.format(gpu_enabled=gpu_enabled,
-           openmp_dependencies=openmp_dependencies,
-           pytorch_dependencies=pytorch_dependencies)
+           backend_dependencies=backend_dependencies)
 
     if enable_gpu:
         df += install_dcgm_libraries(argmap['DCGM_VERSION'], target_machine)
