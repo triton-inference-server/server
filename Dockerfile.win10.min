@@ -135,6 +135,4 @@ RUN setx PATH "%PATH%;c:\TensorRT\lib;%CUDA_INSTALL_ROOT_WP%\bin"
 # that cmake can find the packages installed by vcpkg.
 ENV CMAKE_TOOLCHAIN_FILE /vcpkg/scripts/buildsystems/vcpkg.cmake
 ENV VCPKG_TARGET_TRIPLET x64-windows
-ENV TRITONBUILD_CMAKE_TOOLCHAIN_FILE /vcpkg/scripts/buildsystems/vcpkg.cmake
-ENV TRITONBUILD_VCPKG_TARGET_TRIPLET x64-windows
 ENTRYPOINT C:\BuildTools\VC\Auxiliary\Build\vcvars64.bat &&

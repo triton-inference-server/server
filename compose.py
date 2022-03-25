@@ -107,7 +107,7 @@ def add_requested_backends(ddir, dockerfile_name, backends):
         if backend == 'openvino':
             import build
             ver = next(iter(build.TRITON_VERSION_MAP.values()))
-            backend = build.get_tagged_backend(backend, ver[4][0])
+            backend = build.tagged_backend(backend, ver[4][0])
         df += '''COPY --chown=1000:1000 --from=full /opt/tritonserver/backends/{} /opt/tritonserver/backends/{}    
 '''.format(backend, backend)
     if len(backends) > 0:
