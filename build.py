@@ -1037,8 +1037,8 @@ ENV PATH /opt/tritonserver/bin:${PATH}
 ENV LD_LIBRARY_PATH /opt/tritonserver/backends/onnxruntime:${LD_LIBRARY_PATH}
 '''
 
-    # libgomp1 is needed by both onnxruntime and pytorch backends
     backend_dependencies = ""
+    # libgomp1 is needed by both onnxruntime and pytorch backends
     if ('onnxruntime' in backends) or ('pytorch' in backends):
         backend_dependencies = "libgomp1"
 
@@ -1081,8 +1081,7 @@ RUN apt-get update && \
             curl \
             {backend_dependencies} && \
     rm -rf /var/lib/apt/lists/*
-'''.format(gpu_enabled=gpu_enabled,
-           backend_dependencies=backend_dependencies)
+'''.format(gpu_enabled=gpu_enabled, backend_dependencies=backend_dependencies)
 
     if enable_gpu:
         df += install_dcgm_libraries(argmap['DCGM_VERSION'], target_machine)
