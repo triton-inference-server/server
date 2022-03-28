@@ -74,6 +74,11 @@ fi
 TF_VERSION=${TF_VERSION:=1}
 TEST_JETSON=${TEST_JETSON:=0}
 
+# Default size (in MB) of shared memory to be used by each python model
+# instance (Default is 64MB)
+DEFAULT_SHM_SIZE_MB=${DEFAULT_SHM_SIZE_MB:=64}
+DEFAULT_SHM_SIZE_BYTES=$((1024*1024*$DEFAULT_SHM_SIZE_MB))
+
 # On windows the paths invoked by the script (running in WSL) must use
 # /mnt/c when needed but the paths on the tritonserver command-line
 # must be C:/ style.
@@ -91,7 +96,7 @@ else
 fi
 
 # Allow more time to exit. Ensemble brings in too many models
-SERVER_ARGS_EXTRA="--exit-timeout-secs=${SERVER_TIMEOUT} --backend-directory=${BACKEND_DIR} --backend-config=tensorflow,version=${TF_VERSION} --backend-config=python,stub-timeout-seconds=120"
+SERVER_ARGS_EXTRA="--exit-timeout-secs=${SERVER_TIMEOUT} --backend-directory=${BACKEND_DIR} --backend-config=tensorflow,version=${TF_VERSION} --backend-config=python,stub-timeout-seconds=120 --backend-config=python,shm-default-byte-size=${DEFAULT_SHM_SIZE_BYTES}"
 SERVER_ARGS="--model-repository=${MODELDIR} ${SERVER_ARGS_EXTRA}"
 SERVER_LOG_BASE="./inference_server"
 source ../common/util.sh
