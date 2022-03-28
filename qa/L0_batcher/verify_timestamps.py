@@ -64,8 +64,8 @@ def verify_timestamps(traces, preserve):
                 trace["timestamps"] = []
             filtered_traces[trace['id']] = trace
 
-    # First find the latest send end timestamp for the batch with large delay
-    large_delay_send_end = 0
+    # First find the latest response complete timestamp for the batch with large delay
+    large_delay_response_complete = 0
     small_delay_traces = []
     for trace_id, trace in filtered_traces.items():
         timestamps = dict()
@@ -77,8 +77,8 @@ def verify_timestamps(traces, preserve):
         # want to use its responses as baseline
         if trace["id"] <= (
                 8 + grpc_id_offset) and compute_span >= 400 * 1000 * 1000:
-            send_end = timestamps["HTTP_SEND_END"]
-            large_delay_send_end = max(large_delay_send_end, send_end)
+            response_complete = timestamps["INFER_RESPONSE_COMPLETE"]
+            large_delay_response_complete = max(large_delay_response_complete, response_complete)
         else:
             small_delay_traces.append(trace)
 
@@ -87,8 +87,8 @@ def verify_timestamps(traces, preserve):
         timestamps = dict()
         for ts in trace["timestamps"]:
             timestamps[ts["name"]] = ts["ns"]
-        send_end = timestamps["HTTP_SEND_END"]
-        if send_end > large_delay_send_end:
+        response_complete = timestamps["INFER_RESPONSE_COMPLETE"]
+        if response_complete > large_delay_response_complete:
             response_request_after_large_delay_count += 1
 
     # Hardcoded expected count here
@@ -102,128 +102,6 @@ def verify_timestamps(traces, preserve):
         # If not preserve ordering, the small delay batches should all be done
         # before large delay batch regardless of the ordering in scheduler
         return 0 if response_request_after_large_delay_count == 0 else 1
-
-
-def summarize(protocol, traces):
-    for trace in filtered_traces:
-        timestamps = dict()
-        for ts in trace["timestamps"]:
-            timestamps[ts["name"]] = ts["ns"]
-
-        if ("REQUEST_START" in timestamps) and ("REQUEST_END" in timestamps):
-            key = (trace["model_name"], trace["model_version"])
-            if key not in model_count_map:
-                model_count_map[key] = 0
-                model_span_map[key] = dict()
-
-            model_count_map[key] += 1
-            if ("HTTP_RECV_START" in timestamps) and ("HTTP_SEND_END"
-                                                      in timestamps):
-                add_span(model_span_map[key], timestamps, "http infer",
-                         "HTTP_RECV_START", "HTTP_SEND_END")
-                add_span(model_span_map[key], timestamps, "http recv",
-                         "HTTP_RECV_START", "HTTP_RECV_END")
-                add_span(model_span_map[key], timestamps, "http send",
-                         "HTTP_SEND_START", "HTTP_SEND_END")
-            elif ("GRPC_WAITREAD_START" in timestamps) and ("GRPC_SEND_END"
-                                                            in timestamps):
-                add_span(model_span_map[key], timestamps, "grpc infer",
-                         "GRPC_WAITREAD_START", "GRPC_SEND_END")
-                add_span(model_span_map[key], timestamps, "grpc wait/read",
-                         "GRPC_WAITREAD_START", "GRPC_WAITREAD_END")
-                add_span(model_span_map[key], timestamps, "grpc send",
-                         "GRPC_SEND_START", "GRPC_SEND_END")
-
-            add_span(model_span_map[key], timestamps, "request handler",
-                     "REQUEST_START", "REQUEST_END")
-
-            # The tags below will be missing for ensemble model
-            if ("QUEUE_START" in timestamps) and ("COMPUTE_START"
-                                                  in timestamps):
-                add_span(model_span_map[key], timestamps, "queue",
-                         "QUEUE_START", "COMPUTE_START")
-            if ("COMPUTE_START" in timestamps) and ("COMPUTE_END"
-                                                    in timestamps):
-                add_span(model_span_map[key], timestamps, "compute",
-                         "COMPUTE_START", "COMPUTE_END")
-            if ("COMPUTE_INPUT_END" in timestamps) and ("COMPUTE_OUTPUT_START"
-                                                        in timestamps):
-                add_span(model_span_map[key], timestamps, "compute input",
-                         "COMPUTE_START", "COMPUTE_INPUT_END")
-                add_span(model_span_map[key], timestamps, "compute infer",
-                         "COMPUTE_INPUT_END", "COMPUTE_OUTPUT_START")
-                add_span(model_span_map[key], timestamps, "compute output",
-                         "COMPUTE_OUTPUT_START", "COMPUTE_END")
-
-            if FLAGS.show_trace:
-                print("{} ({}):".format(trace["model_name"],
-                                        trace["model_version"]))
-                print("\tid: {}".format(trace["id"]))
-                if "parent_id" in trace:
-                    print("\tparent id: {}".format(trace["parent_id"]))
-                ordered_timestamps = list()
-                for ts in trace["timestamps"]:
-                    ordered_timestamps.append((ts["name"], ts["ns"]))
-                ordered_timestamps.sort(key=lambda tup: tup[1])
-
-                now = None
-                for ts in ordered_timestamps:
-                    if now is not None:
-                        print("\t\t{}us".format((ts[1] - now) / 1000))
-                    print("\t{}".format(ts[0]))
-                    now = ts[1]
-
-    for key, cnt in model_count_map.items():
-        model_name, model_value = key
-        print("Summary for {} ({}): trace count = {}".format(
-            model_name, model_value, cnt))
-
-        if "http infer" in model_span_map[key]:
-            print("HTTP infer request (avg): {}us".format(
-                model_span_map[key]["http infer"] / (cnt * 1000)))
-            print("\tReceive (avg): {}us".format(
-                model_span_map[key]["http recv"] / (cnt * 1000)))
-            print("\tSend (avg): {}us".format(model_span_map[key]["http send"] /
-                                              (cnt * 1000)))
-            print("\tOverhead (avg): {}us".format(
-                (model_span_map[key]["http infer"] -
-                 model_span_map[key]["request handler"] -
-                 model_span_map[key]["http recv"] -
-                 model_span_map[key]["http send"]) / (cnt * 1000)))
-        elif "grpc infer" in model_span_map[key]:
-            print("GRPC infer request (avg): {}us".format(
-                model_span_map[key]["grpc infer"] / (cnt * 1000)))
-            print("\tWait/Read (avg): {}us".format(
-                model_span_map[key]["grpc wait/read"] / (cnt * 1000)))
-            print("\tSend (avg): {}us".format(model_span_map[key]["grpc send"] /
-                                              (cnt * 1000)))
-            print("\tOverhead (avg): {}us".format(
-                (model_span_map[key]["grpc infer"] -
-                 model_span_map[key]["request handler"] -
-                 model_span_map[key]["grpc wait/read"] -
-                 model_span_map[key]["grpc send"]) / (cnt * 1000)))
-
-        print("\tHandler (avg): {}us".format(
-            model_span_map[key]["request handler"] / (cnt * 1000)))
-        if ("queue"
-                in model_span_map[key]) and "compute" in model_span_map[key]:
-            print("\t\tOverhead (avg): {}us".format(
-                (model_span_map[key]["request handler"] -
-                 model_span_map[key]["queue"] - model_span_map[key]["compute"])
-                / (cnt * 1000)))
-            print("\t\tQueue (avg): {}us".format(model_span_map[key]["queue"] /
-                                                 (cnt * 1000)))
-            print("\t\tCompute (avg): {}us".format(
-                model_span_map[key]["compute"] / (cnt * 1000)))
-        if ("compute input" in model_span_map[key]
-           ) and "compute output" in model_span_map[key]:
-            print("\t\t\tInput (avg): {}us".format(
-                model_span_map[key]["compute input"] / (cnt * 1000)))
-            print("\t\t\tInfer (avg): {}us".format(
-                model_span_map[key]["compute infer"] / (cnt * 1000)))
-            print("\t\t\tOutput (avg): {}us".format(
-                model_span_map[key]["compute output"] / (cnt * 1000)))
-
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
