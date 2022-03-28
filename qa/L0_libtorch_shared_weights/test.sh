@@ -52,9 +52,13 @@ export CUDA_VISIBLE_DEVICES=0
 
 CLIENT_LOG="./client.log"
 DATADIR=/data/inferenceserver/${REPO_VERSION}
-WEIGHTS_TEST=libtorch_shared_weights_test.py
+INSTANCE_CNT=4
+REUSE_MSG="Reusing TorchScript model for instance"
 SERVER=/opt/tritonserver/bin/tritonserver
+SERVER_ARGS="--model-repository=`pwd`/models --exit-on-error=false \
+             --exit-timeout-secs=10"
 TEST_RESULT_FILE='test_results.txt'
+WEIGHTS_TEST=libtorch_shared_weights_test.py
 source ../common/util.sh
 
 RET=0
@@ -65,15 +69,16 @@ LOG_IDX=0
 # Prepare model repository
 rm -fr models
 mkdir models
-for i in graphdef savedmodel ; do
+for i in models; do
     cp -r $DATADIR//qa_identity_model_repository/libtorch_nobatch_zero_1_float32 models/.
+done
+
+for MC in `ls models/libtorch*/config.pbtxt`; do
+        echo "instance_group [ { count: ${INSTANCE_CNT} }]" >> $MC
 done
 
 # SharedWeightsTest.test_pytorch_identity_model
 # Without shared weights
-# TODO: Add grep to make sure weights are not shared
-SERVER_ARGS="--model-repository=`pwd`/models --exit-on-error=false \
-             --exit-timeout-secs=5"
 SERVER_LOG="./inference_server_$LOG_IDX.log"
 run_server
 if [ "$SERVER_PID" == "0" ]; then
@@ -97,6 +102,12 @@ else
         RET=1
     fi
 fi
+
+if [ `grep -c "$REUSE_MSG" $SERVER_LOG` != "0" ]; then
+    echo -e "\n***\n*** Failed. Expected 0 "$REUSE_MSG"\n***"
+    RET=1
+fi
+
 set -e
 
 kill $SERVER_PID
@@ -106,9 +117,17 @@ LOG_IDX=$((LOG_IDX+1))
 
 # SharedWeightsTest.test_pytorch_identity_model
 # With shared weights
-# TODO: Add sed to share weights, grep to make sure weights are shared
-SERVER_ARGS="--model-repository=`pwd`/models --exit-on-error=false \
-             --exit-timeout-secs=5"
+
+for MC in `ls models/libtorch*/config.pbtxt`; do
+    echo """
+    parameters: {
+        key: \"ENABLE_WEIGHT_SHARING\"
+        value: {
+            string_value: \"true\"
+        }
+    }""" >> $MC
+done
+
 SERVER_LOG="./inference_server_$LOG_IDX.log"
 run_server
 if [ "$SERVER_PID" == "0" ]; then
@@ -132,6 +151,12 @@ else
         RET=1
     fi
 fi
+
+if [ `grep -c "$REUSE_MSG" $SERVER_LOG` != "3" ]; then
+    echo -e "\n***\n*** Failed. Expected 3 "$REUSE_MSG"\n***"
+    RET=1
+fi
+
 set -e
 
 kill $SERVER_PID
