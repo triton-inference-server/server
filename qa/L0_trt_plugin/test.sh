@@ -66,7 +66,7 @@ source ../common/util.sh
 RET=0
 rm -f ./*.log
 
-SERVER_ARGS_BASE="--model-repository=${MODELDIR} --backend-directory=${BACKEND_DIR}"
+SERVER_ARGS_BASE="--model-repository=${MODELDIR} --backend-directory=${BACKEND_DIR} --log-verbose=1"
 
 LOG_IDX=0
 
