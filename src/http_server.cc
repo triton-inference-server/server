@@ -2813,6 +2813,13 @@ HTTPAPIServer::InferRequestClass::InferResponseComplete(
     err = infer_request->FinalizeResponse(response);
   }
 
+#ifdef TRITON_ENABLE_TRACING
+  if (infer_request->trace_ != nullptr) {
+    infer_request->trace_->CaptureTimestamp(
+        "INFER_RESPONSE_COMPLETE", TraceManager::CaptureTimestamp());
+  }
+#endif  // TRITON_ENABLE_TRACING
+
   if (err == nullptr) {
     evthr_defer(infer_request->thread_, OKReplyCallback, infer_request);
   } else {
