@@ -25,11 +25,13 @@
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 import os
+from os import listdir
 import numpy as np
 from ctypes import *
 
 import tritonclient.http as httpclient
 from tritonclient.utils import *
+import triton_shm_monitor
 
 # By default, find tritonserver on "localhost", but can be overridden
 # with TRITONSERVER_IPADDR envvar
@@ -229,7 +231,8 @@ def unregister_cleanup_shm_regions(shm_regions, shm_handles,
     if not (use_system_shared_memory or use_cuda_shared_memory):
         return None
 
-    triton_client = httpclient.InferenceServerClient(f"{_tritonserver_ipaddr}:8000")
+    triton_client = httpclient.InferenceServerClient(
+        f"{_tritonserver_ipaddr}:8000")
 
     if use_cuda_shared_memory:
         triton_client.unregister_cuda_shared_memory(shm_regions[0] + '_data')
@@ -344,3 +347,37 @@ def register_add_either_shm_regions(inputs, outputs, shm_region_prefix,
                                          input_byte_size)
         outputs[io_num].set_shared_memory(output_shm_name + '_data',
                                           output_byte_size)
+
+
+class ShmLeakDetector:
+    """Detect shared memory leaks when testing Python backend."""
+
+    class ShmLeakProbe:
+
+        def __init__(self, shm_monitors):
+            self._shm_monitors = shm_monitors
+
+        def __enter__(self):
+            self._shm_region_free_sizes = []
+            for shm_monitor in self._shm_monitors:
+                self._shm_region_free_sizes.append(shm_monitor.free_memory())
+
+            return self
+
+        def __exit__(self, type, value, traceback):
+            current_shm_sizes = []
+            for shm_monitor in self._shm_monitors:
+                current_shm_sizes.append(shm_monitor.free_memory())
+
+            assert current_shm_sizes == self._shm_region_free_sizes, "Shared memory leak detected."
+
+    def __init__(self, prefix='triton_python_backend_shm_region'):
+        self._shm_monitors = []
+        shm_regions = listdir('/dev/shm')
+        for shm_region in shm_regions:
+            if shm_region.startswith(prefix):
+                self._shm_monitors.append(
+                    triton_shm_monitor.SharedMemoryManager(shm_region))
+
+    def Probe(self):
+        return self.ShmLeakProbe(self._shm_monitors)

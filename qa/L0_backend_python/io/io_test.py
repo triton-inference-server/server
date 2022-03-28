@@ -29,6 +29,7 @@ import sys
 sys.path.append("../../common")
 
 import test_util as tu
+import shm_util
 import tritonclient.http as httpclient
 from tritonclient.utils import *
 import numpy as np
@@ -37,30 +38,35 @@ import unittest
 
 class IOTest(tu.TestResultCollector):
 
+    def setUp(self):
+        self._shm_leak_detector = shm_util.ShmLeakDetector()
+
     def test_ensemble_io(self):
         model_name = "ensemble_io"
-        with httpclient.InferenceServerClient("localhost:8000") as client:
-            input0 = np.random.random([1000]).astype(np.float32)
-            for model_1_in_gpu in [True, False]:
-                for model_2_in_gpu in [True, False]:
-                    for model_3_in_gpu in [True, False]:
-                        gpu_output = np.asarray(
-                            [model_1_in_gpu, model_2_in_gpu, model_3_in_gpu],
-                            dtype=bool)
-                        inputs = [
-                            httpclient.InferInput(
-                                "INPUT0", input0.shape,
-                                np_to_triton_dtype(input0.dtype)),
-                            httpclient.InferInput(
-                                "GPU_OUTPUT", gpu_output.shape,
-                                np_to_triton_dtype(gpu_output.dtype))
-                        ]
-                        inputs[0].set_data_from_numpy(input0)
-                        inputs[1].set_data_from_numpy(gpu_output)
-                        result = client.infer(model_name, inputs)
-                        output0 = result.as_numpy('OUTPUT0')
-                        self.assertIsNotNone(output0)
-                        self.assertTrue(np.all(output0 == input0))
+        with self._shm_leak_detector.Probe() as shm_probe:
+            with httpclient.InferenceServerClient("localhost:8000") as client:
+                input0 = np.random.random([1000]).astype(np.float32)
+                for model_1_in_gpu in [True, False]:
+                    for model_2_in_gpu in [True, False]:
+                        for model_3_in_gpu in [True, False]:
+                            gpu_output = np.asarray([
+                                model_1_in_gpu, model_2_in_gpu, model_3_in_gpu
+                            ],
+                                                    dtype=bool)
+                            inputs = [
+                                httpclient.InferInput(
+                                    "INPUT0", input0.shape,
+                                    np_to_triton_dtype(input0.dtype)),
+                                httpclient.InferInput(
+                                    "GPU_OUTPUT", gpu_output.shape,
+                                    np_to_triton_dtype(gpu_output.dtype))
+                            ]
+                            inputs[0].set_data_from_numpy(input0)
+                            inputs[1].set_data_from_numpy(gpu_output)
+                            result = client.infer(model_name, inputs)
+                            output0 = result.as_numpy('OUTPUT0')
+                            self.assertIsNotNone(output0)
+                            self.assertTrue(np.all(output0 == input0))
 
 
 if __name__ == '__main__':

@@ -33,9 +33,13 @@ import tritonclient.http as httpclient
 from tritonclient.utils import *
 import numpy as np
 import unittest
+import shm_util
 
 
 class ExplicitModelTest(tu.TestResultCollector):
+
+    def setUp(self):
+        self._shm_leak_detector = shm_util.ShmLeakDetector()
 
     def send_identity_request(self, client, model_name):
         inputs = []
@@ -43,10 +47,12 @@ class ExplicitModelTest(tu.TestResultCollector):
         input0_data = np.arange(start=0, stop=16, dtype=np.float32)
         input0_data = np.expand_dims(input0_data, axis=0)
         inputs[0].set_data_from_numpy(input0_data)
-        result = client.infer(
-            model_name=model_name,
-            inputs=inputs,
-            outputs=[httpclient.InferRequestedOutput('OUTPUT0')])
+
+        with self._shm_leak_detector.Probe() as shm_probe:
+            result = client.infer(
+                model_name=model_name,
+                inputs=inputs,
+                outputs=[httpclient.InferRequestedOutput('OUTPUT0')])
         output_numpy = result.as_numpy('OUTPUT0')
         self.assertTrue(np.all(input0_data == output_numpy))
 

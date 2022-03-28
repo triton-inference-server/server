@@ -154,8 +154,19 @@ RUN cd ${TRITONTMP_DIR}/tritonbuild/identity && \
         -DTRITON_BACKEND_REPO_TAG:STRING=${TRITON_BACKEND_REPO_TAG} .. && \
     make -j16 install
 
+# L0_backend_python test require triton_shm_monitor
+RUN cd ${TRITONTMP_DIR}/tritonbuild/python && \
+    rm -rf install build && mkdir build && cd build && \
+    cmake -DCMAKE_INSTALL_PREFIX:PATH=${TRITONTMP_DIR}/tritonbuild/python/install \
+        -DTRITON_COMMON_REPO_TAG:STRING=${TRITON_COMMON_REPO_TAG} \
+        -DTRITON_CORE_REPO_TAG:STRING=${TRITON_CORE_REPO_TAG} \
+        -DTRITON_BACKEND_REPO_TAG:STRING=${TRITON_BACKEND_REPO_TAG} .. && \
+    make -j18 triton-shm-monitor install
+
 RUN cp ${TRITONTMP_DIR}/tritonbuild/identity/install/backends/identity/libtriton_identity.so \
         qa/L0_lifecycle/. && \
+    cp ${TRITONTMP_DIR}/tritonbuild/python/install/backends/python/triton_shm_monitor*.so \
+        qa/common/. && \
     mkdir -p qa/L0_perf_nomodel/custom_models/custom_zero_1_float32/1 && \
     mkdir -p qa/L0_perf_pyclients/custom_models/custom_zero_1_int32/1 && \
     mkdir -p qa/L0_infer_shm && \
