@@ -28,7 +28,7 @@
 
 # Triton Inference Server Support for Jetson and JetPack
 
-A release of Triton for [JetPack 4.6.1](https://developer.nvidia.com/embedded/jetpack)
+A release of Triton for [JetPack 5.0](https://developer.nvidia.com/embedded/jetpack)
 is provided in the attached tar file in the [release notes](https://github.com/triton-inference-server/server/releases).
 
 ![Triton on Jetson Diagram](images/triton_on_jetson.png)
@@ -54,11 +54,11 @@ The TensorRT execution provider however is supported.
 On JetPack, although HTTP/REST and GRPC inference protocols are supported, for edge
 use cases, direct [C API integration](inference_protocols.md#c-api) is recommended.
 
-You can download the `.tar` files for Jetson from the Triton Inference Server
+You can download the `.tgz` file for Jetson from the Triton Inference Server
 [release page](https://github.com/triton-inference-server/server/releases) in the
 _"Jetson JetPack Support"_ section.
 
-The `.tar` file contains the Triton server executable and shared libraries,
+The `.tgz` file contains the Triton server executable and shared libraries,
 as well as the C++ and Python client libraries and examples.
 
 ## Installation and Usage
@@ -113,11 +113,8 @@ pip3 install --upgrade expecttest xmlrunner hypothesis aiohttp pyyaml scipy ninj
 Apart from these PyTorch dependencies, the PyTorch wheel corresponding to the release must also be installed (for build and runtime):
 
 ```
-pip3 install --upgrade https://developer.download.nvidia.com/compute/redist/jp/v461/pytorch/torch-1.11.0a0+17540c5-cp36-cp36m-linux_aarch64.whl
+pip3 install --upgrade https://developer.download.nvidia.com/compute/redist/jp/v50/pytorch/torch-1.12.0a0+2c916ef.nv22.3-cp38-cp38-linux_aarch64.whl
 ```
-
-**Note**: Seeing a core dump when using numpy 1.19.5 on Jetson is a [known issue](https://github.com/numpy/numpy/issues/18131).
-We recommend using numpy version 1.19.4 or earlier to work around this issue.
 
 The following dependencies must be installed before building Triton client libraries/examples:
 
@@ -127,23 +124,23 @@ apt-get install -y --no-install-recommends \
             jq
 
 pip3 install --upgrade wheel setuptools cython && \
-    pip3 install --upgrade grpcio-tools numpy==1.19.4 attrdict pillow
+    pip3 install --upgrade grpcio-tools numpy attrdict pillow
 ```
 
-**Note**: OpenCV 4.1.1 is installed as a part of JetPack. It is one of the dependencies for the client build.
+**Note**: OpenCV 4.2.0 is installed as a part of JetPack. It is one of the dependencies for the client build.
 
 **Note**: When building Triton on Jetson, you will require a recent version of cmake. 
-We recommend using cmake 3.21.0. Below is a script to upgrade your cmake version to 3.21.0.
+We recommend using cmake 3.21.1. Below is a script to upgrade your cmake version to 3.21.1.
 
 ```
 apt remove cmake
 wget -O - https://apt.kitware.com/keys/kitware-archive-latest.asc 2>/dev/null | \
       gpg --dearmor - | \
       tee /etc/apt/trusted.gpg.d/kitware.gpg >/dev/null && \
-    apt-add-repository 'deb https://apt.kitware.com/ubuntu/ bionic main' && \
+    apt-add-repository 'deb https://apt.kitware.com/ubuntu/ focal main' && \
     apt-get update && \
     apt-get install -y --no-install-recommends \
-        cmake-data=3.21.0-0kitware1ubuntu18.04.1 cmake=3.21.0-0kitware1ubuntu18.04.1
+        cmake-data=3.21.1-0kitware1ubuntu20.04.1 cmake=3.21.1-0kitware1ubuntu20.04.1
 ```
 
 ### Runtime Dependencies for Triton
@@ -174,7 +171,7 @@ apt-get update && \
         jq
 
 pip3 install --upgrade wheel setuptools && \
-    pip3 install --upgrade grpcio-tools numpy==1.19.4 attrdict pillow
+    pip3 install --upgrade grpcio-tools numpy attrdict pillow
 ```
 
 The PyTorch runtime depenencies are the same as the build dependencies listed above.
