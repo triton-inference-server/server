@@ -43,7 +43,7 @@ class SharedWeightsTest(tu.TestResultCollector):
 
     def _full_exact(self, model_name, request_parallelism, shape):
 
-        # Run async requests to make sure backend handles request requests
+        # Run async requests to make sure backend handles parallel requests
         # correctly.
         client = httpclient.InferenceServerClient(
             "localhost:8000", concurrency=request_parallelism)
@@ -60,7 +60,7 @@ class SharedWeightsTest(tu.TestResultCollector):
 
         for i in range(request_parallelism):
             # Get the result from the initiated asynchronous inference request.
-            # Note the call will block till the server responds.
+            # Note the call will block until the server responds.
             results = requests[i].get_result()
 
             output_data = results.as_numpy("OUTPUT__0")
