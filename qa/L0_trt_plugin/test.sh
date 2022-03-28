@@ -94,6 +94,9 @@ python3 $PLUGIN_TEST PluginModelTest.test_raw_fff_gelu >>$CLIENT_LOG 2>&1
 if [ $? -ne 0 ]; then
     cat $CLIENT_LOG
     echo -e "\n***\n*** Test Failed\n***"
+    echo -e "\n***\n*** Server Log Start\n***"
+    cat $SERVER_LOG
+    echo -e "\n***\n*** Server Log End\n***"
     RET=1
 else
     check_test_results $TEST_RESULT_FILE 1
@@ -108,6 +111,9 @@ python3 $PLUGIN_TEST PluginModelTest.test_raw_fff_norm >>$CLIENT_LOG 2>&1
 if [ $? -ne 0 ]; then
     cat $CLIENT_LOG
     echo -e "\n***\n*** Test Failed\n***"
+    echo -e "\n***\n*** Server Log Start\n***"
+    cat $SERVER_LOG
+    echo -e "\n***\n*** Server Log End\n***"
     RET=1
 else
     check_test_results $TEST_RESULT_FILE 1
@@ -166,6 +172,9 @@ python3 $PLUGIN_TEST PluginModelTest.test_raw_fff_clip >>$CLIENT_LOG 2>&1
 if [ $? -ne 0 ]; then
     cat $CLIENT_LOG
     echo -e "\n***\n*** Test Failed\n***"
+    echo -e "\n***\n*** Server Log Start\n***"
+    cat $SERVER_LOG
+    echo -e "\n***\n*** Server Log End\n***"
     RET=1
 else
     check_test_results $TEST_RESULT_FILE 1
@@ -200,6 +209,9 @@ python3 $PLUGIN_TEST PluginModelTest.test_raw_fff_clip >>$CLIENT_LOG 2>&1
 if [ $? -ne 0 ]; then
     cat $CLIENT_LOG
     echo -e "\n***\n*** Test Failed\n***"
+    echo -e "\n***\n*** Server Log Start\n***"
+    cat $SERVER_LOG
+    echo -e "\n***\n*** Server Log End\n***"
     RET=1
 else
     check_test_results $TEST_RESULT_FILE 1
@@ -235,6 +247,9 @@ python3 $PLUGIN_TEST PluginModelTest.test_raw_fff_clip >>$CLIENT_LOG 2>&1
 if [ $? -ne 0 ]; then
     cat $CLIENT_LOG
     echo -e "\n***\n*** Test Failed\n***"
+    echo -e "\n***\n*** Server Log Start\n***"
+    cat $SERVER_LOG
+    echo -e "\n***\n*** Server Log End\n***"
     RET=1
 else
     check_test_results $TEST_RESULT_FILE 1
