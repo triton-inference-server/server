@@ -1,6 +1,6 @@
 #!/usr/bin/python
 
-# Copyright (c) 2021, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright 2021-2022, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -52,6 +52,9 @@ class OptionalInputTest(tu.TestResultCollector):
         # The helper client for setup will be GRPC for simplicity.
         self.triton_client_ = grpcclient.InferenceServerClient("localhost:8001")
         self.model_name_ = 'identity_2_float32'
+        # This will not be changed even when ensemble is under test,
+        # as the dynamic batching is performed within the composing model
+        self.check_status_model = 'identity_2_float32'
         self.tensor_shape_ = (1, 1)
         self.inputs_ = {
             "INPUT0": grpcclient.InferInput('INPUT0', [1, 1], "FP32"),
@@ -180,7 +183,7 @@ class OptionalInputTest(tu.TestResultCollector):
             for t in threads:
                 t.join()
             self.check_deferred_exception()
-            self.check_status(self.model_name_, {2: 1}, 2, 2)
+            self.check_status(self.check_status_model, {2: 1}, 2, 2)
         except Exception as ex:
             self.assertTrue(False, "unexpected error {}".format(ex))
 
@@ -203,7 +206,7 @@ class OptionalInputTest(tu.TestResultCollector):
             for t in threads:
                 t.join()
             self.check_deferred_exception()
-            self.check_status(self.model_name_, {2: 1}, 2, 2)
+            self.check_status(self.check_status_model, {2: 1}, 2, 2)
         except Exception as ex:
             self.assertTrue(False, "unexpected error {}".format(ex))
 
@@ -238,7 +241,7 @@ class OptionalInputTest(tu.TestResultCollector):
             for t in threads:
                 t.join()
             self.check_deferred_exception()
-            self.check_status(self.model_name_, {1: 4}, 4, 4)
+            self.check_status(self.check_status_model, {1: 4}, 4, 4)
         except Exception as ex:
             self.assertTrue(False, "unexpected error {}".format(ex))
 
@@ -270,7 +273,73 @@ class OptionalInputTest(tu.TestResultCollector):
             for t in threads:
                 t.join()
             self.check_deferred_exception()
-            self.check_status(self.model_name_, {1: 4}, 4, 4)
+            self.check_status(self.check_status_model, {1: 4}, 4, 4)
+        except Exception as ex:
+            self.assertTrue(False, "unexpected error {}".format(ex))
+
+    def test_ensemble_all_inputs(self):
+        # The ensemble is only a wrapper over 'identity_2_float32'
+        self.model_name_ = 'ensemble_identity_2_float32'
+        self.test_all_inputs()
+        # From the ensemble's perspective, the requests are processed as it is
+        self.check_status(self.model_name_, {1: 2}, 2, 2)
+
+    def test_ensemble_optional_same_input(self):
+        # The ensemble is only a wrapper over 'identity_2_float32'
+        self.model_name_ = 'ensemble_identity_2_float32'
+        self.test_optional_same_input()
+        # From the ensemble's perspective, the requests are processed as it is
+        self.check_status(self.model_name_, {1: 2}, 2, 2)
+
+    def test_ensemble_optional_mix_inputs(self):
+        # The ensemble is only a wrapper over 'identity_2_float32'
+        self.model_name_ = 'ensemble_identity_2_float32'
+        self.test_optional_mix_inputs()
+        # From the ensemble's perspective, the requests are processed as it is
+        self.check_status(self.model_name_, {1: 4}, 4, 4)
+
+    def test_ensemble_optional_mix_inputs_2(self):
+        # The ensemble is only a wrapper over 'identity_2_float32'
+        self.model_name_ = 'ensemble_identity_2_float32'
+        self.test_optional_mix_inputs_2()
+        # From the ensemble's perspective, the requests are processed as it is
+        self.check_status(self.model_name_, {1: 4}, 4, 4)
+
+    def test_ensemble_optional_pipeline(self):
+        # The ensemble is a special case of pipelining models with optional
+        # inputs, where the ensemble step only connects a subset of inputs
+        # for the second model (which is valid because the disconnected inputs
+        # are marked optional). See 'config.pbtxt' for detail.
+        self.model_name_ = 'pipeline_identity_2_float32'
+
+        # Provide all inputs, send requests that don't form preferred batch
+        # so all requests should be returned after the queue delay
+        try:
+            provided_inputs = ("INPUT0", "INPUT1")
+            inputs = []
+            for provided_input in provided_inputs:
+                inputs.append(self.inputs_[provided_input])
+
+            triton_client = grpcclient.InferenceServerClient("localhost:8001")
+            results = triton_client.infer(model_name=self.model_name_,
+                                          inputs=inputs)
+
+            # OUTPU0 is always zero, OUTPUT1 = INPUT0
+            output_data = results.as_numpy("OUTPUT0")
+            expected = np.zeros(shape=(1, 1), dtype=np.float32)
+            self.assertTrue(
+                np.array_equal(output_data, expected),
+                "{}, {}, expected: {}, got {}".format(self.model_name_,
+                                                      "OUTPUT0", expected,
+                                                      output_data))
+
+            expected = self.input_data_["INPUT0"]
+            output_data = results.as_numpy("OUTPUT1")
+            self.assertTrue(
+                np.array_equal(output_data, expected),
+                "{}, {}, expected: {}, got {}".format(self.model_name_,
+                                                      "OUTPUT1", expected,
+                                                      output_data))
         except Exception as ex:
             self.assertTrue(False, "unexpected error {}".format(ex))
 
