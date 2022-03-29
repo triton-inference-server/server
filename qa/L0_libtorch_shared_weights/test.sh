@@ -63,11 +63,11 @@ for i in models; do
 done
 
 for MC in `ls models/libtorch*/config.pbtxt`; do
-        echo "instance_group [ { count: ${INSTANCE_CNT} }]" >> $MC
+    echo "instance_group [ { count: ${INSTANCE_CNT} kind: KIND_GPU}]" >> $MC
 done
 
 # SharedWeightsTest.test_pytorch_identity_model
-# Without shared weights
+# Without shared weights, GPU
 SERVER_LOG="./inference_server_$LOG_IDX.log"
 run_server
 if [ "$SERVER_PID" == "0" ]; then
@@ -105,7 +105,7 @@ wait $SERVER_PID
 LOG_IDX=$((LOG_IDX+1))
 
 # SharedWeightsTest.test_pytorch_identity_model
-# With shared weights
+# With shared weights, GPU
 
 for MC in `ls models/libtorch*/config.pbtxt`; do
     echo """
@@ -115,6 +115,49 @@ for MC in `ls models/libtorch*/config.pbtxt`; do
             string_value: \"true\"
         }
     }""" >> $MC
+done
+
+SERVER_LOG="./inference_server_$LOG_IDX.log"
+run_server
+if [ "$SERVER_PID" == "0" ]; then
+    echo -e "\n***\n*** Failed to start $SERVER\n***"
+    cat $SERVER_LOG
+    exit 1
+fi
+
+rm -f $CLIENT_LOG
+set +e
+python $WEIGHTS_TEST SharedWeightsTest.test_pytorch_identity_model >>$CLIENT_LOG 2>&1
+if [ $? -ne 0 ]; then
+    cat $CLIENT_LOG
+    echo -e "\n***\n*** Test Failed\n***"
+    RET=1
+else
+    check_test_results $TEST_RESULT_FILE 1
+    if [ $? -ne 0 ]; then
+        cat $CLIENT_LOG
+        echo -e "\n***\n*** Test Result Verification Failed\n***"
+        RET=1
+    fi
+fi
+
+if [ `grep -c "$REUSE_MSG" $SERVER_LOG` != "15" ]; then
+    echo -e "\n***\n*** Failed. Expected 15 "$REUSE_MSG"\n***"
+    RET=1
+fi
+
+set -e
+
+kill $SERVER_PID
+wait $SERVER_PID
+
+LOG_IDX=$((LOG_IDX+1))
+
+# SharedWeightsTest.test_pytorch_identity_model
+# With shared weights, CPU
+
+for MC in `ls models/libtorch*/config.pbtxt`; do
+    sed -i "s/KIND_GPU/KIND_CPU/g" $MC
 done
 
 SERVER_LOG="./inference_server_$LOG_IDX.log"
