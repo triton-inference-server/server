@@ -305,6 +305,44 @@ class OptionalInputTest(tu.TestResultCollector):
         # From the ensemble's perspective, the requests are processed as it is
         self.check_status(self.model_name_, {1: 4}, 4, 4)
 
+    def test_ensemble_optional_pipeline(self):
+        # The ensemble is a special case of pipelining models with optional
+        # inputs, where the ensemble step only connects a subset of inputs
+        # for the second model (which is valid because the disconnected inputs
+        # are marked optional). See 'config.pbtxt' for detail.
+        self.model_name_ = 'pipeline_identity_2_float32'
+
+        # Provide all inputs, send requests that don't form preferred batch
+        # so all requests should be returned after the queue delay
+        try:
+            provided_inputs = ("INPUT0", "INPUT1")
+            inputs = []
+            for provided_input in provided_inputs:
+                inputs.append(self.inputs_[provided_input])
+
+            triton_client = grpcclient.InferenceServerClient("localhost:8001")
+            results = triton_client.infer(model_name=self.model_name_,
+                                          inputs=inputs)
+
+            # OUTPU0 is always zero, OUTPUT1 = INPUT0
+            output_data = results.as_numpy("OUTPUT0")
+            expected = np.zeros(shape=(1, 1), dtype=np.float32)
+            self.assertTrue(
+                np.array_equal(output_data, expected),
+                "{}, {}, expected: {}, got {}".format(self.model_name_,
+                                                      "OUTPUT0", expected,
+                                                      output_data))
+
+            expected = self.input_data_["INPUT0"]
+            output_data = results.as_numpy("OUTPUT1")
+            self.assertTrue(
+                np.array_equal(output_data, expected),
+                "{}, {}, expected: {}, got {}".format(self.model_name_,
+                                                      "OUTPUT1", expected,
+                                                      output_data))
+        except Exception as ex:
+            self.assertTrue(False, "unexpected error {}".format(ex))
+
 
 if __name__ == '__main__':
     unittest.main()

@@ -40,6 +40,7 @@ rm -fr *.log
 
 mkdir -p ./models/identity_2_float32/1
 mkdir -p ./models/ensemble_identity_2_float32/1
+mkdir -p ./models/pipeline_identity_2_float32/1
 
 # Basic test cases
 TEST_CASES=${TEST_CASES:="test_all_inputs \
@@ -49,7 +50,8 @@ TEST_CASES=${TEST_CASES:="test_all_inputs \
                             test_ensemble_all_inputs \
                             test_ensemble_optional_same_input \
                             test_ensemble_optional_mix_inputs \
-                            test_ensemble_optional_mix_inputs_2"}
+                            test_ensemble_optional_mix_inputs_2 \
+                            test_ensemble_optional_pipeline"}
 
 for i in $TEST_CASES ; do
     # Restart server for every test to clear model stats
