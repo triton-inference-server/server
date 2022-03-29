@@ -167,7 +167,7 @@ function get_datatype () {
   elif [[ $1 == "savedmodel" ]]; then
     dtype="float32 bool"
   elif [[ $1 == "graphdef" ]]; then
-    dtype="object bool"
+    dtype="object bool int32"
   fi
 
   # Add type string to the onnx model tests only for implicit state.
@@ -210,13 +210,12 @@ for BACKEND in $BACKENDS; do
       MODELS="$MODELS $DATADIR/$FIXED_MODEL_REPOSITORY/${BACKEND}_sequence_${DTYPE}"
     done
 
-    if [[ $BACKEND == "graphdef" ]]; then
-      MODELS="$MODELS $DATADIR/$FIXED_MODEL_REPOSITORY/${BACKEND}_sequence_graphdef_sequence_int32"
-    fi
-
     if [ "$ENSEMBLES" == "1" ]; then
       for DTYPE in $DTYPES; do
-        MODELS="$MODELS $DATADIR/qa_ensemble_model_repository/$FIXED_MODEL_REPOSITORY/*_${BACKEND}_sequence_${DTYPE}"
+        # We don't generate ensemble models for bool data type.
+        if [[ $DTYPE != "bool" ]]; then
+          MODELS="$MODELS $DATADIR/qa_ensemble_model_repository/$FIXED_MODEL_REPOSITORY/*_${BACKEND}_sequence_${DTYPE}"
+        fi
       done
     fi
   fi
@@ -317,18 +316,14 @@ for BACKEND in $BACKENDS; do
       MODELS="$MODELS $DATADIR/$FIXED_MODEL_REPOSITORY/${BACKEND}_nobatch_sequence_${DTYPE}"
     done
 
-    if [[ $BACKEND == "graphdef" ]]; then
-      MODELS="$MODELS $DATADIR/$FIXED_MODEL_REPOSITORY/graphdef_nobatch_sequence_int32"
-    fi
-
     if [ "$ENSEMBLES" == "1" ]; then
       for DTYPE in $DTYPES; do
-      MODELS="$MODELS $DATADIR/qa_ensemble_model_repository/$FIXED_MODEL_REPOSITORY/*_${BACKEND}_nobatch_sequence_${DTYPE}"
+        # We don't generate ensemble models for bool data type.
+        if [[ $DTYPE != "bool" ]]; then
+          MODELS="$MODELS $DATADIR/qa_ensemble_model_repository/$FIXED_MODEL_REPOSITORY/*_${BACKEND}_nobatch_sequence_${DTYPE}"
+        fi
       done
 
-      if [[ $BACKEND == "graphdef" ]]; then
-        MODELS="$MODELS $DATADIR/qa_ensemble_model_repository/$FIXED_MODEL_REPOSITORY/*_graphdef_nobatch_sequence_int32"
-      fi
     fi
   fi
 done
@@ -361,8 +356,11 @@ for BACKEND in $BACKENDS; do
 
     if [ "$ENSEMBLES" == "1" ]; then
       for DTYPE in $DTYPES; do
-        MODELS="$MODELS $DATADIR/qa_ensemble_model_repository/${VAR_MODEL_REPOSITORY}/*_${BACKEND}_sequence_${DTYPE}"
-        done
+        # We don't generate ensemble models for bool data type.
+        if [[ $DTYPE != "bool" ]]; then
+          MODELS="$MODELS $DATADIR/qa_ensemble_model_repository/${VAR_MODEL_REPOSITORY}/*_${BACKEND}_sequence_${DTYPE}"
+        fi
+      done
     fi
   fi
 done
