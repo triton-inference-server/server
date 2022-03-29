@@ -24,17 +24,6 @@
 # (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-## Basic framework from other test.sh
-
-## Copy over libtorch non-sequence model
-## Make model have multiple instances on one device
-## Make non-sequence model have share_weights on
-## Use test script to push high concurrency on both and check accuracy
-## Check for expected logs
-## Make model have share_weights off
-## Use test script to push high concurrency on both and check accuracy (repeat)
-## Check for expected logs
-
 REPO_VERSION=${NVIDIA_TRITON_SERVER_VERSION}
 if [ "$#" -ge 1 ]; then
     REPO_VERSION=$1
