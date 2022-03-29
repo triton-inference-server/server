@@ -755,6 +755,40 @@ fi
 set -e
 
 ## Test perf_analyzer with MPI / multiple models
+
+apt update ; apt install -y libopenmpi-dev
+
+is_synchronized() {
+  local TIMESTAMP_RANK_0_STABLE=$(grep -oP "^\K[^$]+(?=\[1,0\]<stdout>:All models on all MPI ranks are stable)" 1/rank.0/stdout | date "+%s" -f -)
+  local TIMESTAMP_RANK_1_STABLE=$(grep -oP "^\K[^$]+(?=\[1,1\]<stdout>:All models on all MPI ranks are stable)" 1/rank.1/stdout | date "+%s" -f -)
+  local TIMESTAMP_RANK_2_STABLE=$(grep -oP "^\K[^$]+(?=\[1,2\]<stdout>:All models on all MPI ranks are stable)" 1/rank.2/stdout | date "+%s" -f -)
+  local TIMESTAMP_MIN=$(echo -e "${TIMESTAMP_RANK_0_STABLE}\n${TIMESTAMP_RANK_1_STABLE}\n${TIMESTAMP_RANK_2_STABLE}" | sort -n | head -1)
+  local TIMESTAMP_MAX=$(echo -e "${TIMESTAMP_RANK_0_STABLE}\n${TIMESTAMP_RANK_1_STABLE}\n${TIMESTAMP_RANK_2_STABLE}" | sort -n | tail -1)
+  local TIMESTAMP_MAX_MIN_DIFFERENCE=$((${TIMESTAMP_MAX}-${TIMESTAMP_MIN}))
+  local ALLOWABLE_SECONDS_BETWEEN_PROFILES_FINISHING="5"
+  echo $(($TIMESTAMP_MAX_MIN_DIFFERENCE <= $ALLOWABLE_SECONDS_BETWEEN_PROFILES_FINISHING))
+}
+
+is_stable() {
+  local RANK=$1
+  local IS_THROUGHPUT=$2
+  if [ $IS_THROUGHPUT ]; then
+    local GREP_PATTERN="\[1,$RANK\]<stdout>:  Pass \[[0-9]+\] throughput: \K[0-9]+\.?[0-9]*"
+  else
+    local GREP_PATTERN="\[1,$RANK\]<stdout>:  Pass \[[0-9]+\] throughput: [0-9]+\.?[0-9]* infer/sec. Avg latency: \K[0-9]+"
+  fi
+  local LAST_MINUS_0=$(grep -oP "$GREP_PATTERN" 1/rank.$RANK/stdout | tail -3 | sed -n 3p)
+  local LAST_MINUS_1=$(grep -oP "$GREP_PATTERN" 1/rank.$RANK/stdout | tail -3 | sed -n 2p)
+  local LAST_MINUS_2=$(grep -oP "$GREP_PATTERN" 1/rank.$RANK/stdout | tail -3 | sed -n 1p)
+  local MEAN=$(awk "BEGIN {print (($LAST_MINUS_0+$LAST_MINUS_1+$LAST_MINUS_2)/3)}")
+  local STABILITY_THRESHOLD=0.5
+  # Based on this: https://github.com/triton-inference-server/client/blob/main/src/c++/perf_analyzer/inference_profiler.cc#L629-L644
+  local WITHIN_THRESHOLD_0=$(awk "BEGIN {print ($LAST_MINUS_0 >= ((1 - $STABILITY_THRESHOLD) * $MEAN) && $LAST_MINUS_0 <= ((1 + $STABILITY_THRESHOLD) * $MEAN))}")
+  local WITHIN_THRESHOLD_1=$(awk "BEGIN {print ($LAST_MINUS_1 >= ((1 - $STABILITY_THRESHOLD) * $MEAN) && $LAST_MINUS_1 <= ((1 + $STABILITY_THRESHOLD) * $MEAN))}")
+  local WITHIN_THRESHOLD_2=$(awk "BEGIN {print ($LAST_MINUS_2 >= ((1 - $STABILITY_THRESHOLD) * $MEAN) && $LAST_MINUS_2 <= ((1 + $STABILITY_THRESHOLD) * $MEAN))}")
+  echo $(($WITHIN_THRESHOLD_0 && $WITHIN_THRESHOLD_1 && $WITHIN_THRESHOLD_2))
+}
+
 set +e
 mpiexec --allow-run-as-root \
   -n 1 --merge-stderr-to-stdout --output-filename . --tag-output --timestamp-output \
@@ -772,43 +806,12 @@ if [ $? -ne 0 ]; then
    echo -e "\n***\n*** Test Failed\n***"
    RET=1
 else
-  is_synchronized() {
-    local TIMESTAMP_RANK_0_STABLE=$(grep -oP "^\K[^$]+(?=\[1,0\]<stdout>:All models on all MPI ranks are stable)" 1/rank.0/stdout | date "+%s" -f -)
-    local TIMESTAMP_RANK_1_STABLE=$(grep -oP "^\K[^$]+(?=\[1,1\]<stdout>:All models on all MPI ranks are stable)" 1/rank.1/stdout | date "+%s" -f -)
-    local TIMESTAMP_RANK_2_STABLE=$(grep -oP "^\K[^$]+(?=\[1,2\]<stdout>:All models on all MPI ranks are stable)" 1/rank.2/stdout | date "+%s" -f -)
-    local TIMESTAMP_MIN=$(echo -e "${TIMESTAMP_RANK_0_STABLE}\n${TIMESTAMP_RANK_1_STABLE}\n${TIMESTAMP_RANK_2_STABLE}" | sort -n | head -1)
-    local TIMESTAMP_MAX=$(echo -e "${TIMESTAMP_RANK_0_STABLE}\n${TIMESTAMP_RANK_1_STABLE}\n${TIMESTAMP_RANK_2_STABLE}" | sort -n | tail -1)
-    local TIMESTAMP_MAX_MIN_DIFFERENCE=$((${TIMESTAMP_MAX}-${TIMESTAMP_MIN}))
-    local ALLOWABLE_SECONDS_BETWEEN_PROFILES_FINISHING="5"
-    echo $(($TIMESTAMP_MAX_MIN_DIFFERENCE <= $ALLOWABLE_SECONDS_BETWEEN_PROFILES_FINISHING))
-  }
-
   if [ $(is_synchronized) -eq 0 ]; then
     cat 1/rank.0/stdout 1/rank.2/stdout 1/rank.2/stdout
     echo -e "\n***\n*** All models did not finish profiling at almost the same time\n***"
     echo -e "\n***\n*** Test Failed\n***"
     RET=1
   fi
-
-  is_stable() {
-    local RANK=$1
-    local IS_THROUGHPUT=$2
-    if [ $IS_THROUGHPUT ]; then
-      local GREP_PATTERN="\[1,$RANK\]<stdout>:  Pass \[[0-9]+\] throughput: \K[0-9]+\.?[0-9]*"
-    else
-      local GREP_PATTERN="\[1,$RANK\]<stdout>:  Pass \[[0-9]+\] throughput: [0-9]+\.?[0-9]* infer/sec. Avg latency: \K[0-9]+"
-    fi
-    local LAST_MINUS_0=$(grep -oP "$GREP_PATTERN" 1/rank.$RANK/stdout | tail -3 | sed -n 3p)
-    local LAST_MINUS_1=$(grep -oP "$GREP_PATTERN" 1/rank.$RANK/stdout | tail -3 | sed -n 2p)
-    local LAST_MINUS_2=$(grep -oP "$GREP_PATTERN" 1/rank.$RANK/stdout | tail -3 | sed -n 1p)
-    local MEAN=$(awk "BEGIN {print (($LAST_MINUS_0+$LAST_MINUS_1+$LAST_MINUS_2)/3)}")
-    local STABILITY_THRESHOLD=0.5
-    # Based on this: https://github.com/triton-inference-server/client/blob/main/src/c++/perf_analyzer/inference_profiler.cc#L629-L644
-    local WITHIN_THRESHOLD_0=$(awk "BEGIN {print ($LAST_MINUS_0 >= ((1 - $STABILITY_THRESHOLD) * $MEAN) && $LAST_MINUS_0 <= ((1 + $STABILITY_THRESHOLD) * $MEAN))}")
-    local WITHIN_THRESHOLD_1=$(awk "BEGIN {print ($LAST_MINUS_1 >= ((1 - $STABILITY_THRESHOLD) * $MEAN) && $LAST_MINUS_1 <= ((1 + $STABILITY_THRESHOLD) * $MEAN))}")
-    local WITHIN_THRESHOLD_2=$(awk "BEGIN {print ($LAST_MINUS_2 >= ((1 - $STABILITY_THRESHOLD) * $MEAN) && $LAST_MINUS_2 <= ((1 + $STABILITY_THRESHOLD) * $MEAN))}")
-    echo $(($WITHIN_THRESHOLD_0 && $WITHIN_THRESHOLD_1 && $WITHIN_THRESHOLD_2))
-  }
 
   RANK_0_THROUGHPUT_IS_STABLE=$(is_stable 0 1)
   RANK_0_LATENCY_IS_STABLE=$(is_stable 0 0)
@@ -831,6 +834,21 @@ else
     echo -e "\n***\n*** Test Failed\n***"
     RET=1
   fi
+
+  rm -rf 1
+fi
+set -e
+
+## Test perf_analyzer without MPI library (`libmpi.so`) available
+
+apt purge -y libopenmpi-dev openmpi-bin ; rm -rf /opt/hpcx
+
+set +e
+$PERF_ANALYZER -v -m graphdef_int32_int32_int32
+if [ $? -ne 0 ]; then
+   cat $CLIENT_LOG
+   echo -e "\n***\n*** Test Failed\n***"
+   RET=1
 fi
 set -e
 
