@@ -212,6 +212,7 @@ for BACKEND in $BACKENDS; do
 
     if [ "$ENSEMBLES" == "1" ]; then
       for DTYPE in $DTYPES; do
+        # We don't generate ensemble models for bool data type.
         if [[ $DTYPE != "bool" ]]; then
           MODELS="$MODELS $DATADIR/qa_ensemble_model_repository/$FIXED_MODEL_REPOSITORY/*_${BACKEND}_sequence_${DTYPE}"
         fi
@@ -317,6 +318,7 @@ for BACKEND in $BACKENDS; do
 
     if [ "$ENSEMBLES" == "1" ]; then
       for DTYPE in $DTYPES; do
+        # We don't generate ensemble models for bool data type.
         if [[ $DTYPE != "bool" ]]; then
           MODELS="$MODELS $DATADIR/qa_ensemble_model_repository/$FIXED_MODEL_REPOSITORY/*_${BACKEND}_nobatch_sequence_${DTYPE}"
         fi
@@ -354,6 +356,7 @@ for BACKEND in $BACKENDS; do
 
     if [ "$ENSEMBLES" == "1" ]; then
       for DTYPE in $DTYPES; do
+        # We don't generate ensemble models for bool data type.
         if [[ $DTYPE != "bool" ]]; then
           MODELS="$MODELS $DATADIR/qa_ensemble_model_repository/${VAR_MODEL_REPOSITORY}/*_${BACKEND}_sequence_${DTYPE}"
         fi
