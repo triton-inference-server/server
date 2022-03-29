@@ -70,7 +70,7 @@ class SharedWeightsTest(tu.TestResultCollector):
 
     def test_pytorch_identity_model(self):
         model_name = "libtorch_nobatch_zero_1_float32"
-        self._full_exact(model_name, 32, [8])
+        self._full_exact(model_name, 128, [8])
 
 
 if __name__ == '__main__':

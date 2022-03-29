@@ -41,7 +41,7 @@ export CUDA_VISIBLE_DEVICES=0
 
 CLIENT_LOG="./client.log"
 DATADIR=/data/inferenceserver/${REPO_VERSION}
-INSTANCE_CNT=4
+INSTANCE_CNT=16
 REUSE_MSG="Reusing TorchScript model for instance"
 SERVER=/opt/tritonserver/bin/tritonserver
 SERVER_ARGS="--model-repository=`pwd`/models --exit-on-error=false \
@@ -141,8 +141,8 @@ else
     fi
 fi
 
-if [ `grep -c "$REUSE_MSG" $SERVER_LOG` != "3" ]; then
-    echo -e "\n***\n*** Failed. Expected 3 "$REUSE_MSG"\n***"
+if [ `grep -c "$REUSE_MSG" $SERVER_LOG` != "15" ]; then
+    echo -e "\n***\n*** Failed. Expected 15 "$REUSE_MSG"\n***"
     RET=1
 fi
 
