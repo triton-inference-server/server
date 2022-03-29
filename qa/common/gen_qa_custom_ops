@@ -37,7 +37,7 @@
 ##
 ############################################################################
 
-TRITON_VERSION=22.02
+TRITON_VERSION=22.03
 TENSORFLOW_IMAGE=${TENSORFLOW_IMAGE:=nvcr.io/nvidia/tensorflow:$TRITON_VERSION-tf1-py3}
 PYTORCH_IMAGE=${PYTORCH_IMAGE:=nvcr.io/nvidia/pytorch:$TRITON_VERSION-py3}
 
