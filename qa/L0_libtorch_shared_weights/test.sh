@@ -55,6 +55,9 @@ rm -fr *.log
 
 LOG_IDX=0
 
+# SharedWeightsTest.test_pytorch_identity_model
+# Without shared weights, GPU
+
 # Prepare model repository
 rm -fr models
 mkdir models
@@ -66,8 +69,7 @@ for MC in `ls models/libtorch*/config.pbtxt`; do
     echo "instance_group [ { count: ${INSTANCE_CNT} kind: KIND_GPU}]" >> $MC
 done
 
-# SharedWeightsTest.test_pytorch_identity_model
-# Without shared weights, GPU
+# Start server
 SERVER_LOG="./inference_server_$LOG_IDX.log"
 run_server
 if [ "$SERVER_PID" == "0" ]; then
@@ -76,6 +78,7 @@ if [ "$SERVER_PID" == "0" ]; then
     exit 1
 fi
 
+# Run test
 rm -f $CLIENT_LOG
 set +e
 python $WEIGHTS_TEST SharedWeightsTest.test_pytorch_identity_model >>$CLIENT_LOG 2>&1
@@ -102,97 +105,69 @@ set -e
 kill $SERVER_PID
 wait $SERVER_PID
 
-LOG_IDX=$((LOG_IDX+1))
-
 # SharedWeightsTest.test_pytorch_identity_model
-# With shared weights, GPU
+# With shared weights
 
-for MC in `ls models/libtorch*/config.pbtxt`; do
-    echo """
-    parameters: {
-        key: \"ENABLE_WEIGHT_SHARING\"
-        value: {
-            string_value: \"true\"
-        }
-    }""" >> $MC
-done
+for KIND in KIND_CPU KIND_GPU; do
 
-SERVER_LOG="./inference_server_$LOG_IDX.log"
-run_server
-if [ "$SERVER_PID" == "0" ]; then
-    echo -e "\n***\n*** Failed to start $SERVER\n***"
-    cat $SERVER_LOG
-    exit 1
-fi
+    # Prepare model repository
+    rm -fr models
+    mkdir models
+    for i in models; do
+        cp -r $DATADIR//qa_identity_model_repository/libtorch_nobatch_zero_1_float32 models/.
+    done
 
-rm -f $CLIENT_LOG
-set +e
-python $WEIGHTS_TEST SharedWeightsTest.test_pytorch_identity_model >>$CLIENT_LOG 2>&1
-if [ $? -ne 0 ]; then
-    cat $CLIENT_LOG
-    echo -e "\n***\n*** Test Failed\n***"
-    RET=1
-else
-    check_test_results $TEST_RESULT_FILE 1
+    LOG_IDX=$((LOG_IDX+1))
+    for MC in `ls models/libtorch*/config.pbtxt`; do
+        echo "instance_group [ { count: ${INSTANCE_CNT} kind: ${KIND}}]" >> $MC
+    done
+
+    for MC in `ls models/libtorch*/config.pbtxt`; do
+        echo """
+        parameters: {
+            key: \"ENABLE_WEIGHT_SHARING\"
+            value: {
+                string_value: \"true\"
+            }
+        }""" >> $MC
+    done
+
+    # Start server
+    SERVER_LOG="./inference_server_$LOG_IDX.log"
+    run_server
+    if [ "$SERVER_PID" == "0" ]; then
+        echo -e "\n***\n*** Failed to start $SERVER\n***"
+        cat $SERVER_LOG
+        exit 1
+    fi
+
+    # Run test
+    rm -f $CLIENT_LOG
+    set +e
+    python $WEIGHTS_TEST SharedWeightsTest.test_pytorch_identity_model >>$CLIENT_LOG 2>&1
     if [ $? -ne 0 ]; then
         cat $CLIENT_LOG
-        echo -e "\n***\n*** Test Result Verification Failed\n***"
+        echo -e "\n***\n*** Test Failed\n***"
+        RET=1
+    else
+        check_test_results $TEST_RESULT_FILE 1
+        if [ $? -ne 0 ]; then
+            cat $CLIENT_LOG
+            echo -e "\n***\n*** Test Result Verification Failed\n***"
+            RET=1
+        fi
+    fi
+
+    if [ `grep -c "$REUSE_MSG" $SERVER_LOG` != "15" ]; then
+        echo -e "\n***\n*** Failed. Expected 15 "$REUSE_MSG"\n***"
         RET=1
     fi
-fi
 
-if [ `grep -c "$REUSE_MSG" $SERVER_LOG` != "15" ]; then
-    echo -e "\n***\n*** Failed. Expected 15 "$REUSE_MSG"\n***"
-    RET=1
-fi
+    set -e
 
-set -e
-
-kill $SERVER_PID
-wait $SERVER_PID
-
-LOG_IDX=$((LOG_IDX+1))
-
-# SharedWeightsTest.test_pytorch_identity_model
-# With shared weights, CPU
-
-for MC in `ls models/libtorch*/config.pbtxt`; do
-    sed -i "s/KIND_GPU/KIND_CPU/g" $MC
+    kill $SERVER_PID
+    wait $SERVER_PID
 done
-
-SERVER_LOG="./inference_server_$LOG_IDX.log"
-run_server
-if [ "$SERVER_PID" == "0" ]; then
-    echo -e "\n***\n*** Failed to start $SERVER\n***"
-    cat $SERVER_LOG
-    exit 1
-fi
-
-rm -f $CLIENT_LOG
-set +e
-python $WEIGHTS_TEST SharedWeightsTest.test_pytorch_identity_model >>$CLIENT_LOG 2>&1
-if [ $? -ne 0 ]; then
-    cat $CLIENT_LOG
-    echo -e "\n***\n*** Test Failed\n***"
-    RET=1
-else
-    check_test_results $TEST_RESULT_FILE 1
-    if [ $? -ne 0 ]; then
-        cat $CLIENT_LOG
-        echo -e "\n***\n*** Test Result Verification Failed\n***"
-        RET=1
-    fi
-fi
-
-if [ `grep -c "$REUSE_MSG" $SERVER_LOG` != "15" ]; then
-    echo -e "\n***\n*** Failed. Expected 15 "$REUSE_MSG"\n***"
-    RET=1
-fi
-
-set -e
-
-kill $SERVER_PID
-wait $SERVER_PID
 
 # Test Cleanup
 rm -f $CLIENT_LOG
