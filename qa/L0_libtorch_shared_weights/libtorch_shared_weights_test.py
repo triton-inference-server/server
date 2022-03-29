@@ -41,15 +41,15 @@ FLAGS = None
 
 class SharedWeightsTest(tu.TestResultCollector):
 
-    def _full_exact(self, model_name, request_parallelism, shape):
+    def _full_exact(self, model_name, request_concurrency, shape):
 
-        # Run async requests to make sure backend handles parallel requests
+        # Run async requests to make sure backend handles concurrent requests
         # correctly.
         client = httpclient.InferenceServerClient(
-            "localhost:8000", concurrency=request_parallelism)
+            "localhost:8000", concurrency=request_concurrency)
         input_datas = []
         requests = []
-        for i in range(request_parallelism):
+        for i in range(request_concurrency):
             input_data = (16384 * np.random.randn(*shape)).astype(np.float32)
             input_datas.append(input_data)
             inputs = [
@@ -58,7 +58,7 @@ class SharedWeightsTest(tu.TestResultCollector):
             inputs[0].set_data_from_numpy(input_data)
             requests.append(client.async_infer(model_name, inputs))
 
-        for i in range(request_parallelism):
+        for i in range(request_concurrency):
             # Get the result from the initiated asynchronous inference request.
             # Note the call will block until the server responds.
             results = requests[i].get_result()
@@ -67,22 +67,6 @@ class SharedWeightsTest(tu.TestResultCollector):
             self.assertIsNotNone(output_data,
                                  "error: expected 'OUTPUT__0' to be found")
             np.testing.assert_allclose(output_data, input_datas[i])
-
-        # Make sure the requests ran in parallel.
-        stats = client.get_inference_statistics(model_name)
-        self.assertEqual(len(stats['model_stats']), 1,
-                         "error: expected statistics for {}".format(model_name))
-        self.assertEqual(stats['model_stats'][0]['name'], model_name,
-                         "error: expected statistics for {}".format(model_name))
-        stat = stats['model_stats'][0]
-        self.assertEqual(
-            stat['inference_count'], request_parallelism,
-            "error: expected inference_count of {}, got {}".format(
-                request_parallelism, stat['inference_count']))
-        self.assertEqual(
-            stat['execution_count'], request_parallelism,
-            "error: expected execution_count of {}, got {}".format(
-                request_parallelism, stat['execution_count']))
 
     def test_pytorch_identity_model(self):
         model_name = "libtorch_nobatch_zero_1_float32"
