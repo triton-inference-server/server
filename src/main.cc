@@ -89,6 +89,7 @@ int32_t repository_poll_secs_ = 15;
 std::unique_ptr<triton::server::HTTPServer> http_service_;
 bool allow_http_ = true;
 int32_t http_port_ = 8000;
+std::string http_addr_ = "0.0.0.0";
 #endif  // TRITON_ENABLE_HTTP
 
 #ifdef TRITON_ENABLE_SAGEMAKER
@@ -114,6 +115,7 @@ std::string vertex_ai_default_model_;
 std::unique_ptr<triton::server::GRPCServer> grpc_service_;
 bool allow_grpc_ = true;
 int32_t grpc_port_ = 8001;
+std::string grpc_addr_ = "0.0.0.0";
 bool grpc_use_ssl_ = false;
 triton::server::SslOptions grpc_ssl_options_;
 grpc_compression_level grpc_response_compression_level_ =
@@ -232,11 +234,13 @@ enum OptionId {
 #if defined(TRITON_ENABLE_HTTP)
   OPTION_ALLOW_HTTP,
   OPTION_HTTP_PORT,
+  OPTION_HTTP_ADDR,
   OPTION_HTTP_THREAD_COUNT,
 #endif  // TRITON_ENABLE_HTTP
 #if defined(TRITON_ENABLE_GRPC)
   OPTION_ALLOW_GRPC,
   OPTION_GRPC_PORT,
+  OPTION_GRPC_ADDR,
   OPTION_GRPC_INFER_ALLOCATION_POOL_SIZE,
   OPTION_GRPC_USE_SSL,
   OPTION_GRPC_USE_SSL_MUTUAL,
@@ -359,6 +363,8 @@ std::vector<Option> options_
        "Allow the server to listen for HTTP requests."},
       {OPTION_HTTP_PORT, "http-port", Option::ArgInt,
        "The port for the server to listen on for HTTP requests."},
+      {OPTION_HTTP_ADDR, "http-addr", Option::ArgStr,
+       "The address for the http server to binds to."},
       {OPTION_HTTP_THREAD_COUNT, "http-thread-count", Option::ArgInt,
        "Number of threads handling HTTP requests."},
 #endif  // TRITON_ENABLE_HTTP
@@ -367,6 +373,8 @@ std::vector<Option> options_
        "Allow the server to listen for GRPC requests."},
       {OPTION_GRPC_PORT, "grpc-port", Option::ArgInt,
        "The port for the server to listen on for GRPC requests."},
+      {OPTION_GRPC_ADDR, "grpc-addr", Option::ArgStr,
+       "The address for the grpc server to binds to."},
       {OPTION_GRPC_INFER_ALLOCATION_POOL_SIZE,
        "grpc-infer-allocation-pool-size", Option::ArgInt,
        "The maximum number of inference request/response objects that remain "
@@ -1254,11 +1262,13 @@ Parse(TRITONSERVER_ServerOptions** server_options, int argc, char** argv)
 
 #if defined(TRITON_ENABLE_HTTP)
   int32_t http_port = http_port_;
+  std::string http_addr = http_addr_;
   int32_t http_thread_cnt = http_thread_cnt_;
 #endif  // TRITON_ENABLE_HTTP
 
 #if defined(TRITON_ENABLE_GRPC)
   int32_t grpc_port = grpc_port_;
+  std::string grpc_addr = grpc_addr_;
   int32_t grpc_use_ssl = grpc_use_ssl_;
   int32_t grpc_infer_allocation_pool_size = grpc_infer_allocation_pool_size_;
   grpc_compression_level grpc_response_compression_level =
@@ -1381,6 +1391,9 @@ Parse(TRITONSERVER_ServerOptions** server_options, int argc, char** argv)
       case OPTION_HTTP_PORT:
         http_port = ParseIntOption(optarg);
         break;
+      case OPTION_HTTP_ADDR:
+        http_addr = optarg;
+        break;
       case OPTION_HTTP_THREAD_COUNT:
         http_thread_cnt = ParseIntOption(optarg);
         break;
@@ -1423,6 +1436,9 @@ Parse(TRITONSERVER_ServerOptions** server_options, int argc, char** argv)
         break;
       case OPTION_GRPC_PORT:
         grpc_port = ParseIntOption(optarg);
+        break;
+      case OPTION_GRPC_ADDR:
+        grpc_addr = optarg;
         break;
       case OPTION_GRPC_INFER_ALLOCATION_POOL_SIZE:
         grpc_infer_allocation_pool_size = ParseIntOption(optarg);
@@ -1633,6 +1649,7 @@ Parse(TRITONSERVER_ServerOptions** server_options, int argc, char** argv)
 
 #if defined(TRITON_ENABLE_HTTP)
   http_port_ = http_port;
+  http_addr_ = http_addr;
   http_thread_cnt_ = http_thread_cnt;
 #endif  // TRITON_ENABLE_HTTP
 
@@ -1662,6 +1679,7 @@ Parse(TRITONSERVER_ServerOptions** server_options, int argc, char** argv)
 
 #if defined(TRITON_ENABLE_GRPC)
   grpc_port_ = grpc_port;
+  grpc_addr_ = grpc_addr;
   grpc_infer_allocation_pool_size_ = grpc_infer_allocation_pool_size;
   grpc_use_ssl_ = grpc_use_ssl;
   grpc_response_compression_level_ = grpc_response_compression_level;
