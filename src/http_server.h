@@ -83,15 +83,16 @@ class HTTPMetricsServer : public HTTPServer {
  public:
   static TRITONSERVER_Error* Create(
       const std::shared_ptr<TRITONSERVER_Server>& server, int32_t port,
-      int thread_cnt, std::unique_ptr<HTTPServer>* metrics_server);
+      std::string address, int thread_cnt,
+      std::unique_ptr<HTTPServer>* metrics_server);
 
   ~HTTPMetricsServer() = default;
 
  private:
   explicit HTTPMetricsServer(
       const std::shared_ptr<TRITONSERVER_Server>& server, const int32_t port,
-      const int thread_cnt)
-      : HTTPServer(port, "0.0.0.0", thread_cnt), server_(server),
+      std::string address, const int thread_cnt)
+      : HTTPServer(port, address, thread_cnt), server_(server),
         api_regex_(R"(/metrics/?)")
   {
   }

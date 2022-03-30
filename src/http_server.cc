@@ -170,11 +170,13 @@ HTTPMetricsServer::Handle(evhtp_request_t* req)
 TRITONSERVER_Error*
 HTTPMetricsServer::Create(
     const std::shared_ptr<TRITONSERVER_Server>& server, const int32_t port,
-    const int thread_cnt, std::unique_ptr<HTTPServer>* metrics_server)
+    std::string address, const int thread_cnt,
+    std::unique_ptr<HTTPServer>* metrics_server)
 {
-  metrics_server->reset(new HTTPMetricsServer(server, port, thread_cnt));
+  metrics_server->reset(
+      new HTTPMetricsServer(server, port, address, thread_cnt));
 
-  const std::string addr = "0.0.0.0:" + std::to_string(port);
+  const std::string addr = address + ":" + std::to_string(port);
   LOG_INFO << "Started Metrics Service at " << addr;
 
   return nullptr;
