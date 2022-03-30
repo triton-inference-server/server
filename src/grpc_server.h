@@ -68,7 +68,7 @@ class GRPCServer {
       const std::shared_ptr<TRITONSERVER_Server>& server,
       triton::server::TraceManager* trace_manager,
       const std::shared_ptr<SharedMemoryManager>& shm_manager, int32_t port,
-      bool use_ssl, const SslOptions& ssl_options,
+      std::string grpc_addr, bool use_ssl, const SslOptions& ssl_options,
       int infer_allocation_pool_size, grpc_compression_level compression_level,
       const KeepAliveOptions& keepalive_options,
       std::unique_ptr<GRPCServer>* grpc_server);

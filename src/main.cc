@@ -670,7 +670,7 @@ StartGrpcService(
     const std::shared_ptr<triton::server::SharedMemoryManager>& shm_manager)
 {
   TRITONSERVER_Error* err = triton::server::GRPCServer::Create(
-      server, trace_manager, shm_manager, grpc_port_, grpc_use_ssl_,
+      server, trace_manager, shm_manager, grpc_port_, grpc_addr_, grpc_use_ssl_,
       grpc_ssl_options_, grpc_infer_allocation_pool_size_,
       grpc_response_compression_level_, grpc_keepalive_options_, service);
   if (err == nullptr) {
