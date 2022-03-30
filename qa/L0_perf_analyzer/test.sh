@@ -120,6 +120,9 @@ for INPUT in INPUT0 INPUT1; do
     done
 done
 
+# Fix container installation of Open MPI
+apt update ; apt install -y libopenmpi-dev
+
 RET=0
 
 run_server
@@ -755,8 +758,6 @@ fi
 set -e
 
 ## Test perf_analyzer with MPI / multiple models
-
-apt update ; apt install -y libopenmpi-dev
 
 is_synchronized() {
   local TIMESTAMP_RANK_0_STABLE=$(grep -oP "^\K[^$]+(?=\[1,0\]<stdout>:All models on all MPI ranks are stable)" 1/rank.0/stdout | date "+%s" -f -)
