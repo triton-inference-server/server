@@ -53,8 +53,8 @@ class HTTPServer {
 
  protected:
   explicit HTTPServer(
-      const int32_t port, const std::string http_addr, const int thread_cnt)
-      : port_(port), http_addr_(http_addr), thread_cnt_(thread_cnt)
+      const int32_t port, const std::string address, const int thread_cnt)
+      : port_(port), http_addr_(address), thread_cnt_(thread_cnt)
   {
   }
 
@@ -110,7 +110,7 @@ class HTTPAPIServer : public HTTPServer {
       const std::shared_ptr<TRITONSERVER_Server>& server,
       triton::server::TraceManager* trace_manager,
       const std::shared_ptr<SharedMemoryManager>& smb_manager,
-      const int32_t port, std::string http_addr, const int thread_cnt,
+      const int32_t port, std::string address, const int thread_cnt,
       std::unique_ptr<HTTPServer>* http_server);
 
   virtual ~HTTPAPIServer();
@@ -225,7 +225,7 @@ class HTTPAPIServer : public HTTPServer {
       const std::shared_ptr<TRITONSERVER_Server>& server,
       triton::server::TraceManager* trace_manager,
       const std::shared_ptr<SharedMemoryManager>& shm_manager,
-      const int32_t port, const std::string http_addr, const int thread_cnt);
+      const int32_t port, const std::string address, const int thread_cnt);
   virtual void Handle(evhtp_request_t* req) override;
   virtual std::unique_ptr<InferRequestClass> CreateInferRequest(
       evhtp_request_t* req)

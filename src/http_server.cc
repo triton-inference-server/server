@@ -946,8 +946,8 @@ HTTPAPIServer::HTTPAPIServer(
     const std::shared_ptr<TRITONSERVER_Server>& server,
     triton::server::TraceManager* trace_manager,
     const std::shared_ptr<SharedMemoryManager>& shm_manager, const int32_t port,
-    const std::string http_addr, const int thread_cnt)
-    : HTTPServer(port, http_addr, thread_cnt), server_(server),
+    const std::string address, const int thread_cnt)
+    : HTTPServer(port, address, thread_cnt), server_(server),
       trace_manager_(trace_manager), shm_manager_(shm_manager),
       allocator_(nullptr), server_regex_(R"(/v2(?:/health/(live|ready))?)"),
       model_regex_(
@@ -3230,13 +3230,13 @@ HTTPAPIServer::Create(
     const std::shared_ptr<TRITONSERVER_Server>& server,
     triton::server::TraceManager* trace_manager,
     const std::shared_ptr<SharedMemoryManager>& shm_manager, const int32_t port,
-    const std::string http_addr, const int thread_cnt,
+    const std::string address, const int thread_cnt,
     std::unique_ptr<HTTPServer>* http_server)
 {
   http_server->reset(new HTTPAPIServer(
-      server, trace_manager, shm_manager, port, http_addr, thread_cnt));
+      server, trace_manager, shm_manager, port, address, thread_cnt));
 
-  const std::string addr = http_addr + ":" + std::to_string(port);
+  const std::string addr = address + ":" + std::to_string(port);
   LOG_INFO << "Started HTTPService at " << addr;
 
   return nullptr;
