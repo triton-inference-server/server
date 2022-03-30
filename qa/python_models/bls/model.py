@@ -286,6 +286,8 @@ class PBBLSTest(unittest.TestCase):
         # Test multiprocess Pool with sync BLS
         pool = Pool(10)
         pool.map(bls_add_sub, [1, 2, 3, 4, 5, 6, 7, 8, 9, 10])
+        pool.close()
+        pool.join()
 
     def test_bls_sync(self):
         infer_request = pb_utils.InferenceRequest(

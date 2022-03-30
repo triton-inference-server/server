@@ -27,6 +27,7 @@
 import os
 from os import listdir
 import numpy as np
+import time
 from ctypes import *
 
 import tritonclient.http as httpclient
@@ -358,6 +359,8 @@ class ShmLeakDetector:
             self._shm_monitors = shm_monitors
 
         def __enter__(self):
+            # Wait so that any pending shared memory object is freed.
+            time.sleep(5)
             self._shm_region_free_sizes = []
             for shm_monitor in self._shm_monitors:
                 self._shm_region_free_sizes.append(shm_monitor.free_memory())
@@ -365,11 +368,21 @@ class ShmLeakDetector:
             return self
 
         def __exit__(self, type, value, traceback):
+            # Wait so that any pending shared memory object is freed.
+            time.sleep(5)
             current_shm_sizes = []
             for shm_monitor in self._shm_monitors:
                 current_shm_sizes.append(shm_monitor.free_memory())
 
-            assert current_shm_sizes == self._shm_region_free_sizes, "Shared memory leak detected."
+            shm_leak_detected = False
+            for current_shm_size, prev_shm_size in zip(
+                    current_shm_sizes, self._shm_region_free_sizes):
+                if current_shm_size != prev_shm_size:
+                    shm_leak_detected = True
+                    print(
+                        f'Shared memory leak detected: {current_shm_size} (current) != {prev_shm_size} (prev).'
+                    )
+            assert not shm_leak_detected, "Shared memory leak detected."
 
     def __init__(self, prefix='triton_python_backend_shm_region'):
         self._shm_monitors = []
