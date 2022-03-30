@@ -359,8 +359,6 @@ class ShmLeakDetector:
             self._shm_monitors = shm_monitors
 
         def __enter__(self):
-            # Wait so that any pending shared memory object is freed.
-            time.sleep(5)
             self._shm_region_free_sizes = []
             for shm_monitor in self._shm_monitors:
                 self._shm_region_free_sizes.append(shm_monitor.free_memory())
@@ -368,8 +366,6 @@ class ShmLeakDetector:
             return self
 
         def __exit__(self, type, value, traceback):
-            # Wait so that any pending shared memory object is freed.
-            time.sleep(5)
             current_shm_sizes = []
             for shm_monitor in self._shm_monitors:
                 current_shm_sizes.append(shm_monitor.free_memory())
