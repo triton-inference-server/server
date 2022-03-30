@@ -694,8 +694,8 @@ StartHttpService(
     const std::shared_ptr<triton::server::SharedMemoryManager>& shm_manager)
 {
   TRITONSERVER_Error* err = triton::server::HTTPAPIServer::Create(
-      server, trace_manager, shm_manager, http_port_, http_thread_cnt_,
-      service);
+      server, trace_manager, shm_manager, http_port_, http_addr_,
+      http_thread_cnt_, service);
   if (err == nullptr) {
     err = (*service)->Start();
   }

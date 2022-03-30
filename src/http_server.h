@@ -52,8 +52,9 @@ class HTTPServer {
   TRITONSERVER_Error* Stop();
 
  protected:
-  explicit HTTPServer(const int32_t port, const int thread_cnt)
-      : port_(port), thread_cnt_(thread_cnt)
+  explicit HTTPServer(
+      const int32_t port, const std::string http_addr, const int thread_cnt)
+      : port_(port), http_addr_(http_addr), thread_cnt_(thread_cnt)
   {
   }
 
@@ -66,6 +67,7 @@ class HTTPServer {
   static void StopCallback(evutil_socket_t sock, short events, void* arg);
 
   int32_t port_;
+  std::string http_addr_;
   int thread_cnt_;
 
   evhtp_t* htp_;
@@ -89,7 +91,7 @@ class HTTPMetricsServer : public HTTPServer {
   explicit HTTPMetricsServer(
       const std::shared_ptr<TRITONSERVER_Server>& server, const int32_t port,
       const int thread_cnt)
-      : HTTPServer(port, thread_cnt), server_(server),
+      : HTTPServer(port, "0.0.0.0", thread_cnt), server_(server),
         api_regex_(R"(/metrics/?)")
   {
   }
@@ -108,7 +110,7 @@ class HTTPAPIServer : public HTTPServer {
       const std::shared_ptr<TRITONSERVER_Server>& server,
       triton::server::TraceManager* trace_manager,
       const std::shared_ptr<SharedMemoryManager>& smb_manager,
-      const int32_t port, const int thread_cnt,
+      const int32_t port, std::string http_addr, const int thread_cnt,
       std::unique_ptr<HTTPServer>* http_server);
 
   virtual ~HTTPAPIServer();
@@ -223,7 +225,7 @@ class HTTPAPIServer : public HTTPServer {
       const std::shared_ptr<TRITONSERVER_Server>& server,
       triton::server::TraceManager* trace_manager,
       const std::shared_ptr<SharedMemoryManager>& shm_manager,
-      const int32_t port, const int thread_cnt);
+      const int32_t port, const std::string http_addr, const int thread_cnt);
   virtual void Handle(evhtp_request_t* req) override;
   virtual std::unique_ptr<InferRequestClass> CreateInferRequest(
       evhtp_request_t* req)
