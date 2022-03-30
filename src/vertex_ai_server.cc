@@ -41,7 +41,8 @@ VertexAiAPIServer::VertexAiAPIServer(
     const std::shared_ptr<SharedMemoryManager>& shm_manager, const int32_t port,
     const int thread_cnt, const std::string& prediction_route,
     const std::string& health_route, const std::string& default_model_name)
-    : HTTPAPIServer(server, trace_manager, shm_manager, port, thread_cnt),
+    : HTTPAPIServer(
+          server, trace_manager, shm_manager, port, "0.0.0.0", thread_cnt),
       prediction_regex_(prediction_route), health_regex_(health_route),
       health_mode_("ready"), model_name_(default_model_name),
       model_version_str_("")
