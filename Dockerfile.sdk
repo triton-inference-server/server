@@ -78,7 +78,6 @@ RUN apt-get update && \
             wget \
             python3-pdfkit \
             maven \
-            libopenmpi-dev \
             default-jdk && \
     pip3 install --upgrade wheel setuptools && \
     pip3 install --upgrade grpcio-tools && \
@@ -243,3 +242,4 @@ ENV NVIDIA_BUILD_ID=${NVIDIA_BUILD_ID}
 
 ENV PATH /workspace/install/bin:${PATH}
 ENV LD_LIBRARY_PATH /workspace/install/lib:${LD_LIBRARY_PATH}
+ENV LD_LIBRARY_PATH /opt/hpcx/ompi/lib:${LD_LIBRARY_PATH}

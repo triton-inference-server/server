@@ -839,7 +839,7 @@ set -e
 
 ## Test perf_analyzer without MPI library (`libmpi.so`) available
 
-apt purge -y libopenmpi-dev openmpi-bin ; rm -rf /opt/hpcx
+rm -rf /opt/hpcx
 
 set +e
 $PERF_ANALYZER -v -m graphdef_int32_int32_int32
