@@ -1081,10 +1081,9 @@ RUN ln -sf ${_CUDA_COMPAT_PATH}/lib.real ${_CUDA_COMPAT_PATH}/lib \
 '''
 
     elif 'pytorch' in backends:
-        # Add dependencies for pytorch backend. Note: Even though the build is
-        # cpu-only, the version of pytorch we are using depends upon libraries
-        # like cuda and cudnn. Since these dependencies are not present in ubuntu
-        # base image, we must copy these from the Triton min container ourselves.
+        cuda_arch = 'sbsa' if target_machine == 'aarch64' else 'x86_64'
+        libs_arch = 'aarch64' if target_machine == 'aarch64' else 'x86_64'
+        # Add extra dependencies for tensorflow1/pytorch backend. 
         df += '''
 RUN mkdir -p /usr/local/cuda/lib64/stubs
 COPY --from=min_container /usr/local/cuda/lib64/stubs/libcusparse.so /usr/local/cuda/lib64/stubs/libcusparse.so.11
@@ -1094,19 +1093,19 @@ COPY --from=min_container /usr/local/cuda/lib64/stubs/libcufft.so /usr/local/cud
 COPY --from=min_container /usr/local/cuda/lib64/stubs/libcublas.so /usr/local/cuda/lib64/stubs/libcublas.so.11
 COPY --from=min_container /usr/local/cuda/lib64/stubs/libcublasLt.so /usr/local/cuda/lib64/stubs/libcublasLt.so.11
 
-RUN mkdir -p /usr/local/cuda/targets/x86_64-linux/lib
-COPY --from=min_container /usr/local/cuda-11.6/targets/x86_64-linux/lib/libcudart.so.11.0 /usr/local/cuda/targets/x86_64-linux/lib/.
-COPY --from=min_container /usr/local/cuda-11.6/targets/x86_64-linux/lib/libcupti.so.11.6 /usr/local/cuda/targets/x86_64-linux/lib/.
-COPY --from=min_container /usr/local/cuda-11.6/targets/x86_64-linux/lib/libnvToolsExt.so.1 /usr/local/cuda/targets/x86_64-linux/lib/.
+RUN mkdir -p /usr/local/cuda/targets/{cuda_arch}-linux/lib
+COPY --from=min_container /usr/local/cuda-11.6/targets/{cuda_arch}-linux/lib/libcudart.so.11.0 /usr/local/cuda/targets/{cuda_arch}-linux/lib/.
+COPY --from=min_container /usr/local/cuda-11.6/targets/{cuda_arch}-linux/lib/libcupti.so.11.6 /usr/local/cuda/targets/{cuda_arch}-linux/lib/.
+COPY --from=min_container /usr/local/cuda-11.6/targets/{cuda_arch}-linux/lib/libnvToolsExt.so.1 /usr/local/cuda/targets/{cuda_arch}-linux/lib/.
 
-COPY --from=min_container /usr/lib/x86_64-linux-gnu/libnccl.so.2 /usr/lib/x86_64-linux-gnu/libnccl.so.2
-COPY --from=min_container /usr/lib/x86_64-linux-gnu/libcudnn.so.8 /usr/lib/x86_64-linux-gnu/libcudnn.so.8
+COPY --from=min_container /usr/lib/{libs_arch}-linux-gnu/libnccl.so.2 /usr/lib/{libs_arch}-linux-gnu/libnccl.so.2
+COPY --from=min_container /usr/lib/{libs_arch}-linux-gnu/libcudnn.so.8 /usr/lib/{libs_arch}-linux-gnu/libcudnn.so.8
 
 RUN apt-get update && \
         apt-get install -y --no-install-recommends openmpi-bin
 
-ENV LD_LIBRARY_PATH /usr/local/cuda/targets/x86_64-linux/lib:/usr/local/cuda/lib64/stubs:${LD_LIBRARY_PATH}
-'''
+ENV LD_LIBRARY_PATH /usr/local/cuda/targets/{cuda_arch}-linux/lib:/usr/local/cuda/lib64/stubs:${{LD_LIBRARY_PATH}}
+'''.format(cuda_arch=cuda_arch, libs_arch=libs_arch)
 
     # Add dependencies needed for python backend
     if 'python' in backends:
