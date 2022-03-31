@@ -638,6 +638,9 @@ CheckPortCollision()
       if (comparing_it == curr_it) {
         continue;
       }
+      if (std::get<1>(*curr_it) != std::get<1>(*comparing_it)) {
+        continue;
+      }
       // Set range and comparing service port is out of range
       if (std::get<3>(*curr_it) &&
           ((std::get<2>(*comparing_it) < std::get<4>(*curr_it)) ||
@@ -648,9 +651,6 @@ CheckPortCollision()
                   << std::get<4>(*curr_it) << ", " << std::get<5>(*curr_it)
                   << "]" << std::endl;
         return true;
-      }
-      if (std::get<1>(*curr_it) != std::get<1>(*comparing_it)) {
-        continue;
       }
       if (std::get<2>(*curr_it) == std::get<2>(*comparing_it)) {
         std::cerr << "The server cannot listen to " << std::get<0>(*curr_it)
