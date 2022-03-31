@@ -932,10 +932,11 @@ FROM ${{BUILD_IMAGE}} AS tritonserver_build
 '''.format(argmap['TRITON_VERSION'], argmap['TRITON_CONTAINER_VERSION'],
            argmap['BASE_IMAGE'])
 
-    # PyTorch backend needs extra CUDA and other dependencies during runtime
-    # that are missing in the CPU only base container. These dependencies
-    # must be copied from the Triton Min image
-    if not FLAGS.enable_gpu and ('pytorch' in backends):
+    # PyTorch and TensorFlow1 backend need extra CUDA and other dependencies
+    # during runtime that are missing in the CPU only base container. These
+    # dependencies must be copied from the Triton Min image
+    if not FLAGS.enable_gpu and \
+        (('pytorch' in backends) or ('tensorflow1' in backends)):
         df += '''
 ############################################################################
 ##  Triton Min image
@@ -1080,10 +1081,14 @@ RUN ln -sf ${_CUDA_COMPAT_PATH}/lib.real ${_CUDA_COMPAT_PATH}/lib \
  && rm -f ${_CUDA_COMPAT_PATH}/lib
 '''
 
-    elif 'pytorch' in backends:
+    elif ('pytorch' in backends) or ('tensorflow1' in backends):
         cuda_arch = 'sbsa' if target_machine == 'aarch64' else 'x86_64'
         libs_arch = 'aarch64' if target_machine == 'aarch64' else 'x86_64'
-        # Add extra dependencies for tensorflow1/pytorch backend. 
+        # Add extra dependencies for tensorflow1/pytorch backend.
+        # Note: Even though the build is cpu-only, the version of tensorflow1/
+        # pytorch we are using depend upon libraries like cuda and cudnn. Since
+        # these dependencies are not present in the ubuntu base image,
+        # we must copy these from the Triton min container ourselves.
         df += '''
 RUN mkdir -p /usr/local/cuda/lib64/stubs
 COPY --from=min_container /usr/local/cuda/lib64/stubs/libcusparse.so /usr/local/cuda/lib64/stubs/libcusparse.so.11
@@ -1254,9 +1259,10 @@ def container_build(images, backends, repoagents, endpoints):
     }
 
     # For cpu-only image we need to copy some cuda libraries and dependencies
-    # since we are using a PyTorch container that is not CPU-only
-    if not FLAGS.enable_gpu and ('pytorch' in backends) and \
-            (target_platform() != 'windows'):
+    # since we are using a PyTorch/TensorFlow1 container that is not CPU-only
+    if not FLAGS.enable_gpu and \
+        (('pytorch' in backends) or ('tensorflow1' in backends)) \
+        and (target_platform() != 'windows'):
         dockerfileargmap[
             'GPU_BASE_IMAGE'] = 'nvcr.io/nvidia/tritonserver:{}-py3-min'.format(
                 FLAGS.upstream_container_version)
