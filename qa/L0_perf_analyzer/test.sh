@@ -120,9 +120,6 @@ for INPUT in INPUT0 INPUT1; do
     done
 done
 
-# Fix container installation of Open MPI
-apt update ; apt install -y libopenmpi-dev
-
 RET=0
 
 run_server

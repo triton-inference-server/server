@@ -78,6 +78,7 @@ RUN apt-get update && \
             wget \
             python3-pdfkit \
             maven \
+            libopenmpi-dev \
             default-jdk && \
     pip3 install --upgrade wheel setuptools && \
     pip3 install --upgrade grpcio-tools && \
