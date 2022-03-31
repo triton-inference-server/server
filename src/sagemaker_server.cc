@@ -113,6 +113,48 @@ SagemakerAPIServer::Handle(evhtp_request_t* req)
     return;
   }
 
+  std::string multi_model_name, action;
+  if (RE2::FullMatch(
+          std::string(req->uri->path->full), models_regex_, &multi_model_name, &action)) {
+
+    switch (req->method) {
+    case htp_method_GET:
+      if (multi_model_name.empty()) {
+        LOG_VERBOSE(1) << "SageMaker request: LIST ALL MODELS";
+        req->method = htp_method_POST;
+        HandleRepositoryIndex(req, "");
+        return;
+      }
+      LOG_VERBOSE(1) << "SageMaker request: GET MODEL";
+      return;
+    case htp_method_POST:
+      if (action == "/invoke") {
+        LOG_VERBOSE(1) << "SageMaker request: INVOKE MODEL";
+        HandleInfer(req, multi_model_name, model_version_str_);
+        return;
+      }
+      if (action.empty()) {
+        LOG_VERBOSE(1) << "SageMaker request: LOAD MODEL";
+        req->method = htp_method_POST;
+        HandleRepositoryControl(req, "", multi_model_name, "load");
+        return;
+      }
+      break;
+    case htp_method_DELETE:
+      // UNLOAD MODEL
+      LOG_VERBOSE(1) << "SageMaker request: UNLOAD MODEL";
+      req->method = htp_method_POST;
+      HandleRepositoryControl(req, "", multi_model_name, "unload");
+      return;
+    default:
+      LOG_VERBOSE(1) << "SageMaker error: " << req->method << " "
+                     << req->uri->path->full << " - "
+                     << static_cast<int>(EVHTP_RES_BADREQ);
+      evhtp_send_reply(req, EVHTP_RES_BADREQ);
+      return;
+    }
+  }
+
   LOG_VERBOSE(1) << "SageMaker error: " << req->method << " "
                  << req->uri->path->full << " - "
                  << static_cast<int>(EVHTP_RES_BADREQ);
