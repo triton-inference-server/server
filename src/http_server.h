@@ -54,7 +54,7 @@ class HTTPServer {
  protected:
   explicit HTTPServer(
       const int32_t port, const std::string address, const int thread_cnt)
-      : port_(port), http_address_(address), thread_cnt_(thread_cnt)
+      : port_(port), address_(address), thread_cnt_(thread_cnt)
   {
   }
 
@@ -67,7 +67,7 @@ class HTTPServer {
   static void StopCallback(evutil_socket_t sock, short events, void* arg);
 
   int32_t port_;
-  std::string http_address_;
+  std::string address_;
   int thread_cnt_;
 
   evhtp_t* htp_;
