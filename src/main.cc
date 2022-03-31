@@ -599,59 +599,63 @@ bool
 CheckPortCollision()
 {
   // List of enabled services and their constraints
-  std::vector<std::tuple<std::string, int32_t, bool, int32_t, int32_t>> ports;
+  std::vector<
+      std::tuple<std::string, std::string, int32_t, bool, int32_t, int32_t>>
+      ports;
 #ifdef TRITON_ENABLE_HTTP
   if (allow_http_) {
-    ports.emplace_back("HTTP", http_port_, false, -1, -1);
+    ports.emplace_back("HTTP", http_addr_, http_port_, false, -1, -1);
   }
 #endif  // TRITON_ENABLE_HTTP
 #ifdef TRITON_ENABLE_GRPC
   if (allow_grpc_) {
-    ports.emplace_back("GRPC", grpc_port_, false, -1, -1);
+    ports.emplace_back("GRPC", grpc_addr_, grpc_port_, false, -1, -1);
   }
 #endif  // TRITON_ENABLE_GRPC
 #ifdef TRITON_ENABLE_METRICS
   if (allow_metrics_) {
-    ports.emplace_back("metrics", metrics_port_, false, -1, -1);
+    ports.emplace_back("metrics", http_addr_, metrics_port_, false, -1, -1);
   }
 #endif  // TRITON_ENABLE_METRICS
 #ifdef TRITON_ENABLE_SAGEMAKER
   if (allow_sagemaker_) {
     ports.emplace_back(
-        "SageMaker", sagemaker_port_, sagemaker_safe_range_set_,
+        "SageMaker", "0.0.0.0", sagemaker_port_, sagemaker_safe_range_set_,
         sagemaker_safe_range_.first, sagemaker_safe_range_.second);
   }
 #endif  // TRITON_ENABLE_SAGEMAKER
 #ifdef TRITON_ENABLE_VERTEX_AI
   if (allow_vertex_ai_) {
-    ports.emplace_back("Vertex AI", vertex_ai_port_, false, -1, -1);
+    ports.emplace_back("Vertex AI", "0.0.0.0", vertex_ai_port_, false, -1, -1);
   }
 #endif  // TRITON_ENABLE_VERTEX_AI
 
   for (auto curr_it = ports.begin(); curr_it != ports.end(); ++curr_it) {
     // If the current service doesn't specify the allow port range for other
     // services, then we don't need to revisit the checked services
-    auto comparing_it = (std::get<2>(*curr_it)) ? ports.begin() : (curr_it + 1);
+    auto comparing_it = (std::get<3>(*curr_it)) ? ports.begin() : (curr_it + 1);
     for (; comparing_it != ports.end(); ++comparing_it) {
       if (comparing_it == curr_it) {
         continue;
       }
       // Set range and comparing service port is out of range
-      if (std::get<2>(*curr_it) &&
-          ((std::get<1>(*comparing_it) < std::get<3>(*curr_it)) ||
-           (std::get<1>(*comparing_it) > std::get<4>(*curr_it)))) {
+      if (std::get<3>(*curr_it) &&
+          ((std::get<2>(*comparing_it) < std::get<4>(*curr_it)) ||
+           (std::get<2>(*comparing_it) > std::get<5>(*curr_it)))) {
         std::cerr << "The server cannot listen to "
                   << std::get<0>(*comparing_it) << " requests at port "
-                  << std::get<1>(*comparing_it) << ", allowed port range is ["
-                  << std::get<3>(*curr_it) << ", " << std::get<4>(*curr_it)
+                  << std::get<2>(*comparing_it) << ", allowed port range is ["
+                  << std::get<4>(*curr_it) << ", " << std::get<5>(*curr_it)
                   << "]" << std::endl;
         return true;
       }
-      if (std::get<1>(*curr_it) == std::get<1>(*comparing_it)) {
+      if ((std::get<2>(*curr_it) == std::get<2>(*comparing_it)) &&
+          (std::get<1>(*curr_it) == std::get<1>(*comparing_it))) {
         std::cerr << "The server cannot listen to " << std::get<0>(*curr_it)
                   << " requests "
                   << "and " << std::get<0>(*comparing_it)
-                  << " requests at the same port " << std::get<1>(*curr_it)
+                  << " requests at the same address and port "
+                  << std::get<1>(*curr_it) << ":" << std::get<2>(*curr_it)
                   << std::endl;
         return true;
       }
