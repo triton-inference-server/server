@@ -179,12 +179,23 @@ The PyTorch runtime depenencies are the same as the build dependencies listed ab
 ### Usage
 
 **Note**: The PyTorch backend depends on libomp.so, which is not loaded automatically.
-If using the PyTorch backend in Triton, you need to set the LD_LIBRARY_PATH to allow
+If using the PyTorch backend in Triton, you must set the LD_LIBRARY_PATH to allow
 libomp.so to be loaded as needed before launching Triton.
 
 ```
-LD_LIBRARY_PATH="$LD_LIBRARY_PATH:/usr/lib/llvm-8/lib"
+LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/usr/lib/llvm-8/lib
 ```
+
+When launching Triton, you must set the LD_LIBRARY_PATH to include the pytorch backend
+directory to avoid the error `unable to load shared library: libc10.so`.
+
+```
+LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/path/to/tritonserver/backends/pytorch
+```
+
+When shutting down Triton after loading Onnx Runtime models, you will notice a segmentation
+fault in the Onnx Runtime backend. To work around this you must set the LD_LIBRARY_PATH to
+include the pytorch backend as shown above, even if no PyTorch models are being loaded.
 
 **Note**: On Jetson, the backend directory must be explicitly specified using the
 `--backend-directory` flag. Triton defaults to using TensorFlow 1.x and a version string
