@@ -649,8 +649,10 @@ CheckPortCollision()
                   << "]" << std::endl;
         return true;
       }
-      if ((std::get<2>(*curr_it) == std::get<2>(*comparing_it)) &&
-          (std::get<1>(*curr_it) == std::get<1>(*comparing_it))) {
+      if (std::get<1>(*curr_it) != std::get<1>(*comparing_it)) {
+        continue;
+      }
+      if (std::get<2>(*curr_it) == std::get<2>(*comparing_it)) {
         std::cerr << "The server cannot listen to " << std::get<0>(*curr_it)
                   << " requests "
                   << "and " << std::get<0>(*comparing_it)
