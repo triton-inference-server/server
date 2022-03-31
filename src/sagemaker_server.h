@@ -63,6 +63,7 @@ class SagemakerAPIServer : public HTTPAPIServer {
       : HTTPAPIServer(
             server, trace_manager, shm_manager, port, address, thread_cnt),
         ping_regex_(R"(/ping)"), invocations_regex_(R"(/invocations)"),
+        models_regex_(R"(/models(?:/)?([^/]+)?(/invoke)?)"),
         ping_mode_("ready"),
         model_name_(GetEnvironmentVariableOrDefault(
             "SAGEMAKER_TRITON_DEFAULT_MODEL_NAME",
@@ -95,6 +96,7 @@ class SagemakerAPIServer : public HTTPAPIServer {
   }
   re2::RE2 ping_regex_;
   re2::RE2 invocations_regex_;
+  re2::RE2 models_regex_;
 
   const std::string ping_mode_;
 
