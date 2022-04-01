@@ -248,6 +248,58 @@ class PBBLSTest(unittest.TestCase):
         output0 = pb_utils.get_output_tensor_by_name(infer_response, 'OUTPUT0')
         self.assertTrue(np.all(output0 == input0))
 
+    def test_bls_tensor_lifecycle(self):
+        model_name = 'dlpack_identity'
+
+        # A 10 MB tensor.
+        input_size = 10 * 1024 * 1024
+
+        # Sending the tensor 50 times to test whether the deallocation is
+        # happening correctly. If the deallocation doesn't happen correctly,
+        # there will be an out of shared memory error.
+        for _ in range(50):
+            input0 = np.ones([1, input_size], dtype=np.float32)
+            input0_pb = pb_utils.Tensor('INPUT0', input0)
+            infer_request = pb_utils.InferenceRequest(
+                model_name=model_name,
+                inputs=[input0_pb],
+                requested_output_names=['OUTPUT0'])
+            infer_response = infer_request.exec()
+            self.assertFalse(infer_response.has_error())
+
+            output0 = pb_utils.get_output_tensor_by_name(
+                infer_response, 'OUTPUT0')
+            self.assertTrue(np.all(output0.as_numpy() == input0))
+
+        # Checking the same with the GPU tensors.
+        for index in range(50):
+            free_memory, _ = torch.cuda.mem_get_info()
+            if index == 3:
+                recorded_free_memory = free_memory
+
+            if index > 3:
+                self.assertEqual(free_memory, recorded_free_memory,
+                                 "GPU memory check failed.")
+
+            input0 = torch.ones([1, input_size], dtype=torch.float32).to('cuda')
+            input0_pb = pb_utils.Tensor.from_dlpack('INPUT0', to_dlpack(input0))
+            infer_request = pb_utils.InferenceRequest(
+                model_name=model_name,
+                inputs=[input0_pb],
+                requested_output_names=['OUTPUT0'])
+            infer_response = infer_request.exec()
+            self.assertFalse(infer_response.has_error())
+
+            output0 = pb_utils.get_output_tensor_by_name(
+                infer_response, 'OUTPUT0')
+            output0_pytorch = from_dlpack(output0.to_dlpack())
+
+            # Set inference response and output0_pytorch to None, to make sure
+            # that the DLPack is still valid.
+            output0 = None
+            infer_response = None
+            self.assertTrue(torch.all(output0_pytorch == input0))
+
     def _test_gpu_bls_add_sub(self, is_input0_gpu, is_input1_gpu):
         input0 = torch.rand(16)
         input1 = torch.rand(16)
