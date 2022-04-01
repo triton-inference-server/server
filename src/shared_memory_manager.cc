@@ -121,8 +121,8 @@ SharedMemoryManager::UnregisterHelper(
 #include <fcntl.h>
 #include <sys/mman.h>
 #include <unistd.h>
-#include "triton/common/logging.h"
 #include "common.h"
+#include "triton/common/logging.h"
 
 namespace triton { namespace server {
 
