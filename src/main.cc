@@ -595,20 +595,18 @@ std::vector<Option> options_
        "Specify a backend-specific configuration setting. The format of this "
        "flag is --backend-config=<backend_name>,<setting>=<value>. Where "
        "<backend_name> is the name of the backend, such as 'tensorrt'."},
+      {OPTION_HOST_POLICY, "host-policy", "<string>,<string>=<string>",
+       "Specify a host policy setting associated with a policy name. The "
+       "format of this flag is --host-policy=<policy_name>,<setting>=<value>."
+       "Currently supported settings are 'numa-node', 'cpu-cores'. Note that "
+       "'numa-node' setting will affect pinned memory pool behavior, see "
+       "--pinned-memory-pool for more detail."},
   {
-    OPTION_HOST_POLICY, "host-policy", "<string>,<string>=<string>",
-        "Specify a host policy setting associated with a policy name. The "
-        "format of this flag is --host-policy=<policy_name>,<setting>=<value>."
-        "Currently supported settings are 'numa-node', 'cpu-cores'. Note that "
-        "'numa-node' setting will affect pinned memory pool behavior, see "
-        "--pinned-memory-pool for more detail."
-  },
-      {OPTION_DEFAULT_MAX_BATCH_SIZE, "default-max-batch-size", Option::ArgInt,
-      "Set the maximum batch size for models which are capable of batching "
-      "and whose configuration is auto-completed. The default value for this "
-      "parameter is 4."
-      }
-
+    OPTION_DEFAULT_MAX_BATCH_SIZE, "default-max-batch-size", Option::ArgInt,
+        "Set the maximum batch size for models which are capable of batching "
+        "and whose configuration is auto-completed. The default value for this "
+        "parameter is 4."
+  }
 };
 
 bool
