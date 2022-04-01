@@ -52,10 +52,10 @@
 #include <sanitizer/lsan_interface.h>
 #endif  // TRITON_ENABLE_ASAN
 
-#include "triton/common/logging.h"
 #include "common.h"
 #include "shared_memory_manager.h"
 #include "tracer.h"
+#include "triton/common/logging.h"
 #include "triton/core/tritonserver.h"
 
 #if defined(TRITON_ENABLE_HTTP) || defined(TRITON_ENABLE_METRICS)
@@ -659,8 +659,7 @@ StartGrpcService(
     std::unique_ptr<triton::server::GRPCServer>* service,
     const std::shared_ptr<TRITONSERVER_Server>& server,
     triton::server::TraceManager* trace_manager,
-    const std::shared_ptr<triton::server::SharedMemoryManager>&
-        shm_manager)
+    const std::shared_ptr<triton::server::SharedMemoryManager>& shm_manager)
 {
   TRITONSERVER_Error* err = triton::server::GRPCServer::Create(
       server, trace_manager, shm_manager, grpc_port_, grpc_use_ssl_,
@@ -684,8 +683,7 @@ StartHttpService(
     std::unique_ptr<triton::server::HTTPServer>* service,
     const std::shared_ptr<TRITONSERVER_Server>& server,
     triton::server::TraceManager* trace_manager,
-    const std::shared_ptr<triton::server::SharedMemoryManager>&
-        shm_manager)
+    const std::shared_ptr<triton::server::SharedMemoryManager>& shm_manager)
 {
   TRITONSERVER_Error* err = triton::server::HTTPAPIServer::Create(
       server, trace_manager, shm_manager, http_port_, http_thread_cnt_,
@@ -727,8 +725,7 @@ StartSagemakerService(
     std::unique_ptr<triton::server::HTTPServer>* service,
     const std::shared_ptr<TRITONSERVER_Server>& server,
     triton::server::TraceManager* trace_manager,
-    const std::shared_ptr<triton::server::SharedMemoryManager>&
-        shm_manager)
+    const std::shared_ptr<triton::server::SharedMemoryManager>& shm_manager)
 {
   TRITONSERVER_Error* err = triton::server::SagemakerAPIServer::Create(
       server, trace_manager, shm_manager, sagemaker_port_,
@@ -751,8 +748,7 @@ StartVertexAiService(
     std::unique_ptr<triton::server::HTTPServer>* service,
     const std::shared_ptr<TRITONSERVER_Server>& server,
     triton::server::TraceManager* trace_manager,
-    const std::shared_ptr<triton::server::SharedMemoryManager>&
-        shm_manager)
+    const std::shared_ptr<triton::server::SharedMemoryManager>& shm_manager)
 {
   TRITONSERVER_Error* err = triton::server::VertexAiAPIServer::Create(
       server, trace_manager, shm_manager, vertex_ai_port_,
@@ -773,8 +769,7 @@ bool
 StartEndpoints(
     const std::shared_ptr<TRITONSERVER_Server>& server,
     triton::server::TraceManager* trace_manager,
-    const std::shared_ptr<triton::server::SharedMemoryManager>&
-        shm_manager)
+    const std::shared_ptr<triton::server::SharedMemoryManager>& shm_manager)
 {
 #ifdef _WIN32
   WSADATA wsaData;
@@ -1280,8 +1275,8 @@ Parse(TRITONSERVER_ServerOptions** server_options, int argc, char** argv)
 #if defined(TRITON_ENABLE_VERTEX_AI)
   // Set different default value if specific flag is set
   {
-    auto aip_mode = triton::server::GetEnvironmentVariableOrDefault(
-        "AIP_MODE", "");
+    auto aip_mode =
+        triton::server::GetEnvironmentVariableOrDefault("AIP_MODE", "");
     // Enable Vertex AI service and disable HTTP / GRPC service by default
     // if detecting Vertex AI environment
     if (aip_mode == "PREDICTION") {
@@ -1654,8 +1649,7 @@ Parse(TRITONSERVER_ServerOptions** server_options, int argc, char** argv)
   // Vertex service is allowed
   {
     auto aip_storage_uri =
-        triton::server::GetEnvironmentVariableOrDefault(
-            "AIP_STORAGE_URI", "");
+        triton::server::GetEnvironmentVariableOrDefault("AIP_STORAGE_URI", "");
     if (!aip_storage_uri.empty() && model_repository_paths.empty()) {
       model_repository_paths.insert(aip_storage_uri);
     }
@@ -1832,8 +1826,7 @@ main(int argc, char** argv)
   triton::server::TraceManager* trace_manager;
 
   // Manager for shared memory blocks.
-  auto shm_manager =
-      std::make_shared<triton::server::SharedMemoryManager>();
+  auto shm_manager = std::make_shared<triton::server::SharedMemoryManager>();
 
   // Create the server...
   TRITONSERVER_Server* server_ptr = nullptr;
@@ -1852,8 +1845,7 @@ main(int argc, char** argv)
   }
 
   // Trap SIGINT and SIGTERM to allow server to exit gracefully
-  TRITONSERVER_Error* signal_err =
-      triton::server::RegisterSignalHandler();
+  TRITONSERVER_Error* signal_err = triton::server::RegisterSignalHandler();
   if (signal_err != nullptr) {
     LOG_TRITONSERVER_ERROR(signal_err, "failed to register signal handler");
     exit(1);

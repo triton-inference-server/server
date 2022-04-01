@@ -28,8 +28,8 @@
 
 #include <stdlib.h>
 #include <unordered_map>
-#include "triton/common/logging.h"
 #include "common.h"
+#include "triton/common/logging.h"
 #ifdef TRITON_ENABLE_GPU
 #include <cuda_runtime_api.h>
 #endif  // TRITON_ENABLE_GPU
