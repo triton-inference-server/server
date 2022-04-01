@@ -242,4 +242,6 @@ ENV NVIDIA_BUILD_ID=${NVIDIA_BUILD_ID}
 
 ENV PATH /workspace/install/bin:${PATH}
 ENV LD_LIBRARY_PATH /workspace/install/lib:${LD_LIBRARY_PATH}
+
+# DLIS-3631: Needed to run Perf Analyzer CI tests correctly
 ENV LD_LIBRARY_PATH /opt/hpcx/ompi/lib:${LD_LIBRARY_PATH}
