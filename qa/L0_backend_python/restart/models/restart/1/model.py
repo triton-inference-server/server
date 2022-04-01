@@ -42,11 +42,9 @@ class TritonPythonModel:
         if path.exists(file_name):
             with open(file_name, 'r') as f:
                 expected_free_memory = f.read()
-                assert (
-                    expected_free_memory == current_free_memory,
-                    f'Free shared memory before and after restart are not equal. '
-                    '{expected_free_memory} (before) != {current_free_memory} (after).'
-                )
+                assert expected_free_memory == current_free_memory, \
+                        (f'Free shared memory before and after restart are not equal. '
+                         '{expected_free_memory} (before) != {current_free_memory} (after).')
         else:
             with open(file_name, 'w') as f:
                 f.write(current_free_memory)
