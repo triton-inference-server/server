@@ -173,6 +173,11 @@ for address in default explicit; do
                 cat $SERVER_LOG
                 exit 1
             fi
+            code=`curl -s -w %{http_code} 127.0.0.1:8007/v2/health/ready`
+            if [ "$code" != "200" ]; then
+                echo -e "\n***\n*** Server is not ready\n***"
+                RET=1
+            fi
             kill $SERVER_PID
             wait $SERVER_PID
         fi
@@ -223,6 +228,11 @@ for address in default explicit; do
                     echo -e "\n***\n*** Failed to start $SERVER\n***"
                     cat $SERVER_LOG
                     exit 1
+                fi
+                code=`curl -s -w %{http_code} 127.0.0.1:8000/v2/health/ready`
+                if [ "$code" != "200" ]; then
+                    echo -e "\n***\n*** Server is not ready\n***"
+                    RET=1
                 fi
                 kill $SERVER_PID
                 wait $SERVER_PID
@@ -276,6 +286,11 @@ for address in default explicit; do
                     echo -e "\n***\n*** Failed to start $SERVER\n***"
                     cat $SERVER_LOG
                     exit 1
+                fi
+                code=`curl -s -w %{http_code} 127.0.0.1:8000/v2/health/ready`
+                if [ "$code" != "200" ]; then
+                    echo -e "\n***\n*** Server is not ready\n***"
+                    RET=1
                 fi
                 kill $SERVER_PID
                 wait $SERVER_PID
