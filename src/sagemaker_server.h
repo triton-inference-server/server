@@ -38,7 +38,7 @@ class SagemakerAPIServer : public HTTPAPIServer {
       const std::shared_ptr<TRITONSERVER_Server>& server,
       triton::server::TraceManager* trace_manager,
       const std::shared_ptr<SharedMemoryManager>& smb_manager,
-      const int32_t port, const int thread_cnt,
+      const int32_t port, const std::string address, const int thread_cnt,
       std::unique_ptr<HTTPServer>* sagemaker_server);
 
   class SagemakeInferRequestClass : public InferRequestClass {
@@ -59,9 +59,9 @@ class SagemakerAPIServer : public HTTPAPIServer {
       const std::shared_ptr<TRITONSERVER_Server>& server,
       triton::server::TraceManager* trace_manager,
       const std::shared_ptr<SharedMemoryManager>& shm_manager,
-      const int32_t port, const int thread_cnt)
+      const int32_t port, const std::string address, const int thread_cnt)
       : HTTPAPIServer(
-            server, trace_manager, shm_manager, port, "0.0.0.0", thread_cnt),
+            server, trace_manager, shm_manager, port, address, thread_cnt),
         ping_regex_(R"(/ping)"), invocations_regex_(R"(/invocations)"),
         ping_mode_("ready"),
         model_name_(GetEnvironmentVariableOrDefault(

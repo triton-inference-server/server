@@ -96,6 +96,8 @@ std::string http_address_ = "0.0.0.0";
 std::unique_ptr<triton::server::HTTPServer> sagemaker_service_;
 bool allow_sagemaker_ = false;
 int32_t sagemaker_port_ = 8080;
+// Triton uses "0.0.0.0" as default address for SageMaker.
+std::string sagemaker_address_ = "0.0.0.0";
 bool sagemaker_safe_range_set_ = false;
 std::pair<int32_t, int32_t> sagemaker_safe_range_ = {-1, -1};
 // The number of threads to initialize for the SageMaker HTTP front-end.
@@ -104,6 +106,8 @@ int sagemaker_thread_cnt_ = 8;
 
 #ifdef TRITON_ENABLE_VERTEX_AI
 std::unique_ptr<triton::server::HTTPServer> vertex_ai_service_;
+// Triton uses "0.0.0.0" as default address for Vertex AI.
+std::string vertex_ai_address_ = "0.0.0.0";
 bool allow_vertex_ai_ = false;
 int32_t vertex_ai_port_ = 8080;
 // The number of threads to initialize for the Vertex AI HTTP front-end.
@@ -620,13 +624,15 @@ CheckPortCollision()
 #ifdef TRITON_ENABLE_SAGEMAKER
   if (allow_sagemaker_) {
     ports.emplace_back(
-        "SageMaker", "0.0.0.0", sagemaker_port_, sagemaker_safe_range_set_,
-        sagemaker_safe_range_.first, sagemaker_safe_range_.second);
+        "SageMaker", sagemaker_address_, sagemaker_port_,
+        sagemaker_safe_range_set_, sagemaker_safe_range_.first,
+        sagemaker_safe_range_.second);
   }
 #endif  // TRITON_ENABLE_SAGEMAKER
 #ifdef TRITON_ENABLE_VERTEX_AI
   if (allow_vertex_ai_) {
-    ports.emplace_back("Vertex AI", "0.0.0.0", vertex_ai_port_, false, -1, -1);
+    ports.emplace_back(
+        "Vertex AI", vertex_ai_address_, vertex_ai_port_, false, -1, -1);
   }
 #endif  // TRITON_ENABLE_VERTEX_AI
 
@@ -742,7 +748,7 @@ StartSagemakerService(
     const std::shared_ptr<triton::server::SharedMemoryManager>& shm_manager)
 {
   TRITONSERVER_Error* err = triton::server::SagemakerAPIServer::Create(
-      server, trace_manager, shm_manager, sagemaker_port_,
+      server, trace_manager, shm_manager, sagemaker_port_, sagemaker_address_,
       sagemaker_thread_cnt_, service);
   if (err == nullptr) {
     err = (*service)->Start();
@@ -765,7 +771,7 @@ StartVertexAiService(
     const std::shared_ptr<triton::server::SharedMemoryManager>& shm_manager)
 {
   TRITONSERVER_Error* err = triton::server::VertexAiAPIServer::Create(
-      server, trace_manager, shm_manager, vertex_ai_port_,
+      server, trace_manager, shm_manager, vertex_ai_port_, vertex_ai_address_,
       vertex_ai_thread_cnt_, vertex_ai_default_model_, service);
   if (err == nullptr) {
     err = (*service)->Start();

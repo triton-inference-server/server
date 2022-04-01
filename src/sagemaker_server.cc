@@ -126,12 +126,13 @@ SagemakerAPIServer::Create(
     const std::shared_ptr<TRITONSERVER_Server>& server,
     triton::server::TraceManager* trace_manager,
     const std::shared_ptr<SharedMemoryManager>& shm_manager, const int32_t port,
-    const int thread_cnt, std::unique_ptr<HTTPServer>* http_server)
+    const std::string address, const int thread_cnt,
+    std::unique_ptr<HTTPServer>* http_server)
 {
   http_server->reset(new SagemakerAPIServer(
-      server, trace_manager, shm_manager, port, thread_cnt));
+      server, trace_manager, shm_manager, port, address, thread_cnt));
 
-  const std::string addr = "0.0.0.0:" + std::to_string(port);
+  const std::string addr = address + ":" + std::to_string(port);
   LOG_INFO << "Started Sagemaker HTTPService at " << addr;
 
   return nullptr;
