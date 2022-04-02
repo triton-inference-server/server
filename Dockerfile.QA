@@ -341,3 +341,6 @@ RUN rm -fr qa/L0_copyrights qa/L0_build_variants && \
     xargs pip3 install --upgrade
 
 ENV LD_LIBRARY_PATH /opt/tritonserver/qa/clients:${LD_LIBRARY_PATH}
+
+# DLIS-3631: Needed to run Perf Analyzer CI tests correctly
+ENV LD_LIBRARY_PATH /opt/hpcx/ompi/lib:${LD_LIBRARY_PATH}
