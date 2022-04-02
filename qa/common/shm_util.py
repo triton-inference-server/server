@@ -29,10 +29,10 @@ from os import listdir
 import numpy as np
 import time
 from ctypes import *
+import platform
 
 import tritonclient.http as httpclient
 from tritonclient.utils import *
-import triton_shm_monitor
 
 # By default, find tritonserver on "localhost", but can be overridden
 # with TRITONSERVER_IPADDR envvar
@@ -381,6 +381,7 @@ class ShmLeakDetector:
             assert not shm_leak_detected, "Shared memory leak detected."
 
     def __init__(self, prefix='triton_python_backend_shm_region'):
+        import triton_shm_monitor
         self._shm_monitors = []
         shm_regions = listdir('/dev/shm')
         for shm_region in shm_regions:
