@@ -4416,12 +4416,12 @@ GRPCServer::Create(
     const std::shared_ptr<TRITONSERVER_Server>& server,
     triton::server::TraceManager* trace_manager,
     const std::shared_ptr<SharedMemoryManager>& shm_manager, int32_t port,
-    bool use_ssl, const SslOptions& ssl_options, int infer_allocation_pool_size,
-    grpc_compression_level compression_level,
+    std::string address, bool use_ssl, const SslOptions& ssl_options,
+    int infer_allocation_pool_size, grpc_compression_level compression_level,
     const KeepAliveOptions& keepalive_options,
     std::unique_ptr<GRPCServer>* grpc_server)
 {
-  const std::string addr = "0.0.0.0:" + std::to_string(port);
+  const std::string addr = address + ":" + std::to_string(port);
   grpc_server->reset(new GRPCServer(
       server, trace_manager, shm_manager, addr, use_ssl, ssl_options,
       infer_allocation_pool_size, compression_level, keepalive_options));

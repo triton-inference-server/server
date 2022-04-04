@@ -75,10 +75,10 @@ HTTPServer::Start()
     evhtp_enable_flag(htp_, EVHTP_FLAG_ENABLE_NODELAY);
     evhtp_set_gencb(htp_, HTTPServer::Dispatch, this);
     evhtp_use_threads_wexit(htp_, NULL, NULL, thread_cnt_, NULL);
-    if (evhtp_bind_socket(htp_, "0.0.0.0", port_, 1024) != 0) {
+    if (evhtp_bind_socket(htp_, address_.c_str(), port_, 1024) != 0) {
       return TRITONSERVER_ErrorNew(
           TRITONSERVER_ERROR_UNAVAILABLE,
-          (std::string("Port '0.0.0.0:") + std::to_string(port_) +
+          (std::string("Socket '") + address_ + ":" + std::to_string(port_) +
            "' already in use ")
               .c_str());
     }
@@ -170,11 +170,13 @@ HTTPMetricsServer::Handle(evhtp_request_t* req)
 TRITONSERVER_Error*
 HTTPMetricsServer::Create(
     const std::shared_ptr<TRITONSERVER_Server>& server, const int32_t port,
-    const int thread_cnt, std::unique_ptr<HTTPServer>* metrics_server)
+    std::string address, const int thread_cnt,
+    std::unique_ptr<HTTPServer>* metrics_server)
 {
-  metrics_server->reset(new HTTPMetricsServer(server, port, thread_cnt));
+  metrics_server->reset(
+      new HTTPMetricsServer(server, port, address, thread_cnt));
 
-  const std::string addr = "0.0.0.0:" + std::to_string(port);
+  const std::string addr = address + ":" + std::to_string(port);
   LOG_INFO << "Started Metrics Service at " << addr;
 
   return nullptr;
@@ -946,8 +948,8 @@ HTTPAPIServer::HTTPAPIServer(
     const std::shared_ptr<TRITONSERVER_Server>& server,
     triton::server::TraceManager* trace_manager,
     const std::shared_ptr<SharedMemoryManager>& shm_manager, const int32_t port,
-    const int thread_cnt)
-    : HTTPServer(port, thread_cnt), server_(server),
+    const std::string address, const int thread_cnt)
+    : HTTPServer(port, address, thread_cnt), server_(server),
       trace_manager_(trace_manager), shm_manager_(shm_manager),
       allocator_(nullptr), server_regex_(R"(/v2(?:/health/(live|ready))?)"),
       model_regex_(
@@ -3230,12 +3232,13 @@ HTTPAPIServer::Create(
     const std::shared_ptr<TRITONSERVER_Server>& server,
     triton::server::TraceManager* trace_manager,
     const std::shared_ptr<SharedMemoryManager>& shm_manager, const int32_t port,
-    const int thread_cnt, std::unique_ptr<HTTPServer>* http_server)
+    const std::string address, const int thread_cnt,
+    std::unique_ptr<HTTPServer>* http_server)
 {
-  http_server->reset(
-      new HTTPAPIServer(server, trace_manager, shm_manager, port, thread_cnt));
+  http_server->reset(new HTTPAPIServer(
+      server, trace_manager, shm_manager, port, address, thread_cnt));
 
-  const std::string addr = "0.0.0.0:" + std::to_string(port);
+  const std::string addr = address + ":" + std::to_string(port);
   LOG_INFO << "Started HTTPService at " << addr;
 
   return nullptr;
