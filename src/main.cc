@@ -601,12 +601,6 @@ std::vector<Option> options_
        "Currently supported settings are 'numa-node', 'cpu-cores'. Note that "
        "'numa-node' setting will affect pinned memory pool behavior, see "
        "--pinned-memory-pool for more detail."},
-  {
-    OPTION_DEFAULT_MAX_BATCH_SIZE, "default-max-batch-size", Option::ArgInt,
-        "Set the maximum batch size for models which are capable of batching "
-        "and whose configuration is auto-completed. The default value for this "
-        "parameter is 4."
-  }
 };
 
 bool
@@ -1199,7 +1193,7 @@ ParseBackendConfigOption(const std::string arg)
   std::string setting_string = arg.substr(delim_name + 1, delim_setting - delim_name - 1);
   std::string value_string = arg.substr(delim_setting + 1);
 
-  if (name_string.empty() || setting_string.empty() || value_string.empty()) {
+  if (setting_string.empty() || value_string.empty()) {
     std::cerr << "--backend-config option format is '<backend "
                  "name>,<setting>=<value>'. Got "
               << arg << std::endl;
@@ -1283,7 +1277,7 @@ Parse(TRITONSERVER_ServerOptions** server_options, int argc, char** argv)
   std::vector<std::tuple<std::string, std::string, std::string>>
       backend_config_settings;
   std::vector<std::tuple<std::string, std::string, std::string>> host_policies;
-  int32_t default_max_batch_size = 4;
+  // int32_t default_max_batch_size = 4;
 
 #ifdef TRITON_ENABLE_GPU
   double min_supported_compute_capability = TRITON_MIN_COMPUTE_CAPABILITY;
@@ -1649,13 +1643,10 @@ Parse(TRITONSERVER_ServerOptions** server_options, int argc, char** argv)
         buffer_manager_thread_count = ParseIntOption(optarg);
         break;
       case OPTION_BACKEND_CONFIG:
-        backend_config_settings.push_back(_ParseBackendConfigOption(optarg));
+        backend_config_settings.push_back(ParseBackendConfigOption(optarg));
         break;
       case OPTION_HOST_POLICY:
         host_policies.push_back(ParseHostPolicyOption(optarg));
-        break;
-      case OPTION_DEFAULT_MAX_BATCH_SIZE:
-        default_max_batch_size = ParseIntOption(optarg);
         break;
     }
   }
@@ -1858,10 +1849,6 @@ Parse(TRITONSERVER_ServerOptions** server_options, int argc, char** argv)
             std::get<2>(hp).c_str()),
         "setting host policy");
   }
-  FAIL_IF_ERR(
-      TRITONSERVER_ServerOptionsSetDefaultMaxBatchSize(
-          loptions, default_max_batch_size),
-      "setting default max batch size");
 
   return true;
 }
