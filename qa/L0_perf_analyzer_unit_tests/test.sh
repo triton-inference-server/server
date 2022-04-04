@@ -25,6 +25,26 @@
 # (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-../clients/perf_analyzer_unit_tests
+TEST_LOG="./perf_analyzer_unit_tests.log"
+PERF_ANALYZER_UNIT_TESTS=../clients/perf_analyzer_unit_tests
 
-exit $?
+RET=0
+
+rm -f $TEST_LOG
+
+set +e
+$PERF_ANALYZER_UNIT_TESTS >> $TEST_LOG 2>&1
+if [ $? -ne 0 ]; then
+    echo -e "\n***\n*** Test Failed\n***"
+    RET=1
+fi
+set -e
+
+if [ $RET -eq 0 ]; then
+    echo -e "\n***\n*** Test Passed\n***"
+else
+    cat $TEST_LOG
+    echo -e "\n***\n*** Test FAILED\n***"
+fi
+
+exit $RET
