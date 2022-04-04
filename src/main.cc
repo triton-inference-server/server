@@ -303,8 +303,7 @@ enum OptionId {
   OPTION_REPOAGENT_DIR,
   OPTION_BUFFER_MANAGER_THREAD_COUNT,
   OPTION_BACKEND_CONFIG,
-  OPTION_HOST_POLICY,
-  OPTION_DEFAULT_MAX_BATCH_SIZE
+  OPTION_HOST_POLICY
 };
 
 struct Option {
@@ -1172,17 +1171,16 @@ ParseBackendConfigOption(const std::string arg)
   // backend or "<setting>=<value>" for all backends
   int delim_name = arg.find(",");
   int delim_setting = arg.find("=", delim_name + 1);
-  
+
   std::string name_string = std::string();
   if (delim_name > 0) {
     name_string = arg.substr(0, delim_name);
   } else if (delim_name == 0) {
-      std::cerr << "No backend specified. --backend-config format is"
-               << "<backend name>,<setting>=<value> or "
-               << "<setting>=<value>. Got "
-               << arg << std::endl;
-      exit(1);
-  } //else global backend config
+    std::cerr << "No backend specified. --backend-config option format is "
+              << "<backend name>,<setting>=<value> or "
+              << "<setting>=<value>. Got " << arg << std::endl;
+    exit(1);
+  }  // else global backend config
 
   if (delim_setting < 0) {
     std::cerr << "--backend-config option format is '<backend "
@@ -1190,7 +1188,8 @@ ParseBackendConfigOption(const std::string arg)
               << arg << std::endl;
     exit(1);
   }
-  std::string setting_string = arg.substr(delim_name + 1, delim_setting - delim_name - 1);
+  std::string setting_string =
+      arg.substr(delim_name + 1, delim_setting - delim_name - 1);
   std::string value_string = arg.substr(delim_setting + 1);
 
   if (setting_string.empty() || value_string.empty()) {
@@ -1277,7 +1276,6 @@ Parse(TRITONSERVER_ServerOptions** server_options, int argc, char** argv)
   std::vector<std::tuple<std::string, std::string, std::string>>
       backend_config_settings;
   std::vector<std::tuple<std::string, std::string, std::string>> host_policies;
-  // int32_t default_max_batch_size = 4;
 
 #ifdef TRITON_ENABLE_GPU
   double min_supported_compute_capability = TRITON_MIN_COMPUTE_CAPABILITY;
