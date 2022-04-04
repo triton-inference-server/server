@@ -39,9 +39,11 @@ VertexAiAPIServer::VertexAiAPIServer(
     const std::shared_ptr<TRITONSERVER_Server>& server,
     triton::server::TraceManager* trace_manager,
     const std::shared_ptr<SharedMemoryManager>& shm_manager, const int32_t port,
-    const int thread_cnt, const std::string& prediction_route,
-    const std::string& health_route, const std::string& default_model_name)
-    : HTTPAPIServer(server, trace_manager, shm_manager, port, thread_cnt),
+    const std::string address, const int thread_cnt,
+    const std::string& prediction_route, const std::string& health_route,
+    const std::string& default_model_name)
+    : HTTPAPIServer(
+          server, trace_manager, shm_manager, port, address, thread_cnt),
       prediction_regex_(prediction_route), health_regex_(health_route),
       health_mode_("ready"), model_name_(default_model_name),
       model_version_str_("")
@@ -264,8 +266,8 @@ VertexAiAPIServer::Create(
     const std::shared_ptr<TRITONSERVER_Server>& server,
     triton::server::TraceManager* trace_manager,
     const std::shared_ptr<SharedMemoryManager>& shm_manager, const int32_t port,
-    const int thread_cnt, std::string default_model_name,
-    std::unique_ptr<HTTPServer>* http_server)
+    const std::string address, const int thread_cnt,
+    std::string default_model_name, std::unique_ptr<HTTPServer>* http_server)
 {
   auto predict_route = GetEnvironmentVariableOrDefault("AIP_PREDICT_ROUTE", "");
   auto health_route = GetEnvironmentVariableOrDefault("AIP_HEALTH_ROUTE", "");
@@ -339,10 +341,10 @@ VertexAiAPIServer::Create(
   }
 
   http_server->reset(new VertexAiAPIServer(
-      server, trace_manager, shm_manager, port, thread_cnt, predict_route,
-      health_route, default_model_name));
+      server, trace_manager, shm_manager, port, address, thread_cnt,
+      predict_route, health_route, default_model_name));
 
-  const std::string addr = "0.0.0.0:" + std::to_string(port);
+  const std::string addr = address + ":" + std::to_string(port);
   LOG_INFO << "Started Vertex AI HTTPService at " << addr;
 
   return nullptr;

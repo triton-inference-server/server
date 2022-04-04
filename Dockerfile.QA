@@ -128,9 +128,9 @@ RUN mkdir -p qa/L0_simple_ensemble/models/simple/1 && \
     mkdir -p qa/L0_simple_ensemble/models/simple/2 && \
     cp /workspace/docs/examples/model_repository/simple/1/model.graphdef \
         qa/L0_simple_ensemble/models/simple/2/. && \
-    mkdir -p qa/L0_multiple_ports/models/simple/1 && \
+    mkdir -p qa/L0_socket/models/simple/1 && \
     cp /workspace/docs/examples/model_repository/simple/1/model.graphdef \
-        qa/L0_multiple_ports/models/simple/1/.
+        qa/L0_socket/models/simple/1/.
 
 RUN mkdir -p qa/L0_backend_identity/models && \
     cp -r src/test/models/identity_fp32 qa/L0_backend_identity/models/. && \

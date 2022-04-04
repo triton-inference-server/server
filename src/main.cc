@@ -89,12 +89,15 @@ int32_t repository_poll_secs_ = 15;
 std::unique_ptr<triton::server::HTTPServer> http_service_;
 bool allow_http_ = true;
 int32_t http_port_ = 8000;
+std::string http_address_ = "0.0.0.0";
 #endif  // TRITON_ENABLE_HTTP
 
 #ifdef TRITON_ENABLE_SAGEMAKER
 std::unique_ptr<triton::server::HTTPServer> sagemaker_service_;
 bool allow_sagemaker_ = false;
 int32_t sagemaker_port_ = 8080;
+// Triton uses "0.0.0.0" as default address for SageMaker.
+std::string sagemaker_address_ = "0.0.0.0";
 bool sagemaker_safe_range_set_ = false;
 std::pair<int32_t, int32_t> sagemaker_safe_range_ = {-1, -1};
 // The number of threads to initialize for the SageMaker HTTP front-end.
@@ -103,6 +106,8 @@ int sagemaker_thread_cnt_ = 8;
 
 #ifdef TRITON_ENABLE_VERTEX_AI
 std::unique_ptr<triton::server::HTTPServer> vertex_ai_service_;
+// Triton uses "0.0.0.0" as default address for Vertex AI.
+std::string vertex_ai_address_ = "0.0.0.0";
 bool allow_vertex_ai_ = false;
 int32_t vertex_ai_port_ = 8080;
 // The number of threads to initialize for the Vertex AI HTTP front-end.
@@ -114,6 +119,7 @@ std::string vertex_ai_default_model_;
 std::unique_ptr<triton::server::GRPCServer> grpc_service_;
 bool allow_grpc_ = true;
 int32_t grpc_port_ = 8001;
+std::string grpc_address_ = "0.0.0.0";
 bool grpc_use_ssl_ = false;
 triton::server::SslOptions grpc_ssl_options_;
 grpc_compression_level grpc_response_compression_level_ =
@@ -232,11 +238,13 @@ enum OptionId {
 #if defined(TRITON_ENABLE_HTTP)
   OPTION_ALLOW_HTTP,
   OPTION_HTTP_PORT,
+  OPTION_HTTP_ADDRESS,
   OPTION_HTTP_THREAD_COUNT,
 #endif  // TRITON_ENABLE_HTTP
 #if defined(TRITON_ENABLE_GRPC)
   OPTION_ALLOW_GRPC,
   OPTION_GRPC_PORT,
+  OPTION_GRPC_ADDRESS,
   OPTION_GRPC_INFER_ALLOCATION_POOL_SIZE,
   OPTION_GRPC_USE_SSL,
   OPTION_GRPC_USE_SSL_MUTUAL,
@@ -359,6 +367,8 @@ std::vector<Option> options_
        "Allow the server to listen for HTTP requests."},
       {OPTION_HTTP_PORT, "http-port", Option::ArgInt,
        "The port for the server to listen on for HTTP requests."},
+      {OPTION_HTTP_ADDRESS, "http-address", Option::ArgStr,
+       "The address for the http server to binds to."},
       {OPTION_HTTP_THREAD_COUNT, "http-thread-count", Option::ArgInt,
        "Number of threads handling HTTP requests."},
 #endif  // TRITON_ENABLE_HTTP
@@ -367,6 +377,8 @@ std::vector<Option> options_
        "Allow the server to listen for GRPC requests."},
       {OPTION_GRPC_PORT, "grpc-port", Option::ArgInt,
        "The port for the server to listen on for GRPC requests."},
+      {OPTION_GRPC_ADDRESS, "grpc-address", Option::ArgStr,
+       "The address for the grpc server to binds to."},
       {OPTION_GRPC_INFER_ALLOCATION_POOL_SIZE,
        "grpc-infer-allocation-pool-size", Option::ArgInt,
        "The maximum number of inference request/response objects that remain "
@@ -591,59 +603,67 @@ bool
 CheckPortCollision()
 {
   // List of enabled services and their constraints
-  std::vector<std::tuple<std::string, int32_t, bool, int32_t, int32_t>> ports;
+  std::vector<
+      std::tuple<std::string, std::string, int32_t, bool, int32_t, int32_t>>
+      ports;
 #ifdef TRITON_ENABLE_HTTP
   if (allow_http_) {
-    ports.emplace_back("HTTP", http_port_, false, -1, -1);
+    ports.emplace_back("HTTP", http_address_, http_port_, false, -1, -1);
   }
 #endif  // TRITON_ENABLE_HTTP
 #ifdef TRITON_ENABLE_GRPC
   if (allow_grpc_) {
-    ports.emplace_back("GRPC", grpc_port_, false, -1, -1);
+    ports.emplace_back("GRPC", grpc_address_, grpc_port_, false, -1, -1);
   }
 #endif  // TRITON_ENABLE_GRPC
 #ifdef TRITON_ENABLE_METRICS
   if (allow_metrics_) {
-    ports.emplace_back("metrics", metrics_port_, false, -1, -1);
+    ports.emplace_back("metrics", http_address_, metrics_port_, false, -1, -1);
   }
 #endif  // TRITON_ENABLE_METRICS
 #ifdef TRITON_ENABLE_SAGEMAKER
   if (allow_sagemaker_) {
     ports.emplace_back(
-        "SageMaker", sagemaker_port_, sagemaker_safe_range_set_,
-        sagemaker_safe_range_.first, sagemaker_safe_range_.second);
+        "SageMaker", sagemaker_address_, sagemaker_port_,
+        sagemaker_safe_range_set_, sagemaker_safe_range_.first,
+        sagemaker_safe_range_.second);
   }
 #endif  // TRITON_ENABLE_SAGEMAKER
 #ifdef TRITON_ENABLE_VERTEX_AI
   if (allow_vertex_ai_) {
-    ports.emplace_back("Vertex AI", vertex_ai_port_, false, -1, -1);
+    ports.emplace_back(
+        "Vertex AI", vertex_ai_address_, vertex_ai_port_, false, -1, -1);
   }
 #endif  // TRITON_ENABLE_VERTEX_AI
 
   for (auto curr_it = ports.begin(); curr_it != ports.end(); ++curr_it) {
     // If the current service doesn't specify the allow port range for other
     // services, then we don't need to revisit the checked services
-    auto comparing_it = (std::get<2>(*curr_it)) ? ports.begin() : (curr_it + 1);
+    auto comparing_it = (std::get<3>(*curr_it)) ? ports.begin() : (curr_it + 1);
     for (; comparing_it != ports.end(); ++comparing_it) {
       if (comparing_it == curr_it) {
         continue;
       }
+      if (std::get<1>(*curr_it) != std::get<1>(*comparing_it)) {
+        continue;
+      }
       // Set range and comparing service port is out of range
-      if (std::get<2>(*curr_it) &&
-          ((std::get<1>(*comparing_it) < std::get<3>(*curr_it)) ||
-           (std::get<1>(*comparing_it) > std::get<4>(*curr_it)))) {
+      if (std::get<3>(*curr_it) &&
+          ((std::get<2>(*comparing_it) < std::get<4>(*curr_it)) ||
+           (std::get<2>(*comparing_it) > std::get<5>(*curr_it)))) {
         std::cerr << "The server cannot listen to "
                   << std::get<0>(*comparing_it) << " requests at port "
-                  << std::get<1>(*comparing_it) << ", allowed port range is ["
-                  << std::get<3>(*curr_it) << ", " << std::get<4>(*curr_it)
+                  << std::get<2>(*comparing_it) << ", allowed port range is ["
+                  << std::get<4>(*curr_it) << ", " << std::get<5>(*curr_it)
                   << "]" << std::endl;
         return true;
       }
-      if (std::get<1>(*curr_it) == std::get<1>(*comparing_it)) {
+      if (std::get<2>(*curr_it) == std::get<2>(*comparing_it)) {
         std::cerr << "The server cannot listen to " << std::get<0>(*curr_it)
                   << " requests "
                   << "and " << std::get<0>(*comparing_it)
-                  << " requests at the same port " << std::get<1>(*curr_it)
+                  << " requests at the same address and port "
+                  << std::get<1>(*curr_it) << ":" << std::get<2>(*curr_it)
                   << std::endl;
         return true;
       }
@@ -662,8 +682,8 @@ StartGrpcService(
     const std::shared_ptr<triton::server::SharedMemoryManager>& shm_manager)
 {
   TRITONSERVER_Error* err = triton::server::GRPCServer::Create(
-      server, trace_manager, shm_manager, grpc_port_, grpc_use_ssl_,
-      grpc_ssl_options_, grpc_infer_allocation_pool_size_,
+      server, trace_manager, shm_manager, grpc_port_, grpc_address_,
+      grpc_use_ssl_, grpc_ssl_options_, grpc_infer_allocation_pool_size_,
       grpc_response_compression_level_, grpc_keepalive_options_, service);
   if (err == nullptr) {
     err = (*service)->Start();
@@ -686,8 +706,8 @@ StartHttpService(
     const std::shared_ptr<triton::server::SharedMemoryManager>& shm_manager)
 {
   TRITONSERVER_Error* err = triton::server::HTTPAPIServer::Create(
-      server, trace_manager, shm_manager, http_port_, http_thread_cnt_,
-      service);
+      server, trace_manager, shm_manager, http_port_, http_address_,
+      http_thread_cnt_, service);
   if (err == nullptr) {
     err = (*service)->Start();
   }
@@ -707,7 +727,7 @@ StartMetricsService(
     const std::shared_ptr<TRITONSERVER_Server>& server)
 {
   TRITONSERVER_Error* err = triton::server::HTTPMetricsServer::Create(
-      server, metrics_port_, 1 /* HTTP thread count */, service);
+      server, metrics_port_, http_address_, 1 /* HTTP thread count */, service);
   if (err == nullptr) {
     err = (*service)->Start();
   }
@@ -728,7 +748,7 @@ StartSagemakerService(
     const std::shared_ptr<triton::server::SharedMemoryManager>& shm_manager)
 {
   TRITONSERVER_Error* err = triton::server::SagemakerAPIServer::Create(
-      server, trace_manager, shm_manager, sagemaker_port_,
+      server, trace_manager, shm_manager, sagemaker_port_, sagemaker_address_,
       sagemaker_thread_cnt_, service);
   if (err == nullptr) {
     err = (*service)->Start();
@@ -751,7 +771,7 @@ StartVertexAiService(
     const std::shared_ptr<triton::server::SharedMemoryManager>& shm_manager)
 {
   TRITONSERVER_Error* err = triton::server::VertexAiAPIServer::Create(
-      server, trace_manager, shm_manager, vertex_ai_port_,
+      server, trace_manager, shm_manager, vertex_ai_port_, vertex_ai_address_,
       vertex_ai_thread_cnt_, vertex_ai_default_model_, service);
   if (err == nullptr) {
     err = (*service)->Start();
@@ -1254,11 +1274,13 @@ Parse(TRITONSERVER_ServerOptions** server_options, int argc, char** argv)
 
 #if defined(TRITON_ENABLE_HTTP)
   int32_t http_port = http_port_;
+  std::string http_address = http_address_;
   int32_t http_thread_cnt = http_thread_cnt_;
 #endif  // TRITON_ENABLE_HTTP
 
 #if defined(TRITON_ENABLE_GRPC)
   int32_t grpc_port = grpc_port_;
+  std::string grpc_address = grpc_address_;
   int32_t grpc_use_ssl = grpc_use_ssl_;
   int32_t grpc_infer_allocation_pool_size = grpc_infer_allocation_pool_size_;
   grpc_compression_level grpc_response_compression_level =
@@ -1381,6 +1403,9 @@ Parse(TRITONSERVER_ServerOptions** server_options, int argc, char** argv)
       case OPTION_HTTP_PORT:
         http_port = ParseIntOption(optarg);
         break;
+      case OPTION_HTTP_ADDRESS:
+        http_address = optarg;
+        break;
       case OPTION_HTTP_THREAD_COUNT:
         http_thread_cnt = ParseIntOption(optarg);
         break;
@@ -1423,6 +1448,9 @@ Parse(TRITONSERVER_ServerOptions** server_options, int argc, char** argv)
         break;
       case OPTION_GRPC_PORT:
         grpc_port = ParseIntOption(optarg);
+        break;
+      case OPTION_GRPC_ADDRESS:
+        grpc_address = optarg;
         break;
       case OPTION_GRPC_INFER_ALLOCATION_POOL_SIZE:
         grpc_infer_allocation_pool_size = ParseIntOption(optarg);
@@ -1633,6 +1661,7 @@ Parse(TRITONSERVER_ServerOptions** server_options, int argc, char** argv)
 
 #if defined(TRITON_ENABLE_HTTP)
   http_port_ = http_port;
+  http_address_ = http_address;
   http_thread_cnt_ = http_thread_cnt;
 #endif  // TRITON_ENABLE_HTTP
 
@@ -1662,6 +1691,7 @@ Parse(TRITONSERVER_ServerOptions** server_options, int argc, char** argv)
 
 #if defined(TRITON_ENABLE_GRPC)
   grpc_port_ = grpc_port;
+  grpc_address_ = grpc_address;
   grpc_infer_allocation_pool_size_ = grpc_infer_allocation_pool_size;
   grpc_use_ssl_ = grpc_use_ssl;
   grpc_response_compression_level_ = grpc_response_compression_level;
