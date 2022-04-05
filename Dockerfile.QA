@@ -115,7 +115,8 @@ RUN mkdir -p qa/common && \
     cp ${TRITONTMP_DIR}/tritonbuild/tritonserver/install/backends/implicit_state/libtriton_implicit_state.so qa/L0_implicit_state/. && \
     mkdir qa/L0_data_compression/models && \
     cp -r /workspace/docs/examples/model_repository/simple qa/L0_data_compression/models && \
-    cp ${TRITONTMP_DIR}/tritonbuild/tritonserver/install/bin/data_compressor_test qa/L0_data_compression/.
+    cp ${TRITONTMP_DIR}/tritonbuild/tritonserver/install/bin/data_compressor_test qa/L0_data_compression/. && \
+    cp ${TRITONTMP_DIR}/tritonbuild/tritonserver/install/bin/metrics_api_test qa/L0_metrics/. && \
 
 # caffe2plan will not exist if the build was done without TensorRT enabled
 RUN if [ -f ${TRITONTMP_DIR}/tritonbuild/tritonserver/install/bin/caffe2plan ]; then \
