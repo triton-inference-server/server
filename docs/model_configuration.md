@@ -107,13 +107,12 @@ the specific ways described above, *max_batch_size* must be set to
 zero.
 
 When a model is using the auto-complete feature, a default maximum batch size may 
-may be set by using the `--default-max-batch-size=<int>` command line switch.
+may be set by using the `--backend-config=default-max-batch-size=<int>` command line switch.
 This allows all models which are capable of batching and which make use of auto-complete
 to have a non-zero maximum batch size, provided the backend which initializes the model
 uses this value. This value is set to 4 by default if no value is provided. While no Triton 
 supported backends implement this feature, backend developers may make use of this value 
-by obtaining it from the TRITONBACKEND_Model by using the TRITONBACKEND_ModelDefaultMaxBatchSize 
-during auto-complete execution.
+by obtaining it from the TRITONBACKEND_BackendConfig api.
 
 
 ### Inputs and Outputs
