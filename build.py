@@ -99,13 +99,7 @@ TRITON_VERSION_MAP = {
         '2.2.9')  # DCGM version
 }
 
-EXAMPLE_BACKENDS = ['identity', 'square', 'repeat']
 CORE_BACKENDS = ['ensemble']
-NONCORE_BACKENDS = [
-    'tensorflow1', 'tensorflow2', 'onnxruntime', 'python', 'dali', 'pytorch',
-    'openvino', 'fil', 'fastertransformer', 'tensorrt', 'armnn_tflite'
-]
-EXAMPLE_REPOAGENTS = ['checksum']
 
 FLAGS = None
 EXTRA_CORE_CMAKE_FLAGS = {}
@@ -519,10 +513,7 @@ def repoagent_repo(ra):
 
 
 def repoagent_cmake_args(images, components, ra, install_dir):
-    if ra in EXAMPLE_REPOAGENTS:
-        args = []
-    else:
-        fail('unknown agent {}'.format(ra))
+    args = []
 
     cargs = args + [
         cmake_repoagent_arg('CMAKE_BUILD_TYPE', None, FLAGS.build_type),
@@ -571,10 +562,8 @@ def backend_cmake_args(images, components, be, install_dir, library_paths,
         args = []
     elif be == 'tensorrt':
         args = tensorrt_cmake_args()
-    elif be in EXAMPLE_BACKENDS:
-        args = []
     else:
-        fail('unknown backend {}'.format(be))
+        args = []
 
     cargs = args + [
         cmake_backend_arg(be, 'CMAKE_BUILD_TYPE', None, FLAGS.build_type),
@@ -1628,6 +1617,63 @@ def finalize_build(cmake_script, install_dir, ci_dir):
     cmake_script.cmd(f'chmod -R a+rw {ci_dir}')
 
 
+def enable_all():
+    if target_platform() != 'windows':
+        all_backends = ['ensemble',
+                        'identity', 'square', 'repeat',
+                        'tensorflow1', 'tensorflow2', 'onnxruntime', 'python', 'dali', 'pytorch',
+                        'openvino', 'fil', 'tensorrt'
+        ]
+        all_repoagents = ['checksum']
+        all_filesystems = [ 'gcs', 's3', 'azure_storage' ]
+        all_endpoints = [ 'http', 'grpc', 'sagemaker', 'vertex-ai' ]
+
+        FLAGS.enable_logging = True
+        FLAGS.enable_stats = True
+        FLAGS.enable_metrics = True
+        FLAGS.enable_gpu_metrics = True
+        FLAGS.enable_tracing = True
+        FLAGS.enable_nvtx = True
+        FLAGS.enable_gpu = True
+    else:
+        all_backends = ['ensemble',
+                        'identity', 'square', 'repeat',
+                        'onnxruntime', 'openvino', 'tensorrt'
+        ]
+        all_repoagents = ['checksum']
+        all_filesystems = [ ]
+        all_endpoints = [ 'http', 'grpc' ]
+
+        FLAGS.enable_logging = True
+        FLAGS.enable_stats = True
+        FLAGS.enable_tracing = True
+        FLAGS.enable_gpu = True
+
+    requested_backends = []
+    for be in FLAGS.backend:
+        parts = be.split(':')
+        requested_backends += [ parts[0] ]
+    for be in all_backends:
+        if be not in requested_backends:
+            FLAGS.backend += [ be ]
+
+    requested_repoagents = []
+    for ra in FLAGS.repoagent:
+        parts = ra.split(':')
+        requested_repoagents += [ parts[0] ]
+    for ra in all_repoagents:
+        if ra not in requested_repoagents:
+            FLAGS.repoagent += [ ra ]
+
+    for fs in all_filesystems:
+        if fs not in FLAGS.filesystem:
+            FLAGS.filesystem += [ fs ]
+
+    for ep in all_endpoints:
+        if ep not in FLAGS.endpoint:
+            FLAGS.endpoint += [ ep ]
+
+
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
 
@@ -1790,6 +1836,10 @@ if __name__ == '__main__':
         'Use specified Docker image in build as <image-name>,<full-image-name>. <image-name> can be "base", "gpu-base", "tensorflow1", "tensorflow2", or "pytorch".'
     )
 
+    parser.add_argument('--enable-all',
+                        action="store_true",
+                        required=False,
+                        help='Enable all standard released Triton features, backends, repository agents, endpoints and file systems.')
     parser.add_argument('--enable-logging',
                         action="store_true",
                         required=False,
@@ -1936,6 +1986,11 @@ if __name__ == '__main__':
     if FLAGS.extra_backend_cmake_arg is None:
         FLAGS.extra_backend_cmake_arg = []
 
+    # if --enable-all is specified, then update FLAGS to enable all
+    # settings, backends, repo-agents, file systems, endpoints, etc.
+    if FLAGS.enable_all:
+        enable_all()
+
     # When doing a docker build, --build-dir, --install-dir and
     # --cmake-dir must not be set. We will use the build/ subdir
     # within the server/ repo that contains this build.py script for
@@ -2002,6 +2057,11 @@ if __name__ == '__main__':
     log('container version {}'.format(FLAGS.container_version))
     log('upstream container version {}'.format(
         FLAGS.upstream_container_version))
+
+    for ep in FLAGS.endpoint:
+        log(f'endpoint "{ep}"')
+    for fs in FLAGS.filesystem:
+        log(f'filesystem "{fs}"')
 
     # Initialize map of backends to build and repo-tag for each.
     backends = {}
