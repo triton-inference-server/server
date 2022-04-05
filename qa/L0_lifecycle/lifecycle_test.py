@@ -29,9 +29,10 @@ import sys
 sys.path.append("../common")
 
 from builtins import range
-from future.utils import iteritems
+from functools import partial
 import os
 import shutil
+import signal
 import time
 import unittest
 import numpy as np
@@ -2235,6 +2236,216 @@ class LifeCycleTest(tu.TestResultCollector):
                         triton_client.is_model_ready(model_name, "3"))
                 except Exception as ex:
                     self.assertTrue(False, "unexpected error {}".format(ex))
+
+    def test_shutdown_dynamic(self):
+        model_shape = (1, 1)
+        input_data = np.ones(shape=(1, 1), dtype=np.float32)
+
+        inputs = [grpcclient.InferInput('INPUT0', model_shape, "FP32")]
+        inputs[0].set_data_from_numpy(input_data)
+
+        triton_client = grpcclient.InferenceServerClient("localhost:8001",
+                                                         verbose=True)
+        model_name = "custom_zero_1_float32"
+
+        # Send two requests as only requests held in scheduler are counted
+        # as in-flight (the first request is in execution)
+        def callback(user_data, result, error):
+            if error:
+                user_data.append(error)
+            else:
+                user_data.append(result)
+
+        # Currently the dynamic batcher will form payloads and place to
+        # instance queue in advance. The batcher doesn't track requests
+        # in the next stage so need to send more requests to saturate the
+        # queue.
+        request_count = 6
+        async_results = []
+        for _ in range(request_count):
+            triton_client.async_infer(model_name, inputs,
+                                      partial(callback, async_results))
+        time.sleep(1)
+
+        # Send signal to shutdown the server
+        os.kill(int(os.environ['SERVER_PID']), signal.SIGINT)
+
+        # Send more requests and should be rejected
+        try:
+            triton_client.infer(model_name, inputs)
+            self.assertTrue(False,
+                            "expected error for new inference during shutdown")
+        except InferenceServerException as ex:
+            self.assertIn(
+                "Server is stopping, scheduler for model has stopped accepting new inference requests",
+                ex.message())
+
+        # Wait until the results are available in user_data
+        time_out = 30
+        while ((len(async_results) < request_count) and time_out > 0):
+            time_out = time_out - 1
+            time.sleep(1)
+
+        # Previous requests should succeed
+        for result in async_results:
+            if type(result) == InferenceServerException:
+                raise result
+            output_data = result.as_numpy('OUTPUT0')
+            np.testing.assert_allclose(
+                output_data,
+                input_data,
+                err_msg='Inference result is not correct')
+
+    def test_shutdown_sequence(self):
+        model_shape = (1, 1)
+        input_data = np.ones(shape=(1, 1), dtype=np.int32)
+
+        inputs = [grpcclient.InferInput('INPUT', model_shape, "INT32")]
+        inputs[0].set_data_from_numpy(input_data)
+
+        triton_client = grpcclient.InferenceServerClient("localhost:8001",
+                                                         verbose=True)
+        model_name = "custom_sequence_int32"
+
+        # Send two requests as only requests held in scheduler are counted
+        # as in-flight (the first request is in execution)
+        def callback(user_data, result, error):
+            if error:
+                user_data.append(error)
+            else:
+                user_data.append(result)
+
+        # Start multiple sequences
+        request_count = 2
+        async_results = []
+        for i in range(request_count):
+            triton_client.async_infer(model_name,
+                                      inputs,
+                                      partial(callback, async_results),
+                                      sequence_id=(i + 1),
+                                      sequence_start=True)
+        time.sleep(1)
+
+        # Send signal to shutdown the server
+        os.kill(int(os.environ['SERVER_PID']), signal.SIGINT)
+
+        # Send requests with different characteristic
+        # 1: New sequence with new seqeuence ID
+        try:
+            triton_client.infer(model_name,
+                                inputs,
+                                sequence_id=request_count,
+                                sequence_start=True)
+            self.assertTrue(False,
+                            "expected error for new inference during shutdown")
+        except InferenceServerException as ex:
+            self.assertIn(
+                "Server is stopping, scheduler for model has stopped accepting new inference requests",
+                ex.message())
+        # 2: New sequence with existing seqeuence ID
+        try:
+            triton_client.infer(model_name,
+                                inputs,
+                                sequence_id=1,
+                                sequence_start=True)
+            self.assertTrue(False,
+                            "expected error for new inference during shutdown")
+        except InferenceServerException as ex:
+            self.assertIn(
+                "Server is stopping, scheduler for model has stopped accepting new inference requests",
+                ex.message())
+        # 3: Continuing sequence
+        try:
+            res = triton_client.infer(model_name,
+                                      inputs,
+                                      sequence_id=2,
+                                      sequence_end=True)
+            output_data = res.as_numpy('OUTPUT')
+            # Result are accumulated
+            np.testing.assert_allclose(
+                output_data,
+                input_data + input_data,
+                err_msg='Inference result is not correct')
+        except Exception as ex:
+            self.assertTrue(False, "unexpected error {}".format(ex))
+
+        # Wait until the results are available in user_data
+        time_out = 30
+        while ((len(async_results) < request_count) and time_out > 0):
+            time_out = time_out - 1
+            time.sleep(1)
+
+        # Previous requests should succeed
+        for result in async_results:
+            if type(result) == InferenceServerException:
+                raise result
+            output_data = result.as_numpy('OUTPUT')
+            np.testing.assert_allclose(
+                output_data,
+                input_data,
+                err_msg='Inference result is not correct')
+
+        # Sleep 5 seconds for scheduler timeout to work and should
+        # reduce the in-flight count
+        time.sleep(5)
+
+    def test_shutdown_ensemble(self):
+        model_shape = (1, 1)
+        input_data = np.ones(shape=(1, 1), dtype=np.float32)
+
+        inputs = [grpcclient.InferInput('INPUT0', model_shape, "FP32")]
+        inputs[0].set_data_from_numpy(input_data)
+
+        triton_client = grpcclient.InferenceServerClient("localhost:8001",
+                                                         verbose=True)
+        model_name = "ensemble_zero_1_float32"
+
+        # Send two requests as only requests held in scheduler are counted
+        # as in-flight (the first request is in execution)
+        def callback(user_data, result, error):
+            if error:
+                user_data.append(error)
+            else:
+                user_data.append(result)
+
+        # Even the ensemble is actually a wrapper over the model for
+        # test_shutdown_dynamic, we don't need to send many requests as
+        # ensemble scheduler tracks in-flight requests w.r.t. the whole pipeline
+        request_count = 1
+        async_results = []
+        for _ in range(request_count):
+            triton_client.async_infer(model_name, inputs,
+                                      partial(callback, async_results))
+        time.sleep(1)
+
+        # Send signal to shutdown the server
+        os.kill(int(os.environ['SERVER_PID']), signal.SIGINT)
+
+        # Send more requests and should be rejected
+        try:
+            triton_client.infer(model_name, inputs)
+            self.assertTrue(False,
+                            "expected error for new inference during shutdown")
+        except InferenceServerException as ex:
+            self.assertIn(
+                "in ensemble 'ensemble_zero_1_float32', Server is stopping, scheduler for model has stopped accepting new inference requests",
+                ex.message())
+
+        # Wait until the results are available in user_data
+        time_out = 10
+        while ((len(async_results) < request_count) and time_out > 0):
+            time_out = time_out - 1
+            time.sleep(1)
+
+        # Previous requests should succeed
+        for result in async_results:
+            if type(result) == InferenceServerException:
+                raise result
+            output_data = result.as_numpy('OUTPUT0')
+            np.testing.assert_allclose(
+                output_data,
+                input_data,
+                err_msg='Inference result is not correct')
 
 
 if __name__ == '__main__':
