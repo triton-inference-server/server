@@ -1651,6 +1651,152 @@ wait $SERVER_PID
 
 rm -f $CLIENT_LOG
 
+LOG_IDX=$((LOG_IDX+1))
+
+# LifeCycleTest.test_shutdown_dynamic
+rm -fr models config.pbtxt.*
+mkdir models
+cp -r ../custom_models/custom_zero_1_float32 models/. && \
+    mkdir -p models/custom_zero_1_float32/1 && \
+    (cd models/custom_zero_1_float32 && \
+        echo "dynamic_batching {}" >> config.pbtxt 
+        echo "parameters [" >> config.pbtxt && \
+        echo "{ key: \"execute_delay_ms\"; value: { string_value: \"5000\" }}" >> config.pbtxt && \
+        echo "]" >> config.pbtxt)
+
+SERVER_ARGS="--model-repository=`pwd`/models --log-verbose=1"
+SERVER_LOG="./inference_server_$LOG_IDX.log"
+run_server
+if [ "$SERVER_PID" == "0" ]; then
+    echo -e "\n***\n*** Failed to start $SERVER\n***"
+    cat $SERVER_LOG
+    exit 1
+fi
+
+set +e
+SERVER_PID=$SERVER_PID python $LC_TEST LifeCycleTest.test_shutdown_dynamic >>$CLIENT_LOG 2>&1
+if [ $? -ne 0 ]; then
+    cat $CLIENT_LOG
+    echo -e "\n***\n*** Test Failed\n***"
+    RET=1
+else
+    check_test_results $TEST_RESULT_FILE 1
+    if [ $? -ne 0 ]; then
+        cat $CLIENT_LOG
+        echo -e "\n***\n*** Test Result Verification Failed\n***"
+        RET=1
+    fi
+fi
+set -e
+
+# check server log
+if [ `grep -c "Model 'custom_zero_1_float32' (version 1) has 1 in-flight inferences" $SERVER_LOG` == "0" ]; then
+    echo -e "\n***\n*** Expect logging for model and in-flight inference count\n***"
+    RET=1
+fi
+
+kill $SERVER_PID
+wait $SERVER_PID
+
+rm -f $CLIENT_LOG
+
+LOG_IDX=$((LOG_IDX+1))
+
+# LifeCycleTest.test_shutdown_sequence
+rm -fr models config.pbtxt.*
+mkdir models
+cp -r ../custom_models/custom_sequence_int32 models/. && \
+    mkdir -p models/custom_sequence_int32/1
+
+SERVER_ARGS="--model-repository=`pwd`/models --log-verbose=1"
+SERVER_LOG="./inference_server_$LOG_IDX.log"
+run_server
+if [ "$SERVER_PID" == "0" ]; then
+    echo -e "\n***\n*** Failed to start $SERVER\n***"
+    cat $SERVER_LOG
+    exit 1
+fi
+
+set +e
+SERVER_PID=$SERVER_PID python $LC_TEST LifeCycleTest.test_shutdown_sequence >>$CLIENT_LOG 2>&1
+if [ $? -ne 0 ]; then
+    cat $CLIENT_LOG
+    echo -e "\n***\n*** Test Failed\n***"
+    RET=1
+else
+    check_test_results $TEST_RESULT_FILE 1
+    if [ $? -ne 0 ]; then
+        cat $CLIENT_LOG
+        echo -e "\n***\n*** Test Result Verification Failed\n***"
+        RET=1
+    fi
+fi
+set -e
+
+# check server log
+if [ `grep -c "Model 'custom_sequence_int32' (version 1) has 2 in-flight inferences" $SERVER_LOG` == "0" ]; then
+    echo -e "\n***\n*** Expect logging for model having 2 in-flight inferences\n***"
+    RET=1
+fi
+if [ `grep -c "Model 'custom_sequence_int32' (version 1) has 1 in-flight inferences" $SERVER_LOG` == "0" ]; then
+    echo -e "\n***\n*** Expect logging for model having 1 in-flight inference\n***"
+    RET=1
+fi
+
+kill $SERVER_PID
+wait $SERVER_PID
+
+rm -f $CLIENT_LOG
+
+LOG_IDX=$((LOG_IDX+1))
+
+# LifeCycleTest.test_shutdown_ensemble
+rm -fr models config.pbtxt.*
+mkdir models
+cp -r ensemble_zero_1_float32 models/. && \
+    mkdir -p models/ensemble_zero_1_float32/1
+cp -r ../custom_models/custom_zero_1_float32 models/. && \
+    mkdir -p models/custom_zero_1_float32/1 && \
+    (cd models/custom_zero_1_float32 && \
+        echo "dynamic_batching {}" >> config.pbtxt 
+        echo "parameters [" >> config.pbtxt && \
+        echo "{ key: \"execute_delay_ms\"; value: { string_value: \"5000\" }}" >> config.pbtxt && \
+        echo "]" >> config.pbtxt)
+
+SERVER_ARGS="--model-repository=`pwd`/models --log-verbose=1"
+SERVER_LOG="./inference_server_$LOG_IDX.log"
+run_server
+if [ "$SERVER_PID" == "0" ]; then
+    echo -e "\n***\n*** Failed to start $SERVER\n***"
+    cat $SERVER_LOG
+    exit 1
+fi
+
+set +e
+SERVER_PID=$SERVER_PID python $LC_TEST LifeCycleTest.test_shutdown_ensemble >>$CLIENT_LOG 2>&1
+if [ $? -ne 0 ]; then
+    cat $CLIENT_LOG
+    echo -e "\n***\n*** Test Failed\n***"
+    RET=1
+else
+    check_test_results $TEST_RESULT_FILE 1
+    if [ $? -ne 0 ]; then
+        cat $CLIENT_LOG
+        echo -e "\n***\n*** Test Result Verification Failed\n***"
+        RET=1
+    fi
+fi
+set -e
+
+# check server log
+if [ `grep -c "Model 'ensemble_zero_1_float32' (version 1) has 1 in-flight inferences" $SERVER_LOG` == "0" ]; then
+    echo -e "\n***\n*** Expect logging for model and in-flight inference count\n***"
+    RET=1
+fi
+
+kill $SERVER_PID
+wait $SERVER_PID
+
 if [ $RET -eq 0 ]; then
   echo -e "\n***\n*** Test Passed\n***"
 fi
