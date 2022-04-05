@@ -218,7 +218,7 @@ SERVER_ARGS="--model-repository=`pwd`/models --http-port 8003 --metrics-port 800
 run_server
 sleep $SLEEP_TIME
 # check server log for the warning messages
-if [ `grep -c "failed to start GRPC service: Unavailable - Port '0.0.0.0:8001' already in use" $SERVER_LOG` != "1" ]; then
+if [ `grep -c "failed to start GRPC service: Unavailable - Socket '0.0.0.0:8001' already in use" $SERVER_LOG` != "1" ]; then
     echo -e "\n***\n*** Server log ${SERVER_LOG} did not report GRPC port collision\n***"
     echo -e "\n***\n*** Test Failed\n***"
     kill $SERVER_PID
@@ -248,7 +248,7 @@ SERVER_ARGS="--model-repository=`pwd`/models --grpc-port 8003 --metrics-port 800
 run_server
 sleep $SLEEP_TIME
 # check server log for the warning messages
-if [ `grep -c "failed to start HTTP service: Unavailable - Port '0.0.0.0:8000' already in use" $SERVER_LOG` != "1" ]; then
+if [ `grep -c "failed to start HTTP service: Unavailable - Socket '0.0.0.0:8000' already in use" $SERVER_LOG` != "1" ]; then
     echo -e "\n***\n*** Server log ${SERVER_LOG} did not report HTTP port collision\n***"
     echo -e "\n***\n*** Test Failed\n***"
     kill $SERVER_PID
@@ -279,7 +279,7 @@ SERVER_ARGS="--model-repository=`pwd`/models --grpc-port 8003 --http-port 8004"
 run_server
 sleep $SLEEP_TIME
 # check server log for the warning messages
-if [ `grep -c "failed to start Metrics service: Unavailable - Port '0.0.0.0:8002' already in use" $SERVER_LOG` != "1" ]; then
+if [ `grep -c "failed to start Metrics service: Unavailable - Socket '0.0.0.0:8002' already in use" $SERVER_LOG` != "1" ]; then
     echo -e "\n***\n*** Server log ${SERVER_LOG} did not report metrics port collision\n***"
     echo -e "\n***\n*** Test Failed\n***"
     kill $SERVER_PID
@@ -309,7 +309,7 @@ SAVED_SERVER_PID=$SERVER_PID
 run_server
 sleep $SLEEP_TIME
 # check server log for the warning messages
-if [ `grep -c "failed to start.*service: Unavailable - Port '.*' already in use" $SERVER_LOG` == "0" ]; then
+if [ `grep -c "failed to start.*service: Unavailable - Socket '.*' already in use" $SERVER_LOG` == "0" ]; then
     echo -e "\n***\n*** Server log ${SERVER_LOG} did not report port collision\n***"
     echo -e "\n***\n*** Test Failed\n***"
     kill $SERVER_PID

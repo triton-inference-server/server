@@ -4507,7 +4507,7 @@ GRPCServer::Start()
   if (bound_port == 0) {
     return TRITONSERVER_ErrorNew(
         TRITONSERVER_ERROR_UNAVAILABLE,
-        (std::string("Port '") + server_addr_ + "' already in use ").c_str());
+        (std::string("Socket '") + server_addr_ + "' already in use ").c_str());
   }
 
   // A common Handler for other non-inference requests
