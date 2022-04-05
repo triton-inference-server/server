@@ -70,7 +70,8 @@ class PythonTest(tu.TestResultCollector):
                                                  size=shape,
                                                  dtype=np.int32)
             else:
-                # Set the input0 dummy data for testing purposes.
+                # Set the input0 to a default value if it is optional. This is
+                # the input used by the model if it is not provided.
                 input0_numpy = np.array([5], dtype=np.int32)
 
             if input1:
@@ -79,7 +80,8 @@ class PythonTest(tu.TestResultCollector):
                                                  size=shape,
                                                  dtype=np.int32)
             else:
-                # Set the input1 dummy data for testing purposes.
+                # Set the input1 to a default value if it is optional. This is
+                # the input used by the model if it is not provided.
                 input1_numpy = np.array([5], dtype=np.int32)
 
             inputs = []
