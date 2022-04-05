@@ -108,6 +108,10 @@ mkdir -p models/init_args/1/
 cp ../python_models/init_args/model.py ./models/init_args/1/
 cp ../python_models/init_args/config.pbtxt ./models/init_args/
 
+mkdir -p models/optional/1/
+cp ../python_models/optional/model.py ./models/optional/1/
+cp ../python_models/optional/config.pbtxt ./models/optional/
+
 mkdir -p models/non_contiguous/1/
 cp ../python_models/non_contiguous/model.py ./models/non_contiguous/1/
 cp ../python_models/non_contiguous/config.pbtxt ./models/non_contiguous/config.pbtxt
