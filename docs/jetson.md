@@ -43,10 +43,10 @@ Triton Inference Server support on JetPack includes:
 * [HTTP/REST and GRPC inference protocols](inference_protocols.md)
 * [C API](inference_protocols.md#c-api)
 
-Limitations on Jetson/JetPack:
+Limitations on JetPack 5.0:
 
-* Onnx Runtime backend does not support the OpenVino execution provider.
-The TensorRT execution provider however is supported.
+* Onnx Runtime backend does not support the OpenVino and TensorRT execution providers.
+The CUDA execution provider is in Beta.
 * The Python backend does not support GPU Tensors and Async BLS.
 * CUDA IPC (shared memory) is not supported. System shared memory however is supported.
 * GPU metrics, GCS storage, S3 storage and Azure storage are not supported.
