@@ -1323,8 +1323,10 @@ def create_docker_build_script(script_name, container_install_dir,
         # build, because we want this code to work even if run within
         # Docker (i.e. docker-in-docker) and not just if run directly
         # from host.
-        runargs = ['docker', 'run', '-w', '/workspace/build',
-                   '--name', 'tritonserver_builder']
+        runargs = [
+            'docker', 'run', '-w', '/workspace/build', '--name',
+            'tritonserver_builder'
+        ]
 
         if not FLAGS.no_container_interactive:
             runargs += ['-it']
@@ -1335,9 +1337,7 @@ def create_docker_build_script(script_name, container_install_dir,
                 '-v', '\\\\.\pipe\docker_engine:\\\\.\pipe\docker_engine'
             ]
         else:
-            runargs += [
-                '-v', '/var/run/docker.sock:/var/run/docker.sock'
-            ]
+            runargs += ['-v', '/var/run/docker.sock:/var/run/docker.sock']
 
         runargs += ['tritonserver_buildbase']
 
@@ -1352,15 +1352,21 @@ def create_docker_build_script(script_name, container_install_dir,
         if target_platform() == 'windows':
             docker_script.cmd(['docker', 'rm', 'tritonserver_builder'])
         else:
-            docker_script._file.write('if [ "$(docker ps -a | grep tritonserver_builder)" ]; then  docker rm tritonserver_builder; fi\n')
+            docker_script._file.write(
+                'if [ "$(docker ps -a | grep tritonserver_builder)" ]; then  docker rm tritonserver_builder; fi\n'
+            )
 
         docker_script.cmd(runargs, check_exitcode=True)
 
-        docker_script.cmd(['docker', 'cp', 'tritonserver_builder:/tmp/tritonbuild/install',
-                           FLAGS.build_dir],
+        docker_script.cmd([
+            'docker', 'cp', 'tritonserver_builder:/tmp/tritonbuild/install',
+            FLAGS.build_dir
+        ],
                           check_exitcode=True)
-        docker_script.cmd(['docker', 'cp', 'tritonserver_builder:/tmp/tritonbuild/ci',
-                           FLAGS.build_dir],
+        docker_script.cmd([
+            'docker', 'cp', 'tritonserver_builder:/tmp/tritonbuild/ci',
+            FLAGS.build_dir
+        ],
                           check_exitcode=True)
 
         #
@@ -1439,7 +1445,8 @@ def core_build(cmake_script, repo_dir, cmake_dir, build_dir, install_dir,
     # For windows, Triton is not delivered as a container so skip for
     # windows platform.
     if target_platform() != 'windows':
-        if not FLAGS.no_container_build and not FLAGS.no_core_build and not FLAGS.no_container_source:
+        if (not FLAGS.no_container_build) and (not FLAGS.no_core_build) and (
+                not FLAGS.no_container_source):
             cmake_script.mkdir(os.path.join(install_dir, 'third-party-src'))
             cmake_script.cwd(repo_build_dir)
             cmake_script.tar(
@@ -1619,14 +1626,14 @@ def finalize_build(cmake_script, install_dir, ci_dir):
 
 def enable_all():
     if target_platform() != 'windows':
-        all_backends = ['ensemble',
-                        'identity', 'square', 'repeat',
-                        'tensorflow1', 'tensorflow2', 'onnxruntime', 'python', 'dali', 'pytorch',
-                        'openvino', 'fil', 'tensorrt'
+        all_backends = [
+            'ensemble', 'identity', 'square', 'repeat', 'tensorflow1',
+            'tensorflow2', 'onnxruntime', 'python', 'dali', 'pytorch',
+            'openvino', 'fil', 'tensorrt'
         ]
         all_repoagents = ['checksum']
-        all_filesystems = [ 'gcs', 's3', 'azure_storage' ]
-        all_endpoints = [ 'http', 'grpc', 'sagemaker', 'vertex-ai' ]
+        all_filesystems = ['gcs', 's3', 'azure_storage']
+        all_endpoints = ['http', 'grpc', 'sagemaker', 'vertex-ai']
 
         FLAGS.enable_logging = True
         FLAGS.enable_stats = True
@@ -1636,13 +1643,13 @@ def enable_all():
         FLAGS.enable_nvtx = True
         FLAGS.enable_gpu = True
     else:
-        all_backends = ['ensemble',
-                        'identity', 'square', 'repeat',
-                        'onnxruntime', 'openvino', 'tensorrt'
+        all_backends = [
+            'ensemble', 'identity', 'square', 'repeat', 'onnxruntime',
+            'openvino', 'tensorrt'
         ]
         all_repoagents = ['checksum']
-        all_filesystems = [ ]
-        all_endpoints = [ 'http', 'grpc' ]
+        all_filesystems = []
+        all_endpoints = ['http', 'grpc']
 
         FLAGS.enable_logging = True
         FLAGS.enable_stats = True
@@ -1652,26 +1659,26 @@ def enable_all():
     requested_backends = []
     for be in FLAGS.backend:
         parts = be.split(':')
-        requested_backends += [ parts[0] ]
+        requested_backends += [parts[0]]
     for be in all_backends:
         if be not in requested_backends:
-            FLAGS.backend += [ be ]
+            FLAGS.backend += [be]
 
     requested_repoagents = []
     for ra in FLAGS.repoagent:
         parts = ra.split(':')
-        requested_repoagents += [ parts[0] ]
+        requested_repoagents += [parts[0]]
     for ra in all_repoagents:
         if ra not in requested_repoagents:
-            FLAGS.repoagent += [ ra ]
+            FLAGS.repoagent += [ra]
 
     for fs in all_filesystems:
         if fs not in FLAGS.filesystem:
-            FLAGS.filesystem += [ fs ]
+            FLAGS.filesystem += [fs]
 
     for ep in all_endpoints:
         if ep not in FLAGS.endpoint:
-            FLAGS.endpoint += [ ep ]
+            FLAGS.endpoint += [ep]
 
 
 if __name__ == '__main__':
@@ -1836,10 +1843,13 @@ if __name__ == '__main__':
         'Use specified Docker image in build as <image-name>,<full-image-name>. <image-name> can be "base", "gpu-base", "tensorflow1", "tensorflow2", or "pytorch".'
     )
 
-    parser.add_argument('--enable-all',
-                        action="store_true",
-                        required=False,
-                        help='Enable all standard released Triton features, backends, repository agents, endpoints and file systems.')
+    parser.add_argument(
+        '--enable-all',
+        action="store_true",
+        required=False,
+        help=
+        'Enable all standard released Triton features, backends, repository agents, endpoints and file systems.'
+    )
     parser.add_argument('--enable-logging',
                         action="store_true",
                         required=False,
@@ -2004,8 +2014,7 @@ if __name__ == '__main__':
                                              "tritonserver")
         if FLAGS.cmake_dir is None:
             FLAGS.cmake_dir = THIS_SCRIPT_DIR
-
-    if not FLAGS.no_container_build:
+    else:
         if FLAGS.build_dir is not None:
             fail('--build-dir must not be set for container-based build')
         if FLAGS.install_dir is not None:
