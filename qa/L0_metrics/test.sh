@@ -57,7 +57,7 @@ rm -fr *.log
 
 set +e
 export CUDA_VISIBLE_DEVICES=0
-$UNIT_TEST >>$TEST_LOG 2>&1
+LD_LIBRARY_PATH=/opt/tritonserver/lib:$LD_LIBRARY_PATH $UNIT_TEST >>$TEST_LOG 2>&1
 if [ $? -ne 0 ]; then
     cat $TEST_LOG
     echo -e "\n***\n*** Metrics API Unit Test Failed\n***"
