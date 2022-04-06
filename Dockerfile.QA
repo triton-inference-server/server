@@ -245,7 +245,8 @@ RUN mkdir -p qa/clients && mkdir -p qa/pkgs && \
     cp install/lib/libgrpcclient.so qa/clients/. && \
     cp install/lib/libhttpclient.so qa/clients/. && \
     cp install/python/*.py qa/clients/. && \
-    cp install/python/triton*.whl qa/pkgs/.
+    cp install/python/triton*.whl qa/pkgs/. && \
+    cp install/java/examples/*.jar qa/clients/.
 RUN cp client/src/grpc_generated/go/*.go qa/L0_simple_go_client/. && \
     cp client/src/grpc_generated/javascript/*.js qa/L0_simple_nodejs_client/. && \
     cp client/src/grpc_generated/javascript/*.json qa/L0_simple_nodejs_client/. && \
