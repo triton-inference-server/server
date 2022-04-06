@@ -134,7 +134,8 @@ bool allow_metrics_ = true;
 int32_t metrics_port_ = 8002;
 float metrics_interval_ms_ = 2000;
 #ifndef TRITON_ENABLE_HTTP
-// Need to set http address for metrics when http service is disable
+// Triton uses the same address for http and metrics services.
+// Need to set http address for metrics when http service is disable.
 std::string http_address_ = "0.0.0.0";
 #endif  // NOT TRITON_ENABLE_HTTP
 #endif  // TRITON_ENABLE_METRICS
