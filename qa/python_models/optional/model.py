@@ -31,7 +31,8 @@ import numpy as np
 class TritonPythonModel:
 
     def execute(self, requests):
-        """Model supporting optional inputs."""
+        """Model supporting optional inputs. If the input is not provided, an
+        input tensor of size 1 containing scalar 5 will be used."""
         responses = []
         for request in requests:
             input0_tensor = pb_utils.get_input_tensor_by_name(request, "INPUT0")
@@ -47,8 +48,11 @@ class TritonPythonModel:
             else:
                 input1_numpy = np.array([5], dtype=np.int32)
 
-            output0_tensor = pb_utils.Tensor("OUTPUT0", input0_numpy + input1_numpy)
-            output1_tensor = pb_utils.Tensor("OUTPUT1", input0_numpy - input1_numpy)
-            responses.append(pb_utils.InferenceResponse([output0_tensor, output1_tensor]))
+            output0_tensor = pb_utils.Tensor("OUTPUT0",
+                                             input0_numpy + input1_numpy)
+            output1_tensor = pb_utils.Tensor("OUTPUT1",
+                                             input0_numpy - input1_numpy)
+            responses.append(
+                pb_utils.InferenceResponse([output0_tensor, output1_tensor]))
 
         return responses

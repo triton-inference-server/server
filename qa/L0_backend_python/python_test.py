@@ -61,10 +61,10 @@ class PythonTest(tu.TestResultCollector):
             output0 = result.as_numpy('OUTPUT0')
             self.assertTrue(np.all(input_data_0 == output0))
 
-    def _optional_input_infer(self, model_name, input0, input1):
+    def _optional_input_infer(self, model_name, has_input0, has_input1):
         with httpclient.InferenceServerClient("localhost:8000") as client:
             shape = (1,)
-            if input0:
+            if has_input0:
                 input0_numpy = np.random.randint(0,
                                                  100,
                                                  size=shape,
@@ -74,7 +74,7 @@ class PythonTest(tu.TestResultCollector):
                 # the input used by the model if it is not provided.
                 input0_numpy = np.array([5], dtype=np.int32)
 
-            if input1:
+            if has_input1:
                 input1_numpy = np.random.randint(0,
                                                  100,
                                                  size=shape,
@@ -85,14 +85,14 @@ class PythonTest(tu.TestResultCollector):
                 input1_numpy = np.array([5], dtype=np.int32)
 
             inputs = []
-            if input0:
+            if has_input0:
                 inputs.append(
                     httpclient.InferInput(
                         "INPUT0", shape,
                         np_to_triton_dtype(input0_numpy.dtype)))
                 inputs[-1].set_data_from_numpy(input0_numpy)
 
-            if input1:
+            if has_input1:
                 inputs.append(
                     httpclient.InferInput(
                         "INPUT1", shape,
@@ -319,9 +319,10 @@ class PythonTest(tu.TestResultCollector):
         model_name = "optional"
 
         with self._shm_leak_detector.Probe() as shm_probe:
-            for input0 in [True, False]:
-                for input1 in [True, False]:
-                    self._optional_input_infer(model_name, input0, input1)
+            for has_input0 in [True, False]:
+                for has_input1 in [True, False]:
+                    self._optional_input_infer(model_name, has_input0,
+                                               has_input1)
 
     def test_string(self):
         model_name = "string_fixed"
