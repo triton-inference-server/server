@@ -238,7 +238,11 @@ that demonstrate how to use the libraries.  You can also send
 HTTP/REST requests directly to Triton using the [HTTP/REST JSON-based
 protocol](docs/inference_protocols.md#httprest-and-grpc-protocols) or
 [generate a GRPC client for many other
-languages](https://github.com/triton-inference-server/client).
+languages](https://github.com/triton-inference-server/client). For
+certain types of models you can also send input data (e.g. a jpeg
+image) directly to Triton in the [body of an HTTP request without any
+additional
+metadata](https://github.com/triton-inference-server/server/blob/main/docs/protocol/extension_binary_data.md#raw-binary-request).
 
 Understanding and [optimizing performance](docs/optimization.md) is an
 important part of deploying your models. The Triton project provides
