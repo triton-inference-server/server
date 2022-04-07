@@ -46,6 +46,9 @@ export TEST_JETSON=${TEST_JETSON:=0}
 export CUDA_VISIBLE_DEVICES=0
 
 BASE_SERVER_ARGS="--model-repository=`pwd`/models --backend-directory=${BACKEND_DIR} --log-verbose=1"
+# Set the default byte size to 5MBs to avoid going out of shared memory. The
+# environment that this job runs on has only 1GB of shared-memory available.
+BASE_SERVER_ARGS="$BASE_SERVER_ARGS --backend-config=python,shm-default-byte-size=5242880"
 SERVER_ARGS=$BASE_SERVER_ARGS
 
 PYTHON_BACKEND_BRANCH=$PYTHON_BACKEND_REPO_TAG
