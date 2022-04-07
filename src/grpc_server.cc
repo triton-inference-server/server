@@ -4299,8 +4299,10 @@ ModelStreamInferHandler::StreamInferResponseComplete(
                  << state->cb_count_ << ", flags " << flags;
 
 #ifdef TRITON_ENABLE_TRACING
-  state->trace_timestamps_.emplace_back(std::make_pair(
-      "INFER_RESPONSE_COMPLETE", TraceManager::CaptureTimestamp()));
+  if (state->cb_count_ == 1) {
+    state->trace_timestamps_.emplace_back(std::make_pair(
+        "INFER_RESPONSE_COMPLETE", TraceManager::CaptureTimestamp()));
+  }
 #endif  // TRITON_ENABLE_TRACING
 
   // Log appropriate errors
