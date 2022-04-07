@@ -42,7 +42,10 @@ $ curl localhost:8002/metrics
 The tritonserver --allow-metrics=false option can be used to disable
 all metric reporting and --allow-gpu-metrics=false can be used to
 disable just the GPU Utilization and GPU Memory metrics. The
---metrics-port option can be used to select a different port.
+--metrics-port option can be used to select a different port. For now,
+Triton reuses http address for metrics endpoint. The option --http-address
+can be used to bind http and metrics endpoints to the same specific address
+when http service is enabled.
 
 The following table describes the available metrics.
 
