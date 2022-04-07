@@ -84,6 +84,10 @@ class SagemakerAPIServer : public HTTPAPIServer {
       evhtp_request_t* req, int32_t content_length,
       size_t* header_length) override;
 
+
+  // Helper methods
+  void ParseRequest(evhtp_request_t* req);
+
   // Currently the compresssion schema hasn't been defined,
   // assume identity compression type is used for both request and response
   DataCompressor::Type GetRequestCompressionType(evhtp_request_t* req) override

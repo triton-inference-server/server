@@ -1011,6 +1011,7 @@ COPY --chown=1000:1000 NVIDIA_Deep_Learning_Container_License.pdf .
         if 'sagemaker' in endpoints:
             df += '''
 LABEL com.amazonaws.sagemaker.capabilities.accept-bind-to-port=true
+LABEL com.amazonaws.sagemaker.capabilities.multi-models=true
 COPY --chown=1000:1000 docker/sagemaker/serve /usr/bin/.
 '''
 
