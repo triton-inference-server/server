@@ -27,6 +27,96 @@
 
 namespace triton { namespace server {
 
+#define HTTP_RESPOND_IF_ERR(REQ, X)                   \
+  do {                                                \
+    TRITONSERVER_Error* err__ = (X);                  \
+    if (err__ != nullptr) {                           \
+      EVBufferAddErrorJson((REQ)->buffer_out, err__); \
+      evhtp_send_reply((REQ), EVHTP_RES_BADREQ);      \
+      TRITONSERVER_ErrorDelete(err__);                \
+      return;                                         \
+    }                                                 \
+  } while (false)
+
+namespace {
+
+void
+EVBufferAddErrorJson(evbuffer* buffer, TRITONSERVER_Error* err)
+{
+  const char* message = TRITONSERVER_ErrorMessage(err);
+
+  triton::common::TritonJson::Value response(
+      triton::common::TritonJson::ValueType::OBJECT);
+  response.AddStringRef("error", message, strlen(message));
+
+  triton::common::TritonJson::WriteBuffer buffer_json;
+  response.Write(&buffer_json);
+
+  evbuffer_add(buffer, buffer_json.Base(), buffer_json.Size());
+}
+
+TRITONSERVER_Error*
+EVBufferToJson(
+    triton::common::TritonJson::Value* document, evbuffer_iovec* v, int* v_idx,
+    const size_t length, int n)
+{
+  size_t offset = 0, remaining_length = length;
+  char* json_base;
+  std::vector<char> json_buffer;
+
+  // No need to memcpy when number of iovecs is 1
+  if ((n > 0) && (v[0].iov_len >= remaining_length)) {
+    json_base = static_cast<char*>(v[0].iov_base);
+    if (v[0].iov_len > remaining_length) {
+      v[0].iov_base = static_cast<void*>(json_base + remaining_length);
+      v[0].iov_len -= remaining_length;
+      remaining_length = 0;
+    } else if (v[0].iov_len == remaining_length) {
+      remaining_length = 0;
+      *v_idx += 1;
+    }
+  } else {
+    json_buffer.resize(length);
+    json_base = json_buffer.data();
+    while ((remaining_length > 0) && (*v_idx < n)) {
+      char* base = static_cast<char*>(v[*v_idx].iov_base);
+      size_t base_size;
+      if (v[*v_idx].iov_len > remaining_length) {
+        base_size = remaining_length;
+        v[*v_idx].iov_base = static_cast<void*>(base + remaining_length);
+        v[*v_idx].iov_len -= remaining_length;
+        remaining_length = 0;
+      } else {
+        base_size = v[*v_idx].iov_len;
+        remaining_length -= v[*v_idx].iov_len;
+        *v_idx += 1;
+      }
+
+      memcpy(json_base + offset, base, base_size);
+      offset += base_size;
+    }
+  }
+
+  if (remaining_length != 0) {
+    return TRITONSERVER_ErrorNew(
+        TRITONSERVER_ERROR_INVALID_ARG,
+        std::string(
+            "unexpected size for request JSON, expecting " +
+            std::to_string(remaining_length) + " more bytes")
+            .c_str());
+  }
+
+  RETURN_IF_ERR(document->Parse(json_base, length));
+
+  return nullptr;  // success
+}
+
+}
+
+
+
+
+
 const std::string SagemakerAPIServer::binary_mime_type_(
     "application/vnd.sagemaker-triton.binary+json;json-header-size=");
 
@@ -116,9 +206,11 @@ SagemakerAPIServer::Handle(evhtp_request_t* req)
   std::string multi_model_name, action;
   if (RE2::FullMatch(
           std::string(req->uri->path->full), models_regex_, &multi_model_name, &action)) {
-
-    switch (req->method) {
-    case htp_method_GET:
+			
+			ParseRequest(req);
+      
+      switch (req->method) {
+      case htp_method_GET:
       if (multi_model_name.empty()) {
         LOG_VERBOSE(1) << "SageMaker request: LIST ALL MODELS";
         req->method = htp_method_POST;
@@ -136,6 +228,9 @@ SagemakerAPIServer::Handle(evhtp_request_t* req)
       if (action.empty()) {
         LOG_VERBOSE(1) << "SageMaker request: LOAD MODEL";
         req->method = htp_method_POST;
+
+        // NSK improve
+
         HandleRepositoryControl(req, "", multi_model_name, "load");
         return;
       }
@@ -180,4 +275,50 @@ SagemakerAPIServer::Create(
   return nullptr;
 }
 
+
+void SagemakerAPIServer::ParseRequest(
+  evhtp_request_t* req
+) {
+  
+  struct evbuffer_iovec* v = nullptr;
+  int v_idx = 0;
+  int n = evbuffer_peek(req->buffer_in, -1, NULL, NULL, 0);
+  if (n > 0) {
+    v = static_cast<struct evbuffer_iovec*>(
+        alloca(sizeof(struct evbuffer_iovec) * n));
+    if (evbuffer_peek(req->buffer_in, -1, NULL, v, n) != n) {
+      HTTP_RESPOND_IF_ERR(
+          req, TRITONSERVER_ErrorNew(
+                    TRITONSERVER_ERROR_INTERNAL,
+                    "unexpected error getting load model request buffers"));
+    }
+  }
+
+  std::vector<const TRITONSERVER_Parameter*> params;
+  size_t buffer_len = evbuffer_get_length(req->buffer_in);
+  if (buffer_len > 0) {
+    triton::common::TritonJson::Value request;
+    HTTP_RESPOND_IF_ERR(
+        req, EVBufferToJson(&request, v, &v_idx, buffer_len, n));
+
+    // NSK: Print url and model_name
+    triton::common::TritonJson::Value url;
+    triton::common::TritonJson::Value model_name;
+
+    if (request.Find("model_name", &model_name)) {
+      std::string model_name_string;
+      HTTP_RESPOND_IF_ERR(req, model_name.AsString(&model_name_string));
+      std::cout << "model_name: " << model_name_string.c_str() << std::endl;
+    }
+
+    if (request.Find("url", &url)) {
+      std::string url_string;
+      HTTP_RESPOND_IF_ERR(req, url.AsString(&url_string));
+      std::cout << "url: " << url_string.c_str() << std::endl;
+    }
+  }
+
+  TRITONSERVER_ServerRegisterModelRepository()  
+
+}
 }}  // namespace triton::server

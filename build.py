@@ -983,6 +983,7 @@ COPY --chown=1000:1000 --from=tritonserver_build {0}/install/third-party-src thi
         if 'sagemaker' in endpoints:
             df += '''
 LABEL com.amazonaws.sagemaker.capabilities.accept-bind-to-port=true
+LABEL com.amazonaws.sagemaker.capabilities.multi-models=true
 COPY --chown=1000:1000 --from=tritonserver_build /workspace/docker/sagemaker/serve /usr/bin/.
 '''
 
