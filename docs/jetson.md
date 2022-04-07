@@ -105,7 +105,7 @@ pip3 install --upgrade expecttest xmlrunner hypothesis aiohttp pyyaml scipy ninj
 In addition to the above Pytorch dependencies, the PyTorch wheel corresponding to this release must also be installed:
 
 ```
-pip3 install --upgrade https://developer.download.nvidia.com/compute/redist/jp/v461/pytorch/torch-1.11.0a0+17540c5-cp36-cp36m-linux_aarch64.whl
+pip3 install --upgrade https://developer.download.nvidia.com/compute/redist/jp/v461/pytorch/torch-1.11.0a0+17540c5+nv22.01-cp36-cp36m-linux_aarch64.whl
 ```
 
 **Note**: The PyTorch backend depends on libomp.so, which is not loaded automatically.
