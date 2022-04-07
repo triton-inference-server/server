@@ -25,6 +25,31 @@
 # (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
+# Install required dependencies for client build
+apt-get update && \
+apt-get install -y --no-install-recommends \
+    rapidjson-dev
+
+# Client build requires recent version of CMake (FetchContent required)
+CMAKE_UBUNTU_VERSION=`lsb_release -sr`
+wget -O - https://apt.kitware.com/keys/kitware-archive-latest.asc 2>/dev/null | \
+    gpg --dearmor - |  \
+    tee /etc/apt/trusted.gpg.d/kitware.gpg >/dev/null && \
+if [ "$CMAKE_UBUNTU_VERSION" = "20.04" ]; then \
+    apt-add-repository 'deb https://apt.kitware.com/ubuntu/ focal main' && \
+    apt-get update && \
+    apt-get install -y --no-install-recommends \
+    cmake-data=3.21.1-0kitware1ubuntu20.04.1 cmake=3.21.1-0kitware1ubuntu20.04.1; \
+elif [ "$CMAKE_UBUNTU_VERSION" = "18.04" ]; then \
+    apt-add-repository 'deb https://apt.kitware.com/ubuntu/ bionic main' && \
+    apt-get update && \
+    apt-get install -y --no-install-recommends \
+    cmake-data=3.18.4-0kitware1 cmake=3.18.4-0kitware1; \
+else \
+    echo "ERROR: Only support CMAKE_UBUNTU_VERSION to be 18.04 or 20.04" && false; \
+fi && \
+cmake --version
+
 set +e
 
 mkdir -p /workspace/build
@@ -183,9 +208,9 @@ fi
               /workspace/client && \
         make -j16 cc-clients python-clients)
 if [ $? -eq 0 ]; then
-    echo -e "\n***\n*** No-TFS Passed\n***"
+    echo -e "\n***\n*** No-TF-Serving Passed\n***"
 else
-    echo -e "\n***\n*** No-TFS FAILED\n***"
+    echo -e "\n***\n*** No-TF-Serving FAILED\n***"
     exit 1
 fi
 
@@ -209,12 +234,11 @@ fi
               /workspace/client && \
         make -j16 cc-clients python-clients)
 if [ $? -eq 0 ]; then
-    echo -e "\n***\n*** No-TS Passed\n***"
+    echo -e "\n***\n*** No-TorchServe Passed\n***"
 else
-    echo -e "\n***\n*** No-TS FAILED\n***"
+    echo -e "\n***\n*** No-TorchServe FAILED\n***"
     exit 1
 fi
-
 
 set -e
 
