@@ -32,7 +32,7 @@ class TritonPythonModel:
 
     def execute(self, requests):
         responses = []
-        new_shape = [64, 2, 32, 55, 84]
+        new_shape = [10, 2, 6, 5, 11]
         shape_reorder = [1, 0, 4, 2, 3]
         for request in requests:
             input_tensor = pb_utils.get_input_tensor_by_name(request, "INPUT0")

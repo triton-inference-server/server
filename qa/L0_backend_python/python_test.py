@@ -351,8 +351,8 @@ class PythonTest(tu.TestResultCollector):
 
     def test_non_contiguous(self):
         model_name = 'non_contiguous'
-        shape = [2, 64, 84, 32, 55]
-        new_shape = [64, 2, 32, 55, 84]
+        shape = [2, 10, 11, 6, 5]
+        new_shape = [10, 2, 6, 5, 11]
         shape_reorder = [1, 0, 4, 2, 3]
         with httpclient.InferenceServerClient("localhost:8000") as client:
             input_numpy = np.random.rand(*shape)

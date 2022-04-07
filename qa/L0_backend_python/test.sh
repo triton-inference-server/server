@@ -48,13 +48,12 @@ export CUDA_VISIBLE_DEVICES=0
 BASE_SERVER_ARGS="--model-repository=`pwd`/models --backend-directory=${BACKEND_DIR} --log-verbose=1"
 # Set the default byte size to 5MBs to avoid going out of shared memory. The
 # environment that this job runs on has only 1GB of shared-memory available.
-BASE_SERVER_ARGS="$BASE_SERVER_ARGS --backend-config=python,shm-default-byte-size=5242880"
-SERVER_ARGS=$BASE_SERVER_ARGS
+SERVER_ARGS="$BASE_SERVER_ARGS --backend-config=python,shm-default-byte-size=5242880"
 
 PYTHON_BACKEND_BRANCH=$PYTHON_BACKEND_REPO_TAG
 CLIENT_PY=./python_test.py
 CLIENT_LOG="./client.log"
-EXPECTED_NUM_TESTS="8"
+EXPECTED_NUM_TESTS="9"
 TEST_RESULT_FILE='test_results.txt'
 SERVER_LOG="./inference_server.log"
 source ../common/util.sh
