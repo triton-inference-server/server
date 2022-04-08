@@ -31,23 +31,13 @@ apt-get install -y --no-install-recommends \
         rapidjson-dev
 
 # Client build requires recent version of CMake (FetchContent required)
-CMAKE_UBUNTU_VERSION=`lsb_release -sr`
 wget -O - https://apt.kitware.com/keys/kitware-archive-latest.asc 2>/dev/null | \
     gpg --dearmor - |  \
     tee /etc/apt/trusted.gpg.d/kitware.gpg >/dev/null && \
-if [ "$CMAKE_UBUNTU_VERSION" = "20.04" ]; then \
-    apt-add-repository 'deb https://apt.kitware.com/ubuntu/ focal main' && \
-    apt-get update && \
-    apt-get install -y --no-install-recommends \
-    cmake-data=3.21.1-0kitware1ubuntu20.04.1 cmake=3.21.1-0kitware1ubuntu20.04.1; \
-elif [ "$CMAKE_UBUNTU_VERSION" = "18.04" ]; then \
-    apt-add-repository 'deb https://apt.kitware.com/ubuntu/ bionic main' && \
-    apt-get update && \
-    apt-get install -y --no-install-recommends \
-    cmake-data=3.18.4-0kitware1 cmake=3.18.4-0kitware1; \
-else \
-    echo "ERROR: Only support CMAKE_UBUNTU_VERSION to be 18.04 or 20.04" && false; \
-fi && \
+apt-add-repository 'deb https://apt.kitware.com/ubuntu/ focal main' && \
+apt-get update && \
+apt-get install -y --no-install-recommends \
+cmake-data=3.21.1-0kitware1ubuntu20.04.1 cmake=3.21.1-0kitware1ubuntu20.04.1; \
 cmake --version
 
 set +e
