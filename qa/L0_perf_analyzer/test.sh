@@ -791,13 +791,13 @@ set +e
 mpiexec --allow-run-as-root \
   -n 1 --merge-stderr-to-stdout --output-filename . --tag-output --timestamp-output \
     $PERF_ANALYZER -v -m graphdef_int32_int32_int32 \
-      --measurement-mode count_windows -s 50 : \
+      --measurement-mode count_windows -s 50 --enable-mpi : \
   -n 1 --merge-stderr-to-stdout --output-filename . --tag-output --timestamp-output \
     $PERF_ANALYZER -v -m graphdef_nobatch_int32_int32_int32 \
-      --measurement-mode count_windows -s 50 : \
+      --measurement-mode count_windows -s 50 --enable-mpi : \
   -n 1 --merge-stderr-to-stdout --output-filename . --tag-output --timestamp-output \
     $PERF_ANALYZER -v -m custom_zero_1_float32 \
-      --measurement-mode count_windows -s 50
+      --measurement-mode count_windows -s 50 --enable-mpi
 if [ $? -ne 0 ]; then
    cat 1/rank.0/stdout 1/rank.2/stdout 1/rank.2/stdout
    echo -e "\n***\n*** Perf Analyzer returned non-zero exit code\n***"
