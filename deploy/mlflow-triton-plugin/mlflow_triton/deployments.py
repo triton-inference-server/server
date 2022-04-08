@@ -1,4 +1,4 @@
-# Copyright 2021, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright 2021-2022, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -240,7 +240,7 @@ class TritonPlugin(BaseDeploymentClient):
                             row, val.shape, np_to_triton_dtype(val.dtype)))
                     inputs[-1].set_data_from_numpy(val)
             else:
-                for key, val in df:
+                for key, val in df.items():
                     inputs.append(
                         tritonhttpclient.InferInput(
                             key, val.shape, np_to_triton_dtype(val.dtype)))
@@ -322,7 +322,7 @@ class TritonPlugin(BaseDeploymentClient):
                 # Provide a minimum config file so Triton knows what backend
                 # should be performing the auto-completion
                 config = '''
-backend: "onnx"
+backend: "onnxruntime"
 default_model_filename: "{}"
 '''.format(model_file)
                 with open(os.path.join(triton_deployment_dir, "config.pbtxt"),

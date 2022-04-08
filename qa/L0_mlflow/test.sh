@@ -45,7 +45,7 @@ mkdir -p ./mlflow/artifacts
 
 pip install ./mlflow-triton-plugin/
 
-rm -r ./models
+rm -rf ./models
 mkdir -p ./models
 SERVER=/opt/tritonserver/bin/tritonserver
 SERVER_ARGS="--model-repository=./models --strict-model-config=false --model-control-mode=explicit"
@@ -134,6 +134,25 @@ if [ $CLI_RET -ne 0 ]; then
   cat $CLI_LOG
   echo -e "\n***\n*** MLFlow Triton plugin CLI Test FAILED\n***"
   RET=1
+fi
+set -e
+
+set +e
+PY_LOG=plugin_py.log
+PY_TEST=plugin_test.py
+TEST_RESULT_FILE='test_results.txt'
+python $PY_TEST >>$PY_LOG 2>&1
+if [ $? -ne 0 ]; then
+    cat $PY_LOG
+    echo -e "\n***\n*** Python Test Failed\n***"
+    RET=1
+else
+    check_test_results $TEST_RESULT_FILE 1
+    if [ $? -ne 0 ]; then
+        cat $PY_LOG
+        echo -e "\n***\n*** Test Result Verification Failed\n***"
+        RET=1
+    fi
 fi
 set -e
 
