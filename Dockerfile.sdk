@@ -133,6 +133,8 @@ RUN cmake -DCMAKE_INSTALL_PREFIX=/workspace/install \
           -DTRITON_ENABLE_JAVA_HTTP=ON \
           -DTRITON_ENABLE_PERF_ANALYZER=ON \
           -DTRITON_ENABLE_PERF_ANALYZER_C_API=ON \
+          -DTRITON_ENABLE_PERF_ANALYZER_TFS=ON \
+          -DTRITON_ENABLE_PERF_ANALYZER_TS=ON \
           -DTRITON_ENABLE_EXAMPLES=ON -DTRITON_ENABLE_TESTS=ON \
           -DTRITON_ENABLE_GPU=${TRITON_ENABLE_GPU} /workspace/client
 RUN make -j16 cc-clients python-clients java-clients && \
@@ -190,9 +192,10 @@ RUN if [ "$TARGETPLATFORM" = "linux/amd64" ]; then \
         --jar-install-path /workspace/install/java-api-bindings; \
     fi
 
-# For CI testing need to copy over L0_sdk test.
+# For CI testing need to copy over L0_sdk test and L0_client_build_variants test.
 RUN mkdir qa
 COPY qa/L0_sdk qa/L0_sdk
+COPY qa/L0_client_build_variants qa/L0_client_build_variants
 
 # Install an image needed by the quickstart and other documentation.
 COPY qa/images/mug.jpg images/mug.jpg
