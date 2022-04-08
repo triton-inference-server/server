@@ -61,6 +61,58 @@ class PythonTest(tu.TestResultCollector):
             output0 = result.as_numpy('OUTPUT0')
             self.assertTrue(np.all(input_data_0 == output0))
 
+    def _optional_input_infer(self, model_name, has_input0, has_input1):
+        with httpclient.InferenceServerClient("localhost:8000") as client:
+            shape = (1,)
+            if has_input0:
+                input0_numpy = np.random.randint(0,
+                                                 100,
+                                                 size=shape,
+                                                 dtype=np.int32)
+            else:
+                # Set the input0 to a default value if it is optional. This is
+                # the input used by the model if it is not provided.
+                input0_numpy = np.array([5], dtype=np.int32)
+
+            if has_input1:
+                input1_numpy = np.random.randint(0,
+                                                 100,
+                                                 size=shape,
+                                                 dtype=np.int32)
+            else:
+                # Set the input1 to a default value if it is optional. This is
+                # the input used by the model if it is not provided.
+                input1_numpy = np.array([5], dtype=np.int32)
+
+            inputs = []
+            if has_input0:
+                inputs.append(
+                    httpclient.InferInput(
+                        "INPUT0", shape,
+                        np_to_triton_dtype(input0_numpy.dtype)))
+                inputs[-1].set_data_from_numpy(input0_numpy)
+
+            if has_input1:
+                inputs.append(
+                    httpclient.InferInput(
+                        "INPUT1", shape,
+                        np_to_triton_dtype(input1_numpy.dtype)))
+                inputs[-1].set_data_from_numpy(input1_numpy)
+
+            result = client.infer(model_name, inputs)
+            output0 = result.as_numpy('OUTPUT0')
+            self.assertIsNotNone(output0, "OUTPUT0 was not found.")
+
+            output1 = result.as_numpy('OUTPUT1')
+            self.assertIsNotNone(output1, "OUTPUT1 was not found.")
+
+            expected_output0 = input0_numpy + input1_numpy
+            expected_output1 = input0_numpy - input1_numpy
+            np.testing.assert_equal(output0, expected_output0,
+                                    "OUTPUT0 doesn't match expected OUTPUT0")
+            np.testing.assert_equal(output1, expected_output1,
+                                    "OUTPUT1 doesn't match expected OUTPUT1")
+
     # We do not use a docker on Jetson so it does not impose a shared memory
     # allocation limit of 1GB. This means test will pass without the expected
     # error on jetson and is hence unnecessary.
@@ -263,6 +315,15 @@ class PythonTest(tu.TestResultCollector):
                     self.assertIsNotNone(output0)
                     self.assertEqual(output0[0], input_data)
 
+    def test_optional_input(self):
+        model_name = "optional"
+
+        with self._shm_leak_detector.Probe() as shm_probe:
+            for has_input0 in [True, False]:
+                for has_input1 in [True, False]:
+                    self._optional_input_infer(model_name, has_input0,
+                                               has_input1)
+
     def test_string(self):
         model_name = "string_fixed"
         shape = [1]
@@ -290,8 +351,8 @@ class PythonTest(tu.TestResultCollector):
 
     def test_non_contiguous(self):
         model_name = 'non_contiguous'
-        shape = [2, 64, 84, 32, 55]
-        new_shape = [64, 2, 32, 55, 84]
+        shape = [2, 10, 11, 6, 5]
+        new_shape = [10, 2, 6, 5, 11]
         shape_reorder = [1, 0, 4, 2, 3]
         with httpclient.InferenceServerClient("localhost:8000") as client:
             input_numpy = np.random.rand(*shape)

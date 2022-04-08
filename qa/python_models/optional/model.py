@@ -1,4 +1,4 @@
-# Copyright (c) 2021, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright (c) 2022, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -24,24 +24,35 @@
 # (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-import numpy as np
 import triton_python_backend_utils as pb_utils
+import numpy as np
 
 
 class TritonPythonModel:
 
     def execute(self, requests):
+        """Model supporting optional inputs. If the input is not provided, an
+        input tensor of size 1 containing scalar 5 will be used."""
         responses = []
-        new_shape = [10, 2, 6, 5, 11]
-        shape_reorder = [1, 0, 4, 2, 3]
         for request in requests:
-            input_tensor = pb_utils.get_input_tensor_by_name(request, "INPUT0")
-            input_numpy = input_tensor.as_numpy()
-            output0 = pb_utils.Tensor("OUTPUT0", input_numpy.reshape(new_shape))
-            # Transpose the tensor to create a non-contiguous tensor.
-            output1 = pb_utils.Tensor("OUTPUT1", input_numpy.T)
-            output2 = pb_utils.Tensor("OUTPUT2",
-                                      np.transpose(input_numpy, shape_reorder))
+            input0_tensor = pb_utils.get_input_tensor_by_name(request, "INPUT0")
+            input1_tensor = pb_utils.get_input_tensor_by_name(request, "INPUT1")
+
+            if input0_tensor is not None:
+                input0_numpy = input0_tensor.as_numpy()
+            else:
+                input0_numpy = np.array([5], dtype=np.int32)
+
+            if input1_tensor is not None:
+                input1_numpy = input1_tensor.as_numpy()
+            else:
+                input1_numpy = np.array([5], dtype=np.int32)
+
+            output0_tensor = pb_utils.Tensor("OUTPUT0",
+                                             input0_numpy + input1_numpy)
+            output1_tensor = pb_utils.Tensor("OUTPUT1",
+                                             input0_numpy - input1_numpy)
             responses.append(
-                pb_utils.InferenceResponse([output0, output1, output2]))
+                pb_utils.InferenceResponse([output0_tensor, output1_tensor]))
+
         return responses

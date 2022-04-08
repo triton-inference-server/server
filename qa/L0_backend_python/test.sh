@@ -46,12 +46,14 @@ export TEST_JETSON=${TEST_JETSON:=0}
 export CUDA_VISIBLE_DEVICES=0
 
 BASE_SERVER_ARGS="--model-repository=`pwd`/models --backend-directory=${BACKEND_DIR} --log-verbose=1"
-SERVER_ARGS=$BASE_SERVER_ARGS
+# Set the default byte size to 5MBs to avoid going out of shared memory. The
+# environment that this job runs on has only 1GB of shared-memory available.
+SERVER_ARGS="$BASE_SERVER_ARGS --backend-config=python,shm-default-byte-size=5242880"
 
 PYTHON_BACKEND_BRANCH=$PYTHON_BACKEND_REPO_TAG
 CLIENT_PY=./python_test.py
 CLIENT_LOG="./client.log"
-EXPECTED_NUM_TESTS="8"
+EXPECTED_NUM_TESTS="9"
 TEST_RESULT_FILE='test_results.txt'
 SERVER_LOG="./inference_server.log"
 source ../common/util.sh
@@ -107,6 +109,10 @@ cp ../python_models/delayed_model/config.pbtxt ./models/delayed_model/
 mkdir -p models/init_args/1/
 cp ../python_models/init_args/model.py ./models/init_args/1/
 cp ../python_models/init_args/config.pbtxt ./models/init_args/
+
+mkdir -p models/optional/1/
+cp ../python_models/optional/model.py ./models/optional/1/
+cp ../python_models/optional/config.pbtxt ./models/optional/
 
 mkdir -p models/non_contiguous/1/
 cp ../python_models/non_contiguous/model.py ./models/non_contiguous/1/
