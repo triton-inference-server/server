@@ -317,6 +317,8 @@ class TritonPlugin(BaseDeploymentClient):
                     artifact_path, config_file)
                 copy_paths['config_path']['to'] = triton_deployment_dir
             else:
+                # Make sure the directory has been created for config.pbtxt
+                os.makedirs(triton_deployment_dir, exist_ok=True)
                 # Provide a minimum config file so Triton knows what backend
                 # should be performing the auto-completion
                 config = '''
