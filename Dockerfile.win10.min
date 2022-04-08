@@ -63,7 +63,6 @@ WORKDIR /
 # option --depth=1 should also be restored
 RUN git clone --single-branch -b master https://github.com/microsoft/vcpkg.git
 WORKDIR /vcpkg
-RUN git checkout a82c62d
 RUN bootstrap-vcpkg.bat
 RUN vcpkg.exe update
 RUN vcpkg.exe install openssl:x64-windows openssl-windows:x64-windows rapidjson:x64-windows re2:x64-windows boost-interprocess:x64-windows boost-stacktrace:x64-windows zlib:x64-windows pthread:x64-windows b64:x64-windows
