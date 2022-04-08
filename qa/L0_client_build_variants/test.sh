@@ -28,7 +28,7 @@
 # Install required dependencies for client build
 apt-get update && \
 apt-get install -y --no-install-recommends \
-    rapidjson-dev
+        rapidjson-dev
 
 # Client build requires recent version of CMake (FetchContent required)
 CMAKE_UBUNTU_VERSION=`lsb_release -sr`
