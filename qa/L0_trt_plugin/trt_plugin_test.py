@@ -38,12 +38,16 @@ import test_util as tu
 import tritonclient.http as httpclient
 from tritonclient.utils import InferenceServerException
 
+# By default, find tritonserver on "localhost", but can be overridden
+# with TRITONSERVER_IPADDR envvar
+_tritonserver_ipaddr = os.environ.get('TRITONSERVER_IPADDR', 'localhost')
+
 
 class PluginModelTest(tu.TestResultCollector):
 
     def _full_exact(self, model_name, plugin_name, shape):
-        triton_client = httpclient.InferenceServerClient("localhost:8000",
-                                                         verbose=True)
+        triton_client = httpclient.InferenceServerClient(
+            f"{_tritonserver_ipaddr}:8001")
 
         inputs = []
         outputs = []
