@@ -1167,8 +1167,9 @@ ParseRateLimiterResourceOption(const std::string arg)
 std::tuple<std::string, std::string, std::string>
 ParseBackendConfigOption(const std::string arg)
 {
-  // Format is "<backend_name>,<setting>=<value>" for single
-  // backend or "<setting>=<value>" for all backends
+  // Format is "<backend_name>,<setting>=<value>" for specific
+  // config/settings and "<setting>=<value>" for backend agnostic
+  // configs/settings
   int delim_name = arg.find(",");
   int delim_setting = arg.find("=", delim_name + 1);
 
