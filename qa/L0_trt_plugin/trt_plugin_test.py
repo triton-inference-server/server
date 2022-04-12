@@ -47,7 +47,7 @@ class PluginModelTest(tu.TestResultCollector):
 
     def _full_exact(self, model_name, plugin_name, shape):
         triton_client = httpclient.InferenceServerClient(
-            f"{_tritonserver_ipaddr}:8001")
+            f"{_tritonserver_ipaddr}:8000")
 
         inputs = []
         outputs = []

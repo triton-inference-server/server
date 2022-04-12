@@ -81,7 +81,6 @@ SERVER_ARGS=$SERVER_ARGS_BASE
 SERVER_LOG="./inference_server_$LOG_IDX.log"
 
 run_server
-cat $SERVER_LOG
 if [ "$SERVER_PID" == "0" ]; then
     echo -e "\n***\n*** Failed to start $SERVER\n***"
     cat $SERVER_LOG
@@ -94,9 +93,6 @@ python3 $PLUGIN_TEST PluginModelTest.test_raw_fff_gelu >>$CLIENT_LOG 2>&1
 if [ $? -ne 0 ]; then
     cat $CLIENT_LOG
     echo -e "\n***\n*** Test Failed\n***"
-    echo -e "\n***\n*** Server Log Start\n***"
-    cat $SERVER_LOG
-    echo -e "\n***\n*** Server Log End\n***"
     RET=1
 else
     check_test_results $TEST_RESULT_FILE 1
@@ -111,9 +107,6 @@ python3 $PLUGIN_TEST PluginModelTest.test_raw_fff_norm >>$CLIENT_LOG 2>&1
 if [ $? -ne 0 ]; then
     cat $CLIENT_LOG
     echo -e "\n***\n*** Test Failed\n***"
-    echo -e "\n***\n*** Server Log Start\n***"
-    cat $SERVER_LOG
-    echo -e "\n***\n*** Server Log End\n***"
     RET=1
 else
     check_test_results $TEST_RESULT_FILE 1
@@ -125,8 +118,7 @@ else
 fi
 set -e
 
-kill $SERVER_PID
-wait $SERVER_PID
+kill_server
 
 ## Custom Plugin Tests
 
@@ -142,13 +134,11 @@ SERVER_ARGS=$SERVER_ARGS_BASE
 SERVER_LOG="./inference_server_$LOG_IDX.log"
 
 run_server
-cat $SERVER_LOG
 if [ "$SERVER_PID" != "0" ]; then
+    cat $SERVER_LOG
     echo -e "\n***\n*** Test Failed\n"
     echo -e "Unexpected successful server start $SERVER\n***"
-    cat $SERVER_LOG
-    kill $SERVER_PID
-    wait $SERVER_PID
+    kill_server
     exit 1
 fi
 
@@ -159,7 +149,6 @@ SERVER_ARGS="${SERVER_ARGS_BASE} --backend-config=tensorrt,plugins=${MODELDIR}/l
 SERVER_LOG="./inference_server_$LOG_IDX.log"
 
 run_server
-cat $SERVER_LOG
 if [ "$SERVER_PID" == "0" ]; then
     echo -e "\n***\n*** Failed to start $SERVER\n***"
     cat $SERVER_LOG
@@ -172,9 +161,6 @@ python3 $PLUGIN_TEST PluginModelTest.test_raw_fff_clip >>$CLIENT_LOG 2>&1
 if [ $? -ne 0 ]; then
     cat $CLIENT_LOG
     echo -e "\n***\n*** Test Failed\n***"
-    echo -e "\n***\n*** Server Log Start\n***"
-    cat $SERVER_LOG
-    echo -e "\n***\n*** Server Log End\n***"
     RET=1
 else
     check_test_results $TEST_RESULT_FILE 1
@@ -186,8 +172,7 @@ else
 fi
 set -e
 
-kill $SERVER_PID
-wait $SERVER_PID
+kill_server
 
 LOG_IDX=$((LOG_IDX+1))
 
@@ -196,7 +181,6 @@ SERVER_ARGS="${SERVER_ARGS_BASE} --backend-config=tensorrt,plugins=${MODELDIR}/l
 SERVER_LOG="./inference_server_$LOG_IDX.log"
 
 run_server
-cat $SERVER_LOG
 if [ "$SERVER_PID" == "0" ]; then
     echo -e "\n***\n*** Failed to start $SERVER\n***"
     cat $SERVER_LOG
@@ -209,9 +193,6 @@ python3 $PLUGIN_TEST PluginModelTest.test_raw_fff_clip >>$CLIENT_LOG 2>&1
 if [ $? -ne 0 ]; then
     cat $CLIENT_LOG
     echo -e "\n***\n*** Test Failed\n***"
-    echo -e "\n***\n*** Server Log Start\n***"
-    cat $SERVER_LOG
-    echo -e "\n***\n*** Server Log End\n***"
     RET=1
 else
     check_test_results $TEST_RESULT_FILE 1
@@ -223,8 +204,7 @@ else
 fi
 set -e
 
-kill $SERVER_PID
-wait $SERVER_PID
+kill_server
 
 LOG_IDX=$((LOG_IDX+1))
 
@@ -234,7 +214,6 @@ SERVER_ARGS=$SERVER_ARGS_BASE
 SERVER_LOG="./inference_server_$LOG_IDX.log"
 
 run_server
-cat $SERVER_LOG
 if [ "$SERVER_PID" == "0" ]; then
     echo -e "\n***\n*** Failed to start $SERVER\n***"
     cat $SERVER_LOG
@@ -247,9 +226,6 @@ python3 $PLUGIN_TEST PluginModelTest.test_raw_fff_clip >>$CLIENT_LOG 2>&1
 if [ $? -ne 0 ]; then
     cat $CLIENT_LOG
     echo -e "\n***\n*** Test Failed\n***"
-    echo -e "\n***\n*** Server Log Start\n***"
-    cat $SERVER_LOG
-    echo -e "\n***\n*** Server Log End\n***"
     RET=1
 else
     check_test_results $TEST_RESULT_FILE 1
@@ -261,8 +237,7 @@ else
 fi
 set -e
 
-kill $SERVER_PID
-wait $SERVER_PID
+kill_server
 
 LOG_IDX=$((LOG_IDX+1))
 
