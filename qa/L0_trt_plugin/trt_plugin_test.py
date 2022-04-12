@@ -46,6 +46,7 @@ _tritonserver_ipaddr = os.environ.get('TRITONSERVER_IPADDR', 'localhost')
 class PluginModelTest(tu.TestResultCollector):
 
     def _full_exact(self, model_name, plugin_name, shape):
+        print(f"{_tritonserver_ipaddr}:8000")
         triton_client = httpclient.InferenceServerClient(
             f"{_tritonserver_ipaddr}:8000")
 
