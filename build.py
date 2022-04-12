@@ -1263,9 +1263,12 @@ def container_build(images, backends, repoagents, endpoints):
     if not FLAGS.enable_gpu and \
         (('pytorch' in backends) or ('tensorflow1' in backends)) \
         and (target_platform() != 'windows'):
-        dockerfileargmap[
-            'GPU_BASE_IMAGE'] = 'nvcr.io/nvidia/tritonserver:{}-py3-min'.format(
+        if 'gpu-base' in images:
+            gpu_base_image = images['gpu-base']
+        else:
+            gpu_base_image = 'nvcr.io/nvidia/tritonserver:{}-py3-min'.format(
                 FLAGS.upstream_container_version)
+        dockerfileargmap['GPU_BASE_IMAGE'] = gpu_base_image
 
     cachefrommap = [
         'tritonserver_buildbase', 'tritonserver_buildbase_cache0',
@@ -1666,7 +1669,7 @@ if __name__ == '__main__':
         action='append',
         required=False,
         help=
-        'Use specified Docker image in build as <image-name>,<full-image-name>. <image-name> can be "base", "tensorflow1", "tensorflow2", or "pytorch".'
+        'Use specified Docker image in build as <image-name>,<full-image-name>. <image-name> can be "base", "gpu-base", "tensorflow1", "tensorflow2", or "pytorch".'
     )
 
     parser.add_argument('--enable-logging',
@@ -1890,8 +1893,9 @@ if __name__ == '__main__':
             len(parts) != 2,
             '--image must specify <image-name>,<full-image-registry>')
         fail_if(
-            parts[0] not in ['base', 'pytorch', 'tensorflow1', 'tensorflow2'],
-            'unsupported value for --image')
+            parts[0] not in [
+                'base', 'gpu-base', 'pytorch', 'tensorflow1', 'tensorflow2'
+            ], 'unsupported value for --image')
         log('image "{}": "{}"'.format(parts[0], parts[1]))
         images[parts[0]] = parts[1]
 
