@@ -77,7 +77,7 @@ FROM {} AS full
         df += '''
 FROM {} AS min_container
 
-'''.format(images["gpu_min"])
+'''.format(images["gpu-min"])
 
     df += '''
 FROM {}
@@ -328,7 +328,7 @@ if __name__ == '__main__':
         action='append',
         required=False,
         help=
-        'Use specified Docker image to generate Docker image. Specified as <image-name>,<full-image-name>. <image-name> can be "min" or "full". Both "min" and "full" need to be specified at the same time. This will override "--container-version".'
+        'Use specified Docker image to generate Docker image. Specified as <image-name>,<full-image-name>. <image-name> can be "min", "gpu-min" or "full". Both "min" and "full" need to be specified at the same time. This will override "--container-version". "gpu-min" is needed for CPU only container to copy TensorFlow and PyTorch deps.'
     )
     parser.add_argument('--enable-gpu',
                         nargs='?',
@@ -409,8 +409,8 @@ if __name__ == '__main__':
 
     # For cpu-only image we need to copy some cuda libraries and dependencies
     # since we are using a PyTorch container that is not CPU-only
-    if 'pytorch' in FLAGS.backend:
-        images["gpu_min"] = "nvcr.io/nvidia/tritonserver:{}-py3-min".format(
+    if ('pytorch' in FLAGS.backend) and ('gpu-min' not in images):
+        images["gpu-min"] = "nvcr.io/nvidia/tritonserver:{}-py3-min".format(
             FLAGS.container_version)
 
     argmap = create_argmap(images)
