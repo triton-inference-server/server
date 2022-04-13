@@ -380,8 +380,8 @@ if __name__ == '__main__':
             fail_if(
                 len(parts) != 2,
                 '--image must specific <image-name>,<full-image-registry>')
-            fail_if(parts[0] not in ['min', 'full'],
-                    'unsupported value for --image')
+            fail_if(parts[0] not in ['min', 'full', 'gpu-min'],
+                    'unsupported image-name \'{}\' for --image'.format(parts[0]))
             log('image "{}": "{}"'.format(parts[0], parts[1]))
             images[parts[0]] = parts[1]
     else:
@@ -404,8 +404,8 @@ if __name__ == '__main__':
                     "ubuntu:20.04"
             }
     fail_if(
-        len(images) != 2,
-        "Need to both specify 'full' and 'min' images if at all")
+        len(images) < 2,
+        "Need to specify both 'full' and 'min' images if at all")
 
     # For cpu-only image we need to copy some cuda libraries and dependencies
     # since we are using a PyTorch container that is not CPU-only
