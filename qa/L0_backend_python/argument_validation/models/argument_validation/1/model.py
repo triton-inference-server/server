@@ -30,69 +30,103 @@ import triton_python_backend_utils as pb_utils
 
 
 class ArgumentValidationTest(unittest.TestCase):
+
     def test_infer_request_args(self):
         # Dummy arguments used in the tests.
         inputs = [pb_utils.Tensor('INPUT0', np.asarray([1, 2], dtype=np.int32))]
         model_name = 'my_model'
         requested_output_names = ['my_output']
 
+        #
         # inputs field validation
-        with self.assertRaises(BaseException) as e:
-            pb_utils.InferenceRequest(inputs=[None], model_name=model_name,
-                    requested_output_names=requested_output_names)
+        #
 
-        with self.assertRaises(BaseException) as e:
-            pb_utils.InferenceRequest(inputs=None, model_name=model_name,
-                    requested_output_names=requested_output_names)
+        # Test list of None as inputs
+        with self.assertRaises(pb_utils.TritonModelException) as e:
+            pb_utils.InferenceRequest(
+                inputs=[None],
+                model_name=model_name,
+                requested_output_names=requested_output_names)
+
+        # Test None object as list of inputs
+        with self.assertRaises(TypeError) as e:
+            pb_utils.InferenceRequest(
+                inputs=None,
+                model_name=model_name,
+                requested_output_names=requested_output_names)
 
         # model_name validation
-        with self.assertRaises(BaseException) as e:
-            pb_utils.InferenceRequest(model_name=None, inputs=inputs,
-                    requested_output_names=requested_output_names)
+        with self.assertRaises(TypeError) as e:
+            pb_utils.InferenceRequest(
+                model_name=None,
+                inputs=inputs,
+                requested_output_names=requested_output_names)
 
+        #
         # Requested output name validations
-        with self.assertRaises(BaseException) as e:
+        #
+
+        # Test list of None objects as requested_output_names
+        with self.assertRaises(TypeError) as e:
             pb_utils.InferenceRequest(requested_output_names=[None],
-                    inputs=inputs, model_name=model_name)
+                                      inputs=inputs,
+                                      model_name=model_name)
 
-        with self.assertRaises(BaseException) as e:
+        with self.assertRaises(TypeError) as e:
             pb_utils.InferenceRequest(requested_output_names=None,
-                    inputs=inputs, model_name=model_name)
-
-        with self.assertRaises(BaseException) as e:
-            pb_utils.InferenceRequest(requested_output_names=None,
-                    inputs=inputs, model_name=model_name)
+                                      inputs=inputs,
+                                      model_name=model_name)
 
         # Other arguments validation
-        with self.assertRaises(BaseException) as e:
-            pb_utils.InferenceRequest(requested_output_names=requested_output_names,
-                    inputs=inputs, model_name=model_name, correleation_id=None)
 
-        with self.assertRaises(BaseException) as e:
-            pb_utils.InferenceRequest(requested_output_names=requested_output_names,
-                    inputs=inputs, model_name=model_name, request_id=None)
+        # correlation_id set to None
+        with self.assertRaises(TypeError) as e:
+            pb_utils.InferenceRequest(
+                requested_output_names=requested_output_names,
+                inputs=inputs,
+                model_name=model_name,
+                correleation_id=None)
 
-        with self.assertRaises(BaseException) as e:
-            pb_utils.InferenceRequest(requested_output_names=requested_output_names,
-                    inputs=inputs, model_name=model_name, model_version=None)
+        # request_id set to None
+        with self.assertRaises(TypeError) as e:
+            pb_utils.InferenceRequest(
+                requested_output_names=requested_output_names,
+                inputs=inputs,
+                model_name=model_name,
+                request_id=None)
 
-        with self.assertRaises(BaseException) as e:
-            pb_utils.InferenceRequest(requested_output_names=requested_output_names,
-                    inputs=inputs, model_name=model_name, flags=None)
+        # model_version set to None
+        with self.assertRaises(TypeError) as e:
+            pb_utils.InferenceRequest(
+                requested_output_names=requested_output_names,
+                inputs=inputs,
+                model_name=model_name,
+                model_version=None)
 
-        # This should not raise an exception
-        pb_utils.InferenceRequest(requested_output_names=[], inputs=[],
-                model_name=model_name)
+        # flags set to None
+        with self.assertRaises(TypeError) as e:
+            pb_utils.InferenceRequest(
+                requested_output_names=requested_output_names,
+                inputs=inputs,
+                model_name=model_name,
+                flags=None)
 
+        # Empty lists should not raise an exception
+        pb_utils.InferenceRequest(requested_output_names=[],
+                                  inputs=[],
+                                  model_name=model_name)
 
     def test_infer_response_args(self):
-        outputs = [pb_utils.Tensor('OUTPUT0', np.asarray([1, 2], dtype=np.int32))]
+        outputs = [
+            pb_utils.Tensor('OUTPUT0', np.asarray([1, 2], dtype=np.int32))
+        ]
 
-        # Inference Response
-        with self.assertRaises(BaseException) as e:
+        # Test list of None object as output tensor
+        with self.assertRaises(pb_utils.TritonModelException) as e:
             pb_utils.InferenceResponse(output_tensors=[None])
 
-        with self.assertRaises(BaseException) as e:
+        # Test None as output tensors
+        with self.assertRaises(TypeError) as e:
             pb_utils.InferenceResponse(output_tensors=None)
 
         # This should not raise an exception
@@ -102,14 +136,25 @@ class ArgumentValidationTest(unittest.TestCase):
     def test_tensor_args(self):
         np_array = np.asarray([1, 2], dtype=np.int32)
 
-        with self.assertRaises(BaseException) as e:
+        # Test None as tensor name
+        with self.assertRaises(TypeError) as e:
             pb_utils.Tensor(None, np_array)
 
-        with self.assertRaises(BaseException) as e:
+        # Test None as Numpy array
+        with self.assertRaises(TypeError) as e:
             pb_utils.Tensor("OUTPUT0", None)
 
-        with self.assertRaises(BaseException) as e:
+        # Test None as dlpack capsule
+        with self.assertRaises(TypeError) as e:
             pb_utils.Tensor.from_dlpack("OUTPUT0", None)
+
+        # Test empty string as model name (from_dlpack)
+        with self.assertRaises(TypeError) as e:
+            pb_utils.Tensor.from_dlpack("", None)
+
+        # Test empty string as model name
+        with self.assertRaises(TypeError) as e:
+            pb_utils.Tensor("", None)
 
 
 class TritonPythonModel:
@@ -129,4 +174,3 @@ class TritonPythonModel:
                                  dtype=np.float16))
                 ]))
         return responses
-
