@@ -106,6 +106,15 @@ For models that do not support batching, or do not support batching in
 the specific ways described above, *max_batch_size* must be set to
 zero.
 
+When a model is using the auto-complete feature, a default maximum batch size may 
+be set by using the `--backend-config=default-max-batch-size=<int>` command line argument. 
+This allows all models which are capable of batching and which make use of 
+[Auto Generated Model configuration](#auto-generated-model-configuration) to have
+a default maximum batch size. This value is set to 4 by default. While none of the
+officially supported Triton backends implement this feature, backend developers 
+may make use of this value by obtaining it from the TRITONBACKEND_BackendConfig api.
+
+
 ### Inputs and Outputs
 
 Each model input and output must specify a name, datatype, and shape.
