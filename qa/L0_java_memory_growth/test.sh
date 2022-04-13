@@ -47,7 +47,7 @@ RET=0
 
 # Run test
 # If program runs successfully, there was no out of memory error with the specified constraints
-mvn compile exec:java -f $SAMPLES_REPO/pom.xml -DargLine="-Xms128m -Xmx768m -Dorg.bytedeco.javacpp.maxPhysicalBytes=2000m -Dorg.bytedeco.javacpp.maxRetries=100" -Dexec.mainClass=Simple -Djavacpp.platform=linux-x86_64 -Dexec.args="-r ${MODEL_REPO} -i 1000000" >>client.log 2>&1
+mvn compile exec:java -f $SAMPLES_REPO/pom.xml -DargLine="-Xms128m -Xmx128m -Dorg.bytedeco.javacpp.maxPhysicalBytes=800m -Dorg.bytedeco.javacpp.nopointergc=true" -Dexec.mainClass=Simple -Djavacpp.platform=linux-x86_64 -Dexec.args="-r ${MODEL_REPO} -i 1000000" >>client.log 2>&1
 if [ $? -ne 0 ]; then
     RET=1
 fi

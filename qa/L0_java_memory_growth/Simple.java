@@ -197,7 +197,7 @@ public class Simple {
             // releasing the buffer.
             if (!allocated_ptr.isNull()) {
               buffer.put(0, allocated_ptr);
-              buffer_userp.put(0, new BytePointer(tensor_name));
+              buffer_userp.put(0, new Loader.newGlobalRef(tensor_name));
             }
           }
 
@@ -210,11 +210,11 @@ public class Simple {
             TRITONSERVER_ResponseAllocator allocator, Pointer buffer, Pointer buffer_userp,
             long byte_size, int memory_type, long memory_type_id)
         {
-          BytePointer name = null;
+          String name = null;
           if (buffer_userp != null) {
-            name = new BytePointer(buffer_userp);
+            name = (String)Loader.accessGlobalRef(buffer_userp);
           } else {
-            name = new BytePointer("<unknown>");
+            name = new "<unknown>";
           }
 
           switch (memory_type) {
@@ -248,7 +248,7 @@ public class Simple {
               break;
           }
 
-          name.deallocate();
+          Loader.deleteGlobalRef(buffer_userp);
 
           return null;  // Success
         }
@@ -964,7 +964,6 @@ public class Simple {
 	try (PointerScope scope = new PointerScope()) {
           RunInference(server, model_name, is_int, is_torch_model);
 	}
-	Thread.sleep(100);
       }
 
       System.out.println("Memory growth test passed");
