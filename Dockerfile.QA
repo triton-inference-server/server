@@ -153,21 +153,7 @@ RUN mkdir -p qa/L0_simple_ensemble/models/simple/1 && \
     cp docs/examples/model_repository/simple/1/model.graphdef \
         qa/L0_socket/models/simple/1/.
 
-# TODO: REMOVE
-# L0_backend_identity needs TRITON_ENABLE_METRICS enabled in identity backend
-RUN cd ${TRITONTMP_DIR}/tritonbuild/identity && \
-    rm -rf install build && mkdir build && cd build && \
-    cmake -DTRITON_ENABLE_METRICS=ON \
-        -DCMAKE_INSTALL_PREFIX:PATH=${TRITONTMP_DIR}/tritonbuild/identity/install \
-        -DTRITON_COMMON_REPO_TAG:STRING=${TRITON_COMMON_REPO_TAG} \
-        -DTRITON_CORE_REPO_TAG:STRING=${TRITON_CORE_REPO_TAG} \
-        -DTRITON_THIRD_PARTY_REPO_TAG:STRING=${TRITON_THIRD_PARTY_REPO_TAG} \
-        -DTRITON_BACKEND_REPO_TAG:STRING=${TRITON_BACKEND_REPO_TAG} .. && \
-    make -j16 install
-
-RUN cp ${TRITONTMP_DIR}/tritonbuild/identity/install/backends/identity/libtriton_identity.so \
-    qa/L0_backend_identity/. && \
-    mkdir -p qa/L0_backend_identity/models && \
+RUN mkdir -p qa/L0_backend_identity/models && \
     cp -r src/test/models/identity_fp32 qa/L0_backend_identity/models/. && \
     mkdir -p qa/L0_backend_identity/models/identity_fp32/1
 
