@@ -214,7 +214,7 @@ public class Simple {
           if (buffer_userp != null) {
             name = (String)Loader.accessGlobalRef(buffer_userp);
           } else {
-            name = new "<unknown>";
+            name = "<unknown>";
           }
 
           switch (memory_type) {
