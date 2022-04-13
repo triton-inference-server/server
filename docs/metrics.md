@@ -127,3 +127,17 @@ Count*. The count metrics are illustrated by the following examples:
   the server. *Request Count* = 2, *Inference Count* = 9, *Execution
   Count* = 1.
 
+## Custom Metrics
+
+Triton exposes a C API to allow users and backends to register and collect
+custom metrics with the existing Triton metrics endpoint. It is up to the user
+to manage the lifetime of their custom metrics via the C API, Triton will not
+handle it for you.
+
+The 
+[identity_backend](https://github.com/triton-inference-server/identity_backend)
+demonstrates a practical example of adding a custom metric to a backend.
+
+Further documentation can be found in the `TRITONSERVER_MetricFamily*` and
+`TRITONSERVER_Metric*` API annotations in
+[tritonserver.h](https://github.com/triton-inference-server/core/blob/main/include/triton/core/tritonserver.h).
