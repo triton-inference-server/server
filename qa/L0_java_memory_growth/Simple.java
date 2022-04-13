@@ -197,7 +197,7 @@ public class Simple {
             // releasing the buffer.
             if (!allocated_ptr.isNull()) {
               buffer.put(0, allocated_ptr);
-              buffer_userp.put(0, new Loader.newGlobalRef(tensor_name));
+              buffer_userp.put(0, Loader.newGlobalRef(tensor_name));
             }
           }
 
