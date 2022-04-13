@@ -1169,24 +1169,33 @@ ParseRateLimiterResourceOption(const std::string arg)
 std::tuple<std::string, std::string, std::string>
 ParseBackendConfigOption(const std::string arg)
 {
-  // Format is "<backend_name>,<setting>=<value>"
+  // Format is "<backend_name>,<setting>=<value>" for specific
+  // config/settings and "<setting>=<value>" for backend agnostic
+  // configs/settings
   int delim_name = arg.find(",");
   int delim_setting = arg.find("=", delim_name + 1);
 
-  // Check for 2 semicolons
-  if ((delim_name < 0) || (delim_setting < 0)) {
+  std::string name_string = std::string();
+  if (delim_name > 0) {
+    name_string = arg.substr(0, delim_name);
+  } else if (delim_name == 0) {
+    std::cerr << "No backend specified. --backend-config option format is "
+              << "<backend name>,<setting>=<value> or "
+              << "<setting>=<value>. Got " << arg << std::endl;
+    exit(1);
+  }  // else global backend config
+
+  if (delim_setting < 0) {
     std::cerr << "--backend-config option format is '<backend "
                  "name>,<setting>=<value>'. Got "
               << arg << std::endl;
     exit(1);
   }
-
-  std::string name_string = arg.substr(0, delim_name);
   std::string setting_string =
       arg.substr(delim_name + 1, delim_setting - delim_name - 1);
   std::string value_string = arg.substr(delim_setting + 1);
 
-  if (name_string.empty() || setting_string.empty() || value_string.empty()) {
+  if (setting_string.empty() || value_string.empty()) {
     std::cerr << "--backend-config option format is '<backend "
                  "name>,<setting>=<value>'. Got "
               << arg << std::endl;
