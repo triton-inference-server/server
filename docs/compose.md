@@ -94,7 +94,8 @@ Method 1 and 2 will result in the same composed container. Furthermore, `--image
 
 ### CPU-only container composition
 
-CPU-only containers are not yet available for customization. Please see [build documentation](build.md) for instructions to build a full CPU-only container.
+CPU-only containers are not yet available for customization. Please see [build documentation](build.md) for instructions to build a full CPU-only container. When including TensorFlow or PyTorch backends in the composed container, an additional `gpu-min` container is needed
+since this container provided the CUDA stubs and runtime dependencies which are not provided in the CPU only min container.
 
 ## Build it yourself
 
