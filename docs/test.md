@@ -128,7 +128,7 @@ you can run L0_infer as follows:
 $ BACKENDS="plan" ENSEMBLES=0 EXPECTED_NUM_TESTS=<expected> bash -x ./test.sh
 ```
 
-Where '<expected>' is the number of sub-tests expected to be run for
+Where '\<expected\>' is the number of sub-tests expected to be run for
 just TensorRT testing and no ensembles. Depending on which backend(s)
 you are testing you will need to experiment and determine the correct
-value for '<expected>'.
+value for '\<expected\>'.
