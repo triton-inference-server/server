@@ -25,9 +25,9 @@
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #pragma once
 
-#include "http_server.h"
-
 #include "common.h"
+#include "http_server.h"
+#include "triton/core/tritonserver.h"
 
 namespace triton { namespace server {
 
@@ -72,6 +72,22 @@ class SagemakerAPIServer : public HTTPAPIServer {
   {
   }
 
+  std::tuple<std::string, std::string> ParseLoadModelRequest(
+      evhtp_request_t* req);
+
+  // Load Model
+  void SageMakerMMELoadModel(
+      evhtp_request_t* req,
+      std::tuple<std::string, std::string> url_modelname_tuple);
+
+  // Unload Model
+
+  // List Model
+
+  // Get Model
+
+  // Invoke Model
+
   void Handle(evhtp_request_t* req) override;
 
   std::unique_ptr<InferRequestClass> CreateInferRequest(
@@ -84,9 +100,6 @@ class SagemakerAPIServer : public HTTPAPIServer {
       evhtp_request_t* req, int32_t content_length,
       size_t* header_length) override;
 
-
-  // Helper methods
-  void ParseRequest(evhtp_request_t* req);
 
   // Currently the compresssion schema hasn't been defined,
   // assume identity compression type is used for both request and response
