@@ -1,5 +1,5 @@
 #!/bin/bash
-# Copyright (c) 2020-2021, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright 2020-2022, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -152,17 +152,26 @@ for MODEL in $(ls models); do
 
     set +e
 
+    TEMP_CLIENT_LOG=temp_client.log
+    TEMP_RET=0
+
     SECONDS=0
     # Run the perf analyzer 'REPETITION' times
     for ((i=1; i<=$REPETITION; i++)); do
-        $PERF_ANALYZER -v -m $MODEL -i grpc --concurrency-range $CONCURRENCY -b $CLIENT_BS >> $CLIENT_LOG 2>&1
+        $PERF_ANALYZER -v -m $MODEL -i grpc --concurrency-range $CONCURRENCY -b $CLIENT_BS > $TEMP_CLIENT_LOG 2>&1
         if [ $? -ne 0 ]; then
-            cat $CLIENT_LOG
-            echo -e "\n***\n*** perf_analyzer for $MODEL failed on iteration $i\n***"
-            RET=1
+            # Only record failure log
+            cat $TEMP_CLIENT_LOG >> $CLIENT_LOG
+            echo -e "\n***\n*** perf_analyzer for $MODEL failed on iteration $i\n***" >> $CLIENT_LOG
+            TEMP_RET=1
         fi
     done
     TEST_DURATION=$SECONDS
+
+    if [ $TEMP_RET -ne 0 ]; then
+        cat $CLIENT_LOG
+        RET=1
+    fi
 
     set -e
 
