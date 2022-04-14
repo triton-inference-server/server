@@ -64,6 +64,12 @@ fi
 if [ -n "$SAGEMAKER_TRITON_LOG_ERROR" ]; then
     SAGEMAKER_ARGS="${SAGEMAKER_ARGS} --log-error=${SAGEMAKER_TRITON_LOG_ERROR}"
 fi
+if [ -n "$SAGEMAKER_TRITON_SHM_DEFAULT_BYTE_SIZE" ]; then
+    SAGEMAKER_ARGS="${SAGEMAKER_ARGS} --backend-config=python,shm-default-byte-size=${SAGEMAKER_TRITON_SHM_DEFAULT_BYTE_SIZE}"
+fi
+if [ -n "$SAGEMAKER_TRITON_SHM_GROWTH_BYTE_SIZE" ]; then
+    SAGEMAKER_ARGS="${SAGEMAKER_ARGS} --backend-config=python,shm-growth-byte-size=${SAGEMAKER_TRITON_SHM_GROWTH_BYTE_SIZE}"
+fi
 
 if [ "${is_mme_mode}" = false ] && [ -f "${SAGEMAKER_MODEL_REPO}/config.pbtxt" ]; then
     echo "ERROR: Incorrect directory structure."

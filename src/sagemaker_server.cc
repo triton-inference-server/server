@@ -111,10 +111,7 @@ EVBufferToJson(
   return nullptr;  // success
 }
 
-}
-
-
-
+}  // namespace
 
 
 const std::string SagemakerAPIServer::binary_mime_type_(
@@ -205,48 +202,48 @@ SagemakerAPIServer::Handle(evhtp_request_t* req)
 
   std::string multi_model_name, action;
   if (RE2::FullMatch(
-          std::string(req->uri->path->full), models_regex_, &multi_model_name, &action)) {
-			
-			ParseRequest(req);
-      
-      switch (req->method) {
+          std::string(req->uri->path->full), models_regex_, &multi_model_name,
+          &action)) {
+    switch (req->method) {
       case htp_method_GET:
-      if (multi_model_name.empty()) {
-        LOG_VERBOSE(1) << "SageMaker request: LIST ALL MODELS";
-        req->method = htp_method_POST;
-        HandleRepositoryIndex(req, "");
+        if (multi_model_name.empty()) {
+          LOG_VERBOSE(1) << "SageMaker request: LIST ALL MODELS";
+          req->method = htp_method_POST;
+          HandleRepositoryIndex(req, "");
+          return;
+        }
+        LOG_VERBOSE(1) << "SageMaker request: GET MODEL";
         return;
-      }
-      LOG_VERBOSE(1) << "SageMaker request: GET MODEL";
-      return;
-    case htp_method_POST:
-      if (action == "/invoke") {
-        LOG_VERBOSE(1) << "SageMaker request: INVOKE MODEL";
-        HandleInfer(req, multi_model_name, model_version_str_);
-        return;
-      }
-      if (action.empty()) {
-        LOG_VERBOSE(1) << "SageMaker request: LOAD MODEL";
-        req->method = htp_method_POST;
+      case htp_method_POST:
+        if (action == "/invoke") {
+          LOG_VERBOSE(1) << "SageMaker request: INVOKE MODEL";
+          HandleInfer(req, multi_model_name, model_version_str_);
+          return;
+        }
+        if (action.empty()) {
+          LOG_VERBOSE(1) << "SageMaker request: LOAD MODEL";
+          req->method = htp_method_POST;
 
-        // NSK improve
+          std::tuple<std::string, std::string> url_modelname_tuple =
+              ParseLoadModelRequest(req);
 
-        HandleRepositoryControl(req, "", multi_model_name, "load");
+          SageMakerMMELoadModel(req, url_modelname_tuple);
+
+          return;
+        }
+        break;
+      case htp_method_DELETE:
+        // UNLOAD MODEL
+        LOG_VERBOSE(1) << "SageMaker request: UNLOAD MODEL";
+        req->method = htp_method_POST;
+        HandleRepositoryControl(req, "", multi_model_name, "unload");
         return;
-      }
-      break;
-    case htp_method_DELETE:
-      // UNLOAD MODEL
-      LOG_VERBOSE(1) << "SageMaker request: UNLOAD MODEL";
-      req->method = htp_method_POST;
-      HandleRepositoryControl(req, "", multi_model_name, "unload");
-      return;
-    default:
-      LOG_VERBOSE(1) << "SageMaker error: " << req->method << " "
-                     << req->uri->path->full << " - "
-                     << static_cast<int>(EVHTP_RES_BADREQ);
-      evhtp_send_reply(req, EVHTP_RES_BADREQ);
-      return;
+      default:
+        LOG_VERBOSE(1) << "SageMaker error: " << req->method << " "
+                       << req->uri->path->full << " - "
+                       << static_cast<int>(EVHTP_RES_BADREQ);
+        evhtp_send_reply(req, EVHTP_RES_BADREQ);
+        return;
     }
   }
 
@@ -276,10 +273,9 @@ SagemakerAPIServer::Create(
 }
 
 
-void SagemakerAPIServer::ParseRequest(
-  evhtp_request_t* req
-) {
-  
+std::tuple<std::string, std::string>
+SagemakerAPIServer::ParseLoadModelRequest(evhtp_request_t* req)
+{
   struct evbuffer_iovec* v = nullptr;
   int v_idx = 0;
   int n = evbuffer_peek(req->buffer_in, -1, NULL, NULL, 0);
@@ -289,36 +285,120 @@ void SagemakerAPIServer::ParseRequest(
     if (evbuffer_peek(req->buffer_in, -1, NULL, v, n) != n) {
       HTTP_RESPOND_IF_ERR(
           req, TRITONSERVER_ErrorNew(
-                    TRITONSERVER_ERROR_INTERNAL,
-                    "unexpected error getting load model request buffers"));
+                   TRITONSERVER_ERROR_INTERNAL,
+                   "unexpected error getting load model request buffers"));
     }
   }
 
   std::vector<const TRITONSERVER_Parameter*> params;
+
+  std::string model_name_string;
+  std::string url_string;
+
   size_t buffer_len = evbuffer_get_length(req->buffer_in);
   if (buffer_len > 0) {
     triton::common::TritonJson::Value request;
     HTTP_RESPOND_IF_ERR(
         req, EVBufferToJson(&request, v, &v_idx, buffer_len, n));
 
-    // NSK: Print url and model_name
     triton::common::TritonJson::Value url;
     triton::common::TritonJson::Value model_name;
 
     if (request.Find("model_name", &model_name)) {
-      std::string model_name_string;
       HTTP_RESPOND_IF_ERR(req, model_name.AsString(&model_name_string));
-      std::cout << "model_name: " << model_name_string.c_str() << std::endl;
+      LOG_INFO << "Received model_name: "
+               << model_name_string.c_str(); /* TODO: Remove */
     }
 
     if (request.Find("url", &url)) {
-      std::string url_string;
       HTTP_RESPOND_IF_ERR(req, url.AsString(&url_string));
-      std::cout << "url: " << url_string.c_str() << std::endl;
+      LOG_INFO << "Received url: " << url_string.c_str(); /* TODO: Remove */
     }
   }
 
-  TRITONSERVER_ServerRegisterModelRepository()  
-
+  return std::make_tuple(url_string.c_str(), model_name_string.c_str());
 }
+
+void
+SagemakerAPIServer::SageMakerMMELoadModel(
+    evhtp_request_t* req,
+    std::tuple<std::string, std::string> url_modelname_tuple)
+{
+  std::string url = std::get<0>(url_modelname_tuple);
+  std::string modelname = std::get<1>(url_modelname_tuple);
+
+  // Create repo url:model name map
+  std::vector<const TRITONSERVER_Parameter*> url_model_name_map;
+
+  auto param = TRITONSERVER_ParameterNew(
+      "", TRITONSERVER_PARAMETER_STRING, modelname.c_str());
+
+  if (param != nullptr) {
+    url_model_name_map.emplace_back(param);
+  } else {
+    HTTP_RESPOND_IF_ERR(
+        req, TRITONSERVER_ErrorNew(
+                 TRITONSERVER_ERROR_INTERNAL,
+                 "unexpected error on creating Triton parameter"));
+  }
+
+  /* Register repository with model mapping */
+  TRITONSERVER_Error* err = nullptr;
+  err = TRITONSERVER_ServerRegisterModelRepository(
+      server_.get(), url.c_str(), url_model_name_map.data(),
+      url_model_name_map.size());
+
+  LOG_INFO << "After registering model repo";
+
+  /*
+    1. Triton doesn't send a response on successful load SM expects a response
+    object
+    2. Load model status codes 409: Already loaded; 507: Can't load due to
+    resource constraint
+  */
+  if (err != nullptr) {
+    LOG_INFO << "Printing TRITONSERVER_ErrorCodeString";
+    LOG_INFO << TRITONSERVER_ErrorCodeString(err);
+    LOG_INFO << "Printing TRITONSERVER_ErrorCode";
+    LOG_INFO << TRITONSERVER_ErrorCode(err);
+  }
+
+
+  // If a model_name is reused i.e. model_name is already mapped, return a 409
+  if ((err != nullptr) &&
+      (TRITONSERVER_ErrorCode(err) == TRITONSERVER_ERROR_ALREADY_EXISTS)) {
+    EVBufferAddErrorJson(req->buffer_out, err);
+    evhtp_send_reply(req, EVHTP_RES_CONFLICT); /* 409 */
+    TRITONSERVER_ErrorDelete(err);
+    return;
+    // Add return here
+  } else if (err != nullptr) {
+    EVBufferAddErrorJson(req->buffer_out, err);
+    evhtp_send_reply(req, EVHTP_RES_BADREQ);
+    TRITONSERVER_ErrorDelete(err);
+    return;
+  }
+
+  /* TODO: Check if we should use TRITONSERVER_ServerLoadModelWithParameters */
+  TRITONSERVER_Error* load_err =
+      nullptr; /* TODO: Check if we can re-use previous object*/
+  load_err = TRITONSERVER_ServerLoadModel(server_.get(), url.c_str());
+
+  /* Unlikely after duplicate repo check, but in case Load Model also returns
+   * ALREADY_EXISTS error */
+  if ((load_err != nullptr) &&
+      (TRITONSERVER_ErrorCode(load_err) == TRITONSERVER_ERROR_ALREADY_EXISTS)) {
+    EVBufferAddErrorJson(req->buffer_out, load_err);
+    evhtp_send_reply(req, EVHTP_RES_CONFLICT); /* 409 */
+    TRITONSERVER_ErrorDelete(load_err);
+  } else if (load_err != nullptr) {
+    EVBufferAddErrorJson(req->buffer_out, load_err);
+    evhtp_send_reply(req, EVHTP_RES_BADREQ);
+    TRITONSERVER_ErrorDelete(load_err);
+  } else {
+    evhtp_send_reply(req, EVHTP_RES_OK);
+  }
+  return;
+}
+
 }}  // namespace triton::server
