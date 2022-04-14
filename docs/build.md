@@ -63,6 +63,10 @@ to build Triton on a platform that is not listed here.
 
 * [Windows 10, x86-64](#windows)
 
+If you are developing or debugging Triton, see [Development and
+Incremental Builds](#development-and-incremental-builds) for information
+on how to perform incremental build.
+
 ## <a name="ubuntu"></a>Building for Ubuntu 20.04
 
 For Ubuntu-20.04, build.py supports both a Docker build and a
@@ -148,7 +152,7 @@ but you can enable all features, backends, and repository agents with
 the --enable-all flag. The -v flag turns on verbose output.
 
 ```bash
-./build.py -v --enable-all
+$ ./build.py -v --enable-all
 ```
 
 If you want to enable only certain Triton features, backends and
@@ -164,7 +168,7 @@ other repos, but if you want to control which branch is used in these
 other repos you can as shown in the following example.
 
 ```bash
-./build.py ... --repo-tag=common:<container tag> --repo-tag=core:<container tag> --repo-tag=backend:<container tag> --repo-tag=thirdparty:<container tag> ... --backend=tensorrt:<container tag> ... --repoagent=checksum:<container tag> ...
+$ ./build.py ... --repo-tag=common:<container tag> --repo-tag=core:<container tag> --repo-tag=backend:<container tag> --repo-tag=thirdparty:<container tag> ... --backend=tensorrt:<container tag> ... --repoagent=checksum:<container tag> ...
 ```
 
 If you are building on a release branch then `<container tag>` will
@@ -213,7 +217,7 @@ with the --dryrun flag, and then looking in the build subdirectory at
 Dockerfile.buildbase.
 
 ```bash
-./build.py -v --enable-all
+$ ./build.py -v --enable-all
 ```
 
 From Dockerfile.buildbase you can see what dependencies you need to
@@ -232,7 +236,7 @@ can then use build.py with the --no-container-build flag to build
 Triton.
 
 ```bash
-./build.py -v --no-container-build --build-dir=`pwd`/build --enable-all
+$ ./build.py -v --no-container-build --build-dir=`pwd`/build --enable-all
 ```
 
 See [Building with Docker](#ubuntu-docker) for more details on how the
@@ -311,7 +315,7 @@ After downloading the zip files for cuDNN and TensorRT, you build the
 min container using the following command.
 
 ```bash
-docker build -t win10-py3-min -f Dockerfile.win10.min .
+$ docker build -t win10-py3-min -f Dockerfile.win10.min .
 ```
 
 ### Build Triton Server
@@ -346,7 +350,7 @@ To see the generated build scripts and Dockerfiles referred to below,
 use:
 
 ```bash
-./build.py -v --enable-all --dryrun
+$ ./build.py -v --enable-all --dryrun
 ```
 
 You should familiarize yourself with the build process for supported
@@ -400,8 +404,98 @@ and cmake_build or the equivalent commands to perform a build.
   that you build separately for your platform. See the pytorch_backend
   build process for details.
 
-## Building with Debug Symbols
+## Development and Incremental Builds
+
+### Development Builds Without Docker
+
+If you are [building without Docker](#ubuntu-without-docker) use the
+CMake invocation steps in cmake_build to invoke CMake to set-up a
+build environment where you can invoke make/msbuild.exe to incremental
+build the Triton core, a backend, or a repository agent.
+
+### Development Builds With Docker
+
+If you are [building with Docker](#ubuntu-docker), the generated
+*tritonserver_buildbase* image contains all the dependencies needed to
+perform a full or incremental build. Within *tritonserver_buildbase*,
+/workspace/build/cmake_build contains the CMake invocations that are
+used to build the Triton core, the backends, and the repository
+agents.
+
+To perform an incremental build within the *tritonserver_buildbase*
+container, map your source into the container and then run the
+appropriate CMake and `make` (or `msbuild.exe`) steps from cmake_build
+within the container.
+
+#### Development Build of Triton Core
+
+Assuming you have a clone of the [server
+repo](https://github.com/triton-inference-server/server) on your host
+system where you are making changes and you want to perform
+incremental builds to test those changes. Your source code is in
+/home/me/server. Run the *tritonserver_buildbase* container and map
+your server source directory into the container at /server.
+
+```
+$ docker run -it --rm -v/home/me/server:/server tritonserver_buildbase bash
+```
+
+Look at /workspace/build/cmake_build within the container for the
+section of commands that build "Triton core library". You can follow
+those command exactly, or you can modify them to change the build
+directory or the CMake options. You **must** change the CMake command
+to use /server instead of /workspace as the location for the
+CMakeLists.txt file and source:
+
+```
+$ cmake <options> /server
+```
+
+Then you can change directory into the build directory and run `make`
+(or `msbuild.exe`) as shown in cmake_build. As you make changes to the
+source on your host system, you can perform incremental builds by
+re-running `make` (or `msbuild.exe`).
+
+#### Development Build of Backend or Repository Agent
+
+Performing a full or incremental build of a backend or repository
+agent is similar to building the Triton core. As an example we will
+use the TensorRT backend. Assuming you have a clone of the [TensorRT
+backend
+repo](https://github.com/triton-inference-server/tensorrt_backend) on
+your host system where you are making changes and you want to perform
+incremental builds to test those changes. Your source code is in
+/home/me/tritonserver_backend. Run the *tritonserver_buildbase*
+container and map your TensorRT backend source directory into the
+container at /tensorrt_backend. Note that some backends will use
+Docker as part of their build, and so the host's Docker registry must
+be made available within the *tritonserver_buildbase* by mounting
+docker.sock (on Windows use
+-v\\.\pipe\docker_engine:\\.\pipe\docker_engine).
+
+```
+$ docker run -it --rm -v/var/run/docker.sock:/var/run/docker.sock -v/home/me/tensorrt_backend:/tensorrt_backend tritonserver_buildbase bash
+```
+
+Look at /workspace/build/cmake_build within the container for the
+section of commands that build "TensorRT backend". You can follow
+those command exactly, or you can modify them to change the build
+directory or the CMake options. You **must** change the CMake command
+to use /tensorrt_backend instead of /workspace as the location for the
+CMakeLists.txt file and source:
+
+```
+$ cmake <options> /tensorrt_backend
+```
+
+Then you can change directory into the build directory and run `make`
+(or `msbuild.exe`) as shown in cmake_build. As you make changes to the
+source on your host system, you can perform incremental builds by
+re-running `make` (or `msbuild.exe`).
+
+### Building with Debug Symbols
 
 To build with Debug symbols, use the --build-type=Debug argument while
-launching build.py. You can then launch the built server with gdb and
-see the debug symbols/information in the gdb trace.
+launching build.py. If building directly with CMake use
+-DCMAKE_BUILD_TYPE=Debug. You can then launch the built server with
+gdb and see the debug symbols/information in the gdb trace.
