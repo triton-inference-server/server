@@ -130,12 +130,12 @@ Count*. The count metrics are illustrated by the following examples:
 ## Custom Metrics
 
 Triton exposes a C API to allow users and backends to register and collect
-custom metrics with the existing Triton metrics endpoint. It is up to the user
-to manage the lifetime of their custom metrics via the C API, Triton will not
-handle it for you.
+custom metrics with the existing Triton metrics endpoint. The user takes the
+ownership of the custom metrics created through the APIs and must manage their
+lifetime following the API documentation.
 
 The 
-[identity_backend](https://github.com/triton-inference-server/identity_backend)
+[identity_backend](https://github.com/triton-inference-server/identity_backend/blob/main/README.md#custom-metric-example)
 demonstrates a practical example of adding a custom metric to a backend.
 
 Further documentation can be found in the `TRITONSERVER_MetricFamily*` and
