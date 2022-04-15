@@ -288,7 +288,7 @@ optimization { execution_accelerators {
 }}
 ```
 
-### TensorFlow with TensorRT Optimization
+### TensorFlow with TensorRT Optimization (TF-TRT)
 
 TensorRT optimization applied to a TensorFlow model works similarly to
 TensorRT and ONNX described above. To enable TensorRT optimization you
