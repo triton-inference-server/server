@@ -1,6 +1,6 @@
 #!/usr/bin/python
 
-# Copyright (c) 2019-2020, NVIDIA CORPORATION. All rights reserved.
+# Copyright 2019-2022, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -129,10 +129,12 @@ if __name__ == '__main__':
             success_str = 'nv_inference_request_success{model="identity_uint32",version="1"}'
             infer_count_str = 'nv_inference_count{model="identity_uint32",version="1"}'
             infer_exec_str = 'nv_inference_exec_count{model="identity_uint32",version="1"}'
+            custom_metric_str = 'input_byte_size_counter{model="identity_uint32",version="1"}'
 
             success_val = None
             infer_count_val = None
             infer_exec_val = None
+            custom_metric_val = None
             for line in metrics.text.splitlines():
                 if line.startswith(success_str):
                     success_val = float(line[len(success_str):])
@@ -140,6 +142,8 @@ if __name__ == '__main__':
                     infer_count_val = float(line[len(infer_count_str):])
                 if line.startswith(infer_exec_str):
                     infer_exec_val = float(line[len(infer_exec_str):])
+                if line.startswith(custom_metric_str):
+                    custom_metric_val = float(line[len(custom_metric_str):])
 
             if success_val != 4:
                 print("error: expected metric {} == 4, got {}".format(
@@ -152,6 +156,10 @@ if __name__ == '__main__':
             if infer_exec_val != 1:
                 print("error: expected metric {} == 1, got {}".format(
                     infer_exec_str, infer_exec_val))
+                sys.exit(1)
+            if custom_metric_val != 64:
+                print("error: expected metric {} == 64, got {}".format(
+                    custom_metric_str, custom_metric_val))
                 sys.exit(1)
 
     # Reuse a single client for all sync tests
