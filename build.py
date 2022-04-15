@@ -1333,6 +1333,7 @@ def create_docker_build_script(script_name, container_install_dir,
 
         if target_platform() == 'windows':
             runargs += ['--memory', FLAGS.container_memory]
+            runargs += ['--isolation=process']
             runargs += [
                 '-v', '\\\\.\pipe\docker_engine:\\\\.\pipe\docker_engine'
             ]
