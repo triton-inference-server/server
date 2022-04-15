@@ -993,6 +993,13 @@ COPY --chown=1000:1000 --from=tritonserver_build {0}/install/backends backends
 '''.format(build_dir)
             break
 
+    # This is required since libcublasLt.so is not present during the build
+    # stage of the PyTorch backend
+    if not FLAGS.enable_gpu and ('pytorch' in backends):
+        df += '''
+RUN patchelf --add-needed /usr/local/cuda/lib64/stubs/libcublasLt.so.11 backends/pytorch/libtorch_cuda.so
+'''
+
     if len(repoagents) > 0:
         df += '''
 COPY --chown=1000:1000 --from=tritonserver_build {0}/install/repoagents repoagents
@@ -1106,8 +1113,9 @@ COPY --from=min_container /usr/local/cuda-11.6/targets/{cuda_arch}-linux/lib/lib
 COPY --from=min_container /usr/lib/{libs_arch}-linux-gnu/libnccl.so.2 /usr/lib/{libs_arch}-linux-gnu/libnccl.so.2
 COPY --from=min_container /usr/lib/{libs_arch}-linux-gnu/libcudnn.so.8 /usr/lib/{libs_arch}-linux-gnu/libcudnn.so.8
 
+# patchelf is needed to add deps of libcublasLt.so.11 to libtorch_cuda.so
 RUN apt-get update && \
-        apt-get install -y --no-install-recommends openmpi-bin
+        apt-get install -y --no-install-recommends openmpi-bin patchelf
 
 ENV LD_LIBRARY_PATH /usr/local/cuda/targets/{cuda_arch}-linux/lib:/usr/local/cuda/lib64/stubs:${{LD_LIBRARY_PATH}}
 '''.format(cuda_arch=cuda_arch, libs_arch=libs_arch)
