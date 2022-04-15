@@ -217,7 +217,7 @@ of the supported model frameworks. These optimization settings are
 controlled by the model configuration [optimization
 policy](model_configuration.md#optimization-policy).
 
-### ONNX with TensorRT Optimization
+### ONNX with TensorRT Optimization (ORT-TRT)
 
 One especially powerful optimization is to use TensorRT in
 conjunction with an ONNX model. As an example of TensorRT optimization
