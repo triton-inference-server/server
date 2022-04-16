@@ -53,3 +53,10 @@ output [
     dims: [ 1 ]
   }
 ]
+
+instance_group [
+  {
+    count: 1
+    kind : KIND_CPU
+  }
+]
