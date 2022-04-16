@@ -467,9 +467,12 @@ kill $SERVER_PID
 wait $SERVER_PID
 
 # Run cpp client unit test
-rm -r ${MODELDIR}/* && cp -r $DATADIR/qa_model_repository/onnx_int32_int32_int32 ${MODELDIR}/.
+rm -rf unit_test_models && mkdir unit_test_models
+cp -r $DATADIR/qa_model_repository/onnx_int32_int32_int32 unit_test_models/.
+cp -r ${MODELDIR}/simple unit_test_models/. 
 
-SERVER_ARGS="--backend-directory=${BACKEND_DIR} --model-repository=${MODELDIR}"
+SERVER_ARGS="--backend-directory=${BACKEND_DIR} --model-repository=unit_test_models
+            --trace-file=global_unittest.log --trace-level=TIMESTAMPS --trace-rate=1"
 SERVER_LOG="./inference_server_cc_unit_test.log"
 CLIENT_LOG="./cc_unit_test.log"
 run_server
