@@ -28,6 +28,8 @@ import triton_python_backend_utils as pb_utils
 
 
 class TritonPythonModel:
+    """ This model sends an error message with the first request.
+    """
 
     def initialize(self, args):
         # You must parse model_config. JSON string is not parsed here

@@ -30,9 +30,8 @@ import triton_python_backend_utils as pb_utils
 
 
 class TritonPythonModel:
-    """ This model tries to create a response sender in
-    a model that is not configured with decoupled
-    model transaction policy.
+    """ This model tries to send response after closing
+    the response_sender.
     """
 
     def initialize(self, args):
@@ -57,7 +56,7 @@ class TritonPythonModel:
             output1_config['data_type'])
 
     def execute(self, requests):
-        """ Tries to create a response sender object and use that
+        """ Create a response sender object and use that
         for sending the response.
         """
 
