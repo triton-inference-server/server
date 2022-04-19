@@ -111,14 +111,14 @@ fi
 grep "model batching: requests in batch 2" $SERVER_LOG
 if [ $? -ne 0 ]; then
     echo -e "\n***\n*** Failed to verify minimal server log. \n***"
-    cat $MINIMAL_LOG
+    cat $SERVER_LOG
     RET=1
 fi
 
 grep "batched IN0 value: \[ 10, 11, 12, 13, 20, 21, 22, 23 \]" $SERVER_LOG
 if [ $? -ne 0 ]; then
     echo -e "\n***\n*** Failed to verify minimal server log. \n***"
-    cat $MINIMAL_LOG
+    cat $SERVER_LOG
     RET=1
 fi
 
@@ -179,14 +179,14 @@ fi
 grep "model batching: requests in batch 2" $SERVER_LOG
 if [ $? -ne 0 ]; then
     echo -e "\n***\n*** Failed to verify recommended server log. \n***"
-    cat $RECOMMENDED_LOG
+    cat $SERVER_LOG
     RET=1
 fi
 
 grep "batched INPUT value: \[ 1.000000, 1.100000, 1.200000, 1.300000, 2.000000, 2.100000, 2.200000, 2.300000, 3.000000, 3.100000, 3.200000, 3.300000, 4.000000, 4.100000, 4.200000, 4.300000, 10.000000, 10.100000, 10.200000, 10.300000, 20.000000, 20.100000, 20.200001, 20.299999, 30.000000, 30.100000, 30.200001, 30.299999, 40.000000, 40.099998, 40.200001, 40.299999 \]" $SERVER_LOG
 if [ $? -ne 0 ]; then
     echo -e "\n***\n*** Failed to verify recommended server log. \n***"
-    cat $RECOMMENDED_LOG
+    cat $SERVER_LOG
     RET=1
 fi
 
