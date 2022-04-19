@@ -2094,7 +2094,7 @@ class LifeCycleTest(tu.TestResultCollector):
             self.assertTrue(False, "unexpected error {}".format(ex))
 
     def test_model_repository_index(self):
-        # use model control EXPLIT and --load-model to load a subset of models
+        # use model control EXPLICIT and --load-model to load a subset of models
         # in model repository
         tensor_shape = (1, 16)
         model_bases = ['graphdef', 'savedmodel', "simple_savedmodel"]
@@ -2119,7 +2119,7 @@ class LifeCycleTest(tu.TestResultCollector):
                 self.assertTrue(False, "unexpected error {}".format(ex))
 
         # Check model repository index
-        # All models should be in ready state except savedmodel_float32_float32_float32
+        # All models should be in ready state except onnx_float32_float32_float32
         # which appears in two repositories.
         model_bases.append("simple_graphdef")
         try:
