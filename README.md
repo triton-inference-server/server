@@ -319,31 +319,14 @@ with new functionality that operates when a model is loaded or
 unloaded. You can introduce your own code to perform authentication,
 decryption, conversion, or similar operations when a model is loaded.
 
-## Papers and Presentation
+## Additional Resources
 
-* [Maximizing Deep Learning Inference Performance with NVIDIA Model
-  Analyzer](https://developer.nvidia.com/blog/maximizing-deep-learning-inference-performance-with-nvidia-model-analyzer/).
+* Additional documentation, presentations, and examples are located in the 
+  [NVIDIA Developer Zone](https://developer.nvidia.com/nvidia-triton-inference-server).
 
-* [High-Performance Inferencing at Scale Using the TensorRT Inference
-  Server](https://developer.nvidia.com/gtc/2020/video/s22418).
-
-* [Accelerate and Autoscale Deep Learning Inference on GPUs with
-  KFServing](https://developer.nvidia.com/gtc/2020/video/s22459).
-
-* [Deep into Triton Inference Server: BERT Practical Deployment on
-  NVIDIA GPU](https://developer.nvidia.com/gtc/2020/video/s21736).
-
-* [Maximizing Utilization for Data Center Inference with TensorRT
-  Inference Server](https://on-demand-gtc.gputechconf.com/gtcnew/sessionview.php?sessionName=s9438-maximizing+utilization+for+data+center+inference+with+tensorrt+inference+server).
-
-* [NVIDIA TensorRT Inference Server Boosts Deep Learning
-  Inference](https://devblogs.nvidia.com/nvidia-serves-deep-learning-inference/).
-
-* [GPU-Accelerated Inference for Kubernetes with the NVIDIA TensorRT
-  Inference Server and
-  Kubeflow](https://www.kubeflow.org/blog/nvidia_tensorrt/).
-
-* [Deploying NVIDIA Triton at Scale with MIG and Kubernetes](https://developer.nvidia.com/blog/deploying-nvidia-triton-at-scale-with-mig-and-kubernetes/).
+* Specific end-to-end examples for popular models, such as ResNet, BERT, and 
+  DLRM are located in the [NVIDIA Deep Learning Examples page on 
+  GitHub](https://github.com/NVIDIA/DeepLearningExamples).
 
 ## Contributing
 
