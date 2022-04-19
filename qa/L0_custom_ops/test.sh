@@ -154,6 +154,28 @@ echo "name: \"custom_op\"" >> onnx_custom_ops/custom_op/config.pbtxt && \
 echo "platform: \"onnxruntime_onnx\"" >> onnx_custom_ops/custom_op/config.pbtxt && \
 echo "max_batch_size: 0" >> onnx_custom_ops/custom_op/config.pbtxt && \
 echo "model_operations { op_library_filename: \"./libcustom_op_library.so\" }" >> onnx_custom_ops/custom_op/config.pbtxt
+echo "input: [{
+		name: \"input_2\",
+		data_type: TYPE_FP32,
+		format: FORMAT_NONE,
+		dims: [3, 5],
+	}, {
+		name: \"input_1\",
+		data_type: TYPE_FP32,
+		format: FORMAT_NONE,
+		dims: [3, 5],
+	}],
+	"output": [{
+		name: \"output\",
+		data_type: TYPE_INT32,
+		dims: [3, 5],
+	}]" >> onnx_custom_ops/custom_op/config.pbtxt
+echo "instance_group [\
+    {\
+      count: 1\
+      kind: KIND_GPU\
+    }\
+  ]"  >> onnx_custom_ops/custom_op/config.pbtxt
 
 SERVER_ARGS="--model-repository=onnx_custom_ops --strict-model-config=false"
 SERVER_LD_PRELOAD=""
