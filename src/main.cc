@@ -519,8 +519,11 @@ std::vector<Option> options_
        "specified."},
       {OPTION_STARTUP_MODEL, "load-model", Option::ArgStr,
        "Name of the model to be loaded on server startup. It may be specified "
-       "multiple times to add multiple models. Note that this option will only "
-       "take affect if --model-control-mode=explicit is true."},
+       "multiple times to add multiple models. To load ALL models at startup, "
+       "specify --load-model=* as the ONLY --load-model argument. Specifying "
+       "--load-model=* in conjunction with another --load-model argument will "
+       "result in error. Note that this option will only take effect if "
+       "--model-control-mode=explicit is true."},
       // FIXME:  fix the default to execution_count once RL logic is complete.
       {OPTION_RATE_LIMIT, "rate-limit", Option::ArgStr,
        "Specify the mode for rate limiting. Options are \"execution_count\" "
