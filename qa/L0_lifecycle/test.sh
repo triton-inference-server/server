@@ -1272,9 +1272,10 @@ run_server
 if [ "$SERVER_PID" != "0" ]; then
     echo -e "\n***\n*** Failed: $SERVER started successfully when it was expected to fail\n***"
     cat $SERVER_LOG
+    RET=1
+
     kill $SERVER_PID
     wait $SERVER_PID
-    exit 1
 fi
 
 LOG_IDX=$((LOG_IDX+1))
