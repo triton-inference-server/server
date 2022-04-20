@@ -47,18 +47,20 @@ protocol](protocol/extension_model_repository.md) will have no affect
 and will return an error response.
 
 This model control mode is selected by specifying
---model-control-mode=none when starting Triton. This is the default
+`--model-control-mode=none` when starting Triton. This is the default
 model control mode. Changing the model repository while Triton is
 running must be done carefully, as explained in [Modifying the Model
 Repository](#modifying-the-model-repository).
 
 ## Model Control Mode EXPLICIT
 
-At startup, Triton loads only those models specified explicitly with
-the --load-model command-line option. If --load-model is not specified
-then no models are loaded at startup. Models that Triton is not able
-to load will be marked as UNAVAILABLE and will not be available for
-inferencing.
+At startup, Triton loads only those models specified explicitly with the
+`--load-model` command-line option. To load ALL models at startup, specify 
+`--load-model=*` as the ONLY `--load-model` argument. Specifying 
+`--load-model=*` in conjunction with another `--load-model` argument will
+result in error. If `--load-model` is not specified then no
+no models are loaded at startup. Models that Triton is not able
+to load will be marked as UNAVAILABLE and will not be available for inferencing.
 
 After startup, all model load and unload actions must be initiated
 explicitly by using the [model control
@@ -71,7 +73,7 @@ newly loaded model will replace the already loaded model without any
 loss in availability for the model.
 
 This model control mode is enabled by specifying
---model-control-mode=explicit. Changing the model repository while
+`--model-control-mode=explicit`. Changing the model repository while
 Triton is running must be done carefully, as explained in [Modifying
 the Model Repository](#modifying-the-model-repository).
 
@@ -91,7 +93,7 @@ the model.
 
 Changes to the model repository may not be detected immediately
 because Triton polls the repository periodically. You can control the
-polling interval with the --repository-poll-secs option. The console
+polling interval with the `--repository-poll-secs` option. The console
 log or the [model ready
 protocol](https://github.com/kserve/kserve/blob/master/docs/predict-api/v2/required_api.md)
 or the index operation of the [model control
@@ -109,7 +111,7 @@ protocol](protocols/extension_model_repository.md) will have no affect
 and will return an error response.
 
 This model control mode is enabled by specifying
---model-control-mode=poll and by setting --repository-poll-secs to a
+`--model-control-mode=poll` and by setting `--repository-poll-secs` to a
 non-zero value when starting Triton. Changing the model repository
 while Triton is running must be done carefully, as explained in
 [Modifying the Model Repository](#modifying-the-model-repository).
