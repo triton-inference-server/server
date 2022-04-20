@@ -1263,8 +1263,8 @@ done
 # as it's unclear what the user's intentions are.
 SERVER_ARGS="--model-repository=`pwd`/models --model-repository=`pwd`/models_0 \
              --model-control-mode=explicit \
-             --strict-readiness=false \
-             --strict-model-config=false --exit-on-error=false \
+             --strict-readiness=true \
+             --exit-on-error=true \
              --load-model=* \
              --load-model=onnx_float32_float32_float32"
 SERVER_LOG="./inference_server_$LOG_IDX.log"
