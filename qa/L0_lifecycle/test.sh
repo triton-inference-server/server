@@ -1196,6 +1196,90 @@ wait $SERVER_PID
 
 LOG_IDX=$((LOG_IDX+1))
 
+# Test loading all models on startup in EXPLICIT model control mode, re-use
+# existing LifeCycleTest.test_multiple_model_repository_control_startup_models
+# unit test
+rm -fr models models_0 config.pbtxt.*
+mkdir models models_0
+# Ensemble models in the second repository
+for i in plan onnx ; do
+    cp -r $DATADIR/qa_model_repository/${i}_float32_float32_float32 models/.
+    cp -r $DATADIR/qa_ensemble_model_repository/qa_model_repository/simple_${i}_float32_float32_float32 models_0/.
+    sed -i "s/max_batch_size:.*/max_batch_size: 1/" models/${i}_float32_float32_float32/config.pbtxt
+    sed -i "s/max_batch_size:.*/max_batch_size: 1/" models_0/simple_${i}_float32_float32_float32/config.pbtxt
+done
+
+# savedmodel doesn't load because it is duplicated in 2 repositories
+for i in savedmodel ; do
+    cp -r $DATADIR/qa_model_repository/${i}_float32_float32_float32 models/.
+    cp -r $DATADIR/qa_model_repository/${i}_float32_float32_float32 models_0/.
+done
+
+SERVER_ARGS="--model-repository=`pwd`/models --model-repository=`pwd`/models_0 \
+             --model-control-mode=explicit \
+             --strict-readiness=false \
+             --strict-model-config=false --exit-on-error=false \
+             --load-model=*"
+SERVER_LOG="./inference_server_$LOG_IDX.log"
+run_server
+if [ "$SERVER_PID" == "0" ]; then
+    echo -e "\n***\n*** Failed to start $SERVER\n***"
+    cat $SERVER_LOG
+    exit 1
+fi
+
+rm -f $CLIENT_LOG
+set +e
+python $LC_TEST LifeCycleTest.test_multiple_model_repository_control_startup_models >>$CLIENT_LOG 2>&1
+if [ $? -ne 0 ]; then
+    cat $CLIENT_LOG
+    echo -e "\n***\n*** Test Failed\n***"
+    RET=1
+else
+    check_test_results $TEST_RESULT_FILE 1
+    if [ $? -ne 0 ]; then
+        cat $CLIENT_LOG
+        echo -e "\n***\n*** Test Result Verification Failed\n***"
+        RET=1
+    fi
+fi
+set -e
+
+kill $SERVER_PID
+wait $SERVER_PID
+
+LOG_IDX=$((LOG_IDX+1))
+
+# Test loading all models on startup in EXPLICIT model control mode AND
+# an additional --load-model argument, it should fail
+rm -fr models 
+mkdir models 
+for i in onnx ; do
+    cp -r $DATADIR/qa_model_repository/${i}_float32_float32_float32 models/.
+    sed -i "s/max_batch_size:.*/max_batch_size: 1/" models/${i}_float32_float32_float32/config.pbtxt
+done
+
+# --load-model=* can not be used with any other --load-model arguments
+# as it's unclear what the user's intentions are.
+SERVER_ARGS="--model-repository=`pwd`/models --model-repository=`pwd`/models_0 \
+             --model-control-mode=explicit \
+             --strict-readiness=true \
+             --exit-on-error=true \
+             --load-model=* \
+             --load-model=onnx_float32_float32_float32"
+SERVER_LOG="./inference_server_$LOG_IDX.log"
+run_server
+if [ "$SERVER_PID" != "0" ]; then
+    echo -e "\n***\n*** Failed: $SERVER started successfully when it was expected to fail\n***"
+    cat $SERVER_LOG
+    RET=1
+
+    kill $SERVER_PID
+    wait $SERVER_PID
+fi
+
+LOG_IDX=$((LOG_IDX+1))
+
 # LifeCycleTest.test_model_repository_index
 rm -fr models models_0 config.pbtxt.*
 mkdir models models_0
