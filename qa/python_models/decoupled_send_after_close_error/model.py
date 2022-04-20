@@ -71,13 +71,8 @@ class TritonPythonModel:
         response_sender = requests[0].get_response_sender()
         in_0 = pb_utils.get_input_tensor_by_name(requests[0], "INPUT0")
         in_1 = pb_utils.get_input_tensor_by_name(requests[0], "INPUT1")
-        if in_0.as_numpy().dtype.type is np.bytes_ or in_0.as_numpy(
-        ).dtype == np.object_:
-            out_0, out_1 = (in_0.as_numpy().astype(np.int32) + in_1.as_numpy().astype(np.int32),\
-                in_0.as_numpy().astype(np.int32) - in_1.as_numpy().astype(np.int32))
-        else:
-            out_0, out_1 = (in_0.as_numpy() + in_1.as_numpy(),
-                            in_0.as_numpy() - in_1.as_numpy())
+        out_0, out_1 = (in_0.as_numpy() + in_1.as_numpy(),
+                        in_0.as_numpy() - in_1.as_numpy())
 
         out_tensor_0 = pb_utils.Tensor("OUTPUT0", out_0.astype(output0_dtype))
         out_tensor_1 = pb_utils.Tensor("OUTPUT1", out_1.astype(output1_dtype))

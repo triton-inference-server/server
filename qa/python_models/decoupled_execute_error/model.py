@@ -60,9 +60,7 @@ class TritonPythonModel:
         # Only generate the error for the first request
         i = 0
         for request in requests:
-            # Start a separate thread to send the responses for the request. In a full implementation we
-            # would need to keep track of any running threads so that we could delay finalizing the
-            # model until all response_thread threads have completed.
+            # Start a separate thread to send the responses for the request.
             thread = threading.Thread(
                 target=response_thread,
                 args=(self, requests[0].get_response_sender(), i,
