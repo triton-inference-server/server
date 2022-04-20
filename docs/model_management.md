@@ -1,5 +1,5 @@
 <!--
-# Copyright (c) 2018-2020, NVIDIA CORPORATION. All rights reserved.
+# Copyright 2018-2022, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -58,9 +58,9 @@ At startup, Triton loads only those models specified explicitly with the
 `--load-model` command-line option. To load ALL models at startup, specify 
 `--load-model=*` as the ONLY `--load-model` argument. Specifying 
 `--load-model=*` in conjunction with another `--load-model` argument will
-result in error. If `--load-model` is not specified then no
-no models are loaded at startup. Models that Triton is not able
-to load will be marked as UNAVAILABLE and will not be available for inferencing.
+result in error. If `--load-model` is not specified then no models are loaded
+at startup. Models that Triton is not able to load will be marked as
+UNAVAILABLE and will not be available for inferencing.
 
 After startup, all model load and unload actions must be initiated
 explicitly by using the [model control
