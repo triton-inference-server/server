@@ -38,7 +38,7 @@ MODEL_REPO=`pwd`/models
 SAMPLES_REPO=`pwd`/javacpp-presets/tritonserver/samples
 cp Simple.java $SAMPLES_REPO
 # Modify the pom to not force include any cuda dependencies
-sed '/<dependency>/ {
+sed -i '/<dependency>/ {
     :start
     N
     /<\/dependency>$/!b start
