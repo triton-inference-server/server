@@ -542,7 +542,7 @@ Concurrency: 1, throughput: 165.8 infer/sec, latency 6032 usec
  
 You might have to specify a different url(`-u`) to access wherever the server is running. The report of perf_analyzer will only include statistics measured at the client-side.
  
-**NOTE:** The support is still in a **beta** quality. perf_analyzer does not guarantee the most optimum tuning for TensorFlow Serving. However, a single benchmarking tool that can be used to stress the inference servers in an identical manner is important for performance analysis.
+**NOTE:** The support is still in a **beta**. perf_analyzer does not guarantee optimum tuning for TensorFlow Serving. However, a single benchmarking tool that can be used to stress the inference servers in an identical manner is important for performance analysis.
 
  
 The following points are important for interpreting the results:
@@ -598,7 +598,7 @@ The content of `data.json`:
  
 You might have to specify a different url(`-u`) to access wherever the server is running. The report of perf_analyzer will only include statistics measured at the client-side.
  
-**NOTE:** The support is still in a **beta** quality. perf_analyzer does not guarantee the most optimum tuning for TorchServe. However, a single benchmarking tool that can be used to stress the inference servers in an identical manner is important for performance analysis.
+**NOTE:** The support is still in a **beta**. perf_analyzer does not guarantee optimum tuning for TorchServe. However, a single benchmarking tool that can be used to stress the inference servers in an identical manner is important for performance analysis.
 
 ## Advantages of using Perf Analyzer over third-party benchmark suites
 
