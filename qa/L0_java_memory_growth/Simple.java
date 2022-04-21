@@ -29,9 +29,7 @@ import java.util.*;
 import java.util.concurrent.*;
 import com.google.gson.*;
 import org.bytedeco.javacpp.*;
-import org.bytedeco.cuda.cudart.*;
 import org.bytedeco.tritonserver.tritonserver.*;
-import static org.bytedeco.cuda.global.cudart.*;
 import static org.bytedeco.tritonserver.global.tritonserver.*;
 
 public class Simple {
@@ -39,7 +37,7 @@ public class Simple {
     private static boolean done = false;
 
     static void FAIL(String MSG) {
-        System.err.println("Cuda failure: " + MSG);
+        System.err.println("failure: " + MSG);
         System.exit(1);
     }
 
@@ -53,45 +51,8 @@ public class Simple {
         }
     }
 
-    static void FAIL_IF_CUDA_ERR(int err__, String MSG) {
-        if (err__ != cudaSuccess) {
-            System.err.println("error: " + MSG + ": " + cudaGetErrorString(err__));
-            System.exit(1);
-        }
-    }
-
     static boolean enforce_memory_type = false;
     static int requested_memory_type;
-
-    static class CudaDataDeleter extends Pointer {
-        public CudaDataDeleter() { super((Pointer)null); }
-        public void reset(Pointer p) {
-            this.address = p.address();
-            this.deallocator(new FreeDeallocator(this));
-        }
-        protected static class FreeDeallocator extends Pointer implements Deallocator {
-            FreeDeallocator(Pointer p) { super(p); }
-            @Override public void deallocate() {
-                if (!isNull()) {
-                  cudaPointerAttributes attr = new cudaPointerAttributes(null);
-                  int cuerr = cudaPointerGetAttributes(attr, this);
-                  if (cuerr != cudaSuccess) {
-                    System.err.println("error: failed to get CUDA pointer attribute of " + this
-                                     + ": " + cudaGetErrorString(cuerr).getString());
-                  }
-                  if (attr.type() == cudaMemoryTypeDevice) {
-                    cuerr = cudaFree(this);
-                  } else if (attr.type() == cudaMemoryTypeHost) {
-                    cuerr = cudaFreeHost(this);
-                  }
-                  if (cuerr != cudaSuccess) {
-                    System.err.println("error: failed to release CUDA pointer " + this
-                                     + ": " + cudaGetErrorString(cuerr).getString());
-                  }
-                }
-            }
-        }
-    }
 
     static class TRITONSERVER_ServerDeleter extends TRITONSERVER_Server {
         public TRITONSERVER_ServerDeleter(TRITONSERVER_Server p) { super(p); deallocator(new DeleteDeallocator(this)); }
@@ -144,55 +105,8 @@ public class Simple {
               actual_memory_type.put(0, requested_memory_type);
             }
 
-            switch (actual_memory_type.get()) {
-              case TRITONSERVER_MEMORY_CPU_PINNED: {
-                int err = cudaSetDevice((int)actual_memory_type_id.get());
-                if ((err != cudaSuccess) && (err != cudaErrorNoDevice) &&
-                    (err != cudaErrorInsufficientDriver)) {
-                  return TRITONSERVER_ErrorNew(
-                      TRITONSERVER_ERROR_INTERNAL,
-                      "unable to recover current CUDA device: " +
-                          cudaGetErrorString(err).getString());
-                }
-
-                err = cudaHostAlloc(allocated_ptr, byte_size, cudaHostAllocPortable);
-                if (err != cudaSuccess) {
-                  return TRITONSERVER_ErrorNew(
-                      TRITONSERVER_ERROR_INTERNAL,
-                      "cudaHostAlloc failed: " +
-                          cudaGetErrorString(err).getString());
-                }
-                break;
-              }
-
-              case TRITONSERVER_MEMORY_GPU: {
-                int err = cudaSetDevice((int)actual_memory_type_id.get());
-                if ((err != cudaSuccess) && (err != cudaErrorNoDevice) &&
-                    (err != cudaErrorInsufficientDriver)) {
-                  return TRITONSERVER_ErrorNew(
-                      TRITONSERVER_ERROR_INTERNAL,
-                      "unable to recover current CUDA device: " +
-                          cudaGetErrorString(err).getString());
-                }
-
-                err = cudaMalloc(allocated_ptr, byte_size);
-                if (err != cudaSuccess) {
-                  return TRITONSERVER_ErrorNew(
-                      TRITONSERVER_ERROR_INTERNAL,
-                      "cudaMalloc failed: " + cudaGetErrorString(err).getString());
-                }
-                break;
-              }
-
-              // Use CPU memory if the requested memory type is unknown
-              // (default case).
-              case TRITONSERVER_MEMORY_CPU:
-              default: {
-                actual_memory_type.put(0, TRITONSERVER_MEMORY_CPU);
-                allocated_ptr = Pointer.malloc(byte_size);
-                break;
-              }
-            }
+            actual_memory_type.put(0, TRITONSERVER_MEMORY_CPU);
+            allocated_ptr = Pointer.malloc(byte_size);
 
             // Pass the tensor name with buffer_userp so we can show it when
             // releasing the buffer.
@@ -217,38 +131,7 @@ public class Simple {
           } else {
             name = new BytePointer("<unknown>");
           }
-
-          switch (memory_type) {
-            case TRITONSERVER_MEMORY_CPU:
-              Pointer.free(buffer);
-              break;
-            case TRITONSERVER_MEMORY_CPU_PINNED: {
-              int err = cudaSetDevice((int)memory_type_id);
-              if (err == cudaSuccess) {
-                err = cudaFreeHost(buffer);
-              }
-              if (err != cudaSuccess) {
-                System.err.println("error: failed to cudaFree " + buffer + ": "
-                                 + cudaGetErrorString(err));
-              }
-              break;
-            }
-            case TRITONSERVER_MEMORY_GPU: {
-              int err = cudaSetDevice((int)memory_type_id);
-              if (err == cudaSuccess) {
-                err = cudaFree(buffer);
-              }
-              if (err != cudaSuccess) {
-                System.err.println("error: failed to cudaFree " + buffer + ": "
-                                 + cudaGetErrorString(err));
-              }
-              break;
-            }
-            default:
-              System.err.println("error: unexpected buffer allocated in CUDA managed memory");
-              break;
-          }
-
+          Pointer.free(buffer);
           name.deallocate();
 
           return null;  // Success
@@ -454,27 +337,7 @@ public class Simple {
         // performance reasons but ok for this simple example.
         BytePointer odata = new BytePointer(byte_size.get());
         output_data.put(name, odata);
-        switch (memory_type.get()) {
-          case TRITONSERVER_MEMORY_CPU: {
-            odata.put(base.limit(byte_size.get()));
-            break;
-          }
-
-          case TRITONSERVER_MEMORY_CPU_PINNED: {
-            odata.put(base.limit(byte_size.get()));
-            break;
-          }
-
-          case TRITONSERVER_MEMORY_GPU: {
-            FAIL_IF_CUDA_ERR(
-                cudaMemcpy(odata, base, byte_size.get(), cudaMemcpyDeviceToHost),
-                "getting " + name + " data from GPU memory");
-            break;
-          }
-
-          default:
-            FAIL("unexpected memory type");
-        }
+        odata.put(base.limit(byte_size.get()));
       }
 
       if (is_int) {
@@ -609,50 +472,6 @@ public class Simple {
 
       Pointer input0_base = input0_data;
       Pointer input1_base = input1_data;
-      CudaDataDeleter input0_gpu = new CudaDataDeleter();
-      CudaDataDeleter input1_gpu = new CudaDataDeleter();
-      boolean use_cuda_memory =
-          (enforce_memory_type &&
-          (requested_memory_type != TRITONSERVER_MEMORY_CPU));
-      if (use_cuda_memory) {
-        FAIL_IF_CUDA_ERR(cudaSetDevice(0), "setting CUDA device to device 0");
-        if (requested_memory_type != TRITONSERVER_MEMORY_CPU_PINNED) {
-          Pointer dst = new Pointer();
-          FAIL_IF_CUDA_ERR(
-              cudaMalloc(dst, input0_size),
-              "allocating GPU memory for INPUT0 data");
-          input0_gpu.reset(dst);
-          FAIL_IF_CUDA_ERR(
-              cudaMemcpy(dst, input0_data, input0_size, cudaMemcpyHostToDevice),
-              "setting INPUT0 data in GPU memory");
-          FAIL_IF_CUDA_ERR(
-              cudaMalloc(dst, input1_size),
-              "allocating GPU memory for INPUT1 data");
-          input1_gpu.reset(dst);
-          FAIL_IF_CUDA_ERR(
-              cudaMemcpy(dst, input1_data, input1_size, cudaMemcpyHostToDevice),
-              "setting INPUT1 data in GPU memory");
-        } else {
-          Pointer dst = new Pointer();
-          FAIL_IF_CUDA_ERR(
-              cudaHostAlloc(dst, input0_size, cudaHostAllocPortable),
-              "allocating pinned memory for INPUT0 data");
-          input0_gpu.reset(dst);
-          FAIL_IF_CUDA_ERR(
-              cudaMemcpy(dst, input0_data, input0_size, cudaMemcpyHostToHost),
-              "setting INPUT0 data in pinned memory");
-          FAIL_IF_CUDA_ERR(
-              cudaHostAlloc(dst, input1_size, cudaHostAllocPortable),
-              "allocating pinned memory for INPUT1 data");
-          input1_gpu.reset(dst);
-          FAIL_IF_CUDA_ERR(
-              cudaMemcpy(dst, input1_data, input1_size, cudaMemcpyHostToHost),
-              "setting INPUT1 data in pinned memory");
-        }
-
-        input0_base = use_cuda_memory ? input0_gpu : input0_data;
-        input1_base = use_cuda_memory ? input1_gpu : input1_data;
-      }
 
       FAIL_IF_ERR(
           TRITONSERVER_InferenceRequestAppendInputData(
@@ -1025,4 +844,3 @@ public class Simple {
       System.exit(0);
     }
 }
-
