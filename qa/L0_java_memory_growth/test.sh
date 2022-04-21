@@ -37,6 +37,15 @@ cd ..
 MODEL_REPO=`pwd`/models
 SAMPLES_REPO=`pwd`/javacpp-presets/tritonserver/samples
 cp Simple.java $SAMPLES_REPO
+# Modify the pom to not force include any cuda dependencies
+sed '/<dependency>/ {
+    :start
+    N
+    /<\/dependency>$/!b start
+    /<artifactId>cuda-platform<\/artifactId>/ {d}
+    /<artifactId>tensorrt-platform<\/artifactId>/ {d}
+}' $SAMPLES_REPO/pom.xml
+
 BASE_COMMAND="mvn clean compile -f $SAMPLES_REPO exec:java -Djavacpp.platform=linux-x86_64"
 source ../common/util.sh
 
