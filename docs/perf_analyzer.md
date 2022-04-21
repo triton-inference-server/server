@@ -549,7 +549,7 @@ You might have to specify a different url(`-u`) to access wherever
 the server is running. The report of perf_analyzer will only
 include statistics measured at the client-side.
  
-**NOTE:** The support is still in a **beta**. perf_analyzer does
+**NOTE:** The support is still in **beta**. perf_analyzer does
 not guarantee optimum tuning for TensorFlow Serving. However, a
 single benchmarking tool that can be used to stress the inference
 servers in an identical manner is important for performance
@@ -640,7 +640,7 @@ You might have to specify a different url(`-u`) to access wherever
 the server is running. The report of perf_analyzer will only include
 statistics measured at the client-side.
  
-**NOTE:** The support is still in a **beta**. perf_analyzer does not
+**NOTE:** The support is still in **beta**. perf_analyzer does not
 guarantee optimum tuning for TorchServe. However, a single benchmarking
 tool that can be used to stress the inference servers in an identical
 manner is important for performance analysis.
