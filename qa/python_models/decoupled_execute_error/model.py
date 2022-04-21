@@ -58,8 +58,7 @@ class TritonPythonModel:
         """
 
         # Only generate the error for the first request
-        i = 0
-        for request in requests:
+        for i, request in enumerate(requests):
             # Start a separate thread to send the responses for the request.
             thread = threading.Thread(
                 target=response_thread,
@@ -72,7 +71,6 @@ class TritonPythonModel:
                 self.inflight_thread_count += 1
 
             thread.start()
-            i += 1
 
         return None
 
