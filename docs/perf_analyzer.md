@@ -594,7 +594,7 @@ variable `TF_ENABLE_ONEDNN_OPTS=1`.
 perf_analyzer can also be used to benchmark
 [TorchServe](https://github.com/pytorch/serve) using the
 `--service-kind` option. The support is however only available through
-HTTP protocol. It also requires input to be provided via a json file.
+HTTP protocol. It also requires input to be provided via JSON file.
  
 Following invocation demonstrates how to configure perf_analyzer to
 issue requests to a running instance of `torchserve` assuming the
