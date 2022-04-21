@@ -524,7 +524,8 @@ perf_analyzer -m <model_name> --service-kind=tfserving -i grpc -u localhost:8500
  
 You might have to specify a different url(`-u`) to access wherever the server is running. The report of perf_analyzer will only include statistics measured at the client-side.
  
-**NOTE:** The support is still in a **beta** quality. perf_analyzer does not guarantee the most optimum tuning for TensorFlow Serving.
+**NOTE:** The support is still in a **beta** quality. perf_analyzer does not guarantee the most optimum tuning for TensorFlow Serving. However, a single benchmarking tool that can be used to stress the inference servers in an identical manner is important for performance analysis.
+
  
 The following points are important for interpreting the results:
 1. `Concurrent Request Execution`:
@@ -560,4 +561,16 @@ The content of `data.json` is:
  
 You might have to specify a different url(`-u`) to access wherever the server is running. The report of perf_analyzer will only include statistics measured at the client-side.
  
-**NOTE:** The support is still in a **beta** quality. perf_analyzer does not guarantee the most optimum tuning for TorchServe.
+**NOTE:** The support is still in a **beta** quality. perf_analyzer does not guarantee the most optimum tuning for TorchServe. However, a single benchmarking tool that can be used to stress the inference servers in an identical manner is important for performance analysis.
+
+## Advantages of using Perf Analyzer over third-party benchmark suites
+
+Triton Inference Server offers the entire serving solution which includes [client libraries](https://github.com/triton-inference-server/client) that are optimized for Triton.
+Using third-party benchmark suites like jmeter fails to take advantage of the optimized libraries. Some of these optimizations includes but are not limited to:
+1. Using [binary tensor data extension](https://github.com/triton-inference-server/server/blob/main/docs/protocol/extension_binary_data.md) with HTTP requests.
+2. Effective re-use of gRPC message allocation in subsequent requests.
+3. Avoiding extra memory copy via libcurl interface.
+
+These optimizations can have a tremendous impact on overall performance. Using perf_analyzer for benchmarking directly allows a user to access these optimizations in their study. 
+
+Not only that, perf_analyzer is also very customizable and supports many Triton features as described in this document. This, along with a detailed report, allows a user to identify performance bottlenecks and experiment with different features before deciding upon what works best for them.
