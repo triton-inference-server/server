@@ -50,15 +50,14 @@ BASE_COMMAND="mvn clean compile -f $SAMPLES_REPO exec:java -Djavacpp.platform=li
 source ../common/util.sh
 
 # Create local model repository
-rm -r models
-cp -r `pwd`/../L0_simple_ensemble/models .
-mkdir ${MODEL_REPO}/ensemble_add_sub_int32_int32_int32/1
+rm -r models && mkdir models
+cp -r `pwd`/../L0_simple_ensemble/models/simple models/.
 
 rm -f *.log
 RET=0
 
 # Run with default settings
-$BASE_COMMAND -Dexec.args="-r $MODEL_REPO -i 1000000" >>client.log 2>&1
+$BASE_COMMAND -Dexec.args="-r $MODEL_REPO -c -i 1000000" >>client.log 2>&1
 if [ $? -ne 0 ]; then
     RET=1
 fi

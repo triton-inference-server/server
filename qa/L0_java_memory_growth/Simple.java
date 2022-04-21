@@ -395,7 +395,7 @@ public class Simple {
     }
 
     static void
-    RunInference(TRITONSERVER_ServerDeleter server, String model_name, boolean[] is_int, boolean[] is_torch_model)
+    RunInference(TRITONSERVER_ServerDeleter server, String model_name, boolean[] is_int, boolean[] is_torch_model, boolean checkAccuracy)
     throws Exception
     {
       // Create the allocator that will be used to allocate buffers for
@@ -507,11 +507,11 @@ public class Simple {
         FAIL_IF_ERR(
             TRITONSERVER_InferenceResponseError(completed_response),
             "response status");
-
-        Check(
-            completed_response, input0_data, input1_data, output0, output1,
-            input0_size, datatype, is_int[0]);
-
+        if (checkAccuracy) {
+          Check(
+              completed_response, input0_data, input1_data, output0, output1,
+              input0_size, datatype, is_int[0]);
+        }
         FAIL_IF_ERR(
             TRITONSERVER_InferenceResponseDelete(completed_response),
             "deleting inference response");
@@ -550,10 +550,11 @@ public class Simple {
         FAIL_IF_ERR(
             TRITONSERVER_InferenceResponseError(completed_response),
             "response status");
-
-        Check(
-            completed_response, input0_data, input1_data, output0, output1,
-            input0_size, datatype, is_int[0]);
+        if (checkAccuracy) {
+          Check(
+              completed_response, input0_data, input1_data, output0, output1,
+              input0_size, datatype, is_int[0]);
+        }
 
         FAIL_IF_ERR(
             TRITONSERVER_InferenceResponseDelete(completed_response),
@@ -594,10 +595,12 @@ public class Simple {
             TRITONSERVER_InferenceResponseError(completed_response),
             "response status");
 
-        // Both inputs are using input1_data...
-        Check(
-            completed_response, input1_data, input1_data, output0, output1,
-            input0_size, datatype, is_int[0]);
+        if (checkAccuracy) {
+          // Both inputs are using input1_data...
+          Check(
+              completed_response, input1_data, input1_data, output0, output1,
+              input0_size, datatype, is_int[0]);
+        }
 
         FAIL_IF_ERR(
             TRITONSERVER_InferenceResponseDelete(completed_response),
@@ -619,6 +622,7 @@ public class Simple {
       int num_iterations = 1000000;
       String model_repository_path = null;
       int verbose_level = 0;
+      boolean checkAccuracy = false;
 
       // Parse commandline...
       for (int i = 0; i < args.length; i++) {
@@ -652,6 +656,9 @@ public class Simple {
             break;
           case "-v":
             verbose_level = 1;
+            break;
+          case "-c":
+            checkAccuracy = true;
             break;
           case "-?":
             Usage(null);
@@ -836,7 +843,7 @@ public class Simple {
 
       for(int i = 0; i < num_iterations; i++){
         try (PointerScope scope = new PointerScope()) {
-          RunInference(server, model_name, is_int, is_torch_model);
+          RunInference(server, model_name, is_int, is_torch_model, checkAccuracy);
         }
       }
       done = true;
