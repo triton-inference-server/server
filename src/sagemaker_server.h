@@ -72,22 +72,20 @@ class SagemakerAPIServer : public HTTPAPIServer {
   {
   }
 
-  std::tuple<std::string, std::string> ParseLoadModelRequest(
-      evhtp_request_t* req);
+  void ParseSageMakerRequest(
+      evhtp_request_t* req,
+      std::unordered_map<std::string, std::string>* parse_map,
+      const std::string& action);
 
-  // Load Model
   void SageMakerMMELoadModel(
       evhtp_request_t* req,
-      std::tuple<std::string, std::string> url_modelname_tuple);
+      const std::unordered_map<std::string, std::string> parse_map);
 
-  // Unload Model
-
-  // List Model
+  void SageMakerMMEListModel(evhtp_request_t* req);
 
   // Get Model
-
-  // Invoke Model
-
+  
+  
   void Handle(evhtp_request_t* req) override;
 
   std::unique_ptr<InferRequestClass> CreateInferRequest(
@@ -122,6 +120,9 @@ class SagemakerAPIServer : public HTTPAPIServer {
   const std::string model_version_str_;
 
   static const std::string binary_mime_type_;
+
+  // Maintain list of loaded models
+  std::unordered_map<std::string, std::string> sagemaker_models_list;
 };
 
 }}  // namespace triton::server
