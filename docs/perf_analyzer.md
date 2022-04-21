@@ -516,10 +516,28 @@ There are a few functionalities that are missing from the C API. They are:
 ## Benchmarking TensorFlow Serving
 perf_analyzer can also be used to benchmark models deployed on [TensorFlow Serving](https://github.com/tensorflow/serving) using the `--service-kind` option. The support is however only available through gRPC protocol.
  
-Following invocation demonstrates how to configure perf_analyzer to issue requests to a running instance of tensorflow_model_server:
+Following invocation demonstrates how to configure perf_analyzer to issue requests to a running instance of `tensorflow_model_server`:
  
 ```
-perf_analyzer -m <model_name> --service-kind=tfserving -i grpc -u localhost:8500
+$ perf_analyzer -m resnet50 --service-kind tfserving -i grpc -b 1 -p 5000 -u localhost:8500
+*** Measurement Settings ***
+  Batch size: 1
+  Using "time_windows" mode for stabilization
+  Measurement window: 5000 msec
+  Using synchronous calls for inference
+  Stabilizing using average latency
+Request concurrency: 1
+  Client: 
+    Request count: 829
+    Throughput: 165.8 infer/sec
+    Avg latency: 6032 usec (standard deviation 569 usec)
+    p50 latency: 5863 usec
+    p90 latency: 6655 usec
+    p95 latency: 6974 usec
+    p99 latency: 8093 usec
+    Avg gRPC time: 5984 usec ((un)marshal request/response 257 usec + response wait 5727 usec)
+Inferences/Second vs. Client Average Batch Latency
+Concurrency: 1, throughput: 165.8 infer/sec, latency 6032 usec
 ```
  
 You might have to specify a different url(`-u`) to access wherever the server is running. The report of perf_analyzer will only include statistics measured at the client-side.
@@ -538,15 +556,34 @@ TFS has separate builds for CPU and GPU targets. They have target-specific optim
  
  
 ## Benchmarking TorchServe
-perf_analyzer can also be used to benchmark [TorchServe](https://github.com/pytorch/serve)  using the `--service-kind` option. The support is however only available through HTTP protocol. It also requires input to be provided within a file.
+perf_analyzer can also be used to benchmark [TorchServe](https://github.com/pytorch/serve) using the `--service-kind` option. The support is however only available through HTTP protocol. It also requires input to be provided via a json file.
  
-Following invocation demonstrates how to configure perf_analyzer to issue requests to a running instance of torchserve assuming the location holds `kitten_small.jpg`:
+Following invocation demonstrates how to configure perf_analyzer to issue requests to a running instance of `torchserve` assuming the location holds `kitten_small.jpg`:
  
 ```
-perf_analyzer -m resnet50 --service-kind=torchserve -i http -u localhost:8080 --input-data data.json
+$ perf_analyzer -m resnet50 --service-kind torchserve -i http -u localhost:8080 -b 1 -p 5000 --input-data data.json
+ Successfully read data for 1 stream/streams with 1 step/steps.
+*** Measurement Settings ***
+  Batch size: 1
+  Using "time_windows" mode for stabilization
+  Measurement window: 5000 msec
+  Using synchronous calls for inference
+  Stabilizing using average latency
+Request concurrency: 1
+  Client: 
+    Request count: 799
+    Throughput: 159.8 infer/sec
+    Avg latency: 6259 usec (standard deviation 397 usec)
+    p50 latency: 6305 usec
+    p90 latency: 6448 usec
+    p95 latency: 6494 usec
+    p99 latency: 7158 usec
+    Avg HTTP time: 6272 usec (send/recv 77 usec + response wait 6195 usec)
+Inferences/Second vs. Client Average Batch Latency
+Concurrency: 1, throughput: 159.8 infer/sec, latency 6259 usec
 ```
  
-The content of `data.json` is:
+The content of `data.json`:
  
 ```
  {
