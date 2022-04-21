@@ -391,6 +391,11 @@ if [ $? -ne 0 ]; then
   RET=1
 fi
 
+(cd argument_validation && bash -ex test.sh)
+if [ $? -ne 0 ]; then
+  RET=1
+fi
+
 if [ $RET -eq 0 ]; then
   echo -e "\n***\n*** Test Passed\n***"
 else
