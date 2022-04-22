@@ -1332,11 +1332,11 @@ HTTPAPIServer::HandleRepositoryControl(
           std::vector<std::string> members;
           HTTP_RESPOND_IF_ERR(req, param_json.Members(&members));
           for (const auto& m : members) {
-            triton::common::TritonJson::Value p;
-            HTTP_RESPOND_IF_ERR(req, param_json.MemberAsObject(m.c_str(), &p));
             const char* param_str = nullptr;
             size_t param_len = 0;
-            HTTP_RESPOND_IF_ERR(req, p.AsString(&param_str, &param_len));
+            HTTP_RESPOND_IF_ERR(
+                req,
+                param_json.MemberAsString(m.c_str(), &param_str, &param_len));
             auto param = TRITONSERVER_ParameterNew(
                 m.c_str(), TRITONSERVER_PARAMETER_STRING, param_str);
             if (param != nullptr) {

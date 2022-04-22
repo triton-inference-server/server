@@ -2276,14 +2276,14 @@ class LifeCycleTest(tu.TestResultCollector):
                 try:
                     triton_client.load_model(
                         model_name,
-                        encoded_file={"file:1/model.onnx": encoded_file})
+                        encoded_files={"file:1/model.onnx": encoded_file})
                     self.assertTrue(
                         False, "expected error on missing override config")
-                except Exception as ex:
-                    # [FIXME] check if error mentions missing config
+                except InferenceServerException as ex:
+                    # [FIXME] Improve error reporting to mention missing config
                     self.assertIn(
-                        "load failed for model '{}'".format(model_name),
-                        ex.message())
+                        "failed to load '{}', failed to poll from model repository"
+                        .format(model_name), ex.message())
 
                 # Sanity check on previous loaded version is still available
                 self.assertFalse(triton_client.is_model_ready(model_name, "1"))
@@ -2301,7 +2301,7 @@ class LifeCycleTest(tu.TestResultCollector):
                         override_model_name,
                         config="""{{"backend":"{backend}" }}""".format(
                             backend=base[1]),
-                        encoded_file={"file:1/model.onnx": encoded_file})
+                        encoded_files={"file:1/model.onnx": encoded_file})
                 except Exception as ex:
                     self.assertTrue(False, "unexpected error {}".format(ex))
 
@@ -2333,7 +2333,7 @@ class LifeCycleTest(tu.TestResultCollector):
                         model_name,
                         config="""{{"backend":"{backend}" }}""".format(
                             backend=base[1]),
-                        encoded_file={"file:1/model.onnx": encoded_file})
+                        encoded_files={"file:1/model.onnx": encoded_file})
                 except Exception as ex:
                     self.assertTrue(False, "unexpected error {}".format(ex))
 
@@ -2360,12 +2360,20 @@ class LifeCycleTest(tu.TestResultCollector):
                                            model_shape,
                                            swap=True)
 
-                # Unload model for the next client iteration
+                # Reset model for the next client iteration
                 try:
-                    triton_client.unload_model(model_name)
+                    # Load model again and the original model repository will
+                    # be use
+                    triton_client.load_model(model_name)
                     triton_client.unload_model(override_model_name)
                 except Exception as ex:
                     self.assertTrue(False, "unexpected error {}".format(ex))
+                self.assertFalse(triton_client.is_model_ready(model_name, "1"))
+                self.assertFalse(triton_client.is_model_ready(model_name, "2"))
+                self.assertTrue(triton_client.is_model_ready(model_name, "3"))
+                self._infer_success_models([
+                    base[0],
+                ], (3,), model_shape)
 
     def test_shutdown_dynamic(self):
         model_shape = (1, 1)
