@@ -108,7 +108,7 @@ def add_requested_backends(ddir, dockerfile_name, backends):
             import build
             ver = next(iter(build.TRITON_VERSION_MAP.values()))
             backend = build.tagged_backend(backend, ver[4][0])
-        df += '''COPY --chown=1000:1000 --from=full /opt/tritonserver/backends/{} /opt/tritonserver/backends/{}    
+        df += '''COPY --chown=1000:1000 --from=full /opt/tritonserver/backends/{} /opt/tritonserver/backends/{}
 '''.format(backend, backend)
     if len(backends) > 0:
         df += '''
@@ -122,7 +122,7 @@ RUN chown triton-server:triton-server /opt/tritonserver/backends
 def add_requested_repoagents(ddir, dockerfile_name, repoagents):
     df = "#  Copying over repoagents \n"
     for ra in repoagents:
-        df += '''COPY --chown=1000:1000 --from=full /opt/tritonserver/repoagents/{} /opt/tritonserver/repoagents/{}    
+        df += '''COPY --chown=1000:1000 --from=full /opt/tritonserver/repoagents/{} /opt/tritonserver/repoagents/{}
 '''.format(ra, ra)
     if len(repoagents) > 0:
         df += '''
@@ -159,7 +159,7 @@ def get_container_version_if_not_specified():
         with open('TRITON_VERSION', "r") as vfile:
             version = vfile.readline().strip()
         import build
-        _, FLAGS.container_version = build.get_container_versions(
+        _, FLAGS.container_version = build.container_versions(
             version, None, FLAGS.container_version)
         log('version {}'.format(version))
     log('using container version {}'.format(FLAGS.container_version))
