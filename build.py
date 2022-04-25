@@ -583,6 +583,8 @@ def backend_cmake_args(images, components, be, install_dir, library_paths,
                              FLAGS.enable_mali_gpu))
     cargs.append(
         cmake_backend_enable(be, 'TRITON_ENABLE_STATS', FLAGS.enable_stats))
+    cargs.append(
+        cmake_backend_enable(be, 'TRITON_ENABLE_METRICS', FLAGS.enable_metrics))
 
     cargs += cmake_backend_extra_args(be)
     cargs.append('..')
