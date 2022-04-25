@@ -83,9 +83,8 @@ class SagemakerAPIServer : public HTTPAPIServer {
 
   void SageMakerMMEListModel(evhtp_request_t* req);
 
-  // Get Model
-  
-  
+  void SageMakerMMEGetModel(evhtp_request_t* req, const char* model_name);
+
   void Handle(evhtp_request_t* req) override;
 
   std::unique_ptr<InferRequestClass> CreateInferRequest(
