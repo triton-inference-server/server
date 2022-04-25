@@ -24,32 +24,39 @@
 # (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-name: "decoupled_execute_error"
+name: "decoupled_send_after_close_error"
 backend: "python"
-max_batch_size: 64
-
 model_transaction_policy {
   decoupled: True
 }
+
 input [
   {
-    name: "IN"
+    name: "INPUT0"
     data_type: TYPE_FP32
-    dims: [ -1 ]
+    dims: [ 16 ]
   }
 ]
-
+input [
+  {
+    name: "INPUT1"
+    data_type: TYPE_FP32
+    dims: [ 16 ]
+  }
+]
 output [
   {
-    name: "OUT"
+    name: "OUTPUT0"
     data_type: TYPE_FP32
-    dims: [ -1 ]
+    dims: [ 16 ]
+  }
+]
+output [
+  {
+    name: "OUTPUT1"
+    data_type: TYPE_FP32
+    dims: [ 16 ]
   }
 ]
 
-instance_group [
-  {
-    count: 1
-    kind : KIND_CPU
-  }
-]
+instance_group [{ kind: KIND_CPU }]

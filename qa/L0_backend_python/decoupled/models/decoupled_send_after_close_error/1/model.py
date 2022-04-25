@@ -79,7 +79,4 @@ class TritonPythonModel:
         response = pb_utils.InferenceResponse([out_tensor_0, out_tensor_1])
 
         response_sender.close()
-
         response_sender.send(response)
-
-        return None

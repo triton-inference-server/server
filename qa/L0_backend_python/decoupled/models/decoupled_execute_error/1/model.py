@@ -25,6 +25,10 @@
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 import triton_python_backend_utils as pb_utils
+import json
+import threading
+import numpy as np
+import time
 
 
 class TritonPythonModel:
@@ -60,11 +64,10 @@ class TritonPythonModel:
         # Only generate the error for the first request
         for i, request in enumerate(requests):
             # Start a separate thread to send the responses for the request.
-            thread = threading.Thread(
-                target=response_thread,
-                args=(self, requests[0].get_response_sender(), i,
-                      pb_utils.get_input_tensor_by_name(requests[0],
-                                                        'IN').as_numpy()))
+            thread = threading.Thread(target=self.response_thread,
+                                      args=(request.get_response_sender(), i,
+                                            pb_utils.get_input_tensor_by_name(
+                                                request, 'IN').as_numpy()))
             thread.daemon = True
 
             with self.inflight_thread_count_lck:
@@ -79,22 +82,16 @@ class TritonPythonModel:
         # The first request will send errors and the other requests will send the responses.
         # The number of responses per requests is the number of elements in input tensor.
 
-        out_dtype = self.out_dtype
+        in_value = in_input
+        out_output = pb_utils.Tensor("OUT", in_value)
 
-        for idx in range(in_input.size):
-            in_value = in_input[idx]
-            out_output = pb_utils.Tensor("OUT",
-                                         numpy.array([in_value], out_dtype))
-
-            if index == 0:
-                error = pb_utils.TritonError(
-                    'An error occured during execution')
-                response = pb_utils.InferenceResponse(
-                    output_tensors=[out_output], error)
-            else:
-                response = pb_utils.InferenceResponse(
-                    output_tensors=[out_output])
-            response_sender.send(response)
+        if index == 0:
+            error = pb_utils.TritonError('An error occured during execution')
+            response = pb_utils.InferenceResponse(output_tensors=[out_output],
+                                                  error=error)
+        else:
+            response = pb_utils.InferenceResponse(output_tensors=[out_output])
+        response_sender.send(response)
 
         # We must close the response sender to indicate to Triton that we are done sending
         # responses for the corresponding request. We can't use the response sender after

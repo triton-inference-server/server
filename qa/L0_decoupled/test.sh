@@ -48,78 +48,91 @@ rm -f *.log
 
 CLIENT_LOG=`pwd`/client.log
 DATADIR=/data/inferenceserver/${REPO_VERSION}/qa_model_repository
-MODELDIR=`pwd`/models
 SERVER=/opt/tritonserver/bin/tritonserver
 SERVER_ARGS="--model-repository=`pwd`/models"
 SERVER_LOG="./inference_server.log"
 source ../common/util.sh
 
-cp -r $DATADIR/libtorch_nobatch_int32_int32_int32 $MODELDIR/.
-(cd $MODELDIR/libtorch_nobatch_int32_int32_int32 && \
-    sed -i "s/dims:.*\[.*\]/dims: \[ 1 \]/g" config.pbtxt)
 
-run_server
-if [ "$SERVER_PID" == "0" ]; then
-    echo -e "\n***\n*** Failed to start $SERVER\n***"
-    cat $SERVER_LOG
-    exit 1
-fi
+TRIALS="python custom"
 
-for i in \
-            test_one_to_none \
-            test_one_to_one \
-            test_one_to_many \
-            test_no_streaming \
-            test_response_order \
-            test_wrong_shape ; do
+for trial in $TRIALS; do
+  if [ $trial == "python" ]; then
+    MODELDIR=`pwd`/python_models
+  else
+    MODELDIR=`pwd`/models
+  fi
 
-    echo "Test: $i" >>$CLIENT_LOG
-    set +e
-    python $DECOUPLED_TEST DecoupledTest.$i >>$CLIENT_LOG 2>&1
-    if [ $? -ne 0 ]; then
-            echo -e "\n***\n*** Test $i Failed\n***" >>$CLIENT_LOG
-            echo -e "\n***\n*** Test $i Failed\n***"
-            RET=1
-    else
-        check_test_results $TEST_RESULT_FILE 1
-        if [ $? -ne 0 ]; then
-            cat $CLIENT_LOG
-            echo -e "\n***\n*** Test Result Verification Failed\n***"
-            RET=1
-        fi
-    fi
-    set -e
+  SERVER_ARGS="--model-repository=$MODELDIR"
+  cp -r $DATADIR/libtorch_nobatch_int32_int32_int32 $MODELDIR/.
+  (cd $MODELDIR/libtorch_nobatch_int32_int32_int32 && \
+   sed -i "s/dims:.*\[.*\]/dims: \[ 1 \]/g" config.pbtxt)
+
+  run_server
+  if [ "$SERVER_PID" == "0" ]; then
+      echo -e "\n***\n*** Failed to start $SERVER\n***"
+      cat $SERVER_LOG
+      exit 1
+  fi
+  
+  for i in \
+              test_one_to_none \
+              test_one_to_one \
+              test_one_to_many \
+              test_no_streaming \
+              test_response_order \
+	      test_wrong_shape; do
+  
+      echo "Test: $i" >>$CLIENT_LOG
+      set +e
+      python $DECOUPLED_TEST DecoupledTest.$i >>$CLIENT_LOG 2>&1
+      if [ $? -ne 0 ]; then
+              echo -e "\n***\n*** Test $i Failed\n***" >>$CLIENT_LOG
+              echo -e "\n***\n*** Test $i Failed\n***"
+              RET=1
+      else
+          check_test_results $TEST_RESULT_FILE 1
+          if [ $? -ne 0 ]; then
+              cat $CLIENT_LOG
+              echo -e "\n***\n*** Test Result Verification Failed\n***"
+              RET=1
+          fi
+      fi
+      set -e
+  done
+  
+  # Will delay the writing of each response by the specified many milliseconds.
+  # This will ensure that there are multiple responses available to be written.
+  export TRITONSERVER_DELAY_GRPC_RESPONSE=2000
+  
+  echo "Test: test_one_to_multi_many" >>$CLIENT_LOG
+  set +e
+  python $DECOUPLED_TEST DecoupledTest.test_one_to_multi_many >>$CLIENT_LOG 2>&1
+  if [ $? -ne 0 ]; then
+      echo -e "\n***\n*** Test test_one_to_multi_many Failed\n***" >>$CLIENT_LOG
+          echo -e "\n***\n*** Test test_one_to_multi_many Failed\n***"
+          RET=1
+  else
+      check_test_results $TEST_RESULT_FILE 1
+      if [ $? -ne 0 ]; then
+          cat $CLIENT_LOG
+          echo -e "\n***\n*** Test Result Verification Failed\n***"
+          RET=1
+      fi
+  fi
+  
+  set -e
+  
+  unset TRITONSERVER_DELAY_GRPC_RESPONSE
+  
+  kill $SERVER_PID
+  wait $SERVER_PID
 done
-
-# Will delay the writing of each response by the specified many milliseconds.
-# This will ensure that there are multiple responses available to be written.
-export TRITONSERVER_DELAY_GRPC_RESPONSE=2000
-
-echo "Test: test_one_to_multi_many" >>$CLIENT_LOG
-set +e
-python $DECOUPLED_TEST DecoupledTest.test_one_to_multi_many >>$CLIENT_LOG 2>&1
-if [ $? -ne 0 ]; then
-    echo -e "\n***\n*** Test test_one_to_multi_many Failed\n***" >>$CLIENT_LOG
-        echo -e "\n***\n*** Test test_one_to_multi_many Failed\n***"
-        RET=1
-else
-    check_test_results $TEST_RESULT_FILE 1
-    if [ $? -ne 0 ]; then
-        cat $CLIENT_LOG
-        echo -e "\n***\n*** Test Result Verification Failed\n***"
-        RET=1
-    fi
-fi
-
-set -e
-
-unset TRITONSERVER_DELAY_GRPC_RESPONSE
-
-kill $SERVER_PID
-wait $SERVER_PID
 
 if [ $RET -eq 0 ]; then
   echo -e "\n***\n*** Test Passed\n***"
+else 
+  echo -e "\n***\n*** Test Failed\n***"
 fi
 
 exit $RET
