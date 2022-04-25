@@ -215,6 +215,7 @@ SagemakerAPIServer::Handle(evhtp_request_t* req)
           return;
         }
         LOG_VERBOSE(1) << "SageMaker request: GET MODEL";
+        SageMakerMMEGetModel(req, multi_model_name.c_str());
         return;
       case htp_method_POST:
         if (action == "/invoke") {
@@ -335,51 +336,69 @@ SagemakerAPIServer::ParseSageMakerRequest(
 }
 
 void
-SagemakerAPIServer::SageMakerMMEListModel(evhtp_request_t* req)
+SagemakerAPIServer::SageMakerMMEGetModel(
+    evhtp_request_t* req, const char* model_name)
 {
-  /* Print the list */
-  for (auto it = sagemaker_models_list.begin();
-       it != sagemaker_models_list.end(); it++) {
-    LOG_INFO << it->first << "==>" << it->second;
+  if (sagemaker_models_list.find(model_name) == sagemaker_models_list.end()) {
+    evhtp_send_reply(req, EVHTP_RES_NOTFOUND); /* 404*/
+    return;
   }
 
+  triton::common::TritonJson::Value sagemaker_get_json(
+      triton::common::TritonJson::ValueType::OBJECT);
 
-  /* Return this list back*/
+  sagemaker_get_json.AddString("modelName", model_name);
+  sagemaker_get_json.AddString(
+      "modelUrl", sagemaker_models_list.at(model_name));
+
+  const char* buffer;
+  size_t byte_size;
+
+  triton::common::TritonJson::WriteBuffer json_buffer_;
+  json_buffer_.Clear();
+  sagemaker_get_json.Write(&json_buffer_);
+
+  byte_size = json_buffer_.Size();
+  buffer = json_buffer_.Base();
+
+  evbuffer_add(req->buffer_out, buffer, byte_size);
+  evhtp_send_reply(req, EVHTP_RES_OK);
+}
+
+void
+SagemakerAPIServer::SageMakerMMEListModel(evhtp_request_t* req)
+{
   triton::common::TritonJson::Value sagemaker_list_json(
-      triton::common::TritonJson::ValueType::ARRAY);
+      triton::common::TritonJson::ValueType::OBJECT);
+
+  triton::common::TritonJson::Value models_array(
+      sagemaker_list_json, triton::common::TritonJson::ValueType::ARRAY);
 
   for (auto it = sagemaker_models_list.begin();
        it != sagemaker_models_list.end(); it++) {
     triton::common::TritonJson::Value model_url_pair(
-        sagemaker_list_json, triton::common::TritonJson::ValueType::OBJECT);
+        models_array, triton::common::TritonJson::ValueType::OBJECT);
 
     model_url_pair.AddString("modelName", it->first);
     model_url_pair.AddString("modelUrl", it->second);
 
-    sagemaker_list_json.Append(std::move(model_url_pair));
+    models_array.Append(std::move(model_url_pair));
   }
+
+  sagemaker_list_json.Add("models", std::move(models_array));
 
   const char* buffer;
   size_t byte_size;
-  TRITONSERVER_Message* message;
 
   triton::common::TritonJson::WriteBuffer json_buffer_;
   json_buffer_.Clear();
   sagemaker_list_json.Write(&json_buffer_);
 
-  message = reinterpret_cast<TRITONSERVER_Message*>(&sagemaker_list_json);
-
-  auto err = TRITONSERVER_MessageSerializeToJson(message, &buffer, &byte_size);
+  byte_size = json_buffer_.Size();
+  buffer = json_buffer_.Base();
 
   evbuffer_add(req->buffer_out, buffer, byte_size);
   evhtp_send_reply(req, EVHTP_RES_OK);
-
-  if (err == nullptr) {
-    evbuffer_add(req->buffer_out, buffer, byte_size);
-    evhtp_send_reply(req, EVHTP_RES_OK);
-  } else {
-    LOG_INFO << "ERROR in Parsing List" << std::endl;
-  }
 }
 
 void
@@ -430,7 +449,6 @@ SagemakerAPIServer::SageMakerMMELoadModel(
     evhtp_send_reply(req, EVHTP_RES_CONFLICT); /* 409 */
     TRITONSERVER_ErrorDelete(err);
     return;
-    // Add return here
   } else if (err != nullptr) {
     EVBufferAddErrorJson(req->buffer_out, err);
     evhtp_send_reply(req, EVHTP_RES_BADREQ);
@@ -455,9 +473,7 @@ SagemakerAPIServer::SageMakerMMELoadModel(
     evhtp_send_reply(req, EVHTP_RES_BADREQ);
     TRITONSERVER_ErrorDelete(load_err);
   } else {
-    // Add model in list
     sagemaker_models_list.emplace(model_name, repo_path);
-
     evhtp_send_reply(req, EVHTP_RES_OK);
   }
   return;
