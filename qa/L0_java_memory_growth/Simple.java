@@ -357,7 +357,7 @@ public class Simple {
      */
     static boolean
     ValidateMemoryGrowth(float max_allowed){
-      // Allocate list starting capacity to hold up to 24 hours worth of snapshots
+      // Allocate list starting capacity to hold up to 24 hours worth of snapshots.
       List<Double> memory_snapshots = new ArrayList<Double>(20000);
       while(!done){
         System.gc();
@@ -377,13 +377,13 @@ public class Simple {
       }
 
       // Measure memory growth without outliers by taking difference
-      // between 95th percentile and median
+      // between 90th percentile and 10th percentile memory usage.
       Collections.sort(memory_snapshots);
-      int index_95 = ((int) Math.ceil(95.0 / 100.0 * memory_snapshots.size())) - 1;
-      int index_50 = ((int) Math.ceil(50.0 / 100.0 * memory_snapshots.size())) - 1;
-      double memory_allocation_delta = memory_snapshots.get(index_95) - memory_snapshots.get(index_50);
+      int index_90 = ((int) Math.ceil(90.0 / 100.0 * memory_snapshots.size())) - 1;
+      int index_10 = ((int) Math.ceil(10.0 / 100.0 * memory_snapshots.size())) - 1;
+      double memory_allocation_delta = memory_snapshots.get(index_90) - memory_snapshots.get(index_10);
       double memory_allocation_delta_mb = memory_allocation_delta / 1E6;
-      double memory_allocation_delta_percent = memory_allocation_delta / memory_snapshots.get(index_95);
+      double memory_allocation_delta_percent = memory_allocation_delta / memory_snapshots.get(index_90);
 
       System.out.println("Change in memory allocation (MB): " +
           memory_allocation_delta_mb + ", " +
@@ -834,7 +834,7 @@ public class Simple {
 
       Runnable runnable =
         () -> { 
-          if(ValidateMemoryGrowth(.1f)){
+          if(ValidateMemoryGrowth(.05f)){
             System.out.println("Memory growth test passed");
           } else {
             System.out.println("Memory growth test FAILED");
