@@ -434,6 +434,16 @@ ReadDataFromJson(
               std::string(tensor_name))
               .c_str());
 
+    // BF16 not supported via JSON
+    case TRITONSERVER_TYPE_BF16:
+      return TRITONSERVER_ErrorNew(
+          TRITONSERVER_ERROR_INVALID_ARG,
+          std::string(
+              "receiving BF16 data via JSON is not supported. Please use the "
+              "binary data format for input " +
+              std::string(tensor_name))
+              .c_str());
+
     case TRITONSERVER_TYPE_INVALID:
       return TRITONSERVER_ErrorNew(
           TRITONSERVER_ERROR_INVALID_ARG,
@@ -584,6 +594,13 @@ WriteDataToJson(
       return TRITONSERVER_ErrorNew(
           TRITONSERVER_ERROR_INVALID_ARG,
           "sending FP16 data via JSON is not supported. Please use the "
+          "binary data format for output");
+
+    // BF16 not supported via JSON
+    case TRITONSERVER_TYPE_BF16:
+      return TRITONSERVER_ErrorNew(
+          TRITONSERVER_ERROR_INVALID_ARG,
+          "sending BF16 data via JSON is not supported. Please use the "
           "binary data format for output");
 
     case TRITONSERVER_TYPE_FP32: {
