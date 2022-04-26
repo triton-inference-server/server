@@ -2286,6 +2286,7 @@ class LifeCycleTest(tu.TestResultCollector):
                         .format(model_name), ex.message())
 
                 # Sanity check on previous loaded version is still available
+                # after the failure attempt to load model with different version
                 self.assertFalse(triton_client.is_model_ready(model_name, "1"))
                 self.assertFalse(triton_client.is_model_ready(model_name, "2"))
                 self.assertTrue(triton_client.is_model_ready(model_name, "3"))
@@ -2306,6 +2307,7 @@ class LifeCycleTest(tu.TestResultCollector):
                     self.assertTrue(False, "unexpected error {}".format(ex))
 
                 # Sanity check on previous loaded version is still available
+                # after the load with different model name
                 self.assertFalse(triton_client.is_model_ready(model_name, "1"))
                 self.assertFalse(triton_client.is_model_ready(model_name, "2"))
                 self.assertTrue(triton_client.is_model_ready(model_name, "3"))
@@ -2313,7 +2315,7 @@ class LifeCycleTest(tu.TestResultCollector):
                     base[0],
                 ], (3,), model_shape)
 
-                # New override model should be available
+                # New override model should also be available
                 self.assertTrue(
                     triton_client.is_model_ready(override_model_name, "1"))
                 self.assertFalse(
@@ -2337,7 +2339,8 @@ class LifeCycleTest(tu.TestResultCollector):
                 except Exception as ex:
                     self.assertTrue(False, "unexpected error {}".format(ex))
 
-                # Sanity check on previous loaded version is still available
+                # The model should be loaded from the override model directory
+                # which has different model version
                 self.assertTrue(triton_client.is_model_ready(model_name, "1"))
                 self.assertFalse(triton_client.is_model_ready(model_name, "2"))
                 self.assertFalse(triton_client.is_model_ready(model_name, "3"))

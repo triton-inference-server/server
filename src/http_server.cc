@@ -1305,7 +1305,6 @@ HTTPAPIServer::HandleRepositoryControl(
                        "unexpected error getting load model request buffers"));
         }
       }
-      // [FIXME] release parameter
       static auto param_deleter =
           [](std::vector<TRITONSERVER_Parameter*>* params) {
             if (params != nullptr) {
