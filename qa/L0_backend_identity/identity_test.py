@@ -173,18 +173,23 @@ if __name__ == '__main__':
             ("identity_uint32", np.uint32, [8, 5]),
             ("identity_nobatch_int8", np.int8, [0]),
             ("identity_nobatch_int8", np.int8, [7]),
-            ("identity_bytes", object, [1, 1])):
+            ("identity_bytes", object, [1, 1]),
+            ("identity_bf16", "BF16", [1, 1])):
             # yapf: enable
             if np_dtype != object:
                 input_data = (16384 * np.random.randn(*shape)).astype(np_dtype)
+            # FIXME: Add proper bfloat16 support instead of fp16 WAR here
+            elif np_dtype == "BF16":
+                input_data = (16384 * np.random.randn(*shape)).astype(np.float16)
             else:
                 in0 = (16384 * np.ones(shape, dtype='int'))
                 in0n = np.array([str(x) for x in in0.reshape(in0.size)],
                                 dtype=object)
                 input_data = in0n.reshape(in0.shape)
+
             inputs = [
                 client_util.InferInput("INPUT0", input_data.shape,
-                                       np_to_triton_dtype(input_data.dtype))
+                                       np_to_triton_dtype(np_dtype))
             ]
             inputs[0].set_data_from_numpy(input_data)
 

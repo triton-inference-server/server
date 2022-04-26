@@ -53,6 +53,10 @@ cp -r ./models/identity_fp32 ./all_models/identity_uint32
           sed -i "s/^max_batch_size:.*/max_batch_size: 8/" config.pbtxt && \
           sed -i "s/TYPE_FP32/TYPE_UINT32/g" config.pbtxt && \
           echo "dynamic_batching { preferred_batch_size: [8], max_queue_delay_microseconds: 3000000 }" >> config.pbtxt)
+cp -r ./models/identity_fp32 ./all_models/identity_bf16
+(cd all_models/identity_bf16 && \
+          sed -i "s/^name:.*/name: \"identity_bf16\"/" config.pbtxt && \
+          sed -i "s/TYPE_FP32/TYPE_BF16/g" config.pbtxt)
 
 run_server
 if [ "$SERVER_PID" == "0" ]; then
