@@ -1302,7 +1302,8 @@ def create_docker_build_script(script_name, container_install_dir,
         # Windows docker runs in a VM and memory needs to be specified
         # explicitly (at least for some configurations of docker).
         if target_platform() == 'windows':
-            baseargs += ['--memory', FLAGS.container_memory]
+            if FLAGS.container_memory:
+                baseargs += ['--memory', FLAGS.container_memory]
 
         baseargs += ['--cache-from={}'.format(k) for k in cachefrommap]
         baseargs += ['.']
@@ -1334,7 +1335,8 @@ def create_docker_build_script(script_name, container_install_dir,
             runargs += ['-it']
 
         if target_platform() == 'windows':
-            runargs += ['--memory', FLAGS.container_memory]
+            if FLAGS.container_memory:
+                runargs += ['--memory', FLAGS.container_memory]
             runargs += [
                 '-v', '\\\\.\pipe\docker_engine:\\\\.\pipe\docker_engine'
             ]
@@ -1721,7 +1723,7 @@ if __name__ == '__main__':
         help='Do not use Docker --pull argument when building container.')
     parser.add_argument(
         '--container-memory',
-        default="8g",
+        default=None,
         required=False,
         help='Value for Docker --memory argument. Used only for windows builds.'
     )
