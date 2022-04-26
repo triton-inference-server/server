@@ -50,20 +50,48 @@ BASE_COMMAND="mvn clean compile -f $SAMPLES_REPO exec:java -Djavacpp.platform=li
 source ../common/util.sh
 
 # Create local model repository
-rm -r models && mkdir models
+rm -r models
+mkdir models
 cp -r `pwd`/../L0_simple_ensemble/models/simple models/.
 
 rm -f *.log
 RET=0
 
-# Run with default settings
-$BASE_COMMAND -Dexec.args="-r $MODEL_REPO -c -i 1000000" >>client.log 2>&1
+# Sanity test: check accuracy
+ITERS=200000
+
+LOG_IDX=0
+CLIENT_LOG="./client_$LOG_IDX.log"
+
+echo -e "\nRunning Sanity Test (accuracy checking)\n"
+$BASE_COMMAND -Dexec.args="-r $MODEL_REPO -i $ITERS" >>$CLIENT_LOG 2>&1
 if [ $? -ne 0 ]; then
     RET=1
 fi
 
-if [ `grep -c "Memory growth test passed" client.log` != "1" ]; then
-    echo -e "\n***\n*** Failed. Expected 1 'Memory growth test passed'\n***"
+if [ `grep -c "Memory growth test passed" $CLIENT_LOG` != "1" ]; then
+    echo -e "\n***\n*** Failed. Expected 1 'Memory growth test passed' in $CLIENT_LOG\n***"
+    RET=1
+fi
+
+LOG_IDX=$((LOG_IDX+1))
+CLIENT_LOG="./client_$LOG_IDX.log"
+
+# Longer-running memory growth test 
+ITERS=1000000
+if [ "$TRITON_PERF_LONG" == 1 ]; then
+    # ~1 day
+    ITERS=125000000
+fi
+
+echo -e "\nRunning Memory Growth Test, $ITERS Iterations\n"
+$BASE_COMMAND -Dexec.args="-r $MODEL_REPO -c -i $ITERS" >>$CLIENT_LOG 2>&1
+if [ $? -ne 0 ]; then
+    RET=1
+fi
+
+if [ `grep -c "Memory growth test passed" $CLIENT_LOG` != "1" ]; then
+    echo -e "\n***\n*** Failed. Expected 1 'Memory growth test passed' in $CLIENT_LOG\n***"
     RET=1
 fi
 

@@ -357,31 +357,33 @@ public class Simple {
      */
     static boolean
     ValidateMemoryGrowth(float max_allowed){
-      double max_mem = 0;
-      double avg_mem = 0;
-      long num_snapshots = 0;
-      DoubleSummaryStatistics stats = new DoubleSummaryStatistics();
+      // Allocate list starting capacity to hold up to 24 hours worth of snapshots
+      List<Double> memory_snapshots = new ArrayList<Double>(20000);
       while(!done){
         System.gc();
-        double memory = Runtime.getRuntime().totalMemory() - Runtime.getRuntime().freeMemory();
-        stats.accept(memory);
-        System.out.println("Memory allocated (MB):" + memory/1E6);
+        double snapshot = Runtime.getRuntime().totalMemory() - Runtime.getRuntime().freeMemory();
+        memory_snapshots.add(snapshot);
+        System.out.println("Memory allocated (MB):" + snapshot/1E6);
         try {
-          Thread.sleep(2000);
+          Thread.sleep(5000);
         } catch (InterruptedException e){
           System.out.println("Memory growth validation interrupted.");
         }
       };
-      if(stats.getCount() < 5){
-        System.out.println("Error: Not enough snapshots, " + stats.getCount());
+      if(memory_snapshots.size() < 5){
+        System.out.println("Error: Not enough snapshots, found " + memory_snapshots.size()
+        + " snapshots");
         return false;
       }
 
-      // Measure difference between mean and maximum memory usage
-      // Compute change in memory allocation
-      double memory_allocation_delta = stats.getMax() - stats.getAverage();
+      // Measure memory growth without outliers by taking difference
+      // between 95th percentile and median
+      Collections.sort(memory_snapshots);
+      int index_95 = ((int) Math.ceil(95.0 / 100.0 * memory_snapshots.size())) - 1;
+      int index_50 = ((int) Math.ceil(50.0 / 100.0 * memory_snapshots.size())) - 1;
+      double memory_allocation_delta = memory_snapshots.get(index_95) - memory_snapshots.get(index_50);
       double memory_allocation_delta_mb = memory_allocation_delta / 1E6;
-      double memory_allocation_delta_percent = memory_allocation_delta / stats.getMax();
+      double memory_allocation_delta_percent = memory_allocation_delta / memory_snapshots.get(index_95);
 
       System.out.println("Change in memory allocation (MB): " +
           memory_allocation_delta_mb + ", " +
