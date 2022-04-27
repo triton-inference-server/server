@@ -30,8 +30,10 @@
 rm -r javacpp-presets
 git clone https://github.com/bytedeco/javacpp-presets.git
 cd javacpp-presets
-mvn clean install --projects .,tritonserver
+mvn clean install --projects .,tritonserver,cuda,tensorrt
 mvn clean install -f platform --projects ../tritonserver/platform -Djavacpp.platform.host
+mvn clean install -f platform --projects ../cuda/platform -Djavacpp.platform.host
+mvn clean install -f platform --projects ../tensorrt/platform -Djavacpp.platform.host
 cd ..
 
 CLIENT_LOG="client_cpu_only.log"
