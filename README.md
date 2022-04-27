@@ -102,9 +102,9 @@ release is
   developed [KServe
   protocol](https://github.com/kserve/kserve/tree/master/docs/predict-api/v2).
 
-* A [C API](docs/inference_protocols.md#c-api) allows Triton to be
-  linked directly into your application for edge and other in-process
-  use cases.
+* A [C API](docs/inference_protocols.md#in-process-triton-server-api)
+  allows Triton to be linked directly into your application for edge
+  and other in-process use cases.
 
 * [Metrics](docs/metrics.md) indicating GPU utilization, server
   throughput, and server latency. The metrics are provided in
@@ -321,11 +321,11 @@ decryption, conversion, or similar operations when a model is loaded.
 
 ## Additional Resources
 
-* Additional documentation, presentations, and examples are located in the 
+* Additional documentation, presentations, and examples are located in the
   [NVIDIA Developer Zone](https://developer.nvidia.com/nvidia-triton-inference-server).
 
-* Specific end-to-end examples for popular models, such as ResNet, BERT, and 
-  DLRM are located in the [NVIDIA Deep Learning Examples page on 
+* Specific end-to-end examples for popular models, such as ResNet, BERT, and
+  DLRM are located in the [NVIDIA Deep Learning Examples page on
   GitHub](https://github.com/NVIDIA/DeepLearningExamples).
 
 ## Contributing
