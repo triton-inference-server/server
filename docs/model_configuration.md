@@ -1,5 +1,5 @@
 <!--
-# Copyright 2018-2021, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright 2018-2022, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -859,7 +859,8 @@ model instance will be served only if it completes the requests
 successfully.  Note that the effect of warming up models varies
 depending on the framework backend, and it will cause Triton to be
 less responsive to model update, so the users should experiment and
-choose the configuration that suits their need.  See the protobuf
+choose the configuration that suits their need.  See the
+[ModelWarmup protobuf](https://github.com/triton-inference-server/common/blob/main/protobuf/model_config.proto)
 documentation for the currently available settings.
 
 ## Response Cache
