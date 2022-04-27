@@ -56,8 +56,16 @@ SAMPLES_REPO=`pwd`/javacpp-presets/tritonserver/samples
 BASE_COMMAND="mvn clean compile -f $SAMPLES_REPO exec:java -Djavacpp.platform=linux-x86_64"
 source ../common/util.sh
 
-cp SequenceTest.java $SAMPLES_REPO
-sed -i 's/Simple/SequenceTest/g' $SAMPLES_REPO/pom.xml
+cp SequenceTest.java $SAMPLES_REPO/Simple.java
+sed -i 's/SequenceTest/Simple/g' $SAMPLES_REPO/Simple.java
+# Modify the pom to not force include any cuda dependencies
+sed -i '/<dependency>/ {
+    :start
+    N
+    /<\/dependency>$/!b start
+    /<artifactId>cuda-platform<\/artifactId>/ {d}
+    /<artifactId>tensorrt-platform<\/artifactId>/ {d}
+}' $SAMPLES_REPO/pom.xml
 
 rm -f *.log
 RET=0
@@ -81,8 +89,6 @@ for BACKEND in graphdef libtorch onnx savedmodel; do
         RET=1
     fi
 done
-
-sed -i 's/SequenceTest/Simple/g' $SAMPLES_REPO/pom.xml
 
 if [ $RET -eq 0 ]; then
     echo -e "\n***\n*** Test Passed\n***"
