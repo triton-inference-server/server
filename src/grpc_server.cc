@@ -1756,37 +1756,42 @@ CommonHandler::SetUpAllRequests()
           grpc::Status* status) {
         TRITONSERVER_Error* err = nullptr;
         if (request.repository_name().empty()) {
-          std::vector<const TRITONSERVER_Parameter*> params;
+          std::vector<TRITONSERVER_Parameter*> params;
+          // WAR for the const-ness check
+          std::vector<const TRITONSERVER_Parameter*> const_params;
           for (auto param_proto : request.parameters()) {
-            if (param_proto.first.compare("config") == 0) {
-              if (param_proto.second.parameter_choice_case() !=
-                  inference::ModelRepositoryParameter::ParameterChoiceCase::
-                      kStringParam) {
-                err = TRITONSERVER_ErrorNew(
-                    TRITONSERVER_ERROR_INVALID_ARG,
-                    "invalid value type for 'unload_dependents' parameter, "
-                    "expected "
-                    "string_param.");
-                break;
+            if (param_proto.second.parameter_choice_case() !=
+                inference::ModelRepositoryParameter::ParameterChoiceCase::
+                    kStringParam) {
+              err = TRITONSERVER_ErrorNew(
+                  TRITONSERVER_ERROR_INVALID_ARG,
+                  (std::string("invalid value type for load parameter '") +
+                   param_proto.first + "', expected string_param.")
+                      .c_str());
+              break;
+            } else {
+              auto param = TRITONSERVER_ParameterNew(
+                  param_proto.first.c_str(), TRITONSERVER_PARAMETER_STRING,
+                  param_proto.second.string_param().c_str());
+              if (param != nullptr) {
+                params.emplace_back(param);
+                const_params.emplace_back(param);
               } else {
-                auto param = TRITONSERVER_ParameterNew(
-                    "config", TRITONSERVER_PARAMETER_STRING,
-                    param_proto.second.string_param().c_str());
-                if (param != nullptr) {
-                  params.emplace_back(param);
-                } else {
-                  err = TRITONSERVER_ErrorNew(
-                      TRITONSERVER_ERROR_INTERNAL,
-                      "unexpected error on creating Triton parameter");
-                  break;
-                }
+                err = TRITONSERVER_ErrorNew(
+                    TRITONSERVER_ERROR_INTERNAL,
+                    "unexpected error on creating Triton parameter");
+                break;
               }
             }
           }
           if (err == nullptr) {
             err = TRITONSERVER_ServerLoadModelWithParameters(
                 tritonserver_.get(), request.model_name().c_str(),
-                params.data(), params.size());
+                const_params.data(), const_params.size());
+          }
+          // Assumes no further 'params' access after load API returns
+          for (auto& param : params) {
+            TRITONSERVER_ParameterDelete(param);
           }
         } else {
           err = TRITONSERVER_ErrorNew(
