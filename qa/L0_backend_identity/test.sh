@@ -71,6 +71,7 @@ for PROTOCOL in http grpc; do
     set +e
     python $CLIENT_PY -i $PROTOCOL -v >>$CLIENT_LOG 2>&1
     if [ $? -ne 0 ]; then
+        echo "Failed: Client test had a non-zero return code."
         RET=1
     fi
     set -e

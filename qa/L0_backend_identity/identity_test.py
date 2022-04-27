@@ -48,14 +48,26 @@ def test_bf16_raw_http(shape):
     r = httpreq.post("http://localhost:8000/v2/models/{}/infer".format(model),
                       data=input_bytes,
                       headers=headers)
+    print("Response content:", r.content)
     r.raise_for_status()
 
     # Get the inference header size so we can locate the output binary data
     header_size = int(r.headers["Inference-Header-Content-Length"])
     output_bytes = r.content[header_size:]
+    # Sanity check output on pass
+    print("Input Bytes:", input_bytes)
+    print("Output Bytes:", output_bytes)
+
+    # Assert correct output datatype
+    import json
+    response_json = json.loads(r.content[:header_size].decode("utf-8"))
+    assert(response_json["outputs"][0]["datatype"] == "BF16")
+
+    # Assert equality of input/output for identity model
     if not np.array_equal(output_bytes, input_bytes):
         print("error: Expected response body contains correct output binary " \
               "data: {}; got: {}".format(input_bytes, output_bytes))
+        sys.exit(1)
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
@@ -202,10 +214,9 @@ if __name__ == '__main__':
                 in0n = np.array([str(x) for x in in0.reshape(in0.size)],
                                 dtype=object)
                 input_data = in0n.reshape(in0.shape)
-
             inputs = [
                 client_util.InferInput("INPUT0", input_data.shape,
-                                       np_to_triton_dtype(np_dtype))
+                                       np_to_triton_dtype(input_data.dtype))
             ]
             inputs[0].set_data_from_numpy(input_data)
 
