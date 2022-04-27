@@ -112,8 +112,9 @@ class DecoupledTest(tu.TestResultCollector):
             if type(data_item) == InferenceServerException:
                 self.assertEqual(
                     data_item.message(),
-                    "Python model 'decoupled_return_response_error_0' is using the decoupled mode and the execute function must return None.",
-                    "Exception message didn't match.")
+                    "Python model 'decoupled_return_response_error_0' is using "
+                    "the decoupled mode and the execute function must return "
+                    "None.", "Exception message didn't match.")
 
     def test_decoupled_send_after_close_error(self):
         model_name = "decoupled_send_after_close_error"
