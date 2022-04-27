@@ -61,6 +61,15 @@ BASE_COMMAND="mvn clean compile -f $SAMPLES_REPO exec:java -Djavacpp.platform=li
 source ../common/util.sh
 
 cp Simple.java $SAMPLES_REPO
+# Modify the pom to not force include any cuda dependencies
+sed -i '/<dependency>/ {
+    :start
+    N
+    /<\/dependency>$/!b start
+    /<artifactId>cuda-platform<\/artifactId>/ {d}
+    /<artifactId>tensorrt-platform<\/artifactId>/ {d}
+}' $SAMPLES_REPO/pom.xml
+
 rm -f *.log
 RET=0
 
