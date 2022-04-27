@@ -48,13 +48,13 @@ def test_bf16_raw_http(shape):
     r = httpreq.post("http://localhost:8000/v2/models/{}/infer".format(model),
                       data=input_bytes,
                       headers=headers)
-    print("Response content:", r.content)
     r.raise_for_status()
 
     # Get the inference header size so we can locate the output binary data
     header_size = int(r.headers["Inference-Header-Content-Length"])
     output_bytes = r.content[header_size:]
     # Sanity check output on pass
+    print("Response content:", r.content)
     print("Input Bytes:", input_bytes)
     print("Output Bytes:", output_bytes)
 
