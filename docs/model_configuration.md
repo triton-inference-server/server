@@ -860,7 +860,7 @@ successfully.  Note that the effect of warming up models varies
 depending on the framework backend, and it will cause Triton to be
 less responsive to model update, so the users should experiment and
 choose the configuration that suits their need.  See the
-[Warmup protobuf](https://github.com/triton-inference-server/common/blob/main/protobuf/model_config.proto)
+[ModelWarmup protobuf](https://github.com/triton-inference-server/common/blob/main/protobuf/model_config.proto)
 documentation for the currently available settings.
 
 ## Response Cache
