@@ -37,6 +37,26 @@ from tritonclientutils import np_to_triton_dtype
 
 FLAGS = None
 
+def test_bf16_raw_http(shape):
+    model = "identity_bf16"
+    # Using fp16 data as a WAR since it is same byte_size as bf16
+    # and is supported by numpy for ease-of-use. Since this is an
+    # identity model, it's OK that the bytes are interpreted differently
+    input_data = (16384 * np.random.randn(*shape)).astype(np.float16)
+    input_bytes = input_data.tobytes()
+    headers = {'Inference-Header-Content-Length': '0'}
+    r = httpreq.post("http://localhost:8000/v2/models/{}/infer".format(model),
+                      data=input_bytes,
+                      headers=headers)
+    r.raise_for_status()
+
+    # Get the inference header size so we can locate the output binary data
+    header_size = int(r.headers["Inference-Header-Content-Length"])
+    output_bytes = r.content[header_size:]
+    if not np.array_equal(output_bytes, input_bytes):
+        print("error: Expected response body contains correct output binary " \
+              "data: {}; got: {}".format(input_bytes, output_bytes))
+
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('-v',
@@ -173,14 +193,10 @@ if __name__ == '__main__':
             ("identity_uint32", np.uint32, [8, 5]),
             ("identity_nobatch_int8", np.int8, [0]),
             ("identity_nobatch_int8", np.int8, [7]),
-            ("identity_bytes", object, [1, 1]),
-            ("identity_bf16", "BF16", [1, 1])):
+            ("identity_bytes", object, [1, 1])):
             # yapf: enable
             if np_dtype != object:
                 input_data = (16384 * np.random.randn(*shape)).astype(np_dtype)
-            # FIXME: Add proper bfloat16 support instead of fp16 WAR here
-            elif np_dtype == "BF16":
-                input_data = (16384 * np.random.randn(*shape)).astype(np.float16)
             else:
                 in0 = (16384 * np.ones(shape, dtype='int'))
                 in0n = np.array([str(x) for x in in0.reshape(in0.size)],
@@ -236,3 +252,8 @@ if __name__ == '__main__':
             if param2 != False:
                 print("error: expected 'param2' == False")
                 sys.exit(1)
+
+    # FIXME: Use identity_bf16 model in test above once proper python client
+    #        support is added, and remove this raw HTTP test
+    test_bf16_raw_http([2, 2])
+
