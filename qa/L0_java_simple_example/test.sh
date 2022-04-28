@@ -54,6 +54,7 @@ function run_cpu_tests() {
     # Run with default settings
     $BASE_COMMAND -Dexec.args="-r $MODEL_REPO" >>$CLIENT_LOG 2>&1
     if [ $? -ne 0 ]; then
+        echo -e "Failed to run: ${BASE_COMMAND} -Dexec.args=\"-r ${MODEL_REPO}\""
         RET=1
     fi
 
@@ -65,6 +66,7 @@ function run_cpu_tests() {
     # Run with verbose logging
     $BASE_COMMAND -Dexec.args="-r $MODEL_REPO -v" >>$CLIENT_LOG 2>&1
     if [ $? -ne 0 ]; then
+        echo -e "Failed to run: ${BASE_COMMAND} -Dexec.args=\"-r ${MODEL_REPO} -v\""
         RET=1
     fi
 
@@ -76,6 +78,7 @@ function run_cpu_tests() {
     # Run with memory set to system
     $BASE_COMMAND -Dexec.args="-r $MODEL_REPO -m system" >>$CLIENT_LOG 2>&1
     if [ $? -ne 0 ]; then
+        echo -e "Failed to run: ${BASE_COMMAND} -Dexec.args=\"-r ${MODEL_REPO} -m system\""
         RET=1
     fi
 
@@ -88,11 +91,12 @@ function run_cpu_tests() {
     sed -i 's/TYPE_INT32/TYPE_FP32/g' $MODEL_REPO/simple/config.pbtxt
     sed -i 's/TYPE_INT32/TYPE_FP32/g' $MODEL_REPO/ensemble_add_sub_int32_int32_int32/config.pbtxt
     $BASE_COMMAND -Dexec.args="-r $MODEL_REPO -v" >>$CLIENT_LOG 2>&1
-    sed -i 's/TYPE_FP32/TYPE_INT32/g' $MODEL_REPO/simple/config.pbtxt
-    sed -i 's/TYPE_FP32/TYPE_INT32/g' $MODEL_REPO/ensemble_add_sub_int32_int32_int32/config.pbtxt
     if [ $? -ne 0 ]; then
+        echo -e "Failed to run: ${BASE_COMMAND} -Dexec.args=\"-r ${MODEL_REPO} -v\""
         RET=1
     fi
+    sed -i 's/TYPE_FP32/TYPE_INT32/g' $MODEL_REPO/simple/config.pbtxt
+    sed -i 's/TYPE_FP32/TYPE_INT32/g' $MODEL_REPO/ensemble_add_sub_int32_int32_int32/config.pbtxt
 
     if [ `grep -c "data_type: TYPE_FP32" ${CLIENT_LOG}` != "8" ]; then
         echo -e "\n***\n*** Failed. Expected 4 'data_type: TYPE_FP32'\n***"
@@ -110,10 +114,11 @@ run_cpu_tests
 sed -i 's/"simple"/"ensemble_add_sub_int32_int32_int32"/g' $SAMPLES_REPO/SimpleCPUOnly.java
 cat $SAMPLES_REPO/pom.xml >>$CLIENT_LOG 2>&1
 $BASE_COMMAND -Dexec.args="-r $MODEL_REPO -v" >>$CLIENT_LOG 2>&1
-sed -i 's/"ensemble_add_sub_int32_int32_int32"/"simple"/g' $SAMPLES_REPO/SimpleCPUOnly.java
 if [ $? -ne 0 ]; then
+    echo -e "Failed to run ensemble model: ${BASE_COMMAND} -Dexec.args=\"-r ${MODEL_REPO} -v\""
     RET=1
 fi
+sed -i 's/"ensemble_add_sub_int32_int32_int32"/"simple"/g' $SAMPLES_REPO/SimpleCPUOnly.java
 
 if [ `grep -c "request id: my_request_id, model: ensemble_add_sub_int32_int32_int32" ${CLIENT_LOG}` != "3" ]; then
     echo -e "\n***\n*** Failed. Expected 3 'request id: my_request_id, model: ensemble_add_sub_int32_int32_int32'\n***"
@@ -131,6 +136,7 @@ INDEX=1
 for MEMORY_TYPE in pinned gpu; do
     $BASE_COMMAND -Dexec.args="-r $MODEL_REPO -m $MEMORY_TYPE" >>$CLIENT_LOG 2>&1
     if [ $? -ne 0 ]; then
+        echo -e "Failed to run: ${BASE_COMMAND} -Dexec.args=\"-r ${MODEL_REPO} -m ${MEMORY_TYPE}\""
         RET=1
     fi
 
@@ -141,10 +147,11 @@ for MEMORY_TYPE in pinned gpu; do
 
     sed -i 's/"simple"/"ensemble_add_sub_int32_int32_int32"/g' $SAMPLES_REPO/Simple.java
     $BASE_COMMAND -Dexec.args="-r $MODEL_REPO -v -m $MEMORY_TYPE" >>$CLIENT_LOG 2>&1
-    sed -i 's/"ensemble_add_sub_int32_int32_int32"/"simple"/g' $SAMPLES_REPO/Simple.java
     if [ $? -ne 0 ]; then
+        echo -e "Failed to run ensemble model: ${BASE_COMMAND} -Dexec.args=\"-r ${MODEL_REPO} -v -m ${MEMORY_TYPE}\""
         RET=1
     fi
+    sed -i 's/"ensemble_add_sub_int32_int32_int32"/"simple"/g' $SAMPLES_REPO/Simple.java
 
     if [ `grep -c "request id: my_request_id, model: ensemble_add_sub_int32_int32_int32" ${CLIENT_LOG}` != $((INDEX*2)) ]; then
         echo -e "\n***\n*** Failed. Expected $((INDEX*2)) 'request id: my_request_id, model: ensemble_add_sub_int32_int32_int32'\n***"
