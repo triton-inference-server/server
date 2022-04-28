@@ -265,6 +265,6 @@ if __name__ == '__main__':
                 sys.exit(1)
 
     # FIXME: Use identity_bf16 model in test above once proper python client
-    #        support is added, and remove this raw HTTP test
+    #        support is added, and remove this raw HTTP test. See DLIS-3720.
     test_bf16_raw_http([2, 2])
 
