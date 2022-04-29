@@ -54,9 +54,11 @@ def callback(user_data, result, error):
 class DecoupledTest(tu.TestResultCollector):
 
     def test_decoupled_execute_error(self):
-        # The decoupled_execute_error model returns an error for the first request and
-        # sucessfully processes the second request. This is making sure that
-        # an error in a single request does not completely fail the batch.
+        # The decoupled_execute_error model returns an error for the first
+        # request and sucessfully processes the second request. This is making
+        # sure that an error in a single request does not completely fail the
+        # batch.
+
         model_name = "decoupled_execute_error"
         shape = [2, 2]
         number_of_requests = 2
@@ -90,6 +92,46 @@ class DecoupledTest(tu.TestResultCollector):
                     np.array_equal(output_data, input_datas[i]),
                     "error: expected output {} to match input {}".format(
                         output_data, input_datas[i]))
+
+    def test_decoupled_bls(self):
+        # Test combinations of BLS and decoupled API in Python backend.
+        model_name = "decoupled_bls"
+        shape = [1, 2]
+        user_data = UserData()
+        with grpcclient.InferenceServerClient(
+                "localhost:8001") as triton_client:
+            triton_client.start_stream(callback=partial(callback, user_data))
+
+            input_datas = []
+            input_data = np.random.randn(*shape).astype(np.float32)
+            input_datas.append(input_data)
+            inputs = [
+                grpcclient.InferInput("IN", input_data.shape,
+                                      np_to_triton_dtype(input_data.dtype))
+            ]
+            inputs[0].set_data_from_numpy(input_data)
+            triton_client.async_stream_infer(model_name=model_name,
+                                             inputs=inputs)
+
+            # The decoupled BLS model will send two responses instead of one
+            # response for each request. One will be using the sync BLS and the
+            # other one will use async BLS.
+            def check_result(result):
+                # Make sure the result is not an exception
+                self.assertIsNot(type(result), InferenceServerException)
+
+                output_data = result.as_numpy("OUT")
+                self.assertIsNotNone(output_data, "error: expected 'OUT'")
+                self.assertTrue(
+                    np.array_equal(output_data, input_data),
+                    "error: expected output {} to match input {}".format(
+                        output_data, input_data))
+
+            result = user_data._completed_requests.get()
+            check_result(result)
+
+            result = user_data._completed_requests.get()
+            check_result(result)
 
     def test_decoupled_return_response_error(self):
         model_name = "decoupled_return_response_error"
