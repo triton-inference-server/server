@@ -188,7 +188,6 @@ describe supported GPUs.
   * [Inference Request/Response Cache](docs/model_configuration.md#response-cache)
 * Model Pipeline
   * [Model Ensemble](docs/architecture.md#ensemble-models)
-    * [Preprocessing in Python Backend Using Ensemble](https://github.com/triton-inference-server/python_backend#preprocessing)
   * [Business Logic Scripting (BLS)](https://github.com/triton-inference-server/python_backend#business-logic-scripting)
 * [Model Management](docs/model_management.md)
   * [Explicit Model Loading and Unloading](docs/model_management.md#model-control-mode-explicit)
