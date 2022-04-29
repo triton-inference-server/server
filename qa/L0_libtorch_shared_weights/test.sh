@@ -62,7 +62,7 @@ LOG_IDX=0
 rm -fr models
 mkdir models
 for i in models; do
-    cp -r $DATADIR//qa_identity_model_repository/libtorch_nobatch_zero_1_float32 models/.
+    cp -r $DATADIR/qa_identity_model_repository/libtorch_nobatch_zero_1_float32 models/.
 done
 
 for MC in `ls models/libtorch*/config.pbtxt`; do
@@ -114,7 +114,7 @@ for KIND in KIND_CPU KIND_GPU; do
     rm -fr models
     mkdir models
     for i in models; do
-        cp -r $DATADIR//qa_identity_model_repository/libtorch_nobatch_zero_1_float32 models/.
+        cp -r $DATADIR/qa_identity_model_repository/libtorch_nobatch_zero_1_float32 models/.
     done
 
     LOG_IDX=$((LOG_IDX+1))
