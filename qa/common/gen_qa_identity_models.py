@@ -1,4 +1,4 @@
-# Copyright 2019-2021, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright 2019-2022, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -381,7 +381,7 @@ def create_libtorch_modelfile(create_savedmodel, models_dir, model_version,
                               io_cnt, max_batch, dtype, shape):
 
     if not tu.validate_for_libtorch_model(dtype, dtype, dtype, shape, shape,
-                                          shape):
+                                          shape, max_batch):
         return
 
     torch_dtype = np_to_torch_dtype(dtype)
@@ -449,7 +449,7 @@ def create_libtorch_modelconfig(create_savedmodel, models_dir, model_version,
                                 io_cnt, max_batch, dtype, shape):
 
     if not tu.validate_for_libtorch_model(dtype, dtype, dtype, shape, shape,
-                                          shape):
+                                          shape, max_batch):
         return
 
     # Unpack version policy

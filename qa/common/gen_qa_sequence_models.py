@@ -1108,7 +1108,7 @@ def create_libtorch_modelfile(models_dir, model_version, max_batch, dtype,
                               shape):
 
     if not tu.validate_for_libtorch_model(dtype, dtype, dtype, shape, shape,
-                                          shape):
+                                          shape, max_batch):
         return
 
     torch_dtype = np_to_torch_dtype(dtype)
@@ -1160,7 +1160,7 @@ def create_libtorch_modelconfig(models_dir, model_version, max_batch, dtype,
                                 shape):
 
     if not tu.validate_for_libtorch_model(dtype, dtype, dtype, shape, shape,
-                                          shape):
+                                          shape, max_batch):
         return
 
     model_name = tu.get_sequence_model_name(

@@ -1174,9 +1174,9 @@ def create_libtorch_modelfile(models_dir,
                               output1_dtype,
                               swap=False):
 
-    if not tu.validate_for_libtorch_model(input_dtype, output0_dtype,
-                                          output1_dtype, input_shape,
-                                          output0_shape, output1_shape):
+    if not tu.validate_for_libtorch_model(
+            input_dtype, output0_dtype, output1_dtype, input_shape,
+            output0_shape, output1_shape, max_batch):
         return
 
     torch_input_dtype = np_to_torch_dtype(input_dtype)
@@ -1237,9 +1237,9 @@ def create_libtorch_modelconfig(models_dir, max_batch, model_version,
                                 input_dtype, output0_dtype, output1_dtype,
                                 output0_label_cnt, version_policy):
 
-    if not tu.validate_for_libtorch_model(input_dtype, output0_dtype,
-                                          output1_dtype, input_shape,
-                                          output0_shape, output1_shape):
+    if not tu.validate_for_libtorch_model(
+            input_dtype, output0_dtype, output1_dtype, input_shape,
+            output0_shape, output1_shape, max_batch):
         return
 
     # Unpack version policy
