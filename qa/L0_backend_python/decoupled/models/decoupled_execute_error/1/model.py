@@ -27,7 +27,6 @@
 import triton_python_backend_utils as pb_utils
 import json
 import threading
-import numpy as np
 import time
 
 
@@ -44,7 +43,7 @@ class TritonPythonModel:
         if not using_decoupled:
             raise pb_utils.TritonModelException(
                 """the model `{}` can generate any number of responses per request,
-                enable decoupled transaction policy in model configuration to 
+                enable decoupled transaction policy in model configuration to
                 serve this model""".format(args['model_name']))
 
         # Get OUT configuration
@@ -78,9 +77,10 @@ class TritonPythonModel:
         return None
 
     def response_thread(self, response_sender, index, in_input):
-        # The response_sender is used to send response(s) associated with the corresponding request.
-        # The first request will send errors and the other requests will send the responses.
-        # The number of responses per requests is the number of elements in input tensor.
+        # The response_sender is used to send response(s) associated with the
+        # corresponding request.  The first request will send errors and the
+        # other requests will send the responses.  The number of responses per
+        # requests is the number of elements in input tensor.
 
         in_value = in_input
         out_output = pb_utils.Tensor("OUT", in_value)
@@ -93,9 +93,9 @@ class TritonPythonModel:
             response = pb_utils.InferenceResponse(output_tensors=[out_output])
         response_sender.send(response)
 
-        # We must close the response sender to indicate to Triton that we are done sending
-        # responses for the corresponding request. We can't use the response sender after
-        # closing it.
+        # We must close the response sender to indicate to Triton that we are
+        # done sending responses for the corresponding request. We can't use the
+        # response sender after closing it.
         response_sender.close()
 
         with self.inflight_thread_count_lck:
