@@ -234,10 +234,12 @@ following steps.
   inference request using `TRITONSERVER_InferenceRequestNew`. You
   create each input tensor in the request using
   `TRITONSERVER_InferenceRequestAddInput` and set the data for the
-  input tensor using
-  `TRITONSERVER_InferenceRequestAppendInputData`. By default, Triton
-  will return all output tensors, but you can limit Triton to only
-  return some outputs by using
+  input tensor using `TRITONSERVER_InferenceRequestAppendInputData`
+  (or one of the `TRITONSERVER_InferenceRequestAppendInputData*`
+  variants defined in
+  [tritonserver.h](https://github.com/triton-inference-server/core/blob/main/include/triton/core/tritonserver.h)). By
+  default, Triton will return all output tensors, but you can limit
+  Triton to only return some outputs by using
   `TRITONSERVER_InferenceRequestAddRequestedOutput`.
 
   To correctly manage the lifecycle of the inference request, you must
@@ -268,10 +270,11 @@ following steps.
   [simple.cc](../src/simple.cc) this callback is
   `InferResponseComplete`.
 
-  When you invoke `TRITONSERVER_ServerInferAsync`, you are passing
-  ownership of the `TRITONSERVER_InferenceRequest` object to Triton,
-  and so you must not access that object in any way until Triton
-  returns ownership to you via the callback you registered with
+  When you invoke `TRITONSERVER_ServerInferAsync` and it returns
+  without error, you are passing ownership of the
+  `TRITONSERVER_InferenceRequest` object to Triton, and so you must
+  not access that object in any way until Triton returns ownership to
+  you via the callback you registered with
   `TRITONSERVER_InferenceRequestSetReleaseCallback`.
 
 * Process the inference response. The inference response is returned
