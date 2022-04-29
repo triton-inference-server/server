@@ -67,9 +67,10 @@ INSTANCE_CNT=1
 CONCURRENCY=1
 
 # Disable TF-TRT test on Jetson due to Segfault
+# Disable ORT-TRT test on Jetson due to support being disabled
 if [ "$ARCH" == "aarch64" ]; then
     MODEL_NAMES="${TRT_MODEL_NAME} ${TF_MODEL_NAME} ${ONNX_MODEL_NAME} ${PYT_MODEL_NAME}"
-    OPTIMIZED_MODEL_NAMES="${TFAMP_MODEL_NAME} ${ONNXTRT_MODEL_NAME}"
+    OPTIMIZED_MODEL_NAMES="${TFAMP_MODEL_NAME}"
     CAFFE2PLAN=${TRITON_DIR}/bin/caffe2plan
 else
     MODEL_NAMES="${TRT_MODEL_NAME} ${TF_MODEL_NAME} ${ONNX_MODEL_NAME} ${PYT_MODEL_NAME}"
