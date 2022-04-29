@@ -133,7 +133,7 @@ if [ "$TEST_JETSON" == "0" ]; then
   pip3 install torch==1.6.0+cpu -f https://download.pytorch.org/whl/torch_stable.html
 else
   # test_growth_error is skipped on jetson
-  EXPECTED_NUM_TESTS=7
+  EXPECTED_NUM_TESTS=8
 fi
 
 prev_num_pages=`get_shm_pages`
