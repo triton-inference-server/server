@@ -272,6 +272,28 @@ for i in \
     #             RET=1
     #         fi
     #     done
+    elif [ $BASE = ${SIMPLE_INFER_CLIENT} ];
+        NEW_CHANNEL_STRING = "creating client_channel for channel stack"
+        GRPC_TRACE=subchannel GRPC_VERBOSITY=info $i -v -c "true" -H test:1 >> ${CLIENT_LOG}.c++.${SUFFIX} 2>&1
+        if [ $? -ne 0 ]; then
+            cat ${CLIENT_LOG}.c++.${SUFFIX}
+            RET=1
+        fi
+        if [ `grep -c ${NEW_CHANNEL_STRING} ${CLIENT_LOG}.c++.${SUFFIX}` != "1" ]; then
+            echo -e "\n***\n*** Failed. Expected 1 ${NEW_CHANNEL_STRING} calls\n***"
+            cat $CLIENT_LOG.c++.${SUFFIX}
+            RET=1
+        fi
+        $i -v -c "false" -H test:1 >> ${CLIENT_LOG}.c++.${SUFFIX} 2>&1
+        if [ $? -ne 0 ]; then
+            cat ${CLIENT_LOG}.c++.${SUFFIX}
+            RET=1
+        fi
+        if [ `grep -c ${NEW_CHANNEL_STRING} ${CLIENT_LOG}.c++.${SUFFIX}` != "2" ]; then
+            echo -e "\n***\n*** Failed. Expected 2 ${NEW_CHANNEL_STRING} calls\n***"
+            cat $CLIENT_LOG.c++.${SUFFIX}
+            RET=1
+        fi
     else
         $i -v -H test:1 >> ${CLIENT_LOG}.c++.${SUFFIX} 2>&1
         if [ $? -ne 0 ]; then
