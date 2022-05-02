@@ -45,27 +45,19 @@ class UnknownRankTest(tu.TestResultCollector):
                                         np_to_triton_dtype(input_data.dtype))
         ]
         inputs[0].set_data_from_numpy(input_data)
+        print('Raw inputs: ' + str(input_data))
         results = client.infer(model_name, inputs)
         self.assertTrue(np.array_equal(results.as_numpy('OUTPUT'), input_data))
+        print('Raw response for rseult: ' + str(results.get_response()))
+        print('Results as numpy: ' + str(results.as_numpy('OUTPUT')))
 
     def test_success(self):
         model_name = "unknown_rank_success"
-        tensor_shape = (1,)
+        tensor_shape = (1,1)
         try:
             self.infer_unknown(model_name, tensor_shape)
         except InferenceServerException as ex:
             self.assertTrue(False, "unexpected error {}".format(ex))
-
-    def test_wrong_output(self):
-        tensor_shape = (1,)
-        model_name = "unknown_rank_wrong_output"
-        try:
-            self.infer_unknown(model_name, tensor_shape)
-        except InferenceServerException as ex:
-            self.assertIn("tensor \'OUTPUT\': the model expects 1 dimensions " \
-                "(shape [1]) but the model configuration specifies 2 dimensions " \
-                "(shape [1,1])", ex.message())
-
 
 if __name__ == '__main__':
     unittest.main()
