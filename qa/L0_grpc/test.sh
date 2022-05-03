@@ -272,7 +272,7 @@ for i in \
     #             RET=1
     #         fi
     #     done
-    elif [ $BASE = ${SIMPLE_INFER_CLIENT} ];
+    elif [ $BASE = ${SIMPLE_INFER_CLIENT} ]; then
         # Test forcing new channel creation with simple infer client
         NEW_CHANNEL_STRING = "creating client_channel for channel stack"
         GRPC_TRACE=subchannel GRPC_VERBOSITY=info $i -v -c "true" >> ${CLIENT_LOG}.c++.${SUFFIX} 2>&1
