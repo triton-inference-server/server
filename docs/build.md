@@ -320,9 +320,29 @@ $ docker build -t win10-py3-min -f Dockerfile.win10.min .
 
 ### Build Triton Server
 
-The Windows build system must have Docker, Python3 and git
-installed. See [Building with Docker](#ubuntu-docker) for more details
-on how to run build.py.
+Triton is built using the build.py script. The build system must have
+Docker, Python3 (plus pip installed *docker* module) and git installed
+so that it can execute build.py and perform a docker build. By
+default, build.py does not enable any of Triton's optional features
+and so you must enable them explicitly. The following build.py
+invocation builds all features and backends available on windows.
+
+```bash
+python build.py --cmake-dir=<path/to/repo>/build --build-dir=/tmp/citritonbuild --no-container-pull --image=base,win10-py3-min --enable-logging --enable-stats --enable-tracing --enable-gpu --endpoint=grpc --endpoint=http --repo-tag=common:<container tag> --repo-tag=core:<container tag> --repo-tag=backend:<container tag> --repo-tag=thirdparty:<container tag> --backend=ensemble --backend=tensorrt:<container tag> --backend=onnxruntime:<container tag> --backend=openvino:<container tag>
+```
+
+If you are building on *main* branch then '<container tag>' will
+default to "main". If you are building on a release branch then
+'<container tag>' will default to the branch name. For example, if you
+are building on the r22.04 branch, '<container tag>' will default to
+r22.04. Therefore, you typically do not need to provide '<container
+tag>' at all (nor the preceding colon). You can use a different
+'<container tag>' for a component to instead use the corresponding
+branch/tag in the build. For example, if you have a branch called
+"mybranch" in the
+[onnxruntime_backend](https://github.com/triton-inference-server/onnxruntime_backend)
+repo that you want to use in the build, you would specify
+--backend=onnxruntime:mybranch.
 
 ### Extract Build Artifacts
 
