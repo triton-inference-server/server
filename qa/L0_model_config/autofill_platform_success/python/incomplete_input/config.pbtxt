@@ -1,0 +1,13 @@
+name: "incomplete_input"
+backend: "python"
+
+input [
+  {
+    name: "INPUT0"
+    data_type: TYPE_FP32
+  },
+  {
+    name: "INPUT1"
+    dims: [ 16 ]
+  }
+]

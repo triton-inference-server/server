@@ -385,6 +385,96 @@ for TARGET_DIR in `ls -d autofill_noplatform_success/*/*`; do
     fi
 done
 
+# Run all autofill tests that has a platform to the model config
+# before running the test
+for TARGET_DIR in `ls -d autofill_platform/*/*`; do
+    TARGET_DIR_DOT=`echo $TARGET_DIR | tr / .`
+    TARGET=`basename ${TARGET_DIR}`
+
+    SERVER_ARGS="--model-repository=`pwd`/models --strict-model-config=false"
+    SERVER_LOG=$SERVER_LOG_BASE.${TARGET_DIR_DOT}.log
+
+    # If there is a config.pbtxt at the top-level of the test then
+    # assume that the directory is a single model. Otherwise assume
+    # that the directory is an entire model repository.
+    rm -fr models && mkdir models
+    if [ -f ${TARGET_DIR}/config.pbtxt ]; then
+        cp -r ${TARGET_DIR} models/.
+        EXPECTEDS=models/$TARGET/expected*
+    else
+        cp -r ${TARGET_DIR}/* models/.
+        EXPECTEDS=models/expected*
+    fi
+
+    echo -e "Test ${TARGET_DIR}" >> $CLIENT_LOG
+
+    # We expect all the tests to fail with one of the expected
+    # error messages
+    run_server
+    if [ "$SERVER_PID" != "0" ]; then
+        echo -e "*** FAILED: unexpected success starting $SERVER" >> $CLIENT_LOG
+        RET=1
+        kill $SERVER_PID
+        wait $SERVER_PID
+    else
+        EXFOUND=0
+        for EXPECTED in `ls $EXPECTEDS`; do
+            EX=`cat $EXPECTED`
+            if grep ^E[0-9][0-9][0-9][0-9].*"$EX" $SERVER_LOG; then
+                echo -e "Found \"$EX\"" >> $CLIENT_LOG
+                EXFOUND=1
+                break
+            else
+                echo -e "Not found \"$EX\"" >> $CLIENT_LOG
+            fi
+        done
+
+        if [ "$EXFOUND" == "0" ]; then
+            echo -e "*** FAILED: ${TARGET_DIR}" >> $CLIENT_LOG
+            RET=1
+        fi
+    fi
+done
+
+# Run all autofill tests that are expected to be successful. These
+# tests need to add a platform to the model config before running
+for TARGET_DIR in `ls -d autofill_platform_success/*/*`; do
+    TARGET_DIR_DOT=`echo $TARGET_DIR | tr / .`
+    TARGET=`basename ${TARGET_DIR}`
+
+    SERVER_ARGS="--model-repository=`pwd`/models --strict-model-config=false"
+    SERVER_LOG=$SERVER_LOG_BASE.${TARGET_DIR_DOT}.log
+
+    # If there is a config.pbtxt at the top-level of the test then
+    # assume that the directory is a single model. Otherwise assume
+    # that the directory is an entire model repository.
+    rm -fr models && mkdir models
+    if [ -f ${TARGET_DIR}/config.pbtxt ]; then
+        cp -r ${TARGET_DIR} models/.
+    else
+        cp -r ${TARGET_DIR}/* models/.
+    fi
+
+    echo -e "Test $TARGET_DIR" >> $CLIENT_LOG
+
+    run_server
+    if [ "$SERVER_PID" == "0" ]; then
+        echo -e "*** FAILED: unable to start $SERVER" >> $CLIENT_LOG
+        RET=1
+    else
+        set +e
+        python ./compare_status.py --expected_dir models/$TARGET --model $TARGET >>$CLIENT_LOG 2>&1
+        if [ $? -ne 0 ]; then
+            echo -e "*** FAILED: unexpected model config" >> $CLIENT_LOG
+            RET=1
+        fi
+        set -e
+
+        kill $SERVER_PID
+        wait $SERVER_PID
+    fi
+done
+
 if [ $RET -eq 0 ]; then
     echo -e "\n***\n*** Test Passed\n***"
 else
