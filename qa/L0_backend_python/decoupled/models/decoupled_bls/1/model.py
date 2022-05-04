@@ -162,21 +162,20 @@ class TritonPythonModel:
         if infer_response.has_error():
             response = pb_utils.InferenceResponse(
                 error=infer_response.error().message())
-            response_sender.send(response)
+            response_sender.send(
+                response, flags=pb_utils.TRITONSERVER_RESPONSE_COMPLETE_FINAL)
         elif np.any(in_input != output0.as_numpy()):
             error_message = (
                 "BLS Request input and BLS response output do not match."
                 f" {in_value} != {output0.as_numpy()}")
             response = pb_utils.InferenceResponse(error=error_message)
-            response_sender.send(response)
+            response_sender.send(
+                response, flags=pb_utils.TRITONSERVER_RESPONSE_COMPLETE_FINAL)
         else:
             output_tensors = [pb_utils.Tensor('OUT', in_value)]
             response = pb_utils.InferenceResponse(output_tensors=output_tensors)
-            response_sender.send(response)
-
-        # This thread will close the response sender because it is exepcted to
-        # take longer.
-        response_sender.close()
+            response_sender.send(
+                response, flags=pb_utils.TRITONSERVER_RESPONSE_COMPLETE_FINAL)
 
         with self.inflight_thread_count_lck:
             self.inflight_thread_count -= 1
