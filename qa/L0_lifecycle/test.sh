@@ -449,6 +449,8 @@ for i in onnx plan ; do
 done
 rm models/graphdef_float32_float32_float32/config.pbtxt
 
+# Autocomplete should not be turned on for this test because it asserts an error was logged
+# when in strict model configuration mode.
 SERVER_ARGS="--model-repository=`pwd`/models --model-repository=`pwd`/models_0 \
              --exit-on-error=false --exit-timeout-secs=5 --strict-model-config=true"
 SERVER_LOG="./inference_server_$LOG_IDX.log"
