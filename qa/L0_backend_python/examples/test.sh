@@ -67,7 +67,7 @@ fi
 
 grep "PASS" $CLIENT_LOG
 if [ $? -ne 0 ]; then
-    echo -e "\n***\n*** Failed to verify pytorch example. \n***"
+    echo -e "\n***\n*** Failed to verify add_sub example. \n***"
     cat $CLIENT_LOG
     RET=1
 fi
@@ -137,6 +137,67 @@ set -e
 
 kill $SERVER_PID
 wait $SERVER_PID
+
+# Example 4
+
+# Decoupled Repeat
+CLIENT_LOG="./repeat_client.log"
+mkdir -p models/repeat_int32/1/
+cp examples/decoupled/repeat_model.py models/repeat_int32/1/model.py
+cp examples/decoupled/repeat_config.pbtxt models/repeat_int32/config.pbtxt
+run_server
+if [ "$SERVER_PID" == "0" ]; then
+    echo -e "\n***\n*** Failed to start $SERVER\n***"
+    cat $SERVER_LOG
+    RET=1
+fi
+
+set +e
+python3 examples/decoupled/repeat_client.py > $CLIENT_LOG
+if [ $? -ne 0 ]; then
+    echo -e "\n***\n*** Failed to verify repeat_int32 example. \n***"
+    RET=1
+fi
+
+grep "PASS" $CLIENT_LOG
+if [ $? -ne 0 ]; then
+    echo -e "\n***\n*** Failed to verify repeat_int32 example. \n***"
+    cat $CLIENT_LOG
+    RET=1
+fi
+set -e
+
+kill $SERVER_PID
+wait $SERVER_PID
+
+# Example 5
+
+# Decoupled Square
+CLIENT_LOG="./square_client.log"
+mkdir -p models/square_int32/1/
+cp examples/decoupled/square_model.py models/square_int32/1/model.py
+cp examples/decoupled/square_config.pbtxt models/square_int32/config.pbtxt
+run_server
+if [ "$SERVER_PID" == "0" ]; then
+    echo -e "\n***\n*** Failed to start $SERVER\n***"
+    cat $SERVER_LOG
+    RET=1
+fi
+
+set +e
+python3 examples/decoupled/square_client.py > $CLIENT_LOG
+if [ $? -ne 0 ]; then
+    echo -e "\n***\n*** Failed to verify square_int32 example. \n***"
+    RET=1
+fi
+
+grep "PASS" $CLIENT_LOG
+if [ $? -ne 0 ]; then
+    echo -e "\n***\n*** Failed to verify square_int32 example. \n***"
+    cat $CLIENT_LOG
+    RET=1
+fi
+set -e
 
 #
 # BLS Async
