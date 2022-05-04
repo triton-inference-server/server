@@ -2252,7 +2252,7 @@ class LifeCycleTest(tu.TestResultCollector):
             # Prepare override file
             with open("models/{}/3/model.{}".format(model_name, base[0]),
                       'rb') as f:
-                encoded_file = base64.b64encode(f.read())
+                file_content = f.read()
 
             for triton_client in (httpclient.InferenceServerClient(
                     "localhost:8000", verbose=True),
@@ -2275,8 +2275,7 @@ class LifeCycleTest(tu.TestResultCollector):
                 # not be used.
                 try:
                     triton_client.load_model(
-                        model_name,
-                        encoded_files={"file:1/model.onnx": encoded_file})
+                        model_name, files={"file:1/model.onnx": file_content})
                     self.assertTrue(
                         False, "expected error on missing override config")
                 except InferenceServerException as ex:
@@ -2302,7 +2301,7 @@ class LifeCycleTest(tu.TestResultCollector):
                         override_model_name,
                         config="""{{"backend":"{backend}" }}""".format(
                             backend=base[1]),
-                        encoded_files={"file:1/model.onnx": encoded_file})
+                        files={"file:1/model.onnx": file_content})
                 except Exception as ex:
                     self.assertTrue(False, "unexpected error {}".format(ex))
 
@@ -2335,7 +2334,7 @@ class LifeCycleTest(tu.TestResultCollector):
                         model_name,
                         config="""{{"backend":"{backend}" }}""".format(
                             backend=base[1]),
-                        encoded_files={"file:1/model.onnx": encoded_file})
+                        files={"file:1/model.onnx": file_content})
                 except Exception as ex:
                     self.assertTrue(False, "unexpected error {}".format(ex))
 

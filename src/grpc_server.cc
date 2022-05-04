@@ -1760,28 +1760,62 @@ CommonHandler::SetUpAllRequests()
           // WAR for the const-ness check
           std::vector<const TRITONSERVER_Parameter*> const_params;
           for (auto param_proto : request.parameters()) {
-            if (param_proto.second.parameter_choice_case() !=
-                inference::ModelRepositoryParameter::ParameterChoiceCase::
-                    kStringParam) {
+            if (param_proto.first == "config") {
+              if (param_proto.second.parameter_choice_case() !=
+                  inference::ModelRepositoryParameter::ParameterChoiceCase::
+                      kStringParam) {
+                err = TRITONSERVER_ErrorNew(
+                    TRITONSERVER_ERROR_INVALID_ARG,
+                    (std::string("invalid value type for load parameter '") +
+                     param_proto.first + "', expected string_param.")
+                        .c_str());
+                break;
+              } else {
+                auto param = TRITONSERVER_ParameterNew(
+                    param_proto.first.c_str(), TRITONSERVER_PARAMETER_STRING,
+                    param_proto.second.string_param().c_str());
+                if (param != nullptr) {
+                  params.emplace_back(param);
+                  const_params.emplace_back(param);
+                } else {
+                  err = TRITONSERVER_ErrorNew(
+                      TRITONSERVER_ERROR_INTERNAL,
+                      "unexpected error on creating Triton parameter");
+                  break;
+                }
+              }
+            } else if (param_proto.first.rfind("file:", 0) == 0) {
+              if (param_proto.second.parameter_choice_case() !=
+                  inference::ModelRepositoryParameter::ParameterChoiceCase::
+                      kBytesParam) {
+                err = TRITONSERVER_ErrorNew(
+                    TRITONSERVER_ERROR_INVALID_ARG,
+                    (std::string("invalid value type for load parameter '") +
+                     param_proto.first + "', expected bytes_param.")
+                        .c_str());
+                break;
+              } else {
+                auto param = TRITONSERVER_ParameterBytesNew(
+                    param_proto.first.c_str(),
+                    param_proto.second.bytes_param().data(),
+                    param_proto.second.bytes_param().length());
+                if (param != nullptr) {
+                  params.emplace_back(param);
+                  const_params.emplace_back(param);
+                } else {
+                  err = TRITONSERVER_ErrorNew(
+                      TRITONSERVER_ERROR_INTERNAL,
+                      "unexpected error on creating Triton parameter");
+                  break;
+                }
+              }
+            } else {
               err = TRITONSERVER_ErrorNew(
                   TRITONSERVER_ERROR_INVALID_ARG,
-                  (std::string("invalid value type for load parameter '") +
-                   param_proto.first + "', expected string_param.")
+                  (std::string("unrecognized load parameter '") +
+                   param_proto.first + "'.")
                       .c_str());
               break;
-            } else {
-              auto param = TRITONSERVER_ParameterNew(
-                  param_proto.first.c_str(), TRITONSERVER_PARAMETER_STRING,
-                  param_proto.second.string_param().c_str());
-              if (param != nullptr) {
-                params.emplace_back(param);
-                const_params.emplace_back(param);
-              } else {
-                err = TRITONSERVER_ErrorNew(
-                    TRITONSERVER_ERROR_INTERNAL,
-                    "unexpected error on creating Triton parameter");
-                break;
-              }
             }
           }
           if (err == nullptr) {
@@ -3323,6 +3357,12 @@ InferResponseCompleteCommon(
         break;
       case TRITONSERVER_PARAMETER_STRING:
         param.set_string_param(reinterpret_cast<const char*>(vvalue));
+        break;
+      case TRITONSERVER_PARAMETER_BYTES:
+        return TRITONSERVER_ErrorNew(
+            TRITONSERVER_ERROR_UNSUPPORTED,
+            "Response parameter of type 'TRITONSERVER_PARAMETER_BYTES' is not "
+            "currently supported");
         break;
     }
   }
