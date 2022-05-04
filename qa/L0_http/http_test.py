@@ -26,12 +26,15 @@
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 import sys
+
 sys.path.append("../common")
 
+import requests
 import unittest
 import numpy as np
 import test_util as tu
-import requests
+import tritonclient.http as tritonhttpclient
+from tritonclient.utils import np_to_triton_dtype, InferenceServerException
 
 
 class HttpTest(tu.TestResultCollector):
@@ -39,39 +42,38 @@ class HttpTest(tu.TestResultCollector):
     def _get_infer_url(self, model_name):
         return "http://localhost:8000/v2/models/{}/infer".format(model_name)
 
-    def test_raw_binary(self):
+    def _raw_binary_helper(self,
+                           model,
+                           input_bytes,
+                           expected_output_bytes,
+                           extra_headers={}):
         # Select model that satisfies constraints for raw binary request
-        model = "onnx_zero_1_float32"
-        input = np.arange(8, dtype=np.float32)
         headers = {'Inference-Header-Content-Length': '0'}
+        # Add extra headers (if any) before sending request
+        headers.update(extra_headers)
         r = requests.post(self._get_infer_url(model),
-                          data=input.tobytes(),
+                          data=input_bytes,
                           headers=headers)
         r.raise_for_status()
 
         # Get the inference header size so we can locate the output binary data
         header_size = int(r.headers["Inference-Header-Content-Length"])
+        # Assert input == output since this tests an identity model
         self.assertEqual(
-            input.tobytes(), r.content[header_size:],
+            expected_output_bytes, r.content[header_size:],
             "Expected response body contains correct output binary data: {}; got: {}"
-            .format(input.tobytes(), r.content[header_size:]))
+            .format(expected_output_bytes, r.content[header_size:]))
+
+    def test_raw_binary(self):
+        model = "onnx_zero_1_float32"
+        input_bytes = np.arange(8, dtype=np.float32).tobytes()
+        self._raw_binary_helper(model, input_bytes, input_bytes)
 
     def test_raw_binary_longer(self):
         # Similar to test_raw_binary but test with different data size
         model = "onnx_zero_1_float32"
-        input = np.arange(32, dtype=np.float32)
-        headers = {'Inference-Header-Content-Length': '0'}
-        r = requests.post(self._get_infer_url(model),
-                          data=input.tobytes(),
-                          headers=headers)
-        r.raise_for_status()
-
-        # Get the inference header size so we can locate the output binary data
-        header_size = int(r.headers["Inference-Header-Content-Length"])
-        self.assertEqual(
-            input.tobytes(), r.content[header_size:],
-            "Expected response body contains correct output binary data: {}; got: {}"
-            .format(input.tobytes(), r.content[header_size:]))
+        input_bytes = np.arange(32, dtype=np.float32).tobytes()
+        self._raw_binary_helper(model, input_bytes, input_bytes)
 
     def test_byte(self):
         # Select model that satisfies constraints for raw binary request
@@ -146,6 +148,52 @@ class HttpTest(tu.TestResultCollector):
             "Raw request must only have 1 input (found 1) to be deduced but got 3 inputs in",
             r.content.decode())
 
+    # This is to test that a properly chunk-encoded request by the caller works,
+    # though Triton does not specifically do any special chunk handling outside
+    # of underlying HTTP libaries used
+    # Future Enhancement: Test other encodings as they come up
+    def test_content_encoding_chunked_manually(self):
+        # Similar to test_raw_binary but test with extra headers
+        extra_headers = {"Transfer-Encoding": "chunked"}
+        model = "onnx_zero_1_float32"
+        input_bytes = np.arange(8, dtype=np.float32).tobytes()
+        # Encode input into a single chunk (for simplicity) following chunked
+        # encoding format: https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/Transfer-Encoding
+        chunk_encoded_input = b""
+        # Length of chunk in hexadecimal and line separator
+        chunk_encoded_input += f"{len(input_bytes):X}\r\n".encode("utf-8")
+        # Chunk bytes and line separator
+        chunk_encoded_input += input_bytes + b"\r\n"
+        # Final byte (0) and end message
+        chunk_encoded_input += b'0\r\n\r\n'
+        self._raw_binary_helper(model, chunk_encoded_input, input_bytes,
+                                extra_headers)
+
+    # Test that Python client rejects any "Transfer-Encoding" HTTP headers
+    # as we don't specially handle encoding requests for the user through
+    # these headers. There are special arguments exposed in the client to
+    # handle some "Content-Encoding" headers.
+    def test_content_encoding_unsupported_client(self):
+        for encoding in ["chunked", "compress", "deflate", "gzip"]:
+            with self.subTest(encoding=encoding):
+                headers = {"Transfer-Encoding": encoding}
+                np_input = np.arange(8, dtype=np.float32).reshape(1, -1)
+                model = "onnx_zero_1_float32"
+                # Setup inputs
+                inputs = []
+                inputs.append(
+                    tritonhttpclient.InferInput(
+                        'INPUT0', np_input.shape,
+                        np_to_triton_dtype(np_input.dtype)))
+                inputs[0].set_data_from_numpy(np_input)
+
+                with tritonhttpclient.InferenceServerClient(
+                        "localhost:8000") as client:
+                    # Python client is expected to raise an exception to reject
+                    # 'content-encoding' HTTP headers.
+                    with self.assertRaisesRegex(InferenceServerException,
+                                                "Unsupported HTTP header"):
+                        client.infer(model_name=model, inputs=inputs, headers=headers)
 
 if __name__ == '__main__':
     unittest.main()
