@@ -516,7 +516,7 @@ fi
 
 TEST_RESULT_FILE='test_results.txt'
 PYTHON_TEST=http_test.py
-EXPECTED_NUM_TESTS=6
+EXPECTED_NUM_TESTS=8
 set +e
 python3 $PYTHON_TEST >$CLIENT_LOG 2>&1
 if [ $? -ne 0 ]; then
