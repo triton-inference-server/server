@@ -189,17 +189,11 @@ class HttpTest(tu.TestResultCollector):
 
                 with tritonhttpclient.InferenceServerClient(
                         "localhost:8000") as client:
-                    try:
+                    # Python client is expected to raise an exception to reject
+                    # 'content-encoding' HTTP headers.
+                    with self.assertRaisesRegex(InferenceServerException,
+                                                "Unsupported HTTP header"):
                         client.infer(model_name=model, inputs=inputs, headers=headers)
-                    except InferenceServerException as ex:
-                        self.assertIn("unsupported http header",
-                                      ex.message().lower())
-                    else:
-                        self.assertTrue(
-                            False,
-                            "Python client is expected to raise an exception to reject 'content-encoding' HTTP headers."
-                        )
-
 
 if __name__ == '__main__':
     unittest.main()
