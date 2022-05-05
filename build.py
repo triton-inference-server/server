@@ -897,11 +897,7 @@ RUN apt-get update && \
     rm -rf /var/lib/apt/lists/*
 
 RUN pip3 install --upgrade pip && \
-    pip3 install --upgrade wheel setuptools docker && \
-    apt-key del 7fa2af80 && \
-    wget https://developer.download.nvidia.com/compute/cuda/repos/ubuntu2004/x86_64/cuda-keyring_1.0-1_all.deb && \
-    dpkg -i cuda-keyring_1.0-1_all.deb && \
-    apt-key adv --fetch-keys https://developer.download.nvidia.com/compute/cuda/repos/ubuntu2004/x86_64/3bf863cc.pub
+    pip3 install --upgrade wheel setuptools docker
 
 # Server build requires recent version of CMake (FetchContent required)
 RUN wget -O - https://apt.kitware.com/keys/kitware-archive-latest.asc 2>/dev/null | \
