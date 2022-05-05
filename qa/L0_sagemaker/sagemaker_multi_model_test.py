@@ -182,17 +182,11 @@ class SageMakerMultiModelTest(tu.TestResultCollector):
 
         request_body, header_length = httpclient.InferenceServerClient.generate_request_body(inputs, outputs=outputs)
 
-        print(f"request_body: {request_body}")
-        print(f"header_length :{header_length}")
-
         invoke_url = "{}/{}/invoke".format(self.url_mme_, self.model2_name)
         headers = {
             "Content-Type": "application/vnd.sagemaker-triton.binary+json;json-header-size={}".format(header_length)
         }
         r = requests.post(invoke_url, data=request_body, headers=headers)
-        # r.raise_for_status()
-
-        print(f"r_content: {r._content}")
 
         header_length_prefix = "application/vnd.sagemaker-triton.binary+json;json-header-size="
         header_length_str = r.headers["Content-Type"][len(header_length_prefix) :]
@@ -200,7 +194,7 @@ class SageMakerMultiModelTest(tu.TestResultCollector):
 
         # Get the inference header size so we can locate the output binary data
         output_data = result.as_numpy("OUTPUT0")
-        print(f"output_data: {output_data}")
+        
         for i in range(8):
             self.assertEqual(output_data[0][i], input_data[0][i], "Tensor Value Mismatch")
 
