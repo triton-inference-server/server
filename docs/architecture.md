@@ -743,16 +743,16 @@ ensemble_scheduling {
 }
 ```
 
-The ensemble_scheduling section indicates that the ensemble scheduler will be
-used and that the ensemble model consists of three different models. Each element
-in step section specifies the model to be used and how the inputs and outputs of
-the model are mapped to tensor names recognized by the scheduler. For
+The ensemble\_scheduling section indicates that the ensemble scheduler will be
+used and that the ensemble model consists of three different models. Each
+element in step section specifies the model to be used and how the inputs and
+outputs of the model are mapped to tensor names recognized by the scheduler. For
 example, the first element in step specifies that the latest version of
-image_preprocess_model should be used, the content of its input "RAW_IMAGE"
-is provided by "IMAGE" tensor, and the content of its output "PREPROCESSED_OUTPUT"
-will be mapped to "preprocessed_image" tensor for later use. The tensor names
-recognized by the scheduler are the ensemble inputs, the ensemble outputs and
-all values in the input_map and the output_map.
+image\_preprocess\_model should be used, the content of its input "RAW\_IMAGE"
+is provided by "IMAGE" tensor, and the content of its output
+"PREPROCESSED\_OUTPUT" will be mapped to "preprocessed\_image" tensor for later
+use. The tensor names recognized by the scheduler are the ensemble inputs, the
+ensemble outputs and all values in the input\_map and the output\_map.
 
 The models composing the ensemble may also have dynamic batching
 enabled.  Since ensemble models are just routing the data between
@@ -771,17 +771,17 @@ When an inference request for the ensemble model is received, the ensemble
 scheduler will:
 
 1. Recognize that the "IMAGE" tensor in the request is mapped to input
-   "RAW_IMAGE" in the preprocess model.
+   "RAW\_IMAGE" in the preprocess model.
 
 2. Check models within the ensemble and send an internal request to the
    preprocess model because all the input tensors required are ready.
 
 3. Recognize the completion of the internal request, collect the output
-   tensor and map the content to "preprocessed_image" which is an unique name
+   tensor and map the content to "preprocessed\_image" which is an unique name
    known within the ensemble.
 
 4. Map the newly collected tensor to inputs of the models within the ensemble.
-   In this case, the inputs of "classification_model" and "segmentation_model"
+   In this case, the inputs of "classification\_model" and "segmentation\_model"
    will be mapped and marked as ready.
 
 5. Check models that require the newly collected tensor and send internal
@@ -793,3 +793,15 @@ scheduler will:
 6. Repeat step 3-5 until no more internal requests should be sent, and then
    response to the inference request with the tensors mapped to the ensemble
    output names.
+
+#### Additional Resources
+
+You can find additional end-to-end ensemble examples in the links below:
+
+* [Preprocessing in Python Backend Using
+  Ensemble](https://github.com/triton-inference-server/python_backend#preprocessing)
+* [Accelerating Inference with NVIDIA Triton Inference Server and NVIDIA
+  DALI](https://developer.nvidia.com/blog/accelerating-inference-with-triton-inference-server-and-dali/)
+* [Using RAPIDS AI with NVIDIA Triton Inference
+  Server](https://github.com/rapidsai/rapids-examples/tree/main/rapids_triton_example)
+

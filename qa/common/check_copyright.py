@@ -36,6 +36,7 @@ SKIP_EXTS = ('jpeg', 'jpg', 'pgm', 'png', 'log', 'serverlog', 'preprocessed',
              'jmx', 'gz', 'json', 'pdf', 'so', 'onnx')
 REPO_PATH_FROM_THIS_FILE = '../..'
 SKIP_PATHS = (
+    'build',
     'deploy/gke-marketplace-app/.gitignore',
     'deploy/gke-marketplace-app/server-deployer/chart/.helmignore',
     'deploy/gcp/.helmignore', 'deploy/aws/.helmignore',

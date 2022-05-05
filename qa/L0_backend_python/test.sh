@@ -46,12 +46,14 @@ export TEST_JETSON=${TEST_JETSON:=0}
 export CUDA_VISIBLE_DEVICES=0
 
 BASE_SERVER_ARGS="--model-repository=`pwd`/models --backend-directory=${BACKEND_DIR} --log-verbose=1"
-SERVER_ARGS=$BASE_SERVER_ARGS
+# Set the default byte size to 5MBs to avoid going out of shared memory. The
+# environment that this job runs on has only 1GB of shared-memory available.
+SERVER_ARGS="$BASE_SERVER_ARGS --backend-config=python,shm-default-byte-size=5242880"
 
 PYTHON_BACKEND_BRANCH=$PYTHON_BACKEND_REPO_TAG
 CLIENT_PY=./python_test.py
 CLIENT_LOG="./client.log"
-EXPECTED_NUM_TESTS="8"
+EXPECTED_NUM_TESTS="9"
 TEST_RESULT_FILE='test_results.txt'
 SERVER_LOG="./inference_server.log"
 source ../common/util.sh
@@ -108,6 +110,10 @@ mkdir -p models/init_args/1/
 cp ../python_models/init_args/model.py ./models/init_args/1/
 cp ../python_models/init_args/config.pbtxt ./models/init_args/
 
+mkdir -p models/optional/1/
+cp ../python_models/optional/model.py ./models/optional/1/
+cp ../python_models/optional/config.pbtxt ./models/optional/
+
 mkdir -p models/non_contiguous/1/
 cp ../python_models/non_contiguous/model.py ./models/non_contiguous/1/
 cp ../python_models/non_contiguous/config.pbtxt ./models/non_contiguous/config.pbtxt
@@ -127,7 +133,7 @@ if [ "$TEST_JETSON" == "0" ]; then
   pip3 install torch==1.6.0+cpu -f https://download.pytorch.org/whl/torch_stable.html
 else
   # test_growth_error is skipped on jetson
-  EXPECTED_NUM_TESTS=7
+  EXPECTED_NUM_TESTS=8
 fi
 
 prev_num_pages=`get_shm_pages`
@@ -381,6 +387,16 @@ if [ $? -ne 0 ]; then
 fi
 
 (cd examples && bash -ex test.sh)
+if [ $? -ne 0 ]; then
+  RET=1
+fi
+
+(cd argument_validation && bash -ex test.sh)
+if [ $? -ne 0 ]; then
+  RET=1
+fi
+
+(cd decoupled && bash -ex test.sh)
 if [ $? -ne 0 ]; then
   RET=1
 fi

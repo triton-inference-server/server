@@ -2094,7 +2094,7 @@ class LifeCycleTest(tu.TestResultCollector):
             self.assertTrue(False, "unexpected error {}".format(ex))
 
     def test_model_repository_index(self):
-        # use model control EXPLIT and --load-model to load a subset of models
+        # use model control EXPLICIT and --load-model to load a subset of models
         # in model repository
         tensor_shape = (1, 16)
         model_bases = ['graphdef', 'savedmodel', "simple_savedmodel"]
@@ -2119,7 +2119,7 @@ class LifeCycleTest(tu.TestResultCollector):
                 self.assertTrue(False, "unexpected error {}".format(ex))
 
         # Check model repository index
-        # All models should be in ready state except savedmodel_float32_float32_float32
+        # All models should be in ready state except onnx_float32_float32_float32
         # which appears in two repositories.
         model_bases.append("simple_graphdef")
         try:
@@ -2236,6 +2236,147 @@ class LifeCycleTest(tu.TestResultCollector):
                         triton_client.is_model_ready(model_name, "3"))
                 except Exception as ex:
                     self.assertTrue(False, "unexpected error {}".format(ex))
+
+    def test_file_override(self):
+        import base64
+
+        model_shape = (1, 16)
+        override_base = "override_model"
+
+        for base in (('onnx', 'onnxruntime'),):
+            model_name = tu.get_model_name(base[0], np.float32, np.float32,
+                                           np.float32)
+            override_model_name = tu.get_model_name(override_base, np.float32,
+                                                    np.float32, np.float32)
+
+            # Prepare override file
+            with open("models/{}/3/model.{}".format(model_name, base[0]),
+                      'rb') as f:
+                encoded_file = base64.b64encode(f.read())
+
+            for triton_client in (httpclient.InferenceServerClient(
+                    "localhost:8000", verbose=True),
+                                  grpcclient.InferenceServerClient(
+                                      "localhost:8001", verbose=True)):
+                try:
+                    self.assertTrue(triton_client.is_server_live())
+                    self.assertFalse(
+                        triton_client.is_model_ready(model_name, "1"))
+                    self.assertFalse(
+                        triton_client.is_model_ready(model_name, "2"))
+                    self.assertTrue(
+                        triton_client.is_model_ready(model_name, "3"))
+                except Exception as ex:
+                    self.assertTrue(False, "unexpected error {}".format(ex))
+
+                # Request to load the model with override file, should fail
+                # without providing override config. The config requirement
+                # serves as an reminder that the existing model directory will
+                # not be used.
+                try:
+                    triton_client.load_model(
+                        model_name,
+                        encoded_files={"file:1/model.onnx": encoded_file})
+                    self.assertTrue(
+                        False, "expected error on missing override config")
+                except InferenceServerException as ex:
+                    # [FIXME] Improve error reporting to mention missing config
+                    self.assertIn(
+                        "failed to load '{}', failed to poll from model repository"
+                        .format(model_name), ex.message())
+
+                # Sanity check on previous loaded version is still available
+                # after the failure attempt to load model with different version
+                self.assertFalse(triton_client.is_model_ready(model_name, "1"))
+                self.assertFalse(triton_client.is_model_ready(model_name, "2"))
+                self.assertTrue(triton_client.is_model_ready(model_name, "3"))
+
+                self._infer_success_models([
+                    base[0],
+                ], (3,), model_shape)
+
+                # Request to load the model with override file and config in
+                # a different name
+                try:
+                    triton_client.load_model(
+                        override_model_name,
+                        config="""{{"backend":"{backend}" }}""".format(
+                            backend=base[1]),
+                        encoded_files={"file:1/model.onnx": encoded_file})
+                except Exception as ex:
+                    self.assertTrue(False, "unexpected error {}".format(ex))
+
+                # Sanity check on previous loaded version is still available
+                # after the load with different model name
+                self.assertFalse(triton_client.is_model_ready(model_name, "1"))
+                self.assertFalse(triton_client.is_model_ready(model_name, "2"))
+                self.assertTrue(triton_client.is_model_ready(model_name, "3"))
+                self._infer_success_models([
+                    base[0],
+                ], (3,), model_shape)
+
+                # New override model should also be available
+                self.assertTrue(
+                    triton_client.is_model_ready(override_model_name, "1"))
+                self.assertFalse(
+                    triton_client.is_model_ready(override_model_name, "2"))
+                self.assertFalse(
+                    triton_client.is_model_ready(override_model_name, "3"))
+                self._infer_success_models([
+                    override_base,
+                ], (1,),
+                                           model_shape,
+                                           swap=True)
+
+                # Request to load the model with override file and config in
+                # original name
+                try:
+                    triton_client.load_model(
+                        model_name,
+                        config="""{{"backend":"{backend}" }}""".format(
+                            backend=base[1]),
+                        encoded_files={"file:1/model.onnx": encoded_file})
+                except Exception as ex:
+                    self.assertTrue(False, "unexpected error {}".format(ex))
+
+                # The model should be loaded from the override model directory
+                # which has different model version
+                self.assertTrue(triton_client.is_model_ready(model_name, "1"))
+                self.assertFalse(triton_client.is_model_ready(model_name, "2"))
+                self.assertFalse(triton_client.is_model_ready(model_name, "3"))
+                self._infer_success_models([
+                    base[0],
+                ], (1,),
+                                           model_shape,
+                                           swap=True)
+
+                # The model with different name should be available
+                self.assertTrue(
+                    triton_client.is_model_ready(override_model_name, "1"))
+                self.assertFalse(
+                    triton_client.is_model_ready(override_model_name, "2"))
+                self.assertFalse(
+                    triton_client.is_model_ready(override_model_name, "3"))
+                self._infer_success_models([
+                    override_base,
+                ], (1,),
+                                           model_shape,
+                                           swap=True)
+
+                # Reset model for the next client iteration
+                try:
+                    # Load model again and the original model repository will
+                    # be use
+                    triton_client.load_model(model_name)
+                    triton_client.unload_model(override_model_name)
+                except Exception as ex:
+                    self.assertTrue(False, "unexpected error {}".format(ex))
+                self.assertFalse(triton_client.is_model_ready(model_name, "1"))
+                self.assertFalse(triton_client.is_model_ready(model_name, "2"))
+                self.assertTrue(triton_client.is_model_ready(model_name, "3"))
+                self._infer_success_models([
+                    base[0],
+                ], (3,), model_shape)
 
     def test_shutdown_dynamic(self):
         model_shape = (1, 1)

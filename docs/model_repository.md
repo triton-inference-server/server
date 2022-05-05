@@ -1,5 +1,5 @@
 <!--
-# Copyright (c) 2018-2021, NVIDIA CORPORATION. All rights reserved.
+# Copyright 2018-2022, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -76,8 +76,8 @@ corresponding model. The config.pbtxt file describes the [model
 configuration](model_configuration.md) for the model. For some models,
 config.pbtxt is required while for others it is optional. See
 [Auto-Generated Model
-Configuration](#auto-generated-model-configuration) for more
-information.
+Configuration](https://github.com/triton-inference-server/server/blob/main/docs/model_configuration.md#auto-generated-model-configuration) 
+for more information.
 
 Each <model-name> directory must have at least one numeric
 sub-directory representing a version of the model.  For more

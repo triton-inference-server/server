@@ -49,7 +49,7 @@ $ ./gen_qa_custom_ops
 ```
 
 This will create multiple model repositories in /tmp/<version>/qa_*
-(for example /tmp/22.03/qa_model_repository).  The TensorRT models
+(for example /tmp/22.04/qa_model_repository).  The TensorRT models
 will be created for the GPU on the system that CUDA considers device 0
 (zero). If you have multiple GPUs on your system see the documentation
 in the scripts for how to target a specific GPU.
@@ -74,7 +74,7 @@ Next you need to build a QA version of the Triton Docker image. This
 image will contain Triton, the QA tests, and all the dependencies
 needed to run the QA tests. First do a [Docker image
 build](build.md#building-triton-with-docker) to produce the
-*tritonserver_build* and *tritonserver* images.
+*tritonserver_cibase* and *tritonserver* images.
 
 Then, build the actual QA image.
 
@@ -128,5 +128,7 @@ you can run L0_infer as follows:
 $ BACKENDS="plan" ENSEMBLES=0 EXPECTED_NUM_TESTS=<expected> bash -x ./test.sh
 ```
 
-Where '<expected>' is the number of sub-tests expected to be run for
-just TensorRT testing and no ensembles.
+Where '\<expected\>' is the number of sub-tests expected to be run for
+just TensorRT testing and no ensembles. Depending on which backend(s)
+you are testing you will need to experiment and determine the correct
+value for '\<expected\>'.

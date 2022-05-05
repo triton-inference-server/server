@@ -272,6 +272,29 @@ for i in \
     #             RET=1
     #         fi
     #     done
+    elif [ $BASE = ${SIMPLE_INFER_CLIENT} ]; then
+        # Test forcing new channel creation with simple infer client
+        NEW_CHANNEL_STRING = "creating client_channel for channel stack"
+        GRPC_TRACE=subchannel GRPC_VERBOSITY=info $i -v -c "true" >> ${CLIENT_LOG}.c++.${SUFFIX} 2>&1
+        if [ $? -ne 0 ]; then
+            cat ${CLIENT_LOG}.c++.${SUFFIX}
+            RET=1
+        fi
+        if [ `grep -c ${NEW_CHANNEL_STRING} ${CLIENT_LOG}.c++.${SUFFIX}` != "1" ]; then
+            echo -e "\n***\n*** Failed. Expected 1 ${NEW_CHANNEL_STRING} calls\n***"
+            cat $CLIENT_LOG.c++.${SUFFIX}
+            RET=1
+        fi
+        GRPC_TRACE=subchannel GRPC_VERBOSITY=info $i -v -c "false" >> ${CLIENT_LOG}.c++.${SUFFIX} 2>&1
+        if [ $? -ne 0 ]; then
+            cat ${CLIENT_LOG}.c++.${SUFFIX}
+            RET=1
+        fi
+        if [ `grep -c ${NEW_CHANNEL_STRING} ${CLIENT_LOG}.c++.${SUFFIX}` != "2" ]; then
+            echo -e "\n***\n*** Failed. Expected 2 ${NEW_CHANNEL_STRING} calls\n***"
+            cat $CLIENT_LOG.c++.${SUFFIX}
+            RET=1
+        fi
     else
         $i -v -H test:1 >> ${CLIENT_LOG}.c++.${SUFFIX} 2>&1
         if [ $? -ne 0 ]; then
@@ -406,9 +429,12 @@ kill $SERVER_PID
 wait $SERVER_PID
 
 # Run cpp client unit test
-rm -r ${MODELDIR}/* && cp -r $DATADIR/qa_model_repository/onnx_int32_int32_int32 ${MODELDIR}/.
+rm -rf unit_test_models && mkdir unit_test_models
+cp -r $DATADIR/qa_model_repository/onnx_int32_int32_int32 unit_test_models/.
+cp -r ${MODELDIR}/simple unit_test_models/. 
 
-SERVER_ARGS="--backend-directory=${BACKEND_DIR} --model-repository=${MODELDIR}"
+SERVER_ARGS="--backend-directory=${BACKEND_DIR} --model-repository=unit_test_models
+            --trace-file=global_unittest.log --trace-level=TIMESTAMPS --trace-rate=1"
 SERVER_LOG="./inference_server_cc_unit_test.log"
 CLIENT_LOG="./cc_unit_test.log"
 run_server

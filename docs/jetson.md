@@ -41,7 +41,7 @@ Triton Inference Server support on JetPack includes:
 * [Model pipelines](architecture.md#ensemble-models)
 * [Extensible backends](https://github.com/triton-inference-server/backend)
 * [HTTP/REST and GRPC inference protocols](inference_protocols.md)
-* [C API](inference_protocols.md#c-api)
+* [C API](inference_protocols.md#in-process-triton-server-api)
 
 Limitations on JetPack 5.0:
 
@@ -52,7 +52,8 @@ The CUDA execution provider is in Beta.
 * GPU metrics, GCS storage, S3 storage and Azure storage are not supported.
 
 On JetPack, although HTTP/REST and GRPC inference protocols are supported, for edge
-use cases, direct [C API integration](inference_protocols.md#c-api) is recommended.
+use cases, direct [C API integration](inference_protocols.md#in-process-triton-server-api)
+is recommended.
 
 You can download the `.tgz` file for Jetson from the Triton Inference Server
 [release page](https://github.com/triton-inference-server/server/releases) in the
@@ -129,7 +130,7 @@ pip3 install --upgrade wheel setuptools cython && \
 
 **Note**: OpenCV 4.2.0 is installed as a part of JetPack. It is one of the dependencies for the client build.
 
-**Note**: When building Triton on Jetson, you will require a recent version of cmake. 
+**Note**: When building Triton on Jetson, you will require a recent version of cmake.
 We recommend using cmake 3.21.1. Below is a script to upgrade your cmake version to 3.21.1.
 
 ```
@@ -197,7 +198,7 @@ tritonserver --model-repository=/path/to/model_repo --backend-directory=/path/to
 
 **Note**: [perf_analyzer](perf_analyzer.md) is supported on Jetson, while the [model_analyzer](model_analyzer.md)
 is currently not available for Jetson. To execute `perf_analyzer` for C API, use
-the CLI flag `--service-kind=triton_c_api`: 
+the CLI flag `--service-kind=triton_c_api`:
 
 ```shell
 perf_analyzer -m graphdef_int32_int32_int32 --service-kind=triton_c_api \

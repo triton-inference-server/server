@@ -32,10 +32,10 @@ SAGEMAKER_MODEL_REPO=${SAGEMAKER_SINGLE_MODEL_REPO}
 is_mme_mode=false
 
 if [ -n "$SAGEMAKER_MULTI_MODEL" ]; then
-    if [ "$SAGEMAKER_MULTI_MODEL" == "true"]; then
+    if [ "$SAGEMAKER_MULTI_MODEL" == "true" ]; then
         SAGEMAKER_MODEL_REPO=${SAGEMAKER_MULTI_MODEL_REPO}
         is_mme_mode=true
-        echo "Triton is running in SageMaker MME mode" #TODO: REMOVE
+        echo "Triton is running in SageMaker MME mode" 
     fi
 fi
 
@@ -84,7 +84,7 @@ if [ "${is_mme_mode}" = false ] && [ -n "$SAGEMAKER_TRITON_DEFAULT_MODEL_NAME" ]
         echo "ERROR: Directory with provided SAGEMAKER_TRITON_DEFAULT_MODEL_NAME ${SAGEMAKER_TRITON_DEFAULT_MODEL_NAME} does not exist"
         exit 1
     fi
-elif [ "${is_mme_mode}" = false ]
+elif [ "${is_mme_mode}" = false ]; then
     MODEL_DIRS=(`find "${SAGEMAKER_MODEL_REPO}" -mindepth 1 -maxdepth 1 -type d -printf "%f\n"`)
     case ${#MODEL_DIRS[@]} in
         0) echo "ERROR: No model found in model repository";

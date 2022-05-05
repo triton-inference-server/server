@@ -26,6 +26,7 @@
 #pragma once
 
 #include "common.h"
+#include "dirent.h"
 #include "http_server.h"
 #include "triton/core/tritonserver.h"
 
@@ -64,6 +65,8 @@ class SagemakerAPIServer : public HTTPAPIServer {
             server, trace_manager, shm_manager, port, address, thread_cnt),
         ping_regex_(R"(/ping)"), invocations_regex_(R"(/invocations)"),
         models_regex_(R"(/models(?:/)?([^/]+)?(/invoke)?)"),
+        model_path_regex_(
+            R"((\/opt\/ml\/models\/[0-9A-Za-z._]+)\/(model)\/?([0-9A-Za-z._]+)?)"),
         ping_mode_("ready"),
         model_name_(GetEnvironmentVariableOrDefault(
             "SAGEMAKER_TRITON_DEFAULT_MODEL_NAME",
@@ -80,6 +83,8 @@ class SagemakerAPIServer : public HTTPAPIServer {
   void SageMakerMMELoadModel(
       evhtp_request_t* req,
       const std::unordered_map<std::string, std::string> parse_map);
+
+  void SageMakerMMEUnloadModel(evhtp_request_t* req, const char* model_name);
 
   void SageMakerMMEListModel(evhtp_request_t* req);
 
@@ -111,6 +116,7 @@ class SagemakerAPIServer : public HTTPAPIServer {
   re2::RE2 ping_regex_;
   re2::RE2 invocations_regex_;
   re2::RE2 models_regex_;
+  re2::RE2 model_path_regex_;
 
   const std::string ping_mode_;
 

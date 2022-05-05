@@ -148,6 +148,18 @@ if [ $(cat $CLIENT_LOG |  grep "input INPUT0 contains dynamic shape, provide sha
   RET=1
 fi
 
+$PERF_ANALYZER -v -i $PROTOCOL -m graphdef_object_object_object -p2000 --shape INPUT0 >$CLIENT_LOG 2>&1
+if [ $? -eq 0 ]; then
+  cat $CLIENT_LOG
+  echo -e "\n***\n*** Test Failed: Expected an error when using dynamic shapes with incorrect arguments\n***"
+  RET=1
+fi
+if [ $(cat $CLIENT_LOG |  grep "failed to parse input shape. There must be a colon after input name." | wc -l) -eq 0 ]; then
+  cat $CLIENT_LOG
+  echo -e "\n***\n*** Test Failed: \n***"
+  RET=1
+fi
+
 # Testing with ensemble and sequential model variants
 $PERF_ANALYZER -v -i grpc -m  simple_savedmodel_sequence_object -p 2000 -t5 --streaming \
 --input-data=$SEQ_JSONDATAFILE  --input-data=$SEQ_JSONDATAFILE >$CLIENT_LOG 2>&1
@@ -791,13 +803,13 @@ set +e
 mpiexec --allow-run-as-root \
   -n 1 --merge-stderr-to-stdout --output-filename . --tag-output --timestamp-output \
     $PERF_ANALYZER -v -m graphdef_int32_int32_int32 \
-      --measurement-mode count_windows -s 50 : \
+      --measurement-mode count_windows -s 50 --enable-mpi : \
   -n 1 --merge-stderr-to-stdout --output-filename . --tag-output --timestamp-output \
     $PERF_ANALYZER -v -m graphdef_nobatch_int32_int32_int32 \
-      --measurement-mode count_windows -s 50 : \
+      --measurement-mode count_windows -s 50 --enable-mpi : \
   -n 1 --merge-stderr-to-stdout --output-filename . --tag-output --timestamp-output \
     $PERF_ANALYZER -v -m custom_zero_1_float32 \
-      --measurement-mode count_windows -s 50
+      --measurement-mode count_windows -s 50 --enable-mpi
 if [ $? -ne 0 ]; then
    cat 1/rank.0/stdout 1/rank.2/stdout 1/rank.2/stdout
    echo -e "\n***\n*** Perf Analyzer returned non-zero exit code\n***"

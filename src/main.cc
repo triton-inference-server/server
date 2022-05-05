@@ -133,6 +133,11 @@ std::unique_ptr<triton::server::HTTPServer> metrics_service_;
 bool allow_metrics_ = true;
 int32_t metrics_port_ = 8002;
 float metrics_interval_ms_ = 2000;
+#ifndef TRITON_ENABLE_HTTP
+// Triton uses the same address for http and metrics services.
+// Need to set http address for metrics when http service is disable.
+std::string http_address_ = "0.0.0.0";
+#endif  // NOT TRITON_ENABLE_HTTP
 #endif  // TRITON_ENABLE_METRICS
 
 #ifdef TRITON_ENABLE_TRACING
@@ -514,8 +519,12 @@ std::vector<Option> options_
        "specified."},
       {OPTION_STARTUP_MODEL, "load-model", Option::ArgStr,
        "Name of the model to be loaded on server startup. It may be specified "
-       "multiple times to add multiple models. Note that this option will only "
-       "take affect if --model-control-mode=explicit is true."},
+       "multiple times to add multiple models. To load ALL models at startup, "
+       "specify '*' as the model name with --load-model=* as the ONLY "
+       "--load-model argument, this does not imply any pattern matching. "
+       "Specifying --load-model=* in conjunction with another --load-model "
+       "argument will result in error. Note that this option will only take "
+       "effect if --model-control-mode=explicit is true."},
       // FIXME:  fix the default to execution_count once RL logic is complete.
       {OPTION_RATE_LIMIT, "rate-limit", Option::ArgStr,
        "Specify the mode for rate limiting. Options are \"execution_count\" "
@@ -1164,24 +1173,33 @@ ParseRateLimiterResourceOption(const std::string arg)
 std::tuple<std::string, std::string, std::string>
 ParseBackendConfigOption(const std::string arg)
 {
-  // Format is "<backend_name>,<setting>=<value>"
+  // Format is "<backend_name>,<setting>=<value>" for specific
+  // config/settings and "<setting>=<value>" for backend agnostic
+  // configs/settings
   int delim_name = arg.find(",");
   int delim_setting = arg.find("=", delim_name + 1);
 
-  // Check for 2 semicolons
-  if ((delim_name < 0) || (delim_setting < 0)) {
+  std::string name_string = std::string();
+  if (delim_name > 0) {
+    name_string = arg.substr(0, delim_name);
+  } else if (delim_name == 0) {
+    std::cerr << "No backend specified. --backend-config option format is "
+              << "<backend name>,<setting>=<value> or "
+              << "<setting>=<value>. Got " << arg << std::endl;
+    exit(1);
+  }  // else global backend config
+
+  if (delim_setting < 0) {
     std::cerr << "--backend-config option format is '<backend "
                  "name>,<setting>=<value>'. Got "
               << arg << std::endl;
     exit(1);
   }
-
-  std::string name_string = arg.substr(0, delim_name);
   std::string setting_string =
       arg.substr(delim_name + 1, delim_setting - delim_name - 1);
   std::string value_string = arg.substr(delim_setting + 1);
 
-  if (name_string.empty() || setting_string.empty() || value_string.empty()) {
+  if (setting_string.empty() || value_string.empty()) {
     std::cerr << "--backend-config option format is '<backend "
                  "name>,<setting>=<value>'. Got "
               << arg << std::endl;

@@ -535,9 +535,15 @@ TraceManager::TraceTensorActivity(
       }
       break;
     }
+
+    // FP16 / BF16 already handled as binary blobs, no need to manipulate here
     case TRITONSERVER_TYPE_FP16: {
       break;
     }
+    case TRITONSERVER_TYPE_BF16: {
+      break;
+    }
+
     case TRITONSERVER_TYPE_FP32: {
       const float* cbase = reinterpret_cast<const float*>(buffer_base);
       for (size_t e = 0; e < element_count; ++e) {

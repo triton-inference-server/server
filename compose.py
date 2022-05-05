@@ -77,7 +77,7 @@ FROM {} AS full
         df += '''
 FROM {} AS min_container
 
-'''.format(images["gpu_min"])
+'''.format(images["gpu-min"])
 
     df += '''
 FROM {}
@@ -107,8 +107,8 @@ def add_requested_backends(ddir, dockerfile_name, backends):
         if backend == 'openvino':
             import build
             ver = next(iter(build.TRITON_VERSION_MAP.values()))
-            backend = build.get_tagged_backend(backend, ver[4][0])
-        df += '''COPY --chown=1000:1000 --from=full /opt/tritonserver/backends/{} /opt/tritonserver/backends/{}    
+            backend = build.tagged_backend(backend, ver[4][0])
+        df += '''COPY --chown=1000:1000 --from=full /opt/tritonserver/backends/{} /opt/tritonserver/backends/{}
 '''.format(backend, backend)
     if len(backends) > 0:
         df += '''
@@ -122,7 +122,7 @@ RUN chown triton-server:triton-server /opt/tritonserver/backends
 def add_requested_repoagents(ddir, dockerfile_name, repoagents):
     df = "#  Copying over repoagents \n"
     for ra in repoagents:
-        df += '''COPY --chown=1000:1000 --from=full /opt/tritonserver/repoagents/{} /opt/tritonserver/repoagents/{}    
+        df += '''COPY --chown=1000:1000 --from=full /opt/tritonserver/repoagents/{} /opt/tritonserver/repoagents/{}
 '''.format(ra, ra)
     if len(repoagents) > 0:
         df += '''
@@ -159,7 +159,7 @@ def get_container_version_if_not_specified():
         with open('TRITON_VERSION', "r") as vfile:
             version = vfile.readline().strip()
         import build
-        _, FLAGS.container_version = build.get_container_versions(
+        _, FLAGS.container_version = build.container_versions(
             version, None, FLAGS.container_version)
         log('version {}'.format(version))
     log('using container version {}'.format(FLAGS.container_version))
@@ -328,7 +328,7 @@ if __name__ == '__main__':
         action='append',
         required=False,
         help=
-        'Use specified Docker image to generate Docker image. Specified as <image-name>,<full-image-name>. <image-name> can be "min" or "full". Both "min" and "full" need to be specified at the same time. This will override "--container-version".'
+        'Use specified Docker image to generate Docker image. Specified as <image-name>,<full-image-name>. <image-name> can be "min", "gpu-min" or "full". Both "min" and "full" need to be specified at the same time. This will override "--container-version". "gpu-min" is needed for CPU only container to copy TensorFlow and PyTorch deps.'
     )
     parser.add_argument('--enable-gpu',
                         nargs='?',
@@ -380,8 +380,8 @@ if __name__ == '__main__':
             fail_if(
                 len(parts) != 2,
                 '--image must specific <image-name>,<full-image-registry>')
-            fail_if(parts[0] not in ['min', 'full'],
-                    'unsupported value for --image')
+            fail_if(parts[0] not in ['min', 'full', 'gpu-min'],
+                    'unsupported image-name \'{}\' for --image'.format(parts[0]))
             log('image "{}": "{}"'.format(parts[0], parts[1]))
             images[parts[0]] = parts[1]
     else:
@@ -404,13 +404,13 @@ if __name__ == '__main__':
                     "ubuntu:20.04"
             }
     fail_if(
-        len(images) != 2,
-        "Need to both specify 'full' and 'min' images if at all")
+        len(images) < 2,
+        "Need to specify both 'full' and 'min' images if at all")
 
     # For cpu-only image we need to copy some cuda libraries and dependencies
     # since we are using a PyTorch container that is not CPU-only
-    if 'pytorch' in FLAGS.backend:
-        images["gpu_min"] = "nvcr.io/nvidia/tritonserver:{}-py3-min".format(
+    if ('pytorch' in FLAGS.backend) and ('gpu-min' not in images):
+        images["gpu-min"] = "nvcr.io/nvidia/tritonserver:{}-py3-min".format(
             FLAGS.container_version)
 
     argmap = create_argmap(images)

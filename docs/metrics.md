@@ -42,7 +42,10 @@ $ curl localhost:8002/metrics
 The tritonserver --allow-metrics=false option can be used to disable
 all metric reporting and --allow-gpu-metrics=false can be used to
 disable just the GPU Utilization and GPU Memory metrics. The
---metrics-port option can be used to select a different port.
+--metrics-port option can be used to select a different port. For now,
+Triton reuses http address for metrics endpoint. The option --http-address
+can be used to bind http and metrics endpoints to the same specific address
+when http service is enabled.
 
 The following table describes the available metrics.
 
@@ -124,3 +127,17 @@ Count*. The count metrics are illustrated by the following examples:
   the server. *Request Count* = 2, *Inference Count* = 9, *Execution
   Count* = 1.
 
+## Custom Metrics
+
+Triton exposes a C API to allow users and backends to register and collect
+custom metrics with the existing Triton metrics endpoint. The user takes the
+ownership of the custom metrics created through the APIs and must manage their
+lifetime following the API documentation.
+
+The 
+[identity_backend](https://github.com/triton-inference-server/identity_backend/blob/main/README.md#custom-metric-example)
+demonstrates a practical example of adding a custom metric to a backend.
+
+Further documentation can be found in the `TRITONSERVER_MetricFamily*` and
+`TRITONSERVER_Metric*` API annotations in
+[tritonserver.h](https://github.com/triton-inference-server/core/blob/main/include/triton/core/tritonserver.h).

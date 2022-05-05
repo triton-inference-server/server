@@ -434,6 +434,16 @@ ReadDataFromJson(
               std::string(tensor_name))
               .c_str());
 
+    // BF16 not supported via JSON
+    case TRITONSERVER_TYPE_BF16:
+      return TRITONSERVER_ErrorNew(
+          TRITONSERVER_ERROR_INVALID_ARG,
+          std::string(
+              "receiving BF16 data via JSON is not supported. Please use the "
+              "binary data format for input " +
+              std::string(tensor_name))
+              .c_str());
+
     case TRITONSERVER_TYPE_INVALID:
       return TRITONSERVER_ErrorNew(
           TRITONSERVER_ERROR_INVALID_ARG,
@@ -584,6 +594,13 @@ WriteDataToJson(
       return TRITONSERVER_ErrorNew(
           TRITONSERVER_ERROR_INVALID_ARG,
           "sending FP16 data via JSON is not supported. Please use the "
+          "binary data format for output");
+
+    // BF16 not supported via JSON
+    case TRITONSERVER_TYPE_BF16:
+      return TRITONSERVER_ErrorNew(
+          TRITONSERVER_ERROR_INVALID_ARG,
+          "sending BF16 data via JSON is not supported. Please use the "
           "binary data format for output");
 
     case TRITONSERVER_TYPE_FP32: {
@@ -1305,7 +1322,19 @@ HTTPAPIServer::HandleRepositoryControl(
                        "unexpected error getting load model request buffers"));
         }
       }
-      std::vector<const TRITONSERVER_Parameter*> params;
+      static auto param_deleter =
+          [](std::vector<TRITONSERVER_Parameter*>* params) {
+            if (params != nullptr) {
+              for (auto& param : *params) {
+                TRITONSERVER_ParameterDelete(param);
+              }
+            }
+          };
+      std::unique_ptr<
+          std::vector<TRITONSERVER_Parameter*>, decltype(param_deleter)>
+      params(new std::vector<TRITONSERVER_Parameter*>(), param_deleter);
+      // WAR for the const-ness check
+      std::vector<const TRITONSERVER_Parameter*> const_params;
       size_t buffer_len = evbuffer_get_length(req->buffer_in);
       if (buffer_len > 0) {
         triton::common::TritonJson::Value request;
@@ -1315,14 +1344,20 @@ HTTPAPIServer::HandleRepositoryControl(
         // Parse request body for parameters
         triton::common::TritonJson::Value param_json;
         if (request.Find("parameters", &param_json)) {
-          triton::common::TritonJson::Value param;
-          if (param_json.Find("config", &param)) {
-            std::string config;
-            HTTP_RESPOND_IF_ERR(req, param.AsString(&config));
+          // Iterate over each member in 'param_json'
+          std::vector<std::string> members;
+          HTTP_RESPOND_IF_ERR(req, param_json.Members(&members));
+          for (const auto& m : members) {
+            const char* param_str = nullptr;
+            size_t param_len = 0;
+            HTTP_RESPOND_IF_ERR(
+                req,
+                param_json.MemberAsString(m.c_str(), &param_str, &param_len));
             auto param = TRITONSERVER_ParameterNew(
-                "config", TRITONSERVER_PARAMETER_STRING, config.c_str());
+                m.c_str(), TRITONSERVER_PARAMETER_STRING, param_str);
             if (param != nullptr) {
-              params.emplace_back(param);
+              params->emplace_back(param);
+              const_params.emplace_back(param);
             } else {
               HTTP_RESPOND_IF_ERR(
                   req, TRITONSERVER_ErrorNew(
@@ -1332,8 +1367,10 @@ HTTPAPIServer::HandleRepositoryControl(
           }
         }
       }
-      err = TRITONSERVER_ServerLoadModelWithParameters(
-          server_.get(), model_name.c_str(), params.data(), params.size());
+      HTTP_RESPOND_IF_ERR(
+          req, TRITONSERVER_ServerLoadModelWithParameters(
+                   server_.get(), model_name.c_str(), const_params.data(),
+                   const_params.size()));
     } else if (action == "unload") {
       // Check if the dependent models should be removed
       bool unload_dependents = false;

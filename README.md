@@ -41,11 +41,11 @@ available as a shared library with a C API that allows the full
 functionality of Triton to be included directly in an
 application.
 
-The current release of the Triton Inference Server is 2.20.0 and
-corresponds to the 22.03 release of the tritonserver container on
+The current release of the Triton Inference Server is 2.21.0 and
+corresponds to the 22.04 release of the tritonserver container on
 [NVIDIA GPU Cloud (NGC)](https://ngc.nvidia.com). The branch for this
 release is
-[r22.03](https://github.com/triton-inference-server/server/tree/r22.03).
+[r22.04](https://github.com/triton-inference-server/server/tree/r22.04).
 
 ## Features
 
@@ -102,9 +102,9 @@ release is
   developed [KServe
   protocol](https://github.com/kserve/kserve/tree/master/docs/predict-api/v2).
 
-* A [C API](docs/inference_protocols.md#c-api) allows Triton to be
-  linked directly into your application for edge and other in-process
-  use cases.
+* A [C API](docs/inference_protocols.md#in-process-triton-server-api)
+  allows Triton to be linked directly into your application for edge
+  and other in-process use cases.
 
 * [Metrics](docs/metrics.md) indicating GPU utilization, server
   throughput, and server latency. The metrics are provided in
@@ -114,8 +114,8 @@ release is
 
 **The master branch documentation tracks the upcoming,
 under-development release and so may not be accurate for the current
-release of Triton. See the [r22.03
-documentation](https://github.com/triton-inference-server/server/tree/r22.03#documentation)
+release of Triton. See the [r22.04
+documentation](https://github.com/triton-inference-server/server/tree/r22.04#documentation)
 for the current release.**
 
 [Triton Architecture](docs/architecture.md) gives a high-level
@@ -161,9 +161,9 @@ describe supported GPUs.
     * [Configuring Rate Limiter](docs/model_configuration.md#rate-limiter-configuration)
   * [Optimization Settings](docs/model_configuration.md#optimization_policy)
     * [Framework-Specific Optimization](docs/optimization.md#framework-specific-optimization)
-      * [ONNX-TensorRT](docs/optimization.md#onnx-with-tensorrt-optimization)
+      * [ONNX-TensorRT](docs/optimization.md#onnx-with-tensorrt-optimization-ort-trt)
       * [ONNX-OpenVINO](docs/optimization.md#onnx-with-openvino-optimization)
-      * [TensorFlow-TensorRT](docs/optimization.md#tensorflow-with-tensorrt-optimization)
+      * [TensorFlow-TensorRT](docs/optimization.md#tensorflow-with-tensorrt-optimization-tf-trt)
       * [TensorFlow-Mixed-Precision](docs/optimization.md#tensorflow-automatic-fp16-optimization)
     * [NUMA Optimization](docs/optimization.md#numa-optimization)
   * [Scheduling and Batching](docs/model_configuration.md#scheduling-and-batching)
@@ -238,7 +238,11 @@ that demonstrate how to use the libraries.  You can also send
 HTTP/REST requests directly to Triton using the [HTTP/REST JSON-based
 protocol](docs/inference_protocols.md#httprest-and-grpc-protocols) or
 [generate a GRPC client for many other
-languages](https://github.com/triton-inference-server/client).
+languages](https://github.com/triton-inference-server/client). For
+certain types of models you can also send input data (e.g. a jpeg
+image) directly to Triton in the [body of an HTTP request without any
+additional
+metadata](https://github.com/triton-inference-server/server/blob/main/docs/protocol/extension_binary_data.md#raw-binary-request).
 
 Understanding and [optimizing performance](docs/optimization.md) is an
 important part of deploying your models. The Triton project provides
@@ -315,31 +319,14 @@ with new functionality that operates when a model is loaded or
 unloaded. You can introduce your own code to perform authentication,
 decryption, conversion, or similar operations when a model is loaded.
 
-## Papers and Presentation
+## Additional Resources
 
-* [Maximizing Deep Learning Inference Performance with NVIDIA Model
-  Analyzer](https://developer.nvidia.com/blog/maximizing-deep-learning-inference-performance-with-nvidia-model-analyzer/).
+* Additional documentation, presentations, and examples are located in the
+  [NVIDIA Developer Zone](https://developer.nvidia.com/nvidia-triton-inference-server).
 
-* [High-Performance Inferencing at Scale Using the TensorRT Inference
-  Server](https://developer.nvidia.com/gtc/2020/video/s22418).
-
-* [Accelerate and Autoscale Deep Learning Inference on GPUs with
-  KFServing](https://developer.nvidia.com/gtc/2020/video/s22459).
-
-* [Deep into Triton Inference Server: BERT Practical Deployment on
-  NVIDIA GPU](https://developer.nvidia.com/gtc/2020/video/s21736).
-
-* [Maximizing Utilization for Data Center Inference with TensorRT
-  Inference Server](https://on-demand-gtc.gputechconf.com/gtcnew/sessionview.php?sessionName=s9438-maximizing+utilization+for+data+center+inference+with+tensorrt+inference+server).
-
-* [NVIDIA TensorRT Inference Server Boosts Deep Learning
-  Inference](https://devblogs.nvidia.com/nvidia-serves-deep-learning-inference/).
-
-* [GPU-Accelerated Inference for Kubernetes with the NVIDIA TensorRT
-  Inference Server and
-  Kubeflow](https://www.kubeflow.org/blog/nvidia_tensorrt/).
-
-* [Deploying NVIDIA Triton at Scale with MIG and Kubernetes](https://developer.nvidia.com/blog/deploying-nvidia-triton-at-scale-with-mig-and-kubernetes/).
+* Specific end-to-end examples for popular models, such as ResNet, BERT, and
+  DLRM are located in the [NVIDIA Deep Learning Examples page on
+  GitHub](https://github.com/NVIDIA/DeepLearningExamples).
 
 ## Contributing
 

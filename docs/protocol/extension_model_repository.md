@@ -143,6 +143,14 @@ the model directory. If config is provided, the (re-)load will be triggered as
 the model metadata has been updated, and the same (re-)load behavior will be
 applied.
 
+- "file:\<version\>/\<file-name\>" : The serialized model file, base64 encoded.
+This convention will be used to specify the override model directory to load
+the model from. For instance, if the user wants to specify a model directory
+that contains an ONNX model as version 2, then the user will specify the
+parameter to "file:2/model.onnx" : "<base64-encoded-file-content>". Note that
+"config" parameter must be provided to serve as the model configuration of the
+override model directory.
+
 A failed load request must be indicated by an HTTP error status
 (typically 400). The HTTP body must contain the
 $repository_load_error_response object.
@@ -313,6 +321,14 @@ This config will be used for loading the model instead of the one in
 the model directory. If config is provided, the (re-)load will be triggered as
 the model metadata has been updated, and the same (re-)load behavior will be
 applied.
+
+- "file:\<version\>/\<file-name\>" : The serialized model file, base64 encoded.
+This convention will be used to specify the override model directory to load
+the model from. For instance, if the user wants to specify a model directory
+that contains an ONNX model as version 2, then the user will specify the
+parameter to "file:2/model.onnx" : "<base64-encoded-file-content>". Note that
+"config" parameter must be provided to serve as the model configuration of the
+override model directory.
 
 ### Unload
 

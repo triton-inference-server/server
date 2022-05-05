@@ -29,7 +29,7 @@
 #
 
 # Base image on the minimum Triton container
-ARG BASE_IMAGE=nvcr.io/nvidia/tritonserver:22.03-py3-min
+ARG BASE_IMAGE=nvcr.io/nvidia/tritonserver:22.04-py3-min
 
 ARG TRITON_CLIENT_REPO_SUBDIR=clientrepo
 ARG TRITON_COMMON_REPO_TAG=main
@@ -133,6 +133,8 @@ RUN cmake -DCMAKE_INSTALL_PREFIX=/workspace/install \
           -DTRITON_ENABLE_JAVA_HTTP=ON \
           -DTRITON_ENABLE_PERF_ANALYZER=ON \
           -DTRITON_ENABLE_PERF_ANALYZER_C_API=ON \
+          -DTRITON_ENABLE_PERF_ANALYZER_TFS=ON \
+          -DTRITON_ENABLE_PERF_ANALYZER_TS=ON \
           -DTRITON_ENABLE_EXAMPLES=ON -DTRITON_ENABLE_TESTS=ON \
           -DTRITON_ENABLE_GPU=${TRITON_ENABLE_GPU} /workspace/client
 RUN make -j16 cc-clients python-clients java-clients && \
@@ -190,9 +192,10 @@ RUN if [ "$TARGETPLATFORM" = "linux/amd64" ]; then \
         --jar-install-path /workspace/install/java-api-bindings; \
     fi
 
-# For CI testing need to copy over L0_sdk test.
+# For CI testing need to copy over L0_sdk test and L0_client_build_variants test.
 RUN mkdir qa
 COPY qa/L0_sdk qa/L0_sdk
+COPY qa/L0_client_build_variants qa/L0_client_build_variants
 
 # Install an image needed by the quickstart and other documentation.
 COPY qa/images/mug.jpg images/mug.jpg
@@ -210,13 +213,13 @@ RUN if [ "$TRITON_ENABLE_GPU" = "ON" ]; then \
       if [ "$TARGETPLATFORM" = "linux/arm64" ]; then \
         wget https://developer.download.nvidia.com/compute/cuda/repos/ubuntu2004/sbsa/cuda-ubuntu2004.pin && \
         mv cuda-ubuntu2004.pin /etc/apt/preferences.d/cuda-repository-pin-600 && \
-        apt-key adv --fetch-keys https://developer.download.nvidia.com/compute/cuda/repos/ubuntu2004/sbsa/7fa2af80.pub && \
+        apt-key adv --fetch-keys https://developer.download.nvidia.com/compute/cuda/repos/ubuntu2004/sbsa/3bf863cc.pub && \
         add-apt-repository "deb https://developer.download.nvidia.com/compute/cuda/repos/ubuntu2004/sbsa/ /" && \
         apt-get update && apt-get install -y datacenter-gpu-manager=1:${DCGM_VERSION}; \
       else \
         wget https://developer.download.nvidia.com/compute/cuda/repos/ubuntu2004/x86_64/cuda-ubuntu2004.pin && \
         mv cuda-ubuntu2004.pin /etc/apt/preferences.d/cuda-repository-pin-600 && \
-        apt-key adv --fetch-keys https://developer.download.nvidia.com/compute/cuda/repos/ubuntu2004/x86_64/7fa2af80.pub && \
+        apt-key adv --fetch-keys https://developer.download.nvidia.com/compute/cuda/repos/ubuntu2004/x86_64/3bf863cc.pub && \
         add-apt-repository "deb https://developer.download.nvidia.com/compute/cuda/repos/ubuntu2004/x86_64/ /" && \
         apt-get update && apt-get install -y datacenter-gpu-manager=1:${DCGM_VERSION}; \
       fi \

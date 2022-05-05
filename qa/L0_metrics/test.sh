@@ -1,5 +1,5 @@
 #!/bin/bash
-# Copyright 2020-2021, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright 2020-2022, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -49,6 +49,21 @@ source ../common/util.sh
 rm -f $SERVER_LOG
 
 RET=0
+
+TEST_LOG="./metrics_api_test.log"
+UNIT_TEST=./metrics_api_test
+
+rm -fr *.log
+
+set +e
+export CUDA_VISIBLE_DEVICES=0
+LD_LIBRARY_PATH=/opt/tritonserver/lib:$LD_LIBRARY_PATH $UNIT_TEST >>$TEST_LOG 2>&1
+if [ $? -ne 0 ]; then
+    cat $TEST_LOG
+    echo -e "\n***\n*** Metrics API Unit Test Failed\n***"
+    RET=1
+fi
+set -e
 
 # Prepare a libtorch float32 model with basic config
 rm -rf $MODELDIR

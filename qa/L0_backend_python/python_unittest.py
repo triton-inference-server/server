@@ -54,10 +54,13 @@ class PythonUnittest(tu.TestResultCollector):
     def test_python_unittest(self):
         model_name = os.environ['MODEL_NAME']
 
-        if model_name == 'bls_memory' or model_name == 'bls_memory_async':
+        if model_name == 'bls' or model_name == 'bls_memory' or model_name == 'bls_memory_async':
             # For these tests, the memory region size will be grown. Because of
-            # this we need to use the shared memory probe only on the second
+            # this we need to use the shared memory probe only on the later
             # call so that the probe can detect the leak correctly.
+            self._run_unittest(model_name)
+
+            # [FIXME] See DLIS-3684
             self._run_unittest(model_name)
             with self._shm_leak_detector.Probe() as shm_probe:
                 self._run_unittest(model_name)

@@ -1,5 +1,5 @@
 <!--
-# Copyright 2018-2021, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright 2018-2022, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -105,6 +105,15 @@ Triton should use with the model.
 For models that do not support batching, or do not support batching in
 the specific ways described above, *max_batch_size* must be set to
 zero.
+
+When a model is using the auto-complete feature, a default maximum batch size may 
+be set by using the `--backend-config=default-max-batch-size=<int>` command line argument. 
+This allows all models which are capable of batching and which make use of 
+[Auto Generated Model configuration](#auto-generated-model-configuration) to have
+a default maximum batch size. This value is set to 4 by default. While none of the
+officially supported Triton backends implement this feature, backend developers 
+may make use of this value by obtaining it from the TRITONBACKEND_BackendConfig api.
+
 
 ### Inputs and Outputs
 
@@ -296,6 +305,7 @@ library.
 |TYPE_FP32     | kFLOAT       |DT_FLOAT      |FLOAT         |kFloat   |FP32     |float32       |
 |TYPE_FP64     |              |DT_DOUBLE     |DOUBLE        |kDouble  |FP64     |float64       |
 |TYPE_STRING   |              |DT_STRING     |STRING        |         |BYTES    |dtype(object) |
+|TYPE_BF16     |              |              |              |         |BF16     |              |
 
 For TensorRT each value is in the nvinfer1::DataType namespace. For
 example, nvinfer1::DataType::kFLOAT is the 32-bit floating-point
@@ -850,7 +860,8 @@ model instance will be served only if it completes the requests
 successfully.  Note that the effect of warming up models varies
 depending on the framework backend, and it will cause Triton to be
 less responsive to model update, so the users should experiment and
-choose the configuration that suits their need.  See the protobuf
+choose the configuration that suits their need.  See the
+[ModelWarmup protobuf](https://github.com/triton-inference-server/common/blob/main/protobuf/model_config.proto)
 documentation for the currently available settings.
 
 ## Response Cache
