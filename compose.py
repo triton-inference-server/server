@@ -70,10 +70,12 @@ FROM {} AS full
 '''.format(argmap['TRITON_VERSION'], argmap['TRITON_CONTAINER_VERSION'],
            images["full"])
 
-    # PyTorch backend needs extra CUDA and other dependencies during runtime
-    # that are missing in the CPU only base container. These dependencies
-    # must be copied from the Triton Min image
-    if not FLAGS.enable_gpu and ('pytorch' in backends):
+    # PyTorch, TensorFlow 1 and TensorFlow 2 backends need extra CUDA and other
+    # dependencies during runtime that are missing in the CPU-only base container.
+    # These dependencies must be copied from the Triton Min image.
+    if not FLAGS.enable_gpu and (('pytorch' in backends) or
+                                 ('tensorflow1' in backends) or
+                                 ('tensorflow2' in backends)):
         df += '''
 FROM {} AS min_container
 
@@ -328,7 +330,7 @@ if __name__ == '__main__':
         action='append',
         required=False,
         help=
-        'Use specified Docker image to generate Docker image. Specified as <image-name>,<full-image-name>. <image-name> can be "min", "gpu-min" or "full". Both "min" and "full" need to be specified at the same time. This will override "--container-version". "gpu-min" is needed for CPU only container to copy TensorFlow and PyTorch deps.'
+        'Use specified Docker image to generate Docker image. Specified as <image-name>,<full-image-name>. <image-name> can be "min", "gpu-min" or "full". Both "min" and "full" need to be specified at the same time. This will override "--container-version". "gpu-min" is needed for CPU-only container to copy TensorFlow and PyTorch deps.'
     )
     parser.add_argument('--enable-gpu',
                         nargs='?',
@@ -380,8 +382,9 @@ if __name__ == '__main__':
             fail_if(
                 len(parts) != 2,
                 '--image must specific <image-name>,<full-image-registry>')
-            fail_if(parts[0] not in ['min', 'full', 'gpu-min'],
-                    'unsupported image-name \'{}\' for --image'.format(parts[0]))
+            fail_if(
+                parts[0] not in ['min', 'full', 'gpu-min'],
+                'unsupported image-name \'{}\' for --image'.format(parts[0]))
             log('image "{}": "{}"'.format(parts[0], parts[1]))
             images[parts[0]] = parts[1]
     else:
@@ -407,9 +410,11 @@ if __name__ == '__main__':
         len(images) < 2,
         "Need to specify both 'full' and 'min' images if at all")
 
-    # For cpu-only image we need to copy some cuda libraries and dependencies
-    # since we are using a PyTorch container that is not CPU-only
-    if ('pytorch' in FLAGS.backend) and ('gpu-min' not in images):
+    # For CPU-only image we need to copy some cuda libraries and dependencies
+    # since we are using PyTorch, TensorFlow 1, TensorFlow 2 containers that
+    # are not CPU-only.
+    if (('pytorch' in FLAGS.backend) or ('tensorflow1' in FLAGS.backend) or
+        ('tensorflow2' in FLAGS.backend)) and ('gpu-min' not in images):
         images["gpu-min"] = "nvcr.io/nvidia/tritonserver:{}-py3-min".format(
             FLAGS.container_version)
 
