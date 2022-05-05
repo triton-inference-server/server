@@ -1,4 +1,4 @@
-# Copyright (c) 2019-2020, NVIDIA CORPORATION. All rights reserved.
+# Copyright 2019-2022, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -135,8 +135,10 @@ class InferReshapeTest(tu.TestResultCollector):
                     use_system_shared_memory=TEST_SYSTEM_SHARED_MEMORY,
                     use_cuda_shared_memory=TEST_CUDA_SHARED_MEMORY)
 
+        # Skip for libtorch string I/O
         if tu.validate_for_libtorch_model(dtype, dtype, dtype, input_shapes[0],
-                                          input_shapes[0], input_shapes[0]):
+                                          input_shapes[0], input_shapes[0]) and \
+                                              (dtype != np_dtype_string):
             # skip variable size reshape on libtorch for now,
             # see "gen_qa_reshape_model.py" for detail
             if dtype != np.int32:
@@ -152,24 +154,23 @@ class InferReshapeTest(tu.TestResultCollector):
                         use_system_shared_memory=TEST_SYSTEM_SHARED_MEMORY,
                         use_cuda_shared_memory=TEST_CUDA_SHARED_MEMORY)
 
-                # model that supports batching. Skip for libtorch string I/O
-                if dtype == np_dtype_string:
-                    for bs in (1, 8):
-                        full_shapes = [[
-                            bs,
-                        ] + input_shape for input_shape in input_shapes]
-                        full_output_shapes = [[
-                            bs,
-                        ] + output_shape for output_shape in output_shapes]
-                        iu.infer_zero(
-                            self,
-                            'libtorch',
-                            bs,
-                            dtype,
-                            full_shapes,
-                            full_output_shapes,
-                            use_system_shared_memory=TEST_SYSTEM_SHARED_MEMORY,
-                            use_cuda_shared_memory=TEST_CUDA_SHARED_MEMORY)
+                # model that supports batching
+                for bs in (1, 8):
+                    full_shapes = [[
+                        bs,
+                    ] + input_shape for input_shape in input_shapes]
+                    full_output_shapes = [[
+                        bs,
+                    ] + output_shape for output_shape in output_shapes]
+                    iu.infer_zero(
+                        self,
+                        'libtorch',
+                        bs,
+                        dtype,
+                        full_shapes,
+                        full_output_shapes,
+                        use_system_shared_memory=TEST_SYSTEM_SHARED_MEMORY,
+                        use_cuda_shared_memory=TEST_CUDA_SHARED_MEMORY)
 
         for name in ["simple_reshape", "sequence_reshape", "fan_reshape"]:
             # [TODO] Skip variable size reshape on ensemble for now.
