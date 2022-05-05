@@ -102,7 +102,7 @@ class InferTest(tu.TestResultCollector):
                         use_cuda_shared_memory=TEST_CUDA_SHARED_MEMORY)
 
                 # model that supports batching. Skip for libtorch string I/O
-                if pf == 'libtorch' and tu.validate_for_libtorch_model(
+                elif pf == 'libtorch' and tu.validate_for_libtorch_model(
                         input_dtype, output0_dtype, output1_dtype, tensor_shape,
                         tensor_shape, tensor_shape, bs):
                     iu.infer_exact(

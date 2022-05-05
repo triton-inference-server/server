@@ -94,26 +94,30 @@ class InferVariableTest(tu.TestResultCollector):
                         correlation_id=correlation_id,
                         use_system_shared_memory=TEST_SYSTEM_SHARED_MEMORY,
                         use_cuda_shared_memory=TEST_CUDA_SHARED_MEMORY)
-                # model that supports batching
-                iu.infer_exact(
-                    tester,
-                    pf, (bs,) + tensor_shape,
-                    bs,
-                    input_dtype,
-                    output0_dtype,
-                    output1_dtype,
-                    output0_raw=output0_raw,
-                    output1_raw=output1_raw,
-                    model_version=model_version,
-                    swap=swap,
-                    outputs=outputs,
-                    use_http=use_http,
-                    use_grpc=use_grpc,
-                    skip_request_id_check=skip_request_id_check,
-                    use_streaming=use_streaming,
-                    correlation_id=correlation_id,
-                    use_system_shared_memory=TEST_SYSTEM_SHARED_MEMORY,
-                    use_cuda_shared_memory=TEST_CUDA_SHARED_MEMORY)
+
+                # model that supports batching. Skip for libtorch string I/O
+                elif pf == 'libtorch' and tu.validate_for_libtorch_model(
+                        input_dtype, output0_dtype, output1_dtype, tensor_shape,
+                        tensor_shape, tensor_shape, bs):
+                    iu.infer_exact(
+                        tester,
+                        pf, (bs,) + tensor_shape,
+                        bs,
+                        input_dtype,
+                        output0_dtype,
+                        output1_dtype,
+                        output0_raw=output0_raw,
+                        output1_raw=output1_raw,
+                        model_version=model_version,
+                        swap=swap,
+                        outputs=outputs,
+                        use_http=use_http,
+                        use_grpc=use_grpc,
+                        skip_request_id_check=skip_request_id_check,
+                        use_streaming=use_streaming,
+                        correlation_id=correlation_id,
+                        use_system_shared_memory=TEST_SYSTEM_SHARED_MEMORY,
+                        use_cuda_shared_memory=TEST_CUDA_SHARED_MEMORY)
 
         all_ensemble_prefix = ["simple_", "sequence_", "fan_"]
         ensemble_prefix = [""]
