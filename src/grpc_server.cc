@@ -1759,7 +1759,7 @@ CommonHandler::SetUpAllRequests()
           std::vector<TRITONSERVER_Parameter*> params;
           // WAR for the const-ness check
           std::vector<const TRITONSERVER_Parameter*> const_params;
-          for (auto param_proto : request.parameters()) {
+          for (const auto& param_proto : request.parameters()) {
             if (param_proto.first == "config") {
               if (param_proto.second.parameter_choice_case() !=
                   inference::ModelRepositoryParameter::ParameterChoiceCase::
