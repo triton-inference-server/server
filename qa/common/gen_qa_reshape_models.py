@@ -425,6 +425,7 @@ def create_libtorch_modelfile(models_dir, model_version, max_batch, dtype,
                                           max_batch):
         return
 
+    # Skip for String I/O
     torch_dtype = np_to_torch_dtype(dtype)
     if torch_dtype is None:
         return
@@ -532,6 +533,7 @@ def create_libtorch_modelconfig(models_dir, model_version, max_batch, dtype,
                                           max_batch):
         return
 
+    # Skip for String I/O
     torch_dtype = np_to_torch_dtype(dtype)
     if torch_dtype is None:
         return

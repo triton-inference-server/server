@@ -1111,7 +1111,11 @@ def create_libtorch_modelfile(models_dir, model_version, max_batch, dtype,
                                           shape, max_batch):
         return
 
+    # Skip for String I/O
     torch_dtype = np_to_torch_dtype(dtype)
+    if torch_dtype is None:
+        return
+
     torch_control_type = torch_dtype
 
     # If input dtype is bool, then use bool type for control and
@@ -1162,6 +1166,12 @@ def create_libtorch_modelconfig(models_dir, model_version, max_batch, dtype,
     if not tu.validate_for_libtorch_model(dtype, dtype, dtype, shape, shape,
                                           shape, max_batch):
         return
+
+    # Skip for String I/O
+    torch_dtype = np_to_torch_dtype(dtype)
+    if torch_dtype is None:
+        return
+
 
     model_name = tu.get_sequence_model_name(
         "libtorch_nobatch" if max_batch == 0 else "libtorch", dtype)
