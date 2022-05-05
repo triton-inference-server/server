@@ -211,7 +211,6 @@ SagemakerAPIServer::Handle(evhtp_request_t* req)
           req->method = htp_method_POST;
 
           SageMakerMMEListModel(req);
-          HandleRepositoryIndex(req, "");
           return;
         }
         LOG_VERBOSE(1) << "SageMaker request: GET MODEL";
@@ -220,6 +219,13 @@ SagemakerAPIServer::Handle(evhtp_request_t* req)
       case htp_method_POST:
         if (action == "/invoke") {
           LOG_VERBOSE(1) << "SageMaker request: INVOKE MODEL";
+
+          if (sagemaker_models_list.find(multi_model_name.c_str()) ==
+              sagemaker_models_list.end()) {
+            evhtp_send_reply(req, EVHTP_RES_NOTFOUND); /* 404*/
+            return;
+          }
+
           HandleInfer(req, multi_model_name, model_version_str_);
           return;
         }
@@ -239,8 +245,8 @@ SagemakerAPIServer::Handle(evhtp_request_t* req)
         LOG_VERBOSE(1) << "SageMaker request: UNLOAD MODEL";
         req->method = htp_method_POST;
 
-        HandleRepositoryControl(req, "", multi_model_name, "unload");
-        sagemaker_models_list.erase(multi_model_name);
+        SageMakerMMEUnloadModel(req, multi_model_name.c_str());
+
         return;
       }
       default:
@@ -314,13 +320,12 @@ SagemakerAPIServer::ParseSageMakerRequest(
 
     if (request.Find("model_name", &model_name)) {
       HTTP_RESPOND_IF_ERR(req, model_name.AsString(&model_name_string));
-      LOG_INFO << "Received model_name: "
-               << model_name_string.c_str(); /* TODO: Remove */
+      LOG_VERBOSE(1) << "Received model_name: " << model_name_string.c_str();
     }
 
     if ((action == "load") && (request.Find("url", &url))) {
       HTTP_RESPOND_IF_ERR(req, url.AsString(&url_string));
-      LOG_INFO << "Received url: " << url_string.c_str(); /* TODO: Remove */
+      LOG_VERBOSE(1) << "Received url: " << url_string.c_str();
     }
   }
 
@@ -333,6 +338,37 @@ SagemakerAPIServer::ParseSageMakerRequest(
 
   *parse_map = parse_map_;
   return;
+}
+
+void
+SagemakerAPIServer::SageMakerMMEUnloadModel(
+    evhtp_request_t* req, const char* model_name)
+{
+  if (sagemaker_models_list.find(model_name) == sagemaker_models_list.end()) {
+    LOG_VERBOSE(1) << "Model " << model_name << "is not loaded." << std::endl;
+    evhtp_send_reply(req, EVHTP_RES_NOTFOUND); /* 404*/
+    return;
+  }
+
+  HandleRepositoryControl(req, "", model_name, "unload");
+
+  std::string repo_path = sagemaker_models_list.at(model_name);
+
+  std::string repo_parent_path, subdir, customer_subdir;
+  RE2::FullMatch(
+      repo_path, model_path_regex_, &repo_parent_path, &subdir,
+      &customer_subdir);
+
+  TRITONSERVER_Error* unload_err = TRITONSERVER_ServerUnregisterModelRepository(
+      server_.get(), repo_parent_path.c_str());
+
+  if (unload_err != nullptr) {
+    EVBufferAddErrorJson(req->buffer_out, unload_err);
+    evhtp_send_reply(req, EVHTP_RES_BADREQ);
+    TRITONSERVER_ErrorDelete(unload_err);
+  }
+
+  sagemaker_models_list.erase(model_name);
 }
 
 void
@@ -379,8 +415,15 @@ SagemakerAPIServer::SageMakerMMEListModel(evhtp_request_t* req)
     triton::common::TritonJson::Value model_url_pair(
         models_array, triton::common::TritonJson::ValueType::OBJECT);
 
-    model_url_pair.AddString("modelName", it->first);
-    model_url_pair.AddString("modelUrl", it->second);
+    bool ready = false;
+    TRITONSERVER_ServerModelIsReady(
+        server_.get(), it->first.c_str(), 1, &ready);
+
+    /* Add to return list only if model is ready to be served */
+    if (ready) {
+      model_url_pair.AddString("modelName", it->first);
+      model_url_pair.AddString("modelUrl", it->second);
+    }
 
     models_array.Append(std::move(model_url_pair));
   }
@@ -409,16 +452,49 @@ SagemakerAPIServer::SageMakerMMELoadModel(
   std::string repo_path = parse_map.at("url");
   std::string model_name = parse_map.at("model_name");
 
-  /*
-  Note: here:
-  repo_path: e.g., /opt/ml/models/<hash>/
-  subdir: "model" unless there's a subdir within repo_path
-  model_name: e.g., customer_model
-  */
+  /* Error out if there's more than one subdir/version within
+   * supplied model repo, as ensemble in MME is not (currently)
+   * supported
+   */
+  DIR* dir;
+  struct dirent* ent;
+  int dir_count = 0;
+  if ((dir = opendir(repo_path.c_str())) != NULL) {
+    while ((ent = readdir(dir)) != NULL) {
+      if ((ent->d_type == DT_DIR) && (strcmp(ent->d_name, ".") == 0) &&
+          (strcmp(ent->d_name, "..") == 0)) {
+        dir_count += 1;
+      }
+      if (dir_count > 1) {
+        HTTP_RESPOND_IF_ERR(
+            req,
+            TRITONSERVER_ErrorNew(
+                TRITONSERVER_ERROR_INTERNAL,
+                "More than one version or model directories found. Note that "
+                "Ensemble models are not supported in SageMaker MME mode."));
+        closedir(dir);
+        return;
+      }
+    }
+    closedir(dir);
+  }
+
   std::vector<const TRITONSERVER_Parameter*> subdir_modelname_map;
 
+  /* Split repo path into three parts:
+   * /opt/ml/models/<hash>/model/optional_customer_subdir
+   * 1st repo_parent_path: /opt/ml/models/<hash>
+   * 2nd subdir: model
+   * 3rd customer_subdir: optional_customer_subdir
+   */
+
+  std::string repo_parent_path, subdir, customer_subdir;
+  RE2::FullMatch(
+      repo_path, model_path_regex_, &repo_parent_path, &subdir,
+      &customer_subdir);
+
   auto param = TRITONSERVER_ParameterNew(
-      "model", TRITONSERVER_PARAMETER_STRING, model_name.c_str());
+      subdir.c_str(), TRITONSERVER_PARAMETER_STRING, model_name.c_str());
 
   if (param != nullptr) {
     subdir_modelname_map.emplace_back(param);
@@ -432,15 +508,8 @@ SagemakerAPIServer::SageMakerMMELoadModel(
   /* Register repository with model mapping */
   TRITONSERVER_Error* err = nullptr;
   err = TRITONSERVER_ServerRegisterModelRepository(
-      server_.get(), repo_path.c_str(), subdir_modelname_map.data(),
+      server_.get(), repo_parent_path.c_str(), subdir_modelname_map.data(),
       subdir_modelname_map.size());
-
-  /*
-    1. Triton doesn't send a response on successful load SM expects a response
-    object
-    2. Load model status codes 409: Already loaded; 507: Can't load due to
-    resource constraint
-  */
 
   // If a model_name is reused i.e. model_name is already mapped, return a 409
   if ((err != nullptr) &&
@@ -468,14 +537,30 @@ SagemakerAPIServer::SageMakerMMELoadModel(
     EVBufferAddErrorJson(req->buffer_out, load_err);
     evhtp_send_reply(req, EVHTP_RES_CONFLICT); /* 409 */
     TRITONSERVER_ErrorDelete(load_err);
+    return;
   } else if (load_err != nullptr) {
     EVBufferAddErrorJson(req->buffer_out, load_err);
     evhtp_send_reply(req, EVHTP_RES_BADREQ);
-    TRITONSERVER_ErrorDelete(load_err);
   } else {
     sagemaker_models_list.emplace(model_name, repo_path);
     evhtp_send_reply(req, EVHTP_RES_OK);
   }
+
+  /* Unregister model repository in case of load failure*/
+  if (load_err != nullptr) {
+    load_err = TRITONSERVER_ServerUnregisterModelRepository(
+        server_.get(), repo_parent_path.c_str());
+    LOG_VERBOSE(1)
+        << "Unregistered model repository due to load failure for model: "
+        << model_name << std::endl;
+  }
+
+  if (load_err != nullptr) {
+    EVBufferAddErrorJson(req->buffer_out, load_err);
+    evhtp_send_reply(req, EVHTP_RES_BADREQ);
+    TRITONSERVER_ErrorDelete(load_err);
+  }
+
   return;
 }
 
