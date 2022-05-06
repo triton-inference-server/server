@@ -27,30 +27,41 @@
 
 # Set up test files based on installation instructions
 # https://github.com/bytedeco/javacpp-presets/blob/master/tritonserver/README.md
+REPO_VERSION=${NVIDIA_TRITON_SERVER_VERSION}
+if [ "$#" -ge 1 ]; then
+    REPO_VERSION=$1
+fi
+if [ -z "$REPO_VERSION" ]; then
+    echo -e "Repository version must be specified"
+    echo -e "\n***\n*** Test Failed\n***"
+    exit 1
+fi
+
 rm -r javacpp-presets
 git clone https://github.com/bytedeco/javacpp-presets.git
 cd javacpp-presets
-mvn clean install --projects .,tritonserver,cuda,tensorrt
+apt-get update && apt install -y openjdk-11-jdk 
+mvn clean install --projects .,tritonserver
 mvn clean install -f platform --projects ../tritonserver/platform -Djavacpp.platform.host
-mvn clean install -f platform --projects ../cuda/platform -Djavacpp.platform.host
-mvn clean install -f platform --projects ../tensorrt/platform -Djavacpp.platform.host
 cd ..
 
 CLIENT_LOG="client_cpu_only.log"
+DATADIR=/data/inferenceserver/${REPO_VERSION}/qa_model_repository
 MODEL_REPO=`pwd`/models
+
 SAMPLES_REPO=`pwd`/javacpp-presets/tritonserver/samples
 BASE_COMMAND="mvn clean compile -f $SAMPLES_REPO exec:java -Djavacpp.platform=linux-x86_64"
 source ../common/util.sh
 
-# Create local model repository
-rm -r models
-cp -r `pwd`/../L0_simple_ensemble/models .
-mkdir ${MODEL_REPO}/ensemble_add_sub_int32_int32_int32/1
 
 rm -f *.log
 RET=0
 
-function run_cpu_tests() {
+function run_cpu_tests_int32() {
+    # Create local model repository
+    rm -r ${MODEL_REPO}
+    mkdir cp -r `pwd`/../L0_simple_ensemble/models/simple ${MODEL_REPO}/.
+
     # Run with default settings
     $BASE_COMMAND -Dexec.args="-r $MODEL_REPO" >>$CLIENT_LOG 2>&1
     if [ $? -ne 0 ]; then
@@ -87,19 +98,59 @@ function run_cpu_tests() {
         RET=1
     fi
 
-    # Run with FP32 datatype
-    sed -i 's/TYPE_INT32/TYPE_FP32/g' $MODEL_REPO/simple/config.pbtxt
-    sed -i 's/TYPE_INT32/TYPE_FP32/g' $MODEL_REPO/ensemble_add_sub_int32_int32_int32/config.pbtxt
+}
+
+function run_cpu_tests_fp32() {
+    for trial in graphdef savedmodel; do
+        full=${trial}_float32_float32_float32
+        rm -rf ${MODEL_REPO}
+        mkdir -p ${MODEL_REPO}/simple/1 && \
+            cp -r $DATADIR/${full}/1/* ${MODEL_REPO}/simple/1/. && \
+            cp $DATADIR/${full}/config.pbtxt ${MODEL_REPO}/simple/. && \
+            (cd ${MODEL_REPO}/simple && \
+                    sed -i "s/^name:.*/name: \"simple\"/" config.pbtxt && \
+                    sed -i "s/label_filename:.*//" config.pbtxt)
+
+        set +e
+
+        # No memory type enforcement
+        $BASE_COMMAND -Dexec.args="-r $MODEL_REPO -v" >>$CLIENT_LOG.$full.log 2>&1
+        if [ $? -ne 0 ]; then
+            cat $CLIENT_LOG.$full.log
+            echo -e "Failed to run: ${BASE_COMMAND} -Dexec.args=\"-r ${MODEL_REPO} -v\" for ${full}"
+            RET=1
+        fi
+
+        # Enforce I/O to be in specific memory type
+        for MEM_TYPE in system; do
+            $BASE_COMMAND -Dexec.args="-r $MODEL_REPO -m ${MEM_TYPE}" >>$CLIENT_LOG.$full.${MEM_TYPE}.log 2>&1
+            if [ $? -ne 0 ]; then
+                cat $CLIENT_LOG.$full.$MEM_TYPE.log
+                echo -e "Failed to run: ${BASE_COMMAND} -Dexec.args=\"-r ${MODEL_REPO} -v -m ${MEM_TYPE}\" for ${full}"
+                RET=1
+            fi
+        done
+    done
+    set -e
+}
+
+
+# Run ensemble
+function run_ensemble_tests() {
+    rm -r ${MODEL_REPO}
+    cp -r `pwd`/../L0_simple_ensemble/models .
+    mkdir -p ${MODEL_REPO}/ensemble_add_sub_int32_int32_int32/1
+    sed -i 's/"simple"/"ensemble_add_sub_int32_int32_int32"/g' $SAMPLES_REPO/SimpleCPUOnly.java
+    cat $SAMPLES_REPO/pom.xml >>$CLIENT_LOG 2>&1
     $BASE_COMMAND -Dexec.args="-r $MODEL_REPO -v" >>$CLIENT_LOG 2>&1
     if [ $? -ne 0 ]; then
-        echo -e "Failed to run: ${BASE_COMMAND} -Dexec.args=\"-r ${MODEL_REPO} -v\""
+        echo -e "Failed to run ensemble model: ${BASE_COMMAND} -Dexec.args=\"-r ${MODEL_REPO} -v\""
         RET=1
     fi
-    sed -i 's/TYPE_FP32/TYPE_INT32/g' $MODEL_REPO/simple/config.pbtxt
-    sed -i 's/TYPE_FP32/TYPE_INT32/g' $MODEL_REPO/ensemble_add_sub_int32_int32_int32/config.pbtxt
+    sed -i 's/"ensemble_add_sub_int32_int32_int32"/"simple"/g' $SAMPLES_REPO/SimpleCPUOnly.java
 
-    if [ `grep -c "data_type: TYPE_FP32" ${CLIENT_LOG}` != "8" ]; then
-        echo -e "\n***\n*** Failed. Expected 4 'data_type: TYPE_FP32'\n***"
+    if [ `grep -c "request id: my_request_id, model: ensemble_add_sub_int32_int32_int32" ${CLIENT_LOG}` != "3" ]; then
+        echo -e "\n***\n*** Failed. Expected 3 'request id: my_request_id, model: ensemble_add_sub_int32_int32_int32'\n***"
         RET=1
     fi
 }
@@ -108,58 +159,17 @@ function run_cpu_tests() {
 echo -e "\nRunning Simple CPU-Only Tests\n"
 
 sed -i 's/Simple/SimpleCPUOnly/g' $SAMPLES_REPO/pom.xml
-run_cpu_tests
-
-# Run ensemble
-sed -i 's/"simple"/"ensemble_add_sub_int32_int32_int32"/g' $SAMPLES_REPO/SimpleCPUOnly.java
-cat $SAMPLES_REPO/pom.xml >>$CLIENT_LOG 2>&1
-$BASE_COMMAND -Dexec.args="-r $MODEL_REPO -v" >>$CLIENT_LOG 2>&1
-if [ $? -ne 0 ]; then
-    echo -e "Failed to run ensemble model: ${BASE_COMMAND} -Dexec.args=\"-r ${MODEL_REPO} -v\""
-    RET=1
-fi
-sed -i 's/"ensemble_add_sub_int32_int32_int32"/"simple"/g' $SAMPLES_REPO/SimpleCPUOnly.java
-
-if [ `grep -c "request id: my_request_id, model: ensemble_add_sub_int32_int32_int32" ${CLIENT_LOG}` != "3" ]; then
-    echo -e "\n***\n*** Failed. Expected 3 'request id: my_request_id, model: ensemble_add_sub_int32_int32_int32'\n***"
-    RET=1
-fi
-
-sed -i 's/SimpleCPUOnly/Simple/g' $SAMPLES_REPO/pom.xml
-
-# Run tests on full simple example
-echo -e "\nRunning Simple Tests\n"
-CLIENT_LOG="client.log"
-run_cpu_tests
-
-INDEX=1
-for MEMORY_TYPE in pinned gpu; do
-    $BASE_COMMAND -Dexec.args="-r $MODEL_REPO -m $MEMORY_TYPE" >>$CLIENT_LOG 2>&1
-    if [ $? -ne 0 ]; then
-        echo -e "Failed to run: ${BASE_COMMAND} -Dexec.args=\"-r ${MODEL_REPO} -m ${MEMORY_TYPE}\""
-        RET=1
-    fi
-
-    if [ `grep -ic "OUTPUT0 is stored in ${MEMORY_TYPE} memory" ${CLIENT_LOG}` != "2" ]; then
-        echo -e "\n***\n*** Failed. Expected 2 'OUTPUT0 is stored in ${MEMORY_TYPE} memory'\n***"
-        RET=1
-    fi
-
-    sed -i 's/"simple"/"ensemble_add_sub_int32_int32_int32"/g' $SAMPLES_REPO/Simple.java
-    $BASE_COMMAND -Dexec.args="-r $MODEL_REPO -v -m $MEMORY_TYPE" >>$CLIENT_LOG 2>&1
-    if [ $? -ne 0 ]; then
-        echo -e "Failed to run ensemble model: ${BASE_COMMAND} -Dexec.args=\"-r ${MODEL_REPO} -v -m ${MEMORY_TYPE}\""
-        RET=1
-    fi
-    sed -i 's/"ensemble_add_sub_int32_int32_int32"/"simple"/g' $SAMPLES_REPO/Simple.java
-
-    if [ `grep -c "request id: my_request_id, model: ensemble_add_sub_int32_int32_int32" ${CLIENT_LOG}` != $((INDEX*2)) ]; then
-        echo -e "\n***\n*** Failed. Expected $((INDEX*2)) 'request id: my_request_id, model: ensemble_add_sub_int32_int32_int32'\n***"
-        RET=1
-    fi
-    let INDEX++
-done
-
+sed -i '/<dependency>/ {
+    :start
+    N
+    /<\/dependency>$/!b start
+    /<artifactId>cuda-platform<\/artifactId>/ {d}
+    /<artifactId>tensorrt-platform<\/artifactId>/ {d}
+}' $SAMPLES_REPO/pom.xml
+rm -r $SAMPLES_REPO/Simple.java
+run_cpu_tests_fp32
+run_cpu_tests_int32
+run_ensemble_tests
 
 if [ $RET -eq 0 ]; then
     echo -e "\n***\n*** Test Passed\n***"
