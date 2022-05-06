@@ -101,30 +101,27 @@ class InferTest(tu.TestResultCollector):
                         use_system_shared_memory=TEST_SYSTEM_SHARED_MEMORY,
                         use_cuda_shared_memory=TEST_CUDA_SHARED_MEMORY)
 
-                # model that supports batching. Skip for libtorch string I/O
-                elif pf == 'libtorch' and tu.validate_for_libtorch_model(
-                        input_dtype, output0_dtype, output1_dtype, tensor_shape,
-                        tensor_shape, tensor_shape, bs):
-                    iu.infer_exact(
-                        tester,
-                        pf, (bs,) + tensor_shape,
-                        bs,
-                        input_dtype,
-                        output0_dtype,
-                        output1_dtype,
-                        output0_raw=output0_raw,
-                        output1_raw=output1_raw,
-                        model_version=model_version,
-                        swap=swap,
-                        outputs=outputs,
-                        use_http=use_http,
-                        use_grpc=use_grpc,
-                        use_http_json_tensors=use_http_json_tensors,
-                        skip_request_id_check=skip_request_id_check,
-                        use_streaming=use_streaming,
-                        correlation_id=correlation_id,
-                        use_system_shared_memory=TEST_SYSTEM_SHARED_MEMORY,
-                        use_cuda_shared_memory=TEST_CUDA_SHARED_MEMORY)
+                # model that supports batching.
+                iu.infer_exact(
+                    tester,
+                    pf, (bs,) + tensor_shape,
+                    bs,
+                    input_dtype,
+                    output0_dtype,
+                    output1_dtype,
+                    output0_raw=output0_raw,
+                    output1_raw=output1_raw,
+                    model_version=model_version,
+                    swap=swap,
+                    outputs=outputs,
+                    use_http=use_http,
+                    use_grpc=use_grpc,
+                    use_http_json_tensors=use_http_json_tensors,
+                    skip_request_id_check=skip_request_id_check,
+                    use_streaming=use_streaming,
+                    correlation_id=correlation_id,
+                    use_system_shared_memory=TEST_SYSTEM_SHARED_MEMORY,
+                    use_cuda_shared_memory=TEST_CUDA_SHARED_MEMORY)
 
         input_size = 16
 
@@ -207,15 +204,37 @@ class InferTest(tu.TestResultCollector):
             else:
                 for prefix in ensemble_prefix:
                     if 'libtorch' in BACKENDS:
-                        _infer_exact_helper(self,
-                                            prefix + 'libtorch', (input_size,),
-                                            8,
-                                            input_dtype,
-                                            output0_dtype,
-                                            output1_dtype,
-                                            output0_raw=output0_raw,
-                                            output1_raw=output1_raw,
-                                            swap=swap)
+                        # Skip batching for PyTorch String I/O
+                        if ((input_dtype == np_dtype_string) or
+                            (output0_dtype == np_dtype_string) or
+                            (output1_dtype == np_dtype_string)):
+                            iu.infer_exact(
+                                self,
+                                prefix + 'libtorch_nobatch',
+                                (input_size,),
+                                1,  # batch_size
+                                input_dtype,
+                                output0_dtype,
+                                output1_dtype,
+                                output0_raw=output0_raw,
+                                output1_raw=output1_raw,
+                                swap=swap,
+                                use_http=USE_HTTP,
+                                use_grpc=USE_GRPC,
+                                use_system_shared_memory=
+                                TEST_SYSTEM_SHARED_MEMORY,
+                                use_cuda_shared_memory=TEST_CUDA_SHARED_MEMORY)
+                        else:
+                            _infer_exact_helper(self,
+                                                prefix + 'libtorch',
+                                                (input_size,),
+                                                8,
+                                                input_dtype,
+                                                output0_dtype,
+                                                output1_dtype,
+                                                output0_raw=output0_raw,
+                                                output1_raw=output1_raw,
+                                                swap=swap)
 
         for prefix in ensemble_prefix:
             if prefix != "":
