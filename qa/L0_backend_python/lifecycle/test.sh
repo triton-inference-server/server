@@ -25,7 +25,6 @@
 # (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-CLIENT_PY=./lifecycle_test.py
 CLIENT_LOG="./client.log"
 EXPECTED_NUM_TESTS="3"
 TEST_RESULT_FILE='test_results.txt'
@@ -96,7 +95,7 @@ wait $SERVER_PID
 current_num_pages=`get_shm_pages`
 if [ $current_num_pages -ne $prev_num_pages ]; then
     ls /dev/shm
-    echo -e "\n***\n*** Test Failed. Shared memory pages where not cleaned properly.
+    echo -e "\n***\n*** Test Failed. Shared memory pages were not cleaned properly.
 Shared memory pages before starting triton equals to $prev_num_pages
 and shared memory pages after starting triton equals to $current_num_pages \n***"
     RET=1
@@ -118,7 +117,7 @@ wait $SERVER_PID
 current_num_pages=`get_shm_pages`
 if [ $current_num_pages -ne $prev_num_pages ]; then
     ls /dev/shm
-    echo -e "\n***\n*** Test Failed. Shared memory pages where not cleaned properly.
+    echo -e "\n***\n*** Test Failed. Shared memory pages were not cleaned properly.
 Shared memory pages before starting triton equals to $prev_num_pages
 and shared memory pages after starting triton equals to $current_num_pages \n***"
     RET=1
@@ -153,7 +152,7 @@ current_num_pages=`get_shm_pages`
 if [ $current_num_pages -ne $prev_num_pages ]; then
     cat $CLIENT_LOG
     ls /dev/shm
-    echo -e "\n***\n*** Test Failed. Shared memory pages where not cleaned properly.
+    echo -e "\n***\n*** Test Failed. Shared memory pages were not cleaned properly.
 Shared memory pages before starting triton equals to $prev_num_pages
 and shared memory pages after starting triton equals to $current_num_pages \n***"
     RET=1
@@ -169,6 +168,37 @@ if [ $? -ne 0 ]; then
 fi
 set -e
 
+rm -rf models/
+mkdir -p models/auto_complete_error/1/
+cp ../../python_models/auto_complete_error/model.py ./models/auto_complete_error/1/
+cp ../../python_models/auto_complete_error/config.pbtxt ./models/auto_complete_error/
+SERVER_ARGS="${SERVER_ARGS} --strict-model-config=false"
+
+set +e
+prev_num_pages=`get_shm_pages`
+run_server_nowait
+
+wait $SERVER_PID
+current_num_pages=`get_shm_pages`
+if [ $current_num_pages -ne $prev_num_pages ]; then
+    cat $CLIENT_LOG
+    ls /dev/shm
+    echo -e "\n***\n*** Test Failed. Shared memory pages were not cleaned properly.
+Shared memory pages before starting triton equals to $prev_num_pages
+and shared memory pages after starting triton equals to $current_num_pages \n***"
+    RET=1
+fi
+
+set +e
+grep "name 'undefined_variable' is not defined" $SERVER_LOG
+
+if [ $? -ne 0 ]; then
+    cat $CLIENT_LOG
+    echo -e "\n***\n*** auto_complete_error model test failed \n***"
+    RET=1
+fi
+set -e
+
 if [ $RET -eq 1 ]; then
     cat $CLIENT_LOG
     echo -e "\n***\n*** Lifecycle test FAILED. \n***"
@@ -177,4 +207,3 @@ else
 fi
 
 exit $RET
-

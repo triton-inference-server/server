@@ -182,6 +182,19 @@ for modelpath in \
        $modelpath/.
 done
 
+# Copy Python models into the test model repositories.
+for modelpath in \
+        autofill_platform/python/mismatch_datatype/1 \
+        autofill_platform/python/mismatch_dims/1 \
+        autofill_platform/python/unknown_input/1 \
+        autofill_platform/python/unknown_output/1 \
+        autofill_platform_success/python/empty_config/1 \
+        autofill_platform_success/python/incomplete_input/1 \
+        autofill_platform_success/python/incomplete_output/1 ; do
+    mkdir -p $modelpath
+    cp /opt/tritonserver/qa/python_models/auto_complete/model.py $modelpath/.
+done
+
 # Copy other required models
 mkdir -p special_cases/invalid_platform/1
 cp -r /data/inferenceserver/${REPO_VERSION}/qa_model_repository/savedmodel_float32_float32_float32/1/model.savedmodel \
