@@ -317,6 +317,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
                               libopencv-core-dev \
                               libzmq3-dev \
                               maven \
+                              openjdk-11-jdk \
                               nginx \
                               npm \
                               protobuf-compiler \
