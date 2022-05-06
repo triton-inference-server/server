@@ -565,13 +565,13 @@ specifications:
 ### Ensemble Model Instance Groups
 
 [Ensemble models](architecture.md#ensemble-models)
-are an abstraction Triton uses to execute a user-defined pipeline of models
-Since there is no physical instance associated with it, the `instance_group`
-field can not be specified for an ensemble model.
+are an abstraction Triton uses to execute a user-defined pipeline of models.
+Since there is no physical instance associated with an ensemble model, the 
+`instance_group` field can not be specified for it.
 
 However, each composing model that makes up an ensemble can specify 
-`instance_group`s in its config file and individually support parallel
-execution when the ensemble receives multiple requests as described above.
+`instance_group` in its config file and individually support parallel
+execution as described above when the ensemble receives multiple requests.
 
 #### Resources
 
