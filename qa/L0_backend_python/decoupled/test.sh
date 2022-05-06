@@ -42,6 +42,10 @@ mkdir -p models/identity_fp32/1/
 cp ../../python_models/identity_fp32/model.py models/identity_fp32/1/
 cp ../../python_models/identity_fp32/config.pbtxt models/identity_fp32/
 
+mkdir -p models/dlpack_add_sub/1/
+cp ../../python_models/dlpack_add_sub/model.py models/dlpack_add_sub/1/
+cp ../../python_models/dlpack_add_sub/config.pbtxt models/dlpack_add_sub/
+
 run_server
 if [ "$SERVER_PID" == "0" ]; then
     echo -e "\n***\n*** Failed to start $SERVER\n***"
