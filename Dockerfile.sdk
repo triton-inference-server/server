@@ -116,6 +116,7 @@ ARG TRITON_BACKEND_REPO_TAG
 ARG TRITON_THIRD_PARTY_REPO_TAG
 ARG TRITON_ENABLE_GPU
 ARG JAVA_BINDINGS_MAVEN_VERSION
+ARG TARGETPLATFORM
 
 WORKDIR /workspace
 COPY TRITON_VERSION .
@@ -139,6 +140,14 @@ RUN cmake -DCMAKE_INSTALL_PREFIX=/workspace/install \
           -DTRITON_ENABLE_GPU=${TRITON_ENABLE_GPU} /workspace/client
 RUN make -j16 cc-clients python-clients java-clients && \
     rm -fr ~/.m2
+
+# Install Java API Bindings
+RUN if [ "$TARGETPLATFORM" = "linux/amd64" ]; then \
+        source client/src/java-api-bindings/scripts/install_dependencies_and_build.sh \
+        --maven-version ${JAVA_BINDINGS_MAVEN_VERSION} \
+        --core-tag ${TRITON_CORE_REPO_TAG} \
+        --jar-install-path /workspace/install/java-api-bindings; \
+    fi
 
 ############################################################################
 ## Create sdk container
@@ -183,14 +192,6 @@ COPY --from=sdk_build /workspace/install/ install/
 RUN cd install && \
     export VERSION=`cat /workspace/TRITON_VERSION` && \
     tar zcf /workspace/v$VERSION.clients.tar.gz *
-
-# Install Java API Bindings
-RUN if [ "$TARGETPLATFORM" = "linux/amd64" ]; then \
-        source client/src/java-api-bindings/scripts/install_dependencies_and_build.sh \
-        --maven-version ${JAVA_BINDINGS_MAVEN_VERSION} \
-        --core-tag ${TRITON_CORE_REPO_TAG} \
-        --jar-install-path /workspace/install/java-api-bindings; \
-    fi
 
 # For CI testing need to copy over L0_sdk test and L0_client_build_variants test.
 RUN mkdir qa
