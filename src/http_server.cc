@@ -1333,6 +1333,8 @@ HTTPAPIServer::HandleRepositoryControl(
       std::unique_ptr<
           std::vector<TRITONSERVER_Parameter*>, decltype(param_deleter)>
       params(new std::vector<TRITONSERVER_Parameter*>(), param_deleter);
+      // local variables to store the decoded file content, the data must
+      // be valid until TRITONSERVER_ServerLoadModelWithParameters returns.
       std::list<std::vector<char>> binary_files;
       // WAR for the const-ness check
       std::vector<const TRITONSERVER_Parameter*> const_params;
