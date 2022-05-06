@@ -65,6 +65,8 @@ if [[ "$(< /proc/sys/kernel/osrelease)" == *microsoft* ]]; then
     SIMPLE_CUDASHM_CLIENT_PY=${SDKDIR}/python/simple_grpc_cudashm_client.py
     SIMPLE_MODEL_CONTROL_PY=${SDKDIR}/python/simple_grpc_model_control.py
     SIMPLE_REUSE_INFER_OBJECTS_CLIENT_PY=${SDKDIR}/python/reuse_infer_objects_client.py
+    SIMPLE_KEEPALIVE_CLIENT_PY=${SDKDIR}/python/simple_grpc_keepalive_client.py
+    SIMPLE_CUSTOM_ARGS_CLIENT_PY=${SDKDIR}/python/simple_grpc_custom_args_client.py
     EXPLICIT_BYTE_CONTENT_CLIENT_PY=${SDKDIR}/python/grpc_explicit_byte_content_client.py
     EXPLICIT_INT_CONTENT_CLIENT_PY=${SDKDIR}/python/grpc_explicit_int_content_client.py
     EXPLICIT_INT8_CONTENT_CLIENT_PY=${SDKDIR}/python/grpc_explicit_int8_content_client.py
@@ -83,6 +85,8 @@ if [[ "$(< /proc/sys/kernel/osrelease)" == *microsoft* ]]; then
     SIMPLE_IMAGE_CLIENT=${SDKDIR}/python/image_client
     # SIMPLE_ENSEMBLE_IMAGE_CLIENT=${SDKDIR}/python/ensemble_image_client
     SIMPLE_REUSE_INFER_OBJECTS_CLIENT=${SDKDIR}/python/reuse_infer_objects_client
+    SIMPLE_KEEPALIVE_CLIENT=${SDKDIR}/python/simple_grpc_keepalive_client
+    SIMPLE_CUSTOM_ARGS_CLIENT=${SDKDIR}/python/simple_grpc_custom_args_client
     # [FIXME] point to proper client
     CC_UNIT_TEST=${SDKDIR}/python/cc_client_test
 else
@@ -105,6 +109,8 @@ else
     SIMPLE_CUDASHM_CLIENT_PY=../clients/simple_grpc_cudashm_client.py
     SIMPLE_MODEL_CONTROL_PY=../clients/simple_grpc_model_control.py
     SIMPLE_REUSE_INFER_OBJECTS_CLIENT_PY=../clients/reuse_infer_objects_client.py
+    SIMPLE_KEEPALIVE_CLIENT_PY=../clients/simple_grpc_keepalive_client.py
+    SIMPLE_CUSTOM_ARGS_CLIENT_PY=../clients/simple_grpc_custom_args_client.py
     EXPLICIT_BYTE_CONTENT_CLIENT_PY=../clients/grpc_explicit_byte_content_client.py
     EXPLICIT_INT_CONTENT_CLIENT_PY=../clients/grpc_explicit_int_content_client.py
     EXPLICIT_INT8_CONTENT_CLIENT_PY=../clients/grpc_explicit_int8_content_client.py
@@ -123,6 +129,8 @@ else
     SIMPLE_IMAGE_CLIENT=../clients/image_client
     # SIMPLE_ENSEMBLE_IMAGE_CLIENT=../clients/ensemble_image_client
     SIMPLE_REUSE_INFER_OBJECTS_CLIENT=../clients/reuse_infer_objects_client
+    SIMPLE_KEEPALIVE_CLIENT=../clients/simple_grpc_keepalive_client
+    SIMPLE_CUSTOM_ARGS_CLIENT=../clients/simple_grpc_custom_args_client
     CC_UNIT_TEST=../clients/cc_client_test
 fi
 
@@ -170,6 +178,8 @@ for i in \
         $SIMPLE_SHM_STRING_CLIENT_PY \
         $SIMPLE_SHM_CLIENT_PY \
         $SIMPLE_CUDASHM_CLIENT_PY \
+        $SIMPLE_KEEPALIVE_CLIENT_PY \
+        $SIMPLE_CUSTOM_ARGS_CLIENT_PY \
         $EXPLICIT_BYTE_CONTENT_CLIENT_PY \
         $EXPLICIT_INT_CONTENT_CLIENT_PY \
         $EXPLICIT_INT8_CONTENT_CLIENT_PY \
@@ -242,6 +252,8 @@ for i in \
    $SIMPLE_CUDASHM_CLIENT \
    $SIMPLE_IMAGE_CLIENT \
    $SIMPLE_ENSEMBLE_IMAGE_CLIENT \
+   $SIMPLE_KEEPALIVE_CLIENT_PY \
+   $SIMPLE_CUSTOM_ARGS_CLIENT_PY \
    ; do
    BASE=$(basename -- $i)
    SUFFIX="${BASE%.*}"
