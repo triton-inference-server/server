@@ -425,11 +425,7 @@ def create_libtorch_modelfile(models_dir, model_version, max_batch, dtype,
                                           max_batch):
         return
 
-    # Skip for String I/O
     torch_dtype = np_to_torch_dtype(dtype)
-    if torch_dtype is None:
-        return
-
     io_cnt = len(input_shapes)
     model_name = tu.get_zero_model_name(
         "libtorch_nobatch" if max_batch == 0 else "libtorch", io_cnt, dtype)
@@ -531,11 +527,6 @@ def create_libtorch_modelconfig(models_dir, model_version, max_batch, dtype,
     if not tu.validate_for_libtorch_model(dtype, dtype, dtype, input_shapes[0],
                                           input_shapes[0], input_shapes[0],
                                           max_batch):
-        return
-
-    # Skip for String I/O
-    torch_dtype = np_to_torch_dtype(dtype)
-    if torch_dtype is None:
         return
 
     io_cnt = len(input_shapes)
