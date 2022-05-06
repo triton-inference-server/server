@@ -562,6 +562,17 @@ instances belonging to this group will not be limited in any way by
 the rate limiter. The configuration includes the following
 specifications:
 
+### Ensemble Model Instance Groups
+
+[Ensemble models](architecture.md#ensemble-models)
+are an abstraction Triton uses to execute a user-defined pipeline of models
+Since there is no physical instance associated with it, the `instance_group`
+field can not be specified for an ensemble model.
+
+However, each composing model that makes up an ensemble can specify 
+`instance_group`s in its config file and individually support parallel
+execution when the ensemble receives multiple requests as described above.
+
 #### Resources
 
 The set of [resources](rate_limiter.md#resources) required to execute
