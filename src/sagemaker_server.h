@@ -25,6 +25,8 @@
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #pragma once
 
+#include <mutex>
+
 #include "common.h"
 #include "dirent.h"
 #include "http_server.h"
@@ -120,14 +122,18 @@ class SagemakerAPIServer : public HTTPAPIServer {
 
   const std::string ping_mode_;
 
-  // For single model mode, assume that only one version of "model" is presented
+  /* For single model mode, assume that only one version of "model" is presented
+   */
   const std::string model_name_;
   const std::string model_version_str_;
 
   static const std::string binary_mime_type_;
 
-  // Maintain list of loaded models
-  std::unordered_map<std::string, std::string> sagemaker_models_list;
+  /* Maintain list of loaded models */
+  std::unordered_map<std::string, std::string> sagemaker_models_list_;
+
+  /* Mutex to handle concurrent updates */
+  std::mutex mutex_;
 };
 
 }}  // namespace triton::server
