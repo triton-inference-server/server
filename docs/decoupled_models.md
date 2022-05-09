@@ -1,0 +1,78 @@
+<!--
+# Copyright 2022, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+#
+# Redistribution and use in source and binary forms, with or without
+# modification, are permitted provided that the following conditions
+# are met:
+#  * Redistributions of source code must retain the above copyright
+#    notice, this list of conditions and the following disclaimer.
+#  * Redistributions in binary form must reproduce the above copyright
+#    notice, this list of conditions and the following disclaimer in the
+#    documentation and/or other materials provided with the distribution.
+#  * Neither the name of NVIDIA CORPORATION nor the names of its
+#    contributors may be used to endorse or promote products derived
+#    from this software without specific prior written permission.
+#
+# THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS ``AS IS'' AND ANY
+# EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+# IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR
+# PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL THE COPYRIGHT OWNER OR
+# CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL,
+# EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
+# PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR
+# PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY
+# OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+# (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+# OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+-->
+
+# Decoupled Backends and Models
+
+Triton can support [backends](https://github.com/triton-inference-server/backend)
+and models that send multiple responses for a request or not send any
+responses for a request. A backend may also send responses out-of-order
+relative to the order that the request batches are executed.
+
+Implementing and deploying such decoupled models can be more involved than
+than backends which generate exactly one response per request.
+
+## Developing Decoupled C++ Backend
+
+Read carefully about the [Triton Backend API](https://github.com/triton-inference-server/backend/blob/main/README.md#triton-backend-api),
+[Inference Requests and Responses](https://github.com/triton-inference-server/backend/blob/main/README.md#inference-requests-and-responses)
+and [Decoupled Responses](https://github.com/triton-inference-server/backend/blob/main/README.md#decoupled-responses).
+The [repeat backend](https://github.com/triton-inference-server/repeat_backend)
+demonstrates how the Triton Backend API can be used to implement a decoupled
+backend. However, the example is designed to show the flexibility of the
+Triton API and in no way should be used in production. This example circumvents
+the restriction placed by the [instance count](model_configuration.md#instance-groups)
+and allows multiple requests to be in process even for single instance. In
+real deployment, the backend should not allow the caller thread to return from
+TRITONBACKEND_ModelInstanceExecute until that instance is ready to handle another
+set of requests.
+
+
+## Deploying Decoupled Models
+
+The users need to explicitly set [decoupled model transaction policy](model_configuration.md#decoupled)
+in their provided [model configuration](model_configuration.md) file for the
+model. Triton requires this information to enable special handling required
+for decoupled models. Deploying decoupled models without this configuration
+setting will throw errors at the runtime.
+
+## Running Inference on Decoupled Models
+
+[Inference Protocols and APIs](inference_protocols.md) describes various ways
+a client can communicate and run inference on the server. For decoupled models,
+Triton's HTTP endpoint can not be used for running inference as it only supports
+exactly one response per request. Even standard ModelInfer RPC in GRPC endpoint
+does not support decoupled responses. In order to run inference on a decoupled
+model, client must use the bi-directional streaming RPC. See
+[here](https://github.com/triton-inference-server/common/blob/main/protobuf/grpc_service.proto)
+for more details. The [decoupled_test.py](../qa/L0_decoupled/decoupled_test.py) demonstrates
+how the gRPC streaming can be used to infer decoupled models
+
+If using [Triton's in-process C API](inference_protocols.md#in-process-triton-server-api),
+your application should be cognizant that the callback function you registered with 
+`TRITONSERVER_InferenceRequestSetResponseCallback` can be invoked any number of times,
+each time with a new response. You can take a look at [grpc_server.cc](../src/grpc_server.cc)
