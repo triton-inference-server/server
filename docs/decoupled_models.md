@@ -29,9 +29,9 @@
 # Decoupled Backends and Models
 
 Triton can support [backends](https://github.com/triton-inference-server/backend)
-and models that send multiple responses for a request or not send any
-responses for a request. A backend may also send responses out-of-order
-relative to the order that the request batches are executed.
+and models that send multiple responses for a request or zero responses
+for a request. A backend may also send responses out-of-order relative
+to the order that the request batches are executed.
 
 Implementing and deploying such decoupled models can be more involved than
 than backends which generate exactly one response per request.
@@ -64,13 +64,13 @@ setting will throw errors at the runtime.
 
 [Inference Protocols and APIs](inference_protocols.md) describes various ways
 a client can communicate and run inference on the server. For decoupled models,
-Triton's HTTP endpoint can not be used for running inference as it only supports
-exactly one response per request. Even standard ModelInfer RPC in GRPC endpoint
+Triton's HTTP endpoint cannot be used for running inference as it supports
+exactly one response per request. Even standard ModelInfer RPC in the GRPC endpoint
 does not support decoupled responses. In order to run inference on a decoupled
-model, client must use the bi-directional streaming RPC. See
+model, the client must use the bi-directional streaming RPC. See
 [here](https://github.com/triton-inference-server/common/blob/main/protobuf/grpc_service.proto)
 for more details. The [decoupled_test.py](../qa/L0_decoupled/decoupled_test.py) demonstrates
-how the gRPC streaming can be used to infer decoupled models
+how the gRPC streaming can be used to infer decoupled models.
 
 If using [Triton's in-process C API](inference_protocols.md#in-process-triton-server-api),
 your application should be cognizant that the callback function you registered with 
