@@ -37,12 +37,14 @@ if [ -z "$REPO_VERSION" ]; then
     exit 1
 fi
 
+set +e
 rm -r javacpp-presets
 git clone https://github.com/bytedeco/javacpp-presets.git
 cd javacpp-presets
 mvn clean install --projects .,tritonserver
 mvn clean install -f platform --projects ../tritonserver/platform -Djavacpp.platform.host
 cd ..
+set -e
 
 CLIENT_LOG="client_cpu_only.log"
 DATADIR=/data/inferenceserver/${REPO_VERSION}/qa_model_repository

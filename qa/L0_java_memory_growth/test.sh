@@ -27,12 +27,14 @@
 
 # Set up test files based on installation instructions
 # https://github.com/bytedeco/javacpp-presets/blob/master/tritonserver/README.md
+set +e
 rm -r javacpp-presets
 git clone https://github.com/bytedeco/javacpp-presets.git
 cd javacpp-presets
 mvn clean install --projects .,tritonserver
 mvn clean install -f platform --projects ../tritonserver/platform -Djavacpp.platform.host
 cd ..
+set -e
 
 MODEL_REPO=`pwd`/models
 SAMPLES_REPO=`pwd`/javacpp-presets/tritonserver/samples
@@ -56,6 +58,7 @@ cp -r `pwd`/../L0_simple_ensemble/models/simple models/.
 
 rm -f *.log
 RET=0
+
 
 # Sanity test: check accuracy
 ITERS=200000

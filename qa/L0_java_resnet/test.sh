@@ -47,12 +47,14 @@ cp -r $DATADIR/perf_model_store/resnet50* models/
 
 # Set up test files based on installation instructions
 # https://github.com/bytedeco/javacpp-presets/blob/master/tritonserver/README.md
+set +e
 rm -r javacpp-presets
 git clone https://github.com/bytedeco/javacpp-presets.git
 cd javacpp-presets
 mvn clean install --projects .,tritonserver
 mvn clean install -f platform --projects ../tritonserver/platform -Djavacpp.platform.host
 cd ..
+set -e
 
 CLIENT_LOG="client.log"
 MODEL_REPO=`pwd`/models
