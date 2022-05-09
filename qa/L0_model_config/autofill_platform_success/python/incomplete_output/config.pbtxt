@@ -8,6 +8,6 @@ output [
   },
   {
     name: "OUTPUT1"
-    dims: [ 16 ]
+    dims: [ 4 ]
   }
 ]

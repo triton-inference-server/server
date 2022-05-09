@@ -1,4 +1,4 @@
-name: "unknown_output"
+name: "missing_name"
 backend: "python"
 
 input [
@@ -15,8 +15,8 @@ input [
 ]
 output [
   {
-    name: "OUTPUT_UNKNOWN"
-    data_type: TYPE_FP32
+    name: "OUTPUT0"
+    data_type: TYPE_INT32
     dims: [ 4 ]
   },
   {

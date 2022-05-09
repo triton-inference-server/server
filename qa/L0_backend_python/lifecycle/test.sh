@@ -181,7 +181,6 @@ run_server_nowait
 wait $SERVER_PID
 current_num_pages=`get_shm_pages`
 if [ $current_num_pages -ne $prev_num_pages ]; then
-    cat $CLIENT_LOG
     ls /dev/shm
     echo -e "\n***\n*** Test Failed. Shared memory pages were not cleaned properly.
 Shared memory pages before starting triton equals to $prev_num_pages
@@ -193,7 +192,7 @@ set +e
 grep "name 'undefined_variable' is not defined" $SERVER_LOG
 
 if [ $? -ne 0 ]; then
-    cat $CLIENT_LOG
+    cat $SERVER_LOG
     echo -e "\n***\n*** auto_complete_error model test failed \n***"
     RET=1
 fi

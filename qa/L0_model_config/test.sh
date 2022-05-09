@@ -194,6 +194,15 @@ for modelpath in \
     mkdir -p $modelpath
     cp /opt/tritonserver/qa/python_models/auto_complete/model.py $modelpath/.
 done
+for modelpath in \
+        autofill_platform/python/conflicting_max_batch_size \
+        autofill_platform/python/missing_datatype \
+        autofill_platform/python/missing_dims \
+        autofill_platform/python/missing_name \
+        autofill_platform/python/wrong_property ; do
+    mkdir -p $modelpath/1
+    mv $modelpath/model.py $modelpath/1/.
+done
 
 # Copy other required models
 mkdir -p special_cases/invalid_platform/1

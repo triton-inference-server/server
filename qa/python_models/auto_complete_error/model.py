@@ -40,16 +40,16 @@ class TritonPythonModel:
         """
         auto_complete_model_config = pb_utils.ModelConfig()
 
-        input0 = {'name': 'INPUT0', 'data_type': 'TYPE_FP32', 'dims': [16]}
-        input1 = {'name': 'INPUT1', 'data_type': 'TYPE_FP32', 'dims': [16]}
-        output0 = {'name': 'OUTPUT0', 'data_type': 'TYPE_FP32', 'dims': [16]}
-        output1 = {'name': 'OUTPUT1', 'data_type': 'TYPE_FP32', 'dims': [16]}
+        input0 = {'name': 'INPUT0', 'data_type': 'TYPE_FP32', 'dims': [4]}
+        input1 = {'name': 'INPUT1', 'data_type': 'TYPE_FP32', 'dims': [4]}
+        output0 = {'name': 'OUTPUT0', 'data_type': 'TYPE_FP32', 'dims': [4]}
+        output1 = {'name': 'OUTPUT1', 'data_type': 'TYPE_FP32', 'dims': [4]}
 
         pb_utils.set_max_batch_size(auto_complete_model_config, 0)
-        pb_utils.set_input(auto_complete_model_config, input0)
-        pb_utils.set_input(auto_complete_model_config, input1)
-        pb_utils.set_output(auto_complete_model_config, output0)
-        pb_utils.set_output(auto_complete_model_config, output1)
+        pb_utils.add_input(auto_complete_model_config, input0)
+        pb_utils.add_input(auto_complete_model_config, input1)
+        pb_utils.add_output(auto_complete_model_config, output0)
+        pb_utils.add_output(auto_complete_model_config, output1)
 
         undefined_variable
 

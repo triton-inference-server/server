@@ -1,5 +1,6 @@
-name: "unknown_output"
+name: "conflicting_max_batch_size"
 backend: "python"
+max_batch_size: 2
 
 input [
   {
@@ -15,7 +16,7 @@ input [
 ]
 output [
   {
-    name: "OUTPUT_UNKNOWN"
+    name: "OUTPUT0"
     data_type: TYPE_FP32
     dims: [ 4 ]
   },

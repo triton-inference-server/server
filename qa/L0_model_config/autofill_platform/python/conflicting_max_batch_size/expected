@@ -1,0 +1,1 @@
+configuration specified max-batch 2 but Python model specified max-batch 4
