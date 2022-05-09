@@ -1745,7 +1745,7 @@ cp -r $DATADIR/qa_model_repository/onnx_float32_float32_float32 models/.
 rm -rf models/onnx_float32_float32_float32/1
 
 # Start with EXPLICIT mode and load onnx_float32_float32_float32
-SERVER_ARGS="--model-repository=`pwd`/models --model-repository=`pwd`/models \
+SERVER_ARGS="--model-repository=`pwd`/models \
              --model-control-mode=explicit \
              --load-model=onnx_float32_float32_float32 \
              --strict-model-config=false"

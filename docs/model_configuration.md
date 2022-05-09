@@ -619,6 +619,17 @@ contend for "R1" among themsleves, but they will contend for "R1"
 with other model instances which includes "R1" in their resource
 requirements and run on the same device as them.
 
+### Ensemble Model Instance Groups
+
+[Ensemble models](architecture.md#ensemble-models)
+are an abstraction Triton uses to execute a user-defined pipeline of models.
+Since there is no physical instance associated with an ensemble model, the 
+`instance_group` field can not be specified for it.
+
+However, each composing model that makes up an ensemble can specify 
+`instance_group` in its config file and individually support parallel
+execution as described above when the ensemble receives multiple requests.
+
 ## Scheduling And Batching
 
 Triton supports batch inferencing by allowing individual inference

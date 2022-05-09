@@ -92,7 +92,7 @@ TRITON_VERSION_MAP = {
     '2.22.0dev': (
         '22.05dev',  # triton container
         '22.04',  # upstream container
-        '1.10.0',  # ORT
+        '1.11.1',  # ORT
         '2021.4.582',  # ORT OpenVINO
         (('2021.4', None), ('2021.4', '2021.4.582'),
          ('SPECIFIC', 'f2f281e6')),  # Standalone OpenVINO
@@ -1012,6 +1012,7 @@ COPY --chown=1000:1000 NVIDIA_Deep_Learning_Container_License.pdf .
         if 'sagemaker' in endpoints:
             df += '''
 LABEL com.amazonaws.sagemaker.capabilities.accept-bind-to-port=true
+LABEL com.amazonaws.sagemaker.capabilities.multi-models=true
 COPY --chown=1000:1000 docker/sagemaker/serve /usr/bin/.
 '''
 

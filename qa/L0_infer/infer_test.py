@@ -1,4 +1,4 @@
-# Copyright 2018-2021, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright 2018-2022, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -100,7 +100,8 @@ class InferTest(tu.TestResultCollector):
                         correlation_id=correlation_id,
                         use_system_shared_memory=TEST_SYSTEM_SHARED_MEMORY,
                         use_cuda_shared_memory=TEST_CUDA_SHARED_MEMORY)
-                # model that supports batching
+
+                # model that supports batching.
                 iu.infer_exact(
                     tester,
                     pf, (bs,) + tensor_shape,
@@ -203,15 +204,37 @@ class InferTest(tu.TestResultCollector):
             else:
                 for prefix in ensemble_prefix:
                     if 'libtorch' in BACKENDS:
-                        _infer_exact_helper(self,
-                                            prefix + 'libtorch', (input_size,),
-                                            8,
-                                            input_dtype,
-                                            output0_dtype,
-                                            output1_dtype,
-                                            output0_raw=output0_raw,
-                                            output1_raw=output1_raw,
-                                            swap=swap)
+                        # Skip batching for PyTorch String I/O
+                        if ((input_dtype == np_dtype_string) or
+                            (output0_dtype == np_dtype_string) or
+                            (output1_dtype == np_dtype_string)):
+                            iu.infer_exact(
+                                self,
+                                prefix + 'libtorch_nobatch',
+                                (input_size,),
+                                1,  # batch_size
+                                input_dtype,
+                                output0_dtype,
+                                output1_dtype,
+                                output0_raw=output0_raw,
+                                output1_raw=output1_raw,
+                                swap=swap,
+                                use_http=USE_HTTP,
+                                use_grpc=USE_GRPC,
+                                use_system_shared_memory=
+                                TEST_SYSTEM_SHARED_MEMORY,
+                                use_cuda_shared_memory=TEST_CUDA_SHARED_MEMORY)
+                        else:
+                            _infer_exact_helper(self,
+                                                prefix + 'libtorch',
+                                                (input_size,),
+                                                8,
+                                                input_dtype,
+                                                output0_dtype,
+                                                output1_dtype,
+                                                output0_raw=output0_raw,
+                                                output1_raw=output1_raw,
+                                                swap=swap)
 
         for prefix in ensemble_prefix:
             if prefix != "":
