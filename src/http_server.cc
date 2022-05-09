@@ -1328,6 +1328,7 @@ HTTPAPIServer::HandleRepositoryControl(
               for (auto& param : *params) {
                 TRITONSERVER_ParameterDelete(param);
               }
+              delete params;
             }
           };
       std::unique_ptr<
