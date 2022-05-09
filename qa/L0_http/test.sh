@@ -483,7 +483,39 @@ if [ "$SERVER_PID" == "0" ]; then
 fi
 
 set +e
-$CC_UNIT_TEST --gtest_filter=HTTP* >> ${CLIENT_LOG} 2>&1
+# Run all unit tests except load
+$CC_UNIT_TEST --gtest_filter=HTTP*:-*Load* >> ${CLIENT_LOG} 2>&1
+if [ $? -ne 0 ]; then
+    cat ${CLIENT_LOG}
+    RET=1
+fi
+set -e
+
+kill $SERVER_PID
+wait $SERVER_PID
+
+# Run cpp client load API unit test
+rm -rf unit_test_models && mkdir unit_test_models
+cp -r $DATADIR/qa_model_repository/onnx_int32_int32_int32 unit_test_models/.
+# Make only version 2, 3 is valid version directory while config requests 1, 3
+rm -rf unit_test_models/onnx_int32_int32_int32/1
+
+# Start with EXPLICIT mode and load onnx_float32_float32_float32
+SERVER_ARGS="--model-repository=`pwd`/unit_test_models \
+             --model-control-mode=explicit \
+             --load-model=onnx_int32_int32_int32 \
+             --strict-model-config=false"
+SERVER_LOG="./inference_server_cc_unit_test.load.log"
+CLIENT_LOG="./cc_unit_test.load.log"
+run_server
+if [ "$SERVER_PID" == "0" ]; then
+    echo -e "\n***\n*** Failed to start $SERVER\n***"
+    cat $SERVER_LOG
+    exit 1
+fi
+
+set +e
+$CC_UNIT_TEST --gtest_filter=HTTP*Load* >> ${CLIENT_LOG} 2>&1
 if [ $? -ne 0 ]; then
     cat ${CLIENT_LOG}
     RET=1

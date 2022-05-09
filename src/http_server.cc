@@ -1328,11 +1328,15 @@ HTTPAPIServer::HandleRepositoryControl(
               for (auto& param : *params) {
                 TRITONSERVER_ParameterDelete(param);
               }
+              delete params;
             }
           };
       std::unique_ptr<
           std::vector<TRITONSERVER_Parameter*>, decltype(param_deleter)>
       params(new std::vector<TRITONSERVER_Parameter*>(), param_deleter);
+      // local variables to store the decoded file content, the data must
+      // be valid until TRITONSERVER_ServerLoadModelWithParameters returns.
+      std::list<std::vector<char>> binary_files;
       // WAR for the const-ness check
       std::vector<const TRITONSERVER_Parameter*> const_params;
       size_t buffer_len = evbuffer_get_length(req->buffer_in);
@@ -1353,8 +1357,24 @@ HTTPAPIServer::HandleRepositoryControl(
             HTTP_RESPOND_IF_ERR(
                 req,
                 param_json.MemberAsString(m.c_str(), &param_str, &param_len));
-            auto param = TRITONSERVER_ParameterNew(
-                m.c_str(), TRITONSERVER_PARAMETER_STRING, param_str);
+
+            TRITONSERVER_Parameter* param = nullptr;
+            if (m == "config") {
+              param = TRITONSERVER_ParameterNew(
+                  m.c_str(), TRITONSERVER_PARAMETER_STRING, param_str);
+            } else if (m.rfind("file:", 0) == 0) {
+              // Decode base64
+              base64_decodestate s;
+              base64_init_decodestate(&s);
+
+              // The decoded can not be larger than the input...
+              binary_files.emplace_back(std::vector<char>(param_len + 1));
+              size_t decoded_size = base64_decode_block(
+                  param_str, param_len, binary_files.back().data(), &s);
+              param = TRITONSERVER_ParameterBytesNew(
+                  m.c_str(), binary_files.back().data(), decoded_size);
+            }
+
             if (param != nullptr) {
               params->emplace_back(param);
               const_params.emplace_back(param);
@@ -2921,6 +2941,12 @@ HTTPAPIServer::InferRequestClass::FinalizeResponse(
         case TRITONSERVER_PARAMETER_STRING:
           RETURN_IF_ERR(params_json.AddStringRef(
               name, reinterpret_cast<const char*>(vvalue)));
+          break;
+        case TRITONSERVER_PARAMETER_BYTES:
+          return TRITONSERVER_ErrorNew(
+              TRITONSERVER_ERROR_UNSUPPORTED,
+              "Response parameter of type 'TRITONSERVER_PARAMETER_BYTES' is "
+              "not currently supported");
           break;
       }
     }
