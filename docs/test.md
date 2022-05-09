@@ -88,7 +88,7 @@ Now run the QA image and mount the QA model repositories into the
 container so the tests will be able to access them.
 
 ```
-$ docker run --gpus=all -it --rm -v/tmp:/data/inferenceserver tritonserver_qa
+$ docker run --gpus=all -it --rm -v /tmp:/data/inferenceserver tritonserver_qa
 ```
 
 Within the container the QA tests are in /opt/tritonserver/qa. To run
