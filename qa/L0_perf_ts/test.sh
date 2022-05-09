@@ -38,6 +38,11 @@ if [ ! -z "$TEST_REPO_ARCH" ]; then
     REPO_VERSION=${REPO_VERSION}_${TEST_REPO_ARCH}
 fi
 
+# TODO: DLIS-3777 following key update is required only while base image 
+#       is not updated accordingly
+apt-key del 7fa2af80
+apt-key adv --fetch-keys https://developer.download.nvidia.com/compute/cuda/repos/ubuntu2004/$(uname -m)/3bf863cc.pub
+
 apt update
 apt install -y libb64-dev curl
 apt install -y python3 python3-pip python3-dev
