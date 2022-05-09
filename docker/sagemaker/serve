@@ -26,7 +26,20 @@
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 SAGEMAKER_SINGLE_MODEL_REPO=/opt/ml/model/
-SAGEMAKER_ARGS="--model-repository=${SAGEMAKER_SINGLE_MODEL_REPO}"
+SAGEMAKER_MULTI_MODEL_REPO=/opt/ml/models/
+
+SAGEMAKER_MODEL_REPO=${SAGEMAKER_SINGLE_MODEL_REPO}
+is_mme_mode=false
+
+if [ -n "$SAGEMAKER_MULTI_MODEL" ]; then
+    if [ "$SAGEMAKER_MULTI_MODEL" == "true" ]; then
+        SAGEMAKER_MODEL_REPO=${SAGEMAKER_MULTI_MODEL_REPO}
+        is_mme_mode=true
+        echo "Triton is running in SageMaker MME mode" 
+    fi
+fi
+
+SAGEMAKER_ARGS="--model-repository=${SAGEMAKER_MODEL_REPO}"
 if [ -n "$SAGEMAKER_BIND_TO_PORT" ]; then
     SAGEMAKER_ARGS="${SAGEMAKER_ARGS} --sagemaker-port=${SAGEMAKER_BIND_TO_PORT}"
 fi
@@ -51,22 +64,28 @@ fi
 if [ -n "$SAGEMAKER_TRITON_LOG_ERROR" ]; then
     SAGEMAKER_ARGS="${SAGEMAKER_ARGS} --log-error=${SAGEMAKER_TRITON_LOG_ERROR}"
 fi
+if [ -n "$SAGEMAKER_TRITON_SHM_DEFAULT_BYTE_SIZE" ]; then
+    SAGEMAKER_ARGS="${SAGEMAKER_ARGS} --backend-config=python,shm-default-byte-size=${SAGEMAKER_TRITON_SHM_DEFAULT_BYTE_SIZE}"
+fi
+if [ -n "$SAGEMAKER_TRITON_SHM_GROWTH_BYTE_SIZE" ]; then
+    SAGEMAKER_ARGS="${SAGEMAKER_ARGS} --backend-config=python,shm-growth-byte-size=${SAGEMAKER_TRITON_SHM_GROWTH_BYTE_SIZE}"
+fi
 
-if [ -f "${SAGEMAKER_SINGLE_MODEL_REPO}/config.pbtxt" ]; then
+if [ "${is_mme_mode}" = false ] && [ -f "${SAGEMAKER_MODEL_REPO}/config.pbtxt" ]; then
     echo "ERROR: Incorrect directory structure."
     echo "       Model directory needs to contain the top level folder"
     exit 1
 fi
 
-if [ -n "$SAGEMAKER_TRITON_DEFAULT_MODEL_NAME" ]; then
-    if [ -d "${SAGEMAKER_SINGLE_MODEL_REPO}/$SAGEMAKER_TRITON_DEFAULT_MODEL_NAME" ]; then
+if [ "${is_mme_mode}" = false ] && [ -n "$SAGEMAKER_TRITON_DEFAULT_MODEL_NAME" ]; then
+    if [ -d "${SAGEMAKER_MODEL_REPO}/$SAGEMAKER_TRITON_DEFAULT_MODEL_NAME" ]; then
         SAGEMAKER_ARGS="${SAGEMAKER_ARGS} --load-model=${SAGEMAKER_TRITON_DEFAULT_MODEL_NAME}"
     else
         echo "ERROR: Directory with provided SAGEMAKER_TRITON_DEFAULT_MODEL_NAME ${SAGEMAKER_TRITON_DEFAULT_MODEL_NAME} does not exist"
         exit 1
     fi
-else
-    MODEL_DIRS=(`find "${SAGEMAKER_SINGLE_MODEL_REPO}" -mindepth 1 -maxdepth 1 -type d -printf "%f\n"`)
+elif [ "${is_mme_mode}" = false ]; then
+    MODEL_DIRS=(`find "${SAGEMAKER_MODEL_REPO}" -mindepth 1 -maxdepth 1 -type d -printf "%f\n"`)
     case ${#MODEL_DIRS[@]} in
         0) echo "ERROR: No model found in model repository";
            exit 1
