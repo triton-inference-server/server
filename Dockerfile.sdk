@@ -143,7 +143,7 @@ RUN make -j16 cc-clients python-clients java-clients && \
 
 # Install Java API Bindings
 RUN if [ "$TARGETPLATFORM" = "linux/amd64" ]; then \
-        source client/src/java-api-bindings/scripts/install_dependencies_and_build.sh \
+        source /workspace/client/src/java-api-bindings/scripts/install_dependencies_and_build.sh \
         --maven-version ${JAVA_BINDINGS_MAVEN_VERSION} \
         --core-tag ${TRITON_CORE_REPO_TAG} \
         --jar-install-path /workspace/install/java-api-bindings; \
