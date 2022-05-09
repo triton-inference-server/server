@@ -1,4 +1,4 @@
-# Copyright (c) 2019-2020, NVIDIA CORPORATION. All rights reserved.
+# Copyright 2019-2022, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -135,11 +135,25 @@ class InferReshapeTest(tu.TestResultCollector):
                     use_system_shared_memory=TEST_SYSTEM_SHARED_MEMORY,
                     use_cuda_shared_memory=TEST_CUDA_SHARED_MEMORY)
 
+        # Skip for libtorch string I/O
         if tu.validate_for_libtorch_model(dtype, dtype, dtype, input_shapes[0],
-                                          input_shapes[0], input_shapes[0]):
+                                          input_shapes[0], input_shapes[0]) and \
+                                              (dtype != np_dtype_string):
             # skip variable size reshape on libtorch for now,
             # see "gen_qa_reshape_model.py" for detail
             if dtype != np.int32:
+                # model that does not support batching
+                if no_batch:
+                    iu.infer_zero(
+                        self,
+                        'libtorch_nobatch',
+                        1,
+                        dtype,
+                        input_shapes,
+                        output_shapes,
+                        use_system_shared_memory=TEST_SYSTEM_SHARED_MEMORY,
+                        use_cuda_shared_memory=TEST_CUDA_SHARED_MEMORY)
+
                 # model that supports batching
                 for bs in (1, 8):
                     full_shapes = [[
@@ -155,17 +169,6 @@ class InferReshapeTest(tu.TestResultCollector):
                         dtype,
                         full_shapes,
                         full_output_shapes,
-                        use_system_shared_memory=TEST_SYSTEM_SHARED_MEMORY,
-                        use_cuda_shared_memory=TEST_CUDA_SHARED_MEMORY)
-                # model that does not support batching
-                if no_batch:
-                    iu.infer_zero(
-                        self,
-                        'libtorch_nobatch',
-                        1,
-                        dtype,
-                        input_shapes,
-                        output_shapes,
                         use_system_shared_memory=TEST_SYSTEM_SHARED_MEMORY,
                         use_cuda_shared_memory=TEST_CUDA_SHARED_MEMORY)
 
