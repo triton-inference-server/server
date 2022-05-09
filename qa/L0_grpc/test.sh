@@ -25,7 +25,8 @@
 # (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-REPO_VERSION=${NVIDIA_TRITON_SERVER_VERSION}
+#REPO_VERSION=${NVIDIA_TRITON_SERVER_VERSION}
+REPO_VERSION="22.04dev"
 if [ "$#" -ge 1 ]; then
     REPO_VERSION=$1
 fi
@@ -134,13 +135,13 @@ else
     CC_UNIT_TEST=../clients/cc_client_test
 fi
 
-# Add string_dyna_sequence model to repo
-cp -r ${MODELDIR}/simple_dyna_sequence ${MODELDIR}/simple_string_dyna_sequence
-sed -i "s/simple_dyna_sequence/simple_string_dyna_sequence/g" ${MODELDIR}/simple_string_dyna_sequence/config.pbtxt
-sed -i "s/^platform: .*/backend: \"dyna_sequence\"/g" ${MODELDIR}/simple_string_dyna_sequence/config.pbtxt
-sed -i "/CONTROL_SEQUENCE_CORRID/{n;s/data_type:.*/data_type: TYPE_STRING/}" ${MODELDIR}/simple_string_dyna_sequence/config.pbtxt
-rm -f ${MODELDIR}/simple_string_dyna_sequence/1/model.graphdef
-cp ../custom_models/custom_dyna_sequence_int32/1/libtriton_dyna_sequence.so ${MODELDIR}/simple_string_dyna_sequence/1/
+## Add string_dyna_sequence model to repo
+#cp -r ${MODELDIR}/simple_dyna_sequence ${MODELDIR}/simple_string_dyna_sequence
+#sed -i "s/simple_dyna_sequence/simple_string_dyna_sequence/g" ${MODELDIR}/simple_string_dyna_sequence/config.pbtxt
+#sed -i "s/^platform: .*/backend: \"dyna_sequence\"/g" ${MODELDIR}/simple_string_dyna_sequence/config.pbtxt
+#sed -i "/CONTROL_SEQUENCE_CORRID/{n;s/data_type:.*/data_type: TYPE_STRING/}" ${MODELDIR}/simple_string_dyna_sequence/config.pbtxt
+#rm -f ${MODELDIR}/simple_string_dyna_sequence/1/model.graphdef
+#cp ../custom_models/custom_dyna_sequence_int32/1/libtriton_dyna_sequence.so ${MODELDIR}/simple_string_dyna_sequence/1/
 
 rm -f *.log
 rm -f *.log.*
@@ -252,8 +253,8 @@ for i in \
    $SIMPLE_CUDASHM_CLIENT \
    $SIMPLE_IMAGE_CLIENT \
    $SIMPLE_ENSEMBLE_IMAGE_CLIENT \
-   $SIMPLE_KEEPALIVE_CLIENT_PY \
-   $SIMPLE_CUSTOM_ARGS_CLIENT_PY \
+   $SIMPLE_KEEPALIVE_CLIENT \
+   $SIMPLE_CUSTOM_ARGS_CLIENT \
    ; do
    BASE=$(basename -- $i)
    SUFFIX="${BASE%.*}"
