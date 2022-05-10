@@ -38,7 +38,6 @@ if [ -z "$REPO_VERSION" ]; then
 fi
 
 set +e
-rm -r javacpp-presets
 git clone https://github.com/bytedeco/javacpp-presets.git
 cd javacpp-presets
 mvn clean install --projects .,tritonserver
