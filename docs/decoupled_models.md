@@ -33,8 +33,9 @@ and models that send multiple responses for a request or zero responses
 for a request. A decoupled model/backend may also send responses out-of-order
 relative to the order that the request batches are executed. This allows
 backend to deliver response whenever it deems fit. This is specifically
-useful in ASR. The requests with large number of responses, will not block
-the responses from other requests from being delivered.
+useful in Automated Speech Recognition (ASR). The requests with large number
+of responses, will not block the responses from other requests from being
+delivered.
 
 ## Developing Decoupled C++ Backend
 
