@@ -37,7 +37,9 @@ useful in Automated Speech Recognition (ASR). The requests with large number
 of responses, will not block the responses from other requests from being
 delivered.
 
-## Developing Decoupled C++ Backend
+## Developing Decoupled Backend/Model
+
+### C++ Backend
 
 Read carefully about the [Triton Backend API](https://github.com/triton-inference-server/backend/blob/main/README.md#triton-backend-api),
 [Inference Requests and Responses](https://github.com/triton-inference-server/backend/blob/main/README.md#inference-requests-and-responses)
@@ -55,6 +57,17 @@ handle another set of requests. If not designed properly the backend
 can be easily over-subscribed. This can also cause under-utilization
 of features like [Dynamic Batching](model_configuration.md#dynamic-batcher)
 as it leads to eager batching. 
+
+### Python model using Python Backend \[BETA\]
+
+Read carefully about the [Python Backend](https://github.com/triton-inference-server/python_backend),
+and specifically [`execute`](https://github.com/triton-inference-server/python_backend#execute).
+
+The [decoupled examples](https://github.com/triton-inference-server/python_backend/tree/main/examples/decoupled)
+demonstrates how decoupled API can be used to implement a decoupled
+python model. As noted in the examples, these are designed to show
+the flexibility of the decoupled API and in no way should be used
+in production.
 
 
 ## Deploying Decoupled Models
