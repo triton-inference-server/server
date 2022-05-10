@@ -339,6 +339,7 @@ wait $SERVER_PID
 # Disable env test for Jetson since build is non-dockerized and cloud storage repos are not supported
 # Disable ensemble, unittest, io and bls tests for Jetson since GPU Tensors are not supported
 # Disable variants test for Jetson since already built without GPU Tensor support
+# Disable decoupled test because it uses GPU tensors
 if [ "$TEST_JETSON" == "0" ]; then
   (cd env && bash -ex test.sh)
   if [ $? -ne 0 ]; then
@@ -361,6 +362,11 @@ if [ "$TEST_JETSON" == "0" ]; then
   fi
 
   (cd bls && bash -ex test.sh)
+  if [ $? -ne 0 ]; then
+    RET=1
+  fi
+
+  (cd decoupled && bash -ex test.sh)
   if [ $? -ne 0 ]; then
     RET=1
   fi
@@ -396,10 +402,6 @@ if [ $? -ne 0 ]; then
   RET=1
 fi
 
-(cd decoupled && bash -ex test.sh)
-if [ $? -ne 0 ]; then
-  RET=1
-fi
 
 if [ $RET -eq 0 ]; then
   echo -e "\n***\n*** Test Passed\n***"
