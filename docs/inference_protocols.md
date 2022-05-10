@@ -112,6 +112,9 @@ tritonserver.dll. In the Triton Docker image the shared library is
 found in /opt/tritonserver/lib. The header file that defines and
 documents the Server API is
 [tritonserver.h](https://github.com/triton-inference-server/core/blob/main/include/triton/core/tritonserver.h).
+[Java bindings for In-Process Triton Server API](#java-bindings-for-in-process-triton-server-api) 
+are built on top of `tritonserver.h` and can be used for Java applications that 
+need to use Tritonserver in-process.
 
 All capabilities of Triton server are encapsulated in the shared
 library and are exposed via the Server API. The `tritonserver`
@@ -299,3 +302,114 @@ following steps.
   inference requests in flight at the same time and can issue
   inference requests from the same thread or from multiple different
   threads.
+allows Triton to be linked directly to a C/C++ application. The API
+is documented in
+[tritonserver.h](https://github.com/triton-inference-server/core/blob/main/include/triton/core/tritonserver.h).
+
+A simple example using the C API can be found in
+[simple.cc](../src/simple.cc).  A more complicated example can be
+found in the source that implements the HTTP/REST and GRPC endpoints
+for Triton. These endpoints use the C API to communicate with the core
+of Triton. The primary source files for the endpoints are
+[grpc_server.cc](../src/grpc_server.cc) and
+[http_server.cc](../src/http_server.cc).
+
+## Java bindings for In-Process Triton Server API
+
+The Triton Inference Server uses [Java CPP](https://github.com/bytedeco/javacpp)
+to create bindings around Tritonserver to create Java API.
+
+The API is documented in 
+[tritonserver.java](https://github.com/bytedeco/javacpp-presets/blob/master/tritonserver/src/gen/java/org/bytedeco/tritonserver/global/tritonserver.java).
+Alternatively, the user can refer to the web version [API docs](http://bytedeco.org/javacpp-presets/tritonserver/apidocs/)
+generated from `tritonserver.java`.
+A simple example using the Java API can be found in
+[Samples folder](https://github.com/bytedeco/javacpp-presets/tree/master/tritonserver/samples)
+which includes `Simple.java` which is similar to 
+[`simple.cc`](https://github.com/triton-inference-server/server/blob/main/src/servers/simple.cc). 
+Please refer to
+[sample usage documentation](https://github.com/bytedeco/javacpp-presets/tree/master/tritonserver#sample-usage)
+to learn about how to build and run `Simple.java`.
+
+In the [QA folder](../qa), folders starting with L0_java include Java API tests.
+These can be useful references for getting started, such as the
+[ResNet50 test](../qa/L0_java_resnet).
+
+### Java API setup instructions
+
+To use the Tritonserver Java API, you will need to have the Tritonserver library
+and dependencies installed in your enviroment. There are two ways to do this:
+
+1. Use a Tritonserver docker container with
+   1. `.jar` Java bindings to C API (recommended)
+   2. maven and build bindings yourself
+2. Build Triton from your enviroment without Docker (not recommended)
+
+#### Run Tritonserver container and install dependencies
+
+To set up your enviroment with Triton Java API, please follow the following steps:
+1. First run Docker container:
+```
+ $ docker run -it --gpus=all -v ${pwd}:/workspace nvcr.io/nvidia/tritonserver:<your container version>-py3 bash
+```
+2. Install `jdk`:
+```bash
+ $ apt update && apt install -y openjdk-11-jdk
+```
+3. Install `maven` (only if you want to build the bindings yourself):
+```bash
+$ cd /opt/tritonserver
+ $ wget https://archive.apache.org/dist/maven/maven-3/3.8.4/binaries/apache-maven-3.8.4-bin.tar.gz
+ $ tar zxvf apache-maven-3.8.4-bin.tar.gz
+ $ export PATH=/opt/tritonserver/apache-maven-3.8.4/bin:$PATH
+```
+
+#### Run Java program with Java bindings Jar
+
+After ensuring that Tritonserver and dependencies are installed, you can run your
+Java program with the Java bindings with the following steps:
+
+1. Place Java bindings into your enviroment. You can do this by either:
+   
+   a. Building Java API bindings with provided build script:
+      ```bash
+      # Clone Triton client repo. Recommended client repo tag is: main
+      $ git clone --single-branch --depth=1 -b <client repo tag>
+                     https://github.com/triton-inference-server/client.git clientrepo
+      # Run build script
+      $ source clientrepo/src/java-api-bindings/scripts/install_dependencies_and_build.sh
+      ```
+      This will install the Java bindings to `/workspace/install/java-api-bindings/tritonserver-java-bindings.jar`
+   
+   *or*
+
+   b. Copying "Uber Jar" from Triton SDK container to your enviroment
+      ```bash
+      $ id=$(docker run -dit nvcr.io/nvidia/tritonserver:<triton container version>-py3-sdk bash)
+      $ docker cp ${id}:/workspace/install/java-api-bindings/tritonserver-java-bindings.jar <Uber Jar directory>/tritonserver-java-bindings.jar
+      $ docker stop ${id}
+      ``` 
+2. Use the built "Uber Jar" that contains the Java bindings
+   ```bash
+   $ java -cp <Uber Jar directory>/tritonserver-java-bindings.jar <your Java program>
+   ```
+
+#### Build Java bindings and run Java program with Maven
+
+If you want to make changes to the Java bindings, then you can use Maven to build yourself. You can refer to part 1.a of [Run Java program with Java bindings Jar](#run-java-program-with-java-bindings-jar) to also build the jar yourself without any modifications to the Tritonserver bindings in JavaCPP-presets. You can do this using the following steps:
+
+1. Create the JNI binaries in your local repository (`/root/.m2/repository`) 
+   with [`javacpp-presets/tritonserver`](https://github.com/bytedeco/javacpp-presets/tree/master/tritonserver)
+```bash
+ $ git clone https://github.com/bytedeco/javacpp-presets.git
+ $ cd javacpp-presets
+ $ mvn clean install --projects .,tritonserver
+ $ mvn clean install -f platform --projects ../tritonserver/platform -Djavacpp.platform=linux-x86_64
+```
+2. Create your custom `*.pom` file for Maven. Please refer to 
+   [samples/pom.xml](https://github.com/bytedeco/javacpp-presets/blob/master/tritonserver/samples/pom.xml) as 
+   reference for how to create your pom file.
+3. After creating your `pom.xml` file you can build your application with:
+```bash
+ $ mvn compile exec:java -Djavacpp.platform=linux-x86_64 -Dexec.args="<your input args>"
+```
