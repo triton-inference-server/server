@@ -38,7 +38,8 @@ public class Simple {
     private static final String[] MODELS = {
       "resnet50_fp32_libtorch",
       "resnet50_fp32_onnx",
-      "resnet50v1.5_fp16_savedmodel",
+      // TODO: fix build to support GPU only resnet50v1.5_fp16_savedmodel
+      //"resnet50v1.5_fp16_savedmodel",
       };
     private static final double TRITON_MIN_COMPUTE_CAPABILITY = 6.0;
     private enum Backend {

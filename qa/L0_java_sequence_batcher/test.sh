@@ -44,6 +44,7 @@ DATADIR=/data/inferenceserver/${REPO_VERSION}
 # Set up test files based on installation instructions
 # https://github.com/bytedeco/javacpp-presets/blob/master/tritonserver/README.md
 set +e
+rm -r javacpp-presets
 git clone https://github.com/bytedeco/javacpp-presets.git
 cd javacpp-presets
 mvn clean install --projects .,tritonserver
@@ -73,10 +74,10 @@ RET=0
 
 for BACKEND in graphdef libtorch onnx savedmodel; do
     # Create local model repository
-    rm -r models/
-    mkdir -p models/
+    mkdir -p ${MODEL_REPO}
     MODEL=${BACKEND}_nobatch_sequence_int32
-    cp -r $DATADIR/qa_sequence_model_repository/${MODEL}/ models/
+    cp -r $DATADIR/qa_sequence_model_repository/${MODEL}/ ${MODEL_REPO}/
+    sed -i "s/kind: KIND_GPU/kind: KIND_CPU/" ${MODEL_REPO}/$MODEL/config.pbtxt
 
     # Run with default settings
     $BASE_COMMAND -Dexec.args="-r $MODEL_REPO -m ${MODEL}" >>client.log 2>&1
@@ -89,6 +90,8 @@ for BACKEND in graphdef libtorch onnx savedmodel; do
         echo -e "\n***\n*** ${BACKEND} sequence batcher test FAILED. Expected '${MODEL} test PASSED'\n***"
         RET=1
     fi
+    rm -r ${MODEL_REPO}
+    rm ${CLIENT_LOG}
 done
 
 if [ $RET -eq 0 ]; then

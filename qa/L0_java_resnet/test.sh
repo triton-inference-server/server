@@ -40,14 +40,21 @@ fi
 
 # Models
 DATADIR=/data/inferenceserver/${REPO_VERSION}
+MODEL_REPO=`pwd`/models
 
 # Create local model repository
-mkdir -p models/
-cp -r $DATADIR/perf_model_store/resnet50* models/
+mkdir -p ${MODEL_REPO}
+# TODO: fix build to support GPU only resnet50v1.5_fp16_savedmodel
+for BACKEND in _fp32_libtorch _fp32_onnx; do
+    cp -r $DATADIR/perf_model_store/resnet50${BACKEND} ${MODEL_REPO}/
+    echo ${MODEL_REPO}/resnet50${BACKEND}/config.pbtxt
+    sed -i "s/kind: KIND_GPU/kind: KIND_CPU/" ${MODEL_REPO}/resnet50${BACKEND}/config.pbtxt
+done
 
 # Set up test files based on installation instructions
 # https://github.com/bytedeco/javacpp-presets/blob/master/tritonserver/README.md
 set +e
+rm -r javacpp-presets
 git clone https://github.com/bytedeco/javacpp-presets.git
 cd javacpp-presets
 mvn clean install --projects .,tritonserver
@@ -56,7 +63,6 @@ cd ..
 set -e
 
 CLIENT_LOG="client.log"
-MODEL_REPO=`pwd`/models
 SAMPLES_REPO=`pwd`/javacpp-presets/tritonserver/samples
 BASE_COMMAND="mvn clean compile -f $SAMPLES_REPO exec:java -Djavacpp.platform=linux-x86_64"
 source ../common/util.sh
@@ -80,7 +86,8 @@ if [ $? -ne 0 ]; then
     RET=1
 fi
 
-for BACKEND in ONNX TORCH TF; do
+# TODO: fix build to support GPU only resnet so can test TF as well
+for BACKEND in ONNX TORCH; do
     if [ `grep -c "${BACKEND} test PASSED" ${CLIENT_LOG}` != "1" ]; then
         echo -e "\n***\n*** ${BACKEND} backend test FAILED. Expected '${BACKEND} test PASSED'\n***"
         RET=1

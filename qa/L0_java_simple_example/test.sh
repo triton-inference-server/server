@@ -38,6 +38,7 @@ if [ -z "$REPO_VERSION" ]; then
 fi
 
 set +e
+rm -r javacpp-presets
 git clone https://github.com/bytedeco/javacpp-presets.git
 cd javacpp-presets
 mvn clean install --projects .,tritonserver
@@ -59,8 +60,11 @@ RET=0
 
 function run_cpu_tests_int32() {
     # Create local model repository
+    set +e
     rm -r ${MODEL_REPO}
-    mkdir cp -r `pwd`/../L0_simple_ensemble/models/simple ${MODEL_REPO}/.
+    cp -r `pwd`/../L0_simple_ensemble/models .
+    mkdir ${MODEL_REPO}/ensemble_add_sub_int32_int32_int32/1
+    set -e
 
     # Run with default settings
     $BASE_COMMAND -Dexec.args="-r $MODEL_REPO" >>$CLIENT_LOG 2>&1
@@ -103,6 +107,7 @@ function run_cpu_tests_int32() {
 function run_cpu_tests_fp32() {
     for trial in graphdef savedmodel; do
         full=${trial}_float32_float32_float32
+        set +e
         rm -rf ${MODEL_REPO}
         mkdir -p ${MODEL_REPO}/simple/1 && \
             cp -r $DATADIR/${full}/1/* ${MODEL_REPO}/simple/1/. && \
@@ -111,7 +116,6 @@ function run_cpu_tests_fp32() {
                     sed -i "s/^name:.*/name: \"simple\"/" config.pbtxt && \
                     sed -i "s/label_filename:.*//" config.pbtxt)
 
-        set +e
 
         # No memory type enforcement
         $BASE_COMMAND -Dexec.args="-r $MODEL_REPO -v" >>$CLIENT_LOG.$full.log 2>&1
@@ -137,11 +141,14 @@ function run_cpu_tests_fp32() {
 
 # Run ensemble
 function run_ensemble_tests() {
+    set +e
     rm -r ${MODEL_REPO}
     cp -r `pwd`/../L0_simple_ensemble/models .
     mkdir -p ${MODEL_REPO}/ensemble_add_sub_int32_int32_int32/1
     sed -i 's/"simple"/"ensemble_add_sub_int32_int32_int32"/g' $SAMPLES_REPO/SimpleCPUOnly.java
     cat $SAMPLES_REPO/pom.xml >>$CLIENT_LOG 2>&1
+    set -e
+
     $BASE_COMMAND -Dexec.args="-r $MODEL_REPO -v" >>$CLIENT_LOG 2>&1
     if [ $? -ne 0 ]; then
         echo -e "Failed to run ensemble model: ${BASE_COMMAND} -Dexec.args=\"-r ${MODEL_REPO} -v\""
@@ -158,6 +165,7 @@ function run_ensemble_tests() {
 # Run tests on CPU-only simple example
 echo -e "\nRunning Simple CPU-Only Tests\n"
 
+set +e
 sed -i 's/Simple/SimpleCPUOnly/g' $SAMPLES_REPO/pom.xml
 sed -i '/<dependency>/ {
     :start
@@ -167,6 +175,7 @@ sed -i '/<dependency>/ {
     /<artifactId>tensorrt-platform<\/artifactId>/ {d}
 }' $SAMPLES_REPO/pom.xml
 rm -r $SAMPLES_REPO/Simple.java
+set -e
 run_cpu_tests_fp32
 run_cpu_tests_int32
 run_ensemble_tests
