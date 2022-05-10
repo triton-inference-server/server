@@ -111,6 +111,12 @@ def target_platform():
     return platform.system().lower()
 
 
+def target_machine():
+    if FLAGS.target_machine is not None:
+        return FLAGS.target_machine
+    return platform.machine().lower()
+
+
 def fail_if(p, msg):
     if p:
         print('error: {}'.format(msg), file=sys.stderr)
@@ -636,6 +642,7 @@ def fil_cmake_args(images):
                               TRITON_VERSION_MAP[FLAGS.version][1]))
 
     return cargs
+
 
 def get_container_versions(version, container_version,
                            upstream_container_version):
@@ -1215,6 +1222,13 @@ if __name__ == '__main__':
         help=
         'Target for build, can be "ubuntu", "windows" or "jetpack". If not specified, build targets the current platform.'
     )
+    parser.add_argument(
+        '--target-machine',
+        required=False,
+        default=None,
+        help=
+        'Target machine/architecture for build. If not specified, build targets the current machine/architecture.'
+    )
 
     parser.add_argument('--build-id',
                         type=str,
@@ -1301,10 +1315,11 @@ if __name__ == '__main__':
         help=
         'When performing a container build, this command will be executed within the container just before the build it performed.'
     )
-    parser.add_argument('--no-container-source',
-                        action="store_true",
-                        required=False,
-                        help='Do not include OSS source code in Docker container.')
+    parser.add_argument(
+        '--no-container-source',
+        action="store_true",
+        required=False,
+        help='Do not include OSS source code in Docker container.')
     parser.add_argument(
         '--image',
         action='append',
