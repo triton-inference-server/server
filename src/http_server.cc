@@ -43,11 +43,9 @@
 #define TRITONJSON_STATUSSUCCESS nullptr
 #include "triton/common/triton_json.h"
 
-#ifdef TRITON_ENABLE_GPU
 extern "C" {
 #include <b64/cdecode.h>
 }
-#endif  // TRITON_ENABLE_GPU
 
 #ifdef TRITON_ENABLE_TRACING
 #include "tracer.h"
