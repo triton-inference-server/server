@@ -36,7 +36,9 @@ to the order that the request batches are executed.
 Implementing and deploying such decoupled models can be more involved than
 than backends which generate exactly one response per request.
 
-## Developing Decoupled C++ Backend
+## Developing Decoupled Backend/Model
+
+### C++ Backend
 
 Read carefully about the [Triton Backend API](https://github.com/triton-inference-server/backend/blob/main/README.md#triton-backend-api),
 [Inference Requests and Responses](https://github.com/triton-inference-server/backend/blob/main/README.md#inference-requests-and-responses)
@@ -50,6 +52,20 @@ and allows multiple requests to be in process even for single instance. In
 real deployment, the backend should not allow the caller thread to return from
 TRITONBACKEND_ModelInstanceExecute until that instance is ready to handle another
 set of requests.
+
+### Python model using Python Backend \[BETA\]
+
+Read carefully about the [Python Backend](https://github.com/triton-inference-server/python_backend),
+and specifically [`execute`](https://github.com/triton-inference-server/python_backend#execute).
+
+The [decoupled examples](https://github.com/triton-inference-server/python_backend/tree/main/examples/decoupled)
+demonstrates how decoupled API can be used to implement a decoupled
+python model. However, the example is designed to show the flexibility of the
+decoupled API and in no way should be used in production. This example circumvents
+the restriction placed by the [instance count](model_configuration.md#instance-groups)
+and allows multiple requests to be in process even for single instance. In
+real deployment, the backend should not allow the caller thread to return from
+`execute` until that instance is ready to handle another set of requests.
 
 
 ## Deploying Decoupled Models
