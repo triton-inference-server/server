@@ -30,11 +30,11 @@
 
 Triton can support [backends](https://github.com/triton-inference-server/backend)
 and models that send multiple responses for a request or zero responses
-for a request. A backend may also send responses out-of-order relative
-to the order that the request batches are executed.
-
-Implementing and deploying such decoupled models can be more involved than
-than backends which generate exactly one response per request.
+for a request. A decoupled model/backend may also send responses out-of-order
+relative to the order that the request batches are executed. This allows
+backend to deliver response whenever it deems fit. This is specifically
+useful in ASR. The requests with large number of responses, will not block
+the responses from other requests from being delivered.
 
 ## Developing Decoupled C++ Backend
 
@@ -42,23 +42,27 @@ Read carefully about the [Triton Backend API](https://github.com/triton-inferenc
 [Inference Requests and Responses](https://github.com/triton-inference-server/backend/blob/main/README.md#inference-requests-and-responses)
 and [Decoupled Responses](https://github.com/triton-inference-server/backend/blob/main/README.md#decoupled-responses).
 The [repeat backend](https://github.com/triton-inference-server/repeat_backend)
-demonstrates how the Triton Backend API can be used to implement a decoupled
-backend. However, the example is designed to show the flexibility of the
-Triton API and in no way should be used in production. This example circumvents
-the restriction placed by the [instance count](model_configuration.md#instance-groups)
-and allows multiple requests to be in process even for single instance. In
-real deployment, the backend should not allow the caller thread to return from
-TRITONBACKEND_ModelInstanceExecute until that instance is ready to handle another
-set of requests.
+and [square backend](https://github.com/triton-inference-server/square_backend)
+demonstrate how the Triton Backend API can be used to implement a decoupled
+backend. The example is designed to show the flexibility of the Triton API
+and in no way should be used in production. This example may process multiple
+batches of requests at the same time without having to increase the
+[instance count](model_configuration.md#instance-groups). In real deployment,
+the backend should not allow the caller thread to return from
+TRITONBACKEND_ModelInstanceExecute until that instance is ready to
+handle another set of requests. If not designed properly the backend
+can be easily over-subscribed. This can also cause under-utilization
+of features like [Dynamic Batching](model_configuration.md#dynamic-batcher)
+as it leads to eager batching. 
 
 
 ## Deploying Decoupled Models
 
-The users need to explicitly set [decoupled model transaction policy](model_configuration.md#decoupled)
-in their provided [model configuration](model_configuration.md) file for the
-model. Triton requires this information to enable special handling required
-for decoupled models. Deploying decoupled models without this configuration
-setting will throw errors at the runtime.
+The [decoupled model transaction policy](model_configuration.md#decoupled)
+must be set in the provided [model configuration](model_configuration.md)
+file for the model. Triton requires this information to enable special
+handling required for decoupled models. Deploying decoupled models without
+this configuration setting will throw errors at the runtime.
 
 ## Running Inference on Decoupled Models
 

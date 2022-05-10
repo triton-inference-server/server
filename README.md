@@ -316,7 +316,7 @@ or
 Triton also allows developers to write backends that can send multiple
 responses for a request or not send any responses for a request. Backends
 and models that operate in this way are referred to as [decoupled
-backends and models](docs/decoupled_backends_and_models.md).
+backends and models](docs/decoupled_models.md).
 
 A [Triton repository agent](docs/repository_agents.md) extends Triton
 with new functionality that operates when a model is loaded or
