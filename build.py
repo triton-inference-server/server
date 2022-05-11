@@ -89,8 +89,8 @@ from inspect import getsourcefile
 # Note: Not all sha ids would successfuly compile and work.
 #
 TRITON_VERSION_MAP = {
-    '2.22.0dev': (
-        '22.05dev',  # triton container
+    '2.23.0dev': (
+        '22.06dev',  # triton container
         '22.04',  # upstream container
         '1.11.1',  # ORT
         '2021.4.582',  # ORT OpenVINO
