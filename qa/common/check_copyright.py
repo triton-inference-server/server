@@ -53,6 +53,7 @@ SKIP_PATHS = (
     'qa/L0_model_config/autofill_noplatform_success',
     'qa/L0_model_config/special_cases', 'qa/L0_perf_nomodel/baseline',
     'qa/L0_perf_nomodel/legacy_baseline', 'qa/L0_warmup/raw_mug_data',
+    'qa/L0_java_resnet/expected_output_data',
     'TRITON_VERSION')
 
 COPYRIGHT_YEAR_RE = 'Copyright( \\(c\\))? 20[1-9][0-9](-(20)?[1-9][0-9])?(,((20[2-9][0-9](-(20)?[2-9][0-9])?)|([2-9][0-9](-[2-9][0-9])?)))*,? NVIDIA CORPORATION( & AFFILIATES)?. All rights reserved.'
