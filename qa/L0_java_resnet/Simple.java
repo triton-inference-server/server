@@ -284,7 +284,7 @@ public class Simple {
       }
 
       // Expected output for model
-      String file_name = "expected_output_";
+      String file_name = "expected_output_data/expected_output_";
       switch (backend) {
         case ONNX:
           file_name += "onnx";
