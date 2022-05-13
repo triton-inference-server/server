@@ -24,4 +24,27 @@
 # (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-name: "auto_complete_error"
+import numpy as np
+import json
+import triton_python_backend_utils as pb_utils
+
+
+class TritonPythonModel:
+
+    @staticmethod
+    def auto_complete_config(auto_complete_model_config):
+        input0 = {'name': 'INPUT0', 'data_type': 'TYPE_FP32', 'dims': [4]}
+        input1 = {'data_type': 'TYPE_FP32', 'dims': [4]}
+        output0 = {'name': 'OUTPUT0', 'data_type': 'TYPE_FP32', 'dims': [4]}
+        output1 = {'name': 'OUTPUT1', 'data_type': 'TYPE_FP32', 'dims': [4]}
+
+        pb_utils.set_max_batch_size(auto_complete_model_config, 0)
+        pb_utils.add_input(auto_complete_model_config, input0)
+        pb_utils.add_input(auto_complete_model_config, input1)
+        pb_utils.add_output(auto_complete_model_config, output0)
+        pb_utils.add_output(auto_complete_model_config, output1)
+
+        return auto_complete_model_config
+
+    def execute(self, requests):
+        pass

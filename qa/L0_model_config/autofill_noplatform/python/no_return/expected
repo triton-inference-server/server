@@ -1,0 +1,1 @@
+Python model 'no_return' is using auto-complete and the auto_complete_config function must not return None.

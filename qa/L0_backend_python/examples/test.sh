@@ -97,7 +97,7 @@ fi
 
 grep "PASS" $CLIENT_LOG
 if [ $? -ne 0 ]; then
-    echo -e "\n***\n*** Failed to verify add_sub example. \n***"
+    echo -e "\n***\n*** Failed to verify pytorch example. \n***"
     cat $CLIENT_LOG
     RET=1
 fi

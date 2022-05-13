@@ -32,14 +32,12 @@ import triton_python_backend_utils as pb_utils
 class TritonPythonModel:
 
     @staticmethod
-    def auto_complete_config(model_config):
+    def auto_complete_config(auto_complete_model_config):
         """
         The body of this model doesn't matter. The main purpose of this model is
         to test correct handling of Python errors in the `auto_complete_config`
         function.
         """
-        auto_complete_model_config = pb_utils.ModelConfig()
-
         input0 = {'name': 'INPUT0', 'data_type': 'TYPE_FP32', 'dims': [4]}
         input1 = {'name': 'INPUT1', 'data_type': 'TYPE_FP32', 'dims': [4]}
         output0 = {'name': 'OUTPUT0', 'data_type': 'TYPE_FP32', 'dims': [4]}

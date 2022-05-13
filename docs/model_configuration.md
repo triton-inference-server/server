@@ -279,7 +279,7 @@ cases the required portions of the model configuration file can be
 generated automatically by Triton. The required portion of the model
 configuration are those settings shown in the [Minimal Model
 Configuration](#minimal-model-configuration). Specifically, TensorRT,
-TensorFlow saved-model, and ONNX models do not require a model
+TensorFlow saved-model, ONNX, and Python models do not require a model
 configuration file because Triton can derive all the required settings
 automatically. All other model types must provide a model
 configuration file.

@@ -184,22 +184,29 @@ done
 
 # Copy Python models into the test model repositories.
 for modelpath in \
-        autofill_platform/python/mismatch_datatype/1 \
-        autofill_platform/python/mismatch_dims/1 \
-        autofill_platform/python/unknown_input/1 \
-        autofill_platform/python/unknown_output/1 \
-        autofill_platform_success/python/empty_config/1 \
-        autofill_platform_success/python/incomplete_input/1 \
-        autofill_platform_success/python/incomplete_output/1 ; do
+        autofill_noplatform/python/input_mismatch_datatype/1 \
+        autofill_noplatform/python/input_mismatch_dims/1 \
+        autofill_noplatform/python/output_mismatch_datatype/1 \
+        autofill_noplatform/python/output_mismatch_dims/1 \
+        autofill_noplatform_success/python/incomplete_output/1 \
+        autofill_noplatform_success/python/unknown_input/1 \
+        autofill_noplatform_success/python/unknown_output/1 \
+        autofill_noplatform_success/python/empty_config/1 ; do
     mkdir -p $modelpath
     cp /opt/tritonserver/qa/python_models/auto_complete/model.py $modelpath/.
 done
 for modelpath in \
-        autofill_platform/python/conflicting_max_batch_size \
-        autofill_platform/python/missing_datatype \
-        autofill_platform/python/missing_dims \
-        autofill_platform/python/missing_name \
-        autofill_platform/python/wrong_property ; do
+        autofill_noplatform/python/conflicting_max_batch_size \
+        autofill_noplatform/python/input_missing_datatype \
+        autofill_noplatform/python/input_missing_dims \
+        autofill_noplatform/python/input_missing_name \
+        autofill_noplatform/python/output_missing_datatype \
+        autofill_noplatform/python/output_missing_dims \
+        autofill_noplatform/python/output_missing_name \
+        autofill_noplatform/python/no_return \
+        autofill_noplatform_success/python/incomplete_input \
+        autofill_noplatform/python/input_wrong_property \
+        autofill_noplatform/python/output_wrong_property ; do
     mkdir -p $modelpath/1
     mv $modelpath/model.py $modelpath/1/.
 done
@@ -382,96 +389,6 @@ for TARGET_DIR in `ls -d autofill_noplatform_success/*/*`; do
     rm -fr models && mkdir models
     if [ -f ${TARGET_DIR}/config.pbtxt ] || [ "$TARGET" = "no_config" ] \
             || [ "$TARGET" = "no_config_variable" ] || [ "$TARGET" = "no_config_shape_tensor" ] ; then
-        cp -r ${TARGET_DIR} models/.
-    else
-        cp -r ${TARGET_DIR}/* models/.
-    fi
-
-    echo -e "Test $TARGET_DIR" >> $CLIENT_LOG
-
-    run_server
-    if [ "$SERVER_PID" == "0" ]; then
-        echo -e "*** FAILED: unable to start $SERVER" >> $CLIENT_LOG
-        RET=1
-    else
-        set +e
-        python ./compare_status.py --expected_dir models/$TARGET --model $TARGET >>$CLIENT_LOG 2>&1
-        if [ $? -ne 0 ]; then
-            echo -e "*** FAILED: unexpected model config" >> $CLIENT_LOG
-            RET=1
-        fi
-        set -e
-
-        kill $SERVER_PID
-        wait $SERVER_PID
-    fi
-done
-
-# Run all autofill tests that has a platform to the model config
-# before running the test
-for TARGET_DIR in `ls -d autofill_platform/*/*`; do
-    TARGET_DIR_DOT=`echo $TARGET_DIR | tr / .`
-    TARGET=`basename ${TARGET_DIR}`
-
-    SERVER_ARGS="--model-repository=`pwd`/models --strict-model-config=false"
-    SERVER_LOG=$SERVER_LOG_BASE.${TARGET_DIR_DOT}.log
-
-    # If there is a config.pbtxt at the top-level of the test then
-    # assume that the directory is a single model. Otherwise assume
-    # that the directory is an entire model repository.
-    rm -fr models && mkdir models
-    if [ -f ${TARGET_DIR}/config.pbtxt ]; then
-        cp -r ${TARGET_DIR} models/.
-        EXPECTEDS=models/$TARGET/expected*
-    else
-        cp -r ${TARGET_DIR}/* models/.
-        EXPECTEDS=models/expected*
-    fi
-
-    echo -e "Test ${TARGET_DIR}" >> $CLIENT_LOG
-
-    # We expect all the tests to fail with one of the expected
-    # error messages
-    run_server
-    if [ "$SERVER_PID" != "0" ]; then
-        echo -e "*** FAILED: unexpected success starting $SERVER" >> $CLIENT_LOG
-        RET=1
-        kill $SERVER_PID
-        wait $SERVER_PID
-    else
-        EXFOUND=0
-        for EXPECTED in `ls $EXPECTEDS`; do
-            EX=`cat $EXPECTED`
-            if grep ^E[0-9][0-9][0-9][0-9].*"$EX" $SERVER_LOG; then
-                echo -e "Found \"$EX\"" >> $CLIENT_LOG
-                EXFOUND=1
-                break
-            else
-                echo -e "Not found \"$EX\"" >> $CLIENT_LOG
-            fi
-        done
-
-        if [ "$EXFOUND" == "0" ]; then
-            echo -e "*** FAILED: ${TARGET_DIR}" >> $CLIENT_LOG
-            RET=1
-        fi
-    fi
-done
-
-# Run all autofill tests that are expected to be successful. These
-# tests need to add a platform to the model config before running
-for TARGET_DIR in `ls -d autofill_platform_success/*/*`; do
-    TARGET_DIR_DOT=`echo $TARGET_DIR | tr / .`
-    TARGET=`basename ${TARGET_DIR}`
-
-    SERVER_ARGS="--model-repository=`pwd`/models --strict-model-config=false"
-    SERVER_LOG=$SERVER_LOG_BASE.${TARGET_DIR_DOT}.log
-
-    # If there is a config.pbtxt at the top-level of the test then
-    # assume that the directory is a single model. Otherwise assume
-    # that the directory is an entire model repository.
-    rm -fr models && mkdir models
-    if [ -f ${TARGET_DIR}/config.pbtxt ]; then
         cp -r ${TARGET_DIR} models/.
     else
         cp -r ${TARGET_DIR}/* models/.
