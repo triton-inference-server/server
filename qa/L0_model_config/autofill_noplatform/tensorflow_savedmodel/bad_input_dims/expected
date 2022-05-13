@@ -1,1 +1,1 @@
-Invalid argument: model 'bad_input_dims', tensor 'INPUT0': the model expects 2 dimensions (shape \[-1,16\]) but the model configuration specifies 3 dimensions
+Internal: unable to autofill for 'bad_input_dims', model tensor configurations are contradicting each other in terms of whether batching is supported

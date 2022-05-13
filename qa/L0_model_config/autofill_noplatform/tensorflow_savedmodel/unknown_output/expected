@@ -1,1 +1,1 @@
-Invalid argument: Config file provided output name 'OUTPUT_UNKNOWN' but none found in loaded model 'unknown_output'.
+Invalid argument: unexpected inference output 'OUTPUT_UNKNOWN', allowed outputs are: OUTPUT0, OUTPUT1
