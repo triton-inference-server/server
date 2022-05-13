@@ -48,7 +48,7 @@ pip3 install torch==1.9.0+cu111 -f https://download.pytorch.org/whl/torch_stable
 TRIALS="default decoupled"
 
 for trial in $TRIALS; do
-    export TRIAL=$TRIAL
+    export TRIAL=$trial
     rm -rf ./models
 
     if [ $trial = "default" ]; then
