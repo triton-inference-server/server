@@ -1,1 +1,1 @@
-Config file specifies too many inputs, 3, while loaded model 'too_many_inputs' specifies 2
+Invalid argument: unable to load model 'too_many_inputs', configuration expects 3 inputs, model provides 2
