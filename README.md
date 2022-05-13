@@ -26,13 +26,11 @@
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 -->
 
-[![License](https://img.shields.io/badge/License-BSD3-lightgrey.svg)](https://opensource.org/licenses/BSD-3-Clause)
-
 # Triton Inference Server
 
-**LATEST RELEASE: You are currently on the main branch which tracks
-under-development progress towards the next release.**
+[![License](https://img.shields.io/badge/License-BSD3-lightgrey.svg)](https://opensource.org/licenses/BSD-3-Clause)
 
+----
 Triton Inference Server provides a cloud and edge inferencing solution
 optimized for both CPUs and GPUs. Triton supports an HTTP/REST and
 GRPC protocol that allows remote clients to request inferencing for
@@ -41,78 +39,85 @@ available as a shared library with a C API that allows the full
 functionality of Triton to be included directly in an
 application.
 
-The current release of the Triton Inference Server is 2.21.0 and
-corresponds to the 22.04 release of the tritonserver container on
-[NVIDIA GPU Cloud (NGC)](https://ngc.nvidia.com). The branch for this
-release is
-[r22.04](https://github.com/triton-inference-server/server/tree/r22.04).
+Major features include:
 
-## Features
-
-* [Deep learning
-  frameworks](https://github.com/triton-inference-server/backend).
-  Triton supports TensorRT, TensorFlow GraphDef, TensorFlow
-  SavedModel, ONNX, PyTorch TorchScript and OpenVINO model
-  formats. Both TensorFlow 1.x and TensorFlow 2.x are
-  supported. Triton also supports TensorFlow-TensorRT, ONNX-TensorRT
-  and PyTorch-TensorRT integrated models.
-
-* [Machine learning
-  frameworks](https://github.com/triton-inference-server/fil_backend).
-  Triton supports popular machine learning frameworks such as XGBoost,
-  LightGBM, Scikit-Learn and cuML using the [RAPIDS Forest Inference
-  Library](https://medium.com/rapids-ai/rapids-forest-inference-library-prediction-at-100-million-rows-per-second-19558890bc35).
-
-* [Concurrent model
-  execution](docs/architecture.md#concurrent-model-execution). Triton
-  can simultaneously run multiple models (or multiple instances of the
-  same model) using the same or different deep-learning and
-  machine-learning frameworks.
-
-* [Dynamic batching](docs/architecture.md#models-and-schedulers). For
-  models that support batching, Triton implements multiple scheduling
-  and batching algorithms that combine individual inference requests
-  together to improve inference throughput. These scheduling and
-  batching decisions are transparent to the client requesting
-  inference.
-
-* [Extensible
-  backends](https://github.com/triton-inference-server/backend). In
-  addition to deep-learning frameworks, Triton provides a *backend
-  API* that allows Triton to be extended with any model execution
-  logic implemented in
-  [Python](https://github.com/triton-inference-server/python_backend)
-  or
-  [C++](https://github.com/triton-inference-server/backend/blob/main/README.md#triton-backend-api),
-  while still benefiting from full CPU and GPU support, concurrent
-  execution, dynamic batching and other features provided by Triton.
-
-* Model pipelines using
+- [Multiple deep learning
+  framework support](https://github.com/triton-inference-server/backend).
+- [Multiple machine learning
+  framework support](https://github.com/triton-inference-server/fil_backend).
+- [Concurrent model
+  execution](docs/architecture.md#concurrent-model-execution).
+- [Dynamic batching](docs/architecture.md#models-and-schedulers).
+- Provides [Extensible
+  backend](https://github.com/triton-inference-server/backend) with a *backend
+  API*.
+- Model pipelines using
   [Ensembling](docs/architecture.md#ensemble-models) or [Business
   Logic Scripting
   (BLS)](https://github.com/triton-inference-server/python_backend#business-logic-scripting).
-  A Triton *ensemble* represents a pipeline of one or more models and
-  the connection of input and output tensors between those
-  models. *BLS* allows a pipeline along with extra business logic to
-  be represented in Python. In both cases a single inference request
-  will trigger the execution of the entire pipeline.
-
-* [HTTP/REST and GRPC inference
+- [HTTP/REST and GRPC inference
   protocols](docs/inference_protocols.md) based on the community
   developed [KServe
   protocol](https://github.com/kserve/kserve/tree/master/docs/predict-api/v2).
-
-* A [C API](docs/inference_protocols.md#in-process-triton-server-api)
+- A [C API](docs/inference_protocols.md#in-process-triton-server-api)
   allows Triton to be linked directly into your application for edge
   and other in-process use cases.
-
-* A [Java API](docs/inference_protocols.md#java-api) is similar to C API and
+- A [Java API](docs/inference_protocols.md#java-api) is similar to C API and
   allows Triton to be linked directly to your Java application.
+- [Metrics](docs/metrics.md) indicating GPU utilization, server
+  throughput, and server latency. 
 
-* [Metrics](docs/metrics.md) indicating GPU utilization, server
-  throughput, and server latency. The metrics are provided in
-  Prometheus data format.
+**LATEST RELEASE: You are currently on the main branch which tracks
+under-development progress towards the next release. The current release is 
+version [2.21.0](https://github.com/triton-inference-server/server/tree/r22.04)
+and corresponds to the 22.04 container release on 
+[NVIDIA GPU Cloud (NGC)](https://catalog.ngc.nvidia.com/orgs/nvidia/containers/tritonserver)**
 
+## Launching a Triton Inference Server in a Minute
+
+```bash
+# Download the latest Triton Inference Server container and repo in one console
+docker pull nvcr.io/nvidia/tritonserver:22.04-py3
+
+git clone -b r22.04 https://github.com/triton-inference-server/server.git
+
+# Create a model repository
+cd server/docs/examples
+
+./fetch_models.sh
+
+# Run Triton. For CPU only systems, remove `--gpus=1` option.
+docker run --gpus=1 --rm -p8000:8000 -p8001:8001 -p8002:8002 -v/full/path/to/docs/examples/model_repository:/models nvcr.io/nvidia/tritonserver:22.04-py3 tritonserver --model-repository=/models
+
+# Verify Triton is running corectly
+curl -v localhost:8000/v2/health/ready
+
+# In a separate console, download and launch the latest SDK container for Client examples
+docker pull nvcr.io/nvidia/tritonserver:22.04-py3-sdk
+
+docker run -it --rm --net=host nvcr.io/nvidia/tritonserver:22.04-py3-sdk
+
+# Run the image classification example
+/workspace/install/bin/image_client -m densenet_onnx -c 3 -s INCEPTION /workspace/images/mug.jpg
+
+# Returns
+Image '/workspace/images/mug.jpg':
+    15.346230 (504) = COFFEE MUG
+    13.224326 (968) = CUP
+    10.422965 (505) = COFFEEPOT
+```
+Please read the [QuickStart](docs/quickstart.md) guide for additional information
+regarding this example.
+
+## Examples and Tutorials
+
+Specific end-to-end examples for popular models, such as ResNet, BERT, and DLRM 
+are located in the 
+[NVIDIA Deep Learning Examples](https://github.com/NVIDIA/DeepLearningExamples)
+page on GitHub. The 
+[NVIDIA Developer Zone](https://developer.nvidia.com/nvidia-triton-inference-server) 
+contains additional documentation, presentations, and examples.
+ 
 ## Documentation
 
 **The master branch documentation tracks the upcoming,
