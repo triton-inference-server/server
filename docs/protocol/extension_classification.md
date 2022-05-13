@@ -48,7 +48,7 @@ When the classification parameter is used, Triton will determine the
 top-n classifications as the n highest-valued elements in the output
 tensor compared using the output tensor’s data type. For example, if
 an output tensor is [ 1, 5, 10, 4 ], the highest-valued element is 10
-(index 2), followed by 5 (index 1), followed by 4 (index 2), followed
+(index 2), followed by 5 (index 1), followed by 4 (index 3), followed
 by 1 (index 0). So, for example, the top-2 classifications by index
 are [ 2, 1 ].
 
