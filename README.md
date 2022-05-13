@@ -31,13 +31,11 @@
 [![License](https://img.shields.io/badge/License-BSD3-lightgrey.svg)](https://opensource.org/licenses/BSD-3-Clause)
 
 ----
-Triton Inference Server provides a cloud and edge inferencing solution
-optimized for both CPUs and GPUs. Triton supports an HTTP/REST and
-GRPC protocol that allows remote clients to request inferencing for
-any model being managed by the server. For edge deployments, Triton is
-available as a shared library with a C API that allows the full
-functionality of Triton to be included directly in an
-application.
+Triton Inference Server is open source and provides a cloud and edge inferencing
+solution for CPUs, GPUs, and AWS Inferentia. Triton is available as a docker 
+container and supports an HTTP/REST and GRPC protocol, as well as a shared 
+library that allows the full functionality of Triton to be included directly in 
+an application and used in-process.
 
 Major features include:
 
@@ -73,7 +71,7 @@ version [2.21.0](https://github.com/triton-inference-server/server/tree/r22.04)
 and corresponds to the 22.04 container release on 
 [NVIDIA GPU Cloud (NGC)](https://catalog.ngc.nvidia.com/orgs/nvidia/containers/tritonserver)**
 
-## Launching a Triton Inference Server in a Minute
+## Launching Triton in Under Five Minutes
 
 ```bash
 # Download the latest Triton Inference Server container and repo in one console
@@ -120,11 +118,7 @@ contains additional documentation, presentations, and examples.
  
 ## Documentation
 
-**The master branch documentation tracks the upcoming,
-under-development release and so may not be accurate for the current
-release of Triton. See the [r22.04
-documentation](https://github.com/triton-inference-server/server/tree/r22.04#documentation)
-for the current release.**
+### Overview
 
 [Triton Architecture](docs/architecture.md) gives a high-level
 overview of the structure and capabilities of the inference
@@ -144,81 +138,29 @@ Matrix](https://docs.nvidia.com/deeplearning/dgx/support-matrix/index.html)
 indicate the required versions of the NVIDIA Driver and CUDA, and also
 describe supported GPUs.
 
+### Build and Deploy
+
+### Model Configuration
+
+#### Creating a Model Repository
+
+#### Preparing Models
+
+#### Pipelining Models
+
+### Configure and Use 
+
+#### Managing Models
+
+
+### Client Support and Examples
+
+
+### OLD Documentation
+----
 ### User Documentation
 
-* [QuickStart](docs/quickstart.md)
-  * [Install Triton](docs/quickstart.md#install-triton-docker-image)
-  * [Create Model Repository](docs/quickstart.md#create-a-model-repository)
-  * [Run Triton](docs/quickstart.md#run-triton)
-* [Model Repository](docs/model_repository.md)
-  * [Cloud Storage](docs/model_repository.md#model-repository-locations)
-  * [File Organization](docs/model_repository.md#model-files)
-  * [Model Versioning](docs/model_repository.md#model-versions)
-* [Model Configuration](docs/model_configuration.md)
-  * [Required Model Configuration](docs/model_configuration.md#minimal-model-configuration)
-    * [Maximum Batch Size - Batching and Non-Batching Models](docs/model_configuration.md#maximum-batch-size)
-    * [Input and Output Tensors](docs/model_configuration.md#inputs-and-outputs)
-      * [Tensor Datatypes](docs/model_configuration.md#datatypes)
-      * [Tensor Reshape](docs/model_configuration.md#reshape)
-      * [Shape Tensor](docs/model_configuration.md#shape-tensors)
-  * [Auto-Generate Required Model Configuration](docs/model_configuration.md#auto-generated-model-configuration)
-  * [Version Policy](docs/model_configuration.md#version-policy)
-  * [Instance Groups](docs/model_configuration.md#instance-groups)
-    * [Specifying Multiple Model Instances](docs/model_configuration.md#multiple-model-instances)
-    * [CPU and GPU Instances](docs/model_configuration.md#cpu-model-instance)
-    * [Configuring Rate Limiter](docs/model_configuration.md#rate-limiter-configuration)
-  * [Optimization Settings](docs/model_configuration.md#optimization_policy)
-    * [Framework-Specific Optimization](docs/optimization.md#framework-specific-optimization)
-      * [ONNX-TensorRT](docs/optimization.md#onnx-with-tensorrt-optimization-ort-trt)
-      * [ONNX-OpenVINO](docs/optimization.md#onnx-with-openvino-optimization)
-      * [TensorFlow-TensorRT](docs/optimization.md#tensorflow-with-tensorrt-optimization-tf-trt)
-      * [TensorFlow-Mixed-Precision](docs/optimization.md#tensorflow-automatic-fp16-optimization)
-    * [NUMA Optimization](docs/optimization.md#numa-optimization)
-  * [Scheduling and Batching](docs/model_configuration.md#scheduling-and-batching)
-    * [Default Scheduler - Non-Batching](docs/model_configuration.md#default-scheduler)
-    * [Dynamic Batcher](docs/model_configuration.md#dynamic-batcher)
-      * [How to Configure Dynamic Batcher](docs/model_configuration.md#recommended-configuration-process)
-        * [Delayed Batching](docs/model_configuration.md#delayed-batching)
-        * [Preferred Batch Size](docs/model_configuration.md#preferred-batch-sizes)
-      * [Preserving Request Ordering](docs/model_configuration.md#preserve-ordering)
-      * [Priority Levels](docs/model_configuration.md#priority-levels)
-      * [Queuing Policies](docs/model_configuration.md#queue-policy)
-      * [Ragged Batching](docs/ragged_batching.md)
-    * [Sequence Batcher](docs/model_configuration.md#sequence-batcher)
-      * [Stateful Models](docs/architecture.md#stateful-models)
-      * [Control Inputs](docs/architecture.md#control-inputs)
-      * [Implicit State - Stateful Inference Using a Stateless Model](docs/architecture.md#implicit-state-management)
-      * [Sequence Scheduling Strategies](docs/architecture.md#scheduling-strateties)
-        * [Direct](docs/architecture.md#direct)
-        * [Oldest](docs/architecture.md#oldest)
-    * [Rate Limiter](docs/rate_limiter.md)
-  * [Model Warmup](docs/model_configuration.md#model-warmup)
-  * [Inference Request/Response Cache](docs/model_configuration.md#response-cache)
-* Model Pipeline
-  * [Model Ensemble](docs/architecture.md#ensemble-models)
-  * [Business Logic Scripting (BLS)](https://github.com/triton-inference-server/python_backend#business-logic-scripting)
-* [Model Management](docs/model_management.md)
-  * [Explicit Model Loading and Unloading](docs/model_management.md#model-control-mode-explicit)
-  * [Modifying the Model Repository](docs/model_management.md#modifying-the-model-repository)
-* [Metrics](docs/metrics.md)
-* [Framework Custom Operations](docs/custom_operations.md)
-  * [TensorRT](docs/custom_operations.md#tensorrt)
-  * [TensorFlow](docs/custom_operations.md#tensorflow)
-  * [PyTorch](docs/custom_operations.md#pytorch)
-  * [ONNX](docs/custom_operations.md#onnx)
-* [Client Libraries and Examples](https://github.com/triton-inference-server/client)
-  * [C++ HTTP/GRPC Libraries](https://github.com/triton-inference-server/client#client-library-apis)
-  * [Python HTTP/GRPC Libraries](https://github.com/triton-inference-server/client#client-library-apis)
-  * [Java HTTP Library](https://github.com/triton-inference-server/client/tree/main/src/java)
-  * GRPC Generated Libraries
-    * [go](https://github.com/triton-inference-server/client/tree/main/src/grpc_generated/go)
-    * [Java/Scala](https://github.com/triton-inference-server/client/tree/main/src/grpc_generated/java)
-    * [Javascript](https://github.com/triton-inference-server/client/tree/main/src/grpc_generated/javascript)
-* [Performance Analysis](docs/optimization.md)
-  * [Model Analyzer](docs/model_analyzer.md)
-  * [Performance Analyzer](docs/perf_analyzer.md)
-  * [Inference Request Tracing](docs/trace.md)
-* [Jetson and JetPack](docs/jetson.md)
+
 
 The [quickstart](docs/quickstart.md) walks you through all the steps
 required to install and run Triton with an example image
@@ -287,12 +229,6 @@ version 2 of Triton from previously using version 1.
 
 ### Developer Documentation
 
-* [Build](docs/build.md)
-* [Protocols and APIs](docs/inference_protocols.md).
-* [Backends](https://github.com/triton-inference-server/backend)
-* [Repository Agents](docs/repository_agents.md)
-* [Test](docs/test.md)
-
 Triton can be [built using
 Docker](docs/build.md#building-triton-with-docker) or [built without
 Docker](docs/build.md#building-triton-without-docker). After building
@@ -330,40 +266,34 @@ A [Triton repository agent](docs/repository_agents.md) extends Triton
 with new functionality that operates when a model is loaded or
 unloaded. You can introduce your own code to perform authentication,
 decryption, conversion, or similar operations when a model is loaded.
-
-## Additional Resources
-
-* Additional documentation, presentations, and examples are located in the
-  [NVIDIA Developer Zone](https://developer.nvidia.com/nvidia-triton-inference-server).
-
-* Specific end-to-end examples for popular models, such as ResNet, BERT, and
-  DLRM are located in the [NVIDIA Deep Learning Examples page on
-  GitHub](https://github.com/NVIDIA/DeepLearningExamples).
+----
 
 ## Contributing
 
 Contributions to Triton Inference Server are more than welcome. To
-contribute make a pull request and follow the guidelines outlined in
-[CONTRIBUTING.md](CONTRIBUTING.md). If you have a backend, client,
+contribute make please review the [contribution 
+guidelines](CONTRIBUTING.md). If you have a backend, client,
 example or similar contribution that is not modifying the core of
 Triton, then you should file a PR in the [contrib
 repo](https://github.com/triton-inference-server/contrib).
 
 ## Reporting problems, asking questions
 
-We appreciate any feedback, questions or bug reporting regarding this
-project. When help with code is needed, follow the process outlined in
-the Stack Overflow (<https://stackoverflow.com/help/mcve>)
-document. Ensure posted examples are:
-
-* minimal – use as little code as possible that still produces the
+We appreciate any feedback, questions or bug reporting regarding this project. 
+When posting [issues in GitHub](https://github.com/triton-inference-server/server/issues),
+follow the process outlined in the [Stack Overflow document](https://stackoverflow.com/help/mcve).
+Ensure posted examples are:
+- minimal – use as little code as possible that still produces the
   same problem
-
-* complete – provide all parts needed to reproduce the problem. Check
+- complete – provide all parts needed to reproduce the problem. Check
   if you can strip external dependency and still show the problem. The
   less time we spend on reproducing problems the more time we have to
   fix it
-
-* verifiable – test the code you're about to provide to make sure it
+- verifiable – test the code you're about to provide to make sure it
   reproduces the problem. Remove all other problems that are not
   related to your request/question.
+
+## For more information
+
+Please refer to the [NVIDIA Developer Triton page](https://developer.nvidia.com/nvidia-triton-inference-server)
+for more information.
