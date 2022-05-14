@@ -83,6 +83,9 @@ if [ "$SERVER_PID" == "0" ]; then
     RET=1
 
 else
+    kill $SERVER_PID
+    wait $SERVER_PID
+
     RESULT_LOG_LINE=$(grep "Adding default backend config setting:" $SERVER_LOG)
     if [ "$RESULT_LOG_LINE" != "" ]; then
         
@@ -97,15 +100,6 @@ else
         echo "*** FAILED: No log statement stating default max batch size\n"
         RET=1
     fi
-
-    # Assert we are also turning on the dynamic_batcher    
-    DYNAMIC_BATCHING_LOG_LINE=$(grep "\"dynamic_batching\": {}" $SERVER_LOG)
-    if [ "$DYNAMIC_BATCHING_LOG_LINE" == "" ]; then
-        echo "*** FAILED: Expected dynamic batching to be set in model config but was not found\n"
-        RET=1
-    fi
-    kill $SERVER_PID
-    wait $SERVER_PID
 fi
 
 for ((i=0; i < ${#POSITIVE_TEST_ARGS[@]}; i++)); do
@@ -118,6 +112,9 @@ for ((i=0; i < ${#POSITIVE_TEST_ARGS[@]}; i++)); do
         RET=1
 
     else
+        kill $SERVER_PID
+        wait $SERVER_PID
+
         RESULT_LOG_LINE=$(grep "Found overwritten default setting:" $SERVER_LOG)
         if [ "$RESULT_LOG_LINE" != "" ]; then
             
@@ -132,18 +129,7 @@ for ((i=0; i < ${#POSITIVE_TEST_ARGS[@]}; i++)); do
             echo "*** FAILED: No log statement stating default max batch size\n"
             RET=1
         fi
-        
-        # Assert we are also turning on the dynamic_batcher    
-        DYNAMIC_BATCHING_LOG_LINE=$(grep "\"dynamic_batching\": {}" $SERVER_LOG)
-        if [ "$DYNAMIC_BATCHING_LOG_LINE" == "" ]; then
-            echo "*** FAILED: Expected dynamic batching to be set in model config but was not found\n"
-            RET=1
-        fi
-
-        kill $SERVER_PID
-        wait $SERVER_PID
     fi
-
 done
 
 # Negative tests
@@ -165,6 +151,73 @@ for ((i=0; i < ${#NEGATIVE_PARSE_ARGS[@]}; i++)); do
         wait $SERVER_PID
     fi
 done
+
+
+#
+# Sepcific backend tests
+# 
+
+# Tensorflow 1: Batching ON
+rm -rf ./models/
+mkdir -p ./models/no_config
+cp -r /data/inferenceserver/${REPO_VERSION}/qa_model_repository/savedmodel_float32_float32_float32/1 ./models/no_config/
+
+SERVER_ARGS="--backend-config=tensorflow,default-max-batch-size=5 $COMMON_ARGS"
+SERVER_LOG=$SERVER_LOG_BASE.backend_config_tensorflow_batch_5.log
+run_server
+
+if [ "$SERVER_PID" == "0" ]; then
+    echo -e "*** FAILED: Server failed to start $SERVER\n"
+    RET=1
+
+else
+    kill $SERVER_PID
+    wait $SERVER_PID
+
+    # Assert the max-batch-size is the command line value
+    DYNAMIC_BATCHING_LOG_LINE=$(grep "\"max_batch_size\": 5" $SERVER_LOG)
+    if [ "$DYNAMIC_BATCHING_LOG_LINE" == "" ]; then
+        echo "*** FAILED: Expected max batch size to be 5 but found: $DYNAMIC_BATCHING_LOG_LINE\n"
+        RET=1
+    fi
+
+    # Assert we are also turning on the dynamic_batcher    
+    DYNAMIC_BATCHING_LOG_LINE=$(grep "\"dynamic_batching\": {}" $SERVER_LOG)
+    if [ "$DYNAMIC_BATCHING_LOG_LINE" == "" ]; then
+        echo "*** FAILED: Expected dynamic batching to be set in model config but was not found\n"
+        RET=1
+    fi
+fi
+
+# Tensorflow 1: Batching OFF
+SERVER_ARGS="--backend-config=tensorflow,default-max-batch-size=0 $COMMON_ARGS"
+SERVER_LOG=$SERVER_LOG_BASE.backend_config_tensorflow_batch_0.log
+run_server
+
+if [ "$SERVER_PID" == "0" ]; then
+    echo -e "*** FAILED: Server failed to start $SERVER\n"
+    RET=1
+
+else
+    kill $SERVER_PID
+    wait $SERVER_PID
+
+    # Assert the max-batch-size is 1 in the case batching is supported
+    # in the model but not in the config.
+    DYNAMIC_BATCHING_LOG_LINE=$(grep "\"max_batch_size\": 1" $SERVER_LOG)
+    if [ "$DYNAMIC_BATCHING_LOG_LINE" == "" ]; then
+        echo "*** FAILED: Expected max batch size to be 1 but found: $DYNAMIC_BATCHING_LOG_LINE\n"
+        RET=1
+    fi
+
+    # Assert batching disabled    
+    if [ $(grep -E '\"dynamic_batching\": \{}' $SERVER_LOG) == 0 ]; then
+        echo "*** FAILED: Expected dynamic batching found in configuration when none expected.\n"
+        RET=1
+    fi
+fi
+
+
 
 # Print test outcome
 if [ $RET -eq 0 ]; then
