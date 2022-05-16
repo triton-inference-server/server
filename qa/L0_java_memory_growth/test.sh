@@ -68,6 +68,7 @@ CLIENT_LOG="./client_$LOG_IDX.log"
 echo -e "\nRunning Sanity Test (accuracy checking)\n"
 $BASE_COMMAND -Dexec.args="-r $MODEL_REPO -i $ITERS" >>$CLIENT_LOG 2>&1
 if [ $? -ne 0 ]; then
+    echo -e "\n***\n*** Failed to run sanity test to complete\n***"
     RET=1
 fi
 
@@ -89,11 +90,13 @@ fi
 echo -e "\nRunning Memory Growth Test, $ITERS Iterations\n"
 $BASE_COMMAND -Dexec.args="-r $MODEL_REPO -c -i $ITERS" >>$CLIENT_LOG 2>&1
 if [ $? -ne 0 ]; then
+    echo -e "\n***\n*** Failed to run memory growth test to complete\n***"
     RET=1
 fi
 
 if [ `grep -c "Memory growth test passed" $CLIENT_LOG` != "1" ]; then
     echo -e "\n***\n*** Failed. Expected 1 'Memory growth test passed' in $CLIENT_LOG\n***"
+    cat $CLIENT_LOG
     RET=1
 fi
 
