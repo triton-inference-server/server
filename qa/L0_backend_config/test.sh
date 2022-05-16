@@ -211,12 +211,75 @@ else
     fi
 
     # Assert batching disabled    
-    if [ $(grep -E '\"dynamic_batching\": \{}' $SERVER_LOG) == 0 ]; then
+    if [ "$(grep -E '\"dynamic_batching\": \{}' $SERVER_LOG)" != "" ]; then
         echo "*** FAILED: Expected dynamic batching found in configuration when none expected.\n"
         RET=1
     fi
 fi
 
+# Onnxruntime: Batching ON
+rm -rf ./models/
+mkdir -p ./models/no_config
+cp -r /data/inferenceserver/${REPO_VERSION}/qa_model_repository/onnx_float32_float32_float32/1 ./models/no_config/
+
+SERVER_ARGS="--backend-config=onnxruntime,default-max-batch-size=5 $COMMON_ARGS"
+SERVER_LOG=$SERVER_LOG_BASE.backend_config_onnxruntime_batch_5.log
+run_server
+
+if [ "$SERVER_PID" == "0" ]; then
+    echo -e "*** FAILED: Server failed to start $SERVER\n"
+    RET=1
+
+else
+    kill $SERVER_PID
+    wait $SERVER_PID
+
+    # Assert the max-batch-size is the command line value
+    DYNAMIC_BATCHING_LOG_LINE=$(grep "\"max_batch_size\": 5" $SERVER_LOG)
+    if [ "$DYNAMIC_BATCHING_LOG_LINE" == "" ]; then
+        echo "*** FAILED: Expected max batch size to be 5 but found: $DYNAMIC_BATCHING_LOG_LINE\n"
+        RET=1
+    fi
+
+    # Assert we are also turning on the dynamic_batcher    
+    DYNAMIC_BATCHING_LOG_LINE=$(grep "\"dynamic_batching\": {}" $SERVER_LOG)
+    if [ "$DYNAMIC_BATCHING_LOG_LINE" == "" ]; then
+        echo "*** FAILED: Expected dynamic batching to be set in model config but was not found\n"
+        RET=1
+    fi
+fi
+
+# Onnxruntime: Batching OFF
+rm -rf ./models/
+mkdir -p ./models/no_config
+cp -r /data/inferenceserver/${REPO_VERSION}/qa_model_repository/onnx_float32_float32_float32/1 ./models/no_config/
+
+SERVER_ARGS="--backend-config=onnxruntime,default-max-batch-size=0 $COMMON_ARGS"
+SERVER_LOG=$SERVER_LOG_BASE.backend_config_onnxruntime_batch_0.log
+run_server
+
+if [ "$SERVER_PID" == "0" ]; then
+    echo -e "*** FAILED: Server failed to start $SERVER\n"
+    RET=1
+
+else
+    kill $SERVER_PID
+    wait $SERVER_PID
+
+    # Assert the max-batch-size is 1 in the case batching is supported
+    # in the model but not in the config.
+    DYNAMIC_BATCHING_LOG_LINE=$(grep "\"max_batch_size\": 1" $SERVER_LOG)
+    if [ "$DYNAMIC_BATCHING_LOG_LINE" == "" ]; then
+        echo "*** FAILED: Expected max batch size to be 1 but found: $DYNAMIC_BATCHING_LOG_LINE\n"
+        RET=1
+    fi
+
+    # Assert batching disabled    
+    if [ "$(grep -E '\"dynamic_batching\": \{}' $SERVER_LOG)" != "" ]; then
+        echo "*** FAILED: Expected dynamic batching found in configuration when none expected.\n"
+        RET=1
+    fi
+fi
 
 
 # Print test outcome
