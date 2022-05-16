@@ -1,5 +1,4 @@
 name: "empty_config"
-platform: "python"
 version_policy {
   latest {
    num_versions: 1
