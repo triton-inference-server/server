@@ -74,6 +74,7 @@ fi
 
 if [ `grep -c "Memory growth test passed" $CLIENT_LOG` != "1" ]; then
     echo -e "\n***\n*** Failed. Expected 1 'Memory growth test passed' in $CLIENT_LOG\n***"
+    cat $CLIENT_LOG
     RET=1
 fi
 
