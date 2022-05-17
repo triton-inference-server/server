@@ -66,6 +66,31 @@ cp -r $DATADIR/libtorch_float32_float32_float32 models/libtorch_no_arguements_ou
     sed -i 's/OUTPUT__0/OUTPUTA/' models/libtorch_no_arguements_output_index/config.pbtxt && \
     sed -i 's/OUTPUT__1/OUTPUTB/' models/libtorch_no_arguements_output_index/config.pbtxt
 
+cp -r $DATADIR/libtorch_float32_float32_float32 models/libtorch_mix_index && \
+    sed -i 's/libtorch_float32_float32_float32/libtorch_mix_index/' models/libtorch_mix_index/config.pbtxt && \
+    sed -i 's/INPUT0/INPUTA/' models/libtorch_mix_index/config.pbtxt && \
+    sed -i 's/INPUT1/INPUT__1/' models/libtorch_mix_index/config.pbtxt && \
+    sed -i 's/OUTPUT__0/OUTPUTA/' models/libtorch_mix_index/config.pbtxt
+
+cp -r $DATADIR/libtorch_float32_float32_float32 models/libtorch_mix_arguements && \
+    sed -i 's/libtorch_float32_float32_float32/libtorch_mix_arguements/' models/libtorch_mix_arguements/config.pbtxt && \
+    sed -i 's/INPUT1/INPUTB/' models/libtorch_mix_arguements/config.pbtxt && \
+    sed -i 's/OUTPUT__0/OUTPUTA/' models/libtorch_mix_arguements/config.pbtxt
+
+cp -r $DATADIR/libtorch_float32_float32_float32 models/libtorch_mix_arguements_index && \
+    sed -i 's/libtorch_float32_float32_float32/libtorch_mix_arguements_index/' models/libtorch_mix_arguements_index/config.pbtxt && \
+    sed -i 's/INPUT1/INPUT__1/' models/libtorch_mix_arguements_index/config.pbtxt && \
+    sed -i 's/OUTPUT__0/OUTPUT0/' models/libtorch_mix_arguements_index/config.pbtxt
+
+cp -r $DATADIR/libtorch_float32_float32_float32 models/libtorch_unordered_index && \
+    sed -i 's/libtorch_float32_float32_float32/libtorch_unordered_index/' models/libtorch_unordered_index/config.pbtxt && \
+    sed -i 's/INPUT0/INPUT_TMP1/' models/libtorch_unordered_index/config.pbtxt && \
+    sed -i 's/INPUT1/INPUT0/' models/libtorch_unordered_index/config.pbtxt && \
+    sed -i 's/INPUT_TMP1/INPUT1/' models/libtorch_unordered_index/config.pbtxt && \
+    sed -i 's/OUTPUT__0/OUT__1/' models/libtorch_unordered_index/config.pbtxt && \
+    sed -i 's/OUTPUT__1/OUT__0/' models/libtorch_unordered_index/config.pbtxt
+
+
 SERVER=/opt/tritonserver/bin/tritonserver
 SERVER_ARGS="--model-repository=models"
 SERVER_LOG="./inference_server.log"
