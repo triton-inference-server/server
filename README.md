@@ -69,9 +69,9 @@ Major features include:
 under-development progress towards the next release. The current release is 
 version [2.21.0](https://github.com/triton-inference-server/server/tree/r22.04)
 and corresponds to the 22.04 container release on 
-[NVIDIA GPU Cloud (NGC)](https://catalog.ngc.nvidia.com/orgs/nvidia/containers/tritonserver)**
+[NVIDIA GPU Cloud (NGC)](https://catalog.ngc.nvidia.com/orgs/nvidia/containers/tritonserver).**
 
-## Launching Triton in Under Five Minutes
+## Quick Example to Launch and Use Triton
 
 ```bash
 # Download the latest Triton Inference Server container and repo in one console
@@ -105,7 +105,7 @@ Image '/workspace/images/mug.jpg':
     10.422965 (505) = COFFEEPOT
 ```
 Please read the [QuickStart](docs/quickstart.md) guide for additional information
-regarding this example.
+regarding this example. The quickstart guide also contains an example of how to launch Triton on [CPU-only systems](docs/quickstart.md#run-on-cpu-only-system).
 
 ## Examples and Tutorials
 
@@ -139,6 +139,17 @@ indicate the required versions of the NVIDIA Driver and CUDA, and also
 describe supported GPUs.
 
 ### Build and Deploy
+
+The recommended way to build and use Triton Inference Server is with Docker
+images.
+
+- [Install Triton Inference Server with Docker containers](docs/build.md#building-triton-with-docker) (*Recommended*)
+- [Install Triton Inference Server without Docker containers](docs/build.md#building-triton-without-docker)
+- [Build a custom Triton Inference Server Docker container](docs/compose.md)
+- [Build Triton Inference Server from source](docs/build.md#building-on-unsupported-platforms)
+- [Build Triton Inference Server for Windows 10](docs/build.md#building-for-windows-10)
+- Examples for deploying Triton Inference Server with Kubernetes and Helm on [GCP](deploy/gcp/README.md), [AWS](deploy/aws/README.md), and [NVIDIA
+FleetCommand](deploy/fleetcommand/README.md)
 
 ### Model Configuration
 
@@ -266,6 +277,7 @@ A [Triton repository agent](docs/repository_agents.md) extends Triton
 with new functionality that operates when a model is loaded or
 unloaded. You can introduce your own code to perform authentication,
 decryption, conversion, or similar operations when a model is loaded.
+
 ----
 
 ## Contributing

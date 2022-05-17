@@ -27,7 +27,7 @@
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 -->
 
-# Table of Contents
+# Triton Inference Server Documentation
 
 ## User Guide
 - [QuickStart](quickstart.md)
