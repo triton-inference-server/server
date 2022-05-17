@@ -9,9 +9,12 @@ max_batch_size: 8
 input {
   name: "INPUT1"
   data_type: TYPE_FP32
-  dims: 4
-  dims: 1
-  dims: 2
+  dims: 8
+  reshape {
+    shape: 4
+    shape: 1
+    shape: 2
+  }
 }
 input {
   name: "INPUT0"
@@ -30,9 +33,12 @@ output {
 output {
   name: "OUTPUT1"
   data_type: TYPE_FP32
-  dims: 4
-  dims: 1
-  dims: 2
+  dims: 8
+  reshape {
+    shape: 4
+    shape: 1
+    shape: 2
+  }
 }
 instance_group {
   name: "reshape_config_provided"
