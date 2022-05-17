@@ -30,6 +30,8 @@
 # Triton Inference Server Documentation
 
 ## User Guide
+The User Guide describes how to use Triton as an inference solution, including information on how to configure Triton, how to organize and configure your models, how to use the C++ and Python clients, etc. 
+
 - [QuickStart](quickstart.md)
   - [Install Triton](quickstart.md#install-triton-docker-image)
   - [Create Model Repository](quickstart.md#create-a-model-repository)
@@ -105,6 +107,8 @@
 - [Jetson and JetPack](jetson.md)
 
 ## Developer Guide
+The Developer Guide describes how to build and test Triton and also how Triton can be extended with new functionality.
+
 - [Build](build.md)
 - [Protocols and APIs](inference_protocols.md).
 - [Backends](https://github.com/triton-inference-server/backend)

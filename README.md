@@ -30,6 +30,12 @@
 
 [![License](https://img.shields.io/badge/License-BSD3-lightgrey.svg)](https://opensource.org/licenses/BSD-3-Clause)
 
+**LATEST RELEASE: You are currently on the main branch which tracks
+under-development progress towards the next release. The current release is 
+version [2.21.0](https://github.com/triton-inference-server/server/tree/r22.04)
+and corresponds to the 22.04 container release on 
+[NVIDIA GPU Cloud (NGC)](https://catalog.ngc.nvidia.com/orgs/nvidia/containers/tritonserver).**
+
 ----
 Triton Inference Server is open source and provides a cloud and edge inferencing
 solution for CPUs, GPUs, and AWS Inferentia. Triton is available as a docker 
@@ -57,19 +63,10 @@ Major features include:
   protocols](docs/inference_protocols.md) based on the community
   developed [KServe
   protocol](https://github.com/kserve/kserve/tree/master/docs/predict-api/v2).
-- A [C API](docs/inference_protocols.md#in-process-triton-server-api)
-  allows Triton to be linked directly into your application for edge
-  and other in-process use cases.
-- A [Java API](docs/inference_protocols.md#java-api) is similar to C API and
-  allows Triton to be linked directly to your Java application.
+- A [C API](docs/inference_protocols.md#in-process-triton-server-api) and
+  [Java API](docs/inference_protocols.md#java-api) allow Triton to link directly into your application for edge and other in-process use cases.
 - [Metrics](docs/metrics.md) indicating GPU utilization, server
   throughput, and server latency. 
-
-**LATEST RELEASE: You are currently on the main branch which tracks
-under-development progress towards the next release. The current release is 
-version [2.21.0](https://github.com/triton-inference-server/server/tree/r22.04)
-and corresponds to the 22.04 container release on 
-[NVIDIA GPU Cloud (NGC)](https://catalog.ngc.nvidia.com/orgs/nvidia/containers/tritonserver).**
 
 ## Quick Example to Launch and Use Triton
 
