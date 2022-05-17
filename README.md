@@ -122,21 +122,14 @@ contains additional documentation, presentations, and examples.
 
 [Triton Architecture](docs/architecture.md) gives a high-level
 overview of the structure and capabilities of the inference
-server. There is also an [FAQ](docs/faq.md). Additional documentation
-is divided into [*user*](#user-documentation) and
-[*developer*](#developer-documentation) sections. The *user*
-documentation describes how to use Triton as an inference solution,
-including information on how to configure Triton, how to organize and
-configure your models, how to use the C++ and Python clients, etc. The
-*developer* documentation describes how to build and test Triton and
-also how Triton can be extended with new functionality.
-
-The Triton [Release
-Notes](https://docs.nvidia.com/deeplearning/triton-inference-server/release-notes/index.html)
-and [Support
+server. Additional Triton Inference Server documentation include:
+- [FAQ](docs/faq.md).
+- [User Guide](docs#user-guide)
+- [Developer Guide](docs#developer-guide)
+- [Release Notes](https://docs.nvidia.com/deeplearning/triton-inference-server/release-notes/index.html)
+- [GPU, Driver, and CUDA Support
 Matrix](https://docs.nvidia.com/deeplearning/dgx/support-matrix/index.html)
-indicate the required versions of the NVIDIA Driver and CUDA, and also
-describe supported GPUs.
+ 
 
 ### Build and Deploy
 
