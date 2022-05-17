@@ -2290,11 +2290,7 @@ class InferHandlerState {
   ~InferHandlerState()
   {
 #ifdef TRITON_ENABLE_TRACING
-    if (trace_ != nullptr) {
-      for (const auto& timestamp : trace_timestamps_) {
-        trace_->CaptureTimestamp(timestamp.first, timestamp.second);
-      }
-    }
+    ClearTraceTimestamps();
 #endif  // TRITON_ENABLE_TRACING
   }
 
@@ -2309,22 +2305,31 @@ class InferHandlerState {
     complete_ = false;
     request_.Clear();
     response_queue_->Reset();
+#ifdef TRITON_ENABLE_TRACING
+    ClearTraceTimestamps();
+#endif  // TRITON_ENABLE_TRACING
   }
 
   void Release()
   {
     context_ = nullptr;
 #ifdef TRITON_ENABLE_TRACING
+    ClearTraceTimestamps();
+#endif  // TRITON_ENABLE_TRACING
+  }
+
+  void ClearTraceTimestamps()
+  {
+#ifdef TRITON_ENABLE_TRACING
     if (trace_ != nullptr) {
       for (const auto& timestamp : trace_timestamps_) {
         trace_->CaptureTimestamp(timestamp.first, timestamp.second);
       }
-      trace_timestamps_.clear();
       trace_.reset();
     }
+    trace_timestamps_.clear();
 #endif  // TRITON_ENABLE_TRACING
   }
-
 
   // Returns whether all the responses from the state
   // are delivered and successfully written on the
