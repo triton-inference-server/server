@@ -1,5 +1,5 @@
 #!/bin/bash
-# Copyright (c) 2019-2022, NVIDIA CORPORATION. All rights reserved.
+# Copyright 2019-2022, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -148,7 +148,7 @@ for BACKEND in ${BACKENDS}; do
         echo -e "\n***\n*** Failed. Expected warmup for stateful model\n***"
         RET=1
     fi
-    grep "warmup error" $SERVER_LOG
+    grep "failed to run warmup" $SERVER_LOG
     if [ $? -eq 0 ]; then
         echo -e "\n***\n*** Failed. Expected no warmup error\n***"
         RET=1
@@ -259,7 +259,7 @@ for BACKEND in ${BACKENDS}; do
             echo -e "\n***\n*** Failed. Expected warmup for string stateful model\n***"
             RET=1
         fi
-        grep "warmup error" $SERVER_LOG
+        grep "failed to run warmup" $SERVER_LOG
         if [ $? -eq 0 ]; then
             echo -e "\n***\n*** Failed. Expected no warmup error\n***"
             RET=1
@@ -320,7 +320,7 @@ for BACKEND in ${BACKENDS}; do
             echo -e "\n***\n*** Failed. Expected warmup for image model\n***"
             RET=1
         fi
-        grep "warmup error" $SERVER_LOG
+        grep "failed to run warmup" $SERVER_LOG
         if [ $? -eq 0 ]; then
             echo -e "\n***\n*** Failed. Expected no warmup error\n***"
             RET=1
@@ -346,6 +346,27 @@ for BACKEND in ${BACKENDS}; do
         wait $SERVER_PID
     fi
 done
+
+# Test warmup sample failure
+rm -fr models && \
+    mkdir models && \
+    cp -r failing_infer models/.
+
+run_server
+if [ "$SERVER_PID" != "0" ]; then
+    echo -e "\n***\n*** Expect fail to start $SERVER\n***"
+    cat $SERVER_LOG
+    exit 1
+fi
+
+set +e
+grep "failed to run warmup sample 'zero sample': An Error Occurred;" $SERVER_LOG
+if [ $? -ne 0 ]; then
+    echo -e "\n***\n*** Failed. Expected no warmup error\n***"
+    cat $SERVER_LOG
+    RET=1
+fi
+set -e
 
 if [ $RET -eq 0 ]; then
   echo -e "\n***\n*** Test Passed\n***"
