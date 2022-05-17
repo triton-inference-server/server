@@ -64,7 +64,7 @@ Major features include:
   developed [KServe
   protocol](https://github.com/kserve/kserve/tree/master/docs/predict-api/v2).
 - A [C API](docs/inference_protocols.md#in-process-triton-server-api) and
-  [Java API](docs/inference_protocols.md#java-api) allow Triton to link directly into your application for edge and other in-process use cases.
+  [Java API](docs/inference_protocols.md#java-bindings-for-in-process-triton-server-api) allow Triton to link directly into your application for edge and other in-process use cases.
 - [Metrics](docs/metrics.md) indicating GPU utilization, server
   throughput, and server latency. 
 
@@ -138,27 +138,60 @@ images.
 - [Build a custom Triton Inference Server Docker container](docs/compose.md)
 - [Build Triton Inference Server from source](docs/build.md#building-on-unsupported-platforms)
 - [Build Triton Inference Server for Windows 10](docs/build.md#building-for-windows-10)
-- Examples for deploying Triton Inference Server with Kubernetes and Helm on [GCP](deploy/gcp/README.md), [AWS](deploy/aws/README.md), and [NVIDIA
-FleetCommand](deploy/fleetcommand/README.md)
+- Examples for deploying Triton Inference Server with Kubernetes and Helm on [GCP](deploy/gcp/README.md), 
+  [AWS](deploy/aws/README.md), and [NVIDIA FleetCommand](deploy/fleetcommand/README.md)
 
-### Model Configuration
+### Use Triton
 
-#### Creating a Model Repository
+#### Preparing Models for Triton Inferencing
 
-#### Preparing Models
+The first step in using Triton to serve your models is to place one or
+more models into a [model repository](docs/model_repository.md). Depending on 
+the type of the model and on what Triton capabilities you want to enable for
+the model, you may need to create a [model
+configuration](docs/model_configuration.md) for the model.  
 
-#### Pipelining Models
+- [Use the Model Analyzer to optimize your model 
+  configuration](https://github.com/triton-inference-server/model_analyzer)
+- [Add custom operations to Triton if needed by your model](docs/custom_operations.md)
+- Enable model pipelining with [Model Ensemble](docs/architecture.md#ensemble-models)
+  and [Business Logic Scripting (BLS)](https://github.com/triton-inference-server/python_backend#business-logic-scripting)
 
-### Configure and Use 
+#### Configure and Use Triton Inference Server
 
-#### Managing Models
+- [TBD] Read tutorial on using Triton Inference Server
+- [TBD] Customize Triton Inference Server for your use case
+- Learn how to [optimizing performance](docs/optimization.md) using the 
+  [Performance Analyzer](docs/perf_analyzer.md) and 
+  [Model Analyzer](https://github.com/triton-inference-server/model_analyzer)
+- Learn how to [manage loading and unloading models](model_management.md)
+- Send requests directly to Triton with the [HTTP/REST JSON-based
+  protocol](docs/inference_protocols.md#httprest-and-grpc-protocols)
 
+#### Client Support and Examples
 
-### Client Support and Examples
+After you have your model(s) available in Triton, you will want to send 
+inference and other requests to Triton from your *client* application. The 
+[Python and C++ client libraries](https://github.com/triton-inference-server/client)
+provide APIs to simplify this communication.
 
+- Review client examples for [C++](https://github.com/triton-inference-server/client/blob/main/src/c%2B%2B/examples),
+  [Python](https://github.com/triton-inference-server/client/blob/main/src/python/examples),
+  and [Java](https://github.com/triton-inference-server/client/blob/main/src/java/src/main/java/triton/client/examples)
+- Configure [HTTP](https://github.com/triton-inference-server/client#http-options)
+  and [gRPC](https://github.com/triton-inference-server/client#grpc-options)
+  client options
+- Send input data (e.g. a jpeg image) directly to Triton in the [body of an HTTP 
+  request without any additional metadata](https://github.com/triton-inference-server/server/blob/main/docs/protocol/extension_binary_data.md#raw-binary-request)
+
+### Extend Triton
+
+TBD
 
 ### OLD Documentation
 ----
+
+Items in this section will be removed
 ### User Documentation
 
 
@@ -170,14 +203,7 @@ perform inferencing using that model. The quickstart also demonstrates
 how [Triton supports both GPU systems and CPU-only
 systems](docs/quickstart.md#run-triton).
 
-The first step in using Triton to serve your models is to place one or
-more models into a [model
-repository](docs/model_repository.md). Optionally, depending on the type
-of the model and on what Triton capabilities you want to enable for
-the model, you may need to create a [model
-configuration](docs/model_configuration.md) for the model.  If your
-model has [custom operations](docs/custom_operations.md) you will need
-to make sure they are loaded correctly by Triton.
+
 
 After you have your model(s) available in Triton, you will want to
 send inference and other requests to Triton from your *client*
