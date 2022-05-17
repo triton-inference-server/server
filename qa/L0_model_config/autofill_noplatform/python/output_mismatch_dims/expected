@@ -1,1 +1,1 @@
-output 'OUTPUT1' has a conflicting dims property.
+model 'output_mismatch_dims', tensor 'OUTPUT1': the model expects dims \[4\] but the model configuration specifies dims \[16\]

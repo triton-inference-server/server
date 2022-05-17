@@ -279,10 +279,16 @@ cases the required portions of the model configuration file can be
 generated automatically by Triton. The required portion of the model
 configuration are those settings shown in the [Minimal Model
 Configuration](#minimal-model-configuration). Specifically, TensorRT,
-TensorFlow saved-model, ONNX, and Python models do not require a model
+TensorFlow saved-model, and ONNX models do not require a model
 configuration file because Triton can derive all the required settings
-automatically. All other model types must provide a model
-configuration file.
+automatically. For Python model,
+[`auto_complete_config`](https://github.com/triton-inference-server/python_backend/#auto_complete_config)
+function can be implemented in Python backend to provide [`max_batch_size`](#maximum-batch-size),
+[`input`](#inputs-and-outputs) and [`output`](#inputs-and-outputs) properties using
+`set_max_batch_size`, `add_input`, and `add_output` functions.
+These properties will allow Triton to load the Python model with [Minimal
+Model Configuration](#minimal-model-configuration) in absence of a configuration file.
+All other model types must provide a model configuration file.
 
 When using --strict-model-config=false you can see the model
 configuration that was generated for a model by using the [model

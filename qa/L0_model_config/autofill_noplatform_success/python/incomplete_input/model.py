@@ -37,10 +37,10 @@ class TritonPythonModel:
         output0 = {'name': 'OUTPUT0', 'data_type': 'TYPE_FP32', 'dims': [4]}
         output1 = {'name': 'OUTPUT1', 'data_type': 'TYPE_FP32', 'dims': [4]}
 
-        pb_utils.set_max_batch_size(auto_complete_model_config, 0)
-        pb_utils.add_input(auto_complete_model_config, input0)
-        pb_utils.add_output(auto_complete_model_config, output0)
-        pb_utils.add_output(auto_complete_model_config, output1)
+        auto_complete_model_config.set_max_batch_size(0)
+        auto_complete_model_config.add_input(input0)
+        auto_complete_model_config.add_output(output0)
+        auto_complete_model_config.add_output(output1)
 
         return auto_complete_model_config
 
