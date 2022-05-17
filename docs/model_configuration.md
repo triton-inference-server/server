@@ -121,14 +121,6 @@ For models that do not support batching, or do not support batching in
 the specific ways described above, *max_batch_size* must be set to
 zero.
 
-When a model is using the auto-complete feature, a default maximum batch size may 
-be set by using the `--backend-config=default-max-batch-size=<int>` command line argument. 
-This allows all models which are capable of batching and which make use of 
-[Auto Generated Model configuration](#auto-generated-model-configuration) to have
-a default maximum batch size. This value is set to 4 by default. While none of the
-officially supported Triton backends implement this feature, backend developers 
-may make use of this value by obtaining it from the TRITONBACKEND_BackendConfig api.
-
 
 ### Inputs and Outputs
 
@@ -307,6 +299,21 @@ Triton only generates the [minimal portion of the model
 configuration](#minimal-model-configuration). You must still provide
 the optional portions of the model configuration by editing the
 config.pbtxt file.
+
+When a model is using the auto-complete feature, a default maximum batch size may 
+be set by using the `--backend-config=default-max-batch-size=<int>` command line argument. 
+This allows all models which are capable of batching and which make use of 
+[Auto Generated Model Configuration](#auto-generated-model-configuration) to have
+a default maximum batch size. This value is set to 2 by default. If the value is
+greater than 1, the [dynamic_batching](#dynamic-batcher) will be set for the model if
+no scheduler is provided in the configuration file. Backend developers may make use of this
+default-max-batch-size by obtaining it from the TRITONBACKEND_BackendConfig api. Currently, the following 
+backends which utilize these default batch values and enable dynamic batching in their
+generated model configurations are:
+
+1. [TensorFlow backend](https://github.com/triton-inference-server/tensorflow_backend)
+2. [Onnxruntime backend](https://github.com/triton-inference-server/onnxruntime_backend)
+
 
 ## Datatypes
 
