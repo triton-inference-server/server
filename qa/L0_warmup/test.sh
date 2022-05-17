@@ -368,6 +368,34 @@ if [ $? -ne 0 ]; then
 fi
 set -e
 
+# Test decoupled model
+rm -fr models && \
+    mkdir models && \
+    cp -r decoupled models/.
+
+run_server
+if [ "$SERVER_PID" == "0" ]; then
+    echo -e "\n***\n*** Failed to start $SERVER\n***"
+    cat $SERVER_LOG
+    exit 1
+fi
+
+set +e
+grep "is running warmup sample 'decoupled sample'" $SERVER_LOG
+if [ $? -ne 0 ]; then
+    echo -e "\n***\n*** Failed. Expected warmup for decoupled model\n***"
+    RET=1
+fi
+grep "failed to run warmup" $SERVER_LOG
+if [ $? -eq 0 ]; then
+    echo -e "\n***\n*** Failed. Expected no warmup error\n***"
+    RET=1
+fi
+set -e
+
+kill $SERVER_PID
+wait $SERVER_PID
+
 if [ $RET -eq 0 ]; then
   echo -e "\n***\n*** Test Passed\n***"
 fi
