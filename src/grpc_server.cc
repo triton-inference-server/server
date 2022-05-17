@@ -2306,6 +2306,8 @@ class InferHandlerState {
     request_.Clear();
     response_queue_->Reset();
 #ifdef TRITON_ENABLE_TRACING
+    // Clear trace_timestamps_ here so they do not grow indefinitely since
+    // states are re-used for performance.
     ClearTraceTimestamps();
 #endif  // TRITON_ENABLE_TRACING
   }
