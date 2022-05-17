@@ -441,6 +441,37 @@ SagemakerAPIServer::SageMakerMMEListModel(evhtp_request_t* req)
 }
 
 void
+SagemakerAPIServer::SageMakerMMEHandlLoadError(
+    evhtp_request_t* req, TRITONSERVER_Error* load_err)
+{
+  const char* message = TRITONSERVER_ErrorMessage(load_err);
+  std::string error_string(message);
+
+  const std::vector<std::string> error_messages{
+      "CUDA out of memory", /* pytorch */
+      "CUDA_OUT_OF_MEMORY", /* tensorflow */
+      "Out of memory",      /* generic */
+  };
+
+  EVBufferAddErrorJson(req->buffer_out, load_err);
+
+  for (long unsigned int i = 0; i < error_messages.size(); i++) {
+    if (error_string.find(error_messages[i]) != std::string::npos) {
+      /* Return a 507*/
+      evhtp_send_reply(req, 507);
+      LOG_VERBOSE(1)
+          << "Received an OOM error during LOAD MODEL. Returning a 507.";
+      return;
+    } else {
+      /* Return a 400*/
+      evhtp_send_reply(req, EVHTP_RES_BADREQ);
+      return;
+    }
+  }
+}
+
+
+void
 SagemakerAPIServer::SageMakerMMELoadModel(
     evhtp_request_t* req,
     const std::unordered_map<std::string, std::string> parse_map)
@@ -534,8 +565,7 @@ SagemakerAPIServer::SageMakerMMELoadModel(
     TRITONSERVER_ErrorDelete(err);
     return;
   } else if (err != nullptr) {
-    EVBufferAddErrorJson(req->buffer_out, err);
-    evhtp_send_reply(req, EVHTP_RES_BADREQ);
+    SageMakerMMEHandlLoadError(req, err);
   } else {
     std::lock_guard<std::mutex> lock(mutex_);
 
