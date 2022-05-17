@@ -2287,12 +2287,7 @@ class InferHandlerState {
     Reset(context, start_step);
   }
 
-  ~InferHandlerState()
-  {
-#ifdef TRITON_ENABLE_TRACING
-    ClearTraceTimestamps();
-#endif  // TRITON_ENABLE_TRACING
-  }
+  ~InferHandlerState() { ClearTraceTimestamps(); }
 
   void Reset(
       const std::shared_ptr<Context>& context, Steps start_step = Steps::START)
@@ -2305,19 +2300,15 @@ class InferHandlerState {
     complete_ = false;
     request_.Clear();
     response_queue_->Reset();
-#ifdef TRITON_ENABLE_TRACING
     // Clear trace_timestamps_ here so they do not grow indefinitely since
     // states are re-used for performance.
     ClearTraceTimestamps();
-#endif  // TRITON_ENABLE_TRACING
   }
 
   void Release()
   {
     context_ = nullptr;
-#ifdef TRITON_ENABLE_TRACING
     ClearTraceTimestamps();
-#endif  // TRITON_ENABLE_TRACING
   }
 
   void ClearTraceTimestamps()
