@@ -1,4 +1,4 @@
-# Copyright (c) 2020, NVIDIA CORPORATION. All rights reserved.
+# Copyright (c) 2022, NVIDIA CORPORATION. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -62,11 +62,13 @@ class UnknownRankTest(tu.TestResultCollector):
         try:
             self.infer_unknown(model_name, tensor_shape)
             self.fail(
-                "Found success when expected failure with model given wrong input tensor [1,2] for input [-1,1]."
+                "Found success when expected failure with model given " \
+                "wrong input tensor [1,2] for input [-1,1]."
             )
         except InferenceServerException as ex:
             self.assertIn(
-                "unexpected shape for input \'INPUT\' for model \'unknown_rank_wrong_output\'. Expected [-1,1], got [1,2]",
+                "unexpected shape for input \'INPUT\' for model " \
+                "\'unknown_rank_wrong_output\'. Expected [-1,1], got [1,2]",
                 ex.message())
 
 
