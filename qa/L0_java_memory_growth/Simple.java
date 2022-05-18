@@ -394,6 +394,13 @@ public class Simple {
       } else {
         return false;
       }
+      if((memory_snapshots.get(index_90) / 1E6) >= 40){
+        System.out.println("Exceeded allowed memory (40MB), got " +
+          memory_allocation_delta_mb + "MB");
+        return false;
+      } else {
+        return true;
+      }
     }
 
     static void
@@ -834,7 +841,7 @@ public class Simple {
 
       Runnable runnable =
         () -> { 
-          if(ValidateMemoryGrowth(.05f)){
+          if(ValidateMemoryGrowth(.25f)){
             System.out.println("Memory growth test passed");
           } else {
             System.out.println("Memory growth test FAILED");
