@@ -65,8 +65,14 @@ class TritonPythonModel:
 
         next_gpu_output = pb_utils.Tensor("NEXT_GPU_OUTPUT", gpu_output[1:])
         infer_response = pb_utils.InferenceResponse([output0, next_gpu_output])
+
+        # Number of times to repeat the response
+        response_repeat = 2
+        for _ in range(response_repeat):
+            response_sender.send(infer_response)
+
         response_sender.send(
-            infer_response, flags=pb_utils.TRITONSERVER_RESPONSE_COMPLETE_FINAL)
+            flags=pb_utils.TRITONSERVER_RESPONSE_COMPLETE_FINAL)
 
         with self.inflight_thread_count_lck:
             self.inflight_thread_count -= 1

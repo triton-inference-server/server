@@ -84,10 +84,18 @@ class IOTest(tu.TestResultCollector):
                         inputs[1].set_data_from_numpy(gpu_output)
                         client.async_stream_infer(model_name=model_name,
                                                   inputs=inputs)
-                        result = user_data._completed_requests.get()
-                        output0 = result.as_numpy('OUTPUT0')
-                        self.assertIsNotNone(output0)
-                        self.assertTrue(np.all(output0 == input0))
+                        if TRIAL == 'default':
+                            result = user_data._completed_requests.get()
+                            output0 = result.as_numpy('OUTPUT0')
+                            self.assertIsNotNone(output0)
+                            self.assertTrue(np.all(output0 == input0))
+                        else:
+                            response_repeat = 2
+                            for _ in range(response_repeat):
+                                result = user_data._completed_requests.get()
+                                output0 = result.as_numpy('OUTPUT0')
+                                self.assertIsNotNone(output0)
+                                self.assertTrue(np.all(output0 == input0))
 
     def test_ensemble_io(self):
         # Only run the shared memory leak detection with the default trial
