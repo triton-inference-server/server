@@ -71,31 +71,27 @@ Major features include:
 ## Quick Example to Launch and Use Triton
 
 ```bash
-# Download the latest Triton Inference Server container and repo in one console
-docker pull nvcr.io/nvidia/tritonserver:22.04-py3
-
+# Create the example model repository 
 git clone -b r22.04 https://github.com/triton-inference-server/server.git
 
-# Create a model repository
 cd server/docs/examples
 
 ./fetch_models.sh
 
-# Run Triton. For CPU only systems, remove `--gpus=1` option.
-docker run --gpus=1 --rm -p8000:8000 -p8001:8001 -p8002:8002 -v/full/path/to/docs/examples/model_repository:/models nvcr.io/nvidia/tritonserver:22.04-py3 tritonserver --model-repository=/models
+# In one console, pull the Triton container and start Triton Inference Server
+docker pull nvcr.io/nvidia/tritonserver:22.04-py3
 
-# Verify Triton is running corectly
-curl -v localhost:8000/v2/health/ready
+docker run --gpus=1 --rm -p8000:8000 -p8001:8001 -p8002:8002 -v/full/path/to/docs/examples/model_repository:/models nvcr.io/nvidia/tritonserver:22.04-py3 tritonserver --model-repository=/models
 
 # In a separate console, download and launch the latest SDK container for Client examples
 docker pull nvcr.io/nvidia/tritonserver:22.04-py3-sdk
 
 docker run -it --rm --net=host nvcr.io/nvidia/tritonserver:22.04-py3-sdk
 
-# Run the image classification example
+# Run the client to inference an image classification example
 /workspace/install/bin/image_client -m densenet_onnx -c 3 -s INCEPTION /workspace/images/mug.jpg
 
-# Returns
+# Inference should return the following
 Image '/workspace/images/mug.jpg':
     15.346230 (504) = COFFEE MUG
     13.224326 (968) = CUP
@@ -120,7 +116,7 @@ contains additional documentation, presentations, and examples.
 [Triton Architecture](docs/architecture.md) gives a high-level
 overview of the structure and capabilities of the inference
 server. Additional Triton Inference Server documentation include:
-- [FAQ](docs/faq.md).
+- [FAQ](docs/faq.md)
 - [User Guide](docs#user-guide)
 - [Developer Guide](docs#developer-guide)
 - [Release Notes](https://docs.nvidia.com/deeplearning/triton-inference-server/release-notes/index.html)
@@ -141,7 +137,7 @@ images.
 - Examples for deploying Triton Inference Server with Kubernetes and Helm on [GCP](deploy/gcp/README.md), 
   [AWS](deploy/aws/README.md), and [NVIDIA FleetCommand](deploy/fleetcommand/README.md)
 
-### Use Triton
+### Using Triton
 
 #### Preparing Models for Triton Inferencing
 
