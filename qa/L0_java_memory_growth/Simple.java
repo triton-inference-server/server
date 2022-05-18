@@ -394,8 +394,8 @@ public class Simple {
       } else {
         return false;
       }
-      if((memory_snapshots.get(index_90) / 1E6) >= 40){
-        System.out.println("Exceeded allowed memory (40MB), got " +
+      if((memory_snapshots.get(index_90) / 1E6) >= 30){
+        System.out.println("Exceeded allowed memory (30MB), got " +
           memory_allocation_delta_mb + "MB");
         return false;
       } else {
