@@ -1,5 +1,5 @@
 name: "conflicting_max_batch_size"
-max_batch_size: 2
+max_batch_size: 6
 
 input [
   {

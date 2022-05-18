@@ -1,1 +1,1 @@
-configuration specified max_batch_size 2 but Python model specified max_batch_size 4
+configuration specified max_batch_size 6 but Python model only specified max_batch_size 4
