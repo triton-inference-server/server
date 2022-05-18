@@ -38,7 +38,8 @@ set -e
 
 MODEL_REPO=`pwd`/models
 SAMPLES_REPO=`pwd`/javacpp-presets/tritonserver/samples
-cp Simple.java $SAMPLES_REPO
+cp MemoryGrowthTest.java $SAMPLES_REPO/Simple.java
+sed -i 's/MemoryGrowthTest/Simple/g' $SAMPLES_REPO/Simple.java
 # Modify the pom to not force include any cuda dependencies
 sed -i '/<dependency>/ {
     :start
@@ -52,6 +53,7 @@ BASE_COMMAND="mvn clean compile -f $SAMPLES_REPO exec:java -Djavacpp.platform=li
 source ../common/util.sh
 
 # Create local model repository
+rm -rf ${MODEL_REPO}
 mkdir ${MODEL_REPO}
 cp -r `pwd`/../L0_simple_ensemble/models/simple ${MODEL_REPO}/.
 
@@ -83,13 +85,15 @@ CLIENT_LOG="./client_$LOG_IDX.log"
 
 # Longer-running memory growth test 
 ITERS=1000000
+MAX_MEM_GROWTH=10
 if [ "$TRITON_PERF_LONG" == 1 ]; then
     # ~1 day
     ITERS=125000000
+    MAX_MEM_GROWTH=25
 fi
 
 echo -e "\nRunning Memory Growth Test, $ITERS Iterations\n"
-$BASE_COMMAND -Dexec.args="-r $MODEL_REPO -c -i $ITERS" >>$CLIENT_LOG 2>&1
+$BASE_COMMAND -Dexec.args="-r $MODEL_REPO -c -i $ITERS --max-growth $MAX_MEM_GROWTH" >>$CLIENT_LOG 2>&1
 if [ $? -ne 0 ]; then
     echo -e "\n***\n*** Failed to run memory growth test to complete\n***"
     RET=1

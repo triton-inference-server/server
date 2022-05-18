@@ -32,7 +32,7 @@ import org.bytedeco.javacpp.*;
 import org.bytedeco.tritonserver.tritonserver.*;
 import static org.bytedeco.tritonserver.global.tritonserver.*;
 
-public class Simple {
+public class MemoryGrowthTest {
     static final double TRITON_MIN_COMPUTE_CAPABILITY = 6.0;
     private static boolean done = false;
 
@@ -53,6 +53,9 @@ public class Simple {
 
     static boolean enforce_memory_type = false;
     static int requested_memory_type;
+    // Parameters for percentile range to include (exclude outliers)
+    const int max_percentile = 90;
+    const int min_percentile = 10;
 
     static class TRITONSERVER_ServerDeleter extends TRITONSERVER_Server {
         public TRITONSERVER_ServerDeleter(TRITONSERVER_Server p) { super(p); deallocator(new DeleteDeallocator(this)); }
@@ -69,7 +72,7 @@ public class Simple {
         System.err.println(msg);
       }
 
-      System.err.println("Usage: java " + Simple.class.getSimpleName() + " [options]");
+      System.err.println("Usage: java " + MemoryGrowthTest.class.getSimpleName() + " [options]");
       System.err.println("\t-i Set number of iterations");
       System.err.println("\t-m <\"system\"|\"pinned\"|gpu>"
                        + " Enforce the memory type for input and output tensors."
@@ -77,6 +80,8 @@ public class Simple {
                        + " will be based on the model's preferred type.");
       System.err.println("\t-v Enable verbose logging");
       System.err.println("\t-r [model repository absolute path]");
+      System.err.println("\t--max-growth Specify maximum allowed memory growth (%)");
+      System.err.println("\t--max-memory Specify maximum allowed memory (MB)");
 
       System.exit(1);
     }
@@ -353,10 +358,11 @@ public class Simple {
 
     /**
     Returns whether the memory growth is within the acceptable range
-    @param  max_allowed     Parameter to represent the maximum allowed percentage growth
+    @param  max_float_allowed     Maximum allowed memory growth (%)
+    @param  max_mem_allowed       Maximum allowed memory (MB)
      */
     static boolean
-    ValidateMemoryGrowth(float max_allowed){
+    ValidateMemoryGrowth(float max_growth_allowed, int max_mem_allowed){
       // Allocate list starting capacity to hold up to 24 hours worth of snapshots.
       List<Double> memory_snapshots = new ArrayList<Double>(20000);
       while(!done){
@@ -378,29 +384,32 @@ public class Simple {
 
       // Measure memory growth without outliers by taking difference
       // between 90th percentile and 10th percentile memory usage.
+      const int bytes_in_mb = 1E6;
       Collections.sort(memory_snapshots);
-      int index_90 = ((int) Math.ceil(90.0 / 100.0 * memory_snapshots.size())) - 1;
-      int index_10 = ((int) Math.ceil(10.0 / 100.0 * memory_snapshots.size())) - 1;
-      double memory_allocation_delta = memory_snapshots.get(index_90) - memory_snapshots.get(index_10);
-      double memory_allocation_delta_mb = memory_allocation_delta / 1E6;
-      double memory_allocation_delta_percent = memory_allocation_delta / memory_snapshots.get(index_90);
+      int index_max = ((int) Math.ceil(max_percentile / 100.0 * memory_snapshots.size())) - 1;
+      int index_min = ((int) Math.ceil(min_percentile / 100.0 * memory_snapshots.size())) - 1;
+      double memory_allocation_delta = memory_snapshots.get(index_max) - memory_snapshots.get(index_min);
+      double memory_allocation_delta_mb = memory_allocation_delta / bytes_in_mb;
+      double memory_allocation_delta_percent = memory_allocation_delta / memory_snapshots.get(index_max);
 
       System.out.println("Change in memory allocation (MB): " +
           memory_allocation_delta_mb + ", " +
-          memory_allocation_delta_percent + "%");
+          (memory_allocation_delta_percent * 100) + "%");
 
-      if(memory_allocation_delta_percent <= max_allowed){
-        return true;
-      } else {
-        return false;
+      boolean passed = true;
+
+      if(memory_allocation_delta_percent >= max_growth_allowed){
+        passed = false;
+        System.out.println("Exceeded allowed memory growth (" +
+          (max_growth_allowed * 100) + "%)");
       }
-      if((memory_snapshots.get(index_90) / 1E6) >= 30){
-        System.out.println("Exceeded allowed memory (30MB), got " +
-          memory_allocation_delta_mb + "MB");
-        return false;
-      } else {
-        return true;
+
+      if((memory_snapshots.get(index_max) / bytes_in_mb) >= max_mem_allowed){
+        passed = false;
+        System.out.println("Exceeded allowed memory (" + max_mem_allowed + 
+          "MB), got " + memory_allocation_delta_mb + "MB");
       }
+      return passed;
     }
 
     static void
@@ -628,6 +637,8 @@ public class Simple {
     public static void
     main(String[] args) throws Exception
     {
+      float max_growth_allowed = .10f;
+      int max_mem_allowed = 30;
       int num_iterations = 1000000;
       String model_repository_path = null;
       int verbose_level = 0;
@@ -671,6 +682,24 @@ public class Simple {
             break;
           case "-?":
             Usage(null);
+            break;
+          case "--max-growth":
+            i++;
+            try {
+              max_growth_allowed = Integer.parseInt(args[i]) / 100;
+            } catch (NumberFormatException e){
+              Usage(
+                  "--max-growth must be used to specify allowed memory growth (%)");
+            }
+            break;
+          case "--max-memory":
+            i++;
+            try {
+              max_mem_allowed = Integer.parseInt(args[i]);
+            } catch (NumberFormatException e){
+              Usage(
+                  "--max-memory must be used to specify maximum allowed memory (MB)");
+            }
             break;
         }
       }
@@ -841,7 +870,7 @@ public class Simple {
 
       Runnable runnable =
         () -> { 
-          if(ValidateMemoryGrowth(.25f)){
+          if(ValidateMemoryGrowth(.25f, 30)){
             System.out.println("Memory growth test passed");
           } else {
             System.out.println("Memory growth test FAILED");
