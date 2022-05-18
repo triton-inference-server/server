@@ -45,19 +45,30 @@ class UnknownRankTest(tu.TestResultCollector):
                                         np_to_triton_dtype(input_data.dtype))
         ]
         inputs[0].set_data_from_numpy(input_data)
-        print('Raw inputs: ' + str(input_data))
         results = client.infer(model_name, inputs)
         self.assertTrue(np.array_equal(results.as_numpy('OUTPUT'), input_data))
-        print('Raw response for rseult: ' + str(results.get_response()))
-        print('Results as numpy: ' + str(results.as_numpy('OUTPUT')))
 
     def test_success(self):
         model_name = "unknown_rank_success"
-        tensor_shape = (1,1)
+        tensor_shape = (1, 1)
         try:
             self.infer_unknown(model_name, tensor_shape)
         except InferenceServerException as ex:
             self.assertTrue(False, "unexpected error {}".format(ex))
+
+    def test_wrong_input(self):
+        model_name = "unknown_rank_wrong_output"
+        tensor_shape = (1, 2)
+        try:
+            self.infer_unknown(model_name, tensor_shape)
+            self.fail(
+                "Found success when expected failure with model given wrong input tensor [1,2] for input [-1,1]."
+            )
+        except InferenceServerException as ex:
+            self.assertIn(
+                "unexpected shape for input \'INPUT\' for model \'unknown_rank_wrong_output\'. Expected [-1,1], got [1,2]",
+                ex.message())
+
 
 if __name__ == '__main__':
     unittest.main()
