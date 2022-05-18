@@ -37,11 +37,13 @@ and corresponds to the 22.04 container release on
 [NVIDIA GPU Cloud (NGC)](https://catalog.ngc.nvidia.com/orgs/nvidia/containers/tritonserver).**
 
 ----
-Triton Inference Server is open source and provides a cloud and edge inferencing
-solution for CPUs, GPUs, and AWS Inferentia. Triton is available as a docker 
-container and supports an HTTP/REST and GRPC protocol, as well as a shared 
-library that allows the full functionality of Triton to be included directly in 
-an application and used in-process.
+Triton Inference Server is an inference serving software that streamlines AI 
+inferencing. Triton enables teams to deploy any AI model from multiple deep 
+learning and machine learning frameworks, including TensorFlow, PyTorch, ONNX, 
+OpenVINO, Python and more. Triton supports inference across cloud, data center,
+edge and embedded devices on NVIDIA GPUs, x86 and ARM CPU, or AWS Inferentia. 
+Triton delivers optimized performance for many query types, including real time,
+batched, ensembles and audio/video streaming.
 
 Major features include:
 
@@ -68,27 +70,26 @@ Major features include:
 - [Metrics](docs/metrics.md) indicating GPU utilization, server
   throughput, and server latency. 
 
-## Quick Example to Launch and Use Triton
+## Serve a Model in 3 Easy Steps
 
 ```bash
-# Create the example model repository 
+# Step 1: Create the example model repository 
 git clone -b r22.04 https://github.com/triton-inference-server/server.git
 
 cd server/docs/examples
 
 ./fetch_models.sh
 
-# In one console, pull the Triton container and start Triton Inference Server
+# Step 2: Launch triton from the NGC Triton container
 docker pull nvcr.io/nvidia/tritonserver:22.04-py3
 
 docker run --gpus=1 --rm -p8000:8000 -p8001:8001 -p8002:8002 -v/full/path/to/docs/examples/model_repository:/models nvcr.io/nvidia/tritonserver:22.04-py3 tritonserver --model-repository=/models
 
-# In a separate console, download and launch the latest SDK container for Client examples
+# Step 3: In a separate console, launch the image_client example from the NGC Triton SDK container
 docker pull nvcr.io/nvidia/tritonserver:22.04-py3-sdk
 
 docker run -it --rm --net=host nvcr.io/nvidia/tritonserver:22.04-py3-sdk
 
-# Run the client to inference an image classification example
 /workspace/install/bin/image_client -m densenet_onnx -c 3 -s INCEPTION /workspace/images/mug.jpg
 
 # Inference should return the following
@@ -110,19 +111,6 @@ page on GitHub. The
 contains additional documentation, presentations, and examples.
  
 ## Documentation
-
-### Overview
-
-[Triton Architecture](docs/architecture.md) gives a high-level
-overview of the structure and capabilities of the inference
-server. Additional Triton Inference Server documentation include:
-- [FAQ](docs/faq.md)
-- [User Guide](docs#user-guide)
-- [Developer Guide](docs#developer-guide)
-- [Release Notes](https://docs.nvidia.com/deeplearning/triton-inference-server/release-notes/index.html)
-- [GPU, Driver, and CUDA Support
-Matrix](https://docs.nvidia.com/deeplearning/dgx/support-matrix/index.html)
- 
 
 ### Build and Deploy
 
@@ -183,6 +171,18 @@ provide APIs to simplify this communication.
 ### Extend Triton
 
 TBD
+
+### Overview
+
+[Triton Architecture](docs/architecture.md) gives a high-level
+overview of the structure and capabilities of the inference
+server. Additional Triton Inference Server documentation include:
+- [FAQ](docs/faq.md)
+- [User Guide](docs#user-guide)
+- [Developer Guide](docs#developer-guide)
+- [Release Notes](https://docs.nvidia.com/deeplearning/triton-inference-server/release-notes/index.html)
+- [GPU, Driver, and CUDA Support
+Matrix](https://docs.nvidia.com/deeplearning/dgx/support-matrix/index.html)
 
 ### OLD Documentation
 ----
