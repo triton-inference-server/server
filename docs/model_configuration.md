@@ -648,7 +648,7 @@ execution as described above when the ensemble receives multiple requests.
 ## CUDA Compute Capability
 
 Similar to the `default_model_filename` field, you can optionally specify the 
-`cc_model_filenames` field to map the server's 
+`cc_model_filenames` field to map the GPU's
 [CUDA Compute Capability](https://developer.nvidia.com/cuda-gpus) 
 to a correspoding model filename at model load time. This is particularly 
 useful for TensorRT models, since they are generally tied to a specific 
