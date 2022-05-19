@@ -59,12 +59,12 @@ cp -r $DATADIR/libtorch_float32_float32_float32 models/libtorch_no_output_index 
     sed -i 's/OUTPUT__0/OUTPUT0/' models/libtorch_no_output_index/config.pbtxt && \
     sed -i 's/OUTPUT__1/OUTPUT1/' models/libtorch_no_output_index/config.pbtxt
 
-cp -r $DATADIR/libtorch_float32_float32_float32 models/libtorch_no_arguements_output_index && \
-    sed -i 's/libtorch_float32_float32_float32/libtorch_no_arguements_output_index/' models/libtorch_no_arguements_output_index/config.pbtxt && \
-    sed -i 's/INPUT0/INPUTA/' models/libtorch_no_arguements_output_index/config.pbtxt && \
-    sed -i 's/INPUT1/INPUTB/' models/libtorch_no_arguements_output_index/config.pbtxt && \
-    sed -i 's/OUTPUT__0/OUTPUTA/' models/libtorch_no_arguements_output_index/config.pbtxt && \
-    sed -i 's/OUTPUT__1/OUTPUTB/' models/libtorch_no_arguements_output_index/config.pbtxt
+cp -r $DATADIR/libtorch_float32_float32_float32 models/libtorch_no_arguments_output_index && \
+    sed -i 's/libtorch_float32_float32_float32/libtorch_no_arguments_output_index/' models/libtorch_no_arguments_output_index/config.pbtxt && \
+    sed -i 's/INPUT0/INPUTA/' models/libtorch_no_arguments_output_index/config.pbtxt && \
+    sed -i 's/INPUT1/INPUTB/' models/libtorch_no_arguments_output_index/config.pbtxt && \
+    sed -i 's/OUTPUT__0/OUTPUTA/' models/libtorch_no_arguments_output_index/config.pbtxt && \
+    sed -i 's/OUTPUT__1/OUTPUTB/' models/libtorch_no_arguments_output_index/config.pbtxt
 
 cp -r $DATADIR/libtorch_float32_float32_float32 models/libtorch_mix_index && \
     sed -i 's/libtorch_float32_float32_float32/libtorch_mix_index/' models/libtorch_mix_index/config.pbtxt && \
@@ -72,15 +72,15 @@ cp -r $DATADIR/libtorch_float32_float32_float32 models/libtorch_mix_index && \
     sed -i 's/INPUT1/INPUT__1/' models/libtorch_mix_index/config.pbtxt && \
     sed -i 's/OUTPUT__0/OUTPUTA/' models/libtorch_mix_index/config.pbtxt
 
-cp -r $DATADIR/libtorch_float32_float32_float32 models/libtorch_mix_arguements && \
-    sed -i 's/libtorch_float32_float32_float32/libtorch_mix_arguements/' models/libtorch_mix_arguements/config.pbtxt && \
-    sed -i 's/INPUT1/INPUTB/' models/libtorch_mix_arguements/config.pbtxt && \
-    sed -i 's/OUTPUT__0/OUTPUTA/' models/libtorch_mix_arguements/config.pbtxt
+cp -r $DATADIR/libtorch_float32_float32_float32 models/libtorch_mix_arguments && \
+    sed -i 's/libtorch_float32_float32_float32/libtorch_mix_arguments/' models/libtorch_mix_arguments/config.pbtxt && \
+    sed -i 's/INPUT1/INPUTB/' models/libtorch_mix_arguments/config.pbtxt && \
+    sed -i 's/OUTPUT__0/OUTPUTA/' models/libtorch_mix_arguments/config.pbtxt
 
-cp -r $DATADIR/libtorch_float32_float32_float32 models/libtorch_mix_arguements_index && \
-    sed -i 's/libtorch_float32_float32_float32/libtorch_mix_arguements_index/' models/libtorch_mix_arguements_index/config.pbtxt && \
-    sed -i 's/INPUT1/INPUT__1/' models/libtorch_mix_arguements_index/config.pbtxt && \
-    sed -i 's/OUTPUT__0/OUTPUT0/' models/libtorch_mix_arguements_index/config.pbtxt
+cp -r $DATADIR/libtorch_float32_float32_float32 models/libtorch_mix_arguments_index && \
+    sed -i 's/libtorch_float32_float32_float32/libtorch_mix_arguments_index/' models/libtorch_mix_arguments_index/config.pbtxt && \
+    sed -i 's/INPUT1/INPUT__1/' models/libtorch_mix_arguments_index/config.pbtxt && \
+    sed -i 's/OUTPUT__0/OUTPUT0/' models/libtorch_mix_arguments_index/config.pbtxt
 
 cp -r $DATADIR/libtorch_float32_float32_float32 models/libtorch_unordered_index && \
     sed -i 's/libtorch_float32_float32_float32/libtorch_unordered_index/' models/libtorch_unordered_index/config.pbtxt && \

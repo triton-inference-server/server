@@ -145,7 +145,7 @@ model files, the "name" attribute of inputs/outputs in the configuration must
 follow specific naming conventions. These are detailed below.
 
 1. [Only for Inputs] When the input is not a Dictionary of Tensors, the input
-names in the configuration file can mirror the names of the input arguements to
+names in the configuration file should mirror the names of the input arguments to
 the forward function in the model's definition.
 
 For example, if the forward function for the Torchscript model was defined as
@@ -156,8 +156,8 @@ For example, if the forward function for the Torchscript model was defined as
 integer index that refers to the position of the corresponding input/output.
 
 This means that if there are two inputs and two outputs, the first and second
-inputs would could named "INPUT__0" and "INPUT__1" and the first and second
-outputs can be named "OUTPUT__0" and "OUTPUT__1" respectively.
+inputs can be named "INPUT__0" and "INPUT__1" and the first and second outputs
+can be named "OUTPUT__0" and "OUTPUT__1" respectively.
 
 3. If all inputs (or outputs) do not follow the same naming convention, then we
 enforce strict ordering from the model configuration i.e. we assume the order of
@@ -174,7 +174,7 @@ example, if there is a model that expects the input of the form:
 {'A': tensor1, 'B': tensor2}
 ```
 
-The input names in the configuration in this case must not to follow the above
+The input names in the configuration in this case must not follow the above
 naming conventions `<name>__<index>`. Instead, the names of the inputs in this
 case must map to the string value 'key' for that specific tensor. For this case,
 the inputs would be "A" and "B", where input "A" refers to value corresponding to

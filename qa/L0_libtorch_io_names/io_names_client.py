@@ -92,21 +92,21 @@ class IONamingConvention(tu.TestResultCollector):
         io_names = ["INPUT0", "INPUT1", "OUTPUT0", "OUTPUT1"]
         self._infer_helper("libtorch_no_output_index", io_names)
 
-    def test_no_arguements_no_output_index(self):
+    def test_no_arguments_no_output_index(self):
         io_names = ["INPUTA", "INPUTB", "OUTPUTA", "OUTPUTB"]
-        self._infer_helper("libtorch_no_arguements_output_index", io_names)
+        self._infer_helper("libtorch_no_arguments_output_index", io_names)
 
     def test_mix_index(self):
         io_names = ["INPUTA", "INPUT__1", "OUTPUTA", "OUTPUT__1"]
         self._infer_helper("libtorch_mix_index", io_names)
 
-    def test_mix_arguements(self):
+    def test_mix_arguments(self):
         io_names = ["INPUT0", "INPUTB", "OUTPUTA", "OUTPUT__1"]
-        self._infer_helper("libtorch_mix_arguements", io_names)
+        self._infer_helper("libtorch_mix_arguments", io_names)
 
-    def test_mix_arguements_index(self):
+    def test_mix_arguments_index(self):
         io_names = ["INPUT0", "INPUT__1", "OUTPUT0", "OUTPUT__1"]
-        self._infer_helper("libtorch_mix_arguements_index", io_names)
+        self._infer_helper("libtorch_mix_arguments_index", io_names)
 
     def test_unordered_index(self):
         io_names = ["INPUT1", "INPUT0", "OUT__1", "OUT__0"]

@@ -60,7 +60,7 @@ git clone --single-branch --depth=1 -b $TRITON_COMMON_REPO_TAG \
 mkdir core && cp common/protobuf/*.proto core/.
 
 # Requires protoc and protoc-gen-go plugin: https://github.com/golang/protobuf#installation
-# Use "M" arguements since go_package is not specified in .proto files.
+# Use "M" arguments since go_package is not specified in .proto files.
 # As mentioned here: https://developers.google.com/protocol-buffers/docs/reference/go-generated#package
 GO_PACKAGE="nvidia_inferenceserver"
 protoc -I core --go_out=plugins=grpc:${PACKAGE_PATH} --go_opt=Mgrpc_service.proto=./${GO_PACKAGE} \
