@@ -86,7 +86,7 @@ class SagemakerAPIServer : public HTTPAPIServer {
       evhtp_request_t* req,
       const std::unordered_map<std::string, std::string> parse_map);
 
-  void SageMakerMMEHandlLoadError(
+  void SageMakerMMEHandleLoadError(
       evhtp_request_t* req, TRITONSERVER_Error* load_err);
 
   void SageMakerMMEUnloadModel(evhtp_request_t* req, const char* model_name);

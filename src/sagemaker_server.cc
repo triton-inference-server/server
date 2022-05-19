@@ -441,7 +441,7 @@ SagemakerAPIServer::SageMakerMMEListModel(evhtp_request_t* req)
 }
 
 void
-SagemakerAPIServer::SageMakerMMEHandlLoadError(
+SagemakerAPIServer::SageMakerMMEHandleLoadError(
     evhtp_request_t* req, TRITONSERVER_Error* load_err)
 {
   const char* message = TRITONSERVER_ErrorMessage(load_err);
@@ -570,7 +570,7 @@ SagemakerAPIServer::SageMakerMMELoadModel(
     TRITONSERVER_ErrorDelete(err);
     return;
   } else if (err != nullptr) {
-    SageMakerMMEHandlLoadError(req, err);
+    SageMakerMMEHandleLoadError(req, err);
   } else {
     std::lock_guard<std::mutex> lock(mutex_);
 
