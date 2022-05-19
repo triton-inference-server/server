@@ -501,6 +501,7 @@ SagemakerAPIServer::SageMakerMMELoadModel(
             TRITONSERVER_ErrorNew(
                 TRITONSERVER_ERROR_INTERNAL,
                 "More than one version or model directories found. Note that "
+                "hidden folders are not allowed and "
                 "Ensemble models are not supported in SageMaker MME mode."));
         closedir(dir);
         return;
