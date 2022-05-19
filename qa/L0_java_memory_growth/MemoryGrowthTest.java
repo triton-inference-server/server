@@ -36,7 +36,7 @@ public class MemoryGrowthTest {
     static final double TRITON_MIN_COMPUTE_CAPABILITY = 6.0;
     private static boolean done = false;
     static float max_growth_allowed = .10f;
-    static int max_mem_allowed = 30;
+    static int max_mem_allowed = 20;
 
     static void FAIL(String MSG) {
         System.err.println("failure: " + MSG);

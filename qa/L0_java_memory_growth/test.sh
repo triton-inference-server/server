@@ -38,8 +38,9 @@ set -e
 
 MODEL_REPO=`pwd`/models
 SAMPLES_REPO=`pwd`/javacpp-presets/tritonserver/samples
-cp MemoryGrowthTest.java $SAMPLES_REPO/Simple.java
-sed -i 's/MemoryGrowthTest/Simple/g' $SAMPLES_REPO/Simple.java
+rm $SAMPLES_REPO/Simple.java
+cp MemoryGrowthTest.java $SAMPLES_REPO/MemoryGrowthTest.java
+sed -i 's/Simple/MemoryGrowthTest/g' $SAMPLES_REPO/pom.xml
 # Modify the pom to not force include any cuda dependencies
 sed -i '/<dependency>/ {
     :start
@@ -85,11 +86,11 @@ CLIENT_LOG="./client_$LOG_IDX.log"
 
 # Longer-running memory growth test 
 ITERS=1000000
-MAX_MEM_GROWTH=10
+MAX_MEM_GROWTH_MB=10
 if [ "$TRITON_PERF_LONG" == 1 ]; then
     # ~1 day
     ITERS=125000000
-    MAX_MEM_GROWTH=25
+    MAX_MEM_GROWTH_MB=25
 fi
 
 echo -e "\nRunning Memory Growth Test, $ITERS Iterations\n"
