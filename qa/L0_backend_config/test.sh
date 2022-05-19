@@ -49,6 +49,7 @@ source ../common/util.sh
 
 SERVER_LOG_BASE="./inference_server"
 rm -f $SERVER_LOG_BASE*
+rm -f *.out
 
 COMMON_ARGS="--model-repository=`pwd`/models --strict-model-config=false --log-verbose=1 "
 
@@ -154,6 +155,19 @@ done
 # Sepcific backend tests
 # 
 
+# While inference server is running, save the 
+# config of the 'no_config' model to the TRIAL 
+# file.
+function save_model_config() {
+    CODE=`curl -s -w %{http_code} -o ./$TRIAL.out localhost:8000/v2/models/no_config/config`
+    set -e
+    if [ "$CODE" != "200" ]; then
+        cat $TRIAL.out
+        echo -e "\n***\n*** Test Failed\n***"
+        RET=1
+    fi
+}
+
 # Tensorflow 1: Batching ON
 rm -rf ./models/
 mkdir -p ./models/no_config
@@ -163,17 +177,18 @@ SERVER_ARGS="--backend-config=tensorflow,default-max-batch-size=5 $COMMON_ARGS"
 SERVER_LOG=$SERVER_LOG_BASE.backend_config_tensorflow_batch_5.log
 run_server
 
+TRIAL=tensorflow_batching_on
 if [ "$SERVER_PID" == "0" ]; then
     echo -e "*** FAILED: Server failed to start $SERVER\n"
     RET=1
 
 else
-    kill $SERVER_PID
-    wait $SERVER_PID
+    save_model_config
 
     # Assert the max-batch-size is the command line value
-    MAX_BATCH_LOG_LINE=$(grep -a "\"max_batch_size\": 5" $SERVER_LOG)
+    MAX_BATCH_LOG_LINE=$(grep -a "\"max_batch_size\":5" $TRIAL.out)
     if [ "$MAX_BATCH_LOG_LINE" == "" ]; then
+        cat $TRIAL.out
         echo "*** FAILED: Expected max batch size to be 5 but found: $MAX_BATCH_LOG_LINE\n"
         RET=1
     fi
@@ -184,6 +199,10 @@ else
         echo "*** FAILED: Expected dynamic batching to be set in model config but was not found\n"
         RET=1
     fi
+    
+    kill $SERVER_PID
+    wait $SERVER_PID
+
 fi
 
 # Tensorflow 1: Batching OFF
@@ -191,17 +210,17 @@ SERVER_ARGS="--backend-config=tensorflow,default-max-batch-size=0 $COMMON_ARGS"
 SERVER_LOG=$SERVER_LOG_BASE.backend_config_tensorflow_batch_0.log
 run_server
 
+TRIAL=tensorflow_batching_off
 if [ "$SERVER_PID" == "0" ]; then
     echo -e "*** FAILED: Server failed to start $SERVER\n"
     RET=1
 
 else
-    kill $SERVER_PID
-    wait $SERVER_PID
+    save_model_config
 
     # Assert the max-batch-size is 1 in the case batching is supported
     # in the model but not in the config.
-    MAX_BATCH_LOG_LINE=$(grep -a "\"max_batch_size\": 1" $SERVER_LOG)
+    MAX_BATCH_LOG_LINE=$(grep -a "\"max_batch_size\":1" $TRIAL.out)
     if [ "$MAX_BATCH_LOG_LINE" == "" ]; then
         echo "*** FAILED: Expected max batch size to be 1 but found: $MAX_BATCH_LOG_LINE\n"
         RET=1
@@ -212,6 +231,10 @@ else
         echo "*** FAILED: Found dynamic batching enabled in configuration when none expected.\n"
         RET=1
     fi
+
+    kill $SERVER_PID
+    wait $SERVER_PID
+
 fi
 
 # Onnxruntime: Batching ON
@@ -223,16 +246,16 @@ SERVER_ARGS="--backend-config=onnxruntime,default-max-batch-size=5 $COMMON_ARGS"
 SERVER_LOG=$SERVER_LOG_BASE.backend_config_onnxruntime_batch_5.log
 run_server
 
+TRIAL=onnxruntime_batching_on
 if [ "$SERVER_PID" == "0" ]; then
     echo -e "*** FAILED: Server failed to start $SERVER\n"
     RET=1
 
 else
-    kill $SERVER_PID
-    wait $SERVER_PID
-
+    save_model_config
+    
     # Assert the max-batch-size is the command line value
-    MAX_BATCH_LOG_LINE=$(grep -a "\"max_batch_size\": 5" $SERVER_LOG)
+    MAX_BATCH_LOG_LINE=$(grep -a "\"max_batch_size\":5" $TRIAL.out)
     if [ "$MAX_BATCH_LOG_LINE" == "" ]; then
         echo "*** FAILED: Expected max batch size to be 5 but found: $MAX_BATCH_LOG_LINE\n"
         RET=1
@@ -244,6 +267,9 @@ else
         echo "*** FAILED: Expected dynamic batching to be set in model config but was not found\n"
         RET=1
     fi
+    
+    kill $SERVER_PID
+    wait $SERVER_PID
 fi
 
 # Onnxruntime: Batching OFF
@@ -255,17 +281,17 @@ SERVER_ARGS="--backend-config=onnxruntime,default-max-batch-size=0 $COMMON_ARGS"
 SERVER_LOG=$SERVER_LOG_BASE.backend_config_onnxruntime_batch_0.log
 run_server
 
+TRIAL=onnxruntime_batching_off
 if [ "$SERVER_PID" == "0" ]; then
     echo -e "*** FAILED: Server failed to start $SERVER\n"
     RET=1
 
 else
-    kill $SERVER_PID
-    wait $SERVER_PID
+    save_model_config
 
     # Assert the max-batch-size is 1 in the case batching is supported
     # in the model but not in the config.
-    MAX_BATCH_LOG_LINE=$(grep -a "\"max_batch_size\": 1" $SERVER_LOG)
+    MAX_BATCH_LOG_LINE=$(grep -a "\"max_batch_size\":1" $TRIAL.out)
     if [ "$MAX_BATCH_LOG_LINE" == "" ]; then
         echo "*** FAILED: Expected max batch size to be 1 but found: $MAX_BATCH_LOG_LINE\n"
         RET=1
@@ -276,6 +302,10 @@ else
         echo "*** FAILED: Found dynamic batching in configuration when none expected.\n"
         RET=1
     fi
+
+    kill $SERVER_PID
+    wait $SERVER_PID
+
 fi
 
 
