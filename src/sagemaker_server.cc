@@ -451,7 +451,7 @@ SagemakerAPIServer::SageMakerMMEHandleLoadError(
       "CUDA out of memory", /* pytorch */
       "CUDA_OUT_OF_MEMORY", /* tensorflow */
       "Out of memory",      /* generic */
-  };
+      "out of memory", "MemoryError"};
 
   EVBufferAddErrorJson(req->buffer_out, load_err);
 
