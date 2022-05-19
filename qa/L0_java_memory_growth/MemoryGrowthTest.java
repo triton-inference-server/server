@@ -35,6 +35,8 @@ import static org.bytedeco.tritonserver.global.tritonserver.*;
 public class MemoryGrowthTest {
     static final double TRITON_MIN_COMPUTE_CAPABILITY = 6.0;
     private static boolean done = false;
+    static float max_growth_allowed = .10f;
+    static int max_mem_allowed = 30;
 
     static void FAIL(String MSG) {
         System.err.println("failure: " + MSG);
@@ -54,8 +56,8 @@ public class MemoryGrowthTest {
     static boolean enforce_memory_type = false;
     static int requested_memory_type;
     // Parameters for percentile range to include (exclude outliers)
-    const int max_percentile = 90;
-    const int min_percentile = 10;
+    static final int max_percentile = 90;
+    static final int min_percentile = 10;
 
     static class TRITONSERVER_ServerDeleter extends TRITONSERVER_Server {
         public TRITONSERVER_ServerDeleter(TRITONSERVER_Server p) { super(p); deallocator(new DeleteDeallocator(this)); }
@@ -375,7 +377,7 @@ public class MemoryGrowthTest {
         } catch (InterruptedException e){
           System.out.println("Memory growth validation interrupted.");
         }
-      };
+      }
       if(memory_snapshots.size() < 5){
         System.out.println("Error: Not enough snapshots, found " + memory_snapshots.size()
         + " snapshots");
@@ -384,7 +386,7 @@ public class MemoryGrowthTest {
 
       // Measure memory growth without outliers by taking difference
       // between 90th percentile and 10th percentile memory usage.
-      const int bytes_in_mb = 1E6;
+      final double bytes_in_mb = 1E6;
       Collections.sort(memory_snapshots);
       int index_max = ((int) Math.ceil(max_percentile / 100.0 * memory_snapshots.size())) - 1;
       int index_min = ((int) Math.ceil(min_percentile / 100.0 * memory_snapshots.size())) - 1;
@@ -413,7 +415,7 @@ public class MemoryGrowthTest {
     }
 
     static void
-    RunInference(TRITONSERVER_ServerDeleter server, String model_name, boolean[] is_int, boolean[] is_torch_model, boolean checkAccuracy)
+    RunInference(TRITONSERVER_ServerDeleter server, String model_name, boolean[] is_int, boolean[] is_torch_model, boolean check_accuracy)
     throws Exception
     {
       // Create the allocator that will be used to allocate buffers for
@@ -525,7 +527,7 @@ public class MemoryGrowthTest {
         FAIL_IF_ERR(
             TRITONSERVER_InferenceResponseError(completed_response),
             "response status");
-        if (checkAccuracy) {
+        if (check_accuracy) {
           Check(
               completed_response, input0_data, input1_data, output0, output1,
               input0_size, datatype, is_int[0]);
@@ -568,7 +570,7 @@ public class MemoryGrowthTest {
         FAIL_IF_ERR(
             TRITONSERVER_InferenceResponseError(completed_response),
             "response status");
-        if (checkAccuracy) {
+        if (check_accuracy) {
           Check(
               completed_response, input0_data, input1_data, output0, output1,
               input0_size, datatype, is_int[0]);
@@ -613,7 +615,7 @@ public class MemoryGrowthTest {
             TRITONSERVER_InferenceResponseError(completed_response),
             "response status");
 
-        if (checkAccuracy) {
+        if (check_accuracy) {
           // Both inputs are using input1_data...
           Check(
               completed_response, input1_data, input1_data, output0, output1,
@@ -637,12 +639,10 @@ public class MemoryGrowthTest {
     public static void
     main(String[] args) throws Exception
     {
-      float max_growth_allowed = .10f;
-      int max_mem_allowed = 30;
       int num_iterations = 1000000;
       String model_repository_path = null;
       int verbose_level = 0;
-      boolean checkAccuracy = false;
+      boolean check_accuracy = false;
 
       // Parse commandline...
       for (int i = 0; i < args.length; i++) {
@@ -678,7 +678,7 @@ public class MemoryGrowthTest {
             verbose_level = 1;
             break;
           case "-c":
-            checkAccuracy = true;
+            check_accuracy = true;
             break;
           case "-?":
             Usage(null);
@@ -686,7 +686,7 @@ public class MemoryGrowthTest {
           case "--max-growth":
             i++;
             try {
-              max_growth_allowed = Integer.parseInt(args[i]) / 100;
+              max_growth_allowed = Integer.parseInt(args[i]) / 100.0f;
             } catch (NumberFormatException e){
               Usage(
                   "--max-growth must be used to specify allowed memory growth (%)");
@@ -869,8 +869,8 @@ public class MemoryGrowthTest {
       }
 
       Runnable runnable =
-        () -> { 
-          if(ValidateMemoryGrowth(.25f, 30)){
+        () -> {
+          if(ValidateMemoryGrowth(max_growth_allowed, max_mem_allowed)){
             System.out.println("Memory growth test passed");
           } else {
             System.out.println("Memory growth test FAILED");
@@ -881,7 +881,7 @@ public class MemoryGrowthTest {
 
       for(int i = 0; i < num_iterations; i++){
         try (PointerScope scope = new PointerScope()) {
-          RunInference(server, model_name, is_int, is_torch_model, checkAccuracy);
+          RunInference(server, model_name, is_int, is_torch_model, check_accuracy);
         }
       }
       done = true;
