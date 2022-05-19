@@ -26,6 +26,7 @@
 #pragma once
 
 #include <mutex>
+#include <sys/stat.h>
 
 #include "common.h"
 #include "dirent.h"

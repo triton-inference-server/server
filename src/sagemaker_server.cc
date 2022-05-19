@@ -486,11 +486,14 @@ SagemakerAPIServer::SageMakerMMELoadModel(
   DIR* dir;
   struct dirent* ent;
   int dir_count = 0;
+  std::string model_subdir;
+
   if ((dir = opendir(repo_path.c_str())) != NULL) {
     while ((ent = readdir(dir)) != NULL) {
-      if ((ent->d_type == DT_DIR) && (strcmp(ent->d_name, ".") == 0) &&
-          (strcmp(ent->d_name, "..") == 0)) {
+      if ((ent->d_type == DT_DIR) && (!strcmp(ent->d_name, ".") == 0) &&
+          (!strcmp(ent->d_name, "..") == 0)) {
         dir_count += 1;
+        model_subdir = std::string(ent->d_name);
       }
       if (dir_count > 1) {
         HTTP_RESPOND_IF_ERR(
@@ -520,13 +523,22 @@ SagemakerAPIServer::SageMakerMMELoadModel(
       repo_path, model_path_regex_, &repo_parent_path, &subdir,
       &customer_subdir);
 
-  std::string subdir_path = subdir;
-  if (!customer_subdir.empty()) {
-    subdir_path = subdir + "/" + customer_subdir;
+  std::string config_path = repo_path + "/config.pbtxt";
+  struct stat buffer;
+
+  /* If config.pbtxt is at repo root,
+   * then repo_parent_path = /opt/ml/models/<hash>/, and model_subdir = model
+   * else repo_parent_path = /opt/ml/models/<hash>/model and
+   * model_subdir = dir under model/
+   */
+  if (stat(config_path.c_str(), &buffer) == 0) {
+    model_subdir = subdir;
+  } else {
+    repo_parent_path = repo_path;
   }
 
   auto param = TRITONSERVER_ParameterNew(
-      subdir_path.c_str(), TRITONSERVER_PARAMETER_STRING, model_name.c_str());
+      model_subdir.c_str(), TRITONSERVER_PARAMETER_STRING, model_name.c_str());
 
   if (param != nullptr) {
     subdir_modelname_map.emplace_back(param);
