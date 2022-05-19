@@ -94,7 +94,7 @@ if [ "$TRITON_PERF_LONG" == 1 ]; then
 fi
 
 echo -e "\nRunning Memory Growth Test, $ITERS Iterations\n"
-$BASE_COMMAND -Dexec.args="-r $MODEL_REPO -c -i $ITERS --max-growth $MAX_MEM_GROWTH" >>$CLIENT_LOG 2>&1
+$BASE_COMMAND -Dexec.args="-r $MODEL_REPO -c -i $ITERS --max-growth $MAX_MEM_GROWTH_MB" >>$CLIENT_LOG 2>&1
 if [ $? -ne 0 ]; then
     echo -e "\n***\n*** Failed to run memory growth test to complete\n***"
     RET=1
