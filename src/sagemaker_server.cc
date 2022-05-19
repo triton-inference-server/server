@@ -520,8 +520,13 @@ SagemakerAPIServer::SageMakerMMELoadModel(
       repo_path, model_path_regex_, &repo_parent_path, &subdir,
       &customer_subdir);
 
+  std::string subdir_path = subdir;
+  if (!customer_subdir.empty()) {
+    subdir_path = subdir + "/" + customer_subdir;
+  }
+
   auto param = TRITONSERVER_ParameterNew(
-      subdir.c_str(), TRITONSERVER_PARAMETER_STRING, model_name.c_str());
+      subdir_path.c_str(), TRITONSERVER_PARAMETER_STRING, model_name.c_str());
 
   if (param != nullptr) {
     subdir_modelname_map.emplace_back(param);
