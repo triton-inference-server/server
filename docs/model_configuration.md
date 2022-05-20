@@ -655,6 +655,28 @@ However, each composing model that makes up an ensemble can specify
 `instance_group` in its config file and individually support parallel
 execution as described above when the ensemble receives multiple requests.
 
+## CUDA Compute Capability
+
+Similar to the `default_model_filename` field, you can optionally specify the 
+`cc_model_filenames` field to map the GPU's
+[CUDA Compute Capability](https://developer.nvidia.com/cuda-gpus) 
+to a correspoding model filename at model load time. This is particularly 
+useful for TensorRT models, since they are generally tied to a specific 
+compute capability. 
+
+```
+cc_model_filenames [
+  {
+    key: "7.5"
+    value: "resnet50_T4.plan"
+  },
+  {
+    key: "8.0"
+    value: "resnet50_A100.plan"
+  }
+]
+```
+
 ## Scheduling And Batching
 
 Triton supports batch inferencing by allowing individual inference
