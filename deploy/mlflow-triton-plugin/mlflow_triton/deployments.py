@@ -302,6 +302,7 @@ class TritonPlugin(BaseDeploymentClient):
                         model_file = onnx_meta_data.get('data', None)
                 elif file.name == 'config.pbtxt':
                     config_file = file.name
+                    copy_paths['config_path'] = {}
             if model_file is None:
                 for file in artifact_path.iterdir():
                     if file.suffix == '.onnx':
