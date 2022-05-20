@@ -39,8 +39,8 @@ and corresponds to the 22.04 container release on
 ----
 Triton Inference Server is an inference serving software that streamlines AI 
 inferencing. Triton enables teams to deploy any AI model from multiple deep 
-learning and machine learning frameworks, including TensorFlow, PyTorch, ONNX, 
-OpenVINO, Python and more. Triton supports inference across cloud, data center,
+learning and machine learning frameworks, including TensorRT, TensorFlow, PyTorch, 
+ONNX, OpenVINO, Python and more. Triton supports inference across cloud, data center,
 edge and embedded devices on NVIDIA GPUs, x86 and ARM CPU, or AWS Inferentia. 
 Triton delivers optimized performance for many query types, including real time,
 batched, ensembles and audio/video streaming.
@@ -135,27 +135,41 @@ the type of the model and on what Triton capabilities you want to enable for
 the model, you may need to create a [model
 configuration](docs/model_configuration.md) for the model.  
 
-- [Use the Model Analyzer to optimize your model 
-  configuration](https://github.com/triton-inference-server/model_analyzer)
+- Optimize your models setting [scheduling and batching](docs/architecture.md#models-and-schedulers)
+  parameters and [model instances](docs/model_configuration.md#instance-groups).
+- Use the [Model Analyzer tool](https://github.com/triton-inference-server/model_analyzer)
+  to help optimize your model configuration with profiling
 - [Add custom operations to Triton if needed by your model](docs/custom_operations.md)
 - Enable model pipelining with [Model Ensemble](docs/architecture.md#ensemble-models)
   and [Business Logic Scripting (BLS)](https://github.com/triton-inference-server/python_backend#business-logic-scripting)
+- Learn how to [explicitly manage what models are available by loading and 
+  unloading models](docs/model_management.md)
 
 #### Configure and Use Triton Inference Server
 
-- [TBD] Read tutorial on using Triton Inference Server
-- [TBD] Customize Triton Inference Server for your use case
+- Read the [Quick Start Guide](docs/quickstart.md) on to run Triton Inference Server
+  on both GPU and CPU
+- Triton supports multiple execution models, called 
+  [backends](https://github.com/triton-inference-server/backend), including 
+  [TensorRT](https://github.com/triton-inference-server/tensorrt_backend), 
+  [TensorFlow](https://github.com/triton-inference-server/tensorflow_backend), 
+  [PyTorch](https://github.com/triton-inference-server/pytorch_backend), 
+  [ONNX](https://github.com/triton-inference-server/onnxruntime_backend), 
+  [OpenVINO](https://github.com/triton-inference-server/openvino_backend), 
+  [Python](https://github.com/triton-inference-server/python_backend), and more
 - Learn how to [optimizing performance](docs/optimization.md) using the 
   [Performance Analyzer](docs/perf_analyzer.md) and 
   [Model Analyzer](https://github.com/triton-inference-server/model_analyzer)
 - Learn how to [manage loading and unloading models](model_management.md)
 - Send requests directly to Triton with the [HTTP/REST JSON-based
   protocol](docs/inference_protocols.md#httprest-and-grpc-protocols)
+- Read examples on how to deploy Triton using Kubernetes and Helm for 
+  [GCP](deploy/gcp/README.md), [AWS](deploy/aws/README.md), and [NVIDIA
+  FleetCommand](deploy/fleetcommand/README.md)
 
 #### Client Support and Examples
 
-After you have your model(s) available in Triton, you will want to send 
-inference and other requests to Triton from your *client* application. The 
+A Triton *client* application sends inference and other requests to Triton. The 
 [Python and C++ client libraries](https://github.com/triton-inference-server/client)
 provide APIs to simplify this communication.
 
@@ -170,127 +184,28 @@ provide APIs to simplify this communication.
 
 ### Extend Triton
 
-TBD
+[Triton Inference Server's archicture](docs/architecture.md) is specifically 
+designed for modularity and flexibility
 
-### Overview
+- [Customize Triton Inference Server](docs/compose.md) for your use case
+- [Create custom backends](https://github.com/triton-inference-server/backend)
+  in either [C/C++](https://github.com/triton-inference-server/backend/blob/main/README.md#triton-backend-api)
+  or [Python](https://github.com/triton-inference-server/python_backend)
+- Create [decouple backend and models](docs/decoupled_models.md) can send 
+  multiple responses for a request or not send any responses for a request
+- Use a [Triton repository agent](docs/repository_agents.md) to add functionality
+  that operates when a model is loaded and unloaded, such as authentication, 
+  decryption, or conversion
+- Deploy Tirton on [Jetson and JetPack](jetson.md)
 
-[Triton Architecture](docs/architecture.md) gives a high-level
-overview of the structure and capabilities of the inference
-server. Additional Triton Inference Server documentation include:
+### Additional Documentation
+
 - [FAQ](docs/faq.md)
 - [User Guide](docs#user-guide)
 - [Developer Guide](docs#developer-guide)
 - [Release Notes](https://docs.nvidia.com/deeplearning/triton-inference-server/release-notes/index.html)
 - [GPU, Driver, and CUDA Support
 Matrix](https://docs.nvidia.com/deeplearning/dgx/support-matrix/index.html)
-
-### OLD Documentation
-----
-
-Items in this section will be removed
-### User Documentation
-
-
-
-The [quickstart](docs/quickstart.md) walks you through all the steps
-required to install and run Triton with an example image
-classification model and then use an example client application to
-perform inferencing using that model. The quickstart also demonstrates
-how [Triton supports both GPU systems and CPU-only
-systems](docs/quickstart.md#run-triton).
-
-
-
-After you have your model(s) available in Triton, you will want to
-send inference and other requests to Triton from your *client*
-application. The [Python and C++ client
-libraries](https://github.com/triton-inference-server/client) provide
-APIs to simplify this communication. There are also a large number of
-[client examples](https://github.com/triton-inference-server/client)
-that demonstrate how to use the libraries.  You can also send
-HTTP/REST requests directly to Triton using the [HTTP/REST JSON-based
-protocol](docs/inference_protocols.md#httprest-and-grpc-protocols) or
-[generate a GRPC client for many other
-languages](https://github.com/triton-inference-server/client). For
-certain types of models you can also send input data (e.g. a jpeg
-image) directly to Triton in the [body of an HTTP request without any
-additional
-metadata](https://github.com/triton-inference-server/server/blob/main/docs/protocol/extension_binary_data.md#raw-binary-request).
-
-Understanding and [optimizing performance](docs/optimization.md) is an
-important part of deploying your models. The Triton project provides
-the [Performance Analyzer](docs/perf_analyzer.md) and the [Model
-Analyzer](docs/model_analyzer.md) to help your optimization
-efforts. Specifically, you will want to optimize [scheduling and
-batching](docs/architecture.md#models-and-schedulers) and [model
-instances](docs/model_configuration.md#instance-groups) appropriately
-for each model. You can also enable cross-model prioritization using
-the [rate limiter](docs/rate_limiter.md) which manages the rate at
-which requests are scheduled on model instances. You may also want to
-consider combining multiple models and pre/post-processing into a
-pipeline using [ensembling](docs/architecture.md#ensemble-models) or
-[Business Logic Scripting
-(BLS)](https://github.com/triton-inference-server/python_backend#business-logic-scripting). A
-[Prometheus metrics endpoint](docs/metrics.md) allows you to visualize
-and monitor aggregate inference metrics.
-
-NVIDIA publishes a number of [deep learning
-examples](https://github.com/NVIDIA/DeepLearningExamples) that use
-Triton.
-
-As part of your deployment strategy you may want to [explicitly manage
-what models are available by loading and unloading
-models](docs/model_management.md) from a running Triton server. If you
-are using Kubernetes for deployment there are simple examples of how
-to deploy Triton using Kubernetes and Helm:
-[GCP](deploy/gcp/README.md), [AWS](deploy/aws/README.md), and [NVIDIA
-FleetCommand](deploy/fleetcommand/README.md)
-
-The [version 1 to version 2 migration
-information](docs/v1_to_v2.md) is helpful if you are moving to
-version 2 of Triton from previously using version 1.
-
-### Developer Documentation
-
-Triton can be [built using
-Docker](docs/build.md#building-triton-with-docker) or [built without
-Docker](docs/build.md#building-triton-without-docker). After building
-you should [test Triton](docs/test.md).
-
-It is also possible to [create a Docker image containing a customized
-Triton](docs/compose.md) that contains only a subset of the backends.
-
-The Triton project also provides [client libraries for Python and
-C++](https://github.com/triton-inference-server/client) that make it
-easy to communicate with the server. There are also a large number of
-[example clients](https://github.com/triton-inference-server/client)
-that demonstrate how to use the libraries. You can also develop your
-own clients that directly communicate with Triton using [HTTP/REST or
-GRPC protocols](docs/inference_protocols.md). There is also a [C
-API](docs/inference_protocols.md) that allows Triton to be linked
-directly into your application.
-
-A [Triton backend](https://github.com/triton-inference-server/backend)
-is the implementation that executes a model. A backend can interface
-with a deep learning framework, like PyTorch, TensorFlow, TensorRT or
-ONNX Runtime; or it can interface with a data processing framework
-like [DALI](https://github.com/triton-inference-server/dali_backend);
-or you can extend Triton by [writing your own
-backend](https://github.com/triton-inference-server/backend) in either
-[C/C++](https://github.com/triton-inference-server/backend/blob/main/README.md#triton-backend-api)
-or
-[Python](https://github.com/triton-inference-server/python_backend).
-Triton also allows developers to write backends that can send multiple
-responses for a request or not send any responses for a request. Backends
-and models that operate in this way are referred to as [decoupled
-backends and models](docs/decoupled_models.md).
-
-A [Triton repository agent](docs/repository_agents.md) extends Triton
-with new functionality that operates when a model is loaded or
-unloaded. You can introduce your own code to perform authentication,
-decryption, conversion, or similar operations when a model is loaded.
-
-----
 
 ## Contributing
 
