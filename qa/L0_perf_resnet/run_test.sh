@@ -34,7 +34,8 @@ REPORTER=../common/reporter.py
 TRITON_DIR=${TRITON_DIR:="/opt/tritonserver"}
 SERVER=${TRITON_DIR}/bin/tritonserver
 BACKEND_DIR=${TRITON_DIR}/backends
-SERVER_ARGS="--model-repository=`pwd`/models --backend-directory=${BACKEND_DIR} ${BACKEND_CONFIG}"
+MODEL_REPO="${PWD}/models"
+SERVER_ARGS="--model-repository=${MODEL_REPO} --backend-directory=${BACKEND_DIR} ${BACKEND_CONFIG}"
 source ../common/util.sh
 
 # Select the single GPU that will be available to the inference
@@ -52,12 +53,15 @@ rm -fr models && mkdir -p models && \
             sed -i "s/^max_batch_size:.*/max_batch_size: ${MAX_BATCH}/" config.pbtxt && \
             echo "instance_group [ { count: ${INSTANCE_CNT} }]" >> config.pbtxt)
 
-SERVER_LOG="${NAME}.serverlog"
-run_server
-if (( $SERVER_PID == 0 )); then
-    echo -e "\n***\n*** Failed to start $SERVER\n***"
-    cat $SERVER_LOG
-    exit 1
+# Don't start separate server if testing perf with C API
+if [[ "${PERF_CLIENT_PROTOCOL}" != "triton_c_api" ]]; then
+    SERVER_LOG="${NAME}.serverlog"
+    run_server
+    if (( $SERVER_PID == 0 )); then
+        echo -e "\n***\n*** Failed to start $SERVER\n***"
+        cat $SERVER_LOG
+        exit 1
+    fi
 fi
 
 # Onnx and onnx-trt models are very slow on Jetson.
@@ -73,14 +77,30 @@ fi
 
 set +e
 
+# Overload use of PERF_CLIENT_PROTOCOL for convenience with existing test and 
+# reporting structure, though "triton_c_api" is not strictly a "protocol".
+# This should be easily extensible for other service kinds.
+if [[ "${PERF_CLIENT_PROTOCOL}" == "triton_c_api" ]]; then
+    # Using C API requires extra info to start in-process server
+    SERVICE_ARGS="--service-kind triton_c_api" \
+                 "--triton-server-directory ${TRITON_DIR}" \
+                 "--model-repository ${MODEL_REPO}"
+# Otherwise run as normal via HTTP/GRPC
+else
+    SERVICE_ARGS="-i ${PERF_CLIENT_PROTOCOL}"
+fi
+
 # Run the model once to warm up. Some frameworks do optimization on the first requests.
 # Must warmup similar to actual run so that all instances are ready
-$PERF_CLIENT -v -i ${PERF_CLIENT_PROTOCOL} -m $MODEL_NAME -p${MEASUREMENT_WINDOW} \
-                -b${STATIC_BATCH} --concurrency-range ${CONCURRENCY}
-
-$PERF_CLIENT -v -i ${PERF_CLIENT_PROTOCOL} -m $MODEL_NAME -p${MEASUREMENT_WINDOW} \
+$PERF_CLIENT -v -m $MODEL_NAME -p${MEASUREMENT_WINDOW} \
                 -b${STATIC_BATCH} --concurrency-range ${CONCURRENCY} \
+                ${SERVICE_ARGS}
+
+$PERF_CLIENT -v -m $MODEL_NAME -p${MEASUREMENT_WINDOW} \
+                -b${STATIC_BATCH} --concurrency-range ${CONCURRENCY} \
+                ${SERVICE_ARGS} \
                 -f ${NAME}.csv 2>&1 | tee ${NAME}.log
+
 if (( $? != 0 )); then
     RET=1
 fi

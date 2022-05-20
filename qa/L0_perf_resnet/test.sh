@@ -40,7 +40,7 @@ fi
 
 rm -f *.log *.serverlog *.csv *.metrics *.tjson *.json
 
-PROTOCOLS="grpc http"
+PROTOCOLS="grpc http triton_c_api"
 
 TRT_MODEL_NAME="resnet50_fp16_plan"
 TF_MODEL_NAME="resnet50v1.5_fp16_savedmodel"
