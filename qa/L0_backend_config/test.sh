@@ -90,7 +90,7 @@ else
         # Pick out the logged value of the default-max-batch-size which gets passed into model creation
         RESOLVED_DEFAULT_MAX_BATCH_SIZE=$(awk -v line="$RESULT_LOG_LINE" 'BEGIN {split(line, a, "]"); split(a[2], b, ": "); split(b[2], c, ","); print c[2]}')
 
-        if [ "$RESOLVED_DEFAULT_MAX_BATCH_SIZE" != "2" ]; then
+        if [ "$RESOLVED_DEFAULT_MAX_BATCH_SIZE" != "4" ]; then
             echo "*** FAILED: Found default-max-batch-size not equal to the expected default-max-batch-size. Expected: default-max-batch-size,4, Found: $RESOLVED_DEFAULT_MAX_BATCH_SIZE \n" 
             RET=1
         fi
