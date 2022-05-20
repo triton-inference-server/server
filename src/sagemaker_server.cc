@@ -462,12 +462,11 @@ SagemakerAPIServer::SageMakerMMEHandleLoadError(
       LOG_VERBOSE(1)
           << "Received an OOM error during LOAD MODEL. Returning a 507.";
       return;
-    } else {
-      /* Return a 400*/
-      evhtp_send_reply(req, EVHTP_RES_BADREQ);
-      return;
     }
   }
+  /* Return a 400*/
+  evhtp_send_reply(req, EVHTP_RES_BADREQ);
+  return;
 }
 
 
