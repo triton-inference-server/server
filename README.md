@@ -140,8 +140,6 @@ configuration](docs/model_configuration.md) for the model.
   parameters and [model instances](docs/model_configuration.md#instance-groups).
 - Use the [Model Analyzer tool](https://github.com/triton-inference-server/model_analyzer)
   to help optimize your model configuration with profiling
-- Enable model pipelining with [Model Ensemble](docs/architecture.md#ensemble-models)
-  and [Business Logic Scripting (BLS)](https://github.com/triton-inference-server/python_backend#business-logic-scripting)
 - Learn how to [explicitly manage what models are available by loading and 
   unloading models](docs/model_management.md)
 
