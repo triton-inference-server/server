@@ -138,37 +138,47 @@ expected by the model.
 
 #### Special Conventions for PyTorch Backend
 
-***Naming Convention:*** Due to the absence of names for outputs in TorchScript
-models, the "name" attribute of outputs in the configuration must follow a
-specific naming convention i.e. "\<name\>__\<index\>". Where \<name\> can be
-any string and \<index\> refers to the position of the corresponding output.
-For inputs, the user has the choice to follow the above naming convention or use
-the names of input arguments to the forward function instead.
+**Naming Convention:** 
 
-This means that if there are two inputs and two outputs, the outputs must be named
-as: "OUTPUT__0" and "OUTPUT__1" such that "OUTPUT__0" refers to first output
-and "OUTPUT__1" refers to the second output.
+Due to the absence of sufficient metadata for inputs/outputs in TorchScript
+model files, the "name" attribute of inputs/outputs in the configuration must
+follow specific naming conventions. These are detailed below.
 
-Similarly, for the inputs, the first and second inputs would be named "INPUT__0"
-and "INPUT__1" respectively. Alternatively, if the forward function for the
-Torchscript model was defined as `forward(self, input0, input1)`, the first and
-second inputs could also be named "input0" and "input1" respectively. 
+1. [Only for Inputs] When the input is not a Dictionary of Tensors, the input
+names in the configuration file should mirror the names of the input arguments to
+the forward function in the model's definition.
 
-***Dictionary of Tensors as Input:*** The PyTorch Backend supports passing
-the inputs to the model in the form of a Dictionary of Tensors. This is only
-supported when there is a *single* input to the model of type Dictionary that
-contains a mapping from a string to a tensor. As an example, if there is a 
-model that expects the input of the form:
+For example, if the forward function for the Torchscript model was defined as
+`forward(self, input0, input1)`, the first and second inputs should be named
+"input0" and "input1" respectively. 
+
+2. `<name>__<index>`: Where \<name\> can be any string and \<index\> is an
+integer index that refers to the position of the corresponding input/output.
+
+This means that if there are two inputs and two outputs, the first and second
+inputs can be named "INPUT__0" and "INPUT__1" and the first and second outputs
+can be named "OUTPUT__0" and "OUTPUT__1" respectively.
+
+3. If all inputs (or outputs) do not follow the same naming convention, then we
+enforce strict ordering from the model configuration i.e. we assume the order of
+inputs (or outputs) in the configuartion is the true ordering of these inputs.
+
+***Dictionary of Tensors as Input:*** 
+
+The PyTorch backend supports passing of inputs to the model in the form of a
+Dictionary of Tensors. This is only supported when there is a *single* input to
+the model of type Dictionary that contains a mapping of string to tensor. As an
+example, if there is a model that expects the input of the form:
 
 ```
 {'A': tensor1, 'B': tensor2}
 ```
 
-Then the input fields in the configuration do not need to follow the "\<name\>__\<index\>" 
-convention. Instead, the names of the inputs in this case must map to the string
-value 'key' for that specific tensor. In this case the inputs would be "A" and "B",
-where input "A" refers to value corresponding to tensor1 and "B" refers to the
-value corresponding to tensor2.
+The input names in the configuration in this case must not follow the above
+naming conventions `<name>__<index>`. Instead, the names of the inputs in this
+case must map to the string value 'key' for that specific tensor. For this case,
+the inputs would be "A" and "B", where input "A" refers to value corresponding to
+tensor1 and "B" refers to the value corresponding to tensor2.
 
 <br>
 
