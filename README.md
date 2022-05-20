@@ -48,27 +48,29 @@ batched, ensembles and audio/video streaming.
 Major features include:
 
 - [Multiple deep learning
-  framework support](https://github.com/triton-inference-server/backend).
+  framework support](https://github.com/triton-inference-server/backend)
 - [Multiple machine learning
-  framework support](https://github.com/triton-inference-server/fil_backend).
+  framework support](https://github.com/triton-inference-server/fil_backend)
 - [Concurrent model
-  execution](docs/architecture.md#concurrent-model-execution).
-- [Dynamic batching](docs/architecture.md#models-and-schedulers).
+  execution](docs/architecture.md#concurrent-model-execution)
+- [Dynamic batching](docs/model_configuration.md#dynamic-batcher)
+- [Sequence batching](docs/model_configuration.md#sequence-batcher) and 
+  [implicit state management](docs/architecture.md#implicit-state-management)
 - Provides [Extensible
   backend](https://github.com/triton-inference-server/backend) with a *backend
-  API*.
+  API*
 - Model pipelines using
   [Ensembling](docs/architecture.md#ensemble-models) or [Business
   Logic Scripting
-  (BLS)](https://github.com/triton-inference-server/python_backend#business-logic-scripting).
+  (BLS)](https://github.com/triton-inference-server/python_backend#business-logic-scripting)
 - [HTTP/REST and GRPC inference
   protocols](docs/inference_protocols.md) based on the community
   developed [KServe
-  protocol](https://github.com/kserve/kserve/tree/master/docs/predict-api/v2).
+  protocol](https://github.com/kserve/kserve/tree/master/docs/predict-api/v2)
 - A [C API](docs/inference_protocols.md#in-process-triton-server-api) and
-  [Java API](docs/inference_protocols.md#java-bindings-for-in-process-triton-server-api) allow Triton to link directly into your application for edge and other in-process use cases.
+  [Java API](docs/inference_protocols.md#java-bindings-for-in-process-triton-server-api) allow Triton to link directly into your application for edge and other in-process use cases
 - [Metrics](docs/metrics.md) indicating GPU utilization, server
-  throughput, and server latency. 
+  throughput, and server latency
 
 ## Serve a Model in 3 Easy Steps
 
