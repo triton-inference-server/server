@@ -316,7 +316,7 @@ SharedMemoryManager::RegisterCUDASharedMemory(
         TRITONSERVER_ERROR_INVALID_ARG,
         std::string(
             "failed to register CUDA shared memory region '" + name +
-            "'. error: " + TRITONSERVER_ErrorMessage(err))
+            "': " + TRITONSERVER_ErrorMessage(err))
             .c_str());
   }
 
