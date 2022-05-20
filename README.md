@@ -68,7 +68,8 @@ Major features include:
   developed [KServe
   protocol](https://github.com/kserve/kserve/tree/master/docs/predict-api/v2)
 - A [C API](docs/inference_protocols.md#in-process-triton-server-api) and
-  [Java API](docs/inference_protocols.md#java-bindings-for-in-process-triton-server-api) allow Triton to link directly into your application for edge and other in-process use cases
+  [Java API](docs/inference_protocols.md#java-bindings-for-in-process-triton-server-api)
+  allow Triton to link directly into your application for edge and other in-process use cases
 - [Metrics](docs/metrics.md) indicating GPU utilization, server
   throughput, and server latency
 
@@ -125,7 +126,7 @@ images.
 
 ### Using Triton
 
-#### Preparing Models for Triton Inferencing
+#### Preparing Models for Triton Inference Server
 
 The first step in using Triton to serve your models is to place one or
 more models into a [model repository](docs/model_repository.md). Depending on 
@@ -148,7 +149,7 @@ configuration](docs/model_configuration.md) for the model.
 - Read the [Quick Start Guide](docs/quickstart.md) to run Triton Inference 
   Server on both GPU and CPU
 - Triton supports multiple execution engines, called 
-  [backends](https://github.com/triton-inference-server/backend), including 
+  [backends](https://github.com/triton-inference-server/backend#where-can-i-find-all-the-backends-that-are-available-for-triton), including 
   [TensorRT](https://github.com/triton-inference-server/tensorrt_backend), 
   [TensorFlow](https://github.com/triton-inference-server/tensorflow_backend), 
   [PyTorch](https://github.com/triton-inference-server/pytorch_backend), 
@@ -183,7 +184,7 @@ provide APIs to simplify this communication.
 [Triton Inference Server's archicture](docs/architecture.md) is specifically 
 designed for modularity and flexibility
 
-- [Customize Triton Inference Server](docs/compose.md) for your use case
+- [Customize Triton Inference Server container](docs/compose.md) for your use case
 - [Create custom backends](https://github.com/triton-inference-server/backend)
   in either [C/C++](https://github.com/triton-inference-server/backend/blob/main/README.md#triton-backend-api)
   or [Python](https://github.com/triton-inference-server/python_backend)
