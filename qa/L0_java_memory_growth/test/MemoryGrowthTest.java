@@ -368,15 +368,15 @@ public class MemoryGrowthTest {
       // Allocate list starting capacity to hold up to 24 hours worth of snapshots.
       List<Double> memory_snapshots = new ArrayList<Double>(20000);
       while(!done){
-        System.gc();
-        double snapshot = Runtime.getRuntime().totalMemory() - Runtime.getRuntime().freeMemory();
-        memory_snapshots.add(snapshot);
-        System.out.println("Memory allocated (MB):" + snapshot/1E6);
         try {
           Thread.sleep(5000);
         } catch (InterruptedException e){
           System.out.println("Memory growth validation interrupted.");
         }
+        System.gc();
+        double snapshot = Runtime.getRuntime().totalMemory() - Runtime.getRuntime().freeMemory();
+        memory_snapshots.add(snapshot);
+        System.out.println("Memory allocated (MB):" + snapshot/1E6);
       }
       if(memory_snapshots.size() < 5){
         System.out.println("Error: Not enough snapshots, found " + memory_snapshots.size()
@@ -409,7 +409,7 @@ public class MemoryGrowthTest {
       if((memory_snapshots.get(index_max) / bytes_in_mb) >= max_mem_allowed){
         passed = false;
         System.out.println("Exceeded allowed memory (" + max_mem_allowed + 
-          "MB), got " + memory_allocation_delta_mb + "MB");
+          "MB), got " + (memory_snapshots.get(index_max) / bytes_in_mb) + "MB");
       }
       return passed;
     }

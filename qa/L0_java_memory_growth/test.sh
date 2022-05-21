@@ -37,20 +37,9 @@ cd ..
 set -e
 
 MODEL_REPO=`pwd`/models
-SAMPLES_REPO=`pwd`/javacpp-presets/tritonserver/samples
-rm $SAMPLES_REPO/Simple.java
-cp MemoryGrowthTest.java $SAMPLES_REPO/MemoryGrowthTest.java
-sed -i 's/Simple/MemoryGrowthTest/g' $SAMPLES_REPO/pom.xml
-# Modify the pom to not force include any cuda dependencies
-sed -i '/<dependency>/ {
-    :start
-    N
-    /<\/dependency>$/!b start
-    /<artifactId>cuda-platform<\/artifactId>/ {d}
-    /<artifactId>tensorrt-platform<\/artifactId>/ {d}
-}' $SAMPLES_REPO/pom.xml
 
-BASE_COMMAND="mvn clean compile -f $SAMPLES_REPO exec:java -Djavacpp.platform=linux-x86_64"
+export MAVEN_OPTS="-XX:MaxGCPauseMillis=40"
+BASE_COMMAND="mvn clean compile -f test exec:java -Djavacpp.platform=linux-x86_64"
 source ../common/util.sh
 
 # Create local model repository
@@ -85,7 +74,7 @@ LOG_IDX=$((LOG_IDX+1))
 CLIENT_LOG="./client_$LOG_IDX.log"
 
 # Longer-running memory growth test 
-ITERS=1000000
+ITERS=100000
 MAX_MEM_GROWTH_MB=10
 if [ "$TRITON_PERF_LONG" == 1 ]; then
     # ~1 day

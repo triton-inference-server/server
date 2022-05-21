@@ -1,0 +1,22 @@
+<project>
+    <modelVersion>4.0.0</modelVersion>
+    <groupId>org.bytedeco.tritonserver</groupId>
+    <artifactId>simple</artifactId>
+    <version>1.5.8-SNAPSHOT</version>
+    <properties>
+        <exec.mainClass>MemoryGrowthTest</exec.mainClass>
+        <maven.compiler.source>1.8</maven.compiler.source>
+        <maven.compiler.target>1.8</maven.compiler.target>
+    </properties>
+    <dependencies>
+        <dependency>
+            <groupId>org.bytedeco</groupId>
+            <artifactId>tritonserver-platform</artifactId>
+            <version>2.20-1.5.8-SNAPSHOT</version>
+            <classifier>shaded</classifier>
+        </dependency>
+    </dependencies>
+    <build>
+        <sourceDirectory>.</sourceDirectory>
+    </build>
+</project>
