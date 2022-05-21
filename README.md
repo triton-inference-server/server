@@ -37,28 +37,29 @@ and corresponds to the 22.04 container release on
 [NVIDIA GPU Cloud (NGC)](https://catalog.ngc.nvidia.com/orgs/nvidia/containers/tritonserver).**
 
 ----
-Triton Inference Server is an inference serving software that streamlines AI 
-inferencing. Triton enables teams to deploy any AI model from multiple deep 
-learning and machine learning frameworks, including TensorRT, TensorFlow, PyTorch, 
-ONNX, OpenVINO, Python and more. Triton supports inference across cloud, data center,
-edge and embedded devices on NVIDIA GPUs, x86 and ARM CPU, or AWS Inferentia. 
-Triton delivers optimized performance for many query types, including real time,
-batched, ensembles and audio/video streaming.
+Triton Inference Server is an open source inference serving software that 
+streamlines AI inferencing. Triton enables teams to deploy any AI model from 
+multiple deep learning and machine learning frameworks, including TensorRT, 
+TensorFlow, PyTorch, ONNX, OpenVINO, Python, RAPIDS FIL, and more. Triton 
+supports inference across cloud, data center,edge and embedded devices on NVIDIA 
+GPUs, x86 and ARM CPU, or AWS Inferentia. Triton delivers optimized performance 
+for many query types, including real time, batched, ensembles and audio/video 
+streaming.
 
 Major features include:
 
-- [Multiple deep learning
-  framework support](https://github.com/triton-inference-server/backend)
-- [Multiple machine learning
-  framework support](https://github.com/triton-inference-server/fil_backend)
+- [Supports multiple deep learning
+  frameworks](https://github.com/triton-inference-server/backend#where-can-i-find-all-the-backends-that-are-available-for-triton)
+- [Supports multiple machine learning
+  frameworks](https://github.com/triton-inference-server/fil_backend)
 - [Concurrent model
   execution](docs/architecture.md#concurrent-model-execution)
 - [Dynamic batching](docs/model_configuration.md#dynamic-batcher)
 - [Sequence batching](docs/model_configuration.md#sequence-batcher) and 
   [implicit state management](docs/architecture.md#implicit-state-management)
-- Provides [Extensible
-  backend](https://github.com/triton-inference-server/backend) with a *backend
-  API*
+  for stateful models
+- Provides [Backend API](https://github.com/triton-inference-server/backend) that
+  allows adding custom backends and pre/post processing operations
 - Model pipelines using
   [Ensembling](docs/architecture.md#ensemble-models) or [Business
   Logic Scripting
@@ -71,7 +72,7 @@ Major features include:
   [Java API](docs/inference_protocols.md#java-bindings-for-in-process-triton-server-api)
   allow Triton to link directly into your application for edge and other in-process use cases
 - [Metrics](docs/metrics.md) indicating GPU utilization, server
-  throughput, and server latency
+  throughput, server latency, and more
 
 ## Serve a Model in 3 Easy Steps
 
@@ -84,7 +85,7 @@ cd server/docs/examples
 ./fetch_models.sh
 
 # Step 2: Launch triton from the NGC Triton container
-docker run --gpus=1 --rm -p8000:8000 -p8001:8001 -p8002:8002 -v/full/path/to/docs/examples/model_repository:/models nvcr.io/nvidia/tritonserver:22.04-py3 tritonserver --model-repository=/models
+docker run --gpus=1 --rm --net=host -v /full/path/to/docs/examples/model_repository:/models nvcr.io/nvidia/tritonserver:22.04-py3 tritonserver --model-repository=/models
 
 # Step 3: In a separate console, launch the image_client example from the NGC Triton SDK container
 docker run -it --rm --net=host nvcr.io/nvidia/tritonserver:22.04-py3-sdk
