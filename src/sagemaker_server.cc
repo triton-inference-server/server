@@ -441,6 +441,36 @@ SagemakerAPIServer::SageMakerMMEListModel(evhtp_request_t* req)
 }
 
 void
+SagemakerAPIServer::SageMakerMMEHandleLoadError(
+    evhtp_request_t* req, TRITONSERVER_Error* load_err)
+{
+  const char* message = TRITONSERVER_ErrorMessage(load_err);
+  std::string error_string(message);
+
+  const std::vector<std::string> error_messages{
+      "CUDA out of memory", /* pytorch */
+      "CUDA_OUT_OF_MEMORY", /* tensorflow */
+      "Out of memory",      /* generic */
+      "out of memory", "MemoryError"};
+
+  EVBufferAddErrorJson(req->buffer_out, load_err);
+
+  for (long unsigned int i = 0; i < error_messages.size(); i++) {
+    if (error_string.find(error_messages[i]) != std::string::npos) {
+      /* Return a 507*/
+      evhtp_send_reply(req, 507);
+      LOG_VERBOSE(1)
+          << "Received an OOM error during LOAD MODEL. Returning a 507.";
+      return;
+    }
+  }
+  /* Return a 400*/
+  evhtp_send_reply(req, EVHTP_RES_BADREQ);
+  return;
+}
+
+
+void
 SagemakerAPIServer::SageMakerMMELoadModel(
     evhtp_request_t* req,
     const std::unordered_map<std::string, std::string> parse_map)
@@ -455,11 +485,14 @@ SagemakerAPIServer::SageMakerMMELoadModel(
   DIR* dir;
   struct dirent* ent;
   int dir_count = 0;
+  std::string model_subdir;
+
   if ((dir = opendir(repo_path.c_str())) != NULL) {
     while ((ent = readdir(dir)) != NULL) {
-      if ((ent->d_type == DT_DIR) && (strcmp(ent->d_name, ".") == 0) &&
-          (strcmp(ent->d_name, "..") == 0)) {
+      if ((ent->d_type == DT_DIR) && (!strcmp(ent->d_name, ".") == 0) &&
+          (!strcmp(ent->d_name, "..") == 0)) {
         dir_count += 1;
+        model_subdir = std::string(ent->d_name);
       }
       if (dir_count > 1) {
         HTTP_RESPOND_IF_ERR(
@@ -467,6 +500,7 @@ SagemakerAPIServer::SageMakerMMELoadModel(
             TRITONSERVER_ErrorNew(
                 TRITONSERVER_ERROR_INTERNAL,
                 "More than one version or model directories found. Note that "
+                "hidden folders are not allowed and "
                 "Ensemble models are not supported in SageMaker MME mode."));
         closedir(dir);
         return;
@@ -489,8 +523,22 @@ SagemakerAPIServer::SageMakerMMELoadModel(
       repo_path, model_path_regex_, &repo_parent_path, &subdir,
       &customer_subdir);
 
+  std::string config_path = repo_path + "/config.pbtxt";
+  struct stat buffer;
+
+  /* If config.pbtxt is at repo root,
+   * then repo_parent_path = /opt/ml/models/<hash>/, and model_subdir = model
+   * else repo_parent_path = /opt/ml/models/<hash>/model and
+   * model_subdir = dir under model/
+   */
+  if (stat(config_path.c_str(), &buffer) == 0) {
+    model_subdir = subdir;
+  } else {
+    repo_parent_path = repo_path;
+  }
+
   auto param = TRITONSERVER_ParameterNew(
-      subdir.c_str(), TRITONSERVER_PARAMETER_STRING, model_name.c_str());
+      model_subdir.c_str(), TRITONSERVER_PARAMETER_STRING, model_name.c_str());
 
   if (param != nullptr) {
     subdir_modelname_map.emplace_back(param);
@@ -534,8 +582,7 @@ SagemakerAPIServer::SageMakerMMELoadModel(
     TRITONSERVER_ErrorDelete(err);
     return;
   } else if (err != nullptr) {
-    EVBufferAddErrorJson(req->buffer_out, err);
-    evhtp_send_reply(req, EVHTP_RES_BADREQ);
+    SageMakerMMEHandleLoadError(req, err);
   } else {
     std::lock_guard<std::mutex> lock(mutex_);
 
