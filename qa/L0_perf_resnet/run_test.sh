@@ -82,9 +82,9 @@ set +e
 # This should be easily extensible for other service kinds.
 if [[ "${PERF_CLIENT_PROTOCOL}" == "triton_c_api" ]]; then
     # Using C API requires extra info to start in-process server
-    SERVICE_ARGS="--service-kind triton_c_api" \
-                 "--triton-server-directory ${TRITON_DIR}" \
-                 "--model-repository ${MODEL_REPO}"
+    SERVICE_ARGS="--service-kind triton_c_api \
+                  --triton-server-directory ${TRITON_DIR} \
+                  --model-repository ${MODEL_REPO}"
 # Otherwise run as normal via HTTP/GRPC
 else
     SERVICE_ARGS="-i ${PERF_CLIENT_PROTOCOL}"
@@ -104,9 +104,14 @@ $PERF_CLIENT -v -m $MODEL_NAME -p${MEASUREMENT_WINDOW} \
 if (( $? != 0 )); then
     RET=1
 fi
-curl localhost:8002/metrics -o ${NAME}.metrics >> ${NAME}.log 2>&1
-if (( $? != 0 )); then
-    RET=1
+
+# No metrics endpoint available when running with C API
+if [[ "${PERF_CLIENT_PROTOCOL}" != "triton_c_api" ]]; then
+    # NOTE: The metrics API output is not currently used
+    curl localhost:8002/metrics -o ${NAME}.metrics >> ${NAME}.log 2>&1
+    if (( $? != 0 )); then
+        RET=1
+    fi
 fi
 
 set -e
@@ -122,8 +127,11 @@ echo -e "\"l_batch_size\":${STATIC_BATCH}," >> ${NAME}.tjson
 echo -e "\"l_instance_count\":${INSTANCE_CNT}," >> ${NAME}.tjson
 echo -e "\"s_architecture\":\"${ARCH}\"}]" >> ${NAME}.tjson
 
-kill $SERVER_PID
-wait $SERVER_PID
+# SERVER_PID may not be set if using "triton_c_api" for example
+if [[ "${SERVER_PID}" -ne 0 ]]; then
+  kill $SERVER_PID
+  wait $SERVER_PID
+fi
 
 if [ -f $REPORTER ]; then
     set +e
