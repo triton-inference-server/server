@@ -218,8 +218,11 @@ for BACKEND in $BACKENDS; do
     echo -e "\"l_instance_count\":${INSTANCE_CNT}," >> ${RESULTDIR}/${NAME}.tjson
     echo -e "\"s_architecture\":\"${ARCH}\"}]" >> ${RESULTDIR}/${NAME}.tjson
 
-    kill $SERVER_PID
-    wait $SERVER_PID
+    # SERVER_PID may not be set if using "triton_c_api" for example
+    if [[ -n "${SERVER_PID}" ]]; then
+        kill $SERVER_PID
+        wait $SERVER_PID
+    fi
 
     if [ -f $REPORTER ]; then
         set +e

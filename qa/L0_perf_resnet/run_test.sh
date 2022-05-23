@@ -131,7 +131,7 @@ echo -e "\"l_instance_count\":${INSTANCE_CNT}," >> ${NAME}.tjson
 echo -e "\"s_architecture\":\"${ARCH}\"}]" >> ${NAME}.tjson
 
 # SERVER_PID may not be set if using "triton_c_api" for example
-if [[ "${SERVER_PID}" -ne 0 ]]; then
+if [[ -n "${SERVER_PID}" ]]; then
   kill $SERVER_PID
   wait $SERVER_PID
 fi
