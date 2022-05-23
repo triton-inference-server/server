@@ -81,6 +81,10 @@ set +e
 # reporting structure, though "triton_c_api" is not strictly a "protocol".
 if [[ "${PERF_CLIENT_PROTOCOL}" == "triton_c_api" ]]; then
     # Using C API requires extra info to start in-process server
+    # NOTE: PA C API doesn't expose --backend-directory, but defaults to
+    #       ${TRITON_DIR}/backends
+    # NOTE: PA C API doesn't expose --backend-config, but this is only used
+    #       for tfserving grpc test currently.
     SERVICE_ARGS="--service-kind triton_c_api \
                   --triton-server-directory ${TRITON_DIR} \
                   --model-repository ${MODEL_REPO}"
