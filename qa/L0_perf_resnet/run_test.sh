@@ -79,7 +79,6 @@ set +e
 
 # Overload use of PERF_CLIENT_PROTOCOL for convenience with existing test and 
 # reporting structure, though "triton_c_api" is not strictly a "protocol".
-# This should be easily extensible for other service kinds.
 if [[ "${PERF_CLIENT_PROTOCOL}" == "triton_c_api" ]]; then
     # Using C API requires extra info to start in-process server
     SERVICE_ARGS="--service-kind triton_c_api \
