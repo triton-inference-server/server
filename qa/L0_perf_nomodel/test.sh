@@ -109,6 +109,7 @@ else
         2
         2
         2)
+    # Small payloads
     TEST_TENSOR_SIZES=(
         1
         1
@@ -145,6 +146,7 @@ TEST_PROTOCOLS+=(
     grpc
     http
     triton_c_api)
+# Large payloads
 TEST_TENSOR_SIZES+=(
     ${TENSOR_SIZE_16MB}
     ${TENSOR_SIZE_16MB}
@@ -185,7 +187,7 @@ for idx in "${!TEST_NAMES[@]}"; do
     TEST_INSTANCE_COUNT=${TEST_INSTANCE_COUNTS[$idx]}
     TEST_CONCURRENCY=${TEST_CONCURRENCY[$idx]}
 
-    # PA C API doesn't support shared memory, so skip this combination
+    # FIXME: If PA C API adds SHMEM support, remove this.
     if [[ "${BENCHMARK_TEST_SHARED_MEMORY}" != "none" ]] && \
        [[ "${TEST_PROTOCOL}" == "triton_c_api" ]]; then
       echo "WARNING: Perf Analyzer C API doesn't currently support shared \
