@@ -47,7 +47,8 @@ TRITON_DIR=${TRITON_DIR:="/opt/tritonserver"}
 ARCH=${ARCH:="x86_64"}
 SERVER=${TRITON_DIR}/bin/tritonserver
 BACKEND_DIR=${TRITON_DIR}/backends
-SERVER_ARGS="--model-repository=`pwd`/models --backend-directory=${BACKEND_DIR}"
+MODEL_REPO="${PWD}/models"
+SERVER_ARGS="--model-repository=${MODEL_REPO} --backend-directory=${BACKEND_DIR}"
 source ../common/util.sh
 
 # DATADIR is already set in environment variable for aarch64
@@ -78,6 +79,18 @@ PERF_CLIENT_PERCENTILE_ARGS="" &&
     (( ${PERF_CLIENT_PERCENTILE} != 0 )) &&
     PERF_CLIENT_PERCENTILE_ARGS="--percentile=${PERF_CLIENT_PERCENTILE}"
 PERF_CLIENT_EXTRA_ARGS="$PERF_CLIENT_PERCENTILE_ARGS --shared-memory \"${SHARED_MEMORY}\""
+
+# Overload use of PERF_CLIENT_PROTOCOL for convenience with existing test and 
+# reporting structure, though "triton_c_api" is not strictly a "protocol".
+if [[ "${PERF_CLIENT_PROTOCOL}" == "triton_c_api" ]]; then
+    # Using C API requires extra info to start in-process server
+    SERVICE_ARGS="--service-kind triton_c_api \
+                  --triton-server-directory ${TRITON_DIR} \
+                  --model-repository ${MODEL_REPO}"
+# Otherwise run as normal via HTTP/GRPC
+else
+    SERVICE_ARGS="-i ${PERF_CLIENT_PROTOCOL}"
+fi
 
 #
 # Use "identity" model for all model types.
@@ -154,12 +167,15 @@ for BACKEND in $BACKENDS; do
                 echo "dynamic_batching { preferred_batch_size: [ ${DYNAMIC_BATCH} ] }" >> config.pbtxt)
     fi
 
-    SERVER_LOG="${RESULTDIR}/${NAME}.serverlog"
-    run_server
-    if [ $SERVER_PID == 0 ]; then
-        echo -e "\n***\n*** Failed to start $SERVER\n***"
-        cat $SERVER_LOG
-        exit 1
+    # Don't start separate server if testing perf with C API
+    if [[ "${PERF_CLIENT_PROTOCOL}" != "triton_c_api" ]]; then
+        SERVER_LOG="${RESULTDIR}/${NAME}.serverlog"
+        run_server
+        if [ $SERVER_PID == 0 ]; then
+            echo -e "\n***\n*** Failed to start $SERVER\n***"
+            cat $SERVER_LOG
+            exit 1
+        fi
     fi
 
     set +e
@@ -167,17 +183,22 @@ for BACKEND in $BACKENDS; do
                  -p${PERF_CLIENT_STABILIZE_WINDOW} \
                  -s${PERF_CLIENT_STABILIZE_THRESHOLD} \
                  ${PERF_CLIENT_EXTRA_ARGS} \
-                 -i ${PERF_CLIENT_PROTOCOL} -m ${MODEL_NAME} \
+                 -m ${MODEL_NAME} \
                  -b${STATIC_BATCH} -t${CONCURRENCY} \
                  --shape ${INPUT_NAME}:${SHAPE} \
+                 ${SERVICE_ARGS} \
                  -f ${RESULTDIR}/${NAME}.csv 2>&1 | tee ${RESULTDIR}/${NAME}.log
     if [ $? -ne 0 ]; then
         RET=1
     fi
-    curl localhost:8002/metrics -o ${RESULTDIR}/${NAME}.metrics >> ${RESULTDIR}/${NAME}.log 2>&1
-    if [ $? -ne 0 ]; then
-        RET=1
-        exit $RET
+
+    # No metrics endpoint available when running with C API
+    if [[ "${PERF_CLIENT_PROTOCOL}" != "triton_c_api" ]]; then
+        curl localhost:8002/metrics -o ${RESULTDIR}/${NAME}.metrics >> ${RESULTDIR}/${NAME}.log 2>&1
+        if [ $? -ne 0 ]; then
+            RET=1
+            exit $RET
+        fi
     fi
     set -e
 

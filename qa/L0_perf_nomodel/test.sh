@@ -83,25 +83,35 @@ else
     TEST_NAMES=(
         "${UNDERTEST_NAME} Minimum Latency GRPC"
         "${UNDERTEST_NAME} Minimum Latency HTTP"
+        "${UNDERTEST_NAME} Minimum Latency C API"
         "${UNDERTEST_NAME} Maximum Throughput GRPC"
-        "${UNDERTEST_NAME} Maximum Throughput HTTP")
+        "${UNDERTEST_NAME} Maximum Throughput HTTP"
+        "${UNDERTEST_NAME} Maximum Throughput C API")
     TEST_DIRS=(
         min_latency_grpc
         min_latency_http
+        min_latency_triton_c_api
         max_throughput_grpc
-        max_throughput_http)
+        max_throughput_http
+        max_throughput_triton_c_api)
     SUFFIX=""
     TEST_CONCURRENCY=(
         1
         1
+        1
+        16
         16
         16)
     TEST_INSTANCE_COUNTS=(
         1
         1
+        1
+        2
         2
         2)
     TEST_TENSOR_SIZES=(
+        1
+        1
         1
         1
         1
@@ -109,25 +119,35 @@ else
     TEST_PROTOCOLS=(
         grpc
         http
+        triton_c_api
         grpc
-        http)
+        http
+        triton_c_api)
 fi
 TEST_NAMES+=(
     "${UNDERTEST_NAME} 16MB I/O Latency GRPC"
     "${UNDERTEST_NAME} 16MB I/O Latency HTTP"
+    "${UNDERTEST_NAME} 16MB I/O Latency C API"
     "${UNDERTEST_NAME} 16MB I/O Throughput GRPC"
-    "${UNDERTEST_NAME} 16MB I/O Throughput HTTP")
+    "${UNDERTEST_NAME} 16MB I/O Throughput HTTP"
+    "${UNDERTEST_NAME} 16MB I/O Throughput C API")
 TEST_DIRS+=(
     16mb_latency_grpc${SUFFIX}
     16mb_latency_http${SUFFIX}
+    16mb_latency_triton_c_api${SUFFIX}
     16mb_throughput_grpc${SUFFIX}
-    16mb_throughput_http${SUFFIX})
+    16mb_throughput_http${SUFFIX}
+    16mb_throughput_triton_c_api${SUFFIX})
 TEST_PROTOCOLS+=(
     grpc
     http
+    triton_c_api
     grpc
-    http)
+    http
+    triton_c_api)
 TEST_TENSOR_SIZES+=(
+    ${TENSOR_SIZE_16MB}
+    ${TENSOR_SIZE_16MB}
     ${TENSOR_SIZE_16MB}
     ${TENSOR_SIZE_16MB}
     ${TENSOR_SIZE_16MB}
@@ -135,11 +155,15 @@ TEST_TENSOR_SIZES+=(
 TEST_INSTANCE_COUNTS+=(
     1
     1
+    1
+    2
     2
     2)
 TEST_CONCURRENCY+=(
     1
     1
+    1
+    16
     16
     16)
 TEST_BACKENDS=${BACKENDS:="plan custom graphdef savedmodel onnx libtorch python"}
@@ -160,6 +184,14 @@ for idx in "${!TEST_NAMES[@]}"; do
     TEST_TENSOR_SIZE=${TEST_TENSOR_SIZES[$idx]}
     TEST_INSTANCE_COUNT=${TEST_INSTANCE_COUNTS[$idx]}
     TEST_CONCURRENCY=${TEST_CONCURRENCY[$idx]}
+
+    # PA C API doesn't support shared memory, so skip this combination
+    if [[ "${BENCHMARK_TEST_SHARED_MEMORY}" != "none" ]] && \
+       [[ "${TEST_PROTOCOL}" == "triton_c_api" ]]; then
+      echo "WARNING: Perf Analyzer C API doesn't currently support shared \
+            memory. Skipping this configuration."
+      continue
+    fi
 
     RESULTNAME=${TEST_NAME} \
                 RESULTDIR=${REPO_VERSION}/${TEST_DIR} \
