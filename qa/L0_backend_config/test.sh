@@ -220,7 +220,7 @@ else
 
     # Assert the max-batch-size is 1 in the case batching is supported
     # in the model but not in the config.
-    MAX_BATCH_LOG_LINE=$(grep -a "\"max_batch_size\":1" $TRIAL.out)
+    MAX_BATCH_LOG_LINE=$(grep -a "\"max_batch_size\":0" $TRIAL.out)
     if [ "$MAX_BATCH_LOG_LINE" == "" ]; then
         echo "*** FAILED: Expected max batch size to be 1 but found: $MAX_BATCH_LOG_LINE\n"
         RET=1
@@ -291,7 +291,7 @@ else
 
     # Assert the max-batch-size is 1 in the case batching is supported
     # in the model but not in the config.
-    MAX_BATCH_LOG_LINE=$(grep -a "\"max_batch_size\":1" $TRIAL.out)
+    MAX_BATCH_LOG_LINE=$(grep -a "\"max_batch_size\":0" $TRIAL.out)
     if [ "$MAX_BATCH_LOG_LINE" == "" ]; then
         echo "*** FAILED: Expected max batch size to be 1 but found: $MAX_BATCH_LOG_LINE\n"
         RET=1
