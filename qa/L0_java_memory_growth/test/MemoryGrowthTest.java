@@ -870,7 +870,15 @@ public class MemoryGrowthTest {
 
       Runnable runnable =
         () -> {
-          if(ValidateMemoryGrowth(max_growth_allowed, max_mem_allowed)){
+          boolean passed = ValidateMemoryGrowth(max_growth_allowed, max_mem_allowed);
+          
+          try {
+            Thread.sleep(5000);
+          } catch (InterruptedException e){
+            System.out.println("Sleep interrupted.");
+          }
+
+          if(passed){
             System.out.println("Memory growth test passed");
           } else {
             System.out.println("Memory growth test FAILED");

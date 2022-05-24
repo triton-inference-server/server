@@ -74,7 +74,7 @@ LOG_IDX=$((LOG_IDX+1))
 CLIENT_LOG="./client_$LOG_IDX.log"
 
 # Longer-running memory growth test 
-ITERS=100000
+ITERS=1000000
 MAX_MEM_GROWTH_MB=10
 if [ "$TRITON_PERF_LONG" == 1 ]; then
     # ~1 day
