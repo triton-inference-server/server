@@ -290,6 +290,9 @@ class TritonPlugin(BaseDeploymentClient):
                 if file.name not in ['MLmodel', 'conda.yaml']:
                     copy_paths['model_path']['from'] = file
             copy_paths['model_path']['to'] = triton_deployment_dir
+            # ensure copy_paths.model_path.from contains at least empty model version folder (ensemble)
+            version_folder = os.path.join(copy_paths['model_path']['from'], "1")
+            os.makedirs(version_folder, exist_ok=True)
         elif flavor == "onnx":
             # Look for model file via MLModel metadata or iterating dir
             model_file = None
