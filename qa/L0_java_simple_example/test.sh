@@ -50,7 +50,7 @@ CLIENT_LOG="client_cpu_only.log"
 DATADIR=/data/inferenceserver/${REPO_VERSION}/qa_model_repository
 MODEL_REPO=`pwd`/models
 
-SAMPLES_REPO=`pwd`/javacpp-presets/tritonserver/samples
+SAMPLES_REPO=`pwd`/javacpp-presets/tritonserver/samples/simple
 BASE_COMMAND="mvn clean compile -f $SAMPLES_REPO exec:java -Djavacpp.platform=linux-x86_64"
 source ../common/util.sh
 
