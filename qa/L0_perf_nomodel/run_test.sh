@@ -139,13 +139,6 @@ for BACKEND in $BACKENDS; do
         REPO_DIR=./custom_models
     elif [ $BACKEND == "python" ]; then
         REPO_DIR=./python_models
-
-        # FIXME: If PA C API adds SHMEM support, remove this.
-        if [[ "${PERF_CLIENT_PROTOCOL}" == "triton_c_api" ]]; then
-            echo "WARNING: Python backend requires Shared Memory and PA C API \
-                  does not support shared memory. Skipping this test."
-            continue
-        fi
     else
         REPO_DIR=$DATADIR/qa_identity_model_repository
     fi
