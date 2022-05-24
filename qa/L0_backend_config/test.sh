@@ -217,7 +217,7 @@ if [ "$SERVER_PID" == "0" ]; then
 else
     save_model_config
 
-    # Assert the max-batch-size is 1 in the case batching is supported
+    # Assert the max-batch-size is 0 in the case batching is supported
     # in the model but not in the config.
     MAX_BATCH_LOG_LINE=$(grep -a "\"max_batch_size\":0" $TRIAL.out)
     if [ "$MAX_BATCH_LOG_LINE" == "" ]; then
@@ -288,7 +288,7 @@ if [ "$SERVER_PID" == "0" ]; then
 else
     save_model_config
 
-    # Assert the max-batch-size is 1 in the case batching is supported
+    # Assert the max-batch-size is 0 in the case batching is supported
     # in the model but not in the config.
     MAX_BATCH_LOG_LINE=$(grep -a "\"max_batch_size\":0" $TRIAL.out)
     if [ "$MAX_BATCH_LOG_LINE" == "" ]; then
