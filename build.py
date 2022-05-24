@@ -1002,7 +1002,6 @@ FROM ${BASE_IMAGE}
     df += '''
 WORKDIR /opt
 COPY --chown=1000:1000 build/install tritonserver
-RUN chmod -R go-w tritonserver
 
 WORKDIR /opt/tritonserver
 COPY --chown=1000:1000 NVIDIA_Deep_Learning_Container_License.pdf .
