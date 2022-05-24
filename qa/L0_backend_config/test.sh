@@ -181,7 +181,6 @@ TRIAL=tensorflow_batching_on
 if [ "$SERVER_PID" == "0" ]; then
     echo -e "*** FAILED: Server failed to start $SERVER\n"
     RET=1
-
 else
     save_model_config
 
