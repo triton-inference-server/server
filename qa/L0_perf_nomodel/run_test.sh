@@ -169,7 +169,7 @@ for BACKEND in $BACKENDS; do
                 echo "dynamic_batching { preferred_batch_size: [ ${DYNAMIC_BATCH} ] }" >> config.pbtxt)
     fi
 
-    # Don't start separate server if testing perf with C API
+    # Only start separate server if not using C API, since C API runs server in-process
     if [[ "${PERF_CLIENT_PROTOCOL}" != "triton_c_api" ]]; then
         SERVER_LOG="${RESULTDIR}/${NAME}.serverlog"
         run_server

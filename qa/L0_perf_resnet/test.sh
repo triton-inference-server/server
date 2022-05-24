@@ -137,6 +137,13 @@ done
 # Tests with optimization enabled models
 for MODEL_NAME in $OPTIMIZED_MODEL_NAMES; do
     for PROTOCOL in $PROTOCOLS; do
+        # NOTE: Skip TF-TRT for C API test, it is too inconsistent with
+        # generating TRT engine in time for perf measurement window
+        if [[ "${MODEL_NAME}" == "${TFTRT_MODEL_NAME}" ]] && \
+           [[ "${PROTOCOL}" == "triton_c_api" ]]; then
+           continue
+        fi
+
         REPO=`pwd`/optimized_model_store
         FRAMEWORK=$(echo ${MODEL_NAME} | cut -d '_' -f 3,4)
         MODEL_NAME=${MODEL_NAME} \

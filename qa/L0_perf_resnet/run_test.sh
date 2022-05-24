@@ -53,17 +53,6 @@ rm -fr models && mkdir -p models && \
             sed -i "s/^max_batch_size:.*/max_batch_size: ${MAX_BATCH}/" config.pbtxt && \
             echo "instance_group [ { count: ${INSTANCE_CNT} }]" >> config.pbtxt)
 
-# Don't start separate server if testing perf with C API
-if [[ "${PERF_CLIENT_PROTOCOL}" != "triton_c_api" ]]; then
-    SERVER_LOG="${NAME}.serverlog"
-    run_server
-    if (( $SERVER_PID == 0 )); then
-        echo -e "\n***\n*** Failed to start $SERVER\n***"
-        cat $SERVER_LOG
-        exit 1
-    fi
-fi
-
 # Onnx and onnx-trt models are very slow on Jetson.
 MEASUREMENT_WINDOW=5000
 if [ "$ARCH" == "aarch64" ]; then
@@ -79,6 +68,7 @@ set +e
 
 # Overload use of PERF_CLIENT_PROTOCOL for convenience with existing test and 
 # reporting structure, though "triton_c_api" is not strictly a "protocol".
+# NOTE: tritonserver will be ran in-process with perf_analyzer
 if [[ "${PERF_CLIENT_PROTOCOL}" == "triton_c_api" ]]; then
     # Using C API requires extra info to start in-process server
     # NOTE: PA C API doesn't expose --backend-directory, but defaults to
@@ -88,17 +78,30 @@ if [[ "${PERF_CLIENT_PROTOCOL}" == "triton_c_api" ]]; then
     SERVICE_ARGS="--service-kind triton_c_api \
                   --triton-server-directory ${TRITON_DIR} \
                   --model-repository ${MODEL_REPO}"
-# Otherwise run as normal via HTTP/GRPC
+# Otherwise run server as separate process as normal via HTTP/GRPC
 else
     SERVICE_ARGS="-i ${PERF_CLIENT_PROTOCOL}"
+
+    # Don't start separate server if testing perf with C API
+    SERVER_LOG="${NAME}.serverlog"
+    run_server
+    if (( $SERVER_PID == 0 )); then
+        echo -e "\n***\n*** Failed to start $SERVER\n***"
+        cat $SERVER_LOG
+        exit 1
+    fi
+
+    # NOTE: Running PA for warmup doesn't make sense for C API since it uses
+    # in-process tritonserver; the runs are independent.
+
+    # Run the model once to warm up. Some frameworks do optimization on the first requests.
+    # Must warmup similar to actual run so that all instances are ready
+    $PERF_CLIENT -v -m $MODEL_NAME -p${MEASUREMENT_WINDOW} \
+                    -b${STATIC_BATCH} --concurrency-range ${CONCURRENCY} \
+                    ${SERVICE_ARGS}
 fi
 
-# Run the model once to warm up. Some frameworks do optimization on the first requests.
-# Must warmup similar to actual run so that all instances are ready
-$PERF_CLIENT -v -m $MODEL_NAME -p${MEASUREMENT_WINDOW} \
-                -b${STATIC_BATCH} --concurrency-range ${CONCURRENCY} \
-                ${SERVICE_ARGS}
-
+# Measure perf client results and write them to a file for reporting
 $PERF_CLIENT -v -m $MODEL_NAME -p${MEASUREMENT_WINDOW} \
                 -b${STATIC_BATCH} --concurrency-range ${CONCURRENCY} \
                 ${SERVICE_ARGS} \

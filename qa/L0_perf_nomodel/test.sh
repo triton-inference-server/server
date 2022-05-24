@@ -190,8 +190,7 @@ for idx in "${!TEST_NAMES[@]}"; do
     # FIXME: If PA C API adds SHMEM support, remove this.
     if [[ "${BENCHMARK_TEST_SHARED_MEMORY}" != "none" ]] && \
        [[ "${TEST_PROTOCOL}" == "triton_c_api" ]]; then
-      echo "WARNING: Perf Analyzer C API doesn't currently support shared \
-            memory. Skipping this configuration."
+      echo "WARNING: Perf Analyzer C API doesn't currently support shared memory, skipping."
       continue
     fi
 
