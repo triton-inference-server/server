@@ -106,7 +106,7 @@ $PERF_CLIENT -v -m $MODEL_NAME -p${MEASUREMENT_WINDOW} \
                 -b${STATIC_BATCH} --concurrency-range ${CONCURRENCY} \
                 ${SERVICE_ARGS} \
                 -f ${NAME}.csv 2>&1 | tee ${NAME}.log
-
+# Check perf client succeeded
 if (( $? != 0 )); then
     RET=1
 fi
