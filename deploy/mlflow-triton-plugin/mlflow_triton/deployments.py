@@ -290,9 +290,6 @@ class TritonPlugin(BaseDeploymentClient):
                 if file.name not in ['MLmodel', 'conda.yaml']:
                     copy_paths['model_path']['from'] = file
             copy_paths['model_path']['to'] = triton_deployment_dir
-            # ensure copy_paths.model_path.from contains at least empty model version folder (ensemble)
-            version_folder = os.path.join(copy_paths['model_path']['from'], "1")
-            os.makedirs(version_folder, exist_ok=True)
         elif flavor == "onnx":
             # Look for model file via MLModel metadata or iterating dir
             model_file = None
@@ -346,6 +343,10 @@ default_model_filename: "{}"
                 shutil.copy(copy_paths[key]['from'], copy_paths[key]['to'])
             print("Copied", copy_paths[key]['from'], "to",
                   copy_paths[key]['to'])
+        # ensure model version folder exists (ensemble)
+        triton_deployment_dir = os.path.join(self.triton_model_repo, name)
+        version_folder = os.path.join(triton_deployment_dir, "1")
+        os.makedirs(version_folder, exist_ok=True)
         return copy_paths
 
     def _delete_deployment_files(self, name):
