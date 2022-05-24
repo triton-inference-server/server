@@ -36,16 +36,19 @@ mvn clean install -f platform --projects ../tritonserver/platform -Djavacpp.plat
 cd ..
 set -e
 
-MODEL_REPO=`pwd`/models
-
 export MAVEN_OPTS="-XX:MaxGCPauseMillis=40"
-BASE_COMMAND="mvn clean compile -f test exec:java -Djavacpp.platform=linux-x86_64"
+MODEL_REPO=`pwd`/models
+SAMPLES_REPO=`pwd`/javacpp-presets/tritonserver/samples/simple
+BASE_COMMAND="mvn clean compile -f $SAMPLES_REPO exec:java -Djavacpp.platform=linux-x86_64"
 source ../common/util.sh
 
 # Create local model repository
 rm -rf ${MODEL_REPO}
 mkdir ${MODEL_REPO}
 cp -r `pwd`/../L0_simple_ensemble/models/simple ${MODEL_REPO}/.
+
+cp MemoryGrowthTest.java $SAMPLES_REPO
+sed -i 's/Simple/MemoryGrowthTest/g' $SAMPLES_REPO/pom.xml
 
 rm -f *.log
 RET=0
