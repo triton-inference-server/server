@@ -1108,7 +1108,7 @@ def create_libtorch_modelfile(models_dir, model_version, max_batch, dtype,
                               shape):
 
     if not tu.validate_for_libtorch_model(dtype, dtype, dtype, shape, shape,
-                                          shape):
+                                          shape, max_batch):
         return
 
     torch_dtype = np_to_torch_dtype(dtype)
@@ -1160,7 +1160,7 @@ def create_libtorch_modelconfig(models_dir, model_version, max_batch, dtype,
                                 shape):
 
     if not tu.validate_for_libtorch_model(dtype, dtype, dtype, shape, shape,
-                                          shape):
+                                          shape, max_batch):
         return
 
     model_name = tu.get_sequence_model_name(
@@ -1399,7 +1399,8 @@ def create_models(models_dir, dtype, shape, no_batch=True):
             create_onnx_modelconfig(models_dir, model_version, 0, dtype, shape)
             create_onnx_modelfile(models_dir, model_version, 0, dtype, shape)
 
-    if FLAGS.libtorch:
+    # Skip for PyTorch String I/O
+    if FLAGS.libtorch and (dtype != np_dtype_string):
         create_libtorch_modelconfig(models_dir, model_version, 8, dtype, shape)
         create_libtorch_modelfile(models_dir, model_version, 8, dtype, shape)
         if no_batch:

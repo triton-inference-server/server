@@ -43,11 +43,9 @@
 #define TRITONJSON_STATUSSUCCESS nullptr
 #include "triton/common/triton_json.h"
 
-#ifdef TRITON_ENABLE_GPU
 extern "C" {
 #include <b64/cdecode.h>
 }
-#endif  // TRITON_ENABLE_GPU
 
 #ifdef TRITON_ENABLE_TRACING
 #include "tracer.h"
@@ -434,6 +432,16 @@ ReadDataFromJson(
               std::string(tensor_name))
               .c_str());
 
+    // BF16 not supported via JSON
+    case TRITONSERVER_TYPE_BF16:
+      return TRITONSERVER_ErrorNew(
+          TRITONSERVER_ERROR_INVALID_ARG,
+          std::string(
+              "receiving BF16 data via JSON is not supported. Please use the "
+              "binary data format for input " +
+              std::string(tensor_name))
+              .c_str());
+
     case TRITONSERVER_TYPE_INVALID:
       return TRITONSERVER_ErrorNew(
           TRITONSERVER_ERROR_INVALID_ARG,
@@ -584,6 +592,13 @@ WriteDataToJson(
       return TRITONSERVER_ErrorNew(
           TRITONSERVER_ERROR_INVALID_ARG,
           "sending FP16 data via JSON is not supported. Please use the "
+          "binary data format for output");
+
+    // BF16 not supported via JSON
+    case TRITONSERVER_TYPE_BF16:
+      return TRITONSERVER_ErrorNew(
+          TRITONSERVER_ERROR_INVALID_ARG,
+          "sending BF16 data via JSON is not supported. Please use the "
           "binary data format for output");
 
     case TRITONSERVER_TYPE_FP32: {
@@ -1305,7 +1320,23 @@ HTTPAPIServer::HandleRepositoryControl(
                        "unexpected error getting load model request buffers"));
         }
       }
-      std::vector<const TRITONSERVER_Parameter*> params;
+      static auto param_deleter =
+          [](std::vector<TRITONSERVER_Parameter*>* params) {
+            if (params != nullptr) {
+              for (auto& param : *params) {
+                TRITONSERVER_ParameterDelete(param);
+              }
+              delete params;
+            }
+          };
+      std::unique_ptr<
+          std::vector<TRITONSERVER_Parameter*>, decltype(param_deleter)>
+      params(new std::vector<TRITONSERVER_Parameter*>(), param_deleter);
+      // local variables to store the decoded file content, the data must
+      // be valid until TRITONSERVER_ServerLoadModelWithParameters returns.
+      std::list<std::vector<char>> binary_files;
+      // WAR for the const-ness check
+      std::vector<const TRITONSERVER_Parameter*> const_params;
       size_t buffer_len = evbuffer_get_length(req->buffer_in);
       if (buffer_len > 0) {
         triton::common::TritonJson::Value request;
@@ -1315,14 +1346,36 @@ HTTPAPIServer::HandleRepositoryControl(
         // Parse request body for parameters
         triton::common::TritonJson::Value param_json;
         if (request.Find("parameters", &param_json)) {
-          triton::common::TritonJson::Value param;
-          if (param_json.Find("config", &param)) {
-            std::string config;
-            HTTP_RESPOND_IF_ERR(req, param.AsString(&config));
-            auto param = TRITONSERVER_ParameterNew(
-                "config", TRITONSERVER_PARAMETER_STRING, config.c_str());
+          // Iterate over each member in 'param_json'
+          std::vector<std::string> members;
+          HTTP_RESPOND_IF_ERR(req, param_json.Members(&members));
+          for (const auto& m : members) {
+            const char* param_str = nullptr;
+            size_t param_len = 0;
+            HTTP_RESPOND_IF_ERR(
+                req,
+                param_json.MemberAsString(m.c_str(), &param_str, &param_len));
+
+            TRITONSERVER_Parameter* param = nullptr;
+            if (m == "config") {
+              param = TRITONSERVER_ParameterNew(
+                  m.c_str(), TRITONSERVER_PARAMETER_STRING, param_str);
+            } else if (m.rfind("file:", 0) == 0) {
+              // Decode base64
+              base64_decodestate s;
+              base64_init_decodestate(&s);
+
+              // The decoded can not be larger than the input...
+              binary_files.emplace_back(std::vector<char>(param_len + 1));
+              size_t decoded_size = base64_decode_block(
+                  param_str, param_len, binary_files.back().data(), &s);
+              param = TRITONSERVER_ParameterBytesNew(
+                  m.c_str(), binary_files.back().data(), decoded_size);
+            }
+
             if (param != nullptr) {
-              params.emplace_back(param);
+              params->emplace_back(param);
+              const_params.emplace_back(param);
             } else {
               HTTP_RESPOND_IF_ERR(
                   req, TRITONSERVER_ErrorNew(
@@ -1332,8 +1385,10 @@ HTTPAPIServer::HandleRepositoryControl(
           }
         }
       }
-      err = TRITONSERVER_ServerLoadModelWithParameters(
-          server_.get(), model_name.c_str(), params.data(), params.size());
+      HTTP_RESPOND_IF_ERR(
+          req, TRITONSERVER_ServerLoadModelWithParameters(
+                   server_.get(), model_name.c_str(), const_params.data(),
+                   const_params.size()));
     } else if (action == "unload") {
       // Check if the dependent models should be removed
       bool unload_dependents = false;
@@ -2884,6 +2939,12 @@ HTTPAPIServer::InferRequestClass::FinalizeResponse(
         case TRITONSERVER_PARAMETER_STRING:
           RETURN_IF_ERR(params_json.AddStringRef(
               name, reinterpret_cast<const char*>(vvalue)));
+          break;
+        case TRITONSERVER_PARAMETER_BYTES:
+          return TRITONSERVER_ErrorNew(
+              TRITONSERVER_ERROR_UNSUPPORTED,
+              "Response parameter of type 'TRITONSERVER_PARAMETER_BYTES' is "
+              "not currently supported");
           break;
       }
     }

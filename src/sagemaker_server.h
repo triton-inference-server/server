@@ -25,9 +25,13 @@
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #pragma once
 
-#include "http_server.h"
+#include <mutex>
+#include <sys/stat.h>
 
 #include "common.h"
+#include "dirent.h"
+#include "http_server.h"
+#include "triton/core/tritonserver.h"
 
 namespace triton { namespace server {
 
@@ -63,6 +67,9 @@ class SagemakerAPIServer : public HTTPAPIServer {
       : HTTPAPIServer(
             server, trace_manager, shm_manager, port, address, thread_cnt),
         ping_regex_(R"(/ping)"), invocations_regex_(R"(/invocations)"),
+        models_regex_(R"(/models(?:/)?([^/]+)?(/invoke)?)"),
+        model_path_regex_(
+            R"((\/opt\/ml\/models\/[0-9A-Za-z._]+)\/(model)\/?([0-9A-Za-z._]+)?)"),
         ping_mode_("ready"),
         model_name_(GetEnvironmentVariableOrDefault(
             "SAGEMAKER_TRITON_DEFAULT_MODEL_NAME",
@@ -70,6 +77,24 @@ class SagemakerAPIServer : public HTTPAPIServer {
         model_version_str_("")
   {
   }
+
+  void ParseSageMakerRequest(
+      evhtp_request_t* req,
+      std::unordered_map<std::string, std::string>* parse_map,
+      const std::string& action);
+
+  void SageMakerMMELoadModel(
+      evhtp_request_t* req,
+      const std::unordered_map<std::string, std::string> parse_map);
+
+  void SageMakerMMEHandleLoadError(
+      evhtp_request_t* req, TRITONSERVER_Error* load_err);
+
+  void SageMakerMMEUnloadModel(evhtp_request_t* req, const char* model_name);
+
+  void SageMakerMMEListModel(evhtp_request_t* req);
+
+  void SageMakerMMEGetModel(evhtp_request_t* req, const char* model_name);
 
   void Handle(evhtp_request_t* req) override;
 
@@ -83,6 +108,7 @@ class SagemakerAPIServer : public HTTPAPIServer {
       evhtp_request_t* req, int32_t content_length,
       size_t* header_length) override;
 
+
   // Currently the compresssion schema hasn't been defined,
   // assume identity compression type is used for both request and response
   DataCompressor::Type GetRequestCompressionType(evhtp_request_t* req) override
@@ -95,14 +121,23 @@ class SagemakerAPIServer : public HTTPAPIServer {
   }
   re2::RE2 ping_regex_;
   re2::RE2 invocations_regex_;
+  re2::RE2 models_regex_;
+  re2::RE2 model_path_regex_;
 
   const std::string ping_mode_;
 
-  // For single model mode, assume that only one version of "model" is presented
+  /* For single model mode, assume that only one version of "model" is presented
+   */
   const std::string model_name_;
   const std::string model_version_str_;
 
   static const std::string binary_mime_type_;
+
+  /* Maintain list of loaded models */
+  std::unordered_map<std::string, std::string> sagemaker_models_list_;
+
+  /* Mutex to handle concurrent updates */
+  std::mutex mutex_;
 };
 
 }}  // namespace triton::server

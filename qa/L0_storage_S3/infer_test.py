@@ -1,4 +1,4 @@
-# Copyright (c) 2018-2021, NVIDIA CORPORATION. All rights reserved.
+# Copyright 2018-2022, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -131,9 +131,10 @@ class InferTest(tu.TestResultCollector):
                                 output1_raw=output1_raw,
                                 swap=swap)
 
+        # Skip for batched string I/O
         if tu.validate_for_libtorch_model(input_dtype, output0_dtype,
                                           output1_dtype, (input_size,),
-                                          (input_size,), (input_size,)):
+                                          (input_size,), (input_size,), 8):
             _infer_exact_helper(self,
                                 'libtorch', (input_size,),
                                 8,

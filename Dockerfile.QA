@@ -81,8 +81,8 @@ RUN mkdir -p inception_graphdef/1 && \
 # Update the qa/ directory with test executables, models, etc.
 WORKDIR /workspace
 RUN mkdir -p qa/common && \
-    cp -r src/test/models/repeat_int32 qa/L0_decoupled/models/ && \
-    cp -r src/test/models/square_int32 qa/L0_decoupled/models/ && \
+    cp -r /workspace/src/test/models/repeat_int32 qa/L0_decoupled/models/ && \
+    cp -r /workspace/src/test/models/square_int32 qa/L0_decoupled/models/ && \
     mkdir qa/L0_simple_example/models && \
     cp -r docs/examples/model_repository/simple qa/L0_simple_example/models/. && \
     mkdir qa/L0_simple_go_client/models && \
@@ -136,6 +136,7 @@ RUN mkdir -p qa/common && \
     cp -r docs/examples/model_repository/simple qa/L0_data_compression/models && \
     cp bin/data_compressor_test qa/L0_data_compression/. && \
     cp bin/metrics_api_test qa/L0_metrics/. && \
+    cp bin/response_cache_test qa/L0_response_cache/. && \
     cp -r deploy/mlflow-triton-plugin qa/L0_mlflow/.
 
 # caffe2plan will not exist if the build was done without TensorRT enabled
@@ -245,6 +246,17 @@ RUN mkdir -p qa/L0_decoupled/models/simple_repeat/1 && \
     mkdir -p qa/L0_decoupled/models/sequence_repeat/1 && \
     mkdir -p qa/L0_decoupled/models/repeat_square/1 && \
     mkdir -p qa/L0_decoupled/models/nested_square/1
+
+RUN cp -r qa/L0_decoupled/models qa/L0_decoupled/python_models/ && \
+    cp /workspace/tritonbuild/python/examples/decoupled/repeat_model.py \
+        qa/L0_decoupled/python_models/repeat_int32/1/. && \
+    cp /workspace/tritonbuild/python/examples/decoupled/repeat_config.pbtxt \
+        qa/L0_decoupled/python_models/repeat_int32/. && \
+    cp /workspace/tritonbuild/python/examples/decoupled/square_model.py \
+        qa/L0_decoupled/python_models/square_int32/1/. && \
+    cp /workspace/tritonbuild/python/examples/decoupled/square_config.pbtxt \
+        qa/L0_decoupled/python_models/square_int32/.
+
 RUN mkdir -p qa/L0_repoagent_checksum/models/identity_int32/1 && \
     cp tritonbuild/identity/install/backends/identity/libtriton_identity.so \
         qa/L0_repoagent_checksum/models/identity_int32/1/.
@@ -305,6 +317,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
                               libopencv-core-dev \
                               libzmq3-dev \
                               maven \
+                              openjdk-11-jdk \
                               nginx \
                               npm \
                               protobuf-compiler \

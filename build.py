@@ -89,10 +89,10 @@ from inspect import getsourcefile
 # Note: Not all sha ids would successfuly compile and work.
 #
 TRITON_VERSION_MAP = {
-    '2.22.0dev': (
-        '22.05dev',  # triton container
-        '22.03',  # upstream container
-        '1.10.0',  # ORT
+    '2.23.0dev': (
+        '22.06dev',  # triton container
+        '22.04',  # upstream container
+        '1.11.1',  # ORT
         '2021.4.582',  # ORT OpenVINO
         (('2021.4', None), ('2021.4', '2021.4.582'),
          ('SPECIFIC', 'f2f281e6')),  # Standalone OpenVINO
@@ -583,6 +583,8 @@ def backend_cmake_args(images, components, be, install_dir, library_paths,
                              FLAGS.enable_mali_gpu))
     cargs.append(
         cmake_backend_enable(be, 'TRITON_ENABLE_STATS', FLAGS.enable_stats))
+    cargs.append(
+        cmake_backend_enable(be, 'TRITON_ENABLE_METRICS', FLAGS.enable_metrics))
 
     cargs += cmake_backend_extra_args(be)
     cargs.append('..')
@@ -817,20 +819,18 @@ def install_dcgm_libraries(dcgm_version, target_machine):
             return '''
 ENV DCGM_VERSION {}
 # Install DCGM. Steps from https://developer.nvidia.com/dcgm#Downloads
-RUN wget https://developer.download.nvidia.com/compute/cuda/repos/ubuntu2004/sbsa/cuda-ubuntu2004.pin && \
-    mv cuda-ubuntu2004.pin /etc/apt/preferences.d/cuda-repository-pin-600 && \
-    apt-key adv --fetch-keys https://developer.download.nvidia.com/compute/cuda/repos/ubuntu2004/sbsa/7fa2af80.pub && \
-    add-apt-repository "deb https://developer.download.nvidia.com/compute/cuda/repos/ubuntu2004/sbsa/ /" && \
+RUN curl -o /tmp/cuda-keyring.deb \
+    https://developer.download.nvidia.com/compute/cuda/repos/ubuntu2004/sbsa/cuda-keyring_1.0-1_all.deb \
+    && apt install /tmp/cuda-keyring.deb && rm /tmp/cuda-keyring.deb && \
     apt-get update && apt-get install -y datacenter-gpu-manager=1:{}
 '''.format(dcgm_version, dcgm_version)
         else:
             return '''
 ENV DCGM_VERSION {}
 # Install DCGM. Steps from https://developer.nvidia.com/dcgm#Downloads
-RUN wget https://developer.download.nvidia.com/compute/cuda/repos/ubuntu2004/x86_64/cuda-ubuntu2004.pin && \
-    mv cuda-ubuntu2004.pin /etc/apt/preferences.d/cuda-repository-pin-600 && \
-    apt-key adv --fetch-keys https://developer.download.nvidia.com/compute/cuda/repos/ubuntu2004/x86_64/7fa2af80.pub && \
-    add-apt-repository "deb https://developer.download.nvidia.com/compute/cuda/repos/ubuntu2004/x86_64/ /" && \
+RUN curl -o /tmp/cuda-keyring.deb \
+    https://developer.download.nvidia.com/compute/cuda/repos/ubuntu2004/x86_64/cuda-keyring_1.0-1_all.deb \
+    && apt install /tmp/cuda-keyring.deb && rm /tmp/cuda-keyring.deb && \
     apt-get update && apt-get install -y datacenter-gpu-manager=1:{}
 '''.format(dcgm_version, dcgm_version)
 
@@ -972,11 +972,12 @@ ARG BASE_IMAGE={}
 '''.format(argmap['TRITON_VERSION'], argmap['TRITON_CONTAINER_VERSION'],
            argmap['BASE_IMAGE'])
 
-    # PyTorch and TensorFlow1 backend need extra CUDA and other dependencies
-    # during runtime that are missing in the CPU only base container. These
-    # dependencies must be copied from the Triton Min image
-    if not FLAGS.enable_gpu and \
-        (('pytorch' in backends) or ('tensorflow1' in backends)):
+    # PyTorch, TensorFlow 1 and TensorFlow 2 backends need extra CUDA and other
+    # dependencies during runtime that are missing in the CPU-only base container.
+    # These dependencies must be copied from the Triton Min image.
+    if not FLAGS.enable_gpu and (('pytorch' in backends) or
+                                 ('tensorflow1' in backends) or
+                                 ('tensorflow2' in backends)):
         df += '''
 ############################################################################
 ##  Triton Min image
@@ -1009,7 +1010,15 @@ COPY --chown=1000:1000 NVIDIA_Deep_Learning_Container_License.pdf .
         if 'sagemaker' in endpoints:
             df += '''
 LABEL com.amazonaws.sagemaker.capabilities.accept-bind-to-port=true
+LABEL com.amazonaws.sagemaker.capabilities.multi-models=true
 COPY --chown=1000:1000 docker/sagemaker/serve /usr/bin/.
+'''
+
+    # This is required since libcublasLt.so is not present during the build
+    # stage of the PyTorch backend
+    if not FLAGS.enable_gpu and ('pytorch' in backends):
+        df += '''
+RUN patchelf --add-needed /usr/local/cuda/lib64/stubs/libcublasLt.so.11 backends/pytorch/libtorch_cuda.so
 '''
 
     with open(os.path.join(ddir, dockerfile_name), "w") as dfile:
@@ -1094,15 +1103,16 @@ RUN ln -sf ${_CUDA_COMPAT_PATH}/lib.real ${_CUDA_COMPAT_PATH}/lib \
  && rm -f ${_CUDA_COMPAT_PATH}/lib
 '''
 
-    elif ('pytorch' in backends) or ('tensorflow1' in backends):
-        cuda_arch = 'sbsa' if target_machine == 'aarch64' else 'x86_64'
+    else:
         libs_arch = 'aarch64' if target_machine == 'aarch64' else 'x86_64'
-        # Add extra dependencies for tensorflow1/pytorch backend.
-        # Note: Even though the build is cpu-only, the version of tensorflow1/
-        # pytorch we are using depend upon libraries like cuda and cudnn. Since
-        # these dependencies are not present in the ubuntu base image,
-        # we must copy these from the Triton min container ourselves.
-        df += '''
+        if ('pytorch' in backends) or ('tensorflow1' in backends):
+            # Add extra dependencies for tensorflow1/pytorch backend.
+            # Note: Even though the build is CPU-only, the version of tensorflow1/
+            # pytorch we are using depend upon libraries like cuda and cudnn. Since
+            # these dependencies are not present in the ubuntu base image,
+            # we must copy these from the Triton min container ourselves.
+            cuda_arch = 'sbsa' if target_machine == 'aarch64' else 'x86_64'
+            df += '''
 RUN mkdir -p /usr/local/cuda/lib64/stubs
 COPY --from=min_container /usr/local/cuda/lib64/stubs/libcusparse.so /usr/local/cuda/lib64/stubs/libcusparse.so.11
 COPY --from=min_container /usr/local/cuda/lib64/stubs/libcusolver.so /usr/local/cuda/lib64/stubs/libcusolver.so.11
@@ -1116,14 +1126,25 @@ COPY --from=min_container /usr/local/cuda-11.6/targets/{cuda_arch}-linux/lib/lib
 COPY --from=min_container /usr/local/cuda-11.6/targets/{cuda_arch}-linux/lib/libcupti.so.11.6 /usr/local/cuda/targets/{cuda_arch}-linux/lib/.
 COPY --from=min_container /usr/local/cuda-11.6/targets/{cuda_arch}-linux/lib/libnvToolsExt.so.1 /usr/local/cuda/targets/{cuda_arch}-linux/lib/.
 
-COPY --from=min_container /usr/lib/{libs_arch}-linux-gnu/libnccl.so.2 /usr/lib/{libs_arch}-linux-gnu/libnccl.so.2
 COPY --from=min_container /usr/lib/{libs_arch}-linux-gnu/libcudnn.so.8 /usr/lib/{libs_arch}-linux-gnu/libcudnn.so.8
 
+# patchelf is needed to add deps of libcublasLt.so.11 to libtorch_cuda.so
 RUN apt-get update && \
-        apt-get install -y --no-install-recommends openmpi-bin
+        apt-get install -y --no-install-recommends openmpi-bin patchelf
 
 ENV LD_LIBRARY_PATH /usr/local/cuda/targets/{cuda_arch}-linux/lib:/usr/local/cuda/lib64/stubs:${{LD_LIBRARY_PATH}}
 '''.format(cuda_arch=cuda_arch, libs_arch=libs_arch)
+
+        if ('pytorch' in backends) or ('tensorflow1' in backends) \
+                or ('tensorflow2' in backends):
+            # Add NCCL dependency for tensorflow1/tensorflow2/pytorch backend.
+            # Note: Even though the build is CPU-only, the version of tensorflow1/
+            # tensorflow2/pytorch we are using depends upon the NCCL library. Since
+            # this dependency is not present in the ubuntu base image, we must
+            # copy it from the Triton min container ourselves.
+            df += '''
+COPY --from=min_container /usr/lib/{libs_arch}-linux-gnu/libnccl.so.2 /usr/lib/{libs_arch}-linux-gnu/libnccl.so.2
+'''.format(libs_arch=libs_arch)
 
     # Add dependencies needed for python backend
     if 'python' in backends:
@@ -1147,7 +1168,7 @@ ENV NVIDIA_PRODUCT_NAME="Triton Server"
 COPY docker/entrypoint.d/ /opt/nvidia/entrypoint.d/
 '''
 
-    # The cpu-only build uses ubuntu as the base image, and so the
+    # The CPU-only build uses ubuntu as the base image, and so the
     # entrypoint files are not available in /opt/nvidia in the base
     # image, so we must provide them ourselves.
     if not enable_gpu:
@@ -1238,11 +1259,12 @@ def create_build_dockerfiles(container_build_dir, images, backends, repoagents,
             not in TRITON_VERSION_MAP else TRITON_VERSION_MAP[FLAGS.version][5],
     }
 
-    # For cpu-only image we need to copy some cuda libraries and dependencies
-    # since we are using a PyTorch/TensorFlow1 container that is not CPU-only
-    if not FLAGS.enable_gpu and \
-        (('pytorch' in backends) or ('tensorflow1' in backends)) \
-        and (target_platform() != 'windows'):
+    # For CPU-only image we need to copy some cuda libraries and dependencies
+    # since we are using PyTorch, TensorFlow 1, TensorFlow 2 containers that
+    # are not CPU-only.
+    if not FLAGS.enable_gpu and (
+        ('pytorch' in backends) or ('tensorflow1' in backends) or
+        ('tensorflow2' in backends)) and (target_platform() != 'windows'):
         if 'gpu-base' in images:
             gpu_base_image = images['gpu-base']
         else:
@@ -1300,7 +1322,8 @@ def create_docker_build_script(script_name, container_install_dir,
         # Windows docker runs in a VM and memory needs to be specified
         # explicitly (at least for some configurations of docker).
         if target_platform() == 'windows':
-            baseargs += ['--memory', FLAGS.container_memory]
+            if FLAGS.container_memory:
+                baseargs += ['--memory', FLAGS.container_memory]
 
         baseargs += ['--cache-from={}'.format(k) for k in cachefrommap]
         baseargs += ['.']
@@ -1332,7 +1355,8 @@ def create_docker_build_script(script_name, container_install_dir,
             runargs += ['-it']
 
         if target_platform() == 'windows':
-            runargs += ['--memory', FLAGS.container_memory]
+            if FLAGS.container_memory:
+                runargs += ['--memory', FLAGS.container_memory]
             runargs += [
                 '-v', '\\\\.\pipe\docker_engine:\\\\.\pipe\docker_engine'
             ]
@@ -1719,7 +1743,7 @@ if __name__ == '__main__':
         help='Do not use Docker --pull argument when building container.')
     parser.add_argument(
         '--container-memory',
-        default="8g",
+        default=None,
         required=False,
         help='Value for Docker --memory argument. Used only for windows builds.'
     )
@@ -1913,7 +1937,7 @@ if __name__ == '__main__':
         action='append',
         required=False,
         help=
-        'Include specified backend in build as <backend-name>[:<repo-tag>]. If <repo-tag> starts with "pull/" then it refers to a pull-request reference, otherwise <repo-tag> indicates the git tag/branch to use for the build. If the version is non-development then the default <repo-tag> is the release branch matching the container version (e.g. version 22.03 -> branch r22.03); otherwise the default <repo-tag> is "main" (e.g. version 22.03dev -> branch main).'
+        'Include specified backend in build as <backend-name>[:<repo-tag>]. If <repo-tag> starts with "pull/" then it refers to a pull-request reference, otherwise <repo-tag> indicates the git tag/branch to use for the build. If the version is non-development then the default <repo-tag> is the release branch matching the container version (e.g. version 22.04 -> branch r22.04); otherwise the default <repo-tag> is "main" (e.g. version 22.04dev -> branch main).'
     )
     parser.add_argument(
         '--build-multiple-openvino',
@@ -1927,14 +1951,14 @@ if __name__ == '__main__':
         action='append',
         required=False,
         help=
-        'The version of a component to use in the build as <component-name>:<repo-tag>. <component-name> can be "common", "core", "backend" or "thirdparty". If <repo-tag> starts with "pull/" then it refers to a pull-request reference, otherwise <repo-tag> indicates the git tag/branch. If the version is non-development then the default <repo-tag> is the release branch matching the container version (e.g. version 22.03 -> branch r22.03); otherwise the default <repo-tag> is "main" (e.g. version 22.03dev -> branch main).'
+        'The version of a component to use in the build as <component-name>:<repo-tag>. <component-name> can be "common", "core", "backend" or "thirdparty". If <repo-tag> starts with "pull/" then it refers to a pull-request reference, otherwise <repo-tag> indicates the git tag/branch. If the version is non-development then the default <repo-tag> is the release branch matching the container version (e.g. version 22.04 -> branch r22.04); otherwise the default <repo-tag> is "main" (e.g. version 22.04dev -> branch main).'
     )
     parser.add_argument(
         '--repoagent',
         action='append',
         required=False,
         help=
-        'Include specified repo agent in build as <repoagent-name>[:<repo-tag>]. If <repo-tag> starts with "pull/" then it refers to a pull-request reference, otherwise <repo-tag> indicates the git tag/branch to use for the build. If the version is non-development then the default <repo-tag> is the release branch matching the container version (e.g. version 22.03 -> branch r22.03); otherwise the default <repo-tag> is "main" (e.g. version 22.03dev -> branch main).'
+        'Include specified repo agent in build as <repoagent-name>[:<repo-tag>]. If <repo-tag> starts with "pull/" then it refers to a pull-request reference, otherwise <repo-tag> indicates the git tag/branch to use for the build. If the version is non-development then the default <repo-tag> is the release branch matching the container version (e.g. version 22.04 -> branch r22.04); otherwise the default <repo-tag> is "main" (e.g. version 22.04dev -> branch main).'
     )
     parser.add_argument(
         '--no-force-clone',

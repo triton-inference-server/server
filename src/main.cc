@@ -519,8 +519,12 @@ std::vector<Option> options_
        "specified."},
       {OPTION_STARTUP_MODEL, "load-model", Option::ArgStr,
        "Name of the model to be loaded on server startup. It may be specified "
-       "multiple times to add multiple models. Note that this option will only "
-       "take affect if --model-control-mode=explicit is true."},
+       "multiple times to add multiple models. To load ALL models at startup, "
+       "specify '*' as the model name with --load-model=* as the ONLY "
+       "--load-model argument, this does not imply any pattern matching. "
+       "Specifying --load-model=* in conjunction with another --load-model "
+       "argument will result in error. Note that this option will only take "
+       "effect if --model-control-mode=explicit is true."},
       // FIXME:  fix the default to execution_count once RL logic is complete.
       {OPTION_RATE_LIMIT, "rate-limit", Option::ArgStr,
        "Specify the mode for rate limiting. Options are \"execution_count\" "
@@ -1265,7 +1269,7 @@ Parse(TRITONSERVER_ServerOptions** server_options, int argc, char** argv)
   std::string server_id("triton");
   std::set<std::string> model_repository_paths;
   bool exit_on_error = true;
-  bool strict_model_config = true;
+  bool strict_model_config = false;
   bool strict_readiness = true;
   std::list<std::pair<int, uint64_t>> cuda_pools;
   int32_t exit_timeout_secs = 30;

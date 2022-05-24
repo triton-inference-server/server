@@ -1,4 +1,4 @@
-// Copyright (c) 2020, NVIDIA CORPORATION. All rights reserved.
+// Copyright 2020-2022, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 //
 // Redistribution and use in source and binary forms, with or without
 // modification, are permitted provided that the following conditions
@@ -505,7 +505,11 @@ main(int argc, char** argv)
   }
 #endif  // TRITON_ENABLE_GPU
 
-  // Check API version.
+  // Check API version. This compares the API version of the
+  // triton-server library linked into this application against the
+  // API version of the header file used when compiling this
+  // application. The API version of the shared library must be >= the
+  // API version used when compiling this application.
   uint32_t api_version_major, api_version_minor;
   FAIL_IF_ERR(
       TRITONSERVER_ApiVersion(&api_version_major, &api_version_minor),
@@ -515,7 +519,8 @@ main(int argc, char** argv)
     FAIL("triton server API version mismatch");
   }
 
-  // Create the server...
+  // Create the option setting to use when creating the inference
+  // server object.
   TRITONSERVER_ServerOptions* server_options = nullptr;
   FAIL_IF_ERR(
       TRITONSERVER_ServerOptionsNew(&server_options),
@@ -548,17 +553,27 @@ main(int argc, char** argv)
           server_options, min_compute_capability),
       "setting minimum supported CUDA compute capability");
 
+  // Create the server object using the option settings. The server
+  // object encapsulates all the functionality of the Triton server
+  // and allows access to the Triton server API. Typically only a
+  // single server object is needed by an application, but it is
+  // allowed to create multiple server objects within a single
+  // application. After the server object is created the server
+  // options can be deleted.
   TRITONSERVER_Server* server_ptr = nullptr;
   FAIL_IF_ERR(
-      TRITONSERVER_ServerNew(&server_ptr, server_options), "creating server");
+      TRITONSERVER_ServerNew(&server_ptr, server_options), "creating server object");
   FAIL_IF_ERR(
       TRITONSERVER_ServerOptionsDelete(server_options),
       "deleting server options");
 
+  // Use a shared_ptr to manage the lifetime of the server object.
   std::shared_ptr<TRITONSERVER_Server> server(
       server_ptr, TRITONSERVER_ServerDelete);
 
-  // Wait until the server is both live and ready.
+  // Wait until the server is both live and ready. The server will not
+  // appear "ready" until all models are loaded and ready to receive
+  // inference requests.
   size_t health_iters = 0;
   while (true) {
     bool live, ready;
@@ -581,7 +596,9 @@ main(int argc, char** argv)
     std::this_thread::sleep_for(std::chrono::milliseconds(500));
   }
 
-  // Print status of the server.
+  // Server metadata can be accessed using the server object. The
+  // metadata is returned as an abstract TRITONSERVER_Message that can
+  // be converted to JSON for further processing.
   {
     TRITONSERVER_Message* server_metadata_message;
     FAIL_IF_ERR(
@@ -594,17 +611,19 @@ main(int argc, char** argv)
             server_metadata_message, &buffer, &byte_size),
         "unable to serialize server metadata message");
 
-    std::cout << "Server Status:" << std::endl;
+    std::cout << "Server Metadata:" << std::endl;
     std::cout << std::string(buffer, byte_size) << std::endl;
 
     FAIL_IF_ERR(
         TRITONSERVER_MessageDelete(server_metadata_message),
-        "deleting status metadata");
+        "deleting server metadata message");
   }
 
   const std::string model_name("simple");
 
-  // Wait for the model to become available.
+  // We already waited for the server to be ready, above, so we know
+  // that all models are also ready. But as an example we also wait
+  // for a specific model to become available.
   bool is_torch_model = false;
   bool is_int = true;
   bool is_ready = false;
@@ -612,7 +631,7 @@ main(int argc, char** argv)
   while (!is_ready) {
     FAIL_IF_ERR(
         TRITONSERVER_ServerModelIsReady(
-            server.get(), model_name.c_str(), 1, &is_ready),
+            server.get(), model_name.c_str(), 1 /* model_version */, &is_ready),
         "unable to get model readiness");
     if (!is_ready) {
       if (++health_iters >= 10) {
@@ -632,8 +651,11 @@ main(int argc, char** argv)
     FAIL_IF_ERR(
         TRITONSERVER_MessageSerializeToJson(
             model_metadata_message, &buffer, &byte_size),
-        "unable to serialize model status protobuf");
+        "unable to serialize model metadata");
 
+    // Parse the JSON string that represents the model metadata into a
+    // JSON document. We use rapidjson for this parsing but any JSON
+    // parser can be used.
     rapidjson::Document model_metadata;
     model_metadata.Parse(buffer, byte_size);
     if (model_metadata.HasParseError()) {
@@ -645,8 +667,11 @@ main(int argc, char** argv)
 
     FAIL_IF_ERR(
         TRITONSERVER_MessageDelete(model_metadata_message),
-        "deleting status protobuf");
+        "deleting model metadata message");
 
+    // Now that we have a document representation of the model
+    // metadata, we can query it to extract some information about the
+    // model.
     if (strcmp(model_metadata["name"].GetString(), model_name.c_str())) {
       FAIL("unable to find metadata for model");
     }
@@ -669,15 +694,23 @@ main(int argc, char** argv)
         "parsing model metadata");
   }
 
-  // Create the allocator that will be used to allocate buffers for
-  // the result tensors.
+  // When triton needs a buffer to hold an output tensor, it will ask
+  // us to provide the buffer. In this way we can have any buffer
+  // management and sharing strategy that we want. To communicate to
+  // triton the functions that we want it to call to perform the
+  // allocations, we create a "response allocator" object. We pass
+  // this response allocate object to triton when requesting
+  // inference. We can reuse this response allocate object for any
+  // number of inference requests.
   TRITONSERVER_ResponseAllocator* allocator = nullptr;
   FAIL_IF_ERR(
       TRITONSERVER_ResponseAllocatorNew(
           &allocator, ResponseAlloc, ResponseRelease, nullptr /* start_fn */),
       "creating response allocator");
 
-  // Inference
+  // Create an inference request object. The inference request object
+  // is where we set the name of the model we want to use for
+  // inference and the input tensors.
   TRITONSERVER_InferenceRequest* irequest = nullptr;
   FAIL_IF_ERR(
       TRITONSERVER_InferenceRequestNew(
@@ -693,7 +726,7 @@ main(int argc, char** argv)
           irequest, InferRequestComplete, nullptr /* request_release_userp */),
       "setting request release callback");
 
-  // Inputs
+  // Add the 2 input tensors to the request...
   auto input0 = "INPUT0";
   auto input1 = "INPUT1";
 
@@ -715,6 +748,10 @@ main(int argc, char** argv)
   auto output0 = is_torch_model ? "OUTPUT__0" : "OUTPUT0";
   auto output1 = is_torch_model ? "OUTPUT__1" : "OUTPUT1";
 
+  // Indicate that we want both output tensors calculated and returned
+  // for the inference request. These calls are optional, if no
+  // output(s) are specifically requested then all outputs defined by
+  // the model will be calculated and returned.
   FAIL_IF_ERR(
       TRITONSERVER_InferenceRequestAddRequestedOutput(irequest, output0),
       "requesting output 0 for the request");
@@ -797,7 +834,11 @@ main(int argc, char** argv)
           0 /* memory_type_id */),
       "assigning INPUT1 data");
 
-  // Perform inference...
+  // Perform inference by calling TRITONSERVER_ServerInferAsync. This
+  // call is asychronous and therefore returns immediately. The
+  // completion of the inference and delivery of the response is done
+  // by triton by calling the "response complete" callback functions
+  // (InferResponseComplete in this case).
   {
     auto p = new std::promise<TRITONSERVER_InferenceResponse*>();
     std::future<TRITONSERVER_InferenceResponse*> completed = p->get_future();
@@ -813,7 +854,8 @@ main(int argc, char** argv)
             server.get(), irequest, nullptr /* trace */),
         "running inference");
 
-    // Wait for the inference to complete.
+    // The InferResponseComplete function sets the std::promise so
+    // that this thread will block until the response is returned.
     TRITONSERVER_InferenceResponse* completed_response = completed.get();
 
     FAIL_IF_ERR(
@@ -829,9 +871,13 @@ main(int argc, char** argv)
         "deleting inference response");
   }
 
-  // Modify some input data in place and then reuse the request
-  // object. For simplicity we only do this when the input tensors are
-  // in non-pinned system memory.
+  // The TRITONSERVER_InferenceRequest object can be reused for
+  // multiple (sequential) inference requests. For example, if we have
+  // multiple requests where the inference request is the same except
+  // for different input tensor data, then we can just change the
+  // input data buffers. Below some input data is changed in place and
+  // then another inference request is issued. For simplicity we only
+  // do this when the input tensors are in non-pinned system memory.
   if (!enforce_memory_type ||
       (requested_memory_type == TRITONSERVER_MEMORY_CPU)) {
     if (is_int) {
@@ -858,7 +904,6 @@ main(int argc, char** argv)
             server.get(), irequest, nullptr /* trace */),
         "running inference");
 
-    // Wait for the inference to complete.
     TRITONSERVER_InferenceResponse* completed_response = completed.get();
     FAIL_IF_ERR(
         TRITONSERVER_InferenceResponseError(completed_response),
@@ -873,7 +918,12 @@ main(int argc, char** argv)
         "deleting inference response");
   }
 
-  // Remove input data and then add back different data.
+  // There are other TRITONSERVER_InferenceRequest APIs that allow
+  // other in-place modifications so that the object can be reused for
+  // multiple (sequential) inference requests. For example, we can
+  // assign a new data buffer for an input by first removing the
+  // existing data with
+  // TRITONSERVER_InferenceRequestRemoveAllInputData.
   {
     FAIL_IF_ERR(
         TRITONSERVER_InferenceRequestRemoveAllInputData(irequest, input0),
@@ -900,7 +950,6 @@ main(int argc, char** argv)
             server.get(), irequest, nullptr /* trace */),
         "running inference");
 
-    // Wait for the inference to complete.
     TRITONSERVER_InferenceResponse* completed_response = completed.get();
     FAIL_IF_ERR(
         TRITONSERVER_InferenceResponseError(completed_response),

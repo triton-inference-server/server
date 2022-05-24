@@ -90,7 +90,7 @@ model run as part of an ensemble, the "parent_id" will indicate the
 "id" of the containing ensemble.  
 
 Each `TIMESTAMPS` trace will have one or more "timestamps" with 
-each timestamp having a name and the timestamp innanoseconds ("ns"). 
+each timestamp having a name and the timestamp in nanoseconds ("ns"). 
 For example:
 
 ```

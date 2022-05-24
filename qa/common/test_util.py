@@ -1,4 +1,4 @@
-# Copyright (c) 2018-2021, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright 2018-2022, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -144,15 +144,24 @@ def validate_for_onnx_model(input_dtype, output0_dtype, output1_dtype,
     return True
 
 
-def validate_for_libtorch_model(input_dtype, output0_dtype, output1_dtype,
-                                input_shape, output0_shape, output1_shape):
+def validate_for_libtorch_model(input_dtype,
+                                output0_dtype,
+                                output1_dtype,
+                                input_shape,
+                                output0_shape,
+                                output1_shape,
+                                max_batch=0):
     """Return True if input and output dtypes are supported by a libtorch model."""
 
-    # STRING, FLOAT16 and UINT16 data types are not supported currently
-    if (input_dtype == np.object_) or (output0_dtype
-                                       == np.object_) or (output1_dtype
-                                                          == np.object_):
+    # STRING data type do not support batching or I/O with more than 1 dims
+    if ((input_dtype == np.object_) or (output0_dtype == np.object_) or
+        (output1_dtype == np.object_)) and ((len(input_shape) > 1) or
+                                            (len(output0_shape) > 1) or
+                                            (len(output1_shape) > 1) or
+                                            (max_batch != 0)):
         return False
+
+    # FLOAT16 and UINT16 data types are not supported currently
     if (input_dtype == np.uint16) or (output0_dtype
                                       == np.uint16) or (output1_dtype
                                                         == np.uint16):
