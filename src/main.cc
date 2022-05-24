@@ -1281,7 +1281,7 @@ Parse(TRITONSERVER_ServerOptions** server_options, int argc, char** argv)
   std::string server_id("triton");
   std::set<std::string> model_repository_paths;
   bool exit_on_error = true;
-  bool strict_model_config = true;
+  bool strict_model_config = false;
   bool strict_readiness = true;
   std::list<std::pair<int, uint64_t>> cuda_pools;
   int32_t exit_timeout_secs = 30;
