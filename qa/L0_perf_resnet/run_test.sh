@@ -47,8 +47,6 @@ RET=0
 MAX_BATCH=${STATIC_BATCH}
 NAME=${MODEL_NAME}_sbatch${STATIC_BATCH}_instance${INSTANCE_CNT}_${PERF_CLIENT_PROTOCOL}
 
-# Append model warmup to every model config. Helps stabilize all results, and
-# helps for C API tests since a separate PA run won't warmup model for C API.
 rm -fr models && mkdir -p models && \
     cp -r $MODEL_PATH models/. && \
     (cd models/$MODEL_NAME && \
