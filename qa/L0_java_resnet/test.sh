@@ -63,19 +63,12 @@ cd ..
 set -e
 
 CLIENT_LOG="client.log"
-SAMPLES_REPO=`pwd`/javacpp-presets/tritonserver/samples
+SAMPLES_REPO=`pwd`/javacpp-presets/tritonserver/samples/simple
 BASE_COMMAND="mvn clean compile -f $SAMPLES_REPO exec:java -Djavacpp.platform=linux-x86_64"
 source ../common/util.sh
 
-cp Simple.java $SAMPLES_REPO
-# Modify the pom to not force include any cuda dependencies
-sed -i '/<dependency>/ {
-    :start
-    N
-    /<\/dependency>$/!b start
-    /<artifactId>cuda-platform<\/artifactId>/ {d}
-    /<artifactId>tensorrt-platform<\/artifactId>/ {d}
-}' $SAMPLES_REPO/pom.xml
+cp ResnetTest.java $SAMPLES_REPO
+sed -i 's/Simple/ResnetTest/g' $SAMPLES_REPO/pom.xml
 
 rm -f *.log
 RET=0

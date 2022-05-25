@@ -32,7 +32,7 @@ import org.bytedeco.javacpp.*;
 import org.bytedeco.tritonserver.tritonserver.*;
 import static org.bytedeco.tritonserver.global.tritonserver.*;
 
-public class Simple {
+public class ResnetTest {
     // Maximum allowed difference from expected model outputs
     private static final float ALLOWED_DELTA = .001f;
     private static final String[] MODELS = {
@@ -82,7 +82,7 @@ public class Simple {
         System.err.println(msg);
       }
 
-      System.err.println("Usage: java " + Simple.class.getSimpleName() + " [options]");
+      System.err.println("Usage: java " + ResnetTest.class.getSimpleName() + " [options]");
       System.err.println("\t-m <\"system\"|\"pinned\"|gpu>"
                        + " Enforce the memory type for input and output tensors."
                        + " If not specified, inputs will be in system memory and outputs"

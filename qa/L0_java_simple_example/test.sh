@@ -50,7 +50,7 @@ CLIENT_LOG="client_cpu_only.log"
 DATADIR=/data/inferenceserver/${REPO_VERSION}/qa_model_repository
 MODEL_REPO=`pwd`/models
 
-SAMPLES_REPO=`pwd`/javacpp-presets/tritonserver/samples
+SAMPLES_REPO=`pwd`/javacpp-presets/tritonserver/samples/simple
 BASE_COMMAND="mvn clean compile -f $SAMPLES_REPO exec:java -Djavacpp.platform=linux-x86_64"
 source ../common/util.sh
 
@@ -145,7 +145,7 @@ function run_ensemble_tests() {
     rm -r ${MODEL_REPO}
     cp -r `pwd`/../L0_simple_ensemble/models .
     mkdir -p ${MODEL_REPO}/ensemble_add_sub_int32_int32_int32/1
-    sed -i 's/"simple"/"ensemble_add_sub_int32_int32_int32"/g' $SAMPLES_REPO/SimpleCPUOnly.java
+    sed -i 's/"simple"/"ensemble_add_sub_int32_int32_int32"/g' $SAMPLES_REPO/Simple.java
     cat $SAMPLES_REPO/pom.xml >>$CLIENT_LOG 2>&1
     set -e
 
@@ -154,7 +154,7 @@ function run_ensemble_tests() {
         echo -e "Failed to run ensemble model: ${BASE_COMMAND} -Dexec.args=\"-r ${MODEL_REPO} -v\""
         RET=1
     fi
-    sed -i 's/"ensemble_add_sub_int32_int32_int32"/"simple"/g' $SAMPLES_REPO/SimpleCPUOnly.java
+    sed -i 's/"ensemble_add_sub_int32_int32_int32"/"simple"/g' $SAMPLES_REPO/Simple.java
 
     if [ `grep -c "request id: my_request_id, model: ensemble_add_sub_int32_int32_int32" ${CLIENT_LOG}` != "3" ]; then
         echo -e "\n***\n*** Failed. Expected 3 'request id: my_request_id, model: ensemble_add_sub_int32_int32_int32'\n***"
@@ -162,20 +162,9 @@ function run_ensemble_tests() {
     fi
 }
 
-# Run tests on CPU-only simple example
-echo -e "\nRunning Simple CPU-Only Tests\n"
+# Run tests on simple example
+echo -e "\nRunning Simple Tests\n"
 
-set +e
-sed -i 's/Simple/SimpleCPUOnly/g' $SAMPLES_REPO/pom.xml
-sed -i '/<dependency>/ {
-    :start
-    N
-    /<\/dependency>$/!b start
-    /<artifactId>cuda-platform<\/artifactId>/ {d}
-    /<artifactId>tensorrt-platform<\/artifactId>/ {d}
-}' $SAMPLES_REPO/pom.xml
-rm -r $SAMPLES_REPO/Simple.java
-set -e
 run_cpu_tests_fp32
 run_cpu_tests_int32
 run_ensemble_tests
