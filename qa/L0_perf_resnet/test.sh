@@ -104,22 +104,6 @@ for MODEL_NAME in $OPTIMIZED_MODEL_NAMES; do
     fi
     echo "} ]" >> ${CONFIG_PATH}
     echo "}}" >> ${CONFIG_PATH}
-
-    # Give TFTRT more time to generate an engine with a server-side warmup request
-    if [ "${MODEL_NAME}" = "${TFTRT_MODEL_NAME}" ] ; then
-        echo "model_warmup [{" >> ${CONFIG_PATH} && \
-        echo "    name : \"sample\"" >> ${CONFIG_PATH} && \
-        echo "    batch_size: 1" >> ${CONFIG_PATH} && \
-        echo "    inputs {" >> ${CONFIG_PATH} && \
-        echo "        key: \"input\"" >> ${CONFIG_PATH} && \
-        echo "        value: {" >> ${CONFIG_PATH} && \
-        echo "            data_type: TYPE_FP32" >> ${CONFIG_PATH} && \
-        echo "            dims: [ 224, 224, 3 ]" >> ${CONFIG_PATH} && \
-        echo "            random_data: true" >> ${CONFIG_PATH} && \
-        echo "        }" >> ${CONFIG_PATH} && \
-        echo "    }" >> ${CONFIG_PATH} && \
-        echo "}]" >> ${CONFIG_PATH}
-    fi
 done
 
 # Create the TensorRT plan from Caffe model
