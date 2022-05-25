@@ -689,7 +689,7 @@ public class MemoryGrowthTest {
               max_growth_allowed = Integer.parseInt(args[i]) / 100.0f;
             } catch (NumberFormatException e){
               Usage(
-                  "--max-growth must be used to specify allowed memory growth (%)");
+                  "--max-growth must be an integer value specifying allowed memory growth (%)");
             }
             break;
           case "--max-memory":
@@ -698,7 +698,7 @@ public class MemoryGrowthTest {
               max_mem_allowed = Integer.parseInt(args[i]);
             } catch (NumberFormatException e){
               Usage(
-                  "--max-memory must be used to specify maximum allowed memory (MB)");
+                  "--max-memory must be an integer value specifying maximum allowed memory (MB)");
             }
             break;
         }
@@ -872,10 +872,13 @@ public class MemoryGrowthTest {
         () -> {
           boolean passed = ValidateMemoryGrowth(max_growth_allowed, max_mem_allowed);
           
+          // Sleep to give the garbage collector time to free the server.
+          // This avoids race conditions between Triton bindings' printing and
+          // Java's native printing below.
           try {
             Thread.sleep(5000);
           } catch (InterruptedException e){
-            System.out.println("Sleep interrupted.");
+            System.out.println("Sleep interrupted: " + e.toString());
           }
 
           if(passed){
