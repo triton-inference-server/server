@@ -137,7 +137,7 @@ done
 # Tests with optimization enabled models
 for MODEL_NAME in $OPTIMIZED_MODEL_NAMES; do
     for PROTOCOL in $PROTOCOLS; do
-        # NOTE: Skip TF-TRT for C API test, it is too inconsistent with
+        # DLIS-3805: Skip TF-TRT for C API test, it is too inconsistent with
         # generating TRT engine in time for perf measurement window
         if [[ "${MODEL_NAME}" == "${TFTRT_MODEL_NAME}" ]] && \
            [[ "${PROTOCOL}" == "triton_c_api" ]]; then

@@ -68,21 +68,14 @@ set +e
 
 # Overload use of PERF_CLIENT_PROTOCOL for convenience with existing test and 
 # reporting structure, though "triton_c_api" is not strictly a "protocol".
-# NOTE: tritonserver will be ran in-process with perf_analyzer
 if [[ "${PERF_CLIENT_PROTOCOL}" == "triton_c_api" ]]; then
-    # Using C API requires extra info to start in-process server
-    # NOTE: PA C API doesn't expose --backend-directory, but defaults to
-    #       ${TRITON_DIR}/backends
-    # NOTE: PA C API doesn't expose --backend-config, but this is only used
-    #       for tfserving grpc test currently.
+    # Server will be run in-process with C API
     SERVICE_ARGS="--service-kind triton_c_api \
                   --triton-server-directory ${TRITON_DIR} \
                   --model-repository ${MODEL_REPO}"
-# Otherwise run server as separate process as normal via HTTP/GRPC
 else
     SERVICE_ARGS="-i ${PERF_CLIENT_PROTOCOL}"
 
-    # Don't start separate server if testing perf with C API
     SERVER_LOG="${NAME}.serverlog"
     run_server
     if (( $SERVER_PID == 0 )); then
@@ -91,11 +84,10 @@ else
         exit 1
     fi
 
-    # NOTE: Running PA for warmup doesn't make sense for C API since it uses
-    # in-process tritonserver; the runs are independent.
-
     # Run the model once to warm up. Some frameworks do optimization on the first requests.
     # Must warmup similar to actual run so that all instances are ready
+    # Note: Running extra PA for warmup doesn't make sense for C API since it
+    # uses in-process tritonserver which will exit along with this PA process.
     $PERF_CLIENT -v -m $MODEL_NAME -p${MEASUREMENT_WINDOW} \
                     -b${STATIC_BATCH} --concurrency-range ${CONCURRENCY} \
                     ${SERVICE_ARGS}
@@ -106,20 +98,9 @@ $PERF_CLIENT -v -m $MODEL_NAME -p${MEASUREMENT_WINDOW} \
                 -b${STATIC_BATCH} --concurrency-range ${CONCURRENCY} \
                 ${SERVICE_ARGS} \
                 -f ${NAME}.csv 2>&1 | tee ${NAME}.log
-# Check perf client succeeded
 if (( $? != 0 )); then
     RET=1
 fi
-
-# No metrics endpoint available when running with C API
-if [[ "${PERF_CLIENT_PROTOCOL}" != "triton_c_api" ]]; then
-    # NOTE: The metrics API output is not currently used
-    curl localhost:8002/metrics -o ${NAME}.metrics >> ${NAME}.log 2>&1
-    if (( $? != 0 )); then
-        RET=1
-    fi
-fi
-
 set -e
 
 echo -e "[{\"s_benchmark_kind\":\"benchmark_perf\"," >> ${NAME}.tjson

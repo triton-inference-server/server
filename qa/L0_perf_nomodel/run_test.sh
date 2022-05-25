@@ -193,15 +193,6 @@ for BACKEND in $BACKENDS; do
     if [ $? -ne 0 ]; then
         RET=1
     fi
-
-    # No metrics endpoint available when running with C API
-    if [[ "${PERF_CLIENT_PROTOCOL}" != "triton_c_api" ]]; then
-        curl localhost:8002/metrics -o ${RESULTDIR}/${NAME}.metrics >> ${RESULTDIR}/${NAME}.log 2>&1
-        if [ $? -ne 0 ]; then
-            RET=1
-            exit $RET
-        fi
-    fi
     set -e
 
     echo -e "[{\"s_benchmark_kind\":\"benchmark_perf\"," >> ${RESULTDIR}/${NAME}.tjson
