@@ -38,9 +38,9 @@ if [ ! -z "$TEST_REPO_ARCH" ]; then
     REPO_VERSION=${REPO_VERSION}_${TEST_REPO_ARCH}
 fi
 
-rm -f *.log *.serverlog *.csv *.metrics *.tjson *.json
+rm -f *.log *.serverlog *.csv *.tjson *.json
 
-PROTOCOLS="grpc http"
+PROTOCOLS="grpc http triton_c_api"
 
 TRT_MODEL_NAME="resnet50_fp16_plan"
 TF_MODEL_NAME="resnet50v1.5_fp16_savedmodel"
