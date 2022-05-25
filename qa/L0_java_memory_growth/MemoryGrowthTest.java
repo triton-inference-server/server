@@ -32,9 +32,11 @@ import org.bytedeco.javacpp.*;
 import org.bytedeco.tritonserver.tritonserver.*;
 import static org.bytedeco.tritonserver.global.tritonserver.*;
 
-public class Simple {
+public class MemoryGrowthTest {
     static final double TRITON_MIN_COMPUTE_CAPABILITY = 6.0;
     private static boolean done = false;
+    static float max_growth_allowed = .10f;
+    static int max_mem_allowed = 30;
 
     static void FAIL(String MSG) {
         System.err.println("failure: " + MSG);
@@ -53,6 +55,9 @@ public class Simple {
 
     static boolean enforce_memory_type = false;
     static int requested_memory_type;
+    // Parameters for percentile range to include (exclude outliers)
+    static final int max_percentile = 90;
+    static final int min_percentile = 10;
 
     static class TRITONSERVER_ServerDeleter extends TRITONSERVER_Server {
         public TRITONSERVER_ServerDeleter(TRITONSERVER_Server p) { super(p); deallocator(new DeleteDeallocator(this)); }
@@ -69,7 +74,7 @@ public class Simple {
         System.err.println(msg);
       }
 
-      System.err.println("Usage: java " + Simple.class.getSimpleName() + " [options]");
+      System.err.println("Usage: java " + MemoryGrowthTest.class.getSimpleName() + " [options]");
       System.err.println("\t-i Set number of iterations");
       System.err.println("\t-m <\"system\"|\"pinned\"|gpu>"
                        + " Enforce the memory type for input and output tensors."
@@ -77,6 +82,8 @@ public class Simple {
                        + " will be based on the model's preferred type.");
       System.err.println("\t-v Enable verbose logging");
       System.err.println("\t-r [model repository absolute path]");
+      System.err.println("\t--max-growth Specify maximum allowed memory growth (%)");
+      System.err.println("\t--max-memory Specify maximum allowed memory (MB)");
 
       System.exit(1);
     }
@@ -353,23 +360,24 @@ public class Simple {
 
     /**
     Returns whether the memory growth is within the acceptable range
-    @param  max_allowed     Parameter to represent the maximum allowed percentage growth
+    @param  max_float_allowed     Maximum allowed memory growth (%)
+    @param  max_mem_allowed       Maximum allowed memory (MB)
      */
     static boolean
-    ValidateMemoryGrowth(float max_allowed){
+    ValidateMemoryGrowth(float max_growth_allowed, int max_mem_allowed){
       // Allocate list starting capacity to hold up to 24 hours worth of snapshots.
       List<Double> memory_snapshots = new ArrayList<Double>(20000);
       while(!done){
-        System.gc();
-        double snapshot = Runtime.getRuntime().totalMemory() - Runtime.getRuntime().freeMemory();
-        memory_snapshots.add(snapshot);
-        System.out.println("Memory allocated (MB):" + snapshot/1E6);
         try {
           Thread.sleep(5000);
         } catch (InterruptedException e){
           System.out.println("Memory growth validation interrupted.");
         }
-      };
+        System.gc();
+        double snapshot = Runtime.getRuntime().totalMemory() - Runtime.getRuntime().freeMemory();
+        memory_snapshots.add(snapshot);
+        System.out.println("Memory allocated (MB):" + snapshot/1E6);
+      }
       if(memory_snapshots.size() < 5){
         System.out.println("Error: Not enough snapshots, found " + memory_snapshots.size()
         + " snapshots");
@@ -378,26 +386,36 @@ public class Simple {
 
       // Measure memory growth without outliers by taking difference
       // between 90th percentile and 10th percentile memory usage.
+      final double bytes_in_mb = 1E6;
       Collections.sort(memory_snapshots);
-      int index_90 = ((int) Math.ceil(90.0 / 100.0 * memory_snapshots.size())) - 1;
-      int index_10 = ((int) Math.ceil(10.0 / 100.0 * memory_snapshots.size())) - 1;
-      double memory_allocation_delta = memory_snapshots.get(index_90) - memory_snapshots.get(index_10);
-      double memory_allocation_delta_mb = memory_allocation_delta / 1E6;
-      double memory_allocation_delta_percent = memory_allocation_delta / memory_snapshots.get(index_90);
+      int index_max = ((int) Math.ceil(max_percentile / 100.0 * memory_snapshots.size())) - 1;
+      int index_min = ((int) Math.ceil(min_percentile / 100.0 * memory_snapshots.size())) - 1;
+      double memory_allocation_delta = memory_snapshots.get(index_max) - memory_snapshots.get(index_min);
+      double memory_allocation_delta_mb = memory_allocation_delta / bytes_in_mb;
+      double memory_allocation_delta_percent = memory_allocation_delta / memory_snapshots.get(index_max);
 
       System.out.println("Change in memory allocation (MB): " +
           memory_allocation_delta_mb + ", " +
-          memory_allocation_delta_percent + "%");
+          (memory_allocation_delta_percent * 100) + "%");
 
-      if(memory_allocation_delta_percent <= max_allowed){
-        return true;
-      } else {
-        return false;
+      boolean passed = true;
+
+      if(memory_allocation_delta_percent >= max_growth_allowed){
+        passed = false;
+        System.out.println("Exceeded allowed memory growth (" +
+          (max_growth_allowed * 100) + "%)");
       }
+
+      if((memory_snapshots.get(index_max) / bytes_in_mb) >= max_mem_allowed){
+        passed = false;
+        System.out.println("Exceeded allowed memory (" + max_mem_allowed + 
+          "MB), got " + (memory_snapshots.get(index_max) / bytes_in_mb) + "MB");
+      }
+      return passed;
     }
 
     static void
-    RunInference(TRITONSERVER_ServerDeleter server, String model_name, boolean[] is_int, boolean[] is_torch_model, boolean checkAccuracy)
+    RunInference(TRITONSERVER_ServerDeleter server, String model_name, boolean[] is_int, boolean[] is_torch_model, boolean check_accuracy)
     throws Exception
     {
       // Create the allocator that will be used to allocate buffers for
@@ -509,7 +527,7 @@ public class Simple {
         FAIL_IF_ERR(
             TRITONSERVER_InferenceResponseError(completed_response),
             "response status");
-        if (checkAccuracy) {
+        if (check_accuracy) {
           Check(
               completed_response, input0_data, input1_data, output0, output1,
               input0_size, datatype, is_int[0]);
@@ -552,7 +570,7 @@ public class Simple {
         FAIL_IF_ERR(
             TRITONSERVER_InferenceResponseError(completed_response),
             "response status");
-        if (checkAccuracy) {
+        if (check_accuracy) {
           Check(
               completed_response, input0_data, input1_data, output0, output1,
               input0_size, datatype, is_int[0]);
@@ -597,7 +615,7 @@ public class Simple {
             TRITONSERVER_InferenceResponseError(completed_response),
             "response status");
 
-        if (checkAccuracy) {
+        if (check_accuracy) {
           // Both inputs are using input1_data...
           Check(
               completed_response, input1_data, input1_data, output0, output1,
@@ -624,7 +642,7 @@ public class Simple {
       int num_iterations = 1000000;
       String model_repository_path = null;
       int verbose_level = 0;
-      boolean checkAccuracy = false;
+      boolean check_accuracy = false;
 
       // Parse commandline...
       for (int i = 0; i < args.length; i++) {
@@ -660,10 +678,28 @@ public class Simple {
             verbose_level = 1;
             break;
           case "-c":
-            checkAccuracy = true;
+            check_accuracy = true;
             break;
           case "-?":
             Usage(null);
+            break;
+          case "--max-growth":
+            i++;
+            try {
+              max_growth_allowed = Integer.parseInt(args[i]) / 100.0f;
+            } catch (NumberFormatException e){
+              Usage(
+                  "--max-growth must be an integer value specifying allowed memory growth (%)");
+            }
+            break;
+          case "--max-memory":
+            i++;
+            try {
+              max_mem_allowed = Integer.parseInt(args[i]);
+            } catch (NumberFormatException e){
+              Usage(
+                  "--max-memory must be an integer value specifying maximum allowed memory (MB)");
+            }
             break;
         }
       }
@@ -833,8 +869,19 @@ public class Simple {
       }
 
       Runnable runnable =
-        () -> { 
-          if(ValidateMemoryGrowth(.05f)){
+        () -> {
+          boolean passed = ValidateMemoryGrowth(max_growth_allowed, max_mem_allowed);
+          
+          // Sleep to give the garbage collector time to free the server.
+          // This avoids race conditions between Triton bindings' printing and
+          // Java's native printing below.
+          try {
+            Thread.sleep(5000);
+          } catch (InterruptedException e){
+            System.out.println("Sleep interrupted: " + e.toString());
+          }
+
+          if(passed){
             System.out.println("Memory growth test passed");
           } else {
             System.out.println("Memory growth test FAILED");
@@ -845,7 +892,7 @@ public class Simple {
 
       for(int i = 0; i < num_iterations; i++){
         try (PointerScope scope = new PointerScope()) {
-          RunInference(server, model_name, is_int, is_torch_model, checkAccuracy);
+          RunInference(server, model_name, is_int, is_torch_model, check_accuracy);
         }
       }
       done = true;

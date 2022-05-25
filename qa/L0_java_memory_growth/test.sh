@@ -36,24 +36,19 @@ mvn clean install -f platform --projects ../tritonserver/platform -Djavacpp.plat
 cd ..
 set -e
 
+export MAVEN_OPTS="-XX:MaxGCPauseMillis=40"
 MODEL_REPO=`pwd`/models
-SAMPLES_REPO=`pwd`/javacpp-presets/tritonserver/samples
-cp Simple.java $SAMPLES_REPO
-# Modify the pom to not force include any cuda dependencies
-sed -i '/<dependency>/ {
-    :start
-    N
-    /<\/dependency>$/!b start
-    /<artifactId>cuda-platform<\/artifactId>/ {d}
-    /<artifactId>tensorrt-platform<\/artifactId>/ {d}
-}' $SAMPLES_REPO/pom.xml
-
+SAMPLES_REPO=`pwd`/javacpp-presets/tritonserver/samples/simple
 BASE_COMMAND="mvn clean compile -f $SAMPLES_REPO exec:java -Djavacpp.platform=linux-x86_64"
 source ../common/util.sh
 
 # Create local model repository
+rm -rf ${MODEL_REPO}
 mkdir ${MODEL_REPO}
 cp -r `pwd`/../L0_simple_ensemble/models/simple ${MODEL_REPO}/.
+
+cp MemoryGrowthTest.java $SAMPLES_REPO
+sed -i 's/Simple/MemoryGrowthTest/g' $SAMPLES_REPO/pom.xml
 
 rm -f *.log
 RET=0
@@ -83,13 +78,15 @@ CLIENT_LOG="./client_$LOG_IDX.log"
 
 # Longer-running memory growth test 
 ITERS=1000000
+MAX_MEM_GROWTH_MB=10
 if [ "$TRITON_PERF_LONG" == 1 ]; then
     # ~1 day
     ITERS=125000000
+    MAX_MEM_GROWTH_MB=25
 fi
 
 echo -e "\nRunning Memory Growth Test, $ITERS Iterations\n"
-$BASE_COMMAND -Dexec.args="-r $MODEL_REPO -c -i $ITERS" >>$CLIENT_LOG 2>&1
+$BASE_COMMAND -Dexec.args="-r $MODEL_REPO -c -i $ITERS --max-growth $MAX_MEM_GROWTH_MB" >>$CLIENT_LOG 2>&1
 if [ $? -ne 0 ]; then
     echo -e "\n***\n*** Failed to run memory growth test to complete\n***"
     RET=1
