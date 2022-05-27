@@ -84,17 +84,35 @@ RET=0
 
 BACKENDS="graphdef savedmodel onnx libtorch plan"
 
-# Construct model repository
-mkdir -p models
-for FW in $BACKENDS; do
-    cp -r /data/inferenceserver/${REPO_VERSION}/qa_model_repository/${FW}_float32_float32_float32 models/
-done
+function run_unit_tests {
+    python $INFER_TEST >$CLIENT_LOG 2>&1
+    if [ $? -ne 0 ]; then
+        cat $CLIENT_LOG
+        echo -e "\n***\n*** Test Failed\n***"
+        RET=1
+    else
+        check_test_results $TEST_RESULT_FILE $EXPECTED_NUM_TESTS
+        if [ $? -ne 0 ]; then
+            cat $CLIENT_LOG
+            echo -e "\n***\n*** Test Result Verification Failed\n***"
+            RET=1
+        fi
+    fi
+}
 
-# Copy models with string inputs and remove nobatch (bs=1) models
-cp -r /data/inferenceserver/${REPO_VERSION}/qa_model_repository/*_object_object_object models/
+function setup_model_repo {
+    # Construct model repository
+    rm -rf models && mkdir -p models
+    for FW in $BACKENDS; do
+        cp -r /data/inferenceserver/${REPO_VERSION}/qa_model_repository/${FW}_float32_float32_float32 models/
+    done
 
-rm -rf models/*nobatch*
+    # Copy models with string inputs and remove nobatch (bs=1) models
+    cp -r /data/inferenceserver/${REPO_VERSION}/qa_model_repository/*_object_object_object models/
+    rm -rf models/*nobatch*
+}
 
+setup_model_repo
 KIND="KIND_GPU"
 for FW in $BACKENDS; do
     for MC in `ls models/${FW}*/config.pbtxt`; do
@@ -144,21 +162,7 @@ for ENV_VAR in "shared_key"; do
     fi
 
     set +e
-
-    python $INFER_TEST >$CLIENT_LOG 2>&1
-    if [ $? -ne 0 ]; then
-        cat $CLIENT_LOG
-        echo -e "\n***\n*** Test Failed\n***"
-        RET=1
-    else
-        check_test_results $TEST_RESULT_FILE $EXPECTED_NUM_TESTS
-        if [ $? -ne 0 ]; then
-            cat $CLIENT_LOG
-            echo -e "\n***\n*** Test Result Verification Failed\n***"
-            RET=1
-        fi
-    fi
-
+    run_unit_tests
     set -e
 
     kill $SERVER_PID
@@ -185,14 +189,10 @@ for BACKEND in $BACKENDS; do
         echo -e "\n***\n*** Test Failed\n***"
         RET=1
     fi
-
-    $PERF_CLIENT -m ${BACKEND}_float32_float32_float32 -p 3000 -t 1 >$CLIENT_LOG 2>&1
-    if [ $? -ne 0 ]; then
-        echo -e "\n***\n*** Test Failed\n***"
-        cat $CLIENT_LOG
-        RET=1
-    fi
 done
+
+# Check that each explicitly loaded model runs correctly
+run_unit_tests
 set -e
 
 kill $SERVER_PID
@@ -211,9 +211,12 @@ SERVER_ARGS="--model-repository=${AS_URL}/models --model-control-mode=poll --str
 az storage container create --name ${CONTAINER_NAME} --account-name ${ACCOUNT_NAME} --account-key ${ACCOUNT_KEY}
 sleep 10
 
-rm -rf models && mkdir -p models
-cp -r /data/inferenceserver/${REPO_VERSION}/qa_model_repository/savedmodel_float32_float32_float32 models/
-rm models/savedmodel_float32_float32_float32/config.pbtxt
+# Construct model repository - remove model configs for autocomplete testing
+setup_model_repo
+AUTOCOMPLETE_BACKENDS="savedmodel onnx plan"
+for FW in ${AUTOCOMPLETE_BACKENDS}; do
+    rm models/${FW}_float32_float32_float32/config.pbtxt
+done
 
 # copy contents of models into container.
 for file in `find models -type f` ;do
@@ -229,12 +232,8 @@ if [ "$SERVER_PID" == "0" ]; then
 fi
 
 set +e
-$PERF_CLIENT -m savedmodel_float32_float32_float32 -p 3000 -t 1 >$CLIENT_LOG 2>&1
-if [ $? -ne 0 ]; then
-    echo -e "\n***\n*** Test Failed\n***"
-    cat $CLIENT_LOG
-    RET=1
-fi
+# Check that each polled model runs correctly
+run_unit_tests
 set -e
 
 kill $SERVER_PID
