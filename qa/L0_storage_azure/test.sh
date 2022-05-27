@@ -83,6 +83,8 @@ rm -f $SERVER_LOG_BASE* $CLIENT_LOG_BASE*
 RET=0
 
 BACKENDS="graphdef savedmodel onnx libtorch plan"
+# Used to control which backends are run in infer_test.py
+export INFER_TEST_BACKENDS="${BACKENDS}"
 
 function run_unit_tests {
     python $INFER_TEST >$CLIENT_LOG 2>&1
@@ -212,9 +214,10 @@ az storage container create --name ${CONTAINER_NAME} --account-name ${ACCOUNT_NA
 sleep 10
 
 # Construct model repository - remove model configs for autocomplete testing
-setup_model_repo
-AUTOCOMPLETE_BACKENDS="savedmodel onnx plan"
+rm -rf models && mkdir -p models
+AUTOCOMPLETE_BACKENDS="savedmodel"
 for FW in ${AUTOCOMPLETE_BACKENDS}; do
+    cp -r /data/inferenceserver/${REPO_VERSION}/qa_model_repository/${FW}_float32_float32_float32 models/
     rm models/${FW}_float32_float32_float32/config.pbtxt
 done
 
@@ -233,6 +236,7 @@ fi
 
 set +e
 # Check that each polled model runs correctly
+export INFER_TEST_BACKENDS="${AUTOCOMPLETE_BACKENDS}"
 run_unit_tests
 set -e
 

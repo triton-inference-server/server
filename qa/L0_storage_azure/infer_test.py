@@ -37,6 +37,7 @@ import os
 
 np_dtype_string = np.dtype(object)
 
+DEFAULT_TEST_BACKENDS = ["graphdef", "savedmodel", "plan", "onnx", "libtorch"]
 
 class InferTest(tu.TestResultCollector):
 
@@ -78,38 +79,38 @@ class InferTest(tu.TestResultCollector):
                                use_streaming=use_streaming,
                                correlation_id=correlation_id)
 
+        # Allow caller to setup subset of backends to test
+        test_backends = os.environ.get("INFER_TEST_BACKENDS", "").split()
+        if not test_backends:
+            test_backends = DEFAULT_TEST_BACKENDS
+
         input_size = 16
 
         if tu.validate_for_tf_model(input_dtype, output0_dtype, output1_dtype,
                                     (input_size,), (input_size,),
                                     (input_size,)):
             for pf in ["graphdef", "savedmodel"]:
-                _infer_exact_helper(self,
-                                    pf, (input_size,),
-                                    8,
-                                    input_dtype,
-                                    output0_dtype,
-                                    output1_dtype,
-                                    output0_raw=output0_raw,
-                                    output1_raw=output1_raw,
-                                    swap=swap)
+                if pf in test_backends:
+                    _infer_exact_helper(self,
+                                        pf, (input_size,),
+                                        8,
+                                        input_dtype,
+                                        output0_dtype,
+                                        output1_dtype,
+                                        output0_raw=output0_raw,
+                                        output1_raw=output1_raw,
+                                        swap=swap)
 
         if tu.validate_for_trt_model(input_dtype, output0_dtype, output1_dtype,
                                      (input_size, 1, 1), (input_size, 1, 1),
                                      (input_size, 1, 1)):
-            if input_dtype == np.int8:
+            if "plan" in test_backends:
+                if input_dtype == np.int8:
+                    shape = (input_size, 1, 1)
+                else:
+                    shape = (input_size,)
                 _infer_exact_helper(self,
-                                    'plan', (input_size, 1, 1),
-                                    8,
-                                    input_dtype,
-                                    output0_dtype,
-                                    output1_dtype,
-                                    output0_raw=output0_raw,
-                                    output1_raw=output1_raw,
-                                    swap=swap)
-            else:
-                _infer_exact_helper(self,
-                                    'plan', (input_size,),
+                                    'plan', shape,
                                     8,
                                     input_dtype,
                                     output0_dtype,
@@ -121,29 +122,31 @@ class InferTest(tu.TestResultCollector):
         if tu.validate_for_onnx_model(input_dtype, output0_dtype, output1_dtype,
                                       (input_size,), (input_size,),
                                       (input_size,)):
-            _infer_exact_helper(self,
-                                'onnx', (input_size,),
-                                8,
-                                input_dtype,
-                                output0_dtype,
-                                output1_dtype,
-                                output0_raw=output0_raw,
-                                output1_raw=output1_raw,
-                                swap=swap)
+            if "onnx" in test_backends:
+                _infer_exact_helper(self,
+                                    'onnx', (input_size,),
+                                    8,
+                                    input_dtype,
+                                    output0_dtype,
+                                    output1_dtype,
+                                    output0_raw=output0_raw,
+                                    output1_raw=output1_raw,
+                                    swap=swap)
 
         # Skip for batched string I/O
         if tu.validate_for_libtorch_model(input_dtype, output0_dtype,
                                           output1_dtype, (input_size,),
                                           (input_size,), (input_size,), 8):
-            _infer_exact_helper(self,
-                                'libtorch', (input_size,),
-                                8,
-                                input_dtype,
-                                output0_dtype,
-                                output1_dtype,
-                                output0_raw=output0_raw,
-                                output1_raw=output1_raw,
-                                swap=swap)
+            if "libtorch" in test_backends:
+                _infer_exact_helper(self,
+                                    'libtorch', (input_size,),
+                                    8,
+                                    input_dtype,
+                                    output0_dtype,
+                                    output1_dtype,
+                                    output0_raw=output0_raw,
+                                    output1_raw=output1_raw,
+                                    swap=swap)
 
     def test_raw_fff(self):
         self._full_exact(np.float32,
