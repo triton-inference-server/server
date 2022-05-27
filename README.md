@@ -32,8 +32,8 @@
 
 **LATEST RELEASE: You are currently on the main branch which tracks
 under-development progress towards the next release. The current release is 
-version [2.21.0](https://github.com/triton-inference-server/server/tree/r22.04)
-and corresponds to the 22.04 container release on 
+version [2.22.0](https://github.com/triton-inference-server/server/tree/r22.05)
+and corresponds to the 22.05 container release on 
 [NVIDIA GPU Cloud (NGC)](https://catalog.ngc.nvidia.com/orgs/nvidia/containers/tritonserver).**
 
 ----
@@ -78,17 +78,17 @@ Major features include:
 
 ```bash
 # Step 1: Create the example model repository 
-git clone -b r22.04 https://github.com/triton-inference-server/server.git
+git clone -b r22.05 https://github.com/triton-inference-server/server.git
 
 cd server/docs/examples
 
 ./fetch_models.sh
 
 # Step 2: Launch triton from the NGC Triton container
-docker run --gpus=1 --rm --net=host -v /full/path/to/docs/examples/model_repository:/models nvcr.io/nvidia/tritonserver:22.04-py3 tritonserver --model-repository=/models
+docker run --gpus=1 --rm --net=host -v /full/path/to/docs/examples/model_repository:/models nvcr.io/nvidia/tritonserver:22.05-py3 tritonserver --model-repository=/models
 
 # Step 3: In a separate console, launch the image_client example from the NGC Triton SDK container
-docker run -it --rm --net=host nvcr.io/nvidia/tritonserver:22.04-py3-sdk
+docker run -it --rm --net=host nvcr.io/nvidia/tritonserver:22.05-py3-sdk
 
 /workspace/install/bin/image_client -m densenet_onnx -c 3 -s INCEPTION /workspace/images/mug.jpg
 
