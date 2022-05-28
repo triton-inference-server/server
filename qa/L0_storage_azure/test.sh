@@ -217,8 +217,11 @@ sleep 10
 rm -rf models && mkdir -p models
 AUTOCOMPLETE_BACKENDS="savedmodel"
 for FW in ${AUTOCOMPLETE_BACKENDS}; do
-    cp -r /data/inferenceserver/${REPO_VERSION}/qa_model_repository/${FW}_float32_float32_float32 models/
-    rm models/${FW}_float32_float32_float32/config.pbtxt
+    for model in "${FW}_float32_float32_float32 ${FW}_object_object_object"; do
+        cp -r /data/inferenceserver/${REPO_VERSION}/qa_model_repository/${model} models/
+        # Create empty config file to autocomplete, except for max batch size since unit test sets bs=8
+        echo "max_batch_size: 8" > models/${model}/config.pbtxt
+    done
 done
 
 # copy contents of models into container.
