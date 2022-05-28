@@ -113,9 +113,7 @@ class DecoupledTest(tu.TestResultCollector):
             triton_client.async_stream_infer(model_name=model_name,
                                              inputs=inputs)
 
-            # The decoupled BLS model will send two responses instead of one
-            # response for each request. One will be using the sync BLS and the
-            # other one will use async BLS.
+            # Check the results of the decoupled model using BLS
             def check_result(result):
                 # Make sure the result is not an exception
                 self.assertIsNot(type(result), InferenceServerException)
@@ -126,9 +124,6 @@ class DecoupledTest(tu.TestResultCollector):
                     np.array_equal(output_data, input_data),
                     "error: expected output {} to match input {}".format(
                         output_data, input_data))
-
-            result = user_data._completed_requests.get()
-            check_result(result)
 
             result = user_data._completed_requests.get()
             check_result(result)

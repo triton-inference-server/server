@@ -61,7 +61,7 @@ class TritonPythonModel:
         self.inflight_thread_count = 0
         self.inflight_thread_count_lck = threading.Lock()
 
-    async def execute(self, requests):
+    def execute(self, requests):
         """ This function is called on inference request.
         """
 
@@ -87,15 +87,6 @@ class TritonPythonModel:
                     f"BLS Request input and BLS response output do not match. {request_input.as_numpy()} != {output0.as_numpy()}"
                 )
 
-            # Async BLS Request
-            infer_response = await infer_request.async_exec()
-            output0 = pb_utils.get_output_tensor_by_name(
-                infer_response, "OUTPUT0")
-            if np.any(output0.as_numpy() != request_input.as_numpy()):
-                raise pb_utils.TritonModelException(
-                    f"BLS Request input and BLS response output do not match. {request_input.as_numpy()} != {output0.as_numpy()}"
-                )
-
             thread1 = threading.Thread(target=self.response_thread,
                                        args=(request.get_response_sender(),
                                              pb_utils.get_input_tensor_by_name(
@@ -104,19 +95,6 @@ class TritonPythonModel:
             with self.inflight_thread_count_lck:
                 self.inflight_thread_count += 1
             thread1.start()
-            thread1.join()
-
-            thread2 = threading.Thread(target=asyncio.run,
-                                       args=(self.response_thread_async(
-                                           request.get_response_sender(),
-                                           pb_utils.get_input_tensor_by_name(
-                                               request, 'IN').as_numpy()),))
-
-            thread2.daemon = True
-
-            with self.inflight_thread_count_lck:
-                self.inflight_thread_count += 1
-            thread2.start()
 
         return None
 
@@ -226,6 +204,8 @@ class TritonPythonModel:
     def response_thread(self, response_sender, in_input):
         # The response_sender is used to send response(s) associated with the
         # corresponding request.
+        # Sleep 5 second to make sure the main thread has exited.
+        time.sleep(5)
 
         status = self.execute_gpu_bls()
         if not status:
@@ -239,48 +219,6 @@ class TritonPythonModel:
                 requested_output_names=["OUTPUT0"],
                 inputs=[pb_utils.Tensor('INPUT0', in_input)])
             infer_response = infer_request.exec()
-            output0 = pb_utils.get_output_tensor_by_name(
-                infer_response, "OUTPUT0")
-            if infer_response.has_error():
-                response = pb_utils.InferenceResponse(
-                    error=infer_response.error().message())
-                response_sender.send(response)
-            elif np.any(in_input != output0.as_numpy()):
-                error_message = (
-                    "BLS Request input and BLS response output do not match."
-                    f" {in_value} != {output0.as_numpy()}")
-                response = pb_utils.InferenceResponse(error=error_message)
-                response_sender.send(response)
-            else:
-                output_tensors = [pb_utils.Tensor('OUT', in_value)]
-                response = pb_utils.InferenceResponse(
-                    output_tensors=output_tensors)
-                response_sender.send(response)
-
-        with self.inflight_thread_count_lck:
-            self.inflight_thread_count -= 1
-
-    async def response_thread_async(self, response_sender, in_input):
-        # The response_sender is used to send response(s) associated with the
-        # corresponding request.
-
-        # Sleep 5 seconds to make sure the main thread has returned.
-        time.sleep(5)
-
-        status = self.execute_gpu_bls()
-        if not status:
-            infer_response = pb_utils.InferenceResponse(
-                error="GPU BLS test failed.")
-            response_sender.send(
-                infer_response,
-                flags=pb_utils.TRITONSERVER_RESPONSE_COMPLETE_FINAL)
-        else:
-            in_value = in_input
-            infer_request = pb_utils.InferenceRequest(
-                model_name='identity_fp32',
-                requested_output_names=["OUTPUT0"],
-                inputs=[pb_utils.Tensor('INPUT0', in_input)])
-            infer_response = await infer_request.async_exec()
             output0 = pb_utils.get_output_tensor_by_name(
                 infer_response, "OUTPUT0")
             if infer_response.has_error():
