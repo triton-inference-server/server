@@ -35,8 +35,8 @@ SHELL ["cmd", "/S", "/C"]
 RUN mkdir c:\tmp
 WORKDIR /tmp
 
-RUN powershell.exe [Net.ServicePointManager]::Expect100Continue = $true; [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls, [Net.SecurityProtocolType]::Tls11, [Net.SecurityProtocolType]::Tls12, [Net.SecurityProtocolType]::Ssl3; Invoke-Expression (New-Object System.Net.WebClient).DownloadString('https://get.scoop.sh')
-RUN scoop install git docker unzip
+RUN powershell.exe [Net.ServicePointManager]::Expect100Continue = $true; [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls, [Net.SecurityProtocolType]::Tls11, [Net.SecurityProtocolType]::Tls12, [Net.SecurityProtocolType]::Ssl3; Invoke-Expression (New-Object System.Net.WebClient).DownloadString('https://chocolatey.org/install.ps1')
+RUN choco install git docker unzip -y
 
 # Be aware that pip can interact badly with VS cmd shell so need to pip install before
 # vsdevcmd.bat (see https://bugs.python.org/issue38989)
