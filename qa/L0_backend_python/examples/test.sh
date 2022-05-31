@@ -245,9 +245,7 @@ CLIENT_LOG="./auto_complete_client.log"
 mkdir -p models/nobatch_auto_complete/1/
 mkdir -p models/batch_auto_complete/1/
 cp examples/auto_complete/nobatch_model.py models/nobatch_auto_complete/1/model.py
-cp examples/auto_complete/nobatch_config.pbtxt models/nobatch_auto_complete/config.pbtxt
 cp examples/auto_complete/batch_model.py models/batch_auto_complete/1/model.py
-cp examples/auto_complete/batch_config.pbtxt models/batch_auto_complete/config.pbtxt
 SERVER_ARGS="$SERVER_ARGS --strict-model-config=false"
 
 run_server

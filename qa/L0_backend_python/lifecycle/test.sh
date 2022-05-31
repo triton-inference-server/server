@@ -171,7 +171,6 @@ set -e
 rm -rf models/
 mkdir -p models/auto_complete_error/1/
 cp ../../python_models/auto_complete_error/model.py ./models/auto_complete_error/1/
-cp ../../python_models/auto_complete_error/config.pbtxt ./models/auto_complete_error/
 SERVER_ARGS="${SERVER_ARGS} --strict-model-config=false"
 
 set +e
