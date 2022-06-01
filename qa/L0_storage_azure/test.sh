@@ -218,14 +218,18 @@ SERVER_ARGS="--model-repository=${AS_URL}/models --model-control-mode=poll --str
 az storage container create --name ${CONTAINER_NAME} --account-name ${ACCOUNT_NAME} --account-key ${ACCOUNT_KEY}
 sleep 10
 
-# Construct model repository - remove model configs for autocomplete testing
+# Setup model repository with minimal configs to be autocompleted
 rm -rf models && mkdir -p models
 AUTOCOMPLETE_BACKENDS="savedmodel"
 for FW in ${AUTOCOMPLETE_BACKENDS}; do
-    for model in "${FW}_float32_float32_float32 ${FW}_object_object_object"; do
+    for model in ${FW}_float32_float32_float32 ${FW}_object_object_object; do
         cp -r /data/inferenceserver/${REPO_VERSION}/qa_model_repository/${model} models/
-        # Create empty config file to autocomplete, except for max batch size since unit test sets bs=8
-        echo "max_batch_size: 8" > models/${model}/config.pbtxt
+        # Config files specify things expected by unit test like label_filename
+        # and max_batch_size for comparing results, so remove some key fields 
+        # for autocomplete to fill that won't break the unit test.
+        sed -i '/platform:/d' models/${model}/config.pbtxt
+        sed -i '/data_type:/d' models/${model}/config.pbtxt
+        sed -i '/dims:/d' models/${model}/config.pbtxt
     done
 done
 
