@@ -1,0 +1,1 @@
+unable to load model 'output_mismatch_datatype', configuration expects datatype TYPE_INT32 for output 'OUTPUT0', model provides TYPE_FP32

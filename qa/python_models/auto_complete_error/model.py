@@ -1,4 +1,4 @@
-# Copyright 2021-2022, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright 2022, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -24,6 +24,34 @@
 # (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-name: "python_version"
+import numpy as np
+import json
+import triton_python_backend_utils as pb_utils
 
-instance_group [{ kind: KIND_CPU }]
+
+class TritonPythonModel:
+
+    @staticmethod
+    def auto_complete_config(auto_complete_model_config):
+        """
+        The body of this model doesn't matter. The main purpose of this model is
+        to test correct handling of Python errors in the `auto_complete_config`
+        function.
+        """
+        input0 = {'name': 'INPUT0', 'data_type': 'TYPE_FP32', 'dims': [4]}
+        input1 = {'name': 'INPUT1', 'data_type': 'TYPE_FP32', 'dims': [4]}
+        output0 = {'name': 'OUTPUT0', 'data_type': 'TYPE_FP32', 'dims': [4]}
+        output1 = {'name': 'OUTPUT1', 'data_type': 'TYPE_FP32', 'dims': [4]}
+
+        auto_complete_model_config.set_max_batch_size(0)
+        auto_complete_model_config.add_input(input0)
+        auto_complete_model_config.add_input(input1)
+        auto_complete_model_config.add_output(output0)
+        auto_complete_model_config.add_output(output1)
+
+        undefined_variable
+
+        return auto_complete_model_config
+
+    def execute(self, requests):
+        pass
