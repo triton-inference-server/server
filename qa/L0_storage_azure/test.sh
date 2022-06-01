@@ -185,13 +185,8 @@ if [ "$SERVER_PID" == "0" ]; then
 fi
 
 set +e
-for FW in $BACKENDS; do
-    code=`curl -s -w %{http_code} -X POST localhost:8000/v2/repository/models/${FW}_float32_float32_float32/load`
-    if [ "$code" != "200" ]; then
-        echo -e "\n***\n*** Test Failed\n***"
-        RET=1
-    fi
-    code=`curl -s -w %{http_code} -X POST localhost:8000/v2/repository/models/${FW}_object_object_object/load`
+for model in `ls models/`; do
+    code=`curl -s -w %{http_code} -X POST localhost:8000/v2/repository/models/${model}/load`
     if [ "$code" != "200" ]; then
         echo -e "\n***\n*** Test Failed\n***"
         RET=1
