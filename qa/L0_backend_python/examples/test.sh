@@ -240,6 +240,39 @@ if [ "$TEST_JETSON" == "0" ]; then
     wait $SERVER_PID
 fi
 
+# Auto Complete Model Configuration Example
+CLIENT_LOG="./auto_complete_client.log"
+mkdir -p models/nobatch_auto_complete/1/
+mkdir -p models/batch_auto_complete/1/
+cp examples/auto_complete/nobatch_model.py models/nobatch_auto_complete/1/model.py
+cp examples/auto_complete/batch_model.py models/batch_auto_complete/1/model.py
+SERVER_ARGS="$SERVER_ARGS --strict-model-config=false"
+
+run_server
+if [ "$SERVER_PID" == "0" ]; then
+    echo -e "\n***\n*** Failed to start $SERVER\n***"
+    cat $SERVER_LOG
+    RET=1
+fi
+
+set +e
+python3 examples/auto_complete/client.py > $CLIENT_LOG
+if [ $? -ne 0 ]; then
+    echo -e "\n***\n*** Failed to verify auto_complete example. \n***"
+    RET=1
+fi
+
+grep "PASS" $CLIENT_LOG
+if [ $? -ne 0 ]; then
+    echo -e "\n***\n*** Failed to verify auto_complete example. \n***"
+    cat $CLIENT_LOG
+    RET=1
+fi
+set -e
+
+kill $SERVER_PID
+wait $SERVER_PID
+
 if [ $RET -eq 0 ]; then
     echo -e "\n***\n*** Example verification test PASSED.\n***"
 else

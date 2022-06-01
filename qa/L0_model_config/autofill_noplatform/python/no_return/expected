@@ -1,0 +1,1 @@
+auto_complete_config function in model 'no_return' must return a valid pb.ModelConfig object.

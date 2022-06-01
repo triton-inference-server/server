@@ -182,6 +182,35 @@ for modelpath in \
        $modelpath/.
 done
 
+# Copy Python models into the test model repositories.
+for modelpath in \
+        autofill_noplatform/python/input_mismatch_datatype/1 \
+        autofill_noplatform/python/input_mismatch_dims/1 \
+        autofill_noplatform/python/output_mismatch_datatype/1 \
+        autofill_noplatform/python/output_mismatch_dims/1 \
+        autofill_noplatform_success/python/incomplete_output/1 \
+        autofill_noplatform_success/python/unknown_input/1 \
+        autofill_noplatform_success/python/unknown_output/1 \
+        autofill_noplatform_success/python/empty_config/1 ; do
+    mkdir -p $modelpath
+    cp /opt/tritonserver/qa/python_models/auto_complete/model.py $modelpath/.
+done
+for modelpath in \
+        autofill_noplatform/python/conflicting_max_batch_size \
+        autofill_noplatform/python/input_missing_datatype \
+        autofill_noplatform/python/input_missing_dims \
+        autofill_noplatform/python/input_missing_name \
+        autofill_noplatform/python/output_missing_datatype \
+        autofill_noplatform/python/output_missing_dims \
+        autofill_noplatform/python/output_missing_name \
+        autofill_noplatform/python/no_return \
+        autofill_noplatform_success/python/incomplete_input \
+        autofill_noplatform/python/input_wrong_property \
+        autofill_noplatform/python/output_wrong_property ; do
+    mkdir -p $modelpath/1
+    mv $modelpath/model.py $modelpath/1/.
+done
+
 # Copy other required models
 mkdir -p special_cases/invalid_platform/1
 cp -r /data/inferenceserver/${REPO_VERSION}/qa_model_repository/savedmodel_float32_float32_float32/1/model.savedmodel \
