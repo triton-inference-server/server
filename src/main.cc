@@ -351,7 +351,7 @@ std::vector<Option> options_
        "Set the logging format. Options are \"default\" and \"ISO8601\". "
        "The default is \"default\". For \"default\", the log severity (L) and "
        "timestamp will be logged as \"LMMDD hh:mm:ss.ssssss\". "
-       "For \"ISO8601\", the log format will be \"YYYY-MM-DDThh:mm:ss L\"."},
+       "For \"ISO8601\", the log format will be \"YYYY-MM-DDThh:mm:ssZ L\"."},
 #endif  // TRITON_ENABLE_LOGGING
       {OPTION_ID, "id", Option::ArgStr, "Identifier for this server."},
       {OPTION_MODEL_REPOSITORY, "model-store", Option::ArgStr,
