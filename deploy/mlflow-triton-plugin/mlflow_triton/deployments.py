@@ -303,6 +303,11 @@ class TritonPlugin(BaseDeploymentClient):
                 elif file.name == 'config.pbtxt':
                     config_file = file.name
                     copy_paths['config_path'] = {}
+                elif file.suffix == '.txt' and file.stem != 'requirements':
+                    copy_paths[file.stem] = {
+                        'from': file,
+                        'to': triton_deployment_dir
+                    }
             if model_file is None:
                 for file in artifact_path.iterdir():
                     if file.suffix == '.onnx':
