@@ -234,6 +234,7 @@ enum OptionId {
   OPTION_LOG_INFO,
   OPTION_LOG_WARNING,
   OPTION_LOG_ERROR,
+  OPTION_LOG_FORMAT,
 #endif  // TRITON_ENABLE_LOGGING
   OPTION_ID,
   OPTION_MODEL_REPOSITORY,
@@ -346,6 +347,11 @@ std::vector<Option> options_
        "Enable/disable warning-level logging."},
       {OPTION_LOG_ERROR, "log-error", Option::ArgBool,
        "Enable/disable error-level logging."},
+      {OPTION_LOG_FORMAT, "log-format", Option::ArgStr,
+       "Set the logging format. Options are \"default\" and \"ISO8601\". "
+       "The default is \"default\". For \"default\", the log severity (L) and "
+       "timestamp will be logged as \"LMMDD hh:mm:ss.ssssss\". "
+       "For \"ISO8601\", the log format will be \"YYYY-MM-DDThh:mm:ssZ L\"."},
 #endif  // TRITON_ENABLE_LOGGING
       {OPTION_ID, "id", Option::ArgStr, "Identifier for this server."},
       {OPTION_MODEL_REPOSITORY, "model-store", Option::ArgStr,
@@ -1367,6 +1373,7 @@ Parse(TRITONSERVER_ServerOptions** server_options, int argc, char** argv)
   bool log_warn = true;
   bool log_error = true;
   int32_t log_verbose = 0;
+  auto log_format = triton::common::Logger::Format::kDEFAULT;
 #endif  // TRITON_ENABLE_LOGGING
 
   std::vector<struct option> long_options;
@@ -1395,6 +1402,19 @@ Parse(TRITONSERVER_ServerOptions** server_options, int argc, char** argv)
       case OPTION_LOG_ERROR:
         log_error = ParseBoolOption(optarg);
         break;
+      case OPTION_LOG_FORMAT: {
+        std::string format_str(optarg);
+        if (format_str == "default") {
+          log_format = triton::common::Logger::Format::kDEFAULT;
+        } else if (format_str == "ISO8601") {
+          log_format = triton::common::Logger::Format::kISO8601;
+        } else {
+          std::cerr << "invalid argument for --log-format" << std::endl;
+          std::cerr << Usage() << std::endl;
+          return false;
+        }
+        break;
+      }
 #endif  // TRITON_ENABLE_LOGGING
 
       case OPTION_ID:
@@ -1670,6 +1690,7 @@ Parse(TRITONSERVER_ServerOptions** server_options, int argc, char** argv)
   LOG_ENABLE_WARNING(log_warn);
   LOG_ENABLE_ERROR(log_error);
   LOG_SET_VERBOSE(log_verbose);
+  LOG_SET_FORMAT(log_format);
 #endif  // TRITON_ENABLE_LOGGING
 
   repository_poll_secs_ = 0;
@@ -1817,6 +1838,20 @@ Parse(TRITONSERVER_ServerOptions** server_options, int argc, char** argv)
   FAIL_IF_ERR(
       TRITONSERVER_ServerOptionsSetLogVerbose(loptions, log_verbose),
       "setting log verbose level");
+  switch (log_format) {
+    case triton::common::Logger::Format::kDEFAULT:
+      FAIL_IF_ERR(
+          TRITONSERVER_ServerOptionsSetLogFormat(
+              loptions, TRITONSERVER_LOG_DEFAULT),
+          "setting log format");
+      break;
+    case triton::common::Logger::Format::kISO8601:
+      FAIL_IF_ERR(
+          TRITONSERVER_ServerOptionsSetLogFormat(
+              loptions, TRITONSERVER_LOG_ISO8601),
+          "setting log format");
+      break;
+  }
 #endif  // TRITON_ENABLE_LOGGING
 
 #ifdef TRITON_ENABLE_METRICS
