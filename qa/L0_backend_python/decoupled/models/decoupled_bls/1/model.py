@@ -204,7 +204,7 @@ class TritonPythonModel:
     def response_thread(self, response_sender, in_input):
         # The response_sender is used to send response(s) associated with the
         # corresponding request.
-        # Sleep 5 second to make sure the main thread has exited.
+        # Sleep 5 seconds to make sure the main thread has exited.
         time.sleep(5)
 
         status = self.execute_gpu_bls()
