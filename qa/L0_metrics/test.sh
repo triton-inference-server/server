@@ -114,7 +114,9 @@ wait $SERVER_PID
 
 # Test metrics interval by querying host and checking energy
 METRICS_INTERVAL_MS=500
-METRICS_INTERVAL_SECS=0.5
+# Below time interval is larger than actual metrics interval in case
+# the update is not ready for unexpected reason
+WAIT_INTERVAL_SECS=0.6
 
 SERVER_ARGS="$SERVER_ARGS --metrics-interval-ms=${METRICS_INTERVAL_MS}"
 run_server
@@ -127,9 +129,10 @@ fi
 num_iterations=10
 prev_energy=`curl -s localhost:8002/metrics | awk '/nv_energy_consumption{/ {print $2}'`
 for (( i = 0; i < $num_iterations; ++i )); do
-  sleep $METRICS_INTERVAL_SECS
+  sleep $WAIT_INTERVAL_SECS
   current_energy=`curl -s localhost:8002/metrics | awk '/nv_energy_consumption{/ {print $2}'`
   if [ $current_energy == $prev_energy ]; then
+    cat $SERVER_LOG
     echo "Metrics were not updated in interval of ${METRICS_INTERVAL_MS} seconds"
     echo -e "\n***\n*** Metric Interval test failed. \n***"
     RET=1
