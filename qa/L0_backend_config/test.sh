@@ -221,7 +221,7 @@ else
     # in the model but not in the config.
     MAX_BATCH_LOG_LINE=$(grep -a "\"max_batch_size\":0" $TRIAL.out)
     if [ "$MAX_BATCH_LOG_LINE" == "" ]; then
-        echo "*** FAILED: Expected max batch size to be 1 but found: $MAX_BATCH_LOG_LINE\n"
+        echo "*** FAILED: Expected max batch size to be 0 but found: $MAX_BATCH_LOG_LINE\n"
         RET=1
     fi
 
