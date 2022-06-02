@@ -362,7 +362,7 @@ fi
 set +e
 grep "failed to run warmup sample 'zero sample': An Error Occurred;" $SERVER_LOG
 if [ $? -ne 0 ]; then
-    echo -e "\n***\n*** Failed. Expected no warmup error\n***"
+    echo -e "\n***\n*** Failed. Expected warmup error\n***"
     cat $SERVER_LOG
     RET=1
 fi
