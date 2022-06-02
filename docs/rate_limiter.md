@@ -88,7 +88,7 @@ will create the following resources with the indicated copies:
 R1: 4
 R2: 5
 R3: 10
-R4: 7
+R4: 5
 ```
 
 These values ensure that all model instances can be successfully
