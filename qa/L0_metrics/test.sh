@@ -127,6 +127,20 @@ if [ "$SERVER_PID" == "0" ]; then
 fi
 
 num_iterations=10
+
+# [DO NOT MERGE] debug add "warm up" iteration
+prev_energy=`curl -s localhost:8002/metrics | awk '/nv_energy_consumption{/ {print $2}'`
+for (( i = 0; i < $num_iterations; ++i )); do
+  sleep $WAIT_INTERVAL_SECS
+  current_energy=`curl -s localhost:8002/metrics | awk '/nv_energy_consumption{/ {print $2}'`
+  if [ $current_energy != $prev_energy ]; then
+    cat $SERVER_LOG
+    echo -e "\n***\n*** Saw changing metrics, warmup completed. \n***"
+    break
+  fi
+  prev_energy=$current_energy
+done
+
 prev_energy=`curl -s localhost:8002/metrics | awk '/nv_energy_consumption{/ {print $2}'`
 for (( i = 0; i < $num_iterations; ++i )); do
   sleep $WAIT_INTERVAL_SECS
