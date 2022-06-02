@@ -50,7 +50,7 @@ class UnknownRankTest(tu.TestResultCollector):
 
     def test_success(self):
         model_name = "unknown_rank_success"
-        tensor_shape = (1, 1)
+        tensor_shape = (1)
         try:
             self.infer_unknown(model_name, tensor_shape)
         except InferenceServerException as ex:
@@ -68,7 +68,7 @@ class UnknownRankTest(tu.TestResultCollector):
         except InferenceServerException as ex:
             self.assertIn(
                 "unexpected shape for input \'INPUT\' for model " \
-                "\'unknown_rank_wrong_output\'. Expected [-1,1], got [1,2]",
+                "\'unknown_rank_wrong_output\'. Expected [1], got [1,2]",
                 ex.message())
 
 
