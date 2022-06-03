@@ -147,7 +147,7 @@ for (( i = 0; i < $num_iterations; ++i )); do
   current_energy=`curl -s localhost:8002/metrics | awk '/nv_energy_consumption{/ {print $2}'`
   if [ $current_energy == $prev_energy ]; then
     cat $SERVER_LOG
-    echo "Metrics were not updated in interval of ${METRICS_INTERVAL_MS} seconds"
+    echo "Metrics were not updated in interval of ${METRICS_INTERVAL_MS} milliseconds"
     echo -e "\n***\n*** Metric Interval test failed. \n***"
     RET=1
     break
