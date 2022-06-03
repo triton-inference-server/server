@@ -71,6 +71,9 @@ rm -f *.log*
     mkdir /etc/minio)
 
 export MINIO_ACCESS_KEY="minio"
+# Specify MINIO CI env to allow using root disk
+# https://github.com/minio/minio/issues/15030
+export MINIO_CI_CD=true
 MINIO_VOLUMES="/usr/local/share/minio/"
 MINIO_OPTS="-C /etc/minio --address localhost:4572"
 export MINIO_SECRET_KEY="miniostorage"
