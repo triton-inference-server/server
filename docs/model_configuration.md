@@ -314,7 +314,12 @@ dynamic batching in their generated model configurations are:
 
 1. [TensorFlow backend](https://github.com/triton-inference-server/tensorflow_backend)
 2. [Onnxruntime backend](https://github.com/triton-inference-server/onnxruntime_backend)
-
+3. [TensorRT backend](https://github.com/triton-inference-server/tensorrt_backend)
+   1. TensorRT models store the maximum batch size explicitly and do not make use
+   of the default-max-batch-size parameter. However, if max_batch_size > 1 
+   and no [scheduler](https://github.com/triton-inference-server/server/blob/main/docs/model_configuration.md#scheduling-and-batching)
+   is provided, the dynamic batch scheduler will be enabled.
+   
 If a value greater than 1 for the maximum batch size is set for the 
 model, the [dynamic_batching](#dynamic-batcher) config will be set
 if no scheduler is provided in the configuration file.
