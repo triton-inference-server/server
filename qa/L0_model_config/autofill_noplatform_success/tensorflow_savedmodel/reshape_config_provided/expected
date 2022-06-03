@@ -40,6 +40,8 @@ instance_group {
   gpus: 0
   kind: KIND_GPU
 }
+dynamic_batching {
+}
 default_model_filename: "model.savedmodel"
 optimization {
   input_pinned_memory {
