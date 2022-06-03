@@ -58,7 +58,7 @@ can be easily over-subscribed. This can also cause under-utilization
 of features like [Dynamic Batching](model_configuration.md#dynamic-batcher)
 as it leads to eager batching. 
 
-### Python model using Python Backend \[BETA\]
+### Python model using Python Backend
 
 Read carefully about the [Python Backend](https://github.com/triton-inference-server/python_backend),
 and specifically [`execute`](https://github.com/triton-inference-server/python_backend#execute).
