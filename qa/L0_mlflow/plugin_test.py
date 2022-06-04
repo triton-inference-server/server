@@ -109,7 +109,9 @@ class PluginTest(tu.TestResultCollector):
 
         # Check if the additional files are properly copied
         import filecmp
-        filecmp.cmp(config_path, "./models/onnx_model_with_files/config.pbtxt")
+        self.assertTrue(
+            filecmp.cmp(config_path,
+                        "./models/onnx_model_with_files/config.pbtxt"))
 
 
 if __name__ == '__main__':
