@@ -77,8 +77,8 @@ RUN move %CMAKE_FILE% CMake
 RUN setx PATH "c:\CMake\bin;%PATH%"
 
 ARG CUDA_MAJOR=11
-ARG CUDA_MINOR=6
-ARG CUDA_PATCH=2
+ARG CUDA_MINOR=5
+ARG CUDA_PATCH=0
 ARG CUDA_VERSION=${CUDA_MAJOR}.${CUDA_MINOR}.${CUDA_PATCH}
 ARG CUDA_PACKAGES="nvcc_${CUDA_MAJOR}.${CUDA_MINOR} \
                    cudart_${CUDA_MAJOR}.${CUDA_MINOR} \
@@ -92,15 +92,15 @@ ARG CUDA_PACKAGES="nvcc_${CUDA_MAJOR}.${CUDA_MINOR} \
                    visual_studio_integration_${CUDA_MAJOR}.${CUDA_MINOR}"
 ARG CUDA_INSTALL_ROOT_WP="C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v${CUDA_MAJOR}.${CUDA_MINOR}"
 
-ARG TENSORRT_VERSION=8.4.0.6
-ARG TENSORRT_ZIP=TensorRT-${TENSORRT_VERSION}.Windows10.x86_64.cuda-11.6.cudnn8.3.zip
+ARG TENSORRT_VERSION=8.2.4.2
+ARG TENSORRT_ZIP=TensorRT-${TENSORRT_VERSION}.Windows10.x86_64.cuda-11.4.cudnn8.2.zip
 
-ARG CUDNN_VERSION=8.4.0.27
-ARG CUDNN_DIR=cudnn-windows-x86_64-${CUDNN_VERSION}_cuda11.6-archive
+ARG CUDNN_VERSION=8.3.3.40
+ARG CUDNN_DIR=cudnn-windows-x86_64-${CUDNN_VERSION}_cuda11.5-archive
 ARG CUDNN_ZIP=${CUDNN_DIR}.zip
-WORKDIR /tmp
 
-ADD https://developer.download.nvidia.com/compute/cuda/${CUDA_VERSION}/network_installers/cuda_${CUDA_VERSION}_windows_network.exe cuda_${CUDA_VERSION}_windows_network.exe
+WORKDIR /tmp
+ADD https://developer.download.nvidia.com/compute/cuda/${CUDA_VERSION}/network_installers/cuda_${CUDA_VERSION}_win10_network.exe cuda_${CUDA_VERSION}_win10_network.exe
 COPY ${CUDNN_ZIP} .
 COPY ${TENSORRT_ZIP} .
 
@@ -110,7 +110,7 @@ RUN move TensorRT-%TENSORRT_VERSION% TensorRT
 ENV TRT_VERSION ${TENSORRT_VERSION}
 
 WORKDIR /tmp
-RUN cuda_%CUDA_VERSION%_windows_network.exe -s %CUDA_PACKAGES%
+RUN cuda_%CUDA_VERSION%_win10_network.exe -s %CUDA_PACKAGES%
 
 WORKDIR /
 RUN unzip /tmp/%CUDNN_ZIP%
