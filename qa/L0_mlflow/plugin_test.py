@@ -92,7 +92,7 @@ class PluginTest(tu.TestResultCollector):
         self._validate_deployment("onnx_model")
 
     def test_onnx_flavor_with_files(self):
-        # Log the ONNX model to MLFlow
+        # Log the ONNX model and additional Triton config file to MLFlow
         import mlflow.onnx
         import onnx
         model = onnx.load(
