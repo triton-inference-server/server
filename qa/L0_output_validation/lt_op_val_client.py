@@ -65,7 +65,7 @@ class OutputValidationTest(tu.TestResultCollector):
         msg = response.json()["error"]
         self.assertTrue(
             msg.startswith(
-                "Request for unknown model: 'libtorch_name_1_float32' has no available versions"
+                "unexpected inference output 'OUTPUT__0' for model 'libtorch_name_1_float32'"
             ))
 
     # successful run
