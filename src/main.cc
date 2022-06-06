@@ -1675,6 +1675,9 @@ Parse(TRITONSERVER_ServerOptions** server_options, int argc, char** argv)
       case OPTION_BUFFER_MANAGER_THREAD_COUNT:
         buffer_manager_thread_count = ParseIntOption(optarg);
         break;
+      case OPTION_MODEL_LOAD_THREAD_COUNT:
+        model_load_thread_count = ParseIntOption(optarg);
+        break;
       case OPTION_BACKEND_CONFIG:
         backend_config_settings.push_back(ParseBackendConfigOption(optarg));
         break;
