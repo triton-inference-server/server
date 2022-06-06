@@ -1287,8 +1287,9 @@ Parse(TRITONSERVER_ServerOptions** server_options, int argc, char** argv)
   int32_t repository_poll_secs = repository_poll_secs_;
   int64_t pinned_memory_pool_byte_size = 1 << 28;
   int32_t buffer_manager_thread_count = 0;
-  // hardware_concurrency() can return 0 if not implemented, so check it. 
-  uint32_t model_load_thread_count = std::max(2, 2*std::thread::hardware_concurrency());
+  // hardware_concurrency() can return 0 if not implemented, so check it.
+  uint32_t model_load_thread_count =
+      std::max(2u, 2 * std::thread::hardware_concurrency());
   uint64_t response_cache_byte_size = 0;
 
   std::string backend_dir = "/opt/tritonserver/backends";
@@ -1833,7 +1834,7 @@ Parse(TRITONSERVER_ServerOptions** server_options, int argc, char** argv)
       "setting buffer manager thread count");
   FAIL_IF_ERR(
       TRITONSERVER_ServerOptionsSetModelLoadThreadCount(
-          loptions, std::max(2, model_load_thread_count)),
+          loptions, std::max(2u, model_load_thread_count)),
       "setting model load thread count");
 
 #ifdef TRITON_ENABLE_LOGGING
