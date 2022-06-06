@@ -612,7 +612,7 @@ std::vector<Option> options_
   {
     OPTION_HOST_POLICY, "host-policy", "<string>,<string>=<string>",
         "Specify a host policy setting associated with a policy name. The "
-        "format of this flag is --host-policy=<policy_name>,<setting>=<value>."
+        "format of this flag is --host-policy=<policy_name>,<setting>=<value>. "
         "Currently supported settings are 'numa-node', 'cpu-cores'. Note that "
         "'numa-node' setting will affect pinned memory pool behavior, see "
         "--pinned-memory-pool for more detail."
