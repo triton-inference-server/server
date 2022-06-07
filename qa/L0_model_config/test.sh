@@ -93,6 +93,7 @@ done
 # Copy variable-sized TensorRT plans into the test model repositories.
 for modelpath in \
         autofill_noplatform_success/tensorrt/no_name_platform_variable/1 \
+        autofill_noplatform_success/tensorrt/cpu_instance/1     \
         autofill_noplatform_success/tensorrt/empty_config_variable/1     \
         autofill_noplatform_success/tensorrt/no_config_variable/1 \
         autofill_noplatform_success/tensorrt/hint_for_no_batch/1 \
@@ -177,7 +178,7 @@ for modelpath in \
         autofill_noplatform/pytorch/too_few_inputs/1 \
         autofill_noplatform/pytorch/too_few_outputs/1 \
         autofill_noplatform_success/pytorch/no_name_platform/1 \
-        autofill_noplatform_success/pytorch/default_cpu_instance/1 ; do
+        autofill_noplatform_success/pytorch/cpu_instance/1 ; do
     mkdir -p $modelpath
     cp /data/inferenceserver/${REPO_VERSION}/qa_model_repository/libtorch_float32_float32_float32/1/model.pt \
        $modelpath/.
@@ -392,7 +393,10 @@ for TARGET_DIR in `ls -d autofill_noplatform_success/*/*`; do
     TARGET_DIR_DOT=`echo $TARGET_DIR | tr / .`
     TARGET=`basename ${TARGET_DIR}`
 
-    SERVER_ARGS="--model-repository=`pwd`/models --strict-model-config=false --log-verbose=1"
+    #nocheckin
+    echo "Executing test: $TARGET_DIR"
+
+    SERVER_ARGS="--model-repository=`pwd`/models --strict-model-config=false"
     SERVER_LOG=$SERVER_LOG_BASE.${TARGET_DIR_DOT}.log
 
     # If there is a config.pbtxt at the top-level of the test then
