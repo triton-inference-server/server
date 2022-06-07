@@ -45,6 +45,14 @@ mkdir -p ./mlflow/artifacts
 
 pip install ./mlflow-triton-plugin/
 
+# Clear mlflow registered models if any
+python - << EOF
+from mlflow.tracking import MlflowClient
+c = MlflowClient()
+for m in c.list_registered_models():
+    c.delete_registered_model(m.name)
+EOF
+
 rm -rf ./models
 mkdir -p ./models
 SERVER=/opt/tritonserver/bin/tritonserver
@@ -137,6 +145,7 @@ if [ $CLI_RET -ne 0 ]; then
 fi
 set -e
 
+# ONNX flavor with Python package
 set +e
 PY_LOG=plugin_py.log
 PY_TEST=plugin_test.py
@@ -147,7 +156,7 @@ if [ $? -ne 0 ]; then
     echo -e "\n***\n*** Python Test Failed\n***"
     RET=1
 else
-    check_test_results $TEST_RESULT_FILE 1
+    check_test_results $TEST_RESULT_FILE 2
     if [ $? -ne 0 ]; then
         cat $PY_LOG
         echo -e "\n***\n*** Test Result Verification Failed\n***"
