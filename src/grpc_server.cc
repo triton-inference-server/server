@@ -3698,7 +3698,7 @@ ModelInferHandler::Process(InferHandler::State* state, bool rpc_ok)
     // has initiated... completion callback will transition to
     // COMPLETE. If error go immediately to COMPLETE.
     if (err != nullptr) {
-      const char* request_id;
+      const char* request_id = "";
       LOG_TRITONSERVER_ERROR(
           TRITONSERVER_InferenceRequestIdString(irequest, &request_id),
           "unable to retrieve request ID string");
@@ -4131,7 +4131,7 @@ ModelStreamInferHandler::Process(InferHandler::State* state, bool rpc_ok)
       } else {
         response = state->response_queue_->GetNonDecoupledResponse();
       }
-      const char* request_id;
+      const char* request_id = "";
       LOG_TRITONSERVER_ERROR(
           TRITONSERVER_InferenceRequestIdString(irequest, &request_id),
           "unable to retrieve request ID string");

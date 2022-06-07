@@ -2737,7 +2737,7 @@ HTTPAPIServer::HandleInfer(
   }
 
   if (err != nullptr) {
-    const char* request_id;
+    const char* request_id = "";
     LOG_TRITONSERVER_ERROR(
         TRITONSERVER_InferenceRequestIdString(irequest, &request_id),
         "unable to retrieve request ID string");
@@ -2904,7 +2904,7 @@ HTTPAPIServer::InferRequestClass::FinalizeResponse(
   triton::common::TritonJson::Value response_json(
       triton::common::TritonJson::ValueType::OBJECT);
 
-  const char* request_id;
+  const char* request_id = "";
   RETURN_IF_ERR(TRITONSERVER_InferenceResponseId(response, &request_id));
   if ((request_id != nullptr) && (request_id[0] != '\0')) {
     RETURN_IF_ERR(response_json.AddStringRef("id", request_id));
