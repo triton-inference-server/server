@@ -3698,10 +3698,11 @@ ModelInferHandler::Process(InferHandler::State* state, bool rpc_ok)
     // has initiated... completion callback will transition to
     // COMPLETE. If error go immediately to COMPLETE.
     if (err != nullptr) {
-      const char *id;
-      RETURN_IF_ERR(TRITONSERVER_InferenceRequestIdString(
-          irequest, &id));
-      LOG_VERBOSE(1) << id
+      const char* request_id;
+      LOG_TRITONSERVER_ERROR(
+          TRITONSERVER_InferenceRequestIdString(irequest, &request_id),
+          "unable to retrieve request ID string");
+      LOG_VERBOSE(1) << request_id
                      << "Infer failed: " << TRITONSERVER_ErrorMessage(err);
 
       LOG_TRITONSERVER_ERROR(
@@ -4130,10 +4131,11 @@ ModelStreamInferHandler::Process(InferHandler::State* state, bool rpc_ok)
       } else {
         response = state->response_queue_->GetNonDecoupledResponse();
       }
-      const char *id;
-      RETURN_IF_ERR(TRITONSERVER_InferenceRequestIdString(
-          irequest, &id));
-      LOG_VERBOSE(1) << id
+      const char* request_id;
+      LOG_TRITONSERVER_ERROR(
+          TRITONSERVER_InferenceRequestIdString(irequest, &request_id),
+          "unable to retrieve request ID string");
+      LOG_VERBOSE(1) << request_id
                      << "Infer failed: " << TRITONSERVER_ErrorMessage(err);
 
       LOG_TRITONSERVER_ERROR(
@@ -4204,9 +4206,10 @@ ModelStreamInferHandler::Process(InferHandler::State* state, bool rpc_ok)
       // cancel right away... need to wait for any pending reads,
       // inferences and writes to complete.
       if (!rpc_ok) {
-        const char *request_id;
-        RETURN_IF_ERR(TRITONSERVER_InferenceRequestIdString(
-            irequest, &request_id));
+        const char* request_id;
+        LOG_TRITONSERVER_ERROR(
+            TRITONSERVER_InferenceRequestIdString(irequest, &request_id),
+            "unable to retrieve request ID string");
         LOG_VERBOSE(1) << request_id << "Write for " << Name()
                        << ", rpc_ok=" << rpc_ok << ", context "
                        << state->context_->unique_id_ << ", "
@@ -4221,11 +4224,12 @@ ModelStreamInferHandler::Process(InferHandler::State* state, bool rpc_ok)
       // right away... need to wait for any pending reads, inferences
       // and writes to complete.
       if (!state->context_->PopCompletedResponse(state)) {
-        const char *request_id;
-        RETURN_IF_ERR(TRITONSERVER_InferenceRequestIdString(
-            irequest, &request_id));
-        LOG_ERROR << request_id << "Unexpected response for "
-                  << Name() << ", rpc_ok=" << rpc_ok << ", context "
+        const char* request_id;
+        LOG_TRITONSERVER_ERROR(
+            TRITONSERVER_InferenceRequestIdString(irequest, &request_id),
+            "unable to retrieve request ID string");
+        LOG_ERROR << request_id << "Unexpected response for " << Name()
+                  << ", rpc_ok=" << rpc_ok << ", context "
                   << state->context_->unique_id_ << ", " << state->unique_id_
                   << " step " << state->step_;
         state->context_->finish_ok_ = false;
@@ -4259,9 +4263,10 @@ ModelStreamInferHandler::Process(InferHandler::State* state, bool rpc_ok)
       // cancel right away... need to wait for any pending reads,
       // inferences and writes to complete.
       if (!rpc_ok) {
-        const char *request_id;
-        RETURN_IF_ERR(TRITONSERVER_InferenceRequestIdString(
-            irequest, &request_id));
+        const char* request_id;
+        LOG_TRITONSERVER_ERROR(
+            TRITONSERVER_InferenceRequestIdString(irequest, &request_id),
+            "unable to retrieve request ID string");
         LOG_VERBOSE(1) << request_id << "Write for " << Name()
                        << ", rpc_ok=" << rpc_ok << ", context "
                        << state->context_->unique_id_ << ", "
@@ -4295,11 +4300,11 @@ ModelStreamInferHandler::Process(InferHandler::State* state, bool rpc_ok)
         // Will delay the write of the response by the specified time.
         // This can be used to test the flow where there are other
         // responses available to be written.
-        const char *request_id;
-        RETURN_IF_ERR(TRITONSERVER_InferenceRequestIdString(
-            irequest, &request_id));
-        LOG_INFO << request_id
-                 << "Delaying the write of the response by "
+        const char* request_id;
+        LOG_TRITONSERVER_ERROR(
+            TRITONSERVER_InferenceRequestIdString(irequest, &request_id),
+            "unable to retrieve request ID string");
+        LOG_INFO << request_id << "Delaying the write of the response by "
                  << state->delay_response_ms_ << " ms...";
         std::this_thread::sleep_for(
             std::chrono::milliseconds(state->delay_response_ms_));
