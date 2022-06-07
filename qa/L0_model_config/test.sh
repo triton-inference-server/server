@@ -339,9 +339,6 @@ for TARGET_DIR in `ls -d autofill_noplatform/*/*`; do
     TARGET_DIR_DOT=`echo $TARGET_DIR | tr / .`
     TARGET=`basename ${TARGET_DIR}`
 
-    #nocheckin
-    echo "Executing test: $TARGET_DIR"
-    
     SERVER_ARGS="--model-repository=`pwd`/models --strict-model-config=false"
     SERVER_LOG=$SERVER_LOG_BASE.${TARGET_DIR_DOT}.log
 
@@ -392,9 +389,6 @@ done
 for TARGET_DIR in `ls -d autofill_noplatform_success/*/*`; do
     TARGET_DIR_DOT=`echo $TARGET_DIR | tr / .`
     TARGET=`basename ${TARGET_DIR}`
-
-    #nocheckin
-    echo "Executing test: $TARGET_DIR"
 
     SERVER_ARGS="--model-repository=`pwd`/models --strict-model-config=false"
     SERVER_LOG=$SERVER_LOG_BASE.${TARGET_DIR_DOT}.log
