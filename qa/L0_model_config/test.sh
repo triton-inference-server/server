@@ -392,7 +392,7 @@ for TARGET_DIR in `ls -d autofill_noplatform_success/*/*`; do
     TARGET_DIR_DOT=`echo $TARGET_DIR | tr / .`
     TARGET=`basename ${TARGET_DIR}`
 
-    SERVER_ARGS="--model-repository=`pwd`/models --strict-model-config=false"
+    SERVER_ARGS="--model-repository=`pwd`/models --strict-model-config=false --log-verbose=1"
     SERVER_LOG=$SERVER_LOG_BASE.${TARGET_DIR_DOT}.log
 
     # If there is a config.pbtxt at the top-level of the test then
