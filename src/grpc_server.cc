@@ -3698,11 +3698,11 @@ ModelInferHandler::Process(InferHandler::State* state, bool rpc_ok)
     // has initiated... completion callback will transition to
     // COMPLETE. If error go immediately to COMPLETE.
     if (err != nullptr) {
-      LOG_VERBOSE(1) << "Infer failed: " << TRITONSERVER_ErrorMessage(err);
+      LOG_VERBOSE(1) << irequest->IdString() << "Infer failed: " << TRITONSERVER_ErrorMessage(err);
 
       LOG_TRITONSERVER_ERROR(
           TRITONSERVER_InferenceRequestDelete(irequest),
-          "deleting GRPC inference request");
+          (irequest->IdString() + "deleting GRPC inference request").c_str());
 
       grpc::Status status;
       GrpcStatusUtil::Create(&status, err);
@@ -4126,11 +4126,11 @@ ModelStreamInferHandler::Process(InferHandler::State* state, bool rpc_ok)
       } else {
         response = state->response_queue_->GetNonDecoupledResponse();
       }
-      LOG_VERBOSE(1) << "Infer failed: " << TRITONSERVER_ErrorMessage(err);
+      LOG_VERBOSE(1) << irequest->IdString() << "Infer failed: " << TRITONSERVER_ErrorMessage(err);
 
       LOG_TRITONSERVER_ERROR(
           TRITONSERVER_InferenceRequestDelete(irequest),
-          "deleting GRPC inference request");
+          (irequest->IdString() + "deleting GRPC inference request").c_str());
 
       grpc::Status status;
       GrpcStatusUtil::Create(&status, err);
@@ -4196,7 +4196,7 @@ ModelStreamInferHandler::Process(InferHandler::State* state, bool rpc_ok)
       // cancel right away... need to wait for any pending reads,
       // inferences and writes to complete.
       if (!rpc_ok) {
-        LOG_VERBOSE(1) << "Write for " << Name() << ", rpc_ok=" << rpc_ok
+        LOG_VERBOSE(1) << irequest->IdString() << "Write for " << Name() << ", rpc_ok=" << rpc_ok
                        << ", context " << state->context_->unique_id_ << ", "
                        << state->unique_id_ << " step " << state->step_
                        << ", failed";
@@ -4209,7 +4209,7 @@ ModelStreamInferHandler::Process(InferHandler::State* state, bool rpc_ok)
       // right away... need to wait for any pending reads, inferences
       // and writes to complete.
       if (!state->context_->PopCompletedResponse(state)) {
-        LOG_ERROR << "Unexpected response for " << Name()
+        LOG_ERROR << irequest->IdString() << "Unexpected response for " << Name()
                   << ", rpc_ok=" << rpc_ok << ", context "
                   << state->context_->unique_id_ << ", " << state->unique_id_
                   << " step " << state->step_;
@@ -4244,7 +4244,7 @@ ModelStreamInferHandler::Process(InferHandler::State* state, bool rpc_ok)
       // cancel right away... need to wait for any pending reads,
       // inferences and writes to complete.
       if (!rpc_ok) {
-        LOG_VERBOSE(1) << "Write for " << Name() << ", rpc_ok=" << rpc_ok
+        LOG_VERBOSE(1) << irequest->IdString() << "Write for " << Name() << ", rpc_ok=" << rpc_ok
                        << ", context " << state->context_->unique_id_ << ", "
                        << state->unique_id_ << " step " << state->step_
                        << ", failed";
@@ -4276,7 +4276,7 @@ ModelStreamInferHandler::Process(InferHandler::State* state, bool rpc_ok)
         // Will delay the write of the response by the specified time.
         // This can be used to test the flow where there are other
         // responses available to be written.
-        LOG_INFO << "Delaying the write of the response by "
+        LOG_INFO << irequest->IdString() << "Delaying the write of the response by "
                  << state->delay_response_ms_ << " ms...";
         std::this_thread::sleep_for(
             std::chrono::milliseconds(state->delay_response_ms_));
