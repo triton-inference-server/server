@@ -1837,7 +1837,7 @@ Parse(TRITONSERVER_ServerOptions** server_options, int argc, char** argv)
       "setting buffer manager thread count");
   FAIL_IF_ERR(
       TRITONSERVER_ServerOptionsSetModelLoadThreadCount(
-          loptions, std::max(2u, model_load_thread_count)),
+          loptions, std::max(1u, model_load_thread_count)),
       "setting model load thread count");
 
 #ifdef TRITON_ENABLE_LOGGING
