@@ -62,7 +62,7 @@ RUN git clone --single-branch --depth=1 -b 2022.04.12 https://github.com/microso
 WORKDIR /vcpkg
 RUN bootstrap-vcpkg.bat
 RUN vcpkg.exe update
-RUN vcpkg.exe install openssl:x64-windows openssl-windows:x64-windows rapidjson:x64-windows re2:x64-windows boost-interprocess:x64-windows boost-stacktrace:x64-windows zlib:x64-windows pthread:x64-windows b64:x64-windows
+RUN vcpkg.exe install openssl:x64-windows openssl-windows:x64-windows rapidjson:x64-windows re2:x64-windows boost-asio:x64-windows boost-interprocess:x64-windows boost-stacktrace:x64-windows zlib:x64-windows pthread:x64-windows b64:x64-windows
 RUN vcpkg.exe integrate install
 
 # Install a recent version of cmake. The version installed with VS is
