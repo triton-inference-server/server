@@ -197,8 +197,6 @@ for modelpath in \
 done
 for modelpath in \
         autofill_noplatform/python/conflicting_max_batch_size \
-        autofill_noplatform/python/conflicting_scheduler_ensemble \
-        autofill_noplatform/python/conflicting_scheduler_sequence \
         autofill_noplatform/python/input_missing_datatype \
         autofill_noplatform/python/input_missing_dims \
         autofill_noplatform/python/input_missing_name \
@@ -206,11 +204,19 @@ for modelpath in \
         autofill_noplatform/python/output_missing_dims \
         autofill_noplatform/python/output_missing_name \
         autofill_noplatform/python/no_return \
+        autofill_noplatform_success/python/conflicting_scheduler_sequence \
         autofill_noplatform_success/python/dynamic_batching \
         autofill_noplatform_success/python/dynamic_batching_no_op \
         autofill_noplatform_success/python/incomplete_input \
         autofill_noplatform/python/input_wrong_property \
         autofill_noplatform/python/output_wrong_property ; do
+    mkdir -p $modelpath/1
+    mv $modelpath/model.py $modelpath/1/.
+done
+for modelpath in \
+        autofill_noplatform_success/python/conflicting_scheduler_ensemble/conflicting_scheduler_ensemble \
+        autofill_noplatform_success/python/conflicting_scheduler_ensemble/ensemble_first_step \
+        autofill_noplatform_success/python/conflicting_scheduler_ensemble/ensemble_second_step ; do
     mkdir -p $modelpath/1
     mv $modelpath/model.py $modelpath/1/.
 done
