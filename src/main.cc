@@ -603,7 +603,7 @@ std::vector<Option> options_
        "required to manage input and output tensor contents. Default is 0."},
       {OPTION_MODEL_LOAD_THREAD_COUNT, "model-load-thread-count",
        Option::ArgInt,
-       "The number of threads used to concurrently load/unload models in "
+       "The number of threads used to concurrently load models in "
        "model repositories. Default is 2*<num_cpu_cores>."},
       {OPTION_BACKEND_CONFIG, "backend-config", "<string>,<string>=<string>",
        "Specify a backend-specific configuration setting. The format of this "
