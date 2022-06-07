@@ -1,6 +1,6 @@
 #!/usr/bin/python
 
-# Copyright (c) 2019-2020, NVIDIA CORPORATION. All rights reserved.
+# Copyright 2019-2022 & AFFILIATES, NVIDIA CORPORATION. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -55,17 +55,6 @@ class OutputValidationTest(tu.TestResultCollector):
         self.assertTrue(
             msg.startswith(
                 "The output OUTPUT__1 in the model configuration refers to an output index which doesn't exist. This model has 1 outputs"
-            ))
-
-    # for naming convention violation
-    def test_name(self):
-        url = 'http://localhost:8000/v2/models/libtorch_name_1_float32/infer'
-        body = '{"inputs":[{"name":"INPUT__0","shape":[1,1],"datatype":"FP32","data":[1.0]}],"outputs":[{"name":"OUTPUT__0"}]}'
-        response = requests.post(url, data=body)
-        msg = response.json()["error"]
-        self.assertTrue(
-            msg.startswith(
-                "Request for unknown model: 'libtorch_name_1_float32' has no available versions"
             ))
 
     # successful run
