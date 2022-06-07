@@ -854,6 +854,7 @@ def install_miniconda(conda_version, target_machine):
 RUN mkdir -p /opt/
 RUN wget "{miniconda_url}" -O miniconda.sh -q && \
     echo "{sha_sum}" "miniconda.sh" > shasum && \
+    sha256sum -c ./shasum && \
     sh miniconda.sh -b -p /opt/conda && \
     rm miniconda.sh shasum && \
     find /opt/conda/ -follow -type f -name '*.a' -delete && \
