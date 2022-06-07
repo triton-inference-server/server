@@ -3699,7 +3699,7 @@ ModelInferHandler::Process(InferHandler::State* state, bool rpc_ok)
     // COMPLETE. If error go immediately to COMPLETE.
     if (err != nullptr) {
       const char *id;
-      RETURN_IF_ERR(TRITONSERVER_InferenceRequestId(
+      RETURN_IF_ERR(TRITONSERVER_InferenceRequestIdString(
           irequest, &id));
       LOG_VERBOSE(1) << id
                      << "Infer failed: " << TRITONSERVER_ErrorMessage(err);
@@ -4131,7 +4131,7 @@ ModelStreamInferHandler::Process(InferHandler::State* state, bool rpc_ok)
         response = state->response_queue_->GetNonDecoupledResponse();
       }
       const char *id;
-      RETURN_IF_ERR(TRITONSERVER_InferenceRequestId(
+      RETURN_IF_ERR(TRITONSERVER_InferenceRequestIdString(
           irequest, &id));
       LOG_VERBOSE(1) << id
                      << "Infer failed: " << TRITONSERVER_ErrorMessage(err);
@@ -4205,7 +4205,7 @@ ModelStreamInferHandler::Process(InferHandler::State* state, bool rpc_ok)
       // inferences and writes to complete.
       if (!rpc_ok) {
         const char *id;
-        RETURN_IF_ERR(TRITONSERVER_InferenceRequestId(
+        RETURN_IF_ERR(TRITONSERVER_InferenceRequestIdString(
             irequest, &id));
         LOG_VERBOSE(1) << id << "Write for " << Name()
                        << ", rpc_ok=" << rpc_ok << ", context "
@@ -4222,7 +4222,7 @@ ModelStreamInferHandler::Process(InferHandler::State* state, bool rpc_ok)
       // and writes to complete.
       if (!state->context_->PopCompletedResponse(state)) {
         const char *id;
-        RETURN_IF_ERR(TRITONSERVER_InferenceRequestId(
+        RETURN_IF_ERR(TRITONSERVER_InferenceRequestIdString(
             irequest, &id));
         LOG_ERROR << id << "Unexpected response for "
                   << Name() << ", rpc_ok=" << rpc_ok << ", context "
@@ -4260,7 +4260,7 @@ ModelStreamInferHandler::Process(InferHandler::State* state, bool rpc_ok)
       // inferences and writes to complete.
       if (!rpc_ok) {
         const char *id;
-        RETURN_IF_ERR(TRITONSERVER_InferenceRequestId(
+        RETURN_IF_ERR(TRITONSERVER_InferenceRequestIdString(
             irequest, &id));
         LOG_VERBOSE(1) << id << "Write for " << Name()
                        << ", rpc_ok=" << rpc_ok << ", context "
@@ -4296,7 +4296,7 @@ ModelStreamInferHandler::Process(InferHandler::State* state, bool rpc_ok)
         // This can be used to test the flow where there are other
         // responses available to be written.
         const char *id;
-        RETURN_IF_ERR(TRITONSERVER_InferenceRequestId(
+        RETURN_IF_ERR(TRITONSERVER_InferenceRequestIdString(
             irequest, &id));
         LOG_INFO << id
                  << "Delaying the write of the response by "
