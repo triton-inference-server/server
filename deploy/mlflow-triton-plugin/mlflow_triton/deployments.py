@@ -302,6 +302,12 @@ class TritonPlugin(BaseDeploymentClient):
                         model_file = onnx_meta_data.get('data', None)
                 elif file.name == 'config.pbtxt':
                     config_file = file.name
+                    copy_paths['config_path'] = {}
+                elif file.suffix == '.txt' and file.stem != 'requirements':
+                    copy_paths[file.stem] = {
+                        'from': file,
+                        'to': triton_deployment_dir
+                    }
             if model_file is None:
                 for file in artifact_path.iterdir():
                     if file.suffix == '.onnx':
@@ -343,6 +349,9 @@ default_model_filename: "{}"
                 shutil.copy(copy_paths[key]['from'], copy_paths[key]['to'])
             print("Copied", copy_paths[key]['from'], "to",
                   copy_paths[key]['to'])
+        triton_deployment_dir = os.path.join(self.triton_model_repo, name)
+        version_folder = os.path.join(triton_deployment_dir, "1")
+        os.makedirs(version_folder, exist_ok=True)
         return copy_paths
 
     def _delete_deployment_files(self, name):
