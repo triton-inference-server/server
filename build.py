@@ -60,7 +60,8 @@ from inspect import getsourcefile
 #      ORT version,
 #      ORT OpenVINO version (use None to disable OpenVINO in ORT),
 #      Standalone OpenVINO version,
-#      DCGM version
+#      DCGM version,
+#      Conda version
 #     )
 #
 # Currently the OpenVINO versions used in ORT and standalone must
@@ -96,7 +97,8 @@ TRITON_VERSION_MAP = {
         '2021.4.582',  # ORT OpenVINO
         (('2021.4', None), ('2021.4', '2021.4.582'),
          ('SPECIFIC', 'f2f281e6')),  # Standalone OpenVINO
-        '2.2.9')  # DCGM version
+        '2.2.9',  # DCGM version
+        'py38_4.11.0')  # Conda version
 }
 
 CORE_BACKENDS = ['ensemble']
@@ -628,8 +630,8 @@ def pytorch_cmake_args(images):
                 cmake_backend_enable('pytorch',
                                      'TRITON_PYTORCH_ENABLE_TORCHTRT', True))
         cargs.append(
-            cmake_backend_enable('pytorch',
-                                 'TRITON_ENABLE_NVTX', FLAGS.enable_nvtx))
+            cmake_backend_enable('pytorch', 'TRITON_ENABLE_NVTX',
+                                 FLAGS.enable_nvtx))
     return cargs
 
 
@@ -838,6 +840,29 @@ RUN curl -o /tmp/cuda-keyring.deb \
 '''.format(dcgm_version, dcgm_version)
 
 
+def install_miniconda(conda_version, target_machine):
+    if conda_version == '':
+        fail(
+            'unable to determine default repo-tag, CONDA version not known for {}'
+            .format(FLAGS.version))
+    miniconda_url = f"https://repo.anaconda.com/miniconda/Miniconda3-{conda_version}-Linux-{target_machine}.sh"
+    if target_machine == 'x86_64':
+        sha_sum = "3190da6626f86eee8abf1b2fd7a5af492994eb2667357ee4243975cdbb175d7a"
+    else:
+        sha_sum = "47affd9577889f80197aadbdf1198b04a41528421aaf0ec1f28b04a50b9f3ab8"
+    return f'''
+RUN mkdir -p /opt/
+RUN wget "{miniconda_url}" -O miniconda.sh -q && \
+    echo "{sha_sum}" "miniconda.sh" > shasum && \
+    sh miniconda.sh -b -p /opt/conda && \
+    rm miniconda.sh shasum && \
+    find /opt/conda/ -follow -type f -name '*.a' -delete && \
+    find /opt/conda/ -follow -type f -name '*.js.map' -delete && \
+    /opt/conda/bin/conda clean -afy
+ENV PATH /opt/conda/bin:${{PATH}}
+'''
+
+
 def create_dockerfile_buildbase(ddir, dockerfile_name, argmap):
     df = '''
 ARG TRITON_VERSION={}
@@ -934,6 +959,10 @@ RUN rm -fr *
 COPY . .
 ENTRYPOINT []
 '''
+
+    # Install miniconda required for the DALI backend.
+    if target_platform() != 'windows':
+        df += install_miniconda(argmap['CONDA_VERSION'], target_machine())
 
     with open(os.path.join(ddir, dockerfile_name), "w") as dfile:
         dfile.write(df)
@@ -1259,6 +1288,9 @@ def create_build_dockerfiles(container_build_dir, images, backends, repoagents,
         'DCGM_VERSION':
             '' if FLAGS.version is None or FLAGS.version
             not in TRITON_VERSION_MAP else TRITON_VERSION_MAP[FLAGS.version][5],
+        'CONDA_VERSION':
+            '' if FLAGS.version is None or FLAGS.version
+            not in TRITON_VERSION_MAP else TRITON_VERSION_MAP[FLAGS.version][6]
     }
 
     # For CPU-only image we need to copy some cuda libraries and dependencies
