@@ -2737,7 +2737,12 @@ HTTPAPIServer::HandleInfer(
   }
 
   if (err != nullptr) {
-    LOG_VERBOSE(1) << "Infer failed: " << TRITONSERVER_ErrorMessage(err);
+    const char* request_id;
+    LOG_TRITONSERVER_ERROR(
+        TRITONSERVER_InferenceRequestIdString(irequest, &request_id),
+        "unable to retrieve request ID string");
+    LOG_VERBOSE(1) << request_id
+                   << "Infer failed: " << TRITONSERVER_ErrorMessage(err);
     evhtp_headers_add_header(
         req->headers_out,
         evhtp_header_new(kContentTypeHeader, "application/json", 1, 1));
