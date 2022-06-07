@@ -88,6 +88,8 @@ from inspect import getsourcefile
 # User can also build openvino backend from specific commit sha of openVINO
 # repository. The pair should be (`SPECIFIC`, <commit_sha_of_ov_repo>).
 # Note: Not all sha ids would successfuly compile and work.
+# Note: When updating the conda version, make sure to update the shasum of
+# the packages used for different platforms in install_miniconda function.
 #
 TRITON_VERSION_MAP = {
     '2.23.0dev': (
@@ -98,7 +100,7 @@ TRITON_VERSION_MAP = {
         (('2021.4', None), ('2021.4', '2021.4.582'),
          ('SPECIFIC', 'f2f281e6')),  # Standalone OpenVINO
         '2.2.9',  # DCGM version
-        'py38_4.11.0')  # Conda version
+        'py38_4.12.0')  # Conda version.
 }
 
 CORE_BACKENDS = ['ensemble']
@@ -849,7 +851,7 @@ def install_miniconda(conda_version, target_machine):
     if target_machine == 'x86_64':
         sha_sum = "3190da6626f86eee8abf1b2fd7a5af492994eb2667357ee4243975cdbb175d7a"
     else:
-        sha_sum = "47affd9577889f80197aadbdf1198b04a41528421aaf0ec1f28b04a50b9f3ab8"
+        sha_sum = "0c20f121dc4c8010032d64f8e9b27d79e52d28355eb8d7972eafc90652387777"
     return f'''
 RUN mkdir -p /opt/
 RUN wget "{miniconda_url}" -O miniconda.sh -q && \
