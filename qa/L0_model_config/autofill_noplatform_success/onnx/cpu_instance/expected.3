@@ -29,10 +29,10 @@ output {
 instance_group {
   name: "cpu_instance"
   count: 2
-  gpus: 0
   kind: KIND_CPU
 }
 dynamic_batching {
+  preferred_batch_size: 4
 }
 default_model_filename: "model.onnx"
 optimization {

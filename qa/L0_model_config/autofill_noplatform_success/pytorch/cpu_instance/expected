@@ -29,7 +29,6 @@ output {
 instance_group {
   name: "cpu_instance"
   count: 1
-  gpus: 0
   kind: KIND_CPU
 }
 default_model_filename: "model.pt"
