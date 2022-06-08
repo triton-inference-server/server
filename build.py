@@ -92,8 +92,8 @@ from inspect import getsourcefile
 # the packages used for different platforms in install_miniconda function.
 #
 TRITON_VERSION_MAP = {
-    '2.23.0dev': (
-        '22.06dev',  # triton container
+    '2.24.0dev': (
+        '22.07dev',  # triton container
         '22.05',  # upstream container
         '1.11.1',  # ORT
         '2021.4.582',  # ORT OpenVINO
