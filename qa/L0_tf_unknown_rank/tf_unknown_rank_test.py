@@ -1,4 +1,4 @@
-# Copyright (c) 2020, NVIDIA CORPORATION. All rights reserved.
+# Copyright (c) 2022, NVIDIA CORPORATION. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -50,21 +50,26 @@ class UnknownRankTest(tu.TestResultCollector):
 
     def test_success(self):
         model_name = "unknown_rank_success"
-        tensor_shape = (1,)
+        tensor_shape = (1)
         try:
             self.infer_unknown(model_name, tensor_shape)
         except InferenceServerException as ex:
             self.assertTrue(False, "unexpected error {}".format(ex))
 
-    def test_wrong_output(self):
-        tensor_shape = (1,)
+    def test_wrong_input(self):
         model_name = "unknown_rank_wrong_output"
+        tensor_shape = (1, 2)
         try:
             self.infer_unknown(model_name, tensor_shape)
+            self.fail(
+                "Found success when expected failure with model given " \
+                "wrong input tensor [1,2] for input [-1,1]."
+            )
         except InferenceServerException as ex:
-            self.assertIn("tensor \'OUTPUT\': the model expects 1 dimensions " \
-                "(shape [1]) but the model configuration specifies 2 dimensions " \
-                "(shape [1,1])", ex.message())
+            self.assertIn(
+                "unexpected shape for input \'INPUT\' for model " \
+                "\'unknown_rank_wrong_output\'. Expected [1], got [1,2]",
+                ex.message())
 
 
 if __name__ == '__main__':
