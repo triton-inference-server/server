@@ -79,7 +79,7 @@ else
     fi
 fi
 
-python $UNKNOWN_RANK_TEST UnknownRankTest.test_wrong_output >> $CLIENT_LOG 2>&1
+python $UNKNOWN_RANK_TEST UnknownRankTest.test_wrong_input >> $CLIENT_LOG 2>&1
 if [ $? -ne 0 ]; then
     echo -e "\n***\n*** Test Failed\n***"
     cat $CLIENT_LOG
