@@ -93,7 +93,6 @@ done
 # Copy variable-sized TensorRT plans into the test model repositories.
 for modelpath in \
         autofill_noplatform_success/tensorrt/no_name_platform_variable/1 \
-        autofill_noplatform_success/tensorrt/cpu_instance/1     \
         autofill_noplatform_success/tensorrt/empty_config_variable/1     \
         autofill_noplatform_success/tensorrt/no_config_variable/1 \
         autofill_noplatform_success/tensorrt/hint_for_no_batch/1 \
