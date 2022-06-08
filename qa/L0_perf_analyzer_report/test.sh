@@ -131,8 +131,8 @@ echo "response_cache { enable: False }" >> "${MODEL_DIR}/${ENSEMBLE_MODEL_CACHE_
 echo "response_cache { enable: True }" >> "${MODEL_DIR}/${COMPOSING_MODEL_CACHE_ENABLED}/config.pbtxt"
 echo "response_cache { enable: False }" >> "${MODEL_DIR}/${COMPOSING_MODEL_CACHE_DISABLED}/config.pbtxt"
 # Force CPU memory for composing models since cache doesn't currently support GPU memory
-echo "instance_group [{ kind: KIND_CPU }]" >> "${MODEL_DIR}/${COMPOSING_MODEL_CACHE_ENABLED}/config.pbtxt"
-echo "instance_group [{ kind: KIND_CPU }]" >> "${MODEL_DIR}/${COMPOSING_MODEL_CACHE_DISABLED}/config.pbtxt"
+echo "instance_group [{ kind: KIND_CPU \n count: 1 }]" >> "${MODEL_DIR}/${COMPOSING_MODEL_CACHE_ENABLED}/config.pbtxt"
+echo "instance_group [{ kind: KIND_CPU \n count: 1 }]" >> "${MODEL_DIR}/${COMPOSING_MODEL_CACHE_DISABLED}/config.pbtxt"
 
 # Run server
 run_server
