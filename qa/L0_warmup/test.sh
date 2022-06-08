@@ -71,7 +71,8 @@ for BACKEND in ${BACKENDS}; do
     START="START" && [ "$BACKEND" == "libtorch" ] && START="START__1"
     READY="READY" && [ "$BACKEND" == "libtorch" ] && READY="READY__2"
 
-    # 2 instances per device with random / zero data
+    # 2 instances per device with random / zero data.
+    # The zero data sample will run twice
     #
     # Provide warmup instruction (batch size 1) in model config
     (cd models/${BACKEND}_float32_float32_float32 && \
@@ -96,12 +97,18 @@ for BACKEND in ${BACKENDS}; do
         echo "    }" >> config.pbtxt && \
         echo "}]" >> config.pbtxt )
 
-    # zero data
+    # zero data. For realistic sequence model, 'repeat_count' may not work
+    # well because the model will expect a valid sequence of requests which
+    # should be represented by a series of warmup samples. 'repeat_count'
+    # essentially "resend" one of the sample, which may invalidate the sequence.
+    # This is okay for this specific test because the synthetic model is not
+    # data sensitive.
     #
     # Instruction for sequence model (batch size 8), need to specify control tensor
     (cd models/${BACKEND}_sequence_int32 && \
         echo "model_warmup [{" >> config.pbtxt && \
         echo "    name : \"sequence sample\"" >> config.pbtxt && \
+        echo "    repeat_count : 2" >> config.pbtxt && \
         echo "    batch_size: 8" >> config.pbtxt && \
         echo "    inputs {" >> config.pbtxt && \
         echo "        key: \"${SEQ_INPUT}\"" >> config.pbtxt && \
@@ -143,7 +150,12 @@ for BACKEND in ${BACKENDS}; do
         echo -e "\n***\n*** Failed. Expected warmup for stateless model\n***"
         RET=1
     fi
-    grep "is running warmup sample 'sequence sample'" $SERVER_LOG
+    grep "is running warmup sample 'sequence sample' for iteration 1" $SERVER_LOG
+    if [ $? -ne 0 ]; then
+        echo -e "\n***\n*** Failed. Expected warmup for stateful model\n***"
+        RET=1
+    fi
+    grep "is running warmup sample 'sequence sample' for iteration 2" $SERVER_LOG
     if [ $? -ne 0 ]; then
         echo -e "\n***\n*** Failed. Expected warmup for stateful model\n***"
         RET=1
