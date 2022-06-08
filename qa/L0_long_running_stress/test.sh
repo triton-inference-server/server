@@ -50,7 +50,7 @@ source ../common/util.sh
 # If the test should be run in long and high load setting
 if [ "$TRITON_PERF_LONG" == 1 ]; then
     # ~ 6.5 days
-    TEST_DURATION=557000
+    TEST_DURATION=500000
     LOAD_THREAD_COUNT=2
     EMAIL_SUBJECT="Long"
 else
@@ -167,7 +167,7 @@ fi
 
 # Run only if both TRITON_FROM and TRITON_TO_DL are set
 if [[ ! -z "$TRITON_FROM" ]] || [[ ! -z "$TRITON_TO_DL" ]]; then
-    python stress_mail.py $EMAIL_SUBJECT
+    python stress_mail.py "$EMAIL_SUBJECT"
 fi
 
 exit $RET

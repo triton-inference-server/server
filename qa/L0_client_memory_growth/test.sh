@@ -61,10 +61,11 @@ source ../common/util.sh
 if [ "$TRITON_PERF_WEEKLY" == 1 ]; then
     if [ "$TRITON_PERF_LONG" == 1 ]; then
         # ~ 12 hours
+        # GRPC cycles are reduced as there is high fluctuation in time spent
         REPETITION_HTTP_CPP=2220000
         REPETITION_HTTP_PY=3600000
-        REPETITION_GRPC_CPP=17000000
-        REPETITION_GRPC_PY=2570000
+        REPETITION_GRPC_CPP=10000000
+        REPETITION_GRPC_PY=2070000
         EMAIL_SUBJECT="Weekly Long"
     else
         # Run the test for each case approximately 1.5 hours
@@ -171,7 +172,7 @@ fi
 
 # Run only if both TRITON_FROM and TRITON_TO_DL are set
 if [[ ! -z "$TRITON_FROM" ]] || [[ ! -z "$TRITON_TO_DL" ]]; then
-    python client_memory_mail.py $EMAIL_SUBJECT
+    python client_memory_mail.py "$EMAIL_SUBJECT"
 fi
 
 exit $RET
