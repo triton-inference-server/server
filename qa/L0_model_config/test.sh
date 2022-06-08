@@ -205,7 +205,7 @@ for modelpath in \
         autofill_noplatform/python/output_missing_name \
         autofill_noplatform/python/no_return \
         autofill_noplatform/python/conflicting_scheduler_sequence \
-        autofill_noplatform/python/dynamic_batching_no_op \
+        autofill_noplatform_success/python/dynamic_batching_no_op \
         autofill_noplatform_success/python/dynamic_batching \
         autofill_noplatform_success/python/incomplete_input \
         autofill_noplatform/python/input_wrong_property \
