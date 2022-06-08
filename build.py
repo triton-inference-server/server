@@ -1628,7 +1628,7 @@ def cibase_build(cmake_script, repo_dir, cmake_dir, build_dir, install_dir,
 
     # Some of the backends are needed for CI testing
     cmake_script.mkdir(os.path.join(ci_dir, 'backends'))
-    for be in ('identity', 'repeat', 'square'):
+    for be in ('identity', 'repeat', 'square', 'bls'):
         be_install_dir = os.path.join(build_dir, be, 'install', 'backends', be)
         if target_platform() == 'windows':
             cmake_script.cmd(f'if (Test-Path -Path {be_install_dir}) {{')
@@ -1690,7 +1690,7 @@ def enable_all():
         all_backends = [
             'ensemble', 'identity', 'square', 'repeat', 'tensorflow1',
             'tensorflow2', 'onnxruntime', 'python', 'dali', 'pytorch',
-            'openvino', 'fil', 'tensorrt'
+            'openvino', 'fil', 'tensorrt', 'bls'
         ]
         all_repoagents = ['checksum']
         all_filesystems = ['gcs', 's3', 'azure_storage']
@@ -1706,7 +1706,7 @@ def enable_all():
     else:
         all_backends = [
             'ensemble', 'identity', 'square', 'repeat', 'onnxruntime',
-            'openvino', 'tensorrt'
+            'openvino', 'tensorrt', 'bls'
         ]
         all_repoagents = ['checksum']
         all_filesystems = []
