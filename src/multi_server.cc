@@ -1,4 +1,4 @@
-// Copyright (c) 2020, NVIDIA CORPORATION. All rights reserved.
+// Copyright 2020-2022, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 //
 // Redistribution and use in source and binary forms, with or without
 // modification, are permitted provided that the following conditions
@@ -409,14 +409,14 @@ Check(
       case TRITONSERVER_MEMORY_CPU: {
         std::cout << name << " is stored in system memory" << std::endl;
         const float* cbase = reinterpret_cast<const float*>(base);
-        odata.assign(cbase, cbase + byte_size);
+        odata.assign(cbase, cbase + (byte_size / sizeof(float)));
         break;
       }
 
       case TRITONSERVER_MEMORY_CPU_PINNED: {
         std::cout << name << " is stored in pinned memory" << std::endl;
         const float* cbase = reinterpret_cast<const float*>(base);
-        odata.assign(cbase, cbase + byte_size);
+        odata.assign(cbase, cbase + (byte_size / sizeof(float)));
         break;
       }
 
