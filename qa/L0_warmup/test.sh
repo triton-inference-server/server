@@ -100,9 +100,9 @@ for BACKEND in ${BACKENDS}; do
     # zero data. For realistic sequence model, 'repeat_count' may not work
     # well because the model will expect a valid sequence of requests which
     # should be represented by a series of warmup samples. 'repeat_count'
-    # essentially "resend" one of the sample, which may invalidate the sequence.
-    # This is okay for this specific test because the synthetic model is not
-    # data sensitive.
+    # essentially "resends" one of the sample, which may invalidate the
+    # sequence. This is okay for this specific test because the synthetic model
+    # is not data sensitive.
     #
     # Instruction for sequence model (batch size 8), need to specify control tensor
     (cd models/${BACKEND}_sequence_int32 && \
@@ -152,12 +152,12 @@ for BACKEND in ${BACKENDS}; do
     fi
     grep "is running warmup sample 'sequence sample' for iteration 1" $SERVER_LOG
     if [ $? -ne 0 ]; then
-        echo -e "\n***\n*** Failed. Expected warmup for stateful model\n***"
+        echo -e "\n***\n*** Failed. Expected 1st warmup iteration for stateful model\n***"
         RET=1
     fi
     grep "is running warmup sample 'sequence sample' for iteration 2" $SERVER_LOG
     if [ $? -ne 0 ]; then
-        echo -e "\n***\n*** Failed. Expected warmup for stateful model\n***"
+        echo -e "\n***\n*** Failed. Expected 2nd warmup iteration for stateful model\n***"
         RET=1
     fi
     grep "failed to run warmup" $SERVER_LOG
