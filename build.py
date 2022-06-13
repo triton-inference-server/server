@@ -922,6 +922,7 @@ RUN apt-get update && \
             libarchive-dev \
             pkg-config \
             uuid-dev \
+            libgtest-dev \
             libnuma-dev && \
     rm -rf /var/lib/apt/lists/*
 
