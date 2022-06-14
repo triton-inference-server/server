@@ -97,9 +97,9 @@ for BACKEND in ${BACKENDS}; do
         echo "    }" >> config.pbtxt && \
         echo "}]" >> config.pbtxt )
 
-    # zero data. For realistic sequence model, 'repeat_count' may not work
+    # zero data. For realistic sequence model, 'count' may not work
     # well because the model will expect a valid sequence of requests which
-    # should be represented by a series of warmup samples. 'repeat_count'
+    # should be represented by a series of warmup samples. 'count > 1'
     # essentially "resends" one of the sample, which may invalidate the
     # sequence. This is okay for this specific test because the synthetic model
     # is not data sensitive.
@@ -108,7 +108,7 @@ for BACKEND in ${BACKENDS}; do
     (cd models/${BACKEND}_sequence_int32 && \
         echo "model_warmup [{" >> config.pbtxt && \
         echo "    name : \"sequence sample\"" >> config.pbtxt && \
-        echo "    repeat_count : 2" >> config.pbtxt && \
+        echo "    count : 2" >> config.pbtxt && \
         echo "    batch_size: 8" >> config.pbtxt && \
         echo "    inputs {" >> config.pbtxt && \
         echo "        key: \"${SEQ_INPUT}\"" >> config.pbtxt && \
