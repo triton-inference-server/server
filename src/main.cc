@@ -1287,7 +1287,7 @@ Parse(TRITONSERVER_ServerOptions** server_options, int argc, char** argv)
   int32_t repository_poll_secs = repository_poll_secs_;
   int64_t pinned_memory_pool_byte_size = 1 << 28;
   int32_t buffer_manager_thread_count = 0;
-  // hardware_concurrency() can return 0 if not implemented, so check it.
+  // hardware_concurrency() returns 0 if not well defined or not computable.
   uint32_t model_load_thread_count =
       std::max(2u, 2 * std::thread::hardware_concurrency());
   uint64_t response_cache_byte_size = 0;
