@@ -2737,9 +2737,9 @@ HTTPAPIServer::HandleInfer(
   }
 
   if (err != nullptr) {
-    const char* request_id = "";
+    const char* request_id = "<id_unknown>";
     LOG_TRITONSERVER_ERROR(
-        TRITONSERVER_InferenceRequestIdString(irequest, &request_id),
+        TRITONSERVER_InferenceRequestId(irequest, &request_id),
         "unable to retrieve request ID string");
     LOG_VERBOSE(1) << "[request id: " << request_id << "]"
                    << "Infer failed: " << TRITONSERVER_ErrorMessage(err);
