@@ -73,7 +73,7 @@ trace settings are defined:
 
 - "trace_file" : the file where the trace output will be saved. If
 "log_frequency" is set, this will be the prefix of the files to save the
-trace output, resulting files in name `${trace_file}.0", "${trace_file}.1", ...`,
+trace output, resulting files in name `"${trace_file}.0", "${trace_file}.1", ...`,
 see trace setting "log_frequency" below for detail.
 - "trace_level" : the trace level. "OFF" to disable tracing,
 "TIMESTAMPS" to trace timestamps, "TENSORS" to trace tensors.
