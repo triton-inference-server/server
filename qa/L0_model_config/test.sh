@@ -244,152 +244,156 @@ rm -f $SERVER_LOG_BASE* $CLIENT_LOG
 RET=0
 
 # Run special test cases
-for TARGET in `ls special_cases`; do
-    SERVER_ARGS="--model-repository=`pwd`/models --strict-model-config=true"
-    SERVER_LOG=$SERVER_LOG_BASE.special_case_${TARGET}.log
+# nocheckin
+# for TARGET in `ls special_cases`; do
+#     SERVER_ARGS="--model-repository=`pwd`/models --strict-model-config=true"
+#     SERVER_LOG=$SERVER_LOG_BASE.special_case_${TARGET}.log
 
-    rm -fr models && mkdir models
-    cp -r special_cases/$TARGET models/.
+#     rm -fr models && mkdir models
+#     cp -r special_cases/$TARGET models/.
 
-    CONFIG=models/$TARGET/config.pbtxt
-    EXPECTEDS=models/$TARGET/expected*
+#     CONFIG=models/$TARGET/config.pbtxt
+#     EXPECTEDS=models/$TARGET/expected*
 
-    echo -e "Test on special_cases/$TARGET" >> $CLIENT_LOG
+#     echo -e "Test on special_cases/$TARGET" >> $CLIENT_LOG
 
-    # We expect all the tests to fail with one of the expected
-    # error messages
-    run_server
-    if [ "$SERVER_PID" != "0" ]; then
-        echo -e "*** FAILED: unexpected success starting $SERVER" >> $CLIENT_LOG
-        RET=1
-        kill $SERVER_PID
-        wait $SERVER_PID
-    else
-        EXFOUND=0
-        for EXPECTED in `ls $EXPECTEDS`; do
-            EX=`cat $EXPECTED`
-            if grep ^E[0-9][0-9][0-9][0-9].*"$EX" $SERVER_LOG; then
-                echo -e "Found \"$EX\"" >> $CLIENT_LOG
-                EXFOUND=1
-                break
-            else
-                echo -e "Not found \"$EX\"" >> $CLIENT_LOG
-            fi
-        done
-        if [ "$EXFOUND" == "0" ]; then
-            echo -e "*** FAILED: special_cases/$TARGET" >> $CLIENT_LOG
-            RET=1
-        fi
-    fi
-done
+#     # We expect all the tests to fail with one of the expected
+#     # error messages
+#     run_server
+#     if [ "$SERVER_PID" != "0" ]; then
+#         echo -e "*** FAILED: unexpected success starting $SERVER" >> $CLIENT_LOG
+#         RET=1
+#         kill $SERVER_PID
+#         wait $SERVER_PID
+#     else
+#         EXFOUND=0
+#         for EXPECTED in `ls $EXPECTEDS`; do
+#             EX=`cat $EXPECTED`
+#             if grep ^E[0-9][0-9][0-9][0-9].*"$EX" $SERVER_LOG; then
+#                 echo -e "Found \"$EX\"" >> $CLIENT_LOG
+#                 EXFOUND=1
+#                 break
+#             else
+#                 echo -e "Not found \"$EX\"" >> $CLIENT_LOG
+#             fi
+#         done
+#         if [ "$EXFOUND" == "0" ]; then
+#             echo -e "*** FAILED: special_cases/$TARGET" >> $CLIENT_LOG
+#             RET=1
+#         fi
+#     fi
+# done
 
-for TRIAL in $TRIALS; do
-    # Run all tests that require no autofill but that add the platform to
-    # the model config before running the test
-    for TARGET in `ls noautofill_platform`; do
-        SERVER_ARGS="--model-repository=`pwd`/models --strict-model-config=true"
-        SERVER_LOG=$SERVER_LOG_BASE.noautofill_platform_${TRIAL}_${TARGET}.log
+# for TRIAL in $TRIALS; do
+#     # Run all tests that require no autofill but that add the platform to
+#     # the model config before running the test
+#     for TARGET in `ls noautofill_platform`; do
+#         SERVER_ARGS="--model-repository=`pwd`/models --strict-model-config=true"
+#         SERVER_LOG=$SERVER_LOG_BASE.noautofill_platform_${TRIAL}_${TARGET}.log
 
-        rm -fr models && mkdir models
-        cp -r noautofill_platform/$TARGET models/.
+#         rm -fr models && mkdir models
+#         cp -r noautofill_platform/$TARGET models/.
 
-        CONFIG=models/$TARGET/config.pbtxt
-        EXPECTEDS=models/$TARGET/expected*
+#         CONFIG=models/$TARGET/config.pbtxt
+#         EXPECTEDS=models/$TARGET/expected*
 
-        # If there is a config.pbtxt change/add platform to it
-        if [ -f $CONFIG ]; then
-            sed -i '/platform:/d' $CONFIG
-            echo "platform: \"$TRIAL\"" >> $CONFIG
-            cat $CONFIG
-        fi
+#         # If there is a config.pbtxt change/add platform to it
+#         if [ -f $CONFIG ]; then
+#             sed -i '/platform:/d' $CONFIG
+#             echo "platform: \"$TRIAL\"" >> $CONFIG
+#             cat $CONFIG
+#         fi
 
-        echo -e "Test platform $TRIAL on noautofill_platform/$TARGET" >> $CLIENT_LOG
+#         echo -e "Test platform $TRIAL on noautofill_platform/$TARGET" >> $CLIENT_LOG
 
-        # We expect all the tests to fail with one of the expected
-        # error messages
-        run_server
-        if [ "$SERVER_PID" != "0" ]; then
-            echo -e "*** FAILED: unexpected success starting $SERVER" >> $CLIENT_LOG
-            RET=1
-            kill $SERVER_PID
-            wait $SERVER_PID
-        else
-            EXFOUND=0
-            for EXPECTED in `ls $EXPECTEDS`; do
-                EX=`cat $EXPECTED`
-                if grep ^E[0-9][0-9][0-9][0-9].*"$EX" $SERVER_LOG; then
-                    echo -e "Found \"$EX\"" >> $CLIENT_LOG
-                    EXFOUND=1
-                    break
-                else
-                    echo -e "Not found \"$EX\"" >> $CLIENT_LOG
-                fi
-            done
+#         # We expect all the tests to fail with one of the expected
+#         # error messages
+#         run_server
+#         if [ "$SERVER_PID" != "0" ]; then
+#             echo -e "*** FAILED: unexpected success starting $SERVER" >> $CLIENT_LOG
+#             RET=1
+#             kill $SERVER_PID
+#             wait $SERVER_PID
+#         else
+#             EXFOUND=0
+#             for EXPECTED in `ls $EXPECTEDS`; do
+#                 EX=`cat $EXPECTED`
+#                 if grep ^E[0-9][0-9][0-9][0-9].*"$EX" $SERVER_LOG; then
+#                     echo -e "Found \"$EX\"" >> $CLIENT_LOG
+#                     EXFOUND=1
+#                     break
+#                 else
+#                     echo -e "Not found \"$EX\"" >> $CLIENT_LOG
+#                 fi
+#             done
 
-            if [ "$EXFOUND" == "0" ]; then
-                echo -e "*** FAILED: platform $TRIAL noautofill_platform/$TARGET" >> $CLIENT_LOG
-                RET=1
-            fi
-        fi
-    done
-done
+#             if [ "$EXFOUND" == "0" ]; then
+#                 echo -e "*** FAILED: platform $TRIAL noautofill_platform/$TARGET" >> $CLIENT_LOG
+#                 RET=1
+#             fi
+#         fi
+#     done
+# done
 
-# Run all autofill tests that don't add a platform to the model config
-# before running the test
-for TARGET_DIR in `ls -d autofill_noplatform/*/*`; do
-    TARGET_DIR_DOT=`echo $TARGET_DIR | tr / .`
-    TARGET=`basename ${TARGET_DIR}`
+# # Run all autofill tests that don't add a platform to the model config
+# # before running the test
+# for TARGET_DIR in `ls -d autofill_noplatform/*/*`; do
+#     TARGET_DIR_DOT=`echo $TARGET_DIR | tr / .`
+#     TARGET=`basename ${TARGET_DIR}`
 
-    SERVER_ARGS="--model-repository=`pwd`/models --strict-model-config=false"
-    SERVER_LOG=$SERVER_LOG_BASE.${TARGET_DIR_DOT}.log
+#     SERVER_ARGS="--model-repository=`pwd`/models --strict-model-config=false"
+#     SERVER_LOG=$SERVER_LOG_BASE.${TARGET_DIR_DOT}.log
 
-    # If there is a config.pbtxt at the top-level of the test then
-    # assume that the directory is a single model. Otherwise assume
-    # that the directory is an entire model repository.
-    rm -fr models && mkdir models
-    if [ -f ${TARGET_DIR}/config.pbtxt ]; then
-        cp -r ${TARGET_DIR} models/.
-        EXPECTEDS=models/$TARGET/expected*
-    else
-        cp -r ${TARGET_DIR}/* models/.
-        EXPECTEDS=models/expected*
-    fi
+#     # If there is a config.pbtxt at the top-level of the test then
+#     # assume that the directory is a single model. Otherwise assume
+#     # that the directory is an entire model repository.
+#     rm -fr models && mkdir models
+#     if [ -f ${TARGET_DIR}/config.pbtxt ]; then
+#         cp -r ${TARGET_DIR} models/.
+#         EXPECTEDS=models/$TARGET/expected*
+#     else
+#         cp -r ${TARGET_DIR}/* models/.
+#         EXPECTEDS=models/expected*
+#     fi
 
-    echo -e "Test ${TARGET_DIR}" >> $CLIENT_LOG
+#     echo -e "Test ${TARGET_DIR}" >> $CLIENT_LOG
 
-    # We expect all the tests to fail with one of the expected
-    # error messages
-    run_server
-    if [ "$SERVER_PID" != "0" ]; then
-        echo -e "*** FAILED: unexpected success starting $SERVER" >> $CLIENT_LOG
-        RET=1
-        kill $SERVER_PID
-        wait $SERVER_PID
-    else
-        EXFOUND=0
-        for EXPECTED in `ls $EXPECTEDS`; do
-            EX=`cat $EXPECTED`
-            if grep ^E[0-9][0-9][0-9][0-9].*"$EX" $SERVER_LOG; then
-                echo -e "Found \"$EX\"" >> $CLIENT_LOG
-                EXFOUND=1
-                break
-            else
-                echo -e "Not found \"$EX\"" >> $CLIENT_LOG
-            fi
-        done
+#     # We expect all the tests to fail with one of the expected
+#     # error messages
+#     run_server
+#     if [ "$SERVER_PID" != "0" ]; then
+#         echo -e "*** FAILED: unexpected success starting $SERVER" >> $CLIENT_LOG
+#         RET=1
+#         kill $SERVER_PID
+#         wait $SERVER_PID
+#     else
+#         EXFOUND=0
+#         for EXPECTED in `ls $EXPECTEDS`; do
+#             EX=`cat $EXPECTED`
+#             if grep ^E[0-9][0-9][0-9][0-9].*"$EX" $SERVER_LOG; then
+#                 echo -e "Found \"$EX\"" >> $CLIENT_LOG
+#                 EXFOUND=1
+#                 break
+#             else
+#                 echo -e "Not found \"$EX\"" >> $CLIENT_LOG
+#             fi
+#         done
 
-        if [ "$EXFOUND" == "0" ]; then
-            echo -e "*** FAILED: ${TARGET_DIR}" >> $CLIENT_LOG
-            RET=1
-        fi
-    fi
-done
+#         if [ "$EXFOUND" == "0" ]; then
+#             echo -e "*** FAILED: ${TARGET_DIR}" >> $CLIENT_LOG
+#             RET=1
+#         fi
+#     fi
+# done
 
 # Run all autofill tests that are expected to be successful. These
 # tests don't add a platform to the model config before running
 for TARGET_DIR in `ls -d autofill_noplatform_success/*/*`; do
     TARGET_DIR_DOT=`echo $TARGET_DIR | tr / .`
     TARGET=`basename ${TARGET_DIR}`
+
+    #nocheckin
+    echo "Executing: $TARGET_DIR"
 
     SERVER_ARGS="--model-repository=`pwd`/models --strict-model-config=false"
     SERVER_LOG=$SERVER_LOG_BASE.${TARGET_DIR_DOT}.log

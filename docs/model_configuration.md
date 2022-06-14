@@ -570,7 +570,7 @@ GPU 0 and two execution instances on GPUs 1 and 2.
 The instance group setting is also used to enable execution of a model
 on the CPU. A model can be executed on the CPU even if there is a GPU
 available in the system. The following places two execution instances
-(the default number of cpu instances) on the CPU.
+on the CPU.
 
 ```
   instance_group [
@@ -580,6 +580,10 @@ available in the system. The following places two execution instances
     }
   ]
 ```
+
+If no `count` is specified for a KIND_CPU instance group, then the default instance
+count will be 2 for selected backends (TensorRT, Tensorflow, and Onnxruntime). All
+other backends will default to 1.
 
 ### Host Policy
 
