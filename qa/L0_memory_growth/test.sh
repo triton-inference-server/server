@@ -159,8 +159,10 @@ for MODEL in $(ls models); do
     # Run the perf analyzer 'REPETITION' times
     for ((i=1; i<=$REPETITION; i++)); do
         $PERF_ANALYZER -v -m $MODEL -i grpc --concurrency-range $CONCURRENCY -b $CLIENT_BS > $TEMP_CLIENT_LOG 2>&1
-        if [ $? -ne 0 ]; then
-            # Only record failure log
+        # Only record failure log for unexpected perf analyzer error
+        # [FIXME] Currently check failure log as WAR, should check for specific
+        # code once perf analyzer returns different code for different error
+        if [ $? -ne 0 ] && [ `grep -c "^No valid requests recorded" $TEMP_CLIENT_LOG` == "0" ]; then
             cat $TEMP_CLIENT_LOG >> $CLIENT_LOG
             echo -e "\n***\n*** perf_analyzer for $MODEL failed on iteration $i\n***" >> $CLIENT_LOG
             TEMP_RET=1

@@ -64,16 +64,16 @@ if [ "$TRITON_PERF_WEEKLY" == 1 ]; then
         # GRPC cycles are reduced as there is high fluctuation in time spent
         REPETITION_HTTP_CPP=2220000
         REPETITION_HTTP_PY=3600000
-        REPETITION_GRPC_CPP=10000000
-        REPETITION_GRPC_PY=2070000
+        REPETITION_GRPC_CPP=8000000
+        REPETITION_GRPC_PY=1500000
         EMAIL_SUBJECT="Weekly Long"
     else
         # Run the test for each case approximately 1.5 hours
         # All tests are run cumulatively for 7 hours
         REPETITION_HTTP_CPP=1300000
         REPETITION_HTTP_PY=2100000
-        REPETITION_GRPC_CPP=10000000
-        REPETITION_GRPC_PY=1500000
+        REPETITION_GRPC_CPP=6600000
+        REPETITION_GRPC_PY=1000000
         EMAIL_SUBJECT="Weekly"
     fi
 else
