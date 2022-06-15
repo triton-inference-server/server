@@ -31,53 +31,18 @@ CLIENT_PY=./bls_test.py
 CLIENT_LOG="./client.log"
 
 SERVER=/opt/tritonserver/bin/tritonserver
+SERVER_ARGS="--model-repository=`pwd`/all_models --model-control-mode=explicit --load-model=* --log-verbose=1"
 SERVER_LOG="./inference_server.log"
 source ../common/util.sh
 
 RET=0
 rm -fr *.log ./all_models
 
-# Install torch
-pip3 uninstall -y torch
-pip3 install torch==1.9.0+cu111 -f https://download.pytorch.org/whl/torch_stable.html
-
 git clone https://github.com/triton-inference-server/bls_backend -b $BLS_BACKEND_REPO_TAG
 cp -r ./models ./all_models/
 cp -r ./bls_backend/models/* ./all_models/
 
-# Run the server without having required pytorch and add_sub models.
-SERVER_ARGS="--model-repository=`pwd`/models --log-verbose=1"
-run_server
-if [ "$SERVER_PID" == "0" ]; then
-    echo -e "\n***\n*** Failed to start $SERVER\n***"
-    cat $SERVER_LOG
-    exit 1
-fi
-
-set +e
-
-# Use the client only for sending requests. No need to verify the client log.
-python $CLIENT_PY >> $CLIENT_LOG 2>&1
-grep "Failed for execute the inference request. Model 'pytorch' is not ready." $SERVER_LOG
-if [ $? -ne 0 ]; then
-    echo -e "\n***\n*** Failed to verify model 'pytorch' is unready. \n***"
-    cat $SERVER_LOG
-    RET=1
-fi
-
-grep "Failed for execute the inference request. Model 'add_sub' is not ready." $SERVER_LOG
-if [ $? -ne 0 ]; then
-    echo -e "\n***\n*** Failed to verify model 'add_sub' is unready. \n***"
-    cat $SERVER_LOG
-    RET=1
-fi
-
-set -e
-
-kill $SERVER_PID
-wait $SERVER_PID
-
-SERVER_ARGS="--model-repository=`pwd`/all_models --log-verbose=1"
+# Run the server with all the required models.
 run_server
 if [ "$SERVER_PID" == "0" ]; then
     echo -e "\n***\n*** Failed to start $SERVER\n***"
@@ -96,6 +61,44 @@ grep "PASS" $CLIENT_LOG
 if [ $? -ne 0 ]; then
     echo -e "\n***\n*** bls_test.py FAILED. \n***"
     cat $CLIENT_LOG
+    cat $SERVER_LOG
+    RET=1
+fi
+set -e
+
+# Run the server without model 'addsub_python'.
+code=`curl -s -w %{http_code} -o ./curl.out -X POST localhost:8000/v2/repository/models/addsub_python/unload`
+if [ "$code" != "200" ]; then
+    echo "Failed to unload 'addsub_python' model."
+    RET=1
+fi
+
+set +e
+python $CLIENT_PY >> $CLIENT_LOG 2>&1
+grep "Failed to execute the inference request. Model 'addsub_python' is not ready." $SERVER_LOG
+if [ $? -ne 0 ]; then
+    echo -e "\n***\n*** Failed to verify model 'addsub_python' is unready. \n***"
+    cat $SERVER_LOG
+    RET=1
+fi
+
+# Run the server without model 'addsub_tf'.
+code=`curl -s -w %{http_code} -o ./curl.out -X POST localhost:8000/v2/repository/models/addsub_python/load`
+if [ "$code" != "200" ]; then
+    echo "Failed to load 'addsub_python' model."
+    RET=1
+fi
+code=`curl -s -w %{http_code} -o ./curl.out -X POST localhost:8000/v2/repository/models/addsub_tf/unload`
+if [ "$code" != "200" ]; then
+    echo "Failed to unload 'addsub_tf' model."
+    RET=1
+fi
+
+set +e
+python $CLIENT_PY >> $CLIENT_LOG 2>&1
+grep "Failed to execute the inference request. Model 'addsub_tf' is not ready." $SERVER_LOG
+if [ $? -ne 0 ]; then
+    echo -e "\n***\n*** Failed to verify model 'addsub_tf' is unready. \n***"
     cat $SERVER_LOG
     RET=1
 fi
