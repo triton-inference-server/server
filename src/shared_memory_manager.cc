@@ -334,6 +334,9 @@ SharedMemoryManager::GetMemoryInfo(
     const std::string& name, size_t offset, void** shm_mapped_addr,
     TRITONSERVER_MemoryType* memory_type, int64_t* device_id)
 {
+  // protect shared_memory_map_ from concurrent access
+  std::lock_guard<std::mutex> lock(mu_);
+
   auto it = shared_memory_map_.find(name);
   if (it == shared_memory_map_.end()) {
     return TRITONSERVER_ErrorNew(
@@ -359,6 +362,9 @@ TRITONSERVER_Error*
 SharedMemoryManager::GetCUDAHandle(
     const std::string& name, cudaIpcMemHandle_t** cuda_mem_handle)
 {
+  // protect shared_memory_map_ from concurrent access
+  std::lock_guard<std::mutex> lock(mu_);
+
   auto it = shared_memory_map_.find(name);
   if (it == shared_memory_map_.end()) {
     return TRITONSERVER_ErrorNew(
