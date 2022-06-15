@@ -303,6 +303,7 @@ enum OptionId {
   OPTION_BACKEND_DIR,
   OPTION_REPOAGENT_DIR,
   OPTION_BUFFER_MANAGER_THREAD_COUNT,
+  OPTION_MODEL_LOAD_THREAD_COUNT,
   OPTION_BACKEND_CONFIG,
   OPTION_HOST_POLICY
 };
@@ -600,6 +601,10 @@ std::vector<Option> options_
        Option::ArgInt,
        "The number of threads used to accelerate copies and other operations "
        "required to manage input and output tensor contents. Default is 0."},
+      {OPTION_MODEL_LOAD_THREAD_COUNT, "model-load-thread-count",
+       Option::ArgInt,
+       "The number of threads used to concurrently load models in "
+       "model repositories. Default is 2*<num_cpu_cores>."},
       {OPTION_BACKEND_CONFIG, "backend-config", "<string>,<string>=<string>",
        "Specify a backend-specific configuration setting. The format of this "
        "flag is --backend-config=<backend_name>,<setting>=<value>. Where "
@@ -607,7 +612,7 @@ std::vector<Option> options_
   {
     OPTION_HOST_POLICY, "host-policy", "<string>,<string>=<string>",
         "Specify a host policy setting associated with a policy name. The "
-        "format of this flag is --host-policy=<policy_name>,<setting>=<value>."
+        "format of this flag is --host-policy=<policy_name>,<setting>=<value>. "
         "Currently supported settings are 'numa-node', 'cpu-cores'. Note that "
         "'numa-node' setting will affect pinned memory pool behavior, see "
         "--pinned-memory-pool for more detail."
@@ -1282,6 +1287,9 @@ Parse(TRITONSERVER_ServerOptions** server_options, int argc, char** argv)
   int32_t repository_poll_secs = repository_poll_secs_;
   int64_t pinned_memory_pool_byte_size = 1 << 28;
   int32_t buffer_manager_thread_count = 0;
+  // hardware_concurrency() returns 0 if not well defined or not computable.
+  uint32_t model_load_thread_count =
+      std::max(2u, 2 * std::thread::hardware_concurrency());
   uint64_t response_cache_byte_size = 0;
 
   std::string backend_dir = "/opt/tritonserver/backends";
@@ -1667,6 +1675,9 @@ Parse(TRITONSERVER_ServerOptions** server_options, int argc, char** argv)
       case OPTION_BUFFER_MANAGER_THREAD_COUNT:
         buffer_manager_thread_count = ParseIntOption(optarg);
         break;
+      case OPTION_MODEL_LOAD_THREAD_COUNT:
+        model_load_thread_count = ParseIntOption(optarg);
+        break;
       case OPTION_BACKEND_CONFIG:
         backend_config_settings.push_back(ParseBackendConfigOption(optarg));
         break;
@@ -1824,6 +1835,10 @@ Parse(TRITONSERVER_ServerOptions** server_options, int argc, char** argv)
       TRITONSERVER_ServerOptionsSetBufferManagerThreadCount(
           loptions, std::max(0, buffer_manager_thread_count)),
       "setting buffer manager thread count");
+  FAIL_IF_ERR(
+      TRITONSERVER_ServerOptionsSetModelLoadThreadCount(
+          loptions, std::max(1u, model_load_thread_count)),
+      "setting model load thread count");
 
 #ifdef TRITON_ENABLE_LOGGING
   FAIL_IF_ERR(
