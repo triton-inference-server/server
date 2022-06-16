@@ -27,20 +27,47 @@
 
 export CUDA_VISIBLE_DEVICES=0
 
-CLIENT_PY=./bls_test.py
-CLIENT_LOG="./client.log"
+TRITON_BACKEND_REPO_TAG=${TRITON_BACKEND_REPO_TAG:="main"}
+TRITON_CORE_REPO_TAG=${TRITON_CORE_REPO_TAG:="main"}
+TRITON_COMMON_REPO_TAG=${TRITON_COMMON_REPO_TAG:="main"}
 
 SERVER=/opt/tritonserver/bin/tritonserver
-SERVER_ARGS="--model-repository=`pwd`/all_models --model-control-mode=explicit --load-model=* --log-verbose=1"
-SERVER_LOG="./inference_server.log"
 source ../common/util.sh
 
 RET=0
-rm -fr *.log ./all_models
 
-git clone https://github.com/triton-inference-server/bls_backend -b $BLS_BACKEND_REPO_TAG
-cp -r ./models ./all_models/
-cp -r ./bls_backend/models/* ./all_models/
+# Client build requires recent version of CMake (FetchContent required)
+wget -O - https://apt.kitware.com/keys/kitware-archive-latest.asc 2>/dev/null | \
+    gpg --dearmor - |  \
+    tee /etc/apt/trusted.gpg.d/kitware.gpg >/dev/null && \
+    apt-add-repository 'deb https://apt.kitware.com/ubuntu/ focal main' && \
+    apt-get update && \
+    apt-get install -y --no-install-recommends \
+            cmake-data=3.21.1-0kitware1ubuntu20.04.1 cmake=3.21.1-0kitware1ubuntu20.04.1 \
+            rapidjson-dev
+cmake --version
+
+rm -fr *.log ./backend
+
+git clone --single-branch --depth=1 -b $TRITON_BACKEND_REPO_TAG \
+    https://github.com/triton-inference-server/backend.git
+
+(cd backend/examples/backends/bls &&
+ mkdir build &&
+ cd build &&
+ cmake -DCMAKE_INSTALL_PREFIX:PATH=`pwd`/install \
+       -DTRITON_BACKEND_REPO_TAG=${TRITON_BACKEND_REPO_TAG} \
+       -DTRITON_CORE_REPO_TAG=${TRITON_CORE_REPO_TAG} \
+       -DTRITON_COMMON_REPO_TAG=${TRITON_COMMON_REPO_TAG} \
+       .. &&
+ make -j4 install)
+
+rm -fr /opt/tritonserver/backends/bls
+cp -r backend/examples/backends/bls/build/install/backends/bls /opt/tritonserver/backends/.
+
+SERVER_ARGS="--model-repository=`pwd`/backend/examples/model_repos/bls_models --model-control-mode=explicit --load-model=* --log-verbose=1"
+SERVER_LOG="./inference_server.log"
+CLIENT_LOG="./client.log"
 
 # Run the server with all the required models.
 run_server
@@ -51,7 +78,7 @@ if [ "$SERVER_PID" == "0" ]; then
 fi
 
 set +e
-python $CLIENT_PY >> $CLIENT_LOG 2>&1
+backend/examples/clients/bls_client >> $CLIENT_LOG 2>&1
 if [ $? -ne 0 ]; then
     echo "Failed: Client test had a non-zero return code."
     RET=1
@@ -74,7 +101,7 @@ if [ "$code" != "200" ]; then
 fi
 
 set +e
-python $CLIENT_PY >> $CLIENT_LOG 2>&1
+backend/examples/clients/bls_client >> $CLIENT_LOG 2>&1
 grep "Failed to execute the inference request. Model 'addsub_python' is not ready." $SERVER_LOG
 if [ $? -ne 0 ]; then
     echo -e "\n***\n*** Failed to verify model 'addsub_python' is unready. \n***"
@@ -95,7 +122,7 @@ if [ "$code" != "200" ]; then
 fi
 
 set +e
-python $CLIENT_PY >> $CLIENT_LOG 2>&1
+backend/examples/clients/bls_client >> $CLIENT_LOG 2>&1
 grep "Failed to execute the inference request. Model 'addsub_tf' is not ready." $SERVER_LOG
 if [ $? -ne 0 ]; then
     echo -e "\n***\n*** Failed to verify model 'addsub_tf' is unready. \n***"
