@@ -8,21 +8,20 @@ version_policy {
 max_batch_size: 8
 input {
   name: "INPUT0"
-  data_type: TYPE_INT32
-  dims: 16
+  data_type: TYPE_FP16
+  dims: -1
+  dims: -1
 }
 output {
   name: "OUTPUT0"
-  data_type: TYPE_INT8
-  dims: 16
+  data_type: TYPE_FP16
+  dims: -1
+  dims: -1
 }
 instance_group {
   name: "cpu_instance"
-  count: 1
-  gpus: 0
-  kind: KIND_GPU
-}
-dynamic_batching {
+  count: 2
+  kind: KIND_CPU
 }
 default_model_filename: "model.onnx"
 optimization {
