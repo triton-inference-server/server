@@ -82,7 +82,6 @@ RUN apt-get update && \
             maven && \
     pip3 install --upgrade wheel setuptools && \
     pip3 install --upgrade grpcio-tools && \
-    pip3 install bfloat16 && \
     pip3 install --upgrade pip
 
 ARG CMAKE_UBUNTU_VERSION
@@ -206,6 +205,7 @@ COPY qa/images/mug.jpg images/mug.jpg
 # are not needed for building but including them allows this image to
 # be used to run the client examples.
 RUN pip3 install --upgrade numpy pillow attrdict && \
+    pip3 install --upgrade bfloat16 && \
     find install/python/ -maxdepth 1 -type f -name \
          "tritonclient-*linux*.whl" | xargs printf -- '%s[all]' | \
     xargs pip3 install --upgrade
