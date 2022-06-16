@@ -93,7 +93,7 @@ if [ $? -ne 0 ]; then
 fi
 set -e
 
-# Run the server without model 'addsub_python'.
+# Send a request without model 'addsub_python'.
 code=`curl -s -w %{http_code} -o ./curl.out -X POST localhost:8000/v2/repository/models/addsub_python/unload`
 if [ "$code" != "200" ]; then
     echo "Failed to unload 'addsub_python' model."
@@ -109,7 +109,7 @@ if [ $? -ne 0 ]; then
     RET=1
 fi
 
-# Run the server without model 'addsub_tf'.
+# Send a request without model 'addsub_tf'.
 code=`curl -s -w %{http_code} -o ./curl.out -X POST localhost:8000/v2/repository/models/addsub_python/load`
 if [ "$code" != "200" ]; then
     echo "Failed to load 'addsub_python' model."
@@ -126,6 +126,26 @@ backend/examples/clients/bls_client >> $CLIENT_LOG 2>&1
 grep "Failed to execute the inference request. Model 'addsub_tf' is not ready." $SERVER_LOG
 if [ $? -ne 0 ]; then
     echo -e "\n***\n*** Failed to verify model 'addsub_tf' is unready. \n***"
+    cat $SERVER_LOG
+    RET=1
+fi
+set -e
+
+# Send a request to a decoupled model.
+echo -e 'model_transaction_policy { decoupled: True }' >> \
+        `pwd`/backend/examples/model_repos/bls_models/addsub_tf/config.pbtxt
+
+code=`curl -s -w %{http_code} -o ./curl.out -X POST localhost:8000/v2/repository/models/addsub_tf/load`
+if [ "$code" != "200" ]; then
+    echo "Failed to load 'addsub_tf' model."
+    RET=1
+fi
+
+set +e
+backend/examples/clients/bls_client >> $CLIENT_LOG 2>&1
+grep "Model 'addsub_tf' is using the decoupled. BLS doesn't support models using the decoupled transaction policy." $SERVER_LOG
+if [ $? -ne 0 ]; then
+    echo -e "\n***\n*** Failed to verify model 'addsub_tf' is using the decoupled transaction policy. \n***"
     cat $SERVER_LOG
     RET=1
 fi
