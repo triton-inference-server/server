@@ -31,18 +31,25 @@ import numpy as np
 import sys
 import requests as httpreq
 from builtins import range
-import tritongrpcclient as grpcclient
-import tritonhttpclient as httpclient
-from tritonclientutils import np_to_triton_dtype
+import tritonclient.grpc as grpcclient
+import tritonclient.http as httpclient
+from tritonclient.utils import np_to_triton_dtype
 
 FLAGS = None
 
-def test_bf16_raw_http(shape):
+def test_bf16_http(shape):
+    if ("tensorflow" not in sys.modules):
+        from bfloat16 import bfloat16
+    else:
+    # known incompatability issue here:
+    # https://github.com/GreenWaves-Technologies/bfloat16/issues/2
+    # Can solve when numpy officially supports bfloat16
+    # https://github.com/numpy/numpy/issues/19808
+        print("error: tensorflow is included in module. This module cannot " \
+            "co-exist with pypi version of bfloat16")
+        sys.exit(1)
     model = "identity_bf16"
-    # Using fp16 data as a WAR since it is same byte_size as bf16
-    # and is supported by numpy for ease-of-use. Since this is an
-    # identity model, it's OK that the bytes are interpreted differently
-    input_data = (16384 * np.random.randn(*shape)).astype(np.float16)
+    input_data = (np.random.randn(*shape)).astype(bfloat16)
     input_bytes = input_data.tobytes()
     headers = {'Inference-Header-Content-Length': '0'}
     r = httpreq.post("http://localhost:8000/v2/models/{}/infer".format(model),
@@ -264,7 +271,5 @@ if __name__ == '__main__':
                 print("error: expected 'param2' == False")
                 sys.exit(1)
 
-    # FIXME: Use identity_bf16 model in test above once proper python client
-    #        support is added, and remove this raw HTTP test. See DLIS-3720.
-    test_bf16_raw_http([2, 2])
+    test_bf16_http([2, 2])
 

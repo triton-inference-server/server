@@ -82,6 +82,7 @@ RUN apt-get update && \
             maven && \
     pip3 install --upgrade wheel setuptools && \
     pip3 install --upgrade grpcio-tools && \
+    pip3 install bfloat16 && \
     pip3 install --upgrade pip
 
 ARG CMAKE_UBUNTU_VERSION
