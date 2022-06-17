@@ -69,6 +69,8 @@ SERVER_ARGS="--model-repository=`pwd`/backend/examples/model_repos/bls_models --
 SERVER_LOG="./inference_server.log"
 CLIENT_LOG="./client.log"
 
+mkdir `pwd`/backend/examples/model_repos/bls_models/bls_fp32/1/
+
 # Run the server with all the required models.
 run_server
 if [ "$SERVER_PID" == "0" ]; then
