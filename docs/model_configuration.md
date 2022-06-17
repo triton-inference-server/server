@@ -582,7 +582,7 @@ on the CPU.
 ```
 
 If no `count` is specified for a KIND_CPU instance group, then the default instance
-count will be 2 for selected backends (TensorRT, Tensorflow, and Onnxruntime). All
+count will be 2 for selected backends (Tensorflow and Onnxruntime). All
 other backends will default to 1.
 
 ### Host Policy
