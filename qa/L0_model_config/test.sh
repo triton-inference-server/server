@@ -176,7 +176,8 @@ done
 for modelpath in \
         autofill_noplatform/pytorch/too_few_inputs/1 \
         autofill_noplatform/pytorch/too_few_outputs/1 \
-        autofill_noplatform_success/pytorch/no_name_platform/1 ; do
+        autofill_noplatform_success/pytorch/no_name_platform/1 \
+        autofill_noplatform_success/pytorch/cpu_instance/1 ; do
     mkdir -p $modelpath
     cp /data/inferenceserver/${REPO_VERSION}/qa_model_repository/libtorch_float32_float32_float32/1/model.pt \
        $modelpath/.
@@ -238,6 +239,11 @@ cp -r /data/inferenceserver/${REPO_VERSION}/qa_reshape_model_repository/savedmod
 mkdir -p autofill_noplatform_success/tensorrt/reshape_config_provided/1
 cp /data/inferenceserver/${REPO_VERSION}/qa_reshape_model_repository/plan_zero_4_float32/1/model.plan \
     autofill_noplatform_success/tensorrt/reshape_config_provided/1
+
+# Copy identity model into onnx test directories
+mkdir -p autofill_noplatform_success/onnx/cpu_instance/1
+cp -r /data/inferenceserver/${REPO_VERSION}/qa_identity_model_repository/onnx_zero_1_float16/1/model.onnx \
+    autofill_noplatform_success/onnx/cpu_instance/1
 
 rm -f $SERVER_LOG_BASE* $CLIENT_LOG
 RET=0
