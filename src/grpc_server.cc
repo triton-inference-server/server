@@ -3698,10 +3698,13 @@ ModelInferHandler::Process(InferHandler::State* state, bool rpc_ok)
     // has initiated... completion callback will transition to
     // COMPLETE. If error go immediately to COMPLETE.
     if (err != nullptr) {
-      const char* request_id = "<id_unknown>";
+      const char* request_id = "";
       LOG_TRITONSERVER_ERROR(
           TRITONSERVER_InferenceRequestId(irequest, &request_id),
           "unable to retrieve request ID string");
+      if (request_id == nullptr || * request_id = 0) {
+        request_id = "<id_unknown>";
+      }
       LOG_VERBOSE(1) << "[request id: " << request_id << "]"
                      << "Infer failed: " << TRITONSERVER_ErrorMessage(err);
 
@@ -4131,10 +4134,13 @@ ModelStreamInferHandler::Process(InferHandler::State* state, bool rpc_ok)
       } else {
         response = state->response_queue_->GetNonDecoupledResponse();
       }
-      const char* request_id = "<id_unknown>";
+      const char* request_id = "";
       LOG_TRITONSERVER_ERROR(
           TRITONSERVER_InferenceRequestId(irequest, &request_id),
           "unable to retrieve request ID string");
+      if (request_id == nullptr || * request_id = 0) {
+        request_id = "<id_unknown>";
+      }
       LOG_VERBOSE(1) << "[request id: " << request_id << "]"
                      << "Infer failed: " << TRITONSERVER_ErrorMessage(err);
 
