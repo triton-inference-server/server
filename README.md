@@ -74,6 +74,10 @@ Major features include:
 - [Metrics](docs/metrics.md) indicating GPU utilization, server
   throughput, server latency, and more
 
+Need enterprise support?  NVIDIA global support is available for Triton 
+Inference Server with the 
+[NVIDIA AI Enterprise software suite](https://www.nvidia.com/en-us/data-center/products/ai-enterprise/). 
+
 ## Serve a Model in 3 Easy Steps
 
 ```bash
@@ -102,6 +106,10 @@ Please read the [QuickStart](docs/quickstart.md) guide for additional informatio
 regarding this example. The quickstart guide also contains an example of how to launch Triton on [CPU-only systems](docs/quickstart.md#run-on-cpu-only-system).
 
 ## Examples and Tutorials
+
+Check out [NVIDIA LaunchPad](https://www.nvidia.com/en-us/data-center/products/ai-enterprise-suite/trial/)
+for free access to a set of hands-on labs with Triton Inference Server hosted on
+NVIDIA infrastructure.
 
 Specific end-to-end examples for popular models, such as ResNet, BERT, and DLRM 
 are located in the 
@@ -182,7 +190,7 @@ provide APIs to simplify this communication.
 
 ### Extend Triton
 
-[Triton Inference Server's archicture](docs/architecture.md) is specifically 
+[Triton Inference Server's architecture](docs/architecture.md) is specifically 
 designed for modularity and flexibility
 
 - [Customize Triton Inference Server container](docs/compose.md) for your use case
