@@ -43,7 +43,6 @@ export CUDA_VISIBLE_DEVICES=0
 TEST_RESULT_FILE='test_results.txt'
 CLIENT_LOG="./client.log"
 TEST=tf_tag_sigdef_test.py
-MAKE_MODEL=gen_tag_sigdef.py
 
 DATADIR=/data/inferenceserver/${REPO_VERSION}/qa_tf_tag_sigdef_repository
 EXPECTED_NUM_TESTS="4"

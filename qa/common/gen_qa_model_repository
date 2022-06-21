@@ -69,6 +69,7 @@ HOST_DESTDIR=/tmp/$TRITON_VERSION/qa_model_repository
 HOST_VARDESTDIR=/tmp/$TRITON_VERSION/qa_variable_model_repository
 HOST_IDENTITYDESTDIR=/tmp/$TRITON_VERSION/qa_identity_model_repository
 HOST_SIGDEFDESTDIR=/tmp/$TRITON_VERSION/qa_tf_tag_sigdef_repository
+HOST_TFPARAMETERSDESTDIR=/tmp/$TRITON_VERSION/qa_tf_parameters_repository
 HOST_IDENTITYBIGDESTDIR=/tmp/$TRITON_VERSION/qa_identity_big_model_repository
 HOST_SHAPEDESTDIR=/tmp/$TRITON_VERSION/qa_shapetensor_model_repository
 HOST_RESHAPEDESTDIR=/tmp/$TRITON_VERSION/qa_reshape_model_repository
@@ -87,7 +88,7 @@ HOST_INITIALSTATEIMPLICITSEQDESTDIR=/tmp/$TRITON_VERSION/qa_sequence_initial_sta
 HOST_VARINITIALSTATEIMPLICITSEQDESTDIR=/tmp/$TRITON_VERSION/qa_variable_sequence_initial_state_implicit_model_repository
 HOST_TORCHTRTDESTDIR=/tmp/$TRITON_VERSION/torchtrt_model_store
 
-rm -fr $HOST_SRCDIR $HOST_DESTDIR $HOST_VARDESTDIR
+rm -fr $HOST_SRCDIR $HOST_DESTDIR $HOST_VARDESTDIR $HOST_TFPARAMETERSDESTDIR
 rm -fr $HOST_IDENTITYDESTDIR $HOST_IDENTITYBIGDESTDIR $HOST_SHAPEDESTDIR $HOST_SIGDEFDESTDIR
 rm -fr $HOST_SEQDESTDIR $HOST_DYNASEQDESTDIR $HOST_VARSEQDESTDIR
 rm -fr $HOST_ENSEMBLEDESTDIR $HOST_NOSHAPEDESTDIR $HOST_RESHAPEDESTDIR
@@ -99,6 +100,7 @@ mkdir -p $HOST_DESTDIR
 mkdir -p $HOST_VARDESTDIR
 mkdir -p $HOST_IDENTITYDESTDIR
 mkdir -p $HOST_SIGDEFDESTDIR
+mkdir -p $HOST_TFPARAMETERSDESTDIR
 mkdir -p $HOST_IDENTITYBIGDESTDIR
 mkdir -p $HOST_SHAPEDESTDIR
 mkdir -p $HOST_RESHAPEDESTDIR
@@ -145,6 +147,7 @@ cp ./gen_qa_torchtrt_models.py $HOST_SRCDIR/.
 cp ./gen_qa_ragged_models.py $HOST_SRCDIR/.
 cp ./test_util.py $HOST_SRCDIR/.
 cp ./gen_tag_sigdef.py $HOST_SRCDIR/.
+cp ./gen_qa_tf_parameters.py $HOST_SRCDIR/.
 
 ONNXSCRIPT=onnx_gen.cmds
 OPENVINOSCRIPT=openvino_gen.cmds
@@ -157,6 +160,7 @@ DESTDIR=/tmp/models
 VARDESTDIR=/tmp/varmodels
 IDENTITYDESTDIR=/tmp/zeromodels
 SIGDEFDESTDIR=/tmp/sigdefmodels
+TFPARAMETERSDIR=/tmp/tfparameters
 IDENTITYBIGDESTDIR=/tmp/zerobigmodels
 SHAPEDESTDIR=/tmp/shapetensormodels
 RESHAPEDESTDIR=/tmp/reshapemodels
@@ -389,6 +393,8 @@ python3 $SRCDIR/gen_qa_sequence_models.py --ensemble --variable --models_dir=$EN
 chmod -R 777 $ENSEMBLEDESTDIR
 python3 $SRCDIR/gen_tag_sigdef.py --dir $SIGDEFDESTDIR
 chmod -R 777 $SIGDEFDESTDIR
+python3 $SRCDIR/gen_qa_tf_parameters.py --models_dir $TFPARAMETERSDIR
+chmod -R 777 $TFPARAMETERSDIR
 EOF
 
 chmod a+x $HOST_SRCDIR/$TFSCRIPT
@@ -411,6 +417,7 @@ docker run --gpus device=$CUDA_DEVICE --rm --entrypoint $SRCDIR/$TFSCRIPT \
        --mount type=bind,source=$HOST_NOSHAPEDESTDIR,target=$NOSHAPEDESTDIR \
        --mount type=bind,source=$HOST_ENSEMBLEDESTDIR,target=$ENSEMBLEDESTDIR \
        --mount type=bind,source=$HOST_RAGGEDDESTDIR,target=$RAGGEDDESTDIR \
+       --mount type=bind,source=$HOST_TFPARAMETERSDESTDIR,target=$TFPARAMETERSDIR \
        $TENSORFLOW_IMAGE
 if [ $? -ne 0 ]; then
     echo -e "Failed"
