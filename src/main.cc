@@ -46,6 +46,7 @@
 #include <list>
 #include <set>
 #include <sstream>
+#include <thread>
 #include "triton_signal.h"
 
 #ifdef TRITON_ENABLE_ASAN
