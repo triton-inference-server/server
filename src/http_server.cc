@@ -2686,6 +2686,7 @@ HTTPAPIServer::HandleInfer(
       err = GetInferenceHeaderLength(req, content_length, &header_length);
     }
   }
+  const char* request_id = nullptr;
 
   if (err == nullptr) {
     connection_paused = true;
@@ -2721,6 +2722,12 @@ HTTPAPIServer::HandleInfer(
             InferRequestClass::InferResponseComplete,
             reinterpret_cast<void*>(infer_request.get()));
       }
+      // Get request ID for logging in case of error.
+      LOG_TRITONSERVER_ERROR(
+          TRITONSERVER_InferenceRequestId(irequest, &request_id),
+          "unable to retrieve request ID string");
+      if (request_id != nullptr)
+        &&(request_id[0] != '\0') { request_id = "<id_unknown>"; }
       if (err == nullptr) {
         err = TRITONSERVER_ServerInferAsync(
             server_.get(), irequest, triton_trace);
@@ -2737,13 +2744,6 @@ HTTPAPIServer::HandleInfer(
   }
 
   if (err != nullptr) {
-    const char* request_id = "";
-    LOG_TRITONSERVER_ERROR(
-        TRITONSERVER_InferenceRequestId(irequest, &request_id),
-        "unable to retrieve request ID string");
-    if (request_id == nullptr || *request_id == 0) {
-      request_id = "<id_unknown>";
-    }
     LOG_VERBOSE(1) << "[request id: " << request_id << "]"
                    << "Infer failed: " << TRITONSERVER_ErrorMessage(err);
     evhtp_headers_add_header(
