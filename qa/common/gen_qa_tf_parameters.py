@@ -44,8 +44,9 @@ def create_graphdefmodel(models_dir, model_name, model_version=1):
     ], "INPUT")
     variable = tf.get_variable("VARIABLE", [
         1,
-    ], dtype=tf.int32)
+    ], initializer=tf.zeros_initializer(), dtype=tf.int32)
     tf.add(variable, input0, name="OUTPUT")
+    print(tf.global_variables_initializer())
 
     model_version_dir = models_dir + "/" + model_name + "/" + str(model_version)
 
