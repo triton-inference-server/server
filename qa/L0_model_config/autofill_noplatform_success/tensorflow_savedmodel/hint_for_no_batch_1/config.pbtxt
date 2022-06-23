@@ -1,0 +1,10 @@
+output [
+  {
+    name: "OUTPUT0"
+    data_type: TYPE_INT8
+  },
+  {
+    name: "OUTPUT1"
+    dims: [ -1, 16 ]
+  }
+]
