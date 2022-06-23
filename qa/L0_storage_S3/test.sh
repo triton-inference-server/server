@@ -52,7 +52,7 @@ aws configure set default.region $AWS_DEFAULT_REGION && \
     aws configure set aws_secret_access_key $AWS_SECRET_ACCESS_KEY
 
 # S3 bucket path (Point to bucket when testing cloud storage)
-BUCKET_URL="s3://triton-bucket-${CI_PIPELINE_ID}"
+BUCKET_URL="s3://triton-bucket-${CI_JOB_ID}"
 
 # Cleanup and delete S3 test bucket if it already exists (due to test failure)
 aws s3 rm $BUCKET_URL --recursive --include "*" && \

@@ -72,12 +72,12 @@ setting value, or an array of $string for some settings. Currently the following
 trace settings are defined:
 
 - "trace_file" : the file where the trace output will be saved. If
-"log frequency" is set, this will be the prefix of the files to save the
-trace output, resulting files in name "${trace_file}.0", "${trace_file}.1"...,
-see trace setting "log frequency" below for detail.
+"log_frequency" is set, this will be the prefix of the files to save the
+trace output, resulting files in name `"${trace_file}.0", "${trace_file}.1", ...`,
+see trace setting "log_frequency" below for detail.
 - "trace_level" : the trace level. "OFF" to disable tracing,
 "TIMESTAMPS" to trace timestamps, "TENSORS" to trace tensors.
-This value is an array of string whhere user may specify multiple levels to
+This value is an array of string where user may specify multiple levels to
 trace multiple informations.
 - "trace_rate" : the trace sampling rate. The value represents how many requests
 will one trace be sampled from. For example, if the trace rate is "1000",
@@ -85,12 +85,12 @@ will one trace be sampled from. For example, if the trace rate is "1000",
 - "trace_count" : the number of remaining traces to be sampled. Once the value
 becomes "0", no more traces will be sampled for the trace setting, and the
 collected traces will be written to indexed trace file in the format described
-in "log_frequency", regardless of the "log_frequencey" status.
+in "log_frequency", regardless of the "log_frequency" status.
 If the value is "-1", the number of traces to be sampled will not be limited.
 - "log_frequency" : the frequency that Triton will log the
 trace output to the files. If the value is "0", Triton will only log
 the trace output to ${trace_file} when shutting down. Otherwise, Triton will log
-the trace output to ${trace_file}.${idx} when it collects
+the trace output to `${trace_file}.${idx}` when it collects
 the specified number of traces. For example, if the log frequency is "100",
 when Triton collects the 100-th trace, it logs the traces to file
 "${trace_file}.0", and when it collects the 200-th trace, it logs the 101-th to

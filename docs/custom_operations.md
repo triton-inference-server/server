@@ -1,5 +1,5 @@
 <!--
-# Copyright (c) 2019-2020, NVIDIA CORPORATION. All rights reserved.
+# Copyright 2019-2022, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -70,7 +70,7 @@ container.
 ## TensorFlow
 
 Tensorflow allows users to [add custom
-operations](https://www.tensorflow.org/guide/extend/op) which can then
+operations](https://www.tensorflow.org/guide/create_op) which can then
 be used in TensorFlow models. By using LD_PRELOAD you can load your
 custom TensorFlow operations into Triton. For example, assuming your
 TensorFlow custom operations are compiled into libtfcustom.so,

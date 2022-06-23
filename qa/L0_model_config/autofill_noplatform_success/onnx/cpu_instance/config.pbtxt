@@ -1,0 +1,23 @@
+
+name: "cpu_instance"
+platform: "onnxruntime_onnx"
+max_batch_size: 8
+version_policy: { latest { num_versions: 1 }}
+input [
+  {
+    name: "INPUT0"
+    data_type: TYPE_FP16
+    dims: [ -1,-1 ]
+  }
+]
+output [
+  {
+    name: "OUTPUT0"
+    data_type: TYPE_FP16
+    dims: [ -1,-1 ]
+  }
+]
+instance_group {
+  name: "cpu_instance"
+  kind: KIND_CPU
+}

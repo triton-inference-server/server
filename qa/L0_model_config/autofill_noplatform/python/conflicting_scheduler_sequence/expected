@@ -1,0 +1,1 @@
+Configuration specified scheduling_choice as 'sequence_batching', but auto-complete-config function for model 'conflicting_scheduler_sequence' tries to set scheduling_choice as 'dynamic_batching'

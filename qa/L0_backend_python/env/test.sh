@@ -1,5 +1,5 @@
 #!/bin/bash
-# Copyright (c) 2021, NVIDIA CORPORATION. All rights reserved.
+# Copyright 2021-2022, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -30,7 +30,7 @@ source ../common.sh
 source ../../common/util.sh
 
 SERVER=/opt/tritonserver/bin/tritonserver
-BASE_SERVER_ARGS="--model-repository=`pwd`/models --log-verbose=1"
+BASE_SERVER_ARGS="--model-repository=`pwd`/models --log-verbose=1 --strict-model-config=false"
 PYTHON_BACKEND_BRANCH=$PYTHON_BACKEND_REPO_TAG
 SERVER_ARGS=$BASE_SERVER_ARGS
 SERVER_LOG="./inference_server.log"
@@ -143,7 +143,7 @@ aws configure set default.region $AWS_DEFAULT_REGION && \
     aws configure set aws_secret_access_key $AWS_SECRET_ACCESS_KEY
 
 # S3 bucket path (Point to bucket when testing cloud storage)
-BUCKET_URL="s3://triton-bucket-${CI_PIPELINE_ID}"
+BUCKET_URL="s3://triton-bucket-${CI_JOB_ID}"
 
 # Cleanup and delete S3 test bucket if it already exists (due to test failure)
 aws s3 rm $BUCKET_URL --recursive --include "*" && \

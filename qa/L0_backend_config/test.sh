@@ -49,6 +49,7 @@ source ../common/util.sh
 
 SERVER_LOG_BASE="./inference_server"
 rm -f $SERVER_LOG_BASE*
+rm -f *.out
 
 COMMON_ARGS="--model-repository=`pwd`/models --strict-model-config=false --log-verbose=1 "
 
@@ -80,7 +81,10 @@ if [ "$SERVER_PID" == "0" ]; then
     RET=1
 
 else
-    RESULT_LOG_LINE=$(grep "Adding default backend config setting:" $SERVER_LOG)
+    kill $SERVER_PID
+    wait $SERVER_PID
+
+    RESULT_LOG_LINE=$(grep -a "Adding default backend config setting:" $SERVER_LOG)
     if [ "$RESULT_LOG_LINE" != "" ]; then
         
         # Pick out the logged value of the default-max-batch-size which gets passed into model creation
@@ -91,12 +95,9 @@ else
             RET=1
         fi
     else
-        echo "*** FAILED: No log statement stating default amx batch size\n"
+        echo "*** FAILED: No log statement stating default max batch size\n"
         RET=1
     fi
-    
-    kill $SERVER_PID
-    wait $SERVER_PID
 fi
 
 for ((i=0; i < ${#POSITIVE_TEST_ARGS[@]}; i++)); do
@@ -109,7 +110,10 @@ for ((i=0; i < ${#POSITIVE_TEST_ARGS[@]}; i++)); do
         RET=1
 
     else
-        RESULT_LOG_LINE=$(grep "Found overwritten default setting:" $SERVER_LOG)
+        kill $SERVER_PID
+        wait $SERVER_PID
+
+        RESULT_LOG_LINE=$(grep -a "Found overwritten default setting:" $SERVER_LOG)
         if [ "$RESULT_LOG_LINE" != "" ]; then
             
             # Pick out the logged value of the default-max-batch-size which gets passed into model creation
@@ -120,14 +124,10 @@ for ((i=0; i < ${#POSITIVE_TEST_ARGS[@]}; i++)); do
                 RET=1
             fi
         else
-            echo "*** FAILED: No log statement stating default amx batch size\n"
+            echo "*** FAILED: No log statement stating default max batch size\n"
             RET=1
         fi
-        
-        kill $SERVER_PID
-        wait $SERVER_PID
     fi
-
 done
 
 # Negative tests
@@ -149,6 +149,164 @@ for ((i=0; i < ${#NEGATIVE_PARSE_ARGS[@]}; i++)); do
         wait $SERVER_PID
     fi
 done
+
+
+#
+# Sepcific backend tests
+# 
+
+# While inference server is running, save the 
+# config of the 'no_config' model to the TRIAL 
+# file.
+function save_model_config() {
+    CODE=`curl -s -w %{http_code} -o ./$TRIAL.out localhost:8000/v2/models/no_config/config`
+    set -e
+    if [ "$CODE" != "200" ]; then
+        cat $TRIAL.out
+        echo -e "\n***\n*** Test Failed\n***"
+        RET=1
+    fi
+}
+
+# Tensorflow 1: Batching ON
+rm -rf ./models/
+mkdir -p ./models/no_config
+cp -r /data/inferenceserver/${REPO_VERSION}/qa_model_repository/savedmodel_float32_float32_float32/1 ./models/no_config/
+
+SERVER_ARGS="--backend-config=tensorflow,default-max-batch-size=5 $COMMON_ARGS"
+SERVER_LOG=$SERVER_LOG_BASE.backend_config_tensorflow_batch_5.log
+run_server
+
+TRIAL=tensorflow_batching_on
+if [ "$SERVER_PID" == "0" ]; then
+    echo -e "*** FAILED: Server failed to start $SERVER\n"
+    RET=1
+else
+    save_model_config
+
+    # Assert the max-batch-size is the command line value
+    MAX_BATCH_LOG_LINE=$(grep -a "\"max_batch_size\":5" $TRIAL.out)
+    if [ "$MAX_BATCH_LOG_LINE" == "" ]; then
+        cat $TRIAL.out
+        echo "*** FAILED: Expected max batch size to be 5 but found: $MAX_BATCH_LOG_LINE\n"
+        RET=1
+    fi
+
+    # Assert we are also turning on the dynamic_batcher    
+    DYNAMIC_BATCHING_LOG_LINE=$(grep -a "Starting dynamic-batcher thread" $SERVER_LOG)
+    if [ "$DYNAMIC_BATCHING_LOG_LINE" == "" ]; then
+        echo "*** FAILED: Expected dynamic batching to be set in model config but was not found\n"
+        RET=1
+    fi
+    
+    kill $SERVER_PID
+    wait $SERVER_PID
+
+fi
+
+# Tensorflow 1: Batching OFF
+SERVER_ARGS="--backend-config=tensorflow,default-max-batch-size=0 $COMMON_ARGS"
+SERVER_LOG=$SERVER_LOG_BASE.backend_config_tensorflow_batch_0.log
+run_server
+
+TRIAL=tensorflow_batching_off
+if [ "$SERVER_PID" == "0" ]; then
+    echo -e "*** FAILED: Server failed to start $SERVER\n"
+    RET=1
+
+else
+    save_model_config
+
+    # Assert the max-batch-size is 0 in the case batching is supported
+    # in the model but not in the config.
+    MAX_BATCH_LOG_LINE=$(grep -a "\"max_batch_size\":0" $TRIAL.out)
+    if [ "$MAX_BATCH_LOG_LINE" == "" ]; then
+        echo "*** FAILED: Expected max batch size to be 0 but found: $MAX_BATCH_LOG_LINE\n"
+        RET=1
+    fi
+
+    # Assert batching disabled    
+    if [ "$(grep -a -E '\"dynamic_batching\": \{}' $SERVER_LOG)" != "" ]; then
+        echo "*** FAILED: Found dynamic batching enabled in configuration when none expected.\n"
+        RET=1
+    fi
+
+    kill $SERVER_PID
+    wait $SERVER_PID
+
+fi
+
+# Onnxruntime: Batching ON
+rm -rf ./models/
+mkdir -p ./models/no_config
+cp -r /data/inferenceserver/${REPO_VERSION}/qa_model_repository/onnx_float32_float32_float32/1 ./models/no_config/
+
+SERVER_ARGS="--backend-config=onnxruntime,default-max-batch-size=5 $COMMON_ARGS"
+SERVER_LOG=$SERVER_LOG_BASE.backend_config_onnxruntime_batch_5.log
+run_server
+
+TRIAL=onnxruntime_batching_on
+if [ "$SERVER_PID" == "0" ]; then
+    echo -e "*** FAILED: Server failed to start $SERVER\n"
+    RET=1
+
+else
+    save_model_config
+    
+    # Assert the max-batch-size is the command line value
+    MAX_BATCH_LOG_LINE=$(grep -a "\"max_batch_size\":5" $TRIAL.out)
+    if [ "$MAX_BATCH_LOG_LINE" == "" ]; then
+        echo "*** FAILED: Expected max batch size to be 5 but found: $MAX_BATCH_LOG_LINE\n"
+        RET=1
+    fi
+
+    # Assert we are also turning on the dynamic_batcher    
+    DYNAMIC_BATCHING_LOG_LINE=$(grep -a "Starting dynamic-batcher thread" $SERVER_LOG)
+    if [ "$DYNAMIC_BATCHING_LOG_LINE" == "" ]; then
+        echo "*** FAILED: Expected dynamic batching to be set in model config but was not found\n"
+        RET=1
+    fi
+    
+    kill $SERVER_PID
+    wait $SERVER_PID
+fi
+
+# Onnxruntime: Batching OFF
+rm -rf ./models/
+mkdir -p ./models/no_config
+cp -r /data/inferenceserver/${REPO_VERSION}/qa_model_repository/onnx_float32_float32_float32/1 ./models/no_config/
+
+SERVER_ARGS="--backend-config=onnxruntime,default-max-batch-size=0 $COMMON_ARGS"
+SERVER_LOG=$SERVER_LOG_BASE.backend_config_onnxruntime_batch_0.log
+run_server
+
+TRIAL=onnxruntime_batching_off
+if [ "$SERVER_PID" == "0" ]; then
+    echo -e "*** FAILED: Server failed to start $SERVER\n"
+    RET=1
+
+else
+    save_model_config
+
+    # Assert the max-batch-size is 0 in the case batching is supported
+    # in the model but not in the config.
+    MAX_BATCH_LOG_LINE=$(grep -a "\"max_batch_size\":0" $TRIAL.out)
+    if [ "$MAX_BATCH_LOG_LINE" == "" ]; then
+        echo "*** FAILED: Expected max batch size to be 0 but found: $MAX_BATCH_LOG_LINE\n"
+        RET=1
+    fi
+
+    # Assert batching disabled    
+    if [ "$(grep -a -E '\"dynamic_batching\": \{}' $SERVER_LOG)" != "" ]; then
+        echo "*** FAILED: Found dynamic batching in configuration when none expected.\n"
+        RET=1
+    fi
+
+    kill $SERVER_PID
+    wait $SERVER_PID
+
+fi
+
 
 # Print test outcome
 if [ $RET -eq 0 ]; then

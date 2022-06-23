@@ -176,10 +176,50 @@ done
 for modelpath in \
         autofill_noplatform/pytorch/too_few_inputs/1 \
         autofill_noplatform/pytorch/too_few_outputs/1 \
-        autofill_noplatform_success/pytorch/no_name_platform/1 ; do
+        autofill_noplatform_success/pytorch/no_name_platform/1 \
+        autofill_noplatform_success/pytorch/cpu_instance/1 ; do
     mkdir -p $modelpath
     cp /data/inferenceserver/${REPO_VERSION}/qa_model_repository/libtorch_float32_float32_float32/1/model.pt \
        $modelpath/.
+done
+
+# Copy Python models into the test model repositories.
+for modelpath in \
+        autofill_noplatform/python/input_mismatch_datatype/1 \
+        autofill_noplatform/python/input_mismatch_dims/1 \
+        autofill_noplatform/python/output_mismatch_datatype/1 \
+        autofill_noplatform/python/output_mismatch_dims/1 \
+        autofill_noplatform_success/python/incomplete_output/1 \
+        autofill_noplatform_success/python/unknown_input/1 \
+        autofill_noplatform_success/python/unknown_output/1 \
+        autofill_noplatform_success/python/empty_config/1 ; do
+    mkdir -p $modelpath
+    cp /opt/tritonserver/qa/python_models/auto_complete/model.py $modelpath/.
+done
+for modelpath in \
+        autofill_noplatform/python/conflicting_max_batch_size \
+        autofill_noplatform/python/input_missing_datatype \
+        autofill_noplatform/python/input_missing_dims \
+        autofill_noplatform/python/input_missing_name \
+        autofill_noplatform/python/output_missing_datatype \
+        autofill_noplatform/python/output_missing_dims \
+        autofill_noplatform/python/output_missing_name \
+        autofill_noplatform/python/no_return \
+        autofill_noplatform/python/conflicting_scheduler_sequence \
+        autofill_noplatform_success/python/dynamic_batching_no_op \
+        autofill_noplatform_success/python/dynamic_batching \
+        autofill_noplatform_success/python/incomplete_input \
+        autofill_noplatform/python/input_wrong_property \
+        autofill_noplatform/python/output_wrong_property ; do
+    mkdir -p $modelpath/1
+    mv $modelpath/model.py $modelpath/1/.
+done
+for modelpath in \
+        autofill_noplatform_success/python/conflicting_scheduler_ensemble/conflicting_scheduler_ensemble \
+        autofill_noplatform_success/python/conflicting_scheduler_ensemble/ensemble_first_step \
+        autofill_noplatform_success/python/conflicting_scheduler_ensemble/ensemble_second_step ; do
+    mkdir -p $modelpath/1
+    mv $modelpath/model.py $modelpath/1/.
 done
 
 # Copy other required models
@@ -199,6 +239,11 @@ cp -r /data/inferenceserver/${REPO_VERSION}/qa_reshape_model_repository/savedmod
 mkdir -p autofill_noplatform_success/tensorrt/reshape_config_provided/1
 cp /data/inferenceserver/${REPO_VERSION}/qa_reshape_model_repository/plan_zero_4_float32/1/model.plan \
     autofill_noplatform_success/tensorrt/reshape_config_provided/1
+
+# Copy identity model into onnx test directories
+mkdir -p autofill_noplatform_success/onnx/cpu_instance/1
+cp -r /data/inferenceserver/${REPO_VERSION}/qa_identity_model_repository/onnx_zero_1_float16/1/model.onnx \
+    autofill_noplatform_success/onnx/cpu_instance/1
 
 rm -f $SERVER_LOG_BASE* $CLIENT_LOG
 RET=0
