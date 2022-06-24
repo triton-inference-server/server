@@ -87,8 +87,6 @@ rm -fr ${MODEL_DIR} && mkdir ${MODEL_DIR}
 MODELS="add_sub_ground_truth"
 
 for model in ${MODELS}; do
-    # Remove "name" line from each config to use directory name for simplicity
-    sed -i "/^name:/d" "${MODEL_DIR}/${model}/config.pbtxt"
     # Add version directory to each model if non-existent
     mkdir -p "${MODEL_DIR}/${model}/1"
     cp ../python_models/${model}/model.py     ./models/${model}/1/model.py
