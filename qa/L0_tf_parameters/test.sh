@@ -37,6 +37,7 @@ fi
 if [ ! -z "$TEST_REPO_ARCH" ]; then
     REPO_VERSION=${REPO_VERSION}_${TEST_REPO_ARCH}
 fi
+source ../common/util.sh
 
 export CUDA_VISIBLE_DEVICES=0
 
@@ -45,70 +46,72 @@ TEST_RESULT_FILE='test_results.txt'
 CLIENT_LOG="./client.log"
 TEST=tf_parameter_test.py
 EXPECTED_NUM_TESTS="1"
-
-rm -rf $SERVER_LOG $CLIENT_LOG models/
-
-cp -r $DATADIR models
 MODEL_REPOSITORY=`pwd`/models
-source ../common/util.sh
 SERVER=/opt/tritonserver/bin/tritonserver
-SERVER_ARGS="--model-repository=$MODEL_REPOSITORY"
 SERVER_LOG="./inference_server.log"
-
+TF_VERSIONS=(1 2)
 RET=0
 
-run_server
-if [ "$SERVER_PID" == "0" ]; then
-    echo -e "\n***\n*** Failed to start $SERVER\n***"
-    cat $SERVER_LOG
-    exit 1
-fi
+for version in ${TF_VERSIONS[@]}; do
+    rm -rf $SERVER_LOG $CLIENT_LOG models/
+    cp -r $DATADIR models
+    SERVER_ARGS="--model-repository=$MODEL_REPOSITORY --backend-config=tensorflow,version=$version"
+    run_server
+    if [ "$SERVER_PID" == "0" ]; then
+        echo -e "\n***\n*** Failed to start $SERVER\n***"
+        cat $SERVER_LOG
+        exit 1
+    fi
 
-set +e
-python $TEST TFParameterTest.test_tf_variable_error>$CLIENT_LOG 2>&1
-if [ $? -ne 0 ]; then
-    cat $CLIENT_LOG
-    echo -e "\n***\n*** Test Failed\n***"
-    RET=1
-else
-    check_test_results $TEST_RESULT_FILE $EXPECTED_NUM_TESTS
+    set +e
+    python $TEST TFParameterTest.test_tf_variable_error>$CLIENT_LOG 2>&1
     if [ $? -ne 0 ]; then
         cat $CLIENT_LOG
-        echo -e "\n***\n*** Test Result Verification Failed\n***"
+        echo -e "\n***\n*** Test Failed\n***"
         RET=1
+    else
+        check_test_results $TEST_RESULT_FILE $EXPECTED_NUM_TESTS
+        if [ $? -ne 0 ]; then
+            cat $CLIENT_LOG
+            echo -e "\n***\n*** Test Result Verification Failed\n***"
+            RET=1
+        fi
     fi
-fi
-set -e
+    set -e
 
-kill $SERVER_PID
-wait $SERVER_PID
+    kill $SERVER_PID
+    wait $SERVER_PID
 
-# Add the initialization operation
-echo "{\"init_ops\": [\"init\"]}" > models/graphdef_variable/init_ops.json
-echo "parameters: { key: \"TF_INIT_OPS_FILE\" value: { string_value:\"init_ops.json\" }}" >> models/graphdef_variable/config.pbtxt
+    # Add the initialization operation
+    echo "{\"init_ops\": [\"init\"]}" > models/graphdef_variable/init_ops.json
+    echo "parameters: { key: \"TF_INIT_OPS_FILE\" value: { string_value:\"init_ops.json\" }}" >> models/graphdef_variable/config.pbtxt
 
-run_server
-if [ "$SERVER_PID" == "0" ]; then
-    echo -e "\n***\n*** Failed to start $SERVER\n***"
-    cat $SERVER_LOG
-    exit 1
-fi
+    run_server
+    if [ "$SERVER_PID" == "0" ]; then
+        echo -e "\n***\n*** Failed to start $SERVER\n***"
+        cat $SERVER_LOG
+        exit 1
+    fi
 
-set +e
-python $TEST TFParameterTest.test_tf_variable>$CLIENT_LOG 2>&1
-if [ $? -ne 0 ]; then
-    cat $CLIENT_LOG
-    echo -e "\n***\n*** Test Failed\n***"
-    RET=1
-else
-    check_test_results $TEST_RESULT_FILE $EXPECTED_NUM_TESTS
+    set +e
+    python $TEST TFParameterTest.test_tf_variable>$CLIENT_LOG 2>&1
     if [ $? -ne 0 ]; then
         cat $CLIENT_LOG
-        echo -e "\n***\n*** Test Result Verification Failed\n***"
+        echo -e "\n***\n*** Test Failed\n***"
         RET=1
+    else
+        check_test_results $TEST_RESULT_FILE $EXPECTED_NUM_TESTS
+        if [ $? -ne 0 ]; then
+            cat $CLIENT_LOG
+            echo -e "\n***\n*** Test Result Verification Failed\n***"
+            RET=1
+        fi
     fi
-fi
-set -e
+    set -e
+
+    kill $SERVER_PID
+    wait $SERVER_PID
+done
 
 if [ $RET -eq 0 ]; then
     echo -e "\n***\n*** Test Passed\n***"
