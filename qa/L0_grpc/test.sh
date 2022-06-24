@@ -52,6 +52,9 @@ if [[ "$(< /proc/sys/kernel/osrelease)" == *microsoft* ]]; then
     BACKEND_DIR=${BACKEND_DIR:=C:/tritonserver/backends}
     SERVER=${SERVER:=/mnt/c/tritonserver/bin/tritonserver.exe}
 
+    SIMPLE_AIO_TEST_CLIENT_PY=${SDKDIR}/python/simple_grpc_aio_test_client.py
+    SIMPLE_AIO_INFER_CLIENT_PY=${SDKDIR}/python/simple_grpc_aio_infer_client.py
+    SIMPLE_AIO_STREAM_INFER_CLIENT_PY=${SDKDIR}/python/simple_grpc_aio_sequence_stream_infer_client.py
     SIMPLE_HEALTH_CLIENT_PY=${SDKDIR}/python/simple_grpc_health_metadata.py
     SIMPLE_INFER_CLIENT_PY=${SDKDIR}/python/simple_grpc_infer_client.py
     SIMPLE_ASYNC_INFER_CLIENT_PY=${SDKDIR}/python/simple_grpc_async_infer_client.py
@@ -96,6 +99,9 @@ else
     SERVER=${TRITON_DIR}/bin/tritonserver
     BACKEND_DIR=${TRITON_DIR}/backends
 
+    SIMPLE_AIO_TEST_CLIENT_PY=../clients/simple_grpc_aio_test_client.py
+    SIMPLE_AIO_INFER_CLIENT_PY=../clients/simple_grpc_aio_infer_client.py
+    SIMPLE_AIO_STREAM_INFER_CLIENT_PY=../clients/simple_grpc_aio_sequence_stream_infer_client.py
     SIMPLE_HEALTH_CLIENT_PY=../clients/simple_grpc_health_metadata.py
     SIMPLE_INFER_CLIENT_PY=../clients/simple_grpc_infer_client.py
     SIMPLE_ASYNC_INFER_CLIENT_PY=../clients/simple_grpc_async_infer_client.py
@@ -166,8 +172,16 @@ if [ $? -ne 0 ]; then
     RET=1
 fi
 
+python $SIMPLE_AIO_TEST_CLIENT_PY >> ${CLIENT_LOG}.aiotest 2>&1
+if [ $? -ne 0 ]; then
+    cat ${CLIENT_LOG}.aiotest
+    RET=1
+fi
+
 IMAGE=../images/vulture.jpeg
 for i in \
+        $SIMPLE_AIO_INFER_CLIENT_PY \
+        $SIMPLE_AIO_STREAM_INFER_CLIENT_PY \
         $SIMPLE_INFER_CLIENT_PY \
         $SIMPLE_ASYNC_INFER_CLIENT_PY \
         $SIMPLE_STRING_INFER_CLIENT_PY \
@@ -381,7 +395,6 @@ if [ $? -ne 0 ]; then
     cat ${CLIENT_LOG}.model_control
     RET=1
 fi
-
 if [ $(cat ${CLIENT_LOG}.model_control | grep "PASS" | wc -l) -ne 1 ]; then
     cat ${CLIENT_LOG}.model_control
     RET=1
