@@ -1,4 +1,4 @@
-name: "hint_for_no_batch"
+name: "hint_for_no_batch_1"
 platform: "tensorflow_savedmodel"
 version_policy {
   latest {
@@ -6,13 +6,13 @@ version_policy {
   }
 }
 input {
-  name: "INPUT1"
+  name: "INPUT0"
   data_type: TYPE_INT32
   dims: -1
   dims: 16
 }
 input {
-  name: "INPUT0"
+  name: "INPUT1"
   data_type: TYPE_INT32
   dims: -1
   dims: 16
@@ -30,7 +30,7 @@ output {
   dims: 16
 }
 instance_group {
-  name: "hint_for_no_batch"
+  name: "hint_for_no_batch_1"
   count: 1
   gpus: 0
   kind: KIND_GPU
