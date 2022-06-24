@@ -71,7 +71,8 @@ function check_performance {
     # check if within tolerance
     ret=$(python3 -c "print(${report_val} >= ${MIN} and ${report_val} <= ${MAX})")
     if [ "$ret" = "False" ]; then
-            RET=1
+        echo -e "\n***\n*** Test Failed\n***"
+        RET=1
     fi
 }
 
@@ -106,7 +107,7 @@ set +e
 RET=0
 PROTOCOLS="http"
 OUTPUT_FILE="results"
-EXPECTED_RESULT="88.34"
+EXPECTED_RESULT="90.00"
 TOLERANCE="0.05"
 
 for protocol in ${PROTOCOLS}; do
