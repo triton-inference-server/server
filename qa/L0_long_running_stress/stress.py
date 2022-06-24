@@ -528,15 +528,13 @@ if __name__ == '__main__':
     for t in threads:
         t.start()
 
-    liveness_count = 0
-    while liveness_count < FLAGS.test_duration:
+    while (time.time() - start_time) < FLAGS.test_duration:
         time.sleep(1)
         for t in threads:
             # Stop the test early if there is early termination of a thread.
             if not t.is_alive():
                 exit_code = 1
                 break
-        liveness_count += 1
         if exit_code != 0:
             break
 
