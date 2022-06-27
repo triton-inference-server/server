@@ -44,10 +44,10 @@ def create_graphdefmodel(models_dir, model_name, model_version=1):
     ], "INPUT")
     variable = tf.get_variable("VARIABLE", [
         1,
-    ], initializer=tf.zeros_initializer(), dtype=tf.int32)
+    ],
+                               initializer=tf.zeros_initializer(),
+                               dtype=tf.int32)
     tf.add(variable, input0, name="OUTPUT")
-    print(tf.global_variables_initializer())
-
     model_version_dir = models_dir + "/" + model_name + "/" + str(model_version)
 
     try:
@@ -62,8 +62,7 @@ def create_graphdefmodel(models_dir, model_name, model_version=1):
                              as_text=False)
 
 
-def create_graphdef_modelconfig(models_dir,
-                                model_name):
+def create_graphdef_modelconfig(models_dir, model_name):
     config_dir = models_dir + "/" + model_name
     config = '''
 name: "{}"
@@ -104,5 +103,4 @@ if __name__ == '__main__':
 
     model_name = "graphdef_variable"
     create_graphdefmodel(args.models_dir, model_name)
-    create_graphdef_modelconfig(args.models_dir,
-                                model_name=model_name)
+    create_graphdef_modelconfig(args.models_dir, model_name=model_name)
