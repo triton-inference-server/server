@@ -1,5 +1,5 @@
 #!/bin/bash
-# Copyright (c) 2020, NVIDIA CORPORATION. All rights reserved.
+# Copyright 2020-2022, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -42,6 +42,7 @@ export CUDA_VISIBLE_DEVICES=0
 
 RET=0
 
+SIMPLE_AIO_INFER_CLIENT_PY=../clients/simple_http_aio_infer_client.py
 SIMPLE_INFER_CLIENT_PY=../clients/simple_http_infer_client.py
 TEST_CLIENT=../clients/simple_http_infer_client
 
@@ -103,6 +104,11 @@ if [ $? -ne 0 ]; then
     cat ${CLIENT_LOG}.ssl_infer
     RET=1
 fi
+python $SIMPLE_AIO_INFER_CLIENT_PY -v -u localhost --ssl --key-file client.key --cert-file client.crt --ca-certs ca.crt >> ${CLIENT_LOG}.ssl_infer.aio 2>&1
+if [ $? -ne 0 ]; then
+    cat ${CLIENT_LOG}.ssl_infer.aio
+    RET=1
+fi
 
 $TEST_CLIENT -v -u https://localhost:443 --key-file client.key --cert-file client.crt --ca-certs ca.crt >> ${CLIENT_LOG}.c++.ssl_infer 2>&1
 if [ $? -ne 0 ]; then
@@ -114,6 +120,11 @@ fi
 python $SIMPLE_INFER_CLIENT_PY -v -u localhost --ssl --insecure >> ${CLIENT_LOG}.ssl_infer_insecure 2>&1
 if [ $? -ne 0 ]; then
     cat ${CLIENT_LOG}.ssl_infer_insecure
+    RET=1
+fi
+python $SIMPLE_AIO_INFER_CLIENT_PY -v -u localhost --ssl --insecure >> ${CLIENT_LOG}.ssl_infer_insecure.aio 2>&1
+if [ $? -ne 0 ]; then
+    cat ${CLIENT_LOG}.ssl_infer_insecure.aio
     RET=1
 fi
 
@@ -132,6 +143,13 @@ if [ $? -ne 0 ]; then
 else
     RET=1
 fi
+$SIMPLE_AIO_INFER_CLIENT_PY -v -u localhost >> ${CLIENT_LOG}.no_ssl_fail_infer.aio 2>&1
+if [ $? -ne 0 ]; then
+    cat ${CLIENT_LOG}.no_ssl_fail_infer.aio
+    echo -e "\n***\n*** Expected test failure\n***"
+else
+    RET=1
+fi
 
 $TEST_CLIENT -v -u https://localhost:443 >> ${CLIENT_LOG}.c++.no_ssl_fail_infer 2>&1
 if [ $? -ne 0 ]; then
@@ -146,6 +164,13 @@ fi
 $SIMPLE_INFER_CLIENT_PY -v -u localhost --ssl --key-file client2.key --cert-file client.crt --ca-certs ca.crt >> ${CLIENT_LOG}.ssl_wrong_key 2>&1
 if [ $? -ne 0 ]; then
     cat ${CLIENT_LOG}.ssl_wrong_key
+    echo -e "\n***\n*** Expected test failure\n***"
+else
+    RET=1
+fi
+$SIMPLE_AIO_INFER_CLIENT_PY -v -u localhost --ssl --key-file client2.key --cert-file client.crt --ca-certs ca.crt >> ${CLIENT_LOG}.ssl_wrong_key.aio 2>&1
+if [ $? -ne 0 ]; then
+    cat ${CLIENT_LOG}.ssl_wrong_key.aio
     echo -e "\n***\n*** Expected test failure\n***"
 else
     RET=1

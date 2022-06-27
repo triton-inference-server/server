@@ -52,6 +52,8 @@ if [[ "$(< /proc/sys/kernel/osrelease)" == *microsoft* ]]; then
     BACKEND_DIR=${BACKEND_DIR:=C:/tritonserver/backends}
     SERVER=${SERVER:=/mnt/c/tritonserver/bin/tritonserver.exe}
 
+    SIMPLE_AIO_INFER_CLIENT_PY=${SDKDIR}/python/simple_http_aio_infer_client.py
+    SIMPLE_AIO_TEST_CLIENT_PY=${SDKDIR}/python/simple_http_aio_test_client.py
     SIMPLE_HEALTH_CLIENT_PY=${SDKDIR}/python/simple_http_health_metadata.py
     SIMPLE_INFER_CLIENT_PY=${SDKDIR}/python/simple_http_infer_client.py
     SIMPLE_ASYNC_INFER_CLIENT_PY=${SDKDIR}/python/simple_http_async_infer_client.py
@@ -83,6 +85,8 @@ else
     SERVER=${TRITON_DIR}/bin/tritonserver
     BACKEND_DIR=${TRITON_DIR}/backends
 
+    SIMPLE_AIO_INFER_CLIENT_PY=../clients/simple_http_aio_infer_client.py
+    SIMPLE_AIO_TEST_CLIENT_PY=../clients/simple_http_aio_test_client.py
     SIMPLE_HEALTH_CLIENT_PY=../clients/simple_http_health_metadata.py
     SIMPLE_INFER_CLIENT_PY=../clients/simple_http_infer_client.py
     SIMPLE_ASYNC_INFER_CLIENT_PY=../clients/simple_http_async_infer_client.py
@@ -140,9 +144,16 @@ if [ $? -ne 0 ]; then
     cat ${CLIENT_LOG}.health
     RET=1
 fi
+# Test aio
+python $SIMPLE_AIO_TEST_CLIENT_PY >> ${CLIENT_LOG}.aiotest 2>&1
+if [ $? -ne 0 ]; then
+    cat ${CLIENT_LOG}.aiotest
+    RET=1
+fi
 
 IMAGE=../images/vulture.jpeg
 for i in \
+        $SIMPLE_AIO_INFER_CLIENT_PY \
         $SIMPLE_INFER_CLIENT_PY \
         $SIMPLE_ASYNC_INFER_CLIENT_PY \
         $SIMPLE_IMAGE_CLIENT_PY \
@@ -263,7 +274,6 @@ if [ $? -ne 0 ]; then
     cat ${CLIENT_LOG}.model_control
     RET=1
 fi
-
 if [ $(cat ${CLIENT_LOG}.model_control | grep "PASS" | wc -l) -ne 1 ]; then
     cat ${CLIENT_LOG}.model_control
     RET=1
