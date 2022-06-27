@@ -59,6 +59,11 @@ function check_perf_analyzer_error {
     fi
 }
 
+# Checks that the model infer/sec performance is equal to an expected value
+# +/- some tolerance.
+# $1: csv result file from PA run
+# $2: expected infer/sec value
+# $3: tolerance for expected value equality
 function check_performance {
     # get the boundary values based on the tolerance percentage
     MIN=$(python3 -c "print(${2} * (1 - ${3}))")
@@ -119,10 +124,10 @@ for protocol in ${PROTOCOLS}; do
         ${PERF_ANALYZER} -v -i ${protocol} -m ${model} -f ${OUTPUT_FILE} | tee ${CLIENT_LOG} 2>&1
         check_perf_analyzer_error $?
 
+        check_performance ${OUTPUT_FILE} ${EXPECTED_RESULT} ${TOLERANCE}
     done;
 done;
 
-check_performance ${OUTPUT_FILE} ${EXPECTED_RESULT} ${TOLERANCE}
 
 set -e
 
@@ -136,6 +141,9 @@ else
   echo "=== START SERVER LOG ==="
   cat ${SERVER_LOG}
   echo "=== END SERVER LOG ==="
+  echo "=== START CLIENT LOG ==="
+  cat ${CLIENT_LOG}
+  echo "=== END CLIENT LOG ==="
   echo -e "\n***\n*** Test FAILED\n***"
 fi
 
