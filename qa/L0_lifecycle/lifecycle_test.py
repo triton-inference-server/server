@@ -2568,7 +2568,8 @@ class LifeCycleTest(tu.TestResultCollector):
                             "expected error for new inference during shutdown")
         except InferenceServerException as ex:
             self.assertIn(
-                "in ensemble 'ensemble_zero_1_float32', Server is stopping, scheduler for model has stopped accepting new inference requests",
+                "in ensemble 'ensemble_zero_1_float32', [request id: <id_unknown>]" \
+                "Server is stopping, scheduler for model has stopped accepting new inference requests",
                 ex.message())
 
         # Wait until the results are available in user_data
