@@ -1,4 +1,4 @@
-# Copyright (c) 2020, NVIDIA CORPORATION. All rights reserved.
+# Copyright (c) 2022, NVIDIA CORPORATION. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -24,36 +24,20 @@
 # (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-name: "add_sub_ground_truth"
-backend: "python"
+import triton_python_backend_utils as pb_utils
+import time
 
-input [
-  {
-    name: "INPUT0"
-    data_type: TYPE_FP32
-    dims: [ 16 ]
-  }
-]
-input [
-  {
-    name: "INPUT1"
-    data_type: TYPE_FP32
-    dims: [ 16 ]
-  }
-]
-output [
-  {
-    name: "OUTPUT0"
-    data_type: TYPE_FP32
-    dims: [ 16 ]
-  }
-]
-output [
-  {
-    name: "OUTPUT1"
-    data_type: TYPE_FP32
-    dims: [ 16 ]
-  }
-]
 
-instance_group [{ kind: KIND_CPU }]
+class TritonPythonModel:
+
+    def execute(self, requests):
+        """
+        Identity model in Python backend.
+        """
+        time.sleep(0.01)
+        responses = []
+        for request in requests:
+            input_tensor = pb_utils.get_input_tensor_by_name(request, "INPUT0")
+            out_tensor = pb_utils.Tensor("OUTPUT0", input_tensor.as_numpy())
+            responses.append(pb_utils.InferenceResponse([out_tensor]))
+        return responses

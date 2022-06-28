@@ -90,7 +90,7 @@ SERVER_LOG="./inference_server.log"
 rm -f $SERVER_LOG $CLIENT_LOG
 MODEL_DIR="./models"
 rm -fr ${MODEL_DIR} && mkdir ${MODEL_DIR}
-MODELS="add_sub_ground_truth"
+MODELS="ground_truth"
 
 for model in ${MODELS}; do
     # Add version directory to each model if non-existent
