@@ -1892,8 +1892,9 @@ class LifeCycleTest(tu.TestResultCollector):
             triton_client.load_model(model_name)
             self.assertTrue(False, "expecting load failure")
         except Exception as ex:
-            self.assertIn("version 2: Internal: GPU instances not supported",
-                          ex.message())
+            self.assertIn(
+                "version 2 is at UNAVAILABLE state: Internal: GPU instances not supported",
+                ex.message())
 
         # Make sure version 1 of the model is available, and version 2 is not
         try:
