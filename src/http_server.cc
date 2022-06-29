@@ -2910,7 +2910,7 @@ HTTPAPIServer::InferRequestClass::FinalizeResponse(
 
   const char* request_id = nullptr;
   RETURN_IF_ERR(TRITONSERVER_InferenceResponseId(response, &request_id));
-  if ((request_id == nullptr) || (request_id[0] == '\0')) {
+  if ((request_id != nullptr) && (request_id[0] != '\0')) {
     RETURN_IF_ERR(response_json.AddStringRef("id", request_id));
   }
 
