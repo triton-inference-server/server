@@ -53,7 +53,6 @@ if [[ "$(< /proc/sys/kernel/osrelease)" == *microsoft* ]]; then
     SERVER=${SERVER:=/mnt/c/tritonserver/bin/tritonserver.exe}
 
     SIMPLE_AIO_INFER_CLIENT_PY=${SDKDIR}/python/simple_http_aio_infer_client.py
-    SIMPLE_AIO_TEST_CLIENT_PY=${SDKDIR}/python/simple_http_aio_test_client.py
     SIMPLE_HEALTH_CLIENT_PY=${SDKDIR}/python/simple_http_health_metadata.py
     SIMPLE_INFER_CLIENT_PY=${SDKDIR}/python/simple_http_infer_client.py
     SIMPLE_ASYNC_INFER_CLIENT_PY=${SDKDIR}/python/simple_http_async_infer_client.py
@@ -86,7 +85,6 @@ else
     BACKEND_DIR=${TRITON_DIR}/backends
 
     SIMPLE_AIO_INFER_CLIENT_PY=../clients/simple_http_aio_infer_client.py
-    SIMPLE_AIO_TEST_CLIENT_PY=../clients/simple_http_aio_test_client.py
     SIMPLE_HEALTH_CLIENT_PY=../clients/simple_http_health_metadata.py
     SIMPLE_INFER_CLIENT_PY=../clients/simple_http_infer_client.py
     SIMPLE_ASYNC_INFER_CLIENT_PY=../clients/simple_http_async_infer_client.py
@@ -142,12 +140,6 @@ set +e
 python $SIMPLE_HEALTH_CLIENT_PY -v >> ${CLIENT_LOG}.health 2>&1
 if [ $? -ne 0 ]; then
     cat ${CLIENT_LOG}.health
-    RET=1
-fi
-# Test aio
-python $SIMPLE_AIO_TEST_CLIENT_PY >> ${CLIENT_LOG}.aiotest 2>&1
-if [ $? -ne 0 ]; then
-    cat ${CLIENT_LOG}.aiotest
     RET=1
 fi
 
@@ -274,6 +266,7 @@ if [ $? -ne 0 ]; then
     cat ${CLIENT_LOG}.model_control
     RET=1
 fi
+
 if [ $(cat ${CLIENT_LOG}.model_control | grep "PASS" | wc -l) -ne 1 ]; then
     cat ${CLIENT_LOG}.model_control
     RET=1
@@ -532,6 +525,27 @@ if [ $? -ne 0 ]; then
 fi
 set -e
 
+kill $SERVER_PID
+wait $SERVER_PID
+
+# Run python http aio unit test
+PYTHON_HTTP_AIO_TEST=python_http_aio_test.py
+CLIENT_LOG=`pwd`/python_http_aio_test.log
+SERVER_ARGS="--backend-directory=${BACKEND_DIR} --model-repository=${MODELDIR}"
+run_server
+if [ "$SERVER_PID" == "0" ]; then
+    echo -e "\n***\n*** Failed to start $SERVER\n***"
+    cat $SERVER_LOG
+    exit 1
+fi
+set +e
+python $PYTHON_HTTP_AIO_TEST > $CLIENT_LOG 2>&1
+if [ $? -ne 0 ]; then
+    cat $CLIENT_LOG
+    echo -e "\n***\n*** Python HTTP AsyncIO Test Failed\n***"
+    RET=1
+fi
+set -e
 kill $SERVER_PID
 wait $SERVER_PID
 
