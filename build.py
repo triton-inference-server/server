@@ -319,8 +319,7 @@ class BuildScript:
     def cmake(self, args):
         # Pass some additional envvars into cmake...
         env_args = []
-        for k in ('TRT_VERSION', 'DALI_VERSION', 'CMAKE_TOOLCHAIN_FILE',
-                  'VCPKG_TARGET_TRIPLET'):
+        for k in ('TRT_VERSION', 'CMAKE_TOOLCHAIN_FILE', 'VCPKG_TARGET_TRIPLET'):
             env_args += [f'"-D{k}={self.envvar_ref(k)}"']
         self.cmd(f'cmake {" ".join(env_args)} {" ".join(args)}',
                  check_exitcode=True)
