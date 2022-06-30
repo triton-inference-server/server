@@ -52,7 +52,6 @@ if [[ "$(< /proc/sys/kernel/osrelease)" == *microsoft* ]]; then
     BACKEND_DIR=${BACKEND_DIR:=C:/tritonserver/backends}
     SERVER=${SERVER:=/mnt/c/tritonserver/bin/tritonserver.exe}
 
-    SIMPLE_AIO_TEST_CLIENT_PY=${SDKDIR}/python/simple_grpc_aio_test_client.py
     SIMPLE_AIO_INFER_CLIENT_PY=${SDKDIR}/python/simple_grpc_aio_infer_client.py
     SIMPLE_AIO_STREAM_INFER_CLIENT_PY=${SDKDIR}/python/simple_grpc_aio_sequence_stream_infer_client.py
     SIMPLE_HEALTH_CLIENT_PY=${SDKDIR}/python/simple_grpc_health_metadata.py
@@ -99,7 +98,6 @@ else
     SERVER=${TRITON_DIR}/bin/tritonserver
     BACKEND_DIR=${TRITON_DIR}/backends
 
-    SIMPLE_AIO_TEST_CLIENT_PY=../clients/simple_grpc_aio_test_client.py
     SIMPLE_AIO_INFER_CLIENT_PY=../clients/simple_grpc_aio_infer_client.py
     SIMPLE_AIO_STREAM_INFER_CLIENT_PY=../clients/simple_grpc_aio_sequence_stream_infer_client.py
     SIMPLE_HEALTH_CLIENT_PY=../clients/simple_grpc_health_metadata.py
@@ -169,12 +167,6 @@ set +e
 python $SIMPLE_HEALTH_CLIENT_PY -v >> ${CLIENT_LOG}.health 2>&1
 if [ $? -ne 0 ]; then
     cat ${CLIENT_LOG}.health
-    RET=1
-fi
-
-python $SIMPLE_AIO_TEST_CLIENT_PY >> ${CLIENT_LOG}.aiotest 2>&1
-if [ $? -ne 0 ]; then
-    cat ${CLIENT_LOG}.aiotest
     RET=1
 fi
 
@@ -395,6 +387,7 @@ if [ $? -ne 0 ]; then
     cat ${CLIENT_LOG}.model_control
     RET=1
 fi
+
 if [ $(cat ${CLIENT_LOG}.model_control | grep "PASS" | wc -l) -ne 1 ]; then
     cat ${CLIENT_LOG}.model_control
     RET=1
@@ -509,6 +502,27 @@ if [ $? -ne 0 ]; then
 fi
 set -e
 
+kill $SERVER_PID
+wait $SERVER_PID
+
+# Run python grpc aio unit test
+PYTHON_GRPC_AIO_TEST=python_grpc_aio_test.py
+CLIENT_LOG=`pwd`/python_grpc_aio_test.log
+SERVER_ARGS="--backend-directory=${BACKEND_DIR} --model-repository=${MODELDIR}"
+run_server
+if [ "$SERVER_PID" == "0" ]; then
+    echo -e "\n***\n*** Failed to start $SERVER\n***"
+    cat $SERVER_LOG
+    exit 1
+fi
+set +e
+python $PYTHON_GRPC_AIO_TEST > $CLIENT_LOG 2>&1
+if [ $? -ne 0 ]; then
+    cat $CLIENT_LOG
+    echo -e "\n***\n*** Python GRPC AsyncIO Test Failed\n***"
+    RET=1
+fi
+set -e
 kill $SERVER_PID
 wait $SERVER_PID
 
