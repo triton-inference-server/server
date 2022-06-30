@@ -722,5 +722,5 @@ else
     echo -e "\n***\n*** Test FAILED\n***"
 fi
 
-
 exit $RET
+
