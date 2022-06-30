@@ -28,8 +28,6 @@
 #include <sys/stat.h>
 
 #include <mutex>
-#include <sys/stat.h>
-#include <mutex>
 
 #include "common.h"
 #include "dirent.h"
@@ -56,6 +54,10 @@ class SagemakerAPIServer : public HTTPAPIServer {
         : InferRequestClass(server, req, response_compression_type)
     {
     }
+    using InferRequestClass::InferResponseComplete;
+    static void InferResponseComplete(
+        TRITONSERVER_InferenceResponse* response, const uint32_t flags,
+        void* userp);
 
     void SetResponseHeader(
         const bool has_binary_data, const size_t header_length) override;
@@ -86,12 +88,18 @@ class SagemakerAPIServer : public HTTPAPIServer {
       std::unordered_map<std::string, std::string>* parse_map,
       const std::string& action);
 
+  void SageMakerMMEHandleInfer(
+      evhtp_request_t* req, const std::string& model_name,
+      const std::string& model_version_str);
+
   void SageMakerMMELoadModel(
       evhtp_request_t* req,
       const std::unordered_map<std::string, std::string> parse_map);
 
-  void SageMakerMMEHandleLoadError(
+  void SageMakerMMEHandleOOMError(
       evhtp_request_t* req, TRITONSERVER_Error* load_err);
+
+  static bool SageMakerMMECheckOOMError(TRITONSERVER_Error* load_err);
 
   void SageMakerMMEUnloadModel(evhtp_request_t* req, const char* model_name);
 
@@ -100,6 +108,10 @@ class SagemakerAPIServer : public HTTPAPIServer {
   void SageMakerMMEGetModel(evhtp_request_t* req, const char* model_name);
 
   void Handle(evhtp_request_t* req) override;
+
+  /* Method to return 507 on invoke i.e. during SageMakerMMEHandleInfer
+   */
+  static void BADReplyCallback507(evthr_t* thr, void* arg, void* shared);
 
   std::unique_ptr<InferRequestClass> CreateInferRequest(
       evhtp_request_t* req) override
