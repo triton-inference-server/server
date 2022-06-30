@@ -60,7 +60,8 @@ if USE_GRPC and USE_HTTP:
     USE_GRPC = False
 assert USE_GRPC or USE_HTTP, "USE_GRPC or USE_HTTP must be non-zero"
 
-BACKENDS = os.environ.get('BACKENDS', "graphdef savedmodel onnx libtorch plan")
+BACKENDS = os.environ.get('BACKENDS',
+                          "graphdef savedmodel onnx libtorch plan python")
 
 _trials = BACKENDS.split(" ")
 
@@ -80,7 +81,8 @@ class BatcherTest(tu.TestResultCollector):
 
     def setUp(self):
         # The helper client for setup will be GRPC for simplicity.
-        self.triton_client_ = grpcclient.InferenceServerClient(f"{_tritonserver_ipaddr}:8001")
+        self.triton_client_ = grpcclient.InferenceServerClient(
+            f"{_tritonserver_ipaddr}:8001")
         self.precreated_shm_regions_ = []
         global _deferred_exceptions
         _deferred_exceptions = []
@@ -144,7 +146,7 @@ class BatcherTest(tu.TestResultCollector):
             start_ms = int(round(time.time() * 1000))
 
             if trial == "savedmodel" or trial == "graphdef" or trial == "libtorch" \
-                    or trial == "onnx" or trial == "plan":
+                    or trial == "onnx" or trial == "plan" or trial == "python":
                 tensor_shape = (bs, input_size)
                 iu.infer_exact(
                     self,
@@ -198,7 +200,8 @@ class BatcherTest(tu.TestResultCollector):
         self.assertEqual(bconfig.max_queue_delay_microseconds,
                          max_queue_delay_us)
 
-    def check_status(self, model_name, batch_exec, request_cnt, infer_cnt, exec_count):
+    def check_status(self, model_name, batch_exec, request_cnt, infer_cnt,
+                     exec_count):
         stats = self.triton_client_.get_inference_statistics(model_name, "1")
         self.assertEqual(len(stats.model_stats), 1, "expect 1 model stats")
         self.assertEqual(stats.model_stats[0].name, model_name,
@@ -222,8 +225,8 @@ class BatcherTest(tu.TestResultCollector):
                 # Get count from one of the stats
                 self.assertEqual(
                     bc, batch_exec[bs],
-                    "expected model-execution-count {} for batch size {}, got {}".
-                    format(batch_exec[bs], bs, bc))
+                    "expected model-execution-count {} for batch size {}, got {}"
+                    .format(batch_exec[bs], bs, bc))
 
         actual_request_cnt = stats.model_stats[0].inference_stats.success.count
         self.assertEqual(
@@ -1716,7 +1719,7 @@ class BatcherTest(tu.TestResultCollector):
                 t.join()
             self.check_deferred_exception()
             model_name = tu.get_zero_model_name(model_base, len(shapes), dtype)
-            self.check_status(model_name, None, 12, 12, (1,2))
+            self.check_status(model_name, None, 12, 12, (1, 2))
         except Exception as ex:
             self.assertTrue(False, "unexpected error {}".format(ex))
 
@@ -1771,6 +1774,7 @@ class BatcherTest(tu.TestResultCollector):
             self.check_status(model_name, None, 12, 12, (2,))
         except Exception as ex:
             self.assertTrue(False, "unexpected error {}".format(ex))
+
 
 if __name__ == '__main__':
     unittest.main()
