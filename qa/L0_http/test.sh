@@ -52,6 +52,7 @@ if [[ "$(< /proc/sys/kernel/osrelease)" == *microsoft* ]]; then
     BACKEND_DIR=${BACKEND_DIR:=C:/tritonserver/backends}
     SERVER=${SERVER:=/mnt/c/tritonserver/bin/tritonserver.exe}
 
+    SIMPLE_AIO_INFER_CLIENT_PY=${SDKDIR}/python/simple_http_aio_infer_client.py
     SIMPLE_HEALTH_CLIENT_PY=${SDKDIR}/python/simple_http_health_metadata.py
     SIMPLE_INFER_CLIENT_PY=${SDKDIR}/python/simple_http_infer_client.py
     SIMPLE_ASYNC_INFER_CLIENT_PY=${SDKDIR}/python/simple_http_async_infer_client.py
@@ -83,6 +84,7 @@ else
     SERVER=${TRITON_DIR}/bin/tritonserver
     BACKEND_DIR=${TRITON_DIR}/backends
 
+    SIMPLE_AIO_INFER_CLIENT_PY=../clients/simple_http_aio_infer_client.py
     SIMPLE_HEALTH_CLIENT_PY=../clients/simple_http_health_metadata.py
     SIMPLE_INFER_CLIENT_PY=../clients/simple_http_infer_client.py
     SIMPLE_ASYNC_INFER_CLIENT_PY=../clients/simple_http_async_infer_client.py
@@ -143,6 +145,7 @@ fi
 
 IMAGE=../images/vulture.jpeg
 for i in \
+        $SIMPLE_AIO_INFER_CLIENT_PY \
         $SIMPLE_INFER_CLIENT_PY \
         $SIMPLE_ASYNC_INFER_CLIENT_PY \
         $SIMPLE_IMAGE_CLIENT_PY \
@@ -522,6 +525,27 @@ if [ $? -ne 0 ]; then
 fi
 set -e
 
+kill $SERVER_PID
+wait $SERVER_PID
+
+# Run python http aio unit test
+PYTHON_HTTP_AIO_TEST=python_http_aio_test.py
+CLIENT_LOG=`pwd`/python_http_aio_test.log
+SERVER_ARGS="--backend-directory=${BACKEND_DIR} --model-repository=${MODELDIR}"
+run_server
+if [ "$SERVER_PID" == "0" ]; then
+    echo -e "\n***\n*** Failed to start $SERVER\n***"
+    cat $SERVER_LOG
+    exit 1
+fi
+set +e
+python $PYTHON_HTTP_AIO_TEST > $CLIENT_LOG 2>&1
+if [ $? -ne 0 ]; then
+    cat $CLIENT_LOG
+    echo -e "\n***\n*** Python HTTP AsyncIO Test Failed\n***"
+    RET=1
+fi
+set -e
 kill $SERVER_PID
 wait $SERVER_PID
 
