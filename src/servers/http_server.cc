@@ -72,7 +72,7 @@ class HTTPServerImpl : public HTTPServer {
 
   TRITONSERVER_Error* Start() override;
   TRITONSERVER_Error* Stop() override;
-  
+
  protected:
   virtual void Handle(evhtp_request_t* req) = 0;
 
@@ -1042,7 +1042,6 @@ class HTTPAPIServer : public HTTPServerImpl {
   };
 
  private:
-  void HandleInferErrors(evhtp_request_t* req, TRITONSERVER_Error* err);
   static TRITONSERVER_Error* InferResponseAlloc(
       TRITONSERVER_ResponseAllocator* allocator, const char* tensor_name,
       size_t byte_size, TRITONSERVER_MemoryType preferred_memory_type,
@@ -1124,14 +1123,7 @@ void HTTPAPIServer::HandleInferErrors(evhtp_request_t* req, TRITONSERVER_Error* 
         << "Received error during model execution, returning may be malformed GPU.";
     return;
   } else {
-        evhtp_headers_add_header(
-              req->headers_out,
-              evhtp_header_new(kContentTypeHeader, "application/json", 1, 1));
-          EVBufferAddErrorJson(req->buffer_out, err);
-          evhtp_send_reply(req, EVHTP_RES_BADREQ);
-          if (connection_paused) {
-            evhtp_request_resume(req);
-          }
+    evhtp_send_reply(req, EVHTP_RES_BADREQ);
   }
   TRITONSERVER_ErrorDelete(err);
 }
@@ -2351,13 +2343,9 @@ HTTPAPIServer::HandleInfer(
   if (err != nullptr) {
     LOG_VERBOSE(1) << "Infer failed: " << TRITONSERVER_ErrorMessage(err);
     HandleInferErrors(req, err);
-#ifdef TRITON_ENABLE_TRACING
-    // If HTTP server still owns Triton trace
-    if ((trace != nullptr) && (trace->trace_ != nullptr)) {
-      TraceManager::TraceRelease(trace->trace_, trace->trace_userp_);
+    if (connection_paused) {
+      evhtp_request_resume(req);
     }
-#endif  // TRITON_ENABLE_TRACING
-
     LOG_TRITONSERVER_ERROR(
         TRITONSERVER_InferenceRequestDelete(irequest),
         "deleting HTTP/REST inference request");

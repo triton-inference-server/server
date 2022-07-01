@@ -40,14 +40,17 @@ ENV DEBIAN_FRONTEND=noninteractive
 # DCGM version to install for Model Analyzer
 ARG DCGM_VERSION=2.0.13
 
+# update CUDA keyrings and update pip
+RUN  apt-key adv --fetch-keys https://developer.download.nvidia.com/compute/cuda/repos/ubuntu2004/x86_64/3bf863cc.pub
+
 RUN apt-get update && \
     apt-get install -y --no-install-recommends \
             software-properties-common \
             autoconf \
             automake \
             build-essential \
-            curl \
             git \
+            curl \
             libb64-dev \
             libopencv-dev \
             libopencv-core-dev \
@@ -126,8 +129,7 @@ RUN pip3 install --upgrade numpy pillow && \
     xargs pip3 install --upgrade
 
 # Install DCGM
-RUN wget https://developer.download.nvidia.com/compute/cuda/repos/ubuntu2004/x86_64/datacenter-gpu-manager_${DCGM_VERSION}_amd64.deb && \
-    dpkg -i datacenter-gpu-manager_${DCGM_VERSION}_amd64.deb
+RUN apt-get update && apt-get install -y datacenter-gpu-manager=1:${DCGM_VERSION}
 
 # Install Model Analyzer
 ARG TRITON_MODEL_ANALYZER_REPO_TAG
