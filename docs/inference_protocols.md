@@ -42,12 +42,27 @@ that have been proposed by the [KServe
 project](https://github.com/kserve). To fully enable all capabilities
 Triton also implements a number [HTTP/REST and GRPC
 extensions](https://github.com/triton-inference-server/server/tree/main/docs/protocol)
-to the KServe inference protocol.
+to the KServe inference protocol. GRPC protocol also provides a
+bi-directional streaming version of the inference RPC to allow a
+sequence of inference requests/responses to be sent over a
+GRPC stream. We typically recommend using the unary version for
+inference request. The streaming version should be used only if
+situation demands it. Some of such use cases can be:
 
-The HTTP/REST and GRPC protcols provide endpoints to check server and
-model health, metadata and statistics. Additional endpoints allow
-model loading and unloading, and inferencing. See the KServe and
-extension documentation for details.
+* Assume a system with mulitple Triton server instances running
+  behind a Load Balancer. If a sequence of inference requests is
+  needed to hit the same Triton server instance. GRPC stream
+  will hold a single connection throughout the lifetime and hence
+  ensure the requests are delivered to the same Triton instance.
+* If the order of requests/responses needs to be preserved over
+  the network. GRPC stream will ensure that the server receives
+  the requests in the same order as they were sent from the
+  client.
+
+The HTTP/REST and GRPC protocols also provide endpoints to check
+server and model health, metadata and statistics. Additional
+endpoints allow model loading and unloading, and inferencing. See
+the KServe and extension documentation for details.
 
 ### HTTP Options
 Triton provides the following configuration options for server-client network transactions over HTTP protocol.
