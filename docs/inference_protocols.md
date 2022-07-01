@@ -40,22 +40,22 @@ inference
 protocols](https://github.com/kserve/kserve/tree/master/docs/predict-api/v2)
 that have been proposed by the [KServe
 project](https://github.com/kserve). To fully enable all capabilities
-Triton also implements a number [HTTP/REST and GRPC
+Triton also implements [HTTP/REST and GRPC
 extensions](https://github.com/triton-inference-server/server/tree/main/docs/protocol)
 to the KServe inference protocol. GRPC protocol also provides a
 bi-directional streaming version of the inference RPC to allow a
 sequence of inference requests/responses to be sent over a
 GRPC stream. We typically recommend using the unary version for
-inference request. The streaming version should be used only if
+inference requests. The streaming version should be used only if the
 situation demands it. Some of such use cases can be:
 
 * Assume a system with mulitple Triton server instances running
   behind a Load Balancer. If a sequence of inference requests is
-  needed to hit the same Triton server instance. GRPC stream
+  needed to hit the same Triton server instance, a GRPC stream
   will hold a single connection throughout the lifetime and hence
   ensure the requests are delivered to the same Triton instance.
 * If the order of requests/responses needs to be preserved over
-  the network. GRPC stream will ensure that the server receives
+  the network, a GRPC stream will ensure that the server receives
   the requests in the same order as they were sent from the
   client.
 
