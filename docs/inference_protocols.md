@@ -49,7 +49,7 @@ GRPC stream. We typically recommend using the unary version for
 inference requests. The streaming version should be used only if the
 situation demands it. Some of such use cases can be:
 
-* Assume a system with mulitple Triton server instances running
+* Assume a system with multiple Triton server instances running
   behind a Load Balancer. If a sequence of inference requests is
   needed to hit the same Triton server instance, a GRPC stream
   will hold a single connection throughout the lifetime and hence
