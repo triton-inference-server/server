@@ -74,13 +74,6 @@ echo 'default_project_id = triton-285001' >> /root/.boto
 # GCS bucket path
 GCS_BUCKET_URL="gs://gcs-bucket-${CI_JOB_ID}"
 
-# Cleanup GCS test bucket if exists (due to test failure)
-gsutil -m rm -r ${GCS_BUCKET_URL} || true
-
-# Create GCS test bucket
-gsutil mb ${GCS_BUCKET_URL}
-
-
 # S3 credentials are necessary for this test. Pass via ENV variables
 aws configure set default.region $AWS_DEFAULT_REGION && \
     aws configure set aws_access_key_id $AWS_ACCESS_KEY_ID && \
@@ -88,35 +81,6 @@ aws configure set default.region $AWS_DEFAULT_REGION && \
 
 # S3 bucket path
 S3_BUCKET_URL="s3://s3-bucket-${CI_JOB_ID}"
-
-# Cleanup and delete S3 test bucket if it already exists (due to test failure)
-aws s3 rm ${S3_BUCKET_URL} --recursive --include "*" && \
-    aws s3 rb ${S3_BUCKET_URL} || true
-
-# Create S3 test bucket
-aws s3 mb ${S3_BUCKET_URL}
-
-
-ACCOUNT_NAME=$AZURE_STORAGE_ACCOUNT
-ACCOUNT_KEY=$AZURE_STORAGE_KEY
-
-AS_CONTAINER_NAME="azure-bucket-${CI_JOB_ID}"
-
-# AS container path
-AS_CONTAINER_URL="as://${ACCOUNT_NAME}/${AS_CONTAINER_NAME}"
-
-# Must use setuptools version before 58.0.0 due to https://github.com/Azure/azure-cli/issues/19468
-python -m pip install -U setuptools==57.5.0
-
-# Can now install latest azure-cli (instead of 2.0.73)
-python -m pip install azure-cli
-
-# Cleanup Azure container test bucket if exists (due to test failure)
-az storage container delete --name ${AS_CONTAINER_NAME} --account-name ${ACCOUNT_NAME} --account-key ${ACCOUNT_KEY}
-
-# Create Azure test container
-az storage container create --name ${AS_CONTAINER_NAME} --account-name ${ACCOUNT_NAME} --account-key ${ACCOUNT_KEY}
-sleep 10
 
 SERVER=/opt/tritonserver/bin/tritonserver
 SERVER_LOG="./inference_server.log"
@@ -126,239 +90,118 @@ rm -f $SERVER_LOG $CLIENT_LOG
 
 RET=0
 
-for CLOUD_REPO in az s3; do
-    rm -rf models && mkdir -p models
-    # Tensorflow
+# Tensorflow
+# Using Tensorflow custom ops with GCS and S3 cloud storages may cause symbol confliction
+# issues. Need to add 'libtritonserver.so' library to LD_PRELOAD variable to overwrite
+# the symbols so that preloaded library is not corrupting the cloud storage workflow.
+for REPO in local gcs s3; do
     # Must explicitly set LD_LIBRARY_PATH so that the custom operations
     # can find libtensorflow_framework.so.
     LD_LIBRARY_PATH=/opt/tritonserver/backends/tensorflow1:$LD_LIBRARY_PATH
-    cp -rf /data/inferenceserver/${REPO_VERSION}/qa_custom_ops/tf_custom_ops/* models/
 
-    if [ "$CLOUD_REPO" == "s3" ]; then
-        # copy contents of models into S3 bucket and wait for them to be loaded.
-        aws s3 cp models ${S3_BUCKET_URL} --recursive --include "*"
+    if [ "$REPO" == "local" ]; then
+        SERVER_ARGS="--model-repository=/data/inferenceserver/${REPO_VERSION}/qa_custom_ops/tf_custom_ops"
+        SERVER_LD_PRELOAD="/data/inferenceserver/${REPO_VERSION}/qa_custom_ops/tf_custom_ops/libzeroout.so:/data/inferenceserver/${REPO_VERSION}/qa_custom_ops/tf_custom_ops/libcudaop.so:/data/inferenceserver/${REPO_VERSION}/qa_custom_ops/tf_custom_ops/libbusyop.so"
+    elif [ "$REPO" == "gcs" ]; then
+        # Cleanup GCS test bucket if exists
+        gsutil -m rm -r ${GCS_BUCKET_URL} || true
+        # Create and delete GCS test bucket if it already exists
+        gsutil mb ${GCS_BUCKET_URL}
+        # Copy contents of models
+        gsutil -m cp -r /data/inferenceserver/${REPO_VERSION}/qa_custom_ops/tf_custom_ops ${GCS_BUCKET_URL}
+
+        # Add 'libtritonserver.so' to LD_PRELOAD
+        SERVER_LD_PRELOAD="/opt/tritonserver/lib/libtritonserver.so:/data/inferenceserver/${REPO_VERSION}/qa_custom_ops/tf_custom_ops/libzeroout.so:/data/inferenceserver/${REPO_VERSION}/qa_custom_ops/tf_custom_ops/libcudaop.so:/data/inferenceserver/${REPO_VERSION}/qa_custom_ops/tf_custom_ops/libbusyop.so"
+        SERVER_ARGS="--model-repository=${GCS_BUCKET_URL}/tf_custom_ops"
+    else
+        # Cleanup and delete S3 test bucket if it already exists
+        aws s3 rm ${S3_BUCKET_URL} --recursive --include "*" && \
+            aws s3 rb ${S3_BUCKET_URL} || true
+        # Create S3 test bucket
+        aws s3 mb ${S3_BUCKET_URL}
+        # Copy contents of models
+        aws s3 cp /data/inferenceserver/${REPO_VERSION}/qa_custom_ops/tf_custom_ops ${S3_BUCKET_URL} --recursive --include "*"
+
+        # Add 'libtritonserver.so' to LD_PRELOAD
+        SERVER_LD_PRELOAD="/opt/tritonserver/lib/libtritonserver.so:/data/inferenceserver/${REPO_VERSION}/qa_custom_ops/tf_custom_ops/libzeroout.so:/data/inferenceserver/${REPO_VERSION}/qa_custom_ops/tf_custom_ops/libcudaop.so:/data/inferenceserver/${REPO_VERSION}/qa_custom_ops/tf_custom_ops/libbusyop.so"
         SERVER_ARGS="--model-repository=${S3_BUCKET_URL}"
-    else
-        # copy contents of models into Azure Storage container.
-        for file in `find models -type f`; do
-            az storage blob upload --container-name ${AS_CONTAINER_NAME} --account-name ${ACCOUNT_NAME} --account-key ${ACCOUNT_KEY} --file $file --name $file
-        done
-
-        # We need a sleep here after Azure storage upload to ensure that the blobs are done uploading and available.  
-        sleep 30
-        SERVER_ARGS="--model-repository=${AS_CONTAINER_URL}/models"
     fi
 
-    for PRELOAD in without_triton_lib with_triton_lib; do
-        if [ "$PRELOAD" == "with_triton_lib" ]; then
-            SERVER_LD_PRELOAD="/opt/tritonserver/lib/libtritonserver.so:/data/inferenceserver/${REPO_VERSION}/qa_custom_ops/tf_custom_ops/libzeroout.so:/data/inferenceserver/${REPO_VERSION}/qa_custom_ops/tf_custom_ops/libcudaop.so:/data/inferenceserver/${REPO_VERSION}/qa_custom_ops/tf_custom_ops/libbusyop.so"
-        else
-            SERVER_LD_PRELOAD="/data/inferenceserver/${REPO_VERSION}/qa_custom_ops/tf_custom_ops/libzeroout.so:/data/inferenceserver/${REPO_VERSION}/qa_custom_ops/tf_custom_ops/libcudaop.so:/data/inferenceserver/${REPO_VERSION}/qa_custom_ops/tf_custom_ops/libbusyop.so"
-        fi
-
-        run_server
-        if [ "$SERVER_PID" == "0" ]; then
-            echo -e "\n***\n*** Failed to start $SERVER\n***"
-            cat $SERVER_LOG
-            echo -e "\n***\n*** Failed: $CLOUD_REPO $PRELOAD\n***"
-            # exit 1
-            RET=1
-        else
-            set +e
-
-            python $ZERO_OUT_TEST -v -m graphdef_zeroout >>$CLIENT_LOG 2>&1
-            if [ $? -ne 0 ]; then
-                cat $CLIENT_LOG
-                cat $SERVER_LOG
-                echo -e "\n***\n*** Test Failed\n***"
-                RET=1
-            fi
-
-            python $ZERO_OUT_TEST -v -m savedmodel_zeroout >>$CLIENT_LOG 2>&1
-            if [ $? -ne 0 ]; then
-                cat $CLIENT_LOG
-                cat $SERVER_LOG
-                echo -e "\n***\n*** Test Failed\n***"
-                RET=1
-            fi
-
-            python $CUDA_OP_TEST -v -m graphdef_cudaop >>$CLIENT_LOG 2>&1
-            if [ $? -ne 0 ]; then
-                cat $CLIENT_LOG
-                cat $SERVER_LOG
-                echo -e "\n***\n*** Test Failed\n***"
-                RET=1
-            fi
-
-            python $CUDA_OP_TEST -v -m savedmodel_cudaop >>$CLIENT_LOG 2>&1
-            if [ $? -ne 0 ]; then
-                cat $CLIENT_LOG
-                cat $SERVER_LOG
-                echo -e "\n***\n*** Test Failed\n***"
-                RET=1
-            fi
-
-            set -e
-
-            kill $SERVER_PID
-            wait $SERVER_PID
-        fi
-    done
-
-    # Clean up bucket contents
-    aws s3 rm "${S3_BUCKET_URL}" --recursive --include "*"
-    az storage container delete --name ${AS_CONTAINER_NAME} --account-name ${ACCOUNT_NAME} --account-key ${ACCOUNT_KEY}
-    sleep 60
-    az storage container create --name ${AS_CONTAINER_NAME} --account-name ${ACCOUNT_NAME} --account-key ${ACCOUNT_KEY}
-    sleep 10
-
-    # Pytorch
-    # Must set LD_LIBRARY_PATH just for the server launch so that the
-    # custom operations can find libtorch.so and other pytorch dependencies.
-    LD_LIBRARY_PATH=/opt/tritonserver/backends/pytorch:$LD_LIBRARY_PATH
-    rm -rf models && mkdir -p models
-    cp -rf /data/inferenceserver/${REPO_VERSION}/qa_custom_ops/libtorch_custom_ops/* models/
-
-    if [ "$CLOUD_REPO" == "s3" ]; then
-        # copy contents of models into S3 bucket and wait for them to be loaded.
-        aws s3 cp models ${S3_BUCKET_URL} --recursive --include "*"
-        SERVER_ARGS="--model-repository=${S3_BUCKET_URL}"
-    else
-        # copy contents of models into Azure Storage container.
-        for file in `find models -type f`; do
-            az storage blob upload --container-name ${AS_CONTAINER_NAME} --account-name ${ACCOUNT_NAME} --account-key ${ACCOUNT_KEY} --file $file --name $file
-        done
-
-        # We need a sleep here after Azure storage upload to ensure that the blobs are done uploading and available.  
-        sleep 30
-        SERVER_ARGS="--model-repository=${AS_CONTAINER_URL}/models"
+    run_server
+    if [ "$SERVER_PID" == "0" ]; then
+        echo -e "\n***\n*** Failed to start $SERVER\n***"
+        cat $SERVER_LOG
+        exit 1
     fi
 
-    for PRELOAD in without_triton_lib with_triton_lib; do
-        if [ "$PRELOAD" == "with_triton_lib" ]; then
-            SERVER_LD_PRELOAD="/opt/tritonserver/lib/libtritonserver.so:/data/inferenceserver/${REPO_VERSION}/qa_custom_ops/libtorch_custom_ops/libtorch_modulo/custom_modulo.so"
-        else
-            SERVER_LD_PRELOAD="/data/inferenceserver/${REPO_VERSION}/qa_custom_ops/libtorch_custom_ops/libtorch_modulo/custom_modulo.so"
-        fi
+    set +e
 
-        run_server
-        if [ "$SERVER_PID" == "0" ]; then
-            echo -e "\n***\n*** Failed to start $SERVER\n***"
-            cat $SERVER_LOG
-            echo -e "\n***\n*** Failed: $CLOUD_REPO $PRELOAD\n***"
-            # exit 1
-            RET=1
-        else
-            set +e
-
-            python $MOD_OP_TEST -v -m libtorch_modulo >>$CLIENT_LOG 2>&1
-            if [ $? -ne 0 ]; then
-                cat $CLIENT_LOG
-                cat $SERVER_LOG
-                echo -e "\n***\n*** Test Failed\n***"
-                RET=1
-            fi
-
-            python $VISION_OP_TEST -v -m libtorch_visionop >>$CLIENT_LOG 2>&1
-            if [ $? -ne 0 ]; then
-                cat $CLIENT_LOG
-                cat $SERVER_LOG
-                echo -e "\n***\n*** Test Failed\n***"
-                RET=1
-            fi
-
-            set -e
-
-            if [ $RET -eq 0 ]; then
-            echo -e "\n***\n*** Test Passed\n***"
-            fi
-
-            kill $SERVER_PID
-            wait $SERVER_PID
-        fi
-    done
-
-    # Clean up bucket contents
-    aws s3 rm "${S3_BUCKET_URL}" --recursive --include "*"
-    az storage container delete --name ${AS_CONTAINER_NAME} --account-name ${ACCOUNT_NAME} --account-key ${ACCOUNT_KEY}
-    sleep 60
-    az storage container create --name ${AS_CONTAINER_NAME} --account-name ${ACCOUNT_NAME} --account-key ${ACCOUNT_KEY}
-    sleep 10
-
-
-    # ONNX
-    rm -rf onnx_custom_ops && \
-        mkdir -p onnx_custom_ops/custom_op/1 && \
-        cp custom_op_test.onnx onnx_custom_ops/custom_op/1/model.onnx
-
-    touch onnx_custom_ops/custom_op/config.pbtxt
-    echo "name: \"custom_op\"" >> onnx_custom_ops/custom_op/config.pbtxt && \
-    echo "platform: \"onnxruntime_onnx\"" >> onnx_custom_ops/custom_op/config.pbtxt && \
-    echo "max_batch_size: 0" >> onnx_custom_ops/custom_op/config.pbtxt && \
-    echo "model_operations { op_library_filename: \"./libcustom_op_library.so\" }" >> onnx_custom_ops/custom_op/config.pbtxt
-
-    if [ "$CLOUD_REPO" == "s3" ]; then
-        # copy contents of models into S3 bucket and wait for them to be loaded.
-        aws s3 cp onnx_custom_ops ${S3_BUCKET_URL} --recursive --include "*"
-        SERVER_ARGS="--model-repository=${S3_BUCKET_URL} --strict-model-config=false"
-    else
-        # copy contents of models into Azure Storage container.
-        for file in `find onnx_custom_ops -type f`; do
-            az storage blob upload --container-name ${AS_CONTAINER_NAME} --account-name ${ACCOUNT_NAME} --account-key ${ACCOUNT_KEY} --file $file --name $file
-        done
-
-        # We need a sleep here after Azure storage upload to ensure that the blobs are done uploading and available.  
-        sleep 30
-        SERVER_ARGS="--model-repository=${AS_CONTAINER_URL}/onnx_custom_ops --strict-model-config=false"
+    python $ZERO_OUT_TEST -v -m graphdef_zeroout >>$CLIENT_LOG 2>&1
+    if [ $? -ne 0 ]; then
+        cat $CLIENT_LOG
+        echo -e "\n***\n*** Test Failed\n***"
+        RET=1
     fi
 
-    for PRELOAD in without_triton_lib with_triton_lib; do
-        if [ "$PRELOAD" == "with_triton_lib" ]; then
-            SERVER_LD_PRELOAD="/opt/tritonserver/lib/libtritonserver.so"
-        else
-            SERVER_LD_PRELOAD=""
-        fi
+    python $ZERO_OUT_TEST -v -m savedmodel_zeroout >>$CLIENT_LOG 2>&1
+    if [ $? -ne 0 ]; then
+        cat $CLIENT_LOG
+        echo -e "\n***\n*** Test Failed\n***"
+        RET=1
+    fi
 
-        run_server
-        if [ "$SERVER_PID" == "0" ]; then
-            echo -e "\n***\n*** Failed to start $SERVER\n***"
-            cat $SERVER_LOG
-            echo -e "\n***\n*** Failed: $CLOUD_REPO $PRELOAD\n***"
-            # exit 1
-            RET=1
-        else
-            set +e
+    python $CUDA_OP_TEST -v -m graphdef_cudaop >>$CLIENT_LOG 2>&1
+    if [ $? -ne 0 ]; then
+        cat $CLIENT_LOG
+        echo -e "\n***\n*** Test Failed\n***"
+        RET=1
+    fi
 
-            python $ONNX_OP_TEST -v -m custom_op >>$CLIENT_LOG 2>&1
-            if [ $? -ne 0 ]; then
-                cat $CLIENT_LOG
-                cat $SERVER_LOG
-                echo -e "\n***\n*** Test Failed\n***"
-                RET=1
-            fi
+    python $CUDA_OP_TEST -v -m savedmodel_cudaop >>$CLIENT_LOG 2>&1
+    if [ $? -ne 0 ]; then
+        cat $CLIENT_LOG
+        echo -e "\n***\n*** Test Failed\n***"
+        RET=1
+    fi
 
-            set -e
-        fi
-    done
+    set -e
 
-    # Clean up bucket contents
-    aws s3 rm "${S3_BUCKET_URL}" --recursive --include "*"
-    az storage container delete --name ${AS_CONTAINER_NAME} --account-name ${ACCOUNT_NAME} --account-key ${ACCOUNT_KEY}
-    sleep 60
-    az storage container create --name ${AS_CONTAINER_NAME} --account-name ${ACCOUNT_NAME} --account-key ${ACCOUNT_KEY}
-    sleep 10
+    kill $SERVER_PID
+    wait $SERVER_PID
 done
 
-# Delete all GCS bucket contents and bucket itself
-gsutil -m rm -r ${GCS_BUCKET_URL}
 
-# Delete S3 bucket contents and bucket itself
-aws s3 rm ${S3_BUCKET_URL} --recursive --include "*" && \
-    aws s3 rb ${S3_BUCKET_URL}
+# Pytorch
+# Must set LD_LIBRARY_PATH just for the server launch so that the
+# custom operations can find libtorch.so and other pytorch dependencies.
+LD_LIBRARY_PATH=/opt/tritonserver/backends/pytorch:$LD_LIBRARY_PATH
 
-# Delete Azure storage container
-az storage container delete --name ${AS_CONTAINER_NAME} --account-name ${ACCOUNT_NAME} --account-key ${ACCOUNT_KEY}
+SERVER_ARGS="--model-repository=/data/inferenceserver/${REPO_VERSION}/qa_custom_ops/libtorch_custom_ops"
+SERVER_LD_PRELOAD="/data/inferenceserver/${REPO_VERSION}/qa_custom_ops/libtorch_custom_ops/libtorch_modulo/custom_modulo.so"
+run_server
+if [ "$SERVER_PID" == "0" ]; then
+    echo -e "\n***\n*** Failed to start $SERVER\n***"
+    cat $SERVER_LOG
+    exit 1
+fi
 
+set +e
+
+python $MOD_OP_TEST -v -m libtorch_modulo >>$CLIENT_LOG 2>&1
+if [ $? -ne 0 ]; then
+    cat $CLIENT_LOG
+    echo -e "\n***\n*** Test Failed\n***"
+    RET=1
+fi
+
+python $VISION_OP_TEST -v -m libtorch_visionop >>$CLIENT_LOG 2>&1
+if [ $? -ne 0 ]; then
+    cat $CLIENT_LOG
+    echo -e "\n***\n*** Test Failed\n***"
+    RET=1
+fi
+
+set -e
 
 if [ $RET -eq 0 ]; then
   echo -e "\n***\n*** Test Passed\n***"
@@ -366,5 +209,51 @@ fi
 
 kill $SERVER_PID
 wait $SERVER_PID
+
+
+# ONNX
+rm -rf onnx_custom_ops && \
+    mkdir -p onnx_custom_ops/custom_op/1 && \
+    cp custom_op_test.onnx onnx_custom_ops/custom_op/1/model.onnx
+
+touch onnx_custom_ops/custom_op/config.pbtxt
+echo "name: \"custom_op\"" >> onnx_custom_ops/custom_op/config.pbtxt && \
+echo "platform: \"onnxruntime_onnx\"" >> onnx_custom_ops/custom_op/config.pbtxt && \
+echo "max_batch_size: 0" >> onnx_custom_ops/custom_op/config.pbtxt && \
+echo "model_operations { op_library_filename: \"./libcustom_op_library.so\" }" >> onnx_custom_ops/custom_op/config.pbtxt
+
+SERVER_ARGS="--model-repository=onnx_custom_ops --strict-model-config=false"
+SERVER_LD_PRELOAD=""
+run_server
+if [ "$SERVER_PID" == "0" ]; then
+    echo -e "\n***\n*** Failed to start $SERVER\n***"
+    cat $SERVER_LOG
+    exit 1
+fi
+
+set +e
+
+python $ONNX_OP_TEST -v -m custom_op >>$CLIENT_LOG 2>&1
+if [ $? -ne 0 ]; then
+    cat $CLIENT_LOG
+    echo -e "\n***\n*** Test Failed\n***"
+    RET=1
+fi
+
+set -e
+
+if [ $RET -eq 0 ]; then
+  echo -e "\n***\n*** Test Passed\n***"
+fi
+
+kill $SERVER_PID
+wait $SERVER_PID
+
+# Delete GCS bucket contents and bucket itself
+gsutil -m rm -r ${GCS_BUCKET_URL}
+
+# Delete S3 bucket contents and bucket itself
+aws s3 rm ${S3_BUCKET_URL} --recursive --include "*" && \
+    aws s3 rb ${S3_BUCKET_URL}
 
 exit $RET
