@@ -1,5 +1,5 @@
 #!/bin/bash
-# Copyright (c) 2019-2021, NVIDIA CORPORATION. All rights reserved.
+# Copyright 2019-2022, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -74,6 +74,17 @@ for i in \
                 sed -i "s/^name:.*/name: \"custom_${i}\"/" config.pbtxt && \
                 echo "instance_group [ { kind: KIND_CPU }]" >> config.pbtxt)
 done
+
+# Prepare libtorch string I/O reshape model. String I/O is supported only for
+# 1-dimensional inputs/outputs. Add 'reshape' field with empty shape so that
+# batching is supported and the full shape becomes [-1].
+mkdir -p models/libtorch_zero_1_object && \
+cp -fr /data/inferenceserver/${REPO_VERSION}/qa_identity_model_repository/libtorch_nobatch_zero_1_object/* \
+    models/libtorch_zero_1_object
+(cd models/libtorch_zero_1_object && \
+            sed -i "s/^name:.*/name: \"libtorch_zero_1_object\"/" config.pbtxt && \
+            sed -i "s/^max_batch_size:.*/max_batch_size: 8/" config.pbtxt && \
+            sed -i "s/dims:.*/dims: [ 1 ]\n\t\treshape: { shape: [] }/" config.pbtxt)
 
 create_nop_version_dir `pwd`/models
 

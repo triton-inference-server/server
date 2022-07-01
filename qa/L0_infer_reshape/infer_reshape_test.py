@@ -136,15 +136,19 @@ class InferReshapeTest(tu.TestResultCollector):
                     use_system_shared_memory=TEST_SYSTEM_SHARED_MEMORY,
                     use_cuda_shared_memory=TEST_CUDA_SHARED_MEMORY)
 
-        # Skip for libtorch string I/O
-        if tu.validate_for_libtorch_model(dtype, dtype, dtype, input_shapes[0],
-                                          input_shapes[0], input_shapes[0]) and \
-                                              (dtype != np_dtype_string):
+        if tu.validate_for_libtorch_model(dtype,
+                                          dtype,
+                                          dtype,
+                                          input_shapes[0],
+                                          input_shapes[0],
+                                          input_shapes[0],
+                                          reshape=True):
             # skip variable size reshape on libtorch for now,
             # see "gen_qa_reshape_model.py" for detail
             if dtype != np.int32:
                 # model that does not support batching
-                if no_batch:
+                # skip for libtorch string I/O
+                if (no_batch) and (dtype != np_dtype_string):
                     iu.infer_zero(
                         self,
                         'libtorch_nobatch',

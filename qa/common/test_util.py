@@ -150,15 +150,17 @@ def validate_for_libtorch_model(input_dtype,
                                 input_shape,
                                 output0_shape,
                                 output1_shape,
-                                max_batch=0):
+                                max_batch=0,
+                                reshape=False):
     """Return True if input and output dtypes are supported by a libtorch model."""
 
-    # STRING data type do not support batching or I/O with more than 1 dims
+    # STRING data type does not support I/O with more than 1 dims. It supports
+    # batching when 'reshape' field is set properly to empty shape.
     if ((input_dtype == np.object_) or (output0_dtype == np.object_) or
-        (output1_dtype == np.object_)) and ((len(input_shape) > 1) or
-                                            (len(output0_shape) > 1) or
-                                            (len(output1_shape) > 1) or
-                                            (max_batch != 0)):
+        (output1_dtype == np.object_)) and (((len(input_shape) > 1) or
+                                             (len(output0_shape) > 1) or
+                                             (len(output1_shape) > 1) or
+                                             (max_batch != 0)) and not reshape):
         return False
 
     # FLOAT16 and UINT16 data types are not supported currently
