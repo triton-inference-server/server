@@ -148,7 +148,7 @@ class InferReshapeTest(tu.TestResultCollector):
             if dtype != np.int32:
                 # model that does not support batching
                 # skip for libtorch string I/O
-                if (no_batch) and (dtype != np_dtype_string):
+                if no_batch and (dtype != np_dtype_string):
                     iu.infer_zero(
                         self,
                         'libtorch_nobatch',
