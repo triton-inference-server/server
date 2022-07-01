@@ -46,7 +46,7 @@ set -e
 # SERVER TESTS
 mkdir -p "${PWD}/models/decoupled_cache/1"
 
-# Assert that server fails to start for a "decoupled" model with response
+# Check that server fails to start for a "decoupled" model with response
 # cache enabled
 SERVER=/opt/tritonserver/bin/tritonserver
 SERVER_ARGS="--model-repository=${PWD}/models --response-cache-byte-size=8192"
@@ -60,6 +60,16 @@ if [ "$SERVER_PID" != "0" ]; then
 
     kill $SERVER_PID
     wait $SERVER_PID
+else
+    # Check that server fails with the correct error message
+    set +e
+    grep -i "response cache does not currently support 'decoupled' model transaction policy" ${SERVER_LOG}
+    if [ $? -ne 0 ]; then
+        echo -e "\n***\n*** Failed: Expected response cache / decoupled mode error message in output\n***"
+        cat $SERVER_LOG
+        RET=1
+    fi
+    set -e
 fi
 
 if [ $RET -eq 0 ]; then
