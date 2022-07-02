@@ -30,6 +30,8 @@ import numpy as np
 import tensorrt as trt
 import test_util as tu
 
+np_dtype_string = np.dtype(object)
+
 
 def np_to_model_dtype(np_dtype):
     if np_dtype == bool:
