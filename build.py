@@ -45,7 +45,7 @@ from inspect import getsourcefile
 
 # By default build.py builds the Triton Docker image, but can also be
 # used to build without Docker.  See docs/build.md and --help for more
-# infomation.
+# information.
 #
 # The TRITON_VERSION file indicates the Triton version and
 # TRITON_VERSION_MAP is used to determine the corresponding container
@@ -87,7 +87,7 @@ from inspect import getsourcefile
 # To use ('2021.4', '2021.4.582') version_str should be `2021_4_pre'.
 # User can also build openvino backend from specific commit sha of openVINO
 # repository. The pair should be (`SPECIFIC`, <commit_sha_of_ov_repo>).
-# Note: Not all sha ids would successfuly compile and work.
+# Note: Not all sha ids would successfully compile and work.
 # Note: When updating the conda version, make sure to update the shasum of
 # the packages used for different platforms in install_miniconda function.
 #
@@ -1062,7 +1062,7 @@ def dockerfile_prepare_container_linux(argmap, backends, enable_gpu,
                                        target_machine):
     gpu_enabled = 1 if enable_gpu else 0
     # Common steps to produce docker images shared by build.py and compose.py.
-    # Sets enviroment variables, installs dependencies and adds entrypoint
+    # Sets environment variables, installs dependencies and adds entrypoint
     df = '''
 ARG TRITON_VERSION
 ARG TRITON_CONTAINER_VERSION

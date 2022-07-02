@@ -127,7 +127,7 @@ class PythonTest(tu.TestResultCollector):
             with self._shm_leak_detector.Probe() as shm_probe:
                 self._infer_help(model_name, shape, dtype)
 
-            # 1 GiB payload leads to error in the main Python backned process.
+            # 1 GiB payload leads to error in the main Python backend process.
             # Total shared memory available is 1GiB.
             total_byte_size = 1024 * 1024 * 1024
             shape = [total_byte_size]
@@ -268,7 +268,7 @@ class PythonTest(tu.TestResultCollector):
                 output_data = result.as_numpy('OUT')
                 self.assertIsNotNone(output_data, "error: expected 'OUT'")
 
-                # expected inference resposne from a zero tensor
+                # expected inference response from a zero tensor
                 expected_result = [
                     -2.2377274, -2.3976364, -2.2464046, -2.2790744, -2.3828976,
                     -2.2940576, -2.2928185, -2.340665, -2.275219, -2.292135

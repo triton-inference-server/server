@@ -41,7 +41,7 @@ def verify_timestamps(traces, preserve):
     for trace in traces:
         if "id" not in trace:
             continue
-        # Skip GRPC traces as actual traces are not genarated via GRPC,
+        # Skip GRPC traces as actual traces are not generated via GRPC,
         # thus GRPC traces are ill-formed
         if "timestamps" in trace:
             is_grpc = False
@@ -55,7 +55,7 @@ def verify_timestamps(traces, preserve):
 
         if (trace['id'] in filtered_traces.keys()):
             rep_trace = filtered_traces[trace['id']]
-            # Apend the timestamp to the trace representing this 'id'
+            # Append the timestamp to the trace representing this 'id'
             if "timestamps" in trace:
                 rep_trace["timestamps"] += trace["timestamps"]
         else:

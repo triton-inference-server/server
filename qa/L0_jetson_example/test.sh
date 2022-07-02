@@ -28,7 +28,7 @@
 wget --content-disposition https://api.ngc.nvidia.com/v2/models/nvidia/tao/peoplenet/versions/pruned_v2.1/zip -O pruned_v2.1.zip
 unzip pruned_v2.1.zip -d concurrency_and_dynamic_batching/tao/models/peoplenet && rm pruned_v2.1.zip
 
-# Use TAO convertor for JP4.6
+# Use TAO converter for JP4.6
 wget --content-disposition https://developer.nvidia.com/jp46-20210820t231431z-001zip -O jp4.6-20210820T231431Z-001.zip
 unzip jp4.6-20210820T231431Z-001.zip && rm jp4.6-20210820T231431Z-001.zip
 

@@ -78,7 +78,7 @@ see trace setting "log_frequency" below for detail.
 - "trace_level" : the trace level. "OFF" to disable tracing,
 "TIMESTAMPS" to trace timestamps, "TENSORS" to trace tensors.
 This value is an array of string where user may specify multiple levels to
-trace multiple informations.
+trace multiple information.
 - "trace_rate" : the trace sampling rate. The value represents how many requests
 will one trace be sampled from. For example, if the trace rate is "1000",
 1 trace will be sampled for every 1000 requests.
@@ -131,10 +131,10 @@ $trace_setting_request =
 
 The $trace_setting JSON is defined in
 [Trace Setting Response JSON Object](#Trace-Setting-Response-JSON-Object), only the specified
-settings will be updated. In additon to the values mentioned in response JSON
+settings will be updated. In addition to the values mentioned in response JSON
 object, JSON null value may be used to remove the specification of
 the trace setting. In such case, the current global setting will be used.
-Similarly, if this is the first request to initalize a model trace settings,
+Similarly, if this is the first request to initialize a model trace settings,
 for the trace settings that are not specified in the request, the current global
 setting will be used.
 
@@ -192,6 +192,6 @@ message TraceSettingResponse
 
 The trace settings are mentioned in
 [Trace Setting Response JSON Object](#Trace-Setting-Response-JSON-Object).
-Note that if this is the first request to initalize
+Note that if this is the first request to initialize
 a model trace settings, for the trace settings that are not specified
 in the request, the value will be copied from the current global settings.

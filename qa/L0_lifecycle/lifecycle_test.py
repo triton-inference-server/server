@@ -1717,7 +1717,7 @@ class LifeCycleTest(tu.TestResultCollector):
 
         # Reload models, v1 should still be available until v2 is loaded
         # The load is requested in other thread as it is blocking API,
-        # and the v1 availibility should be tested during the reload
+        # and the v1 availability should be tested during the reload
         thread = threading.Thread(target=self._async_load,
                                   args=(model_name, use_grpc))
         thread.start()
@@ -1731,7 +1731,7 @@ class LifeCycleTest(tu.TestResultCollector):
             self.assertTrue(triton_client.is_server_live())
             load_end = time.time()
             self.assertTrue((load_end - load_start) < 5,
-                            "server was waiting unexpectly, waited {}".format(
+                            "server was waiting unexpectedly, waited {}".format(
                                 (load_end - load_start)))
             self.assertTrue(triton_client.is_server_ready())
             self.assertTrue(triton_client.is_model_ready(model_name, "1"))
@@ -1775,7 +1775,7 @@ class LifeCycleTest(tu.TestResultCollector):
 
         # Reload models, v1 should still be available until v2 is loaded
         # The load is requested in other thread as it is blocking API,
-        # and the v1 availibility should be tested during the reload
+        # and the v1 availability should be tested during the reload
         thread = threading.Thread(target=self._async_load,
                                   args=(model_name, use_grpc))
         thread.start()
@@ -1789,7 +1789,7 @@ class LifeCycleTest(tu.TestResultCollector):
             self.assertTrue(triton_client.is_server_live())
             load_end = time.time()
             self.assertTrue((load_end - load_start) < 5,
-                            "server was waiting unexpectly, waited {}".format(
+                            "server was waiting unexpectedly, waited {}".format(
                                 (load_end - load_start)))
             self.assertTrue(triton_client.is_server_ready())
             self.assertTrue(triton_client.is_model_ready(model_name, "1"))
@@ -1846,7 +1846,7 @@ class LifeCycleTest(tu.TestResultCollector):
             self.assertTrue(triton_client.is_server_live())
             load_end = time.time()
             self.assertTrue((load_end - load_start) < 5,
-                            "server was waiting unexpectly, waited {}".format(
+                            "server was waiting unexpectedly, waited {}".format(
                                 (load_end - load_start)))
             self.assertTrue(triton_client.is_server_ready())
             self.assertTrue(triton_client.is_model_ready(model_name, "1"))

@@ -495,7 +495,7 @@ std::vector<Option> options_
       {OPTION_TRACE_LEVEL, "trace-level", Option::ArgStr,
        "Specify a trace level. OFF to disable tracing, TIMESTAMPS to "
        "trace timestamps, TENSORS to trace tensors. It may be specified "
-       "multiple times to trace multiple informations. Default is OFF."},
+       "multiple times to trace multiple information. Default is OFF."},
       {OPTION_TRACE_RATE, "trace-rate", Option::ArgInt,
        "Set the trace sampling rate. Default is 1000."},
       {OPTION_TRACE_COUNT, "trace-count", Option::ArgInt,
@@ -1896,7 +1896,7 @@ Parse(TRITONSERVER_ServerOptions** server_options, int argc, char** argv)
         TRITONSERVER_ServerOptionsSetBackendConfig(
             loptions, std::get<0>(bcs).c_str(), std::get<1>(bcs).c_str(),
             std::get<2>(bcs).c_str()),
-        "setting backend configurtion");
+        "setting backend configuration");
   }
   for (const auto& hp : host_policies) {
     FAIL_IF_ERR(

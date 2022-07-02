@@ -129,7 +129,7 @@ class DataCompressor {
               CommitEVBuffer(
                   compressed_data, &current_reserved_space,
                   expected_compressed_size),
-              "unexpected error comitting output buffer for compression: ");
+              "unexpected error committing output buffer for compression: ");
           RETURN_MSG_IF_ERR(
               AllocEVBuffer(
                   expected_compressed_size, compressed_data,
@@ -154,7 +154,7 @@ class DataCompressor {
           CommitEVBuffer(
               compressed_data, &current_reserved_space,
               expected_compressed_size - stream.avail_out),
-          "unexpected error comitting output buffer for compression: ");
+          "unexpected error committing output buffer for compression: ");
     }
     return nullptr;  // success
   }
@@ -238,7 +238,7 @@ class DataCompressor {
                     CommitEVBuffer(
                         decompressed_data, &current_reserved_space,
                         output_buffer_size),
-                    "unexpected error comitting output buffer for "
+                    "unexpected error committing output buffer for "
                     "decompression: ");
                 RETURN_MSG_IF_ERR(
                     AllocEVBuffer(
@@ -265,7 +265,7 @@ class DataCompressor {
                 CommitEVBuffer(
                     decompressed_data, &current_reserved_space,
                     output_buffer_size - stream.avail_out),
-                "unexpected error comitting output buffer for compression: ");
+                "unexpected error committing output buffer for compression: ");
           }
           break;
         }

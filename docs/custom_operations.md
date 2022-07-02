@@ -166,7 +166,7 @@ example](https://github.com/microsoft/onnxruntime/blob/master/onnxruntime/test/s
 from the
 [microsoft/onnxruntime](https://github.com/microsoft/onnxruntime)
 repository and your ONNXRuntime custom operations are compiled into
-libonnxcustom.so, adding the following to the model configuraion of
+libonnxcustom.so, adding the following to the model configuration of
 your model makes those operations available to that specific ONNX
 model.
 

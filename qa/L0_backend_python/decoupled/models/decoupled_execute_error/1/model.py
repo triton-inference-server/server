@@ -86,7 +86,7 @@ class TritonPythonModel:
         out_output = pb_utils.Tensor("OUT", in_value)
 
         if index == 0:
-            error = pb_utils.TritonError('An error occured during execution')
+            error = pb_utils.TritonError('An error occurred during execution')
             response = pb_utils.InferenceResponse(output_tensors=[out_output],
                                                   error=error)
         else:

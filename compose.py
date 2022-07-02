@@ -58,7 +58,7 @@ def fail_if(p, msg):
 
 
 def start_dockerfile(ddir, images, argmap, dockerfile_name, backends):
-    # Set enviroment variables, set default user and install dependencies
+    # Set environment variables, set default user and install dependencies
     df = '''
 #
 # Multistage build.
@@ -173,9 +173,9 @@ def create_argmap(images):
     full_docker_image = images["full"]
     min_docker_image = images["min"]
     enable_gpu = FLAGS.enable_gpu
-    # Docker inspect enviroment variables
+    # Docker inspect environment variables
     base_run_args = ['docker', 'inspect', '-f']
-    import re  # parse all PATH enviroment variables
+    import re  # parse all PATH environment variables
 
     # first pull docker images
     log("pulling container:{}".format(full_docker_image))
@@ -197,7 +197,7 @@ def create_argmap(images):
                                  text=True)
         fail_if(
             pm_path.returncode != 0,
-            'docker inspect to find triton enviroment variables for min container failed, {}'
+            'docker inspect to find triton environment variables for min container failed, {}'
             .format(pm_path.stderr))
         # min container needs to be GPU support  enabled if the build is GPU build
         vars = pm_path.stdout
@@ -208,7 +208,7 @@ def create_argmap(images):
             'Composing container with gpu support enabled but min container provided does not have CUDA installed'
         )
 
-    # Check full container enviroment variables
+    # Check full container environment variables
     p_path = subprocess.run(base_run_args + [
         '{{range $index, $value := .Config.Env}}{{$value}} {{end}}',
         full_docker_image
@@ -217,7 +217,7 @@ def create_argmap(images):
                             text=True)
     fail_if(
         p_path.returncode != 0,
-        'docker inspect to find enviroment variables for full container failed, {}'
+        'docker inspect to find environment variables for full container failed, {}'
         .format(p_path.stderr))
     vars = p_path.stdout
     log_verbose("inspect args: {}".format(vars))

@@ -141,7 +141,7 @@ def create_onnx_modelfile_wo_initial_state(models_dir, model_version, max_batch,
     internal_input = onnx.helper.make_node("Identity", ["INPUT"], ["_INPUT"])
     internal_input_state = onnx.helper.make_node("Identity", ["INPUT_STATE"],
                                                  ["_INPUT_STATE"])
-    # cast int8, int16 input to higer precision int as Onnx Add/Sub operator doesn't support those type
+    # cast int8, int16 input to higher precision int as Onnx Add/Sub operator doesn't support those type
     if ((onnx_dtype == onnx.TensorProto.INT8) or
         (onnx_dtype == onnx.TensorProto.INT16)):
         internal_input = onnx.helper.make_node("Cast", ["INPUT"], ["_INPUT"],
@@ -315,7 +315,7 @@ def create_onnx_modelfile_with_initial_state(models_dir, model_version,
     internal_input = onnx.helper.make_node("Identity", ["INPUT"], ["_INPUT"])
     internal_input_state = onnx.helper.make_node("Identity", ["INPUT_STATE"],
                                                  ["_INPUT_STATE"])
-    # cast int8, int16 input to higer precision int as Onnx Add/Sub operator doesn't support those type
+    # cast int8, int16 input to higher precision int as Onnx Add/Sub operator doesn't support those type
     if ((onnx_dtype == onnx.TensorProto.INT8) or
         (onnx_dtype == onnx.TensorProto.INT16)):
         internal_input = onnx.helper.make_node("Cast", ["INPUT"], ["_INPUT"],

@@ -267,7 +267,7 @@ for the inputs. In addition to specifying explicit tensors, you can
 also provide Base64 encoded binary data for the tensors. Each data
 object must list its data in a row-major order. Binary data must be in
 little-endian byte order. The following example highlights how this
-can be acheived:
+can be achieved:
 
 ```
   {
@@ -450,7 +450,7 @@ can achieve by using shared memory in your application. Use
 ## Communication Protocol
 
 By default perf_analyzer uses HTTP to communicate with Triton. The GRPC
-protocol can be specificed with the -i option. If GRPC is selected the
+protocol can be specified with the -i option. If GRPC is selected the
 --streaming option can also be specified for GRPC streaming.
 
 ### SSL/TLS Support
@@ -495,7 +495,7 @@ you copy the perf_analyzer binary to the Inference Server container.
 
 ### Required Parameters
 Use the --help option to see complete list of supported command line arguments.
-By default perf_analyzer expects the Triton instance to already be running. You can configure the C API mode using the `--service-kind` option. In additon, you will need to point
+By default perf_analyzer expects the Triton instance to already be running. You can configure the C API mode using the `--service-kind` option. In addition, you will need to point
 perf_analyzer to the Triton server library path using the `--triton-server-directory` option and the model 
 repository path using the `--model-repository` option.
 If the server is run successfully, there is a prompt: "server is alive!" and perf_analyzer will print the stats, as normal.
@@ -509,7 +509,7 @@ There are a few functionalities that are missing from the C API. They are:
 1. Async mode (`-a`)
 2. Using shared memory mode (`--shared-memory=cuda` or `--shared-memory=system`)
 3. Request rate range mode
-4. For additonal known non-working cases, please refer to 
+4. For additional known non-working cases, please refer to 
    [qa/L0_perf_analyzer_capi/test.sh](https://github.com/triton-inference-server/server/blob/main/qa/L0_perf_analyzer_capi/test.sh#L239-L277)
 
 

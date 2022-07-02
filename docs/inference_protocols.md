@@ -266,7 +266,7 @@ following steps.
 
 * Ask Triton to execute the inference request using
   `TRITONSERVER_ServerInferAsync`. `TRITONSERVER_ServerInferAsync` is
-  a asychronous call that returns immediately. The inference response
+  a asynchronous call that returns immediately. The inference response
   is returned via a callback into your application. You register this
   callback using `TRITONSERVER_InferenceRequestSetResponseCallback`
   before you invoke `TRITONSERVER_ServerInferAsync`. In
@@ -338,16 +338,16 @@ These can be useful references for getting started, such as the
 ### Java API setup instructions
 
 To use the Tritonserver Java API, you will need to have the Tritonserver library
-and dependencies installed in your enviroment. There are two ways to do this:
+and dependencies installed in your environment. There are two ways to do this:
 
 1. Use a Tritonserver docker container with
    1. `.jar` Java bindings to C API (recommended)
    2. maven and build bindings yourself
-2. Build Triton from your enviroment without Docker (not recommended)
+2. Build Triton from your environment without Docker (not recommended)
 
 #### Run Tritonserver container and install dependencies
 
-To set up your enviroment with Triton Java API, please follow the following steps:
+To set up your environment with Triton Java API, please follow the following steps:
 1. First run Docker container:
 ```
  $ docker run -it --gpus=all -v ${pwd}:/workspace nvcr.io/nvidia/tritonserver:<your container version>-py3 bash
@@ -369,7 +369,7 @@ $ cd /opt/tritonserver
 After ensuring that Tritonserver and dependencies are installed, you can run your
 Java program with the Java bindings with the following steps:
 
-1. Place Java bindings into your enviroment. You can do this by either:
+1. Place Java bindings into your environment. You can do this by either:
    
    a. Building Java API bindings with provided build script:
       ```bash
@@ -383,7 +383,7 @@ Java program with the Java bindings with the following steps:
    
    *or*
 
-   b. Copying "Uber Jar" from Triton SDK container to your enviroment
+   b. Copying "Uber Jar" from Triton SDK container to your environment
       ```bash
       $ id=$(docker run -dit nvcr.io/nvidia/tritonserver:<triton container version>-py3-sdk bash)
       $ docker cp ${id}:/workspace/install/java-api-bindings/tritonserver-java-bindings.jar <Uber Jar directory>/tritonserver-java-bindings.jar

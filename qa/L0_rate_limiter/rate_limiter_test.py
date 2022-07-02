@@ -191,7 +191,7 @@ class RateLimiterTest(su.SequenceBatcherTestUtil):
     def test_cross_model_prioritization_limited_resource(self):
         # Sends requests to two models, one operating at
         # priority of 1 and other at 2 respectively.
-        # The availabe resource counts doesn't allow models
+        # The available resource counts doesn't allow models
         # to execute simultaneously.
 
         model_names = ["custom_zero_1_float32", "custom_zero_1_float32_v2"]
@@ -210,8 +210,8 @@ class RateLimiterTest(su.SequenceBatcherTestUtil):
     def test_cross_model_prioritization_plenty_resource(self):
         # Sends requests to two models, one operating at
         # priority of 1 and other at 2 respectively.
-        # The availabe resource counts wll allow both models
-        # to run simulataneously.
+        # The available resource counts will allow both models
+        # to run simultaneously.
 
         model_names = ["custom_zero_1_float32", "custom_zero_1_float32_v2"]
 

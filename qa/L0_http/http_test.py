@@ -150,7 +150,7 @@ class HttpTest(tu.TestResultCollector):
 
     # This is to test that a properly chunk-encoded request by the caller works,
     # though Triton does not specifically do any special chunk handling outside
-    # of underlying HTTP libaries used
+    # of underlying HTTP libraries used
     # Future Enhancement: Test other encodings as they come up
     def test_content_encoding_chunked_manually(self):
         # Similar to test_raw_binary but test with extra headers

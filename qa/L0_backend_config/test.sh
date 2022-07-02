@@ -152,7 +152,7 @@ done
 
 
 #
-# Sepcific backend tests
+# Specific backend tests
 # 
 
 # While inference server is running, save the 

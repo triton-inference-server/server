@@ -41,7 +41,7 @@ written. The --trace-rate option specifies the sampling rate. In
 this example every 100-th inference request will be traced. The
 --trace-level option indicates the level of trace detail that should
 be collected. --trace-level option may be specified multiple times to 
-trace multiple informations. Use the --help option to get more information.
+trace multiple information. Use the --help option to get more information.
 
 In addition to configure trace settings in command line arguments, The user may
 modify the trace setting when Triton server

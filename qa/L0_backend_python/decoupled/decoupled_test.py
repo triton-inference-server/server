@@ -55,7 +55,7 @@ class DecoupledTest(tu.TestResultCollector):
 
     def test_decoupled_execute_error(self):
         # The decoupled_execute_error model returns an error for the first
-        # request and sucessfully processes the second request. This is making
+        # request and successfully processes the second request. This is making
         # sure that an error in a single request does not completely fail the
         # batch.
 

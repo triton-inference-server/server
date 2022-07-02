@@ -41,7 +41,7 @@ class TritonPythonModel:
             out_tensor = pb_utils.Tensor("OUT", input_tensor.as_numpy())
             if i == 0:
                 error = pb_utils.TritonError(
-                    'An error occured during execution')
+                    'An error occurred during execution')
                 responses.append(pb_utils.InferenceResponse([out_tensor],
                                                             error))
             else:

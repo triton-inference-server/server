@@ -447,7 +447,7 @@ class CrashingScenario(Scenario):
         super().__init__(name, [], verbose, out_stream)
 
     def run(self, client_metadata):
-        # Only use "custom" model as it simulates exectuion delay which
+        # Only use "custom" model as it simulates execution delay which
         # simplifies "crashing simulation" (client exits while request is being
         # executed)
         trial = "custom"

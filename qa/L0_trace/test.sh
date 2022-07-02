@@ -341,7 +341,7 @@ done
 rm -f ./curl.out
 set +e
 
-# Clear trace setting by explicitly asking removal for every feild except 'trace_rate'
+# Clear trace setting by explicitly asking removal for every field except 'trace_rate'
 rm -f ./curl.out
 set +e
 code=`curl -s -w %{http_code} -o ./curl.out -d'{"trace_file":null, "trace_level":null}' localhost:8000/v2/models/simple/trace/setting`
@@ -504,7 +504,7 @@ for p in {1..10}; do
     fi
 done
 
-# Check the current setting agian and expect 'trace_count' becomes 0
+# Check the current setting again and expect 'trace_count' becomes 0
 rm -f ./curl.out
 set +e
 code=`curl -s -w %{http_code} -o ./curl.out localhost:8000/v2/models/simple/trace/setting`

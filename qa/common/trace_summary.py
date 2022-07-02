@@ -160,7 +160,7 @@ def summarize(frontend, traces):
         if trace["id"] in match_frontend_id_set:
             if (trace['id'] in filtered_traces.keys()):
                 rep_trace = filtered_traces[trace['id']]
-                # Apend the timestamp to the trace representing this 'id'
+                # Append the timestamp to the trace representing this 'id'
                 if "model_name" in trace:
                     rep_trace["model_name"] = trace["model_name"]
                 if "model_version" in trace:

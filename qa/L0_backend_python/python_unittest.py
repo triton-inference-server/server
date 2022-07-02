@@ -47,7 +47,7 @@ class PythonUnittest(tu.TestResultCollector):
             result = client.infer(model_name, [], client_timeout=120)
             output0 = result.as_numpy('OUTPUT0')
 
-            # The model returns 1 if the tests were sucessfully passed.
+            # The model returns 1 if the tests were successfully passed.
             # Otherwise, it will return 0.
             self.assertEqual(output0, [1])
 

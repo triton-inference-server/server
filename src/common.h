@@ -132,7 +132,7 @@ std::string GetEnvironmentVariableOrDefault(
 /// \param dims The shape.
 /// \return The number of elements, or -1 if the number of elements
 /// cannot be determined because the shape contains one or more
-/// wilcard dimensions.
+/// wildcard dimensions.
 int64_t GetElementCount(const std::vector<int64_t>& dims);
 
 }}  // namespace triton::server

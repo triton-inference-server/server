@@ -1072,7 +1072,7 @@ def create_onnx_modelfile(models_dir,
     internal_in0 = onnx.helper.make_node("Identity", ["INPUT0"], ["_INPUT0"])
     internal_in1 = onnx.helper.make_node("Identity", ["INPUT1"], ["_INPUT1"])
 
-    # cast int8, int16 input to higer precision int as Onnx Add/Sub operator doesn't support those type
+    # cast int8, int16 input to higher precision int as Onnx Add/Sub operator doesn't support those type
     # Also casting String data type to int32
     if ((onnx_input_dtype == onnx.TensorProto.INT8) or
         (onnx_input_dtype == onnx.TensorProto.INT16) or

@@ -237,7 +237,7 @@ class ModelQueueTest(tu.TestResultCollector):
 
     def test_timeout_override(self):
         # Send requests with batch sizes 1, 1, 3 where the first request
-        # overrides the timout to be less than 'default_timeout_microseconds',
+        # overrides the timeout to be less than 'default_timeout_microseconds',
         # and the second and third requests are sent after the overridden
         # timeout. Expect the first request is timed-out and rejected before
         # 'default_timeout_microseconds', which makes the second and third

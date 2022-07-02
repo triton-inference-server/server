@@ -25,21 +25,21 @@
 # (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-# First need to set up enviroment
+# First need to set up environment
 if [ ${USE_TENSORFLOW} == "1" ] && [ ${USE_PYTORCH} == "1" ] ; then
     echo " Unsupported test configuration. Only one of USE_TENSORFLOW and USE_PYTORCH can be set to 1."
     exit 0
 elif [ ${USE_TENSORFLOW} == "1" ] ; then
-    echo "Setting up enviroment with tensorflow 1"
+    echo "Setting up environment with tensorflow 1"
     source ${TRITON_PATH}/python_backend/inferentia/scripts/setup.sh -t --tensorflow-version 1
 elif [ ${USE_PYTORCH} == "1" ] ; then
-    echo "Setting up enviroment with pytorch"
+    echo "Setting up environment with pytorch"
     source ${TRITON_PATH}/python_backend/inferentia/scripts/setup.sh -p
 else 
     echo " Unsupported test configuration. USE_TENSORFLOW flag is: ${USE_TENSORFLOW} and USE_PYTORCH flag is: ${USE_PYTORCH}. Only one of them can be set to 1."
     exit 0
 fi
-echo "done setting up enviroment"
+echo "done setting up environment"
 
 REPO_VERSION=${NVIDIA_TRITON_SERVER_VERSION}
 if [ "$#" -ge 1 ]; then

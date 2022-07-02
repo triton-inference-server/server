@@ -139,13 +139,13 @@ To execute from the terminal, run from the `concurrency_and_dynamic_batching` di
 LD_LIBRARY_PATH=$HOME/tritonserver/lib ./people_detection -m system -v -r $(pwd)/trtis_model_repo_sample_1 -t 6 -s false -p $HOME/tritonserver
 ```
 
-The parameter `-t` controlls the number of concurrent inference calls we want to execute. We will be executing the same model on the same sample image with the purpose of demonstrating how setting different concurency options affects the performance.
+The parameter `-t` controls the number of concurrent inference calls we want to execute. We will be executing the same model on the same sample image with the purpose of demonstrating how setting different concurrency options affects the performance.
 
 You can enable saving detected bounding boxes in the project directory in form of overlays over the original image for each execution thread. You can turn the visualization on by setting the parameter `-s` to `true` upon execution (`-s` is set to `false` by default).
 
 ### Expected output
 
-Upon execution, in the terminal log you will see _Model 'peoplenet' Stats_ in json format reflecting the inference performance. We also output _TOTAL INFERENCE TIME_ which simply reflects the elapsed time requred to run the application including data loading, pre-processing and post-processing.
+Upon execution, in the terminal log you will see _Model 'peoplenet' Stats_ in json format reflecting the inference performance. We also output _TOTAL INFERENCE TIME_ which simply reflects the elapsed time required to run the application including data loading, pre-processing and post-processing.
 
 A typical output in the log for _Model 'peoplenet' Stats_ looks as follows:
 
@@ -210,7 +210,7 @@ TOTAL INFERENCE TIME: 174ms
 
 To learn about different statistics check out the [documentation](https://github.com/triton-inference-server/server/blob/main/docs/protocol/extension_statistics.md#statistics-extension).
 
-To see how setting different values for concurrency affects total execution time and its componets reflected in the model stats, you need to modify a single parameter in the model config file.
+To see how setting different values for concurrency affects total execution time and its components reflected in the model stats, you need to modify a single parameter in the model config file.
 
 To enable concurrent model execution support for a model, corresponding model config file `trtis_model_repo_sample_1/peoplenet/config.pbtxt` includes the following:
 

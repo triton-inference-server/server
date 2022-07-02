@@ -977,7 +977,7 @@ class BatcherTest(tu.TestResultCollector):
     def test_multi_batch_delayed_use_max_batch(self):
         # Send three requests with first not having preferred size,
         # second being smaller than max preferred size but the sum of
-        # the requests being larger than max preferred size and thrid
+        # the requests being larger than max preferred size and third
         # is sent after the first two requests exceeds the queue delay
         # and the sum of the requests to be in full batch. Use
         # TRITONSERVER_DELAY_SCHEDULER in the environment so that

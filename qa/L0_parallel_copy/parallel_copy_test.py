@@ -134,7 +134,7 @@ class ParallelCopyTest(tu.TestResultCollector):
 
         # The following check is loose, local runs show that the speedup is not
         # significant (~15%), may be due to the dispatch overhead
-        # which cancels part of the improvment
+        # which cancels part of the improvement
         self.assertTrue(
             serialized_time > parallelized_time,
             "Expected parallelized copy is faster than serialized copy")

@@ -1119,7 +1119,7 @@ CommonHandler::SetUpAllRequests()
 #else
     auto err = TRITONSERVER_ErrorNew(
         TRITONSERVER_ERROR_UNAVAILABLE,
-        "the server does not suppport model statistics");
+        "the server does not support model statistics");
     GrpcStatusUtil::Create(status, err);
     TRITONSERVER_ErrorDelete(err);
 #endif
@@ -1329,7 +1329,7 @@ CommonHandler::SetUpAllRequests()
     TRITONSERVER_ErrorDelete(err);
 #else
     auto err = TRITONSERVER_ErrorNew(
-        TRITONSERVER_ERROR_UNAVAILABLE, "the server does not suppport trace");
+        TRITONSERVER_ERROR_UNAVAILABLE, "the server does not support trace");
     GrpcStatusUtil::Create(status, err);
     TRITONSERVER_ErrorDelete(err);
 #endif
@@ -4047,7 +4047,7 @@ ModelStreamInferHandler::Process(InferHandler::State* state, bool rpc_ok)
     state->context_->IncrementRequestCounter();
 
     // If the request is not for a model with decoupled transaction policy
-    // then put it in the context queue so thats it's response is sent in
+    // then put it in the context queue so that it's response is sent in
     // the same order as the request was received.
     if (!state->is_decoupled_) {
       state->context_->EnqueueForResponse(state);

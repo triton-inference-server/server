@@ -385,7 +385,7 @@ message InferStatistics
   // The count of response cache misses and cumulative duration to lookup
   // and insert output tensor data from the computed response to the cache
   // For example, this duration should include the time to copy
-  // output tensor data from the resposne object to the Response Cache.
+  // output tensor data from the response object to the Response Cache.
   // Assuming the response cache is enabled for a given model, a cache
   // miss occurs for a request to that model when the request metadata
   // does NOT hash to an existing entry in the cache. See the response

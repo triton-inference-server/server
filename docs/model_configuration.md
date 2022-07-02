@@ -34,7 +34,7 @@ about the model. Typically, this configuration is provided in a
 config.pbtxt file specified as [ModelConfig
 protobuf](https://github.com/triton-inference-server/common/blob/main/protobuf/model_config.proto).
 In some cases, discussed in [Auto-Generated Model
-Configuraton](#auto-generated-model-configuration), the model
+Configuration](#auto-generated-model-configuration), the model
 configuration can be generated automatically by Triton and so does not
 need to be provided explicitly.
 
@@ -153,7 +153,7 @@ can be named "OUTPUT__0" and "OUTPUT__1" respectively.
 
 3. If all inputs (or outputs) do not follow the same naming convention, then we
 enforce strict ordering from the model configuration i.e. we assume the order of
-inputs (or outputs) in the configuartion is the true ordering of these inputs.
+inputs (or outputs) in the configuration is the true ordering of these inputs.
 
 ***Dictionary of Tensors as Input:*** 
 
@@ -687,7 +687,7 @@ execution as described above when the ensemble receives multiple requests.
 Similar to the `default_model_filename` field, you can optionally specify the 
 `cc_model_filenames` field to map the GPU's
 [CUDA Compute Capability](https://developer.nvidia.com/cuda-gpus) 
-to a correspoding model filename at model load time. This is particularly 
+to a corresponding model filename at model load time. This is particularly 
 useful for TensorRT models, since they are generally tied to a specific 
 compute capability. 
 
@@ -790,7 +790,7 @@ dynamic batcher should attempt to create. For most models,
 [Recommended Configuration
 Process](#recommended-configuration-process). An exception is TensorRT
 models that specify multiple optimization profiles for different batch
-sizes. In this case, bacause some optimization profiles may give
+sizes. In this case, because some optimization profiles may give
 significant performance improvement compared to others, it may make
 sense to use *preferred_batch_size* for the batch sizes supported by
 those higher-performance optimization profiles.

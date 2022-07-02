@@ -175,7 +175,7 @@ pip3 install --upgrade wheel setuptools && \
     pip3 install --upgrade grpcio-tools numpy attrdict pillow
 ```
 
-The PyTorch runtime depenencies are the same as the build dependencies listed above.
+The PyTorch runtime dependencies are the same as the build dependencies listed above.
 
 ### Usage
 

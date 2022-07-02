@@ -319,8 +319,8 @@ request is starting, the model sets the "OUTPUT\_STATE" to be equal to the
 "INPUT" tensor. For non-starting requests, it sets the "OUTPUT\_STATE" tensor
 to the sum of "INPUT" and "INPUT\_STATE" tensors.
 
-In addition to the default state initilization discussed above, Triton provides
-two other mechanisms for initilizing state.
+In addition to the default state initialization discussed above, Triton provides
+two other mechanisms for initializing state.
 
 ###### Initializing State from Zero.
 
@@ -520,7 +520,7 @@ model. Over time the following happens:
   the sequence scheduler sees them both available in their respective
   batch slots. The scheduler immediately schedules the model instance
   to perform a batch-size 2 inference and uses START and READY to show
-  that both slots have an inference request avaiable but that only
+  that both slots have an inference request available but that only
   slot1 is the start of a new sequence.
 
 * The processing continues in a similar manner for the other inference
