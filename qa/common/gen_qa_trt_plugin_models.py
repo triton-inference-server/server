@@ -30,6 +30,8 @@ import os
 import numpy as np
 import tensorrt as trt
 
+np_dtype_string = np.dtype(object)
+
 TRT_LOGGER = trt.Logger()
 
 trt.init_libnvinfer_plugins(TRT_LOGGER, '')
