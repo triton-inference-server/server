@@ -27,6 +27,7 @@
 
 import argparse
 import numpy as np
+import sys
 import time
 
 import tritonclient.grpc as grpcclient
