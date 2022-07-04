@@ -37,8 +37,8 @@ class TritonPythonModel:
         responses = []
         for request in requests:
             input_tensor = pb_utils.get_input_tensor_by_name(request, "IN")
-            out_tensor = utils.Tensor("OUT", input_tensor.as_numpy())
-            responses.append(utils.InferenceResponse([out_tensor]))
+            out_tensor = pb_utils.Tensor("OUT", input_tensor.as_numpy())
+            responses.append(pb_utils.InferenceResponse([out_tensor]))
         return responses
 
     def finalize(self):
