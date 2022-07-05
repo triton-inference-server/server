@@ -33,6 +33,7 @@ instance_group {
   kind: KIND_GPU
 }
 dynamic_batching {
+  preferred_batch_size: 4
 }
 default_model_filename: "model.onnx"
 optimization {
