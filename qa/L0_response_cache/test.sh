@@ -39,7 +39,7 @@ LD_LIBRARY_PATH=/opt/tritonserver/lib:$LD_LIBRARY_PATH $UNIT_TEST >>$TEST_LOG 2>
 if [ $? -ne 0 ]; then
     cat $TEST_LOG
     echo -e "\n***\n*** Response Cache Unit Test Failed\n***"
-    #RET=1
+    RET=1
 fi
 set -e
 
