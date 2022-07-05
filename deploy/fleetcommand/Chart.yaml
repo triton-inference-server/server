@@ -25,8 +25,8 @@
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 apiVersion: v1
-# appVersion is the Triton version; update when changing release (i.e. updating container image in values.yaml)
-appVersion: "2.23.0"
+# appVersion is the Triton version; update when changing release
+appVersion: "2.24.0"
 description: Triton Inference Server (Fleet Command)
 name: triton-inference-server
 # version is the Chart version; update when changing anything in the chart
