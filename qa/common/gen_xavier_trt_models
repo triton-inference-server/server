@@ -50,13 +50,13 @@
 ##
 ############################################################################
 
-TRITON_VERSION=22.07
+TRITON_VERSION=${TRITON_VERSION:=22.07}
 CUDA_DEVICE=0
 
-REPO_ARCH="xavier"
-TMP_DIR=/tmp/${TRITON_VERSION}_${REPO_ARCH}
+HOST_BUILD_DIR=${HOST_BUILD_DIR:=/tmp}
+TMP_DIR=$HOST_BUILD_DIR/${TRITON_VERSION}
 
-SRCDIR=/tmp/gen_srcdir
+SRCDIR=$HOST_BUILD_DIR/gen_srcdir
 DESTDIR=$TMP_DIR/qa_model_repository
 VARDESTDIR=$TMP_DIR/qa_variable_model_repository
 IDENTITYDESTDIR=$TMP_DIR/qa_identity_model_repository

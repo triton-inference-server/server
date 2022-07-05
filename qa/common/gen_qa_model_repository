@@ -48,7 +48,7 @@
 ##
 ############################################################################
 
-TRITON_VERSION=22.07
+TRITON_VERSION=${TRITON_VERSION:=22.07}
 
 # ONNX. Use ONNX_OPSET 0 to use the default for ONNX version
 ONNX_VERSION=1.10.1
@@ -64,29 +64,29 @@ TENSORRT_IMAGE=${TENSORRT_IMAGE:=nvcr.io/nvidia/tensorrt:$TRITON_VERSION-py3}
 CUDA_DEVICE=0
 
 ###
-HOST_SRCDIR=/tmp/gen_srcdir
-HOST_DESTDIR=/tmp/$TRITON_VERSION/qa_model_repository
-HOST_VARDESTDIR=/tmp/$TRITON_VERSION/qa_variable_model_repository
-HOST_IDENTITYDESTDIR=/tmp/$TRITON_VERSION/qa_identity_model_repository
-HOST_SIGDEFDESTDIR=/tmp/$TRITON_VERSION/qa_tf_tag_sigdef_repository
-HOST_TFPARAMETERSDESTDIR=/tmp/$TRITON_VERSION/qa_tf_parameters_repository
-HOST_IDENTITYBIGDESTDIR=/tmp/$TRITON_VERSION/qa_identity_big_model_repository
-HOST_SHAPEDESTDIR=/tmp/$TRITON_VERSION/qa_shapetensor_model_repository
-HOST_RESHAPEDESTDIR=/tmp/$TRITON_VERSION/qa_reshape_model_repository
-HOST_SEQDESTDIR=/tmp/$TRITON_VERSION/qa_sequence_model_repository
-HOST_DYNASEQDESTDIR=/tmp/$TRITON_VERSION/qa_dyna_sequence_model_repository
-HOST_DYNASEQIMPLICITDESTDIR=/tmp/$TRITON_VERSION/qa_dyna_sequence_implicit_model_repository
-HOST_VARSEQDESTDIR=/tmp/$TRITON_VERSION/qa_variable_sequence_model_repository
-HOST_ENSEMBLEDESTDIR=/tmp/$TRITON_VERSION/qa_ensemble_model_repository
-HOST_NOSHAPEDESTDIR=/tmp/$TRITON_VERSION/qa_noshape_model_repository
-HOST_PLGDESTDIR=/tmp/$TRITON_VERSION/qa_trt_plugin_model_repository
-HOST_RAGGEDDESTDIR=/tmp/$TRITON_VERSION/qa_ragged_model_repository
-HOST_FORMATDESTDIR=/tmp/$TRITON_VERSION/qa_trt_format_model_repository
-HOST_IMPLICITSEQDESTDIR=/tmp/$TRITON_VERSION/qa_sequence_implicit_model_repository
-HOST_VARIMPLICITSEQDESTDIR=/tmp/$TRITON_VERSION/qa_variable_sequence_implicit_model_repository
-HOST_INITIALSTATEIMPLICITSEQDESTDIR=/tmp/$TRITON_VERSION/qa_sequence_initial_state_implicit_model_repository
-HOST_VARINITIALSTATEIMPLICITSEQDESTDIR=/tmp/$TRITON_VERSION/qa_variable_sequence_initial_state_implicit_model_repository
-HOST_TORCHTRTDESTDIR=/tmp/$TRITON_VERSION/torchtrt_model_store
+HOST_BUILD_DIR=${HOST_BUILD_DIR:=/tmp}
+HOST_SRCDIR=$HOST_BUILD_DIR/gen_srcdir
+HOST_DESTDIR=$HOST_BUILD_DIR/$TRITON_VERSION/qa_model_repository
+HOST_VARDESTDIR=$HOST_BUILD_DIR/$TRITON_VERSION/qa_variable_model_repository
+HOST_IDENTITYDESTDIR=$HOST_BUILD_DIR/$TRITON_VERSION/qa_identity_model_repository
+HOST_SIGDEFDESTDIR=$HOST_BUILD_DIR/$TRITON_VERSION/qa_tf_tag_sigdef_repository
+HOST_IDENTITYBIGDESTDIR=$HOST_BUILD_DIR/$TRITON_VERSION/qa_identity_big_model_repository
+HOST_SHAPEDESTDIR=$HOST_BUILD_DIR/$TRITON_VERSION/qa_shapetensor_model_repository
+HOST_RESHAPEDESTDIR=$HOST_BUILD_DIR/$TRITON_VERSION/qa_reshape_model_repository
+HOST_SEQDESTDIR=$HOST_BUILD_DIR/$TRITON_VERSION/qa_sequence_model_repository
+HOST_DYNASEQDESTDIR=$HOST_BUILD_DIR/$TRITON_VERSION/qa_dyna_sequence_model_repository
+HOST_DYNASEQIMPLICITDESTDIR=$HOST_BUILD_DIR/$TRITON_VERSION/qa_dyna_sequence_implicit_model_repository
+HOST_VARSEQDESTDIR=$HOST_BUILD_DIR/$TRITON_VERSION/qa_variable_sequence_model_repository
+HOST_ENSEMBLEDESTDIR=$HOST_BUILD_DIR/$TRITON_VERSION/qa_ensemble_model_repository
+HOST_NOSHAPEDESTDIR=$HOST_BUILD_DIR/$TRITON_VERSION/qa_noshape_model_repository
+HOST_PLGDESTDIR=$HOST_BUILD_DIR/$TRITON_VERSION/qa_trt_plugin_model_repository
+HOST_RAGGEDDESTDIR=$HOST_BUILD_DIR/$TRITON_VERSION/qa_ragged_model_repository
+HOST_FORMATDESTDIR=$HOST_BUILD_DIR/$TRITON_VERSION/qa_trt_format_model_repository
+HOST_IMPLICITSEQDESTDIR=$HOST_BUILD_DIR/$TRITON_VERSION/qa_sequence_implicit_model_repository
+HOST_VARIMPLICITSEQDESTDIR=$HOST_BUILD_DIR/$TRITON_VERSION/qa_variable_sequence_implicit_model_repository
+HOST_INITIALSTATEIMPLICITSEQDESTDIR=$HOST_BUILD_DIR/$TRITON_VERSION/qa_sequence_initial_state_implicit_model_repository
+HOST_VARINITIALSTATEIMPLICITSEQDESTDIR=$HOST_BUILD_DIR/$TRITON_VERSION/qa_variable_sequence_initial_state_implicit_model_repository
+HOST_TORCHTRTDESTDIR=$HOST_BUILD_DIR/$TRITON_VERSION/torchtrt_model_store
 
 rm -fr $HOST_SRCDIR $HOST_DESTDIR $HOST_VARDESTDIR $HOST_TFPARAMETERSDESTDIR
 rm -fr $HOST_IDENTITYDESTDIR $HOST_IDENTITYBIGDESTDIR $HOST_SHAPEDESTDIR $HOST_SIGDEFDESTDIR
@@ -230,7 +230,7 @@ if [ $? -ne 0 ]; then
 fi
 
 docker pull $UBUNTU_IMAGE
-docker run --gpus device=$CUDA_DEVICE --rm -it --entrypoint $SRCDIR/$OPENVINOSCRIPT \
+docker run --gpus device=$CUDA_DEVICE --rm --entrypoint $SRCDIR/$OPENVINOSCRIPT \
        --mount type=bind,source=$HOST_SRCDIR,target=$SRCDIR \
        --mount type=bind,source=$HOST_DESTDIR,target=$DESTDIR \
        --mount type=bind,source=$HOST_VARDESTDIR,target=$VARDESTDIR \
