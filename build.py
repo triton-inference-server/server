@@ -26,17 +26,14 @@
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 import argparse
-import logging
 import os
 import os.path
 import multiprocessing
 import pathlib
 import platform
-import shutil
 import stat
 import subprocess
 import sys
-import traceback
 from inspect import getsourcefile
 
 #
@@ -1595,7 +1592,6 @@ def repo_agent_build(ra, cmake_script, build_dir, install_dir, repoagent_repo,
 
 def cibase_build(cmake_script, repo_dir, cmake_dir, build_dir, install_dir,
                  ci_dir, backends):
-    repo_build_dir = os.path.join(build_dir, 'tritonserver', 'build')
     repo_install_dir = os.path.join(build_dir, 'tritonserver', 'install')
 
     cmake_script.commentln(8)

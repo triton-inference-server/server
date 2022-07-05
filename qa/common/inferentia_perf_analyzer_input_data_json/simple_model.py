@@ -115,7 +115,6 @@ if __name__ == '__main__':
     if len(unparsed) > 0:
         raise Exception("Unrecognized options: {}".format(unparsed))
     if FLAGS.model_type == 'tensorflow':
-        import os
         import shutil
         import tensorflow as tf
         import tensorflow.neuron as tfn
@@ -123,5 +122,4 @@ if __name__ == '__main__':
     elif FLAGS.model_type == 'pytorch':
         import torch
         from torch import nn
-        import torch_neuron
         gen_pytorch_model(FLAGS.name, FLAGS.batch_size)

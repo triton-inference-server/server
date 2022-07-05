@@ -27,9 +27,7 @@
 import argparse
 import os
 
-import numpy as np
 import torch
-from torch import nn
 import torchvision
 import torch_tensorrt
 
