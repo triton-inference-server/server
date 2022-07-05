@@ -1048,7 +1048,7 @@ class HTTPAPIServer : public HTTPServerImpl {
       int64_t preferred_memory_type_id, void* userp, void** buffer,
       void** buffer_userp, TRITONSERVER_MemoryType* actual_memory_type,
       int64_t* actual_memory_type_id);
-  void HandleInferErrors(evhtp_request_t* req, TRITONSERVER_Error* err);
+  bool InferErrorIsInternalError(TRITONSERVER_Error* err);
   static TRITONSERVER_Error* InferResponseFree(
       TRITONSERVER_ResponseAllocator* allocator, void* buffer,
       void* buffer_userp, size_t byte_size, TRITONSERVER_MemoryType memory_type,
@@ -1091,6 +1091,7 @@ class HTTPAPIServer : public HTTPServerImpl {
 
   static void OKReplyCallback(evthr_t* thr, void* arg, void* shared);
   static void BADReplyCallback(evthr_t* thr, void* arg, void* shared);
+  static void FAILReplyCallback(evthr_t* thr, void* arg, void* shared);
 
   std::shared_ptr<TRITONSERVER_Server> server_;
 
@@ -1112,20 +1113,15 @@ class HTTPAPIServer : public HTTPServerImpl {
   re2::RE2 cudasharedmemory_regex_;
 };
 
-void HTTPAPIServer::HandleInferErrors(evhtp_request_t* req, TRITONSERVER_Error* err) {
-  const char* message = TRITONSERVER_ErrorMessage(err);
-  std::string error_string(message);
-  EVBufferAddErrorJson(req->buffer_out, err);
-  if (error_string.find("GPU error occured") == std::string::npos) {
-    /* Return a 500*/
-    evhtp_send_reply(req, EVHTP_RES_500);
-    LOG_VERBOSE(1)
-        << "Received error during model execution, returning may be malformed GPU.";
-    return;
+bool
+HTTPAPIServer::InferErrorIsInternalError(TRITONSERVER_Error* err)
+{
+  std::string error_string(TRITONSERVER_ErrorMessage(err));
+  if (error_string.find("GPU error occured") != std::string::npos) {
+    return true;
   } else {
-    evhtp_send_reply(req, EVHTP_RES_BADREQ);
+    return false;
   }
-  TRITONSERVER_ErrorDelete(err);
 }
 
 TRITONSERVER_Error*
@@ -2342,10 +2338,20 @@ HTTPAPIServer::HandleInfer(
 
   if (err != nullptr) {
     LOG_VERBOSE(1) << "Infer failed: " << TRITONSERVER_ErrorMessage(err);
-    HandleInferErrors(req, err);
+    EVBufferAddErrorJson(req->buffer_out, err);
+    if (InferErrorIsInternalError(err)) {
+      /* Return a 500*/
+      evhtp_send_reply(req, EVHTP_RES_500);
+      LOG_VERBOSE(1) << "Received error during model execution, returning may "
+                        "be malformed GPU.";
+    } else {
+      evhtp_send_reply(req, EVHTP_RES_BADREQ);
+    }
     if (connection_paused) {
       evhtp_request_resume(req);
     }
+
+    TRITONSERVER_ErrorDelete(err);
     LOG_TRITONSERVER_ERROR(
         TRITONSERVER_InferenceRequestDelete(irequest),
         "deleting HTTP/REST inference request");
@@ -2385,6 +2391,31 @@ HTTPAPIServer::BADReplyCallback(evthr_t* thr, void* arg, void* shared)
 
   evhtp_request_t* request = infer_request->EvHtpRequest();
   evhtp_send_reply(request, EVHTP_RES_BADREQ);
+  evhtp_request_resume(request);
+
+#ifdef TRITON_ENABLE_TRACING
+  if ((infer_request->trace_manager_ != nullptr) &&
+      (infer_request->trace_id_ != 0)) {
+    infer_request->trace_manager_->CaptureTimestamp(
+        infer_request->trace_id_, TRITONSERVER_TRACE_LEVEL_MIN,
+        "HTTP_SEND_START", TIMESPEC_TO_NANOS(request->send_start_ts));
+    infer_request->trace_manager_->CaptureTimestamp(
+        infer_request->trace_id_, TRITONSERVER_TRACE_LEVEL_MIN, "HTTP_SEND_END",
+        TIMESPEC_TO_NANOS(request->send_end_ts));
+  }
+#endif  // TRITON_ENABLE_TRACING
+
+  delete infer_request;
+}
+
+void
+HTTPAPIServer::FAILReplyCallback(evthr_t* thr, void* arg, void* shared)
+{
+  HTTPAPIServer::InferRequestClass* infer_request =
+      reinterpret_cast<HTTPAPIServer::InferRequestClass*>(arg);
+
+  evhtp_request_t* request = infer_request->EvHtpRequest();
+  evhtp_send_reply(request, EVHTP_RES_500);
   evhtp_request_resume(request);
 
 #ifdef TRITON_ENABLE_TRACING
@@ -2465,6 +2496,10 @@ HTTPAPIServer::InferRequestClass::InferResponseComplete(
 
   if (err == nullptr) {
     evthr_defer(infer_request->thread_, OKReplyCallback, infer_request);
+  } else if (InferErrorIsInternalError(err)) {
+    EVBufferAddErrorJson(infer_request->req_->buffer_out, err);
+    TRITONSERVER_ErrorDelete(err);
+    evthr_defer(infer_request->thread_, FAILReplyCallback, infer_request);
   } else {
     EVBufferAddErrorJson(infer_request->req_->buffer_out, err);
     TRITONSERVER_ErrorDelete(err);
