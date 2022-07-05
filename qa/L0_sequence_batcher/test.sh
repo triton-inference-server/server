@@ -103,7 +103,7 @@ source ../common/util.sh
 RET=0
 
 # If BACKENDS not specified, set to all
-BACKENDS=${BACKENDS:="graphdef savedmodel onnx plan libtorch custom"}
+BACKENDS=${BACKENDS:="graphdef savedmodel onnx plan libtorch custom python"}
 export BACKENDS
 
 # If MODEL_TRIALS not specified set to 0 1 2 4 v
@@ -179,6 +179,22 @@ function get_datatype () {
   echo $dtype
 }
 
+# Modify corresponding onnx config.pbtxt to create python config.pbtxt
+function generate_python_models () {
+  model_path=$1
+  dest_dir=$2
+  onnx_model=$(echo ${model_path//python/onnx})
+  python_model=$(basename $model_path)
+  mkdir -p $dest_dir/$python_model/1/
+  # for emsemble models keep "platform: ensemble"
+  if [[ "$model_path" == *"ensemble_model"* ]]; then
+    cat $onnx_model/config.pbtxt | sed 's/onnx/python/g' > $dest_dir/$python_model/config.pbtxt
+  else
+    cat $onnx_model/config.pbtxt | sed 's/platform:.*/backend:\ "python"/g' | sed 's/onnx/python/g' > $dest_dir/$python_model/config.pbtxt
+    cp ../python_models/identity_int32/model.py $dest_dir/$python_model/1/
+  fi
+}
+
 if [[ "$INITIAL_STATE_ZERO" == "1" && "$INITIAL_STATE_FILE" == "1" ]]; then
   echo -e "\n***\n*** 'INITIAL_STATE_ZERO' and 'INITIAL_STATE_FILE' can't be enabled simultaneously. \n***"
   exit 1
@@ -200,12 +216,13 @@ else
 fi
 
 MODELS=""
+PYTHON_MODELS=""
 for BACKEND in $BACKENDS; do
   if [[ $BACKEND == "custom" ]]; then
     MODELS="$MODELS ../custom_models/custom_sequence_int32"
   else
     DTYPES=$(get_datatype $BACKEND)
-
+    
     for DTYPE in $DTYPES; do
       MODELS="$MODELS $DATADIR/$FIXED_MODEL_REPOSITORY/${BACKEND}_sequence_${DTYPE}"
     done
@@ -214,7 +231,13 @@ for BACKEND in $BACKENDS; do
       for DTYPE in $DTYPES; do
         # We don't generate ensemble models for bool data type.
         if [[ $DTYPE != "bool" ]]; then
-          MODELS="$MODELS $DATADIR/qa_ensemble_model_repository/$FIXED_MODEL_REPOSITORY/*_${BACKEND}_sequence_${DTYPE}"
+          if [ "$BACKEND" == "python" ]; then
+            PYTHON_MODELS="$DATADIR/qa_ensemble_model_repository/$FIXED_MODEL_REPOSITORY/*_onnx_sequence_${DTYPE}"
+            TMP=$(echo $PYTHON_MODELS)
+            MODELS="$MODELS ${TMP//onnx/python}"
+          else
+            MODELS="$MODELS $DATADIR/qa_ensemble_model_repository/$FIXED_MODEL_REPOSITORY/*_${BACKEND}_sequence_${DTYPE}"
+          fi 
         fi
       done
     fi
@@ -229,28 +252,63 @@ fi
 
 for MODEL in $MODELS; do
   if [[ ! "$TEST_VALGRIND" -eq 1 ]]; then
-    cp -r $MODEL models1/. && \
+    if [[ "$MODEL" =~ .*"python".* ]]; then
+      generate_python_models "$MODEL" "models1"
       (cd models1/$(basename $MODEL) && \
-        sed -i "s/^max_batch_size:.*/max_batch_size: 4/" config.pbtxt && \
-        sed -i "s/kind: KIND_GPU/kind: KIND_GPU\\ncount: 1/" config.pbtxt && \
-        sed -i "s/kind: KIND_CPU/kind: KIND_CPU\\ncount: 1/" config.pbtxt)
-    cp -r $MODEL models2/. && \
+            sed -i "s/^max_batch_size:.*/max_batch_size: 4/" config.pbtxt && \
+            sed -i "s/kind: KIND_GPU/kind: KIND_GPU\\ncount: 1/" config.pbtxt && \
+            sed -i "s/kind: KIND_CPU/kind: KIND_CPU\\ncount: 1/" config.pbtxt)
+    else
+      cp -r $MODEL models1/. && \
+        (cd models1/$(basename $MODEL) && \
+          sed -i "s/^max_batch_size:.*/max_batch_size: 4/" config.pbtxt && \
+          sed -i "s/kind: KIND_GPU/kind: KIND_GPU\\ncount: 1/" config.pbtxt && \
+          sed -i "s/kind: KIND_CPU/kind: KIND_CPU\\ncount: 1/" config.pbtxt)
+    fi
+    if [[ "$MODEL" =~ .*"python".* ]]; then
+      generate_python_models "$MODEL" "models2"
       (cd models2/$(basename $MODEL) && \
         sed -i "s/^max_batch_size:.*/max_batch_size: 2/" config.pbtxt && \
         sed -i "s/kind: KIND_GPU/kind: KIND_GPU\\ncount: 2/" config.pbtxt && \
         sed -i "s/kind: KIND_CPU/kind: KIND_CPU\\ncount: 2/" config.pbtxt)
-    cp -r $MODEL models4/. && \
+    else
+      cp -r $MODEL models2/. && \
+        (cd models2/$(basename $MODEL) && \
+          sed -i "s/^max_batch_size:.*/max_batch_size: 2/" config.pbtxt && \
+          sed -i "s/kind: KIND_GPU/kind: KIND_GPU\\ncount: 2/" config.pbtxt && \
+          sed -i "s/kind: KIND_CPU/kind: KIND_CPU\\ncount: 2/" config.pbtxt)
+    fi
+    if [[ "$MODEL" =~ .*"python".* ]]; then
+      generate_python_models "$MODEL" "models4"
       (cd models4/$(basename $MODEL) && \
         sed -i "s/^max_batch_size:.*/max_batch_size: 1/" config.pbtxt && \
         sed -i "s/kind: KIND_GPU/kind: KIND_GPU\\ncount: 4/" config.pbtxt && \
         sed -i "s/kind: KIND_CPU/kind: KIND_CPU\\ncount: 4/" config.pbtxt)
+    else
+      cp -r $MODEL models4/. && \
+        (cd models4/$(basename $MODEL) && \
+          sed -i "s/^max_batch_size:.*/max_batch_size: 1/" config.pbtxt && \
+          sed -i "s/kind: KIND_GPU/kind: KIND_GPU\\ncount: 4/" config.pbtxt && \
+          sed -i "s/kind: KIND_CPU/kind: KIND_CPU\\ncount: 4/" config.pbtxt)
+    fi
+
     # Duplicate the models for different delay settings
-    cp -r $MODEL queue_delay_models/. && \
+    if [[ "$MODEL" =~ .*"python".* ]]; then
+      generate_python_models "$MODEL" "queue_delay_models"
       (cd queue_delay_models/$(basename $MODEL) && \
         sed -i "s/^max_batch_size:.*/max_batch_size: 4/" config.pbtxt && \
         sed -i "s/kind: KIND_GPU/kind: KIND_GPU\\ncount: 1/" config.pbtxt && \
         sed -i "s/kind: KIND_CPU/kind: KIND_CPU\\ncount: 1/" config.pbtxt && \
         sed -i "s/sequence_batching {/sequence_batching {\\ndirect {\\nmax_queue_delay_microseconds: 3000000\\nminimum_slot_utilization: 0\\n}/" config.pbtxt)
+    else
+      cp -r $MODEL queue_delay_models/. && \
+        (cd queue_delay_models/$(basename $MODEL) && \
+          sed -i "s/^max_batch_size:.*/max_batch_size: 4/" config.pbtxt && \
+          sed -i "s/kind: KIND_GPU/kind: KIND_GPU\\ncount: 1/" config.pbtxt && \
+          sed -i "s/kind: KIND_CPU/kind: KIND_CPU\\ncount: 1/" config.pbtxt && \
+          sed -i "s/sequence_batching {/sequence_batching {\\ndirect {\\nmax_queue_delay_microseconds: 3000000\\nminimum_slot_utilization: 0\\n}/" config.pbtxt)
+    fi
+
     cp -r queue_delay_models/$(basename $MODEL) queue_delay_models/$(basename $MODEL)_half && \
       (cd queue_delay_models/$(basename $MODEL)_half && \
         sed -i "s/$(basename $MODEL)/$(basename $MODEL)_half/" config.pbtxt && \
@@ -307,6 +365,7 @@ if [ "$INITIAL_STATE_FILE" == "1" ]; then
 fi
 
 MODELS=""
+PYTHON_MODELS=""
 for BACKEND in $BACKENDS; do
   if [[ $BACKEND == "custom" ]]; then
     MODELS="$MODELS ../custom_models/custom_sequence_int32"
@@ -315,12 +374,18 @@ for BACKEND in $BACKENDS; do
     for DTYPE in $DTYPES; do
       MODELS="$MODELS $DATADIR/$FIXED_MODEL_REPOSITORY/${BACKEND}_nobatch_sequence_${DTYPE}"
     done
-
+    
     if [ "$ENSEMBLES" == "1" ]; then
       for DTYPE in $DTYPES; do
         # We don't generate ensemble models for bool data type.
         if [[ $DTYPE != "bool" ]]; then
-          MODELS="$MODELS $DATADIR/qa_ensemble_model_repository/$FIXED_MODEL_REPOSITORY/*_${BACKEND}_nobatch_sequence_${DTYPE}"
+          if [ "$BACKEND" == "python" ]; then
+            PYTHON_MODELS="$DATADIR/qa_ensemble_model_repository/$FIXED_MODEL_REPOSITORY/*_onnx_nobatch_sequence_${DTYPE}"
+            TMP=$(echo $PYTHON_MODELS)
+            MODELS="$MODELS ${TMP//onnx/python}"
+          else
+            MODELS="$MODELS $DATADIR/qa_ensemble_model_repository/$FIXED_MODEL_REPOSITORY/*_${BACKEND}_nobatch_sequence_${DTYPE}"
+          fi
         fi
       done
 
@@ -329,22 +394,30 @@ for BACKEND in $BACKENDS; do
 done
 
 for MODEL in $MODELS; do
+  if [[ "$MODEL" =~ .*"python".* ]]; then
+      generate_python_models "$MODEL" "models0"
+      (cd models0/$(basename $MODEL) && \
+          sed -i "s/kind: KIND_GPU/kind: KIND_GPU\\ncount: 4/" config.pbtxt && \
+          sed -i "s/kind: KIND_CPU/kind: KIND_CPU\\ncount: 4/" config.pbtxt)
+  else
     cp -r $MODEL models0/. && \
-        (cd models0/$(basename $MODEL) && \
-            sed -i "s/kind: KIND_GPU/kind: KIND_GPU\\ncount: 4/" config.pbtxt && \
-            sed -i "s/kind: KIND_CPU/kind: KIND_CPU\\ncount: 4/" config.pbtxt)
+      (cd models0/$(basename $MODEL) && \
+          sed -i "s/kind: KIND_GPU/kind: KIND_GPU\\ncount: 4/" config.pbtxt && \
+          sed -i "s/kind: KIND_CPU/kind: KIND_CPU\\ncount: 4/" config.pbtxt)
+  fi
 
-    if [ "$INITIAL_STATE_FILE" == "1" ]; then
-        mkdir -p models0/$(basename $MODEL)/initial_state/ && cp input_state_data models0/$(basename $MODEL)/initial_state/ && \
-           (cd models0/$(basename $MODEL) && \
-            sed -i "s/zero_data.*/data_file:\"input_state_data\"/" config.pbtxt)
-    fi
+  if [ "$INITIAL_STATE_FILE" == "1" ]; then
+      mkdir -p models0/$(basename $MODEL)/initial_state/ && cp input_state_data models0/$(basename $MODEL)/initial_state/ && \
+          (cd models0/$(basename $MODEL) && \
+          sed -i "s/zero_data.*/data_file:\"input_state_data\"/" config.pbtxt)
+  fi
 done
 
 # modelsv - one instance with batch-size 4
 rm -fr modelsv && mkdir modelsv
 
 MODELS=""
+PYTHON_MODELS=""
 for BACKEND in $BACKENDS; do
   if [[ $BACKEND == "custom" ]]; then
     MODELS="$MODELS ../custom_models/custom_sequence_int32"
@@ -358,7 +431,13 @@ for BACKEND in $BACKENDS; do
       for DTYPE in $DTYPES; do
         # We don't generate ensemble models for bool data type.
         if [[ $DTYPE != "bool" ]]; then
-          MODELS="$MODELS $DATADIR/qa_ensemble_model_repository/${VAR_MODEL_REPOSITORY}/*_${BACKEND}_sequence_${DTYPE}"
+          if [ "$BACKEND" == "python" ]; then
+            PYTHON_MODELS="$DATADIR/qa_ensemble_model_repository/$FIXED_MODEL_REPOSITORY/*_onnx_sequence_${DTYPE}"
+            TMP=$(echo $PYTHON_MODELS)
+            MODELS="$MODELS ${TMP//onnx/python}"
+          else
+            MODELS="$MODELS $DATADIR/qa_ensemble_model_repository/${VAR_MODEL_REPOSITORY}/*_${BACKEND}_sequence_${DTYPE}"
+          fi
         fi
       done
     fi
@@ -366,17 +445,25 @@ for BACKEND in $BACKENDS; do
 done
 
 for MODEL in $MODELS; do
-    cp -r $MODEL modelsv/. && \
-        (cd modelsv/$(basename $MODEL) && \
+  if [[ "$MODEL" =~ .*"python".* ]]; then
+      generate_python_models "$MODEL" "modelsv"
+      (cd modelsv/$(basename $MODEL) && \
             sed -i "s/^max_batch_size:.*/max_batch_size: 4/" config.pbtxt && \
             sed -i "s/kind: KIND_GPU/kind: KIND_GPU\\ncount: 1/" config.pbtxt && \
             sed -i "s/kind: KIND_CPU/kind: KIND_CPU\\ncount: 1/" config.pbtxt)
+  else
+    cp -r $MODEL modelsv/. && \
+      (cd modelsv/$(basename $MODEL) && \
+          sed -i "s/^max_batch_size:.*/max_batch_size: 4/" config.pbtxt && \
+          sed -i "s/kind: KIND_GPU/kind: KIND_GPU\\ncount: 1/" config.pbtxt && \
+          sed -i "s/kind: KIND_CPU/kind: KIND_CPU\\ncount: 1/" config.pbtxt)
+  fi
 
-    if [ "$INITIAL_STATE_FILE" == "1" ]; then
-        mkdir -p modelsv/$(basename $MODEL)/initial_state/ && cp input_state_data modelsv/$(basename $MODEL)/initial_state/ && \
-           (cd modelsv/$(basename $MODEL) && \
-            sed -i "s/zero_data.*/data_file:\"input_state_data\"/" config.pbtxt)
-    fi
+  if [ "$INITIAL_STATE_FILE" == "1" ]; then
+      mkdir -p modelsv/$(basename $MODEL)/initial_state/ && cp input_state_data modelsv/$(basename $MODEL)/initial_state/ && \
+          (cd modelsv/$(basename $MODEL) && \
+          sed -i "s/zero_data.*/data_file:\"input_state_data\"/" config.pbtxt)
+  fi
 done
 
 # Same test work on all models since they all have same total number
@@ -652,3 +739,4 @@ else
 fi
 
 exit $RET
+

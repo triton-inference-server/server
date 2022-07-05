@@ -52,7 +52,7 @@ elif USE_GRPC:
 else:
     _protocols = ("http",)
 
-BACKENDS = os.environ.get('BACKENDS', "graphdef savedmodel onnx plan custom")
+BACKENDS = os.environ.get('BACKENDS', "graphdef savedmodel onnx plan custom python")
 ENSEMBLES = bool(int(os.environ.get('ENSEMBLES', 1)))
 
 NO_BATCHING = (int(os.environ['NO_BATCHING']) == 1)
@@ -141,9 +141,9 @@ class SequenceBatcherTest(su.SequenceBatcherTestUtil):
         # information.
         if ((not NO_BATCHING and
              ("custom" not in trial)) or ("graphdef" in trial) or
-            ("plan" in trial) or ("onnx" in trial)) or ("libtorch" in trial):
+            ("plan" in trial) or ("onnx" in trial)) or ("libtorch" in trial) or ("python" in trial):
             expected_result = value
-            if (flag_str is not None) and ("start" in flag_str):
+            if (flag_str is not None) and ("start" in flag_str) and ("python" not in trial):
                 expected_result += 1
         return expected_result
 
