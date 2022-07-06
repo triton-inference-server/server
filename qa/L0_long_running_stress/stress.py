@@ -446,7 +446,8 @@ if __name__ == '__main__':
                         required=False,
                         default=0,
                         help='Number of dedicated threads that keep compute '
-                        'device (i.e. GPU/CPUs) under load. Default is 0.')
+                        'device (i.e. GPU/CPUs) under load. Default is 0, '
+                        'which means no dedicated load thread will be created.')
     parser.add_argument(
         '-d',
         '--test-duration',
@@ -472,13 +473,13 @@ if __name__ == '__main__':
 
     # Create hashes for each thread for generating report
     _test_case_count = [
-        dict() for x in range(FLAGS.concurrency + FLAGS.load_thread)
+        dict() for _ in range(FLAGS.concurrency + FLAGS.load_thread)
     ]
     _failed_test_case_count = [
-        dict() for x in range(FLAGS.concurrency + FLAGS.load_thread)
+        dict() for _ in range(FLAGS.concurrency + FLAGS.load_thread)
     ]
     _sequence_request_count = [
-        dict() for x in range(FLAGS.concurrency + FLAGS.load_thread)
+        dict() for _ in range(FLAGS.concurrency + FLAGS.load_thread)
     ]
 
     threads = []
