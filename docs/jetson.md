@@ -188,7 +188,7 @@ LD_LIBRARY_PATH="$LD_LIBRARY_PATH:/usr/lib/llvm-8/lib"
 ```
 
 **Note**: On Jetson, the backend directory must be explicitly specified using the
-`--backend-directory` flag. Triton defaults to using TensorFlow 1.x and a version string
+`--backend-directory` flag. Triton defaults to using TensorFlow 2.x and a version string
 is required to use TensorFlow 2.x.
 
 ```

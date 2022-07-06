@@ -77,7 +77,7 @@ if [ "$TEST_JETSON" -eq 1 ]; then
     MODEL_TRIALS="0 v"
 fi
 
-TF_VERSION=${TF_VERSION:=1}
+TF_VERSION=${TF_VERSION:=2}
 
 # On windows the paths invoked by the script (running in WSL) must use
 # /mnt/c when needed but the paths on the tritonserver command-line

@@ -1,5 +1,5 @@
 #!/bin/bash
-# Copyright (c) 2021, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright 2021-2022, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -31,7 +31,7 @@ if [ ${USE_TENSORFLOW} == "1" ] && [ ${USE_PYTORCH} == "1" ] ; then
     exit 0
 elif [ ${USE_TENSORFLOW} == "1" ] ; then
     echo "Setting up enviroment with tensorflow 1"
-    source ${TRITON_PATH}/python_backend/inferentia/scripts/setup.sh -t --tensorflow-version 1
+    source ${TRITON_PATH}/python_backend/inferentia/scripts/setup.sh -t --tensorflow-version 2
 elif [ ${USE_PYTORCH} == "1" ] ; then
     echo "Setting up enviroment with pytorch"
     source ${TRITON_PATH}/python_backend/inferentia/scripts/setup.sh -p
@@ -117,16 +117,16 @@ function create_inferentia_models () {
 
 # Setup models
 if [ ${USE_TENSORFLOW} == "1" ]; then
-    TEST_FRAMEWORK="tf1"
+    TEST_FRAMEWORK="tf2"
     clear_model_dir
     python ${TEST_JSON_REPO}/simple_model.py \
-        --name add_sub_model_tf1 \
+        --name add_sub_model_tf2 \
         --model_type tensorflow \
-        --tf_version 1 \
+        --tf_version 2 \
         --batch_size 1
     GEN_SCRIPT="python ${TRITON_PATH}/python_backend/inferentia/scripts/gen_triton_model.py"
     MODEL_TYPE="tensorflow"
-    COMPILED_MODEL="${PWD}/add_sub_model_tf1"
+    COMPILED_MODEL="${PWD}/add_sub_model_tf2"
     create_inferentia_models
 
 elif [ ${USE_PYTORCH} == "1" ]; then
