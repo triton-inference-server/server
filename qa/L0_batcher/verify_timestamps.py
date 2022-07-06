@@ -78,7 +78,8 @@ def verify_timestamps(traces, preserve):
         if trace["id"] <= (
                 8 + grpc_id_offset) and compute_span >= 400 * 1000 * 1000:
             response_complete = timestamps["INFER_RESPONSE_COMPLETE"]
-            large_delay_response_complete = max(large_delay_response_complete, response_complete)
+            large_delay_response_complete = max(large_delay_response_complete,
+                                                response_complete)
         else:
             small_delay_traces.append(trace)
 
@@ -102,6 +103,7 @@ def verify_timestamps(traces, preserve):
         # If not preserve ordering, the small delay batches should all be done
         # before large delay batch regardless of the ordering in scheduler
         return 0 if response_request_after_large_delay_count == 0 else 1
+
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()

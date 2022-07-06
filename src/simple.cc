@@ -562,7 +562,8 @@ main(int argc, char** argv)
   // options can be deleted.
   TRITONSERVER_Server* server_ptr = nullptr;
   FAIL_IF_ERR(
-      TRITONSERVER_ServerNew(&server_ptr, server_options), "creating server object");
+      TRITONSERVER_ServerNew(&server_ptr, server_options),
+      "creating server object");
   FAIL_IF_ERR(
       TRITONSERVER_ServerOptionsDelete(server_options),
       "deleting server options");

@@ -41,15 +41,15 @@ def create_resnet50_torchtrt(models_dir, max_batch):
 
     resnet50_ts = torch.jit.trace(model, example_input)
 
-    trt_ts_module = torch_tensorrt.compile(resnet50_ts,
-        inputs = [ 
-            torch_tensorrt.Input(
-                min_shape=[1, 3, 224, 224],
-                opt_shape=[1, 3, 224, 224],
-                max_shape=[max_batch, 3, 224, 224],
-                dtype=torch.float)
+    trt_ts_module = torch_tensorrt.compile(
+        resnet50_ts,
+        inputs=[
+            torch_tensorrt.Input(min_shape=[1, 3, 224, 224],
+                                 opt_shape=[1, 3, 224, 224],
+                                 max_shape=[max_batch, 3, 224, 224],
+                                 dtype=torch.float)
         ],
-        enabled_precisions = {torch.float},
+        enabled_precisions={torch.float},
     )
 
     model_name = "resnet50_libtorch"
