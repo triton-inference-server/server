@@ -126,13 +126,13 @@ sed -i "s/${COMPOSING_MODEL}/${COMPOSING_MODEL_CACHE_ENABLED}/g" "${MODEL_DIR}/$
 sed -i "s/${COMPOSING_MODEL}/${COMPOSING_MODEL_CACHE_DISABLED}/g" "${MODEL_DIR}/${ENSEMBLE_MODEL_CACHE_DISABLED}/config.pbtxt"
 
 ## Append cache config to each model config 
-echo "response_cache { enable: True }" >> "${MODEL_DIR}/${ENSEMBLE_MODEL_CACHE_ENABLED}/config.pbtxt"
-echo "response_cache { enable: False }" >> "${MODEL_DIR}/${ENSEMBLE_MODEL_CACHE_DISABLED}/config.pbtxt"
-echo "response_cache { enable: True }" >> "${MODEL_DIR}/${COMPOSING_MODEL_CACHE_ENABLED}/config.pbtxt"
-echo "response_cache { enable: False }" >> "${MODEL_DIR}/${COMPOSING_MODEL_CACHE_DISABLED}/config.pbtxt"
+echo -e "response_cache { enable: True }" >> "${MODEL_DIR}/${ENSEMBLE_MODEL_CACHE_ENABLED}/config.pbtxt"
+echo -e "response_cache { enable: False }" >> "${MODEL_DIR}/${ENSEMBLE_MODEL_CACHE_DISABLED}/config.pbtxt"
+echo -e "response_cache { enable: True }" >> "${MODEL_DIR}/${COMPOSING_MODEL_CACHE_ENABLED}/config.pbtxt"
+echo -e "response_cache { enable: False }" >> "${MODEL_DIR}/${COMPOSING_MODEL_CACHE_DISABLED}/config.pbtxt"
 # Force CPU memory for composing models since cache doesn't currently support GPU memory
-echo "instance_group [{ kind: KIND_CPU \n count: 1 }]" >> "${MODEL_DIR}/${COMPOSING_MODEL_CACHE_ENABLED}/config.pbtxt"
-echo "instance_group [{ kind: KIND_CPU \n count: 1 }]" >> "${MODEL_DIR}/${COMPOSING_MODEL_CACHE_DISABLED}/config.pbtxt"
+echo -e "instance_group [{ kind: KIND_CPU, count: 1 }]" >> "${MODEL_DIR}/${COMPOSING_MODEL_CACHE_ENABLED}/config.pbtxt"
+echo -e "instance_group [{ kind: KIND_CPU, count: 1 }]" >> "${MODEL_DIR}/${COMPOSING_MODEL_CACHE_DISABLED}/config.pbtxt"
 
 # Run server
 run_server
