@@ -1,0 +1,106 @@
+#!/bin/bash
+# Copyright (c) 2021, NVIDIA CORPORATION. All rights reserved.
+#
+# Redistribution and use in source and binary forms, with or without
+# modification, are permitted provided that the following conditions
+# are met:
+#  * Redistributions of source code must retain the above copyright
+#    notice, this list of conditions and the following disclaimer.
+#  * Redistributions in binary form must reproduce the above copyright
+#    notice, this list of conditions and the following disclaimer in the
+#    documentation and/or other materials provided with the distribution.
+#  * Neither the name of NVIDIA CORPORATION nor the names of its
+#    contributors may be used to endorse or promote products derived
+#    from this software without specific prior written permission.
+#
+# THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS ``AS IS'' AND ANY
+# EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+# IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR
+# PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL THE COPYRIGHT OWNER OR
+# CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL,
+# EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
+# PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR
+# PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY
+# OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+# (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+# OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+
+SAGEMAKER_SINGLE_MODEL_REPO=/opt/ml/model/
+SAGEMAKER_MULTI_MODEL_REPO=/opt/ml/models/
+
+SAGEMAKER_MODEL_REPO=${SAGEMAKER_SINGLE_MODEL_REPO}
+is_mme_mode=false
+
+if [ -n "$SAGEMAKER_MULTI_MODEL" ]; then
+    if [ "$SAGEMAKER_MULTI_MODEL" == "true" ]; then
+        SAGEMAKER_MODEL_REPO=${SAGEMAKER_MULTI_MODEL_REPO}
+        is_mme_mode=true
+        echo "Triton is running in SageMaker MME mode" 
+    fi
+fi
+
+SAGEMAKER_ARGS="--model-repository=${SAGEMAKER_MODEL_REPO}"
+if [ -n "$SAGEMAKER_BIND_TO_PORT" ]; then
+    SAGEMAKER_ARGS="${SAGEMAKER_ARGS} --sagemaker-port=${SAGEMAKER_BIND_TO_PORT}"
+fi
+if [ -n "$SAGEMAKER_SAFE_PORT_RANGE" ]; then
+    SAGEMAKER_ARGS="${SAGEMAKER_ARGS} --sagemaker-safe-port-range=${SAGEMAKER_SAFE_PORT_RANGE}"
+fi
+if [ -n "$SAGEMAKER_TRITON_BUFFER_MANAGER_THREAD_COUNT" ]; then
+    SAGEMAKER_ARGS="${SAGEMAKER_ARGS} --buffer-manager-thread-count=${SAGEMAKER_TRITON_BUFFER_MANAGER_THREAD_COUNT}"
+fi
+if [ -n "$SAGEMAKER_TRITON_THREAD_COUNT" ]; then
+    SAGEMAKER_ARGS="${SAGEMAKER_ARGS} --sagemaker-thread-count=${SAGEMAKER_TRITON_THREAD_COUNT}"
+fi
+if [ -n "$SAGEMAKER_TRITON_LOG_VERBOSE" ]; then
+    SAGEMAKER_ARGS="${SAGEMAKER_ARGS} --log-verbose=${SAGEMAKER_TRITON_LOG_VERBOSE}"
+fi
+if [ -n "$SAGEMAKER_TRITON_LOG_INFO" ]; then
+    SAGEMAKER_ARGS="${SAGEMAKER_ARGS} --log-info=${SAGEMAKER_TRITON_LOG_INFO}"
+fi
+if [ -n "$SAGEMAKER_TRITON_LOG_WARNING" ]; then
+    SAGEMAKER_ARGS="${SAGEMAKER_ARGS} --log-warning=${SAGEMAKER_TRITON_LOG_WARNING}"
+fi
+if [ -n "$SAGEMAKER_TRITON_LOG_ERROR" ]; then
+    SAGEMAKER_ARGS="${SAGEMAKER_ARGS} --log-error=${SAGEMAKER_TRITON_LOG_ERROR}"
+fi
+if [ -n "$SAGEMAKER_TRITON_SHM_DEFAULT_BYTE_SIZE" ]; then
+    SAGEMAKER_ARGS="${SAGEMAKER_ARGS} --backend-config=python,shm-default-byte-size=${SAGEMAKER_TRITON_SHM_DEFAULT_BYTE_SIZE}"
+fi
+if [ -n "$SAGEMAKER_TRITON_SHM_GROWTH_BYTE_SIZE" ]; then
+    SAGEMAKER_ARGS="${SAGEMAKER_ARGS} --backend-config=python,shm-growth-byte-size=${SAGEMAKER_TRITON_SHM_GROWTH_BYTE_SIZE}"
+fi
+
+if [ "${is_mme_mode}" = false ] && [ -f "${SAGEMAKER_MODEL_REPO}/config.pbtxt" ]; then
+    echo "ERROR: Incorrect directory structure."
+    echo "       Model directory needs to contain the top level folder"
+    exit 1
+fi
+
+if [ "${is_mme_mode}" = false ] && [ -n "$SAGEMAKER_TRITON_DEFAULT_MODEL_NAME" ]; then
+    if [ -d "${SAGEMAKER_MODEL_REPO}/$SAGEMAKER_TRITON_DEFAULT_MODEL_NAME" ]; then
+        SAGEMAKER_ARGS="${SAGEMAKER_ARGS} --load-model=${SAGEMAKER_TRITON_DEFAULT_MODEL_NAME}"
+    else
+        echo "ERROR: Directory with provided SAGEMAKER_TRITON_DEFAULT_MODEL_NAME ${SAGEMAKER_TRITON_DEFAULT_MODEL_NAME} does not exist"
+        exit 1
+    fi
+elif [ "${is_mme_mode}" = false ]; then
+    MODEL_DIRS=(`find "${SAGEMAKER_MODEL_REPO}" -mindepth 1 -maxdepth 1 -type d -printf "%f\n"`)
+    case ${#MODEL_DIRS[@]} in
+        0) echo "ERROR: No model found in model repository";
+           exit 1
+           ;;
+        1) echo "WARNING: No SAGEMAKER_TRITON_DEFAULT_MODEL_NAME provided."
+           echo "         Starting with the only existing model directory ${MODEL_DIRS[0]}";
+           export SAGEMAKER_TRITON_DEFAULT_MODEL_NAME=${MODEL_DIRS[0]}
+           ;;
+        *) echo "ERROR: More than 1 model directory found in model repository."
+           echo "       Either provide a single directory or set SAGEMAKER_TRITON_DEFAULT_MODEL_NAME to run the ensemble backend."
+           echo "       Directories found in model repository: ${MODEL_DIRS[@]}";
+           exit 1
+           ;;
+    esac
+    SAGEMAKER_ARGS="${SAGEMAKER_ARGS} --load-model=${SAGEMAKER_TRITON_DEFAULT_MODEL_NAME}"
+fi
+
+tritonserver --allow-sagemaker=true --allow-grpc=false --allow-http=false --allow-metrics=false --model-control-mode=explicit $SAGEMAKER_ARGS

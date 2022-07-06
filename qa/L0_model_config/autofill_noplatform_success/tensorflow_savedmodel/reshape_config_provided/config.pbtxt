@@ -1,0 +1,34 @@
+name: "reshape_config_provided"
+max_batch_size: 8
+input [
+  {
+    name: "INPUT0"
+    data_type: TYPE_FP32
+    dims: [ 1 ]
+    reshape: { shape: [  ] }
+  }
+]
+output [
+  {
+    name: "OUTPUT0"
+    data_type: TYPE_FP32
+    dims: [ 1 ]
+    reshape: { shape: [  ] }
+  }
+]
+input [
+  {
+    name: "INPUT1"
+    data_type: TYPE_FP32
+    dims: [ 8 ]
+    reshape: { shape: [ 4,1,2 ] }
+  }
+]
+output [
+  {
+    name: "OUTPUT1"
+    data_type: TYPE_FP32
+    dims: [ 8 ]
+    reshape: { shape: [ 4,1,2 ] }
+  }
+]

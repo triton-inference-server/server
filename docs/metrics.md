@@ -1,5 +1,5 @@
 <!--
-# Copyright 2018-2021, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright 2018-2022, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -42,7 +42,10 @@ $ curl localhost:8002/metrics
 The tritonserver --allow-metrics=false option can be used to disable
 all metric reporting and --allow-gpu-metrics=false can be used to
 disable just the GPU Utilization and GPU Memory metrics. The
---metrics-port option can be used to select a different port.
+--metrics-port option can be used to select a different port. For now,
+Triton reuses http address for metrics endpoint. The option --http-address
+can be used to bind http and metrics endpoints to the same specific address
+when http service is enabled.
 
 The following table describes the available metrics.
 
@@ -71,7 +74,11 @@ The following table describes the available metrics.
 |              |Total Cache Lookup Time |Cumulative time requests spend checking for a cached response across all models (microseconds) |Server-wide |Per second |
 |              |Total Cache Utilization |Total Response Cache utilization rate (0.0 - 1.0) |Server-wide |Per second |
 |              |Cache Hit Count |Number of response cache hits per model |Per model |Per request |
-|              |Cache Hit Lookup Time |Cumulative time requests spend retrieving a cached response per model on cache hits, does not include cache misses (microseconds) |Per model |Per request |
+|              |Cache Hit Lookup Time |Cumulative time requests spend retrieving a cached response per model on cache hits (microseconds) |Per model |Per request |
+|              |Cache Miss Count |Number of response cache misses per model |Per model |Per request |
+|              |Cache Miss Lookup Time |Cumulative time requests spend looking up a request hash on a cache miss (microseconds) |Per model |Per request |
+|              |Cache Miss Insertion Time |Cumulative time requests spend inserting responses into the cache on a cache miss (microseconds) |Per model |Per request |
+
 
 ## Response Cache
 
@@ -85,9 +92,10 @@ On cache hits, "Cache Hit Lookup Time" indicates the time spent looking up the
 response, and "Compute Input Time" /  "Compute Time" / "Compute Output Time"
 are not recorded.
 
-On cache misses, "Cache Hit Lookup Time" will not be recorded, and
-"Compute Input Time" /  "Compute Time" / "Compute Output Time" will be
-recorded as usual.
+On cache misses, "Cache Miss Lookup Time" indicates the time spent looking up
+the request hash and "Cache Miss Insertion Time" indicates the time spent
+inserting the computed output tensor data into the cache. Otherwise, "Compute
+Input Time" /  "Compute Time" / "Compute Output Time" will be recorded as usual.
 
 ## Count Metrics
 
@@ -119,3 +127,17 @@ Count*. The count metrics are illustrated by the following examples:
   the server. *Request Count* = 2, *Inference Count* = 9, *Execution
   Count* = 1.
 
+## Custom Metrics
+
+Triton exposes a C API to allow users and backends to register and collect
+custom metrics with the existing Triton metrics endpoint. The user takes the
+ownership of the custom metrics created through the APIs and must manage their
+lifetime following the API documentation.
+
+The 
+[identity_backend](https://github.com/triton-inference-server/identity_backend/blob/main/README.md#custom-metric-example)
+demonstrates a practical example of adding a custom metric to a backend.
+
+Further documentation can be found in the `TRITONSERVER_MetricFamily*` and
+`TRITONSERVER_Metric*` API annotations in
+[tritonserver.h](https://github.com/triton-inference-server/core/blob/main/include/triton/core/tritonserver.h).

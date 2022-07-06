@@ -1,4 +1,4 @@
-# Copyright (c) 2018-2021, NVIDIA CORPORATION. All rights reserved.
+# Copyright 2018-2022, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -38,6 +38,10 @@ import test_util as tu
 
 import tritonclient.grpc as grpcclient
 
+# By default, find tritonserver on "localhost", but can be overridden
+# with TRITONSERVER_IPADDR envvar
+_tritonserver_ipaddr = os.environ.get('TRITONSERVER_IPADDR', 'localhost')
+
 TEST_SYSTEM_SHARED_MEMORY = bool(
     int(os.environ.get('TEST_SYSTEM_SHARED_MEMORY', 0)))
 TEST_CUDA_SHARED_MEMORY = bool(int(os.environ.get('TEST_CUDA_SHARED_MEMORY',
@@ -76,7 +80,7 @@ class BatcherTest(tu.TestResultCollector):
 
     def setUp(self):
         # The helper client for setup will be GRPC for simplicity.
-        self.triton_client_ = grpcclient.InferenceServerClient("localhost:8001")
+        self.triton_client_ = grpcclient.InferenceServerClient(f"{_tritonserver_ipaddr}:8001")
         self.precreated_shm_regions_ = []
         global _deferred_exceptions
         _deferred_exceptions = []

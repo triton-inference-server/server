@@ -29,23 +29,29 @@
 # Triton Server Trace
 
 Triton includes that capability to generate a detailed trace for
-individual inference requests.  Tracing is enable by command-line
+individual inference requests. Tracing is enable by command-line
 arguments when running the tritonserver executable. For example,
 
 ```
-$ tritonserver --trace-file=/tmp/trace.json --trace-rate=100 --trace-level=MAX ...
+$ tritonserver --trace-file=/tmp/trace.json --trace-rate=100 --trace-level=TIMESTAMPS ...
 ```
 
 The --trace-file option indicates where the trace output should be
 written. The --trace-rate option specifies the sampling rate. In
 this example every 100-th inference request will be traced. The
 --trace-level option indicates the level of trace detail that should
-be collected. Use the --help option to get more information.
+be collected. --trace-level option may be specified multiple times to 
+trace multiple informations. Use the --help option to get more information.
 
 In addition to configure trace settings in command line arguments, The user may
 modify the trace setting when Triton server
 is running via the trace APIs, more information can be found in [trace
 protocol](protocol/extension_trace.md).
+
+## Supported Trace Level Option
+
+- `TIMESTAMPS`: Tracing execution timestamps of each request.
+- `TENSORS`: Tracing input and output tensors during the execution. 
 
 ## JSON Trace Output
 
@@ -63,23 +69,36 @@ The trace output is a JSON file with the following schema.
       ...
     ]
   },
+  {
+    "model_name": $string,
+    "model_version": $number,
+    "id": $number
+    "activity": $string,
+    "tensor":{
+      "name": $string,
+      "data": $string,
+      "dtype": $string
+    }
+  },
   ...
 ]
 ```
 
-Each trace indicates the model name and version of the inference
-request. Each trace is assigned a unique "id". If the trace is from a
-model run as part of an ensemble the "parent_id" will indicate the
-"id" of the containing ensemble.  Each trace will have one or more
-"timestamps" with each timestamp having a name and the timestamp in
-nanoseconds ("ns"). For example,
+Each trace is assigned a "id", which indicates the model name and 
+version of the inference request. If the trace is from a
+model run as part of an ensemble, the "parent_id" will indicate the
+"id" of the containing ensemble.  
+
+Each `TIMESTAMPS` trace will have one or more "timestamps" with 
+each timestamp having a name and the timestamp in nanoseconds ("ns"). 
+For example:
 
 ```
 [
   {
     "model_name": "simple",
     "model_version": -1,
-    "id":1,
+    "id": 1,
     "timestamps" : [
       { "name": "http recv start", "ns": 2259961222771924 },
       { "name": "http recv end", "ns": 2259961222820985 },
@@ -91,6 +110,27 @@ nanoseconds ("ns"). For example,
       { "name": "http send start", "ns": 2259961230529606 },
       { "name": "http send end", "ns": 2259961230543930 }
     ]
+  }
+]
+```
+
+Each `TENSORS` trace will contain an "activity" and a "tensor". 
+"activity" indicates the type of tensor, including "TENSOR_QUEUE_INPUT" 
+and "TENSOR_BACKEND_OUTPUT" by now. "tensor" has the detail of tensor, 
+including its "name", "data" and "dtype". For example:
+
+```
+[
+  {
+    "model_name": "simple",
+    "model_version": -1,
+    "id": 1,
+    "activity": "TENSOR_QUEUE_INPUT",
+    "tensor":{
+      "name": "input",
+      "data": "0.1,0.1,0.1,...",
+      "dtype": "FP32"
+    }
   }
 ]
 ```
@@ -124,10 +164,10 @@ HTTP infer request (avg): 378us
   			Output (avg): 15us
 Summary for simple (-1): trace count = 1
 GRPC infer request (avg): 21441us
-  	Wait/Read (avg): 20923us
-  	Send (avg): 74us
-  	Overhead (avg): 46us
-  	Handler (avg): 395us
+	Wait/Read (avg): 20923us
+	Send (avg): 74us
+	Overhead (avg): 46us
+	Handler (avg): 395us
   		Overhead (avg): 16us
   		Queue (avg): 47us
   		Compute (avg): 331us
@@ -146,7 +186,7 @@ the request was enqueued in the scheduling queue.
 $ trace_summary.py -t <trace file>
 ...
 simple (-1):
-	grpc wait/read start
+  	grpc wait/read start
   		26529us
   	grpc wait/read end
   		39us
@@ -163,6 +203,50 @@ simple (-1):
   	grpc send start
   		77us
   	grpc send end
+...
+```
+
+The script can also show the data flow of the first request if there are 
+`TENSORS` traces in the file. If the `TENSORS` traces are from an ensemble, 
+the data flow will be shown with the dependency of each model.
+
+```
+...
+Data Flow:
+	==========================================================
+	Name:   ensemble
+	Version:1
+	QUEUE_INPUT:
+		input: [[0.705676  0.830855  0.833153]]
+	BACKEND_OUTPUT:
+		output: [[1. 2. 7. 0. 4. 7. 9. 3. 4. 9.]]
+	==========================================================
+		==================================================
+		Name:   test_trt1
+		Version:1
+		QUEUE_INPUT:
+			input: [[0.705676  0.830855  0.833153]]
+		BACKEND_OUTPUT:
+			output1: [[1. 1. ...]]
+		==================================================
+		==================================================
+		Name:   test_trt2
+		Version:1
+		QUEUE_INPUT:
+			input: [[0.705676  0.830855  0.833153]]
+		BACKEND_OUTPUT:
+			output2: [[2. 2. ...]]
+		==================================================
+		==================================================
+		Name:   test_py
+		Version:1
+		QUEUE_INPUT:
+			output1: [[1. 1. ...]]
+		QUEUE_INPUT:
+			output2: [[2. 2. ...]]
+		BACKEND_OUTPUT:
+			output: [[1. 2. 7. 0. 4. 7. 9. 3. 4. 9.]]
+		==================================================
 ...
 ```
 
@@ -191,7 +275,7 @@ The meaning of the trace timestamps is:
 
   * Compute: The time the inference request spent executing the actual
     inference. This time includes the time spent copying input and
-    output tensors. If --trace-level=MAX then a breakdown of the
+    output tensors. If --trace-level=TIMESTAMPS then a breakdown of the
     compute time will be provided as follows:
 
     * Input: The time to copy input tensor data as required by the
@@ -207,3 +291,15 @@ The meaning of the trace timestamps is:
 
   * Overhead: Additional time required for request handling not
     covered by Queue or Compute times.
+
+* Data Flow: The data flow of the first request. It contains the input and 
+  output tensors of each part of execution.
+
+  * Name: The name of model.
+
+  * Version: The version of model.
+
+  * QUEUE_INPUT: The tensor entering the queue of a backend to wait for 
+    scheduling.
+
+  * BACKEND_OUTPUT: The tensor in the response of a backend.

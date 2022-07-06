@@ -1,5 +1,5 @@
 <!--
-# Copyright (c) 2020, NVIDIA CORPORATION. All rights reserved.
+# Copyright 2020-2022, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -116,8 +116,40 @@ $repository_index_error_response =
 
 The load API requests that a model be loaded into Triton, or reloaded
 if the model is already loaded. A load request is made with an HTTP
-POST to a load endpoint. The HTTP body must be empty. A successful
-load request is indicated by a 200 HTTP status.
+POST to a load endpoint. The HTTP body may be empty or may contain
+the load request object, identified as $repository_load_request.
+A successful load request is indicated by a 200 HTTP status.
+
+
+```
+$repository_load_request =
+{
+  "parameters" : $parameters #optional
+}
+```
+
+- "parameters" : An object containing zero or more parameters for this
+  request expressed as key/value pairs. See
+  [Parameters](https://github.com/kserve/kserve/blob/master/docs/predict-api/v2/required_api.md#parameters)
+  for more information.
+
+The load API accepts the following parameters:
+
+- "config" : string parameter that contains a JSON representation of the model
+configuration, which must be able to be parsed into [ModelConfig message from
+model_config.proto](https://github.com/triton-inference-server/common/blob/main/protobuf/model_config.proto).
+This config will be used for loading the model instead of the one in
+the model directory. If config is provided, the (re-)load will be triggered as
+the model metadata has been updated, and the same (re-)load behavior will be
+applied.
+
+- "file:\<version\>/\<file-name\>" : The serialized model file, base64 encoded.
+This convention will be used to specify the override model directory to load
+the model from. For instance, if the user wants to specify a model directory
+that contains an ONNX model as version 2, then the user will specify the
+parameter to "file:2/model.onnx" : "<base64-encoded-file-content>". Note that
+"config" parameter must be provided to serve as the model configuration of the
+override model directory.
 
 A failed load request must be indicated by an HTTP error status
 (typically 400). The HTTP body must contain the
@@ -155,8 +187,8 @@ The unload API accepts the following parameters:
 
 - "unload_dependents" : boolean parameter indicating that in addition
   to unloading the requested model, also unload any dependent model
-  that was loaded along with the requested model (for example, the
-  models composing an ensemble).
+  that was loaded along with the requested model. For example, request to
+  unload the models composing an ensemble will unload the ensemble as well.
 
 A failed unload request must be indicated by an HTTP error status
 (typically 400). The HTTP body must contain the
@@ -207,6 +239,9 @@ message ModelRepositoryParameter
 
     // A string parameter value.
     string string_param = 3;
+
+    // A bytes parameter value.
+    bytes bytes_param = 4;
   }
 }
 ```
@@ -270,12 +305,33 @@ message RepositoryModelLoadRequest
 
   // The name of the model to load, or reload.
   string model_name = 2;
+
+  // Optional parameters.
+  map<string, ModelRepositoryParameter> parameters = 3;
 }
 
 message RepositoryModelLoadResponse
 {
 }
 ```
+
+The RepositoryModelLoad API accepts the following parameters:
+
+- "config" : string parameter that contains a JSON representation of the model
+configuration, which must be able to be parsed into [ModelConfig message from
+model_config.proto](https://github.com/triton-inference-server/common/blob/main/protobuf/model_config.proto).
+This config will be used for loading the model instead of the one in
+the model directory. If config is provided, the (re-)load will be triggered as
+the model metadata has been updated, and the same (re-)load behavior will be
+applied.
+
+- "file:\<version\>/\<file-name\>" : bytes parameter that contains the model
+file content. This convention will be used to specify the override model
+directory to load the model from. For instance, if the user wants to specify a
+model directory that contains an ONNX model as version 2, then the user will
+specify the parameter to "file:2/model.onnx" : "<file-content>". Note that
+"config" parameter must be provided to serve as the model configuration of the
+override model directory.
 
 ### Unload
 
@@ -303,3 +359,10 @@ message RepositoryModelUnloadResponse
 {
 }
 ```
+
+The RepositoryModelUnload API accepts the following parameters:
+
+- "unload_dependents" : boolean parameter indicating that in addition
+  to unloading the requested model, also unload any dependent model
+  that was loaded along with the requested model. For example, request to
+  unload the models composing an ensemble will unload the ensemble as well.

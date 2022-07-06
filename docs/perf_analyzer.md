@@ -511,3 +511,157 @@ There are a few functionalities that are missing from the C API. They are:
 3. Request rate range mode
 4. For additonal known non-working cases, please refer to 
    [qa/L0_perf_analyzer_capi/test.sh](https://github.com/triton-inference-server/server/blob/main/qa/L0_perf_analyzer_capi/test.sh#L239-L277)
+
+
+## Benchmarking TensorFlow Serving
+perf_analyzer can also be used to benchmark models deployed on
+[TensorFlow Serving](https://github.com/tensorflow/serving) using
+the `--service-kind` option. The support is however only available
+through gRPC protocol.
+ 
+Following invocation demonstrates how to configure perf_analyzer
+to issue requests to a running instance of
+`tensorflow_model_server`:
+ 
+```
+$ perf_analyzer -m resnet50 --service-kind tfserving -i grpc -b 1 -p 5000 -u localhost:8500
+*** Measurement Settings ***
+  Batch size: 1
+  Using "time_windows" mode for stabilization
+  Measurement window: 5000 msec
+  Using synchronous calls for inference
+  Stabilizing using average latency
+Request concurrency: 1
+  Client: 
+    Request count: 829
+    Throughput: 165.8 infer/sec
+    Avg latency: 6032 usec (standard deviation 569 usec)
+    p50 latency: 5863 usec
+    p90 latency: 6655 usec
+    p95 latency: 6974 usec
+    p99 latency: 8093 usec
+    Avg gRPC time: 5984 usec ((un)marshal request/response 257 usec + response wait 5727 usec)
+Inferences/Second vs. Client Average Batch Latency
+Concurrency: 1, throughput: 165.8 infer/sec, latency 6032 usec
+```
+ 
+You might have to specify a different url(`-u`) to access wherever
+the server is running. The report of perf_analyzer will only
+include statistics measured at the client-side.
+ 
+**NOTE:** The support is still in **beta**. perf_analyzer does
+not guarantee optimum tuning for TensorFlow Serving. However, a
+single benchmarking tool that can be used to stress the inference
+servers in an identical manner is important for performance
+analysis.
+
+ 
+The following points are important for interpreting the results:
+1. `Concurrent Request Execution`:
+TensorFlow Serving (TFS), as of version 2.8.0, by default creates
+threads for each request that individually submits requests to
+TensorFlow Session. There is a resource limit on the number of
+concurrent threads serving requests. When benchmarking at a higher
+request concurrency, you can see higher throughput because of this.  
+Unlike TFS, by default Triton is configured with only a single
+[instance count](https://github.com/triton-inference-server/server/blob/main/docs/model_configuration.md#instance-groups). Hence, at a higher request concurrency, most
+of the requests are blocked on the instance availability. To
+configure Triton to behave like TFS, set the instance count to a
+reasonably high value and then set
+[MAX_SESSION_SHARE_COUNT](https://github.com/triton-inference-server/tensorflow_backend#parameters)
+parameter in the model confib.pbtxt to the same value.For some
+context, the TFS sets its thread constraint to four times the
+num of schedulable CPUs.
+2. `Different library versions`:
+The version of TensorFlow might differ between Triton and
+TensorFlow Serving being benchmarked. Even the versions of cuda
+libraries might differ between the two solutions. The performance
+of models can be susceptible to the versions of these libraries.
+For a single request concurrency, if the compute_infer time
+reported by perf_analyzer when benchmarking Triton is as large as
+the latency reported by perf_analyzer when benchmarking TFS, then
+the performance difference is likely because of the difference in
+the software stack and outside the scope of Triton.
+3. `CPU Optimization`:
+TFS has separate builds for CPU and GPU targets. They have
+target-specific optimization. Unlike TFS, Triton has a single build
+which is optimized for execution on GPUs. When collecting performance
+on CPU models on Triton, try running Triton with the environment
+variable `TF_ENABLE_ONEDNN_OPTS=1`.
+ 
+ 
+## Benchmarking TorchServe
+perf_analyzer can also be used to benchmark
+[TorchServe](https://github.com/pytorch/serve) using the
+`--service-kind` option. The support is however only available through
+HTTP protocol. It also requires input to be provided via JSON file.
+ 
+Following invocation demonstrates how to configure perf_analyzer to
+issue requests to a running instance of `torchserve` assuming the
+location holds `kitten_small.jpg`:
+ 
+```
+$ perf_analyzer -m resnet50 --service-kind torchserve -i http -u localhost:8080 -b 1 -p 5000 --input-data data.json
+ Successfully read data for 1 stream/streams with 1 step/steps.
+*** Measurement Settings ***
+  Batch size: 1
+  Using "time_windows" mode for stabilization
+  Measurement window: 5000 msec
+  Using synchronous calls for inference
+  Stabilizing using average latency
+Request concurrency: 1
+  Client: 
+    Request count: 799
+    Throughput: 159.8 infer/sec
+    Avg latency: 6259 usec (standard deviation 397 usec)
+    p50 latency: 6305 usec
+    p90 latency: 6448 usec
+    p95 latency: 6494 usec
+    p99 latency: 7158 usec
+    Avg HTTP time: 6272 usec (send/recv 77 usec + response wait 6195 usec)
+Inferences/Second vs. Client Average Batch Latency
+Concurrency: 1, throughput: 159.8 infer/sec, latency 6259 usec
+```
+ 
+The content of `data.json`:
+ 
+```
+ {
+   "data" :
+    [
+       {
+         "TORCHSERVE_INPUT" : ["kitten_small.jpg"]
+       }
+     ]
+ }
+```
+ 
+You might have to specify a different url(`-u`) to access wherever
+the server is running. The report of perf_analyzer will only include
+statistics measured at the client-side.
+ 
+**NOTE:** The support is still in **beta**. perf_analyzer does not
+guarantee optimum tuning for TorchServe. However, a single benchmarking
+tool that can be used to stress the inference servers in an identical
+manner is important for performance analysis.
+
+## Advantages of using Perf Analyzer over third-party benchmark suites
+
+Triton Inference Server offers the entire serving solution which
+includes [client libraries](https://github.com/triton-inference-server/client)
+that are optimized for Triton.
+Using third-party benchmark suites like jmeter fails to take advantage of the
+optimized libraries. Some of these optimizations includes but are not limited
+to:
+1. Using [binary tensor data extension](https://github.com/triton-inference-server/server/blob/main/docs/protocol/extension_binary_data.md) with HTTP requests.
+2. Effective re-use of gRPC message allocation in subsequent requests.
+3. Avoiding extra memory copy via libcurl interface.
+
+These optimizations can have a tremendous impact on overall performance.
+Using perf_analyzer for benchmarking directly allows a user to access
+these optimizations in their study. 
+
+Not only that, perf_analyzer is also very customizable and supports many
+Triton features as described in this document. This, along with a detailed
+report, allows a user to identify performance bottlenecks and experiment
+with different features before deciding upon what works best for them.

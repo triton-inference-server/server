@@ -1,5 +1,5 @@
 #!/bin/bash
-# Copyright 2019-2021, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright 2019-2022, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -47,7 +47,8 @@ TRITON_DIR=${TRITON_DIR:="/opt/tritonserver"}
 ARCH=${ARCH:="x86_64"}
 SERVER=${TRITON_DIR}/bin/tritonserver
 BACKEND_DIR=${TRITON_DIR}/backends
-SERVER_ARGS="--model-repository=`pwd`/models --backend-directory=${BACKEND_DIR}"
+MODEL_REPO="${PWD}/models"
+SERVER_ARGS="--model-repository=${MODEL_REPO} --backend-directory=${BACKEND_DIR}"
 source ../common/util.sh
 
 # DATADIR is already set in environment variable for aarch64
@@ -78,6 +79,17 @@ PERF_CLIENT_PERCENTILE_ARGS="" &&
     (( ${PERF_CLIENT_PERCENTILE} != 0 )) &&
     PERF_CLIENT_PERCENTILE_ARGS="--percentile=${PERF_CLIENT_PERCENTILE}"
 PERF_CLIENT_EXTRA_ARGS="$PERF_CLIENT_PERCENTILE_ARGS --shared-memory \"${SHARED_MEMORY}\""
+
+# Overload use of PERF_CLIENT_PROTOCOL for convenience with existing test and 
+# reporting structure, though "triton_c_api" is not strictly a "protocol".
+if [[ "${PERF_CLIENT_PROTOCOL}" == "triton_c_api" ]]; then
+    # Server will be run in-process with C API
+    SERVICE_ARGS="--service-kind triton_c_api \
+                  --triton-server-directory ${TRITON_DIR} \
+                  --model-repository ${MODEL_REPO}"
+else
+    SERVICE_ARGS="-i ${PERF_CLIENT_PROTOCOL}"
+fi
 
 #
 # Use "identity" model for all model types.
@@ -134,23 +146,35 @@ for BACKEND in $BACKENDS; do
     rm -fr models && mkdir -p models && \
         cp -r $REPO_DIR/$MODEL_NAME models/. && \
         (cd models/$MODEL_NAME && \
-                sed -i "s/^max_batch_size:.*/max_batch_size: ${MAX_BATCH}/" config.pbtxt && \
+                sed -i "s/^max_batch_size:.*/max_batch_size: ${MAX_BATCH}/" config.pbtxt)
+
+    # python model already has instance count and kind
+    if [ $BACKEND == "python" ]; then
+        (cd models/$MODEL_NAME && \
+                sed -i "s/count:.*/count: ${INSTANCE_CNT}/" config.pbtxt)
+    else
+        (cd models/$MODEL_NAME && \
                 echo "instance_group [ { kind: ${KIND}, count: ${INSTANCE_CNT} }]" >> config.pbtxt)
+    fi
+
     if [ $BACKEND == "custom" ]; then
         (cd models/$MODEL_NAME && \
-            sed -i "s/dims:.*\[.*\]/dims: \[ ${SHAPE} \]/g" config.pbtxt)
+                sed -i "s/dims:.*\[.*\]/dims: \[ ${SHAPE} \]/g" config.pbtxt)
     fi
     if [ $DYNAMIC_BATCH > 1 ] && [ $BACKEND != "openvino" ]; then
         (cd models/$MODEL_NAME && \
                 echo "dynamic_batching { preferred_batch_size: [ ${DYNAMIC_BATCH} ] }" >> config.pbtxt)
     fi
 
-    SERVER_LOG="${RESULTDIR}/${NAME}.serverlog"
-    run_server
-    if [ $SERVER_PID == 0 ]; then
-        echo -e "\n***\n*** Failed to start $SERVER\n***"
-        cat $SERVER_LOG
-        exit 1
+    # Only start separate server if not using C API, since C API runs server in-process
+    if [[ "${PERF_CLIENT_PROTOCOL}" != "triton_c_api" ]]; then
+        SERVER_LOG="${RESULTDIR}/${NAME}.serverlog"
+        run_server
+        if [ $SERVER_PID == 0 ]; then
+            echo -e "\n***\n*** Failed to start $SERVER\n***"
+            cat $SERVER_LOG
+            exit 1
+        fi
     fi
 
     set +e
@@ -158,17 +182,13 @@ for BACKEND in $BACKENDS; do
                  -p${PERF_CLIENT_STABILIZE_WINDOW} \
                  -s${PERF_CLIENT_STABILIZE_THRESHOLD} \
                  ${PERF_CLIENT_EXTRA_ARGS} \
-                 -i ${PERF_CLIENT_PROTOCOL} -m ${MODEL_NAME} \
+                 -m ${MODEL_NAME} \
                  -b${STATIC_BATCH} -t${CONCURRENCY} \
                  --shape ${INPUT_NAME}:${SHAPE} \
+                 ${SERVICE_ARGS} \
                  -f ${RESULTDIR}/${NAME}.csv 2>&1 | tee ${RESULTDIR}/${NAME}.log
     if [ $? -ne 0 ]; then
         RET=1
-    fi
-    curl localhost:8002/metrics -o ${RESULTDIR}/${NAME}.metrics >> ${RESULTDIR}/${NAME}.log 2>&1
-    if [ $? -ne 0 ]; then
-        RET=1
-        exit $RET
     fi
     set -e
 
@@ -186,8 +206,11 @@ for BACKEND in $BACKENDS; do
     echo -e "\"l_instance_count\":${INSTANCE_CNT}," >> ${RESULTDIR}/${NAME}.tjson
     echo -e "\"s_architecture\":\"${ARCH}\"}]" >> ${RESULTDIR}/${NAME}.tjson
 
-    kill $SERVER_PID
-    wait $SERVER_PID
+    # SERVER_PID may not be set if using "triton_c_api" for example
+    if [[ -n "${SERVER_PID}" ]]; then
+        kill $SERVER_PID
+        wait $SERVER_PID
+    fi
 
     if [ -f $REPORTER ]; then
         set +e

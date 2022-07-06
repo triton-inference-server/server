@@ -1,5 +1,5 @@
 #!/bin/bash
-# Copyright (c) 2020-2022, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright 2020-2022, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -104,6 +104,14 @@ cp -r /data/inferenceserver/${REPO_VERSION}/tf_model_store/inception_v1_graphdef
 # Copy resnet50v1.5_fp16
 cp -r /data/inferenceserver/${REPO_VERSION}/perf_model_store/resnet50v1.5_fp16_savedmodel $DATADIR
 
+# Copy and customize custom_zero_1_float32
+cp -r ../custom_models/custom_zero_1_float32 $DATADIR && \
+  mkdir $DATADIR/custom_zero_1_float32/1 && \
+  (cd $DATADIR/custom_zero_1_float32 && \
+    echo "parameters [" >> config.pbtxt && \
+        echo "{ key: \"execute_delay_ms\"; value: { string_value: \"100\" }}" >> config.pbtxt && \
+        echo "]" >> config.pbtxt)
+
 # Generating test data
 mkdir -p $TESTDATADIR
 for INPUT in INPUT0 INPUT1; do
@@ -135,6 +143,18 @@ if [ $? -eq 0 ]; then
   RET=1
 fi
 if [ $(cat $CLIENT_LOG |  grep "input INPUT0 contains dynamic shape, provide shapes to send along with the request" | wc -l) -ne 0 ]; then
+  cat $CLIENT_LOG
+  echo -e "\n***\n*** Test Failed: \n***"
+  RET=1
+fi
+
+$PERF_ANALYZER -v -i $PROTOCOL -m graphdef_object_object_object -p2000 --shape INPUT0 >$CLIENT_LOG 2>&1
+if [ $? -eq 0 ]; then
+  cat $CLIENT_LOG
+  echo -e "\n***\n*** Test Failed: Expected an error when using dynamic shapes with incorrect arguments\n***"
+  RET=1
+fi
+if [ $(cat $CLIENT_LOG |  grep "failed to parse input shape. There must be a colon after input name." | wc -l) -eq 0 ]; then
   cat $CLIENT_LOG
   echo -e "\n***\n*** Test Failed: \n***"
   RET=1
@@ -366,8 +386,39 @@ for PROTOCOL in grpc http; do
         RET=1
     fi
 
+    # Binary search for request rate mode
     $PERF_ANALYZER -v -i $PROTOCOL -m graphdef_int32_int32_int32 --request-rate-range 1000:2000:100 -p1000 -b 1 \
     -a --binary-search --request-distribution "poisson" -l 10 >$CLIENT_LOG 2>&1
+    if [ $? -ne 0 ]; then
+        cat $CLIENT_LOG
+        echo -e "\n***\n*** Test Failed\n***"
+        RET=1
+    fi
+    if [ $(cat $CLIENT_LOG |  grep "${ERROR_STRING}" | wc -l) -ne 0 ]; then
+        cat $CLIENT_LOG
+        echo -e "\n***\n*** Test Failed\n***"
+        RET=1
+    fi
+    set -e
+    
+    # Binary search for concurrency range mode and make sure it doesn't hang
+    $PERF_ANALYZER -v -a --request-distribution "poisson" --shared-memory none \
+    --percentile 99 --binary-search --concurrency-range 1:8:2 -l 5 \
+    -m graphdef_int32_int32_int32 -b 1 >$CLIENT_LOG 2>&1 &
+    PA_PID=$!
+    if [ "$PA_PID" == "0" ]; then
+        echo -e "\n***\n*** Failed to start $PERF_ANALYZER\n***"
+        cat $CLIENT_LOG
+        RET=1
+    fi
+    # wait for PA to finish running
+    sleep 200
+    if ps -p $PA_PID > /dev/null; then
+        cat $CLIENT_LOG
+        echo -e "\n***\n*** $PERF_ANALYZER is hanging after 200 s\n***"
+        kill $PA_PID
+        RET=1
+    fi
     if [ $? -ne 0 ]; then
         cat $CLIENT_LOG
         echo -e "\n***\n*** Test Failed\n***"
@@ -709,6 +760,102 @@ if [ $? -ne 0 ]; then
    RET=1
 fi
 if [ $(cat $CLIENT_LOG |  grep "${ERROR_STRING}" | wc -l) -ne 0 ]; then
+   cat $CLIENT_LOG
+   echo -e "\n***\n*** Test Failed\n***"
+   RET=1
+fi
+set -e
+
+## Test perf_analyzer with MPI / multiple models
+
+is_synchronized() {
+  local TIMESTAMP_RANK_0_STABLE=$(grep -oP "^\K[^$]+(?=\[1,0\]<stdout>:All models on all MPI ranks are stable)" 1/rank.0/stdout | date "+%s" -f -)
+  local TIMESTAMP_RANK_1_STABLE=$(grep -oP "^\K[^$]+(?=\[1,1\]<stdout>:All models on all MPI ranks are stable)" 1/rank.1/stdout | date "+%s" -f -)
+  local TIMESTAMP_RANK_2_STABLE=$(grep -oP "^\K[^$]+(?=\[1,2\]<stdout>:All models on all MPI ranks are stable)" 1/rank.2/stdout | date "+%s" -f -)
+  local TIMESTAMP_MIN=$(echo -e "${TIMESTAMP_RANK_0_STABLE}\n${TIMESTAMP_RANK_1_STABLE}\n${TIMESTAMP_RANK_2_STABLE}" | sort -n | head -1)
+  local TIMESTAMP_MAX=$(echo -e "${TIMESTAMP_RANK_0_STABLE}\n${TIMESTAMP_RANK_1_STABLE}\n${TIMESTAMP_RANK_2_STABLE}" | sort -n | tail -1)
+  local TIMESTAMP_MAX_MIN_DIFFERENCE=$((${TIMESTAMP_MAX}-${TIMESTAMP_MIN}))
+  local ALLOWABLE_SECONDS_BETWEEN_PROFILES_FINISHING="5"
+  echo $(($TIMESTAMP_MAX_MIN_DIFFERENCE <= $ALLOWABLE_SECONDS_BETWEEN_PROFILES_FINISHING))
+}
+
+is_stable() {
+  local RANK=$1
+  local IS_THROUGHPUT=$2
+  if [ $IS_THROUGHPUT ]; then
+    local GREP_PATTERN="\[1,$RANK\]<stdout>:  Pass \[[0-9]+\] throughput: \K[0-9]+\.?[0-9]*"
+  else
+    local GREP_PATTERN="\[1,$RANK\]<stdout>:  Pass \[[0-9]+\] throughput: [0-9]+\.?[0-9]* infer/sec. Avg latency: \K[0-9]+"
+  fi
+  local LAST_MINUS_0=$(grep -oP "$GREP_PATTERN" 1/rank.$RANK/stdout | tail -3 | sed -n 3p)
+  local LAST_MINUS_1=$(grep -oP "$GREP_PATTERN" 1/rank.$RANK/stdout | tail -3 | sed -n 2p)
+  local LAST_MINUS_2=$(grep -oP "$GREP_PATTERN" 1/rank.$RANK/stdout | tail -3 | sed -n 1p)
+  local MEAN=$(awk "BEGIN {print (($LAST_MINUS_0+$LAST_MINUS_1+$LAST_MINUS_2)/3)}")
+  local STABILITY_THRESHOLD=0.5
+  # Based on this: https://github.com/triton-inference-server/client/blob/main/src/c++/perf_analyzer/inference_profiler.cc#L629-L644
+  local WITHIN_THRESHOLD_0=$(awk "BEGIN {print ($LAST_MINUS_0 >= ((1 - $STABILITY_THRESHOLD) * $MEAN) && $LAST_MINUS_0 <= ((1 + $STABILITY_THRESHOLD) * $MEAN))}")
+  local WITHIN_THRESHOLD_1=$(awk "BEGIN {print ($LAST_MINUS_1 >= ((1 - $STABILITY_THRESHOLD) * $MEAN) && $LAST_MINUS_1 <= ((1 + $STABILITY_THRESHOLD) * $MEAN))}")
+  local WITHIN_THRESHOLD_2=$(awk "BEGIN {print ($LAST_MINUS_2 >= ((1 - $STABILITY_THRESHOLD) * $MEAN) && $LAST_MINUS_2 <= ((1 + $STABILITY_THRESHOLD) * $MEAN))}")
+  echo $(($WITHIN_THRESHOLD_0 && $WITHIN_THRESHOLD_1 && $WITHIN_THRESHOLD_2))
+}
+
+set +e
+mpiexec --allow-run-as-root \
+  -n 1 --merge-stderr-to-stdout --output-filename . --tag-output --timestamp-output \
+    $PERF_ANALYZER -v -m graphdef_int32_int32_int32 \
+      --measurement-mode count_windows -s 50 --enable-mpi : \
+  -n 1 --merge-stderr-to-stdout --output-filename . --tag-output --timestamp-output \
+    $PERF_ANALYZER -v -m graphdef_nobatch_int32_int32_int32 \
+      --measurement-mode count_windows -s 50 --enable-mpi : \
+  -n 1 --merge-stderr-to-stdout --output-filename . --tag-output --timestamp-output \
+    $PERF_ANALYZER -v -m custom_zero_1_float32 \
+      --measurement-mode count_windows -s 50 --enable-mpi
+if [ $? -ne 0 ]; then
+   cat 1/rank.0/stdout 1/rank.2/stdout 1/rank.2/stdout
+   echo -e "\n***\n*** Perf Analyzer returned non-zero exit code\n***"
+   echo -e "\n***\n*** Test Failed\n***"
+   RET=1
+else
+  if [ $(is_synchronized) -eq 0 ]; then
+    cat 1/rank.0/stdout 1/rank.2/stdout 1/rank.2/stdout
+    echo -e "\n***\n*** All models did not finish profiling at almost the same time\n***"
+    echo -e "\n***\n*** Test Failed\n***"
+    RET=1
+  fi
+
+  RANK_0_THROUGHPUT_IS_STABLE=$(is_stable 0 1)
+  RANK_0_LATENCY_IS_STABLE=$(is_stable 0 0)
+  RANK_1_THROUGHPUT_IS_STABLE=$(is_stable 1 1)
+  RANK_1_LATENCY_IS_STABLE=$(is_stable 1 0)
+  RANK_2_THROUGHPUT_IS_STABLE=$(is_stable 2 1)
+  RANK_2_LATENCY_IS_STABLE=$(is_stable 2 0)
+
+  ALL_STABLE=$(( \
+    $RANK_0_THROUGHPUT_IS_STABLE && \
+    $RANK_0_LATENCY_IS_STABLE && \
+    $RANK_1_THROUGHPUT_IS_STABLE && \
+    $RANK_1_LATENCY_IS_STABLE && \
+    $RANK_2_THROUGHPUT_IS_STABLE && \
+    $RANK_2_LATENCY_IS_STABLE))
+
+  if [ $ALL_STABLE -eq 0 ]; then
+    cat 1/rank.0/stdout 1/rank.2/stdout 1/rank.2/stdout
+    echo -e "\n***\n*** All models did not stabilize\n***"
+    echo -e "\n***\n*** Test Failed\n***"
+    RET=1
+  fi
+
+  rm -rf 1
+fi
+set -e
+
+## Test perf_analyzer without MPI library (`libmpi.so`) available
+
+rm -rf /opt/hpcx
+
+set +e
+$PERF_ANALYZER -v -m graphdef_int32_int32_int32
+if [ $? -ne 0 ]; then
    cat $CLIENT_LOG
    echo -e "\n***\n*** Test Failed\n***"
    RET=1

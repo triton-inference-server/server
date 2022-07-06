@@ -42,7 +42,6 @@ class TritonPythonModel:
         responses = []
         for request in requests:
             input0 = pb_utils.get_input_tensor_by_name(request, "INPUT0")
-            print('ISCPU', input0.is_cpu())
             gpu_output = pb_utils.get_input_tensor_by_name(
                 request, "GPU_OUTPUT").as_numpy()
 

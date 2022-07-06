@@ -1,5 +1,5 @@
 #!/bin/bash
-# Copyright 2020-2021, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright 2020-2022, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -50,6 +50,21 @@ rm -f $SERVER_LOG
 
 RET=0
 
+TEST_LOG="./metrics_api_test.log"
+UNIT_TEST=./metrics_api_test
+
+rm -fr *.log
+
+set +e
+export CUDA_VISIBLE_DEVICES=0
+LD_LIBRARY_PATH=/opt/tritonserver/lib:$LD_LIBRARY_PATH $UNIT_TEST >>$TEST_LOG 2>&1
+if [ $? -ne 0 ]; then
+    cat $TEST_LOG
+    echo -e "\n***\n*** Metrics API Unit Test Failed\n***"
+    RET=1
+fi
+set -e
+
 # Prepare a libtorch float32 model with basic config
 rm -rf $MODELDIR
 model=libtorch_float32_float32_float32
@@ -99,7 +114,9 @@ wait $SERVER_PID
 
 # Test metrics interval by querying host and checking energy
 METRICS_INTERVAL_MS=500
-METRICS_INTERVAL_SECS=0.5
+# Below time interval is larger than actual metrics interval in case
+# the update is not ready for unexpected reason
+WAIT_INTERVAL_SECS=0.6
 
 SERVER_ARGS="$SERVER_ARGS --metrics-interval-ms=${METRICS_INTERVAL_MS}"
 run_server
@@ -110,12 +127,27 @@ if [ "$SERVER_PID" == "0" ]; then
 fi
 
 num_iterations=10
+
+# Add "warm up" iteration because in some cases the GPU metrics collection
+# doesn't start immediately
 prev_energy=`curl -s localhost:8002/metrics | awk '/nv_energy_consumption{/ {print $2}'`
 for (( i = 0; i < $num_iterations; ++i )); do
-  sleep $METRICS_INTERVAL_SECS
+  sleep $WAIT_INTERVAL_SECS
+  current_energy=`curl -s localhost:8002/metrics | awk '/nv_energy_consumption{/ {print $2}'`
+  if [ $current_energy != $prev_energy ]; then
+    echo -e "\n***\n*** Detected changing metrics, warmup completed.\n***"
+    break
+  fi
+  prev_energy=$current_energy
+done
+
+prev_energy=`curl -s localhost:8002/metrics | awk '/nv_energy_consumption{/ {print $2}'`
+for (( i = 0; i < $num_iterations; ++i )); do
+  sleep $WAIT_INTERVAL_SECS
   current_energy=`curl -s localhost:8002/metrics | awk '/nv_energy_consumption{/ {print $2}'`
   if [ $current_energy == $prev_energy ]; then
-    echo "Metrics were not updated in interval of ${METRICS_INTERVAL_MS} seconds"
+    cat $SERVER_LOG
+    echo "Metrics were not updated in interval of ${METRICS_INTERVAL_MS} milliseconds"
     echo -e "\n***\n*** Metric Interval test failed. \n***"
     RET=1
     break

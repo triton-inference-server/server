@@ -45,44 +45,62 @@ rm -fr *.log ./models
 pip3 uninstall -y torch
 pip3 install torch==1.9.0+cu111 -f https://download.pytorch.org/whl/torch_stable.html
 
-for i in {1..3}; do
-    model_name=dlpack_io_identity_$i
-    mkdir -p models/$model_name/1/
-    cp ../../python_models/dlpack_io_identity/model.py ./models/$model_name/1/
-    cp ../../python_models/dlpack_io_identity/config.pbtxt ./models/$model_name/
-    (cd models/$model_name && \
-              sed -i "s/^name:.*/name: \"$model_name\"/" config.pbtxt)
-done
+TRIALS="default decoupled"
 
-mkdir -p models/ensemble_io/1/
-cp ../../python_models/ensemble_io/config.pbtxt ./models/ensemble_io
+for trial in $TRIALS; do
+    export TRIAL=$trial
+    rm -rf ./models
 
-run_server
-if [ "$SERVER_PID" == "0" ]; then
-    echo -e "\n***\n*** Failed to start $SERVER\n***"
-    cat $SERVER_LOG
-    RET=1
-fi
+    if [ $trial = "default" ]; then
+        for i in {1..3}; do
+            model_name=dlpack_io_identity_$i
+            mkdir -p models/$model_name/1/
+            cp ../../python_models/dlpack_io_identity/model.py ./models/$model_name/1/
+            cp ../../python_models/dlpack_io_identity/config.pbtxt ./models/$model_name/
+            (cd models/$model_name && \
+                      sed -i "s/^name:.*/name: \"$model_name\"/" config.pbtxt)
+        done
+    else
+        for i in {1..3}; do
+            model_name=dlpack_io_identity_$i
+            mkdir -p models/$model_name/1/
+            cp ../../python_models/dlpack_io_identity_decoupled/model.py ./models/$model_name/1/
+            cp ../../python_models/dlpack_io_identity_decoupled/config.pbtxt ./models/$model_name/
+            (cd models/$model_name && \
+                      sed -i "s/^name:.*/name: \"$model_name\"/" config.pbtxt)
+        done
+    fi
 
-set +e
-python3 $UNITTEST_PY > $CLIENT_LOG
-if [ $? -ne 0 ]; then
-    echo -e "\n***\n*** io_test.py FAILED. \n***"
-    cat $CLIENT_LOG
-    RET=1
-else
-    check_test_results $TEST_RESULT_FILE $EXPECTED_NUM_TESTS
-    if [ $? -ne 0 ]; then
-        cat $CLIENT_LOG
-        echo -e "\n***\n*** Test Result Verification Failed\n***"
+    mkdir -p models/ensemble_io/1/
+    cp ../../python_models/ensemble_io/config.pbtxt ./models/ensemble_io
+
+    run_server
+    if [ "$SERVER_PID" == "0" ]; then
+        echo -e "\n***\n*** Failed to start $SERVER\n***"
+        cat $SERVER_LOG
         RET=1
     fi
-fi
 
-set -e
+    set +e
+    python3 $UNITTEST_PY > $CLIENT_LOG
+    if [ $? -ne 0 ]; then
+        echo -e "\n***\n*** io_test.py FAILED. \n***"
+        cat $CLIENT_LOG
+        RET=1
+    else
+        check_test_results $TEST_RESULT_FILE $EXPECTED_NUM_TESTS
+        if [ $? -ne 0 ]; then
+            cat $CLIENT_LOG
+            echo -e "\n***\n*** Test Result Verification Failed\n***"
+            RET=1
+        fi
+    fi
 
-kill $SERVER_PID
-wait $SERVER_PID
+    set -e
+
+    kill $SERVER_PID
+    wait $SERVER_PID
+done
 
 if [ $RET -eq 0 ]; then
     echo -e "\n***\n*** IO test PASSED.\n***"

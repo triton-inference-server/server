@@ -1,4 +1,4 @@
-# Copyright 2021, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright 2021-2022, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -35,8 +35,8 @@ SHELL ["cmd", "/S", "/C"]
 RUN mkdir c:\tmp
 WORKDIR /tmp
 
-RUN powershell.exe [Net.ServicePointManager]::Expect100Continue = $true; [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls, [Net.SecurityProtocolType]::Tls11, [Net.SecurityProtocolType]::Tls12, [Net.SecurityProtocolType]::Ssl3; Invoke-Expression (New-Object System.Net.WebClient).DownloadString('https://get.scoop.sh')
-RUN scoop install git docker unzip
+RUN powershell.exe [Net.ServicePointManager]::Expect100Continue = $true; [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls, [Net.SecurityProtocolType]::Tls11, [Net.SecurityProtocolType]::Tls12, [Net.SecurityProtocolType]::Ssl3; Invoke-Expression (New-Object System.Net.WebClient).DownloadString('https://chocolatey.org/install.ps1')
+RUN choco install git docker unzip -y
 
 # Be aware that pip can interact badly with VS cmd shell so need to pip install before
 # vsdevcmd.bat (see https://bugs.python.org/issue38989)
@@ -58,12 +58,8 @@ ARG VS_INSTALL_PATH_WP="C:\BuildTools"
 RUN powershell.exe Start-Process -FilePath vs_buildtools.exe -ArgumentList "--wait","--quiet","--norestart","--nocache","--installPath","%VS_INSTALL_PATH_WP%","--channelUri","C:\tmp\doesnotexist.chman","--add","Microsoft.VisualStudio.Workload.VCTools`;includeRecommended","--add","Microsoft.Component.MSBuild" -Wait -PassThru
 
 WORKDIR /
-# vcpkg 2021.05.12 does not contain b64 port, so checking out master branch here (commit a82c62d)
-# should be switched to next vcpkg tag when one is created
-# option --depth=1 should also be restored
-RUN git clone --single-branch -b master https://github.com/microsoft/vcpkg.git
+RUN git clone --single-branch --depth=1 -b 2022.04.12 https://github.com/microsoft/vcpkg.git
 WORKDIR /vcpkg
-RUN git checkout a82c62d
 RUN bootstrap-vcpkg.bat
 RUN vcpkg.exe update
 RUN vcpkg.exe install openssl:x64-windows openssl-windows:x64-windows rapidjson:x64-windows re2:x64-windows boost-interprocess:x64-windows boost-stacktrace:x64-windows zlib:x64-windows pthread:x64-windows b64:x64-windows
@@ -115,12 +111,15 @@ ENV TRT_VERSION ${TENSORRT_VERSION}
 
 WORKDIR /tmp
 RUN cuda_%CUDA_VERSION%_win10_network.exe -s %CUDA_PACKAGES%
-RUN unzip %CUDNN_ZIP%
-RUN copy %CUDNN_DIR%\bin\cudnn*.dll "%CUDA_INSTALL_ROOT_WP%\bin\."
-RUN copy %CUDNN_DIR%\lib\cudnn*.lib "%CUDA_INSTALL_ROOT_WP%\lib\x64\."
-RUN copy %CUDNN_DIR%\include\cudnn*.h "%CUDA_INSTALL_ROOT_WP%\include\."
 
-# Copy the CUDA visualstudio integration from where is was installed
+WORKDIR /
+RUN unzip /tmp/%CUDNN_ZIP%
+RUN move %CUDNN_DIR% cudnn
+RUN copy cudnn\bin\cudnn*.dll "%CUDA_INSTALL_ROOT_WP%\bin\."
+RUN copy cudnn\lib\cudnn*.lib "%CUDA_INSTALL_ROOT_WP%\lib\x64\."
+RUN copy cudnn\include\cudnn*.h "%CUDA_INSTALL_ROOT_WP%\include\."
+
+# Copy the CUDA visualstudio integration from where it was installed
 # into the appropriate place in BuildTools
 RUN copy "%CUDA_INSTALL_ROOT_WP%\extras\visual_studio_integration\MSBuildExtensions\*" "%VS_INSTALL_PATH_WP%\MSBuild\Microsoft\VC\v160\BuildCustomizations"
 
@@ -132,6 +131,4 @@ RUN setx PATH "%PATH%;c:\TensorRT\lib;%CUDA_INSTALL_ROOT_WP%\bin"
 # that cmake can find the packages installed by vcpkg.
 ENV CMAKE_TOOLCHAIN_FILE /vcpkg/scripts/buildsystems/vcpkg.cmake
 ENV VCPKG_TARGET_TRIPLET x64-windows
-ENV TRITONBUILD_CMAKE_TOOLCHAIN_FILE /vcpkg/scripts/buildsystems/vcpkg.cmake
-ENV TRITONBUILD_VCPKG_TARGET_TRIPLET x64-windows
 ENTRYPOINT C:\BuildTools\VC\Auxiliary\Build\vcvars64.bat &&

@@ -1,5 +1,5 @@
 #!/bin/bash
-# Copyright 2019-2021, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright 2019-2022, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -38,9 +38,9 @@ if [ ! -z "$TEST_REPO_ARCH" ]; then
     REPO_VERSION=${REPO_VERSION}_${TEST_REPO_ARCH}
 fi
 
-rm -f *.log *.serverlog *.csv *.metrics *.tjson *.json
+rm -f *.log *.serverlog *.csv *.tjson *.json
 
-PROTOCOLS="grpc http"
+PROTOCOLS="grpc http triton_c_api"
 
 TRT_MODEL_NAME="resnet50_fp16_plan"
 TF_MODEL_NAME="resnet50v1.5_fp16_savedmodel"
@@ -67,10 +67,11 @@ INSTANCE_CNT=1
 CONCURRENCY=1
 
 # Disable TF-TRT test on Jetson due to Segfault
+# Disable ORT-TRT test on Jetson due to support being disabled
 if [ "$ARCH" == "aarch64" ]; then
     MODEL_NAMES="${TRT_MODEL_NAME} ${TF_MODEL_NAME} ${ONNX_MODEL_NAME} ${PYT_MODEL_NAME}"
-    OPTIMIZED_MODEL_NAMES="${TFAMP_MODEL_NAME} ${ONNXTRT_MODEL_NAME}"
-    CAFFE2PLAN=${TRITON_DIR}/test-util/bin/caffe2plan
+    OPTIMIZED_MODEL_NAMES="${TFAMP_MODEL_NAME}"
+    CAFFE2PLAN=${TRITON_DIR}/bin/caffe2plan
 else
     MODEL_NAMES="${TRT_MODEL_NAME} ${TF_MODEL_NAME} ${ONNX_MODEL_NAME} ${PYT_MODEL_NAME}"
     OPTIMIZED_MODEL_NAMES="${TFTRT_MODEL_NAME} ${TFAMP_MODEL_NAME} ${ONNXTRT_MODEL_NAME}"

@@ -1,4 +1,4 @@
-# Copyright (c) 2018-2021, NVIDIA CORPORATION. All rights reserved.
+# Copyright 2018-2022, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -24,6 +24,7 @@
 # (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
+SERVER_IPADDR=${TRITONSERVER_IPADDR:=localhost}
 SERVER_LOG=${SERVER_LOG:=./server.log}
 SERVER_TIMEOUT=${SERVER_TIMEOUT:=120}
 SERVER_LD_PRELOAD=${SERVER_LD_PRELOAD:=""}
@@ -74,7 +75,7 @@ function wait_for_server_ready() {
         sleep 1;
 
         set +e
-        code=`curl -s -w %{http_code} localhost:8000/v2/health/ready`
+        code=`curl -s -w %{http_code} ${SERVER_IPADDR}:8000/v2/health/ready`
         set -e
         if [ "$code" == "200" ]; then
             return
@@ -106,7 +107,7 @@ function wait_for_server_live() {
         sleep 1;
 
         set +e
-        code=`curl -s -w %{http_code} localhost:8000/v2/health/live`
+        code=`curl -s -w %{http_code} ${SERVER_IPADDR}:8000/v2/health/live`
         set -e
         if [ "$code" == "200" ]; then
             return
@@ -131,8 +132,8 @@ function wait_for_model_stable() {
         sleep 1;
 
         set +e
-        total_count=`curl -s -X POST localhost:8000/v2/repository/index | json_pp | grep "state" | wc -l`
-        stable_count=`curl -s -X POST localhost:8000/v2/repository/index | json_pp | grep "READY\|UNAVAILABLE" | wc -l`
+        total_count=`curl -s -X POST ${SERVER_IPADDR}:8000/v2/repository/index | json_pp | grep "state" | wc -l`
+        stable_count=`curl -s -X POST ${SERVER_IPADDR}:8000/v2/repository/index | json_pp | grep "READY\|UNAVAILABLE" | wc -l`
         count=$((total_count - stable_count))
         set -e
         if [ "$count" == "0" ]; then
@@ -224,7 +225,7 @@ function run_server_nowait () {
         return
     fi
 
-    if [[ "$(< /proc/sys/kernel/osrelease)" == *Microsoft ]]; then
+    if [[ "$(< /proc/sys/kernel/osrelease)" == *microsoft* ]]; then
         # LD_PRELOAD not yet supported on windows
         if [ -z "$SERVER_LD_PRELOAD" ]; then
             echo "=== Running $SERVER $SERVER_ARGS"
@@ -275,7 +276,7 @@ function run_server_leakcheck () {
       echo "=== Running LD_PRELOAD=$SERVER_LD_PRELOAD $SERVER $SERVER_ARGS"
     fi
 
-    TRITONSERVER_DISABLE_BACKEND_UNLOAD=1 LD_PRELOAD=$SERVER_LD_PRELOAD $LEAKCHECK $LEAKCHECK_ARGS $SERVER $SERVER_ARGS > $SERVER_LOG 2>&1 &
+    LD_PRELOAD=$SERVER_LD_PRELOAD $LEAKCHECK $LEAKCHECK_ARGS $SERVER $SERVER_ARGS > $SERVER_LOG 2>&1 &
     SERVER_PID=$!
 
     wait_for_server_ready $SERVER_PID $SERVER_TIMEOUT
@@ -296,16 +297,16 @@ function kill_server () {
     # causes the entire WSL shell to just exit. So instead we must use
     # taskkill.exe which can only forcefully kill tritonserver which
     # means that it does not gracefully exit.
-    if [[ "$(< /proc/sys/kernel/osrelease)" == *Microsoft ]]; then
+    if [[ "$(< /proc/sys/kernel/osrelease)" == *microsoft* ]]; then
         # Disable -x as it makes output below hard to read
         oldstate="$(set +o)"; [[ -o errexit ]] && oldstate="$oldstate; set -e"
         set +x
         set +e
-        
+
         tasklist=$(/mnt/c/windows/system32/tasklist.exe /FI 'IMAGENAME eq tritonserver.exe' /FO CSV)
         echo "=== Windows tritonserver tasks"
         echo "$tasklist"
-        
+
         taskcount=$(echo "$tasklist" | grep -c tritonserver)
         if (( $taskcount > 0 )); then
             echo "$tasklist" | while IFS=, read -r taskname taskpid taskrest; do
@@ -318,7 +319,7 @@ function kill_server () {
                 fi
             done
         fi
-        
+
         set +vx; eval "$oldstate"
     else
         # Non-windows...
@@ -326,7 +327,7 @@ function kill_server () {
         wait $SERVER_PID
     fi
 }
-          
+
 # Run nvidia-smi to monitor GPU utilization.
 # Writes utilization into MONITOR_LOG. If MONITOR_ID is specified only
 # that GPU PCI bus ID is monitored.

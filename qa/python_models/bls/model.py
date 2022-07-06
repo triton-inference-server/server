@@ -90,6 +90,9 @@ class PBBLSTest(unittest.TestCase):
             requested_output_names=['OUTPUT0', 'OUTPUT1'])
         infer_response = infer_request.exec()
         self.assertTrue(infer_response.has_error())
+        self.assertEqual(
+            infer_response.error().message(),
+            "expected 2 inputs but got 1 inputs for model 'add_sub'")
         self.assertTrue(len(infer_response.output_tensors()) == 0)
 
     def _send_bls_sequence_requests(self, correlation_id):
@@ -245,6 +248,67 @@ class PBBLSTest(unittest.TestCase):
         output0 = pb_utils.get_output_tensor_by_name(infer_response, 'OUTPUT0')
         self.assertTrue(np.all(output0 == input0))
 
+    def test_bls_tensor_lifecycle(self):
+        model_name = 'dlpack_identity'
+
+        # A 10 MB tensor.
+        input_size = 10 * 1024 * 1024
+
+        # Sending the tensor 50 times to test whether the deallocation is
+        # happening correctly. If the deallocation doesn't happen correctly,
+        # there will be an out of shared memory error.
+        for _ in range(50):
+            input0 = np.ones([1, input_size], dtype=np.float32)
+            input0_pb = pb_utils.Tensor('INPUT0', input0)
+            infer_request = pb_utils.InferenceRequest(
+                model_name=model_name,
+                inputs=[input0_pb],
+                requested_output_names=['OUTPUT0'])
+            infer_response = infer_request.exec()
+            self.assertFalse(infer_response.has_error())
+
+            output0 = pb_utils.get_output_tensor_by_name(
+                infer_response, 'OUTPUT0')
+            np.testing.assert_equal(output0.as_numpy(), input0,
+                                    "BLS CPU memory lifecycle failed.")
+
+        # Checking the same with the GPU tensors.
+        for index in range(50):
+            input0 = None
+            infer_request = None
+            input0_pb = None
+
+            torch.cuda.empty_cache()
+            free_memory, _ = torch.cuda.mem_get_info()
+            if index == 1:
+                recorded_memory = free_memory
+
+            if index > 1:
+                self.assertEqual(free_memory, recorded_memory,
+                                 "GPU memory lifecycle test failed.")
+
+            input0 = torch.ones([1, input_size], dtype=torch.float32).to('cuda')
+            input0_pb = pb_utils.Tensor.from_dlpack('INPUT0', to_dlpack(input0))
+            infer_request = pb_utils.InferenceRequest(
+                model_name=model_name,
+                inputs=[input0_pb],
+                requested_output_names=['OUTPUT0'])
+            infer_response = infer_request.exec()
+            self.assertFalse(infer_response.has_error())
+
+            output0 = pb_utils.get_output_tensor_by_name(
+                infer_response, 'OUTPUT0')
+            output0_pytorch = from_dlpack(output0.to_dlpack())
+
+            # Set inference response and output0_pytorch to None, to make sure
+            # that the DLPack is still valid.
+            output0 = None
+            infer_response = None
+            self.assertTrue(
+                torch.all(output0_pytorch == input0),
+                f"input ({input0}) and output ({output0_pytorch}) didn't match for identity model."
+            )
+
     def _test_gpu_bls_add_sub(self, is_input0_gpu, is_input1_gpu):
         input0 = torch.rand(16)
         input1 = torch.rand(16)
@@ -283,6 +347,8 @@ class PBBLSTest(unittest.TestCase):
         # Test multiprocess Pool with sync BLS
         pool = Pool(10)
         pool.map(bls_add_sub, [1, 2, 3, 4, 5, 6, 7, 8, 9, 10])
+        pool.close()
+        pool.join()
 
     def test_bls_sync(self):
         infer_request = pb_utils.InferenceRequest(
@@ -294,6 +360,10 @@ class PBBLSTest(unittest.TestCase):
         # Because the model doesn't exist, the inference response must have an
         # error
         self.assertTrue(infer_response.has_error())
+        self.assertEqual(
+            infer_response.error().message(),
+            "Failed for execute the inference request. Model 'non_existent_model' is not ready."
+        )
 
         # Make sure that the inference requests can be performed properly after
         # an error.
@@ -306,6 +376,9 @@ class PBBLSTest(unittest.TestCase):
                                                   requested_output_names=[])
         infer_response = infer_request.exec()
         self.assertTrue(infer_response.has_error())
+        self.assertEqual(
+            infer_response.error().message(),
+            "expected 1 inputs but got 0 inputs for model 'execute_error'")
         self.assertTrue(len(infer_response.output_tensors()) == 0)
 
     def test_multiple_bls(self):

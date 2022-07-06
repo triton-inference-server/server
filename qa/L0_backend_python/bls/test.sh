@@ -41,7 +41,7 @@ RET=0
 rm -fr *.log ./models
 
 pip3 uninstall -y torch
-pip3 install torch==1.9.0+cu111 -f https://download.pytorch.org/whl/torch_stable.html
+pip3 install torch==1.11.0+cu113 -f https://download.pytorch.org/whl/torch_stable.html
 
 mkdir -p models/bls/1/
 cp ../../python_models/bls/model.py models/bls/1/
@@ -74,6 +74,10 @@ cp ../../python_models/execute_error/config.pbtxt models/execute_error
 mkdir -p models/identity_fp32/1/
 cp ../../python_models/identity_fp32/model.py models/identity_fp32/1/
 cp ../../python_models/identity_fp32/config.pbtxt models/identity_fp32
+
+mkdir -p models/dlpack_identity/1/
+cp ../../python_models/dlpack_identity/model.py models/dlpack_identity/1/
+cp ../../python_models/dlpack_identity/config.pbtxt models/dlpack_identity
 
 cp -r ${DATADIR}/qa_sequence_implicit_model_repository/onnx_nobatch_sequence_int32/ ./models
 

@@ -1,4 +1,4 @@
-# Copyright (c) 2018-2021, NVIDIA CORPORATION. All rights reserved.
+# Copyright 2018-2022, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -29,9 +29,10 @@ import sys
 sys.path.append("../common")
 
 from builtins import range
-from future.utils import iteritems
+from functools import partial
 import os
 import shutil
+import signal
 import time
 import unittest
 import numpy as np
@@ -39,9 +40,9 @@ import infer_util as iu
 import test_util as tu
 import threading
 
-import tritongrpcclient as grpcclient
-import tritonhttpclient as httpclient
-from tritonclientutils import InferenceServerException
+import tritonclient.grpc as grpcclient
+import tritonclient.http as httpclient
+from tritonclient.utils import InferenceServerException
 
 
 class LifeCycleTest(tu.TestResultCollector):
@@ -75,7 +76,7 @@ class LifeCycleTest(tu.TestResultCollector):
                                    np.float32,
                                    np.float32,
                                    model_version=v,
-                                   swap=(swap or (v == 3)))
+                                   swap=(swap or (v != 1)))
             except Exception as ex:
                 self.assertTrue(False, "unexpected error {}".format(ex))
 
@@ -1498,6 +1499,43 @@ class LifeCycleTest(tu.TestResultCollector):
         except Exception as ex:
             self.assertTrue(False, "unexpected error {}".format(ex))
 
+    def test_model_control_fail(self):
+        model_name = tu.get_model_name('onnx', np.float32, np.float32,
+                                       np.float32)
+
+        # Make sure no models are loaded
+        try:
+            for triton_client in (httpclient.InferenceServerClient(
+                    "localhost:8000", verbose=True),
+                                  grpcclient.InferenceServerClient(
+                                      "localhost:8001", verbose=True)):
+                self.assertTrue(triton_client.is_server_live())
+                self.assertTrue(triton_client.is_server_ready())
+                self.assertFalse(triton_client.is_model_ready(model_name, "1"))
+                self.assertFalse(triton_client.is_model_ready(model_name, "3"))
+        except Exception as ex:
+            self.assertTrue(False, "unexpected error {}".format(ex))
+
+        # Request to load the model and expect fail to load
+        try:
+            triton_client = httpclient.InferenceServerClient("localhost:8000",
+                                                             verbose=True)
+            triton_client.load_model(model_name)
+            self.assertTrue(False, "expecting load failure")
+        except InferenceServerException as ex:
+            self.assertIn("load failed for model '{}'".format(model_name),
+                          ex.message())
+
+        # Another attempt should fail as well
+        try:
+            triton_client = httpclient.InferenceServerClient("localhost:8000",
+                                                             verbose=True)
+            triton_client.load_model(model_name)
+            self.assertTrue(False, "expecting load failure")
+        except InferenceServerException as ex:
+            self.assertIn("load failed for model '{}'".format(model_name),
+                          ex.message())
+
     def test_model_control_ensemble(self):
         model_shape = (1, 16)
         onnx_name = tu.get_model_name('onnx', np.float32, np.float32,
@@ -2056,7 +2094,7 @@ class LifeCycleTest(tu.TestResultCollector):
             self.assertTrue(False, "unexpected error {}".format(ex))
 
     def test_model_repository_index(self):
-        # use model control EXPLIT and --load-model to load a subset of models
+        # use model control EXPLICIT and --load-model to load a subset of models
         # in model repository
         tensor_shape = (1, 16)
         model_bases = ['graphdef', 'savedmodel', "simple_savedmodel"]
@@ -2081,7 +2119,7 @@ class LifeCycleTest(tu.TestResultCollector):
                 self.assertTrue(False, "unexpected error {}".format(ex))
 
         # Check model repository index
-        # All models should be in ready state except savedmodel_float32_float32_float32
+        # All models should be in ready state except onnx_float32_float32_float32
         # which appears in two repositories.
         model_bases.append("simple_graphdef")
         try:
@@ -2120,6 +2158,434 @@ class LifeCycleTest(tu.TestResultCollector):
 
         except Exception as ex:
             self.assertTrue(False, "unexpected error {}".format(ex))
+
+    def test_config_override(self):
+        model_shape = (1, 16)
+
+        for triton_client in (httpclient.InferenceServerClient("localhost:8000",
+                                                               verbose=True),
+                              grpcclient.InferenceServerClient("localhost:8001",
+                                                               verbose=True)):
+            for base in (('onnx', 'onnxruntime'),):
+                model_name = tu.get_model_name(base[0], np.float32, np.float32,
+                                               np.float32)
+                try:
+                    self.assertTrue(triton_client.is_server_live())
+                    self.assertFalse(
+                        triton_client.is_model_ready(model_name, "1"))
+                    self.assertFalse(
+                        triton_client.is_model_ready(model_name, "2"))
+                    self.assertFalse(
+                        triton_client.is_model_ready(model_name, "3"))
+                except Exception as ex:
+                    self.assertTrue(False, "unexpected error {}".format(ex))
+
+                # Request to load the model as is and expect the model fails
+                # to load with default config
+                try:
+                    triton_client.load_model(model_name)
+                    self.assertTrue(
+                        False, "expected fail to load '{}'".format(model_name))
+                except Exception as ex:
+                    self.assertIn(
+                        "load failed for model '{}'".format(model_name),
+                        ex.message())
+
+                # Request to load the model with provided "correct" config
+                try:
+                    triton_client.load_model(model_name,
+                                             config="""
+{{"backend":"{backend}","version_policy":{{"specific" : {{ "versions": [2] }} }} }}
+""".format(backend=base[1]))
+                except Exception as ex:
+                    self.assertTrue(False, "unexpected error {}".format(ex))
+                self.assertFalse(triton_client.is_model_ready(model_name, "1"))
+                self.assertTrue(triton_client.is_model_ready(model_name, "2"))
+                self.assertFalse(triton_client.is_model_ready(model_name, "3"))
+
+                # And loaded models work properly
+                self._infer_success_models([
+                    base[0],
+                ], (2,), model_shape)
+
+                # request without additional config will load with default
+                # config and expect to fail, and version 2 will not be unloaded.
+                try:
+                    triton_client.load_model(model_name)
+                    self.assertTrue(
+                        False, "expected fail to load '{}'".format(model_name))
+                except Exception as ex:
+                    self.assertIn(
+                        "load failed for model '{}'".format(model_name),
+                        ex.message())
+                    self.assertFalse(
+                        triton_client.is_model_ready(model_name, "1"))
+                    self.assertTrue(
+                        triton_client.is_model_ready(model_name, "2"))
+                    self.assertFalse(
+                        triton_client.is_model_ready(model_name, "3"))
+
+                # Unload model for the next client iteration
+                try:
+                    triton_client.unload_model(model_name)
+                    self.assertFalse(
+                        triton_client.is_model_ready(model_name, "1"))
+                    self.assertFalse(
+                        triton_client.is_model_ready(model_name, "2"))
+                    self.assertFalse(
+                        triton_client.is_model_ready(model_name, "3"))
+                except Exception as ex:
+                    self.assertTrue(False, "unexpected error {}".format(ex))
+
+    def test_file_override(self):
+        import base64
+
+        model_shape = (1, 16)
+        override_base = "override_model"
+
+        for base in (('onnx', 'onnxruntime'),):
+            model_name = tu.get_model_name(base[0], np.float32, np.float32,
+                                           np.float32)
+            override_model_name = tu.get_model_name(override_base, np.float32,
+                                                    np.float32, np.float32)
+
+            # Prepare override file
+            with open("models/{}/3/model.{}".format(model_name, base[0]),
+                      'rb') as f:
+                file_content = f.read()
+
+            for triton_client in (httpclient.InferenceServerClient(
+                    "localhost:8000", verbose=True),
+                                  grpcclient.InferenceServerClient(
+                                      "localhost:8001", verbose=True)):
+                try:
+                    self.assertTrue(triton_client.is_server_live())
+                    self.assertFalse(
+                        triton_client.is_model_ready(model_name, "1"))
+                    self.assertFalse(
+                        triton_client.is_model_ready(model_name, "2"))
+                    self.assertTrue(
+                        triton_client.is_model_ready(model_name, "3"))
+                except Exception as ex:
+                    self.assertTrue(False, "unexpected error {}".format(ex))
+
+                # Request to load the model with override file, should fail
+                # without providing override config. The config requirement
+                # serves as an reminder that the existing model directory will
+                # not be used.
+                try:
+                    triton_client.load_model(
+                        model_name, files={"file:1/model.onnx": file_content})
+                    self.assertTrue(
+                        False, "expected error on missing override config")
+                except InferenceServerException as ex:
+                    # [FIXME] Improve error reporting to mention missing config
+                    self.assertIn(
+                        "failed to load '{}', failed to poll from model repository"
+                        .format(model_name), ex.message())
+
+                # Sanity check on previous loaded version is still available
+                # after the failure attempt to load model with different version
+                self.assertFalse(triton_client.is_model_ready(model_name, "1"))
+                self.assertFalse(triton_client.is_model_ready(model_name, "2"))
+                self.assertTrue(triton_client.is_model_ready(model_name, "3"))
+
+                self._infer_success_models([
+                    base[0],
+                ], (3,), model_shape)
+
+                # Request to load the model with override file and config in
+                # a different name
+                try:
+                    triton_client.load_model(
+                        override_model_name,
+                        config="""{{"backend":"{backend}" }}""".format(
+                            backend=base[1]),
+                        files={"file:1/model.onnx": file_content})
+                except Exception as ex:
+                    self.assertTrue(False, "unexpected error {}".format(ex))
+
+                # Sanity check on previous loaded version is still available
+                # after the load with different model name
+                self.assertFalse(triton_client.is_model_ready(model_name, "1"))
+                self.assertFalse(triton_client.is_model_ready(model_name, "2"))
+                self.assertTrue(triton_client.is_model_ready(model_name, "3"))
+                self._infer_success_models([
+                    base[0],
+                ], (3,), model_shape)
+
+                # New override model should also be available
+                self.assertTrue(
+                    triton_client.is_model_ready(override_model_name, "1"))
+                self.assertFalse(
+                    triton_client.is_model_ready(override_model_name, "2"))
+                self.assertFalse(
+                    triton_client.is_model_ready(override_model_name, "3"))
+                self._infer_success_models([
+                    override_base,
+                ], (1,),
+                                           model_shape,
+                                           swap=True)
+
+                # Request to load the model with override file and config in
+                # original name
+                try:
+                    triton_client.load_model(
+                        model_name,
+                        config="""{{"backend":"{backend}" }}""".format(
+                            backend=base[1]),
+                        files={"file:1/model.onnx": file_content})
+                except Exception as ex:
+                    self.assertTrue(False, "unexpected error {}".format(ex))
+
+                # The model should be loaded from the override model directory
+                # which has different model version
+                self.assertTrue(triton_client.is_model_ready(model_name, "1"))
+                self.assertFalse(triton_client.is_model_ready(model_name, "2"))
+                self.assertFalse(triton_client.is_model_ready(model_name, "3"))
+                self._infer_success_models([
+                    base[0],
+                ], (1,),
+                                           model_shape,
+                                           swap=True)
+
+                # The model with different name should be available
+                self.assertTrue(
+                    triton_client.is_model_ready(override_model_name, "1"))
+                self.assertFalse(
+                    triton_client.is_model_ready(override_model_name, "2"))
+                self.assertFalse(
+                    triton_client.is_model_ready(override_model_name, "3"))
+                self._infer_success_models([
+                    override_base,
+                ], (1,),
+                                           model_shape,
+                                           swap=True)
+
+                # Reset model for the next client iteration
+                try:
+                    # Load model again and the original model repository will
+                    # be use
+                    triton_client.load_model(model_name)
+                    triton_client.unload_model(override_model_name)
+                except Exception as ex:
+                    self.assertTrue(False, "unexpected error {}".format(ex))
+                self.assertFalse(triton_client.is_model_ready(model_name, "1"))
+                self.assertFalse(triton_client.is_model_ready(model_name, "2"))
+                self.assertTrue(triton_client.is_model_ready(model_name, "3"))
+                self._infer_success_models([
+                    base[0],
+                ], (3,), model_shape)
+
+    def test_shutdown_dynamic(self):
+        model_shape = (1, 1)
+        input_data = np.ones(shape=(1, 1), dtype=np.float32)
+
+        inputs = [grpcclient.InferInput('INPUT0', model_shape, "FP32")]
+        inputs[0].set_data_from_numpy(input_data)
+
+        triton_client = grpcclient.InferenceServerClient("localhost:8001",
+                                                         verbose=True)
+        model_name = "custom_zero_1_float32"
+
+        # Send two requests as only requests held in scheduler are counted
+        # as in-flight (the first request is in execution)
+        def callback(user_data, result, error):
+            if error:
+                user_data.append(error)
+            else:
+                user_data.append(result)
+
+        # Currently the dynamic batcher will form payloads and place to
+        # instance queue in advance. The batcher doesn't track requests
+        # in the next stage so need to send more requests to saturate the
+        # queue.
+        request_count = 6
+        async_results = []
+        for _ in range(request_count):
+            triton_client.async_infer(model_name, inputs,
+                                      partial(callback, async_results))
+        time.sleep(1)
+
+        # Send signal to shutdown the server
+        os.kill(int(os.environ['SERVER_PID']), signal.SIGINT)
+
+        # Send more requests and should be rejected
+        try:
+            triton_client.infer(model_name, inputs)
+            self.assertTrue(False,
+                            "expected error for new inference during shutdown")
+        except InferenceServerException as ex:
+            self.assertIn(
+                "Server is stopping, scheduler for model has stopped accepting new inference requests",
+                ex.message())
+
+        # Wait until the results are available in user_data
+        time_out = 30
+        while ((len(async_results) < request_count) and time_out > 0):
+            time_out = time_out - 1
+            time.sleep(1)
+
+        # Previous requests should succeed
+        for result in async_results:
+            if type(result) == InferenceServerException:
+                raise result
+            output_data = result.as_numpy('OUTPUT0')
+            np.testing.assert_allclose(
+                output_data,
+                input_data,
+                err_msg='Inference result is not correct')
+
+    def test_shutdown_sequence(self):
+        model_shape = (1, 1)
+        input_data = np.ones(shape=(1, 1), dtype=np.int32)
+
+        inputs = [grpcclient.InferInput('INPUT', model_shape, "INT32")]
+        inputs[0].set_data_from_numpy(input_data)
+
+        triton_client = grpcclient.InferenceServerClient("localhost:8001",
+                                                         verbose=True)
+        model_name = "custom_sequence_int32"
+
+        # Send two requests as only requests held in scheduler are counted
+        # as in-flight (the first request is in execution)
+        def callback(user_data, result, error):
+            if error:
+                user_data.append(error)
+            else:
+                user_data.append(result)
+
+        # Start multiple sequences
+        request_count = 2
+        async_results = []
+        for i in range(request_count):
+            triton_client.async_infer(model_name,
+                                      inputs,
+                                      partial(callback, async_results),
+                                      sequence_id=(i + 1),
+                                      sequence_start=True)
+        time.sleep(1)
+
+        # Send signal to shutdown the server
+        os.kill(int(os.environ['SERVER_PID']), signal.SIGINT)
+
+        # Send requests with different characteristic
+        # 1: New sequence with new seqeuence ID
+        try:
+            triton_client.infer(model_name,
+                                inputs,
+                                sequence_id=request_count,
+                                sequence_start=True)
+            self.assertTrue(False,
+                            "expected error for new inference during shutdown")
+        except InferenceServerException as ex:
+            self.assertIn(
+                "Server is stopping, scheduler for model has stopped accepting new inference requests",
+                ex.message())
+        # 2: New sequence with existing seqeuence ID
+        try:
+            triton_client.infer(model_name,
+                                inputs,
+                                sequence_id=1,
+                                sequence_start=True)
+            self.assertTrue(False,
+                            "expected error for new inference during shutdown")
+        except InferenceServerException as ex:
+            self.assertIn(
+                "Server is stopping, scheduler for model has stopped accepting new inference requests",
+                ex.message())
+        # 3: Continuing sequence
+        try:
+            res = triton_client.infer(model_name,
+                                      inputs,
+                                      sequence_id=2,
+                                      sequence_end=True)
+            output_data = res.as_numpy('OUTPUT')
+            # Result are accumulated
+            np.testing.assert_allclose(
+                output_data,
+                input_data + input_data,
+                err_msg='Inference result is not correct')
+        except Exception as ex:
+            self.assertTrue(False, "unexpected error {}".format(ex))
+
+        # Wait until the results are available in user_data
+        time_out = 30
+        while ((len(async_results) < request_count) and time_out > 0):
+            time_out = time_out - 1
+            time.sleep(1)
+
+        # Previous requests should succeed
+        for result in async_results:
+            if type(result) == InferenceServerException:
+                raise result
+            output_data = result.as_numpy('OUTPUT')
+            np.testing.assert_allclose(
+                output_data,
+                input_data,
+                err_msg='Inference result is not correct')
+
+        # Sleep 5 seconds for scheduler timeout to work and should
+        # reduce the in-flight count
+        time.sleep(5)
+
+    def test_shutdown_ensemble(self):
+        model_shape = (1, 1)
+        input_data = np.ones(shape=(1, 1), dtype=np.float32)
+
+        inputs = [grpcclient.InferInput('INPUT0', model_shape, "FP32")]
+        inputs[0].set_data_from_numpy(input_data)
+
+        triton_client = grpcclient.InferenceServerClient("localhost:8001",
+                                                         verbose=True)
+        model_name = "ensemble_zero_1_float32"
+
+        # Send two requests as only requests held in scheduler are counted
+        # as in-flight (the first request is in execution)
+        def callback(user_data, result, error):
+            if error:
+                user_data.append(error)
+            else:
+                user_data.append(result)
+
+        # Even the ensemble is actually a wrapper over the model for
+        # test_shutdown_dynamic, we don't need to send many requests as
+        # ensemble scheduler tracks in-flight requests w.r.t. the whole pipeline
+        request_count = 1
+        async_results = []
+        for _ in range(request_count):
+            triton_client.async_infer(model_name, inputs,
+                                      partial(callback, async_results))
+        time.sleep(1)
+
+        # Send signal to shutdown the server
+        os.kill(int(os.environ['SERVER_PID']), signal.SIGINT)
+
+        # Send more requests and should be rejected
+        try:
+            triton_client.infer(model_name, inputs)
+            self.assertTrue(False,
+                            "expected error for new inference during shutdown")
+        except InferenceServerException as ex:
+            self.assertIn(
+                "in ensemble 'ensemble_zero_1_float32', Server is stopping, scheduler for model has stopped accepting new inference requests",
+                ex.message())
+
+        # Wait until the results are available in user_data
+        time_out = 10
+        while ((len(async_results) < request_count) and time_out > 0):
+            time_out = time_out - 1
+            time.sleep(1)
+
+        # Previous requests should succeed
+        for result in async_results:
+            if type(result) == InferenceServerException:
+                raise result
+            output_data = result.as_numpy('OUTPUT0')
+            np.testing.assert_allclose(
+                output_data,
+                input_data,
+                err_msg='Inference result is not correct')
 
 
 if __name__ == '__main__':

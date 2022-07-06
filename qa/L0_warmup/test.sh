@@ -1,5 +1,5 @@
 #!/bin/bash
-# Copyright (c) 2019-2021, NVIDIA CORPORATION. All rights reserved.
+# Copyright 2019-2022, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -65,12 +65,14 @@ for BACKEND in ${BACKENDS}; do
     cp -r /data/inferenceserver/${REPO_VERSION}/qa_model_repository/${BACKEND}_float32_float32_float32 models/. && \
     cp -r /data/inferenceserver/${REPO_VERSION}/qa_sequence_model_repository/${BACKEND}_sequence_int32 models/.
 
-    INPUT_PREFIX="INPUT" && [ "$BACKEND" == "libtorch" ] && INPUT_PREFIX="INPUT__"
+    INPUT_PREFIX="INPUT"
+    IDENTITY_INPUT_PREFIX="INPUT" && [ "$BACKEND" == "libtorch" ] && IDENTITY_INPUT_PREFIX="INPUT__"
     SEQ_INPUT="INPUT" && [ "$BACKEND" == "libtorch" ] && SEQ_INPUT="INPUT__0"
     START="START" && [ "$BACKEND" == "libtorch" ] && START="START__1"
     READY="READY" && [ "$BACKEND" == "libtorch" ] && READY="READY__2"
 
-    # 2 instances per device with random / zero data
+    # 2 instances per device with random / zero data.
+    # The zero data sample will run twice
     #
     # Provide warmup instruction (batch size 1) in model config
     (cd models/${BACKEND}_float32_float32_float32 && \
@@ -95,12 +97,18 @@ for BACKEND in ${BACKENDS}; do
         echo "    }" >> config.pbtxt && \
         echo "}]" >> config.pbtxt )
 
-    # zero data
+    # zero data. For realistic sequence model, 'count' may not work
+    # well because the model will expect a valid sequence of requests which
+    # should be represented by a series of warmup samples. 'count > 1'
+    # essentially "resends" one of the sample, which may invalidate the
+    # sequence. This is okay for this specific test because the synthetic model
+    # is not data sensitive.
     #
     # Instruction for sequence model (batch size 8), need to specify control tensor
     (cd models/${BACKEND}_sequence_int32 && \
         echo "model_warmup [{" >> config.pbtxt && \
         echo "    name : \"sequence sample\"" >> config.pbtxt && \
+        echo "    count : 2" >> config.pbtxt && \
         echo "    batch_size: 8" >> config.pbtxt && \
         echo "    inputs {" >> config.pbtxt && \
         echo "        key: \"${SEQ_INPUT}\"" >> config.pbtxt && \
@@ -142,12 +150,17 @@ for BACKEND in ${BACKENDS}; do
         echo -e "\n***\n*** Failed. Expected warmup for stateless model\n***"
         RET=1
     fi
-    grep "is running warmup sample 'sequence sample'" $SERVER_LOG
+    grep "is running warmup sample 'sequence sample' for iteration 1" $SERVER_LOG
     if [ $? -ne 0 ]; then
-        echo -e "\n***\n*** Failed. Expected warmup for stateful model\n***"
+        echo -e "\n***\n*** Failed. Expected 1st warmup iteration for stateful model\n***"
         RET=1
     fi
-    grep "warmup error" $SERVER_LOG
+    grep "is running warmup sample 'sequence sample' for iteration 2" $SERVER_LOG
+    if [ $? -ne 0 ]; then
+        echo -e "\n***\n*** Failed. Expected 2nd warmup iteration for stateful model\n***"
+        RET=1
+    fi
+    grep "failed to run warmup" $SERVER_LOG
     if [ $? -eq 0 ]; then
         echo -e "\n***\n*** Failed. Expected no warmup error\n***"
         RET=1
@@ -174,7 +187,7 @@ for BACKEND in ${BACKENDS}; do
             echo "    name : \"zero string stateless\"" >> config.pbtxt && \
             echo "    batch_size: 1" >> config.pbtxt && \
             echo "    inputs {" >> config.pbtxt && \
-            echo "        key: \"${INPUT_PREFIX}0\"" >> config.pbtxt && \
+            echo "        key: \"${IDENTITY_INPUT_PREFIX}0\"" >> config.pbtxt && \
             echo "        value: {" >> config.pbtxt && \
             echo "            data_type: TYPE_STRING" >> config.pbtxt && \
             echo "            dims: 16" >> config.pbtxt && \
@@ -186,7 +199,7 @@ for BACKEND in ${BACKENDS}; do
             echo "    name : \"random string stateless\"" >> config.pbtxt && \
             echo "    batch_size: 1" >> config.pbtxt && \
             echo "    inputs {" >> config.pbtxt && \
-            echo "        key: \"${INPUT_PREFIX}0\"" >> config.pbtxt && \
+            echo "        key: \"${IDENTITY_INPUT_PREFIX}0\"" >> config.pbtxt && \
             echo "        value: {" >> config.pbtxt && \
             echo "            data_type: TYPE_STRING" >> config.pbtxt && \
             echo "            dims: 16" >> config.pbtxt && \
@@ -258,7 +271,7 @@ for BACKEND in ${BACKENDS}; do
             echo -e "\n***\n*** Failed. Expected warmup for string stateful model\n***"
             RET=1
         fi
-        grep "warmup error" $SERVER_LOG
+        grep "failed to run warmup" $SERVER_LOG
         if [ $? -eq 0 ]; then
             echo -e "\n***\n*** Failed. Expected no warmup error\n***"
             RET=1
@@ -319,7 +332,7 @@ for BACKEND in ${BACKENDS}; do
             echo -e "\n***\n*** Failed. Expected warmup for image model\n***"
             RET=1
         fi
-        grep "warmup error" $SERVER_LOG
+        grep "failed to run warmup" $SERVER_LOG
         if [ $? -eq 0 ]; then
             echo -e "\n***\n*** Failed. Expected no warmup error\n***"
             RET=1
@@ -345,6 +358,55 @@ for BACKEND in ${BACKENDS}; do
         wait $SERVER_PID
     fi
 done
+
+# Test warmup sample failure
+rm -fr models && \
+    mkdir models && \
+    cp -r failing_infer models/.
+
+run_server
+if [ "$SERVER_PID" != "0" ]; then
+    echo -e "\n***\n*** Expect fail to start $SERVER\n***"
+    cat $SERVER_LOG
+    exit 1
+fi
+
+set +e
+grep "failed to run warmup sample 'zero sample': An Error Occurred;" $SERVER_LOG
+if [ $? -ne 0 ]; then
+    echo -e "\n***\n*** Failed. Expected warmup error\n***"
+    cat $SERVER_LOG
+    RET=1
+fi
+set -e
+
+# Test decoupled model
+rm -fr models && \
+    mkdir models && \
+    cp -r decoupled models/.
+
+run_server
+if [ "$SERVER_PID" == "0" ]; then
+    echo -e "\n***\n*** Failed to start $SERVER\n***"
+    cat $SERVER_LOG
+    exit 1
+fi
+
+set +e
+grep "is running warmup sample 'decoupled sample'" $SERVER_LOG
+if [ $? -ne 0 ]; then
+    echo -e "\n***\n*** Failed. Expected warmup for decoupled model\n***"
+    RET=1
+fi
+grep "failed to run warmup" $SERVER_LOG
+if [ $? -eq 0 ]; then
+    echo -e "\n***\n*** Failed. Expected no warmup error\n***"
+    RET=1
+fi
+set -e
+
+kill $SERVER_PID
+wait $SERVER_PID
 
 if [ $RET -eq 0 ]; then
   echo -e "\n***\n*** Test Passed\n***"

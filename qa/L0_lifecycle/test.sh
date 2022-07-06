@@ -1,5 +1,5 @@
 #!/bin/bash
-# Copyright (c) 2018-2021, NVIDIA CORPORATION. All rights reserved.
+# Copyright 2018-2022, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -40,19 +40,24 @@ fi
 
 export CUDA_VISIBLE_DEVICES=0
 
-TEST_RESULT_FILE='test_results.txt'
 CLIENT_LOG="./client.log"
-LC_TEST=lifecycle_test.py
-
 DATADIR=/data/inferenceserver/${REPO_VERSION}
-
+LC_TEST=lifecycle_test.py
+SLEEP_TIME=10
 SERVER=/opt/tritonserver/bin/tritonserver
+TEST_RESULT_FILE='test_results.txt'
 source ../common/util.sh
 
 RET=0
 rm -fr *.log
 
 LOG_IDX=0
+
+if [ `ps | grep -c "tritonserver"` != "0" ]; then
+    echo -e "Tritonserver already running"
+    echo -e `ps | grep tritonserver`
+    exit 1
+fi
 
 # LifeCycleTest.test_parse_error_noexit_strict
 SERVER_ARGS="--model-repository=/tmp/xyzx --strict-readiness=true \
@@ -64,7 +69,7 @@ if [ "$SERVER_PID" == "0" ]; then
     cat $SERVER_LOG
     exit 1
 fi
-sleep 10
+sleep $SLEEP_TIME
 
 rm -f $CLIENT_LOG
 set +e
@@ -98,7 +103,7 @@ if [ "$SERVER_PID" == "0" ]; then
     cat $SERVER_LOG
     exit 1
 fi
-sleep 10
+sleep $SLEEP_TIME
 
 
 rm -f $CLIENT_LOG
@@ -135,7 +140,7 @@ if [ "$SERVER_PID" == "0" ]; then
     cat $SERVER_LOG
     exit 1
 fi
-sleep 10
+sleep $SLEEP_TIME
 
 
 rm -f $CLIENT_LOG
@@ -172,7 +177,7 @@ if [ "$SERVER_PID" == "0" ]; then
     cat $SERVER_LOG
     exit 1
 fi
-sleep 10
+sleep $SLEEP_TIME
 
 
 rm -f $CLIENT_LOG
@@ -194,6 +199,163 @@ set -e
 
 kill $SERVER_PID
 wait $SERVER_PID
+
+LOG_IDX=$((LOG_IDX+1))
+
+# GRPC Port Collision Test
+rm -rf models
+mkdir models
+SERVER_ARGS="--model-repository=`pwd`/models"
+SERVER_LOG="./stub_inference_server_$LOG_IDX.log"
+run_server
+if [ "$SERVER_PID" == "0" ]; then
+    echo -e "\n***\n*** Failed to start $SERVER\n***"
+    cat $SERVER_LOG
+    exit 1
+fi
+SAVED_SERVER_PID=$SERVER_PID
+SERVER_ARGS="--model-repository=`pwd`/models --http-port 8003 --metrics-port 8004"
+SERVER_LOG="./inference_server_$LOG_IDX.log"
+run_server
+sleep $SLEEP_TIME
+# check server log for the warning messages
+if [ `grep -c "failed to start GRPC service: Unavailable - Socket '0.0.0.0:8001' already in use" $SERVER_LOG` != "1" ]; then
+    echo -e "\n***\n*** Server log ${SERVER_LOG} did not report GRPC port collision\n***"
+    echo -e "\n***\n*** Test Failed\n***"
+    kill $SERVER_PID
+    wait $SERVER_PID
+    RET=1
+fi
+
+SERVER_PID=$SAVED_SERVER_PID
+kill $SERVER_PID
+wait $SERVER_PID
+
+LOG_IDX=$((LOG_IDX+1))
+
+# HTTP Port Collision Test
+rm -rf models
+mkdir models
+SERVER_ARGS="--model-repository=`pwd`/models"
+SERVER_LOG="./stub_inference_server_$LOG_IDX.log"
+run_server
+if [ "$SERVER_PID" == "0" ]; then
+    echo -e "\n***\n*** Failed to start $SERVER\n***"
+    cat $SERVER_LOG
+    exit 1
+fi
+SAVED_SERVER_PID=$SERVER_PID
+SERVER_ARGS="--model-repository=`pwd`/models --grpc-port 8003 --metrics-port 8004"
+SERVER_LOG="./inference_server_$LOG_IDX.log"
+run_server
+sleep $SLEEP_TIME
+# check server log for the warning messages
+if [ `grep -c "failed to start HTTP service: Unavailable - Socket '0.0.0.0:8000' already in use" $SERVER_LOG` != "1" ]; then
+    echo -e "\n***\n*** Server log ${SERVER_LOG} did not report HTTP port collision\n***"
+    echo -e "\n***\n*** Test Failed\n***"
+    kill $SERVER_PID
+    wait $SERVER_PID
+    RET=1
+fi
+
+SERVER_PID=$SAVED_SERVER_PID
+
+kill $SERVER_PID
+wait $SERVER_PID
+
+LOG_IDX=$((LOG_IDX+1))
+
+# Metrics Port Collision Test
+rm -rf models
+mkdir models
+SERVER_ARGS="--model-repository=`pwd`/models"
+SERVER_LOG="./stub_inference_server_$LOG_IDX.log"
+run_server
+if [ "$SERVER_PID" == "0" ]; then
+    echo -e "\n***\n*** Failed to start $SERVER\n***"
+    cat $SERVER_LOG
+    exit 1
+fi
+SAVED_SERVER_PID=$SERVER_PID
+SERVER_ARGS="--model-repository=`pwd`/models --grpc-port 8003 --http-port 8004"
+SERVER_LOG="./inference_server_$LOG_IDX.log"
+run_server
+sleep $SLEEP_TIME
+# check server log for the warning messages
+if [ `grep -c "failed to start Metrics service: Unavailable - Socket '0.0.0.0:8002' already in use" $SERVER_LOG` != "1" ]; then
+    echo -e "\n***\n*** Server log ${SERVER_LOG} did not report metrics port collision\n***"
+    echo -e "\n***\n*** Test Failed\n***"
+    kill $SERVER_PID
+    wait $SERVER_PID
+    RET=1
+fi
+
+SERVER_PID=$SAVED_SERVER_PID
+
+kill $SERVER_PID
+wait $SERVER_PID
+
+LOG_IDX=$((LOG_IDX+1))
+
+# Multiple Port Collisions Test
+rm -rf models
+mkdir models
+SERVER_ARGS="--model-repository=`pwd`/models"
+SERVER_LOG="./inference_server_$LOG_IDX.log"
+run_server
+if [ "$SERVER_PID" == "0" ]; then
+    echo -e "\n***\n*** Failed to start $SERVER\n***"
+    cat $SERVER_LOG
+    exit 1
+fi
+SAVED_SERVER_PID=$SERVER_PID
+run_server
+sleep $SLEEP_TIME
+# check server log for the warning messages
+if [ `grep -c "failed to start.*service: Unavailable - Socket '.*' already in use" $SERVER_LOG` == "0" ]; then
+    echo -e "\n***\n*** Server log ${SERVER_LOG} did not report port collision\n***"
+    echo -e "\n***\n*** Test Failed\n***"
+    kill $SERVER_PID
+    wait $SERVER_PID
+    RET=1
+fi
+
+SERVER_PID=$SAVED_SERVER_PID
+
+kill $SERVER_PID
+wait $SERVER_PID
+
+LOG_IDX=$((LOG_IDX+1))
+
+# No Port Collision Test
+rm -rf models
+mkdir models
+SERVER_ARGS="--model-repository=`pwd`/models"
+SERVER_LOG="./inference_server_$LOG_IDX.log"
+run_server
+if [ "$SERVER_PID" == "0" ]; then
+    echo -e "\n***\n*** Failed to start $SERVER\n***"
+    cat $SERVER_LOG
+    exit 1
+fi
+
+LOG_IDX=$((LOG_IDX+1))
+SERVER_LOG="./inference_server_$LOG_IDX.log"
+
+SAVED_SERVER_PID=$SERVER_PID
+SERVER_ARGS="--model-repository=`pwd`/models --grpc-port 8003 --http-port 8004 --metrics-port 8005"
+run_server
+sleep $SLEEP_TIME
+if [ "$SERVER_PID" == "0" ]; then
+    echo -e "\n***\n*** Failed to start $SERVER\n***"
+    cat $SERVER_LOG
+    exit 1
+fi
+
+kill $SERVER_PID
+wait $SERVER_PID
+kill $SAVED_SERVER_PID
+wait $SAVED_SERVER_PID
 
 LOG_IDX=$((LOG_IDX+1))
 
@@ -897,6 +1059,49 @@ wait $SERVER_PID
 
 LOG_IDX=$((LOG_IDX+1))
 
+# LifeCycleTest.test_model_control_fail
+rm -fr models config.pbtxt.*
+mkdir models
+for i in onnx ; do
+    cp -r $DATADIR/qa_model_repository/${i}_float32_float32_float32 models/.
+    # Remove all model files so the model will fail to load
+    rm models/${i}_float32_float32_float32/*/*
+    sed -i "s/max_batch_size:.*/max_batch_size: 1/" models/${i}_float32_float32_float32/config.pbtxt
+done
+
+SERVER_ARGS="--model-repository=`pwd`/models --model-control-mode=explicit \
+             --exit-timeout-secs=5 --strict-model-config=false
+             --strict-readiness=false"
+SERVER_LOG="./inference_server_$LOG_IDX.log"
+run_server
+if [ "$SERVER_PID" == "0" ]; then
+    echo -e "\n***\n*** Failed to start $SERVER\n***"
+    cat $SERVER_LOG
+    exit 1
+fi
+
+rm -f $CLIENT_LOG
+set +e
+python $LC_TEST LifeCycleTest.test_model_control_fail >>$CLIENT_LOG 2>&1
+if [ $? -ne 0 ]; then
+    cat $CLIENT_LOG
+    echo -e "\n***\n*** Test Failed\n***"
+    RET=1
+else
+    check_test_results $TEST_RESULT_FILE 1
+    if [ $? -ne 0 ]; then
+        cat $CLIENT_LOG
+        echo -e "\n***\n*** Test Result Verification Failed\n***"
+        RET=1
+    fi
+fi
+set -e
+
+kill $SERVER_PID
+wait $SERVER_PID
+
+LOG_IDX=$((LOG_IDX+1))
+
 # LifeCycleTest.test_model_control_ensemble
 rm -fr models config.pbtxt.*
 mkdir models
@@ -991,6 +1196,90 @@ set -e
 
 kill $SERVER_PID
 wait $SERVER_PID
+
+LOG_IDX=$((LOG_IDX+1))
+
+# Test loading all models on startup in EXPLICIT model control mode, re-use
+# existing LifeCycleTest.test_multiple_model_repository_control_startup_models
+# unit test
+rm -fr models models_0 config.pbtxt.*
+mkdir models models_0
+# Ensemble models in the second repository
+for i in plan onnx ; do
+    cp -r $DATADIR/qa_model_repository/${i}_float32_float32_float32 models/.
+    cp -r $DATADIR/qa_ensemble_model_repository/qa_model_repository/simple_${i}_float32_float32_float32 models_0/.
+    sed -i "s/max_batch_size:.*/max_batch_size: 1/" models/${i}_float32_float32_float32/config.pbtxt
+    sed -i "s/max_batch_size:.*/max_batch_size: 1/" models_0/simple_${i}_float32_float32_float32/config.pbtxt
+done
+
+# savedmodel doesn't load because it is duplicated in 2 repositories
+for i in savedmodel ; do
+    cp -r $DATADIR/qa_model_repository/${i}_float32_float32_float32 models/.
+    cp -r $DATADIR/qa_model_repository/${i}_float32_float32_float32 models_0/.
+done
+
+SERVER_ARGS="--model-repository=`pwd`/models --model-repository=`pwd`/models_0 \
+             --model-control-mode=explicit \
+             --strict-readiness=false \
+             --strict-model-config=false --exit-on-error=false \
+             --load-model=*"
+SERVER_LOG="./inference_server_$LOG_IDX.log"
+run_server
+if [ "$SERVER_PID" == "0" ]; then
+    echo -e "\n***\n*** Failed to start $SERVER\n***"
+    cat $SERVER_LOG
+    exit 1
+fi
+
+rm -f $CLIENT_LOG
+set +e
+python $LC_TEST LifeCycleTest.test_multiple_model_repository_control_startup_models >>$CLIENT_LOG 2>&1
+if [ $? -ne 0 ]; then
+    cat $CLIENT_LOG
+    echo -e "\n***\n*** Test Failed\n***"
+    RET=1
+else
+    check_test_results $TEST_RESULT_FILE 1
+    if [ $? -ne 0 ]; then
+        cat $CLIENT_LOG
+        echo -e "\n***\n*** Test Result Verification Failed\n***"
+        RET=1
+    fi
+fi
+set -e
+
+kill $SERVER_PID
+wait $SERVER_PID
+
+LOG_IDX=$((LOG_IDX+1))
+
+# Test loading all models on startup in EXPLICIT model control mode AND
+# an additional --load-model argument, it should fail
+rm -fr models 
+mkdir models 
+for i in onnx ; do
+    cp -r $DATADIR/qa_model_repository/${i}_float32_float32_float32 models/.
+    sed -i "s/max_batch_size:.*/max_batch_size: 1/" models/${i}_float32_float32_float32/config.pbtxt
+done
+
+# --load-model=* can not be used with any other --load-model arguments
+# as it's unclear what the user's intentions are.
+SERVER_ARGS="--model-repository=`pwd`/models --model-repository=`pwd`/models_0 \
+             --model-control-mode=explicit \
+             --strict-readiness=true \
+             --exit-on-error=true \
+             --load-model=* \
+             --load-model=onnx_float32_float32_float32"
+SERVER_LOG="./inference_server_$LOG_IDX.log"
+run_server
+if [ "$SERVER_PID" != "0" ]; then
+    echo -e "\n***\n*** Failed: $SERVER started successfully when it was expected to fail\n***"
+    cat $SERVER_LOG
+    RET=1
+
+    kill $SERVER_PID
+    wait $SERVER_PID
+fi
 
 LOG_IDX=$((LOG_IDX+1))
 
@@ -1406,7 +1695,238 @@ fi
 kill $SERVER_PID
 wait $SERVER_PID
 
+LOG_IDX=$((LOG_IDX+1))
+
+# LifeCycleTest.test_config_override
+rm -fr models config.pbtxt.*
+mkdir models
+cp -r $DATADIR/qa_model_repository/onnx_float32_float32_float32 models/.
+# Make only version 2 is valid version directory while config requests 1, 3
+rm models/onnx_float32_float32_float32/1/*
+rm models/onnx_float32_float32_float32/3/*
+
+SERVER_ARGS="--model-repository=`pwd`/models --model-repository=`pwd`/models \
+             --model-control-mode=explicit \
+             --strict-model-config=false"
+SERVER_LOG="./inference_server_$LOG_IDX.log"
+run_server
+if [ "$SERVER_PID" == "0" ]; then
+    echo -e "\n***\n*** Failed to start $SERVER\n***"
+    cat $SERVER_LOG
+    exit 1
+fi
+
 rm -f $CLIENT_LOG
+set +e
+python $LC_TEST LifeCycleTest.test_config_override >>$CLIENT_LOG 2>&1
+if [ $? -ne 0 ]; then
+    cat $CLIENT_LOG
+    echo -e "\n***\n*** Test Failed\n***"
+    RET=1
+else
+    check_test_results $TEST_RESULT_FILE 1
+    if [ $? -ne 0 ]; then
+        cat $CLIENT_LOG
+        echo -e "\n***\n*** Test Result Verification Failed\n***"
+        RET=1
+    fi
+fi
+set -e
+
+kill $SERVER_PID
+wait $SERVER_PID
+
+rm -f $CLIENT_LOG
+
+LOG_IDX=$((LOG_IDX+1))
+
+# LifeCycleTest.test_file_override
+rm -fr models config.pbtxt.*
+mkdir models
+cp -r $DATADIR/qa_model_repository/onnx_float32_float32_float32 models/.
+# Make only version 2, 3 is valid version directory while config requests 1, 3
+rm -rf models/onnx_float32_float32_float32/1
+
+# Start with EXPLICIT mode and load onnx_float32_float32_float32
+SERVER_ARGS="--model-repository=`pwd`/models \
+             --model-control-mode=explicit \
+             --load-model=onnx_float32_float32_float32 \
+             --strict-model-config=false"
+SERVER_LOG="./inference_server_$LOG_IDX.log"
+run_server
+if [ "$SERVER_PID" == "0" ]; then
+    echo -e "\n***\n*** Failed to start $SERVER\n***"
+    cat $SERVER_LOG
+    exit 1
+fi
+
+rm -f $CLIENT_LOG
+set +e
+python $LC_TEST LifeCycleTest.test_file_override >>$CLIENT_LOG 2>&1
+if [ $? -ne 0 ]; then
+    cat $CLIENT_LOG
+    echo -e "\n***\n*** Test Failed\n***"
+    RET=1
+else
+    check_test_results $TEST_RESULT_FILE 1
+    if [ $? -ne 0 ]; then
+        cat $CLIENT_LOG
+        echo -e "\n***\n*** Test Result Verification Failed\n***"
+        RET=1
+    fi
+fi
+set -e
+
+kill $SERVER_PID
+wait $SERVER_PID
+
+rm -f $CLIENT_LOG
+
+LOG_IDX=$((LOG_IDX+1))
+
+# LifeCycleTest.test_shutdown_dynamic
+rm -fr models config.pbtxt.*
+mkdir models
+cp -r ../custom_models/custom_zero_1_float32 models/. && \
+    mkdir -p models/custom_zero_1_float32/1 && \
+    (cd models/custom_zero_1_float32 && \
+        echo "dynamic_batching {}" >> config.pbtxt 
+        echo "parameters [" >> config.pbtxt && \
+        echo "{ key: \"execute_delay_ms\"; value: { string_value: \"5000\" }}" >> config.pbtxt && \
+        echo "]" >> config.pbtxt)
+
+SERVER_ARGS="--model-repository=`pwd`/models --log-verbose=1"
+SERVER_LOG="./inference_server_$LOG_IDX.log"
+run_server
+if [ "$SERVER_PID" == "0" ]; then
+    echo -e "\n***\n*** Failed to start $SERVER\n***"
+    cat $SERVER_LOG
+    exit 1
+fi
+
+set +e
+SERVER_PID=$SERVER_PID python $LC_TEST LifeCycleTest.test_shutdown_dynamic >>$CLIENT_LOG 2>&1
+if [ $? -ne 0 ]; then
+    cat $CLIENT_LOG
+    echo -e "\n***\n*** Test Failed\n***"
+    RET=1
+else
+    check_test_results $TEST_RESULT_FILE 1
+    if [ $? -ne 0 ]; then
+        cat $CLIENT_LOG
+        echo -e "\n***\n*** Test Result Verification Failed\n***"
+        RET=1
+    fi
+fi
+set -e
+
+# check server log
+if [ `grep -c "Model 'custom_zero_1_float32' (version 1) has 1 in-flight inferences" $SERVER_LOG` == "0" ]; then
+    echo -e "\n***\n*** Expect logging for model and in-flight inference count\n***"
+    RET=1
+fi
+
+kill $SERVER_PID
+wait $SERVER_PID
+
+rm -f $CLIENT_LOG
+
+LOG_IDX=$((LOG_IDX+1))
+
+# LifeCycleTest.test_shutdown_sequence
+rm -fr models config.pbtxt.*
+mkdir models
+cp -r ../custom_models/custom_sequence_int32 models/. && \
+    mkdir -p models/custom_sequence_int32/1
+
+SERVER_ARGS="--model-repository=`pwd`/models --log-verbose=1"
+SERVER_LOG="./inference_server_$LOG_IDX.log"
+run_server
+if [ "$SERVER_PID" == "0" ]; then
+    echo -e "\n***\n*** Failed to start $SERVER\n***"
+    cat $SERVER_LOG
+    exit 1
+fi
+
+set +e
+SERVER_PID=$SERVER_PID python $LC_TEST LifeCycleTest.test_shutdown_sequence >>$CLIENT_LOG 2>&1
+if [ $? -ne 0 ]; then
+    cat $CLIENT_LOG
+    echo -e "\n***\n*** Test Failed\n***"
+    RET=1
+else
+    check_test_results $TEST_RESULT_FILE 1
+    if [ $? -ne 0 ]; then
+        cat $CLIENT_LOG
+        echo -e "\n***\n*** Test Result Verification Failed\n***"
+        RET=1
+    fi
+fi
+set -e
+
+# check server log
+if [ `grep -c "Model 'custom_sequence_int32' (version 1) has 2 in-flight inferences" $SERVER_LOG` == "0" ]; then
+    echo -e "\n***\n*** Expect logging for model having 2 in-flight inferences\n***"
+    RET=1
+fi
+if [ `grep -c "Model 'custom_sequence_int32' (version 1) has 1 in-flight inferences" $SERVER_LOG` == "0" ]; then
+    echo -e "\n***\n*** Expect logging for model having 1 in-flight inference\n***"
+    RET=1
+fi
+
+kill $SERVER_PID
+wait $SERVER_PID
+
+rm -f $CLIENT_LOG
+
+LOG_IDX=$((LOG_IDX+1))
+
+# LifeCycleTest.test_shutdown_ensemble
+rm -fr models config.pbtxt.*
+mkdir models
+cp -r ensemble_zero_1_float32 models/. && \
+    mkdir -p models/ensemble_zero_1_float32/1
+cp -r ../custom_models/custom_zero_1_float32 models/. && \
+    mkdir -p models/custom_zero_1_float32/1 && \
+    (cd models/custom_zero_1_float32 && \
+        echo "dynamic_batching {}" >> config.pbtxt 
+        echo "parameters [" >> config.pbtxt && \
+        echo "{ key: \"execute_delay_ms\"; value: { string_value: \"5000\" }}" >> config.pbtxt && \
+        echo "]" >> config.pbtxt)
+
+SERVER_ARGS="--model-repository=`pwd`/models --log-verbose=1"
+SERVER_LOG="./inference_server_$LOG_IDX.log"
+run_server
+if [ "$SERVER_PID" == "0" ]; then
+    echo -e "\n***\n*** Failed to start $SERVER\n***"
+    cat $SERVER_LOG
+    exit 1
+fi
+
+set +e
+SERVER_PID=$SERVER_PID python $LC_TEST LifeCycleTest.test_shutdown_ensemble >>$CLIENT_LOG 2>&1
+if [ $? -ne 0 ]; then
+    cat $CLIENT_LOG
+    echo -e "\n***\n*** Test Failed\n***"
+    RET=1
+else
+    check_test_results $TEST_RESULT_FILE 1
+    if [ $? -ne 0 ]; then
+        cat $CLIENT_LOG
+        echo -e "\n***\n*** Test Result Verification Failed\n***"
+        RET=1
+    fi
+fi
+set -e
+
+# check server log
+if [ `grep -c "Model 'ensemble_zero_1_float32' (version 1) has 1 in-flight inferences" $SERVER_LOG` == "0" ]; then
+    echo -e "\n***\n*** Expect logging for model and in-flight inference count\n***"
+    RET=1
+fi
+
+kill $SERVER_PID
+wait $SERVER_PID
 
 if [ $RET -eq 0 ]; then
   echo -e "\n***\n*** Test Passed\n***"

@@ -28,12 +28,12 @@ import argparse
 import os
 import sys
 import json
-import tritongrpcclient as grpcclient
-import tritonhttpclient as httpclient
-from tritonclientutils import *
+import tritonclient.grpc as grpcclient
+import tritonclient.http as httpclient
+from tritonclient.utils import *
 from google.protobuf import text_format
 from google.protobuf import json_format
-import tritongrpcclient.model_config_pb2 as mc
+import tritonclient.grpc.model_config_pb2 as mc
 
 FLAGS = None
 

@@ -1,0 +1,35 @@
+name: "cpu_instance"
+platform: "onnxruntime_onnx"
+version_policy {
+  latest {
+    num_versions: 1
+  }
+}
+max_batch_size: 8
+input {
+  name: "INPUT0"
+  data_type: TYPE_FP16
+  dims: -1
+  dims: -1
+}
+output {
+  name: "OUTPUT0"
+  data_type: TYPE_FP16
+  dims: -1
+  dims: -1
+}
+instance_group {
+  name: "cpu_instance"
+  count: 2
+  kind: KIND_CPU
+}
+default_model_filename: "model.onnx"
+optimization {
+  input_pinned_memory {
+    enable: true
+  }
+  output_pinned_memory {
+    enable: true
+  }
+}
+backend: "onnxruntime"

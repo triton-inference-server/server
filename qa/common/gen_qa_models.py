@@ -1,4 +1,4 @@
-# Copyright 2018-2021, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright 2018-2022, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -32,6 +32,7 @@ import gen_ensemble_model_utils as emu
 
 FLAGS = None
 np_dtype_string = np.dtype(object)
+from typing import List, Tuple
 
 
 def np_to_model_dtype(np_dtype):
@@ -148,7 +149,7 @@ def np_to_torch_dtype(np_dtype):
     elif np_dtype == np.float64:
         return torch.double
     elif np_dtype == np_dtype_string:
-        return None  # Not supported in Torch
+        return List[str]
 
 
 def create_graphdef_modelfile(models_dir,
@@ -685,6 +686,16 @@ def create_plan_dynamic_modelfile(models_dir, max_batch, model_version,
                                      full_static_shape, full_static_shape)
         config.add_optimization_profile(profile[7 + i])
 
+    # Add profiles where each profile supports a specific batch size
+    if max_batch != 0:
+        for i in range(max_batch):
+            profile.append(builder.create_optimization_profile())
+            profile[10 + i].set_shape("INPUT0", [1 + i] + min_shape,
+                                      [1 + i] + opt_shape, [1 + i] + max_shape)
+            profile[10 + i].set_shape("INPUT1", [1 + i] + min_shape,
+                                      [1 + i] + opt_shape, [1 + i] + max_shape)
+            config.add_optimization_profile(profile[10 + i])
+
     config.max_workspace_size = 1 << 20
     try:
         engine_bytes = builder.build_serialized_network(network, config)
@@ -1164,12 +1175,11 @@ def create_libtorch_modelfile(models_dir,
                               output1_dtype,
                               swap=False):
 
-    if not tu.validate_for_libtorch_model(input_dtype, output0_dtype,
-                                          output1_dtype, input_shape,
-                                          output0_shape, output1_shape):
+    if not tu.validate_for_libtorch_model(
+            input_dtype, output0_dtype, output1_dtype, input_shape,
+            output0_shape, output1_shape, max_batch):
         return
 
-    torch_input_dtype = np_to_torch_dtype(input_dtype)
     torch_output0_dtype = np_to_torch_dtype(output0_dtype)
     torch_output1_dtype = np_to_torch_dtype(output1_dtype)
 
@@ -1178,39 +1188,193 @@ def create_libtorch_modelfile(models_dir,
         output0_dtype, output1_dtype)
     # handle for -1 (when variable) since can't create tensor with shape of [-1]
     input_shape = [abs(ips) for ips in input_shape]
+
     # Create the model
-    if not swap:
+    if (input_dtype
+            == np_dtype_string) and (output0_dtype != np_dtype_string) and (
+                output1_dtype != np_dtype_string):
 
         class AddSubNet(nn.Module):
 
             def __init__(self, *args):
-                self.torch_output0_dtype = args[0][0]
-                self.torch_output1_dtype = args[0][1]
+                self.output0_dtype = args[0][0]
+                self.output1_dtype = args[0][1]
+                self.swap = args[0][2]
                 super(AddSubNet, self).__init__()
 
-            def forward(self, input0, input1):
-                return (input0 + input1).to(self.torch_output0_dtype), \
-                    (input0 - input1).to(self.torch_output1_dtype)
+            def forward(self, INPUT0: List[str], INPUT1: List[str]):
+                input0_int = torch.tensor([int(i) for i in INPUT0])
+                input1_int = torch.tensor([int(i) for i in INPUT1])
+                op0 = input0_int + input1_int if not self.swap else input0_int - input1_int
+                op1 = input0_int - input1_int if not self.swap else input0_int + input1_int
+                return op0.to(self.output0_dtype), op1.to(self.output1_dtype)
+    elif (input_dtype
+          == np_dtype_string) and (output0_dtype
+                                   == np_dtype_string) and (output1_dtype
+                                                            == np_dtype_string):
 
-        addSubModel = AddSubNet((torch_output0_dtype, torch_output1_dtype))
-        example_input = torch.zeros(input_shape, dtype=torch_input_dtype)
-        traced = torch.jit.trace(addSubModel, (example_input, example_input))
-    else:
-
-        class SubAddNet(nn.Module):
+        class AddSubNet(nn.Module):
 
             def __init__(self, *args):
-                self.torch_output0_dtype = args[0][0]
-                self.torch_output1_dtype = args[0][1]
-                super(SubAddNet, self).__init__()
+                self.output0_dtype = args[0][0]
+                self.output1_dtype = args[0][1]
+                self.swap = args[0][2]
+                super(AddSubNet, self).__init__()
 
-            def forward(self, input0, input1):
-                return (input0 - input1).to(self.torch_output0_dtype), \
-                    (input0 + input1).to(self.torch_output1_dtype)
+            def forward(self, INPUT0: List[str],
+                        INPUT1: List[str]) -> Tuple[List[str], List[str]]:
+                input0_int = torch.tensor([int(i) for i in INPUT0])
+                input1_int = torch.tensor([int(i) for i in INPUT1])
+                op0 = [
+                    str(i.item())
+                    for i in (input0_int +
+                              input1_int if not self.swap else input0_int -
+                              input1_int)
+                ]
+                op1 = [
+                    str(i.item())
+                    for i in (input0_int -
+                              input1_int if not self.swap else input0_int +
+                              input1_int)
+                ]
+                return op0, op1
+    elif (input_dtype
+          == np_dtype_string) and (output0_dtype == np_dtype_string) and (
+              output1_dtype != np_dtype_string):
 
-        subAddModel = SubAddNet((torch_output0_dtype, torch_output1_dtype))
-        example_input = torch.zeros(input_shape, dtype=torch_input_dtype)
-        traced = torch.jit.trace(subAddModel, (example_input, example_input))
+        class AddSubNet(nn.Module):
+
+            def __init__(self, *args):
+                self.output0_dtype = args[0][0]
+                self.output1_dtype = args[0][1]
+                self.swap = args[0][2]
+                super(AddSubNet, self).__init__()
+
+            def forward(self, INPUT0: List[str],
+                        INPUT1: List[str]) -> Tuple[List[str], torch.Tensor]:
+                input0_int = torch.tensor([int(i) for i in INPUT0])
+                input1_int = torch.tensor([int(i) for i in INPUT1])
+                op0 = [
+                    str(i.item())
+                    for i in (input0_int +
+                              input1_int if not self.swap else input0_int -
+                              input1_int)
+                ]
+                op1 = (input0_int -
+                       input1_int if not self.swap else input0_int +
+                       input1_int).to(self.output1_dtype)
+                return op0, op1
+    elif (input_dtype == np_dtype_string) and (
+            output0_dtype != np_dtype_string) and (output1_dtype
+                                                   == np_dtype_string):
+
+        class AddSubNet(nn.Module):
+
+            def __init__(self, *args):
+                self.output0_dtype = args[0][0]
+                self.output1_dtype = args[0][1]
+                self.swap = args[0][2]
+                super(AddSubNet, self).__init__()
+
+            def forward(self, INPUT0: List[str],
+                        INPUT1: List[str]) -> Tuple[torch.Tensor, List[str]]:
+                input0_int = torch.tensor([int(i) for i in INPUT0])
+                input1_int = torch.tensor([int(i) for i in INPUT1])
+                op0 = (input0_int +
+                       input1_int if not self.swap else input0_int -
+                       input1_int).to(self.output0_dtype)
+                op1 = [
+                    str(i.item())
+                    for i in (input0_int -
+                              input1_int if not self.swap else input0_int +
+                              input1_int)
+                ]
+                return op0, op1
+    elif (input_dtype != np_dtype_string) and (
+            output0_dtype == np_dtype_string) and (output1_dtype
+                                                   == np_dtype_string):
+
+        class AddSubNet(nn.Module):
+
+            def __init__(self, *args):
+                self.output0_dtype = args[0][0]
+                self.output1_dtype = args[0][1]
+                self.swap = args[0][2]
+                super(AddSubNet, self).__init__()
+
+            def forward(self, INPUT0, INPUT1) -> Tuple[List[str], List[str]]:
+                op0 = [
+                    str(i.item())
+                    for i in (INPUT0 + INPUT1 if not self.swap else INPUT0 -
+                              INPUT1)
+                ]
+                op1 = [
+                    str(i.item())
+                    for i in (INPUT0 - INPUT1 if not self.swap else INPUT0 +
+                              INPUT1)
+                ]
+                return op0, op1
+    elif (input_dtype != np_dtype_string) and (
+            output0_dtype != np_dtype_string) and (output1_dtype
+                                                   == np_dtype_string):
+
+        class AddSubNet(nn.Module):
+
+            def __init__(self, *args):
+                self.output0_dtype = args[0][0]
+                self.output1_dtype = args[0][1]
+                self.swap = args[0][2]
+                super(AddSubNet, self).__init__()
+
+            def forward(self, INPUT0, INPUT1) -> Tuple[torch.Tensor, List[str]]:
+                op0 = (INPUT0 + INPUT1 if not self.swap else INPUT0 -
+                       INPUT1).to(self.output0_dtype)
+                op1 = [
+                    str(i.item())
+                    for i in (INPUT0 - INPUT1 if not self.swap else INPUT0 +
+                              INPUT1)
+                ]
+                return op0, op1
+    elif (input_dtype != np_dtype_string) and (
+            output0_dtype
+            == np_dtype_string) and (output1_dtype != np_dtype_string):
+
+        class AddSubNet(nn.Module):
+
+            def __init__(self, *args):
+                self.output0_dtype = args[0][0]
+                self.output1_dtype = args[0][1]
+                self.swap = args[0][2]
+                super(AddSubNet, self).__init__()
+
+            def forward(self, INPUT0, INPUT1) -> Tuple[List[str], torch.Tensor]:
+                op0 = [
+                    str(i.item())
+                    for i in (INPUT0 + INPUT1 if not self.swap else INPUT0 -
+                              INPUT1)
+                ]
+                op1 = (INPUT0 - INPUT1 if not self.swap else INPUT0 +
+                       INPUT1).to(self.output1_dtype)
+                return op0, op1
+    else:
+
+        class AddSubNet(nn.Module):
+
+            def __init__(self, *args):
+                self.output0_dtype = args[0][0]
+                self.output1_dtype = args[0][1]
+                self.swap = args[0][2]
+                super(AddSubNet, self).__init__()
+
+            def forward(self, INPUT0, INPUT1):
+                op0 = (INPUT0 + INPUT1 if not self.swap else INPUT0 -
+                       INPUT1).to(self.output0_dtype)
+                op1 = (INPUT0 - INPUT1 if not self.swap else INPUT0 +
+                       INPUT1).to(self.output1_dtype)
+                return op0, op1
+
+    addSubModel = AddSubNet((torch_output0_dtype, torch_output1_dtype, swap))
+    traced = torch.jit.script(addSubModel)
 
     model_version_dir = models_dir + "/" + model_name + "/" + str(model_version)
 
@@ -1227,9 +1391,9 @@ def create_libtorch_modelconfig(models_dir, max_batch, model_version,
                                 input_dtype, output0_dtype, output1_dtype,
                                 output0_label_cnt, version_policy):
 
-    if not tu.validate_for_libtorch_model(input_dtype, output0_dtype,
-                                          output1_dtype, input_shape,
-                                          output0_shape, output1_shape):
+    if not tu.validate_for_libtorch_model(
+            input_dtype, output0_dtype, output1_dtype, input_shape,
+            output0_shape, output1_shape, max_batch):
         return
 
     # Unpack version policy
@@ -1256,12 +1420,12 @@ max_batch_size: {}
 version_policy: {}
 input [
   {{
-    name: "INPUT__0"
+    name: "INPUT0"
     data_type: {}
     dims: [ {} ]
   }},
   {{
-    name: "INPUT__1"
+    name: "INPUT1"
     data_type: {}
     dims: [ {} ]
   }}
@@ -1605,18 +1769,6 @@ def create_models(models_dir,
                 if len(output1_shape) == 1 and output1_dtype == np.int8:
                     config_output1_shape = (output1_shape[0], 1, 1)
 
-            # max-batch 8
-            emu.create_ensemble_modelconfig(pair[0], models_dir, 8,
-                                            model_version, config_input_shape,
-                                            config_output0_shape,
-                                            config_output1_shape, input_dtype,
-                                            output0_dtype, output1_dtype,
-                                            output0_label_cnt, version_policy)
-            emu.create_ensemble_modelfile(pair[0], models_dir, 8, model_version,
-                                          config_input_shape,
-                                          config_output0_shape,
-                                          config_output1_shape, input_dtype,
-                                          output0_dtype, output1_dtype)
             # max-batch 0
             emu.create_ensemble_modelconfig(pair[0], models_dir, 0,
                                             model_version, config_input_shape,
@@ -1629,6 +1781,23 @@ def create_models(models_dir,
                                           config_output0_shape,
                                           config_output1_shape, input_dtype,
                                           output0_dtype, output1_dtype)
+
+            # max-batch 8 (Skip for PyTorch models with String I/O)
+            if (pair[0] == "libtorch") and not pair[1](
+                    input_dtype, output0_dtype, output1_dtype, input_shape,
+                    output0_shape, output1_shape, 8):
+                continue
+
+            emu.create_ensemble_modelconfig(
+                pair[0], models_dir, 8, model_version, config_input_shape,
+                config_output0_shape, config_output1_shape, input_dtype,
+                output0_dtype, output1_dtype, output0_label_cnt,
+                version_policy)
+            emu.create_ensemble_modelfile(pair[0], models_dir, 8,
+                                            model_version, config_input_shape,
+                                            config_output0_shape,
+                                            config_output1_shape, input_dtype,
+                                            output0_dtype, output1_dtype)
 
 
 def create_fixed_models(models_dir,

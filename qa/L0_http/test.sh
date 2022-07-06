@@ -1,5 +1,5 @@
 #!/bin/bash
-# Copyright 2019-2021, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright 2019-2022, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -45,12 +45,14 @@ RET=0
 # On windows the paths invoked by the script (running in WSL) must use
 # /mnt/c when needed but the paths on the tritonserver command-line
 # must be C:/ style.
-if [[ "$(< /proc/sys/kernel/osrelease)" == *Microsoft ]]; then
+if [[ "$(< /proc/sys/kernel/osrelease)" == *microsoft* ]]; then
     SDKDIR=${SDKDIR:=C:/sdk}
     MODELDIR=${MODELDIR:=C:/models}
+    DATADIR=${DATADIR:="/mnt/c/data/inferenceserver/${REPO_VERSION}"}
     BACKEND_DIR=${BACKEND_DIR:=C:/tritonserver/backends}
     SERVER=${SERVER:=/mnt/c/tritonserver/bin/tritonserver.exe}
 
+    SIMPLE_AIO_INFER_CLIENT_PY=${SDKDIR}/python/simple_http_aio_infer_client.py
     SIMPLE_HEALTH_CLIENT_PY=${SDKDIR}/python/simple_http_health_metadata.py
     SIMPLE_INFER_CLIENT_PY=${SDKDIR}/python/simple_http_infer_client.py
     SIMPLE_ASYNC_INFER_CLIENT_PY=${SDKDIR}/python/simple_http_async_infer_client.py
@@ -73,12 +75,16 @@ if [[ "$(< /proc/sys/kernel/osrelease)" == *Microsoft ]]; then
     SIMPLE_SHM_CLIENT=${SDKDIR}/python/simple_http_shm_client
     SIMPLE_CUDASHM_CLIENT=${SDKDIR}/python/simple_http_cudashm_client
     SIMPLE_REUSE_INFER_OBJECTS_CLIENT=${SDKDIR}/python/reuse_infer_objects_client
+    # [FIXME] point to proper client
+    CC_UNIT_TEST=${SDKDIR}/python/cc_client_test
 else
     MODELDIR=${MODELDIR:=`pwd`/models}
+    DATADIR=${DATADIR:="/data/inferenceserver/${REPO_VERSION}"}
     TRITON_DIR=${TRITON_DIR:="/opt/tritonserver"}
     SERVER=${TRITON_DIR}/bin/tritonserver
     BACKEND_DIR=${TRITON_DIR}/backends
 
+    SIMPLE_AIO_INFER_CLIENT_PY=../clients/simple_http_aio_infer_client.py
     SIMPLE_HEALTH_CLIENT_PY=../clients/simple_http_health_metadata.py
     SIMPLE_INFER_CLIENT_PY=../clients/simple_http_infer_client.py
     SIMPLE_ASYNC_INFER_CLIENT_PY=../clients/simple_http_async_infer_client.py
@@ -101,6 +107,7 @@ else
     SIMPLE_SHM_CLIENT=../clients/simple_http_shm_client
     SIMPLE_CUDASHM_CLIENT=../clients/simple_http_cudashm_client
     SIMPLE_REUSE_INFER_OBJECTS_CLIENT=../clients/reuse_infer_objects_client
+    CC_UNIT_TEST=../clients/cc_client_test
 fi
 
 # Add string_dyna_sequence model to repo
@@ -138,6 +145,7 @@ fi
 
 IMAGE=../images/vulture.jpeg
 for i in \
+        $SIMPLE_AIO_INFER_CLIENT_PY \
         $SIMPLE_INFER_CLIENT_PY \
         $SIMPLE_ASYNC_INFER_CLIENT_PY \
         $SIMPLE_IMAGE_CLIENT_PY \
@@ -461,6 +469,127 @@ fi
 kill $SERVER_PID
 wait $SERVER_PID
 
+# Run cpp client unit test
+rm -rf unit_test_models && mkdir unit_test_models
+cp -r $DATADIR/qa_model_repository/onnx_int32_int32_int32 unit_test_models/.
+cp -r ${MODELDIR}/simple unit_test_models/. 
+
+SERVER_ARGS="--backend-directory=${BACKEND_DIR} --model-repository=unit_test_models
+            --trace-file=global_unittest.log --trace-level=TIMESTAMPS --trace-rate=1"
+SERVER_LOG="./inference_server_cc_unit_test.log"
+CLIENT_LOG="./cc_unit_test.log"
+run_server
+if [ "$SERVER_PID" == "0" ]; then
+    echo -e "\n***\n*** Failed to start $SERVER\n***"
+    cat $SERVER_LOG
+    exit 1
+fi
+
+set +e
+# Run all unit tests except load
+$CC_UNIT_TEST --gtest_filter=HTTP*:-*Load* >> ${CLIENT_LOG} 2>&1
+if [ $? -ne 0 ]; then
+    cat ${CLIENT_LOG}
+    RET=1
+fi
+set -e
+
+kill $SERVER_PID
+wait $SERVER_PID
+
+# Run cpp client load API unit test
+rm -rf unit_test_models && mkdir unit_test_models
+cp -r $DATADIR/qa_model_repository/onnx_int32_int32_int32 unit_test_models/.
+# Make only version 2, 3 is valid version directory while config requests 1, 3
+rm -rf unit_test_models/onnx_int32_int32_int32/1
+
+# Start with EXPLICIT mode and load onnx_float32_float32_float32
+SERVER_ARGS="--model-repository=`pwd`/unit_test_models \
+             --model-control-mode=explicit \
+             --load-model=onnx_int32_int32_int32 \
+             --strict-model-config=false"
+SERVER_LOG="./inference_server_cc_unit_test.load.log"
+CLIENT_LOG="./cc_unit_test.load.log"
+run_server
+if [ "$SERVER_PID" == "0" ]; then
+    echo -e "\n***\n*** Failed to start $SERVER\n***"
+    cat $SERVER_LOG
+    exit 1
+fi
+
+set +e
+$CC_UNIT_TEST --gtest_filter=HTTP*Load* >> ${CLIENT_LOG} 2>&1
+if [ $? -ne 0 ]; then
+    cat ${CLIENT_LOG}
+    RET=1
+fi
+set -e
+
+kill $SERVER_PID
+wait $SERVER_PID
+
+# Run python http aio unit test
+PYTHON_HTTP_AIO_TEST=python_http_aio_test.py
+CLIENT_LOG=`pwd`/python_http_aio_test.log
+SERVER_ARGS="--backend-directory=${BACKEND_DIR} --model-repository=${MODELDIR}"
+run_server
+if [ "$SERVER_PID" == "0" ]; then
+    echo -e "\n***\n*** Failed to start $SERVER\n***"
+    cat $SERVER_LOG
+    exit 1
+fi
+set +e
+python $PYTHON_HTTP_AIO_TEST > $CLIENT_LOG 2>&1
+if [ $? -ne 0 ]; then
+    cat $CLIENT_LOG
+    echo -e "\n***\n*** Python HTTP AsyncIO Test Failed\n***"
+    RET=1
+fi
+set -e
+kill $SERVER_PID
+wait $SERVER_PID
+
+# Run python unit test
+rm -r ${MODELDIR}/*
+cp -r $DATADIR/qa_identity_model_repository/onnx_zero_1_float32 ${MODELDIR}/.
+cp -r $DATADIR/qa_identity_model_repository/onnx_zero_1_object ${MODELDIR}/.
+cp -r $DATADIR/qa_identity_model_repository/onnx_zero_1_float16 ${MODELDIR}/.
+cp -r $DATADIR/qa_identity_model_repository/onnx_zero_3_float32 ${MODELDIR}/.
+cp -r ${MODELDIR}/onnx_zero_1_object ${MODELDIR}/onnx_zero_1_object_1_element && \
+    (cd models/onnx_zero_1_object_1_element && \
+        sed -i "s/onnx_zero_1_object/onnx_zero_1_object_1_element/" config.pbtxt && \
+        sed -i "0,/-1/{s/-1/1/}" config.pbtxt)
+
+SERVER_ARGS="--backend-directory=${BACKEND_DIR} --model-repository=${MODELDIR}"
+SERVER_LOG="./inference_server_http_test.log"
+CLIENT_LOG="./http_test.log"
+run_server
+if [ "$SERVER_PID" == "0" ]; then
+    echo -e "\n***\n*** Failed to start $SERVER\n***"
+    cat $SERVER_LOG
+    exit 1
+fi
+
+TEST_RESULT_FILE='test_results.txt'
+PYTHON_TEST=http_test.py
+EXPECTED_NUM_TESTS=8
+set +e
+python3 $PYTHON_TEST >$CLIENT_LOG 2>&1
+if [ $? -ne 0 ]; then
+    cat $CLIENT_LOG
+    RET=1
+else
+    check_test_results $TEST_RESULT_FILE $EXPECTED_NUM_TESTS
+    if [ $? -ne 0 ]; then
+        cat $CLIENT_LOG
+        echo -e "\n***\n*** Test Result Verification Failed\n***"
+        RET=1
+    fi
+fi
+set -e
+
+kill $SERVER_PID
+wait $SERVER_PID
 
 if [ $RET -eq 0 ]; then
     echo -e "\n***\n*** Test Passed\n***"

@@ -1,4 +1,4 @@
-# Copyright 2019-2021, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright 2019-2022, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -32,6 +32,7 @@ import gen_ensemble_model_utils as emu
 
 FLAGS = None
 np_dtype_string = np.dtype(object)
+from typing import List, Tuple
 
 
 def np_to_model_dtype(np_dtype):
@@ -148,7 +149,7 @@ def np_to_torch_dtype(np_dtype):
     elif np_dtype == np.float64:
         return torch.double
     elif np_dtype == np_dtype_string:
-        return None  # Not supported in Torch
+        return List[str]
 
 
 def create_tf_modelfile(create_savedmodel, models_dir, model_version, io_cnt,
@@ -381,59 +382,99 @@ def create_libtorch_modelfile(create_savedmodel, models_dir, model_version,
                               io_cnt, max_batch, dtype, shape):
 
     if not tu.validate_for_libtorch_model(dtype, dtype, dtype, shape, shape,
-                                          shape):
+                                          shape, max_batch):
         return
-
-    torch_dtype = np_to_torch_dtype(dtype)
 
     model_name = tu.get_zero_model_name(
         "libtorch_nobatch" if max_batch == 0 else "libtorch", io_cnt, dtype)
-    # handle for -1 (when variable) since can't create tensor with shape of [-1]
-    torch_shape = [abs(s) for s in shape]
+
     # Create the model
     if io_cnt == 1:
+        if (dtype == np_dtype_string):
 
-        class IdentityNet(nn.Module):
+            class IdentityNet(nn.Module):
 
-            def __init__(self):
-                super(IdentityNet, self).__init__()
+                def __init__(self):
+                    super(IdentityNet, self).__init__()
 
-            def forward(self, input0):
-                return input0
+                def forward(self, input0: List[str]) -> List[str]:
+                    return input0
+        else:
+
+            class IdentityNet(nn.Module):
+
+                def __init__(self):
+                    super(IdentityNet, self).__init__()
+
+                def forward(self, input0):
+                    return input0
     elif io_cnt == 2:
+        if (dtype == np_dtype_string):
 
-        class IdentityNet(nn.Module):
+            class IdentityNet(nn.Module):
 
-            def __init__(self):
-                super(IdentityNet, self).__init__()
+                def __init__(self):
+                    super(IdentityNet, self).__init__()
 
-            def forward(self, input0, input1):
-                return input0, input1
+                def forward(self, input0: List[str],
+                            input1: List[str]) -> Tuple[List[str], List[str]]:
+                    return input0, input1
+        else:
+
+            class IdentityNet(nn.Module):
+
+                def __init__(self):
+                    super(IdentityNet, self).__init__()
+
+                def forward(self, input0, input1):
+                    return input0, input1
     elif io_cnt == 3:
+        if (dtype == np_dtype_string):
 
-        class IdentityNet(nn.Module):
+            class IdentityNet(nn.Module):
 
-            def __init__(self):
-                super(IdentityNet, self).__init__()
+                def __init__(self):
+                    super(IdentityNet, self).__init__()
 
-            def forward(self, input0, input1, input2):
-                return input0, input1, input2
+                def forward(
+                    self, input0: List[str], input1: List[str],
+                    input2: List[str]
+                ) -> Tuple[List[str], List[str], List[str]]:
+                    return input0, input1, input2
+        else:
+
+            class IdentityNet(nn.Module):
+
+                def __init__(self):
+                    super(IdentityNet, self).__init__()
+
+                def forward(self, input0, input1, input2):
+                    return input0, input1, input2
     elif io_cnt == 4:
+        if (dtype == np_dtype_string):
 
-        class IdentityNet(nn.Module):
+            class IdentityNet(nn.Module):
 
-            def __init__(self):
-                super(IdentityNet, self).__init__()
+                def __init__(self):
+                    super(IdentityNet, self).__init__()
 
-            def forward(self, input0, input1, input2, input3):
-                return input0, input1, input2, input3
+                def forward(
+                    self, input0: List[str], input1: List[str],
+                    input2: List[str], input3: List[str]
+                ) -> Tuple[List[str], List[str], List[str], List[str]]:
+                    return input0, input1, input2, input3
+        else:
+
+            class IdentityNet(nn.Module):
+
+                def __init__(self):
+                    super(IdentityNet, self).__init__()
+
+                def forward(self, input0, input1, input2, input3):
+                    return input0, input1, input2, input3
 
     identityModel = IdentityNet()
-    example_inputs = [
-        torch.zeros(torch_shape, dtype=torch_dtype) for i in range(io_cnt)
-    ]
-    traced = torch.jit.trace(identityModel,
-                             tuple(example_inputs[i] for i in range(io_cnt)))
+    traced = torch.jit.script(identityModel)
 
     model_version_dir = models_dir + "/" + model_name + "/" + str(model_version)
 
@@ -449,7 +490,7 @@ def create_libtorch_modelconfig(create_savedmodel, models_dir, model_version,
                                 io_cnt, max_batch, dtype, shape):
 
     if not tu.validate_for_libtorch_model(dtype, dtype, dtype, shape, shape,
-                                          shape):
+                                          shape, max_batch):
         return
 
     # Unpack version policy

@@ -1,4 +1,4 @@
-# Copyright (c) 2019-2021, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright 2019-2022, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -44,6 +44,10 @@ if sys.version_info >= (3, 0):
 else:
     import Queue as queue
 
+# By default, find tritonserver on "localhost", but can be overridden
+# with TRITONSERVER_IPADDR envvar
+_tritonserver_ipaddr = os.environ.get('TRITONSERVER_IPADDR', 'localhost')
+
 _test_system_shared_memory = bool(
     int(os.environ.get('TEST_SYSTEM_SHARED_MEMORY', 0)))
 _test_cuda_shared_memory = bool(
@@ -81,7 +85,7 @@ class SequenceBatcherTestUtil(tu.TestResultCollector):
 
     def setUp(self):
         # The helper client for setup will be GRPC for simplicity.
-        self.triton_client_ = grpcclient.InferenceServerClient("localhost:8001")
+        self.triton_client_ = grpcclient.InferenceServerClient(f"{_tritonserver_ipaddr}:8001")
         self.clear_deferred_exceptions()
 
     def clear_deferred_exceptions(self):
@@ -423,11 +427,11 @@ class SequenceBatcherTestUtil(tu.TestResultCollector):
         # sequence model with state, so can have only a single config.
         configs = []
         if protocol == "http":
-            configs.append(("localhost:8000", "http", False))
+            configs.append((f"{_tritonserver_ipaddr}:8000", "http", False))
         if protocol == "grpc":
-            configs.append(("localhost:8001", "grpc", False))
+            configs.append((f"{_tritonserver_ipaddr}:8001", "grpc", False))
         if protocol == "streaming":
-            configs.append(("localhost:8001", "grpc", True))
+            configs.append((f"{_tritonserver_ipaddr}:8001", "grpc", True))
 
         self.assertFalse(
             _test_system_shared_memory and _test_cuda_shared_memory,
@@ -672,7 +676,7 @@ class SequenceBatcherTestUtil(tu.TestResultCollector):
             batch_size,) + tensor_shape
 
         client_utils = grpcclient
-        triton_client = client_utils.InferenceServerClient("localhost:8001",
+        triton_client = client_utils.InferenceServerClient(f"{_tritonserver_ipaddr}:8001",
                                                            verbose=True)
         user_data = UserData()
         triton_client.start_stream(partial(completion_callback, user_data))
@@ -805,7 +809,7 @@ class SequenceBatcherTestUtil(tu.TestResultCollector):
                          "Shape tensors does not support CUDA shared memory")
 
         client_utils = grpcclient
-        triton_client = client_utils.InferenceServerClient("localhost:8001",
+        triton_client = client_utils.InferenceServerClient(f"{_tritonserver_ipaddr}:8001",
                                                            verbose=True)
         user_data = UserData()
         triton_client.start_stream(partial(completion_callback, user_data))

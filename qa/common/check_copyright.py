@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 
-# Copyright (c) 2018-2021, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright 2018-2022, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -36,13 +36,13 @@ SKIP_EXTS = ('jpeg', 'jpg', 'pgm', 'png', 'log', 'serverlog', 'preprocessed',
              'jmx', 'gz', 'json', 'pdf', 'so', 'onnx')
 REPO_PATH_FROM_THIS_FILE = '../..'
 SKIP_PATHS = (
-    'builddir', 'build/libdcgm', 'build/libevhtp', 'build/onnxruntime',
-    'build/server/README.third-party-src',
+    'build',
     'deploy/gke-marketplace-app/.gitignore',
     'deploy/gke-marketplace-app/server-deployer/chart/.helmignore',
     'deploy/gcp/.helmignore', 'deploy/aws/.helmignore',
     'deploy/fleetcommand/.helmignore', 'docs/examples/model_repository',
-    'docs/examples/jetson', 'qa/common/cuda_op_kernel.cu.cc.patch',
+    'docs/examples/jetson', 'docker',
+    'qa/common/cuda_op_kernel.cu.cc.patch',
     'qa/ensemble_models/mix_platform_float32_float32_float32/output0_labels.txt',
     'qa/ensemble_models/mix_type_int32_float32_float32/output0_labels.txt',
     'qa/ensemble_models/mix_ensemble_int32_float32_float32/output0_labels.txt',
@@ -53,6 +53,7 @@ SKIP_PATHS = (
     'qa/L0_model_config/autofill_noplatform_success',
     'qa/L0_model_config/special_cases', 'qa/L0_perf_nomodel/baseline',
     'qa/L0_perf_nomodel/legacy_baseline', 'qa/L0_warmup/raw_mug_data',
+    'qa/L0_java_resnet/expected_output_data',
     'TRITON_VERSION')
 
 COPYRIGHT_YEAR_RE = 'Copyright( \\(c\\))? 20[1-9][0-9](-(20)?[1-9][0-9])?(,((20[2-9][0-9](-(20)?[2-9][0-9])?)|([2-9][0-9](-[2-9][0-9])?)))*,? NVIDIA CORPORATION( & AFFILIATES)?. All rights reserved.'

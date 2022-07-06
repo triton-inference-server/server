@@ -1,5 +1,5 @@
 #!/bin/bash
-# Copyright 2019-2021, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright 2019-2022, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -34,7 +34,8 @@ REPORTER=../common/reporter.py
 TRITON_DIR=${TRITON_DIR:="/opt/tritonserver"}
 SERVER=${TRITON_DIR}/bin/tritonserver
 BACKEND_DIR=${TRITON_DIR}/backends
-SERVER_ARGS="--model-repository=`pwd`/models --backend-directory=${BACKEND_DIR} ${BACKEND_CONFIG}"
+MODEL_REPO="${PWD}/models"
+SERVER_ARGS="--model-repository=${MODEL_REPO} --backend-directory=${BACKEND_DIR} ${BACKEND_CONFIG}"
 source ../common/util.sh
 
 # Select the single GPU that will be available to the inference
@@ -50,15 +51,7 @@ rm -fr models && mkdir -p models && \
     cp -r $MODEL_PATH models/. && \
     (cd models/$MODEL_NAME && \
             sed -i "s/^max_batch_size:.*/max_batch_size: ${MAX_BATCH}/" config.pbtxt && \
-            echo "instance_group [ { count: ${INSTANCE_CNT} }]" >> config.pbtxt)
-
-SERVER_LOG="${NAME}.serverlog"
-run_server
-if (( $SERVER_PID == 0 )); then
-    echo -e "\n***\n*** Failed to start $SERVER\n***"
-    cat $SERVER_LOG
-    exit 1
-fi
+            echo "instance_group [ { count: ${INSTANCE_CNT} }]")
 
 # Onnx and onnx-trt models are very slow on Jetson.
 MEASUREMENT_WINDOW=5000
@@ -73,22 +66,41 @@ fi
 
 set +e
 
-# Run the model once to warm up. Some frameworks do optimization on the first requests.
-# Must warmup similar to actual run so that all instances are ready
-$PERF_CLIENT -v -i ${PERF_CLIENT_PROTOCOL} -m $MODEL_NAME -p${MEASUREMENT_WINDOW} \
-                -b${STATIC_BATCH} --concurrency-range ${CONCURRENCY}
+# Overload use of PERF_CLIENT_PROTOCOL for convenience with existing test and 
+# reporting structure, though "triton_c_api" is not strictly a "protocol".
+if [[ "${PERF_CLIENT_PROTOCOL}" == "triton_c_api" ]]; then
+    # Server will be run in-process with C API
+    SERVICE_ARGS="--service-kind triton_c_api \
+                  --triton-server-directory ${TRITON_DIR} \
+                  --model-repository ${MODEL_REPO}"
+else
+    SERVICE_ARGS="-i ${PERF_CLIENT_PROTOCOL}"
 
-$PERF_CLIENT -v -i ${PERF_CLIENT_PROTOCOL} -m $MODEL_NAME -p${MEASUREMENT_WINDOW} \
+    SERVER_LOG="${NAME}.serverlog"
+    run_server
+    if (( $SERVER_PID == 0 )); then
+        echo -e "\n***\n*** Failed to start $SERVER\n***"
+        cat $SERVER_LOG
+        exit 1
+    fi
+
+    # Run the model once to warm up. Some frameworks do optimization on the first requests.
+    # Must warmup similar to actual run so that all instances are ready
+    # Note: Running extra PA for warmup doesn't make sense for C API since it
+    # uses in-process tritonserver which will exit along with this PA process.
+    $PERF_CLIENT -v -m $MODEL_NAME -p${MEASUREMENT_WINDOW} \
+                    -b${STATIC_BATCH} --concurrency-range ${CONCURRENCY} \
+                    ${SERVICE_ARGS}
+fi
+
+# Measure perf client results and write them to a file for reporting
+$PERF_CLIENT -v -m $MODEL_NAME -p${MEASUREMENT_WINDOW} \
                 -b${STATIC_BATCH} --concurrency-range ${CONCURRENCY} \
+                ${SERVICE_ARGS} \
                 -f ${NAME}.csv 2>&1 | tee ${NAME}.log
 if (( $? != 0 )); then
     RET=1
 fi
-curl localhost:8002/metrics -o ${NAME}.metrics >> ${NAME}.log 2>&1
-if (( $? != 0 )); then
-    RET=1
-fi
-
 set -e
 
 echo -e "[{\"s_benchmark_kind\":\"benchmark_perf\"," >> ${NAME}.tjson
@@ -102,8 +114,11 @@ echo -e "\"l_batch_size\":${STATIC_BATCH}," >> ${NAME}.tjson
 echo -e "\"l_instance_count\":${INSTANCE_CNT}," >> ${NAME}.tjson
 echo -e "\"s_architecture\":\"${ARCH}\"}]" >> ${NAME}.tjson
 
-kill $SERVER_PID
-wait $SERVER_PID
+# SERVER_PID may not be set if using "triton_c_api" for example
+if [[ -n "${SERVER_PID}" ]]; then
+  kill $SERVER_PID
+  wait $SERVER_PID
+fi
 
 if [ -f $REPORTER ]; then
     set +e

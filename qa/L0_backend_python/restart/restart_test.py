@@ -50,7 +50,7 @@ class RestartTest(tu.TestResultCollector):
 
     def test_restart(self):
         shape = [1, 16]
-        model_name = 'identity_fp32'
+        model_name = 'restart'
         dtype = np.float32
 
         # Since the stub process has been killed, the first request
@@ -60,6 +60,12 @@ class RestartTest(tu.TestResultCollector):
 
         # The second request should work properly since the stub process should
         # have come alive.
+        self._infer_helper(model_name, shape, dtype)
+
+    def test_infer(self):
+        shape = [1, 16]
+        model_name = 'restart'
+        dtype = np.float32
         self._infer_helper(model_name, shape, dtype)
 
 

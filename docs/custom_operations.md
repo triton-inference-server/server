@@ -1,5 +1,5 @@
 <!--
-# Copyright (c) 2019-2020, NVIDIA CORPORATION. All rights reserved.
+# Copyright 2019-2022, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -64,13 +64,13 @@ simple way to ensure you are using the correct version of TensorRT is
 to use the [NGC TensorRT
 container](https://ngc.nvidia.com/catalog/containers/nvidia:tensorrt)
 corresponding to the Triton container. For example, if you are using
-the 22.01 version of Triton, use the 22.01 version of the TensorRT
+the 22.06 version of Triton, use the 22.06 version of the TensorRT
 container.
 
 ## TensorFlow
 
 Tensorflow allows users to [add custom
-operations](https://www.tensorflow.org/guide/extend/op) which can then
+operations](https://www.tensorflow.org/guide/create_op) which can then
 be used in TensorFlow models. By using LD_PRELOAD you can load your
 custom TensorFlow operations into Triton. For example, assuming your
 TensorFlow custom operations are compiled into libtfcustom.so,
@@ -108,7 +108,7 @@ simple way to ensure you are using the correct version of TensorFlow
 is to use the [NGC TensorFlow
 container](https://ngc.nvidia.com/catalog/containers/nvidia:tensorflow)
 corresponding to the Triton container. For example, if you are using
-the 22.01 version of Triton, use the 22.01 version of the TensorFlow
+the 22.06 version of Triton, use the 22.06 version of the TensorFlow
 container.
 
 ## PyTorch
@@ -152,7 +152,7 @@ simple way to ensure you are using the correct version of PyTorch is
 to use the [NGC PyTorch
 container](https://ngc.nvidia.com/catalog/containers/nvidia:pytorch)
 corresponding to the Triton container. For example, if you are using
-the 22.01 version of Triton, use the 22.01 version of the PyTorch
+the 22.06 version of Triton, use the 22.06 version of the PyTorch
 container.
 
 ## ONNX

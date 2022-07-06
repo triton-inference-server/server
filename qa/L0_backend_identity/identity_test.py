@@ -1,6 +1,6 @@
 #!/usr/bin/python
 
-# Copyright (c) 2019-2020, NVIDIA CORPORATION. All rights reserved.
+# Copyright 2019-2022, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -36,6 +36,38 @@ import tritonhttpclient as httpclient
 from tritonclientutils import np_to_triton_dtype
 
 FLAGS = None
+
+def test_bf16_raw_http(shape):
+    model = "identity_bf16"
+    # Using fp16 data as a WAR since it is same byte_size as bf16
+    # and is supported by numpy for ease-of-use. Since this is an
+    # identity model, it's OK that the bytes are interpreted differently
+    input_data = (16384 * np.random.randn(*shape)).astype(np.float16)
+    input_bytes = input_data.tobytes()
+    headers = {'Inference-Header-Content-Length': '0'}
+    r = httpreq.post("http://localhost:8000/v2/models/{}/infer".format(model),
+                      data=input_bytes,
+                      headers=headers)
+    r.raise_for_status()
+
+    # Get the inference header size so we can locate the output binary data
+    header_size = int(r.headers["Inference-Header-Content-Length"])
+    output_bytes = r.content[header_size:]
+    # Sanity check output on pass
+    print("Response content:", r.content)
+    print("Input Bytes:", input_bytes)
+    print("Output Bytes:", output_bytes)
+
+    # Assert correct output datatype
+    import json
+    response_json = json.loads(r.content[:header_size].decode("utf-8"))
+    assert(response_json["outputs"][0]["datatype"] == "BF16")
+
+    # Assert equality of input/output for identity model
+    if not np.array_equal(output_bytes, input_bytes):
+        print("error: Expected response body contains correct output binary " \
+              "data: {}; got: {}".format(input_bytes, output_bytes))
+        sys.exit(1)
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
@@ -129,10 +161,12 @@ if __name__ == '__main__':
             success_str = 'nv_inference_request_success{model="identity_uint32",version="1"}'
             infer_count_str = 'nv_inference_count{model="identity_uint32",version="1"}'
             infer_exec_str = 'nv_inference_exec_count{model="identity_uint32",version="1"}'
+            custom_metric_str = 'input_byte_size_counter{model="identity_uint32",version="1"}'
 
             success_val = None
             infer_count_val = None
             infer_exec_val = None
+            custom_metric_val = None
             for line in metrics.text.splitlines():
                 if line.startswith(success_str):
                     success_val = float(line[len(success_str):])
@@ -140,6 +174,8 @@ if __name__ == '__main__':
                     infer_count_val = float(line[len(infer_count_str):])
                 if line.startswith(infer_exec_str):
                     infer_exec_val = float(line[len(infer_exec_str):])
+                if line.startswith(custom_metric_str):
+                    custom_metric_val = float(line[len(custom_metric_str):])
 
             if success_val != 4:
                 print("error: expected metric {} == 4, got {}".format(
@@ -152,6 +188,10 @@ if __name__ == '__main__':
             if infer_exec_val != 1:
                 print("error: expected metric {} == 1, got {}".format(
                     infer_exec_str, infer_exec_val))
+                sys.exit(1)
+            if custom_metric_val != 64:
+                print("error: expected metric {} == 64, got {}".format(
+                    custom_metric_str, custom_metric_val))
                 sys.exit(1)
 
     # Reuse a single client for all sync tests
@@ -223,3 +263,8 @@ if __name__ == '__main__':
             if param2 != False:
                 print("error: expected 'param2' == False")
                 sys.exit(1)
+
+    # FIXME: Use identity_bf16 model in test above once proper python client
+    #        support is added, and remove this raw HTTP test. See DLIS-3720.
+    test_bf16_raw_http([2, 2])
+

@@ -1,5 +1,5 @@
 #!/usr/bin/env python
-# Copyright (c) 2021, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright 2021-2022, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -25,6 +25,7 @@
 # (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
+import os
 import sys
 sys.path.append("../common")
 
@@ -35,13 +36,16 @@ import test_util as tu
 import tritonclient.http as httpclient
 from tritonclient.utils import InferenceServerException
 
+# By default, find tritonserver on "localhost", but can be overridden
+# with TRITONSERVER_IPADDR envvar
+_tritonserver_ipaddr = os.environ.get('TRITONSERVER_IPADDR', 'localhost')
 
 class InferTest(tu.TestResultCollector):
 
     def test_infer(self):
         try:
             triton_client = httpclient.InferenceServerClient(
-                url="localhost:8000")
+                url=f"{_tritonserver_ipaddr}:8000")
         except Exception as e:
             print("channel creation failed: " + str(e))
             sys.exit(1)
@@ -50,8 +54,8 @@ class InferTest(tu.TestResultCollector):
 
         inputs = []
         outputs = []
-        inputs.append(httpclient.InferInput('INPUT__0', [1, 16], "INT32"))
-        inputs.append(httpclient.InferInput('INPUT__1', [1, 16], "INT32"))
+        inputs.append(httpclient.InferInput('INPUT0', [1, 16], "INT32"))
+        inputs.append(httpclient.InferInput('INPUT1', [1, 16], "INT32"))
 
         # Create the data for the two input tensors. Initialize the first
         # to unique integers and the second to all ones.
