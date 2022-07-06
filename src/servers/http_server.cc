@@ -2498,13 +2498,11 @@ HTTPAPIServer::InferRequestClass::InferResponseComplete(
     evthr_defer(infer_request->thread_, OKReplyCallback, infer_request);
   } else {
     std::string msg(TRITONSERVER_ErrorMessage(err));
+    EVBufferAddErrorJson(infer_request->req_->buffer_out, err);
+    TRITONSERVER_ErrorDelete(err);
     if (InferErrorIsInternalError(msg)) {
-      EVBufferAddErrorJson(infer_request->req_->buffer_out, err);
-      TRITONSERVER_ErrorDelete(err);
       evthr_defer(infer_request->thread_, FAILReplyCallback, infer_request);
     } else {
-      EVBufferAddErrorJson(infer_request->req_->buffer_out, err);
-      TRITONSERVER_ErrorDelete(err);
       evthr_defer(infer_request->thread_, BADReplyCallback, infer_request);
     }
   }
