@@ -1048,7 +1048,7 @@ class HTTPAPIServer : public HTTPServerImpl {
       int64_t preferred_memory_type_id, void* userp, void** buffer,
       void** buffer_userp, TRITONSERVER_MemoryType* actual_memory_type,
       int64_t* actual_memory_type_id);
-  bool InferErrorIsInternalError(TRITONSERVER_Error* err);
+  bool InferErrorIsInternalError(const std::string& msg);
   static TRITONSERVER_Error* InferResponseFree(
       TRITONSERVER_ResponseAllocator* allocator, void* buffer,
       void* buffer_userp, size_t byte_size, TRITONSERVER_MemoryType memory_type,
@@ -1114,9 +1114,8 @@ class HTTPAPIServer : public HTTPServerImpl {
 };
 
 bool
-HTTPAPIServer::InferErrorIsInternalError(TRITONSERVER_Error* err)
+HTTPAPIServer::InferErrorIsInternalError(const std::string& msg)
 {
-  std::string error_string(TRITONSERVER_ErrorMessage(err));
   if (error_string.find("GPU error occured") != std::string::npos) {
     return true;
   } else {
@@ -2337,9 +2336,10 @@ HTTPAPIServer::HandleInfer(
   }
 
   if (err != nullptr) {
-    LOG_VERBOSE(1) << "Infer failed: " << TRITONSERVER_ErrorMessage(err);
+    std::string msg(TRITONSERVER_ErrorMessage(err));
+    LOG_VERBOSE(1) << "Infer failed: " << msg;
     EVBufferAddErrorJson(req->buffer_out, err);
-    if (InferErrorIsInternalError(err)) {
+    if (InferErrorIsInternalError(msg)) {
       /* Return a 500*/
       evhtp_send_reply(req, EVHTP_RES_500);
       LOG_VERBOSE(1) << "Received error during model execution, returning may "
@@ -2496,14 +2496,17 @@ HTTPAPIServer::InferRequestClass::InferResponseComplete(
 
   if (err == nullptr) {
     evthr_defer(infer_request->thread_, OKReplyCallback, infer_request);
-  } else if (InferErrorIsInternalError(err)) {
-    EVBufferAddErrorJson(infer_request->req_->buffer_out, err);
-    TRITONSERVER_ErrorDelete(err);
-    evthr_defer(infer_request->thread_, FAILReplyCallback, infer_request);
   } else {
-    EVBufferAddErrorJson(infer_request->req_->buffer_out, err);
-    TRITONSERVER_ErrorDelete(err);
-    evthr_defer(infer_request->thread_, BADReplyCallback, infer_request);
+    std::string msg(TRITONSERVER_ErrorMessage(err));
+    if (InferErrorIsInternalError(msg)) {
+      EVBufferAddErrorJson(infer_request->req_->buffer_out, err);
+      TRITONSERVER_ErrorDelete(err);
+      evthr_defer(infer_request->thread_, FAILReplyCallback, infer_request);
+    } else {
+      EVBufferAddErrorJson(infer_request->req_->buffer_out, err);
+      TRITONSERVER_ErrorDelete(err);
+      evthr_defer(infer_request->thread_, BADReplyCallback, infer_request);
+    }
   }
 
   LOG_TRITONSERVER_ERROR(
