@@ -498,7 +498,7 @@ if __name__ == '__main__':
     FLAGS, unparsed = parser.parse_known_args()
 
     if FLAGS.graphdef or FLAGS.savedmodel:
-        # Use Tensorflow 2 as default so need to disable the v2 behavior for
+        # Use Tensorflow 2 as default. Need to disable the v2 behavior for
         # model generation scripts.
         import tensorflow.compat.v1 as tf
         tf.disable_v2_behavior()
