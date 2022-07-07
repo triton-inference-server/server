@@ -366,11 +366,15 @@ std::vector<Option> options_
        "available."},
       {OPTION_EXIT_ON_ERROR, "exit-on-error", Option::ArgBool,
        "Exit the inference server if an error occurs during initialization."},
-      {OPTION_DISABLE_AUTO_COMPLETE_CONFIG, "disable-auto-complete-config", Option::ArgNone,
-       "If set, disables the triton and backends from auto completing model configuration files. Model configuration files must be provided and all required "
+      {OPTION_DISABLE_AUTO_COMPLETE_CONFIG, "disable-auto-complete-config",
+       Option::ArgNone,
+       "If set, disables the triton and backends from auto completing model "
+       "configuration files. Model configuration files must be provided and "
+       "all required "
        "configuration settings must be specified."},
       {OPTION_STRICT_MODEL_CONFIG, "strict-model-config", Option::ArgBool,
-       "DEPRECATED: If true model configuration files must be provided and all required "
+       "DEPRECATED: If true model configuration files must be provided and all "
+       "required "
        "configuration settings must be specified. If false the model "
        "configuration may be absent or only partially specified and the "
        "server will attempt to derive the missing required configuration."},
