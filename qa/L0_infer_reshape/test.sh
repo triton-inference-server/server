@@ -38,7 +38,6 @@ if [ ! -z "$TEST_REPO_ARCH" ]; then
     REPO_VERSION=${REPO_VERSION}_${TEST_REPO_ARCH}
 fi
 
-REPO_VERSION="22.07dev_krish"
 export CUDA_VISIBLE_DEVICES=0
 
 CLIENT_LOG="./client.log"
