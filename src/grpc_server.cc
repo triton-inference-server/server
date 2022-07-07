@@ -3706,7 +3706,7 @@ ModelInferHandler::Process(InferHandler::State* state, bool rpc_ok)
     // has initiated... completion callback will transition to
     // COMPLETE. If error go immediately to COMPLETE.
     if (err != nullptr) {
-      LOG_VERBOSE(1) << "[request id: " << request_id << "]"
+      LOG_VERBOSE(1) << "[request id: " << request_id << "] "
                      << "Infer failed: " << TRITONSERVER_ErrorMessage(err);
 
       LOG_TRITONSERVER_ERROR(
@@ -4143,7 +4143,7 @@ ModelStreamInferHandler::Process(InferHandler::State* state, bool rpc_ok)
       } else {
         response = state->response_queue_->GetNonDecoupledResponse();
       }
-      LOG_VERBOSE(1) << "[request id: " << request_id << "]"
+      LOG_VERBOSE(1) << "[request id: " << request_id << "] "
                      << "Infer failed: " << TRITONSERVER_ErrorMessage(err);
 
       LOG_TRITONSERVER_ERROR(

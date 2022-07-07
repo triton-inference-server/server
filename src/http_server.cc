@@ -2745,7 +2745,7 @@ HTTPAPIServer::HandleInfer(
   }
 
   if (err != nullptr) {
-    LOG_VERBOSE(1) << "[request id: " << request_id << "]"
+    LOG_VERBOSE(1) << "[request id: " << request_id << "] "
                    << "Infer failed: " << TRITONSERVER_ErrorMessage(err);
     evhtp_headers_add_header(
         req->headers_out,
