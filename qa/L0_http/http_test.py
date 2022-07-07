@@ -193,7 +193,10 @@ class HttpTest(tu.TestResultCollector):
                     # 'content-encoding' HTTP headers.
                     with self.assertRaisesRegex(InferenceServerException,
                                                 "Unsupported HTTP header"):
-                        client.infer(model_name=model, inputs=inputs, headers=headers)
+                        client.infer(model_name=model,
+                                     inputs=inputs,
+                                     headers=headers)
+
 
 if __name__ == '__main__':
     unittest.main()

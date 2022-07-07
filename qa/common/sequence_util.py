@@ -85,7 +85,8 @@ class SequenceBatcherTestUtil(tu.TestResultCollector):
 
     def setUp(self):
         # The helper client for setup will be GRPC for simplicity.
-        self.triton_client_ = grpcclient.InferenceServerClient(f"{_tritonserver_ipaddr}:8001")
+        self.triton_client_ = grpcclient.InferenceServerClient(
+            f"{_tritonserver_ipaddr}:8001")
         self.clear_deferred_exceptions()
 
     def clear_deferred_exceptions(self):
@@ -676,8 +677,8 @@ class SequenceBatcherTestUtil(tu.TestResultCollector):
             batch_size,) + tensor_shape
 
         client_utils = grpcclient
-        triton_client = client_utils.InferenceServerClient(f"{_tritonserver_ipaddr}:8001",
-                                                           verbose=True)
+        triton_client = client_utils.InferenceServerClient(
+            f"{_tritonserver_ipaddr}:8001", verbose=True)
         user_data = UserData()
         triton_client.start_stream(partial(completion_callback, user_data))
         # Execute the sequence of inference...
@@ -809,8 +810,8 @@ class SequenceBatcherTestUtil(tu.TestResultCollector):
                          "Shape tensors does not support CUDA shared memory")
 
         client_utils = grpcclient
-        triton_client = client_utils.InferenceServerClient(f"{_tritonserver_ipaddr}:8001",
-                                                           verbose=True)
+        triton_client = client_utils.InferenceServerClient(
+            f"{_tritonserver_ipaddr}:8001", verbose=True)
         user_data = UserData()
         triton_client.start_stream(partial(completion_callback, user_data))
         # Execute the sequence of inference...
