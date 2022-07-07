@@ -166,7 +166,7 @@ else
 fi
 
 # Run only if both TRITON_FROM and TRITON_TO_DL are set
-if [[ ! -z "$TRITON_FROM" ]] || [[ ! -z "$TRITON_TO_DL" ]]; then
+if [[ ! -z "$TRITON_FROM" ]] && [[ ! -z "$TRITON_TO_DL" ]]; then
     python stress_mail.py "$EMAIL_SUBJECT"
 fi
 
