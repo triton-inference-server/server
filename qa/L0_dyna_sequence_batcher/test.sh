@@ -69,11 +69,16 @@ rm -fr *.log *.serverlog
 
 # models
 rm -fr models && mkdir models
-cp -r ${DATADIR}/$MODEL_REPOSITORY/* models/.
+for MODEL in ${DATADIR}/$MODEL_REPOSITORY/* ; do
+    cp -r $MODEL models/. && \
+        (cd models/$(basename $MODEL) && \
+            sed -i "s/kind: KIND_CPU/kind: KIND_CPU\\ncount: 1/" config.pbtxt)
+done
 
 # Implicit state models for custom backend do not exist.
 if [ $IMPLICIT_STATE == "0" ]; then
     cp -r ../custom_models/custom_dyna_sequence_int32 models/.
+    sed -i "s/kind: KIND_CPU/kind: KIND_CPU\\ncount: 1/" models/custom_dyna_sequence_int32/config.pbtxt
     # Construct custom dyna_sequence_model with STRING sequence ID. Copy model and edit config.pbtxt
     cp -r models/custom_dyna_sequence_int32 models/custom_string_dyna_sequence_int32
     sed -i "s/custom_dyna_sequence_int32/custom_string_dyna_sequence_int32/g" models/custom_string_dyna_sequence_int32/config.pbtxt
@@ -86,6 +91,7 @@ if [ $IMPLICIT_STATE == "0" ]; then
     rm -fr ragged_models && mkdir ragged_models
     cp -r ../custom_models/custom_dyna_sequence_int32 ragged_models/.
     (cd ragged_models/custom_dyna_sequence_int32 && \
+            sed -i "s/kind: KIND_CPU/kind: KIND_CPU\\ncount: 1/" config.pbtxt \
             sed -i "s/name:.*\"INPUT\"/name: \"INPUT\"\\nallow_ragged_batch: true/" config.pbtxt)
 fi
 
