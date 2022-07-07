@@ -49,7 +49,7 @@ rm -rf ${DATADIR}
 mkdir -p ${DATADIR}
 
 SERVER=/opt/tritonserver/bin/tritonserver
-SERVER_ARGS="--log-verbose=1 --model-repository=$DATADIR"
+SERVER_ARGS="--log-verbose=1 --model-repository=$DATADIR --strict-model-config=true"
 SERVER_LOG="./inference_server.log"
 source ../common/util.sh
 
@@ -118,6 +118,7 @@ wait $SERVER_PID
 rm -rf ${DATADIR} && mkdir -p ${DATADIR}
 cp -r /data/inferenceserver/${REPO_VERSION}/qa_variable_model_repository/plan_float32_float32_float32 ${DATADIR}/
 
+SERVER_ARGS="--log-verbose=1 --model-repository=$DATADIR --strict-model-config=true"
 CLIENT_LOG="./dynamic_shape.client.log"
 SERVER_LOG="./dynamic_shape.inference_server.log"
 sed -i "s/profile:.*/profile: [\"0\"]/" ${DATADIR}/plan_float32_float32_float32/config.pbtxt
@@ -167,6 +168,7 @@ cp -r /data/inferenceserver/${REPO_VERSION}/qa_model_repository/plan_float32_flo
 # Make sure only one version is present
 rm -rf ${DATADIR}/plan_float32_float32_float32/3
 
+SERVER_ARGS="--log-verbose=1 --model-repository=$DATADIR"
 CLIENT_LOG="./range_fixed_shape.client.log"
 SERVER_LOG="./range_fixed_shape.inference_server.log"
 echo "optimization { \
