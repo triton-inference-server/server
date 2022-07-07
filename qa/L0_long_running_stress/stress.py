@@ -446,7 +446,10 @@ if __name__ == '__main__':
                         required=False,
                         default=0,
                         help='Number of dedicated threads that keep compute '
-                        'device (i.e. GPU/CPUs) under load. Default is 0, '
+                        'device (i.e. GPU/CPUs) under load. The load generated '
+                        'from "--concurrency" often behaves as request spike, '
+                        ' this argument may be used to produce consistent load '
+                        ' to keep devices at high utilization. Default is 0, '
                         'which means no dedicated load thread will be created.')
     parser.add_argument(
         '-d',
