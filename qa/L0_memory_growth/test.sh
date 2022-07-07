@@ -45,6 +45,9 @@ export CUDA_VISIBLE_DEVICES=0
 PERF_ANALYZER=../clients/perf_analyzer
 IMAGE=../images/vulture.jpeg
 
+# Change repo for testing.
+REPO_VERSION="22.07dev_krish"
+
 # Models
 CAFFE2PLAN=../common/caffe2plan
 DATADIR=/data/inferenceserver/${REPO_VERSION}
