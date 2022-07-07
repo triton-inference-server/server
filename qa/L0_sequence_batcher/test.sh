@@ -191,7 +191,7 @@ function generate_python_models () {
     cat $onnx_model/config.pbtxt | sed 's/onnx/python/g' > $dest_dir/$python_model/config.pbtxt
   else
     cat $onnx_model/config.pbtxt | sed 's/platform:.*/backend:\ "python"/g' | sed 's/onnx/python/g' > $dest_dir/$python_model/config.pbtxt
-    cp ../python_models/identity_int32/model.py $dest_dir/$python_model/1/
+    cp ../python_models/sequence_int32/model.py $dest_dir/$python_model/1/
   fi
 }
 

@@ -141,9 +141,9 @@ class SequenceBatcherTest(su.SequenceBatcherTestUtil):
         # information.
         if ((not NO_BATCHING and
              ("custom" not in trial)) or ("graphdef" in trial) or
-            ("plan" in trial) or ("onnx" in trial)) or ("libtorch" in trial) or ("python" in trial):
+            ("plan" in trial) or ("onnx" in trial)) or ("libtorch" in trial):
             expected_result = value
-            if (flag_str is not None) and ("start" in flag_str) and ("python" not in trial):
+            if (flag_str is not None) and ("start" in flag_str):
                 expected_result += 1
         return expected_result
 
