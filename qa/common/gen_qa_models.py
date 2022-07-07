@@ -1788,16 +1788,17 @@ def create_models(models_dir,
                     output0_shape, output1_shape, 8):
                 continue
 
-            emu.create_ensemble_modelconfig(
-                pair[0], models_dir, 8, model_version, config_input_shape,
-                config_output0_shape, config_output1_shape, input_dtype,
-                output0_dtype, output1_dtype, output0_label_cnt,
-                version_policy)
-            emu.create_ensemble_modelfile(pair[0], models_dir, 8,
+            emu.create_ensemble_modelconfig(pair[0], models_dir, 8,
                                             model_version, config_input_shape,
                                             config_output0_shape,
                                             config_output1_shape, input_dtype,
-                                            output0_dtype, output1_dtype)
+                                            output0_dtype, output1_dtype,
+                                            output0_label_cnt, version_policy)
+            emu.create_ensemble_modelfile(pair[0], models_dir, 8, model_version,
+                                          config_input_shape,
+                                          config_output0_shape,
+                                          config_output1_shape, input_dtype,
+                                          output0_dtype, output1_dtype)
 
 
 def create_fixed_models(models_dir,

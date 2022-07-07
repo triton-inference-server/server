@@ -27,6 +27,7 @@
 import sys
 
 from scenarios import *
+
 sys.path.append("../common")
 
 import argparse

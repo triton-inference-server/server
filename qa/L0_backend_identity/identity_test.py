@@ -37,6 +37,7 @@ from tritonclientutils import np_to_triton_dtype
 
 FLAGS = None
 
+
 def test_bf16_raw_http(shape):
     model = "identity_bf16"
     # Using fp16 data as a WAR since it is same byte_size as bf16
@@ -46,8 +47,8 @@ def test_bf16_raw_http(shape):
     input_bytes = input_data.tobytes()
     headers = {'Inference-Header-Content-Length': '0'}
     r = httpreq.post("http://localhost:8000/v2/models/{}/infer".format(model),
-                      data=input_bytes,
-                      headers=headers)
+                     data=input_bytes,
+                     headers=headers)
     r.raise_for_status()
 
     # Get the inference header size so we can locate the output binary data
@@ -61,13 +62,14 @@ def test_bf16_raw_http(shape):
     # Assert correct output datatype
     import json
     response_json = json.loads(r.content[:header_size].decode("utf-8"))
-    assert(response_json["outputs"][0]["datatype"] == "BF16")
+    assert (response_json["outputs"][0]["datatype"] == "BF16")
 
     # Assert equality of input/output for identity model
     if not np.array_equal(output_bytes, input_bytes):
         print("error: Expected response body contains correct output binary " \
               "data: {}; got: {}".format(input_bytes, output_bytes))
         sys.exit(1)
+
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
@@ -267,4 +269,3 @@ if __name__ == '__main__':
     # FIXME: Use identity_bf16 model in test above once proper python client
     #        support is added, and remove this raw HTTP test. See DLIS-3720.
     test_bf16_raw_http([2, 2])
-
