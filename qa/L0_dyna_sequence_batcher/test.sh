@@ -91,7 +91,7 @@ if [ $IMPLICIT_STATE == "0" ]; then
     rm -fr ragged_models && mkdir ragged_models
     cp -r ../custom_models/custom_dyna_sequence_int32 ragged_models/.
     (cd ragged_models/custom_dyna_sequence_int32 && \
-            sed -i "s/kind: KIND_CPU/kind: KIND_CPU\\ncount: 1/" config.pbtxt \
+            sed -i "s/kind: KIND_CPU/kind: KIND_CPU\\ncount: 1/" config.pbtxt && \
             sed -i "s/name:.*\"INPUT\"/name: \"INPUT\"\\nallow_ragged_batch: true/" config.pbtxt)
 fi
 
