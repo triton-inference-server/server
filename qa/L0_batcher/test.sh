@@ -99,7 +99,7 @@ source ../common/util.sh
 RET=0
 
 # If BACKENDS not specified, set to all
-BACKENDS=${BACKENDS:="graphdef savedmodel onnx libtorch plan"}
+BACKENDS=${BACKENDS:="graphdef savedmodel onnx libtorch plan python"}
 export BACKENDS
 
 # Basic batcher tests
@@ -141,8 +141,18 @@ MAX_QUEUE_DELAY_ONLY_TESTS=${MAX_QUEUE_DELAY_ONLY_TESTS:="test_max_queue_delay_o
 rm -fr *.log *.serverlog models && mkdir models
 for BACKEND in $BACKENDS; do
     TMP_MODEL_DIR="$DATADIR/qa_model_repository/${BACKEND}_float32_float32_float32"
-
-    cp -r $TMP_MODEL_DIR models/. &&
+    if [ "$BACKEND" == "python" ]; then
+        # We will be using ONNX models config.pbtxt and tweak them to make them
+        # appropriate for Python backend
+        onnx_model="${DATADIR}/qa_model_repository/onnx_float32_float32_float32"
+        python_model=`echo $onnx_model | sed 's/onnx/python/g' | sed 's,'"$DATADIR/qa_model_repository/"',,g'`
+        mkdir -p models/$python_model/1/
+        cat $onnx_model/config.pbtxt | sed 's/platform:.*/backend:\ "python"/g' | sed 's/onnx/python/g' > models/$python_model/config.pbtxt
+        cp $onnx_model/output0_labels.txt models/$python_model
+        cp ../python_models/add_sub/model.py models/$python_model/1/
+    else
+        cp -r $TMP_MODEL_DIR models/. 
+    fi
     (cd models/$(basename $TMP_MODEL_DIR) && \
           sed -i "s/^max_batch_size:.*/max_batch_size: 8/" config.pbtxt && \
           sed -i "s/^version_policy:.*/version_policy: { specific { versions: [1] }}/" config.pbtxt && \
@@ -152,8 +162,18 @@ done
 rm -fr preferred_batch_only_models && mkdir preferred_batch_only_models
 for BACKEND in $BACKENDS; do
     TMP_MODEL_DIR="$DATADIR/qa_model_repository/${BACKEND}_float32_float32_float32"
-
-    cp -r $TMP_MODEL_DIR preferred_batch_only_models/. &&
+    if [ "$BACKEND" == "python" ]; then
+        # We will be using ONNX models config.pbtxt and tweak them to make them
+        # appropriate for Python backend
+        onnx_model="${DATADIR}/qa_model_repository/onnx_float32_float32_float32"
+        python_model=`echo $onnx_model | sed 's/onnx/python/g' | sed 's,'"$DATADIR/qa_model_repository/"',,g'`
+        mkdir -p preferred_batch_only_models/$python_model/1/
+        cat $onnx_model/config.pbtxt | sed 's/platform:.*/backend:\ "python"/g' | sed 's/onnx/python/g' > preferred_batch_only_models/$python_model/config.pbtxt
+        cp $onnx_model/output0_labels.txt preferred_batch_only_models/$python_model
+        cp ../python_models/add_sub/model.py preferred_batch_only_models/$python_model/1/
+    else
+        cp -r $TMP_MODEL_DIR preferred_batch_only_models/.
+    fi
     (cd preferred_batch_only_models/$(basename $TMP_MODEL_DIR) && \
           sed -i "s/^max_batch_size:.*/max_batch_size: 8/" config.pbtxt && \
           sed -i "s/^version_policy:.*/version_policy: { specific { versions: [1] }}/" config.pbtxt && \
@@ -164,14 +184,22 @@ done
 rm -fr var_models && mkdir var_models
 for BACKEND in $BACKENDS; do
     TMP_MODEL_DIR="$DATADIR/qa_variable_model_repository/${BACKEND}_float32_float32_float32"
-
-    for TMP_DIR in $TMP_MODEL_DIR; do
-      cp -r $TMP_DIR var_models/. &&
-        (cd var_models/$(basename $TMP_DIR) && \
+    if [ "$BACKEND" == "python" ]; then
+        # We will be using ONNX models config.pbtxt and tweak them to make them
+        # appropriate for Python backend
+        onnx_model="${DATADIR}/qa_variable_model_repository/onnx_float32_float32_float32"
+        python_model=`echo $onnx_model | sed 's/onnx/python/g' | sed 's,'"$DATADIR/qa_variable_model_repository/"',,g'`
+        mkdir -p var_models/$python_model/1/
+        cat $onnx_model/config.pbtxt | sed 's/platform:.*/backend:\ "python"/g' | sed 's/onnx/python/g' > var_models/$python_model/config.pbtxt
+        cp $onnx_model/output0_labels.txt var_models/$python_model
+        cp ../python_models/add_sub/model.py var_models/$python_model/1/
+    else
+        cp -r $TMP_MODEL_DIR var_models/.
+    fi
+    (cd var_models/$(basename $TMP_MODEL_DIR) && \
             sed -i "s/^max_batch_size:.*/max_batch_size: 8/" config.pbtxt && \
             sed -i "s/^version_policy:.*/version_policy: { specific { versions: [1] }}/" config.pbtxt && \
             echo "dynamic_batching { preferred_batch_size: [ 2, 6 ], max_queue_delay_microseconds: 10000000 }" >> config.pbtxt)
-    done
 done
 
 for MC in `ls var_models/*/config.pbtxt`; do
@@ -695,3 +723,4 @@ else
 fi
 
 exit $RET
+
