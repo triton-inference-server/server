@@ -32,6 +32,7 @@ import gen_ensemble_model_utils as emu
 
 FLAGS = None
 np_dtype_string = np.dtype(object)
+from typing import List
 
 
 def np_to_model_dtype(np_dtype):
@@ -148,7 +149,7 @@ def np_to_torch_dtype(np_dtype):
     elif np_dtype == np.float64:
         return torch.double
     elif np_dtype == np_dtype_string:
-        return None  # Not supported in Torch
+        return List[str]
     return None
 
 
@@ -420,9 +421,14 @@ def create_libtorch_modelfile(models_dir, model_version, max_batch, dtype,
                               input_shapes, output_shapes):
 
     assert len(input_shapes) == len(output_shapes)
-    if not tu.validate_for_libtorch_model(dtype, dtype, dtype, input_shapes[0],
-                                          input_shapes[0], input_shapes[0],
-                                          max_batch):
+    if not tu.validate_for_libtorch_model(dtype,
+                                          dtype,
+                                          dtype,
+                                          input_shapes[0],
+                                          input_shapes[0],
+                                          input_shapes[0],
+                                          max_batch,
+                                          reshape=True):
         return
 
     torch_dtype = np_to_torch_dtype(dtype)
@@ -431,81 +437,131 @@ def create_libtorch_modelfile(models_dir, model_version, max_batch, dtype,
         "libtorch_nobatch" if max_batch == 0 else "libtorch", io_cnt, dtype)
 
     # Create the model that reshapes inputs to corresponding outputs
+    # Note that string I/O is supported only for 1-dimensional inputs/outputs.
+    # Use identity model for string I/O models and add 'reshape' field with
+    # empty shape so that batching is supported and the full shape becomes [-1].
     if io_cnt == 1:
+        if (dtype == np_dtype_string):
 
-        class ReshapeNet(nn.Module):
+            class IdentityNet(nn.Module):
 
-            def __init__(self, *args):
-                super(ReshapeNet, self).__init__()
-                self.shape = args[0][0]
-                self.max_batch = args[0][1]
+                def __init__(self):
+                    super(IdentityNet, self).__init__()
 
-            def forward(self, input0):
-                if self.max_batch == 0:
-                    return input0.view(self.shape[0])
-                else:
-                    return input0.view([
-                        -1,
-                    ] + self.shape[0])
+                def forward(self, input0: List[str]) -> List[str]:
+                    return input0
+        else:
+
+            class ReshapeNet(nn.Module):
+
+                def __init__(self, *args):
+                    super(ReshapeNet, self).__init__()
+                    self.shape = args[0][0]
+                    self.max_batch = args[0][1]
+
+                def forward(self, input0):
+                    if self.max_batch == 0:
+                        return input0.view(self.shape[0])
+                    else:
+                        return input0.view([
+                            -1,
+                        ] + self.shape[0])
     elif io_cnt == 2:
+        if (dtype == np_dtype_string):
 
-        class ReshapeNet(nn.Module):
+            class IdentityNet(nn.Module):
 
-            def __init__(self, *args):
-                super(ReshapeNet, self).__init__()
-                self.shape = args[0][0]
-                self.max_batch = args[0][1]
+                def __init__(self):
+                    super(IdentityNet, self).__init__()
 
-            def forward(self, input0, input1):
-                if self.max_batch == 0:
-                    return input0.view(self.shape[0]), input1.view(
-                        self.shape[1])
-                else:
-                    return input0.view([
-                        -1,
-                    ] + self.shape[0]), input1.view([
-                        -1,
-                    ] + self.shape[1])
+                def forward(self, input0: List[str],
+                            input1: List[str]) -> Tuple[List[str], List[str]]:
+                    return input0, input1
+        else:
+
+            class ReshapeNet(nn.Module):
+
+                def __init__(self, *args):
+                    super(ReshapeNet, self).__init__()
+                    self.shape = args[0][0]
+                    self.max_batch = args[0][1]
+
+                def forward(self, input0, input1):
+                    if self.max_batch == 0:
+                        return input0.view(self.shape[0]), input1.view(
+                            self.shape[1])
+                    else:
+                        return input0.view([
+                            -1,
+                        ] + self.shape[0]), input1.view([
+                            -1,
+                        ] + self.shape[1])
     elif io_cnt == 3:
+        if (dtype == np_dtype_string):
 
-        class ReshapeNet(nn.Module):
+            class IdentityNet(nn.Module):
 
-            def __init__(self, *args):
-                super(ReshapeNet, self).__init__()
-                self.shape = args[0][0]
-                self.max_batch = args[0][1]
+                def __init__(self):
+                    super(IdentityNet, self).__init__()
 
-            def forward(self, input0, input1, input2):
-                if self.max_batch == 0:
-                    return input0.view(self.shape[0]), input1.view(
-                        self.shape[1]), input2.view(self.shape[2])
-                else:
-                    return input0.view([-1,]+self.shape[0]), input1.view([-1,]+self.shape[1]), \
-                         input2.view([-1,]+self.shape[2])
+                def forward(
+                    self, input0: List[str], input1: List[str],
+                    input2: List[str]
+                ) -> Tuple[List[str], List[str], List[str]]:
+                    return input0, input1, input2
+        else:
+
+            class ReshapeNet(nn.Module):
+
+                def __init__(self, *args):
+                    super(ReshapeNet, self).__init__()
+                    self.shape = args[0][0]
+                    self.max_batch = args[0][1]
+
+                def forward(self, input0, input1, input2):
+                    if self.max_batch == 0:
+                        return input0.view(self.shape[0]), input1.view(
+                            self.shape[1]), input2.view(self.shape[2])
+                    else:
+                        return input0.view([-1,]+self.shape[0]), input1.view([-1,]+self.shape[1]), \
+                            input2.view([-1,]+self.shape[2])
     elif io_cnt == 4:
+        if (dtype == np_dtype_string):
 
-        class ReshapeNet(nn.Module):
+            class IdentityNet(nn.Module):
 
-            def __init__(self, *args):
-                super(ReshapeNet, self).__init__()
-                self.shape = args[0][0]
-                self.max_batch = args[0][1]
+                def __init__(self):
+                    super(IdentityNet, self).__init__()
 
-            def forward(self, input0, input1, input2, input3):
-                if self.max_batch == 0:
-                    return input0.view(self.shape[0]), input1.view(self.shape[1]), input2.view(self.shape[2]), \
-                        input3.view(self.shape[3])
-                else:
-                    return input0.view([-1,]+self.shape[0]), input1.view([-1,]+self.shape[1]), \
-                        input2.view([-1,]+self.shape[2]), input3.view([-1,]+self.shape[3])
+                def forward(
+                    self, input0: List[str], input1: List[str],
+                    input2: List[str], input3: List[str]
+                ) -> Tuple[List[str], List[str], List[str], List[str]]:
+                    return input0, input1, input2, input3
+        else:
 
-    reshapeModel = ReshapeNet([[op_shape for op_shape in output_shapes],
-                               max_batch])
-    example_inputs = [
-        torch.zeros(input_shapes[i], dtype=torch_dtype) for i in range(io_cnt)
-    ]
-    traced = torch.jit.trace(reshapeModel,
-                             tuple(example_inputs[i] for i in range(io_cnt)))
+            class ReshapeNet(nn.Module):
+
+                def __init__(self, *args):
+                    super(ReshapeNet, self).__init__()
+                    self.shape = args[0][0]
+                    self.max_batch = args[0][1]
+
+                def forward(self, input0, input1, input2, input3):
+                    if self.max_batch == 0:
+                        return input0.view(self.shape[0]), input1.view(self.shape[1]), input2.view(self.shape[2]), \
+                            input3.view(self.shape[3])
+                    else:
+                        return input0.view([-1,]+self.shape[0]), input1.view([-1,]+self.shape[1]), \
+                            input2.view([-1,]+self.shape[2]), input3.view([-1,]+self.shape[3])
+
+    if (dtype == np_dtype_string):
+        identityModel = IdentityNet()
+        traced = torch.jit.script(identityModel)
+    else:
+        reshapeModel = ReshapeNet([[op_shape for op_shape in output_shapes],
+                                   max_batch])
+        traced = torch.jit.script(reshapeModel)
 
     model_version_dir = models_dir + "/" + model_name + "/" + str(model_version)
 
@@ -524,9 +580,14 @@ def create_libtorch_modelconfig(models_dir, model_version, max_batch, dtype,
     assert len(input_shapes) == len(input_model_shapes)
     assert len(output_shapes) == len(output_model_shapes)
     assert len(input_shapes) == len(output_shapes)
-    if not tu.validate_for_libtorch_model(dtype, dtype, dtype, input_shapes[0],
-                                          input_shapes[0], input_shapes[0],
-                                          max_batch):
+    if not tu.validate_for_libtorch_model(dtype,
+                                          dtype,
+                                          dtype,
+                                          input_shapes[0],
+                                          input_shapes[0],
+                                          input_shapes[0],
+                                          max_batch,
+                                          reshape=True):
         return
 
     io_cnt = len(input_shapes)
@@ -968,7 +1029,8 @@ def create_libtorch_models(models_dir,
                                     output_shapes, output_model_shapes)
         create_libtorch_modelfile(models_dir, model_version, 8, dtype,
                                   input_model_shapes, output_model_shapes)
-        if no_batch:
+        # skip for libtorch string I/O
+        if no_batch and (dtype != np_dtype_string):
             create_libtorch_modelconfig(models_dir, model_version, 0, dtype,
                                         input_shapes, input_model_shapes,
                                         output_shapes, output_model_shapes)
@@ -1084,6 +1146,9 @@ if __name__ == '__main__':
                            no_batch=False)
     create_libtorch_models(FLAGS.models_dir, np.float32,
                            ([4, 4], [2], [2, 2, 3]), ([16], [1, 2], [3, 2, 2]))
+    create_libtorch_models(FLAGS.models_dir,
+                           np_dtype_string, ([1],), ([],),
+                           no_batch=False)
     create_openvino_models(FLAGS.models_dir,
                            np.float32, ([1],), ([1, 1, 1],),
                            no_batch=False)
