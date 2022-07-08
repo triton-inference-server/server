@@ -48,6 +48,7 @@ TESTDATADIR=`pwd`/test_data
 
 INT_JSONDATAFILE=`pwd`/../common/perf_analyzer_input_data_json/int_data.json
 INT_DIFFSHAPE_JSONDATAFILE=`pwd`/../common/perf_analyzer_input_data_json/int_data_diff_shape.json
+INT_OPTIONAL_JSONDATAFILE=`pwd`/../common/perf_analyzer_input_data_json/int_data_optional.json
 FLOAT_DIFFSHAPE_JSONDATAFILE=`pwd`/../common/perf_analyzer_input_data_json/float_data_with_shape.json
 STRING_JSONDATAFILE=`pwd`/../common/perf_analyzer_input_data_json/string_data.json
 STRING_WITHSHAPE_JSONDATAFILE=`pwd`/../common/perf_analyzer_input_data_json/string_data_with_shape.json
@@ -111,6 +112,11 @@ cp -r ../custom_models/custom_zero_1_float32 $DATADIR && \
     echo "parameters [" >> config.pbtxt && \
         echo "{ key: \"execute_delay_ms\"; value: { string_value: \"100\" }}" >> config.pbtxt && \
         echo "]" >> config.pbtxt)
+
+# Copy optional inputs model
+cp -r ../python_models/optional $DATADIR && \
+  mkdir $DATADIR/optional/1 && \
+  mv $DATADIR/optional/model.py $DATADIR/optional/1
 
 # Generating test data
 mkdir -p $TESTDATADIR
@@ -754,6 +760,22 @@ fi
 
 $PERF_ANALYZER -v -m graphdef_object_int32_int32 --measurement-mode "count_windows" \
     --shape INPUT0:2,8 --shape INPUT1:2,8 --string-data=1 >$CLIENT_LOG 2>&1
+if [ $? -ne 0 ]; then
+   cat $CLIENT_LOG
+   echo -e "\n***\n*** Test Failed\n***"
+   RET=1
+fi
+if [ $(cat $CLIENT_LOG |  grep "${ERROR_STRING}" | wc -l) -ne 0 ]; then
+   cat $CLIENT_LOG
+   echo -e "\n***\n*** Test Failed\n***"
+   RET=1
+fi
+set -e
+
+# Test with output validation
+set +e
+$PERF_ANALYZER -v -m optional --measurement-mode "count_windows" \
+    --input-data=${INT_OPTIONAL_JSONDATAFILE} >$CLIENT_LOG 2>&1
 if [ $? -ne 0 ]; then
    cat $CLIENT_LOG
    echo -e "\n***\n*** Test Failed\n***"
