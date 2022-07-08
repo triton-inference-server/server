@@ -1,0 +1,1 @@
+Invalid argument: model 'bad_output_dims', tensor 'OUTPUT1': the model expects 2 dimensions (shape \[-1,16\]) but the model configuration specifies 2 dimensions (an initial batch dimension because max_batch_size > 0 followed by the explicit tensor shape, making complete shape \[-1,1\])
