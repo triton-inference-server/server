@@ -1,5 +1,5 @@
 #!/bin/bash
-# Copyright (c) 2019-2020, NVIDIA CORPORATION. All rights reserved.
+# Copyright 2019-2022, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -37,6 +37,8 @@ if [ ! -z "$TEST_REPO_ARCH" ]; then
     REPO_VERSION=${REPO_VERSION}_${TEST_REPO_ARCH}
 fi
 
+TF_VERSION=${TF_VERSION:=2}
+
 apt update
  # needed by perf_analyzer
 apt install -y libb64-dev
@@ -58,7 +60,7 @@ mkdir -p model_store/${MODEL_NAME}
 cp -r ${REPODIR}/perf_model_store/${MODEL_NAME}/1/model.savedmodel model_store/${MODEL_NAME}/1
 
 # Run server
-tensorflow_model_server --port=8500 --model_name=${MODEL_NAME} --model_base_path=$PWD/model_store/${MODEL_NAME} > server.log 2>&1 &
+tensorflow_model_server --port=8500 --model_name=${MODEL_NAME} --model_base_path=$PWD/model_store/${MODEL_NAME} --backend-config=tensorflow,version=${TF_VERSION} > server.log 2>&1 &
 SERVER_PID=$!
 # Wait for the server to start
 sleep 10
