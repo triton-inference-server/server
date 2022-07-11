@@ -257,30 +257,30 @@ for MODEL in $MODELS; do
     else
       cp -r $MODEL models1/.
     fi
-        (cd models1/$(basename $MODEL) && \
-          sed -i "s/^max_batch_size:.*/max_batch_size: 4/" config.pbtxt && \
-          sed -i "s/kind: KIND_GPU/kind: KIND_GPU\\ncount: 1/" config.pbtxt && \
-          sed -i "s/kind: KIND_CPU/kind: KIND_CPU\\ncount: 1/" config.pbtxt)
+      (cd models1/$(basename $MODEL) && \
+        sed -i "s/^max_batch_size:.*/max_batch_size: 4/" config.pbtxt && \
+        sed -i "s/kind: KIND_GPU/kind: KIND_GPU\\ncount: 1/" config.pbtxt && \
+        sed -i "s/kind: KIND_CPU/kind: KIND_CPU\\ncount: 1/" config.pbtxt)
 
     if [[ "$MODEL" =~ .*"python".* ]]; then
       generate_python_models "$MODEL" "models2"
     else
       cp -r $MODEL models2/.
     fi
-        (cd models2/$(basename $MODEL) && \
-          sed -i "s/^max_batch_size:.*/max_batch_size: 2/" config.pbtxt && \
-          sed -i "s/kind: KIND_GPU/kind: KIND_GPU\\ncount: 2/" config.pbtxt && \
-          sed -i "s/kind: KIND_CPU/kind: KIND_CPU\\ncount: 2/" config.pbtxt)
+      (cd models2/$(basename $MODEL) && \
+        sed -i "s/^max_batch_size:.*/max_batch_size: 2/" config.pbtxt && \
+        sed -i "s/kind: KIND_GPU/kind: KIND_GPU\\ncount: 2/" config.pbtxt && \
+        sed -i "s/kind: KIND_CPU/kind: KIND_CPU\\ncount: 2/" config.pbtxt)
 
     if [[ "$MODEL" =~ .*"python".* ]]; then
       generate_python_models "$MODEL" "models4"
     else
       cp -r $MODEL models4/.
     fi
-        (cd models4/$(basename $MODEL) && \
-          sed -i "s/^max_batch_size:.*/max_batch_size: 1/" config.pbtxt && \
-          sed -i "s/kind: KIND_GPU/kind: KIND_GPU\\ncount: 4/" config.pbtxt && \
-          sed -i "s/kind: KIND_CPU/kind: KIND_CPU\\ncount: 4/" config.pbtxt)
+      (cd models4/$(basename $MODEL) && \
+        sed -i "s/^max_batch_size:.*/max_batch_size: 1/" config.pbtxt && \
+        sed -i "s/kind: KIND_GPU/kind: KIND_GPU\\ncount: 4/" config.pbtxt && \
+        sed -i "s/kind: KIND_CPU/kind: KIND_CPU\\ncount: 4/" config.pbtxt)
 
     # Duplicate the models for different delay settings
     if [[ "$MODEL" =~ .*"python".* ]]; then
@@ -288,11 +288,11 @@ for MODEL in $MODELS; do
     else
       cp -r $MODEL queue_delay_models/.
     fi
-        (cd queue_delay_models/$(basename $MODEL) && \
-          sed -i "s/^max_batch_size:.*/max_batch_size: 4/" config.pbtxt && \
-          sed -i "s/kind: KIND_GPU/kind: KIND_GPU\\ncount: 1/" config.pbtxt && \
-          sed -i "s/kind: KIND_CPU/kind: KIND_CPU\\ncount: 1/" config.pbtxt && \
-          sed -i "s/sequence_batching {/sequence_batching {\\ndirect {\\nmax_queue_delay_microseconds: 3000000\\nminimum_slot_utilization: 0\\n}/" config.pbtxt)
+      (cd queue_delay_models/$(basename $MODEL) && \
+        sed -i "s/^max_batch_size:.*/max_batch_size: 4/" config.pbtxt && \
+        sed -i "s/kind: KIND_GPU/kind: KIND_GPU\\ncount: 1/" config.pbtxt && \
+        sed -i "s/kind: KIND_CPU/kind: KIND_CPU\\ncount: 1/" config.pbtxt && \
+        sed -i "s/sequence_batching {/sequence_batching {\\ndirect {\\nmax_queue_delay_microseconds: 3000000\\nminimum_slot_utilization: 0\\n}/" config.pbtxt)
 
     cp -r queue_delay_models/$(basename $MODEL) queue_delay_models/$(basename $MODEL)_half && \
       (cd queue_delay_models/$(basename $MODEL)_half && \
@@ -359,7 +359,7 @@ for BACKEND in $BACKENDS; do
     for DTYPE in $DTYPES; do
       MODELS="$MODELS $DATADIR/$FIXED_MODEL_REPOSITORY/${BACKEND}_nobatch_sequence_${DTYPE}"
     done
-    
+
     if [ "$ENSEMBLES" == "1" ]; then
       for DTYPE in $DTYPES; do
         # We don't generate ensemble models for bool data type.
@@ -384,9 +384,9 @@ for MODEL in $MODELS; do
   else
     cp -r $MODEL models0/.
   fi
-      (cd models0/$(basename $MODEL) && \
-          sed -i "s/kind: KIND_GPU/kind: KIND_GPU\\ncount: 4/" config.pbtxt && \
-          sed -i "s/kind: KIND_CPU/kind: KIND_CPU\\ncount: 4/" config.pbtxt)
+    (cd models0/$(basename $MODEL) && \
+      sed -i "s/kind: KIND_GPU/kind: KIND_GPU\\ncount: 4/" config.pbtxt && \
+      sed -i "s/kind: KIND_CPU/kind: KIND_CPU\\ncount: 4/" config.pbtxt)
 
   if [ "$INITIAL_STATE_FILE" == "1" ]; then
       mkdir -p models0/$(basename $MODEL)/initial_state/ && cp input_state_data models0/$(basename $MODEL)/initial_state/ && \
@@ -432,10 +432,10 @@ for MODEL in $MODELS; do
   else
     cp -r $MODEL modelsv/.
   fi
-      (cd modelsv/$(basename $MODEL) && \
-          sed -i "s/^max_batch_size:.*/max_batch_size: 4/" config.pbtxt && \
-          sed -i "s/kind: KIND_GPU/kind: KIND_GPU\\ncount: 1/" config.pbtxt && \
-          sed -i "s/kind: KIND_CPU/kind: KIND_CPU\\ncount: 1/" config.pbtxt)
+    (cd modelsv/$(basename $MODEL) && \
+      sed -i "s/^max_batch_size:.*/max_batch_size: 4/" config.pbtxt && \
+      sed -i "s/kind: KIND_GPU/kind: KIND_GPU\\ncount: 1/" config.pbtxt && \
+      sed -i "s/kind: KIND_CPU/kind: KIND_CPU\\ncount: 1/" config.pbtxt)
 
   if [ "$INITIAL_STATE_FILE" == "1" ]; then
       mkdir -p modelsv/$(basename $MODEL)/initial_state/ && cp input_state_data modelsv/$(basename $MODEL)/initial_state/ && \
