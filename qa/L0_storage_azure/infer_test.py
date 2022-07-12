@@ -37,7 +37,9 @@ import os
 
 np_dtype_string = np.dtype(object)
 
-DEFAULT_TEST_BACKENDS = ["graphdef", "savedmodel", "plan", "onnx", "libtorch"]
+# Allow caller to setup specific set of backends to test
+DEFAULT_BACKENDS="graphdef savedmodel plan onnx libtorch"
+TEST_BACKENDS = os.environ.get("BACKENDS", DEFAULT_BACKENDS).split()
 
 class InferTest(tu.TestResultCollector):
 
@@ -79,10 +81,6 @@ class InferTest(tu.TestResultCollector):
                                use_streaming=use_streaming,
                                correlation_id=correlation_id)
 
-        # Allow caller to setup subset of backends to test
-        test_backends = os.environ.get("INFER_TEST_BACKENDS", "").split()
-        if not test_backends:
-            test_backends = DEFAULT_TEST_BACKENDS
 
         input_size = 16
 
@@ -90,7 +88,7 @@ class InferTest(tu.TestResultCollector):
                                     (input_size,), (input_size,),
                                     (input_size,)):
             for pf in ["graphdef", "savedmodel"]:
-                if pf in test_backends:
+                if pf in TEST_BACKENDS:
                     _infer_exact_helper(self,
                                         pf, (input_size,),
                                         8,
@@ -104,7 +102,7 @@ class InferTest(tu.TestResultCollector):
         if tu.validate_for_trt_model(input_dtype, output0_dtype, output1_dtype,
                                      (input_size, 1, 1), (input_size, 1, 1),
                                      (input_size, 1, 1)):
-            if "plan" in test_backends:
+            if "plan" in TEST_BACKENDS:
                 if input_dtype == np.int8:
                     shape = (input_size, 1, 1)
                 else:
@@ -122,7 +120,7 @@ class InferTest(tu.TestResultCollector):
         if tu.validate_for_onnx_model(input_dtype, output0_dtype, output1_dtype,
                                       (input_size,), (input_size,),
                                       (input_size,)):
-            if "onnx" in test_backends:
+            if "onnx" in TEST_BACKENDS:
                 _infer_exact_helper(self,
                                     'onnx', (input_size,),
                                     8,
@@ -137,7 +135,7 @@ class InferTest(tu.TestResultCollector):
         if tu.validate_for_libtorch_model(input_dtype, output0_dtype,
                                           output1_dtype, (input_size,),
                                           (input_size,), (input_size,), 8):
-            if "libtorch" in test_backends:
+            if "libtorch" in TEST_BACKENDS:
                 _infer_exact_helper(self,
                                     'libtorch', (input_size,),
                                     8,
