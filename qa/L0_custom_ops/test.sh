@@ -55,9 +55,6 @@ rm -f $SERVER_LOG $CLIENT_LOG
 
 RET=0
 
-# Change repo for testing.
-REPO_VERSION="22.07dev_krish"
-
 # Must explicitly set LD_LIBRARY_PATH so that the custom operations
 # can find libtensorflow_framework.so.
 LD_LIBRARY_PATH=/opt/tritonserver/backends/tensorflow2:$LD_LIBRARY_PATH
