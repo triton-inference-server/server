@@ -285,11 +285,11 @@ $ helm delete --purge example
 $ helm delete --purge example-metrics
 ```
 
-For the Prometheus and Grafana services you should [explicitly delete
-CRDs](https://github.com/helm/charts/tree/master/stable/prometheus-operator#uninstalling-the-chart):
+For the Prometheus and Grafana services, you should [explicitly delete
+CRDs](https://github.com/prometheus-community/helm-charts/tree/main/charts/kube-prometheus-stack#uninstall-helm-chart):
 
 ```
-$ kubectl delete crd alertmanagers.monitoring.coreos.com servicemonitors.monitoring.coreos.com podmonitors.monitoring.coreos.com prometheuses.monitoring.coreos.com prometheusrules.monitoring.coreos.com
+$ kubectl delete crd alertmanagerconfigs.monitoring.coreos.com alertmanagers.monitoring.coreos.com podmonitors.monitoring.coreos.com probes.monitoring.coreos.com prometheuses.monitoring.coreos.com prometheusrules.monitoring.coreos.com servicemonitors.monitoring.coreos.com thanosrulers.monitoring.coreos.com
 ```
 
 You may also want to delete the GCS bucket you created to hold the
