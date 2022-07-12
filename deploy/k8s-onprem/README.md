@@ -217,7 +217,7 @@ deploy a cluster with a minimum of two inference servers use *--set* to
 set the autoscaler.minReplicas parameter.
 
 ```
-$ helm install --name example --set autoscaler.minReplicas=2 .
+$ helm install example --set autoscaler.minReplicas=2 .
 ```
 
 You can also write your own "config.yaml" file with the values you
@@ -231,7 +231,7 @@ image:
   imageName: nvcr.io/nvidia/tritonserver:custom-tag
   modelRepositoryPath: gs://my_model_repository
 EOF
-$ helm install --name example -f config.yaml .
+$ helm install example -f config.yaml .
 ```
 
 ## Using Triton Inference Server
@@ -305,13 +305,13 @@ NAME            REVISION  UPDATED                   STATUS    CHART             
 example         1         Wed Feb 27 22:16:55 2019  DEPLOYED  triton-inference-server-1.0.0  1.0           default
 example-metrics	1       	Tue Jan 21 12:24:07 2020	DEPLOYED	prometheus-operator-6.18.0   	 0.32.0     	 default
 
-$ helm delete --purge example
-$ helm delete --purge example-metrics
+$ helm uninstall example
+$ helm uninstall example-metrics
 ```
 
 For the Prometheus and Grafana services, you should [explicitly delete
-CRDs](https://github.com/helm/charts/tree/master/stable/prometheus-operator#uninstalling-the-chart):
+CRDs](https://github.com/prometheus-community/helm-charts/tree/main/charts/kube-prometheus-stack#uninstall-helm-chart):
 
 ```
-$ kubectl delete crd alertmanagers.monitoring.coreos.com servicemonitors.monitoring.coreos.com podmonitors.monitoring.coreos.com prometheuses.monitoring.coreos.com prometheusrules.monitoring.coreos.com
+$ kubectl delete crd alertmanagerconfigs.monitoring.coreos.com alertmanagers.monitoring.coreos.com podmonitors.monitoring.coreos.com probes.monitoring.coreos.com prometheuses.monitoring.coreos.com prometheusrules.monitoring.coreos.com servicemonitors.monitoring.coreos.com thanosrulers.monitoring.coreos.com
 ```
