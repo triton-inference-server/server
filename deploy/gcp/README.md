@@ -164,13 +164,13 @@ by Grafana. The inference server helm chart assumes that Prometheus
 and Grafana are available so this step must be followed even if you
 don't want to use Grafana.
 
-Use the prometheus-operator to install these components. The
+Use the [kube-prometheus-stack](https://github.com/prometheus-community/helm-charts/tree/main/charts/kube-prometheus-stack) to install these components. The
 *serviceMonitorSelectorNilUsesHelmValues* flag is needed so that
 Prometheus can find the inference server metrics in the *example*
 release deployed below.
 
 ```
-$ helm install --name example-metrics --set prometheus.prometheusSpec.serviceMonitorSelectorNilUsesHelmValues=false stable/prometheus-operator
+$ helm install example-metrics --set prometheus.prometheusSpec.serviceMonitorSelectorNilUsesHelmValues=false prometheus-community/kube-prometheus-stack
 ```
 
 Then port-forward to the Grafana service so you can access it from
