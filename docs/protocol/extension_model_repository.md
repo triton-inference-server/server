@@ -165,7 +165,7 @@ $repository_load_error_response =
 
 #### Examples
 
-For the following request, Triton will load the model "mymodel" with override
+For the following request, Triton will load the model "mymodel" with provided
 model configuration and model file.
 
 ```
@@ -173,7 +173,7 @@ POST /v2/repository/models/mymodel/load HTTP/1.1
 Host: localhost:8000
 {
   "parameters": {
-    "config": {
+    "config": "{
       "name": "mymodel",
       "backend": "onnxruntime",
       "inputs": [{
@@ -188,9 +188,9 @@ Host: localhost:8000
           "shape": [ 1 ]
         }
       ]
-    },
+    }",
 
-    "file:1/model.onnx" : ""<base64-encoded-file-content>"
+    "file:1/model.onnx" : "<base64-encoded-file-content>"
   }
 }
 ```
