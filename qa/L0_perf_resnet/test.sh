@@ -111,6 +111,7 @@ rm -fr tensorrt_models && mkdir tensorrt_models
 cp -r $REPODIR/caffe_models/trt_model_store/resnet50_plan tensorrt_models/${TRT_MODEL_NAME} && \
     (cd tensorrt_models/${TRT_MODEL_NAME} && \
             sed -i "s/^name:.*/name: \"${TRT_MODEL_NAME}\"/" config.pbtxt) && \
+            sed -i "s/max_batch_size:.*/max_batch_size: ${STATIC_BATCH}/" config.pbtxt && \
     mkdir -p tensorrt_models/${TRT_MODEL_NAME}/1
 $CAFFE2PLAN -h -b ${STATIC_BATCH} \
             -n prob -o tensorrt_models/${TRT_MODEL_NAME}/1/model.plan \
@@ -168,6 +169,7 @@ rm -fr tensorrt_models && mkdir tensorrt_models
 cp -r $REPODIR/caffe_models/trt_model_store/resnet50_plan tensorrt_models/${TRT_MODEL_NAME} && \
     (cd tensorrt_models/${TRT_MODEL_NAME} && \
             sed -i "s/^name:.*/name: \"${TRT_MODEL_NAME}\"/" config.pbtxt) && \
+            sed -i "s/max_batch_size:.*/max_batch_size: ${STATIC_BATCH}/" config.pbtxt && \
     mkdir -p tensorrt_models/${TRT_MODEL_NAME}/1
 $CAFFE2PLAN -h -b ${STATIC_BATCH} \
             -n prob -o tensorrt_models/${TRT_MODEL_NAME}/1/model.plan \
