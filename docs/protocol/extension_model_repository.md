@@ -163,6 +163,38 @@ $repository_load_error_response =
 ```
 - “error” : The descriptive message for the error.
 
+#### Examples
+
+For the following request, Triton will load the model "mymodel" with override
+model configuration and model file.
+
+```
+POST /v2/repository/models/mymodel/load HTTP/1.1
+Host: localhost:8000
+{
+  "parameters": {
+    "config": {
+      "name": "mymodel",
+      "backend": "onnxruntime",
+      "inputs": [{
+          "name": "INPUT0",
+          "datatype": "FP32",
+          "shape": [ 1 ]
+        }
+      ],
+      "outputs": [{
+          "name": "OUTPUT0",
+          "datatype": "FP32",
+          "shape": [ 1 ]
+        }
+      ]
+    },
+
+    "file:1/model.onnx" : ""<base64-encoded-file-content>"
+  }
+}
+```
+
 ### Unload
 
 The unload API requests that a model be unloaded from Triton. An
