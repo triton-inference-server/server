@@ -112,6 +112,7 @@ else
     ERROR_MESSAGE="Unable to autofill for 'scalar_model': the rank of model tensor 'x' is 0 and dimensions are not defined"
     if [[ $(cat $SERVER_LOG | grep "${ERROR_MESSAGE}" | wc -l) -ne 2 ]]; then
         echo -e "\n***\n*** Test Failed: "${ERROR_MESSAGE}" not found\n***"
+        cat $SERVER_LOG
         RET=1
     fi
 fi
