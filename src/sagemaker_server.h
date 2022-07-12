@@ -25,8 +25,8 @@
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #pragma once
 
-#include <mutex>
 #include <sys/stat.h>
+#include <mutex>
 
 #include "common.h"
 #include "dirent.h"

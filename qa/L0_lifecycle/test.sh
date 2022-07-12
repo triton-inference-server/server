@@ -206,7 +206,7 @@ LOG_IDX=$((LOG_IDX+1))
 rm -rf models
 mkdir models
 SERVER_ARGS="--model-repository=`pwd`/models"
-SERVER_LOG="./inference_server_$LOG_IDX.log"
+SERVER_LOG="./stub_inference_server_$LOG_IDX.log"
 run_server
 if [ "$SERVER_PID" == "0" ]; then
     echo -e "\n***\n*** Failed to start $SERVER\n***"
@@ -215,6 +215,7 @@ if [ "$SERVER_PID" == "0" ]; then
 fi
 SAVED_SERVER_PID=$SERVER_PID
 SERVER_ARGS="--model-repository=`pwd`/models --http-port 8003 --metrics-port 8004"
+SERVER_LOG="./inference_server_$LOG_IDX.log"
 run_server
 sleep $SLEEP_TIME
 # check server log for the warning messages
@@ -236,7 +237,7 @@ LOG_IDX=$((LOG_IDX+1))
 rm -rf models
 mkdir models
 SERVER_ARGS="--model-repository=`pwd`/models"
-SERVER_LOG="./inference_server_$LOG_IDX.log"
+SERVER_LOG="./stub_inference_server_$LOG_IDX.log"
 run_server
 if [ "$SERVER_PID" == "0" ]; then
     echo -e "\n***\n*** Failed to start $SERVER\n***"
@@ -245,6 +246,7 @@ if [ "$SERVER_PID" == "0" ]; then
 fi
 SAVED_SERVER_PID=$SERVER_PID
 SERVER_ARGS="--model-repository=`pwd`/models --grpc-port 8003 --metrics-port 8004"
+SERVER_LOG="./inference_server_$LOG_IDX.log"
 run_server
 sleep $SLEEP_TIME
 # check server log for the warning messages
@@ -267,7 +269,7 @@ LOG_IDX=$((LOG_IDX+1))
 rm -rf models
 mkdir models
 SERVER_ARGS="--model-repository=`pwd`/models"
-SERVER_LOG="./inference_server_$LOG_IDX.log"
+SERVER_LOG="./stub_inference_server_$LOG_IDX.log"
 run_server
 if [ "$SERVER_PID" == "0" ]; then
     echo -e "\n***\n*** Failed to start $SERVER\n***"
@@ -276,6 +278,7 @@ if [ "$SERVER_PID" == "0" ]; then
 fi
 SAVED_SERVER_PID=$SERVER_PID
 SERVER_ARGS="--model-repository=`pwd`/models --grpc-port 8003 --http-port 8004"
+SERVER_LOG="./inference_server_$LOG_IDX.log"
 run_server
 sleep $SLEEP_TIME
 # check server log for the warning messages
@@ -449,8 +452,10 @@ for i in onnx plan ; do
 done
 rm models/graphdef_float32_float32_float32/config.pbtxt
 
+# Autocomplete should not be turned on for this test because it asserts an error was logged
+# when in strict model configuration mode.
 SERVER_ARGS="--model-repository=`pwd`/models --model-repository=`pwd`/models_0 \
-             --exit-on-error=false --exit-timeout-secs=5"
+             --exit-on-error=false --exit-timeout-secs=5 --strict-model-config=true"
 SERVER_LOG="./inference_server_$LOG_IDX.log"
 run_server_tolive
 if [ "$SERVER_PID" == "0" ]; then

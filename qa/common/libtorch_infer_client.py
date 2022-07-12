@@ -27,6 +27,7 @@
 
 import os
 import sys
+
 sys.path.append("../common")
 
 import unittest
@@ -39,6 +40,7 @@ from tritonclient.utils import InferenceServerException
 # By default, find tritonserver on "localhost", but can be overridden
 # with TRITONSERVER_IPADDR envvar
 _tritonserver_ipaddr = os.environ.get('TRITONSERVER_IPADDR', 'localhost')
+
 
 class InferTest(tu.TestResultCollector):
 

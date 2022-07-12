@@ -240,6 +240,7 @@ enum OptionId {
   OPTION_ID,
   OPTION_MODEL_REPOSITORY,
   OPTION_EXIT_ON_ERROR,
+  OPTION_DISABLE_AUTO_COMPLETE_CONFIG,
   OPTION_STRICT_MODEL_CONFIG,
   OPTION_STRICT_READINESS,
 #if defined(TRITON_ENABLE_HTTP)
@@ -365,8 +366,15 @@ std::vector<Option> options_
        "available."},
       {OPTION_EXIT_ON_ERROR, "exit-on-error", Option::ArgBool,
        "Exit the inference server if an error occurs during initialization."},
+      {OPTION_DISABLE_AUTO_COMPLETE_CONFIG, "disable-auto-complete-config",
+       Option::ArgNone,
+       "If set, disables the triton and backends from auto completing model "
+       "configuration files. Model configuration files must be provided and "
+       "all required "
+       "configuration settings must be specified."},
       {OPTION_STRICT_MODEL_CONFIG, "strict-model-config", Option::ArgBool,
-       "If true model configuration files must be provided and all required "
+       "DEPRECATED: If true model configuration files must be provided and all "
+       "required "
        "configuration settings must be specified. If false the model "
        "configuration may be absent or only partially specified and the "
        "server will attempt to derive the missing required configuration."},
@@ -1281,7 +1289,7 @@ Parse(TRITONSERVER_ServerOptions** server_options, int argc, char** argv)
   std::string server_id("triton");
   std::set<std::string> model_repository_paths;
   bool exit_on_error = true;
-  bool strict_model_config = true;
+  bool strict_model_config = false;
   bool strict_readiness = true;
   std::list<std::pair<int, uint64_t>> cuda_pools;
   int32_t exit_timeout_secs = 30;
@@ -1435,6 +1443,9 @@ Parse(TRITONSERVER_ServerOptions** server_options, int argc, char** argv)
 
       case OPTION_EXIT_ON_ERROR:
         exit_on_error = ParseBoolOption(optarg);
+        break;
+      case OPTION_DISABLE_AUTO_COMPLETE_CONFIG:
+        strict_model_config = true;
         break;
       case OPTION_STRICT_MODEL_CONFIG:
         strict_model_config = ParseBoolOption(optarg);

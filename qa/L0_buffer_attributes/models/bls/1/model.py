@@ -45,7 +45,9 @@ class TritonPythonModel:
                 raise pb_utils.TritonModelException(
                     infer_response.error().message())
 
-            inference_response = pb_utils.InferenceResponse(output_tensors=[pb_utils.get_output_tensor_by_name(infer_response, 'OUTPUT0')])
+            inference_response = pb_utils.InferenceResponse(output_tensors=[
+                pb_utils.get_output_tensor_by_name(infer_response, 'OUTPUT0')
+            ])
             responses.append(inference_response)
 
         return responses

@@ -85,3 +85,5 @@ make room for new entries.
 - Only requests going through the Default Scheduler or Dynamic Batch Scheduler
   are eligible for caching. The Sequence Batcher does not currently support
   response caching.
+- The response cache does not currently support
+  [decoupled models](https://github.com/triton-inference-server/server/blob/main/docs/decoupled_models.md).

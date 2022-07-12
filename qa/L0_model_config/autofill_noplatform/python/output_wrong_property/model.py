@@ -36,7 +36,12 @@ class TritonPythonModel:
         input0 = {'name': 'INPUT0', 'data_type': 'TYPE_FP32', 'dims': [4]}
         input1 = {'name': 'INPUT1', 'data_type': 'TYPE_FP32', 'dims': [4]}
         output0 = {'name': 'OUTPUT0', 'data_type': 'TYPE_FP32', 'dims': [4]}
-        output1 = {'name': 'OUTPUT1', 'data_type': 'TYPE_FP32', 'dims': [4], 'is_shape_tensor:' : True}
+        output1 = {
+            'name': 'OUTPUT1',
+            'data_type': 'TYPE_FP32',
+            'dims': [4],
+            'is_shape_tensor:': True
+        }
 
         auto_complete_model_config.set_max_batch_size(0)
         auto_complete_model_config.add_input(input0)

@@ -28,6 +28,7 @@ import json
 import numpy as np
 import triton_python_backend_utils as pb_utils
 
+
 class TritonPythonModel:
 
     def initialize(self, args):
@@ -40,7 +41,8 @@ class TritonPythonModel:
         responses = []
         for request in requests:
             # Include one of each specially parsed JSON value: nan, inf, and -inf
-            out_0 = np.array([np.nan, np.inf, np.NINF, 1, 2, 3], dtype=np.float32)
+            out_0 = np.array([np.nan, np.inf, np.NINF, 1, 2, 3],
+                             dtype=np.float32)
             out_tensor_0 = pb_utils.Tensor("OUTPUT0", out_0)
             responses.append(pb_utils.InferenceResponse([out_tensor_0]))
 

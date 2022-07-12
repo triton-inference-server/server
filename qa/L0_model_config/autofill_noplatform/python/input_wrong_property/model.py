@@ -34,7 +34,12 @@ class TritonPythonModel:
     @staticmethod
     def auto_complete_config(auto_complete_model_config):
         input0 = {'name': 'INPUT0', 'data_type': 'TYPE_FP32', 'dims': [4]}
-        input1 = {'name': 'INPUT1', 'data_type': 'TYPE_FP32', 'dims': [4], 'is_shape_tensor:' : True}
+        input1 = {
+            'name': 'INPUT1',
+            'data_type': 'TYPE_FP32',
+            'dims': [4],
+            'is_shape_tensor:': True
+        }
         output0 = {'name': 'OUTPUT0', 'data_type': 'TYPE_FP32', 'dims': [4]}
         output1 = {'name': 'OUTPUT1', 'data_type': 'TYPE_FP32', 'dims': [4]}
 

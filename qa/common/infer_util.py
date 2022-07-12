@@ -128,7 +128,8 @@ def infer_exact(tester,
             # Float16 not supported for Input and Output via JSON
             if use_http_json_tensors and (input_dtype != np.float16) and \
                (output0_dtype != np.float16) and (output1_dtype != np.float16):
-                configs.append((f"{_tritonserver_ipaddr}:8000", "http", False, False))
+                configs.append(
+                    (f"{_tritonserver_ipaddr}:8000", "http", False, False))
     if use_grpc:
         configs.append((f"{_tritonserver_ipaddr}:8001", "grpc", False, False))
     if use_streaming:
@@ -831,7 +832,8 @@ def infer_zero(tester,
     if use_http:
         configs.append((f"{_tritonserver_ipaddr}:8000", "http", False, True))
         if use_http_json_tensors and (tensor_dtype != np.float16):
-            configs.append((f"{_tritonserver_ipaddr}:8000", "http", False, False))
+            configs.append(
+                (f"{_tritonserver_ipaddr}:8000", "http", False, False))
     if use_grpc:
         configs.append((f"{_tritonserver_ipaddr}:8001", "grpc", False, False))
     if use_streaming:

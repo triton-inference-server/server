@@ -94,7 +94,7 @@ from inspect import getsourcefile
 TRITON_VERSION_MAP = {
     '2.24.0dev': (
         '22.07dev',  # triton container
-        '22.05',  # upstream container
+        '22.06',  # upstream container
         '1.11.1',  # ORT
         '2021.4.582',  # ORT OpenVINO
         (('2021.4', None), ('2021.4', '2021.4.582'),
@@ -319,7 +319,7 @@ class BuildScript:
     def cmake(self, args):
         # Pass some additional envvars into cmake...
         env_args = []
-        for k in ('TRT_VERSION', 'DALI_VERSION', 'CMAKE_TOOLCHAIN_FILE',
+        for k in ('TRT_VERSION', 'CMAKE_TOOLCHAIN_FILE',
                   'VCPKG_TARGET_TRIPLET'):
             env_args += [f'"-D{k}={self.envvar_ref(k)}"']
         self.cmd(f'cmake {" ".join(env_args)} {" ".join(args)}',
@@ -1974,7 +1974,7 @@ if __name__ == '__main__':
         action='append',
         required=False,
         help=
-        'Include specified backend in build as <backend-name>[:<repo-tag>]. If <repo-tag> starts with "pull/" then it refers to a pull-request reference, otherwise <repo-tag> indicates the git tag/branch to use for the build. If the version is non-development then the default <repo-tag> is the release branch matching the container version (e.g. version 22.05 -> branch r22.05); otherwise the default <repo-tag> is "main" (e.g. version 22.05dev -> branch main).'
+        'Include specified backend in build as <backend-name>[:<repo-tag>]. If <repo-tag> starts with "pull/" then it refers to a pull-request reference, otherwise <repo-tag> indicates the git tag/branch to use for the build. If the version is non-development then the default <repo-tag> is the release branch matching the container version (e.g. version 22.06 -> branch r22.06); otherwise the default <repo-tag> is "main" (e.g. version 22.06dev -> branch main).'
     )
     parser.add_argument(
         '--build-multiple-openvino',
@@ -1988,14 +1988,14 @@ if __name__ == '__main__':
         action='append',
         required=False,
         help=
-        'The version of a component to use in the build as <component-name>:<repo-tag>. <component-name> can be "common", "core", "backend" or "thirdparty". If <repo-tag> starts with "pull/" then it refers to a pull-request reference, otherwise <repo-tag> indicates the git tag/branch. If the version is non-development then the default <repo-tag> is the release branch matching the container version (e.g. version 22.05 -> branch r22.05); otherwise the default <repo-tag> is "main" (e.g. version 22.05dev -> branch main).'
+        'The version of a component to use in the build as <component-name>:<repo-tag>. <component-name> can be "common", "core", "backend" or "thirdparty". If <repo-tag> starts with "pull/" then it refers to a pull-request reference, otherwise <repo-tag> indicates the git tag/branch. If the version is non-development then the default <repo-tag> is the release branch matching the container version (e.g. version 22.06 -> branch r22.06); otherwise the default <repo-tag> is "main" (e.g. version 22.06dev -> branch main).'
     )
     parser.add_argument(
         '--repoagent',
         action='append',
         required=False,
         help=
-        'Include specified repo agent in build as <repoagent-name>[:<repo-tag>]. If <repo-tag> starts with "pull/" then it refers to a pull-request reference, otherwise <repo-tag> indicates the git tag/branch to use for the build. If the version is non-development then the default <repo-tag> is the release branch matching the container version (e.g. version 22.05 -> branch r22.05); otherwise the default <repo-tag> is "main" (e.g. version 22.05dev -> branch main).'
+        'Include specified repo agent in build as <repoagent-name>[:<repo-tag>]. If <repo-tag> starts with "pull/" then it refers to a pull-request reference, otherwise <repo-tag> indicates the git tag/branch to use for the build. If the version is non-development then the default <repo-tag> is the release branch matching the container version (e.g. version 22.06 -> branch r22.06); otherwise the default <repo-tag> is "main" (e.g. version 22.06dev -> branch main).'
     )
     parser.add_argument(
         '--no-force-clone',

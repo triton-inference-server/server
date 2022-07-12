@@ -26,6 +26,7 @@
 
 import math
 import sys
+
 sys.path.append("../common")
 
 import numpy as np

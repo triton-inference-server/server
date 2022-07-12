@@ -37,6 +37,7 @@ import tritonclient.http as tritonhttpclient
 from tritonclient.utils import InferenceServerException
 import unittest
 import test_util as tu
+
 BACKENDS = os.environ.get('BACKENDS', "onnx plan")
 
 
@@ -47,29 +48,41 @@ class ImplicitStateTest(tu.TestResultCollector):
         inputs = []
         inputs.append(tritonhttpclient.InferInput('INPUT', [1], 'INT32'))
         inputs.append(tritonhttpclient.InferInput('TEST_CASE', [1], 'INT32'))
-        inputs[0].set_data_from_numpy(np.random.randint(5, size=[1], dtype=np.int32))
+        inputs[0].set_data_from_numpy(
+            np.random.randint(5, size=[1], dtype=np.int32))
         inputs[1].set_data_from_numpy(np.asarray([0], dtype=np.int32))
 
         with self.assertRaises(InferenceServerException) as e:
-            triton_client.infer(model_name="no_implicit_state", inputs=inputs, sequence_id=1, sequence_start=True)
+            triton_client.infer(model_name="no_implicit_state",
+                                inputs=inputs,
+                                sequence_id=1,
+                                sequence_start=True)
 
-        self.assertEqual(str(e.exception), "unable to add state 'undefined_state'. State configuration is missing for model 'no_implicit_state'.")
+        self.assertEqual(
+            str(e.exception),
+            "unable to add state 'undefined_state'. State configuration is missing for model 'no_implicit_state'."
+        )
 
     def test_wrong_implicit_state_name(self):
         triton_client = tritonhttpclient.InferenceServerClient("localhost:8000")
         inputs = []
         inputs.append(tritonhttpclient.InferInput('INPUT', [1], 'INT32'))
         inputs.append(tritonhttpclient.InferInput('TEST_CASE', [1], 'INT32'))
-        inputs[0].set_data_from_numpy(np.random.randint(5, size=[1], dtype=np.int32))
+        inputs[0].set_data_from_numpy(
+            np.random.randint(5, size=[1], dtype=np.int32))
         inputs[1].set_data_from_numpy(np.asarray([0], dtype=np.int32))
 
         with self.assertRaises(InferenceServerException) as e:
-            triton_client.infer(model_name="wrong_internal_state", inputs=inputs, sequence_id=2, sequence_start=True)
+            triton_client.infer(model_name="wrong_internal_state",
+                                inputs=inputs,
+                                sequence_id=2,
+                                sequence_start=True)
 
-        self.assertEqual(str(e.exception), "state 'undefined_state' is not a valid state name.")
+        self.assertEqual(str(e.exception),
+                         "state 'undefined_state' is not a valid state name.")
 
     def test_no_update(self):
-	    # Test implicit state without updating any state
+        # Test implicit state without updating any state
         triton_client = tritonhttpclient.InferenceServerClient("localhost:8000")
         inputs = []
         inputs.append(tritonhttpclient.InferInput('INPUT', [1], 'INT32'))
@@ -79,13 +92,21 @@ class ImplicitStateTest(tu.TestResultCollector):
         correlation_id = 3
 
         # Make sure the state is never updated.
-        result_start = triton_client.infer(model_name="no_state_update", inputs=inputs, sequence_id=correlation_id, sequence_start=True)
+        result_start = triton_client.infer(model_name="no_state_update",
+                                           inputs=inputs,
+                                           sequence_id=correlation_id,
+                                           sequence_start=True)
         self.assertEqual(result_start.as_numpy('OUTPUT')[0], 1)
         for _ in range(10):
-            result = triton_client.infer(model_name="no_state_update", inputs=inputs, sequence_id=correlation_id)
+            result = triton_client.infer(model_name="no_state_update",
+                                         inputs=inputs,
+                                         sequence_id=correlation_id)
             self.assertEqual(result.as_numpy('OUTPUT')[0], 1)
 
-        result_start = triton_client.infer(model_name="no_state_update", inputs=inputs, sequence_id=correlation_id, sequence_end=True)
+        result_start = triton_client.infer(model_name="no_state_update",
+                                           inputs=inputs,
+                                           sequence_id=correlation_id,
+                                           sequence_end=True)
         self.assertEqual(result.as_numpy('OUTPUT')[0], 1)
 
     def test_request_output_not_allowed(self):
@@ -106,7 +127,9 @@ class ImplicitStateTest(tu.TestResultCollector):
                     sequence_id=1,
                     sequence_start=True,
                     sequence_end=True)
-            self.assertTrue(str(e.exception).startswith("unexpected inference output 'OUTPUT_STATE' for model"))
+            self.assertTrue(
+                str(e.exception).startswith(
+                    "unexpected inference output 'OUTPUT_STATE' for model"))
 
     def test_request_output(self):
         triton_client = tritonhttpclient.InferenceServerClient("localhost:8000")
@@ -120,16 +143,15 @@ class ImplicitStateTest(tu.TestResultCollector):
 
         for backend in BACKENDS.split(" "):
             result = triton_client.infer(
-                    model_name=f"{backend}_nobatch_sequence_int32_output",
-                    inputs=inputs,
-                    outputs=outputs,
-                    sequence_id=1,
-                    sequence_start=True,
-                    sequence_end=True)
+                model_name=f"{backend}_nobatch_sequence_int32_output",
+                inputs=inputs,
+                outputs=outputs,
+                sequence_id=1,
+                sequence_start=True,
+                sequence_end=True)
             self.assertTrue(result.as_numpy('OUTPUT_STATE')[0], 1)
             self.assertTrue(result.as_numpy('OUTPUT')[0], 1)
 
 
 if __name__ == '__main__':
     unittest.main()
-

@@ -32,6 +32,7 @@ UNIT_TEST=./response_cache_test
 
 rm -fr *.log
 
+# UNIT TEST
 set +e
 export CUDA_VISIBLE_DEVICES=0
 LD_LIBRARY_PATH=/opt/tritonserver/lib:$LD_LIBRARY_PATH $UNIT_TEST >>$TEST_LOG 2>&1
@@ -41,6 +42,35 @@ if [ $? -ne 0 ]; then
     RET=1
 fi
 set -e
+
+# SERVER TESTS
+mkdir -p "${PWD}/models/decoupled_cache/1"
+
+# Check that server fails to start for a "decoupled" model with response
+# cache enabled
+SERVER=/opt/tritonserver/bin/tritonserver
+SERVER_ARGS="--model-repository=${PWD}/models --response-cache-byte-size=8192"
+SERVER_LOG="./inference_server.log"
+source ../common/util.sh
+run_server
+if [ "$SERVER_PID" != "0" ]; then
+    echo -e "\n***\n*** Failed: $SERVER started successfully when it was expected to fail\n***"
+    cat $SERVER_LOG
+    RET=1
+
+    kill $SERVER_PID
+    wait $SERVER_PID
+else
+    # Check that server fails with the correct error message
+    set +e
+    grep -i "response cache does not currently support" ${SERVER_LOG} | grep -i "decoupled"
+    if [ $? -ne 0 ]; then
+        echo -e "\n***\n*** Failed: Expected response cache / decoupled mode error message in output\n***"
+        cat $SERVER_LOG
+        RET=1
+    fi
+    set -e
+fi
 
 if [ $RET -eq 0 ]; then
   echo -e "\n***\n*** Test Passed\n***"
