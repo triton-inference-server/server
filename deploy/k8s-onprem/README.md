@@ -305,8 +305,8 @@ NAME            REVISION  UPDATED                   STATUS    CHART             
 example         1         Wed Feb 27 22:16:55 2019  DEPLOYED  triton-inference-server-1.0.0  1.0           default
 example-metrics	1       	Tue Jan 21 12:24:07 2020	DEPLOYED	prometheus-operator-6.18.0   	 0.32.0     	 default
 
-$ helm delete --purge example
-$ helm delete --purge example-metrics
+$ helm uninstall example
+$ helm uninstall example-metrics
 ```
 
 For the Prometheus and Grafana services, you should [explicitly delete
