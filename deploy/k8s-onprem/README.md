@@ -217,7 +217,7 @@ deploy a cluster with a minimum of two inference servers use *--set* to
 set the autoscaler.minReplicas parameter.
 
 ```
-$ helm install --name example --set autoscaler.minReplicas=2 .
+$ helm install example --set autoscaler.minReplicas=2 .
 ```
 
 You can also write your own "config.yaml" file with the values you
@@ -231,7 +231,7 @@ image:
   imageName: nvcr.io/nvidia/tritonserver:custom-tag
   modelRepositoryPath: gs://my_model_repository
 EOF
-$ helm install --name example -f config.yaml .
+$ helm install example -f config.yaml .
 ```
 
 ## Using Triton Inference Server
