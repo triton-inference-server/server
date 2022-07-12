@@ -226,8 +226,8 @@ SagemakerAPIServer::Handle(evhtp_request_t* req)
             evhtp_send_reply(req, EVHTP_RES_NOTFOUND); /* 404*/
             return;
           }
-
-          HandleInfer(req, multi_model_name, model_version_str_);
+          LOG_VERBOSE(1) << "SM MME Custom Invoke Model" << std::endl;
+          SageMakerMMEHandleInfer(req, multi_model_name, model_version_str_);
           return;
         }
         if (action.empty()) {
@@ -332,6 +332,281 @@ SagemakerAPIServer::ParseSageMakerRequest(
   (*parse_map)["model_name"] = model_name_string.c_str();
 
   return;
+}
+
+void
+SagemakerAPIServer::SagemakeInferRequestClass::InferResponseComplete(
+    TRITONSERVER_InferenceResponse* response, const uint32_t flags, void* userp)
+{
+  // FIXME can't use InferRequestClass object here since it's lifetime
+  // is different than response. For response we need to know how to
+  // send each output (as json, shm, or binary) and that information
+  // has to be maintained in a way that allows us to clean it up
+  // appropriately if connection closed or last response sent.
+  //
+  // But for now userp is the InferRequestClass object and the end of
+  // its life is in the OK or BAD ReplyCallback.
+
+  SagemakerAPIServer::SagemakeInferRequestClass* infer_request =
+      reinterpret_cast<SagemakerAPIServer::SagemakeInferRequestClass*>(userp);
+
+  auto response_count = infer_request->IncrementResponseCount();
+
+  // Defer to the callback with the final response
+  if ((flags & TRITONSERVER_RESPONSE_COMPLETE_FINAL) == 0) {
+    LOG_ERROR << "[INTERNAL] received a response without FINAL flag";
+    return;
+  }
+
+  TRITONSERVER_Error* err = nullptr;
+  if (response_count != 0) {
+    err = TRITONSERVER_ErrorNew(
+        TRITONSERVER_ERROR_INTERNAL, std::string(
+                                         "expected a single response, got " +
+                                         std::to_string(response_count + 1))
+                                         .c_str());
+  } else if (response == nullptr) {
+    err = TRITONSERVER_ErrorNew(
+        TRITONSERVER_ERROR_INTERNAL, "received an unexpected null response");
+  } else {
+    err = infer_request->FinalizeResponse(response);
+  }
+
+#ifdef TRITON_ENABLE_TRACING
+  if (infer_request->trace_ != nullptr) {
+    infer_request->trace_->CaptureTimestamp(
+        "INFER_RESPONSE_COMPLETE", TraceManager::CaptureTimestamp());
+  }
+#endif  // TRITON_ENABLE_TRACING
+
+  if (err == nullptr) {
+    evthr_defer(infer_request->thread_, OKReplyCallback, infer_request);
+  } else {
+    EVBufferAddErrorJson(infer_request->req_->buffer_out, err);
+    TRITONSERVER_ErrorDelete(err);
+    if (SageMakerMMECheckOOMError(err) == true) {
+      evthr_defer(infer_request->thread_, BADReplyCallback507, infer_request);
+    } else {
+      evthr_defer(infer_request->thread_, BADReplyCallback, infer_request);
+    }
+  }
+
+  LOG_TRITONSERVER_ERROR(
+      TRITONSERVER_InferenceResponseDelete(response),
+      "deleting inference response");
+}
+
+void
+SagemakerAPIServer::BADReplyCallback507(evthr_t* thr, void* arg, void* shared)
+{
+  HTTPAPIServer::InferRequestClass* infer_request =
+      reinterpret_cast<HTTPAPIServer::InferRequestClass*>(arg);
+
+  evhtp_request_t* request = infer_request->EvHtpRequest();
+  evhtp_send_reply(request, 507);
+
+  evhtp_request_resume(request);
+
+#ifdef TRITON_ENABLE_TRACING
+  if (infer_request->trace_ != nullptr) {
+    infer_request->trace_->CaptureTimestamp(
+        "HTTP_SEND_START", request->send_start_ns);
+    infer_request->trace_->CaptureTimestamp(
+        "HTTP_SEND_END", request->send_end_ns);
+  }
+#endif  // TRITON_ENABLE_TRACING
+
+  delete infer_request;
+}
+
+void
+SagemakerAPIServer::SageMakerMMEHandleInfer(
+    evhtp_request_t* req, const std::string& model_name,
+    const std::string& model_version_str)
+{
+  if (req->method != htp_method_POST) {
+    evhtp_send_reply(req, EVHTP_RES_METHNALLOWED);
+    return;
+  }
+
+  bool connection_paused = false;
+
+  int64_t requested_model_version;
+  auto err = GetModelVersionFromString(
+      model_version_str.c_str(), &requested_model_version);
+
+  if (err == nullptr) {
+    uint32_t txn_flags;
+    err = TRITONSERVER_ServerModelTransactionProperties(
+        server_.get(), model_name.c_str(), requested_model_version, &txn_flags,
+        nullptr /* voidp */);
+    if ((err == nullptr) && (txn_flags & TRITONSERVER_TXN_DECOUPLED) != 0) {
+      err = TRITONSERVER_ErrorNew(
+          TRITONSERVER_ERROR_UNSUPPORTED,
+          "HTTP end point doesn't support models with decoupled "
+          "transaction policy");
+    }
+  }
+
+  // If tracing is enabled see if this request should be traced.
+  TRITONSERVER_InferenceTrace* triton_trace = nullptr;
+#ifdef TRITON_ENABLE_TRACING
+  std::shared_ptr<TraceManager::Trace> trace;
+  if (err == nullptr) {
+    trace = std::move(trace_manager_->SampleTrace(model_name));
+    if (trace != nullptr) {
+      triton_trace = trace->trace_;
+
+      // Timestamps from evhtp are capture in 'req'. We record here
+      // since this is the first place where we have access to trace
+      // manager.
+      trace->CaptureTimestamp("HTTP_RECV_START", req->recv_start_ns);
+      trace->CaptureTimestamp("HTTP_RECV_END", req->recv_end_ns);
+    }
+  }
+#endif  // TRITON_ENABLE_TRACING
+
+  // Create the inference request object which provides all information needed
+  // for an inference.
+  TRITONSERVER_InferenceRequest* irequest = nullptr;
+  if (err == nullptr) {
+    err = TRITONSERVER_InferenceRequestNew(
+        &irequest, server_.get(), model_name.c_str(), requested_model_version);
+  }
+
+  // Decompress request body if it is compressed in supported type
+  evbuffer* decompressed_buffer = nullptr;
+  if (err == nullptr) {
+    auto compression_type = GetRequestCompressionType(req);
+    switch (compression_type) {
+      case DataCompressor::Type::DEFLATE:
+      case DataCompressor::Type::GZIP: {
+        decompressed_buffer = evbuffer_new();
+        err = DataCompressor::DecompressData(
+            compression_type, req->buffer_in, decompressed_buffer);
+        break;
+      }
+      case DataCompressor::Type::UNKNOWN: {
+        // Encounter unsupported compressed type,
+        // send 415 error with supported types in Accept-Encoding
+        evhtp_headers_add_header(
+            req->headers_out,
+            evhtp_header_new(kAcceptEncodingHTTPHeader, "gzip, deflate", 1, 1));
+        evhtp_send_reply(req, EVHTP_RES_UNSUPPORTED);
+        return;
+      }
+      case DataCompressor::Type::IDENTITY:
+        // Do nothing
+        break;
+    }
+  }
+
+  // Get the header length
+  size_t header_length;
+  if (err == nullptr) {
+    // Set to body size in case there is no Content-Length to compare with
+    int32_t content_length = evbuffer_get_length(req->buffer_in);
+    if (decompressed_buffer == nullptr) {
+      const char* content_length_c_str =
+          evhtp_kv_find(req->headers_in, kContentLengthHeader);
+      if (content_length_c_str != nullptr) {
+        try {
+          content_length = std::atoi(content_length_c_str);
+        }
+        catch (const std::invalid_argument& ia) {
+          err = TRITONSERVER_ErrorNew(
+              TRITONSERVER_ERROR_INVALID_ARG,
+              (std::string("Unable to parse ") + kContentLengthHeader +
+               ", got: " + content_length_c_str)
+                  .c_str());
+        }
+      }
+    } else {
+      // The Content-Length doesn't reflect the actual request body size
+      // if compression is used, set 'content_length' to the decompressed size
+      content_length = evbuffer_get_length(decompressed_buffer);
+    }
+
+    if (err == nullptr) {
+      err = GetInferenceHeaderLength(req, content_length, &header_length);
+    }
+  }
+
+  if (err == nullptr) {
+    connection_paused = true;
+
+    auto infer_request = CreateInferRequest(req);
+#ifdef TRITON_ENABLE_TRACING
+    infer_request->trace_ = trace;
+#endif  // TRITON_ENABLE_TRACING
+
+    if (err == nullptr) {
+      if (header_length != 0) {
+        err = EVBufferToInput(
+            model_name, irequest,
+            (decompressed_buffer == nullptr) ? req->buffer_in
+                                             : decompressed_buffer,
+            infer_request.get(), header_length);
+      } else {
+        err = EVBufferToRawInput(
+            model_name, irequest,
+            (decompressed_buffer == nullptr) ? req->buffer_in
+                                             : decompressed_buffer,
+            infer_request.get());
+      }
+    }
+    if (err == nullptr) {
+      err = TRITONSERVER_InferenceRequestSetReleaseCallback(
+          irequest, InferRequestClass::InferRequestComplete,
+          decompressed_buffer);
+      if (err == nullptr) {
+        err = TRITONSERVER_InferenceRequestSetResponseCallback(
+            irequest, allocator_,
+            reinterpret_cast<void*>(&infer_request->alloc_payload_),
+            SagemakerAPIServer::SagemakeInferRequestClass::
+                InferResponseComplete,
+            reinterpret_cast<void*>(infer_request.get()));
+
+        LOG_VERBOSE(1) << std::endl;
+      }
+      if (err == nullptr) {
+        err = TRITONSERVER_ServerInferAsync(
+            server_.get(), irequest, triton_trace);
+#ifdef TRITON_ENABLE_TRACING
+        if (trace != nullptr) {
+          trace->trace_ = nullptr;
+        }
+#endif  // TRITON_ENABLE_TRACING
+      }
+      if (err == nullptr) {
+        infer_request.release();
+      }
+    }
+  }
+
+  if (err != nullptr) {
+    LOG_VERBOSE(1) << "Infer failed: " << TRITONSERVER_ErrorMessage(err);
+    evhtp_headers_add_header(
+        req->headers_out,
+        evhtp_header_new(kContentTypeHeader, "application/json", 1, 1));
+
+    SageMakerMMEHandleOOMError(req, err);
+
+    if (connection_paused) {
+      evhtp_request_resume(req);
+    }
+    TRITONSERVER_ErrorDelete(err);
+#ifdef TRITON_ENABLE_TRACING
+    // If HTTP server still owns Triton trace
+    if ((trace != nullptr) && (trace->trace_ != nullptr)) {
+      TraceManager::TraceRelease(trace->trace_, trace->trace_userp_);
+    }
+#endif  // TRITON_ENABLE_TRACING
+
+    LOG_TRITONSERVER_ERROR(
+        TRITONSERVER_InferenceRequestDelete(irequest),
+        "deleting HTTP/REST inference request");
+  }
 }
 
 void
@@ -440,29 +715,45 @@ SagemakerAPIServer::SageMakerMMEListModel(evhtp_request_t* req)
   evhtp_send_reply(req, EVHTP_RES_OK);
 }
 
-void
-SagemakerAPIServer::SageMakerMMEHandleLoadError(
-    evhtp_request_t* req, TRITONSERVER_Error* load_err)
+bool
+SagemakerAPIServer::SageMakerMMECheckOOMError(TRITONSERVER_Error* err)
 {
-  const char* message = TRITONSERVER_ErrorMessage(load_err);
+  const char* message = TRITONSERVER_ErrorMessage(err);
   std::string error_string(message);
 
   const std::vector<std::string> error_messages{
       "CUDA out of memory", /* pytorch */
       "CUDA_OUT_OF_MEMORY", /* tensorflow */
       "Out of memory",      /* generic */
-      "out of memory", "MemoryError"};
-
-  EVBufferAddErrorJson(req->buffer_out, load_err);
+      "out of memory",
+      "MemoryError",
+      "Dst tensor is not initialized",
+      "Src tensor is not initialized",
+      "CNMEM_STATUS_OUT_OF_MEMORY",
+      "CUDNN_STATUS_NOT_INITIALIZED"};
 
   for (long unsigned int i = 0; i < error_messages.size(); i++) {
     if (error_string.find(error_messages[i]) != std::string::npos) {
-      /* Return a 507*/
-      evhtp_send_reply(req, 507);
-      LOG_VERBOSE(1)
-          << "Received an OOM error during LOAD MODEL. Returning a 507.";
-      return;
+      LOG_VERBOSE(1) << "OOM strings detected in logs.";
+      return true;
     }
+  }
+
+  return false;
+}
+
+void
+SagemakerAPIServer::SageMakerMMEHandleOOMError(
+    evhtp_request_t* req, TRITONSERVER_Error* err)
+{
+  EVBufferAddErrorJson(req->buffer_out, err);
+
+  if (SageMakerMMECheckOOMError(err) == true) {
+    /* Return a 507*/
+    evhtp_send_reply(req, 507);
+    LOG_VERBOSE(1)
+        << "Received an OOM error during LOAD MODEL. Returning a 507.";
+    return;
   }
   /* Return a 400*/
   evhtp_send_reply(req, EVHTP_RES_BADREQ);
@@ -582,7 +873,7 @@ SagemakerAPIServer::SageMakerMMELoadModel(
     TRITONSERVER_ErrorDelete(err);
     return;
   } else if (err != nullptr) {
-    SageMakerMMEHandleLoadError(req, err);
+    SageMakerMMEHandleOOMError(req, err);
   } else {
     std::lock_guard<std::mutex> lock(mutex_);
 
