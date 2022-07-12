@@ -243,8 +243,6 @@ TRITONSERVER_Error*
 JsonBytesArrayByteSize(
     triton::common::TritonJson::Value& tensor_data, size_t* byte_size)
 {
-  *byte_size = 0;
-
   for (size_t i = 0; i < tensor_data.ArraySize(); i++) {
     triton::common::TritonJson::Value el;
     RETURN_IF_ERR(tensor_data.At(i, &el));
@@ -2421,6 +2419,7 @@ HTTPAPIServer::EVBufferToInput(
               "Unable to parse 'data'");
 
           if (dtype == TRITONSERVER_TYPE_BYTES) {
+            byte_size = 0;
             RETURN_IF_ERR(JsonBytesArrayByteSize(tensor_data, &byte_size));
           } else {
             byte_size = element_cnt * TRITONSERVER_DataTypeByteSize(dtype);
