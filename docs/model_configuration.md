@@ -290,8 +290,8 @@ configuration and call `TRITONBACKEND_ModelSetConfig` API to
 update completed configuration with Triton core. You can take a
 look at [TensorFlow](https://github.com/triton-inference-server/tensorflow_backend)
 and [Onnxruntime](https://github.com/triton-inference-server/onnxruntime_backend)
-backends as examples of how to acheive this. The users *must*
-still have to provide a config.pbtxt with `backend` field for
+backends as examples of how to acheive this. The users would still
+be required to provide a config.pbtxt with `backend` field for these
 custom backends.
 
 You can also see the model configuration generated for a model by
