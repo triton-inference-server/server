@@ -2419,7 +2419,7 @@ HTTPAPIServer::EVBufferToInput(
               "Unable to parse 'data'");
 
           if (dtype == TRITONSERVER_TYPE_BYTES) {
-            byte_size = 0;
+            byte_size = 0;  // initialize for its recursive computation
             RETURN_IF_ERR(JsonBytesArrayByteSize(tensor_data, &byte_size));
           } else {
             byte_size = element_cnt * TRITONSERVER_DataTypeByteSize(dtype);
