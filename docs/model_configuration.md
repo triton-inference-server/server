@@ -419,7 +419,7 @@ must be specified since each output must specify a non-empty
 
 For models that support shape tensors, the *is_shape_tensor* property
 must be set appropriately for inputs and outputs that are acting as
-shape tensors. The following shows and example configuration that
+shape tensors. The following shows an example configuration that
 specifies shape tensors.
 
 ```
