@@ -1289,6 +1289,8 @@ Parse(TRITONSERVER_ServerOptions** server_options, int argc, char** argv)
   std::string server_id("triton");
   std::set<std::string> model_repository_paths;
   bool exit_on_error = true;
+  bool disable_auto_complete_config = false;
+  bool strict_model_config_present = false;
   bool strict_model_config = false;
   bool strict_readiness = true;
   std::list<std::pair<int, uint64_t>> cuda_pools;
@@ -1445,9 +1447,13 @@ Parse(TRITONSERVER_ServerOptions** server_options, int argc, char** argv)
         exit_on_error = ParseBoolOption(optarg);
         break;
       case OPTION_DISABLE_AUTO_COMPLETE_CONFIG:
-        strict_model_config = true;
+        disable_auto_complete_config = true;
         break;
       case OPTION_STRICT_MODEL_CONFIG:
+        std::cerr << "Warning: '--strict-model-config' has been deprecated! "
+                     "Please use '--disable-auto-complete-config' instead."
+                  << std::endl;
+        strict_model_config_present = true;
         strict_model_config = ParseBoolOption(optarg);
         break;
       case OPTION_STRICT_READINESS:
@@ -1779,6 +1785,18 @@ Parse(TRITONSERVER_ServerOptions** server_options, int argc, char** argv)
   // Check if HTTP, GRPC and metrics port clash
   if (CheckPortCollision()) {
     return false;
+  }
+
+  // Check if there is a conflict between --disable-auto-complete-config
+  // and --strict-model-config
+  if (disable_auto_complete_config && strict_model_config_present) {
+    if (!strict_model_config) {
+      std::cerr
+          << "Warning: Overriding deprecated '--strict-model-config' from "
+             "False to True in favor of '--disable-auto-complete-config'!"
+          << std::endl;
+    }
+    strict_model_config = true;
   }
 
   FAIL_IF_ERR(
