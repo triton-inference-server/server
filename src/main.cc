@@ -1450,7 +1450,9 @@ Parse(TRITONSERVER_ServerOptions** server_options, int argc, char** argv)
         disable_auto_complete_config = true;
         break;
       case OPTION_STRICT_MODEL_CONFIG:
-        std::cerr << "Warning: '--strict-model-config' has been deprecated! Please use '--disable-auto-complete-config' instead." << std::endl;
+        std::cerr << "Warning: '--strict-model-config' has been deprecated! "
+                     "Please use '--disable-auto-complete-config' instead."
+                  << std::endl;
         strict_model_config_present = true;
         strict_model_config = ParseBoolOption(optarg);
         break;
@@ -1789,10 +1791,13 @@ Parse(TRITONSERVER_ServerOptions** server_options, int argc, char** argv)
   // and --strict-model-config
   if (disable_auto_complete_config && strict_model_config_present) {
     if (!strict_model_config) {
-      std::cerr << "Warning: Overriding deprecated '--strict-model-config' from False to True in favor of '--disable-auto-complete-config'!" << std::endl;
+      std::cerr
+          << "Warning: Overriding deprecated '--strict-model-config' from "
+             "False to True in favor of '--disable-auto-complete-config'!"
+          << std::endl;
     }
     strict_model_config = true;
-  } 
+  }
 
   FAIL_IF_ERR(
       TRITONSERVER_ServerOptionsNew(server_options), "creating server options");
