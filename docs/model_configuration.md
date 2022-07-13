@@ -419,7 +419,8 @@ must be specified since each output must specify a non-empty
 
 For models that support shape tensors, the *is_shape_tensor* property
 must be set appropriately for inputs and outputs that are acting as
-shape tensors. The following shows and example configuration that specifies shape tensors.
+shape tensors. The following shows and example configuration that
+specifies shape tensors.
 
 ```
   name: "myshapetensormodel"
@@ -461,9 +462,11 @@ with the following shapes.
 
 Where *x* is the batch size of the request. Triton requires the shape
 tensors to be marked as shape tensors in the model when using
-batching. Note that "input1" has shape *[ 3 ]* and not *[ x, 2 ]*. Triton
-will accumulate all the shape values together for "input1" in batch
-dimension before issuing the request to model.
+batching. Note that "input1" has shape *[ 3 ]* and not *[ 2 ]*, which
+is how it is described in model configuration. As `myshapetensormodel`
+model is a batching model, the batch size should be provided as an
+additional value. Triton will accumulate all the shape values together
+for "input1" in batch dimension before issuing the request to model.
 
 For example, assume the client sends following three requests to Triton
 with following inputs:
@@ -493,6 +496,8 @@ input1: [4, 4, 6] <== shape of this tensor [3]
 
 ```
 
+Currently, only TensorRT supports shape tensors. Read [Shape Tensor I/O](https://docs.nvidia.com/deeplearning/tensorrt/developer-guide/index.html#shape_tensor_io)
+to learn more about shape tensors.
 
 ## Version Policy
 
