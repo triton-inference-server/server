@@ -52,7 +52,7 @@ elif USE_GRPC:
 else:
     _protocols = ("http",)
 
-BACKENDS = os.environ.get('BACKENDS', "graphdef savedmodel onnx plan custom")
+BACKENDS = os.environ.get('BACKENDS', "graphdef savedmodel onnx plan custom python")
 ENSEMBLES = bool(int(os.environ.get('ENSEMBLES', 1)))
 
 NO_BATCHING = (int(os.environ['NO_BATCHING']) == 1)
