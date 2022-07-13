@@ -264,28 +264,43 @@ enforcing the input to have the same shape in all requests.
 
 ## Auto-Generated Model Configuration
 
-By default, the model configuration file containing the required
-settings must be provided with each model. However, if Triton is
-started with the --strict-model-config=false option, then in some
-cases the required portions of the model configuration file can be
-generated automatically by Triton. The required portion of the model
-configuration are those settings shown in the [Minimal Model
-Configuration](#minimal-model-configuration). Specifically, TensorRT,
-TensorFlow saved-model, and ONNX models do not require a model
-configuration file because Triton can derive all the required settings
-automatically. For Python model,
-[`auto_complete_config`](https://github.com/triton-inference-server/python_backend/#auto_complete_config)
-function can be implemented in Python backend to provide [`max_batch_size`](#maximum-batch-size),
-[`input`](#inputs-and-outputs) and [`output`](#inputs-and-outputs) properties using
-`set_max_batch_size`, `add_input`, and `add_output` functions.
-These properties will allow Triton to load the Python model with [Minimal
-Model Configuration](#minimal-model-configuration) in absence of a configuration file.
-All other model types must provide a model configuration file.
+The model configuration file containing the required
+settings must be available with each model to be deployed
+on Triton. In some cases the required portions of the model
+configuration can be generated automatically by Triton. The
+required portion of the model configuration are the settings
+shown in the [Minimal Model Configuration](#minimal-model-configuration).
+By default, Triton will try to complete these sections. However,
+by starting Triton with `--disable-auto-complete-config` option,
+Triton can be configured to not auto-complete model configuration
+on the backend side. However, even with this option Triton will
+fill in missing instance_group(#instance-group) settings with default
+values.
 
-When using --strict-model-config=false you can see the model
-configuration that was generated for a model by using the [model
-configuration
-endpoint](https://github.com/triton-inference-server/server/blob/main/docs/protocol/extension_model_configuration.md). The
+Triton can derive all the required settings automatically for
+most of the TensorRT, TensorFlow saved-model, and ONNX models.
+For Python models, [`auto_complete_config`](https://github.com/triton-inference-server/python_backend/#auto_complete_config)
+function can be implemented in Python backend to provide
+[`max_batch_size`](#maximum-batch-size), [`input`](#inputs-and-outputs)
+and [`output`](#inputs-and-outputs) properties using `set_max_batch_size`,
+`add_input`, and `add_output` functions. These properties will allow Triton
+to load the Python model with [Minimal Model Configuration](#minimal-model-configuration)
+in absence of a configuration file. 
+All other model types *must* provide a model configuration file.
+
+When developing a custom backend, you can populate required settings
+in the configuration and call `TRITONBACKEND_ModelSetConfig` API to
+update completed configuration with Triton core. You can take a
+look at [TensorFlow](https://github.com/triton-inference-server/tensorflow_backend)
+and [Onnxruntime](https://github.com/triton-inference-server/onnxruntime_backend)
+backends as examples of how to acheive this. Currently, only
+[inputs, outputs](#inputs-and-outputs), [max_batch_size](#maximum-batch-size)
+and [dynamic batching](#dynamic-batcher) settings can be populated by
+backend. You would still need to provide a config.pbtxt with
+`backend` field for these custom backends.
+
+You can also see the model configuration generated for a model by
+Triton using the [model configuration endpoint](https://github.com/triton-inference-server/server/blob/main/docs/protocol/extension_model_configuration.md). The
 easiest way to do this is to use a utility like *curl*:
 
 ```bash
