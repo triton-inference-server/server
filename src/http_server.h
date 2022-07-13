@@ -292,6 +292,7 @@ class HTTPAPIServer : public HTTPServer {
       evhtp_request_t* req, const std::string& region_name,
       const std::string& action);
   void HandleTrace(evhtp_request_t* req, const std::string& model_name = "");
+  void HandleLogging(evhtp_request_t* req);
 
   TRITONSERVER_Error* EVBufferToInput(
       const std::string& model_name, TRITONSERVER_InferenceRequest* irequest,

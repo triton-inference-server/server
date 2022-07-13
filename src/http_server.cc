@@ -1823,6 +1823,124 @@ HTTPAPIServer::HandleTrace(evhtp_request_t* req, const std::string& model_name)
 }
 
 void
+HTTPAPIServer::HandleLogging(evhtp_request_t* req)
+{
+  if ((req->method != htp_method_GET) && (req->method != htp_method_POST)) {
+    evhtp_send_reply(req, EVHTP_RES_METHNALLOWED);
+    return;
+  }
+  evhtp_headers_add_header(
+      req->headers_out,
+      evhtp_header_new(kContentTypeHeader, "application/json", 1, 1));
+
+#ifdef TRITON_ENABLE_LOGGING
+  std::string log_file_path = LOG_OUT_FILE;
+  bool log_info_status = LOG_INFO_IS_ON;
+  bool log_warn_status = LOG_WARNING_IS_ON;
+  bool log_error_status = LOG_ERROR_IS_ON;
+  uint64_t verbose_level = static_cast<uint64_t>(LOG_VERBOSE_LEVEL);
+  triton::common::Logger::Format log_format_final = LOG_FORMAT;
+  std::string log_format_parse = LOG_FORMAT_STRING;
+
+  // Perform log setting update if requested
+  if (req->method == htp_method_POST) {
+    struct evbuffer_iovec* v = nullptr;
+    int v_idx = 0;
+    int n = evbuffer_peek(req->buffer_in, -1, NULL, NULL, 0);
+    if (n > 0) {
+      v = static_cast<struct evbuffer_iovec*>(
+          alloca(sizeof(struct evbuffer_iovec) * n));
+      if (evbuffer_peek(req->buffer_in, -1, NULL, v, n) != n) {
+        HTTP_RESPOND_IF_ERR(
+            req,
+            TRITONSERVER_ErrorNew(
+                TRITONSERVER_ERROR_INTERNAL,
+                "unexpected error getting dynamic logging request buffers"));
+      }
+    }
+    triton::common::TritonJson::Value request;
+    size_t buffer_len = evbuffer_get_length(req->buffer_in);
+    HTTP_RESPOND_IF_ERR(
+        req, EVBufferToJson(&request, v, &v_idx, buffer_len, n));
+
+    triton::common::TritonJson::Value setting_json;
+    if (request.Find("log_file", &setting_json)) {
+      if (!setting_json.IsNull()) {
+        HTTP_RESPOND_IF_ERR(req, setting_json.AsString(&log_file_path));
+        LOG_SET_OUT_FILE(log_file_path);
+      }
+    }
+    if (request.Find("log_info", &setting_json)) {
+      if (!setting_json.IsNull()) {
+        HTTP_RESPOND_IF_ERR(req, setting_json.AsBool(&log_info_status));
+        LOG_ENABLE_INFO(log_info_status);
+      }
+    }
+    if (request.Find("log_warnings", &setting_json)) {
+      if (!setting_json.IsNull()) {
+        HTTP_RESPOND_IF_ERR(req, setting_json.AsBool(&log_warn_status));
+        LOG_ENABLE_WARNING(log_warn_status);
+      }
+    }
+    if (request.Find("log_errors", &setting_json)) {
+      if (!setting_json.IsNull()) {
+        HTTP_RESPOND_IF_ERR(req, setting_json.AsBool(&log_error_status));
+        LOG_ENABLE_ERROR(log_error_status);
+      }
+    }
+    if (request.Find("log_verbose_level", &setting_json)) {
+      if (!setting_json.IsNull()) {
+        HTTP_RESPOND_IF_ERR(req, setting_json.AsUInt(&verbose_level));
+        LOG_SET_VERBOSE(static_cast<int32_t>(verbose_level));
+      }
+    }
+    if (request.Find("log_format", &setting_json)) {
+      if (!setting_json.IsNull()) {
+        HTTP_RESPOND_IF_ERR(req, setting_json.AsString(&log_format_parse));
+        if (log_format_parse == "default") {
+          log_format_final = triton::common::Logger::Format::kDEFAULT;
+        } else if (log_format_parse == "ISO8601") {
+          log_format_final = triton::common::Logger::Format::kISO8601;
+        } else {
+          // Returns from function
+          HTTP_RESPOND_IF_ERR(
+              req, TRITONSERVER_ErrorNew(
+                       TRITONSERVER_ERROR_UNAVAILABLE,
+                       ("invalid argument for --log_format, got: " +
+                        log_format_parse)
+                           .c_str()));
+        }
+        LOG_SET_FORMAT(log_format_final);
+      }
+    }
+  }
+  triton::common::TritonJson::Value log_setting_response(
+      triton::common::TritonJson::ValueType::OBJECT);
+  HTTP_RESPOND_IF_ERR(
+      req, log_setting_response.AddString("log_file", log_file_path));
+  HTTP_RESPOND_IF_ERR(
+      req, log_setting_response.AddBool("log_info", log_info_status));
+  HTTP_RESPOND_IF_ERR(
+      req, log_setting_response.AddBool("log_warnings", log_warn_status));
+  HTTP_RESPOND_IF_ERR(
+      req, log_setting_response.AddBool("log_errors", log_error_status));
+  HTTP_RESPOND_IF_ERR(
+      req, log_setting_response.AddInt("log_verbose_level", verbose_level));
+  HTTP_RESPOND_IF_ERR(
+      req, log_setting_response.AddString("log_format", log_format_parse));
+  triton::common::TritonJson::WriteBuffer buffer;
+  HTTP_RESPOND_IF_ERR(req, log_setting_response.Write(&buffer));
+  evbuffer_add(req->buffer_out, buffer.Base(), buffer.Size());
+  evhtp_send_reply(req, EVHTP_RES_OK);
+#else
+  HTTP_RESPOND_IF_ERR(
+      req, TRITONSERVER_ErrorNew(
+               TRITONSERVER_ERROR_UNAVAILABLE,
+               "the server does not suppport dynamic logging"));
+#endif  // TRITON_ENABLE_LOGGING
+}
+
+void
 HTTPAPIServer::HandleServerMetadata(evhtp_request_t* req)
 {
   if (req->method != htp_method_GET) {
@@ -3220,7 +3338,11 @@ HTTPAPIServer::Handle(evhtp_request_t* req)
     HandleModelStats(req);
     return;
   }
-
+  if (std::string(req->uri->path->full) == "/v2/logging") {
+    // change logging
+    HandleLogging(req);
+    return;
+  }
   std::string model_name, version, kind;
   if (RE2::FullMatch(
           std::string(req->uri->path->full), model_regex_, &model_name,

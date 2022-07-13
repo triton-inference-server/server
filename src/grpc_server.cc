@@ -1342,6 +1342,191 @@ CommonHandler::SetUpAllRequests()
       inference::TraceSettingRequest, inference::TraceSettingResponse>(
       "Trace", 0, OnRegisterTrace, OnExecuteTrace, false /* async */, cq_);
 
+  //
+  //  Log Settings
+  //
+
+  auto OnRegisterLogging =
+      [this](
+          grpc::ServerContext* ctx, inference::LogSettingsRequest* request,
+          grpc::ServerAsyncResponseWriter<inference::LogSettingsResponse>*
+              responder,
+          void* tag) {
+        this->service_->RequestLogSettings(
+            ctx, request, responder, this->cq_, this->cq_, tag);
+      };
+
+  auto OnExecuteLogging = [this](
+                              inference::LogSettingsRequest& request,
+                              inference::LogSettingsResponse* response,
+                              grpc::Status* status) {
+
+#ifdef TRITON_ENABLE_LOGGING
+    TRITONSERVER_Error* err = nullptr;
+    std::string log_file_path = LOG_OUT_FILE;
+    bool log_info_status = LOG_INFO_IS_ON;
+    bool log_warn_status = LOG_WARNING_IS_ON;
+    bool log_error_status = LOG_ERROR_IS_ON;
+    uint32_t verbose_level = LOG_VERBOSE_LEVEL;
+    triton::common::Logger::Format log_format_final = LOG_FORMAT;
+    std::string log_format_parse = LOG_FORMAT_STRING;
+    // Update log settings
+    if (!request.settings().empty()) {
+      {
+        static std::string setting_name = "log_file";
+        auto it = request.settings().find(setting_name);
+        if (it != request.settings().end()) {
+          const auto& log_param = it->second;
+          if (log_param.parameter_choice_case() !=
+              inference::LogSettingsRequest_SettingValue::ParameterChoiceCase::
+                  kStringParam) {
+            err = TRITONSERVER_ErrorNew(
+                TRITONSERVER_ERROR_INVALID_ARG,
+                (std::string("expect string for '") + setting_name + "'")
+                    .c_str());
+            GOTO_IF_ERR(err, earlyexit);
+          } else {
+            log_file_path = it->second.string_param();
+            LOG_SET_OUT_FILE(log_file_path);
+          }
+        }
+      }
+      {
+        static std::string setting_name = "log_info";
+        auto it = request.settings().find(setting_name);
+        if (it != request.settings().end()) {
+          const auto& log_param = it->second;
+          if (log_param.parameter_choice_case() !=
+              inference::LogSettingsRequest_SettingValue::ParameterChoiceCase::
+                  kBoolParam) {
+            err = TRITONSERVER_ErrorNew(
+                TRITONSERVER_ERROR_INVALID_ARG,
+                (std::string("expect boolean for '") + setting_name + "'")
+                    .c_str());
+            GOTO_IF_ERR(err, earlyexit);
+          } else {
+            log_info_status = it->second.bool_param();
+            LOG_ENABLE_INFO(log_info_status);
+          }
+        }
+      }
+      {
+        static std::string setting_name = "log_warnings";
+        auto it = request.settings().find(setting_name);
+        if (it != request.settings().end()) {
+          const auto& log_param = it->second;
+          if (log_param.parameter_choice_case() !=
+              inference::LogSettingsRequest_SettingValue::ParameterChoiceCase::
+                  kBoolParam) {
+            err = TRITONSERVER_ErrorNew(
+                TRITONSERVER_ERROR_INVALID_ARG,
+                (std::string("expect boolean for '") + setting_name + "'")
+                    .c_str());
+            GOTO_IF_ERR(err, earlyexit);
+          } else {
+            log_warn_status = it->second.bool_param();
+            LOG_ENABLE_INFO(log_warn_status);
+          }
+        }
+      }
+      {
+        static std::string setting_name = "log_errors";
+        auto it = request.settings().find(setting_name);
+        if (it != request.settings().end()) {
+          const auto& log_param = it->second;
+          if (log_param.parameter_choice_case() !=
+              inference::LogSettingsRequest_SettingValue::ParameterChoiceCase::
+                  kBoolParam) {
+            err = TRITONSERVER_ErrorNew(
+                TRITONSERVER_ERROR_INVALID_ARG,
+                (std::string("expect boolean for '") + setting_name + "'")
+                    .c_str());
+            GOTO_IF_ERR(err, earlyexit);
+          } else {
+            log_error_status = it->second.bool_param();
+            LOG_ENABLE_INFO(log_error_status);
+          }
+        }
+      }
+      {
+        static std::string setting_name = "log_verbose_level";
+        auto it = request.settings().find(setting_name);
+        if (it != request.settings().end()) {
+          const auto& log_param = it->second;
+          if (log_param.parameter_choice_case() !=
+              inference::LogSettingsRequest_SettingValue::ParameterChoiceCase::
+                  kUint32Param) {
+            err = TRITONSERVER_ErrorNew(
+                TRITONSERVER_ERROR_INVALID_ARG,
+                (std::string("expect int32 for '") + setting_name + "'")
+                    .c_str());
+            GOTO_IF_ERR(err, earlyexit);
+          } else {
+            verbose_level = it->second.uint32_param();
+            LOG_ENABLE_INFO(verbose_level);
+          }
+        }
+      }
+      {
+        static std::string setting_name = "log_format";
+        auto it = request.settings().find(setting_name);
+        if (it != request.settings().end()) {
+          const auto& log_param = it->second;
+          if (log_param.parameter_choice_case() !=
+              inference::LogSettingsRequest_SettingValue::ParameterChoiceCase::
+                  kStringParam) {
+            err = TRITONSERVER_ErrorNew(
+                TRITONSERVER_ERROR_INVALID_ARG,
+                (std::string("expect string for '") + setting_name + "'")
+                    .c_str());
+            GOTO_IF_ERR(err, earlyexit);
+          } else {
+            log_format_parse = it->second.string_param();
+            if (log_format_parse == "default") {
+              log_format_final = triton::common::Logger::Format::kDEFAULT;
+            } else if (log_format_parse == "ISO8601") {
+              log_format_final = triton::common::Logger::Format::kISO8601;
+            } else {
+              err = TRITONSERVER_ErrorNew(
+                  TRITONSERVER_ERROR_INVALID_ARG,
+                  ("invalid argument for log_format, got: " + log_format_parse)
+                      .c_str());
+              GOTO_IF_ERR(err, earlyexit);
+            }
+            LOG_SET_FORMAT(log_format_final);
+          }
+        }
+      }
+      GOTO_IF_ERR(err, earlyexit);
+    }
+    (*response->mutable_settings())["log_file"].set_string_param(log_file_path);
+    (*response->mutable_settings())["log_info"].set_bool_param(log_info_status);
+    (*response->mutable_settings())["log_warnings"].set_bool_param(
+        log_warn_status);
+    (*response->mutable_settings())["log_errors"].set_bool_param(
+        log_error_status);
+    (*response->mutable_settings())["log_verbose_level"].set_uint32_param(
+        verbose_level);
+    (*response->mutable_settings())["log_format"].set_string_param(
+        log_format_parse);
+  earlyexit:
+    GrpcStatusUtil::Create(status, err);
+    TRITONSERVER_ErrorDelete(err);
+#else
+    auto err = TRITONSERVER_ErrorNew(
+        TRITONSERVER_ERROR_UNAVAILABLE,
+        "the server does not suppport dynamic logging");
+    GrpcStatusUtil::Create(status, err);
+    TRITONSERVER_ErrorDelete(err);
+#endif
+  };
+
+  new CommonCallData<
+      grpc::ServerAsyncResponseWriter<inference::LogSettingsResponse>,
+      inference::LogSettingsRequest, inference::LogSettingsResponse>(
+      "Dynamic_Logging", 0, OnRegisterLogging, OnExecuteLogging,
+      false /* async */, cq_);
+
 
   //
   // SystemSharedMemoryStatus
