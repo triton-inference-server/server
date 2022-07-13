@@ -272,7 +272,10 @@ required portion of the model configuration are the settings
 shown in the [Minimal Model Configuration](#minimal-model-configuration).
 By default, Triton will try to complete these sections. However,
 by starting Triton with `--disable-auto-complete-config` option,
-Triton can be configured to use the provided configuration as is.
+Triton can be configured to not auto-complete model configuration
+on the backend side. However, even with this option Triton will
+fill in missing instance_group(#instance-group) settings with default
+values.
 
 Triton can derive all the required settings automatically for
 most of the TensorRT, TensorFlow saved-model, and ONNX models.
@@ -285,14 +288,16 @@ to load the Python model with [Minimal Model Configuration](#minimal-model-confi
 in absence of a configuration file. 
 All other model types *must* provide a model configuration file.
 
-A custom backend developer can populate required settings in the
-configuration and call `TRITONBACKEND_ModelSetConfig` API to
+When developing a custom backend, you can populate required settings
+in the configuration and call `TRITONBACKEND_ModelSetConfig` API to
 update completed configuration with Triton core. You can take a
 look at [TensorFlow](https://github.com/triton-inference-server/tensorflow_backend)
 and [Onnxruntime](https://github.com/triton-inference-server/onnxruntime_backend)
-backends as examples of how to acheive this. The users would still
-be required to provide a config.pbtxt with `backend` field for these
-custom backends.
+backends as examples of how to acheive this. Currently, only
+[inputs, outputs](#inputs-and-outputs), [max_batch_size](#maximum-batch-size)
+and [dynamic batching](#dynamic-batcher) settings can be populated by
+backend. You would still need to provide a config.pbtxt with
+`backend` field for these custom backends.
 
 You can also see the model configuration generated for a model by
 Triton using the [model configuration endpoint](https://github.com/triton-inference-server/server/blob/main/docs/protocol/extension_model_configuration.md). The
