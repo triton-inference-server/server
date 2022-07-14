@@ -239,10 +239,13 @@ AllocEVBuffer(const size_t byte_size, evbuffer** evb, void** base)
   return nullptr;  // success
 }
 
+// Recursively adds to byte_size from multi dimensional data input
 TRITONSERVER_Error*
 JsonBytesArrayByteSize(
     triton::common::TritonJson::Value& tensor_data, size_t* byte_size)
 {
+  *byte_size = 0;
+
   for (size_t i = 0; i < tensor_data.ArraySize(); i++) {
     triton::common::TritonJson::Value el;
     RETURN_IF_ERR(tensor_data.At(i, &el));
@@ -251,7 +254,9 @@ JsonBytesArrayByteSize(
     TRITONSERVER_Error* assert_err =
         el.AssertType(triton::common::TritonJson::ValueType::ARRAY);
     if (assert_err == nullptr) {
-      RETURN_IF_ERR(JsonBytesArrayByteSize(el, byte_size));
+      size_t byte_size_;
+      RETURN_IF_ERR(JsonBytesArrayByteSize(el, &byte_size_));
+      *byte_size += byte_size_;
     } else {
       // Serialized data size is the length of the string itself plus
       // 4 bytes to record the string length.
@@ -2419,7 +2424,6 @@ HTTPAPIServer::EVBufferToInput(
               "Unable to parse 'data'");
 
           if (dtype == TRITONSERVER_TYPE_BYTES) {
-            byte_size = 0;  // initialize for its recursive computation
             RETURN_IF_ERR(JsonBytesArrayByteSize(tensor_data, &byte_size));
           } else {
             byte_size = element_cnt * TRITONSERVER_DataTypeByteSize(dtype);
