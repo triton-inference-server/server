@@ -730,8 +730,6 @@ def create_plan_dynamic_rf_modelfile(models_dir, model_version, io_cnt,
     with open(model_version_dir + "/model.plan", "wb") as f:
         f.write(engine_bytes)
 
-    del builder
-
 
 def create_plan_shape_tensor_modelfile(models_dir, model_version, io_cnt,
                                        max_batch, dtype, shape,
@@ -839,8 +837,6 @@ def create_plan_shape_tensor_modelfile(models_dir, model_version, io_cnt,
     with open(model_version_dir + "/model.plan", "wb") as f:
         f.write(engine_bytes)
 
-    del builder
-
 
 def create_plan_dynamic_modelfile(models_dir, model_version, io_cnt, max_batch,
                                   dtype, shape, profile_max_size):
@@ -905,8 +901,6 @@ def create_plan_dynamic_modelfile(models_dir, model_version, io_cnt, max_batch,
 
     with open(model_version_dir + "/model.plan", "wb") as f:
         f.write(engine_bytes)
-
-    del builder
 
 
 def create_plan_modelconfig(create_savedmodel, models_dir, model_version,

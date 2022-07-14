@@ -336,7 +336,6 @@ if __name__ == '__main__':
 
     if FLAGS.savedmodel:
         import tensorflow as tf
-        from tensorflow.python.framework import graph_util
 
     import test_util as tu
 

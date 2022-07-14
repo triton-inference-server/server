@@ -1042,7 +1042,7 @@ def infer_zero(tester,
             else:
                 result_name = result.name
 
-            tester.assertTrue(result_name in expected_dict)
+            tester.assertIn(result_name, expected_dict)
             if use_system_shared_memory or use_cuda_shared_memory:
                 if platform == "pytorch_libtorch":
                     io_num = int(result_name.split("OUTPUT__")[1])

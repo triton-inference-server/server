@@ -29,7 +29,6 @@ import sys
 sys.path.append("../../common")
 
 import test_util as tu
-import tritonclient
 import time
 import tritonclient.grpc as grpcclient
 from tritonclient.utils import *
