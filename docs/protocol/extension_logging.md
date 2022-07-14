@@ -102,7 +102,7 @@ $log_setting_error_response =
 
 - “error” : The descriptive message for the error.
 
-#### Log Setting Request JSON Object
+### Log Setting Request JSON Object
 
 A log setting request is made with a HTTP POST to
 the logging endpoint. In the corresponding response, the HTTP body contains the
@@ -125,11 +125,12 @@ settings will be updated.
 The logging protocol extension can be invoked using the curl library in the following manner (assuming 
 a Triton server is running at `localhost:8000`):
 ```
-curl -s -w '%{http_code}\n' -d'{"log_verbose_level":1}' localhost:8000/v2/logging
+curl -s -w '\n%{http_code}\n' -d'{"log_verbose_level":1}' localhost:8000/v2/logging
 ```
 This command should return a $log_setting_response JSON object with the following format:
 ```
-{"log_file":"","log_info":true,"log_warnings":true,"log_errors":true,"log_verbose_level":1,"log_format":"default"}200
+{"log_file":"","log_info":true,"log_warnings":true,"log_errors":true,"log_verbose_level":1,"log_format":"default"}
+200
 ```
 Note that the current values for all parameter fields are returned even though `log_verbose_level` 
 was the only parameter that was modified.
