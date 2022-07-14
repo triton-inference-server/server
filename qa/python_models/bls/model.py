@@ -90,9 +90,8 @@ class PBBLSTest(unittest.TestCase):
             requested_output_names=['OUTPUT0', 'OUTPUT1'])
         infer_response = infer_request.exec()
         self.assertTrue(infer_response.has_error())
-        self.assertEqual(
-            infer_response.error().message(),
-            "expected 2 inputs but got 1 inputs for model 'add_sub'")
+        self.assertIn("expected 2 inputs but got 1 inputs for model 'add_sub'",
+                      infer_response.error().message())
         self.assertTrue(len(infer_response.output_tensors()) == 0)
 
     def _send_bls_sequence_requests(self, correlation_id):
@@ -360,10 +359,9 @@ class PBBLSTest(unittest.TestCase):
         # Because the model doesn't exist, the inference response must have an
         # error
         self.assertTrue(infer_response.has_error())
-        self.assertEqual(
-            infer_response.error().message(),
-            "Failed for execute the inference request. Model 'non_existent_model' is not ready."
-        )
+        self.assertIn(
+            "Failed for execute the inference request. Model 'non_existent_model' is not ready.",
+            infer_response.error().message())
 
         # Make sure that the inference requests can be performed properly after
         # an error.
@@ -376,9 +374,9 @@ class PBBLSTest(unittest.TestCase):
                                                   requested_output_names=[])
         infer_response = infer_request.exec()
         self.assertTrue(infer_response.has_error())
-        self.assertEqual(
-            infer_response.error().message(),
-            "expected 1 inputs but got 0 inputs for model 'execute_error'")
+        self.assertIn(
+            "expected 1 inputs but got 0 inputs for model 'execute_error'",
+            infer_response.error().message())
         self.assertTrue(len(infer_response.output_tensors()) == 0)
 
     def test_multiple_bls(self):
