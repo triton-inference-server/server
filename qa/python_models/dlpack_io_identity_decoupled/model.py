@@ -26,7 +26,6 @@
 
 import triton_python_backend_utils as pb_utils
 from torch.utils.dlpack import to_dlpack, from_dlpack
-import numpy as np
 import time
 import threading
 

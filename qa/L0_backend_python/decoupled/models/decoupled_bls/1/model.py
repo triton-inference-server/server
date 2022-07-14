@@ -29,7 +29,6 @@ import json
 import threading
 import time
 import numpy as np
-import asyncio
 import torch
 from torch.utils.dlpack import from_dlpack, to_dlpack
 import sys

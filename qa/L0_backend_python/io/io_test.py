@@ -31,7 +31,6 @@ sys.path.append("../../common")
 from functools import partial
 import test_util as tu
 import shm_util
-import tritonclient.http as httpclient
 import tritonclient.grpc as grpcclient
 from tritonclient.utils import *
 import numpy as np

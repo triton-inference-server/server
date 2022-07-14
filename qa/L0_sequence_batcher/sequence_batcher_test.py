@@ -185,10 +185,10 @@ class SequenceBatcherTest(su.SequenceBatcherTestUtil):
                     self.clear_deferred_exceptions()
                     try:
                         self.check_setup(model_name)
-                        self.assertFalse(
-                            "TRITONSERVER_DELAY_SCHEDULER" in os.environ)
-                        self.assertFalse("TRITONSERVER_BACKLOG_DELAY_SCHEDULER"
-                                         in os.environ)
+                        self.assertNotIn("TRITONSERVER_DELAY_SCHEDULER",
+                                         os.environ)
+                        self.assertNotIn("TRITONSERVER_BACKLOG_DELAY_SCHEDULER",
+                                         os.environ)
                         expected_result = self.get_expected_result(
                             45, 9, trial, "end"
                         ) if not IMPLICIT_STATE else self.get_expected_result_implicit(
@@ -238,10 +238,10 @@ class SequenceBatcherTest(su.SequenceBatcherTestUtil):
                     self.clear_deferred_exceptions()
                     try:
                         self.check_setup(model_name)
-                        self.assertFalse(
-                            "TRITONSERVER_DELAY_SCHEDULER" in os.environ)
-                        self.assertFalse("TRITONSERVER_BACKLOG_DELAY_SCHEDULER"
-                                         in os.environ)
+                        self.assertNotIn("TRITONSERVER_DELAY_SCHEDULER",
+                                         os.environ)
+                        self.assertNotIn("TRITONSERVER_BACKLOG_DELAY_SCHEDULER",
+                                         os.environ)
                         expected_result = self.get_expected_result(
                             42, 42, trial, "start,end"
                         ) if not IMPLICIT_STATE else self.get_expected_result_implicit(
@@ -294,10 +294,10 @@ class SequenceBatcherTest(su.SequenceBatcherTestUtil):
                     self.clear_deferred_exceptions()
                     try:
                         self.check_setup(model_name)
-                        self.assertFalse(
-                            "TRITONSERVER_DELAY_SCHEDULER" in os.environ)
-                        self.assertFalse("TRITONSERVER_BACKLOG_DELAY_SCHEDULER"
-                                         in os.environ)
+                        self.assertNotIn("TRITONSERVER_DELAY_SCHEDULER",
+                                         os.environ)
+                        self.assertNotIn("TRITONSERVER_BACKLOG_DELAY_SCHEDULER",
+                                         os.environ)
                         expected_result = self.get_expected_result(
                             10, 9, trial, "end"
                         ) if not IMPLICIT_STATE else self.get_expected_result_implicit(
@@ -356,10 +356,10 @@ class SequenceBatcherTest(su.SequenceBatcherTestUtil):
                     self.clear_deferred_exceptions()
                     try:
                         self.check_setup(model_name)
-                        self.assertFalse(
-                            "TRITONSERVER_DELAY_SCHEDULER" in os.environ)
-                        self.assertFalse("TRITONSERVER_BACKLOG_DELAY_SCHEDULER"
-                                         in os.environ)
+                        self.assertNotIn("TRITONSERVER_DELAY_SCHEDULER",
+                                         os.environ)
+                        self.assertNotIn("TRITONSERVER_BACKLOG_DELAY_SCHEDULER",
+                                         os.environ)
                         expected_result = self.get_expected_result(
                             10, 9, trial, "end"
                         ) if not IMPLICIT_STATE else self.get_expected_result_implicit(
@@ -416,10 +416,10 @@ class SequenceBatcherTest(su.SequenceBatcherTestUtil):
                     self.clear_deferred_exceptions()
                     try:
                         self.check_setup(model_name)
-                        self.assertFalse(
-                            "TRITONSERVER_DELAY_SCHEDULER" in os.environ)
-                        self.assertFalse("TRITONSERVER_BACKLOG_DELAY_SCHEDULER"
-                                         in os.environ)
+                        self.assertNotIn("TRITONSERVER_DELAY_SCHEDULER",
+                                         os.environ)
+                        self.assertNotIn("TRITONSERVER_BACKLOG_DELAY_SCHEDULER",
+                                         os.environ)
 
                         expected_result = self.get_expected_result(
                             6, 3, trial, "end"
@@ -481,10 +481,10 @@ class SequenceBatcherTest(su.SequenceBatcherTestUtil):
                     self.clear_deferred_exceptions()
                     try:
                         self.check_setup(model_name)
-                        self.assertFalse(
-                            "TRITONSERVER_DELAY_SCHEDULER" in os.environ)
-                        self.assertFalse("TRITONSERVER_BACKLOG_DELAY_SCHEDULER"
-                                         in os.environ)
+                        self.assertNotIn("TRITONSERVER_DELAY_SCHEDULER",
+                                         os.environ)
+                        self.assertNotIn("TRITONSERVER_BACKLOG_DELAY_SCHEDULER",
+                                         os.environ)
                         expected_result = self.get_expected_result(
                             6, 3, trial, None
                         ) if not IMPLICIT_STATE else self.get_expected_result_implicit(
@@ -547,10 +547,10 @@ class SequenceBatcherTest(su.SequenceBatcherTestUtil):
                     self.clear_deferred_exceptions()
                     try:
                         self.check_setup(model_name)
-                        self.assertFalse(
-                            "TRITONSERVER_DELAY_SCHEDULER" in os.environ)
-                        self.assertFalse("TRITONSERVER_BACKLOG_DELAY_SCHEDULER"
-                                         in os.environ)
+                        self.assertNotIn("TRITONSERVER_DELAY_SCHEDULER",
+                                         os.environ)
+                        self.assertNotIn("TRITONSERVER_BACKLOG_DELAY_SCHEDULER",
+                                         os.environ)
                         expected_result = self.get_expected_result(
                             51, 9, trial, "end"
                         ) if not IMPLICIT_STATE else self.get_expected_result_implicit(
@@ -605,12 +605,11 @@ class SequenceBatcherTest(su.SequenceBatcherTestUtil):
 
                     # Need scheduler to wait for queue to contain all
                     # inferences for both sequences.
-                    self.assertTrue(
-                        "TRITONSERVER_DELAY_SCHEDULER" in os.environ)
+                    self.assertIn("TRITONSERVER_DELAY_SCHEDULER", os.environ)
                     self.assertEqual(
                         int(os.environ["TRITONSERVER_DELAY_SCHEDULER"]), 8)
-                    self.assertTrue(
-                        "TRITONSERVER_BACKLOG_DELAY_SCHEDULER" in os.environ)
+                    self.assertIn("TRITONSERVER_BACKLOG_DELAY_SCHEDULER",
+                                  os.environ)
                     self.assertEqual(
                         int(os.environ["TRITONSERVER_BACKLOG_DELAY_SCHEDULER"]),
                         0)
@@ -717,12 +716,11 @@ class SequenceBatcherTest(su.SequenceBatcherTestUtil):
 
                     # Need scheduler to wait for queue to contain all
                     # inferences for both sequences.
-                    self.assertTrue(
-                        "TRITONSERVER_DELAY_SCHEDULER" in os.environ)
+                    self.assertIn("TRITONSERVER_DELAY_SCHEDULER", os.environ)
                     self.assertEqual(
                         int(os.environ["TRITONSERVER_DELAY_SCHEDULER"]), 12)
-                    self.assertTrue(
-                        "TRITONSERVER_BACKLOG_DELAY_SCHEDULER" in os.environ)
+                    self.assertIn("TRITONSERVER_BACKLOG_DELAY_SCHEDULER",
+                                  os.environ)
                     self.assertEqual(
                         int(os.environ["TRITONSERVER_BACKLOG_DELAY_SCHEDULER"]),
                         0)
@@ -881,12 +879,11 @@ class SequenceBatcherTest(su.SequenceBatcherTestUtil):
 
                     # Need scheduler to wait for queue to contain all
                     # inferences for both sequences.
-                    self.assertTrue(
-                        "TRITONSERVER_DELAY_SCHEDULER" in os.environ)
+                    self.assertIn("TRITONSERVER_DELAY_SCHEDULER", os.environ)
                     self.assertEqual(
                         int(os.environ["TRITONSERVER_DELAY_SCHEDULER"]), 12)
-                    self.assertTrue(
-                        "TRITONSERVER_BACKLOG_DELAY_SCHEDULER" in os.environ)
+                    self.assertIn("TRITONSERVER_BACKLOG_DELAY_SCHEDULER",
+                                  os.environ)
                     self.assertEqual(
                         int(os.environ["TRITONSERVER_BACKLOG_DELAY_SCHEDULER"]),
                         0)
@@ -1044,12 +1041,11 @@ class SequenceBatcherTest(su.SequenceBatcherTestUtil):
 
                     # Need scheduler to wait for queue to contain all
                     # inferences for both sequences.
-                    self.assertTrue(
-                        "TRITONSERVER_DELAY_SCHEDULER" in os.environ)
+                    self.assertIn("TRITONSERVER_DELAY_SCHEDULER", os.environ)
                     self.assertEqual(
                         int(os.environ["TRITONSERVER_DELAY_SCHEDULER"]), 12)
-                    self.assertTrue(
-                        "TRITONSERVER_BACKLOG_DELAY_SCHEDULER" in os.environ)
+                    self.assertIn("TRITONSERVER_BACKLOG_DELAY_SCHEDULER",
+                                  os.environ)
                     self.assertEqual(
                         int(os.environ["TRITONSERVER_BACKLOG_DELAY_SCHEDULER"]),
                         0)
@@ -1210,12 +1206,11 @@ class SequenceBatcherTest(su.SequenceBatcherTestUtil):
 
                     # Need scheduler to wait for queue to contain all
                     # inferences for both sequences.
-                    self.assertTrue(
-                        "TRITONSERVER_DELAY_SCHEDULER" in os.environ)
+                    self.assertIn("TRITONSERVER_DELAY_SCHEDULER", os.environ)
                     self.assertEqual(
                         int(os.environ["TRITONSERVER_DELAY_SCHEDULER"]), 12)
-                    self.assertTrue(
-                        "TRITONSERVER_BACKLOG_DELAY_SCHEDULER" in os.environ)
+                    self.assertIn("TRITONSERVER_BACKLOG_DELAY_SCHEDULER",
+                                  os.environ)
                     self.assertEqual(
                         int(os.environ["TRITONSERVER_BACKLOG_DELAY_SCHEDULER"]),
                         0)
@@ -1371,12 +1366,11 @@ class SequenceBatcherTest(su.SequenceBatcherTestUtil):
 
                     # Need scheduler to wait for queue to contain all
                     # inferences for both sequences.
-                    self.assertTrue(
-                        "TRITONSERVER_DELAY_SCHEDULER" in os.environ)
+                    self.assertIn("TRITONSERVER_DELAY_SCHEDULER", os.environ)
                     self.assertEqual(
                         int(os.environ["TRITONSERVER_DELAY_SCHEDULER"]), 12)
-                    self.assertTrue(
-                        "TRITONSERVER_BACKLOG_DELAY_SCHEDULER" in os.environ)
+                    self.assertIn("TRITONSERVER_BACKLOG_DELAY_SCHEDULER",
+                                  os.environ)
                     self.assertEqual(
                         int(os.environ["TRITONSERVER_BACKLOG_DELAY_SCHEDULER"]),
                         0)
@@ -1564,12 +1558,11 @@ class SequenceBatcherTest(su.SequenceBatcherTestUtil):
 
                     # Need scheduler to wait for queue to contain all
                     # inferences for both sequences.
-                    self.assertTrue(
-                        "TRITONSERVER_DELAY_SCHEDULER" in os.environ)
+                    self.assertIn("TRITONSERVER_DELAY_SCHEDULER", os.environ)
                     self.assertEqual(
                         int(os.environ["TRITONSERVER_DELAY_SCHEDULER"]), 10)
-                    self.assertTrue(
-                        "TRITONSERVER_BACKLOG_DELAY_SCHEDULER" in os.environ)
+                    self.assertIn("TRITONSERVER_BACKLOG_DELAY_SCHEDULER",
+                                  os.environ)
                     self.assertEqual(
                         int(os.environ["TRITONSERVER_BACKLOG_DELAY_SCHEDULER"]),
                         2)
@@ -1778,12 +1771,11 @@ class SequenceBatcherTest(su.SequenceBatcherTestUtil):
 
                     # Need scheduler to wait for queue to contain all
                     # inferences for both sequences.
-                    self.assertTrue(
-                        "TRITONSERVER_DELAY_SCHEDULER" in os.environ)
+                    self.assertIn("TRITONSERVER_DELAY_SCHEDULER", os.environ)
                     self.assertEqual(
                         int(os.environ["TRITONSERVER_DELAY_SCHEDULER"]), 10)
-                    self.assertTrue(
-                        "TRITONSERVER_BACKLOG_DELAY_SCHEDULER" in os.environ)
+                    self.assertIn("TRITONSERVER_BACKLOG_DELAY_SCHEDULER",
+                                  os.environ)
                     self.assertEqual(
                         int(os.environ["TRITONSERVER_BACKLOG_DELAY_SCHEDULER"]),
                         3)
@@ -1992,12 +1984,11 @@ class SequenceBatcherTest(su.SequenceBatcherTestUtil):
 
                     # Need scheduler to wait for queue to contain all
                     # inferences for both sequences.
-                    self.assertTrue(
-                        "TRITONSERVER_DELAY_SCHEDULER" in os.environ)
+                    self.assertIn("TRITONSERVER_DELAY_SCHEDULER", os.environ)
                     self.assertEqual(
                         int(os.environ["TRITONSERVER_DELAY_SCHEDULER"]), 12)
-                    self.assertTrue(
-                        "TRITONSERVER_BACKLOG_DELAY_SCHEDULER" in os.environ)
+                    self.assertIn("TRITONSERVER_BACKLOG_DELAY_SCHEDULER",
+                                  os.environ)
                     self.assertEqual(
                         int(os.environ["TRITONSERVER_BACKLOG_DELAY_SCHEDULER"]),
                         2)
@@ -2190,12 +2181,11 @@ class SequenceBatcherTest(su.SequenceBatcherTestUtil):
 
                     # Need scheduler to wait for queue to contain all
                     # inferences for both sequences.
-                    self.assertTrue(
-                        "TRITONSERVER_DELAY_SCHEDULER" in os.environ)
+                    self.assertIn("TRITONSERVER_DELAY_SCHEDULER", os.environ)
                     self.assertEqual(
                         int(os.environ["TRITONSERVER_DELAY_SCHEDULER"]), 16)
-                    self.assertTrue(
-                        "TRITONSERVER_BACKLOG_DELAY_SCHEDULER" in os.environ)
+                    self.assertIn("TRITONSERVER_BACKLOG_DELAY_SCHEDULER",
+                                  os.environ)
                     self.assertEqual(
                         int(os.environ["TRITONSERVER_BACKLOG_DELAY_SCHEDULER"]),
                         0)
@@ -2379,12 +2369,11 @@ class SequenceBatcherTest(su.SequenceBatcherTestUtil):
 
                     # Need scheduler to wait for queue to contain all
                     # inferences for all sequences.
-                    self.assertTrue(
-                        "TRITONSERVER_DELAY_SCHEDULER" in os.environ)
+                    self.assertIn("TRITONSERVER_DELAY_SCHEDULER", os.environ)
                     self.assertEqual(
                         int(os.environ["TRITONSERVER_DELAY_SCHEDULER"]), 4)
-                    self.assertTrue(
-                        "TRITONSERVER_BACKLOG_DELAY_SCHEDULER" in os.environ)
+                    self.assertIn("TRITONSERVER_BACKLOG_DELAY_SCHEDULER",
+                                  os.environ)
                     self.assertEqual(
                         int(os.environ["TRITONSERVER_BACKLOG_DELAY_SCHEDULER"]),
                         0)
@@ -2574,12 +2563,11 @@ class SequenceBatcherTest(su.SequenceBatcherTestUtil):
                     self.check_setup(model_name)
 
                     # Need scheduler to wait for queue to contain 2 sequences.
-                    self.assertTrue(
-                        "TRITONSERVER_DELAY_SCHEDULER" in os.environ)
+                    self.assertIn("TRITONSERVER_DELAY_SCHEDULER", os.environ)
                     self.assertEqual(
                         int(os.environ["TRITONSERVER_DELAY_SCHEDULER"]), 2)
-                    self.assertTrue(
-                        "TRITONSERVER_BACKLOG_DELAY_SCHEDULER" in os.environ)
+                    self.assertIn("TRITONSERVER_BACKLOG_DELAY_SCHEDULER",
+                                  os.environ)
                     self.assertEqual(
                         int(os.environ["TRITONSERVER_BACKLOG_DELAY_SCHEDULER"]),
                         0)
@@ -2681,12 +2669,11 @@ class SequenceBatcherTest(su.SequenceBatcherTestUtil):
                     self.check_setup(model_name)
 
                     # Need scheduler to wait for queue to contain 2 sequences.
-                    self.assertTrue(
-                        "TRITONSERVER_DELAY_SCHEDULER" in os.environ)
+                    self.assertIn("TRITONSERVER_DELAY_SCHEDULER", os.environ)
                     self.assertEqual(
                         int(os.environ["TRITONSERVER_DELAY_SCHEDULER"]), 2)
-                    self.assertTrue(
-                        "TRITONSERVER_BACKLOG_DELAY_SCHEDULER" in os.environ)
+                    self.assertIn("TRITONSERVER_BACKLOG_DELAY_SCHEDULER",
+                                  os.environ)
                     self.assertEqual(
                         int(os.environ["TRITONSERVER_BACKLOG_DELAY_SCHEDULER"]),
                         0)
@@ -2788,12 +2775,11 @@ class SequenceBatcherTest(su.SequenceBatcherTestUtil):
                     self.check_setup(model_name)
 
                     # Need scheduler to wait for queue to contain 2 sequences.
-                    self.assertTrue(
-                        "TRITONSERVER_DELAY_SCHEDULER" in os.environ)
+                    self.assertIn("TRITONSERVER_DELAY_SCHEDULER", os.environ)
                     self.assertEqual(
                         int(os.environ["TRITONSERVER_DELAY_SCHEDULER"]), 2)
-                    self.assertTrue(
-                        "TRITONSERVER_BACKLOG_DELAY_SCHEDULER" in os.environ)
+                    self.assertIn("TRITONSERVER_BACKLOG_DELAY_SCHEDULER",
+                                  os.environ)
                     self.assertEqual(
                         int(os.environ["TRITONSERVER_BACKLOG_DELAY_SCHEDULER"]),
                         0)
