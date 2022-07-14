@@ -772,7 +772,7 @@ if [ $(cat $CLIENT_LOG |  grep "${ERROR_STRING}" | wc -l) -ne 0 ]; then
 fi
 set -e
 
-# Test with output validation
+# Test with optional inputs missing but still valid
 set +e
 $PERF_ANALYZER -v -m optional --measurement-mode "count_windows" \
     --input-data=${INT_OPTIONAL_JSONDATAFILE} >$CLIENT_LOG 2>&1
@@ -781,7 +781,21 @@ if [ $? -ne 0 ]; then
    echo -e "\n***\n*** Test Failed\n***"
    RET=1
 fi
-if [ $(cat $CLIENT_LOG |  grep "${ERROR_STRING}" | wc -l) -ne 0 ]; then
+set -e
+
+# Test with optional inputs missing and invalid
+set +e
+OPTIONAL_INPUT_ERROR_STRING="For batch sizes larger than 1, the same set of " \
+"inputs must be specified for each batch. You cannot use different set of " \
+"optional inputs for each individual batch."
+$PERF_ANALYZER -v -m optional -b 2 --measurement-mode "count_windows" \
+    --input-data=${INT_OPTIONAL_JSONDATAFILE} >$CLIENT_LOG 2>&1
+if [ $? -eq 0 ]; then
+   cat $CLIENT_LOG
+   echo -e "\n***\n*** Test Failed\n***"
+   RET=1
+fi
+if [ $(cat $CLIENT_LOG |  grep "${OPTIONAL_INPUT_ERROR_STRING}" | wc -l) -ne 0 ]; then
    cat $CLIENT_LOG
    echo -e "\n***\n*** Test Failed\n***"
    RET=1
