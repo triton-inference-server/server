@@ -125,7 +125,7 @@ settings will be updated.
 The logging protocol extension can be invoked using the curl library in the following manner (assuming 
 a Triton server is running at `localhost:8000`):
 ```
-curl -s -w '\n%{http_code}\n' -d'{"log_verbose_level":1}' localhost:8000/v2/logging
+curl -s -w '\n%{http_code}\n' -d '{"log_verbose_level":1}' localhost:8000/v2/logging
 ```
 This command should return a $log_setting_response JSON object with the following format:
 ```
