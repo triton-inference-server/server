@@ -113,10 +113,11 @@ cp -r ../custom_models/custom_zero_1_float32 $DATADIR && \
         echo "{ key: \"execute_delay_ms\"; value: { string_value: \"100\" }}" >> config.pbtxt && \
         echo "]" >> config.pbtxt)
 
-# Copy optional inputs model
+# Copy and customize optional inputs model
 cp -r ../python_models/optional $DATADIR && \
   mkdir $DATADIR/optional/1 && \
-  mv $DATADIR/optional/model.py $DATADIR/optional/1
+  mv $DATADIR/optional/model.py $DATADIR/optional/1 && \
+  sed -i 's/max_batch_size: 0/max_batch_size: 2/g' $DATADIR/optional/config.pbtxt
 
 # Generating test data
 mkdir -p $TESTDATADIR
