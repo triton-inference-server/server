@@ -1789,8 +1789,8 @@ Parse(TRITONSERVER_ServerOptions** server_options, int argc, char** argv)
 
   // Check if there is a conflict between --disable-auto-complete-config
   // and --strict-model-config
-  if (disable_auto_complete_config && strict_model_config_present) {
-    if (!strict_model_config) {
+  if (disable_auto_complete_config) {
+    if (strict_model_config_present && !strict_model_config) {
       std::cerr
           << "Warning: Overriding deprecated '--strict-model-config' from "
              "False to True in favor of '--disable-auto-complete-config'!"
