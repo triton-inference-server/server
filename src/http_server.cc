@@ -1862,36 +1862,55 @@ HTTPAPIServer::HandleLogging(evhtp_request_t* req)
     size_t buffer_len = evbuffer_get_length(req->buffer_in);
     HTTP_RESPOND_IF_ERR(
         req, EVBufferToJson(&request, v, &v_idx, buffer_len, n));
-
+    // Server and Core repos do not have the same Logger object
+    // Each update must be applied to both server and core repo versions
     triton::common::TritonJson::Value setting_json;
     if (request.Find("log_file", &setting_json)) {
       if (!setting_json.IsNull()) {
+        // Set new settings in server then in core
         HTTP_RESPOND_IF_ERR(req, setting_json.AsString(&log_file_path));
         LOG_SET_OUT_FILE(log_file_path);
+        FAIL_IF_ERR(
+            TRITONSERVER_ServerOptionsSetLogOutFile(
+                NULL, log_file_path.c_str()),
+            "setting log out file");
       }
     }
     if (request.Find("log_info", &setting_json)) {
       if (!setting_json.IsNull()) {
         HTTP_RESPOND_IF_ERR(req, setting_json.AsBool(&log_info_status));
         LOG_ENABLE_INFO(log_info_status);
+        FAIL_IF_ERR(
+            TRITONSERVER_ServerOptionsSetLogInfo(NULL, log_info_status),
+            "setting log info enable");
       }
     }
     if (request.Find("log_warnings", &setting_json)) {
       if (!setting_json.IsNull()) {
         HTTP_RESPOND_IF_ERR(req, setting_json.AsBool(&log_warn_status));
         LOG_ENABLE_WARNING(log_warn_status);
+        FAIL_IF_ERR(
+            TRITONSERVER_ServerOptionsSetLogWarn(NULL, log_warn_status),
+            "setting log warning enable");
       }
     }
     if (request.Find("log_errors", &setting_json)) {
       if (!setting_json.IsNull()) {
         HTTP_RESPOND_IF_ERR(req, setting_json.AsBool(&log_error_status));
         LOG_ENABLE_ERROR(log_error_status);
+        FAIL_IF_ERR(
+            TRITONSERVER_ServerOptionsSetLogError(NULL, log_warn_status),
+            "setting log error enable");
       }
     }
     if (request.Find("log_verbose_level", &setting_json)) {
       if (!setting_json.IsNull()) {
         HTTP_RESPOND_IF_ERR(req, setting_json.AsUInt(&verbose_level));
         LOG_SET_VERBOSE(static_cast<int32_t>(verbose_level));
+        FAIL_IF_ERR(
+            TRITONSERVER_ServerOptionsSetLogVerbose(
+                NULL, static_cast<int32_t>(verbose_level)),
+            "setting log verbose level");
       }
     }
     if (request.Find("log_format", &setting_json)) {
@@ -1911,6 +1930,20 @@ HTTPAPIServer::HandleLogging(evhtp_request_t* req)
                            .c_str()));
         }
         LOG_SET_FORMAT(log_format_final);
+        switch (log_format_final) {
+          case triton::common::Logger::Format::kDEFAULT:
+            FAIL_IF_ERR(
+                TRITONSERVER_ServerOptionsSetLogFormat(
+                    NULL, TRITONSERVER_LOG_DEFAULT),
+                "setting log format");
+            break;
+          case triton::common::Logger::Format::kISO8601:
+            FAIL_IF_ERR(
+                TRITONSERVER_ServerOptionsSetLogFormat(
+                    NULL, TRITONSERVER_LOG_ISO8601),
+                "setting log format");
+            break;
+        }
       }
     }
   }

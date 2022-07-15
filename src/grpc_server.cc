@@ -1371,6 +1371,8 @@ CommonHandler::SetUpAllRequests()
     triton::common::Logger::Format log_format_final = LOG_FORMAT;
     std::string log_format_parse = LOG_FORMAT_STRING;
     // Update log settings
+    // Server and Core repos do not have the same Logger object
+    // Each update must be applied to both server and core repo versions
     if (!request.settings().empty()) {
       {
         static std::string setting_name = "log_file";
@@ -1386,8 +1388,13 @@ CommonHandler::SetUpAllRequests()
                     .c_str());
             GOTO_IF_ERR(err, earlyexit);
           } else {
+            // Set new settings in server then in core
             log_file_path = it->second.string_param();
             LOG_SET_OUT_FILE(log_file_path);
+            FAIL_IF_ERR(
+                TRITONSERVER_ServerOptionsSetLogOutFile(
+                    NULL, log_file_path.c_str()),
+                "setting log out file");
           }
         }
       }
@@ -1407,6 +1414,9 @@ CommonHandler::SetUpAllRequests()
           } else {
             log_info_status = it->second.bool_param();
             LOG_ENABLE_INFO(log_info_status);
+            FAIL_IF_ERR(
+                TRITONSERVER_ServerOptionsSetLogInfo(NULL, log_info_status),
+                "setting log info enable");
           }
         }
       }
@@ -1426,6 +1436,9 @@ CommonHandler::SetUpAllRequests()
           } else {
             log_warn_status = it->second.bool_param();
             LOG_ENABLE_INFO(log_warn_status);
+            FAIL_IF_ERR(
+                TRITONSERVER_ServerOptionsSetLogWarn(NULL, log_warn_status),
+                "setting log info enable");
           }
         }
       }
@@ -1445,6 +1458,9 @@ CommonHandler::SetUpAllRequests()
           } else {
             log_error_status = it->second.bool_param();
             LOG_ENABLE_INFO(log_error_status);
+            FAIL_IF_ERR(
+                TRITONSERVER_ServerOptionsSetLogError(NULL, log_error_status),
+                "setting log info enable");
           }
         }
       }
@@ -1464,6 +1480,9 @@ CommonHandler::SetUpAllRequests()
           } else {
             verbose_level = it->second.uint32_param();
             LOG_ENABLE_INFO(verbose_level);
+            FAIL_IF_ERR(
+                TRITONSERVER_ServerOptionsSetLogVerbose(NULL, verbose_level),
+                "setting log info enable");
           }
         }
       }
@@ -1494,6 +1513,20 @@ CommonHandler::SetUpAllRequests()
               GOTO_IF_ERR(err, earlyexit);
             }
             LOG_SET_FORMAT(log_format_final);
+            switch (log_format_final) {
+              case triton::common::Logger::Format::kDEFAULT:
+                FAIL_IF_ERR(
+                    TRITONSERVER_ServerOptionsSetLogFormat(
+                        NULL, TRITONSERVER_LOG_DEFAULT),
+                    "setting log format");
+                break;
+              case triton::common::Logger::Format::kISO8601:
+                FAIL_IF_ERR(
+                    TRITONSERVER_ServerOptionsSetLogFormat(
+                        NULL, TRITONSERVER_LOG_ISO8601),
+                    "setting log format");
+                break;
+            }
           }
         }
       }
