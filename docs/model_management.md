@@ -107,7 +107,7 @@ to unexpected behavior. For this reason POLL mode is not recommended
 for use in production environments.**
 
 Model load and unload requests using the [model control
-protocol](protocols/extension_model_repository.md) will have no affect
+protocol](protocol/extension_model_repository.md) will have no affect
 and will return an error response.
 
 This model control mode is enabled by specifying
