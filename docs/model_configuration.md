@@ -434,7 +434,8 @@ must be specified since each output must specify a non-empty
 
 For models that support shape tensors, the *is_shape_tensor* property
 must be set appropriately for inputs and outputs that are acting as
-shape tensors. The following shows and example configuration that specifies shape tensors.
+shape tensors. The following shows an example configuration that
+specifies shape tensors.
 
 ```
   name: "myshapetensormodel"
@@ -444,12 +445,12 @@ shape tensors. The following shows and example configuration that specifies shap
     {
       name: "input0"
       data_type: TYPE_FP32
-      dims: [ -1 ]
+      dims: [ 1 , 3]
     },
     {
       name: "input1"
       data_type: TYPE_INT32
-      dims: [ 1 ]
+      dims: [ 2 ]
       is_shape_tensor: true
     }
   ]
@@ -457,7 +458,7 @@ shape tensors. The following shows and example configuration that specifies shap
     {
       name: "output0"
       data_type: TYPE_FP32
-      dims: [ -1 ]
+      dims: [ 1 , 3]
     }
   ]
 ```
@@ -469,16 +470,49 @@ value. For the above example, an inference request must provide inputs
 with the following shapes.
 
 ```
-  "input0": [ x, -1]
-  "input1": [ 1 ]
-  "output0": [ x, -1]
+  "input0": [ x, 1, 3]
+  "input1": [ 3 ]
+  "output0": [ x, 1, 3]
 ```
 
 Where *x* is the batch size of the request. Triton requires the shape
 tensors to be marked as shape tensors in the model when using
-batching. Note that "input1" has shape *[ 1 ]* and not *[ 2 ]*. Triton
-will prepend the shape value *x* at "input1" before issuing the
-request to model.
+batching. Note that "input1" has shape *[ 3 ]* and not *[ 2 ]*, which
+is how it is described in model configuration. As `myshapetensormodel`
+model is a batching model, the batch size should be provided as an
+additional value. Triton will accumulate all the shape values together
+for "input1" in batch dimension before issuing the request to model.
+
+For example, assume the client sends following three requests to Triton
+with following inputs:
+
+```
+Request1:
+input0: [[[1,2,3]]] <== shape of this tensor [1,1,3]
+input1: [1,4,6] <== shape of this tensor [3]
+
+Request2:
+input0: [[[4,5,6]], [[7,8,9]]] <== shape of this tensor [2,1,3]
+input1: [2,4,6] <== shape of this tensor [3]
+
+Request3:
+input0: [[[10,11,12]]] <== shape of this tensor [1,1,3]
+input1: [1,4,6] <== shape of this tensor [3]
+```
+
+Assuming these requests get batched together would be delivered to the
+model as:
+
+
+```
+Batched Requests to model:
+input0: [[[1,2,3]], [[4,5,6]], [[7,8,9]], [[10,11,12]]] <== shape of this tensor [4,1,3]
+input1: [4, 4, 6] <== shape of this tensor [3]
+
+```
+
+Currently, only TensorRT supports shape tensors. Read [Shape Tensor I/O](https://docs.nvidia.com/deeplearning/tensorrt/developer-guide/index.html#shape_tensor_io)
+to learn more about shape tensors.
 
 ## Version Policy
 
