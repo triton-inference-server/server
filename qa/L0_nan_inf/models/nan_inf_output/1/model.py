@@ -39,7 +39,7 @@ class TritonPythonModel:
         """
 
         responses = []
-        for request in requests:
+        for _ in requests:
             # Include one of each specially parsed JSON value: nan, inf, and -inf
             out_0 = np.array([np.nan, np.inf, np.NINF, 1, 2, 3],
                              dtype=np.float32)

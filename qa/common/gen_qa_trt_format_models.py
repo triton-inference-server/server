@@ -207,8 +207,6 @@ def create_plan_dynamic_modelfile(models_dir,
     with open(model_version_dir + "/model.plan", "wb") as f:
         f.write(engine_bytes)
 
-    del builder
-
 
 def create_plan_fixed_modelfile(models_dir, max_batch, model_version,
                                 input_shape, output0_shape, output1_shape,
@@ -285,8 +283,6 @@ def create_plan_fixed_modelfile(models_dir, max_batch, model_version,
 
     with open(model_version_dir + "/model.plan", "wb") as f:
         f.write(engine_bytes)
-
-    del builder
 
 
 def create_plan_modelconfig(models_dir, max_batch, model_version, input_shape,

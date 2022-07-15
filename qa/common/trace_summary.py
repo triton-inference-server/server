@@ -28,7 +28,6 @@
 
 import argparse
 import json
-import sys
 import numpy as np
 
 FLAGS = None

@@ -3681,9 +3681,12 @@ ModelInferHandler::Process(InferHandler::State* state, bool rpc_ok)
     }
     // Get request ID for logging in case of error.
     const char* request_id = nullptr;
-    LOG_TRITONSERVER_ERROR(
-        TRITONSERVER_InferenceRequestId(irequest, &request_id),
-        "unable to retrieve request ID string");
+    if (irequest != nullptr) {
+      LOG_TRITONSERVER_ERROR(
+          TRITONSERVER_InferenceRequestId(irequest, &request_id),
+          "unable to retrieve request ID string");
+    }
+
     if ((request_id == nullptr) || (request_id[0] == '\0')) {
       request_id = "<id_unknown>";
     }

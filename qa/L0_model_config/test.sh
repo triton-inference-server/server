@@ -248,6 +248,53 @@ cp -r /data/inferenceserver/${REPO_VERSION}/qa_identity_model_repository/onnx_ze
 rm -f $SERVER_LOG_BASE* $CLIENT_LOG
 RET=0
 
+# Run tests for logs which do not have a timestamp on them 
+for TARGET in `ls cli_messages`; do
+    case $TARGET in
+        "cli_override")
+            EXTRA_ARGS="--disable-auto-complete-config --strict-model-config=false" ;;
+        "cli_deprecation") 
+            EXTRA_ARGS="--strict-model-config=true" ;;
+        *) 
+            EXTRA_ARGS="" ;;
+    esac
+
+    SERVER_ARGS="--model-repository=`pwd`/models  $EXTRA_ARGS"
+    SERVER_LOG=$SERVER_LOG_BASE.cli_messages_${TARGET}.log
+
+    rm -fr models && mkdir models
+    cp -r cli_messages/$TARGET models/.
+
+    EXPECTEDS=models/$TARGET/expected*
+
+    echo -e "Test on cli_messages/$TARGET" >> $CLIENT_LOG
+
+    run_server
+    if [ "$SERVER_PID" != "0" ]; then
+        echo -e "*** FAILED: unexpected success starting $SERVER" >> $CLIENT_LOG
+        RET=1
+        kill $SERVER_PID
+        wait $SERVER_PID
+    else
+        EXFOUND=0
+        for EXPECTED in `ls $EXPECTEDS`; do
+            EX=`cat $EXPECTED`
+            echo "grepping for: $EX"
+            if grep "$EX" $SERVER_LOG; then
+                echo -e "Found \"$EX\"" >> $CLIENT_LOG
+                EXFOUND=1
+                break
+            else
+                echo -e "Not found \"$EX\"" >> $CLIENT_LOG
+            fi
+        done
+        if [ "$EXFOUND" == "0" ]; then
+            echo -e "*** FAILED: cli_messages/$TARGET" >> $CLIENT_LOG
+            RET=1
+        fi
+    fi
+done
+
 # Run special test cases
 for TARGET in `ls special_cases`; do
     SERVER_ARGS="--model-repository=`pwd`/models --strict-model-config=true"

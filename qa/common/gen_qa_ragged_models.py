@@ -295,8 +295,6 @@ def create_plan_modelfile(models_dir, model_version, dtype):
     with open(model_version_dir + "/model.plan", "wb") as f:
         f.write(engine_bytes)
 
-    del builder
-
 
 def create_onnx_modelfile(models_dir, model_version, dtype):
     # Create special identity model for batch input testing.
@@ -580,8 +578,6 @@ def create_plan_itemshape_modelfile(models_dir, model_version, dtype):
     with open(model_version_dir + "/model.plan", "wb") as f:
         f.write(engine_bytes)
 
-    del builder
-
 
 def create_onnx_itemshape_modelfile(models_dir, model_version, dtype):
     # Create special identity model for batch input 'BATCH_ITEM_SHAPE' testing,
@@ -754,7 +750,6 @@ if __name__ == '__main__':
         import tensorrt as trt
     if FLAGS.graphdef or FLAGS.savedmodel:
         import tensorflow as tf
-        from tensorflow.python.framework import graph_util
     if FLAGS.onnx:
         import onnx
 
