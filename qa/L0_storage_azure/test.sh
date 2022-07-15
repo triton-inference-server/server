@@ -55,9 +55,8 @@ ACCOUNT_NAME=$AZURE_STORAGE_ACCOUNT
 ACCOUNT_KEY=$AZURE_STORAGE_KEY
 export CUDA_VISIBLE_DEVICES=0
 CLIENT_LOG_BASE="./client"
-INFER_TEST=infer_test.py
+INFER_TEST="../infer_test.py"
 EXPECTED_NUM_TESTS="3"
-PERF_CLIENT=../clients/perf_client
 timestamp=$(date +%s)
 CONTAINER_NAME="tritonqatest${timestamp}"
 
