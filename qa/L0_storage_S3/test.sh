@@ -42,7 +42,7 @@ fi
 export CUDA_VISIBLE_DEVICES=0
 
 CLIENT_LOG_BASE="./client"
-INFER_TEST="../infer_test.py"
+INFER_TEST="../common/infer_test.py"
 EXPECTED_NUM_TESTS="3"
 TEST_RESULT_FILE='test_results.txt'
 

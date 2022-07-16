@@ -42,7 +42,7 @@ export CUDA_VISIBLE_DEVICES=0
 
 CLIENT_LOG="./client.log"
 TEST_RESULT_FILE='test_results.txt'
-INFER_TEST="../infer_test.py"
+INFER_TEST="../common/infer_test.py"
 EXPECTED_NUM_TESTS="3"
 
 DATADIR="/data/inferenceserver/${REPO_VERSION}/qa_model_repository"
@@ -95,7 +95,9 @@ function load_models {
     done
 }
 
+set +e
 setup_model_repo
+set -e
 
 # Create model with name that has all types of allowed characters
 DUMMY_MODEL="Model_repo-1.0"
