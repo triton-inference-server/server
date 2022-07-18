@@ -35,33 +35,40 @@ import unittest
 
 
 class TFParameterTest(tu.TestResultCollector):
+
     def setUp(self):
-      self._client = tritonhttpclient.InferenceServerClient("localhost:8000", verbose=True)
+        self._client = tritonhttpclient.InferenceServerClient("localhost:8000",
+                                                              verbose=True)
 
     def _infer_helper(self):
-      # The model has a single variable which is added to the input.  Since the
-      # variable is initialized to zero the input and output must match.
-      model_name = 'graphdef_variable'
-      input = np.array([10], dtype=np.int32)
+        # The model has a single variable which is added to the input.  Since the
+        # variable is initialized to zero the input and output must match.
+        model_name = 'graphdef_variable'
+        input = np.array([10], dtype=np.int32)
 
-      inputs = []
-      inputs.append(tritonhttpclient.InferInput('INPUT', input.shape, 'INT32'))
-      inputs[-1].set_data_from_numpy(input)
+        inputs = []
+        inputs.append(tritonhttpclient.InferInput('INPUT', input.shape,
+                                                  'INT32'))
+        inputs[-1].set_data_from_numpy(input)
 
-      outputs = []
-      outputs.append(tritonhttpclient.InferRequestedOutput('OUTPUT'))
+        outputs = []
+        outputs.append(tritonhttpclient.InferRequestedOutput('OUTPUT'))
 
-      results = self._client.infer(model_name=model_name, inputs=inputs, outputs=outputs)
-      output = results.as_numpy('OUTPUT')
-      np.testing.assert_array_equal(output, input)
+        results = self._client.infer(model_name=model_name,
+                                     inputs=inputs,
+                                     outputs=outputs)
+        output = results.as_numpy('OUTPUT')
+        np.testing.assert_array_equal(output, input)
 
     def test_tf_variable(self):
-      self._infer_helper()
+        self._infer_helper()
 
     def test_tf_variable_error(self):
-      with self.assertRaises(tritonclient.utils.InferenceServerException) as e:
-        self._infer_helper()
-      self.assertIn("Attempting to use uninitialized value VARIABLE", e.exception.message())
+        with self.assertRaises(
+                tritonclient.utils.InferenceServerException) as e:
+            self._infer_helper()
+        self.assertIn("Attempting to use uninitialized value VARIABLE",
+                      e.exception.message())
 
 
 if __name__ == '__main__':
