@@ -49,7 +49,7 @@ DATADIR="/data/inferenceserver/${REPO_VERSION}/qa_model_repository"
 # Used to control which backends are run in infer_test.py
 BACKENDS=${BACKENDS:="graphdef savedmodel onnx libtorch plan"}
 
-function run_unit_tests {
+function run_unit_tests() {
     echo "Running unit tests: ${INFER_TEST}"
     python $INFER_TEST >$CLIENT_LOG 2>&1
     if [ $? -ne 0 ]; then
@@ -66,7 +66,7 @@ function run_unit_tests {
     fi
 }
 
-function setup_model_repo {
+function setup_model_repo() {
     model_repo=${1:-"models"}
     backends=${2:-${BACKENDS}}
     types=${3:-"float32_float32_float32 object_object_object"}
@@ -83,7 +83,7 @@ function setup_model_repo {
     done
 }
 
-function load_models {
+function load_models() {
     model_repo=${1:-"models"}
     for model in `ls ${model_repo}`; do
 	echo "Loading model: ${model}"

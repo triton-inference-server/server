@@ -84,7 +84,7 @@ RET=0
 # Used to control which backends are run in infer_test.py
 BACKENDS=${BACKENDS:="graphdef savedmodel onnx libtorch plan"}
 
-function run_unit_tests {
+function run_unit_tests() {
     python $INFER_TEST >$CLIENT_LOG 2>&1
     if [ $? -ne 0 ]; then
         cat $CLIENT_LOG
@@ -100,7 +100,7 @@ function run_unit_tests {
     fi
 }
 
-function setup_model_repo {
+function setup_model_repo() {
     # Construct model repository
     rm -rf models && mkdir -p models
     for FW in $BACKENDS; do
