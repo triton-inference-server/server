@@ -49,7 +49,10 @@ SKIP_PATHS = (
     'qa/L0_model_config/noautofill_platform',
     'qa/L0_model_config/autofill_noplatform',
     'qa/L0_model_config/autofill_noplatform_success',
-    'qa/L0_model_config/special_cases', 'qa/L0_perf_nomodel/baseline',
+    'qa/L0_model_config/special_cases',
+    'qa/L0_model_config/cli_messages/cli_override/expected',
+    'qa/L0_model_config/cli_messages/cli_deprecation/expected',
+    'qa/L0_perf_nomodel/baseline',
     'qa/L0_perf_nomodel/legacy_baseline', 'qa/L0_warmup/raw_mug_data',
     'qa/L0_java_resnet/expected_output_data', 'TRITON_VERSION')
 
