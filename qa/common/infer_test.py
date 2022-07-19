@@ -1,4 +1,4 @@
-# Copyright 2018-2022, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright 2020-2022, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -38,6 +38,9 @@ import os
 
 np_dtype_string = np.dtype(object)
 
+# Allow caller to setup specific set of backends to test
+DEFAULT_BACKENDS="graphdef savedmodel plan onnx libtorch"
+TEST_BACKENDS = os.environ.get("BACKENDS", DEFAULT_BACKENDS).split()
 
 class InferTest(tu.TestResultCollector):
 
@@ -79,38 +82,34 @@ class InferTest(tu.TestResultCollector):
                                use_streaming=use_streaming,
                                correlation_id=correlation_id)
 
+
         input_size = 16
 
         if tu.validate_for_tf_model(input_dtype, output0_dtype, output1_dtype,
                                     (input_size,), (input_size,),
                                     (input_size,)):
             for pf in ["graphdef", "savedmodel"]:
-                _infer_exact_helper(self,
-                                    pf, (input_size,),
-                                    8,
-                                    input_dtype,
-                                    output0_dtype,
-                                    output1_dtype,
-                                    output0_raw=output0_raw,
-                                    output1_raw=output1_raw,
-                                    swap=swap)
+                if pf in TEST_BACKENDS:
+                    _infer_exact_helper(self,
+                                        pf, (input_size,),
+                                        8,
+                                        input_dtype,
+                                        output0_dtype,
+                                        output1_dtype,
+                                        output0_raw=output0_raw,
+                                        output1_raw=output1_raw,
+                                        swap=swap)
 
         if tu.validate_for_trt_model(input_dtype, output0_dtype, output1_dtype,
                                      (input_size, 1, 1), (input_size, 1, 1),
                                      (input_size, 1, 1)):
-            if input_dtype == np.int8:
+            if "plan" in TEST_BACKENDS:
+                if input_dtype == np.int8:
+                    shape = (input_size, 1, 1)
+                else:
+                    shape = (input_size,)
                 _infer_exact_helper(self,
-                                    'plan', (input_size, 1, 1),
-                                    8,
-                                    input_dtype,
-                                    output0_dtype,
-                                    output1_dtype,
-                                    output0_raw=output0_raw,
-                                    output1_raw=output1_raw,
-                                    swap=swap)
-            else:
-                _infer_exact_helper(self,
-                                    'plan', (input_size,),
+                                    'plan', shape,
                                     8,
                                     input_dtype,
                                     output0_dtype,
@@ -122,29 +121,31 @@ class InferTest(tu.TestResultCollector):
         if tu.validate_for_onnx_model(input_dtype, output0_dtype, output1_dtype,
                                       (input_size,), (input_size,),
                                       (input_size,)):
-            _infer_exact_helper(self,
-                                'onnx', (input_size,),
-                                8,
-                                input_dtype,
-                                output0_dtype,
-                                output1_dtype,
-                                output0_raw=output0_raw,
-                                output1_raw=output1_raw,
-                                swap=swap)
+            if "onnx" in TEST_BACKENDS:
+                _infer_exact_helper(self,
+                                    'onnx', (input_size,),
+                                    8,
+                                    input_dtype,
+                                    output0_dtype,
+                                    output1_dtype,
+                                    output0_raw=output0_raw,
+                                    output1_raw=output1_raw,
+                                    swap=swap)
 
         # Skip for batched string I/O
         if tu.validate_for_libtorch_model(input_dtype, output0_dtype,
                                           output1_dtype, (input_size,),
                                           (input_size,), (input_size,), 8):
-            _infer_exact_helper(self,
-                                'libtorch', (input_size,),
-                                8,
-                                input_dtype,
-                                output0_dtype,
-                                output1_dtype,
-                                output0_raw=output0_raw,
-                                output1_raw=output1_raw,
-                                swap=swap)
+            if "libtorch" in TEST_BACKENDS:
+                _infer_exact_helper(self,
+                                    'libtorch', (input_size,),
+                                    8,
+                                    input_dtype,
+                                    output0_dtype,
+                                    output1_dtype,
+                                    output0_raw=output0_raw,
+                                    output1_raw=output1_raw,
+                                    swap=swap)
 
     def test_raw_fff(self):
         self._full_exact(np.float32,
