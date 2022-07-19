@@ -41,17 +41,63 @@ fi
 export CUDA_VISIBLE_DEVICES=0
 
 CLIENT_LOG="./client.log"
-PERF_CLIENT=../clients/perf_client
+TEST_RESULT_FILE='test_results.txt'
+INFER_TEST="../common/infer_test.py"
+EXPECTED_NUM_TESTS="3"
 
 DATADIR="/data/inferenceserver/${REPO_VERSION}/qa_model_repository"
-BACKENDS="graphdef libtorch onnx plan savedmodel"
+# Used to control which backends are run in infer_test.py
+BACKENDS=${BACKENDS:="graphdef savedmodel onnx libtorch plan"}
 
-rm -rf models && mkdir models
-for BACKEND in $BACKENDS; do
-    cp -r $DATADIR/${BACKEND}_float32_float32_float32 models/.
-    # Remove version policy from config.pbtxt
-    sed -i '/^version_policy/d' models/${BACKEND}_float32_float32_float32/config.pbtxt
-done
+function run_unit_tests() {
+    echo "Running unit tests: ${INFER_TEST}"
+    python $INFER_TEST >$CLIENT_LOG 2>&1
+    if [ $? -ne 0 ]; then
+        cat $CLIENT_LOG
+        echo -e "\n***\n*** Test Failed\n***"
+        RET=1
+    else
+        check_test_results $TEST_RESULT_FILE $EXPECTED_NUM_TESTS
+        if [ $? -ne 0 ]; then
+            cat $CLIENT_LOG
+            echo -e "\n***\n*** Test Result Verification Failed\n***"
+            RET=1
+        fi
+    fi
+}
+
+function setup_model_repo() {
+    model_repo=${1:-"models"}
+    backends=${2:-${BACKENDS}}
+    types=${3:-"float32_float32_float32 object_object_object"}
+    echo "[setup_model_repo] model_repo: ${model_repo}, backends: ${backends}"
+    rm -rf ${model_repo} && mkdir ${model_repo}
+    for BACKEND in ${backends}; do
+        for TYPE in ${types}; do
+            model="${BACKEND}_${TYPE}"
+	    echo "Copying ${DATADIR}/${model} to ${model_repo}."
+            cp -r "${DATADIR}/${model}" "${model_repo}/"
+            # Remove version policy from config.pbtxt
+            sed -i '/^version_policy/d' ${model_repo}/${model}/config.pbtxt
+        done
+    done
+}
+
+function load_models() {
+    model_repo=${1:-"models"}
+    for model in `ls ${model_repo}`; do
+	echo "Loading model: ${model}"
+	code=`curl -s -w %{http_code} -X POST localhost:8000/v2/repository/models/${model}/load`
+	if [ "$code" != "200" ]; then
+	    echo -e "\n***\n*** Test Failed. Failed to load model: ${model}\n***"
+	    RET=1
+	fi
+    done
+}
+
+set +e
+setup_model_repo
+set -e
 
 # Create model with name that has all types of allowed characters
 DUMMY_MODEL="Model_repo-1.0"
@@ -105,6 +151,7 @@ awslocal $ENDPOINT_FLAG s3 mb s3://demo-bucket1.0 && \
 RET=0
 
 # Test with hostname and IP address
+echo "=== Running hostname/IP tests ==="
 for HOST in "127.0.0.1" "localhost"; do
     SERVER_ARGS="--model-repository=s3://$HOST:4572/demo-bucket1.0 --model-control-mode=explicit"
     if [ "$HOST" = "127.0.0.1" ]; then
@@ -124,20 +171,8 @@ for HOST in "127.0.0.1" "localhost"; do
     fi
 
     set +e
-    for BACKEND in $BACKENDS; do
-        code=`curl -s -w %{http_code} -X POST localhost:8000/v2/repository/models/${BACKEND}_float32_float32_float32/load`
-        if [ "$code" != "200" ]; then
-            echo -e "\n***\n*** Test Failed\n***"
-            RET=1
-        fi
-
-        $PERF_CLIENT -m ${BACKEND}_float32_float32_float32 -p 3000 -t 1 >$CLIENT_LOG 2>&1
-        if [ $? -ne 0 ]; then
-            echo -e "\n***\n*** Test Failed\n***"
-            cat $CLIENT_LOG
-            RET=1
-        fi
-    done
+    load_models
+    run_unit_tests
 
     # Try to load model with name that checks for all types of allowed characters
     code=`curl -s -w %{http_code} -X POST localhost:8000/v2/repository/models/${DUMMY_MODEL}/load`
@@ -152,6 +187,7 @@ for HOST in "127.0.0.1" "localhost"; do
 done
 
 # Test with Polling
+echo "=== Running polling tests ==="
 SERVER_ARGS="--model-repository=s3://localhost:4572/demo-bucket1.0 --model-control-mode=poll"
 SERVER_LOG="./inference_server_poll.log"
 
@@ -170,7 +206,7 @@ awslocal $ENDPOINT_FLAG s3 sync models s3://demo-bucket1.0
 
 sleep 20
 
-set + e
+set +e
 CURL_LOG=$(curl -X POST localhost:8000/v2/repository/index)
 if [[ "$CURL_LOG" != *"{\"name\":\"libtorch_float32_float32_float32\",\"version\":\"3\",\"state\":\"UNAVAILABLE\",\"reason\":\"unloaded\"}"* ]]; then
     echo -e "\n***\n*** Failed. Server did not unload libtorch_float32_float32_float32 version 3\n***"
@@ -191,9 +227,26 @@ awslocal $ENDPOINT_FLAG s3 rm s3://demo-bucket1.0 --recursive --include "*" && \
     awslocal $ENDPOINT_FLAG s3 rb s3://demo-bucket1.0
 
 # Test with Polling, no model configuration file - with strict model config disabled
-rm -rf models && mkdir models
-cp -r $DATADIR/savedmodel_float32_float32_float32 models/.
-rm models/savedmodel_float32_float32_float32/config.pbtxt
+echo "=== Running autocomplete tests ==="
+AUTOCOMPLETE_BACKENDS="savedmodel"
+export BACKENDS=${AUTOCOMPLETE_BACKENDS}
+
+set +e
+setup_model_repo
+
+TYPES="float32_float32_float32 object_object_object"
+for BACKEND in ${AUTOCOMPLETE_BACKENDS}; do
+    for TYPE in ${TYPES}; do
+        model="${BACKEND}_${TYPE}"
+        # Config files specify things expected by unit test like label_filename
+        # and max_batch_size for comparing results, so remove some key fields
+        # for autocomplete to fill that won't break the unit test.
+        sed -i '/platform:/d' models/${model}/config.pbtxt
+        sed -i '/data_type:/d' models/${model}/config.pbtxt
+        sed -i '/dims:/d' models/${model}/config.pbtxt
+    done
+done
+set -e
 
 awslocal $ENDPOINT_FLAG s3 mb s3://demo-bucket1.0 && \
     awslocal $ENDPOINT_FLAG s3 sync models s3://demo-bucket1.0
@@ -211,12 +264,7 @@ if [ "$SERVER_PID" == "0" ]; then
     exit 1
 fi
 
-$PERF_CLIENT -m savedmodel_float32_float32_float32 -p 3000 -t 1 > $CLIENT_LOG 2>&1
-if [ $? -ne 0 ]; then
-    echo -e "\n***\n*** Test Failed\n***"
-    cat $CLIENT_LOG
-    RET=1
-fi
+run_unit_tests
 
 kill $SERVER_PID
 wait $SERVER_PID
@@ -226,23 +274,15 @@ awslocal $ENDPOINT_FLAG s3 rm s3://demo-bucket1.0 --recursive --include "*" && \
     awslocal $ENDPOINT_FLAG s3 rb s3://demo-bucket1.0
 
 # Test for multiple model repositories using S3 cloud storage
+echo "=== Running multiple-model-repository tests ==="
 BACKENDS1="graphdef libtorch"
 BACKENDS2="onnx plan savedmodel"
-BACKENDS="$BACKENDS1 $BACKENDS2"
+export BACKENDS="$BACKENDS1 $BACKENDS2"
 
-rm -rf models1 && mkdir models1
-for BACKEND in $BACKENDS1; do
-    cp -r $DATADIR/${BACKEND}_float32_float32_float32 models1/.
-    # Remove version policy from config.pbtxt
-    sed -i '/^version_policy/d' models1/${BACKEND}_float32_float32_float32/config.pbtxt
-done
-
-rm -rf models2 && mkdir models2
-for BACKEND in $BACKENDS2; do
-    cp -r $DATADIR/${BACKEND}_float32_float32_float32 models2/.
-    # Remove version policy from config.pbtxt
-    sed -i '/^version_policy/d' models2/${BACKEND}_float32_float32_float32/config.pbtxt
-done
+set +e
+setup_model_repo "models1" "${BACKENDS1}"
+setup_model_repo "models2" "${BACKENDS2}"
+set -e
 
 BUCKET_NAME="demo-bucket"
 MODEL_REPO_ARGS=""
@@ -272,20 +312,9 @@ if [ "$SERVER_PID" == "0" ]; then
 fi
 
 set +e
-for BACKEND in $BACKENDS; do
-    code=`curl -s -w %{http_code} -X POST localhost:8000/v2/repository/models/${BACKEND}_float32_float32_float32/load`
-    if [ "$code" != "200" ]; then
-        echo -e "\n***\n*** Test Failed\n***"
-        RET=1
-    fi
-
-    $PERF_CLIENT -m ${BACKEND}_float32_float32_float32 -p 3000 -t 1 >$CLIENT_LOG 2>&1
-    if [ $? -ne 0 ]; then
-        echo -e "\n***\n*** Test Failed\n***"
-        cat $CLIENT_LOG
-        RET=1
-    fi
-done
+load_models "models1"
+load_models "models2"
+run_unit_tests
 set -e
 
 kill $SERVER_PID
