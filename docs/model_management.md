@@ -177,3 +177,17 @@ model. On some OSes it may also be possible to simply move the
 existing shared-libraries to another location outside of the model
 repository, copy in the new shared libraries, and then reload the
 model.
+
+## Concurrently Loading Models
+
+To reduce service downtime, Triton loads new models in the background while
+continuing to serve inferences on existing models. Based on use case and
+performance requirements, the optimal amount of resources dedicated to loading
+models may differ. Triton exposes a `--model-load-thread-count` option to
+configure the number of threads dedicated to loading models, which defaults to
+twice the number of CPU cores (`2*num_cpus`) visible to the server. 
+
+To set this parameter with the C API, refer to 
+`TRITONSERVER_ServerOptionsSetModelLoadThreadCount` in 
+[tritonserver.h](https://github.com/triton-inference-server/core/blob/main/include/triton/core/tritonserver.h).
+
