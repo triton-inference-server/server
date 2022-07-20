@@ -819,7 +819,9 @@ CommonHandler::SetUpAllRequests()
             model_config_message, &buffer, &byte_size);
         if (err == nullptr) {
           ::google::protobuf::util::JsonStringToMessage(
-              {buffer, (int)byte_size}, response->mutable_config());
+              ::google::protobuf::stringpiece_internal::StringPiece(
+                  buffer, (int)byte_size),
+              response->mutable_config());
         }
         TRITONSERVER_MessageDelete(model_config_message);
       }
