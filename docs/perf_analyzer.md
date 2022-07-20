@@ -402,6 +402,10 @@ The following is the example to provide contents as base64 string with explicit 
 }
 ```
 
+Note that for STRING type an element is represented by a 4-byte unsigned integer giving
+the length followed by the actual bytes. The byte array to be encoded using base64 must
+include the 4-byte unsigned integers.
+
 ### Output Validation
 
 When real input data is provided, it is optional to request perf analyzer to
