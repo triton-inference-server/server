@@ -642,7 +642,7 @@ for PROTOCOL in grpc http; do
     $PERF_ANALYZER -v -i $PROTOCOL -m simple_savedmodel_sequence_object -p 2000 -t5 --sync --trace-file $TRACE_FILE \
     --trace-level TIMESTAMPS --trace-rate 1000 --trace-count 100 --log-frequency 10 \
     --input-data=$SEQ_JSONDATAFILE >$CLIENT_LOG 2>&1
-    if [ $? -eq 0 ]; then
+    if [ $? -ne 0 ]; then
         cat $CLIENT_LOG
         echo -e "\n***\n*** Test Failed\n***"
         RET=1
