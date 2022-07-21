@@ -334,7 +334,7 @@ RUN rm -f /usr/bin/python && \
     ln -s /usr/bin/python3 /usr/bin/python
 
 RUN pip3 install --upgrade wheel setuptools && \
-    pip3 install --upgrade numpy pillow attrdict future grpcio requests gsutil awscli six grpcio-channelz
+    pip3 install --upgrade numpy pillow attrdict future grpcio requests gsutil awscli six grpcio-channelz prettytable
 
 # L0_http_fuzz is hitting similar issue with boofuzz with latest version (0.4.0):
 # https://github.com/jtpereyda/boofuzz/issues/529

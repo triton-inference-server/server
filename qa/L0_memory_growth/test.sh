@@ -76,10 +76,16 @@ CLIENT_BS=8
 # Set the number of repetitions in nightly and weekly tests
 # Set the email subject for nightly and weekly tests
 if [ "$TRITON_PERF_WEEKLY" == 1 ]; then
-    # Run the test for each model approximately 1.5 hours
-    # All tests are run cumulatively for 7 hours
-    REPETITION=200
-    EMAIL_SUBJECT="Weekly"
+    if [ "$TRITON_PERF_LONG" == 1 ]; then
+        # ~ 2.5 days for system under test
+        REPETITION=1400
+        EMAIL_SUBJECT="Weekly Long"
+    else
+        # Run the test for each model approximately 1.5 hours
+        # All tests are run cumulatively for 7 hours
+        REPETITION=200
+        EMAIL_SUBJECT="Weekly"
+    fi
 else
     REPETITION=3
     EMAIL_SUBJECT="Nightly"
@@ -146,17 +152,28 @@ for MODEL in $(ls models); do
 
     set +e
 
+    TEMP_CLIENT_LOG=temp_client.log
+    TEMP_RET=0
+
     SECONDS=0
     # Run the perf analyzer 'REPETITION' times
     for ((i=1; i<=$REPETITION; i++)); do
-        $PERF_ANALYZER -v -m $MODEL -i grpc --concurrency-range $CONCURRENCY -b $CLIENT_BS >> $CLIENT_LOG 2>&1
-        if [ $? -ne 0 ]; then
-            cat $CLIENT_LOG
-            echo -e "\n***\n*** perf_analyzer for $MODEL failed on iteration $i\n***"
-            RET=1
+        $PERF_ANALYZER -v -m $MODEL -i grpc --concurrency-range $CONCURRENCY -b $CLIENT_BS > $TEMP_CLIENT_LOG 2>&1
+        # Only record failure log for unexpected perf analyzer error
+        # [TMA-625] Currently check failure log as WAR, should check for specific
+        # code once perf analyzer returns different code for different error
+        if [ $? -ne 0 ] && [ `grep -c "^No valid requests recorded" $TEMP_CLIENT_LOG` == "0" ]; then
+            cat $TEMP_CLIENT_LOG >> $CLIENT_LOG
+            echo -e "\n***\n*** perf_analyzer for $MODEL failed on iteration $i\n***" >> $CLIENT_LOG
+            TEMP_RET=1
         fi
     done
     TEST_DURATION=$SECONDS
+
+    if [ $TEMP_RET -ne 0 ]; then
+        cat $CLIENT_LOG
+        RET=1
+    fi
 
     set -e
 
@@ -263,8 +280,8 @@ else
 fi
 
 # Run only if both TRITON_FROM and TRITON_TO_DL are set
-if [[ ! -z "$TRITON_FROM" ]] || [[ ! -z "$TRITON_TO_DL" ]]; then
-    python server_memory_mail.py $EMAIL_SUBJECT
+if [[ ! -z "$TRITON_FROM" ]] && [[ ! -z "$TRITON_TO_DL" ]]; then
+    python server_memory_mail.py "$EMAIL_SUBJECT"
 fi
 
 exit $RET

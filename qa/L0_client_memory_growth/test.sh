@@ -1,5 +1,5 @@
 #!/bin/bash
-# Copyright (c) 2021, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright 2021-2022, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -59,13 +59,23 @@ source ../common/util.sh
 # Set the number of repetitions in nightly and weekly tests
 # Set the email subject for nightly and weekly tests
 if [ "$TRITON_PERF_WEEKLY" == 1 ]; then
-    # Run the test for each case approximately 1.5 hours
-    # All tests are run cumulatively for 7 hours
-    REPETITION_HTTP_CPP=1300000
-    REPETITION_HTTP_PY=2100000
-    REPETITION_GRPC_CPP=10000000
-    REPETITION_GRPC_PY=1500000
-    EMAIL_SUBJECT="Weekly"
+    if [ "$TRITON_PERF_LONG" == 1 ]; then
+        # ~ 12 hours
+        # GRPC cycles are reduced as there is high fluctuation in time spent
+        REPETITION_HTTP_CPP=2220000
+        REPETITION_HTTP_PY=3600000
+        REPETITION_GRPC_CPP=8000000
+        REPETITION_GRPC_PY=1500000
+        EMAIL_SUBJECT="Weekly Long"
+    else
+        # Run the test for each case approximately 1.5 hours
+        # All tests are run cumulatively for 7 hours
+        REPETITION_HTTP_CPP=1300000
+        REPETITION_HTTP_PY=2100000
+        REPETITION_GRPC_CPP=6600000
+        REPETITION_GRPC_PY=1000000
+        EMAIL_SUBJECT="Weekly"
+    fi
 else
     REPETITION_CPP=100000
     REPETITION_PY=10000
@@ -113,9 +123,11 @@ for PROTOCOL in http grpc; do
             EXTRA_ARGS="-r ${REPETITION_PY} -i ${PROTOCOL}"
         fi
 
+        set +e
         SECONDS=0
         $LEAKCHECK $LEAKCHECK_ARGS $MEMORY_GROWTH_TEST $EXTRA_ARGS >> ${CLIENT_LOG} 2>&1
         TEST_DURATION=$SECONDS
+        set -e
         if [ $? -ne 0 ]; then
             cat ${CLIENT_LOG}
             RET=1
@@ -159,8 +171,8 @@ else
 fi
 
 # Run only if both TRITON_FROM and TRITON_TO_DL are set
-if [[ ! -z "$TRITON_FROM" ]] || [[ ! -z "$TRITON_TO_DL" ]]; then
-    python client_memory_mail.py $EMAIL_SUBJECT
+if [[ ! -z "$TRITON_FROM" ]] && [[ ! -z "$TRITON_TO_DL" ]]; then
+    python client_memory_mail.py "$EMAIL_SUBJECT"
 fi
 
 exit $RET
