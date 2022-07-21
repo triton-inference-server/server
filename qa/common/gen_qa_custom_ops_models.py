@@ -498,7 +498,10 @@ if __name__ == '__main__':
     FLAGS, unparsed = parser.parse_known_args()
 
     if FLAGS.graphdef or FLAGS.savedmodel:
-        import tensorflow as tf
+        # Use Tensorflow 2 as default. Need to disable the v2 behavior for
+        # model generation scripts.
+        import tensorflow.compat.v1 as tf
+        tf.disable_v2_behavior()
         from tensorflow.python.framework import graph_io
         create_zero_out_models(FLAGS.models_dir)
         create_cuda_op_models(FLAGS.models_dir)
