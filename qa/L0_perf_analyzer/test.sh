@@ -638,10 +638,7 @@ for PROTOCOL in grpc http; do
     # Testing that trace logging works
     set +e
     TRACE_FILE="trace.json"
-    if  compgen -G "${TRACE_FILE}*" > /dev/null; then
-        echo -e "\n***\n*** Test Failed. Unexpected generation of $TRACE_FILE.\n***"
-        RET=1
-    fi
+    rm ${TRACE_FILE}*
     $PERF_ANALYZER -v -i $PROTOCOL -m simple_savedmodel_sequence_object -p 2000 -t5 --sync --trace-file $TRACE_FILE \
     --trace-level TIMESTAMPS --trace-rate 1000 --trace-count 100 --log-frequency 10 \
     --input-data=$SEQ_JSONDATAFILE >$CLIENT_LOG 2>&1
@@ -658,7 +655,6 @@ for PROTOCOL in grpc http; do
         echo -e "\n***\n*** Test Failed. Did not find `REQUEST_START` in $TRACE_FILE \n***"
         RET=1
     fi
-    rm ${TRACE_FILE}*
     set -e
 done
 
