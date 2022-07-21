@@ -71,7 +71,7 @@ else
   EXPECTED_NUM_TESTS=${EXPECTED_NUM_TESTS:="42"}
 fi
 
-TF_VERSION=${TF_VERSION:=1}
+TF_VERSION=${TF_VERSION:=2}
 TEST_JETSON=${TEST_JETSON:=0}
 
 # Default size (in MB) of shared memory to be used by each python model

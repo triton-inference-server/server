@@ -48,7 +48,8 @@ ARCH=${ARCH:="x86_64"}
 SERVER=${TRITON_DIR}/bin/tritonserver
 BACKEND_DIR=${TRITON_DIR}/backends
 MODEL_REPO="${PWD}/models"
-SERVER_ARGS="--model-repository=${MODEL_REPO} --backend-directory=${BACKEND_DIR}"
+TF_VERSION=${TF_VERSION:=2}
+SERVER_ARGS="--model-repository=${MODEL_REPO} --backend-directory=${BACKEND_DIR} --backend-config=tensorflow,version=${TF_VERSION}"
 source ../common/util.sh
 
 # DATADIR is already set in environment variable for aarch64
