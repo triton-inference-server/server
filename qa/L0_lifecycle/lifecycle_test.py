@@ -1370,7 +1370,7 @@ class LifeCycleTest(tu.TestResultCollector):
                 self.assertTrue(False, "expected unknown model failure")
             except Exception as ex:
                 self.assertIn(
-                    "failed to load 'unknown_model', no version is available",
+                    "failed to load 'unknown_model', failed to poll from model repository",
                     ex.message())
 
         # Load ensemble model, the dependent model should be polled and loaded
@@ -1960,7 +1960,7 @@ class LifeCycleTest(tu.TestResultCollector):
                 self.assertTrue(False, "expected unknown model failure")
             except Exception as ex:
                 self.assertIn(
-                    "failed to load 'unknown_model', no version is available",
+                    "failed to load 'unknown_model', failed to poll from model repository",
                     ex.message())
 
         # Load plan ensemble model, the dependent model is already
