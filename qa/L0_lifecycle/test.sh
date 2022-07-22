@@ -48,6 +48,21 @@ SERVER=/opt/tritonserver/bin/tritonserver
 TEST_RESULT_FILE='test_results.txt'
 source ../common/util.sh
 
+function check_unit_test() {
+    if [ $? -ne 0 ]; then
+        cat $CLIENT_LOG
+        echo -e "\n***\n*** Test Failed\n***"
+        RET=1
+    else
+        check_test_results $TEST_RESULT_FILE 1
+        if [ $? -ne 0 ]; then
+            cat $CLIENT_LOG
+            echo -e "\n***\n*** Test Result Verification Failed\n***"
+            RET=1
+        fi
+    fi
+}
+
 RET=0
 rm -fr *.log
 
@@ -74,18 +89,7 @@ sleep $SLEEP_TIME
 rm -f $CLIENT_LOG
 set +e
 python $LC_TEST LifeCycleTest.test_parse_error_noexit >>$CLIENT_LOG 2>&1
-if [ $? -ne 0 ]; then
-    cat $CLIENT_LOG
-    echo -e "\n***\n*** Test Failed\n***"
-    RET=1
-else
-    check_test_results $TEST_RESULT_FILE 1
-    if [ $? -ne 0 ]; then
-        cat $CLIENT_LOG
-        echo -e "\n***\n*** Test Result Verification Failed\n***"
-        RET=1
-    fi
-fi
+check_unit_test
 set -e
 
 kill $SERVER_PID
@@ -109,18 +113,7 @@ sleep $SLEEP_TIME
 rm -f $CLIENT_LOG
 set +e
 python $LC_TEST LifeCycleTest.test_parse_error_noexit >>$CLIENT_LOG 2>&1
-if [ $? -ne 0 ]; then
-    cat $CLIENT_LOG
-    echo -e "\n***\n*** Test Failed\n***"
-    RET=1
-else
-    check_test_results $TEST_RESULT_FILE 1
-    if [ $? -ne 0 ]; then
-        cat $CLIENT_LOG
-        echo -e "\n***\n*** Test Result Verification Failed\n***"
-        RET=1
-    fi
-fi
+check_unit_test
 set -e
 
 kill $SERVER_PID
@@ -146,18 +139,7 @@ sleep $SLEEP_TIME
 rm -f $CLIENT_LOG
 set +e
 python $LC_TEST LifeCycleTest.test_parse_error_noexit >>$CLIENT_LOG 2>&1
-if [ $? -ne 0 ]; then
-    cat $CLIENT_LOG
-    echo -e "\n***\n*** Test Failed\n***"
-    RET=1
-else
-    check_test_results $TEST_RESULT_FILE 1
-    if [ $? -ne 0 ]; then
-        cat $CLIENT_LOG
-        echo -e "\n***\n*** Test Result Verification Failed\n***"
-        RET=1
-    fi
-fi
+check_unit_test
 set -e
 
 kill $SERVER_PID
@@ -183,18 +165,7 @@ sleep $SLEEP_TIME
 rm -f $CLIENT_LOG
 set +e
 python $LC_TEST LifeCycleTest.test_parse_error_noexit >>$CLIENT_LOG 2>&1
-if [ $? -ne 0 ]; then
-    cat $CLIENT_LOG
-    echo -e "\n***\n*** Test Failed\n***"
-    RET=1
-else
-    check_test_results $TEST_RESULT_FILE 1
-    if [ $? -ne 0 ]; then
-        cat $CLIENT_LOG
-        echo -e "\n***\n*** Test Result Verification Failed\n***"
-        RET=1
-    fi
-fi
+check_unit_test
 set -e
 
 kill $SERVER_PID
@@ -388,18 +359,7 @@ wait_for_model_stable $SERVER_TIMEOUT
 rm -f $CLIENT_LOG
 set +e
 python $LC_TEST LifeCycleTest.test_parse_error_modelfail >>$CLIENT_LOG 2>&1
-if [ $? -ne 0 ]; then
-    cat $CLIENT_LOG
-    echo -e "\n***\n*** Test Failed\n***"
-    RET=1
-else
-    check_test_results $TEST_RESULT_FILE 1
-    if [ $? -ne 0 ]; then
-        cat $CLIENT_LOG
-        echo -e "\n***\n*** Test Result Verification Failed\n***"
-        RET=1
-    fi
-fi
+check_unit_test
 set -e
 
 kill $SERVER_PID
@@ -424,18 +384,7 @@ wait_for_model_stable $SERVER_TIMEOUT
 rm -f $CLIENT_LOG
 set +e
 python $LC_TEST LifeCycleTest.test_parse_error_modelfail_nostrict >>$CLIENT_LOG 2>&1
-if [ $? -ne 0 ]; then
-    cat $CLIENT_LOG
-    echo -e "\n***\n*** Test Failed\n***"
-    RET=1
-else
-    check_test_results $TEST_RESULT_FILE 1
-    if [ $? -ne 0 ]; then
-        cat $CLIENT_LOG
-        echo -e "\n***\n*** Test Result Verification Failed\n***"
-        RET=1
-    fi
-fi
+check_unit_test
 set -e
 
 kill $SERVER_PID
@@ -472,18 +421,7 @@ wait_for_model_stable $SERVER_TIMEOUT
 rm -f $CLIENT_LOG
 set +e
 python $LC_TEST LifeCycleTest.test_parse_error_no_model_config >>$CLIENT_LOG 2>&1
-if [ $? -ne 0 ]; then
-    cat $CLIENT_LOG
-    echo -e "\n***\n*** Test Failed\n***"
-    RET=1
-else
-    check_test_results $TEST_RESULT_FILE 1
-    if [ $? -ne 0 ]; then
-        cat $CLIENT_LOG
-        echo -e "\n***\n*** Test Result Verification Failed\n***"
-        RET=1
-    fi
-fi
+check_unit_test
 set -e
 
 kill $SERVER_PID
@@ -528,18 +466,7 @@ wait_for_model_stable $SERVER_TIMEOUT
 rm -f $CLIENT_LOG
 set +e
 python $LC_TEST LifeCycleTest.test_init_error_modelfail >>$CLIENT_LOG 2>&1
-if [ $? -ne 0 ]; then
-    cat $CLIENT_LOG
-    echo -e "\n***\n*** Test Failed\n***"
-    RET=1
-else
-    check_test_results $TEST_RESULT_FILE 1
-    if [ $? -ne 0 ]; then
-        cat $CLIENT_LOG
-        echo -e "\n***\n*** Test Result Verification Failed\n***"
-        RET=1
-    fi
-fi
+check_unit_test
 set -e
 
 kill $SERVER_PID
@@ -573,18 +500,7 @@ wait_for_model_stable $SERVER_TIMEOUT
 rm -f $CLIENT_LOG
 set +e
 python $LC_TEST LifeCycleTest.test_parse_error_model_no_version >>$CLIENT_LOG 2>&1
-if [ $? -ne 0 ]; then
-    cat $CLIENT_LOG
-    echo -e "\n***\n*** Test Failed\n***"
-    RET=1
-else
-    check_test_results $TEST_RESULT_FILE 1
-    if [ $? -ne 0 ]; then
-        cat $CLIENT_LOG
-        echo -e "\n***\n*** Test Result Verification Failed\n***"
-        RET=1
-    fi
-fi
+check_unit_test
 set -e
 
 kill $SERVER_PID
@@ -613,18 +529,7 @@ fi
 rm -f $CLIENT_LOG
 set +e
 python $LC_TEST LifeCycleTest.test_parse_ignore_zero_prefixed_version >>$CLIENT_LOG 2>&1
-if [ $? -ne 0 ]; then
-    cat $CLIENT_LOG
-    echo -e "\n***\n*** Test Failed\n***"
-    RET=1
-else
-    check_test_results $TEST_RESULT_FILE 1
-    if [ $? -ne 0 ]; then
-        cat $CLIENT_LOG
-        echo -e "\n***\n*** Test Result Verification Failed\n***"
-        RET=1
-    fi
-fi
+check_unit_test
 set -e
 
 kill $SERVER_PID
@@ -659,18 +564,7 @@ fi
 rm -f $CLIENT_LOG
 set +e
 python $LC_TEST LifeCycleTest.test_parse_ignore_non_intergral_version >>$CLIENT_LOG 2>&1
-if [ $? -ne 0 ]; then
-    cat $CLIENT_LOG
-    echo -e "\n***\n*** Test Failed\n***"
-    RET=1
-else
-    check_test_results $TEST_RESULT_FILE 1
-    if [ $? -ne 0 ]; then
-        cat $CLIENT_LOG
-        echo -e "\n***\n*** Test Result Verification Failed\n***"
-        RET=1
-    fi
-fi
+check_unit_test
 set -e
 
 kill $SERVER_PID
@@ -705,18 +599,7 @@ fi
 rm -f $CLIENT_LOG
 set +e
 python $LC_TEST LifeCycleTest.test_dynamic_model_load_unload >>$CLIENT_LOG 2>&1
-if [ $? -ne 0 ]; then
-    cat $CLIENT_LOG
-    echo -e "\n***\n*** Test Failed\n***"
-    RET=1
-else
-    check_test_results $TEST_RESULT_FILE 1
-    if [ $? -ne 0 ]; then
-        cat $CLIENT_LOG
-        echo -e "\n***\n*** Test Result Verification Failed\n***"
-        RET=1
-    fi
-fi
+check_unit_test
 set -e
 
 kill $SERVER_PID
@@ -745,18 +628,7 @@ fi
 rm -f $CLIENT_LOG
 set +e
 python $LC_TEST LifeCycleTest.test_dynamic_model_load_unload_disabled >>$CLIENT_LOG 2>&1
-if [ $? -ne 0 ]; then
-    cat $CLIENT_LOG
-    echo -e "\n***\n*** Test Failed\n***"
-    RET=1
-else
-    check_test_results $TEST_RESULT_FILE 1
-    if [ $? -ne 0 ]; then
-        cat $CLIENT_LOG
-        echo -e "\n***\n*** Test Result Verification Failed\n***"
-        RET=1
-    fi
-fi
+check_unit_test
 set -e
 
 kill $SERVER_PID
@@ -784,18 +656,7 @@ fi
 rm -f $CLIENT_LOG
 set +e
 python $LC_TEST LifeCycleTest.test_dynamic_version_load_unload >>$CLIENT_LOG 2>&1
-if [ $? -ne 0 ]; then
-    cat $CLIENT_LOG
-    echo -e "\n***\n*** Test Failed\n***"
-    RET=1
-else
-    check_test_results $TEST_RESULT_FILE 1
-    if [ $? -ne 0 ]; then
-        cat $CLIENT_LOG
-        echo -e "\n***\n*** Test Result Verification Failed\n***"
-        RET=1
-    fi
-fi
+check_unit_test
 set -e
 
 kill $SERVER_PID
@@ -824,18 +685,7 @@ fi
 rm -f $CLIENT_LOG
 set +e
 python $LC_TEST LifeCycleTest.test_dynamic_version_load_unload_disabled >>$CLIENT_LOG 2>&1
-if [ $? -ne 0 ]; then
-    cat $CLIENT_LOG
-    echo -e "\n***\n*** Test Failed\n***"
-    RET=1
-else
-    check_test_results $TEST_RESULT_FILE 1
-    if [ $? -ne 0 ]; then
-        cat $CLIENT_LOG
-        echo -e "\n***\n*** Test Result Verification Failed\n***"
-        RET=1
-    fi
-fi
+check_unit_test
 set -e
 
 kill $SERVER_PID
@@ -870,18 +720,7 @@ fi
 rm -f $CLIENT_LOG
 set +e
 python $LC_TEST LifeCycleTest.test_dynamic_model_modify >>$CLIENT_LOG 2>&1
-if [ $? -ne 0 ]; then
-    cat $CLIENT_LOG
-    echo -e "\n***\n*** Test Failed\n***"
-    RET=1
-else
-    check_test_results $TEST_RESULT_FILE 1
-    if [ $? -ne 0 ]; then
-        cat $CLIENT_LOG
-        echo -e "\n***\n*** Test Result Verification Failed\n***"
-        RET=1
-    fi
-fi
+check_unit_test
 set -e
 
 kill $SERVER_PID
@@ -909,18 +748,7 @@ fi
 rm -f $CLIENT_LOG
 set +e
 python $LC_TEST LifeCycleTest.test_dynamic_file_delete >>$CLIENT_LOG 2>&1
-if [ $? -ne 0 ]; then
-    cat $CLIENT_LOG
-    echo -e "\n***\n*** Test Failed\n***"
-    RET=1
-else
-    check_test_results $TEST_RESULT_FILE 1
-    if [ $? -ne 0 ]; then
-        cat $CLIENT_LOG
-        echo -e "\n***\n*** Test Result Verification Failed\n***"
-        RET=1
-    fi
-fi
+check_unit_test
 set -e
 
 kill $SERVER_PID
@@ -954,18 +782,7 @@ fi
 rm -f $CLIENT_LOG
 set +e
 python $LC_TEST LifeCycleTest.test_multiple_model_repository_polling >>$CLIENT_LOG 2>&1
-if [ $? -ne 0 ]; then
-    cat $CLIENT_LOG
-    echo -e "\n***\n*** Test Failed\n***"
-    RET=1
-else
-    check_test_results $TEST_RESULT_FILE 1
-    if [ $? -ne 0 ]; then
-        cat $CLIENT_LOG
-        echo -e "\n***\n*** Test Result Verification Failed\n***"
-        RET=1
-    fi
-fi
+check_unit_test
 set -e
 
 kill $SERVER_PID
@@ -1001,18 +818,7 @@ fi
 rm -f $CLIENT_LOG
 set +e
 python $LC_TEST LifeCycleTest.test_multiple_model_repository_control >>$CLIENT_LOG 2>&1
-if [ $? -ne 0 ]; then
-    cat $CLIENT_LOG
-    echo -e "\n***\n*** Test Failed\n***"
-    RET=1
-else
-    check_test_results $TEST_RESULT_FILE 1
-    if [ $? -ne 0 ]; then
-        cat $CLIENT_LOG
-        echo -e "\n***\n*** Test Result Verification Failed\n***"
-        RET=1
-    fi
-fi
+check_unit_test
 set -e
 
 kill $SERVER_PID
@@ -1044,18 +850,7 @@ fi
 rm -f $CLIENT_LOG
 set +e
 python $LC_TEST LifeCycleTest.test_model_control >>$CLIENT_LOG 2>&1
-if [ $? -ne 0 ]; then
-    cat $CLIENT_LOG
-    echo -e "\n***\n*** Test Failed\n***"
-    RET=1
-else
-    check_test_results $TEST_RESULT_FILE 1
-    if [ $? -ne 0 ]; then
-        cat $CLIENT_LOG
-        echo -e "\n***\n*** Test Result Verification Failed\n***"
-        RET=1
-    fi
-fi
+check_unit_test
 set -e
 
 kill $SERVER_PID
@@ -1087,18 +882,7 @@ fi
 rm -f $CLIENT_LOG
 set +e
 python $LC_TEST LifeCycleTest.test_model_control_fail >>$CLIENT_LOG 2>&1
-if [ $? -ne 0 ]; then
-    cat $CLIENT_LOG
-    echo -e "\n***\n*** Test Failed\n***"
-    RET=1
-else
-    check_test_results $TEST_RESULT_FILE 1
-    if [ $? -ne 0 ]; then
-        cat $CLIENT_LOG
-        echo -e "\n***\n*** Test Result Verification Failed\n***"
-        RET=1
-    fi
-fi
+check_unit_test
 set -e
 
 kill $SERVER_PID
@@ -1130,18 +914,7 @@ fi
 rm -f $CLIENT_LOG
 set +e
 python $LC_TEST LifeCycleTest.test_model_control_ensemble >>$CLIENT_LOG 2>&1
-if [ $? -ne 0 ]; then
-    cat $CLIENT_LOG
-    echo -e "\n***\n*** Test Failed\n***"
-    RET=1
-else
-    check_test_results $TEST_RESULT_FILE 1
-    if [ $? -ne 0 ]; then
-        cat $CLIENT_LOG
-        echo -e "\n***\n*** Test Result Verification Failed\n***"
-        RET=1
-    fi
-fi
+check_unit_test
 set -e
 
 kill $SERVER_PID
@@ -1184,18 +957,7 @@ fi
 rm -f $CLIENT_LOG
 set +e
 python $LC_TEST LifeCycleTest.test_multiple_model_repository_control_startup_models >>$CLIENT_LOG 2>&1
-if [ $? -ne 0 ]; then
-    cat $CLIENT_LOG
-    echo -e "\n***\n*** Test Failed\n***"
-    RET=1
-else
-    check_test_results $TEST_RESULT_FILE 1
-    if [ $? -ne 0 ]; then
-        cat $CLIENT_LOG
-        echo -e "\n***\n*** Test Result Verification Failed\n***"
-        RET=1
-    fi
-fi
+check_unit_test
 set -e
 
 kill $SERVER_PID
@@ -1238,18 +1000,7 @@ fi
 rm -f $CLIENT_LOG
 set +e
 python $LC_TEST LifeCycleTest.test_multiple_model_repository_control_startup_models >>$CLIENT_LOG 2>&1
-if [ $? -ne 0 ]; then
-    cat $CLIENT_LOG
-    echo -e "\n***\n*** Test Failed\n***"
-    RET=1
-else
-    check_test_results $TEST_RESULT_FILE 1
-    if [ $? -ne 0 ]; then
-        cat $CLIENT_LOG
-        echo -e "\n***\n*** Test Result Verification Failed\n***"
-        RET=1
-    fi
-fi
+check_unit_test
 set -e
 
 kill $SERVER_PID
@@ -1320,18 +1071,7 @@ fi
 rm -f $CLIENT_LOG
 set +e
 python $LC_TEST LifeCycleTest.test_model_repository_index >>$CLIENT_LOG 2>&1
-if [ $? -ne 0 ]; then
-    cat $CLIENT_LOG
-    echo -e "\n***\n*** Test Failed\n***"
-    RET=1
-else
-    check_test_results $TEST_RESULT_FILE 1
-    if [ $? -ne 0 ]; then
-        cat $CLIENT_LOG
-        echo -e "\n***\n*** Test Result Verification Failed\n***"
-        RET=1
-    fi
-fi
+check_unit_test
 set -e
 
 kill $SERVER_PID
@@ -1515,18 +1255,7 @@ fi
 rm -f $CLIENT_LOG
 set +e
 python $LC_TEST LifeCycleTest.test_model_reload_fail >>$CLIENT_LOG 2>&1
-if [ $? -ne 0 ]; then
-    cat $CLIENT_LOG
-    echo -e "\n***\n*** Test Failed\n***"
-    RET=1
-else
-    check_test_results $TEST_RESULT_FILE 1
-    if [ $? -ne 0 ]; then
-        cat $CLIENT_LOG
-        echo -e "\n***\n*** Test Result Verification Failed\n***"
-        RET=1
-    fi
-fi
+check_unit_test
 set -e
 
 kill $SERVER_PID
@@ -1723,18 +1452,7 @@ fi
 rm -f $CLIENT_LOG
 set +e
 python $LC_TEST LifeCycleTest.test_config_override >>$CLIENT_LOG 2>&1
-if [ $? -ne 0 ]; then
-    cat $CLIENT_LOG
-    echo -e "\n***\n*** Test Failed\n***"
-    RET=1
-else
-    check_test_results $TEST_RESULT_FILE 1
-    if [ $? -ne 0 ]; then
-        cat $CLIENT_LOG
-        echo -e "\n***\n*** Test Result Verification Failed\n***"
-        RET=1
-    fi
-fi
+check_unit_test
 set -e
 
 kill $SERVER_PID
@@ -1767,18 +1485,7 @@ fi
 rm -f $CLIENT_LOG
 set +e
 python $LC_TEST LifeCycleTest.test_file_override >>$CLIENT_LOG 2>&1
-if [ $? -ne 0 ]; then
-    cat $CLIENT_LOG
-    echo -e "\n***\n*** Test Failed\n***"
-    RET=1
-else
-    check_test_results $TEST_RESULT_FILE 1
-    if [ $? -ne 0 ]; then
-        cat $CLIENT_LOG
-        echo -e "\n***\n*** Test Result Verification Failed\n***"
-        RET=1
-    fi
-fi
+check_unit_test
 set -e
 
 kill $SERVER_PID
@@ -1810,18 +1517,7 @@ fi
 
 set +e
 SERVER_PID=$SERVER_PID python $LC_TEST LifeCycleTest.test_shutdown_dynamic >>$CLIENT_LOG 2>&1
-if [ $? -ne 0 ]; then
-    cat $CLIENT_LOG
-    echo -e "\n***\n*** Test Failed\n***"
-    RET=1
-else
-    check_test_results $TEST_RESULT_FILE 1
-    if [ $? -ne 0 ]; then
-        cat $CLIENT_LOG
-        echo -e "\n***\n*** Test Result Verification Failed\n***"
-        RET=1
-    fi
-fi
+check_unit_test
 set -e
 
 # check server log
@@ -1854,18 +1550,7 @@ fi
 
 set +e
 SERVER_PID=$SERVER_PID python $LC_TEST LifeCycleTest.test_shutdown_sequence >>$CLIENT_LOG 2>&1
-if [ $? -ne 0 ]; then
-    cat $CLIENT_LOG
-    echo -e "\n***\n*** Test Failed\n***"
-    RET=1
-else
-    check_test_results $TEST_RESULT_FILE 1
-    if [ $? -ne 0 ]; then
-        cat $CLIENT_LOG
-        echo -e "\n***\n*** Test Result Verification Failed\n***"
-        RET=1
-    fi
-fi
+check_unit_test
 set -e
 
 # check server log
@@ -1909,18 +1594,7 @@ fi
 
 set +e
 SERVER_PID=$SERVER_PID python $LC_TEST LifeCycleTest.test_shutdown_ensemble >>$CLIENT_LOG 2>&1
-if [ $? -ne 0 ]; then
-    cat $CLIENT_LOG
-    echo -e "\n***\n*** Test Failed\n***"
-    RET=1
-else
-    check_test_results $TEST_RESULT_FILE 1
-    if [ $? -ne 0 ]; then
-        cat $CLIENT_LOG
-        echo -e "\n***\n*** Test Result Verification Failed\n***"
-        RET=1
-    fi
-fi
+check_unit_test
 set -e
 
 # check server log
