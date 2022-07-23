@@ -61,11 +61,11 @@ $log_setting_response =
   $log_setting, ...
 }
 
-$log_setting = $string : $string | $boolean | $uint32
+$log_setting = $string : $string | $boolean | $number
 ```
 
 Each $log_setting JSON describes a “name”/”value” pair, where the “name” is
-the $string representation of the log setting and the “value” is a $string, $bool, or $uint32 representation of the
+the $string representation of the log setting and the “value” is a $string, $bool, or $number representation of the
 setting value. Currently, the following log settings are defined:
 
 - "log_file" : a $string parameter defining the file where the log outputs will be saved. If not specified,
@@ -77,11 +77,11 @@ log outputs will stream to the console.
 
 - "log_errors" : a $boolean parameter that controls whether the Triton server logs ERROR level messages. 
 
-- "log_verbose_level" : a $uint32 parameter that controls whether the Triton server outputs verbose messages
-of varying degrees. This value can be any integer >= 0. If "log_verbose_level" is 0, no verbose messages
-will be output by the Triton server. If "log_verbose_level" is 1, level 1 verbose messages will be output
+- "log_verbose_level" : a $number parameter that controls whether the Triton server outputs verbose messages
+of varying degrees. This value can be any integer >= 0. If "log_verbose_level" is 0, verbose logging will be disabled, and 
+no verbose messages will be output by the Triton server. If "log_verbose_level" is 1, level 1 verbose messages will be output
 by the Triton server. If "log_verbose_level" is 2, the Triton server will output all verbose messages of 
-level <= 2, etc.
+level <= 2, etc. Attempting to set "log_verbose_level" to a number < 0 will result in an error.
 
 - "log_format" : a $string parameter that controls the format of Triton server log messages. There are currently
 2 formats: "default" and "ISO8601".
@@ -125,7 +125,7 @@ settings will be updated.
 The logging protocol extension can be invoked using the curl library in the following manner (assuming 
 a Triton server is running at `localhost:8000`):
 ```
-curl -s -w '\n%{http_code}\n' -d '{"log_verbose_level":1}' localhost:8000/v2/logging
+curl -s -w '\n%{http_code}\n' -d '{"log_verbose_level":1}' -X POST localhost:8000/v2/logging
 ```
 This command should return a $log_setting_response JSON object with the following format:
 ```

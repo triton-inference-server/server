@@ -357,7 +357,9 @@ std::vector<Option> options_
        "timestamp will be logged as \"LMMDD hh:mm:ss.ssssss\". "
        "For \"ISO8601\", the log format will be \"YYYY-MM-DDThh:mm:ssZ L\"."},
       {OPTION_LOG_FILE, "log-file", Option::ArgStr,
-       "Set the name of the log output file."},
+       "Set the name of the log output file. If specified, log outputs will be "
+       "saved to this file. If not specified, log outputs will stream to the "
+       "console."},
 #endif  // TRITON_ENABLE_LOGGING
       {OPTION_ID, "id", Option::ArgStr, "Identifier for this server."},
       {OPTION_MODEL_REPOSITORY, "model-store", Option::ArgStr,

@@ -114,17 +114,16 @@ if [ `grep -c "\"log_format\":\"default\"" ./curl.out` != "1" ]; then
     RET=1
 fi
 
-for p in {1..10}; do
-    $SIMPLE_HTTP_CLIENT >> client_default.log 2>&1
-    if [ $? -ne 0 ]; then
-        RET=1
-    fi
+$SIMPLE_HTTP_CLIENT >> client_default.log 2>&1
+if [ $? -ne 0 ]; then
+    RET=1
+fi
 
-    $SIMPLE_GRPC_CLIENT >> client_default.log 2>&1
-    if [ $? -ne 0 ]; then
-        RET=1
-    fi
-done
+$SIMPLE_GRPC_CLIENT >> client_default.log 2>&1
+if [ $? -ne 0 ]; then
+    RET=1
+fi
+
 
 set -e
 
@@ -171,17 +170,15 @@ if [ `grep -c "\"log_format\":\"default\"" ./curl.out` != "1" ]; then
     RET=1
 fi
 
-for p in {1..10}; do
-    $SIMPLE_HTTP_CLIENT >> client_test_log_file.log 2>&1
-    if [ $? -ne 0 ]; then
-        RET=1
-    fi
+$SIMPLE_HTTP_CLIENT >> client_test_log_file.log 2>&1
+if [ $? -ne 0 ]; then
+    RET=1
+fi
 
-    $SIMPLE_GRPC_CLIENT >> client_test_log_file.log 2>&1
-    if [ $? -ne 0 ]; then
-        RET=1
-    fi
-done
+$SIMPLE_GRPC_CLIENT >> client_test_log_file.log 2>&1
+if [ $? -ne 0 ]; then
+    RET=1
+fi
 
 set -e
 
@@ -228,17 +225,16 @@ if [ `grep -c "\"log_format\":\"default\"" ./curl.out` != "1" ]; then
     RET=1
 fi
 
-for p in {1..10}; do
-    $SIMPLE_HTTP_CLIENT >> client_test_log_info.log 2>&1
-    if [ $? -ne 0 ]; then
-        RET=1
-    fi
 
-    $SIMPLE_GRPC_CLIENT >> client_test_log_info.log 2>&1
-    if [ $? -ne 0 ]; then
-        RET=1
-    fi
-done
+$SIMPLE_HTTP_CLIENT >> client_test_log_info.log 2>&1
+if [ $? -ne 0 ]; then
+    RET=1
+fi
+
+$SIMPLE_GRPC_CLIENT >> client_test_log_info.log 2>&1
+if [ $? -ne 0 ]; then
+    RET=1
+fi
 
 set -e
 
@@ -284,17 +280,15 @@ if [ `grep -c "\"log_format\":\"default\"" ./curl.out` != "1" ]; then
     RET=1
 fi
 
-for p in {1..10}; do
-    $SIMPLE_HTTP_CLIENT >> client_test_log_warning.log 2>&1
-    if [ $? -ne 0 ]; then
-        RET=1
-    fi
+$SIMPLE_HTTP_CLIENT >> client_test_log_warning.log 2>&1
+if [ $? -ne 0 ]; then
+    RET=1
+fi
 
-    $SIMPLE_GRPC_CLIENT >> client_test_log_warning.log 2>&1
-    if [ $? -ne 0 ]; then
-        RET=1
-    fi
-done
+$SIMPLE_GRPC_CLIENT >> client_test_log_warning.log 2>&1
+if [ $? -ne 0 ]; then
+    RET=1
+fi
 
 set -e
 
@@ -341,17 +335,15 @@ if [ `grep -c "\"log_format\":\"default\"" ./curl.out` != "1" ]; then
     RET=1
 fi
 
-for p in {1..10}; do
-    $SIMPLE_HTTP_CLIENT >> client_test_log_error.log 2>&1
-    if [ $? -ne 0 ]; then
-        RET=1
-    fi
+$SIMPLE_HTTP_CLIENT >> client_test_log_error.log 2>&1
+if [ $? -ne 0 ]; then
+    RET=1
+fi
 
-    $SIMPLE_GRPC_CLIENT >> client_test_log_error.log 2>&1
-    if [ $? -ne 0 ]; then
-        RET=1
-    fi
-done
+$SIMPLE_GRPC_CLIENT >> client_test_log_error.log 2>&1
+if [ $? -ne 0 ]; then
+    RET=1
+fi
 
 set -e
 
@@ -398,17 +390,15 @@ if [ `grep -c "\"log_format\":\"default\"" ./curl.out` != "1" ]; then
     RET=1
 fi
 
-for p in {1..10}; do
-    $SIMPLE_HTTP_CLIENT >> client_test_log_verbose.log 2>&1
-    if [ $? -ne 0 ]; then
-        RET=1
-    fi
+$SIMPLE_HTTP_CLIENT >> client_test_log_verbose.log 2>&1
+if [ $? -ne 0 ]; then
+    RET=1
+fi
 
-    $SIMPLE_GRPC_CLIENT >> client_test_log_verbose.log 2>&1
-    if [ $? -ne 0 ]; then
-        RET=1
-    fi
-done
+$SIMPLE_GRPC_CLIENT >> client_test_log_verbose.log 2>&1
+if [ $? -ne 0 ]; then
+    RET=1
+fi
 
 set -e
 
@@ -455,17 +445,15 @@ if [ `grep -c "\"log_format\":\"ISO8601\"" ./curl.out` != "1" ]; then
     RET=1
 fi
 
-for p in {1..10}; do
-    $SIMPLE_HTTP_CLIENT >> client_test_log_format.log 2>&1
-    if [ $? -ne 0 ]; then
-        RET=1
-    fi
+$SIMPLE_HTTP_CLIENT >> client_test_log_format.log 2>&1
+if [ $? -ne 0 ]; then
+    RET=1
+fi
 
-    $SIMPLE_GRPC_CLIENT >> client_test_log_format.log 2>&1
-    if [ $? -ne 0 ]; then
-        RET=1
-    fi
-done
+$SIMPLE_GRPC_CLIENT >> client_test_log_format.log 2>&1
+if [ $? -ne 0 ]; then
+    RET=1
+fi
 
 set -e
 

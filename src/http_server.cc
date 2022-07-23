@@ -1834,14 +1834,6 @@ HTTPAPIServer::HandleLogging(evhtp_request_t* req)
       evhtp_header_new(kContentTypeHeader, "application/json", 1, 1));
 
 #ifdef TRITON_ENABLE_LOGGING
-  std::string log_file_path = LOG_OUT_FILE;
-  bool log_info_status = LOG_INFO_IS_ON;
-  bool log_warn_status = LOG_WARNING_IS_ON;
-  bool log_error_status = LOG_ERROR_IS_ON;
-  uint64_t verbose_level = static_cast<uint64_t>(LOG_VERBOSE_LEVEL);
-  triton::common::Logger::Format log_format_final = LOG_FORMAT;
-  std::string log_format_parse = LOG_FORMAT_STRING;
-
   // Perform log setting update if requested
   if (req->method == htp_method_POST) {
     struct evbuffer_iovec* v = nullptr;
@@ -1868,54 +1860,63 @@ HTTPAPIServer::HandleLogging(evhtp_request_t* req)
     if (request.Find("log_file", &setting_json)) {
       if (!setting_json.IsNull()) {
         // Set new settings in server then in core
+        std::string log_file_path;
         HTTP_RESPOND_IF_ERR(req, setting_json.AsString(&log_file_path));
         LOG_SET_OUT_FILE(log_file_path);
+        // Okay to pass nullptr because we know the update will be applied
+        // to the global object.
         FAIL_IF_ERR(
             TRITONSERVER_ServerOptionsSetLogOutFile(
-                NULL, log_file_path.c_str()),
+                nullptr, log_file_path.c_str()),
             "setting log out file");
       }
     }
     if (request.Find("log_info", &setting_json)) {
       if (!setting_json.IsNull()) {
+        bool log_info_status;
         HTTP_RESPOND_IF_ERR(req, setting_json.AsBool(&log_info_status));
         LOG_ENABLE_INFO(log_info_status);
         FAIL_IF_ERR(
-            TRITONSERVER_ServerOptionsSetLogInfo(NULL, log_info_status),
+            TRITONSERVER_ServerOptionsSetLogInfo(nullptr, log_info_status),
             "setting log info enable");
       }
     }
     if (request.Find("log_warnings", &setting_json)) {
       if (!setting_json.IsNull()) {
+        bool log_warn_status;
         HTTP_RESPOND_IF_ERR(req, setting_json.AsBool(&log_warn_status));
         LOG_ENABLE_WARNING(log_warn_status);
         FAIL_IF_ERR(
-            TRITONSERVER_ServerOptionsSetLogWarn(NULL, log_warn_status),
+            TRITONSERVER_ServerOptionsSetLogWarn(nullptr, log_warn_status),
             "setting log warning enable");
       }
     }
     if (request.Find("log_errors", &setting_json)) {
       if (!setting_json.IsNull()) {
+        bool log_error_status;
         HTTP_RESPOND_IF_ERR(req, setting_json.AsBool(&log_error_status));
         LOG_ENABLE_ERROR(log_error_status);
         FAIL_IF_ERR(
-            TRITONSERVER_ServerOptionsSetLogError(NULL, log_warn_status),
+            TRITONSERVER_ServerOptionsSetLogError(nullptr, log_error_status),
             "setting log error enable");
       }
     }
     if (request.Find("log_verbose_level", &setting_json)) {
       if (!setting_json.IsNull()) {
+        uint64_t verbose_level;
         HTTP_RESPOND_IF_ERR(req, setting_json.AsUInt(&verbose_level));
         LOG_SET_VERBOSE(static_cast<int32_t>(verbose_level));
         FAIL_IF_ERR(
             TRITONSERVER_ServerOptionsSetLogVerbose(
-                NULL, static_cast<int32_t>(verbose_level)),
+                nullptr, static_cast<int32_t>(verbose_level)),
             "setting log verbose level");
       }
     }
     if (request.Find("log_format", &setting_json)) {
       if (!setting_json.IsNull()) {
+        std::string log_format_parse;
         HTTP_RESPOND_IF_ERR(req, setting_json.AsString(&log_format_parse));
+        triton::common::Logger::Format log_format_final;
         if (log_format_parse == "default") {
           log_format_final = triton::common::Logger::Format::kDEFAULT;
         } else if (log_format_parse == "ISO8601") {
@@ -1934,13 +1935,13 @@ HTTPAPIServer::HandleLogging(evhtp_request_t* req)
           case triton::common::Logger::Format::kDEFAULT:
             FAIL_IF_ERR(
                 TRITONSERVER_ServerOptionsSetLogFormat(
-                    NULL, TRITONSERVER_LOG_DEFAULT),
+                    nullptr, TRITONSERVER_LOG_DEFAULT),
                 "setting log format");
             break;
           case triton::common::Logger::Format::kISO8601:
             FAIL_IF_ERR(
                 TRITONSERVER_ServerOptionsSetLogFormat(
-                    NULL, TRITONSERVER_LOG_ISO8601),
+                    nullptr, TRITONSERVER_LOG_ISO8601),
                 "setting log format");
             break;
         }
@@ -1950,17 +1951,17 @@ HTTPAPIServer::HandleLogging(evhtp_request_t* req)
   triton::common::TritonJson::Value log_setting_response(
       triton::common::TritonJson::ValueType::OBJECT);
   HTTP_RESPOND_IF_ERR(
-      req, log_setting_response.AddString("log_file", log_file_path));
+      req, log_setting_response.AddString("log_file", LOG_OUT_FILE));
   HTTP_RESPOND_IF_ERR(
-      req, log_setting_response.AddBool("log_info", log_info_status));
+      req, log_setting_response.AddBool("log_info", LOG_INFO_IS_ON));
   HTTP_RESPOND_IF_ERR(
-      req, log_setting_response.AddBool("log_warnings", log_warn_status));
+      req, log_setting_response.AddBool("log_warnings", LOG_WARNING_IS_ON));
   HTTP_RESPOND_IF_ERR(
-      req, log_setting_response.AddBool("log_errors", log_error_status));
+      req, log_setting_response.AddBool("log_errors", LOG_ERROR_IS_ON));
   HTTP_RESPOND_IF_ERR(
-      req, log_setting_response.AddInt("log_verbose_level", verbose_level));
+      req, log_setting_response.AddInt("log_verbose_level", static_cast<uint64_t>(LOG_VERBOSE_LEVEL)));
   HTTP_RESPOND_IF_ERR(
-      req, log_setting_response.AddString("log_format", log_format_parse));
+      req, log_setting_response.AddString("log_format", LOG_FORMAT_STRING));
   triton::common::TritonJson::WriteBuffer buffer;
   HTTP_RESPOND_IF_ERR(req, log_setting_response.Write(&buffer));
   evbuffer_add(req->buffer_out, buffer.Base(), buffer.Size());

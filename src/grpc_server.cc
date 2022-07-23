@@ -1363,13 +1363,6 @@ CommonHandler::SetUpAllRequests()
 
 #ifdef TRITON_ENABLE_LOGGING
     TRITONSERVER_Error* err = nullptr;
-    std::string log_file_path = LOG_OUT_FILE;
-    bool log_info_status = LOG_INFO_IS_ON;
-    bool log_warn_status = LOG_WARNING_IS_ON;
-    bool log_error_status = LOG_ERROR_IS_ON;
-    uint32_t verbose_level = LOG_VERBOSE_LEVEL;
-    triton::common::Logger::Format log_format_final = LOG_FORMAT;
-    std::string log_format_parse = LOG_FORMAT_STRING;
     // Update log settings
     // Server and Core repos do not have the same Logger object
     // Each update must be applied to both server and core repo versions
@@ -1389,11 +1382,13 @@ CommonHandler::SetUpAllRequests()
             GOTO_IF_ERR(err, earlyexit);
           } else {
             // Set new settings in server then in core
-            log_file_path = it->second.string_param();
+            const std::string& log_file_path = it->second.string_param();
             LOG_SET_OUT_FILE(log_file_path);
+            // Okay to pass nullptr because we know the update will be applied
+            // to the global object.
             FAIL_IF_ERR(
                 TRITONSERVER_ServerOptionsSetLogOutFile(
-                    NULL, log_file_path.c_str()),
+                    nullptr, log_file_path.c_str()),
                 "setting log out file");
           }
         }
@@ -1412,10 +1407,10 @@ CommonHandler::SetUpAllRequests()
                     .c_str());
             GOTO_IF_ERR(err, earlyexit);
           } else {
-            log_info_status = it->second.bool_param();
+            bool log_info_status = it->second.bool_param();
             LOG_ENABLE_INFO(log_info_status);
             FAIL_IF_ERR(
-                TRITONSERVER_ServerOptionsSetLogInfo(NULL, log_info_status),
+                TRITONSERVER_ServerOptionsSetLogInfo(nullptr, log_info_status),
                 "setting log info enable");
           }
         }
@@ -1434,10 +1429,10 @@ CommonHandler::SetUpAllRequests()
                     .c_str());
             GOTO_IF_ERR(err, earlyexit);
           } else {
-            log_warn_status = it->second.bool_param();
-            LOG_ENABLE_INFO(log_warn_status);
+            bool log_warn_status = it->second.bool_param();
+            LOG_ENABLE_WARNING(log_warn_status);
             FAIL_IF_ERR(
-                TRITONSERVER_ServerOptionsSetLogWarn(NULL, log_warn_status),
+                TRITONSERVER_ServerOptionsSetLogWarn(nullptr, log_warn_status),
                 "setting log info enable");
           }
         }
@@ -1456,10 +1451,10 @@ CommonHandler::SetUpAllRequests()
                     .c_str());
             GOTO_IF_ERR(err, earlyexit);
           } else {
-            log_error_status = it->second.bool_param();
-            LOG_ENABLE_INFO(log_error_status);
+            bool log_error_status = it->second.bool_param();
+            LOG_ENABLE_ERROR(log_error_status);
             FAIL_IF_ERR(
-                TRITONSERVER_ServerOptionsSetLogError(NULL, log_error_status),
+                TRITONSERVER_ServerOptionsSetLogError(nullptr, log_error_status),
                 "setting log info enable");
           }
         }
@@ -1478,10 +1473,10 @@ CommonHandler::SetUpAllRequests()
                     .c_str());
             GOTO_IF_ERR(err, earlyexit);
           } else {
-            verbose_level = it->second.uint32_param();
-            LOG_ENABLE_INFO(verbose_level);
+            uint32_t verbose_level = it->second.uint32_param();
+            LOG_SET_VERBOSE(static_cast<int32_t>(verbose_level));
             FAIL_IF_ERR(
-                TRITONSERVER_ServerOptionsSetLogVerbose(NULL, verbose_level),
+                TRITONSERVER_ServerOptionsSetLogVerbose(nullptr, verbose_level),
                 "setting log info enable");
           }
         }
@@ -1500,7 +1495,8 @@ CommonHandler::SetUpAllRequests()
                     .c_str());
             GOTO_IF_ERR(err, earlyexit);
           } else {
-            log_format_parse = it->second.string_param();
+            const std::string& log_format_parse = it->second.string_param();
+            triton::common::Logger::Format log_format_final;
             if (log_format_parse == "default") {
               log_format_final = triton::common::Logger::Format::kDEFAULT;
             } else if (log_format_parse == "ISO8601") {
@@ -1517,13 +1513,13 @@ CommonHandler::SetUpAllRequests()
               case triton::common::Logger::Format::kDEFAULT:
                 FAIL_IF_ERR(
                     TRITONSERVER_ServerOptionsSetLogFormat(
-                        NULL, TRITONSERVER_LOG_DEFAULT),
+                        nullptr, TRITONSERVER_LOG_DEFAULT),
                     "setting log format");
                 break;
               case triton::common::Logger::Format::kISO8601:
                 FAIL_IF_ERR(
                     TRITONSERVER_ServerOptionsSetLogFormat(
-                        NULL, TRITONSERVER_LOG_ISO8601),
+                        nullptr, TRITONSERVER_LOG_ISO8601),
                     "setting log format");
                 break;
             }
@@ -1532,16 +1528,16 @@ CommonHandler::SetUpAllRequests()
       }
       GOTO_IF_ERR(err, earlyexit);
     }
-    (*response->mutable_settings())["log_file"].set_string_param(log_file_path);
-    (*response->mutable_settings())["log_info"].set_bool_param(log_info_status);
+    (*response->mutable_settings())["log_file"].set_string_param(LOG_OUT_FILE);
+    (*response->mutable_settings())["log_info"].set_bool_param(LOG_INFO_IS_ON);
     (*response->mutable_settings())["log_warnings"].set_bool_param(
-        log_warn_status);
+        LOG_WARNING_IS_ON);
     (*response->mutable_settings())["log_errors"].set_bool_param(
-        log_error_status);
+        LOG_ERROR_IS_ON);
     (*response->mutable_settings())["log_verbose_level"].set_uint32_param(
-        verbose_level);
+        LOG_VERBOSE_LEVEL);
     (*response->mutable_settings())["log_format"].set_string_param(
-        log_format_parse);
+        LOG_FORMAT_STRING);
   earlyexit:
     GrpcStatusUtil::Create(status, err);
     TRITONSERVER_ErrorDelete(err);
@@ -1557,7 +1553,7 @@ CommonHandler::SetUpAllRequests()
   new CommonCallData<
       grpc::ServerAsyncResponseWriter<inference::LogSettingsResponse>,
       inference::LogSettingsRequest, inference::LogSettingsResponse>(
-      "Dynamic_Logging", 0, OnRegisterLogging, OnExecuteLogging,
+      "Logging", 0, OnRegisterLogging, OnExecuteLogging,
       false /* async */, cq_);
 
 
