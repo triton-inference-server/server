@@ -146,13 +146,14 @@ fi
 set +e
 RET=0
 PROTOCOLS="http grpc"
+STABILITY_THRESHOLD="15"
 for protocol in ${PROTOCOLS}; do
     for model in ${MODELS}; do
 	echo "================================================================"
 	echo "[PERMUTATION] Protocol=${protocol} Model=${model}"
 	echo "================================================================"
 
-        ${PERF_ANALYZER} -v -i ${protocol} -m ${model} | tee ${CLIENT_LOG} 2>&1
+        ${PERF_ANALYZER} -v -i ${protocol} -m ${model} -s ${STABILITY_THRESHOLD} | tee ${CLIENT_LOG} 2>&1
         check_perf_analyzer_error $?
 
 	# Check response cache outputs

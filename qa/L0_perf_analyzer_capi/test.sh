@@ -57,6 +57,8 @@ SHAPETENSORADTAFILE=`pwd`/../common/perf_analyzer_input_data_json/shape_tensor_d
 ERROR_STRING="error | Request count: 0 | : 0 infer/sec"
 NON_SUPPORTED_ERROR_STRING="supported by C API"
 
+STABILITY_THRESHOLD="15"
+
 source ../common/util.sh
 
 rm -f $CLIENT_LOG
@@ -106,7 +108,7 @@ set -e
 $PERF_ANALYZER -v -m graphdef_int32_int32_int32 \
 --service-kind=triton_c_api \
 --model-repository=$DATADIR --triton-server-directory=$SERVER_LIBRARY_PATH \
->$CLIENT_LOG 2>&1
+-s ${STABILITY_THRESHOLD} >$CLIENT_LOG 2>&1
 if [ $? -ne 0 ]; then
     cat $CLIENT_LOG
     echo -e "\n***\n*** Test Failed\n***"
@@ -120,7 +122,8 @@ fi
 
 $PERF_ANALYZER -v -m graphdef_int32_int32_int32 -t 1 -p2000 -b 1 \
 --service-kind=triton_c_api --model-repository=$DATADIR \
---triton-server-directory=$SERVER_LIBRARY_PATH >$CLIENT_LOG 2>&1
+--triton-server-directory=$SERVER_LIBRARY_PATH -s ${STABILITY_THRESHOLD} \
+>$CLIENT_LOG 2>&1
 if [ $? -ne 0 ]; then
     cat $CLIENT_LOG
     echo -e "\n***\n*** Test Failed\n***"
@@ -135,7 +138,8 @@ fi
 #Testing with string input
 $PERF_ANALYZER -v -m graphdef_object_object_object --string-data=1 -p2000 \
 --service-kind=triton_c_api --model-repository=$DATADIR \
---triton-server-directory=$SERVER_LIBRARY_PATH >$CLIENT_LOG 2>&1
+--triton-server-directory=$SERVER_LIBRARY_PATH -s ${STABILITY_THRESHOLD} \
+>$CLIENT_LOG 2>&1
 if [ $? -ne 0 ]; then
     cat $CLIENT_LOG
     echo -e "\n***\n*** Test Failed\n***"
@@ -151,7 +155,8 @@ fi
 $PERF_ANALYZER -v -m graphdef_object_int32_int32 --input-data=$TESTDATADIR \
 --shape INPUT0:2,8 --shape INPUT1:2,8 \
 --service-kind=triton_c_api --model-repository=$DATADIR \
---triton-server-directory=$SERVER_LIBRARY_PATH >$CLIENT_LOG 2>&1
+--triton-server-directory=$SERVER_LIBRARY_PATH -s ${STABILITY_THRESHOLD} \
+>$CLIENT_LOG 2>&1
 if [ $? -ne 0 ]; then
     cat $CLIENT_LOG
     echo -e "\n***\n*** Test Failed\n***"
@@ -162,7 +167,7 @@ $PERF_ANALYZER -v -m graphdef_object_int32_int32 \
 --input-data=$STRING_WITHSHAPE_JSONDATAFILE \
 --shape INPUT0:2,8 --shape INPUT1:2,8 -p2000 \
 --service-kind=triton_c_api --model-repository=$DATADIR \
---triton-server-directory=$SERVER_LIBRARY_PATH >$CLIENT_LOG 2>&1
+--triton-server-directory=$SERVER_LIBRARY_PATH -s ${STABILITY_THRESHOLD} \
 >$CLIENT_LOG 2>&1
 if [ $? -ne 0 ]; then
     cat $CLIENT_LOG
@@ -178,7 +183,8 @@ fi
 $PERF_ANALYZER -v -m graphdef_int32_int32_float32 --shape INPUT0:2,8,2 \
 --shape INPUT1:2,8,2 -p2000 \
 --service-kind=triton_c_api --model-repository=$DATADIR \
---triton-server-directory=$SERVER_LIBRARY_PATH >$CLIENT_LOG 2>&1
+--triton-server-directory=$SERVER_LIBRARY_PATH -s ${STABILITY_THRESHOLD} \
+>$CLIENT_LOG 2>&1
 if [ $? -ne 0 ]; then
     cat $CLIENT_LOG
     echo -e "\n***\n*** Test Failed\n***"
@@ -194,7 +200,8 @@ fi
 $PERF_ANALYZER -v -m plan_zero_1_float32 --input-data=$SHAPETENSORADTAFILE \
 --shape DUMMY_INPUT0:4,4 -p2000 -b 8 \
 --service-kind=triton_c_api --model-repository=$DATADIR \
---triton-server-directory=$SERVER_LIBRARY_PATH >$CLIENT_LOG 2>&1
+--triton-server-directory=$SERVER_LIBRARY_PATH -s ${STABILITY_THRESHOLD} \
+>$CLIENT_LOG 2>&1
 if [ $? -ne 0 ]; then
     cat $CLIENT_LOG
     echo -e "\n***\n*** Test Failed\n***"
@@ -243,7 +250,8 @@ fi
 set +e
 $PERF_ANALYZER -v -m graphdef_int32_int32_int32 -t 1 -p2000 -b 1 -a \
 --service-kind=triton_c_api --model-repository=$DATADIR \
---triton-server-directory=$SERVER_LIBRARY_PATH >$CLIENT_LOG 2>&1
+--triton-server-directory=$SERVER_LIBRARY_PATH -s ${STABILITY_THRESHOLD} \
+>$CLIENT_LOG 2>&1
 if [ $(cat $CLIENT_LOG | grep "${NON_SUPPORTED_ERROR_STRING}" | wc -l) -ne 1 ]; then
     cat $CLIENT_LOG
     echo -e "\n***\n*** Test Failed\n***"
@@ -271,7 +279,8 @@ done
 set +e
 $PERF_ANALYZER -v -m graphdef_int32_int32_int32 --request-rate-range 1000:2000:500 -p1000 -b 1 \
 --service-kind=triton_c_api --model-repository=$DATADIR \
---triton-server-directory=$SERVER_LIBRARY_PATH >$CLIENT_LOG 2>&1
+--triton-server-directory=$SERVER_LIBRARY_PATH -s ${STABILITY_THRESHOLD} \
+>$CLIENT_LOG 2>&1
 if [ $(cat $CLIENT_LOG | grep "${NON_SUPPORTED_ERROR_STRING}" | wc -l) -ne 1 ]; then
     cat $CLIENT_LOG
     echo -e "\n***\n*** Test Failed\n***"
