@@ -1315,7 +1315,9 @@ class LifeCycleTest(tu.TestResultCollector):
                 # should NOT unload the existing versions in model control mode.
                 self.assertTrue(
                     triton_client.is_model_ready(savedmodel_name, "1"))
-                self.assertTrue(
+                # Version 3 did not exist in the first model repository, so
+                # it should still not be loaded.
+                self.assertFalse(
                     triton_client.is_model_ready(savedmodel_name, "3"))
         except Exception as ex:
             self.assertTrue(False, "unexpected error {}".format(ex))
@@ -1330,6 +1332,9 @@ class LifeCycleTest(tu.TestResultCollector):
         try:
             triton_client = httpclient.InferenceServerClient("localhost:8000",
                                                              verbose=True)
+            # Unload existing in-memory model from first model repository
+            triton_client.unload_model(savedmodel_name)
+            # Load model from second model repository since original was deleted
             triton_client.load_model(savedmodel_name)
         except Exception as ex:
             self.assertIn("failed to load '{}'".format(savedmodel_name),
