@@ -1866,7 +1866,7 @@ HTTPAPIServer::HandleLogging(evhtp_request_t* req)
         // Okay to pass nullptr because we know the update will be applied
         // to the global object.
         FAIL_IF_ERR(
-            TRITONSERVER_ServerOptionsSetLogOutFile(
+            TRITONSERVER_ServerOptionsSetLogFile(
                 nullptr, log_file_path.c_str()),
             "setting log out file");
       }
@@ -1951,7 +1951,7 @@ HTTPAPIServer::HandleLogging(evhtp_request_t* req)
   triton::common::TritonJson::Value log_setting_response(
       triton::common::TritonJson::ValueType::OBJECT);
   HTTP_RESPOND_IF_ERR(
-      req, log_setting_response.AddString("log_file", LOG_OUT_FILE));
+      req, log_setting_response.AddString("log_file", LOG_FILE));
   HTTP_RESPOND_IF_ERR(
       req, log_setting_response.AddBool("log_info", LOG_INFO_IS_ON));
   HTTP_RESPOND_IF_ERR(
