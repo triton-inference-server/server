@@ -175,7 +175,7 @@ if __name__ == '__main__':
             ("identity_nobatch_int8", np.int8, [7]),
             ("identity_bytes", object, [1, 1]),
             ("identity_bf16", np.float32, [1, 0]),
-            ("identity_bf16", np.float32, [2, 2])):
+            ("identity_bf16", np.float32, [1, 5])):
             # yapf: enable
             if np_dtype != object:
                 input_data = (16384 * np.random.randn(*shape)).astype(np_dtype)
