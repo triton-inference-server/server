@@ -1038,6 +1038,28 @@ fi
 
 LOG_IDX=$((LOG_IDX+1))
 
+# Test loading a startup model that doesn't exist, it should fail
+rm -fr models && mkdir models
+INVALID_MODEL="does-not-exist"
+SERVER_ARGS="--model-repository=`pwd`/models \
+             --model-control-mode=explicit \
+             --strict-readiness=true \
+             --exit-on-error=true \
+             --load-model=${INVALID_MODEL}"
+SERVER_LOG="./inference_server_$LOG_IDX.log"
+run_server
+if [ "$SERVER_PID" != "0" ]; then
+    echo -e "\n***\n*** Failed: $SERVER started successfully when it was expected to fail\n***"
+    echo -e "ERROR: Startup model [${INVALID_MODEL}] should have failed to load."
+    cat $SERVER_LOG
+    RET=1
+
+    kill $SERVER_PID
+    wait $SERVER_PID
+fi
+
+LOG_IDX=$((LOG_IDX+1))
+
 # LifeCycleTest.test_model_repository_index
 rm -fr models models_0 config.pbtxt.*
 mkdir models models_0

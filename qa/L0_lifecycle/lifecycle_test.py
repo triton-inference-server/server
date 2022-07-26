@@ -1294,8 +1294,8 @@ class LifeCycleTest(tu.TestResultCollector):
         ], (1,), model_shape)
         self._infer_success_models(['graphdef', 'onnx'], (1, 3), model_shape)
 
-        # Reload savedmodel which will cause it to unload because it
-        # is in 2 model repositories. Use HTTP here.
+        # Load savedmodel again which should fail because it is now duplicated
+        # in 2 model repositories. Use HTTP here.
         try:
             triton_client = httpclient.InferenceServerClient("localhost:8000",
                                                              verbose=True)
@@ -1311,8 +1311,12 @@ class LifeCycleTest(tu.TestResultCollector):
                                       "localhost:8001", verbose=True)):
                 self.assertTrue(triton_client.is_server_live())
                 self.assertTrue(triton_client.is_server_ready())
-                self.assertFalse(
+                # Unlike polling mode, the failed load on the duplicate model
+                # should NOT unload the existing versions in model control mode.
+                self.assertTrue(
                     triton_client.is_model_ready(savedmodel_name, "1"))
+                # Version 3 did not exist in the first model repository, so
+                # it should still not be loaded.
                 self.assertFalse(
                     triton_client.is_model_ready(savedmodel_name, "3"))
         except Exception as ex:
@@ -1328,6 +1332,9 @@ class LifeCycleTest(tu.TestResultCollector):
         try:
             triton_client = httpclient.InferenceServerClient("localhost:8000",
                                                              verbose=True)
+            # Unload existing in-memory model from first model repository
+            triton_client.unload_model(savedmodel_name)
+            # Load model from second model repository since original was deleted
             triton_client.load_model(savedmodel_name)
         except Exception as ex:
             self.assertIn("failed to load '{}'".format(savedmodel_name),
