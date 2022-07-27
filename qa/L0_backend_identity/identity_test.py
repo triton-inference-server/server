@@ -209,18 +209,28 @@ if __name__ == '__main__':
                 sys.exit(1)
 
             if model_name == "identity_bf16":
-                if(input_data.shape != output_data.shape):
-                    print("error: expected output shape {} to match input shape {}".format(
-                            output_data.shape, input_data.shape))
+                if (input_data.shape != output_data.shape):
+                    print(
+                        "error: expected output shape {} to match input shape {}"
+                        .format(output_data.shape, input_data.shape))
                     sys.exit(1)
-                for input, output in zip(np.nditer(input_data, flags=["refs_ok", "zerosize_ok"], order='C'), np.nditer(output_data, flags=["refs_ok", "zerosize_ok"], order='C')):
+                for input, output in zip(
+                        np.nditer(input_data,
+                                  flags=["refs_ok", "zerosize_ok"],
+                                  order='C'),
+                        np.nditer(output_data,
+                                  flags=["refs_ok", "zerosize_ok"],
+                                  order='C')):
                     if input.tobytes()[2:4] != output.tobytes()[2:4]:
-                        print("error: expected output {} to match input {}".format(
-                            output, input))
+                        print(
+                            "error: expected low-order bits of output {} to match low-order bits of input {}"
+                            .format(output, input))
                         sys.exit(1)
                     if output.tobytes()[0:2] != b'\x00\x00':
-                        print("error: expected output {} to have zero high-order bits, got {}".format(
-                            output, output.tobytes()[0:2]))
+                        print(
+                            "error: expected output {} to have all-zero high-order bits, got {}"
+                            .format(output,
+                                    output.tobytes()[0:2]))
                         sys.exit(1)
             else:
                 if not np.array_equal(output_data, input_data):
