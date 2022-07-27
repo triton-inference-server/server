@@ -141,6 +141,9 @@ HTTPMetricsServer::Handle(evhtp_request_t* req)
   }
 
   evhtp_res res = EVHTP_RES_BADREQ;
+  evhtp_headers_add_header(
+      req->headers_out,
+      evhtp_header_new(kContentTypeHeader, "text/plain; charset=utf-8", 1, 1));
 
   // Call to metric endpoint should not have any trailing string
   if (RE2::FullMatch(std::string(req->uri->path->full), api_regex_)) {
