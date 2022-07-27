@@ -307,7 +307,8 @@ enum OptionId {
   OPTION_BUFFER_MANAGER_THREAD_COUNT,
   OPTION_MODEL_LOAD_THREAD_COUNT,
   OPTION_BACKEND_CONFIG,
-  OPTION_HOST_POLICY
+  OPTION_HOST_POLICY,
+  OPTION_MODEL_LOAD_GPU_LIMIT
 };
 
 struct Option {
@@ -618,13 +619,20 @@ std::vector<Option> options_
        "Specify a backend-specific configuration setting. The format of this "
        "flag is --backend-config=<backend_name>,<setting>=<value>. Where "
        "<backend_name> is the name of the backend, such as 'tensorrt'."},
+      {OPTION_HOST_POLICY, "host-policy", "<string>,<string>=<string>",
+       "Specify a host policy setting associated with a policy name. The "
+       "format of this flag is --host-policy=<policy_name>,<setting>=<value>. "
+       "Currently supported settings are 'numa-node', 'cpu-cores'. Note that "
+       "'numa-node' setting will affect pinned memory pool behavior, see "
+       "--pinned-memory-pool for more detail."},
   {
-    OPTION_HOST_POLICY, "host-policy", "<string>,<string>=<string>",
-        "Specify a host policy setting associated with a policy name. The "
-        "format of this flag is --host-policy=<policy_name>,<setting>=<value>. "
-        "Currently supported settings are 'numa-node', 'cpu-cores'. Note that "
-        "'numa-node' setting will affect pinned memory pool behavior, see "
-        "--pinned-memory-pool for more detail."
+    OPTION_MODEL_LOAD_GPU_LIMIT, "model-load-gpu-limit",
+        "<device_id>:<fraction>",
+        "Specify the limit on GPU memory usage in fraction. If model loading "
+        "on "
+        "the device is requested and the current memory usage exceeds the "
+        "limit,"
+        "the load will be rejected. If not specified, the limit will not set."
   }
 };
 
@@ -1099,8 +1107,9 @@ ParseFloatOption(const std::string arg)
 }
 #endif
 
+template <>
 double
-ParseDoubleOption(const std::string arg)
+ParseOption(const std::string& arg)
 {
   return std::stod(arg);
 }
@@ -1308,6 +1317,7 @@ Parse(TRITONSERVER_ServerOptions** server_options, int argc, char** argv)
   std::vector<std::tuple<std::string, std::string, std::string>>
       backend_config_settings;
   std::vector<std::tuple<std::string, std::string, std::string>> host_policies;
+  std::map<int, double> load_gpu_limit;
 
 #ifdef TRITON_ENABLE_GPU
   double min_supported_compute_capability = TRITON_MIN_COMPUTE_CAPABILITY;
@@ -1679,7 +1689,7 @@ Parse(TRITONSERVER_ServerOptions** server_options, int argc, char** argv)
         response_cache_byte_size = (uint64_t)ParseLongLongOption(optarg);
         break;
       case OPTION_MIN_SUPPORTED_COMPUTE_CAPABILITY:
-        min_supported_compute_capability = ParseDoubleOption(optarg);
+        min_supported_compute_capability = ParseOption<double>(optarg);
         break;
       case OPTION_EXIT_TIMEOUT_SECS:
         exit_timeout_secs = ParseIntOption(optarg);
@@ -1701,6 +1711,9 @@ Parse(TRITONSERVER_ServerOptions** server_options, int argc, char** argv)
         break;
       case OPTION_HOST_POLICY:
         host_policies.push_back(ParseHostPolicyOption(optarg));
+        break;
+      case OPTION_MODEL_LOAD_GPU_LIMIT:
+        load_gpu_limit.emplace(ParsePairOption<int, double>(optarg, ":"));
         break;
     }
   }
@@ -1926,6 +1939,14 @@ Parse(TRITONSERVER_ServerOptions** server_options, int argc, char** argv)
             loptions, std::get<0>(bcs).c_str(), std::get<1>(bcs).c_str(),
             std::get<2>(bcs).c_str()),
         "setting backend configurtion");
+  }
+  for (const auto& limit : load_gpu_limit) {
+    static std::string key_prefix = "model-load-gpu-limit-device-";
+    FAIL_IF_ERR(
+        TRITONSERVER_ServerOptionsSetBackendConfig(
+            loptions, "", (key_prefix + std::to_string(limit.first)).c_str(),
+            std::to_string(limit.second).c_str()),
+        "setting model load GPU limit");
   }
   for (const auto& hp : host_policies) {
     FAIL_IF_ERR(
