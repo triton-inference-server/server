@@ -1916,12 +1916,10 @@ HTTPAPIServer::HandleLogging(evhtp_request_t* req)
       if (!setting_json.IsNull()) {
         std::string log_format_parse;
         HTTP_RESPOND_IF_ERR(req, setting_json.AsString(&log_format_parse));
-        triton::common::Logger::Format log_format_final;
-        if (log_format_parse == "default") {
-          log_format_final = triton::common::Logger::Format::kDEFAULT;
-        } else if (log_format_parse == "ISO8601") {
+        triton::common::Logger::Format log_format_final = triton::common::Logger::Format::kDEFAULT;
+        if (log_format_parse == "ISO8601") {
           log_format_final = triton::common::Logger::Format::kISO8601;
-        } else {
+        } else if (log_format_parse != "default") {
           // Returns from function
           HTTP_RESPOND_IF_ERR(
               req, TRITONSERVER_ErrorNew(
