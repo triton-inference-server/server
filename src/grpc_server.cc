@@ -1496,12 +1496,10 @@ CommonHandler::SetUpAllRequests()
             GOTO_IF_ERR(err, earlyexit);
           } else {
             const std::string& log_format_parse = it->second.string_param();
-            triton::common::Logger::Format log_format_final;
-            if (log_format_parse == "default") {
-              log_format_final = triton::common::Logger::Format::kDEFAULT;
-            } else if (log_format_parse == "ISO8601") {
+            triton::common::Logger::Format log_format_final = triton::common::Logger::Format::kDEFAULT;
+            if (log_format_parse == "ISO8601") {
               log_format_final = triton::common::Logger::Format::kISO8601;
-            } else {
+            } else if (log_format_parse != "default") {
               err = TRITONSERVER_ErrorNew(
                   TRITONSERVER_ERROR_INVALID_ARG,
                   ("invalid argument for log_format, got: " + log_format_parse)
