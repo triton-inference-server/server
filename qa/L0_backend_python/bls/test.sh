@@ -79,9 +79,7 @@ mkdir -p models/dlpack_identity/1/
 cp ../../python_models/dlpack_identity/model.py models/dlpack_identity/1/
 cp ../../python_models/dlpack_identity/config.pbtxt models/dlpack_identity
 
-cp -r ${DATADIR}/qa_sequence_implicit_model_repository/onnx_nobatch_sequence_int32/ ./models && \
-    (cd models/onnx_nobatch_sequence_int32 && \
-        sed -i "s/kind: KIND_GPU/kind: KIND_CPU/" config.pbtxt)
+cp -r ${DATADIR}/qa_sequence_implicit_model_repository/onnx_nobatch_sequence_int32/ ./models
 
 run_server
 if [ "$SERVER_PID" == "0" ]; then
