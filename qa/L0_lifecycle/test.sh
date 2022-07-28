@@ -1628,6 +1628,30 @@ fi
 kill $SERVER_PID
 wait $SERVER_PID
 
+# LifeCycleTest.test_load_gpu_limit
+rm -fr models config.pbtxt.*
+mkdir models
+cp -r ../python_models/cuda_memory_consumer models/cuda_memory_consumer_1 && \
+    cp -r ../python_models/cuda_memory_consumer models/cuda_memory_consumer_2
+
+# Run server to stop model loading if > 30% of GPU 0 memeory is used
+SERVER_ARGS="--model-repository=`pwd`/models --model-control-mode=explicit --model-load-gpu-limit 0:0.3"
+SERVER_LOG="./inference_server_$LOG_IDX.log"
+run_server
+if [ "$SERVER_PID" == "0" ]; then
+    echo -e "\n***\n*** Failed to start $SERVER\n***"
+    cat $SERVER_LOG
+    exit 1
+fi
+
+set +e
+SERVER_PID=$SERVER_PID python $LC_TEST LifeCycleTest.test_load_gpu_limit >>$CLIENT_LOG 2>&1
+check_unit_test
+set -e
+
+kill $SERVER_PID
+wait $SERVER_PID
+
 if [ $RET -eq 0 ]; then
   echo -e "\n***\n*** Test Passed\n***"
 fi

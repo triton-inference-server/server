@@ -2596,6 +2596,35 @@ class LifeCycleTest(tu.TestResultCollector):
                 input_data,
                 err_msg='Inference result is not correct')
 
+    def test_load_gpu_limit(self):
+        model_name = "cuda_memory_consumer"
+        try:
+            triton_client = grpcclient.InferenceServerClient("localhost:8001",
+                                                             verbose=True)
+            triton_client.load_model(model_name + "_1")
+        except Exception as ex:
+            self.assertTrue(False, "unexpected error {}".format(ex))
+
+        # After the first load, the memory consumption should have exceeded
+        # the specified limit, load will fail
+        try:
+            triton_client = grpcclient.InferenceServerClient("localhost:8001",
+                                                             verbose=True)
+            triton_client.load_model(model_name + "_2")
+            self.assertTrue(False, "expected error for loading model")
+        except Exception as ex:
+            self.assertIn("memory limit set for GPU 0 has exceeded",
+                          ex.message())
+
+        # Load should work after explicitly unload model to free memory
+        try:
+            triton_client = grpcclient.InferenceServerClient("localhost:8001",
+                                                             verbose=True)
+            triton_client.unload_model(model_name + "_1")
+            triton_client.load_model(model_name + "_2")
+        except Exception as ex:
+            self.assertTrue(False, "unexpected error {}".format(ex))
+
 
 if __name__ == '__main__':
     unittest.main()
