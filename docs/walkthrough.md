@@ -89,7 +89,7 @@ mkdir -p ./models/alexnet/1
 wget -O models/alexnet/1/model.onnx https://github.com/onnx/models/blob/main/vision/classification/alexnet/model/bvlcalexnet-12.onnx?raw=true
 ```
 
-2. Create a minimal model configuration at `./models/alexnet/config.pbtxt`
+2. Create a minimal [model configuration](https://github.com/triton-inference-server/server/blob/main/docs/model_configuration.md) at `./models/alexnet/config.pbtxt`
 ```protobuf
 name: "alexnet"
 backend: "onnxruntime"
