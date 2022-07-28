@@ -70,6 +70,8 @@ SERVER_LOG="./inference_server.log"
 
 ERROR_STRING="error | Request count: 0 | : 0 infer/sec"
 
+STABILITY_THRESHOLD="15"
+
 source ../common/util.sh
 
 rm -f $SERVER_LOG $CLIENT_LOG
@@ -143,7 +145,7 @@ fi
 SERVER_ERROR_STRING="The previous sequence did not end before this sequence start"
 
 set +e
-$PERF_ANALYZER -v -i $PROTOCOL -m graphdef_object_object_object -p2000 >$CLIENT_LOG 2>&1
+$PERF_ANALYZER -v -i $PROTOCOL -m graphdef_object_object_object -p2000 -s ${STABILITY_THRESHOLD} >$CLIENT_LOG 2>&1
 if [ $? -eq 0 ]; then
   cat $CLIENT_LOG
   echo -e "\n***\n*** Test Failed: Expected an error when using dynamic shapes in string inputs\n***"
@@ -155,7 +157,7 @@ if [ $(cat $CLIENT_LOG |  grep "input INPUT0 contains dynamic shape, provide sha
   RET=1
 fi
 
-$PERF_ANALYZER -v -i $PROTOCOL -m graphdef_object_object_object -p2000 --shape INPUT0 >$CLIENT_LOG 2>&1
+$PERF_ANALYZER -v -i $PROTOCOL -m graphdef_object_object_object -p2000 --shape INPUT0 -s ${STABILITY_THRESHOLD} >$CLIENT_LOG 2>&1
 if [ $? -eq 0 ]; then
   cat $CLIENT_LOG
   echo -e "\n***\n*** Test Failed: Expected an error when using dynamic shapes with incorrect arguments\n***"
@@ -169,7 +171,7 @@ fi
 
 # Testing with ensemble and sequential model variants
 $PERF_ANALYZER -v -i grpc -m  simple_savedmodel_sequence_object -p 2000 -t5 --streaming \
---input-data=$SEQ_JSONDATAFILE  --input-data=$SEQ_JSONDATAFILE >$CLIENT_LOG 2>&1
+--input-data=$SEQ_JSONDATAFILE  --input-data=$SEQ_JSONDATAFILE -s ${STABILITY_THRESHOLD} >$CLIENT_LOG 2>&1
 if [ $? -ne 0 ]; then
     cat $CLIENT_LOG
     echo -e "\n***\n*** Test Failed\n***"
@@ -187,7 +189,7 @@ if [ $(cat $CLIENT_LOG |  grep "${ERROR_STRING}" | wc -l) -ne 0 ]; then
 fi
 
 $PERF_ANALYZER -v -i grpc -m  simple_savedmodel_sequence_object -p 1000 --request-rate-range 100:200:50 --streaming \
---input-data=$SEQ_JSONDATAFILE >$CLIENT_LOG 2>&1
+--input-data=$SEQ_JSONDATAFILE -s ${STABILITY_THRESHOLD} >$CLIENT_LOG 2>&1
 if [ $? -ne 0 ]; then
     cat $CLIENT_LOG
     echo -e "\n***\n*** Test Failed\n***"
@@ -212,7 +214,7 @@ for PROTOCOL in grpc http; do
     for SHARED_MEMORY_TYPE in none system cuda; do
         set +e
         $PERF_ANALYZER -v -i $PROTOCOL -m graphdef_int32_int32_int32 -t 1 -p2000 -b 1 \
-    --shared-memory=$SHARED_MEMORY_TYPE >$CLIENT_LOG 2>&1
+    --shared-memory=$SHARED_MEMORY_TYPE -s ${STABILITY_THRESHOLD} >$CLIENT_LOG 2>&1
         if [ $? -ne 0 ]; then
             cat $CLIENT_LOG
             echo -e "\n***\n*** Test Failed\n***"
@@ -225,7 +227,7 @@ for PROTOCOL in grpc http; do
         fi
 
         $PERF_ANALYZER -v -i $PROTOCOL -m graphdef_int32_int32_int32 -t 1 -p2000 -b 1 -a \
-    --shared-memory=$SHARED_MEMORY_TYPE>$CLIENT_LOG 2>&1
+    --shared-memory=$SHARED_MEMORY_TYPE -s ${STABILITY_THRESHOLD} >$CLIENT_LOG 2>&1
         if [ $? -ne 0 ]; then
             cat $CLIENT_LOG
             echo -e "\n***\n*** Test Failed\n***"
@@ -245,7 +247,7 @@ for PROTOCOL in grpc http; do
     for SHARED_MEMORY_TYPE in none system cuda; do
         set +e
         $PERF_ANALYZER -v -i $PROTOCOL -m inception_v1_graphdef -t 1 -p2000 -b 1 \
-    --shared-memory=$SHARED_MEMORY_TYPE >$CLIENT_LOG 2>&1
+    --shared-memory=$SHARED_MEMORY_TYPE -s ${STABILITY_THRESHOLD} >$CLIENT_LOG 2>&1
         if [ $? -ne 0 ]; then
             cat $CLIENT_LOG
             echo -e "\n***\n*** Test Failed\n***"
@@ -258,7 +260,7 @@ for PROTOCOL in grpc http; do
         fi
 
         $PERF_ANALYZER -v -i $PROTOCOL -m inception_v1_graphdef -t 1 -p2000 -b 1 -a \
-    --shared-memory=$SHARED_MEMORY_TYPE>$CLIENT_LOG 2>&1
+    --shared-memory=$SHARED_MEMORY_TYPE -s ${STABILITY_THRESHOLD} >$CLIENT_LOG 2>&1
         if [ $? -ne 0 ]; then
             cat $CLIENT_LOG
             echo -e "\n***\n*** Test Failed\n***"
@@ -276,7 +278,7 @@ for PROTOCOL in grpc http; do
     for SHARED_MEMORY_TYPE in none system cuda; do
         set +e
         $PERF_ANALYZER -v -i $PROTOCOL -m inception_v1_graphdef -t 2 -p2000 -b 64 \
-    --shared-memory=$SHARED_MEMORY_TYPE >$CLIENT_LOG 2>&1
+    --shared-memory=$SHARED_MEMORY_TYPE -s ${STABILITY_THRESHOLD} >$CLIENT_LOG 2>&1
         if [ $? -ne 0 ]; then
             cat $CLIENT_LOG
             echo -e "\n***\n*** Test Failed\n***"
@@ -289,7 +291,7 @@ for PROTOCOL in grpc http; do
         fi
 
         $PERF_ANALYZER -v -i $PROTOCOL -m inception_v1_graphdef -t 2 -p2000 -b 64 \
-    --shared-memory=$SHARED_MEMORY_TYPE -a >$CLIENT_LOG 2>&1
+    --shared-memory=$SHARED_MEMORY_TYPE -a -s ${STABILITY_THRESHOLD} >$CLIENT_LOG 2>&1
         if [ $? -ne 0 ]; then
             cat $CLIENT_LOG
             echo -e "\n***\n*** Test Failed\n***"
@@ -307,7 +309,7 @@ for PROTOCOL in grpc http; do
     for MODEL in graphdef_nobatch_int32_int32_int32 graphdef_int32_int32_int32; do
         # Valid batch size
         set +e
-        $PERF_ANALYZER -v -i $PROTOCOL -m $MODEL -t 1 -p2000 -b 1 >$CLIENT_LOG 2>&1
+        $PERF_ANALYZER -v -i $PROTOCOL -m $MODEL -t 1 -p2000 -b 1 -s ${STABILITY_THRESHOLD} >$CLIENT_LOG 2>&1
         if [ $? -ne 0 ]; then
             cat $CLIENT_LOG
             echo -e "\n***\n*** Test Failed\n***"
@@ -318,7 +320,7 @@ for PROTOCOL in grpc http; do
         # Invalid batch sizes
         for STATIC_BATCH in 0 10; do
             set +e
-            $PERF_ANALYZER -v -i $PROTOCOL -m $MODEL -t 1 -p2000 -b $STATIC_BATCH >$CLIENT_LOG 2>&1
+            $PERF_ANALYZER -v -i $PROTOCOL -m $MODEL -t 1 -p2000 -b $STATIC_BATCH -s ${STABILITY_THRESHOLD} >$CLIENT_LOG 2>&1
             if [ $? -eq 0 ]; then
                 cat $CLIENT_LOG
                 echo -e "\n***\n*** Test Failed\n***"
@@ -330,7 +332,7 @@ for PROTOCOL in grpc http; do
 
     # Testing with the new arguments
     set +e
-    $PERF_ANALYZER -v -i $PROTOCOL -m graphdef_int32_int32_int32 >$CLIENT_LOG 2>&1
+    $PERF_ANALYZER -v -i $PROTOCOL -m graphdef_int32_int32_int32 -s ${STABILITY_THRESHOLD} >$CLIENT_LOG 2>&1
     if [ $? -ne 0 ]; then
         cat $CLIENT_LOG
         echo -e "\n***\n*** Test Failed\n***"
@@ -342,7 +344,7 @@ for PROTOCOL in grpc http; do
         RET=1
     fi
 
-    $PERF_ANALYZER -v -i $PROTOCOL -m graphdef_int32_int32_int32 --concurrency-range 1:5:2 >$CLIENT_LOG 2>&1
+    $PERF_ANALYZER -v -i $PROTOCOL -m graphdef_int32_int32_int32 --concurrency-range 1:5:2 -s ${STABILITY_THRESHOLD} >$CLIENT_LOG 2>&1
     if [ $? -ne 0 ]; then
         cat $CLIENT_LOG
         echo -e "\n***\n*** Test Failed\n***"
@@ -355,7 +357,7 @@ for PROTOCOL in grpc http; do
     fi
 
     $PERF_ANALYZER -v -i $PROTOCOL -m graphdef_int32_int32_int32 --concurrency-range 1:5:2 \
-    --input-data=${INT_JSONDATAFILE} >$CLIENT_LOG 2>&1
+    --input-data=${INT_JSONDATAFILE} -s ${STABILITY_THRESHOLD} >$CLIENT_LOG 2>&1
     if [ $? -ne 0 ]; then
         cat $CLIENT_LOG
         echo -e "\n***\n*** Test Failed\n***"
@@ -368,7 +370,7 @@ for PROTOCOL in grpc http; do
     fi
 
     $PERF_ANALYZER -v -i $PROTOCOL -m graphdef_int32_int32_int32 --request-rate-range 1000:2000:500 \
-    -p1000 -b 1 -a>$CLIENT_LOG 2>&1
+    -p1000 -b 1 -a -s ${STABILITY_THRESHOLD} >$CLIENT_LOG 2>&1
     if [ $? -ne 0 ]; then
         cat $CLIENT_LOG
         echo -e "\n***\n*** Test Failed\n***"
@@ -381,7 +383,7 @@ for PROTOCOL in grpc http; do
     fi
 
     $PERF_ANALYZER -v -i $PROTOCOL -m graphdef_int32_int32_int32 --request-rate-range 1000:2000:500 \
-    --input-data=${INT_JSONDATAFILE} -p1000 -b 1 -a>$CLIENT_LOG 2>&1
+    --input-data=${INT_JSONDATAFILE} -p1000 -b 1 -a -s ${STABILITY_THRESHOLD} >$CLIENT_LOG 2>&1
     if [ $? -ne 0 ]; then
         cat $CLIENT_LOG
         echo -e "\n***\n*** Test Failed\n***"
@@ -395,7 +397,7 @@ for PROTOCOL in grpc http; do
 
     # Binary search for request rate mode
     $PERF_ANALYZER -v -i $PROTOCOL -m graphdef_int32_int32_int32 --request-rate-range 1000:2000:100 -p1000 -b 1 \
-    -a --binary-search --request-distribution "poisson" -l 10 >$CLIENT_LOG 2>&1
+    -a --binary-search --request-distribution "poisson" -l 10 -s ${STABILITY_THRESHOLD} >$CLIENT_LOG 2>&1
     if [ $? -ne 0 ]; then
         cat $CLIENT_LOG
         echo -e "\n***\n*** Test Failed\n***"
@@ -411,7 +413,7 @@ for PROTOCOL in grpc http; do
     # Binary search for concurrency range mode and make sure it doesn't hang
     $PERF_ANALYZER -v -a --request-distribution "poisson" --shared-memory none \
     --percentile 99 --binary-search --concurrency-range 1:8:2 -l 5 \
-    -m graphdef_int32_int32_int32 -b 1 >$CLIENT_LOG 2>&1 &
+    -m graphdef_int32_int32_int32 -b 1 -s ${STABILITY_THRESHOLD} >$CLIENT_LOG 2>&1 &
     PA_PID=$!
     if [ "$PA_PID" == "0" ]; then
         echo -e "\n***\n*** Failed to start $PERF_ANALYZER\n***"
@@ -442,7 +444,7 @@ for PROTOCOL in grpc http; do
     for SHARED_MEMORY_TYPE in none system cuda; do
         set +e
         $PERF_ANALYZER -v -i $PROTOCOL -m graphdef_object_object_object --string-data=1 -p2000 \
-    --shared-memory=$SHARED_MEMORY_TYPE>$CLIENT_LOG 2>&1
+    --shared-memory=$SHARED_MEMORY_TYPE -s ${STABILITY_THRESHOLD} >$CLIENT_LOG 2>&1
         if [ $? -ne 0 ]; then
             cat $CLIENT_LOG
             echo -e "\n***\n*** Test Failed\n***"
@@ -460,7 +462,7 @@ for PROTOCOL in grpc http; do
     for SHARED_MEMORY_TYPE in none system cuda; do
         set +e
         $PERF_ANALYZER -v -i $PROTOCOL -m graphdef_object_object_object --input-data=$TESTDATADIR -p2000 \
-    --shared-memory=$SHARED_MEMORY_TYPE>$CLIENT_LOG 2>&1
+    --shared-memory=$SHARED_MEMORY_TYPE -s ${STABILITY_THRESHOLD} >$CLIENT_LOG 2>&1
         if [ $? -ne 0 ]; then
             cat $CLIENT_LOG
             echo -e "\n***\n*** Test Failed\n***"
@@ -477,7 +479,7 @@ for PROTOCOL in grpc http; do
     for SHARED_MEMORY_TYPE in none system cuda; do
         set +e
         $PERF_ANALYZER -v -i $PROTOCOL -m graphdef_object_object_object --input-data=$STRING_JSONDATAFILE \
-    --input-data=$STRING_JSONDATAFILE -p2000 --shared-memory=$SHARED_MEMORY_TYPE>$CLIENT_LOG 2>&1
+    --input-data=$STRING_JSONDATAFILE -p2000 --shared-memory=$SHARED_MEMORY_TYPE -s ${STABILITY_THRESHOLD} >$CLIENT_LOG 2>&1
         if [ $? -ne 0 ]; then
             cat $CLIENT_LOG
             echo -e "\n***\n*** Test Failed\n***"
@@ -495,7 +497,7 @@ for PROTOCOL in grpc http; do
     for SHARED_MEMORY_TYPE in none system cuda; do
         set +e
         $PERF_ANALYZER -v -i $PROTOCOL -m graphdef_object_int32_int32 --input-data=$TESTDATADIR \
-    --shape INPUT0:2,8 --shape INPUT1:2,8 -p2000 --shared-memory=$SHARED_MEMORY_TYPE \
+    --shape INPUT0:2,8 --shape INPUT1:2,8 -p2000 --shared-memory=$SHARED_MEMORY_TYPE -s ${STABILITY_THRESHOLD} \
     >$CLIENT_LOG 2>&1
         if [ $? -ne 0 ]; then
             cat $CLIENT_LOG
@@ -513,7 +515,7 @@ for PROTOCOL in grpc http; do
     for SHARED_MEMORY_TYPE in none system cuda; do
         set +e
         $PERF_ANALYZER -v -i $PROTOCOL -m graphdef_object_int32_int32 --input-data=$STRING_WITHSHAPE_JSONDATAFILE \
-    --shape INPUT0:2,8 --shape INPUT1:2,8 -p2000 --shared-memory=$SHARED_MEMORY_TYPE \
+    --shape INPUT0:2,8 --shape INPUT1:2,8 -p2000 --shared-memory=$SHARED_MEMORY_TYPE -s ${STABILITY_THRESHOLD} \
     >$CLIENT_LOG 2>&1
         if [ $? -ne 0 ]; then
             cat $CLIENT_LOG
@@ -530,7 +532,7 @@ for PROTOCOL in grpc http; do
 
     set +e
     $PERF_ANALYZER -v -i $PROTOCOL -m graphdef_int32_int32_float32 --shape INPUT0:2,8,2 \
-    --shape INPUT1:2,8,2 -p2000 >$CLIENT_LOG 2>&1
+    --shape INPUT1:2,8,2 -p2000 -s ${STABILITY_THRESHOLD} >$CLIENT_LOG 2>&1
     if [ $? -ne 0 ]; then
         cat $CLIENT_LOG
         echo -e "\n***\n*** Test Failed\n***"
@@ -547,7 +549,7 @@ for PROTOCOL in grpc http; do
     for SHARED_MEMORY_TYPE in none system cuda; do
         set +e
         $PERF_ANALYZER -v -i $PROTOCOL -m graphdef_int32_int32_float32 --shape INPUT0:2,8,2 --shape INPUT1:2,8,2 -p2000 -b 4 \
-    --shared-memory=$SHARED_MEMORY_TYPE --input-data=$INT_DIFFSHAPE_JSONDATAFILE >$CLIENT_LOG 2>&1
+    --shared-memory=$SHARED_MEMORY_TYPE --input-data=$INT_DIFFSHAPE_JSONDATAFILE -s ${STABILITY_THRESHOLD} >$CLIENT_LOG 2>&1
         if [ $? -eq 0 ]; then
             cat $CLIENT_LOG
             echo -e "\n***\n*** Test Failed\n***"
@@ -565,7 +567,7 @@ for PROTOCOL in grpc http; do
     for SHARED_MEMORY_TYPE in none system; do
         set +e
         $PERF_ANALYZER -v -i $PROTOCOL -m plan_zero_1_float32 --input-data=$SHAPETENSORADTAFILE \
-    --shape DUMMY_INPUT0:4,4 -p2000 --shared-memory=$SHARED_MEMORY_TYPE -b 8 \
+    --shape DUMMY_INPUT0:4,4 -p2000 --shared-memory=$SHARED_MEMORY_TYPE -b 8 -s ${STABILITY_THRESHOLD} \
     >$CLIENT_LOG 2>&1
         if [ $? -ne 0 ]; then
             cat $CLIENT_LOG
@@ -582,7 +584,7 @@ for PROTOCOL in grpc http; do
 
     set +e
     $PERF_ANALYZER -v -i $PROTOCOL -m  simple_savedmodel_sequence_object -p 2000 -t5 --sync \
-    --input-data=$SEQ_JSONDATAFILE >$CLIENT_LOG 2>&1
+    --input-data=$SEQ_JSONDATAFILE -s ${STABILITY_THRESHOLD} >$CLIENT_LOG 2>&1
     if [ $? -ne 0 ]; then
         cat $CLIENT_LOG
         echo -e "\n***\n*** Test Failed\n***"
@@ -595,7 +597,7 @@ for PROTOCOL in grpc http; do
     fi
 
     $PERF_ANALYZER -v -i $PROTOCOL -m  simple_savedmodel_sequence_object -p 2000 -t5 --sync \
-    --input-data=$SEQ_JSONDATAFILE  >$CLIENT_LOG 2>&1
+    --input-data=$SEQ_JSONDATAFILE -s ${STABILITY_THRESHOLD} >$CLIENT_LOG 2>&1
     if [ $? -ne 0 ]; then
         cat $CLIENT_LOG
         echo -e "\n***\n*** Test Failed\n***"
@@ -608,7 +610,7 @@ for PROTOCOL in grpc http; do
     fi
 
     $PERF_ANALYZER -v -i $PROTOCOL -m  simple_savedmodel_sequence_object -p 1000 --request-rate-range 100:200:50 --sync \
-    --input-data=$SEQ_JSONDATAFILE >$CLIENT_LOG 2>&1
+    --input-data=$SEQ_JSONDATAFILE -s ${STABILITY_THRESHOLD} >$CLIENT_LOG 2>&1
     if [ $? -ne 0 ]; then
         cat $CLIENT_LOG
         echo -e "\n***\n*** Test Failed\n***"
@@ -628,7 +630,7 @@ for PROTOCOL in grpc http; do
         set +e
         # FIXME: Enable HTTP when the server is able to correctly return the complex error messages.
         $PERF_ANALYZER -v -i grpc -m graphdef_sequence_float32 --shape INPUT:2 --input-data=$FLOAT_DIFFSHAPE_JSONDATAFILE \
-    --input-data=$FLOAT_DIFFSHAPE_JSONDATAFILE -p2000 --shared-memory=$SHARED_MEMORY_TYPE >$CLIENT_LOG 2>&1
+    --input-data=$FLOAT_DIFFSHAPE_JSONDATAFILE -p2000 --shared-memory=$SHARED_MEMORY_TYPE -s ${STABILITY_THRESHOLD} >$CLIENT_LOG 2>&1
         if [ $? -eq 0 ]; then
             cat $CLIENT_LOG
             echo -e "\n***\n*** Test Failed\n***"
@@ -648,7 +650,7 @@ for PROTOCOL in grpc http; do
     rm ${TRACE_FILE}*
     $PERF_ANALYZER -v -i $PROTOCOL -m simple_savedmodel_sequence_object -p 2000 -t5 --sync --trace-file $TRACE_FILE \
     --trace-level TIMESTAMPS --trace-rate 1000 --trace-count 100 --log-frequency 10 \
-    --input-data=$SEQ_JSONDATAFILE >$CLIENT_LOG 2>&1
+    --input-data=$SEQ_JSONDATAFILE -s ${STABILITY_THRESHOLD} >$CLIENT_LOG 2>&1
     if [ $? -ne 0 ]; then
         cat $CLIENT_LOG
         echo -e "\n***\n*** Test Failed\n***"
@@ -667,7 +669,7 @@ done
 
 # Test with output validation
 set +e
-$PERF_ANALYZER -v -m graphdef_int32_int32_int32 --input-data=${NON_ALIGNED_OUTPUT_JSONDATAFILE} >$CLIENT_LOG 2>&1
+$PERF_ANALYZER -v -m graphdef_int32_int32_int32 --input-data=${NON_ALIGNED_OUTPUT_JSONDATAFILE} -s ${STABILITY_THRESHOLD} >$CLIENT_LOG 2>&1
 if [ $? -eq 0 ]; then
     cat $CLIENT_LOG
     echo -e "\n***\n*** Test Failed\n***"
@@ -679,7 +681,7 @@ if [ $(cat $CLIENT_LOG |  grep "The 'validation_data' field doesn't align with '
     RET=1
 fi
 
-$PERF_ANALYZER -v -m graphdef_int32_int32_int32 --input-data=${WRONG_OUTPUT_JSONDATAFILE} >$CLIENT_LOG 2>&1
+$PERF_ANALYZER -v -m graphdef_int32_int32_int32 --input-data=${WRONG_OUTPUT_JSONDATAFILE} -s ${STABILITY_THRESHOLD} >$CLIENT_LOG 2>&1
 if [ $? -eq 0 ]; then
     cat $CLIENT_LOG
     echo -e "\n***\n*** Test Failed\n***"
@@ -691,7 +693,7 @@ if [ $(cat $CLIENT_LOG |  grep "Output size doesn't match expected size" | wc -l
     RET=1
 fi
 
-$PERF_ANALYZER -v -m graphdef_int32_int32_int32 --input-data=${WRONG_OUTPUT_2_JSONDATAFILE} >$CLIENT_LOG 2>&1
+$PERF_ANALYZER -v -m graphdef_int32_int32_int32 --input-data=${WRONG_OUTPUT_2_JSONDATAFILE} -s ${STABILITY_THRESHOLD} >$CLIENT_LOG 2>&1
 if [ $? -eq 0 ]; then
     cat $CLIENT_LOG
     echo -e "\n***\n*** Test Failed\n***"
@@ -704,7 +706,7 @@ if [ $(cat $CLIENT_LOG |  grep "Output doesn't match expected output" | wc -l) -
 fi
 
 
-$PERF_ANALYZER -v -m graphdef_int32_int32_int32 --input-data=${OUTPUT_JSONDATAFILE} >$CLIENT_LOG 2>&1
+$PERF_ANALYZER -v -m graphdef_int32_int32_int32 --input-data=${OUTPUT_JSONDATAFILE} -s ${STABILITY_THRESHOLD} >$CLIENT_LOG 2>&1
 if [ $? -ne 0 ]; then
     cat $CLIENT_LOG
     echo -e "\n***\n*** Test Failed\n***"
@@ -717,7 +719,7 @@ if [ $(cat $CLIENT_LOG |  grep "${ERROR_STRING}" | wc -l) -ne 0 ]; then
 fi
 
 $PERF_ANALYZER -v -m simple_savedmodel_sequence_object -i grpc --streaming \
---input-data=${SEQ_WRONG_OUTPUT_JSONDATAFILE} >$CLIENT_LOG 2>&1
+--input-data=${SEQ_WRONG_OUTPUT_JSONDATAFILE} -s ${STABILITY_THRESHOLD} >$CLIENT_LOG 2>&1
 if [ $? -eq 0 ]; then
     cat $CLIENT_LOG
     echo -e "\n***\n*** Test Failed\n***"
@@ -730,7 +732,7 @@ if [ $(cat $CLIENT_LOG |  grep "Output doesn't match expected output" | wc -l) -
 fi
 
 $PERF_ANALYZER -v -m simple_savedmodel_sequence_object -i grpc --streaming \
---input-data=${SEQ_OUTPUT_JSONDATAFILE} >$CLIENT_LOG 2>&1
+--input-data=${SEQ_OUTPUT_JSONDATAFILE} -s ${STABILITY_THRESHOLD} >$CLIENT_LOG 2>&1
 if [ $? -ne 0 ]; then
     cat $CLIENT_LOG
     echo -e "\n***\n*** Test Failed\n***"
@@ -750,7 +752,7 @@ for i in {1..9}; do
 done
 set +e
 $PERF_ANALYZER -v -m  simple_savedmodel_sequence_object -p 10000 --concurrency-range 1500:2000:250 -i grpc --streaming \
-${INPUT_DATA_OPTION} >$CLIENT_LOG 2>&1
+${INPUT_DATA_OPTION} -s ${STABILITY_THRESHOLD} >$CLIENT_LOG 2>&1
 if [ $? -ne 0 ]; then
    cat $CLIENT_LOG
    echo -e "\n***\n*** Test Failed\n***"
@@ -768,7 +770,7 @@ set +e
 
 # Send incorrect shape and make sure that perf_analyzer doesn't hang
 $PERF_ANALYZER -v -m graphdef_object_int32_int32 --measurement-mode "count_windows" \
-    --shape INPUT0:1,8,100 --shape INPUT1:2,8 --string-data=1 >$CLIENT_LOG 2>&1
+    --shape INPUT0:1,8,100 --shape INPUT1:2,8 --string-data=1 -s ${STABILITY_THRESHOLD} >$CLIENT_LOG 2>&1
 if [ $? -eq 0 ]; then
    cat $CLIENT_LOG
    echo -e "\n***\n*** Test Failed\n***"
@@ -781,7 +783,7 @@ if [ $(cat $CLIENT_LOG |  grep "unexpected shape for input 'INPUT0' for model" |
 fi
 
 $PERF_ANALYZER -v -m graphdef_object_int32_int32 --measurement-mode "count_windows" \
-    --shape INPUT0:2,8 --shape INPUT1:2,8 --string-data=1 >$CLIENT_LOG 2>&1
+    --shape INPUT0:2,8 --shape INPUT1:2,8 --string-data=1 -s ${STABILITY_THRESHOLD} >$CLIENT_LOG 2>&1
 if [ $? -ne 0 ]; then
    cat $CLIENT_LOG
    echo -e "\n***\n*** Test Failed\n***"
@@ -797,7 +799,7 @@ set -e
 # Test with optional inputs missing but still valid
 set +e
 $PERF_ANALYZER -v -m optional --measurement-mode "count_windows" \
-    --input-data=${INT_OPTIONAL_JSONDATAFILE} >$CLIENT_LOG 2>&1
+    --input-data=${INT_OPTIONAL_JSONDATAFILE} -s ${STABILITY_THRESHOLD} >$CLIENT_LOG 2>&1
 if [ $? -ne 0 ]; then
    cat $CLIENT_LOG
    echo -e "\n***\n*** Test Failed\n***"
@@ -811,7 +813,7 @@ OPTIONAL_INPUT_ERROR_STRING="For batch sizes larger than 1, the same set of
 inputs must be specified for each batch. You cannot use different set of 
 optional inputs for each individual batch."
 $PERF_ANALYZER -v -m optional -b 2 --measurement-mode "count_windows" \
-    --input-data=${INT_OPTIONAL_JSONDATAFILE} >$CLIENT_LOG 2>&1
+    --input-data=${INT_OPTIONAL_JSONDATAFILE} -s ${STABILITY_THRESHOLD} >$CLIENT_LOG 2>&1
 if [ $? -eq 0 ]; then
    cat $CLIENT_LOG
    echo -e "\n***\n*** Test Failed\n***"
@@ -912,7 +914,7 @@ set -e
 rm -rf /opt/hpcx
 
 set +e
-$PERF_ANALYZER -v -m graphdef_int32_int32_int32
+$PERF_ANALYZER -v -m graphdef_int32_int32_int32 -s ${STABILITY_THRESHOLD} >$CLIENT_LOG 2>&1
 if [ $? -ne 0 ]; then
    cat $CLIENT_LOG
    echo -e "\n***\n*** Test Failed\n***"
@@ -965,6 +967,7 @@ $PERF_ANALYZER -v -i grpc -m graphdef_int32_int32_int32 \
   --ssl-grpc-root-certifications-file=ca.crt \
   --ssl-grpc-private-key-file=client.key \
   --ssl-grpc-certificate-chain-file=client.crt \
+  -s ${STABILITY_THRESHOLD} \
   > ${CLIENT_LOG}.grpc_success 2>&1
 if [ $? -ne 0 ]; then
     cat ${CLIENT_LOG}.grpc_success
@@ -977,6 +980,7 @@ $PERF_ANALYZER -v -i grpc -m graphdef_int32_int32_int32 \
     --ssl-grpc-root-certifications-file=ca.crt \
     --ssl-grpc-private-key-file=client.key \
     --ssl-grpc-certificate-chain-file=client2.crt \
+    -s ${STABILITY_THRESHOLD} \
     > ${CLIENT_LOG}.grpc_failure 2>&1
 if [ $? -eq 0 ]; then
     cat ${CLIENT_LOG}.grpc_failure
@@ -1020,6 +1024,7 @@ $PERF_ANALYZER -v -u https://localhost:443 -i http -m graphdef_int32_int32_int32
     --ssl-https-client-certificate-type PEM \
     --ssl-https-private-key-file client.key \
     --ssl-https-private-key-type PEM \
+    -s ${STABILITY_THRESHOLD} \
     > ${CLIENT_LOG}.https_success 2>&1
 if [ $? -ne 0 ]; then
     cat ${CLIENT_LOG}.https_success
@@ -1029,7 +1034,8 @@ fi
 # Test that HTTP protocol with SSL works correctly without certificates
 $PERF_ANALYZER -v -u https://localhost:443 -i http -m graphdef_int32_int32_int32 \
     --ssl-https-verify-peer 0 \
-    --ssl-https-verify-host 0
+    --ssl-https-verify-host 0 \
+    -s ${STABILITY_THRESHOLD} \
     > ${CLIENT_LOG}.https_success 2>&1
 if [ $? -ne 0 ]; then
     cat ${CLIENT_LOG}.https_success
@@ -1045,6 +1051,7 @@ $PERF_ANALYZER -v -u https://localhost:443 -i http -m graphdef_int32_int32_int32
     --ssl-https-client-certificate-type PEM \
     --ssl-https-private-key-file client2.key \
     --ssl-https-private-key-type PEM \
+    -s ${STABILITY_THRESHOLD} \
     > ${CLIENT_LOG}.https_failure 2>&1
 if [ $? -eq 0 ]; then
     cat ${CLIENT_LOG}.https_failure

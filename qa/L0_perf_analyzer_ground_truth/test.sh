@@ -114,6 +114,7 @@ PROTOCOLS="http"
 OUTPUT_FILE="results"
 EXPECTED_RESULT="90.00"
 TOLERANCE="0.05"
+STABILITY_THRESHOLD="15"
 
 for protocol in ${PROTOCOLS}; do
     for model in ${MODELS}; do
@@ -121,7 +122,7 @@ for protocol in ${PROTOCOLS}; do
 	echo "[PERMUTATION] Protocol=${protocol} Model=${model}"
 	echo "================================================================"
 
-        ${PERF_ANALYZER} -v -i ${protocol} -m ${model} -f ${OUTPUT_FILE} | tee ${CLIENT_LOG} 2>&1
+        ${PERF_ANALYZER} -v -i ${protocol} -m ${model} -f ${OUTPUT_FILE} -s ${STABILITY_THRESHOLD} | tee ${CLIENT_LOG} 2>&1
         check_perf_analyzer_error $?
 
         check_performance ${OUTPUT_FILE} ${EXPECTED_RESULT} ${TOLERANCE}
