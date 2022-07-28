@@ -111,7 +111,10 @@ class PBBLSTest(unittest.TestCase):
             self.assertFalse(infer_response.has_error())
             output = pb_utils.get_output_tensor_by_name(infer_response,
                                                         'OUTPUT')
-            self.assertEqual(output.as_numpy()[0], input.as_numpy()[0])
+            self.assertFalse(output.is_cpu())
+            output = from_dlpack(
+                output.to_dlpack()).to('cpu').cpu().detach().numpy()
+            self.assertEqual(output[0], input.as_numpy()[0])
 
             for i in range(10):
                 input = pb_utils.Tensor('INPUT', np.array([i], dtype=np.int32))
@@ -124,10 +127,13 @@ class PBBLSTest(unittest.TestCase):
                 self.assertFalse(infer_response.has_error())
 
                 # The new output is the previous output + the current input
-                expected_output = output.as_numpy()[0] + i
+                expected_output = output[0] + i
                 output = pb_utils.get_output_tensor_by_name(
                     infer_response, 'OUTPUT')
-                self.assertEqual(output.as_numpy()[0], expected_output)
+                self.assertFalse(output.is_cpu())
+                output = from_dlpack(
+                    output.to_dlpack()).to('cpu').cpu().detach().numpy()
+                self.assertEqual(output[0], expected_output)
 
             # Final request
             input = pb_utils.Tensor('INPUT', np.array([2000], dtype=np.int32))
@@ -144,10 +150,13 @@ class PBBLSTest(unittest.TestCase):
 
             infer_response = infer_request.exec()
             self.assertFalse(infer_response.has_error())
-            expected_output = output.as_numpy()[0] + input.as_numpy()[0]
+            expected_output = output[0] + input.as_numpy()[0]
             output = pb_utils.get_output_tensor_by_name(infer_response,
                                                         'OUTPUT')
-            self.assertEqual(output.as_numpy()[0], expected_output)
+            self.assertFalse(output.is_cpu())
+            output = from_dlpack(
+                output.to_dlpack()).to('cpu').cpu().detach().numpy()
+            self.assertEqual(output[0], expected_output)
         except Exception as e:
             self.add_deferred_exception(e)
 
