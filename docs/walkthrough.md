@@ -47,13 +47,12 @@ everything, but here is the common flow:
     # NOTE: "my_model" represents the model currently being served by 
     #       Triton in the background from the previous step.
 
-    $ perf_analyzer -m my_model --concurrency-range 1:2
+    $ perf_analyzer -m my_model
 
     ...
 
     Inferences/Second vs. Client Average Batch Latency
     Concurrency: 1, throughput: 482.8 infer/sec, latency 12613 usec
-    Concurrency: 2, throughput: 765.2 infer/sec, latency 18191 usec
     ```
 
     - The defintion of "performing well" is subject to change for each use case. There are many variables that can be tweaked just within your Triton configuration (`config.pbtxt`) to obtain different results.
@@ -141,7 +140,7 @@ tritonserver --model-repository=/mnt/models
 docker exec -ti triton-sdk bash
 
 # Benchmark model being served from step 3
-perf_analyzer -m alexnet --concurrency 1:4
+perf_analyzer -m alexnet --concurrency-range 1:4
 ```
 
 ```
