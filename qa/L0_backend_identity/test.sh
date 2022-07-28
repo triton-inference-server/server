@@ -82,7 +82,7 @@ wait $SERVER_PID
 
 # Validate the byte_sizes reported by backend
 OLDIFS=$IFS; IFS=','
-for i in "byte_size = 0, 6", \
+for i in "byte_size = 0, 8", \
          "byte_size = 7, 2", \
          "byte_size = 16, 6", \
          "byte_size = 20, 2", \
