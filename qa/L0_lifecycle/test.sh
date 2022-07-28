@@ -1629,6 +1629,8 @@ kill $SERVER_PID
 wait $SERVER_PID
 
 # LifeCycleTest.test_load_gpu_limit
+# dependency of the Python model to be used
+pip install cuda-python
 rm -fr models config.pbtxt.*
 mkdir models
 cp -r ../python_models/cuda_memory_consumer models/cuda_memory_consumer_1 && \
