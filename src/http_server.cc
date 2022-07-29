@@ -1862,13 +1862,20 @@ HTTPAPIServer::HandleLogging(evhtp_request_t* req)
         // Set new settings in server then in core
         std::string log_file_path;
         HTTP_RESPOND_IF_ERR(req, setting_json.AsString(&log_file_path));
-        LOG_SET_OUT_FILE(log_file_path);
+        bool success = LOG_SET_OUT_FILE(log_file_path);
+        // On failure, close log file and revert to default "empty"
+        if (!success) {
+          std::string empty;
+          TRITONSERVER_ServerOptionsSetLogFile(nullptr, empty.c_str());
+
+          HTTP_RESPOND_IF_ERR(
+              req,
+              TRITONSERVER_ErrorNew(
+                  TRITONSERVER_ERROR_UNAVAILABLE, ("Failed to open log file")));
+        }
         // Okay to pass nullptr because we know the update will be applied
         // to the global object.
-        FAIL_IF_ERR(
-            TRITONSERVER_ServerOptionsSetLogFile(
-                nullptr, log_file_path.c_str()),
-            "setting log out file");
+        TRITONSERVER_ServerOptionsSetLogFile(nullptr, log_file_path.c_str())
       }
     }
     if (request.Find("log_info", &setting_json)) {
@@ -1916,7 +1923,8 @@ HTTPAPIServer::HandleLogging(evhtp_request_t* req)
       if (!setting_json.IsNull()) {
         std::string log_format_parse;
         HTTP_RESPOND_IF_ERR(req, setting_json.AsString(&log_format_parse));
-        triton::common::Logger::Format log_format_final = triton::common::Logger::Format::kDEFAULT;
+        triton::common::Logger::Format log_format_final =
+            triton::common::Logger::Format::kDEFAULT;
         if (log_format_parse == "ISO8601") {
           log_format_final = triton::common::Logger::Format::kISO8601;
         } else if (log_format_parse != "default") {
@@ -1946,6 +1954,7 @@ HTTPAPIServer::HandleLogging(evhtp_request_t* req)
       }
     }
   }
+  std::cerr << "Preparing reponse object" << std::endl;
   triton::common::TritonJson::Value log_setting_response(
       triton::common::TritonJson::ValueType::OBJECT);
   HTTP_RESPOND_IF_ERR(
@@ -1957,7 +1966,8 @@ HTTPAPIServer::HandleLogging(evhtp_request_t* req)
   HTTP_RESPOND_IF_ERR(
       req, log_setting_response.AddBool("log_error", LOG_ERROR_IS_ON));
   HTTP_RESPOND_IF_ERR(
-      req, log_setting_response.AddInt("log_verbose_level", static_cast<uint64_t>(LOG_VERBOSE_LEVEL)));
+      req, log_setting_response.AddInt(
+               "log_verbose_level", static_cast<uint64_t>(LOG_VERBOSE_LEVEL)));
   HTTP_RESPOND_IF_ERR(
       req, log_setting_response.AddString("log_format", LOG_FORMAT_STRING));
   triton::common::TritonJson::WriteBuffer buffer;

@@ -1383,13 +1383,19 @@ CommonHandler::SetUpAllRequests()
           } else {
             // Set new settings in server then in core
             const std::string& log_file_path = it->second.string_param();
-            LOG_SET_OUT_FILE(log_file_path);
+            bool success = LOG_SET_OUT_FILE(log_file_path);
+            // On failure, close log file and revert to default "empty"
+            if (!success) {
+              std::string empty;
+              TRITONSERVER_ServerOptionsSetLogFile(nullptr, empty.c_str());
+              err = TRITONSERVER_ErrorNew(
+                  TRITONSERVER_ERROR_INVALID_ARG, ("Failed to open log file"));
+              GOTO_IF_ERR(err, earlyexit);
+            }
             // Okay to pass nullptr because we know the update will be applied
             // to the global object.
-            FAIL_IF_ERR(
-                TRITONSERVER_ServerOptionsSetLogFile(
-                    nullptr, log_file_path.c_str()),
-                "setting log out file");
+            TRITONSERVER_ServerOptionsSetLogFile(
+                nullptr, log_file_path.c_str());
           }
         }
       }
@@ -1454,7 +1460,8 @@ CommonHandler::SetUpAllRequests()
             bool log_error_status = it->second.bool_param();
             LOG_ENABLE_ERROR(log_error_status);
             FAIL_IF_ERR(
-                TRITONSERVER_ServerOptionsSetLogError(nullptr, log_error_status),
+                TRITONSERVER_ServerOptionsSetLogError(
+                    nullptr, log_error_status),
                 "setting log info enable");
           }
         }
@@ -1496,7 +1503,8 @@ CommonHandler::SetUpAllRequests()
             GOTO_IF_ERR(err, earlyexit);
           } else {
             const std::string& log_format_parse = it->second.string_param();
-            triton::common::Logger::Format log_format_final = triton::common::Logger::Format::kDEFAULT;
+            triton::common::Logger::Format log_format_final =
+                triton::common::Logger::Format::kDEFAULT;
             if (log_format_parse == "ISO8601") {
               log_format_final = triton::common::Logger::Format::kISO8601;
             } else if (log_format_parse != "default") {
@@ -1551,8 +1559,8 @@ CommonHandler::SetUpAllRequests()
   new CommonCallData<
       grpc::ServerAsyncResponseWriter<inference::LogSettingsResponse>,
       inference::LogSettingsRequest, inference::LogSettingsResponse>(
-      "Logging", 0, OnRegisterLogging, OnExecuteLogging,
-      false /* async */, cq_);
+      "Logging", 0, OnRegisterLogging, OnExecuteLogging, false /* async */,
+      cq_);
 
 
   //
