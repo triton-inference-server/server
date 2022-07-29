@@ -575,7 +575,7 @@ TraceManager::TraceTensorActivity(
           return;
         }
         std::string str(cbase + offset, len);
-        *ss << "\"" << str << "\"";
+        *ss << "\\\"" << str << "\\\"";
         offset += len;
 
         if (e < (element_count - 1))
