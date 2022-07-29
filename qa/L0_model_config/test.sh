@@ -226,6 +226,11 @@ done
 mkdir -p special_cases/invalid_platform/1
 cp -r /data/inferenceserver/${REPO_VERSION}/qa_model_repository/savedmodel_float32_float32_float32/1/model.savedmodel \
     special_cases/invalid_platform/1/
+# Note that graphdef models don't support auto-complete-config
+# and that is why we are using graphdef model in this test case.
+mkdir -p special_cases/noautofill_noconfig/1
+cp -r /data/inferenceserver/${REPO_VERSION}/qa_model_repository/graphdef_float32_float32_float32/1/model.graphdef \
+    special_cases/noautofill_noconfig/1/
 
 # Copy reshape model files into the test model repositories.
 mkdir -p autofill_noplatform_success/tensorflow_graphdef/reshape_config_provided/1
@@ -297,7 +302,14 @@ done
 
 # Run special test cases
 for TARGET in `ls special_cases`; do
-    SERVER_ARGS="--model-repository=`pwd`/models --strict-model-config=true"
+    case $TARGET in
+        "invalid_platform")
+            EXTRA_ARGS="--disable-auto-complete-config" ;;
+        *)
+            EXTRA_ARGS="" ;;
+    esac
+
+    SERVER_ARGS="--model-repository=`pwd`/models $EXTRA_ARGS"
     SERVER_LOG=$SERVER_LOG_BASE.special_case_${TARGET}.log
 
     rm -fr models && mkdir models
