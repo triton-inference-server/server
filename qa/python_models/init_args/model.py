@@ -1,4 +1,4 @@
-# Copyright (c) 2020-2021, NVIDIA CORPORATION. All rights reserved.
+# Copyright 2020-2022, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -28,15 +28,32 @@ import numpy as np
 import triton_python_backend_utils as pb_utils
 
 
+def check_init_args(args):
+    expected_args = {
+        'model_name':
+            'init_args',
+        'model_instance_name':
+            'init_args_0',
+        'model_instance_kind':
+            'CPU',
+        'model_instance_device_id':
+            '0',
+        'model_repository':
+            '/opt/tritonserver/qa/L0_backend_python/models/init_args',
+        'model_version':
+            '1'
+    }
+    for arg in expected_args:
+        if args[arg] != expected_args[arg]:
+            raise pb_utils.TritonModelException(
+                arg + ' does not contain correct value.')
+
+
 class TritonPythonModel:
 
     def initialize(self, args):
         self.args = args
-        if args['model_name'] != 'init_args' or args[
-                'model_instance_name'] != 'init_args_0':
-            raise pb_utils.TritonModelException(
-                'model_instance_name/model_name does not contain correct value.'
-            )
+        check_init_args(self.args)
 
     def execute(self, requests):
         """
