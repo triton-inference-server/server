@@ -222,6 +222,22 @@ for modelpath in \
     mv $modelpath/model.py $modelpath/1/.
 done
 
+# Copy custom backend over
+# TODO: Do I need to copy the backend over?
+# Copy custom models into the test model repositories.
+# TODO: Add models and directories... find where the correct model and backend is stored. Can I reuse backend for dyna_sequence test?
+for modelpath in \
+        autofill_noplatform/custom/unknown_backend/1 \
+        autofill_noplatform/custom/no_delimiter/1 \
+        autofill_noplatform/custom/nonstandard_name/1 \
+        autofill_noplatform_success/custom/no_config/1   \
+        autofill_noplatform_success/custom/empty_config/1   \
+        autofill_noplatform_success/custom/no_backend/1   ; do
+    mkdir -p $modelpath
+    cp ../custom_models/custom_dyna_sequence_int32/1/libtriton_dyna_sequence.so \
+       $modelpath/.
+done
+
 # Copy other required models
 mkdir -p special_cases/invalid_platform/1
 cp -r /data/inferenceserver/${REPO_VERSION}/qa_model_repository/savedmodel_float32_float32_float32/1/model.savedmodel \
