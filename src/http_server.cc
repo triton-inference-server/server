@@ -1875,7 +1875,7 @@ HTTPAPIServer::HandleLogging(evhtp_request_t* req)
         }
         // Okay to pass nullptr because we know the update will be applied
         // to the global object.
-        TRITONSERVER_ServerOptionsSetLogFile(nullptr, log_file_path.c_str())
+        TRITONSERVER_ServerOptionsSetLogFile(nullptr, log_file_path.c_str());
       }
     }
     if (request.Find("log_info", &setting_json)) {
@@ -1954,7 +1954,6 @@ HTTPAPIServer::HandleLogging(evhtp_request_t* req)
       }
     }
   }
-  std::cerr << "Preparing reponse object" << std::endl;
   triton::common::TritonJson::Value log_setting_response(
       triton::common::TritonJson::ValueType::OBJECT);
   HTTP_RESPOND_IF_ERR(
