@@ -1881,7 +1881,7 @@ HTTPAPIServer::HandleLogging(evhtp_request_t* req)
             "setting log info enable");
       }
     }
-    if (request.Find("log_warnings", &setting_json)) {
+    if (request.Find("log_warning", &setting_json)) {
       if (!setting_json.IsNull()) {
         bool log_warn_status;
         HTTP_RESPOND_IF_ERR(req, setting_json.AsBool(&log_warn_status));
@@ -1891,7 +1891,7 @@ HTTPAPIServer::HandleLogging(evhtp_request_t* req)
             "setting log warning enable");
       }
     }
-    if (request.Find("log_errors", &setting_json)) {
+    if (request.Find("log_error", &setting_json)) {
       if (!setting_json.IsNull()) {
         bool log_error_status;
         HTTP_RESPOND_IF_ERR(req, setting_json.AsBool(&log_error_status));
@@ -1953,9 +1953,9 @@ HTTPAPIServer::HandleLogging(evhtp_request_t* req)
   HTTP_RESPOND_IF_ERR(
       req, log_setting_response.AddBool("log_info", LOG_INFO_IS_ON));
   HTTP_RESPOND_IF_ERR(
-      req, log_setting_response.AddBool("log_warnings", LOG_WARNING_IS_ON));
+      req, log_setting_response.AddBool("log_warning", LOG_WARNING_IS_ON));
   HTTP_RESPOND_IF_ERR(
-      req, log_setting_response.AddBool("log_errors", LOG_ERROR_IS_ON));
+      req, log_setting_response.AddBool("log_error", LOG_ERROR_IS_ON));
   HTTP_RESPOND_IF_ERR(
       req, log_setting_response.AddInt("log_verbose_level", static_cast<uint64_t>(LOG_VERBOSE_LEVEL)));
   HTTP_RESPOND_IF_ERR(

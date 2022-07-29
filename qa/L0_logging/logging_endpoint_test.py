@@ -52,8 +52,8 @@ class LogEndpointTest(tu.TestResultCollector):
         clear_settings = {
             "log_file": "",
             "log_info": True,
-            "log_warnings": True,
-            "log_errors": True,
+            "log_warning": True,
+            "log_error": True,
             "log_verbose_level": 0,
             "log_format": "default"
         }
@@ -69,8 +69,8 @@ class LogEndpointTest(tu.TestResultCollector):
         initial_settings = {
             "log_file": "",
             "log_info": True,
-            "log_warnings": True,
-            "log_errors": True,
+            "log_warning": True,
+            "log_error": True,
             "log_verbose_level": 0,
             "log_format": "default"
         }
@@ -84,8 +84,8 @@ class LogEndpointTest(tu.TestResultCollector):
         initial_settings = {
             "log_file": "",
             "log_info": True,
-            "log_warnings": True,
-            "log_errors": True,
+            "log_warning": True,
+            "log_error": True,
             "log_verbose_level": 0,
             "log_format": "default"
         }
@@ -107,10 +107,10 @@ class LogEndpointTest(tu.TestResultCollector):
                     "log_info": {
                         "boolParam": True
                     },
-                    "log_warnings": {
+                    "log_warning": {
                         "boolParam": True
                     },
-                    "log_errors": {
+                    "log_error": {
                         "boolParam": True
                     },
                     "log_verbose_level": {
@@ -135,48 +135,48 @@ class LogEndpointTest(tu.TestResultCollector):
         expected_log_settings_1 = {
             "log_file": "log_file.log",
             "log_info": True,
-            "log_warnings": True,
-            "log_errors": True,
+            "log_warning": True,
+            "log_error": True,
             "log_verbose_level": 0,
             "log_format": "default"
         }
         expected_log_settings_2 = {
             "log_file": "log_file.log",
             "log_info": False,
-            "log_warnings": True,
-            "log_errors": True,
+            "log_warning": True,
+            "log_error": True,
             "log_verbose_level": 0,
             "log_format": "default"
         }
         expected_log_settings_3 = {
             "log_file": "log_file.log",
             "log_info": False,
-            "log_warnings": False,
-            "log_errors": True,
+            "log_warning": False,
+            "log_error": True,
             "log_verbose_level": 0,
             "log_format": "default"
         }
         expected_log_settings_4 = {
             "log_file": "log_file.log",
             "log_info": False,
-            "log_warnings": False,
-            "log_errors": False,
+            "log_warning": False,
+            "log_error": False,
             "log_verbose_level": 0,
             "log_format": "default"
         }
         expected_log_settings_5 = {
             "log_file": "log_file.log",
             "log_info": False,
-            "log_warnings": False,
-            "log_errors": False,
+            "log_warning": False,
+            "log_error": False,
             "log_verbose_level": 1,
             "log_format": "default"
         }
         expected_log_settings_6 = {
             "log_file": "log_file.log",
             "log_info": False,
-            "log_warnings": False,
-            "log_errors": False,
+            "log_warning": False,
+            "log_error": False,
             "log_verbose_level": 1,
             "log_format": "ISO8601"
         }
@@ -218,8 +218,8 @@ class LogEndpointTest(tu.TestResultCollector):
         log_settings_1 = {
             "log_file": "log_file.log",
             "log_info": True,
-            "log_warnings": True,
-            "log_errors": True,
+            "log_warning": True,
+            "log_error": True,
             "log_verbose_level": 0,
             "log_format": "default"
         }
@@ -233,10 +233,10 @@ class LogEndpointTest(tu.TestResultCollector):
                     "log_info": {
                         "boolParam": True
                     },
-                    "log_warnings": {
+                    "log_warning": {
                         "boolParam": True
                     },
-                    "log_errors": {
+                    "log_error": {
                         "boolParam": True
                     },
                     "log_verbose_level": {
@@ -256,8 +256,8 @@ class LogEndpointTest(tu.TestResultCollector):
         log_settings_2 = {
             "log_file": "log_file.log",
             "log_info": False,
-            "log_warnings": True,
-            "log_errors": True,
+            "log_warning": True,
+            "log_error": True,
             "log_verbose_level": 0,
             "log_format": "default"
         }
@@ -271,10 +271,10 @@ class LogEndpointTest(tu.TestResultCollector):
                     "log_info": {
                         "boolParam": False
                     },
-                    "log_warnings": {
+                    "log_warning": {
                         "boolParam": True
                     },
-                    "log_errors": {
+                    "log_error": {
                         "boolParam": True
                     },
                     "log_verbose_level": {
@@ -294,8 +294,8 @@ class LogEndpointTest(tu.TestResultCollector):
         log_settings_3 = {
             "log_file": "log_file.log",
             "log_info": False,
-            "log_warnings": False,
-            "log_errors": True,
+            "log_warning": False,
+            "log_error": True,
             "log_verbose_level": 0,
             "log_format": "default"
         }
@@ -309,10 +309,10 @@ class LogEndpointTest(tu.TestResultCollector):
                     "log_info": {
                         "boolParam": False
                     },
-                    "log_warnings": {
+                    "log_warning": {
                         "boolParam": False
                     },
-                    "log_errors": {
+                    "log_error": {
                         "boolParam": True
                     },
                     "log_verbose_level": {
@@ -332,8 +332,8 @@ class LogEndpointTest(tu.TestResultCollector):
         log_settings_4 = {
             "log_file": "log_file.log",
             "log_info": False,
-            "log_warnings": False,
-            "log_errors": False,
+            "log_warning": False,
+            "log_error": False,
             "log_verbose_level": 0,
             "log_format": "default"
         }
@@ -347,10 +347,10 @@ class LogEndpointTest(tu.TestResultCollector):
                     "log_info": {
                         "boolParam": False
                     },
-                    "log_warnings": {
+                    "log_warning": {
                         "boolParam": False
                     },
-                    "log_errors": {
+                    "log_error": {
                         "boolParam": False
                     },
                     "log_verbose_level": {
@@ -370,8 +370,8 @@ class LogEndpointTest(tu.TestResultCollector):
         log_settings_5 = {
             "log_file": "log_file.log",
             "log_info": False,
-            "log_warnings": False,
-            "log_errors": False,
+            "log_warning": False,
+            "log_error": False,
             "log_verbose_level": 1,
             "log_format": "default"
         }
@@ -385,10 +385,10 @@ class LogEndpointTest(tu.TestResultCollector):
                     "log_info": {
                         "boolParam": False
                     },
-                    "log_warnings": {
+                    "log_warning": {
                         "boolParam": False
                     },
-                    "log_errors": {
+                    "log_error": {
                         "boolParam": False
                     },
                     "log_verbose_level": {
@@ -408,8 +408,8 @@ class LogEndpointTest(tu.TestResultCollector):
         log_settings_6 = {
             "log_file": "log_file.log",
             "log_info": False,
-            "log_warnings": False,
-            "log_errors": False,
+            "log_warning": False,
+            "log_error": False,
             "log_verbose_level": 1,
             "log_format": "ISO8601"
         }
@@ -423,10 +423,10 @@ class LogEndpointTest(tu.TestResultCollector):
                     "log_info": {
                         "boolParam": False
                     },
-                    "log_warnings": {
+                    "log_warning": {
                         "boolParam": False
                     },
-                    "log_errors": {
+                    "log_error": {
                         "boolParam": False
                     },
                     "log_verbose_level": {

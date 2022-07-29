@@ -1416,7 +1416,7 @@ CommonHandler::SetUpAllRequests()
         }
       }
       {
-        static std::string setting_name = "log_warnings";
+        static std::string setting_name = "log_warning";
         auto it = request.settings().find(setting_name);
         if (it != request.settings().end()) {
           const auto& log_param = it->second;
@@ -1438,7 +1438,7 @@ CommonHandler::SetUpAllRequests()
         }
       }
       {
-        static std::string setting_name = "log_errors";
+        static std::string setting_name = "log_error";
         auto it = request.settings().find(setting_name);
         if (it != request.settings().end()) {
           const auto& log_param = it->second;
@@ -1528,9 +1528,9 @@ CommonHandler::SetUpAllRequests()
     }
     (*response->mutable_settings())["log_file"].set_string_param(LOG_FILE);
     (*response->mutable_settings())["log_info"].set_bool_param(LOG_INFO_IS_ON);
-    (*response->mutable_settings())["log_warnings"].set_bool_param(
+    (*response->mutable_settings())["log_warning"].set_bool_param(
         LOG_WARNING_IS_ON);
-    (*response->mutable_settings())["log_errors"].set_bool_param(
+    (*response->mutable_settings())["log_error"].set_bool_param(
         LOG_ERROR_IS_ON);
     (*response->mutable_settings())["log_verbose_level"].set_uint32_param(
         LOG_VERBOSE_LEVEL);

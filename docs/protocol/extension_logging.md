@@ -73,9 +73,9 @@ log outputs will stream to the console.
 
 - "log_info" : a $boolean parameter that controls whether the Triton server logs INFO level messages. 
 
-- "log_warnings" : a $boolean parameter that controls whether the Triton server logs WARNING level messages. 
+- "log_warning" : a $boolean parameter that controls whether the Triton server logs WARNING level messages. 
 
-- "log_errors" : a $boolean parameter that controls whether the Triton server logs ERROR level messages. 
+- "log_error" : a $boolean parameter that controls whether the Triton server logs ERROR level messages. 
 
 - "log_verbose_level" : a $number parameter that controls whether the Triton server outputs verbose messages
 of varying degrees. This value can be any integer >= 0. If "log_verbose_level" is 0, verbose logging will be disabled, and 

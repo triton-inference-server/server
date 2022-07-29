@@ -85,11 +85,11 @@ function verify_correct_settings () {
     echo -e "\n***\n*** Test Failed: Incorrect Log Info Setting\n***"
     RET=1
   fi
-  if [ `grep -c "\"log_warnings\":$log_warn_expected" ./curl.out` != "1" ]; then
+  if [ `grep -c "\"log_warning\":$log_warn_expected" ./curl.out` != "1" ]; then
     echo -e "\n***\n*** Test Failed: Incorrect Log Warn Setting\n***"
     RET=1
   fi
-  if [ `grep -c "\"log_errors\":$log_error_expected" ./curl.out` != "1" ]; then
+  if [ `grep -c "\"log_error\":$log_error_expected" ./curl.out` != "1" ]; then
     echo -e "\n***\n*** Test Failed: Incorrect Log Error Setting\n***"
     RET=1
   fi
@@ -101,23 +101,6 @@ function verify_correct_settings () {
     echo -e "\n***\n*** Test Failed: Incorrect Log Format Setting\n***"
     RET=1
   fi
-}
-
-function verify_log_redirection() {
-    log_file=$1
-    console_file=$2
-    expected_file_line_count=$3
-    expected_console_line_count=$4
-    file_count=($(wc -l ./$log_file))
-    console_count=($(wc -l ./$console_file))
-    if [ $file_count -le $expected_file_line_count ]; then
-        echo -e "\n***\n*** Test Failed: Log File Error\n***"
-        RET=1
-    fi
-    if [ $console_count -gt $expected_console_line_count ]; then
-        echo -e "\n***\n*** Test Failed: Console Has Output\n***"
-        RET=1
-    fi
 }
 
 #Run Default Server
@@ -183,9 +166,22 @@ $SIMPLE_GRPC_CLIENT >> client_test_log_file.log 2>&1
 if [ $? -ne 0 ]; then
     RET=1
 fi
-
-verify_log_redirection "log_file.log" "inference_server_log_file.log" 30 1
-
+expected_log_count=19
+actual_log_count=$(grep -c ^[IWEV][0-9][0-9][0-9][0-9].* ./log_file.log)
+if [ $actual_log_count -lt $expected_log_count ]; then
+    echo $actual_log_count
+    echo $expected_log_count
+    echo -e "\n***\n*** Test Failed: Less Log Messages Than Expected $LINENO\n***"
+    RET=1
+fi
+expected_server_count=0
+actual_server_count=$(grep -c ^[IWEV][0-9][0-9][0-9][0-9].* inference_server_log_file.log)
+if [ $actual_server_count -gt $expected_server_count ]; then
+    echo $actual_server_count
+    echo $expected_server_count
+    echo -e "\n***\n*** Test Failed: More Log Messages Than Expected $LINENO\n***"
+    RET=1
+fi
 set -e
 
 kill $SERVER_PID
@@ -220,8 +216,30 @@ fi
 
 # Check redirection worked properly (server log has tolerance of 40 due to 
 # unavoidable onnx framework logging)
-verify_log_redirection "log_file.log" "inference_server_log_file.log" 50 40
-verify_log_redirection "other_log.log" "inference_server_log_file.log" 50 40
+expected_log_count=79
+actual_log_count=$(grep -c ^[IWEV][0-9][0-9][0-9][0-9].* ./log_file.log)
+if [ $actual_log_count -lt $expected_log_count ]; then
+    echo $actual_log_count
+    echo $expected_log_count
+    echo -e "\n***\n*** Test Failed: Less Log Messages Than Expected $LINENO\n***"
+    RET=1
+fi
+expected_other_log_count=31
+actual_other_log_count=$(grep -c ^[IWEV][0-9][0-9][0-9][0-9].* ./other_log.log)
+if [ $actual_other_log_count -lt $expected_other_log_count ]; then
+    echo $actual_other_log_count
+    echo $expected_other_log_count
+    echo -e "\n***\n*** Test Failed: Less Log Messages Than Expected $LINENO\n***"
+    RET=1
+fi
+expected_server_count=0
+actual_server_count=$(grep -c ^[IWEV][0-9][0-9][0-9][0-9].* inference_server_log_file.log)
+if [ $actual_server_count -gt $expected_server_count ]; then
+    echo $actual_server_count
+    echo $expected_server_count
+    echo -e "\n***\n*** Test Failed: More Log Messages Than Expected $LINENO\n***"
+    RET=1
+fi
 
 set -e
 kill $SERVER_PID
@@ -474,7 +492,7 @@ fi
 
 set +e
 
-BOOL_PARAMS=${BOOL_PARAMS:="log_info log_warnings log_errors"}
+BOOL_PARAMS=${BOOL_PARAMS:="log_info log_warning log_error"}
 for BOOL_PARAM in $BOOL_PARAMS; do
     # Attempt to use integer instead of bool
     code=`curl -s -w %{http_code} -o ./curl.out -d'{"'"$BOOL_PARAM"'":1}' localhost:8000/v2/logging`
