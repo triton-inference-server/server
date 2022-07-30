@@ -1538,7 +1538,7 @@ if [ "$SERVER_PID" == "0" ]; then
 fi
 
 set +e
-SERVER_PID=$SERVER_PID python $LC_TEST LifeCycleTest.test_shutdown_dynamic >>$CLIENT_LOG 2>&1
+python $LC_TEST LifeCycleTest.test_shutdown_dynamic >>$CLIENT_LOG 2>&1
 check_unit_test
 set -e
 
@@ -1571,7 +1571,7 @@ if [ "$SERVER_PID" == "0" ]; then
 fi
 
 set +e
-SERVER_PID=$SERVER_PID python $LC_TEST LifeCycleTest.test_shutdown_sequence >>$CLIENT_LOG 2>&1
+python $LC_TEST LifeCycleTest.test_shutdown_sequence >>$CLIENT_LOG 2>&1
 check_unit_test
 set -e
 
@@ -1615,7 +1615,7 @@ if [ "$SERVER_PID" == "0" ]; then
 fi
 
 set +e
-SERVER_PID=$SERVER_PID python $LC_TEST LifeCycleTest.test_shutdown_ensemble >>$CLIENT_LOG 2>&1
+python $LC_TEST LifeCycleTest.test_shutdown_ensemble >>$CLIENT_LOG 2>&1
 check_unit_test
 set -e
 
@@ -1636,8 +1636,8 @@ mkdir models
 cp -r ../python_models/cuda_memory_consumer models/cuda_memory_consumer_1 && \
     cp -r ../python_models/cuda_memory_consumer models/cuda_memory_consumer_2
 
-# Run server to stop model loading if > 30% of GPU 0 memeory is used
-SERVER_ARGS="--model-repository=`pwd`/models --model-control-mode=explicit --model-load-gpu-limit 0:0.3"
+# Run server to stop model loading if > 60% of GPU 0 memeory is used
+SERVER_ARGS="--model-repository=`pwd`/models --model-control-mode=explicit --model-load-gpu-limit 0:0.6"
 SERVER_LOG="./inference_server_$LOG_IDX.log"
 run_server
 if [ "$SERVER_PID" == "0" ]; then
@@ -1647,7 +1647,7 @@ if [ "$SERVER_PID" == "0" ]; then
 fi
 
 set +e
-SERVER_PID=$SERVER_PID python $LC_TEST LifeCycleTest.test_load_gpu_limit >>$CLIENT_LOG 2>&1
+python $LC_TEST LifeCycleTest.test_load_gpu_limit >>$CLIENT_LOG 2>&1
 check_unit_test
 set -e
 

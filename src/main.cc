@@ -628,11 +628,10 @@ std::vector<Option> options_
   {
     OPTION_MODEL_LOAD_GPU_LIMIT, "model-load-gpu-limit",
         "<device_id>:<fraction>",
-        "Specify the limit on GPU memory usage in fraction. If model loading "
-        "on "
-        "the device is requested and the current memory usage exceeds the "
-        "limit,"
-        "the load will be rejected. If not specified, the limit will not set."
+        "Specify the limit on GPU memory usage as a fraction. If model loading "
+        "on the device is requested and the current memory usage exceeds the "
+        "limit, the load will be rejected. If not specified, the limit will "
+        "not be set."
   }
 };
 
@@ -1941,6 +1940,16 @@ Parse(TRITONSERVER_ServerOptions** server_options, int argc, char** argv)
         "setting backend configurtion");
   }
   for (const auto& limit : load_gpu_limit) {
+    if (limit.first < 0) {
+      std::cerr << "--model-load-gpu-limit option expects device ID >= 0, Got "
+                << limit.first << std::endl;
+      exit(1);
+    } else if ((limit.second < 0.0) || (limit.second > 1.0)) {
+      std::cerr << "--model-load-gpu-limit option expects limit fraction to be "
+                   "in range [0.0, 1.0], Got "
+                << limit.second << std::endl;
+      exit(1);
+    }
     static std::string key_prefix = "model-load-gpu-limit-device-";
     FAIL_IF_ERR(
         TRITONSERVER_ServerOptionsSetBackendConfig(
