@@ -35,8 +35,8 @@ here to help answer that.
 For those who like a high level overview, below is the common flow for most use cases. For those who wish to jump right in, skip to the [end-to-end example](#end-to-end-example).
 
 1. Is my model compatible with Triton?
-    - If your model falls under one of Triton's [supported backends](https://github.com/triton-inference-server/backend), then we can simply try to deploy the model as described in the [Quickstart](https://github.com/triton-inference-server/server/blob/main/docs/quickstart.md) guide. For the ONNXRuntime, TensorFlow SavedModel, and TensorRT backends, the model configuration can be completely inferred from the model using Triton's [AutoComplete](https://github.com/triton-inference-server/server/blob/main/docs/model_configuration.md#auto-generated-model-configuration) feature, so no `config.pbtxt` file is required. Additionally, by enabling verbose logging via `--log-verbose=1` - you can see the complete config that Triton sees internally in the server log output. For other backends, refer to the [Minimal Model Configuration](https://github.com/triton-inference-server/server/blob/main/docs/model_configuration.md#minimal-model-configuration) required to get started.
-    - If your model does not come directly from a supported backend, but is executable through Python; you may be interested in writing a simple python script for running your model through the [Python Backend](https://github.com/triton-inference-server/python_backend).
+    - If your model falls under one of Triton's [supported backends](https://github.com/triton-inference-server/backend), then we can simply try to deploy the model as described in the [Quickstart](https://github.com/triton-inference-server/server/blob/main/docs/quickstart.md) guide. For the ONNXRuntime, TensorFlow SavedModel, and TensorRT backends, the model configuration can be completely inferred from the model using Triton's [AutoComplete](https://github.com/triton-inference-server/server/blob/main/docs/model_configuration.md#auto-generated-model-configuration) feature, so no `config.pbtxt` file is required. Additionally, by enabling verbose logging via `--log-verbose=1`, you can see the complete config that Triton sees internally in the server log output. For other backends, refer to the [Minimal Model Configuration](https://github.com/triton-inference-server/server/blob/main/docs/model_configuration.md#minimal-model-configuration) required to get started.
+    - If your model does not come directly from a supported backend, but is executable through Python, you may be interested in writing a simple python script for running your model through the [Python Backend](https://github.com/triton-inference-server/python_backend).
     - Otherwise, you can create a [Custom Backend](https://github.com/triton-inference-server/backend/blob/main/examples/README.md) for executing your model.
 
 2. Can I run inference on my served model?
@@ -54,8 +54,8 @@ For those who like a high level overview, below is the common flow for most use 
     Concurrency: 1, throughput: 482.8 infer/sec, latency 12613 usec
     ```
 
-    - This gives us a sanity test that we are able to successfully form input requests and receive output responses to communicate with the model backend via Triton APIs. If for some reason Perf Analyzer fails to send requests and it is not clear from the error how to proceed, then you may want to sanity check that your model `config.pbtxt` inputs/outputs match what the model expects, and that you can perform inference directly using your model's original framework.
-    - The defintion of "performing well" is subject to change for each use case. Some common metrics are throughput, latency, and GPU utilization. There are many variables that can be tweaked just within your Triton configuration (`config.pbtxt`) to obtain different results.
+    - This gives us a sanity test that we are able to successfully form input requests and receive output responses to communicate with the model backend via Triton APIs. If Perf Analyzer fails to send requests and it is unclear from the error how to proceed, then you may want to sanity check that your model `config.pbtxt` inputs/outputs match what the model expects. If the config is correct, check that the model runs successfully using its original framework directly. If you don't have your own script or tool to do so, [Polygraphy](https://github.com/NVIDIA/TensorRT/tree/main/tools/Polygraphy) is a useful tool to run sample inferences on a model via various frameworks.
+    - The definition of "performing well" is subject to change for each use case. Some common metrics are throughput, latency, and GPU utilization. There are many variables that can be tweaked just within your Triton configuration (`config.pbtxt`) to obtain different results.
     - As your model, config, or use case evolves, [Perf Analyzer](https://github.com/triton-inference-server/server/blob/main/docs/perf_analyzer.md) is a great tool to quickly verify model functionality and performance.
 
 3. How can I improve my model performance?
@@ -140,7 +140,7 @@ docker exec -ti triton-server bash
 tritonserver --model-repository=/mnt/models
 ```
 
-> NOTE: The `-v $PWD:/mnt` is mounting your current directory on the host into the `/mnt` directory inside the container. So if you created your model repository in `$PWD/models`, you will find it inside the container at `/mnt/models`; You can change these paths as needed. See [docker volume](https://docs.docker.com/storage/volumes/) docs for more information on how this works.
+> NOTE: The `-v $PWD:/mnt` is mounting your current directory on the host into the `/mnt` directory inside the container. So if you created your model repository in `$PWD/models`, you will find it inside the container at `/mnt/models`. You can change these paths as needed. See [docker volume](https://docs.docker.com/storage/volumes/) docs for more information on how this works.
 
 5. Verify the model can run inference
 
@@ -222,7 +222,7 @@ In our example above, `alexnet_config_4` was the optimal configuration. So let's
 # (optional) Backup our original config.pbtxt (if any) to another directory
 cp /mnt/models/alexnet/config.pbtxt /tmp/original_config.pbtxt
 
-# Copy over the optimal config.pbtxt from model-analyzer results to our model repository
+# Copy over the optimal config.pbtxt from Model Analyzer results to our model repository
 cp ./results/alexnet_config_4/config.pbtxt /mnt/models/alexnet/
 ```
 
