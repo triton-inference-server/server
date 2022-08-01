@@ -68,7 +68,7 @@ Each $log_setting JSON describes a “name”/”value” pair, where the “nam
 the $string representation of the log setting and the “value” is a $string, $bool, or $number representation of the
 setting value. Currently, the following log settings are defined:
 
-- "log_file" : a $string parameter defining the file where the log outputs will be saved. If not specified,
+- "log_file" : a $string parameter defining the file where the log outputs will be saved. If an empty string is specified,
 log outputs will stream to the console.
 
 - "log_info" : a $boolean parameter that controls whether the Triton server logs INFO level messages. 
