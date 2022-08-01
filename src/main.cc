@@ -1881,9 +1881,7 @@ Parse(TRITONSERVER_ServerOptions** server_options, int argc, char** argv)
       "setting model load thread count");
 
 #ifdef TRITON_ENABLE_LOGGING
-  FAIL_IF_ERR(
-      TRITONSERVER_ServerOptionsSetLogFile(loptions, log_file.c_str()),
-      "setting log output file");
+  TRITONSERVER_ServerOptionsSetLogFile(loptions, log_file.c_str());
   FAIL_IF_ERR(
       TRITONSERVER_ServerOptionsSetLogInfo(loptions, log_info),
       "setting log info enable");

@@ -1386,16 +1386,15 @@ CommonHandler::SetUpAllRequests()
             bool success = LOG_SET_OUT_FILE(log_file_path);
             // On failure, close log file and revert to default "empty"
             if (!success) {
-              std::string empty;
-              TRITONSERVER_ServerOptionsSetLogFile(nullptr, empty.c_str());
-              err = TRITONSERVER_ErrorNew(
-                  TRITONSERVER_ERROR_INVALID_ARG, ("Failed to open log file"));
               GOTO_IF_ERR(err, earlyexit);
             }
             // Okay to pass nullptr because we know the update will be applied
             // to the global object.
-            TRITONSERVER_ServerOptionsSetLogFile(
+            success = TRITONSERVER_ServerOptionsSetLogFile(
                 nullptr, log_file_path.c_str());
+            if (!success) {
+              GOTO_IF_ERR(err, earlyexit);
+            }
           }
         }
       }
@@ -1415,9 +1414,7 @@ CommonHandler::SetUpAllRequests()
           } else {
             bool log_info_status = it->second.bool_param();
             LOG_ENABLE_INFO(log_info_status);
-            FAIL_IF_ERR(
-                TRITONSERVER_ServerOptionsSetLogInfo(nullptr, log_info_status),
-                "setting log info enable");
+            TRITONSERVER_ServerOptionsSetLogInfo(nullptr, log_info_status);
           }
         }
       }
@@ -1437,9 +1434,7 @@ CommonHandler::SetUpAllRequests()
           } else {
             bool log_warn_status = it->second.bool_param();
             LOG_ENABLE_WARNING(log_warn_status);
-            FAIL_IF_ERR(
-                TRITONSERVER_ServerOptionsSetLogWarn(nullptr, log_warn_status),
-                "setting log info enable");
+            TRITONSERVER_ServerOptionsSetLogWarn(nullptr, log_warn_status);
           }
         }
       }
@@ -1459,10 +1454,8 @@ CommonHandler::SetUpAllRequests()
           } else {
             bool log_error_status = it->second.bool_param();
             LOG_ENABLE_ERROR(log_error_status);
-            FAIL_IF_ERR(
-                TRITONSERVER_ServerOptionsSetLogError(
-                    nullptr, log_error_status),
-                "setting log info enable");
+            TRITONSERVER_ServerOptionsSetLogError(
+                    nullptr, log_error_status);
           }
         }
       }
@@ -1482,9 +1475,7 @@ CommonHandler::SetUpAllRequests()
           } else {
             uint32_t verbose_level = it->second.uint32_param();
             LOG_SET_VERBOSE(static_cast<int32_t>(verbose_level));
-            FAIL_IF_ERR(
-                TRITONSERVER_ServerOptionsSetLogVerbose(nullptr, verbose_level),
-                "setting log info enable");
+            TRITONSERVER_ServerOptionsSetLogVerbose(nullptr, verbose_level);
           }
         }
       }
@@ -1517,16 +1508,12 @@ CommonHandler::SetUpAllRequests()
             LOG_SET_FORMAT(log_format_final);
             switch (log_format_final) {
               case triton::common::Logger::Format::kDEFAULT:
-                FAIL_IF_ERR(
-                    TRITONSERVER_ServerOptionsSetLogFormat(
-                        nullptr, TRITONSERVER_LOG_DEFAULT),
-                    "setting log format");
+                TRITONSERVER_ServerOptionsSetLogFormat(
+                        nullptr, TRITONSERVER_LOG_DEFAULT);
                 break;
               case triton::common::Logger::Format::kISO8601:
-                FAIL_IF_ERR(
-                    TRITONSERVER_ServerOptionsSetLogFormat(
-                        nullptr, TRITONSERVER_LOG_ISO8601),
-                    "setting log format");
+                TRITONSERVER_ServerOptionsSetLogFormat(
+                        nullptr, TRITONSERVER_LOG_ISO8601);
                 break;
             }
           }

@@ -1865,9 +1865,6 @@ HTTPAPIServer::HandleLogging(evhtp_request_t* req)
         bool success = LOG_SET_OUT_FILE(log_file_path);
         // On failure, close log file and revert to default "empty"
         if (!success) {
-          std::string empty;
-          TRITONSERVER_ServerOptionsSetLogFile(nullptr, empty.c_str());
-
           HTTP_RESPOND_IF_ERR(
               req,
               TRITONSERVER_ErrorNew(
@@ -1875,7 +1872,13 @@ HTTPAPIServer::HandleLogging(evhtp_request_t* req)
         }
         // Okay to pass nullptr because we know the update will be applied
         // to the global object.
-        TRITONSERVER_ServerOptionsSetLogFile(nullptr, log_file_path.c_str());
+        success = TRITONSERVER_ServerOptionsSetLogFile(nullptr, log_file_path.c_str());
+        if (!success) {
+          HTTP_RESPOND_IF_ERR(
+            req,
+            TRITONSERVER_ErrorNew(
+                TRITONSERVER_ERROR_UNAVAILABLE, ("Failed to open log file")));
+        }
       }
     }
     if (request.Find("log_info", &setting_json)) {
@@ -1883,9 +1886,7 @@ HTTPAPIServer::HandleLogging(evhtp_request_t* req)
         bool log_info_status;
         HTTP_RESPOND_IF_ERR(req, setting_json.AsBool(&log_info_status));
         LOG_ENABLE_INFO(log_info_status);
-        FAIL_IF_ERR(
-            TRITONSERVER_ServerOptionsSetLogInfo(nullptr, log_info_status),
-            "setting log info enable");
+        TRITONSERVER_ServerOptionsSetLogInfo(nullptr, log_info_status);
       }
     }
     if (request.Find("log_warning", &setting_json)) {
@@ -1893,9 +1894,7 @@ HTTPAPIServer::HandleLogging(evhtp_request_t* req)
         bool log_warn_status;
         HTTP_RESPOND_IF_ERR(req, setting_json.AsBool(&log_warn_status));
         LOG_ENABLE_WARNING(log_warn_status);
-        FAIL_IF_ERR(
-            TRITONSERVER_ServerOptionsSetLogWarn(nullptr, log_warn_status),
-            "setting log warning enable");
+        TRITONSERVER_ServerOptionsSetLogWarn(nullptr, log_warn_status);
       }
     }
     if (request.Find("log_error", &setting_json)) {
@@ -1903,9 +1902,7 @@ HTTPAPIServer::HandleLogging(evhtp_request_t* req)
         bool log_error_status;
         HTTP_RESPOND_IF_ERR(req, setting_json.AsBool(&log_error_status));
         LOG_ENABLE_ERROR(log_error_status);
-        FAIL_IF_ERR(
-            TRITONSERVER_ServerOptionsSetLogError(nullptr, log_error_status),
-            "setting log error enable");
+        TRITONSERVER_ServerOptionsSetLogError(nullptr, log_error_status);
       }
     }
     if (request.Find("log_verbose_level", &setting_json)) {
@@ -1913,10 +1910,8 @@ HTTPAPIServer::HandleLogging(evhtp_request_t* req)
         uint64_t verbose_level;
         HTTP_RESPOND_IF_ERR(req, setting_json.AsUInt(&verbose_level));
         LOG_SET_VERBOSE(static_cast<int32_t>(verbose_level));
-        FAIL_IF_ERR(
-            TRITONSERVER_ServerOptionsSetLogVerbose(
-                nullptr, static_cast<int32_t>(verbose_level)),
-            "setting log verbose level");
+        TRITONSERVER_ServerOptionsSetLogVerbose(
+                nullptr, static_cast<int32_t>(verbose_level));
       }
     }
     if (request.Find("log_format", &setting_json)) {
@@ -1939,16 +1934,12 @@ HTTPAPIServer::HandleLogging(evhtp_request_t* req)
         LOG_SET_FORMAT(log_format_final);
         switch (log_format_final) {
           case triton::common::Logger::Format::kDEFAULT:
-            FAIL_IF_ERR(
-                TRITONSERVER_ServerOptionsSetLogFormat(
-                    nullptr, TRITONSERVER_LOG_DEFAULT),
-                "setting log format");
+            TRITONSERVER_ServerOptionsSetLogFormat(
+                    nullptr, TRITONSERVER_LOG_DEFAULT);
             break;
           case triton::common::Logger::Format::kISO8601:
-            FAIL_IF_ERR(
-                TRITONSERVER_ServerOptionsSetLogFormat(
-                    nullptr, TRITONSERVER_LOG_ISO8601),
-                "setting log format");
+            TRITONSERVER_ServerOptionsSetLogFormat(
+                    nullptr, TRITONSERVER_LOG_ISO8601);
             break;
         }
       }
