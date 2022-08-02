@@ -1386,7 +1386,7 @@ CommonHandler::SetUpAllRequests()
             const std::string& error = LOG_SET_OUT_FILE(log_file_path);
             if (!error.empty()) {
               err = TRITONSERVER_ErrorNew(
-                TRITONSERVER_ERROR_INTERNAL, (error).c_str());
+                  TRITONSERVER_ERROR_INTERNAL, (error).c_str());
               GOTO_IF_ERR(err, earlyexit);
             }
             // Okay to pass nullptr because we know the update will be applied
@@ -1455,8 +1455,7 @@ CommonHandler::SetUpAllRequests()
           } else {
             bool log_error_status = it->second.bool_param();
             LOG_ENABLE_ERROR(log_error_status);
-            TRITONSERVER_ServerOptionsSetLogError(
-                    nullptr, log_error_status);
+            TRITONSERVER_ServerOptionsSetLogError(nullptr, log_error_status);
           }
         }
       }
@@ -1510,11 +1509,11 @@ CommonHandler::SetUpAllRequests()
             switch (log_format_final) {
               case triton::common::Logger::Format::kDEFAULT:
                 TRITONSERVER_ServerOptionsSetLogFormat(
-                        nullptr, TRITONSERVER_LOG_DEFAULT);
+                    nullptr, TRITONSERVER_LOG_DEFAULT);
                 break;
               case triton::common::Logger::Format::kISO8601:
                 TRITONSERVER_ServerOptionsSetLogFormat(
-                        nullptr, TRITONSERVER_LOG_ISO8601);
+                    nullptr, TRITONSERVER_LOG_ISO8601);
                 break;
             }
           }

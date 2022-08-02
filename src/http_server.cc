@@ -1866,18 +1866,18 @@ HTTPAPIServer::HandleLogging(evhtp_request_t* req)
         const std::string& error = LOG_SET_OUT_FILE(log_file_path);
         if (!error.empty()) {
           HTTP_RESPOND_IF_ERR(
-              req,
-              TRITONSERVER_ErrorNew(
-                  TRITONSERVER_ERROR_UNAVAILABLE, (error).c_str()));
+              req, TRITONSERVER_ErrorNew(
+                       TRITONSERVER_ERROR_UNAVAILABLE, (error).c_str()));
         }
         // Okay to pass nullptr because we know the update will be applied
         // to the global object.
-        err = TRITONSERVER_ServerOptionsSetLogFile(nullptr, log_file_path.c_str());
+        err = TRITONSERVER_ServerOptionsSetLogFile(
+            nullptr, log_file_path.c_str());
         if (err != nullptr) {
           HTTP_RESPOND_IF_ERR(
-            req,
-            TRITONSERVER_ErrorNew(
-                TRITONSERVER_ERROR_UNAVAILABLE, (TRITONSERVER_ErrorMessage(err))));
+              req, TRITONSERVER_ErrorNew(
+                       TRITONSERVER_ERROR_UNAVAILABLE,
+                       (TRITONSERVER_ErrorMessage(err))));
         }
       }
     }
@@ -1911,7 +1911,7 @@ HTTPAPIServer::HandleLogging(evhtp_request_t* req)
         HTTP_RESPOND_IF_ERR(req, setting_json.AsUInt(&verbose_level));
         LOG_SET_VERBOSE(static_cast<int32_t>(verbose_level));
         TRITONSERVER_ServerOptionsSetLogVerbose(
-                nullptr, static_cast<int32_t>(verbose_level));
+            nullptr, static_cast<int32_t>(verbose_level));
       }
     }
     if (request.Find("log_format", &setting_json)) {
@@ -1935,11 +1935,11 @@ HTTPAPIServer::HandleLogging(evhtp_request_t* req)
         switch (log_format_final) {
           case triton::common::Logger::Format::kDEFAULT:
             TRITONSERVER_ServerOptionsSetLogFormat(
-                    nullptr, TRITONSERVER_LOG_DEFAULT);
+                nullptr, TRITONSERVER_LOG_DEFAULT);
             break;
           case triton::common::Logger::Format::kISO8601:
             TRITONSERVER_ServerOptionsSetLogFormat(
-                    nullptr, TRITONSERVER_LOG_ISO8601);
+                nullptr, TRITONSERVER_LOG_ISO8601);
             break;
         }
       }
