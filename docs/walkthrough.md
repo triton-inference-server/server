@@ -26,14 +26,16 @@
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 -->
 
-# From Model to Deployment
+# Deploying your trained model using Triton
 
 Given a trained model, how do I deploy it at-scale with an optimal configuration using Triton Inference Server? 
 This document is here to help answer that.
 
-For those who like a high level overview, below is the common flow for most use cases. 
+For those who like a [high level overview](#overview), below is the common flow for most use cases. 
 
 For those who wish to jump right in, skip to the [end-to-end example](#end-to-end-example).
+
+## Overview
 
 1. Is my model compatible with Triton?
     - If your model falls under one of Triton's [supported backends](https://github.com/triton-inference-server/backend), then we can simply try to deploy the model as described in the [Quickstart](https://github.com/triton-inference-server/server/blob/main/docs/quickstart.md) guide. 
@@ -69,7 +71,7 @@ For those who wish to jump right in, skip to the [end-to-end example](#end-to-en
     Currently, Polygraphy supports ONNXRuntime, TensorRT, and TensorFlow 1.x.
     - The definition of "performing well" is subject to change for each use case. 
     Some common metrics are throughput, latency, and GPU utilization. 
-    There are many variables that can be tweaked just within your Triton configuration (`config.pbtxt`) to obtain different results.
+    There are many variables that can be tweaked just within your model configuration (`config.pbtxt`) to obtain different results.
     - As your model, config, or use case evolves, [Perf Analyzer](https://github.com/triton-inference-server/server/blob/main/docs/perf_analyzer.md) is a great tool to quickly verify model functionality and performance.
 
 3. How can I improve my model performance?
@@ -83,7 +85,7 @@ For those who wish to jump right in, skip to the [end-to-end example](#end-to-en
     These backend-specific options may be worth investigating if the defaults are not providing sufficient performance. 
     - For manual tuning of your model configuration, there is further information in our [Optimization](https://github.com/triton-inference-server/server/blob/main/docs/optimization.md) docs.
 
-## Other Areas of Interest
+### Other Areas of Interest
 
 1. My model performs slowly when it is first loaded by Triton (cold-start penalty), what do I do?
     - Triton exposes the ability to run [ModelWarmup](https://github.com/triton-inference-server/server/blob/main/docs/model_configuration.md#model-warmup) requests when first loading the model to ensure that the model is sufficiently warmed up before being marked "READY" for inference.
@@ -97,24 +99,30 @@ For those who wish to jump right in, skip to the [end-to-end example](#end-to-en
 
 ## End-to-end Example
 
-> NOTE: If you have never worked with Triton before, you may be interested in first checking out the [Quickstart](https://github.com/triton-inference-server/server/blob/main/docs/quickstart.md) example. 
-Some basic understanding of Triton may be useful for the following section, but this example is meant to be straightforward enough without prior experience.
+> **Note**
+> If you have never worked with Triton before, you may be interested in first checking out the [Quickstart](https://github.com/triton-inference-server/server/blob/main/docs/quickstart.md) example. 
+> Some basic understanding of Triton may be useful for the following section, but this example is meant to be straightforward enough without prior experience.
 
 Let's take an ONNX model as our example since ONNX is designed to be a format that can be [easily exported](https://github.com/onnx/tutorials#converting-to-onnx-format) from most other frameworks.
 
-1. Download our example Alexnet model from the [ONNX Model Zoo](https://github.com/onnx/models/blob/main/vision/classification/alexnet/model/bvlcalexnet-12.onnx).
+1. Create a [Model Repository](https://github.com/triton-inference-server/server/blob/main/docs/model_repository.md) and download our example `densenet_onnx` model into it.
 
 ```bash
-# Create model repository
-mkdir -p ./models/alexnet/1
+# Create model repository with placeholder for model and version 1
+mkdir -p ./models/densenet_onnx/1
 
 # Download model and place it in model repository
-wget -O models/alexnet/1/model.onnx https://github.com/onnx/models/blob/main/vision/classification/alexnet/model/bvlcalexnet-12.onnx?raw=true
+wget -O models/densenet_onnx/1/model.onnx 
+https://contentmamluswest001.blob.core.windows.net/content/14b2744cf8d6418c87ffddc3f3127242/9502630827244d60a1214f250e3bbca7/08aed7327d694b8dbaee2c97b8d0fcba/densenet121-1.2.onnx
 ```
 
-2. Create a minimal [model configuration](https://github.com/triton-inference-server/server/blob/main/docs/model_configuration.md) at `./models/alexnet/config.pbtxt`
+2. Create a minimal [Model Configuration](https://github.com/triton-inference-server/server/blob/main/docs/model_configuration.md) for the `densenet_onnx` model in our [Model Repository](https://github.com/triton-inference-server/server/blob/main/docs/model_repository.md) at `./models/densenet_onnx/config.pbtxt`. 
+
+> **Note**
+> This is a slightly simplified version of another [example config](https://github.com/triton-inference-server/server/blob/main/docs/examples/model_repository/densenet_onnx/config.pbtxt) that utilizes other [Model Configuration](https://github.com/triton-inference-server/server/blob/main/docs/model_configuration.md) features not necessary for this example.
+
 ```protobuf
-name: "alexnet"
+name: "densenet_onnx"
 backend: "onnxruntime"
 max_batch_size: 0
 input: [
@@ -128,15 +136,16 @@ output: [
   {
     name: "prob_1",
     data_type: TYPE_FP32,
-    dims: [ 1, 1000 ]
+    dims: [ 1, 1000, 1, 1 ]
   }
 ]
 ```
 
-> NOTE: As of the 22.07 release, both Triton and Model Analyzer support fully auto-completing the config file for [backends that support it](https://github.com/triton-inference-server/server/blob/main/docs/model_configuration.md#auto-generated-model-configuration). 
-So for an ONNX model, for example, this step can be skipped unless you want to explicitly set certain parameters.
+> **Note**
+> As of the 22.07 release, both Triton and Model Analyzer support fully auto-completing the config file for [backends that support it](https://github.com/triton-inference-server/server/blob/main/docs/model_configuration.md#auto-generated-model-configuration). 
+> So for an ONNX model, for example, this step can be skipped unless you want to explicitly set certain parameters.
 
-3. Start server and SDK containers in the background
+3. Start server and client containers in the background
 
 These containers can be started interactively instead, but for the sake of demonstration it is more clear to start these containers in the background and `docker exec` into them as needed for the following steps.
 
@@ -144,9 +153,14 @@ These containers can be started interactively instead, but for the sake of demon
 # Start server container in the background
 docker run -d --gpus=all --network=host -v $PWD:/mnt --name triton-server nvcr.io/nvidia/tritonserver:22.07-py3 
 
-# Start SDK container in the background
-docker run -d --gpus=all --network=host -v $PWD:/mnt --name triton-sdk nvcr.io/nvidia/tritonserver:22.07-py3-sdk
+# Start client container in the background
+docker run -d --gpus=all --network=host -v $PWD:/mnt --name triton-client nvcr.io/nvidia/tritonserver:22.07-py3-sdk
 ```
+
+> **Note**
+> The `-v $PWD:/mnt` is mounting your current directory on the host into the `/mnt` directory inside the container. 
+> So if you created your model repository in `$PWD/models`, you will find it inside the container at `/mnt/models`. 
+> You can change these paths as needed. See [docker volume](https://docs.docker.com/storage/volumes/) docs for more information on how this works.
 
 4. Serve the model with Triton
 
@@ -160,25 +174,34 @@ docker exec -ti triton-server bash
 tritonserver --model-repository=/mnt/models
 ```
 
-> NOTE: The `-v $PWD:/mnt` is mounting your current directory on the host into the `/mnt` directory inside the container. 
-So if you created your model repository in `$PWD/models`, you will find it inside the container at `/mnt/models`. 
-You can change these paths as needed. See [docker volume](https://docs.docker.com/storage/volumes/) docs for more information on how this works.
+To check if the model loaded successfully, we expect to see our model in a `READY` state in the output of the previous command:
+```
+...
+I0802 18:11:47.100537 135 model_repository_manager.cc:1345] successfully loaded 'densenet_onnx' version 1
+...
++---------+---------+--------+
+| Model   | Version | Status |
++---------+---------+--------+
+| densenet_onnx | 1       | READY  |
++---------+---------+--------+
+...
+```
 
 5. Verify the model can run inference
 
-To verify our model can perform inference, we will use the `triton-sdk` (client) container that we already started which comes with `perf_analyzer`  pre-installed.
+To verify our model can perform inference, we will use the `triton-client` container that we already started which comes with `perf_analyzer`  pre-installed.
 
 In a separate shell, we use Perf Analyzer to sanity check that we can run inference and get a baseline for the kind of performance we expect from this model.
 
 In the example below, Perf Analyzer is sending requests to models served on the same machine (`localhost` from the server container via `--network=host`). 
-However, you may also test models being served remotely at some `<IP>:<PORT>`  by setting the `-u` flag, such as `perf_analyzer -m alexnet -u 127.0.0.1:8000`.
+However, you may also test models being served remotely at some `<IP>:<PORT>`  by setting the `-u` flag, such as `perf_analyzer -m densenet_onnx -u 127.0.0.1:8000`.
 
 ```bash
-# Enter SDK container interactively
-docker exec -ti triton-sdk bash
+# Enter client container interactively
+docker exec -ti triton-client bash
 
 # Benchmark model being served from step 3
-perf_analyzer -m alexnet --concurrency-range 1:4
+perf_analyzer -m densenet_onnx --concurrency-range 1:4
 ```
 
 ```
@@ -192,7 +215,7 @@ Concurrency: 4, throughput: 965.21 infer/sec, latency 4142 usec
 
 6. Run Model Analyzer to find the best configurations for our model
 
-While Model Analyzer comes pre-installed in the SDK container and supports various modes of connecting to a Triton server, for simplicity we will use install Model Analyzer in our `server` container to use the `--triton-launch-mode=local` flag.
+While Model Analyzer comes pre-installed in the SDK (client) container and supports various modes of connecting to a Triton server, for simplicity we will use install Model Analyzer in our `server` container to use the `local` (default) mode.
 To learn more about other methods of connecting Model Analyzer to a running Triton Server, see the `--triton-launch-mode` Model Analyzer flag.
 
 ```bash
@@ -208,54 +231,55 @@ kill ${SERVER_PID}
 pip install --upgrade pip 
 pip install triton-model-analyzer wkhtmltopdf
 
-# Profile the model
+# Profile the model using local (default) mode
 # NOTE: This may take some time, in this example it took ~10 minutes
 model-analyzer profile \
   --model-repository=/mnt/models \
-  --profile-models=alexnet \
-  --triton-launch-mode=local \
+  --profile-models=densenet_onnx \
   --output-model-repository-path=results
 
 # Summarize the profiling results
-model-analyzer analyze --analysis-models=alexnet
+model-analyzer analyze --analysis-models=densenet_onnx
 ```
 
 Example Model Analyzer output summary:
 
-> In 41 measurements across 6 configurations, `alexnet_config_4` provides the best throughput: 1676 infer/sec.
+> In 51 measurements across 6 configurations, `densenet_onnx_config_3` provides the best throughput: **323 infer/sec**.
 >
-> **This is a 67% gain over the default configuration (1002 infer/sec), under the given constraints.**
+> **This is a 92% gain over the default configuration (168 infer/sec), under the given constraints.**
 
 | Model Config Name | Max Batch Size | Dynamic Batching | Instance Count | p99 Latency (ms) | Throughput (infer/sec) | Max GPU Memory Usage (MB) | Average GPU Utilization (%) |
 |---|---|---|---|---|---|---|---|
-| alexnet_config_4 | 0 | Enabled | 5/GPU | 22.333 | 1675.98 | 6437 | 31.7 |
-| alexnet_config_3 | 0 | Enabled | 4/GPU | 43.26 | 1612.95 | 5809 | 53.4 |
-| alexnet_config_2 | 0 | Enabled | 3/GPU | 44.403 | 1563.16 | 5117 | 55.1 |
-| alexnet_config_default | 0 | Disabled | 1/GPU | 8.274 | 1001.77 | 3786 | 24.6 |
+| densenet_onnx_config_3 | 0 | Enabled | 4/GPU | 35.8 | 323.13 | 3695 | 58.6 |
+| densenet_onnx_config_2 | 0 | Enabled | 3/GPU | 59.575 | 295.82 | 3615 | 58.9 |
+| densenet_onnx_config_4 | 0 | Enabled | 5/GPU | 69.939 | 291.468 | 3966 | 58.2 |
+| densenet_onnx_config_default | 0 | Disabled | 1/GPU | 12.658 | 167.549 | 3116 | 51.3 |
 
-In the table above, we see that setting our GPU [Instance Count](https://github.com/triton-inference-server/server/blob/main/docs/model_configuration.md#instance-groups) to 5 allows us to achieve the highest throughput and lowest latency on this system. 
-These results are specific to the system running the Triton server, so for example, on a smaller GPU we may not see improvement from increasing the GPU instance count. 
-In general, running the same configuration on systems with different hardware (CPU, GPU, RAM, etc.) may provide different results, so it is important to profile your model on a system that accurately reflects where you will deploy your models for your use case.
+In the table above, we see that setting our GPU [Instance Count](https://github.com/triton-inference-server/server/blob/main/docs/model_configuration.md#instance-groups) to 4 allows us to achieve the highest throughput and almost lowest latency on this system. 
 
-Also, note that our this "alexnet" model has a fixed batch-size that is explicitly specified in the first dimension of the Input/Output `dims`, therefore the `max_batch_size` parameter is set to 0 as described [here](https://github.com/triton-inference-server/server/blob/main/docs/model_configuration.md#maximum-batch-size). 
+Also, note that this `densenet_onnx` model has a fixed batch-size that is explicitly specified in the first dimension of the Input/Output `dims`, therefore the `max_batch_size` parameter is set to 0 as described [here](https://github.com/triton-inference-server/server/blob/main/docs/model_configuration.md#maximum-batch-size). 
 For models that support dynamic batch size, Model Analyzer would also tune the `max_batch_size` parameter.
+
+> **Warning**
+> These results are specific to the system running the Triton server, so for example, on a smaller GPU we may not see improvement from increasing the GPU instance count. 
+> In general, running the same configuration on systems with different hardware (CPU, GPU, RAM, etc.) may provide different results, so it is important to profile your model on a system that accurately reflects where you will deploy your models for your use case.
 
 7. Extract optimal config from Model Analyzer results
 
-In our example above, `alexnet_config_4` was the optimal configuration. 
+In our example above, `densenet_onnx_config_3` was the optimal configuration. 
 So let's extract that `config.pbtxt` and put it back in our model repository for future use.
 
 ```bash
 # (optional) Backup our original config.pbtxt (if any) to another directory
-cp /mnt/models/alexnet/config.pbtxt /tmp/original_config.pbtxt
+cp /mnt/models/densenet_onnx/config.pbtxt /tmp/original_config.pbtxt
 
 # Copy over the optimal config.pbtxt from Model Analyzer results to our model repository
-cp ./results/alexnet_config_4/config.pbtxt /mnt/models/alexnet/
+cp ./results/densenet_onnx_config_3/config.pbtxt /mnt/models/densenet_onnx/
 ```
 
 Now that we have an optimized Model Configuration, we are ready to take our model to deployment. 
 For further manual tuning, read the [Model Configuration](https://github.com/triton-inference-server/server/blob/main/docs/model_configuration.md) and [Optimization](https://github.com/triton-inference-server/server/blob/main/docs/optimization.md#) docs to learn more about Triton's complete set of capabilities.
 
-In this example, we happened to get both the highest throughput and lowest latency from the same configuration, but in some cases this is a tradeoff that must be made. 
+In this example, we happened to get both the highest throughput and almost lowest latency from the same configuration, but in some cases this is a tradeoff that must be made. 
 Certain models or configurations may achieve a higher throughput but also incur a higher latency in return. 
 It is worthwhile to fully inspect the reports generated by Model Analyzer to ensure your model performance meets your requirements.
