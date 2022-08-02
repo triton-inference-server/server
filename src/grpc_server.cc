@@ -1383,16 +1383,17 @@ CommonHandler::SetUpAllRequests()
           } else {
             // Set new settings in server then in core
             const std::string& log_file_path = it->second.string_param();
-            bool success = LOG_SET_OUT_FILE(log_file_path);
-            // On failure, close log file and revert to default "empty"
-            if (!success) {
+            const std::string& error = LOG_SET_OUT_FILE(log_file_path);
+            if (!error.empty()) {
+              err = TRITONSERVER_ErrorNew(
+                TRITONSERVER_ERROR_INTERNAL, (error).c_str());
               GOTO_IF_ERR(err, earlyexit);
             }
             // Okay to pass nullptr because we know the update will be applied
             // to the global object.
-            success = TRITONSERVER_ServerOptionsSetLogFile(
+            err = TRITONSERVER_ServerOptionsSetLogFile(
                 nullptr, log_file_path.c_str());
-            if (!success) {
+            if (err != nullptr) {
               GOTO_IF_ERR(err, earlyexit);
             }
           }

@@ -1850,6 +1850,7 @@ HTTPAPIServer::HandleLogging(evhtp_request_t* req)
                 "unexpected error getting dynamic logging request buffers"));
       }
     }
+    TRITONSERVER_Error* err = nullptr;
     triton::common::TritonJson::Value request;
     size_t buffer_len = evbuffer_get_length(req->buffer_in);
     HTTP_RESPOND_IF_ERR(
@@ -1862,22 +1863,21 @@ HTTPAPIServer::HandleLogging(evhtp_request_t* req)
         // Set new settings in server then in core
         std::string log_file_path;
         HTTP_RESPOND_IF_ERR(req, setting_json.AsString(&log_file_path));
-        bool success = LOG_SET_OUT_FILE(log_file_path);
-        // On failure, close log file and revert to default "empty"
-        if (!success) {
+        const std::string& error = LOG_SET_OUT_FILE(log_file_path);
+        if (!error.empty()) {
           HTTP_RESPOND_IF_ERR(
               req,
               TRITONSERVER_ErrorNew(
-                  TRITONSERVER_ERROR_UNAVAILABLE, ("Failed to open log file")));
+                  TRITONSERVER_ERROR_UNAVAILABLE, (error).c_str()));
         }
         // Okay to pass nullptr because we know the update will be applied
         // to the global object.
-        success = TRITONSERVER_ServerOptionsSetLogFile(nullptr, log_file_path.c_str());
-        if (!success) {
+        err = TRITONSERVER_ServerOptionsSetLogFile(nullptr, log_file_path.c_str());
+        if (err != nullptr) {
           HTTP_RESPOND_IF_ERR(
             req,
             TRITONSERVER_ErrorNew(
-                TRITONSERVER_ERROR_UNAVAILABLE, ("Failed to open log file")));
+                TRITONSERVER_ERROR_UNAVAILABLE, (TRITONSERVER_ErrorMessage(err))));
         }
       }
     }
