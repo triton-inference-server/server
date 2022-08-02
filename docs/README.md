@@ -100,7 +100,7 @@ The User Guide describes how to use Triton as an inference solution, including i
     - [Java/Scala](https://github.com/triton-inference-server/client/tree/main/src/grpc_generated/java)
     - [Javascript](https://github.com/triton-inference-server/client/tree/main/src/grpc_generated/javascript)
 - Performance Analysis
-  - [Performance Tuning Walkthrough](walkthrough.md)
+  - [Performance Tuning Guide](performance_tuning.md)
   - [Optimization](optimization.md)
   - [Model Analyzer](model_analyzer.md)
   - [Performance Analyzer](perf_analyzer.md)

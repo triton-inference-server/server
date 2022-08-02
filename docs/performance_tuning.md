@@ -179,11 +179,11 @@ To check if the model loaded successfully, we expect to see our model in a `READ
 ...
 I0802 18:11:47.100537 135 model_repository_manager.cc:1345] successfully loaded 'densenet_onnx' version 1
 ...
-+---------+---------+--------+
-| Model   | Version | Status |
-+---------+---------+--------+
++---------------+---------+--------+
+| Model         | Version | Status |
++---------------+---------+--------+
 | densenet_onnx | 1       | READY  |
-+---------+---------+--------+
++---------------+---------+--------+
 ...
 ```
 
