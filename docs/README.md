@@ -99,7 +99,9 @@ The User Guide describes how to use Triton as an inference solution, including i
     - [go](https://github.com/triton-inference-server/client/tree/main/src/grpc_generated/go)
     - [Java/Scala](https://github.com/triton-inference-server/client/tree/main/src/grpc_generated/java)
     - [Javascript](https://github.com/triton-inference-server/client/tree/main/src/grpc_generated/javascript)
-- [Performance Analysis](optimization.md)
+- Performance Analysis
+  - [Performance Tuning Walkthrough](walkthrough.md)
+  - [Optimization](optimization.md)
   - [Model Analyzer](model_analyzer.md)
   - [Performance Analyzer](perf_analyzer.md)
   - [Inference Request Tracing](trace.md)
