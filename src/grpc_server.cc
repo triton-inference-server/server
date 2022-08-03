@@ -4462,12 +4462,13 @@ GRPCServer::GRPCServer(
     const std::shared_ptr<TRITONSERVER_Server>& server,
     triton::server::TraceManager* trace_manager,
     const std::shared_ptr<SharedMemoryManager>& shm_manager,
-    const std::string& server_addr, bool use_ssl, const SslOptions& ssl_options,
-    const int infer_allocation_pool_size,
+    const std::string& server_addr, const bool is_port_reused, bool use_ssl,
+    const SslOptions& ssl_options, const int infer_allocation_pool_size,
     grpc_compression_level compression_level,
     const KeepAliveOptions& keepalive_options)
     : server_(server), trace_manager_(trace_manager), shm_manager_(shm_manager),
-      server_addr_(server_addr), use_ssl_(use_ssl), ssl_options_(ssl_options),
+      server_addr_(server_addr), is_port_reused_(is_port_reused),
+      use_ssl_(use_ssl), ssl_options_(ssl_options),
       infer_allocation_pool_size_(infer_allocation_pool_size),
       compression_level_(compression_level),
       keepalive_options_(keepalive_options), running_(false)
@@ -4484,15 +4485,17 @@ GRPCServer::Create(
     const std::shared_ptr<TRITONSERVER_Server>& server,
     triton::server::TraceManager* trace_manager,
     const std::shared_ptr<SharedMemoryManager>& shm_manager, int32_t port,
-    std::string address, bool use_ssl, const SslOptions& ssl_options,
-    int infer_allocation_pool_size, grpc_compression_level compression_level,
+    const bool is_port_reused, std::string address, bool use_ssl,
+    const SslOptions& ssl_options, int infer_allocation_pool_size,
+    grpc_compression_level compression_level,
     const KeepAliveOptions& keepalive_options,
     std::unique_ptr<GRPCServer>* grpc_server)
 {
   const std::string addr = address + ":" + std::to_string(port);
   grpc_server->reset(new GRPCServer(
-      server, trace_manager, shm_manager, addr, use_ssl, ssl_options,
-      infer_allocation_pool_size, compression_level, keepalive_options));
+      server, trace_manager, shm_manager, addr, is_port_reused, use_ssl,
+      ssl_options, infer_allocation_pool_size, compression_level,
+      keepalive_options));
 
   return nullptr;  // success
 }
@@ -4533,7 +4536,7 @@ GRPCServer::Start()
   // GRPC KeepAlive Docs: https://grpc.github.io/grpc/cpp/md_doc_keepalive.html
   // NOTE: In order to work properly, the client-side settings should
   // be in agreement with server-side settings.
-  grpc_builder_.AddChannelArgument(GRPC_ARG_ALLOW_REUSEPORT, 0);
+  grpc_builder_.AddChannelArgument(GRPC_ARG_ALLOW_REUSEPORT, is_port_reused_);
   grpc_builder_.AddChannelArgument(
       GRPC_ARG_KEEPALIVE_TIME_MS, keepalive_options_.keepalive_time_ms);
   grpc_builder_.AddChannelArgument(
