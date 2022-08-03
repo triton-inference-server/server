@@ -53,11 +53,8 @@ For those who wish to jump right in, skip to the [end-to-end example](#end-to-en
     Here is a simplified output for demonstration purposes:
 
     ```
-    # NOTE: "my_model" represents the model currently being served by 
-    #       Triton in the background from the previous step.
-
+    # NOTE: "my_model" represents a model currently being served by Triton
     $ perf_analyzer -m my_model
-
     ...
 
     Inferences/Second vs. Client Average Batch Latency
@@ -65,7 +62,7 @@ For those who wish to jump right in, skip to the [end-to-end example](#end-to-en
     ```
 
     - This gives us a sanity test that we are able to successfully form input requests and receive output responses to communicate with the model backend via Triton APIs. 
-    If Perf Analyzer fails to send requests and it is unclear from the error how to proceed, then you may want to sanity check that your model `config.pbtxt` inputs/outputs match what the model expects. 
+    - If Perf Analyzer fails to send requests and it is unclear from the error how to proceed, then you may want to sanity check that your model `config.pbtxt` inputs/outputs match what the model expects. 
     If the config is correct, check that the model runs successfully using its original framework directly. 
     If you don't have your own script or tool to do so, [Polygraphy](https://github.com/NVIDIA/TensorRT/tree/main/tools/Polygraphy) is a useful tool to run sample inferences on your model via various frameworks. 
     Currently, Polygraphy supports ONNXRuntime, TensorRT, and TensorFlow 1.x.
@@ -76,14 +73,16 @@ For those who wish to jump right in, skip to the [end-to-end example](#end-to-en
 
 3. How can I improve my model performance?
     - To further understand the best model configuration you can provide to Triton for your use case, Triton's [Model Analyzer](https://github.com/triton-inference-server/model_analyzer) tool can help. 
+    Model Analyzer can automatically or [manually](https://github.com/triton-inference-server/model_analyzer/blob/main/docs/config_search.md) search through config combinations to find the optimal triton configuration to meet your constraints.
     After running Model Analyzer to find the optimal configurations for your model/use case, you can transfer the generated config files to your [Model Repository](https://github.com/triton-inference-server/server/blob/main/docs/model_repository.md). 
     Model Analyzer provides a [Quickstart](https://github.com/triton-inference-server/model_analyzer/blob/main/docs/quick_start.md) guide with some examples to walk through.
     - Upon serving the model with the newly optimized configuration file found by Model Analyzer and running Perf Analyzer again, you should expect to find better performance numbers in most cases compared to a default config.
-    - Some parameters that can be tuned for a model may not be exposed to Model Analyzer since they don't apply to all models. 
+    - Some parameters that can be tuned for a model may not be exposed to Model Analyzer's automatic search since they don't apply to all models.
     For instance, [backends](https://github.com/triton-inference-server/backend) can expose backend-specific configuration options that can be tuned as well. 
     The [ONNXRuntime Backend](https://github.com/triton-inference-server/onnxruntime_backend), for example, has several [parameters](https://github.com/triton-inference-server/onnxruntime_backend#model-config-options) that affect the level of parallelization when executing inference on a model. 
     These backend-specific options may be worth investigating if the defaults are not providing sufficient performance. 
-    - For manual tuning of your model configuration, there is further information in our [Optimization](https://github.com/triton-inference-server/server/blob/main/docs/optimization.md) docs.
+    To tune custom sets of parameters, Model Analyzer supports [Manual Configuration Search](https://github.com/triton-inference-server/model_analyzer/blob/main/docs/config_search.md).
+    - To learn more about further optimizations for your model configuration, see the [Optimization](https://github.com/triton-inference-server/server/blob/main/docs/optimization.md) docs.
 
 ### Other Areas of Interest
 
