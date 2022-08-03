@@ -1940,21 +1940,10 @@ Parse(TRITONSERVER_ServerOptions** server_options, int argc, char** argv)
         "setting backend configurtion");
   }
   for (const auto& limit : load_gpu_limit) {
-    if (limit.first < 0) {
-      std::cerr << "--model-load-gpu-limit option expects device ID >= 0, Got "
-                << limit.first << std::endl;
-      exit(1);
-    } else if ((limit.second < 0.0) || (limit.second > 1.0)) {
-      std::cerr << "--model-load-gpu-limit option expects limit fraction to be "
-                   "in range [0.0, 1.0], Got "
-                << limit.second << std::endl;
-      exit(1);
-    }
-    static std::string key_prefix = "model-load-gpu-limit-device-";
     FAIL_IF_ERR(
-        TRITONSERVER_ServerOptionsSetBackendConfig(
-            loptions, "", (key_prefix + std::to_string(limit.first)).c_str(),
-            std::to_string(limit.second).c_str()),
+        TRITONSERVER_ServerOptionsSetModelLoadDeviceLimit(
+            loptions, TRITONSERVER_INSTANCEGROUPKIND_GPU, limit.first,
+            limit.second),
         "setting model load GPU limit");
   }
   for (const auto& hp : host_policies) {
