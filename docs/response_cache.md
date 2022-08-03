@@ -30,6 +30,8 @@
 
 **This feature is currently in beta and may be subject to change.**
 
+## Overview
+
 In this document an *inference request* is the model name, model version, and
 input tensors (name, shape, datatype and tensor data) that make up a request
 submitted to Triton. An inference result is the output tensors (name, shape,
@@ -40,17 +42,6 @@ requests that hit in the cache will not need to execute a model to produce
 results and will instead extract their results from the cache. For some use
 cases this can significantly reduce the inference request latency.
 
-The response cache is enabled by setting a non-zero size when Triton is launched
-using the `--response-cache-byte-size` flag. The flag defaults to 0 (zero). When
-non-zero, Triton allocates the requested size in CPU memory and **shares the
-cache across all inference requests and across all models**. For a given model
-to use response caching, the model must enable response caching in the model
-configuration. **By default, no model uses response caching even if the response
-cache is enabled with the `--response-cache-byte-size` flag.** For more
-information on enabling the response cache for each model, see the [model
-configuration
-docs](https://github.com/triton-inference-server/server/blob/main/docs/model_configuration.md#response-cache).
-
 Triton accesses the response cache with a hash of the inference request that
 includes the model name, model version and model inputs. If the hash is found in
 the cache, the corresponding inference result is extracted from the cache and
@@ -60,12 +51,56 @@ cache, Triton executes the model to produce the inference result, and then
 records that result in the cache so that subsequent inference requests can
 (re)use those results. 
 
+## Usage
+
+The response cache is enabled by setting a non-zero size (in bytes) when Triton 
+is launched using the `--response-cache-byte-size` flag. This flag defaults
+to 0 (zero).
+
+> **Note**
+>
+> The response cache initialization may fail for very small values of 
+> `--response-cache-byte-size` (ex: less than 1024 bytes) due to internal 
+> memory management requirements. If you encounter an initialization error 
+> for a relatively small cache size, try increasing it.
+>
+> Similarly, the size is upper bounded by the available RAM on the system.
+> If you encounter an initial allocation error for a very large cache size
+> setting, try decreasing it.
+
+When non-zero, Triton allocates the requested size in CPU memory and **shares the
+cache across all inference requests and across all models**. For a given model
+to use response caching, the model must enable response caching in the model
+configuration. **By default, no model uses response caching even if the response
+cache is enabled with the `--response-cache-byte-size` flag.** For more
+information on enabling the response cache for each model, see the [model
+configuration
+docs](https://github.com/triton-inference-server/server/blob/main/docs/model_configuration.md#response-cache).
+
+## Replacement Policy
+
 The response cache is a fixed-size resource, as a result it must be managed by a
 replacement policy when the number of cacheable responses exceeds the capacity
 of the cache. Currently, the cache only implements a least-recently-used
 ([LRU](https://en.wikipedia.org/wiki/Cache_replacement_policies#Least_recently_used_(LRU)))
 replacement policy which will automatically evict one or more LRU entries to
 make room for new entries.
+
+## Performance
+
+The response cache is intended to be used for use cases where a significant 
+number of duplicate requests (cache hits) are expected and therefore would 
+benefit from caching. The term "significant" here is subjective to the use
+case, but a simple interpretation would be to consider the proportion of
+expected cache hits/misses, as well as the average time spend computing
+a response. 
+
+For cases where cache hits are common and computation is expensive, 
+the cache can significantly improve overall performance.
+
+For cases where all or most requests are unique (cache misses), the
+cache may negatively impact the overall performance due to the overhead
+of managing the cache.
 
 ## Known Limitations
 
