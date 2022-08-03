@@ -1649,7 +1649,7 @@ if [ "$SERVER_PID" != "0" ]; then
     RET=1
     kill $SERVER_PID
     wait $SERVER_PID
-elif [ `grep -c "Expects device ID >= 0, got -1" $SERVER_LOG` == "0" ]; then
+elif [ `grep -c "expects device ID >= 0, got -1" $SERVER_LOG` == "0" ]; then
     echo -e "\n***\n*** Expect error on invalid device\n***"
     RET=1
 fi
