@@ -35,7 +35,7 @@ SERVER=/opt/tritonserver/bin/tritonserver
 SERVER_TIMEOUT=15
 source ../common/util.sh
 
-rm -f $CLIENT_LOG $SERVER_LOG
+rm -f *.log
 
 RET=0
 
@@ -300,6 +300,108 @@ for address in default explicit; do
             fi
         fi
     done
+done
+
+# Test multiple servers binding to the same http/grpc port
+SERVER1_LOG="./server1.log"
+SERVER2_LOG="./server2.log"
+SERVER3_LOG="./server3.log"
+CLIENT_PY=./client.py
+
+for p in http grpc; do
+    # error if servers bind to the same http/grpc port without setting the reuse flag
+    if [ "$p" == "http" ]; then
+        SERVER1_ARGS="--model-repository=$DATADIR --metrics-port 8002 --reuse-grpc-port=1"
+        SERVER2_ARGS="--model-repository=$DATADIR --metrics-port 8003 --reuse-grpc-port=1"
+        SERVER3_ARGS="--model-repository=$DATADIR --metrics-port 8004 --reuse-grpc-port=1"
+    else
+        SERVER1_ARGS="--model-repository=$DATADIR --metrics-port 8002 --reuse-http-port=1"
+        SERVER2_ARGS="--model-repository=$DATADIR --metrics-port 8003 --reuse-http-port=1"
+        SERVER3_ARGS="--model-repository=$DATADIR --metrics-port 8004 --reuse-http-port=1"
+    fi
+    run_multiple_servers_nowait
+    sleep 15
+    if [ "$SERVER1_PID" == "0" ]; then
+        echo -e "\n***\n*** Failed to start SERVER1 $SERVER\n***"
+        cat $SERVER1_LOG
+        exit 1
+    fi
+    if [ "$SERVER2_PID" != "0" ]; then
+        set +e
+        kill $SERVER2_PID
+        wait $SERVER2_PID
+        if [ "$?" == "0" ]; then
+            echo -e "\n***\n*** unexpected start SERVER2 $SERVER\n***"
+            cat $SERVER2_LOG
+            exit 1
+        fi
+        set -e
+    fi
+    if [ "$SERVER3_PID" != "0" ]; then
+        set +e
+        kill $SERVER3_PID
+        wait $SERVER3_PID
+        if [ "$?" == "0" ]; then
+            echo -e "\n***\n*** unexpected start SERVER3 $SERVER\n***"
+            cat $SERVER2_LOG
+            exit 1
+        fi
+        set -e
+    fi
+    kill $SERVER1_PID
+    wait $SERVER1_PID
+
+    # allow multiple servers to bind to the same http/grpc port with setting the reuse flag
+    SERVER1_ARGS="--model-repository=$DATADIR --log-verbose=1 --metrics-port 8002 --reuse-http-port=1 --reuse-grpc-port=1"
+    SERVER2_ARGS="--model-repository=$DATADIR --log-verbose=1 --metrics-port 8003 --reuse-http-port=1 --reuse-grpc-port=1"
+    SERVER3_ARGS="--model-repository=$DATADIR --log-verbose=1 --metrics-port 8004 --reuse-http-port=1 --reuse-grpc-port=1"
+    run_multiple_servers_nowait
+    sleep 15
+    if [ "$SERVER1_PID" == "0" ]; then
+        echo -e "\n***\n*** Failed to start SERVER1 $SERVER\n***"
+        cat $SERVER1_LOG
+        exit 1
+    fi
+    if [ "$SERVER2_PID" == "0" ]; then
+        echo -e "\n***\n*** Failed to start SERVER2 $SERVER\n***"
+        cat $SERVER2_LOG
+        exit 1
+    fi
+    if [ "$SERVER3_PID" == "0" ]; then
+        echo -e "\n***\n*** Failed to start SERVER3 $SERVER\n***"
+        cat $SERVER3_LOG
+        exit 1
+    fi
+
+    set +e
+
+    # test if requests are being distributed among three servers
+    for i in {0..10}; do
+        if [ "$p" == "http" ]; then
+            python3 $CLIENT_PY >> $CLIENT_LOG 2>&1
+        else
+            python3 $CLIENT_PY -v -i grpc -u localhost:8001 >> $CLIENT_LOG 2>&1
+        fi
+        if [ $? -ne 0 ]; then
+            cat $CLIENT_LOG
+            echo -e "\n***\n*** Python ${p} Async Infer Test Failed\n***"
+            RET=1
+        fi
+    done
+
+    set -e
+
+    server1_request_count=`curl -s localhost:8002/metrics | awk '/nv_inference_request_success{/ {print $2}'`
+    server2_request_count=`curl -s localhost:8003/metrics | awk '/nv_inference_request_success{/ {print $2}'`
+    server3_request_count=`curl -s localhost:8004/metrics | awk '/nv_inference_request_success{/ {print $2}'`
+    if [ ${server1_request_count%.*} -eq 0 ] || \
+       [ ${server2_request_count%.*} -eq 0 ] || \
+       [ ${server3_request_count%.*} -eq 0 ]; then
+        echo -e "\n***\n*** Failed: ${p} requests are not distributed among all servers.\n***"
+        RET=1
+    fi
+
+    kill_servers
 done
 
 if [ $RET -eq 0 ]; then
