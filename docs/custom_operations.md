@@ -158,7 +158,7 @@ container.
 ## ONNX
 
 ONNX Runtime allows users to [add custom
-operations](https://github.com/microsoft/onnxruntime/blob/master/docs/AddingCustomOp.md)
+operations](https://onnxruntime.ai/docs/reference/operators/add-custom-op.html)
 which can then be used in ONNX models. To register your custom
 operations library you need to include it in the model configuration
 as an additional field. For example, if you follow [this
