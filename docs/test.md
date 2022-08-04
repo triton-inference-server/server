@@ -73,7 +73,7 @@ $ docker build -t tritonserver_sdk -f Dockerfile.sdk .
 Next you need to build a QA version of the Triton Docker image. This
 image will contain Triton, the QA tests, and all the dependencies
 needed to run the QA tests. First do a [Docker image
-build](build.md#building-triton-with-docker) to produce the
+build](build.md#building-with-docker) to produce the
 *tritonserver_cibase* and *tritonserver* images.
 
 Then, build the actual QA image.

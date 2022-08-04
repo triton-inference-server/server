@@ -53,7 +53,7 @@ System](quickstart.md#run-on-cpu-only-system).
 ## Can Triton Inference Server be used in non-Docker environments?
 
 Yes. Triton Inference Server can also be [built from
-source](build.md#building-triton-without-docker) on your "bare metal"
+source](build.md#building-without-docker) on your "bare metal"
 system.
 
 ## Do you provide client libraries for languages other than C++ and Python?
