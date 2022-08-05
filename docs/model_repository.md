@@ -196,14 +196,14 @@ export TRITON_CLOUD_CREDENTIAL_PATH="cloud_credential.json"
       "key_id": "AWS_ACCESS_KEY_ID",
       "region": "AWS_DEFAULT_REGION",
       "session_token": "",
-      "session_token": "",
+      "profile": "",
     },
     "s3://s3-bucket-002": {
       "secret_key": "AWS_SECRET_ACCESS_KEY_2",
       "key_id": "AWS_ACCESS_KEY_ID_2",
       "region": "AWS_DEFAULT_REGION_2",
       "session_token": "AWS_SESSION_TOKEN_2"
-      "session_token": "AWS_PROFILE_2"
+      "profile": "AWS_PROFILE_2"
     }
   },
   "as": {
