@@ -1,0 +1,33 @@
+name: "no_backend.identity"
+version_policy {
+latest {
+    num_versions: 1
+}
+}
+max_batch_size: 64
+input {
+name: "INPUT0"
+data_type: TYPE_INT32
+dims: 1000
+}
+output {
+name: "OUTPUT0"
+data_type: TYPE_INT32
+dims: 1000
+}
+instance_group {
+name: "no_backend.identity"
+count: 1
+gpus: 0
+kind: KIND_GPU
+}
+default_model_filename: "model.identity"
+optimization {
+input_pinned_memory {
+    enable: true
+}
+output_pinned_memory {
+    enable: true
+}
+}
+backend: "identity"
