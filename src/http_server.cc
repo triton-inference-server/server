@@ -505,7 +505,8 @@ WriteDataToJson(
                 .c_str());
       }
       for (size_t e = 0; e < element_count; ++e) {
-        data_json->AppendBool((bool_base[e] == 0) ? false : true);
+        RETURN_IF_ERR(
+            data_json->AppendBool((bool_base[e] == 0) ? false : true));
       }
       break;
     }
@@ -515,7 +516,7 @@ WriteDataToJson(
           output_name, byte_size, sizeof(uint8_t) * element_count));
       const uint8_t* cbase = reinterpret_cast<const uint8_t*>(base);
       for (size_t e = 0; e < element_count; ++e) {
-        data_json->AppendUInt(cbase[e]);
+        RETURN_IF_ERR(data_json->AppendUInt(cbase[e]));
       }
       break;
     }
@@ -525,7 +526,7 @@ WriteDataToJson(
           output_name, byte_size, sizeof(uint16_t) * element_count));
       const uint16_t* cbase = reinterpret_cast<const uint16_t*>(base);
       for (size_t e = 0; e < element_count; ++e) {
-        data_json->AppendUInt(cbase[e]);
+        RETURN_IF_ERR(data_json->AppendUInt(cbase[e]));
       }
       break;
     }
@@ -535,7 +536,7 @@ WriteDataToJson(
           output_name, byte_size, sizeof(uint32_t) * element_count));
       const uint32_t* cbase = reinterpret_cast<const uint32_t*>(base);
       for (size_t e = 0; e < element_count; ++e) {
-        data_json->AppendUInt(cbase[e]);
+        RETURN_IF_ERR(data_json->AppendUInt(cbase[e]));
       }
       break;
     }
@@ -545,7 +546,7 @@ WriteDataToJson(
           output_name, byte_size, sizeof(uint64_t) * element_count));
       const uint64_t* cbase = reinterpret_cast<const uint64_t*>(base);
       for (size_t e = 0; e < element_count; ++e) {
-        data_json->AppendUInt(cbase[e]);
+        RETURN_IF_ERR(data_json->AppendUInt(cbase[e]));
       }
       break;
     }
@@ -555,7 +556,7 @@ WriteDataToJson(
           output_name, byte_size, sizeof(int8_t) * element_count));
       const int8_t* cbase = reinterpret_cast<const int8_t*>(base);
       for (size_t e = 0; e < element_count; ++e) {
-        data_json->AppendInt(cbase[e]);
+        RETURN_IF_ERR(data_json->AppendInt(cbase[e]));
       }
       break;
     }
@@ -565,7 +566,7 @@ WriteDataToJson(
           output_name, byte_size, sizeof(int16_t) * element_count));
       const int16_t* cbase = reinterpret_cast<const int16_t*>(base);
       for (size_t e = 0; e < element_count; ++e) {
-        data_json->AppendInt(cbase[e]);
+        RETURN_IF_ERR(data_json->AppendInt(cbase[e]));
       }
       break;
     }
@@ -575,7 +576,7 @@ WriteDataToJson(
           output_name, byte_size, sizeof(int32_t) * element_count));
       const int32_t* cbase = reinterpret_cast<const int32_t*>(base);
       for (size_t e = 0; e < element_count; ++e) {
-        data_json->AppendInt(cbase[e]);
+        RETURN_IF_ERR(data_json->AppendInt(cbase[e]));
       }
       break;
     }
@@ -585,7 +586,7 @@ WriteDataToJson(
           output_name, byte_size, sizeof(int64_t) * element_count));
       const int64_t* cbase = reinterpret_cast<const int64_t*>(base);
       for (size_t e = 0; e < element_count; ++e) {
-        data_json->AppendInt(cbase[e]);
+        RETURN_IF_ERR(data_json->AppendInt(cbase[e]));
       }
       break;
     }
@@ -609,7 +610,7 @@ WriteDataToJson(
           output_name, byte_size, sizeof(float) * element_count));
       const float* cbase = reinterpret_cast<const float*>(base);
       for (size_t e = 0; e < element_count; ++e) {
-        data_json->AppendDouble(cbase[e]);
+        RETURN_IF_ERR(data_json->AppendDouble(cbase[e]));
       }
       break;
     }
@@ -619,7 +620,7 @@ WriteDataToJson(
           output_name, byte_size, sizeof(double) * element_count));
       const double* cbase = reinterpret_cast<const double*>(base);
       for (size_t e = 0; e < element_count; ++e) {
-        data_json->AppendDouble(cbase[e]);
+        RETURN_IF_ERR(data_json->AppendDouble(cbase[e]));
       }
       break;
     }
@@ -652,7 +653,7 @@ WriteDataToJson(
         // Can use stringref because 'base' buffer is not deleted
         // until response is deleted and that happens after this json
         // is serialized.
-        data_json->AppendStringRef(cbase + offset, len);
+        RETURN_IF_ERR(data_json->AppendStringRef(cbase + offset, len));
         offset += len;
       }
       break;
