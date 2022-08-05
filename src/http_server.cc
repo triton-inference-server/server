@@ -71,7 +71,7 @@ HTTPServer::Start()
     evbase_ = event_base_new();
     htp_ = evhtp_new(evbase_, NULL);
     evhtp_enable_flag(htp_, EVHTP_FLAG_ENABLE_NODELAY);
-    if (is_port_reused_) {
+    if (reuse_port_) {
       evhtp_enable_flag(htp_, EVHTP_FLAG_ENABLE_REUSEPORT);
     }
     evhtp_set_gencb(htp_, HTTPServer::Dispatch, this);
@@ -970,8 +970,8 @@ HTTPAPIServer::HTTPAPIServer(
     const std::shared_ptr<TRITONSERVER_Server>& server,
     triton::server::TraceManager* trace_manager,
     const std::shared_ptr<SharedMemoryManager>& shm_manager, const int32_t port,
-    const bool is_port_reused, const std::string address, const int thread_cnt)
-    : HTTPServer(port, is_port_reused, address, thread_cnt), server_(server),
+    const bool reuse_port, const std::string address, const int thread_cnt)
+    : HTTPServer(port, reuse_port, address, thread_cnt), server_(server),
       trace_manager_(trace_manager), shm_manager_(shm_manager),
       allocator_(nullptr), server_regex_(R"(/v2(?:/health/(live|ready))?)"),
       model_regex_(
@@ -3309,11 +3309,11 @@ HTTPAPIServer::Create(
     const std::shared_ptr<TRITONSERVER_Server>& server,
     triton::server::TraceManager* trace_manager,
     const std::shared_ptr<SharedMemoryManager>& shm_manager, const int32_t port,
-    const bool is_port_reused, const std::string address, const int thread_cnt,
+    const bool reuse_port, const std::string address, const int thread_cnt,
     std::unique_ptr<HTTPServer>* http_server)
 {
   http_server->reset(new HTTPAPIServer(
-      server, trace_manager, shm_manager, port, is_port_reused, address,
+      server, trace_manager, shm_manager, port, reuse_port, address,
       thread_cnt));
 
   const std::string addr = address + ":" + std::to_string(port);

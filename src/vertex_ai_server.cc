@@ -43,7 +43,7 @@ VertexAiAPIServer::VertexAiAPIServer(
     const std::string& prediction_route, const std::string& health_route,
     const std::string& default_model_name)
     : HTTPAPIServer(
-          server, trace_manager, shm_manager, port, false /* is_port_reused */,
+          server, trace_manager, shm_manager, port, false /* reuse_port */,
           address, thread_cnt),
       prediction_regex_(prediction_route), health_regex_(health_route),
       health_mode_("ready"), model_name_(default_model_name),

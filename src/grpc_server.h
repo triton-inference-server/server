@@ -68,7 +68,7 @@ class GRPCServer {
       const std::shared_ptr<TRITONSERVER_Server>& server,
       triton::server::TraceManager* trace_manager,
       const std::shared_ptr<SharedMemoryManager>& shm_manager, int32_t port,
-      const bool is_port_reused, std::string address, bool use_ssl,
+      const bool reuse_port, std::string address, bool use_ssl,
       const SslOptions& ssl_options, int infer_allocation_pool_size,
       grpc_compression_level compression_level,
       const KeepAliveOptions& keepalive_options,
@@ -98,7 +98,7 @@ class GRPCServer {
       const std::shared_ptr<TRITONSERVER_Server>& server,
       triton::server::TraceManager* trace_manager,
       const std::shared_ptr<SharedMemoryManager>& shm_manager,
-      const std::string& server_addr, const bool is_port_reused, bool use_ssl,
+      const std::string& server_addr, const bool reuse_port, bool use_ssl,
       const SslOptions& ssl_options, const int infer_allocation_pool_size,
       grpc_compression_level compression_level,
       const KeepAliveOptions& keepalive_options);
@@ -107,7 +107,7 @@ class GRPCServer {
   TraceManager* trace_manager_;
   std::shared_ptr<SharedMemoryManager> shm_manager_;
   const std::string server_addr_;
-  const bool is_port_reused_;
+  const bool reuse_port_;
   const bool use_ssl_;
   const SslOptions ssl_options_;
 

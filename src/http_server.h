@@ -53,9 +53,9 @@ class HTTPServer {
 
  protected:
   explicit HTTPServer(
-      const int32_t port, const bool is_port_reused, const std::string address,
+      const int32_t port, const bool reuse_port, const std::string address,
       const int thread_cnt)
-      : port_(port), is_port_reused_(is_port_reused), address_(address),
+      : port_(port), reuse_port_(reuse_port), address_(address),
         thread_cnt_(thread_cnt)
   {
   }
@@ -69,7 +69,7 @@ class HTTPServer {
   static void StopCallback(evutil_socket_t sock, short events, void* arg);
 
   int32_t port_;
-  bool is_port_reused_;
+  bool reuse_port_;
   std::string address_;
   int thread_cnt_;
 
@@ -95,7 +95,7 @@ class HTTPMetricsServer : public HTTPServer {
   explicit HTTPMetricsServer(
       const std::shared_ptr<TRITONSERVER_Server>& server, const int32_t port,
       std::string address, const int thread_cnt)
-      : HTTPServer(port, false /* is_port_reused */, address, thread_cnt),
+      : HTTPServer(port, false /* reuse_port */, address, thread_cnt),
         server_(server), api_regex_(R"(/metrics/?)")
   {
   }
@@ -114,7 +114,7 @@ class HTTPAPIServer : public HTTPServer {
       const std::shared_ptr<TRITONSERVER_Server>& server,
       triton::server::TraceManager* trace_manager,
       const std::shared_ptr<SharedMemoryManager>& smb_manager,
-      const int32_t port, const bool is_port_reused, std::string address,
+      const int32_t port, const bool reuse_port, std::string address,
       const int thread_cnt, std::unique_ptr<HTTPServer>* http_server);
 
   virtual ~HTTPAPIServer();
@@ -229,7 +229,7 @@ class HTTPAPIServer : public HTTPServer {
       const std::shared_ptr<TRITONSERVER_Server>& server,
       triton::server::TraceManager* trace_manager,
       const std::shared_ptr<SharedMemoryManager>& shm_manager,
-      const int32_t port, const bool is_port_reused, const std::string address,
+      const int32_t port, const bool reuse_port, const std::string address,
       const int thread_cnt);
   virtual void Handle(evhtp_request_t* req) override;
   virtual std::unique_ptr<InferRequestClass> CreateInferRequest(
