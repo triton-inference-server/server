@@ -105,7 +105,9 @@ specified.
 $ tritonserver --model-repository=/path/to/model/repository ...
 ```
 
-### Google Cloud Storage
+### Cloud Storage with Environment variables
+
+#### Google Cloud Storage
 
 For a model repository residing in Google Cloud Storage, the
 repository path must be prefixed with gs://.
@@ -114,7 +116,7 @@ repository path must be prefixed with gs://.
 $ tritonserver --model-repository=gs://bucket/path/to/model/repository ...
 ```
 
-### S3
+#### S3
 
 For a model repository residing in Amazon S3, the path must be
 prefixed with s3://.
@@ -149,7 +151,7 @@ If the environment variables are set they will take a higher priority
 and will be used by Triton instead of the credentials set using the
 aws config command.
 
-### Azure Storage
+#### Azure Storage
 
 For a model repository residing in Azure Storage, the repository path
 must be prefixed with as://.
@@ -168,6 +170,68 @@ here's an example of how to find a key corresponding to your `AZURE_STORAGE_ACCO
 $ export AZURE_STORAGE_ACCOUNT="account_name"
 $ export AZURE_STORAGE_KEY=$(az storage account keys list -n $AZURE_STORAGE_ACCOUNT --query "[0].value")
 ```
+
+### Cloud Storage with Credential file (Beta)
+
+*This feature is currently in beta and may be subject to change.*
+
+To group the credentials into a single file for Triton, you may set the 
+`TRITON_CLOUD_CREDENTIAL_PATH` environment variable to a path pointing to a 
+JSON file of the following format, residing in the local file system.
+
+```
+export TRITON_CLOUD_CREDENTIAL_PATH="cloud_credential.json"
+```
+
+"cloud_credential.json":
+```
+{
+  "gs": {
+    "": "PATH_TO_GOOGLE_APPLICATION_CREDENTIALS",
+    "gs://gcs-bucket-002": "PATH_TO_GOOGLE_APPLICATION_CREDENTIALS_2"
+  },
+  "s3": {
+    "": {
+      "secret_key": "AWS_SECRET_ACCESS_KEY",
+      "key_id": "AWS_ACCESS_KEY_ID",
+      "region": "AWS_DEFAULT_REGION",
+      "session_token": "",
+      "profile": ""
+    },
+    "s3://s3-bucket-002": {
+      "secret_key": "AWS_SECRET_ACCESS_KEY_2",
+      "key_id": "AWS_ACCESS_KEY_ID_2",
+      "region": "AWS_DEFAULT_REGION_2",
+      "session_token": "AWS_SESSION_TOKEN_2",
+      "profile": "AWS_PROFILE_2"
+    }
+  },
+  "as": {
+    "": {
+      "account_str": "AZURE_STORAGE_ACCOUNT",
+      "account_key": "AZURE_STORAGE_KEY"
+    },
+    "as://Account-002/Container": {
+      "account_str": "",
+      "account_key": ""
+    }
+  }
+}
+```
+
+To match a credential, the longest matching credential name against the start
+of a given path is used. For example: `gs://gcs-bucket-002/model_repository`
+will match the "gs://gcs-bucket-002" GCS credential, and
+`gs://any-other-gcs-bucket` will match the "" GCS credential.
+
+This feature is intended for use-cases which multiple credentials are needed
+for each cloud storage provider. Be sure to replace any credential paths/keys
+with the actual paths/keys from the example above.
+
+If the `TRITON_CLOUD_CREDENTIAL_PATH` environment variable is not set, the 
+[Cloud Storage with Environment variables](#cloud-storage-with-environment-variables)
+will be used.
+
 
 ## Model Versions
 
