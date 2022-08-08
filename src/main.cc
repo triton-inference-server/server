@@ -133,12 +133,8 @@ triton::server::KeepAliveOptions grpc_keepalive_options_;
 std::unique_ptr<triton::server::HTTPServer> metrics_service_;
 bool allow_metrics_ = true;
 int32_t metrics_port_ = 8002;
+std::string metrics_address_ = "0.0.0.0";
 float metrics_interval_ms_ = 2000;
-#ifndef TRITON_ENABLE_HTTP
-// Triton uses the same address for http and metrics services.
-// Need to set http address for metrics when http service is disable.
-std::string http_address_ = "0.0.0.0";
-#endif  // NOT TRITON_ENABLE_HTTP
 #endif  // TRITON_ENABLE_METRICS
 
 #ifdef TRITON_ENABLE_TRACING
@@ -283,6 +279,7 @@ enum OptionId {
   OPTION_ALLOW_METRICS,
   OPTION_ALLOW_GPU_METRICS,
   OPTION_METRICS_PORT,
+  OPTION_METRICS_ADDRESS,
   OPTION_METRICS_INTERVAL_MS,
 #endif  // TRITON_ENABLE_METRICS
 #ifdef TRITON_ENABLE_TRACING
@@ -492,6 +489,8 @@ std::vector<Option> options_
        "--allow-metrics is true."},
       {OPTION_METRICS_PORT, "metrics-port", Option::ArgInt,
        "The port reporting prometheus metrics."},
+      {OPTION_METRICS_ADDRESS, "metrics-address", Option::ArgStr,
+       "The address for the prometheus metrics server to bind to."},
       {OPTION_METRICS_INTERVAL_MS, "metrics-interval-ms", Option::ArgFloat,
        "Metrics will be collected once every <metrics-interval-ms> "
        "milliseconds. Default is 2000 milliseconds."},
@@ -763,7 +762,7 @@ StartMetricsService(
     const std::shared_ptr<TRITONSERVER_Server>& server)
 {
   TRITONSERVER_Error* err = triton::server::HTTPMetricsServer::Create(
-      server, metrics_port_, http_address_, 1 /* HTTP thread count */, service);
+      server, metrics_port_, metrics_address_, 1 /* HTTP thread count */, service);
   if (err == nullptr) {
     err = (*service)->Start();
   }
@@ -1373,6 +1372,7 @@ Parse(TRITONSERVER_ServerOptions** server_options, int argc, char** argv)
 
 #ifdef TRITON_ENABLE_METRICS
   int32_t metrics_port = metrics_port_;
+  std::string metrics_address = metrics_address_;
   bool allow_gpu_metrics = true;
   float metrics_interval_ms = metrics_interval_ms_;
 #endif  // TRITON_ENABLE_METRICS
@@ -1598,6 +1598,9 @@ Parse(TRITONSERVER_ServerOptions** server_options, int argc, char** argv)
       case OPTION_METRICS_PORT:
         metrics_port = ParseIntOption(optarg);
         break;
+      case OPTION_METRICS_ADDRESS:
+        metrics_address = optarg;
+        break;
       case OPTION_METRICS_INTERVAL_MS:
         metrics_interval_ms = ParseIntOption(optarg);
         break;
@@ -1779,6 +1782,7 @@ Parse(TRITONSERVER_ServerOptions** server_options, int argc, char** argv)
 
 #ifdef TRITON_ENABLE_METRICS
   metrics_port_ = metrics_port;
+  metrics_address_ = metrics_address;
   allow_gpu_metrics = allow_metrics_ ? allow_gpu_metrics : false;
   metrics_interval_ms_ = metrics_interval_ms;
 #endif  // TRITON_ENABLE_METRICS
