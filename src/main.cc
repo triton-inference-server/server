@@ -1478,6 +1478,10 @@ Parse(TRITONSERVER_ServerOptions** server_options, int argc, char** argv)
         break;
       case OPTION_HTTP_ADDRESS:
         http_address = optarg;
+        // Use the same address for the metrics server if it was not changed already
+        if (metrics_address == metrics_address_) {
+          metrics_address = optarg;
+        }
         break;
       case OPTION_HTTP_THREAD_COUNT:
         http_thread_cnt = ParseIntOption(optarg);
