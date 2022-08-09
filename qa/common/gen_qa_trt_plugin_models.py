@@ -111,11 +111,10 @@ def get_trt_plugin(plugin_name):
             field_collection = trt.PluginFieldCollection([min_clip, max_clip])
             break
 
-    if (field_collection is not None):
-        plugin = plugin_creator.create_plugin(name=plugin_name,
-                                              field_collection=field_collection)
-    else:
+    if field_collection is None:
         raise RuntimeError("Plugin not found: " + plugin_name)
+    plugin = plugin_creator.create_plugin(name=plugin_name,
+                                          field_collection=field_collection)
 
     return plugin
 
