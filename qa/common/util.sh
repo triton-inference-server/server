@@ -392,3 +392,46 @@ function check_test_results () {
 
     return 0
 }
+
+# Run multiple inference servers and return immediately. Sets pid for each server
+# correspondingly, or 0 if error.
+function run_multiple_servers_nowait () {
+    if [ -z "$SERVER" ]; then
+        echo "=== SERVER must be defined"
+        return
+    fi
+
+    if [ ! -f "$SERVER" ]; then
+        echo "=== $SERVER does not exist"
+        return
+    fi
+
+    local server_count=$1
+    server_pid=()
+    local server_args=()
+    local server_log=()
+    for (( i=0; i<$server_count; i++ )); do
+        let SERVER${i}_PID=0 || true
+        server_pid+=(SERVER${i}_PID)
+        server_args+=(SERVER${i}_ARGS)
+        server_log+=(SERVER${i}_LOG)
+    done
+
+    for (( i=0; i<$server_count; i++ )); do
+        if [ -z "$SERVER_LD_PRELOAD" ]; then
+            echo "=== Running $SERVER ${!server_args[$i]}"
+        else
+            echo "=== Running LD_PRELOAD=$SERVER_LD_PRELOAD $SERVER ${!server_args[$i]}"
+        fi
+        LD_PRELOAD=$SERVER_LD_PRELOAD $SERVER ${!server_args[$i]} > ${!server_log[$i]} 2>&1 &
+        let SERVER${i}_PID=$!
+    done
+}
+
+# Kill all inference servers.
+function kill_servers () {
+    for (( i=0; i<${#server_pid[@]}; i++ )); do
+        kill ${!server_pid[$i]}
+        wait ${!server_pid[$i]}
+    done
+}
