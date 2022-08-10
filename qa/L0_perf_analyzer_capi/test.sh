@@ -86,7 +86,7 @@ cp -r /data/inferenceserver/${REPO_VERSION}/qa_variable_sequence_model_repositor
 # Copying bls model with undefined variable
 mkdir -p $DATADIR/bls_undefined/1 && \
     cp ../python_models/bls_undefined/model.py $DATADIR/bls_undefined/1/. && \
-    cp ../python_models/bls_undefined/config.txt $DATADIR/bls_undefined/.
+    cp ../python_models/bls_undefined/config.pbtxt $DATADIR/bls_undefined/.
 
 # Generating test data
 mkdir -p $TESTDATADIR
