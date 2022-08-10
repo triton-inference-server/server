@@ -238,6 +238,7 @@ enum OptionId {
   OPTION_LOG_WARNING,
   OPTION_LOG_ERROR,
   OPTION_LOG_FORMAT,
+  OPTION_LOG_FILE,
 #endif  // TRITON_ENABLE_LOGGING
   OPTION_ID,
   OPTION_MODEL_REPOSITORY,
@@ -360,6 +361,10 @@ std::vector<Option> options_
        "The default is \"default\". For \"default\", the log severity (L) and "
        "timestamp will be logged as \"LMMDD hh:mm:ss.ssssss\". "
        "For \"ISO8601\", the log format will be \"YYYY-MM-DDThh:mm:ssZ L\"."},
+      {OPTION_LOG_FILE, "log-file", Option::ArgStr,
+       "Set the name of the log output file. If specified, log outputs will be "
+       "saved to this file. If not specified, log outputs will stream to the "
+       "console."},
 #endif  // TRITON_ENABLE_LOGGING
       {OPTION_ID, "id", Option::ArgStr, "Identifier for this server."},
       {OPTION_MODEL_REPOSITORY, "model-store", Option::ArgStr,
@@ -1415,6 +1420,7 @@ Parse(TRITONSERVER_ServerOptions** server_options, int argc, char** argv)
   bool log_error = true;
   int32_t log_verbose = 0;
   auto log_format = triton::common::Logger::Format::kDEFAULT;
+  std::string log_file;
 #endif  // TRITON_ENABLE_LOGGING
 
   std::vector<struct option> long_options;
@@ -1456,6 +1462,9 @@ Parse(TRITONSERVER_ServerOptions** server_options, int argc, char** argv)
         }
         break;
       }
+      case OPTION_LOG_FILE:
+        log_file = optarg;
+        break;
 #endif  // TRITON_ENABLE_LOGGING
 
       case OPTION_ID:
@@ -1751,6 +1760,7 @@ Parse(TRITONSERVER_ServerOptions** server_options, int argc, char** argv)
   LOG_ENABLE_ERROR(log_error);
   LOG_SET_VERBOSE(log_verbose);
   LOG_SET_FORMAT(log_format);
+  LOG_SET_OUT_FILE(log_file);
 #endif  // TRITON_ENABLE_LOGGING
 
   repository_poll_secs_ = 0;
@@ -1904,6 +1914,7 @@ Parse(TRITONSERVER_ServerOptions** server_options, int argc, char** argv)
       "setting model load thread count");
 
 #ifdef TRITON_ENABLE_LOGGING
+  TRITONSERVER_ServerOptionsSetLogFile(loptions, log_file.c_str());
   FAIL_IF_ERR(
       TRITONSERVER_ServerOptionsSetLogInfo(loptions, log_info),
       "setting log info enable");
