@@ -83,6 +83,11 @@ cp -r /data/inferenceserver/${REPO_VERSION}/qa_ensemble_model_repository/qa_sequ
 # Copying variable sequence model
 cp -r /data/inferenceserver/${REPO_VERSION}/qa_variable_sequence_model_repository/graphdef_sequence_float32 $DATADIR
 
+# Copying bls model with undefined variable
+mkdir -p $DATADIR/bls_undefined/1 && \
+    cp ../python_models/bls_undefined/model.py $DATADIR/bls_undefined/1/. && \
+    cp ../python_models/bls_undefined/config.txt $DATADIR/bls_undefined/.
+
 # Generating test data
 mkdir -p $TESTDATADIR
 for INPUT in INPUT0 INPUT1; do
@@ -287,6 +292,18 @@ if [ $(cat $CLIENT_LOG | grep "${NON_SUPPORTED_ERROR_STRING}" | wc -l) -ne 1 ]; 
     RET=1
 fi
 set -e
+
+# Testing erroneous configuration
+# This model is expected to fail
+$PERF_ANALYZER -v -m bls_undefined --shape INPUT0:1048576 -t 64\
+--service-kind=triton_c_api \
+--model-repository=$DATADIR --triton-server-directory=$SERVER_LIBRARY_PATH \
+-s ${STABILITY_THRESHOLD} >$CLIENT_LOG 2>&1
+if [ $? -ne 99 ]; then
+    cat $CLIENT_LOG
+    echo -e "\n***\n*** Test Failed\n***"
+    RET=1
+fi
 
 # Make sure server is not still running
 set +e

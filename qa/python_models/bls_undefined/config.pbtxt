@@ -1,0 +1,24 @@
+name: "bls_undefined"
+backend: "python"
+
+input [
+  {
+    name: "INPUT0"
+    data_type: TYPE_INT32
+    dims: [ -1 ]
+  }
+]
+
+output [
+  {
+    name: "OUTPUT0"
+    data_type: TYPE_INT32
+    dims: [ -1 ]
+  }
+]
+
+instance_group [{
+        kind: KIND_CPU,
+        count: 2
+}]
+
