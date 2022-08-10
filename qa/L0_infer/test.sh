@@ -64,7 +64,7 @@ if [ "$TEST_VALGRIND" -eq 1 ]; then
     SERVER_TIMEOUT=4000
     rm -f $LEAKCHECK_LOG_BASE*
     # Remove onnx and python backends for now as the server hangs up when 
-    # loading onnx and python models during valgrind test.
+    # loading onnx and python models during valgrind test. DLIS-4056
     BACKENDS="graphdef savedmodel libtorch plan openvino"
 fi
 
