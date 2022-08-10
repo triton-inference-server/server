@@ -274,8 +274,8 @@ By default, Triton will try to complete these sections. However,
 by starting Triton with `--disable-auto-complete-config` option,
 Triton can be configured to not auto-complete model configuration
 on the backend side. However, even with this option Triton will
-fill in missing instance_group(#instance-group) settings with default
-values.
+fill in missing [`instance_group`](#instance-groups) settings with
+default values.
 
 Triton can derive all the required settings automatically for
 most of the TensorRT, TensorFlow saved-model, and ONNX models.
