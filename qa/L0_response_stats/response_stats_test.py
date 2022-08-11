@@ -98,30 +98,38 @@ class ResponseStatsTest(tu.TestResultCollector):
     def _check_response_stats(self, response_dict):
         # response list contains a list containing the number of responses
         # that should be present in the response stat
-        statistics = self._http_client.get_inference_statistics(
-            model_name=self._model_name)
-        model_stats = statistics['model_stats']
-        self.assertEqual(len(model_stats), 1)
-        response_stats = model_stats[0]['response_stats']
-        self.assertTrue(len(response_stats), len(response_dict))
+        clients = [self._http_client, self._client]
 
-        for response_stat in response_stats:
-            self.assertIn(len(response_stat['responses']), response_dict)
-            response_count = response_dict[len(response_stat['responses'])]
+        for client in clients:
+            if type(client) == grpcclient.InferenceServerClient:
+                statistics = client.get_inference_statistics(
+                    model_name=self._model_name, as_json=True)
+                model_stats = statistics
+            else:
+                statistics = client.get_inference_statistics(
+                    model_name=self._model_name)
+                model_stats = statistics['model_stats']
+                self.assertEqual(len(model_stats), 1)
+                response_stats = model_stats[0]['response_stats']
+            self.assertTrue(len(response_stats), len(response_dict))
 
-            indexes = set()
-            for response in response_stat['responses']:
-                indexes.add(response['index'])
-                self._check_success_duration(response['success'],
-                                             response_count)
-                self._check_success_duration(response['compute_infer'],
-                                             response_count)
-                self._check_success_duration(response['compute_output'],
-                                             response_count)
-                self._check_fail_duration(response['fail'])
-            expected_indexes = set(
-                list(range(0, len(response_stat['responses']))))
-            self.assertEqual(indexes, expected_indexes)
+            for response_stat in response_stats:
+                self.assertIn(len(response_stat['responses']), response_dict)
+                response_count = response_dict[len(response_stat['responses'])]
+
+                indexes = set()
+                for response in response_stat['responses']:
+                    indexes.add(response['index'])
+                    self._check_success_duration(response['success'],
+                                                 response_count)
+                    self._check_success_duration(response['compute_infer'],
+                                                 response_count)
+                    self._check_success_duration(response['compute_output'],
+                                                 response_count)
+                    self._check_fail_duration(response['fail'])
+                expected_indexes = set(
+                    list(range(0, len(response_stat['responses']))))
+                self.assertEqual(indexes, expected_indexes)
 
     def test_response_stats(self):
         number_of_responses = 5
