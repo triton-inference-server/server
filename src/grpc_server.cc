@@ -1053,7 +1053,6 @@ CommonHandler::SetUpAllRequests()
               ucnt);
         }
 
-
         triton::common::TritonJson::Value batches_json;
         err = model_stat.MemberAsArray("batch_stats", &batches_json);
         GOTO_IF_ERR(err, earlyexit);
@@ -1110,6 +1109,70 @@ CommonHandler::SetUpAllRequests()
             err = compute_output_json.MemberAsUInt("ns", &ucnt);
             GOTO_IF_ERR(err, earlyexit);
             batch_statistics->mutable_compute_output()->set_ns(ucnt);
+          }
+        }
+
+        triton::common::TritonJson::Value responses_json;
+        err = model_stat.MemberAsArray("response_stats", &responses_json);
+        GOTO_IF_ERR(err, earlyexit);
+
+        for (size_t idx = 0; idx < responses_json.ArraySize(); ++idx) {
+          triton::common::TritonJson::Value response_stat_json;
+          err = responses_json.IndexAsObject(idx, &response_stat_json);
+          GOTO_IF_ERR(err, earlyexit);
+
+          triton::common::TritonJson::Value responses_stat;
+          err = response_stat_json.MemberAsArray("responses", &responses_stat);
+          GOTO_IF_ERR(err, earlyexit);
+
+          auto response_stats_pb = statistics->add_response_stats();
+
+          for (size_t idx = 0; idx < responses_stat.ArraySize(); ++idx) {
+            triton::common::TritonJson::Value response_stat;
+            err = responses_stat.IndexAsObject(idx, &response_stat);
+            GOTO_IF_ERR(err, earlyexit);
+
+            auto response_stats = response_stats_pb->add_responses();
+
+            {
+              triton::common::TritonJson::Value compute_infer_json;
+              err = response_stat.MemberAsObject(
+                  "compute_infer", &compute_infer_json);
+              GOTO_IF_ERR(err, earlyexit);
+
+              err = compute_infer_json.MemberAsUInt("count", &ucnt);
+              GOTO_IF_ERR(err, earlyexit);
+              response_stats->mutable_compute_infer()->set_count(ucnt);
+              err = compute_infer_json.MemberAsUInt("ns", &ucnt);
+              GOTO_IF_ERR(err, earlyexit);
+              response_stats->mutable_compute_infer()->set_ns(ucnt);
+            }
+
+            {
+              triton::common::TritonJson::Value success_json;
+              err = response_stat.MemberAsObject("success", &success_json);
+              GOTO_IF_ERR(err, earlyexit);
+
+              err = success_json.MemberAsUInt("count", &ucnt);
+              GOTO_IF_ERR(err, earlyexit);
+              response_stats->mutable_success()->set_count(ucnt);
+              err = success_json.MemberAsUInt("ns", &ucnt);
+              GOTO_IF_ERR(err, earlyexit);
+              response_stats->mutable_success()->set_ns(ucnt);
+            }
+
+            {
+              triton::common::TritonJson::Value fail_json;
+              err = response_stat.MemberAsObject("fail", &fail_json);
+              GOTO_IF_ERR(err, earlyexit);
+
+              err = fail_json.MemberAsUInt("count", &ucnt);
+              GOTO_IF_ERR(err, earlyexit);
+              response_stats->mutable_fail()->set_count(ucnt);
+              err = fail_json.MemberAsUInt("ns", &ucnt);
+              GOTO_IF_ERR(err, earlyexit);
+              response_stats->mutable_fail()->set_ns(ucnt);
+            }
           }
         }
       }
