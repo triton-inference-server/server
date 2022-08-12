@@ -305,12 +305,13 @@ and shared memory pages after starting triton equals to $current_num_pages \n***
     exit 1
 fi
 
+set +e
 rm -fr ./models
 mkdir -p models/identity_fp32/1/
 cp ../python_models/identity_fp32/model.py ./models/identity_fp32/1/model.py
 cp ../python_models/identity_fp32/config.pbtxt ./models/identity_fp32/config.pbtxt
 
-shm_default_byte_size=$((1024*1024*4))
+shm_default_byte_size=$((1024*1024*5))
 SERVER_ARGS="$BASE_SERVER_ARGS --backend-config=python,shm-default-byte-size=$shm_default_byte_size"
 
 run_server
@@ -332,6 +333,7 @@ $page_size."
         RET=1
     fi
 done
+set -e
 
 kill $SERVER_PID
 wait $SERVER_PID
