@@ -293,6 +293,7 @@ if [ $(cat $CLIENT_LOG | grep "${NON_SUPPORTED_ERROR_STRING}" | wc -l) -ne 1 ]; 
 fi
 set -e
 
+set +e
 # Testing erroneous configuration
 # This model is expected to fail
 $PERF_ANALYZER -v -m bls_undefined --shape INPUT0:1048576 -t 64\
@@ -304,6 +305,7 @@ if [ $? -ne 99 ]; then
     echo -e "\n***\n*** Test Failed\n***"
     RET=1
 fi
+set -e
 
 # Make sure server is not still running
 set +e
