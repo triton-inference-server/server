@@ -849,6 +849,7 @@ RUN apt-get update && \
             libssl-dev \
             libtool \
             libboost-dev \
+            libboost-program-options-dev \
             libcurl4-openssl-dev \
             libb64-dev \
             patchelf \
@@ -1067,6 +1068,7 @@ RUN apt-get update && \
             libnuma-dev \
             curl \
             librdkafka-dev \
+            libboost-program-options-dev \
             {backend_dependencies} && \
     rm -rf /var/lib/apt/lists/*
 '''.format(gpu_enabled=gpu_enabled, backend_dependencies=backend_dependencies)
