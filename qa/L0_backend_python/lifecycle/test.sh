@@ -171,10 +171,6 @@ set -e
 rm -rf models/
 mkdir -p models/auto_complete_error/1/
 cp ../../python_models/auto_complete_error/model.py ./models/auto_complete_error/1/
-if [ "$TEST_JETSON" == "1" ]; then
-    echo -e 'name: "auto_complete_error" \ninstance_group [{ kind: KIND_CPU }]' > \
-        models/auto_complete_error/config.pbtxt
-fi
 
 SERVER_ARGS="${SERVER_ARGS} --strict-model-config=false"
 
