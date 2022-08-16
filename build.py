@@ -841,7 +841,9 @@ RUN curl -o /tmp/cuda-keyring.deb \
 
 def install_miniconda(conda_version, target_machine):
     if target_machine == "arm64":
-        # Arm architecture on MacOS named arm64
+        # This branch used for the case when linux container builds on MacOS with ARM chip
+        # macos arm arch names "arm64" when in linux it's names "aarch64".
+        # So we just replace the architecture to able find right conda version for Linux 
         target_machine = "aarch64"
     if conda_version == '':
         fail(
