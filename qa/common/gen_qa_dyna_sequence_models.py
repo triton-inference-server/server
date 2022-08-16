@@ -1478,11 +1478,6 @@ output [
     dims: [ 1 ]
   }}
 ]
-instance_group [
-  {{
-    kind: KIND_CPU
-  }}
-]
 '''.format(
         model_name, max_batch,
         "oldest { max_candidate_sequences: 6\npreferred_batch_size: [ 4 ]\nmax_queue_delay_microseconds: 0\n}"
