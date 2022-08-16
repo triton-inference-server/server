@@ -48,13 +48,13 @@ PLUGIN_TEST=trt_plugin_test.py
 # /mnt/c when needed but the paths on the tritonserver command-line
 # must be C:/ style.
 if [[ "$(< /proc/sys/kernel/osrelease)" == *microsoft* ]]; then
-    DATADIR=${DATADIR:="/mnt/c/data/inferenceserver/${REPO_VERSION}"}
+    DATADIR=${DATADIR:="/mnt/c/data/inferenceserver/${REPO_VERSION}_davidy"}
     MODELDIR=${MODELDIR:=C:/models}
     CUSTOMPLUGIN=${CUSTOMPLUGIN:=clipplugin.dll}
     BACKEND_DIR=${BACKEND_DIR:=C:/tritonserver/backends}
     SERVER=${SERVER:=/mnt/c/tritonserver/bin/tritonserver.exe}
 else
-    DATADIR=${DATADIR:="/data/inferenceserver/${REPO_VERSION}"}
+    DATADIR=${DATADIR:="/data/inferenceserver/${REPO_VERSION}_davidy"}
     MODELDIR=${MODELDIR:=`pwd`/models}
     CUSTOMPLUGIN=${CUSTOMPLUGIN:=libclipplugin.so}
     TRITON_DIR=${TRITON_DIR:="/opt/tritonserver"}
