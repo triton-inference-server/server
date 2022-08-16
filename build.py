@@ -864,6 +864,7 @@ RUN apt-get update && \
             libarchive-dev \
             pkg-config \
             uuid-dev \
+            librdkafka-dev \
             libnuma-dev && \
     rm -rf /var/lib/apt/lists/*
 
@@ -1065,6 +1066,7 @@ RUN apt-get update && \
             dirmngr \
             libnuma-dev \
             curl \
+            librdkafka-dev \
             {backend_dependencies} && \
     rm -rf /var/lib/apt/lists/*
 '''.format(gpu_enabled=gpu_enabled, backend_dependencies=backend_dependencies)
