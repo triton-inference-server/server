@@ -50,12 +50,13 @@ PLUGIN_TEST=trt_plugin_test.py
 if [[ "$(< /proc/sys/kernel/osrelease)" == *microsoft* ]]; then
     DATADIR=${DATADIR:="/mnt/c/data/inferenceserver/${REPO_VERSION}"}
     MODELDIR=${MODELDIR:=C:/models}
+    CUSTOMPLUGIN=${CUSTOMPLUGIN:=clipplugin.dll}
     BACKEND_DIR=${BACKEND_DIR:=C:/tritonserver/backends}
     SERVER=${SERVER:=/mnt/c/tritonserver/bin/tritonserver.exe}
 else
-    # TODO: Remove "_davidy" once passes in Windows, update model repo.
-    DATADIR=${DATADIR:="/data/inferenceserver/${REPO_VERSION}_davidy"}
+    DATADIR=${DATADIR:="/data/inferenceserver/${REPO_VERSION}"}
     MODELDIR=${MODELDIR:=`pwd`/models}
+    CUSTOMPLUGIN=${CUSTOMPLUGIN:=libclipplugin.so}
     TRITON_DIR=${TRITON_DIR:="/opt/tritonserver"}
     BACKEND_DIR=${TRITON_DIR}/backends
     SERVER=${TRITON_DIR}/bin/tritonserver
@@ -67,6 +68,7 @@ RET=0
 rm -f ./*.log
 
 SERVER_ARGS_BASE="--model-repository=${MODELDIR} --backend-directory=${BACKEND_DIR} --log-verbose=1"
+SERVER_TIMEOUT=20
 
 LOG_IDX=0
 
@@ -145,7 +147,7 @@ fi
 LOG_IDX=$((LOG_IDX+1))
 
 ## Backend Config, Single Plugin Test
-SERVER_ARGS="${SERVER_ARGS_BASE} --backend-config=tensorrt,plugins=${MODELDIR}/libclipplugin.so"
+SERVER_ARGS="${SERVER_ARGS_BASE} --backend-config=tensorrt,plugins=${MODELDIR}/${CUSTOMPLUGIN}"
 SERVER_LOG="./inference_server_$LOG_IDX.log"
 
 run_server
@@ -177,7 +179,7 @@ kill_server
 LOG_IDX=$((LOG_IDX+1))
 
 ## Backend Config, Multiple Plugins Test
-SERVER_ARGS="${SERVER_ARGS_BASE} --backend-config=tensorrt,plugins=${MODELDIR}/libclipplugin.so;${MODELDIR}/libclipplugin.so\""
+SERVER_ARGS="${SERVER_ARGS_BASE} --backend-config=tensorrt,plugins=${MODELDIR}/${CUSTOMPLUGIN};${MODELDIR}/${CUSTOMPLUGIN}\""
 SERVER_LOG="./inference_server_$LOG_IDX.log"
 
 run_server
@@ -209,37 +211,39 @@ kill_server
 LOG_IDX=$((LOG_IDX+1))
 
 ## LD_PRELOAD, Single Plugin Test
-SERVER_LD_PRELOAD=$MODELDIR/libclipplugin.so
+## LD_PRELOAD is only on Linux
+
+SERVER_LD_PRELOAD=$MODELDIR/$CUSTOMPLUGIN
 SERVER_ARGS=$SERVER_ARGS_BASE
 SERVER_LOG="./inference_server_$LOG_IDX.log"
 
-run_server
-if [ "$SERVER_PID" == "0" ]; then
-    echo -e "\n***\n*** Failed to start $SERVER\n***"
-    cat $SERVER_LOG
-    exit 1
-fi
+if [[ "$(< /proc/sys/kernel/osrelease)" != *microsoft* ]]; then
+    run_server
+    if [ "$SERVER_PID" == "0" ]; then
+        echo -e "\n***\n*** Failed to start $SERVER\n***"
+        cat $SERVER_LOG
+        exit 1
+    fi
 
-rm -f $CLIENT_LOG
-set +e
-python3 $PLUGIN_TEST PluginModelTest.test_raw_fff_clip >>$CLIENT_LOG 2>&1
-if [ $? -ne 0 ]; then
-    cat $CLIENT_LOG
-    echo -e "\n***\n*** Test Failed\n***"
-    RET=1
-else
-    check_test_results $TEST_RESULT_FILE 1
+    rm -f $CLIENT_LOG
+    set +e
+    python3 $PLUGIN_TEST PluginModelTest.test_raw_fff_clip >>$CLIENT_LOG 2>&1
     if [ $? -ne 0 ]; then
         cat $CLIENT_LOG
-        echo -e "\n***\n*** Test Result Verification Failed\n***"
+        echo -e "\n***\n*** Test Failed\n***"
         RET=1
+    else
+        check_test_results $TEST_RESULT_FILE 1
+        if [ $? -ne 0 ]; then
+            cat $CLIENT_LOG
+            echo -e "\n***\n*** Test Result Verification Failed\n***"
+            RET=1
+        fi
     fi
+    set -e
+
+    kill_server
 fi
-set -e
-
-kill_server
-
-LOG_IDX=$((LOG_IDX+1))
 
 if [ $RET -eq 0 ]; then
     echo -e "\n***\n*** Test Passed\n***"
