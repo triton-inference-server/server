@@ -167,7 +167,7 @@ configuration](docs/model_configuration.md) for the model.
   [Python](https://github.com/triton-inference-server/python_backend), and more
 - Not all the above backends are supported on every platform supported by Triton.
   Look at the
-  [Backend-Platform Support Matrix](https://github.com/triton-inference-server/backend/docs/backend_platform_support_matrix.md)
+  [Backend-Platform Support Matrix](https://github.com/triton-inference-server/backend/blob/main/docs/backend_platform_support_matrix.md)
   to learn which backends are supported on your target platform.
 - Learn how to [optimize performance](docs/optimization.md) using the 
   [Performance Analyzer](docs/perf_analyzer.md) and 
