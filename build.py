@@ -840,6 +840,9 @@ RUN curl -o /tmp/cuda-keyring.deb \
 
 
 def install_miniconda(conda_version, target_machine):
+    if target_machine == "arm64":
+        # Arm architecture on MacOS named arm64
+        target_machine = "aarch64"
     if conda_version == '':
         fail(
             'unable to determine default repo-tag, CONDA version not known for {}'
