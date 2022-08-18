@@ -71,7 +71,9 @@
 #ifdef TRITON_ENABLE_GRPC
 #include "grpc_server.h"
 #endif  // TRITON_ENABLE_GRPC
-
+#if defined(TRITON_ENABLE_KAFKA)
+#include "kafka_endpoint.h"
+#endif // TRITON_ENABLE_KAFKA
 #ifdef TRITON_ENABLE_GPU
 static_assert(
     TRITON_MIN_COMPUTE_CAPABILITY >= 1.0,
