@@ -85,17 +85,17 @@ Count*. The count metrics are illustrated by the following examples:
   the server. *Request Count* = 2, *Inference Count* = 9, *Execution
   Count* = 1.
 
-|Category      |Metric          |Description                            |Granularity|Frequency    |
-|--------------|----------------|---------------------------------------|-----------|-------------|
-|Count         |Success Count   |Number of successful inference requests received by Triton (each request is counted as 1, even if the request contains a batch) |Per model  |Per request  |
-|              |Failure Count   |Number of failed inference requests received by Triton (each request is counted as 1, even if the request contains a batch) |Per model  |Per request  |
-|              |Inference Count |Number of inferences performed (a batch of "n" is counted as "n" inferences, does not include cached requests)|Per model|Per request|
-|              |Execution Count |Number of inference batch executions (see [Count Metrics](#count-metrics), does not include cached requests)|Per model|Per request|
-|Latency       |Request Time    |Cumulative end-to-end inference request handling time (includes cached requests) |Per model  |Per request  |
-|              |Queue Time      |Cumulative time requests spend waiting in the scheduling queue (includes cached requests) |Per model  |Per request  |
-|              |Compute Input Time|Cumulative time requests spend processing inference inputs (in the framework backend, does not include cached requests)     |Per model  |Per request  |
-|              |Compute Time    |Cumulative time requests spend executing the inference model (in the framework backend, does not include cached requests)     |Per model  |Per request  |
-|              |Compute Output Time|Cumulative time requests spend processing inference outputs (in the framework backend, does not include cached requests)     |Per model  |Per request  |
+|Category      |Metric          |Metric Name |Description                            |Granularity|Frequency    |
+|--------------|----------------|------------|---------------------------|-----------|-------------|
+|Count         |Success Count   |`nv_inference_request_success` |Number of successful inference requests received by Triton (each request is counted as 1, even if the request contains a batch) |Per model  |Per request  |
+|              |Failure Count   |`nv_inference_request_failure` |Number of failed inference requests received by Triton (each request is counted as 1, even if the request contains a batch) |Per model  |Per request  |
+|              |Inference Count |`nv_inference_count` |Number of inferences performed (a batch of "n" is counted as "n" inferences, does not include cached requests)|Per model|Per request|
+|              |Execution Count |`nv_inference_exec_count` |Number of inference batch executions (see [Count Metrics](#count-metrics), does not include cached requests)|Per model|Per request|
+|Latency       |Request Time    |`nv_inference_request_duration_us` |Cumulative end-to-end inference request handling time (includes cached requests) |Per model  |Per request  |
+|              |Queue Time      |`nv_inference_queue_duration_us` |Cumulative time requests spend waiting in the scheduling queue (includes cached requests) |Per model  |Per request  |
+|              |Compute Input Time|`nv_inference_compute_input_duration_us` |Cumulative time requests spend processing inference inputs (in the framework backend, does not include cached requests)     |Per model  |Per request  |
+|              |Compute Time    |`nv_inference_compute_infer_duration_us` |Cumulative time requests spend executing the inference model (in the framework backend, does not include cached requests)     |Per model  |Per request  |
+|              |Compute Output Time|`nv_inference_compute_output_duration_us` |Cumulative time requests spend processing inference outputs (in the framework backend, does not include cached requests)     |Per model  |Per request  |
 
 ## Response Cache
 
@@ -114,21 +114,21 @@ the request hash and "Cache Miss Insertion Time" indicates the time spent
 inserting the computed output tensor data into the cache. Otherwise, "Compute
 Input Time" /  "Compute Time" / "Compute Output Time" will be recorded as usual.
 
-|Category      |Metric          |Description                            |Granularity|Frequency    |
-|--------------|----------------|---------------------------------------|-----------|-------------|
-|Response Cache|Total Cache Entry Count |Total number of responses stored in response cache across all models |Server-wide |Per second |
-|              |Total Cache Lookup Count |Total number of response cache lookups done by Triton across all models |Server-wide |Per second |
-|              |Total Cache Hit Count |Total number of response cache hits across all models |Server-wide |Per second |
-|              |Total Cache Miss Count |Total number of response cache misses across all models |Server-wide |Per second |
-|              |Total Cache Eviction Count |Total number of response cache evictions across all models |Server-wide |Per second |
-|              |Total Cache Lookup Time |Cumulative time requests spend checking for a cached response across all models (microseconds) |Server-wide |Per second |
-|              |Total Cache Utilization |Total Response Cache utilization rate (0.0 - 1.0) |Server-wide |Per second |
-|              |Cache Hit Count |Number of response cache hits per model |Per model |Per request |
-|              |Cache Hit Lookup Time |Cumulative time requests spend retrieving a cached response per model on cache hits (microseconds) |Per model |Per request |
-|              |Cache Miss Count |Number of response cache misses per model |Per model |Per request |
-|              |Cache Miss Lookup Time |Cumulative time requests spend looking up a request hash on a cache miss (microseconds) |Per model |Per request |
-|              |Cache Miss Insertion Time |Cumulative time requests spend inserting responses into the cache on a cache miss (microseconds) |Per model |Per request |
-
+|Category      |Metric          |Metric Name |Description                            |Granularity|Frequency    |
+|--------------|----------------|------------|---------------------------|-----------|-------------|
+|Response Cache|Total Cache Entry Count |`nv_cache_num_entries` |Total number of responses stored in response cache across all models |Server-wide |Per second |
+|              |Total Cache Lookup Count |`nv_cache_num_lookups` |Total number of response cache lookups done by Triton across all models |Server-wide |Per second |
+|              |Total Cache Hit Count |`nv_cache_num_hits` |Total number of response cache hits across all models |Server-wide |Per second |
+|              |Total Cache Miss Count |`nv_cache_num_misses` |Total number of response cache misses across all models |Server-wide |Per second |
+|              |Total Cache Eviction Count |`nv_cache_num_evictions` |Total number of response cache evictions across all models |Server-wide |Per second |
+|              |Total Cache Lookup Time |`nv_cache_lookup_duration` |Cumulative time requests spend checking for a cached response across all models (microseconds) |Server-wide |Per second |
+|              |Total Cache Insertion Time |`nv_cache_insertion_duration` |Cumulative time requests spend inserting a response into the cache across all models (microseconds) |Server-wide |Per second |
+|              |Total Cache Utilization |`nv_cache_util` |Total Response Cache utilization rate (0.0 - 1.0) |Server-wide |Per second |
+|              |Cache Hit Count |`nv_cache_num_hits_per_model` |Number of response cache hits per model |Per model |Per request |
+|              |Cache Hit Lookup Time |`nv_cache_hit_lookup_duration_per_model` |Cumulative time requests spend retrieving a cached response per model on cache hits (microseconds) |Per model |Per request |
+|              |Cache Miss Count |`nv_cache_num_misses_per_model` |Number of response cache misses per model |Per model |Per request |
+|              |Cache Miss Lookup Time |`nv_cache_miss_lookup_duration_per_model`| Cumulative time requests spend looking up a request hash on a cache miss (microseconds) |Per model |Per request |
+|              |Cache Miss Insertion Time |`nv_cache_miss_insertion_duration_per_model` |Cumulative time requests spend inserting responses into the cache on a cache miss (microseconds) |Per model |Per request |
 
 
 ## GPU Metrics
@@ -139,14 +139,14 @@ TODO:
 - Details: DCGM
 - Known issue with separate DCGM agent
 
-|Category      |Metric          |Description                            |Granularity|Frequency    |
-|--------------|----------------|---------------------------------------|-----------|-------------|
-|GPU Utilization |Power Usage   |GPU instantaneous power                |Per GPU    |Per second   |
-|              |Power Limit     |Maximum GPU power limit                |Per GPU    |Per second   |
-|              |Energy Consumption|GPU energy consumption in joules since Triton started|Per GPU|Per second|
-|              |GPU Utilization |GPU utilization rate (0.0 - 1.0)       |Per GPU    |Per second   |
-|GPU Memory    |GPU Total Memory|Total GPU memory, in bytes             |Per GPU    |Per second   |
-|              |GPU Used Memory |Used GPU memory, in bytes              |Per GPU    |Per second   |
+|Category      |Metric          |Metric Name |Description                            |Granularity|Frequency    |
+|--------------|----------------|------------|---------------------------|-----------|-------------|
+|GPU Utilization |Power Usage   |`nv_gpu_power_usage` |GPU instantaneous power                |Per GPU    |Per second   |
+|              |Power Limit     |`nv_gpu_power_limit` |Maximum GPU power limit                |Per GPU    |Per second   |
+|              |Energy Consumption|`nv_energy_consumption` |GPU energy consumption in joules since Triton started|Per GPU|Per second|
+|              |GPU Utilization |`nv_gpu_utilization` |GPU utilization rate (0.0 - 1.0)       |Per GPU    |Per second   |
+|GPU Memory    |GPU Total Memory|`nv_gpu_memory_total_bytes` |Total GPU memory, in bytes             |Per GPU    |Per second   |
+|              |GPU Used Memory |`nv_gpu_memory_used_bytes` |Used GPU memory, in bytes              |Per GPU    |Per second   |
 
 
 ## CPU Metrics
@@ -157,10 +157,10 @@ TODO:
 - `--allow-cpu-metrics`
 - Details: `/proc/stat` ?
 
-|Category      |Metric          |Description                            |Granularity|Frequency    |
-|--------------|----------------|---------------------------------------|-----------|-------------|
-|CPU Utilization | TBD | TBD | Per CPU | Per second |
-|CPU Memory | TBD | TBD | Per CPU | Per second |
+|Category      |Metric          |Metric Name |Description                            |Granularity|Frequency    |
+|--------------|----------------|------------|---------------------------|-----------|-------------|
+|CPU Utilization | TBD | `TBD` | TBD | Per CPU | Per second |
+|CPU Memory      | TBD | `TBD` | TBD | Per CPU | Per second |
 
 ## Custom Metrics
 
