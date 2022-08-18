@@ -29,7 +29,7 @@
 # Quickstart
 
 The Triton Inference Server is available as [buildable source
-  code](build.md), but the easiest way to install and run Triton is to
+  code](../customization_guide/build.md), but the easiest way to install and run Triton is to
   use the pre-built Docker image available from the [NVIDIA GPU
   Cloud (NGC)](https://ngc.nvidia.com).
 
@@ -52,7 +52,7 @@ Where \<xx.yy\> is the version of Triton that you want to pull.
 
 ## Create A Model Repository
 
-The [model repository](model_repository.md) is the directory where you
+The [model repository](../user_guide/model_repository.md) is the directory where you
 place the models that you want Triton to serve. An example model
 repository is included in the
 [docs/examples/model_repository](examples/model_repository). Before
