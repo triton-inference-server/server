@@ -116,6 +116,7 @@ Input Time" /  "Compute Time" / "Compute Output Time" will be recorded as usual.
 
 |Category      |Metric          |Metric Name |Description                            |Granularity|Frequency    |
 |--------------|----------------|------------|---------------------------|-----------|-------------|
+|Utilization   |Total Cache Utilization |`nv_cache_util` |Total Response Cache utilization rate (0.0 - 1.0) |Server-wide |Per second |
 |Count         |Total Cache Entry Count |`nv_cache_num_entries` |Total number of responses stored in response cache across all models |Server-wide |Per second |
 |              |Total Cache Lookup Count |`nv_cache_num_lookups` |Total number of response cache lookups done by Triton across all models |Server-wide |Per second |
 |              |Total Cache Hit Count |`nv_cache_num_hits` |Total number of response cache hits across all models |Server-wide |Per second |
@@ -128,7 +129,6 @@ Input Time" /  "Compute Time" / "Compute Output Time" will be recorded as usual.
 |              |Cache Hit Lookup Time |`nv_cache_hit_lookup_duration_per_model` |Cumulative time requests spend retrieving a cached response per model on cache hits (microseconds) |Per model |Per request |
 |              |Cache Miss Lookup Time |`nv_cache_miss_lookup_duration_per_model`| Cumulative time requests spend looking up a request hash on a cache miss (microseconds) |Per model |Per request |
 |              |Cache Miss Insertion Time |`nv_cache_miss_insertion_duration_per_model` |Cumulative time requests spend inserting responses into the cache on a cache miss (microseconds) |Per model |Per request |
-|Utilization   |Total Cache Utilization |`nv_cache_util` |Total Response Cache utilization rate (0.0 - 1.0) |Server-wide |Per second |
 
 
 ## GPU Metrics
