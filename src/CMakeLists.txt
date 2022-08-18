@@ -569,6 +569,77 @@ if(${TRITON_ENABLE_HTTP}
 endif() # TRITON_ENABLE_HTTP || TRITON_ENABLE_METRICS ||
         # TRITON_ENABLE_SAGEMAKER || TRITON_ENABLE_VERTEX_AI
 
+# kafka
+#
+if(${TRITON_ENABLE_KAFKA})
+  message(STATUS "Using Kafka Endpoint")
+  add_library(
+    kafka-endpoint-library EXCLUDE_FROM_ALL
+    kafka_endpoint.cc kafka_endpoint.h
+  )
+
+  target_link_libraries(
+    kafka-endpoint-library
+    PUBLIC
+      triton-common-logging    # from repo-common
+      triton-core-serverapi    # from repo-core
+      triton-core-serverstub   # from repo-core
+  )
+
+  target_compile_definitions(
+    kafka-endpoint-library
+    PRIVATE TRITON_ENABLE_KAFKA=1
+  )
+
+  if(${TRITON_ENABLE_GPU})
+    target_compile_definitions(
+      kafka-endpoint-library
+      PRIVATE TRITON_ENABLE_GPU=1
+      PRIVATE TRITON_MIN_COMPUTE_CAPABILITY=${TRITON_MIN_COMPUTE_CAPABILITY}
+    )
+
+    target_link_libraries(
+      kafka-endpoint-library
+      PUBLIC
+        CUDA::cudart
+    )
+  endif() # TRITON_ENABLE_GPU
+
+  if(${TRITON_ENABLE_METRICS})
+    target_compile_definitions(
+      kafka-endpoint-library
+      PRIVATE TRITON_ENABLE_METRICS=1
+    )
+  endif() # TRITON_ENABLE_METRICS
+
+  if(${TRITON_ENABLE_LOGGING})
+    target_compile_definitions(
+      kafka-endpoint-library
+      PRIVATE TRITON_ENABLE_LOGGING=1
+    )
+  endif() # TRITON_ENABLE_LOGGING
+
+  if(${TRITON_ENABLE_STATS})
+    target_compile_definitions(
+      kafka-endpoint-library
+      PRIVATE TRITON_ENABLE_STATS=1
+    )
+  endif() # TRITON_ENABLE_STATS
+
+  if(${TRITON_ENABLE_NVTX})
+    target_compile_definitions(
+      kafka-endpoint-library
+      PRIVATE TRITON_ENABLE_NVTX=1
+    )
+  endif() # TRITON_ENABLE_NVTX
+
+  target_link_libraries(
+    main
+    PRIVATE
+      kafka-endpoint-library
+  )
+endif() # TRITON_ENABLE_KAFKA
+
 # tracing
 #
 if(${TRITON_ENABLE_TRACING})
