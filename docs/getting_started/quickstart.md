@@ -35,9 +35,9 @@ The Triton Inference Server is available as [buildable source
 
 Launching and maintaining Triton Inference Server revolves around the use of building model repositories. This tutorial will cover:
 
-* Creating a model Repository
-* Run Triton
-* Sending an Infernce Request
+* Creating a Model Repository
+* Launching Triton
+* Sending an Inference Request
 
 ## Create A Model Repository
 
@@ -140,7 +140,6 @@ image.
 ```
 $ docker run -it --rm --net=host nvcr.io/nvidia/tritonserver:<xx.yy>-py3-sdk
 ```
-
 
 From within the nvcr.io/nvidia/tritonserver:<xx.yy>-py3-sdk
 image, run the example image-client application to perform image

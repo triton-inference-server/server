@@ -26,7 +26,7 @@
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 -->
 
-# Triton Response Cache (beta)
+# Triton Response Cache
 
 **This feature is currently in beta and may be subject to change.**
 
