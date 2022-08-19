@@ -286,12 +286,6 @@ def create_plugin_models(models_dir):
         16,
     ), np.float32, np.float32)
 
-    # custom CustomClipPlugin
-    create_plan_modelconfig(models_dir, 8, model_version, "CustomClipPlugin",
-                            (16,), (16,), np.float32, np.float32)
-    create_plan_modelfile(models_dir, 8, model_version, "CustomClipPlugin",
-                          (16,), (16,), np.float32, np.float32)
-
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
