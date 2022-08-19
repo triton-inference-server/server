@@ -78,6 +78,7 @@ def np_to_trt_dtype(np_dtype):
 
 def get_trt_plugin(plugin_name):
     plugin = None
+    field_collection = None
     for plugin_creator in PLUGIN_CREATORS:
         if (plugin_creator.name == "Normalize_TRT") and \
                 (plugin_name == "Normalize_TRT"):
@@ -91,8 +92,6 @@ def get_trt_plugin(plugin_name):
                                       trt.PluginFieldType.FLOAT32)
             field_collection = trt.PluginFieldCollection(
                 [weights, eps, nbWeights])
-            plugin = plugin_creator.create_plugin(
-                name=plugin_name, field_collection=field_collection)
             break
         elif (plugin_creator.name
               == "CustomGeluPluginDynamic") and (plugin_name
@@ -102,9 +101,21 @@ def get_trt_plugin(plugin_name):
             bias = trt.PluginField("bias", np.array([[[1]]], np.float32),
                                    trt.PluginFieldType.FLOAT32)
             field_collection = trt.PluginFieldCollection([type_id, bias])
-            plugin = plugin_creator.create_plugin(
-                name=plugin_name, field_collection=field_collection)
             break
+        elif (plugin_creator.name
+              == "CustomClipPlugin") and (plugin_name == "CustomClipPlugin"):
+            min_clip = trt.PluginField("clipMin", np.array([0.1],\
+                dtype=np.float32), trt.PluginFieldType.FLOAT32)
+            max_clip = trt.PluginField("clipMax", np.array([0.5],\
+                dtype=np.float32), trt.PluginFieldType.FLOAT32)
+            field_collection = trt.PluginFieldCollection([min_clip, max_clip])
+            break
+
+    if field_collection is None:
+        raise RuntimeError("Plugin not found: " + plugin_name)
+    plugin = plugin_creator.create_plugin(name=plugin_name,
+                                          field_collection=field_collection)
+
     return plugin
 
 
@@ -241,6 +252,12 @@ output [
 def create_plugin_models(models_dir):
     model_version = 1
 
+    # custom CustomClipPlugin
+    create_plan_modelconfig(models_dir, 8, model_version, "CustomClipPlugin",
+                            (16,), (16,), np.float32, np.float32)
+    create_plan_modelfile(models_dir, 8, model_version, "CustomClipPlugin",
+                          (16,), (16,), np.float32, np.float32)
+
     # default CustomGeluPluginDynamic plugin
     create_plan_modelconfig(models_dir, 0, model_version,
                             "CustomGeluPluginDynamic", (16, 1, 1), (16, 1, 1),
@@ -249,7 +266,7 @@ def create_plugin_models(models_dir):
                           "CustomGeluPluginDynamic", (16, 1, 1), (16, 1, 1),
                           np.float32, np.float32)
 
-    # custom Normalize_TRT
+    # default Normalize_TRT
     create_plan_modelconfig(models_dir, 8, model_version, "Normalize_TRT", (
         16,
         16,
