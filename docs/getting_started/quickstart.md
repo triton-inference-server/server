@@ -33,22 +33,11 @@ The Triton Inference Server is available as [buildable source
   use the pre-built Docker image available from the [NVIDIA GPU
   Cloud (NGC)](https://ngc.nvidia.com).
 
-## Install Triton Docker Image
+Launching and maintaining Triton Inference Server revolves around the use of building model repositories. This tutorial will cover:
 
-Before you can use the Triton Docker image you must install
-[Docker](https://docs.docker.com/engine/install). If you plan on using
-a GPU for inference you must also install the [NVIDIA Container
-Toolkit](https://github.com/NVIDIA/nvidia-docker). DGX users should
-follow [Preparing to use NVIDIA
-Containers](http://docs.nvidia.com/deeplearning/dgx/preparing-containers/index.html).
-
-Pull the image using the following command.
-
-```
-$ docker pull nvcr.io/nvidia/tritonserver:<xx.yy>-py3
-```
-
-Where \<xx.yy\> is the version of Triton that you want to pull.
+* Creating a model Repository
+* Run Triton
+* Sending an Infernce Request
 
 ## Create A Model Repository
 
@@ -64,7 +53,7 @@ $ cd docs/examples
 $ ./fetch_models.sh
 ```
 
-## Run Triton
+## Launch Triton
 
 Triton is optimized to provide the best inferencing performance by
 using GPUs, but it can also work on CPU-only systems. In both cases
@@ -119,7 +108,7 @@ Because the --gpus flag is not used, a GPU is not available and Triton
 will therefore be unable to load any model configuration that requires
 a GPU.
 
-## Verify Triton Is Running Correctly
+### Verify Triton Is Running Correctly
 
 Use Triton’s *ready* endpoint to verify that the server and the models
 are ready for inference. From the host system use curl to access the
@@ -136,7 +125,7 @@ $ curl -v localhost:8000/v2/health/ready
 The HTTP request returns status 200 if Triton is ready and non-200 if
 it is not ready.
 
-## Getting The Client Examples
+## Sending an Infernce Request
 
 Use docker pull to get the client libraries and examples image
 from NGC.
@@ -152,7 +141,6 @@ image.
 $ docker run -it --rm --net=host nvcr.io/nvidia/tritonserver:<xx.yy>-py3-sdk
 ```
 
-## Running The Image Classification Example
 
 From within the nvcr.io/nvidia/tritonserver:<xx.yy>-py3-sdk
 image, run the example image-client application to perform image

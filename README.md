@@ -91,7 +91,8 @@ cd server/docs/examples
 # Step 2: Launch triton from the NGC Triton container
 docker run --gpus=1 --rm --net=host -v /full/path/to/docs/examples/model_repository:/models nvcr.io/nvidia/tritonserver:22.07-py3 tritonserver --model-repository=/models
 
-# Step 3: In a separate console, launch the image_client example from the NGC Triton SDK container
+# Step 3: Sending an Inference Request 
+# In a separate console, launch the image_client example from the NGC Triton SDK container
 docker run -it --rm --net=host nvcr.io/nvidia/tritonserver:22.07-py3-sdk
 
 /workspace/install/bin/image_client -m densenet_onnx -c 3 -s INCEPTION /workspace/images/mug.jpg
