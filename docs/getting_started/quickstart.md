@@ -37,7 +37,7 @@ Launching and maintaining Triton Inference Server revolves around the use of bui
 
 * Creating a Model Repository
 * Launching Triton
-* Sending an Inference Request
+* Send an Inference Request
 
 ## Create A Model Repository
 
@@ -125,7 +125,7 @@ $ curl -v localhost:8000/v2/health/ready
 The HTTP request returns status 200 if Triton is ready and non-200 if
 it is not ready.
 
-## Sending an Infernce Request
+## Send an Infernce Request
 
 Use docker pull to get the client libraries and examples image
 from NGC.
