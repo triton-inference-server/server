@@ -287,6 +287,7 @@ enum OptionId {
 #ifdef TRITON_ENABLE_METRICS
   OPTION_ALLOW_METRICS,
   OPTION_ALLOW_GPU_METRICS,
+  OPTION_ALLOW_CPU_METRICS,
   OPTION_METRICS_PORT,
   OPTION_METRICS_INTERVAL_MS,
 #endif  // TRITON_ENABLE_METRICS
@@ -504,6 +505,9 @@ std::vector<Option> options_
        "Allow the server to provide prometheus metrics."},
       {OPTION_ALLOW_GPU_METRICS, "allow-gpu-metrics", Option::ArgBool,
        "Allow the server to provide GPU metrics. Ignored unless "
+       "--allow-metrics is true."},
+      {OPTION_ALLOW_CPU_METRICS, "allow-cpu-metrics", Option::ArgBool,
+       "Allow the server to provide CPU metrics. Ignored unless "
        "--allow-metrics is true."},
       {OPTION_METRICS_PORT, "metrics-port", Option::ArgInt,
        "The port reporting prometheus metrics."},
@@ -1392,6 +1396,7 @@ Parse(TRITONSERVER_ServerOptions** server_options, int argc, char** argv)
 #ifdef TRITON_ENABLE_METRICS
   int32_t metrics_port = metrics_port_;
   bool allow_gpu_metrics = true;
+  bool allow_cpu_metrics = true;
   float metrics_interval_ms = metrics_interval_ms_;
 #endif  // TRITON_ENABLE_METRICS
 
@@ -1623,6 +1628,9 @@ Parse(TRITONSERVER_ServerOptions** server_options, int argc, char** argv)
       case OPTION_ALLOW_GPU_METRICS:
         allow_gpu_metrics = ParseBoolOption(optarg);
         break;
+      case OPTION_ALLOW_CPU_METRICS:
+        allow_cpu_metrics = ParseBoolOption(optarg);
+        break;
       case OPTION_METRICS_PORT:
         metrics_port = ParseIntOption(optarg);
         break;
@@ -1811,6 +1819,7 @@ Parse(TRITONSERVER_ServerOptions** server_options, int argc, char** argv)
 #ifdef TRITON_ENABLE_METRICS
   metrics_port_ = metrics_port;
   allow_gpu_metrics = allow_metrics_ ? allow_gpu_metrics : false;
+  allow_cpu_metrics = allow_metrics_ ? allow_cpu_metrics : false;
   metrics_interval_ms_ = metrics_interval_ms;
 #endif  // TRITON_ENABLE_METRICS
 
@@ -1950,6 +1959,9 @@ Parse(TRITONSERVER_ServerOptions** server_options, int argc, char** argv)
   FAIL_IF_ERR(
       TRITONSERVER_ServerOptionsSetGpuMetrics(loptions, allow_gpu_metrics),
       "setting GPU metrics enable");
+  FAIL_IF_ERR(
+      TRITONSERVER_ServerOptionsSetCpuMetrics(loptions, allow_cpu_metrics),
+      "setting CPU metrics enable");
   FAIL_IF_ERR(
       TRITONSERVER_ServerOptionsSetMetricsInterval(
           loptions, metrics_interval_ms_),
