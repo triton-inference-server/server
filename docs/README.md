@@ -52,7 +52,7 @@ Where \<yy.mm\> is the version of Triton that you want to pull. For a complete l
 This guide covers the simplest possible workflow for deploying a model using a Triton Inference Server.
 - [Create a Model Repository](getting_started/quickstart.md#create-a-model-repository)
 - [Launch Triton](getting_started/quickstart.md#launch-triton)
-- [Sending an Infernce Request](getting_started/quickstart.md#sending-an-inference-request)
+- [Sending an Inference Request](getting_started/quickstart.md#sending-an-inference-request)
 
 Triton Inference Server has a considerble list versrtile and powerful features. All new users are recommended to explore the [User Guide](README.md#user-guide) and the [additional resources](README.md#resources) sections for features most relevant to their usecase. 
 
