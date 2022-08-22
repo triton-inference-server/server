@@ -113,6 +113,7 @@ def infer_exact(tester,
                 use_system_shared_memory=False,
                 use_cuda_shared_memory=False,
                 priority=0,
+                # 60 sec is the default value
                 network_timeout=60.0):
     # Lazy shm imports...
     if use_system_shared_memory or use_cuda_shared_memory:

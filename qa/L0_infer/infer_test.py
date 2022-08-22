@@ -64,6 +64,7 @@ class InferTest(tu.TestResultCollector):
                     output0_raw,
                     output1_raw,
                     swap,
+                    # 60 sec is the default value
                     network_timeout=60.0):
 
         def _infer_exact_helper(tester,
