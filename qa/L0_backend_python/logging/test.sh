@@ -222,9 +222,9 @@ verify_log_counts 2 0
 
 
 if [ $RET -eq 0 ]; then
-    echo -e "\n***\n*** Test Passed\n***"
+    echo -e "\n***\n*** Logging test PASSED. \n***"
 else
-    echo -e "\n***\n*** Test FAILED\n***"
+    echo -e "\n***\n*** Logging test FAILED. \n***"
 fi
 
 
