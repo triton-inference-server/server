@@ -343,6 +343,11 @@ wait $SERVER_PID
 # Disable variants test for Jetson since already built without GPU Tensor support
 # Disable decoupled test because it uses GPU tensors
 if [ "$TEST_JETSON" == "0" ]; then
+  (cd logging && bash -ex test.sh)
+  if [ $? -ne 0 ]; then
+    RET=1
+  fi
+  
   (cd env && bash -ex test.sh)
   if [ $? -ne 0 ]; then
     RET=1

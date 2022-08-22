@@ -1,0 +1,42 @@
+
+name: "python_float32_float32_float32"
+backend: "python"
+max_batch_size: 8
+version_policy: { specific { versions: [1] }}
+
+
+
+input [
+  {
+    name: "INPUT0"
+    data_type: TYPE_FP32
+    dims: [ 16 ]
+    
+  }
+]
+input [
+  {
+    name: "INPUT1"
+    data_type: TYPE_FP32
+    dims: [ 16 ]
+    
+  }
+]
+output [
+  {
+    name: "OUTPUT0"
+    data_type: TYPE_FP32
+    dims: [ 16 ]
+    
+    label_filename: "output0_labels.txt"
+  }
+]
+output [
+  {
+    name: "OUTPUT1"
+    data_type: TYPE_FP32
+    dims: [ 16 ]
+    
+    
+  }
+]dynamic_batching { preferred_batch_size: [ 2, 6 ], max_queue_delay_microseconds: 10000000 }
