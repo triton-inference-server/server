@@ -83,18 +83,15 @@ Inference Server with the
 ```bash
 # Step 1: Create the example model repository 
 git clone -b r22.07 https://github.com/triton-inference-server/server.git
-
 cd server/docs/examples
-
 ./fetch_models.sh
 
 # Step 2: Launch triton from the NGC Triton container
-docker run --gpus=1 --rm --net=host -v /full/path/to/docs/examples/model_repository:/models nvcr.io/nvidia/tritonserver:22.07-py3 tritonserver --model-repository=/models
+docker run --gpus=1 --rm --net=host -v ${PWD}/model_repository:/models nvcr.io/nvidia/tritonserver:22.07-py3 tritonserver --model-repository=/models
 
 # Step 3: Sending an Inference Request 
 # In a separate console, launch the image_client example from the NGC Triton SDK container
 docker run -it --rm --net=host nvcr.io/nvidia/tritonserver:22.07-py3-sdk
-
 /workspace/install/bin/image_client -m densenet_onnx -c 3 -s INCEPTION /workspace/images/mug.jpg
 
 # Inference should return the following
