@@ -115,7 +115,9 @@ fi
 set +e
 python3 $LOG_TEST >>$CLIENT_LOG 2>&1
 if [ $? -ne 0 ]; then
+    cat $SERVER_LOG
     echo -e "\n***\n*** Test Failed\n***"
+    cat $CLIENT_LOG
     RET=1
 else
     check_test_results $TEST_RESULT_FILE 1
@@ -156,7 +158,9 @@ fi
 
 python3 $LOG_TEST >>$CLIENT_LOG 2>&1
 if [ $? -ne 0 ]; then
+    cat $SERVER_LOG
     echo -e "\n***\n*** Test Failed\n***"
+    cat $CLIENT_LOG
     RET=1
 else
     check_test_results $TEST_RESULT_FILE 1
@@ -201,7 +205,9 @@ done
 
 python3 $LOG_TEST >>$CLIENT_LOG 2>&1
 if [ $? -ne 0 ]; then
+    cat $SERVER_LOG
     echo -e "\n***\n*** Test Failed\n***"
+    cat $CLIENT_LOG
     RET=1
 else
     check_test_results $TEST_RESULT_FILE 1
