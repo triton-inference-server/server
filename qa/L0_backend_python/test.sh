@@ -340,12 +340,13 @@ wait $SERVER_PID
 # Disable ensemble, unittest, io and bls tests for Jetson since GPU Tensors are not supported
 # Disable variants test for Jetson since already built without GPU Tensor support
 # Disable decoupled test because it uses GPU tensors
+
+(cd argument_validation && bash -ex test.sh)
+if [ $? -ne 0 ]; then
+  RET=1
+fi
+
 if [ "$TEST_JETSON" == "0" ]; then
-  (cd logging && bash -ex test.sh)
-  if [ $? -ne 0 ]; then
-    RET=1
-  fi
-  
   (cd env && bash -ex test.sh)
   if [ $? -ne 0 ]; then
     RET=1
@@ -380,6 +381,11 @@ if [ "$TEST_JETSON" == "0" ]; then
   if [ $? -ne 0 ]; then
     RET=1
   fi
+
+  (cd logging && bash -ex test.sh)
+  if [ $? -ne 0 ]; then
+    RET=1
+  fi
 fi
 
 (cd lifecycle && bash -ex test.sh)
@@ -401,12 +407,6 @@ fi
 if [ $? -ne 0 ]; then
   RET=1
 fi
-
-(cd argument_validation && bash -ex test.sh)
-if [ $? -ne 0 ]; then
-  RET=1
-fi
-
 
 if [ $RET -eq 0 ]; then
   echo -e "\n***\n*** Test Passed\n***"
