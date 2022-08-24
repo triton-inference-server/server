@@ -42,20 +42,21 @@ $ curl localhost:8002/metrics
 The `tritonserver --allow-metrics=false` option can be used to disable
 all metric reporting, while the `--allow-gpu-metrics=false` and
 `--allow-cpu-metrics=false` can be used to disable just the GPU and CPU
-metrics respectively. 
+metrics respectively.
 
 The `--metrics-port` option can be used to select a different port. For now,
 Triton reuses http address for metrics endpoint. The option `--http-address`
 can be used to bind http and metrics endpoints to the same specific address
 when http service is enabled.
 
-**TODO**: 
-- `--metrics-interval-ms` mention this
-- Update tables to say "Per interval" instead of "Per second" ?
+To change the interval at whichs metrics are polled/updated, see the `--metrics-interval-ms` flag. Metrics that are updated "Per Request" are unaffected by this interval setting. This interval only applies to metrics that are designated as "Per Interval" in the tables of each section below:
 
-Each section below has a table describing the available metrics.
+- [Inference Request Metrics](#inference-request-metrics)
+- [Response Cache Metrics](#response-cache-metrics)
+- [GPU Metrics](#gpu-metrics)
+- [CPU Metrics](#cpu-metrics)
 
-## Count Metrics
+## Inference Request Metrics
 
 For models that do not support batching, *Request Count*, *Inference
 Count* and *Execution Count* will be equal, indicating that each
@@ -97,7 +98,7 @@ Count*. The count metrics are illustrated by the following examples:
 |              |Compute Time    |`nv_inference_compute_infer_duration_us` |Cumulative time requests spend executing the inference model (in the framework backend, does not include cached requests)     |Per model  |Per request  |
 |              |Compute Output Time|`nv_inference_compute_output_duration_us` |Cumulative time requests spend processing inference outputs (in the framework backend, does not include cached requests)     |Per model  |Per request  |
 
-## Response Cache
+## Response Cache Metrics
 
 Compute latency metrics in the table above are calculated for the
 time spent in model inference backends. If the response cache is enabled for a
@@ -116,16 +117,16 @@ Input Time" /  "Compute Time" / "Compute Output Time" will be recorded as usual.
 
 |Category      |Metric          |Metric Name |Description                            |Granularity|Frequency    |
 |--------------|----------------|------------|---------------------------|-----------|-------------|
-|Utilization   |Total Cache Utilization |`nv_cache_util` |Total Response Cache utilization rate (0.0 - 1.0) |Server-wide |Per second |
-|Count         |Total Cache Entry Count |`nv_cache_num_entries` |Total number of responses stored in response cache across all models |Server-wide |Per second |
-|              |Total Cache Lookup Count |`nv_cache_num_lookups` |Total number of response cache lookups done by Triton across all models |Server-wide |Per second |
-|              |Total Cache Hit Count |`nv_cache_num_hits` |Total number of response cache hits across all models |Server-wide |Per second |
-|              |Total Cache Miss Count |`nv_cache_num_misses` |Total number of response cache misses across all models |Server-wide |Per second |
-|              |Total Cache Eviction Count |`nv_cache_num_evictions` |Total number of response cache evictions across all models |Server-wide |Per second |
+|Utilization   |Total Cache Utilization |`nv_cache_util` |Total Response Cache utilization rate (0.0 - 1.0) |Server-wide |Per interval |
+|Count         |Total Cache Entry Count |`nv_cache_num_entries` |Total number of responses stored in response cache across all models |Server-wide |Per interval |
+|              |Total Cache Lookup Count |`nv_cache_num_lookups` |Total number of response cache lookups done by Triton across all models |Server-wide |Per interval |
+|              |Total Cache Hit Count |`nv_cache_num_hits` |Total number of response cache hits across all models |Server-wide |Per interval |
+|              |Total Cache Miss Count |`nv_cache_num_misses` |Total number of response cache misses across all models |Server-wide |Per interval |
+|              |Total Cache Eviction Count |`nv_cache_num_evictions` |Total number of response cache evictions across all models |Server-wide |Per interval |
 |              |Cache Hit Count |`nv_cache_num_hits_per_model` |Number of response cache hits per model |Per model |Per request |
 |              |Cache Miss Count |`nv_cache_num_misses_per_model` |Number of response cache misses per model |Per model |Per request |
-|Latency       |Total Cache Lookup Time |`nv_cache_lookup_duration` |Cumulative time requests spend checking for a cached response across all models (microseconds) |Server-wide |Per second |
-|              |Total Cache Insertion Time |`nv_cache_insertion_duration` |Cumulative time requests spend inserting a response into the cache across all models (microseconds) |Server-wide |Per second |
+|Latency       |Total Cache Lookup Time |`nv_cache_lookup_duration` |Cumulative time requests spend checking for a cached response across all models (microseconds) |Server-wide |Per interval |
+|              |Total Cache Insertion Time |`nv_cache_insertion_duration` |Cumulative time requests spend inserting a response into the cache across all models (microseconds) |Server-wide |Per interval |
 |              |Cache Hit Lookup Time |`nv_cache_hit_lookup_duration_per_model` |Cumulative time requests spend retrieving a cached response per model on cache hits (microseconds) |Per model |Per request |
 |              |Cache Miss Lookup Time |`nv_cache_miss_lookup_duration_per_model`| Cumulative time requests spend looking up a request hash on a cache miss (microseconds) |Per model |Per request |
 |              |Cache Miss Insertion Time |`nv_cache_miss_insertion_duration_per_model` |Cumulative time requests spend inserting responses into the cache on a cache miss (microseconds) |Per model |Per request |
@@ -133,34 +134,35 @@ Input Time" /  "Compute Time" / "Compute Output Time" will be recorded as usual.
 
 ## GPU Metrics
 
-TODO:
-- Optionally toggled with `TRITON_ENABLE_METRICS_GPU`, default True
-- `--allow-gpu-metrics`
-- Details: DCGM
-- Known issue with separate DCGM agent
+GPU metrics are collected through the use of [DCGM](https://developer.nvidia.com/dcgm). 
+Collection of GPU metrics can be toggled with the `--allow-gpu-metrics` CLI flag. 
+If building Triton locally, the `TRITON_ENABLE_METRICS_GPU` CMake build flag can be used to toggle building the relevant code entirely.
 
 |Category      |Metric          |Metric Name |Description                            |Granularity|Frequency    |
 |--------------|----------------|------------|---------------------------|-----------|-------------|
-|GPU Utilization |Power Usage   |`nv_gpu_power_usage` |GPU instantaneous power                |Per GPU    |Per second   |
-|              |Power Limit     |`nv_gpu_power_limit` |Maximum GPU power limit                |Per GPU    |Per second   |
-|              |Energy Consumption|`nv_energy_consumption` |GPU energy consumption in joules since Triton started|Per GPU|Per second|
-|              |GPU Utilization |`nv_gpu_utilization` |GPU utilization rate (0.0 - 1.0)       |Per GPU    |Per second   |
-|GPU Memory    |GPU Total Memory|`nv_gpu_memory_total_bytes` |Total GPU memory, in bytes             |Per GPU    |Per second   |
-|              |GPU Used Memory |`nv_gpu_memory_used_bytes` |Used GPU memory, in bytes              |Per GPU    |Per second   |
+|GPU Utilization |Power Usage   |`nv_gpu_power_usage` |GPU instantaneous power                |Per GPU    |Per interval   |
+|              |Power Limit     |`nv_gpu_power_limit` |Maximum GPU power limit                |Per GPU    |Per interval   |
+|              |Energy Consumption|`nv_energy_consumption` |GPU energy consumption in joules since Triton started|Per GPU|Per interval|
+|              |GPU Utilization |`nv_gpu_utilization` |GPU utilization rate (0.0 - 1.0)       |Per GPU    |Per interval   |
+|GPU Memory    |GPU Total Memory|`nv_gpu_memory_total_bytes` |Total GPU memory, in bytes             |Per GPU    |Per interval   |
+|              |GPU Used Memory |`nv_gpu_memory_used_bytes` |Used GPU memory, in bytes              |Per GPU    |Per interval   |
 
 
 ## CPU Metrics
 
-TODO:
-- Linux-only
-- Optionally toggled with `TRITON_ENABLE_METRICS_CPU`, default True?
-- `--allow-cpu-metrics`
-- Details: `/proc/stat` ?
+Collection of CPU metrics can be toggled with the `--allow-cpu-metrics` CLI flag. 
+If building Triton locally, the `TRITON_ENABLE_METRICS_CPU` CMake build flag can be used to toggle building the relevant code entirely.
+
+> **Note**
+>
+> CPU Metrics are currently only supported on Linux.
+> They collection information from the [/proc filesystem](https://www.kernel.org/doc/html/latest/filesystems/proc.html) such as `/proc/stat` and `/proc/meminfo`.
 
 |Category      |Metric          |Metric Name |Description                            |Granularity|Frequency    |
 |--------------|----------------|------------|---------------------------|-----------|-------------|
-|CPU Utilization | TBD | `TBD` | TBD | Per CPU | Per second |
-|CPU Memory      | TBD | `TBD` | TBD | Per CPU | Per second |
+|CPU Utilization | CPU Utilization | `nv_cpu_utilization` | Total CPU utilization rate [0.0 - 1.0] | Aggregated across all cores since last interval | Per interval |
+|CPU Memory      | CPU Total Memory | `nv_cpu_memory_total_bytes` | Total CPU memory (RAM), in bytes | System-wide | Per interval |
+|                | CPU Used Memory | `nv_cpu_memory_used_bytes` | Used CPU memory (RAM), in bytes | System-wide | Per interval |
 
 ## Custom Metrics
 
