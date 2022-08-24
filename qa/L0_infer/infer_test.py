@@ -41,6 +41,7 @@ TEST_SYSTEM_SHARED_MEMORY = bool(
 TEST_CUDA_SHARED_MEMORY = bool(int(os.environ.get('TEST_CUDA_SHARED_MEMORY',
                                                   0)))
 CPU_ONLY = (os.environ.get('TRITON_SERVER_CPU_ONLY') is not None)
+TEST_VALGRIND = bool(int(os.environ.get('TEST_VALGRIND', 0)))
 
 USE_GRPC = (os.environ.get('USE_GRPC', 1) != "0")
 USE_HTTP = (os.environ.get('USE_HTTP', 1) != "0")
@@ -56,8 +57,15 @@ np_dtype_string = np.dtype(object)
 
 class InferTest(tu.TestResultCollector):
 
-    def _full_exact(self, input_dtype, output0_dtype, output1_dtype,
-                    output0_raw, output1_raw, swap):
+    def _full_exact(self,
+                    input_dtype,
+                    output0_dtype,
+                    output1_dtype,
+                    output0_raw,
+                    output1_raw,
+                    swap,
+                    # 60 sec is the default value
+                    network_timeout=60.0):
 
         def _infer_exact_helper(tester,
                                 pf,
@@ -76,7 +84,8 @@ class InferTest(tu.TestResultCollector):
                                 use_http_json_tensors=True,
                                 skip_request_id_check=True,
                                 use_streaming=True,
-                                correlation_id=0):
+                                correlation_id=0,
+                                network_timeout=60.0):
             for bs in (1, batch_size):
                 # model that does not support batching
                 if bs == 1:
@@ -100,7 +109,8 @@ class InferTest(tu.TestResultCollector):
                         use_streaming=use_streaming,
                         correlation_id=correlation_id,
                         use_system_shared_memory=TEST_SYSTEM_SHARED_MEMORY,
-                        use_cuda_shared_memory=TEST_CUDA_SHARED_MEMORY)
+                        use_cuda_shared_memory=TEST_CUDA_SHARED_MEMORY,
+                        network_timeout=network_timeout)
 
                 # model that supports batching.
                 iu.infer_exact(
@@ -122,7 +132,8 @@ class InferTest(tu.TestResultCollector):
                     use_streaming=use_streaming,
                     correlation_id=correlation_id,
                     use_system_shared_memory=TEST_SYSTEM_SHARED_MEMORY,
-                    use_cuda_shared_memory=TEST_CUDA_SHARED_MEMORY)
+                    use_cuda_shared_memory=TEST_CUDA_SHARED_MEMORY,
+                    network_timeout=network_timeout)
 
         input_size = 16
 
@@ -150,7 +161,8 @@ class InferTest(tu.TestResultCollector):
                                             output1_dtype,
                                             output0_raw=output0_raw,
                                             output1_raw=output1_raw,
-                                            swap=swap)
+                                            swap=swap,
+                                            network_timeout=network_timeout)
 
         if not CPU_ONLY and tu.validate_for_trt_model(
                 input_dtype, output0_dtype, output1_dtype, (input_size, 1, 1),
@@ -426,12 +438,16 @@ class InferTest(tu.TestResultCollector):
     if not (TEST_SYSTEM_SHARED_MEMORY or TEST_CUDA_SHARED_MEMORY):
 
         def test_class_bbb(self):
-            self._full_exact(np.int8,
-                             np.int8,
-                             np.int8,
-                             output0_raw=False,
-                             output1_raw=False,
-                             swap=True)
+            self._full_exact(
+                np.int8,
+                np.int8,
+                np.int8,
+                output0_raw=False,
+                output1_raw=False,
+                swap=True,
+                # Increase network_timeout for TensorFlow models for
+                # valgrind test.
+                network_timeout=100.0 if TEST_VALGRIND else 60.0)
 
         def test_class_sss(self):
             self._full_exact(np.int16,
