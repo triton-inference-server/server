@@ -28,6 +28,7 @@
 CLIENT_LOG="client.log"
 TEST_RESULT_FILE="test_results.txt"
 LOG_TEST="logging_test.py"
+SERVER_LOG="./server.log"
 
 REPO_VERSION=${NVIDIA_TRITON_SERVER_VERSION}
 if [ "$#" -ge 1 ]; then
@@ -68,23 +69,23 @@ function verify_log_counts () {
   non_verbose_expected=$1
   verbose_expected=$2
   
-  if [ `grep -c "Specific Msg!" ./server.log` != $non_verbose_expected ]; then
+  if [ `grep -c "Specific Msg!" $SERVER_LOG` != $non_verbose_expected ]; then
     echo -e "\n***\n*** Test Failed: Specific Msg Count Incorrect\n***"
     RET=1
   fi
-  if [ `grep -c "Info Msg!" ./server.log` != $non_verbose_expected ]; then
+  if [ `grep -c "Info Msg!" $SERVER_LOG` != $non_verbose_expected ]; then
     echo -e "\n***\n*** Test Failed: Info Msg Count Incorrect\n***"
     RET=1
   fi
-  if [ `grep -c "Warning Msg!" ./server.log` != $non_verbose_expected ]; then
+  if [ `grep -c "Warning Msg!" $SERVER_LOG` != $non_verbose_expected ]; then
     echo -e "\n***\n*** Test Failed: Warning Msg Count Incorrect\n***"
     RET=1
   fi
-  if [ `grep -c "Error Msg!" ./server.log` != $non_verbose_expected ]; then
+  if [ `grep -c "Error Msg!" $SERVER_LOG` != $non_verbose_expected ]; then
     echo -e "\n***\n*** Test Failed: Error Msg Count Incorrect\n***"
     RET=1
   fi
-  if [ `grep -c "Verbose Msg!" ./server.log` != $verbose_expected ]; then
+  if [ `grep -c "Verbose Msg!" $SERVER_LOG` != $verbose_expected ]; then
     echo -e "\n***\n*** Test Failed: Verbose Msg Count Incorrect\n***"
     RET=1
   fi
@@ -104,7 +105,6 @@ RET=0
 
 #Run Server with Default Log Settings
 SERVER_ARGS="--model-repository=$MODELSDIR"
-SERVER_LOG="./server.log"
 run_server
 if [ "$SERVER_PID" == "0" ]; then
     echo -e "\n***\n*** Failed to start $SERVER\n***"
