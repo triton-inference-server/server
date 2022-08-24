@@ -1324,11 +1324,6 @@ output [
     dims: [ 1 ]
   }}
 ]
-instance_group [
-  {{
-    kind: KIND_CPU
-  }}
-]
 '''.format(model_name, max_batch, "int32" if dtype == np.int32 else "fp32",
            "int32" if dtype == np.int32 else "fp32", np_to_model_dtype(dtype),
            tu.shape_to_dims_str(shape), np_to_model_dtype(dtype))

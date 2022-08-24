@@ -1575,7 +1575,6 @@ output [
     dims: [ {} ]
   }}
 ]
-instance_group [ {{ kind: KIND_CPU }}]
 '''.format(model_name, max_batch, version_policy_str,
            np_to_model_dtype(input_dtype), tu.shape_to_dims_str(input_shape),
            np_to_model_dtype(input_dtype), tu.shape_to_dims_str(input_shape),

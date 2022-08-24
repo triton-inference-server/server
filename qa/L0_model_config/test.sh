@@ -231,6 +231,15 @@ for modelpath in \
     mkdir -p $modelpath
 done
 
+# Make version folders as the instance group validation is deferred to
+# the beginning of model creation
+for modelpath in \
+        noautofill_platform/invalid_cpu/1 \
+        noautofill_platform/invalid_gpu/1 \
+        noautofill_platform/negative_gpu/1 ; do
+    mkdir -p $modelpath
+done
+
 # Copy other required models
 mkdir -p special_cases/invalid_platform/1
 cp -r /data/inferenceserver/${REPO_VERSION}/qa_model_repository/savedmodel_float32_float32_float32/1/model.savedmodel \
