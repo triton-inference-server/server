@@ -865,7 +865,6 @@ def create_openvino_modelconfig(models_dir, model_version, max_batch, dtype,
 name: "{}"
 backend: "openvino"
 max_batch_size: {}
-instance_group [ {{ kind: KIND_CPU }}]
 '''.format(model_name, max_batch)
 
     for io_num in range(io_cnt):
