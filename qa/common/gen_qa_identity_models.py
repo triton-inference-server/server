@@ -600,7 +600,6 @@ name: "{}"
 backend: "openvino"
 max_batch_size: {}
 version_policy: {}
-instance_group [ {{ kind: KIND_CPU }}]
 '''.format(model_name, max_batch, version_policy_str)
 
     for io_num in range(io_cnt):
