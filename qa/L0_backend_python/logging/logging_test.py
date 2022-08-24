@@ -43,16 +43,6 @@ import tritonclient.grpc as grpcclient
 # with TRITONSERVER_IPADDR envvar
 _tritonserver_ipaddr = os.environ.get('TRITONSERVER_IPADDR', 'localhost')
 
-TEST_SYSTEM_SHARED_MEMORY = bool(
-    int(os.environ.get('TEST_SYSTEM_SHARED_MEMORY', 0)))
-TEST_CUDA_SHARED_MEMORY = bool(int(os.environ.get('TEST_CUDA_SHARED_MEMORY',
-                                                  0)))
-
-if TEST_SYSTEM_SHARED_MEMORY:
-    import tritonclient.utils.shared_memory as shm
-if TEST_CUDA_SHARED_MEMORY:
-    import tritonclient.utils.cuda_shared_memory as cudashm
-
 # Test with either GRPC of HTTP, but not both since when we check
 # results we expect only one to run
 USE_GRPC = (os.environ.get('USE_GRPC', 1) != "0")
@@ -78,42 +68,6 @@ class LogTest(tu.TestResultCollector):
         self.precreated_shm_regions_ = []
         global _deferred_exceptions
         _deferred_exceptions = []
-
-    def tearDown(self):
-        if TEST_SYSTEM_SHARED_MEMORY:
-            self.triton_client_.unregister_system_shared_memory()
-        if TEST_CUDA_SHARED_MEMORY:
-            self.triton_client_.unregister_cuda_shared_memory()
-        for precreated_shm_region in self.precreated_shm_regions_:
-            if TEST_SYSTEM_SHARED_MEMORY:
-                shm.destroy_shared_memory_region(precreated_shm_region)
-            elif TEST_CUDA_SHARED_MEMORY:
-                cudashm.destroy_shared_memory_region(precreated_shm_region)
-        super().tearDown()
-
-    # FIXME why only used for outputs
-    def create_advance(self, shm_regions=None):
-        if TEST_SYSTEM_SHARED_MEMORY or TEST_CUDA_SHARED_MEMORY:
-            precreated_shm_regions = []
-            if shm_regions is None:
-                shm_regions = ['output0', 'output1']
-            for shm_region in shm_regions:
-                if TEST_SYSTEM_SHARED_MEMORY:
-                    shm_handle = shm.create_shared_memory_region(
-                        shm_region + '_data', '/' + shm_region, 512)
-                    self.triton_client_.register_system_shared_memory(
-                        shm_region + '_data', '/' + shm_region, 512)
-                else:
-                    shm_handle = cudashm.create_shared_memory_region(
-                        shm_region + '_data', 512, 0)
-                    self.triton_client_.register_cuda_shared_memory(
-                        shm_region + '_data',
-                        cudashm.get_raw_handle(shm_handle), 0, 512)
-                # Collect precreated handles for cleanup
-                self.precreated_shm_regions_.append(shm_handle)
-                precreated_shm_regions.append(shm_handle)
-            return precreated_shm_regions
-        return []
 
     def add_deferred_exception(self, ex):
         global _deferred_exceptions
@@ -157,8 +111,8 @@ class LogTest(tu.TestResultCollector):
                 use_streaming=False,
                 shm_region_names=shm_region_names,
                 precreated_shm_regions=precreated_shm_regions,
-                use_system_shared_memory=TEST_SYSTEM_SHARED_MEMORY,
-                use_cuda_shared_memory=TEST_CUDA_SHARED_MEMORY)
+                use_system_shared_memory=False,
+                use_cuda_shared_memory=False)
 
             end_ms = int(round(time.time() * 1000))
 
@@ -239,7 +193,7 @@ class LogTest(tu.TestResultCollector):
         # Send two requests with static batch sizes == preferred
         # size. This should cause the responses to be returned
         # immediately
-        precreated_shm_regions = self.create_advance()
+        precreated_shm_regions = []
         for trial in _trials:
             try:
                 model_name = tu.get_model_name(trial, np.float32, np.float32,
