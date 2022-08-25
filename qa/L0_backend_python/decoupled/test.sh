@@ -46,31 +46,32 @@ mkdir -p models/dlpack_add_sub/1/
 cp ../../python_models/dlpack_add_sub/model.py models/dlpack_add_sub/1/
 cp ../../python_models/dlpack_add_sub/config.pbtxt models/dlpack_add_sub/
 
-mkdir -p models/dlpack_add_sub_logging/1/
-cp ../../python_models/dlpack_add_sub_logging/model.py models/dlpack_add_sub_logging/1/
-cp ../../python_models/dlpack_add_sub_logging/config.pbtxt models/dlpack_add_sub_logging/
-
 function verify_log_counts () {
-  non_verbose_expected=$1
-  verbose_expected=$2
-
-  if [ `grep -c "Specific Msg!" $SERVER_LOG` -lt $non_verbose_expected ]; then
+  if [ `grep -c "Specific Msg!" $SERVER_LOG` -lt 1 ]; then
     echo -e "\n***\n*** Test Failed: Specific Msg Count Incorrect\n***"
     RET=1
   fi
-  if [ `grep -c "Info Msg!" $SERVER_LOG` -lt $non_verbose_expected ]; then
+  if [ `grep -c "Info Msg!" $SERVER_LOG` -lt 1 ]; then
     echo -e "\n***\n*** Test Failed: Info Msg Count Incorrect\n***"
     RET=1
   fi
-  if [ `grep -c "Warning Msg!" $SERVER_LOG` -lt $non_verbose_expected ]; then
+  if [ `grep -c "Warning Msg!" $SERVER_LOG` -lt 1 ]; then
     echo -e "\n***\n*** Test Failed: Warning Msg Count Incorrect\n***"
     RET=1
   fi
-  if [ `grep -c "Error Msg!" $SERVER_LOG` -lt $non_verbose_expected ]; then
+  if [ `grep -c "Error Msg!" $SERVER_LOG` -lt 1 ]; then
     echo -e "\n***\n*** Test Failed: Error Msg Count Incorrect\n***"
     RET=1
   fi
-  if [ `grep -c "Verbose Msg!" $SERVER_LOG` -lt $verbose_expected ]; then
+  if [ `grep -c "Verbose Msg!" $SERVER_LOG` -lt 1 ]; then
+    echo -e "\n***\n*** Test Failed: Verbose Msg Count Incorrect\n***"
+    RET=1
+  fi
+  if [ `grep -c "Finalize invoked" $SERVER_LOG` -ne 1 ]; then
+    echo -e "\n***\n*** Test Failed: Verbose Msg Count Incorrect\n***"
+    RET=1
+  fi
+  if [ `grep -c "Finalize complete..." $SERVER_LOG` -ne 1 ]; then
     echo -e "\n***\n*** Test Failed: Verbose Msg Count Incorrect\n***"
     RET=1
   fi
@@ -102,7 +103,7 @@ set -e
 kill $SERVER_PID
 wait $SERVER_PID
 
-verify_log_counts 2 2 
+verify_log_counts
 
 if [ $RET -eq 1 ]; then
     cat $CLIENT_LOG

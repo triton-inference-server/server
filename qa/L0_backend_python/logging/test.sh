@@ -95,12 +95,10 @@ rm -f *.log
 
 # set up simple repository MODELBASE
 rm -fr $MODELSDIR && mkdir -p $MODELSDIR && \
-    onnx_model="${DATADIR}/qa_model_repository/onnx_float32_float32_float32"
-    python_model=`echo $onnx_model | sed 's/onnx/python/g' | sed 's,'"$DATADIR/qa_model_repository/"',,g'`
+    python_model="identity_fp32_logging"
     mkdir -p models/$python_model/1/
-    cat $onnx_model/config.pbtxt | sed 's/platform:.*/backend:\ "python"/g' | sed 's/onnx/python/g' > models/$python_model/config.pbtxt
-    cp $onnx_model/output0_labels.txt models/$python_model
-    cp ../../python_models/add_sub_logging/model.py models/$python_model/1/
+    cp ../../python_models/$python_model/config.pbtxt models/$python_model/config.pbtxt
+    cp ../../python_models/$python_model/model.py models/$python_model/1/
     (cd models/$python_model && \
           sed -i "s/^max_batch_size:.*/max_batch_size: 8/" config.pbtxt && \
           sed -i "s/^version_policy:.*/version_policy: { specific { versions: [1] }}/" config.pbtxt && \
@@ -137,7 +135,7 @@ kill $SERVER_PID
 wait $SERVER_PID
 
 # Check if correct # log messages are present [ non-verbose-msg-cnt | verbose-msg-cnt ]
-verify_log_counts 7 0
+verify_log_counts 4 0
 
 rm -f *.log
 #Run Server Enabling Verbose Messages
@@ -179,9 +177,9 @@ set -e
 kill $SERVER_PID
 wait $SERVER_PID
 
-# Verbose only 5 because model must initialize before
+# Verbose only 3 because model must initialize before
 # log settings can be modified
-verify_log_counts 7 5
+verify_log_counts 4 3
 
 rm -f *.log
 #Run Server Enabling Verbose Messages
@@ -226,9 +224,10 @@ set -e
 kill $SERVER_PID
 wait $SERVER_PID
 
-# Verbose only 5 because model must initialize before
-# log settings can be modified
-verify_log_counts 2 0
+# Will have 1 occurrence of each non-verbose log type
+# because the server must initialize before log settings
+# can be modified
+verify_log_counts 1 0
 
 
 if [ $RET -eq 0 ]; then

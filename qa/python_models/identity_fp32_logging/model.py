@@ -38,58 +38,32 @@ class TritonPythonModel:
         logger.log_warn("Initialize-Warning Msg!")
         logger.log_error("Initialize-Error Msg!")
         logger.log_verbose("Initialize-Verbose Msg!")
-        self.model_config = model_config = json.loads(args['model_config'])
-
-        output0_config = pb_utils.get_output_config_by_name(
-            model_config, "OUTPUT0")
-        output1_config = pb_utils.get_output_config_by_name(
-            model_config, "OUTPUT1")
-
-        self.output0_dtype = pb_utils.triton_string_to_numpy(
-            output0_config['data_type'])
-        self.output1_dtype = pb_utils.triton_string_to_numpy(
-            output1_config['data_type'])
-        logger.log("Initialize-Specific Msg!", logger.INFO)
-        logger.log_info("Initialize-Info Msg!")
-        logger.log_warn("Initialize-Warning Msg!")
-        logger.log_error("Initialize-Error Msg!")
-        logger.log_verbose("Initialize-Verbose Msg!")
-
+        
     def execute(self, requests):
-        """ This function is called on inference request.
         """
+        Identity model in Python backend.
+        """
+        # Log as early as possible
         logger = pb_utils.Logger
         logger.log("Execute-Specific Msg!", logger.INFO)
         logger.log_info("Execute-Info Msg!")
         logger.log_warn("Execute-Warning Msg!")
         logger.log_error("Execute-Error Msg!")
         logger.log_verbose("Execute-Verbose Msg!")
-        output0_dtype = self.output0_dtype
-        output1_dtype = self.output1_dtype
 
         responses = []
         for request in requests:
-            in_0 = pb_utils.get_input_tensor_by_name(request, "INPUT0")
-            in_1 = pb_utils.get_input_tensor_by_name(request, "INPUT1")
-            if in_0.as_numpy().dtype.type is np.bytes_ or in_0.as_numpy(
-            ).dtype == np.object_:
-                out_0, out_1 = (in_0.as_numpy().astype(np.int32) + in_1.as_numpy().astype(np.int32),\
-                    in_0.as_numpy().astype(np.int32) - in_1.as_numpy().astype(np.int32))
-            else:
-                out_0, out_1 = (in_0.as_numpy() + in_1.as_numpy(),
-                                in_0.as_numpy() - in_1.as_numpy())
+            input_tensor = pb_utils.get_input_tensor_by_name(request, "INPUT0")
+            out_tensor = pb_utils.Tensor("OUTPUT0", input_tensor.as_numpy())
+            responses.append(pb_utils.InferenceResponse([out_tensor]))
 
-            out_tensor_0 = pb_utils.Tensor("OUTPUT0",
-                                           out_0.astype(output0_dtype))
-            out_tensor_1 = pb_utils.Tensor("OUTPUT1",
-                                           out_1.astype(output1_dtype))
-            responses.append(
-                pb_utils.InferenceResponse([out_tensor_0, out_tensor_1]))
+        # Log as late as possible
         logger.log("Execute-Specific Msg!", logger.INFO)
         logger.log_info("Execute-Info Msg!")
         logger.log_warn("Execute-Warning Msg!")
         logger.log_error("Execute-Error Msg!")
         logger.log_verbose("Execute-Verbose Msg!")
+
         return responses
 
     def finalize(self):
