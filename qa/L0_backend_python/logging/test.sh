@@ -96,11 +96,15 @@ rm -f *.log
 # set up simple repository MODELBASE
 rm -fr $MODELSDIR && mkdir -p $MODELSDIR && \
     onnx_model="${DATADIR}/qa_model_repository/onnx_float32_float32_float32"
-    python_model="python_float32_float32_float32"
+    python_model=`echo $onnx_model | sed 's/onnx/python/g' | sed 's,'"$DATADIR/qa_model_repository/"',,g'`
     mkdir -p models/$python_model/1/
-    cp ../../python_models/add_sub_logging/model.py models/$python_model/1/
-    cp ../../python_models/add_sub_logging/config.pbtxt models/$python_model/
+    cat $onnx_model/config.pbtxt | sed 's/platform:.*/backend:\ "python"/g' | sed 's/onnx/python/g' > models/$python_model/config.pbtxt
     cp $onnx_model/output0_labels.txt models/$python_model
+    cp ../../python_models/add_sub_logging/model.py models/$python_model/1/
+    (cd models/$python_model && \
+          sed -i "s/^max_batch_size:.*/max_batch_size: 8/" config.pbtxt && \
+          sed -i "s/^version_policy:.*/version_policy: { specific { versions: [1] }}/" config.pbtxt && \
+          echo "dynamic_batching { preferred_batch_size: [ 2, 6 ], max_queue_delay_microseconds: 10000000 }" >> config.pbtxt)
 RET=0
 
 #Run Server with Default Log Settings

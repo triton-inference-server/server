@@ -47,8 +47,8 @@ cp ../../python_models/dlpack_add_sub/model.py models/dlpack_add_sub/1/
 cp ../../python_models/dlpack_add_sub/config.pbtxt models/dlpack_add_sub/
 
 mkdir -p models/dlpack_add_sub_logging/1/
-cp ../../python_models/add_sub_logging/model.py models/add_sub_logging/1/
-cp ../../python_models/add_sub_logging/config.pbtxt models/add_sub_logging/
+cp ../../python_models/dlpack_add_sub_logging/model.py models/dlpack_add_sub_logging/1/
+cp ../../python_models/dlpack_add_sub_logging/config.pbtxt models/dlpack_add_sub_logging/
 
 function verify_log_counts () {
   non_verbose_expected=$1
@@ -102,11 +102,11 @@ set -e
 kill $SERVER_PID
 wait $SERVER_PID
 
-verify_log_counts 2 2
+verify_log_counts 5 5
 
 if [ $RET -eq 1 ]; then
-    cat $CLIENT_LOG
-    cat $SERVER_LOG
+    #cat $CLIENT_LOG
+    #cat $SERVER_LOG
     echo -e "\n***\n*** Decoupled test FAILED. \n***"
 else
     echo -e "\n***\n*** Decoupled test PASSED. \n***"
