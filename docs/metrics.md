@@ -123,7 +123,7 @@ If building Triton locally, the `TRITON_ENABLE_METRICS_CPU` CMake build flag can
 > **Note**
 >
 > CPU Metrics are currently only supported on Linux.
-> They collection information from the [/proc filesystem](https://www.kernel.org/doc/html/latest/filesystems/proc.html) such as `/proc/stat` and `/proc/meminfo`.
+> They collect information from the [/proc filesystem](https://www.kernel.org/doc/html/latest/filesystems/proc.html) such as `/proc/stat` and `/proc/meminfo`.
 
 |Category      |Metric          |Metric Name |Description                            |Granularity|Frequency    |
 |--------------|----------------|------------|---------------------------|-----------|-------------|
