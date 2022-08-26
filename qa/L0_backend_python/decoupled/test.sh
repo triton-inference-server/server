@@ -64,11 +64,11 @@ function verify_log_counts () {
     RET=1
   fi
   if [ `grep -c "Finalize invoked" $SERVER_LOG` -ne 1 ]; then
-    echo -e "\n***\n*** Test Failed: Verbose Msg Count Incorrect\n***"
+    echo -e "\n***\n*** Test Failed: 'Finalize invoked' message missing\n***"
     RET=1
   fi
   if [ `grep -c "Finalize complete..." $SERVER_LOG` -ne 1 ]; then
-    echo -e "\n***\n*** Test Failed: Verbose Msg Count Incorrect\n***"
+    echo -e "\n***\n*** Test Failed: 'Finalize complete...' message missing\n***"
     RET=1
   fi
 }
