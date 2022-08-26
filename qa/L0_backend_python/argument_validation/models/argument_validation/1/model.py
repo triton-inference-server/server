@@ -156,6 +156,36 @@ class ArgumentValidationTest(unittest.TestCase):
         with self.assertRaises(TypeError) as e:
             pb_utils.Tensor("", None)
 
+    def test_log_args(self):
+        logger = pb_utils.Logger
+
+        # Test None as log level setting
+        with self.assertRaises(TypeError) as e:
+            logger.log("Invalid Level", None)
+
+        # Test integer as log level setting
+        with self.assertRaises(TypeError) as e:
+            logger.log("Invalid Level", 1)
+
+        # Test None as log info msg
+        with self.assertRaises(TypeError) as e:
+            logger.log_info(None)
+
+        # Test None as log warning msg
+        with self.assertRaises(TypeError) as e:
+            logger.log_warn(None)
+
+        # Test None as log error msg
+        with self.assertRaises(TypeError) as e:
+            logger.log_error(None)
+
+        # Test None as log verbose msg
+        with self.assertRaises(TypeError) as e:
+            logger.log_verbose(None)
+
+        # This should not raise an exception
+        logger.log("Level unspecified")
+
 
 class TritonPythonModel:
     """This model tests the Python API arguments to make sure invalid args are

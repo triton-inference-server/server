@@ -39,6 +39,11 @@ class TritonPythonModel:
     """
 
     def initialize(self, args):
+        logger = pb_utils.Logger
+        logger.log("Initialize-Specific Msg!", logger.INFO)
+        logger.log_info("Initialize-Info Msg!")
+        logger.log_warn("Initialize-Warning Msg!")
+        logger.log_error("Initialize-Error Msg!")
         # You must parse model_config. JSON string is not parsed here
         self.model_config = model_config = json.loads(args['model_config'])
 
@@ -59,11 +64,20 @@ class TritonPythonModel:
 
         self.inflight_thread_count = 0
         self.inflight_thread_count_lck = threading.Lock()
+        logger = pb_utils.Logger
+        logger.log("Initialize-Specific Msg!", logger.INFO)
+        logger.log_info("Initialize-Info Msg!")
+        logger.log_warn("Initialize-Warning Msg!")
+        logger.log_error("Initialize-Error Msg!")
 
     def execute(self, requests):
         """ This function is called on inference request.
         """
-
+        logger = pb_utils.Logger
+        logger.log("Execute-Specific Msg!", logger.INFO)
+        logger.log_info("Execute-Info Msg!")
+        logger.log_warn("Execute-Warning Msg!")
+        logger.log_error("Execute-Error Msg!")
         # Only generate the error for the first request
         for i, request in enumerate(requests):
             request_input = pb_utils.get_input_tensor_by_name(request, 'IN')
@@ -94,6 +108,12 @@ class TritonPythonModel:
             with self.inflight_thread_count_lck:
                 self.inflight_thread_count += 1
             thread1.start()
+        
+        logger = pb_utils.Logger
+        logger.log("Execute-Specific Msg!", logger.INFO)
+        logger.log_info("Execute-Info Msg!")
+        logger.log_warn("Execute-Warning Msg!")
+        logger.log_error("Execute-Error Msg!")
 
         return None
 
@@ -104,6 +124,12 @@ class TritonPythonModel:
 
         Returns True on success and False on failure.
         """
+        logger = pb_utils.Logger
+        logger.log("_get_gpu_bls_outputs-Specific Msg!", logger.INFO)
+        logger.log_info("_get_gpu_bls_outputs-Info Msg!")
+        logger.log_warn("_get_gpu_bls_outputs-Warning Msg!")
+        logger.log_error("_get_gpu_bls_outputs-Error Msg!")
+
         infer_request = pb_utils.InferenceRequest(
             model_name='dlpack_add_sub',
             inputs=[input0_pb, input1_pb],
@@ -157,6 +183,12 @@ class TritonPythonModel:
         return output0.to_dlpack(), output1.to_dlpack()
 
     def _test_gpu_bls_add_sub(self, is_input0_gpu, is_input1_gpu):
+        logger = pb_utils.Logger
+        logger.log("_test_gpu_bls_add_sub-Specific Msg!", logger.INFO)
+        logger.log_info("_test_gpu_bls_add_sub-Info Msg!")
+        logger.log_warn("_test_gpu_bls_add_sub-Warning Msg!")
+        logger.log_error("_test_gpu_bls_add_sub-Error Msg!")
+
         input0 = torch.rand(16)
         input1 = torch.rand(16)
 
@@ -191,6 +223,11 @@ class TritonPythonModel:
         return True
 
     def execute_gpu_bls(self):
+        logger = pb_utils.Logger
+        logger.log("execute_gpu_bls-Specific Msg!", logger.INFO)
+        logger.log_info("execute_gpu_bls-Info Msg!")
+        logger.log_warn("execute_gpu_bls-Warning Msg!")
+        logger.log_error("execute_gpu_bls-Error Msg!")
         for input0_device in [True, False]:
             for input1_device in [True, False]:
                 test_status = self._test_gpu_bls_add_sub(
@@ -204,6 +241,11 @@ class TritonPythonModel:
         # The response_sender is used to send response(s) associated with the
         # corresponding request.
         # Sleep 5 seconds to make sure the main thread has exited.
+        logger = pb_utils.Logger
+        logger.log("response_thread-Specific Msg!", logger.INFO)
+        logger.log_info("response_thread-Info Msg!")
+        logger.log_warn("response_thread-Warning Msg!")
+        logger.log_error("response_thread-Error Msg!")
         time.sleep(5)
 
         status = self.execute_gpu_bls()
@@ -244,13 +286,18 @@ class TritonPythonModel:
 
         with self.inflight_thread_count_lck:
             self.inflight_thread_count -= 1
+        logger.log("response_thread-Specific Msg!", logger.INFO)
+        logger.log_info("response_thread-Info Msg!")
+        logger.log_warn("response_thread-Warning Msg!")
+        logger.log_error("response_thread-Error Msg!")
 
     def finalize(self):
         """`finalize` is called only once when the model is being unloaded.
         Implementing `finalize` function is OPTIONAL. This function allows
         the model to perform any necessary clean ups before exit.
         """
-        print('Finalize invoked')
+        logger = pb_utils.Logger()
+        logger.log_info('Finalize invoked')
 
         inflight_threads = True
         while inflight_threads:
@@ -259,4 +306,4 @@ class TritonPythonModel:
             if inflight_threads:
                 time.sleep(0.1)
 
-        print('Finalize complete...')
+        logger.log_info('Finalize complete...')

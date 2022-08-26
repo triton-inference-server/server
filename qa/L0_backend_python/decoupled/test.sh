@@ -46,6 +46,33 @@ mkdir -p models/dlpack_add_sub/1/
 cp ../../python_models/dlpack_add_sub/model.py models/dlpack_add_sub/1/
 cp ../../python_models/dlpack_add_sub/config.pbtxt models/dlpack_add_sub/
 
+function verify_log_counts () {
+  if [ `grep -c "Specific Msg!" $SERVER_LOG` -lt 1 ]; then
+    echo -e "\n***\n*** Test Failed: Specific Msg Count Incorrect\n***"
+    RET=1
+  fi
+  if [ `grep -c "Info Msg!" $SERVER_LOG` -lt 1 ]; then
+    echo -e "\n***\n*** Test Failed: Info Msg Count Incorrect\n***"
+    RET=1
+  fi
+  if [ `grep -c "Warning Msg!" $SERVER_LOG` -lt 1 ]; then
+    echo -e "\n***\n*** Test Failed: Warning Msg Count Incorrect\n***"
+    RET=1
+  fi
+  if [ `grep -c "Error Msg!" $SERVER_LOG` -lt 1 ]; then
+    echo -e "\n***\n*** Test Failed: Error Msg Count Incorrect\n***"
+    RET=1
+  fi
+  if [ `grep -c "Finalize invoked" $SERVER_LOG` -ne 1 ]; then
+    echo -e "\n***\n*** Test Failed: 'Finalize invoked' message missing\n***"
+    RET=1
+  fi
+  if [ `grep -c "Finalize complete..." $SERVER_LOG` -ne 1 ]; then
+    echo -e "\n***\n*** Test Failed: 'Finalize complete...' message missing\n***"
+    RET=1
+  fi
+}
+
 run_server
 if [ "$SERVER_PID" == "0" ]; then
     echo -e "\n***\n*** Failed to start $SERVER\n***"
@@ -71,6 +98,8 @@ set -e
 
 kill $SERVER_PID
 wait $SERVER_PID
+
+verify_log_counts
 
 if [ $RET -eq 1 ]; then
     cat $CLIENT_LOG
