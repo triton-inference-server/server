@@ -99,10 +99,6 @@ rm -fr $MODELSDIR && mkdir -p $MODELSDIR && \
     mkdir -p models/$python_model/1/
     cp ../../python_models/$python_model/config.pbtxt models/$python_model/config.pbtxt
     cp ../../python_models/$python_model/model.py models/$python_model/1/
-    (cd models/$python_model && \
-          sed -i "s/^max_batch_size:.*/max_batch_size: 8/" config.pbtxt && \
-          sed -i "s/^version_policy:.*/version_policy: { specific { versions: [1] }}/" config.pbtxt && \
-          echo "dynamic_batching { preferred_batch_size: [ 2, 6 ], max_queue_delay_microseconds: 10000000 }" >> config.pbtxt)
 RET=0
 
 #Run Server with Default Log Settings
