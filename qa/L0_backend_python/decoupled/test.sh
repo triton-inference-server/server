@@ -63,10 +63,6 @@ function verify_log_counts () {
     echo -e "\n***\n*** Test Failed: Error Msg Count Incorrect\n***"
     RET=1
   fi
-  if [ `grep -c "Verbose Msg!" $SERVER_LOG` -lt 1 ]; then
-    echo -e "\n***\n*** Test Failed: Verbose Msg Count Incorrect\n***"
-    RET=1
-  fi
   if [ `grep -c "Finalize invoked" $SERVER_LOG` -ne 1 ]; then
     echo -e "\n***\n*** Test Failed: Verbose Msg Count Incorrect\n***"
     RET=1
