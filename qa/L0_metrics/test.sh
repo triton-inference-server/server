@@ -50,6 +50,8 @@ rm -f $SERVER_LOG
 
 RET=0
 
+### UNIT TESTS
+
 TEST_LOG="./metrics_api_test.log"
 UNIT_TEST=./metrics_api_test
 
@@ -64,6 +66,8 @@ if [ $? -ne 0 ]; then
     RET=1
 fi
 set -e
+
+### GPU Metrics
 
 # Prepare a libtorch float32 model with basic config
 rm -rf $MODELDIR
@@ -154,6 +158,41 @@ for (( i = 0; i < $num_iterations; ++i )); do
   fi
   prev_energy=$current_energy
 done
+
+
+### CPU / RAM Metrics
+
+# The underlying values for these metrics do not always update frequently,
+# so give ample WAIT time to make sure they change and are being updated.
+CPU_METRICS="nv_cpu_utilization nv_cpu_memory_used_bytes"
+WAIT_INTERVAL_SECS=2.0
+for metric in ${CPU_METRICS}; do
+    echo "\n=== Checking Metric: ${metric} ===\n"
+    prev_value=`curl -s localhost:8002/metrics | grep ${metric} | grep -v "HELP\|TYPE" | awk '{print $2}'`
+    echo "  Initial ${metric} value: ${prev_value}"
+
+    for (( i = 0; i < $num_iterations; ++i )); do
+      sleep $WAIT_INTERVAL_SECS
+      current_value=`curl -s localhost:8002/metrics | grep ${metric} | grep -v "HELP\|TYPE" | awk '{print $2}'`
+      echo "  ${metric} value: ${current_value}"
+      if [ $current_value == $prev_value ]; then
+        cat $SERVER_LOG
+        echo "Metrics were not updated in interval of ${METRICS_INTERVAL_MS} milliseconds for metric: ${metric}"
+        echo -e "\n***\n*** Metric Interval test failed. \n***"
+        RET=1
+        break
+      fi
+      prev_value=$current_value
+    done
+done
+
+# Verify reported total memory is non-zero
+total_memory=`curl -s localhost:8002/metrics | grep "nv_cpu_memory_total_bytes" | grep -v "HELP\|TYPE" | awk '{print $2}'`
+if [ $total_memory -eq 0 ]; then
+  echo "Found nv_cpu_memory_total_bytes had a value of zero, this should not happen."
+  echo -e "\n***\n*** CPU total memory test failed. \n***"
+  RET=1
+fi
 
 kill $SERVER_PID
 wait $SERVER_PID

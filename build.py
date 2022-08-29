@@ -434,6 +434,9 @@ def core_cmake_args(components, backends, cmake_dir, install_dir):
         cmake_core_enable('TRITON_ENABLE_METRICS_GPU',
                           FLAGS.enable_gpu_metrics))
     cargs.append(
+        cmake_core_enable('TRITON_ENABLE_METRICS_CPU',
+                          FLAGS.enable_cpu_metrics))
+    cargs.append(
         cmake_core_enable('TRITON_ENABLE_TRACING', FLAGS.enable_tracing))
     cargs.append(cmake_core_enable('TRITON_ENABLE_NVTX', FLAGS.enable_nvtx))
 
@@ -1637,6 +1640,7 @@ def enable_all():
         FLAGS.enable_stats = True
         FLAGS.enable_metrics = True
         FLAGS.enable_gpu_metrics = True
+        FLAGS.enable_cpu_metrics = True
         FLAGS.enable_tracing = True
         FLAGS.enable_nvtx = True
         FLAGS.enable_gpu = True
@@ -1864,6 +1868,10 @@ if __name__ == '__main__':
                         action="store_true",
                         required=False,
                         help='Include GPU metrics in reported metrics.')
+    parser.add_argument('--enable-cpu-metrics',
+                        action="store_true",
+                        required=False,
+                        help='Include CPU metrics in reported metrics.')
     parser.add_argument('--enable-tracing',
                         action="store_true",
                         required=False,
