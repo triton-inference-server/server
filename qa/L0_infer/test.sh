@@ -136,21 +136,7 @@ if [[ $BACKENDS == *"python_dlpack"* ]]; then
     fi
 fi
 
-
-for TARGET in cpu gpu; do
-    if [ "$TRITON_SERVER_CPU_ONLY" == "1" ]; then
-        if [ "$TARGET" == "gpu" ]; then
-            echo -e "Skip GPU testing on CPU-only device"
-            continue
-        fi
-        # set strict readiness=false on CPU-only device to allow
-        # unsuccessful load of TensorRT plans, which require GPU.
-        SERVER_ARGS="--model-repository=${MODELDIR} --strict-readiness=false --exit-on-error=false ${SERVER_ARGS_EXTRA}"
-    fi
-
-    SERVER_LOG=$SERVER_LOG_BASE.${TARGET}.log
-    CLIENT_LOG=$CLIENT_LOG_BASE.${TARGET}.log
-
+function generate_models() {
     rm -fr models && mkdir models
     for BACKEND in $BACKENDS; do
       if [ "$BACKEND" == "python" ] || [ "$BACKEND" == "python_dlpack" ]; then
@@ -272,6 +258,24 @@ for TARGET in cpu gpu; do
             sed -i "s/max_batch_size: 1/max_batch_size: 0/" config.pbtxt && \
             sed -i "s/dims: \[ 1 \]/dims: \[ -1, -1 \]/" config.pbtxt)
 
+}
+
+for TARGET in cpu gpu; do
+    if [ "$TRITON_SERVER_CPU_ONLY" == "1" ]; then
+        if [ "$TARGET" == "gpu" ]; then
+            echo -e "Skip GPU testing on CPU-only device"
+            continue
+        fi
+        # set strict readiness=false on CPU-only device to allow
+        # unsuccessful load of TensorRT plans, which require GPU.
+        SERVER_ARGS="--model-repository=${MODELDIR} --strict-readiness=false --exit-on-error=false ${SERVER_ARGS_EXTRA}"
+    fi
+
+    SERVER_LOG=$SERVER_LOG_BASE.${TARGET}.log
+    CLIENT_LOG=$CLIENT_LOG_BASE.${TARGET}.log
+
+    generate_models
+
     # Check if running a memory leak check
     if [ "$TEST_VALGRIND" -eq 1 ]; then
         LEAKCHECK_LOG=$LEAKCHECK_LOG_BASE.${TARGET}.log
@@ -301,7 +305,6 @@ for TARGET in cpu gpu; do
             RET=1
         fi
     fi
-
 
     set -e
 
