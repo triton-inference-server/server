@@ -288,16 +288,6 @@ def inferAndCheckResults(tester, configs, pf, batch_size, model_version,
     # Get model platform
     model_name = tu.get_model_name(pf, input_dtype, output0_dtype,
                                    output1_dtype)
-    if configs[0][1] == "http":
-        metadata_client = httpclient.InferenceServerClient(configs[0][0],
-                                                           verbose=True)
-        metadata = metadata_client.get_model_metadata(model_name)
-        platform = metadata["platform"]
-    else:
-        metadata_client = grpcclient.InferenceServerClient(configs[0][0],
-                                                           verbose=True)
-        metadata = metadata_client.get_model_metadata(model_name)
-        platform = metadata.platform
 
     INPUT0 = "INPUT0"
     INPUT1 = "INPUT1"
