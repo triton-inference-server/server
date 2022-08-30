@@ -1,0 +1,211 @@
+<?xml version="1.0"?>
+<mapping>
+	<map>
+		<framework name="input1" output_port_id="input1:0" />
+		<IR name="input1" output_port_id="0" />
+	</map>
+	<map>
+		<framework name="input1" output_port_id="input1:0" />
+		<IR name="input1" output_port_id="0" />
+	</map>
+	<map>
+		<framework name="input1" output_port_id="input1:0" />
+		<IR name="input1" output_port_id="0" />
+	</map>
+	<map>
+		<framework name="input1" output_port_id="input1" />
+		<IR name="input1" output_port_id="0" />
+	</map>
+	<map>
+		<framework name="input1" output_port_id="input1" />
+		<IR name="input1" output_port_id="0" />
+	</map>
+	<map>
+		<framework name="input1" output_port_id="input1" />
+		<IR name="input1" output_port_id="0" />
+	</map>
+	<map>
+		<framework name="input0" output_port_id="input0:0" />
+		<IR name="input0" output_port_id="0" />
+	</map>
+	<map>
+		<framework name="input0" output_port_id="input0:0" />
+		<IR name="input0" output_port_id="0" />
+	</map>
+	<map>
+		<framework name="Func/PartitionedCall/input/_0" output_port_id="input0:0" />
+		<IR name="input0" output_port_id="0" />
+	</map>
+	<map>
+		<framework name="input0" output_port_id="Func/PartitionedCall/input/_0:0" />
+		<IR name="input0" output_port_id="0" />
+	</map>
+	<map>
+		<framework name="input0" output_port_id="Func/PartitionedCall/input/_0:0" />
+		<IR name="input0" output_port_id="0" />
+	</map>
+	<map>
+		<framework name="Func/PartitionedCall/input/_0" output_port_id="Func/PartitionedCall/input/_0:0" />
+		<IR name="input0" output_port_id="0" />
+	</map>
+	<map>
+		<framework name="PartitionedCall/model/tf.math.subtract/Sub" output_port_id="Func/PartitionedCall/output/_3:0" />
+		<IR name="PartitionedCall/model/tf.math.subtract/Sub" output_port_id="2" />
+	</map>
+	<map>
+		<framework name="Func/PartitionedCall/output/_3" output_port_id="Func/PartitionedCall/output/_3:0" />
+		<IR name="PartitionedCall/model/tf.math.subtract/Sub" output_port_id="2" />
+	</map>
+	<map>
+		<framework name="Identity_1" output_port_id="Func/PartitionedCall/output/_3:0" />
+		<IR name="PartitionedCall/model/tf.math.subtract/Sub" output_port_id="2" />
+	</map>
+	<map>
+		<framework name="PartitionedCall/Identity_1" output_port_id="Func/PartitionedCall/output/_3:0" />
+		<IR name="PartitionedCall/model/tf.math.subtract/Sub" output_port_id="2" />
+	</map>
+	<map>
+		<framework name="PartitionedCall/model/tf.math.subtract/Sub" output_port_id="Func/PartitionedCall/output/_3:0" />
+		<IR name="PartitionedCall/model/tf.math.subtract/Sub" output_port_id="2" />
+	</map>
+	<map>
+		<framework name="PartitionedCall/model/tf.math.subtract/Sub" output_port_id="Identity_1:0" />
+		<IR name="PartitionedCall/model/tf.math.subtract/Sub" output_port_id="2" />
+	</map>
+	<map>
+		<framework name="Func/PartitionedCall/output/_3" output_port_id="Identity_1:0" />
+		<IR name="PartitionedCall/model/tf.math.subtract/Sub" output_port_id="2" />
+	</map>
+	<map>
+		<framework name="Identity_1" output_port_id="Identity_1:0" />
+		<IR name="PartitionedCall/model/tf.math.subtract/Sub" output_port_id="2" />
+	</map>
+	<map>
+		<framework name="PartitionedCall/Identity_1" output_port_id="Identity_1:0" />
+		<IR name="PartitionedCall/model/tf.math.subtract/Sub" output_port_id="2" />
+	</map>
+	<map>
+		<framework name="PartitionedCall/model/tf.math.subtract/Sub" output_port_id="Identity_1:0" />
+		<IR name="PartitionedCall/model/tf.math.subtract/Sub" output_port_id="2" />
+	</map>
+	<map>
+		<framework name="PartitionedCall/model/tf.math.subtract/Sub" output_port_id="PartitionedCall/Identity_1:0" />
+		<IR name="PartitionedCall/model/tf.math.subtract/Sub" output_port_id="2" />
+	</map>
+	<map>
+		<framework name="Func/PartitionedCall/output/_3" output_port_id="PartitionedCall/Identity_1:0" />
+		<IR name="PartitionedCall/model/tf.math.subtract/Sub" output_port_id="2" />
+	</map>
+	<map>
+		<framework name="Identity_1" output_port_id="PartitionedCall/Identity_1:0" />
+		<IR name="PartitionedCall/model/tf.math.subtract/Sub" output_port_id="2" />
+	</map>
+	<map>
+		<framework name="PartitionedCall/Identity_1" output_port_id="PartitionedCall/Identity_1:0" />
+		<IR name="PartitionedCall/model/tf.math.subtract/Sub" output_port_id="2" />
+	</map>
+	<map>
+		<framework name="PartitionedCall/model/tf.math.subtract/Sub" output_port_id="PartitionedCall/Identity_1:0" />
+		<IR name="PartitionedCall/model/tf.math.subtract/Sub" output_port_id="2" />
+	</map>
+	<map>
+		<framework name="PartitionedCall/model/tf.math.subtract/Sub" output_port_id="PartitionedCall/model/tf.math.subtract/Sub:0" />
+		<IR name="PartitionedCall/model/tf.math.subtract/Sub" output_port_id="2" />
+	</map>
+	<map>
+		<framework name="Func/PartitionedCall/output/_3" output_port_id="PartitionedCall/model/tf.math.subtract/Sub:0" />
+		<IR name="PartitionedCall/model/tf.math.subtract/Sub" output_port_id="2" />
+	</map>
+	<map>
+		<framework name="Identity_1" output_port_id="PartitionedCall/model/tf.math.subtract/Sub:0" />
+		<IR name="PartitionedCall/model/tf.math.subtract/Sub" output_port_id="2" />
+	</map>
+	<map>
+		<framework name="PartitionedCall/Identity_1" output_port_id="PartitionedCall/model/tf.math.subtract/Sub:0" />
+		<IR name="PartitionedCall/model/tf.math.subtract/Sub" output_port_id="2" />
+	</map>
+	<map>
+		<framework name="PartitionedCall/model/tf.math.subtract/Sub" output_port_id="PartitionedCall/model/tf.math.subtract/Sub:0" />
+		<IR name="PartitionedCall/model/tf.math.subtract/Sub" output_port_id="2" />
+	</map>
+	<map>
+		<framework name="PartitionedCall/model/tf.math.add/Add" output_port_id="PartitionedCall/model/tf.math.add/Add:0" />
+		<IR name="PartitionedCall/model/tf.math.add/Add" output_port_id="2" />
+	</map>
+	<map>
+		<framework name="PartitionedCall/model/tf.math.add/Add" output_port_id="PartitionedCall/model/tf.math.add/Add:0" />
+		<IR name="PartitionedCall/model/tf.math.add/Add" output_port_id="2" />
+	</map>
+	<map>
+		<framework name="PartitionedCall/Identity" output_port_id="PartitionedCall/model/tf.math.add/Add:0" />
+		<IR name="PartitionedCall/model/tf.math.add/Add" output_port_id="2" />
+	</map>
+	<map>
+		<framework name="Identity" output_port_id="PartitionedCall/model/tf.math.add/Add:0" />
+		<IR name="PartitionedCall/model/tf.math.add/Add" output_port_id="2" />
+	</map>
+	<map>
+		<framework name="Func/PartitionedCall/output/_2" output_port_id="PartitionedCall/model/tf.math.add/Add:0" />
+		<IR name="PartitionedCall/model/tf.math.add/Add" output_port_id="2" />
+	</map>
+	<map>
+		<framework name="PartitionedCall/model/tf.math.add/Add" output_port_id="PartitionedCall/Identity:0" />
+		<IR name="PartitionedCall/model/tf.math.add/Add" output_port_id="2" />
+	</map>
+	<map>
+		<framework name="PartitionedCall/model/tf.math.add/Add" output_port_id="PartitionedCall/Identity:0" />
+		<IR name="PartitionedCall/model/tf.math.add/Add" output_port_id="2" />
+	</map>
+	<map>
+		<framework name="PartitionedCall/Identity" output_port_id="PartitionedCall/Identity:0" />
+		<IR name="PartitionedCall/model/tf.math.add/Add" output_port_id="2" />
+	</map>
+	<map>
+		<framework name="Identity" output_port_id="PartitionedCall/Identity:0" />
+		<IR name="PartitionedCall/model/tf.math.add/Add" output_port_id="2" />
+	</map>
+	<map>
+		<framework name="Func/PartitionedCall/output/_2" output_port_id="PartitionedCall/Identity:0" />
+		<IR name="PartitionedCall/model/tf.math.add/Add" output_port_id="2" />
+	</map>
+	<map>
+		<framework name="PartitionedCall/model/tf.math.add/Add" output_port_id="Identity:0" />
+		<IR name="PartitionedCall/model/tf.math.add/Add" output_port_id="2" />
+	</map>
+	<map>
+		<framework name="PartitionedCall/model/tf.math.add/Add" output_port_id="Identity:0" />
+		<IR name="PartitionedCall/model/tf.math.add/Add" output_port_id="2" />
+	</map>
+	<map>
+		<framework name="PartitionedCall/Identity" output_port_id="Identity:0" />
+		<IR name="PartitionedCall/model/tf.math.add/Add" output_port_id="2" />
+	</map>
+	<map>
+		<framework name="Identity" output_port_id="Identity:0" />
+		<IR name="PartitionedCall/model/tf.math.add/Add" output_port_id="2" />
+	</map>
+	<map>
+		<framework name="Func/PartitionedCall/output/_2" output_port_id="Identity:0" />
+		<IR name="PartitionedCall/model/tf.math.add/Add" output_port_id="2" />
+	</map>
+	<map>
+		<framework name="PartitionedCall/model/tf.math.add/Add" output_port_id="Func/PartitionedCall/output/_2:0" />
+		<IR name="PartitionedCall/model/tf.math.add/Add" output_port_id="2" />
+	</map>
+	<map>
+		<framework name="PartitionedCall/model/tf.math.add/Add" output_port_id="Func/PartitionedCall/output/_2:0" />
+		<IR name="PartitionedCall/model/tf.math.add/Add" output_port_id="2" />
+	</map>
+	<map>
+		<framework name="PartitionedCall/Identity" output_port_id="Func/PartitionedCall/output/_2:0" />
+		<IR name="PartitionedCall/model/tf.math.add/Add" output_port_id="2" />
+	</map>
+	<map>
+		<framework name="Identity" output_port_id="Func/PartitionedCall/output/_2:0" />
+		<IR name="PartitionedCall/model/tf.math.add/Add" output_port_id="2" />
+	</map>
+	<map>
+		<framework name="Func/PartitionedCall/output/_2" output_port_id="Func/PartitionedCall/output/_2:0" />
+		<IR name="PartitionedCall/model/tf.math.add/Add" output_port_id="2" />
+	</map>
+</mapping>

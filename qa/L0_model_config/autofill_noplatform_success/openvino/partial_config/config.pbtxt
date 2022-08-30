@@ -1,0 +1,17 @@
+max_batch_size: 4
+input [
+  {
+    name: "input_tensor"
+    data_type: TYPE_FP32
+    format: FORMAT_NCHW
+    dims: [ 3, 224, 224 ]
+  }
+]
+output [
+  {
+    name: "softmax_tensor"
+    data_type: TYPE_FP32
+    dims: [ 1001 ]
+    label_filename: "labels.txt"
+  }
+]

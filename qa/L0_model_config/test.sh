@@ -263,6 +263,12 @@ mkdir -p autofill_noplatform_success/onnx/cpu_instance/1
 cp -r /data/inferenceserver/${REPO_VERSION}/qa_identity_model_repository/onnx_zero_1_float16/1/model.onnx \
     autofill_noplatform_success/onnx/cpu_instance/1
 
+# Copy resnet50 model into openvino test directories
+cp -r /data/inferenceserver/${REPO_VERSION}/openvino_model_store/resnet50_int8_openvino/1 \
+    autofill_noplatform_success/openvino/partial_config
+cp /data/inferenceserver/${REPO_VERSION}/openvino_model_store/resnet50_int8_openvino/labels.txt \
+    autofill_noplatform_success/openvino/partial_config
+
 rm -f $SERVER_LOG_BASE* $CLIENT_LOG
 RET=0
 

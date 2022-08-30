@@ -1,0 +1,36 @@
+name: "partial_config"
+version_policy {
+  latest {
+    num_versions: 1
+  }
+}
+max_batch_size: 4
+input {
+  name: "input_tensor"
+  data_type: TYPE_FP32
+  format: FORMAT_NCHW
+  dims: 3
+  dims: 224
+  dims: 224
+}
+output {
+  name: "softmax_tensor"
+  data_type: TYPE_FP32
+  dims: 1001
+  label_filename: "labels.txt"
+}
+instance_group {
+  name: "partial_config"
+  count: 1
+  kind: KIND_CPU
+}
+default_model_filename: "model.xml"
+optimization {
+  input_pinned_memory {
+    enable: true
+  }
+  output_pinned_memory {
+    enable: true
+  }
+}
+backend: "openvino"
