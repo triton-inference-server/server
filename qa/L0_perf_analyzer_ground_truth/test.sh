@@ -85,7 +85,6 @@ function check_performance {
 # $1: client log file
 # example line: Avg gRPC time: 42648 usec (marshal 6 usec + response wait 42640 usec + unmarshal 2 usec)
 function check_grpc_time {
-
     grep "gRPC" $1 | awk '{print $4}' | while read -r line; do
         if [ $line -eq 0 ]; then
             RET=1
@@ -138,7 +137,7 @@ for protocol in ${PROTOCOLS}; do
         check_perf_analyzer_error $?
 
         check_performance ${OUTPUT_FILE} ${EXPECTED_RESULT} ${TOLERANCE}
-        
+
         if [ "${protocol}" == "grpc" ]; then
             check_grpc_time ${CLIENT_LOG}
         fi
