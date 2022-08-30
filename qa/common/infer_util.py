@@ -301,13 +301,8 @@ def inferAndCheckResults(tester, configs, pf, batch_size, model_version,
 
     INPUT0 = "INPUT0"
     INPUT1 = "INPUT1"
-
-    if platform == "pytorch_libtorch":
-        OUTPUT0 = "OUTPUT__0"
-        OUTPUT1 = "OUTPUT__1"
-    else:
-        OUTPUT0 = "OUTPUT0"
-        OUTPUT1 = "OUTPUT1"
+    OUTPUT0 = "OUTPUT0"
+    OUTPUT1 = "OUTPUT1"
 
     # Create system/cuda shared memory regions if needed
     shm_regions, shm_handles = su.create_set_shm_regions(

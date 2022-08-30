@@ -136,7 +136,7 @@ if [[ $BACKENDS == *"python_dlpack"* ]]; then
     fi
 fi
 
-function generate_models() {
+function generate_model_repository() {
     rm -fr models && mkdir models
     for BACKEND in $BACKENDS; do
       if [ "$BACKEND" == "python" ] || [ "$BACKEND" == "python_dlpack" ]; then
@@ -274,7 +274,7 @@ for TARGET in cpu gpu; do
     SERVER_LOG=$SERVER_LOG_BASE.${TARGET}.log
     CLIENT_LOG=$CLIENT_LOG_BASE.${TARGET}.log
 
-    generate_models
+    generate_model_repository
 
     # Check if running a memory leak check
     if [ "$TEST_VALGRIND" -eq 1 ]; then
