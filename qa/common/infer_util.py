@@ -267,7 +267,7 @@ def infer_exact(tester,
                          input1_list_tmp, shm_region_names, input0_byte_size,
                          input1_byte_size, output0_byte_size, output1_byte_size,
                          use_system_shared_memory, use_cuda_shared_memory,
-                         skip_request_id_check)
+                         network_timeout, skip_request_id_check)
 
 
 def inferAndCheckResults(tester, configs, pf, batch_size, model_version,
@@ -277,8 +277,8 @@ def inferAndCheckResults(tester, configs, pf, batch_size, model_version,
                          outputs, precreated_shm_regions, input0_list_tmp,
                          input1_list_tmp, shm_region_names, input0_byte_size,
                          input1_byte_size, output0_byte_size, output1_byte_size,
-                         use_system_shared_memory, use_cuda_shared_memory,
-                         skip_request_id_check):
+                         use_system_shared_memory, use_cuda_shared_memory, 
+                         network_timeout, skip_request_id_check):
     # Lazy shm imports...
     if use_system_shared_memory or use_cuda_shared_memory:
         import tritonclient.utils.shared_memory as shm
