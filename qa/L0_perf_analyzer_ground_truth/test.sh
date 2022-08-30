@@ -81,6 +81,18 @@ function check_performance {
     fi
 }
 
+# Iterate over the grpc results to ensure gRPC times are greater than 0
+# $1: client log file
+# example line: Avg gRPC time: 42648 usec (marshal 6 usec + response wait 42640 usec + unmarshal 2 usec)
+function check_grpc_time {
+
+    grep "gRPC" $1 | awk '{print $4}' | while read -r line; do
+        if [ $line -eq 0 ]; then
+            RET=1
+        fi
+    done
+}
+
 # Setup server
 export CUDA_VISIBLE_DEVICES=0
 SERVER=/opt/tritonserver/bin/tritonserver
@@ -110,7 +122,7 @@ fi
 # Run perf_analyzer
 set +e
 RET=0
-PROTOCOLS="http"
+PROTOCOLS="http grpc"
 OUTPUT_FILE="results"
 EXPECTED_RESULT="90.00"
 TOLERANCE="0.05"
@@ -126,6 +138,10 @@ for protocol in ${PROTOCOLS}; do
         check_perf_analyzer_error $?
 
         check_performance ${OUTPUT_FILE} ${EXPECTED_RESULT} ${TOLERANCE}
+        
+        if [ "${protocol}" == "grpc" ]; then
+            check_grpc_time ${CLIENT_LOG}
+        fi
     done;
 done;
 
