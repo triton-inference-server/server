@@ -83,6 +83,14 @@ if(${TRITON_ENABLE_HTTP} OR ${TRITON_ENABLE_METRICS} OR
   message(STATUS "Using libevent ${Libevent_VERSION}")
 endif()
 
+if(${TRITON_ENABLE_KAFKA})
+  set(LIBRDKAFKA_INCLUDE_DIR /usr/local/include)
+  set(LIBRDKAFKA_LIBRARY_DIR /usr/local/lib)
+  find_package(doctest REQUIRED)
+  message(STATUS "Using doctest")
+endif()
+
+
 # re2
 #
 find_library(RE2_LIBRARY NAMES re2)
@@ -127,7 +135,7 @@ else()
   target_compile_options(
     main
     PRIVATE
-      -Wall -Wextra -Wno-unused-parameter -Wno-deprecated-declarations -Werror
+      -Wall -Wextra -Wno-unused-parameter -Wno-deprecated-declarations -Werror -lrdkafka
   )
 endif()
 
@@ -204,6 +212,14 @@ if(${TRITON_ENABLE_HTTP})
     PRIVATE TRITON_ENABLE_HTTP=1
   )
 endif() # TRITON_ENABLE_HTTP
+
+if(${TRITON_ENABLE_KAFKA})
+  target_compile_definitions(
+    main
+    PRIVATE TRITON_ENABLE_KAFKA=1
+  )
+endif() # TRITON_ENABLE_KAFKA
+
 
 if(${TRITON_ENABLE_SAGEMAKER})
   target_compile_definitions(
@@ -572,11 +588,102 @@ endif() # TRITON_ENABLE_HTTP || TRITON_ENABLE_METRICS ||
 # kafka
 #
 if(${TRITON_ENABLE_KAFKA})
+message(STATUS "Using Kafka Unit Tests")
+
+find_package(doctest REQUIRED)
+
+add_executable(tests kafka_unit_tests.cc common.cc)
+
+target_compile_features(tests PRIVATE cxx_std_11)
+if(CMAKE_CXX_COMPILER_ID STREQUAL "MSVC")
+  message("Using MSVC as compiler, default target on Windows 10. "
+          "If the target system is not Windows 10, please update _WIN32_WINNT "
+          "to corresponding value.")
+  target_compile_options(
+    tests
+    PRIVATE
+      /W1 /D_WIN32_WINNT=0x0A00 /EHsc
+  )
+else()
+  target_compile_options(
+    tests
+    PRIVATE
+      -Wall -Wextra -Wno-type-limits -Wno-unused-parameter -Wno-deprecated-declarations -Werror -lrdkafka
+  )
+endif()
+
+find_library(KAFKA_LIBRARY librdkafka.so.1 HINTS /usr/local/lib REQUIRED)
+target_link_libraries(tests PUBLIC ${KAFKA_LIBRARY})
+
+target_link_libraries(
+  tests
+  PRIVATE
+    triton-common-async-work-queue  # from repo-common
+    triton-common-error             # from repo-common
+    triton-core-serverapi           # from repo-core
+    triton-core-serverstub          # from repo-core
+    kafka-endpoint-library
+  )
+
+if(${TRITON_ENABLE_GPU})
+  target_compile_definitions(
+    tests
+    PRIVATE TRITON_ENABLE_GPU=1
+    PRIVATE TRITON_MIN_COMPUTE_CAPABILITY=${TRITON_MIN_COMPUTE_CAPABILITY}
+  )
+
+  target_link_libraries(
+    tests
+    PRIVATE
+      CUDA::cudart
+  )
+endif() # TRITON_ENABLE_GPU
+
+set_target_properties(
+  tests
+  PROPERTIES
+    POSITION_INDEPENDENT_CODE ON
+    SKIP_BUILD_RPATH TRUE
+    BUILD_WITH_INSTALL_RPATH TRUE
+    INSTALL_RPATH_USE_LINK_PATH FALSE
+    INSTALL_RPATH ""
+)
+
+install(
+  TARGETS tests
+  RUNTIME DESTINATION bin
+)
+
+
+endif() # TRITON_ENABLE_KAFKA
+
+# kafka
+#
+if(${TRITON_ENABLE_KAFKA})
   message(STATUS "Using Kafka Endpoint")
   add_library(
     kafka-endpoint-library EXCLUDE_FROM_ALL
     kafka_endpoint.cc kafka_endpoint.h
   )
+
+  target_compile_features(kafka-endpoint-library PRIVATE cxx_std_11)
+  if(CMAKE_CXX_COMPILER_ID STREQUAL "MSVC")
+    target_compile_options(
+      kafka-endpoint-library
+      PRIVATE
+        /W1 /D_WIN32_WINNT=0x0A00 /EHsc
+    )
+  else()
+    target_compile_options(
+      kafka-endpoint-library
+      PRIVATE
+        -Wall -Wextra -Wno-unused-parameter -Wno-deprecated-declarations -Werror
+    )
+  endif()
+
+  target_include_directories(kafka-endpoint-library SYSTEM PRIVATE ${LIBRDKAFKA_INCLUDE_DIR})
+  target_link_directories(kafka-endpoint-library PUBLIC ${LIBRDKAFKA_LIBRARY_DIR})
+  target_link_libraries(kafka-endpoint-library PRIVATE rdkafka)
 
   target_link_libraries(
     kafka-endpoint-library
@@ -597,7 +704,7 @@ if(${TRITON_ENABLE_KAFKA})
       PRIVATE TRITON_ENABLE_GPU=1
       PRIVATE TRITON_MIN_COMPUTE_CAPABILITY=${TRITON_MIN_COMPUTE_CAPABILITY}
     )
-
+  
     target_link_libraries(
       kafka-endpoint-library
       PUBLIC
@@ -639,6 +746,7 @@ if(${TRITON_ENABLE_KAFKA})
       kafka-endpoint-library
   )
 endif() # TRITON_ENABLE_KAFKA
+
 
 # tracing
 #
@@ -735,7 +843,7 @@ if (NOT WIN32)
     target_compile_options(
       simple
       PRIVATE
-        -Wall -Wextra -Wno-type-limits -Wno-unused-parameter -Wno-deprecated-declarations -Werror
+        -Wall -Wextra -Wno-type-limits -Wno-unused-parameter -Wno-deprecated-declarations -Werror -lrdkafka
     )
   endif()
 
