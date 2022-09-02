@@ -59,6 +59,10 @@
 #include "triton/common/logging.h"
 #include "triton/core/tritonserver.h"
 
+// For kafka consumer arg parsing
+#include <boost/algorithm/string/split.hpp>
+#include <boost/algorithm/string/classification.hpp>
+
 #if defined(TRITON_ENABLE_HTTP) || defined(TRITON_ENABLE_METRICS)
 #include "http_server.h"
 #endif  // TRITON_ENABLE_HTTP|| TRITON_ENABLE_METRICS
@@ -71,7 +75,7 @@
 #ifdef TRITON_ENABLE_GRPC
 #include "grpc_server.h"
 #endif  // TRITON_ENABLE_GRPC
-#if defined(TRITON_ENABLE_KAFKA)
+#if TRITON_ENABLE_KAFKA
 #include "kafka_endpoint.h"
 #endif // TRITON_ENABLE_KAFKA
 #ifdef TRITON_ENABLE_GPU
@@ -95,6 +99,13 @@ int32_t http_port_ = 8000;
 bool reuse_http_port_ = false;
 std::string http_address_ = "0.0.0.0";
 #endif  // TRITON_ENABLE_HTTP
+
+#if TRITON_ENABLE_KAFKA
+bool allow_kafka_ = false;
+std::unique_ptr<triton::server::KafkaEndpoint> kafka_service_;
+std::string kafka_port_ = "localhost:9092";
+std::vector<std::string> kafka_consumer_topic_;
+#endif  // TRITON_ENABLE_KAFKA
 
 #ifdef TRITON_ENABLE_SAGEMAKER
 std::unique_ptr<triton::server::HTTPServer> sagemaker_service_;
@@ -274,6 +285,11 @@ enum OptionId {
   OPTION_GRPC_ARG_HTTP2_MIN_RECV_PING_INTERVAL_WITHOUT_DATA_MS,
   OPTION_GRPC_ARG_HTTP2_MAX_PING_STRIKES,
 #endif  // TRITON_ENABLE_GRPC
+#if TRITON_ENABLE_KAFKA
+  OPTION_ALLOW_KAFKA,
+  OPTION_CONSUMER_TOPIC,
+  OPTION_BROKER_PORT,
+#endif  // TRITON_ENABLE_KAFKA
 #if defined(TRITON_ENABLE_SAGEMAKER)
   OPTION_ALLOW_SAGEMAKER,
   OPTION_SAGEMAKER_PORT,
@@ -476,6 +492,14 @@ std::vector<Option> options_
        "sending an HTTP2 GOAWAY frame and closing the transport. Setting it to "
        "0 allows the server to accept any number of bad pings. Default is 2."},
 #endif  // TRITON_ENABLE_GRPC
+#if TRITON_ENABLE_KAFKA
+      {OPTION_ALLOW_KAFKA, "allow-kafka", Option::ArgBool,
+       "Allow the server to subscribe to a Kafka broker."},
+      {OPTION_CONSUMER_TOPIC, "kafka-consumer-topic", Option::ArgStr,
+       "The topic the Triton kafka consumer will consume from."},
+      {OPTION_BROKER_PORT, "kafka-port", Option::ArgStr,
+       "The port of the kafka broker storing the topics."},
+#endif  // TRITON_ENABLE_KAFKA
 #if defined(TRITON_ENABLE_SAGEMAKER)
       {OPTION_ALLOW_SAGEMAKER, "allow-sagemaker", Option::ArgBool,
        "Allow the server to listen for Sagemaker requests. Default is false."},
@@ -778,6 +802,27 @@ StartHttpService(
 }
 #endif  // TRITON_ENABLE_HTTP
 
+#if TRITON_ENABLE_KAFKA
+TRITONSERVER_Error*
+StartKafkaService(
+    std::unique_ptr<triton::server::KafkaEndpoint>* service,
+    const std::shared_ptr<TRITONSERVER_Server>& server,
+    const std::shared_ptr<triton::server::SharedMemoryManager>& shm_manager)
+{
+  TRITONSERVER_Error* err = triton::server::KafkaEndpoint::Create(
+      server, shm_manager, kafka_port_, kafka_consumer_topic_, service);
+  if (err == nullptr) {
+    err = (*service)->Start();
+  }
+
+  if (err != nullptr) {
+    service->reset();
+  }
+
+  return err;
+}
+#endif  // TRITON_ENABLE_KAFKA
+
 #ifdef TRITON_ENABLE_METRICS
 TRITONSERVER_Error*
 StartMetricsService(
@@ -883,6 +928,18 @@ StartEndpoints(
   }
 #endif  // TRITON_ENABLE_HTTP
 
+#if TRITON_ENABLE_KAFKA 
+  // Enable Kafka endpoints if requested...
+  if (allow_kafka_) {
+    TRITONSERVER_Error* err =
+        StartKafkaService(&kafka_service_, server, shm_manager);
+    if (err != nullptr) {
+      LOG_TRITONSERVER_ERROR(err, "failed to start Kafka service");
+      return false;
+    }
+  }
+#endif  // TRITON_ENABLE_KAFKA
+
 
 #ifdef TRITON_ENABLE_SAGEMAKER
   // Enable Sagemaker endpoints if requested...
@@ -938,6 +995,18 @@ StopEndpoints()
     http_service_.reset();
   }
 #endif  // TRITON_ENABLE_HTTP
+
+#if TRITON_ENABLE_KAFKA
+  if (kafka_service_) {
+    TRITONSERVER_Error* err = kafka_service_->Stop();
+    if (err != nullptr) {
+      LOG_TRITONSERVER_ERROR(err, "failed to stop Kafka service");
+      ret = false;
+    }
+
+    kafka_service_.reset();
+  }
+#endif  // TRITON_ENABLE_KAFKA
 
 #ifdef TRITON_ENABLE_GRPC
   if (grpc_service_) {
@@ -1107,6 +1176,16 @@ ParseOption(const std::string& arg)
 {
   return std::stoll(arg);
 }
+
+#if TRITON_ENABLE_KAFKA
+template <>
+std::vector<std::string>
+ParseOption(const std::string& arg)
+{
+  std::vector<std::string> options;
+  return boost::split(options, arg, boost::is_any_of(", "), boost::token_compress_on);
+}
+#endif // TRITON_ENABLE_KAFKA
 
 int
 ParseIntOption(const std::string arg)
@@ -1353,6 +1432,11 @@ Parse(TRITONSERVER_ServerOptions** server_options, int argc, char** argv)
   int32_t http_thread_cnt = http_thread_cnt_;
 #endif  // TRITON_ENABLE_HTTP
 
+#if TRITON_ENABLE_KAFKA
+  std::string kafka_port = kafka_port_;
+  std::vector<std::string> kafka_consumer_topic;
+#endif  // TRITON_ENABLE_KAFKA
+
 #if defined(TRITON_ENABLE_GRPC)
   int32_t grpc_port = grpc_port_;
   bool reuse_grpc_port = reuse_grpc_port_;
@@ -1515,6 +1599,18 @@ Parse(TRITONSERVER_ServerOptions** server_options, int argc, char** argv)
         http_thread_cnt = ParseIntOption(optarg);
         break;
 #endif  // TRITON_ENABLE_HTTP
+
+#if TRITON_ENABLE_KAFKA
+      case OPTION_ALLOW_KAFKA:
+        allow_kafka_ = optarg;
+        break;
+      case OPTION_BROKER_PORT:
+        kafka_port = optarg;
+        break;
+      case OPTION_CONSUMER_TOPIC:
+        kafka_consumer_topic = ParseOption<std::vector<std::string>>(optarg);
+        break;
+#endif  // TRITON_ENABLE_KAFKA
 
 #if defined(TRITON_ENABLE_SAGEMAKER)
       case OPTION_ALLOW_SAGEMAKER:
@@ -1784,6 +1880,12 @@ Parse(TRITONSERVER_ServerOptions** server_options, int argc, char** argv)
   http_address_ = http_address;
   http_thread_cnt_ = http_thread_cnt;
 #endif  // TRITON_ENABLE_HTTP
+
+#if TRITON_ENABLE_KAFKA
+  kafka_port_ = kafka_port;
+  kafka_consumer_topic_ = kafka_consumer_topic;
+#endif  // TRITON_ENABLE_KAFKA
+
 
 #if defined(TRITON_ENABLE_SAGEMAKER)
   sagemaker_port_ = sagemaker_port;

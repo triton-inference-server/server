@@ -1036,6 +1036,8 @@ HTTPAPIServer::InferResponseAlloc(
     void** buffer_userp, TRITONSERVER_MemoryType* actual_memory_type,
     int64_t* actual_memory_type_id)
 {
+  LOG_INFO << "HTTP Infer response alloc " << tensor_name << " " << (int)byte_size;
+
   AllocPayload* payload = reinterpret_cast<AllocPayload*>(userp);
   std::unordered_map<std::string, AllocPayload::OutputInfo*>& output_map =
       payload->output_map_;
@@ -1054,9 +1056,11 @@ HTTPAPIServer::InferResponseAlloc(
   // OutputInfo for it that uses default setting of JSON.
   auto pr = output_map.find(tensor_name);
   if (pr == output_map.end()) {
+    LOG_INFO << "Could not find tensor name in output";
     info = new AllocPayload::OutputInfo(default_output_kind, 0);
   } else {
     // Take ownership of the OutputInfo object.
+    LOG_INFO << "Found tensor name in output";
     info = pr->second;
     output_map.erase(pr);
   }
@@ -1101,6 +1105,7 @@ HTTPAPIServer::InferResponseAlloc(
     }
 
     evbuffer* evhttp_buffer;
+    LOG_INFO << "Infer response alloc: byte size: " << byte_size << " buffer: " << std::strlen((char*)buffer) << " " << (char*)buffer;
     TRITONSERVER_Error* err = AllocEVBuffer(byte_size, &evhttp_buffer, buffer);
     if (err != nullptr) {
       delete info;
@@ -1112,7 +1117,7 @@ HTTPAPIServer::InferResponseAlloc(
     // as the buffer itself.
     info->evbuffer_ = evhttp_buffer;
 
-    LOG_VERBOSE(1) << "HTTP using buffer for: '" << tensor_name
+    LOG_INFO << "HTTP using buffer for: '" << tensor_name
                    << "', size: " << byte_size << ", addr: " << *buffer;
   }
 
@@ -1864,7 +1869,7 @@ HTTPAPIServer::HandleLogging(evhtp_request_t* req)
     triton::common::TritonJson::Value setting_json;
     if (request.Find("log_file", &setting_json)) {
       if (!setting_json.IsNull()) {
-        // Set new settings in server then in core
+        // Set new settings in server then in core`
         std::string log_file_path;
         HTTP_RESPOND_IF_ERR(req, setting_json.AsString(&log_file_path));
         const std::string& error = LOG_SET_OUT_FILE(log_file_path);
@@ -2333,8 +2338,14 @@ HTTPAPIServer::EVBufferToInput(
   // Extract just the json header from the HTTP body. 'header_length == 0' means
   // that the entire HTTP body should be input data for a raw binary request.
   triton::common::TritonJson::Value request_json;
+  triton::common::TritonJson::WriteBuffer msg;
+  
 
   RETURN_IF_ERR(EVBufferToJson(&request_json, v, &v_idx, header_length, n));
+  request_json.Write(&msg);
+  LOG_INFO << "Json request: " << msg.Base();
+  //FILE *fptr = fopen("outfile.txt", "w+");
+  //evbuffer_write(input_buffer, fileno(fptr));
 
   // Set InferenceRequest request_id
   triton::common::TritonJson::Value id_json;
@@ -2491,16 +2502,20 @@ HTTPAPIServer::EVBufferToInput(
         char* base = static_cast<char*>(v[v_idx].iov_base);
         size_t base_size;
         if (v[v_idx].iov_len > byte_size) {
+          LOG_INFO << "If case, name: " << input_name << " length " << v[v_idx].iov_len;
           base_size = byte_size;
           v[v_idx].iov_base = static_cast<void*>(base + byte_size);
           v[v_idx].iov_len -= byte_size;
           byte_size = 0;
         } else {
+          LOG_INFO << "Else len: " << v[v_idx].iov_len;
+          LOG_INFO << "Else case (before), name: " << input_name << " base size: " << base_size << " byte size: " << byte_size << " index " << v_idx << " " << n;
           base_size = v[v_idx].iov_len;
           byte_size -= v[v_idx].iov_len;
           v_idx++;
+          LOG_INFO << "Else case (after), name: " << input_name << " base size: " << base_size << " byte size: " << byte_size << " index " << v_idx;
         }
-
+        LOG_INFO << "Base: " << base << " base size: " << base_size;
         RETURN_IF_ERR(TRITONSERVER_InferenceRequestAppendInputData(
             irequest, input_name, base, base_size, TRITONSERVER_MEMORY_CPU,
             0 /* memory_type_id */));
@@ -2852,6 +2867,7 @@ HTTPAPIServer::HandleInfer(
 #ifdef TRITON_ENABLE_TRACING
     infer_request->trace_ = trace;
 #endif  // TRITON_ENABLE_TRACING
+    LOG_INFO << "Input buffer: " << req->buffer_in << std::endl;
 
     if (err == nullptr) {
       if (header_length != 0) {
@@ -2987,7 +3003,7 @@ HTTPAPIServer::InferRequestClass::InferRequestComplete(
 {
   // FIXME need to manage the lifetime of InferRequestClass so that we
   // delete it here.
-
+  LOG_INFO << "HTTP infer requset complete";
   if ((flags & TRITONSERVER_REQUEST_RELEASE_ALL) != 0) {
     if (userp != nullptr) {
       evbuffer_free(reinterpret_cast<evbuffer*>(userp));
@@ -3010,7 +3026,7 @@ HTTPAPIServer::InferRequestClass::InferResponseComplete(
   //
   // But for now userp is the InferRequestClass object and the end of
   // its life is in the OK or BAD ReplyCallback.
-
+  LOG_INFO << "HTTP infer response complete";
   HTTPAPIServer::InferRequestClass* infer_request =
       reinterpret_cast<HTTPAPIServer::InferRequestClass*>(userp);
 
@@ -3060,6 +3076,7 @@ TRITONSERVER_Error*
 HTTPAPIServer::InferRequestClass::FinalizeResponse(
     TRITONSERVER_InferenceResponse* response)
 {
+  LOG_INFO << "HTTP finalizing response";
   RETURN_IF_ERR(TRITONSERVER_InferenceResponseError(response));
 
   triton::common::TritonJson::Value response_json(
@@ -3277,6 +3294,8 @@ HTTPAPIServer::InferRequestClass::FinalizeResponse(
   // Write json metadata into response evbuffer
   triton::common::TritonJson::WriteBuffer buffer;
   RETURN_IF_ERR(response_json.Write(&buffer));
+  LOG_INFO << "Json response: " << buffer.Base();
+
   evbuffer_add(response_placeholder, buffer.Base(), buffer.Size());
 
   // If there is binary data write it next in the appropriate
