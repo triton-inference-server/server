@@ -70,6 +70,9 @@ fi
 if [ -n "$SAGEMAKER_TRITON_SHM_GROWTH_BYTE_SIZE" ]; then
     SAGEMAKER_ARGS="${SAGEMAKER_ARGS} --backend-config=python,shm-growth-byte-size=${SAGEMAKER_TRITON_SHM_GROWTH_BYTE_SIZE}"
 fi
+if [ -n "$SAGEMAKER_TRITON_TENSORFLOW_VERSION" ]; then
+    SAGEMAKER_ARGS="${SAGEMAKER_ARGS} --backend-config=tensorflow,version=${SAGEMAKER_TRITON_TENSORFLOW_VERSION}"
+fi
 
 if [ "${is_mme_mode}" = false ] && [ -f "${SAGEMAKER_MODEL_REPO}/config.pbtxt" ]; then
     echo "ERROR: Incorrect directory structure."
