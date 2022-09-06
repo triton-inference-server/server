@@ -50,7 +50,7 @@
 ##
 ############################################################################
 
-TRITON_VERSION=${TRITON_VERSION:=22.08}
+TRITON_VERSION=${TRITON_VERSION:=22.09}
 CUDA_DEVICE=0
 
 HOST_BUILD_DIR=${HOST_BUILD_DIR:=/tmp}
