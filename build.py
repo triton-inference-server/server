@@ -67,10 +67,10 @@ from inspect import getsourcefile
 # incorrectly load the other version of the openvino libraries.
 #
 TRITON_VERSION_MAP = {
-    '2.26.0dev': (
-        '22.09dev',  # triton container
-        '22.08',  # upstream container
-        '1.12.0',  # ORT
+    '2.26.0': (
+        '22.09',  # triton container
+        '22.09',  # upstream container
+        '1.12.1',  # ORT
         '2022.1.0',  # ORT OpenVINO
         '2022.1.0',  # Standalone OpenVINO
         '2.2.9',  # DCGM version
@@ -1098,9 +1098,9 @@ COPY --from=min_container /usr/local/cuda/lib64/stubs/libcublas.so /usr/local/cu
 COPY --from=min_container /usr/local/cuda/lib64/stubs/libcublasLt.so /usr/local/cuda/lib64/stubs/libcublasLt.so.11
 
 RUN mkdir -p /usr/local/cuda/targets/{cuda_arch}-linux/lib
-COPY --from=min_container /usr/local/cuda-11.7/targets/{cuda_arch}-linux/lib/libcudart.so.11.0 /usr/local/cuda/targets/{cuda_arch}-linux/lib/.
-COPY --from=min_container /usr/local/cuda-11.7/targets/{cuda_arch}-linux/lib/libcupti.so.11.7 /usr/local/cuda/targets/{cuda_arch}-linux/lib/.
-COPY --from=min_container /usr/local/cuda-11.7/targets/{cuda_arch}-linux/lib/libnvToolsExt.so.1 /usr/local/cuda/targets/{cuda_arch}-linux/lib/.
+COPY --from=min_container /usr/local/cuda-11.8/targets/{cuda_arch}-linux/lib/libcudart.so.11.0 /usr/local/cuda/targets/{cuda_arch}-linux/lib/.
+COPY --from=min_container /usr/local/cuda-11.8/targets/{cuda_arch}-linux/lib/libcupti.so.11.8 /usr/local/cuda/targets/{cuda_arch}-linux/lib/.
+COPY --from=min_container /usr/local/cuda-11.8/targets/{cuda_arch}-linux/lib/libnvToolsExt.so.1 /usr/local/cuda/targets/{cuda_arch}-linux/lib/.
 
 COPY --from=min_container /usr/lib/{libs_arch}-linux-gnu/libcudnn.so.8 /usr/lib/{libs_arch}-linux-gnu/libcudnn.so.8
 
