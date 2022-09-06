@@ -263,7 +263,21 @@ mkdir -p autofill_noplatform_success/onnx/cpu_instance/1
 cp -r /data/inferenceserver/${REPO_VERSION}/qa_identity_model_repository/onnx_zero_1_float16/1/model.onnx \
     autofill_noplatform_success/onnx/cpu_instance/1
 
-# Copy resnet50 model into openvino test directories
+# Copy openvino models into test directories
+for modelpath in \
+        autofill_noplatform/openvino/bad_input_dims \
+        autofill_noplatform/openvino/bad_output_dims \
+        autofill_noplatform/openvino/too_few_inputs \
+        autofill_noplatform/openvino/too_many_inputs \
+        autofill_noplatform/openvino/unknown_input \
+        autofill_noplatform/openvino/unknown_output \
+        autofill_noplatform_success/openvino/empty_config \
+        autofill_noplatform_success/openvino/no_config; do
+    cp -r /opt/tritonserver/qa/openvino_models/fixed_batch/1 $modelpath
+done
+cp -r /opt/tritonserver/qa/openvino_models/dynamic_batch/1 \
+    autofill_noplatform_success/openvino/dynamic_batch
+# Copy openvino resnet50 model
 cp -r /data/inferenceserver/${REPO_VERSION}/openvino_model_store/resnet50_int8_openvino/1 \
     autofill_noplatform_success/openvino/partial_config
 cp /data/inferenceserver/${REPO_VERSION}/openvino_model_store/resnet50_int8_openvino/labels.txt \

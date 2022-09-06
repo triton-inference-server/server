@@ -1,5 +1,5 @@
 <?xml version="1.0" ?>
-<net name="no_config" version="11">
+<net name="fixed_batch" version="11">
 	<layers>
 		<layer id="1" name="input0" type="Parameter" version="opset1">
 			<data shape="1,4" element_type="i32"/>
