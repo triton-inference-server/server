@@ -390,7 +390,7 @@ KafkaEndpoint::ParseInferenceRequestPayload(
 
     // Parse BINARY_DATA_SIZE
     bool binary_payload = false;
-    size_t payload_length;
+    size_t payload_length = 0;
     triton::common::TritonJson::Value params_json;
     if (request_input.Find("parameters", &params_json)) {
       triton::common::TritonJson::Value binary_data_size_json;
