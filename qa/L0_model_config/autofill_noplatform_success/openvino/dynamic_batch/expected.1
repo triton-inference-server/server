@@ -4,7 +4,7 @@ version_policy {
     num_versions: 1
   }
 }
-max_batch_size: 1
+max_batch_size: 4
 input {
   name: "input1"
   data_type: TYPE_INT32
@@ -31,6 +31,9 @@ instance_group {
   kind: KIND_CPU
 }
 default_model_filename: "model.xml"
+dynamic_batching {
+  preferred_batch_size: 4
+}
 optimization {
   input_pinned_memory {
     enable: true

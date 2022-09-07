@@ -277,10 +277,10 @@ for modelpath in \
 done
 cp -r /opt/tritonserver/qa/openvino_models/dynamic_batch/1 \
     autofill_noplatform_success/openvino/dynamic_batch
-# Copy openvino resnet50 model
-cp -r /data/inferenceserver/${REPO_VERSION}/openvino_model_store/resnet50_int8_openvino/1 \
+# Copy openvino model from qa_model_repository
+cp -r /data/inferenceserver/${REPO_VERSION}/qa_model_repository/openvino_int8_int8_int8/1 \
     autofill_noplatform_success/openvino/partial_config
-cp /data/inferenceserver/${REPO_VERSION}/openvino_model_store/resnet50_int8_openvino/labels.txt \
+cp /data/inferenceserver/${REPO_VERSION}/qa_model_repository/openvino_int8_int8_int8/output0_labels.txt \
     autofill_noplatform_success/openvino/partial_config
 
 rm -f $SERVER_LOG_BASE* $CLIENT_LOG
