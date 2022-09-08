@@ -1,0 +1,1 @@
+model 'bad_input_dims', tensor 'input1': the model expects 2 dimensions (shape \[1,4\]) but the model configuration specifies 2 dimensions (shape \[1,256\])

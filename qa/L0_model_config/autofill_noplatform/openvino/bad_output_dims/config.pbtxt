@@ -1,0 +1,12 @@
+output {
+  name: "Func/PartitionedCall/output/_2:0"
+  data_type: TYPE_INT32
+  dims: 1
+  dims: 128
+}
+output {
+  name: "Func/PartitionedCall/output/_3:0"
+  data_type: TYPE_INT32
+  dims: 1
+  dims: 4
+}

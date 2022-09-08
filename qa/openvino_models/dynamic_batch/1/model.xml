@@ -1,0 +1,166 @@
+<?xml version="1.0" ?>
+<net name="dynamic_batch" version="11">
+	<layers>
+		<layer id="1" name="Func/PartitionedCall/input/_0/placeholder_out_port_0" type="Parameter" version="opset1">
+			<data shape="1,4" element_type="i32"/>
+			<rt_info>
+				<attribute name="fused_names" version="0" value="Func/PartitionedCall/input/_0/placeholder_out_port_0"/>
+			</rt_info>
+			<output>
+				<port id="0" precision="I32" names="Func/PartitionedCall/input/_0:0">
+					<dim>1</dim>
+					<dim>4</dim>
+					<rt_info>
+						<attribute name="layout" version="0" layout="[N,H]"/>
+					</rt_info>
+				</port>
+			</output>
+		</layer>
+		<layer id="0" name="input1" type="Parameter" version="opset1">
+			<data shape="1,4" element_type="i32"/>
+			<rt_info>
+				<attribute name="fused_names" version="0" value="input1"/>
+			</rt_info>
+			<output>
+				<port id="0" precision="I32" names="input1,input1:0">
+					<dim>1</dim>
+					<dim>4</dim>
+					<rt_info>
+						<attribute name="layout" version="0" layout="[N,H]"/>
+					</rt_info>
+				</port>
+			</output>
+		</layer>
+		<layer id="2" name="PartitionedCall/model/tf.math.subtract/Sub" type="Subtract" version="opset1">
+			<data auto_broadcast="numpy"/>
+			<rt_info>
+				<attribute name="fused_names" version="0" value="PartitionedCall/model/tf.math.subtract/Sub, PartitionedCall/model/tf.math.subtract/Sub/neg_"/>
+			</rt_info>
+			<input>
+				<port id="0" precision="I32">
+					<dim>1</dim>
+					<dim>4</dim>
+				</port>
+				<port id="1" precision="I32">
+					<dim>1</dim>
+					<dim>4</dim>
+				</port>
+			</input>
+			<output>
+				<port id="2" precision="I32" names="Func/PartitionedCall/output/_3:0,Identity_1:0,PartitionedCall/Identity_1:0,PartitionedCall/model/tf.math.subtract/Sub:0">
+					<dim>1</dim>
+					<dim>4</dim>
+					<rt_info>
+						<attribute name="layout" version="0" layout="[N,H]"/>
+					</rt_info>
+				</port>
+			</output>
+		</layer>
+		<layer id="4" name="PartitionedCall/model/tf.math.add/Add" type="Add" version="opset1">
+			<data auto_broadcast="numpy"/>
+			<rt_info>
+				<attribute name="fused_names" version="0" value="PartitionedCall/model/tf.math.add/Add"/>
+			</rt_info>
+			<input>
+				<port id="0" precision="I32">
+					<dim>1</dim>
+					<dim>4</dim>
+				</port>
+				<port id="1" precision="I32">
+					<dim>1</dim>
+					<dim>4</dim>
+				</port>
+			</input>
+			<output>
+				<port id="2" precision="I32" names="Func/PartitionedCall/output/_2:0,Identity:0,PartitionedCall/Identity:0,PartitionedCall/model/tf.math.add/Add:0">
+					<dim>1</dim>
+					<dim>4</dim>
+					<rt_info>
+						<attribute name="layout" version="0" layout="[N,H]"/>
+					</rt_info>
+				</port>
+			</output>
+		</layer>
+		<layer id="5" name="Func/PartitionedCall/output/_2:0" type="Result" version="opset1">
+			<rt_info>
+				<attribute name="fused_names" version="0" value="Func/PartitionedCall/output/_2:0"/>
+			</rt_info>
+			<input>
+				<port id="0" precision="I32">
+					<dim>1</dim>
+					<dim>4</dim>
+				</port>
+			</input>
+		</layer>
+		<layer id="3" name="Func/PartitionedCall/output/_3:0" type="Result" version="opset1">
+			<rt_info>
+				<attribute name="fused_names" version="0" value="Func/PartitionedCall/output/_3:0"/>
+			</rt_info>
+			<input>
+				<port id="0" precision="I32">
+					<dim>1</dim>
+					<dim>4</dim>
+				</port>
+			</input>
+		</layer>
+	</layers>
+	<edges>
+		<edge from-layer="0" from-port="0" to-layer="2" to-port="1"/>
+		<edge from-layer="0" from-port="0" to-layer="4" to-port="1"/>
+		<edge from-layer="1" from-port="0" to-layer="2" to-port="0"/>
+		<edge from-layer="1" from-port="0" to-layer="4" to-port="0"/>
+		<edge from-layer="2" from-port="2" to-layer="3" to-port="0"/>
+		<edge from-layer="4" from-port="2" to-layer="5" to-port="0"/>
+	</edges>
+	<meta_data>
+		<MO_version value="2022.1.0-7019-cdb9bec7210-releases/2022/1"/>
+		<Runtime_version value="2022.1.0-7019-cdb9bec7210-releases/2022/1"/>
+		<legacy_path value="True"/>
+		<cli_parameters>
+			<auto_disable_nhwc_to_nchw value="True"/>
+			<caffe_parser_path value="DIR"/>
+			<compress_fp16 value="False"/>
+			<data_type value="float"/>
+			<disable_nhwc_to_nchw value="False"/>
+			<disable_omitting_optional value="False"/>
+			<disable_resnet_optimization value="False"/>
+			<disable_weights_compression value="False"/>
+			<enable_concat_optimization value="False"/>
+			<enable_flattening_nested_params value="False"/>
+			<enable_ssd_gluoncv value="False"/>
+			<extensions value="DIR"/>
+			<framework value="tf"/>
+			<freeze_placeholder_with_value value="{}"/>
+			<input value="Func/PartitionedCall/input/_0:0,input1"/>
+			<input_model_is_text value="False"/>
+			<k value="DIR/CustomLayersMapping.xml"/>
+			<layout value="Func/PartitionedCall/input/_0:0(nh),input1(nh),Func/PartitionedCall/output/_2:0(nh),Func/PartitionedCall/output/_3:0(nh)"/>
+			<layout_values value="{'Func/PartitionedCall/input/_0:0': {'source_layout': 'nh', 'target_layout': None, 'is_input': True}, 'input1': {'source_layout': 'nh', 'target_layout': None, 'is_input': True}, 'Func/PartitionedCall/output/_2:0': {'source_layout': 'nh', 'target_layout': None, 'is_input': False}, 'Func/PartitionedCall/output/_3:0': {'source_layout': 'nh', 'target_layout': None, 'is_input': False}}"/>
+			<legacy_mxnet_model value="False"/>
+			<log_level value="ERROR"/>
+			<mean_scale_values value="{}"/>
+			<mean_values value="()"/>
+			<model_name value="saved_model"/>
+			<output_dir value="DIR"/>
+			<packed_user_shapes value="defaultdict(&lt;class 'list'&gt;, {'Func/PartitionedCall/input/_0': [{'shape': (1, 4), 'out': 0, 'data_type': &lt;class 'numpy.int32'&gt;, 'added': True}], 'input1': [{'shape': (1, 4), 'port': None, 'data_type': &lt;class 'numpy.int32'&gt;, 'added': True}]})"/>
+			<placeholder_data_types value="{'Func/PartitionedCall/input/_0:0': &lt;class 'numpy.int32'&gt;, 'input1': &lt;class 'numpy.int32'&gt;}"/>
+			<placeholder_shapes value="{'Func/PartitionedCall/input/_0:0': (1, 4), 'input1': (1, 4)}"/>
+			<progress value="False"/>
+			<remove_memory value="False"/>
+			<remove_output_softmax value="False"/>
+			<reverse_input_channels value="False"/>
+			<save_params_from_nd value="False"/>
+			<saved_model_dir value="DIR"/>
+			<scale_values value="()"/>
+			<silent value="False"/>
+			<source_layout value="()"/>
+			<static_shape value="False"/>
+			<stream_output value="False"/>
+			<target_layout value="()"/>
+			<transform value=""/>
+			<use_legacy_frontend value="False"/>
+			<use_new_frontend value="False"/>
+			<unset unset_cli_parameters="batch, counts, disable_fusing, finegrain_fusing, input_checkpoint, input_meta_graph, input_model, input_proto, input_shape, input_symbol, mean_file, mean_file_offsets, nd_prefix_name, output, pretrained_model_name, saved_model_tags, scale, tensorboard_logdir, tensorflow_custom_layer_libraries, tensorflow_custom_operations_config_update, tensorflow_object_detection_api_pipeline_config, tensorflow_use_custom_operations_config, transformations_config"/>
+		</cli_parameters>
+	</meta_data>
+</net>
