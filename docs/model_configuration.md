@@ -278,7 +278,7 @@ fill in missing [`instance_group`](#instance-groups) settings with
 default values.
 
 Triton can derive all the required settings automatically for
-most of the TensorRT, TensorFlow saved-model, and ONNX models.
+most of the TensorRT, TensorFlow saved-model, ONNX models, and OpenVINO models.
 For Python models, [`auto_complete_config`](https://github.com/triton-inference-server/python_backend/#auto_complete_config)
 function can be implemented in Python backend to provide
 [`max_batch_size`](#maximum-batch-size), [`input`](#inputs-and-outputs)
