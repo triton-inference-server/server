@@ -65,8 +65,6 @@ else
     PERF_CLIENT=../clients/perf_client
 fi
 
-set +e
-
 # Overload use of PERF_CLIENT_PROTOCOL for convenience with existing test and 
 # reporting structure, though "triton_c_api" is not strictly a "protocol".
 if [[ "${PERF_CLIENT_PROTOCOL}" == "triton_c_api" ]]; then
@@ -89,11 +87,13 @@ else
     # Must warmup similar to actual run so that all instances are ready
     # Note: Running extra PA for warmup doesn't make sense for C API since it
     # uses in-process tritonserver which will exit along with this PA process.
+    set +e
     $PERF_CLIENT -v -m $MODEL_NAME -p${MEASUREMENT_WINDOW} \
                     -b${STATIC_BATCH} --concurrency-range ${CONCURRENCY} \
                     ${SERVICE_ARGS}
+    set -e
 fi
-
+set +e
 # Measure perf client results and write them to a file for reporting
 $PERF_CLIENT -v -m $MODEL_NAME -p${MEASUREMENT_WINDOW} \
                 -b${STATIC_BATCH} --concurrency-range ${CONCURRENCY} \
