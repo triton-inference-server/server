@@ -470,7 +470,7 @@ For gRPC, see the following options:
 
 More details here: https://grpc.github.io/grpc/cpp/structgrpc_1_1_ssl_credentials_options.html
 
-The [inference protocol gRPC SSL/TLS section](inference_protocols.md#ssltls) describes server-side options to configure SSL/TLS in Triton's gRPC endpoint.
+The [inference protocol gRPC SSL/TLS section](../customization_guide/inference_protocols.md#ssltls) describes server-side options to configure SSL/TLS in Triton's gRPC endpoint.
 
 For HTTPS, the following options are exposed:
 

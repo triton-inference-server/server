@@ -47,7 +47,7 @@ before loading a model.
 
 A model can use one or more repository agents by specifying them in
 the *ModelRepositoryAgents* section of the [model
-configuration](model_configuration.md). Each repository agent can have
+configuration](../user_guide/model_configuration.md). Each repository agent can have
 parameters specific to that agent that are specified in the model
 configuration to control the behavior of the agent. To understand the
 parameters available for a given agent consult the documentation for
