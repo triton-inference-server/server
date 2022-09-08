@@ -51,7 +51,7 @@ version 2.
 
 * The HTTP/REST and GRPC protocols, while conceptually similar to
   version 1, are completely changed in version 2. See [inference
-  protocols](inference_protocols.md) for more information.
+  protocols](../customization_guide/inference_protocols.md) for more information.
 
 * Python and C++ client libraries are re-implemented to match the new
   HTTP/REST and GRPC protocols. The Python client no longer depends on

@@ -96,7 +96,7 @@ deep-learning models loaded by the inference server.
 The Triton Inference Server exposes performance information in two
 ways: by [Prometheus metrics](metrics.md) and by the statistics
 available through the [HTTP/REST, GRPC, and C
-APIs](inference_protocols.md).
+APIs](../customization_guide/inference_protocols.md).
 
 A client application, [perf_analyzer](perf_analyzer.md), allows you to
 measure the performance of an individual model using a synthetic

@@ -80,7 +80,7 @@ this configuration setting will throw errors at the runtime.
 
 ## Running Inference on Decoupled Models
 
-[Inference Protocols and APIs](inference_protocols.md) describes various ways
+[Inference Protocols and APIs](../customization_guide/inference_protocols.md) describes various ways
 a client can communicate and run inference on the server. For decoupled models,
 Triton's HTTP endpoint cannot be used for running inference as it supports
 exactly one response per request. Even standard ModelInfer RPC in the GRPC endpoint
@@ -90,7 +90,7 @@ model, the client must use the bi-directional streaming RPC. See
 for more details. The [decoupled_test.py](../qa/L0_decoupled/decoupled_test.py) demonstrates
 how the gRPC streaming can be used to infer decoupled models.
 
-If using [Triton's in-process C API](inference_protocols.md#in-process-triton-server-api),
+If using [Triton's in-process C API](../customization_guide/inference_protocols.md#in-process-triton-server-api),
 your application should be cognizant that the callback function you registered with 
 `TRITONSERVER_InferenceRequestSetResponseCallback` can be invoked any number of times,
 each time with a new response. You can take a look at [grpc_server.cc](../src/grpc_server.cc)

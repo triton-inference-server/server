@@ -30,7 +30,7 @@
 
 Triton provides model management APIs are part of the [HTTP/REST and
 GRPC protocols, and as part of the C
-API](inference_protocols.md). Triton operates in one of three model
+API](../customization_guide/inference_protocols.md). Triton operates in one of three model
 control modes: NONE, EXPLICIT or POLL. The model control mode
 determines how changes to the model repository are handled by Triton
 and which of these protocols and APIs are available.
@@ -155,7 +155,7 @@ sub-directory](model_repository.md#repository-layout). The activity
 allowed on the contents of a model's sub-directory varies depending on
 how Triton is using that model. The state of a model can be determined
 by using the [model
-metadata](inference_protocols.md#inference-protocols-and-apis) or
+metadata](../customization_guide/inference_protocols.md#inference-protocols-and-apis) or
 [repository index](protocol/extension_model_repository.md#index) APIs.
 
 * If the model is actively loading or unloading, no files or

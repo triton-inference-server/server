@@ -40,8 +40,8 @@ Triton Inference Server support on JetPack includes:
 * [Dynamic batching](architecture.md#models-and-schedulers)
 * [Model pipelines](architecture.md#ensemble-models)
 * [Extensible backends](https://github.com/triton-inference-server/backend)
-* [HTTP/REST and GRPC inference protocols](inference_protocols.md)
-* [C API](inference_protocols.md#in-process-triton-server-api)
+* [HTTP/REST and GRPC inference protocols](../customization_guide/inference_protocols.md)
+* [C API](../customization_guide/inference_protocols.md#in-process-triton-server-api)
 
 Limitations on JetPack 5.0:
 
@@ -52,7 +52,7 @@ The CUDA execution provider is in Beta.
 * GPU metrics, GCS storage, S3 storage and Azure storage are not supported.
 
 On JetPack, although HTTP/REST and GRPC inference protocols are supported, for edge
-use cases, direct [C API integration](inference_protocols.md#in-process-triton-server-api)
+use cases, direct [C API integration](../customization_guide/inference_protocols.md#in-process-triton-server-api)
 is recommended.
 
 You can download the `.tgz` file for Jetson from the Triton Inference Server
@@ -206,4 +206,4 @@ perf_analyzer -m graphdef_int32_int32_int32 --service-kind=triton_c_api \
     --model-repository=/workspace/qa/L0_perf_analyzer_capi/models
 ```
 
-Refer to these [examples](examples/jetson) that demonstrate how to use Triton Inference Server on Jetson.
+Refer to these [examples](../examples/jetson) that demonstrate how to use Triton Inference Server on Jetson.
