@@ -101,7 +101,7 @@ Image '/workspace/images/mug.jpg':
     10.422965 (505) = COFFEEPOT
 ```
 Please read the [QuickStart](docs/getting_started/quickstart.md) guide for additional information
-regarding this example. The quickstart guide also contains an example of how to launch Triton on [CPU-only systems](docs/getting_started/quickstart.md#run-on-cpu-only-system).
+regarding this example. The quickstart guide also contains an example of how to launch Triton on [CPU-only systems](docs/getting_started/quickstart.md#run-on-cpu-only-system). New to Triton and wondering where to get started? Watch the [Getting Started video](https://youtu.be/NQDtfSi5QF4).
 
 ## Examples and Tutorials
 
