@@ -48,12 +48,12 @@ leading to a streamlined deployment.
 ## Can Triton Inference Server run on systems that don't have GPUs?
 
 Yes, the QuickStart guide describes how to [run Triton on a CPU-Only
-System](quickstart.md#run-on-cpu-only-system).
+System](../getting_started/quickstart.md#run-on-cpu-only-system).
 
 ## Can Triton Inference Server be used in non-Docker environments?
 
 Yes. Triton Inference Server can also be [built from
-source](build.md#building-without-docker) on your "bare metal"
+source](../customization_guide/build.md#building-without-docker) on your "bare metal"
 system.
 
 ## Do you provide client libraries for languages other than C++ and Python?
@@ -84,7 +84,7 @@ library to suit your specific needs.
 
 In an AWS environment, the Triton Inference Server docker container
 can run on [CPU-only instances or GPU compute
-instances](quickstart.md#run-triton). Triton can run directly on the
+instances](../getting_started/quickstart.md#run-triton). Triton can run directly on the
 compute instance or inside Elastic Kubernetes Service (EKS). In
 addition, other AWS services such as Elastic Load Balancer (ELB) can
 be used for load balancing traffic among multiple Triton
@@ -155,7 +155,7 @@ available Triton instances.
 
 The NGC build is a Release build and does not contain Debug symbols. 
 The build.py as well defaults to a Release build. Refer to the instructions
-in [build.md](build.md#building-with-debug-symbols) to create a Debug build
+in [build.md](../customization_guide/build.md#building-with-debug-symbols) to create a Debug build
 of Triton. This will help find the cause of the segmentation fault when
 looking at the gdb trace for the segfault.
 

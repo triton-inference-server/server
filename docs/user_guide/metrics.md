@@ -92,7 +92,7 @@ Count*. The count metrics are illustrated by the following examples:
 |Count         |Success Count   |`nv_inference_request_success` |Number of successful inference requests received by Triton (each request is counted as 1, even if the request contains a batch) |Per model  |Per request  |
 |              |Failure Count   |`nv_inference_request_failure` |Number of failed inference requests received by Triton (each request is counted as 1, even if the request contains a batch) |Per model  |Per request  |
 |              |Inference Count |`nv_inference_count` |Number of inferences performed (a batch of "n" is counted as "n" inferences, does not include cached requests)|Per model|Per request|
-|              |Execution Count |`nv_inference_exec_count` |Number of inference batch executions (see [Count Metrics](#count-metrics), does not include cached requests)|Per model|Per request|
+|              |Execution Count |`nv_inference_exec_count` |Number of inference batch executions (see [Inference Request Metrics](#inference-request-metrics), does not include cached requests)|Per model|Per request|
 |Latency       |Request Time    |`nv_inference_request_duration_us` |Cumulative end-to-end inference request handling time (includes cached requests) |Per model  |Per request  |
 |              |Queue Time      |`nv_inference_queue_duration_us` |Cumulative time requests spend waiting in the scheduling queue (includes cached requests) |Per model  |Per request  |
 |              |Compute Input Time|`nv_inference_compute_input_duration_us` |Cumulative time requests spend processing inference inputs (in the framework backend, does not include cached requests)     |Per model  |Per request  |
@@ -135,7 +135,7 @@ If building Triton locally, the `TRITON_ENABLE_METRICS_CPU` CMake build flag can
 
 Compute latency metrics in the [Inference Request Metrics table](#inference-request-metrics) above are calculated for the
 time spent in model inference backends. If the response cache is enabled for a
-given model (see [Response Cache](https://github.com/triton-inference-server/server/blob/main/docs/response_cache.md)
+given model (see [Response Cache](response_cache.md)
 docs for more info), total inference times may be affected by response cache
 lookup times.
 

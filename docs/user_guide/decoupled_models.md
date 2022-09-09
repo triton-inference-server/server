@@ -87,10 +87,10 @@ exactly one response per request. Even standard ModelInfer RPC in the GRPC endpo
 does not support decoupled responses. In order to run inference on a decoupled
 model, the client must use the bi-directional streaming RPC. See
 [here](https://github.com/triton-inference-server/common/blob/main/protobuf/grpc_service.proto)
-for more details. The [decoupled_test.py](../qa/L0_decoupled/decoupled_test.py) demonstrates
+for more details. The [decoupled_test.py](../../qa/L0_decoupled/decoupled_test.py) demonstrates
 how the gRPC streaming can be used to infer decoupled models.
 
 If using [Triton's in-process C API](../customization_guide/inference_protocols.md#in-process-triton-server-api),
 your application should be cognizant that the callback function you registered with 
 `TRITONSERVER_InferenceRequestSetResponseCallback` can be invoked any number of times,
-each time with a new response. You can take a look at [grpc_server.cc](../src/grpc_server.cc)
+each time with a new response. You can take a look at [grpc_server.cc](../../src/grpc_server.cc)
