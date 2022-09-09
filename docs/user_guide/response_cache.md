@@ -75,7 +75,7 @@ configuration. **By default, no model uses response caching even if the response
 cache is enabled with the `--response-cache-byte-size` flag.** For more
 information on enabling the response cache for each model, see the [model
 configuration
-docs](https://github.com/triton-inference-server/server/blob/main/docs/model_configuration.md#response-cache).
+docs](model_configuration.md#response-cache).
 
 ## Replacement Policy
 
@@ -121,4 +121,4 @@ of managing the cache.
   are eligible for caching. The Sequence Batcher does not currently support
   response caching.
 - The response cache does not currently support
-  [decoupled models](https://github.com/triton-inference-server/server/blob/main/docs/decoupled_models.md).
+  [decoupled models](decoupled_models.md).

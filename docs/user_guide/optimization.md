@@ -32,7 +32,7 @@ The Triton Inference Server has many features that you can use to
 decrease latency and increase throughput for your model. This section
 discusses these features and demonstrates how you can use them to
 improve the performance of your model. As a prerequisite you should
-follow the [QuickStart](quickstart.md) to get Triton and client
+follow the [QuickStart](../getting_started/quickstart.md) to get Triton and client
 examples running with the example model repository.
 
 This section focuses on understanding latency and throughput tradeoffs
@@ -49,10 +49,10 @@ performance.
 
 As a running example demonstrating the optimization features and
 options, we will use a TensorFlow Inception model that you can obtain
-by following the [QuickStart](quickstart.md). As a baseline we use
+by following the [QuickStart](../getting_started/quickstart.md). As a baseline we use
 perf_analyzer to determine the performance of the model using a [basic
 model configuration that does not enable any performance
-features](examples/model_repository/inception_graphdef/config.pbtxt).
+features](../examples/model_repository/inception_graphdef/config.pbtxt).
 
 ```
 $ perf_analyzer -m inception_graphdef --percentile=95 --concurrency-range 1:4
@@ -91,7 +91,7 @@ larger batch that will often execute much more efficiently than
 executing the individual requests independently. To enable the dynamic
 batcher stop Triton, add the following line to the end of the [model
 configuration file for
-inception_graphdef](examples/model_repository/inception_graphdef/config.pbtxt),
+inception_graphdef](../examples/model_repository/inception_graphdef/config.pbtxt),
 and then restart Triton.
 
 ```
@@ -159,7 +159,7 @@ remove any dynamic batching settings you may have previously added to
 the model configuration (we discuss combining dynamic batcher and
 multiple model instances below), add the following lines to the end of
 the [model configuration
-file](examples/model_repository/inception_graphdef/config.pbtxt), and
+file](../examples/model_repository/inception_graphdef/config.pbtxt), and
 then restart Triton.
 
 ```
@@ -222,10 +222,10 @@ policy](model_configuration.md#optimization-policy).
 One especially powerful optimization is to use TensorRT in
 conjunction with an ONNX model. As an example of TensorRT optimization
 applied to an ONNX model, we will use an ONNX DenseNet model that you
-can obtain by following [QuickStart](quickstart.md). As a baseline we
+can obtain by following [QuickStart](../getting_started/quickstart.md). As a baseline we
 use perf_analyzer to determine the performance of the model using a
 [basic model configuration that does not enable any performance
-features](examples/model_repository/densenet_onnx/config.pbtxt).
+features](../examples/model_repository/densenet_onnx/config.pbtxt).
 
 ```
 $ perf_analyzer -m densenet_onnx --percentile=95 --concurrency-range 1:4
@@ -310,10 +310,10 @@ section of the model configuration protobuf.
 
 As an example of TensorRT optimization applied to a TensorFlow model,
 we will use a TensorFlow Inception model that you can obtain by
-following the [QuickStart](quickstart.md). As a baseline we use
+following the [QuickStart](../getting_started/quickstart.md). As a baseline we use
 perf_analyzer to determine the performance of the model using a [basic
 model configuration that does not enable any performance
-features](examples/model_repository/inception_graphdef/config.pbtxt).
+features](../examples/model_repository/inception_graphdef/config.pbtxt).
 
 ```
 $ perf_analyzer -m inception_graphdef --percentile=95 --concurrency-range 1:4
@@ -379,8 +379,9 @@ to evaluate the model's performance with and without the optimization.
 
 Many modern CPUs are composed of multiple cores, memories and interconnects that
 expose different performance characteristics depending on how threads and
-data are allocated [cite https://www.kernel.org/doc/html/latest/vm/numa.html].
-Triton allows you to set host policies that describe this NUMA configuration for
+data are allocated.
+Triton allows you to set host policies that describe this
+[NUMA](https://www.kernel.org/doc/html/latest/mm/numa.html) configuration for
 your system and then assign model instances to different host policies
 to exploit these NUMA properties.
 
