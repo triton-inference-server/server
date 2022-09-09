@@ -343,13 +343,13 @@ RUN pip3 install 'boofuzz==0.3.0'
 
 # go needed for example go client test.
 RUN if [ "$TARGETPLATFORM" = "linux/arm64" ]; then \
-      wget https://golang.org/dl/go1.16.3.linux-arm64.tar.gz && \
-      rm -rf /usr/local/go && tar -C /usr/local -xzf go1.16.3.linux-arm64.tar.gz && \
-      rm -f go1.16.3.linux-arm64.tar.gz; \
+      wget https://golang.org/dl/go1.19.1.linux-arm64.tar.gz && \
+      rm -rf /usr/local/go && tar -C /usr/local -xzf go1.19.1.linux-arm64.tar.gz && \
+      rm -f go1.19.1.linux-arm64.tar.gz; \
     else \
-      wget https://golang.org/dl/go1.16.3.linux-amd64.tar.gz && \
-      rm -rf /usr/local/go && tar -C /usr/local -xzf go1.16.3.linux-amd64.tar.gz && \
-      rm -f go1.16.3.linux-amd64.tar.gz; \
+      wget https://golang.org/dl/go1.19.1.linux-amd64.tar.gz && \
+      rm -rf /usr/local/go && tar -C /usr/local -xzf go1.19.1.linux-amd64.tar.gz && \
+      rm -f go1.19.1.linux-amd64.tar.gz; \
     fi
 ENV GOPATH /root/go
 ENV PATH $PATH:/usr/local/go/bin:$GOPATH/bin
