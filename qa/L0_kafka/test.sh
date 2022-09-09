@@ -62,6 +62,7 @@ pip install kafka-python
 pip install tritonclient[all]
 
 # Get and install kafka test server
+# Set up derived from https://kafka.apache.org/quickstart
 wget https://dlcdn.apache.org/kafka/3.2.1/kafka_2.13-3.2.1.tgz
 tar -xzf kafka_2.13-3.2.1.tgz
 kafka_2.13-3.2.1/bin/zookeeper-server-start.sh kafka_2.13-3.2.1/config/zookeeper.properties &
@@ -165,3 +166,4 @@ else
 fi
 
 exit $RET
+

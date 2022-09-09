@@ -453,8 +453,6 @@ using JSON before being converted into a string and sent to the Kafka
 broker. As such, the schemas outlined below will be represented as
 JSON objects for simplicity, where $number and $string refer to the
 fundamental JSON types. #optional indicates an optional JSON field.
-$string($number) refers to an integer value that has been converted
-to a string.
 
 ## Kafka Inference Request
 Once the Kafka endpoint is running, Triton will begin consuming inference
@@ -467,10 +465,10 @@ The inference request header should have the following format:
 ```C++
 $inference_request_header
 {
-  "id" : $string($number),
+  "id" : $number,
   "model_name" : $string,
-  "model_version" : $string($number),
-  "payload_schema_length" : $string($number),
+  "model_version" : $number,
+  "payload_schema_length" : $number,
   "response_topic" : $string, //optional
   "response_key" : $string //optional
 }
@@ -502,9 +500,9 @@ Where a $request_input is defined as:
 $request_input
 {
   "name" : $string,
-  "shape" : $string([ $number, ... ]),
+  "shape" : [ $number, ... ],
   "datatype"  : $string,
-  "parameters" : {"binary_data_size":$string(int)}
+  "parameters" : {"binary_data_size":$number}
 }
 ```
 * "name" : The name of the input tensor.
@@ -546,10 +544,10 @@ The inference response header will have the following format:
 ```C++
 $inference_response_header
 {
-  "id" : $string($number),
+  "id" : $number,
   "model_name" : $string,
-  "model_version" : $string($number),
-  "payload_schema_length" : $string($number),
+  "model_version" : $number,
+  "payload_schema_length" : $number,
 }
 ```
 * "id" : A unique identifier corresponding  to the original inference request.
@@ -575,8 +573,8 @@ $response_output
 {
   "name" : $string,
   "datatype"  : $string,
-  "shape" : $string([ $number, ... ]),
-  "parameters" : {"binary_data_size":$string(int)}
+  "shape" : [ $number, ... ],
+  "parameters" : {"binary_data_size":$number}
 }
 ```
 * "name" : The name of the output tensor.
