@@ -1130,3 +1130,61 @@ def infer_zero(tester,
                 shm.destroy_shared_memory_region(shm_op_handles[io_num])
 
     return results
+
+def inferKafka(model_name,
+               inputs,
+               kafka_obj,
+               model_version="",
+               outputs=None,
+               request_id=""):
+
+    # Use http client to generate body
+    kafka_value, json_size = httpclient._get_inference_request(
+            inputs=inputs,
+            request_id=request_id,
+            outputs=outputs,
+            sequence_id="",
+            sequence_start=False,
+            sequence_end=False,
+            priority=0,
+            timeout=None)
+
+    headers = [
+        ("model_name", model_name.encode()),
+        ("model_version", model_version.encode()),
+        ("id", request_id.encode()),
+        ("payload_schema_length", str(json_size).encode())
+    ]
+    
+    kafka_obj.producer_.send(kafka_obj.producer_topic_, value=kafka_value, headers=headers)
+    kafka_obj.producer_.flush()
+
+    print(kafka_obj.producer_topic_)
+    print(kafka_obj.consumer_topics_)
+    time.sleep(2)
+
+    response_msg = kafka_obj.consume_requests()
+
+    ret_dict = {}
+    for header_attr in response_msg.headers:
+        ret_dict[header_attr[0]] = header_attr[1].decode()
+
+    header_length_pair = [header_attr for header_attr in response_msg.headers if header_attr[0] == "payload_schema_length"]
+    header_length = int(header_length_pair[0][1].decode())
+    msg_header = response_msg.value[:header_length].decode()
+    msg_header_json = json.loads(msg_header)
+    offset = header_length
+    output_list = []
+    
+    for output in msg_header_json["outputs"]:
+        datatype = triton_to_np_dtype(output["datatype"])
+        output_length = output["parameters"]["binary_data_size"]
+        output_payload = response_msg.value[offset:offset+output_length]
+        output_payload = np.frombuffer(output_payload, datatype)
+        output["data"] = output_payload.reshape(output["shape"])
+        output_list.append(output)
+        offset += output_length
+
+    ret_dict["outputs"] = output_list
+    return ret_dict
+
