@@ -103,7 +103,7 @@ std::string http_address_ = "0.0.0.0";
 #if TRITON_ENABLE_KAFKA
 bool allow_kafka_ = true;
 std::unique_ptr<triton::server::KafkaEndpoint> kafka_service_;
-std::string kafka_port_ = "localhost:9092";
+std::string kafka_port_;
 std::vector<std::string> kafka_consumer_topic_;
 #endif  // TRITON_ENABLE_KAFKA
 

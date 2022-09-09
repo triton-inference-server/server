@@ -76,7 +76,7 @@ KafkaEndpoint::Create(
   kafka_endpoint->reset(
       new KafkaEndpoint(server, shm_manager, port, consumer_topics));
 
-  LOG_INFO << "Started Kafka Endpoint, subscribed to port: " << port;
+  LOG_INFO << "Started Kafka Endpoint. Specified broker port: " << port;
 
   return nullptr;  // Success
 }
@@ -143,10 +143,20 @@ KafkaEndpoint::CreateInferenceResponse(
     std::vector<std::pair<std::string, std::string>>& header_pair_vector,
     const std::string& val)
 {
+  std::string response_topic =
+      current_request_map_[request_id]["response_topic"];
+  kafka::Key key = kafka::NullKey;
+  if (!current_request_map_[request_id]["response_key"].empty()) {
+    kafka::Value key_string(
+        current_request_map_[request_id]["response_key"].c_str(),
+        current_request_map_[request_id]["response_key"].size());
+    key = kafka::Key(key_string);
+  }
+  LOG_INFO << "Response Topic: " << response_topic;
   LOG_INFO << "Creating inference response";
   std::unique_ptr<kafka::clients::producer::ProducerRecord> response_record(
       std::make_unique<kafka::clients::producer::ProducerRecord>(
-          "output", kafka::NullKey, kafka::Value(val.c_str(), val.size())));
+          response_topic, key, kafka::Value(val.c_str(), val.size())));
   LOG_INFO << "[" << &response_record << "]";
 
   for (auto it = header_pair_vector.begin(); it != header_pair_vector.end();
@@ -225,9 +235,16 @@ KafkaEndpoint::HandleInferenceRequest(
   std::string model_version;
   std::string request_id;
   std::string response_topic;
-  std::string payload_header_length;
+  std::string response_key;
+  std::string payload_schema_length;
   std::map<std::string, std::string> inference_request_map;
   CreateInferenceRequestMap(inference_request_map, inference_request_msg);
+
+  if (request_id.empty()) {
+    return TRITONSERVER_ErrorNew(
+        TRITONSERVER_ERROR_INVALID_ARG,
+        "Request id not provided, but is required.");
+  }
 
   RETURN_IF_ERR(
       FindParameter(inference_request_map, "model_name", &model_name));
@@ -235,14 +252,21 @@ KafkaEndpoint::HandleInferenceRequest(
       FindParameter(inference_request_map, "model_version", &model_version));
   RETURN_IF_ERR(
       FindParameter(inference_request_map, "response_topic", &response_topic));
-  RETURN_IF_ERR(FindParameter(inference_request_map, "id", &request_id));
+  RETURN_IF_ERR(
+      FindParameter(inference_request_map, "response_key", &response_key));
   RETURN_IF_ERR(FindParameter(
-      inference_request_map, "payload_header_length", &payload_header_length));
+      inference_request_map, "payload_schema_length", &payload_schema_length));
 
+  current_request_map_[request_id] = inference_request_map;
+  current_request_map_[request_id]["response_topic"] = response_topic;
+  current_request_map_[request_id]["response_key"] = response_key;
   LOG_INFO << "Request Parsed: [ name: " << model_name
-           << ", version: " << model_version
-           << ", output topic: " << response_topic << ", id: " << request_id
-           << ", payload header length: " << payload_header_length << "]";
+           << ", version: " << model_version << ", response key: "
+           << current_request_map_[request_id]["response_key"]
+           << ", output topic: "
+           << current_request_map_[request_id]["response_topic"]
+           << ", id: " << request_id
+           << ", payload header length: " << payload_schema_length << "]";
 
   int64_t requested_model_version;
   RETURN_IF_ERR(GetModelVersionFromString(
@@ -277,8 +301,20 @@ KafkaEndpoint::CreateInferenceRequestMap(
   for (unsigned long i = 0; i < inference_request_msg.headers().size(); i++) {
     std::string key = inference_request_msg.headers().at(i).key;
     std::string value = inference_request_msg.headers().at(i).value.toString();
-    inference_request_map[key] = value;
+    if (key == "id") {
+      // Don't allow duplicate request IDs
+      if (current_request_map_.find(value) == current_request_map_.end()) {
+        request_id = value;
+      } else {
+        return TRITONSERVER_ErrorNew(
+            TRITONSERVER_ERROR_INVALID_ARG,
+            ("Request id [" + value + "] already exists.").c_str());
+      }
+    } else {
+      inference_request_map[key] = value;
+    }
   }
+  return nullptr;  // Success
 }
 
 TRITONSERVER_Error*
@@ -288,12 +324,19 @@ KafkaEndpoint::FindParameter(
 {
   auto it = inference_request_map.find(parameter);
   if (it == inference_request_map.end()) {
-    LOG_INFO << "Failed to find " << std::string(parameter);
-    return TRITONSERVER_ErrorNew(
-        TRITONSERVER_ERROR_UNAVAILABLE,
-        ("Inference request parameter [" + std::string(parameter) +
-         "] is required, but was not found.")
-            .c_str());
+    if (std::string(parameter) == "response_topic") {
+      *value = producer_topic_;
+      return nullptr;
+    } else if (std::string(parameter) == "response_key") {
+      return nullptr;
+    } else {
+      LOG_INFO << "Failed to find " << std::string(parameter);
+      return TRITONSERVER_ErrorNew(
+          TRITONSERVER_ERROR_UNAVAILABLE,
+          ("Inference request parameter [" + std::string(parameter) +
+           "] is required, but was not found.")
+              .c_str());
+    }
   }
   *value = it->second;
   return nullptr;  // Success
@@ -306,17 +349,17 @@ KafkaEndpoint::ParseInferenceRequestPayload(
     TRITONSERVER_InferenceRequest* irequest, InferRequestClass* infer_req)
 {
   // Convert payload header into a parseable json object
-  int64_t payload_header_length;
+  int64_t payload_schema_length;
   try {
-    payload_header_length =
-        std::stol(inference_request_map["payload_header_length"].c_str());
+    payload_schema_length =
+        std::stol(inference_request_map["payload_schema_length"].c_str());
   }
   catch (std::exception& e) {
     return TRITONSERVER_ErrorNew(
         TRITONSERVER_ERROR_INVALID_ARG,
         std::string(
             "failed to get header length from specified version string '" +
-            inference_request_map["payload_header_length"] + "' (details: " +
+            inference_request_map["payload_schema_length"] + "' (details: " +
             e.what() + "), version should be an integral value > 0")
             .c_str());
   }
@@ -329,7 +372,7 @@ KafkaEndpoint::ParseInferenceRequestPayload(
       payload_ptr, inference_request_msg.value().size());
 
   std::string payload_header =
-      complete_payload.substr(0, payload_header_length);
+      complete_payload.substr(0, payload_schema_length);
   LOG_INFO << "Payload header: " << payload_header;
   triton::common::TritonJson::Value payload_header_json;
   payload_header_json.Parse(payload_header.c_str(), payload_header.size());
@@ -341,7 +384,7 @@ KafkaEndpoint::ParseInferenceRequestPayload(
       "Unable to parse 'inputs'");
 
   std::string binary_data = complete_payload.substr(
-      payload_header_length, (complete_payload.size() - payload_header_length));
+      payload_schema_length, (complete_payload.size() - payload_schema_length));
   int binary_data_offset = 0;
 
   // Iterate over 'input' elements
@@ -681,6 +724,12 @@ KafkaEndpoint::OutputBufferAttributes(
   return nullptr;  // Success
 }
 
+std::unique_ptr<KafkaEndpoint::InferRequestClass>
+KafkaEndpoint::CreateInferRequest()
+{
+  return std::unique_ptr<InferRequestClass>(
+      new InferRequestClass(*this, server_.get()));
+}
 
 void
 KafkaEndpoint::InferRequestClass::InferResponseComplete(
@@ -872,18 +921,13 @@ KafkaEndpoint::InferRequestClass::FinalizeResponse(
     RETURN_IF_ERR(response_outputs.Append(std::move(output_json)));
   }
 
-  /* = {
-      {"model_name", "python_float32_float32_float32"},
-      {"model_version", "1"},
-      {"response_topic", "output"},
-      {"id", "1"},
-      {"payload_header_length", "317"}};*/
-
   RETURN_IF_ERR(response_json.Add("outputs", std::move(response_outputs)));
 
   triton::common::TritonJson::WriteBuffer buffer;
   RETURN_IF_ERR(response_json.Write(&buffer));
   LOG_INFO << "Json response: " << buffer.Base();
+  header_pair_vector.push_back(std::pair<std::string, std::string>(
+      "payload_schema_length", std::to_string(buffer.Size())));
 
   int additional_size = 0;
   if (!ordered_buffers.empty()) {
@@ -905,10 +949,9 @@ KafkaEndpoint::InferRequestClass::FinalizeResponse(
   }
   response_payload[total_size] = '\0';
   LOG_INFO << "Total size: " << total_size;
-  std::string payload(response_payload);
-
-  LOG_INFO << response_payload;
-  //CreateInferenceResponse(header_pair_vector, payload);
+  std::string payload(response_payload, total_size);
+  LOG_INFO << payload.size();
+  parent_.CreateInferenceResponse(header_pair_vector, payload, request_id);
 
   free(response_payload);
 
