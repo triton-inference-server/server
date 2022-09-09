@@ -464,7 +464,7 @@ in the Kafka broker to be comprised of a header and a payload.
 #### Message Header
 The inference request header should have the following format:
 
-```JSON
+```C++
 $inference_request_header
 {
   "id" : $string($number),
@@ -490,7 +490,7 @@ The expected payload of the inference request is composed of two parts:
 schema and inference data (as raw bytes) concatenated together. The payload
 schema should have the following format:
 
-```JSON
+```C++
 $payload_request_schema
 {
   "inputs" : [ $request_input, ... ],
@@ -498,7 +498,7 @@ $payload_request_schema
 }
 ```
 Where a $request_input is defined as:
-```JSON
+```C++
 $request_input
 {
   "name" : $string,
@@ -513,7 +513,7 @@ $request_input
 * "parameters" : Currently only supporting "binary_data_size" which expects the size of the input tensor data in bytes.
 
 And a $request_output is defined as:
-```JSON
+```C++
 request_output
 {
   "name" : $string
@@ -529,7 +529,7 @@ this schema should be inserted in the "payload_schema_length" field of the
 message header. The "..." below represents the raw tensor data that should be 
 appended to this string in order to complete the message payload. According to
 this schema, Triton will expect 768 bytes of tensor data.
-```JSON
+```C++
 {"inputs":[{"name":"INPUT0","shape":[6,16],"datatype":"FP32","parameters":{"binary_data_size":384}},{"name":"INPUT1","shape":[6,16],"datatype":"FP32","parameters":{"binary_data_size":384}}],"outputs":[{"name":"OUTPUT0","parameters":{"binary_data":true}},{"name":"OUTPUT1","parameters":{"binary_data":true}}]}...
 ```
 For additional details regarding how to construct request messages of this form,
@@ -543,7 +543,7 @@ response comprised of a header and a payload.
 
 The inference response header will have the following format:
 
-```JSON
+```C++
 $inference_response_header
 {
   "id" : $string($number),
@@ -562,7 +562,7 @@ The payload of the inference response is composed of two parts:
 schema and inference data (as raw bytes) concatenated together. The payload
 schema will have the following format:
 
-```JSON
+```C++
 $payload_response_schema
 {
   "outputs" : [ $response_output, ... ]
@@ -570,7 +570,7 @@ $payload_response_schema
 ```
 Where a $response_output is defined as: 
 
-```JSON
+```C++
 $response_output
 {
   "name" : $string,
@@ -591,6 +591,6 @@ message header. The "..." below represents the raw tensor data that will be
 appended to this string in order to complete the message payload. According to
 this schema, Triton will send 1,024 bytes of tensor data.
 
-```JSON
+```C++
 {"outputs":[{"name":"OUTPUT0","datatype":"FP32","shape":[8,16],"parameters":{"binary_data_size":512}},{"name":"OUTPUT1","datatype":"FP32","shape":[8,16],"parameters":{"binary_data_size":512}}]}...
 ```
