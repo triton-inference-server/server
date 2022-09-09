@@ -124,7 +124,8 @@ KafkaEndpoint::StartConsumer()
     consumer_ = std::make_unique<kafka::clients::KafkaConsumer>(props);
 
     // Subscribe to topics
-    // TODO NOTE ______
+    // TODO: Currently if a single topic in a list is valid, the server
+    // will not time out, it will silently fail.
     consumer_->subscribe({consumer_topics_});
   }
   catch (const kafka::KafkaException& e) {
@@ -146,6 +147,7 @@ KafkaEndpoint::CreateInferenceResponse(
   std::string response_topic =
       current_request_map_[request_id]["response_topic"];
   kafka::Key key = kafka::NullKey;
+  // TODO: This functionality needs to be tested
   if (!current_request_map_[request_id]["response_key"].empty()) {
     kafka::Value key_string(
         current_request_map_[request_id]["response_key"].c_str(),
@@ -452,7 +454,7 @@ KafkaEndpoint::ParseInferenceRequestPayload(
     LOG_INFO << "Payload length: " << payload_length;
     // Permitted b/c strings are stored as contiguous memory in c++11
     char* start = &binary_data[binary_data_offset];
-    // TODO double check using memcpy
+    // TODO: This should not be necessary. Retry using memcpy.
     unsigned char* base = (unsigned char*)malloc(payload_length + 1);
     for (size_t i = 0; i < payload_length; i++) {
       base[i] = *reinterpret_cast<unsigned char*>(start);
