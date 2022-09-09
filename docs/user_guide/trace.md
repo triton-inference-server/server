@@ -46,7 +46,7 @@ trace multiple informations. Use the --help option to get more information.
 In addition to configure trace settings in command line arguments, The user may
 modify the trace setting when Triton server
 is running via the trace APIs, more information can be found in [trace
-protocol](protocol/extension_trace.md).
+protocol](../protocol/extension_trace.md).
 
 ## Supported Trace Level Option
 
@@ -137,7 +137,7 @@ including its "name", "data" and "dtype". For example:
 
 ## Trace Summary Tool
 
-An example [trace summary tool](../qa/common/trace_summary.py) can be
+An example [trace summary tool](../../qa/common/trace_summary.py) can be
 used to summarize a set of traces collected from Triton. Basic usage
 is:
 

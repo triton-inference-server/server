@@ -61,7 +61,7 @@ version 2.
   more information.
 
 * Building Triton has changed significantly in version 2. See
-  [build](build.md) for more information.
+  [build](../customization_guide/build.md) for more information.
 
 * In the Docker containers the environment variables indicating the
   Triton version have changed to have a TRITON prefix, for example,

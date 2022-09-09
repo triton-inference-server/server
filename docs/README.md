@@ -63,7 +63,7 @@ The User Guide describes how to configure Triton, organize and configure your mo
 * Buillding a Model Pipeline [[Overview](README.md#model-pipeline)]
 * Managing Model Availablity [[Overview](README.md#model-management) || [Details](user_guide/model_management.md)]
 * Collecting Server Metrics [[Overview](README.md#metrics) || [Details](user_guide/metrics.md)]
-* Supporting Custom Ops/layers [[Overview](README.md#framework-custom-operations) || [Details]((user_guide/custom_operations.md))]
+* Supporting Custom Ops/layers [[Overview](README.md#framework-custom-operations) || [Details](user_guide/custom_operations.md)]
 * Using the Client API [[Overview](README.md#client-libraries-and-examples) || [Details](https://github.com/triton-inference-server/client)]
 * Analyzing Performance [[Overview](README.md#performance-analysis)]
 * Deploying on edge (Jetson) [[Overview](README.md#jetson-and-jetpack)]
@@ -133,7 +133,7 @@ Rate limiter manages the rate at which requests are scheduled on model instances
 For a few of the Backends (check [Additional Resources](README.md#resources)) some or all of intialization is deffered till the first inference request is received, the benefit is resource conservation but comes with the downside of the initial requests getting processed slower than expected. Users can pre-"warm up" the model by instructing Triton to intialize the model. [Learn more](user_guide/model_configuration.md#model-warmup). 
 
 #### Inference Request/Response Cache
-Triton has a feature which allows inference responses to get cached. [Learn More](https://github.com/triton-inference-server/server/blob/main/docs/response_cache.md).
+Triton has a feature which allows inference responses to get cached. [Learn More](user_guide/response_cache.md).
 
 ### Model Pipeline
 Building ensembles is as easy as adding an addition configuration file which outlines the specific flow of tensors from one model to another. Any additional changes required by the model ensemble can be made in existing (individual) model configurations. 
@@ -178,7 +178,7 @@ The following resources are recommended to explore the full suite of Triton Infe
 
 - **Configuring Deployment**: Triton comes with three tools which can be used to configure deployment setting, measure performance and recommend optimizations.
   - [Model Analyzer](https://github.com/triton-inference-server/model_analyzer) Model Analyzer is CLI tool built to recommend deployment configurations for Triton Inference Server based on user's Quality of Service Requirements. It also generates detailed reports about model performance to summarize the benefits and trade offs of different configurations.
-  - [Perf Analyzer](https://github.com/triton-inference-server/server/blob/main/docs/perf_analyzer.md): Perf Analyzer is a CLI application built to generate inference requests and measures the latency of those requests and throughput of the model being served .
+  - [Perf Analyzer](user_guide/perf_analyzer.md): Perf Analyzer is a CLI application built to generate inference requests and measures the latency of those requests and throughput of the model being served .
   - [Model Navigator](https://github.com/triton-inference-server/model_navigator):
   The Triton Model Navigator is a tool that provides the ability to automate the process of moving model from source to optimal format and configuration for deployment on Triton Inference Server. The tool supports export model from source to all possible formats and applies the Triton Inference Server backend optimizations.
 

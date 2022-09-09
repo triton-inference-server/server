@@ -43,7 +43,7 @@ UNAVAILABLE and will not be available for inferencing.
 
 Changes to the model repository while the server is running will be
 ignored. Model load and unload requests using the [model control
-protocol](protocol/extension_model_repository.md) will have no affect
+protocol](../protocol/extension_model_repository.md) will have no affect
 and will return an error response.
 
 This model control mode is selected by specifying
@@ -64,7 +64,7 @@ UNAVAILABLE and will not be available for inferencing.
 
 After startup, all model load and unload actions must be initiated
 explicitly by using the [model control
-protocol](protocol/extension_model_repository.md). The response
+protocol](../protocol/extension_model_repository.md). The response
 status of the model control request indicates success or failure of
 the load or unload action. When attempting to reload an already loaded
 model, if the reload fails for any reason the already loaded model
@@ -97,7 +97,7 @@ polling interval with the `--repository-poll-secs` option. The console
 log or the [model ready
 protocol](https://github.com/kserve/kserve/blob/master/docs/predict-api/v2/required_api.md)
 or the index operation of the [model control
-protocol](protocol/extension_model_repository.md) can be used to
+protocol](../protocol/extension_model_repository.md) can be used to
 determine when model repository changes have taken effect.
 
 **WARNING: There is no synchronization between when Triton polls the
@@ -107,7 +107,7 @@ to unexpected behavior. For this reason POLL mode is not recommended
 for use in production environments.**
 
 Model load and unload requests using the [model control
-protocol](protocol/extension_model_repository.md) will have no affect
+protocol](../protocol/extension_model_repository.md) will have no affect
 and will return an error response.
 
 This model control mode is enabled by specifying
@@ -156,7 +156,7 @@ allowed on the contents of a model's sub-directory varies depending on
 how Triton is using that model. The state of a model can be determined
 by using the [model
 metadata](../customization_guide/inference_protocols.md#inference-protocols-and-apis) or
-[repository index](protocol/extension_model_repository.md#index) APIs.
+[repository index](../protocol/extension_model_repository.md#index) APIs.
 
 * If the model is actively loading or unloading, no files or
 directories within that sub-directory must be added, removed or
