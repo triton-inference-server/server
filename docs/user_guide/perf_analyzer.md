@@ -568,7 +568,7 @@ TensorFlow Session. There is a resource limit on the number of
 concurrent threads serving requests. When benchmarking at a higher
 request concurrency, you can see higher throughput because of this.  
 Unlike TFS, by default Triton is configured with only a single
-[instance count](https://github.com/triton-inference-server/server/blob/main/docs/model_configuration.md#instance-groups). Hence, at a higher request concurrency, most
+[instance count](model_configuration.md#instance-groups). Hence, at a higher request concurrency, most
 of the requests are blocked on the instance availability. To
 configure Triton to behave like TFS, set the instance count to a
 reasonably high value and then set
@@ -657,7 +657,7 @@ that are optimized for Triton.
 Using third-party benchmark suites like jmeter fails to take advantage of the
 optimized libraries. Some of these optimizations includes but are not limited
 to:
-1. Using [binary tensor data extension](https://github.com/triton-inference-server/server/blob/main/docs/protocol/extension_binary_data.md) with HTTP requests.
+1. Using [binary tensor data extension](../protocol/extension_binary_data.md) with HTTP requests.
 2. Effective re-use of gRPC message allocation in subsequent requests.
 3. Avoiding extra memory copy via libcurl interface.
 

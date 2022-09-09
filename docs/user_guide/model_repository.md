@@ -76,7 +76,7 @@ corresponding model. The config.pbtxt file describes the [model
 configuration](model_configuration.md) for the model. For some models,
 config.pbtxt is required while for others it is optional. See
 [Auto-Generated Model
-Configuration](https://github.com/triton-inference-server/server/blob/main/docs/model_configuration.md#auto-generated-model-configuration) 
+Configuration](model_configuration.md#auto-generated-model-configuration) 
 for more information.
 
 Each <model-name> directory must have at least one numeric

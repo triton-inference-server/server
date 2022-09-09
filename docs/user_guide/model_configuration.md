@@ -301,7 +301,7 @@ include a `backend` field or your model name must be in the
 form `<model_name>.<backend_name>`.
 
 You can also see the model configuration generated for a model by
-Triton using the [model configuration endpoint](https://github.com/triton-inference-server/server/blob/main/docs/protocol/extension_model_configuration.md). The
+Triton using the [model configuration endpoint](../protocol/extension_model_configuration.md). The
 easiest way to do this is to use a utility like *curl*:
 
 ```bash
@@ -333,7 +333,7 @@ dynamic batching in their generated model configurations are:
 3. [TensorRT backend](https://github.com/triton-inference-server/tensorrt_backend)
    1. TensorRT models store the maximum batch size explicitly and do not make use
    of the default-max-batch-size parameter. However, if max_batch_size > 1 
-   and no [scheduler](https://github.com/triton-inference-server/server/blob/main/docs/model_configuration.md#scheduling-and-batching)
+   and no [scheduler](model_configuration.md#scheduling-and-batching)
    is provided, the dynamic batch scheduler will be enabled.
    
 If a value greater than 1 for the maximum batch size is set for the 
@@ -1015,7 +1015,7 @@ response_cache {
 ```
 
 See the [Response
-Cache](https://github.com/triton-inference-server/server/blob/main/docs/response_cache.md)
+Cache](response_cache.md)
 and [ModelConfig
 protobuf](https://github.com/triton-inference-server/common/blob/main/protobuf/model_config.proto).
 docs for more information.
