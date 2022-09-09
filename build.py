@@ -851,7 +851,6 @@ RUN apt-get update && \
             libssl-dev \
             libtool \
             libboost-dev \
-            libboost-program-options-dev \
             libcurl4-openssl-dev \
             libb64-dev \
             patchelf \
@@ -1068,7 +1067,6 @@ RUN apt-get update && \
             dirmngr \
             libnuma-dev \
             curl \
-            libboost-program-options-dev \
             {backend_dependencies} && \
     rm -rf /var/lib/apt/lists/*
 '''.format(gpu_enabled=gpu_enabled, backend_dependencies=backend_dependencies)
@@ -2305,9 +2303,3 @@ if __name__ == '__main__':
         fail_if(p.returncode != 0, 'build failed')
 
 
-# apt get update
-# apt install -y install default-jre
-# apt install -y doctest-dev
-# apt install -y libboost-program-options-dev
-# LD_LIBRARY_PATH=/opt/tritonserver/lib:$LD_LIBRARY_PATH
-# LD_LIBRARY_PATH=/usr/local/lib:$LD_LIBRARY_PATH
