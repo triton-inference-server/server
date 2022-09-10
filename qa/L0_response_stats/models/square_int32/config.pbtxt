@@ -44,3 +44,21 @@ output [
     dims: [ 1 ]
   }
 ]
+parameters: {
+  key: "CUSTOM_INFER_DELAY_NS"
+  value: {
+    string_value: "800000"
+  }
+}
+parameters: {
+  key: "CUSTOM_OUTPUT_DELAY_NS"
+  value: {
+    string_value: "200000"
+  }
+}
+parameters: {
+  key: "CUSTOM_FAIL_COUNT"
+  value: {
+    string_value: "2"
+  }
+}

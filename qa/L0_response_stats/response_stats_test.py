@@ -87,13 +87,9 @@ class ResponseStatsTest(tu.TestResultCollector):
                                         outputs=outputs)
         self._wait_until_responses_complete(number_of_responses)
 
-    def _check_success_duration(self, duration, count):
-        self.assertEqual(duration['count'], count)
-        self.assertGreater(duration['ns'], 0)
-
-    def _check_fail_duration(self, duration):
-        self.assertEqual(duration['count'], 0)
-        self.assertEqual(duration['ns'], 0)
+    def _check_duration(self, duration_dict, expect_count, expect_duration_ns):
+        self.assertEqual(duration_dict['count'], expect_count)
+        self.assertGreaterEqual(duration_dict['ns'], expect_duration_ns)
 
     def _check_response_stats(self, response_dict):
         # response list contains a list containing the number of responses
@@ -113,20 +109,39 @@ class ResponseStatsTest(tu.TestResultCollector):
                 response_stats = model_stats[0]['response_stats']
             self.assertTrue(len(response_stats), len(response_dict))
 
+            print(response_stats)
+
+            min_infer_delay_ns = 800000
+            min_output_delay_ns = 200000
+            num_fail_infer = 2
+
             for response_stat in response_stats:
                 self.assertIn(len(response_stat['responses']), response_dict)
                 response_count = response_dict[len(response_stat['responses'])]
 
                 indexes = set()
-                for response in response_stat['responses']:
+                for i in range(len(response_stat['responses'])):
+                    response = response_stat['responses'][i]
+                    print(response)
                     indexes.add(response['index'])
-                    self._check_success_duration(response['success'],
-                                                 response_count)
-                    self._check_success_duration(response['compute_infer'],
-                                                 response_count)
-                    self._check_success_duration(response['compute_output'],
-                                                 response_count)
-                    self._check_fail_duration(response['fail'])
+                    if i + num_fail_infer < len(response_stat['responses']):
+                        self._check_duration(
+                            response['success'], response_count,
+                            min_infer_delay_ns + min_output_delay_ns)
+                        self._check_duration(response['compute_infer'],
+                                             response_count, min_infer_delay_ns)
+                        self._check_duration(response['compute_output'],
+                                             response_count,
+                                             min_output_delay_ns)
+                        self._check_duration(response['fail'], 0, 0)
+                    else:
+                        self._check_duration(response['success'], 0, 0)
+                        self._check_duration(response['compute_infer'], 0, 0)
+                        self._check_duration(response['compute_output'], 0, 0)
+                        self._check_duration(
+                            response['fail'], response_count,
+                            min_infer_delay_ns + min_output_delay_ns)
+
                 expected_indexes = set(
                     list(range(0, len(response_stat['responses']))))
                 self.assertEqual(indexes, expected_indexes)
