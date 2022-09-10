@@ -31,9 +31,11 @@ namespace triton { namespace server {
 KafkaEndpoint::KafkaEndpoint(
     const std::shared_ptr<TRITONSERVER_Server>& server,
     const std::shared_ptr<SharedMemoryManager>& shm_manager,
-    const std::string& port, const std::vector<std::string>& consumer_topics)
+    const std::string& port, const std::vector<std::string>& consumer_topics,
+    const std::string& producer_topic)
     : server_(server), shm_manager_(shm_manager), port_(port),
-      consumer_topics_(consumer_topics.begin(), consumer_topics.end())
+      consumer_topics_(consumer_topics.begin(), consumer_topics.end()),
+      producer_topic_(producer_topic)
 
 {
   allocator_ = nullptr;
@@ -66,15 +68,15 @@ KafkaEndpoint::Create(
     const std::shared_ptr<TRITONSERVER_Server>& server,
     const std::shared_ptr<SharedMemoryManager>& shm_manager,
     const std::string& port, const std::vector<std::string>& consumer_topics,
-    std::unique_ptr<KafkaEndpoint>* kafka_endpoint)
+    const std::string& producer_topic, std::unique_ptr<KafkaEndpoint>* kafka_endpoint)
 {
-  if (port.empty() || consumer_topics.empty()) {
+  if (port.empty() || producer_topic.empty() || consumer_topics.empty()) {
     return TRITONSERVER_ErrorNew(
         TRITONSERVER_ERROR_INVALID_ARG,
         "Kakfa [port], [producer topic], or [consumer topics] not specified");
   }
   kafka_endpoint->reset(
-      new KafkaEndpoint(server, shm_manager, port, consumer_topics));
+      new KafkaEndpoint(server, shm_manager, port, consumer_topics, producer_topic));
 
   LOG_INFO << "Started Kafka Endpoint. Specified broker port: " << port;
 
@@ -142,8 +144,9 @@ KafkaEndpoint::StartConsumer()
 void
 KafkaEndpoint::CreateInferenceResponse(
     std::vector<std::pair<std::string, std::string>>& header_pair_vector,
-    const std::string& val)
+    const std::string& val, const std::string& request_id)
 {
+  LOG_INFO << "Request ID: " << request_id;
   std::string response_topic =
       current_request_map_[request_id]["response_topic"];
   kafka::Key key = kafka::NullKey;
@@ -200,18 +203,14 @@ KafkaEndpoint::ConsumeRequests()
       auto records = consumer_->poll(std::chrono::milliseconds(100));
       for (const auto& record : records) {
         if (!record.error()) {
-          std::cout << "% Got a new message..." << std::endl;
-          std::cout << "    Topic    : " << record.topic() << std::endl;
-          std::cout << "    Partition: " << record.partition() << std::endl;
-          std::cout << "    Offset   : " << record.offset() << std::endl;
-          std::cout << "    Timestamp: " << record.timestamp().toString()
-                    << std::endl;
-          std::cout << "    Headers  : " << kafka::toString(record.headers())
-                    << std::endl;
-          std::cout << "    Key   [" << record.key().toString() << "]"
-                    << std::endl;
-          std::cout << "    Value [" << record.value().toString() << "]"
-                    << std::endl;
+          LOG_INFO << "Kafka Got a new message...";
+          LOG_INFO << "    Topic    : " << record.topic();
+          LOG_VERBOSE(1) << "    Partition: " << record.partition();
+          LOG_VERBOSE(1) << "    Offset   : " << record.offset();
+          LOG_VERBOSE(1) << "    Timestamp: " << record.timestamp().toString();
+          LOG_VERBOSE(1) << "    Headers  : " << kafka::toString(record.headers());
+          LOG_VERBOSE(1) << "    Key   [" << record.key().toString() << "]";
+          LOG_VERBOSE(1) << "    Value [" << record.value().toString() << "]";
           TRITONSERVER_Error* err = HandleInferenceRequest(record);
           if (err != nullptr) {
             LOG_ERROR << "Failed to parse inference request: "
@@ -240,7 +239,7 @@ KafkaEndpoint::HandleInferenceRequest(
   std::string response_key;
   std::string payload_schema_length;
   std::map<std::string, std::string> inference_request_map;
-  CreateInferenceRequestMap(inference_request_map, inference_request_msg);
+  RETURN_IF_ERR(CreateInferenceRequestMap(inference_request_map, inference_request_msg, request_id));
 
   if (request_id.empty()) {
     return TRITONSERVER_ErrorNew(
@@ -294,10 +293,11 @@ KafkaEndpoint::HandleInferenceRequest(
   return nullptr;  // Success
 }
 
-void
+TRITONSERVER_Error*
 KafkaEndpoint::CreateInferenceRequestMap(
     std::map<std::string, std::string>& inference_request_map,
-    const kafka::clients::consumer::ConsumerRecord& inference_request_msg)
+    const kafka::clients::consumer::ConsumerRecord& inference_request_msg,
+    std::string& request_id)
 {
   LOG_INFO << "Creating inference map";
   for (unsigned long i = 0; i < inference_request_msg.headers().size(); i++) {
@@ -953,6 +953,10 @@ KafkaEndpoint::InferRequestClass::FinalizeResponse(
   LOG_INFO << "Total size: " << total_size;
   std::string payload(response_payload, total_size);
   LOG_INFO << payload.size();
+
+  for(size_t i = 0; i < header_pair_vector.size(); i++){
+    std::cerr << header_pair_vector.at(i).first << " : " << header_pair_vector.at(i).second << std::endl;
+  }
   parent_.CreateInferenceResponse(header_pair_vector, payload, request_id);
 
   free(response_payload);

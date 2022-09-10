@@ -44,7 +44,8 @@ class KafkaEndpoint {
   KafkaEndpoint(
       const std::shared_ptr<TRITONSERVER_Server>& server,
       const std::shared_ptr<SharedMemoryManager>& shm_manager,
-      const std::string& port, const std::vector<std::string>& consumer_topics);
+      const std::string& port, const std::vector<std::string>& consumer_topics,
+      const std::string& producer_topic);
 
   ~KafkaEndpoint();
 
@@ -52,7 +53,7 @@ class KafkaEndpoint {
       const std::shared_ptr<TRITONSERVER_Server>& server,
       const std::shared_ptr<SharedMemoryManager>& shm_manager,
       const std::string& port, const std::vector<std::string>& consumer_topics,
-      std::unique_ptr<KafkaEndpoint>* kafka_endpoint);
+      const std::string& producer_topic, std::unique_ptr<KafkaEndpoint>* kafka_endpoint);
 
   TRITONSERVER_Error* Start();
 
@@ -121,7 +122,8 @@ class KafkaEndpoint {
   class InferRequestClass {
    public:
     explicit InferRequestClass(
-        TRITONSERVER_Server* server): server_(server), response_count_(0) {};
+        KafkaEndpoint& parent,
+        TRITONSERVER_Server* server): parent_(parent), server_(server), response_count_(0) {};
     ~InferRequestClass() = default;
 
     static void InferRequestComplete(
@@ -149,6 +151,7 @@ class KafkaEndpoint {
     //std::list<std::vector<char>> serialized_data_;
 
    protected:
+    KafkaEndpoint& parent_;
     TRITONSERVER_Server* server_;
     // Counter to keep track of number of responses generated.
     std::atomic<uint32_t> response_count_;
@@ -160,9 +163,10 @@ class KafkaEndpoint {
 
   void ConsumeRequests();
 
-  void CreateInferenceRequestMap(
+  TRITONSERVER_Error* CreateInferenceRequestMap(
       std::map<std::string, std::string>& inference_request_map,
-      const kafka::clients::consumer::ConsumerRecord& inference_request_msg);
+      const kafka::clients::consumer::ConsumerRecord& inference_request_msg,
+      std::string& request_id);
 
   TRITONSERVER_Error* FindParameter(
       std::map<std::string, std::string>& inference_request_map,
@@ -190,7 +194,7 @@ class KafkaEndpoint {
 
   void CreateInferenceResponse(
       std::vector<std::pair<std::string, std::string>>& header_pair_vector,
-      const std::string& val);
+      const std::string& val, const std::string& request_id);
 
   static TRITONSERVER_Error* InferResponseAlloc(
       TRITONSERVER_ResponseAllocator* allocator, const char* tensor_name,
@@ -219,23 +223,19 @@ class KafkaEndpoint {
         void* userp);*/
 
   protected:
-    virtual std::unique_ptr<InferRequestClass> CreateInferRequest()
-    {
-        return std::unique_ptr<InferRequestClass>(new InferRequestClass(
-            server_.get()));
-    }
-
+    std::unique_ptr<InferRequestClass> CreateInferRequest();
 
  private:
   std::shared_ptr<TRITONSERVER_Server> server_;
   std::shared_ptr<SharedMemoryManager> shm_manager_;
   const std::string port_;
   std::set<std::string> consumer_topics_;
+  std::string producer_topic_;
   std::thread consumer_thread_;
   bool consumer_active_;
   std::unique_ptr<kafka::clients::KafkaConsumer> consumer_;
   std::unique_ptr<kafka::clients::KafkaProducer> producer_;
-  std::map<std::string, std::map<std::string, std::string>> request_header_map_;
+  std::map<std::string, std::map<std::string, std::string>> current_request_map_;
   TRITONSERVER_ResponseAllocator* allocator_;
   AllocPayload alloc_payload_;
 };
