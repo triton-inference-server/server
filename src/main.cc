@@ -105,6 +105,7 @@ bool allow_kafka_ = true;
 std::unique_ptr<triton::server::KafkaEndpoint> kafka_service_;
 std::string kafka_port_;
 std::vector<std::string> kafka_consumer_topic_;
+std::string kafka_producer_topic_;
 #endif  // TRITON_ENABLE_KAFKA
 
 #ifdef TRITON_ENABLE_SAGEMAKER
@@ -288,6 +289,7 @@ enum OptionId {
 #if TRITON_ENABLE_KAFKA
   OPTION_ALLOW_KAFKA,
   OPTION_CONSUMER_TOPIC,
+  OPTION_PRODUCER_TOPIC,
   OPTION_BROKER_PORT,
 #endif  // TRITON_ENABLE_KAFKA
 #if defined(TRITON_ENABLE_SAGEMAKER)
@@ -495,8 +497,10 @@ std::vector<Option> options_
 #if TRITON_ENABLE_KAFKA
       {OPTION_ALLOW_KAFKA, "allow-kafka", Option::ArgBool,
        "Allow the server to subscribe to a Kafka broker."},
-      {OPTION_CONSUMER_TOPIC, "kafka-consumer-topic", Option::ArgStr,
+      {OPTION_CONSUMER_TOPIC, "kafka-consumer-topics", Option::ArgStr,
        "The topic the Triton kafka consumer will consume from."},
+      {OPTION_PRODUCER_TOPIC, "kafka-producer-topic", Option::ArgStr,
+      "The topic the Triton kafka producer will produce to."},
       {OPTION_BROKER_PORT, "kafka-port", Option::ArgStr,
        "The port of the kafka broker storing the topics."},
 #endif  // TRITON_ENABLE_KAFKA
@@ -779,6 +783,27 @@ StartGrpcService(
 }
 #endif  // TRITON_ENABLE_GRPC
 
+#if TRITON_ENABLE_KAFKA
+TRITONSERVER_Error*
+StartKafkaService(
+    std::unique_ptr<triton::server::KafkaEndpoint>* service,
+    const std::shared_ptr<TRITONSERVER_Server>& server,
+    const std::shared_ptr<triton::server::SharedMemoryManager>& shm_manager)
+{
+  TRITONSERVER_Error* err = triton::server::KafkaEndpoint::Create(
+      server, shm_manager, kafka_port_, kafka_consumer_topic_, kafka_producer_topic_, service);
+  if (err == nullptr) {
+    err = (*service)->Start();
+  }
+
+  if (err != nullptr) {
+    service->reset();
+  }
+
+  return err;
+}
+#endif  // TRITON_ENABLE_KAFKA
+
 #ifdef TRITON_ENABLE_HTTP
 TRITONSERVER_Error*
 StartHttpService(
@@ -802,26 +827,6 @@ StartHttpService(
 }
 #endif  // TRITON_ENABLE_HTTP
 
-#if TRITON_ENABLE_KAFKA
-TRITONSERVER_Error*
-StartKafkaService(
-    std::unique_ptr<triton::server::KafkaEndpoint>* service,
-    const std::shared_ptr<TRITONSERVER_Server>& server,
-    const std::shared_ptr<triton::server::SharedMemoryManager>& shm_manager)
-{
-  TRITONSERVER_Error* err = triton::server::KafkaEndpoint::Create(
-      server, shm_manager, kafka_port_, kafka_consumer_topic_, service);
-  if (err == nullptr) {
-    err = (*service)->Start();
-  }
-
-  if (err != nullptr) {
-    service->reset();
-  }
-
-  return err;
-}
-#endif  // TRITON_ENABLE_KAFKA
 
 #ifdef TRITON_ENABLE_METRICS
 TRITONSERVER_Error*
@@ -1435,6 +1440,7 @@ Parse(TRITONSERVER_ServerOptions** server_options, int argc, char** argv)
 #if TRITON_ENABLE_KAFKA
   std::string kafka_port = kafka_port_;
   std::vector<std::string> kafka_consumer_topic;
+  std::string kafka_producer_topic;
 #endif  // TRITON_ENABLE_KAFKA
 
 #if defined(TRITON_ENABLE_GRPC)
@@ -1609,6 +1615,9 @@ Parse(TRITONSERVER_ServerOptions** server_options, int argc, char** argv)
         break;
       case OPTION_CONSUMER_TOPIC:
         kafka_consumer_topic = ParseOption<std::vector<std::string>>(optarg);
+        break;
+      case OPTION_PRODUCER_TOPIC:
+        kafka_producer_topic = optarg;
         break;
 #endif  // TRITON_ENABLE_KAFKA
 
@@ -1884,6 +1893,7 @@ Parse(TRITONSERVER_ServerOptions** server_options, int argc, char** argv)
 #if TRITON_ENABLE_KAFKA
   kafka_port_ = kafka_port;
   kafka_consumer_topic_ = kafka_consumer_topic;
+  kafka_producer_topic_ = kafka_producer_topic;
 #endif  // TRITON_ENABLE_KAFKA
 
 

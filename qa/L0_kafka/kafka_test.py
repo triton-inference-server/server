@@ -94,8 +94,6 @@ class KafkaTest(tu.TestResultCollector):
                        shm_region_names=None,
                        precreated_shm_regions=None):
         try:
-            start_ms = int(round(time.time() * 1000))
-
             if trial == "savedmodel" or trial == "graphdef" or trial == "libtorch" \
                     or trial == "onnx" or trial == "plan" or trial == "python":
                 tensor_shape = (bs, input_size)

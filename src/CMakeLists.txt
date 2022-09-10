@@ -86,8 +86,6 @@ endif()
 if(${TRITON_ENABLE_KAFKA})
   set(LIBRDKAFKA_INCLUDE_DIR /usr/local/include)
   set(LIBRDKAFKA_LIBRARY_DIR /usr/local/lib)
-  find_package(doctest REQUIRED)
-  message(STATUS "Using doctest")
 endif()
 
 
@@ -584,78 +582,6 @@ if(${TRITON_ENABLE_HTTP}
   )
 endif() # TRITON_ENABLE_HTTP || TRITON_ENABLE_METRICS ||
         # TRITON_ENABLE_SAGEMAKER || TRITON_ENABLE_VERTEX_AI
-
-# kafka
-#
-if(${TRITON_ENABLE_KAFKA})
-message(STATUS "Using Kafka Unit Tests")
-
-find_package(doctest REQUIRED)
-
-add_executable(tests kafka_unit_tests.cc common.cc)
-
-target_compile_features(tests PRIVATE cxx_std_11)
-if(CMAKE_CXX_COMPILER_ID STREQUAL "MSVC")
-  message("Using MSVC as compiler, default target on Windows 10. "
-          "If the target system is not Windows 10, please update _WIN32_WINNT "
-          "to corresponding value.")
-  target_compile_options(
-    tests
-    PRIVATE
-      /W1 /D_WIN32_WINNT=0x0A00 /EHsc
-  )
-else()
-  target_compile_options(
-    tests
-    PRIVATE
-      -Wall -Wextra -Wno-type-limits -Wno-unused-parameter -Wno-deprecated-declarations -Werror -lrdkafka
-  )
-endif()
-
-find_library(KAFKA_LIBRARY librdkafka.so.1 HINTS /usr/local/lib REQUIRED)
-target_link_libraries(tests PUBLIC ${KAFKA_LIBRARY})
-
-target_link_libraries(
-  tests
-  PRIVATE
-    triton-common-async-work-queue  # from repo-common
-    triton-common-error             # from repo-common
-    triton-core-serverapi           # from repo-core
-    triton-core-serverstub          # from repo-core
-    kafka-endpoint-library
-  )
-
-if(${TRITON_ENABLE_GPU})
-  target_compile_definitions(
-    tests
-    PRIVATE TRITON_ENABLE_GPU=1
-    PRIVATE TRITON_MIN_COMPUTE_CAPABILITY=${TRITON_MIN_COMPUTE_CAPABILITY}
-  )
-
-  target_link_libraries(
-    tests
-    PRIVATE
-      CUDA::cudart
-  )
-endif() # TRITON_ENABLE_GPU
-
-set_target_properties(
-  tests
-  PROPERTIES
-    POSITION_INDEPENDENT_CODE ON
-    SKIP_BUILD_RPATH TRUE
-    BUILD_WITH_INSTALL_RPATH TRUE
-    INSTALL_RPATH_USE_LINK_PATH FALSE
-    INSTALL_RPATH ""
-)
-
-install(
-  TARGETS tests
-  RUNTIME DESTINATION bin
-)
-
-
-endif() # TRITON_ENABLE_KAFKA
 
 # kafka
 #
