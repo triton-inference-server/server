@@ -208,6 +208,15 @@ output csv will have this format:
 
 `<gpu-uuid-0>:<metric-value>;<gpu-uuid-1>:<metric-value>;...;`
 
+The server metrics are collected every N milliseconds (default `1000`) as set by
+the Perf Analyzer `--metrics-interval` option. All metric collections are then
+aggregated (averaged, maximum, etc) across the profiling (during stable
+measurement windows).
+
+If the metrics endpoint is not accessible via the default
+`localhost:8002/metrics` url, it can be specified to Perf Analyzer via the
+`--metrics-url` option.
+
 Here is a simplified example output:
 
 ```bash
