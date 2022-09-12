@@ -196,6 +196,29 @@ components of the latency. Follow these steps:
 - Select "Upload" and upload the file
 - Select "Replace data at selected cell" and then select the "Import data" button
 
+### Server-side metrics
+
+Perf Analyzer can optionally collect and output server-side metrics, such as GPU
+utilization and GPU power usage. To enable this collection/output, use the
+`--verbose-csv` (with the `-f <filename>` option) and `--collect-metrics`
+options. Perf Analyzer accesses the
+[metrics endpoint](metrics.md) of the Triton server throughout profiling and
+reads several metrics from it to output to a csv file. Each metric column in the
+output csv will have this format:
+
+`<gpu-uuid-0>:<metric-value>;<gpu-uuid-1>:<metric-value>;...;`
+
+Here is a simplified example output:
+
+```bash
+$ perf_analyzer -m resnet50_libtorch -f output.csv --verbose-csv --collect-metrics
+$ cat output.csv
+Concurrency,...,Avg GPU Utilization,Avg GPU Power Usage,Max GPU Memory Usage,Total GPU Memory
+1,...,gpu_uuid_0:0.33;gpu_uuid_1:0.5;,gpu_uuid_0:55.3;gpu_uuid_1:56.9;,gpu_uuid_0:10000;gpu_uuid_1:11000;,gpu_uuid_0:50000;gpu_uuid_1:75000;,
+2,...,gpu_uuid_0:0.25;gpu_uuid_1:0.6;,gpu_uuid_0:25.6;gpu_uuid_1:77.2;,gpu_uuid_0:11000;gpu_uuid_1:17000;,gpu_uuid_0:50000;gpu_uuid_1:75000;,
+3,...,gpu_uuid_0:0.87;gpu_uuid_1:0.9;,gpu_uuid_0:87.1;gpu_uuid_1:71.7;,gpu_uuid_0:15000;gpu_uuid_1:22000;,gpu_uuid_0:50000;gpu_uuid_1:75000;,
+```
+
 ## Input Data
 
 Use the --help option to see complete documentation for all input
