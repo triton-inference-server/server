@@ -68,7 +68,7 @@ option(TRITON_ENABLE_TENSORRT "Include TensorRT backend in server" OFF)
 option(TRITON_ENABLE_ASAN "Build with address sanitizer" OFF)
 
 # Repo tags
-set(TRITON_THIRD_PARTY_REPO_TAG "main" CACHE STRING
+set(TRITON_THIRD_PARTY_REPO_TAG "sagemaker_mme" CACHE STRING
     "Tag for triton-inference-server/third_party repo")
 set(TRITON_COMMON_REPO_TAG "sagemaker_mme" CACHE STRING "Tag for triton-inference-server/common repo")
 set(TRITON_CORE_REPO_TAG "sagemaker_mme" CACHE STRING "Tag for triton-inference-server/core repo")
