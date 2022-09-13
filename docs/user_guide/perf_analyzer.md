@@ -200,7 +200,7 @@ components of the latency. Follow these steps:
 
 Perf Analyzer can collect [server-side metrics](metrics.md#gpu-metrics), such as
 GPU utilization and GPU power usage. To enable the collection of these metrics,
-use the `--collect metrics` CLI option.
+use the `--collect-metrics` CLI option.
 
 Perf Analyzer defaults to access the metrics endpoint at
 `localhost:8002/metrics`. If the metrics are accessible at a different url, use
