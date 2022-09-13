@@ -196,31 +196,46 @@ components of the latency. Follow these steps:
 - Select "Upload" and upload the file
 - Select "Replace data at selected cell" and then select the "Import data" button
 
-### Server-side metrics
+### Server-side Prometheus metrics
 
-Perf Analyzer can optionally collect and output server-side metrics, such as GPU
-utilization and GPU power usage. To enable this collection/output, use the
-`--verbose-csv` (with the `-f <filename>` option) and `--collect-metrics`
-options. Perf Analyzer accesses the
-[metrics endpoint](metrics.md) of the Triton server throughout profiling and
-reads several metrics from it to output to a csv file. Each metric column in the
-output csv will have this format:
+Perf Analyzer can collect [server-side metrics](metrics.md#gpu-metrics), such as
+GPU utilization and GPU power usage. To enable the collection of these metrics,
+use the `--collect metrics` CLI option.
+
+Perf Analyzer defaults to access the metrics endpoint at
+`localhost:8002/metrics`. If the metrics are accessible at a different url, use
+the `--metrics-url <url>` CLI option to specify that.
+
+Perf Analyzer defaults to access the metrics endpoint every 1000 milliseconds.
+To use a different accessing interval, use the `--metrics-interval <interval>`
+CLI option (specify in milliseconds).
+
+Because Perf Analyzer can collect the server-side metrics multiple times per
+run, these metrics are aggregated in specific ways to produce one final number
+per sweep (concurrency/request rate). Here are how they are aggregated:
+
+| Metric | Aggregation |
+|--------|-------------|
+| GPU Utilization | Averaged from each collection taken during stable passes. We want a number representative of all stable passes. |
+| GPU Power Usage | Averaged from each collection taken during stable passes. We want a number representative of all stable passes. |
+| GPU Used Memory | Maximum from all collections taken during a stable pass. Users are typically curious what the peak memory usage is for determining model/hardware viability. |
+| GPU Total Memory | First from any collection taken during a stable pass. All of the collections should produce the same value for total memory available on the GPU. |
+
+Note that all metrics are per-GPU in the case of multi-GPU systems.
+
+To output these server-side metrics to a CSV file, use the `-f <filename>` and
+`--verbose-csv` CLI options. The output CSV will contain one column per metric.
+The value of each column will be a `key:value` pair (`GPU UUID:metric value`).
+Each `key:value` pair will be delimited by a semicolon (`;`) to indicate metric
+values for each GPU accessible by the server. There is a trailing semicolon. See
+below:
 
 `<gpu-uuid-0>:<metric-value>;<gpu-uuid-1>:<metric-value>;...;`
 
-The server metrics are collected every N milliseconds (default `1000`) as set by
-the Perf Analyzer `--metrics-interval` option. All metric collections are then
-aggregated (averaged, maximum, etc) across the profiling (during stable
-measurement windows).
-
-If the metrics endpoint is not accessible via the default
-`localhost:8002/metrics` url, it can be specified to Perf Analyzer via the
-`--metrics-url` option.
-
-Here is a simplified example output:
+Here is a simplified CSV output:
 
 ```bash
-$ perf_analyzer -m resnet50_libtorch -f output.csv --verbose-csv --collect-metrics
+$ perf_analyzer -m resnet50_libtorch --collect-metrics -f output.csv --verbose-csv
 $ cat output.csv
 Concurrency,...,Avg GPU Utilization,Avg GPU Power Usage,Max GPU Memory Usage,Total GPU Memory
 1,...,gpu_uuid_0:0.33;gpu_uuid_1:0.5;,gpu_uuid_0:55.3;gpu_uuid_1:56.9;,gpu_uuid_0:10000;gpu_uuid_1:11000;,gpu_uuid_0:50000;gpu_uuid_1:75000;,
