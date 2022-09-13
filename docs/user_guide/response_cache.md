@@ -28,8 +28,6 @@
 
 # Triton Response Cache
 
-**This feature is currently in beta and may be subject to change.**
-
 ## Overview
 
 In this document an *inference request* is the model name, model version, and
