@@ -196,6 +196,53 @@ components of the latency. Follow these steps:
 - Select "Upload" and upload the file
 - Select "Replace data at selected cell" and then select the "Import data" button
 
+### Server-side Prometheus metrics
+
+Perf Analyzer can collect [server-side metrics](metrics.md#gpu-metrics), such as
+GPU utilization and GPU power usage. To enable the collection of these metrics,
+use the `--collect-metrics` CLI option.
+
+Perf Analyzer defaults to access the metrics endpoint at
+`localhost:8002/metrics`. If the metrics are accessible at a different url, use
+the `--metrics-url <url>` CLI option to specify that.
+
+Perf Analyzer defaults to access the metrics endpoint every 1000 milliseconds.
+To use a different accessing interval, use the `--metrics-interval <interval>`
+CLI option (specify in milliseconds).
+
+Because Perf Analyzer can collect the server-side metrics multiple times per
+run, these metrics are aggregated in specific ways to produce one final number
+per sweep (concurrency/request rate). Here are how they are aggregated:
+
+| Metric | Aggregation |
+|--------|-------------|
+| GPU Utilization | Averaged from each collection taken during stable passes. We want a number representative of all stable passes. |
+| GPU Power Usage | Averaged from each collection taken during stable passes. We want a number representative of all stable passes. |
+| GPU Used Memory | Maximum from all collections taken during a stable pass. Users are typically curious what the peak memory usage is for determining model/hardware viability. |
+| GPU Total Memory | First from any collection taken during a stable pass. All of the collections should produce the same value for total memory available on the GPU. |
+
+Note that all metrics are per-GPU in the case of multi-GPU systems.
+
+To output these server-side metrics to a CSV file, use the `-f <filename>` and
+`--verbose-csv` CLI options. The output CSV will contain one column per metric.
+The value of each column will be a `key:value` pair (`GPU UUID:metric value`).
+Each `key:value` pair will be delimited by a semicolon (`;`) to indicate metric
+values for each GPU accessible by the server. There is a trailing semicolon. See
+below:
+
+`<gpu-uuid-0>:<metric-value>;<gpu-uuid-1>:<metric-value>;...;`
+
+Here is a simplified CSV output:
+
+```bash
+$ perf_analyzer -m resnet50_libtorch --collect-metrics -f output.csv --verbose-csv
+$ cat output.csv
+Concurrency,...,Avg GPU Utilization,Avg GPU Power Usage,Max GPU Memory Usage,Total GPU Memory
+1,...,gpu_uuid_0:0.33;gpu_uuid_1:0.5;,gpu_uuid_0:55.3;gpu_uuid_1:56.9;,gpu_uuid_0:10000;gpu_uuid_1:11000;,gpu_uuid_0:50000;gpu_uuid_1:75000;,
+2,...,gpu_uuid_0:0.25;gpu_uuid_1:0.6;,gpu_uuid_0:25.6;gpu_uuid_1:77.2;,gpu_uuid_0:11000;gpu_uuid_1:17000;,gpu_uuid_0:50000;gpu_uuid_1:75000;,
+3,...,gpu_uuid_0:0.87;gpu_uuid_1:0.9;,gpu_uuid_0:87.1;gpu_uuid_1:71.7;,gpu_uuid_0:15000;gpu_uuid_1:22000;,gpu_uuid_0:50000;gpu_uuid_1:75000;,
+```
+
 ## Input Data
 
 Use the --help option to see complete documentation for all input
