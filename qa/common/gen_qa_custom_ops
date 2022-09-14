@@ -41,7 +41,7 @@ TRITON_VERSION=${TRITON_VERSION:=22.09}
 TENSORFLOW_IMAGE=${TENSORFLOW_IMAGE:=nvcr.io/nvidia/tensorflow:$TRITON_VERSION-tf2-py3}
 PYTORCH_IMAGE=${PYTORCH_IMAGE:=nvcr.io/nvidia/pytorch:$TRITON_VERSION-py3}
 
-CUDA_DEVICE=0
+CUDA_DEVICE=${RUNNER_ID:=0}
 
 ###
 HOST_BUILD_DIR=${HOST_BUILD_DIR:=/tmp}
@@ -66,6 +66,7 @@ DESTDIR=/tmp/custom_ops
 # Tensorflow
 cat >$HOST_SRCDIR/$TFSCRIPT <<EOF
 #!/bin/bash -x
+nvidia-smi -L || true
 set -e
 
 TF_CFLAGS=\$(python -c 'import tensorflow as tf; print(" ".join(tf.sysconfig.get_compile_flags()))')
@@ -114,6 +115,7 @@ fi
 # PyTorch
 cat >$HOST_SRCDIR/$PYTSCRIPT <<EOF
 #!/bin/bash -x
+nvidia-smi -L || true
 set -e
 python3 $SRCDIR/gen_qa_custom_ops_models.py --libtorch --models_dir=$DESTDIR
 cp /root/.cache/torch_extensions/py38_cu118/custom_modulo/custom_modulo.so $DESTDIR/libtorch_modulo/.
