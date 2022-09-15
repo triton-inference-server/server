@@ -3896,7 +3896,7 @@ ModelInferHandler::Process(InferHandler::State* state, bool rpc_ok)
           "unable to retrieve request ID string");
     }
 
-    if ((request_id == "") || (request_id[0] == '\0')) {
+    if ((!strcmp(request_id, "")) || (request_id[0] == '\0')) {
       request_id = "<id_unknown>";
     }
     if (err == nullptr) {
@@ -4324,7 +4324,7 @@ ModelStreamInferHandler::Process(InferHandler::State* state, bool rpc_ok)
     LOG_TRITONSERVER_ERROR(
         TRITONSERVER_InferenceRequestId(irequest, &request_id),
         "unable to retrieve request ID string");
-    if ((request_id == "") || (request_id[0] == '\0')) {
+    if (!strcmp(request_id, "") || (request_id[0] == '\0')) {
       request_id = "<id_unknown>";
     }
     if (err == nullptr) {
