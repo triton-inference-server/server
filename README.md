@@ -87,7 +87,7 @@ cd server/docs/examples
 ./fetch_models.sh
 
 # Step 2: Launch triton from the NGC Triton container
-docker run --gpus=1 --rm --net=host -v ${PWD}/model_repository:/models nvcr.io/nvidia/tritonserver:22.07-py3 tritonserver --model-repository=/models
+docker run --rm --net=host -v ${PWD}/model_repository:/models nvcr.io/nvidia/tritonserver:22.07-py3 tritonserver --model-repository=/models
 
 # Step 3: Sending an Inference Request 
 # In a separate console, launch the image_client example from the NGC Triton SDK container
