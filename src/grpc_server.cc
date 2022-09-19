@@ -1175,6 +1175,10 @@ CommonHandler::SetUpAllRequests()
             }
           }
         }
+
+        err = model_stat.MemberAsUInt("no_response_count", &ucnt);
+        GOTO_IF_ERR(err, earlyexit);
+        statistics->set_no_response_count(ucnt);
       }
     }
 

@@ -25,6 +25,7 @@
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 from collections import defaultdict
+import time
 import sys
 
 sys.path.append("../common")
@@ -85,7 +86,10 @@ class ResponseStatsTest(tu.TestResultCollector):
         self._client.async_stream_infer(model_name=self._model_name,
                                         inputs=inputs,
                                         outputs=outputs)
-        self._wait_until_responses_complete(number_of_responses)
+        if number_of_responses > 0:
+            self._wait_until_responses_complete(number_of_responses)
+        else:
+            time.sleep(2)  # if not expecting response, wait 2 seconds
 
     def _check_duration(self, duration_dict, expect_count, expect_duration_ns):
         self.assertEqual(duration_dict['count'], expect_count)
@@ -107,9 +111,11 @@ class ResponseStatsTest(tu.TestResultCollector):
                 model_stats = statistics['model_stats']
                 self.assertEqual(len(model_stats), 1)
                 response_stats = model_stats[0]['response_stats']
+                no_response_count = model_stats[0]['no_response_count']
             self.assertTrue(len(response_stats), len(response_dict))
 
-            print(response_stats)
+            if 0 in response_dict:
+                self.assertEqual(no_response_count, response_dict[0])
 
             min_infer_delay_ns = 800000
             min_output_delay_ns = 200000
@@ -122,7 +128,6 @@ class ResponseStatsTest(tu.TestResultCollector):
                 indexes = set()
                 for i in range(len(response_stat['responses'])):
                     response = response_stat['responses'][i]
-                    print(response)
                     indexes.add(response['index'])
                     if i + num_fail_infer < len(response_stat['responses']):
                         self._check_duration(
@@ -150,7 +155,6 @@ class ResponseStatsTest(tu.TestResultCollector):
         number_of_responses = 5
         response_dict = defaultdict(int)
         response_dict[number_of_responses] += 1
-
         self._send_request(number_of_responses)
         self._check_response_stats(response_dict)
 
@@ -160,6 +164,11 @@ class ResponseStatsTest(tu.TestResultCollector):
         self._check_response_stats(response_dict)
 
         number_of_responses = 5
+        response_dict[number_of_responses] += 1
+        self._send_request(number_of_responses)
+        self._check_response_stats(response_dict)
+
+        number_of_responses = 0
         response_dict[number_of_responses] += 1
         self._send_request(number_of_responses)
         self._check_response_stats(response_dict)
