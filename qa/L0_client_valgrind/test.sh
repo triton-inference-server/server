@@ -87,8 +87,8 @@ for PROTOCOL in http grpc; do
         else
             python3 ../common/check_valgrind_log.py -f $LEAKCHECK_LOG
             if [ $? -ne 0 ]; then
-            echo -e "\n***\n*** Memory leak detected\n***"
-            RET=1
+                echo -e "\n***\n*** Memory leak detected\n***"
+                RET=1
             fi
         fi
     done
