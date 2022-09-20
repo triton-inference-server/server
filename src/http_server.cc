@@ -3067,7 +3067,7 @@ HTTPAPIServer::InferRequestClass::FinalizeResponse(
 
   const char* request_id = "";
   RETURN_IF_ERR(TRITONSERVER_InferenceResponseId(response, &request_id));
-  if ((strncmp(request_id, "", 1))) {
+  if (strncmp(request_id, "", 1)) {
     RETURN_IF_ERR(response_json.AddStringRef("id", request_id));
   }
 
