@@ -247,6 +247,10 @@ RUN mkdir -p qa/L0_decoupled/models/simple_repeat/1 && \
     mkdir -p qa/L0_decoupled/models/repeat_square/1 && \
     mkdir -p qa/L0_decoupled/models/nested_square/1
 
+RUN mkdir -p qa/L0_response_stats/models/square_int32/1 && \
+    cp backends/square/libtriton_square.so \
+        qa/L0_response_stats/models/square_int32/1/.
+
 RUN cp -r qa/L0_decoupled/models qa/L0_decoupled/python_models/ && \
     cp /workspace/tritonbuild/python/examples/decoupled/repeat_model.py \
         qa/L0_decoupled/python_models/repeat_int32/1/. && \
