@@ -661,10 +661,10 @@ TRITONBACKEND_ModelInstanceExecute(
     uint64_t input_1_byte_size = input_byte_size;
     GUARDED_RESPOND_IF_ERROR(
         responses, r,
-        ReadInputTensor(request, "INPUT0", input_0.data(), &input_0_byte_size));
+        ReadInputTensor(request, "INPUT0", input_0.data(), reinterpret_cast<size_t*>(&input_0_byte_size)));
     GUARDED_RESPOND_IF_ERROR(
         responses, r,
-        ReadInputTensor(request, "INPUT1", input_1.data(), &input_1_byte_size));
+        ReadInputTensor(request, "INPUT1", input_1.data(), reinterpret_cast<size_t*>(&input_1_byte_size)));
     if (responses[r] == nullptr) {
       LOG_MESSAGE(
           TRITONSERVER_LOG_ERROR,
