@@ -2883,7 +2883,7 @@ HTTPAPIServer::HandleInfer(
       LOG_TRITONSERVER_ERROR(
           TRITONSERVER_InferenceRequestId(irequest, &request_id),
           "unable to retrieve request ID string");
-      if ((!strncmp(request_id, "", 1))) {
+      if (!strncmp(request_id, "", 1)) {
         request_id = "<id_unknown>";
       }
       if (err == nullptr) {
