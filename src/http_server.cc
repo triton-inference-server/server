@@ -703,7 +703,7 @@ CheckBinaryInputData(
     triton::common::TritonJson::Value binary_data_size_json;
     if (params_json.Find("binary_data_size", &binary_data_size_json)) {
       RETURN_MSG_IF_ERR(
-          binary_data_size_json.AsUInt(byte_size),
+          binary_data_size_json.AsUInt(reinterpret_cast<uint64_t*>(byte_size)),
           "Unable to parse 'binary_data_size'");
       *is_binary = true;
     }
@@ -2565,7 +2565,7 @@ HTTPAPIServer::EVBufferToInput(
       uint64_t shm_offset;
       const char* shm_region;
       RETURN_IF_ERR(CheckSharedMemoryData(
-          request_input, &use_shm, &shm_region, &shm_offset, &byte_size));
+          request_input, &use_shm, &shm_region, &shm_offset, reinterpret_cast<uint64_t*>(&byte_size)));
       if (use_shm) {
         void* base;
         TRITONSERVER_MemoryType memory_type;
