@@ -35,14 +35,10 @@ import argparse
 #     -> tensorflow::LibHDFS::LoadAndBind()::{lambda(char const*, void**)#1}::operator()(char const*, void**)
 #     -> tensorflow::internal::LoadLibrary
 #     -> dlerror
-#   * InferenceEngine::getAvailableCoresTypes() leak in OpenVINO could be due to
-#     https://github.com/openvinotoolkit/openvino/issues/6593. Should be fixed
-#     after version 2021.4(https://github.com/openvinotoolkit/openvino/issues/6593#issuecomment-878093502).
-#     Remove this after migrating to OpenVINO to 2022.1: DLIS-4055
 
 LEAK_WHITE_LIST = [
     'cnmem', 'tensorflow::NewSession', 'dl-init', 'dl-open', 'dlerror',
-    'libtorch', 'InferenceEngine::getAvailableCoresTypes()'
+    'libtorch'
 ]
 
 
