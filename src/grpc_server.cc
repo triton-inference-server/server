@@ -3896,7 +3896,7 @@ ModelInferHandler::Process(InferHandler::State* state, bool rpc_ok)
           "unable to retrieve request ID string");
     }
 
-    if ((!strncmp(request_id, "", 1))) {
+    if (!strncmp(request_id, "", 1)) {
       request_id = "<id_unknown>";
     }
     if (err == nullptr) {
