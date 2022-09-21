@@ -74,7 +74,9 @@ Major features include:
 - [Metrics](docs/user_guide/metrics.md) indicating GPU utilization, server
   throughput, server latency, and more
 
-Need enterprise support?  NVIDIA global support is available for Triton 
+Join the [Triton and TensorRT community](https://www.nvidia.com/en-us/deep-learning-ai/triton-tensorrt-newsletter/) and 
+stay current on the latest product updates, bug fixes, content, best practices, 
+and more.  Need enterprise support?  NVIDIA global support is available for Triton 
 Inference Server with the 
 [NVIDIA AI Enterprise software suite](https://www.nvidia.com/en-us/data-center/products/ai-enterprise/). 
 
