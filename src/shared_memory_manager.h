@@ -38,7 +38,10 @@
 #include "triton/common/triton_json.h"
 
 #ifdef TRITON_ENABLE_GPU
+#include <cuda.h>  // Driver APIs for CUDA Virtual Memory
 #include <cuda_runtime_api.h>
+// Unix sockets for CUDA virtual memory
+#include <boost/asio/local/stream_protocol.hpp>
 #endif  // TRITON_ENABLE_GPU
 
 namespace triton { namespace server {
@@ -75,6 +78,12 @@ class SharedMemoryManager {
   TRITONSERVER_Error* RegisterCUDASharedMemory(
       const std::string& name, const cudaIpcMemHandle_t* cuda_shm_handle,
       const size_t byte_size, const int device_id);
+
+  /// TODO: Add description
+  TRITONSERVER_Error* RegisterCUDAVirtualMemory(
+      const std::string& name, const std::string& socket_path,
+      const size_t byte_size, const int device_id);
+
 #endif  // TRITON_ENABLE_GPU
 
   /// Get the access information for the shared memory block
@@ -101,7 +110,7 @@ class SharedMemoryManager {
   /// \return a TRITONSERVER_Error indicating success or failure.
   TRITONSERVER_Error* GetCUDAHandle(
       const std::string& name, cudaIpcMemHandle_t** cuda_mem_handle);
-#endif
+#endif  // TRITON_ENABLE_GPU
 
   /// Populates the status of active system/CUDA shared memory regions
   /// in the status JSON. If 'name' is empty then return status of all
@@ -130,6 +139,15 @@ class SharedMemoryManager {
   TRITONSERVER_Error* UnregisterAll(TRITONSERVER_MemoryType memory_type);
 
  private:
+#ifdef TRITON_ENABLE_GPU
+  /// CUDA Virtual Memory Helpers
+  void memMapImportAndMapMemory(
+      CUdeviceptr d_ptr, size_t mapSize, int shareableHandle, int mapDevice);
+  std::size_t read_fd(
+      boost::asio::local::stream_protocol::socket& socket, int& fd,
+      boost::system::error_code& ec);
+#endif  // TRITON_ENABLE_GPU
+
   /// A helper function to remove the named shared memory blocks of
   /// specified type
   TRITONSERVER_Error* UnregisterHelper(
@@ -175,6 +193,20 @@ class SharedMemoryManager {
 
     cudaIpcMemHandle_t cuda_ipc_handle_;
   };
+
+  struct CUDAVirtualMemoryInfo : SharedMemoryInfo {
+    CUDAVirtualMemoryInfo(
+        const std::string& name, const std::string& shm_key,
+        const size_t offset, const size_t byte_size, int shm_fd,
+        void* mapped_addr, const TRITONSERVER_MemoryType kind,
+        const int64_t device_id)
+        : SharedMemoryInfo(
+              name, shm_key, offset, byte_size, shm_fd, mapped_addr, kind,
+              device_id)
+    {
+    }
+  };
+
 #endif
 
   using SharedMemoryStateMap =

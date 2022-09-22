@@ -2163,18 +2163,46 @@ HTTPAPIServer::HandleCudaSharedMemory(
         size_t buffer_len = evbuffer_get_length(req->buffer_in);
         err = EVBufferToJson(&register_request, v, &v_idx, buffer_len, n);
         if (err == nullptr) {
+          bool is_cuda_ipc = false;
+          bool is_cuda_vm = false;
+
+          // CUDA IPC fields
           const char* b64_handle = nullptr;
           size_t b64_handle_len = 0;
           triton::common::TritonJson::Value raw_handle_json;
-          if (!register_request.Find("raw_handle", &raw_handle_json)) {
-            err = TRITONSERVER_ErrorNew(
-                TRITONSERVER_ERROR_INVALID_ARG,
-                "Shared memory register request has no 'raw_handle' field");
-          } else {
+          // CUDA Virtual Memory fields
+          const char* socket_path = nullptr;
+          size_t socket_path_len = 0;
+          triton::common::TritonJson::Value cuda_vm_info_json;
+
+          // CUDA IPC Interface
+          if (register_request.Find("raw_handle", &raw_handle_json)) {
+            is_cuda_ipc = true;
             err = raw_handle_json.MemberAsString(
                 "b64", &b64_handle, &b64_handle_len);
           }
+          // CUDA Virtual Memory Interface
+          // NOTE: Order matters here, so if user provides both, it will
+          // pick CUDA IPC handle first
+          else if (register_request.Find("cuda_vm_info", &cuda_vm_info_json)) {
+            LOG_VERBOSE(1) << "CALLED CUDA VIRTUAL MEMORY REGISTER API";
+            is_cuda_vm = true;
+            err = cuda_vm_info_json.MemberAsString(
+                "unix_socket_path", &socket_path, &socket_path_len);
+            if (err != nullptr) {
+              LOG_ERROR << "FAILED TO FIND CUDA VM INFO IN REQUEST";
+            }
+          }
+          // No CUDA SHM fields specified
+          else {
+            err = TRITONSERVER_ErrorNew(
+                TRITONSERVER_ERROR_INVALID_ARG,
+                "Shared memory register request has no 'raw_handle' or "
+                "'cuda_vm_info' field. One of these fields is required.");
+          }
 
+          // TODO: can probably just check if (err != nullptr) and send reply
+          // early rather than all of these checks
           uint64_t byte_size = 0;
           if (err == nullptr) {
             err = register_request.MemberAsUInt("byte_size", &byte_size);
@@ -2186,25 +2214,37 @@ HTTPAPIServer::HandleCudaSharedMemory(
           }
 
           if (err == nullptr) {
-            base64_decodestate s;
-            base64_init_decodestate(&s);
+            if (is_cuda_ipc) {
+              base64_decodestate s;
+              base64_init_decodestate(&s);
 
-            // The decoded can not be larger than the input...
-            std::vector<char> raw_handle(b64_handle_len + 1);
-            size_t decoded_size = base64_decode_block(
-                b64_handle, b64_handle_len, raw_handle.data(), &s);
-            if (decoded_size != sizeof(cudaIpcMemHandle_t)) {
+              // The decoded can not be larger than the input...
+              std::vector<char> raw_handle(b64_handle_len + 1);
+              size_t decoded_size = base64_decode_block(
+                  b64_handle, b64_handle_len, raw_handle.data(), &s);
+              if (decoded_size != sizeof(cudaIpcMemHandle_t)) {
+                err = TRITONSERVER_ErrorNew(
+                    TRITONSERVER_ERROR_INVALID_ARG,
+                    "'raw_handle' must be a valid base64 encoded "
+                    "cudaIpcMemHandle_t");
+              } else {
+                raw_handle.resize(sizeof(cudaIpcMemHandle_t));
+                err = shm_manager_->RegisterCUDASharedMemory(
+                    region_name.c_str(),
+                    reinterpret_cast<const cudaIpcMemHandle_t*>(
+                        raw_handle.data()),
+                    byte_size, device_id);
+              }
+            }
+            // TODO
+            else if (is_cuda_vm) {
+              err = shm_manager_->RegisterCUDAVirtualMemory(
+                  region_name, socket_path, byte_size, device_id);
+            } else {
+              // TODO: cleanup or separate the 2 sections
               err = TRITONSERVER_ErrorNew(
                   TRITONSERVER_ERROR_INVALID_ARG,
-                  "'raw_handle' must be a valid base64 encoded "
-                  "cudaIpcMemHandle_t");
-            } else {
-              raw_handle.resize(sizeof(cudaIpcMemHandle_t));
-              err = shm_manager_->RegisterCUDASharedMemory(
-                  region_name.c_str(),
-                  reinterpret_cast<const cudaIpcMemHandle_t*>(
-                      raw_handle.data()),
-                  byte_size, device_id);
+                  "not enough cuda shm info provided");
             }
           }
         }

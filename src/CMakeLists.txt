@@ -173,6 +173,7 @@ if(${TRITON_ENABLE_GPU})
     main
     PRIVATE
       CUDA::cudart
+      CUDA::cuda_driver
   )
 endif() # TRITON_ENABLE_GPU
 

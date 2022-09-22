@@ -26,6 +26,12 @@
 
 #include "shared_memory_manager.h"
 
+// TODO: Use other cuda error mechanisms in triton
+#define checkCudaErrors(err)                         \
+  if (err) {                                         \
+    std::cerr << "CUDA ERROR: " << err << std::endl; \
+  }
+
 // Not supporting shared memory for now
 #ifdef _WIN32
 namespace triton { namespace server {
@@ -46,6 +52,17 @@ SharedMemoryManager::RegisterSystemSharedMemory(
 TRITONSERVER_Error*
 SharedMemoryManager::RegisterCUDASharedMemory(
     const std::string& name, const cudaIpcMemHandle_t* cuda_shm_handle,
+    const size_t byte_size, const int device_id)
+{
+  return TRITONSERVER_ErrorNew(
+      TRITONSERVER_ERROR_UNSUPPORTED,
+      std::string("Shared memory feature is currently not supported on Windows")
+          .c_str());
+}
+
+TRITONSERVER_Error*
+SharedMemoryManager::RegisterCUDAVirtualMemory(
+    const std::string& name, const std::string socket_path,
     const size_t byte_size, const int device_id)
 {
   return TRITONSERVER_ErrorNew(
@@ -233,10 +250,11 @@ SharedMemoryManager::RegisterSystemSharedMemory(
   std::lock_guard<std::mutex> lock(mu_);
 
   if (shared_memory_map_.find(name) != shared_memory_map_.end()) {
+    std::string error_msg =
+        std::string("shared memory region '" + name + "' already in manager");
+    LOG_ERROR << error_msg;
     return TRITONSERVER_ErrorNew(
-        TRITONSERVER_ERROR_ALREADY_EXISTS,
-        std::string("shared memory region '" + name + "' already in manager")
-            .c_str());
+        TRITONSERVER_ERROR_ALREADY_EXISTS, error_msg.c_str());
   }
 
   // register
@@ -299,10 +317,11 @@ SharedMemoryManager::RegisterCUDASharedMemory(
   // If name is already in shared_memory_map_ then return error saying already
   // registered
   if (shared_memory_map_.find(name) != shared_memory_map_.end()) {
+    std::string error_msg =
+        std::string("shared memory region '" + name + "' already in manager");
+    LOG_ERROR << error_msg;
     return TRITONSERVER_ErrorNew(
-        TRITONSERVER_ERROR_ALREADY_EXISTS,
-        std::string("shared memory region '" + name + "' already in manager")
-            .c_str());
+        TRITONSERVER_ERROR_ALREADY_EXISTS, error_msg.c_str());
   }
 
   // register
@@ -327,6 +346,194 @@ SharedMemoryManager::RegisterCUDASharedMemory(
 
   return nullptr;  // success
 }
+
+TRITONSERVER_Error*
+SharedMemoryManager::RegisterCUDAVirtualMemory(
+    const std::string& name, const std::string& socket_path,
+    const size_t byte_size, const int device_id)
+{
+  // Serialize all operations that write/read current shared memory regions
+  std::lock_guard<std::mutex> lock(mu_);
+
+  // If name is already in shared_memory_map_ then return error saying already
+  // registered
+  if (shared_memory_map_.find(name) != shared_memory_map_.end()) {
+    std::string error_msg =
+        std::string("shared memory region '" + name + "' already in manager");
+    LOG_ERROR << error_msg;
+    return TRITONSERVER_ErrorNew(
+        TRITONSERVER_ERROR_ALREADY_EXISTS, error_msg.c_str());
+  }
+
+  // Triton server will connect to Triton client's existing socket
+  boost::asio::io_context my_io_context;
+  boost::asio::local::stream_protocol::endpoint ep(socket_path);
+  boost::asio::local::stream_protocol::socket socket(my_io_context);
+  std::cout << "Connecting..." << std::endl;
+  try {
+    socket.connect(ep);
+  }
+  catch (const boost::system::system_error& ex) {
+    auto error_msg = std::string(
+        "Failed to connect to unix socket at socket_path: '" + socket_path +
+        "'. Error: " + ex.what());
+    LOG_ERROR << error_msg;
+    return TRITONSERVER_ErrorNew(
+        TRITONSERVER_ERROR_ALREADY_EXISTS, error_msg.c_str());
+  }
+
+  std::cout << "Connected..." << std::endl;
+
+  // Receive fd over unix socket
+  int shm_fd = -1;
+  boost::system::error_code ec;
+  // Wait for socket to be readable
+  socket.wait(boost::asio::socket_base::wait_read);
+  read_fd(socket, shm_fd, ec);
+
+  // CUDA stuff
+  checkCudaErrors(cuInit(0));
+  CUdevice device;
+  CUcontext ctx;
+  CUdeviceptr d_ptr = 0ULL;
+  checkCudaErrors(cuDeviceGet(&device, device_id));
+  checkCudaErrors(cuCtxCreate(&ctx, 0, device));
+
+  // Reserve the required contiguous VA space for the allocations
+  checkCudaErrors(cuMemAddressReserve(&d_ptr, byte_size, byte_size, 0, 0));
+
+  // Import the memory allocations shared by the parent with us and map them in
+  // our address space.
+  memMapImportAndMapMemory(d_ptr, byte_size, shm_fd, device_id);
+
+  // Read data from shared buffer
+  constexpr int num_data = 4;
+  // int data[num_data] = {42, 1729, 314, 2718};
+  int data[num_data] = {-1, -1, -1, -1};
+  int data_size_bytes = num_data * sizeof(int);
+  CUdeviceptr dst = (CUdeviceptr)data;
+  checkCudaErrors(cuMemcpy(dst, d_ptr, data_size_bytes));
+  std::cout << "Data read from shared buffer: ";
+  for (int i = 0; i < num_data; i++) {
+    std::cout << ((int*)dst)[i] << " ";
+  }
+  std::cout << std::endl;
+
+  // TODO: Do some error checking above
+  TRITONSERVER_Error* err = nullptr;
+  if (err != nullptr) {
+    return TRITONSERVER_ErrorNew(
+        TRITONSERVER_ERROR_INVALID_ARG,
+        std::string(
+            "failed to register CUDA shared memory region '" + name +
+            "': " + TRITONSERVER_ErrorMessage(err))
+            .c_str());
+  }
+
+  // TODO: separate map for virtual memory? probably not
+  // mapped_addr = device_ptr ?
+  // leave cuda_shm_handle empty? or shareable fd ?
+  void* mapped_addr = (void*)d_ptr;
+  shared_memory_map_.insert(std::make_pair(
+      name, std::unique_ptr<CUDAVirtualMemoryInfo>(new CUDAVirtualMemoryInfo(
+                name, "" /*shm_key*/, 0 /*offset*/, byte_size, shm_fd,
+                mapped_addr, TRITONSERVER_MEMORY_GPU, device_id))));
+
+  LOG_VERBOSE(1) << "Insert CUDAVirtualMemoryInfo into map for"
+                 << " name: "
+                 << "[" << name << "]"
+                 << " shm_fd: "
+                 << "[" << shm_fd << "]"
+                 << " mapped_addr: "
+                 << "[" << mapped_addr << "]"
+                 << " device_id: "
+                 << "[" << device_id << "]"
+                 << " byte_size: "
+                 << "[" << byte_size << "]";
+
+  return nullptr;  // success
+}
+
+// Helpers for Virtual Memory
+std::size_t
+SharedMemoryManager::read_fd(
+    boost::asio::local::stream_protocol::socket& socket, int& fd,
+    boost::system::error_code& ec)
+{
+  //::msghdr msg = {0};
+  ::msghdr msg = {};
+
+  char m_buffer[256];
+  ::iovec io = {.iov_base = m_buffer, .iov_len = sizeof(m_buffer)};
+  msg.msg_iov = &io;
+  msg.msg_iovlen = 1;
+
+  union {
+    ::cmsghdr cmsghdr;
+    char control[CMSG_SPACE(sizeof(int))];
+  } cmsgu;
+  msg.msg_control = &cmsgu;
+  msg.msg_controllen = sizeof(cmsgu.control);
+
+  std::cout << "Receiving message from socket..." << std::endl;
+  auto size = ::recvmsg(socket.native_handle(), &msg, 0);
+  if (size < 0) {
+    ec = {errno, boost::system::system_category()};
+    return 0;
+  } else {
+    std::cout << "Copying data to fd..." << std::endl;
+    ::cmsghdr* cmsg = CMSG_FIRSTHDR(&msg);
+    if (cmsg == nullptr) {
+      std::cerr << "cmsg was nullptr" << std::endl;
+      return 0;
+    }
+    unsigned char* data = CMSG_DATA(cmsg);
+    if (data == nullptr) {
+      std::cerr << "data was nullptr" << std::endl;
+    }
+    std::memcpy(&fd, data, sizeof(fd));
+    std::cout << "Received fd: " << fd << std::endl;
+    return size;
+  }
+}
+
+void
+SharedMemoryManager::memMapImportAndMapMemory(
+    CUdeviceptr d_ptr, size_t mapSize, int shareableHandle, int mapDevice)
+{
+  CUmemGenericAllocationHandle allocationHandle;
+
+  // The accessDescriptor will describe the mapping requirement for the
+  // mapDevice passed as argument
+  CUmemAccessDesc accessDescriptor;
+
+  // Specify location for mapping the imported allocations.
+  accessDescriptor.location.type = CU_MEM_LOCATION_TYPE_DEVICE;
+  accessDescriptor.location.id = mapDevice;
+
+  // Specify both read and write accesses.
+  accessDescriptor.flags = CU_MEM_ACCESS_FLAGS_PROT_READWRITE;
+
+  // Import the memory allocation back into a CUDA handle from the platform
+  // specific handle.
+  // TODO: Double cast? fix
+  checkCudaErrors(cuMemImportFromShareableHandle(
+      &allocationHandle, (void*)(uintptr_t)shareableHandle,
+      CU_MEM_HANDLE_TYPE_POSIX_FILE_DESCRIPTOR));
+
+  // Assign the chunk to the appropriate VA range and release the handle.
+  // After mapping the memory, it can be referenced by virtual address.
+  checkCudaErrors(cuMemMap(d_ptr, mapSize, 0, allocationHandle, 0));
+
+  // Since we do not need to make any other mappings of this memory or export
+  // it, we no longer need and can release the allocationHandle. The
+  // allocation will be kept live until it is unmapped.
+  checkCudaErrors(cuMemRelease(allocationHandle));
+
+  // Retain peer access and map all chunks to mapDevice
+  checkCudaErrors(cuMemSetAccess(d_ptr, mapSize, &accessDescriptor, 1));
+}
+
 #endif  // TRITON_ENABLE_GPU
 
 TRITONSERVER_Error*
