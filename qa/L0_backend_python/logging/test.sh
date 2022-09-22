@@ -102,7 +102,7 @@ rm -fr $MODELSDIR && mkdir -p $MODELSDIR && \
 RET=0
 
 #Run Server with Default Log Settings
-SERVER_ARGS="--model-repository=$MODELSDIR"
+SERVER_ARGS="--model-repository=$MODELSDIR --backend-directory=${BACKEND_DIR}"
 run_server
 if [ "$SERVER_PID" == "0" ]; then
     echo -e "\n***\n*** Failed to start $SERVER\n***"
@@ -135,7 +135,7 @@ verify_log_counts 4 0
 
 rm -f *.log
 #Run Server Enabling Verbose Messages
-SERVER_ARGS="--model-repository=$MODELSDIR"
+SERVER_ARGS="--model-repository=$MODELSDIR --backend-directory=${BACKEND_DIR}"
 SERVER_LOG="./server.log"
 run_server
 if [ "$SERVER_PID" == "0" ]; then
@@ -179,7 +179,7 @@ verify_log_counts 4 3
 
 rm -f *.log
 #Run Server Enabling Verbose Messages
-SERVER_ARGS="--model-repository=$MODELSDIR"
+SERVER_ARGS="--model-repository=$MODELSDIR --backend-directory=${BACKEND_DIR}"
 SERVER_LOG="./server.log"
 run_server
 if [ "$SERVER_PID" == "0" ]; then
