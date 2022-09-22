@@ -24,8 +24,11 @@
 # (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
+import os
 import numpy as np
 import triton_python_backend_utils as pb_utils
+
+TEST_JETSON = bool(int(os.environ.get('TEST_JETSON', 0)))
 
 
 def check_init_args(args):
@@ -43,10 +46,15 @@ def check_init_args(args):
         'model_version':
             '1'
     }
+    if TEST_JETSON:
+        expected_args[
+            'model_repository'] = '/raid/home/gitlab-runner/tritonserver/qa/L0_backend_python/models/init_args'
+
     for arg in expected_args:
         if args[arg] != expected_args[arg]:
             raise pb_utils.TritonModelException(
-                arg + ' does not contain correct value.')
+                arg + ' does not contain correct value. Expected "' +
+                expected_args[arg] + ', got ' + args[arg])
 
 
 class TritonPythonModel:
