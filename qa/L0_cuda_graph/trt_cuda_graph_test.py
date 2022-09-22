@@ -36,16 +36,21 @@ from tritonclientutils import *
 
 
 class TrtCudaGraphTest(tu.TestResultCollector):
+    MODELNAME= "plan"
 
     def setUp(self):
         self.dtype_ = np.float32
         self.dtype_str_ = "FP32"
-        self.model_name_ = 'plan'
+        self.model_name_ = self.MODELNAME
 
     def _check_infer(self, tensor_shape, batch_size=1):
         try:
+            if batch_size:
+                full_shape = (batch_size,) + tensor_shape
+            else:
+                full_shape = tensor_shape
             iu.infer_exact(self,
-                           self.model_name_, (batch_size,) + tensor_shape,
+                           self.model_name_, full_shape,
                            batch_size,
                            self.dtype_,
                            self.dtype_,
@@ -132,6 +137,11 @@ class TrtCudaGraphTest(tu.TestResultCollector):
         self._check_infer((16,), 8)
         self._check_infer((30,), 4)
 
+    def test_nobatch_fixed_shape(self):
+        self._check_infer((16,), 0)
 
 if __name__ == '__main__':
+    if len(sys.argv) > 2:
+        TrtCudaGraphTest.MODELNAME = sys.argv.pop()
+
     unittest.main()

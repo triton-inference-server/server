@@ -287,6 +287,53 @@ set -e
 kill $SERVER_PID
 wait $SERVER_PID
 
+# TrtCudaGraphTest.test_nobatch_fixed_shape
+rm -rf ${DATADIR} && mkdir -p ${DATADIR}
+cp -r /data/inferenceserver/${REPO_VERSION}/qa_model_repository/plan_nobatch_float32_float32_float32 ${DATADIR}/
+# Make sure only one version is present
+rm -rf ${DATADIR}/plan_nobatch_float32_float32_float32/2 ${DATADIR}/plan_nobatch_float32_float32_float32/3
+
+CLIENT_LOG="./nobatch_fixed_shape.client.log"
+SERVER_LOG="./nobatch_fixed_shape.inference_server.log"
+echo "optimization { cuda { graphs: true } }" >> ${DATADIR}/plan_nobatch_float32_float32_float32/config.pbtxt
+
+run_server
+if [ "$SERVER_PID" == "0" ]; then
+    echo -e "\n***\n*** Failed to start $SERVER\n***"
+    cat $SERVER_LOG
+    exit 1
+fi
+
+set +e
+python $TRT_CUDA_GRAPH_TEST TrtCudaGraphTest.test_nobatch_fixed_shape plan_nobatch>>$CLIENT_LOG 2>&1
+if [ $? -ne 0 ]; then
+    echo -e "\n***\n*** Test Failed\n***"
+    cat $CLIENT_LOG
+    RET=1
+else
+    check_test_results $TEST_RESULT_FILE 1
+    if [ $? -ne 0 ]; then
+        cat $CLIENT_LOG
+        echo -e "\n***\n*** Test Result Verification Failed\n***"
+        RET=1
+    fi
+fi
+set -e
+
+set +e
+if [ `grep -c "Context with profile default \[0\] is launching CUDA graph " $SERVER_LOG` != "1" ]; then
+    echo -e "\n***\n*** Failed. Expected only one execution with CUDA graph\n***"
+    RET=1
+fi
+
+if [ `grep -c "captured CUDA graph for" $SERVER_LOG` != "1" ]; then
+    echo -e "\n***\n*** Failed. Expected 1 CUDA graph to be captured\n***"
+    RET=1
+fi
+set -e
+
+kill $SERVER_PID
+wait $SERVER_PID
 
 if [ $RET -eq 0 ]; then
   echo -e "\n***\n*** Test Passed\n***"
