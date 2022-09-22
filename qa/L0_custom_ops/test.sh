@@ -113,7 +113,7 @@ SERVER_LD_PRELOAD=""
 
 rm -rf tf_custom_ops && \
     mkdir -p tf_custom_ops && \
-    cp -r --model-repository=/data/inferenceserver/${REPO_VERSION}/qa_custom_ops/tf_custom_ops tf_custom_ops
+    cp -r /data/inferenceserver/${REPO_VERSION}/qa_custom_ops/tf_custom_ops .
 
 echo "model_operations { op_library_filename: \"./libbusyop.so\" }" >> tf_custom_ops/graphdef_busyop/config.pbtxt
 echo "model_operations { op_library_filename: \"./libbusyop.so\" }" >> tf_custom_ops/savedmodel_busyop/config.pbtxt
@@ -121,7 +121,6 @@ echo "model_operations { op_library_filename: \"./libcudaop.so\" }" >> tf_custom
 echo "model_operations { op_library_filename: \"./libcudaop.so\" }" >> tf_custom_ops/savedmodel_cudaop/config.pbtxt
 echo "model_operations { op_library_filename: \"./libzeroout.so\" }" >> tf_custom_ops/graphdef_zeroout/config.pbtxt
 echo "model_operations { op_library_filename: \"./libzeroout.so\" }" >> tf_custom_ops/savedmodel_zeroout/config.pbtxt
-/data/inferenceserver/${REPO_VERSION}/qa_custom_ops/tf_custom_ops/libzeroout.so:/data/inferenceserver/${REPO_VERSION}/qa_custom_ops/tf_custom_ops/libcudaop.so:/data/inferenceserver/${REPO_VERSION}/qa_custom_ops/tf_custom_ops/libbusyop.so
 
 run_server
 if [ "$SERVER_PID" == "0" ]; then
