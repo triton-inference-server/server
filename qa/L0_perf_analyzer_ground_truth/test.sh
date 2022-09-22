@@ -92,6 +92,12 @@ function check_grpc_time {
     done
 }
 
+# Create input_data.json to communicate the requested model delay 
+# $1: desired model delay
+function create_input_data {
+    echo "{\"data\":[{\"INPUT0\" : [${1}]}]}" > input_data.json
+}
+
 # Setup server
 export CUDA_VISIBLE_DEVICES=0
 SERVER=/opt/tritonserver/bin/tritonserver
@@ -123,24 +129,27 @@ set +e
 RET=0
 PROTOCOLS="http grpc"
 OUTPUT_FILE="results"
-EXPECTED_RESULT="90.00"
+MODEL_DELAYS=(0.05 0.5)
 TOLERANCE="0.05"
-STABILITY_THRESHOLD="15"
 
-for protocol in ${PROTOCOLS}; do
-    for model in ${MODELS}; do
-	echo "================================================================"
-	echo "[PERMUTATION] Protocol=${protocol} Model=${model}"
-	echo "================================================================"
+for model_delay in ${MODEL_DELAYS[@]}; do
+    create_input_data ${model_delay}
+    EXPECTED_RESULT=$(python3 -c "print(1 / ${model_delay})")    
+    for protocol in ${PROTOCOLS}; do
+        for model in ${MODELS}; do
+        echo "================================================================"
+        echo "[PERMUTATION] Protocol=${protocol} Model=${model}"
+        echo "================================================================"
 
-        ${PERF_ANALYZER} -v -i ${protocol} -m ${model} -f ${OUTPUT_FILE} -s ${STABILITY_THRESHOLD} | tee ${CLIENT_LOG} 2>&1
-        check_perf_analyzer_error $?
+            ${PERF_ANALYZER} -v -i ${protocol} --concurrency-range 2 --input-data input_data.json -m ${model} -f ${OUTPUT_FILE} | tee ${CLIENT_LOG} 2>&1
+            check_perf_analyzer_error $?
 
-        check_performance ${OUTPUT_FILE} ${EXPECTED_RESULT} ${TOLERANCE}
+            check_performance ${OUTPUT_FILE} ${EXPECTED_RESULT} ${TOLERANCE}
 
-        if [ "${protocol}" == "grpc" ]; then
-            check_grpc_time ${CLIENT_LOG}
-        fi
+            if [ "${protocol}" == "grpc" ]; then
+                check_grpc_time ${CLIENT_LOG}
+            fi
+        done;
     done;
 done;
 

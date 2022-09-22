@@ -32,12 +32,20 @@ class TritonPythonModel:
 
     def execute(self, requests):
         """
-        Identity model in Python backend.
+        Mock Model that uses the input data to determine how long to wait
+        before returning identity data
         """
-        time.sleep(0.01)
+        assert(len(requests) == 1)
+        delay = 0
+        request = requests[0]
         responses = []
-        for request in requests:
-            input_tensor = pb_utils.get_input_tensor_by_name(request, "INPUT0")
-            out_tensor = pb_utils.Tensor("OUTPUT0", input_tensor.as_numpy())
-            responses.append(pb_utils.InferenceResponse([out_tensor]))
+
+        delay_tensor = pb_utils.get_input_tensor_by_name(request, "INPUT0")
+        delay_as_numpy = delay_tensor.as_numpy()
+        delay = float(delay_as_numpy[0][0])
+
+        out_tensor = pb_utils.Tensor("OUTPUT0", delay_as_numpy)
+        responses.append(pb_utils.InferenceResponse([out_tensor]))
+
+        time.sleep(delay)
         return responses
