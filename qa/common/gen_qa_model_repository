@@ -63,6 +63,8 @@ TENSORFLOW_IMAGE=${TENSORFLOW_IMAGE:=nvcr.io/nvidia/tensorflow:$TRITON_VERSION-t
 TENSORRT_IMAGE=${TENSORRT_IMAGE:=nvcr.io/nvidia/tensorrt:$TRITON_VERSION-py3}
 CUDA_DEVICE=${RUNNER_ID:=0}
 
+[[ $RUNNER_GPUS =~ ^[0-9] ]] && DOCKER_GPU_ARGS=$(eval $NV_DOCKER_ARGS) || DOCKER_GPU_ARGS="--gpus device=$CUDA_DEVICE" 
+
 ###
 HOST_BUILD_DIR=${HOST_BUILD_DIR:=/tmp}
 HOST_SRCDIR=$HOST_BUILD_DIR/gen_srcdir
@@ -232,7 +234,7 @@ if [ $? -ne 0 ]; then
 fi
 
 docker pull $UBUNTU_IMAGE
-docker run --gpus device=$CUDA_DEVICE --rm --entrypoint $SRCDIR/$OPENVINOSCRIPT \
+docker run $DOCKER_GPU_ARGS --rm --entrypoint $SRCDIR/$OPENVINOSCRIPT \
        --mount type=bind,source=$HOST_SRCDIR,target=$SRCDIR \
        --mount type=bind,source=$HOST_DESTDIR,target=$DESTDIR \
        --mount type=bind,source=$HOST_VARDESTDIR,target=$VARDESTDIR \
@@ -299,7 +301,7 @@ if [ $? -ne 0 ]; then
 fi
 
 docker pull $UBUNTU_IMAGE
-docker run --gpus device=$CUDA_DEVICE --rm --entrypoint $SRCDIR/$ONNXSCRIPT \
+docker run $DOCKER_GPU_ARGS --rm --entrypoint $SRCDIR/$ONNXSCRIPT \
        --mount type=bind,source=$HOST_SRCDIR,target=$SRCDIR \
        --mount type=bind,source=$HOST_DESTDIR,target=$DESTDIR \
        --mount type=bind,source=$HOST_VARDESTDIR,target=$VARDESTDIR \
@@ -350,7 +352,7 @@ if [ $? -ne 0 ]; then
 fi
 
 docker pull $PYTORCH_IMAGE
-docker run --gpus device=$CUDA_DEVICE --rm --entrypoint $SRCDIR/$TORCHSCRIPT \
+docker run $DOCKER_GPU_ARGS --rm --entrypoint $SRCDIR/$TORCHSCRIPT \
        --mount type=bind,source=$HOST_SRCDIR,target=$SRCDIR \
        --mount type=bind,source=$HOST_DESTDIR,target=$DESTDIR \
        --mount type=bind,source=$HOST_VARDESTDIR,target=$VARDESTDIR \
@@ -409,7 +411,7 @@ if [ $? -ne 0 ]; then
 fi
 
 docker pull $TENSORFLOW_IMAGE
-docker run --gpus device=$CUDA_DEVICE --rm --entrypoint $SRCDIR/$TFSCRIPT \
+docker run $DOCKER_GPU_ARGS --rm --entrypoint $SRCDIR/$TFSCRIPT \
        --mount type=bind,source=$HOST_SRCDIR,target=$SRCDIR \
        --mount type=bind,source=$HOST_DESTDIR,target=$DESTDIR \
        --mount type=bind,source=$HOST_VARDESTDIR,target=$VARDESTDIR \
@@ -484,7 +486,7 @@ if [ $? -ne 0 ]; then
 fi
 
 docker pull $TENSORRT_IMAGE
-docker run --gpus device=$CUDA_DEVICE --rm --entrypoint $SRCDIR/$TRTSCRIPT \
+docker run $DOCKER_GPU_ARGS --rm --entrypoint $SRCDIR/$TRTSCRIPT \
        --mount type=bind,source=$HOST_SRCDIR,target=$SRCDIR \
        --mount type=bind,source=$HOST_DESTDIR,target=$DESTDIR \
        --mount type=bind,source=$HOST_VARDESTDIR,target=$VARDESTDIR \
