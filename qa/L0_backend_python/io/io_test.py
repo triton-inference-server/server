@@ -32,6 +32,7 @@ from functools import partial
 import test_util as tu
 import shm_util
 import tritonclient.grpc as grpcclient
+import tritonclient.http as httpclient
 from tritonclient.utils import *
 import numpy as np
 import unittest
@@ -59,7 +60,7 @@ class IOTest(tu.TestResultCollector):
     def setUp(self):
         self._shm_leak_detector = shm_util.ShmLeakDetector()
 
-    def _run_test(self):
+    def _run_ensemble_test(self):
         model_name = "ensemble_io"
         user_data = UserData()
         with grpcclient.InferenceServerClient("localhost:8001") as client:
@@ -100,9 +101,23 @@ class IOTest(tu.TestResultCollector):
         # Only run the shared memory leak detection with the default trial
         if TRIAL == 'default':
             with self._shm_leak_detector.Probe():
-                self._run_test()
+                self._run_ensemble_test()
         else:
-            self._run_test()
+            self._run_ensemble_test()
+
+    def test_empty_gpu_output(self):
+        model_name = 'dlpack_empty_output'
+        with httpclient.InferenceServerClient("localhost:8000") as client:
+            input_data = np.array([[1.0]], dtype=np.float32)
+            inputs = [
+                httpclient.InferInput("INPUT", input_data.shape,
+                                      np_to_triton_dtype(input_data.dtype))
+            ]
+            inputs[0].set_data_from_numpy(input_data)
+            result = client.infer(model_name, inputs)
+            output = result.as_numpy('OUTPUT')
+            self.assertIsNotNone(output)
+            self.assertTrue(output.size == 0)
 
 
 if __name__ == '__main__':
