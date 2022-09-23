@@ -43,6 +43,8 @@ PYTORCH_IMAGE=${PYTORCH_IMAGE:=nvcr.io/nvidia/pytorch:$TRITON_VERSION-py3}
 
 CUDA_DEVICE=${RUNNER_ID:=0}
 
+[[ $RUNNER_GPUS =~ ^[0-9] ]] && DOCKER_GPU_ARGS=$(eval $NV_DOCKER_ARGS) || DOCKER_GPU_ARGS="--gpus device=$CUDA_DEVICE" 
+
 ###
 HOST_BUILD_DIR=${HOST_BUILD_DIR:=/tmp}
 HOST_SRCDIR=$HOST_BUILD_DIR/gen_srcdir
@@ -103,7 +105,7 @@ if [ $? -ne 0 ]; then
 fi
 
 docker pull $TENSORFLOW_IMAGE
-docker run --gpus device=$CUDA_DEVICE --rm --entrypoint $SRCDIR/$TFSCRIPT \
+docker run $DOCKER_GPU_ARGS --rm --entrypoint $SRCDIR/$TFSCRIPT \
        --mount type=bind,source=$HOST_SRCDIR,target=$SRCDIR \
        --mount type=bind,source=$HOST_DESTDIR/tf_custom_ops,target=$DESTDIR \
        $TENSORFLOW_IMAGE
@@ -129,7 +131,7 @@ if [ $? -ne 0 ]; then
 fi
 
 docker pull $PYTORCH_IMAGE
-docker run --gpus device=$CUDA_DEVICE --rm --entrypoint $SRCDIR/$PYTSCRIPT \
+docker run $DOCKER_GPU_ARGS --rm --entrypoint $SRCDIR/$PYTSCRIPT \
        --mount type=bind,source=$HOST_SRCDIR,target=$SRCDIR \
        --mount type=bind,source=$HOST_DESTDIR/libtorch_custom_ops,target=$DESTDIR \
        $PYTORCH_IMAGE
