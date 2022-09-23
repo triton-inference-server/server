@@ -26,7 +26,7 @@
 
 import torch
 import triton_python_backend_utils as pb_utils
-from torch.utils.dlpack import to_dlpack, from_dlpack
+from torch.utils.dlpack import to_dlpack
 
 
 class TritonPythonModel:
@@ -37,7 +37,7 @@ class TritonPythonModel:
     def execute(self, requests):
         responses = []
 
-        for request in requests:
+        for _ in requests:
             SHAPE = (0,)
 
             pytorch_tensor = torch.ones(SHAPE, dtype=torch.float32)

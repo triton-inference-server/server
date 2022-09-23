@@ -117,7 +117,7 @@ class IOTest(tu.TestResultCollector):
             result = client.infer(model_name, inputs)
             output = result.as_numpy('OUTPUT')
             self.assertIsNotNone(output)
-            self.assertTrue(output.size == 0)
+            self.assertEqual(output.size, 0)
 
 
 if __name__ == '__main__':
