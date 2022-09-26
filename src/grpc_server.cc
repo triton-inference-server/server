@@ -3399,8 +3399,8 @@ InferGRPCToInput(
             RETURN_IF_ERR(InferGRPCToInputHelper(
                 io.name(), request.model_name(), TRITONSERVER_TYPE_UINT32,
                 dtype, byte_size));
-            base = (const void*)io.contents().int_contents().data();
-            byte_size = io.contents().int_contents_size() * elem_byte_size;
+            base = (const void*)io.contents().uint_contents().data();
+            byte_size = io.contents().uint_contents_size() * elem_byte_size;
           }
         }
 
