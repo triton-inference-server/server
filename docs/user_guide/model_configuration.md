@@ -357,7 +357,7 @@ library.
 |Model Config  |TensorRT      |TensorFlow    |ONNX Runtime  |PyTorch  |API      |NumPy         |
 |--------------|--------------|--------------|--------------|---------|---------|--------------|
 |TYPE_BOOL     | kBOOL        |DT_BOOL       |BOOL          |kBool    |BOOL     |bool          |
-|TYPE_UINT8    |              |DT_UINT8      |UINT8         |kByte    |UINT8    |uint8         |
+|TYPE_UINT8    | kUINT8       |DT_UINT8      |UINT8         |kByte    |UINT8    |uint8         |
 |TYPE_UINT16   |              |DT_UINT16     |UINT16        |         |UINT16   |uint16        |
 |TYPE_UINT32   |              |DT_UINT32     |UINT32        |         |UINT32   |uint32        |
 |TYPE_UINT64   |              |DT_UINT64     |UINT64        |         |UINT64   |uint64        |
