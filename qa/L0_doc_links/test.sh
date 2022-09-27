@@ -21,16 +21,15 @@ python3 -m pip install mkdocs-htmlproofer-plugin
 
 # Get the necessary repos
 mkdir repos && cd repos
-TRITON_SERVER_BRANCH_NAME=${TRITON_SERVER_BRANCH_NAME:="main"}
 TRITON_BACKEND_REPO_TAG=${TRITON_BACKEND_REPO_TAG:="main"}
-echo ${TRITON_SERVER_BRANCH_NAME}
-git clone --single-branch --depth=1 -b ${TRITON_SERVER_BRANCH_NAME} https://github.com/triton-inference-server/server.git
 echo ${TRITON_BACKEND_REPO_TAG}
 git clone --single-branch --depth=1 -b ${TRITON_BACKEND_REPO_TAG} https://github.com/triton-inference-server/backend.git
 cd ..
 
 exec mkdocs serve -f $CONFIG > $LOG &
 PID=$!
+# Time for the compilation to finish. This needs to be increased if other repos
+# are added to the test
 sleep 20
 
 until [[ (-z `pgrep mkdocs`) ]]; do
