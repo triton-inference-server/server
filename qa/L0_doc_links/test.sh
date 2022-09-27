@@ -15,6 +15,8 @@
 LOG="`pwd`/log.txt"
 CONFIG="`pwd`/mkdocs.yml"
 RET=0
+python3 -m pip install mkdocs
+python3 -m pip install mkdocs-htmlproofer-plugin
 
 exec mkdocs serve -f $CONFIG > $LOG &
 PID=$!
