@@ -80,7 +80,7 @@ latency.
 
 For most models, the Triton feature that provides the largest
 performance improvement is [dynamic
-batching](architecture.md#dynamic-batcher). If your model does not
+batching](model_configuration.md#dynamic-batcher). If your model does not
 support batching then you can skip ahead to [Model
 Instances](#model-instances).
 
