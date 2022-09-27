@@ -15,8 +15,19 @@
 LOG="`pwd`/log.txt"
 CONFIG="`pwd`/mkdocs.yml"
 RET=0
+# Download necessary packages
 python3 -m pip install mkdocs
 python3 -m pip install mkdocs-htmlproofer-plugin
+
+# Get the necessary repos
+mkdir repos && cd repos
+TRITON_SERVER_BRANCH_NAME=${TRITON_SERVER_BRANCH_NAME:="main"}
+TRITON_BACKEND_REPO_TAG=${TRITON_BACKEND_REPO_TAG:="main"}
+echo ${TRITON_SERVER_BRANCH_NAME}
+git clone --single-branch --depth=1 -b ${TRITON_SERVER_BRANCH_NAME} https://github.com/triton-inference-server/server.git
+echo ${TRITON_BACKEND_REPO_TAG}
+git clone --single-branch --depth=1 -b ${TRITON_BACKEND_REPO_TAG} https://github.com/triton-inference-server/backend.git
+cd ..
 
 exec mkdocs serve -f $CONFIG > $LOG &
 PID=$!
@@ -38,4 +49,4 @@ if [ $RET -eq 0 ]; then
 else
     echo -e "\n***\n*** Test FAILED\n***"
 fi
-exit $RET
+# exit $RET

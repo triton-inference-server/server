@@ -125,8 +125,8 @@ contains additional documentation, presentations, and examples.
 The recommended way to build and use Triton Inference Server is with Docker
 images.
 
-- [Install Triton Inference Server with Docker containers](docs/customization_guide/build.md#building-triton-with-docker) (*Recommended*)
-- [Install Triton Inference Server without Docker containers](docs/customization_guide/build.md#building-triton-without-docker)
+- [Install Triton Inference Server with Docker containers](docs/customization_guide/build.md#building-with-docker) (*Recommended*)
+- [Install Triton Inference Server without Docker containers](docs/customization_guide/build.md#building-without-docker)
 - [Build a custom Triton Inference Server Docker container](docs/customization_guide/compose.md)
 - [Build Triton Inference Server from source](docs/customization_guide/build.md#building-on-unsupported-platforms)
 - [Build Triton Inference Server for Windows 10](docs/customization_guide/build.md#building-for-windows-10)
@@ -213,8 +213,8 @@ designed for modularity and flexibility
 ### Additional Documentation
 
 - [FAQ](docs/user_guide/faq.md)
-- [User Guide](docs#user-guide)
-- [Developer Guide](docs#developer-guide)
+- [User Guide](docs/README.md#user-guide)
+- [Customization Guide](docs/README.md#customization-guide)
 - [Release Notes](https://docs.nvidia.com/deeplearning/triton-inference-server/release-notes/index.html)
 - [GPU, Driver, and CUDA Support
 Matrix](https://docs.nvidia.com/deeplearning/dgx/support-matrix/index.html)

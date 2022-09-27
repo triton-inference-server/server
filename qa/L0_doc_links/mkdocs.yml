@@ -14,7 +14,7 @@
 
 site_name: CI Test
 use_directory_urls: False
-docs_dir: "docs"
+docs_dir: "./repos"
 plugins:
         - htmlproofer
         - search

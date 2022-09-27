@@ -47,7 +47,7 @@ proposed change so that the Triton team can provide feedback.
   will provide guidance about how and where your enhancement should be
   implemented.
 
-- [Testing](docs/test.md) is a critical part of any Triton
+- [Testing](docs/customization_guide/test.md) is a critical part of any Triton
   enhancement. You should plan on spending significant time on
   creating tests for your change. The Triton team will help you to
   design your testing so that it is compatible with existing testing
@@ -84,7 +84,7 @@ proposed change so that the Triton team can provide feedback.
 - Make sure all `L0_*` tests pass:
 
   - In the `qa/` directory, there are basic sanity tests scripted in
-    directories named `L0_...`.  See the [Test](docs/test.md)
+    directories named `L0_...`.  See the [Test](docs/customization_guide/test.md)
     documentation for instructions on running these tests.
 
 - Triton Inference Server's default build assumes recent versions of

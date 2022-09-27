@@ -125,7 +125,7 @@ $ curl -v localhost:8000/v2/health/ready
 The HTTP request returns status 200 if Triton is ready and non-200 if
 it is not ready.
 
-## Send an Infernce Request
+## Send an Inference Request
 
 Use docker pull to get the client libraries and examples image
 from NGC.
