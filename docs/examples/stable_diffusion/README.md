@@ -6,14 +6,15 @@ This example focuses on showcasing two of Triton Inference Server's features:
 
 ## How to run?
 
-Before starting, clone this repository and navigate to the root folder. It is recommended to use three different terminals for ease.
+Before starting, clone this repository and navigate to the root folder. Use three different terminals for an easier user experience.
 
 ### Step 1: Prepare the Server Environment
 * First, run the Triton Inference Server Container.
 ```
-docker run --gpus=all -it --shm-size=256m --rm -p8000:8000 -p8001:8001 -p8002:8002 -v ${PWD}:/workspace/ -v ${PWD}/model_repository:/models nvcr.io/nvidia/tritonserver:22.08-py3 bash
+# Replace yy.mm with year and month of release. Eg. 22.08
+docker run --gpus=all -it --shm-size=256m --rm -p8000:8000 -p8001:8001 -p8002:8002 -v ${PWD}:/workspace/ -v ${PWD}/model_repository:/models nvcr.io/nvidia/tritonserver:yy.mm-py3 bash
 ```
-* Next, we need to install all the dependencies required by the models running in the python backend.
+* Next, install all the dependencies required by the models running in the python backend.
 
 ```
 # PyTorch & Transformers Lib
@@ -41,7 +42,8 @@ export USE_MEMORY_EFFICIENT_ATTENTION=1
 Use the NGC PyTorch container, to export and convert the models.
 
 ```
-docker run -it --gpus all -p 8888:8888 -v ${PWD}:/mount nvcr.io/nvidia/pytorch:22.08-py3
+# Replace yy.mm with year and month of release. Eg. 22.08
+docker run -it --gpus all -p 8888:8888 -v ${PWD}:/mount nvcr.io/nvidia/pytorch:yy.mm-py3
 
 pip install transformers ftfy scipy
 pip install transformers[onnxruntime]
@@ -69,7 +71,8 @@ tritonserver --model-repository=/models
 ### Step 4: Run the client
 Use the client container and run the client.
 ```
-docker run -it --net=host -v /home/tvarshney:/mount -v ${PWD}:/workspace/ nvcr.io/nvidia/tritonserver:22.08-py3-sdk bash
+# Replace yy.mm with year and month of release. Eg. 22.08
+docker run -it --net=host -v /home/tvarshney:/mount -v ${PWD}:/workspace/ nvcr.io/nvidia/tritonserver:yy.mm-py3-sdk bash
 
 # Client with no GUI
 python3 client.py
