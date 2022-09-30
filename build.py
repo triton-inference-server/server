@@ -307,6 +307,9 @@ class BuildScript:
         else:
             self.cmd(f'if [[ ! -e {clone_dir} ]]; then')
 
+        # FIXME [DLIS-4045 - Currently the tag starting with "pull/" is not
+        # working with "--repo-tag" as the option is not forwared to the
+        # individual repo build correctly.]
         # If 'tag' starts with "pull/" then it must be of form
         # "pull/<pr>/head". We just clone at "main" and then fetch the
         # reference onto a new branch we name "tritonbuildref".
@@ -1559,12 +1562,15 @@ def cibase_build(cmake_script, repo_dir, cmake_dir, build_dir, install_dir,
     cmake_script.mkdir(os.path.join(ci_dir, 'src', 'test'))
     cmake_script.cpdir(os.path.join(repo_dir, 'src', 'test', 'models'),
                        os.path.join(ci_dir, 'src', 'test'))
-    cmake_script.cpdir(os.path.join(repo_install_dir, 'bin'), ci_dir)
-    cmake_script.mkdir(os.path.join(ci_dir, 'lib'))
-    cmake_script.cp(
-        os.path.join(repo_install_dir, 'lib',
-                     'libtritonrepoagent_relocation.so'),
-        os.path.join(ci_dir, 'lib'))
+    # Skip copying the artifacts in the bin and lib as those directories will
+    # be missing when the core build is not enabled.
+    if not FLAGS.no_core_build:
+        cmake_script.cpdir(os.path.join(repo_install_dir, 'bin'), ci_dir)
+        cmake_script.mkdir(os.path.join(ci_dir, 'lib'))
+        cmake_script.cp(
+            os.path.join(repo_install_dir, 'lib',
+                        'libtritonrepoagent_relocation.so'),
+            os.path.join(ci_dir, 'lib'))
 
     # Some of the backends are needed for CI testing
     cmake_script.mkdir(os.path.join(ci_dir, 'backends'))
@@ -1913,7 +1919,7 @@ if __name__ == '__main__':
         '--no-core-build',
         action="store_true",
         required=False,
-        help='Do not build Triton core sharead library or executable.')
+        help='Do not build Triton core shared library or executable.')
     parser.add_argument(
         '--backend',
         action='append',
@@ -1926,7 +1932,7 @@ if __name__ == '__main__':
         action='append',
         required=False,
         help=
-        'The version of a component to use in the build as <component-name>:<repo-tag>. <component-name> can be "common", "core", "backend" or "thirdparty". If <repo-tag> starts with "pull/" then it refers to a pull-request reference, otherwise <repo-tag> indicates the git tag/branch. If the version is non-development then the default <repo-tag> is the release branch matching the container version (e.g. version YY.MM -> branch rYY.MM); otherwise the default <repo-tag> is "main" (e.g. version YY.MMdev -> branch main).'
+        'The version of a component to use in the build as <component-name>:<repo-tag>. <component-name> can be "common", "core", "backend" or "thirdparty". <repo-tag> indicates the git tag/branch to use for the build. Currently <repo-tag> does not support pull-request reference. If the version is non-development then the default <repo-tag> is the release branch matching the container version (e.g. version YY.MM -> branch rYY.MM); otherwise the default <repo-tag> is "main" (e.g. version YY.MMdev -> branch main).'
     )
     parser.add_argument(
         '--repoagent',
