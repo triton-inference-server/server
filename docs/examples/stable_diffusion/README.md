@@ -42,7 +42,6 @@ export USE_MEMORY_EFFICIENT_ATTENTION=1
 Use the NGC PyTorch container, to export and convert the models.
 
 ```
-# Replace yy.mm with year and month of release. Eg. 22.08
 docker run -it --gpus all -p 8888:8888 -v ${PWD}:/mount nvcr.io/nvidia/pytorch:yy.mm-py3
 
 pip install transformers ftfy scipy
@@ -71,7 +70,6 @@ tritonserver --model-repository=/models
 ### Step 4: Run the client
 Use the client container and run the client.
 ```
-# Replace yy.mm with year and month of release. Eg. 22.08
 docker run -it --net=host -v /home/tvarshney:/mount -v ${PWD}:/workspace/ nvcr.io/nvidia/tritonserver:yy.mm-py3-sdk bash
 
 # Client with no GUI
