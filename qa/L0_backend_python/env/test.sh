@@ -156,12 +156,46 @@ aws s3 mb "${BUCKET_URL}"
 BUCKET_URL=${BUCKET_URL%/}
 BUCKET_URL_SLASH="${BUCKET_URL}/"
 
-# Model Python 3.7 contains absolute paths and because of this it cannot be used
+# Remove Python 3.7 model because it contains absolute paths and cannot be used
 # with S3.
 rm -rf models/python_3_7
+
+# Test with the bucket url as model repository
+aws s3 cp models/ "${BUCKET_URL_SLASH}" --recursive --include "*"
+
 rm $SERVER_LOG
 
+SERVER_ARGS="--model-repository=$BUCKET_URL_SLASH --log-verbose=1"
+run_server
+if [ "$SERVER_PID" == "0" ]; then
+    echo -e "\n***\n*** Failed to start $SERVER\n***"
+    cat $SERVER_LOG
+    exit 1
+fi
+
+kill $SERVER_PID
+wait $SERVER_PID
+
+set +e
+grep "Python version is 3.6, NumPy version is 1.18.1, and Tensorflow version is 2.1.0" $SERVER_LOG
+if [ $? -ne 0 ]; then
+    cat $SERVER_LOG
+    echo -e "\n***\n*** Python version is 3.6, NumPy version is 1.18.1, and Tensorflow version is 2.1.0 was not found in Triton logs. \n***"
+    RET=1
+fi
+set -e
+
+# Clean up bucket contents
+aws s3 rm "${BUCKET_URL_SLASH}" --recursive --include "*"
+
+# Test with EXECUTION_ENV_PATH outside the model directory
+sed -i "s/TRITON_MODEL_DIRECTORY\/python_3_6_environment/TRITON_MODEL_DIRECTORY\/..\/python_3_6_environment/" models/python_3_6/config.pbtxt
+mv models/python_3_6/python_3_6_environment.tar.gz models
+
 aws s3 cp models/ "${BUCKET_URL_SLASH}" --recursive --include "*"
+
+rm $SERVER_LOG
+
 SERVER_ARGS="--model-repository=$BUCKET_URL_SLASH --log-verbose=1"
 run_server
 if [ "$SERVER_PID" == "0" ]; then
