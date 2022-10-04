@@ -69,11 +69,26 @@ container.
 
 ## TensorFlow
 
-Tensorflow allows users to [add custom
+TensorFlow allows users to [add custom
 operations](https://www.tensorflow.org/guide/create_op) which can then
-be used in TensorFlow models. By using LD_PRELOAD you can load your
-custom TensorFlow operations into Triton. For example, assuming your
-TensorFlow custom operations are compiled into libtfcustom.so,
+be used in TensorFlow models. You can load your custom TensorFlow operations
+into Triton in two ways: 
+* At runtime, by listing them in your model configuration.
+* At load time, by using LD_PRELOAD.
+
+To register your custom operations library via the the model configuration,
+you can include it as an additional field. See the below configuration as an example.
+
+```bash
+$ model_operations { op_library_filename: "path/to/libtfcustom.so" }
+```
+
+Note that even though the models are loaded at runtime, multiple models can use the custom
+operators. There is currently no way to deallocate the custom operators, so they will stay
+available until Triton is shut down.
+
+You can also register your custom operations library via LD_PRELOAD. For example,
+assuming your TensorFlow custom operations are compiled into libtfcustom.so,
 starting Triton with the following command makes those operations
 available to all TensorFlow models.
 
@@ -81,9 +96,9 @@ available to all TensorFlow models.
 $ LD_PRELOAD=libtfcustom.so:${LD_PRELOAD} tritonserver --model-repository=/tmp/models ...
 ```
 
-All TensorFlow custom operations depend on a TensorFlow shared library
-that must be available to the custom shared library when it is
-loading. In practice this means that you must make sure that
+With this approach, all TensorFlow custom operations depend on a TensorFlow shared
+library that must be available to the custom shared library when it is
+loading. In practice, this means that you must make sure that
 /opt/tritonserver/backends/tensorflow1 or
 /opt/tritonserver/backends/tensorflow2 is on the library path before
 issuing the above command. There are several ways to control the
