@@ -4,7 +4,7 @@ import torch
 import triton_python_backend_utils as pb_utils
 
 from torch import autocast
-from torch.utils.dlpack import to_dlpack
+from torch.utils.dlpack import to_dlpack, from_dlpack
 from transformers import CLIPTokenizer
 from diffusers import LMSDiscreteScheduler, UNet2DConditionModel
 from tqdm.auto import tqdm

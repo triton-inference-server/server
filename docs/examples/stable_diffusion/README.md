@@ -4,6 +4,8 @@ This example focuses on showcasing two of Triton Inference Server's features:
 * Using multiple frameworks in the same inference pipeline
 * Using the Python Backend API to build complex non linear pipelines.
 
+It is recommended to watch [this explainer video](https://youtu.be/JgP2WgNIq_w) with discusses the pipeline, before proceeding with the example. 
+
 ## How to run?
 
 Before starting, clone this repository and navigate to the root folder. Use three different terminals for an easier user experience.
@@ -14,13 +16,14 @@ Before starting, clone this repository and navigate to the root folder. Use thre
 # Replace yy.mm with year and month of release. Eg. 22.08
 docker run --gpus=all -it --shm-size=256m --rm -p8000:8000 -p8001:8001 -p8002:8002 -v ${PWD}:/workspace/ -v ${PWD}/model_repository:/models nvcr.io/nvidia/tritonserver:yy.mm-py3 bash
 ```
-* Next, install all the dependencies required by the models running in the python backend.
+* Next, install all the dependencies required by the models running in the python backend and login with your [huggingface token](https://huggingface.co/settings/tokens)(Account on [HuggingFace](https://huggingface.co/) is required).
 
 ```
 # PyTorch & Transformers Lib
 pip install torch torchvision torchaudio --extra-index-url https://download.pytorch.org/whl/cu116
 pip install transformers ftfy scipy
 pip install transformers[onnxruntime]
+huggingface-cli login
 ```
 
 As of the creation of this example, there are some unmerged optimizations for the diffusers repository, which are being used to accelerate the UNet Model. If you DO NOT wish to use the optimizations:
@@ -77,6 +80,6 @@ python3 client.py
 
 # Client with GUI
 pip install gradio
-python3 gui/client.py --triton_url="localhost:8000"
+python3 gui/client.py --triton_url="localhost:8001"
 ```
 Note: First Inference query may take more time than successive queries
