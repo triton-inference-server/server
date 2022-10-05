@@ -67,6 +67,7 @@ user_guide/faq
 :maxdepth: 1
 :caption: Protocol Guides
 
+protocol/README.md
 customization_guide/inference_protocols
 protocol/extension_binary_data
 protocol/extension_classification

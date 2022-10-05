@@ -94,7 +94,7 @@ myst_enable_extensions = [
     # "linkify",
     "substitution",
 ]
-myst_heading_anchors = 3
+myst_heading_anchors = 4
 
 # Add any paths that contain templates here, relative to this directory.
 templates_path = ['_templates']
@@ -115,7 +115,6 @@ exclude_patterns = [
 html_theme = "sphinx_book_theme"
 html_logo = "_static/nvidia-logo-horiz-rgb-blk-for-screen.png"
 html_title = "NVIDIA Triton Inference Server"
-html_version = "v2.27.0"
 html_short_title = "Triton"
 html_copy_source = True
 html_sourcelink_suffix = ""
