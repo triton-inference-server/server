@@ -1,8 +1,8 @@
 # Stable diffusion
 
 This example focuses on showcasing two of Triton Inference Server's features:
-* Using multiple frameworks in the same inference pipeline
-* Using the Python Backend API to build complex non linear pipelines.
+* Using multiple frameworks in the same inference pipeline. Refer [this for more information](https://github.com/triton-inference-server/backend#where-can-i-find-all-the-backends-that-are-available-for-triton) about supported frameworks.
+* Using the Python Backend's [Business Logic Scripting](https://github.com/triton-inference-server/python_backend#business-logic-scripting) API to build complex non linear pipelines.
 
 It is recommended to watch [this explainer video](https://youtu.be/JgP2WgNIq_w) with discusses the pipeline, before proceeding with the example. 
 
