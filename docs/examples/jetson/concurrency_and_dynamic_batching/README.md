@@ -326,6 +326,6 @@ dynamic_batching {
 }
 ```
 
-To try further options of dynamic batcher see the [documentation](https://github.com/triton-inference-server/server/blob/main/docs/model_configuration.md#dynamic-batcher). 
+To try further options of dynamic batcher see the [documentation](https://github.com/triton-inference-server/server/blob/main/docs/user_guide/model_configuration.md#dynamic-batcher). 
 
 You can also try enabling both concurrent model execution and dynamic batching.

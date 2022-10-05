@@ -98,7 +98,7 @@ in an AWS S3 Storage bucket.
 $ aws s3 mb s3://triton-inference-server-repository
 ```
 
-Following the [QuickStart](../../docs/quickstart.md) download the
+Following the [QuickStart](../../docs/getting_started/quickstart.md) download the
 example model repository to your system and copy it into the AWS S3
 bucket.
 
@@ -218,7 +218,7 @@ from the HTTP endpoint.
 $ curl 34.83.9.133:8000/v2
 ```
 
-Follow the [QuickStart](../../docs/quickstart.md) to get the example
+Follow the [QuickStart](../../docs/getting_started/quickstart.md) to get the example
 image classification client that can be used to perform inferencing
 using image classification models being served by the inference
 server. For example,

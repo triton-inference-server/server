@@ -35,7 +35,7 @@ same as when using the model's framework directly. However, with
 Triton you get benefits like [concurrent model
 execution](architecture.md#concurrent-model-execution) (the ability to
 run multiple models at the same time on the same GPU) and [dynamic
-batching](architecture.md#dynamic-batcher) to get better
+batching](model_configuration.md#dynamic-batcher) to get better
 throughput. You can also [replace or upgrade models while Triton and
 client application are running](model_management.md). Another benefit
 is that Triton can be deployed as a Docker container, anywhere – on
@@ -84,7 +84,7 @@ library to suit your specific needs.
 
 In an AWS environment, the Triton Inference Server docker container
 can run on [CPU-only instances or GPU compute
-instances](../getting_started/quickstart.md#run-triton). Triton can run directly on the
+instances](../getting_started/quickstart.md#launch-triton). Triton can run directly on the
 compute instance or inside Elastic Kubernetes Service (EKS). In
 addition, other AWS services such as Elastic Load Balancer (ELB) can
 be used for load balancing traffic among multiple Triton
@@ -121,13 +121,13 @@ concurrency](model_configuration.md#instance-groups) on a
 model-by-model basis.
 
 * Triton can [batch together multiple inference requests into a single
-  inference execution](architecture.md#dynamic-batcher). Typically,
+  inference execution](model_configuration.md#dynamic-batcher). Typically,
   batching inference requests leads to much higher thoughput with only
   a relatively small increase in latency.
 
 As a general rule, batching is the most beneficial way to increase GPU
 utilization. So you should always try enabling the [dynamic
-batcher](architecture.md#dynamic-batcher) with your models. Using
+batcher](model_configuration.md#dynamic-batcher) with your models. Using
 multiple instances of a model can also provide some benefit but is
 typically most useful for models that have small compute
 requirements. Most models will benefit from using two instances but
