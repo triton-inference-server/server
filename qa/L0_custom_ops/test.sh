@@ -115,12 +115,11 @@ rm -rf tf_custom_ops && \
     mkdir -p tf_custom_ops && \
     cp -r /data/inferenceserver/${REPO_VERSION}/qa_custom_ops/tf_custom_ops .
 
-echo "model_operations { op_library_filename: \"tf_custom_ops/libbusyop.so\" }" >> tf_custom_ops/graphdef_busyop/config.pbtxt
-echo "model_operations { op_library_filename: \"tf_custom_ops/libbusyop.so\" }" >> tf_custom_ops/savedmodel_busyop/config.pbtxt
-echo "model_operations { op_library_filename: \"tf_custom_ops/libcudaop.so\" }" >> tf_custom_ops/graphdef_cudaop/config.pbtxt
-echo "model_operations { op_library_filename: \"tf_custom_ops/libcudaop.so\" }" >> tf_custom_ops/savedmodel_cudaop/config.pbtxt
-echo "model_operations { op_library_filename: \"tf_custom_ops/libzeroout.so\" }" >> tf_custom_ops/graphdef_zeroout/config.pbtxt
-echo "model_operations { op_library_filename: \"tf_custom_ops/libzeroout.so\" }" >> tf_custom_ops/savedmodel_zeroout/config.pbtxt
+for MODEL_TYPE in savedmodel graphdef; do
+    echo "model_operations { op_library_filename: \"tf_custom_ops/libbusyop.so\" }" >> tf_custom_ops/${MODEL_TYPE}_busyop/config.pbtxt
+    echo "model_operations { op_library_filename: \"tf_custom_ops/libcudaop.so\" }" >> tf_custom_ops/${MODEL_TYPE}_cudaop/config.pbtxt
+    echo "model_operations { op_library_filename: \"tf_custom_ops/libzeroout.so\" }" >> tf_custom_ops/${MODEL_TYPE}_zeroout/config.pbtxt
+done
 
 run_server
 if [ "$SERVER_PID" == "0" ]; then

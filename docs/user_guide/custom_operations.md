@@ -71,10 +71,10 @@ container.
 
 TensorFlow allows users to [add custom
 operations](https://www.tensorflow.org/guide/create_op) which can then
-be used in TensorFlow models. You can load your custom TensorFlow operations
+be used in TensorFlow models. You can load custom TensorFlow operations
 into Triton in two ways: 
-* At runtime, by listing them in your model configuration.
-* At load time, by using LD_PRELOAD.
+* At model load time, by listing them in the model configuration.
+* At server launch time, by using LD_PRELOAD.
 
 To register your custom operations library via the the model configuration,
 you can include it as an additional field. See the below configuration as an example.
