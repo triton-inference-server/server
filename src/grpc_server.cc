@@ -2037,6 +2037,17 @@ CommonHandler::SetUpAllRequests()
           std::vector<const TRITONSERVER_Parameter*> const_params;
           for (const auto& param_proto : request.parameters()) {
             if (param_proto.first == "config") {
+              if ((param_proto.second.string_param().find("config") !=
+                   std::string::npos) ||
+                  (param_proto.second.string_param().find("parameters")) !=
+                      std::string::npos) {
+                err = TRITONSERVER_ErrorNew(
+                    TRITONSERVER_ERROR_INVALID_ARG,
+                    "invalid value for config: please remove the extra "
+                    "'parameters' or 'config' field from the override config.");
+                break;
+              }
+
               if (param_proto.second.parameter_choice_case() !=
                   inference::ModelRepositoryParameter::ParameterChoiceCase::
                       kStringParam) {

@@ -1365,6 +1365,16 @@ HTTPAPIServer::HandleRepositoryControl(
 
             TRITONSERVER_Parameter* param = nullptr;
             if (m == "config") {
+              std::string config(param_str);
+              if ((config.find("config") != std::string::npos) ||
+                  (config.find("parameters")) != std::string::npos) {
+                HTTP_RESPOND_IF_ERR(
+                    req, TRITONSERVER_ErrorNew(
+                             TRITONSERVER_ERROR_INVALID_ARG,
+                             "invalid value for config: please remove the "
+                             "extra 'parameters' or 'config' field from the "
+                             "override config."));
+              }
               param = TRITONSERVER_ParameterNew(
                   m.c_str(), TRITONSERVER_PARAMETER_STRING, param_str);
             } else if (m.rfind("file:", 0) == 0) {
