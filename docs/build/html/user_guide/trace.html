@@ -1,0 +1,864 @@
+
+<!DOCTYPE html>
+
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Triton Server Trace &#8212; NVIDIA Triton Inference Server</title>
+    
+  <!-- Loaded before other Sphinx assets -->
+  <link href="../_static/styles/theme.css?digest=1999514e3f237ded88cf" rel="stylesheet">
+<link href="../_static/styles/pydata-sphinx-theme.css?digest=1999514e3f237ded88cf" rel="stylesheet">
+
+    
+  <link rel="stylesheet"
+    href="../_static/vendor/fontawesome/5.13.0/css/all.min.css">
+  <link rel="preload" as="font" type="font/woff2" crossorigin
+    href="../_static/vendor/fontawesome/5.13.0/webfonts/fa-solid-900.woff2">
+  <link rel="preload" as="font" type="font/woff2" crossorigin
+    href="../_static/vendor/fontawesome/5.13.0/webfonts/fa-brands-400.woff2">
+
+    <link rel="stylesheet" type="text/css" href="../_static/pygments.css" />
+    <link rel="stylesheet" href="../_static/styles/sphinx-book-theme.css?digest=62ba249389abaaa9ffc34bf36a076bdc1d65ee18" type="text/css" />
+    <link rel="stylesheet" type="text/css" href="../_static/mystnb.4510f1fc1dee50b3e5859aac5469c37c29e427902b24a333a5f9fcb2f0b3ac41.css" />
+    <link rel="stylesheet" type="text/css" href="../_static/copybutton.css" />
+    <link rel="stylesheet" type="text/css" href="../_static/tabs.css" />
+    <link rel="stylesheet" type="text/css" href="../_static/custom.css" />
+    <link rel="stylesheet" type="text/css" href="../_static/design-style.4045f2051d55cab465a707391d5b2007.min.css" />
+    
+  <!-- Pre-loaded scripts that we'll load fully later -->
+  <link rel="preload" as="script" href="../_static/scripts/pydata-sphinx-theme.js?digest=1999514e3f237ded88cf">
+
+    <script data-url_root="../" id="documentation_options" src="../_static/documentation_options.js"></script>
+    <script src="../_static/jquery.js"></script>
+    <script src="../_static/underscore.js"></script>
+    <script src="../_static/doctools.js"></script>
+    <script src="../_static/clipboard.min.js"></script>
+    <script src="../_static/copybutton.js"></script>
+    <script src="https://js.hcaptcha.com/1/api.js"></script>
+    <script src="//assets.adobedtm.com/5d4962a43b79/c1061d2c5e7b/launch-191c2462b890.min.js"></script>
+    <script src="../_static/scripts/sphinx-book-theme.js?digest=f31d14ad54b65d19161ba51d4ffff3a77ae00456"></script>
+    <script src="../_static/design-tabs.js"></script>
+    <link rel="canonical" href="https://docs.nvidia.com/deeplearning/triton-inference-server/user-guide/docs/user_guide/trace.html" />
+    <link rel="shortcut icon" href="../_static/nvidia-logo-vert-rgb-blk-for-screen.png"/>
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" />
+    <link rel="next" title="Triton Inference Server Support for Jetson and JetPack" href="jetson.html" />
+    <link rel="prev" title="Metrics" href="metrics.html" /> 
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="docsearch:language" content="None">
+    
+
+    <!-- Google Analytics -->
+      
+<style type="text/css">
+  ul.ablog-archive {
+    list-style: none;
+    overflow: auto;
+    margin-left: 0px;
+  }
+  ul.ablog-archive li {
+    float: left;
+    margin-right: 5px;
+    font-size: 80%;
+  }
+  ul.postlist a {
+    font-style: italic;
+  }
+  ul.postlist-style-disc {
+    list-style-type: disc;
+  }
+  ul.postlist-style-none {
+    list-style-type: none;
+  }
+  ul.postlist-style-circle {
+    list-style-type: circle;
+  }
+</style>
+
+  </head>
+  <body data-spy="scroll" data-target="#bd-toc-nav" data-offset="60">
+<!-- Checkboxes to toggle the left sidebar -->
+<input type="checkbox" class="sidebar-toggle" name="__navigation" id="__navigation" aria-label="Toggle navigation sidebar">
+<label class="overlay overlay-navbar" for="__navigation">
+    <div class="visually-hidden">Toggle navigation sidebar</div>
+</label>
+<!-- Checkboxes to toggle the in-page toc -->
+<input type="checkbox" class="sidebar-toggle" name="__page-toc" id="__page-toc" aria-label="Toggle in-page Table of Contents">
+<label class="overlay overlay-pagetoc" for="__page-toc">
+    <div class="visually-hidden">Toggle in-page Table of Contents</div>
+</label>
+<!-- Headers at the top -->
+<div class="announcement header-item noprint"></div>
+<div class="header header-item noprint"></div>
+
+    
+    <div class="container-fluid" id="banner"></div>
+
+    
+
+    <div class="container-xl">
+      <div class="row">
+          
+<!-- Sidebar -->
+<div class="bd-sidebar noprint" id="site-navigation">
+    <div class="bd-sidebar__content">
+        <div class="bd-sidebar__top"><div class="navbar-brand-box">
+    <a class="navbar-brand text-wrap" href="../index.html">
+      
+        <!-- `logo` is deprecated in Sphinx 4.0, so remove this when we stop supporting 3 -->
+        
+      
+      
+      <img src="../_static/nvidia-logo-horiz-rgb-blk-for-screen.png" class="logo" alt="logo">
+      
+      
+      <h1 class="site-logo" id="site-title">NVIDIA Triton Inference Server</h1>
+      
+    </a>
+</div><form class="bd-search d-flex align-items-center" action="../search.html" method="get">
+  <i class="icon fas fa-search"></i>
+  <input type="search" class="form-control" name="q" id="search-input" placeholder="Search the docs ..." aria-label="Search the docs ..." autocomplete="off" >
+</form><nav class="bd-links" id="bd-docs-nav" aria-label="Main">
+    <div class="bd-toc-item active">
+        <p aria-level="2" class="caption" role="heading">
+ <span class="caption-text">
+  Getting Started
+ </span>
+</p>
+<ul class="nav bd-sidenav">
+ <li class="toctree-l1">
+  <a class="reference internal" href="../getting_started/quickstart.html">
+   Quickstart
+  </a>
+ </li>
+</ul>
+<p aria-level="2" class="caption" role="heading">
+ <span class="caption-text">
+  User Guide
+ </span>
+</p>
+<ul class="current nav bd-sidenav">
+ <li class="toctree-l1">
+  <a class="reference internal" href="performance_tuning.html">
+   Deploying your trained model using Triton
+  </a>
+ </li>
+ <li class="toctree-l1">
+  <a class="reference internal" href="architecture.html">
+   Triton Architecture
+  </a>
+ </li>
+ <li class="toctree-l1">
+  <a class="reference internal" href="model_repository.html">
+   Model Repository
+  </a>
+ </li>
+ <li class="toctree-l1">
+  <a class="reference internal" href="../customization_guide/repository_agents.html">
+   Repository Agent
+  </a>
+ </li>
+ <li class="toctree-l1">
+  <a class="reference internal" href="model_configuration.html">
+   Model Configuration
+  </a>
+ </li>
+ <li class="toctree-l1">
+  <a class="reference internal" href="optimization.html">
+   Optimization
+  </a>
+ </li>
+ <li class="toctree-l1">
+  <a class="reference internal" href="ragged_batching.html">
+   Ragged Batching
+  </a>
+ </li>
+ <li class="toctree-l1">
+  <a class="reference internal" href="rate_limiter.html">
+   Rate Limiter
+  </a>
+ </li>
+ <li class="toctree-l1">
+  <a class="reference internal" href="model_analyzer.html">
+   Model Analyzer
+  </a>
+ </li>
+ <li class="toctree-l1">
+  <a class="reference internal" href="perf_analyzer.html">
+   Performance Analyzer
+  </a>
+ </li>
+ <li class="toctree-l1">
+  <a class="reference internal" href="model_management.html">
+   Model Management
+  </a>
+ </li>
+ <li class="toctree-l1">
+  <a class="reference internal" href="custom_operations.html">
+   Custom Operations
+  </a>
+ </li>
+ <li class="toctree-l1">
+  <a class="reference internal" href="decoupled_models.html">
+   Decoupled Backends and Models
+  </a>
+ </li>
+ <li class="toctree-l1">
+  <a class="reference internal" href="response_cache.html">
+   Triton Response Cache
+  </a>
+ </li>
+ <li class="toctree-l1">
+  <a class="reference internal" href="metrics.html">
+   Metrics
+  </a>
+ </li>
+ <li class="toctree-l1 current active">
+  <a class="current reference internal" href="#">
+   Triton Server Trace
+  </a>
+ </li>
+ <li class="toctree-l1">
+  <a class="reference internal" href="jetson.html">
+   Triton Inference Server Support for Jetson and JetPack
+  </a>
+ </li>
+ <li class="toctree-l1">
+  <a class="reference internal" href="v1_to_v2.html">
+   Version 1 to Version 2 Migration
+  </a>
+ </li>
+</ul>
+<ul class="nav bd-sidenav">
+ <li class="toctree-l1">
+  <a class="reference internal" href="faq.html">
+   FAQ
+  </a>
+ </li>
+</ul>
+<p aria-level="2" class="caption" role="heading">
+ <span class="caption-text">
+  Protocol Guides
+ </span>
+</p>
+<ul class="nav bd-sidenav">
+ <li class="toctree-l1">
+  <a class="reference internal" href="../customization_guide/inference_protocols.html">
+   Inference Protocols and APIs
+  </a>
+ </li>
+ <li class="toctree-l1">
+  <a class="reference internal" href="../protocol/extension_binary_data.html">
+   Binary Tensor Data Extension
+  </a>
+ </li>
+ <li class="toctree-l1">
+  <a class="reference internal" href="../protocol/extension_classification.html">
+   Classification Extension
+  </a>
+ </li>
+ <li class="toctree-l1">
+  <a class="reference internal" href="../protocol/extension_logging.html">
+   Logging Extension
+  </a>
+ </li>
+ <li class="toctree-l1">
+  <a class="reference internal" href="../protocol/extension_model_configuration.html">
+   Model Configuration Extension
+  </a>
+ </li>
+ <li class="toctree-l1">
+  <a class="reference internal" href="../protocol/extension_model_repository.html">
+   Model Repository Extension
+  </a>
+ </li>
+ <li class="toctree-l1">
+  <a class="reference internal" href="../protocol/extension_schedule_policy.html">
+   Schedule Policy Extension
+  </a>
+ </li>
+ <li class="toctree-l1">
+  <a class="reference internal" href="../protocol/extension_sequence.html">
+   Sequence Extension
+  </a>
+ </li>
+ <li class="toctree-l1">
+  <a class="reference internal" href="../protocol/extension_shared_memory.html">
+   Shared-Memory Extension
+  </a>
+ </li>
+ <li class="toctree-l1">
+  <a class="reference internal" href="../protocol/extension_statistics.html">
+   Statistics Extension
+  </a>
+ </li>
+ <li class="toctree-l1">
+  <a class="reference internal" href="../protocol/extension_trace.html">
+   Trace Extension
+  </a>
+ </li>
+</ul>
+<p aria-level="2" class="caption" role="heading">
+ <span class="caption-text">
+  Customization Guide
+ </span>
+</p>
+<ul class="nav bd-sidenav">
+ <li class="toctree-l1">
+  <a class="reference internal" href="../customization_guide/build.html">
+   Building Triton
+  </a>
+ </li>
+ <li class="toctree-l1">
+  <a class="reference internal" href="../customization_guide/compose.html">
+   Customize Triton Container
+  </a>
+ </li>
+ <li class="toctree-l1">
+  <a class="reference internal" href="../customization_guide/test.html">
+   Testing Triton
+  </a>
+ </li>
+</ul>
+<p aria-level="2" class="caption" role="heading">
+ <span class="caption-text">
+  Examples
+ </span>
+</p>
+<ul class="nav bd-sidenav">
+ <li class="toctree-l1">
+  <a class="reference internal" href="../examples/jetson/README.html">
+   Using Triton Inference Server as a shared library for execution on Jetson
+  </a>
+ </li>
+ <li class="toctree-l1">
+  <a class="reference internal" href="../examples/jetson/concurrency_and_dynamic_batching/README.html">
+   Concurrent inference and dynamic batching
+  </a>
+ </li>
+</ul>
+
+    </div>
+</nav></div>
+        <div class="bd-sidebar__bottom">
+             <!-- To handle the deprecated key -->
+            
+        </div>
+    </div>
+    <div id="rtd-footer-container"></div>
+</div>
+
+
+          
+
+
+          
+<!-- A tiny helper pixel to detect if we've scrolled -->
+<div class="sbt-scroll-pixel-helper"></div>
+<!-- Main content -->
+<div class="col py-0 content-container">
+    
+    <div class="header-article row sticky-top noprint">
+        
+
+
+
+<div class="col py-1 d-flex header-article-main">
+    <div class="header-article__left">
+        
+        <label for="__navigation"
+  class="headerbtn"
+  data-toggle="tooltip"
+data-placement="right"
+title="Toggle navigation"
+>
+  
+
+<span class="headerbtn__icon-container">
+  <i class="fas fa-bars"></i>
+  </span>
+
+</label>
+
+        
+    </div>
+    <div class="header-article__right">
+<button onclick="toggleFullScreen()"
+  class="headerbtn"
+  data-toggle="tooltip"
+data-placement="bottom"
+title="Fullscreen mode"
+>
+  
+
+<span class="headerbtn__icon-container">
+  <i class="fas fa-expand"></i>
+  </span>
+
+</button>
+
+<div class="menu-dropdown menu-dropdown-repository-buttons">
+  <button class="headerbtn menu-dropdown__trigger"
+      aria-label="Source repositories">
+      <i class="fab fa-github"></i>
+  </button>
+  <div class="menu-dropdown__content">
+    <ul>
+      <li>
+        <a href="https://github.com/triton-inference-server/server"
+   class="headerbtn"
+   data-toggle="tooltip"
+data-placement="left"
+title="Source repository"
+>
+  
+
+<span class="headerbtn__icon-container">
+  <i class="fab fa-github"></i>
+  </span>
+<span class="headerbtn__text-container">repository</span>
+</a>
+
+      </li>
+      
+      <li>
+        <a href="https://github.com/triton-inference-server/server/issues/new?title=Issue%20on%20page%20%2Fuser_guide/trace.html&body=Your%20issue%20content%20here."
+   class="headerbtn"
+   data-toggle="tooltip"
+data-placement="left"
+title="Open an issue"
+>
+  
+
+<span class="headerbtn__icon-container">
+  <i class="fas fa-lightbulb"></i>
+  </span>
+<span class="headerbtn__text-container">open issue</span>
+</a>
+
+      </li>
+      
+    </ul>
+  </div>
+</div>
+<label for="__page-toc"
+  class="headerbtn headerbtn-page-toc"
+  
+>
+  
+
+<span class="headerbtn__icon-container">
+  <i class="fas fa-list"></i>
+  </span>
+
+</label>
+
+    </div>
+</div>
+
+<!-- Table of contents -->
+<div class="col-md-3 bd-toc show noprint">
+    <div class="tocsection onthispage pt-5 pb-3">
+        <i class="fas fa-list"></i> Contents
+    </div>
+    <nav id="bd-toc-nav" aria-label="Page">
+        <ul class="visible nav section-nav flex-column">
+ <li class="toc-h2 nav-item toc-entry">
+  <a class="reference internal nav-link" href="#supported-trace-level-option">
+   Supported Trace Level Option
+  </a>
+ </li>
+ <li class="toc-h2 nav-item toc-entry">
+  <a class="reference internal nav-link" href="#json-trace-output">
+   JSON Trace Output
+  </a>
+ </li>
+ <li class="toc-h2 nav-item toc-entry">
+  <a class="reference internal nav-link" href="#trace-summary-tool">
+   Trace Summary Tool
+  </a>
+ </li>
+</ul>
+
+    </nav>
+</div>
+    </div>
+    <div class="article row">
+        <div class="col pl-md-3 pl-lg-5 content-container">
+            <!-- Table of contents that is only displayed when printing the page -->
+            <div id="jb-print-docs-body" class="onlyprint">
+                <h1>Triton Server Trace</h1>
+                <!-- Table of contents -->
+                <div id="print-main-content">
+                    <div id="jb-print-toc">
+                        
+                        <div>
+                            <h2> Contents </h2>
+                        </div>
+                        <nav aria-label="Page">
+                            <ul class="visible nav section-nav flex-column">
+ <li class="toc-h2 nav-item toc-entry">
+  <a class="reference internal nav-link" href="#supported-trace-level-option">
+   Supported Trace Level Option
+  </a>
+ </li>
+ <li class="toc-h2 nav-item toc-entry">
+  <a class="reference internal nav-link" href="#json-trace-output">
+   JSON Trace Output
+  </a>
+ </li>
+ <li class="toc-h2 nav-item toc-entry">
+  <a class="reference internal nav-link" href="#trace-summary-tool">
+   Trace Summary Tool
+  </a>
+ </li>
+</ul>
+
+                        </nav>
+                    </div>
+                </div>
+            </div>
+            <main id="main-content" role="main">
+                
+              <div>
+                 <!--
+# Copyright 2019-2022, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+#
+# Redistribution and use in source and binary forms, with or without
+# modification, are permitted provided that the following conditions
+# are met:
+#  * Redistributions of source code must retain the above copyright
+#    notice, this list of conditions and the following disclaimer.
+#  * Redistributions in binary form must reproduce the above copyright
+#    notice, this list of conditions and the following disclaimer in the
+#    documentation and/or other materials provided with the distribution.
+#  * Neither the name of NVIDIA CORPORATION nor the names of its
+#    contributors may be used to endorse or promote products derived
+#    from this software without specific prior written permission.
+#
+# THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS ``AS IS'' AND ANY
+# EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+# IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR
+# PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL THE COPYRIGHT OWNER OR
+# CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL,
+# EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
+# PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR
+# PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY
+# OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+# (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+# OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+-->
+<div class="tex2jax_ignore mathjax_ignore section" id="triton-server-trace">
+<h1>Triton Server Trace<a class="headerlink" href="#triton-server-trace" title="Permalink to this headline">#</a></h1>
+<p>Triton includes that capability to generate a detailed trace for
+individual inference requests. Tracing is enable by command-line
+arguments when running the tritonserver executable. For example,</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span>$ tritonserver --trace-file=/tmp/trace.json --trace-rate=100 --trace-level=TIMESTAMPS ...
+</pre></div>
+</div>
+<p>The –trace-file option indicates where the trace output should be
+written. The –trace-rate option specifies the sampling rate. In
+this example every 100-th inference request will be traced. The
+–trace-level option indicates the level of trace detail that should
+be collected. –trace-level option may be specified multiple times to
+trace multiple informations. Use the –help option to get more information.</p>
+<p>In addition to configure trace settings in command line arguments, The user may
+modify the trace setting when Triton server
+is running via the trace APIs, more information can be found in <a class="reference internal" href="../protocol/extension_trace.html"><span class="doc std std-doc">trace
+protocol</span></a>.</p>
+<div class="section" id="supported-trace-level-option">
+<h2>Supported Trace Level Option<a class="headerlink" href="#supported-trace-level-option" title="Permalink to this headline">#</a></h2>
+<ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">TIMESTAMPS</span></code>: Tracing execution timestamps of each request.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">TENSORS</span></code>: Tracing input and output tensors during the execution.</p></li>
+</ul>
+</div>
+<div class="section" id="json-trace-output">
+<h2>JSON Trace Output<a class="headerlink" href="#json-trace-output" title="Permalink to this headline">#</a></h2>
+<p>The trace output is a JSON file with the following schema.</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span>[
+  {
+    &quot;model_name&quot;: $string,
+    &quot;model_version&quot;: $number,
+    &quot;id&quot;: $number
+    &quot;parent_id&quot;: $number,
+    &quot;timestamps&quot;: [
+      { &quot;name&quot; : $string, &quot;ns&quot; : $number },
+      ...
+    ]
+  },
+  {
+    &quot;model_name&quot;: $string,
+    &quot;model_version&quot;: $number,
+    &quot;id&quot;: $number
+    &quot;activity&quot;: $string,
+    &quot;tensor&quot;:{
+      &quot;name&quot;: $string,
+      &quot;data&quot;: $string,
+      &quot;dtype&quot;: $string
+    }
+  },
+  ...
+]
+</pre></div>
+</div>
+<p>Each trace is assigned a “id”, which indicates the model name and
+version of the inference request. If the trace is from a
+model run as part of an ensemble, the “parent_id” will indicate the
+“id” of the containing ensemble.</p>
+<p>Each <code class="docutils literal notranslate"><span class="pre">TIMESTAMPS</span></code> trace will have one or more “timestamps” with
+each timestamp having a name and the timestamp in nanoseconds (“ns”).
+For example:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="p">[</span>
+  <span class="p">{</span>
+    <span class="s2">&quot;model_name&quot;</span><span class="p">:</span> <span class="s2">&quot;simple&quot;</span><span class="p">,</span>
+    <span class="s2">&quot;model_version&quot;</span><span class="p">:</span> <span class="o">-</span><span class="mi">1</span><span class="p">,</span>
+    <span class="s2">&quot;id&quot;</span><span class="p">:</span> <span class="mi">1</span><span class="p">,</span>
+    <span class="s2">&quot;timestamps&quot;</span> <span class="p">:</span> <span class="p">[</span>
+      <span class="p">{</span> <span class="s2">&quot;name&quot;</span><span class="p">:</span> <span class="s2">&quot;http recv start&quot;</span><span class="p">,</span> <span class="s2">&quot;ns&quot;</span><span class="p">:</span> <span class="mi">2259961222771924</span> <span class="p">},</span>
+      <span class="p">{</span> <span class="s2">&quot;name&quot;</span><span class="p">:</span> <span class="s2">&quot;http recv end&quot;</span><span class="p">,</span> <span class="s2">&quot;ns&quot;</span><span class="p">:</span> <span class="mi">2259961222820985</span> <span class="p">},</span>
+      <span class="p">{</span> <span class="s2">&quot;name&quot;</span><span class="p">:</span> <span class="s2">&quot;request handler start&quot;</span><span class="p">,</span> <span class="s2">&quot;ns&quot;</span><span class="p">:</span> <span class="mi">2259961223164078</span> <span class="p">},</span>
+      <span class="p">{</span> <span class="s2">&quot;name&quot;</span><span class="p">:</span> <span class="s2">&quot;queue start&quot;</span><span class="p">,</span> <span class="s2">&quot;ns&quot;</span><span class="p">:</span> <span class="mi">2259961223182400</span> <span class="p">},</span>
+      <span class="p">{</span> <span class="s2">&quot;name&quot;</span><span class="p">:</span> <span class="s2">&quot;compute start&quot;</span><span class="p">,</span> <span class="s2">&quot;ns&quot;</span><span class="p">:</span> <span class="mi">2259961223232405</span> <span class="p">},</span>
+      <span class="p">{</span> <span class="s2">&quot;name&quot;</span><span class="p">:</span> <span class="s2">&quot;compute end&quot;</span><span class="p">,</span> <span class="s2">&quot;ns&quot;</span><span class="p">:</span> <span class="mi">2259961230206777</span> <span class="p">},</span>
+      <span class="p">{</span> <span class="s2">&quot;name&quot;</span><span class="p">:</span> <span class="s2">&quot;request handler end&quot;</span><span class="p">,</span> <span class="s2">&quot;ns&quot;</span><span class="p">:</span> <span class="mi">2259961230211887</span> <span class="p">},</span>
+      <span class="p">{</span> <span class="s2">&quot;name&quot;</span><span class="p">:</span> <span class="s2">&quot;http send start&quot;</span><span class="p">,</span> <span class="s2">&quot;ns&quot;</span><span class="p">:</span> <span class="mi">2259961230529606</span> <span class="p">},</span>
+      <span class="p">{</span> <span class="s2">&quot;name&quot;</span><span class="p">:</span> <span class="s2">&quot;http send end&quot;</span><span class="p">,</span> <span class="s2">&quot;ns&quot;</span><span class="p">:</span> <span class="mi">2259961230543930</span> <span class="p">}</span>
+    <span class="p">]</span>
+  <span class="p">}</span>
+<span class="p">]</span>
+</pre></div>
+</div>
+<p>Each <code class="docutils literal notranslate"><span class="pre">TENSORS</span></code> trace will contain an “activity” and a “tensor”.
+“activity” indicates the type of tensor, including “TENSOR_QUEUE_INPUT”
+and “TENSOR_BACKEND_OUTPUT” by now. “tensor” has the detail of tensor,
+including its “name”, “data” and “dtype”. For example:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="p">[</span>
+  <span class="p">{</span>
+    <span class="s2">&quot;model_name&quot;</span><span class="p">:</span> <span class="s2">&quot;simple&quot;</span><span class="p">,</span>
+    <span class="s2">&quot;model_version&quot;</span><span class="p">:</span> <span class="o">-</span><span class="mi">1</span><span class="p">,</span>
+    <span class="s2">&quot;id&quot;</span><span class="p">:</span> <span class="mi">1</span><span class="p">,</span>
+    <span class="s2">&quot;activity&quot;</span><span class="p">:</span> <span class="s2">&quot;TENSOR_QUEUE_INPUT&quot;</span><span class="p">,</span>
+    <span class="s2">&quot;tensor&quot;</span><span class="p">:{</span>
+      <span class="s2">&quot;name&quot;</span><span class="p">:</span> <span class="s2">&quot;input&quot;</span><span class="p">,</span>
+      <span class="s2">&quot;data&quot;</span><span class="p">:</span> <span class="s2">&quot;0.1,0.1,0.1,...&quot;</span><span class="p">,</span>
+      <span class="s2">&quot;dtype&quot;</span><span class="p">:</span> <span class="s2">&quot;FP32&quot;</span>
+    <span class="p">}</span>
+  <span class="p">}</span>
+<span class="p">]</span>
+</pre></div>
+</div>
+</div>
+<div class="section" id="trace-summary-tool">
+<h2>Trace Summary Tool<a class="headerlink" href="#trace-summary-tool" title="Permalink to this headline">#</a></h2>
+<p>An example <span class="xref myst">trace summary tool</span> can be
+used to summarize a set of traces collected from Triton. Basic usage
+is:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span>$ trace_summary.py &lt;trace file&gt;
+</pre></div>
+</div>
+<p>This produces a summary report for all traces in the file. HTTP and
+GRPC inference requests are reported separately.</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">File</span><span class="p">:</span> <span class="n">trace</span><span class="o">.</span><span class="n">json</span>
+<span class="n">Summary</span> <span class="k">for</span> <span class="n">simple</span> <span class="p">(</span><span class="o">-</span><span class="mi">1</span><span class="p">):</span> <span class="n">trace</span> <span class="n">count</span> <span class="o">=</span> <span class="mi">1</span>
+<span class="n">HTTP</span> <span class="n">infer</span> <span class="n">request</span> <span class="p">(</span><span class="n">avg</span><span class="p">):</span> <span class="mi">378</span><span class="n">us</span>
+	<span class="n">Receive</span> <span class="p">(</span><span class="n">avg</span><span class="p">):</span> <span class="mi">21</span><span class="n">us</span>
+	<span class="n">Send</span> <span class="p">(</span><span class="n">avg</span><span class="p">):</span> <span class="mi">7</span><span class="n">us</span>
+	<span class="n">Overhead</span> <span class="p">(</span><span class="n">avg</span><span class="p">):</span> <span class="mi">79</span><span class="n">us</span>
+	<span class="n">Handler</span> <span class="p">(</span><span class="n">avg</span><span class="p">):</span> <span class="mi">269</span><span class="n">us</span>
+  		<span class="n">Overhead</span> <span class="p">(</span><span class="n">avg</span><span class="p">):</span> <span class="mi">11</span><span class="n">us</span>
+  		<span class="n">Queue</span> <span class="p">(</span><span class="n">avg</span><span class="p">):</span> <span class="mi">15</span><span class="n">us</span>
+  		<span class="n">Compute</span> <span class="p">(</span><span class="n">avg</span><span class="p">):</span> <span class="mi">242</span><span class="n">us</span>
+  			<span class="n">Input</span> <span class="p">(</span><span class="n">avg</span><span class="p">):</span> <span class="mi">18</span><span class="n">us</span>
+  			<span class="n">Infer</span> <span class="p">(</span><span class="n">avg</span><span class="p">):</span> <span class="mi">208</span><span class="n">us</span>
+  			<span class="n">Output</span> <span class="p">(</span><span class="n">avg</span><span class="p">):</span> <span class="mi">15</span><span class="n">us</span>
+<span class="n">Summary</span> <span class="k">for</span> <span class="n">simple</span> <span class="p">(</span><span class="o">-</span><span class="mi">1</span><span class="p">):</span> <span class="n">trace</span> <span class="n">count</span> <span class="o">=</span> <span class="mi">1</span>
+<span class="n">GRPC</span> <span class="n">infer</span> <span class="n">request</span> <span class="p">(</span><span class="n">avg</span><span class="p">):</span> <span class="mi">21441</span><span class="n">us</span>
+	<span class="n">Wait</span><span class="o">/</span><span class="n">Read</span> <span class="p">(</span><span class="n">avg</span><span class="p">):</span> <span class="mi">20923</span><span class="n">us</span>
+	<span class="n">Send</span> <span class="p">(</span><span class="n">avg</span><span class="p">):</span> <span class="mi">74</span><span class="n">us</span>
+	<span class="n">Overhead</span> <span class="p">(</span><span class="n">avg</span><span class="p">):</span> <span class="mi">46</span><span class="n">us</span>
+	<span class="n">Handler</span> <span class="p">(</span><span class="n">avg</span><span class="p">):</span> <span class="mi">395</span><span class="n">us</span>
+  		<span class="n">Overhead</span> <span class="p">(</span><span class="n">avg</span><span class="p">):</span> <span class="mi">16</span><span class="n">us</span>
+  		<span class="n">Queue</span> <span class="p">(</span><span class="n">avg</span><span class="p">):</span> <span class="mi">47</span><span class="n">us</span>
+  		<span class="n">Compute</span> <span class="p">(</span><span class="n">avg</span><span class="p">):</span> <span class="mi">331</span><span class="n">us</span>
+  			<span class="n">Input</span> <span class="p">(</span><span class="n">avg</span><span class="p">):</span> <span class="mi">30</span><span class="n">us</span>
+  			<span class="n">Infer</span> <span class="p">(</span><span class="n">avg</span><span class="p">):</span> <span class="mi">286</span><span class="n">us</span>
+  			<span class="n">Output</span> <span class="p">(</span><span class="n">avg</span><span class="p">):</span> <span class="mi">14</span><span class="n">us</span>
+</pre></div>
+</div>
+<p>Use the -t option to get a summary for each trace in the file. This
+summary shows the time, in microseconds, between different points in
+the processing of an inference request. For example, the below output
+shows that it took 15us from the start of handling the request until
+the request was enqueued in the scheduling queue.</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span>$ trace_summary.py -t &lt;trace file&gt;
+...
+simple (-1):
+  	grpc wait/read start
+  		26529us
+  	grpc wait/read end
+  		39us
+  	request handler start
+  		15us
+  	queue start
+  		20us
+  	compute start
+  		266us
+  	compute end
+  		4us
+  	request handler end
+  		19us
+  	grpc send start
+  		77us
+  	grpc send end
+...
+</pre></div>
+</div>
+<p>The script can also show the data flow of the first request if there are
+<code class="docutils literal notranslate"><span class="pre">TENSORS</span></code> traces in the file. If the <code class="docutils literal notranslate"><span class="pre">TENSORS</span></code> traces are from an ensemble,
+the data flow will be shown with the dependency of each model.</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="o">...</span>
+<span class="n">Data</span> <span class="n">Flow</span><span class="p">:</span>
+	<span class="o">==========================================================</span>
+	<span class="n">Name</span><span class="p">:</span>   <span class="n">ensemble</span>
+	<span class="n">Version</span><span class="p">:</span><span class="mi">1</span>
+	<span class="n">QUEUE_INPUT</span><span class="p">:</span>
+		<span class="nb">input</span><span class="p">:</span> <span class="p">[[</span><span class="mf">0.705676</span>  <span class="mf">0.830855</span>  <span class="mf">0.833153</span><span class="p">]]</span>
+	<span class="n">BACKEND_OUTPUT</span><span class="p">:</span>
+		<span class="n">output</span><span class="p">:</span> <span class="p">[[</span><span class="mf">1.</span> <span class="mf">2.</span> <span class="mf">7.</span> <span class="mf">0.</span> <span class="mf">4.</span> <span class="mf">7.</span> <span class="mf">9.</span> <span class="mf">3.</span> <span class="mf">4.</span> <span class="mf">9.</span><span class="p">]]</span>
+	<span class="o">==========================================================</span>
+		<span class="o">==================================================</span>
+		<span class="n">Name</span><span class="p">:</span>   <span class="n">test_trt1</span>
+		<span class="n">Version</span><span class="p">:</span><span class="mi">1</span>
+		<span class="n">QUEUE_INPUT</span><span class="p">:</span>
+			<span class="nb">input</span><span class="p">:</span> <span class="p">[[</span><span class="mf">0.705676</span>  <span class="mf">0.830855</span>  <span class="mf">0.833153</span><span class="p">]]</span>
+		<span class="n">BACKEND_OUTPUT</span><span class="p">:</span>
+			<span class="n">output1</span><span class="p">:</span> <span class="p">[[</span><span class="mf">1.</span> <span class="mf">1.</span> <span class="o">...</span><span class="p">]]</span>
+		<span class="o">==================================================</span>
+		<span class="o">==================================================</span>
+		<span class="n">Name</span><span class="p">:</span>   <span class="n">test_trt2</span>
+		<span class="n">Version</span><span class="p">:</span><span class="mi">1</span>
+		<span class="n">QUEUE_INPUT</span><span class="p">:</span>
+			<span class="nb">input</span><span class="p">:</span> <span class="p">[[</span><span class="mf">0.705676</span>  <span class="mf">0.830855</span>  <span class="mf">0.833153</span><span class="p">]]</span>
+		<span class="n">BACKEND_OUTPUT</span><span class="p">:</span>
+			<span class="n">output2</span><span class="p">:</span> <span class="p">[[</span><span class="mf">2.</span> <span class="mf">2.</span> <span class="o">...</span><span class="p">]]</span>
+		<span class="o">==================================================</span>
+		<span class="o">==================================================</span>
+		<span class="n">Name</span><span class="p">:</span>   <span class="n">test_py</span>
+		<span class="n">Version</span><span class="p">:</span><span class="mi">1</span>
+		<span class="n">QUEUE_INPUT</span><span class="p">:</span>
+			<span class="n">output1</span><span class="p">:</span> <span class="p">[[</span><span class="mf">1.</span> <span class="mf">1.</span> <span class="o">...</span><span class="p">]]</span>
+		<span class="n">QUEUE_INPUT</span><span class="p">:</span>
+			<span class="n">output2</span><span class="p">:</span> <span class="p">[[</span><span class="mf">2.</span> <span class="mf">2.</span> <span class="o">...</span><span class="p">]]</span>
+		<span class="n">BACKEND_OUTPUT</span><span class="p">:</span>
+			<span class="n">output</span><span class="p">:</span> <span class="p">[[</span><span class="mf">1.</span> <span class="mf">2.</span> <span class="mf">7.</span> <span class="mf">0.</span> <span class="mf">4.</span> <span class="mf">7.</span> <span class="mf">9.</span> <span class="mf">3.</span> <span class="mf">4.</span> <span class="mf">9.</span><span class="p">]]</span>
+		<span class="o">==================================================</span>
+<span class="o">...</span>
+</pre></div>
+</div>
+<p>The meaning of the trace timestamps is:</p>
+<ul class="simple">
+<li><p>GRPC Request Wait/Read: Collected only for inference requests that use the
+GRPC protocol. The time spent waiting for a request to arrive at the
+server and for that request to be read. Because wait time is
+included in the time it is not a useful measure of how much time is
+spent reading a request from the network. Tracing an HTTP request
+will provide an accurate measure of the read time.</p></li>
+<li><p>HTTP Request Receive: Collected only for inference requests that use the
+HTTP protocol. The time required to read the inference request from
+the network.</p></li>
+<li><p>Send: The time required to send the inference response.</p></li>
+<li><p>Overhead: Additional time required in the HTTP or GRPC endpoint to
+process the inference request and response.</p></li>
+<li><p>Handler: The total time spent handling the inference request, not
+including the HTTP and GRPC request/response handling.</p>
+<ul>
+<li><p>Queue: The time the inference request spent in the scheduling queue.</p></li>
+<li><p>Compute: The time the inference request spent executing the actual
+inference. This time includes the time spent copying input and
+output tensors. If –trace-level=TIMESTAMPS then a breakdown of the
+compute time will be provided as follows:</p>
+<ul>
+<li><p>Input: The time to copy input tensor data as required by the
+inference framework / backend. This includes the time to copy
+input tensor data to the GPU.</p></li>
+<li><p>Infer: The time spent executing the model to perform the
+inference.</p></li>
+<li><p>Output: The time to copy output tensor data as required by the
+inference framework / backend. This includes the time to copy
+output tensor data from the GPU.</p></li>
+</ul>
+</li>
+<li><p>Overhead: Additional time required for request handling not
+covered by Queue or Compute times.</p></li>
+</ul>
+</li>
+<li><p>Data Flow: The data flow of the first request. It contains the input and
+output tensors of each part of execution.</p>
+<ul>
+<li><p>Name: The name of model.</p></li>
+<li><p>Version: The version of model.</p></li>
+<li><p>QUEUE_INPUT: The tensor entering the queue of a backend to wait for
+scheduling.</p></li>
+<li><p>BACKEND_OUTPUT: The tensor in the response of a backend.</p></li>
+</ul>
+</li>
+</ul>
+</div>
+</div>
+
+<div class="section">
+   
+</div>
+
+              </div>
+              
+            </main>
+            <footer class="footer-article noprint">
+                
+    <!-- Previous / next buttons -->
+<div class='prev-next-area'>
+    <a class='left-prev' id="prev-link" href="metrics.html" title="previous page">
+        <i class="fas fa-angle-left"></i>
+        <div class="prev-next-info">
+            <p class="prev-next-subtitle">previous</p>
+            <p class="prev-next-title">Metrics</p>
+        </div>
+    </a>
+    <a class='right-next' id="next-link" href="jetson.html" title="next page">
+    <div class="prev-next-info">
+        <p class="prev-next-subtitle">next</p>
+        <p class="prev-next-title">Triton Inference Server Support for Jetson and JetPack</p>
+    </div>
+    <i class="fas fa-angle-right"></i>
+    </a>
+</div>
+            </footer>
+        </div>
+    </div>
+    <div class="footer-content row">
+        <footer class="col footer"><p>
+  
+    By NVIDIA<br/>
+  
+      &copy; Copyright 2022 NVIDIA CORPORATION &amp; AFFILIATES. All rights reserved.<br/>
+    Last updated on Oct 05, 2022.<br/>
+</p>
+        </footer>
+    </div>
+    
+</div>
+
+
+      </div>
+    </div>
+  
+  <!-- Scripts loaded after <body> so the DOM is not blocked -->
+  <script src="../_static/scripts/pydata-sphinx-theme.js?digest=1999514e3f237ded88cf"></script>
+
+
+<script type="text/javascript">_satellite.pageBottom();</script>
+  </body>
+</html>

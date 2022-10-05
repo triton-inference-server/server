@@ -1,0 +1,21 @@
+name: "densenet_onnx"
+platform: "onnxruntime_onnx"
+max_batch_size : 0
+input [
+  {
+    name: "data_0"
+    data_type: TYPE_FP32
+    format: FORMAT_NCHW
+    dims: [ 3, 224, 224 ]
+    reshape { shape: [ 1, 3, 224, 224 ] }
+  }
+]
+output [
+  {
+    name: "fc6_1"
+    data_type: TYPE_FP32
+    dims: [ 1000 ]
+    reshape { shape: [ 1, 1000, 1, 1 ] }
+    label_filename: "densenet_labels.txt"
+  }
+]

@@ -1,0 +1,1189 @@
+
+<!DOCTYPE html>
+
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Inference Protocols and APIs &#8212; NVIDIA Triton Inference Server</title>
+    
+  <!-- Loaded before other Sphinx assets -->
+  <link href="../_static/styles/theme.css?digest=1999514e3f237ded88cf" rel="stylesheet">
+<link href="../_static/styles/pydata-sphinx-theme.css?digest=1999514e3f237ded88cf" rel="stylesheet">
+
+    
+  <link rel="stylesheet"
+    href="../_static/vendor/fontawesome/5.13.0/css/all.min.css">
+  <link rel="preload" as="font" type="font/woff2" crossorigin
+    href="../_static/vendor/fontawesome/5.13.0/webfonts/fa-solid-900.woff2">
+  <link rel="preload" as="font" type="font/woff2" crossorigin
+    href="../_static/vendor/fontawesome/5.13.0/webfonts/fa-brands-400.woff2">
+
+    <link rel="stylesheet" type="text/css" href="../_static/pygments.css" />
+    <link rel="stylesheet" href="../_static/styles/sphinx-book-theme.css?digest=62ba249389abaaa9ffc34bf36a076bdc1d65ee18" type="text/css" />
+    <link rel="stylesheet" type="text/css" href="../_static/mystnb.4510f1fc1dee50b3e5859aac5469c37c29e427902b24a333a5f9fcb2f0b3ac41.css" />
+    <link rel="stylesheet" type="text/css" href="../_static/copybutton.css" />
+    <link rel="stylesheet" type="text/css" href="../_static/tabs.css" />
+    <link rel="stylesheet" type="text/css" href="../_static/custom.css" />
+    <link rel="stylesheet" type="text/css" href="../_static/design-style.4045f2051d55cab465a707391d5b2007.min.css" />
+    
+  <!-- Pre-loaded scripts that we'll load fully later -->
+  <link rel="preload" as="script" href="../_static/scripts/pydata-sphinx-theme.js?digest=1999514e3f237ded88cf">
+
+    <script data-url_root="../" id="documentation_options" src="../_static/documentation_options.js"></script>
+    <script src="../_static/jquery.js"></script>
+    <script src="../_static/underscore.js"></script>
+    <script src="../_static/doctools.js"></script>
+    <script src="../_static/clipboard.min.js"></script>
+    <script src="../_static/copybutton.js"></script>
+    <script src="https://js.hcaptcha.com/1/api.js"></script>
+    <script src="//assets.adobedtm.com/5d4962a43b79/c1061d2c5e7b/launch-191c2462b890.min.js"></script>
+    <script src="../_static/scripts/sphinx-book-theme.js?digest=f31d14ad54b65d19161ba51d4ffff3a77ae00456"></script>
+    <script src="../_static/design-tabs.js"></script>
+    <link rel="canonical" href="https://docs.nvidia.com/deeplearning/triton-inference-server/user-guide/docs/customization_guide/inference_protocols.html" />
+    <link rel="shortcut icon" href="../_static/nvidia-logo-vert-rgb-blk-for-screen.png"/>
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" />
+    <link rel="next" title="Binary Tensor Data Extension" href="../protocol/extension_binary_data.html" />
+    <link rel="prev" title="FAQ" href="../user_guide/faq.html" /> 
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="docsearch:language" content="None">
+    
+
+    <!-- Google Analytics -->
+      
+<style type="text/css">
+  ul.ablog-archive {
+    list-style: none;
+    overflow: auto;
+    margin-left: 0px;
+  }
+  ul.ablog-archive li {
+    float: left;
+    margin-right: 5px;
+    font-size: 80%;
+  }
+  ul.postlist a {
+    font-style: italic;
+  }
+  ul.postlist-style-disc {
+    list-style-type: disc;
+  }
+  ul.postlist-style-none {
+    list-style-type: none;
+  }
+  ul.postlist-style-circle {
+    list-style-type: circle;
+  }
+</style>
+
+  </head>
+  <body data-spy="scroll" data-target="#bd-toc-nav" data-offset="60">
+<!-- Checkboxes to toggle the left sidebar -->
+<input type="checkbox" class="sidebar-toggle" name="__navigation" id="__navigation" aria-label="Toggle navigation sidebar">
+<label class="overlay overlay-navbar" for="__navigation">
+    <div class="visually-hidden">Toggle navigation sidebar</div>
+</label>
+<!-- Checkboxes to toggle the in-page toc -->
+<input type="checkbox" class="sidebar-toggle" name="__page-toc" id="__page-toc" aria-label="Toggle in-page Table of Contents">
+<label class="overlay overlay-pagetoc" for="__page-toc">
+    <div class="visually-hidden">Toggle in-page Table of Contents</div>
+</label>
+<!-- Headers at the top -->
+<div class="announcement header-item noprint"></div>
+<div class="header header-item noprint"></div>
+
+    
+    <div class="container-fluid" id="banner"></div>
+
+    
+
+    <div class="container-xl">
+      <div class="row">
+          
+<!-- Sidebar -->
+<div class="bd-sidebar noprint" id="site-navigation">
+    <div class="bd-sidebar__content">
+        <div class="bd-sidebar__top"><div class="navbar-brand-box">
+    <a class="navbar-brand text-wrap" href="../index.html">
+      
+        <!-- `logo` is deprecated in Sphinx 4.0, so remove this when we stop supporting 3 -->
+        
+      
+      
+      <img src="../_static/nvidia-logo-horiz-rgb-blk-for-screen.png" class="logo" alt="logo">
+      
+      
+      <h1 class="site-logo" id="site-title">NVIDIA Triton Inference Server</h1>
+      
+    </a>
+</div><form class="bd-search d-flex align-items-center" action="../search.html" method="get">
+  <i class="icon fas fa-search"></i>
+  <input type="search" class="form-control" name="q" id="search-input" placeholder="Search the docs ..." aria-label="Search the docs ..." autocomplete="off" >
+</form><nav class="bd-links" id="bd-docs-nav" aria-label="Main">
+    <div class="bd-toc-item active">
+        <p aria-level="2" class="caption" role="heading">
+ <span class="caption-text">
+  Getting Started
+ </span>
+</p>
+<ul class="nav bd-sidenav">
+ <li class="toctree-l1">
+  <a class="reference internal" href="../getting_started/quickstart.html">
+   Quickstart
+  </a>
+ </li>
+</ul>
+<p aria-level="2" class="caption" role="heading">
+ <span class="caption-text">
+  User Guide
+ </span>
+</p>
+<ul class="nav bd-sidenav">
+ <li class="toctree-l1">
+  <a class="reference internal" href="../user_guide/performance_tuning.html">
+   Deploying your trained model using Triton
+  </a>
+ </li>
+ <li class="toctree-l1">
+  <a class="reference internal" href="../user_guide/architecture.html">
+   Triton Architecture
+  </a>
+ </li>
+ <li class="toctree-l1">
+  <a class="reference internal" href="../user_guide/model_repository.html">
+   Model Repository
+  </a>
+ </li>
+ <li class="toctree-l1">
+  <a class="reference internal" href="repository_agents.html">
+   Repository Agent
+  </a>
+ </li>
+ <li class="toctree-l1">
+  <a class="reference internal" href="../user_guide/model_configuration.html">
+   Model Configuration
+  </a>
+ </li>
+ <li class="toctree-l1">
+  <a class="reference internal" href="../user_guide/optimization.html">
+   Optimization
+  </a>
+ </li>
+ <li class="toctree-l1">
+  <a class="reference internal" href="../user_guide/ragged_batching.html">
+   Ragged Batching
+  </a>
+ </li>
+ <li class="toctree-l1">
+  <a class="reference internal" href="../user_guide/rate_limiter.html">
+   Rate Limiter
+  </a>
+ </li>
+ <li class="toctree-l1">
+  <a class="reference internal" href="../user_guide/model_analyzer.html">
+   Model Analyzer
+  </a>
+ </li>
+ <li class="toctree-l1">
+  <a class="reference internal" href="../user_guide/perf_analyzer.html">
+   Performance Analyzer
+  </a>
+ </li>
+ <li class="toctree-l1">
+  <a class="reference internal" href="../user_guide/model_management.html">
+   Model Management
+  </a>
+ </li>
+ <li class="toctree-l1">
+  <a class="reference internal" href="../user_guide/custom_operations.html">
+   Custom Operations
+  </a>
+ </li>
+ <li class="toctree-l1">
+  <a class="reference internal" href="../user_guide/decoupled_models.html">
+   Decoupled Backends and Models
+  </a>
+ </li>
+ <li class="toctree-l1">
+  <a class="reference internal" href="../user_guide/response_cache.html">
+   Triton Response Cache
+  </a>
+ </li>
+ <li class="toctree-l1">
+  <a class="reference internal" href="../user_guide/metrics.html">
+   Metrics
+  </a>
+ </li>
+ <li class="toctree-l1">
+  <a class="reference internal" href="../user_guide/trace.html">
+   Triton Server Trace
+  </a>
+ </li>
+ <li class="toctree-l1">
+  <a class="reference internal" href="../user_guide/jetson.html">
+   Triton Inference Server Support for Jetson and JetPack
+  </a>
+ </li>
+ <li class="toctree-l1">
+  <a class="reference internal" href="../user_guide/v1_to_v2.html">
+   Version 1 to Version 2 Migration
+  </a>
+ </li>
+</ul>
+<ul class="nav bd-sidenav">
+ <li class="toctree-l1">
+  <a class="reference internal" href="../user_guide/faq.html">
+   FAQ
+  </a>
+ </li>
+</ul>
+<p aria-level="2" class="caption" role="heading">
+ <span class="caption-text">
+  Protocol Guides
+ </span>
+</p>
+<ul class="current nav bd-sidenav">
+ <li class="toctree-l1 current active">
+  <a class="current reference internal" href="#">
+   Inference Protocols and APIs
+  </a>
+ </li>
+ <li class="toctree-l1">
+  <a class="reference internal" href="../protocol/extension_binary_data.html">
+   Binary Tensor Data Extension
+  </a>
+ </li>
+ <li class="toctree-l1">
+  <a class="reference internal" href="../protocol/extension_classification.html">
+   Classification Extension
+  </a>
+ </li>
+ <li class="toctree-l1">
+  <a class="reference internal" href="../protocol/extension_logging.html">
+   Logging Extension
+  </a>
+ </li>
+ <li class="toctree-l1">
+  <a class="reference internal" href="../protocol/extension_model_configuration.html">
+   Model Configuration Extension
+  </a>
+ </li>
+ <li class="toctree-l1">
+  <a class="reference internal" href="../protocol/extension_model_repository.html">
+   Model Repository Extension
+  </a>
+ </li>
+ <li class="toctree-l1">
+  <a class="reference internal" href="../protocol/extension_schedule_policy.html">
+   Schedule Policy Extension
+  </a>
+ </li>
+ <li class="toctree-l1">
+  <a class="reference internal" href="../protocol/extension_sequence.html">
+   Sequence Extension
+  </a>
+ </li>
+ <li class="toctree-l1">
+  <a class="reference internal" href="../protocol/extension_shared_memory.html">
+   Shared-Memory Extension
+  </a>
+ </li>
+ <li class="toctree-l1">
+  <a class="reference internal" href="../protocol/extension_statistics.html">
+   Statistics Extension
+  </a>
+ </li>
+ <li class="toctree-l1">
+  <a class="reference internal" href="../protocol/extension_trace.html">
+   Trace Extension
+  </a>
+ </li>
+</ul>
+<p aria-level="2" class="caption" role="heading">
+ <span class="caption-text">
+  Customization Guide
+ </span>
+</p>
+<ul class="nav bd-sidenav">
+ <li class="toctree-l1">
+  <a class="reference internal" href="build.html">
+   Building Triton
+  </a>
+ </li>
+ <li class="toctree-l1">
+  <a class="reference internal" href="compose.html">
+   Customize Triton Container
+  </a>
+ </li>
+ <li class="toctree-l1">
+  <a class="reference internal" href="test.html">
+   Testing Triton
+  </a>
+ </li>
+</ul>
+<p aria-level="2" class="caption" role="heading">
+ <span class="caption-text">
+  Examples
+ </span>
+</p>
+<ul class="nav bd-sidenav">
+ <li class="toctree-l1">
+  <a class="reference internal" href="../examples/jetson/README.html">
+   Using Triton Inference Server as a shared library for execution on Jetson
+  </a>
+ </li>
+ <li class="toctree-l1">
+  <a class="reference internal" href="../examples/jetson/concurrency_and_dynamic_batching/README.html">
+   Concurrent inference and dynamic batching
+  </a>
+ </li>
+</ul>
+
+    </div>
+</nav></div>
+        <div class="bd-sidebar__bottom">
+             <!-- To handle the deprecated key -->
+            
+        </div>
+    </div>
+    <div id="rtd-footer-container"></div>
+</div>
+
+
+          
+
+
+          
+<!-- A tiny helper pixel to detect if we've scrolled -->
+<div class="sbt-scroll-pixel-helper"></div>
+<!-- Main content -->
+<div class="col py-0 content-container">
+    
+    <div class="header-article row sticky-top noprint">
+        
+
+
+
+<div class="col py-1 d-flex header-article-main">
+    <div class="header-article__left">
+        
+        <label for="__navigation"
+  class="headerbtn"
+  data-toggle="tooltip"
+data-placement="right"
+title="Toggle navigation"
+>
+  
+
+<span class="headerbtn__icon-container">
+  <i class="fas fa-bars"></i>
+  </span>
+
+</label>
+
+        
+    </div>
+    <div class="header-article__right">
+<button onclick="toggleFullScreen()"
+  class="headerbtn"
+  data-toggle="tooltip"
+data-placement="bottom"
+title="Fullscreen mode"
+>
+  
+
+<span class="headerbtn__icon-container">
+  <i class="fas fa-expand"></i>
+  </span>
+
+</button>
+
+<div class="menu-dropdown menu-dropdown-repository-buttons">
+  <button class="headerbtn menu-dropdown__trigger"
+      aria-label="Source repositories">
+      <i class="fab fa-github"></i>
+  </button>
+  <div class="menu-dropdown__content">
+    <ul>
+      <li>
+        <a href="https://github.com/triton-inference-server/server"
+   class="headerbtn"
+   data-toggle="tooltip"
+data-placement="left"
+title="Source repository"
+>
+  
+
+<span class="headerbtn__icon-container">
+  <i class="fab fa-github"></i>
+  </span>
+<span class="headerbtn__text-container">repository</span>
+</a>
+
+      </li>
+      
+      <li>
+        <a href="https://github.com/triton-inference-server/server/issues/new?title=Issue%20on%20page%20%2Fcustomization_guide/inference_protocols.html&body=Your%20issue%20content%20here."
+   class="headerbtn"
+   data-toggle="tooltip"
+data-placement="left"
+title="Open an issue"
+>
+  
+
+<span class="headerbtn__icon-container">
+  <i class="fas fa-lightbulb"></i>
+  </span>
+<span class="headerbtn__text-container">open issue</span>
+</a>
+
+      </li>
+      
+    </ul>
+  </div>
+</div>
+<label for="__page-toc"
+  class="headerbtn headerbtn-page-toc"
+  
+>
+  
+
+<span class="headerbtn__icon-container">
+  <i class="fas fa-list"></i>
+  </span>
+
+</label>
+
+    </div>
+</div>
+
+<!-- Table of contents -->
+<div class="col-md-3 bd-toc show noprint">
+    <div class="tocsection onthispage pt-5 pb-3">
+        <i class="fas fa-list"></i> Contents
+    </div>
+    <nav id="bd-toc-nav" aria-label="Page">
+        <ul class="visible nav section-nav flex-column">
+ <li class="toc-h2 nav-item toc-entry">
+  <a class="reference internal nav-link" href="#http-rest-and-grpc-protocols">
+   HTTP/REST and GRPC Protocols
+  </a>
+  <ul class="visible nav section-nav flex-column">
+   <li class="toc-h3 nav-item toc-entry">
+    <a class="reference internal nav-link" href="#http-options">
+     HTTP Options
+    </a>
+    <ul class="nav section-nav flex-column">
+     <li class="toc-h4 nav-item toc-entry">
+      <a class="reference internal nav-link" href="#compression">
+       Compression
+      </a>
+     </li>
+    </ul>
+   </li>
+   <li class="toc-h3 nav-item toc-entry">
+    <a class="reference internal nav-link" href="#grpc-options">
+     GRPC Options
+    </a>
+    <ul class="nav section-nav flex-column">
+     <li class="toc-h4 nav-item toc-entry">
+      <a class="reference internal nav-link" href="#ssl-tls">
+       SSL/TLS
+      </a>
+     </li>
+     <li class="toc-h4 nav-item toc-entry">
+      <a class="reference internal nav-link" href="#id1">
+       Compression
+      </a>
+     </li>
+     <li class="toc-h4 nav-item toc-entry">
+      <a class="reference internal nav-link" href="#grpc-keepalive">
+       GRPC KeepAlive
+      </a>
+     </li>
+    </ul>
+   </li>
+  </ul>
+ </li>
+ <li class="toc-h2 nav-item toc-entry">
+  <a class="reference internal nav-link" href="#in-process-triton-server-api">
+   In-Process Triton Server API
+  </a>
+  <ul class="visible nav section-nav flex-column">
+   <li class="toc-h3 nav-item toc-entry">
+    <a class="reference internal nav-link" href="#api-description">
+     API Description
+    </a>
+    <ul class="nav section-nav flex-column">
+     <li class="toc-h4 nav-item toc-entry">
+      <a class="reference internal nav-link" href="#error-handling">
+       Error Handling
+      </a>
+     </li>
+     <li class="toc-h4 nav-item toc-entry">
+      <a class="reference internal nav-link" href="#versioning-and-backwards-compatibility">
+       Versioning and Backwards Compatibility
+      </a>
+     </li>
+     <li class="toc-h4 nav-item toc-entry">
+      <a class="reference internal nav-link" href="#non-inference-apis">
+       Non-Inference APIs
+      </a>
+     </li>
+     <li class="toc-h4 nav-item toc-entry">
+      <a class="reference internal nav-link" href="#inference-apis">
+       Inference APIs
+      </a>
+     </li>
+    </ul>
+   </li>
+  </ul>
+ </li>
+ <li class="toc-h2 nav-item toc-entry">
+  <a class="reference internal nav-link" href="#java-bindings-for-in-process-triton-server-api">
+   Java bindings for In-Process Triton Server API
+  </a>
+  <ul class="visible nav section-nav flex-column">
+   <li class="toc-h3 nav-item toc-entry">
+    <a class="reference internal nav-link" href="#java-api-setup-instructions">
+     Java API setup instructions
+    </a>
+    <ul class="nav section-nav flex-column">
+     <li class="toc-h4 nav-item toc-entry">
+      <a class="reference internal nav-link" href="#run-tritonserver-container-and-install-dependencies">
+       Run Tritonserver container and install dependencies
+      </a>
+     </li>
+     <li class="toc-h4 nav-item toc-entry">
+      <a class="reference internal nav-link" href="#run-java-program-with-java-bindings-jar">
+       Run Java program with Java bindings Jar
+      </a>
+     </li>
+     <li class="toc-h4 nav-item toc-entry">
+      <a class="reference internal nav-link" href="#build-java-bindings-and-run-java-program-with-maven">
+       Build Java bindings and run Java program with Maven
+      </a>
+     </li>
+    </ul>
+   </li>
+  </ul>
+ </li>
+</ul>
+
+    </nav>
+</div>
+    </div>
+    <div class="article row">
+        <div class="col pl-md-3 pl-lg-5 content-container">
+            <!-- Table of contents that is only displayed when printing the page -->
+            <div id="jb-print-docs-body" class="onlyprint">
+                <h1>Inference Protocols and APIs</h1>
+                <!-- Table of contents -->
+                <div id="print-main-content">
+                    <div id="jb-print-toc">
+                        
+                        <div>
+                            <h2> Contents </h2>
+                        </div>
+                        <nav aria-label="Page">
+                            <ul class="visible nav section-nav flex-column">
+ <li class="toc-h2 nav-item toc-entry">
+  <a class="reference internal nav-link" href="#http-rest-and-grpc-protocols">
+   HTTP/REST and GRPC Protocols
+  </a>
+  <ul class="visible nav section-nav flex-column">
+   <li class="toc-h3 nav-item toc-entry">
+    <a class="reference internal nav-link" href="#http-options">
+     HTTP Options
+    </a>
+    <ul class="nav section-nav flex-column">
+     <li class="toc-h4 nav-item toc-entry">
+      <a class="reference internal nav-link" href="#compression">
+       Compression
+      </a>
+     </li>
+    </ul>
+   </li>
+   <li class="toc-h3 nav-item toc-entry">
+    <a class="reference internal nav-link" href="#grpc-options">
+     GRPC Options
+    </a>
+    <ul class="nav section-nav flex-column">
+     <li class="toc-h4 nav-item toc-entry">
+      <a class="reference internal nav-link" href="#ssl-tls">
+       SSL/TLS
+      </a>
+     </li>
+     <li class="toc-h4 nav-item toc-entry">
+      <a class="reference internal nav-link" href="#id1">
+       Compression
+      </a>
+     </li>
+     <li class="toc-h4 nav-item toc-entry">
+      <a class="reference internal nav-link" href="#grpc-keepalive">
+       GRPC KeepAlive
+      </a>
+     </li>
+    </ul>
+   </li>
+  </ul>
+ </li>
+ <li class="toc-h2 nav-item toc-entry">
+  <a class="reference internal nav-link" href="#in-process-triton-server-api">
+   In-Process Triton Server API
+  </a>
+  <ul class="visible nav section-nav flex-column">
+   <li class="toc-h3 nav-item toc-entry">
+    <a class="reference internal nav-link" href="#api-description">
+     API Description
+    </a>
+    <ul class="nav section-nav flex-column">
+     <li class="toc-h4 nav-item toc-entry">
+      <a class="reference internal nav-link" href="#error-handling">
+       Error Handling
+      </a>
+     </li>
+     <li class="toc-h4 nav-item toc-entry">
+      <a class="reference internal nav-link" href="#versioning-and-backwards-compatibility">
+       Versioning and Backwards Compatibility
+      </a>
+     </li>
+     <li class="toc-h4 nav-item toc-entry">
+      <a class="reference internal nav-link" href="#non-inference-apis">
+       Non-Inference APIs
+      </a>
+     </li>
+     <li class="toc-h4 nav-item toc-entry">
+      <a class="reference internal nav-link" href="#inference-apis">
+       Inference APIs
+      </a>
+     </li>
+    </ul>
+   </li>
+  </ul>
+ </li>
+ <li class="toc-h2 nav-item toc-entry">
+  <a class="reference internal nav-link" href="#java-bindings-for-in-process-triton-server-api">
+   Java bindings for In-Process Triton Server API
+  </a>
+  <ul class="visible nav section-nav flex-column">
+   <li class="toc-h3 nav-item toc-entry">
+    <a class="reference internal nav-link" href="#java-api-setup-instructions">
+     Java API setup instructions
+    </a>
+    <ul class="nav section-nav flex-column">
+     <li class="toc-h4 nav-item toc-entry">
+      <a class="reference internal nav-link" href="#run-tritonserver-container-and-install-dependencies">
+       Run Tritonserver container and install dependencies
+      </a>
+     </li>
+     <li class="toc-h4 nav-item toc-entry">
+      <a class="reference internal nav-link" href="#run-java-program-with-java-bindings-jar">
+       Run Java program with Java bindings Jar
+      </a>
+     </li>
+     <li class="toc-h4 nav-item toc-entry">
+      <a class="reference internal nav-link" href="#build-java-bindings-and-run-java-program-with-maven">
+       Build Java bindings and run Java program with Maven
+      </a>
+     </li>
+    </ul>
+   </li>
+  </ul>
+ </li>
+</ul>
+
+                        </nav>
+                    </div>
+                </div>
+            </div>
+            <main id="main-content" role="main">
+                
+              <div>
+                 <!--
+# Copyright 2018-2022, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+#
+# Redistribution and use in source and binary forms, with or without
+# modification, are permitted provided that the following conditions
+# are met:
+#  * Redistributions of source code must retain the above copyright
+#    notice, this list of conditions and the following disclaimer.
+#  * Redistributions in binary form must reproduce the above copyright
+#    notice, this list of conditions and the following disclaimer in the
+#    documentation and/or other materials provided with the distribution.
+#  * Neither the name of NVIDIA CORPORATION nor the names of its
+#    contributors may be used to endorse or promote products derived
+#    from this software without specific prior written permission.
+#
+# THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS ``AS IS'' AND ANY
+# EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+# IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR
+# PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL THE COPYRIGHT OWNER OR
+# CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL,
+# EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
+# PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR
+# PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY
+# OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+# (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+# OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+-->
+<div class="tex2jax_ignore mathjax_ignore section" id="inference-protocols-and-apis">
+<h1>Inference Protocols and APIs<a class="headerlink" href="#inference-protocols-and-apis" title="Permalink to this headline">#</a></h1>
+<p>Clients can communicate with Triton using either an <a class="reference internal" href="#http-rest-and-grpc-protocols"><span class="std std-doc">HTTP/REST
+protocol</span></a>, a <a class="reference internal" href="#http-rest-and-grpc-protocols"><span class="std std-doc">GRPC
+protocol</span></a>, or by an <a class="reference internal" href="#in-process-triton-server-api"><span class="std std-doc">in-process C
+API</span></a>.</p>
+<div class="section" id="http-rest-and-grpc-protocols">
+<h2>HTTP/REST and GRPC Protocols<a class="headerlink" href="#http-rest-and-grpc-protocols" title="Permalink to this headline">#</a></h2>
+<p>Triton exposes both HTTP/REST and GRPC endpoints based on <a class="reference external" href="https://github.com/kserve/kserve/tree/master/docs/predict-api/v2">standard
+inference
+protocols</a>
+that have been proposed by the <a class="reference external" href="https://github.com/kserve">KServe
+project</a>. To fully enable all capabilities
+Triton also implements <a class="reference external" href="https://github.com/triton-inference-server/server/tree/main/docs/protocol">HTTP/REST and GRPC
+extensions</a>
+to the KServe inference protocol. GRPC protocol also provides a
+bi-directional streaming version of the inference RPC to allow a
+sequence of inference requests/responses to be sent over a
+GRPC stream. We typically recommend using the unary version for
+inference requests. The streaming version should be used only if the
+situation demands it. Some of such use cases can be:</p>
+<ul class="simple">
+<li><p>Assume a system with multiple Triton server instances running
+behind a Load Balancer. If a sequence of inference requests is
+needed to hit the same Triton server instance, a GRPC stream
+will hold a single connection throughout the lifetime and hence
+ensure the requests are delivered to the same Triton instance.</p></li>
+<li><p>If the order of requests/responses needs to be preserved over
+the network, a GRPC stream will ensure that the server receives
+the requests in the same order as they were sent from the
+client.</p></li>
+</ul>
+<p>The HTTP/REST and GRPC protocols also provide endpoints to check
+server and model health, metadata and statistics. Additional
+endpoints allow model loading and unloading, and inferencing. See
+the KServe and extension documentation for details.</p>
+<div class="section" id="http-options">
+<h3>HTTP Options<a class="headerlink" href="#http-options" title="Permalink to this headline">#</a></h3>
+<p>Triton provides the following configuration options for server-client network transactions over HTTP protocol.</p>
+<div class="section" id="compression">
+<h4>Compression<a class="headerlink" href="#compression" title="Permalink to this headline">#</a></h4>
+<p>Triton allows the on-wire compression of request/response on HTTP through its clients. See <a class="reference external" href="https://github.com/triton-inference-server/client/tree/main#compression">HTTP Compression</a> for more details.</p>
+</div>
+</div>
+<div class="section" id="grpc-options">
+<h3>GRPC Options<a class="headerlink" href="#grpc-options" title="Permalink to this headline">#</a></h3>
+<p>Triton exposes various GRPC parameters for configuring the server-client network transactions. For usage of these options, refer to the output from <code class="docutils literal notranslate"><span class="pre">tritonserver</span> <span class="pre">--help</span></code>.</p>
+<div class="section" id="ssl-tls">
+<h4>SSL/TLS<a class="headerlink" href="#ssl-tls" title="Permalink to this headline">#</a></h4>
+<p>These options can be used to configure a secured channel for communication. The server-side options include:</p>
+<ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">--grpc-use-ssl</span></code></p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">--grpc-use-ssl-mutual</span></code></p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">--grpc-server-cert</span></code></p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">--grpc-server-key</span></code></p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">--grpc-root-cert</span></code></p></li>
+</ul>
+<p>For client-side documentation, see <a class="reference external" href="https://github.com/triton-inference-server/client/tree/main#ssltls">Client-Side GRPC SSL/TLS</a></p>
+<p>For more details on overview of authentication in gRPC, refer <a class="reference external" href="https://grpc.io/docs/guides/auth/">here</a>.</p>
+</div>
+<div class="section" id="id1">
+<h4>Compression<a class="headerlink" href="#id1" title="Permalink to this headline">#</a></h4>
+<p>Triton allows the on-wire compression of request/response messages by exposing following option on server-side:</p>
+<ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">--grpc-infer-response-compression-level</span></code></p></li>
+</ul>
+<p>For client-side documentation, see <a class="reference external" href="https://github.com/triton-inference-server/client/tree/main#compression-1">Client-Side GRPC Compression</a></p>
+<p>Compression can be used to reduce the amount of bandwidth used in server-client communication. For more details, see <a class="reference external" href="https://grpc.github.io/grpc/core/md_doc_compression.html">gRPC Compression</a>.</p>
+</div>
+<div class="section" id="grpc-keepalive">
+<h4>GRPC KeepAlive<a class="headerlink" href="#grpc-keepalive" title="Permalink to this headline">#</a></h4>
+<p>Triton exposes GRPC KeepAlive parameters with the default values for both
+client and server described <a class="reference external" href="https://github.com/grpc/grpc/blob/master/doc/keepalive.md">here</a>.</p>
+<p>These options can be used to configure the KeepAlive settings:</p>
+<ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">--grpc-keepalive-time</span></code></p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">--grpc-keepalive-timeout</span></code></p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">--grpc-keepalive-permit-without-calls</span></code></p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">--grpc-http2-max-pings-without-data</span></code></p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">--grpc-http2-min-recv-ping-interval-without-data</span></code></p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">--grpc-http2-max-ping-strikes</span></code></p></li>
+</ul>
+<p>For client-side documentation, see <a class="reference external" href="https://github.com/triton-inference-server/client/blob/main/README.md#grpc-keepalive">Client-Side GRPC KeepAlive</a>.</p>
+</div>
+</div>
+</div>
+<div class="section" id="in-process-triton-server-api">
+<h2>In-Process Triton Server API<a class="headerlink" href="#in-process-triton-server-api" title="Permalink to this headline">#</a></h2>
+<p>The Triton Inference Server provides a backwards-compatible C API that
+allows Triton to be linked directly into a C/C++ application. This API
+is called the “Triton Server API” or just “Server API” for short. The
+API is implemented in the Triton shared library which is built from
+source contained in the <a class="reference external" href="https://github.com/triton-inference-server/core">core
+repository</a>. On Linux
+this library is libtritonserver.so and on Windows it is
+tritonserver.dll. In the Triton Docker image the shared library is
+found in /opt/tritonserver/lib. The header file that defines and
+documents the Server API is
+<a class="reference external" href="https://github.com/triton-inference-server/core/blob/main/include/triton/core/tritonserver.h">tritonserver.h</a>.
+<a class="reference internal" href="#java-bindings-for-in-process-triton-server-api"><span class="std std-doc">Java bindings for In-Process Triton Server API</span></a>
+are built on top of <code class="docutils literal notranslate"><span class="pre">tritonserver.h</span></code> and can be used for Java applications that
+need to use Tritonserver in-process.</p>
+<p>All capabilities of Triton server are encapsulated in the shared
+library and are exposed via the Server API. The <code class="docutils literal notranslate"><span class="pre">tritonserver</span></code>
+executable implements HTTP/REST and GRPC endpoints and uses the Server
+API to communicate with core Triton logic. The primary source files
+for the endpoints are <span class="xref myst">grpc_server.cc</span> and
+<span class="xref myst">http_server.cc</span>. In these source files you can
+see the Server API being used.</p>
+<p>You can use the Server API in your own application as well. A simple
+example using the Server API can be found in
+<span class="xref myst">simple.cc</span>.</p>
+<div class="section" id="api-description">
+<h3>API Description<a class="headerlink" href="#api-description" title="Permalink to this headline">#</a></h3>
+<p>Triton server functionality is encapsulated in a shared library which
+is built from source contained in the <a class="reference external" href="https://github.com/triton-inference-server/core">core
+repository</a>. You can
+include the full capabilities of Triton by linking the shared library
+into your application and by using the C API defined in
+<a class="reference external" href="https://github.com/triton-inference-server/core/blob/main/include/triton/core/tritonserver.h">tritonserver.h</a>.</p>
+<p>When you link the Triton shared library into your application you are
+<em>not</em> spawning a separate Triton process, instead, you are including
+the Triton core logic directly in your application. The Triton
+HTTP/REST or GRPC protocols are not used to communicate with this
+Triton core logic, instead all communication between your appliation
+and the Triton core logic must take place via the <a class="reference external" href="https://github.com/triton-inference-server/core/blob/main/include/triton/core/tritonserver.h">Server
+API</a>.</p>
+<p>The top-level abstraction used by Server API is <code class="docutils literal notranslate"><span class="pre">TRITONSERVER_Server</span></code>,
+which represents the Triton core logic that is capable of implementing
+all of the features and capabilities of Triton. A
+<code class="docutils literal notranslate"><span class="pre">TRITONSERVER_Server</span></code> object is created by calling
+<code class="docutils literal notranslate"><span class="pre">TRITONSERVER_ServerNew</span></code> with a set of options that indicate how the
+object should be initialized.  Use of <code class="docutils literal notranslate"><span class="pre">TRITONSERVER_ServerNew</span></code> is
+demonstrated in <span class="xref myst">simple.cc</span>. Once you have created a
+<code class="docutils literal notranslate"><span class="pre">TRITONSERVER_Server</span></code> object, you can begin using the rest of the
+Server API as described below.</p>
+<div class="section" id="error-handling">
+<h4>Error Handling<a class="headerlink" href="#error-handling" title="Permalink to this headline">#</a></h4>
+<p>Most Server API functions return an error object indicating success or
+failure. Success is indicated by return <code class="docutils literal notranslate"><span class="pre">nullptr</span></code> (<code class="docutils literal notranslate"><span class="pre">NULL</span></code>). Failure is
+indicated by returning a <code class="docutils literal notranslate"><span class="pre">TRITONSERVER_Error</span></code> object. The error code
+and message can be retrieved from a <code class="docutils literal notranslate"><span class="pre">TRITONSERVER_Error</span></code> object with
+<code class="docutils literal notranslate"><span class="pre">TRITONSERVER_ErrorCode</span></code> and <code class="docutils literal notranslate"><span class="pre">TRITONSERVER_ErrorMessage</span></code>.</p>
+<p>The lifecycle and ownership of all Server API objects is documented in
+<a class="reference external" href="https://github.com/triton-inference-server/core/blob/main/include/triton/core/tritonserver.h">tritonserver.h</a>. For
+<code class="docutils literal notranslate"><span class="pre">TRITONSERVER_Error</span></code>, ownership of the object passes to the caller of
+the Server API function. As a result, your application is responsible
+for managing the lifecycle of the returned <code class="docutils literal notranslate"><span class="pre">TRITONSERVER_Error</span></code>
+object. You must delete the error object using
+<code class="docutils literal notranslate"><span class="pre">TRITONSERVER_ErrorDelete</span></code> when you are done using it. Macros such as
+<code class="docutils literal notranslate"><span class="pre">FAIL_IF_ERR</span></code> shown in <span class="xref myst">common.h</span> are useful for
+managing error object lifetimes.</p>
+</div>
+<div class="section" id="versioning-and-backwards-compatibility">
+<h4>Versioning and Backwards Compatibility<a class="headerlink" href="#versioning-and-backwards-compatibility" title="Permalink to this headline">#</a></h4>
+<p>A typical pattern, demonstrated in <span class="xref myst">simple.cc</span> and
+shown below, shows how you can compare the Server API version provided
+by the shared library against the Server API version that you compiled
+your application against. The Server API is backwards compatible, so
+as long as the major version provided by the shared library matches
+the major version that you compiled against, and the minor version
+provided by the shared library is greater-than-or-equal to the minor
+version that you compiled against, then your application can use the
+Server API.</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="c1">#include &quot;tritonserver.h&quot;</span>
+<span class="o">//</span> <span class="n">Error</span> <span class="n">checking</span> <span class="n">removed</span> <span class="k">for</span> <span class="n">clarity</span><span class="o">...</span>
+<span class="n">uint32_t</span> <span class="n">api_version_major</span><span class="p">,</span> <span class="n">api_version_minor</span><span class="p">;</span>
+<span class="n">TRITONSERVER_ApiVersion</span><span class="p">(</span><span class="o">&amp;</span><span class="n">api_version_major</span><span class="p">,</span> <span class="o">&amp;</span><span class="n">api_version_minor</span><span class="p">);</span>
+<span class="k">if</span> <span class="p">((</span><span class="n">TRITONSERVER_API_VERSION_MAJOR</span> <span class="o">!=</span> <span class="n">api_version_major</span><span class="p">)</span> <span class="o">||</span>
+    <span class="p">(</span><span class="n">TRITONSERVER_API_VERSION_MINOR</span> <span class="o">&gt;</span> <span class="n">api_version_minor</span><span class="p">))</span> <span class="p">{</span>
+  <span class="o">//</span> <span class="n">Error</span><span class="p">,</span> <span class="n">the</span> <span class="n">shared</span> <span class="n">library</span> <span class="n">implementing</span> <span class="n">the</span> <span class="n">Server</span> <span class="n">API</span> <span class="ow">is</span> <span class="n">older</span> <span class="n">than</span>
+  <span class="o">//</span> <span class="n">the</span> <span class="n">version</span> <span class="n">of</span> <span class="n">the</span> <span class="n">Server</span> <span class="n">API</span> <span class="n">that</span> <span class="n">you</span> <span class="n">compiled</span> <span class="n">against</span><span class="o">.</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+</div>
+<div class="section" id="non-inference-apis">
+<h4>Non-Inference APIs<a class="headerlink" href="#non-inference-apis" title="Permalink to this headline">#</a></h4>
+<p>The Server API contains functions for checking health and readiness,
+getting model information, getting model statistics and metrics,
+loading and unloading models, etc. The use of these functions is
+straightforward and some of these functions are demonstrated in
+<span class="xref myst">simple.cc</span> and all are documented in
+<a class="reference external" href="https://github.com/triton-inference-server/core/blob/main/include/triton/core/tritonserver.h">tritonserver.h</a>.</p>
+</div>
+<div class="section" id="inference-apis">
+<h4>Inference APIs<a class="headerlink" href="#inference-apis" title="Permalink to this headline">#</a></h4>
+<p>Performing an inference request requires the use of many Server API
+functions and objects, as demonstrated in
+<span class="xref myst">simple.cc</span>. The general usage requires the
+following steps.</p>
+<ul>
+<li><p>Create a <code class="docutils literal notranslate"><span class="pre">TRITONSERVER_ResponseAllocator</span></code> using
+<code class="docutils literal notranslate"><span class="pre">TRITONSERVER_ResponseAllocatorNew</span></code>.  You can use the same response
+allocator for all of your inference requests, or you can create
+multiple response allocators.  When Triton produces an output
+tensor, it needs a memory buffer into which it can store the
+contents of that tensor. Triton defers the allocation of these
+output buffers by invoking callback functions in your
+application. You communicate these callback functions to Triton with
+the <code class="docutils literal notranslate"><span class="pre">TRITONSERVER_ResponseAllocator</span></code> object. You must implement two
+callback functions, one for buffer allocation and one for buffer
+free. The signatures for these functions are
+<code class="docutils literal notranslate"><span class="pre">TRITONSERVER_ResponseAllocatorAllocFn_t</span></code> and
+<code class="docutils literal notranslate"><span class="pre">TRITONSERVER_ResponseAllocatorReleaseFn_t</span></code> as defined in
+<a class="reference external" href="https://github.com/triton-inference-server/core/blob/main/include/triton/core/tritonserver.h">tritonserver.h</a>. In
+<span class="xref myst">simple.cc</span>, these callback functions are
+implemented as <code class="docutils literal notranslate"><span class="pre">ResponseAlloc</span></code> and <code class="docutils literal notranslate"><span class="pre">ResponseRelease</span></code>.</p></li>
+<li><p>Create an inference request as a <code class="docutils literal notranslate"><span class="pre">TRITONSERVER_InferenceRequest</span></code>
+object. The inference request is where you specify what model you
+want to use, the input tensors and their values, the output tensors
+that you want returned, and other request parameters. You create an
+inference request using <code class="docutils literal notranslate"><span class="pre">TRITONSERVER_InferenceRequestNew</span></code>. You
+create each input tensor in the request using
+<code class="docutils literal notranslate"><span class="pre">TRITONSERVER_InferenceRequestAddInput</span></code> and set the data for the
+input tensor using <code class="docutils literal notranslate"><span class="pre">TRITONSERVER_InferenceRequestAppendInputData</span></code>
+(or one of the <code class="docutils literal notranslate"><span class="pre">TRITONSERVER_InferenceRequestAppendInputData*</span></code>
+variants defined in
+<a class="reference external" href="https://github.com/triton-inference-server/core/blob/main/include/triton/core/tritonserver.h">tritonserver.h</a>). By
+default, Triton will return all output tensors, but you can limit
+Triton to only return some outputs by using
+<code class="docutils literal notranslate"><span class="pre">TRITONSERVER_InferenceRequestAddRequestedOutput</span></code>.</p>
+<p>To correctly manage the lifecycle of the inference request, you must
+use <code class="docutils literal notranslate"><span class="pre">TRITONSERVER_InferenceRequestSetReleaseCallback</span></code> to set a
+callback into a function in your application. This callback will be
+invoke by Triton to return ownership of the
+<code class="docutils literal notranslate"><span class="pre">TRITONSERVER_InferenceRequest</span></code> object. Typically, in this callback
+you will just delete the <code class="docutils literal notranslate"><span class="pre">TRITONSERVER_InferenceRequest</span></code> object by
+using <code class="docutils literal notranslate"><span class="pre">TRITONSERVER_InferenceRequestDelete</span></code>. But you may also
+implement a different lifecycle management; for example, if you are
+reusing inference request objects you would want to make the object
+available for reuse.</p>
+<p>You can optionally use <code class="docutils literal notranslate"><span class="pre">TRITONSERVER_InferenceRequestSetId</span></code> to set a
+user-defined ID on the request. This ID is not used by Triton but
+will be returned in the response.</p>
+<p>You can reuse an existing <code class="docutils literal notranslate"><span class="pre">TRITONSERVER_InferenceRequest</span></code> object for
+a new inference request. A couple of examples of how this is done
+and why it is useful are shown in <span class="xref myst">simple.cc</span>.</p>
+</li>
+<li><p>Ask Triton to execute the inference request using
+<code class="docutils literal notranslate"><span class="pre">TRITONSERVER_ServerInferAsync</span></code>. <code class="docutils literal notranslate"><span class="pre">TRITONSERVER_ServerInferAsync</span></code> is
+a asynchronous call that returns immediately. The inference response
+is returned via a callback into your application. You register this
+callback using <code class="docutils literal notranslate"><span class="pre">TRITONSERVER_InferenceRequestSetResponseCallback</span></code>
+before you invoke <code class="docutils literal notranslate"><span class="pre">TRITONSERVER_ServerInferAsync</span></code>. In
+<span class="xref myst">simple.cc</span> this callback is
+<code class="docutils literal notranslate"><span class="pre">InferResponseComplete</span></code>.</p>
+<p>When you invoke <code class="docutils literal notranslate"><span class="pre">TRITONSERVER_ServerInferAsync</span></code> and it returns
+without error, you are passing ownership of the
+<code class="docutils literal notranslate"><span class="pre">TRITONSERVER_InferenceRequest</span></code> object to Triton, and so you must
+not access that object in any way until Triton returns ownership to
+you via the callback you registered with
+<code class="docutils literal notranslate"><span class="pre">TRITONSERVER_InferenceRequestSetReleaseCallback</span></code>.</p>
+</li>
+<li><p>Process the inference response. The inference response is returned
+to the callback function you registered with
+<code class="docutils literal notranslate"><span class="pre">TRITONSERVER_InferenceRequestSetResponseCallback</span></code>. Your callback
+receives the response as a <code class="docutils literal notranslate"><span class="pre">TRITONSERVER_InferenceResponse</span></code>
+object. Your callback takes ownership of the
+<code class="docutils literal notranslate"><span class="pre">TRITONSERVER_InferenceResponse</span></code> object and so must free it with
+<code class="docutils literal notranslate"><span class="pre">TRITONSERVER_InferenceResponseDelete</span></code> when it is no longer needed.</p>
+<p>The first step in processing a response is to use
+<code class="docutils literal notranslate"><span class="pre">TRITONSERVER_InferenceResponseError</span></code> to check if the response is
+returning an error or if it is returning valid results. If the
+response is valid you can use
+<code class="docutils literal notranslate"><span class="pre">TRITONSERVER_InferenceResponseOutputCount</span></code> to iterate over the
+output tensors, and <code class="docutils literal notranslate"><span class="pre">TRITONSERVER_InferenceResponseOutput</span></code> to get
+information about each output tensor.</p>
+<p>Note that the <span class="xref myst">simple.cc</span> example uses a
+std::promise to simply wait for the response, but synchronizing
+response handling in this way is not required. You can have multiple
+inference requests in flight at the same time and can issue
+inference requests from the same thread or from multiple different
+threads.
+allows Triton to be linked directly to a C/C++ application. The API
+is documented in
+<a class="reference external" href="https://github.com/triton-inference-server/core/blob/main/include/triton/core/tritonserver.h">tritonserver.h</a>.</p>
+</li>
+</ul>
+<p>A simple example using the C API can be found in
+<span class="xref myst">simple.cc</span>.  A more complicated example can be
+found in the source that implements the HTTP/REST and GRPC endpoints
+for Triton. These endpoints use the C API to communicate with the core
+of Triton. The primary source files for the endpoints are
+<span class="xref myst">grpc_server.cc</span> and
+<span class="xref myst">http_server.cc</span>.</p>
+</div>
+</div>
+</div>
+<div class="section" id="java-bindings-for-in-process-triton-server-api">
+<h2>Java bindings for In-Process Triton Server API<a class="headerlink" href="#java-bindings-for-in-process-triton-server-api" title="Permalink to this headline">#</a></h2>
+<p>The Triton Inference Server uses <a class="reference external" href="https://github.com/bytedeco/javacpp">Java CPP</a>
+to create bindings around Tritonserver to create Java API.</p>
+<p>The API is documented in
+<a class="reference external" href="https://github.com/bytedeco/javacpp-presets/blob/master/tritonserver/src/gen/java/org/bytedeco/tritonserver/global/tritonserver.java">tritonserver.java</a>.
+Alternatively, the user can refer to the web version <a class="reference external" href="http://bytedeco.org/javacpp-presets/tritonserver/apidocs/">API docs</a>
+generated from <code class="docutils literal notranslate"><span class="pre">tritonserver.java</span></code>.
+A simple example using the Java API can be found in
+<a class="reference external" href="https://github.com/bytedeco/javacpp-presets/tree/master/tritonserver/samples">Samples folder</a>
+which includes <code class="docutils literal notranslate"><span class="pre">Simple.java</span></code> which is similar to
+<span class="xref myst"><code class="docutils literal notranslate"><span class="pre">simple.cc</span></code></span>.
+Please refer to
+<a class="reference external" href="https://github.com/bytedeco/javacpp-presets/tree/master/tritonserver#sample-usage">sample usage documentation</a>
+to learn about how to build and run <code class="docutils literal notranslate"><span class="pre">Simple.java</span></code>.</p>
+<p>In the <span class="xref myst">QA folder</span>, folders starting with L0_java include Java API tests.
+These can be useful references for getting started, such as the
+<span class="xref myst">ResNet50 test</span>.</p>
+<div class="section" id="java-api-setup-instructions">
+<h3>Java API setup instructions<a class="headerlink" href="#java-api-setup-instructions" title="Permalink to this headline">#</a></h3>
+<p>To use the Tritonserver Java API, you will need to have the Tritonserver library
+and dependencies installed in your environment. There are two ways to do this:</p>
+<ol class="arabic simple">
+<li><p>Use a Tritonserver docker container with</p>
+<ol class="arabic simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">.jar</span></code> Java bindings to C API (recommended)</p></li>
+<li><p>maven and build bindings yourself</p></li>
+</ol>
+</li>
+<li><p>Build Triton from your environment without Docker (not recommended)</p></li>
+</ol>
+<div class="section" id="run-tritonserver-container-and-install-dependencies">
+<h4>Run Tritonserver container and install dependencies<a class="headerlink" href="#run-tritonserver-container-and-install-dependencies" title="Permalink to this headline">#</a></h4>
+<p>To set up your environment with Triton Java API, please follow the following steps:</p>
+<ol class="arabic simple">
+<li><p>First run Docker container:</p></li>
+</ol>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span> $ docker run -it --gpus=all -v ${pwd}:/workspace nvcr.io/nvidia/tritonserver:&lt;your container version&gt;-py3 bash
+</pre></div>
+</div>
+<ol class="arabic simple" start="2">
+<li><p>Install <code class="docutils literal notranslate"><span class="pre">jdk</span></code>:</p></li>
+</ol>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span> $ apt update <span class="o">&amp;&amp;</span> apt install -y openjdk-11-jdk
+</pre></div>
+</div>
+<ol class="arabic simple" start="3">
+<li><p>Install <code class="docutils literal notranslate"><span class="pre">maven</span></code> (only if you want to build the bindings yourself):</p></li>
+</ol>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>$ <span class="nb">cd</span> /opt/tritonserver
+ $ wget https://archive.apache.org/dist/maven/maven-3/3.8.4/binaries/apache-maven-3.8.4-bin.tar.gz
+ $ tar zxvf apache-maven-3.8.4-bin.tar.gz
+ $ <span class="nb">export</span> <span class="nv">PATH</span><span class="o">=</span>/opt/tritonserver/apache-maven-3.8.4/bin:<span class="nv">$PATH</span>
+</pre></div>
+</div>
+</div>
+<div class="section" id="run-java-program-with-java-bindings-jar">
+<h4>Run Java program with Java bindings Jar<a class="headerlink" href="#run-java-program-with-java-bindings-jar" title="Permalink to this headline">#</a></h4>
+<p>After ensuring that Tritonserver and dependencies are installed, you can run your
+Java program with the Java bindings with the following steps:</p>
+<ol class="arabic">
+<li><p>Place Java bindings into your environment. You can do this by either:</p>
+<p>a. Building Java API bindings with provided build script:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span><span class="c1"># Clone Triton client repo. Recommended client repo tag is: main</span>
+$ git clone --single-branch --depth<span class="o">=</span><span class="m">1</span> -b &lt;client repo tag&gt;
+               https://github.com/triton-inference-server/client.git clientrepo
+<span class="c1"># Run build script</span>
+$ <span class="nb">source</span> clientrepo/src/java-api-bindings/scripts/install_dependencies_and_build.sh
+</pre></div>
+</div>
+<p>This will install the Java bindings to <code class="docutils literal notranslate"><span class="pre">/workspace/install/java-api-bindings/tritonserver-java-bindings.jar</span></code></p>
+<p><em>or</em></p>
+<p>b. Copying “Uber Jar” from Triton SDK container to your environment</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>$ <span class="nv">id</span><span class="o">=</span><span class="k">$(</span>docker run -dit nvcr.io/nvidia/tritonserver:&lt;triton container version&gt;-py3-sdk bash<span class="k">)</span>
+$ docker cp <span class="si">${</span><span class="nv">id</span><span class="si">}</span>:/workspace/install/java-api-bindings/tritonserver-java-bindings.jar &lt;Uber Jar directory&gt;/tritonserver-java-bindings.jar
+$ docker stop <span class="si">${</span><span class="nv">id</span><span class="si">}</span>
+</pre></div>
+</div>
+</li>
+<li><p>Use the built “Uber Jar” that contains the Java bindings</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>$ java -cp &lt;Uber Jar directory&gt;/tritonserver-java-bindings.jar &lt;your Java program&gt;
+</pre></div>
+</div>
+</li>
+</ol>
+</div>
+<div class="section" id="build-java-bindings-and-run-java-program-with-maven">
+<h4>Build Java bindings and run Java program with Maven<a class="headerlink" href="#build-java-bindings-and-run-java-program-with-maven" title="Permalink to this headline">#</a></h4>
+<p>If you want to make changes to the Java bindings, then you can use Maven to
+build yourself. You can refer to part 1.a of <span class="xref myst">Run Java program with Java
+bindings Jar</span> to also build the jar
+yourself without any modifications to the Tritonserver bindings in
+JavaCPP-presets. You can do this using the following steps:</p>
+<ol class="arabic simple">
+<li><p>Create the JNI binaries in your local repository (<code class="docutils literal notranslate"><span class="pre">/root/.m2/repository</span></code>)
+with <a class="reference external" href="https://github.com/bytedeco/javacpp-presets/tree/master/tritonserver"><code class="docutils literal notranslate"><span class="pre">javacpp-presets/tritonserver</span></code></a></p></li>
+</ol>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span> $ git clone https://github.com/bytedeco/javacpp-presets.git
+ $ <span class="nb">cd</span> javacpp-presets
+ $ mvn clean install --projects .,tritonserver
+ $ mvn clean install -f platform --projects ../tritonserver/platform -Djavacpp.platform<span class="o">=</span>linux-x86_64
+</pre></div>
+</div>
+<ol class="arabic simple" start="2">
+<li><p>Create your custom <code class="docutils literal notranslate"><span class="pre">*.pom</span></code> file for Maven. Please refer to
+<a class="reference external" href="https://github.com/bytedeco/javacpp-presets/blob/master/tritonserver/samples/simple/pom.xml">samples/simple/pom.xml</a> as
+reference for how to create your pom file.</p></li>
+<li><p>After creating your <code class="docutils literal notranslate"><span class="pre">pom.xml</span></code> file you can build your application with:</p></li>
+</ol>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span> $ mvn compile exec:java -Djavacpp.platform<span class="o">=</span>linux-x86_64 -Dexec.args<span class="o">=</span><span class="s2">&quot;&lt;your input args&gt;&quot;</span>
+</pre></div>
+</div>
+</div>
+</div>
+</div>
+</div>
+
+<div class="section">
+   
+</div>
+
+              </div>
+              
+            </main>
+            <footer class="footer-article noprint">
+                
+    <!-- Previous / next buttons -->
+<div class='prev-next-area'>
+    <a class='left-prev' id="prev-link" href="../user_guide/faq.html" title="previous page">
+        <i class="fas fa-angle-left"></i>
+        <div class="prev-next-info">
+            <p class="prev-next-subtitle">previous</p>
+            <p class="prev-next-title">FAQ</p>
+        </div>
+    </a>
+    <a class='right-next' id="next-link" href="../protocol/extension_binary_data.html" title="next page">
+    <div class="prev-next-info">
+        <p class="prev-next-subtitle">next</p>
+        <p class="prev-next-title">Binary Tensor Data Extension</p>
+    </div>
+    <i class="fas fa-angle-right"></i>
+    </a>
+</div>
+            </footer>
+        </div>
+    </div>
+    <div class="footer-content row">
+        <footer class="col footer"><p>
+  
+    By NVIDIA<br/>
+  
+      &copy; Copyright 2022 NVIDIA CORPORATION &amp; AFFILIATES. All rights reserved.<br/>
+    Last updated on Oct 05, 2022.<br/>
+</p>
+        </footer>
+    </div>
+    
+</div>
+
+
+      </div>
+    </div>
+  
+  <!-- Scripts loaded after <body> so the DOM is not blocked -->
+  <script src="../_static/scripts/pydata-sphinx-theme.js?digest=1999514e3f237ded88cf"></script>
+
+
+<script type="text/javascript">_satellite.pageBottom();</script>
+  </body>
+</html>

@@ -1,0 +1,1271 @@
+
+<!DOCTYPE html>
+
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Building Triton &#8212; NVIDIA Triton Inference Server</title>
+    
+  <!-- Loaded before other Sphinx assets -->
+  <link href="../_static/styles/theme.css?digest=1999514e3f237ded88cf" rel="stylesheet">
+<link href="../_static/styles/pydata-sphinx-theme.css?digest=1999514e3f237ded88cf" rel="stylesheet">
+
+    
+  <link rel="stylesheet"
+    href="../_static/vendor/fontawesome/5.13.0/css/all.min.css">
+  <link rel="preload" as="font" type="font/woff2" crossorigin
+    href="../_static/vendor/fontawesome/5.13.0/webfonts/fa-solid-900.woff2">
+  <link rel="preload" as="font" type="font/woff2" crossorigin
+    href="../_static/vendor/fontawesome/5.13.0/webfonts/fa-brands-400.woff2">
+
+    <link rel="stylesheet" type="text/css" href="../_static/pygments.css" />
+    <link rel="stylesheet" href="../_static/styles/sphinx-book-theme.css?digest=62ba249389abaaa9ffc34bf36a076bdc1d65ee18" type="text/css" />
+    <link rel="stylesheet" type="text/css" href="../_static/mystnb.4510f1fc1dee50b3e5859aac5469c37c29e427902b24a333a5f9fcb2f0b3ac41.css" />
+    <link rel="stylesheet" type="text/css" href="../_static/copybutton.css" />
+    <link rel="stylesheet" type="text/css" href="../_static/tabs.css" />
+    <link rel="stylesheet" type="text/css" href="../_static/custom.css" />
+    <link rel="stylesheet" type="text/css" href="../_static/design-style.4045f2051d55cab465a707391d5b2007.min.css" />
+    
+  <!-- Pre-loaded scripts that we'll load fully later -->
+  <link rel="preload" as="script" href="../_static/scripts/pydata-sphinx-theme.js?digest=1999514e3f237ded88cf">
+
+    <script data-url_root="../" id="documentation_options" src="../_static/documentation_options.js"></script>
+    <script src="../_static/jquery.js"></script>
+    <script src="../_static/underscore.js"></script>
+    <script src="../_static/doctools.js"></script>
+    <script src="../_static/clipboard.min.js"></script>
+    <script src="../_static/copybutton.js"></script>
+    <script src="https://js.hcaptcha.com/1/api.js"></script>
+    <script src="//assets.adobedtm.com/5d4962a43b79/c1061d2c5e7b/launch-191c2462b890.min.js"></script>
+    <script src="../_static/scripts/sphinx-book-theme.js?digest=f31d14ad54b65d19161ba51d4ffff3a77ae00456"></script>
+    <script src="../_static/design-tabs.js"></script>
+    <link rel="canonical" href="https://docs.nvidia.com/deeplearning/triton-inference-server/user-guide/docs/customization_guide/build.html" />
+    <link rel="shortcut icon" href="../_static/nvidia-logo-vert-rgb-blk-for-screen.png"/>
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" />
+    <link rel="next" title="Customize Triton Container" href="compose.html" />
+    <link rel="prev" title="Trace Extension" href="../protocol/extension_trace.html" /> 
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="docsearch:language" content="None">
+    
+
+    <!-- Google Analytics -->
+      
+<style type="text/css">
+  ul.ablog-archive {
+    list-style: none;
+    overflow: auto;
+    margin-left: 0px;
+  }
+  ul.ablog-archive li {
+    float: left;
+    margin-right: 5px;
+    font-size: 80%;
+  }
+  ul.postlist a {
+    font-style: italic;
+  }
+  ul.postlist-style-disc {
+    list-style-type: disc;
+  }
+  ul.postlist-style-none {
+    list-style-type: none;
+  }
+  ul.postlist-style-circle {
+    list-style-type: circle;
+  }
+</style>
+
+  </head>
+  <body data-spy="scroll" data-target="#bd-toc-nav" data-offset="60">
+<!-- Checkboxes to toggle the left sidebar -->
+<input type="checkbox" class="sidebar-toggle" name="__navigation" id="__navigation" aria-label="Toggle navigation sidebar">
+<label class="overlay overlay-navbar" for="__navigation">
+    <div class="visually-hidden">Toggle navigation sidebar</div>
+</label>
+<!-- Checkboxes to toggle the in-page toc -->
+<input type="checkbox" class="sidebar-toggle" name="__page-toc" id="__page-toc" aria-label="Toggle in-page Table of Contents">
+<label class="overlay overlay-pagetoc" for="__page-toc">
+    <div class="visually-hidden">Toggle in-page Table of Contents</div>
+</label>
+<!-- Headers at the top -->
+<div class="announcement header-item noprint"></div>
+<div class="header header-item noprint"></div>
+
+    
+    <div class="container-fluid" id="banner"></div>
+
+    
+
+    <div class="container-xl">
+      <div class="row">
+          
+<!-- Sidebar -->
+<div class="bd-sidebar noprint" id="site-navigation">
+    <div class="bd-sidebar__content">
+        <div class="bd-sidebar__top"><div class="navbar-brand-box">
+    <a class="navbar-brand text-wrap" href="../index.html">
+      
+        <!-- `logo` is deprecated in Sphinx 4.0, so remove this when we stop supporting 3 -->
+        
+      
+      
+      <img src="../_static/nvidia-logo-horiz-rgb-blk-for-screen.png" class="logo" alt="logo">
+      
+      
+      <h1 class="site-logo" id="site-title">NVIDIA Triton Inference Server</h1>
+      
+    </a>
+</div><form class="bd-search d-flex align-items-center" action="../search.html" method="get">
+  <i class="icon fas fa-search"></i>
+  <input type="search" class="form-control" name="q" id="search-input" placeholder="Search the docs ..." aria-label="Search the docs ..." autocomplete="off" >
+</form><nav class="bd-links" id="bd-docs-nav" aria-label="Main">
+    <div class="bd-toc-item active">
+        <p aria-level="2" class="caption" role="heading">
+ <span class="caption-text">
+  Getting Started
+ </span>
+</p>
+<ul class="nav bd-sidenav">
+ <li class="toctree-l1">
+  <a class="reference internal" href="../getting_started/quickstart.html">
+   Quickstart
+  </a>
+ </li>
+</ul>
+<p aria-level="2" class="caption" role="heading">
+ <span class="caption-text">
+  User Guide
+ </span>
+</p>
+<ul class="nav bd-sidenav">
+ <li class="toctree-l1">
+  <a class="reference internal" href="../user_guide/performance_tuning.html">
+   Deploying your trained model using Triton
+  </a>
+ </li>
+ <li class="toctree-l1">
+  <a class="reference internal" href="../user_guide/architecture.html">
+   Triton Architecture
+  </a>
+ </li>
+ <li class="toctree-l1">
+  <a class="reference internal" href="../user_guide/model_repository.html">
+   Model Repository
+  </a>
+ </li>
+ <li class="toctree-l1">
+  <a class="reference internal" href="repository_agents.html">
+   Repository Agent
+  </a>
+ </li>
+ <li class="toctree-l1">
+  <a class="reference internal" href="../user_guide/model_configuration.html">
+   Model Configuration
+  </a>
+ </li>
+ <li class="toctree-l1">
+  <a class="reference internal" href="../user_guide/optimization.html">
+   Optimization
+  </a>
+ </li>
+ <li class="toctree-l1">
+  <a class="reference internal" href="../user_guide/ragged_batching.html">
+   Ragged Batching
+  </a>
+ </li>
+ <li class="toctree-l1">
+  <a class="reference internal" href="../user_guide/rate_limiter.html">
+   Rate Limiter
+  </a>
+ </li>
+ <li class="toctree-l1">
+  <a class="reference internal" href="../user_guide/model_analyzer.html">
+   Model Analyzer
+  </a>
+ </li>
+ <li class="toctree-l1">
+  <a class="reference internal" href="../user_guide/perf_analyzer.html">
+   Performance Analyzer
+  </a>
+ </li>
+ <li class="toctree-l1">
+  <a class="reference internal" href="../user_guide/model_management.html">
+   Model Management
+  </a>
+ </li>
+ <li class="toctree-l1">
+  <a class="reference internal" href="../user_guide/custom_operations.html">
+   Custom Operations
+  </a>
+ </li>
+ <li class="toctree-l1">
+  <a class="reference internal" href="../user_guide/decoupled_models.html">
+   Decoupled Backends and Models
+  </a>
+ </li>
+ <li class="toctree-l1">
+  <a class="reference internal" href="../user_guide/response_cache.html">
+   Triton Response Cache
+  </a>
+ </li>
+ <li class="toctree-l1">
+  <a class="reference internal" href="../user_guide/metrics.html">
+   Metrics
+  </a>
+ </li>
+ <li class="toctree-l1">
+  <a class="reference internal" href="../user_guide/trace.html">
+   Triton Server Trace
+  </a>
+ </li>
+ <li class="toctree-l1">
+  <a class="reference internal" href="../user_guide/jetson.html">
+   Triton Inference Server Support for Jetson and JetPack
+  </a>
+ </li>
+ <li class="toctree-l1">
+  <a class="reference internal" href="../user_guide/v1_to_v2.html">
+   Version 1 to Version 2 Migration
+  </a>
+ </li>
+</ul>
+<ul class="nav bd-sidenav">
+ <li class="toctree-l1">
+  <a class="reference internal" href="../user_guide/faq.html">
+   FAQ
+  </a>
+ </li>
+</ul>
+<p aria-level="2" class="caption" role="heading">
+ <span class="caption-text">
+  Protocol Guides
+ </span>
+</p>
+<ul class="nav bd-sidenav">
+ <li class="toctree-l1">
+  <a class="reference internal" href="inference_protocols.html">
+   Inference Protocols and APIs
+  </a>
+ </li>
+ <li class="toctree-l1">
+  <a class="reference internal" href="../protocol/extension_binary_data.html">
+   Binary Tensor Data Extension
+  </a>
+ </li>
+ <li class="toctree-l1">
+  <a class="reference internal" href="../protocol/extension_classification.html">
+   Classification Extension
+  </a>
+ </li>
+ <li class="toctree-l1">
+  <a class="reference internal" href="../protocol/extension_logging.html">
+   Logging Extension
+  </a>
+ </li>
+ <li class="toctree-l1">
+  <a class="reference internal" href="../protocol/extension_model_configuration.html">
+   Model Configuration Extension
+  </a>
+ </li>
+ <li class="toctree-l1">
+  <a class="reference internal" href="../protocol/extension_model_repository.html">
+   Model Repository Extension
+  </a>
+ </li>
+ <li class="toctree-l1">
+  <a class="reference internal" href="../protocol/extension_schedule_policy.html">
+   Schedule Policy Extension
+  </a>
+ </li>
+ <li class="toctree-l1">
+  <a class="reference internal" href="../protocol/extension_sequence.html">
+   Sequence Extension
+  </a>
+ </li>
+ <li class="toctree-l1">
+  <a class="reference internal" href="../protocol/extension_shared_memory.html">
+   Shared-Memory Extension
+  </a>
+ </li>
+ <li class="toctree-l1">
+  <a class="reference internal" href="../protocol/extension_statistics.html">
+   Statistics Extension
+  </a>
+ </li>
+ <li class="toctree-l1">
+  <a class="reference internal" href="../protocol/extension_trace.html">
+   Trace Extension
+  </a>
+ </li>
+</ul>
+<p aria-level="2" class="caption" role="heading">
+ <span class="caption-text">
+  Customization Guide
+ </span>
+</p>
+<ul class="current nav bd-sidenav">
+ <li class="toctree-l1 current active">
+  <a class="current reference internal" href="#">
+   Building Triton
+  </a>
+ </li>
+ <li class="toctree-l1">
+  <a class="reference internal" href="compose.html">
+   Customize Triton Container
+  </a>
+ </li>
+ <li class="toctree-l1">
+  <a class="reference internal" href="test.html">
+   Testing Triton
+  </a>
+ </li>
+</ul>
+<p aria-level="2" class="caption" role="heading">
+ <span class="caption-text">
+  Examples
+ </span>
+</p>
+<ul class="nav bd-sidenav">
+ <li class="toctree-l1">
+  <a class="reference internal" href="../examples/jetson/README.html">
+   Using Triton Inference Server as a shared library for execution on Jetson
+  </a>
+ </li>
+ <li class="toctree-l1">
+  <a class="reference internal" href="../examples/jetson/concurrency_and_dynamic_batching/README.html">
+   Concurrent inference and dynamic batching
+  </a>
+ </li>
+</ul>
+
+    </div>
+</nav></div>
+        <div class="bd-sidebar__bottom">
+             <!-- To handle the deprecated key -->
+            
+        </div>
+    </div>
+    <div id="rtd-footer-container"></div>
+</div>
+
+
+          
+
+
+          
+<!-- A tiny helper pixel to detect if we've scrolled -->
+<div class="sbt-scroll-pixel-helper"></div>
+<!-- Main content -->
+<div class="col py-0 content-container">
+    
+    <div class="header-article row sticky-top noprint">
+        
+
+
+
+<div class="col py-1 d-flex header-article-main">
+    <div class="header-article__left">
+        
+        <label for="__navigation"
+  class="headerbtn"
+  data-toggle="tooltip"
+data-placement="right"
+title="Toggle navigation"
+>
+  
+
+<span class="headerbtn__icon-container">
+  <i class="fas fa-bars"></i>
+  </span>
+
+</label>
+
+        
+    </div>
+    <div class="header-article__right">
+<button onclick="toggleFullScreen()"
+  class="headerbtn"
+  data-toggle="tooltip"
+data-placement="bottom"
+title="Fullscreen mode"
+>
+  
+
+<span class="headerbtn__icon-container">
+  <i class="fas fa-expand"></i>
+  </span>
+
+</button>
+
+<div class="menu-dropdown menu-dropdown-repository-buttons">
+  <button class="headerbtn menu-dropdown__trigger"
+      aria-label="Source repositories">
+      <i class="fab fa-github"></i>
+  </button>
+  <div class="menu-dropdown__content">
+    <ul>
+      <li>
+        <a href="https://github.com/triton-inference-server/server"
+   class="headerbtn"
+   data-toggle="tooltip"
+data-placement="left"
+title="Source repository"
+>
+  
+
+<span class="headerbtn__icon-container">
+  <i class="fab fa-github"></i>
+  </span>
+<span class="headerbtn__text-container">repository</span>
+</a>
+
+      </li>
+      
+      <li>
+        <a href="https://github.com/triton-inference-server/server/issues/new?title=Issue%20on%20page%20%2Fcustomization_guide/build.html&body=Your%20issue%20content%20here."
+   class="headerbtn"
+   data-toggle="tooltip"
+data-placement="left"
+title="Open an issue"
+>
+  
+
+<span class="headerbtn__icon-container">
+  <i class="fas fa-lightbulb"></i>
+  </span>
+<span class="headerbtn__text-container">open issue</span>
+</a>
+
+      </li>
+      
+    </ul>
+  </div>
+</div>
+<label for="__page-toc"
+  class="headerbtn headerbtn-page-toc"
+  
+>
+  
+
+<span class="headerbtn__icon-container">
+  <i class="fas fa-list"></i>
+  </span>
+
+</label>
+
+    </div>
+</div>
+
+<!-- Table of contents -->
+<div class="col-md-3 bd-toc show noprint">
+    <div class="tocsection onthispage pt-5 pb-3">
+        <i class="fas fa-list"></i> Contents
+    </div>
+    <nav id="bd-toc-nav" aria-label="Page">
+        <ul class="visible nav section-nav flex-column">
+ <li class="toc-h2 nav-item toc-entry">
+  <a class="reference internal nav-link" href="#a-name-ubuntu-a-building-for-ubuntu-20-04">
+   <a name="ubuntu">
+   </a>
+   Building for Ubuntu 20.04
+  </a>
+  <ul class="visible nav section-nav flex-column">
+   <li class="toc-h3 nav-item toc-entry">
+    <a class="reference internal nav-link" href="#a-name-ubuntu-docker-a-building-with-docker">
+     <a name="ubuntu-docker">
+     </a>
+     Building With Docker
+    </a>
+    <ul class="nav section-nav flex-column">
+     <li class="toc-h4 nav-item toc-entry">
+      <a class="reference internal nav-link" href="#building-with-specific-github-branches">
+       Building With Specific GitHub Branches
+      </a>
+     </li>
+     <li class="toc-h4 nav-item toc-entry">
+      <a class="reference internal nav-link" href="#cpu-only-build">
+       CPU-Only Build
+      </a>
+     </li>
+    </ul>
+   </li>
+   <li class="toc-h3 nav-item toc-entry">
+    <a class="reference internal nav-link" href="#a-name-ubuntu-without-docker-a-building-without-docker">
+     <a name="ubuntu-without-docker">
+     </a>
+     Building Without Docker
+    </a>
+    <ul class="nav section-nav flex-column">
+     <li class="toc-h4 nav-item toc-entry">
+      <a class="reference internal nav-link" href="#cuda-cublas-cudnn">
+       CUDA, cuBLAS, cuDNN
+      </a>
+     </li>
+     <li class="toc-h4 nav-item toc-entry">
+      <a class="reference internal nav-link" href="#tensorrt">
+       TensorRT
+      </a>
+     </li>
+    </ul>
+   </li>
+  </ul>
+ </li>
+ <li class="toc-h2 nav-item toc-entry">
+  <a class="reference internal nav-link" href="#a-name-jetpack-a-building-for-jetpack-4-x">
+   <a name="jetpack">
+   </a>
+   Building for JetPack 4.x
+  </a>
+ </li>
+ <li class="toc-h2 nav-item toc-entry">
+  <a class="reference internal nav-link" href="#a-name-windows-a-building-for-windows-10">
+   <a name="windows">
+   </a>
+   Building for Windows 10
+  </a>
+  <ul class="visible nav section-nav flex-column">
+   <li class="toc-h3 nav-item toc-entry">
+    <a class="reference internal nav-link" href="#windows-and-docker">
+     Windows and Docker
+    </a>
+   </li>
+   <li class="toc-h3 nav-item toc-entry">
+    <a class="reference internal nav-link" href="#windows-10-min-image">
+     Windows 10 “Min” Image
+    </a>
+   </li>
+   <li class="toc-h3 nav-item toc-entry">
+    <a class="reference internal nav-link" href="#build-triton-server">
+     Build Triton Server
+    </a>
+   </li>
+   <li class="toc-h3 nav-item toc-entry">
+    <a class="reference internal nav-link" href="#extract-build-artifacts">
+     Extract Build Artifacts
+    </a>
+   </li>
+  </ul>
+ </li>
+ <li class="toc-h2 nav-item toc-entry">
+  <a class="reference internal nav-link" href="#building-on-unsupported-platforms">
+   Building on Unsupported Platforms
+  </a>
+ </li>
+ <li class="toc-h2 nav-item toc-entry">
+  <a class="reference internal nav-link" href="#development-and-incremental-builds">
+   Development and Incremental Builds
+  </a>
+  <ul class="visible nav section-nav flex-column">
+   <li class="toc-h3 nav-item toc-entry">
+    <a class="reference internal nav-link" href="#development-builds-without-docker">
+     Development Builds Without Docker
+    </a>
+   </li>
+   <li class="toc-h3 nav-item toc-entry">
+    <a class="reference internal nav-link" href="#development-builds-with-docker">
+     Development Builds With Docker
+    </a>
+    <ul class="nav section-nav flex-column">
+     <li class="toc-h4 nav-item toc-entry">
+      <a class="reference internal nav-link" href="#development-build-of-triton-core">
+       Development Build of Triton Core
+      </a>
+     </li>
+     <li class="toc-h4 nav-item toc-entry">
+      <a class="reference internal nav-link" href="#development-build-of-backend-or-repository-agent">
+       Development Build of Backend or Repository Agent
+      </a>
+     </li>
+    </ul>
+   </li>
+   <li class="toc-h3 nav-item toc-entry">
+    <a class="reference internal nav-link" href="#building-with-debug-symbols">
+     Building with Debug Symbols
+    </a>
+   </li>
+  </ul>
+ </li>
+</ul>
+
+    </nav>
+</div>
+    </div>
+    <div class="article row">
+        <div class="col pl-md-3 pl-lg-5 content-container">
+            <!-- Table of contents that is only displayed when printing the page -->
+            <div id="jb-print-docs-body" class="onlyprint">
+                <h1>Building Triton</h1>
+                <!-- Table of contents -->
+                <div id="print-main-content">
+                    <div id="jb-print-toc">
+                        
+                        <div>
+                            <h2> Contents </h2>
+                        </div>
+                        <nav aria-label="Page">
+                            <ul class="visible nav section-nav flex-column">
+ <li class="toc-h2 nav-item toc-entry">
+  <a class="reference internal nav-link" href="#a-name-ubuntu-a-building-for-ubuntu-20-04">
+   <a name="ubuntu">
+   </a>
+   Building for Ubuntu 20.04
+  </a>
+  <ul class="visible nav section-nav flex-column">
+   <li class="toc-h3 nav-item toc-entry">
+    <a class="reference internal nav-link" href="#a-name-ubuntu-docker-a-building-with-docker">
+     <a name="ubuntu-docker">
+     </a>
+     Building With Docker
+    </a>
+    <ul class="nav section-nav flex-column">
+     <li class="toc-h4 nav-item toc-entry">
+      <a class="reference internal nav-link" href="#building-with-specific-github-branches">
+       Building With Specific GitHub Branches
+      </a>
+     </li>
+     <li class="toc-h4 nav-item toc-entry">
+      <a class="reference internal nav-link" href="#cpu-only-build">
+       CPU-Only Build
+      </a>
+     </li>
+    </ul>
+   </li>
+   <li class="toc-h3 nav-item toc-entry">
+    <a class="reference internal nav-link" href="#a-name-ubuntu-without-docker-a-building-without-docker">
+     <a name="ubuntu-without-docker">
+     </a>
+     Building Without Docker
+    </a>
+    <ul class="nav section-nav flex-column">
+     <li class="toc-h4 nav-item toc-entry">
+      <a class="reference internal nav-link" href="#cuda-cublas-cudnn">
+       CUDA, cuBLAS, cuDNN
+      </a>
+     </li>
+     <li class="toc-h4 nav-item toc-entry">
+      <a class="reference internal nav-link" href="#tensorrt">
+       TensorRT
+      </a>
+     </li>
+    </ul>
+   </li>
+  </ul>
+ </li>
+ <li class="toc-h2 nav-item toc-entry">
+  <a class="reference internal nav-link" href="#a-name-jetpack-a-building-for-jetpack-4-x">
+   <a name="jetpack">
+   </a>
+   Building for JetPack 4.x
+  </a>
+ </li>
+ <li class="toc-h2 nav-item toc-entry">
+  <a class="reference internal nav-link" href="#a-name-windows-a-building-for-windows-10">
+   <a name="windows">
+   </a>
+   Building for Windows 10
+  </a>
+  <ul class="visible nav section-nav flex-column">
+   <li class="toc-h3 nav-item toc-entry">
+    <a class="reference internal nav-link" href="#windows-and-docker">
+     Windows and Docker
+    </a>
+   </li>
+   <li class="toc-h3 nav-item toc-entry">
+    <a class="reference internal nav-link" href="#windows-10-min-image">
+     Windows 10 “Min” Image
+    </a>
+   </li>
+   <li class="toc-h3 nav-item toc-entry">
+    <a class="reference internal nav-link" href="#build-triton-server">
+     Build Triton Server
+    </a>
+   </li>
+   <li class="toc-h3 nav-item toc-entry">
+    <a class="reference internal nav-link" href="#extract-build-artifacts">
+     Extract Build Artifacts
+    </a>
+   </li>
+  </ul>
+ </li>
+ <li class="toc-h2 nav-item toc-entry">
+  <a class="reference internal nav-link" href="#building-on-unsupported-platforms">
+   Building on Unsupported Platforms
+  </a>
+ </li>
+ <li class="toc-h2 nav-item toc-entry">
+  <a class="reference internal nav-link" href="#development-and-incremental-builds">
+   Development and Incremental Builds
+  </a>
+  <ul class="visible nav section-nav flex-column">
+   <li class="toc-h3 nav-item toc-entry">
+    <a class="reference internal nav-link" href="#development-builds-without-docker">
+     Development Builds Without Docker
+    </a>
+   </li>
+   <li class="toc-h3 nav-item toc-entry">
+    <a class="reference internal nav-link" href="#development-builds-with-docker">
+     Development Builds With Docker
+    </a>
+    <ul class="nav section-nav flex-column">
+     <li class="toc-h4 nav-item toc-entry">
+      <a class="reference internal nav-link" href="#development-build-of-triton-core">
+       Development Build of Triton Core
+      </a>
+     </li>
+     <li class="toc-h4 nav-item toc-entry">
+      <a class="reference internal nav-link" href="#development-build-of-backend-or-repository-agent">
+       Development Build of Backend or Repository Agent
+      </a>
+     </li>
+    </ul>
+   </li>
+   <li class="toc-h3 nav-item toc-entry">
+    <a class="reference internal nav-link" href="#building-with-debug-symbols">
+     Building with Debug Symbols
+    </a>
+   </li>
+  </ul>
+ </li>
+</ul>
+
+                        </nav>
+                    </div>
+                </div>
+            </div>
+            <main id="main-content" role="main">
+                
+              <div>
+                 <!--
+# Copyright 2018-2022, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+#
+# Redistribution and use in source and binary forms, with or without
+# modification, are permitted provided that the following conditions
+# are met:
+#  * Redistributions of source code must retain the above copyright
+#    notice, this list of conditions and the following disclaimer.
+#  * Redistributions in binary form must reproduce the above copyright
+#    notice, this list of conditions and the following disclaimer in the
+#    documentation and/or other materials provided with the distribution.
+#  * Neither the name of NVIDIA CORPORATION nor the names of its
+#    contributors may be used to endorse or promote products derived
+#    from this software without specific prior written permission.
+#
+# THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS ``AS IS'' AND ANY
+# EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+# IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR
+# PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL THE COPYRIGHT OWNER OR
+# CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL,
+# EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
+# PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR
+# PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY
+# OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+# (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+# OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+-->
+<div class="tex2jax_ignore mathjax_ignore section" id="building-triton">
+<h1>Building Triton<a class="headerlink" href="#building-triton" title="Permalink to this headline">#</a></h1>
+<p>This section describes how to build the Triton server from source. For
+information on building the Triton client libraries and examples see
+<a class="reference external" href="https://github.com/triton-inference-server/client">Client Libraries and
+Examples</a>. For
+information on building the Triton SDK container see <a class="reference internal" href="test.html#build-sdk-image"><span class="std std-doc">Build SDK
+Image</span></a>. For information on testing your
+Triton build see <a class="reference internal" href="test.html"><span class="doc std std-doc">Testing Triton</span></a>.</p>
+<p>You can create a customized Triton Docker image that contains a subset
+of the released backends without building from source. For example,
+you may want a Triton image that contains only the TensorRT and Python
+backends. For this type of customization you don’t need to build
+Triton from source and instead can use <a class="reference internal" href="compose.html"><span class="doc std std-doc">the <em>compose</em>
+utility</span></a>.</p>
+<p>The Triton source is distributed across multiple GitHub repositories
+that together can be built and installed to create a complete Triton
+installation. Triton server is built using CMake and (optionally)
+Docker. To simplify the build process, Triton provides a
+<span class="xref myst">build.py</span> script. The build.py script will generate the
+CMake and Docker build steps required to build Triton, and will
+optionally invoke those steps or leave the invocation to you, as
+described below.</p>
+<p>The build.py script currently supports building Triton for the
+following platforms. See <a class="reference internal" href="#building-on-unsupported-platforms"><span class="std std-doc">Building on Unsupported
+Platforms</span></a> if you are attempting
+to build Triton on a platform that is not listed here.</p>
+<ul class="simple">
+<li><p><span class="xref myst">Ubuntu 20.04, x86-64</span></p></li>
+<li><p><span class="xref myst">Jetpack 4.x, NVIDIA Jetson (Xavier, Nano, TX2)</span></p></li>
+<li><p><span class="xref myst">Windows 10, x86-64</span></p></li>
+</ul>
+<p>If you are developing or debugging Triton, see <a class="reference internal" href="#development-and-incremental-builds"><span class="std std-doc">Development and
+Incremental Builds</span></a> for information
+on how to perform incremental build.</p>
+<div class="section" id="a-name-ubuntu-a-building-for-ubuntu-20-04">
+<h2><a name="ubuntu"></a>Building for Ubuntu 20.04<a class="headerlink" href="#a-name-ubuntu-a-building-for-ubuntu-20-04" title="Permalink to this headline">#</a></h2>
+<p>For Ubuntu-20.04, build.py supports both a Docker build and a
+non-Docker build.</p>
+<ul class="simple">
+<li><p><span class="xref myst">Build using Docker</span> and the TensorFlow and PyTorch
+Docker images from <a class="reference external" href="https://ngc.nvidia.com">NVIDIA GPU Cloud (NGC)</a>.</p></li>
+<li><p><span class="xref myst">Build without Docker</span>.</p></li>
+</ul>
+<div class="section" id="a-name-ubuntu-docker-a-building-with-docker">
+<h3><a name="ubuntu-docker"></a>Building With Docker<a class="headerlink" href="#a-name-ubuntu-docker-a-building-with-docker" title="Permalink to this headline">#</a></h3>
+<p>The easiest way to build Triton is to use Docker. The result of the
+build will be a Docker image called <em>tritonserver</em> that will contain
+the tritonserver executable in /opt/tritonserver/bin and the required
+shared libraries in /opt/tritonserver/lib. The backends and
+repository-agents built for Triton will be in
+/opt/tritonserver/backends and /opt/tritonserver/repoagents,
+respectively.</p>
+<p>The first step for the build is to clone the
+<a class="reference external" href="https://github.com/triton-inference-server/server">triton-inference-server/server</a>
+repo branch for the release you are interested in building (or the
+<em>main</em> branch to build from the development branch). Then run build.py
+as described below. The build.py script performs these steps when
+building with Docker.</p>
+<ul class="simple">
+<li><p>In the <em>build</em> subdirectory of the server repo, generate the
+docker_build script, the cmake_build script and the Dockerfiles
+needed to build Triton. If you use the –dryrun flag, build.py will
+stop here so that you can examine these files.</p></li>
+<li><p>Run the docker_build script to perform the Docker-based build. The
+docker_build script performs the following steps.</p>
+<ul>
+<li><p>Build the <em>tritonserver_buildbase</em> Docker image that collects all
+the build dependencies needed to build Triton. The
+<em>tritonserver_buildbase</em> image is based on a minimal/base
+image. When building with GPU support (–enable-gpu), the <em>min</em>
+image is the
+<a class="reference external" href="https://catalog.ngc.nvidia.com/orgs/nvidia/containers/tritonserver">&lt;xx.yy&gt;-py3-min</a>
+image pulled from <a class="reference external" href="https://ngc.nvidia.com">NGC</a> that contains the
+CUDA, cuDNN, TensorRT and other dependencies that are required to
+build Triton. When building without GPU support, the <em>min</em> image
+is the standard ubuntu:20.04 image.</p></li>
+<li><p>Run the cmake_build script within the <em>tritonserver_buildbase</em>
+image to actually build Triton. The cmake_build script performs
+the following steps.</p>
+<ul>
+<li><p>Invoke CMake in the server repo to build Triton’s core shared
+library and <em>tritonserver</em> executable.</p></li>
+<li><p>Clone each requested backend and build it using CMake. For
+example, the ONNX Runtime backend is built using
+<a class="reference external" href="https://github.com/triton-inference-server/onnxruntime_backend/blob/main/CMakeLists.txt">triton-inference-server/onnxruntime_backend/CMakeLists.txt</a>. Some
+of the backends may use Docker as part of their build (for
+example <a class="reference external" href="https://github.com/triton-inference-server/onnxruntime_backend">ONNX
+Runtime</a>
+and
+<a class="reference external" href="https://github.com/triton-inference-server/openvino_backend">OpenVINO</a>). If
+you don’t want to use Docker in those cases you must consult the
+build process for those backends.</p></li>
+<li><p>Clone each repository agent and build it using the CMake file
+from the corresponding repo. For example, the
+<a class="reference external" href="https://github.com/triton-inference-server/checksum_repository_agent">Checksum</a>
+repository agent is built using
+<a class="reference external" href="https://github.com/triton-inference-server/checksum_repository_agent/blob/main/CMakeLists.txt">triton-inference-server/checksum_repository_agent/CMakeLists.txt</a>.</p></li>
+</ul>
+</li>
+<li><p>Copy the built artifacts out of the container and into the build
+subdirectory on the host system.</p></li>
+<li><p>Create the final <em>tritonserver</em> Docker image that contains the
+libraries, executables and other artifacts from the build.</p></li>
+<li><p>Create a <em>tritonserver_cibase</em> Docker image that contains the QA
+artifacts needed for testing, as described in <a class="reference internal" href="test.html"><span class="doc std std-doc">Testing
+Triton</span></a>.</p></li>
+</ul>
+</li>
+</ul>
+<p>By default, build.py does not enable any of Triton’s optional features
+but you can enable all features, backends, and repository agents with
+the –enable-all flag. The -v flag turns on verbose output.</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>$ ./build.py -v --enable-all
+</pre></div>
+</div>
+<p>If you want to enable only certain Triton features, backends and
+repository agents, do not specify –enable-all. Instead you must
+specify the individual flags as documented by –help.</p>
+<div class="section" id="building-with-specific-github-branches">
+<h4>Building With Specific GitHub Branches<a class="headerlink" href="#building-with-specific-github-branches" title="Permalink to this headline">#</a></h4>
+<p>As described above, the build is performed in the server repo, but
+source from several other repos is fetched during the build
+process. Typically you do not need to specify anything about these
+other repos, but if you want to control which branch is used in these
+other repos you can as shown in the following example.</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>$ ./build.py ... --repo-tag<span class="o">=</span>common:&lt;container tag&gt; --repo-tag<span class="o">=</span>core:&lt;container tag&gt; --repo-tag<span class="o">=</span>backend:&lt;container tag&gt; --repo-tag<span class="o">=</span>thirdparty:&lt;container tag&gt; ... --backend<span class="o">=</span>tensorrt:&lt;container tag&gt; ... --repoagent<span class="o">=</span>checksum:&lt;container tag&gt; ...
+</pre></div>
+</div>
+<p>If you are building on a release branch then <code class="docutils literal notranslate"><span class="pre">&lt;container</span> <span class="pre">tag&gt;</span></code> will
+default to the branch name. For example, if you are building on the
+r22.08 branch, <code class="docutils literal notranslate"><span class="pre">&lt;container</span> <span class="pre">tag&gt;</span></code> will default to r22.08. If you are
+building on any other branch (including the <em>main</em> branch) then
+<code class="docutils literal notranslate"><span class="pre">&lt;container</span> <span class="pre">tag&gt;</span></code> will default to “main”. Therefore, you typically do
+not need to provide <code class="docutils literal notranslate"><span class="pre">&lt;container</span> <span class="pre">tag&gt;</span></code> at all (nor the preceding
+colon). You can use a different <code class="docutils literal notranslate"><span class="pre">&lt;container</span> <span class="pre">tag&gt;</span></code> for a component to
+instead use the corresponding branch/tag in the build. For example, if
+you have a branch called “mybranch” in the
+<a class="reference external" href="https://github.com/triton-inference-server/onnxruntime_backend">onnxruntime_backend</a>
+repo that you want to use in the build, you would specify
+–backend=onnxruntime:mybranch.</p>
+</div>
+<div class="section" id="cpu-only-build">
+<h4>CPU-Only Build<a class="headerlink" href="#cpu-only-build" title="Permalink to this headline">#</a></h4>
+<p>If you want to build without GPU support you must specify individual
+feature flags and not include the <code class="docutils literal notranslate"><span class="pre">--enable-gpu</span></code> and
+<code class="docutils literal notranslate"><span class="pre">--enable-gpu-metrics</span></code> flags. Only the following backends are
+available for a non-GPU / CPU-only build: <code class="docutils literal notranslate"><span class="pre">identity</span></code>, <code class="docutils literal notranslate"><span class="pre">repeat</span></code>,
+<code class="docutils literal notranslate"><span class="pre">square</span></code>, <code class="docutils literal notranslate"><span class="pre">tensorflow2</span></code>, <code class="docutils literal notranslate"><span class="pre">pytorch</span></code>, <code class="docutils literal notranslate"><span class="pre">onnxruntime</span></code>, <code class="docutils literal notranslate"><span class="pre">openvino</span></code>,
+<code class="docutils literal notranslate"><span class="pre">python</span></code> and <code class="docutils literal notranslate"><span class="pre">fil</span></code>.</p>
+<p>To include the TensorFlow2 backend in your CPU-only build, you must
+provide this additional flag to build.py:
+<code class="docutils literal notranslate"><span class="pre">--extra-backend-cmake-arg=tensorflow2:TRITON_TENSORFLOW_INSTALL_EXTRA_DEPS=ON</span></code>.</p>
+<p>When building without GPU support, you must use the <code class="docutils literal notranslate"><span class="pre">--image=gpu-base,nvcr.io/nvidia/tritonserver:&lt;xx.yy&gt;-py3-min</span></code>
+flag. This is needed since the CPU-only builds of the TensorFlow and
+PyTorch backends require some CUDA stubs and runtime dependencies that are
+not present in the CPU-only base container.</p>
+</div>
+</div>
+<div class="section" id="a-name-ubuntu-without-docker-a-building-without-docker">
+<h3><a name="ubuntu-without-docker"></a>Building Without Docker<a class="headerlink" href="#a-name-ubuntu-without-docker-a-building-without-docker" title="Permalink to this headline">#</a></h3>
+<p>To build Triton without using Docker you must install the build
+dependencies that are handled automatically when building with Docker.</p>
+<p>The first step for the build is to clone the
+<a class="reference external" href="https://github.com/triton-inference-server/server">triton-inference-server/server</a>
+repo branch for the release you are interested in building (or the
+<em>main</em> branch to build from the development branch).</p>
+<p>To determine what dependencies are required by the build, run build.py
+with the –dryrun flag, and then looking in the build subdirectory at
+Dockerfile.buildbase.</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>$ ./build.py -v --enable-all
+</pre></div>
+</div>
+<p>From Dockerfile.buildbase you can see what dependencies you need to
+install on your host system. Note that when building with –enable-gpu
+(or –enable-all), Dockerfile.buildbase depends on the
+<a class="reference external" href="https://catalog.ngc.nvidia.com/orgs/nvidia/containers/tritonserver">&lt;xx.yy&gt;-py3-min</a>
+image pulled from <a class="reference external" href="https://ngc.nvidia.com">NGC</a>. Unfortunately, a
+Dockerfile is not currently available for the
+<a class="reference external" href="https://catalog.ngc.nvidia.com/orgs/nvidia/containers/tritonserver">&lt;xx.yy&gt;-py3-min</a>
+image. Instead, you must manually install <span class="xref myst">CUDA and
+cuDNN</span> and <span class="xref myst">TensorRT</span> dependencies as
+described below.</p>
+<p>Once you have installed these dependencies on your build system you
+can then use build.py with the –no-container-build flag to build
+Triton.</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>$ ./build.py -v --no-container-build --build-dir<span class="o">=</span><span class="sb">`</span><span class="nb">pwd</span><span class="sb">`</span>/build --enable-all
+</pre></div>
+</div>
+<p>See <span class="xref myst">Building with Docker</span> for more details on how the
+cmake_build script is used to perform the build.</p>
+<div class="section" id="cuda-cublas-cudnn">
+<h4>CUDA, cuBLAS, cuDNN<a class="headerlink" href="#cuda-cublas-cudnn" title="Permalink to this headline">#</a></h4>
+<p>For Triton to support NVIDIA GPUs you must install CUDA, cuBLAS and
+cuDNN. These libraries must be installed on the system include and
+library paths so that they are available for the build. The version of
+the libraries used for a given release can be found in the <a class="reference external" href="https://docs.nvidia.com/deeplearning/frameworks/support-matrix/index.html">Framework
+Containers Support
+Matrix</a>.</p>
+<p>For a given version of Triton you can attempt to build with
+non-supported versions of the libraries but you may have build or
+execution issues since non-supported versions are not tested.</p>
+</div>
+<div class="section" id="tensorrt">
+<h4>TensorRT<a class="headerlink" href="#tensorrt" title="Permalink to this headline">#</a></h4>
+<p>The TensorRT headers and libraries must be installed on system include
+and library paths so that they are available for the build. The
+version of TensorRT used in a given release can be found in the
+<a class="reference external" href="https://docs.nvidia.com/deeplearning/frameworks/support-matrix/index.html">Framework Containers Support
+Matrix</a>.</p>
+<p>For a given version of Triton you can attempt to build with
+non-supported versions of TensorRT but you may have build or execution
+issues since non-supported versions are not tested.</p>
+</div>
+</div>
+</div>
+<div class="section" id="a-name-jetpack-a-building-for-jetpack-4-x">
+<h2><a name="jetpack"></a>Building for JetPack 4.x<a class="headerlink" href="#a-name-jetpack-a-building-for-jetpack-4-x" title="Permalink to this headline">#</a></h2>
+<p><em>Under Construction</em></p>
+</div>
+<div class="section" id="a-name-windows-a-building-for-windows-10">
+<h2><a name="windows"></a>Building for Windows 10<a class="headerlink" href="#a-name-windows-a-building-for-windows-10" title="Permalink to this headline">#</a></h2>
+<p>For Windows 10, build.py supports both a Docker build and a non-Docker
+build in a similar way as described for <span class="xref myst">Ubuntu</span>. The primary
+difference is that the minimal/base image used as the base of
+Dockerfile.buildbase image can be built from the provided
+<span class="xref myst">Dockerfile.win10.min</span> file as described in
+<a class="reference internal" href="#windows-10-min-image"><span class="std std-doc">Windows 10 “Min” Image</span></a>. When running build.py
+use the –image flag to specify the tag that you assigned to this
+image. For example, –image=base,win10-py3-min.</p>
+<div class="section" id="windows-and-docker">
+<h3>Windows and Docker<a class="headerlink" href="#windows-and-docker" title="Permalink to this headline">#</a></h3>
+<p>Depending on your version of Windows 10 and your version of Docker you
+may need to perform these additional steps before any of the following
+step.</p>
+<ul class="simple">
+<li><p>Set your Docker to work with “Windows containers”. Right click on
+the whale icon in the lower-right status area and select “Switch to
+Windows containers”.</p></li>
+</ul>
+</div>
+<div class="section" id="windows-10-min-image">
+<h3>Windows 10 “Min” Image<a class="headerlink" href="#windows-10-min-image" title="Permalink to this headline">#</a></h3>
+<p>The “min” container describes the base dependencies needed to perform
+the Windows build. The Windows min container is
+<span class="xref myst">Dockerfile.win10.min</span>.</p>
+<p>Before building the min container you must download the appropriate
+cuDNN and TensorRT versions and place them in the same directory as
+Dockerfile.win10.min.</p>
+<ul class="simple">
+<li><p>For cuDNN the CUDNN_VERSION and CUDNN_ZIP arguments defined in
+Dockerfile.win10.min indicate the version of cuDNN that your should
+download from https://developer.nvidia.com/rdp/cudnn-download.</p></li>
+<li><p>For TensorRT the TENSORRT_VERSION and TENSORRT_ZIP arguments defined
+in Dockerfile.win10.min indicate the version of TensorRT that your
+should download from
+https://developer.nvidia.com/nvidia-tensorrt-download.</p></li>
+</ul>
+<p>After downloading the zip files for cuDNN and TensorRT, you build the
+min container using the following command.</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>$ docker build -t win10-py3-min -f Dockerfile.win10.min .
+</pre></div>
+</div>
+</div>
+<div class="section" id="build-triton-server">
+<h3>Build Triton Server<a class="headerlink" href="#build-triton-server" title="Permalink to this headline">#</a></h3>
+<p>Triton is built using the build.py script. The build system must have
+Docker, Python3 (plus pip installed <em>docker</em> module) and git installed
+so that it can execute build.py and perform a docker build. By
+default, build.py does not enable any of Triton’s optional features
+and so you must enable them explicitly. The following build.py
+invocation builds all features and backends available on windows.</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>python build.py --cmake-dir<span class="o">=</span>&lt;path/to/repo&gt;/build --build-dir<span class="o">=</span>/tmp/citritonbuild --no-container-pull --image<span class="o">=</span>base,win10-py3-min --enable-logging --enable-stats --enable-tracing --enable-gpu --endpoint<span class="o">=</span>grpc --endpoint<span class="o">=</span>http --repo-tag<span class="o">=</span>common:&lt;container tag&gt; --repo-tag<span class="o">=</span>core:&lt;container tag&gt; --repo-tag<span class="o">=</span>backend:&lt;container tag&gt; --repo-tag<span class="o">=</span>thirdparty:&lt;container tag&gt; --backend<span class="o">=</span>ensemble --backend<span class="o">=</span>tensorrt:&lt;container tag&gt; --backend<span class="o">=</span>onnxruntime:&lt;container tag&gt; --backend<span class="o">=</span>openvino:&lt;container tag&gt;
+</pre></div>
+</div>
+<p>If you are building on <em>main</em> branch then ‘<container tag>’ will
+default to “main”. If you are building on a release branch then
+‘<container tag>’ will default to the branch name. For example, if you
+are building on the r22.08 branch, ‘<container tag>’ will default to
+r22.08. Therefore, you typically do not need to provide ‘<container
+tag>’ at all (nor the preceding colon). You can use a different
+‘<container tag>’ for a component to instead use the corresponding
+branch/tag in the build. For example, if you have a branch called
+“mybranch” in the
+<a class="reference external" href="https://github.com/triton-inference-server/onnxruntime_backend">onnxruntime_backend</a>
+repo that you want to use in the build, you would specify
+–backend=onnxruntime:mybranch.</p>
+</div>
+<div class="section" id="extract-build-artifacts">
+<h3>Extract Build Artifacts<a class="headerlink" href="#extract-build-artifacts" title="Permalink to this headline">#</a></h3>
+<p>When build.py completes, a Docker image called <em>tritonserver</em> will
+contain the built Triton Server executable, libraries and other
+artifacts. Windows containers do not support GPU access so you likely
+want to extract the necessary files from the tritonserver image and
+run them directly on your host system. All the Triton artifacts can be
+found in /opt/tritonserver directory of the tritonserver image.  Your
+host system will need to install the CUDA, cuDNN, TensorRT and other
+dependencies that were used for the build.</p>
+</div>
+</div>
+<div class="section" id="building-on-unsupported-platforms">
+<h2>Building on Unsupported Platforms<a class="headerlink" href="#building-on-unsupported-platforms" title="Permalink to this headline">#</a></h2>
+<p>Building for an unsupported OS and/or hardware platform is
+possible. All of the build scripting, Dockerfiles and CMake
+invocations are included in the public repos or are generated by
+build.py as described in <span class="xref myst">Building with Docker</span>. From
+these files you can find the required dependencies and CMake
+invocations. However, due to differences in compilers, libraries,
+package management, etc. you may have to make changes in the build
+scripts, Dockerfiles, CMake files and the source code.</p>
+<p>To see the generated build scripts and Dockerfiles referred to below,
+use:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>$ ./build.py -v --enable-all --dryrun
+</pre></div>
+</div>
+<p>You should familiarize yourself with the build process for supported
+platforms by reading the above documentation and then follow the
+process for the supported platform that most closely matches the
+platform you are interested in (for example, if you are trying to
+build for RHEL/x86-64 then follow the <a class="reference internal" href="#a-name-ubuntu-a-building-for-ubuntu-20-04"><span class="std std-doc">Building for Ubuntu
+20.04</span></a> process. You will likely need to
+make changes in the following areas and then manually run docker_build
+and cmake_build or the equivalent commands to perform a build.</p>
+<ul class="simple">
+<li><p>The generated Dockerfiles install dependencies for the build using
+platform-specific packaging tools, for example, apt-get for
+Ubuntu. You will need to change build.py to use the packaging tool
+appropriate for your platform.</p></li>
+<li><p>The package and libraries names for your platform may differ from
+those used by the generated Dockerfiles. You will need to find the
+corresponding packages on libraries on your platform.</p></li>
+<li><p>Your platform may use a different compiler or compiler version than
+the support platforms. As a result you may encounter build errors
+that need to be fixed by editing the source code or changing the
+compilation flags.</p></li>
+<li><p>Triton depends on a large number of open-source packages that it
+builds from source. If one of these packages does not support your
+platform then you may need to disable the Triton feature that
+depends on that package. For example, Triton supports the S3
+filesystem by building the aws-sdk-cpp package. If aws-sdk-cpp
+doesn’t build for your platform then you can remove the need for
+that package by not specifying –filesystem=s3 when you run
+build.py. In general, you should start by running build.py with the
+minimal required feature set.</p></li>
+<li><p>The
+<a class="reference external" href="https://github.com/triton-inference-server/tensorflow_backend">TensorFlow</a>
+backend extracts pre-built shared libraries from the TensorFlow NGC
+container as part of the build. This container is only available for
+Ubuntu-20.04 / x86-64, so if you require the TensorFlow backend for
+your platform you will need download the TensorFlow container and
+modify its build to produce shared libraries for your platform. You
+must use the TensorFlow source and build scripts from within the NGC
+container because they contain Triton-specific patches that are
+required for the Triton TensorFlow backend.</p></li>
+<li><p>By default, the
+<a class="reference external" href="https://github.com/triton-inference-server/pytorch_backend">PyTorch</a>
+backend build extracts pre-built shared libraries from The PyTorch
+NGC container. But the build can also use PyTorch shared libraries
+that you build separately for your platform. See the pytorch_backend
+build process for details.</p></li>
+</ul>
+</div>
+<div class="section" id="development-and-incremental-builds">
+<h2>Development and Incremental Builds<a class="headerlink" href="#development-and-incremental-builds" title="Permalink to this headline">#</a></h2>
+<div class="section" id="development-builds-without-docker">
+<h3>Development Builds Without Docker<a class="headerlink" href="#development-builds-without-docker" title="Permalink to this headline">#</a></h3>
+<p>If you are <span class="xref myst">building without Docker</span> use the
+CMake invocation steps in cmake_build to invoke CMake to set-up a
+build environment where you can invoke make/msbuild.exe to incremental
+build the Triton core, a backend, or a repository agent.</p>
+</div>
+<div class="section" id="development-builds-with-docker">
+<h3>Development Builds With Docker<a class="headerlink" href="#development-builds-with-docker" title="Permalink to this headline">#</a></h3>
+<p>If you are <span class="xref myst">building with Docker</span>, the generated
+<em>tritonserver_buildbase</em> image contains all the dependencies needed to
+perform a full or incremental build. Within <em>tritonserver_buildbase</em>,
+/workspace/build/cmake_build contains the CMake invocations that are
+used to build the Triton core, the backends, and the repository
+agents.</p>
+<p>To perform an incremental build within the <em>tritonserver_buildbase</em>
+container, map your source into the container and then run the
+appropriate CMake and <code class="docutils literal notranslate"><span class="pre">make</span></code> (or <code class="docutils literal notranslate"><span class="pre">msbuild.exe</span></code>) steps from cmake_build
+within the container.</p>
+<div class="section" id="development-build-of-triton-core">
+<h4>Development Build of Triton Core<a class="headerlink" href="#development-build-of-triton-core" title="Permalink to this headline">#</a></h4>
+<p>Assuming you have a clone of the <a class="reference external" href="https://github.com/triton-inference-server/server">server
+repo</a> on your host
+system where you are making changes and you want to perform
+incremental builds to test those changes. Your source code is in
+/home/me/server. Run the <em>tritonserver_buildbase</em> container and map
+your server source directory into the container at /server.</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span>$ docker run -it --rm -v/home/me/server:/server tritonserver_buildbase bash
+</pre></div>
+</div>
+<p>Look at /workspace/build/cmake_build within the container for the
+section of commands that build “Triton core library”. You can follow
+those command exactly, or you can modify them to change the build
+directory or the CMake options. You <strong>must</strong> change the CMake command
+to use /server instead of /workspace as the location for the
+CMakeLists.txt file and source:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span>$ cmake &lt;options&gt; /server
+</pre></div>
+</div>
+<p>Then you can change directory into the build directory and run <code class="docutils literal notranslate"><span class="pre">make</span></code>
+(or <code class="docutils literal notranslate"><span class="pre">msbuild.exe</span></code>) as shown in cmake_build. As you make changes to the
+source on your host system, you can perform incremental builds by
+re-running <code class="docutils literal notranslate"><span class="pre">make</span></code> (or <code class="docutils literal notranslate"><span class="pre">msbuild.exe</span></code>).</p>
+</div>
+<div class="section" id="development-build-of-backend-or-repository-agent">
+<h4>Development Build of Backend or Repository Agent<a class="headerlink" href="#development-build-of-backend-or-repository-agent" title="Permalink to this headline">#</a></h4>
+<p>Performing a full or incremental build of a backend or repository
+agent is similar to building the Triton core. As an example we will
+use the TensorRT backend. Assuming you have a clone of the <a class="reference external" href="https://github.com/triton-inference-server/tensorrt_backend">TensorRT
+backend
+repo</a> on
+your host system where you are making changes and you want to perform
+incremental builds to test those changes. Your source code is in
+/home/me/tritonserver_backend. Run the <em>tritonserver_buildbase</em>
+container and map your TensorRT backend source directory into the
+container at /tensorrt_backend. Note that some backends will use
+Docker as part of their build, and so the host’s Docker registry must
+be made available within the <em>tritonserver_buildbase</em> by mounting
+docker.sock (on Windows use
+-v.\pipe\docker_engine:.\pipe\docker_engine).</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span>$ docker run -it --rm -v/var/run/docker.sock:/var/run/docker.sock -v/home/me/tensorrt_backend:/tensorrt_backend tritonserver_buildbase bash
+</pre></div>
+</div>
+<p>Look at /workspace/build/cmake_build within the container for the
+section of commands that build “TensorRT backend”. You can follow
+those command exactly, or you can modify them to change the build
+directory or the CMake options. You <strong>must</strong> change the CMake command
+to use /tensorrt_backend instead of /workspace as the location for the
+CMakeLists.txt file and source:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span>$ cmake &lt;options&gt; /tensorrt_backend
+</pre></div>
+</div>
+<p>Then you can change directory into the build directory and run <code class="docutils literal notranslate"><span class="pre">make</span></code>
+(or <code class="docutils literal notranslate"><span class="pre">msbuild.exe</span></code>) as shown in cmake_build. As you make changes to the
+source on your host system, you can perform incremental builds by
+re-running <code class="docutils literal notranslate"><span class="pre">make</span></code> (or <code class="docutils literal notranslate"><span class="pre">msbuild.exe</span></code>).</p>
+</div>
+</div>
+<div class="section" id="building-with-debug-symbols">
+<h3>Building with Debug Symbols<a class="headerlink" href="#building-with-debug-symbols" title="Permalink to this headline">#</a></h3>
+<p>To build with Debug symbols, use the –build-type=Debug argument while
+launching build.py. If building directly with CMake use
+-DCMAKE_BUILD_TYPE=Debug. You can then launch the built server with
+gdb and see the debug symbols/information in the gdb trace.</p>
+</div>
+</div>
+</div>
+
+<div class="section">
+   
+</div>
+
+              </div>
+              
+            </main>
+            <footer class="footer-article noprint">
+                
+    <!-- Previous / next buttons -->
+<div class='prev-next-area'>
+    <a class='left-prev' id="prev-link" href="../protocol/extension_trace.html" title="previous page">
+        <i class="fas fa-angle-left"></i>
+        <div class="prev-next-info">
+            <p class="prev-next-subtitle">previous</p>
+            <p class="prev-next-title">Trace Extension</p>
+        </div>
+    </a>
+    <a class='right-next' id="next-link" href="compose.html" title="next page">
+    <div class="prev-next-info">
+        <p class="prev-next-subtitle">next</p>
+        <p class="prev-next-title">Customize Triton Container</p>
+    </div>
+    <i class="fas fa-angle-right"></i>
+    </a>
+</div>
+            </footer>
+        </div>
+    </div>
+    <div class="footer-content row">
+        <footer class="col footer"><p>
+  
+    By NVIDIA<br/>
+  
+      &copy; Copyright 2022 NVIDIA CORPORATION &amp; AFFILIATES. All rights reserved.<br/>
+    Last updated on Oct 05, 2022.<br/>
+</p>
+        </footer>
+    </div>
+    
+</div>
+
+
+      </div>
+    </div>
+  
+  <!-- Scripts loaded after <body> so the DOM is not blocked -->
+  <script src="../_static/scripts/pydata-sphinx-theme.js?digest=1999514e3f237ded88cf"></script>
+
+
+<script type="text/javascript">_satellite.pageBottom();</script>
+  </body>
+</html>

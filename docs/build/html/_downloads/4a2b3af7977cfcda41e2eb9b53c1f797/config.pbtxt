@@ -1,0 +1,19 @@
+name: "inception_graphdef"
+platform: "tensorflow_graphdef"
+max_batch_size: 128
+input [
+  {
+    name: "input"
+    data_type: TYPE_FP32
+    format: FORMAT_NHWC
+    dims: [ 299, 299, 3 ]
+  }
+]
+output [
+  {
+    name: "InceptionV3/Predictions/Softmax"
+    data_type: TYPE_FP32
+    dims: [ 1001 ]
+    label_filename: "inception_labels.txt"
+  }
+]

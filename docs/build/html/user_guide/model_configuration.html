@@ -1,0 +1,1998 @@
+
+<!DOCTYPE html>
+
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Model Configuration &#8212; NVIDIA Triton Inference Server</title>
+    
+  <!-- Loaded before other Sphinx assets -->
+  <link href="../_static/styles/theme.css?digest=1999514e3f237ded88cf" rel="stylesheet">
+<link href="../_static/styles/pydata-sphinx-theme.css?digest=1999514e3f237ded88cf" rel="stylesheet">
+
+    
+  <link rel="stylesheet"
+    href="../_static/vendor/fontawesome/5.13.0/css/all.min.css">
+  <link rel="preload" as="font" type="font/woff2" crossorigin
+    href="../_static/vendor/fontawesome/5.13.0/webfonts/fa-solid-900.woff2">
+  <link rel="preload" as="font" type="font/woff2" crossorigin
+    href="../_static/vendor/fontawesome/5.13.0/webfonts/fa-brands-400.woff2">
+
+    <link rel="stylesheet" type="text/css" href="../_static/pygments.css" />
+    <link rel="stylesheet" href="../_static/styles/sphinx-book-theme.css?digest=62ba249389abaaa9ffc34bf36a076bdc1d65ee18" type="text/css" />
+    <link rel="stylesheet" type="text/css" href="../_static/mystnb.4510f1fc1dee50b3e5859aac5469c37c29e427902b24a333a5f9fcb2f0b3ac41.css" />
+    <link rel="stylesheet" type="text/css" href="../_static/copybutton.css" />
+    <link rel="stylesheet" type="text/css" href="../_static/tabs.css" />
+    <link rel="stylesheet" type="text/css" href="../_static/custom.css" />
+    <link rel="stylesheet" type="text/css" href="../_static/design-style.4045f2051d55cab465a707391d5b2007.min.css" />
+    
+  <!-- Pre-loaded scripts that we'll load fully later -->
+  <link rel="preload" as="script" href="../_static/scripts/pydata-sphinx-theme.js?digest=1999514e3f237ded88cf">
+
+    <script data-url_root="../" id="documentation_options" src="../_static/documentation_options.js"></script>
+    <script src="../_static/jquery.js"></script>
+    <script src="../_static/underscore.js"></script>
+    <script src="../_static/doctools.js"></script>
+    <script src="../_static/clipboard.min.js"></script>
+    <script src="../_static/copybutton.js"></script>
+    <script src="https://js.hcaptcha.com/1/api.js"></script>
+    <script src="//assets.adobedtm.com/5d4962a43b79/c1061d2c5e7b/launch-191c2462b890.min.js"></script>
+    <script src="../_static/scripts/sphinx-book-theme.js?digest=f31d14ad54b65d19161ba51d4ffff3a77ae00456"></script>
+    <script src="../_static/design-tabs.js"></script>
+    <link rel="canonical" href="https://docs.nvidia.com/deeplearning/triton-inference-server/user-guide/docs/user_guide/model_configuration.html" />
+    <link rel="shortcut icon" href="../_static/nvidia-logo-vert-rgb-blk-for-screen.png"/>
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" />
+    <link rel="next" title="Optimization" href="optimization.html" />
+    <link rel="prev" title="Repository Agent" href="../customization_guide/repository_agents.html" /> 
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="docsearch:language" content="None">
+    
+
+    <!-- Google Analytics -->
+      
+<style type="text/css">
+  ul.ablog-archive {
+    list-style: none;
+    overflow: auto;
+    margin-left: 0px;
+  }
+  ul.ablog-archive li {
+    float: left;
+    margin-right: 5px;
+    font-size: 80%;
+  }
+  ul.postlist a {
+    font-style: italic;
+  }
+  ul.postlist-style-disc {
+    list-style-type: disc;
+  }
+  ul.postlist-style-none {
+    list-style-type: none;
+  }
+  ul.postlist-style-circle {
+    list-style-type: circle;
+  }
+</style>
+
+  </head>
+  <body data-spy="scroll" data-target="#bd-toc-nav" data-offset="60">
+<!-- Checkboxes to toggle the left sidebar -->
+<input type="checkbox" class="sidebar-toggle" name="__navigation" id="__navigation" aria-label="Toggle navigation sidebar">
+<label class="overlay overlay-navbar" for="__navigation">
+    <div class="visually-hidden">Toggle navigation sidebar</div>
+</label>
+<!-- Checkboxes to toggle the in-page toc -->
+<input type="checkbox" class="sidebar-toggle" name="__page-toc" id="__page-toc" aria-label="Toggle in-page Table of Contents">
+<label class="overlay overlay-pagetoc" for="__page-toc">
+    <div class="visually-hidden">Toggle in-page Table of Contents</div>
+</label>
+<!-- Headers at the top -->
+<div class="announcement header-item noprint"></div>
+<div class="header header-item noprint"></div>
+
+    
+    <div class="container-fluid" id="banner"></div>
+
+    
+
+    <div class="container-xl">
+      <div class="row">
+          
+<!-- Sidebar -->
+<div class="bd-sidebar noprint" id="site-navigation">
+    <div class="bd-sidebar__content">
+        <div class="bd-sidebar__top"><div class="navbar-brand-box">
+    <a class="navbar-brand text-wrap" href="../index.html">
+      
+        <!-- `logo` is deprecated in Sphinx 4.0, so remove this when we stop supporting 3 -->
+        
+      
+      
+      <img src="../_static/nvidia-logo-horiz-rgb-blk-for-screen.png" class="logo" alt="logo">
+      
+      
+      <h1 class="site-logo" id="site-title">NVIDIA Triton Inference Server</h1>
+      
+    </a>
+</div><form class="bd-search d-flex align-items-center" action="../search.html" method="get">
+  <i class="icon fas fa-search"></i>
+  <input type="search" class="form-control" name="q" id="search-input" placeholder="Search the docs ..." aria-label="Search the docs ..." autocomplete="off" >
+</form><nav class="bd-links" id="bd-docs-nav" aria-label="Main">
+    <div class="bd-toc-item active">
+        <p aria-level="2" class="caption" role="heading">
+ <span class="caption-text">
+  Getting Started
+ </span>
+</p>
+<ul class="nav bd-sidenav">
+ <li class="toctree-l1">
+  <a class="reference internal" href="../getting_started/quickstart.html">
+   Quickstart
+  </a>
+ </li>
+</ul>
+<p aria-level="2" class="caption" role="heading">
+ <span class="caption-text">
+  User Guide
+ </span>
+</p>
+<ul class="current nav bd-sidenav">
+ <li class="toctree-l1">
+  <a class="reference internal" href="performance_tuning.html">
+   Deploying your trained model using Triton
+  </a>
+ </li>
+ <li class="toctree-l1">
+  <a class="reference internal" href="architecture.html">
+   Triton Architecture
+  </a>
+ </li>
+ <li class="toctree-l1">
+  <a class="reference internal" href="model_repository.html">
+   Model Repository
+  </a>
+ </li>
+ <li class="toctree-l1">
+  <a class="reference internal" href="../customization_guide/repository_agents.html">
+   Repository Agent
+  </a>
+ </li>
+ <li class="toctree-l1 current active">
+  <a class="current reference internal" href="#">
+   Model Configuration
+  </a>
+ </li>
+ <li class="toctree-l1">
+  <a class="reference internal" href="optimization.html">
+   Optimization
+  </a>
+ </li>
+ <li class="toctree-l1">
+  <a class="reference internal" href="ragged_batching.html">
+   Ragged Batching
+  </a>
+ </li>
+ <li class="toctree-l1">
+  <a class="reference internal" href="rate_limiter.html">
+   Rate Limiter
+  </a>
+ </li>
+ <li class="toctree-l1">
+  <a class="reference internal" href="model_analyzer.html">
+   Model Analyzer
+  </a>
+ </li>
+ <li class="toctree-l1">
+  <a class="reference internal" href="perf_analyzer.html">
+   Performance Analyzer
+  </a>
+ </li>
+ <li class="toctree-l1">
+  <a class="reference internal" href="model_management.html">
+   Model Management
+  </a>
+ </li>
+ <li class="toctree-l1">
+  <a class="reference internal" href="custom_operations.html">
+   Custom Operations
+  </a>
+ </li>
+ <li class="toctree-l1">
+  <a class="reference internal" href="decoupled_models.html">
+   Decoupled Backends and Models
+  </a>
+ </li>
+ <li class="toctree-l1">
+  <a class="reference internal" href="response_cache.html">
+   Triton Response Cache
+  </a>
+ </li>
+ <li class="toctree-l1">
+  <a class="reference internal" href="metrics.html">
+   Metrics
+  </a>
+ </li>
+ <li class="toctree-l1">
+  <a class="reference internal" href="trace.html">
+   Triton Server Trace
+  </a>
+ </li>
+ <li class="toctree-l1">
+  <a class="reference internal" href="jetson.html">
+   Triton Inference Server Support for Jetson and JetPack
+  </a>
+ </li>
+ <li class="toctree-l1">
+  <a class="reference internal" href="v1_to_v2.html">
+   Version 1 to Version 2 Migration
+  </a>
+ </li>
+</ul>
+<ul class="nav bd-sidenav">
+ <li class="toctree-l1">
+  <a class="reference internal" href="faq.html">
+   FAQ
+  </a>
+ </li>
+</ul>
+<p aria-level="2" class="caption" role="heading">
+ <span class="caption-text">
+  Protocol Guides
+ </span>
+</p>
+<ul class="nav bd-sidenav">
+ <li class="toctree-l1">
+  <a class="reference internal" href="../customization_guide/inference_protocols.html">
+   Inference Protocols and APIs
+  </a>
+ </li>
+ <li class="toctree-l1">
+  <a class="reference internal" href="../protocol/extension_binary_data.html">
+   Binary Tensor Data Extension
+  </a>
+ </li>
+ <li class="toctree-l1">
+  <a class="reference internal" href="../protocol/extension_classification.html">
+   Classification Extension
+  </a>
+ </li>
+ <li class="toctree-l1">
+  <a class="reference internal" href="../protocol/extension_logging.html">
+   Logging Extension
+  </a>
+ </li>
+ <li class="toctree-l1">
+  <a class="reference internal" href="../protocol/extension_model_configuration.html">
+   Model Configuration Extension
+  </a>
+ </li>
+ <li class="toctree-l1">
+  <a class="reference internal" href="../protocol/extension_model_repository.html">
+   Model Repository Extension
+  </a>
+ </li>
+ <li class="toctree-l1">
+  <a class="reference internal" href="../protocol/extension_schedule_policy.html">
+   Schedule Policy Extension
+  </a>
+ </li>
+ <li class="toctree-l1">
+  <a class="reference internal" href="../protocol/extension_sequence.html">
+   Sequence Extension
+  </a>
+ </li>
+ <li class="toctree-l1">
+  <a class="reference internal" href="../protocol/extension_shared_memory.html">
+   Shared-Memory Extension
+  </a>
+ </li>
+ <li class="toctree-l1">
+  <a class="reference internal" href="../protocol/extension_statistics.html">
+   Statistics Extension
+  </a>
+ </li>
+ <li class="toctree-l1">
+  <a class="reference internal" href="../protocol/extension_trace.html">
+   Trace Extension
+  </a>
+ </li>
+</ul>
+<p aria-level="2" class="caption" role="heading">
+ <span class="caption-text">
+  Customization Guide
+ </span>
+</p>
+<ul class="nav bd-sidenav">
+ <li class="toctree-l1">
+  <a class="reference internal" href="../customization_guide/build.html">
+   Building Triton
+  </a>
+ </li>
+ <li class="toctree-l1">
+  <a class="reference internal" href="../customization_guide/compose.html">
+   Customize Triton Container
+  </a>
+ </li>
+ <li class="toctree-l1">
+  <a class="reference internal" href="../customization_guide/test.html">
+   Testing Triton
+  </a>
+ </li>
+</ul>
+<p aria-level="2" class="caption" role="heading">
+ <span class="caption-text">
+  Examples
+ </span>
+</p>
+<ul class="nav bd-sidenav">
+ <li class="toctree-l1">
+  <a class="reference internal" href="../examples/jetson/README.html">
+   Using Triton Inference Server as a shared library for execution on Jetson
+  </a>
+ </li>
+ <li class="toctree-l1">
+  <a class="reference internal" href="../examples/jetson/concurrency_and_dynamic_batching/README.html">
+   Concurrent inference and dynamic batching
+  </a>
+ </li>
+</ul>
+
+    </div>
+</nav></div>
+        <div class="bd-sidebar__bottom">
+             <!-- To handle the deprecated key -->
+            
+        </div>
+    </div>
+    <div id="rtd-footer-container"></div>
+</div>
+
+
+          
+
+
+          
+<!-- A tiny helper pixel to detect if we've scrolled -->
+<div class="sbt-scroll-pixel-helper"></div>
+<!-- Main content -->
+<div class="col py-0 content-container">
+    
+    <div class="header-article row sticky-top noprint">
+        
+
+
+
+<div class="col py-1 d-flex header-article-main">
+    <div class="header-article__left">
+        
+        <label for="__navigation"
+  class="headerbtn"
+  data-toggle="tooltip"
+data-placement="right"
+title="Toggle navigation"
+>
+  
+
+<span class="headerbtn__icon-container">
+  <i class="fas fa-bars"></i>
+  </span>
+
+</label>
+
+        
+    </div>
+    <div class="header-article__right">
+<button onclick="toggleFullScreen()"
+  class="headerbtn"
+  data-toggle="tooltip"
+data-placement="bottom"
+title="Fullscreen mode"
+>
+  
+
+<span class="headerbtn__icon-container">
+  <i class="fas fa-expand"></i>
+  </span>
+
+</button>
+
+<div class="menu-dropdown menu-dropdown-repository-buttons">
+  <button class="headerbtn menu-dropdown__trigger"
+      aria-label="Source repositories">
+      <i class="fab fa-github"></i>
+  </button>
+  <div class="menu-dropdown__content">
+    <ul>
+      <li>
+        <a href="https://github.com/triton-inference-server/server"
+   class="headerbtn"
+   data-toggle="tooltip"
+data-placement="left"
+title="Source repository"
+>
+  
+
+<span class="headerbtn__icon-container">
+  <i class="fab fa-github"></i>
+  </span>
+<span class="headerbtn__text-container">repository</span>
+</a>
+
+      </li>
+      
+      <li>
+        <a href="https://github.com/triton-inference-server/server/issues/new?title=Issue%20on%20page%20%2Fuser_guide/model_configuration.html&body=Your%20issue%20content%20here."
+   class="headerbtn"
+   data-toggle="tooltip"
+data-placement="left"
+title="Open an issue"
+>
+  
+
+<span class="headerbtn__icon-container">
+  <i class="fas fa-lightbulb"></i>
+  </span>
+<span class="headerbtn__text-container">open issue</span>
+</a>
+
+      </li>
+      
+    </ul>
+  </div>
+</div>
+<label for="__page-toc"
+  class="headerbtn headerbtn-page-toc"
+  
+>
+  
+
+<span class="headerbtn__icon-container">
+  <i class="fas fa-list"></i>
+  </span>
+
+</label>
+
+    </div>
+</div>
+
+<!-- Table of contents -->
+<div class="col-md-3 bd-toc show noprint">
+    <div class="tocsection onthispage pt-5 pb-3">
+        <i class="fas fa-list"></i> Contents
+    </div>
+    <nav id="bd-toc-nav" aria-label="Page">
+        <ul class="visible nav section-nav flex-column">
+ <li class="toc-h2 nav-item toc-entry">
+  <a class="reference internal nav-link" href="#minimal-model-configuration">
+   Minimal Model Configuration
+  </a>
+  <ul class="visible nav section-nav flex-column">
+   <li class="toc-h3 nav-item toc-entry">
+    <a class="reference internal nav-link" href="#name-platform-and-backend">
+     Name, Platform and Backend
+    </a>
+   </li>
+   <li class="toc-h3 nav-item toc-entry">
+    <a class="reference internal nav-link" href="#model-transaction-policy">
+     Model Transaction Policy
+    </a>
+    <ul class="nav section-nav flex-column">
+     <li class="toc-h4 nav-item toc-entry">
+      <a class="reference internal nav-link" href="#decoupled">
+       Decoupled
+      </a>
+     </li>
+    </ul>
+   </li>
+   <li class="toc-h3 nav-item toc-entry">
+    <a class="reference internal nav-link" href="#maximum-batch-size">
+     Maximum Batch Size
+    </a>
+   </li>
+   <li class="toc-h3 nav-item toc-entry">
+    <a class="reference internal nav-link" href="#inputs-and-outputs">
+     Inputs and Outputs
+    </a>
+    <ul class="nav section-nav flex-column">
+     <li class="toc-h4 nav-item toc-entry">
+      <a class="reference internal nav-link" href="#special-conventions-for-pytorch-backend">
+       Special Conventions for PyTorch Backend
+      </a>
+     </li>
+    </ul>
+   </li>
+  </ul>
+ </li>
+ <li class="toc-h2 nav-item toc-entry">
+  <a class="reference internal nav-link" href="#auto-generated-model-configuration">
+   Auto-Generated Model Configuration
+  </a>
+  <ul class="visible nav section-nav flex-column">
+   <li class="toc-h3 nav-item toc-entry">
+    <a class="reference internal nav-link" href="#default-max-batch-size-and-dynamic-batcher">
+     Default Max Batch Size and Dynamic Batcher
+    </a>
+   </li>
+  </ul>
+ </li>
+ <li class="toc-h2 nav-item toc-entry">
+  <a class="reference internal nav-link" href="#datatypes">
+   Datatypes
+  </a>
+ </li>
+ <li class="toc-h2 nav-item toc-entry">
+  <a class="reference internal nav-link" href="#reshape">
+   Reshape
+  </a>
+ </li>
+ <li class="toc-h2 nav-item toc-entry">
+  <a class="reference internal nav-link" href="#shape-tensors">
+   Shape Tensors
+  </a>
+ </li>
+ <li class="toc-h2 nav-item toc-entry">
+  <a class="reference internal nav-link" href="#version-policy">
+   Version Policy
+  </a>
+ </li>
+ <li class="toc-h2 nav-item toc-entry">
+  <a class="reference internal nav-link" href="#instance-groups">
+   Instance Groups
+  </a>
+  <ul class="visible nav section-nav flex-column">
+   <li class="toc-h3 nav-item toc-entry">
+    <a class="reference internal nav-link" href="#multiple-model-instances">
+     Multiple Model Instances
+    </a>
+   </li>
+   <li class="toc-h3 nav-item toc-entry">
+    <a class="reference internal nav-link" href="#cpu-model-instance">
+     CPU Model Instance
+    </a>
+   </li>
+   <li class="toc-h3 nav-item toc-entry">
+    <a class="reference internal nav-link" href="#host-policy">
+     Host Policy
+    </a>
+   </li>
+   <li class="toc-h3 nav-item toc-entry">
+    <a class="reference internal nav-link" href="#rate-limiter-configuration">
+     Rate Limiter Configuration
+    </a>
+    <ul class="nav section-nav flex-column">
+     <li class="toc-h4 nav-item toc-entry">
+      <a class="reference internal nav-link" href="#resources">
+       Resources
+      </a>
+     </li>
+     <li class="toc-h4 nav-item toc-entry">
+      <a class="reference internal nav-link" href="#priority">
+       Priority
+      </a>
+     </li>
+    </ul>
+   </li>
+   <li class="toc-h3 nav-item toc-entry">
+    <a class="reference internal nav-link" href="#ensemble-model-instance-groups">
+     Ensemble Model Instance Groups
+    </a>
+   </li>
+  </ul>
+ </li>
+ <li class="toc-h2 nav-item toc-entry">
+  <a class="reference internal nav-link" href="#cuda-compute-capability">
+   CUDA Compute Capability
+  </a>
+ </li>
+ <li class="toc-h2 nav-item toc-entry">
+  <a class="reference internal nav-link" href="#scheduling-and-batching">
+   Scheduling And Batching
+  </a>
+  <ul class="visible nav section-nav flex-column">
+   <li class="toc-h3 nav-item toc-entry">
+    <a class="reference internal nav-link" href="#default-scheduler">
+     Default Scheduler
+    </a>
+   </li>
+   <li class="toc-h3 nav-item toc-entry">
+    <a class="reference internal nav-link" href="#dynamic-batcher">
+     Dynamic Batcher
+    </a>
+    <ul class="nav section-nav flex-column">
+     <li class="toc-h4 nav-item toc-entry">
+      <a class="reference internal nav-link" href="#recommended-configuration-process">
+       Recommended Configuration Process
+      </a>
+     </li>
+     <li class="toc-h4 nav-item toc-entry">
+      <a class="reference internal nav-link" href="#preferred-batch-sizes">
+       Preferred Batch Sizes
+      </a>
+     </li>
+     <li class="toc-h4 nav-item toc-entry">
+      <a class="reference internal nav-link" href="#delayed-batching">
+       Delayed Batching
+      </a>
+     </li>
+     <li class="toc-h4 nav-item toc-entry">
+      <a class="reference internal nav-link" href="#preserve-ordering">
+       Preserve Ordering
+      </a>
+     </li>
+     <li class="toc-h4 nav-item toc-entry">
+      <a class="reference internal nav-link" href="#priority-levels">
+       Priority Levels
+      </a>
+     </li>
+     <li class="toc-h4 nav-item toc-entry">
+      <a class="reference internal nav-link" href="#queue-policy">
+       Queue Policy
+      </a>
+     </li>
+    </ul>
+   </li>
+   <li class="toc-h3 nav-item toc-entry">
+    <a class="reference internal nav-link" href="#sequence-batcher">
+     Sequence Batcher
+    </a>
+   </li>
+   <li class="toc-h3 nav-item toc-entry">
+    <a class="reference internal nav-link" href="#ensemble-scheduler">
+     Ensemble Scheduler
+    </a>
+   </li>
+  </ul>
+ </li>
+ <li class="toc-h2 nav-item toc-entry">
+  <a class="reference internal nav-link" href="#optimization-policy">
+   Optimization Policy
+  </a>
+ </li>
+ <li class="toc-h2 nav-item toc-entry">
+  <a class="reference internal nav-link" href="#model-warmup">
+   Model Warmup
+  </a>
+ </li>
+ <li class="toc-h2 nav-item toc-entry">
+  <a class="reference internal nav-link" href="#response-cache">
+   Response Cache
+  </a>
+ </li>
+</ul>
+
+    </nav>
+</div>
+    </div>
+    <div class="article row">
+        <div class="col pl-md-3 pl-lg-5 content-container">
+            <!-- Table of contents that is only displayed when printing the page -->
+            <div id="jb-print-docs-body" class="onlyprint">
+                <h1>Model Configuration</h1>
+                <!-- Table of contents -->
+                <div id="print-main-content">
+                    <div id="jb-print-toc">
+                        
+                        <div>
+                            <h2> Contents </h2>
+                        </div>
+                        <nav aria-label="Page">
+                            <ul class="visible nav section-nav flex-column">
+ <li class="toc-h2 nav-item toc-entry">
+  <a class="reference internal nav-link" href="#minimal-model-configuration">
+   Minimal Model Configuration
+  </a>
+  <ul class="visible nav section-nav flex-column">
+   <li class="toc-h3 nav-item toc-entry">
+    <a class="reference internal nav-link" href="#name-platform-and-backend">
+     Name, Platform and Backend
+    </a>
+   </li>
+   <li class="toc-h3 nav-item toc-entry">
+    <a class="reference internal nav-link" href="#model-transaction-policy">
+     Model Transaction Policy
+    </a>
+    <ul class="nav section-nav flex-column">
+     <li class="toc-h4 nav-item toc-entry">
+      <a class="reference internal nav-link" href="#decoupled">
+       Decoupled
+      </a>
+     </li>
+    </ul>
+   </li>
+   <li class="toc-h3 nav-item toc-entry">
+    <a class="reference internal nav-link" href="#maximum-batch-size">
+     Maximum Batch Size
+    </a>
+   </li>
+   <li class="toc-h3 nav-item toc-entry">
+    <a class="reference internal nav-link" href="#inputs-and-outputs">
+     Inputs and Outputs
+    </a>
+    <ul class="nav section-nav flex-column">
+     <li class="toc-h4 nav-item toc-entry">
+      <a class="reference internal nav-link" href="#special-conventions-for-pytorch-backend">
+       Special Conventions for PyTorch Backend
+      </a>
+     </li>
+    </ul>
+   </li>
+  </ul>
+ </li>
+ <li class="toc-h2 nav-item toc-entry">
+  <a class="reference internal nav-link" href="#auto-generated-model-configuration">
+   Auto-Generated Model Configuration
+  </a>
+  <ul class="visible nav section-nav flex-column">
+   <li class="toc-h3 nav-item toc-entry">
+    <a class="reference internal nav-link" href="#default-max-batch-size-and-dynamic-batcher">
+     Default Max Batch Size and Dynamic Batcher
+    </a>
+   </li>
+  </ul>
+ </li>
+ <li class="toc-h2 nav-item toc-entry">
+  <a class="reference internal nav-link" href="#datatypes">
+   Datatypes
+  </a>
+ </li>
+ <li class="toc-h2 nav-item toc-entry">
+  <a class="reference internal nav-link" href="#reshape">
+   Reshape
+  </a>
+ </li>
+ <li class="toc-h2 nav-item toc-entry">
+  <a class="reference internal nav-link" href="#shape-tensors">
+   Shape Tensors
+  </a>
+ </li>
+ <li class="toc-h2 nav-item toc-entry">
+  <a class="reference internal nav-link" href="#version-policy">
+   Version Policy
+  </a>
+ </li>
+ <li class="toc-h2 nav-item toc-entry">
+  <a class="reference internal nav-link" href="#instance-groups">
+   Instance Groups
+  </a>
+  <ul class="visible nav section-nav flex-column">
+   <li class="toc-h3 nav-item toc-entry">
+    <a class="reference internal nav-link" href="#multiple-model-instances">
+     Multiple Model Instances
+    </a>
+   </li>
+   <li class="toc-h3 nav-item toc-entry">
+    <a class="reference internal nav-link" href="#cpu-model-instance">
+     CPU Model Instance
+    </a>
+   </li>
+   <li class="toc-h3 nav-item toc-entry">
+    <a class="reference internal nav-link" href="#host-policy">
+     Host Policy
+    </a>
+   </li>
+   <li class="toc-h3 nav-item toc-entry">
+    <a class="reference internal nav-link" href="#rate-limiter-configuration">
+     Rate Limiter Configuration
+    </a>
+    <ul class="nav section-nav flex-column">
+     <li class="toc-h4 nav-item toc-entry">
+      <a class="reference internal nav-link" href="#resources">
+       Resources
+      </a>
+     </li>
+     <li class="toc-h4 nav-item toc-entry">
+      <a class="reference internal nav-link" href="#priority">
+       Priority
+      </a>
+     </li>
+    </ul>
+   </li>
+   <li class="toc-h3 nav-item toc-entry">
+    <a class="reference internal nav-link" href="#ensemble-model-instance-groups">
+     Ensemble Model Instance Groups
+    </a>
+   </li>
+  </ul>
+ </li>
+ <li class="toc-h2 nav-item toc-entry">
+  <a class="reference internal nav-link" href="#cuda-compute-capability">
+   CUDA Compute Capability
+  </a>
+ </li>
+ <li class="toc-h2 nav-item toc-entry">
+  <a class="reference internal nav-link" href="#scheduling-and-batching">
+   Scheduling And Batching
+  </a>
+  <ul class="visible nav section-nav flex-column">
+   <li class="toc-h3 nav-item toc-entry">
+    <a class="reference internal nav-link" href="#default-scheduler">
+     Default Scheduler
+    </a>
+   </li>
+   <li class="toc-h3 nav-item toc-entry">
+    <a class="reference internal nav-link" href="#dynamic-batcher">
+     Dynamic Batcher
+    </a>
+    <ul class="nav section-nav flex-column">
+     <li class="toc-h4 nav-item toc-entry">
+      <a class="reference internal nav-link" href="#recommended-configuration-process">
+       Recommended Configuration Process
+      </a>
+     </li>
+     <li class="toc-h4 nav-item toc-entry">
+      <a class="reference internal nav-link" href="#preferred-batch-sizes">
+       Preferred Batch Sizes
+      </a>
+     </li>
+     <li class="toc-h4 nav-item toc-entry">
+      <a class="reference internal nav-link" href="#delayed-batching">
+       Delayed Batching
+      </a>
+     </li>
+     <li class="toc-h4 nav-item toc-entry">
+      <a class="reference internal nav-link" href="#preserve-ordering">
+       Preserve Ordering
+      </a>
+     </li>
+     <li class="toc-h4 nav-item toc-entry">
+      <a class="reference internal nav-link" href="#priority-levels">
+       Priority Levels
+      </a>
+     </li>
+     <li class="toc-h4 nav-item toc-entry">
+      <a class="reference internal nav-link" href="#queue-policy">
+       Queue Policy
+      </a>
+     </li>
+    </ul>
+   </li>
+   <li class="toc-h3 nav-item toc-entry">
+    <a class="reference internal nav-link" href="#sequence-batcher">
+     Sequence Batcher
+    </a>
+   </li>
+   <li class="toc-h3 nav-item toc-entry">
+    <a class="reference internal nav-link" href="#ensemble-scheduler">
+     Ensemble Scheduler
+    </a>
+   </li>
+  </ul>
+ </li>
+ <li class="toc-h2 nav-item toc-entry">
+  <a class="reference internal nav-link" href="#optimization-policy">
+   Optimization Policy
+  </a>
+ </li>
+ <li class="toc-h2 nav-item toc-entry">
+  <a class="reference internal nav-link" href="#model-warmup">
+   Model Warmup
+  </a>
+ </li>
+ <li class="toc-h2 nav-item toc-entry">
+  <a class="reference internal nav-link" href="#response-cache">
+   Response Cache
+  </a>
+ </li>
+</ul>
+
+                        </nav>
+                    </div>
+                </div>
+            </div>
+            <main id="main-content" role="main">
+                
+              <div>
+                 <!--
+# Copyright 2018-2022, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+#
+# Redistribution and use in source and binary forms, with or without
+# modification, are permitted provided that the following conditions
+# are met:
+#  * Redistributions of source code must retain the above copyright
+#    notice, this list of conditions and the following disclaimer.
+#  * Redistributions in binary form must reproduce the above copyright
+#    notice, this list of conditions and the following disclaimer in the
+#    documentation and/or other materials provided with the distribution.
+#  * Neither the name of NVIDIA CORPORATION nor the names of its
+#    contributors may be used to endorse or promote products derived
+#    from this software without specific prior written permission.
+#
+# THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS ``AS IS'' AND ANY
+# EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+# IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR
+# PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL THE COPYRIGHT OWNER OR
+# CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL,
+# EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
+# PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR
+# PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY
+# OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+# (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+# OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+-->
+<div class="tex2jax_ignore mathjax_ignore section" id="model-configuration">
+<h1>Model Configuration<a class="headerlink" href="#model-configuration" title="Permalink to this headline">#</a></h1>
+<p>Each model in a <a class="reference internal" href="model_repository.html"><span class="doc std std-doc">model repository</span></a> must include a
+model configuration that provides required and optional information
+about the model. Typically, this configuration is provided in a
+config.pbtxt file specified as <a class="reference external" href="https://github.com/triton-inference-server/common/blob/main/protobuf/model_config.proto">ModelConfig
+protobuf</a>.
+In some cases, discussed in <a class="reference internal" href="#auto-generated-model-configuration"><span class="std std-doc">Auto-Generated Model
+Configuraton</span></a>, the model
+configuration can be generated automatically by Triton and so does not
+need to be provided explicitly.</p>
+<p>This section describes the most important model configuration
+properties but the documentation in the <a class="reference external" href="https://github.com/triton-inference-server/common/blob/main/protobuf/model_config.proto">ModelConfig
+protobuf</a>
+should also be consulted.</p>
+<div class="section" id="minimal-model-configuration">
+<h2>Minimal Model Configuration<a class="headerlink" href="#minimal-model-configuration" title="Permalink to this headline">#</a></h2>
+<p>A minimal model configuration must specify the <a class="reference external" href="https://github.com/triton-inference-server/backend/blob/main/README.md#backends"><em>platform</em> and/or
+<em>backend</em>
+properties</a>,
+the <em>max_batch_size</em> property, and the input and output tensors of the
+model.</p>
+<p>As an example consider a TensorRT model that has two inputs, <em>input0</em>
+and <em>input1</em>, and one output, <em>output0</em>, all of which are 16 entry
+float32 tensors. The minimal configuration is:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span>  <span class="n">platform</span><span class="p">:</span> <span class="s2">&quot;tensorrt_plan&quot;</span>
+  <span class="n">max_batch_size</span><span class="p">:</span> <span class="mi">8</span>
+  <span class="nb">input</span> <span class="p">[</span>
+    <span class="p">{</span>
+      <span class="n">name</span><span class="p">:</span> <span class="s2">&quot;input0&quot;</span>
+      <span class="n">data_type</span><span class="p">:</span> <span class="n">TYPE_FP32</span>
+      <span class="n">dims</span><span class="p">:</span> <span class="p">[</span> <span class="mi">16</span> <span class="p">]</span>
+    <span class="p">},</span>
+    <span class="p">{</span>
+      <span class="n">name</span><span class="p">:</span> <span class="s2">&quot;input1&quot;</span>
+      <span class="n">data_type</span><span class="p">:</span> <span class="n">TYPE_FP32</span>
+      <span class="n">dims</span><span class="p">:</span> <span class="p">[</span> <span class="mi">16</span> <span class="p">]</span>
+    <span class="p">}</span>
+  <span class="p">]</span>
+  <span class="n">output</span> <span class="p">[</span>
+    <span class="p">{</span>
+      <span class="n">name</span><span class="p">:</span> <span class="s2">&quot;output0&quot;</span>
+      <span class="n">data_type</span><span class="p">:</span> <span class="n">TYPE_FP32</span>
+      <span class="n">dims</span><span class="p">:</span> <span class="p">[</span> <span class="mi">16</span> <span class="p">]</span>
+    <span class="p">}</span>
+  <span class="p">]</span>
+</pre></div>
+</div>
+<div class="section" id="name-platform-and-backend">
+<h3>Name, Platform and Backend<a class="headerlink" href="#name-platform-and-backend" title="Permalink to this headline">#</a></h3>
+<p>The model configuration <em>name</em> property is optional. If the name of
+the model is not specified in the configuration it is assumed to be
+the same as the model repository directory containing the model. If
+<em>name</em> is specified it must match the name of the model repository
+directory containing the model.  The required values for <em>platform</em>
+and <em>backend</em> are described in the <a class="reference external" href="https://github.com/triton-inference-server/backend/blob/main/README.md#backends">backend
+documentation</a>.</p>
+</div>
+<div class="section" id="model-transaction-policy">
+<h3>Model Transaction Policy<a class="headerlink" href="#model-transaction-policy" title="Permalink to this headline">#</a></h3>
+<p>The <em>model_transaction_policy</em> property describes the nature of
+transactions expected from the model.</p>
+<div class="section" id="decoupled">
+<h4>Decoupled<a class="headerlink" href="#decoupled" title="Permalink to this headline">#</a></h4>
+<p>This boolean setting indicates whether responses generated by
+the model are <a class="reference internal" href="decoupled_models.html"><span class="doc std std-doc">decoupled</span></a>
+with the requests issued to it. Using decoupled means the number of
+responses generated by the model may differ from number of requests
+issued, and the responses may be out of order relative to the order
+of requests. The default is false, which means the model will
+generate exactly one response for each request.</p>
+</div>
+</div>
+<div class="section" id="maximum-batch-size">
+<h3>Maximum Batch Size<a class="headerlink" href="#maximum-batch-size" title="Permalink to this headline">#</a></h3>
+<p>The <em>max_batch_size</em> property indicates the maximum batch size that
+the model supports for the <a class="reference internal" href="architecture.html#models-and-schedulers"><span class="std std-doc">types of
+batching</span></a> that can be exploited
+by Triton. If the model’s batch dimension is the first dimension, and
+all inputs and outputs to the model have this batch dimension, then
+Triton can use its <a class="reference internal" href="#dynamic-batcher"><span class="std std-doc">dynamic batcher</span></a> or <a class="reference internal" href="#sequence-batcher"><span class="std std-doc">sequence
+batcher</span></a> to automatically use batching with the
+model. In this case <em>max_batch_size</em> should be set to a value
+greater-or-equal-to 1 that indicates the maximum batch size that
+Triton should use with the model.</p>
+<p>For models that do not support batching, or do not support batching in
+the specific ways described above, <em>max_batch_size</em> must be set to
+zero.</p>
+</div>
+<div class="section" id="inputs-and-outputs">
+<h3>Inputs and Outputs<a class="headerlink" href="#inputs-and-outputs" title="Permalink to this headline">#</a></h3>
+<p>Each model input and output must specify a name, datatype, and shape.
+The name specified for an input or output tensor must match the name
+expected by the model.</p>
+<div class="section" id="special-conventions-for-pytorch-backend">
+<h4>Special Conventions for PyTorch Backend<a class="headerlink" href="#special-conventions-for-pytorch-backend" title="Permalink to this headline">#</a></h4>
+<p><strong>Naming Convention:</strong></p>
+<p>Due to the absence of sufficient metadata for inputs/outputs in TorchScript
+model files, the “name” attribute of inputs/outputs in the configuration must
+follow specific naming conventions. These are detailed below.</p>
+<ol class="arabic simple">
+<li><p>[Only for Inputs] When the input is not a Dictionary of Tensors, the input
+names in the configuration file should mirror the names of the input arguments to
+the forward function in the model’s definition.</p></li>
+</ol>
+<p>For example, if the forward function for the Torchscript model was defined as
+<code class="docutils literal notranslate"><span class="pre">forward(self,</span> <span class="pre">input0,</span> <span class="pre">input1)</span></code>, the first and second inputs should be named
+“input0” and “input1” respectively.</p>
+<ol class="arabic simple" start="2">
+<li><p><code class="docutils literal notranslate"><span class="pre">&lt;name&gt;__&lt;index&gt;</span></code>: Where &lt;name&gt; can be any string and &lt;index&gt; is an
+integer index that refers to the position of the corresponding input/output.</p></li>
+</ol>
+<p>This means that if there are two inputs and two outputs, the first and second
+inputs can be named “INPUT__0” and “INPUT__1” and the first and second outputs
+can be named “OUTPUT__0” and “OUTPUT__1” respectively.</p>
+<ol class="arabic simple" start="3">
+<li><p>If all inputs (or outputs) do not follow the same naming convention, then we
+enforce strict ordering from the model configuration i.e. we assume the order of
+inputs (or outputs) in the configuartion is the true ordering of these inputs.</p></li>
+</ol>
+<p><em><strong>Dictionary of Tensors as Input:</strong></em></p>
+<p>The PyTorch backend supports passing of inputs to the model in the form of a
+Dictionary of Tensors. This is only supported when there is a <em>single</em> input to
+the model of type Dictionary that contains a mapping of string to tensor. As an
+example, if there is a model that expects the input of the form:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="p">{</span><span class="s1">&#39;A&#39;</span><span class="p">:</span> <span class="n">tensor1</span><span class="p">,</span> <span class="s1">&#39;B&#39;</span><span class="p">:</span> <span class="n">tensor2</span><span class="p">}</span>
+</pre></div>
+</div>
+<p>The input names in the configuration in this case must not follow the above
+naming conventions <code class="docutils literal notranslate"><span class="pre">&lt;name&gt;__&lt;index&gt;</span></code>. Instead, the names of the inputs in this
+case must map to the string value ‘key’ for that specific tensor. For this case,
+the inputs would be “A” and “B”, where input “A” refers to value corresponding to
+tensor1 and “B” refers to the value corresponding to tensor2.</p>
+<br>
+<p>The datatypes allowed for input and output tensors varies based on the
+type of the model. Section <a class="reference internal" href="#datatypes"><span class="std std-doc">Datatypes</span></a> describes the
+allowed datatypes and how they map to the datatypes of each model
+type.</p>
+<p>An input shape indicates the shape of an input tensor expected by the
+model and by Triton in inference requests. An output shape indicates
+the shape of an output tensor produced by the model and returned by
+Triton in response to an inference request. Both input and output
+shape must have rank greater-or-equal-to 1, that is, the empty shape
+<strong>[ ]</strong> is not allowed.</p>
+<p>Input and output shapes are specified by a combination of
+<em>max_batch_size</em> and the dimensions specified by the input or output
+<em>dims</em> property. For models with <em>max_batch_size</em> greater-than 0, the
+full shape is formed as [ -1 ] + <em>dims</em>. For models with
+<em>max_batch_size</em> equal to 0, the full shape is formed as <em>dims</em>. For
+example, for the following configuration the shape of “input0” is [
+-1, 16 ] and the shape of “output0” is [ -1, 4 ].</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span>  <span class="n">platform</span><span class="p">:</span> <span class="s2">&quot;tensorrt_plan&quot;</span>
+  <span class="n">max_batch_size</span><span class="p">:</span> <span class="mi">8</span>
+  <span class="nb">input</span> <span class="p">[</span>
+    <span class="p">{</span>
+      <span class="n">name</span><span class="p">:</span> <span class="s2">&quot;input0&quot;</span>
+      <span class="n">data_type</span><span class="p">:</span> <span class="n">TYPE_FP32</span>
+      <span class="n">dims</span><span class="p">:</span> <span class="p">[</span> <span class="mi">16</span> <span class="p">]</span>
+    <span class="p">}</span>
+  <span class="p">]</span>
+  <span class="n">output</span> <span class="p">[</span>
+    <span class="p">{</span>
+      <span class="n">name</span><span class="p">:</span> <span class="s2">&quot;output0&quot;</span>
+      <span class="n">data_type</span><span class="p">:</span> <span class="n">TYPE_FP32</span>
+      <span class="n">dims</span><span class="p">:</span> <span class="p">[</span> <span class="mi">4</span> <span class="p">]</span>
+    <span class="p">}</span>
+  <span class="p">]</span>
+</pre></div>
+</div>
+<p>For a configuration that is identical except that <em>max_batch_size</em>
+equal to 0, the shape of “input0” is [ 16 ] and the shape of “output0”
+is [ 4 ].</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span>  <span class="n">platform</span><span class="p">:</span> <span class="s2">&quot;tensorrt_plan&quot;</span>
+  <span class="n">max_batch_size</span><span class="p">:</span> <span class="mi">0</span>
+  <span class="nb">input</span> <span class="p">[</span>
+    <span class="p">{</span>
+      <span class="n">name</span><span class="p">:</span> <span class="s2">&quot;input0&quot;</span>
+      <span class="n">data_type</span><span class="p">:</span> <span class="n">TYPE_FP32</span>
+      <span class="n">dims</span><span class="p">:</span> <span class="p">[</span> <span class="mi">16</span> <span class="p">]</span>
+    <span class="p">}</span>
+  <span class="p">]</span>
+  <span class="n">output</span> <span class="p">[</span>
+    <span class="p">{</span>
+      <span class="n">name</span><span class="p">:</span> <span class="s2">&quot;output0&quot;</span>
+      <span class="n">data_type</span><span class="p">:</span> <span class="n">TYPE_FP32</span>
+      <span class="n">dims</span><span class="p">:</span> <span class="p">[</span> <span class="mi">4</span> <span class="p">]</span>
+    <span class="p">}</span>
+  <span class="p">]</span>
+</pre></div>
+</div>
+<p>For models that support input and output tensors with variable-size
+dimensions, those dimensions can be listed as -1 in the input and
+output configuration. For example, if a model requires a 2-dimensional
+input tensor where the first dimension must be size 4 but the second
+dimension can be any size, the model configuration for that input
+would include <em>dims: [ 4, -1 ]</em>. Triton would then accept inference
+requests where that input tensor’s second dimension was any value
+greater-or-equal-to 0. The model configuration can be more restrictive
+than what is allowed by the underlying model. For example, even though
+the framework model itself allows the second dimension to be any size,
+the model configuration could be specified as <em>dims: [ 4, 4 ]</em>. In
+this case, Triton would only accept inference requests where the input
+tensor’s shape was exactly <em>[ 4, 4 ]</em>.</p>
+<p>The <a class="reference internal" href="#reshape"><span class="std std-doc"><em>reshape</em> property</span></a> must be used if there is a mismatch
+between the input shape that Triton receives in an inference request
+and the input shape expected by the model. Similarly, the <em>reshape</em>
+property must be used if there is a mismatch between the output shape
+produced by the model and the shape that Triton returns in a response
+to an inference request.</p>
+<p>Model inputs can specify <code class="docutils literal notranslate"><span class="pre">allow_ragged_batch</span></code> to indicate that the
+input is a <a class="reference internal" href="ragged_batching.html#ragged-batching"><span class="std std-doc">ragged input</span></a>. The field is
+used with <a class="reference internal" href="#dynamic-batcher"><span class="std std-doc">dynamic batcher</span></a> to allow batching without
+enforcing the input to have the same shape in all requests.</p>
+</div>
+</div>
+</div>
+<div class="section" id="auto-generated-model-configuration">
+<h2>Auto-Generated Model Configuration<a class="headerlink" href="#auto-generated-model-configuration" title="Permalink to this headline">#</a></h2>
+<p>The model configuration file containing the required
+settings must be available with each model to be deployed
+on Triton. In some cases the required portions of the model
+configuration can be generated automatically by Triton. The
+required portion of the model configuration are the settings
+shown in the <a class="reference internal" href="#minimal-model-configuration"><span class="std std-doc">Minimal Model Configuration</span></a>.
+By default, Triton will try to complete these sections. However,
+by starting Triton with <code class="docutils literal notranslate"><span class="pre">--disable-auto-complete-config</span></code> option,
+Triton can be configured to not auto-complete model configuration
+on the backend side. However, even with this option Triton will
+fill in missing <a class="reference internal" href="#instance-groups"><span class="std std-doc"><code class="docutils literal notranslate"><span class="pre">instance_group</span></code></span></a> settings with
+default values.</p>
+<p>Triton can derive all the required settings automatically for
+most of the TensorRT, TensorFlow saved-model, ONNX models, and OpenVINO models.
+For Python models, <a class="reference external" href="https://github.com/triton-inference-server/python_backend/#auto_complete_config"><code class="docutils literal notranslate"><span class="pre">auto_complete_config</span></code></a>
+function can be implemented in Python backend to provide
+<a class="reference internal" href="#maximum-batch-size"><span class="std std-doc"><code class="docutils literal notranslate"><span class="pre">max_batch_size</span></code></span></a>, <a class="reference internal" href="#inputs-and-outputs"><span class="std std-doc"><code class="docutils literal notranslate"><span class="pre">input</span></code></span></a>
+and <a class="reference internal" href="#inputs-and-outputs"><span class="std std-doc"><code class="docutils literal notranslate"><span class="pre">output</span></code></span></a> properties using <code class="docutils literal notranslate"><span class="pre">set_max_batch_size</span></code>,
+<code class="docutils literal notranslate"><span class="pre">add_input</span></code>, and <code class="docutils literal notranslate"><span class="pre">add_output</span></code> functions. These properties will allow Triton
+to load the Python model with <a class="reference internal" href="#minimal-model-configuration"><span class="std std-doc">Minimal Model Configuration</span></a>
+in absence of a configuration file.
+All other model types <em>must</em> provide a model configuration file.</p>
+<p>When developing a custom backend, you can populate required settings
+in the configuration and call <code class="docutils literal notranslate"><span class="pre">TRITONBACKEND_ModelSetConfig</span></code> API to
+update completed configuration with Triton core. You can take a
+look at <a class="reference external" href="https://github.com/triton-inference-server/tensorflow_backend">TensorFlow</a>
+and <a class="reference external" href="https://github.com/triton-inference-server/onnxruntime_backend">Onnxruntime</a>
+backends as examples of how to acheive this. Currently, only
+<a class="reference internal" href="#inputs-and-outputs"><span class="std std-doc">inputs, outputs</span></a>, <a class="reference internal" href="#maximum-batch-size"><span class="std std-doc">max_batch_size</span></a>
+and <a class="reference internal" href="#dynamic-batcher"><span class="std std-doc">dynamic batching</span></a> settings can be populated by
+backend. For custom backends, your config.pbtxt file must
+include a <code class="docutils literal notranslate"><span class="pre">backend</span></code> field or your model name must be in the
+form <code class="docutils literal notranslate"><span class="pre">&lt;model_name&gt;.&lt;backend_name&gt;</span></code>.</p>
+<p>You can also see the model configuration generated for a model by
+Triton using the <a class="reference internal" href="../protocol/extension_model_configuration.html"><span class="doc std std-doc">model configuration endpoint</span></a>. The
+easiest way to do this is to use a utility like <em>curl</em>:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>$ curl localhost:8000/v2/models/&lt;model name&gt;/config
+</pre></div>
+</div>
+<p>This will return a JSON representation of the generated model
+configuration. From this you can take the max_batch_size, inputs, and
+outputs sections of the JSON and convert it to a config.pbtxt file.
+Triton only generates the <a class="reference internal" href="#minimal-model-configuration"><span class="std std-doc">minimal portion of the model
+configuration</span></a>. You must still provide
+the optional portions of the model configuration by editing the
+config.pbtxt file.</p>
+<div class="section" id="default-max-batch-size-and-dynamic-batcher">
+<h3>Default Max Batch Size and Dynamic Batcher<a class="headerlink" href="#default-max-batch-size-and-dynamic-batcher" title="Permalink to this headline">#</a></h3>
+<p>When a model is using the auto-complete feature, a default maximum
+batch size may be set by using the <code class="docutils literal notranslate"><span class="pre">--backend-config=default-max-batch-size=&lt;int&gt;</span></code>
+command line argument. This allows all models which are capable of
+batching and which make use of <a class="reference internal" href="#auto-generated-model-configuration"><span class="std std-doc">Auto Generated Model Configuration</span></a>
+to have a default maximum batch size. This value is set to 4 by
+default. Backend developers may make use of this default-max-batch-size
+by obtaining it from the TRITONBACKEND_BackendConfig api. Currently, the
+following backends which utilize these default batch values and turn on
+dynamic batching in their generated model configurations are:</p>
+<ol class="arabic simple">
+<li><p><a class="reference external" href="https://github.com/triton-inference-server/tensorflow_backend">TensorFlow backend</a></p></li>
+<li><p><a class="reference external" href="https://github.com/triton-inference-server/onnxruntime_backend">Onnxruntime backend</a></p></li>
+<li><p><a class="reference external" href="https://github.com/triton-inference-server/tensorrt_backend">TensorRT backend</a></p>
+<ol class="arabic simple">
+<li><p>TensorRT models store the maximum batch size explicitly and do not make use
+of the default-max-batch-size parameter. However, if max_batch_size &gt; 1
+and no <a class="reference internal" href="#scheduling-and-batching"><span class="std std-doc">scheduler</span></a>
+is provided, the dynamic batch scheduler will be enabled.</p></li>
+</ol>
+</li>
+</ol>
+<p>If a value greater than 1 for the maximum batch size is set for the
+model, the <a class="reference internal" href="#dynamic-batcher"><span class="std std-doc">dynamic_batching</span></a> config will be set
+if no scheduler is provided in the configuration file.</p>
+</div>
+</div>
+<div class="section" id="datatypes">
+<h2>Datatypes<a class="headerlink" href="#datatypes" title="Permalink to this headline">#</a></h2>
+<p>The following table shows the tensor datatypes supported by
+Triton. The first column shows the name of the datatype as it appears
+in the model configuration file. The next four columns show the
+corresponding datatype for supported model frameworks. If a model
+framework does not have an entry for a given datatype, then Triton
+does not support that datatype for that model. The sixth column,
+labeled “API”, shows the corresponding datatype for the TRITONSERVER C
+API, TRITONBACKEND C API, HTTP/REST protocol and GRPC protocol. The
+last column shows the corresponding datatype for the Python numpy
+library.</p>
+<table class="colwidths-auto table">
+<thead>
+<tr class="row-odd"><th class="head"><p>Model Config</p></th>
+<th class="head"><p>TensorRT</p></th>
+<th class="head"><p>TensorFlow</p></th>
+<th class="head"><p>ONNX Runtime</p></th>
+<th class="head"><p>PyTorch</p></th>
+<th class="head"><p>API</p></th>
+<th class="head"><p>NumPy</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p>TYPE_BOOL</p></td>
+<td><p>kBOOL</p></td>
+<td><p>DT_BOOL</p></td>
+<td><p>BOOL</p></td>
+<td><p>kBool</p></td>
+<td><p>BOOL</p></td>
+<td><p>bool</p></td>
+</tr>
+<tr class="row-odd"><td><p>TYPE_UINT8</p></td>
+<td><p></p></td>
+<td><p>DT_UINT8</p></td>
+<td><p>UINT8</p></td>
+<td><p>kByte</p></td>
+<td><p>UINT8</p></td>
+<td><p>uint8</p></td>
+</tr>
+<tr class="row-even"><td><p>TYPE_UINT16</p></td>
+<td><p></p></td>
+<td><p>DT_UINT16</p></td>
+<td><p>UINT16</p></td>
+<td><p></p></td>
+<td><p>UINT16</p></td>
+<td><p>uint16</p></td>
+</tr>
+<tr class="row-odd"><td><p>TYPE_UINT32</p></td>
+<td><p></p></td>
+<td><p>DT_UINT32</p></td>
+<td><p>UINT32</p></td>
+<td><p></p></td>
+<td><p>UINT32</p></td>
+<td><p>uint32</p></td>
+</tr>
+<tr class="row-even"><td><p>TYPE_UINT64</p></td>
+<td><p></p></td>
+<td><p>DT_UINT64</p></td>
+<td><p>UINT64</p></td>
+<td><p></p></td>
+<td><p>UINT64</p></td>
+<td><p>uint64</p></td>
+</tr>
+<tr class="row-odd"><td><p>TYPE_INT8</p></td>
+<td><p>kINT8</p></td>
+<td><p>DT_INT8</p></td>
+<td><p>INT8</p></td>
+<td><p>kChar</p></td>
+<td><p>INT8</p></td>
+<td><p>int8</p></td>
+</tr>
+<tr class="row-even"><td><p>TYPE_INT16</p></td>
+<td><p></p></td>
+<td><p>DT_INT16</p></td>
+<td><p>INT16</p></td>
+<td><p>kShort</p></td>
+<td><p>INT16</p></td>
+<td><p>int16</p></td>
+</tr>
+<tr class="row-odd"><td><p>TYPE_INT32</p></td>
+<td><p>kINT32</p></td>
+<td><p>DT_INT32</p></td>
+<td><p>INT32</p></td>
+<td><p>kInt</p></td>
+<td><p>INT32</p></td>
+<td><p>int32</p></td>
+</tr>
+<tr class="row-even"><td><p>TYPE_INT64</p></td>
+<td><p></p></td>
+<td><p>DT_INT64</p></td>
+<td><p>INT64</p></td>
+<td><p>kLong</p></td>
+<td><p>INT64</p></td>
+<td><p>int64</p></td>
+</tr>
+<tr class="row-odd"><td><p>TYPE_FP16</p></td>
+<td><p>kHALF</p></td>
+<td><p>DT_HALF</p></td>
+<td><p>FLOAT16</p></td>
+<td><p></p></td>
+<td><p>FP16</p></td>
+<td><p>float16</p></td>
+</tr>
+<tr class="row-even"><td><p>TYPE_FP32</p></td>
+<td><p>kFLOAT</p></td>
+<td><p>DT_FLOAT</p></td>
+<td><p>FLOAT</p></td>
+<td><p>kFloat</p></td>
+<td><p>FP32</p></td>
+<td><p>float32</p></td>
+</tr>
+<tr class="row-odd"><td><p>TYPE_FP64</p></td>
+<td><p></p></td>
+<td><p>DT_DOUBLE</p></td>
+<td><p>DOUBLE</p></td>
+<td><p>kDouble</p></td>
+<td><p>FP64</p></td>
+<td><p>float64</p></td>
+</tr>
+<tr class="row-even"><td><p>TYPE_STRING</p></td>
+<td><p></p></td>
+<td><p>DT_STRING</p></td>
+<td><p>STRING</p></td>
+<td><p></p></td>
+<td><p>BYTES</p></td>
+<td><p>dtype(object)</p></td>
+</tr>
+<tr class="row-odd"><td><p>TYPE_BF16</p></td>
+<td><p></p></td>
+<td><p></p></td>
+<td><p></p></td>
+<td><p></p></td>
+<td><p>BF16</p></td>
+<td><p></p></td>
+</tr>
+</tbody>
+</table>
+<p>For TensorRT each value is in the nvinfer1::DataType namespace. For
+example, nvinfer1::DataType::kFLOAT is the 32-bit floating-point
+datatype.</p>
+<p>For TensorFlow each value is in the tensorflow namespace. For example,
+tensorflow::DT_FLOAT is the 32-bit floating-point value.</p>
+<p>For ONNX Runtime each value is prepended with ONNX_TENSOR_ELEMENT_DATA_TYPE_.
+For example, ONNX_TENSOR_ELEMENT_DATA_TYPE_FLOAT is the 32-bit floating-point
+datatype.</p>
+<p>For PyTorch each value is in the torch namespace. For example, torch::kFloat
+is the 32-bit floating-point datatype.</p>
+<p>For Numpy each value is in the numpy module. For example, numpy.float32
+is the 32-bit floating-point datatype.</p>
+</div>
+<div class="section" id="reshape">
+<h2>Reshape<a class="headerlink" href="#reshape" title="Permalink to this headline">#</a></h2>
+<p>The <em>ModelTensorReshape</em> property on a model configuration input or
+output is used to indicate that the input or output shape accepted by
+the inference API differs from the input or output shape expected or
+produced by the underlying framework model or custom backend.</p>
+<p>For an input, <em>reshape</em> can be used to reshape the input tensor to a
+different shape expected by the framework or backend. A common
+use-case is where a model that supports batching expects a batched
+input to have shape <em>[ batch-size ]</em>, which means that the batch
+dimension fully describes the shape. For the inference API the
+equivalent shape <em>[ batch-size, 1 ]</em> must be specified since each
+input must specify a non-empty <em>dims</em>. For this case the input should
+be specified as:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span>  <span class="nb">input</span> <span class="p">[</span>
+    <span class="p">{</span>
+      <span class="n">name</span><span class="p">:</span> <span class="s2">&quot;in&quot;</span>
+      <span class="n">dims</span><span class="p">:</span> <span class="p">[</span> <span class="mi">1</span> <span class="p">]</span>
+      <span class="n">reshape</span><span class="p">:</span> <span class="p">{</span> <span class="n">shape</span><span class="p">:</span> <span class="p">[</span> <span class="p">]</span> <span class="p">}</span>
+    <span class="p">}</span>
+</pre></div>
+</div>
+<p>For an output, <em>reshape</em> can be used to reshape the output tensor
+produced by the framework or backend to a different shape that is
+returned by the inference API. A common use-case is where a model that
+supports batching expects a batched output to have shape <em>[ batch-size
+]</em>, which means that the batch dimension fully describes the
+shape. For the inference API the equivalent shape <em>[ batch-size, 1 ]</em>
+must be specified since each output must specify a non-empty
+<em>dims</em>. For this case the output should be specified as:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span>  <span class="n">output</span> <span class="p">[</span>
+    <span class="p">{</span>
+      <span class="n">name</span><span class="p">:</span> <span class="s2">&quot;in&quot;</span>
+      <span class="n">dims</span><span class="p">:</span> <span class="p">[</span> <span class="mi">1</span> <span class="p">]</span>
+      <span class="n">reshape</span><span class="p">:</span> <span class="p">{</span> <span class="n">shape</span><span class="p">:</span> <span class="p">[</span> <span class="p">]</span> <span class="p">}</span>
+    <span class="p">}</span>
+</pre></div>
+</div>
+</div>
+<div class="section" id="shape-tensors">
+<h2>Shape Tensors<a class="headerlink" href="#shape-tensors" title="Permalink to this headline">#</a></h2>
+<p>For models that support shape tensors, the <em>is_shape_tensor</em> property
+must be set appropriately for inputs and outputs that are acting as
+shape tensors. The following shows an example configuration that
+specifies shape tensors.</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span>  <span class="n">name</span><span class="p">:</span> <span class="s2">&quot;myshapetensormodel&quot;</span>
+  <span class="n">platform</span><span class="p">:</span> <span class="s2">&quot;tensorrt_plan&quot;</span>
+  <span class="n">max_batch_size</span><span class="p">:</span> <span class="mi">8</span>
+  <span class="nb">input</span> <span class="p">[</span>
+    <span class="p">{</span>
+      <span class="n">name</span><span class="p">:</span> <span class="s2">&quot;input0&quot;</span>
+      <span class="n">data_type</span><span class="p">:</span> <span class="n">TYPE_FP32</span>
+      <span class="n">dims</span><span class="p">:</span> <span class="p">[</span> <span class="mi">1</span> <span class="p">,</span> <span class="mi">3</span><span class="p">]</span>
+    <span class="p">},</span>
+    <span class="p">{</span>
+      <span class="n">name</span><span class="p">:</span> <span class="s2">&quot;input1&quot;</span>
+      <span class="n">data_type</span><span class="p">:</span> <span class="n">TYPE_INT32</span>
+      <span class="n">dims</span><span class="p">:</span> <span class="p">[</span> <span class="mi">2</span> <span class="p">]</span>
+      <span class="n">is_shape_tensor</span><span class="p">:</span> <span class="n">true</span>
+    <span class="p">}</span>
+  <span class="p">]</span>
+  <span class="n">output</span> <span class="p">[</span>
+    <span class="p">{</span>
+      <span class="n">name</span><span class="p">:</span> <span class="s2">&quot;output0&quot;</span>
+      <span class="n">data_type</span><span class="p">:</span> <span class="n">TYPE_FP32</span>
+      <span class="n">dims</span><span class="p">:</span> <span class="p">[</span> <span class="mi">1</span> <span class="p">,</span> <span class="mi">3</span><span class="p">]</span>
+    <span class="p">}</span>
+  <span class="p">]</span>
+</pre></div>
+</div>
+<p>As discussed above, Triton assumes that batching occurs along the
+first dimension which is not listed in in the input or output tensor
+<em>dims</em>. However, for shape tensors, batching occurs at the first shape
+value. For the above example, an inference request must provide inputs
+with the following shapes.</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span>  <span class="s2">&quot;input0&quot;</span><span class="p">:</span> <span class="p">[</span> <span class="n">x</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="mi">3</span><span class="p">]</span>
+  <span class="s2">&quot;input1&quot;</span><span class="p">:</span> <span class="p">[</span> <span class="mi">3</span> <span class="p">]</span>
+  <span class="s2">&quot;output0&quot;</span><span class="p">:</span> <span class="p">[</span> <span class="n">x</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="mi">3</span><span class="p">]</span>
+</pre></div>
+</div>
+<p>Where <em>x</em> is the batch size of the request. Triton requires the shape
+tensors to be marked as shape tensors in the model when using
+batching. Note that “input1” has shape <em>[ 3 ]</em> and not <em>[ 2 ]</em>, which
+is how it is described in model configuration. As <code class="docutils literal notranslate"><span class="pre">myshapetensormodel</span></code>
+model is a batching model, the batch size should be provided as an
+additional value. Triton will accumulate all the shape values together
+for “input1” in batch dimension before issuing the request to model.</p>
+<p>For example, assume the client sends following three requests to Triton
+with following inputs:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">Request1</span><span class="p">:</span>
+<span class="n">input0</span><span class="p">:</span> <span class="p">[[[</span><span class="mi">1</span><span class="p">,</span><span class="mi">2</span><span class="p">,</span><span class="mi">3</span><span class="p">]]]</span> <span class="o">&lt;==</span> <span class="n">shape</span> <span class="n">of</span> <span class="n">this</span> <span class="n">tensor</span> <span class="p">[</span><span class="mi">1</span><span class="p">,</span><span class="mi">1</span><span class="p">,</span><span class="mi">3</span><span class="p">]</span>
+<span class="n">input1</span><span class="p">:</span> <span class="p">[</span><span class="mi">1</span><span class="p">,</span><span class="mi">4</span><span class="p">,</span><span class="mi">6</span><span class="p">]</span> <span class="o">&lt;==</span> <span class="n">shape</span> <span class="n">of</span> <span class="n">this</span> <span class="n">tensor</span> <span class="p">[</span><span class="mi">3</span><span class="p">]</span>
+
+<span class="n">Request2</span><span class="p">:</span>
+<span class="n">input0</span><span class="p">:</span> <span class="p">[[[</span><span class="mi">4</span><span class="p">,</span><span class="mi">5</span><span class="p">,</span><span class="mi">6</span><span class="p">]],</span> <span class="p">[[</span><span class="mi">7</span><span class="p">,</span><span class="mi">8</span><span class="p">,</span><span class="mi">9</span><span class="p">]]]</span> <span class="o">&lt;==</span> <span class="n">shape</span> <span class="n">of</span> <span class="n">this</span> <span class="n">tensor</span> <span class="p">[</span><span class="mi">2</span><span class="p">,</span><span class="mi">1</span><span class="p">,</span><span class="mi">3</span><span class="p">]</span>
+<span class="n">input1</span><span class="p">:</span> <span class="p">[</span><span class="mi">2</span><span class="p">,</span><span class="mi">4</span><span class="p">,</span><span class="mi">6</span><span class="p">]</span> <span class="o">&lt;==</span> <span class="n">shape</span> <span class="n">of</span> <span class="n">this</span> <span class="n">tensor</span> <span class="p">[</span><span class="mi">3</span><span class="p">]</span>
+
+<span class="n">Request3</span><span class="p">:</span>
+<span class="n">input0</span><span class="p">:</span> <span class="p">[[[</span><span class="mi">10</span><span class="p">,</span><span class="mi">11</span><span class="p">,</span><span class="mi">12</span><span class="p">]]]</span> <span class="o">&lt;==</span> <span class="n">shape</span> <span class="n">of</span> <span class="n">this</span> <span class="n">tensor</span> <span class="p">[</span><span class="mi">1</span><span class="p">,</span><span class="mi">1</span><span class="p">,</span><span class="mi">3</span><span class="p">]</span>
+<span class="n">input1</span><span class="p">:</span> <span class="p">[</span><span class="mi">1</span><span class="p">,</span><span class="mi">4</span><span class="p">,</span><span class="mi">6</span><span class="p">]</span> <span class="o">&lt;==</span> <span class="n">shape</span> <span class="n">of</span> <span class="n">this</span> <span class="n">tensor</span> <span class="p">[</span><span class="mi">3</span><span class="p">]</span>
+</pre></div>
+</div>
+<p>Assuming these requests get batched together would be delivered to the
+model as:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">Batched</span> <span class="n">Requests</span> <span class="n">to</span> <span class="n">model</span><span class="p">:</span>
+<span class="n">input0</span><span class="p">:</span> <span class="p">[[[</span><span class="mi">1</span><span class="p">,</span><span class="mi">2</span><span class="p">,</span><span class="mi">3</span><span class="p">]],</span> <span class="p">[[</span><span class="mi">4</span><span class="p">,</span><span class="mi">5</span><span class="p">,</span><span class="mi">6</span><span class="p">]],</span> <span class="p">[[</span><span class="mi">7</span><span class="p">,</span><span class="mi">8</span><span class="p">,</span><span class="mi">9</span><span class="p">]],</span> <span class="p">[[</span><span class="mi">10</span><span class="p">,</span><span class="mi">11</span><span class="p">,</span><span class="mi">12</span><span class="p">]]]</span> <span class="o">&lt;==</span> <span class="n">shape</span> <span class="n">of</span> <span class="n">this</span> <span class="n">tensor</span> <span class="p">[</span><span class="mi">4</span><span class="p">,</span><span class="mi">1</span><span class="p">,</span><span class="mi">3</span><span class="p">]</span>
+<span class="n">input1</span><span class="p">:</span> <span class="p">[</span><span class="mi">4</span><span class="p">,</span> <span class="mi">4</span><span class="p">,</span> <span class="mi">6</span><span class="p">]</span> <span class="o">&lt;==</span> <span class="n">shape</span> <span class="n">of</span> <span class="n">this</span> <span class="n">tensor</span> <span class="p">[</span><span class="mi">3</span><span class="p">]</span>
+
+</pre></div>
+</div>
+<p>Currently, only TensorRT supports shape tensors. Read <a class="reference external" href="https://docs.nvidia.com/deeplearning/tensorrt/developer-guide/index.html#shape_tensor_io">Shape Tensor I/O</a>
+to learn more about shape tensors.</p>
+</div>
+<div class="section" id="version-policy">
+<h2>Version Policy<a class="headerlink" href="#version-policy" title="Permalink to this headline">#</a></h2>
+<p>Each model can have one or more
+<a class="reference internal" href="model_repository.html#model-versions"><span class="std std-doc">versions</span></a>. The
+<em>ModelVersionPolicy</em> property of the model configuration is used to
+set one of the following policies.</p>
+<ul class="simple">
+<li><p><em>All</em>: All versions of the model that are available in the model
+repository are available for inferencing.
+<code class="docutils literal notranslate"><span class="pre">version_policy:</span> <span class="pre">{</span> <span class="pre">all:</span> <span class="pre">{}}</span></code></p></li>
+<li><p><em>Latest</em>: Only the latest ‘n’ versions of the model in the
+repository are available for inferencing. The latest versions of the
+model are the numerically greatest version numbers.
+<code class="docutils literal notranslate"><span class="pre">version_policy:</span> <span class="pre">{</span> <span class="pre">latest:</span> <span class="pre">{</span> <span class="pre">num_versions:</span> <span class="pre">2}}</span></code></p></li>
+<li><p><em>Specific</em>: Only the specifically listed versions of the model are
+available for inferencing.
+<code class="docutils literal notranslate"><span class="pre">version_policy:</span> <span class="pre">{</span> <span class="pre">specific:</span> <span class="pre">{</span> <span class="pre">versions:</span> <span class="pre">[1,3]}}</span></code></p></li>
+</ul>
+<p>If no version policy is specified, then <em>Latest</em> (with n=1) is used as
+the default, indicating that only the most recent version of the model
+is made available by Triton. In all cases, the <a class="reference internal" href="model_management.html"><span class="doc std std-doc">addition or removal of
+version subdirectories</span></a> from the model repository
+can change which model version is used on subsequent inference
+requests.</p>
+<p>The following configuration specifies that all versions of the model
+will be available from the server.</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span>  <span class="n">platform</span><span class="p">:</span> <span class="s2">&quot;tensorrt_plan&quot;</span>
+  <span class="n">max_batch_size</span><span class="p">:</span> <span class="mi">8</span>
+  <span class="nb">input</span> <span class="p">[</span>
+    <span class="p">{</span>
+      <span class="n">name</span><span class="p">:</span> <span class="s2">&quot;input0&quot;</span>
+      <span class="n">data_type</span><span class="p">:</span> <span class="n">TYPE_FP32</span>
+      <span class="n">dims</span><span class="p">:</span> <span class="p">[</span> <span class="mi">16</span> <span class="p">]</span>
+    <span class="p">},</span>
+    <span class="p">{</span>
+      <span class="n">name</span><span class="p">:</span> <span class="s2">&quot;input1&quot;</span>
+      <span class="n">data_type</span><span class="p">:</span> <span class="n">TYPE_FP32</span>
+      <span class="n">dims</span><span class="p">:</span> <span class="p">[</span> <span class="mi">16</span> <span class="p">]</span>
+    <span class="p">}</span>
+  <span class="p">]</span>
+  <span class="n">output</span> <span class="p">[</span>
+    <span class="p">{</span>
+      <span class="n">name</span><span class="p">:</span> <span class="s2">&quot;output0&quot;</span>
+      <span class="n">data_type</span><span class="p">:</span> <span class="n">TYPE_FP32</span>
+      <span class="n">dims</span><span class="p">:</span> <span class="p">[</span> <span class="mi">16</span> <span class="p">]</span>
+    <span class="p">}</span>
+  <span class="p">]</span>
+  <span class="n">version_policy</span><span class="p">:</span> <span class="p">{</span> <span class="nb">all</span> <span class="p">{</span> <span class="p">}}</span>
+</pre></div>
+</div>
+</div>
+<div class="section" id="instance-groups">
+<h2>Instance Groups<a class="headerlink" href="#instance-groups" title="Permalink to this headline">#</a></h2>
+<p>Triton can provide multiple <a class="reference internal" href="architecture.html#concurrent-model-execution"><span class="std std-doc">instances of a
+model</span></a> so that multiple
+inference requests for that model can be handled simultaneously. The
+model configuration <em>ModelInstanceGroup</em> property is used to specify
+the number of execution instances that should be made available and
+what compute resource should be used for those instances.</p>
+<div class="section" id="multiple-model-instances">
+<h3>Multiple Model Instances<a class="headerlink" href="#multiple-model-instances" title="Permalink to this headline">#</a></h3>
+<p>By default, a single execution instance of the model is created for
+each GPU available in the system. The instance-group setting can be
+used to place multiple execution instances of a model on every GPU or
+on only certain GPUs. For example, the following configuration will
+place two execution instances of the model to be available on each
+system GPU.</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span>  <span class="n">instance_group</span> <span class="p">[</span>
+    <span class="p">{</span>
+      <span class="n">count</span><span class="p">:</span> <span class="mi">2</span>
+      <span class="n">kind</span><span class="p">:</span> <span class="n">KIND_GPU</span>
+    <span class="p">}</span>
+  <span class="p">]</span>
+</pre></div>
+</div>
+<p>And the following configuration will place one execution instance on
+GPU 0 and two execution instances on GPUs 1 and 2.</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span>  <span class="n">instance_group</span> <span class="p">[</span>
+    <span class="p">{</span>
+      <span class="n">count</span><span class="p">:</span> <span class="mi">1</span>
+      <span class="n">kind</span><span class="p">:</span> <span class="n">KIND_GPU</span>
+      <span class="n">gpus</span><span class="p">:</span> <span class="p">[</span> <span class="mi">0</span> <span class="p">]</span>
+    <span class="p">},</span>
+    <span class="p">{</span>
+      <span class="n">count</span><span class="p">:</span> <span class="mi">2</span>
+      <span class="n">kind</span><span class="p">:</span> <span class="n">KIND_GPU</span>
+      <span class="n">gpus</span><span class="p">:</span> <span class="p">[</span> <span class="mi">1</span><span class="p">,</span> <span class="mi">2</span> <span class="p">]</span>
+    <span class="p">}</span>
+  <span class="p">]</span>
+</pre></div>
+</div>
+</div>
+<div class="section" id="cpu-model-instance">
+<h3>CPU Model Instance<a class="headerlink" href="#cpu-model-instance" title="Permalink to this headline">#</a></h3>
+<p>The instance group setting is also used to enable execution of a model
+on the CPU. A model can be executed on the CPU even if there is a GPU
+available in the system. The following places two execution instances
+on the CPU.</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span>  <span class="n">instance_group</span> <span class="p">[</span>
+    <span class="p">{</span>
+      <span class="n">count</span><span class="p">:</span> <span class="mi">2</span>
+      <span class="n">kind</span><span class="p">:</span> <span class="n">KIND_CPU</span>
+    <span class="p">}</span>
+  <span class="p">]</span>
+</pre></div>
+</div>
+<p>If no <code class="docutils literal notranslate"><span class="pre">count</span></code> is specified for a KIND_CPU instance group, then the default instance
+count will be 2 for selected backends (Tensorflow and Onnxruntime). All
+other backends will default to 1.</p>
+</div>
+<div class="section" id="host-policy">
+<h3>Host Policy<a class="headerlink" href="#host-policy" title="Permalink to this headline">#</a></h3>
+<p>The instance group setting is associated with a host policy. The following
+configuration will associate all instances created by the instance group setting
+with host policy “policy_0”. By default the host policy will be set according to
+the device kind of the instance, for instance, KIND_CPU is “cpu”, KIND_MODEL is
+“model”, and KIND_GPU is “gpu_&lt;gpu_id&gt;”.</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span>  <span class="n">instance_group</span> <span class="p">[</span>
+    <span class="p">{</span>
+      <span class="n">count</span><span class="p">:</span> <span class="mi">2</span>
+      <span class="n">kind</span><span class="p">:</span> <span class="n">KIND_CPU</span>
+      <span class="n">host_policy</span><span class="p">:</span> <span class="s2">&quot;policy_0&quot;</span>
+    <span class="p">}</span>
+  <span class="p">]</span>
+</pre></div>
+</div>
+</div>
+<div class="section" id="rate-limiter-configuration">
+<h3>Rate Limiter Configuration<a class="headerlink" href="#rate-limiter-configuration" title="Permalink to this headline">#</a></h3>
+<p>Instance group optionally specifies <a class="reference internal" href="rate_limiter.html"><span class="doc std std-doc">rate limiter</span></a>
+configuration which controls how the rate limiter operates on the
+instances in the group. The rate limiter configuration is ignored if
+rate limiting is off. If rate limiting is on and if an instance_group
+does not provide this configuration, then the execution on the model
+instances belonging to this group will not be limited in any way by
+the rate limiter. The configuration includes the following
+specifications:</p>
+<div class="section" id="resources">
+<h4>Resources<a class="headerlink" href="#resources" title="Permalink to this headline">#</a></h4>
+<p>The set of <a class="reference internal" href="rate_limiter.html#resources"><span class="std std-doc">resources</span></a> required to execute
+a model instance. The “name” field identifies the resource and “count”
+field refers to the number of copies of the resource that the model
+instance in the group requires to run. The “global” field specifies
+whether the resource is per-device or shared globally across the system.
+Loaded models can not specify a resource with the same name both as global
+and non-global. If no resources are provided then triton assumes the
+execution of model instance does not require any resources and will
+start executing as soon as model instance is available.</p>
+</div>
+<div class="section" id="priority">
+<h4>Priority<a class="headerlink" href="#priority" title="Permalink to this headline">#</a></h4>
+<p>Priority serves as a weighting value to be used for prioritizing across
+all the instances of all the models. An instance with priority 2 will be
+given 1/2 the number of scheduling chances as an instance with priority
+1.</p>
+<p>The following example specifies the instances in the group requires
+four “R1” and two “R2” resources for execution. Resource “R2” is a global
+resource. Additionally, the rate-limiter priority of the instance_group
+is 2.</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span>  <span class="n">instance_group</span> <span class="p">[</span>
+    <span class="p">{</span>
+      <span class="n">count</span><span class="p">:</span> <span class="mi">1</span>
+      <span class="n">kind</span><span class="p">:</span> <span class="n">KIND_GPU</span>
+      <span class="n">gpus</span><span class="p">:</span> <span class="p">[</span> <span class="mi">0</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="mi">2</span> <span class="p">]</span>
+      <span class="n">rate_limiter</span> <span class="p">{</span>
+        <span class="n">resources</span> <span class="p">[</span>
+          <span class="p">{</span>
+            <span class="n">name</span><span class="p">:</span> <span class="s2">&quot;R1&quot;</span>
+            <span class="n">count</span><span class="p">:</span> <span class="mi">4</span>
+          <span class="p">},</span>
+          <span class="p">{</span>
+            <span class="n">name</span><span class="p">:</span> <span class="s2">&quot;R2&quot;</span>
+            <span class="k">global</span><span class="p">:</span> <span class="kc">True</span>
+            <span class="n">count</span><span class="p">:</span> <span class="mi">2</span>
+          <span class="p">}</span>
+        <span class="p">]</span>
+        <span class="n">priority</span><span class="p">:</span> <span class="mi">2</span>
+      <span class="p">}</span>
+    <span class="p">}</span>
+  <span class="p">]</span>
+</pre></div>
+</div>
+<p>The above configuration creates 3 model instances, one on each device
+(0, 1 and 2). The three instances will not contend for “R1” among
+themselves as “R1” is local for their own device, however, they will
+contend for “R2” because it is specified as a global resource which
+means “R2” is shared across the system. Though these instances don’t
+contend for “R1” among themsleves, but they will contend for “R1”
+with other model instances which includes “R1” in their resource
+requirements and run on the same device as them.</p>
+</div>
+</div>
+<div class="section" id="ensemble-model-instance-groups">
+<h3>Ensemble Model Instance Groups<a class="headerlink" href="#ensemble-model-instance-groups" title="Permalink to this headline">#</a></h3>
+<p><a class="reference internal" href="architecture.html#ensemble-models"><span class="std std-doc">Ensemble models</span></a>
+are an abstraction Triton uses to execute a user-defined pipeline of models.
+Since there is no physical instance associated with an ensemble model, the
+<code class="docutils literal notranslate"><span class="pre">instance_group</span></code> field can not be specified for it.</p>
+<p>However, each composing model that makes up an ensemble can specify
+<code class="docutils literal notranslate"><span class="pre">instance_group</span></code> in its config file and individually support parallel
+execution as described above when the ensemble receives multiple requests.</p>
+</div>
+</div>
+<div class="section" id="cuda-compute-capability">
+<h2>CUDA Compute Capability<a class="headerlink" href="#cuda-compute-capability" title="Permalink to this headline">#</a></h2>
+<p>Similar to the <code class="docutils literal notranslate"><span class="pre">default_model_filename</span></code> field, you can optionally specify the
+<code class="docutils literal notranslate"><span class="pre">cc_model_filenames</span></code> field to map the GPU’s
+<a class="reference external" href="https://developer.nvidia.com/cuda-gpus">CUDA Compute Capability</a>
+to a correspoding model filename at model load time. This is particularly
+useful for TensorRT models, since they are generally tied to a specific
+compute capability.</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">cc_model_filenames</span> <span class="p">[</span>
+  <span class="p">{</span>
+    <span class="n">key</span><span class="p">:</span> <span class="s2">&quot;7.5&quot;</span>
+    <span class="n">value</span><span class="p">:</span> <span class="s2">&quot;resnet50_T4.plan&quot;</span>
+  <span class="p">},</span>
+  <span class="p">{</span>
+    <span class="n">key</span><span class="p">:</span> <span class="s2">&quot;8.0&quot;</span>
+    <span class="n">value</span><span class="p">:</span> <span class="s2">&quot;resnet50_A100.plan&quot;</span>
+  <span class="p">}</span>
+<span class="p">]</span>
+</pre></div>
+</div>
+</div>
+<div class="section" id="scheduling-and-batching">
+<h2>Scheduling And Batching<a class="headerlink" href="#scheduling-and-batching" title="Permalink to this headline">#</a></h2>
+<p>Triton supports batch inferencing by allowing individual inference
+requests to specify a batch of inputs. The inferencing for a batch of
+inputs is performed at the same time which is especially important for
+GPUs since it can greatly increase inferencing throughput. In many use
+cases the individual inference requests are not batched, therefore,
+they do not benefit from the throughput benefits of batching.</p>
+<p>The inference server contains multiple scheduling and batching
+algorithms that support many different model types and use-cases. More
+information about model types and schedulers can be found in <a class="reference internal" href="architecture.html#models-and-schedulers"><span class="std std-doc">Models
+And Schedulers</span></a>.</p>
+<div class="section" id="default-scheduler">
+<h3>Default Scheduler<a class="headerlink" href="#default-scheduler" title="Permalink to this headline">#</a></h3>
+<p>The default scheduler is used for a model if none of the
+<em>scheduling_choice</em> properties are specified in the model
+configuration. The default scheduler simply distributes inference
+requests to all <a class="reference internal" href="#instance-groups"><span class="std std-doc">model instances</span></a> configured for the
+model.</p>
+</div>
+<div class="section" id="dynamic-batcher">
+<h3>Dynamic Batcher<a class="headerlink" href="#dynamic-batcher" title="Permalink to this headline">#</a></h3>
+<p>Dynamic batching is a feature of Triton that allows inference requests
+to be combined by the server, so that a batch is created
+dynamically. Creating a batch of requests typically results in
+increased throughput. The dynamic batcher should be used for
+<a class="reference internal" href="architecture.html#stateless-models"><span class="std std-doc">stateless models</span></a>. The dynamically created
+batches are distributed to all <a class="reference internal" href="#instance-groups"><span class="std std-doc">model instances</span></a>
+configured for the model.</p>
+<p>Dynamic batching is enabled and configured independently for each
+model using the <em>ModelDynamicBatching</em> property in the model
+configuration. These settings control the preferred size(s) of the
+dynamically created batches, the maximum time that requests can be
+delayed in the scheduler to allow other requests to join the dynamic
+batch, and queue properties such a queue size, priorities, and
+time-outs.</p>
+<div class="section" id="recommended-configuration-process">
+<h4>Recommended Configuration Process<a class="headerlink" href="#recommended-configuration-process" title="Permalink to this headline">#</a></h4>
+<p>The individual settings are described in detail below. The following
+steps are the recommended process for tuning the dynamic batcher for
+each model. It is also possible to use the <a class="reference internal" href="model_analyzer.html"><span class="doc std std-doc">Model
+Analyzer</span></a> to automatically search across different
+dynamic batcher configurations.</p>
+<ul class="simple">
+<li><p>Decide on a <a class="reference internal" href="#maximum-batch-size"><span class="std std-doc">maximum batch size</span></a> for the model.</p></li>
+<li><p>Add the following to the model configuration to enable the dynamic
+batcher with all default settings. By default the dynamic batcher
+will create batches as large as possible up to the maximum batch
+size and will not <span class="xref myst">delay</span> when forming batches.</p></li>
+</ul>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span>  <span class="n">dynamic_batching</span> <span class="p">{</span> <span class="p">}</span>
+</pre></div>
+</div>
+<ul class="simple">
+<li><p>Use the <a class="reference internal" href="perf_analyzer.html"><span class="doc std std-doc">Performance Analyzer</span></a> to determine the
+latency and throughput provided by the default dynamic batcher
+configuration.</p></li>
+<li><p>If the default configuration results in latency values that are
+within your latency budget, try one or both of the following to
+trade off increased latency for increased throughput:</p>
+<ul>
+<li><p>Increase maximum batch size.</p></li>
+<li><p>Set <span class="xref myst">batch delay</span> to a non-zero value. Try
+increasing delay values until the latency budget is exceeded to
+see the impact on throughput.</p></li>
+</ul>
+</li>
+<li><p><span class="xref myst">Preferred batch sizes</span> should not be used
+for most models. A preferred batch size(s) should only be configured
+if that batch size results in significantly higher performance than
+other batch sizes.</p></li>
+</ul>
+</div>
+<div class="section" id="preferred-batch-sizes">
+<h4>Preferred Batch Sizes<a class="headerlink" href="#preferred-batch-sizes" title="Permalink to this headline">#</a></h4>
+<p>The <em>preferred_batch_size</em> property indicates the batch sizes that the
+dynamic batcher should attempt to create. For most models,
+<em>preferred_batch_size</em> should not be specified, as described in
+<span class="xref myst">Recommended Configuration
+Process</span>. An exception is TensorRT
+models that specify multiple optimization profiles for different batch
+sizes. In this case, bacause some optimization profiles may give
+significant performance improvement compared to others, it may make
+sense to use <em>preferred_batch_size</em> for the batch sizes supported by
+those higher-performance optimization profiles.</p>
+<p>The following example shows the configuration that enables dynamic
+batching with preferred batch sizes of 4 and 8.</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span>  <span class="n">dynamic_batching</span> <span class="p">{</span>
+    <span class="n">preferred_batch_size</span><span class="p">:</span> <span class="p">[</span> <span class="mi">4</span><span class="p">,</span> <span class="mi">8</span> <span class="p">]</span>
+  <span class="p">}</span>
+</pre></div>
+</div>
+<p>When a model instance becomes available for inferencing, the dynamic
+batcher will attempt to create batches from the requests that are
+available in the scheduler. Requests are added to the batch in the
+order the requests were received. If the dynamic batcher can form a
+batch of a preferred size(s) it will create a batch of the largest
+possible preferred size and send it for inferencing. If the dynamic
+batcher cannot form a batch of a preferred size (or if the dynamic
+batcher is not configured with any preferred batch sizes), it will
+send a batch of the largest size possible that is less than the
+maximum batch size allowed by the model (but see the following section
+for the delay option that changes this behavior).</p>
+<p>The size of generated batches can be examined in aggregate using
+<span class="xref myst">count metrics</span>.</p>
+</div>
+<div class="section" id="delayed-batching">
+<h4>Delayed Batching<a class="headerlink" href="#delayed-batching" title="Permalink to this headline">#</a></h4>
+<p>The dynamic batcher can be configured to allow requests to be delayed
+for a limited time in the scheduler to allow other requests to join
+the dynamic batch. For example, the following configuration sets the
+maximum delay time of 100 microseconds for a request.</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span>  <span class="n">dynamic_batching</span> <span class="p">{</span>
+    <span class="n">max_queue_delay_microseconds</span><span class="p">:</span> <span class="mi">100</span>
+  <span class="p">}</span>
+</pre></div>
+</div>
+<p>The <em>max_queue_delay_microseconds</em> property setting changes the
+dynamic batcher behavior when a maximum size (or preferred size) batch
+cannot be created. When a batch of a maximum or preferred size cannot
+be created from the available requests, the dynamic batcher will delay
+sending the batch as long as no request is delayed longer than the
+configured <em>max_queue_delay_microseconds</em> value. If a new request
+arrives during this delay and allows the dynamic batcher to form a
+batch of a maximum or preferred batch size, then that batch is sent
+immediately for inferencing. If the delay expires the dynamic batcher
+sends the batch as is, even though it is not a maximum or preferred
+size.</p>
+</div>
+<div class="section" id="preserve-ordering">
+<h4>Preserve Ordering<a class="headerlink" href="#preserve-ordering" title="Permalink to this headline">#</a></h4>
+<p>The <em>preserve_ordering</em> property is used to force all responses to be
+returned in the same order as requests were received. See the
+<a class="reference external" href="https://github.com/triton-inference-server/common/blob/main/protobuf/model_config.proto">protobuf
+documentation</a>
+for details.</p>
+</div>
+<div class="section" id="priority-levels">
+<h4>Priority Levels<a class="headerlink" href="#priority-levels" title="Permalink to this headline">#</a></h4>
+<p>By default the dynamic batcher maintains a single queue that holds all
+inference requests for a model. The requests are processed and batched
+in order.  The <em>priority_levels</em> property can be used to create
+multiple priority levels within the dynamic batcher so that requests
+with higher priority are allowed to bypass requests with lower
+priority. Requests at the same priority level are processed in
+order. Inference requests that do not set a priority are scheduled
+using the <em>default_priority_level</em> property.</p>
+</div>
+<div class="section" id="queue-policy">
+<h4>Queue Policy<a class="headerlink" href="#queue-policy" title="Permalink to this headline">#</a></h4>
+<p>The dynamic batcher provides several settings that control how
+requests are queued for batching.</p>
+<p>When <em>priority_levels</em> is not defined, the <em>ModelQueuePolicy</em> for the
+single queue can be set with <em>default_queue_policy</em>.  When
+<em>priority_levels</em> is defined, each priority level can have a different
+<em>ModelQueuePolicy</em> as specified by <em>default_queue_policy</em> and <em>priority_queue_policy</em>.</p>
+<p>The <em>ModelQueuePolicy</em> property allows a maximum queue size to be set
+using the <em>max_queue_size</em>. The <em>timeout_action</em>,
+<em>default_timeout_microseconds</em> and <em>allow_timeout_override</em> settings
+allow the queue to be configured so that individual requests are
+rejected or deferred if their time in the queue exceeds a specified
+timeout.</p>
+</div>
+</div>
+<div class="section" id="sequence-batcher">
+<h3>Sequence Batcher<a class="headerlink" href="#sequence-batcher" title="Permalink to this headline">#</a></h3>
+<p>Like the dynamic batcher, the sequence batcher combines non-batched
+inference requests, so that a batch is created dynamically. Unlike the
+dynamic batcher, the sequence batcher should be used for
+<a class="reference internal" href="architecture.html#stateful-models"><span class="std std-doc">stateful models</span></a> where a sequence of
+inference requests must be routed to the same model instance. The
+dynamically created batches are distributed to all <a class="reference internal" href="#instance-groups"><span class="std std-doc">model
+instances</span></a> configured for the model.</p>
+<p>Sequence batching is enabled and configured independently for each
+model using the <em>ModelSequenceBatching</em> property in the model
+configuration. These settings control the sequence timeout as well as
+configuring how Triton will send control signals to the model
+indicating sequence start, end, ready and correlation ID. See
+<a class="reference internal" href="architecture.html#stateful-models"><span class="std std-doc">Stateful Models</span></a> for more
+information and examples.</p>
+</div>
+<div class="section" id="ensemble-scheduler">
+<h3>Ensemble Scheduler<a class="headerlink" href="#ensemble-scheduler" title="Permalink to this headline">#</a></h3>
+<p>The ensemble scheduler must be used for <a class="reference internal" href="architecture.html#ensemble-models"><span class="std std-doc">ensemble
+models</span></a> and cannot be used for any
+other type of model.</p>
+<p>The ensemble scheduler is enabled and configured independently for
+each model using the <em>ModelEnsembleScheduling</em> property in the model
+configuration. The settings describe the models that are included in
+the ensemble and the flow of tensor values between the models. See
+<a class="reference internal" href="architecture.html#ensemble-models"><span class="std std-doc">Ensemble Models</span></a> for more
+information and examples.</p>
+</div>
+</div>
+<div class="section" id="optimization-policy">
+<h2>Optimization Policy<a class="headerlink" href="#optimization-policy" title="Permalink to this headline">#</a></h2>
+<p>The model configuration <em>ModelOptimizationPolicy</em> property is used to
+specify optimization and prioritization settings for a model. These
+settings control if/how a model is optimized by the backend and how it
+is scheduled and executed by Triton. See the <a class="reference external" href="https://github.com/triton-inference-server/common/blob/main/protobuf/model_config.proto">ModelConfig
+protobuf</a>
+and <a class="reference internal" href="optimization.html#framework-specific-optimization"><span class="std std-doc">optimization</span></a>
+documentation for the currently available settings.</p>
+</div>
+<div class="section" id="model-warmup">
+<h2>Model Warmup<a class="headerlink" href="#model-warmup" title="Permalink to this headline">#</a></h2>
+<p>When a model is loaded by Triton the corresponding
+<a class="reference external" href="https://github.com/triton-inference-server/backend/blob/main/README.md">backend</a>
+initializes for that model.  For some backends, some or all of this
+initialization is deferred until the model receives its first
+inference request (or first few inference requests). As a result, the
+first (few) inference requests can be significantly slower due to
+deferred initialization.</p>
+<p>To avoid these initial, slow inference requests, Triton provides a
+configuration option that enables a model to be “warmed up” so that it
+is completely initialized before the first inference request is
+received. When the <em>ModelWarmup</em> property is defined in a model
+configuration, Triton will not show the model as being ready for
+inference until model warmup has completed.</p>
+<p>The model configuration <em>ModelWarmup</em> is used to specify warmup
+settings for a model. The settings define a series of inference
+requests that Triton will create to warm-up each model instance. A
+model instance will be served only if it completes the requests
+successfully.  Note that the effect of warming up models varies
+depending on the framework backend, and it will cause Triton to be
+less responsive to model update, so the users should experiment and
+choose the configuration that suits their need. See the
+<a class="reference external" href="https://github.com/triton-inference-server/common/blob/main/protobuf/model_config.proto">ModelWarmup protobuf</a>
+documentation for the currently available settings, and
+<a class="reference external" href="https://github.com/triton-inference-server/server/blob/main/qa/L0_warmup/test.sh">L0_warmup</a>
+for examples on specifying different variants of warmup samples.</p>
+</div>
+<div class="section" id="response-cache">
+<h2>Response Cache<a class="headerlink" href="#response-cache" title="Permalink to this headline">#</a></h2>
+<p>The model configuration <code class="docutils literal notranslate"><span class="pre">response_cache</span></code> section has an <code class="docutils literal notranslate"><span class="pre">enable</span></code> boolean used to
+enable the Response Cache for this model. In addition to enabling the cache in
+the model config, a non-zero <code class="docutils literal notranslate"><span class="pre">--response-cache-byte-size</span></code> must be set when
+starting the server.</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">response_cache</span> <span class="p">{</span>
+  <span class="n">enable</span><span class="p">:</span> <span class="kc">True</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+<p>See the <a class="reference internal" href="response_cache.html"><span class="doc std std-doc">Response
+Cache</span></a>
+and <a class="reference external" href="https://github.com/triton-inference-server/common/blob/main/protobuf/model_config.proto">ModelConfig
+protobuf</a>.
+docs for more information.</p>
+</div>
+</div>
+
+<div class="section">
+   
+</div>
+
+              </div>
+              
+            </main>
+            <footer class="footer-article noprint">
+                
+    <!-- Previous / next buttons -->
+<div class='prev-next-area'>
+    <a class='left-prev' id="prev-link" href="../customization_guide/repository_agents.html" title="previous page">
+        <i class="fas fa-angle-left"></i>
+        <div class="prev-next-info">
+            <p class="prev-next-subtitle">previous</p>
+            <p class="prev-next-title">Repository Agent</p>
+        </div>
+    </a>
+    <a class='right-next' id="next-link" href="optimization.html" title="next page">
+    <div class="prev-next-info">
+        <p class="prev-next-subtitle">next</p>
+        <p class="prev-next-title">Optimization</p>
+    </div>
+    <i class="fas fa-angle-right"></i>
+    </a>
+</div>
+            </footer>
+        </div>
+    </div>
+    <div class="footer-content row">
+        <footer class="col footer"><p>
+  
+    By NVIDIA<br/>
+  
+      &copy; Copyright 2022 NVIDIA CORPORATION &amp; AFFILIATES. All rights reserved.<br/>
+    Last updated on Oct 05, 2022.<br/>
+</p>
+        </footer>
+    </div>
+    
+</div>
+
+
+      </div>
+    </div>
+  
+  <!-- Scripts loaded after <body> so the DOM is not blocked -->
+  <script src="../_static/scripts/pydata-sphinx-theme.js?digest=1999514e3f237ded88cf"></script>
+
+
+<script type="text/javascript">_satellite.pageBottom();</script>
+  </body>
+</html>

@@ -1,0 +1,1425 @@
+
+<!DOCTYPE html>
+
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Performance Analyzer &#8212; NVIDIA Triton Inference Server</title>
+    
+  <!-- Loaded before other Sphinx assets -->
+  <link href="../_static/styles/theme.css?digest=1999514e3f237ded88cf" rel="stylesheet">
+<link href="../_static/styles/pydata-sphinx-theme.css?digest=1999514e3f237ded88cf" rel="stylesheet">
+
+    
+  <link rel="stylesheet"
+    href="../_static/vendor/fontawesome/5.13.0/css/all.min.css">
+  <link rel="preload" as="font" type="font/woff2" crossorigin
+    href="../_static/vendor/fontawesome/5.13.0/webfonts/fa-solid-900.woff2">
+  <link rel="preload" as="font" type="font/woff2" crossorigin
+    href="../_static/vendor/fontawesome/5.13.0/webfonts/fa-brands-400.woff2">
+
+    <link rel="stylesheet" type="text/css" href="../_static/pygments.css" />
+    <link rel="stylesheet" href="../_static/styles/sphinx-book-theme.css?digest=62ba249389abaaa9ffc34bf36a076bdc1d65ee18" type="text/css" />
+    <link rel="stylesheet" type="text/css" href="../_static/mystnb.4510f1fc1dee50b3e5859aac5469c37c29e427902b24a333a5f9fcb2f0b3ac41.css" />
+    <link rel="stylesheet" type="text/css" href="../_static/copybutton.css" />
+    <link rel="stylesheet" type="text/css" href="../_static/tabs.css" />
+    <link rel="stylesheet" type="text/css" href="../_static/custom.css" />
+    <link rel="stylesheet" type="text/css" href="../_static/design-style.4045f2051d55cab465a707391d5b2007.min.css" />
+    
+  <!-- Pre-loaded scripts that we'll load fully later -->
+  <link rel="preload" as="script" href="../_static/scripts/pydata-sphinx-theme.js?digest=1999514e3f237ded88cf">
+
+    <script data-url_root="../" id="documentation_options" src="../_static/documentation_options.js"></script>
+    <script src="../_static/jquery.js"></script>
+    <script src="../_static/underscore.js"></script>
+    <script src="../_static/doctools.js"></script>
+    <script src="../_static/clipboard.min.js"></script>
+    <script src="../_static/copybutton.js"></script>
+    <script src="https://js.hcaptcha.com/1/api.js"></script>
+    <script src="//assets.adobedtm.com/5d4962a43b79/c1061d2c5e7b/launch-191c2462b890.min.js"></script>
+    <script src="../_static/scripts/sphinx-book-theme.js?digest=f31d14ad54b65d19161ba51d4ffff3a77ae00456"></script>
+    <script src="../_static/design-tabs.js"></script>
+    <link rel="canonical" href="https://docs.nvidia.com/deeplearning/triton-inference-server/user-guide/docs/user_guide/perf_analyzer.html" />
+    <link rel="shortcut icon" href="../_static/nvidia-logo-vert-rgb-blk-for-screen.png"/>
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" />
+    <link rel="next" title="Model Management" href="model_management.html" />
+    <link rel="prev" title="Model Analyzer" href="model_analyzer.html" /> 
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="docsearch:language" content="None">
+    
+
+    <!-- Google Analytics -->
+      
+<style type="text/css">
+  ul.ablog-archive {
+    list-style: none;
+    overflow: auto;
+    margin-left: 0px;
+  }
+  ul.ablog-archive li {
+    float: left;
+    margin-right: 5px;
+    font-size: 80%;
+  }
+  ul.postlist a {
+    font-style: italic;
+  }
+  ul.postlist-style-disc {
+    list-style-type: disc;
+  }
+  ul.postlist-style-none {
+    list-style-type: none;
+  }
+  ul.postlist-style-circle {
+    list-style-type: circle;
+  }
+</style>
+
+  </head>
+  <body data-spy="scroll" data-target="#bd-toc-nav" data-offset="60">
+<!-- Checkboxes to toggle the left sidebar -->
+<input type="checkbox" class="sidebar-toggle" name="__navigation" id="__navigation" aria-label="Toggle navigation sidebar">
+<label class="overlay overlay-navbar" for="__navigation">
+    <div class="visually-hidden">Toggle navigation sidebar</div>
+</label>
+<!-- Checkboxes to toggle the in-page toc -->
+<input type="checkbox" class="sidebar-toggle" name="__page-toc" id="__page-toc" aria-label="Toggle in-page Table of Contents">
+<label class="overlay overlay-pagetoc" for="__page-toc">
+    <div class="visually-hidden">Toggle in-page Table of Contents</div>
+</label>
+<!-- Headers at the top -->
+<div class="announcement header-item noprint"></div>
+<div class="header header-item noprint"></div>
+
+    
+    <div class="container-fluid" id="banner"></div>
+
+    
+
+    <div class="container-xl">
+      <div class="row">
+          
+<!-- Sidebar -->
+<div class="bd-sidebar noprint" id="site-navigation">
+    <div class="bd-sidebar__content">
+        <div class="bd-sidebar__top"><div class="navbar-brand-box">
+    <a class="navbar-brand text-wrap" href="../index.html">
+      
+        <!-- `logo` is deprecated in Sphinx 4.0, so remove this when we stop supporting 3 -->
+        
+      
+      
+      <img src="../_static/nvidia-logo-horiz-rgb-blk-for-screen.png" class="logo" alt="logo">
+      
+      
+      <h1 class="site-logo" id="site-title">NVIDIA Triton Inference Server</h1>
+      
+    </a>
+</div><form class="bd-search d-flex align-items-center" action="../search.html" method="get">
+  <i class="icon fas fa-search"></i>
+  <input type="search" class="form-control" name="q" id="search-input" placeholder="Search the docs ..." aria-label="Search the docs ..." autocomplete="off" >
+</form><nav class="bd-links" id="bd-docs-nav" aria-label="Main">
+    <div class="bd-toc-item active">
+        <p aria-level="2" class="caption" role="heading">
+ <span class="caption-text">
+  Getting Started
+ </span>
+</p>
+<ul class="nav bd-sidenav">
+ <li class="toctree-l1">
+  <a class="reference internal" href="../getting_started/quickstart.html">
+   Quickstart
+  </a>
+ </li>
+</ul>
+<p aria-level="2" class="caption" role="heading">
+ <span class="caption-text">
+  User Guide
+ </span>
+</p>
+<ul class="current nav bd-sidenav">
+ <li class="toctree-l1">
+  <a class="reference internal" href="performance_tuning.html">
+   Deploying your trained model using Triton
+  </a>
+ </li>
+ <li class="toctree-l1">
+  <a class="reference internal" href="architecture.html">
+   Triton Architecture
+  </a>
+ </li>
+ <li class="toctree-l1">
+  <a class="reference internal" href="model_repository.html">
+   Model Repository
+  </a>
+ </li>
+ <li class="toctree-l1">
+  <a class="reference internal" href="../customization_guide/repository_agents.html">
+   Repository Agent
+  </a>
+ </li>
+ <li class="toctree-l1">
+  <a class="reference internal" href="model_configuration.html">
+   Model Configuration
+  </a>
+ </li>
+ <li class="toctree-l1">
+  <a class="reference internal" href="optimization.html">
+   Optimization
+  </a>
+ </li>
+ <li class="toctree-l1">
+  <a class="reference internal" href="ragged_batching.html">
+   Ragged Batching
+  </a>
+ </li>
+ <li class="toctree-l1">
+  <a class="reference internal" href="rate_limiter.html">
+   Rate Limiter
+  </a>
+ </li>
+ <li class="toctree-l1">
+  <a class="reference internal" href="model_analyzer.html">
+   Model Analyzer
+  </a>
+ </li>
+ <li class="toctree-l1 current active">
+  <a class="current reference internal" href="#">
+   Performance Analyzer
+  </a>
+ </li>
+ <li class="toctree-l1">
+  <a class="reference internal" href="model_management.html">
+   Model Management
+  </a>
+ </li>
+ <li class="toctree-l1">
+  <a class="reference internal" href="custom_operations.html">
+   Custom Operations
+  </a>
+ </li>
+ <li class="toctree-l1">
+  <a class="reference internal" href="decoupled_models.html">
+   Decoupled Backends and Models
+  </a>
+ </li>
+ <li class="toctree-l1">
+  <a class="reference internal" href="response_cache.html">
+   Triton Response Cache
+  </a>
+ </li>
+ <li class="toctree-l1">
+  <a class="reference internal" href="metrics.html">
+   Metrics
+  </a>
+ </li>
+ <li class="toctree-l1">
+  <a class="reference internal" href="trace.html">
+   Triton Server Trace
+  </a>
+ </li>
+ <li class="toctree-l1">
+  <a class="reference internal" href="jetson.html">
+   Triton Inference Server Support for Jetson and JetPack
+  </a>
+ </li>
+ <li class="toctree-l1">
+  <a class="reference internal" href="v1_to_v2.html">
+   Version 1 to Version 2 Migration
+  </a>
+ </li>
+</ul>
+<ul class="nav bd-sidenav">
+ <li class="toctree-l1">
+  <a class="reference internal" href="faq.html">
+   FAQ
+  </a>
+ </li>
+</ul>
+<p aria-level="2" class="caption" role="heading">
+ <span class="caption-text">
+  Protocol Guides
+ </span>
+</p>
+<ul class="nav bd-sidenav">
+ <li class="toctree-l1">
+  <a class="reference internal" href="../customization_guide/inference_protocols.html">
+   Inference Protocols and APIs
+  </a>
+ </li>
+ <li class="toctree-l1">
+  <a class="reference internal" href="../protocol/extension_binary_data.html">
+   Binary Tensor Data Extension
+  </a>
+ </li>
+ <li class="toctree-l1">
+  <a class="reference internal" href="../protocol/extension_classification.html">
+   Classification Extension
+  </a>
+ </li>
+ <li class="toctree-l1">
+  <a class="reference internal" href="../protocol/extension_logging.html">
+   Logging Extension
+  </a>
+ </li>
+ <li class="toctree-l1">
+  <a class="reference internal" href="../protocol/extension_model_configuration.html">
+   Model Configuration Extension
+  </a>
+ </li>
+ <li class="toctree-l1">
+  <a class="reference internal" href="../protocol/extension_model_repository.html">
+   Model Repository Extension
+  </a>
+ </li>
+ <li class="toctree-l1">
+  <a class="reference internal" href="../protocol/extension_schedule_policy.html">
+   Schedule Policy Extension
+  </a>
+ </li>
+ <li class="toctree-l1">
+  <a class="reference internal" href="../protocol/extension_sequence.html">
+   Sequence Extension
+  </a>
+ </li>
+ <li class="toctree-l1">
+  <a class="reference internal" href="../protocol/extension_shared_memory.html">
+   Shared-Memory Extension
+  </a>
+ </li>
+ <li class="toctree-l1">
+  <a class="reference internal" href="../protocol/extension_statistics.html">
+   Statistics Extension
+  </a>
+ </li>
+ <li class="toctree-l1">
+  <a class="reference internal" href="../protocol/extension_trace.html">
+   Trace Extension
+  </a>
+ </li>
+</ul>
+<p aria-level="2" class="caption" role="heading">
+ <span class="caption-text">
+  Customization Guide
+ </span>
+</p>
+<ul class="nav bd-sidenav">
+ <li class="toctree-l1">
+  <a class="reference internal" href="../customization_guide/build.html">
+   Building Triton
+  </a>
+ </li>
+ <li class="toctree-l1">
+  <a class="reference internal" href="../customization_guide/compose.html">
+   Customize Triton Container
+  </a>
+ </li>
+ <li class="toctree-l1">
+  <a class="reference internal" href="../customization_guide/test.html">
+   Testing Triton
+  </a>
+ </li>
+</ul>
+<p aria-level="2" class="caption" role="heading">
+ <span class="caption-text">
+  Examples
+ </span>
+</p>
+<ul class="nav bd-sidenav">
+ <li class="toctree-l1">
+  <a class="reference internal" href="../examples/jetson/README.html">
+   Using Triton Inference Server as a shared library for execution on Jetson
+  </a>
+ </li>
+ <li class="toctree-l1">
+  <a class="reference internal" href="../examples/jetson/concurrency_and_dynamic_batching/README.html">
+   Concurrent inference and dynamic batching
+  </a>
+ </li>
+</ul>
+
+    </div>
+</nav></div>
+        <div class="bd-sidebar__bottom">
+             <!-- To handle the deprecated key -->
+            
+        </div>
+    </div>
+    <div id="rtd-footer-container"></div>
+</div>
+
+
+          
+
+
+          
+<!-- A tiny helper pixel to detect if we've scrolled -->
+<div class="sbt-scroll-pixel-helper"></div>
+<!-- Main content -->
+<div class="col py-0 content-container">
+    
+    <div class="header-article row sticky-top noprint">
+        
+
+
+
+<div class="col py-1 d-flex header-article-main">
+    <div class="header-article__left">
+        
+        <label for="__navigation"
+  class="headerbtn"
+  data-toggle="tooltip"
+data-placement="right"
+title="Toggle navigation"
+>
+  
+
+<span class="headerbtn__icon-container">
+  <i class="fas fa-bars"></i>
+  </span>
+
+</label>
+
+        
+    </div>
+    <div class="header-article__right">
+<button onclick="toggleFullScreen()"
+  class="headerbtn"
+  data-toggle="tooltip"
+data-placement="bottom"
+title="Fullscreen mode"
+>
+  
+
+<span class="headerbtn__icon-container">
+  <i class="fas fa-expand"></i>
+  </span>
+
+</button>
+
+<div class="menu-dropdown menu-dropdown-repository-buttons">
+  <button class="headerbtn menu-dropdown__trigger"
+      aria-label="Source repositories">
+      <i class="fab fa-github"></i>
+  </button>
+  <div class="menu-dropdown__content">
+    <ul>
+      <li>
+        <a href="https://github.com/triton-inference-server/server"
+   class="headerbtn"
+   data-toggle="tooltip"
+data-placement="left"
+title="Source repository"
+>
+  
+
+<span class="headerbtn__icon-container">
+  <i class="fab fa-github"></i>
+  </span>
+<span class="headerbtn__text-container">repository</span>
+</a>
+
+      </li>
+      
+      <li>
+        <a href="https://github.com/triton-inference-server/server/issues/new?title=Issue%20on%20page%20%2Fuser_guide/perf_analyzer.html&body=Your%20issue%20content%20here."
+   class="headerbtn"
+   data-toggle="tooltip"
+data-placement="left"
+title="Open an issue"
+>
+  
+
+<span class="headerbtn__icon-container">
+  <i class="fas fa-lightbulb"></i>
+  </span>
+<span class="headerbtn__text-container">open issue</span>
+</a>
+
+      </li>
+      
+    </ul>
+  </div>
+</div>
+<label for="__page-toc"
+  class="headerbtn headerbtn-page-toc"
+  
+>
+  
+
+<span class="headerbtn__icon-container">
+  <i class="fas fa-list"></i>
+  </span>
+
+</label>
+
+    </div>
+</div>
+
+<!-- Table of contents -->
+<div class="col-md-3 bd-toc show noprint">
+    <div class="tocsection onthispage pt-5 pb-3">
+        <i class="fas fa-list"></i> Contents
+    </div>
+    <nav id="bd-toc-nav" aria-label="Page">
+        <ul class="visible nav section-nav flex-column">
+ <li class="toc-h2 nav-item toc-entry">
+  <a class="reference internal nav-link" href="#request-concurrency">
+   Request Concurrency
+  </a>
+ </li>
+ <li class="toc-h2 nav-item toc-entry">
+  <a class="reference internal nav-link" href="#understanding-the-output">
+   Understanding The Output
+  </a>
+ </li>
+ <li class="toc-h2 nav-item toc-entry">
+  <a class="reference internal nav-link" href="#visualizing-latency-vs-throughput">
+   Visualizing Latency vs. Throughput
+  </a>
+  <ul class="visible nav section-nav flex-column">
+   <li class="toc-h3 nav-item toc-entry">
+    <a class="reference internal nav-link" href="#server-side-prometheus-metrics">
+     Server-side Prometheus metrics
+    </a>
+   </li>
+  </ul>
+ </li>
+ <li class="toc-h2 nav-item toc-entry">
+  <a class="reference internal nav-link" href="#input-data">
+   Input Data
+  </a>
+ </li>
+ <li class="toc-h2 nav-item toc-entry">
+  <a class="reference internal nav-link" href="#real-input-data">
+   Real Input Data
+  </a>
+  <ul class="visible nav section-nav flex-column">
+   <li class="toc-h3 nav-item toc-entry">
+    <a class="reference internal nav-link" href="#output-validation">
+     Output Validation
+    </a>
+   </li>
+  </ul>
+ </li>
+ <li class="toc-h2 nav-item toc-entry">
+  <a class="reference internal nav-link" href="#shared-memory">
+   Shared Memory
+  </a>
+ </li>
+ <li class="toc-h2 nav-item toc-entry">
+  <a class="reference internal nav-link" href="#communication-protocol">
+   Communication Protocol
+  </a>
+  <ul class="visible nav section-nav flex-column">
+   <li class="toc-h3 nav-item toc-entry">
+    <a class="reference internal nav-link" href="#ssl-tls-support">
+     SSL/TLS Support
+    </a>
+   </li>
+  </ul>
+ </li>
+ <li class="toc-h2 nav-item toc-entry">
+  <a class="reference internal nav-link" href="#benchmarking-triton-directly-via-c-api">
+   Benchmarking Triton directly via C API
+  </a>
+  <ul class="visible nav section-nav flex-column">
+   <li class="toc-h3 nav-item toc-entry">
+    <a class="reference internal nav-link" href="#prerequisite">
+     Prerequisite
+    </a>
+   </li>
+   <li class="toc-h3 nav-item toc-entry">
+    <a class="reference internal nav-link" href="#required-parameters">
+     Required Parameters
+    </a>
+   </li>
+   <li class="toc-h3 nav-item toc-entry">
+    <a class="reference internal nav-link" href="#non-supported-functionalities">
+     Non-supported functionalities
+    </a>
+   </li>
+  </ul>
+ </li>
+ <li class="toc-h2 nav-item toc-entry">
+  <a class="reference internal nav-link" href="#benchmarking-tensorflow-serving">
+   Benchmarking TensorFlow Serving
+  </a>
+ </li>
+ <li class="toc-h2 nav-item toc-entry">
+  <a class="reference internal nav-link" href="#benchmarking-torchserve">
+   Benchmarking TorchServe
+  </a>
+ </li>
+ <li class="toc-h2 nav-item toc-entry">
+  <a class="reference internal nav-link" href="#advantages-of-using-perf-analyzer-over-third-party-benchmark-suites">
+   Advantages of using Perf Analyzer over third-party benchmark suites
+  </a>
+ </li>
+</ul>
+
+    </nav>
+</div>
+    </div>
+    <div class="article row">
+        <div class="col pl-md-3 pl-lg-5 content-container">
+            <!-- Table of contents that is only displayed when printing the page -->
+            <div id="jb-print-docs-body" class="onlyprint">
+                <h1>Performance Analyzer</h1>
+                <!-- Table of contents -->
+                <div id="print-main-content">
+                    <div id="jb-print-toc">
+                        
+                        <div>
+                            <h2> Contents </h2>
+                        </div>
+                        <nav aria-label="Page">
+                            <ul class="visible nav section-nav flex-column">
+ <li class="toc-h2 nav-item toc-entry">
+  <a class="reference internal nav-link" href="#request-concurrency">
+   Request Concurrency
+  </a>
+ </li>
+ <li class="toc-h2 nav-item toc-entry">
+  <a class="reference internal nav-link" href="#understanding-the-output">
+   Understanding The Output
+  </a>
+ </li>
+ <li class="toc-h2 nav-item toc-entry">
+  <a class="reference internal nav-link" href="#visualizing-latency-vs-throughput">
+   Visualizing Latency vs. Throughput
+  </a>
+  <ul class="visible nav section-nav flex-column">
+   <li class="toc-h3 nav-item toc-entry">
+    <a class="reference internal nav-link" href="#server-side-prometheus-metrics">
+     Server-side Prometheus metrics
+    </a>
+   </li>
+  </ul>
+ </li>
+ <li class="toc-h2 nav-item toc-entry">
+  <a class="reference internal nav-link" href="#input-data">
+   Input Data
+  </a>
+ </li>
+ <li class="toc-h2 nav-item toc-entry">
+  <a class="reference internal nav-link" href="#real-input-data">
+   Real Input Data
+  </a>
+  <ul class="visible nav section-nav flex-column">
+   <li class="toc-h3 nav-item toc-entry">
+    <a class="reference internal nav-link" href="#output-validation">
+     Output Validation
+    </a>
+   </li>
+  </ul>
+ </li>
+ <li class="toc-h2 nav-item toc-entry">
+  <a class="reference internal nav-link" href="#shared-memory">
+   Shared Memory
+  </a>
+ </li>
+ <li class="toc-h2 nav-item toc-entry">
+  <a class="reference internal nav-link" href="#communication-protocol">
+   Communication Protocol
+  </a>
+  <ul class="visible nav section-nav flex-column">
+   <li class="toc-h3 nav-item toc-entry">
+    <a class="reference internal nav-link" href="#ssl-tls-support">
+     SSL/TLS Support
+    </a>
+   </li>
+  </ul>
+ </li>
+ <li class="toc-h2 nav-item toc-entry">
+  <a class="reference internal nav-link" href="#benchmarking-triton-directly-via-c-api">
+   Benchmarking Triton directly via C API
+  </a>
+  <ul class="visible nav section-nav flex-column">
+   <li class="toc-h3 nav-item toc-entry">
+    <a class="reference internal nav-link" href="#prerequisite">
+     Prerequisite
+    </a>
+   </li>
+   <li class="toc-h3 nav-item toc-entry">
+    <a class="reference internal nav-link" href="#required-parameters">
+     Required Parameters
+    </a>
+   </li>
+   <li class="toc-h3 nav-item toc-entry">
+    <a class="reference internal nav-link" href="#non-supported-functionalities">
+     Non-supported functionalities
+    </a>
+   </li>
+  </ul>
+ </li>
+ <li class="toc-h2 nav-item toc-entry">
+  <a class="reference internal nav-link" href="#benchmarking-tensorflow-serving">
+   Benchmarking TensorFlow Serving
+  </a>
+ </li>
+ <li class="toc-h2 nav-item toc-entry">
+  <a class="reference internal nav-link" href="#benchmarking-torchserve">
+   Benchmarking TorchServe
+  </a>
+ </li>
+ <li class="toc-h2 nav-item toc-entry">
+  <a class="reference internal nav-link" href="#advantages-of-using-perf-analyzer-over-third-party-benchmark-suites">
+   Advantages of using Perf Analyzer over third-party benchmark suites
+  </a>
+ </li>
+</ul>
+
+                        </nav>
+                    </div>
+                </div>
+            </div>
+            <main id="main-content" role="main">
+                
+              <div>
+                 <!--
+# Copyright (c) 2020-2022, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+#
+# Redistribution and use in source and binary forms, with or without
+# modification, are permitted provided that the following conditions
+# are met:
+#  * Redistributions of source code must retain the above copyright
+#    notice, this list of conditions and the following disclaimer.
+#  * Redistributions in binary form must reproduce the above copyright
+#    notice, this list of conditions and the following disclaimer in the
+#    documentation and/or other materials provided with the distribution.
+#  * Neither the name of NVIDIA CORPORATION nor the names of its
+#    contributors may be used to endorse or promote products derived
+#    from this software without specific prior written permission.
+#
+# THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS ``AS IS'' AND ANY
+# EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+# IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR
+# PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL THE COPYRIGHT OWNER OR
+# CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL,
+# EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
+# PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR
+# PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY
+# OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+# (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+# OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+-->
+<div class="tex2jax_ignore mathjax_ignore section" id="performance-analyzer">
+<h1>Performance Analyzer<a class="headerlink" href="#performance-analyzer" title="Permalink to this headline">#</a></h1>
+<p>A critical part of optimizing the inference performance of your model
+is being able to measure changes in performance as you experiment with
+different optimization strategies. The perf_analyzer application
+(previously known as perf_client) performs this task for the Triton
+Inference Server. The perf_analyzer is included with the client
+examples which are <a class="reference external" href="https://github.com/triton-inference-server/client#getting-the-client-libraries-and-examples">available from several
+sources</a>.</p>
+<p>The perf_analyzer application generates inference requests to your
+model and measures the throughput and latency of those requests. To
+get representative results, perf_analyzer measures the throughput and
+latency over a time window, and then repeats the measurements until it
+gets stable values. By default perf_analyzer uses average latency to
+determine stability but you can use the –percentile flag to stabilize
+results based on that confidence level. For example, if
+–percentile=95 is used the results will be stabilized using the 95-th
+percentile request latency. For example,</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span>$ perf_analyzer -m inception_graphdef --percentile=95
+*** Measurement Settings ***
+  Batch size: 1
+  Measurement window: 5000 msec
+  Using synchronous calls for inference
+  Stabilizing using p95 latency
+
+Request concurrency: 1
+  Client:
+    Request count: 348
+    Throughput: 69.6 infer/sec
+    p50 latency: 13936 usec
+    p90 latency: 18682 usec
+    p95 latency: 19673 usec
+    p99 latency: 21859 usec
+    Avg HTTP time: 14017 usec (send/recv 200 usec + response wait 13817 usec)
+  Server:
+    Inference count: 428
+    Execution count: 428
+    Successful request count: 428
+    Avg request latency: 12005 usec (overhead 36 usec + queue 42 usec + compute input 164 usec + compute infer 11748 usec + compute output 15 usec)
+
+Inferences/Second vs. Client p95 Batch Latency
+Concurrency: 1, throughput: 69.6 infer/sec, latency 19673 usec
+</pre></div>
+</div>
+<div class="section" id="request-concurrency">
+<h2>Request Concurrency<a class="headerlink" href="#request-concurrency" title="Permalink to this headline">#</a></h2>
+<p>By default perf_analyzer measures your model’s latency and throughput
+using the lowest possible load on the model. To do this perf_analyzer
+sends one inference request to Triton and waits for the response.
+When that response is received, the perf_analyzer immediately sends
+another request, and then repeats this process during the measurement
+windows. The number of outstanding inference requests is referred to
+as the <em>request concurrency</em>, and so by default perf_analyzer uses a
+request concurrency of 1.</p>
+<p>Using the –concurrency-range &lt;start&gt;:&lt;end&gt;:&lt;step&gt; option you can have
+perf_analyzer collect data for a range of request concurrency
+levels. Use the –help option to see complete documentation for this
+and other options. For example, to see the latency and throughput of
+your model for request concurrency values from 1 to 4:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span>$ perf_analyzer -m inception_graphdef --concurrency-range 1:4
+*** Measurement Settings ***
+  Batch size: 1
+  Measurement window: 5000 msec
+  Latency limit: 0 msec
+  Concurrency limit: 4 concurrent requests
+  Using synchronous calls for inference
+  Stabilizing using average latency
+
+Request concurrency: 1
+  Client:
+    Request count: 339
+    Throughput: 67.8 infer/sec
+    Avg latency: 14710 usec (standard deviation 2539 usec)
+    p50 latency: 13665 usec
+...
+Request concurrency: 4
+  Client:
+    Request count: 415
+    Throughput: 83 infer/sec
+    Avg latency: 48064 usec (standard deviation 6412 usec)
+    p50 latency: 47975 usec
+    p90 latency: 56670 usec
+    p95 latency: 59118 usec
+    p99 latency: 63609 usec
+    Avg HTTP time: 48166 usec (send/recv 264 usec + response wait 47902 usec)
+  Server:
+    Inference count: 498
+    Execution count: 498
+    Successful request count: 498
+    Avg request latency: 45602 usec (overhead 39 usec + queue 33577 usec + compute input 217 usec + compute infer 11753 usec + compute output 16 usec)
+
+Inferences/Second vs. Client Average Batch Latency
+Concurrency: 1, throughput: 67.8 infer/sec, latency 14710 usec
+Concurrency: 2, throughput: 89.8 infer/sec, latency 22280 usec
+Concurrency: 3, throughput: 80.4 infer/sec, latency 37283 usec
+Concurrency: 4, throughput: 83 infer/sec, latency 48064 usec
+</pre></div>
+</div>
+</div>
+<div class="section" id="understanding-the-output">
+<h2>Understanding The Output<a class="headerlink" href="#understanding-the-output" title="Permalink to this headline">#</a></h2>
+<p>For each request concurrency level perf_analyzer reports latency and
+throughput as seen from the <em>client</em> (that is, as seen by
+perf_analyzer) and also the average request latency on the server.</p>
+<p>The server latency measures the total time from when the request is
+received at the server until the response is sent from the
+server. Because of the HTTP and GRPC libraries used to implement the
+server endpoints, total server latency is typically more accurate for
+HTTP requests as it measures time from first byte received until last
+byte sent. For both HTTP and GRPC the total server latency is
+broken-down into the following components:</p>
+<ul class="simple">
+<li><p><em>queue</em>: The average time spent in the inference schedule queue by a
+request waiting for an instance of the model to become available.</p></li>
+<li><p><em>compute</em>: The average time spent performing the actual inference,
+including any time needed to copy data to/from the GPU.</p></li>
+</ul>
+<p>The client latency time is broken-down further for HTTP and GRPC as
+follows:</p>
+<ul class="simple">
+<li><p>HTTP: <em>send/recv</em> indicates the time on the client spent sending the
+request and receiving the response. <em>response wait</em> indicates time
+waiting for the response from the server.</p></li>
+<li><p>GRPC: <em>(un)marshal request/response</em> indicates the time spent
+marshalling the request data into the GRPC protobuf and
+unmarshalling the response data from the GRPC protobuf. <em>response
+wait</em> indicates time writing the GRPC request to the network,
+waiting for the response, and reading the GRPC response from the
+network.</p></li>
+</ul>
+<p>Use the verbose (-v) option to perf_analyzer to see more output,
+including the stabilization passes run for each request concurrency
+level.</p>
+</div>
+<div class="section" id="visualizing-latency-vs-throughput">
+<h2>Visualizing Latency vs. Throughput<a class="headerlink" href="#visualizing-latency-vs-throughput" title="Permalink to this headline">#</a></h2>
+<p>The perf_analyzer provides the -f option to generate a file containing
+CSV output of the results.</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span>$ perf_analyzer -m inception_graphdef --concurrency-range 1:4 -f perf.csv
+$ cat perf.csv
+Concurrency,Inferences/Second,Client Send,Network+Server Send/Recv,Server Queue,Server Compute Input,Server Compute Infer,Server Compute Output,Client Recv,p50 latency,p90 latency,p95 latency,p99 latency
+1,69.2,225,2148,64,206,11781,19,0,13891,18795,19753,21018
+3,84.2,237,1768,21673,209,11742,17,0,35398,43984,47085,51701
+4,84.2,279,1604,33669,233,11731,18,1,47045,56545,59225,64886
+2,87.2,235,1973,9151,190,11346,17,0,21874,28557,29768,34766
+</pre></div>
+</div>
+<p>NOTE: The rows in the CSV file are sorted in an increasing order of throughput (Inferences/Second).</p>
+<p>You can import the CSV file into a spreadsheet to help visualize
+the latency vs inferences/second tradeoff as well as see some
+components of the latency. Follow these steps:</p>
+<ul class="simple">
+<li><p>Open <a class="reference external" href="https://docs.google.com/spreadsheets/d/1S8h0bWBBElHUoLd2SOvQPzZzRiQ55xjyqodm_9ireiw">this
+spreadsheet</a></p></li>
+<li><p>Make a copy from the File menu “Make a copy…”</p></li>
+<li><p>Open the copy</p></li>
+<li><p>Select the A1 cell on the “Raw Data” tab</p></li>
+<li><p>From the File menu select “Import…”</p></li>
+<li><p>Select “Upload” and upload the file</p></li>
+<li><p>Select “Replace data at selected cell” and then select the “Import data” button</p></li>
+</ul>
+<div class="section" id="server-side-prometheus-metrics">
+<h3>Server-side Prometheus metrics<a class="headerlink" href="#server-side-prometheus-metrics" title="Permalink to this headline">#</a></h3>
+<p>Perf Analyzer can collect <a class="reference internal" href="metrics.html#gpu-metrics"><span class="std std-doc">server-side metrics</span></a>, such as
+GPU utilization and GPU power usage. To enable the collection of these metrics,
+use the <code class="docutils literal notranslate"><span class="pre">--collect-metrics</span></code> CLI option.</p>
+<p>Perf Analyzer defaults to access the metrics endpoint at
+<code class="docutils literal notranslate"><span class="pre">localhost:8002/metrics</span></code>. If the metrics are accessible at a different url, use
+the <code class="docutils literal notranslate"><span class="pre">--metrics-url</span> <span class="pre">&lt;url&gt;</span></code> CLI option to specify that.</p>
+<p>Perf Analyzer defaults to access the metrics endpoint every 1000 milliseconds.
+To use a different accessing interval, use the <code class="docutils literal notranslate"><span class="pre">--metrics-interval</span> <span class="pre">&lt;interval&gt;</span></code>
+CLI option (specify in milliseconds).</p>
+<p>Because Perf Analyzer can collect the server-side metrics multiple times per
+run, these metrics are aggregated in specific ways to produce one final number
+per sweep (concurrency/request rate). Here are how they are aggregated:</p>
+<table class="colwidths-auto table">
+<thead>
+<tr class="row-odd"><th class="head"><p>Metric</p></th>
+<th class="head"><p>Aggregation</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p>GPU Utilization</p></td>
+<td><p>Averaged from each collection taken during stable passes. We want a number representative of all stable passes.</p></td>
+</tr>
+<tr class="row-odd"><td><p>GPU Power Usage</p></td>
+<td><p>Averaged from each collection taken during stable passes. We want a number representative of all stable passes.</p></td>
+</tr>
+<tr class="row-even"><td><p>GPU Used Memory</p></td>
+<td><p>Maximum from all collections taken during a stable pass. Users are typically curious what the peak memory usage is for determining model/hardware viability.</p></td>
+</tr>
+<tr class="row-odd"><td><p>GPU Total Memory</p></td>
+<td><p>First from any collection taken during a stable pass. All of the collections should produce the same value for total memory available on the GPU.</p></td>
+</tr>
+</tbody>
+</table>
+<p>Note that all metrics are per-GPU in the case of multi-GPU systems.</p>
+<p>To output these server-side metrics to a CSV file, use the <code class="docutils literal notranslate"><span class="pre">-f</span> <span class="pre">&lt;filename&gt;</span></code> and
+<code class="docutils literal notranslate"><span class="pre">--verbose-csv</span></code> CLI options. The output CSV will contain one column per metric.
+The value of each column will be a <code class="docutils literal notranslate"><span class="pre">key:value</span></code> pair (<code class="docutils literal notranslate"><span class="pre">GPU</span> <span class="pre">UUID:metric</span> <span class="pre">value</span></code>).
+Each <code class="docutils literal notranslate"><span class="pre">key:value</span></code> pair will be delimited by a semicolon (<code class="docutils literal notranslate"><span class="pre">;</span></code>) to indicate metric
+values for each GPU accessible by the server. There is a trailing semicolon. See
+below:</p>
+<p><code class="docutils literal notranslate"><span class="pre">&lt;gpu-uuid-0&gt;:&lt;metric-value&gt;;&lt;gpu-uuid-1&gt;:&lt;metric-value&gt;;...;</span></code></p>
+<p>Here is a simplified CSV output:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>$ perf_analyzer -m resnet50_libtorch --collect-metrics -f output.csv --verbose-csv
+$ cat output.csv
+Concurrency,...,Avg GPU Utilization,Avg GPU Power Usage,Max GPU Memory Usage,Total GPU Memory
+<span class="m">1</span>,...,gpu_uuid_0:0.33<span class="p">;</span>gpu_uuid_1:0.5<span class="p">;</span>,gpu_uuid_0:55.3<span class="p">;</span>gpu_uuid_1:56.9<span class="p">;</span>,gpu_uuid_0:10000<span class="p">;</span>gpu_uuid_1:11000<span class="p">;</span>,gpu_uuid_0:50000<span class="p">;</span>gpu_uuid_1:75000<span class="p">;</span>,
+<span class="m">2</span>,...,gpu_uuid_0:0.25<span class="p">;</span>gpu_uuid_1:0.6<span class="p">;</span>,gpu_uuid_0:25.6<span class="p">;</span>gpu_uuid_1:77.2<span class="p">;</span>,gpu_uuid_0:11000<span class="p">;</span>gpu_uuid_1:17000<span class="p">;</span>,gpu_uuid_0:50000<span class="p">;</span>gpu_uuid_1:75000<span class="p">;</span>,
+<span class="m">3</span>,...,gpu_uuid_0:0.87<span class="p">;</span>gpu_uuid_1:0.9<span class="p">;</span>,gpu_uuid_0:87.1<span class="p">;</span>gpu_uuid_1:71.7<span class="p">;</span>,gpu_uuid_0:15000<span class="p">;</span>gpu_uuid_1:22000<span class="p">;</span>,gpu_uuid_0:50000<span class="p">;</span>gpu_uuid_1:75000<span class="p">;</span>,
+</pre></div>
+</div>
+</div>
+</div>
+<div class="section" id="input-data">
+<h2>Input Data<a class="headerlink" href="#input-data" title="Permalink to this headline">#</a></h2>
+<p>Use the –help option to see complete documentation for all input
+data options. By default perf_analyzer sends random data to all the
+inputs of your model. You can select a different input data mode with
+the –input-data option:</p>
+<ul class="simple">
+<li><p><em>random</em>: (default) Send random data for each input.</p></li>
+<li><p><em>zero</em>: Send zeros for each input.</p></li>
+<li><p>directory path: A path to a directory containing a binary file for each input, named the same as the input. Each binary file must contain the data required for that input for a batch-1 request. Each file should contain the raw binary representation of the input in row-major order.</p></li>
+<li><p>file path: A path to a JSON file containing data to be used with every inference request. See the “Real Input Data” section for further details. –input-data can be provided multiple times with different file paths to specific multiple JSON files.</p></li>
+</ul>
+<p>For tensors with with STRING/BYTES datatype there are additional
+options –string-length and –string-data that may be used in some
+cases (see –help for full documentation).</p>
+<p>For models that support batching you can use the -b option to indicate
+the batch-size of the requests that perf_analyzer should send. For
+models with variable-sized inputs you must provide the –shape
+argument so that perf_analyzer knows what shape tensors to use. For
+example, for a model that has an input called <em>IMAGE</em> that has shape [
+3, N, M ], where N and M are variable-size dimensions, to tell
+perf_analyzer to send batch-size 4 requests of shape [ 3, 224, 224 ]:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span>$ perf_analyzer -m mymodel -b 4 --shape IMAGE:3,224,224
+</pre></div>
+</div>
+</div>
+<div class="section" id="real-input-data">
+<h2>Real Input Data<a class="headerlink" href="#real-input-data" title="Permalink to this headline">#</a></h2>
+<p>The performance of some models is highly dependent on the data used.
+For such cases you can provide data to be used with every inference
+request made by analyzer in a JSON file. The perf_analyzer will use
+the provided data in a round-robin order when sending inference
+requests.</p>
+<p>Each entry in the “data” array must specify all input tensors with the
+exact size expected by the model from a single batch. The following
+example describes data for a model with inputs named, INPUT0 and
+INPUT1, shape [4, 4] and data type INT32:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span>  <span class="p">{</span>
+    <span class="s2">&quot;data&quot;</span> <span class="p">:</span>
+     <span class="p">[</span>
+        <span class="p">{</span>
+          <span class="s2">&quot;INPUT0&quot;</span> <span class="p">:</span> <span class="p">[</span><span class="mi">1</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="mi">1</span><span class="p">],</span>
+          <span class="s2">&quot;INPUT1&quot;</span> <span class="p">:</span> <span class="p">[</span><span class="mi">1</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="mi">1</span><span class="p">]</span>
+        <span class="p">},</span>
+        <span class="p">{</span>
+          <span class="s2">&quot;INPUT0&quot;</span> <span class="p">:</span> <span class="p">[</span><span class="mi">1</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="mi">1</span><span class="p">],</span>
+          <span class="s2">&quot;INPUT1&quot;</span> <span class="p">:</span> <span class="p">[</span><span class="mi">1</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="mi">1</span><span class="p">]</span>
+        <span class="p">},</span>
+        <span class="p">{</span>
+          <span class="s2">&quot;INPUT0&quot;</span> <span class="p">:</span> <span class="p">[</span><span class="mi">1</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="mi">1</span><span class="p">],</span>
+          <span class="s2">&quot;INPUT1&quot;</span> <span class="p">:</span> <span class="p">[</span><span class="mi">1</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="mi">1</span><span class="p">]</span>
+        <span class="p">},</span>
+        <span class="p">{</span>
+          <span class="s2">&quot;INPUT0&quot;</span> <span class="p">:</span> <span class="p">[</span><span class="mi">1</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="mi">1</span><span class="p">],</span>
+          <span class="s2">&quot;INPUT1&quot;</span> <span class="p">:</span> <span class="p">[</span><span class="mi">1</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="mi">1</span><span class="p">]</span>
+        <span class="p">}</span>
+        <span class="o">...</span>
+      <span class="p">]</span>
+  <span class="p">}</span>
+</pre></div>
+</div>
+<p>Note that the [4, 4] tensor has been flattened in a row-major format
+for the inputs. In addition to specifying explicit tensors, you can
+also provide Base64 encoded binary data for the tensors. Each data
+object must list its data in a row-major order. Binary data must be in
+little-endian byte order. The following example highlights how this
+can be acheived:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span>  <span class="p">{</span>
+    <span class="s2">&quot;data&quot;</span> <span class="p">:</span>
+     <span class="p">[</span>
+        <span class="p">{</span>
+          <span class="s2">&quot;INPUT0&quot;</span> <span class="p">:</span> <span class="p">{</span><span class="s2">&quot;b64&quot;</span><span class="p">:</span> <span class="s2">&quot;YmFzZTY0IGRlY29kZXI=&quot;</span><span class="p">},</span>
+          <span class="s2">&quot;INPUT1&quot;</span> <span class="p">:</span> <span class="p">{</span><span class="s2">&quot;b64&quot;</span><span class="p">:</span> <span class="s2">&quot;YmFzZTY0IGRlY29kZXI=&quot;</span><span class="p">}</span>
+        <span class="p">},</span>
+        <span class="p">{</span>
+          <span class="s2">&quot;INPUT0&quot;</span> <span class="p">:</span> <span class="p">{</span><span class="s2">&quot;b64&quot;</span><span class="p">:</span> <span class="s2">&quot;YmFzZTY0IGRlY29kZXI=&quot;</span><span class="p">},</span>
+          <span class="s2">&quot;INPUT1&quot;</span> <span class="p">:</span> <span class="p">{</span><span class="s2">&quot;b64&quot;</span><span class="p">:</span> <span class="s2">&quot;YmFzZTY0IGRlY29kZXI=&quot;</span><span class="p">}</span>
+        <span class="p">},</span>
+        <span class="p">{</span>
+          <span class="s2">&quot;INPUT0&quot;</span> <span class="p">:</span> <span class="p">{</span><span class="s2">&quot;b64&quot;</span><span class="p">:</span> <span class="s2">&quot;YmFzZTY0IGRlY29kZXI=&quot;</span><span class="p">},</span>
+          <span class="s2">&quot;INPUT1&quot;</span> <span class="p">:</span> <span class="p">{</span><span class="s2">&quot;b64&quot;</span><span class="p">:</span> <span class="s2">&quot;YmFzZTY0IGRlY29kZXI=&quot;</span><span class="p">}</span>
+        <span class="p">},</span>
+        <span class="o">...</span>
+      <span class="p">]</span>
+  <span class="p">}</span>
+</pre></div>
+</div>
+<p>In case of sequence models, multiple data streams can be specified in
+the JSON file. Each sequence will get a data stream of its own and the
+analyzer will ensure the data from each stream is played back to the
+same correlation id. The below example highlights how to specify data
+for multiple streams for a sequence model with a single input named
+INPUT, shape [1] and data type STRING:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span>  <span class="p">{</span>
+    <span class="s2">&quot;data&quot;</span> <span class="p">:</span>
+      <span class="p">[</span>
+        <span class="p">[</span>
+          <span class="p">{</span>
+            <span class="s2">&quot;INPUT&quot;</span> <span class="p">:</span> <span class="p">[</span><span class="s2">&quot;1&quot;</span><span class="p">]</span>
+          <span class="p">},</span>
+          <span class="p">{</span>
+            <span class="s2">&quot;INPUT&quot;</span> <span class="p">:</span> <span class="p">[</span><span class="s2">&quot;2&quot;</span><span class="p">]</span>
+          <span class="p">},</span>
+          <span class="p">{</span>
+            <span class="s2">&quot;INPUT&quot;</span> <span class="p">:</span> <span class="p">[</span><span class="s2">&quot;3&quot;</span><span class="p">]</span>
+          <span class="p">},</span>
+          <span class="p">{</span>
+            <span class="s2">&quot;INPUT&quot;</span> <span class="p">:</span> <span class="p">[</span><span class="s2">&quot;4&quot;</span><span class="p">]</span>
+          <span class="p">}</span>
+        <span class="p">],</span>
+        <span class="p">[</span>
+          <span class="p">{</span>
+            <span class="s2">&quot;INPUT&quot;</span> <span class="p">:</span> <span class="p">[</span><span class="s2">&quot;1&quot;</span><span class="p">]</span>
+          <span class="p">},</span>
+          <span class="p">{</span>
+            <span class="s2">&quot;INPUT&quot;</span> <span class="p">:</span> <span class="p">[</span><span class="s2">&quot;1&quot;</span><span class="p">]</span>
+          <span class="p">},</span>
+          <span class="p">{</span>
+            <span class="s2">&quot;INPUT&quot;</span> <span class="p">:</span> <span class="p">[</span><span class="s2">&quot;1&quot;</span><span class="p">]</span>
+          <span class="p">}</span>
+        <span class="p">],</span>
+        <span class="p">[</span>
+          <span class="p">{</span>
+            <span class="s2">&quot;INPUT&quot;</span> <span class="p">:</span> <span class="p">[</span><span class="s2">&quot;1&quot;</span><span class="p">]</span>
+          <span class="p">},</span>
+          <span class="p">{</span>
+            <span class="s2">&quot;INPUT&quot;</span> <span class="p">:</span> <span class="p">[</span><span class="s2">&quot;1&quot;</span><span class="p">]</span>
+          <span class="p">}</span>
+        <span class="p">]</span>
+      <span class="p">]</span>
+  <span class="p">}</span>
+</pre></div>
+</div>
+<p>The above example describes three data streams with lengths 4, 3 and 2
+respectively.  The perf_analyzer will hence produce sequences of
+length 4, 3 and 2 in this case.</p>
+<p>You can also provide an optional “shape” field to the tensors. This is
+especially useful while profiling the models with variable-sized
+tensors as input. Additionally note that when providing the “shape” field,
+tensor contents must be provided separately in “content” field in row-major
+order. The specified shape values will override default input shapes
+provided as a command line option (see –shape) for variable-sized inputs.
+In the absence of “shape” field, the provided defaults will be used. There
+is no need to specify shape as a command line option if all the data steps
+provide shape values for variable tensors. Below is an example json file
+for a model with single input “INPUT”, shape [-1,-1] and data type INT32:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span>  <span class="p">{</span>
+    <span class="s2">&quot;data&quot;</span> <span class="p">:</span>
+     <span class="p">[</span>
+        <span class="p">{</span>
+          <span class="s2">&quot;INPUT&quot;</span> <span class="p">:</span>
+                <span class="p">{</span>
+                    <span class="s2">&quot;content&quot;</span><span class="p">:</span> <span class="p">[</span><span class="mi">1</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="mi">1</span><span class="p">],</span>
+                    <span class="s2">&quot;shape&quot;</span><span class="p">:</span> <span class="p">[</span><span class="mi">2</span><span class="p">,</span><span class="mi">8</span><span class="p">]</span>
+                <span class="p">}</span>
+        <span class="p">},</span>
+        <span class="p">{</span>
+          <span class="s2">&quot;INPUT&quot;</span> <span class="p">:</span>
+                <span class="p">{</span>
+                    <span class="s2">&quot;content&quot;</span><span class="p">:</span> <span class="p">[</span><span class="mi">1</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="mi">1</span><span class="p">],</span>
+                    <span class="s2">&quot;shape&quot;</span><span class="p">:</span> <span class="p">[</span><span class="mi">8</span><span class="p">,</span><span class="mi">2</span><span class="p">]</span>
+                <span class="p">}</span>
+        <span class="p">},</span>
+        <span class="p">{</span>
+          <span class="s2">&quot;INPUT&quot;</span> <span class="p">:</span>
+                <span class="p">{</span>
+                    <span class="s2">&quot;content&quot;</span><span class="p">:</span> <span class="p">[</span><span class="mi">1</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="mi">1</span><span class="p">]</span>
+                <span class="p">}</span>
+        <span class="p">},</span>
+        <span class="p">{</span>
+          <span class="s2">&quot;INPUT&quot;</span> <span class="p">:</span>
+                <span class="p">{</span>
+                    <span class="s2">&quot;content&quot;</span><span class="p">:</span> <span class="p">[</span><span class="mi">1</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="mi">1</span><span class="p">],</span>
+                    <span class="s2">&quot;shape&quot;</span><span class="p">:</span> <span class="p">[</span><span class="mi">4</span><span class="p">,</span><span class="mi">4</span><span class="p">]</span>
+                <span class="p">}</span>
+        <span class="p">}</span>
+        <span class="o">...</span>
+      <span class="p">]</span>
+  <span class="p">}</span>
+</pre></div>
+</div>
+<p>The following is the example to provide contents as base64 string with explicit shapes:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="p">{</span>
+  <span class="s2">&quot;data&quot;</span><span class="p">:</span> <span class="p">[{</span> 
+      <span class="s2">&quot;INPUT&quot;</span><span class="p">:</span> <span class="p">{</span>
+                 <span class="s2">&quot;content&quot;</span><span class="p">:</span> <span class="p">{</span><span class="s2">&quot;b64&quot;</span><span class="p">:</span> <span class="s2">&quot;/9j/4AAQSkZ(...)&quot;</span><span class="p">},</span>
+                 <span class="s2">&quot;shape&quot;</span><span class="p">:</span> <span class="p">[</span><span class="mi">7964</span><span class="p">]</span>
+               <span class="p">}},</span>
+    <span class="p">(</span><span class="o">...</span><span class="p">)]</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+<p>Note that for STRING type an element is represented by a 4-byte unsigned integer giving
+the length followed by the actual bytes. The byte array to be encoded using base64 must
+include the 4-byte unsigned integers.</p>
+<div class="section" id="output-validation">
+<h3>Output Validation<a class="headerlink" href="#output-validation" title="Permalink to this headline">#</a></h3>
+<p>When real input data is provided, it is optional to request perf analyzer to
+validate the inference output for the input data.</p>
+<p>Validation output can be specified in “validation_data” field in the same format
+as “data” field for real input. Note that the entries in “validation_data” must
+align with “data” for proper mapping. The following example describes validation
+data for a model with inputs named, INPUT0 and INPUT1, outputs named, OUTPUT0
+and OUTPUT1, all tensors have shape [4, 4] and data type INT32:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span>  <span class="p">{</span>
+    <span class="s2">&quot;data&quot;</span> <span class="p">:</span>
+     <span class="p">[</span>
+        <span class="p">{</span>
+          <span class="s2">&quot;INPUT0&quot;</span> <span class="p">:</span> <span class="p">[</span><span class="mi">1</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="mi">1</span><span class="p">],</span>
+          <span class="s2">&quot;INPUT1&quot;</span> <span class="p">:</span> <span class="p">[</span><span class="mi">1</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="mi">1</span><span class="p">]</span>
+        <span class="p">}</span>
+        <span class="o">...</span>
+      <span class="p">],</span>
+    <span class="s2">&quot;validation_data&quot;</span> <span class="p">:</span>
+     <span class="p">[</span>
+        <span class="p">{</span>
+          <span class="s2">&quot;OUTPUT0&quot;</span> <span class="p">:</span> <span class="p">[</span><span class="mi">0</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="mi">0</span><span class="p">],</span>
+          <span class="s2">&quot;OUTPUT1&quot;</span> <span class="p">:</span> <span class="p">[</span><span class="mi">2</span><span class="p">,</span> <span class="mi">2</span><span class="p">,</span> <span class="mi">2</span><span class="p">,</span> <span class="mi">2</span><span class="p">,</span> <span class="mi">2</span><span class="p">,</span> <span class="mi">2</span><span class="p">,</span> <span class="mi">2</span><span class="p">,</span> <span class="mi">2</span><span class="p">,</span> <span class="mi">2</span><span class="p">,</span> <span class="mi">2</span><span class="p">,</span> <span class="mi">2</span><span class="p">,</span> <span class="mi">2</span><span class="p">,</span> <span class="mi">2</span><span class="p">,</span> <span class="mi">2</span><span class="p">,</span> <span class="mi">2</span><span class="p">,</span> <span class="mi">2</span><span class="p">]</span>
+        <span class="p">}</span>
+        <span class="o">...</span>
+      <span class="p">]</span>
+  <span class="p">}</span>
+</pre></div>
+</div>
+<p>Besides the above example, the validation outputs can be specified in the same
+variations described in “real input data” section.</p>
+</div>
+</div>
+<div class="section" id="shared-memory">
+<h2>Shared Memory<a class="headerlink" href="#shared-memory" title="Permalink to this headline">#</a></h2>
+<p>By default perf_analyzer sends input tensor data and receives output
+tensor data over the network. You can instead instruct perf_analyzer to
+use system shared memory or CUDA shared memory to communicate tensor
+data. By using these options you can model the performance that you
+can achieve by using shared memory in your application. Use
+–shared-memory=system to use system (CPU) shared memory or
+–shared-memory=cuda to use CUDA shared memory.</p>
+</div>
+<div class="section" id="communication-protocol">
+<h2>Communication Protocol<a class="headerlink" href="#communication-protocol" title="Permalink to this headline">#</a></h2>
+<p>By default perf_analyzer uses HTTP to communicate with Triton. The GRPC
+protocol can be specificed with the -i option. If GRPC is selected the
+–streaming option can also be specified for GRPC streaming.</p>
+<div class="section" id="ssl-tls-support">
+<h3>SSL/TLS Support<a class="headerlink" href="#ssl-tls-support" title="Permalink to this headline">#</a></h3>
+<p>perf_analyzer can be used to benchmark Triton service behind SSL/TLS-enabled endpoints. These options can help in establishing secure connection with the endpoint and profile the server.</p>
+<p>For gRPC, see the following options:</p>
+<ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">--ssl-grpc-use-ssl</span></code></p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">--ssl-grpc-root-certifications-file</span></code></p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">--ssl-grpc-private-key-file</span></code></p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">--ssl-grpc-certificate-chain-file</span></code></p></li>
+</ul>
+<p>More details here: https://grpc.github.io/grpc/cpp/structgrpc_1_1_ssl_credentials_options.html</p>
+<p>The <span class="xref myst">inference protocol gRPC SSL/TLS section</span> describes server-side options to configure SSL/TLS in Triton’s gRPC endpoint.</p>
+<p>For HTTPS, the following options are exposed:</p>
+<ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">--ssl-https-verify-peer</span></code></p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">--ssl-https-verify-host</span></code></p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">--ssl-https-ca-certificates-file</span></code></p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">--ssl-https-client-certificate-file</span></code></p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">--ssl-https-client-certificate-type</span></code></p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">--ssl-https-private-key-file</span></code></p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">--ssl-https-private-key-type</span></code></p></li>
+</ul>
+<p>See <code class="docutils literal notranslate"><span class="pre">--help</span></code> for full documentation.</p>
+<p>Unlike gRPC, Triton’s HTTP server endpoint can not be configured with SSL/TLS support.</p>
+<p>Note: Just providing these <code class="docutils literal notranslate"><span class="pre">--ssl-http-*</span></code> options to perf_analyzer does not ensure the SSL/TLS is used in communication. If SSL/TLS is not enabled on the service endpoint, these options have no effect. The intent of exposing these options to a user of perf_analyzer is to allow them to configure perf_analyzer to benchmark Triton service behind SSL/TLS-enabled endpoints. In other words, if Triton is running behind a HTTPS server proxy, then these options would allow perf_analyzer to profile Triton via exposed HTTPS proxy.</p>
+</div>
+</div>
+<div class="section" id="benchmarking-triton-directly-via-c-api">
+<h2>Benchmarking Triton directly via C API<a class="headerlink" href="#benchmarking-triton-directly-via-c-api" title="Permalink to this headline">#</a></h2>
+<p>Besides using HTTP or gRPC server endpoints to communicate with Triton, perf_analyzer also allows user to benchmark Triton directly using C API. HTTP/gRPC endpoints introduce an additional latency in the pipeline which may not be of interest to the user who is using Triton via C API within their application. Specifically, this feature is useful to benchmark bare minimum Triton without additional overheads from HTTP/gRPC communication.</p>
+<div class="section" id="prerequisite">
+<h3>Prerequisite<a class="headerlink" href="#prerequisite" title="Permalink to this headline">#</a></h3>
+<p>Pull the Triton SDK and the Inference Server container images on target machine.
+Since you will need access to the Tritonserver install, it might be easier if
+you copy the perf_analyzer binary to the Inference Server container.</p>
+</div>
+<div class="section" id="required-parameters">
+<h3>Required Parameters<a class="headerlink" href="#required-parameters" title="Permalink to this headline">#</a></h3>
+<p>Use the –help option to see complete list of supported command line arguments.
+By default perf_analyzer expects the Triton instance to already be running. You can configure the C API mode using the <code class="docutils literal notranslate"><span class="pre">--service-kind</span></code> option. In additon, you will need to point
+perf_analyzer to the Triton server library path using the <code class="docutils literal notranslate"><span class="pre">--triton-server-directory</span></code> option and the model
+repository path using the <code class="docutils literal notranslate"><span class="pre">--model-repository</span></code> option.
+If the server is run successfully, there is a prompt: “server is alive!” and perf_analyzer will print the stats, as normal.
+An example run would look like:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">perf_analyzer</span> <span class="o">-</span><span class="n">m</span> <span class="n">graphdef_int32_int32_int32</span> <span class="o">--</span><span class="n">service</span><span class="o">-</span><span class="n">kind</span><span class="o">=</span><span class="n">triton_c_api</span> <span class="o">--</span><span class="n">triton</span><span class="o">-</span><span class="n">server</span><span class="o">-</span><span class="n">directory</span><span class="o">=/</span><span class="n">opt</span><span class="o">/</span><span class="n">tritonserver</span> <span class="o">--</span><span class="n">model</span><span class="o">-</span><span class="n">repository</span><span class="o">=/</span><span class="n">workspace</span><span class="o">/</span><span class="n">qa</span><span class="o">/</span><span class="n">L0_perf_analyzer_capi</span><span class="o">/</span><span class="n">models</span>
+</pre></div>
+</div>
+</div>
+<div class="section" id="non-supported-functionalities">
+<h3>Non-supported functionalities<a class="headerlink" href="#non-supported-functionalities" title="Permalink to this headline">#</a></h3>
+<p>There are a few functionalities that are missing from the C API. They are:</p>
+<ol class="arabic simple">
+<li><p>Async mode (<code class="docutils literal notranslate"><span class="pre">-a</span></code>)</p></li>
+<li><p>Using shared memory mode (<code class="docutils literal notranslate"><span class="pre">--shared-memory=cuda</span></code> or <code class="docutils literal notranslate"><span class="pre">--shared-memory=system</span></code>)</p></li>
+<li><p>Request rate range mode</p></li>
+<li><p>For additonal known non-working cases, please refer to
+<a class="reference external" href="https://github.com/triton-inference-server/server/blob/main/qa/L0_perf_analyzer_capi/test.sh#L239-L277">qa/L0_perf_analyzer_capi/test.sh</a></p></li>
+</ol>
+</div>
+</div>
+<div class="section" id="benchmarking-tensorflow-serving">
+<h2>Benchmarking TensorFlow Serving<a class="headerlink" href="#benchmarking-tensorflow-serving" title="Permalink to this headline">#</a></h2>
+<p>perf_analyzer can also be used to benchmark models deployed on
+<a class="reference external" href="https://github.com/tensorflow/serving">TensorFlow Serving</a> using
+the <code class="docutils literal notranslate"><span class="pre">--service-kind</span></code> option. The support is however only available
+through gRPC protocol.</p>
+<p>Following invocation demonstrates how to configure perf_analyzer
+to issue requests to a running instance of
+<code class="docutils literal notranslate"><span class="pre">tensorflow_model_server</span></code>:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span>$ perf_analyzer -m resnet50 --service-kind tfserving -i grpc -b 1 -p 5000 -u localhost:8500
+*** Measurement Settings ***
+  Batch size: 1
+  Using &quot;time_windows&quot; mode for stabilization
+  Measurement window: 5000 msec
+  Using synchronous calls for inference
+  Stabilizing using average latency
+Request concurrency: 1
+  Client: 
+    Request count: 829
+    Throughput: 165.8 infer/sec
+    Avg latency: 6032 usec (standard deviation 569 usec)
+    p50 latency: 5863 usec
+    p90 latency: 6655 usec
+    p95 latency: 6974 usec
+    p99 latency: 8093 usec
+    Avg gRPC time: 5984 usec ((un)marshal request/response 257 usec + response wait 5727 usec)
+Inferences/Second vs. Client Average Batch Latency
+Concurrency: 1, throughput: 165.8 infer/sec, latency 6032 usec
+</pre></div>
+</div>
+<p>You might have to specify a different url(<code class="docutils literal notranslate"><span class="pre">-u</span></code>) to access wherever
+the server is running. The report of perf_analyzer will only
+include statistics measured at the client-side.</p>
+<p><strong>NOTE:</strong> The support is still in <strong>beta</strong>. perf_analyzer does
+not guarantee optimum tuning for TensorFlow Serving. However, a
+single benchmarking tool that can be used to stress the inference
+servers in an identical manner is important for performance
+analysis.</p>
+<p>The following points are important for interpreting the results:</p>
+<ol class="arabic simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">Concurrent</span> <span class="pre">Request</span> <span class="pre">Execution</span></code>:
+TensorFlow Serving (TFS), as of version 2.8.0, by default creates
+threads for each request that individually submits requests to
+TensorFlow Session. There is a resource limit on the number of
+concurrent threads serving requests. When benchmarking at a higher
+request concurrency, you can see higher throughput because of this.<br />
+Unlike TFS, by default Triton is configured with only a single
+<a class="reference internal" href="model_configuration.html#instance-groups"><span class="std std-doc">instance count</span></a>. Hence, at a higher request concurrency, most
+of the requests are blocked on the instance availability. To
+configure Triton to behave like TFS, set the instance count to a
+reasonably high value and then set
+<a class="reference external" href="https://github.com/triton-inference-server/tensorflow_backend#parameters">MAX_SESSION_SHARE_COUNT</a>
+parameter in the model confib.pbtxt to the same value.For some
+context, the TFS sets its thread constraint to four times the
+num of schedulable CPUs.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">Different</span> <span class="pre">library</span> <span class="pre">versions</span></code>:
+The version of TensorFlow might differ between Triton and
+TensorFlow Serving being benchmarked. Even the versions of cuda
+libraries might differ between the two solutions. The performance
+of models can be susceptible to the versions of these libraries.
+For a single request concurrency, if the compute_infer time
+reported by perf_analyzer when benchmarking Triton is as large as
+the latency reported by perf_analyzer when benchmarking TFS, then
+the performance difference is likely because of the difference in
+the software stack and outside the scope of Triton.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">CPU</span> <span class="pre">Optimization</span></code>:
+TFS has separate builds for CPU and GPU targets. They have
+target-specific optimization. Unlike TFS, Triton has a single build
+which is optimized for execution on GPUs. When collecting performance
+on CPU models on Triton, try running Triton with the environment
+variable <code class="docutils literal notranslate"><span class="pre">TF_ENABLE_ONEDNN_OPTS=1</span></code>.</p></li>
+</ol>
+</div>
+<div class="section" id="benchmarking-torchserve">
+<h2>Benchmarking TorchServe<a class="headerlink" href="#benchmarking-torchserve" title="Permalink to this headline">#</a></h2>
+<p>perf_analyzer can also be used to benchmark
+<a class="reference external" href="https://github.com/pytorch/serve">TorchServe</a> using the
+<code class="docutils literal notranslate"><span class="pre">--service-kind</span></code> option. The support is however only available through
+HTTP protocol. It also requires input to be provided via JSON file.</p>
+<p>Following invocation demonstrates how to configure perf_analyzer to
+issue requests to a running instance of <code class="docutils literal notranslate"><span class="pre">torchserve</span></code> assuming the
+location holds <code class="docutils literal notranslate"><span class="pre">kitten_small.jpg</span></code>:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span>$ perf_analyzer -m resnet50 --service-kind torchserve -i http -u localhost:8080 -b 1 -p 5000 --input-data data.json
+ Successfully read data for 1 stream/streams with 1 step/steps.
+*** Measurement Settings ***
+  Batch size: 1
+  Using &quot;time_windows&quot; mode for stabilization
+  Measurement window: 5000 msec
+  Using synchronous calls for inference
+  Stabilizing using average latency
+Request concurrency: 1
+  Client: 
+    Request count: 799
+    Throughput: 159.8 infer/sec
+    Avg latency: 6259 usec (standard deviation 397 usec)
+    p50 latency: 6305 usec
+    p90 latency: 6448 usec
+    p95 latency: 6494 usec
+    p99 latency: 7158 usec
+    Avg HTTP time: 6272 usec (send/recv 77 usec + response wait 6195 usec)
+Inferences/Second vs. Client Average Batch Latency
+Concurrency: 1, throughput: 159.8 infer/sec, latency 6259 usec
+</pre></div>
+</div>
+<p>The content of <code class="docutils literal notranslate"><span class="pre">data.json</span></code>:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span> <span class="p">{</span>
+   <span class="s2">&quot;data&quot;</span> <span class="p">:</span>
+    <span class="p">[</span>
+       <span class="p">{</span>
+         <span class="s2">&quot;TORCHSERVE_INPUT&quot;</span> <span class="p">:</span> <span class="p">[</span><span class="s2">&quot;kitten_small.jpg&quot;</span><span class="p">]</span>
+       <span class="p">}</span>
+     <span class="p">]</span>
+ <span class="p">}</span>
+</pre></div>
+</div>
+<p>You might have to specify a different url(<code class="docutils literal notranslate"><span class="pre">-u</span></code>) to access wherever
+the server is running. The report of perf_analyzer will only include
+statistics measured at the client-side.</p>
+<p><strong>NOTE:</strong> The support is still in <strong>beta</strong>. perf_analyzer does not
+guarantee optimum tuning for TorchServe. However, a single benchmarking
+tool that can be used to stress the inference servers in an identical
+manner is important for performance analysis.</p>
+</div>
+<div class="section" id="advantages-of-using-perf-analyzer-over-third-party-benchmark-suites">
+<h2>Advantages of using Perf Analyzer over third-party benchmark suites<a class="headerlink" href="#advantages-of-using-perf-analyzer-over-third-party-benchmark-suites" title="Permalink to this headline">#</a></h2>
+<p>Triton Inference Server offers the entire serving solution which
+includes <a class="reference external" href="https://github.com/triton-inference-server/client">client libraries</a>
+that are optimized for Triton.
+Using third-party benchmark suites like jmeter fails to take advantage of the
+optimized libraries. Some of these optimizations includes but are not limited
+to:</p>
+<ol class="arabic simple">
+<li><p>Using <a class="reference internal" href="../protocol/extension_binary_data.html"><span class="doc std std-doc">binary tensor data extension</span></a> with HTTP requests.</p></li>
+<li><p>Effective re-use of gRPC message allocation in subsequent requests.</p></li>
+<li><p>Avoiding extra memory copy via libcurl interface.</p></li>
+</ol>
+<p>These optimizations can have a tremendous impact on overall performance.
+Using perf_analyzer for benchmarking directly allows a user to access
+these optimizations in their study.</p>
+<p>Not only that, perf_analyzer is also very customizable and supports many
+Triton features as described in this document. This, along with a detailed
+report, allows a user to identify performance bottlenecks and experiment
+with different features before deciding upon what works best for them.</p>
+</div>
+</div>
+
+<div class="section">
+   
+</div>
+
+              </div>
+              
+            </main>
+            <footer class="footer-article noprint">
+                
+    <!-- Previous / next buttons -->
+<div class='prev-next-area'>
+    <a class='left-prev' id="prev-link" href="model_analyzer.html" title="previous page">
+        <i class="fas fa-angle-left"></i>
+        <div class="prev-next-info">
+            <p class="prev-next-subtitle">previous</p>
+            <p class="prev-next-title">Model Analyzer</p>
+        </div>
+    </a>
+    <a class='right-next' id="next-link" href="model_management.html" title="next page">
+    <div class="prev-next-info">
+        <p class="prev-next-subtitle">next</p>
+        <p class="prev-next-title">Model Management</p>
+    </div>
+    <i class="fas fa-angle-right"></i>
+    </a>
+</div>
+            </footer>
+        </div>
+    </div>
+    <div class="footer-content row">
+        <footer class="col footer"><p>
+  
+    By NVIDIA<br/>
+  
+      &copy; Copyright 2022 NVIDIA CORPORATION &amp; AFFILIATES. All rights reserved.<br/>
+    Last updated on Oct 05, 2022.<br/>
+</p>
+        </footer>
+    </div>
+    
+</div>
+
+
+      </div>
+    </div>
+  
+  <!-- Scripts loaded after <body> so the DOM is not blocked -->
+  <script src="../_static/scripts/pydata-sphinx-theme.js?digest=1999514e3f237ded88cf"></script>
+
+
+<script type="text/javascript">_satellite.pageBottom();</script>
+  </body>
+</html>

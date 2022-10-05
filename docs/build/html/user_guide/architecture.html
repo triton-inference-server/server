@@ -1,0 +1,1455 @@
+
+<!DOCTYPE html>
+
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Triton Architecture &#8212; NVIDIA Triton Inference Server</title>
+    
+  <!-- Loaded before other Sphinx assets -->
+  <link href="../_static/styles/theme.css?digest=1999514e3f237ded88cf" rel="stylesheet">
+<link href="../_static/styles/pydata-sphinx-theme.css?digest=1999514e3f237ded88cf" rel="stylesheet">
+
+    
+  <link rel="stylesheet"
+    href="../_static/vendor/fontawesome/5.13.0/css/all.min.css">
+  <link rel="preload" as="font" type="font/woff2" crossorigin
+    href="../_static/vendor/fontawesome/5.13.0/webfonts/fa-solid-900.woff2">
+  <link rel="preload" as="font" type="font/woff2" crossorigin
+    href="../_static/vendor/fontawesome/5.13.0/webfonts/fa-brands-400.woff2">
+
+    <link rel="stylesheet" type="text/css" href="../_static/pygments.css" />
+    <link rel="stylesheet" href="../_static/styles/sphinx-book-theme.css?digest=62ba249389abaaa9ffc34bf36a076bdc1d65ee18" type="text/css" />
+    <link rel="stylesheet" type="text/css" href="../_static/mystnb.4510f1fc1dee50b3e5859aac5469c37c29e427902b24a333a5f9fcb2f0b3ac41.css" />
+    <link rel="stylesheet" type="text/css" href="../_static/copybutton.css" />
+    <link rel="stylesheet" type="text/css" href="../_static/tabs.css" />
+    <link rel="stylesheet" type="text/css" href="../_static/custom.css" />
+    <link rel="stylesheet" type="text/css" href="../_static/design-style.4045f2051d55cab465a707391d5b2007.min.css" />
+    
+  <!-- Pre-loaded scripts that we'll load fully later -->
+  <link rel="preload" as="script" href="../_static/scripts/pydata-sphinx-theme.js?digest=1999514e3f237ded88cf">
+
+    <script data-url_root="../" id="documentation_options" src="../_static/documentation_options.js"></script>
+    <script src="../_static/jquery.js"></script>
+    <script src="../_static/underscore.js"></script>
+    <script src="../_static/doctools.js"></script>
+    <script src="../_static/clipboard.min.js"></script>
+    <script src="../_static/copybutton.js"></script>
+    <script src="https://js.hcaptcha.com/1/api.js"></script>
+    <script src="//assets.adobedtm.com/5d4962a43b79/c1061d2c5e7b/launch-191c2462b890.min.js"></script>
+    <script src="../_static/scripts/sphinx-book-theme.js?digest=f31d14ad54b65d19161ba51d4ffff3a77ae00456"></script>
+    <script src="../_static/design-tabs.js"></script>
+    <link rel="canonical" href="https://docs.nvidia.com/deeplearning/triton-inference-server/user-guide/docs/user_guide/architecture.html" />
+    <link rel="shortcut icon" href="../_static/nvidia-logo-vert-rgb-blk-for-screen.png"/>
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" />
+    <link rel="next" title="Model Repository" href="model_repository.html" />
+    <link rel="prev" title="Deploying your trained model using Triton" href="performance_tuning.html" /> 
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="docsearch:language" content="None">
+    
+
+    <!-- Google Analytics -->
+      
+<style type="text/css">
+  ul.ablog-archive {
+    list-style: none;
+    overflow: auto;
+    margin-left: 0px;
+  }
+  ul.ablog-archive li {
+    float: left;
+    margin-right: 5px;
+    font-size: 80%;
+  }
+  ul.postlist a {
+    font-style: italic;
+  }
+  ul.postlist-style-disc {
+    list-style-type: disc;
+  }
+  ul.postlist-style-none {
+    list-style-type: none;
+  }
+  ul.postlist-style-circle {
+    list-style-type: circle;
+  }
+</style>
+
+  </head>
+  <body data-spy="scroll" data-target="#bd-toc-nav" data-offset="60">
+<!-- Checkboxes to toggle the left sidebar -->
+<input type="checkbox" class="sidebar-toggle" name="__navigation" id="__navigation" aria-label="Toggle navigation sidebar">
+<label class="overlay overlay-navbar" for="__navigation">
+    <div class="visually-hidden">Toggle navigation sidebar</div>
+</label>
+<!-- Checkboxes to toggle the in-page toc -->
+<input type="checkbox" class="sidebar-toggle" name="__page-toc" id="__page-toc" aria-label="Toggle in-page Table of Contents">
+<label class="overlay overlay-pagetoc" for="__page-toc">
+    <div class="visually-hidden">Toggle in-page Table of Contents</div>
+</label>
+<!-- Headers at the top -->
+<div class="announcement header-item noprint"></div>
+<div class="header header-item noprint"></div>
+
+    
+    <div class="container-fluid" id="banner"></div>
+
+    
+
+    <div class="container-xl">
+      <div class="row">
+          
+<!-- Sidebar -->
+<div class="bd-sidebar noprint" id="site-navigation">
+    <div class="bd-sidebar__content">
+        <div class="bd-sidebar__top"><div class="navbar-brand-box">
+    <a class="navbar-brand text-wrap" href="../index.html">
+      
+        <!-- `logo` is deprecated in Sphinx 4.0, so remove this when we stop supporting 3 -->
+        
+      
+      
+      <img src="../_static/nvidia-logo-horiz-rgb-blk-for-screen.png" class="logo" alt="logo">
+      
+      
+      <h1 class="site-logo" id="site-title">NVIDIA Triton Inference Server</h1>
+      
+    </a>
+</div><form class="bd-search d-flex align-items-center" action="../search.html" method="get">
+  <i class="icon fas fa-search"></i>
+  <input type="search" class="form-control" name="q" id="search-input" placeholder="Search the docs ..." aria-label="Search the docs ..." autocomplete="off" >
+</form><nav class="bd-links" id="bd-docs-nav" aria-label="Main">
+    <div class="bd-toc-item active">
+        <p aria-level="2" class="caption" role="heading">
+ <span class="caption-text">
+  Getting Started
+ </span>
+</p>
+<ul class="nav bd-sidenav">
+ <li class="toctree-l1">
+  <a class="reference internal" href="../getting_started/quickstart.html">
+   Quickstart
+  </a>
+ </li>
+</ul>
+<p aria-level="2" class="caption" role="heading">
+ <span class="caption-text">
+  User Guide
+ </span>
+</p>
+<ul class="current nav bd-sidenav">
+ <li class="toctree-l1">
+  <a class="reference internal" href="performance_tuning.html">
+   Deploying your trained model using Triton
+  </a>
+ </li>
+ <li class="toctree-l1 current active">
+  <a class="current reference internal" href="#">
+   Triton Architecture
+  </a>
+ </li>
+ <li class="toctree-l1">
+  <a class="reference internal" href="model_repository.html">
+   Model Repository
+  </a>
+ </li>
+ <li class="toctree-l1">
+  <a class="reference internal" href="../customization_guide/repository_agents.html">
+   Repository Agent
+  </a>
+ </li>
+ <li class="toctree-l1">
+  <a class="reference internal" href="model_configuration.html">
+   Model Configuration
+  </a>
+ </li>
+ <li class="toctree-l1">
+  <a class="reference internal" href="optimization.html">
+   Optimization
+  </a>
+ </li>
+ <li class="toctree-l1">
+  <a class="reference internal" href="ragged_batching.html">
+   Ragged Batching
+  </a>
+ </li>
+ <li class="toctree-l1">
+  <a class="reference internal" href="rate_limiter.html">
+   Rate Limiter
+  </a>
+ </li>
+ <li class="toctree-l1">
+  <a class="reference internal" href="model_analyzer.html">
+   Model Analyzer
+  </a>
+ </li>
+ <li class="toctree-l1">
+  <a class="reference internal" href="perf_analyzer.html">
+   Performance Analyzer
+  </a>
+ </li>
+ <li class="toctree-l1">
+  <a class="reference internal" href="model_management.html">
+   Model Management
+  </a>
+ </li>
+ <li class="toctree-l1">
+  <a class="reference internal" href="custom_operations.html">
+   Custom Operations
+  </a>
+ </li>
+ <li class="toctree-l1">
+  <a class="reference internal" href="decoupled_models.html">
+   Decoupled Backends and Models
+  </a>
+ </li>
+ <li class="toctree-l1">
+  <a class="reference internal" href="response_cache.html">
+   Triton Response Cache
+  </a>
+ </li>
+ <li class="toctree-l1">
+  <a class="reference internal" href="metrics.html">
+   Metrics
+  </a>
+ </li>
+ <li class="toctree-l1">
+  <a class="reference internal" href="trace.html">
+   Triton Server Trace
+  </a>
+ </li>
+ <li class="toctree-l1">
+  <a class="reference internal" href="jetson.html">
+   Triton Inference Server Support for Jetson and JetPack
+  </a>
+ </li>
+ <li class="toctree-l1">
+  <a class="reference internal" href="v1_to_v2.html">
+   Version 1 to Version 2 Migration
+  </a>
+ </li>
+</ul>
+<ul class="nav bd-sidenav">
+ <li class="toctree-l1">
+  <a class="reference internal" href="faq.html">
+   FAQ
+  </a>
+ </li>
+</ul>
+<p aria-level="2" class="caption" role="heading">
+ <span class="caption-text">
+  Protocol Guides
+ </span>
+</p>
+<ul class="nav bd-sidenav">
+ <li class="toctree-l1">
+  <a class="reference internal" href="../customization_guide/inference_protocols.html">
+   Inference Protocols and APIs
+  </a>
+ </li>
+ <li class="toctree-l1">
+  <a class="reference internal" href="../protocol/extension_binary_data.html">
+   Binary Tensor Data Extension
+  </a>
+ </li>
+ <li class="toctree-l1">
+  <a class="reference internal" href="../protocol/extension_classification.html">
+   Classification Extension
+  </a>
+ </li>
+ <li class="toctree-l1">
+  <a class="reference internal" href="../protocol/extension_logging.html">
+   Logging Extension
+  </a>
+ </li>
+ <li class="toctree-l1">
+  <a class="reference internal" href="../protocol/extension_model_configuration.html">
+   Model Configuration Extension
+  </a>
+ </li>
+ <li class="toctree-l1">
+  <a class="reference internal" href="../protocol/extension_model_repository.html">
+   Model Repository Extension
+  </a>
+ </li>
+ <li class="toctree-l1">
+  <a class="reference internal" href="../protocol/extension_schedule_policy.html">
+   Schedule Policy Extension
+  </a>
+ </li>
+ <li class="toctree-l1">
+  <a class="reference internal" href="../protocol/extension_sequence.html">
+   Sequence Extension
+  </a>
+ </li>
+ <li class="toctree-l1">
+  <a class="reference internal" href="../protocol/extension_shared_memory.html">
+   Shared-Memory Extension
+  </a>
+ </li>
+ <li class="toctree-l1">
+  <a class="reference internal" href="../protocol/extension_statistics.html">
+   Statistics Extension
+  </a>
+ </li>
+ <li class="toctree-l1">
+  <a class="reference internal" href="../protocol/extension_trace.html">
+   Trace Extension
+  </a>
+ </li>
+</ul>
+<p aria-level="2" class="caption" role="heading">
+ <span class="caption-text">
+  Customization Guide
+ </span>
+</p>
+<ul class="nav bd-sidenav">
+ <li class="toctree-l1">
+  <a class="reference internal" href="../customization_guide/build.html">
+   Building Triton
+  </a>
+ </li>
+ <li class="toctree-l1">
+  <a class="reference internal" href="../customization_guide/compose.html">
+   Customize Triton Container
+  </a>
+ </li>
+ <li class="toctree-l1">
+  <a class="reference internal" href="../customization_guide/test.html">
+   Testing Triton
+  </a>
+ </li>
+</ul>
+<p aria-level="2" class="caption" role="heading">
+ <span class="caption-text">
+  Examples
+ </span>
+</p>
+<ul class="nav bd-sidenav">
+ <li class="toctree-l1">
+  <a class="reference internal" href="../examples/jetson/README.html">
+   Using Triton Inference Server as a shared library for execution on Jetson
+  </a>
+ </li>
+ <li class="toctree-l1">
+  <a class="reference internal" href="../examples/jetson/concurrency_and_dynamic_batching/README.html">
+   Concurrent inference and dynamic batching
+  </a>
+ </li>
+</ul>
+
+    </div>
+</nav></div>
+        <div class="bd-sidebar__bottom">
+             <!-- To handle the deprecated key -->
+            
+        </div>
+    </div>
+    <div id="rtd-footer-container"></div>
+</div>
+
+
+          
+
+
+          
+<!-- A tiny helper pixel to detect if we've scrolled -->
+<div class="sbt-scroll-pixel-helper"></div>
+<!-- Main content -->
+<div class="col py-0 content-container">
+    
+    <div class="header-article row sticky-top noprint">
+        
+
+
+
+<div class="col py-1 d-flex header-article-main">
+    <div class="header-article__left">
+        
+        <label for="__navigation"
+  class="headerbtn"
+  data-toggle="tooltip"
+data-placement="right"
+title="Toggle navigation"
+>
+  
+
+<span class="headerbtn__icon-container">
+  <i class="fas fa-bars"></i>
+  </span>
+
+</label>
+
+        
+    </div>
+    <div class="header-article__right">
+<button onclick="toggleFullScreen()"
+  class="headerbtn"
+  data-toggle="tooltip"
+data-placement="bottom"
+title="Fullscreen mode"
+>
+  
+
+<span class="headerbtn__icon-container">
+  <i class="fas fa-expand"></i>
+  </span>
+
+</button>
+
+<div class="menu-dropdown menu-dropdown-repository-buttons">
+  <button class="headerbtn menu-dropdown__trigger"
+      aria-label="Source repositories">
+      <i class="fab fa-github"></i>
+  </button>
+  <div class="menu-dropdown__content">
+    <ul>
+      <li>
+        <a href="https://github.com/triton-inference-server/server"
+   class="headerbtn"
+   data-toggle="tooltip"
+data-placement="left"
+title="Source repository"
+>
+  
+
+<span class="headerbtn__icon-container">
+  <i class="fab fa-github"></i>
+  </span>
+<span class="headerbtn__text-container">repository</span>
+</a>
+
+      </li>
+      
+      <li>
+        <a href="https://github.com/triton-inference-server/server/issues/new?title=Issue%20on%20page%20%2Fuser_guide/architecture.html&body=Your%20issue%20content%20here."
+   class="headerbtn"
+   data-toggle="tooltip"
+data-placement="left"
+title="Open an issue"
+>
+  
+
+<span class="headerbtn__icon-container">
+  <i class="fas fa-lightbulb"></i>
+  </span>
+<span class="headerbtn__text-container">open issue</span>
+</a>
+
+      </li>
+      
+    </ul>
+  </div>
+</div>
+<label for="__page-toc"
+  class="headerbtn headerbtn-page-toc"
+  
+>
+  
+
+<span class="headerbtn__icon-container">
+  <i class="fas fa-list"></i>
+  </span>
+
+</label>
+
+    </div>
+</div>
+
+<!-- Table of contents -->
+<div class="col-md-3 bd-toc show noprint">
+    <div class="tocsection onthispage pt-5 pb-3">
+        <i class="fas fa-list"></i> Contents
+    </div>
+    <nav id="bd-toc-nav" aria-label="Page">
+        <ul class="visible nav section-nav flex-column">
+ <li class="toc-h2 nav-item toc-entry">
+  <a class="reference internal nav-link" href="#concurrent-model-execution">
+   Concurrent Model Execution
+  </a>
+ </li>
+ <li class="toc-h2 nav-item toc-entry">
+  <a class="reference internal nav-link" href="#models-and-schedulers">
+   Models And Schedulers
+  </a>
+  <ul class="visible nav section-nav flex-column">
+   <li class="toc-h3 nav-item toc-entry">
+    <a class="reference internal nav-link" href="#stateless-models">
+     Stateless Models
+    </a>
+   </li>
+   <li class="toc-h3 nav-item toc-entry">
+    <a class="reference internal nav-link" href="#stateful-models">
+     Stateful Models
+    </a>
+    <ul class="nav section-nav flex-column">
+     <li class="toc-h4 nav-item toc-entry">
+      <a class="reference internal nav-link" href="#control-inputs">
+       Control Inputs
+      </a>
+     </li>
+     <li class="toc-h4 nav-item toc-entry">
+      <a class="reference internal nav-link" href="#implicit-state-management">
+       Implicit State Management
+      </a>
+      <ul class="nav section-nav flex-column">
+       <li class="toc-h5 nav-item toc-entry">
+        <a class="reference internal nav-link" href="#state-initialization">
+         State Initialization
+        </a>
+        <ul class="nav section-nav flex-column">
+         <li class="toc-h6 nav-item toc-entry">
+          <a class="reference internal nav-link" href="#initializing-state-from-zero">
+           Initializing State from Zero.
+          </a>
+         </li>
+         <li class="toc-h6 nav-item toc-entry">
+          <a class="reference internal nav-link" href="#initializing-state-from-file">
+           Initializing State from File
+          </a>
+         </li>
+        </ul>
+       </li>
+      </ul>
+     </li>
+     <li class="toc-h4 nav-item toc-entry">
+      <a class="reference internal nav-link" href="#scheduling-strategies">
+       Scheduling Strategies
+      </a>
+      <ul class="nav section-nav flex-column">
+       <li class="toc-h5 nav-item toc-entry">
+        <a class="reference internal nav-link" href="#direct">
+         Direct
+        </a>
+       </li>
+       <li class="toc-h5 nav-item toc-entry">
+        <a class="reference internal nav-link" href="#oldest">
+         Oldest
+        </a>
+       </li>
+      </ul>
+     </li>
+    </ul>
+   </li>
+   <li class="toc-h3 nav-item toc-entry">
+    <a class="reference internal nav-link" href="#ensemble-models">
+     Ensemble Models
+    </a>
+    <ul class="nav section-nav flex-column">
+     <li class="toc-h4 nav-item toc-entry">
+      <a class="reference internal nav-link" href="#additional-resources">
+       Additional Resources
+      </a>
+     </li>
+    </ul>
+   </li>
+  </ul>
+ </li>
+</ul>
+
+    </nav>
+</div>
+    </div>
+    <div class="article row">
+        <div class="col pl-md-3 pl-lg-5 content-container">
+            <!-- Table of contents that is only displayed when printing the page -->
+            <div id="jb-print-docs-body" class="onlyprint">
+                <h1>Triton Architecture</h1>
+                <!-- Table of contents -->
+                <div id="print-main-content">
+                    <div id="jb-print-toc">
+                        
+                        <div>
+                            <h2> Contents </h2>
+                        </div>
+                        <nav aria-label="Page">
+                            <ul class="visible nav section-nav flex-column">
+ <li class="toc-h2 nav-item toc-entry">
+  <a class="reference internal nav-link" href="#concurrent-model-execution">
+   Concurrent Model Execution
+  </a>
+ </li>
+ <li class="toc-h2 nav-item toc-entry">
+  <a class="reference internal nav-link" href="#models-and-schedulers">
+   Models And Schedulers
+  </a>
+  <ul class="visible nav section-nav flex-column">
+   <li class="toc-h3 nav-item toc-entry">
+    <a class="reference internal nav-link" href="#stateless-models">
+     Stateless Models
+    </a>
+   </li>
+   <li class="toc-h3 nav-item toc-entry">
+    <a class="reference internal nav-link" href="#stateful-models">
+     Stateful Models
+    </a>
+    <ul class="nav section-nav flex-column">
+     <li class="toc-h4 nav-item toc-entry">
+      <a class="reference internal nav-link" href="#control-inputs">
+       Control Inputs
+      </a>
+     </li>
+     <li class="toc-h4 nav-item toc-entry">
+      <a class="reference internal nav-link" href="#implicit-state-management">
+       Implicit State Management
+      </a>
+      <ul class="nav section-nav flex-column">
+       <li class="toc-h5 nav-item toc-entry">
+        <a class="reference internal nav-link" href="#state-initialization">
+         State Initialization
+        </a>
+        <ul class="nav section-nav flex-column">
+         <li class="toc-h6 nav-item toc-entry">
+          <a class="reference internal nav-link" href="#initializing-state-from-zero">
+           Initializing State from Zero.
+          </a>
+         </li>
+         <li class="toc-h6 nav-item toc-entry">
+          <a class="reference internal nav-link" href="#initializing-state-from-file">
+           Initializing State from File
+          </a>
+         </li>
+        </ul>
+       </li>
+      </ul>
+     </li>
+     <li class="toc-h4 nav-item toc-entry">
+      <a class="reference internal nav-link" href="#scheduling-strategies">
+       Scheduling Strategies
+      </a>
+      <ul class="nav section-nav flex-column">
+       <li class="toc-h5 nav-item toc-entry">
+        <a class="reference internal nav-link" href="#direct">
+         Direct
+        </a>
+       </li>
+       <li class="toc-h5 nav-item toc-entry">
+        <a class="reference internal nav-link" href="#oldest">
+         Oldest
+        </a>
+       </li>
+      </ul>
+     </li>
+    </ul>
+   </li>
+   <li class="toc-h3 nav-item toc-entry">
+    <a class="reference internal nav-link" href="#ensemble-models">
+     Ensemble Models
+    </a>
+    <ul class="nav section-nav flex-column">
+     <li class="toc-h4 nav-item toc-entry">
+      <a class="reference internal nav-link" href="#additional-resources">
+       Additional Resources
+      </a>
+     </li>
+    </ul>
+   </li>
+  </ul>
+ </li>
+</ul>
+
+                        </nav>
+                    </div>
+                </div>
+            </div>
+            <main id="main-content" role="main">
+                
+              <div>
+                 <!--
+# Copyright (c) 2018-2020, NVIDIA CORPORATION. All rights reserved.
+#
+# Redistribution and use in source and binary forms, with or without
+# modification, are permitted provided that the following conditions
+# are met:
+#  * Redistributions of source code must retain the above copyright
+#    notice, this list of conditions and the following disclaimer.
+#  * Redistributions in binary form must reproduce the above copyright
+#    notice, this list of conditions and the following disclaimer in the
+#    documentation and/or other materials provided with the distribution.
+#  * Neither the name of NVIDIA CORPORATION nor the names of its
+#    contributors may be used to endorse or promote products derived
+#    from this software without specific prior written permission.
+#
+# THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS ``AS IS'' AND ANY
+# EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+# IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR
+# PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL THE COPYRIGHT OWNER OR
+# CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL,
+# EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
+# PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR
+# PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY
+# OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+# (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+# OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+-->
+<div class="tex2jax_ignore mathjax_ignore section" id="triton-architecture">
+<h1>Triton Architecture<a class="headerlink" href="#triton-architecture" title="Permalink to this headline">#</a></h1>
+<p>The following figure shows the Triton Inference Server high-level
+architecture. The <a class="reference internal" href="model_repository.html"><span class="doc std std-doc">model repository</span></a> is a
+file-system based repository of the models that Triton will make
+available for inferencing. Inference requests arrive at the server via
+either <a class="reference internal" href="../customization_guide/inference_protocols.html"><span class="doc std std-doc">HTTP/REST or GRPC</span></a> or by the <a class="reference internal" href="../customization_guide/inference_protocols.html"><span class="doc std std-doc">C
+API</span></a> and are then routed to the appropriate per-model
+scheduler. Triton implements <a class="reference internal" href="#models-and-schedulers"><span class="std std-doc">multiple scheduling and batching
+algorithms</span></a> that can be configured on a
+model-by-model basis. Each model’s scheduler optionally performs
+batching of inference requests and then passes the requests to the
+<a class="reference external" href="https://github.com/triton-inference-server/backend/blob/main/README.md">backend</a>
+corresponding to the model type. The backend performs inferencing
+using the inputs provided in the batched requests to produce the
+requested outputs. The outputs are then returned.</p>
+<p>Triton supports a <a class="reference external" href="https://github.com/triton-inference-server/backend/blob/main/README.md#triton-backend-api">backend C
+API</a>
+that allows Triton to be extended with new functionality such as
+custom pre- and post-processing operations or even a new deep-learning
+framework.</p>
+<p>The models being served by Triton can be queried and controlled by a
+dedicated <a class="reference internal" href="model_management.html"><span class="doc std std-doc">model management API</span></a> that is
+available by HTTP/REST or GRPC protocol, or by the C API.</p>
+<p>Readiness and liveness health endpoints and utilization, throughput
+and latency metrics ease the integration of Triton into deployment
+framework such as Kubernetes.</p>
+<p><img alt="Triton Architecture Diagram" src="../_images/arch.jpg" /></p>
+<div class="section" id="concurrent-model-execution">
+<h2>Concurrent Model Execution<a class="headerlink" href="#concurrent-model-execution" title="Permalink to this headline">#</a></h2>
+<p>The Triton architecture allows multiple models and/or multiple
+instances of the same model to execute in parallel on the same
+system. The system may have zero, one, or many GPUs. The following
+figure shows an example with two models; model0 and model1. Assuming
+Triton is not currently processing any request, when two requests
+arrive simultaneously, one for each model, Triton immediately
+schedules both of them onto the GPU and the GPU’s hardware scheduler
+begins working on both computations in parallel. Models executing on
+the system’s CPU are handled similarly by Triton except that the
+scheduling of the CPU threads execution each model is handled by the
+system’s OS.</p>
+<p><img alt="Triton Mult-Model Execution Diagram" src="../_images/multi_model_exec.png" /></p>
+<p>By default, if multiple requests for the same model arrive at the same
+time, Triton will serialize their execution by scheduling only one at
+a time on the GPU, as shown in the following figure.</p>
+<p><img alt="Triton Mult-Model Serial ExecutionDiagram" src="../_images/multi_model_serial_exec.png" /></p>
+<p>Triton provides a <a class="reference internal" href="model_configuration.html#instance-groups"><span class="std std-doc">model configuration option called
+instance-group</span></a> that allows
+each model to specify how many parallel executions of that model
+should be allowed. Each such enabled parallel execution is referred to
+as an <em>instance</em>. By default, Triton gives each model a single
+instance for each available GPU in the system. By
+using the instance_group field in the model configuration, the number
+of execution instances for a model can
+be changed. The following figure shows model execution when model1
+is configured to allow three instances. As shown in the figure, the
+first three model1 inference requests are immediately executed in
+parallel. The fourth model1 inference request must wait until one of
+the first three executions completes before beginning.</p>
+<p><img alt="Triton Mult-Model Parallel ExecutionDiagram" src="../_images/multi_model_parallel_exec.png" /></p>
+</div>
+<div class="section" id="models-and-schedulers">
+<h2>Models And Schedulers<a class="headerlink" href="#models-and-schedulers" title="Permalink to this headline">#</a></h2>
+<p>Triton supports multiple scheduling and batching algorithms that can
+be selected independently for each model.  This section describes
+<em>stateless</em>, <em>stateful</em> and <em>ensemble</em> models and how Triton provides
+schedulers to support those model types. For a given model, the
+selection and configuration of the scheduler is done with the <a class="reference internal" href="model_configuration.html"><span class="doc std std-doc">model’s
+configuration file</span></a>.</p>
+<div class="section" id="stateless-models">
+<h3>Stateless Models<a class="headerlink" href="#stateless-models" title="Permalink to this headline">#</a></h3>
+<p>With respect to Triton’s schedulers, a <em>stateless</em> model does not
+maintain state between inference requests. Each inference performed on
+a stateless model is independent of all other inferences using that
+model.</p>
+<p>Examples of stateless models are CNNs such as image classification and
+object detection. The <a class="reference internal" href="model_configuration.html#default-scheduler"><span class="std std-doc">default
+scheduler</span></a> or <a class="reference internal" href="model_configuration.html#dynamic-batcher"><span class="std std-doc">dynamic
+batcher</span></a> can be used as the
+scheduler for these stateless models.</p>
+<p>RNNs and similar models which do have internal memory can be stateless
+as long as the state they maintain does not span inference
+requests. For example, an RNN that iterates over all elements in a
+batch is considered stateless by Triton if the internal state is not
+carried between batches of inference requests. The <a class="reference internal" href="model_configuration.html#default-scheduler"><span class="std std-doc">default
+scheduler</span></a> can be used for
+these stateless models. The <a class="reference internal" href="model_configuration.html#dynamic-batcher"><span class="std std-doc">dynamic
+batcher</span></a> cannot be used since
+the model is typically not expecting the batch to represent multiple
+inference requests.</p>
+</div>
+<div class="section" id="stateful-models">
+<h3>Stateful Models<a class="headerlink" href="#stateful-models" title="Permalink to this headline">#</a></h3>
+<p>With respect to Triton’s schedulers, a <em>stateful</em> model does maintain
+state between inference requests. The model is expecting multiple
+inference requests that together form a sequence of inferences that
+must be routed to the same model instance so that the state being
+maintained by the model is correctly updated. Moreover, the model may
+require that Triton provide <em>control</em> signals indicating, for example,
+the start and end of the sequence.</p>
+<p>The <a class="reference internal" href="model_configuration.html#sequence-batcher"><span class="std std-doc">sequence batcher</span></a> must
+be used for these stateful models. As explained below, the sequence
+batcher ensures that all inference requests in a sequence get routed
+to the same model instance so that the model can maintain state
+correctly. The sequence batcher also communicates with the model to
+indicate when a sequence is starting, when a sequence is ending, when
+a sequence has an inference request ready for execution, and the
+<em>correlation ID</em> of the sequence.</p>
+<p>When making inference requests for a stateful model, the client
+application must provide the same correlation ID to all requests in a
+sequence, and must also mark the start and end of the sequence. The
+correlation ID allows Triton to identify that the requests belong to
+the same sequence.</p>
+<div class="section" id="control-inputs">
+<h4>Control Inputs<a class="headerlink" href="#control-inputs" title="Permalink to this headline">#</a></h4>
+<p>For a stateful model to operate correctly with the sequence batcher,
+the model must typically accept one or more <em>control</em> input tensors
+that Triton uses to communicate with the model. The
+<em>ModelSequenceBatching::Control</em> section of the <a class="reference internal" href="model_configuration.html"><span class="doc std std-doc">model
+configuration</span></a> indicates how the model exposes
+the tensors that the sequence batcher should use for these
+controls. All controls are optional. Below is portion of a model
+configuration that shows an example configuration for all the
+available control signals.</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">sequence_batching</span> <span class="p">{</span>
+  <span class="n">control_input</span> <span class="p">[</span>
+    <span class="p">{</span>
+      <span class="n">name</span><span class="p">:</span> <span class="s2">&quot;START&quot;</span>
+      <span class="n">control</span> <span class="p">[</span>
+        <span class="p">{</span>
+          <span class="n">kind</span><span class="p">:</span> <span class="n">CONTROL_SEQUENCE_START</span>
+          <span class="n">fp32_false_true</span><span class="p">:</span> <span class="p">[</span> <span class="mi">0</span><span class="p">,</span> <span class="mi">1</span> <span class="p">]</span>
+        <span class="p">}</span>
+      <span class="p">]</span>
+    <span class="p">},</span>
+    <span class="p">{</span>
+      <span class="n">name</span><span class="p">:</span> <span class="s2">&quot;END&quot;</span>
+      <span class="n">control</span> <span class="p">[</span>
+        <span class="p">{</span>
+          <span class="n">kind</span><span class="p">:</span> <span class="n">CONTROL_SEQUENCE_END</span>
+          <span class="n">fp32_false_true</span><span class="p">:</span> <span class="p">[</span> <span class="mi">0</span><span class="p">,</span> <span class="mi">1</span> <span class="p">]</span>
+        <span class="p">}</span>
+      <span class="p">]</span>
+    <span class="p">},</span>
+    <span class="p">{</span>
+      <span class="n">name</span><span class="p">:</span> <span class="s2">&quot;READY&quot;</span>
+      <span class="n">control</span> <span class="p">[</span>
+        <span class="p">{</span>
+          <span class="n">kind</span><span class="p">:</span> <span class="n">CONTROL_SEQUENCE_READY</span>
+          <span class="n">fp32_false_true</span><span class="p">:</span> <span class="p">[</span> <span class="mi">0</span><span class="p">,</span> <span class="mi">1</span> <span class="p">]</span>
+        <span class="p">}</span>
+      <span class="p">]</span>
+    <span class="p">},</span>
+    <span class="p">{</span>
+      <span class="n">name</span><span class="p">:</span> <span class="s2">&quot;CORRID&quot;</span>
+      <span class="n">control</span> <span class="p">[</span>
+        <span class="p">{</span>
+          <span class="n">kind</span><span class="p">:</span> <span class="n">CONTROL_SEQUENCE_CORRID</span>
+          <span class="n">data_type</span><span class="p">:</span> <span class="n">TYPE_UINT64</span>
+        <span class="p">}</span>
+      <span class="p">]</span>
+    <span class="p">}</span>
+  <span class="p">]</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+<ul class="simple">
+<li><p><strong>Start</strong>: The start input tensor is specified using
+CONTROL_SEQUENCE_START in the configuration. The example
+configuration indicates that the model has an input tensor called
+START with a 32-bit floating point data-type. The sequence batcher
+will define this tensor when executing an inference on the
+model. The START tensor must be 1-dimensional with size equal to the
+batch-size. Each element in the tensor indicates if the sequence in
+the corresponding batch slot is starting or not. In the example
+configuration, fp32_false_true indicates that a sequence start is
+indicated by tensor element equal to 1, and non-start is indicated
+by tensor element equal to 0.</p></li>
+<li><p><strong>End</strong>: The end input tensor is specified using
+CONTROL_SEQUENCE_END in the configuration. The example configuration
+indicates that the model has an input tensor called END with a
+32-bit floating point data-type. The sequence batcher will define
+this tensor when executing an inference on the model. The END tensor
+must be 1-dimensional with size equal to the batch-size. Each
+element in the tensor indicates if the sequence in the corresponding
+batch slot is ending or not. In the example configuration,
+fp32_false_true indicates that a sequence end is indicated by tensor
+element equal to 1, and non-end is indicated by tensor element equal
+to 0.</p></li>
+<li><p><strong>Ready</strong>: The ready input tensor is specified using
+CONTROL_SEQUENCE_READY in the configuration. The example
+configuration indicates that the model has an input tensor called
+READY with a 32-bit floating point data-type. The sequence batcher
+will define this tensor when executing an inference on the
+model. The READY tensor must be 1-dimensional with size equal to the
+batch-size. Each element in the tensor indicates if the sequence in
+the corresponding batch slot has an inference request ready for
+inference. In the example configuration, fp32_false_true indicates
+that a sequence ready is indicated by tensor element equal to 1, and
+non-ready is indicated by tensor element equal to 0.</p></li>
+<li><p><strong>Correlation ID</strong>: The correlation ID input tensor is specified
+using CONTROL_SEQUENCE_CORRID in the configuration. The example
+configuration indicates that the model has an input tensor called
+CORRID with a unsigned 64-bit integer data-type. The sequence
+batcher will define this tensor when executing an inference on the
+model. The CORRID tensor must be 1-dimensional with size equal to
+the batch-size. Each element in the tensor indicates the correlation
+ID of the sequence in the corresponding batch slot.</p></li>
+</ul>
+</div>
+<div class="section" id="implicit-state-management">
+<h4>Implicit State Management<a class="headerlink" href="#implicit-state-management" title="Permalink to this headline">#</a></h4>
+<p>Implicit state management allows a stateful model to store its state inside
+Triton. When using implicit state, the stateful model does not need to store
+the state required for inference inside the model.</p>
+<p>Below is a portion of the model configuration that indicates the model
+is using implicit state.</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">sequence_batching</span> <span class="p">{</span>
+  <span class="n">state</span> <span class="p">[</span>
+    <span class="p">{</span>
+      <span class="n">input_name</span><span class="p">:</span> <span class="s2">&quot;INPUT_STATE&quot;</span>
+      <span class="n">output_name</span><span class="p">:</span> <span class="s2">&quot;OUTPUT_STATE&quot;</span>
+      <span class="n">data_type</span><span class="p">:</span> <span class="n">TYPE_INT32</span>
+      <span class="n">dims</span><span class="p">:</span> <span class="p">[</span> <span class="o">-</span><span class="mi">1</span> <span class="p">]</span>
+    <span class="p">}</span>
+  <span class="p">]</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+<p>The <em>state</em> section in the sequence_batching setting is used to indicate that
+the model is using implicit state. The <em>input_name</em> field specifies the name of
+the input tensor that will contain the input state. The <em>output_name</em> field
+describes the name of the output tensor produced by the model that contains
+output state. The output state provided by the model in the <em>i<sup>th</sup></em>
+request in the sequence will be used as the input state in the
+<em>i+1<sup>th</sup></em> request. The <em>dims</em> field specifies the dimensions of the
+state tensors. When the <em>dims</em> field contains variable-sized dimensions, the
+shape of the input state and output state does not have to match.</p>
+<p>For debugging purposes, the client can request the output state. In order to
+allow the client to request the output state, the
+<a class="reference internal" href="model_configuration.html#inputs-and-outputs"><span class="std std-doc"><em>output</em> section of the model configuration</span></a>
+must list the output state as one of the model outputs. Note that requesting the
+output state from the client can increase the request latency because of the
+additional tensors that have to be transferred.</p>
+<p>Implicit state management requires backend support. Currently, only
+<a class="reference external" href="https://github.com/triton-inference-server/onnxruntime_backend">onnxruntime_backend</a>
+and <a class="reference external" href="https://github.com/triton-inference-server/tensorrt_backend">tensorrt_backend</a>
+support implicit state.</p>
+<div class="section" id="state-initialization">
+<h5>State Initialization<a class="headerlink" href="#state-initialization" title="Permalink to this headline">#</a></h5>
+<p>By default, the starting request in the sequence contains uninitialized data for
+the input state. The model can use the start flag in the request to detect the
+beginning of a new sequence and initialize the model state by providing the
+initial state in the model output. If the <em>dims</em> section in the <em>state</em>
+description of the model contains variable-sized dimensions, Triton will use <em>1</em>
+for every variable-sized dimension for the starting request. For other
+non-starting requests in the sequence, the input state is the output state of
+the previous request in the sequence. For an example ONNX model that uses
+implicit state you can refer to
+<span class="xref myst">this ONNX model</span>.
+This is a simple accumulator model that stores the partial sum of the requests
+in a sequence in Triton using implicit state. For state initialization, if the
+request is starting, the model sets the “OUTPUT_STATE” to be equal to the
+“INPUT” tensor. For non-starting requests, it sets the “OUTPUT_STATE” tensor
+to the sum of “INPUT” and “INPUT_STATE” tensors.</p>
+<p>In addition to the default state initilization discussed above, Triton provides
+two other mechanisms for initilizing state.</p>
+<div class="section" id="initializing-state-from-zero">
+<h6>Initializing State from Zero.<a class="headerlink" href="#initializing-state-from-zero" title="Permalink to this headline">#</a></h6>
+<p>Below is an example of initializing state from zero.</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">sequence_batching</span> <span class="p">{</span>
+  <span class="n">state</span> <span class="p">[</span>
+    <span class="p">{</span>
+      <span class="n">input_name</span><span class="p">:</span> <span class="s2">&quot;INPUT_STATE&quot;</span>
+      <span class="n">output_name</span><span class="p">:</span> <span class="s2">&quot;OUTPUT_STATE&quot;</span>
+      <span class="n">data_type</span><span class="p">:</span> <span class="n">TYPE_INT32</span>
+      <span class="n">dims</span><span class="p">:</span> <span class="p">[</span> <span class="o">-</span><span class="mi">1</span> <span class="p">]</span>
+      <span class="n">initial_state</span><span class="p">:</span> <span class="p">{</span>
+       <span class="n">data_type</span><span class="p">:</span> <span class="n">TYPE_INT32</span>
+       <span class="n">dims</span><span class="p">:</span> <span class="p">[</span> <span class="mi">1</span> <span class="p">]</span>
+       <span class="n">zero_data</span><span class="p">:</span> <span class="n">true</span>
+       <span class="n">name</span><span class="p">:</span> <span class="s2">&quot;initial state&quot;</span>
+      <span class="p">}</span>
+    <span class="p">}</span>
+  <span class="p">]</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+<p>Note that in the example above variable dimensions in the state description are
+converted to fixed size dimensions.</p>
+</div>
+<div class="section" id="initializing-state-from-file">
+<h6>Initializing State from File<a class="headerlink" href="#initializing-state-from-file" title="Permalink to this headline">#</a></h6>
+<p>For initializing state from file, you need to create a directory named
+“initial_state” under the model directory. The file that contains the initial
+state under this directory needs to be provided in the <em>data_file</em> field.
+The data stored in this file will be used in row-major order as the initial
+state. Below is an example state description initializing state from file.</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">sequence_batching</span> <span class="p">{</span>
+  <span class="n">state</span> <span class="p">[</span>
+    <span class="p">{</span>
+      <span class="n">input_name</span><span class="p">:</span> <span class="s2">&quot;INPUT_STATE&quot;</span>
+      <span class="n">output_name</span><span class="p">:</span> <span class="s2">&quot;OUTPUT_STATE&quot;</span>
+      <span class="n">data_type</span><span class="p">:</span> <span class="n">TYPE_INT32</span>
+      <span class="n">dims</span><span class="p">:</span> <span class="p">[</span> <span class="o">-</span><span class="mi">1</span> <span class="p">]</span>
+      <span class="n">initial_state</span><span class="p">:</span> <span class="p">{</span>
+       <span class="n">data_type</span><span class="p">:</span> <span class="n">TYPE_INT32</span>
+       <span class="n">dims</span><span class="p">:</span> <span class="p">[</span> <span class="mi">1</span> <span class="p">]</span>
+       <span class="n">data_file</span><span class="p">:</span> <span class="s2">&quot;initial_state_data&quot;</span>
+       <span class="n">name</span><span class="p">:</span> <span class="s2">&quot;initial state&quot;</span>
+      <span class="p">}</span>
+    <span class="p">}</span>
+  <span class="p">]</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+</div>
+</div>
+</div>
+<div class="section" id="scheduling-strategies">
+<h4>Scheduling Strategies<a class="headerlink" href="#scheduling-strategies" title="Permalink to this headline">#</a></h4>
+<p>The sequence batcher can employ one of two scheduling strategies when
+deciding how to batch the sequences that are routed to the same model
+instance. These strategies are <span class="xref myst">direct</span> and <span class="xref myst">oldest</span>.</p>
+<div class="section" id="direct">
+<h5>Direct<a class="headerlink" href="#direct" title="Permalink to this headline">#</a></h5>
+<p>With the Direct scheduling strategy the sequence batcher ensures not
+only that all inference requests in a sequence are routed to the same
+model instance, but also that each sequence is routed to a dedicated
+batch slot within the model instance. This strategy is required when
+the model maintains state for each batch slot, and is expecting all
+inference requests for a given sequence to be routed to the same slot
+so that the state is correctly updated.</p>
+<p>As an example of the sequence batcher using the Direct scheduling
+strategy, assume a TensorRT stateful model that has the following
+model configuration.</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">name</span><span class="p">:</span> <span class="s2">&quot;direct_stateful_model&quot;</span>
+<span class="n">platform</span><span class="p">:</span> <span class="s2">&quot;tensorrt_plan&quot;</span>
+<span class="n">max_batch_size</span><span class="p">:</span> <span class="mi">2</span>
+<span class="n">sequence_batching</span> <span class="p">{</span>
+  <span class="n">max_sequence_idle_microseconds</span><span class="p">:</span> <span class="mi">5000000</span>
+  <span class="n">direct</span> <span class="p">{</span> <span class="p">}</span>
+  <span class="n">control_input</span> <span class="p">[</span>
+    <span class="p">{</span>
+      <span class="n">name</span><span class="p">:</span> <span class="s2">&quot;START&quot;</span>
+      <span class="n">control</span> <span class="p">[</span>
+        <span class="p">{</span>
+          <span class="n">kind</span><span class="p">:</span> <span class="n">CONTROL_SEQUENCE_START</span>
+          <span class="n">fp32_false_true</span><span class="p">:</span> <span class="p">[</span> <span class="mi">0</span><span class="p">,</span> <span class="mi">1</span> <span class="p">]</span>
+        <span class="p">}</span>
+      <span class="p">]</span>
+    <span class="p">},</span>
+    <span class="p">{</span>
+      <span class="n">name</span><span class="p">:</span> <span class="s2">&quot;READY&quot;</span>
+      <span class="n">control</span> <span class="p">[</span>
+        <span class="p">{</span>
+          <span class="n">kind</span><span class="p">:</span> <span class="n">CONTROL_SEQUENCE_READY</span>
+          <span class="n">fp32_false_true</span><span class="p">:</span> <span class="p">[</span> <span class="mi">0</span><span class="p">,</span> <span class="mi">1</span> <span class="p">]</span>
+        <span class="p">}</span>
+      <span class="p">]</span>
+    <span class="p">}</span>
+  <span class="p">]</span>
+<span class="p">}</span>
+<span class="nb">input</span> <span class="p">[</span>
+  <span class="p">{</span>
+    <span class="n">name</span><span class="p">:</span> <span class="s2">&quot;INPUT&quot;</span>
+    <span class="n">data_type</span><span class="p">:</span> <span class="n">TYPE_FP32</span>
+    <span class="n">dims</span><span class="p">:</span> <span class="p">[</span> <span class="mi">100</span><span class="p">,</span> <span class="mi">100</span> <span class="p">]</span>
+  <span class="p">}</span>
+<span class="p">]</span>
+<span class="n">output</span> <span class="p">[</span>
+  <span class="p">{</span>
+    <span class="n">name</span><span class="p">:</span> <span class="s2">&quot;OUTPUT&quot;</span>
+    <span class="n">data_type</span><span class="p">:</span> <span class="n">TYPE_FP32</span>
+    <span class="n">dims</span><span class="p">:</span> <span class="p">[</span> <span class="mi">10</span> <span class="p">]</span>
+  <span class="p">}</span>
+<span class="p">]</span>
+<span class="n">instance_group</span> <span class="p">[</span>
+  <span class="p">{</span>
+    <span class="n">count</span><span class="p">:</span> <span class="mi">2</span>
+  <span class="p">}</span>
+<span class="p">]</span>
+</pre></div>
+</div>
+<p>The sequence_batching section indicates that the model should use the
+sequence batcher and the Direct scheduling strategy. In this example
+the model only requires a <em>start</em> and <em>ready</em> control input from the
+sequence batcher so only those controls are listed. The instance_group
+indicates two instances of the model should be instantiated and
+max_batch_size indicates that each of those instances should perform
+batch-size 2 inferences. The following figure shows a representation
+of the sequence batcher and the inference resources specified by this
+configuration.</p>
+<p><img alt="Sequence Batching Example" src="../_images/sequence_example0.png" /></p>
+<p>Each model instance is maintaining state for each batch slot, and is
+expecting all inference requests for a given sequence to be routed to
+the same slot so that the state is correctly updated. For this example
+that means that Triton can simultaneously perform inference for up to
+four sequences.</p>
+<p>Using the Direct scheduling strategy, the sequence batcher:</p>
+<ul class="simple">
+<li><p>Recognizes when an inference request starts a new sequence and
+allocates a batch slot for that sequence. If no batch slot is
+available for the new sequence, Triton places the inference request
+in a backlog.</p></li>
+<li><p>Recognizes when an inference request is part of a sequence that has
+an allocated batch slot and routes the request to that slot.</p></li>
+<li><p>Recognizes when an inference request is part of a sequence that is
+in the backlog and places the request in the backlog.</p></li>
+<li><p>Recognizes when the last inference request in a sequence has been
+completed. The batch slot occupied by that sequence is immediately
+reallocated to a sequence in the backlog, or freed for a future
+sequence if there is no backlog.</p></li>
+</ul>
+<p>The following figure shows how multiple sequences are scheduled onto
+the model instances using the Direct scheduling strategy. On the left
+the figure shows several sequences of requests arriving at
+Triton. Each sequence could be made up of any number of inference
+requests and those individual inference requests could arrive in any
+order relative to inference requests in other sequences, except that
+the execution order shown on the right assumes that the first
+inference request of sequence 0 arrives before any inference request
+in sequences 1-5, the first inference request of sequence 1 arrives
+before any inference request in sequences 2-5, etc.</p>
+<p>The right of the figure shows how the inference request sequences are
+scheduled onto the model instances over time.</p>
+<p><img alt="Sequence Batcher Example" src="../_images/sequence_example1.png" /></p>
+<p>The following figure shows the sequence batcher uses the control input
+tensors to communicate with the model. The figure shows two sequences
+assigned to the two batch slots in a model instance. Inference
+requests for each sequence arrive over time. The START and READY rows
+show the input tensor values used for each execution of the
+model. Over time the following happens:</p>
+<ul class="simple">
+<li><p>The first request arrives for the sequence in slot0. Assuming the
+model instance is not already executing an inference, the sequence
+scheduler immediately schedules the model instance to execute
+because an inference request is available.</p></li>
+<li><p>This is the first request in the sequence so the corresponding
+element in the START tensor is set to 1. There is no request
+available in slot1 so the READY tensor shows only slot0 as ready.</p></li>
+<li><p>After the inference completes the sequence scheduler sees that there
+are no requests available in any batch slot and so the model
+instance sits idle.</p></li>
+<li><p>Next, two inference requests arrive close together in time so that
+the sequence scheduler sees them both available in their respective
+batch slots. The scheduler immediately schedules the model instance
+to perform a batch-size 2 inference and uses START and READY to show
+that both slots have an inference request avaiable but that only
+slot1 is the start of a new sequence.</p></li>
+<li><p>The processing continues in a similar manner for the other inference
+requests.</p></li>
+</ul>
+<p><img alt="Sequence Batcher Example" src="../_images/sequence_example2.png" /></p>
+</div>
+<div class="section" id="oldest">
+<h5>Oldest<a class="headerlink" href="#oldest" title="Permalink to this headline">#</a></h5>
+<p>With the Oldest scheduling strategy the sequence batcher ensures that
+all inference requests in a sequence are routed to the same model
+instance and then uses the <a class="reference internal" href="model_configuration.html#dynamic-batcher"><span class="std std-doc">dynamic
+batcher</span></a> to batch together
+multiple inferences from different sequences into a batch that
+inferences together.  With this strategy the model must typically use
+the CONTROL_SEQUENCE_CORRID control so that it knows which sequence
+each inference request in the batch belongs to. The
+CONTROL_SEQUENCE_READY control is typically not needed because all
+inferences in the batch will always be ready for inference.</p>
+<p>As an example of the sequence batcher using the Oldest scheduling
+strategy, assume a stateful model that has the following model
+configuration:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">name</span><span class="p">:</span> <span class="s2">&quot;oldest_stateful_model&quot;</span>
+<span class="n">platform</span><span class="p">:</span> <span class="s2">&quot;tensorflow_savedmodel&quot;</span>
+<span class="n">max_batch_size</span><span class="p">:</span> <span class="mi">2</span>
+<span class="n">sequence_batching</span> <span class="p">{</span>
+  <span class="n">max_sequence_idle_microseconds</span><span class="p">:</span> <span class="mi">5000000</span>
+  <span class="n">oldest</span>
+    <span class="p">{</span>
+      <span class="n">max_candidate_sequences</span><span class="p">:</span> <span class="mi">4</span>
+    <span class="p">}</span>
+  <span class="n">control_input</span> <span class="p">[</span>
+    <span class="p">{</span>
+      <span class="n">name</span><span class="p">:</span> <span class="s2">&quot;START&quot;</span>
+      <span class="n">control</span> <span class="p">[</span>
+        <span class="p">{</span>
+          <span class="n">kind</span><span class="p">:</span> <span class="n">CONTROL_SEQUENCE_START</span>
+          <span class="n">fp32_false_true</span><span class="p">:</span> <span class="p">[</span> <span class="mi">0</span><span class="p">,</span> <span class="mi">1</span> <span class="p">]</span>
+        <span class="p">}</span>
+      <span class="p">]</span>
+    <span class="p">},</span>
+    <span class="p">{</span>
+      <span class="n">name</span><span class="p">:</span> <span class="s2">&quot;END&quot;</span>
+      <span class="n">control</span> <span class="p">[</span>
+        <span class="p">{</span>
+          <span class="n">kind</span><span class="p">:</span> <span class="n">CONTROL_SEQUENCE_END</span>
+          <span class="n">fp32_false_true</span><span class="p">:</span> <span class="p">[</span> <span class="mi">0</span><span class="p">,</span> <span class="mi">1</span> <span class="p">]</span>
+        <span class="p">}</span>
+      <span class="p">]</span>
+    <span class="p">},</span>
+    <span class="p">{</span>
+      <span class="n">name</span><span class="p">:</span> <span class="s2">&quot;CORRID&quot;</span>
+      <span class="n">control</span> <span class="p">[</span>
+        <span class="p">{</span>
+          <span class="n">kind</span><span class="p">:</span> <span class="n">CONTROL_SEQUENCE_CORRID</span>
+          <span class="n">data_type</span><span class="p">:</span> <span class="n">TYPE_UINT64</span>
+        <span class="p">}</span>
+      <span class="p">]</span>
+    <span class="p">}</span>
+  <span class="p">]</span>
+<span class="p">}</span>
+<span class="nb">input</span> <span class="p">[</span>
+  <span class="p">{</span>
+    <span class="n">name</span><span class="p">:</span> <span class="s2">&quot;INPUT&quot;</span>
+    <span class="n">data_type</span><span class="p">:</span> <span class="n">TYPE_FP32</span>
+    <span class="n">dims</span><span class="p">:</span> <span class="p">[</span> <span class="mi">100</span><span class="p">,</span> <span class="mi">100</span> <span class="p">]</span>
+  <span class="p">}</span>
+<span class="p">]</span>
+<span class="n">output</span> <span class="p">[</span>
+  <span class="p">{</span>
+    <span class="n">name</span><span class="p">:</span> <span class="s2">&quot;OUTPUT&quot;</span>
+    <span class="n">data_type</span><span class="p">:</span> <span class="n">TYPE_FP32</span>
+    <span class="n">dims</span><span class="p">:</span> <span class="p">[</span> <span class="mi">10</span> <span class="p">]</span>
+  <span class="p">}</span>
+<span class="p">]</span>
+</pre></div>
+</div>
+<p>The sequence_batching section indicates that the model should use the
+sequence batcher and the Oldest scheduling strategy. The Oldest
+strategy is configured so that the sequence batcher maintains up to 4
+active candidate sequences from which it prefers to form dynamic
+batches of size 2. In this example the model requires a <em>start</em>,
+<em>end</em>, and <em>correlation ID</em> control input from the sequence
+batcher. The following figure shows a representation of the sequence
+batcher and the inference resources specified by this configuration.</p>
+<p><img alt="Sequence Batching Example" src="../_images/dyna_sequence_example0.png" /></p>
+<p>Using the Oldest scheduling strategy, the sequence batcher:</p>
+<ul class="simple">
+<li><p>Recognizes when an inference request starts a new sequence and
+attempts to find a model instance that has room for a candidate
+sequence. If no model instance has room for a new candidate
+sequence, Triton places the inference request in a backlog.</p></li>
+<li><p>Recognizes when an inference request is part of a sequence that is
+already a candidate sequence in some model instance and routes the
+request to that model instance.</p></li>
+<li><p>Recognizes when an inference request is part of a sequence that is
+in the backlog and places the request in the backlog.</p></li>
+<li><p>Recognizes when the last inference request in a sequence has been
+completed. The model instance immediately removes a sequence from
+the backlog and makes it a candidate sequence in the model instance,
+or records that the model instance can handle a future sequence if
+there is no backlog.</p></li>
+</ul>
+<p>The following figure shows how multiple sequences are scheduled onto
+the model instance specified by the above example configuration. On
+the left the figure shows four sequences of requests arriving at
+Triton. Each sequence is composed of multiple inference requests as
+shown in the figure. The center of the figure shows how the inference
+request sequences are batched onto the model instance over time,
+assuming that the inference requests for each sequence arrive at the
+same rate with sequence A arriving just before B, which arrives just
+before C, etc. The Oldest strategy forms a dynamic batch from the
+oldest requests but never includes more than one request from a given
+sequence in a batch (for example, the last two inferences in sequence
+D are not batched together).</p>
+<p><img alt="Sequence Batcher Example" src="../_images/dyna_sequence_example1.png" /></p>
+</div>
+</div>
+</div>
+<div class="section" id="ensemble-models">
+<h3>Ensemble Models<a class="headerlink" href="#ensemble-models" title="Permalink to this headline">#</a></h3>
+<p>An ensemble model represents a <em>pipeline</em> of one or more models and
+the connection of input and output tensors between those
+models. Ensemble models are intended to be used to encapsulate a
+procedure that involves multiple models, such as “data preprocessing
+-&gt; inference -&gt; data postprocessing”.  Using ensemble models for this
+purpose can avoid the overhead of transferring intermediate tensors
+and minimize the number of requests that must be sent to Triton.</p>
+<p>The ensemble scheduler must be used for ensemble models, regardless of
+the scheduler used by the models within the ensemble. With respect to
+the ensemble scheduler, an <em>ensemble</em> model is not an actual
+model. Instead, it specifies the dataflow between models within the
+ensemble as <em>ModelEnsembling::Step</em> entries in the model
+configuration. The scheduler collects the output tensors in each step,
+provides them as input tensors for other steps according to the
+specification. In spite of that, the ensemble model is still viewed as
+a single model from an external view.</p>
+<p>Note that the ensemble models will inherit the characteristics of the
+models involved, so the meta-data in the request header must comply
+with the models within the ensemble. For instance, if one of the
+models is stateful model, then the inference request for the ensemble
+model should contain the information mentioned in <a class="reference internal" href="#stateful-models"><span class="std std-doc">Stateful
+Models</span></a>, which will be provided to the stateful
+model by the scheduler.</p>
+<p>As an example consider an ensemble model for image classification and
+segmentation that has the following model configuration:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">name</span><span class="p">:</span> <span class="s2">&quot;ensemble_model&quot;</span>
+<span class="n">platform</span><span class="p">:</span> <span class="s2">&quot;ensemble&quot;</span>
+<span class="n">max_batch_size</span><span class="p">:</span> <span class="mi">1</span>
+<span class="nb">input</span> <span class="p">[</span>
+  <span class="p">{</span>
+    <span class="n">name</span><span class="p">:</span> <span class="s2">&quot;IMAGE&quot;</span>
+    <span class="n">data_type</span><span class="p">:</span> <span class="n">TYPE_STRING</span>
+    <span class="n">dims</span><span class="p">:</span> <span class="p">[</span> <span class="mi">1</span> <span class="p">]</span>
+  <span class="p">}</span>
+<span class="p">]</span>
+<span class="n">output</span> <span class="p">[</span>
+  <span class="p">{</span>
+    <span class="n">name</span><span class="p">:</span> <span class="s2">&quot;CLASSIFICATION&quot;</span>
+    <span class="n">data_type</span><span class="p">:</span> <span class="n">TYPE_FP32</span>
+    <span class="n">dims</span><span class="p">:</span> <span class="p">[</span> <span class="mi">1000</span> <span class="p">]</span>
+  <span class="p">},</span>
+  <span class="p">{</span>
+    <span class="n">name</span><span class="p">:</span> <span class="s2">&quot;SEGMENTATION&quot;</span>
+    <span class="n">data_type</span><span class="p">:</span> <span class="n">TYPE_FP32</span>
+    <span class="n">dims</span><span class="p">:</span> <span class="p">[</span> <span class="mi">3</span><span class="p">,</span> <span class="mi">224</span><span class="p">,</span> <span class="mi">224</span> <span class="p">]</span>
+  <span class="p">}</span>
+<span class="p">]</span>
+<span class="n">ensemble_scheduling</span> <span class="p">{</span>
+  <span class="n">step</span> <span class="p">[</span>
+    <span class="p">{</span>
+      <span class="n">model_name</span><span class="p">:</span> <span class="s2">&quot;image_preprocess_model&quot;</span>
+      <span class="n">model_version</span><span class="p">:</span> <span class="o">-</span><span class="mi">1</span>
+      <span class="n">input_map</span> <span class="p">{</span>
+        <span class="n">key</span><span class="p">:</span> <span class="s2">&quot;RAW_IMAGE&quot;</span>
+        <span class="n">value</span><span class="p">:</span> <span class="s2">&quot;IMAGE&quot;</span>
+      <span class="p">}</span>
+      <span class="n">output_map</span> <span class="p">{</span>
+        <span class="n">key</span><span class="p">:</span> <span class="s2">&quot;PREPROCESSED_OUTPUT&quot;</span>
+        <span class="n">value</span><span class="p">:</span> <span class="s2">&quot;preprocessed_image&quot;</span>
+      <span class="p">}</span>
+    <span class="p">},</span>
+    <span class="p">{</span>
+      <span class="n">model_name</span><span class="p">:</span> <span class="s2">&quot;classification_model&quot;</span>
+      <span class="n">model_version</span><span class="p">:</span> <span class="o">-</span><span class="mi">1</span>
+      <span class="n">input_map</span> <span class="p">{</span>
+        <span class="n">key</span><span class="p">:</span> <span class="s2">&quot;FORMATTED_IMAGE&quot;</span>
+        <span class="n">value</span><span class="p">:</span> <span class="s2">&quot;preprocessed_image&quot;</span>
+      <span class="p">}</span>
+      <span class="n">output_map</span> <span class="p">{</span>
+        <span class="n">key</span><span class="p">:</span> <span class="s2">&quot;CLASSIFICATION_OUTPUT&quot;</span>
+        <span class="n">value</span><span class="p">:</span> <span class="s2">&quot;CLASSIFICATION&quot;</span>
+      <span class="p">}</span>
+    <span class="p">},</span>
+    <span class="p">{</span>
+      <span class="n">model_name</span><span class="p">:</span> <span class="s2">&quot;segmentation_model&quot;</span>
+      <span class="n">model_version</span><span class="p">:</span> <span class="o">-</span><span class="mi">1</span>
+      <span class="n">input_map</span> <span class="p">{</span>
+        <span class="n">key</span><span class="p">:</span> <span class="s2">&quot;FORMATTED_IMAGE&quot;</span>
+        <span class="n">value</span><span class="p">:</span> <span class="s2">&quot;preprocessed_image&quot;</span>
+      <span class="p">}</span>
+      <span class="n">output_map</span> <span class="p">{</span>
+        <span class="n">key</span><span class="p">:</span> <span class="s2">&quot;SEGMENTATION_OUTPUT&quot;</span>
+        <span class="n">value</span><span class="p">:</span> <span class="s2">&quot;SEGMENTATION&quot;</span>
+      <span class="p">}</span>
+    <span class="p">}</span>
+  <span class="p">]</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+<p>The ensemble_scheduling section indicates that the ensemble scheduler will be
+used and that the ensemble model consists of three different models. Each
+element in step section specifies the model to be used and how the inputs and
+outputs of the model are mapped to tensor names recognized by the scheduler. For
+example, the first element in step specifies that the latest version of
+image_preprocess_model should be used, the content of its input “RAW_IMAGE”
+is provided by “IMAGE” tensor, and the content of its output
+“PREPROCESSED_OUTPUT” will be mapped to “preprocessed_image” tensor for later
+use. The tensor names recognized by the scheduler are the ensemble inputs, the
+ensemble outputs and all values in the input_map and the output_map.</p>
+<p>The models composing the ensemble may also have dynamic batching
+enabled.  Since ensemble models are just routing the data between
+composing models, Triton can take requests into an ensemble model
+without modifying the ensemble’s configuration to exploit the dynamic
+batching of the composing models.</p>
+<p>Assuming that only the ensemble model, the preprocess model, the classification
+model and the segmentation model are being served, the client applications will
+see them as four different models which can process requests independently.
+However, the ensemble scheduler will view the ensemble model as the following.</p>
+<p><img alt="Ensemble Example" src="../_images/ensemble_example0.png" /></p>
+<p>When an inference request for the ensemble model is received, the ensemble
+scheduler will:</p>
+<ol class="arabic simple">
+<li><p>Recognize that the “IMAGE” tensor in the request is mapped to input
+“RAW_IMAGE” in the preprocess model.</p></li>
+<li><p>Check models within the ensemble and send an internal request to the
+preprocess model because all the input tensors required are ready.</p></li>
+<li><p>Recognize the completion of the internal request, collect the output
+tensor and map the content to “preprocessed_image” which is an unique name
+known within the ensemble.</p></li>
+<li><p>Map the newly collected tensor to inputs of the models within the ensemble.
+In this case, the inputs of “classification_model” and “segmentation_model”
+will be mapped and marked as ready.</p></li>
+<li><p>Check models that require the newly collected tensor and send internal
+requests to models whose inputs are ready, the classification
+model and the segmentation model in this case. Note that the responses will
+be in arbitrary order depending on the load and computation time of
+individual models.</p></li>
+<li><p>Repeat step 3-5 until no more internal requests should be sent, and then
+response to the inference request with the tensors mapped to the ensemble
+output names.</p></li>
+</ol>
+<div class="section" id="additional-resources">
+<h4>Additional Resources<a class="headerlink" href="#additional-resources" title="Permalink to this headline">#</a></h4>
+<p>You can find additional end-to-end ensemble examples in the links below:</p>
+<ul class="simple">
+<li><p><a class="reference external" href="https://github.com/triton-inference-server/python_backend#preprocessing">Preprocessing in Python Backend Using
+Ensemble</a></p></li>
+<li><p><a class="reference external" href="https://developer.nvidia.com/blog/accelerating-inference-with-triton-inference-server-and-dali/">Accelerating Inference with NVIDIA Triton Inference Server and NVIDIA
+DALI</a></p></li>
+<li><p><a class="reference external" href="https://github.com/rapidsai/rapids-examples/tree/main/rapids_triton_example">Using RAPIDS AI with NVIDIA Triton Inference
+Server</a></p></li>
+</ul>
+</div>
+</div>
+</div>
+</div>
+
+<div class="section">
+   
+</div>
+
+              </div>
+              
+            </main>
+            <footer class="footer-article noprint">
+                
+    <!-- Previous / next buttons -->
+<div class='prev-next-area'>
+    <a class='left-prev' id="prev-link" href="performance_tuning.html" title="previous page">
+        <i class="fas fa-angle-left"></i>
+        <div class="prev-next-info">
+            <p class="prev-next-subtitle">previous</p>
+            <p class="prev-next-title">Deploying your trained model using Triton</p>
+        </div>
+    </a>
+    <a class='right-next' id="next-link" href="model_repository.html" title="next page">
+    <div class="prev-next-info">
+        <p class="prev-next-subtitle">next</p>
+        <p class="prev-next-title">Model Repository</p>
+    </div>
+    <i class="fas fa-angle-right"></i>
+    </a>
+</div>
+            </footer>
+        </div>
+    </div>
+    <div class="footer-content row">
+        <footer class="col footer"><p>
+  
+    By NVIDIA<br/>
+  
+      &copy; Copyright 2022 NVIDIA CORPORATION &amp; AFFILIATES. All rights reserved.<br/>
+    Last updated on Oct 05, 2022.<br/>
+</p>
+        </footer>
+    </div>
+    
+</div>
+
+
+      </div>
+    </div>
+  
+  <!-- Scripts loaded after <body> so the DOM is not blocked -->
+  <script src="../_static/scripts/pydata-sphinx-theme.js?digest=1999514e3f237ded88cf"></script>
+
+
+<script type="text/javascript">_satellite.pageBottom();</script>
+  </body>
+</html>

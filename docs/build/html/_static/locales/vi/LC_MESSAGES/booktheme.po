@@ -1,0 +1,81 @@
+
+msgid ""
+msgstr ""
+"Project-Id-Version: Sphinx-Book-Theme\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Language: vi\n"
+"Plural-Forms: nplurals=2; plural=(n != 1);\n"
+
+msgid "Download this page"
+msgstr "Tải xuống trang này"
+
+msgid "Download notebook file"
+msgstr "Tải xuống tệp sổ tay"
+
+msgid "Open an issue"
+msgstr "Mở một vấn đề"
+
+msgid "repository"
+msgstr "kho"
+
+msgid "Theme by the"
+msgstr "Chủ đề của"
+
+msgid "Contents"
+msgstr "Nội dung"
+
+msgid "next page"
+msgstr "Trang tiếp theo"
+
+msgid "Last updated on"
+msgstr "Cập nhật lần cuối vào"
+
+msgid "Launch"
+msgstr "Phóng"
+
+msgid "Edit this page"
+msgstr "chỉnh sửa trang này"
+
+msgid "Source repository"
+msgstr "Kho nguồn"
+
+msgid "Download source file"
+msgstr "Tải xuống tệp nguồn"
+
+msgid "Sphinx Book Theme"
+msgstr "Chủ đề sách nhân sư"
+
+msgid "Copyright"
+msgstr "Bản quyền"
+
+msgid "Fullscreen mode"
+msgstr "Chế độ toàn màn hình"
+
+msgid "Search the docs ..."
+msgstr "Tìm kiếm tài liệu ..."
+
+msgid "suggest edit"
+msgstr "đề nghị chỉnh sửa"
+
+msgid "Search this book..."
+msgstr "Tìm kiếm cuốn sách này ..."
+
+msgid "By"
+msgstr "Bởi"
+
+msgid "open issue"
+msgstr "vấn đề mở"
+
+msgid "Print to PDF"
+msgstr "In sang PDF"
+
+msgid "previous page"
+msgstr "trang trước"
+
+msgid "Toggle navigation"
+msgstr "Chuyển đổi điều hướng thành"
+
+msgid "By the"
+msgstr "Bằng"

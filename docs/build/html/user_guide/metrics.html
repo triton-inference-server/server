@@ -1,0 +1,993 @@
+
+<!DOCTYPE html>
+
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Metrics &#8212; NVIDIA Triton Inference Server</title>
+    
+  <!-- Loaded before other Sphinx assets -->
+  <link href="../_static/styles/theme.css?digest=1999514e3f237ded88cf" rel="stylesheet">
+<link href="../_static/styles/pydata-sphinx-theme.css?digest=1999514e3f237ded88cf" rel="stylesheet">
+
+    
+  <link rel="stylesheet"
+    href="../_static/vendor/fontawesome/5.13.0/css/all.min.css">
+  <link rel="preload" as="font" type="font/woff2" crossorigin
+    href="../_static/vendor/fontawesome/5.13.0/webfonts/fa-solid-900.woff2">
+  <link rel="preload" as="font" type="font/woff2" crossorigin
+    href="../_static/vendor/fontawesome/5.13.0/webfonts/fa-brands-400.woff2">
+
+    <link rel="stylesheet" type="text/css" href="../_static/pygments.css" />
+    <link rel="stylesheet" href="../_static/styles/sphinx-book-theme.css?digest=62ba249389abaaa9ffc34bf36a076bdc1d65ee18" type="text/css" />
+    <link rel="stylesheet" type="text/css" href="../_static/mystnb.4510f1fc1dee50b3e5859aac5469c37c29e427902b24a333a5f9fcb2f0b3ac41.css" />
+    <link rel="stylesheet" type="text/css" href="../_static/copybutton.css" />
+    <link rel="stylesheet" type="text/css" href="../_static/tabs.css" />
+    <link rel="stylesheet" type="text/css" href="../_static/custom.css" />
+    <link rel="stylesheet" type="text/css" href="../_static/design-style.4045f2051d55cab465a707391d5b2007.min.css" />
+    
+  <!-- Pre-loaded scripts that we'll load fully later -->
+  <link rel="preload" as="script" href="../_static/scripts/pydata-sphinx-theme.js?digest=1999514e3f237ded88cf">
+
+    <script data-url_root="../" id="documentation_options" src="../_static/documentation_options.js"></script>
+    <script src="../_static/jquery.js"></script>
+    <script src="../_static/underscore.js"></script>
+    <script src="../_static/doctools.js"></script>
+    <script src="../_static/clipboard.min.js"></script>
+    <script src="../_static/copybutton.js"></script>
+    <script src="https://js.hcaptcha.com/1/api.js"></script>
+    <script src="//assets.adobedtm.com/5d4962a43b79/c1061d2c5e7b/launch-191c2462b890.min.js"></script>
+    <script src="../_static/scripts/sphinx-book-theme.js?digest=f31d14ad54b65d19161ba51d4ffff3a77ae00456"></script>
+    <script src="../_static/design-tabs.js"></script>
+    <link rel="canonical" href="https://docs.nvidia.com/deeplearning/triton-inference-server/user-guide/docs/user_guide/metrics.html" />
+    <link rel="shortcut icon" href="../_static/nvidia-logo-vert-rgb-blk-for-screen.png"/>
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" />
+    <link rel="next" title="Triton Server Trace" href="trace.html" />
+    <link rel="prev" title="Triton Response Cache" href="response_cache.html" /> 
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="docsearch:language" content="None">
+    
+
+    <!-- Google Analytics -->
+      
+<style type="text/css">
+  ul.ablog-archive {
+    list-style: none;
+    overflow: auto;
+    margin-left: 0px;
+  }
+  ul.ablog-archive li {
+    float: left;
+    margin-right: 5px;
+    font-size: 80%;
+  }
+  ul.postlist a {
+    font-style: italic;
+  }
+  ul.postlist-style-disc {
+    list-style-type: disc;
+  }
+  ul.postlist-style-none {
+    list-style-type: none;
+  }
+  ul.postlist-style-circle {
+    list-style-type: circle;
+  }
+</style>
+
+  </head>
+  <body data-spy="scroll" data-target="#bd-toc-nav" data-offset="60">
+<!-- Checkboxes to toggle the left sidebar -->
+<input type="checkbox" class="sidebar-toggle" name="__navigation" id="__navigation" aria-label="Toggle navigation sidebar">
+<label class="overlay overlay-navbar" for="__navigation">
+    <div class="visually-hidden">Toggle navigation sidebar</div>
+</label>
+<!-- Checkboxes to toggle the in-page toc -->
+<input type="checkbox" class="sidebar-toggle" name="__page-toc" id="__page-toc" aria-label="Toggle in-page Table of Contents">
+<label class="overlay overlay-pagetoc" for="__page-toc">
+    <div class="visually-hidden">Toggle in-page Table of Contents</div>
+</label>
+<!-- Headers at the top -->
+<div class="announcement header-item noprint"></div>
+<div class="header header-item noprint"></div>
+
+    
+    <div class="container-fluid" id="banner"></div>
+
+    
+
+    <div class="container-xl">
+      <div class="row">
+          
+<!-- Sidebar -->
+<div class="bd-sidebar noprint" id="site-navigation">
+    <div class="bd-sidebar__content">
+        <div class="bd-sidebar__top"><div class="navbar-brand-box">
+    <a class="navbar-brand text-wrap" href="../index.html">
+      
+        <!-- `logo` is deprecated in Sphinx 4.0, so remove this when we stop supporting 3 -->
+        
+      
+      
+      <img src="../_static/nvidia-logo-horiz-rgb-blk-for-screen.png" class="logo" alt="logo">
+      
+      
+      <h1 class="site-logo" id="site-title">NVIDIA Triton Inference Server</h1>
+      
+    </a>
+</div><form class="bd-search d-flex align-items-center" action="../search.html" method="get">
+  <i class="icon fas fa-search"></i>
+  <input type="search" class="form-control" name="q" id="search-input" placeholder="Search the docs ..." aria-label="Search the docs ..." autocomplete="off" >
+</form><nav class="bd-links" id="bd-docs-nav" aria-label="Main">
+    <div class="bd-toc-item active">
+        <p aria-level="2" class="caption" role="heading">
+ <span class="caption-text">
+  Getting Started
+ </span>
+</p>
+<ul class="nav bd-sidenav">
+ <li class="toctree-l1">
+  <a class="reference internal" href="../getting_started/quickstart.html">
+   Quickstart
+  </a>
+ </li>
+</ul>
+<p aria-level="2" class="caption" role="heading">
+ <span class="caption-text">
+  User Guide
+ </span>
+</p>
+<ul class="current nav bd-sidenav">
+ <li class="toctree-l1">
+  <a class="reference internal" href="performance_tuning.html">
+   Deploying your trained model using Triton
+  </a>
+ </li>
+ <li class="toctree-l1">
+  <a class="reference internal" href="architecture.html">
+   Triton Architecture
+  </a>
+ </li>
+ <li class="toctree-l1">
+  <a class="reference internal" href="model_repository.html">
+   Model Repository
+  </a>
+ </li>
+ <li class="toctree-l1">
+  <a class="reference internal" href="../customization_guide/repository_agents.html">
+   Repository Agent
+  </a>
+ </li>
+ <li class="toctree-l1">
+  <a class="reference internal" href="model_configuration.html">
+   Model Configuration
+  </a>
+ </li>
+ <li class="toctree-l1">
+  <a class="reference internal" href="optimization.html">
+   Optimization
+  </a>
+ </li>
+ <li class="toctree-l1">
+  <a class="reference internal" href="ragged_batching.html">
+   Ragged Batching
+  </a>
+ </li>
+ <li class="toctree-l1">
+  <a class="reference internal" href="rate_limiter.html">
+   Rate Limiter
+  </a>
+ </li>
+ <li class="toctree-l1">
+  <a class="reference internal" href="model_analyzer.html">
+   Model Analyzer
+  </a>
+ </li>
+ <li class="toctree-l1">
+  <a class="reference internal" href="perf_analyzer.html">
+   Performance Analyzer
+  </a>
+ </li>
+ <li class="toctree-l1">
+  <a class="reference internal" href="model_management.html">
+   Model Management
+  </a>
+ </li>
+ <li class="toctree-l1">
+  <a class="reference internal" href="custom_operations.html">
+   Custom Operations
+  </a>
+ </li>
+ <li class="toctree-l1">
+  <a class="reference internal" href="decoupled_models.html">
+   Decoupled Backends and Models
+  </a>
+ </li>
+ <li class="toctree-l1">
+  <a class="reference internal" href="response_cache.html">
+   Triton Response Cache
+  </a>
+ </li>
+ <li class="toctree-l1 current active">
+  <a class="current reference internal" href="#">
+   Metrics
+  </a>
+ </li>
+ <li class="toctree-l1">
+  <a class="reference internal" href="trace.html">
+   Triton Server Trace
+  </a>
+ </li>
+ <li class="toctree-l1">
+  <a class="reference internal" href="jetson.html">
+   Triton Inference Server Support for Jetson and JetPack
+  </a>
+ </li>
+ <li class="toctree-l1">
+  <a class="reference internal" href="v1_to_v2.html">
+   Version 1 to Version 2 Migration
+  </a>
+ </li>
+</ul>
+<ul class="nav bd-sidenav">
+ <li class="toctree-l1">
+  <a class="reference internal" href="faq.html">
+   FAQ
+  </a>
+ </li>
+</ul>
+<p aria-level="2" class="caption" role="heading">
+ <span class="caption-text">
+  Protocol Guides
+ </span>
+</p>
+<ul class="nav bd-sidenav">
+ <li class="toctree-l1">
+  <a class="reference internal" href="../customization_guide/inference_protocols.html">
+   Inference Protocols and APIs
+  </a>
+ </li>
+ <li class="toctree-l1">
+  <a class="reference internal" href="../protocol/extension_binary_data.html">
+   Binary Tensor Data Extension
+  </a>
+ </li>
+ <li class="toctree-l1">
+  <a class="reference internal" href="../protocol/extension_classification.html">
+   Classification Extension
+  </a>
+ </li>
+ <li class="toctree-l1">
+  <a class="reference internal" href="../protocol/extension_logging.html">
+   Logging Extension
+  </a>
+ </li>
+ <li class="toctree-l1">
+  <a class="reference internal" href="../protocol/extension_model_configuration.html">
+   Model Configuration Extension
+  </a>
+ </li>
+ <li class="toctree-l1">
+  <a class="reference internal" href="../protocol/extension_model_repository.html">
+   Model Repository Extension
+  </a>
+ </li>
+ <li class="toctree-l1">
+  <a class="reference internal" href="../protocol/extension_schedule_policy.html">
+   Schedule Policy Extension
+  </a>
+ </li>
+ <li class="toctree-l1">
+  <a class="reference internal" href="../protocol/extension_sequence.html">
+   Sequence Extension
+  </a>
+ </li>
+ <li class="toctree-l1">
+  <a class="reference internal" href="../protocol/extension_shared_memory.html">
+   Shared-Memory Extension
+  </a>
+ </li>
+ <li class="toctree-l1">
+  <a class="reference internal" href="../protocol/extension_statistics.html">
+   Statistics Extension
+  </a>
+ </li>
+ <li class="toctree-l1">
+  <a class="reference internal" href="../protocol/extension_trace.html">
+   Trace Extension
+  </a>
+ </li>
+</ul>
+<p aria-level="2" class="caption" role="heading">
+ <span class="caption-text">
+  Customization Guide
+ </span>
+</p>
+<ul class="nav bd-sidenav">
+ <li class="toctree-l1">
+  <a class="reference internal" href="../customization_guide/build.html">
+   Building Triton
+  </a>
+ </li>
+ <li class="toctree-l1">
+  <a class="reference internal" href="../customization_guide/compose.html">
+   Customize Triton Container
+  </a>
+ </li>
+ <li class="toctree-l1">
+  <a class="reference internal" href="../customization_guide/test.html">
+   Testing Triton
+  </a>
+ </li>
+</ul>
+<p aria-level="2" class="caption" role="heading">
+ <span class="caption-text">
+  Examples
+ </span>
+</p>
+<ul class="nav bd-sidenav">
+ <li class="toctree-l1">
+  <a class="reference internal" href="../examples/jetson/README.html">
+   Using Triton Inference Server as a shared library for execution on Jetson
+  </a>
+ </li>
+ <li class="toctree-l1">
+  <a class="reference internal" href="../examples/jetson/concurrency_and_dynamic_batching/README.html">
+   Concurrent inference and dynamic batching
+  </a>
+ </li>
+</ul>
+
+    </div>
+</nav></div>
+        <div class="bd-sidebar__bottom">
+             <!-- To handle the deprecated key -->
+            
+        </div>
+    </div>
+    <div id="rtd-footer-container"></div>
+</div>
+
+
+          
+
+
+          
+<!-- A tiny helper pixel to detect if we've scrolled -->
+<div class="sbt-scroll-pixel-helper"></div>
+<!-- Main content -->
+<div class="col py-0 content-container">
+    
+    <div class="header-article row sticky-top noprint">
+        
+
+
+
+<div class="col py-1 d-flex header-article-main">
+    <div class="header-article__left">
+        
+        <label for="__navigation"
+  class="headerbtn"
+  data-toggle="tooltip"
+data-placement="right"
+title="Toggle navigation"
+>
+  
+
+<span class="headerbtn__icon-container">
+  <i class="fas fa-bars"></i>
+  </span>
+
+</label>
+
+        
+    </div>
+    <div class="header-article__right">
+<button onclick="toggleFullScreen()"
+  class="headerbtn"
+  data-toggle="tooltip"
+data-placement="bottom"
+title="Fullscreen mode"
+>
+  
+
+<span class="headerbtn__icon-container">
+  <i class="fas fa-expand"></i>
+  </span>
+
+</button>
+
+<div class="menu-dropdown menu-dropdown-repository-buttons">
+  <button class="headerbtn menu-dropdown__trigger"
+      aria-label="Source repositories">
+      <i class="fab fa-github"></i>
+  </button>
+  <div class="menu-dropdown__content">
+    <ul>
+      <li>
+        <a href="https://github.com/triton-inference-server/server"
+   class="headerbtn"
+   data-toggle="tooltip"
+data-placement="left"
+title="Source repository"
+>
+  
+
+<span class="headerbtn__icon-container">
+  <i class="fab fa-github"></i>
+  </span>
+<span class="headerbtn__text-container">repository</span>
+</a>
+
+      </li>
+      
+      <li>
+        <a href="https://github.com/triton-inference-server/server/issues/new?title=Issue%20on%20page%20%2Fuser_guide/metrics.html&body=Your%20issue%20content%20here."
+   class="headerbtn"
+   data-toggle="tooltip"
+data-placement="left"
+title="Open an issue"
+>
+  
+
+<span class="headerbtn__icon-container">
+  <i class="fas fa-lightbulb"></i>
+  </span>
+<span class="headerbtn__text-container">open issue</span>
+</a>
+
+      </li>
+      
+    </ul>
+  </div>
+</div>
+<label for="__page-toc"
+  class="headerbtn headerbtn-page-toc"
+  
+>
+  
+
+<span class="headerbtn__icon-container">
+  <i class="fas fa-list"></i>
+  </span>
+
+</label>
+
+    </div>
+</div>
+
+<!-- Table of contents -->
+<div class="col-md-3 bd-toc show noprint">
+    <div class="tocsection onthispage pt-5 pb-3">
+        <i class="fas fa-list"></i> Contents
+    </div>
+    <nav id="bd-toc-nav" aria-label="Page">
+        <ul class="visible nav section-nav flex-column">
+ <li class="toc-h2 nav-item toc-entry">
+  <a class="reference internal nav-link" href="#inference-request-metrics">
+   Inference Request Metrics
+  </a>
+ </li>
+ <li class="toc-h2 nav-item toc-entry">
+  <a class="reference internal nav-link" href="#gpu-metrics">
+   GPU Metrics
+  </a>
+ </li>
+ <li class="toc-h2 nav-item toc-entry">
+  <a class="reference internal nav-link" href="#cpu-metrics">
+   CPU Metrics
+  </a>
+ </li>
+ <li class="toc-h2 nav-item toc-entry">
+  <a class="reference internal nav-link" href="#response-cache-metrics">
+   Response Cache Metrics
+  </a>
+ </li>
+ <li class="toc-h2 nav-item toc-entry">
+  <a class="reference internal nav-link" href="#custom-metrics">
+   Custom Metrics
+  </a>
+ </li>
+</ul>
+
+    </nav>
+</div>
+    </div>
+    <div class="article row">
+        <div class="col pl-md-3 pl-lg-5 content-container">
+            <!-- Table of contents that is only displayed when printing the page -->
+            <div id="jb-print-docs-body" class="onlyprint">
+                <h1>Metrics</h1>
+                <!-- Table of contents -->
+                <div id="print-main-content">
+                    <div id="jb-print-toc">
+                        
+                        <div>
+                            <h2> Contents </h2>
+                        </div>
+                        <nav aria-label="Page">
+                            <ul class="visible nav section-nav flex-column">
+ <li class="toc-h2 nav-item toc-entry">
+  <a class="reference internal nav-link" href="#inference-request-metrics">
+   Inference Request Metrics
+  </a>
+ </li>
+ <li class="toc-h2 nav-item toc-entry">
+  <a class="reference internal nav-link" href="#gpu-metrics">
+   GPU Metrics
+  </a>
+ </li>
+ <li class="toc-h2 nav-item toc-entry">
+  <a class="reference internal nav-link" href="#cpu-metrics">
+   CPU Metrics
+  </a>
+ </li>
+ <li class="toc-h2 nav-item toc-entry">
+  <a class="reference internal nav-link" href="#response-cache-metrics">
+   Response Cache Metrics
+  </a>
+ </li>
+ <li class="toc-h2 nav-item toc-entry">
+  <a class="reference internal nav-link" href="#custom-metrics">
+   Custom Metrics
+  </a>
+ </li>
+</ul>
+
+                        </nav>
+                    </div>
+                </div>
+            </div>
+            <main id="main-content" role="main">
+                
+              <div>
+                 <!--
+# Copyright 2018-2022, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+#
+# Redistribution and use in source and binary forms, with or without
+# modification, are permitted provided that the following conditions
+# are met:
+#  * Redistributions of source code must retain the above copyright
+#    notice, this list of conditions and the following disclaimer.
+#  * Redistributions in binary form must reproduce the above copyright
+#    notice, this list of conditions and the following disclaimer in the
+#    documentation and/or other materials provided with the distribution.
+#  * Neither the name of NVIDIA CORPORATION nor the names of its
+#    contributors may be used to endorse or promote products derived
+#    from this software without specific prior written permission.
+#
+# THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS ``AS IS'' AND ANY
+# EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+# IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR
+# PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL THE COPYRIGHT OWNER OR
+# CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL,
+# EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
+# PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR
+# PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY
+# OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+# (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+# OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+-->
+<div class="tex2jax_ignore mathjax_ignore section" id="metrics">
+<h1>Metrics<a class="headerlink" href="#metrics" title="Permalink to this headline">#</a></h1>
+<p>Triton provides <a class="reference external" href="https://prometheus.io/">Prometheus</a> metrics
+indicating GPU and request statistics. By default, these metrics are
+available at http://localhost:8002/metrics. The metrics are only
+available by accessing the endpoint, and are not pushed or published
+to any remote server. The metric format is plain text so you can view
+them directly, for example:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span>$ curl localhost:8002/metrics
+</pre></div>
+</div>
+<p>The <code class="docutils literal notranslate"><span class="pre">tritonserver</span> <span class="pre">--allow-metrics=false</span></code> option can be used to disable
+all metric reporting, while the <code class="docutils literal notranslate"><span class="pre">--allow-gpu-metrics=false</span></code> and
+<code class="docutils literal notranslate"><span class="pre">--allow-cpu-metrics=false</span></code> can be used to disable just the GPU and CPU
+metrics respectively.</p>
+<p>The <code class="docutils literal notranslate"><span class="pre">--metrics-port</span></code> option can be used to select a different port. For now,
+Triton reuses http address for metrics endpoint. The option <code class="docutils literal notranslate"><span class="pre">--http-address</span></code>
+can be used to bind http and metrics endpoints to the same specific address
+when http service is enabled.</p>
+<p>To change the interval at whichs metrics are polled/updated, see the <code class="docutils literal notranslate"><span class="pre">--metrics-interval-ms</span></code> flag. Metrics that are updated “Per Request” are unaffected by this interval setting. This interval only applies to metrics that are designated as “Per Interval” in the tables of each section below:</p>
+<ul class="simple">
+<li><p><a class="reference internal" href="#inference-request-metrics"><span class="std std-doc">Inference Request Metrics</span></a></p></li>
+<li><p><a class="reference internal" href="#gpu-metrics"><span class="std std-doc">GPU Metrics</span></a></p></li>
+<li><p><a class="reference internal" href="#cpu-metrics"><span class="std std-doc">CPU Metrics</span></a></p></li>
+<li><p><a class="reference internal" href="#response-cache-metrics"><span class="std std-doc">Response Cache Metrics</span></a></p></li>
+<li><p><a class="reference internal" href="#custom-metrics"><span class="std std-doc">Custom Metrics</span></a></p></li>
+</ul>
+<div class="section" id="inference-request-metrics">
+<h2>Inference Request Metrics<a class="headerlink" href="#inference-request-metrics" title="Permalink to this headline">#</a></h2>
+<p>For models that do not support batching, <em>Request Count</em>, <em>Inference
+Count</em> and <em>Execution Count</em> will be equal, indicating that each
+inference request is executed separately.</p>
+<p>For models that support batching, the count metrics can be interpreted
+to determine average batch size as <em>Inference Count</em> / <em>Execution
+Count</em>. The count metrics are illustrated by the following examples:</p>
+<ul class="simple">
+<li><p>Client sends a single batch-1 inference request. <em>Request Count</em> =
+1, <em>Inference Count</em> = 1, <em>Execution Count</em> = 1.</p></li>
+<li><p>Client sends a single batch-8 inference request. <em>Request Count</em> =
+1, <em>Inference Count</em> = 8, <em>Execution Count</em> = 1.</p></li>
+<li><p>Client sends 2 requests: batch-1 and batch-8. Dynamic batcher is not
+enabled for the model. <em>Request Count</em> = 2, <em>Inference Count</em> = 9,
+<em>Execution Count</em> = 2.</p></li>
+<li><p>Client sends 2 requests: batch-1 and batch-1. Dynamic batcher is
+enabled for the model and the 2 requests are dynamically batched by
+the server. <em>Request Count</em> = 2, <em>Inference Count</em> = 2, <em>Execution
+Count</em> = 1.</p></li>
+<li><p>Client sends 2 requests: batch-1 and batch-8. Dynamic batcher is
+enabled for the model and the 2 requests are dynamically batched by
+the server. <em>Request Count</em> = 2, <em>Inference Count</em> = 9, <em>Execution
+Count</em> = 1.</p></li>
+</ul>
+<table class="colwidths-auto table">
+<thead>
+<tr class="row-odd"><th class="head"><p>Category</p></th>
+<th class="head"><p>Metric</p></th>
+<th class="head"><p>Metric Name</p></th>
+<th class="head"><p>Description</p></th>
+<th class="head"><p>Granularity</p></th>
+<th class="head"><p>Frequency</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p>Count</p></td>
+<td><p>Success Count</p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">nv_inference_request_success</span></code></p></td>
+<td><p>Number of successful inference requests received by Triton (each request is counted as 1, even if the request contains a batch)</p></td>
+<td><p>Per model</p></td>
+<td><p>Per request</p></td>
+</tr>
+<tr class="row-odd"><td><p></p></td>
+<td><p>Failure Count</p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">nv_inference_request_failure</span></code></p></td>
+<td><p>Number of failed inference requests received by Triton (each request is counted as 1, even if the request contains a batch)</p></td>
+<td><p>Per model</p></td>
+<td><p>Per request</p></td>
+</tr>
+<tr class="row-even"><td><p></p></td>
+<td><p>Inference Count</p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">nv_inference_count</span></code></p></td>
+<td><p>Number of inferences performed (a batch of “n” is counted as “n” inferences, does not include cached requests)</p></td>
+<td><p>Per model</p></td>
+<td><p>Per request</p></td>
+</tr>
+<tr class="row-odd"><td><p></p></td>
+<td><p>Execution Count</p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">nv_inference_exec_count</span></code></p></td>
+<td><p>Number of inference batch executions (see <a class="reference internal" href="#inference-request-metrics"><span class="std std-doc">Inference Request Metrics</span></a>, does not include cached requests)</p></td>
+<td><p>Per model</p></td>
+<td><p>Per request</p></td>
+</tr>
+<tr class="row-even"><td><p>Latency</p></td>
+<td><p>Request Time</p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">nv_inference_request_duration_us</span></code></p></td>
+<td><p>Cumulative end-to-end inference request handling time (includes cached requests)</p></td>
+<td><p>Per model</p></td>
+<td><p>Per request</p></td>
+</tr>
+<tr class="row-odd"><td><p></p></td>
+<td><p>Queue Time</p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">nv_inference_queue_duration_us</span></code></p></td>
+<td><p>Cumulative time requests spend waiting in the scheduling queue (includes cached requests)</p></td>
+<td><p>Per model</p></td>
+<td><p>Per request</p></td>
+</tr>
+<tr class="row-even"><td><p></p></td>
+<td><p>Compute Input Time</p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">nv_inference_compute_input_duration_us</span></code></p></td>
+<td><p>Cumulative time requests spend processing inference inputs (in the framework backend, does not include cached requests)</p></td>
+<td><p>Per model</p></td>
+<td><p>Per request</p></td>
+</tr>
+<tr class="row-odd"><td><p></p></td>
+<td><p>Compute Time</p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">nv_inference_compute_infer_duration_us</span></code></p></td>
+<td><p>Cumulative time requests spend executing the inference model (in the framework backend, does not include cached requests)</p></td>
+<td><p>Per model</p></td>
+<td><p>Per request</p></td>
+</tr>
+<tr class="row-even"><td><p></p></td>
+<td><p>Compute Output Time</p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">nv_inference_compute_output_duration_us</span></code></p></td>
+<td><p>Cumulative time requests spend processing inference outputs (in the framework backend, does not include cached requests)</p></td>
+<td><p>Per model</p></td>
+<td><p>Per request</p></td>
+</tr>
+</tbody>
+</table>
+</div>
+<div class="section" id="gpu-metrics">
+<h2>GPU Metrics<a class="headerlink" href="#gpu-metrics" title="Permalink to this headline">#</a></h2>
+<p>GPU metrics are collected through the use of <a class="reference external" href="https://developer.nvidia.com/dcgm">DCGM</a>.
+Collection of GPU metrics can be toggled with the <code class="docutils literal notranslate"><span class="pre">--allow-gpu-metrics</span></code> CLI flag.
+If building Triton locally, the <code class="docutils literal notranslate"><span class="pre">TRITON_ENABLE_METRICS_GPU</span></code> CMake build flag can be used to toggle building the relevant code entirely.</p>
+<table class="colwidths-auto table">
+<thead>
+<tr class="row-odd"><th class="head"><p>Category</p></th>
+<th class="head"><p>Metric</p></th>
+<th class="head"><p>Metric Name</p></th>
+<th class="head"><p>Description</p></th>
+<th class="head"><p>Granularity</p></th>
+<th class="head"><p>Frequency</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p>GPU Utilization</p></td>
+<td><p>Power Usage</p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">nv_gpu_power_usage</span></code></p></td>
+<td><p>GPU instantaneous power</p></td>
+<td><p>Per GPU</p></td>
+<td><p>Per interval</p></td>
+</tr>
+<tr class="row-odd"><td><p></p></td>
+<td><p>Power Limit</p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">nv_gpu_power_limit</span></code></p></td>
+<td><p>Maximum GPU power limit</p></td>
+<td><p>Per GPU</p></td>
+<td><p>Per interval</p></td>
+</tr>
+<tr class="row-even"><td><p></p></td>
+<td><p>Energy Consumption</p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">nv_energy_consumption</span></code></p></td>
+<td><p>GPU energy consumption in joules since Triton started</p></td>
+<td><p>Per GPU</p></td>
+<td><p>Per interval</p></td>
+</tr>
+<tr class="row-odd"><td><p></p></td>
+<td><p>GPU Utilization</p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">nv_gpu_utilization</span></code></p></td>
+<td><p>GPU utilization rate (0.0 - 1.0)</p></td>
+<td><p>Per GPU</p></td>
+<td><p>Per interval</p></td>
+</tr>
+<tr class="row-even"><td><p>GPU Memory</p></td>
+<td><p>GPU Total Memory</p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">nv_gpu_memory_total_bytes</span></code></p></td>
+<td><p>Total GPU memory, in bytes</p></td>
+<td><p>Per GPU</p></td>
+<td><p>Per interval</p></td>
+</tr>
+<tr class="row-odd"><td><p></p></td>
+<td><p>GPU Used Memory</p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">nv_gpu_memory_used_bytes</span></code></p></td>
+<td><p>Used GPU memory, in bytes</p></td>
+<td><p>Per GPU</p></td>
+<td><p>Per interval</p></td>
+</tr>
+</tbody>
+</table>
+</div>
+<div class="section" id="cpu-metrics">
+<h2>CPU Metrics<a class="headerlink" href="#cpu-metrics" title="Permalink to this headline">#</a></h2>
+<p>Collection of CPU metrics can be toggled with the <code class="docutils literal notranslate"><span class="pre">--allow-cpu-metrics</span></code> CLI flag.
+If building Triton locally, the <code class="docutils literal notranslate"><span class="pre">TRITON_ENABLE_METRICS_CPU</span></code> CMake build flag can be used to toggle building the relevant code entirely.</p>
+<blockquote>
+<div><p><strong>Note</strong></p>
+<p>CPU Metrics are currently only supported on Linux.
+They collect information from the <a class="reference external" href="https://www.kernel.org/doc/html/latest/filesystems/proc.html">/proc filesystem</a> such as <code class="docutils literal notranslate"><span class="pre">/proc/stat</span></code> and <code class="docutils literal notranslate"><span class="pre">/proc/meminfo</span></code>.</p>
+</div></blockquote>
+<table class="colwidths-auto table">
+<thead>
+<tr class="row-odd"><th class="head"><p>Category</p></th>
+<th class="head"><p>Metric</p></th>
+<th class="head"><p>Metric Name</p></th>
+<th class="head"><p>Description</p></th>
+<th class="head"><p>Granularity</p></th>
+<th class="head"><p>Frequency</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p>CPU Utilization</p></td>
+<td><p>CPU Utilization</p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">nv_cpu_utilization</span></code></p></td>
+<td><p>Total CPU utilization rate [0.0 - 1.0]</p></td>
+<td><p>Aggregated across all cores since last interval</p></td>
+<td><p>Per interval</p></td>
+</tr>
+<tr class="row-odd"><td><p>CPU Memory</p></td>
+<td><p>CPU Total Memory</p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">nv_cpu_memory_total_bytes</span></code></p></td>
+<td><p>Total CPU memory (RAM), in bytes</p></td>
+<td><p>System-wide</p></td>
+<td><p>Per interval</p></td>
+</tr>
+<tr class="row-even"><td><p></p></td>
+<td><p>CPU Used Memory</p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">nv_cpu_memory_used_bytes</span></code></p></td>
+<td><p>Used CPU memory (RAM), in bytes</p></td>
+<td><p>System-wide</p></td>
+<td><p>Per interval</p></td>
+</tr>
+</tbody>
+</table>
+</div>
+<div class="section" id="response-cache-metrics">
+<h2>Response Cache Metrics<a class="headerlink" href="#response-cache-metrics" title="Permalink to this headline">#</a></h2>
+<p>Compute latency metrics in the <a class="reference internal" href="#inference-request-metrics"><span class="std std-doc">Inference Request Metrics table</span></a> above are calculated for the
+time spent in model inference backends. If the response cache is enabled for a
+given model (see <a class="reference internal" href="response_cache.html"><span class="doc std std-doc">Response Cache</span></a>
+docs for more info), total inference times may be affected by response cache
+lookup times.</p>
+<p>On cache hits, “Cache Hit Lookup Time” indicates the time spent looking up the
+response, and “Compute Input Time” /  “Compute Time” / “Compute Output Time”
+are not recorded.</p>
+<p>On cache misses, “Cache Miss Lookup Time” indicates the time spent looking up
+the request hash and “Cache Miss Insertion Time” indicates the time spent
+inserting the computed output tensor data into the cache. Otherwise, “Compute
+Input Time” /  “Compute Time” / “Compute Output Time” will be recorded as usual.</p>
+<table class="colwidths-auto table">
+<thead>
+<tr class="row-odd"><th class="head"><p>Category</p></th>
+<th class="head"><p>Metric</p></th>
+<th class="head"><p>Metric Name</p></th>
+<th class="head"><p>Description</p></th>
+<th class="head"><p>Granularity</p></th>
+<th class="head"><p>Frequency</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p>Utilization</p></td>
+<td><p>Total Cache Utilization</p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">nv_cache_util</span></code></p></td>
+<td><p>Total Response Cache utilization rate (0.0 - 1.0)</p></td>
+<td><p>Server-wide</p></td>
+<td><p>Per interval</p></td>
+</tr>
+<tr class="row-odd"><td><p>Count</p></td>
+<td><p>Total Cache Entry Count</p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">nv_cache_num_entries</span></code></p></td>
+<td><p>Total number of responses stored in response cache across all models</p></td>
+<td><p>Server-wide</p></td>
+<td><p>Per interval</p></td>
+</tr>
+<tr class="row-even"><td><p></p></td>
+<td><p>Total Cache Lookup Count</p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">nv_cache_num_lookups</span></code></p></td>
+<td><p>Total number of response cache lookups done by Triton across all models</p></td>
+<td><p>Server-wide</p></td>
+<td><p>Per interval</p></td>
+</tr>
+<tr class="row-odd"><td><p></p></td>
+<td><p>Total Cache Hit Count</p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">nv_cache_num_hits</span></code></p></td>
+<td><p>Total number of response cache hits across all models</p></td>
+<td><p>Server-wide</p></td>
+<td><p>Per interval</p></td>
+</tr>
+<tr class="row-even"><td><p></p></td>
+<td><p>Total Cache Miss Count</p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">nv_cache_num_misses</span></code></p></td>
+<td><p>Total number of response cache misses across all models</p></td>
+<td><p>Server-wide</p></td>
+<td><p>Per interval</p></td>
+</tr>
+<tr class="row-odd"><td><p></p></td>
+<td><p>Total Cache Eviction Count</p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">nv_cache_num_evictions</span></code></p></td>
+<td><p>Total number of response cache evictions across all models</p></td>
+<td><p>Server-wide</p></td>
+<td><p>Per interval</p></td>
+</tr>
+<tr class="row-even"><td><p></p></td>
+<td><p>Cache Hit Count</p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">nv_cache_num_hits_per_model</span></code></p></td>
+<td><p>Number of response cache hits per model</p></td>
+<td><p>Per model</p></td>
+<td><p>Per request</p></td>
+</tr>
+<tr class="row-odd"><td><p></p></td>
+<td><p>Cache Miss Count</p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">nv_cache_num_misses_per_model</span></code></p></td>
+<td><p>Number of response cache misses per model</p></td>
+<td><p>Per model</p></td>
+<td><p>Per request</p></td>
+</tr>
+<tr class="row-even"><td><p>Latency</p></td>
+<td><p>Total Cache Lookup Time</p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">nv_cache_lookup_duration</span></code></p></td>
+<td><p>Cumulative time requests spend checking for a cached response across all models (microseconds)</p></td>
+<td><p>Server-wide</p></td>
+<td><p>Per interval</p></td>
+</tr>
+<tr class="row-odd"><td><p></p></td>
+<td><p>Total Cache Insertion Time</p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">nv_cache_insertion_duration</span></code></p></td>
+<td><p>Cumulative time requests spend inserting a response into the cache across all models (microseconds)</p></td>
+<td><p>Server-wide</p></td>
+<td><p>Per interval</p></td>
+</tr>
+<tr class="row-even"><td><p></p></td>
+<td><p>Cache Hit Lookup Time</p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">nv_cache_hit_lookup_duration_per_model</span></code></p></td>
+<td><p>Cumulative time requests spend retrieving a cached response per model on cache hits (microseconds)</p></td>
+<td><p>Per model</p></td>
+<td><p>Per request</p></td>
+</tr>
+<tr class="row-odd"><td><p></p></td>
+<td><p>Cache Miss Lookup Time</p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">nv_cache_miss_lookup_duration_per_model</span></code></p></td>
+<td><p>Cumulative time requests spend looking up a request hash on a cache miss (microseconds)</p></td>
+<td><p>Per model</p></td>
+<td><p>Per request</p></td>
+</tr>
+<tr class="row-even"><td><p></p></td>
+<td><p>Cache Miss Insertion Time</p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">nv_cache_miss_insertion_duration_per_model</span></code></p></td>
+<td><p>Cumulative time requests spend inserting responses into the cache on a cache miss (microseconds)</p></td>
+<td><p>Per model</p></td>
+<td><p>Per request</p></td>
+</tr>
+</tbody>
+</table>
+</div>
+<div class="section" id="custom-metrics">
+<h2>Custom Metrics<a class="headerlink" href="#custom-metrics" title="Permalink to this headline">#</a></h2>
+<p>Triton exposes a C API to allow users and backends to register and collect
+custom metrics with the existing Triton metrics endpoint. The user takes the
+ownership of the custom metrics created through the APIs and must manage their
+lifetime following the API documentation.</p>
+<p>The
+<a class="reference external" href="https://github.com/triton-inference-server/identity_backend/blob/main/README.md#custom-metric-example">identity_backend</a>
+demonstrates a practical example of adding a custom metric to a backend.</p>
+<p>Further documentation can be found in the <code class="docutils literal notranslate"><span class="pre">TRITONSERVER_MetricFamily*</span></code> and
+<code class="docutils literal notranslate"><span class="pre">TRITONSERVER_Metric*</span></code> API annotations in
+<a class="reference external" href="https://github.com/triton-inference-server/core/blob/main/include/triton/core/tritonserver.h">tritonserver.h</a>.</p>
+</div>
+</div>
+
+<div class="section">
+   
+</div>
+
+              </div>
+              
+            </main>
+            <footer class="footer-article noprint">
+                
+    <!-- Previous / next buttons -->
+<div class='prev-next-area'>
+    <a class='left-prev' id="prev-link" href="response_cache.html" title="previous page">
+        <i class="fas fa-angle-left"></i>
+        <div class="prev-next-info">
+            <p class="prev-next-subtitle">previous</p>
+            <p class="prev-next-title">Triton Response Cache</p>
+        </div>
+    </a>
+    <a class='right-next' id="next-link" href="trace.html" title="next page">
+    <div class="prev-next-info">
+        <p class="prev-next-subtitle">next</p>
+        <p class="prev-next-title">Triton Server Trace</p>
+    </div>
+    <i class="fas fa-angle-right"></i>
+    </a>
+</div>
+            </footer>
+        </div>
+    </div>
+    <div class="footer-content row">
+        <footer class="col footer"><p>
+  
+    By NVIDIA<br/>
+  
+      &copy; Copyright 2022 NVIDIA CORPORATION &amp; AFFILIATES. All rights reserved.<br/>
+    Last updated on Oct 05, 2022.<br/>
+</p>
+        </footer>
+    </div>
+    
+</div>
+
+
+      </div>
+    </div>
+  
+  <!-- Scripts loaded after <body> so the DOM is not blocked -->
+  <script src="../_static/scripts/pydata-sphinx-theme.js?digest=1999514e3f237ded88cf"></script>
+
+
+<script type="text/javascript">_satellite.pageBottom();</script>
+  </body>
+</html>

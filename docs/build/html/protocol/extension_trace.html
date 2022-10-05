@@ -1,0 +1,793 @@
+
+<!DOCTYPE html>
+
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Trace Extension &#8212; NVIDIA Triton Inference Server</title>
+    
+  <!-- Loaded before other Sphinx assets -->
+  <link href="../_static/styles/theme.css?digest=1999514e3f237ded88cf" rel="stylesheet">
+<link href="../_static/styles/pydata-sphinx-theme.css?digest=1999514e3f237ded88cf" rel="stylesheet">
+
+    
+  <link rel="stylesheet"
+    href="../_static/vendor/fontawesome/5.13.0/css/all.min.css">
+  <link rel="preload" as="font" type="font/woff2" crossorigin
+    href="../_static/vendor/fontawesome/5.13.0/webfonts/fa-solid-900.woff2">
+  <link rel="preload" as="font" type="font/woff2" crossorigin
+    href="../_static/vendor/fontawesome/5.13.0/webfonts/fa-brands-400.woff2">
+
+    <link rel="stylesheet" type="text/css" href="../_static/pygments.css" />
+    <link rel="stylesheet" href="../_static/styles/sphinx-book-theme.css?digest=62ba249389abaaa9ffc34bf36a076bdc1d65ee18" type="text/css" />
+    <link rel="stylesheet" type="text/css" href="../_static/mystnb.4510f1fc1dee50b3e5859aac5469c37c29e427902b24a333a5f9fcb2f0b3ac41.css" />
+    <link rel="stylesheet" type="text/css" href="../_static/copybutton.css" />
+    <link rel="stylesheet" type="text/css" href="../_static/tabs.css" />
+    <link rel="stylesheet" type="text/css" href="../_static/custom.css" />
+    <link rel="stylesheet" type="text/css" href="../_static/design-style.4045f2051d55cab465a707391d5b2007.min.css" />
+    
+  <!-- Pre-loaded scripts that we'll load fully later -->
+  <link rel="preload" as="script" href="../_static/scripts/pydata-sphinx-theme.js?digest=1999514e3f237ded88cf">
+
+    <script data-url_root="../" id="documentation_options" src="../_static/documentation_options.js"></script>
+    <script src="../_static/jquery.js"></script>
+    <script src="../_static/underscore.js"></script>
+    <script src="../_static/doctools.js"></script>
+    <script src="../_static/clipboard.min.js"></script>
+    <script src="../_static/copybutton.js"></script>
+    <script src="https://js.hcaptcha.com/1/api.js"></script>
+    <script src="//assets.adobedtm.com/5d4962a43b79/c1061d2c5e7b/launch-191c2462b890.min.js"></script>
+    <script src="../_static/scripts/sphinx-book-theme.js?digest=f31d14ad54b65d19161ba51d4ffff3a77ae00456"></script>
+    <script src="../_static/design-tabs.js"></script>
+    <link rel="canonical" href="https://docs.nvidia.com/deeplearning/triton-inference-server/user-guide/docs/protocol/extension_trace.html" />
+    <link rel="shortcut icon" href="../_static/nvidia-logo-vert-rgb-blk-for-screen.png"/>
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" />
+    <link rel="next" title="Building Triton" href="../customization_guide/build.html" />
+    <link rel="prev" title="Statistics Extension" href="extension_statistics.html" /> 
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="docsearch:language" content="None">
+    
+
+    <!-- Google Analytics -->
+      
+<style type="text/css">
+  ul.ablog-archive {
+    list-style: none;
+    overflow: auto;
+    margin-left: 0px;
+  }
+  ul.ablog-archive li {
+    float: left;
+    margin-right: 5px;
+    font-size: 80%;
+  }
+  ul.postlist a {
+    font-style: italic;
+  }
+  ul.postlist-style-disc {
+    list-style-type: disc;
+  }
+  ul.postlist-style-none {
+    list-style-type: none;
+  }
+  ul.postlist-style-circle {
+    list-style-type: circle;
+  }
+</style>
+
+  </head>
+  <body data-spy="scroll" data-target="#bd-toc-nav" data-offset="60">
+<!-- Checkboxes to toggle the left sidebar -->
+<input type="checkbox" class="sidebar-toggle" name="__navigation" id="__navigation" aria-label="Toggle navigation sidebar">
+<label class="overlay overlay-navbar" for="__navigation">
+    <div class="visually-hidden">Toggle navigation sidebar</div>
+</label>
+<!-- Checkboxes to toggle the in-page toc -->
+<input type="checkbox" class="sidebar-toggle" name="__page-toc" id="__page-toc" aria-label="Toggle in-page Table of Contents">
+<label class="overlay overlay-pagetoc" for="__page-toc">
+    <div class="visually-hidden">Toggle in-page Table of Contents</div>
+</label>
+<!-- Headers at the top -->
+<div class="announcement header-item noprint"></div>
+<div class="header header-item noprint"></div>
+
+    
+    <div class="container-fluid" id="banner"></div>
+
+    
+
+    <div class="container-xl">
+      <div class="row">
+          
+<!-- Sidebar -->
+<div class="bd-sidebar noprint" id="site-navigation">
+    <div class="bd-sidebar__content">
+        <div class="bd-sidebar__top"><div class="navbar-brand-box">
+    <a class="navbar-brand text-wrap" href="../index.html">
+      
+        <!-- `logo` is deprecated in Sphinx 4.0, so remove this when we stop supporting 3 -->
+        
+      
+      
+      <img src="../_static/nvidia-logo-horiz-rgb-blk-for-screen.png" class="logo" alt="logo">
+      
+      
+      <h1 class="site-logo" id="site-title">NVIDIA Triton Inference Server</h1>
+      
+    </a>
+</div><form class="bd-search d-flex align-items-center" action="../search.html" method="get">
+  <i class="icon fas fa-search"></i>
+  <input type="search" class="form-control" name="q" id="search-input" placeholder="Search the docs ..." aria-label="Search the docs ..." autocomplete="off" >
+</form><nav class="bd-links" id="bd-docs-nav" aria-label="Main">
+    <div class="bd-toc-item active">
+        <p aria-level="2" class="caption" role="heading">
+ <span class="caption-text">
+  Getting Started
+ </span>
+</p>
+<ul class="nav bd-sidenav">
+ <li class="toctree-l1">
+  <a class="reference internal" href="../getting_started/quickstart.html">
+   Quickstart
+  </a>
+ </li>
+</ul>
+<p aria-level="2" class="caption" role="heading">
+ <span class="caption-text">
+  User Guide
+ </span>
+</p>
+<ul class="nav bd-sidenav">
+ <li class="toctree-l1">
+  <a class="reference internal" href="../user_guide/performance_tuning.html">
+   Deploying your trained model using Triton
+  </a>
+ </li>
+ <li class="toctree-l1">
+  <a class="reference internal" href="../user_guide/architecture.html">
+   Triton Architecture
+  </a>
+ </li>
+ <li class="toctree-l1">
+  <a class="reference internal" href="../user_guide/model_repository.html">
+   Model Repository
+  </a>
+ </li>
+ <li class="toctree-l1">
+  <a class="reference internal" href="../customization_guide/repository_agents.html">
+   Repository Agent
+  </a>
+ </li>
+ <li class="toctree-l1">
+  <a class="reference internal" href="../user_guide/model_configuration.html">
+   Model Configuration
+  </a>
+ </li>
+ <li class="toctree-l1">
+  <a class="reference internal" href="../user_guide/optimization.html">
+   Optimization
+  </a>
+ </li>
+ <li class="toctree-l1">
+  <a class="reference internal" href="../user_guide/ragged_batching.html">
+   Ragged Batching
+  </a>
+ </li>
+ <li class="toctree-l1">
+  <a class="reference internal" href="../user_guide/rate_limiter.html">
+   Rate Limiter
+  </a>
+ </li>
+ <li class="toctree-l1">
+  <a class="reference internal" href="../user_guide/model_analyzer.html">
+   Model Analyzer
+  </a>
+ </li>
+ <li class="toctree-l1">
+  <a class="reference internal" href="../user_guide/perf_analyzer.html">
+   Performance Analyzer
+  </a>
+ </li>
+ <li class="toctree-l1">
+  <a class="reference internal" href="../user_guide/model_management.html">
+   Model Management
+  </a>
+ </li>
+ <li class="toctree-l1">
+  <a class="reference internal" href="../user_guide/custom_operations.html">
+   Custom Operations
+  </a>
+ </li>
+ <li class="toctree-l1">
+  <a class="reference internal" href="../user_guide/decoupled_models.html">
+   Decoupled Backends and Models
+  </a>
+ </li>
+ <li class="toctree-l1">
+  <a class="reference internal" href="../user_guide/response_cache.html">
+   Triton Response Cache
+  </a>
+ </li>
+ <li class="toctree-l1">
+  <a class="reference internal" href="../user_guide/metrics.html">
+   Metrics
+  </a>
+ </li>
+ <li class="toctree-l1">
+  <a class="reference internal" href="../user_guide/trace.html">
+   Triton Server Trace
+  </a>
+ </li>
+ <li class="toctree-l1">
+  <a class="reference internal" href="../user_guide/jetson.html">
+   Triton Inference Server Support for Jetson and JetPack
+  </a>
+ </li>
+ <li class="toctree-l1">
+  <a class="reference internal" href="../user_guide/v1_to_v2.html">
+   Version 1 to Version 2 Migration
+  </a>
+ </li>
+</ul>
+<ul class="nav bd-sidenav">
+ <li class="toctree-l1">
+  <a class="reference internal" href="../user_guide/faq.html">
+   FAQ
+  </a>
+ </li>
+</ul>
+<p aria-level="2" class="caption" role="heading">
+ <span class="caption-text">
+  Protocol Guides
+ </span>
+</p>
+<ul class="current nav bd-sidenav">
+ <li class="toctree-l1">
+  <a class="reference internal" href="../customization_guide/inference_protocols.html">
+   Inference Protocols and APIs
+  </a>
+ </li>
+ <li class="toctree-l1">
+  <a class="reference internal" href="extension_binary_data.html">
+   Binary Tensor Data Extension
+  </a>
+ </li>
+ <li class="toctree-l1">
+  <a class="reference internal" href="extension_classification.html">
+   Classification Extension
+  </a>
+ </li>
+ <li class="toctree-l1">
+  <a class="reference internal" href="extension_logging.html">
+   Logging Extension
+  </a>
+ </li>
+ <li class="toctree-l1">
+  <a class="reference internal" href="extension_model_configuration.html">
+   Model Configuration Extension
+  </a>
+ </li>
+ <li class="toctree-l1">
+  <a class="reference internal" href="extension_model_repository.html">
+   Model Repository Extension
+  </a>
+ </li>
+ <li class="toctree-l1">
+  <a class="reference internal" href="extension_schedule_policy.html">
+   Schedule Policy Extension
+  </a>
+ </li>
+ <li class="toctree-l1">
+  <a class="reference internal" href="extension_sequence.html">
+   Sequence Extension
+  </a>
+ </li>
+ <li class="toctree-l1">
+  <a class="reference internal" href="extension_shared_memory.html">
+   Shared-Memory Extension
+  </a>
+ </li>
+ <li class="toctree-l1">
+  <a class="reference internal" href="extension_statistics.html">
+   Statistics Extension
+  </a>
+ </li>
+ <li class="toctree-l1 current active">
+  <a class="current reference internal" href="#">
+   Trace Extension
+  </a>
+ </li>
+</ul>
+<p aria-level="2" class="caption" role="heading">
+ <span class="caption-text">
+  Customization Guide
+ </span>
+</p>
+<ul class="nav bd-sidenav">
+ <li class="toctree-l1">
+  <a class="reference internal" href="../customization_guide/build.html">
+   Building Triton
+  </a>
+ </li>
+ <li class="toctree-l1">
+  <a class="reference internal" href="../customization_guide/compose.html">
+   Customize Triton Container
+  </a>
+ </li>
+ <li class="toctree-l1">
+  <a class="reference internal" href="../customization_guide/test.html">
+   Testing Triton
+  </a>
+ </li>
+</ul>
+<p aria-level="2" class="caption" role="heading">
+ <span class="caption-text">
+  Examples
+ </span>
+</p>
+<ul class="nav bd-sidenav">
+ <li class="toctree-l1">
+  <a class="reference internal" href="../examples/jetson/README.html">
+   Using Triton Inference Server as a shared library for execution on Jetson
+  </a>
+ </li>
+ <li class="toctree-l1">
+  <a class="reference internal" href="../examples/jetson/concurrency_and_dynamic_batching/README.html">
+   Concurrent inference and dynamic batching
+  </a>
+ </li>
+</ul>
+
+    </div>
+</nav></div>
+        <div class="bd-sidebar__bottom">
+             <!-- To handle the deprecated key -->
+            
+        </div>
+    </div>
+    <div id="rtd-footer-container"></div>
+</div>
+
+
+          
+
+
+          
+<!-- A tiny helper pixel to detect if we've scrolled -->
+<div class="sbt-scroll-pixel-helper"></div>
+<!-- Main content -->
+<div class="col py-0 content-container">
+    
+    <div class="header-article row sticky-top noprint">
+        
+
+
+
+<div class="col py-1 d-flex header-article-main">
+    <div class="header-article__left">
+        
+        <label for="__navigation"
+  class="headerbtn"
+  data-toggle="tooltip"
+data-placement="right"
+title="Toggle navigation"
+>
+  
+
+<span class="headerbtn__icon-container">
+  <i class="fas fa-bars"></i>
+  </span>
+
+</label>
+
+        
+    </div>
+    <div class="header-article__right">
+<button onclick="toggleFullScreen()"
+  class="headerbtn"
+  data-toggle="tooltip"
+data-placement="bottom"
+title="Fullscreen mode"
+>
+  
+
+<span class="headerbtn__icon-container">
+  <i class="fas fa-expand"></i>
+  </span>
+
+</button>
+
+<div class="menu-dropdown menu-dropdown-repository-buttons">
+  <button class="headerbtn menu-dropdown__trigger"
+      aria-label="Source repositories">
+      <i class="fab fa-github"></i>
+  </button>
+  <div class="menu-dropdown__content">
+    <ul>
+      <li>
+        <a href="https://github.com/triton-inference-server/server"
+   class="headerbtn"
+   data-toggle="tooltip"
+data-placement="left"
+title="Source repository"
+>
+  
+
+<span class="headerbtn__icon-container">
+  <i class="fab fa-github"></i>
+  </span>
+<span class="headerbtn__text-container">repository</span>
+</a>
+
+      </li>
+      
+      <li>
+        <a href="https://github.com/triton-inference-server/server/issues/new?title=Issue%20on%20page%20%2Fprotocol/extension_trace.html&body=Your%20issue%20content%20here."
+   class="headerbtn"
+   data-toggle="tooltip"
+data-placement="left"
+title="Open an issue"
+>
+  
+
+<span class="headerbtn__icon-container">
+  <i class="fas fa-lightbulb"></i>
+  </span>
+<span class="headerbtn__text-container">open issue</span>
+</a>
+
+      </li>
+      
+    </ul>
+  </div>
+</div>
+<label for="__page-toc"
+  class="headerbtn headerbtn-page-toc"
+  
+>
+  
+
+<span class="headerbtn__icon-container">
+  <i class="fas fa-list"></i>
+  </span>
+
+</label>
+
+    </div>
+</div>
+
+<!-- Table of contents -->
+<div class="col-md-3 bd-toc show noprint">
+    <div class="tocsection onthispage pt-5 pb-3">
+        <i class="fas fa-list"></i> Contents
+    </div>
+    <nav id="bd-toc-nav" aria-label="Page">
+        <ul class="visible nav section-nav flex-column">
+ <li class="toc-h2 nav-item toc-entry">
+  <a class="reference internal nav-link" href="#http-rest">
+   HTTP/REST
+  </a>
+  <ul class="visible nav section-nav flex-column">
+   <li class="toc-h3 nav-item toc-entry">
+    <a class="reference internal nav-link" href="#trace-setting-response-json-object">
+     Trace Setting Response JSON Object
+    </a>
+   </li>
+   <li class="toc-h3 nav-item toc-entry">
+    <a class="reference internal nav-link" href="#trace-setting-response-json-error-object">
+     Trace Setting Response JSON Error Object
+    </a>
+    <ul class="nav section-nav flex-column">
+     <li class="toc-h4 nav-item toc-entry">
+      <a class="reference internal nav-link" href="#trace-setting-request-json-object">
+       Trace Setting Request JSON Object
+      </a>
+     </li>
+    </ul>
+   </li>
+  </ul>
+ </li>
+ <li class="toc-h2 nav-item toc-entry">
+  <a class="reference internal nav-link" href="#grpc">
+   GRPC
+  </a>
+ </li>
+</ul>
+
+    </nav>
+</div>
+    </div>
+    <div class="article row">
+        <div class="col pl-md-3 pl-lg-5 content-container">
+            <!-- Table of contents that is only displayed when printing the page -->
+            <div id="jb-print-docs-body" class="onlyprint">
+                <h1>Trace Extension</h1>
+                <!-- Table of contents -->
+                <div id="print-main-content">
+                    <div id="jb-print-toc">
+                        
+                        <div>
+                            <h2> Contents </h2>
+                        </div>
+                        <nav aria-label="Page">
+                            <ul class="visible nav section-nav flex-column">
+ <li class="toc-h2 nav-item toc-entry">
+  <a class="reference internal nav-link" href="#http-rest">
+   HTTP/REST
+  </a>
+  <ul class="visible nav section-nav flex-column">
+   <li class="toc-h3 nav-item toc-entry">
+    <a class="reference internal nav-link" href="#trace-setting-response-json-object">
+     Trace Setting Response JSON Object
+    </a>
+   </li>
+   <li class="toc-h3 nav-item toc-entry">
+    <a class="reference internal nav-link" href="#trace-setting-response-json-error-object">
+     Trace Setting Response JSON Error Object
+    </a>
+    <ul class="nav section-nav flex-column">
+     <li class="toc-h4 nav-item toc-entry">
+      <a class="reference internal nav-link" href="#trace-setting-request-json-object">
+       Trace Setting Request JSON Object
+      </a>
+     </li>
+    </ul>
+   </li>
+  </ul>
+ </li>
+ <li class="toc-h2 nav-item toc-entry">
+  <a class="reference internal nav-link" href="#grpc">
+   GRPC
+  </a>
+ </li>
+</ul>
+
+                        </nav>
+                    </div>
+                </div>
+            </div>
+            <main id="main-content" role="main">
+                
+              <div>
+                 <!--
+# Copyright (c) 2022, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+#
+# Redistribution and use in source and binary forms, with or without
+# modification, are permitted provided that the following conditions
+# are met:
+#  * Redistributions of source code must retain the above copyright
+#    notice, this list of conditions and the following disclaimer.
+#  * Redistributions in binary form must reproduce the above copyright
+#    notice, this list of conditions and the following disclaimer in the
+#    documentation and/or other materials provided with the distribution.
+#  * Neither the name of NVIDIA CORPORATION nor the names of its
+#    contributors may be used to endorse or promote products derived
+#    from this software without specific prior written permission.
+#
+# THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS ``AS IS'' AND ANY
+# EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+# IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR
+# PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL THE COPYRIGHT OWNER OR
+# CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL,
+# EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
+# PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR
+# PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY
+# OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+# (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+# OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+-->
+<div class="tex2jax_ignore mathjax_ignore section" id="trace-extension">
+<h1>Trace Extension<a class="headerlink" href="#trace-extension" title="Permalink to this headline">#</a></h1>
+<p>This document describes Triton’s trace extension. The trace extension enables
+the client to configure the trace settings during a Triton run. Because this
+extension is supported, Triton reports “trace” in the extensions field of
+its Server Metadata.</p>
+<div class="section" id="http-rest">
+<h2>HTTP/REST<a class="headerlink" href="#http-rest" title="Permalink to this headline">#</a></h2>
+<p>In all JSON schemas shown in this document <code class="docutils literal notranslate"><span class="pre">$number</span></code>, <code class="docutils literal notranslate"><span class="pre">$string</span></code>, <code class="docutils literal notranslate"><span class="pre">$boolean</span></code>,
+<code class="docutils literal notranslate"><span class="pre">$object</span></code> and <code class="docutils literal notranslate"><span class="pre">$array</span></code> refer to the fundamental JSON types. <code class="docutils literal notranslate"><span class="pre">#optional</span></code>
+indicates an optional JSON field.</p>
+<p>Triton exposes the trace endpoint at the following URL. The client may use
+HTTP GET request to retrieve the current trace setting. A HTTP POST request
+will modify the trace setting, and the endpoint will return the updated trace
+setting on success or an error in the case of failure. Optional model name
+can be provided to get or to set the trace settings for specific model.</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span>GET v2[/models/${MODEL_NAME}]/trace/setting
+
+POST v2[/models/${MODEL_NAME}]/trace/setting
+</pre></div>
+</div>
+<div class="section" id="trace-setting-response-json-object">
+<h3>Trace Setting Response JSON Object<a class="headerlink" href="#trace-setting-response-json-object" title="Permalink to this headline">#</a></h3>
+<p>A successful trace setting request is indicated by a 200 HTTP status
+code. The response object, identified as <code class="docutils literal notranslate"><span class="pre">$trace_setting_response</span></code>, is
+returned in the HTTP body for every successful trace setting request.</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span>$trace_setting_response =
+{
+  $trace_setting, ...
+}
+
+$trace_setting = $string : $string | [ $string, ...]
+</pre></div>
+</div>
+<p>Each <code class="docutils literal notranslate"><span class="pre">$trace_setting</span></code> JSON describes a “name”/”value” pair, where the “name” is
+the name of the trace setting and the “value” is a <code class="docutils literal notranslate"><span class="pre">$string</span> <span class="pre">representation</span></code> of the
+setting value, or an array of <code class="docutils literal notranslate"><span class="pre">$string</span></code> for some settings. Currently the following
+trace settings are defined:</p>
+<ul class="simple">
+<li><p>“trace_file” : the file where the trace output will be saved. If
+“log_frequency” is set, this will be the prefix of the files to save the
+trace output, resulting files in name <code class="docutils literal notranslate"><span class="pre">&quot;${trace_file}.0&quot;,</span> <span class="pre">&quot;${trace_file}.1&quot;,</span> <span class="pre">...</span></code>,
+see trace setting “log_frequency” below for detail.</p></li>
+<li><p>“trace_level” : the trace level. “OFF” to disable tracing,
+“TIMESTAMPS” to trace timestamps, “TENSORS” to trace tensors.
+This value is an array of string where user may specify multiple levels to
+trace multiple informations.</p></li>
+<li><p>“trace_rate” : the trace sampling rate. The value represents how many requests
+will one trace be sampled from. For example, if the trace rate is “1000”,
+1 trace will be sampled for every 1000 requests.</p></li>
+<li><p>“trace_count” : the number of remaining traces to be sampled. Once the value
+becomes “0”, no more traces will be sampled for the trace setting, and the
+collected traces will be written to indexed trace file in the format described
+in “log_frequency”, regardless of the “log_frequency” status.
+If the value is “-1”, the number of traces to be sampled will not be limited.</p></li>
+<li><p>“log_frequency” : the frequency that Triton will log the
+trace output to the files. If the value is “0”, Triton will only log
+the trace output to <code class="docutils literal notranslate"><span class="pre">${trace_file}</span></code> when shutting down. Otherwise, Triton will log
+the trace output to <code class="docutils literal notranslate"><span class="pre">${trace_file}.${idx}</span></code> when it collects
+the specified number of traces. For example, if the log frequency is “100”,
+when Triton collects the 100-th trace, it logs the traces to file
+<code class="docutils literal notranslate"><span class="pre">&quot;${trace_file}.0&quot;</span></code>, and when it collects the 200-th trace, it logs the 101-th to
+the 200-th traces to file <code class="docutils literal notranslate"><span class="pre">&quot;${trace_file}.1&quot;</span></code>. Note that the file index will be
+reset to 0 when “trace_file” setting is updated.</p></li>
+</ul>
+</div>
+<div class="section" id="trace-setting-response-json-error-object">
+<h3>Trace Setting Response JSON Error Object<a class="headerlink" href="#trace-setting-response-json-error-object" title="Permalink to this headline">#</a></h3>
+<p>A failed trace setting request will be indicated by an HTTP error status
+(typically 400). The HTTP body must contain the
+<code class="docutils literal notranslate"><span class="pre">$trace_setting_error_response</span></code> object.</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span>$trace_setting_error_response =
+{
+  &quot;error&quot;: $string
+}
+</pre></div>
+</div>
+<ul class="simple">
+<li><p>“error” : The descriptive message for the error.</p></li>
+</ul>
+<div class="section" id="trace-setting-request-json-object">
+<h4>Trace Setting Request JSON Object<a class="headerlink" href="#trace-setting-request-json-object" title="Permalink to this headline">#</a></h4>
+<p>A trace setting request is made with a HTTP POST to
+the trace endpoint. In the corresponding response the HTTP body contains the
+response JSON. A successful request is indicated by a 200 HTTP status code.</p>
+<p>The request object, identified as <code class="docutils literal notranslate"><span class="pre">$trace_setting_request</span></code> must be provided in the HTTP
+body.</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span>$trace_setting_request =
+{
+  $trace_setting, ...
+}
+</pre></div>
+</div>
+<p>The <code class="docutils literal notranslate"><span class="pre">$trace_setting</span></code> JSON is defined in
+<a class="reference internal" href="#trace-setting-response-json-object"><span class="std std-doc">Trace Setting Response JSON Object</span></a>, only the specified
+settings will be updated. In addition to the values mentioned in response JSON
+object, JSON null value may be used to remove the specification of
+the trace setting. In such case, the current global setting will be used.
+Similarly, if this is the first request to initialize a model trace settings,
+for the trace settings that are not specified in the request, the current global
+setting will be used.</p>
+</div>
+</div>
+</div>
+<div class="section" id="grpc">
+<h2>GRPC<a class="headerlink" href="#grpc" title="Permalink to this headline">#</a></h2>
+<p>For the trace extension Triton implements the following API:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span>service GRPCInferenceService
+{
+  …
+
+  // Update and get the trace setting of the Triton server.
+  rpc TraceSetting(TraceSettingRequest)
+          returns (TraceSettingResponse) {}
+}
+</pre></div>
+</div>
+<p>The Trace Setting API returns the latest trace settings. Errors are indicated
+by the google.rpc.Status returned for the request. The OK code
+indicates success and other codes indicate failure. The request and
+response messages for Trace Setting are:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">message</span> <span class="n">TraceSettingRequest</span>
+<span class="p">{</span>
+  <span class="o">//</span> <span class="n">The</span> <span class="n">values</span> <span class="n">to</span> <span class="n">be</span> <span class="n">associated</span> <span class="k">with</span> <span class="n">a</span> <span class="n">trace</span> <span class="n">setting</span><span class="o">.</span>
+  <span class="o">//</span> <span class="n">If</span> <span class="n">no</span> <span class="n">value</span> <span class="ow">is</span> <span class="n">provided</span><span class="p">,</span> <span class="n">the</span> <span class="n">setting</span> <span class="n">will</span> <span class="n">be</span> <span class="n">clear</span> <span class="ow">and</span>
+  <span class="o">//</span> <span class="n">the</span> <span class="k">global</span> <span class="n">setting</span> <span class="n">value</span> <span class="n">will</span> <span class="n">be</span> <span class="n">used</span><span class="o">.</span>
+  <span class="n">message</span> <span class="n">SettingValue</span>
+  <span class="p">{</span>
+    <span class="n">repeated</span> <span class="n">string</span> <span class="n">value</span> <span class="o">=</span> <span class="mi">1</span><span class="p">;</span>
+  <span class="p">}</span>
+
+  <span class="o">//</span> <span class="n">The</span> <span class="n">new</span> <span class="n">setting</span> <span class="n">values</span> <span class="n">to</span> <span class="n">be</span> <span class="n">updated</span><span class="p">,</span>
+  <span class="o">//</span> <span class="n">settings</span> <span class="n">that</span> <span class="n">are</span> <span class="ow">not</span> <span class="n">specified</span> <span class="n">will</span> <span class="n">remain</span> <span class="n">unchanged</span><span class="o">.</span>
+  <span class="nb">map</span><span class="o">&lt;</span><span class="n">string</span><span class="p">,</span> <span class="n">SettingValue</span><span class="o">&gt;</span> <span class="n">settings</span> <span class="o">=</span> <span class="mi">1</span><span class="p">;</span>
+
+  <span class="o">//</span> <span class="n">The</span> <span class="n">name</span> <span class="n">of</span> <span class="n">the</span> <span class="n">model</span> <span class="n">to</span> <span class="n">apply</span> <span class="n">the</span> <span class="n">new</span> <span class="n">trace</span> <span class="n">settings</span><span class="o">.</span>
+  <span class="o">//</span> <span class="n">If</span> <span class="ow">not</span> <span class="n">given</span><span class="p">,</span> <span class="n">the</span> <span class="n">new</span> <span class="n">settings</span> <span class="n">will</span> <span class="n">be</span> <span class="n">applied</span> <span class="n">globally</span><span class="o">.</span>
+  <span class="n">string</span> <span class="n">model_name</span> <span class="o">=</span> <span class="mi">2</span><span class="p">;</span>
+<span class="p">}</span>
+
+<span class="n">message</span> <span class="n">TraceSettingResponse</span>
+<span class="p">{</span>
+  <span class="n">message</span> <span class="n">SettingValue</span>
+  <span class="p">{</span>
+    <span class="n">repeated</span> <span class="n">string</span> <span class="n">value</span> <span class="o">=</span> <span class="mi">1</span><span class="p">;</span>
+  <span class="p">}</span>
+
+  <span class="o">//</span> <span class="n">The</span> <span class="n">latest</span> <span class="n">trace</span> <span class="n">settings</span><span class="o">.</span>
+  <span class="nb">map</span><span class="o">&lt;</span><span class="n">string</span><span class="p">,</span> <span class="n">SettingValue</span><span class="o">&gt;</span> <span class="n">settings</span> <span class="o">=</span> <span class="mi">1</span><span class="p">;</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+<p>The trace settings are mentioned in
+<a class="reference internal" href="#trace-setting-response-json-object"><span class="std std-doc">Trace Setting Response JSON Object</span></a>.
+Note that if this is the first request to initialize
+a model trace settings, for the trace settings that are not specified
+in the request, the value will be copied from the current global settings.</p>
+</div>
+</div>
+
+<div class="section">
+   
+</div>
+
+              </div>
+              
+            </main>
+            <footer class="footer-article noprint">
+                
+    <!-- Previous / next buttons -->
+<div class='prev-next-area'>
+    <a class='left-prev' id="prev-link" href="extension_statistics.html" title="previous page">
+        <i class="fas fa-angle-left"></i>
+        <div class="prev-next-info">
+            <p class="prev-next-subtitle">previous</p>
+            <p class="prev-next-title">Statistics Extension</p>
+        </div>
+    </a>
+    <a class='right-next' id="next-link" href="../customization_guide/build.html" title="next page">
+    <div class="prev-next-info">
+        <p class="prev-next-subtitle">next</p>
+        <p class="prev-next-title">Building Triton</p>
+    </div>
+    <i class="fas fa-angle-right"></i>
+    </a>
+</div>
+            </footer>
+        </div>
+    </div>
+    <div class="footer-content row">
+        <footer class="col footer"><p>
+  
+    By NVIDIA<br/>
+  
+      &copy; Copyright 2022 NVIDIA CORPORATION &amp; AFFILIATES. All rights reserved.<br/>
+    Last updated on Oct 05, 2022.<br/>
+</p>
+        </footer>
+    </div>
+    
+</div>
+
+
+      </div>
+    </div>
+  
+  <!-- Scripts loaded after <body> so the DOM is not blocked -->
+  <script src="../_static/scripts/pydata-sphinx-theme.js?digest=1999514e3f237ded88cf"></script>
+
+
+<script type="text/javascript">_satellite.pageBottom();</script>
+  </body>
+</html>

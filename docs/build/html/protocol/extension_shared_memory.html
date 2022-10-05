@@ -1,0 +1,1300 @@
+
+<!DOCTYPE html>
+
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Shared-Memory Extension &#8212; NVIDIA Triton Inference Server</title>
+    
+  <!-- Loaded before other Sphinx assets -->
+  <link href="../_static/styles/theme.css?digest=1999514e3f237ded88cf" rel="stylesheet">
+<link href="../_static/styles/pydata-sphinx-theme.css?digest=1999514e3f237ded88cf" rel="stylesheet">
+
+    
+  <link rel="stylesheet"
+    href="../_static/vendor/fontawesome/5.13.0/css/all.min.css">
+  <link rel="preload" as="font" type="font/woff2" crossorigin
+    href="../_static/vendor/fontawesome/5.13.0/webfonts/fa-solid-900.woff2">
+  <link rel="preload" as="font" type="font/woff2" crossorigin
+    href="../_static/vendor/fontawesome/5.13.0/webfonts/fa-brands-400.woff2">
+
+    <link rel="stylesheet" type="text/css" href="../_static/pygments.css" />
+    <link rel="stylesheet" href="../_static/styles/sphinx-book-theme.css?digest=62ba249389abaaa9ffc34bf36a076bdc1d65ee18" type="text/css" />
+    <link rel="stylesheet" type="text/css" href="../_static/mystnb.4510f1fc1dee50b3e5859aac5469c37c29e427902b24a333a5f9fcb2f0b3ac41.css" />
+    <link rel="stylesheet" type="text/css" href="../_static/copybutton.css" />
+    <link rel="stylesheet" type="text/css" href="../_static/tabs.css" />
+    <link rel="stylesheet" type="text/css" href="../_static/custom.css" />
+    <link rel="stylesheet" type="text/css" href="../_static/design-style.4045f2051d55cab465a707391d5b2007.min.css" />
+    
+  <!-- Pre-loaded scripts that we'll load fully later -->
+  <link rel="preload" as="script" href="../_static/scripts/pydata-sphinx-theme.js?digest=1999514e3f237ded88cf">
+
+    <script data-url_root="../" id="documentation_options" src="../_static/documentation_options.js"></script>
+    <script src="../_static/jquery.js"></script>
+    <script src="../_static/underscore.js"></script>
+    <script src="../_static/doctools.js"></script>
+    <script src="../_static/clipboard.min.js"></script>
+    <script src="../_static/copybutton.js"></script>
+    <script src="https://js.hcaptcha.com/1/api.js"></script>
+    <script src="//assets.adobedtm.com/5d4962a43b79/c1061d2c5e7b/launch-191c2462b890.min.js"></script>
+    <script src="../_static/scripts/sphinx-book-theme.js?digest=f31d14ad54b65d19161ba51d4ffff3a77ae00456"></script>
+    <script src="../_static/design-tabs.js"></script>
+    <link rel="canonical" href="https://docs.nvidia.com/deeplearning/triton-inference-server/user-guide/docs/protocol/extension_shared_memory.html" />
+    <link rel="shortcut icon" href="../_static/nvidia-logo-vert-rgb-blk-for-screen.png"/>
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" />
+    <link rel="next" title="Statistics Extension" href="extension_statistics.html" />
+    <link rel="prev" title="Sequence Extension" href="extension_sequence.html" /> 
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="docsearch:language" content="None">
+    
+
+    <!-- Google Analytics -->
+      
+<style type="text/css">
+  ul.ablog-archive {
+    list-style: none;
+    overflow: auto;
+    margin-left: 0px;
+  }
+  ul.ablog-archive li {
+    float: left;
+    margin-right: 5px;
+    font-size: 80%;
+  }
+  ul.postlist a {
+    font-style: italic;
+  }
+  ul.postlist-style-disc {
+    list-style-type: disc;
+  }
+  ul.postlist-style-none {
+    list-style-type: none;
+  }
+  ul.postlist-style-circle {
+    list-style-type: circle;
+  }
+</style>
+
+  </head>
+  <body data-spy="scroll" data-target="#bd-toc-nav" data-offset="60">
+<!-- Checkboxes to toggle the left sidebar -->
+<input type="checkbox" class="sidebar-toggle" name="__navigation" id="__navigation" aria-label="Toggle navigation sidebar">
+<label class="overlay overlay-navbar" for="__navigation">
+    <div class="visually-hidden">Toggle navigation sidebar</div>
+</label>
+<!-- Checkboxes to toggle the in-page toc -->
+<input type="checkbox" class="sidebar-toggle" name="__page-toc" id="__page-toc" aria-label="Toggle in-page Table of Contents">
+<label class="overlay overlay-pagetoc" for="__page-toc">
+    <div class="visually-hidden">Toggle in-page Table of Contents</div>
+</label>
+<!-- Headers at the top -->
+<div class="announcement header-item noprint"></div>
+<div class="header header-item noprint"></div>
+
+    
+    <div class="container-fluid" id="banner"></div>
+
+    
+
+    <div class="container-xl">
+      <div class="row">
+          
+<!-- Sidebar -->
+<div class="bd-sidebar noprint" id="site-navigation">
+    <div class="bd-sidebar__content">
+        <div class="bd-sidebar__top"><div class="navbar-brand-box">
+    <a class="navbar-brand text-wrap" href="../index.html">
+      
+        <!-- `logo` is deprecated in Sphinx 4.0, so remove this when we stop supporting 3 -->
+        
+      
+      
+      <img src="../_static/nvidia-logo-horiz-rgb-blk-for-screen.png" class="logo" alt="logo">
+      
+      
+      <h1 class="site-logo" id="site-title">NVIDIA Triton Inference Server</h1>
+      
+    </a>
+</div><form class="bd-search d-flex align-items-center" action="../search.html" method="get">
+  <i class="icon fas fa-search"></i>
+  <input type="search" class="form-control" name="q" id="search-input" placeholder="Search the docs ..." aria-label="Search the docs ..." autocomplete="off" >
+</form><nav class="bd-links" id="bd-docs-nav" aria-label="Main">
+    <div class="bd-toc-item active">
+        <p aria-level="2" class="caption" role="heading">
+ <span class="caption-text">
+  Getting Started
+ </span>
+</p>
+<ul class="nav bd-sidenav">
+ <li class="toctree-l1">
+  <a class="reference internal" href="../getting_started/quickstart.html">
+   Quickstart
+  </a>
+ </li>
+</ul>
+<p aria-level="2" class="caption" role="heading">
+ <span class="caption-text">
+  User Guide
+ </span>
+</p>
+<ul class="nav bd-sidenav">
+ <li class="toctree-l1">
+  <a class="reference internal" href="../user_guide/performance_tuning.html">
+   Deploying your trained model using Triton
+  </a>
+ </li>
+ <li class="toctree-l1">
+  <a class="reference internal" href="../user_guide/architecture.html">
+   Triton Architecture
+  </a>
+ </li>
+ <li class="toctree-l1">
+  <a class="reference internal" href="../user_guide/model_repository.html">
+   Model Repository
+  </a>
+ </li>
+ <li class="toctree-l1">
+  <a class="reference internal" href="../customization_guide/repository_agents.html">
+   Repository Agent
+  </a>
+ </li>
+ <li class="toctree-l1">
+  <a class="reference internal" href="../user_guide/model_configuration.html">
+   Model Configuration
+  </a>
+ </li>
+ <li class="toctree-l1">
+  <a class="reference internal" href="../user_guide/optimization.html">
+   Optimization
+  </a>
+ </li>
+ <li class="toctree-l1">
+  <a class="reference internal" href="../user_guide/ragged_batching.html">
+   Ragged Batching
+  </a>
+ </li>
+ <li class="toctree-l1">
+  <a class="reference internal" href="../user_guide/rate_limiter.html">
+   Rate Limiter
+  </a>
+ </li>
+ <li class="toctree-l1">
+  <a class="reference internal" href="../user_guide/model_analyzer.html">
+   Model Analyzer
+  </a>
+ </li>
+ <li class="toctree-l1">
+  <a class="reference internal" href="../user_guide/perf_analyzer.html">
+   Performance Analyzer
+  </a>
+ </li>
+ <li class="toctree-l1">
+  <a class="reference internal" href="../user_guide/model_management.html">
+   Model Management
+  </a>
+ </li>
+ <li class="toctree-l1">
+  <a class="reference internal" href="../user_guide/custom_operations.html">
+   Custom Operations
+  </a>
+ </li>
+ <li class="toctree-l1">
+  <a class="reference internal" href="../user_guide/decoupled_models.html">
+   Decoupled Backends and Models
+  </a>
+ </li>
+ <li class="toctree-l1">
+  <a class="reference internal" href="../user_guide/response_cache.html">
+   Triton Response Cache
+  </a>
+ </li>
+ <li class="toctree-l1">
+  <a class="reference internal" href="../user_guide/metrics.html">
+   Metrics
+  </a>
+ </li>
+ <li class="toctree-l1">
+  <a class="reference internal" href="../user_guide/trace.html">
+   Triton Server Trace
+  </a>
+ </li>
+ <li class="toctree-l1">
+  <a class="reference internal" href="../user_guide/jetson.html">
+   Triton Inference Server Support for Jetson and JetPack
+  </a>
+ </li>
+ <li class="toctree-l1">
+  <a class="reference internal" href="../user_guide/v1_to_v2.html">
+   Version 1 to Version 2 Migration
+  </a>
+ </li>
+</ul>
+<ul class="nav bd-sidenav">
+ <li class="toctree-l1">
+  <a class="reference internal" href="../user_guide/faq.html">
+   FAQ
+  </a>
+ </li>
+</ul>
+<p aria-level="2" class="caption" role="heading">
+ <span class="caption-text">
+  Protocol Guides
+ </span>
+</p>
+<ul class="current nav bd-sidenav">
+ <li class="toctree-l1">
+  <a class="reference internal" href="../customization_guide/inference_protocols.html">
+   Inference Protocols and APIs
+  </a>
+ </li>
+ <li class="toctree-l1">
+  <a class="reference internal" href="extension_binary_data.html">
+   Binary Tensor Data Extension
+  </a>
+ </li>
+ <li class="toctree-l1">
+  <a class="reference internal" href="extension_classification.html">
+   Classification Extension
+  </a>
+ </li>
+ <li class="toctree-l1">
+  <a class="reference internal" href="extension_logging.html">
+   Logging Extension
+  </a>
+ </li>
+ <li class="toctree-l1">
+  <a class="reference internal" href="extension_model_configuration.html">
+   Model Configuration Extension
+  </a>
+ </li>
+ <li class="toctree-l1">
+  <a class="reference internal" href="extension_model_repository.html">
+   Model Repository Extension
+  </a>
+ </li>
+ <li class="toctree-l1">
+  <a class="reference internal" href="extension_schedule_policy.html">
+   Schedule Policy Extension
+  </a>
+ </li>
+ <li class="toctree-l1">
+  <a class="reference internal" href="extension_sequence.html">
+   Sequence Extension
+  </a>
+ </li>
+ <li class="toctree-l1 current active">
+  <a class="current reference internal" href="#">
+   Shared-Memory Extension
+  </a>
+ </li>
+ <li class="toctree-l1">
+  <a class="reference internal" href="extension_statistics.html">
+   Statistics Extension
+  </a>
+ </li>
+ <li class="toctree-l1">
+  <a class="reference internal" href="extension_trace.html">
+   Trace Extension
+  </a>
+ </li>
+</ul>
+<p aria-level="2" class="caption" role="heading">
+ <span class="caption-text">
+  Customization Guide
+ </span>
+</p>
+<ul class="nav bd-sidenav">
+ <li class="toctree-l1">
+  <a class="reference internal" href="../customization_guide/build.html">
+   Building Triton
+  </a>
+ </li>
+ <li class="toctree-l1">
+  <a class="reference internal" href="../customization_guide/compose.html">
+   Customize Triton Container
+  </a>
+ </li>
+ <li class="toctree-l1">
+  <a class="reference internal" href="../customization_guide/test.html">
+   Testing Triton
+  </a>
+ </li>
+</ul>
+<p aria-level="2" class="caption" role="heading">
+ <span class="caption-text">
+  Examples
+ </span>
+</p>
+<ul class="nav bd-sidenav">
+ <li class="toctree-l1">
+  <a class="reference internal" href="../examples/jetson/README.html">
+   Using Triton Inference Server as a shared library for execution on Jetson
+  </a>
+ </li>
+ <li class="toctree-l1">
+  <a class="reference internal" href="../examples/jetson/concurrency_and_dynamic_batching/README.html">
+   Concurrent inference and dynamic batching
+  </a>
+ </li>
+</ul>
+
+    </div>
+</nav></div>
+        <div class="bd-sidebar__bottom">
+             <!-- To handle the deprecated key -->
+            
+        </div>
+    </div>
+    <div id="rtd-footer-container"></div>
+</div>
+
+
+          
+
+
+          
+<!-- A tiny helper pixel to detect if we've scrolled -->
+<div class="sbt-scroll-pixel-helper"></div>
+<!-- Main content -->
+<div class="col py-0 content-container">
+    
+    <div class="header-article row sticky-top noprint">
+        
+
+
+
+<div class="col py-1 d-flex header-article-main">
+    <div class="header-article__left">
+        
+        <label for="__navigation"
+  class="headerbtn"
+  data-toggle="tooltip"
+data-placement="right"
+title="Toggle navigation"
+>
+  
+
+<span class="headerbtn__icon-container">
+  <i class="fas fa-bars"></i>
+  </span>
+
+</label>
+
+        
+    </div>
+    <div class="header-article__right">
+<button onclick="toggleFullScreen()"
+  class="headerbtn"
+  data-toggle="tooltip"
+data-placement="bottom"
+title="Fullscreen mode"
+>
+  
+
+<span class="headerbtn__icon-container">
+  <i class="fas fa-expand"></i>
+  </span>
+
+</button>
+
+<div class="menu-dropdown menu-dropdown-repository-buttons">
+  <button class="headerbtn menu-dropdown__trigger"
+      aria-label="Source repositories">
+      <i class="fab fa-github"></i>
+  </button>
+  <div class="menu-dropdown__content">
+    <ul>
+      <li>
+        <a href="https://github.com/triton-inference-server/server"
+   class="headerbtn"
+   data-toggle="tooltip"
+data-placement="left"
+title="Source repository"
+>
+  
+
+<span class="headerbtn__icon-container">
+  <i class="fab fa-github"></i>
+  </span>
+<span class="headerbtn__text-container">repository</span>
+</a>
+
+      </li>
+      
+      <li>
+        <a href="https://github.com/triton-inference-server/server/issues/new?title=Issue%20on%20page%20%2Fprotocol/extension_shared_memory.html&body=Your%20issue%20content%20here."
+   class="headerbtn"
+   data-toggle="tooltip"
+data-placement="left"
+title="Open an issue"
+>
+  
+
+<span class="headerbtn__icon-container">
+  <i class="fas fa-lightbulb"></i>
+  </span>
+<span class="headerbtn__text-container">open issue</span>
+</a>
+
+      </li>
+      
+    </ul>
+  </div>
+</div>
+<label for="__page-toc"
+  class="headerbtn headerbtn-page-toc"
+  
+>
+  
+
+<span class="headerbtn__icon-container">
+  <i class="fas fa-list"></i>
+  </span>
+
+</label>
+
+    </div>
+</div>
+
+<!-- Table of contents -->
+<div class="col-md-3 bd-toc show noprint">
+    <div class="tocsection onthispage pt-5 pb-3">
+        <i class="fas fa-list"></i> Contents
+    </div>
+    <nav id="bd-toc-nav" aria-label="Page">
+        <ul class="visible nav section-nav flex-column">
+ <li class="toc-h2 nav-item toc-entry">
+  <a class="reference internal nav-link" href="#http-rest">
+   HTTP/REST
+  </a>
+  <ul class="visible nav section-nav flex-column">
+   <li class="toc-h3 nav-item toc-entry">
+    <a class="reference internal nav-link" href="#system-shared-memory">
+     System Shared Memory
+    </a>
+    <ul class="nav section-nav flex-column">
+     <li class="toc-h4 nav-item toc-entry">
+      <a class="reference internal nav-link" href="#status">
+       Status
+      </a>
+     </li>
+     <li class="toc-h4 nav-item toc-entry">
+      <a class="reference internal nav-link" href="#register">
+       Register
+      </a>
+     </li>
+     <li class="toc-h4 nav-item toc-entry">
+      <a class="reference internal nav-link" href="#unregister">
+       Unregister
+      </a>
+     </li>
+    </ul>
+   </li>
+   <li class="toc-h3 nav-item toc-entry">
+    <a class="reference internal nav-link" href="#cuda-shared-memory">
+     CUDA Shared Memory
+    </a>
+    <ul class="nav section-nav flex-column">
+     <li class="toc-h4 nav-item toc-entry">
+      <a class="reference internal nav-link" href="#id1">
+       Status
+      </a>
+     </li>
+     <li class="toc-h4 nav-item toc-entry">
+      <a class="reference internal nav-link" href="#id2">
+       Register
+      </a>
+     </li>
+     <li class="toc-h4 nav-item toc-entry">
+      <a class="reference internal nav-link" href="#id3">
+       Unregister
+      </a>
+     </li>
+    </ul>
+   </li>
+  </ul>
+ </li>
+ <li class="toc-h2 nav-item toc-entry">
+  <a class="reference internal nav-link" href="#grpc">
+   GRPC
+  </a>
+  <ul class="visible nav section-nav flex-column">
+   <li class="toc-h3 nav-item toc-entry">
+    <a class="reference internal nav-link" href="#id4">
+     System Shared Memory
+    </a>
+    <ul class="nav section-nav flex-column">
+     <li class="toc-h4 nav-item toc-entry">
+      <a class="reference internal nav-link" href="#id5">
+       Status
+      </a>
+     </li>
+     <li class="toc-h4 nav-item toc-entry">
+      <a class="reference internal nav-link" href="#id6">
+       Register
+      </a>
+     </li>
+     <li class="toc-h4 nav-item toc-entry">
+      <a class="reference internal nav-link" href="#id7">
+       Unregister
+      </a>
+     </li>
+    </ul>
+   </li>
+   <li class="toc-h3 nav-item toc-entry">
+    <a class="reference internal nav-link" href="#id8">
+     CUDA Shared Memory
+    </a>
+    <ul class="nav section-nav flex-column">
+     <li class="toc-h4 nav-item toc-entry">
+      <a class="reference internal nav-link" href="#id9">
+       Status
+      </a>
+     </li>
+     <li class="toc-h4 nav-item toc-entry">
+      <a class="reference internal nav-link" href="#id10">
+       Register
+      </a>
+     </li>
+     <li class="toc-h4 nav-item toc-entry">
+      <a class="reference internal nav-link" href="#id11">
+       Unregister
+      </a>
+     </li>
+    </ul>
+   </li>
+  </ul>
+ </li>
+</ul>
+
+    </nav>
+</div>
+    </div>
+    <div class="article row">
+        <div class="col pl-md-3 pl-lg-5 content-container">
+            <!-- Table of contents that is only displayed when printing the page -->
+            <div id="jb-print-docs-body" class="onlyprint">
+                <h1>Shared-Memory Extension</h1>
+                <!-- Table of contents -->
+                <div id="print-main-content">
+                    <div id="jb-print-toc">
+                        
+                        <div>
+                            <h2> Contents </h2>
+                        </div>
+                        <nav aria-label="Page">
+                            <ul class="visible nav section-nav flex-column">
+ <li class="toc-h2 nav-item toc-entry">
+  <a class="reference internal nav-link" href="#http-rest">
+   HTTP/REST
+  </a>
+  <ul class="visible nav section-nav flex-column">
+   <li class="toc-h3 nav-item toc-entry">
+    <a class="reference internal nav-link" href="#system-shared-memory">
+     System Shared Memory
+    </a>
+    <ul class="nav section-nav flex-column">
+     <li class="toc-h4 nav-item toc-entry">
+      <a class="reference internal nav-link" href="#status">
+       Status
+      </a>
+     </li>
+     <li class="toc-h4 nav-item toc-entry">
+      <a class="reference internal nav-link" href="#register">
+       Register
+      </a>
+     </li>
+     <li class="toc-h4 nav-item toc-entry">
+      <a class="reference internal nav-link" href="#unregister">
+       Unregister
+      </a>
+     </li>
+    </ul>
+   </li>
+   <li class="toc-h3 nav-item toc-entry">
+    <a class="reference internal nav-link" href="#cuda-shared-memory">
+     CUDA Shared Memory
+    </a>
+    <ul class="nav section-nav flex-column">
+     <li class="toc-h4 nav-item toc-entry">
+      <a class="reference internal nav-link" href="#id1">
+       Status
+      </a>
+     </li>
+     <li class="toc-h4 nav-item toc-entry">
+      <a class="reference internal nav-link" href="#id2">
+       Register
+      </a>
+     </li>
+     <li class="toc-h4 nav-item toc-entry">
+      <a class="reference internal nav-link" href="#id3">
+       Unregister
+      </a>
+     </li>
+    </ul>
+   </li>
+  </ul>
+ </li>
+ <li class="toc-h2 nav-item toc-entry">
+  <a class="reference internal nav-link" href="#grpc">
+   GRPC
+  </a>
+  <ul class="visible nav section-nav flex-column">
+   <li class="toc-h3 nav-item toc-entry">
+    <a class="reference internal nav-link" href="#id4">
+     System Shared Memory
+    </a>
+    <ul class="nav section-nav flex-column">
+     <li class="toc-h4 nav-item toc-entry">
+      <a class="reference internal nav-link" href="#id5">
+       Status
+      </a>
+     </li>
+     <li class="toc-h4 nav-item toc-entry">
+      <a class="reference internal nav-link" href="#id6">
+       Register
+      </a>
+     </li>
+     <li class="toc-h4 nav-item toc-entry">
+      <a class="reference internal nav-link" href="#id7">
+       Unregister
+      </a>
+     </li>
+    </ul>
+   </li>
+   <li class="toc-h3 nav-item toc-entry">
+    <a class="reference internal nav-link" href="#id8">
+     CUDA Shared Memory
+    </a>
+    <ul class="nav section-nav flex-column">
+     <li class="toc-h4 nav-item toc-entry">
+      <a class="reference internal nav-link" href="#id9">
+       Status
+      </a>
+     </li>
+     <li class="toc-h4 nav-item toc-entry">
+      <a class="reference internal nav-link" href="#id10">
+       Register
+      </a>
+     </li>
+     <li class="toc-h4 nav-item toc-entry">
+      <a class="reference internal nav-link" href="#id11">
+       Unregister
+      </a>
+     </li>
+    </ul>
+   </li>
+  </ul>
+ </li>
+</ul>
+
+                        </nav>
+                    </div>
+                </div>
+            </div>
+            <main id="main-content" role="main">
+                
+              <div>
+                 <!--
+# Copyright (c) 2020, NVIDIA CORPORATION. All rights reserved.
+#
+# Redistribution and use in source and binary forms, with or without
+# modification, are permitted provided that the following conditions
+# are met:
+#  * Redistributions of source code must retain the above copyright
+#    notice, this list of conditions and the following disclaimer.
+#  * Redistributions in binary form must reproduce the above copyright
+#    notice, this list of conditions and the following disclaimer in the
+#    documentation and/or other materials provided with the distribution.
+#  * Neither the name of NVIDIA CORPORATION nor the names of its
+#    contributors may be used to endorse or promote products derived
+#    from this software without specific prior written permission.
+#
+# THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS ``AS IS'' AND ANY
+# EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+# IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR
+# PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL THE COPYRIGHT OWNER OR
+# CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL,
+# EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
+# PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR
+# PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY
+# OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+# (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+# OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+-->
+<div class="tex2jax_ignore mathjax_ignore section" id="shared-memory-extension">
+<h1>Shared-Memory Extension<a class="headerlink" href="#shared-memory-extension" title="Permalink to this headline">#</a></h1>
+<p>This document describes Triton’s shared-memory extensions.  The
+shared-memory extensions allow a client to communicate input and
+output tensors by system or CUDA shared memory. Using shared memory
+instead of sending the tensor data over the GRPC or REST interface can
+provide significant performance improvement for some use cases.
+Because both of these extensions are supported, Triton reports
+“system_shared_memory” and “cuda_shared_memory” in the extensions
+field of its Server Metadata.</p>
+<p>The shared-memory extensions use a common set of parameters to
+indicate that an input or output tensor is communicated via shared
+memory. These parameters and their type are:</p>
+<ul class="simple">
+<li><p>“shared_memory_region” : string value is the name of a previously
+registered shared memory region. Region names share a namespace for
+system-shared-memory regions and CUDA-shared-memory regions.</p></li>
+<li><p>“shared_memory_offset” : int64 value is the offset, in bytes, into
+the region where the data for the tensor starts.</p></li>
+<li><p>“shared_memory_byte_size” : int64 value is the size, in bytes, of
+the data.</p></li>
+</ul>
+<p>The “shared_memory_offset” parameter is optional and defaults to
+zero. The other two parameters are required. If only one of the two is
+given Triton will return an error.</p>
+<div class="section" id="http-rest">
+<h2>HTTP/REST<a class="headerlink" href="#http-rest" title="Permalink to this headline">#</a></h2>
+<p>In all JSON schemas shown in this document <code class="docutils literal notranslate"><span class="pre">$number</span></code>, <code class="docutils literal notranslate"><span class="pre">$string</span></code>, <code class="docutils literal notranslate"><span class="pre">$boolean</span></code>,
+<code class="docutils literal notranslate"><span class="pre">$object</span></code> and <code class="docutils literal notranslate"><span class="pre">$array</span></code> refer to the fundamental JSON types. #optional
+indicates an optional JSON field.</p>
+<p>The shared-memory parameters may be used in the <code class="docutils literal notranslate"><span class="pre">$request_input</span></code>
+parameters to indicate that the corresponding input is being
+communicated via shared memory. The parameters may be used in the
+<code class="docutils literal notranslate"><span class="pre">$request_output</span></code> parameters to indicate that the requested output
+should be communicated via shared memory.</p>
+<p>When these parameters are set for an input tensor the “data” field of
+<code class="docutils literal notranslate"><span class="pre">$request_input</span></code> must not be set. If the “data” field is set Triton will
+return an error. When these parameters are set for a requested output
+tensor the returned <code class="docutils literal notranslate"><span class="pre">$response_output</span></code> must not define the “data” field.</p>
+<p>Shared memory regions must be created by the client and then
+registered with Triton before they can be referenced with a
+“shared_memory_region” parameter. The system and CUDA shared-memory
+extensions each require a different set of APIs for registering a
+shared memory region.</p>
+<div class="section" id="system-shared-memory">
+<h3>System Shared Memory<a class="headerlink" href="#system-shared-memory" title="Permalink to this headline">#</a></h3>
+<p>The system shared memory extension requires Status, Register and
+Unregister APIs.</p>
+<p>Triton exposes the following URL to register and unregister system
+shared memory regions.</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span>GET v2/systemsharedmemory[/region/${REGION_NAME}]/status
+
+POST v2/systemsharedmemory/region/${REGION_NAME}/register
+
+POST v2/systemsharedmemory[/region/${REGION_NAME}]/unregister
+</pre></div>
+</div>
+<div class="section" id="status">
+<h4>Status<a class="headerlink" href="#status" title="Permalink to this headline">#</a></h4>
+<p>A system-shared-memory status request is made with an HTTP GET to the
+status endpoint. In the corresponding response the HTTP body contains
+the response JSON. If REGION_NAME is provided in the URL the response
+includes the status for the corresponding region. If REGION_NAME is
+not provided in the URL the response includes the status for all
+registered regions.</p>
+<p>A successful status request is indicated by a 200 HTTP status
+code. The response object, identified as
+<code class="docutils literal notranslate"><span class="pre">$system_shared_memory_status_response</span></code>, is returned in the HTTP body
+for every successful request.</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span>$system_shared_memory_status_response =
+[
+  {
+    &quot;name&quot; : $string,
+    &quot;key&quot; : $string,
+    &quot;offset&quot; : $number,
+    &quot;byte_size&quot; : $number
+  },
+  …
+]
+</pre></div>
+</div>
+<ul class="simple">
+<li><p>“name” : The name of the shared-memory region.</p></li>
+<li><p>“key” : The key of the underlying memory object that contains the
+shared memory region.</p></li>
+<li><p>“offset” : The offset, in bytes, within the underlying memory object
+to the start of the shared memory region.</p></li>
+<li><p>“byte_size” : The size of the shared memory region, in bytes.</p></li>
+</ul>
+<p>A failed status request must be indicated by an HTTP error status
+(typically 400). The HTTP body must contain the
+<code class="docutils literal notranslate"><span class="pre">$system_shared_memory_status_error_response</span></code> object.</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span>$system_shared_memory_status_error_response =
+{
+  &quot;error&quot;: $string
+}
+</pre></div>
+</div>
+<ul class="simple">
+<li><p>“error” : The descriptive message for the error.</p></li>
+</ul>
+</div>
+<div class="section" id="register">
+<h4>Register<a class="headerlink" href="#register" title="Permalink to this headline">#</a></h4>
+<p>A system-shared-memory register request is made with a HTTP POST to
+the register endpoint. In the corresponding response the HTTP body
+contains the response JSON. A successful register request is indicated
+by a 200 HTTP status code.</p>
+<p>The request object, identified as
+<code class="docutils literal notranslate"><span class="pre">$system_shared_memory_register_request</span></code> must be provided in the HTTP
+body.</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span>$system_shared_memory_register_request =
+{
+  &quot;key&quot; : $string,
+  &quot;offset&quot; : $number,
+  &quot;byte_size&quot; : $number
+}
+</pre></div>
+</div>
+<ul class="simple">
+<li><p>“key” : The key of the underlying memory object that contains the
+shared memory region.</p></li>
+<li><p>“offset” : The offset, in bytes, within the underlying memory object
+to the start of the shared memory region.</p></li>
+<li><p>“byte_size” : The size of the shared memory region, in bytes.</p></li>
+</ul>
+<p>A failed register request must be indicated by an HTTP error status
+(typically 400). The HTTP body must contain the
+<code class="docutils literal notranslate"><span class="pre">$system_shared_memory_register_error_response</span></code> object.</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span>$system_shared_memory_register_error_response =
+{
+  &quot;error&quot;: $string
+}
+</pre></div>
+</div>
+<ul class="simple">
+<li><p>“error” : The descriptive message for the error.</p></li>
+</ul>
+</div>
+<div class="section" id="unregister">
+<h4>Unregister<a class="headerlink" href="#unregister" title="Permalink to this headline">#</a></h4>
+<p>A system-shared-memory unregister request is made with an HTTP POST to
+an unregister endpoint. In the request the HTTP body must be empty.</p>
+<p>A successful register request is indicated by a 200 HTTP status.  If
+REGION_NAME is provided in the URL the single region is
+unregistered. If REGION_NAME is not provided in the URL all regions
+are unregisered.</p>
+<p>A failed unregister request must be indicated by an HTTP error status
+(typically 400). The HTTP body must contain the
+<code class="docutils literal notranslate"><span class="pre">$system_shared_memory_unregister_error_response</span></code> object.</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span>$system_shared_memory_unregister_error_response =
+{
+  &quot;error&quot;: $string
+}
+</pre></div>
+</div>
+<ul class="simple">
+<li><p>“error” : The descriptive message for the error.</p></li>
+</ul>
+</div>
+</div>
+<div class="section" id="cuda-shared-memory">
+<h3>CUDA Shared Memory<a class="headerlink" href="#cuda-shared-memory" title="Permalink to this headline">#</a></h3>
+<p>The CUDA shared memory extension requires Status, Register and
+Unregister APIs.</p>
+<p>Triton exposes the following URL to register and unregister system
+shared memory regions.</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span>GET v2/cudasharedmemory[/region/${REGION_NAME}]/status
+
+POST v2/cudasharedmemory/region/${REGION_NAME}/register
+
+POST v2/cudasharedmemory[/region/${REGION_NAME}]/unregister
+</pre></div>
+</div>
+<div class="section" id="id1">
+<h4>Status<a class="headerlink" href="#id1" title="Permalink to this headline">#</a></h4>
+<p>A CUDA-shared-memory status request is made with an HTTP GET to the
+status endpoint. In the corresponding response the HTTP body contains
+the response JSON. If REGION_NAME is provided in the URL the response
+includes the status for the corresponding region. If REGION_NAME is
+not provided in the URL the response includes the status for all
+registered regions.</p>
+<p>A successful status request is indicated by a 200 HTTP status
+code. The response object, identified as
+<code class="docutils literal notranslate"><span class="pre">$cuda_shared_memory_status_response</span></code>, is returned in the HTTP body
+for every successful request.</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span>$cuda_shared_memory_status_response =
+[
+  {
+    &quot;name&quot; : $string,
+    &quot;device_id&quot; : $number,
+    &quot;byte_size&quot; : $number
+  },
+  …
+]
+</pre></div>
+</div>
+<ul class="simple">
+<li><p>“name” : The name of the shared memory region.</p></li>
+<li><p>“device_id” : The GPU device ID where the cudaIPC handle was
+created.</p></li>
+<li><p>“byte_size” : The size of the shared memory region, in bytes.</p></li>
+</ul>
+<p>A failed status request must be indicated by an HTTP error status
+(typically 400). The HTTP body must contain the
+<code class="docutils literal notranslate"><span class="pre">$cuda_shared_memory_status_error_response</span></code> object.</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span>$cuda_shared_memory_status_error_response =
+{
+  &quot;error&quot;: $string
+}
+</pre></div>
+</div>
+<ul class="simple">
+<li><p>“error” : The descriptive message for the error.</p></li>
+</ul>
+</div>
+<div class="section" id="id2">
+<h4>Register<a class="headerlink" href="#id2" title="Permalink to this headline">#</a></h4>
+<p>A CUDA-shared-memory register request is made with a HTTP POST to
+the register endpoint. In the corresponding response the HTTP body
+contains the response JSON. A successful register request is indicated
+by a 200 HTTP status code.</p>
+<p>The request object, identified as
+<code class="docutils literal notranslate"><span class="pre">$cuda_shared_memory_register_request</span></code> must be provided in the HTTP
+body.</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span>$cuda_shared_memory_register_request =
+{
+  &quot;raw_handle&quot; : { &quot;b64&quot; : $string },
+  &quot;device_id&quot; : $number,
+  &quot;byte_size&quot; : $number
+}
+</pre></div>
+</div>
+<ul class="simple">
+<li><p>“raw_handle” : The serialized cudaIPC handle, base64 encoded.</p></li>
+<li><p>“device_id” : The GPU device ID where the cudaIPC handle was
+created.</p></li>
+<li><p>“byte_size” : The size of the shared memory region, in bytes.</p></li>
+</ul>
+<p>A failed register request must be indicated by an HTTP error status
+(typically 400). The HTTP body must contain the
+<code class="docutils literal notranslate"><span class="pre">$cuda_shared_memory_register_error_response</span></code> object.</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span>$cuda_shared_memory_register_error_response =
+{
+  &quot;error&quot;: $string
+}
+</pre></div>
+</div>
+<ul class="simple">
+<li><p>“error” : The descriptive message for the error.</p></li>
+</ul>
+</div>
+<div class="section" id="id3">
+<h4>Unregister<a class="headerlink" href="#id3" title="Permalink to this headline">#</a></h4>
+<p>A CUDA-shared-memory unregister request is made with an HTTP POST to
+an unregister endpoint. In the request the HTTP body must be empty.</p>
+<p>A successful register request is indicated by a 200 HTTP status.  If
+REGION_NAME is provided in the URL the single region is
+unregistered. If REGION_NAME is not provided in the URL all regions
+are unregisered.</p>
+<p>A failed unregister request must be indicated by an HTTP error status
+(typically 400). The HTTP body must contain the
+<code class="docutils literal notranslate"><span class="pre">$cuda_shared_memory_unregister_error_response</span></code> object.</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span>$cuda_shared_memory_unregister_error_response =
+{
+  &quot;error&quot;: $string
+}
+</pre></div>
+</div>
+<ul class="simple">
+<li><p>“error” : The descriptive message for the error.</p></li>
+</ul>
+</div>
+</div>
+</div>
+<div class="section" id="grpc">
+<h2>GRPC<a class="headerlink" href="#grpc" title="Permalink to this headline">#</a></h2>
+<p>The shared-memory parameters may be used in the
+ModelInferRequest::InferInputTensor message to indicate that the
+corresponding input is being communicated via shared memory. The
+parameters may be used in the
+ModelInferRequest::InferRequestedOutputTensor message to indicate that
+the requested output should be communicated via shared memory.</p>
+<p>When these parameters are set for an input tensor the “contents” field
+of ModelInferRequest::InferInputTensor must not be set. If the
+“contents” field is set Triton will return an error… When these
+parameters are set for a requested output tensor the “contents” field
+of the ModelInferResponse::InferOutputTensor will not be set in the
+inference response.</p>
+<p>Shared memory regions must be created by the client and then
+registered with Triton before they can be referenced with a
+“shared_memory_region” parameter. The system and CUDA shared-memory
+extensions each require a different set of APIs. For all APIs, errors
+are indicated by the google.rpc.Status returned for the request. The
+OK code indicates success and other codes indicate failure.</p>
+<div class="section" id="id4">
+<h3>System Shared Memory<a class="headerlink" href="#id4" title="Permalink to this headline">#</a></h3>
+<p>The system shared memory extension requires the following API:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span>service GRPCInferenceService
+{
+  …
+
+  // Get the status of all registered system-shared-memory regions.
+  rpc SystemSharedMemoryStatus(SystemSharedMemoryStatusRequest)
+          returns (SystemSharedMemoryStatusResponse) {}
+
+  // Register system-shared-memory region.
+  rpc SystemSharedMemoryRegister(SystemSharedMemoryRegisterRequest)
+          returns (SystemSharedMemoryRegisterResponse) {}
+
+  // Unregister system-shared-memory region.
+  rpc SystemSharedMemoryUnregister(SystemSharedMemoryUnregisterRequest)
+          returns (SystemSharedMemoryUnregisterResponse) {}
+}
+</pre></div>
+</div>
+<div class="section" id="id5">
+<h4>Status<a class="headerlink" href="#id5" title="Permalink to this headline">#</a></h4>
+<p>The system-shared-memory status API provides information about
+registered system shared-memory regions. Errors are indicated by the
+google.rpc.Status returned for the request. The OK code indicates
+success and other codes indicate failure. The request and response
+messages for SystemSharedMemoryStatus are:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">message</span> <span class="n">SystemSharedMemoryStatusRequest</span>
+<span class="p">{</span>
+  <span class="o">//</span> <span class="n">The</span> <span class="n">name</span> <span class="n">of</span> <span class="n">the</span> <span class="n">region</span> <span class="n">to</span> <span class="n">get</span> <span class="n">status</span> <span class="k">for</span><span class="o">.</span> <span class="n">If</span> <span class="n">empty</span> <span class="n">the</span>
+  <span class="o">//</span> <span class="n">status</span> <span class="ow">is</span> <span class="n">returned</span> <span class="k">for</span> <span class="nb">all</span> <span class="n">registered</span> <span class="n">regions</span><span class="o">.</span>
+  <span class="n">string</span> <span class="n">name</span> <span class="o">=</span> <span class="mi">1</span><span class="p">;</span>
+<span class="p">}</span>
+
+<span class="n">message</span> <span class="n">SystemSharedMemoryStatusResponse</span>
+<span class="p">{</span>
+  <span class="o">//</span> <span class="n">Status</span> <span class="k">for</span> <span class="n">a</span> <span class="n">shared</span> <span class="n">memory</span> <span class="n">region</span><span class="o">.</span>
+  <span class="n">message</span> <span class="n">RegionStatus</span> <span class="p">{</span>
+    <span class="o">//</span> <span class="n">The</span> <span class="n">name</span> <span class="k">for</span> <span class="n">the</span> <span class="n">shared</span> <span class="n">memory</span> <span class="n">region</span><span class="o">.</span>
+    <span class="n">string</span> <span class="n">name</span> <span class="o">=</span> <span class="mi">1</span><span class="p">;</span>
+
+    <span class="o">//</span> <span class="n">The</span> <span class="n">key</span> <span class="n">of</span> <span class="n">the</span> <span class="n">underlying</span> <span class="n">memory</span> <span class="nb">object</span> <span class="n">that</span> <span class="n">contains</span> <span class="n">the</span>
+    <span class="o">//</span> <span class="n">shared</span> <span class="n">memory</span> <span class="n">region</span><span class="o">.</span>
+    <span class="n">string</span> <span class="n">key</span> <span class="o">=</span> <span class="mi">2</span><span class="p">;</span>
+
+    <span class="o">//</span> <span class="n">Offset</span><span class="p">,</span> <span class="ow">in</span> <span class="nb">bytes</span><span class="p">,</span> <span class="n">within</span> <span class="n">the</span> <span class="n">underlying</span> <span class="n">memory</span> <span class="nb">object</span> <span class="n">to</span>
+    <span class="o">//</span> <span class="n">the</span> <span class="n">start</span> <span class="n">of</span> <span class="n">the</span> <span class="n">shared</span> <span class="n">memory</span> <span class="n">region</span><span class="o">.</span>
+    <span class="n">uint64</span> <span class="n">offset</span> <span class="o">=</span> <span class="mi">3</span><span class="p">;</span>
+
+    <span class="o">//</span> <span class="n">Size</span> <span class="n">of</span> <span class="n">the</span> <span class="n">shared</span> <span class="n">memory</span> <span class="n">region</span><span class="p">,</span> <span class="ow">in</span> <span class="nb">bytes</span><span class="o">.</span>
+    <span class="n">uint64</span> <span class="n">byte_size</span> <span class="o">=</span> <span class="mi">4</span><span class="p">;</span>
+  <span class="p">}</span>
+
+  <span class="o">//</span> <span class="n">Status</span> <span class="k">for</span> <span class="n">each</span> <span class="n">of</span> <span class="n">the</span> <span class="n">registered</span> <span class="n">regions</span><span class="p">,</span> <span class="n">indexed</span> <span class="n">by</span> <span class="n">region</span> <span class="n">name</span><span class="o">.</span>
+  <span class="nb">map</span><span class="o">&lt;</span><span class="n">string</span><span class="p">,</span> <span class="n">RegionStatus</span><span class="o">&gt;</span> <span class="n">regions</span> <span class="o">=</span> <span class="mi">1</span><span class="p">;</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+</div>
+<div class="section" id="id6">
+<h4>Register<a class="headerlink" href="#id6" title="Permalink to this headline">#</a></h4>
+<p>The system-shared-memory register API is used to register a new
+shared-memory region with Triton. After a region is registered it can
+be used in the “shared_memory_region” parameter for an input or output
+tensor. Errors are indicated by the google.rpc.Status returned for the
+request. The OK code indicates success and other codes indicate
+failure. The request and response messages for
+SystemSharedMemoryRegister are:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">message</span> <span class="n">SystemSharedMemoryRegisterRequest</span>
+<span class="p">{</span>
+  <span class="o">//</span> <span class="n">The</span> <span class="n">name</span> <span class="n">of</span> <span class="n">the</span> <span class="n">region</span> <span class="n">to</span> <span class="n">register</span><span class="o">.</span>
+  <span class="n">string</span> <span class="n">name</span> <span class="o">=</span> <span class="mi">1</span><span class="p">;</span>
+
+  <span class="o">//</span> <span class="n">The</span> <span class="n">key</span> <span class="n">of</span> <span class="n">the</span> <span class="n">underlying</span> <span class="n">memory</span> <span class="nb">object</span> <span class="n">that</span> <span class="n">contains</span> <span class="n">the</span>
+  <span class="o">//</span> <span class="n">shared</span> <span class="n">memory</span> <span class="n">region</span><span class="o">.</span>
+  <span class="n">string</span> <span class="n">key</span> <span class="o">=</span> <span class="mi">2</span><span class="p">;</span>
+
+  <span class="o">//</span> <span class="n">Offset</span><span class="p">,</span> <span class="ow">in</span> <span class="nb">bytes</span><span class="p">,</span> <span class="n">within</span> <span class="n">the</span> <span class="n">underlying</span> <span class="n">memory</span> <span class="nb">object</span> <span class="n">to</span>
+  <span class="o">//</span> <span class="n">the</span> <span class="n">start</span> <span class="n">of</span> <span class="n">the</span> <span class="n">shared</span> <span class="n">memory</span> <span class="n">region</span><span class="o">.</span>
+  <span class="n">uint64</span> <span class="n">offset</span> <span class="o">=</span> <span class="mi">3</span><span class="p">;</span>
+
+  <span class="o">//</span> <span class="n">Size</span> <span class="n">of</span> <span class="n">the</span> <span class="n">shared</span> <span class="n">memory</span> <span class="n">region</span><span class="p">,</span> <span class="ow">in</span> <span class="nb">bytes</span><span class="o">.</span>
+  <span class="n">uint64</span> <span class="n">byte_size</span> <span class="o">=</span> <span class="mi">4</span><span class="p">;</span>
+<span class="p">}</span>
+
+<span class="n">message</span> <span class="n">SystemSharedMemoryRegisterResponse</span>
+<span class="p">{</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+</div>
+<div class="section" id="id7">
+<h4>Unregister<a class="headerlink" href="#id7" title="Permalink to this headline">#</a></h4>
+<p>The system-shared-memory unregister API provides unregisters a
+shared-memory region from Triton. After a region is
+unregistered it can no longer be used to communicate input and output
+tensor contents. Errors are indicated by the google.rpc.Status
+returned for the request. The OK code indicates success and other
+codes indicate failure. The request and response messages for
+SystemSharedMemoryStatus are:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">message</span> <span class="n">SystemSharedMemoryUnregisterRequest</span>
+<span class="p">{</span>
+  <span class="o">//</span> <span class="n">The</span> <span class="n">name</span> <span class="n">of</span> <span class="n">the</span> <span class="n">region</span> <span class="n">to</span> <span class="n">unregister</span><span class="o">.</span> <span class="n">If</span> <span class="n">empty</span> <span class="nb">all</span> <span class="n">system</span> <span class="n">shared</span><span class="o">-</span><span class="n">memory</span>
+  <span class="o">//</span> <span class="n">regions</span> <span class="n">are</span> <span class="n">unregistered</span><span class="o">.</span>
+  <span class="n">string</span> <span class="n">name</span> <span class="o">=</span> <span class="mi">1</span><span class="p">;</span>
+<span class="p">}</span>
+
+<span class="n">message</span> <span class="n">SystemSharedMemoryUnregisterResponse</span>
+<span class="p">{</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+</div>
+</div>
+<div class="section" id="id8">
+<h3>CUDA Shared Memory<a class="headerlink" href="#id8" title="Permalink to this headline">#</a></h3>
+<p>The CUDA shared memory extension requires the following API:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span>service GRPCInferenceService
+{
+  …
+
+  // Get the status of all registered CUDA-shared-memory regions.
+  rpc CudaSharedMemoryStatus(CudaSharedMemoryStatusRequest)
+          returns (CudaSharedMemoryStatusResponse) {}
+
+  // Register CUDA-shared-memory region.
+  rpc CudaSharedMemoryRegister(CudaSharedMemoryRegisterRequest)
+          returns (CudaSharedMemoryRegisterResponse) {}
+
+  // Unregister CUDA-shared-memory region.
+  rpc CudaSharedMemorUnregister(CudaSharedMemoryUnregisterRequest)
+          returns (CudaSharedMemoryUnregisterResponse) {}
+}
+</pre></div>
+</div>
+<div class="section" id="id9">
+<h4>Status<a class="headerlink" href="#id9" title="Permalink to this headline">#</a></h4>
+<p>The CUDA-shared-memory status API provides information about
+registered CUDA shared-memory regions. Errors are indicated by the
+google.rpc.Status returned for the request. The OK code indicates
+success and other codes indicate failure. The request and response
+messages for CudaSharedMemoryStatus are:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">message</span> <span class="n">CudaSharedMemoryStatusRequest</span>
+<span class="p">{</span>
+  <span class="o">//</span> <span class="n">The</span> <span class="n">name</span> <span class="n">of</span> <span class="n">the</span> <span class="n">region</span> <span class="n">to</span> <span class="n">get</span> <span class="n">status</span> <span class="k">for</span><span class="o">.</span> <span class="n">If</span> <span class="n">empty</span> <span class="n">the</span>
+  <span class="o">//</span> <span class="n">status</span> <span class="ow">is</span> <span class="n">returned</span> <span class="k">for</span> <span class="nb">all</span> <span class="n">registered</span> <span class="n">regions</span><span class="o">.</span>
+  <span class="n">string</span> <span class="n">name</span> <span class="o">=</span> <span class="mi">1</span><span class="p">;</span>
+<span class="p">}</span>
+
+<span class="n">message</span> <span class="n">CudaSharedMemoryStatusResponse</span>
+<span class="p">{</span>
+  <span class="o">//</span> <span class="n">Status</span> <span class="k">for</span> <span class="n">a</span> <span class="n">shared</span> <span class="n">memory</span> <span class="n">region</span><span class="o">.</span>
+  <span class="n">message</span> <span class="n">RegionStatus</span> <span class="p">{</span>
+    <span class="o">//</span> <span class="n">The</span> <span class="n">name</span> <span class="k">for</span> <span class="n">the</span> <span class="n">shared</span> <span class="n">memory</span> <span class="n">region</span><span class="o">.</span>
+    <span class="n">string</span> <span class="n">name</span> <span class="o">=</span> <span class="mi">1</span><span class="p">;</span>
+
+    <span class="o">//</span> <span class="n">The</span> <span class="n">GPU</span> <span class="n">device</span> <span class="n">ID</span> <span class="n">where</span> <span class="n">the</span> <span class="n">cudaIPC</span> <span class="n">handle</span> <span class="n">was</span> <span class="n">created</span><span class="o">.</span>
+    <span class="n">uint64</span> <span class="n">device_id</span> <span class="o">=</span> <span class="mi">2</span><span class="p">;</span>
+
+    <span class="o">//</span> <span class="n">Size</span> <span class="n">of</span> <span class="n">the</span> <span class="n">shared</span> <span class="n">memory</span> <span class="n">region</span><span class="p">,</span> <span class="ow">in</span> <span class="nb">bytes</span><span class="o">.</span>
+    <span class="n">uint64</span> <span class="n">byte_size</span> <span class="o">=</span> <span class="mi">3</span><span class="p">;</span>
+  <span class="p">}</span>
+
+  <span class="o">//</span> <span class="n">Status</span> <span class="k">for</span> <span class="n">each</span> <span class="n">of</span> <span class="n">the</span> <span class="n">registered</span> <span class="n">regions</span><span class="p">,</span> <span class="n">indexed</span> <span class="n">by</span> <span class="n">region</span> <span class="n">name</span><span class="o">.</span>
+  <span class="nb">map</span><span class="o">&lt;</span><span class="n">string</span><span class="p">,</span> <span class="n">RegionStatus</span><span class="o">&gt;</span> <span class="n">regions</span> <span class="o">=</span> <span class="mi">1</span><span class="p">;</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+</div>
+<div class="section" id="id10">
+<h4>Register<a class="headerlink" href="#id10" title="Permalink to this headline">#</a></h4>
+<p>The CUDA-shared-memory register API is used to register a new
+shared-memory region with Triton. After a region is
+registered it can be used in the “shared_memory_region” parameter for
+an input or output tensor. Errors are indicated by the
+google.rpc.Status returned for the request. The OK code indicates
+success and other codes indicate failure. The request and response
+messages for CudaSharedMemoryRegister are:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">message</span> <span class="n">CudaSharedMemoryRegisterRequest</span>
+<span class="p">{</span>
+  <span class="o">//</span> <span class="n">The</span> <span class="n">name</span> <span class="n">of</span> <span class="n">the</span> <span class="n">region</span> <span class="n">to</span> <span class="n">register</span><span class="o">.</span>
+  <span class="n">string</span> <span class="n">name</span> <span class="o">=</span> <span class="mi">1</span><span class="p">;</span>
+
+  <span class="o">//</span> <span class="n">The</span> <span class="n">raw</span> <span class="n">serialized</span> <span class="n">cudaIPC</span> <span class="n">handle</span><span class="o">.</span>
+  <span class="nb">bytes</span> <span class="n">raw_handle</span> <span class="o">=</span> <span class="mi">2</span><span class="p">;</span>
+
+  <span class="o">//</span> <span class="n">The</span> <span class="n">GPU</span> <span class="n">device</span> <span class="n">ID</span> <span class="n">on</span> <span class="n">which</span> <span class="n">the</span> <span class="n">cudaIPC</span> <span class="n">handle</span> <span class="n">was</span> <span class="n">created</span><span class="o">.</span>
+  <span class="n">int64</span> <span class="n">device_id</span> <span class="o">=</span> <span class="mi">3</span><span class="p">;</span>
+
+  <span class="o">//</span> <span class="n">Size</span> <span class="n">of</span> <span class="n">the</span> <span class="n">shared</span> <span class="n">memory</span> <span class="n">region</span><span class="p">,</span> <span class="ow">in</span> <span class="nb">bytes</span><span class="o">.</span>
+  <span class="n">uint64</span> <span class="n">byte_size</span> <span class="o">=</span> <span class="mi">4</span><span class="p">;</span>
+<span class="p">}</span>
+
+<span class="n">message</span> <span class="n">CudaSharedMemoryRegisterResponse</span>
+<span class="p">{</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+</div>
+<div class="section" id="id11">
+<h4>Unregister<a class="headerlink" href="#id11" title="Permalink to this headline">#</a></h4>
+<p>The CUDA-shared-memory unregister API provides unregisters a
+shared-memory region from Triton. After a region is unregistered it
+can no longer be used to communicate input and output tensor
+contents. Errors are indicated by the google.rpc.Status returned for
+the request. The OK code indicates success and other codes indicate
+failure. The request and response messages for CudaSharedMemoryStatus
+are:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">message</span> <span class="n">CudaSharedMemoryUnregisterRequest</span>
+<span class="p">{</span>
+  <span class="o">//</span> <span class="n">The</span> <span class="n">name</span> <span class="n">of</span> <span class="n">the</span> <span class="n">region</span> <span class="n">to</span> <span class="n">unregister</span><span class="o">.</span> <span class="n">If</span> <span class="n">empty</span> <span class="nb">all</span> <span class="n">CUDA</span> <span class="n">shared</span><span class="o">-</span><span class="n">memory</span>
+  <span class="o">//</span> <span class="n">regions</span> <span class="n">are</span> <span class="n">unregistered</span><span class="o">.</span>
+  <span class="n">string</span> <span class="n">name</span> <span class="o">=</span> <span class="mi">1</span><span class="p">;</span>
+<span class="p">}</span>
+
+<span class="n">message</span> <span class="n">CudaSharedMemoryUnregisterResponse</span>
+<span class="p">{</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+</div>
+</div>
+</div>
+</div>
+
+<div class="section">
+   
+</div>
+
+              </div>
+              
+            </main>
+            <footer class="footer-article noprint">
+                
+    <!-- Previous / next buttons -->
+<div class='prev-next-area'>
+    <a class='left-prev' id="prev-link" href="extension_sequence.html" title="previous page">
+        <i class="fas fa-angle-left"></i>
+        <div class="prev-next-info">
+            <p class="prev-next-subtitle">previous</p>
+            <p class="prev-next-title">Sequence Extension</p>
+        </div>
+    </a>
+    <a class='right-next' id="next-link" href="extension_statistics.html" title="next page">
+    <div class="prev-next-info">
+        <p class="prev-next-subtitle">next</p>
+        <p class="prev-next-title">Statistics Extension</p>
+    </div>
+    <i class="fas fa-angle-right"></i>
+    </a>
+</div>
+            </footer>
+        </div>
+    </div>
+    <div class="footer-content row">
+        <footer class="col footer"><p>
+  
+    By NVIDIA<br/>
+  
+      &copy; Copyright 2022 NVIDIA CORPORATION &amp; AFFILIATES. All rights reserved.<br/>
+    Last updated on Oct 05, 2022.<br/>
+</p>
+        </footer>
+    </div>
+    
+</div>
+
+
+      </div>
+    </div>
+  
+  <!-- Scripts loaded after <body> so the DOM is not blocked -->
+  <script src="../_static/scripts/pydata-sphinx-theme.js?digest=1999514e3f237ded88cf"></script>
+
+
+<script type="text/javascript">_satellite.pageBottom();</script>
+  </body>
+</html>

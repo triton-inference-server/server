@@ -1,0 +1,916 @@
+
+<!DOCTYPE html>
+
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Deploying your trained model using Triton &#8212; NVIDIA Triton Inference Server</title>
+    
+  <!-- Loaded before other Sphinx assets -->
+  <link href="../_static/styles/theme.css?digest=1999514e3f237ded88cf" rel="stylesheet">
+<link href="../_static/styles/pydata-sphinx-theme.css?digest=1999514e3f237ded88cf" rel="stylesheet">
+
+    
+  <link rel="stylesheet"
+    href="../_static/vendor/fontawesome/5.13.0/css/all.min.css">
+  <link rel="preload" as="font" type="font/woff2" crossorigin
+    href="../_static/vendor/fontawesome/5.13.0/webfonts/fa-solid-900.woff2">
+  <link rel="preload" as="font" type="font/woff2" crossorigin
+    href="../_static/vendor/fontawesome/5.13.0/webfonts/fa-brands-400.woff2">
+
+    <link rel="stylesheet" type="text/css" href="../_static/pygments.css" />
+    <link rel="stylesheet" href="../_static/styles/sphinx-book-theme.css?digest=62ba249389abaaa9ffc34bf36a076bdc1d65ee18" type="text/css" />
+    <link rel="stylesheet" type="text/css" href="../_static/mystnb.4510f1fc1dee50b3e5859aac5469c37c29e427902b24a333a5f9fcb2f0b3ac41.css" />
+    <link rel="stylesheet" type="text/css" href="../_static/copybutton.css" />
+    <link rel="stylesheet" type="text/css" href="../_static/tabs.css" />
+    <link rel="stylesheet" type="text/css" href="../_static/custom.css" />
+    <link rel="stylesheet" type="text/css" href="../_static/design-style.4045f2051d55cab465a707391d5b2007.min.css" />
+    
+  <!-- Pre-loaded scripts that we'll load fully later -->
+  <link rel="preload" as="script" href="../_static/scripts/pydata-sphinx-theme.js?digest=1999514e3f237ded88cf">
+
+    <script data-url_root="../" id="documentation_options" src="../_static/documentation_options.js"></script>
+    <script src="../_static/jquery.js"></script>
+    <script src="../_static/underscore.js"></script>
+    <script src="../_static/doctools.js"></script>
+    <script src="../_static/clipboard.min.js"></script>
+    <script src="../_static/copybutton.js"></script>
+    <script src="https://js.hcaptcha.com/1/api.js"></script>
+    <script src="//assets.adobedtm.com/5d4962a43b79/c1061d2c5e7b/launch-191c2462b890.min.js"></script>
+    <script src="../_static/scripts/sphinx-book-theme.js?digest=f31d14ad54b65d19161ba51d4ffff3a77ae00456"></script>
+    <script src="../_static/design-tabs.js"></script>
+    <link rel="canonical" href="https://docs.nvidia.com/deeplearning/triton-inference-server/user-guide/docs/user_guide/performance_tuning.html" />
+    <link rel="shortcut icon" href="../_static/nvidia-logo-vert-rgb-blk-for-screen.png"/>
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" />
+    <link rel="next" title="Triton Architecture" href="architecture.html" />
+    <link rel="prev" title="Quickstart" href="../getting_started/quickstart.html" /> 
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="docsearch:language" content="None">
+    
+
+    <!-- Google Analytics -->
+      
+<style type="text/css">
+  ul.ablog-archive {
+    list-style: none;
+    overflow: auto;
+    margin-left: 0px;
+  }
+  ul.ablog-archive li {
+    float: left;
+    margin-right: 5px;
+    font-size: 80%;
+  }
+  ul.postlist a {
+    font-style: italic;
+  }
+  ul.postlist-style-disc {
+    list-style-type: disc;
+  }
+  ul.postlist-style-none {
+    list-style-type: none;
+  }
+  ul.postlist-style-circle {
+    list-style-type: circle;
+  }
+</style>
+
+  </head>
+  <body data-spy="scroll" data-target="#bd-toc-nav" data-offset="60">
+<!-- Checkboxes to toggle the left sidebar -->
+<input type="checkbox" class="sidebar-toggle" name="__navigation" id="__navigation" aria-label="Toggle navigation sidebar">
+<label class="overlay overlay-navbar" for="__navigation">
+    <div class="visually-hidden">Toggle navigation sidebar</div>
+</label>
+<!-- Checkboxes to toggle the in-page toc -->
+<input type="checkbox" class="sidebar-toggle" name="__page-toc" id="__page-toc" aria-label="Toggle in-page Table of Contents">
+<label class="overlay overlay-pagetoc" for="__page-toc">
+    <div class="visually-hidden">Toggle in-page Table of Contents</div>
+</label>
+<!-- Headers at the top -->
+<div class="announcement header-item noprint"></div>
+<div class="header header-item noprint"></div>
+
+    
+    <div class="container-fluid" id="banner"></div>
+
+    
+
+    <div class="container-xl">
+      <div class="row">
+          
+<!-- Sidebar -->
+<div class="bd-sidebar noprint" id="site-navigation">
+    <div class="bd-sidebar__content">
+        <div class="bd-sidebar__top"><div class="navbar-brand-box">
+    <a class="navbar-brand text-wrap" href="../index.html">
+      
+        <!-- `logo` is deprecated in Sphinx 4.0, so remove this when we stop supporting 3 -->
+        
+      
+      
+      <img src="../_static/nvidia-logo-horiz-rgb-blk-for-screen.png" class="logo" alt="logo">
+      
+      
+      <h1 class="site-logo" id="site-title">NVIDIA Triton Inference Server</h1>
+      
+    </a>
+</div><form class="bd-search d-flex align-items-center" action="../search.html" method="get">
+  <i class="icon fas fa-search"></i>
+  <input type="search" class="form-control" name="q" id="search-input" placeholder="Search the docs ..." aria-label="Search the docs ..." autocomplete="off" >
+</form><nav class="bd-links" id="bd-docs-nav" aria-label="Main">
+    <div class="bd-toc-item active">
+        <p aria-level="2" class="caption" role="heading">
+ <span class="caption-text">
+  Getting Started
+ </span>
+</p>
+<ul class="nav bd-sidenav">
+ <li class="toctree-l1">
+  <a class="reference internal" href="../getting_started/quickstart.html">
+   Quickstart
+  </a>
+ </li>
+</ul>
+<p aria-level="2" class="caption" role="heading">
+ <span class="caption-text">
+  User Guide
+ </span>
+</p>
+<ul class="current nav bd-sidenav">
+ <li class="toctree-l1 current active">
+  <a class="current reference internal" href="#">
+   Deploying your trained model using Triton
+  </a>
+ </li>
+ <li class="toctree-l1">
+  <a class="reference internal" href="architecture.html">
+   Triton Architecture
+  </a>
+ </li>
+ <li class="toctree-l1">
+  <a class="reference internal" href="model_repository.html">
+   Model Repository
+  </a>
+ </li>
+ <li class="toctree-l1">
+  <a class="reference internal" href="../customization_guide/repository_agents.html">
+   Repository Agent
+  </a>
+ </li>
+ <li class="toctree-l1">
+  <a class="reference internal" href="model_configuration.html">
+   Model Configuration
+  </a>
+ </li>
+ <li class="toctree-l1">
+  <a class="reference internal" href="optimization.html">
+   Optimization
+  </a>
+ </li>
+ <li class="toctree-l1">
+  <a class="reference internal" href="ragged_batching.html">
+   Ragged Batching
+  </a>
+ </li>
+ <li class="toctree-l1">
+  <a class="reference internal" href="rate_limiter.html">
+   Rate Limiter
+  </a>
+ </li>
+ <li class="toctree-l1">
+  <a class="reference internal" href="model_analyzer.html">
+   Model Analyzer
+  </a>
+ </li>
+ <li class="toctree-l1">
+  <a class="reference internal" href="perf_analyzer.html">
+   Performance Analyzer
+  </a>
+ </li>
+ <li class="toctree-l1">
+  <a class="reference internal" href="model_management.html">
+   Model Management
+  </a>
+ </li>
+ <li class="toctree-l1">
+  <a class="reference internal" href="custom_operations.html">
+   Custom Operations
+  </a>
+ </li>
+ <li class="toctree-l1">
+  <a class="reference internal" href="decoupled_models.html">
+   Decoupled Backends and Models
+  </a>
+ </li>
+ <li class="toctree-l1">
+  <a class="reference internal" href="response_cache.html">
+   Triton Response Cache
+  </a>
+ </li>
+ <li class="toctree-l1">
+  <a class="reference internal" href="metrics.html">
+   Metrics
+  </a>
+ </li>
+ <li class="toctree-l1">
+  <a class="reference internal" href="trace.html">
+   Triton Server Trace
+  </a>
+ </li>
+ <li class="toctree-l1">
+  <a class="reference internal" href="jetson.html">
+   Triton Inference Server Support for Jetson and JetPack
+  </a>
+ </li>
+ <li class="toctree-l1">
+  <a class="reference internal" href="v1_to_v2.html">
+   Version 1 to Version 2 Migration
+  </a>
+ </li>
+</ul>
+<ul class="nav bd-sidenav">
+ <li class="toctree-l1">
+  <a class="reference internal" href="faq.html">
+   FAQ
+  </a>
+ </li>
+</ul>
+<p aria-level="2" class="caption" role="heading">
+ <span class="caption-text">
+  Protocol Guides
+ </span>
+</p>
+<ul class="nav bd-sidenav">
+ <li class="toctree-l1">
+  <a class="reference internal" href="../customization_guide/inference_protocols.html">
+   Inference Protocols and APIs
+  </a>
+ </li>
+ <li class="toctree-l1">
+  <a class="reference internal" href="../protocol/extension_binary_data.html">
+   Binary Tensor Data Extension
+  </a>
+ </li>
+ <li class="toctree-l1">
+  <a class="reference internal" href="../protocol/extension_classification.html">
+   Classification Extension
+  </a>
+ </li>
+ <li class="toctree-l1">
+  <a class="reference internal" href="../protocol/extension_logging.html">
+   Logging Extension
+  </a>
+ </li>
+ <li class="toctree-l1">
+  <a class="reference internal" href="../protocol/extension_model_configuration.html">
+   Model Configuration Extension
+  </a>
+ </li>
+ <li class="toctree-l1">
+  <a class="reference internal" href="../protocol/extension_model_repository.html">
+   Model Repository Extension
+  </a>
+ </li>
+ <li class="toctree-l1">
+  <a class="reference internal" href="../protocol/extension_schedule_policy.html">
+   Schedule Policy Extension
+  </a>
+ </li>
+ <li class="toctree-l1">
+  <a class="reference internal" href="../protocol/extension_sequence.html">
+   Sequence Extension
+  </a>
+ </li>
+ <li class="toctree-l1">
+  <a class="reference internal" href="../protocol/extension_shared_memory.html">
+   Shared-Memory Extension
+  </a>
+ </li>
+ <li class="toctree-l1">
+  <a class="reference internal" href="../protocol/extension_statistics.html">
+   Statistics Extension
+  </a>
+ </li>
+ <li class="toctree-l1">
+  <a class="reference internal" href="../protocol/extension_trace.html">
+   Trace Extension
+  </a>
+ </li>
+</ul>
+<p aria-level="2" class="caption" role="heading">
+ <span class="caption-text">
+  Customization Guide
+ </span>
+</p>
+<ul class="nav bd-sidenav">
+ <li class="toctree-l1">
+  <a class="reference internal" href="../customization_guide/build.html">
+   Building Triton
+  </a>
+ </li>
+ <li class="toctree-l1">
+  <a class="reference internal" href="../customization_guide/compose.html">
+   Customize Triton Container
+  </a>
+ </li>
+ <li class="toctree-l1">
+  <a class="reference internal" href="../customization_guide/test.html">
+   Testing Triton
+  </a>
+ </li>
+</ul>
+<p aria-level="2" class="caption" role="heading">
+ <span class="caption-text">
+  Examples
+ </span>
+</p>
+<ul class="nav bd-sidenav">
+ <li class="toctree-l1">
+  <a class="reference internal" href="../examples/jetson/README.html">
+   Using Triton Inference Server as a shared library for execution on Jetson
+  </a>
+ </li>
+ <li class="toctree-l1">
+  <a class="reference internal" href="../examples/jetson/concurrency_and_dynamic_batching/README.html">
+   Concurrent inference and dynamic batching
+  </a>
+ </li>
+</ul>
+
+    </div>
+</nav></div>
+        <div class="bd-sidebar__bottom">
+             <!-- To handle the deprecated key -->
+            
+        </div>
+    </div>
+    <div id="rtd-footer-container"></div>
+</div>
+
+
+          
+
+
+          
+<!-- A tiny helper pixel to detect if we've scrolled -->
+<div class="sbt-scroll-pixel-helper"></div>
+<!-- Main content -->
+<div class="col py-0 content-container">
+    
+    <div class="header-article row sticky-top noprint">
+        
+
+
+
+<div class="col py-1 d-flex header-article-main">
+    <div class="header-article__left">
+        
+        <label for="__navigation"
+  class="headerbtn"
+  data-toggle="tooltip"
+data-placement="right"
+title="Toggle navigation"
+>
+  
+
+<span class="headerbtn__icon-container">
+  <i class="fas fa-bars"></i>
+  </span>
+
+</label>
+
+        
+    </div>
+    <div class="header-article__right">
+<button onclick="toggleFullScreen()"
+  class="headerbtn"
+  data-toggle="tooltip"
+data-placement="bottom"
+title="Fullscreen mode"
+>
+  
+
+<span class="headerbtn__icon-container">
+  <i class="fas fa-expand"></i>
+  </span>
+
+</button>
+
+<div class="menu-dropdown menu-dropdown-repository-buttons">
+  <button class="headerbtn menu-dropdown__trigger"
+      aria-label="Source repositories">
+      <i class="fab fa-github"></i>
+  </button>
+  <div class="menu-dropdown__content">
+    <ul>
+      <li>
+        <a href="https://github.com/triton-inference-server/server"
+   class="headerbtn"
+   data-toggle="tooltip"
+data-placement="left"
+title="Source repository"
+>
+  
+
+<span class="headerbtn__icon-container">
+  <i class="fab fa-github"></i>
+  </span>
+<span class="headerbtn__text-container">repository</span>
+</a>
+
+      </li>
+      
+      <li>
+        <a href="https://github.com/triton-inference-server/server/issues/new?title=Issue%20on%20page%20%2Fuser_guide/performance_tuning.html&body=Your%20issue%20content%20here."
+   class="headerbtn"
+   data-toggle="tooltip"
+data-placement="left"
+title="Open an issue"
+>
+  
+
+<span class="headerbtn__icon-container">
+  <i class="fas fa-lightbulb"></i>
+  </span>
+<span class="headerbtn__text-container">open issue</span>
+</a>
+
+      </li>
+      
+    </ul>
+  </div>
+</div>
+<label for="__page-toc"
+  class="headerbtn headerbtn-page-toc"
+  
+>
+  
+
+<span class="headerbtn__icon-container">
+  <i class="fas fa-list"></i>
+  </span>
+
+</label>
+
+    </div>
+</div>
+
+<!-- Table of contents -->
+<div class="col-md-3 bd-toc show noprint">
+    <div class="tocsection onthispage pt-5 pb-3">
+        <i class="fas fa-list"></i> Contents
+    </div>
+    <nav id="bd-toc-nav" aria-label="Page">
+        <ul class="visible nav section-nav flex-column">
+ <li class="toc-h2 nav-item toc-entry">
+  <a class="reference internal nav-link" href="#overview">
+   Overview
+  </a>
+  <ul class="visible nav section-nav flex-column">
+   <li class="toc-h3 nav-item toc-entry">
+    <a class="reference internal nav-link" href="#other-areas-of-interest">
+     Other Areas of Interest
+    </a>
+   </li>
+  </ul>
+ </li>
+ <li class="toc-h2 nav-item toc-entry">
+  <a class="reference internal nav-link" href="#end-to-end-example">
+   End-to-end Example
+  </a>
+ </li>
+</ul>
+
+    </nav>
+</div>
+    </div>
+    <div class="article row">
+        <div class="col pl-md-3 pl-lg-5 content-container">
+            <!-- Table of contents that is only displayed when printing the page -->
+            <div id="jb-print-docs-body" class="onlyprint">
+                <h1>Deploying your trained model using Triton</h1>
+                <!-- Table of contents -->
+                <div id="print-main-content">
+                    <div id="jb-print-toc">
+                        
+                        <div>
+                            <h2> Contents </h2>
+                        </div>
+                        <nav aria-label="Page">
+                            <ul class="visible nav section-nav flex-column">
+ <li class="toc-h2 nav-item toc-entry">
+  <a class="reference internal nav-link" href="#overview">
+   Overview
+  </a>
+  <ul class="visible nav section-nav flex-column">
+   <li class="toc-h3 nav-item toc-entry">
+    <a class="reference internal nav-link" href="#other-areas-of-interest">
+     Other Areas of Interest
+    </a>
+   </li>
+  </ul>
+ </li>
+ <li class="toc-h2 nav-item toc-entry">
+  <a class="reference internal nav-link" href="#end-to-end-example">
+   End-to-end Example
+  </a>
+ </li>
+</ul>
+
+                        </nav>
+                    </div>
+                </div>
+            </div>
+            <main id="main-content" role="main">
+                
+              <div>
+                 <!--
+# Copyright 2022, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+#
+# Redistribution and use in source and binary forms, with or without
+# modification, are permitted provided that the following conditions
+# are met:
+#  * Redistributions of source code must retain the above copyright
+#    notice, this list of conditions and the following disclaimer.
+#  * Redistributions in binary form must reproduce the above copyright
+#    notice, this list of conditions and the following disclaimer in the
+#    documentation and/or other materials provided with the distribution.
+#  * Neither the name of NVIDIA CORPORATION nor the names of its
+#    contributors may be used to endorse or promote products derived
+#    from this software without specific prior written permission.
+#
+# THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS ``AS IS'' AND ANY
+# EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+# IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR
+# PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL THE COPYRIGHT OWNER OR
+# CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL,
+# EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
+# PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR
+# PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY
+# OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+# (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+# OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+-->
+<div class="tex2jax_ignore mathjax_ignore section" id="deploying-your-trained-model-using-triton">
+<h1>Deploying your trained model using Triton<a class="headerlink" href="#deploying-your-trained-model-using-triton" title="Permalink to this headline">#</a></h1>
+<p>Given a trained model, how do I deploy it at-scale with an optimal configuration using Triton Inference Server?
+This document is here to help answer that.</p>
+<p>For those who like a <a class="reference internal" href="#overview"><span class="std std-doc">high level overview</span></a>, below is the common flow for most use cases.</p>
+<p>For those who wish to jump right in, skip to the <a class="reference internal" href="#end-to-end-example"><span class="std std-doc">end-to-end example</span></a>.</p>
+<div class="section" id="overview">
+<h2>Overview<a class="headerlink" href="#overview" title="Permalink to this headline">#</a></h2>
+<ol class="arabic">
+<li><p>Is my model compatible with Triton?</p>
+<ul class="simple">
+<li><p>If your model falls under one of Triton’s <a class="reference external" href="https://github.com/triton-inference-server/backend">supported backends</a>, then we can simply try to deploy the model as described in the <a class="reference internal" href="../getting_started/quickstart.html"><span class="doc std std-doc">Quickstart</span></a> guide.
+For the ONNXRuntime, TensorFlow SavedModel, and TensorRT backends, the minimal model configuration can be inferred from the model using Triton’s <a class="reference internal" href="model_configuration.html#auto-generated-model-configuration"><span class="std std-doc">AutoComplete</span></a> feature.
+This means that a <code class="docutils literal notranslate"><span class="pre">config.pbtxt</span></code> may still be provided, but is not required unless you want to explicitly set certain parameters.
+Additionally, by enabling verbose logging via <code class="docutils literal notranslate"><span class="pre">--log-verbose=1</span></code>, you can see the complete config that Triton sees internally in the server log output.
+For other backends, refer to the <a class="reference internal" href="model_configuration.html#minimal-model-configuration"><span class="std std-doc">Minimal Model Configuration</span></a> required to get started.</p></li>
+<li><p>If your model does not come from a supported backend, you can look into the <a class="reference external" href="https://github.com/triton-inference-server/python_backend">Python Backend</a> or writing a <a class="reference external" href="https://github.com/triton-inference-server/backend/blob/main/examples/README.md">Custom C++ Backend</a> to support your model.
+The Python Backend provides a simple interface to execute requests through a generic python script, but may not be as performant as a Custom C++ Backend.
+Depending on your use case, the Python Backend performance may be a sufficient tradeoff for the simplicity of implementation.</p></li>
+</ul>
+</li>
+<li><p>Can I run inference on my served model?</p>
+<ul class="simple">
+<li><p>Assuming you were able to load your model on Triton, the next step is to verify that we can run inference requests and get a baseline performance benchmark of your model.
+Triton’s <a class="reference internal" href="perf_analyzer.html"><span class="doc std std-doc">Perf Analyzer</span></a> tool specifically fits this purpose.
+Here is a simplified output for demonstration purposes:</p></li>
+</ul>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span># NOTE: &quot;my_model&quot; represents a model currently being served by Triton
+$ perf_analyzer -m my_model
+...
+
+Inferences/Second vs. Client Average Batch Latency
+Concurrency: 1, throughput: 482.8 infer/sec, latency 12613 usec
+</pre></div>
+</div>
+<ul class="simple">
+<li><p>This gives us a sanity test that we are able to successfully form input requests and receive output responses to communicate with the model backend via Triton APIs.</p></li>
+<li><p>If Perf Analyzer fails to send requests and it is unclear from the error how to proceed, then you may want to sanity check that your model <code class="docutils literal notranslate"><span class="pre">config.pbtxt</span></code> inputs/outputs match what the model expects.
+If the config is correct, check that the model runs successfully using its original framework directly.
+If you don’t have your own script or tool to do so, <a class="reference external" href="https://github.com/NVIDIA/TensorRT/tree/main/tools/Polygraphy">Polygraphy</a> is a useful tool to run sample inferences on your model via various frameworks.
+Currently, Polygraphy supports ONNXRuntime, TensorRT, and TensorFlow 1.x.</p></li>
+<li><p>The definition of “performing well” is subject to change for each use case.
+Some common metrics are throughput, latency, and GPU utilization.
+There are many variables that can be tweaked just within your model configuration (<code class="docutils literal notranslate"><span class="pre">config.pbtxt</span></code>) to obtain different results.</p></li>
+<li><p>As your model, config, or use case evolves, <a class="reference internal" href="perf_analyzer.html"><span class="doc std std-doc">Perf Analyzer</span></a> is a great tool to quickly verify model functionality and performance.</p></li>
+</ul>
+</li>
+<li><p>How can I improve my model performance?</p>
+<ul class="simple">
+<li><p>To further understand the best model configuration you can provide to Triton for your use case, Triton’s <a class="reference external" href="https://github.com/triton-inference-server/model_analyzer">Model Analyzer</a> tool can help.
+Model Analyzer can automatically or <a class="reference external" href="https://github.com/triton-inference-server/model_analyzer/blob/main/docs/config_search.md">manually</a> search through config combinations to find the optimal triton configuration to meet your constraints.
+After running Model Analyzer to find the optimal configurations for your model/use case, you can transfer the generated config files to your <a class="reference internal" href="model_repository.html"><span class="doc std std-doc">Model Repository</span></a>.
+Model Analyzer provides a <a class="reference external" href="https://github.com/triton-inference-server/model_analyzer/blob/main/docs/quick_start.md">Quickstart</a> guide with some examples to walk through.</p></li>
+<li><p>Upon serving the model with the newly optimized configuration file found by Model Analyzer and running Perf Analyzer again, you should expect to find better performance numbers in most cases compared to a default config.</p></li>
+<li><p>Some parameters that can be tuned for a model may not be exposed to Model Analyzer’s automatic search since they don’t apply to all models.
+For instance, <a class="reference external" href="https://github.com/triton-inference-server/backend">backends</a> can expose backend-specific configuration options that can be tuned as well.
+The <a class="reference external" href="https://github.com/triton-inference-server/onnxruntime_backend">ONNXRuntime Backend</a>, for example, has several <a class="reference external" href="https://github.com/triton-inference-server/onnxruntime_backend#model-config-options">parameters</a> that affect the level of parallelization when executing inference on a model.
+These backend-specific options may be worth investigating if the defaults are not providing sufficient performance.
+To tune custom sets of parameters, Model Analyzer supports <a class="reference external" href="https://github.com/triton-inference-server/model_analyzer/blob/main/docs/config_search.md">Manual Configuration Search</a>.</p></li>
+<li><p>To learn more about further optimizations for your model configuration, see the <a class="reference internal" href="optimization.html"><span class="doc std std-doc">Optimization</span></a> docs.</p></li>
+</ul>
+</li>
+</ol>
+<div class="section" id="other-areas-of-interest">
+<h3>Other Areas of Interest<a class="headerlink" href="#other-areas-of-interest" title="Permalink to this headline">#</a></h3>
+<ol class="arabic simple">
+<li><p>My model performs slowly when it is first loaded by Triton (cold-start penalty), what do I do?</p>
+<ul class="simple">
+<li><p>Triton exposes the ability to run <a class="reference internal" href="model_configuration.html#model-warmup"><span class="std std-doc">ModelWarmup</span></a> requests when first loading the model to ensure that the model is sufficiently warmed up before being marked “READY” for inference.</p></li>
+</ul>
+</li>
+<li><p>Why doesn’t my model perform significantly faster on GPU?</p>
+<ul class="simple">
+<li><p>Most official backends supported by Triton are optimized for GPU inference and should perform well on GPU out of the box.</p></li>
+<li><p>Triton exposes options for you to optimize your model further on the GPU. Triton’s <a class="reference internal" href="optimization.html#framework-specific-optimization"><span class="std std-doc">Framework Specific Optimizations</span></a> goes into further detail on this topic.</p></li>
+<li><p>Complete conversion of your model to a backend fully optimized for GPU inference such as <a class="reference external" href="https://developer.nvidia.com/tensorrt">TensorRT</a> may provide even better results.
+You may find more Triton-specific details about TensorRT in the <a class="reference external" href="https://github.com/triton-inference-server/tensorrt_backend">TensorRT Backend</a>.</p></li>
+<li><p>If none of the above can help get sufficient GPU-accelerated performance for your model, the model may simply be better designed for CPU execution and the <a class="reference external" href="https://github.com/triton-inference-server/openvino_backend">OpenVINO Backend</a> may help further optimize your CPU execution.</p></li>
+</ul>
+</li>
+</ol>
+</div>
+</div>
+<div class="section" id="end-to-end-example">
+<h2>End-to-end Example<a class="headerlink" href="#end-to-end-example" title="Permalink to this headline">#</a></h2>
+<blockquote>
+<div><p><strong>Note</strong>
+If you have never worked with Triton before, you may be interested in first checking out the <a class="reference internal" href="../getting_started/quickstart.html"><span class="doc std std-doc">Quickstart</span></a> example.
+Some basic understanding of Triton may be useful for the following section, but this example is meant to be straightforward enough without prior experience.</p>
+</div></blockquote>
+<p>Let’s take an ONNX model as our example since ONNX is designed to be a format that can be <a class="reference external" href="https://github.com/onnx/tutorials#converting-to-onnx-format">easily exported</a> from most other frameworks.</p>
+<ol class="arabic simple">
+<li><p>Create a <a class="reference internal" href="model_repository.html"><span class="doc std std-doc">Model Repository</span></a> and download our example <code class="docutils literal notranslate"><span class="pre">densenet_onnx</span></code> model into it.</p></li>
+</ol>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span><span class="c1"># Create model repository with placeholder for model and version 1</span>
+mkdir -p ./models/densenet_onnx/1
+
+<span class="c1"># Download model and place it in model repository</span>
+wget -O models/densenet_onnx/1/model.onnx 
+https://contentmamluswest001.blob.core.windows.net/content/14b2744cf8d6418c87ffddc3f3127242/9502630827244d60a1214f250e3bbca7/08aed7327d694b8dbaee2c97b8d0fcba/densenet121-1.2.onnx
+</pre></div>
+</div>
+<ol class="arabic simple" start="2">
+<li><p>Create a minimal <a class="reference internal" href="model_configuration.html"><span class="doc std std-doc">Model Configuration</span></a> for the <code class="docutils literal notranslate"><span class="pre">densenet_onnx</span></code> model in our <a class="reference internal" href="model_repository.html"><span class="doc std std-doc">Model Repository</span></a> at <code class="docutils literal notranslate"><span class="pre">./models/densenet_onnx/config.pbtxt</span></code>.</p></li>
+</ol>
+<blockquote>
+<div><p><strong>Note</strong>
+This is a slightly simplified version of another <a class="reference download internal" download="" href="../_downloads/3da32df3e3fd77534e90cb4ee7051ec9/config.pbtxt"><span class="xref download myst">example config</span></a> that utilizes other <a class="reference internal" href="model_configuration.html"><span class="doc std std-doc">Model Configuration</span></a> features not necessary for this example.</p>
+</div></blockquote>
+<div class="highlight-protobuf notranslate"><div class="highlight"><pre><span></span><span class="n">name</span><span class="o">:</span><span class="w"> </span><span class="s">&quot;densenet_onnx&quot;</span>
+<span class="n">backend</span><span class="o">:</span><span class="w"> </span><span class="s">&quot;onnxruntime&quot;</span>
+<span class="n">max_batch_size</span><span class="o">:</span><span class="w"> </span><span class="mi">0</span>
+<span class="n">input</span><span class="o">:</span><span class="w"> </span><span class="p">[</span>
+<span class="w">  </span><span class="p">{</span>
+<span class="w">    </span><span class="n">name</span><span class="o">:</span><span class="w"> </span><span class="s">&quot;data_0&quot;</span><span class="p">,</span>
+<span class="w">    </span><span class="n">data_type</span><span class="o">:</span><span class="w"> </span><span class="n">TYPE_FP32</span><span class="p">,</span>
+<span class="w">    </span><span class="n">dims</span><span class="o">:</span><span class="w"> </span><span class="p">[</span><span class="w"> </span><span class="mi">1</span><span class="p">,</span><span class="w"> </span><span class="mi">3</span><span class="p">,</span><span class="w"> </span><span class="mi">224</span><span class="p">,</span><span class="w"> </span><span class="mi">224</span><span class="p">]</span>
+<span class="w">  </span><span class="p">}</span>
+<span class="p">]</span>
+<span class="n">output</span><span class="o">:</span><span class="w"> </span><span class="p">[</span>
+<span class="w">  </span><span class="p">{</span>
+<span class="w">    </span><span class="n">name</span><span class="o">:</span><span class="w"> </span><span class="s">&quot;prob_1&quot;</span><span class="p">,</span>
+<span class="w">    </span><span class="n">data_type</span><span class="o">:</span><span class="w"> </span><span class="n">TYPE_FP32</span><span class="p">,</span>
+<span class="w">    </span><span class="n">dims</span><span class="o">:</span><span class="w"> </span><span class="p">[</span><span class="w"> </span><span class="mi">1</span><span class="p">,</span><span class="w"> </span><span class="mi">1000</span><span class="p">,</span><span class="w"> </span><span class="mi">1</span><span class="p">,</span><span class="w"> </span><span class="mi">1</span><span class="w"> </span><span class="p">]</span>
+<span class="w">  </span><span class="p">}</span>
+<span class="p">]</span>
+</pre></div>
+</div>
+<blockquote>
+<div><p><strong>Note</strong>
+As of the 22.07 release, both Triton and Model Analyzer support fully auto-completing the config file for <a class="reference internal" href="model_configuration.html#auto-generated-model-configuration"><span class="std std-doc">backends that support it</span></a>.
+So for an ONNX model, for example, this step can be skipped unless you want to explicitly set certain parameters.</p>
+</div></blockquote>
+<ol class="arabic simple" start="3">
+<li><p>Start server and client containers in the background</p></li>
+</ol>
+<p>These containers can be started interactively instead, but for the sake of demonstration it is more clear to start these containers in the background and <code class="docutils literal notranslate"><span class="pre">docker</span> <span class="pre">exec</span></code> into them as needed for the following steps.</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span><span class="c1"># Start server container in the background</span>
+docker run -d --gpus<span class="o">=</span>all --network<span class="o">=</span>host -v <span class="nv">$PWD</span>:/mnt --name triton-server nvcr.io/nvidia/tritonserver:22.08-py3 
+
+<span class="c1"># Start client container in the background</span>
+docker run -d --gpus<span class="o">=</span>all --network<span class="o">=</span>host -v <span class="nv">$PWD</span>:/mnt --name triton-client nvcr.io/nvidia/tritonserver:22.08-py3-sdk
+</pre></div>
+</div>
+<blockquote>
+<div><p><strong>Note</strong>
+The <code class="docutils literal notranslate"><span class="pre">-v</span> <span class="pre">$PWD:/mnt</span></code> is mounting your current directory on the host into the <code class="docutils literal notranslate"><span class="pre">/mnt</span></code> directory inside the container.
+So if you created your model repository in <code class="docutils literal notranslate"><span class="pre">$PWD/models</span></code>, you will find it inside the container at <code class="docutils literal notranslate"><span class="pre">/mnt/models</span></code>.
+You can change these paths as needed. See <a class="reference external" href="https://docs.docker.com/storage/volumes/">docker volume</a> docs for more information on how this works.</p>
+</div></blockquote>
+<ol class="arabic simple" start="4">
+<li><p>Serve the model with Triton</p></li>
+</ol>
+<p>To serve our model, we will use the server container that we already started which comes pre-installed with a <code class="docutils literal notranslate"><span class="pre">tritonserver</span></code> binary.</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span><span class="c1"># Enter server container interactively</span>
+docker <span class="nb">exec</span> -ti triton-server bash
+
+<span class="c1"># Start serving your models</span>
+tritonserver --model-repository<span class="o">=</span>/mnt/models
+</pre></div>
+</div>
+<p>To check if the model loaded successfully, we expect to see our model in a <code class="docutils literal notranslate"><span class="pre">READY</span></code> state in the output of the previous command:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="o">...</span>
+<span class="n">I0802</span> <span class="mi">18</span><span class="p">:</span><span class="mi">11</span><span class="p">:</span><span class="mf">47.100537</span> <span class="mi">135</span> <span class="n">model_repository_manager</span><span class="o">.</span><span class="n">cc</span><span class="p">:</span><span class="mi">1345</span><span class="p">]</span> <span class="n">successfully</span> <span class="n">loaded</span> <span class="s1">&#39;densenet_onnx&#39;</span> <span class="n">version</span> <span class="mi">1</span>
+<span class="o">...</span>
+<span class="o">+---------------+---------+--------+</span>
+<span class="o">|</span> <span class="n">Model</span>         <span class="o">|</span> <span class="n">Version</span> <span class="o">|</span> <span class="n">Status</span> <span class="o">|</span>
+<span class="o">+---------------+---------+--------+</span>
+<span class="o">|</span> <span class="n">densenet_onnx</span> <span class="o">|</span> <span class="mi">1</span>       <span class="o">|</span> <span class="n">READY</span>  <span class="o">|</span>
+<span class="o">+---------------+---------+--------+</span>
+<span class="o">...</span>
+</pre></div>
+</div>
+<ol class="arabic simple" start="5">
+<li><p>Verify the model can run inference</p></li>
+</ol>
+<p>To verify our model can perform inference, we will use the <code class="docutils literal notranslate"><span class="pre">triton-client</span></code> container that we already started which comes with <code class="docutils literal notranslate"><span class="pre">perf_analyzer</span></code>  pre-installed.</p>
+<p>In a separate shell, we use Perf Analyzer to sanity check that we can run inference and get a baseline for the kind of performance we expect from this model.</p>
+<p>In the example below, Perf Analyzer is sending requests to models served on the same machine (<code class="docutils literal notranslate"><span class="pre">localhost</span></code> from the server container via <code class="docutils literal notranslate"><span class="pre">--network=host</span></code>).
+However, you may also test models being served remotely at some <code class="docutils literal notranslate"><span class="pre">&lt;IP&gt;:&lt;PORT&gt;</span></code>  by setting the <code class="docutils literal notranslate"><span class="pre">-u</span></code> flag, such as <code class="docutils literal notranslate"><span class="pre">perf_analyzer</span> <span class="pre">-m</span> <span class="pre">densenet_onnx</span> <span class="pre">-u</span> <span class="pre">127.0.0.1:8000</span></code>.</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span><span class="c1"># Enter client container interactively</span>
+docker <span class="nb">exec</span> -ti triton-client bash
+
+<span class="c1"># Benchmark model being served from step 3</span>
+perf_analyzer -m densenet_onnx --concurrency-range <span class="m">1</span>:4
+</pre></div>
+</div>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="o">...</span>
+<span class="n">Inferences</span><span class="o">/</span><span class="n">Second</span> <span class="n">vs</span><span class="o">.</span> <span class="n">Client</span> <span class="n">Average</span> <span class="n">Batch</span> <span class="n">Latency</span>
+<span class="n">Concurrency</span><span class="p">:</span> <span class="mi">1</span><span class="p">,</span> <span class="n">throughput</span><span class="p">:</span> <span class="mf">265.147</span> <span class="n">infer</span><span class="o">/</span><span class="n">sec</span><span class="p">,</span> <span class="n">latency</span> <span class="mi">3769</span> <span class="n">usec</span>
+<span class="n">Concurrency</span><span class="p">:</span> <span class="mi">2</span><span class="p">,</span> <span class="n">throughput</span><span class="p">:</span> <span class="mf">890.793</span> <span class="n">infer</span><span class="o">/</span><span class="n">sec</span><span class="p">,</span> <span class="n">latency</span> <span class="mi">2243</span> <span class="n">usec</span>
+<span class="n">Concurrency</span><span class="p">:</span> <span class="mi">3</span><span class="p">,</span> <span class="n">throughput</span><span class="p">:</span> <span class="mf">937.036</span> <span class="n">infer</span><span class="o">/</span><span class="n">sec</span><span class="p">,</span> <span class="n">latency</span> <span class="mi">3199</span> <span class="n">usec</span>
+<span class="n">Concurrency</span><span class="p">:</span> <span class="mi">4</span><span class="p">,</span> <span class="n">throughput</span><span class="p">:</span> <span class="mf">965.21</span> <span class="n">infer</span><span class="o">/</span><span class="n">sec</span><span class="p">,</span> <span class="n">latency</span> <span class="mi">4142</span> <span class="n">usec</span>
+</pre></div>
+</div>
+<ol class="arabic simple" start="6">
+<li><p>Run Model Analyzer to find the best configurations for our model</p></li>
+</ol>
+<p>While Model Analyzer comes pre-installed in the SDK (client) container and supports various modes of connecting to a Triton server, for simplicity we will use install Model Analyzer in our <code class="docutils literal notranslate"><span class="pre">server</span></code> container to use the <code class="docutils literal notranslate"><span class="pre">local</span></code> (default) mode.
+To learn more about other methods of connecting Model Analyzer to a running Triton Server, see the <code class="docutils literal notranslate"><span class="pre">--triton-launch-mode</span></code> Model Analyzer flag.</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span><span class="c1"># Enter server container interactively</span>
+docker <span class="nb">exec</span> -ti triton-server bash
+
+<span class="c1"># Stop existing tritonserver process if still running</span>
+<span class="c1"># because model-analyzer will start its own server</span>
+<span class="nv">SERVER_PID</span><span class="o">=</span><span class="sb">`</span>ps <span class="p">|</span> grep tritonserver <span class="p">|</span> awk <span class="s1">&#39;{ printf $1 }&#39;</span><span class="sb">`</span>
+<span class="nb">kill</span> <span class="si">${</span><span class="nv">SERVER_PID</span><span class="si">}</span>
+
+<span class="c1"># Install model analyzer</span>
+pip install --upgrade pip 
+pip install triton-model-analyzer wkhtmltopdf
+
+<span class="c1"># Profile the model using local (default) mode</span>
+<span class="c1"># NOTE: This may take some time, in this example it took ~10 minutes</span>
+model-analyzer profile <span class="se">\</span>
+  --model-repository<span class="o">=</span>/mnt/models <span class="se">\</span>
+  --profile-models<span class="o">=</span>densenet_onnx <span class="se">\</span>
+  --output-model-repository-path<span class="o">=</span>results
+
+<span class="c1"># Summarize the profiling results</span>
+model-analyzer analyze --analysis-models<span class="o">=</span>densenet_onnx
+</pre></div>
+</div>
+<p>Example Model Analyzer output summary:</p>
+<blockquote>
+<div><p>In 51 measurements across 6 configurations, <code class="docutils literal notranslate"><span class="pre">densenet_onnx_config_3</span></code> provides the best throughput: <strong>323 infer/sec</strong>.</p>
+<p><strong>This is a 92% gain over the default configuration (168 infer/sec), under the given constraints.</strong></p>
+</div></blockquote>
+<table class="colwidths-auto table">
+<thead>
+<tr class="row-odd"><th class="head"><p>Model Config Name</p></th>
+<th class="head"><p>Max Batch Size</p></th>
+<th class="head"><p>Dynamic Batching</p></th>
+<th class="head"><p>Instance Count</p></th>
+<th class="head"><p>p99 Latency (ms)</p></th>
+<th class="head"><p>Throughput (infer/sec)</p></th>
+<th class="head"><p>Max GPU Memory Usage (MB)</p></th>
+<th class="head"><p>Average GPU Utilization (%)</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p>densenet_onnx_config_3</p></td>
+<td><p>0</p></td>
+<td><p>Enabled</p></td>
+<td><p>4/GPU</p></td>
+<td><p>35.8</p></td>
+<td><p>323.13</p></td>
+<td><p>3695</p></td>
+<td><p>58.6</p></td>
+</tr>
+<tr class="row-odd"><td><p>densenet_onnx_config_2</p></td>
+<td><p>0</p></td>
+<td><p>Enabled</p></td>
+<td><p>3/GPU</p></td>
+<td><p>59.575</p></td>
+<td><p>295.82</p></td>
+<td><p>3615</p></td>
+<td><p>58.9</p></td>
+</tr>
+<tr class="row-even"><td><p>densenet_onnx_config_4</p></td>
+<td><p>0</p></td>
+<td><p>Enabled</p></td>
+<td><p>5/GPU</p></td>
+<td><p>69.939</p></td>
+<td><p>291.468</p></td>
+<td><p>3966</p></td>
+<td><p>58.2</p></td>
+</tr>
+<tr class="row-odd"><td><p>densenet_onnx_config_default</p></td>
+<td><p>0</p></td>
+<td><p>Disabled</p></td>
+<td><p>1/GPU</p></td>
+<td><p>12.658</p></td>
+<td><p>167.549</p></td>
+<td><p>3116</p></td>
+<td><p>51.3</p></td>
+</tr>
+</tbody>
+</table>
+<p>In the table above, we see that setting our GPU <a class="reference internal" href="model_configuration.html#instance-groups"><span class="std std-doc">Instance Count</span></a> to 4 allows us to achieve the highest throughput and almost lowest latency on this system.</p>
+<p>Also, note that this <code class="docutils literal notranslate"><span class="pre">densenet_onnx</span></code> model has a fixed batch-size that is explicitly specified in the first dimension of the Input/Output <code class="docutils literal notranslate"><span class="pre">dims</span></code>, therefore the <code class="docutils literal notranslate"><span class="pre">max_batch_size</span></code> parameter is set to 0 as described <a class="reference internal" href="model_configuration.html#maximum-batch-size"><span class="std std-doc">here</span></a>.
+For models that support dynamic batch size, Model Analyzer would also tune the <code class="docutils literal notranslate"><span class="pre">max_batch_size</span></code> parameter.</p>
+<blockquote>
+<div><p><strong>Warning</strong>
+These results are specific to the system running the Triton server, so for example, on a smaller GPU we may not see improvement from increasing the GPU instance count.
+In general, running the same configuration on systems with different hardware (CPU, GPU, RAM, etc.) may provide different results, so it is important to profile your model on a system that accurately reflects where you will deploy your models for your use case.</p>
+</div></blockquote>
+<ol class="arabic simple" start="7">
+<li><p>Extract optimal config from Model Analyzer results</p></li>
+</ol>
+<p>In our example above, <code class="docutils literal notranslate"><span class="pre">densenet_onnx_config_3</span></code> was the optimal configuration.
+So let’s extract that <code class="docutils literal notranslate"><span class="pre">config.pbtxt</span></code> and put it back in our model repository for future use.</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span><span class="c1"># (optional) Backup our original config.pbtxt (if any) to another directory</span>
+cp /mnt/models/densenet_onnx/config.pbtxt /tmp/original_config.pbtxt
+
+<span class="c1"># Copy over the optimal config.pbtxt from Model Analyzer results to our model repository</span>
+cp ./results/densenet_onnx_config_3/config.pbtxt /mnt/models/densenet_onnx/
+</pre></div>
+</div>
+<p>Now that we have an optimized Model Configuration, we are ready to take our model to deployment.
+For further manual tuning, read the <a class="reference internal" href="model_configuration.html"><span class="doc std std-doc">Model Configuration</span></a> and <span class="xref myst">Optimization</span> docs to learn more about Triton’s complete set of capabilities.</p>
+<p>In this example, we happened to get both the highest throughput and almost lowest latency from the same configuration, but in some cases this is a tradeoff that must be made.
+Certain models or configurations may achieve a higher throughput but also incur a higher latency in return.
+It is worthwhile to fully inspect the reports generated by Model Analyzer to ensure your model performance meets your requirements.</p>
+</div>
+</div>
+
+<div class="section">
+   
+</div>
+
+              </div>
+              
+            </main>
+            <footer class="footer-article noprint">
+                
+    <!-- Previous / next buttons -->
+<div class='prev-next-area'>
+    <a class='left-prev' id="prev-link" href="../getting_started/quickstart.html" title="previous page">
+        <i class="fas fa-angle-left"></i>
+        <div class="prev-next-info">
+            <p class="prev-next-subtitle">previous</p>
+            <p class="prev-next-title">Quickstart</p>
+        </div>
+    </a>
+    <a class='right-next' id="next-link" href="architecture.html" title="next page">
+    <div class="prev-next-info">
+        <p class="prev-next-subtitle">next</p>
+        <p class="prev-next-title">Triton Architecture</p>
+    </div>
+    <i class="fas fa-angle-right"></i>
+    </a>
+</div>
+            </footer>
+        </div>
+    </div>
+    <div class="footer-content row">
+        <footer class="col footer"><p>
+  
+    By NVIDIA<br/>
+  
+      &copy; Copyright 2022 NVIDIA CORPORATION &amp; AFFILIATES. All rights reserved.<br/>
+    Last updated on Oct 05, 2022.<br/>
+</p>
+        </footer>
+    </div>
+    
+</div>
+
+
+      </div>
+    </div>
+  
+  <!-- Scripts loaded after <body> so the DOM is not blocked -->
+  <script src="../_static/scripts/pydata-sphinx-theme.js?digest=1999514e3f237ded88cf"></script>
+
+
+<script type="text/javascript">_satellite.pageBottom();</script>
+  </body>
+</html>

@@ -1,0 +1,983 @@
+
+<!DOCTYPE html>
+
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Statistics Extension &#8212; NVIDIA Triton Inference Server</title>
+    
+  <!-- Loaded before other Sphinx assets -->
+  <link href="../_static/styles/theme.css?digest=1999514e3f237ded88cf" rel="stylesheet">
+<link href="../_static/styles/pydata-sphinx-theme.css?digest=1999514e3f237ded88cf" rel="stylesheet">
+
+    
+  <link rel="stylesheet"
+    href="../_static/vendor/fontawesome/5.13.0/css/all.min.css">
+  <link rel="preload" as="font" type="font/woff2" crossorigin
+    href="../_static/vendor/fontawesome/5.13.0/webfonts/fa-solid-900.woff2">
+  <link rel="preload" as="font" type="font/woff2" crossorigin
+    href="../_static/vendor/fontawesome/5.13.0/webfonts/fa-brands-400.woff2">
+
+    <link rel="stylesheet" type="text/css" href="../_static/pygments.css" />
+    <link rel="stylesheet" href="../_static/styles/sphinx-book-theme.css?digest=62ba249389abaaa9ffc34bf36a076bdc1d65ee18" type="text/css" />
+    <link rel="stylesheet" type="text/css" href="../_static/mystnb.4510f1fc1dee50b3e5859aac5469c37c29e427902b24a333a5f9fcb2f0b3ac41.css" />
+    <link rel="stylesheet" type="text/css" href="../_static/copybutton.css" />
+    <link rel="stylesheet" type="text/css" href="../_static/tabs.css" />
+    <link rel="stylesheet" type="text/css" href="../_static/custom.css" />
+    <link rel="stylesheet" type="text/css" href="../_static/design-style.4045f2051d55cab465a707391d5b2007.min.css" />
+    
+  <!-- Pre-loaded scripts that we'll load fully later -->
+  <link rel="preload" as="script" href="../_static/scripts/pydata-sphinx-theme.js?digest=1999514e3f237ded88cf">
+
+    <script data-url_root="../" id="documentation_options" src="../_static/documentation_options.js"></script>
+    <script src="../_static/jquery.js"></script>
+    <script src="../_static/underscore.js"></script>
+    <script src="../_static/doctools.js"></script>
+    <script src="../_static/clipboard.min.js"></script>
+    <script src="../_static/copybutton.js"></script>
+    <script src="https://js.hcaptcha.com/1/api.js"></script>
+    <script src="//assets.adobedtm.com/5d4962a43b79/c1061d2c5e7b/launch-191c2462b890.min.js"></script>
+    <script src="../_static/scripts/sphinx-book-theme.js?digest=f31d14ad54b65d19161ba51d4ffff3a77ae00456"></script>
+    <script src="../_static/design-tabs.js"></script>
+    <link rel="canonical" href="https://docs.nvidia.com/deeplearning/triton-inference-server/user-guide/docs/protocol/extension_statistics.html" />
+    <link rel="shortcut icon" href="../_static/nvidia-logo-vert-rgb-blk-for-screen.png"/>
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" />
+    <link rel="next" title="Trace Extension" href="extension_trace.html" />
+    <link rel="prev" title="Shared-Memory Extension" href="extension_shared_memory.html" /> 
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="docsearch:language" content="None">
+    
+
+    <!-- Google Analytics -->
+      
+<style type="text/css">
+  ul.ablog-archive {
+    list-style: none;
+    overflow: auto;
+    margin-left: 0px;
+  }
+  ul.ablog-archive li {
+    float: left;
+    margin-right: 5px;
+    font-size: 80%;
+  }
+  ul.postlist a {
+    font-style: italic;
+  }
+  ul.postlist-style-disc {
+    list-style-type: disc;
+  }
+  ul.postlist-style-none {
+    list-style-type: none;
+  }
+  ul.postlist-style-circle {
+    list-style-type: circle;
+  }
+</style>
+
+  </head>
+  <body data-spy="scroll" data-target="#bd-toc-nav" data-offset="60">
+<!-- Checkboxes to toggle the left sidebar -->
+<input type="checkbox" class="sidebar-toggle" name="__navigation" id="__navigation" aria-label="Toggle navigation sidebar">
+<label class="overlay overlay-navbar" for="__navigation">
+    <div class="visually-hidden">Toggle navigation sidebar</div>
+</label>
+<!-- Checkboxes to toggle the in-page toc -->
+<input type="checkbox" class="sidebar-toggle" name="__page-toc" id="__page-toc" aria-label="Toggle in-page Table of Contents">
+<label class="overlay overlay-pagetoc" for="__page-toc">
+    <div class="visually-hidden">Toggle in-page Table of Contents</div>
+</label>
+<!-- Headers at the top -->
+<div class="announcement header-item noprint"></div>
+<div class="header header-item noprint"></div>
+
+    
+    <div class="container-fluid" id="banner"></div>
+
+    
+
+    <div class="container-xl">
+      <div class="row">
+          
+<!-- Sidebar -->
+<div class="bd-sidebar noprint" id="site-navigation">
+    <div class="bd-sidebar__content">
+        <div class="bd-sidebar__top"><div class="navbar-brand-box">
+    <a class="navbar-brand text-wrap" href="../index.html">
+      
+        <!-- `logo` is deprecated in Sphinx 4.0, so remove this when we stop supporting 3 -->
+        
+      
+      
+      <img src="../_static/nvidia-logo-horiz-rgb-blk-for-screen.png" class="logo" alt="logo">
+      
+      
+      <h1 class="site-logo" id="site-title">NVIDIA Triton Inference Server</h1>
+      
+    </a>
+</div><form class="bd-search d-flex align-items-center" action="../search.html" method="get">
+  <i class="icon fas fa-search"></i>
+  <input type="search" class="form-control" name="q" id="search-input" placeholder="Search the docs ..." aria-label="Search the docs ..." autocomplete="off" >
+</form><nav class="bd-links" id="bd-docs-nav" aria-label="Main">
+    <div class="bd-toc-item active">
+        <p aria-level="2" class="caption" role="heading">
+ <span class="caption-text">
+  Getting Started
+ </span>
+</p>
+<ul class="nav bd-sidenav">
+ <li class="toctree-l1">
+  <a class="reference internal" href="../getting_started/quickstart.html">
+   Quickstart
+  </a>
+ </li>
+</ul>
+<p aria-level="2" class="caption" role="heading">
+ <span class="caption-text">
+  User Guide
+ </span>
+</p>
+<ul class="nav bd-sidenav">
+ <li class="toctree-l1">
+  <a class="reference internal" href="../user_guide/performance_tuning.html">
+   Deploying your trained model using Triton
+  </a>
+ </li>
+ <li class="toctree-l1">
+  <a class="reference internal" href="../user_guide/architecture.html">
+   Triton Architecture
+  </a>
+ </li>
+ <li class="toctree-l1">
+  <a class="reference internal" href="../user_guide/model_repository.html">
+   Model Repository
+  </a>
+ </li>
+ <li class="toctree-l1">
+  <a class="reference internal" href="../customization_guide/repository_agents.html">
+   Repository Agent
+  </a>
+ </li>
+ <li class="toctree-l1">
+  <a class="reference internal" href="../user_guide/model_configuration.html">
+   Model Configuration
+  </a>
+ </li>
+ <li class="toctree-l1">
+  <a class="reference internal" href="../user_guide/optimization.html">
+   Optimization
+  </a>
+ </li>
+ <li class="toctree-l1">
+  <a class="reference internal" href="../user_guide/ragged_batching.html">
+   Ragged Batching
+  </a>
+ </li>
+ <li class="toctree-l1">
+  <a class="reference internal" href="../user_guide/rate_limiter.html">
+   Rate Limiter
+  </a>
+ </li>
+ <li class="toctree-l1">
+  <a class="reference internal" href="../user_guide/model_analyzer.html">
+   Model Analyzer
+  </a>
+ </li>
+ <li class="toctree-l1">
+  <a class="reference internal" href="../user_guide/perf_analyzer.html">
+   Performance Analyzer
+  </a>
+ </li>
+ <li class="toctree-l1">
+  <a class="reference internal" href="../user_guide/model_management.html">
+   Model Management
+  </a>
+ </li>
+ <li class="toctree-l1">
+  <a class="reference internal" href="../user_guide/custom_operations.html">
+   Custom Operations
+  </a>
+ </li>
+ <li class="toctree-l1">
+  <a class="reference internal" href="../user_guide/decoupled_models.html">
+   Decoupled Backends and Models
+  </a>
+ </li>
+ <li class="toctree-l1">
+  <a class="reference internal" href="../user_guide/response_cache.html">
+   Triton Response Cache
+  </a>
+ </li>
+ <li class="toctree-l1">
+  <a class="reference internal" href="../user_guide/metrics.html">
+   Metrics
+  </a>
+ </li>
+ <li class="toctree-l1">
+  <a class="reference internal" href="../user_guide/trace.html">
+   Triton Server Trace
+  </a>
+ </li>
+ <li class="toctree-l1">
+  <a class="reference internal" href="../user_guide/jetson.html">
+   Triton Inference Server Support for Jetson and JetPack
+  </a>
+ </li>
+ <li class="toctree-l1">
+  <a class="reference internal" href="../user_guide/v1_to_v2.html">
+   Version 1 to Version 2 Migration
+  </a>
+ </li>
+</ul>
+<ul class="nav bd-sidenav">
+ <li class="toctree-l1">
+  <a class="reference internal" href="../user_guide/faq.html">
+   FAQ
+  </a>
+ </li>
+</ul>
+<p aria-level="2" class="caption" role="heading">
+ <span class="caption-text">
+  Protocol Guides
+ </span>
+</p>
+<ul class="current nav bd-sidenav">
+ <li class="toctree-l1">
+  <a class="reference internal" href="../customization_guide/inference_protocols.html">
+   Inference Protocols and APIs
+  </a>
+ </li>
+ <li class="toctree-l1">
+  <a class="reference internal" href="extension_binary_data.html">
+   Binary Tensor Data Extension
+  </a>
+ </li>
+ <li class="toctree-l1">
+  <a class="reference internal" href="extension_classification.html">
+   Classification Extension
+  </a>
+ </li>
+ <li class="toctree-l1">
+  <a class="reference internal" href="extension_logging.html">
+   Logging Extension
+  </a>
+ </li>
+ <li class="toctree-l1">
+  <a class="reference internal" href="extension_model_configuration.html">
+   Model Configuration Extension
+  </a>
+ </li>
+ <li class="toctree-l1">
+  <a class="reference internal" href="extension_model_repository.html">
+   Model Repository Extension
+  </a>
+ </li>
+ <li class="toctree-l1">
+  <a class="reference internal" href="extension_schedule_policy.html">
+   Schedule Policy Extension
+  </a>
+ </li>
+ <li class="toctree-l1">
+  <a class="reference internal" href="extension_sequence.html">
+   Sequence Extension
+  </a>
+ </li>
+ <li class="toctree-l1">
+  <a class="reference internal" href="extension_shared_memory.html">
+   Shared-Memory Extension
+  </a>
+ </li>
+ <li class="toctree-l1 current active">
+  <a class="current reference internal" href="#">
+   Statistics Extension
+  </a>
+ </li>
+ <li class="toctree-l1">
+  <a class="reference internal" href="extension_trace.html">
+   Trace Extension
+  </a>
+ </li>
+</ul>
+<p aria-level="2" class="caption" role="heading">
+ <span class="caption-text">
+  Customization Guide
+ </span>
+</p>
+<ul class="nav bd-sidenav">
+ <li class="toctree-l1">
+  <a class="reference internal" href="../customization_guide/build.html">
+   Building Triton
+  </a>
+ </li>
+ <li class="toctree-l1">
+  <a class="reference internal" href="../customization_guide/compose.html">
+   Customize Triton Container
+  </a>
+ </li>
+ <li class="toctree-l1">
+  <a class="reference internal" href="../customization_guide/test.html">
+   Testing Triton
+  </a>
+ </li>
+</ul>
+<p aria-level="2" class="caption" role="heading">
+ <span class="caption-text">
+  Examples
+ </span>
+</p>
+<ul class="nav bd-sidenav">
+ <li class="toctree-l1">
+  <a class="reference internal" href="../examples/jetson/README.html">
+   Using Triton Inference Server as a shared library for execution on Jetson
+  </a>
+ </li>
+ <li class="toctree-l1">
+  <a class="reference internal" href="../examples/jetson/concurrency_and_dynamic_batching/README.html">
+   Concurrent inference and dynamic batching
+  </a>
+ </li>
+</ul>
+
+    </div>
+</nav></div>
+        <div class="bd-sidebar__bottom">
+             <!-- To handle the deprecated key -->
+            
+        </div>
+    </div>
+    <div id="rtd-footer-container"></div>
+</div>
+
+
+          
+
+
+          
+<!-- A tiny helper pixel to detect if we've scrolled -->
+<div class="sbt-scroll-pixel-helper"></div>
+<!-- Main content -->
+<div class="col py-0 content-container">
+    
+    <div class="header-article row sticky-top noprint">
+        
+
+
+
+<div class="col py-1 d-flex header-article-main">
+    <div class="header-article__left">
+        
+        <label for="__navigation"
+  class="headerbtn"
+  data-toggle="tooltip"
+data-placement="right"
+title="Toggle navigation"
+>
+  
+
+<span class="headerbtn__icon-container">
+  <i class="fas fa-bars"></i>
+  </span>
+
+</label>
+
+        
+    </div>
+    <div class="header-article__right">
+<button onclick="toggleFullScreen()"
+  class="headerbtn"
+  data-toggle="tooltip"
+data-placement="bottom"
+title="Fullscreen mode"
+>
+  
+
+<span class="headerbtn__icon-container">
+  <i class="fas fa-expand"></i>
+  </span>
+
+</button>
+
+<div class="menu-dropdown menu-dropdown-repository-buttons">
+  <button class="headerbtn menu-dropdown__trigger"
+      aria-label="Source repositories">
+      <i class="fab fa-github"></i>
+  </button>
+  <div class="menu-dropdown__content">
+    <ul>
+      <li>
+        <a href="https://github.com/triton-inference-server/server"
+   class="headerbtn"
+   data-toggle="tooltip"
+data-placement="left"
+title="Source repository"
+>
+  
+
+<span class="headerbtn__icon-container">
+  <i class="fab fa-github"></i>
+  </span>
+<span class="headerbtn__text-container">repository</span>
+</a>
+
+      </li>
+      
+      <li>
+        <a href="https://github.com/triton-inference-server/server/issues/new?title=Issue%20on%20page%20%2Fprotocol/extension_statistics.html&body=Your%20issue%20content%20here."
+   class="headerbtn"
+   data-toggle="tooltip"
+data-placement="left"
+title="Open an issue"
+>
+  
+
+<span class="headerbtn__icon-container">
+  <i class="fas fa-lightbulb"></i>
+  </span>
+<span class="headerbtn__text-container">open issue</span>
+</a>
+
+      </li>
+      
+    </ul>
+  </div>
+</div>
+<label for="__page-toc"
+  class="headerbtn headerbtn-page-toc"
+  
+>
+  
+
+<span class="headerbtn__icon-container">
+  <i class="fas fa-list"></i>
+  </span>
+
+</label>
+
+    </div>
+</div>
+
+<!-- Table of contents -->
+<div class="col-md-3 bd-toc show noprint">
+    <div class="tocsection onthispage pt-5 pb-3">
+        <i class="fas fa-list"></i> Contents
+    </div>
+    <nav id="bd-toc-nav" aria-label="Page">
+        <ul class="visible nav section-nav flex-column">
+ <li class="toc-h2 nav-item toc-entry">
+  <a class="reference internal nav-link" href="#http-rest">
+   HTTP/REST
+  </a>
+  <ul class="visible nav section-nav flex-column">
+   <li class="toc-h3 nav-item toc-entry">
+    <a class="reference internal nav-link" href="#statistics-response-json-object">
+     Statistics Response JSON Object
+    </a>
+   </li>
+   <li class="toc-h3 nav-item toc-entry">
+    <a class="reference internal nav-link" href="#statistics-response-json-error-object">
+     Statistics Response JSON Error Object
+    </a>
+   </li>
+  </ul>
+ </li>
+ <li class="toc-h2 nav-item toc-entry">
+  <a class="reference internal nav-link" href="#grpc">
+   GRPC
+  </a>
+ </li>
+</ul>
+
+    </nav>
+</div>
+    </div>
+    <div class="article row">
+        <div class="col pl-md-3 pl-lg-5 content-container">
+            <!-- Table of contents that is only displayed when printing the page -->
+            <div id="jb-print-docs-body" class="onlyprint">
+                <h1>Statistics Extension</h1>
+                <!-- Table of contents -->
+                <div id="print-main-content">
+                    <div id="jb-print-toc">
+                        
+                        <div>
+                            <h2> Contents </h2>
+                        </div>
+                        <nav aria-label="Page">
+                            <ul class="visible nav section-nav flex-column">
+ <li class="toc-h2 nav-item toc-entry">
+  <a class="reference internal nav-link" href="#http-rest">
+   HTTP/REST
+  </a>
+  <ul class="visible nav section-nav flex-column">
+   <li class="toc-h3 nav-item toc-entry">
+    <a class="reference internal nav-link" href="#statistics-response-json-object">
+     Statistics Response JSON Object
+    </a>
+   </li>
+   <li class="toc-h3 nav-item toc-entry">
+    <a class="reference internal nav-link" href="#statistics-response-json-error-object">
+     Statistics Response JSON Error Object
+    </a>
+   </li>
+  </ul>
+ </li>
+ <li class="toc-h2 nav-item toc-entry">
+  <a class="reference internal nav-link" href="#grpc">
+   GRPC
+  </a>
+ </li>
+</ul>
+
+                        </nav>
+                    </div>
+                </div>
+            </div>
+            <main id="main-content" role="main">
+                
+              <div>
+                 <!--
+# Copyright 2020-2022, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+#
+# Redistribution and use in source and binary forms, with or without
+# modification, are permitted provided that the following conditions
+# are met:
+#  * Redistributions of source code must retain the above copyright
+#    notice, this list of conditions and the following disclaimer.
+#  * Redistributions in binary form must reproduce the above copyright
+#    notice, this list of conditions and the following disclaimer in the
+#    documentation and/or other materials provided with the distribution.
+#  * Neither the name of NVIDIA CORPORATION nor the names of its
+#    contributors may be used to endorse or promote products derived
+#    from this software without specific prior written permission.
+#
+# THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS ``AS IS'' AND ANY
+# EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+# IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR
+# PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL THE COPYRIGHT OWNER OR
+# CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL,
+# EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
+# PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR
+# PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY
+# OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+# (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+# OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+-->
+<div class="tex2jax_ignore mathjax_ignore section" id="statistics-extension">
+<h1>Statistics Extension<a class="headerlink" href="#statistics-extension" title="Permalink to this headline">#</a></h1>
+<p>This document describes Triton’s statistics extension. The statistics
+extension enables the reporting of per-model (per-version) statistics
+which provide aggregate information about all activity occurring for a
+specific model (version) since Triton started. Because this extension
+is supported, Triton reports “statistics” in the extensions field of
+its Server Metadata.</p>
+<div class="section" id="http-rest">
+<h2>HTTP/REST<a class="headerlink" href="#http-rest" title="Permalink to this headline">#</a></h2>
+<p>In all JSON schemas shown in this document <code class="docutils literal notranslate"><span class="pre">$number</span></code>, <code class="docutils literal notranslate"><span class="pre">$string</span></code>, <code class="docutils literal notranslate"><span class="pre">$boolean</span></code>,
+<code class="docutils literal notranslate"><span class="pre">$object</span></code> and <code class="docutils literal notranslate"><span class="pre">$array</span></code> refer to the fundamental JSON types. #optional
+indicates an optional JSON field.</p>
+<p>Triton exposes the statistics endpoint at the following URL. The
+specific model name portion of the URL is optional; if not provided
+Triton will return the statistics for all versions of all models. If a
+specific model is given in the URL the versions portion of the URL is
+optional; if not provided Triton will return statistics for all
+versions of the specified model.</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span>GET v2/models[/${MODEL_NAME}[/versions/${MODEL_VERSION}]]/stats
+</pre></div>
+</div>
+<div class="section" id="statistics-response-json-object">
+<h3>Statistics Response JSON Object<a class="headerlink" href="#statistics-response-json-object" title="Permalink to this headline">#</a></h3>
+<p>A successful statistics request is indicated by a 200 HTTP status
+code. The response object, identified as <code class="docutils literal notranslate"><span class="pre">$stats_model_response</span></code>, is
+returned in the HTTP body for every successful statistics request.</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span>$stats_model_response =
+{
+  &quot;model_stats&quot; : [ $model_stat, ... ]
+}
+</pre></div>
+</div>
+<p>Each <code class="docutils literal notranslate"><span class="pre">$model_stat</span></code> object gives the statistics for a specific model and
+version. The <code class="docutils literal notranslate"><span class="pre">$version</span></code> field is optional for servers that do not
+support versions.</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span>$model_stat =
+{
+  &quot;name&quot; : $string,
+  &quot;version&quot; : $string #optional,
+  &quot;last_inference&quot; : $number,
+  &quot;inference_count&quot; : $number,
+  &quot;execution_count&quot; : $number,
+  &quot;inference_stats&quot; : $inference_stats,
+  &quot;batch_stats&quot; : [ $batch_stat, ... ]
+}
+</pre></div>
+</div>
+<ul class="simple">
+<li><p>“name” : The name of the model.</p></li>
+<li><p>“version” : The version of the model.</p></li>
+<li><p>“last_inference” : The timestamp of the last inference request made
+for this model, as milliseconds since the epoch.</p></li>
+<li><p>“inference_count” : The cumulative count of successful inference
+requests made for this model. Each inference in a batched request is
+counted as an individual inference. For example, if a client sends a
+single inference request with batch size 64, “inference_count” will
+be incremented by 64. Similarly, if a clients sends 64 individual
+requests each with batch size 1, “inference_count” will be
+incremented by 64. The “inference_count” value DOES NOT include cache hits.</p></li>
+<li><p>“execution_count” : The cumulative count of the number of successful
+inference executions performed for the model. When dynamic batching
+is enabled, a single model execution can perform inferencing for
+more than one inference request. For example, if a clients sends 64
+individual requests each with batch size 1 and the dynamic batcher
+batches them into a single large batch for model execution then
+“execution_count” will be incremented by 1. If, on the other hand,
+the dynamic batcher is not enabled for that each of the 64
+individual requests is executed independently, then
+“execution_count” will be incremented by 64. The “execution_count” value
+DOES NOT include cache hits.</p></li>
+<li><p>“inference_stats” : The aggregate statistics for the
+model/version. So, for example, “inference_stats”:”success”
+indicates the number of successful inference requests for the model.</p></li>
+<li><p>“batch_stats” : The aggregate statistics for each different batch
+size that is executed in the model. The batch statistics indicate
+how many actual model executions were performed and show differences
+due to different batch size (for example, larger batches typically
+take longer to compute).</p></li>
+</ul>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span>$inference_stats =
+{
+  &quot;success&quot; : $duration_stat,
+  &quot;fail&quot; : $duration_stat,
+  &quot;queue&quot; : $duration_stat,
+  &quot;compute_input&quot; : $duration_stat,
+  &quot;compute_infer&quot; : $duration_stat,
+  &quot;compute_output&quot; : $duration_stat,
+  &quot;cache_hit&quot;: $duration_stat,
+  &quot;cache_miss&quot;: $duration_stat
+}
+</pre></div>
+</div>
+<ul class="simple">
+<li><p>“success” : The count and cumulative duration for all successful
+inference requests. The “success” count and cumulative duration includes
+cache hits.</p></li>
+<li><p>“fail” : The count and cumulative duration for all failed inference
+requests.</p></li>
+<li><p>“queue” : The count and cumulative duration that inference requests
+wait in scheduling or other queues. The “queue” count and cumulative
+duration includes cache hits.</p></li>
+<li><p>“compute_input” : The count and cumulative duration to prepare input
+tensor data as required by the model framework / backend. For
+example, this duration should include the time to copy input tensor
+data to the GPU. The “compute_input” count and cumulative duration DO NOT
+include cache hits.</p></li>
+<li><p>“compute_infer” : The count and cumulative duration to execute the
+model. The “compute_infer” count and cumulative duration DO NOT include
+cache hits.</p></li>
+<li><p>“compute_output” : The count and cumulative duration to extract
+output tensor data produced by the model framework / backend. For
+example, this duration should include the time to copy output tensor
+data from the GPU. The “compute_output” count and cumulative duration DO NOT
+include cache hits.</p></li>
+<li><p>“cache_hit” : The count of response cache hits and cumulative duration to
+lookup and extract output tensor data from the Response Cache on a cache hit.
+For example, this duration should include the time to copy output tensor data
+from the Response Cache to the response object.</p></li>
+<li><p>“cache_miss” : The count of response cache misses and cumulative duration to
+lookup and insert output tensor data to the Response Cache on a cache miss.
+For example, this duration should include the time to copy output tensor data
+from the response object to the Response Cache.</p></li>
+</ul>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span>$batch_stats =
+{
+  &quot;batch_size&quot; : $number,
+  &quot;compute_input&quot; : $duration_stat,
+  &quot;compute_infer&quot; : $duration_stat,
+  &quot;compute_output&quot; : $duration_stat
+}
+</pre></div>
+</div>
+<ul class="simple">
+<li><p>“batch_size” : The size of the batch.</p></li>
+<li><p>“count” : The number of times the batch size was executed on the
+model. A single model execution performs inferencing for the entire
+request batch and can perform inferencing for multiple requests if
+dynamic batching is enabled.</p></li>
+<li><p>“compute_input” : The count and cumulative duration to prepare input
+tensor data as required by the model framework / backend with the
+given batch size. For example, this duration should include the time
+to copy input tensor data to the GPU.</p></li>
+<li><p>“compute_infer” : The count and cumulative duration to execute the
+model with the given batch size.</p></li>
+<li><p>“compute_output” : The count and cumulative duration to extract
+output tensor data produced by the model framework / backend with
+the given batch size. For example, this duration should include the
+time to copy output tensor data from the GPU.</p></li>
+</ul>
+<p>The <code class="docutils literal notranslate"><span class="pre">$duration_stat</span></code> object reports a count and a total time. This
+format can be sampled to determine not only long-running averages but
+also incremental averages between sample points.</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span>$duration_stat =
+{
+  &quot;count&quot; : $number,
+  &quot;ns&quot; : $number
+}
+</pre></div>
+</div>
+<ul class="simple">
+<li><p>“count” : The number of times the statistic was collected.</p></li>
+<li><p>“ns” : The total duration for the statistic in nanoseconds.</p></li>
+</ul>
+</div>
+<div class="section" id="statistics-response-json-error-object">
+<h3>Statistics Response JSON Error Object<a class="headerlink" href="#statistics-response-json-error-object" title="Permalink to this headline">#</a></h3>
+<p>A failed statistics request will be indicated by an HTTP error status
+(typically 400). The HTTP body must contain the
+<code class="docutils literal notranslate"><span class="pre">$repository_statistics_error_response</span></code> object.</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span>$repository_statistics_error_response =
+{
+  &quot;error&quot;: $string
+}
+</pre></div>
+</div>
+<ul class="simple">
+<li><p>“error” : The descriptive message for the error.</p></li>
+</ul>
+</div>
+</div>
+<div class="section" id="grpc">
+<h2>GRPC<a class="headerlink" href="#grpc" title="Permalink to this headline">#</a></h2>
+<p>For the statistics extension Triton implements the following API:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span>service GRPCInferenceService
+{
+  …
+
+  // Get the cumulative statistics for a model and version.
+  rpc ModelStatistics(ModelStatisticsRequest)
+          returns (ModelStatisticsResponse) {}
+}
+</pre></div>
+</div>
+<p>The ModelStatistics API returns model statistics. Errors are indicated
+by the google.rpc.Status returned for the request. The OK code
+indicates success and other codes indicate failure. The request and
+response messages for ModelStatistics are:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">message</span> <span class="n">ModelStatisticsRequest</span>
+<span class="p">{</span>
+  <span class="o">//</span> <span class="n">The</span> <span class="n">name</span> <span class="n">of</span> <span class="n">the</span> <span class="n">model</span><span class="o">.</span> <span class="n">If</span> <span class="ow">not</span> <span class="n">given</span> <span class="n">returns</span> <span class="n">statistics</span> <span class="k">for</span> <span class="nb">all</span>
+  <span class="o">//</span> <span class="n">models</span><span class="o">.</span>
+  <span class="n">string</span> <span class="n">name</span> <span class="o">=</span> <span class="mi">1</span><span class="p">;</span>
+
+  <span class="o">//</span> <span class="n">The</span> <span class="n">version</span> <span class="n">of</span> <span class="n">the</span> <span class="n">model</span><span class="o">.</span> <span class="n">If</span> <span class="ow">not</span> <span class="n">given</span> <span class="n">returns</span> <span class="n">statistics</span> <span class="k">for</span>
+  <span class="o">//</span> <span class="nb">all</span> <span class="n">model</span> <span class="n">versions</span><span class="o">.</span>
+  <span class="n">string</span> <span class="n">version</span> <span class="o">=</span> <span class="mi">2</span><span class="p">;</span>
+<span class="p">}</span>
+
+<span class="n">message</span> <span class="n">ModelStatisticsResponse</span>
+<span class="p">{</span>
+  <span class="o">//</span> <span class="n">Statistics</span> <span class="k">for</span> <span class="n">each</span> <span class="n">requested</span> <span class="n">model</span><span class="o">.</span>
+  <span class="n">repeated</span> <span class="n">ModelStatistics</span> <span class="n">model_stats</span> <span class="o">=</span> <span class="mi">1</span><span class="p">;</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+<p>The statistics messages are:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="o">//</span> <span class="n">Statistic</span> <span class="n">recording</span> <span class="n">a</span> <span class="n">cumulative</span> <span class="n">duration</span> <span class="n">metric</span><span class="o">.</span>
+<span class="n">message</span> <span class="n">StatisticDuration</span>
+<span class="p">{</span>
+  <span class="o">//</span> <span class="n">Cumulative</span> <span class="n">number</span> <span class="n">of</span> <span class="n">times</span> <span class="n">this</span> <span class="n">metric</span> <span class="n">occurred</span><span class="o">.</span>
+  <span class="n">uint64</span> <span class="n">count</span> <span class="o">=</span> <span class="mi">1</span><span class="p">;</span>
+
+  <span class="o">//</span> <span class="n">Total</span> <span class="n">collected</span> <span class="n">duration</span> <span class="n">of</span> <span class="n">this</span> <span class="n">metric</span> <span class="ow">in</span> <span class="n">nanoseconds</span><span class="o">.</span>
+  <span class="n">uint64</span> <span class="n">ns</span> <span class="o">=</span> <span class="mi">2</span><span class="p">;</span>
+<span class="p">}</span>
+
+<span class="o">//</span> <span class="n">Statistics</span> <span class="k">for</span> <span class="n">a</span> <span class="n">specific</span> <span class="n">model</span> <span class="ow">and</span> <span class="n">version</span><span class="o">.</span>
+<span class="n">message</span> <span class="n">ModelStatistics</span>
+<span class="p">{</span>
+  <span class="o">//</span> <span class="n">The</span> <span class="n">name</span> <span class="n">of</span> <span class="n">the</span> <span class="n">model</span><span class="o">.</span>
+  <span class="n">string</span> <span class="n">name</span> <span class="o">=</span> <span class="mi">1</span><span class="p">;</span>
+
+  <span class="o">//</span> <span class="n">The</span> <span class="n">version</span> <span class="n">of</span> <span class="n">the</span> <span class="n">model</span><span class="o">.</span>
+  <span class="n">string</span> <span class="n">version</span> <span class="o">=</span> <span class="mi">2</span><span class="p">;</span>
+
+  <span class="o">//</span> <span class="n">The</span> <span class="n">timestamp</span> <span class="n">of</span> <span class="n">the</span> <span class="n">last</span> <span class="n">inference</span> <span class="n">request</span> <span class="n">made</span> <span class="k">for</span> <span class="n">this</span> <span class="n">model</span><span class="p">,</span>
+  <span class="o">//</span> <span class="k">as</span> <span class="n">milliseconds</span> <span class="n">since</span> <span class="n">the</span> <span class="n">epoch</span><span class="o">.</span>
+  <span class="n">uint64</span> <span class="n">last_inference</span> <span class="o">=</span> <span class="mi">3</span><span class="p">;</span>
+
+  <span class="o">//</span> <span class="n">The</span> <span class="n">cumulative</span> <span class="n">count</span> <span class="n">of</span> <span class="n">successful</span> <span class="n">inference</span> <span class="n">requests</span> <span class="n">made</span> <span class="k">for</span> <span class="n">this</span>
+  <span class="o">//</span> <span class="n">model</span><span class="o">.</span> <span class="n">Each</span> <span class="n">inference</span> <span class="ow">in</span> <span class="n">a</span> <span class="n">batched</span> <span class="n">request</span> <span class="ow">is</span> <span class="n">counted</span> <span class="k">as</span> <span class="n">an</span>
+  <span class="o">//</span> <span class="n">individual</span> <span class="n">inference</span><span class="o">.</span> <span class="n">For</span> <span class="n">example</span><span class="p">,</span> <span class="k">if</span> <span class="n">a</span> <span class="n">client</span> <span class="n">sends</span> <span class="n">a</span> <span class="n">single</span>
+  <span class="o">//</span> <span class="n">inference</span> <span class="n">request</span> <span class="k">with</span> <span class="n">batch</span> <span class="n">size</span> <span class="mi">64</span><span class="p">,</span> <span class="s2">&quot;inference_count&quot;</span> <span class="n">will</span> <span class="n">be</span>
+  <span class="o">//</span> <span class="n">incremented</span> <span class="n">by</span> <span class="mf">64.</span> <span class="n">Similarly</span><span class="p">,</span> <span class="k">if</span> <span class="n">a</span> <span class="n">clients</span> <span class="n">sends</span> <span class="mi">64</span> <span class="n">individual</span>
+  <span class="o">//</span> <span class="n">requests</span> <span class="n">each</span> <span class="k">with</span> <span class="n">batch</span> <span class="n">size</span> <span class="mi">1</span><span class="p">,</span> <span class="s2">&quot;inference_count&quot;</span> <span class="n">will</span> <span class="n">be</span>
+  <span class="o">//</span> <span class="n">incremented</span> <span class="n">by</span> <span class="mf">64.</span> <span class="n">The</span> <span class="s2">&quot;inference_count&quot;</span> <span class="n">value</span> <span class="n">DOES</span> <span class="n">NOT</span> <span class="n">include</span> <span class="n">cache</span> <span class="n">hits</span><span class="o">.</span>
+  <span class="n">uint64</span> <span class="n">inference_count</span> <span class="o">=</span> <span class="mi">4</span><span class="p">;</span>
+
+  <span class="o">//</span> <span class="n">The</span> <span class="n">cumulative</span> <span class="n">count</span> <span class="n">of</span> <span class="n">the</span> <span class="n">number</span> <span class="n">of</span> <span class="n">successful</span> <span class="n">inference</span> <span class="n">executions</span>
+  <span class="o">//</span> <span class="n">performed</span> <span class="k">for</span> <span class="n">the</span> <span class="n">model</span><span class="o">.</span> <span class="n">When</span> <span class="n">dynamic</span> <span class="n">batching</span> <span class="ow">is</span> <span class="n">enabled</span><span class="p">,</span> <span class="n">a</span> <span class="n">single</span>
+  <span class="o">//</span> <span class="n">model</span> <span class="n">execution</span> <span class="n">can</span> <span class="n">perform</span> <span class="n">inferencing</span> <span class="k">for</span> <span class="n">more</span> <span class="n">than</span> <span class="n">one</span> <span class="n">inference</span>
+  <span class="o">//</span> <span class="n">request</span><span class="o">.</span> <span class="n">For</span> <span class="n">example</span><span class="p">,</span> <span class="k">if</span> <span class="n">a</span> <span class="n">clients</span> <span class="n">sends</span> <span class="mi">64</span> <span class="n">individual</span> <span class="n">requests</span> <span class="n">each</span>
+  <span class="o">//</span> <span class="k">with</span> <span class="n">batch</span> <span class="n">size</span> <span class="mi">1</span> <span class="ow">and</span> <span class="n">the</span> <span class="n">dynamic</span> <span class="n">batcher</span> <span class="n">batches</span> <span class="n">them</span> <span class="n">into</span> <span class="n">a</span> <span class="n">single</span>
+  <span class="o">//</span> <span class="n">large</span> <span class="n">batch</span> <span class="k">for</span> <span class="n">model</span> <span class="n">execution</span> <span class="n">then</span> <span class="s2">&quot;execution_count&quot;</span> <span class="n">will</span> <span class="n">be</span>
+  <span class="o">//</span> <span class="n">incremented</span> <span class="n">by</span> <span class="mf">1.</span> <span class="n">If</span><span class="p">,</span> <span class="n">on</span> <span class="n">the</span> <span class="n">other</span> <span class="n">hand</span><span class="p">,</span> <span class="n">the</span> <span class="n">dynamic</span> <span class="n">batcher</span> <span class="ow">is</span> <span class="ow">not</span>
+  <span class="o">//</span> <span class="n">enabled</span> <span class="k">for</span> <span class="n">that</span> <span class="n">each</span> <span class="n">of</span> <span class="n">the</span> <span class="mi">64</span> <span class="n">individual</span> <span class="n">requests</span> <span class="ow">is</span> <span class="n">executed</span>
+  <span class="o">//</span> <span class="n">independently</span><span class="p">,</span> <span class="n">then</span> <span class="s2">&quot;execution_count&quot;</span> <span class="n">will</span> <span class="n">be</span> <span class="n">incremented</span> <span class="n">by</span> <span class="mf">64.</span>
+  <span class="o">//</span> <span class="n">The</span> <span class="s2">&quot;execution_count&quot;</span> <span class="n">value</span> <span class="n">DOES</span> <span class="n">NOT</span> <span class="n">include</span> <span class="n">cache</span> <span class="n">hits</span><span class="o">.</span>
+  <span class="n">uint64</span> <span class="n">execution_count</span> <span class="o">=</span> <span class="mi">5</span><span class="p">;</span>
+
+  <span class="o">//</span> <span class="n">The</span> <span class="n">aggregate</span> <span class="n">statistics</span> <span class="k">for</span> <span class="n">the</span> <span class="n">model</span><span class="o">/</span><span class="n">version</span><span class="o">.</span>
+  <span class="n">InferStatistics</span> <span class="n">inference_stats</span> <span class="o">=</span> <span class="mi">6</span><span class="p">;</span>
+
+  <span class="o">//</span> <span class="n">The</span> <span class="n">aggregate</span> <span class="n">statistics</span> <span class="k">for</span> <span class="n">each</span> <span class="n">different</span> <span class="n">batch</span> <span class="n">size</span> <span class="n">that</span> <span class="ow">is</span>
+  <span class="o">//</span> <span class="n">executed</span> <span class="ow">in</span> <span class="n">the</span> <span class="n">model</span><span class="o">.</span> <span class="n">The</span> <span class="n">batch</span> <span class="n">statistics</span> <span class="n">indicate</span> <span class="n">how</span> <span class="n">many</span> <span class="n">actual</span>
+  <span class="o">//</span> <span class="n">model</span> <span class="n">executions</span> <span class="n">were</span> <span class="n">performed</span> <span class="ow">and</span> <span class="n">show</span> <span class="n">differences</span> <span class="n">due</span> <span class="n">to</span> <span class="n">different</span>
+  <span class="o">//</span> <span class="n">batch</span> <span class="n">size</span> <span class="p">(</span><span class="k">for</span> <span class="n">example</span><span class="p">,</span> <span class="n">larger</span> <span class="n">batches</span> <span class="n">typically</span> <span class="n">take</span> <span class="n">longer</span> <span class="n">to</span> <span class="n">compute</span><span class="p">)</span><span class="o">.</span>
+  <span class="n">InferBatchStatistics</span> <span class="n">batch_stats</span> <span class="o">=</span> <span class="mi">7</span><span class="p">;</span>
+<span class="p">}</span>
+
+<span class="o">//</span> <span class="n">Inference</span> <span class="n">statistics</span><span class="o">.</span>
+<span class="n">message</span> <span class="n">InferStatistics</span>
+<span class="p">{</span>
+  <span class="o">//</span> <span class="n">Cumulative</span> <span class="n">count</span> <span class="ow">and</span> <span class="n">duration</span> <span class="k">for</span> <span class="n">successful</span> <span class="n">inference</span>
+  <span class="o">//</span> <span class="n">request</span><span class="o">.</span> <span class="n">The</span> <span class="s2">&quot;success&quot;</span> <span class="n">count</span> <span class="ow">and</span> <span class="n">cumulative</span> <span class="n">duration</span> <span class="n">includes</span>
+  <span class="o">//</span> <span class="n">cache</span> <span class="n">hits</span><span class="o">.</span>
+  <span class="n">StatisticDuration</span> <span class="n">success</span> <span class="o">=</span> <span class="mi">1</span><span class="p">;</span>
+
+  <span class="o">//</span> <span class="n">Cumulative</span> <span class="n">count</span> <span class="ow">and</span> <span class="n">duration</span> <span class="k">for</span> <span class="n">failed</span> <span class="n">inference</span>
+  <span class="o">//</span> <span class="n">request</span><span class="o">.</span>
+  <span class="n">StatisticDuration</span> <span class="n">fail</span> <span class="o">=</span> <span class="mi">2</span><span class="p">;</span>
+
+  <span class="o">//</span> <span class="n">The</span> <span class="n">count</span> <span class="ow">and</span> <span class="n">cumulative</span> <span class="n">duration</span> <span class="n">that</span> <span class="n">inference</span> <span class="n">requests</span> <span class="n">wait</span> <span class="ow">in</span>
+  <span class="o">//</span> <span class="n">scheduling</span> <span class="ow">or</span> <span class="n">other</span> <span class="n">queues</span><span class="o">.</span> <span class="n">The</span> <span class="s2">&quot;queue&quot;</span> <span class="n">count</span> <span class="ow">and</span> <span class="n">cumulative</span> 
+  <span class="o">//</span> <span class="n">duration</span> <span class="n">includes</span> <span class="n">cache</span> <span class="n">hits</span><span class="o">.</span>
+  <span class="n">StatisticDuration</span> <span class="n">queue</span> <span class="o">=</span> <span class="mi">3</span><span class="p">;</span>
+
+  <span class="o">//</span> <span class="n">The</span> <span class="n">count</span> <span class="ow">and</span> <span class="n">cumulative</span> <span class="n">duration</span> <span class="n">to</span> <span class="n">prepare</span> <span class="nb">input</span> <span class="n">tensor</span> <span class="n">data</span> <span class="k">as</span>
+  <span class="o">//</span> <span class="n">required</span> <span class="n">by</span> <span class="n">the</span> <span class="n">model</span> <span class="n">framework</span> <span class="o">/</span> <span class="n">backend</span><span class="o">.</span> <span class="n">For</span> <span class="n">example</span><span class="p">,</span> <span class="n">this</span> <span class="n">duration</span>
+  <span class="o">//</span> <span class="n">should</span> <span class="n">include</span> <span class="n">the</span> <span class="n">time</span> <span class="n">to</span> <span class="n">copy</span> <span class="nb">input</span> <span class="n">tensor</span> <span class="n">data</span> <span class="n">to</span> <span class="n">the</span> <span class="n">GPU</span><span class="o">.</span>
+  <span class="o">//</span> <span class="n">The</span> <span class="s2">&quot;compute_input&quot;</span> <span class="n">count</span> <span class="ow">and</span> <span class="n">cumulative</span> <span class="n">duration</span> <span class="n">do</span> <span class="ow">not</span> <span class="n">account</span> <span class="k">for</span>
+  <span class="o">//</span> <span class="n">requests</span> <span class="n">that</span> <span class="n">were</span> <span class="n">a</span> <span class="n">cache</span> <span class="n">hit</span><span class="o">.</span> <span class="n">See</span> <span class="n">the</span> <span class="s2">&quot;cache_hit&quot;</span> <span class="n">field</span> <span class="k">for</span> <span class="n">more</span>
+  <span class="o">//</span> <span class="n">info</span><span class="o">.</span>
+  <span class="n">StatisticDuration</span> <span class="n">compute_input</span> <span class="o">=</span> <span class="mi">4</span><span class="p">;</span>
+
+  <span class="o">//</span> <span class="n">The</span> <span class="n">count</span> <span class="ow">and</span> <span class="n">cumulative</span> <span class="n">duration</span> <span class="n">to</span> <span class="n">execute</span> <span class="n">the</span> <span class="n">model</span><span class="o">.</span>
+  <span class="o">//</span> <span class="n">The</span> <span class="s2">&quot;compute_infer&quot;</span> <span class="n">count</span> <span class="ow">and</span> <span class="n">cumulative</span> <span class="n">duration</span> <span class="n">do</span> <span class="ow">not</span> <span class="n">account</span> <span class="k">for</span>
+  <span class="o">//</span> <span class="n">requests</span> <span class="n">that</span> <span class="n">were</span> <span class="n">a</span> <span class="n">cache</span> <span class="n">hit</span><span class="o">.</span> <span class="n">See</span> <span class="n">the</span> <span class="s2">&quot;cache_hit&quot;</span> <span class="n">field</span> <span class="k">for</span> <span class="n">more</span>
+  <span class="o">//</span> <span class="n">info</span><span class="o">.</span>
+  <span class="n">StatisticDuration</span> <span class="n">compute_infer</span> <span class="o">=</span> <span class="mi">5</span><span class="p">;</span>
+
+  <span class="o">//</span> <span class="n">The</span> <span class="n">count</span> <span class="ow">and</span> <span class="n">cumulative</span> <span class="n">duration</span> <span class="n">to</span> <span class="n">extract</span> <span class="n">output</span> <span class="n">tensor</span> <span class="n">data</span>
+  <span class="o">//</span> <span class="n">produced</span> <span class="n">by</span> <span class="n">the</span> <span class="n">model</span> <span class="n">framework</span> <span class="o">/</span> <span class="n">backend</span><span class="o">.</span> <span class="n">For</span> <span class="n">example</span><span class="p">,</span> <span class="n">this</span> <span class="n">duration</span>
+  <span class="o">//</span> <span class="n">should</span> <span class="n">include</span> <span class="n">the</span> <span class="n">time</span> <span class="n">to</span> <span class="n">copy</span> <span class="n">output</span> <span class="n">tensor</span> <span class="n">data</span> <span class="kn">from</span> <span class="nn">the</span> <span class="n">GPU</span><span class="o">.</span>
+  <span class="o">//</span> <span class="n">The</span> <span class="s2">&quot;compute_output&quot;</span> <span class="n">count</span> <span class="ow">and</span> <span class="n">cumulative</span> <span class="n">duration</span> <span class="n">do</span> <span class="ow">not</span> <span class="n">account</span> <span class="k">for</span>
+  <span class="o">//</span> <span class="n">requests</span> <span class="n">that</span> <span class="n">were</span> <span class="n">a</span> <span class="n">cache</span> <span class="n">hit</span><span class="o">.</span> <span class="n">See</span> <span class="n">the</span> <span class="s2">&quot;cache_hit&quot;</span> <span class="n">field</span> <span class="k">for</span> <span class="n">more</span>
+  <span class="o">//</span> <span class="n">info</span><span class="o">.</span>
+  <span class="n">StatisticDuration</span> <span class="n">compute_output</span> <span class="o">=</span> <span class="mi">6</span><span class="p">;</span>
+
+  <span class="o">//</span> <span class="n">The</span> <span class="n">count</span> <span class="n">of</span> <span class="n">response</span> <span class="n">cache</span> <span class="n">hits</span> <span class="ow">and</span> <span class="n">cumulative</span> <span class="n">duration</span> <span class="n">to</span> <span class="n">lookup</span>
+  <span class="o">//</span> <span class="ow">and</span> <span class="n">extract</span> <span class="n">output</span> <span class="n">tensor</span> <span class="n">data</span> <span class="kn">from</span> <span class="nn">the</span> <span class="n">Response</span> <span class="n">Cache</span> <span class="n">on</span> <span class="n">a</span> <span class="n">cache</span>
+  <span class="o">//</span> <span class="n">hit</span><span class="o">.</span> <span class="n">For</span> <span class="n">example</span><span class="p">,</span> <span class="n">this</span> <span class="n">duration</span> <span class="n">should</span> <span class="n">include</span> <span class="n">the</span> <span class="n">time</span> <span class="n">to</span> <span class="n">copy</span>
+  <span class="o">//</span> <span class="n">output</span> <span class="n">tensor</span> <span class="n">data</span> <span class="kn">from</span> <span class="nn">the</span> <span class="n">Response</span> <span class="n">Cache</span> <span class="n">to</span> <span class="n">the</span> <span class="n">response</span> <span class="nb">object</span><span class="o">.</span>
+  <span class="o">//</span> <span class="n">On</span> <span class="n">cache</span> <span class="n">hits</span><span class="p">,</span> <span class="n">triton</span> <span class="n">does</span> <span class="ow">not</span> <span class="n">need</span> <span class="n">to</span> <span class="n">go</span> <span class="n">to</span> <span class="n">the</span> <span class="n">model</span><span class="o">/</span><span class="n">backend</span> 
+  <span class="o">//</span> <span class="k">for</span> <span class="n">the</span> <span class="n">output</span> <span class="n">tensor</span> <span class="n">data</span><span class="p">,</span> <span class="n">so</span> <span class="n">the</span> <span class="s2">&quot;compute_input&quot;</span><span class="p">,</span> <span class="s2">&quot;compute_infer&quot;</span><span class="p">,</span>
+  <span class="o">//</span> <span class="ow">and</span> <span class="s2">&quot;compute_output&quot;</span> <span class="n">fields</span> <span class="n">are</span> <span class="ow">not</span> <span class="n">updated</span><span class="o">.</span> <span class="n">Assuming</span> <span class="n">the</span> <span class="n">response</span>
+  <span class="o">//</span> <span class="n">cache</span> <span class="ow">is</span> <span class="n">enabled</span> <span class="k">for</span> <span class="n">a</span> <span class="n">given</span> <span class="n">model</span><span class="p">,</span> <span class="n">a</span> <span class="n">cache</span> <span class="n">hit</span> <span class="n">occurs</span> <span class="k">for</span> <span class="n">a</span>
+  <span class="o">//</span> <span class="n">request</span> <span class="n">to</span> <span class="n">that</span> <span class="n">model</span> <span class="n">when</span> <span class="n">the</span> <span class="n">request</span> <span class="n">metadata</span> <span class="p">(</span><span class="n">model</span> <span class="n">name</span><span class="p">,</span>
+  <span class="o">//</span> <span class="n">model</span> <span class="n">version</span><span class="p">,</span> <span class="n">model</span> <span class="n">inputs</span><span class="p">)</span> <span class="n">hashes</span> <span class="n">to</span> <span class="n">an</span> <span class="n">existing</span> <span class="n">entry</span> <span class="ow">in</span> <span class="n">the</span>
+  <span class="o">//</span> <span class="n">cache</span><span class="o">.</span> <span class="n">On</span> <span class="n">a</span> <span class="n">cache</span> <span class="n">miss</span><span class="p">,</span> <span class="n">the</span> <span class="n">request</span> <span class="nb">hash</span> <span class="ow">and</span> <span class="n">response</span> <span class="n">output</span> <span class="n">tensor</span>
+  <span class="o">//</span> <span class="n">data</span> <span class="ow">is</span> <span class="n">added</span> <span class="n">to</span> <span class="n">the</span> <span class="n">cache</span><span class="o">.</span> <span class="n">See</span> <span class="n">response</span> <span class="n">cache</span> <span class="n">docs</span> <span class="k">for</span> <span class="n">more</span> <span class="n">info</span><span class="p">:</span>
+  <span class="o">//</span> <span class="n">https</span><span class="p">:</span><span class="o">//</span><span class="n">github</span><span class="o">.</span><span class="n">com</span><span class="o">/</span><span class="n">triton</span><span class="o">-</span><span class="n">inference</span><span class="o">-</span><span class="n">server</span><span class="o">/</span><span class="n">server</span><span class="o">/</span><span class="n">blob</span><span class="o">/</span><span class="n">main</span><span class="o">/</span><span class="n">docs</span><span class="o">/</span><span class="n">response_cache</span><span class="o">.</span><span class="n">md</span>
+  <span class="n">StatisticDuration</span> <span class="n">cache_hit</span> <span class="o">=</span> <span class="mi">7</span><span class="p">;</span>
+
+  <span class="o">//</span> <span class="n">The</span> <span class="n">count</span> <span class="n">of</span> <span class="n">response</span> <span class="n">cache</span> <span class="n">misses</span> <span class="ow">and</span> <span class="n">cumulative</span> <span class="n">duration</span> <span class="n">to</span> <span class="n">lookup</span>
+  <span class="o">//</span> <span class="ow">and</span> <span class="n">insert</span> <span class="n">output</span> <span class="n">tensor</span> <span class="n">data</span> <span class="kn">from</span> <span class="nn">the</span> <span class="n">computed</span> <span class="n">response</span> <span class="n">to</span> <span class="n">the</span> <span class="n">cache</span>
+  <span class="o">//</span> <span class="n">For</span> <span class="n">example</span><span class="p">,</span> <span class="n">this</span> <span class="n">duration</span> <span class="n">should</span> <span class="n">include</span> <span class="n">the</span> <span class="n">time</span> <span class="n">to</span> <span class="n">copy</span>
+  <span class="o">//</span> <span class="n">output</span> <span class="n">tensor</span> <span class="n">data</span> <span class="kn">from</span> <span class="nn">the</span> <span class="n">resposne</span> <span class="nb">object</span> <span class="n">to</span> <span class="n">the</span> <span class="n">Response</span> <span class="n">Cache</span><span class="o">.</span>
+  <span class="o">//</span> <span class="n">Assuming</span> <span class="n">the</span> <span class="n">response</span> <span class="n">cache</span> <span class="ow">is</span> <span class="n">enabled</span> <span class="k">for</span> <span class="n">a</span> <span class="n">given</span> <span class="n">model</span><span class="p">,</span> <span class="n">a</span> <span class="n">cache</span>
+  <span class="o">//</span> <span class="n">miss</span> <span class="n">occurs</span> <span class="k">for</span> <span class="n">a</span> <span class="n">request</span> <span class="n">to</span> <span class="n">that</span> <span class="n">model</span> <span class="n">when</span> <span class="n">the</span> <span class="n">request</span> <span class="n">metadata</span>
+  <span class="o">//</span> <span class="n">does</span> <span class="n">NOT</span> <span class="nb">hash</span> <span class="n">to</span> <span class="n">an</span> <span class="n">existing</span> <span class="n">entry</span> <span class="ow">in</span> <span class="n">the</span> <span class="n">cache</span><span class="o">.</span> <span class="n">See</span> <span class="n">the</span> <span class="n">response</span>
+  <span class="o">//</span> <span class="n">cache</span> <span class="n">docs</span> <span class="k">for</span> <span class="n">more</span> <span class="n">info</span><span class="p">:</span>
+  <span class="o">//</span> <span class="n">https</span><span class="p">:</span><span class="o">//</span><span class="n">github</span><span class="o">.</span><span class="n">com</span><span class="o">/</span><span class="n">triton</span><span class="o">-</span><span class="n">inference</span><span class="o">-</span><span class="n">server</span><span class="o">/</span><span class="n">server</span><span class="o">/</span><span class="n">blob</span><span class="o">/</span><span class="n">main</span><span class="o">/</span><span class="n">docs</span><span class="o">/</span><span class="n">response_cache</span><span class="o">.</span><span class="n">md</span>
+  <span class="n">StatisticDuration</span> <span class="n">cache_miss</span> <span class="o">=</span> <span class="mi">8</span><span class="p">;</span>
+<span class="p">}</span>
+
+<span class="o">//</span> <span class="n">Inference</span> <span class="n">batch</span> <span class="n">statistics</span><span class="o">.</span>
+<span class="n">message</span> <span class="n">InferBatchStatistics</span>
+<span class="p">{</span>
+  <span class="o">//</span> <span class="n">The</span> <span class="n">size</span> <span class="n">of</span> <span class="n">the</span> <span class="n">batch</span><span class="o">.</span>
+  <span class="n">uint64</span> <span class="n">batch_size</span> <span class="o">=</span> <span class="mi">1</span><span class="p">;</span>
+
+  <span class="o">//</span> <span class="n">The</span> <span class="n">count</span> <span class="ow">and</span> <span class="n">cumulative</span> <span class="n">duration</span> <span class="n">to</span> <span class="n">prepare</span> <span class="nb">input</span> <span class="n">tensor</span> <span class="n">data</span> <span class="k">as</span>
+  <span class="o">//</span> <span class="n">required</span> <span class="n">by</span> <span class="n">the</span> <span class="n">model</span> <span class="n">framework</span> <span class="o">/</span> <span class="n">backend</span> <span class="k">with</span> <span class="n">the</span> <span class="n">given</span> <span class="n">batch</span> <span class="n">size</span><span class="o">.</span>
+  <span class="o">//</span> <span class="n">For</span> <span class="n">example</span><span class="p">,</span> <span class="n">this</span> <span class="n">duration</span> <span class="n">should</span> <span class="n">include</span> <span class="n">the</span> <span class="n">time</span> <span class="n">to</span> <span class="n">copy</span> <span class="nb">input</span>
+  <span class="o">//</span> <span class="n">tensor</span> <span class="n">data</span> <span class="n">to</span> <span class="n">the</span> <span class="n">GPU</span><span class="o">.</span>
+  <span class="n">StatisticDuration</span> <span class="n">compute_input</span> <span class="o">=</span> <span class="mi">2</span><span class="p">;</span>
+
+  <span class="o">//</span> <span class="n">The</span> <span class="n">count</span> <span class="ow">and</span> <span class="n">cumulative</span> <span class="n">duration</span> <span class="n">to</span> <span class="n">execute</span> <span class="n">the</span> <span class="n">model</span> <span class="k">with</span> <span class="n">the</span> <span class="n">given</span>
+  <span class="o">//</span> <span class="n">batch</span> <span class="n">size</span><span class="o">.</span>
+  <span class="n">StatisticDuration</span> <span class="n">compute_infer</span> <span class="o">=</span> <span class="mi">3</span><span class="p">;</span>
+
+  <span class="o">//</span> <span class="n">The</span> <span class="n">count</span> <span class="ow">and</span> <span class="n">cumulative</span> <span class="n">duration</span> <span class="n">to</span> <span class="n">extract</span> <span class="n">output</span> <span class="n">tensor</span> <span class="n">data</span>
+  <span class="o">//</span> <span class="n">produced</span> <span class="n">by</span> <span class="n">the</span> <span class="n">model</span> <span class="n">framework</span> <span class="o">/</span> <span class="n">backend</span> <span class="k">with</span> <span class="n">the</span> <span class="n">given</span> <span class="n">batch</span> <span class="n">size</span><span class="o">.</span>
+  <span class="o">//</span> <span class="n">For</span> <span class="n">example</span><span class="p">,</span> <span class="n">this</span> <span class="n">duration</span> <span class="n">should</span> <span class="n">include</span> <span class="n">the</span> <span class="n">time</span> <span class="n">to</span> <span class="n">copy</span> <span class="n">output</span>
+  <span class="o">//</span> <span class="n">tensor</span> <span class="n">data</span> <span class="kn">from</span> <span class="nn">the</span> <span class="n">GPU</span><span class="o">.</span>
+  <span class="n">StatisticDuration</span> <span class="n">compute_output</span> <span class="o">=</span> <span class="mi">4</span><span class="p">;</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+</div>
+</div>
+
+<div class="section">
+   
+</div>
+
+              </div>
+              
+            </main>
+            <footer class="footer-article noprint">
+                
+    <!-- Previous / next buttons -->
+<div class='prev-next-area'>
+    <a class='left-prev' id="prev-link" href="extension_shared_memory.html" title="previous page">
+        <i class="fas fa-angle-left"></i>
+        <div class="prev-next-info">
+            <p class="prev-next-subtitle">previous</p>
+            <p class="prev-next-title">Shared-Memory Extension</p>
+        </div>
+    </a>
+    <a class='right-next' id="next-link" href="extension_trace.html" title="next page">
+    <div class="prev-next-info">
+        <p class="prev-next-subtitle">next</p>
+        <p class="prev-next-title">Trace Extension</p>
+    </div>
+    <i class="fas fa-angle-right"></i>
+    </a>
+</div>
+            </footer>
+        </div>
+    </div>
+    <div class="footer-content row">
+        <footer class="col footer"><p>
+  
+    By NVIDIA<br/>
+  
+      &copy; Copyright 2022 NVIDIA CORPORATION &amp; AFFILIATES. All rights reserved.<br/>
+    Last updated on Oct 05, 2022.<br/>
+</p>
+        </footer>
+    </div>
+    
+</div>
+
+
+      </div>
+    </div>
+  
+  <!-- Scripts loaded after <body> so the DOM is not blocked -->
+  <script src="../_static/scripts/pydata-sphinx-theme.js?digest=1999514e3f237ded88cf"></script>
+
+
+<script type="text/javascript">_satellite.pageBottom();</script>
+  </body>
+</html>
