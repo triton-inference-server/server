@@ -112,10 +112,10 @@ $ git clone https://github.com/triton-inference-server/server.git
 Triton Server needs a repository of models that it will make available
 for inferencing. For this example, we are using an existing NFS server and
 placing our model files there. See the
-[Model Repository documentation](../../docs/model_repository.md) for other
+[Model Repository documentation](../../docs/user_guide/model_repository.md) for other
 supported locations.
 
-Following the [QuickStart](../../docs/quickstart.md), download the
+Following the [QuickStart](../../docs/getting_started/quickstart.md), download the
 example model repository to your system and copy it onto your NFS server.
 Then, add the url or IP address of your NFS server and the server path of your
 model repository to `values.yaml`.
@@ -237,7 +237,7 @@ $ helm install example -f config.yaml .
 ## Using Triton Inference Server
 
 Now that the inference server is running you can send HTTP or GRPC
-requests to it to perform inferencing. By default, this chart deploys [Traefik](traefik.io)
+requests to it to perform inferencing. By default, this chart deploys [Traefik](https://traefik.io/)
 and uses [IngressRoutes](https://doc.traefik.io/traefik/providers/kubernetes-crd/)
 to balance requests across all available nodes.
 
@@ -267,7 +267,7 @@ from the HTTP endpoint.
 $ curl $cluster_ip:8000/v2
 ```
 
-Follow the [QuickStart](../../docs/quickstart.md) to get the example
+Follow the [QuickStart](../../docs/getting_started/quickstart.md) to get the example
 image classification client that can be used to perform inferencing
 using image classification models on the inference
 server. For example,
@@ -284,7 +284,7 @@ Image 'images/mug.jpg':
 ## Testing Load Balancing and Autoscaling
 After you have confirmed that your Triton cluster is operational and can perform inference,
 you can test the load balancing and autoscaling features by sending a heavy load of requests.
-One option for doing this is using the [perf_analyzer](../../docs/perf_analyzer.md) application.
+One option for doing this is using the [perf_analyzer](../../docs/user_guide/perf_analyzer.md) application.
 
 You can apply a progressively increasing load with a command like:
 ```

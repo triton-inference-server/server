@@ -52,7 +52,7 @@ Where \<yy.mm\> is the version of Triton that you want to pull. For a complete l
 This guide covers the simplest possible workflow for deploying a model using a Triton Inference Server.
 - [Create a Model Repository](getting_started/quickstart.md#create-a-model-repository)
 - [Launch Triton](getting_started/quickstart.md#launch-triton)
-- [Send an Inference Request](getting_started/quickstart.md#sending-an-inference-request)
+- [Send an Inference Request](getting_started/quickstart.md#send-an-inference-request)
 
 Triton Inference Server has a considerable list versatile and powerful features. All new users are recommended to explore the [User Guide](README.md#user-guide) and the [additional resources](README.md#resources) sections for features most relevant to their use case. 
 
@@ -122,7 +122,7 @@ Triton supports batching individual inference requests to improve compute resour
   - [Stateful Models](user_guide/architecture.md#stateful-models)
   - [Control Inputs](user_guide/architecture.md#control-inputs)
   - [Implicit State - Stateful Inference Using a Stateless Model](user_guide/architecture.md#implicit-state-management)
-  - [Sequence Scheduling Strategies](user_guide/architecture.md#scheduling-strateties)
+  - [Sequence Scheduling Strategies](user_guide/architecture.md#scheduling-strategies)
     - [Direct](user_guide/architecture.md#direct)
     - [Oldest](user_guide/architecture.md#oldest)
 

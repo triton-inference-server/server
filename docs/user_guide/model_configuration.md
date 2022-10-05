@@ -867,7 +867,7 @@ maximum batch size allowed by the model (but see the following section
 for the delay option that changes this behavior).
 
 The size of generated batches can be examined in aggregate using
-[count metrics](metrics.md#count-metrics).
+[count metrics](metrics.md#inference-request-metrics).
 
 #### Delayed Batching
 
