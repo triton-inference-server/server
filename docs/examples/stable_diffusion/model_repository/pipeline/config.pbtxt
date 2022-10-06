@@ -1,0 +1,25 @@
+name: "pipeline"
+backend: "python"
+max_batch_size: 8
+
+input [
+  {
+    name: "prompt"
+    data_type: TYPE_STRING	
+    dims: [1]
+  }
+]
+output [
+  {
+    name: "generated_image"
+    data_type: TYPE_FP32	
+    dims: [ -1, -1, -1]
+  }
+]
+
+instance_group [
+  {
+    kind: KIND_GPU
+  }
+]
+

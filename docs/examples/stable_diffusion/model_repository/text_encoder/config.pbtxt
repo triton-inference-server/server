@@ -1,0 +1,37 @@
+name: "text_encoder"
+platform: "onnxruntime_onnx"
+max_batch_size: 8
+
+input [
+  {
+    name: "input_ids"
+    data_type: TYPE_INT32
+    dims: [ -1]
+  }
+]
+output [
+  {
+    name: "pooler_output"
+    data_type: TYPE_FP32
+    dims: [ 768]
+  },
+  {
+    name: "last_hidden_state"
+    data_type: TYPE_FP32
+    dims: [ -1, 768]
+  }
+]
+
+instance_group [
+  {
+    kind: KIND_GPU
+  }
+]
+optimization {
+  graph : {
+    level : 1
+  }
+}
+
+parameters { key: "execution_mode" value: { string_value: "1" } }
+parameters { key: "cudnn_conv_algo_search" value: { string_value: "0" } }
