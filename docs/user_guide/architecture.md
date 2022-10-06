@@ -313,7 +313,7 @@ non-starting requests in the sequence, the input state is the output state of
 the previous request in the sequence. For an example ONNX model that uses
 implicit state you can refer to this onnx model generated from the 
 `create_onnx_modelfile_wo_initial_state()`
-[from this generation script](../../qa/common/gen_qa_implicit_models.py).
+[from this generation script](https://github.com/triton-inference-server/server/blob/main/qa/common/gen_qa_implicit_models.py).
 This is a simple accumulator model that stores the partial sum of the requests
 in a sequence in Triton using implicit state. For state initialization, if the
 request is starting, the model sets the "OUTPUT\_STATE" to be equal to the

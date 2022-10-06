@@ -34,8 +34,8 @@ in the extensions field of its Server Metadata.
 
 ## HTTP/REST
 
-In all JSON schemas shown in this document $number, $string, $boolean,
-$object and $array refer to the fundamental JSON types. #optional
+In all JSON schemas shown in this document `$number`, `$string`, `$boolean`,
+`$object` and `$array` refer to the fundamental JSON types. #optional
 indicates an optional JSON field.
 
 Triton exposes the logging endpoint at the following URL. The client may use
@@ -52,7 +52,7 @@ POST v2/logging
 ### Log Setting Response JSON Object
 
 A successful log setting request is indicated by a 200 HTTP status
-code. The response object, identified as $log_setting_response, is
+code. The response object, identified as `$log_setting_response`, is
 returned in the HTTP body for every successful log setting request.
 
 ```
@@ -64,34 +64,33 @@ $log_setting_response =
 $log_setting = $string : $string | $boolean | $number
 ```
 
-Each $log_setting JSON describes a “name”/”value” pair, where the “name” is
-the $string representation of the log setting and the “value” is a $string, $bool, or $number representation of the
-setting value. Currently, the following log settings are defined:
+Each `$log_setting` JSON describes a “name”/”value” pair, where the “name” is
+the `$string` representation of the log setting and the “value” is a `$string`, 
+`$bool`, or `$number` representation of the setting value. Currently, the 
+following log settings are defined:
 
-- "log_file" : a $string parameter defining the file where the log outputs will be saved. If an empty string is specified,
-log outputs will stream to the console.
+- "log_file" : a `$string` parameter defining the file where the log outputs will be saved. If an empty string is specified, log outputs will stream to the console.
 
-- "log_info" : a $boolean parameter that controls whether the Triton server logs INFO level messages. 
+- "log_info" : a `$boolean` parameter that controls whether the Triton server logs INFO level messages. 
 
-- "log_warning" : a $boolean parameter that controls whether the Triton server logs WARNING level messages. 
+- "log_warning" : a `$boolean` parameter that controls whether the Triton server logs WARNING level messages. 
 
-- "log_error" : a $boolean parameter that controls whether the Triton server logs ERROR level messages. 
+- "log_error" : a `$boolean` parameter that controls whether the Triton server logs ERROR level messages. 
 
-- "log_verbose_level" : a $number parameter that controls whether the Triton server outputs verbose messages
+- "log_verbose_level" : a `$number` parameter that controls whether the Triton server outputs verbose messages
 of varying degrees. This value can be any integer >= 0. If "log_verbose_level" is 0, verbose logging will be disabled, and 
 no verbose messages will be output by the Triton server. If "log_verbose_level" is 1, level 1 verbose messages will be output
 by the Triton server. If "log_verbose_level" is 2, the Triton server will output all verbose messages of 
 level <= 2, etc. Attempting to set "log_verbose_level" to a number < 0 will result in an error.
 
-- "log_format" : a $string parameter that controls the format of Triton server log messages. There are currently
+- "log_format" : a `$string` parameter that controls the format of Triton server log messages. There are currently
 2 formats: "default" and "ISO8601".
 
 
 ### Log Setting Response JSON Error Object
 
 A failed log setting request will be indicated by an HTTP error status
-(typically 400). The HTTP body will contain a
-$log_setting_error_response object.
+(typically 400). The HTTP body will contain a `$log_setting_error_response` object.
 
 ```
 $log_setting_error_response =
@@ -108,7 +107,7 @@ A log setting request is made with a HTTP POST to
 the logging endpoint. In the corresponding response, the HTTP body contains the
 response JSON. A successful request is indicated by a 200 HTTP status code.
 
-The request object, identified as $log_setting_request must be provided in the HTTP
+The request object, identified as `$log_setting_request` must be provided in the HTTP
 body.
 
 ```
@@ -118,7 +117,7 @@ $log_setting_request =
 }
 ```
 
-When a $log_setting JSON is received (defined above), only the specified
+When a `$log_setting` JSON is received (defined above), only the specified
 settings will be updated.
 
 ### Example Usage
@@ -127,7 +126,7 @@ a Triton server is running at `localhost:8000`):
 ```
 curl -s -w '\n%{http_code}\n' -d '{"log_verbose_level":1}' -X POST localhost:8000/v2/logging
 ```
-This command should return a $log_setting_response JSON object with the following format:
+This command should return a `$log_setting_response` JSON object with the following format:
 ```
 {"log_file":"","log_info":true,"log_warnings":true,"log_errors":true,"log_verbose_level":1,"log_format":"default"}
 200

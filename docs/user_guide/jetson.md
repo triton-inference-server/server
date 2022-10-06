@@ -206,4 +206,4 @@ perf_analyzer -m graphdef_int32_int32_int32 --service-kind=triton_c_api \
     --model-repository=/workspace/qa/L0_perf_analyzer_capi/models
 ```
 
-Refer to these [examples](../examples/jetson) that demonstrate how to use Triton Inference Server on Jetson.
+Refer to these [examples](../examples/jetson/README.md) that demonstrate how to use Triton Inference Server on Jetson.

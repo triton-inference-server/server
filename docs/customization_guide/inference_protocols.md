@@ -135,13 +135,13 @@ All capabilities of Triton server are encapsulated in the shared
 library and are exposed via the Server API. The `tritonserver`
 executable implements HTTP/REST and GRPC endpoints and uses the Server
 API to communicate with core Triton logic. The primary source files
-for the endpoints are [grpc_server.cc](../../src/grpc_server.cc) and
-[http_server.cc](../../src/http_server.cc). In these source files you can
+for the endpoints are [grpc_server.cc](https://github.com/triton-inference-server/server/blob/main/src/grpc_server.cc) and
+[http_server.cc](https://github.com/triton-inference-server/server/blob/main/src/http_server.cc). In these source files you can
 see the Server API being used.
 
 You can use the Server API in your own application as well. A simple
 example using the Server API can be found in
-[simple.cc](../../src/simple.cc).
+[simple.cc](https://github.com/triton-inference-server/server/blob/main/src/simple.cc).
 
 ### API Description
 
@@ -166,7 +166,7 @@ all of the features and capabilities of Triton. A
 `TRITONSERVER_Server` object is created by calling
 `TRITONSERVER_ServerNew` with a set of options that indicate how the
 object should be initialized.  Use of `TRITONSERVER_ServerNew` is
-demonstrated in [simple.cc](../../src/simple.cc). Once you have created a
+demonstrated in [simple.cc](https://github.com/triton-inference-server/server/blob/main/src/simple.cc). Once you have created a
 `TRITONSERVER_Server` object, you can begin using the rest of the
 Server API as described below.
 
@@ -185,12 +185,12 @@ the Server API function. As a result, your application is responsible
 for managing the lifecycle of the returned `TRITONSERVER_Error`
 object. You must delete the error object using
 `TRITONSERVER_ErrorDelete` when you are done using it. Macros such as
-`FAIL_IF_ERR` shown in [common.h](../../src/common.h) are useful for
+`FAIL_IF_ERR` shown in [common.h](https://github.com/triton-inference-server/server/blob/main/src/common.h) are useful for
 managing error object lifetimes.
 
 #### Versioning and Backwards Compatibility
 
-A typical pattern, demonstrated in [simple.cc](../../src/simple.cc) and
+A typical pattern, demonstrated in [simple.cc](https://github.com/triton-inference-server/server/blob/main/src/simple.cc) and
 shown below, shows how you can compare the Server API version provided
 by the shared library against the Server API version that you compiled
 your application against. The Server API is backwards compatible, so
@@ -218,14 +218,14 @@ The Server API contains functions for checking health and readiness,
 getting model information, getting model statistics and metrics,
 loading and unloading models, etc. The use of these functions is
 straightforward and some of these functions are demonstrated in
-[simple.cc](../../src/simple.cc) and all are documented in
+[simple.cc](https://github.com/triton-inference-server/server/blob/main/src/simple.cc) and all are documented in
 [tritonserver.h](https://github.com/triton-inference-server/core/blob/main/include/triton/core/tritonserver.h).
 
 #### Inference APIs
 
 Performing an inference request requires the use of many Server API
 functions and objects, as demonstrated in
-[simple.cc](../../src/simple.cc). The general usage requires the
+[simple.cc](https://github.com/triton-inference-server/server/blob/main/src/simple.cc). The general usage requires the
 following steps.
 
 * Create a `TRITONSERVER_ResponseAllocator` using
@@ -242,7 +242,7 @@ following steps.
   `TRITONSERVER_ResponseAllocatorAllocFn_t` and
   `TRITONSERVER_ResponseAllocatorReleaseFn_t` as defined in
   [tritonserver.h](https://github.com/triton-inference-server/core/blob/main/include/triton/core/tritonserver.h). In
-  [simple.cc](../../src/simple.cc), these callback functions are
+  [simple.cc](https://github.com/triton-inference-server/server/blob/main/src/simple.cc), these callback functions are
   implemented as `ResponseAlloc` and `ResponseRelease`.
 
 * Create an inference request as a `TRITONSERVER_InferenceRequest`
@@ -277,7 +277,7 @@ following steps.
 
   You can reuse an existing `TRITONSERVER_InferenceRequest` object for
   a new inference request. A couple of examples of how this is done
-  and why it is useful are shown in [simple.cc](../../src/simple.cc).
+  and why it is useful are shown in [simple.cc](https://github.com/triton-inference-server/server/blob/main/src/simple.cc).
 
 * Ask Triton to execute the inference request using
   `TRITONSERVER_ServerInferAsync`. `TRITONSERVER_ServerInferAsync` is
@@ -285,7 +285,7 @@ following steps.
   is returned via a callback into your application. You register this
   callback using `TRITONSERVER_InferenceRequestSetResponseCallback`
   before you invoke `TRITONSERVER_ServerInferAsync`. In
-  [simple.cc](../../src/simple.cc) this callback is
+  [simple.cc](https://github.com/triton-inference-server/server/blob/main/src/simple.cc) this callback is
   `InferResponseComplete`.
 
   When you invoke `TRITONSERVER_ServerInferAsync` and it returns
@@ -311,7 +311,7 @@ following steps.
   output tensors, and `TRITONSERVER_InferenceResponseOutput` to get
   information about each output tensor.
 
-  Note that the [simple.cc](../../src/simple.cc) example uses a
+  Note that the [simple.cc](https://github.com/triton-inference-server/server/blob/main/src/simple.cc) example uses a
   std::promise to simply wait for the response, but synchronizing
   response handling in this way is not required. You can have multiple
   inference requests in flight at the same time and can issue
@@ -322,12 +322,12 @@ is documented in
 [tritonserver.h](https://github.com/triton-inference-server/core/blob/main/include/triton/core/tritonserver.h).
 
 A simple example using the C API can be found in
-[simple.cc](../../src/simple.cc).  A more complicated example can be
+[simple.cc](https://github.com/triton-inference-server/server/blob/main/src/simple.cc).  A more complicated example can be
 found in the source that implements the HTTP/REST and GRPC endpoints
 for Triton. These endpoints use the C API to communicate with the core
 of Triton. The primary source files for the endpoints are
-[grpc_server.cc](../../src/grpc_server.cc) and
-[http_server.cc](../../src/http_server.cc).
+[grpc_server.cc](https://github.com/triton-inference-server/server/blob/main/src/grpc_server.cc) and
+[http_server.cc](https://github.com/triton-inference-server/server/blob/main/src/http_server.cc).
 
 ## Java bindings for In-Process Triton Server API
 
@@ -341,14 +341,14 @@ generated from `tritonserver.java`.
 A simple example using the Java API can be found in
 [Samples folder](https://github.com/bytedeco/javacpp-presets/tree/master/tritonserver/samples)
 which includes `Simple.java` which is similar to 
-[`simple.cc`](../../src/simple.cc). 
+[`simple.cc`](https://github.com/triton-inference-server/server/blob/main/src/simple.cc). 
 Please refer to
 [sample usage documentation](https://github.com/bytedeco/javacpp-presets/tree/master/tritonserver#sample-usage)
 to learn about how to build and run `Simple.java`.
 
-In the [QA folder](../../qa), folders starting with L0_java include Java API tests.
+In the [QA folder](https://github.com/triton-inference-server/server/blob/main/qa), folders starting with L0_java include Java API tests.
 These can be useful references for getting started, such as the
-[ResNet50 test](../../qa/L0_java_resnet).
+[ResNet50 test](https://github.com/triton-inference-server/server/blob/main/qa/L0_java_resnet).
 
 ### Java API setup instructions
 
