@@ -60,7 +60,7 @@ RET=0
 LD_LIBRARY_PATH=/opt/tritonserver/backends/tensorflow2:$LD_LIBRARY_PATH
 
 # Tensorflow
-## LD_PRELOAD
+## Load operations via LD_PRELOAD
 SERVER_ARGS="--model-repository=/data/inferenceserver/${REPO_VERSION}/qa_custom_ops/tf_custom_ops"
 SERVER_LD_PRELOAD="/data/inferenceserver/${REPO_VERSION}/qa_custom_ops/tf_custom_ops/libzeroout.so:/data/inferenceserver/${REPO_VERSION}/qa_custom_ops/tf_custom_ops/libcudaop.so:/data/inferenceserver/${REPO_VERSION}/qa_custom_ops/tf_custom_ops/libbusyop.so"
 
@@ -106,7 +106,7 @@ set -e
 kill $SERVER_PID
 wait $SERVER_PID
 
-## Runtime loading via config
+## Load operations via model config
 SERVER_ARGS="--model-repository=tf_custom_ops --strict-model-config=false"
 SERVER_ARGS="--model-repository=tf_custom_ops"
 SERVER_LD_PRELOAD=""
