@@ -392,7 +392,7 @@ if [ $(cat ${CLIENT_LOG}.model_control | grep "PASS" | wc -l) -ne 1 ]; then
     cat ${CLIENT_LOG}.model_control
     RET=1
 fi
-if [ $(cat ${SERVER_LOG} | grep "Invalid override config" | wc -l) -eq 0 ]; then
+if [ $(cat ${SERVER_LOG} | grep "Invalid config override" | wc -l) -eq 0 ]; then
     cat ${SERVER_LOG}
     RET=1
 fi
