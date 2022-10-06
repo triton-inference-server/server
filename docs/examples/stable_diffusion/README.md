@@ -1,5 +1,7 @@
 # Stable diffusion
 
+*Note*: This tutorial aims at demonstrating the ease of deployment and doesn't incorporate all possible optimizations using the NVIDIA ecosystem.
+
 This example focuses on showcasing two of Triton Inference Server's features:
 * Using multiple frameworks in the same inference pipeline. Refer [this for more information](https://github.com/triton-inference-server/backend#where-can-i-find-all-the-backends-that-are-available-for-triton) about supported frameworks.
 * Using the Python Backend's [Business Logic Scripting](https://github.com/triton-inference-server/python_backend#business-logic-scripting) API to build complex non linear pipelines.
