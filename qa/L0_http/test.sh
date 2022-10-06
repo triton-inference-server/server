@@ -271,7 +271,7 @@ if [ $(cat ${CLIENT_LOG}.model_control | grep "PASS" | wc -l) -ne 1 ]; then
     cat ${CLIENT_LOG}.model_control
     RET=1
 fi
-if [ $(cat ${SERVER_LOG} | grep "Unrecognized override config" | wc -l) -eq 0 ]; then
+if [ $(cat ${SERVER_LOG} | grep "Invalid override config" | wc -l) -eq 0 ]; then
     cat ${SERVER_LOG}
     RET=1
 fi
@@ -514,23 +514,29 @@ SERVER_ARGS="--model-repository=`pwd`/unit_test_models \
              --strict-model-config=false"
 SERVER_LOG="./inference_server_cc_unit_test.load.log"
 CLIENT_LOG="./cc_unit_test.load.log"
-run_server
-if [ "$SERVER_PID" == "0" ]; then
-    echo -e "\n***\n*** Failed to start $SERVER\n***"
-    cat $SERVER_LOG
-    exit 1
-fi
 
-set +e
-$CC_UNIT_TEST --gtest_filter=HTTP*Load* >> ${CLIENT_LOG} 2>&1
-if [ $? -ne 0 ]; then
-    cat ${CLIENT_LOG}
-    RET=1
-fi
-set -e
+for i in \
+   "LoadWithFileOverride" \
+   "LoadWithConfigOverride" \
+   ; do
+    run_server
+    if [ "$SERVER_PID" == "0" ]; then
+        echo -e "\n***\n*** Failed to start $SERVER\n***"
+        cat $SERVER_LOG
+        exit 1
+    fi
 
-kill $SERVER_PID
-wait $SERVER_PID
+    set +e
+    $CC_UNIT_TEST --gtest_filter=HTTP*$i >> ${CLIENT_LOG}.$i 2>&1
+    if [ $? -ne 0 ]; then
+        cat ${CLIENT_LOG}.$i
+        RET=1
+    fi
+    set -e
+
+    kill $SERVER_PID
+    wait $SERVER_PID
+done
 
 # Run python http aio unit test
 PYTHON_HTTP_AIO_TEST=python_http_aio_test.py
