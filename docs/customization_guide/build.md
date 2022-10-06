@@ -67,7 +67,7 @@ If you are developing or debugging Triton, see [Development and
 Incremental Builds](#development-and-incremental-builds) for information
 on how to perform incremental build.
 
-## <a name="ubuntu"></a>Building for Ubuntu 20.04
+## Building for Ubuntu 20.04
 
 For Ubuntu-20.04, build.py supports both a Docker build and a
 non-Docker build.
@@ -77,7 +77,7 @@ non-Docker build.
 
 * [Build without Docker](#building-without-docker).
 
-### <a name="ubuntu-docker"></a>Building With Docker
+### Building With Docker
 
 The easiest way to build Triton is to use Docker. The result of the
 build will be a Docker image called *tritonserver* that will contain
@@ -202,7 +202,7 @@ flag. This is needed since the CPU-only builds of the TensorFlow and
 PyTorch backends require some CUDA stubs and runtime dependencies that are
 not present in the CPU-only base container.
 
-### <a name="ubuntu-without-docker"></a>Building Without Docker
+### Building Without Docker
 
 To build Triton without using Docker you must install the build
 dependencies that are handled automatically when building with Docker.
@@ -267,11 +267,11 @@ For a given version of Triton you can attempt to build with
 non-supported versions of TensorRT but you may have build or execution
 issues since non-supported versions are not tested.
 
-## <a name="jetpack"></a>Building for JetPack 4.x
+## Building for JetPack 4.x
 
 *Under Construction*
 
-## <a name="windows"></a>Building for Windows 10
+## Building for Windows 10
 
 For Windows 10, build.py supports both a Docker build and a non-Docker
 build in a similar way as described for [Ubuntu](#building-for-ubuntu-2004). The primary
