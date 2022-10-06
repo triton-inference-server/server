@@ -277,7 +277,7 @@ cp ./results/densenet_onnx_config_3/config.pbtxt /mnt/models/densenet_onnx/
 ```
 
 Now that we have an optimized Model Configuration, we are ready to take our model to deployment. 
-For further manual tuning, read the [Model Configuration](model_configuration.md) and [Optimization](optimization.md#) docs to learn more about Triton's complete set of capabilities.
+For further manual tuning, read the [Model Configuration](model_configuration.md) and [Optimization](optimization.md) docs to learn more about Triton's complete set of capabilities.
 
 In this example, we happened to get both the highest throughput and almost lowest latency from the same configuration, but in some cases this is a tradeoff that must be made. 
 Certain models or configurations may achieve a higher throughput but also incur a higher latency in return. 

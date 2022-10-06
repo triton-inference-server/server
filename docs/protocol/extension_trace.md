@@ -35,8 +35,8 @@ its Server Metadata.
 
 ## HTTP/REST
 
-In all JSON schemas shown in this document $number, $string, $boolean,
-$object and $array refer to the fundamental JSON types. #optional
+In all JSON schemas shown in this document `$number`, `$string`, `$boolean`,
+`$object` and `$array` refer to the fundamental JSON types. `#optional`
 indicates an optional JSON field.
 
 Triton exposes the trace endpoint at the following URL. The client may use
@@ -54,7 +54,7 @@ POST v2[/models/${MODEL_NAME}]/trace/setting
 ### Trace Setting Response JSON Object
 
 A successful trace setting request is indicated by a 200 HTTP status
-code. The response object, identified as $trace_setting_response, is
+code. The response object, identified as `$trace_setting_response`, is
 returned in the HTTP body for every successful trace setting request.
 
 ```
@@ -66,9 +66,9 @@ $trace_setting_response =
 $trace_setting = $string : $string | [ $string, ...]
 ```
 
-Each $trace_setting JSON describes a “name”/”value” pair, where the “name” is
-the name of the trace setting and the “value” is a $string representation of the
-setting value, or an array of $string for some settings. Currently the following
+Each `$trace_setting` JSON describes a “name”/”value” pair, where the “name” is
+the name of the trace setting and the “value” is a `$string representation` of the
+setting value, or an array of `$string` for some settings. Currently the following
 trace settings are defined:
 
 - "trace_file" : the file where the trace output will be saved. If
@@ -89,12 +89,12 @@ in "log_frequency", regardless of the "log_frequency" status.
 If the value is "-1", the number of traces to be sampled will not be limited.
 - "log_frequency" : the frequency that Triton will log the
 trace output to the files. If the value is "0", Triton will only log
-the trace output to ${trace_file} when shutting down. Otherwise, Triton will log
+the trace output to `${trace_file}` when shutting down. Otherwise, Triton will log
 the trace output to `${trace_file}.${idx}` when it collects
 the specified number of traces. For example, if the log frequency is "100",
 when Triton collects the 100-th trace, it logs the traces to file
-"${trace_file}.0", and when it collects the 200-th trace, it logs the 101-th to
-the 200-th traces to file "${trace_file}.1". Note that the file index will be
+`"${trace_file}.0"`, and when it collects the 200-th trace, it logs the 101-th to
+the 200-th traces to file `"${trace_file}.1"`. Note that the file index will be
 reset to 0 when "trace_file" setting is updated.
 
 
@@ -102,7 +102,7 @@ reset to 0 when "trace_file" setting is updated.
 
 A failed trace setting request will be indicated by an HTTP error status
 (typically 400). The HTTP body must contain the
-$trace_setting_error_response object.
+`$trace_setting_error_response` object.
 
 ```
 $trace_setting_error_response =
@@ -119,7 +119,7 @@ A trace setting request is made with a HTTP POST to
 the trace endpoint. In the corresponding response the HTTP body contains the
 response JSON. A successful request is indicated by a 200 HTTP status code.
 
-The request object, identified as $trace_setting_request must be provided in the HTTP
+The request object, identified as `$trace_setting_request` must be provided in the HTTP
 body.
 
 ```
@@ -129,7 +129,7 @@ $trace_setting_request =
 }
 ```
 
-The $trace_setting JSON is defined in
+The `$trace_setting` JSON is defined in
 [Trace Setting Response JSON Object](#trace-setting-response-json-object), only the specified
 settings will be updated. In addition to the values mentioned in response JSON
 object, JSON null value may be used to remove the specification of

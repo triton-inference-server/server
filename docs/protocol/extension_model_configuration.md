@@ -35,8 +35,8 @@ information.  Because this extension is supported, Triton reports
 
 ## HTTP/REST
 
-In all JSON schemas shown in this document $number, $string, $boolean,
-$object and $array refer to the fundamental JSON types. #optional
+In all JSON schemas shown in this document `$number`, `$string`, `$boolean`,
+`$object` and `$array` refer to the fundamental JSON types. #optional
 indicates an optional JSON field.
 
 Triton exposes the model configuation endpoint at the following
@@ -51,7 +51,7 @@ GET v2/models/${MODEL_NAME}[/versions/${MODEL_VERSION}]/config
 A model configuration request is made with an HTTP GET to the model
 configuration endpoint.A successful model configuration request is
 indicated by a 200 HTTP status code. The model configuration response
-object, identified as $model_configuration_response, is returned in
+object, identified as `$model_configuration_response`, is returned in
 the HTTP body for every successful request.
 
 ```
@@ -67,7 +67,7 @@ model_config.proto](https://github.com/triton-inference-server/common/blob/main/
 
 A failed model configuration request must be indicated by an HTTP
 error status (typically 400). The HTTP body must contain the
-$model_configuration_error_response object.
+`$model_configuration_error_response` object.
 
 ```
 $model_configuration_error_response =

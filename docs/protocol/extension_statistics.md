@@ -37,8 +37,8 @@ its Server Metadata.
 
 ## HTTP/REST
 
-In all JSON schemas shown in this document $number, $string, $boolean,
-$object and $array refer to the fundamental JSON types. #optional
+In all JSON schemas shown in this document `$number`, `$string`, `$boolean`,
+`$object` and `$array` refer to the fundamental JSON types. #optional
 indicates an optional JSON field.
 
 Triton exposes the statistics endpoint at the following URL. The
@@ -55,7 +55,7 @@ GET v2/models[/${MODEL_NAME}[/versions/${MODEL_VERSION}]]/stats
 ### Statistics Response JSON Object
 
 A successful statistics request is indicated by a 200 HTTP status
-code. The response object, identified as $stats_model_response, is
+code. The response object, identified as `$stats_model_response`, is
 returned in the HTTP body for every successful statistics request.
 
 ```
@@ -65,8 +65,8 @@ $stats_model_response =
 }
 ```
 
-Each $model_stat object gives the statistics for a specific model and
-version. The $version field is optional for servers that do not
+Each `$model_stat` object gives the statistics for a specific model and
+version. The `$version` field is optional for servers that do not
 support versions.
 
 ```
@@ -201,7 +201,7 @@ $batch_stats =
   the given batch size. For example, this duration should include the
   time to copy output tensor data from the GPU.
 
-The $duration_stat object reports a count and a total time. This
+The `$duration_stat` object reports a count and a total time. This
 format can be sampled to determine not only long-running averages but
 also incremental averages between sample points.
 
@@ -221,7 +221,7 @@ $duration_stat =
 
 A failed statistics request will be indicated by an HTTP error status
 (typically 400). The HTTP body must contain the
-$repository_statistics_error_response object.
+`$repository_statistics_error_response` object.
 
 ```
 $repository_statistics_error_response =

@@ -62,15 +62,15 @@ indices, the returned tensor will be [ “10:2:apple”, “5:1:pickle” ].
 
 ## HTTP/REST
 
-In all JSON schemas shown in this document $number, $string, $boolean,
-$object and $array refer to the fundamental JSON types. #optional
+In all JSON schemas shown in this document `$number`, `$string`, `$boolean`,
+`$object` and `$array` refer to the fundamental JSON types. #optional
 indicates an optional JSON field.
 
 The classification extension requires that the “classification”
 parameter, when applied to a requested inference output, be recognized
 by Triton as follows:
 
-- “classification” : $number indicating the number of classes that
+- “classification” : `$number` indicating the number of classes that
   should be returned for the output.
 
 The following example shows how the classification parameter is used

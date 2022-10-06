@@ -28,6 +28,7 @@
 
 # Using Triton Inference Server as a shared library for execution on Jetson
 
+## Overview
 This project demonstrates how to run C API applications using Triton Inference Server as a shared library. We also show how to build and execute such applications on Jetson.
 
 ### Prerequisites
@@ -44,7 +45,7 @@ In our example, we placed the contents of downloaded release directory under `/o
 
 ## Part 1. Concurrent inference and dynamic batching
 
-The purpose of the sample located under [concurrency_and_dynamic_batching](concurrency_and_dynamic_batching)
+The purpose of the sample located under [concurrency_and_dynamic_batching](concurrency_and_dynamic_batching/README.md)
 is to demonstrate the important features of Triton Inference Server such as concurrent model execution and
 dynamic batching. In order to do that, we implemented a people detection application using C API and Triton
 Inference Server as a shared library.
