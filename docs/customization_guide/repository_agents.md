@@ -96,7 +96,7 @@ name of the shared library must be
 *libtritonrepoagent_\<repo-agent-name\>.so*. The shared library should
 hide all symbols except those needed by the repository agent API. See
 the [checksum example's
-CMakeList.txt](https://github.com/triton-inference-server/checksum_repository_agent/blob/main/CMakeLists.txt)
+CMakeList.txt](https://github.com/triton-inference-server/checksum_repository_agent/blob/r22.10/CMakeLists.txt)
 for an example of how to use an ldscript to expose only the necessary
 symbols.
 

@@ -561,7 +561,7 @@ There are a few functionalities that are missing from the C API. They are:
 2. Using shared memory mode (`--shared-memory=cuda` or `--shared-memory=system`)
 3. Request rate range mode
 4. For additonal known non-working cases, please refer to 
-   [qa/L0_perf_analyzer_capi/test.sh](https://github.com/triton-inference-server/server/blob/main/qa/L0_perf_analyzer_capi/test.sh#L239-L277)
+   [qa/L0_perf_analyzer_capi/test.sh](https://github.com/triton-inference-server/server/blob/r22.10/qa/L0_perf_analyzer_capi/test.sh#L239-L277)
 
 
 ## Benchmarking TensorFlow Serving

@@ -150,7 +150,7 @@ including its "name", "data" and "dtype". For example:
 
 ## Trace Summary Tool
 
-An example [trace summary tool](https://github.com/triton-inference-server/server/blob/main/qa/common/trace_summary.py) can be
+An example [trace summary tool](https://github.com/triton-inference-server/server/blob/r22.10/qa/common/trace_summary.py) can be
 used to summarize a set of traces collected from Triton. Basic usage
 is:
 

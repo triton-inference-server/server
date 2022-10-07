@@ -67,12 +67,12 @@ languages if there is a need.
 We provide the GRPC API as a way to generate your own client library
 for a large number of languages. By following the official GRPC
 documentation and using
-[grpc_service.proto](https://github.com/triton-inference-server/common/blob/main/protobuf/grpc_service.proto)
+[grpc_service.proto](https://github.com/triton-inference-server/common/blob/r22.10/protobuf/grpc_service.proto)
 you can generate language bindings for all the languages supported by
 GRPC. We provide three examples of this for
-[Go](https://github.com/triton-inference-server/client/blob/main/src/grpc_generated/go), 
-[Python](https://github.com/triton-inference-server/client/blob/main/src/python/examples/grpc_client.py) and
-[Java](https://github.com/triton-inference-server/client/blob/main/src/grpc_generated/java).
+[Go](https://github.com/triton-inference-server/client/blob/r22.10/src/grpc_generated/go), 
+[Python](https://github.com/triton-inference-server/client/blob/r22.10/src/python/examples/grpc_client.py) and
+[Java](https://github.com/triton-inference-server/client/blob/r22.10/src/grpc_generated/java).
 
 In general the client libraries (and client examples) are meant to be
 just that, examples. We feel the client libraries are well written and

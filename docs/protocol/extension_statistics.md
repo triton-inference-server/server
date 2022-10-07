@@ -379,7 +379,7 @@ message InferStatistics
   // model version, model inputs) hashes to an existing entry in the
   // cache. On a cache miss, the request hash and response output tensor
   // data is added to the cache. See response cache docs for more info:
-  // https://github.com/triton-inference-server/server/blob/main/docs/response_cache.md
+  // https://github.com/triton-inference-server/server/blob/r22.10/docs/response_cache.md
   StatisticDuration cache_hit = 7;
 
   // The count of response cache misses and cumulative duration to lookup
@@ -390,7 +390,7 @@ message InferStatistics
   // miss occurs for a request to that model when the request metadata
   // does NOT hash to an existing entry in the cache. See the response
   // cache docs for more info:
-  // https://github.com/triton-inference-server/server/blob/main/docs/response_cache.md
+  // https://github.com/triton-inference-server/server/blob/r22.10/docs/response_cache.md
   StatisticDuration cache_miss = 8;
 }
 

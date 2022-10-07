@@ -45,5 +45,5 @@ plus several extensions that are defined in the following documents:
 - [Trace extension](./extension_trace.md)
 
 For the GRPC protocol the [protobuf
-specification](https://github.com/triton-inference-server/common/blob/main/protobuf/grpc_service.proto)
+specification](https://github.com/triton-inference-server/common/blob/r22.10/protobuf/grpc_service.proto)
 is also available.

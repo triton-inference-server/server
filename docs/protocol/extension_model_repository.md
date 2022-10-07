@@ -137,7 +137,7 @@ The load API accepts the following parameters:
 
 - "config" : string parameter that contains a JSON representation of the model
 configuration, which must be able to be parsed into [ModelConfig message from
-model_config.proto](https://github.com/triton-inference-server/common/blob/main/protobuf/model_config.proto).
+model_config.proto](https://github.com/triton-inference-server/common/blob/r22.10/protobuf/model_config.proto).
 This config will be used for loading the model instead of the one in
 the model directory. If config is provided, the (re-)load will be triggered as
 the model metadata has been updated, and the same (re-)load behavior will be
@@ -351,7 +351,7 @@ The RepositoryModelLoad API accepts the following parameters:
 
 - "config" : string parameter that contains a JSON representation of the model
 configuration, which must be able to be parsed into [ModelConfig message from
-model_config.proto](https://github.com/triton-inference-server/common/blob/main/protobuf/model_config.proto).
+model_config.proto](https://github.com/triton-inference-server/common/blob/r22.10/protobuf/model_config.proto).
 This config will be used for loading the model instead of the one in
 the model directory. If config is provided, the (re-)load will be triggered as
 the model metadata has been updated, and the same (re-)load behavior will be

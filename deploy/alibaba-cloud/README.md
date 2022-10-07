@@ -48,7 +48,7 @@ This repository contains information about how to deploy NVIDIA Triton Inference
 
 # Demo Instruction
 ## Prepare a model repo directory in OSS
-Download the tensorflow inception model via [fetch_model.sh](https://github.com/triton-inference-server/server/blob/main/docs/examples/fetch_models.sh). Then using [ossutil](https://help.aliyun.com/document_detail/50452.html?spm=a2c4g.11186623.6.833.26d66d51dPEytI) , which is a command line tool to use OSS, to upload the model to a certain OSS dir as you want.
+Download the tensorflow inception model via [fetch_model.sh](https://github.com/triton-inference-server/server/blob/r22.10/docs/examples/fetch_models.sh). Then using [ossutil](https://help.aliyun.com/document_detail/50452.html?spm=a2c4g.11186623.6.833.26d66d51dPEytI) , which is a command line tool to use OSS, to upload the model to a certain OSS dir as you want.
 
 ```
 ./ossutil cp inception_graphdef/ oss://triton-model-repo/models
@@ -157,7 +157,7 @@ See the following resources to learn more about how to use Alibaba Cloud's OSS o
 
 
 # Known Issues
-- [Binary Tensor Data Extension](https://github.com/triton-inference-server/server/blob/main/docs/protocol/extension_binary_data.md) is not fully supported yet, users want to use service with binary extension supported, it is only available in cn-shanghai region of PAI-EAS.
+- [Binary Tensor Data Extension](https://github.com/triton-inference-server/server/blob/r22.10/docs/protocol/extension_binary_data.md) is not fully supported yet, users want to use service with binary extension supported, it is only available in cn-shanghai region of PAI-EAS.
 - Currently only HTTP/1 is supported, hence gRPC cannot be used when query Triton servers on EAS. HTP/2 will be officially supported in a short time.
 - Users should not mount a whole OSS bucket when launching Triton processor, but an arbitrarily deep sub-directory in bucket. Otherwise the mounted path will no be as expected.
 - Not all of Triton Server parameters are be supported on EAS, the following params are supported on EAS:
