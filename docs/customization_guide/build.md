@@ -47,7 +47,7 @@ The Triton source is distributed across multiple GitHub repositories
 that together can be built and installed to create a complete Triton
 installation. Triton server is built using CMake and (optionally)
 Docker. To simplify the build process, Triton provides a
-[build.py](https://github.com/triton-inference-server/server/blob/main/build.py) script. 
+[build.py](https://github.com/triton-inference-server/server/blob/r22.10/build.py) script. 
 The build.py script will generate the CMake and Docker build steps required to 
 build Triton, and will optionally invoke those steps or leave the invocation to 
 you, as described below.
@@ -122,7 +122,7 @@ building with Docker.
 
     * Clone each requested backend and build it using CMake. For
       example, the ONNX Runtime backend is built using
-      [triton-inference-server/onnxruntime_backend/CMakeLists.txt](https://github.com/triton-inference-server/onnxruntime_backend/blob/main/CMakeLists.txt). Some
+      [triton-inference-server/onnxruntime_backend/CMakeLists.txt](https://github.com/triton-inference-server/onnxruntime_backend/blob/r22.10/CMakeLists.txt). Some
       of the backends may use Docker as part of their build (for
       example [ONNX
       Runtime](https://github.com/triton-inference-server/onnxruntime_backend)
@@ -135,7 +135,7 @@ building with Docker.
       from the corresponding repo. For example, the
       [Checksum](https://github.com/triton-inference-server/checksum_repository_agent)
       repository agent is built using
-      [triton-inference-server/checksum_repository_agent/CMakeLists.txt](https://github.com/triton-inference-server/checksum_repository_agent/blob/main/CMakeLists.txt).
+      [triton-inference-server/checksum_repository_agent/CMakeLists.txt](https://github.com/triton-inference-server/checksum_repository_agent/blob/r22.10/CMakeLists.txt).
 
   * Copy the built artifacts out of the container and into the build
     subdirectory on the host system.
@@ -277,7 +277,7 @@ For Windows 10, build.py supports both a Docker build and a non-Docker
 build in a similar way as described for [Ubuntu](#building-for-ubuntu-2004). The primary
 difference is that the minimal/base image used as the base of
 Dockerfile.buildbase image can be built from the provided
-[Dockerfile.win10.min](https://github.com/triton-inference-server/server/blob/main/Dockerfile.win10.min)
+[Dockerfile.win10.min](https://github.com/triton-inference-server/server/blob/r22.10/Dockerfile.win10.min)
 file as described in [Windows 10 "Min" Image](#windows-10-min-image). When running build.py
 use the --image flag to specify the tag that you assigned to this
 image. For example, --image=base,win10-py3-min.
@@ -296,7 +296,7 @@ step.
 
 The "min" container describes the base dependencies needed to perform
 the Windows build. The Windows min container is
-[Dockerfile.win10.min](https://github.com/triton-inference-server/server/blob/main/Dockerfile.win10.min).
+[Dockerfile.win10.min](https://github.com/triton-inference-server/server/blob/r22.10/Dockerfile.win10.min).
 
 Before building the min container you must download the appropriate
 cuDNN and TensorRT versions and place them in the same directory as

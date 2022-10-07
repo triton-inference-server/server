@@ -208,7 +208,7 @@ A typical output in the log for _Model 'peoplenet' Stats_ looks as follows:
 TOTAL INFERENCE TIME: 174ms
 ```
 
-To learn about different statistics check out the [documentation](https://github.com/triton-inference-server/server/blob/main/docs/protocol/extension_statistics.md#statistics-extension).
+To learn about different statistics check out the [documentation](https://github.com/triton-inference-server/server/blob/r22.10/docs/protocol/extension_statistics.md#statistics-extension).
 
 To see how setting different values for concurrency affects total execution time and its componets reflected in the model stats, you need to modify a single parameter in the model config file.
 
@@ -326,6 +326,6 @@ dynamic_batching {
 }
 ```
 
-To try further options of dynamic batcher see the [documentation](https://github.com/triton-inference-server/server/blob/main/docs/user_guide/model_configuration.md#dynamic-batcher). 
+To try further options of dynamic batcher see the [documentation](https://github.com/triton-inference-server/server/blob/r22.10/docs/user_guide/model_configuration.md#dynamic-batcher). 
 
 You can also try enabling both concurrent model execution and dynamic batching.

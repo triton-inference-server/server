@@ -172,9 +172,9 @@ ownership of the custom metrics created through the APIs and must manage their
 lifetime following the API documentation.
 
 The 
-[identity_backend](https://github.com/triton-inference-server/identity_backend/blob/main/README.md#custom-metric-example)
+[identity_backend](https://github.com/triton-inference-server/identity_backend/blob/r22.10/README.md#custom-metric-example)
 demonstrates a practical example of adding a custom metric to a backend.
 
 Further documentation can be found in the `TRITONSERVER_MetricFamily*` and
 `TRITONSERVER_Metric*` API annotations in
-[tritonserver.h](https://github.com/triton-inference-server/core/blob/main/include/triton/core/tritonserver.h).
+[tritonserver.h](https://github.com/triton-inference-server/core/blob/r22.10/include/triton/core/tritonserver.h).

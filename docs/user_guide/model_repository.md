@@ -84,7 +84,7 @@ sub-directory representing a version of the model.  For more
 information about how the model versions are handled by Triton see
 [Model Versions](#model-versions).  Each model is executed by a
 specific
-[backend](https://github.com/triton-inference-server/backend/blob/main/README.md).
+[backend](https://github.com/triton-inference-server/backend/blob/r22.10/README.md).
 Within each version sub-directory there must be the files required by
 that backend. For example, models that use framework backends such as
 TensorRT, PyTorch, ONNX, OpenVINO and TensorFlow must provide the
@@ -249,7 +249,7 @@ any given time.
 
 The contents of each model version sub-directory is determined by the
 type of the model and the requirements of the
-[backend](https://github.com/triton-inference-server/backend/blob/main/README.md)
+[backend](https://github.com/triton-inference-server/backend/blob/r22.10/README.md)
 that supports the model.
 
 ### TensorRT Models

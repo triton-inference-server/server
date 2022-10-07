@@ -76,7 +76,7 @@ only be finalized after the dynamic batch is formed.
 
 Besides element count,
 there are other batch input kinds that the user can specify, see the
-[protobuf documentation](https://github.com/triton-inference-server/common/blob/main/protobuf/model_config.proto)
+[protobuf documentation](https://github.com/triton-inference-server/common/blob/r22.10/protobuf/model_config.proto)
 for details.
 
 ## Example on Ragged Input and Batch Input
@@ -134,5 +134,5 @@ batch_input [
 ```
 
 The above example uses
-[`BATCH_ACCUMULATED_ELEMENT_COUNT`](https://github.com/triton-inference-server/common/blob/main/protobuf/model_config.proto)
-type of ragged batching. Other types described in [protobuf documentation](https://github.com/triton-inference-server/common/blob/main/protobuf/model_config.proto) operate similarly.
+[`BATCH_ACCUMULATED_ELEMENT_COUNT`](https://github.com/triton-inference-server/common/blob/r22.10/protobuf/model_config.proto)
+type of ragged batching. Other types described in [protobuf documentation](https://github.com/triton-inference-server/common/blob/r22.10/protobuf/model_config.proto) operate similarly.

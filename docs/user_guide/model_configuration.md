@@ -32,7 +32,7 @@ Each model in a [model repository](model_repository.md) must include a
 model configuration that provides required and optional information
 about the model. Typically, this configuration is provided in a
 config.pbtxt file specified as [ModelConfig
-protobuf](https://github.com/triton-inference-server/common/blob/main/protobuf/model_config.proto).
+protobuf](https://github.com/triton-inference-server/common/blob/r22.10/protobuf/model_config.proto).
 In some cases, discussed in [Auto-Generated Model
 Configuraton](#auto-generated-model-configuration), the model
 configuration can be generated automatically by Triton and so does not
@@ -40,14 +40,14 @@ need to be provided explicitly.
 
 This section describes the most important model configuration
 properties but the documentation in the [ModelConfig
-protobuf](https://github.com/triton-inference-server/common/blob/main/protobuf/model_config.proto)
+protobuf](https://github.com/triton-inference-server/common/blob/r22.10/protobuf/model_config.proto)
 should also be consulted.
 
 ## Minimal Model Configuration
 
 A minimal model configuration must specify the [*platform* and/or
 *backend*
-properties](https://github.com/triton-inference-server/backend/blob/main/README.md#backends),
+properties](https://github.com/triton-inference-server/backend/blob/r22.10/README.md#backends),
 the *max_batch_size* property, and the input and output tensors of the
 model.
 
@@ -87,7 +87,7 @@ the same as the model repository directory containing the model. If
 *name* is specified it must match the name of the model repository
 directory containing the model.  The required values for *platform*
 and *backend* are described in the [backend
-documentation](https://github.com/triton-inference-server/backend/blob/main/README.md#backends).
+documentation](https://github.com/triton-inference-server/backend/blob/r22.10/README.md#backends).
 
 ### Model Transaction Policy
 
@@ -899,7 +899,7 @@ size.
 The *preserve_ordering* property is used to force all responses to be
 returned in the same order as requests were received. See the
 [protobuf
-documentation](https://github.com/triton-inference-server/common/blob/main/protobuf/model_config.proto)
+documentation](https://github.com/triton-inference-server/common/blob/r22.10/protobuf/model_config.proto)
 for details.
 
 #### Priority Levels
@@ -967,14 +967,14 @@ The model configuration *ModelOptimizationPolicy* property is used to
 specify optimization and prioritization settings for a model. These
 settings control if/how a model is optimized by the backend and how it
 is scheduled and executed by Triton. See the [ModelConfig
-protobuf](https://github.com/triton-inference-server/common/blob/main/protobuf/model_config.proto)
+protobuf](https://github.com/triton-inference-server/common/blob/r22.10/protobuf/model_config.proto)
 and [optimization](optimization.md#framework-specific-optimization)
 documentation for the currently available settings.
 
 ## Model Warmup
 
 When a model is loaded by Triton the corresponding
-[backend](https://github.com/triton-inference-server/backend/blob/main/README.md)
+[backend](https://github.com/triton-inference-server/backend/blob/r22.10/README.md)
 initializes for that model.  For some backends, some or all of this
 initialization is deferred until the model receives its first
 inference request (or first few inference requests). As a result, the
@@ -996,9 +996,9 @@ successfully.  Note that the effect of warming up models varies
 depending on the framework backend, and it will cause Triton to be
 less responsive to model update, so the users should experiment and
 choose the configuration that suits their need. See the
-[ModelWarmup protobuf](https://github.com/triton-inference-server/common/blob/main/protobuf/model_config.proto)
+[ModelWarmup protobuf](https://github.com/triton-inference-server/common/blob/r22.10/protobuf/model_config.proto)
 documentation for the currently available settings, and
-[L0_warmup](https://github.com/triton-inference-server/server/blob/main/qa/L0_warmup/test.sh)
+[L0_warmup](https://github.com/triton-inference-server/server/blob/r22.10/qa/L0_warmup/test.sh)
 for examples on specifying different variants of warmup samples.
 
 ## Response Cache
@@ -1017,5 +1017,5 @@ response_cache {
 See the [Response
 Cache](response_cache.md)
 and [ModelConfig
-protobuf](https://github.com/triton-inference-server/common/blob/main/protobuf/model_config.proto).
+protobuf](https://github.com/triton-inference-server/common/blob/r22.10/protobuf/model_config.proto).
 docs for more information.

@@ -189,5 +189,5 @@ twice the number of CPU cores (`2*num_cpus`) visible to the server.
 
 To set this parameter with the C API, refer to 
 `TRITONSERVER_ServerOptionsSetModelLoadThreadCount` in 
-[tritonserver.h](https://github.com/triton-inference-server/core/blob/main/include/triton/core/tritonserver.h).
+[tritonserver.h](https://github.com/triton-inference-server/core/blob/r22.10/include/triton/core/tritonserver.h).
 

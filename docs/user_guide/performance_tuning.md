@@ -43,7 +43,7 @@ For those who wish to jump right in, skip to the [end-to-end example](#end-to-en
     This means that a `config.pbtxt` may still be provided, but is not required unless you want to explicitly set certain parameters. 
     Additionally, by enabling verbose logging via `--log-verbose=1`, you can see the complete config that Triton sees internally in the server log output. 
     For other backends, refer to the [Minimal Model Configuration](model_configuration.md#minimal-model-configuration) required to get started.
-    - If your model does not come from a supported backend, you can look into the [Python Backend](https://github.com/triton-inference-server/python_backend) or writing a [Custom C++ Backend](https://github.com/triton-inference-server/backend/blob/main/examples/README.md) to support your model. 
+    - If your model does not come from a supported backend, you can look into the [Python Backend](https://github.com/triton-inference-server/python_backend) or writing a [Custom C++ Backend](https://github.com/triton-inference-server/backend/blob/r22.10/examples/README.md) to support your model. 
     The Python Backend provides a simple interface to execute requests through a generic python script, but may not be as performant as a Custom C++ Backend. 
     Depending on your use case, the Python Backend performance may be a sufficient tradeoff for the simplicity of implementation.
 
@@ -73,15 +73,15 @@ For those who wish to jump right in, skip to the [end-to-end example](#end-to-en
 
 3. How can I improve my model performance?
     - To further understand the best model configuration you can provide to Triton for your use case, Triton's [Model Analyzer](https://github.com/triton-inference-server/model_analyzer) tool can help. 
-    Model Analyzer can automatically or [manually](https://github.com/triton-inference-server/model_analyzer/blob/main/docs/config_search.md) search through config combinations to find the optimal triton configuration to meet your constraints.
+    Model Analyzer can automatically or [manually](https://github.com/triton-inference-server/model_analyzer/blob/r22.10/docs/config_search.md) search through config combinations to find the optimal triton configuration to meet your constraints.
     After running Model Analyzer to find the optimal configurations for your model/use case, you can transfer the generated config files to your [Model Repository](model_repository.md). 
-    Model Analyzer provides a [Quickstart](https://github.com/triton-inference-server/model_analyzer/blob/main/docs/quick_start.md) guide with some examples to walk through.
+    Model Analyzer provides a [Quickstart](https://github.com/triton-inference-server/model_analyzer/blob/r22.10/docs/quick_start.md) guide with some examples to walk through.
     - Upon serving the model with the newly optimized configuration file found by Model Analyzer and running Perf Analyzer again, you should expect to find better performance numbers in most cases compared to a default config.
     - Some parameters that can be tuned for a model may not be exposed to Model Analyzer's automatic search since they don't apply to all models.
     For instance, [backends](https://github.com/triton-inference-server/backend) can expose backend-specific configuration options that can be tuned as well. 
     The [ONNXRuntime Backend](https://github.com/triton-inference-server/onnxruntime_backend), for example, has several [parameters](https://github.com/triton-inference-server/onnxruntime_backend#model-config-options) that affect the level of parallelization when executing inference on a model. 
     These backend-specific options may be worth investigating if the defaults are not providing sufficient performance. 
-    To tune custom sets of parameters, Model Analyzer supports [Manual Configuration Search](https://github.com/triton-inference-server/model_analyzer/blob/main/docs/config_search.md).
+    To tune custom sets of parameters, Model Analyzer supports [Manual Configuration Search](https://github.com/triton-inference-server/model_analyzer/blob/r22.10/docs/config_search.md).
     - To learn more about further optimizations for your model configuration, see the [Optimization](optimization.md) docs.
 
 ### Other Areas of Interest

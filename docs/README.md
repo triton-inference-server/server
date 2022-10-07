@@ -98,7 +98,7 @@ Triton allows users to use of multiple instances of the same model. Users can sp
 
 #### Optimization Settings
 
-The Model Configuration ModelOptimizationPolicy property is used to specify optimization and prioritization settings for a model. These settings control if/how a model is optimized by the backend and how it is scheduled and executed by Triton. See the [ModelConfig Protobuf](https://github.com/triton-inference-server/common/blob/main/protobuf/model_config.proto) and [Optimization Documentation](user_guide/optimization.md#optimization) for the currently available settings.
+The Model Configuration ModelOptimizationPolicy property is used to specify optimization and prioritization settings for a model. These settings control if/how a model is optimized by the backend and how it is scheduled and executed by Triton. See the [ModelConfig Protobuf](https://github.com/triton-inference-server/common/blob/r22.10/protobuf/model_config.proto) and [Optimization Documentation](user_guide/optimization.md#optimization) for the currently available settings.
 - [Framework-Specific Optimization](user_guide/optimization.md#framework-specific-optimization)
   - [ONNX-TensorRT](user_guide/optimization.md#onnx-with-tensorrt-optimization-ort-trt)
   - [ONNX-OpenVINO](user_guide/optimization.md#onnx-with-openvino-optimization)

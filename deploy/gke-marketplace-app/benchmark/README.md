@@ -36,8 +36,8 @@
 
 First, we collect a set of TensorFlow and TensorRT models to compare:
 
-- Get [Distill Bert fine-tuned with Squad Q&A task](https://huggingface.co/distilbert-base-cased-distilled-squad/tree/main) from Huggingface. `wget https://huggingface.co/distilbert-base-cased-distilled-squad/blob/main/saved_model.tar.gz`
-- Get [Bert base fine-tuned with Squad Q&A task](https://huggingface.co/deepset/bert-base-cased-squad2/tree/main) from Huggingface `wget https://huggingface.co/deepset/bert-base-cased-squad2/blob/main/saved_model.tar.gz`
+- Get [Distill Bert fine-tuned with Squad Q&A task](https://huggingface.co/distilbert-base-cased-distilled-squad/tree/main) from Huggingface. `wget https://huggingface.co/distilbert-base-cased-distilled-squad/blob/r22.10/saved_model.tar.gz`
+- Get [Bert base fine-tuned with Squad Q&A task](https://huggingface.co/deepset/bert-base-cased-squad2/tree/main) from Huggingface `wget https://huggingface.co/deepset/bert-base-cased-squad2/blob/r22.10/saved_model.tar.gz`
 - Follow [TensorRT Demo Bert](https://github.com/NVIDIA/TensorRT/tree/master/demo/BERT) to convert BERT base model to TensorRT Engine, choose sequence length of 384 to match previous 2 TensorFlow models. Last step, we choose to create TensorRT engine with 2 optimization profile, profile 0 for batch size 1 and profile 1 for batch size 4 run: `python3 builder.py -m models/fine-tuned/bert_tf_ckpt_base_qa_squad2_amp_384_v19.03.1/model.ckpt -o engines/model.plan -b 8 -s 384 --fp16 --int8 --strict -c models/fine-tuned/bert_tf_ckpt_base_qa_squad2_amp_384_v19.03.1 --squad-json ./squad/train-v2.0.json -v models/fine-tuned/bert_tf_ckpt_base_qa_squad2_amp_384_v19.03.1/vocab.txt --calib-num 100 -iln -imh`. This needs to be ran on the inference GPU respectively (Engine optimized with A100 cannot be used for inference on T4).
 
 We the place the model into a GCS with following structure, `config.pbtxt` was provided.
