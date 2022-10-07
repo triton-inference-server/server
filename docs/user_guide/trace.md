@@ -63,20 +63,21 @@ The trace output is a JSON file with the following schema.
     "model_name": $string,
     "model_version": $number,
     "id": $number
-    "parent_id": $number,
+    "parent_id": $number
+  },
+  {
+    "id": $number,
     "timestamps": [
-      { "name" : $string, "ns" : $number },
-      ...
+      { "name" : $string, "ns" : $number }
     ]
   },
   {
-    "model_name": $string,
-    "model_version": $number,
     "id": $number
     "activity": $string,
     "tensor":{
       "name": $string,
       "data": $string,
+      "shape": $string,
       "dtype": $string
     }
   },
@@ -87,7 +88,18 @@ The trace output is a JSON file with the following schema.
 Each trace is assigned a "id", which indicates the model name and 
 version of the inference request. If the trace is from a
 model run as part of an ensemble, the "parent_id" will indicate the
-"id" of the containing ensemble.  
+"id" of the containing ensemble.
+For example:
+```
+[
+  {
+    "id": 1,
+    "model_name": "simple",
+    "model_version": 1
+  },
+  ...
+]
+```
 
 Each `TIMESTAMPS` trace will have one or more "timestamps" with 
 each timestamp having a name and the timestamp in nanoseconds ("ns"). 
@@ -95,22 +107,18 @@ For example:
 
 ```
 [
-  {
-    "model_name": "simple",
-    "model_version": -1,
-    "id": 1,
-    "timestamps" : [
-      { "name": "http recv start", "ns": 2259961222771924 },
-      { "name": "http recv end", "ns": 2259961222820985 },
-      { "name": "request handler start", "ns": 2259961223164078 },
-      { "name": "queue start", "ns": 2259961223182400 },
-      { "name": "compute start", "ns": 2259961223232405 },
-      { "name": "compute end", "ns": 2259961230206777 },
-      { "name": "request handler end", "ns": 2259961230211887 },
-      { "name": "http send start", "ns": 2259961230529606 },
-      { "name": "http send end", "ns": 2259961230543930 }
-    ]
-  }
+  {"id": 1, "timestamps": [{ "name": "HTTP_RECV_START", "ns": 2356425054587444 }] },
+  {"id": 1, "timestamps": [{ "name": "HTTP_RECV_END", "ns": 2356425054632308 }] },
+  {"id": 1, "timestamps": [{ "name": "REQUEST_START", "ns": 2356425054785863 }] },
+  {"id": 1, "timestamps": [{ "name": "QUEUE_START", "ns": 2356425054791517 }] },
+  {"id": 1, "timestamps": [{ "name": "INFER_RESPONSE_COMPLETE", "ns": 2356425057587919 }] },
+  {"id": 1, "timestamps": [{ "name": "COMPUTE_START", "ns": 2356425054887198 }] },
+  {"id": 1, "timestamps": [{ "name": "COMPUTE_INPUT_END", "ns": 2356425057152908 }] },
+  {"id": 1, "timestamps": [{ "name": "COMPUTE_OUTPUT_START", "ns": 2356425057497763 }] },
+  {"id": 1, "timestamps": [{ "name": "COMPUTE_END", "ns": 2356425057540989 }] },
+  {"id": 1, "timestamps": [{ "name": "REQUEST_END", "ns": 2356425057643164 }] },
+  {"id": 1, "timestamps": [{ "name": "HTTP_SEND_START", "ns": 2356425057681578 }] },
+  {"id": 1, "timestamps": [{ "name": "HTTP_SEND_END", "ns": 2356425057712991 }] }
 ]
 ```
 
@@ -122,13 +130,12 @@ including its "name", "data" and "dtype". For example:
 ```
 [
   {
-    "model_name": "simple",
-    "model_version": -1,
     "id": 1,
     "activity": "TENSOR_QUEUE_INPUT",
     "tensor":{
       "name": "input",
       "data": "0.1,0.1,0.1,...",
+      "shape": "1,16",
       "dtype": "FP32"
     }
   }
