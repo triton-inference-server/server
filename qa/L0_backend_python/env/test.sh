@@ -191,6 +191,8 @@ aws s3 rm "${BUCKET_URL_SLASH}" --recursive --include "*"
 # Test with EXECUTION_ENV_PATH outside the model directory
 sed -i "s/TRITON_MODEL_DIRECTORY\/python_3_6_environment/TRITON_MODEL_DIRECTORY\/..\/python_3_6_environment/" models/python_3_6/config.pbtxt
 mv models/python_3_6/python_3_6_environment.tar.gz models
+sed -i "s/\$\$TRITON_MODEL_DIRECTORY\/python_3_8_environment/s3:\/\/triton-bucket-${CI_JOB_ID}\/python_3_8_environment/" models/python_3_8/config.pbtxt
+mv models/python_3_8/python_3_8_environment.tar.gz models
 
 aws s3 cp models/ "${BUCKET_URL_SLASH}" --recursive --include "*"
 
@@ -212,6 +214,12 @@ grep "Python version is 3.6, NumPy version is 1.18.1, and Tensorflow version is 
 if [ $? -ne 0 ]; then
     cat $SERVER_LOG
     echo -e "\n***\n*** Python version is 3.6, NumPy version is 1.18.1, and Tensorflow version is 2.1.0 was not found in Triton logs. \n***"
+    RET=1
+fi
+grep "Python version is 3.8, NumPy version is 1.19.1, and Tensorflow version is 2.3.0" $SERVER_LOG
+if [ $? -ne 0 ]; then
+    cat $SERVER_LOG
+    echo -e "\n***\n*** Python version is 3.8, NumPy version is 1.19.1, and Tensorflow version is 2.3.0 was not found in Triton logs. \n***"
     RET=1
 fi
 set -e
