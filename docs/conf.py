@@ -44,7 +44,6 @@ from sphinx import search
 # import sys
 # sys.path.insert(0, os.path.abspath('.'))
 
-
 # -- Project information -----------------------------------------------------
 
 project = 'NVIDIA Triton Inference Server'
@@ -102,10 +101,7 @@ templates_path = ['_templates']
 # List of patterns, relative to source directory, that match files and
 # directories to ignore when looking for source files.
 # This pattern also affects html_static_path and html_extra_path.
-exclude_patterns = [
-  "README.md"
-]
-
+exclude_patterns = ["README.md"]
 
 # -- Options for HTML output -------------------------------------------------
 
@@ -154,8 +150,11 @@ version_short = release
 deploy_ngc_org = "nvidia"
 deploy_ngc_team = "triton"
 myst_substitutions = {
-    "VersionNum": version_short,
-    "deploy_ngc_org_team": f"{deploy_ngc_org}/{deploy_ngc_team}" if deploy_ngc_team else deploy_ngc_org,
+    "VersionNum":
+        version_short,
+    "deploy_ngc_org_team":
+        f"{deploy_ngc_org}/{deploy_ngc_team}"
+        if deploy_ngc_team else deploy_ngc_org,
 }
 
 
@@ -168,9 +167,13 @@ def ultimateReplace(app, docname, source):
 
 # this is a necessary hack to allow us to fill in variables that exist in code blocks
 ultimate_replacements = {
-    "{VersionNum}": version_short,
-    "{SamplesVersionNum}": version_short,
-    "{NgcOrgTeam}": f"{deploy_ngc_org}/{deploy_ngc_team}" if deploy_ngc_team else deploy_ngc_org,
+    "{VersionNum}":
+        version_short,
+    "{SamplesVersionNum}":
+        version_short,
+    "{NgcOrgTeam}":
+        f"{deploy_ngc_org}/{deploy_ngc_team}"
+        if deploy_ngc_team else deploy_ngc_org,
 }
 
 #bibtex_bibfiles = ["references.bib"]
@@ -210,7 +213,8 @@ def setup(app):
 
 # Patch for sphinx.search stemming short terms (i.e. tts -> tt)
 # https://github.com/sphinx-doc/sphinx/blob/4.5.x/sphinx/search/__init__.py#L380
-def sphinxSearchIndexFeed(self, docname: str, filename: str, title: str, doctree: nodes.document):
+def sphinxSearchIndexFeed(self, docname: str, filename: str, title: str,
+                          doctree: nodes.document):
     """Feed a doctree to the index."""
     self._titles[docname] = title
     self._filenames[docname] = filename
@@ -238,9 +242,11 @@ def sphinxSearchIndexFeed(self, docname: str, filename: str, title: str, doctree
     for word in visitor.found_words:
         stemmed_word = stem(word)
         # again, stemmer must not remove words from search index
-        if len(stemmed_word) <= 3 or not _filter(stemmed_word) and _filter(word):
+        if len(stemmed_word) <= 3 or not _filter(stemmed_word) and _filter(
+                word):
             stemmed_word = word.lower()
-        already_indexed = docname in self._title_mapping.get(stemmed_word, set())
+        already_indexed = docname in self._title_mapping.get(
+            stemmed_word, set())
         if _filter(stemmed_word) and not already_indexed:
             self._mapping.setdefault(stemmed_word, set()).add(docname)
 
