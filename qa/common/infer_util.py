@@ -168,6 +168,14 @@ def infer_exact(tester,
         input0_array = input0_array.astype(input_dtype)
         input1_array = input1_array.astype(input_dtype)
 
+    # for unsigned data type, the value being subtracted must be less than the
+    # value it is subtracted from, to avoid overflow.
+    if val_min == 0:
+        # swap element if the element at input 0 < input 1
+        tmp = np.where(input0_array < input1_array, input1_array, input0_array)
+        input1_array = np.where(input0_array < input1_array, input0_array, input1_array)
+        input0_array = tmp
+
     if not swap:
         output0_array = input0_array + input1_array
         output1_array = input0_array - input1_array

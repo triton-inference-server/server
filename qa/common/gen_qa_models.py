@@ -94,6 +94,8 @@ def np_to_trt_dtype(np_dtype):
         return trt.int8
     elif np_dtype == np.int32:
         return trt.int32
+    elif np_dtype == np.uint8:
+        return trt.uint8
     elif np_dtype == np.float16:
         return trt.float16
     elif np_dtype == np.float32:
@@ -493,11 +495,29 @@ def create_plan_dynamic_rf_modelfile(models_dir, max_batch, model_version,
 
     in0 = network.add_input("INPUT0", trt_input_dtype, input_with_batchsize)
     in1 = network.add_input("INPUT1", trt_input_dtype, input_with_batchsize)
+
+    # TRT identity layer does not support uint8 yet
+    # uint8 must be converted before any operation
+    if trt_input_dtype == trt.uint8:
+        in0_cast = network.add_identity(in0)
+        in0_cast.set_output_type(0, trt.float32)
+        in0 = in0_cast.get_output(0)
+        in1_cast = network.add_identity(in1)
+        in1_cast.set_output_type(0, trt.float32)
+        in1 = in1_cast.get_output(0)
+
     add = network.add_elementwise(in0, in1, trt.ElementWiseOperation.SUM)
     sub = network.add_elementwise(in0, in1, trt.ElementWiseOperation.SUB)
-
     out0 = add if not swap else sub
     out1 = sub if not swap else add
+
+    # uint8 conversion after operations
+    if trt_output0_dtype == trt.uint8:
+        out0 = network.add_identity(out0.get_output(0))
+        out0.set_output_type(0, trt.uint8)
+    if trt_output1_dtype == trt.uint8:
+        out1 = network.add_identity(out1.get_output(0))
+        out1.set_output_type(0, trt.uint8)
 
     out0.get_output(0).name = "OUTPUT0"
     out1.get_output(0).name = "OUTPUT1"
@@ -2039,6 +2059,14 @@ if __name__ == '__main__':
                                   vt,
                                   vt,
                                   swap=True)
+            
+            # uint8
+            model_version = 1
+            shape = (16, )
+            dtype = np.uint8
+            for max_batch in [0, 8]:
+                create_plan_modelconfig(FLAGS.models_dir, max_batch, model_version, shape, shape, shape, dtype, dtype, dtype, 16, None, 1, 32)
+                create_plan_dynamic_rf_modelfile(FLAGS.models_dir, max_batch, model_version, shape, shape, shape, dtype, dtype, dtype, True, 1, 32)
 
         if FLAGS.onnx:
             for vt in [np.float16, np.float32, np.int8, np.int16, np.int32]:

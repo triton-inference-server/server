@@ -252,6 +252,8 @@ class InferTest(tu.TestResultCollector):
         for prefix in ensemble_prefix:
             if prefix != "":
                 continue
+            if input_dtype == np.uint8 or output0_dtype == np.uint8 or output1_dtype == np.uint8:
+                continue
 
             if 'python_dlpack' in BACKENDS:
                 _infer_exact_helper(self,
@@ -273,6 +275,14 @@ class InferTest(tu.TestResultCollector):
                                     output0_raw=output0_raw,
                                     output1_raw=output1_raw,
                                     swap=swap)
+
+    def test_raw_uuu(self):
+        self._full_exact(np.uint8,
+                         np.uint8,
+                         np.uint8,
+                         output0_raw=True,
+                         output1_raw=True,
+                         swap=True)
 
     def test_raw_bbb(self):
         self._full_exact(np.int8,
