@@ -40,53 +40,24 @@ class NoAutoFillTest(tu.TestResultCollector):
 
     def setUp(self):
         self._model_name = "noautofill_noconfig"
-        parser = argparse.ArgumentParser()
-        parser.add_argument(
-            '-u',
-            '--url',
-            type=str,
-            required=False,
-            default='localhost:8000',
-            help='Inference server URL. Default is localhost:8000.')
-        parser.add_argument('-v',
-                            '--verbose',
-                            action="store_true",
-                            required=False,
-                            default=False,
-                            help='Enable verbose output')
-        FLAGS = parser.parse_args()
-        try:
-            self._triton_client = httpclient.InferenceServerClient(
-                url=FLAGS.url, verbose=FLAGS.verbose)
-        except Exception as e:
-            print("context creation failed: " + str(e))
-            sys.exit(1)
+        self._triton_client = httpclient.InferenceServerClient("localhost:8000")
+
+    def tearDown(self):
+        self._triton_client.unload_model(self._model_name)
 
     def test_load_no_autofill_model_with_config(self):
-        try:
-            config = "{\"max_batch_size\":\"16\"}"
-            self._triton_client.load_model(self._model_name, config=config)
-        except InferenceServerException as e:
-            print("Failed: unexpected error: ", e.message())
-            sys.exit(1)
+        config = "{\"max_batch_size\":\"16\"}"
+        self._triton_client.load_model(self._model_name, config=config)
 
         # Check if the model config is correct
         model_config = self._triton_client.get_model_config(self._model_name)
-        if model_config['max_batch_size'] != 16:
-            print("Failed: expect max_batch_size = 16, got: {}".format(
-                model_config['max_batch_size']))
-            sys.exit(1)
+        self.assertEqual(model_config['max_batch_size'], 16)
 
     def test_load_no_autofill_model_with_no_config(self):
-        try:
+        with self.assertRaises(InferenceServerException) as ex:
             self._triton_client.load_model(self._model_name)
-        except InferenceServerException as e:
-            if "unable to find the model configuration file" not in e.message():
-                print("Failed: wrong error message", e.message())
-                sys.exit(1)
-        else:
-            print("Failed: expect error occurs.")
-            sys.exit(1)
+        self.assertIn("unable to find the model configuration file",
+                      str(ex.exception))
 
 
 if __name__ == '__main__':
