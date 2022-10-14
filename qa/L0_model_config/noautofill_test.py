@@ -56,8 +56,7 @@ class NoAutoFillTest(tu.TestResultCollector):
     def test_load_no_autofill_model_with_no_config(self):
         with self.assertRaises(InferenceServerException) as ex:
             self._triton_client.load_model(self._model_name)
-        self.assertIn("unable to find the model configuration file",
-                      str(ex.exception))
+        self.assertIn("model configuration is not provided", str(ex.exception))
 
 
 if __name__ == '__main__':
