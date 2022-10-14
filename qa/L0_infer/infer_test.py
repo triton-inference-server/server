@@ -364,6 +364,30 @@ class InferTest(tu.TestResultCollector):
                          output1_raw=True,
                          swap=False)
 
+    def test_raw_fuu(self):
+        self._full_exact(np.float32,
+                         np.uint8,
+                         np.uint8,
+                         output0_raw=True,
+                         output1_raw=True,
+                         swap=False)
+
+    def test_raw_uff(self):
+        self._full_exact(np.uint8,
+                         np.float32,
+                         np.float32,
+                         output0_raw=True,
+                         output1_raw=True,
+                         swap=False)
+
+    def test_raw_fuh(self):
+        self._full_exact(np.float32,
+                         np.uint8,
+                         np.float16,
+                         output0_raw=True,
+                         output1_raw=True,
+                         swap=False)
+
     def test_raw_iff(self):
         self._full_exact(np.int32,
                          np.float32,

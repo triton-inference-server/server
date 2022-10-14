@@ -173,7 +173,8 @@ def infer_exact(tester,
     if val_min == 0:
         # swap element if the element at input 0 < input 1
         tmp = np.where(input0_array < input1_array, input1_array, input0_array)
-        input1_array = np.where(input0_array < input1_array, input0_array, input1_array)
+        input1_array = np.where(input0_array < input1_array, input0_array,
+                                input1_array)
         input0_array = tmp
 
     if not swap:
@@ -285,7 +286,7 @@ def inferAndCheckResults(tester, configs, pf, batch_size, model_version,
                          outputs, precreated_shm_regions, input0_list_tmp,
                          input1_list_tmp, shm_region_names, input0_byte_size,
                          input1_byte_size, output0_byte_size, output1_byte_size,
-                         use_system_shared_memory, use_cuda_shared_memory, 
+                         use_system_shared_memory, use_cuda_shared_memory,
                          network_timeout, skip_request_id_check):
     # Lazy shm imports...
     if use_system_shared_memory or use_cuda_shared_memory:

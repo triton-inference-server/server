@@ -496,8 +496,8 @@ def create_plan_dynamic_rf_modelfile(models_dir, max_batch, model_version,
     in0 = network.add_input("INPUT0", trt_input_dtype, input_with_batchsize)
     in1 = network.add_input("INPUT1", trt_input_dtype, input_with_batchsize)
 
-    # TRT identity layer does not support uint8 yet
-    # uint8 must be converted before any operation
+    # TRT uint8 cannot be used to represent quantized floating-point value yet
+    # uint8 must be converted to float16 or float32 before any operation
     if trt_input_dtype == trt.uint8:
         in0_cast = network.add_identity(in0)
         in0_cast.set_output_type(0, trt.float32)
@@ -880,7 +880,16 @@ def create_plan_modelfile(models_dir,
                                      input_shape, output0_shape, output1_shape):
         return
 
-    if input_dtype != np.float32 or output0_dtype != np.float32 or output1_dtype != np.float32:
+    if input_dtype == np.uint8 or output0_dtype == np.uint8 or output1_dtype == np.uint8:
+        # TRT uint8 cannot be used to represent quantized floating-point value yet
+        # EXPLICIT_BATCH network and conversion are required to create models
+        create_plan_dynamic_rf_modelfile(models_dir, max_batch, model_version,
+                                         input_shape, output0_shape,
+                                         output1_shape, input_dtype,
+                                         output0_dtype, output1_dtype, swap,
+                                         min_dim, max_dim)
+
+    elif input_dtype != np.float32 or output0_dtype != np.float32 or output1_dtype != np.float32:
         if (not tu.shape_is_fixed(input_shape) or
                 not tu.shape_is_fixed(output0_shape) or
                 not tu.shape_is_fixed(output1_shape)):
@@ -1897,6 +1906,8 @@ if __name__ == '__main__':
 
     # Tests with models that accept fixed-shape input/output tensors
     if not FLAGS.variable:
+        create_fixed_models(FLAGS.models_dir, np.uint8, np.uint8, np.uint8,
+                            ('latest', 3))
         create_fixed_models(FLAGS.models_dir, np.int8, np.int8, np.int8,
                             ('latest', 1))
         create_fixed_models(FLAGS.models_dir, np.int16, np.int16, np.int16,
@@ -1915,6 +1926,9 @@ if __name__ == '__main__':
         create_fixed_models(FLAGS.models_dir, np.int32, np.int8, np.int8)
         create_fixed_models(FLAGS.models_dir, np.int8, np.int32, np.int32)
         create_fixed_models(FLAGS.models_dir, np.int32, np.int8, np.int16)
+        create_fixed_models(FLAGS.models_dir, np.float32, np.uint8, np.uint8)
+        create_fixed_models(FLAGS.models_dir, np.uint8, np.float32, np.float32)
+        create_fixed_models(FLAGS.models_dir, np.float32, np.uint8, np.float16)
         create_fixed_models(FLAGS.models_dir, np.int32, np.float32, np.float32)
         create_fixed_models(FLAGS.models_dir, np.float32, np.int32, np.int32)
         create_fixed_models(FLAGS.models_dir, np.int32, np.float16, np.int16)
@@ -1999,7 +2013,7 @@ if __name__ == '__main__':
                                             swap=True)
 
         if FLAGS.tensorrt:
-            for vt in [np.float32, np.float16, np.int32]:
+            for vt in [np.float32, np.float16, np.int32, np.uint8]:
                 create_plan_modelfile(FLAGS.models_dir,
                                       8,
                                       2, (16,), (16,), (16,),
@@ -2059,14 +2073,6 @@ if __name__ == '__main__':
                                   vt,
                                   vt,
                                   swap=True)
-            
-            # uint8
-            model_version = 1
-            shape = (16, )
-            dtype = np.uint8
-            for max_batch in [0, 8]:
-                create_plan_modelconfig(FLAGS.models_dir, max_batch, model_version, shape, shape, shape, dtype, dtype, dtype, 16, None, 1, 32)
-                create_plan_dynamic_rf_modelfile(FLAGS.models_dir, max_batch, model_version, shape, shape, shape, dtype, dtype, dtype, True, 1, 32)
 
         if FLAGS.onnx:
             for vt in [np.float16, np.float32, np.int8, np.int16, np.int32]:
