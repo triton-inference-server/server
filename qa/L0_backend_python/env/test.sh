@@ -48,6 +48,7 @@ install_conda
 create_conda_env "3.7" "python-3-7"
 conda install numpy=1.20.1 -y
 conda install tensorflow=2.1.0 -y
+PY37_VERSION_STRING="Python version is 3.7, NumPy version is 1.20.1, and Tensorflow version is 2.1.0"
 create_python_backend_stub
 conda-pack -o python3.7.tar.gz
 path_to_conda_pack=`pwd`/python3.7.tar.gz
@@ -66,6 +67,7 @@ conda deactivate
 create_conda_env "3.6" "python-3-6"
 conda install numpy=1.18.1 -y
 conda install tensorflow=2.1.0 -y
+PY36_VERSION_STRING="Python version is 3.6, NumPy version is 1.18.1, and Tensorflow version is 2.1.0"
 conda-pack -o python3.6.tar.gz
 
 # Test relative execution env path
@@ -86,6 +88,7 @@ path_to_conda_pack='$$TRITON_MODEL_DIRECTORY/python_3_8_environment.tar.gz'
 create_conda_env "3.8" "python-3-8"
 conda install numpy=1.19.1 -y
 conda install tensorflow=2.3.0 -y
+PY38_VERSION_STRING="Python version is 3.8, NumPy version is 1.19.1, and Tensorflow version is 2.3.0"
 conda-pack -o python3.8.tar.gz
 mkdir -p models/python_3_8/1/
 cp ../../python_models/python_version/config.pbtxt ./models/python_3_8
@@ -107,33 +110,14 @@ kill $SERVER_PID
 wait $SERVER_PID
 
 set +e
-grep "Python version is 3.6, NumPy version is 1.18.1, and Tensorflow version is 2.1.0" $SERVER_LOG
-if [ $? -ne 0 ]; then
-    cat $SERVER_LOG
-    echo -e "\n***\n*** Python version is 3.6, NumPy version is 1.18.1, and Tensorflow version is 2.1.0 was not found in Triton logs. \n***"
-    RET=1
-fi
-
-grep "Python version is 3.7, NumPy version is 1.20.1, and Tensorflow version is 2.1.0" $SERVER_LOG
-if [ $? -ne 0 ]; then
-    cat $SERVER_LOG
-    echo -e "\n***\n*** Python version is 3.7, NumPy version is 1.20.1, and Tensorflow version is 2.1.0 was not found in Triton logs. \n***"
-    RET=1
-fi
-
-grep "Python version is 3.8, NumPy version is 1.19.1, and Tensorflow version is 2.3.0" $SERVER_LOG
-if [ $? -ne 0 ]; then
-    cat $SERVER_LOG
-    echo -e "\n***\n*** Python version is 3.8, NumPy version is 1.19.1, and Tensorflow version is 2.3.0 was not found in Triton logs. \n***"
-    RET=1
-fi
-
-grep "no version information available (required by /bin/bash)." $SERVER_LOG
-if [ $? -eq 0 ]; then
-    cat $SERVER_LOG
-    echo -e "\n***\n*** \"no version information available (required by /bin/bash).\" was found in the server logs. \n***"
-    RET=1
-fi
+for EXPECTED_VERSION_STRING in "$PY36_VERSION_STRING" "$PY37_VERSION_STRING" "$PY38_VERSION_STRING"; do
+    grep "$EXPECTED_VERSION_STRING" $SERVER_LOG
+    if [ $? -ne 0 ]; then
+        cat $SERVER_LOG
+        echo -e "\n***\n*** $EXPECTED_VERSION_STRING was not found in Triton logs. \n***"
+        RET=1
+    fi
+done
 set -e
 
 # Test execution environments with S3
@@ -156,12 +140,15 @@ aws s3 mb "${BUCKET_URL}"
 BUCKET_URL=${BUCKET_URL%/}
 BUCKET_URL_SLASH="${BUCKET_URL}/"
 
-# Model Python 3.7 contains absolute paths and because of this it cannot be used
+# Remove Python 3.7 model because it contains absolute paths and cannot be used
 # with S3.
 rm -rf models/python_3_7
+
+# Test with the bucket url as model repository
+aws s3 cp models/ "${BUCKET_URL_SLASH}" --recursive --include "*"
+
 rm $SERVER_LOG
 
-aws s3 cp models/ "${BUCKET_URL_SLASH}" --recursive --include "*"
 SERVER_ARGS="--model-repository=$BUCKET_URL_SLASH --log-verbose=1"
 run_server
 if [ "$SERVER_PID" == "0" ]; then
@@ -174,12 +161,47 @@ kill $SERVER_PID
 wait $SERVER_PID
 
 set +e
-grep "Python version is 3.6, NumPy version is 1.18.1, and Tensorflow version is 2.1.0" $SERVER_LOG
+grep "$PY36_VERSION_STRING" $SERVER_LOG
 if [ $? -ne 0 ]; then
     cat $SERVER_LOG
-    echo -e "\n***\n*** Python version is 3.6, NumPy version is 1.18.1, and Tensorflow version is 2.1.0 was not found in Triton logs. \n***"
+    echo -e "\n***\n*** $PY36_VERSION_STRING was not found in Triton logs. \n***"
     RET=1
 fi
+set -e
+
+# Clean up bucket contents
+aws s3 rm "${BUCKET_URL_SLASH}" --recursive --include "*"
+
+# Test with EXECUTION_ENV_PATH outside the model directory
+sed -i "s/TRITON_MODEL_DIRECTORY\/python_3_6_environment/TRITON_MODEL_DIRECTORY\/..\/python_3_6_environment/" models/python_3_6/config.pbtxt
+mv models/python_3_6/python_3_6_environment.tar.gz models
+sed -i "s/\$\$TRITON_MODEL_DIRECTORY\/python_3_8_environment/s3:\/\/triton-bucket-${CI_JOB_ID}\/python_3_8_environment/" models/python_3_8/config.pbtxt
+mv models/python_3_8/python_3_8_environment.tar.gz models
+
+aws s3 cp models/ "${BUCKET_URL_SLASH}" --recursive --include "*"
+
+rm $SERVER_LOG
+
+SERVER_ARGS="--model-repository=$BUCKET_URL_SLASH --log-verbose=1"
+run_server
+if [ "$SERVER_PID" == "0" ]; then
+    echo -e "\n***\n*** Failed to start $SERVER\n***"
+    cat $SERVER_LOG
+    exit 1
+fi
+
+kill $SERVER_PID
+wait $SERVER_PID
+
+set +e
+for EXPECTED_VERSION_STRING in "$PY36_VERSION_STRING" "$PY38_VERSION_STRING"; do
+    grep "$EXPECTED_VERSION_STRING" $SERVER_LOG
+    if [ $? -ne 0 ]; then
+        cat $SERVER_LOG
+        echo -e "\n***\n*** $EXPECTED_VERSION_STRING was not found in Triton logs. \n***"
+        RET=1
+    fi
+done
 set -e
 
 # Clean up bucket contents and delete bucket
