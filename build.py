@@ -456,6 +456,8 @@ def core_cmake_args(components, backends, cmake_dir, install_dir):
     cargs.append(
         cmake_core_enable('TRITON_ENABLE_HTTP', 'http' in FLAGS.endpoint))
     cargs.append(
+        cmake_core_enable('TRITON_ENABLE_KAFKA', 'kafka' in FLAGS.endpoint))
+    cargs.append(
         cmake_core_enable('TRITON_ENABLE_SAGEMAKER', 'sagemaker'
                           in FLAGS.endpoint))
     cargs.append(
@@ -1640,7 +1642,7 @@ def enable_all():
         ]
         all_repoagents = ['checksum']
         all_filesystems = ['gcs', 's3', 'azure_storage']
-        all_endpoints = ['http', 'grpc', 'sagemaker', 'vertex-ai']
+        all_endpoints = ['http', 'grpc', 'kafka', 'sagemaker', 'vertex-ai']
 
         FLAGS.enable_logging = True
         FLAGS.enable_stats = True
@@ -1657,7 +1659,7 @@ def enable_all():
         ]
         all_repoagents = ['checksum']
         all_filesystems = []
-        all_endpoints = ['http', 'grpc']
+        all_endpoints = ['http', 'grpc', 'kafka']
 
         FLAGS.enable_logging = True
         FLAGS.enable_stats = True
@@ -1906,7 +1908,7 @@ if __name__ == '__main__':
         action='append',
         required=False,
         help=
-        'Include specified endpoint in build. Allowed values are "grpc", "http", "vertex-ai" and "sagemaker".'
+        'Include specified endpoint in build. Allowed values are "grpc", "http", "vertex-ai", "sagemaker", and "kafka".'
     )
     parser.add_argument(
         '--filesystem',
@@ -2305,3 +2307,5 @@ if __name__ == '__main__':
             p = subprocess.Popen([f'./{script_name}'], cwd=FLAGS.build_dir)
         p.wait()
         fail_if(p.returncode != 0, 'build failed')
+
+

@@ -33,6 +33,7 @@ import tritonclient.grpc as grpcclient
 import tritonclient.http as httpclient
 import shm_util as su
 from tritonclient.utils import *
+import time
 
 if sys.version_info >= (3, 0):
     import queue
@@ -114,7 +115,8 @@ def infer_exact(tester,
                 use_cuda_shared_memory=False,
                 priority=0,
                 # 60 sec is the default value for L0_infer_valgrind
-                network_timeout=60.0):
+                network_timeout=60.0,
+                kafka_obj=None):
     # Lazy shm imports...
     if use_system_shared_memory or use_cuda_shared_memory:
         import tritonclient.utils.shared_memory as shm
@@ -135,6 +137,8 @@ def infer_exact(tester,
         configs.append((f"{_tritonserver_ipaddr}:8001", "grpc", False, False))
     if use_streaming:
         configs.append((f"{_tritonserver_ipaddr}:8001", "grpc", True, False))
+    if kafka_obj:
+        configs.append((f"{_tritonserver_ipaddr}:8001", "kafka", False, True))
 
     # outputs are sum and difference of inputs so set max input
     # values so that they will not overflow the output. This
@@ -267,7 +271,7 @@ def infer_exact(tester,
                          input1_list_tmp, shm_region_names, input0_byte_size,
                          input1_byte_size, output0_byte_size, output1_byte_size,
                          use_system_shared_memory, use_cuda_shared_memory,
-                         network_timeout, skip_request_id_check)
+                         network_timeout, skip_request_id_check, kafka_obj)
 
 
 def inferAndCheckResults(tester, configs, pf, batch_size, model_version,
@@ -278,7 +282,7 @@ def inferAndCheckResults(tester, configs, pf, batch_size, model_version,
                          input1_list_tmp, shm_region_names, input0_byte_size,
                          input1_byte_size, output0_byte_size, output1_byte_size,
                          use_system_shared_memory, use_cuda_shared_memory, 
-                         network_timeout, skip_request_id_check):
+                         network_timeout, skip_request_id_check, kafka_obj):
     # Lazy shm imports...
     if use_system_shared_memory or use_cuda_shared_memory:
         import tritonclient.utils.shared_memory as shm
@@ -326,7 +330,7 @@ def inferAndCheckResults(tester, configs, pf, batch_size, model_version,
                                                              verbose=True)
 
         inputs = []
-        if config[1] == "http":
+        if config[1] == "http" or config[1] == "kafka":
             inputs.append(
                 httpclient.InferInput(INPUT0, tensor_shape,
                                       np_to_triton_dtype(input_dtype)))
@@ -342,7 +346,7 @@ def inferAndCheckResults(tester, configs, pf, batch_size, model_version,
                                       np_to_triton_dtype(input_dtype)))
 
         if not (use_cuda_shared_memory or use_system_shared_memory):
-            if config[1] == "http":
+            if config[1] == "http" or config[1] == "kafka":
                 inputs[0].set_data_from_numpy(input0_array,
                                               binary_data=config[3])
                 inputs[1].set_data_from_numpy(input1_array,
@@ -394,7 +398,7 @@ def inferAndCheckResults(tester, configs, pf, batch_size, model_version,
                                                  output0_byte_size)
             else:
                 if output0_raw:
-                    if config[1] == "http":
+                    if config[1] == "http" or config[1] == "kafka":
                         output_req.append(
                             httpclient.InferRequestedOutput(
                                 OUTPUT0, binary_data=config[3]))
@@ -402,7 +406,7 @@ def inferAndCheckResults(tester, configs, pf, batch_size, model_version,
                         output_req.append(
                             grpcclient.InferRequestedOutput(OUTPUT0))
                 else:
-                    if config[1] == "http":
+                    if config[1] == "http" or config[1] == "kafka":
                         output_req.append(
                             httpclient.InferRequestedOutput(
                                 OUTPUT0,
@@ -426,7 +430,7 @@ def inferAndCheckResults(tester, configs, pf, batch_size, model_version,
                                                  output1_byte_size)
             else:
                 if output1_raw:
-                    if config[1] == "http":
+                    if config[1] == "http" or config[1] == "kafka":
                         output_req.append(
                             httpclient.InferRequestedOutput(
                                 OUTPUT1, binary_data=config[3]))
@@ -434,7 +438,7 @@ def inferAndCheckResults(tester, configs, pf, batch_size, model_version,
                         output_req.append(
                             grpcclient.InferRequestedOutput(OUTPUT1))
                 else:
-                    if config[1] == "http":
+                    if config[1] == "http" or config[1] == "kafka":
                         output_req.append(
                             httpclient.InferRequestedOutput(
                                 OUTPUT1,
@@ -462,6 +466,13 @@ def inferAndCheckResults(tester, configs, pf, batch_size, model_version,
             (results, error) = user_data._completed_requests.get()
             if error is not None:
                 raise error
+        elif config[1] == "kafka":
+            results = inferKafka(model_name,
+                                    inputs,
+                                    kafka_obj,
+                                    model_version=model_version,
+                                    outputs=output_req,
+                                    request_id=str(_unique_request_id()))
         else:
             results = triton_client.infer(model_name,
                                           inputs,
@@ -469,12 +480,15 @@ def inferAndCheckResults(tester, configs, pf, batch_size, model_version,
                                           outputs=output_req,
                                           request_id=str(_unique_request_id()))
 
-        last_response = results.get_response()
+        if config[1] != "kafka":
+            last_response = results.get_response()
 
         if not skip_request_id_check:
             global _seen_request_ids
             if config[1] == "http":
                 request_id = int(last_response["id"])
+            elif config[1] == "kafka":
+                request_id = int(results["id"])
             else:
                 request_id = int(last_response.id)
             tester.assertFalse(request_id in _seen_request_ids,
@@ -486,6 +500,11 @@ def inferAndCheckResults(tester, configs, pf, batch_size, model_version,
             if model_version != "":
                 response_model_version = last_response["model_version"]
             response_outputs = last_response["outputs"]
+        elif config[1] == "kafka":
+            response_model_name = results["model_name"]
+            if model_version != "":
+                response_model_version = results["model_version"]
+            response_outputs = results["outputs"]
         else:
             response_model_name = last_response.model_name
             if model_version != "":
@@ -500,7 +519,7 @@ def inferAndCheckResults(tester, configs, pf, batch_size, model_version,
         tester.assertEqual(len(response_outputs), len(outputs))
 
         for result in response_outputs:
-            if config[1] == "http":
+            if config[1] == "http" or config[1] == "kafka":
                 result_name = result["name"]
             else:
                 result_name = result.name
@@ -514,7 +533,7 @@ def inferAndCheckResults(tester, configs, pf, batch_size, model_version,
                         shm_handle = shm_handles[3]
 
                     output = results.get_output(result_name)
-                    if config[1] == "http":
+                    if config[1] == "http"  or config[1] == "kafka":
                         output_datatype = output['datatype']
                         output_shape = output['shape']
                     else:
@@ -528,7 +547,10 @@ def inferAndCheckResults(tester, configs, pf, batch_size, model_version,
                     output_data = cudashm.get_contents_as_numpy(
                         shm_handle, output_dtype, output_shape)
                 else:
-                    output_data = results.as_numpy(result_name)
+                    if config[1] == "kafka":
+                        output_data = result["data"]
+                    else:
+                        output_data = results.as_numpy(result_name)
                     if (output_data.dtype == np.object_) and (not config[3]):
                         if config[1] == 'http':
                             output_data = np.array([
@@ -1130,3 +1152,62 @@ def infer_zero(tester,
                 shm.destroy_shared_memory_region(shm_op_handles[io_num])
 
     return results
+
+def inferKafka(model_name,
+               inputs,
+               kafka_obj,
+               model_version="",
+               outputs=None,
+               request_id=""):
+
+    # Use http client to generate body
+    kafka_value, json_size = httpclient._get_inference_request(
+            inputs=inputs,
+            request_id=request_id,
+            outputs=outputs,
+            sequence_id="",
+            sequence_start=False,
+            sequence_end=False,
+            priority=0,
+            timeout=None)
+
+    headers = [
+        ("model_name", model_name.encode()),
+        ("model_version", model_version.encode()),
+        ("id", request_id.encode()),
+        ("payload_schema_length", str(json_size).encode())
+    ]
+    
+    kafka_obj.producer_.send(kafka_obj.producer_topic_, value=kafka_value, headers=headers)
+    # this flush needs to appear after send
+    kafka_obj.producer_.flush()
+
+    print(kafka_obj.producer_topic_)
+    print(kafka_obj.consumer_topics_)
+    time.sleep(2)
+
+    response_msg = kafka_obj.consume_requests()
+
+    ret_dict = {}
+    for header_attr in response_msg.headers:
+        ret_dict[header_attr[0]] = header_attr[1].decode()
+
+    header_length_pair = [header_attr for header_attr in response_msg.headers if header_attr[0] == "payload_schema_length"]
+    header_length = int(header_length_pair[0][1].decode())
+    msg_header = response_msg.value[:header_length].decode()
+    msg_header_json = json.loads(msg_header)
+    offset = header_length
+    output_list = []
+    
+    for output in msg_header_json["outputs"]:
+        datatype = triton_to_np_dtype(output["datatype"])
+        output_length = output["parameters"]["binary_data_size"]
+        output_payload = response_msg.value[offset:offset+output_length]
+        output_payload = np.frombuffer(output_payload, datatype)
+        output["data"] = output_payload.reshape(output["shape"])
+        output_list.append(output)
+        offset += output_length
+
+    ret_dict["outputs"] = output_list
+    return ret_dict
+

@@ -83,6 +83,12 @@ if(${TRITON_ENABLE_HTTP} OR ${TRITON_ENABLE_METRICS} OR
   message(STATUS "Using libevent ${Libevent_VERSION}")
 endif()
 
+if(${TRITON_ENABLE_KAFKA})
+  set(LIBRDKAFKA_INCLUDE_DIR /usr/local/include)
+  set(LIBRDKAFKA_LIBRARY_DIR /usr/local/lib)
+endif()
+
+
 # re2
 #
 find_library(RE2_LIBRARY NAMES re2)
@@ -204,6 +210,14 @@ if(${TRITON_ENABLE_HTTP})
     PRIVATE TRITON_ENABLE_HTTP=1
   )
 endif() # TRITON_ENABLE_HTTP
+
+if(${TRITON_ENABLE_KAFKA})
+  target_compile_definitions(
+    main
+    PRIVATE TRITON_ENABLE_KAFKA=1
+  )
+endif() # TRITON_ENABLE_KAFKA
+
 
 if(${TRITON_ENABLE_SAGEMAKER})
   target_compile_definitions(
@@ -568,6 +582,100 @@ if(${TRITON_ENABLE_HTTP}
   )
 endif() # TRITON_ENABLE_HTTP || TRITON_ENABLE_METRICS ||
         # TRITON_ENABLE_SAGEMAKER || TRITON_ENABLE_VERTEX_AI
+
+# kafka
+#
+if(${TRITON_ENABLE_KAFKA})
+  message(STATUS "Using Kafka Endpoint")
+  add_library(
+    kafka-endpoint-library EXCLUDE_FROM_ALL
+    kafka_endpoint.cc kafka_endpoint.h
+  )
+
+  target_compile_features(kafka-endpoint-library PRIVATE cxx_std_11)
+  if(CMAKE_CXX_COMPILER_ID STREQUAL "MSVC")
+    target_compile_options(
+      kafka-endpoint-library
+      PRIVATE
+        /W1 /D_WIN32_WINNT=0x0A00 /EHsc
+    )
+  else()
+    target_compile_options(
+      kafka-endpoint-library
+      PRIVATE
+        -Wall -Wextra -Wno-unused-parameter -Wno-deprecated-declarations -Werror
+    )
+  endif()
+
+  target_include_directories(kafka-endpoint-library SYSTEM PRIVATE ${LIBRDKAFKA_INCLUDE_DIR})
+  target_link_directories(kafka-endpoint-library PUBLIC ${LIBRDKAFKA_LIBRARY_DIR})
+  target_link_libraries(kafka-endpoint-library PRIVATE rdkafka)
+
+  target_link_libraries(
+    kafka-endpoint-library
+    PUBLIC
+      triton-common-logging    # from repo-common
+      triton-core-serverapi    # from repo-core
+      triton-core-serverstub   # from repo-core
+  )
+
+  target_compile_definitions(
+    kafka-endpoint-library
+    PRIVATE TRITON_ENABLE_KAFKA=1
+  )
+
+  if(${TRITON_ENABLE_GPU})
+    target_compile_definitions(
+      kafka-endpoint-library
+      PRIVATE TRITON_ENABLE_GPU=1
+      PRIVATE TRITON_MIN_COMPUTE_CAPABILITY=${TRITON_MIN_COMPUTE_CAPABILITY}
+    )
+  
+    target_link_libraries(
+      kafka-endpoint-library
+      PUBLIC
+        CUDA::cudart
+    )
+  endif() # TRITON_ENABLE_GPU
+
+  if(${TRITON_ENABLE_METRICS})
+    target_compile_definitions(
+      kafka-endpoint-library
+      PRIVATE TRITON_ENABLE_METRICS=1
+    )
+  endif() # TRITON_ENABLE_METRICS
+
+  if(${TRITON_ENABLE_LOGGING})
+    target_compile_definitions(
+      kafka-endpoint-library
+      PRIVATE TRITON_ENABLE_LOGGING=1
+    )
+  endif() # TRITON_ENABLE_LOGGING
+
+  if(${TRITON_ENABLE_STATS})
+    target_compile_definitions(
+      kafka-endpoint-library
+      PRIVATE TRITON_ENABLE_STATS=1
+    )
+  endif() # TRITON_ENABLE_STATS
+
+  if(${TRITON_ENABLE_NVTX})
+    target_compile_definitions(
+      kafka-endpoint-library
+      PRIVATE TRITON_ENABLE_NVTX=1
+    )
+  endif() # TRITON_ENABLE_NVTX
+
+  SET(CMAKE_EXE_LINKER_FLAGS 
+          "${CMAKE_EXE_LINKER_FLAGS} -Wl,-rpath -Wl,/usr/local/lib")
+          
+  target_link_libraries(
+    main
+    PRIVATE
+      kafka-endpoint-library
+  )
+endif() # TRITON_ENABLE_KAFKA
+
 
 # tracing
 #

@@ -432,3 +432,163 @@ JavaCPP-presets. You can do this using the following steps:
 ```bash
  $ mvn compile exec:java -Djavacpp.platform=linux-x86_64 -Dexec.args="<your input args>"
 ```
+
+## Kafka Protocol
+
+Triton exposes the Kafka endpoint based on [standard inference
+protocols](https://github.com/kserve/kserve/tree/master/docs/predict-api/v2)
+that have been proposed by the [KServeproject](https://github.com/kserve),
+with some minor adjustments.
+
+In order to start the endpoint, Triton requires the following command line
+arguements to be specified with valid values:
+
+* "--kafka-port" : The port of the kafka broker (e.g. localhost:9092).
+* "--kafka-consumer-topics" : One or several comma-separated topics.
+* "--kafka-producer-topic" : Single, default topic to be used by Triton's producer when "response_topic" is not specified in an "inference_request_header". 
+
+The following sections will outline the Kafka request and response message
+designs. It is intended that the schemas mentioned below be constructed
+using JSON before being converted into a string and sent to the Kafka
+broker. As such, the schemas outlined below will be represented as
+JSON objects for simplicity, where $number and $string refer to the
+fundamental JSON types. #optional indicates an optional JSON field.
+
+## Kafka Inference Request
+Once the Kafka endpoint is running, Triton will begin consuming inference
+requests from the provided topics. Triton expects inference requests stored
+in the Kafka broker to be comprised of a header and a payload. 
+
+#### Message Header
+The inference request header should have the following format:
+
+```C++
+$inference_request_header
+{
+  "id" : $number,
+  "model_name" : $string,
+  "model_version" : $number,
+  "payload_schema_length" : $number,
+  "response_topic" : $string, //optional
+  "response_key" : $string //optional
+}
+```
+
+* "id" : A unique identifier for the corresponding inference request.
+* "model_name" : The name of the model to perform the inference.
+* "model_version" : The version of the model to perform the inference.
+* "payload_schema_length" : The length of the $payload_request_schema.
+* "response_topic" : The topic Triton's producer should send the response message
+to.
+* "response_key" : The key Triton's producer should use when sending a response
+message.
+
+#### Message Payload
+The expected payload of the inference request is composed of two parts:
+schema and inference data (as raw bytes) concatenated together. The payload
+schema should have the following format:
+
+```C++
+$payload_request_schema
+{
+  "inputs" : [ $request_input, ... ],
+  "outputs" : [ $request_output, ... ]
+}
+```
+Where a $request_input is defined as:
+```C++
+$request_input
+{
+  "name" : $string,
+  "shape" : [ $number, ... ],
+  "datatype"  : $string,
+  "parameters" : {"binary_data_size":$number}
+}
+```
+* "name" : The name of the input tensor.
+* "shape" : The shape of the input tensor.
+* "datatype" : The data-type of the input tensor, defined in [Datatypes](https://github.com/triton-inference-server/server/blob/main/docs/model_configuration.md#datatypes).
+* "parameters" : Currently only supporting "binary_data_size" which expects the size of the input tensor data in bytes.
+
+And a $request_output is defined as:
+```C++
+request_output
+{
+  "name" : $string
+  "parameters" : {"binary_data":true}
+}
+```
+* "name" : The name of the output tensor.
+* "parameters" : Currently only supporting "binary_data", which must be set to true.
+
+## Example Inference Request
+The following is an example of a valid request payload schema. The length of 
+this schema should be inserted in the "payload_schema_length" field of the 
+message header. The "..." below represents the raw tensor data that should be 
+appended to this string in order to complete the message payload. According to
+this schema, Triton will expect 768 bytes of tensor data.
+```C++
+{"inputs":[{"name":"INPUT0","shape":[6,16],"datatype":"FP32","parameters":{"binary_data_size":384}},{"name":"INPUT1","shape":[6,16],"datatype":"FP32","parameters":{"binary_data_size":384}}],"outputs":[{"name":"OUTPUT0","parameters":{"binary_data":true}},{"name":"OUTPUT1","parameters":{"binary_data":true}}]}...
+```
+For additional details regarding how to construct request messages of this form,
+please view our [client repository's](https://github.com/triton-inference-server/client) HTTP inference request protocol.
+
+## Kafka Inference Response
+Once Triton has completed an inference request, it will produce an inference
+response comprised of a header and a payload.
+
+### Message Header
+
+The inference response header will have the following format:
+
+```C++
+$inference_response_header
+{
+  "id" : $number,
+  "model_name" : $string,
+  "model_version" : $number,
+  "payload_schema_length" : $number,
+}
+```
+* "id" : A unique identifier corresponding  to the original inference request.
+* "model_name" : The name of the model to perform the inference.
+* "model_version" : The version of the model to perform the inference.
+* "payload_schema_length" : The length of the $payload_response_schema.
+
+#### Message Payload
+The payload of the inference response is composed of two parts:
+schema and inference data (as raw bytes) concatenated together. The payload
+schema will have the following format:
+
+```C++
+$payload_response_schema
+{
+  "outputs" : [ $response_output, ... ]
+}
+```
+Where a $response_output is defined as: 
+
+```C++
+$response_output
+{
+  "name" : $string,
+  "datatype"  : $string,
+  "shape" : [ $number, ... ],
+  "parameters" : {"binary_data_size":$number}
+}
+```
+* "name" : The name of the output tensor.
+* "datatype" : The data-type of the output tensor, defined in [Datatypes](https://github.com/triton-inference-server/server/blob/main/docs/model_configuration.md#datatypes).
+* "shape" : The shape of the output tensor.
+* "parameters" : Currently only supporting "binary_data_size" which specifies the size of the output tensor data in bytes.
+
+## Example Inference Response
+The following is an example of a valid response payload schema. The length of 
+this schema will be inserted in the "payload_schema_length" field of the 
+message header. The "..." below represents the raw tensor data that will be 
+appended to this string in order to complete the message payload. According to
+this schema, Triton will send 1,024 bytes of tensor data.
+
+```C++
+{"outputs":[{"name":"OUTPUT0","datatype":"FP32","shape":[8,16],"parameters":{"binary_data_size":512}},{"name":"OUTPUT1","datatype":"FP32","shape":[8,16],"parameters":{"binary_data_size":512}}]}...
+```

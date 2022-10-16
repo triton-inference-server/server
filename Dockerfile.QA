@@ -341,6 +341,10 @@ RUN pip3 install --upgrade wheel setuptools && \
 # Hence, fixing the boofuzz version to 0.3.0
 RUN pip3 install 'boofuzz==0.3.0'
 
+# L0_kafka tests required this package to be installed and accessible from
+# infer_utils.py
+RUN pip3 install kafka-python
+
 # go needed for example go client test.
 RUN if [ "$TARGETPLATFORM" = "linux/arm64" ]; then \
       wget https://golang.org/dl/go1.19.1.linux-arm64.tar.gz && \
