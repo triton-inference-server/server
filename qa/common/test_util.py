@@ -75,6 +75,10 @@ def validate_for_tf_model(input_dtype, output0_dtype, output1_dtype,
                           input_shape, output0_shape, output1_shape):
     """Return True if input and output dtypes are supported by a TF model."""
 
+    # Not extending test to uint8 yet
+    if input_dtype == np.uint8 or output0_dtype == np.uint8 or output1_dtype == np.uint8:
+        return False
+
     # If the input type is string the output type must be string or
     # int32. This is because the QA models we generate convert strings
     # internally to int32 for compute.
@@ -89,7 +93,9 @@ def validate_for_tf_model(input_dtype, output0_dtype, output1_dtype,
 def validate_for_trt_model(input_dtype, output0_dtype, output1_dtype,
                            input_shape, output0_shape, output1_shape):
     """Return True if input and output dtypes are supported by a TRT model."""
-    supported_datatypes = [bool, np.int8, np.int32, np.float16, np.float32]
+    supported_datatypes = [
+        bool, np.int8, np.int32, np.uint8, np.float16, np.float32
+    ]
     if not input_dtype in supported_datatypes:
         return False
     if not output0_dtype in supported_datatypes:
@@ -113,6 +119,10 @@ def validate_for_ensemble_model(ensemble_type, input_dtype, output0_dtype,
                                 output1_shape):
     """Return True if input and output dtypes are supported by the ensemble type."""
 
+    # Not extending test to uint8 yet
+    if input_dtype == np.uint8 or output0_dtype == np.uint8 or output1_dtype == np.uint8:
+        return False
+
     # Those ensemble types contains "identity" model which doesn't allow STRING
     # data type
     # Test types that use identity for both input and output
@@ -132,6 +142,10 @@ def validate_for_ensemble_model(ensemble_type, input_dtype, output0_dtype,
 def validate_for_onnx_model(input_dtype, output0_dtype, output1_dtype,
                             input_shape, output0_shape, output1_shape):
     """Return True if input and output dtypes are supported by a Onnx model."""
+
+    # Not extending test to uint8 yet
+    if input_dtype == np.uint8 or output0_dtype == np.uint8 or output1_dtype == np.uint8:
+        return False
 
     # If the input type is string the output type must be string or
     # int32. This is because the QA models we generate convert strings
@@ -153,6 +167,10 @@ def validate_for_libtorch_model(input_dtype,
                                 max_batch=0,
                                 reshape=False):
     """Return True if input and output dtypes are supported by a libtorch model."""
+
+    # Not extending test to uint8 yet
+    if input_dtype == np.uint8 or output0_dtype == np.uint8 or output1_dtype == np.uint8:
+        return False
 
     # STRING data type does not support I/O with more than 1 dims. It supports
     # batching when 'reshape' field is set properly to empty shape.
@@ -180,6 +198,10 @@ def validate_for_libtorch_model(input_dtype,
 def validate_for_openvino_model(input_dtype, output0_dtype, output1_dtype,
                                 input_shape, output0_shape, output1_shape):
     """Return True if input and output dtypes are supported by an OpenVino model."""
+
+    # Not extending test to uint8 yet
+    if input_dtype == np.uint8 or output0_dtype == np.uint8 or output1_dtype == np.uint8:
+        return False
 
     # float16 is not supported on CPU by OpenVino
     supported_datatypes = [np.int8, np.int32, np.float32]
