@@ -94,6 +94,8 @@ def np_to_trt_dtype(np_dtype):
         return trt.int8
     elif np_dtype == np.int32:
         return trt.int32
+    elif np_dtype == np.uint8:
+        return trt.uint8
     elif np_dtype == np.float16:
         return trt.float16
     elif np_dtype == np.float32:
@@ -493,11 +495,29 @@ def create_plan_dynamic_rf_modelfile(models_dir, max_batch, model_version,
 
     in0 = network.add_input("INPUT0", trt_input_dtype, input_with_batchsize)
     in1 = network.add_input("INPUT1", trt_input_dtype, input_with_batchsize)
+
+    # TRT uint8 cannot be used to represent quantized floating-point value yet
+    # uint8 must be converted to float16 or float32 before any operation
+    if trt_input_dtype == trt.uint8:
+        in0_cast = network.add_identity(in0)
+        in0_cast.set_output_type(0, trt.float32)
+        in0 = in0_cast.get_output(0)
+        in1_cast = network.add_identity(in1)
+        in1_cast.set_output_type(0, trt.float32)
+        in1 = in1_cast.get_output(0)
+
     add = network.add_elementwise(in0, in1, trt.ElementWiseOperation.SUM)
     sub = network.add_elementwise(in0, in1, trt.ElementWiseOperation.SUB)
-
     out0 = add if not swap else sub
     out1 = sub if not swap else add
+
+    # uint8 conversion after operations
+    if trt_output0_dtype == trt.uint8:
+        out0 = network.add_identity(out0.get_output(0))
+        out0.set_output_type(0, trt.uint8)
+    if trt_output1_dtype == trt.uint8:
+        out1 = network.add_identity(out1.get_output(0))
+        out1.set_output_type(0, trt.uint8)
 
     out0.get_output(0).name = "OUTPUT0"
     out1.get_output(0).name = "OUTPUT1"
@@ -860,7 +880,16 @@ def create_plan_modelfile(models_dir,
                                      input_shape, output0_shape, output1_shape):
         return
 
-    if input_dtype != np.float32 or output0_dtype != np.float32 or output1_dtype != np.float32:
+    if input_dtype == np.uint8 or output0_dtype == np.uint8 or output1_dtype == np.uint8:
+        # TRT uint8 cannot be used to represent quantized floating-point value yet
+        # EXPLICIT_BATCH network and conversion are required to create models
+        create_plan_dynamic_rf_modelfile(models_dir, max_batch, model_version,
+                                         input_shape, output0_shape,
+                                         output1_shape, input_dtype,
+                                         output0_dtype, output1_dtype, swap,
+                                         min_dim, max_dim)
+
+    elif input_dtype != np.float32 or output0_dtype != np.float32 or output1_dtype != np.float32:
         if (not tu.shape_is_fixed(input_shape) or
                 not tu.shape_is_fixed(output0_shape) or
                 not tu.shape_is_fixed(output1_shape)):
@@ -1877,6 +1906,8 @@ if __name__ == '__main__':
 
     # Tests with models that accept fixed-shape input/output tensors
     if not FLAGS.variable:
+        create_fixed_models(FLAGS.models_dir, np.uint8, np.uint8, np.uint8,
+                            ('latest', 3))
         create_fixed_models(FLAGS.models_dir, np.int8, np.int8, np.int8,
                             ('latest', 1))
         create_fixed_models(FLAGS.models_dir, np.int16, np.int16, np.int16,
@@ -1895,6 +1926,9 @@ if __name__ == '__main__':
         create_fixed_models(FLAGS.models_dir, np.int32, np.int8, np.int8)
         create_fixed_models(FLAGS.models_dir, np.int8, np.int32, np.int32)
         create_fixed_models(FLAGS.models_dir, np.int32, np.int8, np.int16)
+        create_fixed_models(FLAGS.models_dir, np.float32, np.uint8, np.uint8)
+        create_fixed_models(FLAGS.models_dir, np.uint8, np.float32, np.float32)
+        create_fixed_models(FLAGS.models_dir, np.float32, np.uint8, np.float16)
         create_fixed_models(FLAGS.models_dir, np.int32, np.float32, np.float32)
         create_fixed_models(FLAGS.models_dir, np.float32, np.int32, np.int32)
         create_fixed_models(FLAGS.models_dir, np.int32, np.float16, np.int16)
@@ -1979,7 +2013,7 @@ if __name__ == '__main__':
                                             swap=True)
 
         if FLAGS.tensorrt:
-            for vt in [np.float32, np.float16, np.int32]:
+            for vt in [np.float32, np.float16, np.int32, np.uint8]:
                 create_plan_modelfile(FLAGS.models_dir,
                                       8,
                                       2, (16,), (16,), (16,),

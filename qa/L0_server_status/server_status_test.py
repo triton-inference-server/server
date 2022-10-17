@@ -639,8 +639,8 @@ class ModelMetadataTest(tu.TestResultCollector):
                 else:
                     stats = infer_stats.model_stats
                 self.assertEqual(
-                    len(stats), 207,
-                    "expected 207 infer stats for all ready versions of all model"
+                    len(stats), 219,
+                    "expected 219 infer stats for all ready versions of all model"
                 )
 
         except InferenceServerException as ex:
