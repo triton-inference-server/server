@@ -401,7 +401,9 @@ std::vector<Option> options_
        "The port for the server to listen on for HTTP requests."},
       {OPTION_REUSE_HTTP_PORT, "reuse-http-port", Option::ArgBool,
        "Allow multiple servers to listen on the same HTTP port when every "
-       "server has this option set."},
+       "server has this option set. If you plan to use this option as a way to "
+       "load balance between different Triton servers, the same model "
+       "repository or set of models must be used for every server."},
       {OPTION_HTTP_ADDRESS, "http-address", Option::ArgStr,
        "The address for the http server to binds to."},
       {OPTION_HTTP_THREAD_COUNT, "http-thread-count", Option::ArgInt,
@@ -414,7 +416,9 @@ std::vector<Option> options_
        "The port for the server to listen on for GRPC requests."},
       {OPTION_REUSE_GRPC_PORT, "reuse-grpc-port", Option::ArgBool,
        "Allow multiple servers to listen on the same GRPC port when every "
-       "server has this option set."},
+       "server has this option set. If you plan to use this option as a way to "
+       "load balance between different Triton servers, the same model "
+       "repository or set of models must be used for every server."},
       {OPTION_GRPC_ADDRESS, "grpc-address", Option::ArgStr,
        "The address for the grpc server to binds to."},
       {OPTION_GRPC_INFER_ALLOCATION_POOL_SIZE,
