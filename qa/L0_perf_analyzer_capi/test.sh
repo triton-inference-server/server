@@ -1,5 +1,5 @@
 #!/bin/bash
-# Copyright (c) 2021-2022, NVIDIA CORPORATION. All rights reserved.
+# Copyright 2021-2022, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -218,40 +218,40 @@ if [ $(cat $CLIENT_LOG | grep ": 0 infer/sec\|: 0 usec" | wc -l) -ne 0 ]; then
     RET=1
 fi
 
-# TODO: Re-enable after sequence model support if fixed for CAPI
-# $PERF_ANALYZER -v -m  simple_savedmodel_sequence_object -p 2000 -t5 --sync \
-# --input-data=$SEQ_JSONDATAFILE \
-# --service-kind=triton_c_api --model-repository=$DATADIR \
-# --triton-server-directory=$SERVER_LIBRARY_PATH >$CLIENT_LOG 2>&1
-# if [ $? -ne 0 ]; then
-#     cat $CLIENT_LOG
-#     echo -e "\n***\n*** Test Failed\n***"
-#     RET=1
-# fi
-# if [ $(cat $CLIENT_LOG |  grep "${ERROR_STRING}" | wc -l) -ne 0 ]; then
-#     cat $CLIENT_LOG
-#     echo -e "\n***\n*** Test Failed\n***"
-#     RET=1
-# fi
-#
-# TODO: Re-enable after variable model support if fixed for CAPI
-# $PERF_ANALYZER -v -m graphdef_sequence_float32 --shape INPUT:2 \
-# --input-data=$FLOAT_DIFFSHAPE_JSONDATAFILE \
-# --input-data=$FLOAT_DIFFSHAPE_JSONDATAFILE -p2000 \
-# --service-kind=triton_c_api --model-repository=$DATADIR \
-# --triton-server-directory=$SERVER_LIBRARY_PATH >$CLIENT_LOG 2>&1
-# if [ $? -eq 0 ]; then
-#     cat $CLIENT_LOG
-#     echo -e "\n***\n*** Test Failed\n***"
-#     RET=1
-# fi
-# if [ $(cat $CLIENT_LOG |  grep "Inputs to operation Select of type Select must have the same size and shape." | wc -l) -eq 0 ]; then
-#     cat $CLIENT_LOG
-#     echo -e "\n***\n*** Test Failed\n***"
-#     RET=1
-# fi
+$PERF_ANALYZER -v -m  simple_savedmodel_sequence_object -p 2000 -t5 --sync \
+--input-data=$SEQ_JSONDATAFILE \
+--service-kind=triton_c_api --model-repository=$DATADIR \
+--triton-server-directory=$SERVER_LIBRARY_PATH >$CLIENT_LOG 2>&1
+if [ $? -ne 0 ]; then
+    cat $CLIENT_LOG
+    echo -e "\n***\n*** Test Failed\n***"
+    RET=1
+fi
+if [ $(cat $CLIENT_LOG |  grep "${ERROR_STRING}" | wc -l) -ne 0 ]; then
+    cat $CLIENT_LOG
+    echo -e "\n***\n*** Test Failed\n***"
+    RET=1
+fi
 
-#Testing that async does NOT work
+set +e
+$PERF_ANALYZER -v -m graphdef_sequence_float32 --shape INPUT:2 \
+--input-data=$FLOAT_DIFFSHAPE_JSONDATAFILE \
+--input-data=$FLOAT_DIFFSHAPE_JSONDATAFILE -p2000 \
+--service-kind=triton_c_api --model-repository=$DATADIR \
+--triton-server-directory=$SERVER_LIBRARY_PATH --sync >$CLIENT_LOG 2>&1
+if [ $? -eq 0 ]; then
+    cat $CLIENT_LOG
+    echo -e "\n***\n*** Test Failed\n***"
+    RET=1
+fi
+if [ $(cat $CLIENT_LOG |  grep "Inputs to operation Select of type Select must have the same size and shape." | wc -l) -eq 0 ]; then
+    cat $CLIENT_LOG
+    echo -e "\n***\n*** Test Failed\n***"
+    RET=1
+fi
+set -e
+
+# Negative test for the async mode.
 set +e
 $PERF_ANALYZER -v -m graphdef_int32_int32_int32 -t 1 -p2000 -b 1 -a \
 --service-kind=triton_c_api --model-repository=$DATADIR \
@@ -264,19 +264,21 @@ if [ $(cat $CLIENT_LOG | grep "${NON_SUPPORTED_ERROR_STRING}" | wc -l) -ne 1 ]; 
 fi
 set -e
 
-#Testing that shared memory does NOT work
 for SHARED_MEMORY_TYPE in system cuda; do
-    set +e
     $PERF_ANALYZER -v -m graphdef_int32_int32_int32 -t 1 -p2000 -b 1 \
     --shared-memory=$SHARED_MEMORY_TYPE \
     --service-kind=triton_c_api --model-repository=$DATADIR \
     --triton-server-directory=$SERVER_LIBRARY_PATH >$CLIENT_LOG 2>&1
-    if [ $(cat $CLIENT_LOG | grep "${NON_SUPPORTED_ERROR_STRING}" | wc -l) -ne 1 ]; then
+    if [ $? -ne 0 ]; then
         cat $CLIENT_LOG
         echo -e "\n***\n*** Test Failed\n***"
         RET=1
     fi
-    set -e
+    if [ $(cat $CLIENT_LOG |  grep "${ERROR_STRING}" | wc -l) -ne 0 ]; then
+        cat $CLIENT_LOG
+        echo -e "\n***\n*** Test Failed\n***"
+        RET=1
+    fi
 done
 
 
