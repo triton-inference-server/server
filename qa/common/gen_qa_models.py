@@ -498,7 +498,7 @@ def create_plan_dynamic_rf_modelfile(models_dir, max_batch, model_version,
 
     # TRT uint8 cannot be used to represent quantized floating-point value yet
     # uint8 must be converted to float16 or float32 before any operation
-    if trt_input_dtype == trt.uint8:
+    if input_dtype == np.uint8:
         in0_cast = network.add_identity(in0)
         in0_cast.set_output_type(0, trt.float32)
         in0 = in0_cast.get_output(0)
@@ -512,10 +512,10 @@ def create_plan_dynamic_rf_modelfile(models_dir, max_batch, model_version,
     out1 = sub if not swap else add
 
     # uint8 conversion after operations
-    if trt_output0_dtype == trt.uint8:
+    if output0_dtype == np.uint8:
         out0 = network.add_identity(out0.get_output(0))
         out0.set_output_type(0, trt.uint8)
-    if trt_output1_dtype == trt.uint8:
+    if output1_dtype == np.uint8:
         out1 = network.add_identity(out1.get_output(0))
         out1.set_output_type(0, trt.uint8)
 
