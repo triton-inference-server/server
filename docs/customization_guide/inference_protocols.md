@@ -41,7 +41,7 @@ protocols](https://github.com/kserve/kserve/tree/master/docs/predict-api/v2)
 that have been proposed by the [KServe
 project](https://github.com/kserve). To fully enable all capabilities
 Triton also implements [HTTP/REST and GRPC
-extensions](https://github.com/triton-inference-server/server/tree/main/docs/protocol)
+extensions](https://github.com/triton-inference-server/server/tree/r22.10/docs/protocol)
 to the KServe inference protocol. GRPC protocol also provides a
 bi-directional streaming version of the inference RPC to allow a
 sequence of inference requests/responses to be sent over a
@@ -69,7 +69,7 @@ Triton provides the following configuration options for server-client network tr
 
 #### Compression
 
-Triton allows the on-wire compression of request/response on HTTP through its clients. See [HTTP Compression](https://github.com/triton-inference-server/client/tree/main#compression) for more details.
+Triton allows the on-wire compression of request/response on HTTP through its clients. See [HTTP Compression](https://github.com/triton-inference-server/client/tree/r22.10#compression) for more details.
 
 ### GRPC Options
 Triton exposes various GRPC parameters for configuring the server-client network transactions. For usage of these options, refer to the output from `tritonserver --help`.
@@ -84,7 +84,7 @@ These options can be used to configure a secured channel for communication. The 
 * `--grpc-server-key`
 * `--grpc-root-cert`
 
-For client-side documentation, see [Client-Side GRPC SSL/TLS](https://github.com/triton-inference-server/client/tree/main#ssltls)
+For client-side documentation, see [Client-Side GRPC SSL/TLS](https://github.com/triton-inference-server/client/tree/r22.10#ssltls)
 
 For more details on overview of authentication in gRPC, refer [here](https://grpc.io/docs/guides/auth/).
 
@@ -94,7 +94,7 @@ Triton allows the on-wire compression of request/response messages by exposing f
 
 * `--grpc-infer-response-compression-level`
 
-For client-side documentation, see [Client-Side GRPC Compression](https://github.com/triton-inference-server/client/tree/main#compression-1)
+For client-side documentation, see [Client-Side GRPC Compression](https://github.com/triton-inference-server/client/tree/r22.10#compression-1)
 
 Compression can be used to reduce the amount of bandwidth used in server-client communication. For more details, see [gRPC Compression](https://grpc.github.io/grpc/core/md_doc_compression.html).
 

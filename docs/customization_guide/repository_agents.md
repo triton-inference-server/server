@@ -37,7 +37,7 @@ operations when a model is loaded.
 non-backward-compatible changes for one or more releases.**
 
 A repository agent comunicates with Triton using the [repository agent
-API](https://github.com/triton-inference-server/core/tree/main/include/triton/core/tritonrepoagent.h). The
+API](https://github.com/triton-inference-server/core/tree/r22.10/include/triton/core/tritonrepoagent.h). The
 [checksum_repository_agent GitHub
 repo](https://github.com/triton-inference-server/checksum_repository_agent)
 provides an example repository agent that verifies file checksums
@@ -109,7 +109,7 @@ used to override the default.
 
 Your repository agent must implement the repository agent API as
 documented in
-[tritonrepoagent.h](https://github.com/triton-inference-server/core/tree/main/include/triton/core/tritonrepoagent.h).
+[tritonrepoagent.h](https://github.com/triton-inference-server/core/tree/r22.10/include/triton/core/tritonrepoagent.h).
 
 Triton follows these steps when loading a model:
 
