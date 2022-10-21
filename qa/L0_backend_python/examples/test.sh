@@ -47,9 +47,6 @@ fi
 # Install JAX
 if [ "$TEST_JETSON" == "0" ]; then
     pip3 install --upgrade "jax[cuda]" -f https://storage.googleapis.com/jax-releases/jax_cuda_releases.html
-else
-    # Gpu version of JAX is not supported on Jetson
-    pip3 install --upgrade "jax[cpu]" -f https://storage.googleapis.com/jax-releases/jax_cuda_releases.html
 fi
 
 git clone https://github.com/triton-inference-server/python_backend -b $PYTHON_BACKEND_REPO_TAG
@@ -118,35 +115,37 @@ wait $SERVER_PID
 # Example 3
 
 # JAX AddSub
-CLIENT_LOG="./jax_client.log"
-mkdir -p models/jax/1/
-cp examples/jax/model.py models/jax/1/model.py
-cp examples/jax/config.pbtxt models/jax/config.pbtxt
-run_server
-if [ "$SERVER_PID" == "0" ]; then
-    echo -e "\n***\n*** Failed to start $SERVER\n***"
-    cat $SERVER_LOG
-    RET=1
+# JAX is not supported on Jetson
+if [ "$TEST_JETSON" == "0" ]; then
+    CLIENT_LOG="./jax_client.log"
+    mkdir -p models/jax/1/
+    cp examples/jax/model.py models/jax/1/model.py
+    cp examples/jax/config.pbtxt models/jax/config.pbtxt
+    run_server
+    if [ "$SERVER_PID" == "0" ]; then
+        echo -e "\n***\n*** Failed to start $SERVER\n***"
+        cat $SERVER_LOG
+        RET=1
+    fi
+
+    set +e
+    python3 examples/jax/client.py > $CLIENT_LOG
+    if [ $? -ne 0 ]; then
+        echo -e "\n***\n*** Failed to verify jax example. \n***"
+        RET=1
+    fi
+
+    grep "PASS" $CLIENT_LOG
+    if [ $? -ne 0 ]; then
+        echo -e "\n***\n*** Failed to verify jax example. \n***"
+        cat $CLIENT_LOG
+        RET=1
+    fi
+    set -e
+
+    kill $SERVER_PID
+    wait $SERVER_PID
 fi
-
-set +e
-python3 examples/jax/client.py > $CLIENT_LOG
-if [ $? -ne 0 ]; then
-    echo -e "\n***\n*** Failed to verify jax example. \n***"
-    RET=1
-fi
-
-grep "PASS" $CLIENT_LOG
-if [ $? -ne 0 ]; then
-    echo -e "\n***\n*** Failed to verify jax example. \n***"
-    cat $CLIENT_LOG
-    RET=1
-fi
-set -e
-
-kill $SERVER_PID
-wait $SERVER_PID
-
 
 # Example 4
 
