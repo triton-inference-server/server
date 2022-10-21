@@ -63,7 +63,7 @@ as it leads to eager batching.
 Read carefully about the [Python Backend](https://github.com/triton-inference-server/python_backend),
 and specifically [`execute`](https://github.com/triton-inference-server/python_backend#execute).
 
-The [decoupled examples](https://github.com/triton-inference-server/python_backend/tree/main/examples/decoupled)
+The [decoupled examples](https://github.com/triton-inference-server/python_backend/tree/r22.10/examples/decoupled)
 demonstrates how decoupled API can be used to implement a decoupled
 python model. As noted in the examples, these are designed to show
 the flexibility of the decoupled API and in no way should be used

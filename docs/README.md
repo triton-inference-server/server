@@ -155,11 +155,11 @@ Some frameworks provide the option of building custom layers/operations. These c
 Use the [Triton Client](https://github.com/triton-inference-server/client) API to integrate client applications over the network HTTP/gRPC API or integrate applications directly with Triton using CUDA shared memory to remove network overhead.
 - [C++ HTTP/GRPC Libraries](https://github.com/triton-inference-server/client#client-library-apis)
 - [Python HTTP/GRPC Libraries](https://github.com/triton-inference-server/client#client-library-apis)
-- [Java HTTP Library](https://github.com/triton-inference-server/client/tree/main/src/java)
+- [Java HTTP Library](https://github.com/triton-inference-server/client/tree/r22.10/src/java)
 - GRPC Generated Libraries
-  - [go](https://github.com/triton-inference-server/client/tree/main/src/grpc_generated/go)
-  - [Java/Scala](https://github.com/triton-inference-server/client/tree/main/src/grpc_generated/java)
-  - [Javascript](https://github.com/triton-inference-server/client/tree/main/src/grpc_generated/javascript)
+  - [go](https://github.com/triton-inference-server/client/tree/r22.10/src/grpc_generated/go)
+  - [Java/Scala](https://github.com/triton-inference-server/client/tree/r22.10/src/grpc_generated/java)
+  - [Javascript](https://github.com/triton-inference-server/client/tree/r22.10/src/grpc_generated/javascript)
 - [Shared Memory Extention](protocol/extension_shared_memory.md)
 ### Performance Analysis
 Understanding Inference perfomance is key to better resource utilization. Use Triton's Tools to costomize your deployment.
@@ -174,7 +174,7 @@ Triton can be deployed on edge devices. Explore [resources](user_guide/jetson.md
 ## **Resources**
 
 The following resources are recommended to explore the full suite of Triton Inference Server's functionalities.
-- **Clients**: Triton Inference Server comes with C++, Python and Java APIs with which users can send HTTP/REST or gRPC(possible extensions for other languages) requests. Explore the [client repository](https://github.com/triton-inference-server/server/tree/main/docs/protocol) for examples and documentation.
+- **Clients**: Triton Inference Server comes with C++, Python and Java APIs with which users can send HTTP/REST or gRPC(possible extensions for other languages) requests. Explore the [client repository](https://github.com/triton-inference-server/server/tree/r22.10/docs/protocol) for examples and documentation.
 
 - **Configuring Deployment**: Triton comes with three tools which can be used to configure deployment setting, measure performance and recommend optimizations.
   - [Model Analyzer](https://github.com/triton-inference-server/model_analyzer) Model Analyzer is CLI tool built to recommend deployment configurations for Triton Inference Server based on user's Quality of Service Requirements. It also generates detailed reports about model performance to summarize the benefits and trade offs of different configurations.
@@ -195,7 +195,7 @@ The following resources are recommended to explore the full suite of Triton Infe
   - [HugeCTR](https://github.com/triton-inference-server/hugectr_backend): HugeCTR is a GPU-accelerated recommender framework designed to distribute training across multiple GPUs and nodes and estimate Click-Through Rates
   - [Managed Stateful Models](https://github.com/triton-inference-server/stateful_backend): This backend automatically manages the input and output states of a model. The states are associated with a sequence id and need to be tracked for inference requests associated with the sequence id.
   - [Faster Transformer](https://github.com/triton-inference-server/fastertransformer_backend): NVIDIA [FasterTransformer](https://github.com/NVIDIA/FasterTransformer/) (FT) is a library implementing an accelerated engine for the inference of transformer-based neural networks, with a special emphasis on large models, spanning many GPUs and nodes in a distributed manner.
-  - [Building Custom Backends](https://github.com/triton-inference-server/backend/tree/main/examples#tutorial)
+  - [Building Custom Backends](https://github.com/triton-inference-server/backend/tree/r22.10/examples#tutorial)
   - [Sample Custom Backend: Repeat_backend](https://github.com/triton-inference-server/repeat_backend): Backend built to demonstrate sending of zero, one, or multiple responses per request.
 
 ## **Customization Guide**
