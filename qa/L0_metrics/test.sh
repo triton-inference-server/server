@@ -171,19 +171,26 @@ for metric in ${CPU_METRICS}; do
     prev_value=`curl -s localhost:8002/metrics | grep ${metric} | grep -v "HELP\|TYPE" | awk '{print $2}'`
     echo "  Initial ${metric} value: ${prev_value}"
 
+    num_not_updated=0
     for (( i = 0; i < $num_iterations; ++i )); do
       sleep $WAIT_INTERVAL_SECS
       current_value=`curl -s localhost:8002/metrics | grep ${metric} | grep -v "HELP\|TYPE" | awk '{print $2}'`
       echo "  ${metric} value: ${current_value}"
       if [ $current_value == $prev_value ]; then
-        cat $SERVER_LOG
-        echo "Metrics were not updated in interval of ${METRICS_INTERVAL_MS} milliseconds for metric: ${metric}"
-        echo -e "\n***\n*** Metric Interval test failed. \n***"
-        RET=1
-        break
+        num_not_updated=$((num_not_updated+1))
       fi
       prev_value=$current_value
     done
+
+    # Give CPU metrics some tolerance to not update
+    # An alternative may be to run some busy work in the background
+    if [[ ${num_not_updated} -gt $((num_iterations/2)) ]]; then
+        cat $SERVER_LOG
+        echo "Metrics were not updated ${num_not_updated}/${num_iterations} times for interval of ${METRICS_INTERVAL_MS} milliseconds for metric: ${metric}"
+        echo -e "\n***\n*** Metric Interval test failed. \n***"
+        RET=1
+        break
+    fi
 done
 
 # Verify reported total memory is non-zero
