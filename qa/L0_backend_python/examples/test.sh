@@ -43,8 +43,14 @@ if [ "$TEST_JETSON" == "0" ]; then
     pip3 uninstall -y torch
     pip3 install torch==1.9.0+cu111 -f https://download.pytorch.org/whl/torch_stable.html
 fi
+
 # Install JAX
-pip3 install --upgrade "jax[cuda]" -f https://storage.googleapis.com/jax-releases/jax_cuda_releases.html
+if [ "$TEST_JETSON" == "0" ]; then
+    pip3 install --upgrade "jax[cuda]" -f https://storage.googleapis.com/jax-releases/jax_cuda_releases.html
+else
+    # Gpu version of JAX is not supported on Jetson
+    pip3 install --upgrade "jax[cpu]" -f https://storage.googleapis.com/jax-releases/jax_cuda_releases.html
+fi
 
 git clone https://github.com/triton-inference-server/python_backend -b $PYTHON_BACKEND_REPO_TAG
 cd python_backend
