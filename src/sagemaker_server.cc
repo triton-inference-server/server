@@ -226,7 +226,7 @@ SagemakerAPIServer::Handle(evhtp_request_t* req)
             evhtp_send_reply(req, EVHTP_RES_NOTFOUND); /* 404*/
             return;
           }
-          LOG_VERBOSE(1) << "SM MME Custom Invoke Model" << std::endl;
+          LOG_VERBOSE(1) << "SageMaker MME Custom Invoke Model Path" << std::endl;
           SageMakerMMEHandleInfer(req, multi_model_name, model_version_str_);
           return;
         }
@@ -383,12 +383,15 @@ SagemakerAPIServer::SagemakeInferRequestClass::InferResponseComplete(
     evthr_defer(infer_request->thread_, OKReplyCallback, infer_request);
   } else {
     EVBufferAddErrorJson(infer_request->req_->buffer_out, err);
-    TRITONSERVER_ErrorDelete(err);
     if (SageMakerMMECheckOOMError(err) == true) {
+      LOG_VERBOSE(1)
+          << "Received an OOM error during INVOKE MODEL. Returning a 507."
+          << std::endl;
       evthr_defer(infer_request->thread_, BADReplyCallback507, infer_request);
     } else {
       evthr_defer(infer_request->thread_, BADReplyCallback, infer_request);
     }
+    TRITONSERVER_ErrorDelete(err);
   }
 
   LOG_TRITONSERVER_ERROR(
@@ -616,7 +619,7 @@ SagemakerAPIServer::SageMakerMMEUnloadModel(
   std::lock_guard<std::mutex> lock(mutex_);
 
   if (sagemaker_models_list_.find(model_name) == sagemaker_models_list_.end()) {
-    LOG_VERBOSE(1) << "Model " << model_name << "is not loaded." << std::endl;
+    LOG_VERBOSE(1) << "Model " << model_name << " is not loaded." << std::endl;
     evhtp_send_reply(req, EVHTP_RES_NOTFOUND); /* 404*/
     return;
   }
@@ -721,20 +724,31 @@ SagemakerAPIServer::SageMakerMMECheckOOMError(TRITONSERVER_Error* err)
   const char* message = TRITONSERVER_ErrorMessage(err);
   std::string error_string(message);
 
+  LOG_VERBOSE(1) << "Logging Verbose Invoke Error: " << std::endl
+                 << error_string.c_str() << std::endl;
+
   const std::vector<std::string> error_messages{
       "CUDA out of memory", /* pytorch */
       "CUDA_OUT_OF_MEMORY", /* tensorflow */
       "Out of memory",      /* generic */
+      "Out Of Memory",
       "out of memory",
       "MemoryError",
+      "OutOfMemory",
+      "OOM",
       "Dst tensor is not initialized",
       "Src tensor is not initialized",
       "CNMEM_STATUS_OUT_OF_MEMORY",
-      "CUDNN_STATUS_NOT_INITIALIZED"};
+      "CUDNN_STATUS_NOT_INITIALIZED",
+      "CUBLAS_STATUS_ALLOC_FAILED"};
 
+  /*
+    TODO: Improve the search to do pattern match on whole words only
+  */
   for (long unsigned int i = 0; i < error_messages.size(); i++) {
     if (error_string.find(error_messages[i]) != std::string::npos) {
-      LOG_VERBOSE(1) << "OOM strings detected in logs.";
+      LOG_VERBOSE(1) << "OOM string '" << error_messages[i].c_str()
+                     << "' detected in logs.";
       return true;
     }
   }
