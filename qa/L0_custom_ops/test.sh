@@ -107,7 +107,6 @@ kill $SERVER_PID
 wait $SERVER_PID
 
 ## Load operations via model config
-SERVER_ARGS="--model-repository=tf_custom_ops --strict-model-config=false"
 SERVER_ARGS="--model-repository=tf_custom_ops"
 SERVER_LD_PRELOAD=""
 
