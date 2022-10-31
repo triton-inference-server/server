@@ -352,6 +352,34 @@ cutting latency by more than half. The benefit provided by TensorRT
 will vary based on the model, but in general it can provide
 significant performance improvement.
 
+### TensorFlow JIT Graph Optimizations
+
+Tensorflow allows its user to specify the optimization level
+while running the model graph via GlobalJitLevel setting.
+See [config.proto](https://github.com/tensorflow/tensorflow/blob/v2.10.0/tensorflow/core/protobuf/config.proto)
+for more information. When running
+TensorFlow models in Triton, the users can provide this setting
+by providing graph levels like below:
+
+```
+optimization {
+  graph { level: 1
+}}
+```
+
+The users can also utilize the [XLA optimization](https://www.tensorflow.org/xla)
+by setting `TF_XLA_FLAGS` environment variable before launching
+Triton. An example to launch Triton with GPU and CPU auto-clustering:
+
+```
+$ TF_XLA_FLAGS="--tf_xla_auto_jit=2 --tf_xla_cpu_global_jit" tritonserver --model-repository=...
+```
+
+As in the case of TensorRT optimization above, these optimizations
+occur when the first inference request is run. To mitigate the
+model startup slowdown in production systems, you can use
+[model warmup](model_configuration.md#model-warmup).
+
 ### TensorFlow Automatic FP16 Optimization
 
 TensorFlow has an option to provide FP16 optimization that can be
