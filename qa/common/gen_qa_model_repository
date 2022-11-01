@@ -85,6 +85,7 @@ HOST_NOSHAPEDESTDIR=$HOST_BUILD_DIR/$TRITON_VERSION/qa_noshape_model_repository
 HOST_PLGDESTDIR=$HOST_BUILD_DIR/$TRITON_VERSION/qa_trt_plugin_model_repository
 HOST_RAGGEDDESTDIR=$HOST_BUILD_DIR/$TRITON_VERSION/qa_ragged_model_repository
 HOST_FORMATDESTDIR=$HOST_BUILD_DIR/$TRITON_VERSION/qa_trt_format_model_repository
+HOST_DATADEPENDENTDIR=$HOST_BUILD_DIR/$TRITON_VERSION/qa_trt_data_dependent_model_repository
 HOST_IMPLICITSEQDESTDIR=$HOST_BUILD_DIR/$TRITON_VERSION/qa_sequence_implicit_model_repository
 HOST_VARIMPLICITSEQDESTDIR=$HOST_BUILD_DIR/$TRITON_VERSION/qa_variable_sequence_implicit_model_repository
 HOST_INITIALSTATEIMPLICITSEQDESTDIR=$HOST_BUILD_DIR/$TRITON_VERSION/qa_sequence_initial_state_implicit_model_repository
@@ -95,7 +96,7 @@ rm -fr $HOST_SRCDIR $HOST_DESTDIR $HOST_VARDESTDIR $HOST_TFPARAMETERSDESTDIR
 rm -fr $HOST_IDENTITYDESTDIR $HOST_IDENTITYBIGDESTDIR $HOST_SHAPEDESTDIR $HOST_SIGDEFDESTDIR
 rm -fr $HOST_SEQDESTDIR $HOST_DYNASEQDESTDIR $HOST_VARSEQDESTDIR
 rm -fr $HOST_ENSEMBLEDESTDIR $HOST_NOSHAPEDESTDIR $HOST_RESHAPEDESTDIR
-rm -fr $HOST_PLGDESTDIR $HOST_RAGGEDDESTDIR $HOST_FORMATDESTDIR
+rm -fr $HOST_PLGDESTDIR $HOST_RAGGEDDESTDIR $HOST_FORMATDESTDIR $HOST_DATADEPENDENTDIR
 rm -rf $HOST_IMPLICITSEQDESTDIR $HOST_VARIMPLICITSEQDESTDIR $HOST_DYNASEQIMPLICITDESTDIR 
 rm -rf $HOST_VARINITIALSTATEIMPLICITSEQDESTDIR $HOST_INITIALSTATEIMPLICITSEQDESTDIR
 mkdir -p $HOST_SRCDIR
@@ -116,6 +117,7 @@ mkdir -p $HOST_NOSHAPEDESTDIR
 mkdir -p $HOST_PLGDESTDIR
 mkdir -p $HOST_RAGGEDDESTDIR
 mkdir -p $HOST_FORMATDESTDIR
+mkdir -p $HOST_DATADEPENDENTDIR
 mkdir -p $HOST_IMPLICITSEQDESTDIR
 mkdir -p $HOST_VARIMPLICITSEQDESTDIR
 mkdir -p $HOST_INITIALSTATEIMPLICITSEQDESTDIR
@@ -146,6 +148,7 @@ cp ./gen_qa_dyna_sequence_implicit_models.py $HOST_SRCDIR/.
 cp ./gen_ensemble_model_utils.py $HOST_SRCDIR/.
 cp ./gen_qa_trt_plugin_models.py $HOST_SRCDIR/.
 cp ./gen_qa_trt_format_models.py $HOST_SRCDIR/.
+cp ./gen_qa_trt_data_dependent_shape.py $HOST_SRCDIR/.
 cp ./gen_qa_torchtrt_models.py $HOST_SRCDIR/.
 cp ./gen_qa_ragged_models.py $HOST_SRCDIR/.
 cp ./test_util.py $HOST_SRCDIR/.
@@ -180,6 +183,7 @@ NOSHAPEDESTDIR=/tmp/noshapemodels
 PLGDESTDIR=/tmp/pluginmodels
 RAGGEDDESTDIR=/tmp/raggedmodels
 FORMATDESTDIR=/tmp/formatmodels
+DATADEPENDENTDIR=/tmp/datadependentmodels
 TORCHTRTDESTDIR=/tmp/torchtrtmodels
 
 # OPENVINO
@@ -482,6 +486,8 @@ cd /workspace/TensorRT/samples/python/uff_custom_plugin && cmake . && make && \
 cp libclipplugin.so $PLGDESTDIR/.)
 LD_PRELOAD=$PLGDESTDIR/libclipplugin.so python3 $SRCDIR/gen_qa_trt_plugin_models.py --models_dir=$PLGDESTDIR
 chmod -R 777 $PLGDESTDIR
+python3 $SRCDIR/ gen_qa_trt_data_dependent_shape.py --models_dir=$DATADEPENDENTDIR
+chmod -R 777 $DATADEPENDENTDIR
 EOF
 
 chmod a+x $HOST_SRCDIR/$TRTSCRIPT
@@ -505,6 +511,7 @@ docker run $DOCKER_GPU_ARGS --rm --entrypoint $SRCDIR/$TRTSCRIPT \
        --mount type=bind,source=$HOST_PLGDESTDIR,target=$PLGDESTDIR \
        --mount type=bind,source=$HOST_RAGGEDDESTDIR,target=$RAGGEDDESTDIR \
        --mount type=bind,source=$HOST_FORMATDESTDIR,target=$FORMATDESTDIR \
+       --mount type=bind,source=$HOST_DATADEPENDENTDIR,target=$DATADEPENDENTDIR \
        --mount type=bind,source=$HOST_VARIMPLICITSEQDESTDIR,target=$VARIMPLICITSEQDESTDIR \
        --mount type=bind,source=$HOST_DYNASEQIMPLICITDESTDIR,target=$DYNASEQIMPLICITDESTDIR \
        --mount type=bind,source=$HOST_IMPLICITSEQDESTDIR,target=$IMPLICITSEQDESTDIR \
