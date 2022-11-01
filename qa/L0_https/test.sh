@@ -42,14 +42,27 @@ export CUDA_VISIBLE_DEVICES=0
 
 RET=0
 
-SIMPLE_AIO_INFER_CLIENT_PY=../clients/simple_http_aio_infer_client.py
-SIMPLE_INFER_CLIENT_PY=../clients/simple_http_infer_client.py
-TEST_CLIENT=../clients/simple_http_infer_client
+# On windows the paths invoked by the script (running in WSL) must use
+# /mnt/c when needed but the paths on the tritonserver command-line
+# must be C:/ style.
+if [[ "$(< /proc/sys/kernel/osrelease)" == *microsoft* ]]; then
+    SDKDIR=${SDKDIR:=C:/sdk}
+    DATADIR=${DATADIR:="C:/data/inferenceserver/${REPO_VERSION}"}
+    BACKEND_DIR=${BACKEND_DIR:=C:/tritonserver/backends}
+    SERVER=${SERVER:=/mnt/c/tritonserver/bin/tritonserver.exe}
+    SIMPLE_AIO_INFER_CLIENT_PY=${SDKDIR}/python/simple_http_aio_infer_client.py
+    SIMPLE_INFER_CLIENT_PY=${SDKDIR}/python/simple_http_infer_client.py
+    TEST_CLIENT=${SDKDIR}/python/simple_http_infer_client
+else
+    DATADIR=`pwd`/models
+    SERVER=/opt/tritonserver/bin/tritonserver
+    SIMPLE_AIO_INFER_CLIENT_PY=../clients/simple_http_aio_infer_client.py
+    SIMPLE_INFER_CLIENT_PY=../clients/simple_http_infer_client.py
+    TEST_CLIENT=../clients/simple_http_infer_client
+fi
 
 NGINX_CONF=`pwd`/nginx.conf
 CLIENT_LOG=`pwd`/client.log
-DATADIR=`pwd`/models
-SERVER=/opt/tritonserver/bin/tritonserver
 SERVER_ARGS="--model-repository=$DATADIR"
 source ../common/util.sh
 
