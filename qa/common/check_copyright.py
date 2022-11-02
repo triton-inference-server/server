@@ -124,7 +124,7 @@ def visit(path):
                     first_line = False
                     if (fline.startswith("#!") or fline.startswith("..") or
                             fline.startswith("<!--") or
-                            fline.startswith("/*")) or
+                            fline.startswith("/*") or
                             fline.startswith("{{/*")):
                         continue
                 # Skip empty lines...
