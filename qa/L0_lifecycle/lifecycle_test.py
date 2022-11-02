@@ -2625,6 +2625,39 @@ class LifeCycleTest(tu.TestResultCollector):
         except Exception as ex:
             self.assertTrue(False, "unexpected error {}".format(ex))
 
+    def test_concurrent_load_speedup(self):
+        model_names = ["identity_zero_1_int32_1", "identity_zero_1_int32_2"]
+        start_time = time.time()
+        try:
+            triton_client = grpcclient.InferenceServerClient("localhost:8001",
+                                                             verbose=True)
+            threads = []
+            for model_name in model_names:
+                threads.append(
+                    threading.Thread(target=triton_client.load_model,
+                                     args=(model_name,)))
+            for thread in threads:
+                thread.start()
+            for thread in threads:
+                thread.join()
+        except Exception as ex:
+            self.assertTrue(False, "unexpected error {}".format(ex))
+        end_time = time.time()
+        loading_time = end_time - start_time
+        # Each of the two models has a minimum loading delay of 10 seconds
+        # Speedup is observed when the concurrent loading time < 20 seconds but
+        # use a tighter bound of 15 seconds
+        self.assertLess(loading_time, 15.0,
+                        "Concurrent loading speedup not observed")
+        # Concurrent loading time cannot be < 10 seconds
+        self.assertGreaterEqual(loading_time, 10.0,
+                                "Invalid concurrent loading time")
+        # Make sure the models are loaded
+        self.assertTrue(triton_client.is_server_live())
+        self.assertTrue(triton_client.is_server_ready())
+        for model_name in model_names:
+            self.assertTrue(triton_client.is_model_ready(model_name))
+
 
 if __name__ == '__main__':
     unittest.main()
