@@ -27,6 +27,7 @@
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 import argparse
+import csv
 import json
 import numpy as np
 
@@ -388,7 +389,10 @@ TRITON_TYPE_TO_NUMPY = {
 
 def get_numpy_array(tensor):
     dtype = TRITON_TYPE_TO_NUMPY[tensor["dtype"]]
-    value = map(float, tensor["data"].split(","))
+    if dtype == np.object_:
+        value = next(csv.reader([tensor["data"]], skipinitialspace=True))
+    else:
+        value = map(float, tensor["data"].split(","))
     shape = map(int, tensor["shape"].split(","))
     array = np.array(list(value), dtype=dtype)
     array = array.reshape(list(shape))

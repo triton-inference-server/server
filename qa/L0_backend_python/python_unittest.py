@@ -44,7 +44,7 @@ class PythonUnittest(tu.TestResultCollector):
     def _run_unittest(self, model_name):
         with grpcclient.InferenceServerClient("localhost:8001") as client:
             # No input is required
-            result = client.infer(model_name, [], client_timeout=120)
+            result = client.infer(model_name, [], client_timeout=240)
             output0 = result.as_numpy('OUTPUT0')
 
             # The model returns 1 if the tests were sucessfully passed.

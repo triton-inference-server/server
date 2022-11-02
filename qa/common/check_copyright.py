@@ -33,13 +33,14 @@ import pathlib
 
 FLAGS = None
 SKIP_EXTS = ('jpeg', 'jpg', 'pgm', 'png', 'log', 'serverlog', 'preprocessed',
-             'jmx', 'gz', 'json', 'pdf', 'so', 'onnx')
+             'jmx', 'gz', 'json', 'pdf', 'so', 'onnx', 'svg')
 REPO_PATH_FROM_THIS_FILE = '../..'
 SKIP_PATHS = (
     'build', 'deploy/gke-marketplace-app/.gitignore',
     'deploy/gke-marketplace-app/server-deployer/chart/.helmignore',
     'deploy/gcp/.helmignore', 'deploy/aws/.helmignore',
-    'deploy/fleetcommand/.helmignore', 'docs/examples/model_repository',
+    'deploy/fleetcommand/.helmignore', 'docs/.gitignore',
+    'docs/_static/.gitattributes', 'docs/examples/model_repository',
     'docs/examples/jetson', 'docker', 'qa/common/cuda_op_kernel.cu.cc.patch',
     'qa/ensemble_models/mix_platform_float32_float32_float32/output0_labels.txt',
     'qa/ensemble_models/mix_type_int32_float32_float32/output0_labels.txt',
@@ -117,12 +118,13 @@ def visit(path):
             for fline in f:
                 line = fline
 
-                # Skip any '#!', '..', '<!--', or '{{/*' lines at the
+                # Skip any '#!', '..', '<!--', '\*' or '{{/*' lines at the
                 # start of the file
                 if first_line:
                     first_line = False
                     if (fline.startswith("#!") or fline.startswith("..") or
                             fline.startswith("<!--") or
+                            fline.startswith("/*") or
                             fline.startswith("{{/*")):
                         continue
                 # Skip empty lines...
