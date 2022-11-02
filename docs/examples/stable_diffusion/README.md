@@ -54,21 +54,7 @@ pip install torch torchvision torchaudio --extra-index-url https://download.pyto
 pip install transformers ftfy scipy
 pip install transformers[onnxruntime]
 huggingface-cli login
-```
-
-As of the creation of this example, there are some unmerged optimizations for the diffusers repository, which are being used to accelerate the UNet Model. If you DO NOT wish to use the optimizations:
-```
 pip install diffusers
-```
-If you wish to use the optimizations:
-```
-# this pip install take ~ 20 minutes
-pip install git+https://github.com/facebookresearch/xformers@51dd119#egg=xformers
-git clone https://github.com/MatthieuTPHR/diffusers.git
-cd diffusers
-git checkout memory_efficient_attention
-pip install -e .
-export USE_MEMORY_EFFICIENT_ATTENTION=1
 ```
 
 ### Step 2: Exporting and converting the models
