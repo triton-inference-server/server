@@ -195,6 +195,7 @@ done
 
 # Verify reported total memory is non-zero
 total_memory=`curl -s localhost:8002/metrics | grep "nv_cpu_memory_total_bytes" | grep -v "HELP\|TYPE" | awk '{print $2}'`
+test -z "${total_memory}" && total_memory=0
 if [ $total_memory -eq 0 ]; then
   echo "Found nv_cpu_memory_total_bytes had a value of zero, this should not happen."
   echo -e "\n***\n*** CPU total memory test failed. \n***"
