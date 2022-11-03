@@ -55,7 +55,6 @@ SEQ_JSONDATAFILE=`pwd`/../common/perf_analyzer_input_data_json/seq_data.json
 SHAPETENSORADTAFILE=`pwd`/../common/perf_analyzer_input_data_json/shape_tensor_data.json
 
 ERROR_STRING="error | Request count: 0 | : 0 infer/sec"
-NON_SUPPORTED_ERROR_STRING="supported by C API"
 
 STABILITY_THRESHOLD="15"
 
@@ -257,7 +256,7 @@ $PERF_ANALYZER -v -m graphdef_int32_int32_int32 -t 1 -p2000 -b 1 -a \
 --service-kind=triton_c_api --model-repository=$DATADIR \
 --triton-server-directory=$SERVER_LIBRARY_PATH -s ${STABILITY_THRESHOLD} \
 >$CLIENT_LOG 2>&1
-if [ $(cat $CLIENT_LOG | grep "${NON_SUPPORTED_ERROR_STRING}" | wc -l) -ne 1 ]; then
+if [ $(cat $CLIENT_LOG | grep "not supported by triton_c_api service" | wc -l) -ne 1 ]; then
     cat $CLIENT_LOG
     echo -e "\n***\n*** Test Failed\n***"
     RET=1
@@ -282,13 +281,16 @@ for SHARED_MEMORY_TYPE in system cuda; do
 done
 
 
-# Testing --request-rate-range does NOT work
-set +e
 $PERF_ANALYZER -v -m graphdef_int32_int32_int32 --request-rate-range 1000:2000:500 -p1000 -b 1 \
 --service-kind=triton_c_api --model-repository=$DATADIR \
 --triton-server-directory=$SERVER_LIBRARY_PATH -s ${STABILITY_THRESHOLD} \
 >$CLIENT_LOG 2>&1
-if [ $(cat $CLIENT_LOG | grep "${NON_SUPPORTED_ERROR_STRING}" | wc -l) -ne 1 ]; then
+if [ $? -ne 0 ]; then
+    cat $CLIENT_LOG
+    echo -e "\n***\n*** Test Failed\n***"
+    RET=1
+fi
+if [ $(cat $CLIENT_LOG |  grep "${ERROR_STRING}" | wc -l) -ne 0 ]; then
     cat $CLIENT_LOG
     echo -e "\n***\n*** Test Failed\n***"
     RET=1
