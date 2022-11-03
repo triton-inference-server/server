@@ -96,6 +96,9 @@ def validate_for_trt_model(input_dtype, output0_dtype, output1_dtype,
     supported_datatypes = [
         bool, np.int8, np.int32, np.uint8, np.float16, np.float32
     ]
+    # FIXME: Remove this check when jetson supports TRT 8.5 (DLIS-4256)
+    if not support_trt_uint8():
+        supported_datatypes.remove(np.uint8)
     if not input_dtype in supported_datatypes:
         return False
     if not output0_dtype in supported_datatypes:
@@ -238,6 +241,18 @@ def get_dyna_sequence_model_name(pf, dtype):
 
 def get_zero_model_name(pf, io_cnt, dtype):
     return "{}_zero_{}_{}".format(pf, io_cnt, np.dtype(dtype).name)
+
+
+# FIXME: Remove this def when jetson supports TRT 8.5 (DLIS-4256)
+def support_trt_uint8():
+    try:
+        import tensorrt as trt
+    except:
+        # tensorrt library is not found, detect from environment
+        import os
+        return not bool(int(os.environ.get("TEST_JETSON", 0)))
+    # tensorrt library is found, return if uint8 is defined
+    return hasattr(trt, "uint8")
 
 
 class TestResultCollector(unittest.TestCase):

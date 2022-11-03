@@ -498,13 +498,15 @@ def create_plan_dynamic_rf_modelfile(models_dir, max_batch, model_version,
 
     # TRT uint8 cannot be used to represent quantized floating-point value yet
     # uint8 must be converted to float16 or float32 before any operation
-    if trt_input_dtype == trt.uint8:
-        in0_cast = network.add_identity(in0)
-        in0_cast.set_output_type(0, trt.float32)
-        in0 = in0_cast.get_output(0)
-        in1_cast = network.add_identity(in1)
-        in1_cast.set_output_type(0, trt.float32)
-        in1 = in1_cast.get_output(0)
+    # FIXME: Remove support check when jetson supports TRT 8.5 (DLIS-4256)
+    if tu.support_trt_uint8():
+        if trt_input_dtype == trt.uint8:
+            in0_cast = network.add_identity(in0)
+            in0_cast.set_output_type(0, trt.float32)
+            in0 = in0_cast.get_output(0)
+            in1_cast = network.add_identity(in1)
+            in1_cast.set_output_type(0, trt.float32)
+            in1 = in1_cast.get_output(0)
 
     add = network.add_elementwise(in0, in1, trt.ElementWiseOperation.SUM)
     sub = network.add_elementwise(in0, in1, trt.ElementWiseOperation.SUB)
@@ -512,12 +514,14 @@ def create_plan_dynamic_rf_modelfile(models_dir, max_batch, model_version,
     out1 = sub if not swap else add
 
     # uint8 conversion after operations
-    if trt_output0_dtype == trt.uint8:
-        out0 = network.add_identity(out0.get_output(0))
-        out0.set_output_type(0, trt.uint8)
-    if trt_output1_dtype == trt.uint8:
-        out1 = network.add_identity(out1.get_output(0))
-        out1.set_output_type(0, trt.uint8)
+    # FIXME: Remove support check when jetson supports TRT 8.5 (DLIS-4256)
+    if tu.support_trt_uint8():
+        if trt_output0_dtype == trt.uint8:
+            out0 = network.add_identity(out0.get_output(0))
+            out0.set_output_type(0, trt.uint8)
+        if trt_output1_dtype == trt.uint8:
+            out1 = network.add_identity(out1.get_output(0))
+            out1.set_output_type(0, trt.uint8)
 
     out0.get_output(0).name = "OUTPUT0"
     out1.get_output(0).name = "OUTPUT1"
