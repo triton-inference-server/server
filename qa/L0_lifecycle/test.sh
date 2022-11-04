@@ -1695,7 +1695,7 @@ wait $SERVER_PID
 LOG_IDX=$((LOG_IDX+1))
 
 # LifeCycleTest.test_concurrent_load_speedup
-rm -rf models config.pbtxt.*
+rm -rf models
 mkdir models
 cp -r identity_zero_1_int32 models/identity_zero_1_int32_1 && mkdir -p models/identity_zero_1_int32_1/1
 cp -r models/identity_zero_1_int32_1 models/identity_zero_1_int32_2
@@ -1713,6 +1713,41 @@ fi
 
 set +e
 python $LC_TEST LifeCycleTest.test_concurrent_load_speedup >>$CLIENT_LOG 2>&1
+if [ $? -ne 0 ]; then
+    cat $CLIENT_LOG
+    echo -e "\n***\n*** Test Failed\n***"
+    RET=1
+fi
+set -e
+
+kill $SERVER_PID
+wait $SERVER_PID
+
+LOG_IDX=$((LOG_IDX+1))
+
+# LifeCycleTest.test_concurrent_load_unload
+rm -rf models
+mkdir models
+cp -r identity_zero_1_int32 models && mkdir -p models/identity_zero_1_int32/1
+cp -r ensemble_zero_1_float32 models && mkdir -p models/ensemble_zero_1_float32/1
+cp -r ../custom_models/custom_zero_1_float32 models/. && \
+    mkdir -p models/custom_zero_1_float32/1 && \
+    (cd models/custom_zero_1_float32 && \
+        echo "parameters [" >> config.pbtxt && \
+        echo "{ key: \"creation_delay_sec\"; value: { string_value: \"10\" }}" >> config.pbtxt && \
+        echo "]" >> config.pbtxt)
+
+SERVER_ARGS="--model-repository=`pwd`/models --model-control-mode=explicit"
+SERVER_LOG="./inference_server_$LOG_IDX.log"
+run_server
+if [ "$SERVER_PID" == "0" ]; then
+    echo -e "\n***\n*** Failed to start $SERVER\n***"
+    cat $SERVER_LOG
+    exit 1
+fi
+
+set +e
+python $LC_TEST LifeCycleTest.test_concurrent_load_unload >>$CLIENT_LOG 2>&1
 if [ $? -ne 0 ]; then
     cat $CLIENT_LOG
     echo -e "\n***\n*** Test Failed\n***"

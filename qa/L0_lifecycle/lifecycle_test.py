@@ -2626,22 +2626,24 @@ class LifeCycleTest(tu.TestResultCollector):
             self.assertTrue(False, "unexpected error {}".format(ex))
 
     def test_concurrent_load_speedup(self):
-        model_names = ["identity_zero_1_int32_1", "identity_zero_1_int32_2"]
-        start_time = time.time()
+        # Initialize client
         try:
             triton_client = grpcclient.InferenceServerClient("localhost:8001",
                                                              verbose=True)
-            threads = []
-            for model_name in model_names:
-                threads.append(
-                    threading.Thread(target=triton_client.load_model,
-                                     args=(model_name,)))
-            for thread in threads:
-                thread.start()
-            for thread in threads:
-                thread.join()
         except Exception as ex:
             self.assertTrue(False, "unexpected error {}".format(ex))
+        # Load both models concurrently
+        model_names = ["identity_zero_1_int32_1", "identity_zero_1_int32_2"]
+        threads = []
+        for model_name in model_names:
+            threads.append(
+                threading.Thread(target=triton_client.load_model,
+                                 args=(model_name,)))
+        start_time = time.time()
+        for thread in threads:
+            thread.start()
+        for thread in threads:
+            thread.join()
         end_time = time.time()
         loading_time = end_time - start_time
         # Each of the two models has a minimum loading delay of 10 seconds
@@ -2657,6 +2659,60 @@ class LifeCycleTest(tu.TestResultCollector):
         self.assertTrue(triton_client.is_server_ready())
         for model_name in model_names:
             self.assertTrue(triton_client.is_model_ready(model_name))
+
+    def test_concurrent_load_unload(self):
+        # Initialize client
+        try:
+            triton_client = grpcclient.InferenceServerClient("localhost:8001",
+                                                             verbose=True)
+        except Exception as ex:
+            self.assertTrue(False, "unexpected error {}".format(ex))
+        # Load identity_zero_1_int32 and unload it while it is loading
+        # The unload operation should have no effect
+        threads = [
+            threading.Thread(target=triton_client.load_model,
+                             args=("identity_zero_1_int32",)),
+            threading.Thread(target=triton_client.unload_model,
+                             args=("identity_zero_1_int32",))
+        ]
+        for thread in threads:
+            thread.start()
+            time.sleep(2)  # wait between load and unload
+        for thread in threads:
+            thread.join()
+        self.assertTrue(triton_client.is_server_live())
+        self.assertTrue(triton_client.is_server_ready())
+        self.assertTrue(triton_client.is_model_ready("identity_zero_1_int32"))
+        # Load ensemble_zero_1_float32 and unload its dependency while it is loading
+        # The unload operation should have no effect
+        threads = [
+            threading.Thread(target=triton_client.load_model,
+                             args=("ensemble_zero_1_float32",)),
+            threading.Thread(target=triton_client.unload_model,
+                             args=("custom_zero_1_float32",))
+        ]
+        for thread in threads:
+            thread.start()
+            time.sleep(2)  # wait between load and unload
+        for thread in threads:
+            thread.join()
+        self.assertTrue(triton_client.is_server_live())
+        self.assertTrue(triton_client.is_server_ready())
+        self.assertTrue(triton_client.is_model_ready("ensemble_zero_1_float32"))
+        self.assertTrue(triton_client.is_model_ready("custom_zero_1_float32"))
+        # Unload models concurrently
+        model_names = ["identity_zero_1_int32", "ensemble_zero_1_float32"]
+        threads = []
+        for model_name in model_names:
+            threads.append(
+                threading.Thread(target=triton_client.unload_model,
+                                 args=(model_name,)))
+        for thread in threads:
+            thread.start()
+        for thread in threads:
+            thread.join()
+        for model_name in model_names:
+            self.assertFalse(triton_client.is_model_ready(model_name))
 
 
 if __name__ == '__main__':
