@@ -2661,6 +2661,31 @@ class LifeCycleTest(tu.TestResultCollector):
         for model_name in model_names:
             self.assertTrue(triton_client.is_model_ready(model_name))
 
+    def test_concurrent_load(self):
+        # Initialize client
+        try:
+            triton_client = grpcclient.InferenceServerClient("localhost:8001",
+                                                             verbose=True)
+        except Exception as ex:
+            self.assertTrue(False, "unexpected error {}".format(ex))
+        # Load same model concurrently
+        with concurrent.futures.ThreadPoolExecutor() as pool:
+            thread_1 = pool.submit(triton_client.load_model,
+                                   "identity_zero_1_int32")
+            time.sleep(2)  # wait between load and unload
+            thread_2 = pool.submit(triton_client.load_model,
+                                   "identity_zero_1_int32")
+            thread_1.result()
+            with self.assertRaises(Exception) as ex:
+                thread_2.result()
+                self.assertEqual(
+                    str(ex.exception),
+                    "[StatusCode.INVALID_ARGUMENT] a related model 'identity_zero_1_int32' to a load/unload request is currently loading or unloading"
+                )
+        self.assertTrue(triton_client.is_server_live())
+        self.assertTrue(triton_client.is_server_ready())
+        self.assertTrue(triton_client.is_model_ready("identity_zero_1_int32"))
+
     def test_concurrent_load_unload(self):
         # Initialize client
         try:
