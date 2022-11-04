@@ -44,9 +44,6 @@ class TrtDataDependentShapeTest(tu.TestResultCollector):
         input_np = np.arange(16, dtype=np.int32).reshape((4, 4))
         expected_output_np = np.nonzero(input_np)
 
-        # Use shared memory to bypass the shape check in client library, because
-        # for non-linear format tensor, the data buffer is padded and thus the
-        # data byte size may not match what is calculated from tensor shape
         inputs = []
         inputs.append(client.InferInput('INPUT', [4, 4], "INT32"))
         inputs[-1].set_data_from_numpy(input_np)
@@ -68,9 +65,6 @@ class TrtDataDependentShapeTest(tu.TestResultCollector):
         input_np = np.array(input_data, dtype=np.int32).reshape((20, 16))
         expected_output_np = np.nonzero(input_np)
 
-        # Use shared memory to bypass the shape check in client library, because
-        # for non-linear format tensor, the data buffer is padded and thus the
-        # data byte size may not match what is calculated from tensor shape
         inputs = []
         inputs.append(client.InferInput('INPUT', [20, 16], "INT32"))
         inputs[-1].set_data_from_numpy(input_np)
