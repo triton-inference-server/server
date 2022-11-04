@@ -169,26 +169,34 @@ WAIT_INTERVAL_SECS=2.0
 for metric in ${CPU_METRICS}; do
     echo "\n=== Checking Metric: ${metric} ===\n"
     prev_value=`curl -s localhost:8002/metrics | grep ${metric} | grep -v "HELP\|TYPE" | awk '{print $2}'`
-    echo "  Initial ${metric} value: ${prev_value}"
 
+    num_not_updated=0
+    num_not_updated_threshold=3
     for (( i = 0; i < $num_iterations; ++i )); do
       sleep $WAIT_INTERVAL_SECS
       current_value=`curl -s localhost:8002/metrics | grep ${metric} | grep -v "HELP\|TYPE" | awk '{print $2}'`
-      echo "  ${metric} value: ${current_value}"
       if [ $current_value == $prev_value ]; then
-        cat $SERVER_LOG
-        echo "Metrics were not updated in interval of ${METRICS_INTERVAL_MS} milliseconds for metric: ${metric}"
-        echo -e "\n***\n*** Metric Interval test failed. \n***"
-        RET=1
-        break
+        num_not_updated=$((num_not_updated+1))
       fi
       prev_value=$current_value
     done
+
+    # Give CPU metrics some tolerance to not update, up to a threshold
+    # DLIS-4304: An alternative may be to run some busy work on CPU in the
+    #            background rather than allowing a tolerance threshold
+    if [[ ${num_not_updated} -gt ${num_not_updated_threshold} ]]; then
+        cat $SERVER_LOG
+        echo "Metrics were not updated ${num_not_updated}/${num_iterations} times for interval of ${METRICS_INTERVAL_MS} milliseconds for metric: ${metric}"
+        echo -e "\n***\n*** Metric Interval test failed. \n***"
+        RET=1
+        break
+    fi
 done
 
 # Verify reported total memory is non-zero
 total_memory=`curl -s localhost:8002/metrics | grep "nv_cpu_memory_total_bytes" | grep -v "HELP\|TYPE" | awk '{print $2}'`
-if [ $total_memory -eq 0 ]; then
+test -z "${total_memory}" && total_memory=0
+if [ ${total_memory} -eq 0 ]; then
   echo "Found nv_cpu_memory_total_bytes had a value of zero, this should not happen."
   echo -e "\n***\n*** CPU total memory test failed. \n***"
   RET=1
