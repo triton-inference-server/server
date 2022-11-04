@@ -39,6 +39,7 @@ import numpy as np
 import infer_util as iu
 import test_util as tu
 import threading
+import concurrent.futures
 
 import tritonclient.grpc as grpcclient
 import tritonclient.http as httpclient
@@ -2669,48 +2670,50 @@ class LifeCycleTest(tu.TestResultCollector):
             self.assertTrue(False, "unexpected error {}".format(ex))
         # Load identity_zero_1_int32 and unload it while it is loading
         # The unload operation should have no effect
-        threads = [
-            threading.Thread(target=triton_client.load_model,
-                             args=("identity_zero_1_int32",)),
-            threading.Thread(target=triton_client.unload_model,
-                             args=("identity_zero_1_int32",))
-        ]
-        for thread in threads:
-            thread.start()
+        with concurrent.futures.ThreadPoolExecutor() as pool:
+            load_thread = pool.submit(triton_client.load_model,
+                                      "identity_zero_1_int32")
             time.sleep(2)  # wait between load and unload
-        for thread in threads:
-            thread.join()
+            unload_thread = pool.submit(triton_client.unload_model,
+                                        "identity_zero_1_int32")
+            load_thread.result()
+            with self.assertRaises(Exception) as ex:
+                unload_thread.result()
+                self.assertEqual(
+                    str(ex.exception),
+                    "[StatusCode.INVALID_ARGUMENT] a related model 'identity_zero_1_int32' to a load/unload request is currently loading or unloading"
+                )
         self.assertTrue(triton_client.is_server_live())
         self.assertTrue(triton_client.is_server_ready())
         self.assertTrue(triton_client.is_model_ready("identity_zero_1_int32"))
         # Load ensemble_zero_1_float32 and unload its dependency while it is loading
         # The unload operation should have no effect
-        threads = [
-            threading.Thread(target=triton_client.load_model,
-                             args=("ensemble_zero_1_float32",)),
-            threading.Thread(target=triton_client.unload_model,
-                             args=("custom_zero_1_float32",))
-        ]
-        for thread in threads:
-            thread.start()
+        with concurrent.futures.ThreadPoolExecutor() as pool:
+            load_thread = pool.submit(triton_client.load_model,
+                                      "ensemble_zero_1_float32")
             time.sleep(2)  # wait between load and unload
-        for thread in threads:
-            thread.join()
+            unload_thread = pool.submit(triton_client.unload_model,
+                                        "custom_zero_1_float32")
+            load_thread.result()
+            with self.assertRaises(Exception) as ex:
+                unload_thread.result()
+                self.assertEqual(
+                    str(ex.exception),
+                    "[StatusCode.INVALID_ARGUMENT] a related model 'custom_zero_1_float32' to a load/unload request is currently loading or unloading"
+                )
         self.assertTrue(triton_client.is_server_live())
         self.assertTrue(triton_client.is_server_ready())
         self.assertTrue(triton_client.is_model_ready("ensemble_zero_1_float32"))
         self.assertTrue(triton_client.is_model_ready("custom_zero_1_float32"))
         # Unload models concurrently
         model_names = ["identity_zero_1_int32", "ensemble_zero_1_float32"]
-        threads = []
-        for model_name in model_names:
-            threads.append(
-                threading.Thread(target=triton_client.unload_model,
-                                 args=(model_name,)))
-        for thread in threads:
-            thread.start()
-        for thread in threads:
-            thread.join()
+        with concurrent.futures.ThreadPoolExecutor() as pool:
+            threads = []
+            for model_name in model_names:
+                threads.append(
+                    pool.submit(triton_client.unload_model, model_name))
+            for thread in concurrent.futures.as_completed(threads):
+                thread.result()
         for model_name in model_names:
             self.assertFalse(triton_client.is_model_ready(model_name))
 
