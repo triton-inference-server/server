@@ -54,7 +54,7 @@ git clone -b dyas-go-fix https://github.com/triton-inference-server/client.git
 source <(grep '^export PACKAGE.*=' client/src/grpc_generated/go/gen_go_stubs.sh)
 
 # Fix to allow global stubs import
-#sed -i "s/.\/$PACKAGE/$PACKAGE/g" $SIMPLE_GO_CLIENT
+sed -i "s/.\/$PACKAGE/$PACKAGE/g" $SIMPLE_GO_CLIENT
 
 PACKAGE_PATH="${GOPATH}/src"
 mkdir -p ${PACKAGE_PATH}
