@@ -116,6 +116,10 @@ repository path must be prefixed with gs://.
 $ tritonserver --model-repository=gs://bucket/path/to/model/repository ...
 ```
 
+When using Google Cloud Storage, the
+[GOOGLE_APPLICATION_CREDENTIALS](https://cloud.google.com/docs/authentication/application-default-credentials#GAC)
+environment variable should be set.
+
 #### S3
 
 For a model repository residing in Amazon S3, the path must be
