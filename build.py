@@ -848,12 +848,14 @@ RUN apt-get update && \
             build-essential \
             docker.io \
             git \
+            gperf \
             libre2-dev \
             libssl-dev \
             libtool \
             libboost-dev \
             libcurl4-openssl-dev \
             libb64-dev \
+            libgoogle-perftools-dev \
             patchelf \
             python3-dev \
             python3-pip \
@@ -1065,7 +1067,9 @@ RUN apt-get update && \
             libcurl4-openssl-dev \
             libre2-5 \
             git \
+            gperf \
             dirmngr \
+            libgoogle-perftools-dev \
             libnuma-dev \
             curl \
             {backend_dependencies} && \
