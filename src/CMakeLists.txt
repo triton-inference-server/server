@@ -87,11 +87,13 @@ endif()
 #
 find_library(RE2_LIBRARY NAMES re2)
 
-# Gperftools
-#
-link_directories(/usr/local/lib)
-LIST(APPEND CMAKE_MODULE_PATH "${PROJECT_SOURCE_DIR}/cmake")
-find_package(Gperftools REQUIRED)
+if (NOT WIN32)
+  # Gperftools
+  #
+  link_directories(/usr/local/lib)
+  LIST(APPEND CMAKE_MODULE_PATH "${PROJECT_SOURCE_DIR}/cmake")
+  find_package(Gperftools REQUIRED)
+endif()
 
 
 #
@@ -183,12 +185,14 @@ if(${TRITON_ENABLE_GPU})
   )
 endif() # TRITON_ENABLE_GPU
 
-# Link the main process with tcmalloc
-target_link_libraries(
+if (NOT WIN32)
+  # Link the main process with tcmalloc
+  target_link_libraries(
     main
     PRIVATE
       tcmalloc
-)
+  )
+endif()
 
 if(${TRITON_ENABLE_HTTP} OR ${TRITON_ENABLE_METRICS} OR
     ${TRITON_ENABLE_SAGEMAKER} OR ${TRITON_ENABLE_VERTEX_AI})
