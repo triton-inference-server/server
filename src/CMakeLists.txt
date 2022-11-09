@@ -87,6 +87,13 @@ endif()
 #
 find_library(RE2_LIBRARY NAMES re2)
 
+# Gperftools
+#
+link_directories(/usr/local/lib)
+LIST(APPEND CMAKE_MODULE_PATH "${PROJECT_SOURCE_DIR}/cmake")
+find_package(Gperftools REQUIRED)
+
+
 #
 # tritonserver executable
 #
@@ -175,6 +182,13 @@ if(${TRITON_ENABLE_GPU})
       CUDA::cudart
   )
 endif() # TRITON_ENABLE_GPU
+
+# Link the main process with tcmalloc
+target_link_libraries(
+    main
+    PRIVATE
+      tcmalloc
+)
 
 if(${TRITON_ENABLE_HTTP} OR ${TRITON_ENABLE_METRICS} OR
     ${TRITON_ENABLE_SAGEMAKER} OR ${TRITON_ENABLE_VERTEX_AI})
