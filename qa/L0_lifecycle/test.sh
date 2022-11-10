@@ -1298,6 +1298,13 @@ for protocol in grpc http; do
        export TRITONSERVER_USE_GRPC=1
     fi
 
+    # The OS file system is more granular when determining modification time, a
+    # file is modified when its content is changed in place, and a file is
+    # updated when it is copied or moved. With Triton, any operation that
+    # changes a file is modification. Thus, preparing the models backward will
+    # test when a replacement model is haing an earlier or equal modification
+    # timestamp than the current model, Triton must still detect the model is
+    # modified with the update timestamp and proceed with model reload.
     for prep_order in normal reverse; do
         rm -fr models simple_float32_float32_float32
         mkdir models
@@ -1310,7 +1317,6 @@ for protocol in grpc http; do
             sed -i "s/libtorch_float32_float32_float32/simple_float32_float32_float32/" simple_float32_float32_float32/config.pbtxt
         else
             # Prepare the pytorch model first, then the TRT model
-            # When the replacement model is older, the reload must commence
             cp -r $DATADIR/qa_model_repository/libtorch_float32_float32_float32 simple_float32_float32_float32
             sed -i "s/libtorch_float32_float32_float32/simple_float32_float32_float32/" simple_float32_float32_float32/config.pbtxt
             cp -r $DATADIR/qa_model_repository/plan_float32_float32_float32 models/simple_float32_float32_float32
