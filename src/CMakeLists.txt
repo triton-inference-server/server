@@ -703,7 +703,8 @@ if (NOT WIN32)
       triton-common-error             # from repo-common
       triton-core-serverapi           # from repo-core
       triton-core-serverstub          # from repo-core
-    )
+      tcmalloc
+  )
 
   if(${TRITON_ENABLE_GPU})
     target_compile_definitions(
@@ -767,6 +768,7 @@ if (NOT WIN32)
       triton-common-error             # from repo-common
       triton-core-serverapi           # from repo-core
       triton-core-serverstub          # from repo-core
+      tcmalloc
     )
 
   if(${TRITON_ENABLE_GPU})
@@ -839,6 +841,7 @@ if (NOT WIN32)
         triton-core-serverapi           # from repo-core
         triton-core-serverstub          # from repo-core
         CUDA::cudart
+        tcmalloc
       )
 
     install(
