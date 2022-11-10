@@ -91,7 +91,7 @@ if (NOT WIN32)
   # Gperftools
   #
   link_directories(/usr/local/lib)
-  LIST(APPEND CMAKE_MODULE_PATH "${PROJECT_SOURCE_DIR}/cmake")
+  LIST(APPEND CMAKE_MODULE_PATH "${repo-common_SOURCE_DIR}/cmake")
   find_package(Gperftools REQUIRED)
 endif()
 
