@@ -61,7 +61,7 @@ LOG_IDX=0
 CLIENT_LOG="./client_$LOG_IDX.log"
 
 echo -e "\nRunning Sanity Test (accuracy checking)\n"
-$BASE_COMMAND -Dexec.args="-r $MODEL_REPO -i $ITERS" >>$CLIENT_LOG 2>&1
+LD_PRELOAD="/usr/lib/x86_64-linux-gnu/libtcmalloc.so.4" $BASE_COMMAND -Dexec.args="-r $MODEL_REPO -i $ITERS" >>$CLIENT_LOG 2>&1
 if [ $? -ne 0 ]; then
     echo -e "\n***\n*** Failed to run sanity test to complete\n***"
     RET=1
@@ -86,7 +86,7 @@ if [ "$TRITON_PERF_LONG" == 1 ]; then
 fi
 
 echo -e "\nRunning Memory Growth Test, $ITERS Iterations\n"
-$BASE_COMMAND -Dexec.args="-r $MODEL_REPO -c -i $ITERS --max-growth $MAX_MEM_GROWTH_MB" >>$CLIENT_LOG 2>&1
+LD_PRELOAD="/usr/lib/x86_64-linux-gnu/libtcmalloc.so.4" $BASE_COMMAND -Dexec.args="-r $MODEL_REPO -c -i $ITERS --max-growth $MAX_MEM_GROWTH_MB" >>$CLIENT_LOG 2>&1
 if [ $? -ne 0 ]; then
     echo -e "\n***\n*** Failed to run memory growth test to complete\n***"
     RET=1

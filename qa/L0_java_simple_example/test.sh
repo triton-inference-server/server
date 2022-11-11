@@ -67,7 +67,7 @@ function run_cpu_tests_int32() {
     set -e
 
     # Run with default settings
-    $BASE_COMMAND -Dexec.args="-r $MODEL_REPO" >>$CLIENT_LOG 2>&1
+    LD_PRELOAD="/usr/lib/x86_64-linux-gnu/libtcmalloc.so.4" $BASE_COMMAND -Dexec.args="-r $MODEL_REPO" >>$CLIENT_LOG 2>&1
     if [ $? -ne 0 ]; then
         echo -e "Failed to run: ${BASE_COMMAND} -Dexec.args=\"-r ${MODEL_REPO}\""
         RET=1
@@ -79,7 +79,7 @@ function run_cpu_tests_int32() {
     fi
 
     # Run with verbose logging
-    $BASE_COMMAND -Dexec.args="-r $MODEL_REPO -v" >>$CLIENT_LOG 2>&1
+    LD_PRELOAD="/usr/lib/x86_64-linux-gnu/libtcmalloc.so.4" $BASE_COMMAND -Dexec.args="-r $MODEL_REPO -v" >>$CLIENT_LOG 2>&1
     if [ $? -ne 0 ]; then
         echo -e "Failed to run: ${BASE_COMMAND} -Dexec.args=\"-r ${MODEL_REPO} -v\""
         RET=1
@@ -91,7 +91,7 @@ function run_cpu_tests_int32() {
     fi
 
     # Run with memory set to system
-    $BASE_COMMAND -Dexec.args="-r $MODEL_REPO -m system" >>$CLIENT_LOG 2>&1
+    LD_PRELOAD="/usr/lib/x86_64-linux-gnu/libtcmalloc.so.4" $BASE_COMMAND -Dexec.args="-r $MODEL_REPO -m system" >>$CLIENT_LOG 2>&1
     if [ $? -ne 0 ]; then
         echo -e "Failed to run: ${BASE_COMMAND} -Dexec.args=\"-r ${MODEL_REPO} -m system\""
         RET=1
@@ -118,7 +118,7 @@ function run_cpu_tests_fp32() {
 
 
         # No memory type enforcement
-        $BASE_COMMAND -Dexec.args="-r $MODEL_REPO -v" >>$CLIENT_LOG.$full.log 2>&1
+        LD_PRELOAD="/usr/lib/x86_64-linux-gnu/libtcmalloc.so.4" $BASE_COMMAND -Dexec.args="-r $MODEL_REPO -v" >>$CLIENT_LOG.$full.log 2>&1
         if [ $? -ne 0 ]; then
             cat $CLIENT_LOG.$full.log
             echo -e "Failed to run: ${BASE_COMMAND} -Dexec.args=\"-r ${MODEL_REPO} -v\" for ${full}"
@@ -127,7 +127,7 @@ function run_cpu_tests_fp32() {
 
         # Enforce I/O to be in specific memory type
         for MEM_TYPE in system; do
-            $BASE_COMMAND -Dexec.args="-r $MODEL_REPO -m ${MEM_TYPE}" >>$CLIENT_LOG.$full.${MEM_TYPE}.log 2>&1
+            LD_PRELOAD="/usr/lib/x86_64-linux-gnu/libtcmalloc.so.4" $BASE_COMMAND -Dexec.args="-r $MODEL_REPO -m ${MEM_TYPE}" >>$CLIENT_LOG.$full.${MEM_TYPE}.log 2>&1
             if [ $? -ne 0 ]; then
                 cat $CLIENT_LOG.$full.$MEM_TYPE.log
                 echo -e "Failed to run: ${BASE_COMMAND} -Dexec.args=\"-r ${MODEL_REPO} -v -m ${MEM_TYPE}\" for ${full}"
@@ -149,7 +149,7 @@ function run_ensemble_tests() {
     cat $SAMPLES_REPO/pom.xml >>$CLIENT_LOG 2>&1
     set -e
 
-    $BASE_COMMAND -Dexec.args="-r $MODEL_REPO -v" >>$CLIENT_LOG 2>&1
+    LD_PRELOAD="/usr/lib/x86_64-linux-gnu/libtcmalloc.so.4" $BASE_COMMAND -Dexec.args="-r $MODEL_REPO -v" >>$CLIENT_LOG 2>&1
     if [ $? -ne 0 ]; then
         echo -e "Failed to run ensemble model: ${BASE_COMMAND} -Dexec.args=\"-r ${MODEL_REPO} -v\""
         RET=1

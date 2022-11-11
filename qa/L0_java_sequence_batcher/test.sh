@@ -72,7 +72,7 @@ for BACKEND in graphdef libtorch onnx savedmodel; do
     sed -i "s/kind: KIND_GPU/kind: KIND_CPU/" ${MODEL_REPO}/$MODEL/config.pbtxt
 
     # Run with default settings
-    $BASE_COMMAND -Dexec.args="-r $MODEL_REPO -m ${MODEL}" >>client.log 2>&1
+    LD_PRELOAD="/usr/lib/x86_64-linux-gnu/libtcmalloc.so.4" $BASE_COMMAND -Dexec.args="-r $MODEL_REPO -m ${MODEL}" >>client.log 2>&1
     if [ $? -ne 0 ]; then
         RET=1
     fi

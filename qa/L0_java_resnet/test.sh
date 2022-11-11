@@ -74,7 +74,7 @@ rm -f *.log
 RET=0
 
 # Run with default settings
-$BASE_COMMAND -Dexec.args="-r $MODEL_REPO" >>$CLIENT_LOG 2>&1
+LD_PRELOAD="/usr/lib/x86_64-linux-gnu/libtcmalloc.so.4" $BASE_COMMAND -Dexec.args="-r $MODEL_REPO" >>$CLIENT_LOG 2>&1
 if [ $? -ne 0 ]; then
     RET=1
 fi
