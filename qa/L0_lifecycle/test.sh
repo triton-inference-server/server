@@ -1297,14 +1297,14 @@ for protocol in grpc http; do
     if [[ $protocol == "grpc" ]]; then
        export TRITONSERVER_USE_GRPC=1
     fi
-
-    # The OS file system is more granular when determining modification time, a
-    # file is modified when its content is changed in place, and a file is
-    # updated when it is copied or moved. With Triton, any operation that
-    # changes a file is modification. Thus, preparing the models backward will
-    # test when a replacement model is haing an earlier or equal modification
-    # timestamp than the current model, Triton must still detect the model is
-    # modified with the update timestamp and proceed with model reload.
+--------------------------------------------------------------------------------
+    # The OS file system is more granular when determining modification time,
+    # the modification timestamp is updated when the file content is changed in
+    # place, but not updated when the file is copied or moved. With Triton, any
+    # operation that changes a file is a modification. Thus, preparing the
+    # models backward will test when a replacement model is having an earlier or
+    # equal modification timestamp than the current model, Triton must still
+    # detect the model is modified and proceed with model reload.
     for prep_order in normal reverse; do
         rm -fr models simple_float32_float32_float32
         mkdir models
