@@ -1297,7 +1297,7 @@ for protocol in grpc http; do
     if [[ $protocol == "grpc" ]]; then
        export TRITONSERVER_USE_GRPC=1
     fi
---------------------------------------------------------------------------------
+
     # The OS file system is more granular when determining modification time,
     # the modification timestamp is updated when the file content is changed in
     # place, but not updated when the file is copied or moved. With Triton, any
