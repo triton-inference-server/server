@@ -65,7 +65,9 @@ RUN apt-get update && \
             build-essential \
             curl \
             git \
+            gperf \
             libb64-dev \
+            libgoogle-perftools-dev \
             libopencv-dev \
             libopencv-core-dev \
             libssl-dev \
@@ -167,7 +169,9 @@ RUN apt-get update && \
             software-properties-common \
             curl \
             git \
+            gperf \
             libb64-dev \
+            libgoogle-perftools-dev \
             libopencv-dev \
             libopencv-core-dev \
             libssl-dev \
