@@ -47,8 +47,7 @@ RET=0
 # must be C:/ style.
 if [[ "$(< /proc/sys/kernel/osrelease)" == *microsoft* ]]; then
     SDKDIR=${SDKDIR:=C:/sdk}
-    DATADIR=${DATADIR:="C:/data/inferenceserver/${REPO_VERSION}"}
-    BACKEND_DIR=${BACKEND_DIR:=C:/tritonserver/backends}
+    DATADIR=${MODELDIR:="C:/data/inferenceserver/${REPO_VERSION}"}
     SERVER=${SERVER:=/mnt/c/tritonserver/bin/tritonserver.exe}
     SIMPLE_AIO_INFER_CLIENT_PY=${SDKDIR}/python/simple_http_aio_infer_client.py
     SIMPLE_INFER_CLIENT_PY=${SDKDIR}/python/simple_http_infer_client.py
