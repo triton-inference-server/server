@@ -28,7 +28,9 @@
 # Install required dependencies for client build
 apt-get update && \
 apt-get install -y --no-install-recommends \
-        rapidjson-dev
+        rapidjson-dev \
+        gperf \
+        libgoogle-perftools-dev
 
 # Client build requires recent version of CMake (FetchContent required)
 wget -O - https://apt.kitware.com/keys/kitware-archive-latest.asc 2>/dev/null | \
@@ -62,6 +64,9 @@ mkdir -p /workspace/build
               -DTRITON_ENABLE_EXAMPLES=ON \
               -DTRITON_ENABLE_TESTS=ON \
               -DTRITON_ENABLE_GPU=OFF \
+              -DTRITON_COMMON_REPO_TAG=${TRITON_COMMON_REPO_TAG} \
+              -DTRITON_CORE_REPO_TAG=${TRITON_CORE_REPO_TAG} \
+              -DTRITON_THIRD_PARTY_REPO_TAG=${TRITON_THIRD_PARTY_REPO_TAG} \
               /workspace/client && \
         make -j16 cc-clients java-clients python-clients)
 if [ $? -eq 0 ]; then
@@ -90,6 +95,9 @@ fi
               -DTRITON_ENABLE_EXAMPLES=ON \
               -DTRITON_ENABLE_TESTS=ON \
               -DTRITON_ENABLE_GPU=ON \
+              -DTRITON_COMMON_REPO_TAG=${TRITON_COMMON_REPO_TAG} \
+              -DTRITON_CORE_REPO_TAG=${TRITON_CORE_REPO_TAG} \
+              -DTRITON_THIRD_PARTY_REPO_TAG=${TRITON_THIRD_PARTY_REPO_TAG} \
               /workspace/client && \
         make -j16 cc-clients python-clients)
 if [ $? -eq 0 ]; then
@@ -117,6 +125,9 @@ fi
               -DTRITON_ENABLE_EXAMPLES=ON \
               -DTRITON_ENABLE_TESTS=ON \
               -DTRITON_ENABLE_GPU=ON \
+              -DTRITON_COMMON_REPO_TAG=${TRITON_COMMON_REPO_TAG} \
+              -DTRITON_CORE_REPO_TAG=${TRITON_CORE_REPO_TAG} \
+              -DTRITON_THIRD_PARTY_REPO_TAG=${TRITON_THIRD_PARTY_REPO_TAG} \
               /workspace/client && \
         make -j16 cc-clients python-clients)
 if [ $? -eq 0 ]; then
@@ -143,6 +154,9 @@ fi
               -DTRITON_ENABLE_EXAMPLES=ON \
               -DTRITON_ENABLE_TESTS=ON \
               -DTRITON_ENABLE_GPU=ON \
+              -DTRITON_COMMON_REPO_TAG=${TRITON_COMMON_REPO_TAG} \
+              -DTRITON_CORE_REPO_TAG=${TRITON_CORE_REPO_TAG} \
+              -DTRITON_THIRD_PARTY_REPO_TAG=${TRITON_THIRD_PARTY_REPO_TAG} \
               /workspace/client && \
         make -j16 cc-clients python-clients)
 if [ $? -eq 0 ]; then
@@ -169,6 +183,9 @@ fi
               -DTRITON_ENABLE_EXAMPLES=ON \
               -DTRITON_ENABLE_TESTS=ON \
               -DTRITON_ENABLE_GPU=ON \
+              -DTRITON_COMMON_REPO_TAG=${TRITON_COMMON_REPO_TAG} \
+              -DTRITON_CORE_REPO_TAG=${TRITON_CORE_REPO_TAG} \
+              -DTRITON_THIRD_PARTY_REPO_TAG=${TRITON_THIRD_PARTY_REPO_TAG} \
               /workspace/client && \
         make -j16 cc-clients python-clients)
 if [ $? -eq 0 ]; then
@@ -195,6 +212,9 @@ fi
               -DTRITON_ENABLE_EXAMPLES=ON \
               -DTRITON_ENABLE_TESTS=ON \
               -DTRITON_ENABLE_GPU=ON \
+              -DTRITON_COMMON_REPO_TAG=${TRITON_COMMON_REPO_TAG} \
+              -DTRITON_CORE_REPO_TAG=${TRITON_CORE_REPO_TAG} \
+              -DTRITON_THIRD_PARTY_REPO_TAG=${TRITON_THIRD_PARTY_REPO_TAG} \
               /workspace/client && \
         make -j16 cc-clients python-clients)
 if [ $? -eq 0 ]; then
@@ -221,6 +241,9 @@ fi
               -DTRITON_ENABLE_EXAMPLES=ON \
               -DTRITON_ENABLE_TESTS=ON \
               -DTRITON_ENABLE_GPU=ON \
+              -DTRITON_COMMON_REPO_TAG=${TRITON_COMMON_REPO_TAG} \
+              -DTRITON_CORE_REPO_TAG=${TRITON_CORE_REPO_TAG} \
+              -DTRITON_THIRD_PARTY_REPO_TAG=${TRITON_THIRD_PARTY_REPO_TAG} \
               /workspace/client && \
         make -j16 cc-clients python-clients)
 if [ $? -eq 0 ]; then
