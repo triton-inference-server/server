@@ -58,7 +58,7 @@ fi
 # Add valgrind flag check
 if [ "$TEST_VALGRIND" -eq 1 ]; then
     LEAKCHECK=/usr/bin/valgrind
-    LEAKCHECK_ARGS_BASE="--leak-check=full --show-leak-kinds=definite --max-threads=3000"
+    LEAKCHECK_ARGS_BASE="--leak-check=full --show-leak-kinds=definite --max-threads=3000 --soname-synonyms=somalloc=/usr/lib/x86_64-linux-gnu/libtcmalloc.so.4"
     SERVER_TIMEOUT=3600
     rm -f *.valgrind.log
 

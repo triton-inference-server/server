@@ -55,7 +55,7 @@ SERVER_TIMEOUT=1200
 
 # Valgrind massif
 LEAKCHECK=/usr/bin/valgrind
-LEAKCHECK_ARGS_BASE="--tool=massif --time-unit=B"
+LEAKCHECK_ARGS_BASE="--tool=massif --time-unit=B --soname-synonyms=somalloc=/usr/lib/x86_64-linux-gnu/libtcmalloc.so.4"
 MASSIF_TEST=../common/check_massif_log.py
 
 source ../common/util.sh
