@@ -46,8 +46,9 @@ RET=0
 # /mnt/c when needed but the paths on the tritonserver command-line
 # must be C:/ style.
 if [[ "$(< /proc/sys/kernel/osrelease)" == *microsoft* ]]; then
-    SDKDIR=${SDKDIR:=C:/sdk}
-    DATADIR=${MODELDIR:="C:/data/inferenceserver/${REPO_VERSION}"}
+    SDKDIR=${SDKDIR:="C:/sdk"}
+    DATADIR=${MODELDIR:="C:/repo/qa/L0_https/models"}
+    mkdir ${DATADIR} && cp -r ${DATADIR}/../../../docs/examples/model_repository/simple ${DATADIR}
     SERVER=${SERVER:=/mnt/c/tritonserver/bin/tritonserver.exe}
     SIMPLE_AIO_INFER_CLIENT_PY=${SDKDIR}/python/simple_http_aio_infer_client.py
     SIMPLE_INFER_CLIENT_PY=${SDKDIR}/python/simple_http_infer_client.py
