@@ -48,7 +48,8 @@ RET=0
 if [[ "$(< /proc/sys/kernel/osrelease)" == *microsoft* ]]; then
     SDKDIR=${SDKDIR:="C:/sdk"}
     DATADIR=${MODELDIR:="C:/repo/qa/L0_https/models"}
-    mkdir ${DATADIR} && cp -r ${DATADIR}/../../../docs/examples/model_repository/simple ${DATADIR}
+    COPYDIR="/mnt/c`echo $DATADIR | cut -c 3-`"
+    mkdir ${COPYDIR} && cp -r ${COPYDIR}/../../../docs/examples/model_repository/simple ${COPYDIR}
     SERVER=${SERVER:=/mnt/c/tritonserver/bin/tritonserver.exe}
     SIMPLE_AIO_INFER_CLIENT_PY=${SDKDIR}/python/simple_http_aio_infer_client.py
     SIMPLE_INFER_CLIENT_PY=${SDKDIR}/python/simple_http_infer_client.py
