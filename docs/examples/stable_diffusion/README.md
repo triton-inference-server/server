@@ -50,11 +50,10 @@ docker run --gpus=all -it --shm-size=256m --rm -p8000:8000 -p8001:8001 -p8002:80
 
 ```
 # PyTorch & Transformers Lib
-pip install torch torchvision torchaudio --extra-index-url https://download.pytorch.org/whl/cu116
-pip install transformers ftfy scipy
+pip install torch torchvision torchaudio
+pip install transformers ftfy scipy accelerate diffusers
 pip install transformers[onnxruntime]
 huggingface-cli login
-pip install diffusers
 ```
 
 ### Step 2: Exporting and converting the models
@@ -89,13 +88,13 @@ tritonserver --model-repository=/models
 ### Step 4: Run the client
 Use the client container and run the client.
 ```
-docker run -it --net=host -v /home/tvarshney:/mount -v ${PWD}:/workspace/ nvcr.io/nvidia/tritonserver:yy.mm-py3-sdk bash
+docker run -it --net=host -v ${PWD}:/workspace/ nvcr.io/nvidia/tritonserver:yy.mm-py3-sdk bash
 
 # Client with no GUI
 python3 client.py
 
 # Client with GUI
-pip install gradio
+pip install gradio packaging
 python3 gui/client.py --triton_url="localhost:8001"
 ```
 Note: First Inference query may take more time than successive queries
