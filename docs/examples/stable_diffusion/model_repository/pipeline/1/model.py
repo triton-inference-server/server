@@ -100,7 +100,7 @@ class TritonPythonModel:
             else:
                 text_embeddings = pb_utils.get_output_tensor_by_name(
                     response, "last_hidden_state")
-            text_embeddings = from_dlpack(text_embeddings.to_dlpack())
+            text_embeddings = from_dlpack(text_embeddings.to_dlpack()).clone()
             text_embeddings = text_embeddings.to("cuda")
 
             # Running Scheduler
@@ -147,7 +147,7 @@ class TritonPythonModel:
             else:
                 decoded_image = pb_utils.get_output_tensor_by_name(
                     decoding_response, "sample")
-            decoded_image = from_dlpack(decoded_image.to_dlpack())
+            decoded_image = from_dlpack(decoded_image.to_dlpack()).clone()
 
             decoded_image = (decoded_image / 2 + 0.5).clamp(0, 1)
             decoded_image = decoded_image.detach().cpu().permute(0, 2, 3,
