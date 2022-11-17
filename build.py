@@ -851,7 +851,6 @@ RUN apt-get update && \
             libre2-dev \
             libssl-dev \
             libtool \
-            libboost-dev \
             libcurl4-openssl-dev \
             libb64-dev \
             patchelf \
@@ -872,6 +871,13 @@ RUN apt-get update && \
 
 RUN pip3 install --upgrade pip && \
     pip3 install --upgrade wheel setuptools docker
+
+# Install boost version >= 1.78 for boost::span
+# Current libboost-dev apt packages are < 1.78, so install from tar.gz
+RUN wget -O /tmp/boost.tar.gz \
+        https://boostorg.jfrog.io/artifactory/main/release/1.80.0/source/boost_1_80_0.tar.gz && \
+    (cd /tmp && tar xzf boost.tar.gz) && \
+    mv /tmp/boost_1_80_0/boost /usr/include/boost
 
 # Server build requires recent version of CMake (FetchContent required)
 RUN wget -O - https://apt.kitware.com/keys/kitware-archive-latest.asc 2>/dev/null | \
