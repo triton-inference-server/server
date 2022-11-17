@@ -26,7 +26,7 @@
 
 # Windows min container for Triton build
 
-ARG BASE_IMAGE=mcr.microsoft.com/dotnet/framework/sdk:4.8
+ARG BASE_IMAGE=mcr.microsoft.com/windows/servercore:ltsc2019
 
 FROM ${BASE_IMAGE}
 
@@ -55,10 +55,10 @@ RUN pip install grpcio-tools
 # https://docs.microsoft.com/en-us/visualstudio/releases/2019/history#release-dates-and-build-numbers
 ADD https://download.visualstudio.microsoft.com/download/pr/20130c62-1bc8-43d6-b4f0-c20bb7c79113/145a319d79a83376915d8f855605e152ef5f6fa2b2f1d2dca411fb03722eea72/vs_BuildTools.exe vs_buildtools.exe
 ARG VS_INSTALL_PATH_WP="C:\BuildTools"
-RUN powershell.exe Start-Process -FilePath vs_buildtools.exe -ArgumentList "--wait","--quiet","--norestart","--nocache","--installPath","%VS_INSTALL_PATH_WP%","--channelUri","C:\tmp\doesnotexist.chman","--add","Microsoft.VisualStudio.Workload.VCTools`;includeRecommended","--add","Microsoft.Component.MSBuild" -Wait -PassThru
+RUN powershell.exe Start-Process -FilePath vs_buildtools.exe -ArgumentList "--wait","--quiet","--norestart","--nocache","--installPath","%VS_INSTALL_PATH_WP%","--channelUri","C:\tmp\doesnotexist.chman","--addProductLang","En-us","--add","Microsoft.VisualStudio.Workload.VCTools`;includeRecommended","--add","Microsoft.Component.MSBuild" -Wait -PassThru
 
 WORKDIR /
-RUN git clone --single-branch --depth=1 -b 2022.04.12 https://github.com/microsoft/vcpkg.git
+RUN git clone --single-branch --depth=1 -b 2022.11.14 https://github.com/microsoft/vcpkg.git
 WORKDIR /vcpkg
 RUN bootstrap-vcpkg.bat
 RUN vcpkg.exe update
