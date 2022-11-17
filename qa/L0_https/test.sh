@@ -50,6 +50,7 @@ if [[ "$(< /proc/sys/kernel/osrelease)" == *microsoft* ]]; then
     DATADIR=${MODELDIR:="C:/repo/qa/L0_https/models"}
     COPYDIR="/mnt/c`echo $DATADIR | cut -c 3-`"
     mkdir ${COPYDIR} && cp -r ${COPYDIR}/../../../docs/examples/model_repository/simple ${COPYDIR}
+    sed -i "s/platform: \"tensorflow_graphdef\"/backend: \"identity\"/" ${COPYDIR}/simple/config.pbtxt && rm -rf ${COPYDIR}/simple/1/*
     SERVER=${SERVER:=/mnt/c/tritonserver/bin/tritonserver.exe}
     SIMPLE_AIO_INFER_CLIENT_PY=${SDKDIR}/python/simple_http_aio_infer_client.py
     SIMPLE_INFER_CLIENT_PY=${SDKDIR}/python/simple_http_infer_client.py
