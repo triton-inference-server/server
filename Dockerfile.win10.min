@@ -26,7 +26,7 @@
 
 # Windows min container for Triton build
 
-ARG BASE_IMAGE=mcr.microsoft.com/dotnet/framework/sdk:4.8
+ARG BASE_IMAGE=mcr.microsoft.com/windows:10.0.19042.1889
 
 FROM ${BASE_IMAGE}
 
@@ -35,7 +35,8 @@ SHELL ["cmd", "/S", "/C"]
 RUN mkdir c:\tmp
 WORKDIR /tmp
 
-RUN powershell.exe [Net.ServicePointManager]::Expect100Continue = $true; [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls, [Net.SecurityProtocolType]::Tls11, [Net.SecurityProtocolType]::Tls12, [Net.SecurityProtocolType]::Ssl3; Invoke-Expression (New-Object System.Net.WebClient).DownloadString('https://chocolatey.org/install.ps1')
+RUN powershell.exe Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope LocalMachine
+RUN powershell.exe [Net.ServicePointManager]::Expect100Continue=$true;[Net.ServicePointManager]::SecurityProtocol=[Net.SecurityProtocolType]::Tls,[Net.SecurityProtocolType]::Tls11,[Net.SecurityProtocolType]::Tls12,[Net.SecurityProtocolType]::Ssl3;Invoke-Expression( New-Object System.Net.WebClient ).DownloadString('https://chocolatey.org/install.ps1')
 RUN choco install git docker unzip -y
 
 # Be aware that pip can interact badly with VS cmd shell so need to pip install before
@@ -50,15 +51,15 @@ RUN pip install grpcio-tools
 # powershell for the install seems to be required to make the command
 # wait for the install to complete before continuing. To avoid failures
 # caused by VS regressions we want to stick with a working
-# compiler. Currently this is 16.8.5. This page contains download
+# compiler. Currently this is 16.11.21. This page contains download
 # links for buildtools.
 # https://docs.microsoft.com/en-us/visualstudio/releases/2019/history#release-dates-and-build-numbers
-ADD https://download.visualstudio.microsoft.com/download/pr/20130c62-1bc8-43d6-b4f0-c20bb7c79113/145a319d79a83376915d8f855605e152ef5f6fa2b2f1d2dca411fb03722eea72/vs_BuildTools.exe vs_buildtools.exe
+ADD https://download.visualstudio.microsoft.com/download/pr/8f1eb024-006a-43f6-a372-0721f71058b3/cc5cc690ac094fbfa78dfb8e40089ba52056026579e8d8dc31e95e8ea5466df5/vs_BuildTools.exe vs_buildtools.exe
 ARG VS_INSTALL_PATH_WP="C:\BuildTools"
 RUN powershell.exe Start-Process -FilePath vs_buildtools.exe -ArgumentList "--wait","--quiet","--norestart","--nocache","--installPath","%VS_INSTALL_PATH_WP%","--channelUri","C:\tmp\doesnotexist.chman","--add","Microsoft.VisualStudio.Workload.VCTools`;includeRecommended","--add","Microsoft.Component.MSBuild" -Wait -PassThru
 
 WORKDIR /
-RUN git clone --single-branch --depth=1 -b 2022.04.12 https://github.com/microsoft/vcpkg.git
+RUN git clone --single-branch --depth=1 -b 2022.11.14 https://github.com/microsoft/vcpkg.git
 WORKDIR /vcpkg
 RUN bootstrap-vcpkg.bat
 RUN vcpkg.exe update
@@ -77,7 +78,7 @@ RUN move %CMAKE_FILE% CMake
 RUN setx PATH "c:\CMake\bin;%PATH%"
 
 ARG CUDA_MAJOR=11
-ARG CUDA_MINOR=5
+ARG CUDA_MINOR=8
 ARG CUDA_PATCH=0
 ARG CUDA_VERSION=${CUDA_MAJOR}.${CUDA_MINOR}.${CUDA_PATCH}
 ARG CUDA_PACKAGES="nvcc_${CUDA_MAJOR}.${CUDA_MINOR} \
@@ -92,32 +93,36 @@ ARG CUDA_PACKAGES="nvcc_${CUDA_MAJOR}.${CUDA_MINOR} \
                    visual_studio_integration_${CUDA_MAJOR}.${CUDA_MINOR}"
 ARG CUDA_INSTALL_ROOT_WP="C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v${CUDA_MAJOR}.${CUDA_MINOR}"
 
-ARG TENSORRT_VERSION=8.2.2.1
-ARG TENSORRT_ZIP=TensorRT-${TENSORRT_VERSION}.Windows10.x86_64.cuda-11.4.cudnn8.2.zip
+WORKDIR /
 
-ARG CUDNN_VERSION=8.3.2.44
-ARG CUDNN_DIR=cudnn-windows-x86_64-${CUDNN_VERSION}_cuda11.5-archive
-ARG CUDNN_ZIP=${CUDNN_DIR}.zip
+ARG TENSORRT_VERSION=8.5.1.7
+ARG TENSORRT_ZIP="TensorRT-${TENSORRT_VERSION}.Windows10.x86_64.cuda-11.8.cudnn8.6.zip"
 
-WORKDIR /tmp
-ADD https://developer.download.nvidia.com/compute/cuda/${CUDA_VERSION}/network_installers/cuda_${CUDA_VERSION}_win10_network.exe cuda_${CUDA_VERSION}_win10_network.exe
+LABEL TENSORRT_VERSION="${TENSORRT_VERSION}"
+
+ARG CUDNN_VERSION=8.7.0.80
+ARG CUDNN_ZIP=cudnn-${CUDNN_VERSION}.zip
+
+LABEL CUDNN_VERSION="${CUDNN_VERSION}"
+
+ADD https://developer.download.nvidia.com/compute/cuda/${CUDA_VERSION}/network_installers/cuda_${CUDA_VERSION}_windows_network.exe cuda_${CUDA_VERSION}_windows_network.exe
 COPY ${CUDNN_ZIP} .
 COPY ${TENSORRT_ZIP} .
 
-WORKDIR /
-RUN unzip /tmp/%TENSORRT_ZIP%
+LABEL CUDA_VERSION="${CUDA_VERSION}"
+
+RUN unzip %TENSORRT_ZIP%
 RUN move TensorRT-%TENSORRT_VERSION% TensorRT
 ENV TRT_VERSION ${TENSORRT_VERSION}
 
-WORKDIR /tmp
-RUN cuda_%CUDA_VERSION%_win10_network.exe -s %CUDA_PACKAGES%
+RUN cuda_%CUDA_VERSION%_windows_network.exe -s %CUDA_PACKAGES%
 
-WORKDIR /
-RUN unzip /tmp/%CUDNN_ZIP%
-RUN move %CUDNN_DIR% cudnn
-RUN copy cudnn\bin\cudnn*.dll "%CUDA_INSTALL_ROOT_WP%\bin\."
-RUN copy cudnn\lib\cudnn*.lib "%CUDA_INSTALL_ROOT_WP%\lib\x64\."
-RUN copy cudnn\include\cudnn*.h "%CUDA_INSTALL_ROOT_WP%\include\."
+RUN unzip cudnn-%CUDNN_VERSION% -d cudnn
+RUN copy cudnn\libcudnn\bin\cudnn*.dll "%CUDA_INSTALL_ROOT_WP%\bin\."
+RUN copy cudnn\libcudnn_dev\lib\x64\cudnn*.lib "%CUDA_INSTALL_ROOT_WP%\lib\x64\."
+RUN copy cudnn\libcudnn_dev\include\cudnn*.h "%CUDA_INSTALL_ROOT_WP%\include\."
+ENV CUDNN_VERSION ${CUDNN_VERSION}
+
 
 # Copy the CUDA visualstudio integration from where it was installed
 # into the appropriate place in BuildTools
