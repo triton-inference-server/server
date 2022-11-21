@@ -26,7 +26,7 @@
 
 # Windows min container for Triton build
 
-ARG BASE_IMAGE=mcr.microsoft.com/windows/servercore:ltsc2019
+ARG BASE_IMAGE=mcr.microsoft.com/windows:10.0.19042.1889
 
 FROM ${BASE_IMAGE}
 
