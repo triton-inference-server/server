@@ -56,7 +56,7 @@ rm -f *.out
 
 SAGEMAKER_TEST=sagemaker_test.py
 SAGEMAKER_MULTI_MODEL_TEST=sagemaker_multi_model_test.py
-MULTI_MODEL_UNIT_TEST_COUNT=6
+MULTI_MODEL_UNIT_TEST_COUNT=7
 UNIT_TEST_COUNT=9
 CLIENT_LOG="./client.log"
 
@@ -425,6 +425,64 @@ kill $SERVER_PID
 wait $SERVE_PID
 
 # MME end
+
+# MME ensemble begin
+ln -s `pwd`/models /opt/ml/models
+# Model path will be of the form /opt/ml/models/<hash>/model
+ENSEMBLE_MODEL_PATH="models/123456789ensemble/model"
+mkdir -p "${ENSEMBLE_MODEL_PATH}"
+
+# set up "addsub" ensemble for custom float32 model
+cp -r $MODELSDIR/fan_graphdef_float32_float32_float32 $MODELSDIR/fan_python && \
+    (cd $MODELSDIR/fan_python && \
+            sed -i "s/graphdef_float32_float32_float32/python/" config.pbtxt)
+
+# custom float32 component of ensemble
+cp -r $ENSEMBLEDIR/nop_TYPE_FP32_-1 $MODELSDIR/. && \
+    mkdir -p $MODELSDIR/nop_TYPE_FP32_-1/1
+
+MODEL1_PATH="models/123456789abcdefghi/model"
+MODEL2_PATH="models/987654321ihgfedcba/model"
+mkdir -p "${MODEL1_PATH}"
+mkdir -p "${MODEL2_PATH}"
+
+cp -r $DATADIR/qa_model_repository/onnx_int32_int32_int32/* ${MODEL1_PATH} && \
+    rm -r ${MODEL1_PATH}/2 && rm -r ${MODEL1_PATH}/3 && \
+    sed -i "s/onnx_int32_int32_int32/sm_mme_model_1/" ${MODEL1_PATH}/config.pbtxt
+
+cp -r $DATADIR/qa_identity_model_repository/onnx_zero_1_float32/* ${MODEL2_PATH} && \
+    sed -i "s/onnx_zero_1_float32/sm_mme_model_2/" ${MODEL2_PATH}/config.pbtxt
+
+# Start server with 'serve' script
+export SAGEMAKER_MULTI_MODEL=true
+export SAGEMAKER_TRITON_LOG_VERBOSE=true
+
+serve > $SERVER_LOG 2>&1 &
+SERVE_PID=$!
+# Obtain Triton PID in such way as $! will return the script PID
+sleep 1
+SERVER_PID=`ps | grep tritonserver | awk '{ printf $1 }'`
+sagemaker_wait_for_server_ready $SERVER_PID 10
+if [ "$WAIT_RET" != "0" ]; then
+    echo -e "\n***\n*** Failed to start $SERVER\n***"
+    kill $SERVER_PID || true
+    cat $SERVER_LOG
+    exit 1
+fi
+
+# API tests in ensemble setting
+# LOAD/UNLOAD/INFER ensemble
+
+
+# Destroy
+unset SAGEMAKER_MULTI_MODEL
+
+unlink /opt/ml/models
+rm -rf /opt/ml/models
+
+kill $SERVER_PID
+wait $SERVE_PID
+# MME ensemble end
 
 
 unlink /opt/ml/model

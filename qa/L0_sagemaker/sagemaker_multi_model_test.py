@@ -142,11 +142,11 @@ class SageMakerMultiModelTest(tu.TestResultCollector):
             "models": [
                 {
                     "modelName": self.model1_name,
-                    "modelUrl": self.model1_url
+                    "modelUrl": self.model1_url.rstrip("/model")
                 },
                 {
                     "modelName": self.model2_name,
-                    "modelUrl": self.model2_url
+                    "modelUrl": self.model2_url.rstrip("/model")
                 },
             ]
         }
@@ -154,11 +154,11 @@ class SageMakerMultiModelTest(tu.TestResultCollector):
             "models": [
                 {
                     "modelName": self.model2_name,
-                    "modelUrl": self.model2_url
+                    "modelUrl": self.model2_url.rstrip("/model")
                 },
                 {
                     "modelName": self.model1_name,
-                    "modelUrl": self.model1_url
+                    "modelUrl": self.model1_url.rstrip("/model")
                 },
             ]
         }
@@ -177,7 +177,7 @@ class SageMakerMultiModelTest(tu.TestResultCollector):
         time.sleep(3)
         expected_response = {
             "modelName": self.model1_name,
-            "modelUrl": self.model1_url
+            "modelUrl": self.model1_url.rstrip()
         }
         self.assertEqual(
             r.json(), expected_response,
@@ -279,6 +279,11 @@ class SageMakerMultiModelTest(tu.TestResultCollector):
         self.assertEqual(
             r.status_code, 404,
             "Expected status code 404, received {}".format(r.status_code))
+
+    def test_sm_6_ensemble_model(self):
+        # Load ensemble model
+        pass
+        
 
 
 if __name__ == "__main__":
