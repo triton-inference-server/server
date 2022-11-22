@@ -1074,9 +1074,6 @@ RUN apt-get update && \
             curl \
             {backend_dependencies} && \
     rm -rf /var/lib/apt/lists/*
-
-# Link to tcmalloc by default
-ENV LD_PRELOAD /usr/lib/x86_64-linux-gnu/libtcmalloc.so.4:${{LD_PRELOAD}}
 '''.format(gpu_enabled=gpu_enabled, backend_dependencies=backend_dependencies)
 
     if enable_gpu:
