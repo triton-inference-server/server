@@ -1077,6 +1077,7 @@ RUN apt-get update && \
 
 # Link to tcmalloc by default
 ENV LD_PRELOAD /usr/lib/x86_64-linux-gnu/libtcmalloc.so.4:${{LD_PRELOAD}}
+ENV TCMALLOC_RELEASE_RATE 200
 '''.format(gpu_enabled=gpu_enabled, backend_dependencies=backend_dependencies)
 
     if enable_gpu:
