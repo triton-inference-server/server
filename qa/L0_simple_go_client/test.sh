@@ -50,6 +50,7 @@ RET=0
 
 # Generate Go stubs.
 rm -fr client common
+## TODO: Remove branch below after CI passes
 git clone -b dyas-go-fix https://github.com/triton-inference-server/client.git
 go install google.golang.org/grpc/cmd/protoc-gen-go-grpc@latest
 
