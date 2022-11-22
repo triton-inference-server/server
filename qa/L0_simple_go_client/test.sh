@@ -60,8 +60,9 @@ git clone --single-branch --depth=1 -b $TRITON_COMMON_REPO_TAG \
 bash gen_go_stubs.sh
 popd
 
+# Copy to the GOPATH, where Go expects to find packages.
 PACKAGE_PATH="${GOPATH}/src/github.com/triton-inference-server"
-rm -r ${PACKAGE_PATH}/client
+rm -rf ${PACKAGE_PATH}/client
 mkdir -p ${PACKAGE_PATH}
 cp -r client $PACKAGE_PATH
 
