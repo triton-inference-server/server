@@ -50,8 +50,7 @@ RET=0
 
 # Generate Go stubs.
 rm -fr client common
-## TODO: Remove branch below after CI passes
-git clone -b dyas-go-fix https://github.com/triton-inference-server/client.git
+git clone https://github.com/triton-inference-server/client.git
 go install google.golang.org/grpc/cmd/protoc-gen-go-grpc@latest
 
 pushd ${GO_CLIENT_DIR}
@@ -60,7 +59,7 @@ git clone --single-branch --depth=1 -b $TRITON_COMMON_REPO_TAG \
 bash gen_go_stubs.sh
 popd
 
-# Copy to the GOPATH, where Go expects to find packages.
+# Copy packages to GOPATH, where Go expects to find packages.
 PACKAGE_PATH="${GOPATH}/src/github.com/triton-inference-server"
 rm -rf ${PACKAGE_PATH}/client
 mkdir -p ${PACKAGE_PATH}
