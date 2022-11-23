@@ -26,9 +26,9 @@
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 -->
 
----
+<!-- ---
 title: Triton Inference Server
----
+--- -->
 
 
 ::::{grid}
@@ -65,7 +65,12 @@ Triton Inference Server is an open source inference serving software that stream
 
 # Triton
 
-Triton enables teams to deploy any AI model from multiple deep learning and machine learning frameworks, including TensorRT, TensorFlow, PyTorch, ONNX, OpenVINO, Python, RAPIDS FIL, and more. Triton supports inference across cloud, data center,edge and embedded devices on NVIDIA GPUs, x86 and ARM CPU, or AWS Inferentia. Triton delivers optimized performance for many query types, including real time, batched, ensembles and audio/video streaming.
+Triton enables teams to deploy any AI model from multiple deep learning and 
+machine learning frameworks, including TensorRT, TensorFlow, PyTorch, ONNX, 
+OpenVINO, Python, RAPIDS FIL, and more. Triton supports inference across cloud, 
+data center,edge and embedded devices on NVIDIA GPUs, x86 and ARM CPU, or AWS 
+Inferentia. Triton delivers optimized performance for many query types, 
+including real time, batched, ensembles and audio/video streaming.
 
 Major features include:
 
@@ -95,4 +100,10 @@ Major features include:
 - [Metrics](user_guide/metrics.md) indicating GPU utilization, server
   throughput, server latency, and more
 
-Join the Triton and TensorRT community and stay current on the latest product updates, bug fixes, content, best practices, and more. Need enterprise support? NVIDIA global support is available for Triton Inference Server with the NVIDIA AI Enterprise software suite.
+Join the [Triton and TensorRT community](https://www.nvidia.com/en-us/deep-learning-ai/triton-tensorrt-newsletter/) and stay current on the latest product updates, bug fixes, content, best practices, 
+and more.  Need enterprise support?  NVIDIA global support is available for Triton 
+Inference Server with the 
+[NVIDIA AI Enterprise software suite](https://www.nvidia.com/en-us/data-center/products/ai-enterprise/). 
+
+See the [Lastest Release Notes](https://docs.nvidia.com/deeplearning/triton-inference-server/release-notes/rel-22-11.html#rel-22-11) 
+for updates on the newest features and bug fixes.
