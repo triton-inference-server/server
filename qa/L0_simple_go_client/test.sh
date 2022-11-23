@@ -29,7 +29,8 @@ export CUDA_VISIBLE_DEVICES=0
 
 TRITON_COMMON_REPO_TAG=${TRITON_COMMON_REPO_TAG:="main"}
 
-SIMPLE_GO_CLIENT=grpc_simple_client.go
+GO_CLIENT_DIR=client/src/grpc_generated/go
+SIMPLE_GO_CLIENT=${GO_CLIENT_DIR}/grpc_simple_client.go
 
 SERVER=/opt/tritonserver/bin/tritonserver
 SERVER_ARGS=--model-repository=`pwd`/models
@@ -47,28 +48,26 @@ fi
 
 RET=0
 
-# Fix to allow global stubs import
-sed -i 's/.\/nvidia_inferenceserver/nvidia_inferenceserver/g' $SIMPLE_GO_CLIENT
+# Generate Go stubs.
+rm -fr client common
+git clone https://github.com/triton-inference-server/client.git
+go install google.golang.org/grpc/cmd/protoc-gen-go-grpc@latest
 
-PACKAGE_PATH="${GOPATH}/src"
-mkdir -p ${PACKAGE_PATH}
-
-# Get the proto files from the common repo
-rm -fr common
+pushd ${GO_CLIENT_DIR}
 git clone --single-branch --depth=1 -b $TRITON_COMMON_REPO_TAG \
     https://github.com/triton-inference-server/common.git
-mkdir core && cp common/protobuf/*.proto core/.
+bash gen_go_stubs.sh
+popd
 
-# Requires protoc and protoc-gen-go plugin: https://github.com/golang/protobuf#installation
-# Use "M" arguments since go_package is not specified in .proto files.
-# As mentioned here: https://developers.google.com/protocol-buffers/docs/reference/go-generated#package
-GO_PACKAGE="nvidia_inferenceserver"
-protoc -I core --go_out=plugins=grpc:${PACKAGE_PATH} --go_opt=Mgrpc_service.proto=./${GO_PACKAGE} \
-    --go_opt=Mmodel_config.proto=./${GO_PACKAGE} core/*.proto
+# Copy packages to GOPATH, where Go expects to find packages.
+PACKAGE_PATH="${GOPATH}/src/github.com/triton-inference-server"
+rm -rf ${PACKAGE_PATH}/client
+mkdir -p ${PACKAGE_PATH}
+cp -r client $PACKAGE_PATH
 
 set +e
 
-# Runs test for GRPC variant of go client
+# Run test for GRPC variant of go client
 GO111MODULE=off go run $SIMPLE_GO_CLIENT >>client.log 2>&1
 if [ $? -ne 0 ]; then
     RET=1
