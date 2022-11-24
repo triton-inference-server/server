@@ -43,7 +43,7 @@ RET=0
 rm -fr *.log ./models
 
 pip3 uninstall -y torch
-pip3 install torch==1.9.0+cu111 -f https://download.pytorch.org/whl/torch_stable.html
+pip3 install torch==1.13.0
 
 # IOTest.test_ensemble_io
 TRIALS="default decoupled"
