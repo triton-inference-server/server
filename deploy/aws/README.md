@@ -107,6 +107,7 @@ $ aws s3 cp --recursive docs/examples/model_repository s3://triton-inference-ser
 ```
 
 ### AWS Model Repository
+#### Explicit credentials
 To load the model from the AWS S3, you need to convert the following AWS credentials in the base64 format and add it to the values.yaml
 
 ```
@@ -118,6 +119,9 @@ echo -n 'SECRECT_KEY_ID' | base64
 ```
 echo -n 'SECRET_ACCESS_KEY' | base64
 ```
+
+#### Assume role credentials
+Assuming a role to authenticate using temporary credentials can be achieved by ensuring that the creation of secrets above is disabled and setting the `serviceAccountName` value to name of the Kubernetes Service Account containing the the aws `role-arn` with permissions to the S3 bucket configured in `modelRepositoryPath`.
 
 ## Deploy Prometheus and Grafana
 
