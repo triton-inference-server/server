@@ -97,6 +97,10 @@ class SageMakerMultiModelTest(tu.TestResultCollector):
         # Output is same as input since this is an identity model
         self.model2_input_data_ = [0, 1, 2, 3, 4, 5, 6, 7]
 
+        # ensemble model setup
+        self.model3_name = "123456789ensemble"
+        self.model3_url = "/opt/ml/models/123456789ensemble/model"
+
     def test_sm_0_environment_variables_set(self):
         self.assertEqual(os.getenv("SAGEMAKER_MULTI_MODEL"), "true",
                          "Variable SAGEMAKER_MULTI_MODEL must be set to true")
@@ -177,7 +181,7 @@ class SageMakerMultiModelTest(tu.TestResultCollector):
         time.sleep(3)
         expected_response = {
             "modelName": self.model1_name,
-            "modelUrl": self.model1_url.rstrip()
+            "modelUrl": self.model1_url.rstrip("/model")
         }
         self.assertEqual(
             r.json(), expected_response,
@@ -282,7 +286,23 @@ class SageMakerMultiModelTest(tu.TestResultCollector):
 
     def test_sm_6_ensemble_model(self):
         # Load ensemble model
-        pass
+        request_body = {"model_name": self.model3_name, "url": self.model3_url}
+        headers = {"Content-Type": "application/json", "X-Amzn-SageMaker-Target-Model": f"{self.model3_name}"}
+        r = requests.post(self.url_mme_,
+                          data=json.dumps(request_body),
+                          headers=headers)
+        time.sleep(10)  # wait for model to load
+        self.assertEqual(
+            r.status_code, 200,
+            "Expected status code 200, received {}".format(r.status_code))
+
+        # Unload ensemble model
+        unload_url = "{}/{}".format(self.url_mme_, self.model3_name)
+        r = requests.delete(unload_url, headers=headers)
+        time.sleep(10)
+        self.assertEqual(
+            r.status_code, 200,
+            "Expected status code 200, received {}".format(r.status_code))
         
 
 

@@ -61,6 +61,7 @@ UNIT_TEST_COUNT=9
 CLIENT_LOG="./client.log"
 
 DATADIR=/data/inferenceserver/${REPO_VERSION}
+ENSEMBLEDIR=/data/inferenceserver/${REPO_VERSION}/qa_ensemble_model_repository/qa_model_repository
 SERVER=/opt/tritonserver/bin/tritonserver
 SERVER_LOG="./server.log"
 # Link model repository to "/opt/ml/model"
@@ -432,14 +433,34 @@ ln -s `pwd`/models /opt/ml/models
 ENSEMBLE_MODEL_PATH="models/123456789ensemble/model"
 mkdir -p "${ENSEMBLE_MODEL_PATH}"
 
-# set up "addsub" ensemble for custom float32 model
-cp -r $MODELSDIR/fan_graphdef_float32_float32_float32 $MODELSDIR/fan_python && \
-    (cd $MODELSDIR/fan_python && \
-            sed -i "s/graphdef_float32_float32_float32/python/" config.pbtxt)
+model_name=python_float32_float32_float32
 
-# custom float32 component of ensemble
-cp -r $ENSEMBLEDIR/nop_TYPE_FP32_-1 $MODELSDIR/. && \
-    mkdir -p $MODELSDIR/nop_TYPE_FP32_-1/1
+mkdir -p ${ENSEMBLE_MODEL_PATH}/${model_name}/1 && \
+cp ../python_models/add_sub/model.py ${ENSEMBLE_MODEL_PATH}/${model_name}/1/. && \
+cp ../python_models/add_sub/config.pbtxt ${ENSEMBLE_MODEL_PATH}/${model_name}/.
+(cd ${ENSEMBLE_MODEL_PATH}/${model_name} && \
+                    sed -i "s/label_filename:.*//" config.pbtxt && \
+                    sed -i "0,/name:.*/{s/name:.*/name: \"${model_name}\"/}" config.pbtxt && \
+                                        echo "max_batch_size: 64" >> config.pbtxt)
+
+# Ensemble part
+mkdir -p ${ENSEMBLE_MODEL_PATH}/fan_${model_name}/1 && \
+            cp ../python_models/add_sub/model.py ${ENSEMBLE_MODEL_PATH}/fan_${model_name}/1/. && \
+            cp ../python_models/fan_add_sub/config.pbtxt ${ENSEMBLE_MODEL_PATH}/fan_${model_name}/. && \
+            (cd ${ENSEMBLE_MODEL_PATH}/fan_${model_name} && \
+                    sed -i "s/label_filename:.*//" config.pbtxt && \
+                    sed -i "s/model_name: \"ENSEMBLE_MODEL_NAME\"/model_name: \"${model_name}\"/" config.pbtxt && \
+                    sed -i "0,/name:.*/{s/name:.*/name: \"fan_${model_name}\"/}" config.pbtxt && \
+                    echo "max_batch_size: 64" >> config.pbtxt)
+
+# set up "addsub" ensemble for custom float32 model
+# cp -r $MODELSDIR/fan_graphdef_float32_float32_float32 $MODELSDIR/fan_python && \
+#     (cd $MODELSDIR/fan_python && \
+#             sed -i "s/graphdef_float32_float32_float32/python/" config.pbtxt)
+# 
+# # custom float32 component of ensemble
+cp -r $ENSEMBLEDIR/nop_TYPE_FP32_-1 ${ENSEMBLE_MODEL_PATH}/. && \
+    mkdir -p ${ENSEMBLE_MODEL_PATH}/nop_TYPE_FP32_-1/1
 
 MODEL1_PATH="models/123456789abcdefghi/model"
 MODEL2_PATH="models/987654321ihgfedcba/model"
@@ -472,7 +493,21 @@ fi
 
 # API tests in ensemble setting
 # LOAD/UNLOAD/INFER ensemble
-
+set +e
+python $SAGEMAKER_MULTI_MODEL_TEST SageMakerMultiModelTest >>$CLIENT_LOG 2>&1
+if [ $? -ne 0 ]; then
+    echo -e "\n***\n*** Test Failed\n***"
+    cat $CLIENT_LOG
+    RET=1
+else
+    check_test_results $TEST_RESULT_FILE $MULTI_MODEL_UNIT_TEST_COUNT
+    if [ $? -ne 0 ]; then
+        cat $CLIENT_LOG
+        echo -e "\n***\n*** Test Result Verification Failed\n***"
+        RET=1
+    fi
+fi
+set -e
 
 # Destroy
 unset SAGEMAKER_MULTI_MODEL
