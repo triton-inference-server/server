@@ -113,21 +113,20 @@ class TritonPythonModel:
 
             for i, t in tqdm(enumerate(self.scheduler.timesteps)):
                 latent_model_input = torch.cat([latents] * 2)
-                sigma = self.scheduler.sigmas[i]
-                latent_model_input = latent_model_input / ((sigma**2 + 1)**0.5)
+                latent_model_input = self.scheduler.scale_model_input(latent_model_input, t)
 
                 with torch.no_grad(), torch.autocast("cuda"):
                     noise_pred = self.unet(
                         latent_model_input,
                         t,
-                        encoder_hidden_states=text_embeddings)["sample"]
+                        encoder_hidden_states=text_embeddings).sample
 
                 noise_pred_uncond, noise_pred_text = noise_pred.chunk(2)
                 noise_pred = noise_pred_uncond + guidance_scale * (
                     noise_pred_text - noise_pred_uncond)
 
-                latents = self.scheduler.step(noise_pred, i,
-                                              latents)["prev_sample"]
+                latents = self.scheduler.step(noise_pred, self.scheduler.timesteps[i],
+                                              latents).prev_sample
 
             # VAE decoding
             latents = 1 / 0.18215 * latents
