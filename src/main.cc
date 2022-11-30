@@ -607,15 +607,11 @@ std::vector<Option> options_
        "<GPU device ID>:<pool byte size>. This option can be used multiple "
        "times, but only once per GPU device. Subsequent uses will overwrite "
        "previous uses for the same GPU device. Default is 64 MB."},
+      // TODO: Add --cache-config field
+      // TODO: Consider --enable-cache field ?
       {OPTION_RESPONSE_CACHE_BYTE_SIZE, "response-cache-byte-size",
        Option::ArgInt,
-       "The size in bytes to allocate for a request/response cache. When "
-       "non-zero, Triton allocates the requested size in CPU memory and "
-       "shares the cache across all inference requests and across all models. "
-       "For a given model to use request caching, the model must enable "
-       "request caching in the model configuration. By default, no model uses "
-       "request caching even if the request cache is enabled with the "
-       "--response-cache-byte-size flag. Default is 0."},
+       "DEPRECATED: Please use --cache-config instead."},
       {OPTION_MIN_SUPPORTED_COMPUTE_CAPABILITY,
        "min-supported-compute-capability", Option::ArgFloat,
        "The minimum supported CUDA compute capability. GPUs that don't support "
@@ -1333,8 +1329,6 @@ Parse(TRITONSERVER_ServerOptions** server_options, int argc, char** argv)
   // hardware_concurrency() returns 0 if not well defined or not computable.
   uint32_t model_load_thread_count =
       std::max(2u, 2 * std::thread::hardware_concurrency());
-  uint64_t response_cache_byte_size = 0;
-
   std::string backend_dir = "/opt/tritonserver/backends";
   std::string repoagent_dir = "/opt/tritonserver/repoagents";
   std::vector<std::tuple<std::string, std::string, std::string>>
@@ -1725,7 +1719,9 @@ Parse(TRITONSERVER_ServerOptions** server_options, int argc, char** argv)
         cuda_pools.push_back(ParsePairOption<int, uint64_t>(optarg, ":"));
         break;
       case OPTION_RESPONSE_CACHE_BYTE_SIZE:
-        response_cache_byte_size = (uint64_t)ParseLongLongOption(optarg);
+        std::cerr << "Warning: '--response-cache-byte-size' has been deprecated! "
+                     "Please use '--cache-config' instead."
+                  << std::endl;
         break;
       case OPTION_MIN_SUPPORTED_COMPUTE_CAPABILITY:
         min_supported_compute_capability = ParseOption<double>(optarg);
@@ -1895,10 +1891,6 @@ Parse(TRITONSERVER_ServerOptions** server_options, int argc, char** argv)
             loptions, cuda_pool.first, cuda_pool.second),
         "setting total CUDA memory byte size");
   }
-  FAIL_IF_ERR(
-      TRITONSERVER_ServerOptionsSetResponseCacheByteSize(
-          loptions, response_cache_byte_size),
-      "setting total response cache byte size");
   FAIL_IF_ERR(
       TRITONSERVER_ServerOptionsSetMinSupportedComputeCapability(
           loptions, min_supported_compute_capability),
