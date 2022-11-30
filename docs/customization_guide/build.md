@@ -189,7 +189,7 @@ repo that you want to use in the build, you would specify
 If you want to build without GPU support you must specify individual
 feature flags and not include the `--enable-gpu` and
 `--enable-gpu-metrics` flags. Only the following backends are
-available for a non-GPU / CPU-only build: `identity`, `repeat`,
+available for a non-GPU / CPU-only build: `identity`, `repeat`, `ensemble`,
 `square`, `tensorflow2`, `pytorch`, `onnxruntime`, `openvino`,
 `python` and `fil`.
 
