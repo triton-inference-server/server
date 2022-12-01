@@ -43,7 +43,11 @@ fi
 export CUDA_VISIBLE_DEVICES=0
 
 LEAKCHECK=/usr/bin/valgrind
-LEAKCHECK_ARGS_BASE="--max-threads=3000 --tool=massif --time-unit=B"
+LEAKCHECK_ARGS_BASE="--max-threads=3000 --tool=massif --time-unit=B --soname-synonyms=somalloc=/usr/lib/x86_64-linux-gnu/libtcmalloc.so.4"
+# Since the flag "--soname-synonyms=somalloc=/usr/lib/x86_64-linux-gnu/libtcmalloc.so.4"
+# is already set for tcmalloc replacement for Valgrind test, need to remove
+# tcmalloc library from LD_PRELOAD.
+unset LD_PRELOAD
 SERVER_TIMEOUT=3600
 rm -f *.log *.massif
 

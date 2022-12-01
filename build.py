@@ -848,12 +848,14 @@ RUN apt-get update && \
             build-essential \
             docker.io \
             git \
+            gperf \
             libre2-dev \
             libssl-dev \
             libtool \
             libboost-dev \
             libcurl4-openssl-dev \
             libb64-dev \
+            libgoogle-perftools-dev \
             patchelf \
             python3-dev \
             python3-pip \
@@ -1065,11 +1067,17 @@ RUN apt-get update && \
             libcurl4-openssl-dev \
             libre2-5 \
             git \
+            gperf \
             dirmngr \
+            libgoogle-perftools-dev \
             libnuma-dev \
             curl \
             {backend_dependencies} && \
     rm -rf /var/lib/apt/lists/*
+
+# Set LD_PRELOAD with tcmalloc and TCMALLOC_RELEASE_RATE
+ENV LD_PRELOAD /usr/lib/x86_64-linux-gnu/libtcmalloc.so.4:${{LD_PRELOAD}}
+ENV TCMALLOC_RELEASE_RATE 200
 '''.format(gpu_enabled=gpu_enabled, backend_dependencies=backend_dependencies)
 
     if enable_gpu:

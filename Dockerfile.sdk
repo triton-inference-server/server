@@ -65,7 +65,9 @@ RUN apt-get update && \
             build-essential \
             curl \
             git \
+            gperf \
             libb64-dev \
+            libgoogle-perftools-dev \
             libopencv-dev \
             libopencv-core-dev \
             libssl-dev \
@@ -167,7 +169,9 @@ RUN apt-get update && \
             software-properties-common \
             curl \
             git \
+            gperf \
             libb64-dev \
+            libgoogle-perftools-dev \
             libopencv-dev \
             libopencv-core-dev \
             libssl-dev \
@@ -244,3 +248,7 @@ ENV LD_LIBRARY_PATH /workspace/install/lib:${LD_LIBRARY_PATH}
 
 # DLIS-3631: Needed to run Perf Analyzer CI tests correctly
 ENV LD_LIBRARY_PATH /opt/hpcx/ompi/lib:${LD_LIBRARY_PATH}
+
+# Set LD_PRELOAD with tcmalloc and TCMALLOC_RELEASE_RATE
+ENV LD_PRELOAD /usr/lib/x86_64-linux-gnu/libtcmalloc.so.4:${LD_PRELOAD}
+ENV TCMALLOC_RELEASE_RATE 200

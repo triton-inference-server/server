@@ -48,7 +48,7 @@ libtrtcustom.so, starting Triton with the following command makes
 those custom layers available to all TensorRT models.
 
 ```bash
-$ LD_PRELOAD=libtrtcustom.so tritonserver --model-repository=/tmp/models ...
+$ LD_PRELOAD=libtrtcustom.so:${LD_PRELOAD} tritonserver --model-repository=/tmp/models ...
 ```
 
 A limitation of this approach is that the custom layers must be
@@ -78,7 +78,7 @@ starting Triton with the following command makes those operations
 available to all TensorFlow models.
 
 ```bash
-$ LD_PRELOAD=libtfcustom.so tritonserver --model-repository=/tmp/models ...
+$ LD_PRELOAD=libtfcustom.so:${LD_PRELOAD} tritonserver --model-repository=/tmp/models ...
 ```
 
 All TensorFlow custom operations depend on a TensorFlow shared library
@@ -130,7 +130,7 @@ launching the server. There are several ways to control the library path
 and a common one is to use the LD_LIBRARY_PATH.
 
 ```bash
-$ LD_LIBRARY_PATH=/opt/tritonserver/backends/pytorch:$LD_LIBRARY_PATH LD_PRELOAD=libpytcustom.so tritonserver --model-repository=/tmp/models ...
+$ LD_LIBRARY_PATH=/opt/tritonserver/backends/pytorch:$LD_LIBRARY_PATH LD_PRELOAD=libpytcustom.so:${LD_PRELOAD} tritonserver --model-repository=/tmp/models ...
 ```
 
 A limitation of this approach is that the custom operations must be

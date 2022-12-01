@@ -55,7 +55,11 @@ SERVER_TIMEOUT=1200
 
 # Valgrind massif
 LEAKCHECK=/usr/bin/valgrind
-LEAKCHECK_ARGS_BASE="--tool=massif --time-unit=B"
+LEAKCHECK_ARGS_BASE="--tool=massif --time-unit=B --soname-synonyms=somalloc=/usr/lib/x86_64-linux-gnu/libtcmalloc.so.4"
+# Since the flag "--soname-synonyms=somalloc=/usr/lib/x86_64-linux-gnu/libtcmalloc.so.4"
+# is already set for tcmalloc replacement for Valgrind test, need to remove
+# tcmalloc library from LD_PRELOAD.
+unset LD_PRELOAD
 MASSIF_TEST=../common/check_massif_log.py
 
 source ../common/util.sh

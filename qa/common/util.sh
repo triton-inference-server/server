@@ -168,7 +168,7 @@ function run_server () {
       echo "=== Running LD_PRELOAD=$SERVER_LD_PRELOAD $SERVER $SERVER_ARGS"
     fi
 
-    LD_PRELOAD=$SERVER_LD_PRELOAD $SERVER $SERVER_ARGS > $SERVER_LOG 2>&1 &
+    LD_PRELOAD=$SERVER_LD_PRELOAD:${LD_PRELOAD} $SERVER $SERVER_ARGS > $SERVER_LOG 2>&1 &
     SERVER_PID=$!
 
     wait_for_server_ready $SERVER_PID $SERVER_TIMEOUT
@@ -200,7 +200,7 @@ function run_server_tolive () {
       echo "=== Running LD_PRELOAD=$SERVER_LD_PRELOAD $SERVER $SERVER_ARGS"
     fi
 
-    LD_PRELOAD=$SERVER_LD_PRELOAD $SERVER $SERVER_ARGS > $SERVER_LOG 2>&1 &
+    LD_PRELOAD=$SERVER_LD_PRELOAD:${LD_PRELOAD} $SERVER $SERVER_ARGS > $SERVER_LOG 2>&1 &
     SERVER_PID=$!
 
     wait_for_server_live $SERVER_PID $SERVER_TIMEOUT
@@ -244,7 +244,7 @@ function run_server_nowait () {
             echo "=== Running LD_PRELOAD=$SERVER_LD_PRELOAD $SERVER $SERVER_ARGS"
         fi
 
-        LD_PRELOAD=$SERVER_LD_PRELOAD $SERVER $SERVER_ARGS > $SERVER_LOG 2>&1 &
+        LD_PRELOAD=$SERVER_LD_PRELOAD:${LD_PRELOAD} $SERVER $SERVER_ARGS > $SERVER_LOG 2>&1 &
         SERVER_PID=$!
     fi
 }
@@ -276,7 +276,7 @@ function run_server_leakcheck () {
       echo "=== Running LD_PRELOAD=$SERVER_LD_PRELOAD $SERVER $SERVER_ARGS"
     fi
 
-    LD_PRELOAD=$SERVER_LD_PRELOAD $LEAKCHECK $LEAKCHECK_ARGS $SERVER $SERVER_ARGS > $SERVER_LOG 2>&1 &
+    LD_PRELOAD=$SERVER_LD_PRELOAD:${LD_PRELOAD} $LEAKCHECK $LEAKCHECK_ARGS $SERVER $SERVER_ARGS > $SERVER_LOG 2>&1 &
     SERVER_PID=$!
 
     wait_for_server_ready $SERVER_PID $SERVER_TIMEOUT
@@ -423,7 +423,7 @@ function run_multiple_servers_nowait () {
         else
             echo "=== Running LD_PRELOAD=$SERVER_LD_PRELOAD $SERVER ${!server_args[$i]}"
         fi
-        LD_PRELOAD=$SERVER_LD_PRELOAD $SERVER ${!server_args[$i]} > ${!server_log[$i]} 2>&1 &
+        LD_PRELOAD=$SERVER_LD_PRELOAD:${LD_PRELOAD} $SERVER ${!server_args[$i]} > ${!server_log[$i]} 2>&1 &
         let SERVER${i}_PID=$!
     done
 }
