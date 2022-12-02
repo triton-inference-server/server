@@ -100,6 +100,13 @@ else
     TRITON_DIR=${TRITON_DIR:="/opt/tritonserver"}
     SERVER=${TRITON_DIR}/bin/tritonserver
     BACKEND_DIR=${TRITON_DIR}/backends
+
+    # PyTorch on SBSA requires libgomp to be loaded first. See the following
+    # GitHub issue for more information:
+    # https://github.com/pytorch/pytorch/issues/2575
+    if [ $TEST_REPO_ARCH = "arm_a100" ]; then
+      SERVER_LD_PRELOAD=/usr/lib/$(uname -m)-linux-gnu/libgomp.so.1
+    fi
 fi
 
 # Allow more time to exit. Ensemble brings in too many models
