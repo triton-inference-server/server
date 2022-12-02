@@ -250,5 +250,5 @@ ENV LD_LIBRARY_PATH /workspace/install/lib:${LD_LIBRARY_PATH}
 ENV LD_LIBRARY_PATH /opt/hpcx/ompi/lib:${LD_LIBRARY_PATH}
 
 # Set LD_PRELOAD with tcmalloc and TCMALLOC_RELEASE_RATE
-ENV LD_PRELOAD /usr/lib/x86_64-linux-gnu/libtcmalloc.so.4:${LD_PRELOAD}
+ENV LD_PRELOAD /usr/lib/$(uname -m)-linux-gnu/libtcmalloc.so.4:${LD_PRELOAD}
 ENV TCMALLOC_RELEASE_RATE 200
