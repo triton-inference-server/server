@@ -1076,7 +1076,8 @@ RUN apt-get update && \
     rm -rf /var/lib/apt/lists/*
 
 # Set LD_PRELOAD with tcmalloc and TCMALLOC_RELEASE_RATE
-ENV LD_PRELOAD /usr/lib/$(uname -m)-linux-gnu/libtcmalloc.so.4:${{LD_PRELOAD}}
+RUN test -f /usr/lib/$(uname -m)-linux-gnu/libtcmalloc.so.4  && ln -s /usr/lib/$(uname -m)-linux-gnu /usr/lib/lib-triton
+ENV LD_PRELOAD=$LD_PRELOAD:/usr/lib/lib-triton/libtcmalloc.so.4
 ENV TCMALLOC_RELEASE_RATE 200
 '''.format(gpu_enabled=gpu_enabled, backend_dependencies=backend_dependencies)
 
