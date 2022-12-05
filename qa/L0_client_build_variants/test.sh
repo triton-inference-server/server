@@ -28,9 +28,7 @@
 # Install required dependencies for client build
 apt-get update && \
 apt-get install -y --no-install-recommends \
-        rapidjson-dev \
-        gperf \
-        libgoogle-perftools-dev
+        rapidjson-dev
 
 # Client build requires recent version of CMake (FetchContent required)
 wget -O - https://apt.kitware.com/keys/kitware-archive-latest.asc 2>/dev/null | \
