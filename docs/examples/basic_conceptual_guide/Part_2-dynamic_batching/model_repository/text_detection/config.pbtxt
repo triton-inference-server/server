@@ -15,12 +15,9 @@ output [
     dims: [ 26, 37 ]
   }
 ]
-#dynamic_batching {
-#    max_queue_delay_microseconds: 100
-#}
-
 
 dynamic_batching { }
+
 instance_group [
     {
       count: 2
