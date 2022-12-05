@@ -1,0 +1,23 @@
+name: "text_recognition"
+platform: "onnxruntime_onnx"
+max_batch_size : 16
+input [
+  {
+    name: "input.1"
+    data_type: TYPE_FP32
+    dims: [ 1, 32, 100 ]
+  }
+]
+output [
+  {
+    name: "308"
+    data_type: TYPE_FP32
+    dims: [ 26, 37 ]
+  }
+]
+
+optimization { execution_accelerators {
+  cpu_execution_accelerator : [ {
+    name : "openvino"
+  } ]
+}}
