@@ -617,7 +617,9 @@ std::vector<Option> options_
        "Default is '/opt/tritonserver/caches/config.json'."},
       {OPTION_CACHE_DIR, "cache-directory", Option::ArgStr,
        "The global directory searched for cache shared libraries. Default is "
-       "'/opt/tritonserver/caches'."},
+       "'/opt/tritonserver/caches'. This directory is expected to contain a "
+       "cache implementation as a shared library with the name "
+       "'libtritoncache.so'."},
       {OPTION_MIN_SUPPORTED_COMPUTE_CAPABILITY,
        "min-supported-compute-capability", Option::ArgFloat,
        "The minimum supported CUDA compute capability. GPUs that don't support "
