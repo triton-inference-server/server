@@ -1,5 +1,5 @@
 #!/bin/bash
-# Copyright (c) 2021-2022, NVIDIA CORPORATION. All rights reserved.
+# Copyright (c) 2021, NVIDIA CORPORATION. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -43,11 +43,7 @@ fi
 export CUDA_VISIBLE_DEVICES=0
 
 LEAKCHECK=/usr/bin/valgrind
-LEAKCHECK_ARGS_BASE="--leak-check=full --show-leak-kinds=definite --max-threads=3000  --soname-synonyms=somalloc=/usr/lib/x86_64-linux-gnu/libtcmalloc.so.4"
-# Since the flag "--soname-synonyms=somalloc=/usr/lib/x86_64-linux-gnu/libtcmalloc.so.4"
-# is already set for tcmalloc replacement for Valgrind test, need to remove
-# tcmalloc library from LD_PRELOAD.
-unset LD_PRELOAD
+LEAKCHECK_ARGS_BASE="--leak-check=full --show-leak-kinds=definite --max-threads=3000"
 SERVER_TIMEOUT=3600
 rm -f *.log
 
