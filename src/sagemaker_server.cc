@@ -332,7 +332,7 @@ SagemakerAPIServer::ParseSageMakerRequest(
   }
   (*parse_map)["model_name"] = model_name_string.c_str();
 
-  /* Extract targetModel archive for debugging purposes */
+  /* Extract targetModel to log the associated archive */
 
   /* Read headers*/
   (*parse_map)["TargetModel"] = "targetModel.tar.gz";
@@ -443,6 +443,7 @@ SagemakerAPIServer::SageMakerMMEHandleInfer(
     return;
   }
 
+  /* Extract targetModel to log the associated archive */
   const char* targetModel =
       evhtp_kv_find(req->headers_in, "X-Amzn-SageMaker-Target-Model");
   LOG_INFO << "Invoking SageMaker TargetModel: " << targetModel << std::endl;
@@ -661,6 +662,7 @@ SagemakerAPIServer::SageMakerMMEUnloadModel(
 
   evbuffer_add(req->buffer_in, buffer, byte_size);
 
+  /* Extract targetModel to log the associated archive */
   const char* targetModel =
       evhtp_kv_find(req->headers_in, "X-Amzn-SageMaker-Target-Model");
 

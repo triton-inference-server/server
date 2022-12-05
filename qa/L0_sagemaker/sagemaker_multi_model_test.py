@@ -291,7 +291,35 @@ class SageMakerMultiModelTest(tu.TestResultCollector):
         r = requests.post(self.url_mme_,
                           data=json.dumps(request_body),
                           headers=headers)
-        time.sleep(10)  # wait for model to load
+        time.sleep(5)  # wait for model to load
+        self.assertEqual(
+            r.status_code, 200,
+            "Expected status code 200, received {}".format(r.status_code))
+
+        # Invoke ensemble model
+        inputs = []
+        outputs = []
+        inputs.append(httpclient.InferInput("INPUT0", [1, 16], "FP32"))
+        inputs.append(httpclient.InferInput("INPUT1", [1, 16], "FP32"))
+
+        # Initialize the data
+        input_data = np.array(self.model1_input_data_, dtype=np.float32)
+        input_data = np.expand_dims(input_data, axis=0)
+        inputs[0].set_data_from_numpy(input_data, binary_data=False)
+        inputs[1].set_data_from_numpy(input_data, binary_data=False)
+
+        outputs.append(
+            httpclient.InferRequestedOutput("OUTPUT0", binary_data=False))
+        outputs.append(
+            httpclient.InferRequestedOutput("OUTPUT1", binary_data=False))
+        request_body, _ = httpclient.InferenceServerClient.generate_request_body(
+            inputs, outputs=outputs)
+
+        headers = {"Content-Type": "application/json"}
+        invoke_url = "{}/{}/invoke".format(self.url_mme_, self.model3_name)
+        r = requests.post(invoke_url, data=request_body, headers=headers)
+        print(f"response: {r.text}")
+        r.raise_for_status()
         self.assertEqual(
             r.status_code, 200,
             "Expected status code 200, received {}".format(r.status_code))
@@ -299,7 +327,7 @@ class SageMakerMultiModelTest(tu.TestResultCollector):
         # Unload ensemble model
         unload_url = "{}/{}".format(self.url_mme_, self.model3_name)
         r = requests.delete(unload_url, headers=headers)
-        time.sleep(10)
+        time.sleep(5)
         self.assertEqual(
             r.status_code, 200,
             "Expected status code 200, received {}".format(r.status_code))
