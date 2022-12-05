@@ -1,0 +1,20 @@
+name: "text_recognition"
+platform: "onnxruntime_onnx"
+max_batch_size : 16
+input [
+  {
+    name: "input.1"
+    data_type: TYPE_FP32
+    dims: [ 1, 32, 100 ]
+  }
+]
+output [
+  {
+    name: "308"
+    data_type: TYPE_FP32
+    dims: [ 26, 37 ]
+  }
+]
+
+parameters { key: "cudnn_conv_algo_search" value: { string_value: "0" } }
+parameters { key: "gpu_mem_limit" value: { string_value: "4294967200" } }

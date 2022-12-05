@@ -1,0 +1,17 @@
+name: "text_recognition"
+platform: "onnxruntime_onnx"
+max_batch_size : 0
+input [
+  {
+    name: "input.1"
+    data_type: TYPE_FP32
+    dims: [ 1, 1, 32, 100 ]
+  }
+]
+output [
+  {
+    name: "308"
+    data_type: TYPE_FP32
+    dims: [ 1, 26, 37 ]
+  }
+]
