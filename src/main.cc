@@ -306,6 +306,8 @@ enum OptionId {
   OPTION_PINNED_MEMORY_POOL_BYTE_SIZE,
   OPTION_CUDA_MEMORY_POOL_BYTE_SIZE,
   OPTION_RESPONSE_CACHE_BYTE_SIZE,
+  OPTION_CACHE_CONFIG_FILE,
+  OPTION_CACHE_DIR,
   OPTION_MIN_SUPPORTED_COMPUTE_CAPABILITY,
   OPTION_EXIT_TIMEOUT_SECS,
   OPTION_BACKEND_DIR,
@@ -607,11 +609,15 @@ std::vector<Option> options_
        "<GPU device ID>:<pool byte size>. This option can be used multiple "
        "times, but only once per GPU device. Subsequent uses will overwrite "
        "previous uses for the same GPU device. Default is 64 MB."},
-      // TODO: Add --cache-config field
-      // TODO: Consider --enable-cache field ?
       {OPTION_RESPONSE_CACHE_BYTE_SIZE, "response-cache-byte-size",
-       Option::ArgInt,
-       "DEPRECATED: Please use --cache-config instead."},
+       Option::ArgInt, "DEPRECATED: Please use --cache-config instead."},
+      {OPTION_CACHE_CONFIG_FILE, "cache-config", Option::ArgStr,
+       "Path to cache config JSON file. This file is used to configure the "
+       "cache implementation specified by --cache-lib that Triton is using. "
+       "Default is '/opt/tritonserver/caches/config.json'."},
+      {OPTION_CACHE_DIR, "cache-directory", Option::ArgStr,
+       "The global directory searched for cache shared libraries. Default is "
+       "'/opt/tritonserver/caches'."},
       {OPTION_MIN_SUPPORTED_COMPUTE_CAPABILITY,
        "min-supported-compute-capability", Option::ArgFloat,
        "The minimum supported CUDA compute capability. GPUs that don't support "
@@ -1331,6 +1337,9 @@ Parse(TRITONSERVER_ServerOptions** server_options, int argc, char** argv)
       std::max(2u, 2 * std::thread::hardware_concurrency());
   std::string backend_dir = "/opt/tritonserver/backends";
   std::string repoagent_dir = "/opt/tritonserver/repoagents";
+  std::string cache_dir = "/opt/tritonserver/caches";
+  std::string cache_config_file = "/opt/tritonserver/caches/config.json";
+  std::string cache_config = "{}";
   std::vector<std::tuple<std::string, std::string, std::string>>
       backend_config_settings;
   std::vector<std::tuple<std::string, std::string, std::string>> host_policies;
@@ -1719,9 +1728,16 @@ Parse(TRITONSERVER_ServerOptions** server_options, int argc, char** argv)
         cuda_pools.push_back(ParsePairOption<int, uint64_t>(optarg, ":"));
         break;
       case OPTION_RESPONSE_CACHE_BYTE_SIZE:
-        std::cerr << "Warning: '--response-cache-byte-size' has been deprecated! "
-                     "Please use '--cache-config' instead."
-                  << std::endl;
+        std::cerr
+            << "Warning: '--response-cache-byte-size' has been deprecated! "
+               "Please use '--cache-config' instead."
+            << std::endl;
+        break;
+      case OPTION_CACHE_CONFIG_FILE:
+        cache_config_file = optarg;
+        break;
+      case OPTION_CACHE_DIR:
+        cache_dir = optarg;
         break;
       case OPTION_MIN_SUPPORTED_COMPUTE_CAPABILITY:
         min_supported_compute_capability = ParseOption<double>(optarg);
@@ -1851,6 +1867,23 @@ Parse(TRITONSERVER_ServerOptions** server_options, int argc, char** argv)
     strict_model_config = true;
   }
 
+  // Read in cache config file
+  std::ifstream config_file(cache_config_file);
+  if (config_file.good()) {
+    std::stringstream buffer;
+    if (buffer << config_file.rdbuf()) {
+      cache_config = buffer.str();
+    } else {
+      std::cerr << "Failed to read cache config file: '" << cache_config_file
+                << "'" << std::endl;
+      exit(1);
+    }
+  } else {
+    std::cerr << "Failed to open cache config file: '" << cache_config_file
+              << "'" << std::endl;
+    exit(1);
+  }
+
   FAIL_IF_ERR(
       TRITONSERVER_ServerOptionsNew(server_options), "creating server options");
   auto loptions = *server_options;
@@ -1964,10 +1997,18 @@ Parse(TRITONSERVER_ServerOptions** server_options, int argc, char** argv)
       "setting metrics interval");
 #endif  // TRITON_ENABLE_METRICS
 
+
   FAIL_IF_ERR(
       TRITONSERVER_ServerOptionsSetBackendDirectory(
           loptions, backend_dir.c_str()),
       "setting backend directory");
+  FAIL_IF_ERR(
+      TRITONSERVER_ServerOptionsSetCacheDirectory(loptions, cache_dir.c_str()),
+      "setting cache directory");
+  FAIL_IF_ERR(
+      TRITONSERVER_ServerOptionsSetCacheConfig(
+          loptions, "" /* name */, cache_config.c_str()),
+      "setting cache config");
   FAIL_IF_ERR(
       TRITONSERVER_ServerOptionsSetRepoAgentDirectory(
           loptions, repoagent_dir.c_str()),
