@@ -40,7 +40,7 @@ source ../../common/util.sh
 
 # Uninstall the non CUDA version of PyTorch
 pip3 uninstall -y torch
-pip3 install torch==1.9.0+cu111 -f https://download.pytorch.org/whl/torch_stable.html
+pip3 install torch==1.13.0+cu117 -f https://download.pytorch.org/whl/torch_stable.html
 pip3 install tensorflow
 
 rm -fr *.log ./models
