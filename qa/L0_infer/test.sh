@@ -137,9 +137,9 @@ export ENSEMBLES
 if [[ $BACKENDS == *"python_dlpack"* ]]; then
     if [ "$TEST_JETSON" == "0" ]; then
         if [[ "aarch64" != $(uname -m) ]] ; then
-            pip3 install torch==1.9.0+cpu -f https://download.pytorch.org/whl/torch_stable.html
+            pip3 install torch==1.13.0+cpu -f https://download.pytorch.org/whl/torch_stable.html
         else
-            pip3 install torch==1.9.0 -f https://download.pytorch.org/whl/torch_stable.html
+            pip3 install torch==1.13.0 -f https://download.pytorch.org/whl/torch_stable.html
         fi
     fi
 fi
