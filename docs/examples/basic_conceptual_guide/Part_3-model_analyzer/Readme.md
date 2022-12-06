@@ -105,4 +105,4 @@ Sample reports can be found in the `reports` folder.
 
 # What's next?
 
-In this tutorial, we covered the use of Model Analyzer, which is a tool to select the best possible deployment configuration with respect to resource utilization. This is Part 3 of a 5 part tutorial series which covers the challenges faced in deploying Deep Learning models to production. Part 2 covers `Inference Acclerations`, which will talk about framework level optimizations to accelerate your models!
+In this tutorial, we covered the use of Model Analyzer, which is a tool to select the best possible deployment configuration with respect to resource utilization. This is Part 3 of a 5 part tutorial series which covers the challenges faced in deploying Deep Learning models to production. Part 2 covers `Inference Accelerations`, which will talk about framework level optimizations to accelerate your models!
