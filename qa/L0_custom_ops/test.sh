@@ -60,8 +60,65 @@ RET=0
 LD_LIBRARY_PATH=/opt/tritonserver/backends/tensorflow2:$LD_LIBRARY_PATH
 
 # Tensorflow
+## Load operations via LD_PRELOAD
 SERVER_ARGS="--model-repository=/data/inferenceserver/${REPO_VERSION}/qa_custom_ops/tf_custom_ops"
 SERVER_LD_PRELOAD="/data/inferenceserver/${REPO_VERSION}/qa_custom_ops/tf_custom_ops/libzeroout.so:/data/inferenceserver/${REPO_VERSION}/qa_custom_ops/tf_custom_ops/libcudaop.so:/data/inferenceserver/${REPO_VERSION}/qa_custom_ops/tf_custom_ops/libbusyop.so"
+
+run_server
+if [ "$SERVER_PID" == "0" ]; then
+    echo -e "\n***\n*** Failed to start $SERVER\n***"
+    cat $SERVER_LOG
+    exit 1
+fi
+
+set +e
+
+python $ZERO_OUT_TEST -v -m graphdef_zeroout >>$CLIENT_LOG 2>&1
+if [ $? -ne 0 ]; then
+    cat $CLIENT_LOG
+    echo -e "\n***\n*** Test Failed\n***"
+    RET=1
+fi
+
+python $ZERO_OUT_TEST -v -m savedmodel_zeroout >>$CLIENT_LOG 2>&1
+if [ $? -ne 0 ]; then
+    cat $CLIENT_LOG
+    echo -e "\n***\n*** Test Failed\n***"
+    RET=1
+fi
+
+python $CUDA_OP_TEST -v -m graphdef_cudaop >>$CLIENT_LOG 2>&1
+if [ $? -ne 0 ]; then
+    cat $CLIENT_LOG
+    echo -e "\n***\n*** Test Failed\n***"
+    RET=1
+fi
+
+python $CUDA_OP_TEST -v -m savedmodel_cudaop >>$CLIENT_LOG 2>&1
+if [ $? -ne 0 ]; then
+    cat $CLIENT_LOG
+    echo -e "\n***\n*** Test Failed\n***"
+    RET=1
+fi
+
+set -e
+
+kill $SERVER_PID
+wait $SERVER_PID
+
+## Load operations via model config
+SERVER_ARGS="--model-repository=tf_custom_ops"
+SERVER_LD_PRELOAD=""
+
+rm -rf tf_custom_ops && \
+    mkdir -p tf_custom_ops && \
+    cp -r /data/inferenceserver/${REPO_VERSION}/qa_custom_ops/tf_custom_ops .
+
+for MODEL_TYPE in savedmodel graphdef; do
+    echo "model_operations { op_library_filename: \"tf_custom_ops/libbusyop.so\" }" >> tf_custom_ops/${MODEL_TYPE}_busyop/config.pbtxt
+    echo "model_operations { op_library_filename: \"tf_custom_ops/libcudaop.so\" }" >> tf_custom_ops/${MODEL_TYPE}_cudaop/config.pbtxt
+    echo "model_operations { op_library_filename: \"tf_custom_ops/libzeroout.so\" }" >> tf_custom_ops/${MODEL_TYPE}_zeroout/config.pbtxt
+done
 
 run_server
 if [ "$SERVER_PID" == "0" ]; then
