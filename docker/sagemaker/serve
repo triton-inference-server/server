@@ -35,7 +35,7 @@ if [ -n "$SAGEMAKER_MULTI_MODEL" ]; then
     if [ "$SAGEMAKER_MULTI_MODEL" == "true" ]; then
         SAGEMAKER_MODEL_REPO=${SAGEMAKER_MULTI_MODEL_REPO}
         is_mme_mode=true
-        echo "Triton is running in SageMaker MME mode" 
+        echo "Triton is running in SageMaker MME mode." 
     fi
 fi
 
@@ -66,13 +66,24 @@ if [ -n "$SAGEMAKER_TRITON_LOG_ERROR" ]; then
 fi
 if [ -n "$SAGEMAKER_TRITON_SHM_DEFAULT_BYTE_SIZE" ]; then
     SAGEMAKER_ARGS="${SAGEMAKER_ARGS} --backend-config=python,shm-default-byte-size=${SAGEMAKER_TRITON_SHM_DEFAULT_BYTE_SIZE}"
+else
+    SAGEMAKER_ARGS="${SAGEMAKER_ARGS} --backend-config=python,shm-default-byte-size=16777216" #16MB
 fi
 if [ -n "$SAGEMAKER_TRITON_SHM_GROWTH_BYTE_SIZE" ]; then
     SAGEMAKER_ARGS="${SAGEMAKER_ARGS} --backend-config=python,shm-growth-byte-size=${SAGEMAKER_TRITON_SHM_GROWTH_BYTE_SIZE}"
+else
+    SAGEMAKER_ARGS="${SAGEMAKER_ARGS} --backend-config=python,shm-growth-byte-size=1048576" #1MB
 fi
 if [ -n "$SAGEMAKER_TRITON_TENSORFLOW_VERSION" ]; then
     SAGEMAKER_ARGS="${SAGEMAKER_ARGS} --backend-config=tensorflow,version=${SAGEMAKER_TRITON_TENSORFLOW_VERSION}"
 fi
+if [ -n "$SAGEMAKER_TRITON_MODEL_LOAD_GPU_LIMIT" ]; then
+    num_gpus=$(nvidia-smi -L | wc -l)
+    for ((i=0; i<${num_gpus}; i++)); do
+        SAGEMAKER_ARGS="${SAGEMAKER_ARGS} --model-load-gpu-limit ${i}:${SAGEMAKER_TRITON_MODEL_LOAD_GPU_LIMIT}"
+    done
+fi
+
 
 if [ "${is_mme_mode}" = false ] && [ -f "${SAGEMAKER_MODEL_REPO}/config.pbtxt" ]; then
     echo "ERROR: Incorrect directory structure."

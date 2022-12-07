@@ -26,7 +26,7 @@
 #pragma once
 
 #include <sys/stat.h>
-
+#include <fstream>
 #include <mutex>
 
 #include "common.h"
@@ -76,6 +76,7 @@ class SagemakerAPIServer : public HTTPAPIServer {
         models_regex_(R"(/models(?:/)?([^/]+)?(/invoke)?)"),
         model_path_regex_(
             R"((\/opt\/ml\/models\/[0-9A-Za-z._]+)\/(model)\/?([0-9A-Za-z._]+)?)"),
+        platform_ensemble_regex_(R"(platform:(\s)*\"ensemble\")"),
         ping_mode_("ready"),
         model_name_(GetEnvironmentVariableOrDefault(
             "SAGEMAKER_TRITON_DEFAULT_MODEL_NAME",
@@ -139,6 +140,7 @@ class SagemakerAPIServer : public HTTPAPIServer {
   re2::RE2 invocations_regex_;
   re2::RE2 models_regex_;
   re2::RE2 model_path_regex_;
+  re2::RE2 platform_ensemble_regex_;
 
   const std::string ping_mode_;
 
