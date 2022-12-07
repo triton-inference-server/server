@@ -62,7 +62,7 @@ torch.onnx.export(model, trace_input, "str.onnx", verbose=True)
 
 ### Setting up the model repository
 
-A model repository is Triton's way of reading your models and any associated metadata with each model (configurations, version files, etc.). While a server can use one or more model repositories for simplicity, this explanation only uses a single repository. It is a folder in your filesystem that contains models in this format:
+A [model repository](https://github.com/triton-inference-server/server/blob/main/docs/user_guide/model_repository.md#model-repository) is Triton's way of reading your models and any associated metadata with each model (configurations, version files, etc.). While a server can use one or more model repositories for simplicity, this explanation only uses a single repository. It is a folder in your filesystem that contains models in this format:
 ```
 <model-repository>/
   <model-name>/
