@@ -117,8 +117,7 @@ ENV TRT_VERSION ${TENSORRT_VERSION}
 
 RUN cuda_%CUDA_VERSION%_windows_network.exe -s %CUDA_PACKAGES%
 
-RUN unzip %CUDNN_ZIP%
-RUN move %CUDNN_DIR% cudnn
+RUN unzip %CUDNN_ZIP% -d cudnn
 RUN copy cudnn\bin\cudnn*.dll "%CUDA_INSTALL_ROOT_WP%\bin\."
 RUN copy cudnn\lib\cudnn*.lib "%CUDA_INSTALL_ROOT_WP%\lib\x64\."
 RUN copy cudnn\include\cudnn*.h "%CUDA_INSTALL_ROOT_WP%\include\."
