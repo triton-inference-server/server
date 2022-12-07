@@ -112,16 +112,15 @@ COPY ${TENSORRT_ZIP} .
 LABEL CUDA_VERSION="${CUDA_VERSION}"
 
 RUN unzip %TENSORRT_ZIP%
-RUN move TensorRT-%TENSORRT_VERSION% TensorRT
+RUN move TensorRT-* TensorRT
 ENV TRT_VERSION ${TENSORRT_VERSION}
 
 RUN cuda_%CUDA_VERSION%_windows_network.exe -s %CUDA_PACKAGES%
 
-RUN unzip %CUDNN_ZIP%
-RUN move %CUDNN_DIR% cudnn
-RUN copy cudnn\bin\cudnn*.dll "%CUDA_INSTALL_ROOT_WP%\bin\."
-RUN copy cudnn\lib\cudnn*.lib "%CUDA_INSTALL_ROOT_WP%\lib\x64\."
-RUN copy cudnn\include\cudnn*.h "%CUDA_INSTALL_ROOT_WP%\include\."
+RUN unzip %CUDNN_ZIP% -d cudnn
+RUN copy cudnn\libcudnn\bin\cudnn*.dll "%CUDA_INSTALL_ROOT_WP%\bin\."
+RUN copy cudnn\libcudnn_dev\lib\x64\cudnn*.lib "%CUDA_INSTALL_ROOT_WP%\lib\x64\."
+RUN copy cudnn\libcudnn_dev\include\cudnn*.h "%CUDA_INSTALL_ROOT_WP%\include\."
 ENV CUDNN_VERSION ${CUDNN_VERSION}
 
 
