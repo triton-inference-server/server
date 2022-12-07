@@ -1,5 +1,5 @@
 #!/bin/bash
-# Copyright 2019-2022, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright (c) 2019-2020, NVIDIA CORPORATION. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -42,7 +42,6 @@ export CUDA_VISIBLE_DEVICES=0
 
 CLIENT=../clients/perf_client
 BACKENDS=${BACKENDS:="graphdef savedmodel"}
-MODEL_TYPES="$BACKENDS mismatch_key_name"
 TENSOR_SIZE=16384
 
 DATADIR=/data/inferenceserver/${REPO_VERSION}
@@ -51,43 +50,24 @@ SERVER=/opt/tritonserver/bin/tritonserver
 source ../common/util.sh
 
 RET=0
-rm -f ./*.log
 
 #
 # Use "identity" model for all model types.
 #
-for MODEL_TYPE in $MODEL_TYPES; do
-
-    # Setup models
-    rm -rf models && mkdir -p models
-    if [[ " ${BACKENDS[*]} " =~ " ${MODEL_TYPE} " ]]; then
-        MODEL_NAME=${MODEL_TYPE}_zero_1_float32
-        INPUT_NAME="INPUT0"
-        # Copy from qa_identity_model_repository
-        cp -r $DATADIR/qa_identity_model_repository/${MODEL_NAME} \
-                models/${MODEL_NAME}_def && \
-        (cd models/${MODEL_NAME}_def && \
-                sed -i 's/_zero_1_float32/&_def/' config.pbtxt) && \
-        # Enable GPU I/O for TensorFlow model
-        cp -r models/${MODEL_NAME}_def models/${MODEL_NAME}_gpu && \
-        (cd models/${MODEL_NAME}_gpu && \
-                sed -i 's/_zero_1_float32_def/_zero_1_float32_gpu/' \
-                    config.pbtxt && \
-                echo "optimization { execution_accelerators { gpu_execution_accelerator : [ { name : \"gpu_io\"} ] } }" >> config.pbtxt)
-    else
-        MODEL_NAME=${MODEL_TYPE}
-        INPUT_NAME="INPUT0_key"
-        # Copy a special model
-        cp -r ${MODEL_NAME} models/${MODEL_NAME}_def && \
-        (cd models/${MODEL_NAME}_def && \
-                sed -i "s/${MODEL_NAME}/&_def/" config.pbtxt) && \
-        # Enable GPU I/O for TensorFlow model
-        cp -r models/${MODEL_NAME}_def models/${MODEL_NAME}_gpu && \
-        (cd models/${MODEL_NAME}_gpu && \
-                sed -i "s/${MODEL_NAME}_def/${MODEL_NAME}_gpu/" \
-                    config.pbtxt && \
-                echo "optimization { execution_accelerators { gpu_execution_accelerator : [ { name : \"gpu_io\"} ] } }" >> config.pbtxt)
-    fi
+rm -f ./*.log
+for BACKEND in $BACKENDS; do
+    MODEL_NAME=${BACKEND}_zero_1_float32
+    rm -fr models && mkdir -p models
+    cp -r $DATADIR/qa_identity_model_repository/${MODEL_NAME} \
+       models/${MODEL_NAME}_def && \
+    (cd models/${MODEL_NAME}_def && \
+            sed -i 's/_zero_1_float32/&_def/' config.pbtxt) && \
+    # Enable GPU I/O for TensorFlow model
+    cp -r models/${MODEL_NAME}_def models/${MODEL_NAME}_gpu && \
+    (cd models/${MODEL_NAME}_gpu && \
+            sed -i 's/_zero_1_float32_def/_zero_1_float32_gpu/' \
+                config.pbtxt && \
+            echo "optimization { execution_accelerators { gpu_execution_accelerator : [ { name : \"gpu_io\"} ] } }" >> config.pbtxt)
 
     SERVER_ARGS="--model-repository=`pwd`/models --log-verbose=1"
     SERVER_LOG="${MODEL_NAME}.serverlog"
@@ -100,9 +80,10 @@ for MODEL_TYPE in $MODEL_TYPES; do
 
     set +e
 
-    $CLIENT -m${MODEL_NAME}_def --shape ${INPUT_NAME}:${TENSOR_SIZE} \
-                >> ${MODEL_TYPE}.sanity.log 2>&1
+    $CLIENT -m${MODEL_NAME}_def --shape INPUT0:${TENSOR_SIZE} \
+                >> ${BACKEND}.sanity.log 2>&1
     if (( $? != 0 )); then
+        cat ${BACKEND}.sanity.log
         RET=1
     fi
 
@@ -112,9 +93,10 @@ for MODEL_TYPE in $MODEL_TYPES; do
         RET=1
     fi
 
-    $CLIENT -m${MODEL_NAME}_gpu  --shape ${INPUT_NAME}:${TENSOR_SIZE} \
-             >> ${MODEL_TYPE}.gpu.sanity.log 2>&1
+    $CLIENT -m${MODEL_NAME}_gpu  --shape INPUT0:${TENSOR_SIZE} \
+             >> ${BACKEND}.gpu.sanity.log 2>&1
     if (( $? != 0 )); then
+        cat ${BACKEND}.gpu.sanity.log
         RET=1
     fi
 
@@ -125,15 +107,17 @@ for MODEL_TYPE in $MODEL_TYPES; do
     fi
 
     # Sample latency results
-    $CLIENT -m${MODEL_NAME}_def --shape ${INPUT_NAME}:${TENSOR_SIZE} \
-             >> ${MODEL_TYPE}.log 2>&1
+    $CLIENT -m${MODEL_NAME}_def --shape INPUT0:${TENSOR_SIZE} \
+             >> ${BACKEND}.log 2>&1
     if (( $? != 0 )); then
+        cat ${BACKEND}.log
         RET=1
     fi
 
-    $CLIENT -m${MODEL_NAME}_gpu --shape ${INPUT_NAME}:${TENSOR_SIZE} \
-            >> ${MODEL_TYPE}.gpu.log 2>&1
+    $CLIENT -m${MODEL_NAME}_gpu --shape INPUT0:${TENSOR_SIZE} \
+            >> ${BACKEND}.gpu.log 2>&1
     if (( $? != 0 )); then
+        cat ${BACKEND}.gpu.log
         RET=1
     fi
 
@@ -141,13 +125,6 @@ for MODEL_TYPE in $MODEL_TYPES; do
 
     kill $SERVER_PID
     wait $SERVER_PID
-done
-
-for MODEL_TYPE in $MODEL_TYPES; do
-    echo -e "\n${MODEL_TYPE}\n************"
-    cat ${MODEL_TYPE}.log
-    echo -e "\n${MODEL_TYPE} with GPU I/O\n************"
-    cat ${MODEL_TYPE}.gpu.log
 done
 
 if [ $RET -eq 0 ]; then
