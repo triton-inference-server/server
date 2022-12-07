@@ -1,5 +1,5 @@
 name: "text_recognition"
-platform: "onnxruntime_onnx"
+backend: "onnxruntime"
 max_batch_size : 8
 input [
   {

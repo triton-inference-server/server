@@ -17,7 +17,7 @@ dynamic_batching {
     max_queue_delay_microseconds: 100
 }
 ```
-Let's discuss a sample scenario(refer the diagram below). Say there are 5 inference requests, `A`, `B`, `C`, `D`, and `E`, with batch sizes of `4`, `2`, `2`, `6`, and `2` respecitvely. Each batch requires time `X ms` to be processed by the model. The maximum batch size supported by the model is `8`. `A` and `C` arrive at time `T = 0`, `B` arrives at time `T = X/3`, and `D` and `E` arrive at time `T = 2*X/3`.
+Let's discuss a sample scenario(refer the diagram below). Say there are 5 inference requests, `A`, `B`, `C`, `D`, and `E`, with batch sizes of `4`, `2`, `2`, `6`, and `2` respectively. Each batch requires time `X ms` to be processed by the model. The maximum batch size supported by the model is `8`. `A` and `C` arrive at time `T = 0`, `B` arrives at time `T = X/3`, and `D` and `E` arrive at time `T = 2*X/3`.
 
 ![Dynamic Batching Sample](./img/dynamic_batching.PNG)
 
@@ -31,7 +31,7 @@ As observed from the above, the use of Dynamic Batching can lead to improvements
 
 ## Concurrent model execution
 
-The Triton Inference Server can spin up multiple instances of the same model, which can process queries in parallel. Triton can spawn instances on the same device (GPU), or a different device on the same node as per the user's specifications. This customizability is especially useful when considering ensembles that have models with different throughputs. Multiple copies of slowers models can be spawned on a separate GPU to allow for more parallel processing. This is enabled via the use of `instance groups` option in a model's configuration.
+The Triton Inference Server can spin up multiple instances of the same model, which can process queries in parallel. Triton can spawn instances on the same device (GPU), or a different device on the same node as per the user's specifications. This customizability is especially useful when considering ensembles that have models with different throughputs. Multiple copies of heavier models can be spawned on a separate GPU to allow for more parallel processing. This is enabled via the use of `instance groups` option in a model's configuration.
 
 ```
 instance_group [
@@ -43,7 +43,7 @@ instance_group [
 ] 
 ```
 
-Let's take the previous example and discuss the effect of adding multiple models for parallel execution. In this example, instead of having a single model process five queries, two models are spawned. ![Multiple Model Instances](./img/2.PNG)
+Let's take the previous example and discuss the effect of adding multiple models for parallel execution. In this example, instead of having a single model process five queries, two models are spawned. ![Multiple Model Instances](./img/multi_instance.PNG)
 
 For a "no dynamic batching" case, as there are model models to execute, the queries are distributed equally. Users can also add [priorities](https://github.com/triton-inference-server/server/blob/main/docs/model_configuration.md#priority) to prioritize or de-prioritize any specific instance group.
 
@@ -63,7 +63,7 @@ docker run -it --gpus all -v ${PWD}:/scratch nvcr.io/nvidia/pytorch:<yy.mm>-py3
 cd /scratch
 wget https://www.dropbox.com/sh/j3xmli4di1zuv3s/AABzCC1KGbIRe2wRwa3diWKwa/None-ResNet-None-CTC.pth
 ```
-Export the models as .onnx using the file in the utils folder. This file is adapted from [Baek et. al. 2019](https://github.com/clovaai/deep-text-recognition-benchmark).
+Export the models as `.onnx` using the file in the `utils` folder. This file is adapted from [Baek et. al. 2019](https://github.com/clovaai/deep-text-recognition-benchmark).
 ```
 import torch
 from utils.model import STRModel
@@ -233,7 +233,7 @@ Request concurrency: 16
     Avg request latency: 5287 usec (overhead 29 usec + queue 1878 usec + compute input 36 usec + compute infer 3332 usec + compute output 11 usec)
 ```
 
-This is a perfect example of "simply enabling all the features" isn't a one-size fits all solution. A point to note is that this experiment was conducted by caping the maximum batch size of the model to `8`, while having a single GPU set up. Each production environment is different. Models, hardware, business level SLAs, costs, are all variables which need to be taken into account while selecting appropriate deployment configurations. Running through a grid search for each and every deployment isn't a feasible strategy. To solve this challenge, Triton users can make use of the Model Analyzer covered in Part 3 of this tutorial! Checkout [this section of the documentation](https://github.com/triton-inference-server/server/blob/main/docs/user_guide/optimization.md#optimization) for another example of dynamic batching and multiple model instance.
+This is a perfect example of "simply enabling all the features" isn't a one-size fits all solution. A point to note is that this experiment was conducted by capping the maximum batch size of the model to `8`, while having a single GPU set up. Each production environment is different. Models, hardware, business level SLAs, costs, are all variables which need to be taken into account while selecting appropriate deployment configurations. Running through a grid search for each and every deployment isn't a feasible strategy. To solve this challenge, Triton users can make use of the Model Analyzer covered in Part 3 of this tutorial! Checkout [this section of the documentation](https://github.com/triton-inference-server/server/blob/main/docs/user_guide/optimization.md#optimization) for another example of dynamic batching and multiple model instance.
 
 # What's next?
 
