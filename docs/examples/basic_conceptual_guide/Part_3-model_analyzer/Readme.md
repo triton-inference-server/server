@@ -89,11 +89,11 @@ There are two types of reports which are generated:
 * Detailed Reports
 
 **Summaries** contain an overall results of all the best configurations. It has information about the hardware being used, the throughput vs latency curve, the GPU Memory vs latency curve and a table with performance numbers and other key information. By default, the sweep space is limited to a certain number of popular features like dynamic batching and multiple model instances, but users can expand the space with [model config parameters](https://github.com/triton-inference-server/model_analyzer/blob/main/docs/config.md#model-config-parameters) to any features which can be specified in Triton's configuration files. 
-![summary](./img/1.PNG)
+![summary](./img/report_1.PNG)
 
 **Detailed Reports** breakdown the performance of each of the configurations. They contain more detailed performance charts describing the performance numbers for different loads.
 
-![summary](./img/2.PNG)
+![summary](./img/report_2.PNG)
 
 Sample reports can be found in the `reports` folder.
 
