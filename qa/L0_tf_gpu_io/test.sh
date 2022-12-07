@@ -50,11 +50,9 @@ SERVER=/opt/tritonserver/bin/tritonserver
 source ../common/util.sh
 
 RET=0
-
-#
-# Use "identity" model for all model types.
-#
 rm -f ./*.log
+
+# Test with qa identity TF models
 for BACKEND in $BACKENDS; do
     MODEL_NAME=${BACKEND}_zero_1_float32
     rm -fr models && mkdir -p models
@@ -126,6 +124,22 @@ for BACKEND in $BACKENDS; do
     kill $SERVER_PID
     wait $SERVER_PID
 done
+
+# Test savedmodel with mismatched key and name
+rm -rf models && mkdir -p models
+cp -r $DATADIR/qa_tf_tag_sigdef_repository/sig_tag0 models
+(cd models/sig_tag0 && \
+    echo "optimization { execution_accelerators { gpu_execution_accelerator : [ { name : \"gpu_io\"} ] } }" >> config.pbtxt)
+SERVER_ARGS="--model-repository=`pwd`/models --log-verbose=1"
+SERVER_LOG="sig_tag0.serverlog"
+run_server
+if [ "$SERVER_PID" == "0" ]; then
+    echo -e "\n***\n*** Failed to start $SERVER\n***"
+    cat $SERVER_LOG
+    exit 1
+fi
+kill $SERVER_PID
+wait $SERVER_PID
 
 if [ $RET -eq 0 ]; then
     echo -e "\n***\n*** Test Passed\n***"
