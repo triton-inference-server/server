@@ -130,6 +130,7 @@ rm -rf models && mkdir -p models
 cp -r $DATADIR/qa_tf_tag_sigdef_repository/sig_tag0 models
 (cd models/sig_tag0 && \
     echo "optimization { execution_accelerators { gpu_execution_accelerator : [ { name : \"gpu_io\"} ] } }" >> config.pbtxt)
+
 SERVER_ARGS="--model-repository=`pwd`/models --log-verbose=1"
 SERVER_LOG="sig_tag0.serverlog"
 run_server
@@ -138,6 +139,21 @@ if [ "$SERVER_PID" == "0" ]; then
     cat $SERVER_LOG
     exit 1
 fi
+
+set +e
+CLIENT_LOG="sig_tag0.gpu.log"
+$CLIENT -m sig_tag0 >> $CLIENT_LOG 2>&1
+if (( $? != 0 )); then
+    cat $CLIENT_LOG
+    RET=1
+fi
+grep "is GPU tensor: true" $SERVER_LOG
+if [ $? -ne 0 ]; then
+    echo -e "\n***\n*** Failed. Expected input and output are GPU tensors\n***"
+    RET=1
+fi
+set -e
+
 kill $SERVER_PID
 wait $SERVER_PID
 
