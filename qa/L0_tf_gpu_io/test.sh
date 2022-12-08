@@ -85,7 +85,7 @@ for BACKEND in $BACKENDS; do
         RET=1
     fi
 
-    grep "is GPU tensor: true" $SERVER_LOG
+    grep "is GPU tensor: true" $SERVER_LOG >> grep.out.log
     if [ $? -eq 0 ]; then
         echo -e "\n***\n*** Failed. Expected neither input or output is GPU tensor\n***"
         RET=1
@@ -98,7 +98,7 @@ for BACKEND in $BACKENDS; do
         RET=1
     fi
 
-    grep "is GPU tensor: true" $SERVER_LOG
+    grep "is GPU tensor: true" $SERVER_LOG >> grep.out.log
     if [ $? -ne 0 ]; then
         echo -e "\n***\n*** Failed. Expected input and output are GPU tensors\n***"
         RET=1
@@ -147,7 +147,7 @@ if (( $? != 0 )); then
     cat $CLIENT_LOG
     RET=1
 fi
-grep "is GPU tensor: true" $SERVER_LOG
+grep "is GPU tensor: true" $SERVER_LOG >> grep.out.log
 if [ $? -ne 0 ]; then
     echo -e "\n***\n*** Failed. Expected input and output are GPU tensors\n***"
     RET=1
@@ -162,5 +162,4 @@ if [ $RET -eq 0 ]; then
 else
     echo -e "\n***\n*** Test FAILED\n***"
 fi
-
 exit $RET
