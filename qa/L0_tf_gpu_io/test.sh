@@ -50,11 +50,9 @@ SERVER=/opt/tritonserver/bin/tritonserver
 source ../common/util.sh
 
 RET=0
-
-#
-# Use "identity" model for all model types.
-#
 rm -f ./*.log
+
+# Test with qa identity TF models
 for BACKEND in $BACKENDS; do
     MODEL_NAME=${BACKEND}_zero_1_float32
     rm -fr models && mkdir -p models
@@ -83,10 +81,11 @@ for BACKEND in $BACKENDS; do
     $CLIENT -m${MODEL_NAME}_def --shape INPUT0:${TENSOR_SIZE} \
                 >> ${BACKEND}.sanity.log 2>&1
     if (( $? != 0 )); then
+        cat ${BACKEND}.sanity.log
         RET=1
     fi
 
-    grep "is GPU tensor: true" $SERVER_LOG
+    grep "is GPU tensor: true" $SERVER_LOG >> grep.out.log
     if [ $? -eq 0 ]; then
         echo -e "\n***\n*** Failed. Expected neither input or output is GPU tensor\n***"
         RET=1
@@ -95,10 +94,11 @@ for BACKEND in $BACKENDS; do
     $CLIENT -m${MODEL_NAME}_gpu  --shape INPUT0:${TENSOR_SIZE} \
              >> ${BACKEND}.gpu.sanity.log 2>&1
     if (( $? != 0 )); then
+        cat ${BACKEND}.gpu.sanity.log
         RET=1
     fi
 
-    grep "is GPU tensor: true" $SERVER_LOG
+    grep "is GPU tensor: true" $SERVER_LOG >> grep.out.log
     if [ $? -ne 0 ]; then
         echo -e "\n***\n*** Failed. Expected input and output are GPU tensors\n***"
         RET=1
@@ -108,12 +108,14 @@ for BACKEND in $BACKENDS; do
     $CLIENT -m${MODEL_NAME}_def --shape INPUT0:${TENSOR_SIZE} \
              >> ${BACKEND}.log 2>&1
     if (( $? != 0 )); then
+        cat ${BACKEND}.log
         RET=1
     fi
 
     $CLIENT -m${MODEL_NAME}_gpu --shape INPUT0:${TENSOR_SIZE} \
             >> ${BACKEND}.gpu.log 2>&1
     if (( $? != 0 )); then
+        cat ${BACKEND}.gpu.log
         RET=1
     fi
 
@@ -123,17 +125,41 @@ for BACKEND in $BACKENDS; do
     wait $SERVER_PID
 done
 
-for BACKEND in $BACKENDS; do
-    echo -e "\n${BACKEND}\n************"
-    cat ${BACKEND}.log
-    echo -e "\n${BACKEND} with GPU I/O\n************"
-    cat ${BACKEND}.gpu.log
-done
+# Test savedmodel with mismatched key and name
+rm -rf models && mkdir -p models
+cp -r $DATADIR/qa_tf_tag_sigdef_repository/sig_tag0 models
+(cd models/sig_tag0 && \
+    echo "optimization { execution_accelerators { gpu_execution_accelerator : [ { name : \"gpu_io\"} ] } }" >> config.pbtxt)
+
+SERVER_ARGS="--model-repository=`pwd`/models --log-verbose=1"
+SERVER_LOG="sig_tag0.serverlog"
+run_server
+if [ "$SERVER_PID" == "0" ]; then
+    echo -e "\n***\n*** Failed to start $SERVER\n***"
+    cat $SERVER_LOG
+    exit 1
+fi
+
+set +e
+CLIENT_LOG="sig_tag0.gpu.log"
+$CLIENT -m sig_tag0 >> $CLIENT_LOG 2>&1
+if (( $? != 0 )); then
+    cat $CLIENT_LOG
+    RET=1
+fi
+grep "is GPU tensor: true" $SERVER_LOG >> grep.out.log
+if [ $? -ne 0 ]; then
+    echo -e "\n***\n*** Failed. Expected input and output are GPU tensors\n***"
+    RET=1
+fi
+set -e
+
+kill $SERVER_PID
+wait $SERVER_PID
 
 if [ $RET -eq 0 ]; then
     echo -e "\n***\n*** Test Passed\n***"
 else
     echo -e "\n***\n*** Test FAILED\n***"
 fi
-
 exit $RET
