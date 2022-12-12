@@ -77,6 +77,18 @@ This model control mode is enabled by specifying
 Triton is running must be done carefully, as explained in [Modifying
 the Model Repository](#modifying-the-model-repository).
 
+If you are seeing some memory growth when using the [model control
+protocol](../protocol/extension_model_repository.md) for loading and unloading
+models, it is possible that it's not an actual memory leak but some system's
+malloc heurestics that causes memory to be unable to be released back to the OS
+right away. You can try to switch from malloc to tcmalloc for better memory
+performance by setting `LD_PRELOAD` as below when running Triton:
+```
+LD_PRELOAD=/usr/lib/$(uname -m)-linux-gnu/libtcmalloc.so.4:${LD_PRELOAD} tritonserver --model-repository=/models ...
+```
+The tcmalloc library is already installed within Triton container. You can also
+install tcmalloc using `apt-get install gperf libgoogle-perftools-dev`.
+
 ## Model Control Mode POLL
 
 Triton attempts to load all models in the model repository at
