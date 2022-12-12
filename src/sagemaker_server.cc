@@ -226,8 +226,7 @@ SagemakerAPIServer::Handle(evhtp_request_t* req)
             evhtp_send_reply(req, EVHTP_RES_NOTFOUND); /* 404*/
             return;
           }
-          LOG_VERBOSE(1) << "SageMaker MME Custom Invoke Model Path"
-                         << std::endl;
+          LOG_VERBOSE(1) << "SM MME Custom Invoke Model" << std::endl;
           SageMakerMMEHandleInfer(req, multi_model_name, model_version_str_);
           return;
         }
@@ -332,16 +331,6 @@ SagemakerAPIServer::ParseSageMakerRequest(
   }
   (*parse_map)["model_name"] = model_name_string.c_str();
 
-  /* Extract targetModel to log the associated archive */
-
-  /* Read headers*/
-  (*parse_map)["TargetModel"] = "targetModel.tar.gz";
-
-  const char* targetModel =
-      evhtp_kv_find(req->headers_in, "X-Amzn-SageMaker-Target-Model");
-
-  LOG_INFO << "Loading SageMaker TargetModel: " << targetModel << std::endl;
-
   return;
 }
 
@@ -394,15 +383,12 @@ SagemakerAPIServer::SagemakeInferRequestClass::InferResponseComplete(
     evthr_defer(infer_request->thread_, OKReplyCallback, infer_request);
   } else {
     EVBufferAddErrorJson(infer_request->req_->buffer_out, err);
+    TRITONSERVER_ErrorDelete(err);
     if (SageMakerMMECheckOOMError(err) == true) {
-      LOG_VERBOSE(1)
-          << "Received an OOM error during INVOKE MODEL. Returning a 507."
-          << std::endl;
       evthr_defer(infer_request->thread_, BADReplyCallback507, infer_request);
     } else {
       evthr_defer(infer_request->thread_, BADReplyCallback, infer_request);
     }
-    TRITONSERVER_ErrorDelete(err);
   }
 
   LOG_TRITONSERVER_ERROR(
@@ -442,11 +428,6 @@ SagemakerAPIServer::SageMakerMMEHandleInfer(
     evhtp_send_reply(req, EVHTP_RES_METHNALLOWED);
     return;
   }
-
-  /* Extract targetModel to log the associated archive */
-  const char* targetModel =
-      evhtp_kv_find(req->headers_in, "X-Amzn-SageMaker-Target-Model");
-  LOG_INFO << "Invoking SageMaker TargetModel: " << targetModel << std::endl;
 
   bool connection_paused = false;
 
@@ -635,42 +616,19 @@ SagemakerAPIServer::SageMakerMMEUnloadModel(
   std::lock_guard<std::mutex> lock(mutex_);
 
   if (sagemaker_models_list_.find(model_name) == sagemaker_models_list_.end()) {
-    LOG_VERBOSE(1) << "Model " << model_name << " is not loaded." << std::endl;
+    LOG_VERBOSE(1) << "Model " << model_name << "is not loaded." << std::endl;
     evhtp_send_reply(req, EVHTP_RES_NOTFOUND); /* 404*/
     return;
   }
 
-  /* Always unload dependents as well - this is required to unload dependents in
-   * ensemble */
-  triton::common::TritonJson::Value request_parameters(
-      triton::common::TritonJson::ValueType::OBJECT);
-  triton::common::TritonJson::Value unload_parameter(
-      request_parameters, triton::common::TritonJson::ValueType::OBJECT);
-
-  unload_parameter.AddBool("unload_dependents", true);
-  request_parameters.Add("parameters", std::move(unload_parameter));
-
-  const char* buffer;
-  size_t byte_size;
-
-  triton::common::TritonJson::WriteBuffer json_buffer_;
-  json_buffer_.Clear();
-  request_parameters.Write(&json_buffer_);
-
-  byte_size = json_buffer_.Size();
-  buffer = json_buffer_.Base();
-
-  evbuffer_add(req->buffer_in, buffer, byte_size);
-
-  /* Extract targetModel to log the associated archive */
-  const char* targetModel =
-      evhtp_kv_find(req->headers_in, "X-Amzn-SageMaker-Target-Model");
-
-  LOG_INFO << "Unloading SageMaker TargetModel: " << targetModel << std::endl;
-
   HandleRepositoryControl(req, "", model_name, "unload");
 
-  std::string repo_parent_path = sagemaker_models_list_.at(model_name);
+  std::string repo_path = sagemaker_models_list_.at(model_name);
+
+  std::string repo_parent_path, subdir, customer_subdir;
+  RE2::FullMatch(
+      repo_path, model_path_regex_, &repo_parent_path, &subdir,
+      &customer_subdir);
 
   TRITONSERVER_Error* unload_err = TRITONSERVER_ServerUnregisterModelRepository(
       server_.get(), repo_parent_path.c_str());
@@ -678,8 +636,6 @@ SagemakerAPIServer::SageMakerMMEUnloadModel(
   if (unload_err != nullptr) {
     EVBufferAddErrorJson(req->buffer_out, unload_err);
     evhtp_send_reply(req, EVHTP_RES_BADREQ);
-    LOG_ERROR << "Unable to unregister model repository for path: "
-              << repo_parent_path << std::endl;
     TRITONSERVER_ErrorDelete(unload_err);
   }
 
@@ -690,8 +646,6 @@ void
 SagemakerAPIServer::SageMakerMMEGetModel(
     evhtp_request_t* req, const char* model_name)
 {
-  std::lock_guard<std::mutex> lock(mutex_);
-
   if (sagemaker_models_list_.find(model_name) == sagemaker_models_list_.end()) {
     evhtp_send_reply(req, EVHTP_RES_NOTFOUND); /* 404*/
     return;
@@ -721,8 +675,6 @@ SagemakerAPIServer::SageMakerMMEGetModel(
 void
 SagemakerAPIServer::SageMakerMMEListModel(evhtp_request_t* req)
 {
-  std::lock_guard<std::mutex> lock(mutex_);
-
   triton::common::TritonJson::Value sagemaker_list_json(
       triton::common::TritonJson::ValueType::OBJECT);
 
@@ -769,31 +721,20 @@ SagemakerAPIServer::SageMakerMMECheckOOMError(TRITONSERVER_Error* err)
   const char* message = TRITONSERVER_ErrorMessage(err);
   std::string error_string(message);
 
-  LOG_VERBOSE(1) << "Logging Verbose Error: " << std::endl
-                 << error_string.c_str() << std::endl;
-
   const std::vector<std::string> error_messages{
       "CUDA out of memory", /* pytorch */
       "CUDA_OUT_OF_MEMORY", /* tensorflow */
       "Out of memory",      /* generic */
-      "Out Of Memory",
       "out of memory",
       "MemoryError",
-      "OutOfMemory",
-      "OOM",
       "Dst tensor is not initialized",
       "Src tensor is not initialized",
       "CNMEM_STATUS_OUT_OF_MEMORY",
-      "CUDNN_STATUS_NOT_INITIALIZED",
-      "CUBLAS_STATUS_ALLOC_FAILED"};
+      "CUDNN_STATUS_NOT_INITIALIZED"};
 
-  /*
-    TODO: Improve the search to do pattern match on whole words only
-  */
   for (long unsigned int i = 0; i < error_messages.size(); i++) {
     if (error_string.find(error_messages[i]) != std::string::npos) {
-      LOG_VERBOSE(1) << "OOM string '" << error_messages[i].c_str()
-                     << "' detected in logs.";
+      LOG_VERBOSE(1) << "OOM strings detected in logs.";
       return true;
     }
   }
@@ -835,7 +776,7 @@ SagemakerAPIServer::SageMakerMMELoadModel(
   DIR* dir;
   struct dirent* ent;
   int dir_count = 0;
-  std::string model_subdir, ensemble_model_subdir;
+  std::string model_subdir;
 
   if ((dir = opendir(repo_path.c_str())) != NULL) {
     while ((ent = readdir(dir)) != NULL) {
@@ -844,54 +785,19 @@ SagemakerAPIServer::SageMakerMMELoadModel(
         dir_count += 1;
         model_subdir = std::string(ent->d_name);
       }
-
-      if (dir_count >= 2) {
-        LOG_VERBOSE(1) << "More than one model detected in archive. "
-                          "Checking if it is an ensemble."
-                       << std::endl;
-      }
-
-      LOG_VERBOSE(1) << "Reading model sub-directory: " << model_subdir.c_str()
-                     << std::endl;
-
-      // Read the config.pbtxt file at each path, if available
-      std::string ensemble_config_path =
-          repo_path + "/" + model_subdir + "/" + "config.pbtxt";
-      std::ifstream config_fstream(ensemble_config_path);
-      std::stringstream ensemble_config_content;
-
-      if (config_fstream.is_open()) {
-        ensemble_config_content << config_fstream.rdbuf();
-      } else {
-        continue;  // A valid config.pbtxt does not exit at this path, or cannot
-                   // be read
-      }
-
-      /* Compare matched string with `platform: "ensemble"` or
-       * `platform:"ensemble"`. If present, we break, and use the model_subdir
-       * to load the ensemble model
-       */
-      std::string detected_ensemble_regex;
-      if (RE2::PartialMatch(
-              ensemble_config_content.str(), platform_ensemble_regex_,
-              &detected_ensemble_regex)) {
-        LOG_INFO << "SageMaker front-end detected an Ensemble config at path: "
-                 << ensemble_config_path << std::endl;
-        ensemble_model_subdir = model_subdir;
-      }
-
-      if (dir_count > 5) {
-        LOG_WARNING
-            << "Several model directories found. If using ensemble, smaller "
-               "ensembles are recommended for better memory management."
-            << std::endl;
+      if (dir_count > 1) {
+        HTTP_RESPOND_IF_ERR(
+            req,
+            TRITONSERVER_ErrorNew(
+                TRITONSERVER_ERROR_INTERNAL,
+                "More than one version or model directories found. Note that "
+                "hidden folders are not allowed and "
+                "Ensemble models are not supported in SageMaker MME mode."));
+        closedir(dir);
+        return;
       }
     }
     closedir(dir);
-  }
-
-  if (!strcmp(ensemble_model_subdir.c_str(), "") == 0) {
-    model_subdir = ensemble_model_subdir;
   }
 
   std::vector<const TRITONSERVER_Parameter*> subdir_modelname_map;
@@ -971,7 +877,7 @@ SagemakerAPIServer::SageMakerMMELoadModel(
   } else {
     std::lock_guard<std::mutex> lock(mutex_);
 
-    sagemaker_models_list_.emplace(model_name, repo_parent_path);
+    sagemaker_models_list_.emplace(model_name, repo_path);
     evhtp_send_reply(req, EVHTP_RES_OK);
   }
 

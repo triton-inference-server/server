@@ -97,10 +97,6 @@ class SageMakerMultiModelTest(tu.TestResultCollector):
         # Output is same as input since this is an identity model
         self.model2_input_data_ = [0, 1, 2, 3, 4, 5, 6, 7]
 
-        # ensemble model setup
-        self.model3_name = "123456789ensemble"
-        self.model3_url = "/opt/ml/models/123456789ensemble/model"
-
     def test_sm_0_environment_variables_set(self):
         self.assertEqual(os.getenv("SAGEMAKER_MULTI_MODEL"), "true",
                          "Variable SAGEMAKER_MULTI_MODEL must be set to true")
@@ -146,11 +142,11 @@ class SageMakerMultiModelTest(tu.TestResultCollector):
             "models": [
                 {
                     "modelName": self.model1_name,
-                    "modelUrl": self.model1_url.rstrip("/model")
+                    "modelUrl": self.model1_url
                 },
                 {
                     "modelName": self.model2_name,
-                    "modelUrl": self.model2_url.rstrip("/model")
+                    "modelUrl": self.model2_url
                 },
             ]
         }
@@ -158,11 +154,11 @@ class SageMakerMultiModelTest(tu.TestResultCollector):
             "models": [
                 {
                     "modelName": self.model2_name,
-                    "modelUrl": self.model2_url.rstrip("/model")
+                    "modelUrl": self.model2_url
                 },
                 {
                     "modelName": self.model1_name,
-                    "modelUrl": self.model1_url.rstrip("/model")
+                    "modelUrl": self.model1_url
                 },
             ]
         }
@@ -181,7 +177,7 @@ class SageMakerMultiModelTest(tu.TestResultCollector):
         time.sleep(3)
         expected_response = {
             "modelName": self.model1_name,
-            "modelUrl": self.model1_url.rstrip("/model")
+            "modelUrl": self.model1_url
         }
         self.assertEqual(
             r.json(), expected_response,
@@ -283,55 +279,6 @@ class SageMakerMultiModelTest(tu.TestResultCollector):
         self.assertEqual(
             r.status_code, 404,
             "Expected status code 404, received {}".format(r.status_code))
-
-    def test_sm_6_ensemble_model(self):
-        # Load ensemble model
-        request_body = {"model_name": self.model3_name, "url": self.model3_url}
-        headers = {"Content-Type": "application/json", "X-Amzn-SageMaker-Target-Model": f"{self.model3_name}"}
-        r = requests.post(self.url_mme_,
-                          data=json.dumps(request_body),
-                          headers=headers)
-        time.sleep(5)  # wait for model to load
-        self.assertEqual(
-            r.status_code, 200,
-            "Expected status code 200, received {}".format(r.status_code))
-
-        # Invoke ensemble model
-        inputs = []
-        outputs = []
-        inputs.append(httpclient.InferInput("INPUT0", [1, 16], "FP32"))
-        inputs.append(httpclient.InferInput("INPUT1", [1, 16], "FP32"))
-
-        # Initialize the data
-        input_data = np.array(self.model1_input_data_, dtype=np.float32)
-        input_data = np.expand_dims(input_data, axis=0)
-        inputs[0].set_data_from_numpy(input_data, binary_data=False)
-        inputs[1].set_data_from_numpy(input_data, binary_data=False)
-
-        outputs.append(
-            httpclient.InferRequestedOutput("OUTPUT0", binary_data=False))
-        outputs.append(
-            httpclient.InferRequestedOutput("OUTPUT1", binary_data=False))
-        request_body, _ = httpclient.InferenceServerClient.generate_request_body(
-            inputs, outputs=outputs)
-
-        headers = {"Content-Type": "application/json"}
-        invoke_url = "{}/{}/invoke".format(self.url_mme_, self.model3_name)
-        r = requests.post(invoke_url, data=request_body, headers=headers)
-        print(f"response: {r.text}")
-        r.raise_for_status()
-        self.assertEqual(
-            r.status_code, 200,
-            "Expected status code 200, received {}".format(r.status_code))
-
-        # Unload ensemble model
-        unload_url = "{}/{}".format(self.url_mme_, self.model3_name)
-        r = requests.delete(unload_url, headers=headers)
-        time.sleep(5)
-        self.assertEqual(
-            r.status_code, 200,
-            "Expected status code 200, received {}".format(r.status_code))
-        
 
 
 if __name__ == "__main__":
