@@ -87,7 +87,10 @@ performance by setting `LD_PRELOAD` as below when running Triton:
 LD_PRELOAD=/usr/lib/$(uname -m)-linux-gnu/libtcmalloc.so.4:${LD_PRELOAD} tritonserver --model-repository=/models ...
 ```
 The tcmalloc library is already installed within Triton container. You can also
-install tcmalloc using `apt-get install gperf libgoogle-perftools-dev`.
+install tcmalloc using
+```
+apt-get install gperf libgoogle-perftools-dev
+```
 
 ## Model Control Mode POLL
 
