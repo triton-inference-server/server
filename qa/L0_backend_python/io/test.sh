@@ -96,7 +96,6 @@ for trial in $TRIALS; do
             RET=1
         fi
     fi
-
     set -e
 
     kill $SERVER_PID
@@ -130,7 +129,38 @@ else
         RET=1
     fi
 fi
+set -e
 
+kill $SERVER_PID
+wait $SERVER_PID
+
+# IOTest.test_variable_gpu_output
+rm -rf models && mkdir models
+mkdir -p models/variable_gpu_output/1/
+cp ../../python_models/variable_gpu_output/model.py ./models/variable_gpu_output/1/
+cp ../../python_models/variable_gpu_output/config.pbtxt ./models/variable_gpu_output/
+
+run_server
+if [ "$SERVER_PID" == "0" ]; then
+    echo -e "\n***\n*** Failed to start $SERVER\n***"
+    cat $SERVER_LOG
+    RET=1
+fi
+
+set +e
+python3 $UNITTEST_PY IOTest.test_variable_gpu_output > $CLIENT_LOG.test_variable_gpu_output
+if [ $? -ne 0 ]; then
+    echo -e "\n***\n*** IOTest.variable_gpu_output FAILED. \n***"
+    cat $CLIENT_LOG.test_variable_gpu_output
+    RET=1
+else
+    check_test_results $TEST_RESULT_FILE $EXPECTED_NUM_TESTS
+    if [ $? -ne 0 ]; then
+        cat $CLIENT_LOG.test_variable_gpu_output
+        echo -e "\n***\n*** Test Result Verification Failed\n***"
+        RET=1
+    fi
+fi
 set -e
 
 kill $SERVER_PID
