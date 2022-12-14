@@ -32,8 +32,8 @@
 
 * Improvements to container and non-container builds on Windows.
 
-* Calling model load for multiple models now loads models in parallel instead 
-  of sequentially improving performance of load times.
+* Concurrent calls to the model load API will be processed in parallel improving 
+  model load times.
 
 * Refer to the 22.12 column of the 
   [Frameworks Support Matrix](https://docs.nvidia.com/deeplearning/frameworks/support-matrix/index.html) 
