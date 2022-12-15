@@ -34,35 +34,6 @@
 ## See what outputs...
 ## Confirm batch output is as expected
 
-REPO_VERSION=${NVIDIA_TRITON_SERVER_VERSION}
-if [ "$#" -ge 1 ]; then
-    REPO_VERSION=$1
-fi
-if [ -z "$REPO_VERSION" ]; then
-    echo -e "Repository version must be specified"
-    echo -e "\n***\n*** Test Failed\n***"
-    exit 1
-fi
-if [ ! -z "$TEST_REPO_ARCH" ]; then
-    REPO_VERSION=${REPO_VERSION}_${TEST_REPO_ARCH}
-fi
-
-export CUDA_VISIBLE_DEVICES=0
-
-CLIENT_LOG="./client.log"
-BATCH_INPUT_TEST=batch_input_test.py
-EXPECTED_NUM_TESTS="1"
-
-DATADIR=/data/inferenceserver/${REPO_VERSION}/qa_model_repository
-IDENTITY_DATADIR=/data/inferenceserver/${REPO_VERSION}/qa_identity_model_repository
-
-TEST_RESULT_FILE='test_results.txt'
-SERVER=/opt/tritonserver/bin/tritonserver
-SERVER_ARGS="--model-repository=models --exit-timeout-secs=120"
-SERVER_LOG="./inference_server.log"
-source ../common/util.sh
-RET=0
-
 # TODO: First, only do this for one model with it loaded in the version folder
 # Add to model config: batching library path (for relevant tests), max_batch_volume
 # Test cases: batching via config, version folder, model folder, backend folder
@@ -93,10 +64,11 @@ DATADIR=/data/inferenceserver/${REPO_VERSION}/qa_identity_model_repository
 
 TEST_RESULT_FILE='test_results.txt'
 SERVER=/opt/tritonserver/bin/tritonserver
-SERVER_ARGS="--model-repository=models --exit-timeout-secs=120 --log-verbose 1"
+SERVER_ARGS="--model-repository=models --exit-timeout-secs=120"
 SERVER_LOG="./inference_server.log"
 MODEL_NAME="onnx_zero_1_float16"
 source ../common/util.sh
+RET=0
 
 rm -f $SERVER_LOG $CLIENT_LOG
 rm -rf models && mkdir models
@@ -105,9 +77,12 @@ cp -r $DATADIR/$MODEL_NAME models
 # TODO: Generate or change script to copy from elsewhere
 CONFIG_PATH="models/${MODEL_NAME}/config.pbtxt"
 cp -r /git/core/examples/batch_strategy/volume_batching/build/libtriton_volumebatching.so models/$MODEL_NAME
-echo "parameters: {key: \"TRITON_BATCH_STRATEGY_PATH\", value: {string_value: \"models/${MODEL_NAME}/libtriton_volumebatching.so\"}}" >> ${CONFIG_PATH}
 echo "parameters { key: \"MAX_BATCH_VOLUME_BYTES\" value: {string_value: \"96\"}}" >> ${CONFIG_PATH}
 echo "dynamic_batching { max_queue_delay_microseconds: 10000}" >> ${CONFIG_PATH}
+echo "instance_group [ { kind: KIND_GPU count: 2 }]" >> ${CONFIG_PATH}
+
+## Test in backend repo
+cp /git/core/examples/batch_strategy/volume_batching/build/libtriton_volumebatching.so /opt/tritonserver/backends/onnxruntime/batchstrategy.so
 
 run_server
 if [ "$SERVER_PID" == "0" ]; then
@@ -120,13 +95,104 @@ set +e
 python $BATCH_CUSTOM_TEST >$CLIENT_LOG 2>&1
 if [ $? -ne 0 ]; then
     cat $CLIENT_LOG
-    echo -e "\n***\n*** Test Failed\n***"
+    echo -e "\n***\n*** Backend Directory Test Failed\n***"
     RET=1
 else
     check_test_results $TEST_RESULT_FILE $EXPECTED_NUM_TESTS
     if [ $? -ne 0 ]; then
         cat $CLIENT_LOG
-        echo -e "\n***\n*** Test Result Verification Failed\n***"
+        echo -e "\n***\n*** Backend Directory Test Result Verification Failed\n***"
+        RET=1
+    fi
+fi
+set -e
+
+kill $SERVER_PID
+wait $SERVER_PID
+
+## Test in model repo
+## Put single batcher in backend repo to confirm model repo checked first
+mv /opt/tritonserver/backends/onnxruntime/batchstrategy.so models/$MODEL_NAME/
+cp /git/core/examples/batch_strategy/single_batching/build/libtriton_singlebatching.so /opt/tritonserver/backends/onnxruntime/batchstrategy.so
+
+run_server
+if [ "$SERVER_PID" == "0" ]; then
+    echo -e "\n***\n*** Failed to start $SERVER\n***"
+    cat $SERVER_LOG
+    exit 1
+fi
+
+set +e
+python $BATCH_CUSTOM_TEST >$CLIENT_LOG 2>&1
+if [ $? -ne 0 ]; then
+    cat $CLIENT_LOG
+    echo -e "\n***\n*** Model Directory Test Failed\n***"
+    RET=1
+else
+    check_test_results $TEST_RESULT_FILE $EXPECTED_NUM_TESTS
+    if [ $? -ne 0 ]; then
+        cat $CLIENT_LOG
+        echo -e "\n***\n*** Model Directory Test Result Verification Failed\n***"
+        RET=1
+    fi
+fi
+set -e
+
+kill $SERVER_PID
+wait $SERVER_PID
+
+## Test in version repo
+mv models/$MODEL_NAME/batchstrategy.so models/$MODEL_NAME/1/batchstrategy.so
+
+run_server
+if [ "$SERVER_PID" == "0" ]; then
+    echo -e "\n***\n*** Failed to start $SERVER\n***"
+    cat $SERVER_LOG
+    exit 1
+fi
+
+set +e
+python $BATCH_CUSTOM_TEST >$CLIENT_LOG 2>&1
+if [ $? -ne 0 ]; then
+    cat $CLIENT_LOG
+    echo -e "\n***\n*** Version Directory Test Failed\n***"
+    RET=1
+else
+    check_test_results $TEST_RESULT_FILE $EXPECTED_NUM_TESTS
+    if [ $? -ne 0 ]; then
+        cat $CLIENT_LOG
+        echo -e "\n***\n*** Version Directory Test Result Verification Failed\n***"
+        RET=1
+    fi
+fi
+set -e
+
+kill $SERVER_PID
+wait $SERVER_PID
+
+## Test loading via model config
+mv models/$MODEL_NAME/1/batchstrategy.so models/$MODEL_NAME/libtriton_volumebatching.so
+
+echo "parameters: {key: \"TRITON_BATCH_STRATEGY_PATH\", value: {string_value: \"models/${MODEL_NAME}/libtriton_volumebatching.so\"}}" >> ${CONFIG_PATH}
+
+run_server
+if [ "$SERVER_PID" == "0" ]; then
+    echo -e "\n***\n*** Failed to start $SERVER\n***"
+    cat $SERVER_LOG
+    exit 1
+fi
+
+set +e
+python $BATCH_CUSTOM_TEST >$CLIENT_LOG 2>&1
+if [ $? -ne 0 ]; then
+    cat $CLIENT_LOG
+    echo -e "\n***\n*** Model Config Test Failed\n***"
+    RET=1
+else
+    check_test_results $TEST_RESULT_FILE $EXPECTED_NUM_TESTS
+    if [ $? -ne 0 ]; then
+        cat $CLIENT_LOG
+        echo -e "\n***\n*** Model Config Test Result Verification Failed\n***"
         RET=1
     fi
 fi
