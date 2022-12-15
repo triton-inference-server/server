@@ -33,6 +33,12 @@ schedule-policy extension allows an inference request to provide
 parameters that influence how Triton handles and schedules the
 request.  Because this extension is supported, Triton reports
 “schedule_policy” in the extensions field of its Server Metadata.
+Note the policies are specific to [dynamic
+batcher](https://github.com/triton-inference-server/server/blob/main/docs/user_guide/model_configuration.md#dynamic-batcher)
+and not [sequence
+batcher](https://github.com/triton-inference-server/server/blob/main/docs/user_guide/model_configuration.md#sequence-batcher) 
+with the [direct](https://github.com/triton-inference-server/server/blob/main/docs/user_guide/architecture.md#direct)
+scheduling strategy.
 
 The schedule-policy extension uses request parameters to indicate the
 policy. The parameters and their type are:
