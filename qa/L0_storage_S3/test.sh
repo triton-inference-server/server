@@ -65,6 +65,11 @@ aws s3 mb "${BUCKET_URL}"
 BUCKET_URL=${BUCKET_URL%/}
 BUCKET_URL_SLASH="${BUCKET_URL}/"
 
+# Backup S3 credentials as they will be unset during the test
+AWS_DEFAULT_REGION_BACKUP=$AWS_DEFAULT_REGION
+AWS_ACCESS_KEY_ID_BACKUP=$AWS_ACCESS_KEY_ID
+AWS_SECRET_ACCESS_KEY_BACKUP=$AWS_SECRET_ACCESS_KEY
+
 SERVER=/opt/tritonserver/bin/tritonserver
 SERVER_TIMEOUT=420
 
@@ -242,6 +247,15 @@ for ENV_VAR in "env" "env_dummy" "config"; do
     done
 done
 
+# Restore S3 credentials
+rm ~/.aws/credentials && rm ~/.aws/config
+export AWS_DEFAULT_REGION=$AWS_DEFAULT_REGION_BACKUP
+export AWS_ACCESS_KEY_ID=$AWS_ACCESS_KEY_ID_BACKUP
+export AWS_SECRET_ACCESS_KEY=$AWS_SECRET_ACCESS_KEY_BACKUP
+aws configure set default.region $AWS_DEFAULT_REGION && \
+    aws configure set aws_access_key_id $AWS_ACCESS_KEY_ID && \
+    aws configure set aws_secret_access_key $AWS_SECRET_ACCESS_KEY
+
 # Test with polling enabled
 SERVER_ARGS="--model-repository=$ROOT_REPO --exit-timeout-secs=120 --model-control-mode=poll"
 
@@ -278,6 +292,8 @@ set -e
 kill $SERVER_PID
 wait $SERVER_PID
 
+# Save models for AWS_SESSION_TOKEN test
+mv models tmp_cred_test_models
 # Clean up bucket contents
 aws s3 rm "${BUCKET_URL_SLASH}" --recursive --include "*"
 
@@ -319,6 +335,53 @@ CURL_LOG=$(curl -X POST localhost:8000/v2/repository/index)
 if [ "$CURL_LOG" != "[{\"name\":\"libtorch_float32_float32_float32\",\"version\":\"1\",\"state\":\"UNAVAILABLE\",\"reason\":\"unloaded\"},{\"name\":\"libtorch_float32_float32_float32\",\"version\":\"3\",\"state\":\"READY\"}]" ]; then
     RET=1
 fi
+
+kill $SERVER_PID
+wait $SERVER_PID
+
+# Clean up bucket contents
+aws s3 rm "${BUCKET_URL_SLASH}" --recursive --include "*"
+
+# Test with temporary credential (AWS_SESSION_TOKEN)
+AWS_GET_SESSION_TOKEN_RES=`aws sts get-session-token --duration-seconds 900` && \
+    export AWS_ACCESS_KEY_ID=`echo $AWS_GET_SESSION_TOKEN_RES | jq -r ".Credentials.AccessKeyId"` && \
+    export AWS_SECRET_ACCESS_KEY=`echo $AWS_GET_SESSION_TOKEN_RES | jq -r ".Credentials.SecretAccessKey"` && \
+    export AWS_SESSION_TOKEN=`echo $AWS_GET_SESSION_TOKEN_RES | jq -r ".Credentials.SessionToken"`
+rm ~/.aws/credentials && rm ~/.aws/config
+aws configure set default.region $AWS_DEFAULT_REGION && \
+    aws configure set aws_access_key_id $AWS_ACCESS_KEY_ID && \
+    aws configure set aws_secret_access_key $AWS_SECRET_ACCESS_KEY && \
+    aws configure set aws_session_token $AWS_SESSION_TOKEN
+
+# Copy models into S3 bucket
+aws s3 cp tmp_cred_test_models/ "${BUCKET_URL_SLASH}" --recursive --include "*"
+
+SERVER_ARGS="--model-repository=$ROOT_REPO --exit-timeout-secs=120"
+
+run_server
+if [ "$SERVER_PID" == "0" ]; then
+    echo -e "\n***\n*** Failed to start $SERVER\n***"
+    cat $SERVER_LOG
+    exit 1
+fi
+
+set +e
+
+python $INFER_TEST >$CLIENT_LOG 2>&1
+if [ $? -ne 0 ]; then
+    cat $CLIENT_LOG
+    echo -e "\n***\n*** Test Failed\n***"
+    RET=1
+else
+    check_test_results $TEST_RESULT_FILE $EXPECTED_NUM_TESTS
+    if [ $? -ne 0 ]; then
+        cat $CLIENT_LOG
+        echo -e "\n***\n*** Test Result Verification Failed\n***"
+        RET=1
+    fi
+fi
+
+set -e
 
 kill $SERVER_PID
 wait $SERVER_PID
