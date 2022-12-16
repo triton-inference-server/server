@@ -930,6 +930,14 @@ allow the queue to be configured so that individual requests are
 rejected or deferred if their time in the queue exceeds a specified
 timeout.
 
+#### Custom Batching
+
+You can set custom batching rules that work _in addition to_ the default behavior of the dynamic batcher. To do so, you would implement three functions in [tritonbackend.h](https://github.com/triton-inference-server/core/blob/main/include/triton/core/tritonbackend.h) and create a shared library. These functions are `TRITONBACKEND_ModelBatchIncludeRequest`, `TRITONBACKEND_ModelBatchInitialize`, and `TRITONBACKEND_ModelBatchFinalize`.
+
+The path to the shared library can be passed into the model configuration via the parameter `TRITON_BATCH_STRATEGY_PATH`. If not provided, the dynamic batcher will look for a custom batching strategy named batchstrategy.so in the model version, model, and backend directories, in that order. If found, it will load it. This lets you easily share a custom batching strategy among all models using the same backend.
+
+For a tutorial of how to create and use a custom batching library, please see the [backend examples directory](https://github.com/triton-inference-server/backend/tree/main/examples#volume-batching).
+
 ### Sequence Batcher
 
 Like the dynamic batcher, the sequence batcher combines non-batched
