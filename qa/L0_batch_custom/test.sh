@@ -27,13 +27,6 @@
 
 ## This test tests the ability to use custom batching strategies with models.
 
-## Clone git core repo
-## 
-## Run each of the models
-## Confirm they run
-## See what outputs...
-## Confirm batch output is as expected
-
 # TODO: First, only do this for one model with it loaded in the version folder
 # Add to model config: batching library path (for relevant tests), max_batch_volume
 # Test cases: batching via config, version folder, model folder, backend folder
@@ -56,6 +49,8 @@ fi
 
 export CUDA_VISIBLE_DEVICES=0
 
+# TODO: Update backend repo tag below to main
+TRITON_BACKEND_REPO_TAG=${TRITON_BACKEND_REPO_TAG:="dyas-custom-batching"}
 CLIENT_LOG="./client.log"
 BATCH_CUSTOM_TEST=batch_custom_test.py
 EXPECTED_NUM_TESTS="1"
@@ -64,142 +59,106 @@ DATADIR=/data/inferenceserver/${REPO_VERSION}/qa_identity_model_repository
 
 TEST_RESULT_FILE='test_results.txt'
 SERVER=/opt/tritonserver/bin/tritonserver
-SERVER_ARGS="--model-repository=models --exit-timeout-secs=120"
+SERVER_ARGS="--model-repository=models --log-verbose 1"
 SERVER_LOG="./inference_server.log"
 MODEL_NAME="onnx_zero_1_float16"
 source ../common/util.sh
 RET=0
 
-rm -f $SERVER_LOG $CLIENT_LOG
-rm -rf models && mkdir models
+# Batch strategy build requires recent version of CMake (FetchContent required)
+wget -O - https://apt.kitware.com/keys/kitware-archive-latest.asc 2>/dev/null | \
+    gpg --dearmor - |  \
+    tee /etc/apt/trusted.gpg.d/kitware.gpg >/dev/null && \
+    apt-add-repository 'deb https://apt.kitware.com/ubuntu/ focal main' && \
+    apt-get update && \
+    apt-get install -y --no-install-recommends \
+            cmake-data=3.21.1-0kitware1ubuntu20.04.1 cmake=3.21.1-0kitware1ubuntu20.04.1 \
+            rapidjson-dev
+cmake --version
+
+# # Clean directory
+rm -fr *.log # ./backend
+
+# # Create models repo
+rm -fr models && mkdir models
 cp -r $DATADIR/$MODEL_NAME models
 
-# TODO: Generate or change script to copy from elsewhere
+# Create custom batching libraries
+git clone --single-branch --depth=1 -b $TRITON_BACKEND_REPO_TAG \
+    https://github.com/triton-inference-server/backend.git
+
+(cd backend/examples/batching_strategies/volume_batching &&
+ mkdir build &&
+ cd build &&
+ cmake -DCMAKE_INSTALL_PREFIX:PATH=`pwd`/install \
+       .. &&
+ make -j4 install)
+
+ (cd backend/examples/batching_strategies/single_batching &&
+ mkdir build &&
+ cd build &&
+ cmake -DCMAKE_INSTALL_PREFIX:PATH=`pwd`/install \
+       .. &&
+ make -j4 install)
+
+cp -r backend/examples/batching_strategies/volume_batching/build/libtriton_volumebatching.so models
+cp -r backend/examples/batching_strategies/single_batching/build/libtriton_singlebatching.so models
+
+cp libtriton_* models
 CONFIG_PATH="models/${MODEL_NAME}/config.pbtxt"
-cp -r /git/core/examples/batch_strategy/volume_batching/build/libtriton_volumebatching.so models/$MODEL_NAME
 echo "parameters { key: \"MAX_BATCH_VOLUME_BYTES\" value: {string_value: \"96\"}}" >> ${CONFIG_PATH}
 echo "dynamic_batching { max_queue_delay_microseconds: 10000}" >> ${CONFIG_PATH}
 echo "instance_group [ { kind: KIND_GPU count: 2 }]" >> ${CONFIG_PATH}
 
-## Test in backend repo
-cp /git/core/examples/batch_strategy/volume_batching/build/libtriton_volumebatching.so /opt/tritonserver/backends/onnxruntime/batchstrategy.so
+# TODO: Add log index... to save each one
+# Run a test for the single batching strategy example.
+# Then, run tests for the volume batching example being passed in by the backend dir, model dir, version dir, and model config.
+BACKEND_DIR="/opt/tritonserver/backends/onnxruntime/"
+MODEL_DIR="models/$MODEL_NAME/"
+VERSION_DIR="$MODEL_DIR/1/"
 
-run_server
-if [ "$SERVER_PID" == "0" ]; then
-    echo -e "\n***\n*** Failed to start $SERVER\n***"
-    cat $SERVER_LOG
-    exit 1
-fi
+test_types=('Single Batching [Backend]' 'Backend Directory' 'Model Directory' 'Version Directory' 'Model Config')
+test_setups=("cp models/libtriton_singlebatching.so ${BACKEND_DIR}/batchstrategy.so && sed -i \"s/(4, 5, 6))/(12))/\" ${BATCH_CUSTOM_TEST}"
+    "cp models/libtriton_volumebatching.so ${BACKEND_DIR}/batchstrategy.so && sed -i \"s/(12))/(4, 5, 6))/\" ${BATCH_CUSTOM_TEST}"
+    "mv ${BACKEND_DIR}/batchstrategy.so ${MODEL_DIR} && cp models/libtriton_singlebatching.so ${BACKEND_DIR}"
+    "mv ${MODEL_DIR}/batchstrategy.so ${VERSION_DIR}/batchstrategy.so"
+    "mv ${VERSION_DIR}/batchstrategy.so models/${MODEL_NAME}/libtriton_volumebatching.so && echo \"parameters: {key: \\\"TRITON_BATCH_STRATEGY_PATH\\\", value: {string_value: \\\"${MODEL_DIR}/libtriton_volumebatching.so\\\"}}\" >> ${CONFIG_PATH}")
 
-set +e
-python $BATCH_CUSTOM_TEST >$CLIENT_LOG 2>&1
-if [ $? -ne 0 ]; then
-    cat $CLIENT_LOG
-    echo -e "\n***\n*** Backend Directory Test Failed\n***"
-    RET=1
-else
-    check_test_results $TEST_RESULT_FILE $EXPECTED_NUM_TESTS
-    if [ $? -ne 0 ]; then
-        cat $CLIENT_LOG
-        echo -e "\n***\n*** Backend Directory Test Result Verification Failed\n***"
-        RET=1
+for i in "${!test_setups[@]}"; do
+    echo "Running ${test_types[$i]} Test"
+    eval ${test_setups[$i]}
+
+    run_server
+    if [ "$SERVER_PID" == "0" ]; then
+        echo -e "\n***\n*** Failed to start $SERVER\n***"
+        cat $SERVER_LOG
+        exit 1  
     fi
-fi
-set -e
-
-kill $SERVER_PID
-wait $SERVER_PID
-
-## Test in model repo
-## Put single batcher in backend repo to confirm model repo checked first
-mv /opt/tritonserver/backends/onnxruntime/batchstrategy.so models/$MODEL_NAME/
-cp /git/core/examples/batch_strategy/single_batching/build/libtriton_singlebatching.so /opt/tritonserver/backends/onnxruntime/batchstrategy.so
-
-run_server
-if [ "$SERVER_PID" == "0" ]; then
-    echo -e "\n***\n*** Failed to start $SERVER\n***"
-    cat $SERVER_LOG
-    exit 1
-fi
-
-set +e
-python $BATCH_CUSTOM_TEST >$CLIENT_LOG 2>&1
-if [ $? -ne 0 ]; then
-    cat $CLIENT_LOG
-    echo -e "\n***\n*** Model Directory Test Failed\n***"
-    RET=1
-else
-    check_test_results $TEST_RESULT_FILE $EXPECTED_NUM_TESTS
-    if [ $? -ne 0 ]; then
-        cat $CLIENT_LOG
-        echo -e "\n***\n*** Model Directory Test Result Verification Failed\n***"
+    if [ `grep -c "Loading custom batching strategy" $SERVER_LOG` != "1" ]; then
+        cat $SERVER_LOG
+        echo -e "\n***\n*** Failed to load custom batching strategy.***"
         RET=1
+    else
+        set +e
+        python $BATCH_CUSTOM_TEST >$CLIENT_LOG 2>&1
+        if [ $? -ne 0 ]; then
+            cat $CLIENT_LOG
+            echo -e "\n***\n*** ${test_types[$i]} Test Failed\n***"
+            RET=1
+        else
+            check_test_results $TEST_RESULT_FILE $EXPECTED_NUM_TESTS
+            if [ $? -ne 0 ]; then
+                cat $CLIENT_LOG
+                echo -e "\n***\n*** ${test_types[$i]} Test Result Verification Failed\n***"
+                RET=1
+            fi
+        fi
+        set -e
     fi
-fi
-set -e
 
-kill $SERVER_PID
-wait $SERVER_PID
-
-## Test in version repo
-mv models/$MODEL_NAME/batchstrategy.so models/$MODEL_NAME/1/batchstrategy.so
-
-run_server
-if [ "$SERVER_PID" == "0" ]; then
-    echo -e "\n***\n*** Failed to start $SERVER\n***"
-    cat $SERVER_LOG
-    exit 1
-fi
-
-set +e
-python $BATCH_CUSTOM_TEST >$CLIENT_LOG 2>&1
-if [ $? -ne 0 ]; then
-    cat $CLIENT_LOG
-    echo -e "\n***\n*** Version Directory Test Failed\n***"
-    RET=1
-else
-    check_test_results $TEST_RESULT_FILE $EXPECTED_NUM_TESTS
-    if [ $? -ne 0 ]; then
-        cat $CLIENT_LOG
-        echo -e "\n***\n*** Version Directory Test Result Verification Failed\n***"
-        RET=1
-    fi
-fi
-set -e
-
-kill $SERVER_PID
-wait $SERVER_PID
-
-## Test loading via model config
-mv models/$MODEL_NAME/1/batchstrategy.so models/$MODEL_NAME/libtriton_volumebatching.so
-
-echo "parameters: {key: \"TRITON_BATCH_STRATEGY_PATH\", value: {string_value: \"models/${MODEL_NAME}/libtriton_volumebatching.so\"}}" >> ${CONFIG_PATH}
-
-run_server
-if [ "$SERVER_PID" == "0" ]; then
-    echo -e "\n***\n*** Failed to start $SERVER\n***"
-    cat $SERVER_LOG
-    exit 1
-fi
-
-set +e
-python $BATCH_CUSTOM_TEST >$CLIENT_LOG 2>&1
-if [ $? -ne 0 ]; then
-    cat $CLIENT_LOG
-    echo -e "\n***\n*** Model Config Test Failed\n***"
-    RET=1
-else
-    check_test_results $TEST_RESULT_FILE $EXPECTED_NUM_TESTS
-    if [ $? -ne 0 ]; then
-        cat $CLIENT_LOG
-        echo -e "\n***\n*** Model Config Test Result Verification Failed\n***"
-        RET=1
-    fi
-fi
-set -e
-
-kill $SERVER_PID
-wait $SERVER_PID
+    kill $SERVER_PID
+    wait $SERVER_PID
+done
 
 if [ $RET -eq 0 ]; then
     echo -e "\n***\n*** Test Passed\n***"
@@ -209,8 +168,3 @@ else
 fi
 
 exit $RET
-
-
-## Afterwards:
-## 1. Update Docker script to move shared library files to this container
-## 2. Move test into L0_batcher?
