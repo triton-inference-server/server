@@ -36,7 +36,7 @@ import unittest
 import numpy as np
 import infer_util as iu
 import test_util as tu
-
+from collections.abc import Iterable
 import tritonclient.grpc as grpcclient
 
 # By default, find tritonserver on "localhost", but can be overridden
@@ -236,11 +236,16 @@ class BatcherTest(tu.TestResultCollector):
                 request_cnt, actual_request_cnt))
 
         actual_exec_cnt = stats.model_stats[0].execution_count
-        self.assertIn(
-            actual_exec_cnt, exec_count,
-            "expected model-exec-count {}, got {}".format(
-                exec_count, actual_exec_cnt))
-
+        if isinstance(exec_count, Iterable):
+            self.assertIn(
+                actual_exec_cnt, exec_count,
+                "expected model-exec-count {}, got {}".format(
+                    exec_count, actual_exec_cnt))
+        else:
+            self.assertEqual(
+                actual_exec_cnt, exec_count,
+                "expected model-exec-count {}, got {}".format(
+                    exec_count, actual_exec_cnt))
         actual_infer_cnt = stats.model_stats[0].inference_count
         self.assertEqual(
             actual_infer_cnt, infer_cnt,
