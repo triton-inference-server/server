@@ -27,13 +27,6 @@
 
 ## This test tests the ability to use custom batching strategies with models.
 
-# TODO: First, only do this for one model with it loaded in the version folder
-# Add to model config: batching library path (for relevant tests), max_batch_volume
-# Test cases: batching via config, version folder, model folder, backend folder
-# Try with number of requests in perf_analyzer less than max_batch_volume and more than
-# Grep for loading library, then executing n requests... not executing 1 requests
-# Alternatively, could use L0_batch_input approach with .py file
-
 REPO_VERSION=${NVIDIA_TRITON_SERVER_VERSION}
 if [ "$#" -ge 1 ]; then
     REPO_VERSION=$1
@@ -49,19 +42,18 @@ fi
 
 export CUDA_VISIBLE_DEVICES=0
 
-# TODO: Update backend repo tag below to main
-TRITON_BACKEND_REPO_TAG=${TRITON_BACKEND_REPO_TAG:="dyas-custom-batching"}
-CLIENT_LOG="./client.log"
 BATCH_CUSTOM_TEST=batch_custom_test.py
-EXPECTED_NUM_TESTS="1"
-
+CLIENT_LOG_BASE="./client.log"
 DATADIR=/data/inferenceserver/${REPO_VERSION}/qa_identity_model_repository
-
-TEST_RESULT_FILE='test_results.txt'
+EXPECTED_NUM_TESTS="1"
+MODEL_NAME="onnx_zero_1_float16"
 SERVER=/opt/tritonserver/bin/tritonserver
 SERVER_ARGS="--model-repository=models --log-verbose 1"
-SERVER_LOG="./inference_server.log"
-MODEL_NAME="onnx_zero_1_float16"
+SERVER_LOG_BASE="./inference_server.log"
+TEST_RESULT_FILE='test_results.txt'
+# TODO: Update backend repo tag below to main
+TRITON_BACKEND_REPO_TAG=${TRITON_BACKEND_REPO_TAG:="dyas-custom-batching"}
+
 source ../common/util.sh
 RET=0
 
@@ -76,12 +68,15 @@ wget -O - https://apt.kitware.com/keys/kitware-archive-latest.asc 2>/dev/null | 
             rapidjson-dev
 cmake --version
 
-# # Clean directory
-rm -fr *.log # ./backend
-
-# # Create models repo
+# Set up repository
+rm -fr *.log ./backend
 rm -fr models && mkdir models
 cp -r $DATADIR/$MODEL_NAME models
+
+CONFIG_PATH="models/${MODEL_NAME}/config.pbtxt"
+echo "dynamic_batching { max_queue_delay_microseconds: 10000}" >> ${CONFIG_PATH}
+echo "instance_group [ { kind: KIND_GPU count: 2 }]" >> ${CONFIG_PATH}
+echo "parameters { key: \"MAX_BATCH_VOLUME_BYTES\" value: {string_value: \"96\"}}" >> ${CONFIG_PATH}
 
 # Create custom batching libraries
 git clone --single-branch --depth=1 -b $TRITON_BACKEND_REPO_TAG \
@@ -104,20 +99,13 @@ git clone --single-branch --depth=1 -b $TRITON_BACKEND_REPO_TAG \
 cp -r backend/examples/batching_strategies/volume_batching/build/libtriton_volumebatching.so models
 cp -r backend/examples/batching_strategies/single_batching/build/libtriton_singlebatching.so models
 
-cp libtriton_* models
-CONFIG_PATH="models/${MODEL_NAME}/config.pbtxt"
-echo "parameters { key: \"MAX_BATCH_VOLUME_BYTES\" value: {string_value: \"96\"}}" >> ${CONFIG_PATH}
-echo "dynamic_batching { max_queue_delay_microseconds: 10000}" >> ${CONFIG_PATH}
-echo "instance_group [ { kind: KIND_GPU count: 2 }]" >> ${CONFIG_PATH}
-
-# TODO: Add log index... to save each one
-# Run a test for the single batching strategy example.
-# Then, run tests for the volume batching example being passed in by the backend dir, model dir, version dir, and model config.
+# Run a test to validate the single batching strategy example.
+# Then, run tests to validate the volume batching example being passed in via the backend dir, model dir, version dir, and model config.
 BACKEND_DIR="/opt/tritonserver/backends/onnxruntime/"
 MODEL_DIR="models/$MODEL_NAME/"
 VERSION_DIR="$MODEL_DIR/1/"
 
-test_types=('Single Batching [Backend]' 'Backend Directory' 'Model Directory' 'Version Directory' 'Model Config')
+test_types=('single_batching_backend' 'backend_directory' 'model_directory' 'version_directory' 'model_config')
 test_setups=("cp models/libtriton_singlebatching.so ${BACKEND_DIR}/batchstrategy.so && sed -i \"s/(4, 5, 6))/(12))/\" ${BATCH_CUSTOM_TEST}"
     "cp models/libtriton_volumebatching.so ${BACKEND_DIR}/batchstrategy.so && sed -i \"s/(12))/(4, 5, 6))/\" ${BATCH_CUSTOM_TEST}"
     "mv ${BACKEND_DIR}/batchstrategy.so ${MODEL_DIR} && cp models/libtriton_singlebatching.so ${BACKEND_DIR}"
@@ -125,8 +113,11 @@ test_setups=("cp models/libtriton_singlebatching.so ${BACKEND_DIR}/batchstrategy
     "mv ${VERSION_DIR}/batchstrategy.so models/${MODEL_NAME}/libtriton_volumebatching.so && echo \"parameters: {key: \\\"TRITON_BATCH_STRATEGY_PATH\\\", value: {string_value: \\\"${MODEL_DIR}/libtriton_volumebatching.so\\\"}}\" >> ${CONFIG_PATH}")
 
 for i in "${!test_setups[@]}"; do
-    echo "Running ${test_types[$i]} Test"
+    echo "Running ${test_types[$i]} test"
     eval ${test_setups[$i]}
+
+    SERVER_LOG=$SERVER_LOG_BASE_${test_types[$i]}
+    CLIENT_LOG=$CLIENT_LOG_BASE_${test_types[$i]}
 
     run_server
     if [ "$SERVER_PID" == "0" ]; then
