@@ -116,8 +116,8 @@ for i in "${!test_setups[@]}"; do
     echo "Running ${test_types[$i]} test"
     eval ${test_setups[$i]}
 
-    SERVER_LOG=$SERVER_LOG_BASE_${test_types[$i]}
-    CLIENT_LOG=$CLIENT_LOG_BASE_${test_types[$i]}
+    SERVER_LOG=${SERVER_LOG_BASE}_${test_types[$i]}
+    CLIENT_LOG=${CLIENT_LOG_BASE}_${test_types[$i]}
 
     run_server
     if [ "$SERVER_PID" == "0" ]; then
