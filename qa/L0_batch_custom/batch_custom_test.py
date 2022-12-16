@@ -61,19 +61,6 @@ if USE_GRPC and USE_HTTP:
     USE_GRPC = False
 assert USE_GRPC or USE_HTTP, "USE_GRPC or USE_HTTP must be non-zero"
 
-BACKENDS = os.environ.get('BACKENDS',
-                          "graphdef savedmodel onnx libtorch plan python")
-
-_trials = BACKENDS.split(" ")
-
-_ragged_batch_supported_trials = ["onn"]
-if "plan" in _trials:
-    _ragged_batch_supported_trials.append("plan")
-if "onnx" in _trials:
-    _ragged_batch_supported_trials.append("onnx")
-
-_max_queue_delay_ms = 10000
-
 _deferred_exceptions_lock = threading.Lock()
 _deferred_exceptions = []
 
@@ -99,30 +86,6 @@ class BatcherTest(tu.TestResultCollector):
             elif TEST_CUDA_SHARED_MEMORY:
                 cudashm.destroy_shared_memory_region(precreated_shm_region)
         super().tearDown()
-
-    # FIXME why only used for outputs
-    def create_advance(self, shm_regions=None):
-        if TEST_SYSTEM_SHARED_MEMORY or TEST_CUDA_SHARED_MEMORY:
-            precreated_shm_regions = []
-            if shm_regions is None:
-                shm_regions = ['output0', 'output1']
-            for shm_region in shm_regions:
-                if TEST_SYSTEM_SHARED_MEMORY:
-                    shm_handle = shm.create_shared_memory_region(
-                        shm_region + '_data', '/' + shm_region, 512)
-                    self.triton_client_.register_system_shared_memory(
-                        shm_region + '_data', '/' + shm_region, 512)
-                else:
-                    shm_handle = cudashm.create_shared_memory_region(
-                        shm_region + '_data', 512, 0)
-                    self.triton_client_.register_cuda_shared_memory(
-                        shm_region + '_data',
-                        cudashm.get_raw_handle(shm_handle), 0, 512)
-                # Collect precreated handles for cleanup
-                self.precreated_shm_regions_.append(shm_handle)
-                precreated_shm_regions.append(shm_handle)
-            return precreated_shm_regions
-        return []
 
     def add_deferred_exception(self, ex):
         global _deferred_exceptions
