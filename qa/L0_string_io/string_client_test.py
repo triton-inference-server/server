@@ -1,5 +1,5 @@
 #!/usr/bin/env python
-# Copyright (c) 2019-2020, NVIDIA CORPORATION. All rights reserved.
+# Copyright 2019-2022, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -148,7 +148,7 @@ class ClientStringTest(tu.TestResultCollector):
         self._test_infer_non_unicode(model_name, client, in0_bytes)
 
     def _test_bytes(self, model_name):
-        dtypes = [np.object_, np.object, np.bytes_]
+        dtypes = [np.object_, np.bytes_]
 
         # This clients will fail for binary_data=False when the binary input
         # is not UTF-8 encodable. They should work for other cases however.

@@ -297,7 +297,7 @@ class PythonTest(tu.TestResultCollector):
         model_name = "string"
         shape = [1]
 
-        for i in range(3):
+        for i in range(2):
             with self._shm_leak_detector.Probe() as shm_probe:
                 with httpclient.InferenceServerClient(
                         "localhost:8000") as client:
@@ -328,7 +328,7 @@ class PythonTest(tu.TestResultCollector):
         model_name = "string_fixed"
         shape = [1]
 
-        for i in range(6):
+        for i in range(4):
             with self._shm_leak_detector.Probe() as shm_probe:
                 with httpclient.InferenceServerClient(
                         "localhost:8000") as client:
