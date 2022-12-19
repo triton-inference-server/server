@@ -38,18 +38,22 @@ class TritonPythonModel:
         self._dtypes = [np.bytes_, np.object_]
 
     def execute(self, requests):
+        # Create four different responses (empty string or fixed string) * (two
+        # datatypes)
         responses = []
         for _ in requests:
-            if self._index % 2 == 0:
+            if self._index == 0:
                 out_tensor_0 = pb_utils.Tensor(
-                    "OUTPUT0",
-                    np.array(['123456'], dtype=self._dtypes[self._index % 3]))
-            else:
-                # Test sending strings with no elements
+                    "OUTPUT0", np.array(['123456'], dtype=self._dtypes[0]))
+            elif self._index == 1:
                 out_tensor_0 = pb_utils.Tensor(
-                    "OUTPUT0", np.array([],
-                                        dtype=self._dtypes[self._index % 3]))
-
+                    "OUTPUT0", np.array([], dtype=self._dtypes[1]))
+            elif self._index == 2:
+                out_tensor_0 = pb_utils.Tensor(
+                    "OUTPUT0", np.array(['123456'], dtype=self._dtypes[0]))
+            elif self._index == 3:
+                out_tensor_0 = pb_utils.Tensor(
+                    "OUTPUT0", np.array([], dtype=self._dtypes[1]))
             self._index += 1
             responses.append(pb_utils.InferenceResponse([out_tensor_0]))
         return responses
