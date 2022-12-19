@@ -32,9 +32,6 @@
 
 * Improvements to container and non-container builds on Windows.
 
-* Concurrent calls to the model load API will be processed in parallel improving 
-  model load times.
-
 * Refer to the 22.12 column of the 
   [Frameworks Support Matrix](https://docs.nvidia.com/deeplearning/frameworks/support-matrix/index.html) 
   for container image versions on which the 22.12 inference server container is 
