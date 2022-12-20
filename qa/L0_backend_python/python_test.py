@@ -297,7 +297,9 @@ class PythonTest(tu.TestResultCollector):
         model_name = "string"
         shape = [1]
 
-        for i in range(3):
+        # The first run will use np.bytes_ and the second run will use
+        # np.object_
+        for i in range(2):
             with self._shm_leak_detector.Probe() as shm_probe:
                 with httpclient.InferenceServerClient(
                         "localhost:8000") as client:
@@ -328,7 +330,10 @@ class PythonTest(tu.TestResultCollector):
         model_name = "string_fixed"
         shape = [1]
 
-        for i in range(6):
+        # Test different string outputs. This test will send 4 requests to the
+        # backend. The model will return 4 responses (np.object_ and np.bytes) *
+        # (empty output and fixed output)
+        for i in range(4):
             with self._shm_leak_detector.Probe() as shm_probe:
                 with httpclient.InferenceServerClient(
                         "localhost:8000") as client:
