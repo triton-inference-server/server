@@ -163,7 +163,7 @@ def get_container_version_if_not_specified():
     log('using container version {}'.format(FLAGS.container_version))
 
 
-def create_argmap(images):
+def create_argmap(images, skip_pull):
     # Extract information from upstream build and create map other functions can
     # use
     full_docker_image = images["full"]
@@ -174,17 +174,19 @@ def create_argmap(images):
     import re  # parse all PATH enviroment variables
 
     # first pull docker images
-    log("pulling container:{}".format(full_docker_image))
-    p = subprocess.run(['docker', 'pull', full_docker_image])
-    fail_if(
-        p.returncode != 0,
-        'docker pull container {} failed, {}'.format(full_docker_image,
-                                                     p.stderr))
-    if enable_gpu:
-        pm = subprocess.run(['docker', 'pull', min_docker_image])
+    if not skip_pull:
+        log("pulling container:{}".format(full_docker_image))
+        p = subprocess.run(['docker', 'pull', full_docker_image])
         fail_if(
-            pm.returncode != 0, 'docker pull container {} failed, {}'.format(
-                min_docker_image, pm.stderr))
+            p.returncode != 0, 'docker pull container {} failed, {}'.format(
+                full_docker_image, p.stderr))
+    if enable_gpu:
+        if not skip_pull:
+            pm = subprocess.run(['docker', 'pull', min_docker_image])
+            fail_if(
+                pm.returncode != 0 and not skip_pull,
+                'docker pull container {} failed, {}'.format(
+                    min_docker_image, pm.stderr))
         pm_path = subprocess.run(base_run_args + [
             '{{range $index, $value := .Config.Env}}{{$value}} {{end}}',
             min_docker_image
@@ -195,7 +197,7 @@ def create_argmap(images):
             pm_path.returncode != 0,
             'docker inspect to find triton enviroment variables for min container failed, {}'
             .format(pm_path.stderr))
-        # min container needs to be GPU support  enabled if the build is GPU build
+        # min container needs to be GPU-support-enabled if the build is GPU build
         vars = pm_path.stdout
         e = re.search("CUDA_VERSION", vars)
         gpu_enabled = False if e is None else True
@@ -227,8 +229,10 @@ def create_argmap(images):
         gpu_enabled = True
     fail_if(
         gpu_enabled != enable_gpu,
-        'Error: full container provided was build with \'TRITON_SERVER_GPU_ENABLED\' as {} and you are composing container with \'TRITON_SERVER_GPU_ENABLED\' as {}'
-        .format(gpu_enabled, enable_gpu))
+        'Error: full container provided was build with '
+        '\'TRITON_SERVER_GPU_ENABLED\' as {} and you are composing container'
+        'with \'TRITON_SERVER_GPU_ENABLED\' as {}'.format(
+            gpu_enabled, enable_gpu))
     e = re.search("TRITON_SERVER_VERSION=([\S]{6,}) ", vars)
     version = "" if e is None else e.group(1)
     fail_if(
@@ -319,15 +323,18 @@ if __name__ == '__main__':
         type=str,
         required=False,
         help=
-        'The version to use for the generated Docker image. If not specified the container version will be chosen automatically based on the repository branch.'
-    )
+        'The version to use for the generated Docker image. If not specified '
+        'the container version will be chosen automatically based on the '
+        'repository branch.')
     parser.add_argument(
         '--image',
         action='append',
         required=False,
-        help=
-        'Use specified Docker image to generate Docker image. Specified as <image-name>,<full-image-name>. <image-name> can be "min", "gpu-min" or "full". Both "min" and "full" need to be specified at the same time. This will override "--container-version". "gpu-min" is needed for CPU-only container to copy TensorFlow and PyTorch deps.'
-    )
+        help='Use specified Docker image to generate Docker image. Specified as '
+        '<image-name>,<full-image-name>. <image-name> can be "min", "gpu-min" '
+        'or "full". Both "min" and "full" need to be specified at the same time.'
+        'This will override "--container-version". "gpu-min" is needed for '
+        'CPU-only container to copy TensorFlow and PyTorch deps.')
     parser.add_argument('--enable-gpu',
                         nargs='?',
                         type=lambda x: (str(x).lower() == 'true'),
@@ -340,15 +347,21 @@ if __name__ == '__main__':
         action='append',
         required=False,
         help=
-        'Include <backend-name> in the generated Docker image. The flag may be specified multiple times.'
-    )
+        'Include <backend-name> in the generated Docker image. The flag may be '
+        'specified multiple times.')
     parser.add_argument(
         '--repoagent',
         action='append',
         required=False,
         help=
-        'Include <repoagent-name> in the generated Docker image. The flag may be specified multiple times.'
-    )
+        'Include <repoagent-name> in the generated Docker image. The flag may '
+        'be specified multiple times.')
+    parser.add_argument(
+        '--skip-pull',
+        action='store_true',
+        required=False,
+        help='Do not pull the required docker images. The user is responsible '
+        'for pulling the upstream images needed to compose the image.')
     parser.add_argument(
         '--dry-run',
         action="store_true",
@@ -414,7 +427,7 @@ if __name__ == '__main__':
         images["gpu-min"] = "nvcr.io/nvidia/tritonserver:{}-py3-min".format(
             FLAGS.container_version)
 
-    argmap = create_argmap(images)
+    argmap = create_argmap(images, FLAGS.skip_pull)
 
     start_dockerfile(FLAGS.work_dir, images, argmap, dockerfile_name,
                      FLAGS.backend)
