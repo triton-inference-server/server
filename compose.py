@@ -174,18 +174,19 @@ def create_argmap(images, skip_pull):
     import re  # parse all PATH enviroment variables
 
     # first pull docker images
-    log("pulling container:{}".format(full_docker_image))
-    p = subprocess.run(['docker', 'pull', full_docker_image])
-    fail_if(
-        p.returncode != 0 and not skip_pull,
-        'docker pull container {} failed, {}'.format(full_docker_image,
-                                                     p.stderr))
-    if enable_gpu:
-        pm = subprocess.run(['docker', 'pull', min_docker_image])
+    if (not skip_pull):
+        log("pulling container:{}".format(full_docker_image))
+        p = subprocess.run(['docker', 'pull', full_docker_image])
         fail_if(
-            pm.returncode != 0 and not skip_pull,
-            'docker pull container {} failed, {}'.format(
-                min_docker_image, pm.stderr))
+            p.returncode != 0, 'docker pull container {} failed, {}'.format(
+                full_docker_image, p.stderr))
+    if enable_gpu:
+        if (not skip_pull):
+            pm = subprocess.run(['docker', 'pull', min_docker_image])
+            fail_if(
+                pm.returncode != 0 and not skip_pull,
+                'docker pull container {} failed, {}'.format(
+                    min_docker_image, pm.stderr))
         pm_path = subprocess.run(base_run_args + [
             '{{range $index, $value := .Config.Env}}{{$value}} {{end}}',
             min_docker_image
@@ -196,7 +197,7 @@ def create_argmap(images, skip_pull):
             pm_path.returncode != 0,
             'docker inspect to find triton enviroment variables for min container failed, {}'
             .format(pm_path.stderr))
-        # min container needs to be GPU support  enabled if the build is GPU build
+        # min container needs to be GPU-support-enabled if the build is GPU build
         vars = pm_path.stdout
         e = re.search("CUDA_VERSION", vars)
         gpu_enabled = False if e is None else True
