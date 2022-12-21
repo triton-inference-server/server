@@ -174,14 +174,14 @@ def create_argmap(images, skip_pull):
     import re  # parse all PATH enviroment variables
 
     # first pull docker images
-    if (not skip_pull):
+    if not skip_pull:
         log("pulling container:{}".format(full_docker_image))
         p = subprocess.run(['docker', 'pull', full_docker_image])
         fail_if(
             p.returncode != 0, 'docker pull container {} failed, {}'.format(
                 full_docker_image, p.stderr))
     if enable_gpu:
-        if (not skip_pull):
+        if not skip_pull:
             pm = subprocess.run(['docker', 'pull', min_docker_image])
             fail_if(
                 pm.returncode != 0 and not skip_pull,
