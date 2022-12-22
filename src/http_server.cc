@@ -1069,13 +1069,14 @@ HTTPAPIServer::InferResponseAlloc(
     // ...then make sure shared memory size is at least as big as
     // the size of the output.
     if (byte_size > info->byte_size_) {
+      audo info_byte_size = info->byte_size_;
       delete info;
       return TRITONSERVER_ErrorNew(
           TRITONSERVER_ERROR_INTERNAL,
           std::string(
               "shared memory size specified with the request for output '" +
               std::string(tensor_name) + "' (" +
-              std::to_string(info->byte_size_) + " bytes) should be at least " +
+              std::to_string(info_byte_size) + " bytes) should be at least " +
               std::to_string(byte_size) + " bytes to hold the results")
               .c_str());
     }
