@@ -55,6 +55,9 @@ The “shared_memory_offset” parameter is optional and defaults to
 zero. The other two parameters are required. If only one of the two is
 given Triton will return an error.
 
+Note that there is no Windows support for shared memory yet. Jetson only
+supports system shared memory.
+
 ## HTTP/REST
 
 In all JSON schemas shown in this document `$number`, `$string`, `$boolean`,
