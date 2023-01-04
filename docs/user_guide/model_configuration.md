@@ -940,9 +940,9 @@ and create a shared library. These functions are described below.
 | :--          |   :--           |
 | TRITONBACKEND_ModelBatchIncludeRequest | Determines whether a request should be included in the current batch |
 | TRITONBACKEND_ModelBatchInitialize | Initializes a record-keeping data structure for a new batch |
-| TRITONBACKEND_ModelBatchFinalize | Frees memory of the record-keeping data structure after batch is formed |
+| TRITONBACKEND_ModelBatchFinalize | Deallocates the record-keeping data structure after a batch is formed |
 | TRITONBACKEND_ModelBatcherInitialize | Initializes a read-only data structure for use with all batches |
-| TRITONBACKEND_ModelBatcherFinalize | Frees the read-only data structure after model is unloaded |
+| TRITONBACKEND_ModelBatcherFinalize | Deallocates the read-only data structure after the model is unloaded |
 
 The path to the shared library can be passed into the model configuration via the parameter 
 `TRITON_BATCH_STRATEGY_PATH`. If not provided, the dynamic batcher will look for a custom 
