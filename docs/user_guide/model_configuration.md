@@ -932,7 +932,7 @@ timeout.
 
 #### Custom Batching
 
-You can set custom batching rules that work _in addition to_ the behavior of the dynamic batcher.
+You can set custom batching rules that work _in addition to_ the specified behavior of the dynamic batcher.
 To do so, you would implement five functions in [tritonbackend.h](https://github.com/triton-inference-server/core/blob/main/include/triton/core/tritonbackend.h) 
 and create a shared library. These functions are described below.
 
