@@ -932,13 +932,17 @@ timeout.
 
 #### Custom Batching
 
-You can set custom batching rules that work _in addition to_ the default behavior of the dynamic 
-batcher. To do so, you would implement three functions in [tritonbackend.h](https://github.com/triton-inference-server/core/blob/main/include/triton/core/tritonbackend.h) 
-and create a shared library. These functions are `TRITONBACKEND_ModelBatchIncludeRequest`, 
-`TRITONBACKEND_ModelBatchInitialize`, and `TRITONBACKEND_ModelBatchFinalize`. 
-You can also implement  two optional functions in your shared library: 
-`TRITONBACKEND_ModelBatchCacheInitialize` and `TRITONBACKEND_ModelBatchCacheFinalize` to store 
-read-only information that is initialized once and used across batches.
+You can set custom batching rules that work _in addition to_ the behavior of the dynamic batcher.
+To do so, you would implement five functions in [tritonbackend.h](https://github.com/triton-inference-server/core/blob/main/include/triton/core/tritonbackend.h) 
+and create a shared library. These functions are:
+
+| Function | Description| 
+| :--          |   :--           |
+| TRITONBACKEND_ModelBatchIncludeRequest | Determines whether a request should be included in the current batch |
+| TRITONBACKEND_ModelBatchInitialize | Initializes record-keeping data structure for a new batch |
+| TRITONBACKEND_ModelBatchFinalize | Frees memory of record-keeping data structure |
+| TRITONBACKEND_ModelBatcherInitialize | Initializes read-only data structure for use with all batches |
+| TRITONBACKEND_ModelBatcherFinalize | Frees read-only batcher data structure |
 
 The path to the shared library can be passed into the model configuration via the parameter 
 `TRITON_BATCH_STRATEGY_PATH`. If not provided, the dynamic batcher will look for a custom 
