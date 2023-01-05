@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-# Copyright 2020-2022, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright 2020-2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -67,9 +67,9 @@ from inspect import getsourcefile
 # incorrectly load the other version of the openvino libraries.
 #
 TRITON_VERSION_MAP = {
-    '2.30.0dev': (
-        '23.01dev',  # triton container
-        '22.12',  # upstream container
+    '2.30.0': (
+        '23.01',  # triton container
+        '23.01',  # upstream container
         '1.13.1',  # ORT
         '2022.1.0',  # ORT OpenVINO
         '2022.1.0',  # Standalone OpenVINO
