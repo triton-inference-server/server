@@ -1,5 +1,5 @@
 <!--
-# Copyright 2019-2022, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright 2019-2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -33,21 +33,21 @@ individual inference requests. Tracing is enable by command-line
 arguments when running the tritonserver executable. For example,
 
 ```
-$ tritonserver --trace-file=/tmp/trace.json --trace-rate=100 --trace-level=TIMESTAMPS \
-    --log-frequency=50 --trace-count=100 ...
+$ tritonserver --trace-file=/tmp/trace.json --trace-rate=100 \
+    --trace-level=TIMESTAMPS --trace-log-frequency=50 --trace-count=100 ...
 ```
 
-The --trace-file option indicates where the trace output should be
-written. The --trace-rate option specifies the sampling rate. In
+The `--trace-file` option indicates where the trace output should be
+written. The `--trace-rate` option specifies the sampling rate. In
 this example every 100-th inference request will be traced. The
---trace-level option indicates the level of trace detail that should
-be collected. --trace-level option may be specified multiple times to 
-trace multiple informations. The --log-frequency option specifies the rate that
-the traces are written to file. In this example Triton will log to file for
-every 50 traces collected. The --trace-count option specifies the remaining 
-number of traces to be collected. In this example Triton will stop tracing more
-requests after 100 traces are collected.
-Use the --help option to get more information.
+`--trace-level` option indicates the level of trace detail that should
+be collected. `--trace-level` option may be specified multiple times to 
+trace multiple informations. The `--trace-log-frequency` option specifies the
+rate that the traces are written to file. In this example Triton will log to
+file for every 50 traces collected. The `--trace-count` option specifies the
+remaining number of traces to be collected. In this example Triton will stop
+tracing more requests after 100 traces are collected.  Use the `--help` option
+to get more information.
 
 In addition to configure trace settings in command line arguments, The user may
 modify the trace setting when Triton server
