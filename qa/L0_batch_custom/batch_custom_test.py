@@ -43,24 +43,6 @@ import tritonclient.grpc as grpcclient
 # with TRITONSERVER_IPADDR envvar
 _tritonserver_ipaddr = os.environ.get('TRITONSERVER_IPADDR', 'localhost')
 
-TEST_SYSTEM_SHARED_MEMORY = bool(
-    int(os.environ.get('TEST_SYSTEM_SHARED_MEMORY', 0)))
-TEST_CUDA_SHARED_MEMORY = bool(int(os.environ.get('TEST_CUDA_SHARED_MEMORY',
-                                                  0)))
-
-if TEST_SYSTEM_SHARED_MEMORY:
-    import tritonclient.utils.shared_memory as shm
-if TEST_CUDA_SHARED_MEMORY:
-    import tritonclient.utils.cuda_shared_memory as cudashm
-
-# Test with either GRPC of HTTP, but not both since when we check
-# results we expect only one to run
-USE_GRPC = (os.environ.get('USE_GRPC', 1) != "0")
-USE_HTTP = (os.environ.get('USE_HTTP', 1) != "0")
-if USE_GRPC and USE_HTTP:
-    USE_GRPC = False
-assert USE_GRPC or USE_HTTP, "USE_GRPC or USE_HTTP must be non-zero"
-
 _deferred_exceptions_lock = threading.Lock()
 _deferred_exceptions = []
 
@@ -76,15 +58,6 @@ class BatcherTest(tu.TestResultCollector):
         _deferred_exceptions = []
 
     def tearDown(self):
-        if TEST_SYSTEM_SHARED_MEMORY:
-            self.triton_client_.unregister_system_shared_memory()
-        if TEST_CUDA_SHARED_MEMORY:
-            self.triton_client_.unregister_cuda_shared_memory()
-        for precreated_shm_region in self.precreated_shm_regions_:
-            if TEST_SYSTEM_SHARED_MEMORY:
-                shm.destroy_shared_memory_region(precreated_shm_region)
-            elif TEST_CUDA_SHARED_MEMORY:
-                cudashm.destroy_shared_memory_region(precreated_shm_region)
         super().tearDown()
 
     def add_deferred_exception(self, ex):
@@ -112,26 +85,21 @@ class BatcherTest(tu.TestResultCollector):
             if trial == "savedmodel" or trial == "graphdef" or trial == "libtorch" \
                     or trial == "onnx" or trial == "plan" or trial == "python":
                 tensor_shape = (bs, input_size)
-                iu.infer_exact(
-                    self,
-                    trial,
-                    tensor_shape,
-                    bs,
-                    np.float32,
-                    np.float32,
-                    np.float32,
-                    swap=False,
-                    model_version=1,
-                    outputs=requested_outputs,
-                    use_http_json_tensors=False,
-                    use_grpc=USE_GRPC,
-                    use_http=USE_HTTP,
-                    skip_request_id_check=True,
-                    use_streaming=False,
-                    shm_region_names=shm_region_names,
-                    precreated_shm_regions=precreated_shm_regions,
-                    use_system_shared_memory=TEST_SYSTEM_SHARED_MEMORY,
-                    use_cuda_shared_memory=TEST_CUDA_SHARED_MEMORY)
+                iu.infer_exact(self,
+                               trial,
+                               tensor_shape,
+                               bs,
+                               np.float32,
+                               np.float32,
+                               np.float32,
+                               swap=False,
+                               model_version=1,
+                               outputs=requested_outputs,
+                               use_http=False,
+                               use_grpc=False,
+                               use_http_json_tensors=False,
+                               skip_request_id_check=True,
+                               use_streaming=False)
             else:
                 self.assertFalse(True, "unknown trial type: " + trial)
 
@@ -151,18 +119,6 @@ class BatcherTest(tu.TestResultCollector):
                     "ms response time, got " + str(end_ms - start_ms) + " ms")
         except Exception as ex:
             self.add_deferred_exception(ex)
-
-    def check_setup(self, model_name, preferred_batch_sizes,
-                    max_queue_delay_us):
-        # Make sure test.sh set up the correct batcher settings
-        config = self.triton_client_.get_model_config(model_name).config
-        bconfig = config.dynamic_batching
-        self.assertEqual(len(bconfig.preferred_batch_size),
-                         len(preferred_batch_sizes))
-        for i in preferred_batch_sizes:
-            self.assertTrue(i in bconfig.preferred_batch_size)
-        self.assertEqual(bconfig.max_queue_delay_microseconds,
-                         max_queue_delay_us)
 
     def check_status(self, model_name, batch_exec, request_cnt, infer_cnt,
                      exec_count):
@@ -231,31 +187,15 @@ class BatcherTest(tu.TestResultCollector):
             # use threads to send 12 requests without waiting for response
             threads = []
             for i in range(12):
-                if TEST_SYSTEM_SHARED_MEMORY or TEST_CUDA_SHARED_MEMORY:
-                    shm_region_name_prefix = [
-                        "input" + str(i), "output" + str(i)
-                    ]
-                else:
-                    shm_region_name_prefix = None
                 threads.append(
                     threading.Thread(target=iu.infer_zero,
                                      args=(self, model_base, 1, dtype, shapes,
                                            shapes),
                                      kwargs={
-                                         'use_grpc':
-                                             USE_GRPC,
-                                         'use_http':
-                                             USE_HTTP,
-                                         'use_http_json_tensors':
-                                             False,
-                                         'use_streaming':
-                                             False,
-                                         'shm_region_name_prefix':
-                                             shm_region_name_prefix,
-                                         'use_system_shared_memory':
-                                             TEST_SYSTEM_SHARED_MEMORY,
-                                         'use_cuda_shared_memory':
-                                             TEST_CUDA_SHARED_MEMORY
+                                         'use_http': True,
+                                         'use_grpc': False,
+                                         'use_http_json_tensors': False,
+                                         'use_streaming': False,
                                      }))
             for t in threads:
                 t.start()

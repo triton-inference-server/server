@@ -52,6 +52,7 @@ SERVER_ARGS="--model-repository=models --log-verbose 1"
 SERVER_LOG_BASE="./inference_server.log"
 TEST_RESULT_FILE='test_results.txt'
 TRITON_BACKEND_REPO_TAG=${TRITON_BACKEND_REPO_TAG:="main"}
+TRITON_CORE_REPO_TAG=${TRITON_CORE_REPO_TAG:="main"}
 
 source ../common/util.sh
 RET=0
@@ -68,7 +69,7 @@ wget -O - https://apt.kitware.com/keys/kitware-archive-latest.asc 2>/dev/null | 
 cmake --version
 
 # Set up repository
-rm -fr *.log ./backend
+rm -fr *.log* ./backend
 rm -fr models && mkdir models
 cp -r $DATADIR/$MODEL_NAME models
 
@@ -85,14 +86,14 @@ git clone --single-branch --depth=1 -b $TRITON_BACKEND_REPO_TAG \
  mkdir build &&
  cd build &&
  cmake -DCMAKE_INSTALL_PREFIX:PATH=`pwd`/install \
-       .. &&
+       -DTRITON_CORE_REPO_TAG=$TRITON_CORE_REPO_TAG .. &&
  make -j4 install)
 
  (cd backend/examples/batching_strategies/single_batching &&
  mkdir build &&
  cd build &&
  cmake -DCMAKE_INSTALL_PREFIX:PATH=`pwd`/install \
-       .. &&
+       -DTRITON_CORE_REPO_TAG=$TRITON_CORE_REPO_TAG .. &&
  make -j4 install)
 
 cp -r backend/examples/batching_strategies/volume_batching/build/libtriton_volumebatching.so models
@@ -100,7 +101,7 @@ cp -r backend/examples/batching_strategies/single_batching/build/libtriton_singl
 
 # Run a test to validate the single batching strategy example.
 # Then, run tests to validate the volume batching example being passed in via the backend dir, model dir, version dir, and model config.
-BACKEND_DIR="/opt/tritonserver/backends/onnxruntime/"
+BACKEND_DIR="/opt/tritonserver/backends/onnxruntime"
 MODEL_DIR="models/$MODEL_NAME/"
 VERSION_DIR="$MODEL_DIR/1/"
 
