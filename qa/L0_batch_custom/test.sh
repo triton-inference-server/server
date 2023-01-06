@@ -51,8 +51,7 @@ SERVER=/opt/tritonserver/bin/tritonserver
 SERVER_ARGS="--model-repository=models --log-verbose 1"
 SERVER_LOG_BASE="./inference_server.log"
 TEST_RESULT_FILE='test_results.txt'
-# TODO: Update backend repo tag below to main
-TRITON_BACKEND_REPO_TAG=${TRITON_BACKEND_REPO_TAG:="dyas-custom-batching"}
+TRITON_BACKEND_REPO_TAG=${TRITON_BACKEND_REPO_TAG:="main"}
 
 source ../common/util.sh
 RET=0
