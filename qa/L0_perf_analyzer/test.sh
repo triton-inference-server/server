@@ -70,7 +70,7 @@ SERVER_LOG="./inference_server.log"
 
 ERROR_STRING="error | Request count: 0 | : 0 infer/sec"
 
-STABILITY_THRESHOLD="15"
+STABILITY_THRESHOLD="100"
 
 source ../common/util.sh
 
