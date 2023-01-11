@@ -632,15 +632,15 @@ def onnxruntime_cmake_args(images, library_paths):
         ]
     else:
         if target_platform() == 'windows':
-            if 'base' in images:
+            if 'ort-base' in images:
                 cargs.append(
                     cmake_backend_arg('onnxruntime', 'TRITON_BUILD_CONTAINER',
-                                      None, images['base']))
+                                      None, images['ort-base']))
         else:
-            if 'base' in images:
+            if 'ort-base' in images:
                 cargs.append(
                     cmake_backend_arg('onnxruntime', 'TRITON_BUILD_CONTAINER',
-                                      None, images['base']))
+                                      None, images['ort-base']))
             else:
                 cargs.append(
                     cmake_backend_arg('onnxruntime',
@@ -2109,9 +2109,11 @@ if __name__ == '__main__':
         fail_if(
             len(parts) != 2,
             '--image must specify <image-name>,<full-image-registry>')
+        # REMOVEME: ONNXRUNTIME 1.13.1 build is failing with cuda 12. Hence, using
+        # cuda 11.8 container as build image for ORT.
         fail_if(
             parts[0] not in [
-                'base', 'gpu-base', 'pytorch', 'tensorflow1', 'tensorflow2'
+                'base', 'gpu-base', 'pytorch', 'tensorflow1', 'tensorflow2', 'ort-base'
             ], 'unsupported value for --image')
         log('image "{}": "{}"'.format(parts[0], parts[1]))
         images[parts[0]] = parts[1]
