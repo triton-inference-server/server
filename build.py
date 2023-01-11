@@ -632,15 +632,15 @@ def onnxruntime_cmake_args(images, library_paths):
         ]
     else:
         if target_platform() == 'windows':
-            if 'base' in images:
+            if 'ort-base' in images:
                 cargs.append(
                     cmake_backend_arg('onnxruntime', 'TRITON_BUILD_CONTAINER',
-                                      None, images['base']))
+                                      None, images['ort-base']))
         else:
-            if 'base' in images:
+            if 'ort-base' in images:
                 cargs.append(
                     cmake_backend_arg('onnxruntime', 'TRITON_BUILD_CONTAINER',
-                                      None, images['base']))
+                                      None, images['ort-base']))
             else:
                 cargs.append(
                     cmake_backend_arg('onnxruntime',
@@ -786,7 +786,7 @@ def install_miniconda(conda_version, target_machine):
     if target_machine == "arm64":
         # This branch used for the case when linux container builds on MacOS with ARM chip
         # macos arm arch names "arm64" when in linux it's names "aarch64".
-        # So we just replace the architecture to able find right conda version for Linux 
+        # So we just replace the architecture to able find right conda version for Linux
         target_machine = "aarch64"
     if conda_version == '':
         fail(
@@ -1026,6 +1026,7 @@ ENV PATH /opt/tritonserver/bin:${PATH}
     if 'onnxruntime' in backends:
         df += '''
 ENV LD_LIBRARY_PATH /opt/tritonserver/backends/onnxruntime:${LD_LIBRARY_PATH}
+ENV LD_LIBRARY_PATH /usr/local/cuda-11.8/lib64:${LD_LIBRARY_PATH}
 '''
 
     backend_dependencies = ""
@@ -1081,6 +1082,10 @@ ENV TCMALLOC_RELEASE_RATE 200
 
     if enable_gpu:
         df += install_dcgm_libraries(argmap['DCGM_VERSION'], target_machine)
+        # This is temporary solution to support 23.01
+        df += '''
+RUN apt-get update && apt-get install -y libcufft-11-8
+'''
         df += '''
 # Extra defensive wiring for CUDA Compat lib
 RUN ln -sf ${_CUDA_COMPAT_PATH}/lib.real ${_CUDA_COMPAT_PATH}/lib \
@@ -1475,15 +1480,8 @@ def core_build(cmake_script, repo_dir, cmake_dir, build_dir, install_dir,
     cmake_script.blankln()
 
 
-def backend_build(be,
-                  cmake_script,
-                  tag,
-                  build_dir,
-                  install_dir,
-                  github_organization,
-                  images,
-                  components,
-                  library_paths):
+def backend_build(be, cmake_script, tag, build_dir, install_dir,
+                  github_organization, images, components, library_paths):
     repo_build_dir = os.path.join(build_dir, be, 'build')
     repo_install_dir = os.path.join(build_dir, be, 'install')
 
@@ -1576,7 +1574,7 @@ def cibase_build(cmake_script, repo_dir, cmake_dir, build_dir, install_dir,
         cmake_script.mkdir(os.path.join(ci_dir, 'lib'))
         cmake_script.cp(
             os.path.join(repo_install_dir, 'lib',
-                        'libtritonrepoagent_relocation.so'),
+                         'libtritonrepoagent_relocation.so'),
             os.path.join(ci_dir, 'lib'))
 
     # Some of the backends are needed for CI testing
@@ -2109,9 +2107,12 @@ if __name__ == '__main__':
         fail_if(
             len(parts) != 2,
             '--image must specify <image-name>,<full-image-registry>')
+        # REMOVEME: ONNXRUNTIME 1.13.1 build is failing with cuda 12. Hence, using
+        # cuda 11.8 container as build image for ORT.
         fail_if(
             parts[0] not in [
-                'base', 'gpu-base', 'pytorch', 'tensorflow1', 'tensorflow2'
+                'base', 'gpu-base', 'pytorch', 'tensorflow1', 'tensorflow2',
+                'ort-base'
             ], 'unsupported value for --image')
         log('image "{}": "{}"'.format(parts[0], parts[1]))
         images[parts[0]] = parts[1]
