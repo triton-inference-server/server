@@ -26,6 +26,7 @@
 #pragma once
 
 #include <grpc++/grpc++.h>
+#include "health.grpc.pb.h"
 #include "grpc_service.grpc.pb.h"
 #include "shared_memory_manager.h"
 #include "tracer.h"
