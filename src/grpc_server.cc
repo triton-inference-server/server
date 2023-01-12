@@ -512,8 +512,8 @@ CommonHandler::SetUpAllRequests()
   //
   auto OnRegisterCheck =
       [this](
-          grpc::ServerContext* ctx, grpc.health.v1::HealthCheckRequest* request,
-          grpc::ServerAsyncResponseWriter<grpc.health.v1::HealthCheckResponse>*
+          grpc::ServerContext* ctx, grpc::health::v1::HealthCheckRequest* request,
+          grpc::ServerAsyncResponseWriter<grpc::health::v1::HealthCheckResponse>*
               responder,
           void* tag) {
         this->health_service_->RequestHealth(
@@ -521,8 +521,8 @@ CommonHandler::SetUpAllRequests()
       };
 
   auto OnExecuteCheck = [this](
-                            grpc.health.v1::HealthCheckRequest& request,
-                            grpc.health.v1::HealthCheckResponse* response,
+                            grpc::health::v1::HealthCheckRequest& request,
+                            grpc::health::v1::HealthCheckResponse* response,
                             grpc::Status* status) {
     bool live = false;
     TRITONSERVER_Error* err =
@@ -540,8 +540,8 @@ CommonHandler::SetUpAllRequests()
   };
 
   new CommonCallData<
-      grpc::HealthAsyncResponseWriter<grpc.health.v1::Check>,
-      grpc.health.v1::HealthCheckRequest, grpc.health.v1::Check>(
+      grpc::HealthAsyncResponseWriter<grpc::health::v1::Check>,
+      grpc::health::v1::HealthCheckRequest, grpc::health::v1::Check>(
       "Check", 0, OnRegisterCheckLive, OnExecuteCheckLive, false /* async */,
       cq_);
 
@@ -550,8 +550,8 @@ CommonHandler::SetUpAllRequests()
   //
   auto OnRegisterWatch =
       [this](
-          grpc::ServerContext* ctx, grpc.health.v1::HealthCheckRequest* request,
-          grpc::ServerAsyncResponseWriter<grpc.health.v1::HealthCheckResponse>*
+          grpc::ServerContext* ctx, grpc::health::v1::HealthCheckRequest* request,
+          grpc::ServerAsyncResponseWriter<grpc::health::v1::HealthCheckResponse>*
               responder,
           void* tag) {
         this->health_service_->RequestWatch(
@@ -559,8 +559,8 @@ CommonHandler::SetUpAllRequests()
       };
 
   auto OnExecuteWatch = [this](
-                            grpc.health.v1::HealthCheckRequest& request,
-                            grpc.health.v1::HealthCheckResponse* response,
+                            grpc::health::v1::HealthCheckRequest& request,
+                            grpc::health::v1::HealthCheckResponse* response,
                             grpc::Status* status) {
     // TODO: Once compiles, modify below to use streaming-type code to return
     // stream
@@ -580,8 +580,8 @@ CommonHandler::SetUpAllRequests()
   };
 
   new CommonCallData<
-      grpc::ServerAsyncResponseWriter<grpc.health.v1::ServerReadyResponse>,
-      grpc.health.v1::ServerReadyRequest, grpc.health.v1::ServerReadyResponse>(
+      grpc::ServerAsyncResponseWriter<grpc::health::v1::ServerReadyResponse>,
+      grpc::health::v1::ServerReadyRequest, grpc::health::v1::ServerReadyResponse>(
       "Watch", 0, OnRegisterServerReady, OnExecuteServerReady,
       false /* async */, cq_);
 
