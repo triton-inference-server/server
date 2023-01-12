@@ -1027,6 +1027,7 @@ ENV PATH /opt/tritonserver/bin:${PATH}
     if 'onnxruntime' in backends:
         df += '''
 ENV LD_LIBRARY_PATH /opt/tritonserver/backends/onnxruntime:${LD_LIBRARY_PATH}
+ENV LD_LIBRARY_PATH /usr/local/cuda-11.8/lib64:${LD_LIBRARY_PATH}
 '''
 
     backend_dependencies = ""
