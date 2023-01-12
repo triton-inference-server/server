@@ -1,5 +1,5 @@
 #!/bin/bash
-# Copyright 2021-2022, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright 2021-2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -38,7 +38,7 @@ SERVER_ARGS="--model-repository=`pwd`/models --backend-directory=${BACKEND_DIR} 
 SERVER_LOG="./inference_server.log"
 
 RET=0
-rm -fr *.log ./models
+rm -fr *.log ./models *.txt
 
 pip3 uninstall -y torch
 pip3 install torch==1.13.0+cu117 -f https://download.pytorch.org/whl/torch_stable.html
@@ -80,6 +80,16 @@ cp ../../python_models/dlpack_identity/model.py models/dlpack_identity/1/
 cp ../../python_models/dlpack_identity/config.pbtxt models/dlpack_identity
 
 cp -r ${DATADIR}/qa_sequence_implicit_model_repository/onnx_nobatch_sequence_int32/ ./models
+
+git clone https://github.com/triton-inference-server/python_backend -b $PYTHON_BACKEND_REPO_TAG
+mkdir -p models/square_int32/1/
+cp python_backend/examples/decoupled/square_model.py models/square_int32/1/model.py
+cp python_backend/examples/decoupled/square_config.pbtxt models/square_int32/config.pbtxt
+
+mkdir -p models/dlpack_square/1/
+cp ../../python_models/dlpack_square/model.py models/dlpack_square/1/
+cp ../../python_models/dlpack_square/config.pbtxt models/dlpack_square
+
 
 run_server
 if [ "$SERVER_PID" == "0" ]; then

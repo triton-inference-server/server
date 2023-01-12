@@ -1,4 +1,4 @@
-# Copyright 2021, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright 2021-2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -28,7 +28,7 @@ import numpy as np
 import triton_python_backend_utils as pb_utils
 
 
-async def _send_identity_tensor(size):
+async def _send_identity_tensor(size, is_stream):
     tensor_size = [1, size]
     input0_np = np.random.randn(*tensor_size)
     input0 = pb_utils.Tensor('INPUT0', input0_np.astype(np.float32))
@@ -36,27 +36,25 @@ async def _send_identity_tensor(size):
         model_name='identity_fp32',
         inputs=[input0],
         requested_output_names=['OUTPUT0'])
-    return input0_np, await infer_request.async_exec()
+    
+    if is_stream:
+        infer_responses = await infer_request.async_stream_exec()
+        infer_response = infer_responses[0]
+    else:
+        infer_response = await infer_request.async_exec()
+
+    return input0_np, infer_response
 
 
 async def test_bls_out_of_memory():
-    tensor_size = 1024 * 1024 * 1024
-    input0_np, infer_response = await _send_identity_tensor(tensor_size)
-    out_of_memory_message = "Failed to increase the shared memory pool size for key"
+    # Test with exec() and stream_exec() separately
+    for is_stream in [True, False]:
+        tensor_size = 1024 * 1024 * 1024
+        input0_np, infer_response = await _send_identity_tensor(
+            tensor_size, is_stream)
 
-    if infer_response.has_error():
-        if not (out_of_memory_message in infer_response.error().message()):
-            return False
-    else:
-        output0 = pb_utils.get_output_tensor_by_name(infer_response, 'OUTPUT0')
-        if output0 is None:
-            return False
-        if not np.allclose(output0.as_numpy(), input0_np):
-            return False
+        out_of_memory_message = "Failed to increase the shared memory pool size for key"
 
-    tensor_size = 50 * 1024 * 1024
-    for _ in range(4):
-        input0_np, infer_response = await _send_identity_tensor(tensor_size)
         if infer_response.has_error():
             if not (out_of_memory_message in infer_response.error().message()):
                 return False
@@ -67,6 +65,22 @@ async def test_bls_out_of_memory():
                 return False
             if not np.allclose(output0.as_numpy(), input0_np):
                 return False
+
+        tensor_size = 50 * 1024 * 1024
+        for _ in range(4):
+            input0_np, infer_response = await _send_identity_tensor(
+                tensor_size, is_stream)
+
+            if infer_response.has_error():
+                if not (out_of_memory_message in infer_response.error().message()):
+                    return False
+            else:
+                output0 = pb_utils.get_output_tensor_by_name(
+                    infer_response, 'OUTPUT0')
+                if output0 is None:
+                    return False
+                if not np.allclose(output0.as_numpy(), input0_np):
+                    return False
 
     return True
 

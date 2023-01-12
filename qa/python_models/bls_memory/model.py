@@ -1,4 +1,4 @@
-# Copyright 2021, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright 2021-2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -31,7 +31,7 @@ import triton_python_backend_utils as pb_utils
 
 class PBBLSMemoryTest(unittest.TestCase):
 
-    def _send_identity_tensor(self, size):
+    def _send_identity_tensor(self, size, is_stream):
         tensor_size = [1, size]
         input0_np = np.random.randn(*tensor_size)
         input0 = pb_utils.Tensor('INPUT0', input0_np.astype(np.float32))
@@ -39,26 +39,24 @@ class PBBLSMemoryTest(unittest.TestCase):
             model_name='identity_fp32',
             inputs=[input0],
             requested_output_names=['OUTPUT0'])
-        return input0_np, infer_request.exec()
+
+        if is_stream:
+            infer_responses = infer_request.stream_exec()
+            self.assertEqual(len(infer_responses), 1)
+            infer_response = infer_responses[0]
+        else:
+            infer_response = infer_request.exec()
+
+        return input0_np, infer_response
 
     def test_bls_out_of_memory(self):
-        tensor_size = 1024 * 1024 * 1024
-        input0_np, infer_response = self._send_identity_tensor(tensor_size)
-        out_of_memory_message = "Failed to increase the shared memory pool size for key"
+        # Test with exec() and stream_exec() separately
+        for is_stream in [True, False]:
+            tensor_size = 1024 * 1024 * 1024
+            input0_np, infer_response = self._send_identity_tensor(
+                tensor_size, is_stream)
+            out_of_memory_message = "Failed to increase the shared memory pool size for key"
 
-        if infer_response.has_error():
-            self.assertIn(out_of_memory_message,
-                          infer_response.error().message())
-        else:
-            self.assertFalse(infer_response.has_error())
-            output0 = pb_utils.get_output_tensor_by_name(
-                infer_response, 'OUTPUT0')
-            self.assertIsNotNone(output0)
-            self.assertTrue(np.allclose(output0.as_numpy(), input0_np))
-
-        tensor_size = 50 * 1024 * 1024
-        for _ in range(4):
-            input0_np, infer_response = self._send_identity_tensor(tensor_size)
             if infer_response.has_error():
                 self.assertIn(out_of_memory_message,
                               infer_response.error().message())
@@ -68,6 +66,20 @@ class PBBLSMemoryTest(unittest.TestCase):
                     infer_response, 'OUTPUT0')
                 self.assertIsNotNone(output0)
                 self.assertTrue(np.allclose(output0.as_numpy(), input0_np))
+
+            tensor_size = 50 * 1024 * 1024
+            for _ in range(4):
+                input0_np, infer_response = self._send_identity_tensor(
+                    tensor_size, is_stream)
+                if infer_response.has_error():
+                    self.assertIn(out_of_memory_message,
+                                  infer_response.error().message())
+                else:
+                    self.assertFalse(infer_response.has_error())
+                    output0 = pb_utils.get_output_tensor_by_name(
+                        infer_response, 'OUTPUT0')
+                    self.assertIsNotNone(output0)
+                    self.assertTrue(np.allclose(output0.as_numpy(), input0_np))
 
 
 class TritonPythonModel:

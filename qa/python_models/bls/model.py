@@ -1,4 +1,4 @@
-# Copyright 2021-2022, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright 2021-2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -68,6 +68,33 @@ def bls_add_sub(_=None):
 
     return True
 
+def bls_square(_=None):
+    input0_np = np.random.randint(16, size=1, dtype=np.int32)
+    input0 = pb_utils.Tensor('IN', input0_np)
+    infer_request = pb_utils.InferenceRequest(
+        model_name='square_int32',
+        inputs=[input0],
+        requested_output_names=['OUT'])
+    infer_responses = infer_request.stream_exec()
+
+    if not np.all(len(infer_responses) == input0.as_numpy()):
+        return False
+    if infer_responses:
+        for infer_response in infer_responses:
+            if infer_response.has_error():
+                return False
+
+            output0 = pb_utils.get_output_tensor_by_name(infer_response, 'OUT')
+            if output0 is None:
+                return False
+
+            expected_output = input0.as_numpy()
+
+            if not np.all(expected_output == output0.as_numpy()):
+                return False
+
+    return True
+
 
 class PBBLSTest(unittest.TestCase):
 
@@ -94,7 +121,19 @@ class PBBLSTest(unittest.TestCase):
                       infer_response.error().message())
         self.assertTrue(len(infer_response.output_tensors()) == 0)
 
-    def _send_bls_sequence_requests(self, correlation_id):
+        # Test stream_exec() API
+        infer_request = pb_utils.InferenceRequest(
+            model_name='square_int32',
+            inputs=[],
+            requested_output_names=['OUT'])
+        infer_responses = infer_request.stream_exec()
+        for infer_response in infer_responses:
+            self.assertTrue(infer_response.has_error())
+            self.assertIn("expected 1 inputs but got 0 inputs for model 'square_int32'",
+                        infer_response.error().message())
+            self.assertTrue(len(infer_response.output_tensors()) == 0)
+
+    def _send_bls_sequence_requests(self, correlation_id, is_stream):
         # Start request
         try:
             input = pb_utils.Tensor('INPUT', np.array([1000], dtype=np.int32))
@@ -123,7 +162,13 @@ class PBBLSTest(unittest.TestCase):
                     inputs=[input],
                     requested_output_names=['OUTPUT'],
                     correlation_id=correlation_id)
-                infer_response = infer_request.exec()
+
+                if is_stream:
+                    infer_responses = infer_request.stream_exec()
+                    self.assertEqual(len(infer_responses), 1)
+                    infer_response = infer_responses[0]
+                else:
+                    infer_response = infer_request.exec()
                 self.assertFalse(infer_response.has_error())
 
                 # The new output is the previous output + the current input
@@ -148,7 +193,13 @@ class PBBLSTest(unittest.TestCase):
             self.assertTrue(infer_request.flags(),
                             pb_utils.TRITONSERVER_REQUEST_FLAG_SEQUENCE_END)
 
-            infer_response = infer_request.exec()
+            if is_stream:
+                infer_responses = infer_request.stream_exec()
+                self.assertEqual(len(infer_responses), 1)
+                infer_response = infer_responses[0]
+            else:
+                infer_response = infer_request.exec()
+
             self.assertFalse(infer_response.has_error())
             expected_output = output[0] + input.as_numpy()[0]
             output = pb_utils.get_output_tensor_by_name(infer_response,
@@ -161,23 +212,25 @@ class PBBLSTest(unittest.TestCase):
             self.add_deferred_exception(e)
 
     def test_bls_sequence(self):
-        # Send 2 sequence of BLS requests simultaneously and check the responses.
-        threads = []
-        thread1 = threading.Thread(target=self._send_bls_sequence_requests,
-                                   args=(1000,))
-        threads.append(thread1)
-        thread2 = threading.Thread(target=self._send_bls_sequence_requests,
-                                   args=(1001,))
-        threads.append(thread2)
+        # Test with exec() and stream_exec() separately
+        for is_stream in [True, False]:
+            # Send 2 sequence of BLS requests simultaneously and check the responses.
+            threads = []
+            thread1 = threading.Thread(target=self._send_bls_sequence_requests,
+                                    args=(1000,is_stream,))
+            threads.append(thread1)
+            thread2 = threading.Thread(target=self._send_bls_sequence_requests,
+                                    args=(1001,is_stream,))
+            threads.append(thread2)
 
-        for thread in threads:
-            thread.start()
+            for thread in threads:
+                thread.start()
 
-        for thread in threads:
-            thread.join()
+            for thread in threads:
+                thread.join()
 
-        # Check if any of the threads had an exception
-        self.check_deferred_exception()
+            # Check if any of the threads had an exception
+            self.check_deferred_exception()
 
     def test_bls_incorrect_args(self):
         with self.assertRaises(TypeError):
@@ -192,7 +245,7 @@ class PBBLSTest(unittest.TestCase):
         with self.assertRaises(TypeError):
             pb_utils.InferenceRequest(model_name='add_sub', inputs=[])
 
-    def _get_gpu_bls_outputs(self, input0_pb, input1_pb):
+    def _get_gpu_bls_outputs(self, input0_pb, input1_pb, is_stream):
         """
         This function is created to test that the DLPack container works
         properly when the inference response and outputs go out of scope.
@@ -201,7 +254,13 @@ class PBBLSTest(unittest.TestCase):
             model_name='dlpack_add_sub',
             inputs=[input0_pb, input1_pb],
             requested_output_names=['OUTPUT0', 'OUTPUT1'])
-        infer_response = infer_request.exec()
+        if is_stream:
+            infer_responses = infer_request.stream_exec()
+            self.assertEqual(len(infer_responses), 1)
+            infer_response = infer_responses[0]
+        else:
+            infer_response = infer_request.exec()
+
         self.assertFalse(infer_response.has_error())
 
         output0 = pb_utils.get_output_tensor_by_name(infer_response, 'OUTPUT0')
@@ -250,11 +309,18 @@ class PBBLSTest(unittest.TestCase):
             model_name=model_name,
             inputs=[input0_pb],
             requested_output_names=['OUTPUT0'])
-        infer_response = infer_request.exec()
-        self.assertFalse(infer_response.has_error())
+        for is_stream in [True, False]:
+            if is_stream:
+                infer_responses = infer_request.stream_exec()
+                self.assertEqual(len(infer_responses), 1)
+                infer_response = infer_responses[0]
+            else:
+                infer_response = infer_request.exec()
 
-        output0 = pb_utils.get_output_tensor_by_name(infer_response, 'OUTPUT0')
-        self.assertTrue(np.all(output0 == input0))
+            self.assertFalse(infer_response.has_error())
+
+            output0 = pb_utils.get_output_tensor_by_name(infer_response, 'OUTPUT0')
+            self.assertTrue(np.all(output0 == input0))
 
     def test_bls_tensor_lifecycle(self):
         model_name = 'dlpack_identity'
@@ -262,62 +328,71 @@ class PBBLSTest(unittest.TestCase):
         # A 10 MB tensor.
         input_size = 10 * 1024 * 1024
 
-        # Sending the tensor 50 times to test whether the deallocation is
-        # happening correctly. If the deallocation doesn't happen correctly,
-        # there will be an out of shared memory error.
-        for _ in range(50):
-            input0 = np.ones([1, input_size], dtype=np.float32)
-            input0_pb = pb_utils.Tensor('INPUT0', input0)
-            infer_request = pb_utils.InferenceRequest(
-                model_name=model_name,
-                inputs=[input0_pb],
-                requested_output_names=['OUTPUT0'])
-            infer_response = infer_request.exec()
-            self.assertFalse(infer_response.has_error())
+        # Test with exec() and stream_exec() separately
+        for is_stream in [True, False]:
+            # Sending the tensor 50 times to test whether the deallocation is
+            # happening correctly. If the deallocation doesn't happen correctly,
+            # there will be an out of shared memory error.
+            for _ in range(50):
+                input0 = np.ones([1, input_size], dtype=np.float32)
+                input0_pb = pb_utils.Tensor('INPUT0', input0)
+                infer_request = pb_utils.InferenceRequest(
+                    model_name=model_name,
+                    inputs=[input0_pb],
+                    requested_output_names=['OUTPUT0'])
+                infer_response = infer_request.exec()
+                self.assertFalse(infer_response.has_error())
 
-            output0 = pb_utils.get_output_tensor_by_name(
-                infer_response, 'OUTPUT0')
-            np.testing.assert_equal(output0.as_numpy(), input0,
-                                    "BLS CPU memory lifecycle failed.")
+                output0 = pb_utils.get_output_tensor_by_name(
+                    infer_response, 'OUTPUT0')
+                np.testing.assert_equal(output0.as_numpy(), input0,
+                                        "BLS CPU memory lifecycle failed.")
 
-        # Checking the same with the GPU tensors.
-        for index in range(50):
-            input0 = None
-            infer_request = None
-            input0_pb = None
+            # Checking the same with the GPU tensors.
+            for index in range(50):
+                input0 = None
+                infer_request = None
+                input0_pb = None
 
-            torch.cuda.empty_cache()
-            free_memory, _ = torch.cuda.mem_get_info()
-            if index == 1:
-                recorded_memory = free_memory
+                torch.cuda.empty_cache()
+                free_memory, _ = torch.cuda.mem_get_info()
+                if index == 1:
+                    recorded_memory = free_memory
 
-            if index > 1:
-                self.assertEqual(free_memory, recorded_memory,
-                                 "GPU memory lifecycle test failed.")
+                if index > 1:
+                    self.assertEqual(free_memory, recorded_memory,
+                                    "GPU memory lifecycle test failed.")
 
-            input0 = torch.ones([1, input_size], dtype=torch.float32).to('cuda')
-            input0_pb = pb_utils.Tensor.from_dlpack('INPUT0', to_dlpack(input0))
-            infer_request = pb_utils.InferenceRequest(
-                model_name=model_name,
-                inputs=[input0_pb],
-                requested_output_names=['OUTPUT0'])
-            infer_response = infer_request.exec()
-            self.assertFalse(infer_response.has_error())
+                input0 = torch.ones([1, input_size], dtype=torch.float32).to('cuda')
+                input0_pb = pb_utils.Tensor.from_dlpack('INPUT0', to_dlpack(input0))
+                infer_request = pb_utils.InferenceRequest(
+                    model_name=model_name,
+                    inputs=[input0_pb],
+                    requested_output_names=['OUTPUT0'])
+                
+                if is_stream:
+                    infer_responses = infer_request.stream_exec()
+                    self.assertEqual(len(infer_responses), 1)
+                    infer_response = infer_responses[0]
+                else:
+                    infer_response = infer_request.exec()
 
-            output0 = pb_utils.get_output_tensor_by_name(
-                infer_response, 'OUTPUT0')
-            output0_pytorch = from_dlpack(output0.to_dlpack())
+                self.assertFalse(infer_response.has_error())
 
-            # Set inference response and output0_pytorch to None, to make sure
-            # that the DLPack is still valid.
-            output0 = None
-            infer_response = None
-            self.assertTrue(
-                torch.all(output0_pytorch == input0),
-                f"input ({input0}) and output ({output0_pytorch}) didn't match for identity model."
-            )
+                output0 = pb_utils.get_output_tensor_by_name(
+                    infer_response, 'OUTPUT0')
+                output0_pytorch = from_dlpack(output0.to_dlpack())
 
-    def _test_gpu_bls_add_sub(self, is_input0_gpu, is_input1_gpu):
+                # Set inference response and output0_pytorch to None, to make sure
+                # that the DLPack is still valid.
+                output0 = None
+                infer_response = None
+                self.assertTrue(
+                    torch.all(output0_pytorch == input0),
+                    f"input ({input0}) and output ({output0_pytorch}) didn't match for identity model."
+                )
+
+    def _test_gpu_bls_add_sub(self, is_input0_gpu, is_input1_gpu, is_stream=False):
         input0 = torch.rand(16)
         input1 = torch.rand(16)
 
@@ -329,8 +404,9 @@ class PBBLSTest(unittest.TestCase):
 
         input0_pb = pb_utils.Tensor.from_dlpack('INPUT0', to_dlpack(input0))
         input1_pb = pb_utils.Tensor.from_dlpack('INPUT1', to_dlpack(input1))
+        
         output0_dlpack, output1_dlpack = self._get_gpu_bls_outputs(
-            input0_pb, input1_pb)
+            input0_pb, input1_pb, is_stream=is_stream)
 
         expected_output_0 = from_dlpack(
             input0_pb.to_dlpack()).to('cpu') + from_dlpack(
@@ -347,16 +423,19 @@ class PBBLSTest(unittest.TestCase):
                 expected_output_1 == from_dlpack(output1_dlpack).to('cpu')))
 
     def test_gpu_bls(self):
-        for input0_device in [True, False]:
-            for input1_device in [True, False]:
-                self._test_gpu_bls_add_sub(input0_device, input1_device)
+        # Test with exec() and stream_exec() separately
+        for is_stream in [True, False]:
+            for input0_device in [True, False]:
+                for input1_device in [True, False]:
+                    self._test_gpu_bls_add_sub(input0_device, input1_device, is_stream)
 
     def test_multiprocess(self):
         # Test multiprocess Pool with sync BLS
-        pool = Pool(10)
-        pool.map(bls_add_sub, [1, 2, 3, 4, 5, 6, 7, 8, 9, 10])
-        pool.close()
-        pool.join()
+        for func_name in [bls_add_sub, bls_square]:
+            pool = Pool(10)
+            pool.map(func_name, [1, 2, 3, 4, 5, 6, 7, 8, 9, 10])
+            pool.close()
+            pool.join()
 
     def test_bls_sync(self):
         infer_request = pb_utils.InferenceRequest(
@@ -376,22 +455,50 @@ class PBBLSTest(unittest.TestCase):
         # an error.
         self.assertTrue(bls_add_sub())
 
+        # Test with stream_exec() API
+        infer_request = pb_utils.InferenceRequest(
+            model_name='non_existent_model',
+            inputs=[],
+            requested_output_names=[])
+        infer_responses = infer_request.stream_exec()
+
+        for infer_response in infer_responses:
+            # Because the model doesn't exist, the inference response must have an
+            # error
+            self.assertTrue(infer_response.has_error())
+            self.assertIn(
+                "Failed for execute the inference request. Model 'non_existent_model' is not ready.",
+                infer_response.error().message())
+
+        # Make sure that the inference requests can be performed properly after
+        # an error.
+        self.assertTrue(bls_square())
+
     def test_bls_execute_error(self):
-        # Test BLS with a model that has an error during execution.
-        infer_request = pb_utils.InferenceRequest(model_name='execute_error',
-                                                  inputs=[],
-                                                  requested_output_names=[])
-        infer_response = infer_request.exec()
-        self.assertTrue(infer_response.has_error())
-        self.assertIn(
-            "expected 1 inputs but got 0 inputs for model 'execute_error'",
-            infer_response.error().message())
-        self.assertTrue(len(infer_response.output_tensors()) == 0)
+        # Test with exec() and stream_exec() separately
+        for is_stream in [True, False]:
+            # Test BLS with a model that has an error during execution.
+            infer_request = pb_utils.InferenceRequest(model_name='execute_error',
+                                                    inputs=[],
+                                                    requested_output_names=[])
+            if is_stream:
+                infer_responses = infer_request.stream_exec()
+                self.assertEqual(len(infer_responses), 1)
+                infer_response = infer_responses[0]
+            else:
+                infer_response = infer_request.exec()
+
+            self.assertTrue(infer_response.has_error())
+            self.assertIn(
+                "expected 1 inputs but got 0 inputs for model 'execute_error'",
+                infer_response.error().message())
+            self.assertTrue(len(infer_response.output_tensors()) == 0)
 
     def test_multiple_bls(self):
         # Test running multiple BLS requests together
         for _ in range(100):
             self.assertTrue(bls_add_sub())
+            self.assertTrue(bls_square())
 
 
 class TritonPythonModel:

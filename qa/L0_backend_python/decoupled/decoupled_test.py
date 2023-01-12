@@ -1,4 +1,4 @@
-# Copyright (c) 2022, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright 2022-2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -127,6 +127,68 @@ class DecoupledTest(tu.TestResultCollector):
 
             result = user_data._completed_requests.get()
             check_result(result)
+
+    def test_decoupled_bls_stream(self):
+        # Test combinations of BLS and decoupled API in Python backend.
+        model_name = "decoupled_bls_stream"
+        in_values = [4, 2, 0, 1]
+        shape = [1]
+        user_data = UserData()
+        with grpcclient.InferenceServerClient(
+                "localhost:8001") as triton_client:
+            triton_client.start_stream(callback=partial(callback, user_data))
+            for i in range(len(in_values)):
+                input_data = np.array([in_values[i]], dtype=np.int32)
+                inputs = [
+                    grpcclient.InferInput("IN", input_data.shape,
+                                          np_to_triton_dtype(input_data.dtype))
+                ]
+                inputs[0].set_data_from_numpy(input_data)
+                triton_client.async_stream_infer(model_name=model_name,
+                                                 inputs=inputs,
+                                                 request_id=str(i))
+
+            # Retrieve results...
+            recv_count = 0
+            expected_count = sum(in_values)
+            result_dict = {}
+            while recv_count < expected_count:
+                data_item = user_data._completed_requests.get()
+                self.assertIsNot(type(data_item), InferenceServerException)
+
+                this_id = data_item.get_response().id
+                if this_id not in result_dict.keys():
+                    result_dict[this_id] = []
+                result_dict[this_id].append((recv_count, data_item))
+
+                recv_count += 1
+            # Validate results...
+            for i in range(len(in_values)):
+                this_id = str(i)
+                is_received = False
+                if this_id in result_dict.keys():
+                    is_received = True
+
+                if in_values[i] != 0:
+                    self.assertTrue(
+                        is_received,
+                        "response for request id {} not received".format(
+                            this_id))
+                    self.assertEqual(len(result_dict[this_id]), in_values[i])
+
+                    result_list = result_dict[this_id]
+                    expected_data = np.array([in_values[i]], dtype=np.int32)
+                    for j in range(len(result_list)):
+                        this_data = result_list[j][1].as_numpy('OUT')
+                        self.assertTrue(
+                            np.array_equal(expected_data, this_data),
+                            "error: incorrect data: expected {}, got {}".format(
+                                expected_data, this_data))
+                else:
+                    self.assertFalse(
+                        is_received,
+                        "received unexpected response for request id {}".format(
+                            this_id))
 
     def test_decoupled_return_response_error(self):
         model_name = "decoupled_return_response_error"
