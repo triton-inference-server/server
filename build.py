@@ -888,6 +888,10 @@ RUN wget -O - https://apt.kitware.com/keys/kitware-archive-latest.asc 2>/dev/nul
         if FLAGS.enable_gpu:
             df += install_dcgm_libraries(argmap['DCGM_VERSION'],
                                          target_machine())
+            # This is temporary solution to support 23.01 
+            df += '''
+RUN apt-get update && apt-get install -y libcufft-11-8
+'''
 
     df += '''
 ENV TRITON_SERVER_VERSION ${TRITON_VERSION}
