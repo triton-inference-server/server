@@ -611,10 +611,12 @@ std::vector<Option> options_
        "previous uses for the same GPU device. Default is 64 MB."},
       {OPTION_RESPONSE_CACHE_BYTE_SIZE, "response-cache-byte-size",
        Option::ArgInt, "DEPRECATED: Please use --cache-config instead."},
+      // TODO: json -> pbtxt
       {OPTION_CACHE_CONFIG_FILE, "cache-config", Option::ArgStr,
-       "Path to cache config JSON file. This file is used to configure the "
-       "cache implementation specified by --cache-lib that Triton is using. "
-       "Default is '/opt/tritonserver/caches/config.json'."},
+       "Path to global cache config file. This file is used to configure the "
+       "global cache, including which cache implementation from the "
+       "--cache-directory to use. An example config file can be found at "
+       "'/opt/tritonserver/caches/cache_config.json'."},
       {OPTION_CACHE_DIR, "cache-directory", Option::ArgStr,
        "The global directory searched for cache shared libraries. Default is "
        "'/opt/tritonserver/caches'. This directory is expected to contain a "
@@ -1340,8 +1342,9 @@ Parse(TRITONSERVER_ServerOptions** server_options, int argc, char** argv)
   std::string backend_dir = "/opt/tritonserver/backends";
   std::string repoagent_dir = "/opt/tritonserver/repoagents";
   std::string cache_dir = "/opt/tritonserver/caches";
-  std::string cache_config_file = "/opt/tritonserver/caches/config.json";
-  std::string cache_config = "{}";
+  std::string cache_config_file = "";
+  std::string cache_config = "";
+  uint64_t response_cache_byte_size = 0;
   std::vector<std::tuple<std::string, std::string, std::string>>
       backend_config_settings;
   std::vector<std::tuple<std::string, std::string, std::string>> host_policies;
@@ -1732,12 +1735,35 @@ Parse(TRITONSERVER_ServerOptions** server_options, int argc, char** argv)
       case OPTION_RESPONSE_CACHE_BYTE_SIZE:
         std::cerr
             << "Warning: '--response-cache-byte-size' has been deprecated! "
+               "This will overwrite any provided cache config and default to "
+               "the 'local' cache implementation with the provided byte size. "
                "Please use '--cache-config' instead."
             << std::endl;
+        response_cache_byte_size = (uint64_t)ParseLongLongOption(optarg);
+        // TODO: Move to protobuf config
+        cache_config = R"({"size": )" + std::to_string(response_cache_byte_size) + "}";
         break;
-      case OPTION_CACHE_CONFIG_FILE:
-        cache_config_file = optarg;
+      case OPTION_CACHE_CONFIG_FILE: {
+          cache_config_file = optarg;
+          if (!cache_config_file.empty()) {
+              std::ifstream config_file(cache_config_file);
+              if (config_file.good()) {
+                std::stringstream buffer;
+                if (buffer << config_file.rdbuf()) {
+                  cache_config = buffer.str();
+                } else {
+                  std::cerr << "Failed to read cache config file: '" << cache_config_file
+                            << "'" << std::endl;
+                  exit(1);
+                }
+              } else {
+                std::cerr << "Failed to open cache config file: '" << cache_config_file
+                          << "'" << std::endl;
+                exit(1);
+              }
+        }
         break;
+      }
       case OPTION_CACHE_DIR:
         cache_dir = optarg;
         break;
@@ -1869,21 +1895,14 @@ Parse(TRITONSERVER_ServerOptions** server_options, int argc, char** argv)
     strict_model_config = true;
   }
 
-  // Read in cache config file
-  std::ifstream config_file(cache_config_file);
-  if (config_file.good()) {
-    std::stringstream buffer;
-    if (buffer << config_file.rdbuf()) {
-      cache_config = buffer.str();
-    } else {
-      std::cerr << "Failed to read cache config file: '" << cache_config_file
-                << "'" << std::endl;
+  // Check if there is a conflict between --response-cache-byte-size
+  // and --cache-config
+  if (response_cache_byte_size > 0 && !cache_config_file.empty()) {
+      std::cerr
+          << "Error: Incompatible flags --response-cache-byte-size and "
+             "--cache-config both provided. Please provide one or the other."
+          << std::endl;
       exit(1);
-    }
-  } else {
-    std::cerr << "Failed to open cache config file: '" << cache_config_file
-              << "'" << std::endl;
-    exit(1);
   }
 
   FAIL_IF_ERR(
