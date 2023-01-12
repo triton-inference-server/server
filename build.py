@@ -853,6 +853,7 @@ RUN apt-get update && \
             libssl-dev \
             libtool \
             libboost-dev \
+            libcufft-11-8 \
             libcurl4-openssl-dev \
             libb64-dev \
             libgoogle-perftools-dev \
