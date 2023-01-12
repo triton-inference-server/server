@@ -507,6 +507,84 @@ CommonHandler::SetUpAllRequests()
       inference::ServerReadyRequest, inference::ServerReadyResponse>(
       "ServerReady", 0, OnRegisterServerReady, OnExecuteServerReady,
       false /* async */, cq_);
+  //
+  //  Health Check
+  //
+  auto OnRegisterCheck =
+      [this](
+          grpc::ServerContext* ctx, grpc.health.v1::HealthCheckRequest* request,
+          grpc::ServerAsyncResponseWriter<grpc.health.v1::HealthCheckResponse>*
+              responder,
+          void* tag) {
+        this->health_service_->RequestHealth(
+            ctx, request, responder, this->cq_, this->cq_, tag);
+      };
+
+  auto OnExecuteCheck = [this](
+                            grpc.health.v1::HealthCheckRequest& request,
+                            grpc.health.v1::HealthCheckResponse* response,
+                            grpc::Status* status) {
+    bool live = false;
+    TRITONSERVER_Error* err =
+        TRITONSERVER_ServerIsReady(tritonserver_.get(), &live);
+
+    ServingStatus serving_status = ServingStatus::UNKNOWN;
+    if (err == nullptr) {
+      serving_status =
+          live ? ServingStatus::SERVING : ServingStatus::NOT_SERVING;
+    }
+    response->set_status(serving_status);
+
+    GrpcStatusUtil::Create(status, err);
+    TRITONSERVER_ErrorDelete(err);
+  };
+
+  new CommonCallData<
+      grpc::HealthAsyncResponseWriter<grpc.health.v1::Check>,
+      grpc.health.v1::HealthCheckRequest, grpc.health.v1::Check>(
+      "Check", 0, OnRegisterCheckLive, OnExecuteCheckLive, false /* async */,
+      cq_);
+
+  //
+  //  Health Watch
+  //
+  auto OnRegisterWatch =
+      [this](
+          grpc::ServerContext* ctx, grpc.health.v1::HealthCheckRequest* request,
+          grpc::ServerAsyncResponseWriter<grpc.health.v1::HealthCheckResponse>*
+              responder,
+          void* tag) {
+        this->health_service_->RequestWatch(
+            ctx, request, responder, this->cq_, this->cq_, tag);
+      };
+
+  auto OnExecuteWatch = [this](
+                            grpc.health.v1::HealthCheckRequest& request,
+                            grpc.health.v1::HealthCheckResponse* response,
+                            grpc::Status* status) {
+    // TODO: Once compiles, modify below to use streaming-type code to return
+    // stream
+    bool live = false;
+    TRITONSERVER_Error* err =
+        TRITONSERVER_ServerIsReady(tritonserver_.get(), &live);
+
+    ServingStatus serving_status = ServingStatus::UNKNOWN;
+    if (err == nullptr) {
+      serving_status =
+          live ? ServingStatus::SERVING : ServingStatus::NOT_SERVING;
+    }
+    response->set_status(serving_status);
+
+    GrpcStatusUtil::Create(status, err);
+    TRITONSERVER_ErrorDelete(err);
+  };
+
+  new CommonCallData<
+      grpc::ServerAsyncResponseWriter<grpc.health.v1::ServerReadyResponse>,
+      grpc.health.v1::ServerReadyRequest, grpc.health.v1::ServerReadyResponse>(
+      "Watch", 0, OnRegisterServerReady, OnExecuteServerReady,
+      false /* async */, cq_);
+
 
   //
   //  ModelReady

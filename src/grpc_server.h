@@ -1,4 +1,4 @@
-// Copyright 2019-2022, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+// Copyright 2019-2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 //
 // Redistribution and use in source and binary forms, with or without
 // modification, are permitted provided that the following conditions
@@ -61,6 +61,10 @@ struct KeepAliveOptions {
   int http2_min_recv_ping_interval_without_data_ms;
   int http2_max_ping_strikes;
 };
+
+/// HealthCheckResponse type used by GRPC health API
+///
+typedef enum { UNKNOWN, SERVING, NOT_SERVING, SERVICE_UNKNOWN } ServingStatus;
 
 class GRPCServer {
  public:
@@ -128,6 +132,7 @@ class GRPCServer {
   std::vector<std::unique_ptr<HandlerBase>> model_stream_infer_handlers_;
 
   inference::GRPCInferenceService::AsyncService service_;
+  grpc.health.v1::Health::AsyncService health_service_;
   bool running_;
 };
 
