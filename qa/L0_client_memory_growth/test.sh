@@ -126,9 +126,10 @@ for PROTOCOL in http grpc; do
         set +e
         SECONDS=0
         $LEAKCHECK $LEAKCHECK_ARGS $MEMORY_GROWTH_TEST $EXTRA_ARGS >> ${CLIENT_LOG} 2>&1
+        TEST_RETCODE=$?
         TEST_DURATION=$SECONDS
         set -e
-        if [ $? -ne 0 ]; then
+        if [ ${TEST_RETCODE} -ne 0 ]; then
             cat ${CLIENT_LOG}
             RET=1
             echo -e "\n***\n*** Test FAILED\n***"
