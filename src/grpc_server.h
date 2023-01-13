@@ -133,7 +133,7 @@ class GRPCServer {
   std::vector<std::unique_ptr<HandlerBase>> model_stream_infer_handlers_;
 
   inference::GRPCInferenceService::AsyncService service_;
-  grpc.health.v1::Health::AsyncService health_service_;
+  grpc::health::v1::Health::AsyncService health_service_;
   bool running_;
 };
 

@@ -314,6 +314,7 @@ if(${TRITON_ENABLE_GRPC})
       proto-library           # from repo-common
       triton-common-logging   # from repo-common
       triton-common-json      # from repo-common
+      health-library          # from repo-common
       grpc-service-library    # from repo-common
       triton-core-serverapi   # from repo-core
       triton-core-serverstub  # from repo-core

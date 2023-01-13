@@ -353,6 +353,7 @@ class CommonHandler : public GRPCServer::HandlerBase {
       const std::shared_ptr<SharedMemoryManager>& shm_manager,
       TraceManager* trace_manager,
       inference::GRPCInferenceService::AsyncService* service,
+      grpc::health::v1::Health::AsyncService* health_service,
       grpc::ServerCompletionQueue* cq);
 
   // Descriptive name of of the handler.
@@ -374,6 +375,7 @@ class CommonHandler : public GRPCServer::HandlerBase {
   TraceManager* trace_manager_;
 
   inference::GRPCInferenceService::AsyncService* service_;
+  grpc::health::v1::Health::AsyncService* health_service_;
   grpc::ServerCompletionQueue* cq_;
   std::unique_ptr<std::thread> thread_;
 };
@@ -384,9 +386,10 @@ CommonHandler::CommonHandler(
     const std::shared_ptr<SharedMemoryManager>& shm_manager,
     TraceManager* trace_manager,
     inference::GRPCInferenceService::AsyncService* service,
+    grpc::health::v1::Health::AsyncService* health_service,
     grpc::ServerCompletionQueue* cq)
     : name_(name), tritonserver_(tritonserver), shm_manager_(shm_manager),
-      trace_manager_(trace_manager), service_(service), cq_(cq)
+      trace_manager_(trace_manager), service_(service), health_service_(health_service), cq_(cq)
 {
 }
 
@@ -516,7 +519,7 @@ CommonHandler::SetUpAllRequests()
           grpc::ServerAsyncResponseWriter<grpc::health::v1::HealthCheckResponse>*
               responder,
           void* tag) {
-        this->health_service_->RequestHealth(
+        this->health_service_->RequestCheck(
             ctx, request, responder, this->cq_, this->cq_, tag);
       };
 
@@ -528,62 +531,63 @@ CommonHandler::SetUpAllRequests()
     TRITONSERVER_Error* err =
         TRITONSERVER_ServerIsReady(tritonserver_.get(), &live);
 
-    ServingStatus serving_status = ServingStatus::UNKNOWN;
+    auto serving_status = grpc::health::v1::HealthCheckResponse_ServingStatus_UNKNOWN;
     if (err == nullptr) {
       serving_status =
-          live ? ServingStatus::SERVING : ServingStatus::NOT_SERVING;
+          live ? grpc::health::v1::HealthCheckResponse_ServingStatus_SERVING : grpc::health::v1::HealthCheckResponse_ServingStatus_NOT_SERVING;
     }
     response->set_status(serving_status);
 
     GrpcStatusUtil::Create(status, err);
     TRITONSERVER_ErrorDelete(err);
   };
-
+  
   new CommonCallData<
-      grpc::HealthAsyncResponseWriter<grpc::health::v1::Check>,
-      grpc::health::v1::HealthCheckRequest, grpc::health::v1::Check>(
-      "Check", 0, OnRegisterCheckLive, OnExecuteCheckLive, false /* async */,
+      grpc::ServerAsyncResponseWriter<grpc::health::v1::HealthCheckRequest>,
+      grpc::health::v1::HealthCheckRequest, grpc::health::v1::HealthCheckResponse>(
+      "Check", 0, OnRegisterCheck, OnExecuteCheck, false /* async */,
       cq_);
+      
+  // TODO: Add health watch call
+  // //
+  // //  Health Watch
+  // //
+  // auto OnRegisterWatch =
+  //     [this](
+  //         grpc::ServerContext* ctx, grpc::health::v1::HealthCheckRequest* request,
+  //         grpc::ServerAsyncResponseWriter<grpc::health::v1::HealthCheckResponse>*
+  //             responder,
+  //         void* tag) {
+  //       this->health_service_->RequestWatch(
+  //           ctx, request, responder, this->cq_, this->cq_, tag);
+  //     };
 
-  //
-  //  Health Watch
-  //
-  auto OnRegisterWatch =
-      [this](
-          grpc::ServerContext* ctx, grpc::health::v1::HealthCheckRequest* request,
-          grpc::ServerAsyncResponseWriter<grpc::health::v1::HealthCheckResponse>*
-              responder,
-          void* tag) {
-        this->health_service_->RequestWatch(
-            ctx, request, responder, this->cq_, this->cq_, tag);
-      };
+  // auto OnExecuteWatch = [this](
+  //                           grpc::health::v1::HealthCheckRequest& request,
+  //                           grpc::health::v1::HealthCheckResponse* response,
+  //                           grpc::Status* status) {
+  //   // TODO: Once compiles, modify below to use streaming-type code to return
+  //   // stream
+  //   bool live = false;
+  //   TRITONSERVER_Error* err =
+  //       TRITONSERVER_ServerIsReady(tritonserver_.get(), &live);
 
-  auto OnExecuteWatch = [this](
-                            grpc::health::v1::HealthCheckRequest& request,
-                            grpc::health::v1::HealthCheckResponse* response,
-                            grpc::Status* status) {
-    // TODO: Once compiles, modify below to use streaming-type code to return
-    // stream
-    bool live = false;
-    TRITONSERVER_Error* err =
-        TRITONSERVER_ServerIsReady(tritonserver_.get(), &live);
+  //   auto serving_status = grpc::health::v1::HealthCheckResponse_ServingStatus_UNKNOWN;
+  //   if (err == nullptr) {
+  //     serving_status =
+  //         live ? grpc::health::v1::HealthCheckResponse_ServingStatus_SERVING : grpc::health::v1::HealthCheckResponse_ServingStatus_NOT_SERVING;
+  //   }
+  //   response->set_status(serving_status);
 
-    ServingStatus serving_status = ServingStatus::UNKNOWN;
-    if (err == nullptr) {
-      serving_status =
-          live ? ServingStatus::SERVING : ServingStatus::NOT_SERVING;
-    }
-    response->set_status(serving_status);
+  //   GrpcStatusUtil::Create(status, err);
+  //   TRITONSERVER_ErrorDelete(err);
+  // };
 
-    GrpcStatusUtil::Create(status, err);
-    TRITONSERVER_ErrorDelete(err);
-  };
-
-  new CommonCallData<
-      grpc::ServerAsyncResponseWriter<grpc::health::v1::ServerReadyResponse>,
-      grpc::health::v1::ServerReadyRequest, grpc::health::v1::ServerReadyResponse>(
-      "Watch", 0, OnRegisterServerReady, OnExecuteServerReady,
-      false /* async */, cq_);
+  // new CommonCallData<
+  //     grpc::ServerAsyncResponseWriter<grpc::health::v1::HealthCheckResponse>,
+  //     grpc::health::v1::HealthCheckRequest, grpc::health::v1::HealthCheckResponse>(
+  //     "Watch", 0, OnRegisterWatch, OnExecuteWatch,
+  //     false /* async */, cq_);
 
 
   //
@@ -4867,7 +4871,7 @@ GRPCServer::Start()
 
   // A common Handler for other non-inference requests
   CommonHandler* hcommon = new CommonHandler(
-      "CommonHandler", server_, shm_manager_, trace_manager_, &service_,
+      "CommonHandler", server_, shm_manager_, trace_manager_, &service_, &health_service_,
       common_cq_.get());
   hcommon->Start();
   common_handler_.reset(hcommon);
