@@ -543,7 +543,7 @@ CommonHandler::SetUpAllRequests()
   };
   
   new CommonCallData<
-      grpc::ServerAsyncResponseWriter<grpc::health::v1::HealthCheckRequest>,
+      grpc::ServerAsyncResponseWriter<grpc::health::v1::HealthCheckResponse>,
       grpc::health::v1::HealthCheckRequest, grpc::health::v1::HealthCheckResponse>(
       "Check", 0, OnRegisterCheck, OnExecuteCheck, false /* async */,
       cq_);
