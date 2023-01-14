@@ -1948,7 +1948,6 @@ Parse(TRITONSERVER_ServerOptions** server_options, int argc, char** argv)
     strict_model_config = true;
   }
 
-
   FAIL_IF_ERR(
       TRITONSERVER_ServerOptionsNew(server_options), "creating server options");
   auto loptions = *server_options;
@@ -2061,7 +2060,6 @@ Parse(TRITONSERVER_ServerOptions** server_options, int argc, char** argv)
           loptions, metrics_interval_ms_),
       "setting metrics interval");
 #endif  // TRITON_ENABLE_METRICS
-
 
   FAIL_IF_ERR(
       TRITONSERVER_ServerOptionsSetBackendDirectory(
