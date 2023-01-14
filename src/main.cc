@@ -1,4 +1,4 @@
-// Copyright 2018-2022, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+// Copyright 2018-2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 //
 // Redistribution and use in source and binary forms, with or without
 // modification, are permitted provided that the following conditions
@@ -306,7 +306,7 @@ enum OptionId {
   OPTION_PINNED_MEMORY_POOL_BYTE_SIZE,
   OPTION_CUDA_MEMORY_POOL_BYTE_SIZE,
   OPTION_RESPONSE_CACHE_BYTE_SIZE,
-  OPTION_CACHE_CONFIG_FILE,
+  OPTION_CACHE_CONFIG,
   OPTION_CACHE_DIR,
   OPTION_MIN_SUPPORTED_COMPUTE_CAPABILITY,
   OPTION_EXIT_TIMEOUT_SECS,
@@ -611,12 +611,12 @@ std::vector<Option> options_
        "previous uses for the same GPU device. Default is 64 MB."},
       {OPTION_RESPONSE_CACHE_BYTE_SIZE, "response-cache-byte-size",
        Option::ArgInt, "DEPRECATED: Please use --cache-config instead."},
-      // TODO: json -> pbtxt
-      {OPTION_CACHE_CONFIG_FILE, "cache-config", Option::ArgStr,
-       "Path to global cache config file. This file is used to configure the "
-       "global cache, including which cache implementation from the "
-       "--cache-directory to use. An example config file can be found at "
-       "'/opt/tritonserver/caches/cache_config.json'."},
+      {OPTION_CACHE_CONFIG, "cache-config", "<string>,<string>=<string>",
+       "Specify a cache-specific configuration setting. The format of this "
+       "flag is --cache-config=<cache_name>,<setting>=<value>. Where "
+       "<cache_name> is the name of the cache, such as 'local' or 'redis'. "
+       "Example: --cache-config=local,size=1048576 will configure a 'local' "
+       "cache implementation with a fixed buffer pool of size 1048576 bytes."},
       {OPTION_CACHE_DIR, "cache-directory", Option::ArgStr,
        "The global directory searched for cache shared libraries. Default is "
        "'/opt/tritonserver/caches'. This directory is expected to contain a "
@@ -1267,6 +1267,65 @@ ParseBackendConfigOption(const std::string arg)
   return {name_string, setting_string, value_string};
 }
 
+std::string
+PairsToJsonStr(std::vector<std::pair<std::string, std::string>> settings)
+{
+  triton::common::TritonJson::Value json(
+      triton::common::TritonJson::ValueType::OBJECT);
+  for (const auto& setting : settings) {
+    const auto& key = setting.first;
+    const auto& value = setting.second;
+    json.SetStringObject(key.c_str(), value);
+  }
+  triton::common::TritonJson::WriteBuffer buffer;
+  auto err = json.Write(&buffer);
+  if (err != nullptr) {
+    LOG_TRITONSERVER_ERROR(err, "failed to convert config to JSON");
+  }
+  return buffer.Contents();
+}
+
+std::tuple<std::string, std::string, std::string>
+ParseCacheConfigOption(const std::string arg)
+{
+  // Format is "<cache_name>,<setting>=<value>" for specific
+  // config/settings and "<setting>=<value>" for cache agnostic
+  // configs/settings
+  int delim_name = arg.find(",");
+  int delim_setting = arg.find("=", delim_name + 1);
+
+  std::string name_string = std::string();
+  if (delim_name > 0) {
+    name_string = arg.substr(0, delim_name);
+  }
+  // No cache-agnostic global settings are currently supported
+  else {
+    std::cerr << "No cache specified. --cache-config option format is "
+              << "<cache name>,<setting>=<value> or "
+              << "<setting>=<value>. Got " << arg << std::endl;
+    exit(1);
+  }
+
+  if (delim_setting < 0) {
+    std::cerr << "--cache-config option format is '<cache "
+                 "name>,<setting>=<value>'. Got "
+              << arg << std::endl;
+    exit(1);
+  }
+  std::string setting_string =
+      arg.substr(delim_name + 1, delim_setting - delim_name - 1);
+  std::string value_string = arg.substr(delim_setting + 1);
+
+  if (setting_string.empty() || value_string.empty()) {
+    std::cerr << "--cache-config option format is '<cache "
+                 "name>,<setting>=<value>'. Got "
+              << arg << std::endl;
+    exit(1);
+  }
+
+  return {name_string, setting_string, value_string};
+}
+
 std::tuple<std::string, std::string, std::string>
 ParseHostPolicyOption(const std::string arg)
 {
@@ -1342,9 +1401,11 @@ Parse(TRITONSERVER_ServerOptions** server_options, int argc, char** argv)
   std::string backend_dir = "/opt/tritonserver/backends";
   std::string repoagent_dir = "/opt/tritonserver/repoagents";
   std::string cache_dir = "/opt/tritonserver/caches";
-  std::string cache_config_file = "";
-  std::string cache_config = "";
-  uint64_t response_cache_byte_size = 0;
+  bool cache_size_present = false;
+  bool cache_config_present = false;
+  std::unordered_map<
+      std::string, std::vector<std::pair<std::string, std::string>>>
+      cache_config_settings;
   std::vector<std::tuple<std::string, std::string, std::string>>
       backend_config_settings;
   std::vector<std::tuple<std::string, std::string, std::string>> host_policies;
@@ -1732,36 +1793,25 @@ Parse(TRITONSERVER_ServerOptions** server_options, int argc, char** argv)
       case OPTION_CUDA_MEMORY_POOL_BYTE_SIZE:
         cuda_pools.push_back(ParsePairOption<int, uint64_t>(optarg, ":"));
         break;
-      case OPTION_RESPONSE_CACHE_BYTE_SIZE:
+      case OPTION_RESPONSE_CACHE_BYTE_SIZE: {
         std::cerr
             << "Warning: '--response-cache-byte-size' has been deprecated! "
                "This will overwrite any provided cache config and default to "
                "the 'local' cache implementation with the provided byte size. "
                "Please use '--cache-config' instead."
             << std::endl;
-        response_cache_byte_size = (uint64_t)ParseLongLongOption(optarg);
-        // TODO: Move to protobuf config
-        cache_config = R"({"size": )" + std::to_string(response_cache_byte_size) + "}";
+        cache_size_present = true;
+        const auto byte_size = std::to_string(ParseLongLongOption(optarg));
+        cache_config_settings["local"] = {{"size", byte_size}};
         break;
-      case OPTION_CACHE_CONFIG_FILE: {
-          cache_config_file = optarg;
-          if (!cache_config_file.empty()) {
-              std::ifstream config_file(cache_config_file);
-              if (config_file.good()) {
-                std::stringstream buffer;
-                if (buffer << config_file.rdbuf()) {
-                  cache_config = buffer.str();
-                } else {
-                  std::cerr << "Failed to read cache config file: '" << cache_config_file
-                            << "'" << std::endl;
-                  exit(1);
-                }
-              } else {
-                std::cerr << "Failed to open cache config file: '" << cache_config_file
-                          << "'" << std::endl;
-                exit(1);
-              }
-        }
+      }
+      case OPTION_CACHE_CONFIG: {
+        cache_config_present = true;
+        const auto cache_setting = ParseCacheConfigOption(optarg);
+        const auto& cache_name = std::get<0>(cache_setting);
+        const auto& key = std::get<1>(cache_setting);
+        const auto& value = std::get<2>(cache_setting);
+        cache_config_settings[cache_name].push_back({key, value});
         break;
       }
       case OPTION_CACHE_DIR:
@@ -1895,15 +1945,6 @@ Parse(TRITONSERVER_ServerOptions** server_options, int argc, char** argv)
     strict_model_config = true;
   }
 
-  // Check if there is a conflict between --response-cache-byte-size
-  // and --cache-config
-  if (response_cache_byte_size > 0 && !cache_config_file.empty()) {
-      std::cerr
-          << "Error: Incompatible flags --response-cache-byte-size and "
-             "--cache-config both provided. Please provide one or the other."
-          << std::endl;
-      exit(1);
-  }
 
   FAIL_IF_ERR(
       TRITONSERVER_ServerOptionsNew(server_options), "creating server options");
@@ -2023,13 +2064,35 @@ Parse(TRITONSERVER_ServerOptions** server_options, int argc, char** argv)
       TRITONSERVER_ServerOptionsSetBackendDirectory(
           loptions, backend_dir.c_str()),
       "setting backend directory");
-  FAIL_IF_ERR(
-      TRITONSERVER_ServerOptionsSetCacheDirectory(loptions, cache_dir.c_str()),
-      "setting cache directory");
-  FAIL_IF_ERR(
-      TRITONSERVER_ServerOptionsSetCacheConfig(
-          loptions, "" /* name */, cache_config.c_str()),
-      "setting cache config");
+
+  // Check if there is a conflict between --response-cache-byte-size
+  // and --cache-config
+  if (cache_size_present && cache_config_present) {
+    std::cerr
+        << "Error: Incompatible flags --response-cache-byte-size and "
+           "--cache-config both provided. Please provide one or the other."
+        << std::endl;
+    exit(1);
+  }
+  // Enable cache and configure it if a cache CLI arg is passed,
+  // this will allow for an empty configuration.
+  if (cache_config_present || cache_size_present) {
+    FAIL_IF_ERR(
+        TRITONSERVER_ServerOptionsSetCacheDirectory(
+            loptions, cache_dir.c_str()),
+        "setting cache directory");
+
+    for (const auto& cache_pair : cache_config_settings) {
+      const auto& cache_name = cache_pair.first;
+      const auto& settings = cache_pair.second;
+      const auto& json_config_str = PairsToJsonStr(settings);
+      FAIL_IF_ERR(
+          TRITONSERVER_ServerOptionsSetCacheConfig(
+              loptions, cache_name.c_str(), json_config_str.c_str()),
+          "setting cache configurtion");
+    }
+  }
+
   FAIL_IF_ERR(
       TRITONSERVER_ServerOptionsSetRepoAgentDirectory(
           loptions, repoagent_dir.c_str()),
