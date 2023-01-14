@@ -1794,15 +1794,18 @@ Parse(TRITONSERVER_ServerOptions** server_options, int argc, char** argv)
         cuda_pools.push_back(ParsePairOption<int, uint64_t>(optarg, ":"));
         break;
       case OPTION_RESPONSE_CACHE_BYTE_SIZE: {
-        std::cerr
-            << "Warning: '--response-cache-byte-size' has been deprecated! "
-               "This will overwrite any provided cache config and default to "
-               "the 'local' cache implementation with the provided byte size. "
-               "Please use '--cache-config' instead."
-            << std::endl;
         cache_size_present = true;
         const auto byte_size = std::to_string(ParseLongLongOption(optarg));
         cache_config_settings["local"] = {{"size", byte_size}};
+        std::cerr
+            << "Warning: '--response-cache-byte-size' has been deprecated! "
+               "This will default to the 'local' cache implementation with "
+               "the provided byte size for its config. Please use "
+               "'--cache-config' instead. The equivalent "
+               "--cache-config CLI args would be: "
+               "'--cache-config=local,size=" +
+                   byte_size + "'"
+            << std::endl;
         break;
       }
       case OPTION_CACHE_CONFIG: {
