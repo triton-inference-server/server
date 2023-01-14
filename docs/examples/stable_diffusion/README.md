@@ -51,7 +51,8 @@ docker run --gpus=all -it --shm-size=256m --rm -p8000:8000 -p8001:8001 -p8002:80
 ```
 # PyTorch & Transformers Lib
 pip install torch torchvision torchaudio
-pip install transformers ftfy scipy accelerate diffusers
+pip install transformers ftfy scipy accelerate
+pip install diffusers==0.9.0
 pip install transformers[onnxruntime]
 huggingface-cli login
 ```
@@ -64,7 +65,7 @@ docker run -it --gpus all -p 8888:8888 -v ${PWD}:/mount nvcr.io/nvidia/pytorch:y
 
 pip install transformers ftfy scipy
 pip install transformers[onnxruntime]
-pip install diffusers
+pip install diffusers==0.9.0
 huggingface-cli login
 cd /mount
 python export.py

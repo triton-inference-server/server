@@ -59,43 +59,42 @@ class IOTest(tu.TestResultCollector):
 
     def setUp(self):
         self._shm_leak_detector = shm_util.ShmLeakDetector()
+        self._client = grpcclient.InferenceServerClient("localhost:8001")
 
     def _run_ensemble_test(self):
         model_name = "ensemble_io"
         user_data = UserData()
-        with grpcclient.InferenceServerClient("localhost:8001") as client:
-            input0 = np.random.random([1000]).astype(np.float32)
-            client.start_stream(callback=partial(callback, user_data))
-            for model_1_in_gpu in [True, False]:
-                for model_2_in_gpu in [True, False]:
-                    for model_3_in_gpu in [True, False]:
-                        gpu_output = np.asarray(
-                            [model_1_in_gpu, model_2_in_gpu, model_3_in_gpu],
-                            dtype=bool)
-                        inputs = [
-                            grpcclient.InferInput(
-                                "INPUT0", input0.shape,
-                                np_to_triton_dtype(input0.dtype)),
-                            grpcclient.InferInput(
-                                "GPU_OUTPUT", gpu_output.shape,
-                                np_to_triton_dtype(gpu_output.dtype))
-                        ]
-                        inputs[0].set_data_from_numpy(input0)
-                        inputs[1].set_data_from_numpy(gpu_output)
-                        client.async_stream_infer(model_name=model_name,
-                                                  inputs=inputs)
-                        if TRIAL == 'default':
+        input0 = np.random.random([1000]).astype(np.float32)
+        self._client.start_stream(callback=partial(callback, user_data))
+        for model_1_in_gpu in [True, False]:
+            for model_2_in_gpu in [True, False]:
+                for model_3_in_gpu in [True, False]:
+                    gpu_output = np.asarray(
+                        [model_1_in_gpu, model_2_in_gpu, model_3_in_gpu],
+                        dtype=bool)
+                    inputs = [
+                        grpcclient.InferInput("INPUT0", input0.shape,
+                                              np_to_triton_dtype(input0.dtype)),
+                        grpcclient.InferInput(
+                            "GPU_OUTPUT", gpu_output.shape,
+                            np_to_triton_dtype(gpu_output.dtype))
+                    ]
+                    inputs[0].set_data_from_numpy(input0)
+                    inputs[1].set_data_from_numpy(gpu_output)
+                    self._client.async_stream_infer(model_name=model_name,
+                                                    inputs=inputs)
+                    if TRIAL == 'default':
+                        result = user_data._completed_requests.get()
+                        output0 = result.as_numpy('OUTPUT0')
+                        self.assertIsNotNone(output0)
+                        self.assertTrue(np.all(output0 == input0))
+                    else:
+                        response_repeat = 2
+                        for _ in range(response_repeat):
                             result = user_data._completed_requests.get()
                             output0 = result.as_numpy('OUTPUT0')
                             self.assertIsNotNone(output0)
                             self.assertTrue(np.all(output0 == input0))
-                        else:
-                            response_repeat = 2
-                            for _ in range(response_repeat):
-                                result = user_data._completed_requests.get()
-                                output0 = result.as_numpy('OUTPUT0')
-                                self.assertIsNotNone(output0)
-                                self.assertTrue(np.all(output0 == input0))
 
     def test_ensemble_io(self):
         # Only run the shared memory leak detection with the default trial
@@ -107,17 +106,45 @@ class IOTest(tu.TestResultCollector):
 
     def test_empty_gpu_output(self):
         model_name = 'dlpack_empty_output'
-        with httpclient.InferenceServerClient("localhost:8000") as client:
-            input_data = np.array([[1.0]], dtype=np.float32)
-            inputs = [
-                httpclient.InferInput("INPUT", input_data.shape,
-                                      np_to_triton_dtype(input_data.dtype))
-            ]
-            inputs[0].set_data_from_numpy(input_data)
-            result = client.infer(model_name, inputs)
+        input_data = np.array([[1.0]], dtype=np.float32)
+        inputs = [
+            grpcclient.InferInput("INPUT", input_data.shape,
+                                  np_to_triton_dtype(input_data.dtype))
+        ]
+        inputs[0].set_data_from_numpy(input_data)
+        result = self._client.infer(model_name, inputs)
+        output = result.as_numpy('OUTPUT')
+        self.assertIsNotNone(output)
+        self.assertEqual(output.size, 0)
+
+    def test_variable_gpu_output(self):
+        # Input is not important in this test
+        model_name = 'variable_gpu_output'
+        input_data = np.array([[1.0]], dtype=np.float32)
+        inputs = [
+            grpcclient.InferInput("INPUT", input_data.shape,
+                                  np_to_triton_dtype(input_data.dtype))
+        ]
+        inputs[0].set_data_from_numpy(input_data)
+        user_data = UserData()
+
+        # The test sends five requests to the model and the model returns five
+        # responses with different GPU output shapes
+        num_requests = 5
+        for _ in range(num_requests):
+            result = self._client.async_infer(model_name=model_name,
+                                              inputs=inputs,
+                                              callback=partial(
+                                                  callback, user_data))
+
+        for i in range(num_requests):
+            result = user_data._completed_requests.get()
+            if result is InferenceServerException:
+                self.assertTrue(False, result)
             output = result.as_numpy('OUTPUT')
             self.assertIsNotNone(output)
-            self.assertEqual(output.size, 0)
+            self.assertEqual(output.size, i + 1)
+            np.testing.assert_almost_equal(output, np.ones(i + 1) * (i + 1))
 
 
 if __name__ == '__main__':

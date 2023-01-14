@@ -1,4 +1,4 @@
-# Copyright (c) 2019-2021, NVIDIA CORPORATION. All rights reserved.
+# Copyright (c) 2022, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -24,18 +24,24 @@
 # (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-replicaCount: 1
+import triton_python_backend_utils as pb_utils
+import torch
+from torch.utils.dlpack import to_dlpack
 
-image:
-  imageName: nvcr.io/nvidia/tritonserver:22.12-py3
-  pullPolicy: IfNotPresent
-  modelRepositoryPath: s3://triton-inference-server-repository/model_repository
-  numGpus: 1
 
-service:
-  type: LoadBalancer
+class TritonPythonModel:
 
-secret:
-  region: AWS_REGION
-  id: AWS_SECRET_KEY_ID
-  key: AWS_SECRET_ACCESS_KEY
+    def execute(self, requests):
+        # The client will send 5 requests
+        assert (len(requests) == 5)
+        responses = []
+        for i, request in enumerate(requests):
+            # Create an (i+1)-element array with all the tensors equal to (i+1)
+            output = torch.ones(i + 1, dtype=torch.float32, device='cuda')
+            output = output * (i + 1)
+            output_pb_tensor = pb_utils.Tensor.from_dlpack(
+                "OUTPUT", to_dlpack(output))
+            inference_response = pb_utils.InferenceResponse(
+                output_tensors=[output_pb_tensor])
+            responses.append(inference_response)
+        return responses

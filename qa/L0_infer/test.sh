@@ -96,7 +96,14 @@ else
     TRITON_DIR=${TRITON_DIR:="/opt/tritonserver"}
     SERVER=${TRITON_DIR}/bin/tritonserver
     BACKEND_DIR=${TRITON_DIR}/backends
-    export SERVER_LD_PRELOAD=/usr/lib/$(uname -m)-linux-gnu/libgomp.so.1
+
+    # PyTorch on SBSA requires libgomp to be loaded first. See the following
+    # GitHub issue for more information:
+    # https://github.com/pytorch/pytorch/issues/2575
+    arch=`uname -m`
+    if [ $arch = "aarch64" ]; then
+      SERVER_LD_PRELOAD=/usr/lib/$(uname -m)-linux-gnu/libgomp.so.1
+    fi
 fi
 
 # Allow more time to exit. Ensemble brings in too many models
@@ -130,9 +137,9 @@ export ENSEMBLES
 if [[ $BACKENDS == *"python_dlpack"* ]]; then
     if [ "$TEST_JETSON" == "0" ]; then
         if [[ "aarch64" != $(uname -m) ]] ; then
-            pip3 install torch==1.9.0+cpu -f https://download.pytorch.org/whl/torch_stable.html
+            pip3 install torch==1.13.0+cpu -f https://download.pytorch.org/whl/torch_stable.html
         else
-            pip3 install torch==1.9.0 -f https://download.pytorch.org/whl/torch_stable.html
+            pip3 install torch==1.13.0 -f https://download.pytorch.org/whl/torch_stable.html
         fi
     fi
 fi

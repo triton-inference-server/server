@@ -62,6 +62,9 @@ mkdir -p /workspace/build
               -DTRITON_ENABLE_EXAMPLES=ON \
               -DTRITON_ENABLE_TESTS=ON \
               -DTRITON_ENABLE_GPU=OFF \
+              -DTRITON_COMMON_REPO_TAG=${TRITON_COMMON_REPO_TAG} \
+              -DTRITON_CORE_REPO_TAG=${TRITON_CORE_REPO_TAG} \
+              -DTRITON_THIRD_PARTY_REPO_TAG=${TRITON_THIRD_PARTY_REPO_TAG} \
               /workspace/client && \
         make -j16 cc-clients java-clients python-clients)
 if [ $? -eq 0 ]; then
@@ -90,6 +93,9 @@ fi
               -DTRITON_ENABLE_EXAMPLES=ON \
               -DTRITON_ENABLE_TESTS=ON \
               -DTRITON_ENABLE_GPU=ON \
+              -DTRITON_COMMON_REPO_TAG=${TRITON_COMMON_REPO_TAG} \
+              -DTRITON_CORE_REPO_TAG=${TRITON_CORE_REPO_TAG} \
+              -DTRITON_THIRD_PARTY_REPO_TAG=${TRITON_THIRD_PARTY_REPO_TAG} \
               /workspace/client && \
         make -j16 cc-clients python-clients)
 if [ $? -eq 0 ]; then
@@ -117,6 +123,9 @@ fi
               -DTRITON_ENABLE_EXAMPLES=ON \
               -DTRITON_ENABLE_TESTS=ON \
               -DTRITON_ENABLE_GPU=ON \
+              -DTRITON_COMMON_REPO_TAG=${TRITON_COMMON_REPO_TAG} \
+              -DTRITON_CORE_REPO_TAG=${TRITON_CORE_REPO_TAG} \
+              -DTRITON_THIRD_PARTY_REPO_TAG=${TRITON_THIRD_PARTY_REPO_TAG} \
               /workspace/client && \
         make -j16 cc-clients python-clients)
 if [ $? -eq 0 ]; then
@@ -143,6 +152,9 @@ fi
               -DTRITON_ENABLE_EXAMPLES=ON \
               -DTRITON_ENABLE_TESTS=ON \
               -DTRITON_ENABLE_GPU=ON \
+              -DTRITON_COMMON_REPO_TAG=${TRITON_COMMON_REPO_TAG} \
+              -DTRITON_CORE_REPO_TAG=${TRITON_CORE_REPO_TAG} \
+              -DTRITON_THIRD_PARTY_REPO_TAG=${TRITON_THIRD_PARTY_REPO_TAG} \
               /workspace/client && \
         make -j16 cc-clients python-clients)
 if [ $? -eq 0 ]; then
@@ -169,6 +181,9 @@ fi
               -DTRITON_ENABLE_EXAMPLES=ON \
               -DTRITON_ENABLE_TESTS=ON \
               -DTRITON_ENABLE_GPU=ON \
+              -DTRITON_COMMON_REPO_TAG=${TRITON_COMMON_REPO_TAG} \
+              -DTRITON_CORE_REPO_TAG=${TRITON_CORE_REPO_TAG} \
+              -DTRITON_THIRD_PARTY_REPO_TAG=${TRITON_THIRD_PARTY_REPO_TAG} \
               /workspace/client && \
         make -j16 cc-clients python-clients)
 if [ $? -eq 0 ]; then
@@ -195,6 +210,9 @@ fi
               -DTRITON_ENABLE_EXAMPLES=ON \
               -DTRITON_ENABLE_TESTS=ON \
               -DTRITON_ENABLE_GPU=ON \
+              -DTRITON_COMMON_REPO_TAG=${TRITON_COMMON_REPO_TAG} \
+              -DTRITON_CORE_REPO_TAG=${TRITON_CORE_REPO_TAG} \
+              -DTRITON_THIRD_PARTY_REPO_TAG=${TRITON_THIRD_PARTY_REPO_TAG} \
               /workspace/client && \
         make -j16 cc-clients python-clients)
 if [ $? -eq 0 ]; then
@@ -221,6 +239,9 @@ fi
               -DTRITON_ENABLE_EXAMPLES=ON \
               -DTRITON_ENABLE_TESTS=ON \
               -DTRITON_ENABLE_GPU=ON \
+              -DTRITON_COMMON_REPO_TAG=${TRITON_COMMON_REPO_TAG} \
+              -DTRITON_CORE_REPO_TAG=${TRITON_CORE_REPO_TAG} \
+              -DTRITON_THIRD_PARTY_REPO_TAG=${TRITON_THIRD_PARTY_REPO_TAG} \
               /workspace/client && \
         make -j16 cc-clients python-clients)
 if [ $? -eq 0 ]; then

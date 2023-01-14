@@ -29,7 +29,7 @@
 #
 
 # Base image on the minimum Triton container
-ARG BASE_IMAGE=nvcr.io/nvidia/tritonserver:22.10-py3-min
+ARG BASE_IMAGE=nvcr.io/nvidia/tritonserver:22.12-py3-min
 
 ARG TRITON_CLIENT_REPO_SUBDIR=clientrepo
 ARG TRITON_COMMON_REPO_TAG=main
@@ -40,6 +40,7 @@ ARG TRITON_MODEL_ANALYZER_REPO_TAG=main
 ARG CMAKE_UBUNTU_VERSION=20.04
 ARG TRITON_ENABLE_GPU=ON
 ARG JAVA_BINDINGS_MAVEN_VERSION=3.8.4
+ARG JAVA_BINDINGS_JAVACPP_PRESETS_TAG=1.5.8
 
 # DCGM version to install for Model Analyzer
 ARG DCGM_VERSION=2.2.9
@@ -65,7 +66,9 @@ RUN apt-get update && \
             build-essential \
             curl \
             git \
+            gperf \
             libb64-dev \
+            libgoogle-perftools-dev \
             libopencv-dev \
             libopencv-core-dev \
             libssl-dev \
@@ -116,6 +119,7 @@ ARG TRITON_BACKEND_REPO_TAG
 ARG TRITON_THIRD_PARTY_REPO_TAG
 ARG TRITON_ENABLE_GPU
 ARG JAVA_BINDINGS_MAVEN_VERSION
+ARG JAVA_BINDINGS_JAVACPP_PRESETS_TAG
 ARG TARGETPLATFORM
 
 WORKDIR /workspace
@@ -146,6 +150,7 @@ RUN if [ "$TARGETPLATFORM" = "linux/amd64" ]; then \
         source /workspace/client/src/java-api-bindings/scripts/install_dependencies_and_build.sh \
         --maven-version ${JAVA_BINDINGS_MAVEN_VERSION} \
         --core-tag ${TRITON_CORE_REPO_TAG} \
+        --javacpp-tag ${JAVA_BINDINGS_JAVACPP_PRESETS_TAG} \
         --jar-install-path /workspace/install/java-api-bindings; \
     fi
 
@@ -167,7 +172,9 @@ RUN apt-get update && \
             software-properties-common \
             curl \
             git \
+            gperf \
             libb64-dev \
+            libgoogle-perftools-dev \
             libopencv-dev \
             libopencv-core-dev \
             libssl-dev \
@@ -244,3 +251,6 @@ ENV LD_LIBRARY_PATH /workspace/install/lib:${LD_LIBRARY_PATH}
 
 # DLIS-3631: Needed to run Perf Analyzer CI tests correctly
 ENV LD_LIBRARY_PATH /opt/hpcx/ompi/lib:${LD_LIBRARY_PATH}
+
+# Set TCMALLOC_RELEASE_RATE for users setting LD_PRELOAD with tcmalloc
+ENV TCMALLOC_RELEASE_RATE 200

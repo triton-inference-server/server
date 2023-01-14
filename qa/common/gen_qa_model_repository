@@ -48,7 +48,7 @@
 ##
 ############################################################################
 
-TRITON_VERSION=${TRITON_VERSION:=22.10}
+TRITON_VERSION=${TRITON_VERSION:=22.12}
 
 # ONNX. Use ONNX_OPSET 0 to use the default for ONNX version
 ONNX_VERSION=1.10.1
@@ -196,6 +196,7 @@ cat >$HOST_SRCDIR/$OPENVINOSCRIPT <<EOF
 nvidia-smi -L || true
 nvidia-smi || true
 set -e
+set -x
 export DEBIAN_FRONTEND=noninteractive
 apt-get update && \
     apt-get install -y --no-install-recommends build-essential cmake libprotobuf-dev \
@@ -212,7 +213,7 @@ ln -s /usr/bin/python3 /usr/bin/python
 
 pip3 install "protobuf<=3.20.1" # TODO: Remove current line DLIS-3838
 
-pip3 install numpy setuptools
+pip3 install  "numpy<=1.23.5" setuptools
 
 PYTHONPATH=/opt/intel/openvino_${OPENVINO_VERSION}/python/python3
 source /opt/intel/openvino_${OPENVINO_VERSION}/bin/setupvars.sh .
@@ -263,13 +264,14 @@ cat >$HOST_SRCDIR/$ONNXSCRIPT <<EOF
 nvidia-smi -L || true
 nvidia-smi || true
 set -e
+set -x
 export DEBIAN_FRONTEND=noninteractive
 apt-get update && \
         apt-get install -y --no-install-recommends build-essential cmake libprotobuf-dev \
                 protobuf-compiler python3 python3-dev python3-pip
 ln -s /usr/bin/python3 /usr/bin/python
 
-pip3 install "protobuf<=3.20.1" # TODO: Remove current line DLIS-3838
+pip3 install "protobuf<=3.20.1"  "numpy<=1.23.5" # TODO: Remove current line DLIS-3838
 pip3 install --upgrade onnx==${ONNX_VERSION}
 
 python3 $SRCDIR/gen_qa_models.py --onnx --onnx_opset=$ONNX_OPSET --models_dir=$DESTDIR
@@ -334,6 +336,7 @@ cat >$HOST_SRCDIR/$TORCHSCRIPT <<EOF
 nvidia-smi -L || true
 nvidia-smi || true
 set -e
+set -x
 python3 $SRCDIR/gen_qa_models.py --libtorch --models_dir=$DESTDIR
 chmod -R 777 $DESTDIR
 python3 $SRCDIR/gen_qa_models.py --libtorch --variable --models_dir=$VARDESTDIR
@@ -381,6 +384,7 @@ cat >$HOST_SRCDIR/$TFSCRIPT <<EOF
 nvidia-smi -L || true
 nvidia-smi || true
 set -e
+set -x
 python3 $SRCDIR/gen_qa_models.py --graphdef --savedmodel --models_dir=$DESTDIR
 chmod -R 777 $DESTDIR
 python3 $SRCDIR/gen_qa_models.py --graphdef --savedmodel --variable --models_dir=$VARDESTDIR
@@ -445,6 +449,7 @@ cat >$HOST_SRCDIR/$TRTSCRIPT <<EOF
 nvidia-smi -L || true
 nvidia-smi || true
 set -e
+set -x
 export TRT_SUPPRESS_DEPRECATION_WARNINGS=1
 # Models using shape tensor i/o
 python3 $SRCDIR/gen_qa_identity_models.py --tensorrt-shape-io --models_dir=$SHAPEDESTDIR

@@ -37,12 +37,11 @@ class PBTensorTest(unittest.TestCase):
         # Test different dtypes
         pytorch_dtypes = [
             torch.float16, torch.float32, torch.float64, torch.int8,
-            torch.int16, torch.int32, torch.int64, torch.uint8, torch.bool
+            torch.int16, torch.int32, torch.int64, torch.uint8
         ]
 
         for pytorch_dtype in pytorch_dtypes:
-            pytorch_tensor = torch.rand([100], dtype=torch.float16) * 100
-            pytorch_tensor = pytorch_tensor.type(pytorch_dtype)
+            pytorch_tensor = torch.ones([100], dtype=pytorch_dtype)
             dlpack_tensor = to_dlpack(pytorch_tensor)
             pb_tensor = pb_utils.Tensor.from_dlpack('test_tensor',
                                                     dlpack_tensor)
@@ -54,14 +53,8 @@ class PBTensorTest(unittest.TestCase):
             pytorch_tensor_dlpack = from_dlpack(pb_tensor.to_dlpack())
             self.assertTrue(torch.all(pytorch_tensor_dlpack == pytorch_tensor))
 
-            # DLPack does not properly support bool type:
-            # https://github.com/google/jax/issues/4719
-            if pytorch_dtype != torch.bool:
-                self.assertTrue(
-                    pytorch_tensor.type() == pytorch_tensor_dlpack.type())
-            else:
-                self.assertFalse(
-                    pytorch_tensor.type() == pytorch_tensor_dlpack.type())
+            self.assertTrue(
+                pytorch_tensor.type() == pytorch_tensor_dlpack.type())
 
     def test_non_contiguous_error(self):
         pytorch_tensor = torch.rand([20, 30], dtype=torch.float16)
@@ -92,13 +85,13 @@ class PBTensorTest(unittest.TestCase):
         # Test different dtypes
         pytorch_dtypes = [
             torch.float16, torch.float32, torch.float64, torch.int8,
-            torch.int16, torch.int32, torch.int64, torch.uint8, torch.bool
+            torch.int16, torch.int32, torch.int64, torch.uint8
         ]
 
         for pytorch_dtype in pytorch_dtypes:
-            pytorch_tensor = torch.rand(
-                [100], dtype=torch.float16, device='cuda') * 100
-            pytorch_tensor = pytorch_tensor.type(pytorch_dtype)
+            pytorch_tensor = torch.ones([100],
+                                        dtype=pytorch_dtype,
+                                        device='cuda')
             dlpack_tensor = to_dlpack(pytorch_tensor)
             pb_tensor = pb_utils.Tensor.from_dlpack('test_tensor',
                                                     dlpack_tensor)

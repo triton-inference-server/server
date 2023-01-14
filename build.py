@@ -67,9 +67,9 @@ from inspect import getsourcefile
 # incorrectly load the other version of the openvino libraries.
 #
 TRITON_VERSION_MAP = {
-    '2.29.0dev': (
-        '22.12dev',  # triton container
-        '22.10',  # upstream container
+    '2.30.0dev': (
+        '23.01dev',  # triton container
+        '22.12',  # upstream container
         '1.13.1',  # ORT
         '2022.1.0',  # ORT OpenVINO
         '2022.1.0',  # Standalone OpenVINO
@@ -848,11 +848,13 @@ RUN apt-get update && \
             build-essential \
             docker.io \
             git \
+            gperf \
             libre2-dev \
             libssl-dev \
             libtool \
             libcurl4-openssl-dev \
             libb64-dev \
+            libgoogle-perftools-dev \
             patchelf \
             python3-dev \
             python3-pip \
@@ -1071,11 +1073,16 @@ RUN apt-get update && \
             libcurl4-openssl-dev \
             libre2-5 \
             git \
+            gperf \
             dirmngr \
+            libgoogle-perftools-dev \
             libnuma-dev \
             curl \
             {backend_dependencies} && \
     rm -rf /var/lib/apt/lists/*
+
+# Set TCMALLOC_RELEASE_RATE for users setting LD_PRELOAD with tcmalloc
+ENV TCMALLOC_RELEASE_RATE 200
 '''.format(gpu_enabled=gpu_enabled, backend_dependencies=backend_dependencies)
 
     if enable_gpu:

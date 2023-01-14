@@ -173,7 +173,7 @@ $ ./build.py ... --repo-tag=common:<container tag> --repo-tag=core:<container ta
 
 If you are building on a release branch then `<container tag>` will
 default to the branch name. For example, if you are building on the
-r22.10 branch, `<container tag>` will default to r22.10. If you are
+r22.12 branch, `<container tag>` will default to r22.12. If you are
 building on any other branch (including the *main* branch) then
 `<container tag>` will default to "main". Therefore, you typically do
 not need to provide `<container tag>` at all (nor the preceding
@@ -189,7 +189,7 @@ repo that you want to use in the build, you would specify
 If you want to build without GPU support you must specify individual
 feature flags and not include the `--enable-gpu` and
 `--enable-gpu-metrics` flags. Only the following backends are
-available for a non-GPU / CPU-only build: `identity`, `repeat`,
+available for a non-GPU / CPU-only build: `identity`, `repeat`, `ensemble`,
 `square`, `tensorflow2`, `pytorch`, `onnxruntime`, `openvino`,
 `python` and `fil`.
 
@@ -334,8 +334,8 @@ python build.py --cmake-dir=<path/to/repo>/build --build-dir=/tmp/citritonbuild 
 If you are building on *main* branch then '<container tag>' will
 default to "main". If you are building on a release branch then
 '<container tag>' will default to the branch name. For example, if you
-are building on the r22.10 branch, '<container tag>' will default to
-r22.10. Therefore, you typically do not need to provide '<container
+are building on the r22.12 branch, '<container tag>' will default to
+r22.12. Therefore, you typically do not need to provide '<container
 tag>' at all (nor the preceding colon). You can use a different
 '<container tag>' for a component to instead use the corresponding
 branch/tag in the build. For example, if you have a branch called

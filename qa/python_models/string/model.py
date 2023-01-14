@@ -1,4 +1,4 @@
-# Copyright (c) 2021, NVIDIA CORPORATION. All rights reserved.
+# Copyright 2021-2022, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -35,7 +35,7 @@ class TritonPythonModel:
 
     def initialize(self, args):
         self._index = 0
-        self._dtypes = [np.bytes_, np.object_, np.object]
+        self._dtypes = [np.bytes_, np.object_]
 
     def execute(self, requests):
         responses = []
