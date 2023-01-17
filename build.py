@@ -999,7 +999,7 @@ COPY --chown=1000:1000 docker/sagemaker/serve /usr/bin/.
     # stage of the PyTorch backend
     if not FLAGS.enable_gpu and ('pytorch' in backends):
         df += '''
-RUN patchelf --add-needed /usr/local/cuda/lib64/stubs/libcublasLt.so.11 backends/pytorch/libtorch_cuda.so
+RUN patchelf --add-needed /usr/local/cuda/lib64/stubs/libcublasLt.so.12 backends/pytorch/libtorch_cuda.so
 '''
 
     with open(os.path.join(ddir, dockerfile_name), "w") as dfile:
