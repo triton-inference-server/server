@@ -1027,18 +1027,15 @@ for examples on specifying different variants of warmup samples.
 ## Response Cache
 
 The model configuration `response_cache` section has an `enable` boolean used to
-enable the Response Cache for this model. In addition to enabling the cache in
-the model config, a non-zero `--response-cache-byte-size` must be set when
-starting the server.
+enable the Response Cache for this model. 
 
 ```
 response_cache {
-  enable: True
+  enable: true
 }
 ```
 
-See the [Response
-Cache](response_cache.md)
-and [ModelConfig
-protobuf](https://github.com/triton-inference-server/common/blob/main/protobuf/model_config.proto).
-docs for more information.
+In addition to enabling the cache in the model config, a `--cache-config` must
+be specified when starting the server to enable caching on the server-side. See 
+the [Response Cache](response_cache.md) doc for more details on enabling
+server-side caching.
