@@ -88,7 +88,7 @@ rm $CLIENT_LOG
 ############################################################
 
 #
-# Single Instance Group Test
+# Tensorflow saved model
 #
 
 # Don't need to test different models so we can copy the same one 
@@ -96,6 +96,11 @@ rm $CLIENT_LOG
 mkdir -p models/increase_count && cp -r $DATADIR/qa_identity_model_repository/savedmodel_nobatch_zero_1_float32/* models/increase_count
 mkdir -p models/decrease_count && cp -r $DATADIR/qa_identity_model_repository/savedmodel_nobatch_zero_1_float32/* models/decrease_count
 mkdir -p models/decrease_count_past_zero && cp -r $DATADIR/qa_identity_model_repository/savedmodel_nobatch_zero_1_float32/* models/decrease_count_past_zero
+mkdir -p models/increase_count_some_multiple && cp -r $DATADIR/qa_identity_model_repository/savedmodel_nobatch_zero_1_float32/* models/increase_count_some_multiple
+mkdir -p models/increase_count_all_multiple && cp -r $DATADIR/qa_identity_model_repository/savedmodel_nobatch_zero_1_float32/* models/increase_count_all_multiple
+mkdir -p models/increase_count_rearrange_multiple && cp -r $DATADIR/qa_identity_model_repository/savedmodel_nobatch_zero_1_float32/* models/increase_count_rearrange_multiple
+mkdir -p models/decrease_count_some_multiple && cp -r $DATADIR/qa_identity_model_repository/savedmodel_nobatch_zero_1_float32/* models/decrease_count_some_multiple
+mkdir -p models/decrease_count_all_multiple && cp -r $DATADIR/qa_identity_model_repository/savedmodel_nobatch_zero_1_float32/* models/decrease_count_all_multiple
 
 mkdir -p models/increase_count_no_config && cp -r $DATADIR/qa_identity_model_repository/savedmodel_nobatch_zero_1_float32/* models/increase_count_no_config
 rm models/increase_count_no_config/config.pbtxt
@@ -108,19 +113,36 @@ if [ "$SERVER_PID" == "0" ]; then
 fi
 
 set +e
-echo "Starting python test..."
+
 python3 $CLIENT >>$CLIENT_LOG 2>&1
 if [ $? -ne 0 ]; then
     echo -e "\n***\n*** Test Failed\n***" >>$CLIENT_LOG
     echo -e "\n***\n*** Test Failed\n***"
     RET=1
 fi
-echo "Python test complete"
 
 set -e
-echo "Killing server..."
 kill_server
-echo "Killing server complete"
+
+#
+# Tensorflow graphdef
+#
+
+#
+# Onnxruntime
+#
+
+#
+# TensorRT
+#
+
+#
+# Python
+#
+
+#
+# Pytorch
+#
 
 
 if [ $RET -eq 0 ]; then
