@@ -26,8 +26,8 @@
 #pragma once
 
 #include <grpc++/grpc++.h>
-#include "health.grpc.pb.h"
 #include "grpc_service.grpc.pb.h"
+#include "health.grpc.pb.h"
 #include "shared_memory_manager.h"
 #include "tracer.h"
 #include "triton/core/tritonserver.h"
@@ -62,10 +62,6 @@ struct KeepAliveOptions {
   int http2_min_recv_ping_interval_without_data_ms;
   int http2_max_ping_strikes;
 };
-
-/// HealthCheckResponse type used by GRPC health API
-///
-typedef enum { UNKNOWN, SERVING, NOT_SERVING, SERVICE_UNKNOWN } ServingStatus;
 
 class GRPCServer {
  public:
