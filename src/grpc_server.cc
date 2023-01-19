@@ -511,6 +511,7 @@ CommonHandler::SetUpAllRequests()
       inference::ServerReadyRequest, inference::ServerReadyResponse>(
       "ServerReady", 0, OnRegisterServerReady, OnExecuteServerReady,
       false /* async */, cq_);
+
   //
   //  Health Check
   //
