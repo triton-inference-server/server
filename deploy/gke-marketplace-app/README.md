@@ -64,9 +64,11 @@ export REGION=<GCP region of your choice>
 export DEPLOYMENT_NAME=<GKE cluster name, triton-gke for example>
 
 gcloud beta container clusters create ${DEPLOYMENT_NAME} \
---addons=HorizontalPodAutoscaling,HttpLoadBalancing,Istio \
+--addons=HorizontalPodAutoscaling,HttpLoadBalancing \
+--service-account=gke-test@k80-exploration.iam.gserviceaccount.com \
 --machine-type=n1-standard-8 \
 --node-locations=${ZONE} \
+--monitoring=SYSTEM \
 --zone=${ZONE} \
 --subnetwork=default \
 --scopes cloud-platform \
@@ -78,6 +80,7 @@ gcloud container node-pools create accel \
   --project ${PROJECT_ID} \
   --zone ${ZONE} \
   --cluster ${DEPLOYMENT_NAME} \
+  --service-account=gke-test@k80-exploration.iam.gserviceaccount.com \
   --num-nodes 2 \
   --accelerator type=nvidia-tesla-t4,count=1 \
   --enable-autoscaling --min-nodes 2 --max-nodes 3 \
@@ -90,13 +93,23 @@ gcloud container node-pools create accel \
 gcloud container clusters get-credentials ${DEPLOYMENT_NAME} --project ${PROJECT_ID} --zone ${ZONE}  
 
 # deploy NVIDIA device plugin for GKE to prepare GPU nodes for driver install
-kubectl apply -f https://raw.githubusercontent.com/GoogleCloudPlatform/container-engine-accelerators/master/nvidia-driver-installer/cos/daemonset-preloaded.yaml
+kubectl apply -f https://raw.githubusercontent.com/GoogleCloudPlatform/container-engine-accelerators/master/nvidia-driver-installer/cos/daemonset-preloaded-latest.yaml 
 
 # make sure you can run kubectl locally to access the cluster
 kubectl create clusterrolebinding cluster-admin-binding --clusterrole cluster-admin --user "$(gcloud config get-value account)"
 
 # enable stackdriver custom metrics adaptor
-kubectl apply -f https://raw.githubusercontent.com/GoogleCloudPlatform/k8s-stackdriver/master/custom-metrics-stackdriver-adapter/deploy/production/adapter.yaml
+kubectl apply -f https://raw.githubusercontent.com/GoogleCloudPlatform/k8s-stackdriver/master/custom-metrics-stackdriver-adapter/deploy/production/adapter_new_resource_model.yaml
+
+# use helm to install istio, update helm chart, make sure your helm client version > 3.6
+helm repo add istio https://istio-release.storage.googleapis.com/charts
+helm repo update
+kubectl create namespace istio-system
+helm install istio-base istio/base -n istio-system
+helm install istiod istio/istiod -n istio-system --wait
+kubectl create namespace istio-ingress
+kubectl label namespace istio-ingress istio-injection=enabled
+helm install istio-ingress istio/gateway -n istio-ingress --wait 
 ```
 Creating a cluster and adding GPU nodes could take up-to 10 minutes. Please be patient after executing this command. GPU resources in GCP could be fully utilized, so please try a different zone in case compute resource cannot be allocated. After GKE cluster is running, run `kubectl get pods --all-namespaces` to make sure the client can access the cluster correctly: 
 
