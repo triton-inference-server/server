@@ -104,8 +104,8 @@ TRITONCACHE APIs and is dynamically loaded on server startup, if enabled.
 For tags `>=23.02`, 
 [tritonserver release containers](https://catalog.ngc.nvidia.com/orgs/nvidia/containers/tritonserver)
 come with the following cache implementations out of the box:
-- [local](https://github.com/triton-inference-server/local_cache): `/opt/tritonserver/caches/local/libtritoncache_local.so`.
-- [redis](https://github.com/triton-inference-server/redis_cache): `/opt/tritonserver/caches/redis/libtritoncache_redis.so`.
+- [local](https://github.com/triton-inference-server/local_cache): `/opt/tritonserver/caches/local/libtritoncache_local.so`
+- [redis](https://github.com/triton-inference-server/redis_cache): `/opt/tritonserver/caches/redis/libtritoncache_redis.so`
 
 With these TRITONCACHE APIs, `tritonserver` exposes a new `--cache-config` 
 CLI flag that gives the user flexible customization of which cache implementation
