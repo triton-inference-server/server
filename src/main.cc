@@ -1301,8 +1301,7 @@ ParseCacheConfigOption(const std::string arg)
   // No cache-agnostic global settings are currently supported
   else {
     std::cerr << "No cache specified. --cache-config option format is "
-              << "<cache name>,<setting>=<value> or "
-              << "<setting>=<value>. Got " << arg << std::endl;
+              << "<cache name>,<setting>=<value>. Got " << arg << std::endl;
     exit(1);
   }
 
