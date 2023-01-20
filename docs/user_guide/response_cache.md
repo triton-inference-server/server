@@ -95,16 +95,21 @@ For more information on enabling the response cache for each model, see the
 
 ### Cache Implementations
 
-As of the 23.02 release, Triton has a set of TRITONCACHE APIs that are used to
-communicate with a cache implementation of the user's choice. Currently, 
-Triton comes with two cache implementations out of the box: `local` or `redis`.
-These implementations can be found in 
-[tritonserver release containers ](https://catalog.ngc.nvidia.com/orgs/nvidia/containers/tritonserver)
->= 23.02 in the `/opt/tritonserver/caches` directory.
+Starting in the 23.02 release, Triton has a set of
+[TRITONCACHE APIs](https://github.com/triton-inference-server/core/blob/main/include/triton/core/tritoncache.h)
+that are used to communicate with a cache implementation of the user's choice.
 
-With these new APIs, `tritonserver` exposes a new `--cache-config` CLI flag
-that gives the user flexible customization of which cache implementation
-to use, and how to configure it. Similar the the `--backend-config` flag,
+A cache implementation is a shared library that implements the required
+TRITONCACHE APIs and is dynamically loaded on server startup, if enabled. 
+For tags `>=23.02`, 
+[tritonserver release containers](https://catalog.ngc.nvidia.com/orgs/nvidia/containers/tritonserver)
+come with the following cache implementations out of the box:
+- [local](https://github.com/triton-inference-server/local_cache): `/opt/tritonserver/caches/local/libtritoncache_local.so`
+- [redis](https://github.com/triton-inference-server/redis_cache): `/opt/tritonserver/caches/redis/libtritoncache_redis.so`
+
+With these TRITONCACHE APIs, `tritonserver` exposes a new `--cache-config` 
+CLI flag that gives the user flexible customization of which cache implementation
+to use, and how to configure it. Similar to the `--backend-config` flag,
 the expected format is `--cache-config <cache_name>,<key>=<value>` and may
 be specified multiple times to specify multiple keys if the cache implementation
 requires it.
