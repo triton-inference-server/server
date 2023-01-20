@@ -165,6 +165,19 @@ RUN mkdir -p qa/custom_models/custom_sequence_int32/1 && \
     cp tritonbuild/tritonserver/backends/dyna_sequence/libtriton_dyna_sequence.so \
         qa/custom_models/custom_dyna_sequence_int32/1/.
 
+# TODO: Cache tests need cache shared library
+# This is a temp WAR and should be added to build.py / etc.
+RUN cd /tmp && \
+    git clone https://github.com/triton-inference-server/local_cache.git && \
+    cd local_cache && mkdir build && cd build && \
+    cmake \
+      -D CMAKE_INSTALL_PREFIX=install \
+      -D TRITON_CORE_REPO_TAG=${TRITON_CORE_REPO_TAG} \
+      -D TRITON_ENABLE_METRICS=${TRITON_ENABLE_METRICS} \
+      .. && \
+    make -j80 install && \
+    cp -r install/caches /opt/tritonserver/
+
 # L0_lifecycle needs No-GPU build of identity backend.
 RUN cd tritonbuild/identity && \
     rm -rf install build && mkdir build && cd build && \
