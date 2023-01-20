@@ -515,7 +515,7 @@ CommonHandler::SetUpAllRequests()
   //
   //  Health Check
   //
-  auto OnRegisterCheck =
+  auto OnHealthRegisterCheck =
       [this](
           grpc::ServerContext* ctx,
           grpc::health::v1::HealthCheckRequest* request,
@@ -526,10 +526,11 @@ CommonHandler::SetUpAllRequests()
             ctx, request, responder, this->cq_, this->cq_, tag);
       };
 
-  auto OnExecuteCheck = [this](
-                            grpc::health::v1::HealthCheckRequest& request,
-                            grpc::health::v1::HealthCheckResponse* response,
-                            grpc::Status* status) {
+  auto OnHealthExecuteCheck = [this](
+                                  grpc::health::v1::HealthCheckRequest& request,
+                                  grpc::health::v1::HealthCheckResponse*
+                                      response,
+                                  grpc::Status* status) {
     bool live = false;
     TRITONSERVER_Error* err =
         TRITONSERVER_ServerIsReady(tritonserver_.get(), &live);
@@ -552,7 +553,8 @@ CommonHandler::SetUpAllRequests()
       grpc::ServerAsyncResponseWriter<grpc::health::v1::HealthCheckResponse>,
       grpc::health::v1::HealthCheckRequest,
       grpc::health::v1::HealthCheckResponse>(
-      "Check", 0, OnRegisterCheck, OnExecuteCheck, false /* async */, cq_);
+      "Check", 0, OnHealthRegisterCheck, OnHealthExecuteCheck,
+      false /* async */, cq_);
 
   //
   //  ModelReady

@@ -1,4 +1,4 @@
-# Copyright 2019-2022, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright 2019-2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -314,7 +314,7 @@ if(${TRITON_ENABLE_GRPC})
       proto-library           # from repo-common
       triton-common-logging   # from repo-common
       triton-common-json      # from repo-common
-      health-library          # from repo-common
+      grpc-health-library     # from repo-common
       grpc-service-library    # from repo-common
       triton-core-serverapi   # from repo-core
       triton-core-serverstub  # from repo-core
