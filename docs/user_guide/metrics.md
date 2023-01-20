@@ -133,36 +133,40 @@ If building Triton locally, the `TRITON_ENABLE_METRICS_CPU` CMake build flag can
 
 ## Response Cache Metrics
 
-Compute latency metrics in the [Inference Request Metrics table](#inference-request-metrics) above are calculated for the
-time spent in model inference backends. If the response cache is enabled for a
-given model (see [Response Cache](response_cache.md)
+Cache metrics can be reported in two ways:
+
+1. A base set of cache metrics will be reported
+by Triton directly, such as the cache hit/miss counts and durations described
+below.
+
+2. As of 23.02, additional cache metrics may be reported depending on the 
+[cache implementation](response_cache.md#cache-implementations) 
+being used through Triton's [Metrics API](#custom-metrics).
+
+### Triton-reported Response Cache Metrics
+
+Compute latency metrics in the 
+[Inference Request Metrics table](#inference-request-metrics) above are 
+calculated for the time spent in model inference backends. If the response 
+cache is enabled for a given model (see [Response Cache](response_cache.md)
 docs for more info), total inference times may be affected by response cache
 lookup times.
 
-On cache hits, "Cache Hit Lookup Time" indicates the time spent looking up the
+On cache hits, "Cache Hit Time" indicates the time spent looking up the
 response, and "Compute Input Time" /  "Compute Time" / "Compute Output Time"
 are not recorded.
 
-On cache misses, "Cache Miss Lookup Time" indicates the time spent looking up
-the request hash and "Cache Miss Insertion Time" indicates the time spent
-inserting the computed output tensor data into the cache. Otherwise, "Compute
-Input Time" /  "Compute Time" / "Compute Output Time" will be recorded as usual.
+On cache misses, "Cache Miss Time" indicates the time spent looking up
+the request hash and inserting the computed output tensor data into the cache. 
+Otherwise, "Compute Input Time" /  "Compute Time" / "Compute Output Time" will
+be recorded as usual.
 
 |Category      |Metric          |Metric Name |Description                            |Granularity|Frequency    |
 |--------------|----------------|------------|---------------------------|-----------|-------------|
-|Utilization   |Total Cache Utilization |`nv_cache_util` |Total Response Cache utilization rate (0.0 - 1.0) |Server-wide |Per interval |
-|Count         |Total Cache Entry Count |`nv_cache_num_entries` |Total number of responses stored in response cache across all models |Server-wide |Per interval |
-|              |Total Cache Lookup Count |`nv_cache_num_lookups` |Total number of response cache lookups done by Triton across all models |Server-wide |Per interval |
-|              |Total Cache Hit Count |`nv_cache_num_hits` |Total number of response cache hits across all models |Server-wide |Per interval |
-|              |Total Cache Miss Count |`nv_cache_num_misses` |Total number of response cache misses across all models |Server-wide |Per interval |
-|              |Total Cache Eviction Count |`nv_cache_num_evictions` |Total number of response cache evictions across all models |Server-wide |Per interval |
-|              |Cache Hit Count |`nv_cache_num_hits_per_model` |Number of response cache hits per model |Per model |Per request |
+|Count         |Cache Hit Count |`nv_cache_num_hits_per_model` |Number of response cache hits per model |Per model |Per request |
 |              |Cache Miss Count |`nv_cache_num_misses_per_model` |Number of response cache misses per model |Per model |Per request |
-|Latency       |Total Cache Lookup Time |`nv_cache_lookup_duration` |Cumulative time requests spend checking for a cached response across all models (microseconds) |Server-wide |Per interval |
-|              |Total Cache Insertion Time |`nv_cache_insertion_duration` |Cumulative time requests spend inserting a response into the cache across all models (microseconds) |Server-wide |Per interval |
-|              |Cache Hit Lookup Time |`nv_cache_hit_lookup_duration_per_model` |Cumulative time requests spend retrieving a cached response per model on cache hits (microseconds) |Per model |Per request |
-|              |Cache Miss Lookup Time |`nv_cache_miss_lookup_duration_per_model`| Cumulative time requests spend looking up a request hash on a cache miss (microseconds) |Per model |Per request |
-|              |Cache Miss Insertion Time |`nv_cache_miss_insertion_duration_per_model` |Cumulative time requests spend inserting responses into the cache on a cache miss (microseconds) |Per model |Per request |
+|Latency       |Cache Hit Time |`nv_cache_hit_duration_per_model` |Cumulative time requests spend retrieving a cached response per model on cache hits (microseconds) |Per model |Per request |
+|              |Cache Miss Time |`nv_cache_miss_duration_per_model` |Cumulative time requests spend looking up and inserting responses into the cache on a cache miss (microseconds) |Per model |Per request |
 
 ## Custom Metrics
 
