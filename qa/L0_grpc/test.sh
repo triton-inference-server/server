@@ -1,5 +1,5 @@
 #!/bin/bash
-# Copyright 2019-2022, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright 2019-2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -533,6 +533,41 @@ if [ $? -ne 0 ]; then
     RET=1
 fi
 set -e
+kill $SERVER_PID
+wait $SERVER_PID
+
+# Test GRPC health check implemented
+go install github.com/grpc-ecosystem/grpc-health-probe@latest
+HEALTH_PROBE="${GOPATH}/bin/grpc-health-probe -addr=localhost:8001"
+
+CLIENT_LOG=`pwd`/grpc_health_probe_offline.log
+set +e
+$HEALTH_PROBE > $CLIENT_LOG 2>&1
+set -e
+if [ `grep -c "timeout: failed to connect service" ${CLIENT_LOG}` != "1" ]; then
+    echo -e "\n***\n*** Failed. Expected health check timeout\n***"
+    cat $CLIENT_LOG
+    RET=1
+fi
+
+SERVER_ARGS="--backend-directory=${BACKEND_DIR} --model-repository=${MODELDIR}"
+run_server
+if [ "$SERVER_PID" == "0" ]; then
+    echo -e "\n***\n*** Failed to start $SERVER\n***"
+    cat $SERVER_LOG
+    exit 1
+fi
+
+CLIENT_LOG=`pwd`/grpc_health_probe_online.log
+set +e
+$HEALTH_PROBE > $CLIENT_LOG 2>&1
+set -e
+if [ `grep -c "status: SERVING" ${CLIENT_LOG}` != "1" ]; then
+    echo -e "\n***\n*** Failed. Expected health check to return SERVING\n***"
+    cat $CLIENT_LOG
+    RET=1
+fi
+
 kill $SERVER_PID
 wait $SERVER_PID
 

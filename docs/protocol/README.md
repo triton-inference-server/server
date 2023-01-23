@@ -1,5 +1,5 @@
 <!--
-# Copyright (c) 2020, NVIDIA CORPORATION. All rights reserved.
+# Copyright 2020-2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -44,6 +44,7 @@ plus several extensions that are defined in the following documents:
 - [Statistics extension](./extension_statistics.md)
 - [Trace extension](./extension_trace.md)
 
-For the GRPC protocol the [protobuf
+For the GRPC protocol, the [protobuf
 specification](https://github.com/triton-inference-server/common/blob/main/protobuf/grpc_service.proto)
-is also available.
+is also available. In addition, you can find the GRPC health checking protocol protobuf
+specification [here](https://github.com/triton-inference-server/common/blob/main/protobuf/health.proto).
