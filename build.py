@@ -111,6 +111,12 @@ def fail_if(p, msg):
         sys.exit(1)
 
 
+def run_subprocess(command_list, msg):
+    p = subprocess.Popen(command_list)
+    p.wait()
+    fail_if(p.returncode != 0, msg)
+
+
 def target_platform():
     if FLAGS.target_platform is not None:
         return FLAGS.target_platform
@@ -528,7 +534,7 @@ def backend_cmake_args(images, components, be, install_dir, library_paths):
     elif be == 'fil':
         args = fil_cmake_args(images)
     elif be == 'fastertransformer':
-        args = []
+        args = fastertransformer_cmake_args()
     elif be == 'tensorrt':
         args = tensorrt_cmake_args()
     else:
@@ -755,6 +761,13 @@ def armnn_tflite_cmake_args():
     ]
 
 
+def fastertransformer_cmake_args():
+    print(
+        "Warning: Fastertransformer backend is not officially supported part of Triton."
+    )
+    return [cmake_backend_arg(be, 'CMAKE_EXPORT_COMPILE_COMMANDS', None, 1)]
+
+
 def install_dcgm_libraries(dcgm_version, target_machine):
     if dcgm_version == '':
         fail(
@@ -786,7 +799,7 @@ def install_miniconda(conda_version, target_machine):
     if target_machine == "arm64":
         # This branch used for the case when linux container builds on MacOS with ARM chip
         # macos arm arch names "arm64" when in linux it's names "aarch64".
-        # So we just replace the architecture to able find right conda version for Linux 
+        # So we just replace the architecture to able find right conda version for Linux
         target_machine = "aarch64"
     if conda_version == '':
         fail(
@@ -1036,6 +1049,9 @@ ENV LD_LIBRARY_PATH /opt/tritonserver/backends/onnxruntime:${LD_LIBRARY_PATH}
     # libgfortran5 is needed by pytorch backend on ARM
     if ('pytorch' in backends) and (target_machine == 'aarch64'):
         backend_dependencies += " libgfortran5"
+    # openssh-server is needed for fastertransformer
+    if ('fastertransformer' in backends):
+        backend_dependencies += " openssh-server"
 
     df += '''
 ENV TF_ADJUST_HUE_FUSED         1
@@ -1078,6 +1094,30 @@ RUN apt-get update && \
 # Set TCMALLOC_RELEASE_RATE for users setting LD_PRELOAD with tcmalloc
 ENV TCMALLOC_RELEASE_RATE 200
 '''.format(gpu_enabled=gpu_enabled, backend_dependencies=backend_dependencies)
+
+    if ('fastertransformer' in backends):
+        be = 'fastertransformer'
+        github_link = FLAGS.github_organization + '/' + be + '.git'
+        dir_name = "tmp_" + be
+
+        # clone the fastertransformer repo and copy over create_dockerfile.py
+        op = [
+            'git', 'clone', '--single-branch', '--depth=1', '-b', backends[be],
+            github_link, dir_name
+        ]
+        msg = 'git clone of branch {}:{} failed'.format(github_link,
+                                                        backends[be])
+        run_subprocess(op, msg)
+        op = ['cp', dir_name + "/docker/create_dockerfile.py", '.']
+        msg = 'Copy dockerfile to current repo failed.'
+
+        import create_dockerfile
+        df += create_dockerfile.create_postbuild(is_multistage_build=False)
+
+        # clean up
+        run_subprocess(op, msg)
+        op = ['rm', '-r', dir_name, 'create_dockerfile.py']
+        msg = 'Failed to remove directory {}'.format(dir_name)
 
     if enable_gpu:
         df += install_dcgm_libraries(argmap['DCGM_VERSION'], target_machine)
@@ -1475,15 +1515,8 @@ def core_build(cmake_script, repo_dir, cmake_dir, build_dir, install_dir,
     cmake_script.blankln()
 
 
-def backend_build(be,
-                  cmake_script,
-                  tag,
-                  build_dir,
-                  install_dir,
-                  github_organization,
-                  images,
-                  components,
-                  library_paths):
+def backend_build(be, cmake_script, tag, build_dir, install_dir,
+                  github_organization, images, components, library_paths):
     repo_build_dir = os.path.join(build_dir, be, 'build')
     repo_install_dir = os.path.join(build_dir, be, 'install')
 
@@ -1576,7 +1609,7 @@ def cibase_build(cmake_script, repo_dir, cmake_dir, build_dir, install_dir,
         cmake_script.mkdir(os.path.join(ci_dir, 'lib'))
         cmake_script.cp(
             os.path.join(repo_install_dir, 'lib',
-                        'libtritonrepoagent_relocation.so'),
+                         'libtritonrepoagent_relocation.so'),
             os.path.join(ci_dir, 'lib'))
 
     # Some of the backends are needed for CI testing
