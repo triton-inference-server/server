@@ -54,12 +54,15 @@ function check_server_success_and_kill {
     wait $SERVER_PID
 }
 
-mkdir -p "${PWD}/models/decoupled_cache/1"
+MODEL_DIR="${PWD}/models"
+mkdir -p "${MODEL_DIR}/decoupled_cache/1"
+mkdir -p "${MODEL_DIR}/identity_cache/1"
 
-# Check that server fails to start for a "decoupled" model with response
-# cache enabled
+# Check that server fails to start for a "decoupled" model with cache enabled
+EXTRA_ARGS="--model-control-mode=explicit --load-model=decoupled_cache"
+
 SERVER=/opt/tritonserver/bin/tritonserver
-SERVER_ARGS="--model-repository=${PWD}/models --response-cache-byte-size=8192"
+SERVER_ARGS="--model-repository=${MODEL_DIR} --response-cache-byte-size=8192 ${EXTRA_ARGS}"
 SERVER_LOG="./inference_server.log"
 source ../common/util.sh
 run_server
@@ -82,19 +85,22 @@ else
     set -e
 fi
 
+# Test with model expected to load successfully
+EXTRA_ARGS="--model-control-mode=explicit --load-model=identity_cache"
+
 # Test old cache config method
 # --response-cache-byte-size must be non-zero to test models with cache enabled
-SERVER_ARGS="--model-repository=`pwd`/models --response-cache-byte-size=8192"
+SERVER_ARGS="--model-repository=${MODEL_DIR} --response-cache-byte-size=8192 ${EXTRA_ARGS}"
 run_server
 check_server_success_and_kill
 
 # Test new cache config method
-SERVER_ARGS="--model-repository=`pwd`/models --cache-config=local,size=8192"
+SERVER_ARGS="--model-repository=${MODEL_DIR} --cache-config=local,size=8192 ${EXTRA_ARGS}"
 run_server
 check_server_success_and_kill
 
 # Test that specifying multiple cache types is not supported and should fail
-SERVER_ARGS="--model-repository=`pwd`/models --cache-config=local,size=8192"
+SERVER_ARGS="--model-repository=${MODEL_DIR} --cache-config=local,size=8192 --cache-config=redis,key=value ${EXTRA_ARGS}"
 run_server
 if [ "$SERVER_PID" != "0" ]; then
     echo -e "\n***\n*** Failed: $SERVER started successfully when it was expected to fail\n***"
@@ -116,7 +122,7 @@ else
 fi
 
 # Test that specifying both config styles is incompatible and should fail
-SERVER_ARGS="--model-repository=`pwd`/models --response-cache-byte-size=12345 --cache-config=local,size=67890"
+SERVER_ARGS="--model-repository=${MODEL_DIR} --response-cache-byte-size=12345 --cache-config=local,size=67890 ${EXTRA_ARGS}"
 run_server
 if [ "$SERVER_PID" != "0" ]; then
     echo -e "\n***\n*** Failed: $SERVER started successfully when it was expected to fail\n***"
