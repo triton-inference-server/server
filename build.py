@@ -2090,6 +2090,8 @@ if __name__ == '__main__':
         FLAGS.filesystem = []
     if FLAGS.repoagent is None:
         FLAGS.repoagent = []
+    if FLAGS.cache is None:
+        FLAGS.cache = []
     if FLAGS.library_paths is None:
         FLAGS.library_paths = []
     if FLAGS.extra_core_cmake_arg is None:
