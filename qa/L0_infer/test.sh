@@ -201,6 +201,9 @@ function generate_model_repository() {
             fi
           fi
         done
+      elif [ "$BACKEND" == "plan" ] && [ "$TRITON_SERVER_CPU_ONLY" == "1" ]; then
+        # skip plan_tensorrt models since they don't run on CPU only containers
+        continue
       else
         cp -r ${DATADIR}/qa_model_repository/${BACKEND}* \
           models/.
@@ -211,7 +214,10 @@ function generate_model_repository() {
 
       # Copy identity backend models and ensembles
       for BACKEND in $BACKENDS; do
-        if [ "$BACKEND" != "python" ] && [ "$BACKEND" != "python_dlpack" ] && [ "$BACKEND" != "openvino" ]; then
+        if [ "$BACKEND" == "plan" ] && [ "$TRITON_SERVER_CPU_ONLY" == "1" ]; then
+            # skip plan_tensorrt models since they don't run on CPU only containers
+            continue
+        elif [ "$BACKEND" != "python" ] && [ "$BACKEND" != "python_dlpack" ] && [ "$BACKEND" != "openvino" ]; then
             cp -r ${DATADIR}/qa_ensemble_model_repository/qa_model_repository/*${BACKEND}* \
               models/.
         fi
@@ -274,9 +280,6 @@ for TARGET in cpu gpu; do
             echo -e "Skip GPU testing on CPU-only device"
             continue
         fi
-        # set strict readiness=false on CPU-only device to allow
-        # unsuccessful load of TensorRT plans, which require GPU.
-        SERVER_ARGS="--model-repository=${MODELDIR} --strict-readiness=false --exit-on-error=false ${SERVER_ARGS_EXTRA}"
     fi
 
     SERVER_LOG=$SERVER_LOG_BASE.${TARGET}.log
