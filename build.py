@@ -762,11 +762,13 @@ def armnn_tflite_cmake_args():
 
 
 def fastertransformer_cmake_args():
-    print(
-        "Warning: Fastertransformer backend is not officially supported part of Triton."
-    )
-    cargs = [cmake_backend_arg('fastertransformer', 'CMAKE_EXPORT_COMPILE_COMMANDS', None, 1)]
-    cargs.append(cmake_backend_arg('fastertransformer', 'ENABLE_FP8', None, 'OFF'))
+    print("Warning: FasterTransformer backend is not officially supported.")
+    cargs = [
+        cmake_backend_arg('fastertransformer', 'CMAKE_EXPORT_COMPILE_COMMANDS',
+                          None, 1)
+    ]
+    cargs.append(
+        cmake_backend_arg('fastertransformer', 'ENABLE_FP8', None, 'OFF'))
     return cargs
 
 
@@ -1100,8 +1102,11 @@ ENV TCMALLOC_RELEASE_RATE 200
     if ('fastertransformer' in backends):
         be = 'fastertransformer'
         github_link = FLAGS.github_organization + '/' + be + '_backend.git'
-        dir_name = "tmp_" + be
+        dir_name = "/tmp/tmp_" + be
         # clone the fastertransformer repo and copy over create_dockerfile.py
+        op = ['mkdir', '-p', dir_name]
+        msg = 'Creating repo {} failed.'.format(dir_name)
+        run_subprocess(op, msg)
         op = ['rm', '-rf', dir_name]
         msg = 'Removing repo {} failed.'.format(dir_name)
         run_subprocess(op, msg)
@@ -1118,10 +1123,11 @@ ENV TCMALLOC_RELEASE_RATE 200
         run_subprocess(op, msg)
 
         import create_dockerfile_and_build
-        df += create_dockerfile_and_build.create_postbuild(is_multistage_build=False)
+        df += create_dockerfile_and_build.create_postbuild(
+            is_multistage_build=False)
 
         # clean up
-        op = ['sudo', 'rm', '-r', dir_name, 'create_dockerfile_and_build.py']
+        op = ['rm', '-r', 'create_dockerfile_and_build.py']
         msg = 'Failed to remove directory {}'.format(dir_name)
         run_subprocess(op, msg)
 
