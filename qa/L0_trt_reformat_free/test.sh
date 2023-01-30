@@ -1,5 +1,5 @@
 #!/bin/bash
-# Copyright (c) 2020, NVIDIA CORPORATION. All rights reserved.
+# Copyright (c) 2019-2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -42,7 +42,6 @@ TEST_RESULT_FILE='test_results.txt'
 export CUDA_VISIBLE_DEVICES=0
 
 CLIENT_LOG="./client.log"
-PERF_CLIENT=../clients/perf_client
 TRT_TEST=trt_reformat_free_test.py
 
 DATADIR="./models"
