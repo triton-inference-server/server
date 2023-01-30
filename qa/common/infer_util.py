@@ -90,31 +90,32 @@ def completion_callback(user_data, result, error):
 
 
 # Perform inference using an "addsum" type verification backend.
-def infer_exact(tester,
-                pf,
-                tensor_shape,
-                batch_size,
-                input_dtype,
-                output0_dtype,
-                output1_dtype,
-                output0_raw=True,
-                output1_raw=True,
-                model_version=None,
-                swap=False,
-                outputs=("OUTPUT0", "OUTPUT1"),
-                use_http=True,
-                use_grpc=True,
-                use_http_json_tensors=True,
-                skip_request_id_check=False,
-                use_streaming=True,
-                correlation_id=0,
-                shm_region_names=None,
-                precreated_shm_regions=None,
-                use_system_shared_memory=False,
-                use_cuda_shared_memory=False,
-                priority=0,
-                # 60 sec is the default value for L0_infer_valgrind
-                network_timeout=60.0):
+def infer_exact(
+        tester,
+        pf,
+        tensor_shape,
+        batch_size,
+        input_dtype,
+        output0_dtype,
+        output1_dtype,
+        output0_raw=True,
+        output1_raw=True,
+        model_version=None,
+        swap=False,
+        outputs=("OUTPUT0", "OUTPUT1"),
+        use_http=True,
+        use_grpc=True,
+        use_http_json_tensors=True,
+        skip_request_id_check=False,
+        use_streaming=True,
+        correlation_id=0,
+        shm_region_names=None,
+        precreated_shm_regions=None,
+        use_system_shared_memory=False,
+        use_cuda_shared_memory=False,
+        priority=0,
+        # 60 sec is the default value for L0_infer_valgrind
+        network_timeout=60.0):
     # Lazy shm imports...
     if use_system_shared_memory or use_cuda_shared_memory:
         import tritonclient.utils.shared_memory as shm
@@ -854,7 +855,10 @@ def infer_zero(tester,
                use_system_shared_memory=False,
                use_cuda_shared_memory=False,
                priority=0,
-               timeout_us=0):
+               timeout_us=0,
+               override_model_name=None,
+               override_input_names=[],
+               override_output_names=[]):
     # Lazy shm imports...
     if use_system_shared_memory or use_cuda_shared_memory:
         import tritonclient.utils.shared_memory as shm
@@ -883,7 +887,10 @@ def infer_zero(tester,
     shm_op_handles = list()
 
     # Get model platform
-    model_name = tu.get_zero_model_name(pf, io_cnt, tensor_dtype)
+    if override_model_name is None:
+        model_name = tu.get_zero_model_name(pf, io_cnt, tensor_dtype)
+    else:
+        model_name = override_model_name
     if configs[0][1] == "http":
         metadata_client = httpclient.InferenceServerClient(configs[0][0],
                                                            verbose=True)
@@ -896,12 +903,16 @@ def infer_zero(tester,
         platform = metadata.platform
 
     for io_num in range(io_cnt):
-        if platform == "pytorch_libtorch":
-            input_name = "INPUT__{}".format(io_num)
-            output_name = "OUTPUT__{}".format(io_num)
+        if override_input_names:
+            input_name = override_input_names[io_num]
+            output_name = override_output_names[io_num]
         else:
-            input_name = "INPUT{}".format(io_num)
-            output_name = "OUTPUT{}".format(io_num)
+            if platform == "pytorch_libtorch":
+                input_name = "INPUT__{}".format(io_num)
+                output_name = "OUTPUT__{}".format(io_num)
+            else:
+                input_name = "INPUT{}".format(io_num)
+                output_name = "OUTPUT{}".format(io_num)
 
         input_shape = input_shapes[io_num]
         output_shape = output_shapes[io_num]
@@ -971,8 +982,6 @@ def infer_zero(tester,
 
     # Run inference and check results for each config
     for config in configs:
-        model_name = tu.get_zero_model_name(pf, io_cnt, tensor_dtype)
-
         if config[1] == "http":
             triton_client = httpclient.InferenceServerClient(config[0],
                                                              verbose=True)
