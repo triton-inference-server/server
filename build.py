@@ -413,6 +413,25 @@ def cmake_repoagent_extra_args():
     args = []
     return args
 
+def cmake_cache_arg(name, type, value):
+    # For now there is no override for caches
+    if type is None:
+        type = ''
+    else:
+        type = ':{}'.format(type)
+    return '"-D{}{}={}"'.format(name, type, value)
+
+
+def cmake_cache_enable(name, flag):
+    # For now there is no override for caches 
+    value = 'ON' if flag else 'OFF'
+    return '"-D{}:BOOL={}"'.format(name, value)
+
+
+def cmake_cache_extra_args():
+    # For now there is no extra args for caches 
+    args = []
+    return args
 
 def core_cmake_args(components, backends, cmake_dir, install_dir):
     cargs = [
@@ -501,6 +520,26 @@ def repoagent_cmake_args(images, components, ra, install_dir):
     cargs.append('..')
     return cargs
 
+def cache_repo(cache):
+    # example: "local", or "redis"
+    return '{}_cache'.format(cache)
+
+def cache_cmake_args(images, components, cache, install_dir):
+    args = []
+
+    cargs = args + [
+        cmake_cache_arg('CMAKE_BUILD_TYPE', None, FLAGS.build_type),
+        cmake_cache_arg('CMAKE_INSTALL_PREFIX', 'PATH', install_dir),
+        cmake_cache_arg('TRITON_COMMON_REPO_TAG', 'STRING',
+                            components['common']),
+        cmake_cache_arg('TRITON_CORE_REPO_TAG', 'STRING',
+                            components['core'])
+    ]
+
+    cargs.append(cmake_cache_enable('TRITON_ENABLE_GPU', FLAGS.enable_gpu))
+    cargs += cmake_cache_extra_args()
+    cargs.append('..')
+    return cargs
 
 def backend_repo(be):
     if (be == 'tensorflow1') or (be == 'tensorflow2'):
@@ -951,7 +990,7 @@ ENV NVIDIA_TRITON_SERVER_VERSION ${TRITON_CONTAINER_VERSION}
 
 
 def create_dockerfile_linux(ddir, dockerfile_name, argmap, backends, repoagents,
-                            endpoints):
+                            caches, endpoints):
     df = '''
 ARG TRITON_VERSION={}
 ARG TRITON_CONTAINER_VERSION={}
@@ -1180,7 +1219,7 @@ LABEL com.nvidia.build.ref={}
 
 
 def create_dockerfile_windows(ddir, dockerfile_name, argmap, backends,
-                              repoagents):
+                              repoagents, caches):
     df = '''
 ARG TRITON_VERSION={}
 ARG TRITON_CONTAINER_VERSION={}
@@ -1224,7 +1263,7 @@ LABEL com.nvidia.build.ref={}
 
 
 def create_build_dockerfiles(container_build_dir, images, backends, repoagents,
-                             endpoints):
+                             caches, endpoints):
     if 'base' in images:
         base_image = images['base']
     elif target_platform() == 'windows':
@@ -1272,10 +1311,10 @@ def create_build_dockerfiles(container_build_dir, images, backends, repoagents,
 
     if target_platform() == 'windows':
         create_dockerfile_windows(FLAGS.build_dir, 'Dockerfile',
-                                  dockerfileargmap, backends, repoagents)
+                                  dockerfileargmap, backends, repoagents, caches)
     else:
         create_dockerfile_linux(FLAGS.build_dir, 'Dockerfile', dockerfileargmap,
-                                backends, repoagents, endpoints)
+                                backends, repoagents, caches, endpoints)
 
     # Dockerfile used for the creating the CI base image.
     create_dockerfile_cibase(FLAGS.build_dir, 'Dockerfile.cibase',
@@ -1549,6 +1588,35 @@ def repo_agent_build(ra, cmake_script, build_dir, install_dir, repoagent_repo,
     cmake_script.commentln(8)
     cmake_script.blankln()
 
+def cache_build(cache, cmake_script, build_dir, install_dir, cache_repo,
+                     caches):
+    repo_build_dir = os.path.join(build_dir, cache, 'build')
+    repo_install_dir = os.path.join(build_dir, cache, 'install')
+
+    cmake_script.commentln(8)
+    cmake_script.comment(f'\'{cache}\' cache')
+    cmake_script.comment(
+        'Delete this section to remove cache from build')
+    cmake_script.comment()
+    cmake_script.mkdir(build_dir)
+    cmake_script.cwd(build_dir)
+    cmake_script.gitclone(cache_repo(cache), caches[cache], cache,
+                          FLAGS.github_organization)
+
+    cmake_script.mkdir(repo_build_dir)
+    cmake_script.cwd(repo_build_dir)
+    cmake_script.cmake(
+        cache_cmake_args(images, components, cache, repo_install_dir))
+    cmake_script.makeinstall()
+
+    cmake_script.mkdir(os.path.join(install_dir, 'caches'))
+    cmake_script.rmdir(os.path.join(install_dir, 'caches', cache))
+    cmake_script.cpdir(os.path.join(repo_install_dir, 'caches', cache),
+                       os.path.join(install_dir, 'caches'))
+    cmake_script.comment()
+    cmake_script.comment(f'end \'{cache}\' cache')
+    cmake_script.commentln(8)
+    cmake_script.blankln()
 
 def cibase_build(cmake_script, repo_dir, cmake_dir, build_dir, install_dir,
                  ci_dir, backends):
@@ -1652,6 +1720,8 @@ def enable_all():
             'openvino', 'fil', 'tensorrt'
         ]
         all_repoagents = ['checksum']
+        # DLIS-4491: Add redis cache to build
+        all_caches = ['local']
         all_filesystems = ['gcs', 's3', 'azure_storage']
         all_endpoints = ['http', 'grpc', 'sagemaker', 'vertex-ai']
 
@@ -1669,6 +1739,8 @@ def enable_all():
             'openvino', 'tensorrt'
         ]
         all_repoagents = ['checksum']
+        # DLIS-4491: Add redis cache to build
+        all_caches = ['local']
         all_filesystems = []
         all_endpoints = ['http', 'grpc']
 
@@ -1692,6 +1764,14 @@ def enable_all():
     for ra in all_repoagents:
         if ra not in requested_repoagents:
             FLAGS.repoagent += [ra]
+
+    requested_caches = []
+    for cache in FLAGS.cache:
+        parts = cache.split(':')
+        requested_caches += [parts[0]]
+    for cache in all_caches:
+        if cache not in requested_caches:
+            FLAGS.cache += [cache]
 
     for fs in all_filesystems:
         if fs not in FLAGS.filesystem:
@@ -1869,7 +1949,7 @@ if __name__ == '__main__':
         action="store_true",
         required=False,
         help=
-        'Enable all standard released Triton features, backends, repository agents, endpoints and file systems.'
+        'Enable all standard released Triton features, backends, repository agents, caches, endpoints and file systems.'
     )
     parser.add_argument('--enable-logging',
                         action="store_true",
@@ -1955,6 +2035,13 @@ if __name__ == '__main__':
         'Include specified repo agent in build as <repoagent-name>[:<repo-tag>]. If <repo-tag> starts with "pull/" then it refers to a pull-request reference, otherwise <repo-tag> indicates the git tag/branch to use for the build. If the version is non-development then the default <repo-tag> is the release branch matching the container version (e.g. version YY.MM -> branch rYY.MM); otherwise the default <repo-tag> is "main" (e.g. version YY.MMdev -> branch main).'
     )
     parser.add_argument(
+        '--cache',
+        action='append',
+        required=False,
+        help=
+        'Include specified cache in build as <cache-name>[:<repo-tag>]. If <repo-tag> starts with "pull/" then it refers to a pull-request reference, otherwise <repo-tag> indicates the git tag/branch to use for the build. If the version is non-development then the default <repo-tag> is the release branch matching the container version (e.g. version YY.MM -> branch rYY.MM); otherwise the default <repo-tag> is "main" (e.g. version YY.MMdev -> branch main).'
+    )
+    parser.add_argument(
         '--no-force-clone',
         action="store_true",
         default=False,
@@ -2003,6 +2090,8 @@ if __name__ == '__main__':
         FLAGS.filesystem = []
     if FLAGS.repoagent is None:
         FLAGS.repoagent = []
+    if FLAGS.cache is None:
+        FLAGS.cache = []
     if FLAGS.library_paths is None:
         FLAGS.library_paths = []
     if FLAGS.extra_core_cmake_arg is None:
@@ -2015,7 +2104,7 @@ if __name__ == '__main__':
         FLAGS.extra_backend_cmake_arg = []
 
     # if --enable-all is specified, then update FLAGS to enable all
-    # settings, backends, repo-agents, file systems, endpoints, etc.
+    # settings, backends, repo-agents, caches, file systems, endpoints, etc.
     if FLAGS.enable_all:
         enable_all()
 
@@ -2060,7 +2149,7 @@ if __name__ == '__main__':
     log('cmake dir {}'.format(FLAGS.cmake_dir))
 
     # Determine the default repo-tag that should be used for images,
-    # backends and repo-agents if a repo-tag is not given
+    # backends, repo-agents, and caches if a repo-tag is not given
     # explicitly. For release branches we use the release branch as
     # the default, otherwise we use 'main'.
     default_repo_tag = 'main'
@@ -2107,6 +2196,15 @@ if __name__ == '__main__':
             parts.append(default_repo_tag)
         log('repoagent "{}" at tag/branch "{}"'.format(parts[0], parts[1]))
         repoagents[parts[0]] = parts[1]
+
+    # Initialize map of caches to build and repo-tag for each.
+    caches = {}
+    for be in FLAGS.cache:
+        parts = be.split(':')
+        if len(parts) == 1:
+            parts.append(default_repo_tag)
+        log('cache "{}" at tag/branch "{}"'.format(parts[0], parts[1]))
+        caches[parts[0]] = parts[1]
 
     # Initialize map of docker images.
     images = {}
@@ -2235,7 +2333,7 @@ if __name__ == '__main__':
     if target_platform() == 'windows':
         script_name += '.ps1'
 
-    # Write the build script that invokes cmake for the core, backends, and repo-agents.
+    # Write the build script that invokes cmake for the core, backends, repo-agents, and caches.
     pathlib.Path(FLAGS.build_dir).mkdir(parents=True, exist_ok=True)
     with BuildScript(
             os.path.join(FLAGS.build_dir, script_name),
@@ -2276,6 +2374,11 @@ if __name__ == '__main__':
             repo_agent_build(ra, cmake_script, script_build_dir,
                              script_install_dir, repoagent_repo, repoagents)
 
+        # Commands to build each cache...
+        for cache in caches:
+            cache_build(cache, cmake_script, script_build_dir,
+                             script_install_dir, cache_repo, caches)
+
         # Commands needed only when building with Docker...
         if not FLAGS.no_container_build:
             # Commands to collect all the build artifacts needed for CI
@@ -2302,7 +2405,7 @@ if __name__ == '__main__':
             script_name += '.ps1'
 
         create_build_dockerfiles(script_build_dir, images, backends, repoagents,
-                                 FLAGS.endpoint)
+                                 caches, FLAGS.endpoint)
         create_docker_build_script(script_name, script_install_dir,
                                    script_ci_dir)
 
