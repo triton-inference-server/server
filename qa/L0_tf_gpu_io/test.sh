@@ -42,7 +42,6 @@ export CUDA_VISIBLE_DEVICES=0
 
 TF_TEST=tf_gpu_io_test.py
 BACKENDS=${BACKENDS:="graphdef savedmodel"}
-TENSOR_SIZE=16384
 
 DATADIR=/data/inferenceserver/${REPO_VERSION}
 

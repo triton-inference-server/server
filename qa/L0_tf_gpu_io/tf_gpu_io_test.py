@@ -34,6 +34,8 @@ import os
 import test_util as tu
 import tritonhttpclient as httpclient
 
+TENSOR_SIZE = 16384
+
 
 class TfGpuIoTest(tu.TestResultCollector):
 
@@ -67,25 +69,25 @@ class TfGpuIoTest(tu.TestResultCollector):
     def test_graphdef_zero_1_float32_def(self):
         self._test_helper("graphdef_zero_1_float32_def", True, "INPUT0",
                           "OUTPUT0", [
-                              16384,
+                              TENSOR_SIZE,
                           ])
 
     def test_graphdef_zero_1_float32_gpu(self):
         self._test_helper("graphdef_zero_1_float32_gpu", True, "INPUT0",
                           "OUTPUT0", [
-                              16384,
+                              TENSOR_SIZE,
                           ])
 
     def test_savedmodel_zero_1_float32_def(self):
         self._test_helper("savedmodel_zero_1_float32_def", True, "INPUT0",
                           "OUTPUT0", [
-                              16384,
+                              TENSOR_SIZE,
                           ])
 
     def test_savedmodel_zero_1_float32_gpu(self):
         self._test_helper("savedmodel_zero_1_float32_gpu", True, "INPUT0",
                           "OUTPUT0", [
-                              16384,
+                              TENSOR_SIZE,
                           ])
 
 
