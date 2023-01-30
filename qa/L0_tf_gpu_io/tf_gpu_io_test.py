@@ -31,6 +31,7 @@ sys.path.append("../common")
 import unittest
 import numpy as np
 import os
+import infer_util as iu
 import test_util as tu
 import tritonhttpclient as httpclient
 
@@ -39,56 +40,53 @@ TENSOR_SIZE = 16384
 
 class TfGpuIoTest(tu.TestResultCollector):
 
-    def _test_helper(self, model_name, batching_enabled, input_name,
-                     output_name, shape):
+    def _test_helper(self,
+                     model_name,
+                     shape,
+                     override_input_names=[],
+                     override_output_names=[],
+                     batching_enabled=False):
         try:
-            triton_client = httpclient.InferenceServerClient("localhost:8000",
-                                                             verbose=True)
-            inputs = []
-            outputs = []
+            bs = 1
             if batching_enabled:
-                shape = [1] + shape
-            inputs.append(httpclient.InferInput(input_name, shape, "FP32"))
-            if batching_enabled:
-                input_data = np.ones(shape=shape, dtype=np.float32)
-            else:
-                input_data = np.ones(shape=shape, dtype=np.float32)
-            inputs[0].set_data_from_numpy(input_data, binary_data=True)
+                shape = [[
+                    bs,
+                ] + shape]
+            iu.infer_zero(
+                self,
+                'graphdef',
+                bs,
+                np.float32,
+                shape,
+                shape,
+                override_model_name=model_name,
+                override_input_names=override_input_names,
+                override_output_names=override_output_names,
+            )
 
-            outputs.append(
-                httpclient.InferRequestedOutput(output_name, binary_data=True))
-            results = triton_client.infer(model_name, inputs, outputs=outputs)
         except Exception as ex:
             self.assertTrue(False, "unexpected error {}".format(ex))
 
     def test_sig_tag0(self):
-        self._test_helper("sig_tag0", False, "INPUT", "OUTPUT", [
-            16,
-        ])
+        self._test_helper("sig_tag0", [16],
+                          override_input_names=["INPUT"],
+                          override_output_names=["OUTPUT"])
 
     def test_graphdef_zero_1_float32_def(self):
-        self._test_helper("graphdef_zero_1_float32_def", True, "INPUT0",
-                          "OUTPUT0", [
-                              TENSOR_SIZE,
-                          ])
+        self._test_helper("graphdef_zero_1_float32_def", [TENSOR_SIZE],
+                          batching_enabled=True)
 
     def test_graphdef_zero_1_float32_gpu(self):
-        self._test_helper("graphdef_zero_1_float32_gpu", True, "INPUT0",
-                          "OUTPUT0", [
-                              TENSOR_SIZE,
-                          ])
+        self._test_helper("graphdef_zero_1_float32_gpu", [TENSOR_SIZE],
+                          batching_enabled=True)
 
     def test_savedmodel_zero_1_float32_def(self):
-        self._test_helper("savedmodel_zero_1_float32_def", True, "INPUT0",
-                          "OUTPUT0", [
-                              TENSOR_SIZE,
-                          ])
+        self._test_helper("savedmodel_zero_1_float32_def", [TENSOR_SIZE],
+                          batching_enabled=True)
 
     def test_savedmodel_zero_1_float32_gpu(self):
-        self._test_helper("savedmodel_zero_1_float32_gpu", True, "INPUT0",
-                          "OUTPUT0", [
-                              TENSOR_SIZE,
-                          ])
+        self._test_helper("savedmodel_zero_1_float32_gpu", [TENSOR_SIZE],
+                          batching_enabled=True)
 
 
 if __name__ == '__main__':
