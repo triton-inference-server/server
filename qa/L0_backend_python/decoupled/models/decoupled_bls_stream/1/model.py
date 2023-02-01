@@ -40,11 +40,6 @@ class TritonPythonModel:
     """
 
     def initialize(self, args):
-        logger = pb_utils.Logger
-        logger.log("Initialize-Specific Msg!", logger.INFO)
-        logger.log_info("Initialize-Info Msg!")
-        logger.log_warn("Initialize-Warning Msg!")
-        logger.log_error("Initialize-Error Msg!")
         # You must parse model_config. JSON string is not parsed here
         self.model_config = model_config = json.loads(args['model_config'])
 
@@ -58,20 +53,10 @@ class TritonPythonModel:
 
         self.inflight_thread_count = 0
         self.inflight_thread_count_lck = threading.Lock()
-        logger = pb_utils.Logger
-        logger.log("Initialize-Specific Msg!", logger.INFO)
-        logger.log_info("Initialize-Info Msg!")
-        logger.log_warn("Initialize-Warning Msg!")
-        logger.log_error("Initialize-Error Msg!")
 
     def execute(self, requests):
         """ This function is called on inference request.
         """
-        logger = pb_utils.Logger
-        logger.log("Execute-Specific Msg!", logger.INFO)
-        logger.log_info("Execute-Info Msg!")
-        logger.log_warn("Execute-Warning Msg!")
-        logger.log_error("Execute-Error Msg!")
 
         for request in requests:
             thread = threading.Thread(target=self.response_thread,
@@ -83,27 +68,15 @@ class TritonPythonModel:
                 self.inflight_thread_count += 1
             thread.start()
 
-        logger = pb_utils.Logger
-        logger.log("Execute-Specific Msg!", logger.INFO)
-        logger.log_info("Execute-Info Msg!")
-        logger.log_warn("Execute-Warning Msg!")
-        logger.log_error("Execute-Error Msg!")
 
         return None
 
     def response_thread(self, response_sender, in_value):
-        logger = pb_utils.Logger
-        logger.log("response_thread-Specific Msg!", logger.INFO)
-        logger.log_info("response_thread-Info Msg!")
-        logger.log_warn("response_thread-Warning Msg!")
-        logger.log_error("response_thread-Error Msg!")
-        time.sleep(5)
-
         infer_request = pb_utils.InferenceRequest(
             model_name='square_int32',
             requested_output_names=["OUT"],
             inputs=[pb_utils.Tensor('IN', in_value)])
-        infer_responses = infer_request.stream_exec()
+        infer_responses = infer_request.exec(decoupled=True)
 
         if len(infer_responses) != in_value:
             error_message = (
@@ -143,20 +116,11 @@ class TritonPythonModel:
 
         with self.inflight_thread_count_lck:
             self.inflight_thread_count -= 1
-        logger.log("response_thread-Specific Msg!", logger.INFO)
-        logger.log_info("response_thread-Info Msg!")
-        logger.log_warn("response_thread-Warning Msg!")
-        logger.log_error("response_thread-Error Msg!")
 
     def finalize(self):
-        logger = pb_utils.Logger()
-        logger.log_info('Finalize invoked')
-
         inflight_threads = True
         while inflight_threads:
             with self.inflight_thread_count_lck:
                 inflight_threads = (self.inflight_thread_count != 0)
             if inflight_threads:
                 time.sleep(0.1)
-
-        logger.log_info('Finalize complete...')

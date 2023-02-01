@@ -159,6 +159,7 @@ else
         RET=1
     fi
 fi
+
 set -e
 
 kill $SERVER_PID

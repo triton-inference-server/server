@@ -173,12 +173,12 @@ async def async_bls_add_sub():
 
 async def async_bls_square():
     input0, infer_request = create_square_inference_request()
-    infer_responses = await infer_request.async_stream_exec()
+    infer_responses = await infer_request.async_exec(decoupled=True)
     result_correct = verify_square_results(input0, infer_responses)
     if not result_correct:
         return False
 
-    infer_responses_sync = infer_request.stream_exec()
+    infer_responses_sync = infer_request.exec(decoupled=True)
     result_correct = verify_square_results(input0, infer_responses_sync)
     if not result_correct:
         return False
@@ -208,7 +208,7 @@ async def multiple_async_bls_square(gpu):
     for _ in range(10):
         input0, infer_request = create_square_inference_request(gpu)
         inputs.append(input0)
-        infer_request_aws.append(infer_request.async_stream_exec())
+        infer_request_aws.append(infer_request.async_exec(decoupled=True))
 
     async_responses = await asyncio.gather(*infer_request_aws)
     for infer_responses, input_pair in zip(async_responses, inputs):

@@ -75,7 +75,7 @@ def bls_square(_=None):
         model_name='square_int32',
         inputs=[input0],
         requested_output_names=['OUT'])
-    infer_responses = infer_request.stream_exec()
+    infer_responses = infer_request.exec(decoupled=True)
 
     if not np.all(len(infer_responses) == input0.as_numpy()):
         return False
@@ -121,19 +121,19 @@ class PBBLSTest(unittest.TestCase):
                       infer_response.error().message())
         self.assertTrue(len(infer_response.output_tensors()) == 0)
 
-        # Test stream_exec() API
+        # Test BLS decoupled support
         infer_request = pb_utils.InferenceRequest(
             model_name='square_int32',
             inputs=[],
             requested_output_names=['OUT'])
-        infer_responses = infer_request.stream_exec()
+        infer_responses = infer_request.exec(decoupled=True)
         for infer_response in infer_responses:
             self.assertTrue(infer_response.has_error())
             self.assertIn("expected 1 inputs but got 0 inputs for model 'square_int32'",
                         infer_response.error().message())
             self.assertTrue(len(infer_response.output_tensors()) == 0)
 
-    def _send_bls_sequence_requests(self, correlation_id, is_stream):
+    def _send_bls_sequence_requests(self, correlation_id, is_decoupled):
         # Start request
         try:
             input = pb_utils.Tensor('INPUT', np.array([1000], dtype=np.int32))
@@ -163,10 +163,10 @@ class PBBLSTest(unittest.TestCase):
                     requested_output_names=['OUTPUT'],
                     correlation_id=correlation_id)
 
-                if is_stream:
-                    infer_responses = infer_request.stream_exec()
+                if is_decoupled:
+                    infer_responses = infer_request.exec(decoupled=True)
                     self.assertEqual(len(infer_responses), 1)
-                    infer_response = infer_responses[0]
+                    infer_response = next(infer_responses)
                 else:
                     infer_response = infer_request.exec()
                 self.assertFalse(infer_response.has_error())
@@ -193,10 +193,10 @@ class PBBLSTest(unittest.TestCase):
             self.assertTrue(infer_request.flags(),
                             pb_utils.TRITONSERVER_REQUEST_FLAG_SEQUENCE_END)
 
-            if is_stream:
-                infer_responses = infer_request.stream_exec()
+            if is_decoupled:
+                infer_responses = infer_request.exec(decoupled=True)
                 self.assertEqual(len(infer_responses), 1)
-                infer_response = infer_responses[0]
+                infer_response = next(infer_responses)
             else:
                 infer_response = infer_request.exec()
 
@@ -212,15 +212,15 @@ class PBBLSTest(unittest.TestCase):
             self.add_deferred_exception(e)
 
     def test_bls_sequence(self):
-        # Test with exec() and stream_exec() separately
-        for is_stream in [True, False]:
+        # Test with exec() and exec(decoupled=True) separately
+        for is_decoupled in [True, False]:
             # Send 2 sequence of BLS requests simultaneously and check the responses.
             threads = []
             thread1 = threading.Thread(target=self._send_bls_sequence_requests,
-                                    args=(1000,is_stream,))
+                                    args=(1000,is_decoupled,))
             threads.append(thread1)
             thread2 = threading.Thread(target=self._send_bls_sequence_requests,
-                                    args=(1001,is_stream,))
+                                    args=(1001,is_decoupled,))
             threads.append(thread2)
 
             for thread in threads:
@@ -245,7 +245,7 @@ class PBBLSTest(unittest.TestCase):
         with self.assertRaises(TypeError):
             pb_utils.InferenceRequest(model_name='add_sub', inputs=[])
 
-    def _get_gpu_bls_outputs(self, input0_pb, input1_pb, is_stream):
+    def _get_gpu_bls_outputs(self, input0_pb, input1_pb, is_decoupled):
         """
         This function is created to test that the DLPack container works
         properly when the inference response and outputs go out of scope.
@@ -254,10 +254,10 @@ class PBBLSTest(unittest.TestCase):
             model_name='dlpack_add_sub',
             inputs=[input0_pb, input1_pb],
             requested_output_names=['OUTPUT0', 'OUTPUT1'])
-        if is_stream:
-            infer_responses = infer_request.stream_exec()
+        if is_decoupled:
+            infer_responses = infer_request.exec(decoupled=True)
             self.assertEqual(len(infer_responses), 1)
-            infer_response = infer_responses[0]
+            infer_response = next(infer_responses)
         else:
             infer_response = infer_request.exec()
 
@@ -309,11 +309,11 @@ class PBBLSTest(unittest.TestCase):
             model_name=model_name,
             inputs=[input0_pb],
             requested_output_names=['OUTPUT0'])
-        for is_stream in [True, False]:
-            if is_stream:
-                infer_responses = infer_request.stream_exec()
+        for is_decoupled in [True, False]:
+            if is_decoupled:
+                infer_responses = infer_request.exec(decoupled=True)
                 self.assertEqual(len(infer_responses), 1)
-                infer_response = infer_responses[0]
+                infer_response = next(infer_responses)
             else:
                 infer_response = infer_request.exec()
 
@@ -328,8 +328,8 @@ class PBBLSTest(unittest.TestCase):
         # A 10 MB tensor.
         input_size = 10 * 1024 * 1024
 
-        # Test with exec() and stream_exec() separately
-        for is_stream in [True, False]:
+        # Test with exec() and exec(decoupled=True) separately
+        for is_decoupled in [True, False]:
             # Sending the tensor 50 times to test whether the deallocation is
             # happening correctly. If the deallocation doesn't happen correctly,
             # there will be an out of shared memory error.
@@ -340,7 +340,13 @@ class PBBLSTest(unittest.TestCase):
                     model_name=model_name,
                     inputs=[input0_pb],
                     requested_output_names=['OUTPUT0'])
-                infer_response = infer_request.exec()
+
+                if is_decoupled:
+                    infer_responses = infer_request.exec(decoupled=True)
+                    self.assertEqual(len(infer_responses), 1)
+                    infer_response = next(infer_responses)
+                else:
+                    infer_response = infer_request.exec()
                 self.assertFalse(infer_response.has_error())
 
                 output0 = pb_utils.get_output_tensor_by_name(
@@ -370,10 +376,10 @@ class PBBLSTest(unittest.TestCase):
                     inputs=[input0_pb],
                     requested_output_names=['OUTPUT0'])
                 
-                if is_stream:
-                    infer_responses = infer_request.stream_exec()
+                if is_decoupled:
+                    infer_responses = infer_request.exec(decoupled=True)
                     self.assertEqual(len(infer_responses), 1)
-                    infer_response = infer_responses[0]
+                    infer_response = next(infer_responses)
                 else:
                     infer_response = infer_request.exec()
 
@@ -392,7 +398,7 @@ class PBBLSTest(unittest.TestCase):
                     f"input ({input0}) and output ({output0_pytorch}) didn't match for identity model."
                 )
 
-    def _test_gpu_bls_add_sub(self, is_input0_gpu, is_input1_gpu, is_stream=False):
+    def _test_gpu_bls_add_sub(self, is_input0_gpu, is_input1_gpu, is_decoupled=False):
         input0 = torch.rand(16)
         input1 = torch.rand(16)
 
@@ -406,7 +412,7 @@ class PBBLSTest(unittest.TestCase):
         input1_pb = pb_utils.Tensor.from_dlpack('INPUT1', to_dlpack(input1))
         
         output0_dlpack, output1_dlpack = self._get_gpu_bls_outputs(
-            input0_pb, input1_pb, is_stream=is_stream)
+            input0_pb, input1_pb, is_decoupled=is_decoupled)
 
         expected_output_0 = from_dlpack(
             input0_pb.to_dlpack()).to('cpu') + from_dlpack(
@@ -423,11 +429,11 @@ class PBBLSTest(unittest.TestCase):
                 expected_output_1 == from_dlpack(output1_dlpack).to('cpu')))
 
     def test_gpu_bls(self):
-        # Test with exec() and stream_exec() separately
-        for is_stream in [True, False]:
+        # Test with exec() and exec(decoupled=True) separately
+        for is_decoupled in [True, False]:
             for input0_device in [True, False]:
                 for input1_device in [True, False]:
-                    self._test_gpu_bls_add_sub(input0_device, input1_device, is_stream)
+                    self._test_gpu_bls_add_sub(input0_device, input1_device, is_decoupled)
 
     def test_multiprocess(self):
         # Test multiprocess Pool with sync BLS
@@ -455,12 +461,12 @@ class PBBLSTest(unittest.TestCase):
         # an error.
         self.assertTrue(bls_add_sub())
 
-        # Test with stream_exec() API
+        # Test with exec(decoupled=True) API
         infer_request = pb_utils.InferenceRequest(
             model_name='non_existent_model',
             inputs=[],
             requested_output_names=[])
-        infer_responses = infer_request.stream_exec()
+        infer_responses = infer_request.exec(decoupled=True)
 
         for infer_response in infer_responses:
             # Because the model doesn't exist, the inference response must have an
@@ -475,16 +481,16 @@ class PBBLSTest(unittest.TestCase):
         self.assertTrue(bls_square())
 
     def test_bls_execute_error(self):
-        # Test with exec() and stream_exec() separately
-        for is_stream in [True, False]:
+        # Test with exec() and exec(decoupled=True) separately
+        for is_decoupled in [True, False]:
             # Test BLS with a model that has an error during execution.
             infer_request = pb_utils.InferenceRequest(model_name='execute_error',
                                                     inputs=[],
                                                     requested_output_names=[])
-            if is_stream:
-                infer_responses = infer_request.stream_exec()
+            if is_decoupled:
+                infer_responses = infer_request.exec(decoupled=True)
                 self.assertEqual(len(infer_responses), 1)
-                infer_response = infer_responses[0]
+                infer_response = next(infer_responses)
             else:
                 infer_response = infer_request.exec()
 

@@ -28,7 +28,7 @@ import numpy as np
 import triton_python_backend_utils as pb_utils
 
 
-async def _send_identity_tensor(size, is_stream):
+async def _send_identity_tensor(size, is_decoupled):
     tensor_size = [1, size]
     input0_np = np.random.randn(*tensor_size)
     input0 = pb_utils.Tensor('INPUT0', input0_np.astype(np.float32))
@@ -37,9 +37,9 @@ async def _send_identity_tensor(size, is_stream):
         inputs=[input0],
         requested_output_names=['OUTPUT0'])
     
-    if is_stream:
-        infer_responses = await infer_request.async_stream_exec()
-        infer_response = infer_responses[0]
+    if is_decoupled:
+        infer_responses = await infer_request.async_exec(decoupled=True)
+        infer_response = next(infer_responses)
     else:
         infer_response = await infer_request.async_exec()
 
@@ -47,11 +47,11 @@ async def _send_identity_tensor(size, is_stream):
 
 
 async def test_bls_out_of_memory():
-    # Test with exec() and stream_exec() separately
-    for is_stream in [True, False]:
+    # Test with exec() and exec(decoupled=True) separately
+    for is_decoupled in [True, False]:
         tensor_size = 1024 * 1024 * 1024
         input0_np, infer_response = await _send_identity_tensor(
-            tensor_size, is_stream)
+            tensor_size, is_decoupled)
 
         out_of_memory_message = "Failed to increase the shared memory pool size for key"
 
@@ -69,7 +69,7 @@ async def test_bls_out_of_memory():
         tensor_size = 50 * 1024 * 1024
         for _ in range(4):
             input0_np, infer_response = await _send_identity_tensor(
-                tensor_size, is_stream)
+                tensor_size, is_decoupled)
 
             if infer_response.has_error():
                 if not (out_of_memory_message in infer_response.error().message()):

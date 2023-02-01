@@ -43,7 +43,7 @@ class PBBLSMemoryTest(unittest.TestCase):
         if is_stream:
             infer_responses = infer_request.stream_exec()
             self.assertEqual(len(infer_responses), 1)
-            infer_response = infer_responses[0]
+            infer_response = next(infer_responses)
         else:
             infer_response = infer_request.exec()
 
