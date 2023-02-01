@@ -52,8 +52,11 @@ fi
 if [ -n "$SAGEMAKER_TRITON_THREAD_COUNT" ]; then
     SAGEMAKER_ARGS="${SAGEMAKER_ARGS} --sagemaker-thread-count=${SAGEMAKER_TRITON_THREAD_COUNT}"
 fi
+# Enable verbose logging by default. If env variable is specified, use value from env variable
 if [ -n "$SAGEMAKER_TRITON_LOG_VERBOSE" ]; then
     SAGEMAKER_ARGS="${SAGEMAKER_ARGS} --log-verbose=${SAGEMAKER_TRITON_LOG_VERBOSE}"
+else
+    SAGEMAKER_ARGS="${SAGEMAKER_ARGS} --log-verbose=true"
 fi
 if [ -n "$SAGEMAKER_TRITON_LOG_INFO" ]; then
     SAGEMAKER_ARGS="${SAGEMAKER_ARGS} --log-info=${SAGEMAKER_TRITON_LOG_INFO}"
