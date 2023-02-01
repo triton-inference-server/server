@@ -905,13 +905,18 @@ def infer_zero(tester,
     for io_num in range(io_cnt):
         if override_input_names:
             input_name = override_input_names[io_num]
-            output_name = override_output_names[io_num]
         else:
             if platform == "pytorch_libtorch":
                 input_name = "INPUT__{}".format(io_num)
-                output_name = "OUTPUT__{}".format(io_num)
             else:
                 input_name = "INPUT{}".format(io_num)
+
+        if override_output_names:
+            output_name = override_output_names[io_num]
+        else:
+            if platform == "pytorch_libtorch":
+                output_name = "OUTPUT__{}".format(io_num)
+            else:
                 output_name = "OUTPUT{}".format(io_num)
 
         input_shape = input_shapes[io_num]
