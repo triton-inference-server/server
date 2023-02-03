@@ -176,10 +176,10 @@ function run_server () {
         # If gdb is installed, collect a backtrace from the hanging process
         if command -v gdb; then
           GDB_LOG="gdb_bt.${SERVER_PID}.log"
-          echo -e "=== WARNING: SERVER HANG DETECTED, DUMPING GDB BACKTRACE TO [${PWD}/${GDB_LOG}] ==="
+          echo -e "=== WARNING: SERVER FAILED TO START, DUMPING GDB BACKTRACE TO [${PWD}/${GDB_LOG}] ==="
           gdb -batch -ex "thread apply all bt" -p "${SERVER_PID}" 2>&1 | tee "${GDB_LOG}"
         else
-          echo -e "=== ERROR: SERVER HANG DETECTED, BUT GDB NOT FOUND ==="
+          echo -e "=== ERROR: SERVER FAILED TO START, BUT GDB NOT FOUND ==="
         fi
 
         # Cleanup
