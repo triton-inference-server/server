@@ -1100,36 +1100,16 @@ ENV TCMALLOC_RELEASE_RATE 200
 '''.format(gpu_enabled=gpu_enabled, backend_dependencies=backend_dependencies)
 
     if ('fastertransformer' in backends):
-        be = 'fastertransformer'
-        github_link = FLAGS.github_organization + '/' + be + '_backend.git'
-        dir_name = "/tmp/tmp_" + be
-        # clone the fastertransformer repo and copy over create_dockerfile.py
-        op = ['mkdir', '-p', dir_name]
-        msg = 'Creating repo {} failed.'.format(dir_name)
-        run_subprocess(op, msg)
-        op = ['rm', '-rf', dir_name]
-        msg = 'Removing repo {} failed.'.format(dir_name)
-        run_subprocess(op, msg)
-        op = [
-            'git', 'clone', '--single-branch', '--depth=1', '-b', backends[be],
-            github_link, dir_name
-        ]
-        msg = 'git clone of branch {}:{} failed'.format(github_link,
-                                                        backends[be])
-        run_subprocess(op, msg)
-
-        op = ['cp', dir_name + "/docker/create_dockerfile_and_build.py", '.']
-        msg = 'Copy dockerfile to current repo failed.'
-        run_subprocess(op, msg)
-
-        import create_dockerfile_and_build
-        df += create_dockerfile_and_build.create_postbuild(
+        import importlib.util, requests
+        url = 'https://raw.githubusercontent.com/triton-inference-server/fastertransformer_backend/main/docker/create_dockerfile_and_build.py'
+        response = requests.get(url)
+        spec = importlib.util.spec_from_loader('fastertransformer_buildscript',
+                                               loader=None,
+                                               origin=url)
+        fastertransformer_buildscript = importlib.util.module_from_spec(spec)
+        exec(response.content, fastertransformer_buildscript.__dict__)
+        df += fastertransformer_buildscript.create_postbuild(
             is_multistage_build=False)
-
-        # clean up
-        op = ['rm', '-r', 'create_dockerfile_and_build.py']
-        msg = 'Failed to remove directory {}'.format(dir_name)
-        run_subprocess(op, msg)
 
     if enable_gpu:
         df += install_dcgm_libraries(argmap['DCGM_VERSION'], target_machine)
