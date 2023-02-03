@@ -111,12 +111,6 @@ def fail_if(p, msg):
         sys.exit(1)
 
 
-def run_subprocess(command_list, msg):
-    p = subprocess.Popen(command_list)
-    p.wait()
-    fail_if(p.returncode != 0, msg)
-
-
 def target_platform():
     if FLAGS.target_platform is not None:
         return FLAGS.target_platform
@@ -765,10 +759,9 @@ def fastertransformer_cmake_args():
     print("Warning: FasterTransformer backend is not officially supported.")
     cargs = [
         cmake_backend_arg('fastertransformer', 'CMAKE_EXPORT_COMPILE_COMMANDS',
-                          None, 1)
+                          None, 1),
+        cmake_backend_arg('fastertransformer', 'ENABLE_FP8', None, 'OFF')
     ]
-    cargs.append(
-        cmake_backend_arg('fastertransformer', 'ENABLE_FP8', None, 'OFF'))
     return cargs
 
 
