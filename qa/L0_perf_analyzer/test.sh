@@ -833,6 +833,7 @@ echo '30000' >> $CUSTOM_SCHEDULE_FILE
 echo '10000' >> $CUSTOM_SCHEDULE_FILE
 echo '40000' >> $CUSTOM_SCHEDULE_FILE
 echo '20000' >> $CUSTOM_SCHEDULE_FILE
+echo '25000' >> $CUSTOM_SCHEDULE_FILE
 
 set +e
 $PERF_ANALYZER -v -i grpc -m graphdef_int32_int32_int32 --request-intervals $CUSTOM_SCHEDULE_FILE >$CLIENT_LOG 2>&1
