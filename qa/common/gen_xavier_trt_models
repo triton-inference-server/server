@@ -1,5 +1,5 @@
 #!/bin/bash
-# Copyright 2020-2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright 2020-2022, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -50,7 +50,7 @@
 ##
 ############################################################################
 
-TRITON_VERSION=${TRITON_VERSION:=23.01}
+TRITON_VERSION=${TRITON_VERSION:=22.12}
 CUDA_DEVICE=${RUNNER_ID:=0}
 
 HOST_BUILD_DIR=${HOST_BUILD_DIR:=/tmp}
