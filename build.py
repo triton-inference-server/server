@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-# Copyright 2020-2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright 2020-2022, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -67,9 +67,9 @@ from inspect import getsourcefile
 # incorrectly load the other version of the openvino libraries.
 #
 TRITON_VERSION_MAP = {
-    '2.31.0dev': (
-        '23.02dev',  # triton container
-        '23.01',  # upstream container
+    '2.30.0dev': (
+        '23.01dev',  # triton container
+        '22.12',  # upstream container
         '1.13.1',  # ORT
         '2022.1.0',  # ORT OpenVINO
         '2022.1.0',  # Standalone OpenVINO
@@ -632,15 +632,15 @@ def onnxruntime_cmake_args(images, library_paths):
         ]
     else:
         if target_platform() == 'windows':
-            if 'ort-base' in images:
+            if 'base' in images:
                 cargs.append(
                     cmake_backend_arg('onnxruntime', 'TRITON_BUILD_CONTAINER',
-                                      None, images['ort-base']))
+                                      None, images['base']))
         else:
-            if 'ort-base' in images:
+            if 'base' in images:
                 cargs.append(
                     cmake_backend_arg('onnxruntime', 'TRITON_BUILD_CONTAINER',
-                                      None, images['ort-base']))
+                                      None, images['base']))
             else:
                 cargs.append(
                     cmake_backend_arg('onnxruntime',
@@ -999,7 +999,7 @@ COPY --chown=1000:1000 docker/sagemaker/serve /usr/bin/.
     # stage of the PyTorch backend
     if not FLAGS.enable_gpu and ('pytorch' in backends):
         df += '''
-RUN patchelf --add-needed /usr/local/cuda/lib64/stubs/libcublasLt.so.12 backends/pytorch/libtorch_cuda.so
+RUN patchelf --add-needed /usr/local/cuda/lib64/stubs/libcublasLt.so.11 backends/pytorch/libtorch_cuda.so
 '''
 
     with open(os.path.join(ddir, dockerfile_name), "w") as dfile:
@@ -1026,7 +1026,6 @@ ENV PATH /opt/tritonserver/bin:${PATH}
     if 'onnxruntime' in backends:
         df += '''
 ENV LD_LIBRARY_PATH /opt/tritonserver/backends/onnxruntime:${LD_LIBRARY_PATH}
-ENV LD_LIBRARY_PATH /usr/local/cuda-11.8/lib64:${LD_LIBRARY_PATH}
 '''
 
     backend_dependencies = ""
@@ -1082,10 +1081,6 @@ ENV TCMALLOC_RELEASE_RATE 200
 
     if enable_gpu:
         df += install_dcgm_libraries(argmap['DCGM_VERSION'], target_machine)
-        # This is temporary solution to support 23.01
-        df += '''
-RUN apt-get update && apt-get install -y libcufft-11-8
-'''
         df += '''
 # Extra defensive wiring for CUDA Compat lib
 RUN ln -sf ${_CUDA_COMPAT_PATH}/lib.real ${_CUDA_COMPAT_PATH}/lib \
@@ -1105,23 +1100,21 @@ RUN ln -sf ${_CUDA_COMPAT_PATH}/lib.real ${_CUDA_COMPAT_PATH}/lib \
             cuda_arch = 'sbsa' if target_machine == 'aarch64' else 'x86_64'
             df += '''
 RUN mkdir -p /usr/local/cuda/lib64/stubs
-COPY --from=min_container /usr/local/cuda/lib64/stubs/libcusparse.so /usr/local/cuda/lib64/stubs/libcusparse.so.12
+COPY --from=min_container /usr/local/cuda/lib64/stubs/libcusparse.so /usr/local/cuda/lib64/stubs/libcusparse.so.11
 COPY --from=min_container /usr/local/cuda/lib64/stubs/libcusolver.so /usr/local/cuda/lib64/stubs/libcusolver.so.11
 COPY --from=min_container /usr/local/cuda/lib64/stubs/libcurand.so /usr/local/cuda/lib64/stubs/libcurand.so.10
-COPY --from=min_container /usr/local/cuda/lib64/stubs/libcufft.so /usr/local/cuda/lib64/stubs/libcufft.so.11
-COPY --from=min_container /usr/local/cuda/lib64/stubs/libcublas.so /usr/local/cuda/lib64/stubs/libcublas.so.12
-COPY --from=min_container /usr/local/cuda/lib64/stubs/libcublasLt.so /usr/local/cuda/lib64/stubs/libcublasLt.so.12
+COPY --from=min_container /usr/local/cuda/lib64/stubs/libcufft.so /usr/local/cuda/lib64/stubs/libcufft.so.10
+COPY --from=min_container /usr/local/cuda/lib64/stubs/libcublas.so /usr/local/cuda/lib64/stubs/libcublas.so.11
 COPY --from=min_container /usr/local/cuda/lib64/stubs/libcublasLt.so /usr/local/cuda/lib64/stubs/libcublasLt.so.11
 
 RUN mkdir -p /usr/local/cuda/targets/{cuda_arch}-linux/lib
-COPY --from=min_container /usr/local/cuda-12.0/targets/{cuda_arch}-linux/lib/libcudart.so.12 /usr/local/cuda/targets/{cuda_arch}-linux/lib/.
-COPY --from=min_container /usr/local/cuda-12.0/targets/{cuda_arch}-linux/lib/libcupti.so.12 /usr/local/cuda/targets/{cuda_arch}-linux/lib/.
-COPY --from=min_container /usr/local/cuda-12.0/targets/{cuda_arch}-linux/lib/libnvToolsExt.so.1 /usr/local/cuda/targets/{cuda_arch}-linux/lib/.
-COPY --from=min_container /usr/local/cuda-12.0/targets/{cuda_arch}-linux/lib/libnvJitLink.so.12 /usr/local/cuda/targets/{cuda_arch}-linux/lib/.
+COPY --from=min_container /usr/local/cuda-11.8/targets/{cuda_arch}-linux/lib/libcudart.so.11.0 /usr/local/cuda/targets/{cuda_arch}-linux/lib/.
+COPY --from=min_container /usr/local/cuda-11.8/targets/{cuda_arch}-linux/lib/libcupti.so.11.8 /usr/local/cuda/targets/{cuda_arch}-linux/lib/.
+COPY --from=min_container /usr/local/cuda-11.8/targets/{cuda_arch}-linux/lib/libnvToolsExt.so.1 /usr/local/cuda/targets/{cuda_arch}-linux/lib/.
 
 COPY --from=min_container /usr/lib/{libs_arch}-linux-gnu/libcudnn.so.8 /usr/lib/{libs_arch}-linux-gnu/libcudnn.so.8
 
-# patchelf is needed to add deps of libcublasLt.so.12 to libtorch_cuda.so
+# patchelf is needed to add deps of libcublasLt.so.11 to libtorch_cuda.so
 RUN apt-get update && \
         apt-get install -y --no-install-recommends openmpi-bin patchelf
 
@@ -2109,12 +2102,9 @@ if __name__ == '__main__':
         fail_if(
             len(parts) != 2,
             '--image must specify <image-name>,<full-image-registry>')
-        # REMOVEME: ONNXRUNTIME 1.13.1 build is failing with cuda 12. Hence, using
-        # cuda 11.8 container as build image for ORT.
         fail_if(
             parts[0] not in [
-                'base', 'gpu-base', 'pytorch', 'tensorflow1', 'tensorflow2',
-                'ort-base'
+                'base', 'gpu-base', 'pytorch', 'tensorflow1', 'tensorflow2'
             ], 'unsupported value for --image')
         log('image "{}": "{}"'.format(parts[0], parts[1]))
         images[parts[0]] = parts[1]

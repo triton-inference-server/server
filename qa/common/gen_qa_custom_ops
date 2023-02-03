@@ -1,5 +1,5 @@
 #!/bin/bash
-# Copyright 2019-2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright 2019-2022, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -37,7 +37,7 @@
 ##
 ############################################################################
 
-TRITON_VERSION=${TRITON_VERSION:=23.01}
+TRITON_VERSION=${TRITON_VERSION:=22.12}
 NVIDIA_UPSTREAM_VERSION=${NVIDIA_UPSTREAM_VERSION:=$TRITON_VERSION}
 TENSORFLOW_IMAGE=${TENSORFLOW_IMAGE:=nvcr.io/nvidia/tensorflow:$NVIDIA_UPSTREAM_VERSION-tf2-py3}
 PYTORCH_IMAGE=${PYTORCH_IMAGE:=nvcr.io/nvidia/pytorch:$NVIDIA_UPSTREAM_VERSION-py3}
@@ -126,7 +126,7 @@ nvidia-smi -L || true
 nvidia-smi || true
 set -e
 python3 $SRCDIR/gen_qa_custom_ops_models.py --libtorch --models_dir=$DESTDIR
-cp /root/.cache/torch_extensions/py38_cu120/custom_modulo/custom_modulo.so $DESTDIR/libtorch_modulo/.
+cp /root/.cache/torch_extensions/py38_cu118/custom_modulo/custom_modulo.so $DESTDIR/libtorch_modulo/.
 chmod -R 777 $DESTDIR
 EOF
 
