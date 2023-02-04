@@ -1093,8 +1093,9 @@ ENV TCMALLOC_RELEASE_RATE 200
 '''.format(gpu_enabled=gpu_enabled, backend_dependencies=backend_dependencies)
 
     if ('fastertransformer' in backends):
+        be = "fastertransformer"
         import importlib.util, requests
-        url = 'https://raw.githubusercontent.com/triton-inference-server/fastertransformer_backend/main/docker/create_dockerfile_and_build.py'
+        url = 'https://raw.githubusercontent.com/triton-inference-server/fastertransformer_backend/{}/docker/create_dockerfile_and_build.py'.format(backends[be])
         response = requests.get(url)
         spec = importlib.util.spec_from_loader('fastertransformer_buildscript',
                                                loader=None,
