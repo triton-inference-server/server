@@ -77,8 +77,8 @@ def bls_square(_=None):
         requested_output_names=['OUT'])
     infer_responses = infer_request.exec(decoupled=True)
 
-    if not np.all(len(infer_responses) == input0.as_numpy()):
-        return False
+    response_count = 0
+
     if infer_responses:
         for infer_response in infer_responses:
             if infer_response.has_error():
@@ -92,6 +92,11 @@ def bls_square(_=None):
 
             if not np.all(expected_output == output0.as_numpy()):
                 return False
+
+            response_count += 1
+
+    if not np.all(response_count == input0.as_numpy()):
+        return False
 
     return True
 
@@ -165,8 +170,9 @@ class PBBLSTest(unittest.TestCase):
 
                 if is_decoupled:
                     infer_responses = infer_request.exec(decoupled=True)
-                    self.assertEqual(len(infer_responses), 1)
                     infer_response = next(infer_responses)
+                    with self.assertRaises(StopIteration):
+                        next(infer_responses)
                 else:
                     infer_response = infer_request.exec()
                 self.assertFalse(infer_response.has_error())
@@ -195,8 +201,9 @@ class PBBLSTest(unittest.TestCase):
 
             if is_decoupled:
                 infer_responses = infer_request.exec(decoupled=True)
-                self.assertEqual(len(infer_responses), 1)
                 infer_response = next(infer_responses)
+                with self.assertRaises(StopIteration):
+                    next(infer_responses)
             else:
                 infer_response = infer_request.exec()
 
@@ -256,8 +263,9 @@ class PBBLSTest(unittest.TestCase):
             requested_output_names=['OUTPUT0', 'OUTPUT1'])
         if is_decoupled:
             infer_responses = infer_request.exec(decoupled=True)
-            self.assertEqual(len(infer_responses), 1)
             infer_response = next(infer_responses)
+            with self.assertRaises(StopIteration):
+                next(infer_responses)
         else:
             infer_response = infer_request.exec()
 
@@ -312,8 +320,9 @@ class PBBLSTest(unittest.TestCase):
         for is_decoupled in [True, False]:
             if is_decoupled:
                 infer_responses = infer_request.exec(decoupled=True)
-                self.assertEqual(len(infer_responses), 1)
                 infer_response = next(infer_responses)
+                with self.assertRaises(StopIteration):
+                    next(infer_responses)
             else:
                 infer_response = infer_request.exec()
 
@@ -343,8 +352,9 @@ class PBBLSTest(unittest.TestCase):
 
                 if is_decoupled:
                     infer_responses = infer_request.exec(decoupled=True)
-                    self.assertEqual(len(infer_responses), 1)
                     infer_response = next(infer_responses)
+                    with self.assertRaises(StopIteration):
+                        next(infer_responses)
                 else:
                     infer_response = infer_request.exec()
                 self.assertFalse(infer_response.has_error())
@@ -378,8 +388,9 @@ class PBBLSTest(unittest.TestCase):
                 
                 if is_decoupled:
                     infer_responses = infer_request.exec(decoupled=True)
-                    self.assertEqual(len(infer_responses), 1)
                     infer_response = next(infer_responses)
+                    with self.assertRaises(StopIteration):
+                        next(infer_responses)
                 else:
                     infer_response = infer_request.exec()
 
@@ -489,8 +500,9 @@ class PBBLSTest(unittest.TestCase):
                                                     requested_output_names=[])
             if is_decoupled:
                 infer_responses = infer_request.exec(decoupled=True)
-                self.assertEqual(len(infer_responses), 1)
                 infer_response = next(infer_responses)
+                with self.assertRaises(StopIteration):
+                    next(infer_responses)
             else:
                 infer_response = infer_request.exec()
 

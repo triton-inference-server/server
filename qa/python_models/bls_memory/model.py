@@ -31,7 +31,7 @@ import triton_python_backend_utils as pb_utils
 
 class PBBLSMemoryTest(unittest.TestCase):
 
-    def _send_identity_tensor(self, size, is_stream):
+    def _send_identity_tensor(self, size, is_decoupled):
         tensor_size = [1, size]
         input0_np = np.random.randn(*tensor_size)
         input0 = pb_utils.Tensor('INPUT0', input0_np.astype(np.float32))
@@ -40,21 +40,22 @@ class PBBLSMemoryTest(unittest.TestCase):
             inputs=[input0],
             requested_output_names=['OUTPUT0'])
 
-        if is_stream:
-            infer_responses = infer_request.stream_exec()
-            self.assertEqual(len(infer_responses), 1)
+        if is_decoupled:
+            infer_responses = infer_request.exec(decoupled=True)
             infer_response = next(infer_responses)
+            with self.assertRaises(StopIteration):
+                next(infer_responses)
         else:
             infer_response = infer_request.exec()
 
         return input0_np, infer_response
 
     def test_bls_out_of_memory(self):
-        # Test with exec() and stream_exec() separately
-        for is_stream in [True, False]:
+        # Test with exec() and exec(decoupled=True) separately
+        for is_decoupled in [True, False]:
             tensor_size = 1024 * 1024 * 1024
             input0_np, infer_response = self._send_identity_tensor(
-                tensor_size, is_stream)
+                tensor_size, is_decoupled)
             out_of_memory_message = "Failed to increase the shared memory pool size for key"
 
             if infer_response.has_error():
@@ -70,7 +71,7 @@ class PBBLSMemoryTest(unittest.TestCase):
             tensor_size = 50 * 1024 * 1024
             for _ in range(4):
                 input0_np, infer_response = self._send_identity_tensor(
-                    tensor_size, is_stream)
+                    tensor_size, is_decoupled)
                 if infer_response.has_error():
                     self.assertIn(out_of_memory_message,
                                   infer_response.error().message())

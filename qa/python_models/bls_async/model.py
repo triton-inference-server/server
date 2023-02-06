@@ -88,10 +88,7 @@ def verify_square_results(input0, infer_responses):
     else:
         input0 = input0.as_numpy()
 
-    if not np.all(len(infer_responses) == input0):
-        print('Expected {} responses, got {}'.format(
-            input0, len(infer_responses)))
-        return False
+    response_count = 0
 
     for infer_response in infer_responses:
         if infer_response.has_error():
@@ -116,6 +113,13 @@ def verify_square_results(input0, infer_responses):
         if not np.all(expected_output == input0):
             print(f'For OUT expected {expected_output} found {output0}')
             return False
+
+        response_count += 1
+
+    if not np.all(response_count == input0):
+        print('Expected {} responses, got {}'.format(
+            input0, response_count))
+        return False        
 
     return True
 
@@ -212,17 +216,6 @@ async def multiple_async_bls_square(gpu):
 
     async_responses = await asyncio.gather(*infer_request_aws)
     for infer_responses, input_pair in zip(async_responses, inputs):
-        if not gpu:
-            expected_responses_num = input_pair.as_numpy()
-        else:
-            expected_responses_num = from_dlpack(
-                input_pair.to_dlpack()).to('cpu').cpu().detach().numpy()
-
-        if len(infer_responses) != expected_responses_num:
-            print('Expected {} responses, got {}'.format(
-                expected_responses_num, len(infer_responses)
-            ))
-        
         result_correct = verify_square_results(input_pair, infer_responses)
         if not result_correct:
             return False
