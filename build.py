@@ -528,7 +528,7 @@ def backend_cmake_args(images, components, be, install_dir, library_paths):
     elif be == 'fil':
         args = fil_cmake_args(images)
     elif be == 'fastertransformer':
-        args = []
+        args = fastertransformer_cmake_args()
     elif be == 'tensorrt':
         args = tensorrt_cmake_args()
     else:
@@ -753,6 +753,16 @@ def armnn_tflite_cmake_args():
         cmake_backend_arg('armnn_tflite', 'JOBS', None,
                           multiprocessing.cpu_count()),
     ]
+
+
+def fastertransformer_cmake_args():
+    print("Warning: FasterTransformer backend is not officially supported.")
+    cargs = [
+        cmake_backend_arg('fastertransformer', 'CMAKE_EXPORT_COMPILE_COMMANDS',
+                          None, 1),
+        cmake_backend_arg('fastertransformer', 'ENABLE_FP8', None, 'OFF')
+    ]
+    return cargs
 
 
 def install_dcgm_libraries(dcgm_version, target_machine):
@@ -1037,6 +1047,9 @@ ENV LD_LIBRARY_PATH /usr/local/cuda-11.8/lib64:${LD_LIBRARY_PATH}
     # libgfortran5 is needed by pytorch backend on ARM
     if ('pytorch' in backends) and (target_machine == 'aarch64'):
         backend_dependencies += " libgfortran5"
+    # openssh-server is needed for fastertransformer
+    if ('fastertransformer' in backends):
+        backend_dependencies += " openssh-server"
 
     df += '''
 ENV TF_ADJUST_HUE_FUSED         1
@@ -1079,6 +1092,19 @@ RUN apt-get update && \
 # Set TCMALLOC_RELEASE_RATE for users setting LD_PRELOAD with tcmalloc
 ENV TCMALLOC_RELEASE_RATE 200
 '''.format(gpu_enabled=gpu_enabled, backend_dependencies=backend_dependencies)
+
+    if ('fastertransformer' in backends):
+        be = "fastertransformer"
+        import importlib.util, requests
+        url = 'https://raw.githubusercontent.com/triton-inference-server/fastertransformer_backend/{}/docker/create_dockerfile_and_build.py'.format(backends[be])
+        response = requests.get(url)
+        spec = importlib.util.spec_from_loader('fastertransformer_buildscript',
+                                               loader=None,
+                                               origin=url)
+        fastertransformer_buildscript = importlib.util.module_from_spec(spec)
+        exec(response.content, fastertransformer_buildscript.__dict__)
+        df += fastertransformer_buildscript.create_postbuild(
+            is_multistage_build=False)
 
     if enable_gpu:
         df += install_dcgm_libraries(argmap['DCGM_VERSION'], target_machine)
