@@ -1,5 +1,5 @@
 <!--
-# Copyright (c) 2020-2022, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright (c) 2020-2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -129,6 +129,18 @@ Concurrency: 2, throughput: 89.8 infer/sec, latency 22280 usec
 Concurrency: 3, throughput: 80.4 infer/sec, latency 37283 usec
 Concurrency: 4, throughput: 83 infer/sec, latency 48064 usec
 ```
+
+## How Throughput is Calculated
+
+Perf Analyzer calculates throughput to be the total number of requests completed during a measurement, divided by the duration of the measurement, in seconds.
+
+### Time Windows
+
+When using time windows measurement mode (`--measurement-mode=time_windows`), Perf Analyzer will count how many requests have completed during a window of duration `X` (in milliseconds, via `--measurement-interval=X`, default is `5000`). This is the default measurement mode.
+
+### Count Windows
+
+When using count windows measurement mode (`--measurement-mode=count_windows`), Perf Analyzer will dynamically increase the window duration until `X` requests have completed (via `--measurement-request-count=X`, default is `50`).
 
 ## Understanding The Output
 
