@@ -24,12 +24,17 @@
 # (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
+import os
 import numpy as np
 import unittest
 import triton_python_backend_utils as pb_utils
 
 
 class PBBLSMemoryTest(unittest.TestCase):
+
+    def setUp(self):
+        self._is_decoupled = True if os.environ[
+            'BLS_KIND'] == "decoupled" else False
 
     def _send_identity_tensor(self, size, is_decoupled):
         tensor_size = [1, size]
@@ -51,13 +56,25 @@ class PBBLSMemoryTest(unittest.TestCase):
         return input0_np, infer_response
 
     def test_bls_out_of_memory(self):
-        # Test with exec() and exec(decoupled=True) separately
-        for is_decoupled in [True, False]:
-            tensor_size = 1024 * 1024 * 1024
-            input0_np, infer_response = self._send_identity_tensor(
-                tensor_size, is_decoupled)
-            out_of_memory_message = "Failed to increase the shared memory pool size for key"
+        tensor_size = 1024 * 1024 * 1024
+        input0_np, infer_response = self._send_identity_tensor(
+            tensor_size, self._is_decoupled)
+        out_of_memory_message = "Failed to increase the shared memory pool size for key"
 
+        if infer_response.has_error():
+            self.assertIn(out_of_memory_message,
+                          infer_response.error().message())
+        else:
+            self.assertFalse(infer_response.has_error())
+            output0 = pb_utils.get_output_tensor_by_name(
+                infer_response, 'OUTPUT0')
+            self.assertIsNotNone(output0)
+            self.assertTrue(np.allclose(output0.as_numpy(), input0_np))
+
+        tensor_size = 50 * 1024 * 1024
+        for _ in range(4):
+            input0_np, infer_response = self._send_identity_tensor(
+                tensor_size, self._is_decoupled)
             if infer_response.has_error():
                 self.assertIn(out_of_memory_message,
                               infer_response.error().message())
@@ -67,20 +84,6 @@ class PBBLSMemoryTest(unittest.TestCase):
                     infer_response, 'OUTPUT0')
                 self.assertIsNotNone(output0)
                 self.assertTrue(np.allclose(output0.as_numpy(), input0_np))
-
-            tensor_size = 50 * 1024 * 1024
-            for _ in range(4):
-                input0_np, infer_response = self._send_identity_tensor(
-                    tensor_size, is_decoupled)
-                if infer_response.has_error():
-                    self.assertIn(out_of_memory_message,
-                                  infer_response.error().message())
-                else:
-                    self.assertFalse(infer_response.has_error())
-                    output0 = pb_utils.get_output_tensor_by_name(
-                        infer_response, 'OUTPUT0')
-                    self.assertIsNotNone(output0)
-                    self.assertTrue(np.allclose(output0.as_numpy(), input0_np))
 
 
 class TritonPythonModel:

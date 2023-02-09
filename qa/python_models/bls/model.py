@@ -24,6 +24,7 @@
 # (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
+import os
 import numpy as np
 import unittest
 import triton_python_backend_utils as pb_utils
@@ -71,10 +72,9 @@ def bls_add_sub(_=None):
 def bls_square(_=None):
     input0_np = np.random.randint(16, size=1, dtype=np.int32)
     input0 = pb_utils.Tensor('IN', input0_np)
-    infer_request = pb_utils.InferenceRequest(
-        model_name='square_int32',
-        inputs=[input0],
-        requested_output_names=['OUT'])
+    infer_request = pb_utils.InferenceRequest(model_name='square_int32',
+                                              inputs=[input0],
+                                              requested_output_names=['OUT'])
     infer_responses = infer_request.exec(decoupled=True)
 
     response_count = 0
@@ -103,6 +103,10 @@ def bls_square(_=None):
 
 class PBBLSTest(unittest.TestCase):
 
+    def setUp(self):
+        self._is_decoupled = True if os.environ[
+            'BLS_KIND'] == "decoupled" else False
+
     def add_deferred_exception(self, ex):
         global _deferred_exceptions
         with _deferred_exceptions_lock:
@@ -116,26 +120,28 @@ class PBBLSTest(unittest.TestCase):
     def test_bls_wrong_inputs(self):
         input0 = pb_utils.Tensor('INPUT0', np.random.randn(*[1, 16]))
 
-        infer_request = pb_utils.InferenceRequest(
-            model_name='add_sub',
-            inputs=[input0],
-            requested_output_names=['OUTPUT0', 'OUTPUT1'])
-        infer_response = infer_request.exec()
-        self.assertTrue(infer_response.has_error())
-        self.assertIn("expected 2 inputs but got 1 inputs for model 'add_sub'",
-                      infer_response.error().message())
-        self.assertTrue(len(infer_response.output_tensors()) == 0)
-
-        # Test BLS decoupled support
-        infer_request = pb_utils.InferenceRequest(
-            model_name='square_int32',
-            inputs=[],
-            requested_output_names=['OUT'])
-        infer_responses = infer_request.exec(decoupled=True)
-        for infer_response in infer_responses:
+        if self._is_decoupled:
+            infer_request = pb_utils.InferenceRequest(
+                model_name='square_int32',
+                inputs=[],
+                requested_output_names=['OUT'])
+            infer_responses = infer_request.exec(decoupled=True)
+            for infer_response in infer_responses:
+                self.assertTrue(infer_response.has_error())
+                self.assertIn(
+                    "expected 1 inputs but got 0 inputs for model 'square_int32'",
+                    infer_response.error().message())
+                self.assertTrue(len(infer_response.output_tensors()) == 0)
+        else:
+            infer_request = pb_utils.InferenceRequest(
+                model_name='add_sub',
+                inputs=[input0],
+                requested_output_names=['OUTPUT0', 'OUTPUT1'])
+            infer_response = infer_request.exec()
             self.assertTrue(infer_response.has_error())
-            self.assertIn("expected 1 inputs but got 0 inputs for model 'square_int32'",
-                        infer_response.error().message())
+            self.assertIn(
+                "expected 2 inputs but got 1 inputs for model 'add_sub'",
+                infer_response.error().message())
             self.assertTrue(len(infer_response.output_tensors()) == 0)
 
     def _send_bls_sequence_requests(self, correlation_id, is_decoupled):
@@ -219,25 +225,29 @@ class PBBLSTest(unittest.TestCase):
             self.add_deferred_exception(e)
 
     def test_bls_sequence(self):
-        # Test with exec() and exec(decoupled=True) separately
-        for is_decoupled in [True, False]:
-            # Send 2 sequence of BLS requests simultaneously and check the responses.
-            threads = []
-            thread1 = threading.Thread(target=self._send_bls_sequence_requests,
-                                    args=(1000,is_decoupled,))
-            threads.append(thread1)
-            thread2 = threading.Thread(target=self._send_bls_sequence_requests,
-                                    args=(1001,is_decoupled,))
-            threads.append(thread2)
+        # Send 2 sequence of BLS requests simultaneously and check the responses.
+        threads = []
+        thread1 = threading.Thread(target=self._send_bls_sequence_requests,
+                                   args=(
+                                       1000,
+                                       self._is_decoupled,
+                                   ))
+        threads.append(thread1)
+        thread2 = threading.Thread(target=self._send_bls_sequence_requests,
+                                   args=(
+                                       1001,
+                                       self._is_decoupled,
+                                   ))
+        threads.append(thread2)
 
-            for thread in threads:
-                thread.start()
+        for thread in threads:
+            thread.start()
 
-            for thread in threads:
-                thread.join()
+        for thread in threads:
+            thread.join()
 
-            # Check if any of the threads had an exception
-            self.check_deferred_exception()
+        # Check if any of the threads had an exception
+        self.check_deferred_exception()
 
     def test_bls_incorrect_args(self):
         with self.assertRaises(TypeError):
@@ -317,8 +327,74 @@ class PBBLSTest(unittest.TestCase):
             model_name=model_name,
             inputs=[input0_pb],
             requested_output_names=['OUTPUT0'])
-        for is_decoupled in [True, False]:
-            if is_decoupled:
+
+        if self._is_decoupled:
+            infer_responses = infer_request.exec(decoupled=True)
+            infer_response = next(infer_responses)
+            with self.assertRaises(StopIteration):
+                next(infer_responses)
+        else:
+            infer_response = infer_request.exec()
+
+        self.assertFalse(infer_response.has_error())
+
+        output0 = pb_utils.get_output_tensor_by_name(infer_response, 'OUTPUT0')
+        self.assertTrue(np.all(output0 == input0))
+
+    def test_bls_tensor_lifecycle(self):
+        model_name = 'dlpack_identity'
+
+        # A 10 MB tensor.
+        input_size = 10 * 1024 * 1024
+
+        # Sending the tensor 50 times to test whether the deallocation is
+        # happening correctly. If the deallocation doesn't happen correctly,
+        # there will be an out of shared memory error.
+        for _ in range(50):
+            input0 = np.ones([1, input_size], dtype=np.float32)
+            input0_pb = pb_utils.Tensor('INPUT0', input0)
+            infer_request = pb_utils.InferenceRequest(
+                model_name=model_name,
+                inputs=[input0_pb],
+                requested_output_names=['OUTPUT0'])
+
+            if self._is_decoupled:
+                infer_responses = infer_request.exec(decoupled=True)
+                infer_response = next(infer_responses)
+                with self.assertRaises(StopIteration):
+                    next(infer_responses)
+            else:
+                infer_response = infer_request.exec()
+            self.assertFalse(infer_response.has_error())
+
+            output0 = pb_utils.get_output_tensor_by_name(
+                infer_response, 'OUTPUT0')
+            np.testing.assert_equal(output0.as_numpy(), input0,
+                                    "BLS CPU memory lifecycle failed.")
+
+        # Checking the same with the GPU tensors.
+        for index in range(50):
+            input0 = None
+            infer_request = None
+            input0_pb = None
+
+            torch.cuda.empty_cache()
+            free_memory, _ = torch.cuda.mem_get_info()
+            if index == 1:
+                recorded_memory = free_memory
+
+            if index > 1:
+                self.assertEqual(free_memory, recorded_memory,
+                                 "GPU memory lifecycle test failed.")
+
+            input0 = torch.ones([1, input_size], dtype=torch.float32).to('cuda')
+            input0_pb = pb_utils.Tensor.from_dlpack('INPUT0', to_dlpack(input0))
+            infer_request = pb_utils.InferenceRequest(
+                model_name=model_name,
+                inputs=[input0_pb],
+                requested_output_names=['OUTPUT0'])
+
+            if self._is_decoupled:
                 infer_responses = infer_request.exec(decoupled=True)
                 infer_response = next(infer_responses)
                 with self.assertRaises(StopIteration):
@@ -328,88 +404,23 @@ class PBBLSTest(unittest.TestCase):
 
             self.assertFalse(infer_response.has_error())
 
-            output0 = pb_utils.get_output_tensor_by_name(infer_response, 'OUTPUT0')
-            self.assertTrue(np.all(output0 == input0))
+            output0 = pb_utils.get_output_tensor_by_name(
+                infer_response, 'OUTPUT0')
+            output0_pytorch = from_dlpack(output0.to_dlpack())
 
-    def test_bls_tensor_lifecycle(self):
-        model_name = 'dlpack_identity'
+            # Set inference response and output0_pytorch to None, to make sure
+            # that the DLPack is still valid.
+            output0 = None
+            infer_response = None
+            self.assertTrue(
+                torch.all(output0_pytorch == input0),
+                f"input ({input0}) and output ({output0_pytorch}) didn't match for identity model."
+            )
 
-        # A 10 MB tensor.
-        input_size = 10 * 1024 * 1024
-
-        # Test with exec() and exec(decoupled=True) separately
-        for is_decoupled in [True, False]:
-            # Sending the tensor 50 times to test whether the deallocation is
-            # happening correctly. If the deallocation doesn't happen correctly,
-            # there will be an out of shared memory error.
-            for _ in range(50):
-                input0 = np.ones([1, input_size], dtype=np.float32)
-                input0_pb = pb_utils.Tensor('INPUT0', input0)
-                infer_request = pb_utils.InferenceRequest(
-                    model_name=model_name,
-                    inputs=[input0_pb],
-                    requested_output_names=['OUTPUT0'])
-
-                if is_decoupled:
-                    infer_responses = infer_request.exec(decoupled=True)
-                    infer_response = next(infer_responses)
-                    with self.assertRaises(StopIteration):
-                        next(infer_responses)
-                else:
-                    infer_response = infer_request.exec()
-                self.assertFalse(infer_response.has_error())
-
-                output0 = pb_utils.get_output_tensor_by_name(
-                    infer_response, 'OUTPUT0')
-                np.testing.assert_equal(output0.as_numpy(), input0,
-                                        "BLS CPU memory lifecycle failed.")
-
-            # Checking the same with the GPU tensors.
-            for index in range(50):
-                input0 = None
-                infer_request = None
-                input0_pb = None
-
-                torch.cuda.empty_cache()
-                free_memory, _ = torch.cuda.mem_get_info()
-                if index == 1:
-                    recorded_memory = free_memory
-
-                if index > 1:
-                    self.assertEqual(free_memory, recorded_memory,
-                                    "GPU memory lifecycle test failed.")
-
-                input0 = torch.ones([1, input_size], dtype=torch.float32).to('cuda')
-                input0_pb = pb_utils.Tensor.from_dlpack('INPUT0', to_dlpack(input0))
-                infer_request = pb_utils.InferenceRequest(
-                    model_name=model_name,
-                    inputs=[input0_pb],
-                    requested_output_names=['OUTPUT0'])
-                
-                if is_decoupled:
-                    infer_responses = infer_request.exec(decoupled=True)
-                    infer_response = next(infer_responses)
-                    with self.assertRaises(StopIteration):
-                        next(infer_responses)
-                else:
-                    infer_response = infer_request.exec()
-
-                self.assertFalse(infer_response.has_error())
-
-                output0 = pb_utils.get_output_tensor_by_name(
-                    infer_response, 'OUTPUT0')
-                output0_pytorch = from_dlpack(output0.to_dlpack())
-
-                # Set inference response and output0_pytorch to None, to make sure
-                # that the DLPack is still valid.
-                output0 = None
-                infer_response = None
-                self.assertTrue(
-                    torch.all(output0_pytorch == input0),
-                    f"input ({input0}) and output ({output0_pytorch}) didn't match for identity model."
-                )
-
-    def _test_gpu_bls_add_sub(self, is_input0_gpu, is_input1_gpu, is_decoupled=False):
+    def _test_gpu_bls_add_sub(self,
+                              is_input0_gpu,
+                              is_input1_gpu,
+                              is_decoupled=False):
         input0 = torch.rand(16)
         input1 = torch.rand(16)
 
@@ -421,7 +432,7 @@ class PBBLSTest(unittest.TestCase):
 
         input0_pb = pb_utils.Tensor.from_dlpack('INPUT0', to_dlpack(input0))
         input1_pb = pb_utils.Tensor.from_dlpack('INPUT1', to_dlpack(input1))
-        
+
         output0_dlpack, output1_dlpack = self._get_gpu_bls_outputs(
             input0_pb, input1_pb, is_decoupled=is_decoupled)
 
@@ -440,46 +451,46 @@ class PBBLSTest(unittest.TestCase):
                 expected_output_1 == from_dlpack(output1_dlpack).to('cpu')))
 
     def test_gpu_bls(self):
-        # Test with exec() and exec(decoupled=True) separately
-        for is_decoupled in [True, False]:
-            for input0_device in [True, False]:
-                for input1_device in [True, False]:
-                    self._test_gpu_bls_add_sub(input0_device, input1_device, is_decoupled)
+        for input0_device in [True, False]:
+            for input1_device in [True, False]:
+                self._test_gpu_bls_add_sub(input0_device, input1_device,
+                                           self._is_decoupled)
 
     def test_multiprocess(self):
         # Test multiprocess Pool with sync BLS
-        for func_name in [bls_add_sub, bls_square]:
-            pool = Pool(10)
-            pool.map(func_name, [1, 2, 3, 4, 5, 6, 7, 8, 9, 10])
-            pool.close()
-            pool.join()
+        if self._is_decoupled:
+            func_name = bls_square
+        else:
+            func_name = bls_add_sub
+
+        pool = Pool(10)
+        pool.map(func_name, [1, 2, 3, 4, 5, 6, 7, 8, 9, 10])
+        pool.close()
+        pool.join()
 
     def test_bls_sync(self):
         infer_request = pb_utils.InferenceRequest(
             model_name='non_existent_model',
             inputs=[],
             requested_output_names=[])
-        infer_response = infer_request.exec()
 
-        # Because the model doesn't exist, the inference response must have an
-        # error
-        self.assertTrue(infer_response.has_error())
-        self.assertIn(
-            "Failed for execute the inference request. Model 'non_existent_model' is not ready.",
-            infer_response.error().message())
+        if self._is_decoupled:
+            infer_responses = infer_request.exec(decoupled=True)
 
-        # Make sure that the inference requests can be performed properly after
-        # an error.
-        self.assertTrue(bls_add_sub())
+            for infer_response in infer_responses:
+                # Because the model doesn't exist, the inference response must have an
+                # error
+                self.assertTrue(infer_response.has_error())
+                self.assertIn(
+                    "Failed for execute the inference request. Model 'non_existent_model' is not ready.",
+                    infer_response.error().message())
 
-        # Test with exec(decoupled=True) API
-        infer_request = pb_utils.InferenceRequest(
-            model_name='non_existent_model',
-            inputs=[],
-            requested_output_names=[])
-        infer_responses = infer_request.exec(decoupled=True)
+                # Make sure that the inference requests can be performed properly after
+                # an error.
+                self.assertTrue(bls_square())
+        else:
+            infer_response = infer_request.exec()
 
-        for infer_response in infer_responses:
             # Because the model doesn't exist, the inference response must have an
             # error
             self.assertTrue(infer_response.has_error())
@@ -487,36 +498,37 @@ class PBBLSTest(unittest.TestCase):
                 "Failed for execute the inference request. Model 'non_existent_model' is not ready.",
                 infer_response.error().message())
 
-        # Make sure that the inference requests can be performed properly after
-        # an error.
-        self.assertTrue(bls_square())
+            # Make sure that the inference requests can be performed properly after
+            # an error.
+            self.assertTrue(bls_add_sub())
 
     def test_bls_execute_error(self):
-        # Test with exec() and exec(decoupled=True) separately
-        for is_decoupled in [True, False]:
-            # Test BLS with a model that has an error during execution.
-            infer_request = pb_utils.InferenceRequest(model_name='execute_error',
-                                                    inputs=[],
-                                                    requested_output_names=[])
-            if is_decoupled:
-                infer_responses = infer_request.exec(decoupled=True)
-                infer_response = next(infer_responses)
-                with self.assertRaises(StopIteration):
-                    next(infer_responses)
-            else:
-                infer_response = infer_request.exec()
+        # Test BLS with a model that has an error during execution.
+        infer_request = pb_utils.InferenceRequest(model_name='execute_error',
+                                                  inputs=[],
+                                                  requested_output_names=[])
+        if self._is_decoupled:
+            infer_responses = infer_request.exec(decoupled=True)
+            infer_response = next(infer_responses)
+            with self.assertRaises(StopIteration):
+                next(infer_responses)
+        else:
+            infer_response = infer_request.exec()
 
-            self.assertTrue(infer_response.has_error())
-            self.assertIn(
-                "expected 1 inputs but got 0 inputs for model 'execute_error'",
-                infer_response.error().message())
-            self.assertTrue(len(infer_response.output_tensors()) == 0)
+        self.assertTrue(infer_response.has_error())
+        self.assertIn(
+            "expected 1 inputs but got 0 inputs for model 'execute_error'",
+            infer_response.error().message())
+        self.assertTrue(len(infer_response.output_tensors()) == 0)
 
     def test_multiple_bls(self):
         # Test running multiple BLS requests together
-        for _ in range(100):
-            self.assertTrue(bls_add_sub())
-            self.assertTrue(bls_square())
+        if self._is_decoupled:
+            for _ in range(100):
+                self.assertTrue(bls_square())
+        else:
+            for _ in range(100):
+                self.assertTrue(bls_add_sub())
 
 
 class TritonPythonModel:

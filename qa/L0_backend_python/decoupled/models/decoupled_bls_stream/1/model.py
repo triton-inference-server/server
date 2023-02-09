@@ -78,16 +78,7 @@ class TritonPythonModel:
             inputs=[pb_utils.Tensor('IN', in_value)])
         infer_responses = infer_request.exec(decoupled=True)
 
-        if len(infer_responses) != in_value:
-            error_message = (
-                "Expected {} responses, got {}".format(
-                    in_value, len(infer_responses)))
-            response = pb_utils.InferenceResponse(
-                error=error_message)
-            response_sender.send(
-                response,
-                flags=pb_utils.TRITONSERVER_RESPONSE_COMPLETE_FINAL)
-
+        response_count = 0
         for infer_response in infer_responses:
             output0 = pb_utils.get_output_tensor_by_name(
                 infer_response, "OUT")
@@ -111,8 +102,20 @@ class TritonPythonModel:
                     output_tensors=output_tensors)
                 response_sender.send(response)
 
-        response_sender.send(
-            flags=pb_utils.TRITONSERVER_RESPONSE_COMPLETE_FINAL)
+            response_count += 1
+
+        if response_count != in_value:
+            error_message = (
+                "Expected {} responses, got {}".format(
+                    in_value, len(infer_responses)))
+            response = pb_utils.InferenceResponse(
+                error=error_message)
+            response_sender.send(
+                response,
+                flags=pb_utils.TRITONSERVER_RESPONSE_COMPLETE_FINAL)
+        else:
+            response_sender.send(
+                flags=pb_utils.TRITONSERVER_RESPONSE_COMPLETE_FINAL)
 
         with self.inflight_thread_count_lck:
             self.inflight_thread_count -= 1

@@ -24,6 +24,7 @@
 # (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
+import os
 import numpy as np
 import triton_python_backend_utils as pb_utils
 import torch
@@ -33,9 +34,7 @@ import asyncio
 
 def verify_add_sub_results(input0, input1, infer_response):
     if infer_response.has_error():
-        print('Async BLS failed:',
-            infer_response.error().message(),
-            flush=True)
+        print('Async BLS failed:', infer_response.error().message(), flush=True)
         return False
 
     output0 = pb_utils.get_output_tensor_by_name(infer_response, 'OUTPUT0')
@@ -81,6 +80,7 @@ def verify_add_sub_results(input0, input1, infer_response):
 
     return True
 
+
 def verify_square_results(input0, infer_responses):
     if not input0.is_cpu():
         input0 = from_dlpack(
@@ -92,9 +92,9 @@ def verify_square_results(input0, infer_responses):
 
     for infer_response in infer_responses:
         if infer_response.has_error():
-            print('Async BLS Stream failed:',
-                infer_response.error().message(),
-                flush=True)
+            print('Async BLS decoupled failed:',
+                  infer_response.error().message(),
+                  flush=True)
             return False
 
         output0 = pb_utils.get_output_tensor_by_name(infer_response, 'OUT')
@@ -117,9 +117,8 @@ def verify_square_results(input0, infer_responses):
         response_count += 1
 
     if not np.all(response_count == input0):
-        print('Expected {} responses, got {}'.format(
-            input0, response_count))
-        return False        
+        print('Expected {} responses, got {}'.format(input0, response_count))
+        return False
 
     return True
 
@@ -146,20 +145,21 @@ def create_addsub_inference_request(gpu=False):
         requested_output_names=['OUTPUT0', 'OUTPUT1'])
     return input0, input1, infer_request
 
+
 def create_square_inference_request(gpu=False):
     if not gpu:
         input0_np = np.random.randint(16, size=1, dtype=np.int32)
         input0 = pb_utils.Tensor('IN', input0_np)
     else:
-        input0_pytorch = torch.randint(1,16, (1,), dtype=torch.int32).to('cuda')
-        input0 = pb_utils.Tensor.from_dlpack('IN',
-                                             to_dlpack(input0_pytorch))
+        input0_pytorch = torch.randint(1, 16, (1,),
+                                       dtype=torch.int32).to('cuda')
+        input0 = pb_utils.Tensor.from_dlpack('IN', to_dlpack(input0_pytorch))
 
-    infer_request = pb_utils.InferenceRequest(
-        model_name='dlpack_square',
-        inputs=[input0],
-        requested_output_names=['OUT'])
+    infer_request = pb_utils.InferenceRequest(model_name='dlpack_square',
+                                              inputs=[input0],
+                                              requested_output_names=['OUT'])
     return input0, infer_request
+
 
 async def async_bls_add_sub():
     input0, input1, infer_request = create_addsub_inference_request()
@@ -175,6 +175,7 @@ async def async_bls_add_sub():
 
     return True
 
+
 async def async_bls_square():
     input0, infer_request = create_square_inference_request()
     infer_responses = await infer_request.async_exec(decoupled=True)
@@ -188,6 +189,7 @@ async def async_bls_square():
         return False
 
     return True
+
 
 async def multiple_async_bls_addsub(gpu):
     infer_request_aws = []
@@ -205,6 +207,7 @@ async def multiple_async_bls_addsub(gpu):
             return False
 
     return True
+
 
 async def multiple_async_bls_square(gpu):
     infer_request_aws = []
@@ -226,20 +229,23 @@ async def multiple_async_bls_square(gpu):
 class TritonPythonModel:
 
     async def execute(self, requests):
+        is_decoupled = True if os.environ['BLS_KIND'] == "decoupled" else False
+
         responses = []
         for _ in requests:
-            test1 = await multiple_async_bls_addsub(gpu=True)
-            test2 = await multiple_async_bls_addsub(gpu=False)
-            test3 = await async_bls_add_sub()
-            test4 = await multiple_async_bls_square(gpu=True)
-            test5 = await multiple_async_bls_square(gpu=False)
-            test6 = await async_bls_square()
+            if is_decoupled:
+                test1 = await multiple_async_bls_square(gpu=True)
+                test2 = await multiple_async_bls_square(gpu=False)
+                test3 = await async_bls_square()
+            else:
+                test1 = await multiple_async_bls_addsub(gpu=True)
+                test2 = await multiple_async_bls_addsub(gpu=False)
+                test3 = await async_bls_add_sub()
 
             responses.append(
                 pb_utils.InferenceResponse(output_tensors=[
                     pb_utils.Tensor('OUTPUT0', np.array([test1 & test2 &
-                                                         test3 & test4 &
-                                                         test5 & test6]))
+                                                         test3]))
                 ]))
 
         return responses

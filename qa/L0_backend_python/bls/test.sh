@@ -91,79 +91,83 @@ cp ../../python_models/dlpack_square/model.py models/dlpack_square/1/
 cp ../../python_models/dlpack_square/config.pbtxt models/dlpack_square
 
 
-run_server
-if [ "$SERVER_PID" == "0" ]; then
-    echo -e "\n***\n*** Failed to start $SERVER\n***"
-    cat $SERVER_LOG
-    exit 1
-fi
+for TRIAL in non_decoupled decoupled ; do
+    export BLS_KIND=$TRIAL
 
-set +e
-
-export MODEL_NAME='bls'
-python3 $CLIENT_PY >> $CLIENT_LOG 2>&1 
-if [ $? -ne 0 ]; then
-    echo -e "\n***\n*** 'bls' test FAILED. \n***"
-    cat $CLIENT_LOG
-    RET=1
-else
-    check_test_results $TEST_RESULT_FILE $EXPECTED_NUM_TESTS
-    if [ $? -ne 0 ]; then
-        cat $CLIENT_LOG
-        echo -e "\n***\n*** Test Result Verification Failed\n***"
-        RET=1
+    run_server
+    if [ "$SERVER_PID" == "0" ]; then
+        echo -e "\n***\n*** Failed to start $SERVER\n***"
+        cat $SERVER_LOG
+        exit 1
     fi
-fi
 
-export MODEL_NAME='bls_memory'
-python3 $CLIENT_PY >> $CLIENT_LOG 2>&1 
-if [ $? -ne 0 ]; then
-    echo -e "\n***\n*** 'bls_memory' test FAILED. \n***"
-    cat $CLIENT_LOG
-    RET=1
-else
-    check_test_results $TEST_RESULT_FILE $EXPECTED_NUM_TESTS
+    set +e
+
+    export MODEL_NAME='bls'
+    python3 $CLIENT_PY >> $CLIENT_LOG 2>&1 
     if [ $? -ne 0 ]; then
+        echo -e "\n***\n*** 'bls' $BLS_KIND test FAILED. \n***"
         cat $CLIENT_LOG
-        echo -e "\n***\n*** Test Result Verification Failed\n***"
         RET=1
+    else
+        check_test_results $TEST_RESULT_FILE $EXPECTED_NUM_TESTS
+        if [ $? -ne 0 ]; then
+            cat $CLIENT_LOG
+            echo -e "\n***\n*** Test Result Verification Failed\n***"
+            RET=1
+        fi
     fi
-fi
 
-export MODEL_NAME='bls_memory_async'
-python3 $CLIENT_PY >> $CLIENT_LOG 2>&1 
-if [ $? -ne 0 ]; then
-    echo -e "\n***\n*** 'bls_async_memory' test FAILED. \n***"
-    cat $CLIENT_LOG
-    RET=1
-else
-    check_test_results $TEST_RESULT_FILE $EXPECTED_NUM_TESTS
+    export MODEL_NAME='bls_memory'
+    python3 $CLIENT_PY >> $CLIENT_LOG 2>&1 
     if [ $? -ne 0 ]; then
+        echo -e "\n***\n*** 'bls_memory' $BLS_KIND test FAILED. \n***"
         cat $CLIENT_LOG
-        echo -e "\n***\n*** Test Result Verification Failed\n***"
         RET=1
+    else
+        check_test_results $TEST_RESULT_FILE $EXPECTED_NUM_TESTS
+        if [ $? -ne 0 ]; then
+            cat $CLIENT_LOG
+            echo -e "\n***\n*** Test Result Verification Failed\n***"
+            RET=1
+        fi
     fi
-fi
 
-export MODEL_NAME='bls_async'
-python3 $CLIENT_PY >> $CLIENT_LOG 2>&1 
-if [ $? -ne 0 ]; then
-    echo -e "\n***\n*** 'bls_async' test FAILED. \n***"
-    cat $CLIENT_LOG
-    RET=1
-else
-    check_test_results $TEST_RESULT_FILE $EXPECTED_NUM_TESTS
+    export MODEL_NAME='bls_memory_async'
+    python3 $CLIENT_PY >> $CLIENT_LOG 2>&1 
     if [ $? -ne 0 ]; then
+        echo -e "\n***\n*** 'bls_async_memory' $BLS_KIND test FAILED. \n***"
         cat $CLIENT_LOG
-        echo -e "\n***\n*** Test Result Verification Failed\n***"
         RET=1
+    else
+        check_test_results $TEST_RESULT_FILE $EXPECTED_NUM_TESTS
+        if [ $? -ne 0 ]; then
+            cat $CLIENT_LOG
+            echo -e "\n***\n*** Test Result Verification Failed\n***"
+            RET=1
+        fi
     fi
-fi
 
-set -e
+    export MODEL_NAME='bls_async'
+    python3 $CLIENT_PY >> $CLIENT_LOG 2>&1 
+    if [ $? -ne 0 ]; then
+        echo -e "\n***\n*** 'bls_async' $BLS_KIND test FAILED. \n***"
+        cat $CLIENT_LOG
+        RET=1
+    else
+        check_test_results $TEST_RESULT_FILE $EXPECTED_NUM_TESTS
+        if [ $? -ne 0 ]; then
+            cat $CLIENT_LOG
+            echo -e "\n***\n*** Test Result Verification Failed\n***"
+            RET=1
+        fi
+    fi
 
-kill $SERVER_PID
-wait $SERVER_PID
+    set -e
+
+    kill $SERVER_PID
+    wait $SERVER_PID
+done
 
 if [ $RET -eq 1 ]; then
     cat $CLIENT_LOG
