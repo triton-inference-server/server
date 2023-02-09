@@ -631,15 +631,13 @@ def onnxruntime_cmake_args(images, library_paths):
                                  'TRITON_ENABLE_ONNXRUNTIME_OPENVINO', False)
         ]
     else:
-        ort_image = None
-        if ('base' in images) and ('ort-base' in images):
+        # If ort-base is not specified, we default to
+        # tensorrt:22.12-py3 base container for ort backend
+        # build with cuda 11.8 library as ORT does
+        # not support cuda 12 in 23.01 containers.
+        ort_image = 'nvcr.io/nvidia/tensorrt:22.12-py3'
+        if ('ort-base' in images):
             ort_image = images['ort-base']
-        elif ('base' in images):
-            # If ort-base is not specified, we default to
-            # tensorrt:22.12-py3 base container for ort backend
-            # build with cuda 11.8 library as ORT does
-            # not support cuda 12 in 23.01 containers.
-            ort_image = 'nvcr.io/nvidia/tensorrt:22.12-py3'
         if target_platform() == 'windows':
             if ort_image is not None:
                 cargs.append(
