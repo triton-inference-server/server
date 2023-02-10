@@ -631,16 +631,24 @@ def onnxruntime_cmake_args(images, library_paths):
                                  'TRITON_ENABLE_ONNXRUNTIME_OPENVINO', False)
         ]
     else:
+        # If ort-base is not specified, we default to
+        # tritonserver:22.12-py3-min base container
+        # for ort backend build with cuda 11.8 library
+        # as ORT does not support cuda 12 in 23.01
+        # containers.
+        ort_image = 'nvcr.io/nvidia/tritonserver:22.12-py3-min'
+        if ('ort-base' in images):
+            ort_image = images['ort-base']
         if target_platform() == 'windows':
-            if 'ort-base' in images:
+            if ort_image is not None:
                 cargs.append(
                     cmake_backend_arg('onnxruntime', 'TRITON_BUILD_CONTAINER',
-                                      None, images['ort-base']))
+                                      None, ort_image))
         else:
-            if 'ort-base' in images:
+            if ort_image is not None:
                 cargs.append(
                     cmake_backend_arg('onnxruntime', 'TRITON_BUILD_CONTAINER',
-                                      None, images['ort-base']))
+                                      None, ort_image))
             else:
                 cargs.append(
                     cmake_backend_arg('onnxruntime',
