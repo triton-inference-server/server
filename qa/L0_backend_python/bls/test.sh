@@ -90,6 +90,9 @@ mkdir -p models/dlpack_square/1/
 cp ../../python_models/dlpack_square/model.py models/dlpack_square/1/
 cp ../../python_models/dlpack_square/config.pbtxt models/dlpack_square
 
+mkdir -p models/identity_fp32_timeout/1/
+cp ../../python_models/identity_fp32_timeout/model.py models/identity_fp32_timeout/1/
+cp ../../python_models/identity_fp32_timeout/config.pbtxt models/identity_fp32_timeout
 
 for TRIAL in non_decoupled decoupled ; do
     export BLS_KIND=$TRIAL

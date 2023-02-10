@@ -530,6 +530,28 @@ class PBBLSTest(unittest.TestCase):
             for _ in range(100):
                 self.assertTrue(bls_add_sub())
 
+    def test_timeout(self):
+        tensor_size = [1, 1024 * 1024]
+        input0_np = np.random.randn(*tensor_size)
+        input0 = pb_utils.Tensor('INPUT0', input0_np.astype(np.float32))
+        infer_request = pb_utils.InferenceRequest(
+            model_name='identity_fp32_timeout',
+            inputs=[input0],
+            requested_output_names=['OUTPUT0'],
+            timeout=5)
+
+        if self._is_decoupled:
+            infer_responses = infer_request.exec(decoupled=True)
+            infer_response = next(infer_responses)
+        else:
+            infer_response = infer_request.exec()
+
+        # Expect timeout error
+        self.assertTrue(infer_response.has_error())
+        self.assertIn(
+            "Request timeout expired",
+            infer_response.error().message())
+        self.assertTrue(len(infer_response.output_tensors()) == 0)
 
 class TritonPythonModel:
 
