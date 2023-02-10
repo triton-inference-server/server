@@ -137,20 +137,6 @@ Concurrency: 4, throughput: 83 infer/sec, latency 48064 usec
 Perf Analyzer calculates throughput to be the total number of requests completed
 during a measurement, divided by the duration of the measurement, in seconds.
 
-#### Time Windows
-
-When using time windows measurement mode (`--measurement-mode=time_windows`),
-Perf Analyzer will count how many requests have completed during a window of
-duration `X` (in milliseconds, via `--measurement-interval=X`, default is
-`5000`). This is the default measurement mode.
-
-#### Count Windows
-
-When using count windows measurement mode (`--measurement-mode=count_windows`),
-Perf Analyzer will start the window duration at 1 second and potentially
-dynamically increase it until `X` requests have completed (via
-`--measurement-request-count=X`, default is `50`).
-
 ### How Latency is Calculated
 
 For each request concurrency level perf_analyzer reports latency and
@@ -186,6 +172,22 @@ follows:
 Use the verbose (-v) option to perf_analyzer to see more output,
 including the stabilization passes run for each request concurrency
 level.
+
+## Measurement Modes
+
+### Time Windows
+
+When using time windows measurement mode (`--measurement-mode=time_windows`),
+Perf Analyzer will count how many requests have completed during a window of
+duration `X` (in milliseconds, via `--measurement-interval=X`, default is
+`5000`). This is the default measurement mode.
+
+### Count Windows
+
+When using count windows measurement mode (`--measurement-mode=count_windows`),
+Perf Analyzer will start the window duration at 1 second and potentially
+dynamically increase it until `X` requests have completed (via
+`--measurement-request-count=X`, default is `50`).
 
 ## Visualizing Latency vs. Throughput
 
