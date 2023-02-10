@@ -632,10 +632,11 @@ def onnxruntime_cmake_args(images, library_paths):
         ]
     else:
         # If ort-base is not specified, we default to
-        # tensorrt:22.12-py3 base container for ort backend
-        # build with cuda 11.8 library as ORT does
-        # not support cuda 12 in 23.01 containers.
-        ort_image = 'nvcr.io/nvidia/tensorrt:22.12-py3'
+        # tritonserver:22.12-py3-min base container
+        # for ort backend build with cuda 11.8 library
+        # as ORT does not support cuda 12 in 23.01
+        # containers.
+        ort_image = 'nvcr.io/nvidia/tritonserver:22.12-py3-min'
         if ('ort-base' in images):
             ort_image = images['ort-base']
         if target_platform() == 'windows':
