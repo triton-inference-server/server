@@ -57,7 +57,7 @@ class ShortCircuitUtil(tu.TestResultCollector):
             time.sleep(1)
             timeout += 1
 
-    def run_test_single(self, backend_name, model_name, model_version, start_count, new_instance_groups, end_count):
+    def run_test_single(self, model_name, model_version, start_count, new_instance_groups, end_count):
         self._triton_client.load_model(model_name=model_name)
         self.wait_or_timeout_model_load(model_name, model_version)
 
@@ -72,7 +72,7 @@ class ShortCircuitUtil(tu.TestResultCollector):
         config = self._triton_client.get_model_config(model_name=model_name, model_version=model_version)
         self.assertEqual(config["instance_group"][0]["count"], end_count)
 
-    def run_test_multiple(self, backend_name, model_name, model_version, start_count, new_instance_groups, end_count):
+    def run_test_multiple(self, model_name, model_version, start_count, new_instance_groups, end_count):
         self._triton_client.load_model(model_name=model_name)
         self.wait_or_timeout_model_load(model_name, model_version)
 

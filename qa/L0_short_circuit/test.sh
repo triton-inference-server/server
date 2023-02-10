@@ -42,7 +42,6 @@ DATADIR=${DATADIR:="/data/inferenceserver/${REPO_VERSION}"}
 MODELDIR=${MODELDIR:=`pwd`/models}
 
 CLIENT_LOG="./client.log"
-CLIENT=short_circuit_test.py
 
 SERVER=/opt/tritonserver/bin/tritonserver
 SERVER_TIMEOUT=20
@@ -91,6 +90,8 @@ rm $CLIENT_LOG
 # Tensorflow saved model
 #
 
+CLIENT=tensorflow_savedmodel_test.py
+
 # Don't need to test different models so we can copy the same one 
 # multiple times.
 mkdir -p models/increase_count && cp -r $DATADIR/qa_identity_model_repository/savedmodel_nobatch_zero_1_float32/* models/increase_count
@@ -99,8 +100,10 @@ mkdir -p models/decrease_count_past_zero && cp -r $DATADIR/qa_identity_model_rep
 mkdir -p models/increase_count_some_multiple && cp -r $DATADIR/qa_identity_model_repository/savedmodel_nobatch_zero_1_float32/* models/increase_count_some_multiple
 mkdir -p models/increase_count_all_multiple && cp -r $DATADIR/qa_identity_model_repository/savedmodel_nobatch_zero_1_float32/* models/increase_count_all_multiple
 mkdir -p models/increase_count_rearrange_multiple && cp -r $DATADIR/qa_identity_model_repository/savedmodel_nobatch_zero_1_float32/* models/increase_count_rearrange_multiple
+mkdir -p models/rearrange_multiple && cp -r $DATADIR/qa_identity_model_repository/savedmodel_nobatch_zero_1_float32/* models/rearrange_multiple
 mkdir -p models/decrease_count_some_multiple && cp -r $DATADIR/qa_identity_model_repository/savedmodel_nobatch_zero_1_float32/* models/decrease_count_some_multiple
 mkdir -p models/decrease_count_all_multiple && cp -r $DATADIR/qa_identity_model_repository/savedmodel_nobatch_zero_1_float32/* models/decrease_count_all_multiple
+mkdir -p models/different_field && cp -r $DATADIR/qa_identity_model_repository/savedmodel_nobatch_zero_1_float32/* models/different_field
 
 mkdir -p models/increase_count_no_config && cp -r $DATADIR/qa_identity_model_repository/savedmodel_nobatch_zero_1_float32/* models/increase_count_no_config
 rm models/increase_count_no_config/config.pbtxt
@@ -126,11 +129,83 @@ kill_server
 
 #
 # Tensorflow graphdef
-#
+# #
+# CLIENT=tensorflow_savedmodel_test.py
+# rm -r models/
+
+# # Don't need to test different models so we can copy the same one 
+# # multiple times.
+# # FIXME: Triton server fails to load the model for some reason. If the model is not unloaded
+# #     then calling 'load' again will mark it as modified since triton has a record of this 
+# #     model in memory.
+# mkdir -p models/increase_count && cp -r $DATADIR/qa_identity_model_repository/graphdef_nobatch_zero_1_float32/* models/increase_count
+# mkdir -p models/decrease_count && cp -r $DATADIR/qa_identity_model_repository/graphdef_nobatch_zero_1_float32/* models/decrease_count
+# mkdir -p models/decrease_count_past_zero && cp -r $DATADIR/qa_identity_model_repository/graphdef_nobatch_zero_1_float32/* models/decrease_count_past_zero
+# mkdir -p models/increase_count_some_multiple && cp -r $DATADIR/qa_identity_model_repository/graphdef_nobatch_zero_1_float32/* models/increase_count_some_multiple
+# mkdir -p models/increase_count_all_multiple && cp -r $DATADIR/qa_identity_model_repository/graphdef_nobatch_zero_1_float32/* models/increase_count_all_multiple
+# mkdir -p models/increase_count_rearrange_multiple && cp -r $DATADIR/qa_identity_model_repository/graphdef_nobatch_zero_1_float32/* models/increase_count_rearrange_multiple
+# mkdir -p models/decrease_count_some_multiple && cp -r $DATADIR/qa_identity_model_repository/graphdef_nobatch_zero_1_float32/* models/decrease_count_some_multiple
+# mkdir -p models/decrease_count_all_multiple && cp -r $DATADIR/qa_identity_model_repository/graphdef_nobatch_zero_1_float32/* models/decrease_count_all_multiple
+
+# run_server
+# if [ "$SERVER_PID" == "0" ]; then
+#     echo -e "\n***\n*** Failed to start $SERVER\n***"
+#     cat $SERVER_LOG
+#     exit 1
+# fi
+
+# set +e
+
+# python3 $CLIENT >>$CLIENT_LOG 2>&1
+# if [ $? -ne 0 ]; then
+#     echo -e "\n***\n*** Test Failed\n***" >>$CLIENT_LOG
+#     echo -e "\n***\n*** Test Failed\n***"
+#     RET=1
+# fi
+
+# set -e
+# kill_server
 
 #
 # Onnxruntime
 #
+
+# CLIENT=tensorflow_savedmodel_test.py
+# rm -r models/
+
+# # Don't need to test different models so we can copy the same one 
+# # multiple times.
+# mkdir -p models/increase_count && cp -r $DATADIR/qa_identity_model_repository/onnx_nobatch_zero_1_float32/* models/increase_count
+# mkdir -p models/decrease_count && cp -r $DATADIR/qa_identity_model_repository/onnx_nobatch_zero_1_float32/* models/decrease_count
+# mkdir -p models/decrease_count_past_zero && cp -r $DATADIR/qa_identity_model_repository/onnx_nobatch_zero_1_float32/* models/decrease_count_past_zero
+# mkdir -p models/increase_count_some_multiple && cp -r $DATADIR/qa_identity_model_repository/onnx_nobatch_zero_1_float32/* models/increase_count_some_multiple
+# mkdir -p models/increase_count_all_multiple && cp -r $DATADIR/qa_identity_model_repository/onnx_nobatch_zero_1_float32/* models/increase_count_all_multiple
+# mkdir -p models/increase_count_rearrange_multiple && cp -r $DATADIR/qa_identity_model_repository/onnx_nobatch_zero_1_float32/* models/increase_count_rearrange_multiple
+# mkdir -p models/decrease_count_some_multiple && cp -r $DATADIR/qa_identity_model_repository/onnx_nobatch_zero_1_float32/* models/decrease_count_some_multiple
+# mkdir -p models/decrease_count_all_multiple && cp -r $DATADIR/qa_identity_model_repository/onnx_nobatch_zero_1_float32/* models/decrease_count_all_multiple
+
+
+# mkdir -p models/increase_count_no_config && cp -r $DATADIR/qa_identity_model_repository/onnx_nobatch_zero_1_float32/* models/increase_count_no_config
+# rm models/increase_count_no_config/config.pbtxt
+
+# run_server
+# if [ "$SERVER_PID" == "0" ]; then
+#     echo -e "\n***\n*** Failed to start $SERVER\n***"
+#     cat $SERVER_LOG
+#     exit 1
+# fi
+
+# set +e
+
+# python3 $CLIENT >>$CLIENT_LOG 2>&1
+# if [ $? -ne 0 ]; then
+#     echo -e "\n***\n*** Test Failed\n***" >>$CLIENT_LOG
+#     echo -e "\n***\n*** Test Failed\n***"
+#     RET=1
+# fi
+
+# set -e
+# kill_server
 
 #
 # TensorRT

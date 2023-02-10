@@ -28,7 +28,7 @@ import sys
 
 sys.path.append("../common")
 
-# import os
+import os
 # import time
 # import threading
 import unittest
@@ -43,6 +43,38 @@ from short_circuit_util import ShortCircuitUtil as scutil
 class ShortCircuitTest(scutil):
     # def setUp(self):
     #     self._triton_client = httpclient.InferenceServerClient("localhost:8000")
+
+    def test_different_field(self):
+        start_instance_group =           \
+            'name: "different_field"      \
+            instance_group {             \
+                name: "different_field",  \
+                count: 1,                \
+                gpus: 0                  \
+                kind: KIND_GPU,          \
+            }'
+        self.set_instance_group_proto('models/different_field/config.pbtxt', start_instance_group)
+
+        end_instance_group = json.loads(
+            '[{                            \
+                "name": "different_field",  \
+                "count": 1,                \
+                "gpus": 0,                 \
+                "kind": "KIND_GPU",         \
+                "rate_limiter": {      \
+                    "resources": [{            \
+                        "name": "resource_1",  \
+                        "global": true,        \
+                        "count": 1           \
+                    }],                     \
+                    "priority": 1          \
+                }                         \
+            }]                             \
+        ')
+        self.set_instance_group_json('models/different_field/config.pbtxt')
+
+        self.run_test_single("different_field", "1", 1, end_instance_group, 1)
+
 
     def test_increase_instance_count(self):
         start_instance_group =           \
@@ -65,7 +97,7 @@ class ShortCircuitTest(scutil):
         ')
         self.set_instance_group_json('models/increase_count/config.pbtxt')
 
-        self.run_test_single("tensorflow", "increase_count", "1", 1, end_instance_group, 2)
+        self.run_test_single("increase_count", "1", 1, end_instance_group, 2)
 
     def test_decrease_instance_count(self):
         start_instance_group =           \
@@ -88,7 +120,7 @@ class ShortCircuitTest(scutil):
         ')
         self.set_instance_group_json('models/decrease_count/config.pbtxt')
 
-        self.run_test_single( "tensorflow", "decrease_count", "1", 2, end_instance_group, 1)
+        self.run_test_single("decrease_count", "1", 2, end_instance_group, 1)
 
     def test_decrease_instance_count_past_zero(self):
         start_instance_group =           \
@@ -111,9 +143,13 @@ class ShortCircuitTest(scutil):
         ')
         self.set_instance_group_json('models/decrease_count_past_zero/config.pbtxt')
 
-        self.run_test_single("tensorflow", "decrease_count_past_zero", "1", 2, end_instance_group, 1)
+        self.run_test_single("decrease_count_past_zero", "1", 2, end_instance_group, 1)
     
     def test_increase_instance_count_no_config(self):
+        # if the directory doesn't exist then we don't run the test
+        if not os.path.isdir('models/increase_count_no_config'):
+            return    
+
         end_instance_group = json.loads(
             '[{                            \
                 "name": "increase_count_no_config",  \
@@ -124,7 +160,7 @@ class ShortCircuitTest(scutil):
         ')
         self.set_instance_group_json('models/increase_count_no_config/config.pbtxt')
 
-        self.run_test_single("tensorflow", "increase_count_no_config", "1", 1, end_instance_group, 2)
+        self.run_test_single("increase_count_no_config", "1", 1, end_instance_group, 2)
         
     def test_increase_instance_count_some_multiple(self):
         start_instance_group =           \
@@ -159,7 +195,7 @@ class ShortCircuitTest(scutil):
         ')
         self.set_instance_group_json('models/increase_count_some_multiple/config.pbtxt')
 
-        self.run_test_multiple( "tensorflow", "increase_count_some_multiple", "1", [1, 1], end_instance_group, [1,2])
+        self.run_test_multiple("increase_count_some_multiple", "1", [1, 1], end_instance_group, [1,2])
 
     def test_increase_instance_count_all_multiple(self):
         start_instance_group =           \
@@ -194,7 +230,7 @@ class ShortCircuitTest(scutil):
         ')
         self.set_instance_group_json('models/increase_count_all_multiple/config.pbtxt')
 
-        self.run_test_multiple("tensorflow", "increase_count_all_multiple", "1", [1, 1], end_instance_group, [2,2])
+        self.run_test_multiple("increase_count_all_multiple", "1", [1, 1], end_instance_group, [2,2])
 
     def test_increase_instance_count_rearrange_multiple(self):
         start_instance_group =           \
@@ -229,7 +265,40 @@ class ShortCircuitTest(scutil):
         ')
         self.set_instance_group_json('models/increase_count_rearrange_multiple/config.pbtxt')
 
-        self.run_test_multiple("tensorflow", "increase_count_rearrange_multiple", "1", [1, 1], end_instance_group, [2,2])
+    def test_rearrange_multiple(self):
+        start_instance_group =           \
+            'name: "rearrange_multiple"      \
+            instance_group {             \
+                name: "rearrange_multiple_1",  \
+                count: 1,                \
+                gpus: 0                  \
+                kind: KIND_GPU,          \
+            }                           \
+            instance_group {             \
+                name: "rearrange_multiple_2",  \
+                count: 1,                \
+                gpus: 0                  \
+                kind: KIND_GPU,          \
+            }'
+        self.set_instance_group_proto('models/rearrange_multiple/config.pbtxt', start_instance_group)
+
+        end_instance_group = json.loads(
+            '[{                            \
+                "name": "rearrange_multiple_2",  \
+                "count": 1,                \
+                "gpus": 0,                 \
+                "kind": "KIND_GPU"         \
+            },                              \
+            {                            \
+                "name": "rearrange_multiple_1",  \
+                "count": 1,                \
+                "gpus": 0,                 \
+                "kind": "KIND_GPU"         \
+            }]                             \
+        ')
+        self.set_instance_group_json('models/rearrange_multiple/config.pbtxt')
+
+        self.run_test_multiple("rearrange_multiple", "1", [1, 1], end_instance_group, [1,1])
 
     def test_decrease_instance_count_some_multiple(self):
         start_instance_group =           \
@@ -264,7 +333,7 @@ class ShortCircuitTest(scutil):
         ')
         self.set_instance_group_json('models/decrease_count_some_multiple/config.pbtxt')
 
-        self.run_test_multiple("tensorflow", "decrease_count_some_multiple", "1", [2, 2], end_instance_group, [2,1])
+        self.run_test_multiple("decrease_count_some_multiple", "1", [2, 2], end_instance_group, [2,1])
 
     def test_decrease_instance_count_all_multiple(self):
         start_instance_group =           \
@@ -299,7 +368,7 @@ class ShortCircuitTest(scutil):
         ')
         self.set_instance_group_json('models/decrease_count_all_multiple/config.pbtxt')
 
-        self.run_test_multiple("tensorflow", "decrease_count_all_multiple", "1", [2, 2], end_instance_group, [1, 1])
+        self.run_test_multiple( "decrease_count_all_multiple", "1", [2, 2], end_instance_group, [1, 1])
 
 if __name__ == '__main__':
     unittest.main()
