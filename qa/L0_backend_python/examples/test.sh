@@ -1,5 +1,5 @@
 #!/bin/bash
-# Copyright 2021-2022, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright 2021-2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -314,6 +314,69 @@ set -e
 
 kill $SERVER_PID
 wait $SERVER_PID
+
+# BLS Decoupled Sync
+CLIENT_LOG="./bls_decoupled_sync_client.log"
+mkdir -p models/bls_decoupled_sync/1
+cp examples/bls_decoupled/sync_model.py models/bls_decoupled_sync/1/model.py
+cp examples/bls_decoupled/sync_config.pbtxt models/bls_decoupled_sync/config.pbtxt
+run_server
+if [ "$SERVER_PID" == "0" ]; then
+    echo -e "\n***\n*** Failed to start $SERVER\n***"
+    cat $SERVER_LOG
+    RET=1
+fi
+
+set +e
+python3 examples/bls_decoupled/sync_client.py > $CLIENT_LOG
+if [ $? -ne 0 ]; then
+    echo -e "\n***\n*** Failed to verify BLS Decoupled Sync example. \n***"
+    RET=1
+fi
+
+grep "PASS" $CLIENT_LOG
+if [ $? -ne 0 ]; then
+    echo -e "\n***\n*** Failed to verify BLS Decoupled Sync example. \n***"
+    cat $CLIENT_LOG
+    RET=1
+fi
+set -e
+
+kill $SERVER_PID
+wait $SERVER_PID
+
+# BLS Decoupled Async
+if [ "$TEST_JETSON" == "0" ]; then
+    CLIENT_LOG="./bls_decoupled_async_client.log"
+    mkdir -p models/bls_decoupled_async/1
+    cp examples/bls_decoupled/async_model.py models/bls_decoupled_async/1/model.py
+    cp examples/bls_decoupled/async_config.pbtxt models/bls_decoupled_async/config.pbtxt
+    run_server
+    if [ "$SERVER_PID" == "0" ]; then
+        echo -e "\n***\n*** Failed to start $SERVER\n***"
+        cat $SERVER_LOG
+        RET=1
+    fi
+
+    set +e
+    python3 examples/bls_decoupled/async_client.py > $CLIENT_LOG
+    if [ $? -ne 0 ]; then
+        echo -e "\n***\n*** Failed to verify BLS Decoupled Async example. \n***"
+        RET=1
+    fi
+
+    grep "PASS" $CLIENT_LOG
+    if [ $? -ne 0 ]; then
+        echo -e "\n***\n*** Failed to verify BLS Decoupled Async example. \n***"
+        cat $CLIENT_LOG
+        RET=1
+    fi
+
+    set -e
+
+    kill $SERVER_PID
+    wait $SERVER_PID
+fi
 
 if [ $RET -eq 0 ]; then
     echo -e "\n***\n*** Example verification test PASSED.\n***"
