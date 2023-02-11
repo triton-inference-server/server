@@ -1,4 +1,4 @@
-# Copyright (c) 2021, NVIDIA CORPORATION. All rights reserved.
+# Copyright 2019-2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -37,7 +37,7 @@ from tensorflow.python.saved_model import signature_constants
 from tensorflow.python.saved_model import tag_constants
 import tensorflow.compat.v1 as tf
 import gen_ensemble_model_utils as gu
-"""Create SaveModels that contains multiple tags and multiple signature defs"""
+"""Create SavedModels that contains multiple tags and multiple signature defs"""
 
 
 def create_savedmodel(models_dir,
@@ -45,15 +45,22 @@ def create_savedmodel(models_dir,
                       dims=16,
                       model_name="sig_tag",
                       tag_name="testTag",
-                      signature_def_name="testSigDef"):
+                      signature_def_name="testSigDef",
+                      different_io=False):
     """
-    Creates 4 SavedModels that have different combinations of model_name and tag_name.
-    The models multiplies the input tensor by a multiplier and the multiplier value is different for each model.
-    Naming convention and config used:
-    <model_name>0: tag: "serve",    signature_def: "serving_default",    multiplier 1
-    <model_name>1: tag: "serve",    signature_def: <signature_def_name>, multiplier 2
-    <model_name>2: tag: <tag_name>, signature_def: "serving_default",    multiplier 3
-    <model_name>3: tag: <tag_name>, signature_def: <signature_def_name>, multiplier 4
+    Creates one SavedModel with four variants of the model based on provided tag and signature_def.
+    The models multiplies the input tensor by a multiplier and the multiplier value is different for each variant.
+    Naming convention and config:
+    <model_name>_0: tag: "serve",    signature_def: "serving_default",    multiplier 1
+    <model_name>_1: tag: "serve",    signature_def: <signature_def_name>, multiplier 2
+    <model_name>_2: tag: <tag_name>, signature_def: "serving_default",    multiplier 3
+    <model_name>_3: tag: <tag_name>, signature_def: <signature_def_name>, multiplier 4
+
+    If different_io is true, there will be two variants of the model created.
+    The variants will have different numbers of inputs and outputs.
+    Alternate naming convention and config:
+    <model_name>0: tag: "serve",    signature_def: "serving_default",    two inputs/outputs
+    <model_name>1: tag: <tag_name>, signature_def: <signature_def_name>, one input/output
     """
     model_version_dir = models_dir + "/" + model_name + "/" + str(model_version)
 
@@ -119,28 +126,64 @@ def create_savedmodel(models_dir,
             inputs={"INPUT": input_tensor_info},
             outputs={"OUTPUT": output_tensor_info_3},
             method_name=tf.saved_model.signature_constants.PREDICT_METHOD_NAME)
-
-        signature_def_map_0 = {
-            signature_constants.DEFAULT_SERVING_SIGNATURE_DEF_KEY: signature_0,
-            signature_def_name: signature_1
-        }
-        signature_def_map_1 = {
-            signature_constants.DEFAULT_SERVING_SIGNATURE_DEF_KEY: signature_2,
-            signature_def_name: signature_3
-        }
+        # tag:tag_name, signature_def:signature_def_name, two inputs/outputs
+        signature_4 = tf.saved_model.signature_def_utils.build_signature_def(
+            inputs={
+                "INPUT": input_tensor_info,
+                "INPUT1": input_tensor_info
+            },
+            outputs={
+                "OUTPUT": output_tensor_info_0,
+                "OUTPUT1": output_tensor_info_1
+            },
+            method_name=tf.saved_model.signature_constants.PREDICT_METHOD_NAME)
 
         b = builder.SavedModelBuilder(model_version_dir + "/model.savedmodel")
-        b.add_meta_graph_and_variables(sess,
-                                       tags=[tag_constants.SERVING],
-                                       signature_def_map=signature_def_map_0,
-                                       assets_collection=ops.get_collection(
-                                           ops.GraphKeys.ASSET_FILEPATHS),
-                                       clear_devices=True)
-        b.add_meta_graph(tags=[tag_name],
-                         signature_def_map=signature_def_map_1,
-                         assets_collection=ops.get_collection(
-                             ops.GraphKeys.ASSET_FILEPATHS),
-                         clear_devices=True)
+
+        if different_io:
+            b.add_meta_graph_and_variables(
+                sess,
+                tags=[tag_name],
+                signature_def_map={signature_def_name: signature_0},
+                assets_collection=ops.get_collection(
+                    ops.GraphKeys.ASSET_FILEPATHS),
+                clear_devices=True)
+            b.add_meta_graph(
+                tags=[tag_constants.SERVING],
+                signature_def_map={
+                    signature_constants.DEFAULT_SERVING_SIGNATURE_DEF_KEY:
+                        signature_4
+                },
+                assets_collection=ops.get_collection(
+                    ops.GraphKeys.ASSET_FILEPATHS),
+                clear_devices=True)
+        else:
+            signature_def_map_0 = {
+                signature_constants.DEFAULT_SERVING_SIGNATURE_DEF_KEY:
+                    signature_0,
+                signature_def_name:
+                    signature_1
+            }
+            signature_def_map_1 = {
+                signature_constants.DEFAULT_SERVING_SIGNATURE_DEF_KEY:
+                    signature_2,
+                signature_def_name:
+                    signature_3
+            }
+
+            b.add_meta_graph_and_variables(
+                sess,
+                tags=[tag_constants.SERVING],
+                signature_def_map=signature_def_map_0,
+                assets_collection=ops.get_collection(
+                    ops.GraphKeys.ASSET_FILEPATHS),
+                clear_devices=True)
+            b.add_meta_graph(tags=[tag_name],
+                             signature_def_map=signature_def_map_1,
+                             assets_collection=ops.get_collection(
+                                 ops.GraphKeys.ASSET_FILEPATHS),
+                             clear_devices=True)
+
         b.save()
 
 
@@ -196,7 +239,9 @@ string_value: "{}"
 if __name__ == '__main__':
     import argparse
     parser = argparse.ArgumentParser(description='getting model output dir')
-    parser.add_argument('--dir', help='directory to run model in')
+    parser.add_argument('--dir',
+                        help='directory to run model in',
+                        required=True)
     args = parser.parse_args()
     base_dir = args.dir
     base_model_name = "sig_tag"
@@ -211,6 +256,11 @@ if __name__ == '__main__':
                           model_name=model_name,
                           tag_name=test_tag,
                           signature_def_name=test_sig_def)
+    create_savedmodel(args.dir,
+                      model_name=base_model_name + "_different_io",
+                      tag_name=test_tag,
+                      signature_def_name=test_sig_def,
+                      different_io=True)
     create_savedmodel_modelconfig(args.dir,
                                   model_name="sig_tag0",
                                   tag_name=base_tag,
@@ -225,5 +275,9 @@ if __name__ == '__main__':
                                   signature_def_name=base_sig_def)
     create_savedmodel_modelconfig(args.dir,
                                   model_name="sig_tag3",
+                                  tag_name=test_tag,
+                                  signature_def_name=test_sig_def)
+    create_savedmodel_modelconfig(args.dir,
+                                  model_name="sig_tag_different_io",
                                   tag_name=test_tag,
                                   signature_def_name=test_sig_def)

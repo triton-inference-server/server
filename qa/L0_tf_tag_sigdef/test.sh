@@ -45,19 +45,27 @@ CLIENT_LOG="./client.log"
 TEST=tf_tag_sigdef_test.py
 
 DATADIR=/data/inferenceserver/${REPO_VERSION}/qa_tf_tag_sigdef_repository
+MODELDIR=`pwd`/models
+
+rm -rf $SERVER_LOG $CLIENT_LOG $MODELDIR
+mkdir $MODELDIR
+cp -r $DATADIR/* $MODELDIR
+
 EXPECTED_NUM_TESTS="4"
 SERVER=/opt/tritonserver/bin/tritonserver
-SERVER_ARGS="--model-repository=$DATADIR --exit-timeout-secs=120"
+SERVER_ARGS="--model-repository=$MODELDIR --exit-timeout-secs=120"
 SERVER_LOG="./inference_server.log"
 source ../common/util.sh
-
-rm -f $SERVER_LOG $CLIENT_LOG
 
 RET=0
 
 run_server
 if [ "$SERVER_PID" == "0" ]; then
     echo -e "\n***\n*** Failed to start $SERVER\n***"
+    if [ `grep -c "configuration expects 2 inputs, model provides 1" $SERVER_LOG` != "0" ]; then
+        echo -e "*** FAILED: sig_tag_different_io config autocompleted with wrong model tag variant, failed to load.\n"
+        RET=1
+    fi
     cat $SERVER_LOG
     exit 1
 fi
