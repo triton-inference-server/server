@@ -252,32 +252,32 @@ if __name__ == '__main__':
 
     for i in range(4):
         model_name = base_model_name + str(i)
-        create_savedmodel(args.dir,
+        create_savedmodel(base_dir,
                           model_name=model_name,
                           tag_name=test_tag,
                           signature_def_name=test_sig_def)
-    create_savedmodel(args.dir,
+    create_savedmodel(base_dir,
                       model_name=base_model_name + "_different_io",
                       tag_name=test_tag,
                       signature_def_name=test_sig_def,
                       different_io=True)
-    create_savedmodel_modelconfig(args.dir,
+    create_savedmodel_modelconfig(base_dir,
                                   model_name="sig_tag0",
                                   tag_name=base_tag,
                                   signature_def_name=base_sig_def)
-    create_savedmodel_modelconfig(args.dir,
+    create_savedmodel_modelconfig(base_dir,
                                   model_name="sig_tag1",
                                   tag_name=base_tag,
                                   signature_def_name=test_sig_def)
-    create_savedmodel_modelconfig(args.dir,
+    create_savedmodel_modelconfig(base_dir,
                                   model_name="sig_tag2",
                                   tag_name=test_tag,
                                   signature_def_name=base_sig_def)
-    create_savedmodel_modelconfig(args.dir,
+    create_savedmodel_modelconfig(base_dir,
                                   model_name="sig_tag3",
                                   tag_name=test_tag,
                                   signature_def_name=test_sig_def)
-    create_savedmodel_modelconfig(args.dir,
+    create_savedmodel_modelconfig(base_dir,
                                   model_name="sig_tag_different_io",
                                   tag_name=test_tag,
                                   signature_def_name=test_sig_def)
