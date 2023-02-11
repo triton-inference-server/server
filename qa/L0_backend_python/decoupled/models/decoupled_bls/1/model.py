@@ -296,7 +296,7 @@ class TritonPythonModel:
         Implementing `finalize` function is OPTIONAL. This function allows
         the model to perform any necessary clean ups before exit.
         """
-        logger = pb_utils.Logger()
+        logger = pb_utils.Logger
         logger.log_info('Finalize invoked')
 
         inflight_threads = True
