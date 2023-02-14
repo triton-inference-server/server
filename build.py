@@ -1096,7 +1096,8 @@ ENV TCMALLOC_RELEASE_RATE 200
     if ('fastertransformer' in backends):
         be = "fastertransformer"
         import importlib.util, requests
-        url = 'https://raw.githubusercontent.com/triton-inference-server/fastertransformer_backend/{}/docker/create_dockerfile_and_build.py'.format(backends[be])
+        url = 'https://raw.githubusercontent.com/triton-inference-server/fastertransformer_backend/{}/docker/create_dockerfile_and_build.py'.format(
+            backends[be])
         response = requests.get(url)
         spec = importlib.util.spec_from_loader('fastertransformer_buildscript',
                                                loader=None,
@@ -1108,10 +1109,6 @@ ENV TCMALLOC_RELEASE_RATE 200
 
     if enable_gpu:
         df += install_dcgm_libraries(argmap['DCGM_VERSION'], target_machine)
-        # This is temporary solution to support 23.01
-        df += '''
-RUN apt-get update && apt-get install -y libcufft-11-8
-'''
         df += '''
 # Extra defensive wiring for CUDA Compat lib
 RUN ln -sf ${_CUDA_COMPAT_PATH}/lib.real ${_CUDA_COMPAT_PATH}/lib \
