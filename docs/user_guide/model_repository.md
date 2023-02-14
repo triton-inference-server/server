@@ -125,6 +125,19 @@ providing a value for the
 [Authorization HTTP header](https://googleapis.dev/cpp/google-cloud-storage/1.42.0/classgoogle_1_1cloud_1_1storage_1_1oauth2_1_1ComputeEngineCredentials.html#a8c3a5d405366523e2f4df06554f0a676) 
 can be obtained. If not obtainable, anonymous credential will be used.
 
+To access buckets with anonymous credential (also known as public bucket), the
+bucket (and objects) should have granted get and list permissions to all users.
+It is tested that adding both
+[storage.objectViewer](https://cloud.google.com/storage/docs/access-control/iam-roles#standard-roles)
+and
+[storage.legacyBucketReader](https://cloud.google.com/storage/docs/access-control/iam-roles#legacy-roles)
+predefined roles for "allUsers" to the bucket can accomplish that, which can be
+added by the following commands:
+```
+$ gsutil iam ch allUsers:objectViewer "${BUCKET_URL}"
+$ gsutil iam ch allUsers:legacyBucketReader "${BUCKET_URL}"
+```
+
 #### S3
 
 For a model repository residing in Amazon S3, the path must be
