@@ -56,7 +56,7 @@ TEST_LIST=${TEST_LIST:="test_duplication \
 # Helper to make sure all ensemble have version directory
 CURR_DIR=`pwd`
 for test_name in $TEST_LIST; do
-    for model_dir in $CURR_DIR/test_name/*/*; do
+    for model_dir in $CURR_DIR/$test_name/*/*; do
         mkdir -p $model_dir/1
     done
 done
