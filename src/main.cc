@@ -314,7 +314,8 @@ enum OptionId {
   OPTION_MODEL_LOAD_THREAD_COUNT,
   OPTION_BACKEND_CONFIG,
   OPTION_HOST_POLICY,
-  OPTION_MODEL_LOAD_GPU_LIMIT
+  OPTION_MODEL_LOAD_GPU_LIMIT,
+  OPTION_MODEL_NAMESPACING
 };
 
 struct Option {
@@ -648,14 +649,16 @@ std::vector<Option> options_
        "Currently supported settings are 'numa-node', 'cpu-cores'. Note that "
        "'numa-node' setting will affect pinned memory pool behavior, see "
        "--pinned-memory-pool for more detail."},
-  {
-    OPTION_MODEL_LOAD_GPU_LIMIT, "model-load-gpu-limit",
-        "<device_id>:<fraction>",
-        "Specify the limit on GPU memory usage as a fraction. If model loading "
-        "on the device is requested and the current memory usage exceeds the "
-        "limit, the load will be rejected. If not specified, the limit will "
-        "not be set."
-  }
+      {OPTION_MODEL_LOAD_GPU_LIMIT, "model-load-gpu-limit",
+       "<device_id>:<fraction>",
+       "Specify the limit on GPU memory usage as a fraction. If model loading "
+       "on the device is requested and the current memory usage exceeds the "
+       "limit, the load will be rejected. If not specified, the limit will "
+       "not be set."
+      },
+      {OPTION_MODEL_NAMESPACING, "model-namespacing", Option::ArgBool,
+       "Whether model namespacing is enable or not. If true, model with the "
+       "same name can be served if they are in different namespace."}
 };
 
 bool
@@ -1333,6 +1336,7 @@ Parse(TRITONSERVER_ServerOptions** server_options, int argc, char** argv)
   // hardware_concurrency() returns 0 if not well defined or not computable.
   uint32_t model_load_thread_count =
       std::max(2u, 2 * std::thread::hardware_concurrency());
+  bool enable_model_namespacing = false;
   uint64_t response_cache_byte_size = 0;
 
   std::string backend_dir = "/opt/tritonserver/backends";
@@ -1754,6 +1758,9 @@ Parse(TRITONSERVER_ServerOptions** server_options, int argc, char** argv)
       case OPTION_MODEL_LOAD_GPU_LIMIT:
         load_gpu_limit.emplace(ParsePairOption<int, double>(optarg, ":"));
         break;
+      case OPTION_MODEL_NAMESPACING:
+        enable_model_namespacing = ParseBoolOption(optarg);
+        break;
     }
   }
 
@@ -1925,6 +1932,10 @@ Parse(TRITONSERVER_ServerOptions** server_options, int argc, char** argv)
       TRITONSERVER_ServerOptionsSetModelLoadThreadCount(
           loptions, std::max(1u, model_load_thread_count)),
       "setting model load thread count");
+  FAIL_IF_ERR(
+      TRITONSERVER_ServerOptionsSetModelNamespacing(
+          loptions, enable_model_namespacing),
+      "setting model namespacing");
 
 #ifdef TRITON_ENABLE_LOGGING
   TRITONSERVER_ServerOptionsSetLogFile(loptions, log_file.c_str());
