@@ -126,8 +126,8 @@ providing a value for the
 can be obtained. If not obtainable, anonymous credential will be used.
 
 To access buckets with anonymous credential (also known as public bucket), the
-bucket (and objects) should have granted get and list permissions to all users.
-It is tested that adding both
+bucket (and objects) should have granted `get` and `list` permission to all
+users. It is tested that adding both
 [storage.objectViewer](https://cloud.google.com/storage/docs/access-control/iam-roles#standard-roles)
 and
 [storage.legacyBucketReader](https://cloud.google.com/storage/docs/access-control/iam-roles#legacy-roles)
