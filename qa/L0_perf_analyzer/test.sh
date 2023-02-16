@@ -1,5 +1,5 @@
 #!/bin/bash
-# Copyright 2020-2022, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright 2020-2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -1093,6 +1093,34 @@ set -e
 
 kill $SERVER_PID
 wait $SERVER_PID
+
+
+# Test the HTTP protocol on a unix socket
+UNIX_PORT="unix:///run/domain.unix"
+SERVER_ARGS="--model-repository=${DATADIR} --http-address=${UNIX_PORT}"
+
+run_server
+if [ "$SERVER_PID" == "0" ]; then
+    echo -e "\n***\n*** Failed to start $SERVER\n***"
+    cat $SERVER_LOG
+    exit 1
+fi
+
+set +e
+
+$PERF_ANALYZER -v -u ${UNIX_PORT} -i http -m graphdef_int32_int32_int32 \
+    -s ${STABILITY_THRESHOLD} \
+    > ${CLIENT_LOG}.https_success 2>&1
+if [ $? -ne 0 ]; then
+    cat ${CLIENT_LOG}.https_success
+    RET=1
+fi
+
+set -e
+
+kill $SERVER_PID
+wait $SERVER_PID
+
 
 if [ $RET -eq 0 ]; then
   echo -e "\n***\n*** Test Passed\n***"
