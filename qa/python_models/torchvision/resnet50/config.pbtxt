@@ -28,14 +28,13 @@ name: "resnet50_python"
 backend: "python"
 max_batch_size: 128
 input {
-    name: "INPUT__0"
+    name: "INPUT0"
     data_type: TYPE_FP32
     format: FORMAT_NCHW
     dims: [ 3, 224, 224 ]
   }
 output {
-    name: "OUTPUT__0"
+    name: "OUTPUT0"
     data_type: TYPE_FP32
     dims: [ 1000 ]
-    label_filename: "resnet50_labels.txt"
   }

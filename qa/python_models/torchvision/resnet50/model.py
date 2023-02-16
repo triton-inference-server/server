@@ -27,18 +27,19 @@
 import numpy as np
 import torch
 import triton_python_backend_utils as pb_utils
-from torchvision.models import ResNet50_Weights, resnet50
+from torch.utils.dlpack import to_dlpack
 
 
 class TritonPythonModel:
 
     def initialize(self, args):
         """
-        This function initializes ResNet50 model with the best 
-        weights available in `torchvision.models` subpackage. 
+        This function initializes pre-trained ResNet50 model.
         """
-        self.model = resnet50(weights=ResNet50_Weights.DEFAULT)
-        self.model.eval()
+        self.device = 'cuda' if args["model_instance_kind"] == "GPU" else 'cpu'
+        self.model = torch.hub.load("pytorch/vision", "resnet50", weights="IMAGENET1K_V2")\
+                        .to(self.device)\
+                        .eval()
 
     def execute(self, requests):
         """
@@ -47,12 +48,10 @@ class TritonPythonModel:
         """
         responses = []
         for request in requests:
-            input_tensor = pb_utils.get_input_tensor_by_name(
-                request, "INPUT__0")
-            # This tensor is read-only, we need to make a copy
-            input_data_ro = input_tensor.as_numpy()
-            input_data = np.array(input_data_ro)
-            result = self.model(torch.tensor(input_data))
-            out_tensor = pb_utils.Tensor("OUTPUT__0", result.detach().numpy())
+            input_tensor = pb_utils.get_input_tensor_by_name(request, "INPUT0")
+            result = self.model(
+                torch.as_tensor(input_tensor.as_numpy(), device=self.device))
+            out_tensor = pb_utils.Tensor.from_dlpack("OUTPUT0",
+                                                     to_dlpack(result))
             responses.append(pb_utils.InferenceResponse([out_tensor]))
         return responses
