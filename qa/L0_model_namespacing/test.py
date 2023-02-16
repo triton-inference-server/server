@@ -39,17 +39,33 @@ import test_util as tu
 import tritonclient.http as httpclient
 from tritonclient.utils import InferenceServerException
 
-class ModelNamespacePoll(tu.TestResultCollector):
-    def setUp(self):
-        self.client_ = httpclient.InferenceServerClient("localhost:8000")
+#
+# Test utilities
+#
 
-        # Create the data for the two input tensors. Initialize the first
-        # to unique integers and the second to all ones.
+# Checker to perform inference on given model, expecting model to have
+# [INPUT0, INPUT1] and produce [OUTPUT0, OUTPUT1] where:
+# OUTPUT0 = INPUT0 + INPUT1
+# OUTPUT1 = INPUT0 - INPUT1
+class AddSubChecker:
+    # Optional 'checker_client' may be provided to use a different
+    # Triton client library, currently it must be either Triton HTTP client
+    # library or Triton GRPC client library
+    def __init__(self, checker_client=None):
+        # client library selection
+        if checker_client is None:
+            import tritonclient.http as checker_client
+        if "http" in checker_client.__name__:
+            self.client_ = checker_client.InferenceServerClient("localhost:8000")
+        else:
+            self.client_ = checker_client.InferenceServerClient("localhost:8001")
+
+        # Create infer input tensors
         self.inputs_ = []
-        self.inputs_.append(httpclient.InferInput('INPUT0', [16], "INT32"))
-        self.inputs_.append(httpclient.InferInput('INPUT1', [16], "INT32"))
+        self.inputs_.append(checker_client.InferInput('INPUT0', [16], "INT32"))
+        self.inputs_.append(checker_client.InferInput('INPUT1', [16], "INT32"))
 
-        # Initialize the data
+        # Initialize the data and expected output
         input_data = np.arange(start=0, stop=16, dtype=np.int32)
         self.inputs_[0].set_data_from_numpy(input_data)
         self.inputs_[1].set_data_from_numpy(input_data)
@@ -57,6 +73,33 @@ class ModelNamespacePoll(tu.TestResultCollector):
           "add" : (input_data + input_data),
           "sub" : (input_data - input_data)
         }
+        
+    def infer(self, model):
+        res = self.client_.infer(model, self.inputs_)
+        np.testing.assert_allclose(res.as_numpy('OUTPUT0'), self.expected_outputs_["add"])
+        np.testing.assert_allclose(res.as_numpy('OUTPUT1'), self.expected_outputs_["sub"])
+
+# Checker to perform inference on given model, expecting model to have
+# [INPUT0, INPUT1] and produce [OUTPUT0, OUTPUT1] where:
+# OUTPUT0 = INPUT0 - INPUT1
+# OUTPUT1 = INPUT0 + INPUT1
+class SubAddChecker(AddSubChecker):
+    def infer(self, model):
+        res = self.client_.infer(model, self.inputs_)
+        np.testing.assert_allclose(res.as_numpy('OUTPUT0'), self.expected_outputs_["sub"])
+        np.testing.assert_allclose(res.as_numpy('OUTPUT1'), self.expected_outputs_["add"])
+
+#
+# Test suites and cases
+#
+
+class ModelNamespacePoll(tu.TestResultCollector):
+    def setUp(self):
+        self.addsub_ = AddSubChecker()
+        self.subadd_ = SubAddChecker()
+        # For other server interaction
+        self.client_ = httpclient.InferenceServerClient("localhost:8000")
+
 
     def check_health(self, expect_live=True, expect_ready=True):
         self.assertEqual(self.client_.is_server_live(), expect_live)
@@ -64,18 +107,15 @@ class ModelNamespacePoll(tu.TestResultCollector):
 
     def test_no_duplication(self):
         # Enable model namspacing on repositories that is already valid without
+        # enabling model namespacing.
         # All models should be visible and can be inferred individually
         self.check_health()
-        # addsub
+
+        # infer check
         for model in ["simple_addsub", "composing_addsub"]:
-            res = self.client_.infer(model, self.inputs_)
-            np.testing.assert_allclose(res.as_numpy('OUTPUT0'), self.expected_outputs_["add"])
-            np.testing.assert_allclose(res.as_numpy('OUTPUT1'), self.expected_outputs_["sub"])
-        # subadd
+            self.addsub_.infer(model)
         for model in ["simple_subadd", "composing_subadd"]:
-            res = self.client_.infer(model, self.inputs_)
-            np.testing.assert_allclose(res.as_numpy('OUTPUT0'), self.expected_outputs_["sub"])
-            np.testing.assert_allclose(res.as_numpy('OUTPUT1'), self.expected_outputs_["add"])
+            self.subadd_.infer(model)
 
     def test_duplication(self):
         # Enable model namspacing on repositories that each repo has one
@@ -84,19 +124,16 @@ class ModelNamespacePoll(tu.TestResultCollector):
         # Expect all models are visible, the ensemble will pick up the correct
         # model even the composing model can't be inferred individually.
         self.check_health()
-        # addsub
+
+        # infer check
         for model in ["simple_addsub",]:
-            res = self.client_.infer(model, self.inputs_)
-            np.testing.assert_allclose(res.as_numpy('OUTPUT0'), self.expected_outputs_["add"])
-            np.testing.assert_allclose(res.as_numpy('OUTPUT1'), self.expected_outputs_["sub"])
-        # subadd
+            self.addsub_.infer(model)
         for model in ["simple_subadd",]:
-            res = self.client_.infer(model, self.inputs_)
-            np.testing.assert_allclose(res.as_numpy('OUTPUT0'), self.expected_outputs_["sub"])
-            np.testing.assert_allclose(res.as_numpy('OUTPUT1'), self.expected_outputs_["add"])
+            self.subadd_.infer(model)
+            
         # error check
         try:
-            self.client_.infer("composing_model", self.inputs_)
+            self.addsub_.infer("composing_model")
             self.assertTrue(False,
                             "expected error for inferring ambiguous named model")
         except InferenceServerException as ex:
@@ -110,19 +147,16 @@ class ModelNamespacePoll(tu.TestResultCollector):
         # model even the ensemble itself can't be inferred without providing
         # namespace.
         self.check_health()
-        # addsub
+
+        # infer
         for model in ["composing_addsub",]:
-            res = self.client_.infer(model, self.inputs_)
-            np.testing.assert_allclose(res.as_numpy('OUTPUT0'), self.expected_outputs_["add"])
-            np.testing.assert_allclose(res.as_numpy('OUTPUT1'), self.expected_outputs_["sub"])
-        # subadd
+            self.addsub_.infer(model)
         for model in ["composing_subadd",]:
-            res = self.client_.infer(model, self.inputs_)
-            np.testing.assert_allclose(res.as_numpy('OUTPUT0'), self.expected_outputs_["sub"])
-            np.testing.assert_allclose(res.as_numpy('OUTPUT1'), self.expected_outputs_["add"])
+            self.subadd_.infer(model)
+
         # error check
         try:
-            self.client_.infer("simple_ensemble", self.inputs_)
+            self.addsub_.infer("simple_ensemble")
             self.assertTrue(False,
                             "expected error for inferring ambiguous named model")
         except InferenceServerException as ex:
@@ -145,28 +179,24 @@ class ModelNamespacePoll(tu.TestResultCollector):
         # step 1.
         shutil.move(composing_before_path, composing_after_path)
         time.sleep(5)
-        # subadd
+
+        # infer
         for model in ["simple_subadd", "simple_addsub", "composing_model"]:
-            res = self.client_.infer(model, self.inputs_)
-            np.testing.assert_allclose(res.as_numpy('OUTPUT0'), self.expected_outputs_["sub"])
-            np.testing.assert_allclose(res.as_numpy('OUTPUT1'), self.expected_outputs_["add"])
+            self.subadd_.infer(model)
   
         # step 2.
         shutil.move(composing_after_path, composing_before_path)
         time.sleep(5)
-        # addsub
+
+        # infer
         for model in ["simple_addsub",]:
-            res = self.client_.infer(model, self.inputs_)
-            np.testing.assert_allclose(res.as_numpy('OUTPUT0'), self.expected_outputs_["add"])
-            np.testing.assert_allclose(res.as_numpy('OUTPUT1'), self.expected_outputs_["sub"])
-        # subadd
+            self.addsub_.infer(model)
         for model in ["simple_subadd",]:
-            res = self.client_.infer(model, self.inputs_)
-            np.testing.assert_allclose(res.as_numpy('OUTPUT0'), self.expected_outputs_["sub"])
-            np.testing.assert_allclose(res.as_numpy('OUTPUT1'), self.expected_outputs_["add"])
+            self.subadd_.infer(model)
+
         # error check
         try:
-            self.client_.infer("composing_model", self.inputs_)
+            self.addsub_.infer("composing_model")
             self.assertTrue(False,
                             "expected error for inferring ambiguous named model")
         except InferenceServerException as ex:
@@ -175,22 +205,10 @@ class ModelNamespacePoll(tu.TestResultCollector):
 
 class ModelNamespaceExplicit(tu.TestResultCollector):
     def setUp(self):
+        self.addsub_ = AddSubChecker()
+        self.subadd_ = SubAddChecker()
+        # For other server interaction
         self.client_ = httpclient.InferenceServerClient("localhost:8000")
-
-        # Create the data for the two input tensors. Initialize the first
-        # to unique integers and the second to all ones.
-        self.inputs_ = []
-        self.inputs_.append(httpclient.InferInput('INPUT0', [16], "INT32"))
-        self.inputs_.append(httpclient.InferInput('INPUT1', [16], "INT32"))
-
-        # Initialize the data
-        input_data = np.arange(start=0, stop=16, dtype=np.int32)
-        self.inputs_[0].set_data_from_numpy(input_data)
-        self.inputs_[1].set_data_from_numpy(input_data)
-        self.expected_outputs_ = {
-          "add" : (input_data + input_data),
-          "sub" : (input_data - input_data)
-        }
 
     def check_health(self, expect_live=True, expect_ready=True):
         self.assertEqual(self.client_.is_server_live(), expect_live)
@@ -198,22 +216,18 @@ class ModelNamespaceExplicit(tu.TestResultCollector):
 
     def test_no_duplication(self):
         # Enable model namspacing on repositories that is already valid without
+        # enabling model namespacing.
         # All models should be visible and can be inferred individually
         self.check_health()
         # load ensembles, cascadingly load composing model
         for model in ["simple_addsub", "simple_subadd"]:
             self.client_.load_model(model)
 
-        # addsub
+        # infer
         for model in ["simple_addsub", "composing_addsub"]:
-            res = self.client_.infer(model, self.inputs_)
-            np.testing.assert_allclose(res.as_numpy('OUTPUT0'), self.expected_outputs_["add"])
-            np.testing.assert_allclose(res.as_numpy('OUTPUT1'), self.expected_outputs_["sub"])
-        # subadd
+            self.addsub_.infer(model)
         for model in ["simple_subadd", "composing_subadd"]:
-            res = self.client_.infer(model, self.inputs_)
-            np.testing.assert_allclose(res.as_numpy('OUTPUT0'), self.expected_outputs_["sub"])
-            np.testing.assert_allclose(res.as_numpy('OUTPUT1'), self.expected_outputs_["add"])
+            self.subadd_.infer(model)
 
     def test_duplication(self):
         # Enable model namspacing on repositories that each repo has one
@@ -226,19 +240,15 @@ class ModelNamespaceExplicit(tu.TestResultCollector):
         for model in ["simple_addsub", "simple_subadd"]:
             self.client_.load_model(model)
 
-        # addsub
+        # infer
         for model in ["simple_addsub",]:
-            res = self.client_.infer(model, self.inputs_)
-            np.testing.assert_allclose(res.as_numpy('OUTPUT0'), self.expected_outputs_["add"])
-            np.testing.assert_allclose(res.as_numpy('OUTPUT1'), self.expected_outputs_["sub"])
-        # subadd
+            self.addsub_.infer(model)
         for model in ["simple_subadd",]:
-            res = self.client_.infer(model, self.inputs_)
-            np.testing.assert_allclose(res.as_numpy('OUTPUT0'), self.expected_outputs_["sub"])
-            np.testing.assert_allclose(res.as_numpy('OUTPUT1'), self.expected_outputs_["add"])
+            self.subadd_.infer(model)
+
         # error check
         try:
-            self.client_.infer("composing_model", self.inputs_)
+            self.addsub_.infer("composing_model")
             self.assertTrue(False,
                             "expected error for inferring ambiguous named model")
         except InferenceServerException as ex:
@@ -256,19 +266,15 @@ class ModelNamespaceExplicit(tu.TestResultCollector):
         for model in ["simple_ensemble"]:
             self.client_.load_model(model)
         
-        # addsub
+        # infer
         for model in ["composing_addsub",]:
-            res = self.client_.infer(model, self.inputs_)
-            np.testing.assert_allclose(res.as_numpy('OUTPUT0'), self.expected_outputs_["add"])
-            np.testing.assert_allclose(res.as_numpy('OUTPUT1'), self.expected_outputs_["sub"])
-        # subadd
+            self.addsub_.infer(model)
         for model in ["composing_subadd",]:
-            res = self.client_.infer(model, self.inputs_)
-            np.testing.assert_allclose(res.as_numpy('OUTPUT0'), self.expected_outputs_["sub"])
-            np.testing.assert_allclose(res.as_numpy('OUTPUT1'), self.expected_outputs_["add"])
+            self.subadd_.infer(model)
+
         # error check
         try:
-            self.client_.infer("simple_ensemble", self.inputs_)
+            self.addsub_.infer("simple_ensemble")
             self.assertTrue(False,
                             "expected error for inferring ambiguous named model")
         except InferenceServerException as ex:
@@ -293,11 +299,10 @@ class ModelNamespaceExplicit(tu.TestResultCollector):
         # load ensembles, cascadingly load composing model
         for model in ["simple_addsub", "simple_subadd"]:
             self.client_.load_model(model)
-        # subadd
+
+        # infer
         for model in ["simple_subadd", "simple_addsub", "composing_model"]:
-            res = self.client_.infer(model, self.inputs_)
-            np.testing.assert_allclose(res.as_numpy('OUTPUT0'), self.expected_outputs_["sub"])
-            np.testing.assert_allclose(res.as_numpy('OUTPUT1'), self.expected_outputs_["add"])
+            self.subadd_.infer(model)
   
         # step 2.
         shutil.move(composing_after_path, composing_before_path)
@@ -305,19 +310,16 @@ class ModelNamespaceExplicit(tu.TestResultCollector):
         # (re-)load
         for model in ["simple_addsub", ]:
             self.client_.load_model(model)
-        # addsub
+
+        # infer
         for model in ["simple_addsub",]:
-            res = self.client_.infer(model, self.inputs_)
-            np.testing.assert_allclose(res.as_numpy('OUTPUT0'), self.expected_outputs_["add"])
-            np.testing.assert_allclose(res.as_numpy('OUTPUT1'), self.expected_outputs_["sub"])
-        # subadd
+            self.addsub_.infer(model)
         for model in ["simple_subadd",]:
-            res = self.client_.infer(model, self.inputs_)
-            np.testing.assert_allclose(res.as_numpy('OUTPUT0'), self.expected_outputs_["sub"])
-            np.testing.assert_allclose(res.as_numpy('OUTPUT1'), self.expected_outputs_["add"])
+            self.subadd_.infer(model)
+
         # error check
         try:
-            self.client_.infer("composing_model", self.inputs_)
+            self.addsub_.infer("composing_model")
             self.assertTrue(False,
                             "expected error for inferring ambiguous named model")
         except InferenceServerException as ex:

@@ -38,6 +38,7 @@ TEST_RESULT_FILE='test_results.txt'
 
 export CUDA_VISIBLE_DEVICES=0
 export TRITON_QA_ROOT_DIR=$TRITON_QA_ROOT_DIR
+export TRITON_QA_PYTHON_MODEL_DIR=$TRITON_QA_ROOT_DIR/L0_model_namespacing
 
 rm -fr *.log
 
