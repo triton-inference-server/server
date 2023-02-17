@@ -1121,6 +1121,9 @@ set -e
 kill $SERVER_PID
 wait $SERVER_PID
 
+# Clean up the unix socket after the server is killed
+rm /run/domain.unix
+
 
 if [ $RET -eq 0 ]; then
   echo -e "\n***\n*** Test Passed\n***"
