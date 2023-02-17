@@ -1,4 +1,4 @@
-// Copyright 2019-2022, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+// Copyright 2019-2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 //
 // Redistribution and use in source and binary forms, with or without
 // modification, are permitted provided that the following conditions
@@ -150,7 +150,8 @@ MapSharedMemory(
     void** mapped_addr)
 {
   // map shared memory to process address space
-  *mapped_addr = mmap(NULL, byte_size, PROT_WRITE, MAP_SHARED, shm_fd, offset);
+  *mapped_addr =
+      mmap(NULL, byte_size, PROT_WRITE | PROT_READ, MAP_SHARED, shm_fd, offset);
   if (*mapped_addr == MAP_FAILED) {
     return TRITONSERVER_ErrorNew(
         TRITONSERVER_ERROR_INTERNAL, std::string(

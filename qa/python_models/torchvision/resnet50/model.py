@@ -1,4 +1,4 @@
-# Copyright (c) 2019-2023, NVIDIA CORPORATION. All rights reserved.
+# Copyright 2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -24,15 +24,34 @@
 # (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-apiVersion: v1
-# appVersion is the Triton version; update when changing release
-appVersion: "2.30.0"
-description: Triton Inference Server (Fleet Command)
-name: triton-inference-server
-# version is the Chart version; update when changing anything in the chart
-# This follows semantic versioning, i.e.:
-#   Given version X.Y.Z
-#   When making fixes to the chart, increment Z
-#   When making functional changes to the chart (including updating the Triton version, above), increment Y and reset Z to 0
-#   When making breaking changes to the chart (e.g. user must take action before deploying), increment X and reset Y and Z to 0
-version: 1.4.0
+import numpy as np
+import torch
+import triton_python_backend_utils as pb_utils
+from torch.utils.dlpack import to_dlpack
+
+
+class TritonPythonModel:
+
+    def initialize(self, args):
+        """
+        This function initializes pre-trained ResNet50 model.
+        """
+        self.device = 'cuda' if args["model_instance_kind"] == "GPU" else 'cpu'
+        self.model = torch.hub.load("pytorch/vision", "resnet50", weights="IMAGENET1K_V2")\
+                        .to(self.device)\
+                        .eval()
+
+    def execute(self, requests):
+        """
+        This function receives a list of requests (`pb_utils.InferenceRequest`),
+        performs inference on every request and appends it to responses.
+        """
+        responses = []
+        for request in requests:
+            input_tensor = pb_utils.get_input_tensor_by_name(request, "INPUT0")
+            result = self.model(
+                torch.as_tensor(input_tensor.as_numpy(), device=self.device))
+            out_tensor = pb_utils.Tensor.from_dlpack("OUTPUT0",
+                                                     to_dlpack(result))
+            responses.append(pb_utils.InferenceResponse([out_tensor]))
+        return responses

@@ -785,7 +785,10 @@ SagemakerAPIServer::SageMakerMMECheckOOMError(TRITONSERVER_Error* err)
       "Src tensor is not initialized",
       "CNMEM_STATUS_OUT_OF_MEMORY",
       "CUDNN_STATUS_NOT_INITIALIZED",
-      "CUBLAS_STATUS_ALLOC_FAILED"};
+      "CUBLAS_STATUS_ALLOC_FAILED",
+      "CUBLAS_STATUS_NOT_INITIALIZED",
+      "Failed to allocate memory",
+      "failed to allocate memory"};
 
   /*
     TODO: Improve the search to do pattern match on whole words only

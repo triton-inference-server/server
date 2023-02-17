@@ -1,5 +1,5 @@
 #!/bin/bash
-# Copyright (c) 2019-2020, NVIDIA CORPORATION. All rights reserved.
+# Copyright (c) 2019-2023, NVIDIA CORPORATION. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -40,9 +40,8 @@ fi
 
 export CUDA_VISIBLE_DEVICES=0
 
-CLIENT=../clients/perf_client
+TF_TEST=tf_gpu_io_test.py
 BACKENDS=${BACKENDS:="graphdef savedmodel"}
-TENSOR_SIZE=16384
 
 DATADIR=/data/inferenceserver/${REPO_VERSION}
 
@@ -78,8 +77,7 @@ for BACKEND in $BACKENDS; do
 
     set +e
 
-    $CLIENT -m${MODEL_NAME}_def --shape INPUT0:${TENSOR_SIZE} \
-                >> ${BACKEND}.sanity.log 2>&1
+    python $TF_TEST TfGpuIoTest.test_${MODEL_NAME}_def >> ${BACKEND}.sanity.log 2>&1
     if (( $? != 0 )); then
         cat ${BACKEND}.sanity.log
         RET=1
@@ -91,8 +89,7 @@ for BACKEND in $BACKENDS; do
         RET=1
     fi
 
-    $CLIENT -m${MODEL_NAME}_gpu  --shape INPUT0:${TENSOR_SIZE} \
-             >> ${BACKEND}.gpu.sanity.log 2>&1
+    python $TF_TEST TfGpuIoTest.test_${MODEL_NAME}_gpu >> ${BACKEND}.gpu.sanity.log 2>&1
     if (( $? != 0 )); then
         cat ${BACKEND}.gpu.sanity.log
         RET=1
@@ -101,21 +98,6 @@ for BACKEND in $BACKENDS; do
     grep "is GPU tensor: true" $SERVER_LOG >> grep.out.log
     if [ $? -ne 0 ]; then
         echo -e "\n***\n*** Failed. Expected input and output are GPU tensors\n***"
-        RET=1
-    fi
-
-    # Sample latency results
-    $CLIENT -m${MODEL_NAME}_def --shape INPUT0:${TENSOR_SIZE} \
-             >> ${BACKEND}.log 2>&1
-    if (( $? != 0 )); then
-        cat ${BACKEND}.log
-        RET=1
-    fi
-
-    $CLIENT -m${MODEL_NAME}_gpu --shape INPUT0:${TENSOR_SIZE} \
-            >> ${BACKEND}.gpu.log 2>&1
-    if (( $? != 0 )); then
-        cat ${BACKEND}.gpu.log
         RET=1
     fi
 
@@ -142,7 +124,7 @@ fi
 
 set +e
 CLIENT_LOG="sig_tag0.gpu.log"
-$CLIENT -m sig_tag0 >> $CLIENT_LOG 2>&1
+python $TF_TEST TfGpuIoTest.test_sig_tag0 >> $CLIENT_LOG 2>&1
 if (( $? != 0 )); then
     cat $CLIENT_LOG
     RET=1

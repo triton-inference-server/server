@@ -173,6 +173,19 @@ function run_server () {
 
     wait_for_server_ready $SERVER_PID $SERVER_TIMEOUT
     if [ "$WAIT_RET" != "0" ]; then
+        # If gdb is installed, collect a backtrace from the hanging process
+        if command -v gdb; then
+          GDB_LOG="gdb_bt.${SERVER_PID}.log"
+          echo -e "=== WARNING: SERVER FAILED TO START, DUMPING GDB BACKTRACE TO [${PWD}/${GDB_LOG}] ==="
+          # Dump backtrace log for quick analysis. Allow these commands to fail.
+          gdb -batch -ex "thread apply all bt" -p "${SERVER_PID}" 2>&1 | tee "${GDB_LOG}" || true
+          # Generate core dump for deeper analysis. Default filename is "core.${PID}"
+          gdb -batch -ex "gcore" -p "${SERVER_PID}" || true
+        else
+          echo -e "=== ERROR: SERVER FAILED TO START, BUT GDB NOT FOUND ==="
+        fi
+
+        # Cleanup
         kill $SERVER_PID || true
         SERVER_PID=0
     fi

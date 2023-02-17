@@ -1,4 +1,4 @@
-// Copyright 2019-2022, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+// Copyright 2019-2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 //
 // Redistribution and use in source and binary forms, with or without
 // modification, are permitted provided that the following conditions
@@ -27,6 +27,7 @@
 
 #include <grpc++/grpc++.h>
 #include "grpc_service.grpc.pb.h"
+#include "health.grpc.pb.h"
 #include "shared_memory_manager.h"
 #include "tracer.h"
 #include "triton/core/tritonserver.h"
@@ -128,6 +129,7 @@ class GRPCServer {
   std::vector<std::unique_ptr<HandlerBase>> model_stream_infer_handlers_;
 
   inference::GRPCInferenceService::AsyncService service_;
+  grpc::health::v1::Health::AsyncService health_service_;
   bool running_;
 };
 

@@ -1,5 +1,5 @@
 <!--
-# Copyright 2018-2022, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright 2018-2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -49,7 +49,7 @@ $ ./gen_qa_custom_ops
 ```
 
 This will create multiple model repositories in /tmp/<version>/qa_*
-(for example /tmp/22.12/qa_model_repository).  The TensorRT models
+(for example /tmp/23.01/qa_model_repository).  The TensorRT models
 will be created for the GPU on the system that CUDA considers device 0
 (zero). If you have multiple GPUs on your system see the documentation
 in the scripts for how to target a specific GPU.

@@ -1,4 +1,4 @@
-// Copyright 2019-2022, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+// Copyright 2019-2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 //
 // Redistribution and use in source and binary forms, with or without
 // modification, are permitted provided that the following conditions
@@ -353,6 +353,7 @@ class CommonHandler : public GRPCServer::HandlerBase {
       const std::shared_ptr<SharedMemoryManager>& shm_manager,
       TraceManager* trace_manager,
       inference::GRPCInferenceService::AsyncService* service,
+      grpc::health::v1::Health::AsyncService* health_service,
       grpc::ServerCompletionQueue* cq);
 
   // Descriptive name of of the handler.
@@ -374,6 +375,7 @@ class CommonHandler : public GRPCServer::HandlerBase {
   TraceManager* trace_manager_;
 
   inference::GRPCInferenceService::AsyncService* service_;
+  grpc::health::v1::Health::AsyncService* health_service_;
   grpc::ServerCompletionQueue* cq_;
   std::unique_ptr<std::thread> thread_;
 };
@@ -384,9 +386,11 @@ CommonHandler::CommonHandler(
     const std::shared_ptr<SharedMemoryManager>& shm_manager,
     TraceManager* trace_manager,
     inference::GRPCInferenceService::AsyncService* service,
+    grpc::health::v1::Health::AsyncService* health_service,
     grpc::ServerCompletionQueue* cq)
     : name_(name), tritonserver_(tritonserver), shm_manager_(shm_manager),
-      trace_manager_(trace_manager), service_(service), cq_(cq)
+      trace_manager_(trace_manager), service_(service),
+      health_service_(health_service), cq_(cq)
 {
 }
 
@@ -506,6 +510,50 @@ CommonHandler::SetUpAllRequests()
       grpc::ServerAsyncResponseWriter<inference::ServerReadyResponse>,
       inference::ServerReadyRequest, inference::ServerReadyResponse>(
       "ServerReady", 0, OnRegisterServerReady, OnExecuteServerReady,
+      false /* async */, cq_);
+
+  //
+  //  Health Check
+  //
+  auto OnHealthRegisterCheck =
+      [this](
+          grpc::ServerContext* ctx,
+          grpc::health::v1::HealthCheckRequest* request,
+          grpc::ServerAsyncResponseWriter<
+              grpc::health::v1::HealthCheckResponse>* responder,
+          void* tag) {
+        this->health_service_->RequestCheck(
+            ctx, request, responder, this->cq_, this->cq_, tag);
+      };
+
+  auto OnHealthExecuteCheck = [this](
+                                  grpc::health::v1::HealthCheckRequest& request,
+                                  grpc::health::v1::HealthCheckResponse*
+                                      response,
+                                  grpc::Status* status) {
+    bool live = false;
+    TRITONSERVER_Error* err =
+        TRITONSERVER_ServerIsReady(tritonserver_.get(), &live);
+
+    auto serving_status =
+        grpc::health::v1::HealthCheckResponse_ServingStatus_UNKNOWN;
+    if (err == nullptr) {
+      serving_status =
+          live
+              ? grpc::health::v1::HealthCheckResponse_ServingStatus_SERVING
+              : grpc::health::v1::HealthCheckResponse_ServingStatus_NOT_SERVING;
+    }
+    response->set_status(serving_status);
+
+    GrpcStatusUtil::Create(status, err);
+    TRITONSERVER_ErrorDelete(err);
+  };
+
+  new CommonCallData<
+      grpc::ServerAsyncResponseWriter<grpc::health::v1::HealthCheckResponse>,
+      grpc::health::v1::HealthCheckRequest,
+      grpc::health::v1::HealthCheckResponse>(
+      "Check", 0, OnHealthRegisterCheck, OnHealthExecuteCheck,
       false /* async */, cq_);
 
   //
@@ -4739,6 +4787,7 @@ GRPCServer::Start()
   grpc_builder_.AddListeningPort(server_addr_, credentials, &bound_port);
   grpc_builder_.SetMaxMessageSize(MAX_GRPC_MESSAGE_SIZE);
   grpc_builder_.RegisterService(&service_);
+  grpc_builder_.RegisterService(&health_service_);
   // GRPC KeepAlive Docs: https://grpc.github.io/grpc/cpp/md_doc_keepalive.html
   // NOTE: In order to work properly, the client-side settings should
   // be in agreement with server-side settings.
@@ -4790,7 +4839,7 @@ GRPCServer::Start()
   // A common Handler for other non-inference requests
   CommonHandler* hcommon = new CommonHandler(
       "CommonHandler", server_, shm_manager_, trace_manager_, &service_,
-      common_cq_.get());
+      &health_service_, common_cq_.get());
   hcommon->Start();
   common_handler_.reset(hcommon);
 

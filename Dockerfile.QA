@@ -312,6 +312,7 @@ RUN if [ $(cat /etc/os-release | grep 'VERSION_ID="20.04"' | wc -l) -ne 0 ]; the
 # libarchive-dev is required by Python backend
 RUN apt-get update && apt-get install -y --no-install-recommends \
                               curl \
+                              gdb \
                               libopencv-dev \
                               libarchive-dev \
                               libopencv-core-dev \

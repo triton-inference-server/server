@@ -1,4 +1,4 @@
-# Copyright 2021, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright 2021-2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -24,11 +24,12 @@
 # (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
+import os
 import numpy as np
 import triton_python_backend_utils as pb_utils
 
 
-async def _send_identity_tensor(size):
+async def _send_identity_tensor(size, is_decoupled):
     tensor_size = [1, size]
     input0_np = np.random.randn(*tensor_size)
     input0 = pb_utils.Tensor('INPUT0', input0_np.astype(np.float32))
@@ -36,12 +37,23 @@ async def _send_identity_tensor(size):
         model_name='identity_fp32',
         inputs=[input0],
         requested_output_names=['OUTPUT0'])
-    return input0_np, await infer_request.async_exec()
+
+    if is_decoupled:
+        infer_responses = await infer_request.async_exec(decoupled=True)
+        infer_response = next(infer_responses)
+    else:
+        infer_response = await infer_request.async_exec()
+
+    return input0_np, infer_response
 
 
 async def test_bls_out_of_memory():
+    is_decoupled = True if os.environ['BLS_KIND'] == "decoupled" else False
+
     tensor_size = 1024 * 1024 * 1024
-    input0_np, infer_response = await _send_identity_tensor(tensor_size)
+    input0_np, infer_response = await _send_identity_tensor(
+        tensor_size, is_decoupled)
+
     out_of_memory_message = "Failed to increase the shared memory pool size for key"
 
     if infer_response.has_error():
@@ -56,7 +68,9 @@ async def test_bls_out_of_memory():
 
     tensor_size = 50 * 1024 * 1024
     for _ in range(4):
-        input0_np, infer_response = await _send_identity_tensor(tensor_size)
+        input0_np, infer_response = await _send_identity_tensor(
+            tensor_size, is_decoupled)
+
         if infer_response.has_error():
             if not (out_of_memory_message in infer_response.error().message()):
                 return False

@@ -1,4 +1,4 @@
-# Copyright (c) 2019-2023, NVIDIA CORPORATION. All rights reserved.
+# Copyright (c) 2023, NVIDIA CORPORATION. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -24,15 +24,17 @@
 # (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-apiVersion: v1
-# appVersion is the Triton version; update when changing release
-appVersion: "2.30.0"
-description: Triton Inference Server (Fleet Command)
-name: triton-inference-server
-# version is the Chart version; update when changing anything in the chart
-# This follows semantic versioning, i.e.:
-#   Given version X.Y.Z
-#   When making fixes to the chart, increment Z
-#   When making functional changes to the chart (including updating the Triton version, above), increment Y and reset Z to 0
-#   When making breaking changes to the chart (e.g. user must take action before deploying), increment X and reset Y and Z to 0
-version: 1.4.0
+name: "resnet50_python"
+backend: "python"
+max_batch_size: 128
+input {
+    name: "INPUT0"
+    data_type: TYPE_FP32
+    format: FORMAT_NCHW
+    dims: [ 3, 224, 224 ]
+  }
+output {
+    name: "OUTPUT0"
+    data_type: TYPE_FP32
+    dims: [ 1000 ]
+  }
