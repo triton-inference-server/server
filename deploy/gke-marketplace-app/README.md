@@ -1,5 +1,5 @@
 <!--
-# Copyright (c) 2021, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright (c) 2021-2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -159,7 +159,13 @@ The client example push about ~650 QPS(Query per second) to Triton Server, and w
 
 ![Locust Client Chart](client.png)
 
-Alternatively, user can opt to use [Perf Analyzer](https://github.com/triton-inference-server/server/blob/master/docs/user_guide/perf_analyzer.md) to profile and study the performance of Triton Inference Server. Here we also provide a [client script](https://github.com/triton-inference-server/server/tree/master/deploy/gke-marketplace-app/client-sample/perf_analyzer_grpc.sh) to use Perf Analyzer to send gRPC to Triton Server GKE deployment. Perf Analyzer client requires user to use NGC Triton Client Container.
+Alternatively, user can opt to use
+[Perf Analyzer](https://github.com/triton-inference-server/client/blob/main/src/c++/perf_analyzer/README.md)
+to profile and study the performance of Triton Inference Server. Here we also
+provide a
+[client script](https://github.com/triton-inference-server/server/tree/master/deploy/gke-marketplace-app/client-sample/perf_analyzer_grpc.sh)
+to use Perf Analyzer to send gRPC to Triton Server GKE deployment. Perf Analyzer
+client requires user to use NGC Triton Client Container.
 
 ```
 bash perf_analyzer_grpc.sh ${INGRESS_HOST}:${INGRESS_PORT}
