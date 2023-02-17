@@ -1097,7 +1097,7 @@ wait $SERVER_PID
 
 # Test the HTTP protocol on a unix socket
 UNIX_PORT="unix:///run/domain.unix"
-SERVER_ARGS="--model-repository=${DATADIR} --http-address=${UNIX_PORT}"
+SERVER_ARGS="--model-repository=${DATADIR} --http-address=${UNIX_PORT} --allow-metrics=false"
 
 run_server
 if [ "$SERVER_PID" == "0" ]; then
