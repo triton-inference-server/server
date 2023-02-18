@@ -1,4 +1,4 @@
-// Copyright 2018-2022, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+// Copyright 2018-2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 //
 // Redistribution and use in source and binary forms, with or without
 // modification, are permitted provided that the following conditions
@@ -654,11 +654,12 @@ std::vector<Option> options_
        "Specify the limit on GPU memory usage as a fraction. If model loading "
        "on the device is requested and the current memory usage exceeds the "
        "limit, the load will be rejected. If not specified, the limit will "
-       "not be set."
-      },
-      {OPTION_MODEL_NAMESPACING, "model-namespacing", Option::ArgBool,
-       "Whether model namespacing is enable or not. If true, model with the "
-       "same name can be served if they are in different namespace."}
+       "not be set."},
+  {
+    OPTION_MODEL_NAMESPACING, "model-namespacing", Option::ArgBool,
+        "Whether model namespacing is enable or not. If true, models with the "
+        "same name can be served if they are in different namespace."
+  }
 };
 
 bool

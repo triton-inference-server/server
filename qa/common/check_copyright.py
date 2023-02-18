@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 
-# Copyright 2018-2022, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright 2018-2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -128,8 +128,7 @@ def visit(path):
                     first_line = False
                     if (fline.startswith("#!") or fline.startswith("..") or
                             fline.startswith("<!--") or
-                            fline.startswith("/*") or
-                            fline.startswith("{{/*")):
+                            fline.startswith("/*") or fline.startswith("{{/*")):
                         continue
                 # Skip empty lines...
                 if len(fline.strip()) != 0:
