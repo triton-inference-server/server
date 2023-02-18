@@ -26,6 +26,5 @@
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 -->
 
-Perf Analyzer documentation has been relocated to here:
-
-https://github.com/triton-inference-server/client/blob/main/src/c++/perf_analyzer/README.md
+Perf Analyzer documentation has been relocated to
+[here](https://github.com/triton-inference-server/client/blob/main/src/c++/perf_analyzer/README.md).
