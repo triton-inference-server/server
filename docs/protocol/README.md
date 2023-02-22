@@ -36,17 +36,25 @@ plus several extensions that are defined in the following documents:
 
 - [Binary tensor data extension](./extension_binary_data.md)
 - [Classification extension](./extension_classification.md)
-- [Model configuration extension](./extension_model_configuration.md)
-- [Model repository extension](./extension_model_repository.md)
 - [Schedule policy extension](./extension_schedule_policy.md)
 - [Sequence extension](./extension_sequence.md)
 - [Shared-memory extension](./extension_shared_memory.md)
+- [Model configuration extension](./extension_model_configuration.md)
+- [Model repository extension](./extension_model_repository.md)
 - [Statistics extension](./extension_statistics.md)
 - [Trace extension](./extension_trace.md)
 - [Logging extension](./extension_logging.md)
 - [Parameters extension](./extension_parameters.md)
 
+Note that some extensions introduce new fields onto the inference protocols,
+and the other extensions define new protocols that Triton follows, please refer
+to the extension documents for detail.
+
 For the GRPC protocol, the [protobuf
 specification](https://github.com/triton-inference-server/common/blob/main/protobuf/grpc_service.proto)
 is also available. In addition, you can find the GRPC health checking protocol protobuf
 specification [here](https://github.com/triton-inference-server/common/blob/main/protobuf/health.proto).
+
+Users may configure the Triton endpoints, which implement the protocols, to
+expose a subset of the protocols and to control network settings, please refer
+to [protocol customization guide](https://github.com/triton-inference-server/server/blob/main/docs/customization_guide/inference_protocols.md#httprest-and-grpc-protocols) for detail.

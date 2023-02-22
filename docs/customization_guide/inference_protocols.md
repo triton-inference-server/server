@@ -114,6 +114,55 @@ These options can be used to configure the KeepAlive settings:
 
 For client-side documentation, see [Client-Side GRPC KeepAlive](https://github.com/triton-inference-server/client/blob/main/README.md#grpc-keepalive).
 
+### Limit Endpoint Access
+
+In some use cases, Triton users may want to restrict the access of the protocols on a given endpoint.
+For example, there can be need for two separate GRPC endpoints that one exposes standard inference
+protocols for user access, while the other one exposes other extension protocols for administration
+usage.
+
+The following option can be specified to declare an restricted endpoint:
+
+```
+--endpoint-config=<name>,<config_key>=<config_value>
+```
+
+The option can be specified multiple times to associate more configuration to
+the given named endpoint.
+
+Currently there are three kinds of configuration keys that can be specified:
+
+* `type` : The network protocol to be used, currently available values are `http` for HTTP/REST protocol and `grpc` for GRPC protocol. This configuration is required.
+
+* `protocols` : A comma-separated list of protocols to be accepted by
+this endpoint. The following protocols are currently recognized by all network protocol types mentioned above:
+
+  * `health` : Health endpoint defined for [HTTP/REST](https://github.com/kserve/kserve/blob/master/docs/predict-api/v2/required_api.md#health) and [GRPC](https://github.com/kserve/kserve/blob/master/docs/predict-api/v2/required_api.md#health-1). For GRPC endpoint, this value also exposes [GRPC health check protocol](https://github.com/triton-inference-server/common/blob/main/protobuf/health.proto).
+  * `metadata` : Server / model metadata endpoints defined for [HTTP/REST](https://github.com/kserve/kserve/blob/master/docs/predict-api/v2/required_api.md#server-metadata) and [GRPC](https://github.com/kserve/kserve/blob/master/docs/predict-api/v2/required_api.md#server-metadata-1).
+  * `inference` : Inference endpoints defined for [HTTP/REST](https://github.com/kserve/kserve/blob/master/docs/predict-api/v2/required_api.md#inference) and [GRPC](https://github.com/kserve/kserve/blob/master/docs/predict-api/v2/required_api.md#inference-1).
+  * `shared-memory` : [Shared-memory endpoint](https://github.com/triton-inference-server/server/blob/main/docs/protocol/extension_shared_memory.md).
+  * `model-config` : [Model configuration endpoint](https://github.com/triton-inference-server/server/blob/main/docs/protocol/extension_model_configuration.md).
+  * `model-repository` : [Model repository endpoint](https://github.com/triton-inference-server/server/blob/main/docs/protocol/extension_model_repository.md).
+  * `statistics` : [statistics endpoint](https://github.com/triton-inference-server/server/blob/main/docs/protocol/extension_statistics.md).
+  * `trace` : [trace endpoint](https://github.com/triton-inference-server/server/blob/main/docs/protocol/extension_trace.md).
+
+
+* Endpoint settings : All [HTTP options](#http-options) and [GRPC
+options](#grpc-options) are valid configuration keys of the corresponding
+endpoint type. The settings specified here will overwrite the global setting in
+the given named endpoint.
+
+#### Example
+
+To start server with the two GRPC endpoints in use case described above, the following command line arguments can be set to start "standard inference" endpoint on port 8002 and "administration" endpoint with health check on port 8003:
+
+```
+tritonserver \
+--endpoint-config=infer,type=grpc --endpoint-config=infer,grpc-port=8002 --endpoint-config=infer,protocols=health,metadata,inference \
+--endpoint-config=admin,type=grpc --endpoint-config=admin,grpc-port=8003 --endpoint-config=admin,protocols=health,shared-memory,model-config,model-repository,statistics,trace
+```
+
+
 ## In-Process Triton Server API
 
 The Triton Inference Server provides a backwards-compatible C API that
