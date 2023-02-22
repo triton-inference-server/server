@@ -1,5 +1,5 @@
 <!--
-# Copyright (c) 2019-2021, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright (c) 2019-2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -43,8 +43,9 @@ single GPU.
 
 Unless you already have a client application suitable for measuring
 the performance of your model on Triton, you should familiarize
-yourself with [Performance Analyzer](perf_analyzer.md). The
-Performance Analyzer is an essential tool for optimizing your model's
+yourself with
+[Performance Analyzer](https://github.com/triton-inference-server/client/blob/main/src/c++/perf_analyzer/README.md).
+The Performance Analyzer is an essential tool for optimizing your model's
 performance.
 
 As a running example demonstrating the optimization features and
