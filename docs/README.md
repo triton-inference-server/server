@@ -1,5 +1,5 @@
 <!--
-# Copyright 2018-2022, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright 2018-2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -166,7 +166,7 @@ Understanding Inference perfomance is key to better resource utilization. Use Tr
 - [Performance Tuning Guide](user_guide/performance_tuning.md)
 - [Optimization](user_guide/optimization.md)
 - [Model Analyzer](user_guide/model_analyzer.md)
-- [Performance Analyzer](user_guide/perf_analyzer.md)
+- [Performance Analyzer](https://github.com/triton-inference-server/client/blob/main/src/c++/perf_analyzer/README.md)
 - [Inference Request Tracing](user_guide/trace.md)
 ### Jetson and JetPack
 Triton can be deployed on edge devices. Explore [resources](user_guide/jetson.md) and [examples](examples/jetson/README.md).
@@ -178,7 +178,10 @@ The following resources are recommended to explore the full suite of Triton Infe
 
 - **Configuring Deployment**: Triton comes with three tools which can be used to configure deployment setting, measure performance and recommend optimizations.
   - [Model Analyzer](https://github.com/triton-inference-server/model_analyzer) Model Analyzer is CLI tool built to recommend deployment configurations for Triton Inference Server based on user's Quality of Service Requirements. It also generates detailed reports about model performance to summarize the benefits and trade offs of different configurations.
-  - [Perf Analyzer](user_guide/perf_analyzer.md): Perf Analyzer is a CLI application built to generate inference requests and measures the latency of those requests and throughput of the model being served .
+  - [Perf Analyzer](https://github.com/triton-inference-server/client/blob/main/src/c++/perf_analyzer/README.md):
+  Perf Analyzer is a CLI application built to generate inference requests and
+  measures the latency of those requests and throughput of the model being
+  served.
   - [Model Navigator](https://github.com/triton-inference-server/model_navigator):
   The Triton Model Navigator is a tool that provides the ability to automate the process of moving model from source to optimal format and configuration for deployment on Triton Inference Server. The tool supports export model from source to all possible formats and applies the Triton Inference Server backend optimizations.
 

@@ -1,5 +1,5 @@
 <!--
-# Copyright 2021-2022, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright 2021-2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -196,8 +196,10 @@ tritonserver --model-repository=/path/to/model_repo --backend-directory=/path/to
              --backend-config=tensorflow,version=2
 ```
 
-**Note**: [perf_analyzer](perf_analyzer.md) is supported on Jetson, while the [model_analyzer](model_analyzer.md)
-is currently not available for Jetson. To execute `perf_analyzer` for C API, use
+**Note**:
+[perf_analyzer](https://github.com/triton-inference-server/client/blob/main/src/c++/perf_analyzer/README.md)
+is supported on Jetson, while the [model_analyzer](model_analyzer.md) is
+currently not available for Jetson. To execute `perf_analyzer` for C API, use
 the CLI flag `--service-kind=triton_c_api`:
 
 ```shell

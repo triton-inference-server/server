@@ -49,8 +49,10 @@ For those who wish to jump right in, skip to the [end-to-end example](#end-to-en
 
 2. Can I run inference on my served model?
     - Assuming you were able to load your model on Triton, the next step is to verify that we can run inference requests and get a baseline performance benchmark of your model. 
-    Triton's [Perf Analyzer](perf_analyzer.md) tool specifically fits this purpose. 
-    Here is a simplified output for demonstration purposes:
+    Triton's
+    [Perf Analyzer](https://github.com/triton-inference-server/client/blob/main/src/c++/perf_analyzer/README.md)
+    tool specifically fits this purpose. Here is a simplified output for
+    demonstration purposes:
 
     ```
     # NOTE: "my_model" represents a model currently being served by Triton
@@ -69,7 +71,9 @@ For those who wish to jump right in, skip to the [end-to-end example](#end-to-en
     - The definition of "performing well" is subject to change for each use case. 
     Some common metrics are throughput, latency, and GPU utilization. 
     There are many variables that can be tweaked just within your model configuration (`config.pbtxt`) to obtain different results.
-    - As your model, config, or use case evolves, [Perf Analyzer](perf_analyzer.md) is a great tool to quickly verify model functionality and performance.
+    - As your model, config, or use case evolves,
+    [Perf Analyzer](https://github.com/triton-inference-server/client/blob/main/src/c++/perf_analyzer/README.md)
+    is a great tool to quickly verify model functionality and performance.
 
 3. How can I improve my model performance?
     - To further understand the best model configuration you can provide to Triton for your use case, Triton's [Model Analyzer](https://github.com/triton-inference-server/model_analyzer) tool can help. 

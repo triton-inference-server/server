@@ -1,5 +1,5 @@
 <!--
-# Copyright (c) 2021, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright (c) 2021-2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -52,7 +52,10 @@ Inference Server as a shared library.
 
 ## Part 2. Analyzing model performance with perf_analyzer
 
-To analyze model performance on Jetson, [perf_analyzer](https://github.com/triton-inference-server/server/blob/main/docs/user_guide/perf_analyzer.md) tool is used. The `perf_analyzer` is included in the release tar file or can be compiled from source.
+To analyze model performance on Jetson,
+[perf_analyzer](https://github.com/triton-inference-server/client/blob/main/src/c++/perf_analyzer/README.md)
+tool is used. The `perf_analyzer` is included in the release tar file or can be
+compiled from source.
 
 From this directory of the repository, execute the following to evaluate model performance:
 
@@ -60,4 +63,6 @@ From this directory of the repository, execute the following to evaluate model p
 ./perf_analyzer -m peoplenet -b 2 --service-kind=triton_c_api --model-repo=$(pwd)/concurrency_and_dynamic_batching/trtis_model_repo_sample_1 --triton-server-directory=/opt/tritonserver --concurrency-range 1:6 -f perf_c_api.csv
 ```
 
-In the example above we saved the results as a `.csv` file. To visualize these results, follow the steps described [here](https://github.com/triton-inference-server/server/blob/main/docs/user_guide/perf_analyzer.md#visualizing-latency-vs-throughput).
+In the example above we saved the results as a `.csv` file. To visualize these
+results, follow the steps described
+[here](https://github.com/triton-inference-server/client/blob/main/src/c++/perf_analyzer/README.md#visualizing-latency-vs-throughput).
