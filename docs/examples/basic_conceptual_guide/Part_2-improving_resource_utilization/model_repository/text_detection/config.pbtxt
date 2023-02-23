@@ -1,0 +1,26 @@
+name: "text_recognition"
+backend: "onnxruntime"
+max_batch_size : 8
+input [
+  {
+    name: "input.1"
+    data_type: TYPE_FP32
+    dims: [ 1, 32, 100 ]
+  }
+]
+output [
+  {
+    name: "308"
+    data_type: TYPE_FP32
+    dims: [ 26, 37 ]
+  }
+]
+
+dynamic_batching { }
+
+instance_group [
+    {
+      count: 2
+      kind: KIND_GPU
+    }
+]
