@@ -1,4 +1,4 @@
-// Copyright 2019-2022, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+// Copyright 2019-2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 //
 // Redistribution and use in source and binary forms, with or without
 // modification, are permitted provided that the following conditions
@@ -27,7 +27,9 @@
 #include "tracer.h"
 
 #include <stdlib.h>
+
 #include <unordered_map>
+
 #include "common.h"
 #include "triton/common/logging.h"
 #ifdef TRITON_ENABLE_GPU
@@ -359,6 +361,7 @@ TraceManager::TraceActivity(
     const char* model_name;
     int64_t model_version;
     uint64_t parent_id;
+    const char* request_id;
 
     LOG_TRITONSERVER_ERROR(
         TRITONSERVER_InferenceTraceModelName(trace, &model_name),
@@ -369,9 +372,17 @@ TraceManager::TraceActivity(
     LOG_TRITONSERVER_ERROR(
         TRITONSERVER_InferenceTraceParentId(trace, &parent_id),
         "getting trace parent id");
+    LOG_TRITONSERVER_ERROR(
+        TRITONSERVER_InferenceTraceRequestId(trace, &request_id),
+        "getting request id");
 
     *ss << "{\"id\":" << id << ",\"model_name\":\"" << model_name
         << "\",\"model_version\":" << model_version;
+
+    if (std::string(request_id) != "") {
+      *ss << ",\"request_id\":\"" << request_id << "\"";
+    }
+
     if (parent_id != 0) {
       *ss << ",\"parent_id\":" << parent_id;
     }
