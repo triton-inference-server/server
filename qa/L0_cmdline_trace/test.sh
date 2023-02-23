@@ -78,12 +78,12 @@ fi
 set +e
 
 for p in {1..10}; do
-    python3 $CLIENT_SCRIPT -p grpc -u localhost:8001 >> client_off.log 2>&1
+    python3 $CLIENT_SCRIPT -i grpc -u localhost:8001 >> client_off.log 2>&1
     if [ $? -ne 0 ]; then
         RET=1
     fi
 
-    python3 $CLIENT_SCRIPT -p http -u localhost:8000 >> client_off.log 2>&1
+    python3 $CLIENT_SCRIPT -i http -u localhost:8000 >> client_off.log 2>&1
     if [ $? -ne 0 ]; then
         RET=1
     fi
@@ -116,12 +116,12 @@ fi
 set +e
 
 for p in {1..10}; do
-    python3 $CLIENT_SCRIPT -p grpc -u localhost:8001 >> client_min.log 2>&1
+    python3 $CLIENT_SCRIPT -i grpc -u localhost:8001 >> client_min.log 2>&1
     if [ $? -ne 0 ]; then
         RET=1
     fi
 
-    python3 $CLIENT_SCRIPT -p http -u localhost:8000 >> client_min.log 2>&1
+    python3 $CLIENT_SCRIPT -i http -u localhost:8000 >> client_min.log 2>&1
     if [ $? -ne 0 ]; then
         RET=1
     fi
@@ -164,12 +164,12 @@ fi
 set +e
 
 for p in {1..10}; do
-    python3 $CLIENT_SCRIPT -p grpc -u localhost:8001 >> client_max.log 2>&1
+    python3 $CLIENT_SCRIPT -i grpc -u localhost:8001 >> client_max.log 2>&1
     if [ $? -ne 0 ]; then
         RET=1
     fi
 
-    python3 $CLIENT_SCRIPT -p http -u localhost:8000 >> client_max.log 2>&1
+    python3 $CLIENT_SCRIPT -i http -u localhost:8000 >> client_max.log 2>&1
     if [ $? -ne 0 ]; then
         RET=1
     fi
@@ -211,12 +211,12 @@ fi
 set +e
 
 for p in {1..10}; do
-    python3 $CLIENT_SCRIPT -p grpc -u localhost:8001 >> client_1.log 2>&1
+    python3 $CLIENT_SCRIPT -i grpc -u localhost:8001 >> client_1.log 2>&1
     if [ $? -ne 0 ]; then
         RET=1
     fi
 
-    python3 $CLIENT_SCRIPT -p http -u localhost:8000 >> client_1.log 2>&1
+    python3 $CLIENT_SCRIPT -i http -u localhost:8000 >> client_1.log 2>&1
     if [ $? -ne 0 ]; then
         RET=1
     fi
@@ -259,12 +259,12 @@ fi
 set +e
 
 for p in {1..10}; do
-    python3 $CLIENT_SCRIPT -p grpc -u localhost:8001 >> client_6.log 2>&1
+    python3 $CLIENT_SCRIPT -i grpc -u localhost:8001 >> client_6.log 2>&1
     if [ $? -ne 0 ]; then
         RET=1
     fi
 
-    python3 $CLIENT_SCRIPT -p http -u localhost:8000 >> client_6.log 2>&1
+    python3 $CLIENT_SCRIPT -i http -u localhost:8000 >> client_6.log 2>&1
     if [ $? -ne 0 ]; then
         RET=1
     fi
@@ -308,12 +308,12 @@ fi
 set +e
 
 for p in {1..10}; do
-    python3 $CLIENT_SCRIPT -p grpc -u localhost:8001 >> client_frequency.log 2>&1
+    python3 $CLIENT_SCRIPT -i grpc -u localhost:8001 >> client_frequency.log 2>&1
     if [ $? -ne 0 ]; then
         RET=1
     fi
 
-    python3 $CLIENT_SCRIPT -p http -u localhost:8000 >> client_frequency.log 2>&1
+    python3 $CLIENT_SCRIPT -i http -u localhost:8000 >> client_frequency.log 2>&1
     if [ $? -ne 0 ]; then
         RET=1
     fi
@@ -369,12 +369,12 @@ fi
 set +e
 
 for p in {1..10}; do
-    python3 $CLIENT_SCRIPT -p grpc -u localhost:8001 >> client_9.log 2>&1
+    python3 $CLIENT_SCRIPT -i grpc -u localhost:8001 >> client_9.log 2>&1
     if [ $? -ne 0 ]; then
         RET=1
     fi
 
-    python3 $CLIENT_SCRIPT -p http -u localhost:8000 >> client_9.log 2>&1
+    python3 $CLIENT_SCRIPT -i http -u localhost:8000 >> client_9.log 2>&1
     if [ $? -ne 0 ]; then
         RET=1
     fi
@@ -438,7 +438,7 @@ fi
 
 set +e
 
-python3 $CLIENT_SCRIPT -p http -u localhost:8000 >> client_ensemble.log 2>&1
+python3 $CLIENT_SCRIPT -i http -u localhost:8000 >> client_ensemble.log 2>&1
 if [ $? -ne 0 ]; then
     echo -e "\n***\n*** Test Failed\n***"
     RET=1
@@ -503,7 +503,7 @@ fi
 
 set +e
 
-python3 $CLIENT_SCRIPT -p http -u localhost:8000 >> client_ensemble_tensor.log 2>&1
+python3 $CLIENT_SCRIPT -i http -u localhost:8000 >> client_ensemble_tensor.log 2>&1
 if [ $? -ne 0 ]; then
     echo -e "\n***\n*** Test Failed\n***"
     RET=1

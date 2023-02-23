@@ -40,7 +40,7 @@ if __name__ == '__main__':
                         required=False,
                         default='localhost:8001',
                         help='Inference server URL. Default is localhost:8001.')
-    parser.add_argument('-p', '--protocol', type=str, required=True)
+    parser.add_argument('-i', '--protocol', type=str, required=True)
     FLAGS = parser.parse_args()
 
     if FLAGS.protocol == 'grpc':
