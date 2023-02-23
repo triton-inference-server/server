@@ -68,7 +68,8 @@ The trace output is a JSON file with the following schema.
   {
     "model_name": $string,
     "model_version": $number,
-    "id": $number
+    "id": $number,
+    "request_id": $string,
     "parent_id": $number
   },
   {
