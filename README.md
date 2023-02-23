@@ -245,6 +245,11 @@ Ensure posted examples are:
   reproduces the problem. Remove all other problems that are not
   related to your request/question.
 
+For issues, please use the provided bug report and feature request templates.
+
+For questions, we recommend posting in our community
+[GitHub Discussions.](https://github.com/triton-inference-server/server/discussions)
+
 ## For more information
 
 Please refer to the [NVIDIA Developer Triton page](https://developer.nvidia.com/nvidia-triton-inference-server)
