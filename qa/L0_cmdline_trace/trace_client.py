@@ -40,10 +40,7 @@ if __name__ == '__main__':
                         required=False,
                         default='localhost:8001',
                         help='Inference server URL. Default is localhost:8001.')
-    parser.add_argument('-p',
-                        '--protocol',
-                        type=str,
-                        required=True)
+    parser.add_argument('-p', '--protocol', type=str, required=True)
     FLAGS = parser.parse_args()
 
     if FLAGS.protocol == 'grpc':
@@ -65,22 +62,17 @@ if __name__ == '__main__':
     inputs.append(client_type.InferInput('INPUT0', [1, 16], "INT32"))
     inputs.append(client_type.InferInput('INPUT1', [1, 16], "INT32"))
 
-    # Create the data for the two input tensors. Initialize the first
-    # to unique integers and the second to all ones.
     input0_data = np.arange(start=0, stop=16, dtype=np.int32)
     input0_data = np.expand_dims(input0_data, axis=0)
     input1_data = np.ones(shape=(1, 16), dtype=np.int32)
 
-    # Initialize the data
     inputs[0].set_data_from_numpy(input0_data)
     inputs[1].set_data_from_numpy(input1_data)
 
     outputs.append(client_type.InferRequestedOutput('OUTPUT0'))
     outputs.append(client_type.InferRequestedOutput('OUTPUT1'))
 
-    # Test with outputs
-    results = triton_client.infer(
-        model_name=model_name,
-        inputs=inputs,
-        outputs=outputs,
-        request_id="1")
+    triton_client.infer(model_name=model_name,
+                        inputs=inputs,
+                        outputs=outputs,
+                        request_id="1")
