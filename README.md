@@ -170,7 +170,8 @@ configuration](docs/user_guide/model_configuration.md) for the model.
   [Backend-Platform Support Matrix](https://github.com/triton-inference-server/backend/blob/main/docs/backend_platform_support_matrix.md)
   to learn which backends are supported on your target platform.
 - Learn how to [optimize performance](docs/user_guide/optimization.md) using the 
-  [Performance Analyzer](docs/user_guide/perf_analyzer.md) and 
+  [Performance Analyzer](https://github.com/triton-inference-server/client/blob/main/src/c++/perf_analyzer/README.md)
+  and
   [Model Analyzer](https://github.com/triton-inference-server/model_analyzer)
 - Learn how to [manage loading and unloading models](docs/user_guide/model_management.md) in 
   Triton
@@ -243,6 +244,11 @@ Ensure posted examples are:
 - verifiable – test the code you're about to provide to make sure it
   reproduces the problem. Remove all other problems that are not
   related to your request/question.
+
+For issues, please use the provided bug report and feature request templates.
+
+For questions, we recommend posting in our community
+[GitHub Discussions.](https://github.com/triton-inference-server/server/discussions)
 
 ## For more information
 

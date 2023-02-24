@@ -813,9 +813,10 @@ dynamic batcher configurations.
   dynamic_batching { }
 ```
 
-* Use the [Performance Analyzer](perf_analyzer.md) to determine the
-  latency and throughput provided by the default dynamic batcher
-  configuration.
+* Use the
+  [Performance Analyzer](https://github.com/triton-inference-server/client/blob/main/src/c++/perf_analyzer/README.md)
+  to determine the latency and throughput provided by the default dynamic
+  batcher configuration.
 
 * If the default configuration results in latency values that are
   within your latency budget, try one or both of the following to
