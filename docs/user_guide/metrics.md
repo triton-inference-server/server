@@ -139,7 +139,7 @@ Cache metrics can be reported in two ways:
 by Triton directly, such as the cache hit/miss counts and durations described
 below.
 
-2. As of 23.02, additional cache metrics may be reported depending on the 
+2. As of 23.03, additional cache metrics may be reported depending on the 
 [cache implementation](response_cache.md#cache-implementations) 
 being used through Triton's [Metrics API](#custom-metrics).
 

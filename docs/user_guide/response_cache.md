@@ -95,13 +95,13 @@ For more information on enabling the response cache for each model, see the
 
 ### Cache Implementations
 
-Starting in the 23.02 release, Triton has a set of
+Starting in the 23.03 release, Triton has a set of
 [TRITONCACHE APIs](https://github.com/triton-inference-server/core/blob/main/include/triton/core/tritoncache.h)
 that are used to communicate with a cache implementation of the user's choice.
 
 A cache implementation is a shared library that implements the required
 TRITONCACHE APIs and is dynamically loaded on server startup, if enabled. 
-For tags `>=23.02`, 
+For tags `>=23.03`, 
 [tritonserver release containers](https://catalog.ngc.nvidia.com/orgs/nvidia/containers/tritonserver)
 come with the following cache implementations out of the box:
 - [local](https://github.com/triton-inference-server/local_cache): `/opt/tritonserver/caches/local/libtritoncache_local.so`
@@ -117,7 +117,7 @@ requires it.
 #### Local Cache
 
 The `local` cache implementation is equivalent to the response cache used
-internally before the 23.02 release. For more implementation specific details,
+internally before the 23.03 release. For more implementation specific details,
 see the
 [local cache implementation](https://github.com/triton-inference-server/local_cache).
 
@@ -155,10 +155,10 @@ cache implementation at `/opt/tritonserver/caches/custom/libtritoncache_custom.s
 ## Deprecation Notes
 
 > **Note**
-> Prior to 23.02, enabling the `local` cache used to be done through setting a non-zero size
+> Prior to 23.03, enabling the `local` cache used to be done through setting a non-zero size
 > (in bytes) when Triton was launched using the `--response-cache-byte-size` flag. 
 >
-> Starting in 23.02, the `--response-cache-byte-size` flag is now deprecated and 
+> Starting in 23.03, the `--response-cache-byte-size` flag is now deprecated and 
 > `--cache-config` should be used instead. For backwards compatibility, 
 > `--response-cache-byte-size` will continue to function under the hood by being 
 > converted to the corresponding `--cache-config` argument, but it will default 
