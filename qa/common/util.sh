@@ -178,7 +178,7 @@ function run_server () {
           GDB_LOG="gdb_bt.${SERVER_PID}.log"
           echo -e "=== WARNING: SERVER FAILED TO START, DUMPING GDB BACKTRACE TO [${PWD}/${GDB_LOG}] ==="
           # Dump backtrace log for quick analysis. Allow these commands to fail.
-          gdb -batch -ex "thread apply all bt" -p "${SERVER_PID}" 2>&1 | tee "${GDB_LOG}" || true
+          gdb -batch -ex "thread apply all bt" -p "${SERVER_PID}" 2>&1 >> "${GDB_LOG}" || true
           # Generate core dump for deeper analysis. Default filename is "core.${PID}"
           gdb -batch -ex "gcore" -p "${SERVER_PID}" || true
         else

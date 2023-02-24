@@ -28,9 +28,6 @@ import os
 import numpy as np
 import triton_python_backend_utils as pb_utils
 
-TEST_JETSON = bool(int(os.environ.get('TEST_JETSON', 0)))
-
-
 def check_init_args(args):
     expected_args = {
         'model_name':
@@ -42,13 +39,10 @@ def check_init_args(args):
         'model_instance_device_id':
             '0',
         'model_repository':
-            '/opt/tritonserver/qa/L0_backend_python/models/init_args',
+            os.getenv("TRITON_DIR", "/opt/tironserver") + '/qa/L0_backend_python/models/init_args',
         'model_version':
             '1'
     }
-    if TEST_JETSON:
-        expected_args[
-            'model_repository'] = '/raid/home/gitlab-runner/tritonserver/qa/L0_backend_python/models/init_args'
 
     for arg in expected_args:
         if args[arg] != expected_args[arg]:
