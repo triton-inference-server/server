@@ -1,5 +1,5 @@
 <!--
-# Copyright (c) 2021, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright 2021-2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -51,38 +51,135 @@ records that result in the cache so that subsequent inference requests can
 
 ## Usage
 
-The response cache is enabled by setting a non-zero size (in bytes) when Triton 
-is launched using the `--response-cache-byte-size` flag. This flag defaults
-to 0 (zero).
+In order for caching to be used on a given model, it must be enabled
+on both the server-side, and in the model's 
+[model config](model_configuration.md#response-cache). See the following
+sections below for more details.
+
+### Enable Caching on Server-side
+
+The response cache is enabled on the server-side by specifying a 
+`<cache_implementation>` and corresponding configuration when starting
+the Triton server.
+
+Through the CLI, this translates to setting
+`tritonserver --cache-config <cache_implementation>,<key>=<value> ...`. For example:
+```
+tritonserver --cache-config local,size=1048576
+```
+
+For in-process C API applications, this translates to calling
+`TRITONSERVER_SetCacheConfig(const char* cache_implementation, const char* config_json)`.
+
+This allows users to enable/disable caching globally on server startup.
+
+### Enable Caching for a Model
+
+**By default, no model uses response caching even if the response cache 
+is enabled globally with the `--cache-config` flag.** 
+
+For a given model to use response caching, the model must also have 
+response caching enabled in its model configuration:
+```
+# config.pbtxt
+
+response_cache {
+  enable: true
+}
+```
+
+This allows users to enable/disable caching for specific models.
+
+For more information on enabling the response cache for each model, see the 
+[model configuration docs](model_configuration.md#response-cache).
+
+### Cache Implementations
+
+Starting in the 23.03 release, Triton has a set of
+[TRITONCACHE APIs](https://github.com/triton-inference-server/core/blob/main/include/triton/core/tritoncache.h)
+that are used to communicate with a cache implementation of the user's choice.
+
+A cache implementation is a shared library that implements the required
+TRITONCACHE APIs and is dynamically loaded on server startup, if enabled. 
+For tags `>=23.03`, 
+[tritonserver release containers](https://catalog.ngc.nvidia.com/orgs/nvidia/containers/tritonserver)
+come with the following cache implementations out of the box:
+- [local](https://github.com/triton-inference-server/local_cache): `/opt/tritonserver/caches/local/libtritoncache_local.so`
+- [redis](https://github.com/triton-inference-server/redis_cache): `/opt/tritonserver/caches/redis/libtritoncache_redis.so`
+
+With these TRITONCACHE APIs, `tritonserver` exposes a new `--cache-config` 
+CLI flag that gives the user flexible customization of which cache implementation
+to use, and how to configure it. Similar to the `--backend-config` flag,
+the expected format is `--cache-config <cache_name>,<key>=<value>` and may
+be specified multiple times to specify multiple keys if the cache implementation
+requires it.
+
+#### Local Cache
+
+The `local` cache implementation is equivalent to the response cache used
+internally before the 23.03 release. For more implementation specific details,
+see the
+[local cache implementation](https://github.com/triton-inference-server/local_cache).
+
+When `--cache-config local,size=SIZE` is specified with a non-zero `SIZE`, 
+Triton allocates the requested size in CPU memory and **shares the
+cache across all inference requests and across all models**. 
+
+#### Redis Cache
+
+The `redis` cache implementation was added along with these TRITONCACHE API
+changes for users that require a more configurable cache. More
+`redis` cache specific details can be found in the
+[redis cache implementation](https://github.com/triton-inference-server/redis_cache).
+
+#### Custom Cache
+
+With the new the TRITONCACHE API interface, it is now possible for
+users to implement their own cache to suit any use-case specific needs.
+To see the required interface that must be implemented by a cache
+developer, see the 
+[TRITONCACHE API header](https://github.com/triton-inference-server/core/blob/main/include/triton/core/tritoncache.h).
+The `local` and `redis` cache implementations may be used as reference 
+implementations.
+
+Upon successfully developing and building a custom cache, the resulting shared
+library (ex: `libtritoncache_<name>.so`) must be placed in the cache directory
+similar to where the `local` and `redis` cache implementations live. By default,
+this directory is `/opt/tritonserver/caches`, but a custom directory may be
+specified with `--cache-dir` as needed. 
+
+To put this example together, if the custom cache were named "custom"
+(this name is arbitrary), by default Triton would expect to find the 
+cache implementation at `/opt/tritonserver/caches/custom/libtritoncache_custom.so`.
+
+## Deprecation Notes
 
 > **Note**
+> Prior to 23.03, enabling the `local` cache used to be done through setting a non-zero size
+> (in bytes) when Triton was launched using the `--response-cache-byte-size` flag. 
 >
-> The response cache initialization may fail for very small values of 
-> `--response-cache-byte-size` (ex: less than 1024 bytes) due to internal 
-> memory management requirements. If you encounter an initialization error 
-> for a relatively small cache size, try increasing it.
+> Starting in 23.03, the `--response-cache-byte-size` flag is now deprecated and 
+> `--cache-config` should be used instead. For backwards compatibility, 
+> `--response-cache-byte-size` will continue to function under the hood by being 
+> converted to the corresponding `--cache-config` argument, but it will default 
+> to using the `local` cache implementation. It is not possible to choose other
+> cache implementations using the `--response-cache-byte-size` flag.
+>
+> For example, `--response-cache-byte-size 1048576`
+> would be equivalent to `--cache-config local,size=1048576`. However, the
+> `--cache-config` flag is much more flexible and should be used instead.
+
+> **Warning**
+>
+> The `local` cache implementation may fail to initialize for very small values 
+> of `--cache-config local,size=<small_value>` or `--response-cache-byte-size` 
+> (ex: less than 1024 bytes) due to internal memory management requirements. 
+> If you encounter an initialization error for a relatively small cache size, 
+> try increasing it.
 >
 > Similarly, the size is upper bounded by the available RAM on the system.
 > If you encounter an initial allocation error for a very large cache size
 > setting, try decreasing it.
-
-When non-zero, Triton allocates the requested size in CPU memory and **shares the
-cache across all inference requests and across all models**. For a given model
-to use response caching, the model must enable response caching in the model
-configuration. **By default, no model uses response caching even if the response
-cache is enabled with the `--response-cache-byte-size` flag.** For more
-information on enabling the response cache for each model, see the [model
-configuration
-docs](model_configuration.md#response-cache).
-
-## Replacement Policy
-
-The response cache is a fixed-size resource, as a result it must be managed by a
-replacement policy when the number of cacheable responses exceeds the capacity
-of the cache. Currently, the cache only implements a least-recently-used
-([LRU](https://en.wikipedia.org/wiki/Cache_replacement_policies#Least_recently_used_(LRU)))
-replacement policy which will automatically evict one or more LRU entries to
-make room for new entries.
 
 ## Performance
 

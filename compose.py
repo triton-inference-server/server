@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-# Copyright 2021-2022, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright 2021-2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -130,6 +130,18 @@ RUN chown triton-server:triton-server /opt/tritonserver/repoagents
     with open(os.path.join(ddir, dockerfile_name), "a") as dfile:
         dfile.write(df)
 
+def add_requested_caches(ddir, dockerfile_name, caches):
+    df = "#  Copying over caches \n"
+    for cache in caches:
+        df += '''COPY --chown=1000:1000 --from=full /opt/tritonserver/caches/{} /opt/tritonserver/caches/{}
+'''.format(cache, cache)
+    if len(caches) > 0:
+        df += '''
+# Top-level /opt/tritonserver/caches not copied so need to explicitly set permissions here
+RUN chown triton-server:triton-server /opt/tritonserver/caches
+'''
+    with open(os.path.join(ddir, dockerfile_name), "a") as dfile:
+        dfile.write(df)
 
 def end_dockerfile(ddir, dockerfile_name, argmap):
     # Install additional dependencies
@@ -357,6 +369,13 @@ if __name__ == '__main__':
         'Include <repoagent-name> in the generated Docker image. The flag may '
         'be specified multiple times.')
     parser.add_argument(
+        '--cache',
+        action='append',
+        required=False,
+        help=
+        'Include <cache-name> in the generated Docker image. The flag may '
+        'be specified multiple times.')
+    parser.add_argument(
         '--skip-pull',
         action='store_true',
         required=False,
@@ -382,6 +401,8 @@ if __name__ == '__main__':
         FLAGS.backend = []
     if FLAGS.repoagent is None:
         FLAGS.repoagent = []
+    if FLAGS.cache is None:
+        FLAGS.cache = []
 
     # Initialize map of docker images.
     images = {}
@@ -433,6 +454,7 @@ if __name__ == '__main__':
                      FLAGS.backend)
     add_requested_backends(FLAGS.work_dir, dockerfile_name, FLAGS.backend)
     add_requested_repoagents(FLAGS.work_dir, dockerfile_name, FLAGS.repoagent)
+    add_requested_caches(FLAGS.work_dir, dockerfile_name, FLAGS.cache)
     end_dockerfile(FLAGS.work_dir, dockerfile_name, argmap)
 
     if (not FLAGS.dry_run):
