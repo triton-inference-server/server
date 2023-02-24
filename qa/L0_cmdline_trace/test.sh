@@ -1,5 +1,5 @@
 #!/bin/bash
-# Copyright 2019-2022, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright 2019-2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -25,9 +25,8 @@
 # (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-SIMPLE_HTTP_CLIENT=../clients/simple_http_infer_client
-SIMPLE_GRPC_CLIENT=../clients/simple_grpc_infer_client
 TRACE_SUMMARY=../common/trace_summary.py
+CLIENT_SCRIPT=trace_client.py
 
 REPO_VERSION=${NVIDIA_TRITON_SERVER_VERSION}
 if [ "$#" -ge 1 ]; then
@@ -79,12 +78,12 @@ fi
 set +e
 
 for p in {1..10}; do
-    $SIMPLE_HTTP_CLIENT >> client_off.log 2>&1
+    python3 $CLIENT_SCRIPT -i grpc -u localhost:8001 >> client_off.log 2>&1
     if [ $? -ne 0 ]; then
         RET=1
     fi
 
-    $SIMPLE_GRPC_CLIENT >> client_off.log 2>&1
+    python3 $CLIENT_SCRIPT -i http -u localhost:8000 >> client_off.log 2>&1
     if [ $? -ne 0 ]; then
         RET=1
     fi
@@ -117,12 +116,12 @@ fi
 set +e
 
 for p in {1..10}; do
-    $SIMPLE_HTTP_CLIENT >> client_min.log 2>&1
+    python3 $CLIENT_SCRIPT -i grpc -u localhost:8001 >> client_min.log 2>&1
     if [ $? -ne 0 ]; then
         RET=1
     fi
 
-    $SIMPLE_GRPC_CLIENT >> client_min.log 2>&1
+    python3 $CLIENT_SCRIPT -i http -u localhost:8000 >> client_min.log 2>&1
     if [ $? -ne 0 ]; then
         RET=1
     fi
@@ -165,12 +164,12 @@ fi
 set +e
 
 for p in {1..10}; do
-    $SIMPLE_HTTP_CLIENT >> client_max.log 2>&1
+    python3 $CLIENT_SCRIPT -i grpc -u localhost:8001 >> client_max.log 2>&1
     if [ $? -ne 0 ]; then
         RET=1
     fi
 
-    $SIMPLE_GRPC_CLIENT >> client_max.log 2>&1
+    python3 $CLIENT_SCRIPT -i http -u localhost:8000 >> client_max.log 2>&1
     if [ $? -ne 0 ]; then
         RET=1
     fi
@@ -212,12 +211,12 @@ fi
 set +e
 
 for p in {1..10}; do
-    $SIMPLE_HTTP_CLIENT >> client_1.log 2>&1
+    python3 $CLIENT_SCRIPT -i grpc -u localhost:8001 >> client_1.log 2>&1
     if [ $? -ne 0 ]; then
         RET=1
     fi
 
-    $SIMPLE_GRPC_CLIENT >> client_1.log 2>&1
+    python3 $CLIENT_SCRIPT -i http -u localhost:8000 >> client_1.log 2>&1
     if [ $? -ne 0 ]; then
         RET=1
     fi
@@ -260,12 +259,12 @@ fi
 set +e
 
 for p in {1..10}; do
-    $SIMPLE_HTTP_CLIENT >> client_6.log 2>&1
+    python3 $CLIENT_SCRIPT -i grpc -u localhost:8001 >> client_6.log 2>&1
     if [ $? -ne 0 ]; then
         RET=1
     fi
 
-    $SIMPLE_GRPC_CLIENT >> client_6.log 2>&1
+    python3 $CLIENT_SCRIPT -i http -u localhost:8000 >> client_6.log 2>&1
     if [ $? -ne 0 ]; then
         RET=1
     fi
@@ -309,12 +308,12 @@ fi
 set +e
 
 for p in {1..10}; do
-    $SIMPLE_HTTP_CLIENT >> client_frequency.log 2>&1
+    python3 $CLIENT_SCRIPT -i grpc -u localhost:8001 >> client_frequency.log 2>&1
     if [ $? -ne 0 ]; then
         RET=1
     fi
 
-    $SIMPLE_GRPC_CLIENT >> client_frequency.log 2>&1
+    python3 $CLIENT_SCRIPT -i http -u localhost:8000 >> client_frequency.log 2>&1
     if [ $? -ne 0 ]; then
         RET=1
     fi
@@ -370,12 +369,12 @@ fi
 set +e
 
 for p in {1..10}; do
-    $SIMPLE_HTTP_CLIENT >> client_9.log 2>&1
+    python3 $CLIENT_SCRIPT -i grpc -u localhost:8001 >> client_9.log 2>&1
     if [ $? -ne 0 ]; then
         RET=1
     fi
 
-    $SIMPLE_GRPC_CLIENT >> client_9.log 2>&1
+    python3 $CLIENT_SCRIPT -i http -u localhost:8000 >> client_9.log 2>&1
     if [ $? -ne 0 ]; then
         RET=1
     fi
@@ -439,7 +438,7 @@ fi
 
 set +e
 
-$SIMPLE_HTTP_CLIENT >> client_ensemble.log 2>&1
+python3 $CLIENT_SCRIPT -i http -u localhost:8000 >> client_ensemble.log 2>&1
 if [ $? -ne 0 ]; then
     echo -e "\n***\n*** Test Failed\n***"
     RET=1
@@ -461,15 +460,15 @@ if [ `grep -c "COMPUTE_INPUT_END" summary_ensemble.log` != "7" ]; then
 fi
 
 for trace_str in \
-        "{\"id\":1,\"model_name\":\"simple\",\"model_version\":1}" \
-        "{\"id\":2,\"model_name\":\"nop_TYPE_INT32_-1\",\"model_version\":1,\"parent_id\":1}" \
-        "{\"id\":3,\"model_name\":\"fan_${MODELBASE}\",\"model_version\":1,\"parent_id\":1}" \
-        "{\"id\":4,\"model_name\":\"nop_TYPE_INT32_-1\",\"model_version\":1,\"parent_id\":3}" \
-        "{\"id\":5,\"model_name\":\"${MODELBASE}\",\"model_version\":1,\"parent_id\":3}" \
-        "{\"id\":6,\"model_name\":\"nop_TYPE_INT32_-1\",\"model_version\":1,\"parent_id\":3}" \
-        "{\"id\":7,\"model_name\":\"nop_TYPE_INT32_-1\",\"model_version\":1,\"parent_id\":3}" \
-        "{\"id\":8,\"model_name\":\"nop_TYPE_INT32_-1\",\"model_version\":1,\"parent_id\":1}" \
-        "{\"id\":9,\"model_name\":\"nop_TYPE_INT32_-1\",\"model_version\":1,\"parent_id\":1}" ; do
+        "{\"id\":1,\"model_name\":\"simple\",\"model_version\":1,\"request_id\":\"1\"}" \
+        "{\"id\":2,\"model_name\":\"nop_TYPE_INT32_-1\",\"model_version\":1,\"request_id\":\"1\",\"parent_id\":1}" \
+        "{\"id\":3,\"model_name\":\"fan_${MODELBASE}\",\"model_version\":1,\"request_id\":\"1\",\"parent_id\":1}" \
+        "{\"id\":4,\"model_name\":\"nop_TYPE_INT32_-1\",\"model_version\":1,\"request_id\":\"1\",\"parent_id\":3}" \
+        "{\"id\":5,\"model_name\":\"${MODELBASE}\",\"model_version\":1,\"request_id\":\"1\",\"parent_id\":3}" \
+        "{\"id\":6,\"model_name\":\"nop_TYPE_INT32_-1\",\"model_version\":1,\"request_id\":\"1\",\"parent_id\":3}" \
+        "{\"id\":7,\"model_name\":\"nop_TYPE_INT32_-1\",\"model_version\":1,\"request_id\":\"1\",\"parent_id\":3}" \
+        "{\"id\":8,\"model_name\":\"nop_TYPE_INT32_-1\",\"model_version\":1,\"request_id\":\"1\",\"parent_id\":1}" \
+        "{\"id\":9,\"model_name\":\"nop_TYPE_INT32_-1\",\"model_version\":1,\"request_id\":\"1\",\"parent_id\":1}" ; do
     if [ `grep -c ${trace_str} trace_ensemble.log` != "1" ]; then
         echo -e "Ensemble trace log expects trace: ${trace_str}"
         RET=1
@@ -504,7 +503,7 @@ fi
 
 set +e
 
-$SIMPLE_HTTP_CLIENT >> client_ensemble_tensor.log 2>&1
+python3 $CLIENT_SCRIPT -i http -u localhost:8000 >> client_ensemble_tensor.log 2>&1
 if [ $? -ne 0 ]; then
     echo -e "\n***\n*** Test Failed\n***"
     RET=1
@@ -525,15 +524,15 @@ if [ `grep -c "COMPUTE_INPUT_END" summary_ensemble_tensor.log` != "7" ]; then
     RET=1
 fi
 for trace_str in \
-        "{\"id\":1,\"model_name\":\"simple\",\"model_version\":1}" \
-        "{\"id\":2,\"model_name\":\"nop_TYPE_INT32_-1\",\"model_version\":1,\"parent_id\":1}" \
-        "{\"id\":3,\"model_name\":\"fan_${MODELBASE}\",\"model_version\":1,\"parent_id\":1}" \
-        "{\"id\":4,\"model_name\":\"nop_TYPE_INT32_-1\",\"model_version\":1,\"parent_id\":3}" \
-        "{\"id\":5,\"model_name\":\"${MODELBASE}\",\"model_version\":1,\"parent_id\":3}" \
-        "{\"id\":6,\"model_name\":\"nop_TYPE_INT32_-1\",\"model_version\":1,\"parent_id\":3}" \
-        "{\"id\":7,\"model_name\":\"nop_TYPE_INT32_-1\",\"model_version\":1,\"parent_id\":3}" \
-        "{\"id\":8,\"model_name\":\"nop_TYPE_INT32_-1\",\"model_version\":1,\"parent_id\":1}" \
-        "{\"id\":9,\"model_name\":\"nop_TYPE_INT32_-1\",\"model_version\":1,\"parent_id\":1}" ; do
+        "{\"id\":1,\"model_name\":\"simple\",\"model_version\":1,\"request_id\":\"1\"}" \
+        "{\"id\":2,\"model_name\":\"nop_TYPE_INT32_-1\",\"model_version\":1,\"request_id\":\"1\",\"parent_id\":1}" \
+        "{\"id\":3,\"model_name\":\"fan_${MODELBASE}\",\"model_version\":1,\"request_id\":\"1\",\"parent_id\":1}" \
+        "{\"id\":4,\"model_name\":\"nop_TYPE_INT32_-1\",\"model_version\":1,\"request_id\":\"1\",\"parent_id\":3}" \
+        "{\"id\":5,\"model_name\":\"${MODELBASE}\",\"model_version\":1,\"request_id\":\"1\",\"parent_id\":3}" \
+        "{\"id\":6,\"model_name\":\"nop_TYPE_INT32_-1\",\"model_version\":1,\"request_id\":\"1\",\"parent_id\":3}" \
+        "{\"id\":7,\"model_name\":\"nop_TYPE_INT32_-1\",\"model_version\":1,\"request_id\":\"1\",\"parent_id\":3}" \
+        "{\"id\":8,\"model_name\":\"nop_TYPE_INT32_-1\",\"model_version\":1,\"request_id\":\"1\",\"parent_id\":1}" \
+        "{\"id\":9,\"model_name\":\"nop_TYPE_INT32_-1\",\"model_version\":1,\"request_id\":\"1\",\"parent_id\":1}" ; do
     if [ `grep -c ${trace_str} trace_ensemble_tensor.log` != "1" ]; then
         echo -e "Ensemble trace tensors log expects trace: ${trace_str}"
         RET=1
