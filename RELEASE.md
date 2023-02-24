@@ -49,18 +49,18 @@
   in use which leads to corrupt input data being used for inference with 
   TensorRT models. If you encounter accuracy issues with your TensorRT model, 
   you can work-around the issue by 
-  [enabling the output_copy_stream option](https://github.com/triton-inference-server/common/blob/r22.12/protobuf/model_config.proto#L843-L852) 
+  [enabling the output_copy_stream option](https://github.com/triton-inference-server/common/blob/r23.02/protobuf/model_config.proto#L843-L852) 
   in your model's configuration. 
 
 * Some systems which implement `malloc()` may not release memory back to the 
   operating system right away causing a false memory leak. This can be mitigated 
   by using a different malloc implementation. Tcmalloc is installed in the 
   Triton container and can be 
-  [used by specifying the library in LD_PRELOAD](https://github.com/triton-inference-server/server/blob/r22.12/docs/user_guide/model_management.md#model-control-mode-explicit).
+  [used by specifying the library in LD_PRELOAD](https://github.com/triton-inference-server/server/blob/r23.02/docs/user_guide/model_management.md#model-control-mode-explicit).
 
 * When using a custom operator for the PyTorch backend, the operator may not be 
   loaded due to undefined Python library symbols. This can be work-around by 
-  [specifying Python library in LD_PRELOAD](https://github.com/triton-inference-server/server/blob/r22.12/qa/L0_custom_ops/test.sh#L114-L117).
+  [specifying Python library in LD_PRELOAD](https://github.com/triton-inference-server/server/blob/r23.02/qa/L0_custom_ops/test.sh#L114-L117).
 
 * Auto-complete may cause an increase in server start time. To avoid a start 
   time increase, users can provide the full model configuration and launch the 
