@@ -256,8 +256,6 @@ if [ $? -ne 0 ]; then
     exit 1
 fi
 
-fi # [[ "aarch64" != $(uname -m) ]]
-
 # ONNX
 cat >$HOST_SRCDIR/$ONNXSCRIPT <<EOF
 #!/bin/bash
@@ -525,3 +523,66 @@ if [ $? -ne 0 ]; then
     echo -e "Failed"
     exit 1
 fi
+
+else # [[ "aarch64" != $(uname -m) ]]
+    # Removing directories which won't be populated by the TRTSCRIPT
+    rm -r $HOST_SIGDEFDESTDIR \
+        $HOST_TFPARAMETERSDESTDIR \
+        $HOST_ENSEMBLEDESTDIR \
+        $HOST_NOSHAPEDESTDIR \
+        $HOST_PLGDESTDIR \
+        $HOST_INITIALSTATEIMPLICITSEQDESTDIR \
+        $HOST_VARINITIALSTATEIMPLICITSEQDESTDIR \
+        $HOST_TORCHTRTDESTDIR 
+
+    # Preparing TRTSCRIPT 
+    cat >$HOST_SRCDIR/$TRTSCRIPT <<EOF
+#!/bin/bash
+nvidia-smi -L || true
+nvidia-smi || true
+set -e
+set -x
+export TRT_SUPPRESS_DEPRECATION_WARNINGS=1
+# Models using shape tensor i/o
+python3 $HOST_SRCDIR/gen_qa_identity_models.py --tensorrt-shape-io --models_dir=$HOST_SHAPEDESTDIR
+python3 $HOST_SRCDIR/gen_qa_sequence_models.py --tensorrt-shape-io --models_dir=$HOST_SHAPEDESTDIR
+python3 $HOST_SRCDIR/gen_qa_dyna_sequence_models.py --tensorrt-shape-io --models_dir=$HOST_SHAPEDESTDIR
+chmod -R 777 $HOST_SHAPEDESTDIR
+python3 $HOST_SRCDIR/gen_qa_models.py --tensorrt --models_dir=$HOST_DESTDIR
+chmod -R 777 $HOST_DESTDIR
+python3 $HOST_SRCDIR/gen_qa_models.py --tensorrt --variable --models_dir=$HOST_VARDESTDIR
+chmod -R 777 $HOST_VARDESTDIR
+python3 $HOST_SRCDIR/gen_qa_identity_models.py --tensorrt --models_dir=$HOST_IDENTITYDESTDIR
+chmod -R 777 $HOST_IDENTITYDESTDIR
+python3 $HOST_SRCDIR/gen_qa_identity_models.py --tensorrt-big --models_dir=$HOST_IDENTITYBIGDESTDIR
+chmod -R 777 $HOST_IDENTITYBIGDESTDIR
+python3 $HOST_SRCDIR/gen_qa_reshape_models.py --tensorrt --variable --models_dir=$HOST_RESHAPEDESTDIR
+chmod -R 777 $HOST_RESHAPEDESTDIR
+python3 $HOST_SRCDIR/gen_qa_sequence_models.py --tensorrt --models_dir=$HOST_SEQDESTDIR
+chmod -R 777 $HOST_SEQDESTDIR
+python3 $HOST_SRCDIR/gen_qa_implicit_models.py --tensorrt --models_dir=$HOST_IMPLICITSEQDESTDIR
+chmod -R 777 $HOST_IMPLICITSEQDESTDIR
+python3 $HOST_SRCDIR/gen_qa_implicit_models.py --tensorrt --variable --models_dir=$HOST_VARIMPLICITSEQDESTDIR
+chmod -R 777 $HOST_VARIMPLICITSEQDESTDIR
+python3 $HOST_SRCDIR/gen_qa_dyna_sequence_models.py --tensorrt --models_dir=$HOST_DYNASEQDESTDIR
+chmod -R 777 $HOST_DYNASEQDESTDIR
+python3 $HOST_SRCDIR/gen_qa_sequence_models.py --tensorrt --variable --models_dir=$HOST_VARSEQDESTDIR
+chmod -R 777 $HOST_VARSEQDESTDIR
+python3 $HOST_SRCDIR/gen_qa_dyna_sequence_implicit_models.py --tensorrt --models_dir=$HOST_DYNASEQIMPLICITDESTDIR
+chmod -R 777 $HOST_DYNASEQIMPLICITDESTDIR
+python3 $HOST_SRCDIR/gen_qa_ragged_models.py --tensorrt --models_dir=$HOST_RAGGEDDESTDIR
+chmod -R 777 $HOST_RAGGEDDESTDIR
+python3 $HOST_SRCDIR/gen_qa_trt_format_models.py --models_dir=$HOST_FORMATDESTDIR
+chmod -R 777 $HOST_FORMATDESTDIR
+python3 $HOST_SRCDIR/gen_qa_trt_data_dependent_shape.py --models_dir=$HOST_DATADEPENDENTDIR
+chmod -R 777 $HOST_DATADEPENDENTDIR
+EOF
+    # Executing TRTSCRIPT
+    bash -ex $HOST_SRCDIR/$TRTSCRIPT
+
+    if [ $? -ne 0 ]; then
+        echo -e "Failed $HOST_SRCDIR/$TRTSCRIPT"
+        exit 1
+    fi    
+
+fi # [[ "aarch64" != $(uname -m) ]]
