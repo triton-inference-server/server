@@ -1,5 +1,5 @@
 #!/bin/bash
-# Copyright 2022, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright 2022-2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -44,12 +44,25 @@ fi
 set -e
 
 # SERVER TESTS
-mkdir -p "${PWD}/models/decoupled_cache/1"
+function check_server_success_and_kill {
+    if [ "${SERVER_PID}" == "0" ]; then
+        echo -e "\n***\n*** Failed to start ${SERVER}\n***"
+        cat ${SERVER_LOG}
+        exit 1
+    fi
+    kill $SERVER_PID
+    wait $SERVER_PID
+}
 
-# Check that server fails to start for a "decoupled" model with response
-# cache enabled
+MODEL_DIR="${PWD}/models"
+mkdir -p "${MODEL_DIR}/decoupled_cache/1"
+mkdir -p "${MODEL_DIR}/identity_cache/1"
+
+# Check that server fails to start for a "decoupled" model with cache enabled
+EXTRA_ARGS="--model-control-mode=explicit --load-model=decoupled_cache"
+
 SERVER=/opt/tritonserver/bin/tritonserver
-SERVER_ARGS="--model-repository=${PWD}/models --response-cache-byte-size=8192"
+SERVER_ARGS="--model-repository=${MODEL_DIR} --response-cache-byte-size=8192 ${EXTRA_ARGS}"
 SERVER_LOG="./inference_server.log"
 source ../common/util.sh
 run_server
@@ -66,6 +79,64 @@ else
     grep -i "response cache does not currently support" ${SERVER_LOG} | grep -i "decoupled"
     if [ $? -ne 0 ]; then
         echo -e "\n***\n*** Failed: Expected response cache / decoupled mode error message in output\n***"
+        cat $SERVER_LOG
+        RET=1
+    fi
+    set -e
+fi
+
+# Test with model expected to load successfully
+EXTRA_ARGS="--model-control-mode=explicit --load-model=identity_cache"
+
+# Test old cache config method
+# --response-cache-byte-size must be non-zero to test models with cache enabled
+SERVER_ARGS="--model-repository=${MODEL_DIR} --response-cache-byte-size=8192 ${EXTRA_ARGS}"
+run_server
+check_server_success_and_kill
+
+# Test new cache config method
+SERVER_ARGS="--model-repository=${MODEL_DIR} --cache-config=local,size=8192 ${EXTRA_ARGS}"
+run_server
+check_server_success_and_kill
+
+# Test that specifying multiple cache types is not supported and should fail
+SERVER_ARGS="--model-repository=${MODEL_DIR} --cache-config=local,size=8192 --cache-config=redis,key=value ${EXTRA_ARGS}"
+run_server
+if [ "$SERVER_PID" != "0" ]; then
+    echo -e "\n***\n*** Failed: $SERVER started successfully when it was expected to fail\n***"
+    cat $SERVER_LOG
+    RET=1
+
+    kill $SERVER_PID
+    wait $SERVER_PID
+else
+    # Check that server fails with the correct error message
+    set +e
+    grep -i "multiple cache configurations" ${SERVER_LOG}
+    if [ $? -ne 0 ]; then
+        echo -e "\n***\n*** Failed: Expected multiple cache configuration error message in output\n***"
+        cat $SERVER_LOG
+        RET=1
+    fi
+    set -e
+fi
+
+# Test that specifying both config styles is incompatible and should fail
+SERVER_ARGS="--model-repository=${MODEL_DIR} --response-cache-byte-size=12345 --cache-config=local,size=67890 ${EXTRA_ARGS}"
+run_server
+if [ "$SERVER_PID" != "0" ]; then
+    echo -e "\n***\n*** Failed: $SERVER started successfully when it was expected to fail\n***"
+    cat $SERVER_LOG
+    RET=1
+
+    kill $SERVER_PID
+    wait $SERVER_PID
+else
+    # Check that server fails with the correct error message
+    set +e
+    grep -i "incompatible flags" ${SERVER_LOG}
+    if [ $? -ne 0 ]; then
+        echo -e "\n***\n*** Failed: Expected incompatible cache config flags error message in output\n***"
         cat $SERVER_LOG
         RET=1
     fi
