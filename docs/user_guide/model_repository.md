@@ -28,7 +28,9 @@
 
 # Model Repository
 
-**Is this your first time setting up a model repository?** Check out [these tutorials](https://github.com/triton-inference-server/tutorials/tree/main/Conceptual_Guide/Part_1-model_deployment#setting-up-the-model-repository) to begin your Triton journey! 
+**Is this your first time setting up a model repository?** Check out 
+[these tutorials](https://github.com/triton-inference-server/tutorials/tree/main/Conceptual_Guide/Part_1-model_deployment#setting-up-the-model-repository)
+ to begin your Triton journey! 
 
 The Triton Inference Server serves models from one or more model
 repositories that are specified when the server is started. While

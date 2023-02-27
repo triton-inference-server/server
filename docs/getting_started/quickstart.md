@@ -28,7 +28,10 @@
 
 # Quickstart
 
-**New to Triton Inference Server and want do just deploy your model quickly?** Make use of [these tutorials](https://github.com/triton-inference-server/tutorials#quick-deploy) to begin your Triton journey! 
+**New to Triton Inference Server and want do just deploy your model quickly?** 
+Make use of 
+[these tutorials](https://github.com/triton-inference-server/tutorials#quick-deploy)
+ to begin your Triton journey! 
 
 The Triton Inference Server is available as [buildable source
   code](../customization_guide/build.md), but the easiest way to install and run Triton is to

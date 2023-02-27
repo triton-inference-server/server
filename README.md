@@ -74,7 +74,9 @@ Major features include:
 - [Metrics](docs/user_guide/metrics.md) indicating GPU utilization, server
   throughput, server latency, and more
 
-**New to Triton Inference Server?** Make use of [these tutorials](https://github.com/triton-inference-server/tutorials) to begin your Triton journey! 
+**New to Triton Inference Server?** Make use of 
+[these tutorials](https://github.com/triton-inference-server/tutorials)
+to begin your Triton journey! 
 
 Join the [Triton and TensorRT community](https://www.nvidia.com/en-us/deep-learning-ai/triton-tensorrt-newsletter/) and 
 stay current on the latest product updates, bug fixes, content, best practices, 
