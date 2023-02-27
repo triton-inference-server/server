@@ -162,7 +162,7 @@ class SagemakerAPIServer : public HTTPAPIServer {
 
   /* Constants */
   const uint32_t UNLOAD_TIMEOUT_SECS_ = 350;
-  const std::string UNLOAD_EXPECTED_STATUS_ = "UNAVAILABLE";
+  const std::string UNLOAD_EXPECTED_STATE_ = "UNAVAILABLE";
   const std::string UNLOAD_EXPECTED_REASON_ = "unloaded";
 };
 

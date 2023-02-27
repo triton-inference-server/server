@@ -681,8 +681,8 @@ SagemakerAPIServer::SageMakerMMEUnloadModelCheckStatus(const char* model_name)
     index_json.MemberAsString("reason", &reason, &reason_len);
 
     if (strcmp(name, model_name) == 0) {
-      if (strcmp(state, "UNAVAILABLE") == 0 &&
-          strcmp(reason, "unloaded") == 0) {
+      if (strcmp(state, UNLOAD_EXPECTED_STATE_.c_str()) == 0 &&
+          strcmp(reason, UNLOAD_EXPECTED_REASON_.c_str()) == 0) {
         is_model_unavailable = true;
       }
     }
@@ -694,35 +694,11 @@ void
 SagemakerAPIServer::SageMakerMMEUnloadModel(
     evhtp_request_t* req, const char* model_name)
 {
-  std::lock_guard<std::mutex> lock(mutex_);
-
   if (sagemaker_models_list_.find(model_name) == sagemaker_models_list_.end()) {
     LOG_VERBOSE(1) << "Model " << model_name << " is not loaded." << std::endl;
     evhtp_send_reply(req, EVHTP_RES_NOTFOUND); /* 404*/
     return;
   }
-
-  /* Always unload dependents as well - this is required to unload dependents in
-   * ensemble */
-  triton::common::TritonJson::Value request_parameters(
-      triton::common::TritonJson::ValueType::OBJECT);
-  triton::common::TritonJson::Value unload_parameter(
-      request_parameters, triton::common::TritonJson::ValueType::OBJECT);
-
-  unload_parameter.AddBool("unload_dependents", true);
-  request_parameters.Add("parameters", std::move(unload_parameter));
-
-  const char* buffer;
-  size_t byte_size;
-
-  triton::common::TritonJson::WriteBuffer json_buffer_;
-  json_buffer_.Clear();
-  request_parameters.Write(&json_buffer_);
-
-  byte_size = json_buffer_.Size();
-  buffer = json_buffer_.Base();
-
-  evbuffer_add(req->buffer_in, buffer, byte_size);
 
   /* Extract targetModel to log the associated archive */
   const char* targetModel =
@@ -730,28 +706,45 @@ SagemakerAPIServer::SageMakerMMEUnloadModel(
 
   LOG_INFO << "Unloading SageMaker TargetModel: " << targetModel << std::endl;
 
-  HandleRepositoryControl(req, "", model_name, "unload");
+  /* Always unload dependents as well - this is required to unload dependents in
+   * ensemble */
+  TRITONSERVER_Error* unload_err = nullptr;
+  unload_err =
+      TRITONSERVER_ServerUnloadModelAndDependents(server_.get(), model_name);
+
+  if (unload_err != nullptr) {
+    EVBufferAddErrorJson(req->buffer_out, unload_err);
+    evhtp_send_reply(req, EVHTP_RES_BADREQ);
+
+    LOG_ERROR
+        << "Error when unloading SagMaker Model with dependents for model: "
+        << model_name << std::endl;
+
+    TRITONSERVER_ErrorDelete(unload_err);
+  }
 
   /*Note: Model status check is repo-specific and therefore must be run before
    * unregistering the repo, else the model information is lost*/
   bool is_model_unavailable = false;
   uint32_t unload_time_in_secs = 0;
 
-  LOG_VERBOSE(1) << "Using Model Repository Index during UNLOAD to check for "
-                    "status of model: "
-                 << model_name;
-
-  /* Wait for the model to be completely unloaded. SageMaker waits a maximum of
-  360 seconds for the UNLOAD request to timeout. Setting a limit of 350 seconds
-  for Triton unload.*/
-  while (!is_model_unavailable && unload_time_in_secs < UNLOAD_TIMEOUT_SECS_) {
-    is_model_unavailable = SageMakerMMEUnloadModelCheckStatus(model_name);
-    sleep(1);
-    unload_time_in_secs += 1;
+  /* Wait for the model to be completely unloaded. SageMaker waits a maximum
+  of 360 seconds for the UNLOAD request to timeout. Setting a limit of 350
+  seconds for Triton unload. This should be run only if above UNLOAD call has
+  succeeded.*/
+  if (unload_err == nullptr) {
+    LOG_VERBOSE(1) << "Using Model Repository Index during UNLOAD to check for "
+                      "status of model: "
+                   << model_name;
+    while (!is_model_unavailable &&
+           unload_time_in_secs < UNLOAD_TIMEOUT_SECS_) {
+      is_model_unavailable = SageMakerMMEUnloadModelCheckStatus(model_name);
+      sleep(1);
+      unload_time_in_secs += 1;
+    }
+    LOG_INFO << "UNLOAD for model " << model_name << " took "
+             << unload_time_in_secs << " seconds.";
   }
-
-  LOG_VERBOSE(1) << "UNLOAD for model " << model_name << " took "
-                 << unload_time_in_secs << " seconds." << std::endl;
 
   if (is_model_unavailable == false &&
       unload_time_in_secs >= UNLOAD_TIMEOUT_SECS_) {
@@ -763,7 +756,7 @@ SagemakerAPIServer::SageMakerMMEUnloadModel(
 
   std::string repo_parent_path = sagemaker_models_list_.at(model_name);
 
-  TRITONSERVER_Error* unload_err = TRITONSERVER_ServerUnregisterModelRepository(
+  unload_err = TRITONSERVER_ServerUnregisterModelRepository(
       server_.get(), repo_parent_path.c_str());
 
   if (unload_err != nullptr) {
@@ -772,8 +765,11 @@ SagemakerAPIServer::SageMakerMMEUnloadModel(
     LOG_ERROR << "Unable to unregister model repository for path: "
               << repo_parent_path << std::endl;
     TRITONSERVER_ErrorDelete(unload_err);
+  } else {
+    evhtp_send_reply(req, EVHTP_RES_OK);
   }
 
+  std::lock_guard<std::mutex> lock(mutex_);
   sagemaker_models_list_.erase(model_name);
 }
 
@@ -957,8 +953,8 @@ SagemakerAPIServer::SageMakerMMELoadModel(
       if (config_fstream.is_open()) {
         ensemble_config_content << config_fstream.rdbuf();
       } else {
-        continue;  // A valid config.pbtxt does not exit at this path, or cannot
-                   // be read
+        continue;  // A valid config.pbtxt does not exit at this path, or
+                   // cannot be read
       }
 
       /* Compare matched string with `platform: "ensemble"` or
@@ -1086,5 +1082,4 @@ SagemakerAPIServer::SageMakerMMELoadModel(
 
   return;
 }
-
 }}  // namespace triton::server
