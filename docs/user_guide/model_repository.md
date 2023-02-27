@@ -28,6 +28,8 @@
 
 # Model Repository
 
+**New to Triton Inference Server?** Make use of [these tutorials](https://github.com/triton-inference-server/tutorials) to begin your Triton journey! 
+
 The Triton Inference Server serves models from one or more model
 repositories that are specified when the server is started. While
 Triton is running, the models being served can be modified as

@@ -28,6 +28,8 @@
 
 # Model Configuration
 
+**New to Triton Inference Server?** Make use of [these tutorials](https://github.com/triton-inference-server/tutorials) to begin your Triton journey! 
+
 Each model in a [model repository](model_repository.md) must include a
 model configuration that provides required and optional information
 about the model. Typically, this configuration is provided in a

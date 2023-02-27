@@ -31,6 +31,8 @@
 | [Installation](README.md#installation) | [Getting Started](README.md#getting-started) | [User Guide](README.md#user-guide) | [API Guide](protocol/README.md) | [Additional Resources](README.md#resources) | [Customization Guide](README.md#customization-guide) |
 | ------------ | --------------- | --------------- | ------------ | --------------- | --------------- | 
 
+**New to Triton Inference Server?** Make use of [these tutorials](https://github.com/triton-inference-server/tutorials) to begin your Triton journey! 
+
 ## **Installation**
 Before you can use the Triton Docker image you must install
 [Docker](https://docs.docker.com/engine/install). If you plan on using

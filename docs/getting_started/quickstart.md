@@ -28,6 +28,8 @@
 
 # Quickstart
 
+**New to Triton Inference Server?** Make use of [these tutorials](https://github.com/triton-inference-server/tutorials) to begin your Triton journey! 
+
 The Triton Inference Server is available as [buildable source
   code](../customization_guide/build.md), but the easiest way to install and run Triton is to
   use the pre-built Docker image available from the [NVIDIA GPU
