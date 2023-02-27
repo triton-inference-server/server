@@ -323,7 +323,7 @@ class TraceManager {
   static void TraceActivity(
       TRITONSERVER_InferenceTrace* trace,
       TRITONSERVER_InferenceTraceActivity activity, uint64_t timestamp_ns,
-      void* userp);
+      void* userp, const char* tag);
 
   static void TraceTensorActivity(
       TRITONSERVER_InferenceTrace* trace,
