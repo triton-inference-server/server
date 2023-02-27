@@ -1,4 +1,4 @@
-# Copyright 2022, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright 2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -47,7 +47,7 @@ from sphinx import search
 # -- Project information -----------------------------------------------------
 
 project = 'NVIDIA Triton Inference Server'
-copyright = '2022 NVIDIA CORPORATION & AFFILIATES. All rights reserved'
+copyright = '2023 NVIDIA CORPORATION & AFFILIATES. All rights reserved'
 author = 'NVIDIA'
 
 # The full version, including alpha/beta/rc tags
