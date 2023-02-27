@@ -145,6 +145,7 @@ this endpoint. The following protocols are currently recognized by all network p
   * `model-repository` : [Model repository endpoint](https://github.com/triton-inference-server/server/blob/main/docs/protocol/extension_model_repository.md).
   * `statistics` : [statistics endpoint](https://github.com/triton-inference-server/server/blob/main/docs/protocol/extension_statistics.md).
   * `trace` : [trace endpoint](https://github.com/triton-inference-server/server/blob/main/docs/protocol/extension_trace.md).
+  * `logging` : [logging endpoint](https://github.com/triton-inference-server/server/blob/main/docs/protocol/extension_logging.md).
 
 
 * Endpoint settings : All [HTTP options](#http-options) and [GRPC
