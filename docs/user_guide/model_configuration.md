@@ -28,6 +28,11 @@
 
 # Model Configuration
 
+**Is this your first time writing a config file?** Check out 
+[this guide](https://github.com/triton-inference-server/tutorials/tree/main/Conceptual_Guide/Part_1-model_deployment#model-configuration)
+ or this 
+[example](https://github.com/triton-inference-server/tutorials/tree/main/HuggingFace#examples)! 
+
 Each model in a [model repository](model_repository.md) must include a
 model configuration that provides required and optional information
 about the model. Typically, this configuration is provided in a
