@@ -1,4 +1,4 @@
-// Copyright 2021-2022, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+// Copyright 2021-2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 //
 // Redistribution and use in source and binary forms, with or without
 // modification, are permitted provided that the following conditions
@@ -26,6 +26,7 @@
 #pragma once
 
 #include <sys/stat.h>
+
 #include <fstream>
 #include <mutex>
 
@@ -105,6 +106,8 @@ class SagemakerAPIServer : public HTTPAPIServer {
 
   void SageMakerMMEUnloadModel(evhtp_request_t* req, const char* model_name);
 
+  bool SageMakerMMEUnloadModelCheckStatus(const char* model_name);
+
   void SageMakerMMEListModel(evhtp_request_t* req);
 
   void SageMakerMMEGetModel(evhtp_request_t* req, const char* model_name);
@@ -156,6 +159,11 @@ class SagemakerAPIServer : public HTTPAPIServer {
 
   /* Mutex to handle concurrent updates */
   std::mutex mutex_;
+
+  /* Constants */
+  const uint32_t UNLOAD_TIMEOUT_SECS_ = 350;
+  const std::string UNLOAD_EXPECTED_STATUS_ = "UNAVAILABLE";
+  const std::string UNLOAD_EXPECTED_REASON_ = "unloaded";
 };
 
 }}  // namespace triton::server
