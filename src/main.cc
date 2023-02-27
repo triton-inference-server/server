@@ -118,17 +118,10 @@ std::string vertex_ai_default_model_;
 #endif  // TRITON_ENABLE_VERTEX_AI
 
 #ifdef TRITON_ENABLE_GRPC
-std::unique_ptr<triton::server::GRPCServer> grpc_service_;
+// [FIXME] global variable should use different naming convention "g_xxx"
+std::unique_ptr<triton::server::grpc::GRPCServer> grpc_service_;
 bool allow_grpc_ = true;
-int32_t grpc_port_ = 8001;
-bool reuse_grpc_port_ = false;
-std::string grpc_address_ = "0.0.0.0";
-bool grpc_use_ssl_ = false;
-triton::server::SslOptions grpc_ssl_options_;
-grpc_compression_level grpc_response_compression_level_ =
-    GRPC_COMPRESS_LEVEL_NONE;
-// KeepAlive defaults: https://grpc.github.io/grpc/cpp/md_doc_keepalive.html
-triton::server::KeepAliveOptions grpc_keepalive_options_;
+triton::server::grpc::GRPCOptions grpc_options_;
 #endif  // TRITON_ENABLE_GRPC
 
 #ifdef TRITON_ENABLE_METRICS
@@ -151,14 +144,6 @@ int32_t trace_rate_ = 1000;
 int32_t trace_count_ = -1;
 int32_t trace_log_frequency_ = 0;
 #endif  // TRITON_ENABLE_TRACING
-
-#if defined(TRITON_ENABLE_GRPC)
-// The maximum number of inference request/response objects that
-// remain allocated for reuse. As long as the number of in-flight
-// requests doesn't exceed this value there will be no
-// allocation/deallocation of request/response objects.
-int grpc_infer_allocation_pool_size_ = 8;
-#endif  // TRITON_ENABLE_GRPC
 
 #if defined(TRITON_ENABLE_HTTP)
 // The number of threads to initialize for the HTTP front-end.
@@ -682,7 +667,9 @@ CheckPortCollision()
 #endif  // TRITON_ENABLE_HTTP
 #ifdef TRITON_ENABLE_GRPC
   if (allow_grpc_) {
-    ports.emplace_back("GRPC", grpc_address_, grpc_port_, false, -1, -1);
+    ports.emplace_back(
+        "GRPC", grpc_options_.socket_.address_, grpc_options_.socket_.port_,
+        false, -1, -1);
   }
 #endif  // TRITON_ENABLE_GRPC
 #ifdef TRITON_ENABLE_METRICS
@@ -745,16 +732,13 @@ CheckPortCollision()
 #ifdef TRITON_ENABLE_GRPC
 TRITONSERVER_Error*
 StartGrpcService(
-    std::unique_ptr<triton::server::GRPCServer>* service,
+    std::unique_ptr<triton::server::grpc::GRPCServer>* service,
     const std::shared_ptr<TRITONSERVER_Server>& server,
     triton::server::TraceManager* trace_manager,
     const std::shared_ptr<triton::server::SharedMemoryManager>& shm_manager)
 {
-  TRITONSERVER_Error* err = triton::server::GRPCServer::Create(
-      server, trace_manager, shm_manager, grpc_port_, reuse_grpc_port_,
-      grpc_address_, grpc_use_ssl_, grpc_ssl_options_,
-      grpc_infer_allocation_pool_size_, grpc_response_compression_level_,
-      grpc_keepalive_options_, service);
+  TRITONSERVER_Error* err = triton::server::grpc::GRPCServer::Create(
+      server, trace_manager, shm_manager, grpc_options_, service);
   if (err == nullptr) {
     err = (*service)->Start();
   }
@@ -1429,13 +1413,7 @@ Parse(TRITONSERVER_ServerOptions** server_options, int argc, char** argv)
 #endif  // TRITON_ENABLE_HTTP
 
 #if defined(TRITON_ENABLE_GRPC)
-  int32_t grpc_port = grpc_port_;
-  bool reuse_grpc_port = reuse_grpc_port_;
-  std::string grpc_address = grpc_address_;
-  int32_t grpc_use_ssl = grpc_use_ssl_;
-  int32_t grpc_infer_allocation_pool_size = grpc_infer_allocation_pool_size_;
-  grpc_compression_level grpc_response_compression_level =
-      grpc_response_compression_level_;
+  triton::server::grpc::GRPCOptions lgrpc_options;
 #endif  // TRITON_ENABLE_GRPC
 
 #if defined(TRITON_ENABLE_SAGEMAKER)
@@ -1627,45 +1605,46 @@ Parse(TRITONSERVER_ServerOptions** server_options, int argc, char** argv)
         allow_grpc_ = ParseBoolOption(optarg);
         break;
       case OPTION_GRPC_PORT:
-        grpc_port = ParseIntOption(optarg);
+        lgrpc_options.socket_.port_ = ParseIntOption(optarg);
         break;
       case OPTION_REUSE_GRPC_PORT:
-        reuse_grpc_port = ParseIntOption(optarg);
+        lgrpc_options.socket_.reuse_port_ = ParseIntOption(optarg);
         break;
       case OPTION_GRPC_ADDRESS:
-        grpc_address = optarg;
+        lgrpc_options.socket_.address_ = optarg;
         break;
       case OPTION_GRPC_INFER_ALLOCATION_POOL_SIZE:
-        grpc_infer_allocation_pool_size = ParseIntOption(optarg);
+        lgrpc_options.infer_allocation_pool_size_ = ParseIntOption(optarg);
         break;
       case OPTION_GRPC_USE_SSL:
-        grpc_use_ssl = ParseBoolOption(optarg);
+        lgrpc_options.ssl_.use_ssl_ = ParseBoolOption(optarg);
         break;
       case OPTION_GRPC_USE_SSL_MUTUAL:
-        grpc_ssl_options_.use_mutual_auth = ParseBoolOption(optarg);
-        grpc_use_ssl = true;
+        lgrpc_options.ssl_.use_mutual_auth_ = ParseBoolOption(optarg);
+        // [FIXME] this implies use SSL, take priority over OPTION_GRPC_USE_SSL?
+        lgrpc_options.ssl_.use_ssl_ = true;
         break;
       case OPTION_GRPC_SERVER_CERT:
-        grpc_ssl_options_.server_cert = optarg;
+        lgrpc_options.ssl_.server_cert_ = optarg;
         break;
       case OPTION_GRPC_SERVER_KEY:
-        grpc_ssl_options_.server_key = optarg;
+        lgrpc_options.ssl_.server_key_ = optarg;
         break;
       case OPTION_GRPC_ROOT_CERT:
-        grpc_ssl_options_.root_cert = optarg;
+        lgrpc_options.ssl_.root_cert_ = optarg;
         break;
       case OPTION_GRPC_RESPONSE_COMPRESSION_LEVEL: {
         std::string mode_str(optarg);
         std::transform(
             mode_str.begin(), mode_str.end(), mode_str.begin(), ::tolower);
         if (mode_str == "none") {
-          grpc_response_compression_level = GRPC_COMPRESS_LEVEL_NONE;
+          lgrpc_options.infer_compression_level_ = GRPC_COMPRESS_LEVEL_NONE;
         } else if (mode_str == "low") {
-          grpc_response_compression_level = GRPC_COMPRESS_LEVEL_LOW;
+          lgrpc_options.infer_compression_level_ = GRPC_COMPRESS_LEVEL_LOW;
         } else if (mode_str == "medium") {
-          grpc_response_compression_level = GRPC_COMPRESS_LEVEL_MED;
+          lgrpc_options.infer_compression_level_ = GRPC_COMPRESS_LEVEL_MED;
         } else if (mode_str == "high") {
-          grpc_response_compression_level = GRPC_COMPRESS_LEVEL_HIGH;
+          lgrpc_options.infer_compression_level_ = GRPC_COMPRESS_LEVEL_HIGH;
         } else {
           std::cerr
               << "invalid argument for --grpc_infer_response_compression_level"
@@ -1676,25 +1655,28 @@ Parse(TRITONSERVER_ServerOptions** server_options, int argc, char** argv)
         break;
       }
       case OPTION_GRPC_ARG_KEEPALIVE_TIME_MS:
-        grpc_keepalive_options_.keepalive_time_ms = ParseIntOption(optarg);
+        lgrpc_options.keep_alive_.keepalive_time_ms_ = ParseIntOption(optarg);
         break;
       case OPTION_GRPC_ARG_KEEPALIVE_TIMEOUT_MS:
-        grpc_keepalive_options_.keepalive_timeout_ms = ParseIntOption(optarg);
+        lgrpc_options.keep_alive_.keepalive_timeout_ms_ =
+            ParseIntOption(optarg);
         break;
       case OPTION_GRPC_ARG_KEEPALIVE_PERMIT_WITHOUT_CALLS:
-        grpc_keepalive_options_.keepalive_permit_without_calls =
+        lgrpc_options.keep_alive_.keepalive_permit_without_calls_ =
             ParseBoolOption(optarg);
         break;
       case OPTION_GRPC_ARG_HTTP2_MAX_PINGS_WITHOUT_DATA:
-        grpc_keepalive_options_.http2_max_pings_without_data =
+        lgrpc_options.keep_alive_.http2_max_pings_without_data_ =
             ParseIntOption(optarg);
         break;
       case OPTION_GRPC_ARG_HTTP2_MIN_RECV_PING_INTERVAL_WITHOUT_DATA_MS:
-        grpc_keepalive_options_.http2_min_recv_ping_interval_without_data_ms =
+        lgrpc_options.keep_alive_
+            .http2_min_recv_ping_interval_without_data_ms_ =
             ParseIntOption(optarg);
         break;
       case OPTION_GRPC_ARG_HTTP2_MAX_PING_STRIKES:
-        grpc_keepalive_options_.http2_max_ping_strikes = ParseIntOption(optarg);
+        lgrpc_options.keep_alive_.http2_max_ping_strikes_ =
+            ParseIntOption(optarg);
         break;
 #endif  // TRITON_ENABLE_GRPC
 
@@ -1912,12 +1894,7 @@ Parse(TRITONSERVER_ServerOptions** server_options, int argc, char** argv)
 
 
 #if defined(TRITON_ENABLE_GRPC)
-  grpc_port_ = grpc_port;
-  reuse_grpc_port_ = reuse_grpc_port;
-  grpc_address_ = grpc_address;
-  grpc_infer_allocation_pool_size_ = grpc_infer_allocation_pool_size;
-  grpc_use_ssl_ = grpc_use_ssl;
-  grpc_response_compression_level_ = grpc_response_compression_level;
+  grpc_options_ = lgrpc_options;
 #endif  // TRITON_ENABLE_GRPC
 
 #ifdef TRITON_ENABLE_METRICS
