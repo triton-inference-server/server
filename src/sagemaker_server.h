@@ -106,7 +106,8 @@ class SagemakerAPIServer : public HTTPAPIServer {
 
   void SageMakerMMEUnloadModel(evhtp_request_t* req, const char* model_name);
 
-  bool SageMakerMMEUnloadModelCheckStatus(const char* model_name);
+  TRITONSERVER_Error* SageMakerMMECheckUnloadedModelIsUnavailable(
+      const char* model_name, bool* is_model_unavailable);
 
   void SageMakerMMEListModel(evhtp_request_t* req);
 
@@ -162,6 +163,7 @@ class SagemakerAPIServer : public HTTPAPIServer {
 
   /* Constants */
   const uint32_t UNLOAD_TIMEOUT_SECS_ = 350;
+  const uint32_t UNLOAD_SLEEP_MILLISECONDS_ = 500;
   const std::string UNLOAD_EXPECTED_STATE_ = "UNAVAILABLE";
   const std::string UNLOAD_EXPECTED_REASON_ = "unloaded";
 };
