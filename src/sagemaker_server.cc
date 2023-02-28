@@ -655,8 +655,6 @@ SagemakerAPIServer::SageMakerMMECheckUnloadedModelIsUnavailable(
   TRITONSERVER_MessageSerializeToJson(
       server_model_index_message_, &index_buffer, &index_byte_size);
 
-  LOG_VERBOSE(1) << "Printing entire model index repository" << index_buffer;
-
   /* Read into json buffer*/
   triton::common::TritonJson::Value server_model_index_json;
   server_model_index_json.Parse(index_buffer, index_byte_size);
@@ -675,19 +673,13 @@ SagemakerAPIServer::SageMakerMMECheckUnloadedModelIsUnavailable(
     RETURN_IF_ERR(index_json.MemberAsString("name", &name, &name_len));
 
     if (std::string(name) == std::string(model_name)) {
-      LOG_VERBOSE(1) << "Model name matched: " << name;
       RETURN_IF_ERR(index_json.MemberAsString("state", &state, &state_len));
 
       if (std::string(state) == UNLOAD_EXPECTED_STATE_) {
         RETURN_IF_ERR(
             index_json.MemberAsString("reason", &reason, &reason_len));
-        LOG_VERBOSE(1) << "reason: " << reason;
         if (std::string(reason) == UNLOAD_EXPECTED_REASON_) {
-          LOG_VERBOSE(1) << "state: " << state;
-
-          LOG_VERBOSE(1) << "BEFORE setting to true" << *is_model_unavailable;
           *is_model_unavailable = true;
-          LOG_VERBOSE(1) << "AFTER setting to true" << *is_model_unavailable;
           break;
         }
       }
@@ -751,10 +743,9 @@ SagemakerAPIServer::SageMakerMMEUnloadModel(
       unload_err = SageMakerMMECheckUnloadedModelIsUnavailable(
           model_name, is_model_unavailable);
       if (unload_err != nullptr) {
-        LOG_VERBOSE(1) << "** Received non-zero exit code on checking for "
-                          "model unavailability";
-        LOG_VERBOSE(1) << "Printing error message"
-                       << TRITONSERVER_ErrorMessage(unload_err);
+        LOG_ERROR << "Error: Received non-zero exit code on checking for "
+                     "model unavailability. "
+                  << TRITONSERVER_ErrorMessage(unload_err);
         break;
       }
       std::this_thread::sleep_for(
