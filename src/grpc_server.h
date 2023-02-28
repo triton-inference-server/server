@@ -63,7 +63,7 @@ struct KeepAliveOptions {
   int http2_max_ping_strikes_{2};
 };
 
-struct GRPCOptions {
+struct Options {
   SocketOptions socket_;
   SslOptions ssl_;
   KeepAliveOptions keep_alive_;
@@ -75,16 +75,15 @@ struct GRPCOptions {
   int infer_allocation_pool_size_{8};
 };
 
-class GRPCServer {
+class Server {
  public:
   static TRITONSERVER_Error* Create(
-      const std::shared_ptr<TRITONSERVER_Server>& server,
+      const std::shared_ptr<TRITONSERVER_Server>& tritonserver,
       triton::server::TraceManager* trace_manager,
       const std::shared_ptr<SharedMemoryManager>& shm_manager,
-      const GRPCOptions& grpc_options,
-      std::unique_ptr<GRPCServer>* grpc_server);
+      const Options& server_options, std::unique_ptr<Server>* server);
 
-  ~GRPCServer();
+  ~Server();
 
   TRITONSERVER_Error* Start();
   TRITONSERVER_Error* Stop();
@@ -106,23 +105,23 @@ class GRPCServer {
   };
 
  private:
-  GRPCServer(
-      const std::shared_ptr<TRITONSERVER_Server>& server,
+  Server(
+      const std::shared_ptr<TRITONSERVER_Server>& tritonserver,
       triton::server::TraceManager* trace_manager,
       const std::shared_ptr<SharedMemoryManager>& shm_manager,
-      const GRPCOptions& options);
+      const Options& server_options);
 
-  std::shared_ptr<TRITONSERVER_Server> server_;
+  std::shared_ptr<TRITONSERVER_Server> tritonserver_;
   TraceManager* trace_manager_;
   std::shared_ptr<SharedMemoryManager> shm_manager_;
   const std::string server_addr_;
 
-  ::grpc::ServerBuilder grpc_builder_;
+  ::grpc::ServerBuilder builder_;
 
   inference::GRPCInferenceService::AsyncService service_;
   ::grpc::health::v1::Health::AsyncService health_service_;
 
-  std::unique_ptr<::grpc::Server> grpc_server_;
+  std::unique_ptr<::grpc::Server> server_;
 
   std::unique_ptr<::grpc::ServerCompletionQueue> common_cq_;
   std::unique_ptr<::grpc::ServerCompletionQueue> model_infer_cq_;

@@ -206,7 +206,7 @@ operator<<(std::ostream& out, const Steps& step)
 //=========================================================================
 
 template <typename ResponderType, typename RequestType, typename ResponseType>
-class CommonCallData : public GRPCServer::ICallData {
+class CommonCallData : public Server::ICallData {
  public:
   using StandardRegisterFunc = std::function<void(
       ::grpc::ServerContext*, RequestType*, ResponderType*, void*)>;
@@ -345,7 +345,7 @@ CommonCallData<ResponderType, RequestType, ResponseType>::WriteResponse()
 //
 // A common handler for all non-inference requests.
 //
-class CommonHandler : public GRPCServer::HandlerBase {
+class CommonHandler : public Server::HandlerBase {
  public:
   CommonHandler(
       const std::string& name,
@@ -430,8 +430,7 @@ CommonHandler::Start()
     bool ok;
 
     while (cq_->Next(&tag, &ok)) {
-      GRPCServer::ICallData* call_data =
-          static_cast<GRPCServer::ICallData*>(tag);
+      Server::ICallData* call_data = static_cast<Server::ICallData*>(tag);
       if (!call_data->Process(ok)) {
         LOG_VERBOSE(1) << "Done for " << call_data->Name() << ", "
                        << call_data->Id();
@@ -2703,7 +2702,7 @@ class InferHandlerState {
 template <
     typename ServiceType, typename ServerResponderType, typename RequestType,
     typename ResponseType>
-class InferHandler : public GRPCServer::HandlerBase {
+class InferHandler : public Server::HandlerBase {
  public:
   InferHandler(
       const std::string& name,
@@ -4788,17 +4787,17 @@ ReadFile(const std::string& filename, std::string& data)
 }  // namespace
 
 //
-// GRPCServer
+// Server
 //
-GRPCServer::GRPCServer(
-    const std::shared_ptr<TRITONSERVER_Server>& server,
+Server::Server(
+    const std::shared_ptr<TRITONSERVER_Server>& tritonserver,
     triton::server::TraceManager* trace_manager,
     const std::shared_ptr<SharedMemoryManager>& shm_manager,
-    const GRPCOptions& options)
-    : server_(server), trace_manager_(trace_manager), shm_manager_(shm_manager),
-      server_addr_(
-          options.socket_.address_ + ":" +
-          std::to_string(options.socket_.port_))
+    const Options& options)
+    : tritonserver_(tritonserver), trace_manager_(trace_manager),
+      shm_manager_(shm_manager), server_addr_(
+                                     options.socket_.address_ + ":" +
+                                     std::to_string(options.socket_.port_))
 {
   std::shared_ptr<::grpc::ServerCredentials> credentials;
   const auto& ssl_options = options.ssl_;
@@ -4822,11 +4821,11 @@ GRPCServer::GRPCServer(
     credentials = ::grpc::InsecureServerCredentials();
   }
 
-  grpc_builder_.AddListeningPort(server_addr_, credentials, &bound_port_);
-  grpc_builder_.SetMaxMessageSize(MAX_GRPC_MESSAGE_SIZE);
-  grpc_builder_.RegisterService(&service_);
-  grpc_builder_.RegisterService(&health_service_);
-  grpc_builder_.AddChannelArgument(
+  builder_.AddListeningPort(server_addr_, credentials, &bound_port_);
+  builder_.SetMaxMessageSize(MAX_GRPC_MESSAGE_SIZE);
+  builder_.RegisterService(&service_);
+  builder_.RegisterService(&health_service_);
+  builder_.AddChannelArgument(
       GRPC_ARG_ALLOW_REUSEPORT, options.socket_.reuse_port_);
 
   {
@@ -4835,20 +4834,20 @@ GRPCServer::GRPCServer(
     // work properly, the client-side settings should be in agreement with
     // server-side settings.
     const auto& keepalive_options = options.keep_alive_;
-    grpc_builder_.AddChannelArgument(
+    builder_.AddChannelArgument(
         GRPC_ARG_KEEPALIVE_TIME_MS, keepalive_options.keepalive_time_ms_);
-    grpc_builder_.AddChannelArgument(
+    builder_.AddChannelArgument(
         GRPC_ARG_KEEPALIVE_TIMEOUT_MS, keepalive_options.keepalive_timeout_ms_);
-    grpc_builder_.AddChannelArgument(
+    builder_.AddChannelArgument(
         GRPC_ARG_KEEPALIVE_PERMIT_WITHOUT_CALLS,
         keepalive_options.keepalive_permit_without_calls_);
-    grpc_builder_.AddChannelArgument(
+    builder_.AddChannelArgument(
         GRPC_ARG_HTTP2_MAX_PINGS_WITHOUT_DATA,
         keepalive_options.http2_max_pings_without_data_);
-    grpc_builder_.AddChannelArgument(
+    builder_.AddChannelArgument(
         GRPC_ARG_HTTP2_MIN_RECV_PING_INTERVAL_WITHOUT_DATA_MS,
         keepalive_options.http2_min_recv_ping_interval_without_data_ms_);
-    grpc_builder_.AddChannelArgument(
+    builder_.AddChannelArgument(
         GRPC_ARG_HTTP2_MAX_PING_STRIKES,
         keepalive_options.http2_max_ping_strikes_);
 
@@ -4869,20 +4868,20 @@ GRPCServer::GRPCServer(
     LOG_VERBOSE(1) << "==============================";
   }
 
-  common_cq_ = grpc_builder_.AddCompletionQueue();
-  model_infer_cq_ = grpc_builder_.AddCompletionQueue();
-  model_stream_infer_cq_ = grpc_builder_.AddCompletionQueue();
+  common_cq_ = builder_.AddCompletionQueue();
+  model_infer_cq_ = builder_.AddCompletionQueue();
+  model_stream_infer_cq_ = builder_.AddCompletionQueue();
 
   // A common Handler for other non-inference requests
   common_handler_.reset(new CommonHandler(
-      "CommonHandler", server_, shm_manager_, trace_manager_, &service_,
+      "CommonHandler", tritonserver_, shm_manager_, trace_manager_, &service_,
       &health_service_, common_cq_.get()));
 
   // Handler for model inference requests.
   for (int i = 0; i < REGISTER_GRPC_INFER_THREAD_COUNT; ++i) {
     model_infer_handlers_.emplace_back(new ModelInferHandler(
-        "ModelInferHandler", server_, trace_manager_, shm_manager_, &service_,
-        model_infer_cq_.get(),
+        "ModelInferHandler", tritonserver_, trace_manager_, shm_manager_,
+        &service_, model_infer_cq_.get(),
         options.infer_allocation_pool_size_ /* max_state_bucket_count */,
         options.infer_compression_level_));
   }
@@ -4890,41 +4889,41 @@ GRPCServer::GRPCServer(
   // Handler for streaming inference requests. Keeps one handler for streaming
   // to avoid possible concurrent writes which is not allowed
   model_stream_infer_handlers_.emplace_back(new ModelStreamInferHandler(
-      "ModelStreamInferHandler", server_, trace_manager_, shm_manager_,
+      "ModelStreamInferHandler", tritonserver_, trace_manager_, shm_manager_,
       &service_, model_stream_infer_cq_.get(),
       options.infer_allocation_pool_size_ /* max_state_bucket_count */,
       options.infer_compression_level_));
 }
 
-GRPCServer::~GRPCServer()
+Server::~Server()
 {
   IGNORE_ERR(Stop());
 }
 
 TRITONSERVER_Error*
-GRPCServer::Create(
-    const std::shared_ptr<TRITONSERVER_Server>& server,
+Server::Create(
+    const std::shared_ptr<TRITONSERVER_Server>& tritonserver,
     triton::server::TraceManager* trace_manager,
     const std::shared_ptr<SharedMemoryManager>& shm_manager,
-    const GRPCOptions& grpc_options, std::unique_ptr<GRPCServer>* grpc_server)
+    const Options& server_options, std::unique_ptr<Server>* server)
 {
-  const std::string addr = grpc_options.socket_.address_ + ":" +
-                           std::to_string(grpc_options.socket_.port_);
-  grpc_server->reset(
-      new GRPCServer(server, trace_manager, shm_manager, grpc_options));
+  const std::string addr = server_options.socket_.address_ + ":" +
+                           std::to_string(server_options.socket_.port_);
+  server->reset(
+      new Server(tritonserver, trace_manager, shm_manager, server_options));
 
   return nullptr;  // success
 }
 
 TRITONSERVER_Error*
-GRPCServer::Start()
+Server::Start()
 {
   if (running_) {
     return TRITONSERVER_ErrorNew(
         TRITONSERVER_ERROR_ALREADY_EXISTS, "GRPC server is already running.");
   }
 
-  grpc_server_ = grpc_builder_.BuildAndStart();
+  server_ = builder_.BuildAndStart();
   // Check if binding port failed
   if (bound_port_ == 0) {
     return TRITONSERVER_ErrorNew(
@@ -4946,7 +4945,7 @@ GRPCServer::Start()
 }
 
 TRITONSERVER_Error*
-GRPCServer::Stop()
+Server::Stop()
 {
   if (!running_) {
     return TRITONSERVER_ErrorNew(
@@ -4954,7 +4953,7 @@ GRPCServer::Stop()
   }
 
   // Always shutdown the completion queue after the server.
-  grpc_server_->Shutdown();
+  server_->Shutdown();
 
   common_cq_->Shutdown();
   model_infer_cq_->Shutdown();

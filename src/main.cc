@@ -119,9 +119,9 @@ std::string vertex_ai_default_model_;
 
 #ifdef TRITON_ENABLE_GRPC
 // [FIXME] global variable should use different naming convention "g_xxx"
-std::unique_ptr<triton::server::grpc::GRPCServer> grpc_service_;
+std::unique_ptr<triton::server::grpc::Server> grpc_service_;
 bool allow_grpc_ = true;
-triton::server::grpc::GRPCOptions grpc_options_;
+triton::server::grpc::Options grpc_options_;
 #endif  // TRITON_ENABLE_GRPC
 
 #ifdef TRITON_ENABLE_METRICS
@@ -732,12 +732,12 @@ CheckPortCollision()
 #ifdef TRITON_ENABLE_GRPC
 TRITONSERVER_Error*
 StartGrpcService(
-    std::unique_ptr<triton::server::grpc::GRPCServer>* service,
+    std::unique_ptr<triton::server::grpc::Server>* service,
     const std::shared_ptr<TRITONSERVER_Server>& server,
     triton::server::TraceManager* trace_manager,
     const std::shared_ptr<triton::server::SharedMemoryManager>& shm_manager)
 {
-  TRITONSERVER_Error* err = triton::server::grpc::GRPCServer::Create(
+  TRITONSERVER_Error* err = triton::server::grpc::Server::Create(
       server, trace_manager, shm_manager, grpc_options_, service);
   if (err == nullptr) {
     err = (*service)->Start();
@@ -1413,7 +1413,7 @@ Parse(TRITONSERVER_ServerOptions** server_options, int argc, char** argv)
 #endif  // TRITON_ENABLE_HTTP
 
 #if defined(TRITON_ENABLE_GRPC)
-  triton::server::grpc::GRPCOptions lgrpc_options;
+  triton::server::grpc::Options lgrpc_options;
 #endif  // TRITON_ENABLE_GRPC
 
 #if defined(TRITON_ENABLE_SAGEMAKER)
