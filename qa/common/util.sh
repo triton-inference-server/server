@@ -153,7 +153,7 @@ function gdb_helper () {
   fi
 
   ### Server Hang ###
-  if [[ kill -0 ${SERVER_PID} ]]; then
+  if kill -0 ${SERVER_PID}; then
     # If server process is still alive, try to get backtrace and core dump from it
     GDB_LOG="gdb_bt.${SERVER_PID}.log"
     echo -e "=== WARNING: SERVER HANG DETECTED, DUMPING GDB BACKTRACE TO [${PWD}/${GDB_LOG}] ==="
