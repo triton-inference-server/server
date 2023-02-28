@@ -655,6 +655,8 @@ SagemakerAPIServer::SageMakerMMECheckUnloadedModelIsUnavailable(
   TRITONSERVER_MessageSerializeToJson(
       server_model_index_message_, &index_buffer, &index_byte_size);
 
+  LOG_VERBOSE(1) << "Printing entire model index repository" << index_buffer;
+
   /* Read into json buffer*/
   triton::common::TritonJson::Value server_model_index_json;
   server_model_index_json.Parse(index_buffer, index_byte_size);
