@@ -568,7 +568,7 @@ def backend_cmake_args(images, components, be, install_dir, library_paths):
         args = armnn_tflite_cmake_args()
     elif be == 'fil':
         args = fil_cmake_args(images)
-        # FIXME: FIL backend fails debug build
+        # DLIS-4618: FIL backend fails debug build, so override it for now.
         cmake_build_type = "Release"
     elif be == 'fastertransformer':
         args = fastertransformer_cmake_args()
