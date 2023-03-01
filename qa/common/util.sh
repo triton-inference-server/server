@@ -146,6 +146,33 @@ function wait_for_model_stable() {
     echo "=== Timeout $wait_time_secs secs. Not all models stable."
 }
 
+function gdb_helper () {
+  if ! command -v gdb; then
+    echo "=== WARNING: gdb not installed"
+    return
+  fi
+
+  ### Server Hang ###
+  if kill -0 ${SERVER_PID}; then
+    # If server process is still alive, try to get backtrace and core dump from it
+    GDB_LOG="gdb_bt.${SERVER_PID}.log"
+    echo -e "=== WARNING: SERVER HANG DETECTED, DUMPING GDB BACKTRACE TO [${PWD}/${GDB_LOG}] ==="
+    # Dump backtrace log for quick analysis. Allow these commands to fail.
+    gdb -batch -ex "thread apply all bt" -p "${SERVER_PID}" 2>&1 | tee "${GDB_LOG}" || true
+
+    # Generate core dump for deeper analysis. Default filename is "core.${PID}"
+    gdb -batch -ex "gcore" -p "${SERVER_PID}" || true
+  fi
+
+  ### Server Segfaulted ###
+  # If there are any core dumps locally from a segfault, load them and get a backtrace
+  for corefile in $(ls core.*); do
+    GDB_LOG="${corefile}.log"
+    echo -e "=== WARNING: SEGFAULT DETECTED, DUMPING GDB BACKTRACE TO [${PWD}/${GDB_LOG}] ==="
+    gdb -batch ${SERVER} ${corefile} -ex "thread apply all bt" | tee "${corefile}.log" || true; 
+  done
+}
+
 # Run inference server. Return once server's health endpoint shows
 # ready or timeout expires. Sets SERVER_PID to pid of SERVER, or 0 if
 # error (including expired timeout)
@@ -173,17 +200,8 @@ function run_server () {
 
     wait_for_server_ready $SERVER_PID $SERVER_TIMEOUT
     if [ "$WAIT_RET" != "0" ]; then
-        # If gdb is installed, collect a backtrace from the hanging process
-        if command -v gdb; then
-          GDB_LOG="gdb_bt.${SERVER_PID}.log"
-          echo -e "=== WARNING: SERVER FAILED TO START, DUMPING GDB BACKTRACE TO [${PWD}/${GDB_LOG}] ==="
-          # Dump backtrace log for quick analysis. Allow these commands to fail.
-          gdb -batch -ex "thread apply all bt" -p "${SERVER_PID}" 2>&1 >> "${GDB_LOG}" || true
-          # Generate core dump for deeper analysis. Default filename is "core.${PID}"
-          gdb -batch -ex "gcore" -p "${SERVER_PID}" || true
-        else
-          echo -e "=== ERROR: SERVER FAILED TO START, BUT GDB NOT FOUND ==="
-        fi
+        # Get further debug information about server startup failure
+        gdb_helper || true
 
         # Cleanup
         kill $SERVER_PID || true
