@@ -32,50 +32,58 @@
 #include "tracer.h"
 #include "triton/core/tritonserver.h"
 
-namespace triton { namespace server {
+namespace triton { namespace server { namespace grpc {
+
+struct SocketOptions {
+  std::string address_{"0.0.0.0"};
+  int32_t port_{8001};
+  bool reuse_port_{false};
+};
 
 struct SslOptions {
-  explicit SslOptions() {}
+  // Whether SSL is used for communication
+  bool use_ssl_{false};
   // File holding PEM-encoded server certificate
-  std::string server_cert;
+  std::string server_cert_{""};
   // File holding PEM-encoded server key
-  std::string server_key;
+  std::string server_key_{""};
   // File holding PEM-encoded root certificate
-  std::string root_cert;
+  std::string root_cert_{""};
   // Whether to use Mutual Authentication
-  bool use_mutual_auth;
+  bool use_mutual_auth_{false};
 };
 
 // GRPC KeepAlive: https://grpc.github.io/grpc/cpp/md_doc_keepalive.html
 struct KeepAliveOptions {
-  explicit KeepAliveOptions()
-      : keepalive_time_ms(7200000), keepalive_timeout_ms(20000),
-        keepalive_permit_without_calls(false), http2_max_pings_without_data(2),
-        http2_min_recv_ping_interval_without_data_ms(300000),
-        http2_max_ping_strikes(2)
-  {
-  }
-  int keepalive_time_ms;
-  int keepalive_timeout_ms;
-  bool keepalive_permit_without_calls;
-  int http2_max_pings_without_data;
-  int http2_min_recv_ping_interval_without_data_ms;
-  int http2_max_ping_strikes;
+  int keepalive_time_ms_{7200000};
+  int keepalive_timeout_ms_{20000};
+  bool keepalive_permit_without_calls_{false};
+  int http2_max_pings_without_data_{2};
+  int http2_min_recv_ping_interval_without_data_ms_{300000};
+  int http2_max_ping_strikes_{2};
 };
 
-class GRPCServer {
+struct Options {
+  SocketOptions socket_;
+  SslOptions ssl_;
+  KeepAliveOptions keep_alive_;
+  grpc_compression_level infer_compression_level_{GRPC_COMPRESS_LEVEL_NONE};
+  // The maximum number of inference request/response objects that
+  // remain allocated for reuse. As long as the number of in-flight
+  // requests doesn't exceed this value there will be no
+  // allocation/deallocation of request/response objects.
+  int infer_allocation_pool_size_{8};
+};
+
+class Server {
  public:
   static TRITONSERVER_Error* Create(
-      const std::shared_ptr<TRITONSERVER_Server>& server,
+      const std::shared_ptr<TRITONSERVER_Server>& tritonserver,
       triton::server::TraceManager* trace_manager,
-      const std::shared_ptr<SharedMemoryManager>& shm_manager, int32_t port,
-      const bool reuse_port, std::string address, bool use_ssl,
-      const SslOptions& ssl_options, int infer_allocation_pool_size,
-      grpc_compression_level compression_level,
-      const KeepAliveOptions& keepalive_options,
-      std::unique_ptr<GRPCServer>* grpc_server);
+      const std::shared_ptr<SharedMemoryManager>& shm_manager,
+      const Options& server_options, std::unique_ptr<Server>* server);
 
-  ~GRPCServer();
+  ~Server();
 
   TRITONSERVER_Error* Start();
   TRITONSERVER_Error* Stop();
@@ -84,6 +92,8 @@ class GRPCServer {
   class HandlerBase {
    public:
     virtual ~HandlerBase() = default;
+    virtual void Start() = 0;
+    virtual void Stop() = 0;
   };
 
   class ICallData {
@@ -95,42 +105,34 @@ class GRPCServer {
   };
 
  private:
-  GRPCServer(
-      const std::shared_ptr<TRITONSERVER_Server>& server,
+  Server(
+      const std::shared_ptr<TRITONSERVER_Server>& tritonserver,
       triton::server::TraceManager* trace_manager,
       const std::shared_ptr<SharedMemoryManager>& shm_manager,
-      const std::string& server_addr, const bool reuse_port, bool use_ssl,
-      const SslOptions& ssl_options, const int infer_allocation_pool_size,
-      grpc_compression_level compression_level,
-      const KeepAliveOptions& keepalive_options);
+      const Options& server_options);
 
-  std::shared_ptr<TRITONSERVER_Server> server_;
+  std::shared_ptr<TRITONSERVER_Server> tritonserver_;
   TraceManager* trace_manager_;
   std::shared_ptr<SharedMemoryManager> shm_manager_;
   const std::string server_addr_;
-  const bool reuse_port_;
-  const bool use_ssl_;
-  const SslOptions ssl_options_;
 
-  const int infer_allocation_pool_size_;
-  grpc_compression_level compression_level_;
+  ::grpc::ServerBuilder builder_;
 
-  const KeepAliveOptions keepalive_options_;
+  inference::GRPCInferenceService::AsyncService service_;
+  ::grpc::health::v1::Health::AsyncService health_service_;
 
-  std::unique_ptr<grpc::ServerCompletionQueue> common_cq_;
-  std::unique_ptr<grpc::ServerCompletionQueue> model_infer_cq_;
-  std::unique_ptr<grpc::ServerCompletionQueue> model_stream_infer_cq_;
+  std::unique_ptr<::grpc::Server> server_;
 
-  grpc::ServerBuilder grpc_builder_;
-  std::unique_ptr<grpc::Server> grpc_server_;
+  std::unique_ptr<::grpc::ServerCompletionQueue> common_cq_;
+  std::unique_ptr<::grpc::ServerCompletionQueue> model_infer_cq_;
+  std::unique_ptr<::grpc::ServerCompletionQueue> model_stream_infer_cq_;
 
   std::unique_ptr<HandlerBase> common_handler_;
   std::vector<std::unique_ptr<HandlerBase>> model_infer_handlers_;
   std::vector<std::unique_ptr<HandlerBase>> model_stream_infer_handlers_;
 
-  inference::GRPCInferenceService::AsyncService service_;
-  grpc::health::v1::Health::AsyncService health_service_;
-  bool running_;
+  int bound_port_{0};
+  bool running_{false};
 };
 
-}}  // namespace triton::server
+}}}  // namespace triton::server::grpc
