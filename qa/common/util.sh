@@ -149,7 +149,7 @@ function wait_for_model_stable() {
 function gdb_helper () {
   if ! command -v gdb; then
     echo "=== WARNING: gdb not installed"
-    return 1
+    return
   fi
 
   ### Server Hang ###
@@ -201,7 +201,7 @@ function run_server () {
     wait_for_server_ready $SERVER_PID $SERVER_TIMEOUT
     if [ "$WAIT_RET" != "0" ]; then
         # Get further debug information about server startup failure
-        gdb_helper
+        gdb_helper || true
 
         # Cleanup
         kill $SERVER_PID || true
