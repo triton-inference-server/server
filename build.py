@@ -67,9 +67,9 @@ from inspect import getsourcefile
 # incorrectly load the other version of the openvino libraries.
 #
 TRITON_VERSION_MAP = {
-    '2.31.0dev': (
-        '23.02dev',  # triton container
-        '23.01',  # upstream container
+    '2.32.0dev': (
+        '23.03dev',  # triton container
+        '23.02',  # upstream container
         '1.13.1',  # ORT
         '2022.1.0',  # ORT OpenVINO
         '2022.1.0',  # Standalone OpenVINO
@@ -548,6 +548,8 @@ def backend_repo(be):
 
 
 def backend_cmake_args(images, components, be, install_dir, library_paths):
+    cmake_build_type = FLAGS.build_type
+
     if be == 'onnxruntime':
         args = onnxruntime_cmake_args(images, library_paths)
     elif be == 'openvino':
@@ -566,6 +568,8 @@ def backend_cmake_args(images, components, be, install_dir, library_paths):
         args = armnn_tflite_cmake_args()
     elif be == 'fil':
         args = fil_cmake_args(images)
+        # DLIS-4618: FIL backend fails debug build, so override it for now.
+        cmake_build_type = "Release"
     elif be == 'fastertransformer':
         args = fastertransformer_cmake_args()
     elif be == 'tensorrt':
@@ -574,7 +578,7 @@ def backend_cmake_args(images, components, be, install_dir, library_paths):
         args = []
 
     cargs = args + [
-        cmake_backend_arg(be, 'CMAKE_BUILD_TYPE', None, FLAGS.build_type),
+        cmake_backend_arg(be, 'CMAKE_BUILD_TYPE', None, cmake_build_type),
         cmake_backend_arg(be, 'CMAKE_INSTALL_PREFIX', 'PATH', install_dir),
         cmake_backend_arg(be, 'TRITON_COMMON_REPO_TAG', 'STRING',
                           components['common']),
@@ -671,15 +675,15 @@ def onnxruntime_cmake_args(images, library_paths):
         ]
     else:
         if target_platform() == 'windows':
-            if 'ort-base' in images:
+            if 'base' in images:
                 cargs.append(
                     cmake_backend_arg('onnxruntime', 'TRITON_BUILD_CONTAINER',
-                                      None, images['ort-base']))
+                                      None, images['base']))
         else:
-            if 'ort-base' in images:
+            if 'base' in images:
                 cargs.append(
                     cmake_backend_arg('onnxruntime', 'TRITON_BUILD_CONTAINER',
-                                      None, images['ort-base']))
+                                      None, images['base']))
             else:
                 cargs.append(
                     cmake_backend_arg('onnxruntime',
@@ -1081,7 +1085,6 @@ ENV PATH /opt/tritonserver/bin:${PATH}
     if 'onnxruntime' in backends:
         df += '''
 ENV LD_LIBRARY_PATH /opt/tritonserver/backends/onnxruntime:${LD_LIBRARY_PATH}
-ENV LD_LIBRARY_PATH /usr/local/cuda-11.8/lib64:${LD_LIBRARY_PATH}
 '''
 
     backend_dependencies = ""
@@ -1153,10 +1156,6 @@ ENV TCMALLOC_RELEASE_RATE 200
 
     if enable_gpu:
         df += install_dcgm_libraries(argmap['DCGM_VERSION'], target_machine)
-        # This is temporary solution to support 23.01
-        df += '''
-RUN apt-get update && apt-get install -y libcufft-11-8
-'''
         df += '''
 # Extra defensive wiring for CUDA Compat lib
 RUN ln -sf ${_CUDA_COMPAT_PATH}/lib.real ${_CUDA_COMPAT_PATH}/lib \
@@ -2239,12 +2238,9 @@ if __name__ == '__main__':
         fail_if(
             len(parts) != 2,
             '--image must specify <image-name>,<full-image-registry>')
-        # REMOVEME: ONNXRUNTIME 1.13.1 build is failing with cuda 12. Hence, using
-        # cuda 11.8 container as build image for ORT.
         fail_if(
             parts[0] not in [
-                'base', 'gpu-base', 'pytorch', 'tensorflow1', 'tensorflow2',
-                'ort-base'
+                'base', 'gpu-base', 'pytorch', 'tensorflow1', 'tensorflow2'
             ], 'unsupported value for --image')
         log('image "{}": "{}"'.format(parts[0], parts[1]))
         images[parts[0]] = parts[1]
