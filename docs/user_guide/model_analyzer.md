@@ -35,7 +35,9 @@ utilization. The Model Analyzer is specifically useful for characterizing the
 GPU memory requirements for your model under different batching and model
 instance configurations. Once you have this GPU memory usage information you can
 more intelligently decide on how to combine multiple models on the same GPU
-while remaining within the memory capacity of the GPU.
+while remaining within the memory capacity of the GPU. Refer 
+[this guide](https://github.com/triton-inference-server/tutorials/tree/main/Conceptual_Guide/Part_3-optimizing_triton_configuration)
+ for an example.
 
 For more information see the [Model Analyzer
 repository](https://github.com/triton-inference-server/model_analyzer)

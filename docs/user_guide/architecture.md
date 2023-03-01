@@ -657,6 +657,8 @@ procedure that involves multiple models, such as "data preprocessing
 -> inference -> data postprocessing".  Using ensemble models for this
 purpose can avoid the overhead of transferring intermediate tensors
 and minimize the number of requests that must be sent to Triton.
+Want to try out ensembles? Checkout 
+[this guide](https://github.com/triton-inference-server/tutorials/tree/main/Conceptual_Guide/Part_5-Model_Ensembles).
 
 The ensemble scheduler must be used for ensemble models, regardless of
 the scheduler used by the models within the ensemble. With respect to
