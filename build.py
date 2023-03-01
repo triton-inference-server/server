@@ -548,6 +548,8 @@ def backend_repo(be):
 
 
 def backend_cmake_args(images, components, be, install_dir, library_paths):
+    cmake_build_type = FLAGS.build_type
+
     if be == 'onnxruntime':
         args = onnxruntime_cmake_args(images, library_paths)
     elif be == 'openvino':
@@ -566,6 +568,8 @@ def backend_cmake_args(images, components, be, install_dir, library_paths):
         args = armnn_tflite_cmake_args()
     elif be == 'fil':
         args = fil_cmake_args(images)
+        # DLIS-4618: FIL backend fails debug build, so override it for now.
+        cmake_build_type = "Release"
     elif be == 'fastertransformer':
         args = fastertransformer_cmake_args()
     elif be == 'tensorrt':
@@ -574,7 +578,7 @@ def backend_cmake_args(images, components, be, install_dir, library_paths):
         args = []
 
     cargs = args + [
-        cmake_backend_arg(be, 'CMAKE_BUILD_TYPE', None, FLAGS.build_type),
+        cmake_backend_arg(be, 'CMAKE_BUILD_TYPE', None, cmake_build_type),
         cmake_backend_arg(be, 'CMAKE_INSTALL_PREFIX', 'PATH', install_dir),
         cmake_backend_arg(be, 'TRITON_COMMON_REPO_TAG', 'STRING',
                           components['common']),
