@@ -50,13 +50,13 @@ PLUGIN_TEST=trt_plugin_test.py
 if [[ "$(< /proc/sys/kernel/osrelease)" == *microsoft* ]]; then
     DATADIR=${DATADIR:="/mnt/c/data/inferenceserver/${REPO_VERSION}"}
     MODELDIR=${MODELDIR:=C:/models}
-    CUSTOMPLUGIN=${CUSTOMPLUGIN:=clipplugin.dll}
+    CUSTOMPLUGIN=${CUSTOMPLUGIN:=$MODELDIR/clipplugin.dll}
     BACKEND_DIR=${BACKEND_DIR:=C:/tritonserver/backends}
     SERVER=${SERVER:=/mnt/c/tritonserver/bin/tritonserver.exe}
 else
     DATADIR=${DATADIR:="/data/inferenceserver/${REPO_VERSION}"}
     MODELDIR=${MODELDIR:=`pwd`/models}
-    CUSTOMPLUGIN=${CUSTOMPLUGIN:=libclipplugin.so}
+    CUSTOMPLUGIN=${CUSTOMPLUGIN:=$MODELDIR/libclipplugin.so}
     TRITON_DIR=${TRITON_DIR:="/opt/tritonserver"}
     BACKEND_DIR=${TRITON_DIR}/backends
     SERVER=${TRITON_DIR}/bin/tritonserver
@@ -147,7 +147,7 @@ fi
 LOG_IDX=$((LOG_IDX+1))
 
 ## Backend Config, Single Plugin Test
-SERVER_ARGS="${SERVER_ARGS_BASE} --backend-config=tensorrt,plugins=${MODELDIR}/${CUSTOMPLUGIN}"
+SERVER_ARGS="${SERVER_ARGS_BASE} --backend-config=tensorrt,plugins=${CUSTOMPLUGIN}"
 SERVER_LOG="./inference_server_$LOG_IDX.log"
 
 run_server
@@ -179,7 +179,7 @@ kill_server
 LOG_IDX=$((LOG_IDX+1))
 
 ## Backend Config, Multiple Plugins Test
-SERVER_ARGS="${SERVER_ARGS_BASE} --backend-config=tensorrt,plugins=${MODELDIR}/${CUSTOMPLUGIN};${MODELDIR}/${CUSTOMPLUGIN}\""
+SERVER_ARGS="${SERVER_ARGS_BASE} --backend-config=tensorrt,plugins=${CUSTOMPLUGIN}"
 SERVER_LOG="./inference_server_$LOG_IDX.log"
 
 run_server
@@ -213,7 +213,7 @@ LOG_IDX=$((LOG_IDX+1))
 ## LD_PRELOAD, Single Plugin Test
 ## LD_PRELOAD is only on Linux
 
-SERVER_LD_PRELOAD=$MODELDIR/$CUSTOMPLUGIN
+SERVER_LD_PRELOAD=$CUSTOMPLUGIN
 SERVER_ARGS=$SERVER_ARGS_BASE
 SERVER_LOG="./inference_server_$LOG_IDX.log"
 
