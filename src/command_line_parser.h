@@ -251,39 +251,54 @@ struct TritonServerParameters {
 #endif  // TRITON_ENABLE_SAGEMAKER
 
 #ifdef TRITON_ENABLE_VERTEX_AI
-  std::string vertex_ai_address_{"0.0.0.0"};
   bool allow_vertex_ai_{false};
+  std::string vertex_ai_address_{"0.0.0.0"};
   int32_t vertex_ai_port_{8080};
   // The number of threads to initialize for the Vertex AI HTTP front-end.
   int vertex_ai_thread_cnt_{8};
   std::string vertex_ai_default_model_{};
 #endif  // TRITON_ENABLE_VERTEX_AI
 
-  bool CheckPortCollision();
+  // [FIXME] who should call this function?
+  void CheckPortCollision();
   using ManagedTritonServerOptionPtr = std::unique_ptr<
       TRITONSERVER_ServerOptions, decltype(&TRITONSERVER_ServerOptionsDelete)>;
-  // [FIXME] change FAIL_IF_ERR to raise exception and let caller decide.
   ManagedTritonServerOptionPtr BuildTritonServerOptions();
 };
 
-// Fall-through parser, Parse() will convert the recognized options into
+// Exception type to be thrown if the error is parsing related
+class ParseException : public std::exception {
+ public:
+  ParseException() = default;
+  ParseException(const std::string& message) : message_(message) {}
+
+  virtual const char* what() const throw() { return message_.c_str(); }
+
+ private:
+  const std::string message_{""};
+};
+
+// [WIP] Fall-through parser, Parse() will convert the recognized options into
 // parameter object and return the unrecognized options to be another argument
 // list for other parser to consume.
 // This allows the composition of parser chain.
-// [FIXME] abstract interface
-class FallThroughParser {
+// [FIXME] abstract interface, concrete class below should only parse Triton
+// core and endpoint control options (endpoint specific options in their own
+// parser)
+class TritonParser {
  public:
   // Parse command line arguements into a parameters struct and transform
-  // the argument list to contain only unrecognized options.
-  // Raise exception if fail to parse recognized options.
+  // the argument list to contain only unrecognized options. The content of
+  // unrecognized argument list shares the same lifecycle as 'argv'.
+  // Raise ParseException if fail to parse recognized options.
   std::pair<TritonServerParameters, std::vector<char*>> Parse(
       int argc, char** argv);
 
+  // Return usage of all recognized options
+  std::string Usage();
+
  private:
-  std::string FormatMessage(std::string str, int offset) const;
-  virtual void Usage(const std::string& msg = std::string());
-  void ParseCommandLine(int argc, char** argv);
-  void VerifyOptions();
+  std::string FormatUsageMessage(std::string str, int offset);
   static std::vector<Option> recognized_options_;
 };
 }}  // namespace triton::server
