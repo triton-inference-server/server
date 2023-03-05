@@ -56,7 +56,7 @@ class PBBLSMemoryTest(unittest.TestCase):
         return input0_np, infer_response
 
     def test_bls_out_of_memory(self):
-        tensor_size = 1024 * 1024 * 1024
+        tensor_size = 512 * 1024 * 1024
         input0_np, infer_response = self._send_identity_tensor(
             tensor_size, self._is_decoupled)
         out_of_memory_message = "Failed to increase the shared memory pool size for key"

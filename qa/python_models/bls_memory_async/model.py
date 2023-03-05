@@ -50,7 +50,7 @@ async def _send_identity_tensor(size, is_decoupled):
 async def test_bls_out_of_memory():
     is_decoupled = True if os.environ['BLS_KIND'] == "decoupled" else False
 
-    tensor_size = 1024 * 1024 * 1024
+    tensor_size = 512 * 1024 * 1024
     input0_np, infer_response = await _send_identity_tensor(
         tensor_size, is_decoupled)
 
