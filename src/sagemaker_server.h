@@ -159,7 +159,7 @@ class SagemakerAPIServer : public HTTPAPIServer {
   std::unordered_map<std::string, std::string> sagemaker_models_list_;
 
   /* Mutex to handle concurrent updates */
-  std::mutex mutex_;
+  std::mutex models_list_mutex_;
 
   /* Constants */
   const uint32_t UNLOAD_TIMEOUT_SECS_ = 350;
