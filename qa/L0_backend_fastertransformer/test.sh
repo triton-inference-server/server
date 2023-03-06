@@ -42,10 +42,11 @@ rm -f $SERVER_LOG_BASE* $CLIENT_LOG_BASE*
 
 RET=0
 
-mkdir ${MODELDIR}
 # Clone repo
+rm -r fastertransformer_backend* 
 git clone --single-branch --depth=1 -b ${FASTERTRANSFORMER_BRANCH_TAG} ${FASTERTRANSFORMER_BRANCH}
-cp -r fastertransformer_backend/all_models/t5 models/*
+mkdir ${MODELDIR}
+cp -r fastertransformer_backend/all_models/t5/* ${MODELDIR}/.
 SERVER_LOG=$SERVER_LOG_BASE.log
 CLIENT_LOG=$CLIENT_LOG_BASE.log
 
