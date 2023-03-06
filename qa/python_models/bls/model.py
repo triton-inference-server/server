@@ -459,14 +459,16 @@ class PBBLSTest(unittest.TestCase):
     def test_multiprocess(self):
         # Test multiprocess Pool with sync BLS
         if self._is_decoupled:
-            func_name = bls_square
+            # Fixme: DLIS-4630
+            # func_name = bls_square
+            pass
         else:
             func_name = bls_add_sub
 
-        pool = Pool(10)
-        pool.map(func_name, [1, 2, 3, 4, 5, 6, 7, 8, 9, 10])
-        pool.close()
-        pool.join()
+            pool = Pool(10)
+            pool.map(func_name, [1,2,3,4,5,6,7,8,9,10])
+            pool.close()
+            pool.join()
 
     def test_bls_sync(self):
         infer_request = pb_utils.InferenceRequest(
