@@ -466,7 +466,7 @@ class PBBLSTest(unittest.TestCase):
             func_name = bls_add_sub
 
             pool = Pool(10)
-            pool.map(func_name, [1,2,3,4,5,6,7,8,9,10])
+            pool.map(func_name, [1, 2, 3, 4, 5, 6, 7, 8, 9, 10])
             pool.close()
             pool.join()
 
