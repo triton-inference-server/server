@@ -727,7 +727,7 @@ SagemakerAPIServer::SageMakerMMEUnloadModel(
     evhtp_send_reply(req, EVHTP_RES_BADREQ);
 
     LOG_ERROR
-        << "Error when unloading SagMaker Model with dependents for model: "
+        << "Error when unloading SageMaker Model with dependents for model: "
         << model_name << std::endl;
 
     TRITONSERVER_ErrorDelete(unload_err);
