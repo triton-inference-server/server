@@ -83,7 +83,9 @@ For most models, the Triton feature that provides the largest
 performance improvement is [dynamic
 batching](model_configuration.md#dynamic-batcher). If your model does not
 support batching then you can skip ahead to [Model
-Instances](#model-instances).
+Instances](#model-instances). 
+[This example](https://github.com/triton-inference-server/tutorials/tree/main/Conceptual_Guide/Part_2-improving_resource_utilization#dynamic-batching--concurrent-model-execution)
+ sheds more light on conceptual details.
 
 ### Dynamic Batcher
 
@@ -216,7 +218,9 @@ settings that best satisfy your throughput and latency requirements.
 Triton has several optimization settings that apply to only a subset
 of the supported model frameworks. These optimization settings are
 controlled by the model configuration [optimization
-policy](model_configuration.md#optimization-policy).
+policy](model_configuration.md#optimization-policy). Visit 
+[this guide](https://github.com/triton-inference-server/tutorials/tree/main/Conceptual_Guide/Part_4-inference_acceleration)
+ for an end to end discussion.
 
 ### ONNX with TensorRT Optimization (ORT-TRT)
 
