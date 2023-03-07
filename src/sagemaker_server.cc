@@ -642,7 +642,7 @@ SagemakerAPIServer::SageMakerMMECheckUnloadedModelIsUnavailable(
   TRITONSERVER_ServerModelIndex(
       server_.get(), ready_flag, &server_model_index_message);
 
-  std::shared_ptr<TRITONSERVER_Message> managed_msg(
+  std::shared_ptr<TRITONSERVER_Message> shared_ptr_msg(
       server_model_index_message,
       [](TRITONSERVER_Message* msg) { TRITONSERVER_MessageDelete(msg); });
 
