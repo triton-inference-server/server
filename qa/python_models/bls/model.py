@@ -634,6 +634,18 @@ class PBBLSTest(unittest.TestCase):
             infer_responses = self._test_response_iterator_square(
                 1, response_num, infer_responses)
 
+            # case 4. Delete the iterator before all the responses have been
+            # retrieved.
+            infer_responses = infer_request.exec(decoupled=True)
+
+            infer_response = next(infer_responses)
+            self.assertFalse(infer_response.has_error())
+            output0 = pb_utils.get_output_tensor_by_name(infer_response, 'OUT')
+            self.assertIsNotNone(output0)
+            self.assertEqual(4, output0.as_numpy())
+
+            del infer_responses
+
 
 class TritonPythonModel:
 
