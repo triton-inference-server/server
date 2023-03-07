@@ -1184,10 +1184,10 @@ COPY --from=min_container /usr/local/cuda/lib64/stubs/libcublasLt.so /usr/local/
 COPY --from=min_container /usr/local/cuda/lib64/stubs/libcublasLt.so /usr/local/cuda/lib64/stubs/libcublasLt.so.11
 
 RUN mkdir -p /usr/local/cuda/targets/{cuda_arch}-linux/lib
-COPY --from=min_container /usr/local/cuda-12.0/targets/{cuda_arch}-linux/lib/libcudart.so.12 /usr/local/cuda/targets/{cuda_arch}-linux/lib/.
-COPY --from=min_container /usr/local/cuda-12.0/targets/{cuda_arch}-linux/lib/libcupti.so.12 /usr/local/cuda/targets/{cuda_arch}-linux/lib/.
-COPY --from=min_container /usr/local/cuda-12.0/targets/{cuda_arch}-linux/lib/libnvToolsExt.so.1 /usr/local/cuda/targets/{cuda_arch}-linux/lib/.
-COPY --from=min_container /usr/local/cuda-12.0/targets/{cuda_arch}-linux/lib/libnvJitLink.so.12 /usr/local/cuda/targets/{cuda_arch}-linux/lib/.
+COPY --from=min_container /usr/local/cuda-12.1/targets/{cuda_arch}-linux/lib/libcudart.so.12 /usr/local/cuda/targets/{cuda_arch}-linux/lib/.
+COPY --from=min_container /usr/local/cuda-12.1/targets/{cuda_arch}-linux/lib/libcupti.so.12 /usr/local/cuda/targets/{cuda_arch}-linux/lib/.
+COPY --from=min_container /usr/local/cuda-12.1/targets/{cuda_arch}-linux/lib/libnvToolsExt.so.1 /usr/local/cuda/targets/{cuda_arch}-linux/lib/.
+COPY --from=min_container /usr/local/cuda-12.1/targets/{cuda_arch}-linux/lib/libnvJitLink.so.12 /usr/local/cuda/targets/{cuda_arch}-linux/lib/.
 
 COPY --from=min_container /usr/lib/{libs_arch}-linux-gnu/libcudnn.so.8 /usr/lib/{libs_arch}-linux-gnu/libcudnn.so.8
 
