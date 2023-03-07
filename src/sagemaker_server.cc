@@ -635,22 +635,22 @@ SagemakerAPIServer::SageMakerMMECheckUnloadedModelIsUnavailable(
   /* Use the RepositoryIndex API to check if the model state has become
   UNAVAILABLE i.e. model is no longer in the 'in-the-process-of' being
   UNLOADED. Consequently, the reason field should be 'unloaded'.*/
-  TRITONSERVER_Message* server_model_index_message_ = nullptr;
+  TRITONSERVER_Message* server_model_index_message = nullptr;
   uint32_t ready_flag = 0;  // value of 1 should be set if only the 'ready'
                             // models are required from the index. In this case,
                             // we need all models.
   TRITONSERVER_ServerModelIndex(
-      server_.get(), ready_flag, &server_model_index_message_);
+      server_.get(), ready_flag, &server_model_index_message);
 
   std::shared_ptr<TRITONSERVER_Message> managed_msg(
-      server_model_index_message_,
+      server_model_index_message,
       [](TRITONSERVER_Message* msg) { TRITONSERVER_MessageDelete(msg); });
 
   const char* index_buffer;
   size_t index_byte_size;
 
   RETURN_IF_ERR(TRITONSERVER_MessageSerializeToJson(
-      server_model_index_message_, &index_buffer, &index_byte_size));
+      server_model_index_message, &index_buffer, &index_byte_size));
 
   /* Read into json buffer*/
   triton::common::TritonJson::Value server_model_index_json;
@@ -731,6 +731,7 @@ SagemakerAPIServer::SageMakerMMEUnloadModel(
         << model_name << std::endl;
 
     TRITONSERVER_ErrorDelete(unload_err);
+    return;
   }
 
   /*Note: Model status check is repo-specific and therefore must be run before
@@ -771,8 +772,8 @@ SagemakerAPIServer::SageMakerMMEUnloadModel(
     TRITONSERVER_ErrorDelete(unload_err);
   }
 
-  if (is_model_unavailable == false &&
-      unload_time_in_secs >= UNLOAD_TIMEOUT_SECS_) {
+  if ((is_model_unavailable == false) &&
+      (unload_time_in_secs >= UNLOAD_TIMEOUT_SECS_)) {
     LOG_ERROR << "Error: UNLOAD did not complete within expected "
               << UNLOAD_TIMEOUT_SECS_
               << " seconds. This may "
