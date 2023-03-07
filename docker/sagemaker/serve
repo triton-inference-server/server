@@ -26,13 +26,21 @@
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 SAGEMAKER_SINGLE_MODEL_REPO=/opt/ml/model/
-SAGEMAKER_MULTI_MODEL_REPO=/opt/ml/models/
+
+# Note: in Triton on SageMaker, each model url is registered as a separate repository
+# e.g., /opt/ml/models/<hash>/model. Specifying MME model repo path as /opt/ml/models causes Triton
+# to treat it as an additional empty repository and changes 
+# the state of all models to be UNAVAILABLE in the model repository
+# https://github.com/triton-inference-server/core/blob/main/src/model_repository_manager.cc#L914,L922
+# On Triton, this path will be a dummy path as it's mandatory to specify a model repo when starting triton
+SAGEMAKER_MULTI_MODEL_REPO=/tmp/sagemaker
 
 SAGEMAKER_MODEL_REPO=${SAGEMAKER_SINGLE_MODEL_REPO}
 is_mme_mode=false
 
 if [ -n "$SAGEMAKER_MULTI_MODEL" ]; then
     if [ "$SAGEMAKER_MULTI_MODEL" == "true" ]; then
+        mkdir -p ${SAGEMAKER_MULTI_MODEL_REPO}
         SAGEMAKER_MODEL_REPO=${SAGEMAKER_MULTI_MODEL_REPO}
         is_mme_mode=true
         echo "Triton is running in SageMaker MME mode." 
