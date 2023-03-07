@@ -299,6 +299,19 @@ class TritonParser {
 
  private:
   std::string FormatUsageMessage(std::string str, int offset);
+  // Helper functions for parsing options that require multi-value parsing.
+  std::tuple<std::string, std::string, std::string> ParseCacheConfigOption(
+      const std::string& arg);
+  std::tuple<std::string, int, int> ParseRateLimiterResourceOption(
+      const std::string& arg);
+  std::tuple<std::string, std::string, std::string> ParseBackendConfigOption(
+      const std::string& arg);
+  std::tuple<std::string, std::string, std::string> ParseHostPolicyOption(
+      const std::string& arg);
+#ifdef TRITON_ENABLE_TRACING
+  TRITONSERVER_InferenceTraceLevel ParseTraceLevelOption(std::string arg);
+#endif  // TRITON_ENABLE_TRACING
+
   static std::vector<Option> recognized_options_;
 };
 }}  // namespace triton::server
