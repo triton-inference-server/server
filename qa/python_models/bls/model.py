@@ -84,18 +84,19 @@ def bls_square(_=None):
             if infer_response.has_error():
                 return False
 
-            output0 = pb_utils.get_output_tensor_by_name(infer_response, 'OUT')
-            if output0 is None:
-                return False
+            if len(infer_response.output_tensors()) > 0:
+                output0 = pb_utils.get_output_tensor_by_name(infer_response, 'OUT')
+                if output0 is None:
+                    return False
 
-            expected_output = input0.as_numpy()
+                expected_output = input0.as_numpy()
 
-            if not np.all(expected_output == output0.as_numpy()):
-                return False
+                if not np.all(expected_output == output0.as_numpy()):
+                    return False
 
             response_count += 1
 
-    if not np.all(response_count == input0.as_numpy()):
+    if not np.all(input0.as_numpy() == response_count-1):
         return False
 
     return True
@@ -564,9 +565,10 @@ class PBBLSTest(unittest.TestCase):
 
         for infer_response in response_iterator:
             self.assertFalse(infer_response.has_error())
-            output0 = pb_utils.get_output_tensor_by_name(infer_response, 'OUT')
-            self.assertIsNotNone(output0)
-            self.assertEqual(expected_output_value, output0.as_numpy())
+            if len(infer_response.output_tensors()) > 0:
+                output0 = pb_utils.get_output_tensor_by_name(infer_response, 'OUT')
+                self.assertIsNotNone(output0)
+                self.assertEqual(expected_output_value, output0.as_numpy())
 
             response_count += 1
 
@@ -581,9 +583,9 @@ class PBBLSTest(unittest.TestCase):
     def test_response_iterator(self):
         if self._is_decoupled:
             # Test the response iterator for decoupled responses. The request
-            # has 4 decoupled responses.
-            response_num = 4
-            input0_np = np.array([response_num], dtype=np.int32)
+            # has 4 decoupled responses followed by an empty response.
+            response_value = 4
+            input0_np = np.array([response_value], dtype=np.int32)
             input0 = pb_utils.Tensor('IN', input0_np)
             infer_request = pb_utils.InferenceRequest(
                 model_name='square_int32',
@@ -597,18 +599,18 @@ class PBBLSTest(unittest.TestCase):
             self.assertFalse(infer_response.has_error())
             output0 = pb_utils.get_output_tensor_by_name(infer_response, 'OUT')
             self.assertIsNotNone(output0)
-            self.assertEqual(4, output0.as_numpy())
-            # The iterator now should only have 3 remaining responses.
+            self.assertEqual(response_value, output0.as_numpy())
+            # The iterator now should only have 4 remaining responses.
             infer_responses = self._test_response_iterator_square(
-                3, response_num, infer_responses)
+                4, response_value, infer_responses)
 
             # case 2. Call for-loop to get all the responses multiple times.
             infer_responses = self._test_response_iterator_square(
-                4, response_num, infer_responses)
+                5, response_value, infer_responses)
             infer_responses = self._test_response_iterator_square(
-                4, response_num, infer_responses)
+                5, response_value, infer_responses)
             infer_responses = self._test_response_iterator_square(
-                4, response_num, infer_responses)
+                5, response_value, infer_responses)
 
             # case 3. Break from the iteration, then use Next() and for-loop to
             # get the remaining responses.
@@ -618,7 +620,7 @@ class PBBLSTest(unittest.TestCase):
                 output0 = pb_utils.get_output_tensor_by_name(infer_response,
                                                              'OUT')
                 self.assertIsNotNone(output0)
-                self.assertEqual(4, output0.as_numpy())
+                self.assertEqual(response_value, output0.as_numpy())
 
                 response_count += 1
                 if response_count == 2:
@@ -628,11 +630,11 @@ class PBBLSTest(unittest.TestCase):
             self.assertFalse(infer_response.has_error())
             output0 = pb_utils.get_output_tensor_by_name(infer_response, 'OUT')
             self.assertIsNotNone(output0)
-            self.assertEqual(4, output0.as_numpy())
+            self.assertEqual(response_value, output0.as_numpy())
 
-            # The iterator now should only have 1 remaining response.
+            # The iterator now should only have 2 remaining responses.
             infer_responses = self._test_response_iterator_square(
-                1, response_num, infer_responses)
+                2, response_value, infer_responses)
 
             # case 4. Delete the iterator before all the responses have been
             # retrieved.
@@ -642,7 +644,7 @@ class PBBLSTest(unittest.TestCase):
             self.assertFalse(infer_response.has_error())
             output0 = pb_utils.get_output_tensor_by_name(infer_response, 'OUT')
             self.assertIsNotNone(output0)
-            self.assertEqual(4, output0.as_numpy())
+            self.assertEqual(response_value, output0.as_numpy())
 
             del infer_responses
 
