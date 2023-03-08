@@ -63,7 +63,7 @@ if [ "$TEST_VALGRIND" -eq 1 ]; then
     LEAKCHECK_ARGS_BASE="--leak-check=full --show-leak-kinds=definite --max-threads=3000 --num-callers=20"
     SERVER_TIMEOUT=4000
     rm -f $LEAKCHECK_LOG_BASE*
-    BACKENDS="python"
+    BACKENDS="onnx"
 fi
 
 if [ "$TEST_SYSTEM_SHARED_MEMORY" -eq 1 ] || [ "$TEST_CUDA_SHARED_MEMORY" -eq 1 ]; then
