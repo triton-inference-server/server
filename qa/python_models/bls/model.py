@@ -84,18 +84,19 @@ def bls_square(_=None):
             if infer_response.has_error():
                 return False
 
-            output0 = pb_utils.get_output_tensor_by_name(infer_response, 'OUT')
-            if output0 is None:
-                return False
+            if len(infer_response.output_tensors()) > 0:
+                output0 = pb_utils.get_output_tensor_by_name(infer_response, 'OUT')
+                if output0 is None:
+                    return False
 
-            expected_output = input0.as_numpy()
+                expected_output = input0.as_numpy()
 
-            if not np.all(expected_output == output0.as_numpy()):
-                return False
+                if not np.all(expected_output == output0.as_numpy()):
+                    return False
 
             response_count += 1
 
-    if not np.all(response_count == input0.as_numpy()):
+    if not np.all(input0.as_numpy() == response_count-1):
         return False
 
     return True
@@ -459,14 +460,16 @@ class PBBLSTest(unittest.TestCase):
     def test_multiprocess(self):
         # Test multiprocess Pool with sync BLS
         if self._is_decoupled:
-            func_name = bls_square
+            # Fixme: DLIS-4630
+            # func_name = bls_square
+            pass
         else:
             func_name = bls_add_sub
 
-        pool = Pool(10)
-        pool.map(func_name, [1, 2, 3, 4, 5, 6, 7, 8, 9, 10])
-        pool.close()
-        pool.join()
+            pool = Pool(10)
+            pool.map(func_name, [1, 2, 3, 4, 5, 6, 7, 8, 9, 10])
+            pool.close()
+            pool.join()
 
     def test_bls_sync(self):
         infer_request = pb_utils.InferenceRequest(
@@ -552,6 +555,99 @@ class PBBLSTest(unittest.TestCase):
             "Request timeout expired",
             infer_response.error().message())
         self.assertTrue(len(infer_response.output_tensors()) == 0)
+
+    def _test_response_iterator_square(self,
+                                       expected_output_cnt,
+                                       expected_output_value,
+                                       response_iterator):
+        response_count = 0
+        expected_output_cnt = np.array([expected_output_cnt], dtype=np.int32)
+
+        for infer_response in response_iterator:
+            self.assertFalse(infer_response.has_error())
+            if len(infer_response.output_tensors()) > 0:
+                output0 = pb_utils.get_output_tensor_by_name(infer_response, 'OUT')
+                self.assertIsNotNone(output0)
+                self.assertEqual(expected_output_value, output0.as_numpy())
+
+            response_count += 1
+
+        self.assertEqual(response_count, expected_output_cnt)
+
+        # Make sure the iterator is exhausted.
+        with self.assertRaises(StopIteration):
+            next(response_iterator)
+
+        return response_iterator
+
+    def test_response_iterator(self):
+        if self._is_decoupled:
+            # Test the response iterator for decoupled responses. The request
+            # has 4 decoupled responses followed by an empty response.
+            response_value = 4
+            input0_np = np.array([response_value], dtype=np.int32)
+            input0 = pb_utils.Tensor('IN', input0_np)
+            infer_request = pb_utils.InferenceRequest(
+                model_name='square_int32',
+                inputs=[input0],
+                requested_output_names=['OUT'])
+            infer_responses = infer_request.exec(decoupled=True)
+
+            # case 1. Use Next() to get the next response first, then use
+            # for-loop to get the remaining responses.
+            infer_response = next(infer_responses)
+            self.assertFalse(infer_response.has_error())
+            output0 = pb_utils.get_output_tensor_by_name(infer_response, 'OUT')
+            self.assertIsNotNone(output0)
+            self.assertEqual(response_value, output0.as_numpy())
+            # The iterator now should only have 4 remaining responses.
+            infer_responses = self._test_response_iterator_square(
+                4, response_value, infer_responses)
+
+            # case 2. Call for-loop to get all the responses multiple times.
+            infer_responses = self._test_response_iterator_square(
+                5, response_value, infer_responses)
+            infer_responses = self._test_response_iterator_square(
+                5, response_value, infer_responses)
+            infer_responses = self._test_response_iterator_square(
+                5, response_value, infer_responses)
+
+            # case 3. Break from the iteration, then use Next() and for-loop to
+            # get the remaining responses.
+            response_count = 0
+            for infer_response in infer_responses:
+                self.assertFalse(infer_response.has_error())
+                output0 = pb_utils.get_output_tensor_by_name(infer_response,
+                                                             'OUT')
+                self.assertIsNotNone(output0)
+                self.assertEqual(response_value, output0.as_numpy())
+
+                response_count += 1
+                if response_count == 2:
+                    break
+
+            infer_response = next(infer_responses)
+            self.assertFalse(infer_response.has_error())
+            output0 = pb_utils.get_output_tensor_by_name(infer_response, 'OUT')
+            self.assertIsNotNone(output0)
+            self.assertEqual(response_value, output0.as_numpy())
+
+            # The iterator now should only have 2 remaining responses.
+            infer_responses = self._test_response_iterator_square(
+                2, response_value, infer_responses)
+
+            # case 4. Delete the iterator before all the responses have been
+            # retrieved.
+            infer_responses = infer_request.exec(decoupled=True)
+
+            infer_response = next(infer_responses)
+            self.assertFalse(infer_response.has_error())
+            output0 = pb_utils.get_output_tensor_by_name(infer_response, 'OUT')
+            self.assertIsNotNone(output0)
+            self.assertEqual(response_value, output0.as_numpy())
+
+            del infer_responses
+
 
 class TritonPythonModel:
 

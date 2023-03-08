@@ -97,27 +97,29 @@ def verify_square_results(input0, infer_responses):
                   flush=True)
             return False
 
-        output0 = pb_utils.get_output_tensor_by_name(infer_response, 'OUT')
+        
+        if len(infer_response.output_tensors()) > 0:
+            output0 = pb_utils.get_output_tensor_by_name(infer_response, 'OUT')
 
-        if (output0 is None):
-            return False
+            if (output0 is None):
+                return False
 
-        if not output0.is_cpu():
-            output0 = from_dlpack(
-                output0.to_dlpack()).to('cpu').cpu().detach().numpy()
-        else:
-            output0 = output0.as_numpy()
+            if not output0.is_cpu():
+                output0 = from_dlpack(
+                    output0.to_dlpack()).to('cpu').cpu().detach().numpy()
+            else:
+                output0 = output0.as_numpy()
 
-        expected_output = input0
+            expected_output = input0
 
-        if not np.all(expected_output == input0):
-            print(f'For OUT expected {expected_output} found {output0}')
-            return False
+            if not np.all(expected_output == input0):
+                print(f'For OUT expected {expected_output} found {output0}')
+                return False
 
         response_count += 1
 
-    if not np.all(response_count == input0):
-        print('Expected {} responses, got {}'.format(input0, response_count))
+    if not np.all(input0 == response_count-1):
+        print('Expected {} responses, got {}'.format(input0, response_count-1))
         return False
 
     return True
