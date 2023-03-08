@@ -352,6 +352,10 @@ TraceManager::Trace::CaptureTimestamp(
 #endif
     }
   }
+  LOG_TRITONSERVER_ERROR(
+      TRITONSERVER_InferenceTraceSetName(trace_, name.c_str()));
+  LOG_TRITONSERVER_ERROR(
+      TRITONSERVER_InferenenceTraceReportActivity(trace_, timestamp));
 }
 
 void
@@ -738,12 +742,13 @@ TraceManager::TraceActivity(
   }
 
   *ss << "{\"id\":" << id << ",\"timestamps\":[";
-
-  if (activity != TRITONSERVER_TRACE_CUSTOM_ACTIVITY) {
+  if (activity == TRITONSERVER_TRACE_CUSTOM_ACTIVITY) {
+    char* name = "";
+    LOG_TRITONSERVER_ERROR(TRITONSERVER_InferenceTraceName(trace, &name));
+    *ss << "{\"name\":\"" << name;
+  } else {
     *ss << "{\"name\":\""
         << TRITONSERVER_InferenceTraceActivityString(activity);
-  } else {
-    *ss << "{\"name\":\"" << tag;
   }
   *ss << "\",\"ns\":" << timestamp_ns << "}]}";
 }
