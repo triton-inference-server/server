@@ -173,7 +173,7 @@ for TRIAL in non_decoupled decoupled ; do
 done
 
 # Test error handling when BLS is used in "initialize" or "finalize" function
-ERROR_MESSAGE="BLS is only supported during 'execute' function."
+ERROR_MESSAGE="BLS is only supported during the 'execute' function."
 
 rm -fr ./models
 mkdir -p models/bls_init_error/1/
