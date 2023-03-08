@@ -38,10 +38,10 @@ RET=0
 rm -fr *.log python_backend/
 
 # Install torch 
-# Skip torch, torchvision and pillow install on Jetson since it is already installed.
+# Skip torch and torchvision install on Jetson since it is already installed.
 if [ "$TEST_JETSON" == "0" ]; then
     pip3 uninstall -y torch
-    pip3 install torch==1.13.0+cu117 -f https://download.pytorch.org/whl/torch_stable.html torchvision==0.14.0+cu117 pillow
+    pip3 install torch==1.13.0+cu117 -f https://download.pytorch.org/whl/torch_stable.html torchvision==0.14.0+cu117
 fi
 
 # Install `validators` for Model Instance Kind example
