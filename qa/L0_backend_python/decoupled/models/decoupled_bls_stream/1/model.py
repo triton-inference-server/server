@@ -80,34 +80,35 @@ class TritonPythonModel:
 
         response_count = 0
         for infer_response in infer_responses:
-            output0 = pb_utils.get_output_tensor_by_name(
-                infer_response, "OUT")
-            if infer_response.has_error():
-                response = pb_utils.InferenceResponse(
-                    error=infer_response.error().message())
-                response_sender.send(
-                    response,
-                    flags=pb_utils.TRITONSERVER_RESPONSE_COMPLETE_FINAL)
-            elif np.any(in_value != output0.as_numpy()):
-                error_message = (
-                    "BLS Request input and BLS response output do not match."
-                    f" {in_value} != {output0.as_numpy()}")
-                response = pb_utils.InferenceResponse(error=error_message)
-                response_sender.send(
-                    response,
-                    flags=pb_utils.TRITONSERVER_RESPONSE_COMPLETE_FINAL)
-            else:
-                output_tensors = [pb_utils.Tensor('OUT', output0.as_numpy())]
-                response = pb_utils.InferenceResponse(
-                    output_tensors=output_tensors)
-                response_sender.send(response)
+            if len(infer_response.output_tensors()) > 0:
+                output0 = pb_utils.get_output_tensor_by_name(
+                    infer_response, "OUT")
+                if infer_response.has_error():
+                    response = pb_utils.InferenceResponse(
+                        error=infer_response.error().message())
+                    response_sender.send(
+                        response,
+                        flags=pb_utils.TRITONSERVER_RESPONSE_COMPLETE_FINAL)
+                elif np.any(in_value != output0.as_numpy()):
+                    error_message = (
+                        "BLS Request input and BLS response output do not match."
+                        f" {in_value} != {output0.as_numpy()}")
+                    response = pb_utils.InferenceResponse(error=error_message)
+                    response_sender.send(
+                        response,
+                        flags=pb_utils.TRITONSERVER_RESPONSE_COMPLETE_FINAL)
+                else:
+                    output_tensors = [pb_utils.Tensor('OUT', output0.as_numpy())]
+                    response = pb_utils.InferenceResponse(
+                        output_tensors=output_tensors)
+                    response_sender.send(response)
 
             response_count += 1
 
-        if response_count != in_value:
+        if in_value != response_count-1:
             error_message = (
                 "Expected {} responses, got {}".format(
-                    in_value, len(infer_responses)))
+                    in_value, len(infer_responses)-1))
             response = pb_utils.InferenceResponse(
                 error=error_message)
             response_sender.send(
