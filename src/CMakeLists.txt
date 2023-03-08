@@ -93,6 +93,7 @@ find_library(RE2_LIBRARY NAMES re2)
 add_executable(
   main
   classification.cc
+  command_line_parser.cc
   common.cc
   main.cc
   shared_memory_manager.cc
