@@ -219,9 +219,12 @@ class CommonCallData : public Server::ICallData {
       const std::string& name, const uint64_t id,
       const StandardRegisterFunc OnRegister,
       const StandardCallbackFunc OnExecute, const bool async,
-      ::grpc::ServerCompletionQueue* cq)
+      ::grpc::ServerCompletionQueue* cq,
+      const std::string& restricted_protocol_key =
+          "" /* [FIXME] don't provide argument default*/)
       : name_(name), id_(id), OnRegister_(OnRegister), OnExecute_(OnExecute),
-        async_(async), cq_(cq), responder_(&ctx_), step_(Steps::START)
+        async_(async), cq_(cq), responder_(&ctx_), step_(Steps::START),
+        restricted_protocol_key_(restricted_protocol_key)
   {
     OnRegister_(&ctx_, &request_, &responder_, this);
     LOG_VERBOSE(1) << "Ready for RPC '" << name_ << "', " << id_;
@@ -244,6 +247,7 @@ class CommonCallData : public Server::ICallData {
   void Execute();
   void AddToCompletionQueue();
   void WriteResponse();
+  bool ExecutePrecondition();
 
   const std::string name_;
   const uint64_t id_;
@@ -263,6 +267,8 @@ class CommonCallData : public Server::ICallData {
   std::thread async_thread_;
 
   Steps step_;
+
+  std::string restricted_protocol_key_{""};
 };
 
 template <typename ResponderType, typename RequestType, typename ResponseType>
@@ -288,7 +294,8 @@ CommonCallData<ResponderType, RequestType, ResponseType>::Process(bool rpc_ok)
     // Start a new request to replace this one...
     if (!shutdown) {
       new CommonCallData<ResponderType, RequestType, ResponseType>(
-          name_, id_ + 1, OnRegister_, OnExecute_, async_, cq_);
+          name_, id_ + 1, OnRegister_, OnExecute_, async_, cq_,
+          restricted_protocol_key_);
     }
 
     if (!async_) {
@@ -316,7 +323,12 @@ template <typename ResponderType, typename RequestType, typename ResponseType>
 void
 CommonCallData<ResponderType, RequestType, ResponseType>::Execute()
 {
-  OnExecute_(request_, &response_, &status_);
+  if (ExecutePrecondition()) {
+    OnExecute_(request_, &response_, &status_);
+  } else {
+    status_ = ::grpc::Status(
+        ::grpc::StatusCode::UNAVAILABLE, "This protocol is restricted");
+  }
   step_ = Steps::WRITEREADY;
 
   if (async_) {
@@ -325,6 +337,18 @@ CommonCallData<ResponderType, RequestType, ResponseType>::Execute()
     // taken up next for execution.
     AddToCompletionQueue();
   }
+}
+
+template <typename ResponderType, typename RequestType, typename ResponseType>
+bool
+CommonCallData<ResponderType, RequestType, ResponseType>::ExecutePrecondition()
+{
+  if (!restricted_protocol_key_.empty()) {
+    const auto& metadata = ctx_.client_metadata();
+    const auto it = metadata.find(kRestrictedProtocolHeader);
+    return (it != metadata.end()) && (it->second == restricted_protocol_key_);
+  }
+  return true;
 }
 
 template <typename ResponderType, typename RequestType, typename ResponseType>
@@ -2175,7 +2199,7 @@ CommonHandler::RegisterRepositoryModelLoad()
       inference::RepositoryModelLoadRequest,
       inference::RepositoryModelLoadResponse>(
       "RepositoryModelLoad", 0, OnRegisterRepositoryModelLoad,
-      OnExecuteRepositoryModelLoad, true /* async */, cq_);
+      OnExecuteRepositoryModelLoad, true /* async */, cq_, "abc_key");
 }
 
 void
@@ -2242,7 +2266,7 @@ CommonHandler::RegisterRepositoryModelUnload()
       inference::RepositoryModelUnloadRequest,
       inference::RepositoryModelUnloadResponse>(
       "RepositoryModelUnload", 0, OnRegisterRepositoryModelUnload,
-      OnExecuteRepositoryModelUnload, true /* async */, cq_);
+      OnExecuteRepositoryModelUnload, true /* async */, cq_, "abc_key");
 }
 
 //=========================================================================

@@ -1320,7 +1320,6 @@ TritonParser::Parse(int argc, char** argv)
   // others which are not determined until after parsing.
   //
 
-  // [FIXME] check at parsing?
   if (lparams.control_mode_ != TRITONSERVER_MODEL_CONTROL_POLL) {
     lparams.repository_poll_secs_ = 0;
   }
