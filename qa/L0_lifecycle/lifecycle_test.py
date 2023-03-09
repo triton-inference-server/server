@@ -2668,20 +2668,26 @@ class LifeCycleTest(tu.TestResultCollector):
                                                              verbose=True)
         except Exception as ex:
             self.assertTrue(False, "unexpected error {}".format(ex))
-        # Load same model concurrently
+        # Load same named model concurrently
         with concurrent.futures.ThreadPoolExecutor() as pool:
-            thread_1 = pool.submit(triton_client.load_model,
-                                   "identity_zero_1_int32")
+            # First load an 10 seconds delayed identity backend model
+            thread_1 = pool.submit(triton_client.load_model, "identity_model")
             time.sleep(2)  # wait between loads
-            thread_2 = pool.submit(triton_client.load_model,
-                                   "identity_zero_1_int32")
-            # Second load should wait until the first completes
+            # Switch the model file to python backend
+            shutil.rmtree("models/identity_model")
+            shutil.move("identity_model", "models")
+            # Second load should be blocked until the first completes
+            thread_2 = pool.submit(triton_client.load_model, "identity_model")
             # Both loads should succeed
             thread_1.result()
             thread_2.result()
+        # Check the model is ready
         self.assertTrue(triton_client.is_server_live())
         self.assertTrue(triton_client.is_server_ready())
-        self.assertTrue(triton_client.is_model_ready("identity_zero_1_int32"))
+        self.assertTrue(triton_client.is_model_ready("identity_model"))
+        # Check the finally loaded model is the second one
+        model_metadata = triton_client.get_model_metadata("identity_model")
+        self.assertEqual(model_metadata.platform, "python")
 
     def test_concurrent_load_unload(self):
         # Initialize client

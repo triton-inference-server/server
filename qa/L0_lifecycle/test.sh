@@ -1745,9 +1745,17 @@ wait $SERVER_PID
 LOG_IDX=$((LOG_IDX+1))
 
 # LifeCycleTest.test_concurrent_load
-rm -rf models
+rm -rf models identity_model
 mkdir models
-cp -r identity_zero_1_int32 models && mkdir -p models/identity_zero_1_int32/1
+cp -r identity_zero_1_int32 models/identity_model && \
+    mkdir -p models/identity_model/1 && \
+    (cd models/identity_model && \
+        sed -i "s/identity_zero_1_int32/identity_model/" config.pbtxt)
+cp -r ../python_models/identity_fp32 identity_model && \
+    mkdir -p identity_model/1 && \
+    mv identity_model/model.py identity_model/1 && \
+    (cd identity_model && \
+        sed -i "s/identity_fp32/identity_model/" config.pbtxt)
 
 SERVER_ARGS="--model-repository=`pwd`/models --model-control-mode=explicit"
 SERVER_LOG="./inference_server_$LOG_IDX.log"
