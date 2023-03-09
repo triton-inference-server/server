@@ -24,13 +24,13 @@
 # OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 # (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
-FASTERTRANSFORMER_BRANCH_TAG=${FASTERTRANSFORMER_BRANCH_TAG:="main"}
+FASTERTRANSFORMER_BRANCH_TAG=${FASTERTRANSFORMER_BRANCH_TAG:="v1.4"}
 FASTERTRANSFORMER_BRANCH=${FASTERTRANSFORMER_BRANCH:="https://github.com/triton-inference-server/fastertransformer_backend.git"}
 SERVER_TIMEOUT=600
 SERVER_LOG_BASE="./inference_server"
 CLIENT_LOG_BASE="./client"
 
-MODELDIR=${MODELDIR:=`pwd`/models}
+MODELDIR=${MODELDIR:=`pwd`/fastertransformer_backend/all_models/t5/}
 TRITON_DIR=${TRITON_DIR:="/opt/tritonserver"}
 SERVER=${TRITON_DIR}/bin/tritonserver
 BACKEND_DIR=${TRITON_DIR}/backends
@@ -45,15 +45,13 @@ RET=0
 # Clone repo
 rm -r fastertransformer_backend* 
 git clone --single-branch --depth=1 -b ${FASTERTRANSFORMER_BRANCH_TAG} ${FASTERTRANSFORMER_BRANCH}
-mkdir ${MODELDIR}
-cp -r fastertransformer_backend/all_models/t5/* ${MODELDIR}/.
 SERVER_LOG=$SERVER_LOG_BASE.log
 CLIENT_LOG=$CLIENT_LOG_BASE.log
 
 run_server
 
 # in separate container
-python3 tools/issue_request.py tools/requests/sample_request_single_t5.json > $CLIENT_LOG 2>&1
+python3 fastertransformer_backend/tools/issue_request.py fastertransformer_backend/tools/requests/sample_request_single_t5.json > $CLIENT_LOG 2>&1
 if [ $? -ne 0 ]; then
     cat $CLIENT_LOG
     RET=1
