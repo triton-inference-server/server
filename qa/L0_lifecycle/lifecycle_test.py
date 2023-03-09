@@ -2674,8 +2674,8 @@ class LifeCycleTest(tu.TestResultCollector):
             thread_1 = pool.submit(triton_client.load_model, "identity_model")
             time.sleep(2)  # wait between loads
             # Switch the model file to python backend
-            shutil.rmtree("models/identity_model")
-            shutil.move("identity_model", "models")
+            shutil.move("models", "models_v1")
+            shutil.move("models_v2", "models")
             # Second load should be blocked until the first completes
             thread_2 = pool.submit(triton_client.load_model, "identity_model")
             # Both loads should succeed
