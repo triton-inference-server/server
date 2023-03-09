@@ -114,28 +114,31 @@ These options can be used to configure the KeepAlive settings:
 
 For client-side documentation, see [Client-Side GRPC KeepAlive](https://github.com/triton-inference-server/client/blob/main/README.md#grpc-keepalive).
 
-### Limit Endpoint Access
+### Limit Endpoint Access (BETA)
 
 In some use cases, Triton users may want to restrict the access of the protocols on a given endpoint.
-For example, there can be need for two separate GRPC endpoints that one exposes standard inference
+For example, there can be need for two separate protocol groups that one exposes standard inference
 protocols for user access, while the other one exposes other extension protocols for administration
-usage.
+usage and should not be accessible by non-admin user.
 
-The following option can be specified to declare an restricted endpoint:
+The following option can be specified to declare an restricted protocol group:
 
 ```
 --endpoint-config=<name>,<config_key>=<config_value>
 ```
 
 The option can be specified multiple times to associate more configuration to
-the given named endpoint.
+the given named group.
 
 Currently there are three kinds of configuration keys that can be specified:
 
-* `type` : The network protocol to be used, currently available values are `http` for HTTP/REST protocol and `grpc` for GRPC protocol. This configuration is required.
+* `type` : The network protocol to be used, currently available values are
+`http` for HTTP/REST protocol and `grpc` for GRPC protocol. This configuration is required.
 
-* `protocols` : A comma-separated list of protocols to be accepted by
-this endpoint. The following protocols are currently recognized by all network protocol types mentioned above:
+* `protocols` : A comma-separated list of protocols to be included in this
+group. Note that currently a given protocol is not allowed to be included in
+multiple groups. The following protocols are currently recognized by all network
+protocol types mentioned above:
 
   * `health` : Health endpoint defined for [HTTP/REST](https://github.com/kserve/kserve/blob/master/docs/predict-api/v2/required_api.md#health) and [GRPC](https://github.com/kserve/kserve/blob/master/docs/predict-api/v2/required_api.md#health-1). For GRPC endpoint, this value also exposes [GRPC health check protocol](https://github.com/triton-inference-server/common/blob/main/protobuf/health.proto).
   * `metadata` : Server / model metadata endpoints defined for [HTTP/REST](https://github.com/kserve/kserve/blob/master/docs/predict-api/v2/required_api.md#server-metadata) and [GRPC](https://github.com/kserve/kserve/blob/master/docs/predict-api/v2/required_api.md#server-metadata-1).
@@ -147,11 +150,9 @@ this endpoint. The following protocols are currently recognized by all network p
   * `trace` : [trace endpoint](https://github.com/triton-inference-server/server/blob/main/docs/protocol/extension_trace.md).
   * `logging` : [logging endpoint](https://github.com/triton-inference-server/server/blob/main/docs/protocol/extension_logging.md).
 
-
-* Endpoint settings : All [HTTP options](#http-options) and [GRPC
-options](#grpc-options) are valid configuration keys of the corresponding
-endpoint type. The settings specified here will overwrite the global setting in
-the given named endpoint.
+* `restricted-key` : The key to be provided in the request header to access this
+protocol groups. Once specified, the header `<name>-restricted-key` will be
+checked when a request to the protocol is received.
 
 #### Example
 
