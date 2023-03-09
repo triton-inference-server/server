@@ -37,3 +37,4 @@ class Config(dict):
             import boto3
             self['s3'] = boto3.client('s3')  # boto3 handles AWS credentials
             self['s3_bucket'] = self['triton_model_repo'].replace('s3://', '').replace('/', '')
+

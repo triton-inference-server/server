@@ -74,7 +74,8 @@ to exploit the deployment feature of the plugin.
 Once the server has started, the following environment must be set so that the plugin
 can interact with the server properly:
 * `TRITON_URL`: The address to the Triton HTTP endpoint
-* `TRITON_MODEL_REPO`: The path to the Triton model repository. It can be an s3 URI but keep in mind that the env vars AWS_ACCESS_KEY_ID and AWS_SECRET_ACCESS_KEY are needed.
+* `TRITON_MODEL_REPO`: The path to the Triton model repository. It can be an s3 URI but keep in \
+mind that the env vars AWS_ACCESS_KEY_ID and AWS_SECRET_ACCESS_KEY are needed.
 
 ### Publish models to MLflow
 
