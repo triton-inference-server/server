@@ -81,11 +81,12 @@ latency.
 
 For most models, the Triton feature that provides the largest
 performance improvement is [dynamic
-batching](model_configuration.md#dynamic-batcher). If your model does not
+batching](model_configuration.md#dynamic-batcher). 
+[This example](https://github.com/triton-inference-server/tutorials/tree/main/Conceptual_Guide/Part_2-improving_resource_utilization#dynamic-batching--concurrent-model-execution)
+ sheds more light on conceptual details. If your model does not
 support batching then you can skip ahead to [Model
 Instances](#model-instances). 
-[This example](https://github.com/triton-inference-server/tutorials/tree/main/Conceptual_Guide/Part_2-improving_resource_utilization#dynamic-batching--concurrent-model-execution)
- sheds more light on conceptual details.
+
 
 ### Dynamic Batcher
 
