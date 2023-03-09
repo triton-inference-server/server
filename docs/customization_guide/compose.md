@@ -44,8 +44,8 @@ from source to get more exact customization.
 The `compose.py` script can be found in the [server repository](https://github.com/triton-inference-server/server).
 Simply clone the repository and run `compose.py` to create a custom container.
 Note: Created container version will depend on the branch that was cloned.
-For example branch [r23.02](https://github.com/triton-inference-server/server/tree/r23.02)
-should be used to create a image based on the NGC 23.02 Triton release.
+For example branch [r23.03](https://github.com/triton-inference-server/server/tree/r23.03)
+should be used to create a image based on the NGC 23.03 Triton release.
 
 `compose.py` provides `--backend`, `--repoagent` options that allow you to
 specify which backends and repository agents to include in the custom image.
@@ -62,7 +62,7 @@ will provide a container `tritonserver` locally. You can access the container wi
 $ docker run -it tritonserver:latest
 ```
 
-Note: If `compose.py` is run on release versions `r23.02` and earlier,
+Note: If `compose.py` is run on release versions `r23.03` and earlier,
 the resulting container will have DCGM version 2.2.3 installed.
 This may result in different GPU statistic reporting behavior.
 
@@ -76,19 +76,19 @@ For example, running
 ```
 python3 compose.py --backend tensorflow1 --repoagent checksum
 ```
-on branch [r23.02](https://github.com/triton-inference-server/server/tree/r23.02) pulls:
-- `min` container `nvcr.io/nvidia/tritonserver:23.02-py3-min`
-- `full` container `nvcr.io/nvidia/tritonserver:23.02-py3`
+on branch [r23.03](https://github.com/triton-inference-server/server/tree/r23.03) pulls:
+- `min` container `nvcr.io/nvidia/tritonserver:23.03-py3-min`
+- `full` container `nvcr.io/nvidia/tritonserver:23.03-py3`
 
 Alternatively, users can specify the version of Triton container to pull from any branch by either:
 1. Adding flag `--container-version <container version>` to branch
 ```
-python3 compose.py --backend tensorflow1 --repoagent checksum --container-version 23.02
+python3 compose.py --backend tensorflow1 --repoagent checksum --container-version 23.03
 ```
 2. Specifying `--image min,<min container image name> --image full,<full container image name>`.
    The user is responsible for specifying compatible `min` and `full` containers.
 ```
-python3 compose.py --backend tensorflow1 --repoagent checksum --image min,nvcr.io/nvidia/tritonserver:23.02-py3-min --image full,nvcr.io/nvidia/tritonserver:23.02-py3
+python3 compose.py --backend tensorflow1 --repoagent checksum --image min,nvcr.io/nvidia/tritonserver:23.03-py3-min --image full,nvcr.io/nvidia/tritonserver:23.03-py3
 ```
 Method 1 and 2 will result in the same composed container. Furthermore, `--image` flag overrides the `--container-version` flag when both are specified.
 
