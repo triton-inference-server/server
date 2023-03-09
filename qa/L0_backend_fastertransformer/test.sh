@@ -24,34 +24,40 @@
 # OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 # (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
-FASTERTRANSFORMER_BRANCH_TAG=${FASTERTRANSFORMER_BRANCH_TAG:="v1.4"}
+FASTERTRANSFORMER_BRANCH_TAG=${FASTERTRANSFORMER_BRANCH_TAG:="main"}
 FASTERTRANSFORMER_BRANCH=${FASTERTRANSFORMER_BRANCH:="https://github.com/triton-inference-server/fastertransformer_backend.git"}
 SERVER_TIMEOUT=600
 SERVER_LOG_BASE="./inference_server"
 CLIENT_LOG_BASE="./client"
 
-MODELDIR=${MODELDIR:=`pwd`/fastertransformer_backend/all_models/t5/}
+MODEL_DIR=${MODEL_DIR:=`$pwd`/fastertransformer_backend/all_models/t5/}
 TRITON_DIR=${TRITON_DIR:="/opt/tritonserver"}
 SERVER=${TRITON_DIR}/bin/tritonserver
 BACKEND_DIR=${TRITON_DIR}/backends
 SERVER_ARGS_EXTRA="--exit-timeout-secs=${SERVER_TIMEOUT} --backend-directory=${BACKEND_DIR}"
-SERVER_ARGS="--model-repository=${MODELDIR} ${SERVER_ARGS_EXTRA}"
+SERVER_ARGS="--model-repository=${MODEL_DIR} ${SERVER_ARGS_EXTRA}"
 source ../common/util.sh
 
 rm -f $SERVER_LOG_BASE* $CLIENT_LOG_BASE*
 
 RET=0
+# install dependencies
+apt-get update && \
+    apt-get install -y --no-install-recommends python3-pip python3-protobuf 
+python3 -m pip install --upgrade pip && \
+    pip3 install --upgrade numpy
 
 # Clone repo
 rm -r fastertransformer_backend* 
 git clone --single-branch --depth=1 -b ${FASTERTRANSFORMER_BRANCH_TAG} ${FASTERTRANSFORMER_BRANCH}
+cd fastertransformer_backend
 SERVER_LOG=$SERVER_LOG_BASE.log
 CLIENT_LOG=$CLIENT_LOG_BASE.log
 
 run_server
 
 # in separate container
-python3 fastertransformer_backend/tools/issue_request.py fastertransformer_backend/tools/requests/sample_request_single_t5.json > $CLIENT_LOG 2>&1
+python3 tools/issue_request.py tools/requests/sample_request_single_t5.json > $CLIENT_LOG 2>&1
 if [ $? -ne 0 ]; then
     cat $CLIENT_LOG
     RET=1
