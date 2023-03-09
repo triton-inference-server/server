@@ -2633,33 +2633,37 @@ class LifeCycleTest(tu.TestResultCollector):
                                                              verbose=True)
         except Exception as ex:
             self.assertTrue(False, "unexpected error {}".format(ex))
-        # Load both models concurrently
-        model_names = ["identity_zero_1_int32_1", "identity_zero_1_int32_2"]
-        threads = []
-        for model_name in model_names:
-            threads.append(
-                threading.Thread(target=triton_client.load_model,
-                                 args=(model_name,)))
-        start_time = time.time()
-        for thread in threads:
-            thread.start()
-        for thread in threads:
-            thread.join()
-        end_time = time.time()
-        loading_time = end_time - start_time
-        # Each of the two models has a minimum loading delay of 10 seconds
-        # Speedup is observed when the concurrent loading time < 20 seconds but
-        # use a tighter bound of 15 seconds
-        self.assertLess(loading_time, 15.0,
-                        "Concurrent loading speedup not observed")
-        # Concurrent loading time cannot be < 10 seconds
-        self.assertGreaterEqual(loading_time, 10.0,
-                                "Invalid concurrent loading time")
-        # Make sure the models are loaded
-        self.assertTrue(triton_client.is_server_live())
-        self.assertTrue(triton_client.is_server_ready())
-        for model_name in model_names:
-            self.assertTrue(triton_client.is_model_ready(model_name))
+        # Each model should have a loading delay of 10 seconds
+        model_pairs = [["identity_zero_1_int32_1", "identity_zero_1_int32_2"],
+                       ["python_identity_fp32_1", "python_identity_fp32_2"]]
+        # Test each model pair for speed up
+        for model_pair in model_pairs:
+            # Load both models concurrently
+            threads = []
+            for model_name in model_pair:
+                threads.append(
+                    threading.Thread(target=triton_client.load_model,
+                                     args=(model_name,)))
+            start_time = time.time()
+            for thread in threads:
+                thread.start()
+            for thread in threads:
+                thread.join()
+            end_time = time.time()
+            loading_time = end_time - start_time
+            # Each of the two models has a minimum loading delay of 10 seconds
+            # Speedup is observed when the concurrent loading time < 20 seconds
+            # but use a tighter bound of 15 seconds
+            self.assertLess(loading_time, 15.0,
+                            "Concurrent loading speedup not observed")
+            # Concurrent loading time cannot be < 10 seconds
+            self.assertGreaterEqual(loading_time, 10.0,
+                                    "Invalid concurrent loading time")
+            # Make sure the models are loaded
+            self.assertTrue(triton_client.is_server_live())
+            self.assertTrue(triton_client.is_server_ready())
+            for model_name in model_pair:
+                self.assertTrue(triton_client.is_model_ready(model_name))
 
     def test_concurrent_load(self):
         # Initialize client
