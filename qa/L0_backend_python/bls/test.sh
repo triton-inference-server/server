@@ -172,6 +172,53 @@ for TRIAL in non_decoupled decoupled ; do
     wait $SERVER_PID
 done
 
+# Test error handling when BLS is used in "initialize" or "finalize" function
+ERROR_MESSAGE="BLS is only supported during the 'execute' function."
+
+rm -fr ./models
+mkdir -p models/bls_init_error/1/
+cp ../../python_models/bls_init_error/model.py models/bls_init_error/1/
+cp ../../python_models/bls_init_error/config.pbtxt models/bls_init_error
+SERVER_LOG="./bls_init_error_server.log"
+
+run_server
+if [ "$SERVER_PID" != "0" ]; then
+    echo -e "*** FAILED: unexpected success starting $SERVER" >> $CLIENT_LOG
+    RET=1
+    kill $SERVER_PID
+    wait $SERVER_PID
+else
+    if grep "$ERROR_MESSAGE" $SERVER_LOG; then
+        echo -e "Found \"$ERROR_MESSAGE\"" >> $CLIENT_LOG
+    else
+        echo -e "Not found \"$ERROR_MESSAGE\"" >> $CLIENT_LOG
+        RET=1
+    fi
+fi
+
+rm -fr ./models
+mkdir -p models/bls_finalize_error/1/
+cp ../../python_models/bls_finalize_error/model.py models/bls_finalize_error/1/
+cp ../../python_models/bls_finalize_error/config.pbtxt models/bls_finalize_error/
+SERVER_LOG="./bls_finalize_error_server.log"
+
+run_server
+if [ "$SERVER_PID" == "0" ]; then
+    echo -e "\n***\n*** Failed to start $SERVER\n***"
+    cat $SERVER_LOG
+    exit 1
+fi
+
+kill $SERVER_PID
+wait $SERVER_PID
+
+if grep "$ERROR_MESSAGE" $SERVER_LOG; then
+    echo -e "Found \"$ERROR_MESSAGE\"" >> $CLIENT_LOG
+else
+    echo -e "Not found \"$ERROR_MESSAGE\"" >> $CLIENT_LOG
+    RET=1
+fi
+
 if [ $RET -eq 1 ]; then
     cat $CLIENT_LOG
     cat $SERVER_LOG
