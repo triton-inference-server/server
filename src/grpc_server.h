@@ -25,6 +25,8 @@
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #pragma once
 
+#include <vector>
+
 #include <grpc++/grpc++.h>
 #include "grpc_service.grpc.pb.h"
 #include "health.grpc.pb.h"
@@ -63,6 +65,12 @@ struct KeepAliveOptions {
   int http2_max_ping_strikes_{2};
 };
 
+struct ProtocolGroup {
+  std::string name_{""};
+  std::set<std::string> protocols_{};
+  std::string restricted_key_{""};
+};
+
 struct Options {
   SocketOptions socket_;
   SslOptions ssl_;
@@ -73,6 +81,7 @@ struct Options {
   // requests doesn't exceed this value there will be no
   // allocation/deallocation of request/response objects.
   int infer_allocation_pool_size_{8};
+  std::vector<ProtocolGroup> protocol_groups_{};
 };
 
 class Server {

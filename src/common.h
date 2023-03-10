@@ -40,7 +40,8 @@ constexpr char kContentTypeHeader[] = "Content-Type";
 constexpr char kContentLengthHeader[] = "Content-Length";
 // GRPC uses HTTP2 which requires header to be in lowercase, so the Triton
 // specific header that may be set for GRPC is defined to be all lowercases
-constexpr char kRestrictedProtocolHeader[] = "triton-restricted-protocol";
+constexpr char kRestrictedProtocolHeaderTemplate[] =
+    "triton-restricted-protocol-group-";
 
 constexpr int MAX_GRPC_MESSAGE_SIZE = INT32_MAX;
 
