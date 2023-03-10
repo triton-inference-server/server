@@ -155,7 +155,7 @@ StartMetricsService(
     const std::shared_ptr<TRITONSERVER_Server>& server)
 {
   TRITONSERVER_Error* err = triton::server::HTTPMetricsServer::Create(
-      server, g_triton_params.metrics_port_, g_triton_params.http_address_,
+      server, g_triton_params.metrics_port_, g_triton_params.metrics_address_,
       1 /* HTTP thread count */, service);
   if (err == nullptr) {
     err = (*service)->Start();
