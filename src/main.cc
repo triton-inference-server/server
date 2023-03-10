@@ -424,6 +424,7 @@ main(int argc, char** argv)
     g_triton_params = res.first;
   }
   catch (const triton::server::ParseException& pe) {
+    std::cerr << pe.what() << std::endl;
     std::cerr << "Usage: tritonserver [options]" << std::endl;
     std::cerr << tp.Usage() << std::endl;
     exit(1);
