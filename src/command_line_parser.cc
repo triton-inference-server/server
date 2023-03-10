@@ -1307,8 +1307,8 @@ TritonParser::Parse(int argc, char** argv)
   //
 
   // [FIXME] check at parsing?
-  if (lparams.control_mode_ == TRITONSERVER_MODEL_CONTROL_POLL) {
-    lparams.repository_poll_secs_ = std::max(0, lparams.repository_poll_secs_);
+  if (lparams.control_mode_ != TRITONSERVER_MODEL_CONTROL_POLL) {
+    lparams.repository_poll_secs_ = 0;
   }
 
 #ifdef TRITON_ENABLE_VERTEX_AI
@@ -1354,6 +1354,7 @@ TritonParser::Parse(int argc, char** argv)
         "Error: Incompatible flags --response-cache-byte-size and "
         "--cache-config both provided. Please provide one or the other.");
   }
+  lparams.enable_cache_ = (cache_size_present || cache_config_present);
   return {lparams, {}};
 }
 
