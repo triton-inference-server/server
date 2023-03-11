@@ -82,6 +82,11 @@ getopt_long(
 #include <string>
 
 #include "common.h"
+
+#define TRITONJSON_STATUSTYPE TRITONSERVER_Error*
+#define TRITONJSON_STATUSRETURN(M) \
+  return TRITONSERVER_ErrorNew(TRITONSERVER_ERROR_INTERNAL, (M).c_str())
+#define TRITONJSON_STATUSSUCCESS nullptr
 #include "triton/common/triton_json.h"
 
 
