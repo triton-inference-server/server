@@ -35,13 +35,15 @@ import tritonclient.http as httpclient
 import tritonclient.grpc as grpcclient
 import tritonclient.http.aio as asynchttpclient
 import tritonclient.grpc.aio as asyncgrpcclient
+from unittest import IsolatedAsyncioTestCase
 import asyncio
 import json
+import unittest
 
 
-class InferenceParametersTest(tu.TestResultCollector):
+class InferenceParametersTest(IsolatedAsyncioTestCase):
 
-    def setUp(self):
+    async def asyncSetUp(self):
         self.http = httpclient.InferenceServerClient(url='localhost:8000')
         self.async_http = asynchttpclient.InferenceServerClient(
             url='localhost:8000')
@@ -49,34 +51,54 @@ class InferenceParametersTest(tu.TestResultCollector):
         self.async_grpc = asyncgrpcclient.InferenceServerClient(
             url='localhost:8001')
 
-    def send_request_and_verify(self, client, is_async=False):
+    async def send_request_and_verify(self,
+                                      client_type,
+                                      client,
+                                      is_async=False):
         inputs = []
-        inputs.append(client.InferInput('INPUT0', [1], "FP32"))
+        inputs.append(client_type.InferInput('INPUT0', [1], "FP32"))
 
         # Initialize the data
-        inputs[0].set_data_from_numpy(np.asarray([1], dtype=np.float))
-        parameters = {'key1': 'value1', 'key2': 'value2'}
-        if is_async:
-            result = asyncio.run(
-                client.infer(model_name='parameter',
-                             inputs=inputs,
-                             parameters=parameters))
-        else:
-            result = client.infer(model_name='parameter',
-                                  inputs=inputs,
-                                  parameters=parameters)
+        inputs[0].set_data_from_numpy(np.asarray([1], dtype=np.float32))
+        parameter_list = []
+        parameter_list.append({'key1': 'value1', 'key2': 'value2'})
+        parameter_list.append({'key1': 1, 'key2': 2})
+        parameter_list.append({'key1': True, 'key2': 'value2'})
+        for parameters in parameter_list:
+            if is_async:
+                result = await client.infer(model_name='parameter',
+                                            inputs=inputs,
+                                            parameters=parameters)
+            else:
+                result = client.infer(model_name='parameter',
+                                      inputs=inputs,
+                                      parameters=parameters)
 
-        result = result.as_numpy('OUTPUT0')
-        self.assertEqual(json.loads(result[0]) == parameters)
+            result = result.as_numpy('OUTPUT0')
+            self.assertEqual(json.loads(result[0]), parameters)
 
-    def test_grpc_parameter(self):
-        self.send_request_and_verify(self.grpc)
+    async def test_grpc_parameter(self):
+        await self.send_request_and_verify(grpcclient, self.grpc)
 
-    def test_http_parameter(self):
-        self.send_request_and_verify(self.http)
+    async def test_http_parameter(self):
+        await self.send_request_and_verify(httpclient, self.http)
 
-    def test_async_http_parameter(self):
-        self.send_request_and_verify(self.http, is_async=True)
+    async def test_async_http_parameter(self):
+        await self.send_request_and_verify(asynchttpclient,
+                                           self.async_http,
+                                           is_async=True)
 
-    def test_async_grpc_parameter(self):
-        self.send_request_and_verify(self.grpc, is_async=True)
+    async def test_async_grpc_parameter(self):
+        await self.send_request_and_verify(asyncgrpcclient,
+                                           self.async_grpc,
+                                           is_async=True)
+
+    async def asyncTearDown(self):
+        self.http.close()
+        self.grpc.close()
+        await self.async_grpc.close()
+        await self.async_http.close()
+
+
+if __name__ == '__main__':
+    unittest.main()
