@@ -3619,19 +3619,17 @@ SetInferenceRequestMetadata(
           inference_request, infer_param.int64_param()));
     } else {
       const auto& infer_param = param.second;
-      if (infer_param.parameter_choice_case() !=
+      if (infer_param.parameter_choice_case() ==
           inference::InferParameter::ParameterChoiceCase::kInt64Param) {
-        RETURN_IF_ERR(TRITONSERVER_InferenceRequestSetStringParameter(
-            inference_request, param.first.c_str(),
-            infer_param.int64_param().c_str()));
+        RETURN_IF_ERR(TRITONSERVER_InferenceRequestSetIntParameter(
+            inference_request, param.first.c_str(), infer_param.int64_param()));
       } else if (
-          infer_param.parameter_choice_case() !=
+          infer_param.parameter_choice_case() ==
           inference::InferParameter::ParameterChoiceCase::kBoolParam) {
-        RETURN_IF_ERR(TRITONSERVER_InferenceRequestSetStringParameter(
-            inference_request, param.first.c_str(),
-            infer_param.bool_param().c_str()));
+        RETURN_IF_ERR(TRITONSERVER_InferenceRequestSetBoolParameter(
+            inference_request, param.first.c_str(), infer_param.bool_param()));
       } else if (
-          infer_param.parameter_choice_case() !=
+          infer_param.parameter_choice_case() ==
           inference::InferParameter::ParameterChoiceCase::kStringParam) {
         RETURN_IF_ERR(TRITONSERVER_InferenceRequestSetStringParameter(
             inference_request, param.first.c_str(),
@@ -3639,9 +3637,11 @@ SetInferenceRequestMetadata(
       } else {
         return TRITONSERVER_ErrorNew(
             TRITONSERVER_ERROR_INVALID_ARG,
-            "invalid value type for '" + param.first.c_str() +
+            std::string(
+                "invalid value type for '" + param.first +
                 "' parameter, expected "
-                "int64_param, bool_param, or string_param.");
+                "int64_param, bool_param, or string_param.")
+                .c_str());
       }
     }
   }

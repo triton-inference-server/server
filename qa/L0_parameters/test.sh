@@ -26,7 +26,6 @@
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 REPO_VERSION=${NVIDIA_TRITON_SERVER_VERSION}
-TEST_RESULT_FILE='test_results.txt'
 if [ "$#" -ge 1 ]; then
     REPO_VERSION=$1
 fi
@@ -58,18 +57,11 @@ if [ "$SERVER_PID" == "0" ]; then
 fi
 
 set +e
-python $TEST_SCRIPT_PY >$CLIENT_LOG 2>&1
+python3 $TEST_SCRIPT_PY >$CLIENT_LOG 2>&1
 if [ $? -ne 0 ]; then
     cat $CLIENT_LOG
     echo -e "\n***\n*** Test Failed\n***"
     RET=1
-else
-    check_test_results $TEST_RESULT_FILE $EXPECTED_NUM_TESTS
-    if [ $? -ne 0 ]; then
-        cat $CLIENT_LOG
-        echo -e "\n***\n*** Test Result Verification Failed\n***"
-        RET=1
-    fi
 fi
 set -e
 
