@@ -27,10 +27,6 @@
 
 #include "command_line_parser.h"
 
-#include <iomanip>
-#include <iostream>
-#include <string>
-
 #ifdef _WIN32
 int optind = 1;
 const char* optarg = nullptr;
@@ -79,6 +75,20 @@ getopt_long(
   return -1;
 }
 #endif
+
+#include <algorithm>
+#include <iomanip>
+#include <iostream>
+#include <string>
+
+#include "common.h"
+
+#define TRITONJSON_STATUSTYPE TRITONSERVER_Error*
+#define TRITONJSON_STATUSRETURN(M) \
+  return TRITONSERVER_ErrorNew(TRITONSERVER_ERROR_INTERNAL, (M).c_str())
+#define TRITONJSON_STATUSSUCCESS nullptr
+#include "triton/common/triton_json.h"
+
 
 namespace triton { namespace server {
 
@@ -639,7 +649,8 @@ TritonServerParameters::CheckPortCollision()
 #endif  // TRITON_ENABLE_GRPC
 #ifdef TRITON_ENABLE_METRICS
   if (allow_metrics_) {
-    ports.emplace_back("metrics", http_address_, metrics_port_, false, -1, -1);
+    ports.emplace_back(
+        "metrics", metrics_address_, metrics_port_, false, -1, -1);
   }
 #endif  // TRITON_ENABLE_METRICS
 #ifdef TRITON_ENABLE_SAGEMAKER
@@ -1022,6 +1033,9 @@ TritonParser::Parse(int argc, char** argv)
         break;
       case OPTION_HTTP_ADDRESS:
         lparams.http_address_ = optarg;
+#ifdef TRITON_ENABLE_METRICS
+        lparams.metrics_address_ = optarg;
+#endif  // TRITON_ENABLE_METRICS
         break;
       case OPTION_HTTP_THREAD_COUNT:
         lparams.http_thread_cnt_ = ParseOption<int>(optarg);
@@ -1307,8 +1321,8 @@ TritonParser::Parse(int argc, char** argv)
   //
 
   // [FIXME] check at parsing?
-  if (lparams.control_mode_ == TRITONSERVER_MODEL_CONTROL_POLL) {
-    lparams.repository_poll_secs_ = std::max(0, lparams.repository_poll_secs_);
+  if (lparams.control_mode_ != TRITONSERVER_MODEL_CONTROL_POLL) {
+    lparams.repository_poll_secs_ = 0;
   }
 
 #ifdef TRITON_ENABLE_VERTEX_AI
@@ -1354,6 +1368,7 @@ TritonParser::Parse(int argc, char** argv)
         "Error: Incompatible flags --response-cache-byte-size and "
         "--cache-config both provided. Please provide one or the other.");
   }
+  lparams.enable_cache_ = (cache_size_present || cache_config_present);
   return {lparams, {}};
 }
 
