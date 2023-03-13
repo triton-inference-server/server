@@ -125,6 +125,22 @@ class InferenceParametersTest(IsolatedAsyncioTestCase):
             expected_values.append(str(expected_value))
         self.assertEqual(set(values.astype(str).tolist()), set(expected_values))
 
+    async def send_request_and_verify(self,
+                                      client_type,
+                                      client,
+                                      is_async=False):
+        inputs = self.create_inputs(client_type)
+        for parameters in self.parameter_list:
+            if is_async:
+                result = await client.infer(model_name='parameter',
+                                            inputs=inputs,
+                                            parameters=parameters)
+            else:
+                result = client.infer(model_name='parameter',
+                                      inputs=inputs,
+                                      parameters=parameters)
+            self.verify_outputs(result, parameters)
+
     async def test_grpc_parameter(self):
         await self.send_request_and_verify(grpcclient, self.grpc)
 
