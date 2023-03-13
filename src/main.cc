@@ -43,8 +43,6 @@
 #include <cctype>
 #include <iomanip>
 #include <iostream>
-#include <list>
-#include <set>
 #include <sstream>
 #include <thread>
 #include "triton_signal.h"
@@ -157,7 +155,7 @@ StartMetricsService(
     const std::shared_ptr<TRITONSERVER_Server>& server)
 {
   TRITONSERVER_Error* err = triton::server::HTTPMetricsServer::Create(
-      server, g_triton_params.metrics_port_, g_triton_params.http_address_,
+      server, g_triton_params.metrics_port_, g_triton_params.metrics_address_,
       1 /* HTTP thread count */, service);
   if (err == nullptr) {
     err = (*service)->Start();
@@ -424,6 +422,7 @@ main(int argc, char** argv)
     g_triton_params = res.first;
   }
   catch (const triton::server::ParseException& pe) {
+    std::cerr << pe.what() << std::endl;
     std::cerr << "Usage: tritonserver [options]" << std::endl;
     std::cerr << tp.Usage() << std::endl;
     exit(1);
