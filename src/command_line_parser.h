@@ -26,9 +26,16 @@
 //
 #pragma once
 
+#include <list>
+#include <map>
+#include <memory>
+#include <set>
 #include <string>
+#include <thread>
+#include <unordered_map>
 #include <vector>
 
+#include "triton/common/logging.h"
 #include "triton/core/tritonserver.h"
 #if defined(TRITON_ENABLE_HTTP) || defined(TRITON_ENABLE_METRICS)
 #include "http_server.h"
@@ -185,6 +192,11 @@ struct TritonServerParameters {
   // Note that socket address is not part of metrics config,
   // current implementation enforce metric to use the same address as in
   // HTTP endpoint.
+  // [FIXME] server can be built with metrics ON and HTTP OFF, but we are
+  // not exposing metrics address configuration (currently only set along with
+  // HTTP address), which causes metrics will always listen on localhost in this
+  // build setting.
+  std::string metrics_address_{"0.0.0.0"};
   int32_t metrics_port_{8002};
   // Metric settings for Triton core
   float metrics_interval_ms_{2000};
