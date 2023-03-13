@@ -35,10 +35,12 @@ import tritonclient.http as httpclient
 import tritonclient.grpc as grpcclient
 import tritonclient.http.aio as asynchttpclient
 import tritonclient.grpc.aio as asyncgrpcclient
+from tritonclient.utils import InferenceServerException
 from unittest import IsolatedAsyncioTestCase
-import asyncio
 import json
 import unittest
+import queue
+from functools import partial
 
 
 class InferenceParametersTest(IsolatedAsyncioTestCase):
@@ -51,20 +53,34 @@ class InferenceParametersTest(IsolatedAsyncioTestCase):
         self.async_grpc = asyncgrpcclient.InferenceServerClient(
             url='localhost:8001')
 
-    async def send_request_and_verify(self,
-                                      client_type,
-                                      client,
-                                      is_async=False):
+        self.parameter_list = []
+        self.parameter_list.append({'key1': 'value1', 'key2': 'value2'})
+        self.parameter_list.append({'key1': 1, 'key2': 2})
+        self.parameter_list.append({'key1': True, 'key2': 'value2'})
+
+        def callback(user_data, result, error):
+            if error:
+                user_data.put(error)
+            else:
+                user_data.put(result)
+
+        self.grpc_callback = callback
+
+    def create_inputs(self, client_type):
         inputs = []
         inputs.append(client_type.InferInput('INPUT0', [1], "FP32"))
 
         # Initialize the data
         inputs[0].set_data_from_numpy(np.asarray([1], dtype=np.float32))
-        parameter_list = []
-        parameter_list.append({'key1': 'value1', 'key2': 'value2'})
-        parameter_list.append({'key1': 1, 'key2': 2})
-        parameter_list.append({'key1': True, 'key2': 'value2'})
-        for parameters in parameter_list:
+        return inputs
+
+    async def send_request_and_verify(self,
+                                      client_type,
+                                      client,
+                                      is_async=False):
+
+        inputs = self.create_inputs(client_type)
+        for parameters in self.parameter_list:
             if is_async:
                 result = await client.infer(model_name='parameter',
                                             inputs=inputs,
@@ -76,6 +92,26 @@ class InferenceParametersTest(IsolatedAsyncioTestCase):
 
             result = result.as_numpy('OUTPUT0')
             self.assertEqual(json.loads(result[0]), parameters)
+
+    def verify_outputs(self, result, parameters):
+        result = result.as_numpy('OUTPUT0')
+        self.assertEqual(json.loads(result[0]), parameters)
+
+    async def send_request_and_verify(self,
+                                      client_type,
+                                      client,
+                                      is_async=False):
+        inputs = self.create_inputs(client_type)
+        for parameters in self.parameter_list:
+            if is_async:
+                result = await client.infer(model_name='parameter',
+                                            inputs=inputs,
+                                            parameters=parameters)
+            else:
+                result = client.infer(model_name='parameter',
+                                      inputs=inputs,
+                                      parameters=parameters)
+            self.verify_outputs(result, parameters)
 
     async def test_grpc_parameter(self):
         await self.send_request_and_verify(grpcclient, self.grpc)
@@ -92,6 +128,40 @@ class InferenceParametersTest(IsolatedAsyncioTestCase):
         await self.send_request_and_verify(asyncgrpcclient,
                                            self.async_grpc,
                                            is_async=True)
+
+    def test_http_async_parameter(self):
+        inputs = self.create_inputs(httpclient)
+        for parameters in self.parameter_list:
+            result = self.http.async_infer(model_name='parameter',
+                                           inputs=inputs,
+                                           parameters=parameters).get_result()
+            self.verify_outputs(result, parameters)
+
+    def test_grpc_async_parameter(self):
+        user_data = queue.Queue()
+        inputs = self.create_inputs(grpcclient)
+        for parameters in self.parameter_list:
+            self.grpc.async_infer(model_name='parameter',
+                                  inputs=inputs,
+                                  parameters=parameters,
+                                  callback=partial(self.grpc_callback,
+                                                   user_data))
+            result = user_data.get()
+            self.assertFalse(result is InferenceServerException)
+            self.verify_outputs(result, parameters)
+
+    def test_grpc_stream_parameter(self):
+        user_data = queue.Queue()
+        self.grpc.start_stream(callback=partial(self.grpc_callback, user_data))
+        inputs = self.create_inputs(grpcclient)
+        for parameters in self.parameter_list:
+            self.grpc.async_stream_infer(model_name='parameter',
+                                         inputs=inputs,
+                                         parameters=parameters)
+            result = user_data.get()
+            self.assertFalse(result is InferenceServerException)
+            self.verify_outputs(result, parameters)
+        self.grpc.stop_stream()
 
     async def asyncTearDown(self):
         self.http.close()
