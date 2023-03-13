@@ -61,7 +61,7 @@ if [ "$TEST_VALGRIND" -eq 1 ]; then
     LEAKCHECK_LOG_BASE="./valgrind_test"
     LEAKCHECK=/usr/bin/valgrind
     LEAKCHECK_ARGS_BASE="--leak-check=full --show-leak-kinds=definite --max-threads=3000 --num-callers=20"
-    SERVER_TIMEOUT=18000
+    SERVER_TIMEOUT=21600
     rm -f $LEAKCHECK_LOG_BASE*
     BACKENDS="graphdef savedmodel onnx libtorch plan openvino"
 fi
