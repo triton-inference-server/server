@@ -114,7 +114,7 @@ These options can be used to configure the KeepAlive settings:
 
 For client-side documentation, see [Client-Side GRPC KeepAlive](https://github.com/triton-inference-server/client/blob/main/README.md#grpc-keepalive).
 
-### Limit Endpoint Access (BETA)
+#### Limit Endpoint Access (BETA)
 
 In some use cases, Triton users may want to restrict the access of the protocols on a given endpoint.
 For example, there can be need for two separate protocol groups that one exposes standard inference
@@ -124,16 +124,11 @@ usage and should not be accessible by non-admin user.
 The following option can be specified to declare an restricted protocol group:
 
 ```
---endpoint-config=<name>,<config_key>=<config_value>
+--grpc-restricted-protocol=<protocol_1>,<protocol_2>,...:<restricted-header>=<restricted-key>
 ```
 
-The option can be specified multiple times to associate more configuration to
-the given named group.
-
-Currently there are three kinds of configuration keys that can be specified:
-
-* `type` : The network protocol to be used, currently available values are
-`http` for HTTP/REST protocol and `grpc` for GRPC protocol. This configuration is required.
+The option can be specified multiple times to specifies multiple groups of
+protocols with different restriction settings.
 
 * `protocols` : A comma-separated list of protocols to be included in this
 group. Note that currently a given protocol is not allowed to be included in
@@ -150,9 +145,11 @@ protocol types mentioned above:
   * `trace` : [trace endpoint](https://github.com/triton-inference-server/server/blob/main/docs/protocol/extension_trace.md).
   * `logging` : [logging endpoint](https://github.com/triton-inference-server/server/blob/main/docs/protocol/extension_logging.md).
 
-* `restricted-key` : The key to be provided in the request header to access this
-protocol groups. Once specified, the header `<name>-restricted-key` will be
-checked when a request to the protocol is received.
+* `restricted-header` : The GRPC request header to be checked when a request to
+the protocol is received.
+
+* `restricted-key` : The value of the header to be matched in order to preceed
+the process of the specified protocols.
 
 #### Example
 
