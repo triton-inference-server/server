@@ -1,4 +1,4 @@
-# Copyright 2018-2022, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright 2018-2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -51,6 +51,8 @@ BACKENDS = os.environ.get(
     'BACKENDS',
     "graphdef savedmodel onnx libtorch plan python python_dlpack openvino")
 ENSEMBLES = bool(int(os.environ.get('ENSEMBLES', 1)))
+NOBATCH = bool(int(os.environ.get('NOBATCH', 1)))
+BATCH = bool(int(os.environ.get('BATCH', 1)))
 
 np_dtype_string = np.dtype(object)
 
@@ -88,11 +90,36 @@ class InferTest(tu.TestResultCollector):
                                 network_timeout=60.0):
             for bs in (1, batch_size):
                 # model that does not support batching
-                if bs == 1:
+                if NOBATCH:
+                    if bs == 1:
+                        iu.infer_exact(
+                            tester,
+                            pf + "_nobatch",
+                            tensor_shape,
+                            bs,
+                            input_dtype,
+                            output0_dtype,
+                            output1_dtype,
+                            output0_raw=output0_raw,
+                            output1_raw=output1_raw,
+                            model_version=model_version,
+                            swap=swap,
+                            outputs=outputs,
+                            use_http=use_http,
+                            use_grpc=use_grpc,
+                            use_http_json_tensors=use_http_json_tensors,
+                            skip_request_id_check=skip_request_id_check,
+                            use_streaming=use_streaming,
+                            correlation_id=correlation_id,
+                            use_system_shared_memory=TEST_SYSTEM_SHARED_MEMORY,
+                            use_cuda_shared_memory=TEST_CUDA_SHARED_MEMORY,
+                            network_timeout=network_timeout)
+
+                if BATCH:
+                    # model that supports batching.
                     iu.infer_exact(
                         tester,
-                        pf + "_nobatch",
-                        tensor_shape,
+                        pf, (bs,) + tensor_shape,
                         bs,
                         input_dtype,
                         output0_dtype,
@@ -111,29 +138,6 @@ class InferTest(tu.TestResultCollector):
                         use_system_shared_memory=TEST_SYSTEM_SHARED_MEMORY,
                         use_cuda_shared_memory=TEST_CUDA_SHARED_MEMORY,
                         network_timeout=network_timeout)
-
-                # model that supports batching.
-                iu.infer_exact(
-                    tester,
-                    pf, (bs,) + tensor_shape,
-                    bs,
-                    input_dtype,
-                    output0_dtype,
-                    output1_dtype,
-                    output0_raw=output0_raw,
-                    output1_raw=output1_raw,
-                    model_version=model_version,
-                    swap=swap,
-                    outputs=outputs,
-                    use_http=use_http,
-                    use_grpc=use_grpc,
-                    use_http_json_tensors=use_http_json_tensors,
-                    skip_request_id_check=skip_request_id_check,
-                    use_streaming=use_streaming,
-                    correlation_id=correlation_id,
-                    use_system_shared_memory=TEST_SYSTEM_SHARED_MEMORY,
-                    use_cuda_shared_memory=TEST_CUDA_SHARED_MEMORY,
-                    network_timeout=network_timeout)
 
         input_size = 16
 
