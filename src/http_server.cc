@@ -2415,6 +2415,12 @@ HTTPAPIServer::EVBufferToInput(
             "Unable to parse 'binary_data_output'");
         default_output_kind = (bdo) ? AllocPayload::OutputInfo::BINARY
                                     : AllocPayload::OutputInfo::JSON;
+      } else if (parameter.rfind("triton_", 0) == 0) {
+        return TRITONSERVER_ErrorNew(
+            TRITONSERVER_ERROR_INVALID_ARG,
+            ("parameter keys starting with 'triton_' are reserved for Triton "
+             "usage "
+             "and should not be specified."));
       } else {
         std::string string_value;
         int64_t int_value;
