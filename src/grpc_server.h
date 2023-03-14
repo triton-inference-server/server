@@ -68,7 +68,7 @@ struct KeepAliveOptions {
 struct ProtocolGroup {
   std::string name_{""};
   std::set<std::string> protocols_{};
-  std::string restricted_key_{""};
+  std::pair<std::string, std::string> restricted_key_{"", ""};
 };
 
 struct Options {

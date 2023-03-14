@@ -273,6 +273,7 @@ enum TritonOptionId {
   OPTION_GRPC_ARG_HTTP2_MAX_PINGS_WITHOUT_DATA,
   OPTION_GRPC_ARG_HTTP2_MIN_RECV_PING_INTERVAL_WITHOUT_DATA_MS,
   OPTION_GRPC_ARG_HTTP2_MAX_PING_STRIKES,
+  OPTION_GRPC_RESTRICTED_PROTOCOL,
 #endif  // TRITON_ENABLE_GRPC
 #if defined(TRITON_ENABLE_SAGEMAKER)
   OPTION_ALLOW_SAGEMAKER,
@@ -319,8 +320,7 @@ enum TritonOptionId {
   OPTION_BACKEND_CONFIG,
   OPTION_HOST_POLICY,
   OPTION_MODEL_LOAD_GPU_LIMIT,
-  OPTION_MODEL_NAMESPACING,
-  OPTION_ENDPOINT_CONFIG
+  OPTION_MODEL_NAMESPACING
 };
 
 std::vector<Option> TritonParser::recognized_options_
@@ -457,6 +457,13 @@ std::vector<Option> TritonParser::recognized_options_
        "Maximum number of bad pings that the server will tolerate before "
        "sending an HTTP2 GOAWAY frame and closing the transport. Setting it to "
        "0 allows the server to accept any number of bad pings. Default is 2."},
+      {OPTION_GRPC_RESTRICTED_PROTOCOL, "grpc-restricted-protocol",
+       "<string>:<string>=<string>",
+       "Specify restricted GRPC protocol setting. The format of this "
+       "flag is --grpc-restricted-protocol=<protocols>,<key>=<value>. Where "
+       "<protocol> is a comma-separated list of protocols to be restricted. "
+       "<key> will be additional header key to be checked when a GRPC request "
+       "is received, and <value> is the value expected to be matched."},
 #endif  // TRITON_ENABLE_GRPC
 #if defined(TRITON_ENABLE_SAGEMAKER)
       {OPTION_ALLOW_SAGEMAKER, "allow-sagemaker", Option::ArgBool,
@@ -638,17 +645,10 @@ std::vector<Option> TritonParser::recognized_options_
        "on the device is requested and the current memory usage exceeds the "
        "limit, the load will be rejected. If not specified, the limit will "
        "not be set."},
-      {OPTION_MODEL_NAMESPACING, "model-namespacing", Option::ArgBool,
-       "Whether model namespacing is enable or not. If true, models with the "
-       "same name can be served if they are in different namespace."},
   {
-    OPTION_ENDPOINT_CONFIG, "endpoint-config", "<string>,<string>=<string>",
-        "Specify a endpoint-specific configuration setting. The format of this "
-        "flag is --endpoint-config=<config_name>,<setting>=<value>. Where "
-        "<config_name> is the name of the config provided by user. When "
-        "specifying a config, 'type' is a required setting to associate the "
-        "config with an endpoint. Currently recognized value for 'type' is "
-        "'grpc'."
+    OPTION_MODEL_NAMESPACING, "model-namespacing", Option::ArgBool,
+        "Whether model namespacing is enable or not. If true, models with the "
+        "same name can be served if they are in different namespace."
   }
 };
 
@@ -949,11 +949,6 @@ TritonParser::Parse(int argc, char** argv)
 #ifdef TRITON_ENABLE_TRACING
   bool explicit_disable_trace{false};
 #endif  // TRITON_ENABLE_TRACING
-  struct EndpointConfig {
-    std::string type_{""};
-    std::vector<std::pair<std::string, std::string>> config_{};
-  };
-  std::map<std::string, EndpointConfig> endpoint_configs;
 
 #ifdef TRITON_ENABLE_GRPC
   triton::server::grpc::Options& lgrpc_options = lparams.grpc_options_;
@@ -1177,6 +1172,19 @@ TritonParser::Parse(int argc, char** argv)
         lgrpc_options.keep_alive_.http2_max_ping_strikes_ =
             ParseOption<int>(optarg);
         break;
+      case OPTION_GRPC_RESTRICTED_PROTOCOL: {
+        const auto& parsed_tuple = ParseGrpcRestrictedProtocolOption(optarg);
+        const auto& protocols = SplitOptions(std::get<0>(parsed_tuple), ",");
+        const auto& key = std::get<1>(parsed_tuple);
+        const auto& value = std::get<2>(parsed_tuple);
+        grpc::ProtocolGroup pg;
+        for (const auto& p : protocols) {
+          pg.protocols_.emplace(p);
+        }
+        pg.restricted_key_ = std::make_pair(key, value);
+        lgrpc_options.protocol_groups_.emplace_back(pg);
+        break;
+      }
 #endif  // TRITON_ENABLE_GRPC
 
 #ifdef TRITON_ENABLE_METRICS
@@ -1328,27 +1336,6 @@ TritonParser::Parse(int argc, char** argv)
         lparams.backend_config_settings_.push_back(
             ParseBackendConfigOption(optarg));
         break;
-      case OPTION_ENDPOINT_CONFIG: {
-        const auto& parsed_tuple = ParseEndpointConfigOption(optarg);
-        const auto& config_name = std::get<0>(parsed_tuple);
-        const auto& setting = std::get<1>(parsed_tuple);
-        const auto& value = std::get<2>(parsed_tuple);
-        auto& config = endpoint_configs[config_name];
-        if (setting == "type") {
-          if (config.type_.empty()) {
-            config.type_ = value;
-          } else {
-            throw ParseException(
-                std::string(
-                    "'type' is already specified for endpoint config '") +
-                config_name + "'");
-          }
-        } else {
-          config.config_.emplace_back(setting, value);
-        }
-
-        break;
-      }
       case OPTION_HOST_POLICY:
         lparams.host_policies_.push_back(ParseHostPolicyOption(optarg));
         break;
@@ -1392,36 +1379,6 @@ TritonParser::Parse(int argc, char** argv)
   lparams.allow_gpu_metrics_ &= lparams.allow_metrics_;
   lparams.allow_cpu_metrics_ &= lparams.allow_metrics_;
 #endif  // TRITON_ENABLE_METRICS
-
-#ifdef TRITON_ENABLE_GRPC
-  for (const auto& ec : endpoint_configs) {
-    const auto& config_name = ec.first;
-    const auto& config = ec.second;
-    if (config.type_ == "grpc") {
-      grpc::ProtocolGroup pg;
-      pg.name_ = config_name;
-      for (const auto& kv : config.config_) {
-        if (kv.first == "protocols") {
-          const auto& protocols = SplitOptions(kv.second, ",");
-          for (const auto& p : protocols) {
-            pg.protocols_.emplace(p);
-          }
-        } else if (kv.first == "restricted-key") {
-          pg.restricted_key_ = kv.second;
-        } else {
-          throw ParseException(
-              std::string("Unrecognized setting '") + kv.first +
-              "' for --endpoint-config of type 'grpc'.");
-        }
-      }
-      lparams.grpc_options_.protocol_groups_.emplace_back(pg);
-    } else {
-      throw ParseException(
-          std::string("Unrecognized type '") + config.type_ +
-          "' for --endpoint-config.");
-    }
-  }
-#endif  // TRITON_ENABLE_GRPC
 
 #ifdef TRITON_ENABLE_TRACING
   if (explicit_disable_trace) {
@@ -1607,16 +1564,16 @@ TritonParser::ParseBackendConfigOption(const std::string& arg)
 }
 
 std::tuple<std::string, std::string, std::string>
-TritonParser::ParseEndpointConfigOption(const std::string& arg)
+TritonParser::ParseGrpcRestrictedProtocolOption(const std::string& arg)
 {
   try {
-    return ParseGenericConfigOption(arg);
+    return ParseGenericConfigOption(arg, ":", "=");
   }
   catch (const ParseException& pe) {
     // catch and throw exception with option specific message
     std::stringstream ss;
-    ss << "--endpoint-config option format is '<config "
-          "name>,<setting>=<value>'. Got "
+    ss << "--grpc-restricted-protocol option format is '<config "
+          "name>:<setting>=<value>'. Got "
        << arg << std::endl;
     throw ParseException(ss.str());
   }
@@ -1628,7 +1585,7 @@ std::tuple<std::string, std::string, std::string>
 TritonParser::ParseHostPolicyOption(const std::string& arg)
 {
   try {
-    return ParseGenericConfigOption(arg);
+    return ParseGenericConfigOption(arg, ",", "=");
   }
   catch (const ParseException& pe) {
     // catch and throw exception with option specific message
@@ -1643,17 +1600,19 @@ TritonParser::ParseHostPolicyOption(const std::string& arg)
 }
 
 std::tuple<std::string, std::string, std::string>
-TritonParser::ParseGenericConfigOption(const std::string& arg)
+TritonParser::ParseGenericConfigOption(
+    const std::string& arg, const std::string& first_delim,
+    const std::string& second_delim)
 {
   // Format is "<string>,<string>=<string>"
-  int delim_name = arg.find(",");
-  int delim_setting = arg.find("=", delim_name + 1);
+  int delim_name = arg.find(first_delim);
+  int delim_setting = arg.find(second_delim, delim_name + 1);
 
   // Check for 2 semicolons
   if ((delim_name < 0) || (delim_setting < 0)) {
     std::stringstream ss;
-    ss << "option format is '<string>,<string>=<string>'. Got " << arg
-       << std::endl;
+    ss << "option format is '<string>" << first_delim << "<string>"
+       << second_delim << "<string>'. Got " << arg << std::endl;
     throw ParseException(ss.str());
   }
 
@@ -1664,8 +1623,8 @@ TritonParser::ParseGenericConfigOption(const std::string& arg)
 
   if (name_string.empty() || setting_string.empty() || value_string.empty()) {
     std::stringstream ss;
-    ss << "option format is '<string>,<string>=<string>'. Got " << arg
-       << std::endl;
+    ss << "option format is '<string>" << first_delim << "<string>"
+       << second_delim << "<string>'. Got " << arg << std::endl;
     throw ParseException(ss.str());
   }
 
