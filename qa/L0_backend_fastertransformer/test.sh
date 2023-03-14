@@ -27,10 +27,10 @@
 FASTERTRANSFORMER_BRANCH_TAG=${FASTERTRANSFORMER_BRANCH_TAG:="main"}
 FASTERTRANSFORMER_BRANCH=${FASTERTRANSFORMER_BRANCH:="https://github.com/triton-inference-server/fastertransformer_backend.git"}
 SERVER_TIMEOUT=600
-SERVER_LOG_BASE="./inference_server"
-CLIENT_LOG_BASE="./client"
+SERVER_LOG_BASE="$PWD/inference_server"
+CLIENT_LOG_BASE="$PWD/client"
 
-MODEL_DIR=${MODEL_DIR:=`$pwd`/fastertransformer_backend/all_models/t5/}
+MODEL_DIR=${MODEL_DIR:=$PWD/fastertransformer_backend/all_models/t5/}
 TRITON_DIR=${TRITON_DIR:="/opt/tritonserver"}
 SERVER=${TRITON_DIR}/bin/tritonserver
 BACKEND_DIR=${TRITON_DIR}/backends
@@ -48,7 +48,6 @@ python3 -m pip install --upgrade pip && \
     pip3 install --upgrade numpy
 
 # Clone repo
-rm -r fastertransformer_backend* 
 git clone --single-branch --depth=1 -b ${FASTERTRANSFORMER_BRANCH_TAG} ${FASTERTRANSFORMER_BRANCH}
 cd fastertransformer_backend
 SERVER_LOG=$SERVER_LOG_BASE.log
@@ -57,7 +56,7 @@ CLIENT_LOG=$CLIENT_LOG_BASE.log
 run_server
 
 # in separate container
-python3 tools/issue_request.py tools/requests/sample_request_single_t5.json > $CLIENT_LOG 2>&1
+python3 tools/issue_request.py tools/requests/sample_request_single_t5.json >$CLIENT_LOG 2>&1
 if [ $? -ne 0 ]; then
     cat $CLIENT_LOG
     RET=1
