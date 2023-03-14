@@ -1,5 +1,5 @@
 <!--
-# Copyright 2020-2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright (c) 2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -26,27 +26,56 @@
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 -->
 
-# HTTP/REST and GRPC Protocol
+# Parameters Extension
 
-This directory contains documents related to the HTTP/REST and GRPC
-protocols used by Triton. Triton uses the [KServe community standard
-inference
-protocols](https://github.com/kserve/kserve/tree/master/docs/predict-api/v2)
-plus several extensions that are defined in the following documents:
+This document describes Triton's parameters extension. The
+parameters extension allows an inference request to provide
+custom parameters that cannot be provided as inputs. Because this extension is
+supported, Triton reports “parameters” in the extensions field of its
+Server Metadata.
 
-- [Binary tensor data extension](./extension_binary_data.md)
-- [Classification extension](./extension_classification.md)
-- [Model configuration extension](./extension_model_configuration.md)
-- [Model repository extension](./extension_model_repository.md)
-- [Schedule policy extension](./extension_schedule_policy.md)
-- [Sequence extension](./extension_sequence.md)
-- [Shared-memory extension](./extension_shared_memory.md)
-- [Statistics extension](./extension_statistics.md)
-- [Trace extension](./extension_trace.md)
-- [Logging extension](./extension_logging.md)
-- [Parameters extension](./extension_parameters.md)
+The following parameters are reserved for Triton's usage and should not be
+used as custom parameters:
 
-For the GRPC protocol, the [protobuf
-specification](https://github.com/triton-inference-server/common/blob/main/protobuf/grpc_service.proto)
-is also available. In addition, you can find the GRPC health checking protocol protobuf
-specification [here](https://github.com/triton-inference-server/common/blob/main/protobuf/health.proto).
+- sequence_id
+- priority
+- timeout
+- sequence_start
+- sequence_end
+- All the keys that start with "triton_" prefix.
+
+## HTTP/REST
+
+The following example shows how a request can include custom parameters.
+
+```
+POST /v2/models/mymodel/infer HTTP/1.1
+Host: localhost:8000
+Content-Type: application/json
+Content-Length: <xx>
+{
+  "parameters" : { "my_custom_parameter" : 42 }
+  "inputs" : [
+    {
+      "name" : "input0",
+      "shape" : [ 2, 2 ],
+      "datatype" : "UINT32",
+      "data" : [ 1, 2, 3, 4 ]
+    }
+  ],
+  "outputs" : [
+    {
+      "name" : "output0",
+    }
+  ]
+}
+```
+
+## GRPC
+
+The `parameters` field in the
+ModelInferRequest message can be used to send custom parameters.
+
+When using both GRPC and HTTP extensions, you need to make sure to not use
+the reserved parameters list to avoid unexpected behavior. The reserved
+parameters are not accessible in the Triton C-API.

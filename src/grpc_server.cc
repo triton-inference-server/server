@@ -3617,6 +3617,12 @@ SetInferenceRequestMetadata(
       }
       RETURN_IF_ERR(TRITONSERVER_InferenceRequestSetTimeoutMicroseconds(
           inference_request, infer_param.int64_param()));
+    } else if (param.first.rfind("triton_", 0) == 0) {
+      return TRITONSERVER_ErrorNew(
+          TRITONSERVER_ERROR_INVALID_ARG,
+          ("parameter keys starting with 'triton_' are reserved for Triton "
+           "usage "
+           "and should not be specified."));
     } else {
       const auto& infer_param = param.second;
       if (infer_param.parameter_choice_case() ==
