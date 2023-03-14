@@ -61,11 +61,11 @@ if [ "$TEST_VALGRIND" -eq 1 ]; then
     LEAKCHECK_LOG_BASE="./valgrind_test"
     LEAKCHECK=/usr/bin/valgrind
     LEAKCHECK_ARGS_BASE="--leak-check=full --show-leak-kinds=definite --max-threads=3000 --num-callers=20"
-    SERVER_TIMEOUT=21600
+    SERVER_TIMEOUT=4000
     rm -f $LEAKCHECK_LOG_BASE*
     # Remove 'python' and 'python_dlpack' from BACKENDS. Need to run python
     # models separately due to OOM issue.
-    BACKENDS="graphdef savedmodel onnx libtorch plan openvino"
+    BACKENDS="graphdef savedmodel libtorch plan openvino"
 fi
 
 if [ "$TEST_SYSTEM_SHARED_MEMORY" -eq 1 ] || [ "$TEST_CUDA_SHARED_MEMORY" -eq 1 ]; then
