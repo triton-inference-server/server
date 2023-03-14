@@ -372,7 +372,7 @@ if [ "$TEST_VALGRIND" -eq 1 ]; then
       mv ./models/*nobatch_* ./nobatch_models/.
       cp -fr ./models/nop_* ./nobatch_models/.
 
-      for BATCHING in batch nobatch; do
+      for BATCHING_MODE in batch nobatch; do
         if [ "$TRITON_SERVER_CPU_ONLY" == "1" ]; then
           if [ "$TARGET" == "gpu" ]; then
               echo -e "Skip GPU testing on CPU-only device"
@@ -380,10 +380,10 @@ if [ "$TEST_VALGRIND" -eq 1 ]; then
           fi
         fi
 
-        SERVER_LOG=$SERVER_LOG_BASE.${TARGET}.${BACKENDS}.${BATCHING}.log
-        CLIENT_LOG=$CLIENT_LOG_BASE.${TARGET}.${BACKENDS}.${BATCHING}.log
+        SERVER_LOG=$SERVER_LOG_BASE.${TARGET}.${BACKENDS}.${BATCHING_MODE}.log
+        CLIENT_LOG=$CLIENT_LOG_BASE.${TARGET}.${BACKENDS}.${BATCHING_MODE}.log
 
-        if [ "$BATCHING" == "batch" ]; then
+        if [ "$BATCHING_MODE" == "batch" ]; then
           NOBATCH="0"
           export NOBATCH
           BATCH="1"
@@ -398,7 +398,7 @@ if [ "$TEST_VALGRIND" -eq 1 ]; then
         fi
 
         SERVER_ARGS="--model-repository=${MODELDIR} ${SERVER_ARGS_EXTRA}"
-        LEAKCHECK_LOG=$LEAKCHECK_LOG_BASE.${TARGET}.${BACKENDS}.${BATCHING}.log
+        LEAKCHECK_LOG=$LEAKCHECK_LOG_BASE.${TARGET}.${BACKENDS}.${BATCHING_MODE}.log
         LEAKCHECK_ARGS="$LEAKCHECK_ARGS_BASE --log-file=$LEAKCHECK_LOG"
         run_server_leakcheck
 
