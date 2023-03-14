@@ -63,8 +63,8 @@ if [ "$TEST_VALGRIND" -eq 1 ]; then
     LEAKCHECK_ARGS_BASE="--leak-check=full --show-leak-kinds=definite --max-threads=3000 --num-callers=20"
     SERVER_TIMEOUT=4000
     rm -f $LEAKCHECK_LOG_BASE*
-    # Remove 'python' and 'python_dlpack' from BACKENDS. Need to run python
-    # models separately due to OOM issue.
+    # Remove 'python', 'python_dlpack' and 'onnx' from BACKENDS and test them
+    # separately below.
     BACKENDS="graphdef savedmodel libtorch plan openvino"
 fi
 
@@ -342,24 +342,42 @@ for TARGET in cpu gpu; do
     set -e
 done
 
-# Run python models separately in valgrind test due to OOM issue
+# Run 'python', 'python_dlpack' and 'onnx' models separately in valgrind test.
+# Loading python and python_dlpack models has OOM issue when running with
+# valgrind, so loading only batch or nobatch models for each time.
+# Loading all the onnx models at once requires more than 12 hours. Loading them
+# separately to reduce the loading time.
 if [ "$TEST_VALGRIND" -eq 1 ]; then
-  EXPECTED_NUM_TESTS=42
-  PYTHON_BACKENDS="python_dlpack python"
-  for BACKENDS in $PYTHON_BACKENDS; do
+  TESTING_BACKENDS="python python_dlpack onnx"
+  if [ "$TEST_JETSON" == "0" ]; then
+    if [[ "aarch64" != $(uname -m) ]] ; then
+        pip3 install torch==1.13.0+cpu -f https://download.pytorch.org/whl/torch_stable.html
+    else
+        pip3 install torch==1.13.0 -f https://download.pytorch.org/whl/torch_stable.html
+    fi
+  fi
+
+  for BACKENDS in $TESTING_BACKENDS; do
     export BACKENDS
-    for TARGET in cpu; do
+    if [ "$BACKENDS" == "python" ] || [ "$BACKENDS" == "python_dlpack" ]; then
+      EXPECTED_NUM_TESTS=42
+    else
+      EXPECTED_NUM_TESTS=46
+    fi
+
+    for TARGET in cpu gpu; do
       rm -fr *models
       generate_model_repository
       mkdir nobatch_models
       mv ./models/*nobatch_* ./nobatch_models/.
+      cp -fr ./models/nop_* ./nobatch_models/.
 
       for BATCHING in batch nobatch; do
         if [ "$TRITON_SERVER_CPU_ONLY" == "1" ]; then
-            if [ "$TARGET" == "gpu" ]; then
-                echo -e "Skip GPU testing on CPU-only device"
-                continue
-            fi
+          if [ "$TARGET" == "gpu" ]; then
+              echo -e "Skip GPU testing on CPU-only device"
+              continue
+          fi
         fi
 
         SERVER_LOG=$SERVER_LOG_BASE.${TARGET}.${BACKENDS}.${BATCHING}.log
