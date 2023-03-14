@@ -1716,20 +1716,22 @@ LOG_IDX=$((LOG_IDX+1))
 # LifeCycleTest.test_concurrent_load_speedup
 rm -rf models
 mkdir models
-cp -r identity_zero_1_int32 models && mkdir -p models/identity_zero_1_int32/1
-cp -r models/identity_zero_1_int32 models/identity_zero_1_int32_1 && \
-    sed -i "s/identity_zero_1_int32/identity_zero_1_int32_1/" models/identity_zero_1_int32_1/config.pbtxt
-mv models/identity_zero_1_int32 models/identity_zero_1_int32_2 && \
-    sed -i "s/identity_zero_1_int32/identity_zero_1_int32_2/" models/identity_zero_1_int32_2/config.pbtxt
-cp -r ../python_models/identity_fp32 models && (cd models/identity_fp32 && \
+MODEL_NAME="identity_zero_1_int32"
+cp -r ${MODEL_NAME} models && mkdir -p models/${MODEL_NAME}/1
+cp -r models/${MODEL_NAME} models/${MODEL_NAME}_1 && \
+    sed -i "s/${MODEL_NAME}/${MODEL_NAME}_1/" models/${MODEL_NAME}_1/config.pbtxt
+mv models/${MODEL_NAME} models/${MODEL_NAME}_2 && \
+    sed -i "s/${MODEL_NAME}/${MODEL_NAME}_2/" models/${MODEL_NAME}_2/config.pbtxt
+MODEL_NAME="identity_fp32"
+cp -r ../python_models/${MODEL_NAME} models && (cd models/${MODEL_NAME} && \
     mkdir 1 && mv model.py 1 && \
     echo "    def initialize(self, args):" >> 1/model.py && \
     echo "        import time" >> 1/model.py && \
     echo "        time.sleep(10)" >> 1/model.py)
-cp -r models/identity_fp32 models/python_identity_fp32_1 && \
-    sed -i "s/identity_fp32/python_identity_fp32_1/" models/python_identity_fp32_1/config.pbtxt
-mv models/identity_fp32 models/python_identity_fp32_2 && \
-    sed -i "s/identity_fp32/python_identity_fp32_2/" models/python_identity_fp32_2/config.pbtxt
+cp -r models/${MODEL_NAME} models/python_${MODEL_NAME}_1 && \
+    sed -i "s/${MODEL_NAME}/python_${MODEL_NAME}_1/" models/python_${MODEL_NAME}_1/config.pbtxt
+mv models/${MODEL_NAME} models/python_${MODEL_NAME}_2 && \
+    sed -i "s/${MODEL_NAME}/python_${MODEL_NAME}_2/" models/python_${MODEL_NAME}_2/config.pbtxt
 
 SERVER_ARGS="--model-repository=`pwd`/models --model-control-mode=explicit"
 SERVER_LOG="./inference_server_$LOG_IDX.log"
