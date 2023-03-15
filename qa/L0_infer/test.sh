@@ -349,6 +349,7 @@ done
 # separately to reduce the loading time.
 if [ "$TEST_VALGRIND" -eq 1 ]; then
   TESTING_BACKENDS="python python_dlpack onnx"
+  EXPECTED_NUM_TESTS=42
   if [ "$TEST_JETSON" == "0" ]; then
     if [[ "aarch64" != $(uname -m) ]] ; then
         pip3 install torch==1.13.0+cpu -f https://download.pytorch.org/whl/torch_stable.html
@@ -359,12 +360,6 @@ if [ "$TEST_VALGRIND" -eq 1 ]; then
 
   for BACKENDS in $TESTING_BACKENDS; do
     export BACKENDS
-    if [ "$BACKENDS" == "python" ] || [ "$BACKENDS" == "python_dlpack" ]; then
-      EXPECTED_NUM_TESTS=42
-    else
-      EXPECTED_NUM_TESTS=46
-    fi
-
     for TARGET in cpu gpu; do
       rm -fr *models
       generate_model_repository
@@ -418,6 +413,7 @@ if [ "$TEST_VALGRIND" -eq 1 ]; then
             check_test_results $TEST_RESULT_FILE $EXPECTED_NUM_TESTS
             if [ $? -ne 0 ]; then
                 cat $CLIENT_LOG
+                cat $TEST_RESULT_FILE
                 echo -e "\n***\n*** Test Result Verification Failed\n***"
                 RET=1
             fi
