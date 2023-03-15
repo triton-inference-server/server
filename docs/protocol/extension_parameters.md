@@ -32,7 +32,11 @@ This document describes Triton's parameters extension. The
 parameters extension allows an inference request to provide
 custom parameters that cannot be provided as inputs. Because this extension is
 supported, Triton reports “parameters” in the extensions field of its
-Server Metadata.
+Server Metadata. This extension uses the optional "parameters"
+field in the KServe Protocol in
+[HTTP](https://kserve.github.io/website/0.10/modelserving/data_plane/v2_protocol/#inference-request-json-object)
+and
+[GRPC](https://kserve.github.io/website/0.10/modelserving/data_plane/v2_protocol/#parameters).
 
 The following parameters are reserved for Triton's usage and should not be
 used as custom parameters:
@@ -43,6 +47,11 @@ used as custom parameters:
 - sequence_start
 - sequence_end
 - All the keys that start with "triton_" prefix.
+- headers
+
+When using both GRPC and HTTP endpoints, you need to make sure to not use
+the reserved parameters list to avoid unexpected behavior. The reserved
+parameters are not accessible in the Triton C-API.
 
 ## HTTP/REST
 
@@ -76,6 +85,3 @@ Content-Length: <xx>
 The `parameters` field in the
 ModelInferRequest message can be used to send custom parameters.
 
-When using both GRPC and HTTP extensions, you need to make sure to not use
-the reserved parameters list to avoid unexpected behavior. The reserved
-parameters are not accessible in the Triton C-API.
