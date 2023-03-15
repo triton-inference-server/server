@@ -153,12 +153,13 @@ the process of the specified protocols.
 
 #### Example
 
-To start server with the two GRPC endpoints in use case described above, the following command line arguments can be set to start "standard inference" endpoint on port 8002 and "administration" endpoint with health check on port 8003:
+To start server with a subset of protocols to be restricted in use case
+described above, the following command line arguments can be set to accept
+"standard inference" request without additional header and the rest of the
+protocols with `<admin-key>=<admin-value>` specified in header:
 
 ```
-tritonserver \
---endpoint-config=infer,type=grpc --endpoint-config=infer,grpc-port=8002 --endpoint-config=infer,protocols=health,metadata,inference \
---endpoint-config=admin,type=grpc --endpoint-config=admin,grpc-port=8003 --endpoint-config=admin,protocols=health,shared-memory,model-config,model-repository,statistics,trace
+tritonserver --grpc-restricted-protocol=shared-memory,model-config,model-repository,statistics,trace:<admin-key>=<admin-value> ...
 ```
 
 
