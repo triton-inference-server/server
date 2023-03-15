@@ -213,6 +213,7 @@ ParsePairOption(const std::string& arg, const std::string& delim_str)
   return {ParseOption<T1>(first_string), ParseOption<T2>(second_string)};
 }
 
+#ifdef TRITON_ENABLE_GRPC
 std::vector<std::string>
 SplitOptions(std::string options, const std::string& delim_str)
 {
@@ -229,6 +230,7 @@ SplitOptions(std::string options, const std::string& delim_str)
   res.emplace_back(options);
   return res;
 }
+#endif  // TRITON_ENABLE_GRPC
 
 }  // namespace
 
