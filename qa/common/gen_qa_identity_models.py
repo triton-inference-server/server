@@ -183,12 +183,8 @@ def create_tf_modelfile(create_savedmodel, models_dir, model_version, io_cnt,
         model_name = tu.get_zero_model_name(
             "graphdef_nobatch" if max_batch == 0 else "graphdef", io_cnt, dtype)
 
-    model_version_dir = models_dir + "/" + model_name + "/" + str(model_version)
-
-    try:
-        os.makedirs(model_version_dir)
-    except OSError as ex:
-        pass  # ignore existing dir
+    model_version_dir = os.path.join(models_dir, model_name, str(model_version))
+    os.makedirs(model_version_dir, exist_ok=True)
 
     if create_savedmodel:
         with tf.Session() as sess:
@@ -232,7 +228,7 @@ def create_tf_modelconfig(create_savedmodel, models_dir, model_version, io_cnt,
         model_name = tu.get_zero_model_name(
             "graphdef_nobatch" if max_batch == 0 else "graphdef", io_cnt, dtype)
 
-    config_dir = models_dir + "/" + model_name
+    config_dir = os.path.join(models_dir, model_name)
     config = '''
 name: "{}"
 platform: "{}"
@@ -261,10 +257,7 @@ output [
 '''.format(io_num, np_to_model_dtype(dtype), shape_str, io_num,
            np_to_model_dtype(dtype), shape_str)
 
-    try:
-        os.makedirs(config_dir)
-    except OSError as ex:
-        pass  # ignore existing dir
+    os.makedirs(config_dir, exist_ok=True)
 
     with open(config_dir + "/config.pbtxt", "w") as cfile:
         cfile.write(config)
@@ -304,7 +297,7 @@ def create_onnx_modelfile(create_savedmodel, models_dir, model_version, io_cnt,
     # Create the model
     model_name = tu.get_zero_model_name(
         "onnx_nobatch" if max_batch == 0 else "onnx", io_cnt, dtype)
-    model_version_dir = models_dir + "/" + model_name + "/" + str(model_version)
+    model_version_dir = os.path.join(models_dir, model_name, str(model_version))
 
     batch_dim = [] if max_batch == 0 else [None]
 
@@ -338,10 +331,7 @@ def create_onnx_modelfile(create_savedmodel, models_dir, model_version, io_cnt,
     else:
         model_def = onnx.helper.make_model(graph_proto, producer_name="triton")
 
-    try:
-        os.makedirs(model_version_dir)
-    except OSError as ex:
-        pass  # ignore existing dir
+    os.makedirs(model_version_dir, exist_ok=True)
 
     onnx.save(model_def, model_version_dir + "/model.onnx")
 
@@ -355,7 +345,7 @@ def create_onnx_modelconfig(create_savedmodel, models_dir, model_version,
     # Use a different model name for the non-batching variant
     model_name = tu.get_zero_model_name(
         "onnx_nobatch" if max_batch == 0 else "onnx", io_cnt, dtype)
-    config_dir = models_dir + "/" + model_name
+    config_dir = os.path.join(models_dir, model_name)
 
     config = emu.create_general_modelconfig(model_name,
                                             "onnxruntime_onnx",
@@ -370,7 +360,7 @@ def create_onnx_modelconfig(create_savedmodel, models_dir, model_version,
                                             force_tensor_number_suffix=True)
 
     try:
-        os.makedirs(config_dir)
+        os.makedirs(config_dir, exist_ok=True)
     except OSError as ex:
         pass  # ignore existing dir
 
@@ -476,10 +466,10 @@ def create_libtorch_modelfile(create_savedmodel, models_dir, model_version,
     identityModel = IdentityNet()
     traced = torch.jit.script(identityModel)
 
-    model_version_dir = models_dir + "/" + model_name + "/" + str(model_version)
+    model_version_dir = os.path.join(models_dir, model_name, str(model_version))
 
     try:
-        os.makedirs(model_version_dir)
+        os.makedirs(model_version_dir, exist_ok=True)
     except OSError as ex:
         pass  # ignore existing dir
 
@@ -501,7 +491,7 @@ def create_libtorch_modelconfig(create_savedmodel, models_dir, model_version,
         "libtorch_nobatch" if max_batch == 0 else "libtorch", io_cnt, dtype)
     shape_str = tu.shape_to_dims_str(shape)
 
-    config_dir = models_dir + "/" + model_name
+    config_dir = os.path.join(models_dir, model_name)
     config = '''
 name: "{}"
 platform: "pytorch_libtorch"
@@ -529,7 +519,7 @@ output [
            np_to_model_dtype(dtype), shape_str)
 
     try:
-        os.makedirs(config_dir)
+        os.makedirs(config_dir, exist_ok=True)
     except OSError as ex:
         pass  # ignore existing dir
 
@@ -560,10 +550,10 @@ def create_libtorch_linalg_modelfile(create_savedmodel, models_dir,
     identityModel = IdentityNet(ref_pts)
     traced = torch.jit.script(identityModel)
 
-    model_version_dir = models_dir + "/" + model_name + "/" + str(model_version)
+    model_version_dir = os.path.join(models_dir, model_name, str(model_version))
 
     try:
-        os.makedirs(model_version_dir)
+        os.makedirs(model_version_dir, exist_ok=True)
     except OSError as ex:
         pass  # ignore existing dir
 
@@ -583,7 +573,7 @@ def create_libtorch_linalg_modelconfig(create_savedmodel, models_dir,
     shape = [6, 4]
     shape_str = tu.shape_to_dims_str(shape)
 
-    config_dir = models_dir + "/" + model_name
+    config_dir = os.path.join(models_dir, model_name)
     config = '''
 name: "{}"
 platform: "pytorch_libtorch"
@@ -611,7 +601,7 @@ output [
            np_to_model_dtype(dtype), shape_str)
 
     try:
-        os.makedirs(config_dir)
+        os.makedirs(config_dir, exist_ok=True)
     except OSError as ex:
         pass  # ignore existing dir
 
@@ -633,7 +623,7 @@ def create_openvino_modelfile(models_dir, model_version, io_cnt, max_batch,
     # Create the model
     model_name = tu.get_zero_model_name(
         "openvino_nobatch" if max_batch == 0 else "openvino", io_cnt, dtype)
-    model_version_dir = models_dir + "/" + model_name + "/" + str(model_version)
+    model_version_dir = os.path.join(models_dir, model_name, str(model_version))
 
     openvino_inputs = []
     openvino_outputs = []
@@ -649,7 +639,7 @@ def create_openvino_modelfile(models_dir, model_version, io_cnt, max_batch,
     ie_network = IENetwork(ng.impl.Function.to_capsule(function))
 
     try:
-        os.makedirs(model_version_dir)
+        os.makedirs(model_version_dir, exist_ok=True)
     except OSError as ex:
         pass  # ignore existing dir
 
@@ -676,7 +666,7 @@ def create_openvino_modelconfig(models_dir, model_version, io_cnt, max_batch,
         "openvino_nobatch" if max_batch == 0 else "openvino", io_cnt, dtype)
     shape_str = tu.shape_to_dims_str(shape)
 
-    config_dir = models_dir + "/" + model_name
+    config_dir = os.path.join(models_dir, model_name)
     config = '''
 name: "{}"
 backend: "openvino"
@@ -704,7 +694,7 @@ output [
            np_to_model_dtype(dtype), shape_str)
 
     try:
-        os.makedirs(config_dir)
+        os.makedirs(config_dir, exist_ok=True)
     except OSError as ex:
         pass  # ignore existing dir
 
@@ -801,10 +791,10 @@ def create_plan_dynamic_rf_modelfile(models_dir, model_version, io_cnt,
 
     model_name = tu.get_zero_model_name(
         "plan_nobatch" if max_batch == 0 else "plan", io_cnt, dtype)
-    model_version_dir = models_dir + "/" + model_name + "/" + str(model_version)
+    model_version_dir = os.path.join(models_dir, model_name, str(model_version))
 
     try:
-        os.makedirs(model_version_dir)
+        os.makedirs(model_version_dir, exist_ok=True)
     except OSError as ex:
         pass  # ignore existing dir
 
@@ -908,10 +898,10 @@ def create_plan_shape_tensor_modelfile(models_dir, model_version, io_cnt,
 
     model_name = tu.get_zero_model_name(
         "plan_nobatch" if max_batch == 0 else "plan", io_cnt, dtype)
-    model_version_dir = models_dir + "/" + model_name + "/" + str(model_version)
+    model_version_dir = os.path.join(models_dir, model_name, str(model_version))
 
     try:
-        os.makedirs(model_version_dir)
+        os.makedirs(model_version_dir, exist_ok=True)
     except OSError as ex:
         pass  # ignore existing dir
 
@@ -973,10 +963,10 @@ def create_plan_dynamic_modelfile(models_dir, model_version, io_cnt, max_batch,
 
     model_name = tu.get_zero_model_name(
         "plan_nobatch" if max_batch == 0 else "plan", io_cnt, dtype)
-    model_version_dir = models_dir + "/" + model_name + "/" + str(model_version)
+    model_version_dir = os.path.join(models_dir, model_name, str(model_version))
 
     try:
-        os.makedirs(model_version_dir)
+        os.makedirs(model_version_dir, exist_ok=True)
     except OSError as ex:
         pass  # ignore existing dir
 
@@ -993,7 +983,7 @@ def create_plan_modelconfig(create_savedmodel, models_dir, model_version,
 
     model_name = tu.get_zero_model_name(
         "plan_nobatch" if max_batch == 0 else "plan", io_cnt, dtype)
-    config_dir = models_dir + "/" + model_name
+    config_dir = os.path.join(models_dir, model_name)
 
     if FLAGS.tensorrt_shape_io:
         shape_tensor_dim = len(shape)
@@ -1062,7 +1052,7 @@ output [
             np_to_model_dtype(dtype), shape_str)
 
     try:
-        os.makedirs(config_dir)
+        os.makedirs(config_dir, exist_ok=True)
     except OSError as ex:
         pass  # ignore existing dir
 
