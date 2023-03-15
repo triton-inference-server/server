@@ -344,15 +344,14 @@ fi
 
 # Now make sure that when setting specific backend configs
 # default ones are not lost.
-# Current logic for backend config resolution sorts default configs
-# and specific configs lexicographically. Then it iterates through them
-# and prioritizes backend specific config over the default one.
-# We would like to make sure that in the following situation
-# (example)
-#           specific_config = {"a":4}
-#           default_config = {"b":5,"c":6,"d":7}
-# "c" and "d" are not lost. 
-SERVER_ARGS="--backend-config=onnxruntime,a=0 $COMMON_ARGS"
+# Current logic for backend config resolution reads default configs first,
+# then specific configs and overrides defaults if needed. 
+# We would like to make sure that none of configs are lost and 
+# defaults are properly overriden.
+# One of defaultconfigs is `min-compute-capability`. This test
+# checks if it is properlly overriden.
+MIN_COMPUTE_CAPABILITY="XX"
+SERVER_ARGS="--backend-config=onnxruntime,min-compute-capability=$MIN_COMPUTE_CAPABILITY $COMMON_ARGS"
 SERVER_LOG=$SERVER_LOG_BASE.global_configs.log
 run_server
 
@@ -363,10 +362,10 @@ if [ "$SERVER_PID" == "0" ]; then
 else
     # Count number of default configs
     BACKEND_CONFIG_MAP=$(grep -a "backend configuration:" $SERVER_LOG -A 1  | grep -v "backend configuration")
-    TOTAL_CONFIG_COUNT=$(echo $BACKEND_CONFIG_MAP | jq -r | jq '.["cmdline"]' | jq 'length')
+    CONFIG_VALUE=$(echo $BACKEND_CONFIG_MAP | jq -r | jq '.["cmdline"]' | jq '.["min-compute-capability"]')
 
-    if [ $TOTAL_CONFIG_COUNT -le $DEFAULT_CONFIG_COUNT ]; then
-        echo "*** FAILED: Expected number of backend configs to be greater than $DEFAULT_CONFIG_COUNT but found: $TOTAL_CONFIG_COUNT\n"
+    if [ $CONFIG_VALUE != $MIN_COMPUTE_CAPABILITY ]; then
+        echo "*** FAILED: Expected min-compute-capability config to be $MIN_COMPUTE_CAPABILITY but found: $CONFIG_VALUE\n"
         RET=1
     fi
 
@@ -374,14 +373,8 @@ else
     wait $SERVER_PID
 
 fi
-# Now make sure that when setting specific backend configs
-# noone is lost.
-# We would like to make sure that in the following situation
-# (example)
-#           specific_config = {"x":4, "y":5, "z":9}
-#           default_config = {"b":5,"c":6,"d":7}
-# "y" and "z" are not lost. 
-SERVER_ARGS="--backend-config=onnxruntime,x=0 \
+# Now make sure that specific backend configs are not lost.
+SERVER_ARGS="--backend-config=onnxruntime,a=0 \
              --backend-config=onnxruntime,y=0 \
              --backend-config=onnxruntime,z=0 $COMMON_ARGS"
 SERVER_LOG=$SERVER_LOG_BASE.specific_configs.log
