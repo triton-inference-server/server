@@ -307,6 +307,106 @@ else
 
 fi
 
+#
+# General backend tests
+# 
+
+# We want to make sure that backend configurations 
+# are not lost. For this purpose we are using only onnx backend
+
+rm -rf ./models/
+mkdir -p ./models/no_config/
+cp -r /data/inferenceserver/${REPO_VERSION}/qa_model_repository/onnx_float32_float32_float32/1 ./models/no_config/
+
+# First getting a baseline for the number of default configs 
+# added during a server set up 
+SERVER_ARGS="$COMMON_ARGS"
+SERVER_LOG=$SERVER_LOG_BASE.default_configs.log
+run_server
+
+if [ "$SERVER_PID" == "0" ]; then
+    echo -e "*** FAILED: Server failed to start $SERVER\n"
+    RET=1
+
+else
+    # Count number of default configs
+    BACKEND_CONFIG_MAP=$(grep -a "backend configuration:" $SERVER_LOG -A 1  | grep -v "backend configuration")
+    DEFAULT_CONFIG_COUNT=$(echo $BACKEND_CONFIG_MAP | jq -r | jq '.["cmdline"]' | jq 'length')
+    if [ $DEFAULT_CONFIG_COUNT -lt 4 ]; then
+        echo "*** FAILED: Expected number of default configs to be at least 4 but found: $DEFAULT_CONFIG_COUNT\n"
+        RET=1
+    fi
+
+    kill $SERVER_PID
+    wait $SERVER_PID
+
+fi
+
+# Now make sure that when setting specific backend configs
+# default ones are not lost.
+# Current logic for backend config resolution sorts default configs
+# and specific configs lexicographically. Then it iterates through them
+# and prioritises backend specific config over the default one.
+# We would like to make sure that in the following situation
+# (example)
+#           specific_config = {"a":4}
+#           default_config = {"b":5,"c":6,"d":7}
+# "c" and "d" are not lost. 
+SERVER_ARGS="--backend-config=onnxruntime,a=0 $COMMON_ARGS"
+SERVER_LOG=$SERVER_LOG_BASE.global_configs.log
+run_server
+
+if [ "$SERVER_PID" == "0" ]; then
+    echo -e "*** FAILED: Server failed to start $SERVER\n"
+    RET=1
+
+else
+    # Count number of default configs
+    BACKEND_CONFIG_MAP=$(grep -a "backend configuration:" $SERVER_LOG -A 1  | grep -v "backend configuration")
+    TOTAL_CONFIG_COUNT=$(echo $BACKEND_CONFIG_MAP | jq -r | jq '.["cmdline"]' | jq 'length')
+
+    if [ $TOTAL_CONFIG_COUNT -le $DEFAULT_CONFIG_COUNT ]; then
+        echo "*** FAILED: Expected number of backend configs to be greater than $DEFAULT_CONFIG_COUNT but found: $TOTAL_CONFIG_COUNT\n"
+        RET=1
+    fi
+
+    kill $SERVER_PID
+    wait $SERVER_PID
+
+fi
+# Now make sure that when setting specific backend configs
+# noone is lost.
+# We would like to make sure that in the following situation
+# (example)
+#           specific_config = {"x":4, "y":5, "z":9}
+#           default_config = {"b":5,"c":6,"d":7}
+# "y" and "z" are not lost. 
+SERVER_ARGS="--backend-config=onnxruntime,x=0 \
+             --backend-config=onnxruntime,y=0 \
+             --backend-config=onnxruntime,z=0 $COMMON_ARGS"
+SERVER_LOG=$SERVER_LOG_BASE.specific_configs.log
+EXPECTED_CONFIG_COUNT=$(($DEFAULT_CONFIG_COUNT+3))
+run_server
+
+if [ "$SERVER_PID" == "0" ]; then
+    echo -e "*** FAILED: Server failed to start $SERVER\n"
+    RET=1
+
+else
+    # Count number of default configs
+    BACKEND_CONFIG_MAP=$(grep -a "backend configuration:" $SERVER_LOG -A 1  | grep -v "backend configuration")
+    TOTAL_CONFIG_COUNT=$(echo $BACKEND_CONFIG_MAP | jq -r | jq '.["cmdline"]' | jq 'length')
+
+    if [ $TOTAL_CONFIG_COUNT -ne $EXPECTED_CONFIG_COUNT ]; then
+        echo "*** FAILED: Expected number of backend configs to be $EXPECTED_CONFIG_COUNT but found: $TOTAL_CONFIG_COUNT\n"
+        RET=1
+    fi
+
+    kill $SERVER_PID
+    wait $SERVER_PID
+
+fi
+
 
 # Print test outcome
 if [ $RET -eq 0 ]; then
