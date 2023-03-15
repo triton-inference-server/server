@@ -537,6 +537,88 @@ output [
         cfile.write(config)
 
 
+def create_libtorch_linalg_modelfile(create_savedmodel, models_dir,
+                                     model_version):
+
+    model_name = "libtorch_float32_linalg"
+
+    # To test the linalg library, this script uses two inverse matrix operations
+    # to return the original input.
+    class IdentityNet(nn.Module):
+
+        def __init__(self, ref_pts):
+            super(IdentityNet, self).__init__()
+            ref_pts = torch.as_tensor(ref_pts)
+            self.register_buffer("ref_pts", ref_pts)
+
+        def forward(self, src: torch.Tensor):
+            X = torch.linalg.tensorsolve(self.ref_pts, src)
+            Y = torch.tensordot(self.ref_pts, X, dims=X.ndim)
+            return Y
+
+    ref_pts = torch.eye(2 * 3 * 4).reshape(2 * 3, 4, 2, 3, 4)
+    identityModel = IdentityNet(ref_pts)
+    traced = torch.jit.script(identityModel)
+
+    model_version_dir = models_dir + "/" + model_name + "/" + str(model_version)
+
+    try:
+        os.makedirs(model_version_dir)
+    except OSError as ex:
+        pass  # ignore existing dir
+
+    traced.save(model_version_dir + "/model.pt")
+
+
+def create_libtorch_linalg_modelconfig(create_savedmodel, models_dir,
+                                       model_version):
+
+    # Unpack version policy
+    version_policy_str = "{ latest { num_versions: 1 }}"
+
+    model_name = "libtorch_float32_linalg"
+    dtype = np.float32
+    io_cnt = 1
+    max_batch = 0
+    shape = [6, 4]
+    shape_str = tu.shape_to_dims_str(shape)
+
+    config_dir = models_dir + "/" + model_name
+    config = '''
+name: "{}"
+platform: "pytorch_libtorch"
+max_batch_size: {}
+version_policy: {}
+'''.format(model_name, max_batch, version_policy_str)
+
+    for io_num in range(io_cnt):
+        config += '''
+input [
+  {{
+    name: "INPUT__{}"
+    data_type: {}
+    dims: [ {} ]
+  }}
+]
+output [
+  {{
+    name: "OUTPUT__{}"
+    data_type: {}
+    dims: [ {} ]
+  }}
+]
+'''.format(io_num, np_to_model_dtype(dtype), shape_str, io_num,
+           np_to_model_dtype(dtype), shape_str)
+
+    try:
+        os.makedirs(config_dir)
+    except OSError as ex:
+        pass  # ignore existing dir
+
+    with open(config_dir + "/config.pbtxt", "w") as cfile:
+        cfile.write(config)
+
+
 def create_openvino_modelfile(models_dir, model_version, io_cnt, max_batch,
                               dtype, shape):
 
@@ -1184,3 +1266,10 @@ if __name__ == '__main__':
         create_models(FLAGS.models_dir, np.float16, [-1, -1], io_cnt=3)
         create_models(FLAGS.models_dir, np_dtype_string, [-1], io_cnt=1)
         create_models(FLAGS.models_dir, np_dtype_string, [-1, -1], io_cnt=3)
+
+    # Create libtorch linalg model
+    if FLAGS.libtorch:
+        model_version = 1
+        create_libtorch_linalg_modelconfig(True, FLAGS.models_dir,
+                                           model_version)
+        create_libtorch_linalg_modelfile(True, FLAGS.models_dir, model_version)
