@@ -346,7 +346,7 @@ fi
 # default ones are not lost.
 # Current logic for backend config resolution sorts default configs
 # and specific configs lexicographically. Then it iterates through them
-# and prioritises backend specific config over the default one.
+# and prioritizes backend specific config over the default one.
 # We would like to make sure that in the following situation
 # (example)
 #           specific_config = {"a":4}
