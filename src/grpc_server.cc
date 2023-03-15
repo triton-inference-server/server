@@ -28,6 +28,7 @@
 
 #include <google/protobuf/arena.h>
 #include <grpc++/alarm.h>
+
 #include <chrono>
 #include <condition_variable>
 #include <cstdint>
@@ -38,6 +39,7 @@
 #include <queue>
 #include <sstream>
 #include <thread>
+
 #include "classification.h"
 #include "common.h"
 #include "grpc++/grpc++.h"
@@ -3615,6 +3617,38 @@ SetInferenceRequestMetadata(
       }
       RETURN_IF_ERR(TRITONSERVER_InferenceRequestSetTimeoutMicroseconds(
           inference_request, infer_param.int64_param()));
+    } else if (param.first.rfind("triton_", 0) == 0) {
+      return TRITONSERVER_ErrorNew(
+          TRITONSERVER_ERROR_INVALID_ARG,
+          ("parameter keys starting with 'triton_' are reserved for Triton "
+           "usage "
+           "and should not be specified."));
+    } else {
+      const auto& infer_param = param.second;
+      if (infer_param.parameter_choice_case() ==
+          inference::InferParameter::ParameterChoiceCase::kInt64Param) {
+        RETURN_IF_ERR(TRITONSERVER_InferenceRequestSetIntParameter(
+            inference_request, param.first.c_str(), infer_param.int64_param()));
+      } else if (
+          infer_param.parameter_choice_case() ==
+          inference::InferParameter::ParameterChoiceCase::kBoolParam) {
+        RETURN_IF_ERR(TRITONSERVER_InferenceRequestSetBoolParameter(
+            inference_request, param.first.c_str(), infer_param.bool_param()));
+      } else if (
+          infer_param.parameter_choice_case() ==
+          inference::InferParameter::ParameterChoiceCase::kStringParam) {
+        RETURN_IF_ERR(TRITONSERVER_InferenceRequestSetStringParameter(
+            inference_request, param.first.c_str(),
+            infer_param.string_param().c_str()));
+      } else {
+        return TRITONSERVER_ErrorNew(
+            TRITONSERVER_ERROR_INVALID_ARG,
+            std::string(
+                "invalid value type for '" + param.first +
+                "' parameter, expected "
+                "int64_param, bool_param, or string_param.")
+                .c_str());
+      }
     }
   }
 
