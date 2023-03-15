@@ -91,6 +91,7 @@ if [[ "$(< /proc/sys/kernel/osrelease)" == *microsoft* ]]; then
     SIMPLE_CUSTOM_ARGS_CLIENT=${SDKDIR}/python/simple_grpc_custom_args_client
     # [FIXME] point to proper client
     CC_UNIT_TEST=${SDKDIR}/python/cc_client_test
+    PYTHON_UNIT_TEST=./python_unit_test.py
 else
     MODELDIR=${MODELDIR:=`pwd`/models}
     DATADIR=${DATADIR:="/data/inferenceserver/${REPO_VERSION}"}
@@ -136,6 +137,7 @@ else
     SIMPLE_KEEPALIVE_CLIENT=../clients/simple_grpc_keepalive_client
     SIMPLE_CUSTOM_ARGS_CLIENT=../clients/simple_grpc_custom_args_client
     CC_UNIT_TEST=../clients/cc_client_test
+    PYTHON_UNIT_TEST=./python_unit_test.py
 fi
 
 # Add string_dyna_sequence model to repo
@@ -568,6 +570,43 @@ if [ `grep -c "status: SERVING" ${CLIENT_LOG}` != "1" ]; then
     RET=1
 fi
 
+kill $SERVER_PID
+wait $SERVER_PID
+
+# Repeated protocol, not allow
+SERVER_ARGS="--model-repository=${MODELDIR} \
+             --grpc-restricted-protocol=model-repository,health:k1=v1 \
+             --grpc-restricted-protocol=metadata,health:k2=v2"
+run_server
+EXPECTED_MSG="protocol 'health' can not be specified in multiple config group"
+if [ "$SERVER_PID" != "0" ]; then
+    echo -e "\n***\n*** Expect fail to start $SERVER\n***"
+    kill $SERVER_PID
+    wait $SERVER_PID
+    RET=1
+elif [ `grep -c "${EXPECTED_MSG}" ${SERVER_LOG}` != "1" ]; then
+    echo -e "\n***\n*** Failed. Expected ${EXPECTED_MSG} to be found in log\n***"
+    cat $SERVER_LOG
+    RET=1
+fi
+
+SERVER_ARGS="--model-repository=${MODELDIR} \
+             --grpc-restricted-protocol=model-repository:admin-key=admin-value \
+             --grpc-restricted-protocol=inference,health:infer-key=infer-value"
+run_server
+if [ "$SERVER_PID" == "0" ]; then
+    echo -e "\n***\n*** Failed to start $SERVER\n***"
+    cat $SERVER_LOG
+    exit 1
+fi
+set +e
+python $PYTHON_UNIT_TEST RestrictedProtocolTest > $CLIENT_LOG 2>&1
+if [ $? -ne 0 ]; then
+    cat $CLIENT_LOG
+    echo -e "\n***\n*** Python GRPC Restricted Protocol Test Failed\n***"
+    RET=1
+fi
+set -e
 kill $SERVER_PID
 wait $SERVER_PID
 

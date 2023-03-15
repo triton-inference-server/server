@@ -5080,7 +5080,7 @@ Server::Server(
 
   // [FIXME] "register" logic is different for infer
   // Handler for model inference requests.
-  const auto it = restricted_keys.find("infer");
+  const auto it = restricted_keys.find("inference");
   std::pair<std::string, std::string> restricted_kv =
       (it == restricted_keys.end())
           ? std::pair<std::string, std::string>{"", ""}
