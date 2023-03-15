@@ -1,5 +1,5 @@
-<!--
-# Copyright 2020-2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+#!/bin/bash
+# Copyright (c) 2023, NVIDIA CORPORATION. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -24,29 +24,55 @@
 # OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 # (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
--->
 
-# HTTP/REST and GRPC Protocol
+REPO_VERSION=${NVIDIA_TRITON_SERVER_VERSION}
+if [ "$#" -ge 1 ]; then
+    REPO_VERSION=$1
+fi
+if [ -z "$REPO_VERSION" ]; then
+    echo -e "Repository version must be specified"
+    echo -e "\n***\n*** Test Failed\n***"
+    exit 1
+fi
+if [ ! -z "$TEST_REPO_ARCH" ]; then
+    REPO_VERSION=${REPO_VERSION}_${TEST_REPO_ARCH}
+fi
 
-This directory contains documents related to the HTTP/REST and GRPC
-protocols used by Triton. Triton uses the [KServe community standard
-inference
-protocols](https://github.com/kserve/kserve/tree/master/docs/predict-api/v2)
-plus several extensions that are defined in the following documents:
+CLIENT_LOG="./client.log"
+TEST_SCRIPT_PY="parameters_test.py"
+EXPECTED_NUM_TESTS="4"
 
-- [Binary tensor data extension](./extension_binary_data.md)
-- [Classification extension](./extension_classification.md)
-- [Model configuration extension](./extension_model_configuration.md)
-- [Model repository extension](./extension_model_repository.md)
-- [Schedule policy extension](./extension_schedule_policy.md)
-- [Sequence extension](./extension_sequence.md)
-- [Shared-memory extension](./extension_shared_memory.md)
-- [Statistics extension](./extension_statistics.md)
-- [Trace extension](./extension_trace.md)
-- [Logging extension](./extension_logging.md)
-- [Parameters extension](./extension_parameters.md)
+SERVER=/opt/tritonserver/bin/tritonserver
+SERVER_ARGS="--model-repository=model_repository --exit-timeout-secs=120"
+SERVER_LOG="./inference_server.log"
+source ../common/util.sh
 
-For the GRPC protocol, the [protobuf
-specification](https://github.com/triton-inference-server/common/blob/main/protobuf/grpc_service.proto)
-is also available. In addition, you can find the GRPC health checking protocol protobuf
-specification [here](https://github.com/triton-inference-server/common/blob/main/protobuf/health.proto).
+RET=0
+
+run_server
+if [ "$SERVER_PID" == "0" ]; then
+    echo -e "\n***\n*** Failed to start $SERVER\n***"
+    cat $SERVER_LOG
+    exit 1
+fi
+
+set +e
+python3 $TEST_SCRIPT_PY >$CLIENT_LOG 2>&1
+if [ $? -ne 0 ]; then
+    cat $CLIENT_LOG
+    echo -e "\n***\n*** Test Failed\n***"
+    RET=1
+fi
+set -e
+
+kill $SERVER_PID
+wait $SERVER_PID
+
+if [ $RET -eq 0 ]; then
+    echo -e "\n***\n*** Test Passed\n***"
+else
+    cat $CLIENT_LOG
+    echo -e "\n***\n*** Test FAILED\n***"
+fi
+
+exit $RET
