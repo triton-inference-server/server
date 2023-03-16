@@ -350,7 +350,7 @@ fi
 # defaults are properly overriden.
 # One of defaultconfigs is `min-compute-capability`. This test
 # checks if it is properlly overriden.
-MIN_COMPUTE_CAPABILITY="XX"
+MIN_COMPUTE_CAPABILITY=XX
 SERVER_ARGS="--backend-config=onnxruntime,min-compute-capability=$MIN_COMPUTE_CAPABILITY $COMMON_ARGS"
 SERVER_LOG=$SERVER_LOG_BASE.global_configs.log
 run_server
@@ -362,7 +362,7 @@ if [ "$SERVER_PID" == "0" ]; then
 else
     # Count number of default configs
     BACKEND_CONFIG_MAP=$(grep -a "backend configuration:" $SERVER_LOG -A 1  | grep -v "backend configuration")
-    CONFIG_VALUE=$(echo $BACKEND_CONFIG_MAP | jq -r | jq '.["cmdline"]' | jq '.["min-compute-capability"]')
+    CONFIG_VALUE=$(echo $BACKEND_CONFIG_MAP | jq -r | jq '.["cmdline"]' | jq -r '.["min-compute-capability"]')
 
     if [ $CONFIG_VALUE != $MIN_COMPUTE_CAPABILITY ]; then
         echo "*** FAILED: Expected min-compute-capability config to be $MIN_COMPUTE_CAPABILITY but found: $CONFIG_VALUE\n"
@@ -374,9 +374,7 @@ else
 
 fi
 # Now make sure that specific backend configs are not lost.
-SERVER_ARGS="--backend-config=onnxruntime,a=0 \
-             --backend-config=onnxruntime,y=0 \
-             --backend-config=onnxruntime,z=0 $COMMON_ARGS"
+SERVER_ARGS="--backend-config=onnxruntime,a=0 --backend-config=onnxruntime,y=0 --backend-config=onnxruntime,z=0 $COMMON_ARGS"
 SERVER_LOG=$SERVER_LOG_BASE.specific_configs.log
 EXPECTED_CONFIG_COUNT=$(($DEFAULT_CONFIG_COUNT+3))
 run_server
