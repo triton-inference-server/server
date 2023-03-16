@@ -25,9 +25,8 @@
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #pragma once
 
-#include <vector>
-
 #include <grpc++/grpc++.h>
+#include <vector>
 #include "grpc_service.grpc.pb.h"
 #include "health.grpc.pb.h"
 #include "shared_memory_manager.h"
