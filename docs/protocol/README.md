@@ -55,6 +55,6 @@ specification](https://github.com/triton-inference-server/common/blob/main/proto
 is also available. In addition, you can find the GRPC health checking protocol protobuf
 specification [here](https://github.com/triton-inference-server/common/blob/main/protobuf/health.proto).
 
-Users may configure the Triton endpoints, which implement the protocols, to
-expose a subset of the protocols and to control network settings, please refer
+You can configure the Triton endpoints, which implement the protocols, to
+restrict access to some protocols and to control network settings, please refer
 to [protocol customization guide](https://github.com/triton-inference-server/server/blob/main/docs/customization_guide/inference_protocols.md#httprest-and-grpc-protocols) for detail.

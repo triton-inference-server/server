@@ -36,6 +36,10 @@
 
 namespace triton { namespace server { namespace grpc {
 
+// GRPC uses HTTP2 which requires header to be in lowercase, so the Triton
+// specific header that may be set for GRPC is defined to be all lowercases
+constexpr char kRestrictedProtocolHeaderTemplate[] = "triton-grpc-protocol-";
+
 struct SocketOptions {
   std::string address_{"0.0.0.0"};
   int32_t port_{8001};

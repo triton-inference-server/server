@@ -1,5 +1,5 @@
 <!--
-# Copyright 2018-2022, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright 2018-2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -124,7 +124,7 @@ usage and should not be accessible by non-admin user.
 The following option can be specified to declare an restricted protocol group:
 
 ```
---grpc-restricted-protocol=<protocol_1>,<protocol_2>,...:<restricted-header>=<restricted-key>
+--grpc-restricted-protocol=<protocol_1>,<protocol_2>,...:<restricted-key>=<restricted-value>
 ```
 
 The option can be specified multiple times to specifies multiple groups of
@@ -145,10 +145,11 @@ protocol types mentioned above:
   * `trace` : [trace endpoint](https://github.com/triton-inference-server/server/blob/main/docs/protocol/extension_trace.md).
   * `logging` : [logging endpoint](https://github.com/triton-inference-server/server/blob/main/docs/protocol/extension_logging.md).
 
-* `restricted-header` : The GRPC request header to be checked when a request to
-the protocol is received.
+* `restricted-key` : Key to determine the GRPC request header to be checked when a
+request to the protocol is received. The completed header will be in the form of
+`triton-grpc-protocol-<restricted-key>`
 
-* `restricted-key` : The value of the header to be matched in order to preceed
+* `restricted-value` : The value of the header to be matched in order to preceed
 the process of the specified protocols.
 
 #### Example
@@ -156,7 +157,7 @@ the process of the specified protocols.
 To start server with a subset of protocols to be restricted in use case
 described above, the following command line arguments can be set to accept
 "standard inference" request without additional header and the rest of the
-protocols with `<admin-key>=<admin-value>` specified in header:
+protocols with `triton-grpc-protocol-<admin-key>=<admin-value>` specified in header:
 
 ```
 tritonserver --grpc-restricted-protocol=shared-memory,model-config,model-repository,statistics,trace:<admin-key>=<admin-value> ...

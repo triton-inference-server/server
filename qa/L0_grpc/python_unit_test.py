@@ -1,5 +1,5 @@
 #!/usr/bin/env python
-# Copyright 2022, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright 2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -55,33 +55,36 @@ class RestrictedProtocolTest(unittest.TestCase):
     def setUp(self):
         self.client_ = grpcclient.InferenceServerClient(url="localhost:8001")
         self.model_name_ = "simple"
+        self.prefix_ = "triton-grpc-protocol-"
 
     # Other unspecified protocols should not be restricted
     def test_sanity(self):
         self.client_.get_inference_statistics("simple")
         self.client_.get_inference_statistics(
-            "simple", headers={"infer-key": "infer-value"})
+            "simple", headers={self.prefix_ + "infer-key": "infer-value"})
 
     # health, infer, model repository protocols are restricted.
-    # health and infer expects "infer-key : infer-value" header,
-    # model repository expected "admin-key : admin-value".
+    # health and infer expects "triton-grpc-restricted-infer-key : infer-value" header,
+    # model repository expected "triton-grpc-restricted-admin-key : admin-value".
     def test_model_repository(self):
         with self.assertRaisesRegex(InferenceServerException,
                                     "This protocol is restricted"):
-            self.client_.unload_model(self.model_name_,
-                                      headers={"infer-key": "infer-value"})
+            self.client_.unload_model(
+                self.model_name_,
+                headers={self.prefix_ + "infer-key": "infer-value"})
         # Request go through and get actual transaction error
         with self.assertRaisesRegex(
                 InferenceServerException,
                 "explicit model load / unload is not allowed"):
-            self.client_.unload_model(self.model_name_,
-                                      headers={"admin-key": "admin-value"})
+            self.client_.unload_model(
+                self.model_name_,
+                headers={self.prefix_ + "admin-key": "admin-value"})
 
     def test_health(self):
         with self.assertRaisesRegex(InferenceServerException,
                                     "This protocol is restricted"):
             self.client_.is_server_live()
-        self.client_.is_server_live({"infer-key": "infer-value"})
+        self.client_.is_server_live({self.prefix_ + "infer-key": "infer-value"})
 
     def test_infer(self):
         # setup
@@ -100,7 +103,7 @@ class RestrictedProtocolTest(unittest.TestCase):
                                          headers={'test': '1'})
         self.client_.infer(model_name=self.model_name_,
                            inputs=inputs,
-                           headers={"infer-key": "infer-value"})
+                           headers={self.prefix_ + "infer-key": "infer-value"})
 
     def test_stream_infer(self):
         # setup
@@ -135,8 +138,9 @@ class RestrictedProtocolTest(unittest.TestCase):
 
         # Stop and start new stream with proper header
         self.client_.stop_stream()
-        self.client_.start_stream(partial(callback, user_data),
-                                  headers={"infer-key": "infer-value"})
+        self.client_.start_stream(
+            partial(callback, user_data),
+            headers={self.prefix_ + "infer-key": "infer-value"})
         self.client_.async_stream_infer(model_name=self.model_name_,
                                         inputs=inputs)
         # wait for response

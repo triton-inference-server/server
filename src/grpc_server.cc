@@ -325,7 +325,9 @@ CommonCallData<ResponderType, RequestType, ResponseType>::Execute()
     OnExecute_(request_, &response_, &status_);
   } else {
     status_ = ::grpc::Status(
-        ::grpc::StatusCode::UNAVAILABLE, "This protocol is restricted");
+        ::grpc::StatusCode::UNAVAILABLE,
+        std::string("This protocol is restricted, expecting header '") +
+            restricted_kv_.first + "'");
   }
   step_ = Steps::WRITEREADY;
 
@@ -4109,7 +4111,9 @@ ModelInferHandler::Process(InferHandler::State* state, bool rpc_ok)
       Execute(state);
     } else {
       ::grpc::Status status = ::grpc::Status(
-          ::grpc::StatusCode::UNAVAILABLE, "This protocol is restricted");
+          ::grpc::StatusCode::UNAVAILABLE,
+          std::string("This protocol is restricted, expecting header '") +
+              restricted_kv_.first + "'");
 
 
 #ifdef TRITON_ENABLE_TRACING
@@ -4525,7 +4529,9 @@ ModelStreamInferHandler::Process(InferHandler::State* state, bool rpc_ok)
       state->context_->step_ = Steps::COMPLETE;
       state->step_ = Steps::COMPLETE;
       ::grpc::Status status = ::grpc::Status(
-          ::grpc::StatusCode::UNAVAILABLE, "This protocol is restricted");
+          ::grpc::StatusCode::UNAVAILABLE,
+          std::string("This protocol is restricted, expecting header '") +
+              restricted_kv_.first + "'");
       state->context_->responder_->Finish(status, state);
       return !finished;
     }
@@ -5069,7 +5075,9 @@ Server::Server(
             "' can not be "
             "specified in multiple config group");
       }
-      restricted_keys[p] = pg.restricted_key_;
+      const auto header = std::string(kRestrictedProtocolHeaderTemplate) +
+                          pg.restricted_key_.first;
+      restricted_keys[p] = std::make_pair(header, pg.restricted_key_.second);
     }
   }
 
