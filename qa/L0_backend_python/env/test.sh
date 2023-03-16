@@ -145,7 +145,7 @@ wait $SERVER_PID
 set +e
 
 PY38_ENV_EXTRACTION="Extracting Python execution env" 
-if [ `grep -c ${PY38_ENV_EXTRACTION} ${SERVER_LOG}` != "2" ]; then
+if [ `grep -c "${PY38_ENV_EXTRACTION}" ${SERVER_LOG}` != "2" ]; then
     cat $SERVER_LOG
     echo -e "\n***\n*** Python execution environment should be extracted exactly twice. \n***"
     RET=1
