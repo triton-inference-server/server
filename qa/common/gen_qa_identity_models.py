@@ -359,10 +359,7 @@ def create_onnx_modelconfig(create_savedmodel, models_dir, model_version,
                                             emu.repeat(None, io_cnt),
                                             force_tensor_number_suffix=True)
 
-    try:
-        os.makedirs(config_dir, exist_ok=True)
-    except OSError as ex:
-        pass  # ignore existing dir
+    os.makedirs(config_dir, exist_ok=True)
 
     with open(config_dir + "/config.pbtxt", "w") as cfile:
         cfile.write(config)
@@ -467,11 +464,7 @@ def create_libtorch_modelfile(create_savedmodel, models_dir, model_version,
     traced = torch.jit.script(identityModel)
 
     model_version_dir = os.path.join(models_dir, model_name, str(model_version))
-
-    try:
-        os.makedirs(model_version_dir, exist_ok=True)
-    except OSError as ex:
-        pass  # ignore existing dir
+    os.makedirs(model_version_dir, exist_ok=True)
 
     traced.save(model_version_dir + "/model.pt")
 
@@ -518,10 +511,7 @@ output [
 '''.format(io_num, np_to_model_dtype(dtype), shape_str, io_num,
            np_to_model_dtype(dtype), shape_str)
 
-    try:
-        os.makedirs(config_dir, exist_ok=True)
-    except OSError as ex:
-        pass  # ignore existing dir
+    os.makedirs(config_dir, exist_ok=True)
 
     with open(config_dir + "/config.pbtxt", "w") as cfile:
         cfile.write(config)
@@ -551,11 +541,7 @@ def create_libtorch_linalg_modelfile(create_savedmodel, models_dir,
     traced = torch.jit.script(identityModel)
 
     model_version_dir = os.path.join(models_dir, model_name, str(model_version))
-
-    try:
-        os.makedirs(model_version_dir, exist_ok=True)
-    except OSError as ex:
-        pass  # ignore existing dir
+    os.makedirs(model_version_dir, exist_ok=True)
 
     traced.save(model_version_dir + "/model.pt")
 
@@ -600,10 +586,7 @@ output [
 '''.format(io_num, np_to_model_dtype(dtype), shape_str, io_num,
            np_to_model_dtype(dtype), shape_str)
 
-    try:
-        os.makedirs(config_dir, exist_ok=True)
-    except OSError as ex:
-        pass  # ignore existing dir
+    os.makedirs(config_dir, exist_ok=True)
 
     with open(config_dir + "/config.pbtxt", "w") as cfile:
         cfile.write(config)
@@ -638,10 +621,7 @@ def create_openvino_modelfile(models_dir, model_version, io_cnt, max_batch,
     function = ng.impl.Function(openvino_outputs, openvino_inputs, model_name)
     ie_network = IENetwork(ng.impl.Function.to_capsule(function))
 
-    try:
-        os.makedirs(model_version_dir, exist_ok=True)
-    except OSError as ex:
-        pass  # ignore existing dir
+    os.makedirs(model_version_dir, exist_ok=True)
 
     ie_network.serialize(model_version_dir + "/model.xml",
                          model_version_dir + "/model.bin")
@@ -693,10 +673,7 @@ output [
 '''.format(io_num, np_to_model_dtype(dtype), shape_str, io_num,
            np_to_model_dtype(dtype), shape_str)
 
-    try:
-        os.makedirs(config_dir, exist_ok=True)
-    except OSError as ex:
-        pass  # ignore existing dir
+    os.makedirs(config_dir, exist_ok=True)
 
     with open(config_dir + "/config.pbtxt", "w") as cfile:
         cfile.write(config)
@@ -792,11 +769,7 @@ def create_plan_dynamic_rf_modelfile(models_dir, model_version, io_cnt,
     model_name = tu.get_zero_model_name(
         "plan_nobatch" if max_batch == 0 else "plan", io_cnt, dtype)
     model_version_dir = os.path.join(models_dir, model_name, str(model_version))
-
-    try:
-        os.makedirs(model_version_dir, exist_ok=True)
-    except OSError as ex:
-        pass  # ignore existing dir
+    os.makedirs(model_version_dir, exist_ok=True)
 
     with open(model_version_dir + "/model.plan", "wb") as f:
         f.write(engine_bytes)
@@ -899,11 +872,7 @@ def create_plan_shape_tensor_modelfile(models_dir, model_version, io_cnt,
     model_name = tu.get_zero_model_name(
         "plan_nobatch" if max_batch == 0 else "plan", io_cnt, dtype)
     model_version_dir = os.path.join(models_dir, model_name, str(model_version))
-
-    try:
-        os.makedirs(model_version_dir, exist_ok=True)
-    except OSError as ex:
-        pass  # ignore existing dir
+    os.makedirs(model_version_dir, exist_ok=True)
 
     with open(model_version_dir + "/model.plan", "wb") as f:
         f.write(engine_bytes)
@@ -964,11 +933,7 @@ def create_plan_dynamic_modelfile(models_dir, model_version, io_cnt, max_batch,
     model_name = tu.get_zero_model_name(
         "plan_nobatch" if max_batch == 0 else "plan", io_cnt, dtype)
     model_version_dir = os.path.join(models_dir, model_name, str(model_version))
-
-    try:
-        os.makedirs(model_version_dir, exist_ok=True)
-    except OSError as ex:
-        pass  # ignore existing dir
+    os.makedirs(model_version_dir, exist_ok=True)
 
     with open(model_version_dir + "/model.plan", "wb") as f:
         f.write(engine_bytes)
@@ -1051,10 +1016,7 @@ output [
 '''.format(io_num, np_to_model_dtype(dtype), shape_str, io_num,
             np_to_model_dtype(dtype), shape_str)
 
-    try:
-        os.makedirs(config_dir, exist_ok=True)
-    except OSError as ex:
-        pass  # ignore existing dir
+    os.makedirs(config_dir, exist_ok=True)
 
     with open(config_dir + "/config.pbtxt", "w") as cfile:
         cfile.write(config)
