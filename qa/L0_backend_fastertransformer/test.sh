@@ -27,8 +27,8 @@
 FASTERTRANSFORMER_BRANCH_TAG=${FASTERTRANSFORMER_BRANCH_TAG:="main"}
 FASTERTRANSFORMER_BRANCH=${FASTERTRANSFORMER_BRANCH:="https://github.com/triton-inference-server/fastertransformer_backend.git"}
 SERVER_TIMEOUT=600
-SERVER_LOG_BASE="$PWD/inference_server"
-CLIENT_LOG_BASE="$PWD/client"
+SERVER_LOG="$PWD/inference_server"
+CLIENT_LOG="$PWD/client"
 
 MODEL_DIR=${MODEL_DIR:=$PWD/fastertransformer_backend/all_models/t5/}
 TRITON_DIR=${TRITON_DIR:="/opt/tritonserver"}
@@ -38,7 +38,7 @@ SERVER_ARGS_EXTRA="--exit-timeout-secs=${SERVER_TIMEOUT} --backend-directory=${B
 SERVER_ARGS="--model-repository=${MODEL_DIR} ${SERVER_ARGS_EXTRA}"
 source ../common/util.sh
 
-rm -f $SERVER_LOG_BASE* $CLIENT_LOG_BASE*
+rm -f $SERVER_LOG* $CLIENT_LOG*
 
 RET=0
 # install dependencies
@@ -50,12 +50,17 @@ python3 -m pip install --upgrade pip && \
 # Clone repo
 git clone --single-branch --depth=1 -b ${FASTERTRANSFORMER_BRANCH_TAG} ${FASTERTRANSFORMER_BRANCH}
 cd fastertransformer_backend
-SERVER_LOG=$SERVER_LOG_BASE.log
-CLIENT_LOG=$CLIENT_LOG_BASE.log
 
 run_server
 
-# in separate container
+if [ "$SERVER_PID" == "0" ]; then
+    echo -e "\n***\n*** Failed to start $SERVER\n***"
+    cat $SERVER_LOG
+    exit 1
+fi
+
+set +e
+
 python3 tools/issue_request.py tools/requests/sample_request_single_t5.json >$CLIENT_LOG 2>&1
 if [ $? -ne 0 ]; then
     cat $CLIENT_LOG
