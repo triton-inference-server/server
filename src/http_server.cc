@@ -2367,7 +2367,10 @@ HTTPAPIServer::EVBufferToInput(
       if (parameter == "sequence_id") {
         uint64_t seq_id;
         // Try to parse sequence_id as uint64_t
-        if (params_json.MemberAsUInt(parameter.c_str(), &seq_id) != nullptr) {
+        TRITONSERVER_Error* err;
+        if ((err = params_json.MemberAsUInt(parameter.c_str(), &seq_id)) !=
+            nullptr) {
+          TRITONSERVER_ErrorDelete(err);
           // On failure try to parse as a string
           std::string seq_id;
           RETURN_MSG_IF_ERR(
@@ -2425,27 +2428,44 @@ HTTPAPIServer::EVBufferToInput(
         std::string string_value;
         int64_t int_value;
         bool bool_value;
-        if (params_json.MemberAsString(parameter.c_str(), &string_value) ==
-            nullptr) {
+        TRITONSERVER_Error* err;
+
+        // String parsing
+        if ((err = params_json.MemberAsString(
+                 parameter.c_str(), &string_value)) != nullptr) {
+          TRITONSERVER_ErrorDelete(err);
+        } else {
           RETURN_IF_ERR(TRITONSERVER_InferenceRequestSetStringParameter(
               irequest, parameter.c_str(), string_value.c_str()));
-        } else if (
-            params_json.MemberAsInt(parameter.c_str(), &int_value) == nullptr) {
+          continue;
+        }
+
+        // Int parsing
+        if ((err = params_json.MemberAsInt(parameter.c_str(), &int_value)) !=
+            nullptr) {
+          TRITONSERVER_ErrorDelete(err);
+        } else {
           RETURN_IF_ERR(TRITONSERVER_InferenceRequestSetIntParameter(
               irequest, parameter.c_str(), int_value));
-        } else if (
-            params_json.MemberAsBool(parameter.c_str(), &bool_value) ==
+          continue;
+        }
+
+        // bool parsing
+        if ((err = params_json.MemberAsBool(parameter.c_str(), &bool_value)) !=
             nullptr) {
+          TRITONSERVER_ErrorDelete(err);
+        } else {
           RETURN_IF_ERR(TRITONSERVER_InferenceRequestSetBoolParameter(
               irequest, parameter.c_str(), bool_value));
-        } else {
-          return TRITONSERVER_ErrorNew(
-              TRITONSERVER_ERROR_INVALID_ARG,
-              ("parameter '" + parameter +
-               "' has invalid type. It should be either "
-               "'int', 'bool', or 'string'.")
-                  .c_str());
+          continue;
         }
+
+        return TRITONSERVER_ErrorNew(
+            TRITONSERVER_ERROR_INVALID_ARG,
+            ("parameter '" + parameter +
+             "' has invalid type. It should be either "
+             "'int', 'bool', or 'string'.")
+                .c_str());
       }
     }
 
