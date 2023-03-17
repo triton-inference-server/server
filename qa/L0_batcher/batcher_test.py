@@ -71,6 +71,8 @@ if "plan" in _trials:
     _ragged_batch_supported_trials.append("plan")
 if "onnx" in _trials:
     _ragged_batch_supported_trials.append("onnx")
+if "libtorch" in _trials:
+    _ragged_batch_supported_trials.append("libtorch")
 
 _max_queue_delay_ms = 10000
 
