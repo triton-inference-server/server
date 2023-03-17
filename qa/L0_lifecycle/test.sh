@@ -1,5 +1,5 @@
 #!/bin/bash
-# Copyright 2018-2022, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright 2018-2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -1650,6 +1650,8 @@ fi
 kill $SERVER_PID
 wait $SERVER_PID
 
+LOG_IDX=$((LOG_IDX+1))
+
 # LifeCycleTest.test_load_gpu_limit
 # dependency of the Python model to be used
 pip install cuda-python
@@ -1673,6 +1675,8 @@ elif [ `grep -c "expects device ID >= 0, got -1" $SERVER_LOG` == "0" ]; then
     RET=1
 fi
 
+LOG_IDX=$((LOG_IDX+1))
+
 SERVER_ARGS="--model-repository=`pwd`/models --model-control-mode=explicit --model-load-gpu-limit 0:-0.4"
 SERVER_LOG="./inference_server_$LOG_IDX.log"
 run_server
@@ -1687,6 +1691,8 @@ elif [ `grep -c "expects limit fraction to be in range \[0.0, 1.0\], got -0.4" $
     RET=1
 fi
 
+LOG_IDX=$((LOG_IDX+1))
+
 # Run server to stop model loading if > 60% of GPU 0 memory is used
 SERVER_ARGS="--model-repository=`pwd`/models --model-control-mode=explicit --model-load-gpu-limit 0:0.6"
 SERVER_LOG="./inference_server_$LOG_IDX.log"
@@ -1700,6 +1706,119 @@ fi
 set +e
 python $LC_TEST LifeCycleTest.test_load_gpu_limit >>$CLIENT_LOG 2>&1
 check_unit_test
+set -e
+
+kill $SERVER_PID
+wait $SERVER_PID
+
+LOG_IDX=$((LOG_IDX+1))
+
+# LifeCycleTest.test_concurrent_load_speedup
+rm -rf models
+mkdir models
+MODEL_NAME="identity_zero_1_int32"
+cp -r ${MODEL_NAME} models && mkdir -p models/${MODEL_NAME}/1
+cp -r models/${MODEL_NAME} models/${MODEL_NAME}_1 && \
+    sed -i "s/${MODEL_NAME}/${MODEL_NAME}_1/" models/${MODEL_NAME}_1/config.pbtxt
+mv models/${MODEL_NAME} models/${MODEL_NAME}_2 && \
+    sed -i "s/${MODEL_NAME}/${MODEL_NAME}_2/" models/${MODEL_NAME}_2/config.pbtxt
+MODEL_NAME="identity_fp32"
+cp -r ../python_models/${MODEL_NAME} models && (cd models/${MODEL_NAME} && \
+    mkdir 1 && mv model.py 1 && \
+    echo "    def initialize(self, args):" >> 1/model.py && \
+    echo "        import time" >> 1/model.py && \
+    echo "        time.sleep(10)" >> 1/model.py)
+cp -r models/${MODEL_NAME} models/python_${MODEL_NAME}_1 && \
+    sed -i "s/${MODEL_NAME}/python_${MODEL_NAME}_1/" models/python_${MODEL_NAME}_1/config.pbtxt
+mv models/${MODEL_NAME} models/python_${MODEL_NAME}_2 && \
+    sed -i "s/${MODEL_NAME}/python_${MODEL_NAME}_2/" models/python_${MODEL_NAME}_2/config.pbtxt
+
+SERVER_ARGS="--model-repository=`pwd`/models --model-control-mode=explicit"
+SERVER_LOG="./inference_server_$LOG_IDX.log"
+run_server
+if [ "$SERVER_PID" == "0" ]; then
+    echo -e "\n***\n*** Failed to start $SERVER\n***"
+    cat $SERVER_LOG
+    exit 1
+fi
+
+set +e
+python $LC_TEST LifeCycleTest.test_concurrent_load_speedup >>$CLIENT_LOG 2>&1
+if [ $? -ne 0 ]; then
+    cat $CLIENT_LOG
+    echo -e "\n***\n*** Test Failed\n***"
+    RET=1
+fi
+set -e
+
+kill $SERVER_PID
+wait $SERVER_PID
+
+LOG_IDX=$((LOG_IDX+1))
+
+# LifeCycleTest.test_concurrent_load
+rm -rf models models_v1 models_v2
+mkdir models models_v2
+cp -r identity_zero_1_int32 models/identity_model && \
+    (cd models/identity_model && \
+        mkdir 1 && \
+        sed -i "s/identity_zero_1_int32/identity_model/" config.pbtxt)
+cp -r ../python_models/identity_fp32 models_v2/identity_model && \
+    (cd models_v2/identity_model && \
+        mkdir 1 && mv model.py 1 && \
+        sed -i "s/identity_fp32/identity_model/" config.pbtxt)
+
+SERVER_ARGS="--model-repository=`pwd`/models --model-control-mode=explicit"
+SERVER_LOG="./inference_server_$LOG_IDX.log"
+run_server
+if [ "$SERVER_PID" == "0" ]; then
+    echo -e "\n***\n*** Failed to start $SERVER\n***"
+    cat $SERVER_LOG
+    exit 1
+fi
+
+set +e
+python $LC_TEST LifeCycleTest.test_concurrent_load >>$CLIENT_LOG 2>&1
+if [ $? -ne 0 ]; then
+    cat $CLIENT_LOG
+    echo -e "\n***\n*** Test Failed\n***"
+    RET=1
+fi
+set -e
+
+kill $SERVER_PID
+wait $SERVER_PID
+
+LOG_IDX=$((LOG_IDX+1))
+
+# LifeCycleTest.test_concurrent_load_unload
+rm -rf models
+mkdir models
+cp -r identity_zero_1_int32 models && mkdir -p models/identity_zero_1_int32/1
+cp -r ensemble_zero_1_float32 models && mkdir -p models/ensemble_zero_1_float32/1
+cp -r ../custom_models/custom_zero_1_float32 models/. && \
+    mkdir -p models/custom_zero_1_float32/1 && \
+    (cd models/custom_zero_1_float32 && \
+        echo "parameters [" >> config.pbtxt && \
+        echo "{ key: \"creation_delay_sec\"; value: { string_value: \"10\" }}" >> config.pbtxt && \
+        echo "]" >> config.pbtxt)
+
+SERVER_ARGS="--model-repository=`pwd`/models --model-control-mode=explicit"
+SERVER_LOG="./inference_server_$LOG_IDX.log"
+run_server
+if [ "$SERVER_PID" == "0" ]; then
+    echo -e "\n***\n*** Failed to start $SERVER\n***"
+    cat $SERVER_LOG
+    exit 1
+fi
+
+set +e
+python $LC_TEST LifeCycleTest.test_concurrent_load_unload >>$CLIENT_LOG 2>&1
+if [ $? -ne 0 ]; then
+    cat $CLIENT_LOG
+    echo -e "\n***\n*** Test Failed\n***"
+    RET=1
+fi
 set -e
 
 kill $SERVER_PID
