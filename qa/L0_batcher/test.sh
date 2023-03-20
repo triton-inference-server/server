@@ -1,5 +1,5 @@
 #!/bin/bash
-# Copyright 2018-2022, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright 2018-2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -239,6 +239,19 @@ if [[ $BACKENDS == *"onnx"* ]]; then
             echo "batch_output [{target_name: \"OUTPUT0\" \
                                     kind: BATCH_SCATTER_WITH_INPUT_SHAPE \
                                     source_input: \"INPUT0\" }] \
+                    dynamic_batching { preferred_batch_size: [ 2, 6 ], max_queue_delay_microseconds: 10000000 }" >> config.pbtxt)
+fi
+
+if [[ $BACKENDS == *"libtorch"* ]]; then
+    # Use nobatch model to match the ragged test requirement
+    cp -r $DATADIR/qa_identity_model_repository/libtorch_nobatch_zero_1_float32 var_models/libtorch_zero_1_float32 && \
+        (cd var_models/libtorch_zero_1_float32 && \
+            sed -i "s/nobatch_//" config.pbtxt && \
+            sed -i "s/^max_batch_size:.*/max_batch_size: 8/" config.pbtxt && \
+            sed -i "s/name: \"INPUT__0\"/name: \"INPUT__0\"\\nallow_ragged_batch: true/" config.pbtxt && \
+            echo "batch_output [{target_name: \"OUTPUT__0\" \
+                                    kind: BATCH_SCATTER_WITH_INPUT_SHAPE \
+                                    source_input: \"INPUT__0\" }] \
                     dynamic_batching { preferred_batch_size: [ 2, 6 ], max_queue_delay_microseconds: 10000000 }" >> config.pbtxt)
 fi
 
