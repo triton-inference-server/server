@@ -420,6 +420,7 @@ main(int argc, char** argv)
   try {
     auto res = tp.Parse(argc, argv);
     g_triton_params = res.first;
+    g_triton_params.CheckPortCollision();
   }
   catch (const triton::server::ParseException& pe) {
     std::cerr << pe.what() << std::endl;
@@ -427,8 +428,17 @@ main(int argc, char** argv)
     std::cerr << tp.Usage() << std::endl;
     exit(1);
   }
-  g_triton_params.CheckPortCollision();
-  auto triton_options = g_triton_params.BuildTritonServerOptions();
+
+  triton::server::TritonServerParameters::ManagedTritonServerOptionPtr
+      triton_options(nullptr, TRITONSERVER_ServerOptionsDelete);
+  try {
+    triton_options = g_triton_params.BuildTritonServerOptions();
+  }
+  catch (const triton::server::ParseException& pe) {
+    std::cerr << "Failed to build Triton option:" << std::endl;
+    std::cerr << pe.what() << std::endl;
+    exit(1);
+  }
 
 #ifdef TRITON_ENABLE_LOGGING
   // Initialize our own logging instance since it is used by GRPC and
