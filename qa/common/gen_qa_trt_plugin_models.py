@@ -1,4 +1,4 @@
-# Copyright (c) 2019-2020, NVIDIA CORPORATION. All rights reserved.
+# Copyright 2019-2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -30,11 +30,12 @@ import os
 import numpy as np
 import tensorrt as trt
 
+np_dtype_string = np.dtype(object)
+
 TRT_LOGGER = trt.Logger()
 
 trt.init_libnvinfer_plugins(TRT_LOGGER, '')
 PLUGIN_CREATORS = trt.get_plugin_registry().plugin_creator_list
-
 
 def np_to_model_dtype(np_dtype):
     if np_dtype == bool:
