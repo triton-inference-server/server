@@ -31,6 +31,7 @@ import numpy as np
 
 np_dtype_string = np.dtype(object)
 
+
 def np_to_model_dtype(np_dtype):
     if np_dtype == bool:
         return "TYPE_BOOL"
