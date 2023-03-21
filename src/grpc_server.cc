@@ -5064,7 +5064,7 @@ Server::Server(
   model_infer_cq_ = builder_.AddCompletionQueue();
   model_stream_infer_cq_ = builder_.AddCompletionQueue();
 
-  // Read and set protocol-wise restriction
+  // Read and set restriction for each protocol specified
   // map from protocol name to a pair of header to look for and the key
   std::map<std::string, std::pair<std::string, std::string>> restricted_keys;
   for (const auto& pg : options.protocol_groups_) {

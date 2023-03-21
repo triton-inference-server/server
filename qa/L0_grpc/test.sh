@@ -91,7 +91,6 @@ if [[ "$(< /proc/sys/kernel/osrelease)" == *microsoft* ]]; then
     SIMPLE_CUSTOM_ARGS_CLIENT=${SDKDIR}/python/simple_grpc_custom_args_client
     # [FIXME] point to proper client
     CC_UNIT_TEST=${SDKDIR}/python/cc_client_test
-    PYTHON_UNIT_TEST=./python_unit_test.py
 else
     MODELDIR=${MODELDIR:=`pwd`/models}
     DATADIR=${DATADIR:="/data/inferenceserver/${REPO_VERSION}"}
@@ -137,8 +136,8 @@ else
     SIMPLE_KEEPALIVE_CLIENT=../clients/simple_grpc_keepalive_client
     SIMPLE_CUSTOM_ARGS_CLIENT=../clients/simple_grpc_custom_args_client
     CC_UNIT_TEST=../clients/cc_client_test
-    PYTHON_UNIT_TEST=./python_unit_test.py
 fi
+PYTHON_UNIT_TEST=python_unit_test.py
 
 # Add string_dyna_sequence model to repo
 cp -r ${MODELDIR}/simple_dyna_sequence ${MODELDIR}/simple_string_dyna_sequence
@@ -573,7 +572,7 @@ fi
 kill $SERVER_PID
 wait $SERVER_PID
 
-# Repeated protocol, not allow
+# Repeated protocol, not allowed
 SERVER_ARGS="--model-repository=${MODELDIR} \
              --grpc-restricted-protocol=model-repository,health:k1=v1 \
              --grpc-restricted-protocol=metadata,health:k2=v2"
@@ -590,6 +589,7 @@ elif [ `grep -c "${EXPECTED_MSG}" ${SERVER_LOG}` != "1" ]; then
     RET=1
 fi
 
+# Test restricted protocols
 SERVER_ARGS="--model-repository=${MODELDIR} \
              --grpc-restricted-protocol=model-repository:admin-key=admin-value \
              --grpc-restricted-protocol=inference,health:infer-key=infer-value"

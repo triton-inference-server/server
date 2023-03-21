@@ -214,13 +214,13 @@ ParsePairOption(const std::string& arg, const std::string& delim_str)
 }
 
 #ifdef TRITON_ENABLE_GRPC
+// Split 'options' by 'delim_str' and place splitted strings into a vector
 std::vector<std::string>
 SplitOptions(std::string options, const std::string& delim_str)
 {
   std::vector<std::string> res;
 
   int delim = options.find(delim_str);
-  // keep splitting until no long found delimeter
   while ((delim >= 0)) {
     res.emplace_back(options.substr(0, delim));
     options = options.substr(delim + delim_str.length());
