@@ -1,5 +1,5 @@
 <!--
-# Copyright 2018-2022, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright 2018-2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -113,6 +113,56 @@ These options can be used to configure the KeepAlive settings:
 * `--grpc-http2-max-ping-strikes`
 
 For client-side documentation, see [Client-Side GRPC KeepAlive](https://github.com/triton-inference-server/client/blob/main/README.md#grpc-keepalive).
+
+#### Limit Endpoint Access (BETA)
+
+In some use cases, Triton users may want to restrict the access of the protocols on a given endpoint.
+For example, there can be need for two separate protocol groups that one exposes standard inference
+protocols for user access, while the other one exposes other extension protocols for administration
+usage and should not be accessible by non-admin user.
+
+The following option can be specified to declare an restricted protocol group:
+
+```
+--grpc-restricted-protocol=<protocol_1>,<protocol_2>,...:<restricted-key>=<restricted-value>
+```
+
+The option can be specified multiple times to specifies multiple groups of
+protocols with different restriction settings.
+
+* `protocols` : A comma-separated list of protocols to be included in this
+group. Note that currently a given protocol is not allowed to be included in
+multiple groups. The following protocols are currently recognized by all network
+protocol types mentioned above:
+
+  * `health` : Health endpoint defined for [HTTP/REST](https://github.com/kserve/kserve/blob/master/docs/predict-api/v2/required_api.md#health) and [GRPC](https://github.com/kserve/kserve/blob/master/docs/predict-api/v2/required_api.md#health-1). For GRPC endpoint, this value also exposes [GRPC health check protocol](https://github.com/triton-inference-server/common/blob/main/protobuf/health.proto).
+  * `metadata` : Server / model metadata endpoints defined for [HTTP/REST](https://github.com/kserve/kserve/blob/master/docs/predict-api/v2/required_api.md#server-metadata) and [GRPC](https://github.com/kserve/kserve/blob/master/docs/predict-api/v2/required_api.md#server-metadata-1).
+  * `inference` : Inference endpoints defined for [HTTP/REST](https://github.com/kserve/kserve/blob/master/docs/predict-api/v2/required_api.md#inference) and [GRPC](https://github.com/kserve/kserve/blob/master/docs/predict-api/v2/required_api.md#inference-1).
+  * `shared-memory` : [Shared-memory endpoint](https://github.com/triton-inference-server/server/blob/main/docs/protocol/extension_shared_memory.md).
+  * `model-config` : [Model configuration endpoint](https://github.com/triton-inference-server/server/blob/main/docs/protocol/extension_model_configuration.md).
+  * `model-repository` : [Model repository endpoint](https://github.com/triton-inference-server/server/blob/main/docs/protocol/extension_model_repository.md).
+  * `statistics` : [statistics endpoint](https://github.com/triton-inference-server/server/blob/main/docs/protocol/extension_statistics.md).
+  * `trace` : [trace endpoint](https://github.com/triton-inference-server/server/blob/main/docs/protocol/extension_trace.md).
+  * `logging` : [logging endpoint](https://github.com/triton-inference-server/server/blob/main/docs/protocol/extension_logging.md).
+
+* `restricted-key` : Key to determine the GRPC request header to be checked when a
+request to the protocol is received. The completed header will be in the form of
+`triton-grpc-protocol-<restricted-key>`
+
+* `restricted-value` : The value of the header to be matched in order to preceed
+the process of the specified protocols.
+
+#### Example
+
+To start server with a subset of protocols to be restricted in use case
+described above, the following command line arguments can be set to accept
+"standard inference" request without additional header and the rest of the
+protocols with `triton-grpc-protocol-<admin-key>=<admin-value>` specified in header:
+
+```
+tritonserver --grpc-restricted-protocol=shared-memory,model-config,model-repository,statistics,trace:<admin-key>=<admin-value> ...
+```
+
 
 ## In-Process Triton Server API
 
