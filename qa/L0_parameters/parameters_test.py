@@ -114,8 +114,16 @@ class InferenceParametersTest(IsolatedAsyncioTestCase):
             self.verify_outputs(result, parameters)
 
     def verify_outputs(self, result, parameters):
-        result = result.as_numpy('OUTPUT0')
-        self.assertEqual(json.loads(result[0]), parameters)
+        keys = result.as_numpy('key')
+        values = result.as_numpy('value')
+        self.assertEqual(set(keys.astype(str).tolist()),
+                         set(list(parameters.keys())))
+
+        # We have to convert the parameter values to string
+        expected_values = []
+        for expected_value in list(parameters.values()):
+            expected_values.append(str(expected_value))
+        self.assertEqual(set(values.astype(str).tolist()), set(expected_values))
 
     async def test_grpc_parameter(self):
         await self.send_request_and_verify(grpcclient, self.grpc)
