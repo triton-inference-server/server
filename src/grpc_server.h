@@ -26,6 +26,7 @@
 #pragma once
 
 #include <grpc++/grpc++.h>
+#include <vector>
 #include "grpc_service.grpc.pb.h"
 #include "health.grpc.pb.h"
 #include "shared_memory_manager.h"
@@ -33,6 +34,10 @@
 #include "triton/core/tritonserver.h"
 
 namespace triton { namespace server { namespace grpc {
+
+// GRPC uses HTTP2 which requires header to be in lowercase, so the Triton
+// specific header that may be set for GRPC is defined to be all lowercases
+constexpr char kRestrictedProtocolHeaderTemplate[] = "triton-grpc-protocol-";
 
 struct SocketOptions {
   std::string address_{"0.0.0.0"};
@@ -63,6 +68,12 @@ struct KeepAliveOptions {
   int http2_max_ping_strikes_{2};
 };
 
+struct ProtocolGroup {
+  std::string name_{""};
+  std::set<std::string> protocols_{};
+  std::pair<std::string, std::string> restricted_key_{"", ""};
+};
+
 struct Options {
   SocketOptions socket_;
   SslOptions ssl_;
@@ -73,6 +84,7 @@ struct Options {
   // requests doesn't exceed this value there will be no
   // allocation/deallocation of request/response objects.
   int infer_allocation_pool_size_{8};
+  std::vector<ProtocolGroup> protocol_groups_{};
 };
 
 class Server {
