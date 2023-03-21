@@ -670,11 +670,12 @@ def onnxruntime_cmake_args(images, library_paths):
                               None, ort_include_path),
             cmake_backend_arg('onnxruntime', 'TRITON_ONNXRUNTIME_LIB_PATHS',
                               None, ort_lib_path),
-            cmake_backend_arg('onnxruntime', 'TRITON_BUILD_PLATFORM',
-                                    None, 'jetpack')
+            cmake_backend_arg('onnxruntime', 'TRITON_BUILD_PLATFORM', None,
+                              'jetpack'),
+            # TODO: Remove if not needed, else put back if arch_90 error
             # Jetson build needs the CUDA compiler to be found
-            cmake_backend_arg('onnxruntime', 'CMAKE_CUDA_COMPILER',
-                                      None, '$(which nvcc)')
+            # cmake_backend_arg('onnxruntime', 'CMAKE_CUDA_COMPILER', None,
+            #                   '$(which nvcc)'),
             cmake_backend_enable('onnxruntime',
                                  'TRITON_ENABLE_ONNXRUNTIME_OPENVINO', False),
         ]
