@@ -41,7 +41,7 @@
 This repository contains Google Kubernetes Engine(GKE) Marketplace Application for NVIDIA Triton Inference Server deployer. 
 
  - Triton GKE deployer is a helm chart deployer recommended by GKE Marketplace
- - Triton GKE deployer leverage [Istio on GCP](https://cloud.google.com/istio/docs/istio-on-gke/overview) for traffic ingress and load balancing, user can further config Istio for advanced use cases in service mesh and Anthos
+ - Triton GKE deployer deploy an GKE ingress which accept public inference request
  - Triton GKE deployer includes a horizontal pod autoscaler(HPA) which relies on [stack driver custom metrics adaptor](https://github.com/GoogleCloudPlatform/k8s-stackdriver/tree/master/custom-metrics-stackdriver-adapter) to monitor GPU duty cycle, and auto scale GPU nodes.
  - This repo also contains a sample to generate BERT model with TensorRT and use Locust to experiment with GPU node autoscaling and monitor client latency/throughput. 
 
@@ -56,16 +56,27 @@ This repository contains Google Kubernetes Engine(GKE) Marketplace Application f
 
 First, install this Triton GKE app to an existing GKE cluster with GPU node pool, Google Cloud Marketplace currently doesn't support auto creation of GPU clusters. User has to run following command to create a compatible cluster (gke version >=1.18.7) with GPU node pools, we recommend user to select T4 or A100(MIG) instances type and choose CPU ratio based on profiling of actual inference workflow. 
 
+User need to follow [instruction](https://cloud.google.com/kubernetes-engine/docs/how-to/kubernetes-service-accounts#creating_a_kubernetes_service_account) create a kubernetes service account. In this example, we use `gke-test@k80-exploration.iam.gserviceaccount.com`
+
 Currently, GKE >= 1.18.7 only supported in GKE rapid channel, to find the latest version, please visit [GKE release notes](https://cloud.google.com/kubernetes-engine/docs/release-notes).
 ```
 export PROJECT_ID=<your GCP project ID>
 export ZONE=<GCP zone of your choice>
 export REGION=<GCP region of your choice>
 export DEPLOYMENT_NAME=<GKE cluster name, triton-gke for example>
+export SERVICE_ACCOUNT=<Your GKE service account, example: gke-test@k80-exploration.iam.gserviceaccount.com>
+
+export PROJECT_ID=k80-exploration
+export ZONE=us-central1-a
+export REGION=us-central1
+export DEPLOYMENT_NAME=triton-gke
+export SERVICE_ACCOUNT=gke-test@k80-exploration.iam.gserviceaccount.com
+
 
 gcloud beta container clusters create ${DEPLOYMENT_NAME} \
 --addons=HorizontalPodAutoscaling,HttpLoadBalancing \
---service-account=gke-test@k80-exploration.iam.gserviceaccount.com \
+--gateway-api=standard \
+--service-account=${SERVICE_ACCOUNT} \
 --machine-type=n1-standard-8 \
 --node-locations=${ZONE} \
 --monitoring=SYSTEM \
@@ -80,7 +91,7 @@ gcloud container node-pools create accel \
   --project ${PROJECT_ID} \
   --zone ${ZONE} \
   --cluster ${DEPLOYMENT_NAME} \
-  --service-account=gke-test@k80-exploration.iam.gserviceaccount.com \
+  --service-account=${SERVICE_ACCOUNT} \
   --num-nodes 2 \
   --accelerator type=nvidia-tesla-t4,count=1 \
   --enable-autoscaling --min-nodes 2 --max-nodes 3 \
@@ -101,16 +112,10 @@ kubectl create clusterrolebinding cluster-admin-binding --clusterrole cluster-ad
 # enable stackdriver custom metrics adaptor
 kubectl apply -f https://raw.githubusercontent.com/GoogleCloudPlatform/k8s-stackdriver/master/custom-metrics-stackdriver-adapter/deploy/production/adapter_new_resource_model.yaml
 
-# use helm to install istio, update helm chart, make sure your helm client version > 3.6
-helm repo add istio https://istio-release.storage.googleapis.com/charts
-helm repo update
-kubectl create namespace istio-system
-helm install istio-base istio/base -n istio-system
-helm install istiod istio/istiod -n istio-system --wait
-kubectl create namespace istio-ingress
-kubectl label namespace istio-ingress istio-injection=enabled
-helm install istio-ingress istio/gateway -n istio-ingress --wait 
+# create a ip for ingress traffic
+gcloud compute addresses create ingress-triton --global
 ```
+
 Creating a cluster and adding GPU nodes could take up-to 10 minutes. Please be patient after executing this command. GPU resources in GCP could be fully utilized, so please try a different zone in case compute resource cannot be allocated. After GKE cluster is running, run `kubectl get pods --all-namespaces` to make sure the client can access the cluster correctly: 
 
 If user would like to experiment with A100 MIG partitioned GPU in GKE, please create node pool with following command:
@@ -126,10 +131,6 @@ gcloud beta container node-pools create accel \
   --disk-size=100 \
   --scopes cloud-platform \
   --verbosity error
-
-# deploy a newer NVIDIA device plugin for GKE to prepare GPU nodes for driver install, additional line to install MIG
-kubectl apply -f https://raw.githubusercontent.com/GoogleCloudPlatform/container-engine-accelerators/master/cmd/nvidia_gpu/device-plugin.yaml
-kubectl apply -f https://raw.githubusercontent.com/GoogleCloudPlatform/container-engine-accelerators/master/nvidia-driver-installer/cos/daemonset-nvidia-mig.yaml
 ```
 
 Please note that A100 MIG in GKE does not support GPU metrics yet, also Triton GPU Metrics is not compatiable with A100 MIG. Hence, please disable GPU metrics by unselect allowGPUMetrics while deploy Triton GKE app. Also for the same reason, this deployer doesn't support inference workfload auto-scaling on A100 MIG as well.  
@@ -142,10 +143,11 @@ Where <xx.yy> is the version of NGC Triton container needed.
 
 We want to discuss HPA autoscaling metrics users can leverage. GPU Power(Percentage of Power) tends to be a reliable metric, especially for larger GPU like V100 and A100. GKE currently natively support GPU duty cycle which is GPU utilization in `nvidia-smi`. We ask users always profile their model to determine the autoscaling target and metrics. When attempting to select the right metrics for autoscaling, the goal should be to pick metrics based on the following: 1, meet SLA rrequirement. 2, give consideration to transient request load, 3, keep GPU as fully utilized as possible. Profiling comes in 2 aspects: If user decided to use Duty Cycle or other GPU metric, it is recommend establish baseline to link SLA requirement such as latency with GPU metrics, for example, for model A, latency will be below 10ms 99% of time when Duty Cycle is below 80% utilized. Additionally, profiling also provide insight to model optimization for inference, with tools like [Nsight](https://developer.nvidia.com/nsight-systems).
 
-As the application deployed successfully, get Istio Ingress host and port
+As the application deployed successfully, get the public ip from ingress
 ```
-export INGRESS_HOST=$(kubectl -n istio-system get service istio-ingressgateway -o jsonpath='{.status.loadBalancer.ingress[0].ip}')
-export INGRESS_PORT=$(kubectl -n istio-system get service istio-ingressgateway -o jsonpath='{.spec.ports[?(@.name=="http2")].port}')
+> kubectl get ingress
+NAME              CLASS    HOSTS   ADDRESS          PORTS   AGE
+triton-external   <none>   *       35.186.215.182   80      107s
 ```
 
 Third, we will try sending request to server with provide client example.
@@ -185,6 +187,5 @@ See the following resources to learn more about NVIDIA Triton Inference Server a
 
 ## Known Issues
 
-- When EXTERNAL-IP stuck in pending state, user can do `kubectl describe svc istio-ingressgateway -n istio-system` to understand and cause, then proceed to increase quota for `Forwarding Rules` as `compute.googleapis.com/forwarding_rules`, `TARGET_POOLS` as `compute.googleapis.com/target_pools` or `HEALTH_CHECKS` as `compute.googleapis.com/health_checks`
 - GKE one click cluster creation doesn't support GPU node pools at the moment, users have to mannually create a compatible (>=1.18.7) cluster and attach node pool (T4 and A100 MIG recommended)
 - When Horizontal Pod Autoscaler(HPA) expand and all GPU node pool already utilized, GKE will request new GPU node and it can take between 4-7 minutes, it could be a long wait plus GPU driver install and image pulling. We recommend user to leverage multi-tier model serving and Triton's priority feature to create cushion for latency critical models, and allocate active standby GPU node for spike of requests.
