@@ -1,35 +1,7 @@
 cff-version: 1.2.0
 message: "If you use this software, please cite it as below."
-title: "Triton Inference Server: an optimized cloud and edge inferencing solution."
+title: "Triton Inference Server: An Optimized Cloud and Edge Inferencing Solution."
 url: https://github.com/triton-inference-server
 repository-code: https://github.com/triton-inference-server/server
 authors:
-  - family-names: Goodwin
-    given-names: David
-  - family-names: Luo
-    given-names: Guan
-  - family-names: Verma
-    given-names: Tanmay
-  - family-names: Jain
-    given-names: Hemant
-  - family-names: Tabrizian
-    given-names: Iman
-  - family-names: Yang
-    given-names: Katherine
-  - family-names: Yastremsky
-    given-names: David
-  - family-names: McCormick
-    given-names: Ryan
-  - family-names: McGill
-    given-names: Kyle
-  - family-names: Hung
-    given-names: Kris
-  - family-names: Hui
-    given-names: Jacky
-  - family-names: Andreeva
-    given-names: Olga
-  - family-names: Chornyi
-    given-names: Misha
-  - family-names: Zier
-    given-names: David
-
+  - name: "NVIDIA Corporation"
