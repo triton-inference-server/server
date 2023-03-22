@@ -76,12 +76,6 @@ export REGION=<GCP region of your choice>
 export DEPLOYMENT_NAME=<GKE cluster name, triton-gke for example>
 export SERVICE_ACCOUNT=<Your GKE service account, example: gke-test@k80-exploration.iam.gserviceaccount.com>
 
-export PROJECT_ID=k80-exploration
-export ZONE=us-central1-a
-export REGION=us-central1
-export DEPLOYMENT_NAME=triton-gke
-export SERVICE_ACCOUNT=gke-test@k80-exploration.iam.gserviceaccount.com
-
 gcloud beta container clusters create ${DEPLOYMENT_NAME} \
 --addons=HorizontalPodAutoscaling,HttpLoadBalancing \
 --service-account=${SERVICE_ACCOUNT} \
