@@ -37,7 +37,7 @@ gcpMarketplace: true
 
 image:
   registry: gcr.io
-  repository: k80-exploration/tritonserver
+  repository: nvidia-ngc-public/tritonserver
   tag: 23.02-py3
   pullPolicy: IfNotPresent
   # modify the model repository here to match your GCP storage bucket
