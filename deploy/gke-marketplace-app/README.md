@@ -72,10 +72,8 @@ export REGION=us-central1
 export DEPLOYMENT_NAME=triton-gke
 export SERVICE_ACCOUNT=gke-test@k80-exploration.iam.gserviceaccount.com
 
-
 gcloud beta container clusters create ${DEPLOYMENT_NAME} \
 --addons=HorizontalPodAutoscaling,HttpLoadBalancing \
---gateway-api=standard \
 --service-account=${SERVICE_ACCOUNT} \
 --machine-type=n1-standard-8 \
 --node-locations=${ZONE} \
