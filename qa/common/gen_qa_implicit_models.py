@@ -344,7 +344,7 @@ def create_onnx_modelfile_with_initial_state(models_dir, model_version,
         if onnx_dtype == onnx.TensorProto.FLOAT16:
             cast = onnx.helper.make_node("Identity", ["CAST"], ["OUTPUT"])
             cast_output_state = onnx.helper.make_node("Identity", ["CAST"],
-                                                  ["OUTPUT_STATE"])
+                                                      ["OUTPUT_STATE"])
         onnx_nodes = [
             internal_input, internal_input_state, add, cast, cast_output_state
         ]
