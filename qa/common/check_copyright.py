@@ -61,7 +61,7 @@ SKIP_PATHS = (
     'qa/L0_warmup/raw_mug_data', 'qa/L0_java_resnet/expected_output_data',
     'qa/L0_trt_dla_jetson/trt_dla_model_store',
     'qa/openvino_models/dynamic_batch', 'qa/openvino_models/fixed_batch',
-    'TRITON_VERSION')
+    'CITATION.cff', 'TRITON_VERSION')
 
 COPYRIGHT_YEAR_RE = 'Copyright( \\(c\\))? 20[1-9][0-9](-(20)?[1-9][0-9])?(,((20[2-9][0-9](-(20)?[2-9][0-9])?)|([2-9][0-9](-[2-9][0-9])?)))*,? NVIDIA CORPORATION( & AFFILIATES)?. All rights reserved.'
 
