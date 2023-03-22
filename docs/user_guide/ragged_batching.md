@@ -57,12 +57,13 @@ How ragged input are processed in a batch of requests depends on the backend
 implementation. The backends, such as
 [ONNX Runtime backend](https://github.com/triton-inference-server/onnxruntime_backend),
 [TensorFlow backend](https://github.com/triton-inference-server/tensorflow_backend),
+[PyTorch backend](https://github.com/triton-inference-server/pytorch_backend),
 and [TensorRT backend](https://github.com/triton-inference-server/tensorrt_backend),
 require models to accept ragged inputs as 1-dimensional tensors.
 These backends concatenates the request inputs into the 1-dimensional tensor.
 
 Because the concatenated input doesn't track the start and end index for each
-request, the backends also require the model to have additional input(s),
+request, the backends often require the model to have additional input(s),
 [batch input](#batch-input), that describe various information about the batch
 formed.
 

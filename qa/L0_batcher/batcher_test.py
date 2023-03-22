@@ -1,4 +1,4 @@
-# Copyright 2018-2022, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright 2018-2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -71,6 +71,8 @@ if "plan" in _trials:
     _ragged_batch_supported_trials.append("plan")
 if "onnx" in _trials:
     _ragged_batch_supported_trials.append("onnx")
+if "libtorch" in _trials:
+    _ragged_batch_supported_trials.append("libtorch")
 
 _max_queue_delay_ms = 10000
 

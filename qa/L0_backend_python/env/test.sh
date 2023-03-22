@@ -120,6 +120,38 @@ for EXPECTED_VERSION_STRING in "$PY36_VERSION_STRING" "$PY37_VERSION_STRING" "$P
 done
 set -e
 
+rm $SERVER_LOG
+
+## Test re-extraction of environment.
+SERVER_ARGS="--model-repository=`pwd`/models --log-verbose=1 --model-control-mode=explicit"
+run_server
+if [ "$SERVER_PID" == "0" ]; then
+    echo -e "\n***\n*** Failed to start $SERVER\n***"
+    cat $SERVER_LOG
+    exit 1
+fi
+# The environment should be extracted
+curl -v -X POST localhost:8000/v2/repository/models/python_3_8/load
+touch -m models/python_3_8/1/model.py
+# The environment should not be re-extracted
+curl -v -X POST localhost:8000/v2/repository/models/python_3_8/load
+touch -m models/python_3_8/python_3_8_environment.tar.gz
+# The environment should be re-extracted
+curl -v -X POST localhost:8000/v2/repository/models/python_3_8/load
+
+kill $SERVER_PID
+wait $SERVER_PID
+
+set +e
+
+PY38_ENV_EXTRACTION="Extracting Python execution env" 
+if [ `grep -c "${PY38_ENV_EXTRACTION}" ${SERVER_LOG}` != "2" ]; then
+    cat $SERVER_LOG
+    echo -e "\n***\n*** Python execution environment should be extracted exactly twice. \n***"
+    RET=1
+fi
+set -e
+
 # Test execution environments with S3
 # S3 credentials are necessary for this test. Pass via ENV variables
 aws configure set default.region $AWS_DEFAULT_REGION && \
