@@ -67,4 +67,4 @@ class TritonUser(HttpUser):
             self.data = json.load(f)
 
         self.url1 = '{}/v2/models/{}/infer'.format(self.environment.host,
-                                                   'bert_large')
+                                                   'bert')
