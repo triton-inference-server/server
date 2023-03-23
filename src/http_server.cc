@@ -2357,7 +2357,7 @@ HTTPAPIServer::EVBufferToInput(
       AllocPayload::OutputInfo::JSON;
 
   triton::common::TritonJson::Value params_json;
-  if (request_json.MemberAsObject("parameters", &params_json) == nullptr) {
+  if (request_json.Find("parameters", &params_json)) {
     std::vector<std::string> parameters;
     RETURN_MSG_IF_ERR(
         params_json.Members(&parameters), "failed to get request params.");
