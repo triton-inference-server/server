@@ -35,6 +35,9 @@ For those who like a [high level overview](#overview), below is the common flow 
 
 For those who wish to jump right in, skip to the [end-to-end example](#end-to-end-example).
 
+For additional material, see the 
+[Triton Conceptual Guide tutorial](https://github.com/triton-inference-server/tutorials/tree/main/Conceptual_Guide/Part_4-inference_acceleration).
+
 ## Overview
 
 1. Is my model compatible with Triton?

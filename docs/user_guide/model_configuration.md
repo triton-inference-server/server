@@ -619,7 +619,8 @@ GPU 0 and two execution instances on GPUs 1 and 2.
     }
   ]
 ```
-
+For a more detailed example of using instance groups, see
+ [this guide](https://github.com/triton-inference-server/tutorials/tree/main/Conceptual_Guide/Part_2-improving_resource_utilization#concurrent-model-execution).
 ### CPU Model Instance
 
 The instance group setting is also used to enable execution of a model
@@ -797,7 +798,9 @@ configuration. These settings control the preferred size(s) of the
 dynamically created batches, the maximum time that requests can be
 delayed in the scheduler to allow other requests to join the dynamic
 batch, and queue properties such a queue size, priorities, and
-time-outs.
+time-outs. Refer to 
+[this guide](https://github.com/triton-inference-server/tutorials/tree/main/Conceptual_Guide/Part_2-improving_resource_utilization#what-is-dynamic-batching)
+for a more detailed example of dynamic batching.
 
 #### Recommended Configuration Process
 
