@@ -26,7 +26,6 @@
 
 import os
 import signal
-import triton_python_backend_utils as pb_utils
 
 
 class TritonPythonModel:
