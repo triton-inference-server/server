@@ -25,15 +25,16 @@
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 import os
+import time
 import signal
 
 
 class TritonPythonModel:
 
     def initialize(self, args):
+        time.sleep(3)
         # Simulate the case that the model goes out of memory and gets killed
         # by the OOM killer
-        x = bytearray(1024 * 1024 * 5000)
         os.kill(os.getpid(), signal.SIGKILL)
 
     def execute(self, requests):

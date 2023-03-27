@@ -342,7 +342,7 @@ mkdir -p models/init_exit/1/
 cp ../python_models/init_exit/model.py ./models/init_exit/1/model.py
 cp ../python_models/init_exit/config.pbtxt ./models/init_exit/config.pbtxt
 
-ERROR_MESSAGE="Stub process 'init_exit_0' is not healthy during model intialization."
+ERROR_MESSAGE="Stub process 'init_exit_0' is not healthy."
 
 prev_num_pages=`get_shm_pages`
 run_server
