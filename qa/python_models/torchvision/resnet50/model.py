@@ -37,7 +37,7 @@ class TritonPythonModel:
         This function initializes pre-trained ResNet50 model.
         """
         self.device = 'cuda' if args["model_instance_kind"] == "GPU" else 'cpu'
-        self.model = torch.hub.load("pytorch/vision", "resnet50", weights="IMAGENET1K_V2")\
+        self.model = torch.hub.load("pytorch/vision:v0.14.1", "resnet50", weights="IMAGENET1K_V2")\
                         .to(self.device)\
                         .eval()
 
