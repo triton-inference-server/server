@@ -2425,47 +2425,38 @@ HTTPAPIServer::EVBufferToInput(
              "usage "
              "and should not be specified."));
       } else {
+        triton::common::TritonJson::Value value;
+        TRITONSERVER_Error* err;
+        if (!param_json.Find(parameter.c_str(), &value)) {
+          return TRITONSERVER_ErrorNew(
+              TRITONSERVER_ERROR_INTERNAL,
+              ("parameter key '" + parameter + "' was not found in the JSON")
+                  .c_str());
+        }
+
         std::string string_value;
         int64_t int_value;
         bool bool_value;
-        TRITONSERVER_Error* err;
-
-        // String parsing
-        if ((err = params_json.MemberAsString(
-                 parameter.c_str(), &string_value)) != nullptr) {
-          TRITONSERVER_ErrorDelete(err);
-        } else {
+        if (value.IsString()) {
+          RETURN_IF_ERR(value.AsString(&string_value));
           RETURN_IF_ERR(TRITONSERVER_InferenceRequestSetStringParameter(
               irequest, parameter.c_str(), string_value.c_str()));
-          continue;
-        }
-
-        // Int parsing
-        if ((err = params_json.MemberAsInt(parameter.c_str(), &int_value)) !=
-            nullptr) {
-          TRITONSERVER_ErrorDelete(err);
-        } else {
+        } else if (value.IsInt()) {
+          RETURN_IF_ERR(value.AsInt(&int_value));
           RETURN_IF_ERR(TRITONSERVER_InferenceRequestSetIntParameter(
               irequest, parameter.c_str(), int_value));
-          continue;
-        }
-
-        // bool parsing
-        if ((err = params_json.MemberAsBool(parameter.c_str(), &bool_value)) !=
-            nullptr) {
-          TRITONSERVER_ErrorDelete(err);
-        } else {
+        } else if (value.IsBool()) {
+          RETURN_IF_ERR(value.AsBool(&bool_value));
           RETURN_IF_ERR(TRITONSERVER_InferenceRequestSetBoolParameter(
-              irequest, parameter.c_str(), bool_value));
-          continue;
+              irequest, parameter.c_str(), int_value));
+        } else {
+          return TRITONSERVER_ErrorNew(
+              TRITONSERVER_ERROR_INVALID_ARG,
+              ("parameter '" + parameter +
+               "' has invalid type. It should be either "
+               "'int', 'bool', or 'string'.")
+                  .c_str());
         }
-
-        return TRITONSERVER_ErrorNew(
-            TRITONSERVER_ERROR_INVALID_ARG,
-            ("parameter '" + parameter +
-             "' has invalid type. It should be either "
-             "'int', 'bool', or 'string'.")
-                .c_str());
       }
     }
 
