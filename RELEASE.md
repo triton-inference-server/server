@@ -57,8 +57,6 @@
   documentation 
   [here](https://github.com/triton-inference-server/server/blob/main/docs/user_guide/response_cache.md).
 
-* Added concurrent model loading.
-
 * Triton’s 
   [trace tool](https://github.com/triton-inference-server/server/blob/main/docs/user_guide/trace.md) 
   now supports tracing for `request_id`
@@ -69,23 +67,14 @@
   based.
 
 ## Known Issues
-<!-- TODO: Update/verify this section -->
-* In some rare cases Triton might overwrite input tensors while they are still 
-  in use which leads to corrupt input data being used for inference with 
-  TensorRT models. If you encounter accuracy issues with your TensorRT model, 
-  you can work-around the issue by 
-  [enabling the output_copy_stream option](https://github.com/triton-inference-server/common/blob/r23.03/protobuf/model_config.proto#L843-L852) 
-  in your model's configuration. 
+
+* Support for TensorFlow1 will be removed starting from 23.04.
 
 * Some systems which implement `malloc()` may not release memory back to the 
   operating system right away causing a false memory leak. This can be mitigated 
   by using a different malloc implementation. Tcmalloc is installed in the 
   Triton container and can be 
   [used by specifying the library in LD_PRELOAD](https://github.com/triton-inference-server/server/blob/r23.03/docs/user_guide/model_management.md#model-control-mode-explicit).
-
-* When using a custom operator for the PyTorch backend, the operator may not be 
-  loaded due to undefined Python library symbols. This can be work-around by 
-  [specifying Python library in LD_PRELOAD](https://github.com/triton-inference-server/server/blob/r23.03/qa/L0_custom_ops/test.sh#L114-L117).
 
 * Auto-complete may cause an increase in server start time. To avoid a start 
   time increase, users can provide the full model configuration and launch the 
@@ -97,13 +86,6 @@
   metadata about the number of outputs and datatypes. Related PyTorch bug: 
   https://github.com/pytorch/pytorch/issues/38273
 
-* Perf Analyzer stability criteria has been changed which may result in 
-  reporting instability for scenarios that were previously considered stable. 
-  This change has been made to improve the accuracy of Perf Analyzer results. 
-  If you observe this message, it can be resolved by increasing the 
-  `--measurement-interval` in the time windows mode or 
-  `--measurement-request-count` in the count windows mode.
-
 * Triton Client PIP wheels for ARM SBSA are not available from PyPI and pip will 
   install an incorrect Jetson version of Triton Client library for Arm SBSA. 
 
@@ -111,7 +93,7 @@
   image and manually installed.
 
 * Traced models in PyTorch seem to create overflows when int8 tensor values are
-  transformed to int32 on the GPU. 
+  transformed to `int32` on the GPU. 
 
   Refer to https://github.com/pytorch/pytorch/issues/66930 for more information.
 
