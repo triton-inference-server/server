@@ -70,6 +70,10 @@
 
 * Support for TensorFlow1 will be removed starting from 23.04.
 
+* [Triton Inferentia guide](https://github.com/triton-inference-server/python_backend/tree/main/inferentia#inferentia-setup) 
+  is out of date. Some users have reported issues with running Triton on AWS 
+  Inferentia instances.
+
 * Some systems which implement `malloc()` may not release memory back to the 
   operating system right away causing a false memory leak. This can be mitigated 
   by using a different malloc implementation. Tcmalloc is installed in the 
