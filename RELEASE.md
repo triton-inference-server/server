@@ -59,7 +59,7 @@
 
 * Triton’s 
   [trace tool](https://github.com/triton-inference-server/server/blob/main/docs/user_guide/trace.md) 
-  now supports tracing for `request_id`
+  now supports tracing for `request_id`.
 
 * Refer to the 23.03 column of the 
   [Frameworks Support Matrix](https://docs.nvidia.com/deeplearning/frameworks/support-matrix/index.html) 
