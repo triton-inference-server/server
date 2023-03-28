@@ -2426,29 +2426,28 @@ HTTPAPIServer::EVBufferToInput(
              "and should not be specified."));
       } else {
         triton::common::TritonJson::Value value;
-        TRITONSERVER_Error* err;
-        if (!param_json.Find(parameter.c_str(), &value)) {
+        if (!params_json.Find(parameter.c_str(), &value)) {
           return TRITONSERVER_ErrorNew(
               TRITONSERVER_ERROR_INTERNAL,
               ("parameter key '" + parameter + "' was not found in the JSON")
                   .c_str());
         }
 
-        std::string string_value;
-        int64_t int_value;
-        bool bool_value;
         if (value.IsString()) {
+          std::string string_value;
           RETURN_IF_ERR(value.AsString(&string_value));
           RETURN_IF_ERR(TRITONSERVER_InferenceRequestSetStringParameter(
               irequest, parameter.c_str(), string_value.c_str()));
         } else if (value.IsInt()) {
+          int64_t int_value;
           RETURN_IF_ERR(value.AsInt(&int_value));
           RETURN_IF_ERR(TRITONSERVER_InferenceRequestSetIntParameter(
               irequest, parameter.c_str(), int_value));
         } else if (value.IsBool()) {
+          bool bool_value;
           RETURN_IF_ERR(value.AsBool(&bool_value));
           RETURN_IF_ERR(TRITONSERVER_InferenceRequestSetBoolParameter(
-              irequest, parameter.c_str(), int_value));
+              irequest, parameter.c_str(), bool_value));
         } else {
           return TRITONSERVER_ErrorNew(
               TRITONSERVER_ERROR_INVALID_ARG,
