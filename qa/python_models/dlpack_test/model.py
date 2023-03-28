@@ -162,7 +162,7 @@ class PBTensorTest(unittest.TestCase):
         self.assertFalse(pytorch_tensor.is_cuda)
         self.assertEqual(pb_tensor.__dlpack_device__(), pytorch_tensor.__dlpack_device__())
     
-    def test_pdtensor_bool_internal_support(self):
+    def test_bool_datatype(self):
         # [FIXME] pass bool_array directly to `pb_utils.Tensor.from_dlpack`,
         # when numpy release supports DLPack bool type
         bool_array = np.asarray([False, True])
