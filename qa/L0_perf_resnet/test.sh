@@ -227,6 +227,6 @@ if [ "$ARCH" == "x86_64" ]; then
        INSTANCE_CNT=${INSTANCE_CNT} \
        CONCURRENCY=${CONCURRENCY} \
        ARCH=${ARCH} \
-       BACKEND_CONFIG=" --backend-config=tensorflow,version=1" \
+       BACKEND_CONFIG=" --backend-config=tensorflow,version=2" \
        bash -x run_test.sh
 fi
