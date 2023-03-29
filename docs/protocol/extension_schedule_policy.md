@@ -31,14 +31,16 @@
 This document describes Triton's schedule policy extension. The
 schedule-policy extension allows an inference request to provide
 parameters that influence how Triton handles and schedules the
-request.  Because this extension is supported, Triton reports
+request. Because this extension is supported, Triton reports
 “schedule_policy” in the extensions field of its Server Metadata.
 Note the policies are specific to [dynamic
 batcher](https://github.com/triton-inference-server/server/blob/main/docs/user_guide/model_configuration.md#dynamic-batcher)
-and not [sequence
+and only experimental support to [sequence
 batcher](https://github.com/triton-inference-server/server/blob/main/docs/user_guide/model_configuration.md#sequence-batcher) 
 with the [direct](https://github.com/triton-inference-server/server/blob/main/docs/user_guide/architecture.md#direct)
 scheduling strategy.
+
+## Dynamic Batcher
 
 The schedule-policy extension uses request parameters to indicate the
 policy. The parameters and their type are:
@@ -55,6 +57,24 @@ policy. The parameters and their type are:
   the time Triton will take a model-specific action such as
   terminating the request.
 
-Both parameters are optional and if not specified Triton will handle
+Both parameters are optional and, if not specified, Triton will handle
 the request using the default priority and timeout values appropriate
 for the model.
+
+## Sequence Batcher with Direct Scheduling Strategy
+
+**Note that the schedule policy for sequence batcher is at experimental stage
+and it is subject to change.**
+
+The schedule-policy extension uses request parameters to indicate the
+policy. The parameters and their type are:
+
+- "timeout" : int64 value indicating the timeout value for the
+  request, in microseconds. If the request cannot be completed within
+  the time Triton will terminate the request, as well as the corresponding
+  sequence and received requests of the sequence. The timeout will only be
+  applied to requests of the sequences that haven't been processed, the timeout
+  will be ignored if the process of the corresponding sequence has been started.
+
+The parameter is optional and, if not specified, Triton will handle
+the request and corresponding sequence based on the model configuration.
