@@ -32,6 +32,6 @@ setup(
     long_description=open("README.md").read(),
     long_description_content_type="text/markdown",
     packages=find_packages(),
-    install_requires=["mlflow==2.2.1", "tritonclient[all]"],
+    install_requires=["mlflow>=2.2.1,<3.0", "tritonclient[all]"],
     entry_points={"mlflow.deployments": "triton=mlflow_triton.deployments"},
 )
