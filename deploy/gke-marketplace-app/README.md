@@ -56,7 +56,7 @@ This repository contains Google Kubernetes Engine(GKE) Marketplace Application f
 
 First, install this Triton GKE app to an existing GKE cluster with GPU node pool, Google Cloud Marketplace currently doesn't support auto creation of GPU clusters. User has to run following command to create a compatible cluster (gke version >=1.18.7) with GPU node pools, we recommend user to select T4 or A100(MIG) instances type and choose CPU ratio based on profiling of actual inference workflow. 
 
-User need to follow [instruction](https://cloud.google.com/kubernetes-engine/docs/how-to/kubernetes-service-accounts#creating_a_kubernetes_service_account) create a kubernetes service account. In this example, we use `gke-test@k80-exploration.iam.gserviceaccount.com`. Make sure it has access to artifact registry and monitoring viewer. For example to grant access to custom metrics which is requires for the HPA to work:
+Users need to follow these [instructions](https://cloud.google.com/kubernetes-engine/docs/how-to/kubernetes-service-accounts#creating_a_kubernetes_service_account) to create a kubernetes service account. In this example, we use `gke-test@k80-exploration.iam.gserviceaccount.com`. Make sure it has access to artifact registry and monitoring viewer. For example, to grant access to custom metrics which is required for HPA to work:
 ```
 gcloud iam service-accounts add-iam-policy-binding --role \
   roles/iam.workloadIdentityUser --member \
