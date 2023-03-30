@@ -1,4 +1,4 @@
-# Copyright 2019-2022, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright 2019-2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -405,7 +405,7 @@ def create_plan_fixed_modelfile(models_dir, model_version, max_batch, dtype,
     network.mark_output(out0_state.get_output(0))
 
     config = builder.create_builder_config()
-    config.max_workspace_size = 1 << 20
+    config.set_memory_pool_limit(trt.MemoryPoolType.WORKSPACE, 1 << 20)
     builder.max_batch_size = max(1, max_batch)
     try:
         engine_bytes = builder.build_serialized_network(network, config)
@@ -497,7 +497,7 @@ def create_plan_fixed_rf_modelfile(models_dir, model_version, max_batch, dtype,
 
     config = builder.create_builder_config()
     config.flags = flags
-    config.max_workspace_size = 1 << 20
+    config.set_memory_pool_limit(trt.MemoryPoolType.WORKSPACE, 1 << 20)
     builder.max_batch_size = max(1, max_batch)
     try:
         engine_bytes = builder.build_serialized_network(network, config)

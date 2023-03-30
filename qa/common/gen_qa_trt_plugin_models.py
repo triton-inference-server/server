@@ -149,7 +149,7 @@ def create_plan_modelfile(models_dir, max_batch, model_version, plugin_name,
             network.mark_output(plugin_layer.get_output(0))
 
             config = builder.create_builder_config()
-            config.max_workspace_size = 1 << 20
+            config.set_memory_pool_limit(trt.MemoryPoolType.WORKSPACE, 1 << 20)
 
             try:
                 engine_bytes = builder.build_serialized_network(network, config)
@@ -180,7 +180,7 @@ def create_plan_modelfile(models_dir, max_batch, model_version, plugin_name,
             network.mark_output(plugin_layer.get_output(0))
 
             config = builder.create_builder_config()
-            config.max_workspace_size = 1 << 20
+            config.set_memory_pool_limit(trt.MemoryPoolType.WORKSPACE, 1 << 20)
             builder.max_batch_size = max(1, max_batch)
 
             try:
