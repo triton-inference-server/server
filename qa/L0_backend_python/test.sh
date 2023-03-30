@@ -1,5 +1,5 @@
 #!/bin/bash
-# Copyright 2020-2022, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright 2020-2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -335,6 +335,40 @@ done
 
 kill $SERVER_PID
 wait $SERVER_PID
+
+# Test model getting killed during initialization
+rm -fr ./models
+mkdir -p models/init_exit/1/
+cp ../python_models/init_exit/model.py ./models/init_exit/1/model.py
+cp ../python_models/init_exit/config.pbtxt ./models/init_exit/config.pbtxt
+
+ERROR_MESSAGE="Stub process 'init_exit_0' is not healthy."
+
+prev_num_pages=`get_shm_pages`
+run_server
+if [ "$SERVER_PID" != "0" ]; then
+    echo -e "*** FAILED: unexpected success starting $SERVER" >> $CLIENT_LOG
+    RET=1
+    kill $SERVER_PID
+    wait $SERVER_PID
+else
+    if grep "$ERROR_MESSAGE" $SERVER_LOG; then
+        echo -e "Found \"$ERROR_MESSAGE\"" >> $CLIENT_LOG
+    else
+        echo -e "Not found \"$ERROR_MESSAGE\"" >> $CLIENT_LOG
+        RET=1
+    fi
+fi
+
+current_num_pages=`get_shm_pages`
+if [ $current_num_pages -ne $prev_num_pages ]; then
+    cat $SERVER_LOG
+    ls /dev/shm
+    echo -e "\n***\n*** Test Failed. Shared memory pages where not cleaned properly.
+Shared memory pages before starting triton equals to $prev_num_pages
+and shared memory pages after starting triton equals to $current_num_pages \n***"
+    exit 1
+fi
 
 # Disable env test for Jetson since build is non-dockerized and cloud storage repos are not supported
 # Disable ensemble, unittest, io and bls tests for Jetson since GPU Tensors are not supported
