@@ -26,9 +26,9 @@
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 RET=0
-UNIT_TEST="./triton-json-test"
+UNIT_TEST="./triton_json_test"
 TEST_LOG="./triton_json_test.log"
-$UNIT_TEST >> $JSON_TEST_LOG 2>&1
+$UNIT_TEST >> $TEST_LOG 2>&1
 if [ $? -ne 0 ]; then
     cat $TEST_LOG
     echo -e "\n***\n*** Triton Json Unit Test Failed\n***"
