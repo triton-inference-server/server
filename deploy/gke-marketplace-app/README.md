@@ -139,7 +139,13 @@ gcloud beta container node-pools create accel \
 
 Please note that A100 MIG in GKE does not support GPU metrics yet, also Triton GPU Metrics is not compatiable with A100 MIG. Hence, please disable GPU metrics by unselect allowGPUMetrics while deploy Triton GKE app. Also for the same reason, this deployer doesn't support inference workfload auto-scaling on A100 MIG as well.  
 
-Second, go to [GKE Marketplace link](https://console.cloud.google.com/marketplace/details/nvidia-ngc-public/triton-inference-server) to deploy Triton application. User could leave everything as default, if user has model that has been validated with Triton, they can provide GCS path point to that model in Triton format. By default, we provide a BERT large model optimized by TensorRT in public GCS bucket that is compatible with xx.yy release of Triton Server, in `gs://triton_sample_models/xx_yy`, please note this TensorRT engine only work with Tesla T4. Also please note that this bucket locates in us-central1 hence loading model into Triton in other region might be effected. Also the first deployment of Triton Application will be slower than consecutive runs as image needs to be pulled into the GKE cluster. 
+Second, go to this [GKE Marketplace link](https://console.cloud.google.com/marketplace/details/nvidia-ngc-public/triton-inference-server) to deploy Triton application. 
+
+Users can leave everything as default if their models have already been tested/validated with Triton. They can provide a GCS path pointing to the model repository containing their models. By default, we provide a BERT large model optimized by TensorRT in a public demo GCS bucket that is compatible with the `xx.yy` release of Triton Server in `gs://triton_sample_models/xx_yy`. However, please take note of the following about this demo bucket:
+- The TensorRT engine provided in the demo bucket is only compatible with Tesla T4 GPUs. 
+- This bucket is located in `us-central1`, so loading from this bucket into Triton in other regions may be affected.
+- The first deployment of this Triton GKE application will be slower than consecutive runs because the image needs to be pulled into the GKE cluster. 
+- You can find an example of how this model is generated and uploaded [here](trt-engine/README.md).
 
 Where <xx.yy> is the version of NGC Triton container needed.
 
