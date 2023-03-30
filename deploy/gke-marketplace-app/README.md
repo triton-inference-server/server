@@ -115,7 +115,7 @@ kubectl create clusterrolebinding cluster-admin-binding --clusterrole cluster-ad
 # enable stackdriver custom metrics adaptor
 kubectl apply -f https://raw.githubusercontent.com/GoogleCloudPlatform/k8s-stackdriver/master/custom-metrics-stackdriver-adapter/deploy/production/adapter_new_resource_model.yaml
 
-# create a ip for ingress traffic
+# create an ip for ingress traffic
 gcloud compute addresses create ingress-triton --global
 ```
 
