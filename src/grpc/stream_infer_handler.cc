@@ -28,6 +28,78 @@
 
 namespace triton { namespace server { namespace grpc {
 
+// Make sure to keep InferResponseAlloc and OutputBufferQuery logic in sync
+TRITONSERVER_Error*
+StreamInferResponseAlloc(
+    TRITONSERVER_ResponseAllocator* allocator, const char* tensor_name,
+    size_t byte_size, TRITONSERVER_MemoryType preferred_memory_type,
+    int64_t preferred_memory_type_id, void* userp, void** buffer,
+    void** buffer_userp, TRITONSERVER_MemoryType* actual_memory_type,
+    int64_t* actual_memory_type_id)
+{
+  AllocPayload<inference::ModelStreamInferResponse>* payload =
+      reinterpret_cast<AllocPayload<inference::ModelStreamInferResponse>*>(
+          userp);
+
+  auto response = payload->response_queue_->GetLastAllocatedResponse();
+
+  if (response == nullptr) {
+    return TRITONSERVER_ErrorNew(
+        TRITONSERVER_ERROR_INTERNAL,
+        "Unable to access the last allocated response");
+  }
+
+  return ResponseAllocatorHelper(
+      allocator, tensor_name, byte_size, preferred_memory_type,
+      preferred_memory_type_id, response->mutable_infer_response(),
+      payload->shm_map_, buffer, buffer_userp, actual_memory_type,
+      actual_memory_type_id);
+}
+
+TRITONSERVER_Error*
+StreamInferResponseStart(TRITONSERVER_ResponseAllocator* allocator, void* userp)
+{
+  AllocPayload<inference::ModelStreamInferResponse>* payload =
+      reinterpret_cast<AllocPayload<inference::ModelStreamInferResponse>*>(
+          userp);
+
+  // Move to the next response object
+  payload->response_queue_->AllocateResponse();
+
+  return nullptr;  // success
+}
+
+// Make sure to keep InferResponseAlloc and OutputBufferQuery logic in sync
+TRITONSERVER_Error*
+StreamOutputBufferQuery(
+    TRITONSERVER_ResponseAllocator* allocator, void* userp,
+    const char* tensor_name, size_t* byte_size,
+    TRITONSERVER_MemoryType* memory_type, int64_t* memory_type_id)
+{
+  AllocPayload<inference::ModelStreamInferResponse>* payload =
+      reinterpret_cast<AllocPayload<inference::ModelStreamInferResponse>*>(
+          userp);
+  return OutputBufferQueryHelper(
+      allocator, tensor_name, byte_size, payload->shm_map_, memory_type,
+      memory_type_id);
+}
+
+// Make sure to keep InferResponseAlloc, OutputBufferQuery, and
+// OutputBufferAttributes logic in sync
+TRITONSERVER_Error*
+StreamOutputBufferAttributes(
+    TRITONSERVER_ResponseAllocator* allocator, const char* tensor_name,
+    TRITONSERVER_BufferAttributes* buffer_attributes, void* userp,
+    void* buffer_userp)
+{
+  AllocPayload<inference::ModelStreamInferResponse>* payload =
+      reinterpret_cast<AllocPayload<inference::ModelStreamInferResponse>*>(
+          userp);
+
+  return OutputBufferAttributesHelper(
+      allocator, tensor_name, payload->shm_map_, buffer_attributes);
+}
+
 void
 ModelStreamInferHandler::StartNewRequest()
 {
@@ -304,7 +376,6 @@ ModelStreamInferHandler::Process(InferHandler::State* state, bool rpc_ok)
         state->context_->finish_ok_ = false;
       }
 
-
       // Log an error if 'state' is not the expected next response. Mark
       // that the stream did not complete successfully but don't cancel
       // right away... need to wait for any pending reads, inferences
@@ -515,6 +586,5 @@ ModelStreamInferHandler::StreamInferResponseComplete(
     }
   }
 }
-
 
 }}}  // namespace triton::server::grpc

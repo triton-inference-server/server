@@ -28,6 +28,42 @@
 
 namespace triton { namespace server { namespace grpc {
 
+void
+GrpcStatusUtil::Create(::grpc::Status* status, TRITONSERVER_Error* err)
+{
+  if (err == nullptr) {
+    *status = ::grpc::Status::OK;
+  } else {
+    *status = ::grpc::Status(
+        GrpcStatusUtil::CodeToStatus(TRITONSERVER_ErrorCode(err)),
+        TRITONSERVER_ErrorMessage(err));
+  }
+}
+
+::grpc::StatusCode
+GrpcStatusUtil::CodeToStatus(TRITONSERVER_Error_Code code)
+{
+  // GRPC status codes:
+  // https://github.com/grpc/grpc/blob/master/include/grpc/impl/codegen/status.h
+  switch (code) {
+    case TRITONSERVER_ERROR_UNKNOWN:
+      return ::grpc::StatusCode::UNKNOWN;
+    case TRITONSERVER_ERROR_INTERNAL:
+      return ::grpc::StatusCode::INTERNAL;
+    case TRITONSERVER_ERROR_NOT_FOUND:
+      return ::grpc::StatusCode::NOT_FOUND;
+    case TRITONSERVER_ERROR_INVALID_ARG:
+      return ::grpc::StatusCode::INVALID_ARGUMENT;
+    case TRITONSERVER_ERROR_UNAVAILABLE:
+      return ::grpc::StatusCode::UNAVAILABLE;
+    case TRITONSERVER_ERROR_UNSUPPORTED:
+      return ::grpc::StatusCode::UNIMPLEMENTED;
+    case TRITONSERVER_ERROR_ALREADY_EXISTS:
+      return ::grpc::StatusCode::ALREADY_EXISTS;
+  }
+
+  return ::grpc::StatusCode::UNKNOWN;
+}
 
 TRITONSERVER_Error*
 ParseClassificationParams(
@@ -60,6 +96,21 @@ ParseClassificationParams(
   }
 
   return nullptr;  // success
+}
+
+void
+ReadFile(const std::string& filename, std::string& data)
+{
+  data.clear();
+  if (!filename.empty()) {
+    std::ifstream file(filename.c_str(), std::ios::in);
+    if (file.is_open()) {
+      std::stringstream ss;
+      ss << file.rdbuf();
+      file.close();
+      data = ss.str();
+    }
+  }
 }
 
 }}}  // namespace triton::server::grpc

@@ -28,7 +28,6 @@ add_library(
   grpc-endpoint-library EXCLUDE_FROM_ALL
   grpc_server.cc
   grpc_server.h
-  grpc_handler.h
   grpc_handler.cc
   grpc_utils.cc
   grpc_utils.h
@@ -134,5 +133,3 @@ if(${TRITON_ENABLE_NVTX})
     PRIVATE TRITON_ENABLE_NVTX=1
   )
 endif() # TRITON_ENABLE_NVTX
-
-

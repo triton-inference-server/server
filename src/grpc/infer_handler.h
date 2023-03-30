@@ -93,208 +93,518 @@ class Barrier {
   size_t generation_;
 };
 
+//
+// ResponseQueue
+//
+// A simple queue holding the responses to be written. Uses a
+// vector of persistent message objects to prevent allocating
+// memory for each response to be written.
+//
+template <typename ResponseType>
+class ResponseQueue {
+ public:
+  explicit ResponseQueue() { Reset(); }
+
+  ~ResponseQueue()
+  {
+    for (auto response : responses_) {
+      delete response;
+    }
+  }
+
+  // Resets the queue
+  void Reset()
+  {
+    alloc_count_ = 0;
+    ready_count_ = 0;
+    current_index_ = 0;
+    for (auto response : responses_) {
+      response->Clear();
+    }
+  }
+
+  // Gets the response for the non-decoupled models.
+  // Note that there will be a single response in
+  // non-decoupled cases.
+  ResponseType* GetNonDecoupledResponse()
+  {
+    std::lock_guard<std::mutex> lock(mtx_);
+    alloc_count_ = 1;
+    if (responses_.size() < 1) {
+      responses_.push_back(new ResponseType());
+    }
+    return responses_[0];
+  }
+
+  // Allocates a response on the head of the queue
+  void AllocateResponse()
+  {
+    std::lock_guard<std::mutex> lock(mtx_);
+    alloc_count_++;
+    if (responses_.size() < alloc_count_) {
+      responses_.push_back(new ResponseType());
+    }
+  }
+
+  // Gets the last allocated response
+  ResponseType* GetLastAllocatedResponse()
+  {
+    std::lock_guard<std::mutex> lock(mtx_);
+    if (responses_.size() < alloc_count_) {
+      LOG_ERROR
+          << "[INTERNAL] Attempting to access the response not yet allocated";
+      return nullptr;
+    }
+    return responses_[alloc_count_ - 1];
+  }
+
+  // Marks the next non-ready response complete
+  bool MarkNextResponseComplete()
+  {
+    std::lock_guard<std::mutex> lock(mtx_);
+    if (alloc_count_ <= ready_count_) {
+      LOG_ERROR
+          << "[INTERNAL] Attempting to mark an unallocated response complete";
+      return false;
+    }
+    ready_count_++;
+
+    return true;
+  }
+
+  // Gets the current response from the tail of
+  // the queue.
+  ResponseType* GetCurrentResponse()
+  {
+    std::lock_guard<std::mutex> lock(mtx_);
+    if (current_index_ >= ready_count_) {
+      LOG_ERROR << "[INTERNAL] Attempting to access current response when it "
+                   "is not ready";
+      return nullptr;
+    }
+    return responses_[current_index_];
+  }
+
+  // Gets the response at the specified index
+  ResponseType* GetResponseAt(const uint32_t index)
+  {
+    std::lock_guard<std::mutex> lock(mtx_);
+    if (index >= alloc_count_) {
+      LOG_ERROR << "[INTERNAL] Attempting to access response which is not yet "
+                   "allocated";
+      return nullptr;
+    }
+    return responses_[index];
+  }
+
+  // Pops the response from the tail of the queue
+  void PopResponse()
+  {
+    std::lock_guard<std::mutex> lock(mtx_);
+    current_index_++;
+  }
+
+  // Returns whether the queue is empty
+  bool IsEmpty()
+  {
+    std::lock_guard<std::mutex> lock(mtx_);
+    return ((alloc_count_ == ready_count_) && (alloc_count_ == current_index_));
+  }
+
+  // Returns whether the queue has responses
+  // ready to be written.
+  bool HasReadyResponse()
+  {
+    std::lock_guard<std::mutex> lock(mtx_);
+    return (ready_count_ > current_index_);
+  }
+
+ private:
+  std::vector<ResponseType*> responses_;
+  std::mutex mtx_;
+
+  // There are three indices to track the responses in the queue
+  // Tracks the allocated response
+  uint32_t alloc_count_;
+  // Tracks the response that is ready to be written
+  uint32_t ready_count_;
+  // Tracks the response next in the queue to be written
+  uint32_t current_index_;
+};
+
+
+//
+// ShmInfo
+//
+// Simple structure that carries the shared memory information
+//
+struct ShmInfo {
+  ShmInfo(
+      void* base, size_t byte_size, TRITONSERVER_MemoryType memory_type,
+      int64_t memory_type_id, char* cuda_ipc_handle)
+      : base_(base), byte_size_(byte_size), memory_type_(memory_type),
+        memory_type_id_(memory_type_id), cuda_ipc_handle_(cuda_ipc_handle)
+  {
+  }
+  void* base_;
+  size_t byte_size_;
+  TRITONSERVER_MemoryType memory_type_;
+  int64_t memory_type_id_;
+  char* cuda_ipc_handle_;
+};
+
+
+using TensorShmMap = std::unordered_map<std::string, ShmInfo>;
+
+//
+// AllocPayload
+//
+// Simple structure that carries the userp payload needed for
+// allocation.
+//
+template <typename ResponseType>
+struct AllocPayload {
+  using ClassificationMap = std::unordered_map<std::string, uint32_t>;
+
+  explicit AllocPayload() : response_queue_(nullptr) {}
+  ~AllocPayload()
+  {
+    // Don't delete 'response_'.. it is owned by the InferHandlerState
+  }
+
+  std::shared_ptr<ResponseQueue<ResponseType>> response_queue_;
+  uint32_t response_alloc_count_;
+  TensorShmMap shm_map_;
+  ClassificationMap classification_map_;
+
+  // Used to extend the lifetime of the serialized data in case
+  // non-raw contents were provided in the request. Serialized data's
+  // actual lifetime is that of the request whereas AllocPayload's
+  // lifetime is that of a response... but it is convenient to keep it
+  // here.
+  std::list<std::string> serialized_data_;
+};
+
+template <typename ResponseType>
 TRITONSERVER_Error*
-ResponseAllocatorHelper(
+InferAllocatorPayload(
+    const std::shared_ptr<TRITONSERVER_Server>& tritonserver,
+    const std::shared_ptr<SharedMemoryManager>& shm_manager,
+    const inference::ModelInferRequest& request,
+    std::list<std::string>&& serialized_data,
+    std::shared_ptr<ResponseQueue<ResponseType>> response_queue,
+    AllocPayload<ResponseType>* alloc_payload)
+{
+  alloc_payload->response_queue_ = response_queue;
+  alloc_payload->shm_map_.clear();
+  alloc_payload->classification_map_.clear();
+  alloc_payload->serialized_data_ = std::move(serialized_data);
+
+  // If any of the outputs use shared memory, then we must calculate
+  // the memory address for that output and store it in the allocator
+  // payload so that it is available when the allocation callback is
+  // invoked.
+  for (const auto& io : request.outputs()) {
+    std::string region_name;
+    int64_t offset;
+    size_t byte_size;
+    bool has_shared_memory;
+    RETURN_IF_ERR(ParseSharedMemoryParams<
+                  inference::ModelInferRequest::InferRequestedOutputTensor>(
+        io, &has_shared_memory, &region_name, &offset, &byte_size));
+
+    bool has_classification;
+    uint32_t classification_count;
+    RETURN_IF_ERR(ParseClassificationParams(
+        io, &has_classification, &classification_count));
+
+    if (has_shared_memory && has_classification) {
+      return TRITONSERVER_ErrorNew(
+          TRITONSERVER_ERROR_INVALID_ARG,
+          "output can't set both 'shared_memory_region' and "
+          "'classification'");
+    }
+
+    if (has_shared_memory) {
+      void* base;
+      TRITONSERVER_MemoryType memory_type;
+      int64_t memory_type_id;
+      RETURN_IF_ERR(shm_manager->GetMemoryInfo(
+          region_name, offset, &base, &memory_type, &memory_type_id));
+
+      if (memory_type == TRITONSERVER_MEMORY_GPU) {
+#ifdef TRITON_ENABLE_GPU
+        char* cuda_handle;
+        RETURN_IF_ERR(shm_manager->GetCUDAHandle(
+            region_name, reinterpret_cast<cudaIpcMemHandle_t**>(&cuda_handle)));
+        alloc_payload->shm_map_.emplace(
+            io.name(),
+            ShmInfo(base, byte_size, memory_type, memory_type_id, cuda_handle));
+#endif
+      } else {
+        alloc_payload->shm_map_.emplace(
+            io.name(), ShmInfo(
+                           base, byte_size, memory_type, memory_type_id,
+                           nullptr /* cuda_ipc_handle */));
+      }
+    } else if (has_classification) {
+      alloc_payload->classification_map_.emplace(
+          io.name(), classification_count);
+    }
+  }
+
+  return nullptr;  // Success
+}
+
+TRITONSERVER_Error* InferGRPCToInputHelper(
+    const std::string& input_name, const std::string& model_name,
+    const TRITONSERVER_DataType tensor_dt, const TRITONSERVER_DataType input_dt,
+    const size_t binary_data_byte_size);
+
+TRITONSERVER_Error* InferGRPCToInput(
+    const std::shared_ptr<TRITONSERVER_Server>& tritonserver,
+    const std::shared_ptr<SharedMemoryManager>& shm_manager,
+    const inference::ModelInferRequest& request,
+    std::list<std::string>* serialized_data,
+    TRITONSERVER_InferenceRequest* inference_request);
+
+TRITONSERVER_Error* ResponseAllocatorHelper(
     TRITONSERVER_ResponseAllocator* allocator, const char* tensor_name,
     size_t byte_size, TRITONSERVER_MemoryType preferred_memory_type,
     int64_t preferred_memory_type_id, inference::ModelInferResponse* response,
     const TensorShmMap& shm_map, void** buffer, void** buffer_userp,
-    TRITONSERVER_MemoryType* actual_memory_type, int64_t* actual_memory_type_id)
-{
-  *buffer = nullptr;
-  *buffer_userp = nullptr;
-  *actual_memory_type = preferred_memory_type;
-  *actual_memory_type_id = preferred_memory_type_id;
+    TRITONSERVER_MemoryType* actual_memory_type,
+    int64_t* actual_memory_type_id);
 
-  // We add an output contents even if the 'byte_size' == 0 because we
-  // expect to have a contents for every output.
-  inference::ModelInferResponse::InferOutputTensor* output_tensor =
-      response->add_outputs();
-  output_tensor->set_name(tensor_name);
-  std::string* raw_output = response->add_raw_output_contents();
-
-  if (byte_size > 0) {
-    const auto& pr = shm_map.find(tensor_name);
-    if (pr != shm_map.end()) {
-      // The output is in shared memory so check that shared memory
-      // size is at least large enough for the output.
-      if (byte_size > pr->second.byte_size_) {
-        return TRITONSERVER_ErrorNew(
-            TRITONSERVER_ERROR_INTERNAL,
-            std::string(
-                "shared memory size specified with the request for output '" +
-                std::string(tensor_name) + "' (" +
-                std::to_string(pr->second.byte_size_) +
-                " bytes) should be at least " + std::to_string(byte_size) +
-                " bytes to hold the results")
-                .c_str());
-      }
-
-      *buffer = const_cast<void*>(pr->second.base_);
-      *actual_memory_type = pr->second.memory_type_;
-      *actual_memory_type_id = pr->second.memory_type_id_;
-
-      LOG_VERBOSE(1) << "GRPC: using shared-memory for '" << tensor_name
-                     << "', size: " << byte_size << ", addr: " << *buffer;
-      return nullptr;  // Success
-    }
-
-    // Not using shared memory so allocate a buffer. The buffer we
-    // create is directly in the response protobuf so we can't
-    // allocate any type other than CPU.
-    //
-    // FIXME we could use pinned CPU memory here.
-    if (*actual_memory_type != TRITONSERVER_MEMORY_CPU) {
-      LOG_VERBOSE(1) << "GRPC: unable to provide '" << tensor_name << "' in "
-                     << TRITONSERVER_MemoryTypeString(*actual_memory_type)
-                     << ", will use "
-                     << TRITONSERVER_MemoryTypeString(TRITONSERVER_MEMORY_CPU);
-      *actual_memory_type = TRITONSERVER_MEMORY_CPU;
-      *actual_memory_type_id = 0;
-    }
-
-    raw_output->resize(byte_size);
-    *buffer = static_cast<void*>(&((*raw_output)[0]));
-
-    LOG_VERBOSE(1) << "GRPC: using buffer for '" << tensor_name
-                   << "', size: " << byte_size << ", addr: " << *buffer;
-  }
-
-  return nullptr;  // Success
-}
-
-TRITONSERVER_Error*
-OutputBufferAttributesHelper(
+TRITONSERVER_Error* OutputBufferAttributesHelper(
     TRITONSERVER_ResponseAllocator* allocator, const char* tensor_name,
     const TensorShmMap& shm_map,
-    TRITONSERVER_BufferAttributes* buffer_attributes)
-{
-  // We only need to set the cuda ipc handle here. The rest of the buffer
-  // attributes have been properly populated by triton core.
-  if (tensor_name != nullptr) {
-    const auto& pr = shm_map.find(tensor_name);
+    TRITONSERVER_BufferAttributes* buffer_attributes);
 
-    if (pr != shm_map.end()) {
-      if (pr->second.memory_type_ == TRITONSERVER_MEMORY_GPU) {
-        RETURN_IF_ERR(TRITONSERVER_BufferAttributesSetCudaIpcHandle(
-            buffer_attributes, pr->second.cuda_ipc_handle_));
-      }
-    }
-  }
-
-  return nullptr;  // Success
-}
-
-TRITONSERVER_Error*
-OutputBufferQueryHelper(
+TRITONSERVER_Error* OutputBufferQueryHelper(
     TRITONSERVER_ResponseAllocator* allocator, const char* tensor_name,
     size_t* byte_size, const TensorShmMap& shm_map,
-    TRITONSERVER_MemoryType* memory_type, int64_t* memory_type_id)
-{
-  // Check if shared memory is used if named tensor is provided
-  if (tensor_name != nullptr) {
-    const auto& pr = shm_map.find(tensor_name);
-    if (pr != shm_map.end()) {
-      // The output is in shared memory so check that shared memory
-      // size is at least large enough for the output, if byte size is provided
-      if ((byte_size != nullptr) && (*byte_size > pr->second.byte_size_)) {
-        // Don't return error yet and just set to the default properties for
-        // GRPC buffer, error will be raised when allocation happens
-        *memory_type = TRITONSERVER_MEMORY_CPU;
-        *memory_type_id = 0;
-      } else {
-        *memory_type = pr->second.memory_type_;
-        *memory_type_id = pr->second.memory_type_id_;
-      }
-      return nullptr;  // Success
-    }
-  }
-
-  // Not using shared memory so a buffer created directly in
-  // the response protobuf will be used, and the type will be CPU.
-  *memory_type = TRITONSERVER_MEMORY_CPU;
-  *memory_type_id = 0;
-  return nullptr;  // Success
-}
-
+    TRITONSERVER_MemoryType* memory_type, int64_t* memory_type_id);
 
 // Make sure to keep InferResponseAlloc and OutputBufferQuery logic in sync
-TRITONSERVER_Error*
-InferResponseAlloc(
+TRITONSERVER_Error* InferResponseAlloc(
     TRITONSERVER_ResponseAllocator* allocator, const char* tensor_name,
     size_t byte_size, TRITONSERVER_MemoryType preferred_memory_type,
     int64_t preferred_memory_type_id, void* userp, void** buffer,
     void** buffer_userp, TRITONSERVER_MemoryType* actual_memory_type,
-    int64_t* actual_memory_type_id)
-{
-  AllocPayload<inference::ModelInferResponse>* payload =
-      reinterpret_cast<AllocPayload<inference::ModelInferResponse>*>(userp);
+    int64_t* actual_memory_type_id);
 
-  // ModelInfer RPC expects exactly one response per request. Hence,
-  // will be creating and using just one response object.
-  inference::ModelInferResponse* response =
-      payload->response_queue_->GetNonDecoupledResponse();
-  return ResponseAllocatorHelper(
-      allocator, tensor_name, byte_size, preferred_memory_type,
-      preferred_memory_type_id, response, payload->shm_map_, buffer,
-      buffer_userp, actual_memory_type, actual_memory_type_id);
-}
+TRITONSERVER_Error* SetInferenceRequestMetadata(
+    TRITONSERVER_InferenceRequest* inference_request,
+    const inference::ModelInferRequest& request);
+
+void InferRequestComplete(
+    TRITONSERVER_InferenceRequest* request, const uint32_t flags, void* userp);
 
 // Make sure to keep InferResponseAlloc and OutputBufferQuery logic in sync
-TRITONSERVER_Error*
-OutputBufferQuery(
+TRITONSERVER_Error* OutputBufferQuery(
     TRITONSERVER_ResponseAllocator* allocator, void* userp,
     const char* tensor_name, size_t* byte_size,
-    TRITONSERVER_MemoryType* memory_type, int64_t* memory_type_id)
-{
-  AllocPayload<inference::ModelInferResponse>* payload =
-      reinterpret_cast<AllocPayload<inference::ModelInferResponse>*>(userp);
-
-  return OutputBufferQueryHelper(
-      allocator, tensor_name, byte_size, payload->shm_map_, memory_type,
-      memory_type_id);
-}
+    TRITONSERVER_MemoryType* memory_type, int64_t* memory_type_id);
 
 // Make sure to keep InferResponseAlloc, OutputBufferQuery, and
 // OutputBufferAttributes logic in sync
-TRITONSERVER_Error*
-OutputBufferAttributes(
+TRITONSERVER_Error* OutputBufferAttributes(
     TRITONSERVER_ResponseAllocator* allocator, const char* tensor_name,
     TRITONSERVER_BufferAttributes* buffer_attributes, void* userp,
-    void* buffer_userp)
-{
-  AllocPayload<inference::ModelInferResponse>* payload =
-      reinterpret_cast<AllocPayload<inference::ModelInferResponse>*>(userp);
+    void* buffer_userp);
 
-  return OutputBufferAttributesHelper(
-      allocator, tensor_name, payload->shm_map_, buffer_attributes);
-  return nullptr;  // Success
-}
-
-
-TRITONSERVER_Error*
-InferResponseFree(
+TRITONSERVER_Error* InferResponseFree(
     TRITONSERVER_ResponseAllocator* allocator, void* buffer, void* buffer_userp,
     size_t byte_size, TRITONSERVER_MemoryType memory_type,
-    int64_t memory_type_id)
-{
-  LOG_VERBOSE(1) << "GRPC free: "
-                 << "size " << byte_size << ", addr " << buffer;
+    int64_t memory_type_id);
 
-  // Don't do anything when releasing a buffer since InferResponseAlloc
-  // wrote directly into the response protobuf.
-  return nullptr;  // Success
-}
+TRITONSERVER_Error* InferResponseStart(
+    TRITONSERVER_ResponseAllocator* allocator, void* userp);
 
+template <typename ResponseType>
 TRITONSERVER_Error*
-InferResponseStart(TRITONSERVER_ResponseAllocator* allocator, void* userp)
+InferResponseCompleteCommon(
+    TRITONSERVER_Server* server, TRITONSERVER_InferenceResponse* iresponse,
+    inference::ModelInferResponse& response,
+    const AllocPayload<ResponseType>& alloc_payload)
 {
-  AllocPayload<inference::ModelInferResponse>* payload =
-      reinterpret_cast<AllocPayload<inference::ModelInferResponse>*>(userp);
+  RETURN_IF_ERR(TRITONSERVER_InferenceResponseError(iresponse));
 
-  // ModelInfer RPC expects exactly one response per request. Hence, always call
-  // GetNonDecoupledResponse() to create one response object on response start.
-  payload->response_queue_->GetNonDecoupledResponse();
+  const char *model_name, *id;
+  int64_t model_version;
+  RETURN_IF_ERR(TRITONSERVER_InferenceResponseModel(
+      iresponse, &model_name, &model_version));
+  RETURN_IF_ERR(TRITONSERVER_InferenceResponseId(iresponse, &id));
+
+  response.set_id(id);
+  response.set_model_name(model_name);
+  response.set_model_version(std::to_string(model_version));
+
+  // Propagate response parameters.
+  uint32_t parameter_count;
+  RETURN_IF_ERR(TRITONSERVER_InferenceResponseParameterCount(
+      iresponse, &parameter_count));
+  for (uint32_t pidx = 0; pidx < parameter_count; ++pidx) {
+    const char* name;
+    TRITONSERVER_ParameterType type;
+    const void* vvalue;
+    RETURN_IF_ERR(TRITONSERVER_InferenceResponseParameter(
+        iresponse, pidx, &name, &type, &vvalue));
+    inference::InferParameter& param = (*response.mutable_parameters())[name];
+    switch (type) {
+      case TRITONSERVER_PARAMETER_BOOL:
+        param.set_bool_param(*(reinterpret_cast<const bool*>(vvalue)));
+        break;
+      case TRITONSERVER_PARAMETER_INT:
+        param.set_int64_param(*(reinterpret_cast<const int64_t*>(vvalue)));
+        break;
+      case TRITONSERVER_PARAMETER_STRING:
+        param.set_string_param(reinterpret_cast<const char*>(vvalue));
+        break;
+      case TRITONSERVER_PARAMETER_BYTES:
+        return TRITONSERVER_ErrorNew(
+            TRITONSERVER_ERROR_UNSUPPORTED,
+            "Response parameter of type 'TRITONSERVER_PARAMETER_BYTES' is not "
+            "currently supported");
+        break;
+    }
+  }
+
+  // Go through each response output and transfer information to the
+  // corresponding GRPC response output.
+  uint32_t output_count;
+  RETURN_IF_ERR(
+      TRITONSERVER_InferenceResponseOutputCount(iresponse, &output_count));
+  if (output_count != (uint32_t)response.outputs_size()) {
+    return TRITONSERVER_ErrorNew(
+        TRITONSERVER_ERROR_INTERNAL, "response output count mismatch");
+  }
+
+  for (uint32_t output_idx = 0; output_idx < output_count; ++output_idx) {
+    const char* cname;
+    TRITONSERVER_DataType datatype;
+    const int64_t* shape;
+    uint64_t dim_count;
+    const void* base;
+    size_t byte_size;
+    TRITONSERVER_MemoryType memory_type;
+    int64_t memory_type_id;
+    void* userp;
+
+    RETURN_IF_ERR(TRITONSERVER_InferenceResponseOutput(
+        iresponse, output_idx, &cname, &datatype, &shape, &dim_count, &base,
+        &byte_size, &memory_type, &memory_type_id, &userp));
+
+    const std::string name(cname);
+
+    // There are usually very few outputs so fastest just to look for
+    // the one we want... could create a map for cases where there are
+    // a large number of outputs. Or rely on order to be same...
+    inference::ModelInferResponse::InferOutputTensor* output = nullptr;
+    for (auto& io : *(response.mutable_outputs())) {
+      if (io.name() == name) {
+        output = &io;
+        break;
+      }
+    }
+
+    if (output == nullptr) {
+      return TRITONSERVER_ErrorNew(
+          TRITONSERVER_ERROR_INTERNAL,
+          "unable to find expected response output");
+    }
+
+    // If this output was requested as classification then remove the
+    // raw output from the response and instead return classification
+    // results as a string tensor
+    const auto itr = alloc_payload.classification_map_.find(name);
+    if (itr == alloc_payload.classification_map_.end()) {
+      // Not classification...
+      output->set_datatype(TRITONSERVER_DataTypeString(datatype));
+      for (size_t idx = 0; idx < dim_count; idx++) {
+        output->add_shape(shape[idx]);
+      }
+    } else {
+      // Classification
+      const uint32_t classification_count = itr->second;
+
+      // For classification need to determine the batch size, if any,
+      // because need to use that to break up the response for each
+      // batch entry.
+      uint32_t batch_size = 0;
+
+      uint32_t batch_flags;
+      RETURN_IF_ERR(TRITONSERVER_ServerModelBatchProperties(
+          server, model_name, model_version, &batch_flags,
+          nullptr /* voidp */));
+      if ((dim_count > 0) &&
+          ((batch_flags & TRITONSERVER_BATCH_FIRST_DIM) != 0)) {
+        batch_size = shape[0];
+      }
+
+      // Determine the batch1 byte size of the tensor... needed when
+      // the response tensor batch-size > 1 so that we know how to
+      // stride though the tensor data.
+      size_t batch1_element_count = 1;
+      for (size_t idx = ((batch_size == 0) ? 0 : 1); idx < dim_count; idx++) {
+        batch1_element_count *= shape[idx];
+      }
+
+      const size_t batch1_byte_size =
+          batch1_element_count * TRITONSERVER_DataTypeByteSize(datatype);
+
+      // Create the classification contents
+      std::string serialized;
+
+      size_t class_offset = 0;
+      for (uint32_t bs = 0; bs < std::max((uint32_t)1, batch_size); ++bs) {
+        std::vector<std::string> class_strs;
+        RETURN_IF_ERR(TopkClassifications(
+            iresponse, output_idx,
+            reinterpret_cast<const char*>(base) + class_offset,
+            ((class_offset + batch1_byte_size) > byte_size) ? 0
+                                                            : batch1_byte_size,
+            datatype, classification_count, &class_strs));
+
+        // Serialize for binary representation...
+        for (const auto& str : class_strs) {
+          uint32_t len = str.size();
+          serialized.append(reinterpret_cast<const char*>(&len), sizeof(len));
+          if (len > 0) {
+            serialized.append(str);
+          }
+        }
+
+        class_offset += batch1_byte_size;
+      }
+
+      // Update the output with new datatype, shape and contents.
+      output->set_datatype(
+          TRITONSERVER_DataTypeString(TRITONSERVER_TYPE_BYTES));
+
+      if (batch_size > 0) {
+        output->add_shape(batch_size);
+      }
+      output->add_shape(
+          std::min(classification_count, (uint32_t)batch1_element_count));
+
+      (*response.mutable_raw_output_contents())[output_idx] =
+          std::move(serialized);
+    }
+  }
+
+  // Make sure response doesn't exceed GRPC limits.
+  if (response.ByteSizeLong() > MAX_GRPC_MESSAGE_SIZE) {
+    return TRITONSERVER_ErrorNew(
+        TRITONSERVER_ERROR_INVALID_ARG,
+        std::string(
+            "Response has byte size " +
+            std::to_string(response.ByteSizeLong()) +
+            " which exceeds gRPC's byte size limit " + std::to_string(INT_MAX) +
+            ".")
+            .c_str());
+  }
 
   return nullptr;  // success
 }
