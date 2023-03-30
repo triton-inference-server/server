@@ -1,4 +1,4 @@
-# Copyright 2020-2021, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright 2020-2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -49,8 +49,12 @@ def div_up(a, b):
 def reformat(format, tensor_np):
     if format == "CHW2":
         factor = 2
-    if format == "CHW32":
+    elif format == "CHW32":
         factor = 32
+    else:
+        raise ValueError(
+            "Unexpected format {} for testing reformat-free input".format(
+                format))
     shape = list(tensor_np.shape) + [factor]
     shape[-4] = div_up(shape[-4], factor)
     reformatted_tensor_np = np.empty(shape, tensor_np.dtype)

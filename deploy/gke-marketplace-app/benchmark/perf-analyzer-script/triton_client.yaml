@@ -33,7 +33,7 @@ metadata:
   namespace: default
 spec:
   containers:
-  - image: nvcr.io/nvidia/tritonserver:23.02-py3-sdk
+  - image: nvcr.io/nvidia/tritonserver:23.03-py3-sdk
     imagePullPolicy: Always
     name: nv-triton-client
     securityContext:
