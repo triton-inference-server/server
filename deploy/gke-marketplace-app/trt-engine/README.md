@@ -36,8 +36,6 @@ docker run --gpus all -it --network host \
     -v ~:/scripts nvcr.io/nvidia/tensorrt:23.02-py3 
 
 pip install onnx six torch tf2onnx tensorflow 
-# pip uninstall protobuf 
-# pip install protobuf==3.20.2
 
 git clone -b main https://github.com/NVIDIA/TensorRT.git
 cd TensorRT
