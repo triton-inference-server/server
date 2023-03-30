@@ -41,7 +41,7 @@
 This repository contains Google Kubernetes Engine(GKE) Marketplace Application for NVIDIA Triton Inference Server deployer. 
 
  - Triton GKE deployer is a helm chart deployer recommended by GKE Marketplace
- - Triton GKE deployer deploy an GKE ingress which accept public inference request
+ - Triton GKE deployer deploys a GKE ingress which accepts public inference requests
  - Triton GKE deployer includes a horizontal pod autoscaler(HPA) which relies on [stack driver custom metrics adaptor](https://github.com/GoogleCloudPlatform/k8s-stackdriver/tree/master/custom-metrics-stackdriver-adapter) to monitor GPU duty cycle, and auto scale GPU nodes.
  - This repo also contains a sample to generate BERT model with TensorRT and use Locust to experiment with GPU node autoscaling and monitor client latency/throughput. 
 
