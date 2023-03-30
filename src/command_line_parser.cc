@@ -1070,6 +1070,7 @@ TritonParser::Parse(int argc, char** argv)
         break;
       case OPTION_HTTP_ADDRESS:
         lparams.http_address_ = optarg;
+        break;
       case OPTION_HTTP_HEADER_FORWARD_PATTERN:
         lparams.http_forward_header_pattern_ = optarg;
         break;

@@ -97,7 +97,9 @@ class HTTPMetricsServer : public HTTPServer {
   explicit HTTPMetricsServer(
       const std::shared_ptr<TRITONSERVER_Server>& server, const int32_t port,
       std::string address, const int thread_cnt)
-      : HTTPServer(port, false /* reuse_port */, address, thread_cnt),
+      : HTTPServer(
+            port, false /* reuse_port */, address,
+            "" /* header forward pattern*/, thread_cnt),
         server_(server), api_regex_(R"(/metrics/?)")
   {
   }
@@ -116,8 +118,9 @@ class HTTPAPIServer : public HTTPServer {
       const std::shared_ptr<TRITONSERVER_Server>& server,
       triton::server::TraceManager* trace_manager,
       const std::shared_ptr<SharedMemoryManager>& smb_manager,
-      const int32_t port, const bool reuse_port, std::string address,
-      const int thread_cnt, std::unique_ptr<HTTPServer>* http_server);
+      const int32_t port, const bool reuse_port, const std::string& address,
+      const std::string& header_forward_pattern, const int thread_cnt,
+      std::unique_ptr<HTTPServer>* http_server);
 
   virtual ~HTTPAPIServer();
 

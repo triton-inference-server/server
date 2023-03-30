@@ -70,7 +70,7 @@
 #include "vertex_ai_server.h"
 #endif  // TRITON_ENABLE_VERTEX_AI
 #ifdef TRITON_ENABLE_GRPC
-#include "grpc_server.h"
+#include "grpc/grpc_server.h"
 #endif  // TRITON_ENABLE_GRPC
 
 #ifdef TRITON_ENABLE_GPU
@@ -137,8 +137,8 @@ StartHttpService(
   TRITONSERVER_Error* err = triton::server::HTTPAPIServer::Create(
       server, trace_manager, shm_manager, g_triton_params.http_port_,
       g_triton_params.reuse_http_port_, g_triton_params.http_address_,
-      g_triton_params.http_thread_cnt_,
-      g_triton_params.http_forward_header_pattern_, service);
+      g_triton_params.http_forward_header_pattern_,
+      g_triton_params.http_thread_cnt_, service);
   if (err == nullptr) {
     err = (*service)->Start();
   }

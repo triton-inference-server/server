@@ -34,7 +34,6 @@
 #include <thread>
 #include <unordered_map>
 #include <vector>
-
 #include "triton/common/logging.h"
 #include "triton/core/tritonserver.h"
 #if defined(TRITON_ENABLE_HTTP) || defined(TRITON_ENABLE_METRICS)
@@ -47,7 +46,7 @@
 #include "vertex_ai_server.h"
 #endif  // TRITON_ENABLE_VERTEX_AI
 #ifdef TRITON_ENABLE_GRPC
-#include "grpc_server.h"
+#include "grpc/grpc_server.h"
 #endif  // TRITON_ENABLE_GRPC
 
 #ifndef _WIN32

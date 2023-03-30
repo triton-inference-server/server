@@ -32,11 +32,9 @@
 
 #include <event2/buffer.h>
 #include <re2/re2.h>
-
 #include <algorithm>
 #include <list>
 #include <thread>
-
 #include "classification.h"
 
 #define TRITONJSON_STATUSTYPE TRITONSERVER_Error*
@@ -975,9 +973,10 @@ HTTPAPIServer::HTTPAPIServer(
     const std::shared_ptr<TRITONSERVER_Server>& server,
     triton::server::TraceManager* trace_manager,
     const std::shared_ptr<SharedMemoryManager>& shm_manager, const int32_t port,
-    const bool reuse_port, const std::string address, const int thread_cnt)
-    : HTTPServer(port, reuse_port, address, thread_cnt), server_(server),
-      trace_manager_(trace_manager), shm_manager_(shm_manager),
+    const bool reuse_port, const std::string& address,
+    const std::string& header_forward_pattern, const int thread_cnt)
+    : HTTPServer(port, reuse_port, address, header_forward_pattern, thread_cnt),
+      server_(server), trace_manager_(trace_manager), shm_manager_(shm_manager),
       allocator_(nullptr), server_regex_(R"(/v2(?:/health/(live|ready))?)"),
       model_regex_(
           R"(/v2/models/([^/]+)(?:/versions/([0-9]+))?(?:/(infer|ready|config|stats|trace/setting))?)"),
