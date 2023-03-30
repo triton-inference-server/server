@@ -74,7 +74,7 @@ policy. The parameters and their type are:
   the time Triton will terminate the request, as well as the corresponding
   sequence and received requests of the sequence. The timeout will only be
   applied to requests of the sequences that haven't been processed, the timeout
-  will be ignored if the process of the corresponding sequence has been started.
+  will be ignored if the corresponding sequence has been scheduled.
 
 The parameter is optional and, if not specified, Triton will handle
 the request and corresponding sequence based on the model configuration.
