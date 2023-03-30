@@ -25,21 +25,22 @@
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #pragma once
 
+#include <evhtp/evhtp.h>
 #include <re2/re2.h>
+
 #include <list>
 #include <map>
 #include <memory>
 #include <string>
 #include <thread>
 #include <unordered_map>
+
 #include "common.h"
 #include "data_compressor.h"
 #include "shared_memory_manager.h"
 #include "tracer.h"
 #include "triton/common/logging.h"
 #include "triton/core/tritonserver.h"
-
-#include <evhtp/evhtp.h>
 
 namespace triton { namespace server {
 
@@ -53,10 +54,10 @@ class HTTPServer {
 
  protected:
   explicit HTTPServer(
-      const int32_t port, const bool reuse_port, const std::string address,
-      const int thread_cnt)
+      const int32_t port, const bool reuse_port, const std::string& address,
+      const std::string& header_forward_pattern, const int thread_cnt)
       : port_(port), reuse_port_(reuse_port), address_(address),
-        thread_cnt_(thread_cnt)
+        header_forward_pattern_(header_forward_pattern), thread_cnt_(thread_cnt)
   {
   }
 
@@ -71,6 +72,7 @@ class HTTPServer {
   int32_t port_;
   bool reuse_port_;
   std::string address_;
+  std::string header_forward_pattern_;
   int thread_cnt_;
 
   evhtp_t* htp_;
@@ -229,8 +231,8 @@ class HTTPAPIServer : public HTTPServer {
       const std::shared_ptr<TRITONSERVER_Server>& server,
       triton::server::TraceManager* trace_manager,
       const std::shared_ptr<SharedMemoryManager>& shm_manager,
-      const int32_t port, const bool reuse_port, const std::string address,
-      const int thread_cnt);
+      const int32_t port, const bool reuse_port, const std::string& address,
+      const std::string& header_forward_pattern, const int thread_cnt);
   virtual void Handle(evhtp_request_t* req) override;
   virtual std::unique_ptr<InferRequestClass> CreateInferRequest(
       evhtp_request_t* req)

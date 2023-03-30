@@ -39,12 +39,14 @@
 #endif
 
 #include <stdint.h>
+
 #include <algorithm>
 #include <cctype>
 #include <iomanip>
 #include <iostream>
 #include <sstream>
 #include <thread>
+
 #include "triton_signal.h"
 
 #ifdef TRITON_ENABLE_ASAN
@@ -135,7 +137,8 @@ StartHttpService(
   TRITONSERVER_Error* err = triton::server::HTTPAPIServer::Create(
       server, trace_manager, shm_manager, g_triton_params.http_port_,
       g_triton_params.reuse_http_port_, g_triton_params.http_address_,
-      g_triton_params.http_thread_cnt_, service);
+      g_triton_params.http_thread_cnt_,
+      g_triton_params.http_forward_header_pattern_, service);
   if (err == nullptr) {
     err = (*service)->Start();
   }

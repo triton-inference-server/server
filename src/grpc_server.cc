@@ -49,6 +49,7 @@
 #include "grpc++/server_context.h"
 #include "grpc++/support/status.h"
 #include "triton/common/logging.h"
+#include "triton/common/table_printer.h"
 #include "triton/core/tritonserver.h"
 
 #define TRITONJSON_STATUSTYPE TRITONSERVER_Error*
@@ -5043,21 +5044,22 @@ Server::Server(
         GRPC_ARG_HTTP2_MAX_PING_STRIKES,
         keepalive_options.http2_max_ping_strikes_);
 
-    LOG_VERBOSE(1) << "=== GRPC KeepAlive Options ===";
-    LOG_VERBOSE(1) << "keepalive_time_ms: "
-                   << keepalive_options.keepalive_time_ms_;
-    LOG_VERBOSE(1) << "keepalive_timeout_ms: "
-                   << keepalive_options.keepalive_timeout_ms_;
-    LOG_VERBOSE(1) << "keepalive_permit_without_calls: "
-                   << keepalive_options.keepalive_permit_without_calls_;
-    LOG_VERBOSE(1) << "http2_max_pings_without_data: "
-                   << keepalive_options.http2_max_pings_without_data_;
-    LOG_VERBOSE(1)
-        << "http2_min_recv_ping_interval_without_data_ms: "
-        << keepalive_options.http2_min_recv_ping_interval_without_data_ms_;
-    LOG_VERBOSE(1) << "http2_max_ping_strikes: "
-                   << keepalive_options.http2_max_ping_strikes_;
-    LOG_VERBOSE(1) << "==============================";
+    TablePrinter table_printer({"GRPC KeepAlive Option", "Value"});
+    table_printer.InsertRow(
+        {"keepalive_time_ms", keepalive_options.keepalive_time_ms_});
+    table_printer.InsertRow(
+        {"keepalive_timeout_ms", keepalive_options.keepalive_timeout_ms_});
+    table_printer.InsertRow(
+        {"keepalive_permit_without_calls",
+         keepalive_options.keepalive_permit_without_calls_});
+    table_printer.InsertRow({"http2_max_pings_without_data",
+                             keepalive_options.http2_max_pings_without_data_});
+    table_printer.InsertRow(
+        {"http2_min_recv_ping_interval_without_data_ms",
+         keepalive_options.http2_min_recv_ping_interval_without_data_ms_});
+    table_printer.InsertRow(
+        {"http2_max_ping_strikes", keepalive_options.http2_max_ping_strikes_});
+    LOG_VERBOSE(1) << table_printer.PrintTable();
   }
 
   common_cq_ = builder_.AddCompletionQueue();

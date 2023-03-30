@@ -3497,12 +3497,13 @@ HTTPAPIServer::Create(
     const std::shared_ptr<TRITONSERVER_Server>& server,
     triton::server::TraceManager* trace_manager,
     const std::shared_ptr<SharedMemoryManager>& shm_manager, const int32_t port,
-    const bool reuse_port, const std::string address, const int thread_cnt,
+    const bool reuse_port, const std::string& address,
+    const std::string& header_forward_pattern, const int thread_cnt,
     std::unique_ptr<HTTPServer>* http_server)
 {
   http_server->reset(new HTTPAPIServer(
       server, trace_manager, shm_manager, port, reuse_port, address,
-      thread_cnt));
+      header_forward_pattern, thread_cnt));
 
   const std::string addr = address + ":" + std::to_string(port);
   LOG_INFO << "Started HTTPService at " << addr;
