@@ -137,6 +137,7 @@ RUN mkdir -p qa/common && \
     cp bin/data_compressor_test qa/L0_data_compression/. && \
     cp bin/metrics_api_test qa/L0_metrics/. && \
     cp bin/response_cache_test qa/L0_response_cache/. && \
+    cp bin/triton_json_test qa/L0_json/. && \
     cp -r deploy/mlflow-triton-plugin qa/L0_mlflow/.
 
 # caffe2plan will not exist if the build was done without TensorRT enabled
