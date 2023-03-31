@@ -1,4 +1,5 @@
-# Copyright (c) 2021-2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+#!/bin/bash
+# Copyright 2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -24,25 +25,20 @@
 # (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-export REGISTRY=gcr.io/$(gcloud config get-value project | tr ':' '/')
-export APP_NAME=tritonserver
-export MAJOR_VERSION=2.32
-export MINOR_VERSION=2.32.0
-export NGC_VERSION=23.03-py3
+RET=0
+UNIT_TEST="./triton_json_test"
+TEST_LOG="./triton_json_test.log"
+$UNIT_TEST >> $TEST_LOG 2>&1
+if [ $? -ne 0 ]; then
+    cat $TEST_LOG
+    echo -e "\n***\n*** Triton Json Unit Test Failed\n***"
+    RET=1
+fi
 
-docker pull nvcr.io/nvidia/$APP_NAME:$NGC_VERSION
+if [ $RET -eq 0 ]; then
+  echo -e "\n***\n*** Test Passed\n***"
+else
+  echo -e "\n***\n*** Test FAILED\n***"
+fi
 
-docker tag nvcr.io/nvidia/$APP_NAME:$NGC_VERSION $REGISTRY/$APP_NAME:$MAJOR_VERSION
-docker tag nvcr.io/nvidia/$APP_NAME:$NGC_VERSION $REGISTRY/$APP_NAME:$MINOR_VERSION
-docker tag nvcr.io/nvidia/$APP_NAME:$NGC_VERSION $REGISTRY/$APP_NAME:$NGC_VERSION
-
-docker push $REGISTRY/$APP_NAME:$MINOR_VERSION
-docker push $REGISTRY/$APP_NAME:$MAJOR_VERSION
-docker push $REGISTRY/$APP_NAME:$NGC_VERSION
-
-docker build --tag $REGISTRY/$APP_NAME/deployer .
-
-docker tag $REGISTRY/$APP_NAME/deployer $REGISTRY/$APP_NAME/deployer:$MAJOR_VERSION
-docker tag $REGISTRY/$APP_NAME/deployer $REGISTRY/$APP_NAME/deployer:$MINOR_VERSION
-docker push $REGISTRY/$APP_NAME/deployer:$MAJOR_VERSION
-docker push $REGISTRY/$APP_NAME/deployer:$MINOR_VERSION
+exit $RET

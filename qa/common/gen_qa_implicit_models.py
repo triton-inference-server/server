@@ -1,4 +1,4 @@
-# Copyright 2021-2022, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright 2021-2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -328,6 +328,10 @@ def create_onnx_modelfile_with_initial_state(models_dir, model_version,
         identity = onnx.helper.make_node("Identity", ["_INPUT"], ["OUTPUT"])
         identity_output_state = onnx.helper.make_node("Identity", ["_INPUT"],
                                                       ["OUTPUT_STATE"])
+        onnx_nodes = [
+            internal_input, internal_input_state, identity,
+            identity_output_state
+        ]
     else:
         add = onnx.helper.make_node("Add", ["_INPUT", "_INPUT_STATE"], ["CAST"])
         cast = onnx.helper.make_node("Cast", ["CAST"], ["OUTPUT"],
@@ -335,22 +339,14 @@ def create_onnx_modelfile_with_initial_state(models_dir, model_version,
         cast_output_state = onnx.helper.make_node("Cast", ["CAST"],
                                                   ["OUTPUT_STATE"],
                                                   to=onnx_dtype)
-
-    # Avoid cast from float16 to float16
-    # (bug in Onnx Runtime, cast from float16 to float16 will become cast from float16 to float32)
-    if onnx_dtype == onnx.TensorProto.FLOAT16:
-        cast = onnx.helper.make_node("Identity", ["CAST"], ["OUTPUT"])
-        cast_output_state = onnx.helper.make_node("Identity", ["CAST"],
-                                                  ["OUTPUT_STATE"])
-
-    if onnx_dtype != onnx.TensorProto.STRING:
+        # Avoid cast from float16 to float16
+        # (bug in Onnx Runtime, cast from float16 to float16 will become cast from float16 to float32)
+        if onnx_dtype == onnx.TensorProto.FLOAT16:
+            cast = onnx.helper.make_node("Identity", ["CAST"], ["OUTPUT"])
+            cast_output_state = onnx.helper.make_node("Identity", ["CAST"],
+                                                      ["OUTPUT_STATE"])
         onnx_nodes = [
             internal_input, internal_input_state, add, cast, cast_output_state
-        ]
-    else:
-        onnx_nodes = [
-            internal_input, internal_input_state, identity,
-            identity_output_state
         ]
 
     onnx_inputs = [onnx_input_state, onnx_input, onnx_start, onnx_ready]
@@ -588,7 +584,7 @@ def create_plan_fixed_modelfile(models_dir, model_version, max_batch, dtype,
     network.mark_output(out0_state.get_output(0))
 
     config = builder.create_builder_config()
-    config.max_workspace_size = 1 << 20
+    config.set_memory_pool_limit(trt.MemoryPoolType.WORKSPACE, 1 << 20)
     builder.max_batch_size = max(1, max_batch)
     try:
         engine_bytes = builder.build_serialized_network(network, config)
@@ -668,7 +664,7 @@ def create_plan_fixed_rf_modelfile(models_dir, model_version, max_batch, dtype,
 
     config = builder.create_builder_config()
     config.flags = flags
-    config.max_workspace_size = 1 << 20
+    config.set_memory_pool_limit(trt.MemoryPoolType.WORKSPACE, 1 << 20)
     builder.max_batch_size = max(1, max_batch)
     try:
         engine_bytes = builder.build_serialized_network(network, config)
@@ -762,7 +758,7 @@ def create_plan_dynamic_modelfile(models_dir, model_version, max_batch, dtype,
     config = builder.create_builder_config()
     config.add_optimization_profile(profile)
 
-    config.max_workspace_size = 1 << 20
+    config.set_memory_pool_limit(trt.MemoryPoolType.WORKSPACE, 1 << 20)
     try:
         engine_bytes = builder.build_serialized_network(network, config)
     except AttributeError:
@@ -880,7 +876,7 @@ def create_plan_dynamic_rf_modelfile(models_dir, model_version, max_batch,
     config.flags = flags
     config.add_optimization_profile(profile)
 
-    config.max_workspace_size = 1 << 20
+    config.set_memory_pool_limit(trt.MemoryPoolType.WORKSPACE, 1 << 20)
     try:
         engine_bytes = builder.build_serialized_network(network, config)
     except AttributeError:

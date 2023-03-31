@@ -278,7 +278,7 @@ def create_plan_modelfile(models_dir, model_version, dtype):
                           max_shape)
     config = builder.create_builder_config()
     config.add_optimization_profile(profile)
-    config.max_workspace_size = 1 << 20
+    config.set_memory_pool_limit(trt.MemoryPoolType.WORKSPACE, 1 << 20)
     try:
         engine_bytes = builder.build_serialized_network(network, config)
     except AttributeError:
@@ -561,7 +561,7 @@ def create_plan_itemshape_modelfile(models_dir, model_version, dtype):
                       max_shape + [2])
     config = builder.create_builder_config()
     config.add_optimization_profile(profile)
-    config.max_workspace_size = 1 << 20
+    config.set_memory_pool_limit(trt.MemoryPoolType.WORKSPACE, 1 << 20)
     try:
         engine_bytes = builder.build_serialized_network(network, config)
     except AttributeError:

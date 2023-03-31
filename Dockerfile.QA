@@ -68,7 +68,7 @@ RUN wget -O - https://apt.kitware.com/keys/kitware-archive-latest.asc 2>/dev/nul
     apt-add-repository 'deb https://apt.kitware.com/ubuntu/ focal main' && \
     apt-get update && \
     apt-get install -y --no-install-recommends \
-      cmake-data=3.21.1-0kitware1ubuntu20.04.1 cmake=3.21.1-0kitware1ubuntu20.04.1
+      cmake-data=3.25.2-0kitware1ubuntu20.04.1 cmake=3.25.2-0kitware1ubuntu20.04.1
 
 # Add inception_graphdef model to example repo
 WORKDIR /workspace/docs/examples/model_repository
@@ -137,6 +137,7 @@ RUN mkdir -p qa/common && \
     cp bin/data_compressor_test qa/L0_data_compression/. && \
     cp bin/metrics_api_test qa/L0_metrics/. && \
     cp bin/response_cache_test qa/L0_response_cache/. && \
+    cp bin/triton_json_test qa/L0_json/. && \
     cp -r deploy/mlflow-triton-plugin qa/L0_mlflow/.
 
 # caffe2plan will not exist if the build was done without TensorRT enabled

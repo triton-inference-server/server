@@ -50,7 +50,7 @@
 ##
 ############################################################################
 
-TRITON_VERSION=${TRITON_VERSION:=23.02}
+TRITON_VERSION=${TRITON_VERSION:=23.03}
 CUDA_DEVICE=${RUNNER_ID:=0}
 
 HOST_BUILD_DIR=${HOST_BUILD_DIR:=/tmp}
@@ -58,36 +58,69 @@ TMP_DIR=$HOST_BUILD_DIR/${TRITON_VERSION}
 
 SRCDIR=$HOST_BUILD_DIR/gen_srcdir
 DESTDIR=$TMP_DIR/qa_model_repository
-VARDESTDIR=$TMP_DIR/qa_variable_model_repository
-IDENTITYDESTDIR=$TMP_DIR/qa_identity_model_repository
+
+DATADEPENDENTDIR=$TMP_DIR/qa_trt_data_dependent_model_repository
+DYNASEQDESTDIR=$TMP_DIR/qa_dyna_sequence_model_repository
+DYNASEQIMPLICITDESTDIR=$TMP_DIR/qa_dyna_sequence_implicit_model_repository
+FORMATDESTDIR=$TMP_DIR/qa_trt_format_model_repository
 IDENTITYBIGDESTDIR=$TMP_DIR/qa_identity_big_model_repository
-SHAPEDESTDIR=$TMP_DIR/qa_shapetensor_model_repository
+IDENTITYDESTDIR=$TMP_DIR/qa_identity_model_repository
+IMPLICITSEQDESTDIR=$TMP_DIR/qa_sequence_implicit_model_repository
+RAGGEDDESTDIR=$TMP_DIR/qa_ragged_model_repository
 RESHAPEDESTDIR=$TMP_DIR/qa_reshape_model_repository
 SEQDESTDIR=$TMP_DIR/qa_sequence_model_repository
-DYNASEQDESTDIR=$TMP_DIR/qa_dyna_sequence_model_repository
+SHAPEDESTDIR=$TMP_DIR/qa_shapetensor_model_repository
+VARDESTDIR=$TMP_DIR/qa_variable_model_repository
+VARIMPLICITSEQDESTDIR=$TMP_DIR/qa_variable_sequence_implicit_model_repository
 VARSEQDESTDIR=$TMP_DIR/qa_variable_sequence_model_repository
 
-rm -fr $SRCDIR $DESTDIR $VARDESTDIR
-rm -fr $IDENTITYDESTDIR $IDENTITYBIGDESTDIR $SHAPEDESTDIR $RESHAPEDESTDIR
-rm -fr $SEQDESTDIR $DYNASEQDESTDIR $VARSEQDESTDIR
+
+rm -fr $DESTDIR
+rm -fr $DATADEPENDENTDIR
+rm -fr $DYNASEQDESTDIR
+rm -fr $DYNASEQIMPLICITDESTDIR
+rm -fr $FORMATDESTDIR
+rm -fr $IDENTITYBIGDESTDIR
+rm -fr $IDENTITYDESTDIR
+rm -fr $IMPLICITSEQDESTDIR
+rm -fr $RAGGEDDESTDIR
+rm -fr $RESHAPEDESTDIR
+rm -fr $SEQDESTDIR
+rm -fr $SHAPEDESTDIR
+rm -fr $VARDESTDIR
+rm -fr $VARIMPLICITSEQDESTDIR
+rm -fr $VARSEQDESTDIR
+
 mkdir -p $SRCDIR
 mkdir -p $DESTDIR
-mkdir -p $VARDESTDIR
-mkdir -p $IDENTITYDESTDIR
+
+mkdir -p $DATADEPENDENTDIR
+mkdir -p $DYNASEQDESTDIR
+mkdir -p $DYNASEQIMPLICITDESTDIR
+mkdir -p $FORMATDESTDIR
 mkdir -p $IDENTITYBIGDESTDIR
-mkdir -p $SHAPEDESTDIR
+mkdir -p $IDENTITYDESTDIR
+mkdir -p $IMPLICITSEQDESTDIR
+mkdir -p $RAGGEDDESTDIR
 mkdir -p $RESHAPEDESTDIR
 mkdir -p $SEQDESTDIR
-mkdir -p $DYNASEQDESTDIR
+mkdir -p $SHAPEDESTDIR
+mkdir -p $VARDESTDIR
+mkdir -p $VARIMPLICITSEQDESTDIR
 mkdir -p $VARSEQDESTDIR
 
-cp ./gen_qa_models.py $SRCDIR/.
-cp ./gen_qa_identity_models.py $SRCDIR/.
-cp ./gen_qa_reshape_models.py $SRCDIR/.
-cp ./gen_qa_noshape_models.py $SRCDIR/.
-cp ./gen_qa_sequence_models.py $SRCDIR/.
-cp ./gen_qa_dyna_sequence_models.py $SRCDIR/.
 cp ./gen_ensemble_model_utils.py $SRCDIR/.
+cp ./gen_qa_dyna_sequence_implicit_models.py $SRCDIR/.
+cp ./gen_qa_dyna_sequence_models.py $SRCDIR/.
+cp ./gen_qa_identity_models.py $SRCDIR/.
+cp ./gen_qa_implicit_models.py $SRCDIR/.
+cp ./gen_qa_models.py $SRCDIR/.
+cp ./gen_qa_noshape_models.py $SRCDIR/.
+cp ./gen_qa_ragged_models.py $SRCDIR/.
+cp ./gen_qa_reshape_models.py $SRCDIR/.
+cp ./gen_qa_sequence_models.py $SRCDIR/.
+cp ./gen_qa_trt_data_dependent_shape.py $SRCDIR/.
+cp ./gen_qa_trt_format_models.py $SRCDIR/.
 cp ./gen_qa_trt_plugin_models.py $SRCDIR/.
 cp ./test_util.py $SRCDIR/.
 
@@ -99,20 +132,32 @@ cd $SRCDIR
 python3 $SRCDIR/gen_qa_identity_models.py --tensorrt-shape-io --models_dir=$SHAPEDESTDIR
 python3 $SRCDIR/gen_qa_sequence_models.py --tensorrt-shape-io --models_dir=$SHAPEDESTDIR
 python3 $SRCDIR/gen_qa_dyna_sequence_models.py --tensorrt-shape-io --models_dir=$SHAPEDESTDIR
-chown -R $(id -u):$(id -g) $SHAPEDESTDIR
+chmod -R 777 $SHAPEDESTDIR
 python3 $SRCDIR/gen_qa_models.py --tensorrt --models_dir=$DESTDIR
-chown -R $(id -u):$(id -g) $DESTDIR
+chmod -R 777 $DESTDIR
 python3 $SRCDIR/gen_qa_models.py --tensorrt --variable --models_dir=$VARDESTDIR
-chown -R $(id -u):$(id -g) $VARDESTDIR
+chmod -R 777 $VARDESTDIR
 python3 $SRCDIR/gen_qa_identity_models.py --tensorrt --models_dir=$IDENTITYDESTDIR
-chown -R $(id -u):$(id -g) $IDENTITYDESTDIR
+chmod -R 777 $IDENTITYDESTDIR
 python3 $SRCDIR/gen_qa_identity_models.py --tensorrt-big --models_dir=$IDENTITYBIGDESTDIR
-chown -R $(id -u):$(id -g) $IDENTITYBIGDESTDIR
+chmod -R 777 $IDENTITYBIGDESTDIR
 python3 $SRCDIR/gen_qa_reshape_models.py --tensorrt --variable --models_dir=$RESHAPEDESTDIR
-chown -R $(id -u):$(id -g) $RESHAPEDESTDIR
+chmod -R 777 $RESHAPEDESTDIR
 python3 $SRCDIR/gen_qa_sequence_models.py --tensorrt --models_dir=$SEQDESTDIR
-chown -R $(id -u):$(id -g) $SEQDESTDIR
+chmod -R 777 $SEQDESTDIR
+python3 $SRCDIR/gen_qa_implicit_models.py --tensorrt --models_dir=$IMPLICITSEQDESTDIR
+chmod -R 777 $IMPLICITSEQDESTDIR
+python3 $SRCDIR/gen_qa_implicit_models.py --tensorrt --variable --models_dir=$VARIMPLICITSEQDESTDIR
+chmod -R 777 $VARIMPLICITSEQDESTDIR
 python3 $SRCDIR/gen_qa_dyna_sequence_models.py --tensorrt --models_dir=$DYNASEQDESTDIR
-chown -R $(id -u):$(id -g) $DYNASEQDESTDIR
+chmod -R 777 $DYNASEQDESTDIR
 python3 $SRCDIR/gen_qa_sequence_models.py --tensorrt --variable --models_dir=$VARSEQDESTDIR
-chown -R $(id -u):$(id -g) $VARSEQDESTDIR
+chmod -R 777 $VARSEQDESTDIR
+python3 $SRCDIR/gen_qa_dyna_sequence_implicit_models.py --tensorrt --models_dir=$DYNASEQIMPLICITDESTDIR
+chmod -R 777 $DYNASEQIMPLICITDESTDIR
+python3 $SRCDIR/gen_qa_ragged_models.py --tensorrt --models_dir=$RAGGEDDESTDIR
+chmod -R 777 $RAGGEDDESTDIR
+python3 $SRCDIR/gen_qa_trt_format_models.py --models_dir=$FORMATDESTDIR
+chmod -R 777 $FORMATDESTDIR
+python3 $SRCDIR/gen_qa_trt_data_dependent_shape.py --models_dir=$DATADEPENDENTDIR
+chmod -R 777 $DATADEPENDENTDIR

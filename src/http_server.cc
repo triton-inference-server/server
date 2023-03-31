@@ -703,7 +703,7 @@ CheckBinaryInputData(
     triton::common::TritonJson::Value binary_data_size_json;
     if (params_json.Find("binary_data_size", &binary_data_size_json)) {
       RETURN_MSG_IF_ERR(
-          binary_data_size_json.AsUInt(byte_size),
+          binary_data_size_json.AsUInt(reinterpret_cast<uint64_t*>(byte_size)),
           "Unable to parse 'binary_data_size'");
       *is_binary = true;
     }
@@ -2357,7 +2357,7 @@ HTTPAPIServer::EVBufferToInput(
       AllocPayload::OutputInfo::JSON;
 
   triton::common::TritonJson::Value params_json;
-  if (request_json.MemberAsObject("parameters", &params_json) == nullptr) {
+  if (request_json.Find("parameters", &params_json)) {
     std::vector<std::string> parameters;
     RETURN_MSG_IF_ERR(
         params_json.Members(&parameters), "failed to get request params.");
@@ -2367,7 +2367,10 @@ HTTPAPIServer::EVBufferToInput(
       if (parameter == "sequence_id") {
         uint64_t seq_id;
         // Try to parse sequence_id as uint64_t
-        if (params_json.MemberAsUInt(parameter.c_str(), &seq_id) != nullptr) {
+        TRITONSERVER_Error* err;
+        if ((err = params_json.MemberAsUInt(parameter.c_str(), &seq_id)) !=
+            nullptr) {
+          TRITONSERVER_ErrorDelete(err);
           // On failure try to parse as a string
           std::string seq_id;
           RETURN_MSG_IF_ERR(
@@ -2422,20 +2425,27 @@ HTTPAPIServer::EVBufferToInput(
              "usage "
              "and should not be specified."));
       } else {
-        std::string string_value;
-        int64_t int_value;
-        bool bool_value;
-        if (params_json.MemberAsString(parameter.c_str(), &string_value) ==
-            nullptr) {
+        triton::common::TritonJson::Value value;
+        if (!params_json.Find(parameter.c_str(), &value)) {
+          return TRITONSERVER_ErrorNew(
+              TRITONSERVER_ERROR_INTERNAL,
+              ("parameter key '" + parameter + "' was not found in the JSON")
+                  .c_str());
+        }
+
+        if (value.IsString()) {
+          std::string string_value;
+          RETURN_IF_ERR(value.AsString(&string_value));
           RETURN_IF_ERR(TRITONSERVER_InferenceRequestSetStringParameter(
               irequest, parameter.c_str(), string_value.c_str()));
-        } else if (
-            params_json.MemberAsInt(parameter.c_str(), &int_value) == nullptr) {
+        } else if (value.IsInt()) {
+          int64_t int_value;
+          RETURN_IF_ERR(value.AsInt(&int_value));
           RETURN_IF_ERR(TRITONSERVER_InferenceRequestSetIntParameter(
               irequest, parameter.c_str(), int_value));
-        } else if (
-            params_json.MemberAsBool(parameter.c_str(), &bool_value) ==
-            nullptr) {
+        } else if (value.IsBool()) {
+          bool bool_value;
+          RETURN_IF_ERR(value.AsBool(&bool_value));
           RETURN_IF_ERR(TRITONSERVER_InferenceRequestSetBoolParameter(
               irequest, parameter.c_str(), bool_value));
         } else {
@@ -2545,7 +2555,7 @@ HTTPAPIServer::EVBufferToInput(
       uint64_t shm_offset;
       const char* shm_region;
       RETURN_IF_ERR(CheckSharedMemoryData(
-          request_input, &use_shm, &shm_region, &shm_offset, &byte_size));
+          request_input, &use_shm, &shm_region, &shm_offset, reinterpret_cast<uint64_t*>(&byte_size)));
       if (use_shm) {
         void* base;
         TRITONSERVER_MemoryType memory_type;

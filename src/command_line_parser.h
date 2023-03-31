@@ -278,9 +278,16 @@ class TritonParser {
       const std::string& arg);
   std::tuple<std::string, std::string, std::string> ParseMetricsConfigOption(
       const std::string& arg);
+  std::tuple<std::string, std::string, std::string>
+  ParseGrpcRestrictedProtocolOption(const std::string& arg);
 #ifdef TRITON_ENABLE_TRACING
   TRITONSERVER_InferenceTraceLevel ParseTraceLevelOption(std::string arg);
 #endif  // TRITON_ENABLE_TRACING
+  // Helper function to parse option in
+  // "<string>[1st_delim]<string>[2nd_delim]<string>" format
+  std::tuple<std::string, std::string, std::string> ParseGenericConfigOption(
+      const std::string& arg, const std::string& first_delim,
+      const std::string& second_delim);
 
   static std::vector<Option> recognized_options_;
 };

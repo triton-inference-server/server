@@ -26,6 +26,7 @@
 
 import triton_python_backend_utils as pb_utils
 import numpy as np
+import json
 
 
 class TritonPythonModel:
@@ -33,7 +34,15 @@ class TritonPythonModel:
     @staticmethod
     def auto_complete_config(auto_complete_model_config):
         inputs = [{'name': 'INPUT0', 'data_type': 'TYPE_FP32', 'dims': [1]}]
-        outputs = [{'name': 'OUTPUT0', 'data_type': 'TYPE_STRING', 'dims': [1]}]
+        outputs = [{
+            'name': 'key',
+            'data_type': 'TYPE_STRING',
+            'dims': [-1]
+        }, {
+            'name': 'value',
+            'data_type': 'TYPE_STRING',
+            'dims': [-1]
+        }]
 
         config = auto_complete_model_config.as_dict()
         input_names = []
@@ -58,10 +67,17 @@ class TritonPythonModel:
         # output.
         responses = []
         for request in requests:
-            output0 = np.asarray([request.parameters()], dtype=object)
-            output_tensor = pb_utils.Tensor("OUTPUT0", output0)
+            parameters = json.loads(request.parameters())
+            keys = []
+            values = []
+            for key, value in parameters.items():
+                keys.append(key)
+                values.append(value)
+            key_output = pb_utils.Tensor("key", np.asarray(keys, dtype=object))
+            value_output = pb_utils.Tensor("value",
+                                           np.asarray(values, dtype=object))
             inference_response = pb_utils.InferenceResponse(
-                output_tensors=[output_tensor])
+                output_tensors=[key_output, value_output])
             responses.append(inference_response)
 
         return responses

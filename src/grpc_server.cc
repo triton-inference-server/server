@@ -219,9 +219,11 @@ class CommonCallData : public Server::ICallData {
       const std::string& name, const uint64_t id,
       const StandardRegisterFunc OnRegister,
       const StandardCallbackFunc OnExecute, const bool async,
-      ::grpc::ServerCompletionQueue* cq)
+      ::grpc::ServerCompletionQueue* cq,
+      const std::pair<std::string, std::string>& restricted_kv)
       : name_(name), id_(id), OnRegister_(OnRegister), OnExecute_(OnExecute),
-        async_(async), cq_(cq), responder_(&ctx_), step_(Steps::START)
+        async_(async), cq_(cq), responder_(&ctx_), step_(Steps::START),
+        restricted_kv_(restricted_kv)
   {
     OnRegister_(&ctx_, &request_, &responder_, this);
     LOG_VERBOSE(1) << "Ready for RPC '" << name_ << "', " << id_;
@@ -244,6 +246,7 @@ class CommonCallData : public Server::ICallData {
   void Execute();
   void AddToCompletionQueue();
   void WriteResponse();
+  bool ExecutePrecondition();
 
   const std::string name_;
   const uint64_t id_;
@@ -263,6 +266,8 @@ class CommonCallData : public Server::ICallData {
   std::thread async_thread_;
 
   Steps step_;
+
+  std::pair<std::string, std::string> restricted_kv_{"", ""};
 };
 
 template <typename ResponderType, typename RequestType, typename ResponseType>
@@ -288,7 +293,7 @@ CommonCallData<ResponderType, RequestType, ResponseType>::Process(bool rpc_ok)
     // Start a new request to replace this one...
     if (!shutdown) {
       new CommonCallData<ResponderType, RequestType, ResponseType>(
-          name_, id_ + 1, OnRegister_, OnExecute_, async_, cq_);
+          name_, id_ + 1, OnRegister_, OnExecute_, async_, cq_, restricted_kv_);
     }
 
     if (!async_) {
@@ -316,7 +321,14 @@ template <typename ResponderType, typename RequestType, typename ResponseType>
 void
 CommonCallData<ResponderType, RequestType, ResponseType>::Execute()
 {
-  OnExecute_(request_, &response_, &status_);
+  if (ExecutePrecondition()) {
+    OnExecute_(request_, &response_, &status_);
+  } else {
+    status_ = ::grpc::Status(
+        ::grpc::StatusCode::UNAVAILABLE,
+        std::string("This protocol is restricted, expecting header '") +
+            restricted_kv_.first + "'");
+  }
   step_ = Steps::WRITEREADY;
 
   if (async_) {
@@ -325,6 +337,18 @@ CommonCallData<ResponderType, RequestType, ResponseType>::Execute()
     // taken up next for execution.
     AddToCompletionQueue();
   }
+}
+
+template <typename ResponderType, typename RequestType, typename ResponseType>
+bool
+CommonCallData<ResponderType, RequestType, ResponseType>::ExecutePrecondition()
+{
+  if (!restricted_kv_.first.empty()) {
+    const auto& metadata = ctx_.client_metadata();
+    const auto it = metadata.find(restricted_kv_.first);
+    return (it != metadata.end()) && (it->second == restricted_kv_.second);
+  }
+  return true;
 }
 
 template <typename ResponderType, typename RequestType, typename ResponseType>
@@ -356,7 +380,9 @@ class CommonHandler : public Server::HandlerBase {
       TraceManager* trace_manager,
       inference::GRPCInferenceService::AsyncService* service,
       ::grpc::health::v1::Health::AsyncService* health_service,
-      ::grpc::ServerCompletionQueue* cq);
+      ::grpc::ServerCompletionQueue* cq,
+      std::map<std::string, std::pair<std::string, std::string>>
+          restricted_keys);
 
   // Descriptive name of of the handler.
   const std::string& Name() const { return name_; }
@@ -401,7 +427,12 @@ class CommonHandler : public Server::HandlerBase {
   ::grpc::health::v1::Health::AsyncService* health_service_;
   ::grpc::ServerCompletionQueue* cq_;
   std::unique_ptr<std::thread> thread_;
+  std::map<std::string, std::pair<std::string, std::string>> restricted_keys_;
+  static std::pair<std::string, std::string> empty_restricted_key_;
 };
+
+std::pair<std::string, std::string> CommonHandler::empty_restricted_key_{"",
+                                                                         ""};
 
 CommonHandler::CommonHandler(
     const std::string& name,
@@ -410,10 +441,12 @@ CommonHandler::CommonHandler(
     TraceManager* trace_manager,
     inference::GRPCInferenceService::AsyncService* service,
     ::grpc::health::v1::Health::AsyncService* health_service,
-    ::grpc::ServerCompletionQueue* cq)
+    ::grpc::ServerCompletionQueue* cq,
+    std::map<std::string, std::pair<std::string, std::string>> restricted_keys)
     : name_(name), tritonserver_(tritonserver), shm_manager_(shm_manager),
       trace_manager_(trace_manager), service_(service),
-      health_service_(health_service), cq_(cq)
+      health_service_(health_service), cq_(cq),
+      restricted_keys_(restricted_keys)
 {
 }
 
@@ -534,11 +567,14 @@ CommonHandler::RegisterServerLive()
     TRITONSERVER_ErrorDelete(err);
   };
 
+  const auto it = restricted_keys_.find("health");
+  std::pair<std::string, std::string> restricted_kv =
+      (it == restricted_keys_.end()) ? empty_restricted_key_ : it->second;
   new CommonCallData<
       ::grpc::ServerAsyncResponseWriter<inference::ServerLiveResponse>,
       inference::ServerLiveRequest, inference::ServerLiveResponse>(
       "ServerLive", 0, OnRegisterServerLive, OnExecuteServerLive,
-      false /* async */, cq_);
+      false /* async */, cq_, restricted_kv);
 }
 
 void
@@ -568,11 +604,14 @@ CommonHandler::RegisterServerReady()
     TRITONSERVER_ErrorDelete(err);
   };
 
+  const auto it = restricted_keys_.find("health");
+  std::pair<std::string, std::string> restricted_kv =
+      (it == restricted_keys_.end()) ? empty_restricted_key_ : it->second;
   new CommonCallData<
       ::grpc::ServerAsyncResponseWriter<inference::ServerReadyResponse>,
       inference::ServerReadyRequest, inference::ServerReadyResponse>(
       "ServerReady", 0, OnRegisterServerReady, OnExecuteServerReady,
-      false /* async */, cq_);
+      false /* async */, cq_, restricted_kv);
 }
 
 void
@@ -613,13 +652,16 @@ CommonHandler::RegisterHealthCheck()
     TRITONSERVER_ErrorDelete(err);
   };
 
+  const auto it = restricted_keys_.find("health");
+  std::pair<std::string, std::string> restricted_kv =
+      (it == restricted_keys_.end()) ? empty_restricted_key_ : it->second;
   new CommonCallData<
       ::grpc::ServerAsyncResponseWriter<
           ::grpc::health::v1::HealthCheckResponse>,
       ::grpc::health::v1::HealthCheckRequest,
       ::grpc::health::v1::HealthCheckResponse>(
       "Check", 0, OnRegisterHealthCheck, OnExecuteHealthCheck,
-      false /* async */, cq_);
+      false /* async */, cq_, restricted_kv);
 }
 
 void
@@ -655,11 +697,14 @@ CommonHandler::RegisterModelReady()
     TRITONSERVER_ErrorDelete(err);
   };
 
+  const auto it = restricted_keys_.find("health");
+  std::pair<std::string, std::string> restricted_kv =
+      (it == restricted_keys_.end()) ? empty_restricted_key_ : it->second;
   new CommonCallData<
       ::grpc::ServerAsyncResponseWriter<inference::ModelReadyResponse>,
       inference::ModelReadyRequest, inference::ModelReadyResponse>(
       "ModelReady", 0, OnRegisterModelReady, OnExecuteModelReady,
-      false /* async */, cq_);
+      false /* async */, cq_, restricted_kv);
 }
 
 void
@@ -731,11 +776,14 @@ CommonHandler::RegisterServerMetadata()
         TRITONSERVER_ErrorDelete(err);
       };
 
+  const auto it = restricted_keys_.find("metadata");
+  std::pair<std::string, std::string> restricted_kv =
+      (it == restricted_keys_.end()) ? empty_restricted_key_ : it->second;
   new CommonCallData<
       ::grpc::ServerAsyncResponseWriter<inference::ServerMetadataResponse>,
       inference::ServerMetadataRequest, inference::ServerMetadataResponse>(
       "ServerMetadata", 0, OnRegisterServerMetadata, OnExecuteServerMetadata,
-      false /* async */, cq_);
+      false /* async */, cq_, restricted_kv);
 }
 
 void
@@ -897,11 +945,14 @@ CommonHandler::RegisterModelMetadata()
     TRITONSERVER_ErrorDelete(err);
   };
 
+  const auto it = restricted_keys_.find("metadata");
+  std::pair<std::string, std::string> restricted_kv =
+      (it == restricted_keys_.end()) ? empty_restricted_key_ : it->second;
   new CommonCallData<
       ::grpc::ServerAsyncResponseWriter<inference::ModelMetadataResponse>,
       inference::ModelMetadataRequest, inference::ModelMetadataResponse>(
       "ModelMetadata", 0, OnRegisterModelMetadata, OnExecuteModelMetadata,
-      false /* async */, cq_);
+      false /* async */, cq_, restricted_kv);
 }
 
 void
@@ -948,11 +999,14 @@ CommonHandler::RegisterModelConfig()
     TRITONSERVER_ErrorDelete(err);
   };
 
+  const auto it = restricted_keys_.find("model-config");
+  std::pair<std::string, std::string> restricted_kv =
+      (it == restricted_keys_.end()) ? empty_restricted_key_ : it->second;
   new CommonCallData<
       ::grpc::ServerAsyncResponseWriter<inference::ModelConfigResponse>,
       inference::ModelConfigRequest, inference::ModelConfigResponse>(
       "ModelConfig", 0, OnRegisterModelConfig, OnExecuteModelConfig,
-      false /* async */, cq_);
+      false /* async */, cq_, restricted_kv);
 }
 
 void
@@ -1245,11 +1299,14 @@ CommonHandler::RegisterModelStatistics()
 #endif
   };
 
+  const auto it = restricted_keys_.find("statistics");
+  std::pair<std::string, std::string> restricted_kv =
+      (it == restricted_keys_.end()) ? empty_restricted_key_ : it->second;
   new CommonCallData<
       ::grpc::ServerAsyncResponseWriter<inference::ModelStatisticsResponse>,
       inference::ModelStatisticsRequest, inference::ModelStatisticsResponse>(
       "ModelStatistics", 0, OnRegisterModelStatistics, OnExecuteModelStatistics,
-      false /* async */, cq_);
+      false /* async */, cq_, restricted_kv);
 }
 
 void
@@ -1456,10 +1513,14 @@ CommonHandler::RegisterTrace()
 #endif
   };
 
+  const auto it = restricted_keys_.find("trace");
+  std::pair<std::string, std::string> restricted_kv =
+      (it == restricted_keys_.end()) ? empty_restricted_key_ : it->second;
   new CommonCallData<
       ::grpc::ServerAsyncResponseWriter<inference::TraceSettingResponse>,
       inference::TraceSettingRequest, inference::TraceSettingResponse>(
-      "Trace", 0, OnRegisterTrace, OnExecuteTrace, false /* async */, cq_);
+      "Trace", 0, OnRegisterTrace, OnExecuteTrace, false /* async */, cq_,
+      restricted_kv);
 }
 
 void
@@ -1662,11 +1723,14 @@ CommonHandler::RegisterLogging()
 #endif
   };
 
+  const auto it = restricted_keys_.find("logging");
+  std::pair<std::string, std::string> restricted_kv =
+      (it == restricted_keys_.end()) ? empty_restricted_key_ : it->second;
   new CommonCallData<
       ::grpc::ServerAsyncResponseWriter<inference::LogSettingsResponse>,
       inference::LogSettingsRequest, inference::LogSettingsResponse>(
-      "Logging", 0, OnRegisterLogging, OnExecuteLogging, false /* async */,
-      cq_);
+      "Logging", 0, OnRegisterLogging, OnExecuteLogging, false /* async */, cq_,
+      restricted_kv);
 }
 
 void
@@ -1732,13 +1796,16 @@ CommonHandler::RegisterSystemSharedMemoryStatus()
         TRITONSERVER_ErrorDelete(err);
       };
 
+  const auto it = restricted_keys_.find("shared-memory");
+  std::pair<std::string, std::string> restricted_kv =
+      (it == restricted_keys_.end()) ? empty_restricted_key_ : it->second;
   new CommonCallData<
       ::grpc::ServerAsyncResponseWriter<
           inference::SystemSharedMemoryStatusResponse>,
       inference::SystemSharedMemoryStatusRequest,
       inference::SystemSharedMemoryStatusResponse>(
       "SystemSharedMemoryStatus", 0, OnRegisterSystemSharedMemoryStatus,
-      OnExecuteSystemSharedMemoryStatus, false /* async */, cq_);
+      OnExecuteSystemSharedMemoryStatus, false /* async */, cq_, restricted_kv);
 }
 
 void
@@ -1768,13 +1835,17 @@ CommonHandler::RegisterSystemSharedMemoryRegister()
         TRITONSERVER_ErrorDelete(err);
       };
 
+  const auto it = restricted_keys_.find("shared-memory");
+  std::pair<std::string, std::string> restricted_kv =
+      (it == restricted_keys_.end()) ? empty_restricted_key_ : it->second;
   new CommonCallData<
       ::grpc::ServerAsyncResponseWriter<
           inference::SystemSharedMemoryRegisterResponse>,
       inference::SystemSharedMemoryRegisterRequest,
       inference::SystemSharedMemoryRegisterResponse>(
       "SystemSharedMemoryRegister", 0, OnRegisterSystemSharedMemoryRegister,
-      OnExecuteSystemSharedMemoryRegister, false /* async */, cq_);
+      OnExecuteSystemSharedMemoryRegister, false /* async */, cq_,
+      restricted_kv);
 }
 
 void
@@ -1808,13 +1879,17 @@ CommonHandler::RegisterSystemSharedMemoryUnregister()
         TRITONSERVER_ErrorDelete(err);
       };
 
+  const auto it = restricted_keys_.find("shared-memory");
+  std::pair<std::string, std::string> restricted_kv =
+      (it == restricted_keys_.end()) ? empty_restricted_key_ : it->second;
   new CommonCallData<
       ::grpc::ServerAsyncResponseWriter<
           inference::SystemSharedMemoryUnregisterResponse>,
       inference::SystemSharedMemoryUnregisterRequest,
       inference::SystemSharedMemoryUnregisterResponse>(
       "SystemSharedMemoryUnregister", 0, OnRegisterSystemSharedMemoryUnregister,
-      OnExecuteSystemSharedMemoryUnregister, false /* async */, cq_);
+      OnExecuteSystemSharedMemoryUnregister, false /* async */, cq_,
+      restricted_kv);
 }
 
 void
@@ -1871,13 +1946,17 @@ CommonHandler::RegisterCudaSharedMemoryStatus()
         GrpcStatusUtil::Create(status, err);
         TRITONSERVER_ErrorDelete(err);
       };
+
+  const auto it = restricted_keys_.find("shared-memory");
+  std::pair<std::string, std::string> restricted_kv =
+      (it == restricted_keys_.end()) ? empty_restricted_key_ : it->second;
   new CommonCallData<
       ::grpc::ServerAsyncResponseWriter<
           inference::CudaSharedMemoryStatusResponse>,
       inference::CudaSharedMemoryStatusRequest,
       inference::CudaSharedMemoryStatusResponse>(
       "CudaSharedMemoryStatus", 0, OnRegisterCudaSharedMemoryStatus,
-      OnExecuteCudaSharedMemoryStatus, false /* async */, cq_);
+      OnExecuteCudaSharedMemoryStatus, false /* async */, cq_, restricted_kv);
 }
 
 void
@@ -1919,13 +1998,16 @@ CommonHandler::RegisterCudaSharedMemoryRegister()
         TRITONSERVER_ErrorDelete(err);
       };
 
+  const auto it = restricted_keys_.find("shared-memory");
+  std::pair<std::string, std::string> restricted_kv =
+      (it == restricted_keys_.end()) ? empty_restricted_key_ : it->second;
   new CommonCallData<
       ::grpc::ServerAsyncResponseWriter<
           inference::CudaSharedMemoryRegisterResponse>,
       inference::CudaSharedMemoryRegisterRequest,
       inference::CudaSharedMemoryRegisterResponse>(
       "CudaSharedMemoryRegister", 0, OnRegisterCudaSharedMemoryRegister,
-      OnExecuteCudaSharedMemoryRegister, false /* async */, cq_);
+      OnExecuteCudaSharedMemoryRegister, false /* async */, cq_, restricted_kv);
 }
 
 void
@@ -1959,13 +2041,17 @@ CommonHandler::RegisterCudaSharedMemoryUnregister()
         TRITONSERVER_ErrorDelete(err);
       };
 
+  const auto it = restricted_keys_.find("shared-memory");
+  std::pair<std::string, std::string> restricted_kv =
+      (it == restricted_keys_.end()) ? empty_restricted_key_ : it->second;
   new CommonCallData<
       ::grpc::ServerAsyncResponseWriter<
           inference::CudaSharedMemoryUnregisterResponse>,
       inference::CudaSharedMemoryUnregisterRequest,
       inference::CudaSharedMemoryUnregisterResponse>(
       "CudaSharedMemoryUnregister", 0, OnRegisterCudaSharedMemoryUnregister,
-      OnExecuteCudaSharedMemoryUnregister, false /* async */, cq_);
+      OnExecuteCudaSharedMemoryUnregister, false /* async */, cq_,
+      restricted_kv);
 }
 
 void
@@ -2061,11 +2147,14 @@ CommonHandler::RegisterRepositoryIndex()
         TRITONSERVER_ErrorDelete(err);
       };
 
+  const auto it = restricted_keys_.find("model-repository");
+  std::pair<std::string, std::string> restricted_kv =
+      (it == restricted_keys_.end()) ? empty_restricted_key_ : it->second;
   new CommonCallData<
       ::grpc::ServerAsyncResponseWriter<inference::RepositoryIndexResponse>,
       inference::RepositoryIndexRequest, inference::RepositoryIndexResponse>(
       "RepositoryIndex", 0, OnRegisterRepositoryIndex, OnExecuteRepositoryIndex,
-      false /* async */, cq_);
+      false /* async */, cq_, restricted_kv);
 }
 
 void
@@ -2170,12 +2259,15 @@ CommonHandler::RegisterRepositoryModelLoad()
         TRITONSERVER_ErrorDelete(err);
       };
 
+  const auto it = restricted_keys_.find("model-repository");
+  std::pair<std::string, std::string> restricted_kv =
+      (it == restricted_keys_.end()) ? empty_restricted_key_ : it->second;
   new CommonCallData<
       ::grpc::ServerAsyncResponseWriter<inference::RepositoryModelLoadResponse>,
       inference::RepositoryModelLoadRequest,
       inference::RepositoryModelLoadResponse>(
       "RepositoryModelLoad", 0, OnRegisterRepositoryModelLoad,
-      OnExecuteRepositoryModelLoad, true /* async */, cq_);
+      OnExecuteRepositoryModelLoad, true /* async */, cq_, restricted_kv);
 }
 
 void
@@ -2236,13 +2328,16 @@ CommonHandler::RegisterRepositoryModelUnload()
         TRITONSERVER_ErrorDelete(err);
       };
 
+  const auto it = restricted_keys_.find("model-repository");
+  std::pair<std::string, std::string> restricted_kv =
+      (it == restricted_keys_.end()) ? empty_restricted_key_ : it->second;
   new CommonCallData<
       ::grpc::ServerAsyncResponseWriter<
           inference::RepositoryModelUnloadResponse>,
       inference::RepositoryModelUnloadRequest,
       inference::RepositoryModelUnloadResponse>(
       "RepositoryModelUnload", 0, OnRegisterRepositoryModelUnload,
-      OnExecuteRepositoryModelUnload, true /* async */, cq_);
+      OnExecuteRepositoryModelUnload, true /* async */, cq_, restricted_kv);
 }
 
 //=========================================================================
@@ -2710,7 +2805,8 @@ class InferHandler : public Server::HandlerBase {
       const std::string& name,
       const std::shared_ptr<TRITONSERVER_Server>& tritonserver,
       ServiceType* service, ::grpc::ServerCompletionQueue* cq,
-      size_t max_state_bucket_count);
+      size_t max_state_bucket_count,
+      std::pair<std::string, std::string> restricted_kv);
   virtual ~InferHandler();
 
   // Descriptive name of of the handler.
@@ -2768,6 +2864,7 @@ class InferHandler : public Server::HandlerBase {
 
   virtual void StartNewRequest() = 0;
   virtual bool Process(State* state, bool rpc_ok) = 0;
+  bool ExecutePrecondition(InferHandler::State* state);
 
   const std::string name_;
   std::shared_ptr<TRITONSERVER_Server> tritonserver_;
@@ -2783,6 +2880,8 @@ class InferHandler : public Server::HandlerBase {
   // of creating a state for every new request.
   const size_t max_state_bucket_count_;
   std::vector<State*> state_bucket_;
+
+  std::pair<std::string, std::string> restricted_kv_;
 };
 
 template <
@@ -2793,9 +2892,11 @@ InferHandler<ServiceType, ServerResponderType, RequestType, ResponseType>::
         const std::string& name,
         const std::shared_ptr<TRITONSERVER_Server>& tritonserver,
         ServiceType* service, ::grpc::ServerCompletionQueue* cq,
-        size_t max_state_bucket_count)
+        size_t max_state_bucket_count,
+        std::pair<std::string, std::string> restricted_kv)
     : name_(name), tritonserver_(tritonserver), service_(service), cq_(cq),
-      max_state_bucket_count_(max_state_bucket_count)
+      max_state_bucket_count_(max_state_bucket_count),
+      restricted_kv_(restricted_kv)
 {
 }
 
@@ -2856,6 +2957,21 @@ InferHandler<
   }
 
   LOG_VERBOSE(1) << "Thread exited for " << Name();
+}
+
+template <
+    typename ServiceType, typename ServerResponderType, typename RequestType,
+    typename ResponseType>
+bool
+InferHandler<ServiceType, ServerResponderType, RequestType, ResponseType>::
+    ExecutePrecondition(InferHandler::State* state)
+{
+  if (!restricted_kv_.first.empty()) {
+    const auto& metadata = state->context_->ctx_->client_metadata();
+    const auto it = metadata.find(restricted_kv_.first);
+    return (it != metadata.end()) && (it->second == restricted_kv_.second);
+  }
+  return true;
 }
 
 //
@@ -3886,8 +4002,11 @@ class ModelInferHandler
       const std::shared_ptr<SharedMemoryManager>& shm_manager,
       inference::GRPCInferenceService::AsyncService* service,
       ::grpc::ServerCompletionQueue* cq, size_t max_state_bucket_count,
-      grpc_compression_level compression_level)
-      : InferHandler(name, tritonserver, service, cq, max_state_bucket_count),
+      grpc_compression_level compression_level,
+      std::pair<std::string, std::string> restricted_kv)
+      : InferHandler(
+            name, tritonserver, service, cq, max_state_bucket_count,
+            restricted_kv),
         trace_manager_(trace_manager), shm_manager_(shm_manager),
         compression_level_(compression_level)
   {
@@ -3920,6 +4039,7 @@ class ModelInferHandler
   bool Process(State* state, bool rpc_ok) override;
 
  private:
+  void Execute(State* state);
   static void InferResponseComplete(
       TRITONSERVER_InferenceResponse* response, const uint32_t flags,
       void* userp);
@@ -3974,11 +4094,7 @@ ModelInferHandler::Process(InferHandler::State* state, bool rpc_ok)
     finished = true;
   }
 
-  const inference::ModelInferRequest& request = state->request_;
-  auto response_queue = state->response_queue_;
-
   if (state->step_ == Steps::START) {
-    TRITONSERVER_Error* err = nullptr;
 #ifdef TRITON_ENABLE_TRACING
     // Can't create trace as we don't know the model to be requested,
     // track timestamps in 'state'
@@ -3991,103 +4107,14 @@ ModelInferHandler::Process(InferHandler::State* state, bool rpc_ok)
       StartNewRequest();
     }
 
-    int64_t requested_model_version;
-    if (err == nullptr) {
-      err = GetModelVersionFromString(
-          request.model_version(), &requested_model_version);
-    }
+    if (ExecutePrecondition(state)) {
+      Execute(state);
+    } else {
+      ::grpc::Status status = ::grpc::Status(
+          ::grpc::StatusCode::UNAVAILABLE,
+          std::string("This protocol is restricted, expecting header '") +
+              restricted_kv_.first + "'");
 
-    if (err == nullptr) {
-      uint32_t txn_flags;
-      err = TRITONSERVER_ServerModelTransactionProperties(
-          tritonserver_.get(), request.model_name().c_str(),
-          requested_model_version, &txn_flags, nullptr /* voidp */);
-      if ((err == nullptr) && (txn_flags & TRITONSERVER_TXN_DECOUPLED) != 0) {
-        err = TRITONSERVER_ErrorNew(
-            TRITONSERVER_ERROR_UNSUPPORTED,
-            "ModelInfer RPC doesn't support models with decoupled "
-            "transaction policy");
-      }
-    }
-
-    // Create the inference request which contains all the
-    // input information needed for an inference.
-    TRITONSERVER_InferenceRequest* irequest = nullptr;
-    if (err == nullptr) {
-      err = TRITONSERVER_InferenceRequestNew(
-          &irequest, tritonserver_.get(), request.model_name().c_str(),
-          requested_model_version);
-    }
-
-    if (err == nullptr) {
-      err = SetInferenceRequestMetadata(irequest, request);
-    }
-
-    // Will be used to hold the serialized data in case explicit string
-    // tensors are present in the request.
-    std::list<std::string> serialized_data;
-
-    if (err == nullptr) {
-      err = InferGRPCToInput(
-          tritonserver_, shm_manager_, request, &serialized_data, irequest);
-    }
-    if (err == nullptr) {
-      err = InferAllocatorPayload<inference::ModelInferResponse>(
-          tritonserver_, shm_manager_, request, std::move(serialized_data),
-          response_queue, &state->alloc_payload_);
-    }
-    if (err == nullptr) {
-      err = TRITONSERVER_InferenceRequestSetReleaseCallback(
-          irequest, InferRequestComplete, nullptr /* request_release_userp */);
-    }
-    if (err == nullptr) {
-      err = TRITONSERVER_InferenceRequestSetResponseCallback(
-          irequest, allocator_,
-          &state->alloc_payload_ /* response_allocator_userp */,
-          InferResponseComplete, reinterpret_cast<void*>(state));
-    }
-    // Get request ID for logging in case of error.
-    const char* request_id = "";
-    if (irequest != nullptr) {
-      LOG_TRITONSERVER_ERROR(
-          TRITONSERVER_InferenceRequestId(irequest, &request_id),
-          "unable to retrieve request ID string");
-    }
-
-    if (!strncmp(request_id, "", 1)) {
-      request_id = "<id_unknown>";
-    }
-    if (err == nullptr) {
-      TRITONSERVER_InferenceTrace* triton_trace = nullptr;
-#ifdef TRITON_ENABLE_TRACING
-      state->trace_ =
-          std::move(trace_manager_->SampleTrace(request.model_name()));
-      if (state->trace_ != nullptr) {
-        triton_trace = state->trace_->trace_;
-      }
-#endif  // TRITON_ENABLE_TRACING
-
-      state->step_ = ISSUED;
-      err = TRITONSERVER_ServerInferAsync(
-          tritonserver_.get(), irequest, triton_trace);
-    }
-
-    // If not error then state->step_ == ISSUED and inference request
-    // has initiated... completion callback will transition to
-    // COMPLETE. If error go immediately to COMPLETE.
-    if (err != nullptr) {
-      LOG_VERBOSE(1) << "[request id: " << request_id << "] "
-                     << "Infer failed: " << TRITONSERVER_ErrorMessage(err);
-
-      LOG_TRITONSERVER_ERROR(
-          TRITONSERVER_InferenceRequestDelete(irequest),
-          "deleting GRPC inference request");
-
-      ::grpc::Status status;
-      GrpcStatusUtil::Create(&status, err);
-      TRITONSERVER_ErrorDelete(err);
-
-      inference::ModelInferResponse error_response;
 
 #ifdef TRITON_ENABLE_TRACING
       state->trace_timestamps_.emplace_back(
@@ -4095,8 +4122,10 @@ ModelInferHandler::Process(InferHandler::State* state, bool rpc_ok)
 #endif  // TRITON_ENABLE_TRACING
 
       state->step_ = COMPLETE;
-      state->context_->responder_->Finish(error_response, status, state);
+      state->context_->responder_->Finish(
+          inference::ModelInferResponse(), status, state);
     }
+
   } else if (state->step_ == Steps::COMPLETE) {
 #ifdef TRITON_ENABLE_TRACING
     state->trace_timestamps_.emplace_back(
@@ -4108,6 +4137,120 @@ ModelInferHandler::Process(InferHandler::State* state, bool rpc_ok)
   }
 
   return !finished;
+}
+
+void
+ModelInferHandler::Execute(InferHandler::State* state)
+{
+  TRITONSERVER_Error* err = nullptr;
+  const inference::ModelInferRequest& request = state->request_;
+  auto response_queue = state->response_queue_;
+  int64_t requested_model_version;
+  if (err == nullptr) {
+    err = GetModelVersionFromString(
+        request.model_version(), &requested_model_version);
+  }
+
+  if (err == nullptr) {
+    uint32_t txn_flags;
+    err = TRITONSERVER_ServerModelTransactionProperties(
+        tritonserver_.get(), request.model_name().c_str(),
+        requested_model_version, &txn_flags, nullptr /* voidp */);
+    if ((err == nullptr) && (txn_flags & TRITONSERVER_TXN_DECOUPLED) != 0) {
+      err = TRITONSERVER_ErrorNew(
+          TRITONSERVER_ERROR_UNSUPPORTED,
+          "ModelInfer RPC doesn't support models with decoupled "
+          "transaction policy");
+    }
+  }
+
+  // Create the inference request which contains all the
+  // input information needed for an inference.
+  TRITONSERVER_InferenceRequest* irequest = nullptr;
+  if (err == nullptr) {
+    err = TRITONSERVER_InferenceRequestNew(
+        &irequest, tritonserver_.get(), request.model_name().c_str(),
+        requested_model_version);
+  }
+
+  if (err == nullptr) {
+    err = SetInferenceRequestMetadata(irequest, request);
+  }
+
+  // Will be used to hold the serialized data in case explicit string
+  // tensors are present in the request.
+  std::list<std::string> serialized_data;
+
+  if (err == nullptr) {
+    err = InferGRPCToInput(
+        tritonserver_, shm_manager_, request, &serialized_data, irequest);
+  }
+  if (err == nullptr) {
+    err = InferAllocatorPayload<inference::ModelInferResponse>(
+        tritonserver_, shm_manager_, request, std::move(serialized_data),
+        response_queue, &state->alloc_payload_);
+  }
+  if (err == nullptr) {
+    err = TRITONSERVER_InferenceRequestSetReleaseCallback(
+        irequest, InferRequestComplete, nullptr /* request_release_userp */);
+  }
+  if (err == nullptr) {
+    err = TRITONSERVER_InferenceRequestSetResponseCallback(
+        irequest, allocator_,
+        &state->alloc_payload_ /* response_allocator_userp */,
+        InferResponseComplete, reinterpret_cast<void*>(state));
+  }
+  // Get request ID for logging in case of error.
+  const char* request_id = "";
+  if (irequest != nullptr) {
+    LOG_TRITONSERVER_ERROR(
+        TRITONSERVER_InferenceRequestId(irequest, &request_id),
+        "unable to retrieve request ID string");
+  }
+
+  if (!strncmp(request_id, "", 1)) {
+    request_id = "<id_unknown>";
+  }
+  if (err == nullptr) {
+    TRITONSERVER_InferenceTrace* triton_trace = nullptr;
+#ifdef TRITON_ENABLE_TRACING
+    state->trace_ =
+        std::move(trace_manager_->SampleTrace(request.model_name()));
+    if (state->trace_ != nullptr) {
+      triton_trace = state->trace_->trace_;
+    }
+#endif  // TRITON_ENABLE_TRACING
+
+    state->step_ = ISSUED;
+    err = TRITONSERVER_ServerInferAsync(
+        tritonserver_.get(), irequest, triton_trace);
+  }
+
+  // If not error then state->step_ == ISSUED and inference request
+  // has initiated... completion callback will transition to
+  // COMPLETE. If error go immediately to COMPLETE.
+  if (err != nullptr) {
+    LOG_VERBOSE(1) << "[request id: " << request_id << "] "
+                   << "Infer failed: " << TRITONSERVER_ErrorMessage(err);
+
+    LOG_TRITONSERVER_ERROR(
+        TRITONSERVER_InferenceRequestDelete(irequest),
+        "deleting GRPC inference request");
+
+    ::grpc::Status status;
+    GrpcStatusUtil::Create(&status, err);
+    TRITONSERVER_ErrorDelete(err);
+
+    inference::ModelInferResponse error_response;
+
+#ifdef TRITON_ENABLE_TRACING
+    state->trace_timestamps_.emplace_back(
+        std::make_pair("GRPC_SEND_START", TraceManager::CaptureTimestamp()));
+#endif  // TRITON_ENABLE_TRACING
+
+    state->step_ = COMPLETE;
+    state->context_->responder_->Finish(error_response, status, state);
+  }
 }
 
 void
@@ -4281,8 +4424,11 @@ class ModelStreamInferHandler
       const std::shared_ptr<SharedMemoryManager>& shm_manager,
       inference::GRPCInferenceService::AsyncService* service,
       ::grpc::ServerCompletionQueue* cq, size_t max_state_bucket_count,
-      grpc_compression_level compression_level)
-      : InferHandler(name, tritonserver, service, cq, max_state_bucket_count),
+      grpc_compression_level compression_level,
+      std::pair<std::string, std::string> restricted_kv)
+      : InferHandler(
+            name, tritonserver, service, cq, max_state_bucket_count,
+            restricted_kv),
         trace_manager_(trace_manager), shm_manager_(shm_manager),
         compression_level_(compression_level)
   {
@@ -4372,11 +4518,23 @@ ModelStreamInferHandler::Process(InferHandler::State* state, bool rpc_ok)
     // Start a new request to replace this one...
     StartNewRequest();
 
-    // Since this is the start of a connection, 'state' hasn't been
-    // used yet so use it to read a request off the connection.
-    state->context_->step_ = Steps::READ;
-    state->step_ = Steps::READ;
-    state->context_->responder_->Read(&state->request_, state);
+    if (ExecutePrecondition(state)) {
+      // Since this is the start of a connection, 'state' hasn't been
+      // used yet so use it to read a request off the connection.
+      state->context_->step_ = Steps::READ;
+      state->step_ = Steps::READ;
+      state->context_->responder_->Read(&state->request_, state);
+    } else {
+      // Precondition is not satisfied, cancel the stream
+      state->context_->step_ = Steps::COMPLETE;
+      state->step_ = Steps::COMPLETE;
+      ::grpc::Status status = ::grpc::Status(
+          ::grpc::StatusCode::UNAVAILABLE,
+          std::string("This protocol is restricted, expecting header '") +
+              restricted_kv_.first + "'");
+      state->context_->responder_->Finish(status, state);
+      return !finished;
+    }
 
   } else if (state->step_ == Steps::READ) {
     TRITONSERVER_Error* err = nullptr;
@@ -4906,18 +5064,41 @@ Server::Server(
   model_infer_cq_ = builder_.AddCompletionQueue();
   model_stream_infer_cq_ = builder_.AddCompletionQueue();
 
+  // Read and set restriction for each protocol specified
+  // map from protocol name to a pair of header to look for and the key
+  std::map<std::string, std::pair<std::string, std::string>> restricted_keys;
+  for (const auto& pg : options.protocol_groups_) {
+    for (const auto& p : pg.protocols_) {
+      if (restricted_keys.find(p) != restricted_keys.end()) {
+        throw std::invalid_argument(
+            std::string("protocol '") + p +
+            "' can not be "
+            "specified in multiple config group");
+      }
+      const auto header = std::string(kRestrictedProtocolHeaderTemplate) +
+                          pg.restricted_key_.first;
+      restricted_keys[p] = std::make_pair(header, pg.restricted_key_.second);
+    }
+  }
+
   // A common Handler for other non-inference requests
   common_handler_.reset(new CommonHandler(
       "CommonHandler", tritonserver_, shm_manager_, trace_manager_, &service_,
-      &health_service_, common_cq_.get()));
+      &health_service_, common_cq_.get(), restricted_keys));
 
+  // [FIXME] "register" logic is different for infer
   // Handler for model inference requests.
+  const auto it = restricted_keys.find("inference");
+  std::pair<std::string, std::string> restricted_kv =
+      (it == restricted_keys.end())
+          ? std::pair<std::string, std::string>{"", ""}
+          : it->second;
   for (int i = 0; i < REGISTER_GRPC_INFER_THREAD_COUNT; ++i) {
     model_infer_handlers_.emplace_back(new ModelInferHandler(
         "ModelInferHandler", tritonserver_, trace_manager_, shm_manager_,
         &service_, model_infer_cq_.get(),
         options.infer_allocation_pool_size_ /* max_state_bucket_count */,
-        options.infer_compression_level_));
+        options.infer_compression_level_, restricted_kv));
   }
 
   // Handler for streaming inference requests. Keeps one handler for streaming
@@ -4926,7 +5107,7 @@ Server::Server(
       "ModelStreamInferHandler", tritonserver_, trace_manager_, shm_manager_,
       &service_, model_stream_infer_cq_.get(),
       options.infer_allocation_pool_size_ /* max_state_bucket_count */,
-      options.infer_compression_level_));
+      options.infer_compression_level_, restricted_kv));
 }
 
 Server::~Server()
@@ -4943,8 +5124,14 @@ Server::Create(
 {
   const std::string addr = server_options.socket_.address_ + ":" +
                            std::to_string(server_options.socket_.port_);
-  server->reset(
-      new Server(tritonserver, trace_manager, shm_manager, server_options));
+  try {
+    server->reset(
+        new Server(tritonserver, trace_manager, shm_manager, server_options));
+  }
+  catch (const std::invalid_argument& pe) {
+    return TRITONSERVER_ErrorNew(TRITONSERVER_ERROR_INVALID_ARG, pe.what());
+    ;
+  }
 
   return nullptr;  // success
 }

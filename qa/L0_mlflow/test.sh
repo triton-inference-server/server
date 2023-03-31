@@ -49,7 +49,7 @@ pip install ./mlflow-triton-plugin/
 python - << EOF
 from mlflow.tracking import MlflowClient
 c = MlflowClient()
-for m in c.list_registered_models():
+for m in c.search_registered_models():
     c.delete_registered_model(m.name)
 EOF
 

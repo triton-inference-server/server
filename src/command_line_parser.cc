@@ -213,6 +213,25 @@ ParsePairOption(const std::string& arg, const std::string& delim_str)
   return {ParseOption<T1>(first_string), ParseOption<T2>(second_string)};
 }
 
+#ifdef TRITON_ENABLE_GRPC
+// Split 'options' by 'delim_str' and place splitted strings into a vector
+std::vector<std::string>
+SplitOptions(std::string options, const std::string& delim_str)
+{
+  std::vector<std::string> res;
+
+  int delim = options.find(delim_str);
+  while ((delim >= 0)) {
+    res.emplace_back(options.substr(0, delim));
+    options = options.substr(delim + delim_str.length());
+    delim = options.find(delim_str);
+  }
+  // include last element
+  res.emplace_back(options);
+  return res;
+}
+#endif  // TRITON_ENABLE_GRPC
+
 }  // namespace
 
 enum TritonOptionId {
@@ -256,6 +275,7 @@ enum TritonOptionId {
   OPTION_GRPC_ARG_HTTP2_MAX_PINGS_WITHOUT_DATA,
   OPTION_GRPC_ARG_HTTP2_MIN_RECV_PING_INTERVAL_WITHOUT_DATA_MS,
   OPTION_GRPC_ARG_HTTP2_MAX_PING_STRIKES,
+  OPTION_GRPC_RESTRICTED_PROTOCOL,
 #endif  // TRITON_ENABLE_GRPC
 #if defined(TRITON_ENABLE_SAGEMAKER)
   OPTION_ALLOW_SAGEMAKER,
@@ -440,6 +460,13 @@ std::vector<Option> TritonParser::recognized_options_
        "Maximum number of bad pings that the server will tolerate before "
        "sending an HTTP2 GOAWAY frame and closing the transport. Setting it to "
        "0 allows the server to accept any number of bad pings. Default is 2."},
+      {OPTION_GRPC_RESTRICTED_PROTOCOL, "grpc-restricted-protocol",
+       "<string>:<string>=<string>",
+       "Specify restricted GRPC protocol setting. The format of this "
+       "flag is --grpc-restricted-protocol=<protocols>,<key>=<value>. Where "
+       "<protocol> is a comma-separated list of protocols to be restricted. "
+       "<key> will be additional header key to be checked when a GRPC request "
+       "is received, and <value> is the value expected to be matched."},
 #endif  // TRITON_ENABLE_GRPC
 #if defined(TRITON_ENABLE_SAGEMAKER)
       {OPTION_ALLOW_SAGEMAKER, "allow-sagemaker", Option::ArgBool,
@@ -1161,6 +1188,19 @@ TritonParser::Parse(int argc, char** argv)
         lgrpc_options.keep_alive_.http2_max_ping_strikes_ =
             ParseOption<int>(optarg);
         break;
+      case OPTION_GRPC_RESTRICTED_PROTOCOL: {
+        const auto& parsed_tuple = ParseGrpcRestrictedProtocolOption(optarg);
+        const auto& protocols = SplitOptions(std::get<0>(parsed_tuple), ",");
+        const auto& key = std::get<1>(parsed_tuple);
+        const auto& value = std::get<2>(parsed_tuple);
+        grpc::ProtocolGroup pg;
+        for (const auto& p : protocols) {
+          pg.protocols_.emplace(p);
+        }
+        pg.restricted_key_ = std::make_pair(key, value);
+        lgrpc_options.protocol_groups_.emplace_back(pg);
+        break;
+      }
 #endif  // TRITON_ENABLE_GRPC
 
 #ifdef TRITON_ENABLE_METRICS
@@ -1338,7 +1378,6 @@ TritonParser::Parse(int argc, char** argv)
   // others which are not determined until after parsing.
   //
 
-  // [FIXME] check at parsing?
   if (lparams.control_mode_ != TRITONSERVER_MODEL_CONTROL_POLL) {
     lparams.repository_poll_secs_ = 0;
   }
@@ -1582,18 +1621,55 @@ TritonParser::ParseBackendConfigOption(const std::string& arg)
 }
 
 std::tuple<std::string, std::string, std::string>
+TritonParser::ParseGrpcRestrictedProtocolOption(const std::string& arg)
+{
+  try {
+    return ParseGenericConfigOption(arg, ":", "=");
+  }
+  catch (const ParseException& pe) {
+    // catch and throw exception with option specific message
+    std::stringstream ss;
+    ss << "--grpc-restricted-protocol option format is '<config "
+          "name>:<setting>=<value>'. Got "
+       << arg << std::endl;
+    throw ParseException(ss.str());
+  }
+  // Should not reach here
+  return {};
+}
+
+std::tuple<std::string, std::string, std::string>
 TritonParser::ParseHostPolicyOption(const std::string& arg)
 {
-  // Format is "<policy_name>,<setting>=<value>"
-  int delim_name = arg.find(",");
-  int delim_setting = arg.find("=", delim_name + 1);
-
-  // Check for 2 semicolons
-  if ((delim_name < 0) || (delim_setting < 0)) {
+  try {
+    return ParseGenericConfigOption(arg, ",", "=");
+  }
+  catch (const ParseException& pe) {
+    // catch and throw exception with option specific message
     std::stringstream ss;
     ss << "--host-policy option format is '<policy "
           "name>,<setting>=<value>'. Got "
        << arg << std::endl;
+    throw ParseException(ss.str());
+  }
+  // Should not reach here
+  return {};
+}
+
+std::tuple<std::string, std::string, std::string>
+TritonParser::ParseGenericConfigOption(
+    const std::string& arg, const std::string& first_delim,
+    const std::string& second_delim)
+{
+  // Format is "<string>,<string>=<string>"
+  int delim_name = arg.find(first_delim);
+  int delim_setting = arg.find(second_delim, delim_name + 1);
+
+  // Check for 2 semicolons
+  if ((delim_name < 0) || (delim_setting < 0)) {
+    std::stringstream ss;
+    ss << "option format is '<string>" << first_delim << "<string>"
+       << second_delim << "<string>'. Got " << arg << std::endl;
     throw ParseException(ss.str());
   }
 
@@ -1604,9 +1680,8 @@ TritonParser::ParseHostPolicyOption(const std::string& arg)
 
   if (name_string.empty() || setting_string.empty() || value_string.empty()) {
     std::stringstream ss;
-    ss << "--host-policy option format is '<policy "
-          "name>,<setting>=<value>'. Got "
-       << arg << std::endl;
+    ss << "option format is '<string>" << first_delim << "<string>"
+       << second_delim << "<string>'. Got " << arg << std::endl;
     throw ParseException(ss.str());
   }
 
