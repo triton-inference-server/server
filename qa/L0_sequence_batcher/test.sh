@@ -1,5 +1,5 @@
 #!/bin/bash
-# Copyright 2018-2022, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright 2018-2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -733,7 +733,7 @@ if [ "$TEST_SYSTEM_SHARED_MEMORY" -ne 1 ] && [ "$TEST_CUDA_SHARED_MEMORY" -ne 1 
     export MODEL_INSTANCES=1
     export BATCHER_TYPE="FIXED"
 
-    TEST_CASE=test_request_timeout
+    TEST_CASE=SequenceBatcherRequestTimeoutTest
     MODEL_PATH=request_timeout_models
     mkdir -p ${MODEL_PATH}/identity_fp32_timeout/1
     cp ../python_models/identity_fp32_timeout/model.py ${MODEL_PATH}/identity_fp32_timeout/1/.
@@ -758,13 +758,13 @@ if [ "$TEST_SYSTEM_SHARED_MEMORY" -ne 1 ] && [ "$TEST_CUDA_SHARED_MEMORY" -ne 1 
     echo "Test: $TEST_CASE, repository $MODEL_PATH" >>$CLIENT_LOG
 
     set +e
-    python3 $BATCHER_TEST SequenceBatcherTest.$TEST_CASE >>$CLIENT_LOG 2>&1
+    python3 $BATCHER_TEST $TEST_CASE >>$CLIENT_LOG 2>&1
     if [ $? -ne 0 ]; then
         echo -e "\n***\n*** Test $TEST_CASE Failed\n***" >>$CLIENT_LOG
         echo -e "\n***\n*** Test $TEST_CASE Failed\n***"
         RET=1
     else
-        check_test_results $TEST_RESULT_FILE 1
+        check_test_results $TEST_RESULT_FILE 2
         if [ $? -ne 0 ]; then
             cat $CLIENT_LOG
             echo -e "\n***\n*** Test Result Verification Failed\n***"

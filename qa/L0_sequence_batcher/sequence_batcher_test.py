@@ -1,4 +1,4 @@
-# Copyright (c) 2018-2021, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright 2018-2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -2850,6 +2850,48 @@ class SequenceBatcherTest(su.SequenceBatcherTestUtil):
                         self.cleanup_shm_regions(precreated_shm0_handles)
                         self.cleanup_shm_regions(precreated_shm1_handles)
 
+
+class SequenceBatcherRequestTimeoutTest(su.SequenceBatcherTestUtil):
+
+    def setUp(self):
+        super(SequenceBatcherRequestTimeoutTest, self).setUp()
+        # By default, find tritonserver on "localhost", but can be overridden
+        # with TRITONSERVER_IPADDR envvar
+        self.server_address_ = os.environ.get('TRITONSERVER_IPADDR',
+                                              'localhost') + ":8001"
+
+        self.model_name_ = "identity_fp32_timeout"
+        self.tensor_data_ = np.ones(shape=[1, 1], dtype=np.float32)
+        self.inputs_ = [grpcclient.InferInput('INPUT0', [1, 1], "FP32")]
+        self.inputs_[0].set_data_from_numpy(self.tensor_data_)
+
+    def send_sequence_with_timeout(self,
+                                   seq_id,
+                                   callback,
+                                   timeout_us=3000000,
+                                   request_pause_sec=0):
+        with grpcclient.InferenceServerClient(
+                self.server_address_) as triton_client:
+            triton_client.start_stream(callback=callback)
+            triton_client.async_stream_infer(self.model_name_,
+                                             self.inputs_,
+                                             sequence_id=seq_id,
+                                             sequence_start=True,
+                                             timeout=timeout_us)
+            if (request_pause_sec != 0):
+                time.sleep(request_pause_sec)
+            triton_client.async_stream_infer(self.model_name_,
+                                             self.inputs_,
+                                             sequence_id=seq_id,
+                                             timeout=timeout_us)
+            if (request_pause_sec != 0):
+                time.sleep(request_pause_sec)
+            triton_client.async_stream_infer(self.model_name_,
+                                             self.inputs_,
+                                             sequence_id=seq_id,
+                                             sequence_end=True,
+                                             timeout=timeout_us)
+
     def test_request_timeout(self):
         # Test long running model that receives requests with shorter timeout,
         # expect the timeout will only be expired on backlog sequence and reject
@@ -2858,51 +2900,19 @@ class SequenceBatcherTest(su.SequenceBatcherTestUtil):
         # at a time. Each model execution takes 5 second and all requests have
         # 3 second timeout, so the second sequence will be rejected.
 
-        model_name = "identity_fp32_timeout"
-        dtype = np.float32
-
-        # By default, find tritonserver on "localhost", but can be overridden
-        # with TRITONSERVER_IPADDR envvar
-        server_address = os.environ.get('TRITONSERVER_IPADDR',
-                                        'localhost') + ":8001"
-
         # correlation ID is 1-index
         seq1_res = []
         seq2_res = []
         seq1_callback = lambda result, error: seq1_res.append((result, error))
         seq2_callback = lambda result, error: seq2_res.append((result, error))
 
-        tensor_data = np.ones(shape=[1, 1], dtype=dtype)
-
-        def send_sequence_with_timeout(seq_id, callback):
-            timeout_us = 3000000  # 3s in us
-            inputs = [grpcclient.InferInput('INPUT0', [1, 1], "FP32")]
-            inputs[0].set_data_from_numpy(tensor_data)
-            with grpcclient.InferenceServerClient(
-                    server_address) as triton_client:
-                triton_client.start_stream(callback=callback)
-                triton_client.async_stream_infer(model_name,
-                                                 inputs,
-                                                 sequence_id=seq_id,
-                                                 sequence_start=True,
-                                                 timeout=timeout_us)
-                triton_client.async_stream_infer(model_name,
-                                                 inputs,
-                                                 sequence_id=seq_id,
-                                                 timeout=timeout_us)
-                triton_client.async_stream_infer(model_name,
-                                                 inputs,
-                                                 sequence_id=seq_id,
-                                                 sequence_end=True,
-                                                 timeout=timeout_us)
-
         # send sequence with 1s interval to ensure processing order
         threads = []
         threads.append(
-            threading.Thread(target=send_sequence_with_timeout,
+            threading.Thread(target=self.send_sequence_with_timeout,
                              args=(1, seq1_callback)))
         threads.append(
-            threading.Thread(target=send_sequence_with_timeout,
+            threading.Thread(target=self.send_sequence_with_timeout,
                              args=(2, seq2_callback)))
         threads[0].start()
         time.sleep(1)
@@ -2917,7 +2927,7 @@ class SequenceBatcherTest(su.SequenceBatcherTestUtil):
                 .format(error))
             np.testing.assert_allclose(
                 result.as_numpy("OUTPUT0"),
-                tensor_data,
+                self.tensor_data_,
                 err_msg="Unexpected output tensor, got {}".format(
                     result.as_numpy("OUTPUT0")))
 
@@ -2928,6 +2938,50 @@ class SequenceBatcherTest(su.SequenceBatcherTestUtil):
                     "timeout of the corresponding sequence has been expired",
                     msg="Unexpected error: {}".format(error)):
                 raise error
+
+    def test_send_request_after_timeout(self):
+        # Similar to test_request_timeout, but the sequence to be timed out
+        # will send the last request after the sequence has been timed out,
+        # and expecting server to return error regarding sending request of
+        # an untracked sequence
+
+        seq1_res = []
+        seq2_res = []
+        seq1_callback = lambda result, error: seq1_res.append((result, error))
+        seq2_callback = lambda result, error: seq2_res.append((result, error))
+
+        threads = []
+        threads.append(
+            threading.Thread(target=self.send_sequence_with_timeout,
+                             args=(1, seq1_callback)))
+        # Each request will be sent with a pause, so the third request
+        # will be sent after the sequence has been timed out
+        threads.append(
+            threading.Thread(target=self.send_sequence_with_timeout,
+                             args=(2, seq2_callback),
+                             kwargs={'request_pause_sec': 2}))
+        threads[0].start()
+        time.sleep(1)
+        threads[1].start()
+        for t in threads:
+            t.join()
+
+        # Check error message of the last request and the rest
+        # separately
+        for _, error in seq2_res[0:-1]:
+            self.assertIsNotNone(error, "Expect error for sequence 2 requests")
+            with self.assertRaisesRegex(
+                    InferenceServerException,
+                    "timeout of the corresponding sequence has been expired",
+                    msg="Unexpected error: {}".format(error)):
+                raise error
+        _, last_err = seq2_res[-1]
+        self.assertIsNotNone(last_err, "Expect error for sequence 2 requests")
+        with self.assertRaisesRegex(
+                InferenceServerException,
+                "must specify the START flag on the first request",
+                msg="Unexpected error: {}".format(error)):
+            raise last_err
 
 
 if __name__ == '__main__':

@@ -1,5 +1,5 @@
 <!--
-# Copyright (c) 2020, NVIDIA CORPORATION. All rights reserved.
+# Copyright 2020-2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -73,8 +73,9 @@ policy. The parameters and their type are:
   request, in microseconds. If the request cannot be completed within
   the time Triton will terminate the request, as well as the corresponding
   sequence and received requests of the sequence. The timeout will only be
-  applied to requests of the sequences that haven't been processed, the timeout
-  will be ignored if the corresponding sequence has been scheduled.
+  applied to requests of the sequences that haven't been allocated a batch slot
+  for execution, the requests of the sequences that have been allocated batch
+  slots will not be affected by the timeout setting.
 
 The parameter is optional and, if not specified, Triton will handle
 the request and corresponding sequence based on the model configuration.
