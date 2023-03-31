@@ -29,6 +29,7 @@
 #include <grpc++/grpc++.h>
 #include <condition_variable>
 #include <queue>
+#include <regex>
 #include <thread>
 #include "../tracer.h"
 #include "grpc_handler.h"
@@ -881,7 +882,8 @@ class InferHandler : public HandlerBase {
       const std::shared_ptr<TRITONSERVER_Server>& tritonserver,
       ServiceType* service, ::grpc::ServerCompletionQueue* cq,
       size_t max_state_bucket_count,
-      std::pair<std::string, std::string> restricted_kv);
+      std::pair<std::string, std::string> restricted_kv,
+      const std::string& header_forward_pattern);
   virtual ~InferHandler();
 
   // Descriptive name of of the handler.
@@ -957,6 +959,7 @@ class InferHandler : public HandlerBase {
   std::vector<State*> state_bucket_;
 
   std::pair<std::string, std::string> restricted_kv_;
+  std::string header_forward_pattern_;
 };
 
 template <
@@ -968,10 +971,12 @@ InferHandler<ServiceType, ServerResponderType, RequestType, ResponseType>::
         const std::shared_ptr<TRITONSERVER_Server>& tritonserver,
         ServiceType* service, ::grpc::ServerCompletionQueue* cq,
         size_t max_state_bucket_count,
-        std::pair<std::string, std::string> restricted_kv)
+        std::pair<std::string, std::string> restricted_kv,
+        const std::string& header_forward_pattern)
     : name_(name), tritonserver_(tritonserver), service_(service), cq_(cq),
       max_state_bucket_count_(max_state_bucket_count),
-      restricted_kv_(restricted_kv)
+      restricted_kv_(restricted_kv),
+      header_forward_pattern_(header_forward_pattern)
 {
 }
 
@@ -1066,10 +1071,11 @@ class ModelInferHandler
       inference::GRPCInferenceService::AsyncService* service,
       ::grpc::ServerCompletionQueue* cq, size_t max_state_bucket_count,
       grpc_compression_level compression_level,
-      std::pair<std::string, std::string> restricted_kv)
+      std::pair<std::string, std::string> restricted_kv,
+      const std::string& forward_header_pattern)
       : InferHandler(
             name, tritonserver, service, cq, max_state_bucket_count,
-            restricted_kv),
+            restricted_kv, forward_header_pattern),
         trace_manager_(trace_manager), shm_manager_(shm_manager),
         compression_level_(compression_level)
   {

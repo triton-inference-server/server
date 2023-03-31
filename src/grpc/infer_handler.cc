@@ -795,6 +795,24 @@ ModelInferHandler::Execute(InferHandler::State* state)
     err = SetInferenceRequestMetadata(irequest, request);
   }
 
+  if (err == nullptr && header_forward_pattern_ != "") {
+    const auto& metadata = state->context_->ctx_->client_metadata();
+    for (const auto& pair : metadata) {
+      auto& key = pair.first;
+      auto& value = pair.second;
+      std::regex base_regex(header_forward_pattern_);
+      if (std::regex_search(key.data(), base_regex)) {
+        std::string param_key = std::string(key.begin(), key.end());
+        std::string param_value = std::string(value.begin(), value.end());
+        err = TRITONSERVER_InferenceRequestSetStringParameter(
+            irequest, param_key.c_str(), param_value.c_str());
+        if (err != nullptr) {
+          break;
+        }
+      }
+    }
+  }
+
   // Will be used to hold the serialized data in case explicit string
   // tensors are present in the request.
   std::list<std::string> serialized_data;

@@ -2382,7 +2382,8 @@ Server::Server(
         "ModelInferHandler", tritonserver_, trace_manager_, shm_manager_,
         &service_, model_infer_cq_.get(),
         options.infer_allocation_pool_size_ /* max_state_bucket_count */,
-        options.infer_compression_level_, restricted_kv));
+        options.infer_compression_level_, restricted_kv,
+        options.forward_header_pattern_));
   }
 
   // Handler for streaming inference requests. Keeps one handler for streaming
@@ -2391,7 +2392,8 @@ Server::Server(
       "ModelStreamInferHandler", tritonserver_, trace_manager_, shm_manager_,
       &service_, model_stream_infer_cq_.get(),
       options.infer_allocation_pool_size_ /* max_state_bucket_count */,
-      options.infer_compression_level_, restricted_kv));
+      options.infer_compression_level_, restricted_kv,
+      options.forward_header_pattern_));
 }
 
 Server::~Server()

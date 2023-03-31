@@ -34,6 +34,7 @@
 #include <re2/re2.h>
 #include <algorithm>
 #include <list>
+#include <regex>
 #include <thread>
 #include "classification.h"
 
@@ -2764,6 +2765,38 @@ HTTPAPIServer::EVBufferToRawInput(
   return nullptr;  // success
 }
 
+struct HeaderSearchPayload {
+  const char* regex_;
+  TRITONSERVER_InferenceRequest* request_;
+  TRITONSERVER_Error* error_;
+};
+
+int
+ForEachHeader(evhtp_header_t* header, void* arg)
+{
+  HeaderSearchPayload* header_search_payload =
+      reinterpret_cast<HeaderSearchPayload*>(arg);
+
+  TRITONSERVER_InferenceRequest* irequest = header_search_payload->request_;
+  const char* pattern = header_search_payload->regex_;
+
+  std::regex base_regex(pattern);
+  if (std::regex_search(header->key, base_regex)) {
+    std::cout << "HTTP Regex matched" << std::endl;
+    std::cout << "Header is " << (header->key) << std::endl;
+    header_search_payload->error_ =
+        TRITONSERVER_InferenceRequestSetStringParameter(
+            irequest, header->key, header->val);
+    std::cout << "parameter was set" << std::endl;
+
+    if (header_search_payload->error_ != nullptr) {
+      return 1;
+    }
+  }
+
+  return 0;
+}
+
 void
 HTTPAPIServer::HandleInfer(
     evhtp_request_t* req, const std::string& model_name,
@@ -2899,6 +2932,18 @@ HTTPAPIServer::HandleInfer(
             (decompressed_buffer == nullptr) ? req->buffer_in
                                              : decompressed_buffer,
             infer_request.get());
+      }
+    }
+    if (err == nullptr && header_forward_pattern_ != "") {
+      HeaderSearchPayload header_search_payload;
+      header_search_payload.error_ = nullptr;
+      header_search_payload.regex_ = header_forward_pattern_.c_str();
+      header_search_payload.request_ = irequest;
+      int status = evhtp_kvs_for_each(
+          req->headers_in, ForEachHeader,
+          reinterpret_cast<void*>(&header_search_payload));
+      if (status != 0) {
+        err = header_search_payload.error_;
       }
     }
     if (err == nullptr) {
