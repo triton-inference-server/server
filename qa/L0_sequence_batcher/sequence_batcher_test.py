@@ -2980,7 +2980,7 @@ class SequenceBatcherRequestTimeoutTest(su.SequenceBatcherTestUtil):
         with self.assertRaisesRegex(
                 InferenceServerException,
                 "must specify the START flag on the first request",
-                msg="Unexpected error: {}".format(error)):
+                msg="Unexpected error: {}".format(last_err)):
             raise last_err
 
 
