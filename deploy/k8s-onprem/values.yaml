@@ -35,6 +35,10 @@ image:
   modelRepositoryPath: /srv/models
   numGpus: 1
 
+# add additional args here e.g. --grpc-use-ssl, --grpc-server-certs, repository-poll-secs, etc
+additionalArgs: 
+  - '--model-repository=/models'
+
 traefik:
   ports:
     triton-http:
