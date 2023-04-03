@@ -76,6 +76,17 @@ if(${TRITON_ENABLE_HTTP} OR ${TRITON_ENABLE_METRICS} OR
   message(STATUS "Using libevent ${Libevent_VERSION}")
 endif()
 
+# OpenTelemetry
+#
+if(${TRITON_ENABLE_TRACING})
+  find_package(CURL CONFIG REQUIRED)
+  message(STATUS "Using curl ${CURL_VERSION}")
+  find_package(nlohmann_json CONFIG REQUIRED)
+  message(STATUS "Using nlohmann_json for otel")
+  find_package(opentelemetry-cpp CONFIG REQUIRED)
+  message(STATUS "Using opentelemetry-cpp ${opentelemetry-cpp_VERSION}")
+endif()
+
 # re2
 #
 find_library(RE2_LIBRARY NAMES re2)
@@ -226,9 +237,15 @@ if(${TRITON_ENABLE_STATS})
 endif() # TRITON_ENABLE_STATS
 
 if(${TRITON_ENABLE_TRACING})
+  
   target_compile_definitions(
     main
     PRIVATE TRITON_ENABLE_TRACING=1
+  )
+  target_include_directories(
+    main
+    PRIVATE
+      ${OPENTELEMETRY_CPP_INCLUDE_DIRS}
   )
 endif() # TRITON_ENABLE_TRACING
 
@@ -281,6 +298,7 @@ if(${TRITON_ENABLE_GRPC})
     main
     PRIVATE
       $<TARGET_PROPERTY:gRPC::grpc,INTERFACE_INCLUDE_DIRECTORIES>
+      ${OPENTELEMETRY_CPP_INCLUDE_DIRS}
   )
 
   target_compile_definitions(
@@ -370,8 +388,12 @@ if(${TRITON_ENABLE_HTTP}
 
   target_include_directories(
     http-endpoint-library
-    PRIVATE $<TARGET_PROPERTY:libevhtp::evhtp,INTERFACE_INCLUDE_DIRECTORIES>
+    PRIVATE 
+      $<TARGET_PROPERTY:libevhtp::evhtp,INTERFACE_INCLUDE_DIRECTORIES>
+      ${OPENTELEMETRY_CPP_INCLUDE_DIRS}
+      #tracing-library
   )
+  
 
   if(${TRITON_ENABLE_GPU})
     target_compile_definitions(
@@ -478,6 +500,16 @@ if(${TRITON_ENABLE_TRACING})
     tracing-library EXCLUDE_FROM_ALL
     tracer.cc tracer.h
   )
+  
+  target_include_directories(
+    tracing-library 
+    PRIVATE ${OPENTELEMETRY_CPP_INCLUDE_DIRS}
+  )
+
+  target_link_libraries(
+    tracing-library
+    PRIVATE 
+    ${OPENTELEMETRY_CPP_LIBRARIES})
 
   target_link_libraries(
     tracing-library

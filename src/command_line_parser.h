@@ -36,6 +36,12 @@
 #include <vector>
 #include "triton/common/logging.h"
 #include "triton/core/tritonserver.h"
+#ifdef TRITON_ENABLE_GRPC
+// To avoid ambiguous reference during build
+// grpc headers should be imported first
+// https://github.com/open-telemetry/opentelemetry-cpp/blob/main/examples/otlp/README.md#additional-notes-regarding-abseil-library
+#include "grpc_server.h"
+#endif  // TRITON_ENABLE_GRPC
 #if defined(TRITON_ENABLE_HTTP) || defined(TRITON_ENABLE_METRICS)
 #include "http_server.h"
 #endif  // TRITON_ENABLE_HTTP|| TRITON_ENABLE_METRICS
@@ -45,9 +51,6 @@
 #ifdef TRITON_ENABLE_VERTEX_AI
 #include "vertex_ai_server.h"
 #endif  // TRITON_ENABLE_VERTEX_AI
-#ifdef TRITON_ENABLE_GRPC
-#include "grpc/grpc_server.h"
-#endif  // TRITON_ENABLE_GRPC
 
 #ifndef _WIN32
 #include <getopt.h>

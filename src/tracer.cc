@@ -33,6 +33,11 @@
 #ifdef TRITON_ENABLE_GPU
 #include <cuda_runtime_api.h>
 #endif  // TRITON_ENABLE_GPU
+#include "opentelemetry/exporters/otlp/otlp_http_exporter_factory.h"
+#include "opentelemetry/exporters/otlp/otlp_http_exporter_options.h"
+#include "opentelemetry/sdk/trace/simple_processor_factory.h"
+namespace otlp = opentelemetry::exporter::otlp;
+namespace trace_sdk = opentelemetry::sdk::trace;
 
 namespace triton { namespace server {
 
@@ -279,6 +284,9 @@ TraceManager::SampleTrace(const std::string& model_name)
 
 TraceManager::Trace::~Trace()
 {
+  trace_span_->End();
+  std::shared_ptr<opentelemetry::trace::TracerProvider> none;
+  opentelemetry::trace::Provider::SetTracerProvider(none);
   // Write trace now
   setting_->WriteTrace(streams_);
 }
@@ -304,6 +312,8 @@ TraceManager::Trace::CaptureTimestamp(
     }
     *ss << "{\"id\":" << trace_id_ << ",\"timestamps\":["
         << "{\"name\":\"" << name << "\",\"ns\":" << timestamp_ns << "}]}";
+    opentelemetry::common::SystemTimestamp otel_timestamp{std::chrono::nanoseconds{timestamp_ns}};
+    this->trace_span_->AddEvent(name, otel_timestamp);
   }
 }
 
@@ -390,6 +400,9 @@ TraceManager::TraceActivity(
   *ss << "{\"id\":" << id << ",\"timestamps\":["
       << "{\"name\":\"" << TRITONSERVER_InferenceTraceActivityString(activity)
       << "\",\"ns\":" << timestamp_ns << "}]}";
+
+  opentelemetry::common::SystemTimestamp timestamp_otel{std::chrono::nanoseconds{timestamp_ns}};
+  ts->trace_span_->AddEvent(TRITONSERVER_InferenceTraceActivityString(activity), timestamp_otel);
 }
 
 void
@@ -689,6 +702,18 @@ TraceManager::TraceSetting::SampleTrace()
     LOG_TRITONSERVER_ERROR(
         TRITONSERVER_InferenceTraceId(trace, &lts->trace_id_),
         "getting trace id");
+    
+    // Setting up exporter
+    otlp::OtlpHttpExporterOptions opts;
+    opts.url="localhost:4318/v1/traces";
+    lts->exporter = otlp::OtlpHttpExporterFactory::Create(opts);
+    lts->processor = trace_sdk::SimpleSpanProcessorFactory::Create(std::move(lts->exporter));
+    lts->provider = trace_sdk::TracerProviderFactory::Create(std::move(lts->processor));
+
+    opentelemetry::trace::StartSpanOptions options;
+    options.kind          = opentelemetry::trace::SpanKind::kServer;  // server
+    lts->trace_span_ = lts->provider->GetTracer("triton-http-server")
+                      -> StartSpan("HandleInfer", {}, options);
     return lts;
   }
   return nullptr;

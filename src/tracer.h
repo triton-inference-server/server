@@ -34,7 +34,21 @@
 #include <sstream>
 #include <string>
 #include <unordered_map>
+
+#include "opentelemetry/exporters/otlp/otlp_http_exporter_factory.h"
+#include "opentelemetry/sdk/trace/simple_processor_factory.h"
+#include "opentelemetry/trace/span.h"
+#include "opentelemetry/sdk/trace/tracer_provider_factory.h"
+#include "opentelemetry/trace/provider.h"
+#include "opentelemetry/nostd/shared_ptr.h"
+#include "opentelemetry/sdk/trace/processor.h"
+namespace otlp = opentelemetry::exporter::otlp;
+namespace trace_sdk = opentelemetry::sdk::trace;
+
+
 #include "triton/core/tritonserver.h"
+
+namespace otel_trace = opentelemetry::trace;
 
 namespace triton { namespace server {
 
@@ -124,6 +138,14 @@ class TraceManager {
     void* trace_userp_;
 
     uint64_t trace_id_;
+
+    opentelemetry::nostd::shared_ptr<opentelemetry::trace::Span> trace_span_;
+    
+    std::unique_ptr<opentelemetry::sdk::trace::SpanExporter> exporter;
+
+    std::unique_ptr<trace_sdk::SpanProcessor> processor;
+
+    std::shared_ptr<opentelemetry::trace::TracerProvider> provider;
 
     // Capture a timestamp generated outside of triton and associate it
     // with this trace.
