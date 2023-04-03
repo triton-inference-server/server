@@ -202,8 +202,6 @@ struct TritonServerParameters {
   float metrics_interval_ms_{2000};
   bool allow_gpu_metrics_{true};
   bool allow_cpu_metrics_{true};
-
-  // Metrics configuration
   std::vector<std::tuple<std::string, std::string, std::string>>
       metrics_config_settings_;
 #endif  // TRITON_ENABLE_METRICS

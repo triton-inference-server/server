@@ -887,7 +887,7 @@ TritonServerParameters::BuildTritonServerOptions()
         TRITONSERVER_ServerOptionsSetMetricsConfig(
             loptions, std::get<0>(mcs).c_str(), std::get<1>(mcs).c_str(),
             std::get<2>(mcs).c_str()),
-        "setting metrics configurtion");
+        "setting metrics configuration");
   }
 
 #endif  // TRITON_ENABLE_METRICS
@@ -915,7 +915,7 @@ TritonServerParameters::BuildTritonServerOptions()
           ParseException,
           TRITONSERVER_ServerOptionsSetCacheConfig(
               loptions, cache_name.c_str(), json_config_str.c_str()),
-          "setting cache configurtion");
+          "setting cache configuration");
     }
   }
 
@@ -930,7 +930,7 @@ TritonServerParameters::BuildTritonServerOptions()
         TRITONSERVER_ServerOptionsSetBackendConfig(
             loptions, std::get<0>(bcs).c_str(), std::get<1>(bcs).c_str(),
             std::get<2>(bcs).c_str()),
-        "setting backend configurtion");
+        "setting backend configuration");
   }
   for (const auto& limit : load_gpu_limit_) {
     THROW_IF_ERR(
@@ -1469,14 +1469,14 @@ TritonParser::ParseMetricsConfigOption(const std::string& arg)
   int delim_setting = arg.find("=", delim_name + 1);
 
   // No name-specific configs currently supported, though it may be in
-  // the future. Map to empty string name like other global configs for now.
+  // the future. Map global configs to empty string like other configs for now.
   std::string name_string = std::string();
   if (delim_name >= 0) {
     std::stringstream ss;
     ss << "--metrics-config option format is "
        << "<setting>=<value>. Got " << arg << std::endl;
     throw ParseException(ss.str());
-  }  // else global backend config
+  }  // else global metrics config
 
   if (delim_setting < 0) {
     std::stringstream ss;
