@@ -1714,10 +1714,9 @@ def cibase_build(cmake_script, repo_dir, cmake_dir, build_dir, install_dir,
         cmake_script.cp(
             os.path.join(ort_install_dir, 'test', 'custom_op_test.onnx'),
             os.path.join(ci_dir, 'qa', 'L0_custom_ops'))
-        backend_test_dir = os.path.join(build_dir, 'onnxruntime', 'test')
-        for test in os.listdir(backend_test_dir):
-            cmake_script.cpdir(os.path.join(backend_test_dir, test),
-                               os.path.join(ci_dir, 'qa'))
+        # [WIP] other way than wildcard?
+        backend_tests = os.path.join(build_dir, 'onnxruntime', 'test', "*")
+        cmake_script.cpdir(backend_tests, os.path.join(ci_dir, 'qa'))
 
     # Need the build area for some backends so that they can be
     # rebuilt with specific options.
