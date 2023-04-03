@@ -109,11 +109,9 @@ def bls_libtorch(model_name, result_device):
     input1 = pb_utils.Tensor('INPUT1', input1_np)
 
     if result_device == "CPU":
-        preferred_memory = pb_utils.PreferredMemory(
-            pb_utils.PreferredMemory.CPU)
+        preferred_memory = pb_utils.PreferredMemory(pb_utils.CPU)
     else:
-        preferred_memory = pb_utils.PreferredMemory(
-            pb_utils.PreferredMemory.GPU, 0)
+        preferred_memory = pb_utils.PreferredMemory(pb_utils.GPU, 0)
 
     infer_request = pb_utils.InferenceRequest(
             model_name=model_name,
