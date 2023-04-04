@@ -148,13 +148,13 @@ def create_savedmodel_modelfile(models_dir, model_version, dtype):
 
     tf_dtype = np_to_tf_dtype(dtype)
 
-    tf.reset_default_graph()
-    in_node = tf.placeholder(tf_dtype, tu.shape_to_tf_shape([-1]),
-                             "TENSOR_RAGGED_INPUT")
-    bs_node = tf.placeholder(tf_dtype, tu.shape_to_tf_shape([-1]),
-                             "TENSOR_BATCH_AND_SIZE_INPUT")
-    batch_node = tf.placeholder(tf_dtype, tu.shape_to_tf_shape([-1]),
-                                "TENSOR_BATCH_INPUT")
+    tf.compat.v1.reset_default_graph()
+    in_node = tf.compat.v1.placeholder(tf_dtype, tu.shape_to_tf_shape([-1]),
+                                       "TENSOR_RAGGED_INPUT")
+    bs_node = tf.compat.v1.placeholder(tf_dtype, tu.shape_to_tf_shape([-1]),
+                                       "TENSOR_BATCH_AND_SIZE_INPUT")
+    batch_node = tf.compat.v1.placeholder(tf_dtype, tu.shape_to_tf_shape([-1]),
+                                          "TENSOR_BATCH_INPUT")
 
     in_mat = tf.reshape(in_node, [1, -1])
     bs_mat = tf.reshape(bs_node, [1, -1])
@@ -178,31 +178,32 @@ def create_savedmodel_modelfile(models_dir, model_version, dtype):
     except OSError as ex:
         pass  # ignore existing dir
 
-    with tf.Session() as sess:
-        in_tensor = tf.get_default_graph().get_tensor_by_name(
+    with tf.compat.v1.Session() as sess:
+        in_tensor = tf.compat.v1.get_default_graph().get_tensor_by_name(
             "TENSOR_RAGGED_INPUT:0")
-        bs_tensor = tf.get_default_graph().get_tensor_by_name(
+        bs_tensor = tf.compat.v1.get_default_graph().get_tensor_by_name(
             "TENSOR_BATCH_AND_SIZE_INPUT:0")
-        batch_tensor = tf.get_default_graph().get_tensor_by_name(
+        batch_tensor = tf.compat.v1.get_default_graph().get_tensor_by_name(
             "TENSOR_BATCH_INPUT:0")
-        out_tensor = tf.get_default_graph().get_tensor_by_name(
+        out_tensor = tf.compat.v1.get_default_graph().get_tensor_by_name(
             "TENSOR_RAGGED_OUTPUT:0")
-        bs_out_tensor = tf.get_default_graph().get_tensor_by_name(
+        bs_out_tensor = tf.compat.v1.get_default_graph().get_tensor_by_name(
             "TENSOR_BATCH_AND_SIZE_OUTPUT:0")
-        batch_out_tensor = tf.get_default_graph().get_tensor_by_name(
+        batch_out_tensor = tf.compat.v1.get_default_graph().get_tensor_by_name(
             "TENSOR_BATCH_OUTPUT:0")
-        tf.saved_model.simple_save(sess,
-                                   model_version_dir + "/model.savedmodel",
-                                   inputs={
-                                       "RAGGED_INPUT": in_tensor,
-                                       "BATCH_AND_SIZE_INPUT": bs_tensor,
-                                       "BATCH_INPUT": batch_tensor,
-                                   },
-                                   outputs={
-                                       "RAGGED_OUTPUT": out_tensor,
-                                       "BATCH_AND_SIZE_OUTPUT": bs_out_tensor,
-                                       "BATCH_OUTPUT": batch_out_tensor,
-                                   })
+        tf.compat.v1.saved_model.simple_save(
+            sess,
+            model_version_dir + "/model.savedmodel",
+            inputs={
+                "RAGGED_INPUT": in_tensor,
+                "BATCH_AND_SIZE_INPUT": bs_tensor,
+                "BATCH_INPUT": batch_tensor,
+            },
+            outputs={
+                "RAGGED_OUTPUT": out_tensor,
+                "BATCH_AND_SIZE_OUTPUT": bs_out_tensor,
+                "BATCH_OUTPUT": batch_out_tensor,
+            })
 
 
 def create_plan_modelfile(models_dir, model_version, dtype):
@@ -496,12 +497,13 @@ def create_savedmodel_itemshape_modelfile(models_dir, model_version, dtype):
 
     tf_dtype = np_to_tf_dtype(dtype)
 
-    tf.reset_default_graph()
-    in_node = tf.placeholder(tf_dtype, tu.shape_to_tf_shape([-1]),
-                             "TENSOR_RAGGED_INPUT")
+    tf.compat.v1.reset_default_graph()
+    in_node = tf.compat.v1.placeholder(tf_dtype, tu.shape_to_tf_shape([-1]),
+                                       "TENSOR_RAGGED_INPUT")
     # Shape is predefined
-    batch_node = tf.placeholder(tf_dtype, tu.shape_to_tf_shape([-1, 2]),
-                                "TENSOR_BATCH_INPUT")
+    batch_node = tf.compat.v1.placeholder(tf_dtype,
+                                          tu.shape_to_tf_shape([-1, 2]),
+                                          "TENSOR_BATCH_INPUT")
     batch_output_node = tf.identity(batch_node, name="TENSOR_BATCH_OUTPUT")
 
     model_name = "savedmodel_batch_item"
@@ -512,22 +514,23 @@ def create_savedmodel_itemshape_modelfile(models_dir, model_version, dtype):
     except OSError as ex:
         pass  # ignore existing dir
 
-    with tf.Session() as sess:
-        in_tensor = tf.get_default_graph().get_tensor_by_name(
+    with tf.compat.v1.Session() as sess:
+        in_tensor = tf.compat.v1.get_default_graph().get_tensor_by_name(
             "TENSOR_RAGGED_INPUT:0")
-        batch_tensor = tf.get_default_graph().get_tensor_by_name(
+        batch_tensor = tf.compat.v1.get_default_graph().get_tensor_by_name(
             "TENSOR_BATCH_INPUT:0")
-        batch_out_tensor = tf.get_default_graph().get_tensor_by_name(
+        batch_out_tensor = tf.compat.v1.get_default_graph().get_tensor_by_name(
             "TENSOR_BATCH_OUTPUT:0")
-        tf.saved_model.simple_save(sess,
-                                   model_version_dir + "/model.savedmodel",
-                                   inputs={
-                                       "RAGGED_INPUT": in_tensor,
-                                       "BATCH_INPUT": batch_tensor,
-                                   },
-                                   outputs={
-                                       "BATCH_OUTPUT": batch_out_tensor,
-                                   })
+        tf.compat.v1.saved_model.simple_save(
+            sess,
+            model_version_dir + "/model.savedmodel",
+            inputs={
+                "RAGGED_INPUT": in_tensor,
+                "BATCH_INPUT": batch_tensor,
+            },
+            outputs={
+                "BATCH_OUTPUT": batch_out_tensor,
+            })
 
 
 def create_plan_itemshape_modelfile(models_dir, model_version, dtype):
@@ -752,6 +755,7 @@ if __name__ == '__main__':
         import tensorrt as trt
     if FLAGS.graphdef or FLAGS.savedmodel:
         import tensorflow as tf
+        tf.compat.v1.disable_eager_execution()
     if FLAGS.onnx:
         import onnx
 
