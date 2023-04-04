@@ -126,7 +126,6 @@ struct TritonServerParameters {
       std::max(2u, 2 * std::thread::hardware_concurrency())};
   std::map<int, double> load_gpu_limit_;
 
-
   // Rate limiter configuration
   // FIXME: Once the rate limiter implementation is complete make
   // EXEC_COUNT the default.
@@ -178,7 +177,7 @@ struct TritonServerParameters {
   std::string http_address_{"0.0.0.0"};
   int32_t http_port_{8000};
   bool reuse_http_port_{false};
-  std::string http_forward_header_pattern_;
+  std::string http_forward_header_prefix_;
   // The number of threads to initialize for the HTTP front-end.
   int http_thread_cnt_{8};
 #endif  // TRITON_ENABLE_HTTP

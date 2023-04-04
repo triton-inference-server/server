@@ -883,7 +883,7 @@ class InferHandler : public HandlerBase {
       ServiceType* service, ::grpc::ServerCompletionQueue* cq,
       size_t max_state_bucket_count,
       std::pair<std::string, std::string> restricted_kv,
-      const std::string& header_forward_pattern);
+      const std::string& header_forward_prefix);
   virtual ~InferHandler();
 
   // Descriptive name of of the handler.
@@ -942,6 +942,8 @@ class InferHandler : public HandlerBase {
   virtual void StartNewRequest() = 0;
   virtual bool Process(State* state, bool rpc_ok) = 0;
   bool ExecutePrecondition(InferHandler::State* state);
+  TRITONSERVER_Error* ForwardHeadersAsParameters(
+      TRITONSERVER_InferenceRequest* irequest, InferHandler::State* state);
 
   const std::string name_;
   std::shared_ptr<TRITONSERVER_Server> tritonserver_;
@@ -959,7 +961,7 @@ class InferHandler : public HandlerBase {
   std::vector<State*> state_bucket_;
 
   std::pair<std::string, std::string> restricted_kv_;
-  std::string header_forward_pattern_;
+  std::string header_forward_prefix_;
 };
 
 template <
@@ -972,11 +974,11 @@ InferHandler<ServiceType, ServerResponderType, RequestType, ResponseType>::
         ServiceType* service, ::grpc::ServerCompletionQueue* cq,
         size_t max_state_bucket_count,
         std::pair<std::string, std::string> restricted_kv,
-        const std::string& header_forward_pattern)
+        const std::string& header_forward_prefix)
     : name_(name), tritonserver_(tritonserver), service_(service), cq_(cq),
       max_state_bucket_count_(max_state_bucket_count),
       restricted_kv_(restricted_kv),
-      header_forward_pattern_(header_forward_pattern)
+      header_forward_prefix_(header_forward_prefix)
 {
 }
 
@@ -1052,6 +1054,36 @@ InferHandler<ServiceType, ServerResponderType, RequestType, ResponseType>::
     return (it != metadata.end()) && (it->second == restricted_kv_.second);
   }
   return true;
+}
+
+template <
+    typename ServiceType, typename ServerResponderType, typename RequestType,
+    typename ResponseType>
+TRITONSERVER_Error*
+InferHandler<ServiceType, ServerResponderType, RequestType, ResponseType>::
+    ForwardHeadersAsParameters(
+        TRITONSERVER_InferenceRequest* irequest, InferHandler::State* state)
+{
+  TRITONSERVER_Error* err = nullptr;
+  if (!header_forward_prefix_.empty()) {
+    const auto& metadata = state->context_->ctx_->client_metadata();
+    for (const auto& pair : metadata) {
+      auto& key = pair.first;
+      auto& value = pair.second;
+      if (header_forward_prefix_ == "*" ||
+          (key.find(header_forward_prefix_) == 0)) {
+        std::string param_key = std::string(key.begin(), key.end());
+        std::string param_value = std::string(value.begin(), value.end());
+        err = TRITONSERVER_InferenceRequestSetStringParameter(
+            irequest, param_key.c_str(), param_value.c_str());
+        if (err != nullptr) {
+          break;
+        }
+      }
+    }
+  }
+
+  return err;
 }
 
 //

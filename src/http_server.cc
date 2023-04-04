@@ -975,8 +975,8 @@ HTTPAPIServer::HTTPAPIServer(
     triton::server::TraceManager* trace_manager,
     const std::shared_ptr<SharedMemoryManager>& shm_manager, const int32_t port,
     const bool reuse_port, const std::string& address,
-    const std::string& header_forward_pattern, const int thread_cnt)
-    : HTTPServer(port, reuse_port, address, header_forward_pattern, thread_cnt),
+    const std::string& header_forward_prefix, const int thread_cnt)
+    : HTTPServer(port, reuse_port, address, header_forward_prefix, thread_cnt),
       server_(server), trace_manager_(trace_manager), shm_manager_(shm_manager),
       allocator_(nullptr), server_regex_(R"(/v2(?:/health/(live|ready))?)"),
       model_regex_(
@@ -2766,7 +2766,13 @@ HTTPAPIServer::EVBufferToRawInput(
 }
 
 struct HeaderSearchPayload {
-  const char* regex_;
+  HeaderSearchPayload(
+      const std::string& prefix, TRITONSERVER_InferenceRequest* request)
+      : prefix_(prefix), request_(request), error_(nullptr)
+  {
+  }
+
+  const std::string& prefix_;
   TRITONSERVER_InferenceRequest* request_;
   TRITONSERVER_Error* error_;
 };
@@ -2777,17 +2783,14 @@ ForEachHeader(evhtp_header_t* header, void* arg)
   HeaderSearchPayload* header_search_payload =
       reinterpret_cast<HeaderSearchPayload*>(arg);
 
-  TRITONSERVER_InferenceRequest* irequest = header_search_payload->request_;
-  const char* pattern = header_search_payload->regex_;
+  TRITONSERVER_InferenceRequest* request = header_search_payload->request_;
+  const std::string& prefix = header_search_payload->prefix_;
 
-  std::regex base_regex(pattern);
-  if (std::regex_search(header->key, base_regex)) {
-    std::cout << "HTTP Regex matched" << std::endl;
-    std::cout << "Header is " << (header->key) << std::endl;
+  // If the prefix is '*' forward all the headers.
+  if (prefix == "*" || (std::string(header->key).find(prefix) == 0)) {
     header_search_payload->error_ =
         TRITONSERVER_InferenceRequestSetStringParameter(
-            irequest, header->key, header->val);
-    std::cout << "parameter was set" << std::endl;
+            request, header->key, header->val);
 
     if (header_search_payload->error_ != nullptr) {
       return 1;
@@ -2934,11 +2937,9 @@ HTTPAPIServer::HandleInfer(
             infer_request.get());
       }
     }
-    if (err == nullptr && header_forward_pattern_ != "") {
-      HeaderSearchPayload header_search_payload;
-      header_search_payload.error_ = nullptr;
-      header_search_payload.regex_ = header_forward_pattern_.c_str();
-      header_search_payload.request_ = irequest;
+    if (err == nullptr && (!header_forward_prefix_.empty())) {
+      HeaderSearchPayload header_search_payload(
+          header_forward_prefix_, irequest);
       int status = evhtp_kvs_for_each(
           req->headers_in, ForEachHeader,
           reinterpret_cast<void*>(&header_search_payload));
@@ -3542,12 +3543,12 @@ HTTPAPIServer::Create(
     triton::server::TraceManager* trace_manager,
     const std::shared_ptr<SharedMemoryManager>& shm_manager, const int32_t port,
     const bool reuse_port, const std::string& address,
-    const std::string& header_forward_pattern, const int thread_cnt,
+    const std::string& header_forward_prefix, const int thread_cnt,
     std::unique_ptr<HTTPServer>* http_server)
 {
   http_server->reset(new HTTPAPIServer(
       server, trace_manager, shm_manager, port, reuse_port, address,
-      header_forward_pattern, thread_cnt));
+      header_forward_prefix, thread_cnt));
 
   const std::string addr = address + ":" + std::to_string(port);
   LOG_INFO << "Started HTTPService at " << addr;

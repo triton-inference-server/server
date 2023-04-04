@@ -73,10 +73,10 @@ class ModelStreamInferHandler
       ::grpc::ServerCompletionQueue* cq, size_t max_state_bucket_count,
       grpc_compression_level compression_level,
       std::pair<std::string, std::string> restricted_kv,
-      const std::string& header_forward_pattern)
+      const std::string& header_forward_prefix)
       : InferHandler(
             name, tritonserver, service, cq, max_state_bucket_count,
-            restricted_kv, header_forward_pattern),
+            restricted_kv, header_forward_prefix),
         trace_manager_(trace_manager), shm_manager_(shm_manager),
         compression_level_(compression_level)
   {

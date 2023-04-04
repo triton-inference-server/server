@@ -2383,7 +2383,7 @@ Server::Server(
         &service_, model_infer_cq_.get(),
         options.infer_allocation_pool_size_ /* max_state_bucket_count */,
         options.infer_compression_level_, restricted_kv,
-        options.forward_header_pattern_));
+        options.forward_header_prefix_));
   }
 
   // Handler for streaming inference requests. Keeps one handler for streaming
@@ -2393,7 +2393,7 @@ Server::Server(
       &service_, model_stream_infer_cq_.get(),
       options.infer_allocation_pool_size_ /* max_state_bucket_count */,
       options.infer_compression_level_, restricted_kv,
-      options.forward_header_pattern_));
+      options.forward_header_prefix_));
 }
 
 Server::~Server()
