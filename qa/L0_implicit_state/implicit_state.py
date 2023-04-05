@@ -133,9 +133,10 @@ class ImplicitStateTest(tu.TestResultCollector):
                     sequence_id=1,
                     sequence_start=True,
                     sequence_end=True)
-            self.assertTrue(
-                str(e.exception).startswith(
-                    "unexpected inference output 'OUTPUT_STATE' for model"))
+            self.assertIn(
+                "unexpected inference output 'OUTPUT_STATE' for model",
+                str(e.exception)
+            )
 
     def test_request_output(self):
         triton_client = tritonhttpclient.InferenceServerClient("localhost:8000")
