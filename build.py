@@ -546,8 +546,6 @@ def cache_cmake_args(images, components, cache, install_dir):
 
 
 def backend_repo(be):
-    if be == 'tensorflow2':
-        return 'tensorflow_backend'
     return '{}_backend'.format(be)
 
 
@@ -1325,7 +1323,7 @@ def create_build_dockerfiles(container_build_dir, images, backends, repoagents,
     }
 
     # For CPU-only image we need to copy some cuda libraries and dependencies
-    # since we are using PyTorch, TensorFlow 1, TensorFlow 2 containers that
+    # since we are using PyTorch and TensorFlow containers that
     # are not CPU-only.
     if not FLAGS.enable_gpu and (
         ('pytorch' in backends) or
