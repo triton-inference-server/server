@@ -106,6 +106,7 @@ fi
 set +e
 grep "Resource count for \"resource1\" is limited to 1 which will prevent scheduling of one or more model instances, the minimum required count is 4" $SERVER_LOG
 if [ $? -ne 0 ]; then
+    cat $SERVER_LOG
     echo -e "\n***\n*** Failed. Expected error message while loading the model \"custom_zero_1_float32\"\n***"
     RET=1
 fi
@@ -127,6 +128,7 @@ fi
 set +e
 grep "Resource count for \"resource1\" is limited to 3 which will prevent scheduling of one or more model instances, the minimum required count is 4" $SERVER_LOG
 if [ $? -ne 0 ]; then
+    cat $SERVER_LOG
     echo -e "\n***\n*** Failed. Expected error message while loading the model \"custom_zero_1_float32\"\n***"
     RET=1
 fi
@@ -148,6 +150,7 @@ fi
 set +e
 grep "Resource count for \"resource1\" is limited to 0 which will prevent scheduling of one or more model instances, the minimum required count is 4" $SERVER_LOG
 if [ $? -ne 0 ]; then
+    cat $SERVER_LOG
     echo -e "\n***\n*** Failed. Expected error message while loading the model \"custom_zero_1_float32\"\n***"
     RET=1
 fi
@@ -174,6 +177,7 @@ fi
 set +e
 grep "Resource \"resource2\" is present as both global and device-specific resource in the model configuration." $SERVER_LOG
 if [ $? -ne 0 ]; then
+    cat $SERVER_LOG
     echo -e "\n***\n*** Failed. Expected error message for conflicting resource types\n***"
     RET=1
 fi
