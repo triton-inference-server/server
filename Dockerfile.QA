@@ -337,6 +337,10 @@ RUN pip3 install --upgrade wheel setuptools && \
 # Hence, fixing the boofuzz version to 0.3.0
 RUN pip3 install 'boofuzz==0.3.0'
 
+# For PA doc testing
+RUN python3 -m pip install mkdocs
+RUN python3 -m pip install mkdocs-htmlproofer-plugin==0.10.3
+
 # go needed for example go client test.
 RUN if [ "$TARGETPLATFORM" = "linux/arm64" ]; then \
       wget https://golang.org/dl/go1.19.1.linux-arm64.tar.gz && \
