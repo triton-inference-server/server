@@ -295,6 +295,7 @@ enum TritonOptionId {
   OPTION_ALLOW_CPU_METRICS,
   OPTION_METRICS_PORT,
   OPTION_METRICS_INTERVAL_MS,
+  OPTION_METRICS_CONFIG,
 #endif  // TRITON_ENABLE_METRICS
 #ifdef TRITON_ENABLE_TRACING
   OPTION_TRACE_FILEPATH,
@@ -507,6 +508,10 @@ std::vector<Option> TritonParser::recognized_options_
       {OPTION_METRICS_INTERVAL_MS, "metrics-interval-ms", Option::ArgFloat,
        "Metrics will be collected once every <metrics-interval-ms> "
        "milliseconds. Default is 2000 milliseconds."},
+      {OPTION_METRICS_CONFIG, "metrics-config", "<string>=<string>",
+       "Specify a metrics-specific configuration setting. The format of this "
+       "flag is --metrics-config=<setting>=<value>. It can be specified "
+       "multiple times."},
 #endif  // TRITON_ENABLE_METRICS
 #ifdef TRITON_ENABLE_TRACING
       {OPTION_TRACE_FILEPATH, "trace-file", Option::ArgStr,
@@ -876,6 +881,15 @@ TritonServerParameters::BuildTritonServerOptions()
       TRITONSERVER_ServerOptionsSetMetricsInterval(
           loptions, metrics_interval_ms_),
       "setting metrics interval");
+  for (const auto& mcs : metrics_config_settings_) {
+    THROW_IF_ERR(
+        ParseException,
+        TRITONSERVER_ServerOptionsSetMetricsConfig(
+            loptions, std::get<0>(mcs).c_str(), std::get<1>(mcs).c_str(),
+            std::get<2>(mcs).c_str()),
+        "setting metrics configuration");
+  }
+
 #endif  // TRITON_ENABLE_METRICS
 
   THROW_IF_ERR(
@@ -901,7 +915,7 @@ TritonServerParameters::BuildTritonServerOptions()
           ParseException,
           TRITONSERVER_ServerOptionsSetCacheConfig(
               loptions, cache_name.c_str(), json_config_str.c_str()),
-          "setting cache configurtion");
+          "setting cache configuration");
     }
   }
 
@@ -916,7 +930,7 @@ TritonServerParameters::BuildTritonServerOptions()
         TRITONSERVER_ServerOptionsSetBackendConfig(
             loptions, std::get<0>(bcs).c_str(), std::get<1>(bcs).c_str(),
             std::get<2>(bcs).c_str()),
-        "setting backend configurtion");
+        "setting backend configuration");
   }
   for (const auto& limit : load_gpu_limit_) {
     THROW_IF_ERR(
@@ -1205,6 +1219,10 @@ TritonParser::Parse(int argc, char** argv)
       case OPTION_METRICS_INTERVAL_MS:
         lparams.metrics_interval_ms_ = ParseOption<int>(optarg);
         break;
+      case OPTION_METRICS_CONFIG:
+        lparams.metrics_config_settings_.push_back(
+            ParseMetricsConfigOption(optarg));
+        break;
 #endif  // TRITON_ENABLE_METRICS
 
 #ifdef TRITON_ENABLE_TRACING
@@ -1441,6 +1459,43 @@ TritonParser::Usage()
     }
   }
   return ss.str();
+}
+
+std::tuple<std::string, std::string, std::string>
+TritonParser::ParseMetricsConfigOption(const std::string& arg)
+{
+  // Format is "<setting>=<value>" for generic configs/settings
+  int delim_name = arg.find(",");
+  int delim_setting = arg.find("=", delim_name + 1);
+
+  // No name-specific configs currently supported, though it may be in
+  // the future. Map global configs to empty string like other configs for now.
+  std::string name_string = std::string();
+  if (delim_name >= 0) {
+    std::stringstream ss;
+    ss << "--metrics-config option format is "
+       << "<setting>=<value>. Got " << arg << std::endl;
+    throw ParseException(ss.str());
+  }  // else global metrics config
+
+  if (delim_setting < 0) {
+    std::stringstream ss;
+    ss << "--metrics-config option format is "
+       << "<setting>=<value>. Got " << arg << std::endl;
+    throw ParseException(ss.str());
+  }
+  std::string setting_string =
+      arg.substr(delim_name + 1, delim_setting - delim_name - 1);
+  std::string value_string = arg.substr(delim_setting + 1);
+
+  if (setting_string.empty() || value_string.empty()) {
+    std::stringstream ss;
+    ss << "--metrics-config option format is "
+       << "<setting>=<value>. Got " << arg << std::endl;
+    throw ParseException(ss.str());
+  }
+
+  return {name_string, setting_string, value_string};
 }
 
 std::tuple<std::string, std::string, std::string>
