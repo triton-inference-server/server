@@ -177,7 +177,7 @@ struct TritonServerParameters {
   std::string http_address_{"0.0.0.0"};
   int32_t http_port_{8000};
   bool reuse_http_port_{false};
-  std::string http_forward_header_prefix_;
+  std::string http_forward_header_pattern_;
   // The number of threads to initialize for the HTTP front-end.
   int http_thread_cnt_{8};
 #endif  // TRITON_ENABLE_HTTP

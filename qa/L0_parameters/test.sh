@@ -41,6 +41,7 @@ fi
 CLIENT_LOG="./client.log"
 TEST_SCRIPT_PY="parameters_test.py"
 EXPECTED_NUM_TESTS="4"
+TEST_RESULT_FILE='test_results.txt'
 
 SERVER=/opt/tritonserver/bin/tritonserver
 SERVER_ARGS="--model-repository=model_repository --exit-timeout-secs=120"
@@ -66,6 +67,13 @@ if [ $? -ne 0 ]; then
     cat $CLIENT_LOG
     echo -e "\n***\n*** Test Failed\n***"
     RET=1
+else
+    check_test_results $TEST_RESULT_FILE $EXPECTED_NUM_TESTS
+    if [ $? -ne 0 ]; then
+        cat $CLIENT_LOG
+        echo -e "\n***\n*** Test Result Verification Failed\n***"
+        RET=1
+    fi
 fi
 set -e
 
@@ -73,7 +81,7 @@ kill $SERVER_PID
 wait $SERVER_PID
 
 export TEST_HEADER=1
-SERVER_ARGS="--model-repository=model_repository --exit-timeout-secs=120 --grpc-header-forward-prefix my_header --http-header-forward-prefix my_header"
+SERVER_ARGS="--model-repository=model_repository --exit-timeout-secs=120 --grpc-header-forward-prefix my_header.* --http-header-forward-prefix my_header.*"
 run_server
 if [ "$SERVER_PID" == "0" ]; then
     echo -e "\n***\n*** Failed to start $SERVER\n***"
@@ -87,28 +95,15 @@ if [ $? -ne 0 ]; then
     cat $CLIENT_LOG
     echo -e "\n***\n*** Test Failed\n***"
     RET=1
-fi
-set -e
-
-kill $SERVER_PID
-wait $SERVER_PID
-
-export TEST_HEADER=all
-SERVER_ARGS='--model-repository=model_repository --exit-timeout-secs=120 --grpc-header-forward-prefix=* --http-header-forward-prefix=*'
-run_server
-if [ "$SERVER_PID" == "0" ]; then
-    echo -e "\n***\n*** Failed to start $SERVER\n***"
-    cat $SERVER_LOG
-    exit 1
+else
+    check_test_results $TEST_RESULT_FILE $EXPECTED_NUM_TESTS
+    if [ $? -ne 0 ]; then
+        cat $CLIENT_LOG
+        echo -e "\n***\n*** Test Result Verification Failed\n***"
+        RET=1
+    fi
 fi
 
-set +e
-python3 $TEST_SCRIPT_PY >$CLIENT_LOG 2>&1
-if [ $? -ne 0 ]; then
-    cat $CLIENT_LOG
-    echo -e "\n***\n*** Test Failed\n***"
-    RET=1
-fi
 set -e
 
 kill $SERVER_PID

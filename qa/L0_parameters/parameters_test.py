@@ -60,7 +60,6 @@ class InferenceParametersTest(IsolatedAsyncioTestCase):
         self.parameter_list.append({'key1': 1, 'key2': 2})
         self.parameter_list.append({'key1': True, 'key2': 'value2'})
         self.parameter_list.append({'triton_': True, 'key2': 'value2'})
-        self.ignore_header_values = False
 
         if TEST_HEADER == "1":
             self.headers = {
@@ -77,29 +76,9 @@ class InferenceParametersTest(IsolatedAsyncioTestCase):
                 'my_header_2': 'my_value_2',
                 'my_header_3': 'This is a "quoted" string with a backslash\ '
             }
-            self.expected_http_headers = self.expected_headers
-            self.expected_grpc_headers = self.expected_headers
-        elif TEST_HEADER == "all":
-            self.headers = {}
-
-            # Only these headers should be forwarded to the model.
-            # The value of these headers will be ignored.
-            self.expected_http_headers = {
-                'Content-Length': '',
-                'Accept-Encoding': '',
-                'Host': '',
-                'Content-Type': '',
-                'User-Agent': '',
-                'Inference-Header-Content-Length': '',
-                'Accept': ''
-            }
-            self.expected_grpc_headers = {'user-agent': ''}
-            self.ignore_header_values = True
         else:
             self.headers = {}
             self.expected_headers = {}
-            self.expected_http_headers = self.expected_headers
-            self.expected_grpc_headers = self.expected_headers
 
         def callback(user_data, result, error):
             if error:
@@ -156,41 +135,24 @@ class InferenceParametersTest(IsolatedAsyncioTestCase):
                                           inputs=inputs,
                                           parameters=parameters,
                                           headers=self.headers)
-            if TEST_HEADER == 'all':
-                if client_type == grpcclient or client_type == asyncgrpcclient:
-                    expected_headers = self.expected_grpc_headers
-                else:
-                    if not is_async:
-                        expected_headers = {
-                            'user-agent': '',
-                            'inference-header-content-length': '',
-                            'host': '',
-                            'content-length': ''
-                        }
-                    else:
-                        expected_headers = self.expected_http_headers
-            else:
-                expected_headers = self.expected_headers
-            self.verify_outputs(result, parameters, expected_headers)
 
-    def verify_outputs(self, result, parameters, headers):
+            self.verify_outputs(result, parameters)
+
+    def verify_outputs(self, result, parameters):
         keys = result.as_numpy('key')
         values = result.as_numpy('value')
         keys = keys.astype(str).tolist()
-        keys = [key.lower() for key in keys]
-        expected_keys = list(
-            parameters.keys()) + [key.lower() for key in list(headers.keys())]
+        expected_keys = list(parameters.keys()) + list(
+            self.expected_headers.keys())
         self.assertEqual(set(keys), set(expected_keys))
 
-        if not self.ignore_header_values:
-            # We have to convert the parameter values to string
-            expected_values = []
-            for expected_value in list(parameters.values()):
-                expected_values.append(str(expected_value))
-            for value in headers.values():
-                expected_values.append(value)
-            self.assertEqual(set(values.astype(str).tolist()),
-                             set(expected_values))
+        # We have to convert the parameter values to string
+        expected_values = []
+        for expected_value in list(parameters.values()):
+            expected_values.append(str(expected_value))
+        for value in self.expected_headers.values():
+            expected_values.append(value)
+        self.assertEqual(set(values.astype(str).tolist()), set(expected_values))
 
     async def test_grpc_parameter(self):
         await self.send_request_and_verify(grpcclient, self.grpc)
@@ -217,14 +179,7 @@ class InferenceParametersTest(IsolatedAsyncioTestCase):
                                            inputs=inputs,
                                            parameters=parameters,
                                            headers=self.headers).get_result()
-            expected_http_headers = {
-                'Content-Length': '',
-                'Host': '',
-                'User-Agent': '',
-                'Inference-Header-Content-Length': '',
-            }
-            expected_headers = expected_http_headers if TEST_HEADER == 'all' else self.expected_headers
-            self.verify_outputs(result, parameters, expected_headers)
+            self.verify_outputs(result, parameters)
 
     def test_grpc_async_parameter(self):
         user_data = queue.Queue()
@@ -240,8 +195,7 @@ class InferenceParametersTest(IsolatedAsyncioTestCase):
                                                    user_data))
             result = user_data.get()
             self.assertFalse(result is InferenceServerException)
-            expected_headers = self.expected_grpc_headers if TEST_HEADER == 'all' else self.expected_headers
-            self.verify_outputs(result, parameters, expected_headers)
+            self.verify_outputs(result, parameters)
 
     def test_grpc_stream_parameter(self):
         user_data = queue.Queue()
@@ -257,8 +211,7 @@ class InferenceParametersTest(IsolatedAsyncioTestCase):
                                          parameters=parameters)
             result = user_data.get()
             self.assertFalse(result is InferenceServerException)
-            expected_headers = self.expected_grpc_headers if TEST_HEADER == 'all' else self.expected_headers
-            self.verify_outputs(result, parameters, expected_headers)
+            self.verify_outputs(result, parameters)
         self.grpc.stop_stream()
 
     async def asyncTearDown(self):

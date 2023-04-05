@@ -137,7 +137,7 @@ StartHttpService(
   TRITONSERVER_Error* err = triton::server::HTTPAPIServer::Create(
       server, trace_manager, shm_manager, g_triton_params.http_port_,
       g_triton_params.reuse_http_port_, g_triton_params.http_address_,
-      g_triton_params.http_forward_header_prefix_,
+      g_triton_params.http_forward_header_pattern_,
       g_triton_params.http_thread_cnt_, service);
   if (err == nullptr) {
     err = (*service)->Start();

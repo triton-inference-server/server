@@ -27,6 +27,7 @@
 
 #include <grpc++/alarm.h>
 #include <grpc++/grpc++.h>
+#include <re2/re2.h>
 #include <condition_variable>
 #include <queue>
 #include <regex>
@@ -41,12 +42,7 @@
 // Unique IDs are only needed when debugging. They only appear in
 // verbose logging.
 #ifndef NDEBUG
-uint64_t
-NextUniqueId()
-{
-  static std::atomic<uint64_t> id(0);
-  return ++id;
-}
+uint64_t NextUniqueId();
 #define NEXT_UNIQUE_ID NextUniqueId()
 #else
 #define NEXT_UNIQUE_ID (0)
@@ -883,7 +879,7 @@ class InferHandler : public HandlerBase {
       ServiceType* service, ::grpc::ServerCompletionQueue* cq,
       size_t max_state_bucket_count,
       std::pair<std::string, std::string> restricted_kv,
-      const std::string& header_forward_prefix);
+      const std::string& header_forward_pattern);
   virtual ~InferHandler();
 
   // Descriptive name of of the handler.
@@ -961,7 +957,8 @@ class InferHandler : public HandlerBase {
   std::vector<State*> state_bucket_;
 
   std::pair<std::string, std::string> restricted_kv_;
-  std::string header_forward_prefix_;
+  std::string header_forward_pattern_;
+  re2::RE2 header_forward_regex_;
 };
 
 template <
@@ -974,11 +971,12 @@ InferHandler<ServiceType, ServerResponderType, RequestType, ResponseType>::
         ServiceType* service, ::grpc::ServerCompletionQueue* cq,
         size_t max_state_bucket_count,
         std::pair<std::string, std::string> restricted_kv,
-        const std::string& header_forward_prefix)
+        const std::string& header_forward_pattern)
     : name_(name), tritonserver_(tritonserver), service_(service), cq_(cq),
       max_state_bucket_count_(max_state_bucket_count),
       restricted_kv_(restricted_kv),
-      header_forward_prefix_(header_forward_prefix)
+      header_forward_pattern_(header_forward_pattern),
+      header_forward_regex_(header_forward_pattern_)
 {
 }
 
@@ -1065,14 +1063,13 @@ InferHandler<ServiceType, ServerResponderType, RequestType, ResponseType>::
         TRITONSERVER_InferenceRequest* irequest, InferHandler::State* state)
 {
   TRITONSERVER_Error* err = nullptr;
-  if (!header_forward_prefix_.empty()) {
+  if (!header_forward_pattern_.empty()) {
     const auto& metadata = state->context_->ctx_->client_metadata();
     for (const auto& pair : metadata) {
       auto& key = pair.first;
       auto& value = pair.second;
-      if (header_forward_prefix_ == "*" ||
-          (key.find(header_forward_prefix_) == 0)) {
-        std::string param_key = std::string(key.begin(), key.end());
+      std::string param_key = std::string(key.begin(), key.end());
+      if (RE2::PartialMatch(param_key, header_forward_regex_)) {
         std::string param_value = std::string(value.begin(), value.end());
         err = TRITONSERVER_InferenceRequestSetStringParameter(
             irequest, param_key.c_str(), param_value.c_str());

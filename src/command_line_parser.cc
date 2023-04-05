@@ -1074,7 +1074,7 @@ TritonParser::Parse(int argc, char** argv)
         lparams.http_address_ = optarg;
         break;
       case OPTION_HTTP_HEADER_FORWARD_PREFIX:
-        lparams.http_forward_header_prefix_ = optarg;
+        lparams.http_forward_header_pattern_ = optarg;
         break;
 #ifdef TRITON_ENABLE_METRICS
         lparams.metrics_address_ = optarg;
@@ -1204,7 +1204,7 @@ TritonParser::Parse(int argc, char** argv)
         break;
       }
       case OPTION_GRPC_HEADER_FORWARD_PREFIX:
-        lgrpc_options.forward_header_prefix_ = optarg;
+        lgrpc_options.forward_header_pattern_ = optarg;
         break;
 #endif  // TRITON_ENABLE_GRPC
 

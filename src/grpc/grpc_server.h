@@ -89,7 +89,7 @@ struct Options {
   // allocation/deallocation of request/response objects.
   int infer_allocation_pool_size_{8};
   std::vector<ProtocolGroup> protocol_groups_{};
-  std::string forward_header_prefix_;
+  std::string forward_header_pattern_;
 };
 
 class Server {

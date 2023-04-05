@@ -26,6 +26,15 @@
 
 #include "infer_handler.h"
 
+#ifndef NDEBUG
+uint64_t
+NextUniqueId()
+{
+  static std::atomic<uint64_t> id(0);
+  return ++id;
+}
+#endif  // NDEBUG
+
 namespace triton { namespace server { namespace grpc {
 
 TRITONSERVER_Error*
