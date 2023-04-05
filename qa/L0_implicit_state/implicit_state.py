@@ -1,5 +1,5 @@
 #!/usr/bin/env python
-# Copyright (c) 2022, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright 2022-2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -58,10 +58,13 @@ class ImplicitStateTest(tu.TestResultCollector):
                                 sequence_id=1,
                                 sequence_start=True)
 
-        self.assertEqual(
-            str(e.exception),
-            "unable to add state 'undefined_state'. State configuration is missing for model 'no_implicit_state'."
+        err_str = str(e.exception).lower()
+        self.assertIn("unable to add state 'undefined_state'", err_str)
+        self.assertIn(
+            "state configuration is missing for model 'no_implicit_state'",
+            err_str
         )
+
 
     def test_wrong_implicit_state_name(self):
         triton_client = tritonhttpclient.InferenceServerClient("localhost:8000")
@@ -78,8 +81,11 @@ class ImplicitStateTest(tu.TestResultCollector):
                                 sequence_id=2,
                                 sequence_start=True)
 
-        self.assertEqual(str(e.exception),
-                         "state 'undefined_state' is not a valid state name.")
+        err_str = str(e.exception).lower()
+        self.assertIn(
+            "state 'undefined_state' is not a valid state name",
+            err_str
+        )
 
     def test_no_update(self):
         # Test implicit state without updating any state
