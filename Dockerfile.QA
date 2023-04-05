@@ -259,10 +259,6 @@ RUN mkdir -p qa/L0_passive_instance/models/distributed_int32_int32_int32/1 && \
     cp tritonbuild/tritonserver/backends/distributed_addsub/libtriton_distributed_addsub.so \
         qa/L0_passive_instance/models/distributed_int32_int32_int32/1/.
 
-# Create a directory for all the python client tests to enable unit testing 
-RUN mkdir -p qa/python_client/ && \
-    cp client/src/python/library/tests/* qa/python_client/
-
 ############################################################################
 ## Copy artifacts from sdk container
 ############################################################################
