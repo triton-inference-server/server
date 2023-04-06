@@ -384,9 +384,8 @@ std::vector<Option> TritonParser::recognized_options_
        "The port for the server to listen on for HTTP requests."},
       {OPTION_HTTP_HEADER_FORWARD_PATTERN, "http-header-forward-pattern",
        Option::ArgStr,
-       "All the HTTP headers that start with the value specified in this "
-       "flag will be added to the inference request as parameters. If "
-       " you specify '*' as the value all the headers will be forwarded."},
+       "The regular expression pattern that will be used for forwarding HTTP "
+       "headers as inference request parameters."},
       {OPTION_REUSE_HTTP_PORT, "reuse-http-port", Option::ArgBool,
        "Allow multiple servers to listen on the same HTTP port when every "
        "server has this option set. If you plan to use this option as a way to "
@@ -402,9 +401,8 @@ std::vector<Option> TritonParser::recognized_options_
        "Allow the server to listen for GRPC requests."},
       {OPTION_GRPC_HEADER_FORWARD_PATTERN, "grpc-header-forward-pattern",
        Option::ArgStr,
-       "All the GRPC headers that start with the value specified in this "
-       "flag will be added to the inference request as parameters. If "
-       " you specify '*' as the value, all the headers will be forwarded."},
+       "The regular expression pattern that will be used for forwarding GRPC "
+       "headers as inference request parameters."},
       {OPTION_GRPC_PORT, "grpc-port", Option::ArgInt,
        "The port for the server to listen on for GRPC requests."},
       {OPTION_REUSE_GRPC_PORT, "reuse-grpc-port", Option::ArgBool,

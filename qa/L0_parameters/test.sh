@@ -55,7 +55,7 @@ for i in {0..1}; do
   
   # TEST_HEADER is a parameter used by `parameters_test.py` that controls
   # whether the script will test for inclusion of headers in parameters or not.
-  if [ $TEST_HEADER == 1 ]; then
+  if [ $i == 1 ]; then
     SERVER_ARGS="--model-repository=model_repository --exit-timeout-secs=120 --grpc-header-forward-pattern my_header.* --http-header-forward-pattern my_header.*"
   else
     SERVER_ARGS="--model-repository=model_repository --exit-timeout-secs=120"
