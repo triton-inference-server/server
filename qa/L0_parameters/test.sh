@@ -40,33 +40,44 @@ fi
 
 CLIENT_LOG="./client.log"
 TEST_SCRIPT_PY="parameters_test.py"
-EXPECTED_NUM_TESTS="4"
 
 SERVER=/opt/tritonserver/bin/tritonserver
-SERVER_ARGS="--model-repository=model_repository --exit-timeout-secs=120"
 SERVER_LOG="./inference_server.log"
 source ../common/util.sh
 
+# TODO: Add support and testing for C++ client parameters:
+# https://jirasw.nvidia.com/browse/DLIS-4673
+
 RET=0
-
-run_server
-if [ "$SERVER_PID" == "0" ]; then
-    echo -e "\n***\n*** Failed to start $SERVER\n***"
-    cat $SERVER_LOG
-    exit 1
-fi
-
-set +e
-python3 $TEST_SCRIPT_PY >$CLIENT_LOG 2>&1
-if [ $? -ne 0 ]; then
-    cat $CLIENT_LOG
-    echo -e "\n***\n*** Test Failed\n***"
-    RET=1
-fi
-set -e
-
-kill $SERVER_PID
-wait $SERVER_PID
+for i in {0..1}; do
+  
+  # TEST_HEADER is a parameter used by `parameters_test.py` that controls
+  # whether the script will test for inclusion of headers in parameters or not.
+  if [ $i == 1 ]; then
+    SERVER_ARGS="--model-repository=model_repository --exit-timeout-secs=120 --grpc-header-forward-pattern my_header.* --http-header-forward-pattern my_header.*"
+  else
+    SERVER_ARGS="--model-repository=model_repository --exit-timeout-secs=120"
+  fi
+  run_server
+  if [ "$SERVER_PID" == "0" ]; then
+      echo -e "\n***\n*** Failed to start $SERVER\n***"
+      cat $SERVER_LOG
+      exit 1
+  fi
+  
+  set +e
+  TEST_HEADER=$i python3 $TEST_SCRIPT_PY >$CLIENT_LOG 2>&1
+  if [ $? -ne 0 ]; then
+      cat $CLIENT_LOG
+      echo -e "\n***\n*** Test Failed\n***"
+      RET=1
+  fi
+  
+  set -e
+  
+  kill $SERVER_PID
+  wait $SERVER_PID
+done
 
 if [ $RET -eq 0 ]; then
     echo -e "\n***\n*** Test Passed\n***"
@@ -76,3 +87,4 @@ else
 fi
 
 exit $RET
+

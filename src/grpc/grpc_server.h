@@ -27,10 +27,14 @@
 
 #include <grpc++/grpc++.h>
 #include <vector>
+#include "../shared_memory_manager.h"
+#include "../tracer.h"
+#include "grpc_handler.h"
 #include "grpc_service.grpc.pb.h"
+#include "grpc_utils.h"
 #include "health.grpc.pb.h"
-#include "shared_memory_manager.h"
-#include "tracer.h"
+#include "infer_handler.h"
+#include "stream_infer_handler.h"
 #include "triton/core/tritonserver.h"
 
 namespace triton { namespace server { namespace grpc {
@@ -85,6 +89,7 @@ struct Options {
   // allocation/deallocation of request/response objects.
   int infer_allocation_pool_size_{8};
   std::vector<ProtocolGroup> protocol_groups_{};
+  std::string forward_header_pattern_;
 };
 
 class Server {
@@ -99,22 +104,6 @@ class Server {
 
   TRITONSERVER_Error* Start();
   TRITONSERVER_Error* Stop();
-
- public:
-  class HandlerBase {
-   public:
-    virtual ~HandlerBase() = default;
-    virtual void Start() = 0;
-    virtual void Stop() = 0;
-  };
-
-  class ICallData {
-   public:
-    virtual ~ICallData() = default;
-    virtual bool Process(bool ok) = 0;
-    virtual std::string Name() = 0;
-    virtual uint64_t Id() = 0;
-  };
 
  private:
   Server(
