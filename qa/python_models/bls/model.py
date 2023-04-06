@@ -101,6 +101,60 @@ def bls_square(_=None):
 
     return True
 
+def bls_libtorch(model_name, result_device):
+    shape = [16]
+    input0_np = np.random.rand(*shape).astype(np.float32)
+    input1_np = np.random.rand(*shape).astype(np.float32)
+    input0 = pb_utils.Tensor('INPUT0', input0_np)
+    input1 = pb_utils.Tensor('INPUT1', input1_np)
+
+    if result_device == "CPU":
+        preferred_memory = pb_utils.PreferredMemory(
+            pb_utils.TRITONSERVER_MEMORY_CPU)
+    else:
+        preferred_memory = pb_utils.PreferredMemory(
+            pb_utils.TRITONSERVER_MEMORY_GPU, 0)
+
+    infer_request = pb_utils.InferenceRequest(
+            model_name=model_name,
+            model_version=1,
+            inputs=[input0, input1],
+            requested_output_names=['OUTPUT__0', 'OUTPUT__1'],
+            preferred_memory=preferred_memory)
+
+    infer_response = infer_request.exec()
+    if infer_response.has_error():
+        return False
+
+    output0 = pb_utils.get_output_tensor_by_name(infer_response, 'OUTPUT__0')
+    output1 = pb_utils.get_output_tensor_by_name(infer_response, 'OUTPUT__1')
+    if output0 is None or output1 is None:
+        return False
+
+    expected_output_0 = input0.as_numpy() + input1.as_numpy()
+    expected_output_1 = input0.as_numpy() - input1.as_numpy()
+
+    if result_device == "CPU":
+        if not output0.is_cpu() or not output1.is_cpu():
+            return False
+
+        if not np.all(expected_output_0 == output0.as_numpy()):
+            return False
+
+        if not np.all(expected_output_1 == output1.as_numpy()):
+            return False
+    else:
+        if output0.is_cpu() or output1.is_cpu():
+            return False
+        output0 = from_dlpack(output0.to_dlpack()).to('cpu').cpu().detach().numpy()
+        output1 = from_dlpack(output1.to_dlpack()).to('cpu').cpu().detach().numpy()
+
+        if not np.all(output0 == expected_output_0):
+            return False
+        if not np.all(output1 == expected_output_1):
+            return False
+
+    return True
 
 class PBBLSTest(unittest.TestCase):
 
@@ -647,6 +701,10 @@ class PBBLSTest(unittest.TestCase):
             self.assertEqual(response_value, output0.as_numpy())
 
             del infer_responses
+
+    def test_preferred_memory(self):
+        self.assertTrue(bls_libtorch("libtorch_gpu", "CPU"))
+        self.assertTrue(bls_libtorch("libtorch_cpu", "GPU"))
 
 
 class TritonPythonModel:
