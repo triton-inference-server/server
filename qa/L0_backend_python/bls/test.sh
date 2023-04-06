@@ -94,6 +94,14 @@ mkdir -p models/identity_fp32_timeout/1/
 cp ../../python_models/identity_fp32_timeout/model.py models/identity_fp32_timeout/1/
 cp ../../python_models/identity_fp32_timeout/config.pbtxt models/identity_fp32_timeout
 
+cp -r ${DATADIR}/qa_model_repository/libtorch_nobatch_float32_float32_float32/ ./models/libtorch_gpu && \
+    sed -i 's/libtorch_nobatch_float32_float32_float32/libtorch_gpu/' models/libtorch_gpu/config.pbtxt && \
+    echo "instance_group [ { kind: KIND_GPU} ]" >> models/libtorch_gpu/config.pbtxt
+
+cp -r ${DATADIR}/qa_model_repository/libtorch_nobatch_float32_float32_float32/ ./models/libtorch_cpu && \
+    sed -i 's/libtorch_nobatch_float32_float32_float32/libtorch_cpu/' models/libtorch_cpu/config.pbtxt && \
+    echo "instance_group [ { kind: KIND_CPU} ]" >> models/libtorch_cpu/config.pbtxt
+
 for TRIAL in non_decoupled decoupled ; do
     export BLS_KIND=$TRIAL
 
