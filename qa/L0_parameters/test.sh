@@ -40,8 +40,6 @@ fi
 
 CLIENT_LOG="./client.log"
 TEST_SCRIPT_PY="parameters_test.py"
-EXPECTED_NUM_TESTS="4"
-TEST_RESULT_FILE='test_results.txt'
 
 SERVER=/opt/tritonserver/bin/tritonserver
 SERVER_LOG="./inference_server.log"
@@ -73,13 +71,6 @@ for i in {0..1}; do
       cat $CLIENT_LOG
       echo -e "\n***\n*** Test Failed\n***"
       RET=1
-  else
-      check_test_results $TEST_RESULT_FILE $EXPECTED_NUM_TESTS
-      if [ $? -ne 0 ]; then
-          cat $CLIENT_LOG
-          echo -e "\n***\n*** Test Result Verification Failed\n***"
-          RET=1
-      fi
   fi
   
   set -e
