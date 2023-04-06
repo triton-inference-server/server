@@ -26,7 +26,7 @@
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 TEST_LOG="./python_client_unit_tests.log"
-PYTHON_CLIENT_UNIT_TESTS_DIR=/opt/tritonserver/qa/python_client/
+PYTHON_CLIENT_UNIT_TESTS_DIR=/opt/tritonserver/qa/python_client_unit_tests/
 PYTHON_CLIENT_UNIT_TESTS_CMD = python3 -m unittest discover -v -s $PYTHON_CLIENT_UNIT_TESTS_DIR -t .
 
 RET=0
