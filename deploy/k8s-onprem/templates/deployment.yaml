@@ -71,7 +71,7 @@ spec:
 
           args: 
             - tritonserver
-            {{- range .Values.additionalArgs }}
+            {{- range .Values.serverArgs }}
             - {{.}}
             {{- end }}
 
