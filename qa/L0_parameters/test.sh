@@ -47,6 +47,9 @@ SERVER=/opt/tritonserver/bin/tritonserver
 SERVER_LOG="./inference_server.log"
 source ../common/util.sh
 
+# TODO: Add support and testing for C++ client parameters:
+# https://jirasw.nvidia.com/browse/DLIS-4673
+
 RET=0
 for i in {0..1}; do
   
