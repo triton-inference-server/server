@@ -252,7 +252,7 @@ enum TritonOptionId {
   OPTION_STRICT_READINESS,
 #if defined(TRITON_ENABLE_HTTP)
   OPTION_ALLOW_HTTP,
-  OPTION_HTTP_HEADER_FORWARD_PREFIX,
+  OPTION_HTTP_HEADER_FORWARD_PATTERN,
   OPTION_HTTP_PORT,
   OPTION_REUSE_HTTP_PORT,
   OPTION_HTTP_ADDRESS,
@@ -263,7 +263,7 @@ enum TritonOptionId {
   OPTION_GRPC_PORT,
   OPTION_REUSE_GRPC_PORT,
   OPTION_GRPC_ADDRESS,
-  OPTION_GRPC_HEADER_FORWARD_PREFIX,
+  OPTION_GRPC_HEADER_FORWARD_PATTERN,
   OPTION_GRPC_INFER_ALLOCATION_POOL_SIZE,
   OPTION_GRPC_USE_SSL,
   OPTION_GRPC_USE_SSL_MUTUAL,
@@ -382,7 +382,7 @@ std::vector<Option> TritonParser::recognized_options_
        "Allow the server to listen for HTTP requests."},
       {OPTION_HTTP_PORT, "http-port", Option::ArgInt,
        "The port for the server to listen on for HTTP requests."},
-      {OPTION_HTTP_HEADER_FORWARD_PREFIX, "http-header-forward-prefix",
+      {OPTION_HTTP_HEADER_FORWARD_PATTERN, "http-header-forward-pattern",
        Option::ArgStr,
        "All the HTTP headers that start with the value specified in this "
        "flag will be added to the inference request as parameters. If "
@@ -400,7 +400,7 @@ std::vector<Option> TritonParser::recognized_options_
 #if defined(TRITON_ENABLE_GRPC)
       {OPTION_ALLOW_GRPC, "allow-grpc", Option::ArgBool,
        "Allow the server to listen for GRPC requests."},
-      {OPTION_GRPC_HEADER_FORWARD_PREFIX, "grpc-header-forward-prefix",
+      {OPTION_GRPC_HEADER_FORWARD_PATTERN, "grpc-header-forward-pattern",
        Option::ArgStr,
        "All the GRPC headers that start with the value specified in this "
        "flag will be added to the inference request as parameters. If "
@@ -1073,7 +1073,7 @@ TritonParser::Parse(int argc, char** argv)
       case OPTION_HTTP_ADDRESS:
         lparams.http_address_ = optarg;
         break;
-      case OPTION_HTTP_HEADER_FORWARD_PREFIX:
+      case OPTION_HTTP_HEADER_FORWARD_PATTERN:
         lparams.http_forward_header_pattern_ = optarg;
         break;
 #ifdef TRITON_ENABLE_METRICS
@@ -1203,7 +1203,7 @@ TritonParser::Parse(int argc, char** argv)
         lgrpc_options.protocol_groups_.emplace_back(pg);
         break;
       }
-      case OPTION_GRPC_HEADER_FORWARD_PREFIX:
+      case OPTION_GRPC_HEADER_FORWARD_PATTERN:
         lgrpc_options.forward_header_pattern_ = optarg;
         break;
 #endif  // TRITON_ENABLE_GRPC
