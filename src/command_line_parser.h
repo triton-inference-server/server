@@ -34,7 +34,6 @@
 #include <thread>
 #include <unordered_map>
 #include <vector>
-
 #include "triton/common/logging.h"
 #include "triton/core/tritonserver.h"
 #if defined(TRITON_ENABLE_HTTP) || defined(TRITON_ENABLE_METRICS)
@@ -47,7 +46,7 @@
 #include "vertex_ai_server.h"
 #endif  // TRITON_ENABLE_VERTEX_AI
 #ifdef TRITON_ENABLE_GRPC
-#include "grpc_server.h"
+#include "grpc/grpc_server.h"
 #endif  // TRITON_ENABLE_GRPC
 
 #ifndef _WIN32
@@ -178,6 +177,7 @@ struct TritonServerParameters {
   std::string http_address_{"0.0.0.0"};
   int32_t http_port_{8000};
   bool reuse_http_port_{false};
+  std::string http_forward_header_pattern_;
   // The number of threads to initialize for the HTTP front-end.
   int http_thread_cnt_{8};
 #endif  // TRITON_ENABLE_HTTP
