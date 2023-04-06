@@ -196,9 +196,9 @@ def create_tf_modelfile(create_savedmodel, models_dir, model_version, max_batch,
         newacc = tf.compat.v1.where(tf.equal(ready0, 1), tmp1, acc)
         assign = tf.compat.v1.assign(acc, newacc)
         if tf_input_dtype == tf.string:
-            output0 = tf.strings.as_string(assign, name="OUTPUT")
+            tf.strings.as_string(assign, name="OUTPUT")
         else:
-            output0 = tf.identity(assign, name="OUTPUT")
+            tf.identity(assign, name="OUTPUT")
     else:
         # For batching we can't use a tf.variable to hold the
         # accumulated values since that forces the size of the output
@@ -223,9 +223,9 @@ def create_tf_modelfile(create_savedmodel, models_dir, model_version, max_batch,
             tf.add(tf.add(start0, input0), tf.multiply(end0, corrid_cast0)),
             tf.zeros(tf.shape(input=input0), dtype=tf_dtype))
         if tf_input_dtype == tf.string:
-            output0 = tf.strings.as_string(tmp, name="OUTPUT")
+            tf.strings.as_string(tmp, name="OUTPUT")
         else:
-            output0 = tf.identity(tmp, name="OUTPUT")
+            tf.identity(tmp, name="OUTPUT")
 
     # Use a different model name for the non-batching variant
     if create_savedmodel:

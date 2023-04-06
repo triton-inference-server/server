@@ -366,8 +366,8 @@ def create_savedmodel_modelfile(models_dir,
     else:
         cast1 = tf.cast(sub if not swap else add, tf_output1_dtype, "CAST1")
 
-    out0 = tf.identity(cast0, "TENSOR_OUTPUT0")
-    out1 = tf.identity(cast1, "TENSOR_OUTPUT1")
+    tf.identity(cast0, "TENSOR_OUTPUT0")
+    tf.identity(cast1, "TENSOR_OUTPUT1")
 
     # Use a different model name for the non-batching variant
     model_name = tu.get_model_name(

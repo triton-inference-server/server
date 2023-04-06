@@ -179,14 +179,14 @@ def create_tf_modelfile(create_savedmodel, models_dir, model_version, max_batch,
             ] + tu.shape_to_tf_shape(input_shapes[io_num]), input_name)
 
         if input_shapes == output_shapes:
-            toutput = tf.identity(tin, name=output_name)
+            tf.identity(tin, name=output_name)
         else:
             if max_batch == 0:
-                toutput = tf.reshape(tin,
+                tf.reshape(tin,
                                      output_shapes[io_num],
                                      name=output_name)
             else:
-                toutput = tf.reshape(tin, [
+                tf.reshape(tin, [
                     -1,
                 ] + output_shapes[io_num],
                                      name=output_name)

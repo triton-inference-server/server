@@ -498,13 +498,13 @@ def create_savedmodel_itemshape_modelfile(models_dir, model_version, dtype):
     tf_dtype = np_to_tf_dtype(dtype)
 
     tf.compat.v1.reset_default_graph()
-    in_node = tf.compat.v1.placeholder(tf_dtype, tu.shape_to_tf_shape([-1]),
+    tf.compat.v1.placeholder(tf_dtype, tu.shape_to_tf_shape([-1]),
                                        "TENSOR_RAGGED_INPUT")
     # Shape is predefined
     batch_node = tf.compat.v1.placeholder(tf_dtype,
                                           tu.shape_to_tf_shape([-1, 2]),
                                           "TENSOR_BATCH_INPUT")
-    batch_output_node = tf.identity(batch_node, name="TENSOR_BATCH_OUTPUT")
+    tf.identity(batch_node, name="TENSOR_BATCH_OUTPUT")
 
     model_name = "savedmodel_batch_item"
     model_version_dir = models_dir + "/" + model_name + "/" + str(model_version)
