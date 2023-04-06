@@ -1,3 +1,4 @@
+<!--
 # Copyright (c) 2021-2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
@@ -23,44 +24,40 @@
 # OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 # (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+-->
 
-initReplicaCount: 1
-minReplicaCount: 1
-maxReplicaCount: 3
-# choice from gRPC and HTTP
-tritonProtocol: HTTP
-# HPA GPU utilization autoscaling target
-HPATargetAverageValue: 85
-modelRepositoryPath: gs://triton_sample_models/23_02
-publishedVersion: '2.31.0'
-gcpMarketplace: true
+# Instruction to create BERT engine for each Triton update
 
-image:
-  registry: gcr.io
-  repository: nvidia-ngc-public/tritonserver
-  tag: 23.03-py3
-  pullPolicy: IfNotPresent
-  # modify the model repository here to match your GCP storage bucket
-  numGpus: 1
-  strictModelConfig: False
-  # add in custom library which could include custom ops in the model
-  ldPreloadPath: ''
-  logVerboseLevel: 0
-  allowGPUMetrics: True
+## Description
 
-service:
-  type: NodePort 
+```
+docker run --gpus all -it --network host \
+    --shm-size=1g --ulimit memlock=-1 --ulimit stack=67108864 \
+    -v ~:/scripts nvcr.io/nvidia/tensorrt:23.02-py3 
 
-deployment:
-  livenessProbe:
-    failureThreshold: 60
-    initialDelaySeconds: 10
-    periodSeconds: 5
-    successThreshold: 1
-    timeoutSeconds: 1
-  readinessProbe:
-    failureThreshold: 60
-    initialDelaySeconds: 10
-    periodSeconds: 5
-    successThreshold: 1
-    timeoutSeconds: 1
+pip install onnx six torch tf2onnx tensorflow 
+
+git clone -b main https://github.com/NVIDIA/TensorRT.git
+cd TensorRT
+git submodule update --init --recursive 
+
+export TRT_OSSPATH=/workspace/TensorRT
+export TRT_LIBPATH=/lib/x86_64-linux-gnu
+
+pushd /usr/local/bin && wget https://ngc.nvidia.com/downloads/ngccli_cat_linux.zip && unzip ngccli_cat_linux.zip && chmod u+x ngc-cli/ngc && rm ngccli_cat_linux.zip ngc-cli.md5 && ln -s ngc-cli/ngc ngc && echo "no-apikey\nascii\n" | ngc config set
+
+popd
+
+cd /workspace/TensorRT/demo/BERT
+bash ./scripts/download_squad.sh 
+bash ./scripts/download_model.sh large 128
+# bash ./scripts/download_model.sh large 384
+
+mkdir -p engines
+
+python3 builder.py -m models/fine-tuned/bert_tf_ckpt_large_qa_squad2_amp_128_v19.03.1/model.ckpt -o engines/bert_large_int8_bs1_s128.engine -b 1 -s 128 -c models/fine-tuned/bert_tf_ckpt_large_qa_squad2_amp_128_v19.03.1/ -v models/fine-tuned/bert_tf_ckpt_large_qa_squad2_amp_128_v19.03.1/vocab.txt --int8 --fp16 --strict --calib-num 1 -iln -imh 
+
+gsutil cp bert_large_int8_bs1_s128.engine gs://triton_sample_models/23_02/bert/1/model.plan
+```
+
+For each Triton upgrade, container version used to genrate the model, and the model path in GCS `gs://triton_sample_models/23_02/` should be updated accordingly with the correct version.
