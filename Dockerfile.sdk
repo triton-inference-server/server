@@ -211,6 +211,7 @@ COPY --from=sdk_build /workspace/client/src/python/library/tests/* qa/python_cli
 
 # For CI testing, need to copy over PA docs
 RUN mkdir -p qa/L0_perf_analyzer_doc_links/docs
+COPY --from=sdk_build /workspace/client/src/c++/perf_analyzer/README.md qa/L0_perf_analyzer_doc_links/
 COPY --from=sdk_build /workspace/client/src/c++/perf_analyzer/docs/* qa/L0_perf_analyzer_doc_links/docs
 
 # Install an image needed by the quickstart and other documentation.

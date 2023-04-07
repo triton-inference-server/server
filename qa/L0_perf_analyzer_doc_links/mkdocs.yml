@@ -18,3 +18,7 @@ docs_dir: "./docs"
 plugins:
         - htmlproofer
         - search
+
+markdown_extensions:
+    - toc:
+        permalink: True
