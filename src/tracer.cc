@@ -705,6 +705,7 @@ TraceManager::TraceSetting::SampleTrace()
     
     // Setting up exporter
     otlp::OtlpHttpExporterOptions opts;
+    // [FIXME] read from cmd
     opts.url="localhost:4318/v1/traces";
     lts->exporter = otlp::OtlpHttpExporterFactory::Create(opts);
     lts->processor = trace_sdk::SimpleSpanProcessorFactory::Create(std::move(lts->exporter));
@@ -712,6 +713,7 @@ TraceManager::TraceSetting::SampleTrace()
 
     opentelemetry::trace::StartSpanOptions options;
     options.kind          = opentelemetry::trace::SpanKind::kServer;  // server
+    // [FIXME] think about names
     lts->trace_span_ = lts->provider->GetTracer("triton-http-server")
                       -> StartSpan("HandleInfer", {}, options);
     return lts;

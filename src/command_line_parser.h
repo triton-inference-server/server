@@ -40,7 +40,7 @@
 // To avoid ambiguous reference during build
 // grpc headers should be imported first
 // https://github.com/open-telemetry/opentelemetry-cpp/blob/main/examples/otlp/README.md#additional-notes-regarding-abseil-library
-#include "grpc_server.h"
+#include "grpc/grpc_server.h"
 #endif  // TRITON_ENABLE_GRPC
 #if defined(TRITON_ENABLE_HTTP) || defined(TRITON_ENABLE_METRICS)
 #include "http_server.h"

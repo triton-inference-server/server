@@ -78,6 +78,7 @@ target_include_directories(
   grpc-endpoint-library
   PRIVATE
     $<TARGET_PROPERTY:gRPC::grpc,INTERFACE_INCLUDE_DIRECTORIES>
+    ${OPENTELEMETRY_CPP_INCLUDE_DIRS}
 )
 
 target_compile_definitions(
