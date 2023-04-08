@@ -370,6 +370,36 @@ and shared memory pages after starting triton equals to $current_num_pages \n***
     exit 1
 fi
 
+(cd lifecycle && bash -ex test.sh)
+if [ $? -ne 0 ]; then
+  RET=1
+fi
+
+(cd restart && bash -ex test.sh)
+if [ $? -ne 0 ]; then
+  RET=1
+fi
+
+(cd model_control && bash -ex test.sh)
+if [ $? -ne 0 ]; then
+  RET=1
+fi
+
+(cd examples && bash -ex test.sh)
+if [ $? -ne 0 ]; then
+  RET=1
+fi
+
+(cd argument_validation && bash -ex test.sh)
+if [ $? -ne 0 ]; then
+  RET=1
+fi
+
+(cd logging && bash -ex test.sh)
+if [ $? -ne 0 ]; then
+  RET=1
+fi
+
 # Disable env test for Jetson since build is non-dockerized and cloud storage repos are not supported
 # Disable ensemble, unittest, io and bls tests for Jetson since GPU Tensors are not supported
 # Disable variants test for Jetson since already built without GPU Tensor support
@@ -409,36 +439,6 @@ if [ "$TEST_JETSON" == "0" ]; then
   if [ $? -ne 0 ]; then
     RET=1
   fi
-fi
-
-(cd lifecycle && bash -ex test.sh)
-if [ $? -ne 0 ]; then
-  RET=1
-fi
-
-(cd restart && bash -ex test.sh)
-if [ $? -ne 0 ]; then
-  RET=1
-fi
-
-(cd model_control && bash -ex test.sh)
-if [ $? -ne 0 ]; then
-  RET=1
-fi
-
-(cd examples && bash -ex test.sh)
-if [ $? -ne 0 ]; then
-  RET=1
-fi
-
-(cd argument_validation && bash -ex test.sh)
-if [ $? -ne 0 ]; then
-  RET=1
-fi
-
-(cd logging && bash -ex test.sh)
-if [ $? -ne 0 ]; then
-  RET=1
 fi
 
 if [ $RET -eq 0 ]; then
