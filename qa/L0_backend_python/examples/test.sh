@@ -49,7 +49,7 @@ pip3 install validators
 
 # Install JAX
 if [ "$TEST_JETSON" == "0" ]; then
-    pip3 install --upgrade "jax[cuda]" -f https://storage.googleapis.com/jax-releases/jax_cuda_releases.html
+    pip3 install --upgrade "jax[cuda12_local]" -f https://storage.googleapis.com/jax-releases/jax_cuda_releases.html
 fi
 
 git clone https://github.com/triton-inference-server/python_backend -b $PYTHON_BACKEND_REPO_TAG
