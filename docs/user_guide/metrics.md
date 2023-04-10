@@ -129,8 +129,8 @@ a set a [Summary](https://prometheus.io/docs/concepts/metric_types/#summary)
 metrics for latencies as well. These metrics are disabled by default, but can
 be enabled by setting `--metrics-config summary_latencies=true`. 
 
-For more information on how the quantiles are calculated, see:
-https://prometheus.io/docs/practices/histograms/#histograms-and-summaries.
+For more information on how the quantiles are calculated, see
+[this explanation](https://grafana.com/blog/2022/03/01/how-summary-metrics-work-in-prometheus/).
 
 The following summary metrics are available:
 
@@ -179,8 +179,9 @@ For example:
 tritonserver --metrics-config summary_quantiles="0.5:0.05,0.9:0.01,0.95:0.001,0.99:0.001"`
 ```
 
-To better understand the setting of error values for computing each quantile, see:
-https://prometheus.io/docs/practices/histograms/#histograms-and-summaries
+To better understand the setting of error values for computing each quantile, see the
+[best practices for histograms and summaries](https://prometheus.io/docs/practices/histograms/#histograms-and-summaries).
+
 
 ## GPU Metrics
 
