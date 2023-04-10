@@ -38,17 +38,19 @@ def create_graphdefmodel(models_dir, model_name, model_version=1):
     model parameter named VARIABLE and produces OUTPUT.
     """
 
-    tf.reset_default_graph()
-    input0 = tf.placeholder(tf.int32, [
+    tf.compat.v1.reset_default_graph()
+    tf.compat.v1.disable_eager_execution()
+    input0 = tf.compat.v1.placeholder(tf.int32, [
         1,
     ], "INPUT")
-    variable = tf.get_variable("VARIABLE", [
-        1,
-    ],
-                               initializer=tf.zeros_initializer(),
-                               dtype=tf.int32)
+    variable = tf.compat.v1.get_variable(
+        "VARIABLE", [
+            1,
+        ],
+        initializer=tf.compat.v1.zeros_initializer(),
+        dtype=tf.int32)
     tf.add(variable, input0, name="OUTPUT")
-    tf.global_variables_initializer()
+    tf.compat.v1.global_variables_initializer()
     model_version_dir = models_dir + "/" + model_name + "/" + str(model_version)
 
     try:
@@ -56,7 +58,7 @@ def create_graphdefmodel(models_dir, model_name, model_version=1):
     except OSError as ex:
         pass  # ignore existing dir
 
-    with tf.Session() as sess:
+    with tf.compat.v1.Session() as sess:
         graph_io.write_graph(sess.graph.as_graph_def(),
                              model_version_dir,
                              "model.graphdef",

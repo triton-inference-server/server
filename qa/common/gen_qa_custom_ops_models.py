@@ -1,4 +1,4 @@
-# Copyright 2019-2021, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright 2019-2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -36,8 +36,8 @@ def create_zeroout_modelfile(create_savedmodel, models_dir, model_version):
     zero_out = _zero_out_module.zero_out
 
     # Create the model that uses custom operator.
-    tf.reset_default_graph()
-    zin = tf.placeholder(tf.int32, [
+    tf.compat.v1.reset_default_graph()
+    zin = tf.compat.v1.placeholder(tf.int32, [
         None,
     ], "to_zero")
     zout = zero_out(zin, name="zeroed")
@@ -51,23 +51,24 @@ def create_zeroout_modelfile(create_savedmodel, models_dir, model_version):
         pass  # ignore existing dir
 
     if create_savedmodel:
-        with tf.Session() as sess:
+        with tf.compat.v1.Session() as sess:
             input_name = "to_zero"
             output_name = "zeroed"
-            input_tensor = tf.get_default_graph().get_tensor_by_name(
+            input_tensor = tf.compat.v1.get_default_graph().get_tensor_by_name(
                 input_name + ":0")
-            output_tensor = tf.get_default_graph().get_tensor_by_name(
+            output_tensor = tf.compat.v1.get_default_graph().get_tensor_by_name(
                 output_name + ":0")
             input_dict = dict()
             output_dict = dict()
             input_dict[input_name] = input_tensor
             output_dict[output_name] = output_tensor
-            tf.saved_model.simple_save(sess,
-                                       model_version_dir + "/model.savedmodel",
-                                       inputs=input_dict,
-                                       outputs=output_dict)
+            tf.compat.v1.saved_model.simple_save(sess,
+                                                 model_version_dir +
+                                                 "/model.savedmodel",
+                                                 inputs=input_dict,
+                                                 outputs=output_dict)
     else:
-        with tf.Session() as sess:
+        with tf.compat.v1.Session() as sess:
             graph_io.write_graph(sess.graph.as_graph_def(),
                                  model_version_dir,
                                  "model.graphdef",
@@ -114,8 +115,8 @@ def create_cudaop_modelfile(create_savedmodel, models_dir, model_version):
     add_one = _cuda_op_module.add_one
 
     # Create the model that uses custom operator.
-    tf.reset_default_graph()
-    zin = tf.placeholder(tf.int32, [
+    tf.compat.v1.reset_default_graph()
+    zin = tf.compat.v1.placeholder(tf.int32, [
         None,
     ], "in")
     zout = add_one(zin, name="out")
@@ -129,23 +130,24 @@ def create_cudaop_modelfile(create_savedmodel, models_dir, model_version):
         pass  # ignore existing dir
 
     if create_savedmodel:
-        with tf.Session() as sess:
+        with tf.compat.v1.Session() as sess:
             input_name = "in"
             output_name = "out"
-            input_tensor = tf.get_default_graph().get_tensor_by_name(
+            input_tensor = tf.compat.v1.get_default_graph().get_tensor_by_name(
                 input_name + ":0")
-            output_tensor = tf.get_default_graph().get_tensor_by_name(
+            output_tensor = tf.compat.v1.get_default_graph().get_tensor_by_name(
                 output_name + ":0")
             input_dict = dict()
             output_dict = dict()
             input_dict[input_name] = input_tensor
             output_dict[output_name] = output_tensor
-            tf.saved_model.simple_save(sess,
-                                       model_version_dir + "/model.savedmodel",
-                                       inputs=input_dict,
-                                       outputs=output_dict)
+            tf.compat.v1.saved_model.simple_save(sess,
+                                                 model_version_dir +
+                                                 "/model.savedmodel",
+                                                 inputs=input_dict,
+                                                 outputs=output_dict)
     else:
-        with tf.Session() as sess:
+        with tf.compat.v1.Session() as sess:
             graph_io.write_graph(sess.graph.as_graph_def(),
                                  model_version_dir,
                                  "model.graphdef",
@@ -192,8 +194,8 @@ def create_busyop_modelfile(create_savedmodel, models_dir, model_version):
     busy_loop = _busy_op_module.busy_loop
 
     # Create the model that uses custom operator.
-    tf.reset_default_graph()
-    zin = tf.placeholder(tf.int32, [
+    tf.compat.v1.reset_default_graph()
+    zin = tf.compat.v1.placeholder(tf.int32, [
         None,
     ], "in")
     zout = busy_loop(zin, name="out")
@@ -207,23 +209,24 @@ def create_busyop_modelfile(create_savedmodel, models_dir, model_version):
         pass  # ignore existing dir
 
     if create_savedmodel:
-        with tf.Session() as sess:
+        with tf.compat.v1.Session() as sess:
             input_name = "in"
             output_name = "out"
-            input_tensor = tf.get_default_graph().get_tensor_by_name(
+            input_tensor = tf.compat.v1.get_default_graph().get_tensor_by_name(
                 input_name + ":0")
-            output_tensor = tf.get_default_graph().get_tensor_by_name(
+            output_tensor = tf.compat.v1.get_default_graph().get_tensor_by_name(
                 output_name + ":0")
             input_dict = dict()
             output_dict = dict()
             input_dict[input_name] = input_tensor
             output_dict[output_name] = output_tensor
-            tf.saved_model.simple_save(sess,
-                                       model_version_dir + "/model.savedmodel",
-                                       inputs=input_dict,
-                                       outputs=output_dict)
+            tf.compat.v1.saved_model.simple_save(sess,
+                                                 model_version_dir +
+                                                 "/model.savedmodel",
+                                                 inputs=input_dict,
+                                                 outputs=output_dict)
     else:
-        with tf.Session() as sess:
+        with tf.compat.v1.Session() as sess:
             graph_io.write_graph(sess.graph.as_graph_def(),
                                  model_version_dir,
                                  "model.graphdef",
@@ -500,8 +503,8 @@ if __name__ == '__main__':
     if FLAGS.graphdef or FLAGS.savedmodel:
         # Use Tensorflow 2 as default. Need to disable the v2 behavior for
         # model generation scripts.
-        import tensorflow.compat.v1 as tf
-        tf.disable_v2_behavior()
+        import tensorflow as tf
+        tf.compat.v1.disable_eager_execution()
         from tensorflow.python.framework import graph_io
         create_zero_out_models(FLAGS.models_dir)
         create_cuda_op_models(FLAGS.models_dir)

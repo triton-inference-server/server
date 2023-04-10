@@ -1,4 +1,4 @@
-# Copyright 2019-2022, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright 2019-2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -137,10 +137,9 @@ class LifecycleTest(tu.TestResultCollector):
                     client.infer(model_name, inputs)
 
                 self.assertTrue(
-                    str(e.exception).startswith(
-                        "Failed to process the request(s) for model instance "
-                        "'execute_return_error_0', message: Expected a list in the "
-                        "execute return"), "Exception message is not correct.")
+                    "Failed to process the request(s) for model instance "
+                    "'execute_return_error_0', message: Expected a list in the "
+                    "execute return" in str(e.exception), "Exception message is not correct.")
 
                 # The second inference request will return a list of None object
                 # instead of Python InferenceResponse objects.
@@ -148,11 +147,10 @@ class LifecycleTest(tu.TestResultCollector):
                     client.infer(model_name, inputs)
 
                 self.assertTrue(
-                    str(e.exception).startswith(
-                        "Failed to process the request(s) for model instance "
-                        "'execute_return_error_0', message: Expected an "
-                        "'InferenceResponse' object in the execute function return"
-                        " list"), "Exception message is not correct.")
+                    "Failed to process the request(s) for model instance "
+                    "'execute_return_error_0', message: Expected an "
+                    "'InferenceResponse' object in the execute function return"
+                    " list" in str(e.exception), "Exception message is not correct.")
 
 
 if __name__ == '__main__':
