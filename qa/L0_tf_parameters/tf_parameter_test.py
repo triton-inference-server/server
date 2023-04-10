@@ -1,4 +1,4 @@
-# Copyright 2022, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright 2022-2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -67,8 +67,10 @@ class TFParameterTest(tu.TestResultCollector):
         with self.assertRaises(
                 tritonclient.utils.InferenceServerException) as e:
             self._infer_helper()
-        self.assertIn("Attempting to use uninitialized value VARIABLE",
-                      e.exception.message())
+        self.assertIn(
+            "FAILED_PRECONDITION: Could not find variable VARIABLE. This " +
+            "could mean that the variable has been deleted. In TF1, it can " +
+            "also mean the variable is uninitialized.", e.exception.message())
 
 
 if __name__ == '__main__':
