@@ -1465,8 +1465,18 @@ std::tuple<std::string, std::string, std::string>
 TritonParser::ParseMetricsConfigOption(const std::string& arg)
 {
   // Format is "<setting>=<value>" for generic configs/settings
-  int delim_name = arg.find(",");
-  int delim_setting = arg.find("=", delim_name + 1);
+  int delim_setting = arg.find("=");
+  if (delim_setting < 0) {
+    std::stringstream ss;
+    ss << "--metrics-config option format is "
+       << "<setting>=<value>. Got " << arg << std::endl;
+    throw ParseException(ss.str());
+  }
+
+  // Break section before "=" into substr to avoid matching commas
+  // in setting values.
+  auto name_substr = arg.substr(0, delim_setting);
+  int delim_name = name_substr.find(",");
 
   // No name-specific configs currently supported, though it may be in
   // the future. Map global configs to empty string like other configs for now.
@@ -1478,12 +1488,6 @@ TritonParser::ParseMetricsConfigOption(const std::string& arg)
     throw ParseException(ss.str());
   }  // else global metrics config
 
-  if (delim_setting < 0) {
-    std::stringstream ss;
-    ss << "--metrics-config option format is "
-       << "<setting>=<value>. Got " << arg << std::endl;
-    throw ParseException(ss.str());
-  }
   std::string setting_string =
       arg.substr(delim_name + 1, delim_setting - delim_name - 1);
   std::string value_string = arg.substr(delim_setting + 1);
