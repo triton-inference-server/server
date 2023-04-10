@@ -1,5 +1,5 @@
 #!/bin/bash
-# Copyright 2022, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright 2022-2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -49,7 +49,7 @@ EXPECTED_NUM_TESTS="1"
 MODEL_REPOSITORY=`pwd`/models
 SERVER=/opt/tritonserver/bin/tritonserver
 SERVER_LOG="./inference_server.log"
-TF_VERSIONS=(1 2)
+TF_VERSIONS=(2)
 RET=0
 
 for version in ${TF_VERSIONS[@]}; do

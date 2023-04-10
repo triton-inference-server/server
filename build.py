@@ -413,6 +413,7 @@ def cmake_repoagent_extra_args():
     args = []
     return args
 
+
 def cmake_cache_arg(name, type, value):
     # For now there is no override for caches
     if type is None:
@@ -423,15 +424,16 @@ def cmake_cache_arg(name, type, value):
 
 
 def cmake_cache_enable(name, flag):
-    # For now there is no override for caches 
+    # For now there is no override for caches
     value = 'ON' if flag else 'OFF'
     return '"-D{}:BOOL={}"'.format(name, value)
 
 
 def cmake_cache_extra_args():
-    # For now there is no extra args for caches 
+    # For now there is no extra args for caches
     args = []
     return args
+
 
 def core_cmake_args(components, backends, cmake_dir, install_dir):
     cargs = [
@@ -520,9 +522,11 @@ def repoagent_cmake_args(images, components, ra, install_dir):
     cargs.append('..')
     return cargs
 
+
 def cache_repo(cache):
     # example: "local", or "redis"
     return '{}_cache'.format(cache)
+
 
 def cache_cmake_args(images, components, cache, install_dir):
     args = []
@@ -531,9 +535,8 @@ def cache_cmake_args(images, components, cache, install_dir):
         cmake_cache_arg('CMAKE_BUILD_TYPE', None, FLAGS.build_type),
         cmake_cache_arg('CMAKE_INSTALL_PREFIX', 'PATH', install_dir),
         cmake_cache_arg('TRITON_COMMON_REPO_TAG', 'STRING',
-                            components['common']),
-        cmake_cache_arg('TRITON_CORE_REPO_TAG', 'STRING',
-                            components['core'])
+                        components['common']),
+        cmake_cache_arg('TRITON_CORE_REPO_TAG', 'STRING', components['core'])
     ]
 
     cargs.append(cmake_cache_enable('TRITON_ENABLE_GPU', FLAGS.enable_gpu))
@@ -541,9 +544,8 @@ def cache_cmake_args(images, components, cache, install_dir):
     cargs.append('..')
     return cargs
 
+
 def backend_repo(be):
-    if (be == 'tensorflow1') or (be == 'tensorflow2'):
-        return 'tensorflow_backend'
     return '{}_backend'.format(be)
 
 
@@ -554,10 +556,8 @@ def backend_cmake_args(images, components, be, install_dir, library_paths):
         args = onnxruntime_cmake_args(images, library_paths)
     elif be == 'openvino':
         args = openvino_cmake_args()
-    elif be == 'tensorflow1':
-        args = tensorflow_cmake_args(1, images, library_paths)
-    elif be == 'tensorflow2':
-        args = tensorflow_cmake_args(2, images, library_paths)
+    elif be == 'tensorflow':
+        args = tensorflow_cmake_args(images, library_paths)
     elif be == 'python':
         args = []
     elif be == 'dali':
@@ -740,8 +740,8 @@ def tensorrt_cmake_args():
     return cargs
 
 
-def tensorflow_cmake_args(ver, images, library_paths):
-    backend_name = "tensorflow{}".format(ver)
+def tensorflow_cmake_args(images, library_paths):
+    backend_name = "tensorflow"
 
     # If platform is jetpack do not use docker images
     extra_args = []
@@ -760,15 +760,13 @@ def tensorflow_cmake_args(ver, images, library_paths):
         if backend_name in images:
             image = images[backend_name]
         else:
-            image = 'nvcr.io/nvidia/tensorflow:{}-tf{}-py3'.format(
-                FLAGS.upstream_container_version, ver)
+            image = 'nvcr.io/nvidia/tensorflow:{}-tf2-py3'.format(
+                FLAGS.upstream_container_version)
         extra_args = [
             cmake_backend_arg(backend_name, 'TRITON_TENSORFLOW_DOCKER_IMAGE',
                               None, image)
         ]
-    return [
-        cmake_backend_arg(backend_name, 'TRITON_TENSORFLOW_VERSION', None, ver)
-    ] + extra_args
+    return extra_args
 
 
 def dali_cmake_args():
@@ -1013,12 +1011,11 @@ ARG BASE_IMAGE={}
 '''.format(argmap['TRITON_VERSION'], argmap['TRITON_CONTAINER_VERSION'],
            argmap['BASE_IMAGE'])
 
-    # PyTorch, TensorFlow 1 and TensorFlow 2 backends need extra CUDA and other
+    # PyTorch and TensorFlow backends need extra CUDA and other
     # dependencies during runtime that are missing in the CPU-only base container.
     # These dependencies must be copied from the Triton Min image.
     if not FLAGS.enable_gpu and (('pytorch' in backends) or
-                                 ('tensorflow1' in backends) or
-                                 ('tensorflow2' in backends)):
+                                 ('tensorflow' in backends)):
         df += '''
 ############################################################################
 ##  Triton Min image
@@ -1144,7 +1141,8 @@ ENV TCMALLOC_RELEASE_RATE 200
     if ('fastertransformer' in backends):
         be = "fastertransformer"
         import importlib.util, requests
-        url = 'https://raw.githubusercontent.com/triton-inference-server/fastertransformer_backend/{}/docker/create_dockerfile_and_build.py'.format(backends[be])
+        url = 'https://raw.githubusercontent.com/triton-inference-server/fastertransformer_backend/{}/docker/create_dockerfile_and_build.py'.format(
+            backends[be])
         response = requests.get(url)
         spec = importlib.util.spec_from_loader('fastertransformer_buildscript',
                                                loader=None,
@@ -1166,10 +1164,10 @@ RUN ln -sf ${_CUDA_COMPAT_PATH}/lib.real ${_CUDA_COMPAT_PATH}/lib \
 
     else:
         libs_arch = 'aarch64' if target_machine == 'aarch64' else 'x86_64'
-        if ('pytorch' in backends) or ('tensorflow1' in backends):
-            # Add extra dependencies for tensorflow1/pytorch backend.
-            # Note: Even though the build is CPU-only, the version of tensorflow1/
-            # pytorch we are using depend upon libraries like cuda and cudnn. Since
+        if 'pytorch' in backends:
+            # Add extra dependencies for pytorch backend.
+            # Note: Even though the build is CPU-only, the version of pytorch
+            # we are using depend upon libraries like cuda and cudnn. Since
             # these dependencies are not present in the ubuntu base image,
             # we must copy these from the Triton min container ourselves.
             cuda_arch = 'sbsa' if target_machine == 'aarch64' else 'x86_64'
@@ -1198,13 +1196,12 @@ RUN apt-get update && \
 ENV LD_LIBRARY_PATH /usr/local/cuda/targets/{cuda_arch}-linux/lib:/usr/local/cuda/lib64/stubs:${{LD_LIBRARY_PATH}}
 '''.format(cuda_arch=cuda_arch, libs_arch=libs_arch)
 
-        if ('pytorch' in backends) or ('tensorflow1' in backends) \
-                or ('tensorflow2' in backends):
-            # Add NCCL dependency for tensorflow1/tensorflow2/pytorch backend.
-            # Note: Even though the build is CPU-only, the version of tensorflow1/
-            # tensorflow2/pytorch we are using depends upon the NCCL library. Since
-            # this dependency is not present in the ubuntu base image, we must
-            # copy it from the Triton min container ourselves.
+        if ('pytorch' in backends) or ('tensorflow' in backends):
+            # Add NCCL dependency for tensorflow/pytorch backend.
+            # Note: Even though the build is CPU-only, the version of
+            # tensorflow/pytorch we are using depends upon the NCCL library.
+            # Since this dependency is not present in the ubuntu base image,
+            # we must copy it from the Triton min container ourselves.
             df += '''
 COPY --from=min_container /usr/lib/{libs_arch}-linux-gnu/libnccl.so.2 /usr/lib/{libs_arch}-linux-gnu/libnccl.so.2
 '''.format(libs_arch=libs_arch)
@@ -1326,11 +1323,11 @@ def create_build_dockerfiles(container_build_dir, images, backends, repoagents,
     }
 
     # For CPU-only image we need to copy some cuda libraries and dependencies
-    # since we are using PyTorch, TensorFlow 1, TensorFlow 2 containers that
+    # since we are using PyTorch and TensorFlow containers that
     # are not CPU-only.
     if not FLAGS.enable_gpu and (
-        ('pytorch' in backends) or ('tensorflow1' in backends) or
-        ('tensorflow2' in backends)) and (target_platform() != 'windows'):
+        ('pytorch' in backends) or
+        ('tensorflow' in backends)) and (target_platform() != 'windows'):
         if 'gpu-base' in images:
             gpu_base_image = images['gpu-base']
         else:
@@ -1343,7 +1340,8 @@ def create_build_dockerfiles(container_build_dir, images, backends, repoagents,
 
     if target_platform() == 'windows':
         create_dockerfile_windows(FLAGS.build_dir, 'Dockerfile',
-                                  dockerfileargmap, backends, repoagents, caches)
+                                  dockerfileargmap, backends, repoagents,
+                                  caches)
     else:
         create_dockerfile_linux(FLAGS.build_dir, 'Dockerfile', dockerfileargmap,
                                 backends, repoagents, caches, endpoints)
@@ -1613,15 +1611,15 @@ def repo_agent_build(ra, cmake_script, build_dir, install_dir, repoagent_repo,
     cmake_script.commentln(8)
     cmake_script.blankln()
 
+
 def cache_build(cache, cmake_script, build_dir, install_dir, cache_repo,
-                     caches):
+                caches):
     repo_build_dir = os.path.join(build_dir, cache, 'build')
     repo_install_dir = os.path.join(build_dir, cache, 'install')
 
     cmake_script.commentln(8)
     cmake_script.comment(f'\'{cache}\' cache')
-    cmake_script.comment(
-        'Delete this section to remove cache from build')
+    cmake_script.comment('Delete this section to remove cache from build')
     cmake_script.comment()
     cmake_script.mkdir(build_dir)
     cmake_script.cwd(build_dir)
@@ -1642,6 +1640,7 @@ def cache_build(cache, cmake_script, build_dir, install_dir, cache_repo,
     cmake_script.comment(f'end \'{cache}\' cache')
     cmake_script.commentln(8)
     cmake_script.blankln()
+
 
 def cibase_build(cmake_script, repo_dir, cmake_dir, build_dir, install_dir,
                  ci_dir, backends):
@@ -1740,9 +1739,9 @@ def finalize_build(cmake_script, install_dir, ci_dir):
 def enable_all():
     if target_platform() != 'windows':
         all_backends = [
-            'ensemble', 'identity', 'square', 'repeat', 'tensorflow1',
-            'tensorflow2', 'onnxruntime', 'python', 'dali', 'pytorch',
-            'openvino', 'fil', 'tensorrt'
+            'ensemble', 'identity', 'square', 'repeat', 'tensorflow',
+            'onnxruntime', 'python', 'dali', 'pytorch', 'openvino', 'fil',
+            'tensorrt'
         ]
         all_repoagents = ['checksum']
         # DLIS-4491: Add redis cache to build
@@ -1966,7 +1965,7 @@ if __name__ == '__main__':
         action='append',
         required=False,
         help=
-        'Use specified Docker image in build as <image-name>,<full-image-name>. <image-name> can be "base", "gpu-base", "tensorflow1", "tensorflow2", or "pytorch".'
+        'Use specified Docker image in build as <image-name>,<full-image-name>. <image-name> can be "base", "gpu-base", "tensorflow", or "pytorch".'
     )
 
     parser.add_argument(
@@ -2210,6 +2209,12 @@ if __name__ == '__main__':
         parts = be.split(':')
         if len(parts) == 1:
             parts.append(default_repo_tag)
+        if parts[0] == 'tensorflow1':
+            fail(
+                'Starting from Triton version 23.04, support for TensorFlow 1 has been discontinued. Please switch to Tensorflow 2.'
+            )
+        if parts[0] == 'tensorflow2':
+            parts[0] = 'tensorflow'
         log('backend "{}" at tag/branch "{}"'.format(parts[0], parts[1]))
         backends[parts[0]] = parts[1]
 
@@ -2239,10 +2244,12 @@ if __name__ == '__main__':
             len(parts) != 2,
             '--image must specify <image-name>,<full-image-registry>')
         fail_if(
-            parts[0] not in [
-                'base', 'gpu-base', 'pytorch', 'tensorflow1', 'tensorflow2'
-            ], 'unsupported value for --image')
+            parts[0]
+            not in ['base', 'gpu-base', 'pytorch', 'tensorflow',
+                    'tensorflow2'], 'unsupported value for --image')
         log('image "{}": "{}"'.format(parts[0], parts[1]))
+        if parts[0] == 'tensorflow2':
+            parts[0] = 'tensorflow'
         images[parts[0]] = parts[1]
 
     # Initialize map of library paths for each backend.
@@ -2251,6 +2258,8 @@ if __name__ == '__main__':
         parts = lpath.split(':')
         if len(parts) == 2:
             log('backend "{}" library path "{}"'.format(parts[0], parts[1]))
+            if parts[0] == 'tensorflow2':
+                parts[0] = 'tensorflow'
             library_paths[parts[0]] = parts[1]
 
     # Parse any explicitly specified cmake arguments
@@ -2402,7 +2411,7 @@ if __name__ == '__main__':
         # Commands to build each cache...
         for cache in caches:
             cache_build(cache, cmake_script, script_build_dir,
-                             script_install_dir, cache_repo, caches)
+                        script_install_dir, cache_repo, caches)
 
         # Commands needed only when building with Docker...
         if not FLAGS.no_container_build:

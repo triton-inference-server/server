@@ -102,11 +102,16 @@ if [ "$SERVER_PID" != "0" ]; then
     kill $SERVER_PID
     wait $SERVER_PID
 fi
+
+set +e
 grep "Resource count for \"resource1\" is limited to 1 which will prevent scheduling of one or more model instances, the minimum required count is 4" $SERVER_LOG
 if [ $? -ne 0 ]; then
+    cat $SERVER_LOG
     echo -e "\n***\n*** Failed. Expected error message while loading the model \"custom_zero_1_float32\"\n***"
     RET=1
 fi
+
+set -e
 
 # Case2: resources sufficient only for one model
 SERVER_ARGS="--rate-limit=execution_count --rate-limit-resource=resource1:3 --rate-limit-resource=resource2:2 --model-repository=$MODELDIR/custom_models"
@@ -119,11 +124,16 @@ if [ "$SERVER_PID" != "0" ]; then
     kill $SERVER_PID
     wait $SERVER_PID
 fi
+
+set +e
 grep "Resource count for \"resource1\" is limited to 3 which will prevent scheduling of one or more model instances, the minimum required count is 4" $SERVER_LOG
 if [ $? -ne 0 ]; then
+    cat $SERVER_LOG
     echo -e "\n***\n*** Failed. Expected error message while loading the model \"custom_zero_1_float32\"\n***"
     RET=1
 fi
+
+set -e
 
 # Case3: Resource specified only for specific device id 10 and not for the GPU that loads the model instance.
 SERVER_ARGS="--rate-limit=execution_count --rate-limit-resource=resource1:10:10 --rate-limit-resource=resource2:2 --model-repository=$MODELDIR/custom_models"
@@ -136,11 +146,16 @@ if [ "$SERVER_PID" != "0" ]; then
     kill $SERVER_PID
     wait $SERVER_PID
 fi
+
+set +e
 grep "Resource count for \"resource1\" is limited to 0 which will prevent scheduling of one or more model instances, the minimum required count is 4" $SERVER_LOG
 if [ $? -ne 0 ]; then
+    cat $SERVER_LOG
     echo -e "\n***\n*** Failed. Expected error message while loading the model \"custom_zero_1_float32\"\n***"
     RET=1
 fi
+
+set -e
 
 # Case4: Conflicting resource types in the config
 cp -r ./custom_models/custom_zero_1_float32_v2 ./custom_models/custom_zero_1_float32_v3
@@ -158,12 +173,17 @@ if [ "$SERVER_PID" != "0" ]; then
     kill $SERVER_PID
     wait $SERVER_PID
 fi
+
+set +e
 grep "Resource \"resource2\" is present as both global and device-specific resource in the model configuration." $SERVER_LOG
 if [ $? -ne 0 ]; then
+    cat $SERVER_LOG
     echo -e "\n***\n*** Failed. Expected error message for conflicting resource types\n***"
     RET=1
 fi
 rm -rf ./custom_models/custom_zero_1_float32_v3
+
+set -e
 
 ##
 ## Tests with cross-model prioritization with various cases:

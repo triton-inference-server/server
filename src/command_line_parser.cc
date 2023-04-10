@@ -252,6 +252,7 @@ enum TritonOptionId {
   OPTION_STRICT_READINESS,
 #if defined(TRITON_ENABLE_HTTP)
   OPTION_ALLOW_HTTP,
+  OPTION_HTTP_HEADER_FORWARD_PATTERN,
   OPTION_HTTP_PORT,
   OPTION_REUSE_HTTP_PORT,
   OPTION_HTTP_ADDRESS,
@@ -262,6 +263,7 @@ enum TritonOptionId {
   OPTION_GRPC_PORT,
   OPTION_REUSE_GRPC_PORT,
   OPTION_GRPC_ADDRESS,
+  OPTION_GRPC_HEADER_FORWARD_PATTERN,
   OPTION_GRPC_INFER_ALLOCATION_POOL_SIZE,
   OPTION_GRPC_USE_SSL,
   OPTION_GRPC_USE_SSL_MUTUAL,
@@ -381,6 +383,10 @@ std::vector<Option> TritonParser::recognized_options_
        "Allow the server to listen for HTTP requests."},
       {OPTION_HTTP_PORT, "http-port", Option::ArgInt,
        "The port for the server to listen on for HTTP requests."},
+      {OPTION_HTTP_HEADER_FORWARD_PATTERN, "http-header-forward-pattern",
+       Option::ArgStr,
+       "The regular expression pattern that will be used for forwarding HTTP "
+       "headers as inference request parameters."},
       {OPTION_REUSE_HTTP_PORT, "reuse-http-port", Option::ArgBool,
        "Allow multiple servers to listen on the same HTTP port when every "
        "server has this option set. If you plan to use this option as a way to "
@@ -394,6 +400,10 @@ std::vector<Option> TritonParser::recognized_options_
 #if defined(TRITON_ENABLE_GRPC)
       {OPTION_ALLOW_GRPC, "allow-grpc", Option::ArgBool,
        "Allow the server to listen for GRPC requests."},
+      {OPTION_GRPC_HEADER_FORWARD_PATTERN, "grpc-header-forward-pattern",
+       Option::ArgStr,
+       "The regular expression pattern that will be used for forwarding GRPC "
+       "headers as inference request parameters."},
       {OPTION_GRPC_PORT, "grpc-port", Option::ArgInt,
        "The port for the server to listen on for GRPC requests."},
       {OPTION_REUSE_GRPC_PORT, "reuse-grpc-port", Option::ArgBool,
@@ -1074,6 +1084,10 @@ TritonParser::Parse(int argc, char** argv)
         break;
       case OPTION_HTTP_ADDRESS:
         lparams.http_address_ = optarg;
+        break;
+      case OPTION_HTTP_HEADER_FORWARD_PATTERN:
+        lparams.http_forward_header_pattern_ = optarg;
+        break;
 #ifdef TRITON_ENABLE_METRICS
         lparams.metrics_address_ = optarg;
 #endif  // TRITON_ENABLE_METRICS
@@ -1201,6 +1215,9 @@ TritonParser::Parse(int argc, char** argv)
         lgrpc_options.protocol_groups_.emplace_back(pg);
         break;
       }
+      case OPTION_GRPC_HEADER_FORWARD_PATTERN:
+        lgrpc_options.forward_header_pattern_ = optarg;
+        break;
 #endif  // TRITON_ENABLE_GRPC
 
 #ifdef TRITON_ENABLE_METRICS

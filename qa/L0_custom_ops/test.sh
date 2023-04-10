@@ -1,5 +1,5 @@
 #!/bin/bash
-# Copyright 2019-2022, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright 2019-2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -57,7 +57,7 @@ RET=0
 
 # Must explicitly set LD_LIBRARY_PATH so that the custom operations
 # can find libtensorflow_framework.so.
-LD_LIBRARY_PATH=/opt/tritonserver/backends/tensorflow2:$LD_LIBRARY_PATH
+LD_LIBRARY_PATH=/opt/tritonserver/backends/tensorflow:$LD_LIBRARY_PATH
 
 # Tensorflow
 ## Load operations via LD_PRELOAD

@@ -165,28 +165,28 @@ def create_tf_modelfile(create_savedmodel, models_dir, model_version, max_batch,
     io_cnt = len(input_shapes)
 
     # Create the model that copies inputs to corresponding outputs.
-    tf.reset_default_graph()
+    tf.compat.v1.reset_default_graph()
     for io_num in range(io_cnt):
         input_name = "INPUT{}".format(io_num)
         output_name = "OUTPUT{}".format(io_num)
         if max_batch == 0:
-            tin = tf.placeholder(tf_dtype,
-                                 tu.shape_to_tf_shape(input_shapes[io_num]),
-                                 input_name)
+            tin = tf.compat.v1.placeholder(
+                tf_dtype, tu.shape_to_tf_shape(input_shapes[io_num]),
+                input_name)
         else:
-            tin = tf.placeholder(tf_dtype, [
+            tin = tf.compat.v1.placeholder(tf_dtype, [
                 None,
             ] + tu.shape_to_tf_shape(input_shapes[io_num]), input_name)
 
         if input_shapes == output_shapes:
-            toutput = tf.identity(tin, name=output_name)
+            tf.identity(tin, name=output_name)
         else:
             if max_batch == 0:
-                toutput = tf.reshape(tin,
+                tf.reshape(tin,
                                      output_shapes[io_num],
                                      name=output_name)
             else:
-                toutput = tf.reshape(tin, [
+                tf.reshape(tin, [
                     -1,
                 ] + output_shapes[io_num],
                                      name=output_name)
@@ -208,24 +208,25 @@ def create_tf_modelfile(create_savedmodel, models_dir, model_version, max_batch,
         pass  # ignore existing dir
 
     if create_savedmodel:
-        with tf.Session() as sess:
+        with tf.compat.v1.Session() as sess:
             input_dict = {}
             output_dict = {}
             for io_num in range(io_cnt):
                 input_name = "INPUT{}".format(io_num)
                 output_name = "OUTPUT{}".format(io_num)
-                input_tensor = tf.get_default_graph().get_tensor_by_name(
-                    input_name + ":0")
-                output_tensor = tf.get_default_graph().get_tensor_by_name(
-                    output_name + ":0")
+                input_tensor = tf.compat.v1.get_default_graph(
+                ).get_tensor_by_name(input_name + ":0")
+                output_tensor = tf.compat.v1.get_default_graph(
+                ).get_tensor_by_name(output_name + ":0")
                 input_dict[input_name] = input_tensor
                 output_dict[output_name] = output_tensor
-            tf.saved_model.simple_save(sess,
-                                       model_version_dir + "/model.savedmodel",
-                                       inputs=input_dict,
-                                       outputs=output_dict)
+            tf.compat.v1.saved_model.simple_save(sess,
+                                                 model_version_dir +
+                                                 "/model.savedmodel",
+                                                 inputs=input_dict,
+                                                 outputs=output_dict)
     else:
-        with tf.Session() as sess:
+        with tf.compat.v1.Session() as sess:
             graph_io.write_graph(sess.graph.as_graph_def(),
                                  model_version_dir,
                                  "model.graphdef",
@@ -1113,6 +1114,7 @@ if __name__ == '__main__':
     if FLAGS.graphdef or FLAGS.savedmodel:
         import tensorflow as tf
         from tensorflow.python.framework import graph_io
+        tf.compat.v1.disable_eager_execution()
     if FLAGS.tensorrt:
         import tensorrt as trt
     if FLAGS.onnx:
