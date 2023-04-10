@@ -1070,13 +1070,13 @@ TritonParser::Parse(int argc, char** argv)
         break;
       case OPTION_HTTP_ADDRESS:
         lparams.http_address_ = optarg;
+#ifdef TRITON_ENABLE_METRICS
+        lparams.metrics_address_ = optarg;
+#endif  // TRITON_ENABLE_METRICS
         break;
       case OPTION_HTTP_HEADER_FORWARD_PATTERN:
         lparams.http_forward_header_pattern_ = optarg;
         break;
-#ifdef TRITON_ENABLE_METRICS
-        lparams.metrics_address_ = optarg;
-#endif  // TRITON_ENABLE_METRICS
         break;
       case OPTION_HTTP_THREAD_COUNT:
         lparams.http_thread_cnt_ = ParseOption<int>(optarg);
