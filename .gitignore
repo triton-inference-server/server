@@ -2,3 +2,6 @@
 /builddir
 /.vscode
 *.so
+__pycache__
+tmp
+*.log
