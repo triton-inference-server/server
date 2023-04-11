@@ -97,6 +97,15 @@ for STATIC_BATCH in $STATIC_BATCH_SIZES; do
                 RET=1
             fi
 
+
+            ### DEBUG ###
+            echo "======================= DEBUG ==================================="
+            ls
+            cat ${NAME}.csv
+            for f in *.log; do cat $f; done
+            echo "================================================================="
+            ###
+
             set -e
 
             echo -e "[{\"s_benchmark_kind\":\"benchmark_perf\"," >> ${NAME}.tjson
@@ -112,6 +121,15 @@ for STATIC_BATCH in $STATIC_BATCH_SIZES; do
 
             kill $SERVER_PID
             wait $SERVER_PID
+
+            ### DEBUG ###
+            echo "======================= DEBUG ==================================="
+            ls
+            cat ${NAME}.csv
+            cat ${NAME}.tjson
+            echo "================================================================="
+            ###
+
 
             if [ -f $REPORTER ]; then
                 set +e
