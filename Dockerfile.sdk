@@ -205,6 +205,10 @@ RUN mkdir qa
 COPY qa/L0_sdk qa/L0_sdk
 COPY qa/L0_client_build_variants qa/L0_client_build_variants
 
+# Create a directory for all the python client tests to enable unit testing 
+RUN mkdir -p qa/python_client_unit_tests/ 
+COPY --from=sdk_build /workspace/client/src/python/library/tests/* qa/python_client_unit_tests/
+
 # Install an image needed by the quickstart and other documentation.
 COPY qa/images/mug.jpg images/mug.jpg
 
