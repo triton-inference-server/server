@@ -305,6 +305,8 @@ enum TritonOptionId {
   OPTION_TRACE_RATE,
   OPTION_TRACE_COUNT,
   OPTION_TRACE_LOG_FREQUENCY,
+  OPTION_TRACE_MODE,
+  OPTION_TRACE_CONFIG,
 #endif  // TRITON_ENABLE_TRACING
   OPTION_MODEL_CONTROL_MODE,
   OPTION_POLL_REPO_SECS,
@@ -545,6 +547,17 @@ std::vector<Option> TritonParser::recognized_options_
        "when Triton collects the 100-th trace, it logs the traces to file "
        "<trace-file>.0, and when it collects the 200-th trace, it logs the "
        "101-th to the 200-th traces to file <trace-file>.1. Default is 0."},
+       {OPTION_TRACE_MODE, "trace-mode", Option::ArgStr, 
+        "Specify the mode for tracing. Options are \"triton\" "
+       "and \"opentelemetry\". The default is \"triton\". For \"triton\", " 
+       "the server will use the Triton's trace APIs. For \"opentelemetry\", "
+       "the server will ose the OpenTelemetry's APIs to generate, collect and "
+       "export traces for individual inference requests."},
+       {OPTION_TRACE_CONFIG, "trace-config", "<string>,<string>=<string>",
+       "Specify a framework-specific configuration setting. The format of this "
+       "flag is --tracing-config=<framework_name>,<setting>=<value>. Where "
+       "<framework_name> is one of the available frameworks. Currently, the "
+       "following frameworks are supported: 'default' and 'opentelemetry'."},
 #endif  // TRITON_ENABLE_TRACING
       {OPTION_MODEL_CONTROL_MODE, "model-control-mode", Option::ArgStr,
        "Specify the mode for model management. Options are \"none\", \"poll\" "
@@ -1263,6 +1276,13 @@ TritonParser::Parse(int argc, char** argv)
       case OPTION_TRACE_LOG_FREQUENCY:
         lparams.trace_log_frequency_ = ParseOption<int>(optarg);
         break;
+      case OPTION_TRACE_MODE:
+        lparams.trace_mode_ = ParseTraceModeOption(optarg);
+        break;
+      case OPTION_TRACE_CONFIG:
+        lparams.trace_config_settings_.push_back(
+            ParseTraceConfigOption(optarg));
+        break;
 #endif  // TRITON_ENABLE_TRACING
 
       case OPTION_POLL_REPO_SECS:
@@ -1729,6 +1749,67 @@ TritonParser::ParseTraceLevelOption(std::string arg)
   }
 
   throw ParseException("invalid value for trace level option: " + arg);
+}
+
+TRITONSERVER_InferenceTraceMode
+TritonParser::ParseTraceModeOption(std::string arg)
+{
+  std::transform(arg.begin(), arg.end(), arg.begin(), [](unsigned char c) {
+    return std::tolower(c);
+  });
+
+  if (arg == "triton") {
+    return TRITONSERVER_TRACE_MODE_TRITON;
+  }
+  if (arg == "opentelemetry") {
+    return TRITONSERVER_TRACE_MODE_OPENTELEMETRY;
+  }
+
+  throw ParseException("invalid value for trace mode option: " + arg +
+    ". Available options are \"triton\" and \"opentelemetry\"");
+}
+
+std::tuple<std::string, std::string, std::string>
+TritonParser::ParseTraceConfigOption(const std::string& arg)
+{
+  //[FIXME] think about default options
+  // Format is "<framework_name>,<setting>=<value>" for specific
+  // config/settings and "<setting>=<value>" for framework-agnostic
+  // configs/settings
+  int delim_name = arg.find(",");
+  int delim_setting = arg.find("=", delim_name + 1);
+
+  std::string name_string = std::string();
+  if (delim_name > 0) {
+    name_string = arg.substr(0, delim_name);
+  } else if (delim_name == 0) {
+    std::stringstream ss;
+    ss << "No framework specified. --tracing-config option format is "
+       << "<framework name>,<setting>=<value> or "
+       << "<setting>=<value>. Got " << arg << std::endl;
+    throw ParseException(ss.str());
+  }  // else global trace config
+
+  if (delim_setting < 0) {
+    std::stringstream ss;
+    ss << "--trace-config option format is '<framework "
+          "name>,<setting>=<value>'. Got "
+       << arg << std::endl;
+    throw ParseException(ss.str());
+  }
+  std::string setting_string =
+      arg.substr(delim_name + 1, delim_setting - delim_name - 1);
+  std::string value_string = arg.substr(delim_setting + 1);
+
+  if (setting_string.empty() || value_string.empty()) {
+    std::stringstream ss;
+    ss << "--trace-config option format is '<backend "
+          "name>,<setting>=<value>'. Got "
+       << arg << std::endl;
+    throw ParseException(ss.str());
+  }
+
+  return {name_string, setting_string, value_string};
 }
 #endif  // TRITON_ENABLE_TRACING
 

@@ -172,6 +172,10 @@ struct TritonServerParameters {
   int32_t trace_rate_{1000};
   int32_t trace_count_{-1};
   int32_t trace_log_frequency_{0};
+  TRITONSERVER_InferenceTraceMode trace_mode_{
+      TRITONSERVER_TRACE_MODE_TRITON};
+  triton::server::TraceConfigMap
+      trace_config_settings_;
 #endif  // TRITON_ENABLE_TRACING
 
 // The configurations for various endpoints (i.e. HTTP, GRPC and metrics)
@@ -283,6 +287,9 @@ class TritonParser {
   ParseGrpcRestrictedProtocolOption(const std::string& arg);
 #ifdef TRITON_ENABLE_TRACING
   TRITONSERVER_InferenceTraceLevel ParseTraceLevelOption(std::string arg);
+  TRITONSERVER_InferenceTraceMode ParseTraceModeOption(std::string arg);
+  std::tuple<std::string, std::string, std::string> ParseTraceConfigOption(
+      const std::string& arg);
 #endif  // TRITON_ENABLE_TRACING
   // Helper function to parse option in
   // "<string>[1st_delim]<string>[2nd_delim]<string>" format
