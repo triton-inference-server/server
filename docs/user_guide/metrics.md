@@ -59,6 +59,8 @@ To change the interval at whichs metrics are polled/updated, see the `--metrics-
 
 ## Inference Request Metrics
 
+### Counts
+
 For models that do not support batching, *Request Count*, *Inference
 Count* and *Execution Count* will be equal, indicating that each
 inference request is executed separately.
@@ -93,11 +95,93 @@ Count*. The count metrics are illustrated by the following examples:
 |              |Failure Count   |`nv_inference_request_failure` |Number of failed inference requests received by Triton (each request is counted as 1, even if the request contains a batch) |Per model  |Per request  |
 |              |Inference Count |`nv_inference_count` |Number of inferences performed (a batch of "n" is counted as "n" inferences, does not include cached requests)|Per model|Per request|
 |              |Execution Count |`nv_inference_exec_count` |Number of inference batch executions (see [Inference Request Metrics](#inference-request-metrics), does not include cached requests)|Per model|Per request|
+
+### Latencies
+
+Starting in 23.04, Triton exposes the ability to choose the types of metrics
+that are published through the `--metrics-config` CLI options.
+
+#### Counters
+
+By default, the following 
+[Counter](https://prometheus.io/docs/concepts/metric_types/#counter)
+metrics are used for latencies:
+
+|Category      |Metric          |Metric Name |Description                            |Granularity|Frequency    |
+|--------------|----------------|------------|---------------------------|-----------|-------------|
 |Latency       |Request Time    |`nv_inference_request_duration_us` |Cumulative end-to-end inference request handling time (includes cached requests) |Per model  |Per request  |
 |              |Queue Time      |`nv_inference_queue_duration_us` |Cumulative time requests spend waiting in the scheduling queue (includes cached requests) |Per model  |Per request  |
 |              |Compute Input Time|`nv_inference_compute_input_duration_us` |Cumulative time requests spend processing inference inputs (in the framework backend, does not include cached requests)     |Per model  |Per request  |
 |              |Compute Time    |`nv_inference_compute_infer_duration_us` |Cumulative time requests spend executing the inference model (in the framework backend, does not include cached requests)     |Per model  |Per request  |
 |              |Compute Output Time|`nv_inference_compute_output_duration_us` |Cumulative time requests spend processing inference outputs (in the framework backend, does not include cached requests)     |Per model  |Per request  |
+
+To disable these metrics specifically, you can set `--metrics-config counter_latencies=false`
+
+#### Summaries
+
+> **Note**
+>
+> The following Summary feature is experimental for the time being and may be
+> subject to change based on user feedback.
+
+To get configurable quantiles over a sliding time window, Triton supports
+a set a [Summary](https://prometheus.io/docs/concepts/metric_types/#summary)
+metrics for latencies as well. These metrics are disabled by default, but can
+be enabled by setting `--metrics-config summary_latencies=true`. 
+
+For more information on how the quantiles are calculated, see
+[this explanation](https://grafana.com/blog/2022/03/01/how-summary-metrics-work-in-prometheus/).
+
+The following summary metrics are available:
+
+|Category      |Metric          |Metric Name |Description                            |Granularity|Frequency    |
+|--------------|----------------|------------|---------------------------|-----------|-------------|
+|Latency       |Request Time    |`nv_inference_request_summary_us` |Summary of end-to-end inference request handling times (includes cached requests) |Per model  |Per request  |
+|              |Queue Time      |`nv_inference_queue_summary_us` |Summary of time requests spend waiting in the scheduling queue (includes cached requests) |Per model  |Per request  |
+|              |Compute Input Time|`nv_inference_compute_input_summary_us` |Summary time requests spend processing inference inputs (in the framework backend, does not include cached requests)     |Per model  |Per request  |
+|              |Compute Time    |`nv_inference_compute_infer_summary_us` |Summary of time requests spend executing the inference model (in the framework backend, does not include cached requests)     |Per model  |Per request  |
+|              |Compute Output Time|`nv_inference_compute_output_summary_us` |Summary of time requests spend processing inference outputs (in the framework backend, does not include cached requests)     |Per model  |Per request  |
+
+Each summary above is actually composed of several sub-metrics. For each
+metric, there is a set of `quantile` metrics tracking the latency for each
+quantile. Additionaly, there are `_count` and `_sum` metrics that aggregate
+the count and observed values for each. For example, see the following
+information exposed by the Inference Queue Summary metrics:
+```
+# HELP nv_inference_queue_summary_us Summary of inference queuing duration in microseconds (includes cached requests)
+# TYPE nv_inference_queue_summary_us summary
+nv_inference_queue_summary_us_count{model="my_model",version="1"} 161
+nv_inference_queue_summary_us_sum{model="my_model",version="1"} 11110
+nv_inference_queue_summary_us{model="my_model",version="1",quantile="0.5"} 55
+nv_inference_queue_summary_us{model="my_model",version="1",quantile="0.9"} 97
+nv_inference_queue_summary_us{model="my_model",version="1",quantile="0.95"} 98
+nv_inference_queue_summary_us{model="my_model",version="1",quantile="0.99"} 101
+nv_inference_queue_summary_us{model="my_model",version="1",quantile="0.999"} 101
+```
+
+The count and sum for the summary above show that stats have been recorded for
+161 requests, and took a combined total of 11110 microseconds. The `_count` and
+`_sum` of a summary should generally match the counter metric equivalents when
+applicable, such as:
+```
+nv_inference_request_success{model="my_model",version="1"} 161
+nv_inference_queue_duration_us{model="my_model",version="1"} 11110
+```
+
+Triton has a set of default quantiles to track, as shown above. To set
+custom quantiles, you can use the `--metrics-config` CLI option. The format is:
+```
+tritonserver --metrics-config summary_quantiles="<quantile1>:<error1>,...,<quantileN>:<errorN>"`
+```
+
+For example:
+```
+tritonserver --metrics-config summary_quantiles="0.5:0.05,0.9:0.01,0.95:0.001,0.99:0.001"`
+```
+
+To better understand the setting of error values for computing each quantile, see the
+[best practices for histograms and summaries](https://prometheus.io/docs/practices/histograms/#histograms-and-summaries).
+
 
 ## GPU Metrics
 
@@ -167,6 +251,16 @@ be recorded as usual.
 |              |Cache Miss Count |`nv_cache_num_misses_per_model` |Number of response cache misses per model |Per model |Per request |
 |Latency       |Cache Hit Time |`nv_cache_hit_duration_per_model` |Cumulative time requests spend retrieving a cached response per model on cache hits (microseconds) |Per model |Per request |
 |              |Cache Miss Time |`nv_cache_miss_duration_per_model` |Cumulative time requests spend looking up and inserting responses into the cache on a cache miss (microseconds) |Per model |Per request |
+
+Similar to the Summaries section above for Inference Request Metrics, the
+per-model cache hit/miss latency metrics also support Summaries.
+
+> **Note**
+>
+> For models with response caching enabled, the inference request **summary** metric
+> is currently disabled. This is due to extra time spent internally on cache
+> management that wouldn't be reflected correctly in the end to end request time.
+> Other summary metrics are unaffected.
 
 ## Custom Metrics
 
