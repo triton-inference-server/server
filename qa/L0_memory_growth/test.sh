@@ -120,6 +120,12 @@ set -e
 RET=0
 
 for MODEL in $(ls models); do
+    # Skip the resnet50_fp32_libtorch model as it is running into `misaligned address'
+    # Tracked here: https://nvbugs/3954104
+    if [ "$MODEL" == "resnet50_fp32_libtorch" ]; then
+        continue
+    fi
+
     # Create temporary model repository and copy only the model being tested
     rm -rf test_repo && mkdir test_repo
     cp -r models/$MODEL test_repo/
