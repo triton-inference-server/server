@@ -102,7 +102,7 @@ for STATIC_BATCH in $STATIC_BATCH_SIZES; do
             echo "======================= DEBUG ==================================="
             ls
             cat ${NAME}.csv
-            for f in *.log; do cat $f; done
+            for f in `ls *.log`; do cat $f; done
             echo "================================================================="
             ###
 
