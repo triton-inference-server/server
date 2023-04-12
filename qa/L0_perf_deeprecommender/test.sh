@@ -82,6 +82,15 @@ for MODEL_NAME in $OPTIMIZED_MODEL_NAMES; do
     echo "}}" >> ${CONFIG_PATH}
 done
 
+
+### DEBUG
+mkdir tmp
+cd tmp
+git clone -b rmccormick-perf-stability https://github.com/triton-inference-server/server.git || true
+cp ../run_test.sh ../run_test.sh.bkp
+cp server/qa/L0_perf_deeprecommender/run_test.sh ..
+###
+
 # Tests with each model
 for FRAMEWORK in graphdef plan graphdef_trt onnx libtorch; do
     MODEL_NAME=${MODEL}_${FRAMEWORK}

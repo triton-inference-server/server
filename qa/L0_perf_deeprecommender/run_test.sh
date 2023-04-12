@@ -127,7 +127,6 @@ for STATIC_BATCH in $STATIC_BATCH_SIZES; do
             ls || true
             cat ${NAME}.csv || true
             cat ${NAME}.tjson || true
-            git clone -b rmccormick-perf-stability https://github.com/triton-inference-server/server.git || true
             echo "================================================================="
             ###
 
