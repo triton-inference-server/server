@@ -84,11 +84,13 @@ done
 
 
 ### DEBUG
-mkdir tmp
+mkdir -p tmp
 cd tmp
 git clone -b rmccormick-perf-stability https://github.com/triton-inference-server/server.git || true
-cp ../run_test.sh ../run_test.sh.bkp
-cp server/qa/L0_perf_deeprecommender/run_test.sh ..
+cd ..
+
+cp run_test.sh run_test.sh.bkp
+cp tmp/server/qa/L0_perf_deeprecommender/run_test.sh .
 ###
 
 # Tests with each model
