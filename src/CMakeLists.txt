@@ -117,6 +117,9 @@ if(CMAKE_CXX_COMPILER_ID STREQUAL "MSVC")
     PRIVATE
       /W1 /D_WIN32_WINNT=0x0A00 /EHsc
   )
+  target_compile_definitions(main
+    PRIVATE
+      NOMINMAX)
 else()
   target_compile_options(
     main
