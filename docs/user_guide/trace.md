@@ -46,9 +46,11 @@ the format is `--trace-config=<setting>=<value>`.
 An example ussage, which invokes Triton's trace APIs:
 
 ```
-$ tritonserver --trace-config=triton,file=/tmp/trace.json \
-    --trace-config=triton,log-frequency=50 --trace-config=rate=100 \
-    --trace-config=level=TIMESTAMPS --trace-config=triton,log-frequency=50 \
+$ tritonserver \
+    --trace-config=triton,file=/tmp/trace.json \
+    --trace-config=triton,log-frequency=50 \
+    --trace-config=rate=100 \
+    --trace-config=level=TIMESTAMPS \
     --trace-config=count=100 ...
 ```
 
