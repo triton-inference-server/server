@@ -120,6 +120,12 @@ set -e
 RET=0
 
 for MODEL in $(ls models); do
+    # Skip the resnet50_fp32_libtorch model as it is running into `misaligned address'
+    # Tracked here: https://nvbugs/3954104
+    if [ "$MODEL" == "resnet50_fp32_libtorch" ]; then
+        continue
+    fi
+
     # Create temporary model repository and copy only the model being tested
     rm -rf test_repo && mkdir test_repo
     cp -r models/$MODEL test_repo/
@@ -211,7 +217,7 @@ rm -rf test_repo && mkdir test_repo
 cp -r ${DATADIR}/qa_custom_ops/tf_custom_ops/graphdef_busyop test_repo/
 
 # Explicitly set library path so custom ops can find TF
-LD_LIBRARY_PATH=/opt/tritonserver/backends/tensorflow2:$LD_LIBRARY_PATH
+LD_LIBRARY_PATH=/opt/tritonserver/backends/tensorflow:$LD_LIBRARY_PATH
 SERVER_ARGS="--model-repository=`pwd`/test_repo"
 SERVER_LD_PRELOAD="${DATADIR}/qa_custom_ops/tf_custom_ops/libbusyop.so"
 
