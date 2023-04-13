@@ -76,6 +76,10 @@ if [[ $BACKENDS == *"python"* ]]; then
         sed -i "s/^name:.*/name: \"python_zero_1_float32\"/" config.pbtxt)
 fi
 
+if [[ $BACKENDS == *"custom"* ]]; then
+    mkdir -p "custom_models/custom_zero_1_float32/1"
+fi
+
 PERF_CLIENT_PERCENTILE_ARGS="" &&
     (( ${PERF_CLIENT_PERCENTILE} != 0 )) &&
     PERF_CLIENT_PERCENTILE_ARGS="--percentile=${PERF_CLIENT_PERCENTILE}"
