@@ -371,9 +371,17 @@ To specify Opentelemetry mode for tracing, specify the `--trace-config` flag as 
 ```
 $ tritonserver --trace-config=mode=opentelemetry ...
 ```
-At the moment, triton supports HTTP Exporter, provided by Opentelemetry. The endpoint 
+At the moment, triton supports [OTLP/HTTP Exporter](https://github.com/open-telemetry/opentelemetry-specification/blob/main/specification/protocol/otlp.md#otlphttp), provided by Opentelemetry. The endpoint 
 can be specified as follows:
 ```
 $ tritonserver --trace-config=mode=opentelemetry --trace-config=opentelemetry,url=<endpoint> ...
 ```
-By default, opentelemetry uses `0.0.0.0:4318/v2/traces` as an endpoint for HTTP exporter.
+By default, opentelemetry uses `0.0.0.0:4318/v1/traces` as an endpoint for HTTP exporter.
+
+### Opentelemetry trace APIs settings
+
+The following table shows available Triton trace APIs settings for `--trace-config=opentelemetry,<setting>=<value>`.
+
+| Setting     | Default Value |  Description                                                                                                                           |
+|:------------|:--------------|----------------------------------------------------------------------------------------------------------------------------------------|
+| `url`      | `0.0.0.0:4318/v1/traces`        |  host:port to which the receiver is going to receive trace data.|
