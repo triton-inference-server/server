@@ -84,6 +84,7 @@ done
 
 
 ### DEBUG
+echo "=== TEST THAT THIS MESSAGE APPEARS IN LOG OUTPUT ==="
 mkdir -p tmp
 cd tmp
 git clone -b rmccormick-perf-stability https://github.com/triton-inference-server/server.git || true
