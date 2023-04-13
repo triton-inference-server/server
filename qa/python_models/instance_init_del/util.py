@@ -26,6 +26,10 @@
 
 import os
 
+#
+# Helper functions for reading/writing state to disk
+#
+
 
 def read_int_from_txt_file(filename):
     full_path = os.path.join(os.environ["MODEL_LOG_DIR"], filename)
@@ -42,6 +46,12 @@ def write_int_to_txt_file(filename, number):
     txt = str(number)
     with open(full_path, mode="w", encoding="utf-8", errors="strict") as f:
         f.write(txt)
+
+
+#
+# Functions for communicating initialize and finalize count between the model
+# and test
+#
 
 
 def get_count(filename):
@@ -86,6 +96,36 @@ def reset_finalize_count():
     return reset_count("instance_init_del_finalize_count.txt")
 
 
+#
+# Functions for communicating varies of delay (in seconds) to the model
+#
+
+
+def get_initialize_delay():
+    delay = read_int_from_txt_file("instance_init_del_initialize_delay.txt")
+    return delay
+
+
+def set_initialize_delay(delay):
+    write_int_to_txt_file("instance_init_del_initialize_delay.txt", delay)
+    return delay
+
+
+def get_infer_delay():
+    delay = read_int_from_txt_file("instance_init_del_infer_delay.txt")
+    return delay
+
+
+def set_infer_delay(delay):
+    write_int_to_txt_file("instance_init_del_infer_delay.txt", delay)
+    return delay
+
+
+#
+# Functions for modifying the model
+#
+
+
 def update_instance_group(instance_group_str):
     full_path = os.path.join(os.path.dirname(__file__), "config.pbtxt")
     with open(full_path, mode="r+", encoding="utf-8", errors="strict") as f:
@@ -94,6 +134,34 @@ def update_instance_group(instance_group_str):
         txt += "instance_group [\n"
         txt += instance_group_str
         txt += "\n]\n"
+        f.truncate(0)
+        f.seek(0)
+        f.write(txt)
+    return txt
+
+
+def update_model_file():
+    full_path = os.path.join(os.path.dirname(__file__), "1", "model.py")
+    with open(full_path, mode="a", encoding="utf-8", errors="strict") as f:
+        f.write("\n# dummy model file update\n")
+
+
+def enable_batching():
+    full_path = os.path.join(os.path.dirname(__file__), "config.pbtxt")
+    with open(full_path, mode="r+", encoding="utf-8", errors="strict") as f:
+        txt = f.read()
+        txt = txt.replace("max_batch_size: 0", "max_batch_size: 2")
+        f.truncate(0)
+        f.seek(0)
+        f.write(txt)
+    return txt
+
+
+def disable_batching():
+    full_path = os.path.join(os.path.dirname(__file__), "config.pbtxt")
+    with open(full_path, mode="r+", encoding="utf-8", errors="strict") as f:
+        txt = f.read()
+        txt = txt.replace("max_batch_size: 2", "max_batch_size: 0")
         f.truncate(0)
         f.seek(0)
         f.write(txt)

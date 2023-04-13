@@ -28,15 +28,17 @@ import triton_python_backend_utils as pb_utils
 
 import sys
 import os
+import time
 
 sys.path.append(os.path.dirname(os.path.dirname(os.path.realpath(__file__))))
-from util import inc_initialize_count, inc_finalize_count
+from util import *
 
 
 class TritonPythonModel:
 
     def initialize(self, args):
         inc_initialize_count()
+        self.__sleep(get_initialize_delay())
 
     def execute(self, requests):
         responses = []
@@ -44,7 +46,12 @@ class TritonPythonModel:
             input_tensor = pb_utils.get_input_tensor_by_name(request, "INPUT0")
             out_tensor = pb_utils.Tensor("OUTPUT0", input_tensor.as_numpy())
             responses.append(pb_utils.InferenceResponse([out_tensor]))
+        self.__sleep(get_infer_delay())
         return responses
 
     def finalize(self):
         inc_finalize_count()
+
+    def __sleep(self, delay):
+        if delay > 0:
+            time.sleep(delay)
