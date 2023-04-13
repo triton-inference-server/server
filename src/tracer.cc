@@ -48,22 +48,27 @@ TraceManager::Create(
     TraceManager** manager, const TRITONSERVER_InferenceTraceLevel level,
     const uint32_t rate, const int32_t count, const uint32_t log_frequency,
     const std::string& filepath, const TRITONSERVER_InferenceTraceMode mode,
-    triton::server::TraceConfigMap trace_config_map
-    )
+    const triton::server::TraceConfigMap& trace_config_map)
 {
   // Always create TraceManager regardless of the global setting as they
   // can be updated at runtime even if tracing is not enable at start.
   // No trace should be sampled if the setting is not valid.
   *manager =
-      new TraceManager(level, rate, count, log_frequency, filepath, mode);
-  
-  std::vector<std::string> headers{"Tracing Option", "Value"};
+      new TraceManager(level, rate, count, log_frequency, filepath, mode, trace_config_map);
+
+  std::vector<std::string> headers{"Tracing Option", "Setting", "Value"};
   triton::common::TablePrinter table_printer(headers);
-  std::vector<std::string> row{
-        "mode",
-        std::to_string(mode)};
-    table_printer.InsertRow(row);
-    LOG_VERBOSE(1) << table_printer.PrintTable();
+  std::vector<std::string> row{"mode", std::to_string(mode)};
+  table_printer.InsertRow(row);
+  row = {"log_frequency", std::to_string(log_frequency)};
+  table_printer.InsertRow(row);
+  row = {"rate", std::to_string(rate)};
+  table_printer.InsertRow(row);
+  row = {"level", std::to_string(level)};
+  table_printer.InsertRow(row);
+  row = {"filepath", filepath};
+  table_printer.InsertRow(row);
+  LOG_VERBOSE(1) << table_printer.PrintTable();
 
   return nullptr;  // success
 }
@@ -71,15 +76,16 @@ TraceManager::Create(
 TraceManager::TraceManager(
     const TRITONSERVER_InferenceTraceLevel level, const uint32_t rate,
     const int32_t count, const uint32_t log_frequency,
-    const std::string& filepath, const TRITONSERVER_InferenceTraceMode mode)
+    const std::string& filepath, const TRITONSERVER_InferenceTraceMode mode, 
+    const TraceConfigMap& config_map)
 {
   std::shared_ptr<TraceFile> file(new TraceFile(filepath));
   global_default_.reset(new TraceSetting(
-      level, rate, count, log_frequency, file, mode, false, false, false, false,
-      false, false));
+      level, rate, count, log_frequency, file, mode, config_map, false, false, false, false,
+      false, false, false));
   global_setting_.reset(new TraceSetting(
-      level, rate, count, log_frequency, file, mode, false, false, false, false,
-      false, false));
+      level, rate, count, log_frequency, file, mode, config_map, false, false, false, false,
+      false, false, false));
   trace_files_.emplace(filepath, file);
 }
 
@@ -135,6 +141,7 @@ TraceManager::UpdateTraceSettingInternal(
   uint32_t log_frequency = fallback_setting->log_frequency_;
   std::string filepath = fallback_setting->file_->FileName();
   TRITONSERVER_InferenceTraceMode mode = fallback_setting->mode_;
+  TraceConfigMap config_map =  fallback_setting->config_map_;
 
   // Whether the field value is specified:
   // if clear then it is not specified, otherwise,
@@ -170,6 +177,11 @@ TraceManager::UpdateTraceSettingInternal(
                                : (((current_setting != nullptr) &&
                                    current_setting->mode_specified_) ||
                                   (new_setting.mode_ != nullptr)));
+  const bool config_map_specified =
+      (new_setting.config_map_ ? false
+                               : (((current_setting != nullptr) &&
+                                   current_setting->config_map_specified_) ||
+                                  (new_setting.config_map_ != nullptr)));
   if (level_specified) {
     level = (new_setting.level_ != nullptr) ? *new_setting.level_
                                             : current_setting->level_;
@@ -195,6 +207,10 @@ TraceManager::UpdateTraceSettingInternal(
   if (mode_specified) {
     mode = (new_setting.mode_ != nullptr) ? *new_setting.mode_
                                           : current_setting->mode_;
+  }
+  if (config_map_specified) {
+    config_map = (new_setting.config_map_ != nullptr) ? *new_setting.config_map_
+                                          : current_setting->config_map_;
   }
 
   // Some special case when updating model setting
@@ -233,9 +249,9 @@ TraceManager::UpdateTraceSettingInternal(
   }
 
   std::shared_ptr<TraceSetting> lts(new TraceSetting(
-      level, rate, count, log_frequency, file, mode, level_specified,
+      level, rate, count, log_frequency, file, mode, config_map, level_specified,
       rate_specified, count_specified, log_frequency_specified,
-      filepath_specified, mode_specified));
+      filepath_specified, mode_specified, config_map_specified));
   // The only invalid setting allowed is if it disables tracing
   if ((!lts->Valid()) && (level != TRITONSERVER_TRACE_LEVEL_DISABLED)) {
     return TRITONSERVER_ErrorNew(
@@ -786,10 +802,17 @@ TraceManager::TraceSetting::SampleTrace()
         "getting trace id");
 #ifndef _WIN32
     if (mode_ == TRITONSERVER_TRACE_MODE_OPENTELEMETRY) {
-      // Setting up exporter
       otlp::OtlpHttpExporterOptions opts;
-      // [FIXME] read from cmd
-      opts.url = "localhost:4318/v1/traces";
+      auto mode_key = std::to_string(TRITONSERVER_TRACE_MODE_OPENTELEMETRY);
+      auto otel_options_it = config_map_.find(mode_key);
+      if (otel_options_it != config_map_.end()){
+        for (const auto& setting: otel_options_it->second){
+          // FIXME add more configuration options of OTLP HTTP Exporter 
+          if (setting.first == "url"){
+            opts.url = setting.second;
+          } 
+        }
+      }
       lts->exporter_ = otlp::OtlpHttpExporterFactory::Create(opts);
       lts->processor_ = otel_trace_sdk::SimpleSpanProcessorFactory::Create(
           std::move(lts->exporter_));
@@ -843,16 +866,19 @@ TraceManager::TraceSetting::TraceSetting(
     const TRITONSERVER_InferenceTraceLevel level, const uint32_t rate,
     const int32_t count, const uint32_t log_frequency,
     const std::shared_ptr<TraceFile>& file,
-    const TRITONSERVER_InferenceTraceMode mode, const bool level_specified,
-    const bool rate_specified, const bool count_specified,
-    const bool log_frequency_specified, const bool filepath_specified,
-    const bool mode_specified)
+    const TRITONSERVER_InferenceTraceMode mode, const TraceConfigMap& config_map,
+    const bool level_specified, const bool rate_specified,
+    const bool count_specified, const bool log_frequency_specified,
+    const bool filepath_specified, const bool mode_specified,
+    const bool config_map_specified)
     : level_(level), rate_(rate), count_(count), log_frequency_(log_frequency),
-      file_(file), mode_(mode), level_specified_(level_specified),
-      rate_specified_(rate_specified), count_specified_(count_specified),
+      file_(file), mode_(mode), config_map_(config_map),
+      level_specified_(level_specified), rate_specified_(rate_specified),
+      count_specified_(count_specified),
       log_frequency_specified_(log_frequency_specified),
       filepath_specified_(filepath_specified), mode_specified_(mode_specified),
-      sample_(0), created_(0), collected_(0), sample_in_stream_(0)
+      config_map_specified_(config_map_specified), sample_(0), created_(0),
+      collected_(0), sample_in_stream_(0)
 {
   if (level_ == TRITONSERVER_TRACE_LEVEL_DISABLED) {
     invalid_reason_ = "tracing is disabled";

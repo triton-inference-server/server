@@ -52,7 +52,7 @@ namespace otel_trace_api = opentelemetry::trace;
 namespace triton { namespace server {
 
 using TraceConfig = std::vector<std::pair<std::string, std::string>>;
-using TraceConfigMap = std::vector<std::tuple<std::string, std::string, std::string>>;
+using TraceConfigMap = std::unordered_map<std::string, TraceConfig>;
 
 //
 // Manager for tracing to a file.
@@ -72,7 +72,7 @@ class TraceManager {
           rate_(nullptr), clear_count_(false), count_(nullptr),
           clear_log_frequency_(false), log_frequency_(nullptr),
           clear_filepath_(false), filepath_(nullptr), clear_mode_(false),
-          mode_(nullptr)
+          mode_(nullptr), clear_config_map_(false), config_map_(nullptr)
     {
     }
     bool clear_level_;
@@ -92,6 +92,9 @@ class TraceManager {
 
     bool clear_mode_;
     const TRITONSERVER_InferenceTraceMode* mode_;
+
+    bool clear_config_map_;
+    const TraceConfigMap* config_map_; 
   };
 
   struct Trace;
@@ -101,7 +104,7 @@ class TraceManager {
       TraceManager** manager, const TRITONSERVER_InferenceTraceLevel level,
       const uint32_t rate, const int32_t count, const uint32_t log_frequency,
       const std::string& filepath, const TRITONSERVER_InferenceTraceMode mode,
-      const TraceConfigMap trace_config_map);
+      const TraceConfigMap& config_map);
 
   ~TraceManager() = default;
 
@@ -186,7 +189,8 @@ class TraceManager {
   TraceManager(
       const TRITONSERVER_InferenceTraceLevel level, const uint32_t rate,
       const int32_t count, const uint32_t log_frequency,
-      const std::string& filepath, const TRITONSERVER_InferenceTraceMode mode);
+      const std::string& filepath, const TRITONSERVER_InferenceTraceMode mode,
+      const TraceConfigMap& config_map);
 
   static void TraceActivity(
       TRITONSERVER_InferenceTrace* trace,
@@ -241,7 +245,7 @@ class TraceManager {
           log_frequency_(0), mode_(TRITONSERVER_TRACE_MODE_TRITON),
           level_specified_(false), rate_specified_(false),
           count_specified_(false), log_frequency_specified_(false),
-          filepath_specified_(false), mode_specified_(false), sample_(0),
+          filepath_specified_(false), mode_specified_(false), config_map_specified_(false), sample_(0),
           created_(0), collected_(0), sample_in_stream_(0)
     {
       invalid_reason_ = "Setting hasn't been initialized";
@@ -250,10 +254,11 @@ class TraceManager {
         const TRITONSERVER_InferenceTraceLevel level, const uint32_t rate,
         const int32_t count, const uint32_t log_frequency,
         const std::shared_ptr<TraceFile>& file,
-        const TRITONSERVER_InferenceTraceMode mode, const bool level_specified,
+        const TRITONSERVER_InferenceTraceMode mode, const TraceConfigMap& config_map, 
+        const bool level_specified,
         const bool rate_specified, const bool count_specified,
         const bool log_frequency_specified, const bool filepath_specified,
-        const bool mode_specified);
+        const bool mode_specified, const bool config_map_specified);
 
     ~TraceSetting();
 
@@ -272,6 +277,7 @@ class TraceManager {
     const uint32_t log_frequency_;
     const std::shared_ptr<TraceFile> file_;
     const TRITONSERVER_InferenceTraceMode mode_;
+    const TraceConfigMap config_map_;
 
     // Whether the field value is specified or mirror from upper level setting
     const bool level_specified_;
@@ -280,6 +286,7 @@ class TraceManager {
     const bool log_frequency_specified_;
     const bool filepath_specified_;
     const bool mode_specified_;
+    const bool config_map_specified_;
 
    private:
     std::string invalid_reason_;

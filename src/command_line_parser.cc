@@ -90,7 +90,8 @@ getopt_long(
 #include "triton/common/triton_json.h"
 
 
-namespace triton { namespace server {
+namespace triton {
+namespace server {
 
 // [FIXME] expose following parse helpers for other type of parser
 namespace {
@@ -547,13 +548,13 @@ std::vector<Option> TritonParser::recognized_options_
        "when Triton collects the 100-th trace, it logs the traces to file "
        "<trace-file>.0, and when it collects the 200-th trace, it logs the "
        "101-th to the 200-th traces to file <trace-file>.1. Default is 0."},
-       {OPTION_TRACE_MODE, "trace-mode", Option::ArgStr, 
-        "Specify the mode for tracing. Options are \"triton\" "
-       "and \"opentelemetry\". The default is \"triton\". For \"triton\", " 
+      {OPTION_TRACE_MODE, "trace-mode", Option::ArgStr,
+       "Specify the mode for tracing. Options are \"triton\" "
+       "and \"opentelemetry\". The default is \"triton\". For \"triton\", "
        "the server will use the Triton's trace APIs. For \"opentelemetry\", "
        "the server will ose the OpenTelemetry's APIs to generate, collect and "
        "export traces for individual inference requests."},
-       {OPTION_TRACE_CONFIG, "trace-config", "<string>,<string>=<string>",
+      {OPTION_TRACE_CONFIG, "trace-config", "<string>,<string>=<string>",
        "Specify a framework-specific configuration setting. The format of this "
        "flag is --tracing-config=<framework_name>,<setting>=<value>. Where "
        "<framework_name> is one of the available frameworks. Currently, the "
@@ -987,6 +988,10 @@ TritonParser::Parse(int argc, char** argv)
   bool cache_config_present{false};
 #ifdef TRITON_ENABLE_TRACING
   bool explicit_disable_trace{false};
+  // bool trace_filepath_present{false};
+  bool trace_level_present{false};
+  bool trace_rate_present{false};
+  bool trace_count_present{false};
 #endif  // TRITON_ENABLE_TRACING
 
 #ifdef TRITON_ENABLE_GRPC
@@ -1257,9 +1262,21 @@ TritonParser::Parse(int argc, char** argv)
 
 #ifdef TRITON_ENABLE_TRACING
       case OPTION_TRACE_FILEPATH:
+        std::cerr << "Warning: '--trace-file' has been deprecated and will be"
+                     " removed in future releases. Please use "
+                     "'--trace-config=triton,trace-file=<filepath> instead."
+                  << std::endl;
+        // trace_filepath_present = true;
+        // lparams.trace_config_map_["triton"].push_back({"trace-file",
+        // optarg});
         lparams.trace_filepath_ = optarg;
         break;
       case OPTION_TRACE_LEVEL: {
+        std::cerr << "Warning: '--trace-level' has been deprecated and will be"
+                     " removed in future releases. Please use "
+                     "'--trace-config=trace-level= instead."
+                  << std::endl;
+        trace_level_present = true;
         auto parsed_level = ParseTraceLevelOption(optarg);
         explicit_disable_trace |=
             (parsed_level == TRITONSERVER_TRACE_LEVEL_DISABLED);
@@ -1267,10 +1284,21 @@ TritonParser::Parse(int argc, char** argv)
             lparams.trace_level_ | parsed_level);
         break;
       }
-      case OPTION_TRACE_RATE:
+      case OPTION_TRACE_RATE: 
+        std::cerr << "Warning: '--trace-rate' has been deprecated and will be"
+                     " removed in future releases. Please use "
+                     "'--trace-config=trace-rate=<trace rate> instead."
+                  << std::endl;
+        trace_rate_present = true;
         lparams.trace_rate_ = ParseOption<int>(optarg);
         break;
+      
       case OPTION_TRACE_COUNT:
+        std::cerr << "Warning: '--trace-count' has been deprecated and will be"
+                     " removed in future releases. Please use "
+                     "'--trace-config=trace-count=<trace count> instead."
+                  << std::endl;
+        trace_count_present = true;
         lparams.trace_count_ = ParseOption<int>(optarg);
         break;
       case OPTION_TRACE_LOG_FREQUENCY:
@@ -1279,10 +1307,16 @@ TritonParser::Parse(int argc, char** argv)
       case OPTION_TRACE_MODE:
         lparams.trace_mode_ = ParseTraceModeOption(optarg);
         break;
-      case OPTION_TRACE_CONFIG:
-        lparams.trace_config_settings_.push_back(
-            ParseTraceConfigOption(optarg));
+      case OPTION_TRACE_CONFIG: {
+        auto trace_config_setting = ParseTraceConfigOption(optarg);
+        triton::server::TraceConfig& tc =
+            lparams
+                .trace_config_map_[std::get<0>(trace_config_setting).c_str()];
+        tc.push_back(std::make_pair(
+            std::get<1>(trace_config_setting).c_str(),
+            std::get<2>(trace_config_setting).c_str()));
         break;
+      }
 #endif  // TRITON_ENABLE_TRACING
 
       case OPTION_POLL_REPO_SECS:
@@ -1441,30 +1475,60 @@ TritonParser::Parse(int argc, char** argv)
   if (explicit_disable_trace) {
     lparams.trace_level_ = TRITONSERVER_TRACE_LEVEL_DISABLED;
   }
+
+  for (const auto& global_setting : lparams.trace_config_map_[""]) {
+    if (global_setting.first == "trace-rate") {
+      if (trace_rate_present) {
+        std::cerr << "Warning: Overriding deprecated '--trace-rate' "
+                     "False to True in favor of provided trace-rate in "
+                     "--trace-config!"
+                  << std::endl;
+      }
+      lparams.trace_rate_ = ParseOption<int>(global_setting.second);
+    }
+    if (global_setting.first == "trace-level") {
+      if (trace_level_present) {
+        std::cerr << "Warning: Overriding deprecated '--trace-level' "
+                     "in favor of provided trace-level in --trace-config!"
+                  << std::endl;
+      }
+      lparams.trace_rate_ = ParseOption<int>(global_setting.second);
+    }
+    if (global_setting.first == "trace-mode") {
+      lparams.trace_mode_ = ParseTraceModeOption(global_setting.second);
+    }
+    if (global_setting.first == "trace-count") {
+      if (trace_count_present) {
+        std::cerr << "Warning: Overriding deprecated '--trace-count' "
+                     "in favor of provided trace-count in --trace-config!"
+                  << std::endl;
+      }
+      lparams.trace_count_ = ParseOption<int>(global_setting.second);
+    }
+  }
 #endif  // TRITON_ENABLE_TRACING
 
-  // Check if there is a conflict between --disable-auto-complete-config
-  // and --strict-model-config
-  if (disable_auto_complete_config) {
-    if (strict_model_config_present && !lparams.strict_model_config_) {
-      std::cerr
-          << "Warning: Overriding deprecated '--strict-model-config' from "
-             "False to True in favor of '--disable-auto-complete-config'!"
-          << std::endl;
-    }
-    lparams.strict_model_config_ = true;
+// Check if there is a conflict between --disable-auto-complete-config
+// and --strict-model-config
+if (disable_auto_complete_config) {
+  if (strict_model_config_present && !lparams.strict_model_config_) {
+    std::cerr << "Warning: Overriding deprecated '--strict-model-config' from "
+                 "False to True in favor of '--disable-auto-complete-config'!"
+              << std::endl;
   }
-
-  // Check if there is a conflict between --response-cache-byte-size
-  // and --cache-config
-  if (cache_size_present && cache_config_present) {
-    throw ParseException(
-        "Error: Incompatible flags --response-cache-byte-size and "
-        "--cache-config both provided. Please provide one or the other.");
-  }
-  lparams.enable_cache_ = (cache_size_present || cache_config_present);
-  return {lparams, {}};
+  lparams.strict_model_config_ = true;
 }
+
+// Check if there is a conflict between --response-cache-byte-size
+// and --cache-config
+if (cache_size_present && cache_config_present) {
+  throw ParseException(
+      "Error: Incompatible flags --response-cache-byte-size and "
+      "--cache-config both provided. Please provide one or the other.");
+}
+lparams.enable_cache_ = (cache_size_present || cache_config_present);
+return {lparams, {}};
+}  // namespace server
 
 std::string
 TritonParser::FormatUsageMessage(std::string str, int offset)
@@ -1765,23 +1829,21 @@ TritonParser::ParseTraceModeOption(std::string arg)
     return TRITONSERVER_TRACE_MODE_OPENTELEMETRY;
   }
 
-  throw ParseException("invalid value for trace mode option: " + arg +
-    ". Available options are \"triton\" and \"opentelemetry\"");
+  throw ParseException(
+      "invalid value for trace mode option: " + arg +
+      ". Available options are \"triton\" and \"opentelemetry\"");
 }
 
 std::tuple<std::string, std::string, std::string>
 TritonParser::ParseTraceConfigOption(const std::string& arg)
 {
-  //[FIXME] think about default options
-  // Format is "<framework_name>,<setting>=<value>" for specific
-  // config/settings and "<setting>=<value>" for framework-agnostic
-  // configs/settings
   int delim_name = arg.find(",");
   int delim_setting = arg.find("=", delim_name + 1);
 
   std::string name_string = std::string();
   if (delim_name > 0) {
-    name_string = arg.substr(0, delim_name);
+    name_string =
+        std::to_string(ParseTraceModeOption(arg.substr(0, delim_name)));
   } else if (delim_name == 0) {
     std::stringstream ss;
     ss << "No framework specified. --tracing-config option format is "
@@ -1813,4 +1875,5 @@ TritonParser::ParseTraceConfigOption(const std::string& arg)
 }
 #endif  // TRITON_ENABLE_TRACING
 
-}}  // namespace triton::server
+}  // namespace triton
+}  // namespace triton::server
