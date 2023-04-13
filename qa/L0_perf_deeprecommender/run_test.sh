@@ -31,7 +31,8 @@ INSTANCE_COUNTS=${INSTANCE_COUNTS:=1}
 TF_VERSION=${TF_VERSION:=2}
 
 PERF_CLIENT=../clients/perf_client
-REPORTER=../common/reporter.py
+#REPORTER=../common/reporter.py
+REPORTER=./reporter.py
 
 SERVER=/opt/tritonserver/bin/tritonserver
 SERVER_ARGS="--model-repository=`pwd`/models --backend-config=tensorflow,version=${TF_VERSION}"
