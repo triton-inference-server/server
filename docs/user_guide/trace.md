@@ -43,7 +43,7 @@ traces for individual inference requests.
 To specify global trace settings (level, rate, count, or mode), 
 the format is `--trace-config=<setting>=<value>`.
 
-An example ussage, which invokes Triton's trace APIs:
+An example usage, which invokes Triton's trace APIs:
 
 ```
 $ tritonserver \
