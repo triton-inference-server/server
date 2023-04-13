@@ -61,7 +61,7 @@ The following table shows available global trace settings to pass to `--trace-co
 | Setting     | Default Value |  Description                                                                                                                           |
 |:------------|:--------------|----------------------------------------------------------------------------------------------------------------------------------------|
 | `rate`      | 1000          | Specifies the sampling rate. The same as deprecated `--trace-rate`. In the above example every 100-th inference request will be traced.|
-| `level`     | OFF           | Indicates the level of trace detail that should be collected and may be specified multiple times to trace multiple informations. The same as deprecated `--trace-level`|
+| `level`     | OFF           | Indicates the level of trace detail that should be collected and may be specified multiple times to trace multiple informations. The same as deprecated `--trace-level`. Choices are `TIMESTAMPS` and `TENSORS`. Note that `opentelemetry` mode does not currently support `TENSORS` level. |
 | `count`     | -1            | Specifies the remaining number of traces to be collected. In the example Triton will stop tracing requests after 100 traces are collected. The same as deprecated `--trace-count`. |
 | `mode`      | triton        | Specifies which trace APIs to use for collecting traces. The choices are "triton" or "opentelemetry". |
 
