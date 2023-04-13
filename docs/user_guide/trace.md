@@ -366,7 +366,7 @@ using [Opentelemetry APIs and SDKs](https://opentelemetry.io/). Currently this o
 only supported for Ubuntu based systems and does not support tracing for 
 [BLS](https://github.com/triton-inference-server/python_backend/tree/main#business-logic-scripting) models.
 
-To specify Opentelemetry as a tracing APIs, specify --trace-config flag as follows:
+To specify Opentelemetry mode for tracing, specify the `--trace-config` flag as follows:
 
 ```
 $ tritonserver --trace-config=mode=opentelemetry ...
