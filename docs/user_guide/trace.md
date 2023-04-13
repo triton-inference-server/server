@@ -54,8 +54,8 @@ $ tritonserver \
     --trace-config=count=100 ...
 ```
 
-## Trace settings
-### Global settings
+## Trace Settings
+### Global Settings
 The following table shows available global trace settings to pass to `--trace-config`
 
 | Setting     | Default Value |  Description                                                                                                                           |
