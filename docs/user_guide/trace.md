@@ -361,9 +361,10 @@ The meaning of the trace timestamps is:
 
 ## Opentelemetry trace support
 
-Starting with 23.04 release triton provides an option to generate and export traces, 
+Starting with the 23.04 release, Triton provides an option to generate and export traces 
 using [Opentelemetry APIs and SDKs](https://opentelemetry.io/). Currently this option is
-only supported for Ubuntu based systems and does not support tracing for bls models.
+only supported for Ubuntu based systems and does not support tracing for 
+[BLS](https://github.com/triton-inference-server/python_backend/tree/main#business-logic-scripting) models.
 
 To specify Opentelemetry as a tracing APIs, specify --trace-config flag as follows:
 
