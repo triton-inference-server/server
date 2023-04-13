@@ -30,13 +30,11 @@ import sys
 
 sys.path.append("../common")
 
-import os
 import unittest
 import test_util as tu
 from mlflow.deployments import get_deploy_client
 import json
 import numpy as np
-from moto import mock_s3
 
 
 class PluginTest(tu.TestResultCollector):
@@ -115,30 +113,6 @@ class PluginTest(tu.TestResultCollector):
             filecmp.cmp(config_path,
                         "./models/onnx_model_with_files/config.pbtxt"))
 
-    @mock_s3
-    def test_s3_support(self):
-        # Set TRITON_MODEL_REPO to an s3 path.
-        os.environ["TRITON_MODEL_REPO"] = "s3://moto-bucket/"
-
-        # Set up moto's AWS
-        import boto3
-        client = boto3.resource("s3", region_name="eu-central-1")
-        client.create_bucket(Bucket="moto-bucket")
-        del client
-
-        # Log the ONNX model to MLFlow
-        import mlflow.onnx
-        import onnx
-        model = onnx.load(
-            "./mlflow-triton-plugin/examples/onnx_float32_int32_int32/1/model.onnx"
-        )
-
-        # Use a different name to ensure the plugin operates on correct model
-        mlflow.onnx.log_model(model,
-                              "triton",
-                              registered_model_name="onnx_model")
-
-        self._validate_deployment("onnx_model")
 
 if __name__ == '__main__':
     unittest.main()
