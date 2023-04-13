@@ -41,7 +41,7 @@ the server will use the [OpenTelemetry's APIs](#opentelemetry-trace-support) to 
 traces for individual inference requests.
 
 To specify global trace settings (level, rate, count, or mode), 
-the format is `--tracing-config=<setting>=<value>`.
+the format is `--trace-config=<setting>=<value>`.
 
 An example ussage, which invokes Triton's trace APIs:
 
