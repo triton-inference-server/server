@@ -34,9 +34,9 @@ arguments when running the tritonserver executable.
 
 Starting in 23.04 release, Triton has one flag `--trace-config` to specify 
 global or trace mode specific configuration setting. The format of this flag 
-is `--tracing-config=<trace mode>,<setting>=<value>`, where `<trace mode>` 
-is either `triton` or `opentelemetry`. By default, trace mode is set to `triton`,
-and the server will use the Triton's trace APIs. For `opentelemetry`, 
+is `--trace-config=<mode>,<setting>=<value>`, where `<mode>` 
+is either `triton` or `opentelemetry`. By default, the trace mode is set to `triton`,
+and the server will use Triton's trace APIs. For `opentelemetry` mode, 
 the server will use the [OpenTelemetry's APIs](#opentelemetry-trace-support) to generate, collect and export 
 traces for individual inference requests.
 
