@@ -65,7 +65,7 @@ The following table shows available global trace settings to pass to `--trace-co
 | `count`     | -1            | Specifies the remaining number of traces to be collected. The default value of -1 specifies to never stop collecting traces. With a value of 100, Triton will stop tracing requests after 100 traces are collected. The same as deprecated `--trace-count`. |
 | `mode`      | triton        | Specifies which trace APIs to use for collecting traces. The choices are "triton" or "opentelemetry". |
 
-### Triton trace APIs settings
+### Triton Trace APIs Settings
 
 The following table shows available Triton trace APIs settings for `--trace-config=triton,<setting>=<value>`.
 
