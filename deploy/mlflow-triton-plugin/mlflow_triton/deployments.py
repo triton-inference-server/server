@@ -370,7 +370,7 @@ default_model_filename: "{}"
         elif os.path.isdir(path):
             return list(os.walk(path))
         else:
-            raise Exception(f'{path} is not a valid path to a file or dir.')
+            raise Exception(f'path: {path} is not a valid path to a file or dir.')
 
     def _copy_files_to_triton_repo(self, artifact_path, name, flavor):
         copy_paths = self._get_copy_paths(artifact_path, name, flavor)
@@ -380,11 +380,20 @@ default_model_filename: "{}"
                 for root, dirs, files in self._walk(copy_paths[key]['from']):
                     for filename in files:
                         local_path = os.path.join(root, filename)
-                        s3_path = os.path.join(
-                            copy_paths[key]['to'].replace(
-                            self.server_config['triton_model_repo'], ''), 
-                            filename,
-                            ).replace('/', '', 1)
+                        
+                        if flavor == "onnx":
+                            s3_path = os.path.join(
+                                    copy_paths[key]['to'].replace(
+                                    self.server_config['triton_model_repo'], ''), 
+                                    filename,
+                                    ).replace('/', '', 1)
+
+                        elif flavor == "triton":
+                            rel_path = os.path.relpath(
+                                    local_path,
+                                    copy_paths[key]['from'],
+                                    )
+                            s3_path = f'{name}/{rel_path}'
                         
                         self.server_config['s3'].upload_file(
                             local_path, 
