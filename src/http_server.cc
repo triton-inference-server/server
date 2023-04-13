@@ -1821,10 +1821,8 @@ HTTPAPIServer::HandleTrace(evhtp_request_t* req, const std::string& model_name)
       trace_response.AddString("log_frequency", std::to_string(log_frequency)));
   HTTP_RESPOND_IF_ERR(req, trace_response.AddString("trace_file", filepath));
   HTTP_RESPOND_IF_ERR(
-      req, 
-      trace_response.AddString(
-          "trace_mode", 
-          TRITONSERVER_InferenceTraceModeString(mode)));
+      req, trace_response.AddString(
+               "trace_mode", TRITONSERVER_InferenceTraceModeString(mode)));
 
   triton::common::TritonJson::WriteBuffer buffer;
   HTTP_RESPOND_IF_ERR(req, trace_response.Write(&buffer));
@@ -2561,7 +2559,8 @@ HTTPAPIServer::EVBufferToInput(
       uint64_t shm_offset;
       const char* shm_region;
       RETURN_IF_ERR(CheckSharedMemoryData(
-          request_input, &use_shm, &shm_region, &shm_offset, reinterpret_cast<uint64_t*>(&byte_size)));
+          request_input, &use_shm, &shm_region, &shm_offset,
+          reinterpret_cast<uint64_t*>(&byte_size)));
       if (use_shm) {
         void* base;
         TRITONSERVER_MemoryType memory_type;

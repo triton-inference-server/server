@@ -172,10 +172,8 @@ struct TritonServerParameters {
   int32_t trace_rate_{1000};
   int32_t trace_count_{-1};
   int32_t trace_log_frequency_{0};
-  TRITONSERVER_InferenceTraceMode trace_mode_{
-      TRITONSERVER_TRACE_MODE_TRITON};
-  triton::server::TraceConfigMap
-      trace_config_map_;
+  TRITONSERVER_InferenceTraceMode trace_mode_{TRITONSERVER_TRACE_MODE_TRITON};
+  triton::server::TraceConfigMap trace_config_map_;
 #endif  // TRITON_ENABLE_TRACING
 
 // The configurations for various endpoints (i.e. HTTP, GRPC and metrics)

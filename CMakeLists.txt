@@ -160,6 +160,14 @@ else()
   set(_FINDPACKAGE_PROTOBUF_CONFIG_DIR "${TRITON_THIRD_PARTY_INSTALL_PREFIX}/protobuf/lib/cmake/protobuf")
 endif()
 
+# Triton with Opentelemetry is not supported on Windows
+# FIXME: add location for Windows, when support is added
+if (WIN32)
+  set(_FINDPACKAGE_OPENTELEMETRY_CONFIG_DIR "")
+else()
+  set(_FINDPACKAGE_OPENTELEMETRY_CONFIG_DIR "${TRITON_THIRD_PARTY_INSTALL_PREFIX}/opentelemetry-cpp/lib/cmake/opentelemetry-cpp")
+endif()
+
 if (CMAKE_INSTALL_PREFIX_INITIALIZED_TO_DEFAULT)
   set(TRITON_INSTALL_PREFIX ${CMAKE_CURRENT_BINARY_DIR}/install)
 else()
@@ -210,7 +218,7 @@ ExternalProject_Add(triton-server
     -Daws-c-common_DIR:PATH=${TRITON_THIRD_PARTY_INSTALL_PREFIX}/aws-sdk-cpp/lib/aws-c-common/cmake
     -Daws-checksums_DIR:PATH=${TRITON_THIRD_PARTY_INSTALL_PREFIX}/aws-sdk-cpp/lib/aws-checksums/cmake
     -DCURL_DIR:STRING=${TRITON_THIRD_PARTY_INSTALL_PREFIX}/curl/lib/cmake/CURL
-    -Dopentelemetry-cpp_DIR:PATH=${TRITON_THIRD_PARTY_INSTALL_PREFIX}/opentelemetry-cpp/lib/cmake/opentelemetry-cpp
+    -Dopentelemetry-cpp_DIR:PATH=${_FINDPACKAGE_OPENTELEMETRY_CONFIG_DIR}
     -DTRITON_THIRD_PARTY_REPO_TAG:STRING=${TRITON_THIRD_PARTY_REPO_TAG}
     -DTRITON_COMMON_REPO_TAG:STRING=${TRITON_COMMON_REPO_TAG}
     -DTRITON_CORE_REPO_TAG:STRING=${TRITON_CORE_REPO_TAG}

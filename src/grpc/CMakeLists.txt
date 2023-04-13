@@ -76,10 +76,17 @@ target_link_libraries(
 
 target_include_directories(
   grpc-endpoint-library
-  PRIVATE
-    $<TARGET_PROPERTY:gRPC::grpc,INTERFACE_INCLUDE_DIRECTORIES>
-    ${OPENTELEMETRY_CPP_INCLUDE_DIRS}
+  PRIVATE $<TARGET_PROPERTY:gRPC::grpc,INTERFACE_INCLUDE_DIRECTORIES>
 )
+
+# FIXME when Triton support of Opentelemetry is available on Windows
+# add ${OPENTELEMETRY_CPP_INCLUDE_DIRS} to above target_include_directories
+if (NOT WIN32)
+  target_include_directories(
+    grpc-endpoint-library
+    PRIVATE ${OPENTELEMETRY_CPP_INCLUDE_DIRS}
+  )
+endif()
 
 target_compile_definitions(
   grpc-endpoint-library

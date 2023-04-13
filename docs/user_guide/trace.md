@@ -30,12 +30,56 @@
 
 Triton includes that capability to generate a detailed trace for
 individual inference requests. Tracing is enable by command-line
-arguments when running the tritonserver executable. For example,
+arguments when running the tritonserver executable.
+
+Starting in 23.04 release, Triton has one flag `--trace-config` to specify 
+global or trace mode specific configuration setting. The format of this flag 
+is `--tracing-config=<trace mode>,<setting>=<value>`, where `<trace mode>` 
+is either `triton` or `opentelemetry`. By default, trace mode is set to `triton`,
+and the server will use the Triton's trace APIs. For `opentelemetry`, 
+the server will use the [OpenTelemetry's APIs](#opentelemetry-trace-support) to generate, collect and export 
+traces for individual inference requests.
+
+To specify global trace settings (level, rate, count, or mode), 
+the format is `--tracing-config=<setting>=<value>`.
+
+An example ussage, which invokes Triton's trace APIs:
 
 ```
-$ tritonserver --trace-file=/tmp/trace.json --trace-rate=100 \
-    --trace-level=TIMESTAMPS --trace-log-frequency=50 --trace-count=100 ...
+$ tritonserver --trace-config=triton,file=/tmp/trace.json \
+    --trace-config=triton,log-frequency=50 --trace-config=rate=100 \
+    --trace-config=level=TIMESTAMPS --trace-config=triton,log-frequency=50 \
+    --trace-config=count=100 ...
 ```
+
+## Trace settings
+### Global settings
+The following table shows available global trace settings to pass to `--trace-config`
+
+| Setting     | Default Value |  Description                                                                                                                           |
+|:------------|:--------------|----------------------------------------------------------------------------------------------------------------------------------------|
+| `rate`      | 1000          | Specifies the sampling rate. The same as deprecated `--trace-rate`. In the above example every 100-th inference request will be traced.|
+| `level`     | OFF           | Indicates the level of trace detail that should be collected and may be specified multiple times to trace multiple informations. The same as deprecated `--trace-level`|
+| `count`     | -1            | Specifies the remaining number of traces to be collected. In the example Triton will stop tracing requests after 100 traces are collected. The same as deprecated `--trace-count`. |
+| `mode`      | triton        | Specifies which trace APIs to use for collecting traces. |
+
+### Triton trace APIs settings
+
+The following table shows available Triton trace APIs settings for `--trace-config=triton,<setting>=<value>`.
+
+| Setting     | Default Value |  Description                                                                                                                           |
+|:------------|:--------------|----------------------------------------------------------------------------------------------------------------------------------------|
+| `file`      |     -         | Indicates where the trace output should be written. The same as deprecated `--trace-file`.|
+| `log-frequency`| 0          | Specifies the rate that the traces are written to file. In the example Triton will log to file for every 50 traces collected. The same as deprecated `--trace-log-frequency`|
+
+In addition to configure trace settings for Triton trace APIs 
+in command line arguments, The user may
+modify the trace setting when Triton server
+is running via the trace APIs, more information can be found in [trace
+protocol](../protocol/extension_trace.md). This option is currently not supported,
+when trace mode is set to `opentelemetry`.
+
+**Note**: the following flags are **depricated**:
 
 The `--trace-file` option indicates where the trace output should be
 written. The `--trace-rate` option specifies the sampling rate. In
@@ -48,11 +92,6 @@ file for every 50 traces collected. The `--trace-count` option specifies the
 remaining number of traces to be collected. In this example Triton will stop
 tracing more requests after 100 traces are collected.  Use the `--help` option
 to get more information.
-
-In addition to configure trace settings in command line arguments, The user may
-modify the trace setting when Triton server
-is running via the trace APIs, more information can be found in [trace
-protocol](../protocol/extension_trace.md).
 
 ## Supported Trace Level Option
 
@@ -317,3 +356,21 @@ The meaning of the trace timestamps is:
     scheduling.
 
   * BACKEND_OUTPUT: The tensor in the response of a backend.
+
+## Opentelemetry trace support
+
+Starting with 23.04 release triton provides an option to generate and export traces, 
+using [Opentelemetry APIs and SDKs](https://opentelemetry.io/). Currently this option is
+only supported for Ubuntu based systems and does not support tracing for bls models.
+
+To specify Opentelemetry as a tracing APIs, specify --trace-config flag as follows:
+
+```
+$ tritonserver --trace-config=mode=opentelemetry ...
+```
+At the moment, triton supports HTTP Exporter, provided by Opentelemetry. The endpoint 
+can be specified as follows:
+```
+$ tritonserver --trace-config=mode=opentelemetry --trace-config=opentelemetry,url=<your endpoint> ...
+```
+By default, opentelemetry uses `0.0.0.0:4318/v2/traces` as an endpoint for HTTP exporter.
