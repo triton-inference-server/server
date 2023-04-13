@@ -554,15 +554,15 @@ std::vector<Option> TritonParser::recognized_options_
        "101-th to the 200-th traces to file <trace-file>.1. Default is 0."},
       {OPTION_TRACE_CONFIG, "trace-config", "<string>,<string>=<string>",
        "Specify global or trace mode specific configuration setting. "
-       "The format of this flag is --tracing-config=<trace "
-       "mode>,<setting>=<value>. "
-       "Where <trace mode> is either \"triton\" or \"opentelemetry\". "
+       "The format of this flag is --trace-config="
+       "<mode>,<setting>=<value>. "
+       "Where <mode> is either \"triton\" or \"opentelemetry\". "
        "The default is \"triton\". To specify global trace settings "
        "(level, rate, count, or mode), the format would be "
-       "--tracing-config=<setting>=<value>. For \"triton\", the server will "
+       "--trace-config=<setting>=<value>. For \"triton\" mode, the server will "
        "use "
-       "the Triton's trace APIs. For \"opentelemetry\", the server will use "
-       "the OpenTelemetry's APIs to generate, collect and export traces for "
+       "Triton's Trace APIs. For \"opentelemetry\" mode, the server will use "
+       "OpenTelemetry's APIs to generate, collect and export traces for "
        "individual inference requests."},
 #endif  // TRITON_ENABLE_TRACING
       {OPTION_MODEL_CONTROL_MODE, "model-control-mode", Option::ArgStr,
