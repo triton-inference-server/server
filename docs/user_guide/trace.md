@@ -72,7 +72,7 @@ The following table shows available Triton trace APIs settings for `--trace-conf
 | Setting     | Default Value |  Description                                                                                                                           |
 |:------------|:--------------|----------------------------------------------------------------------------------------------------------------------------------------|
 | `file`      |     -         | Indicates where the trace output should be written. The same as deprecated `--trace-file`.|
-| `log-frequency`| 0          | Specifies the rate that the traces are written to file. In the example Triton will log to file for every 50 traces collected. The same as deprecated `--trace-log-frequency`|
+| `log-frequency`| 0          | Specifies the rate that the traces are written to file. For example, a value of 50 specifies that Triton will log to file for every 50 traces collected. The same as deprecated `--trace-log-frequency`|
 
 In addition to configure trace settings for Triton trace APIs 
 in command line arguments, The user may
