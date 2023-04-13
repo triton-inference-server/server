@@ -150,14 +150,14 @@ class TraceManager {
     uint64_t trace_id_;
 
 #ifndef _WIN32
-    // OpenTelemetry SDK relies on system's clock for even't timestamps.
-    // Triton Tracing records timestamps using steady clock. This is a
-    // monotonic clock, i.e. time is alway moving forward. It is not related
+    // OpenTelemetry SDK relies on system's clock for event timestamps.
+    // Triton Tracing records timestamps using steady_clock. This is a
+    // monotonic clock, i.e. time is always moving forward. It is not related
     // to wall clock time (for example, it can be time since last reboot).
     // `time_offset_` is recorded when the trace instance is created,
-    // and firther used to calculate `opentelemetry::common::SystemTimestamp`
+    // and further used to calculate `opentelemetry::common::SystemTimestamp`
     // as `time_offset_` + std::chrono:nanoseconds{temestamp_ns}. This way,
-    // every event recorded in stamp will receive a timestamp of
+    // every event recorded timestamp will receive a timestamp of
     // <time when the trace started> + <nanoseconds passed since the start>
     // FIXME: add steady clock timestamps to Triton OpenTelemetry SDK,
     // when created
