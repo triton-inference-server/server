@@ -1232,7 +1232,7 @@ CommonHandler::RegisterTrace()
     int32_t count;
     uint32_t log_frequency;
     std::string filepath;
-    TRITONSERVER_InferenceTraceMode mode = TRITONSERVER_TRACE_MODE_TRITON;
+    triton::server::InferenceTraceMode mode = TRACE_MODE_TRITON;
     // Update trace setting
     if (!request.settings().empty()) {
       TraceManager::NewSetting new_setting;
@@ -1403,7 +1403,7 @@ CommonHandler::RegisterTrace()
         std::to_string(log_frequency));
     (*response->mutable_settings())["trace_file"].add_value(filepath);
     (*response->mutable_settings())["trace_mode"].add_value(
-        TRITONSERVER_InferenceTraceModeString(mode));
+        TraceManager::InferenceTraceModeString(mode));
 
   earlyexit:
     GrpcStatusUtil::Create(status, err);

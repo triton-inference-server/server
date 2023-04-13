@@ -380,8 +380,8 @@ By default, opentelemetry uses `0.0.0.0:4318/v1/traces` as an endpoint for HTTP 
 
 ### Opentelemetry trace APIs settings
 
-The following table shows available Triton trace APIs settings for `--trace-config=opentelemetry,<setting>=<value>`.
+The following table shows available Opentelemetry trace APIs settings for `--trace-config=opentelemetry,<setting>=<value>`.
 
 | Setting     | Default Value |  Description                                                                                                                           |
 |:------------|:--------------|----------------------------------------------------------------------------------------------------------------------------------------|
-| `url`      | `0.0.0.0:4318/v1/traces`        |  host:port to which the receiver is going to receive trace data.|
+| `url`      | `0.0.0.0:4318/v1/traces`        |  `host:port` to which the receiver is going to receive trace data.|

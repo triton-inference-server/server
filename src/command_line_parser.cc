@@ -1516,7 +1516,7 @@ TritonParser::Parse(int argc, char** argv)
     }
   }
 
-  if (lparams.trace_mode_ == TRITONSERVER_TRACE_MODE_OPENTELEMETRY) {
+  if (lparams.trace_mode_ == TRACE_MODE_OPENTELEMETRY) {
     if (trace_filepath_present) {
       std::cerr << "Warning: '--trace-file' is deprecated and will "
                    "be ignored with opentelemetry tracing mode. "
@@ -1527,9 +1527,9 @@ TritonParser::Parse(int argc, char** argv)
                    "and will be ignored with opentelemetry tracing mode."
                 << std::endl;
     }
-  } else if (lparams.trace_mode_ == TRITONSERVER_TRACE_MODE_TRITON) {
+  } else if (lparams.trace_mode_ == TRACE_MODE_TRITON) {
     for (const auto& mode_setting : lparams.trace_config_map_[std::to_string(
-             TRITONSERVER_TRACE_MODE_TRITON)]) {
+             TRACE_MODE_TRITON)]) {
       if (mode_setting.first == "file") {
         if (trace_filepath_present) {
           std::cerr << "Warning: Overriding deprecated '--trace-file' "
@@ -1546,17 +1546,16 @@ TritonParser::Parse(int argc, char** argv)
         lparams.trace_log_frequency_ = ParseOption<int>(mode_setting.second);
       }
     }
-
-    if (lparams.trace_filepath_.empty()) {
-      throw ParseException(
-          "Error: file path must be provided for trace mode='triton' "
-          "Please set file path with --trace-config=triton,file=<filepath>");
-    }
   }
 
   if (explicit_disable_trace) {
     lparams.trace_level_ = TRITONSERVER_TRACE_LEVEL_DISABLED;
   }
+  if (!explicit_disable_trace && lparams.trace_filepath_.empty()) {
+      std::cerr << "Warning: file path is missing. "
+          "Please set file path with --trace-config=triton,file=<filepath>"
+          << std::endl;;
+    }
 #endif  // TRITON_ENABLE_TRACING
 
   // Check if there is a conflict between --disable-auto-complete-config
@@ -1867,7 +1866,7 @@ TritonParser::ParseTraceLevelOption(std::string arg)
   throw ParseException("invalid value for trace level option: " + arg);
 }
 
-TRITONSERVER_InferenceTraceMode
+triton::server::InferenceTraceMode
 TritonParser::ParseTraceModeOption(std::string arg)
 {
   std::transform(arg.begin(), arg.end(), arg.begin(), [](unsigned char c) {
@@ -1875,10 +1874,10 @@ TritonParser::ParseTraceModeOption(std::string arg)
   });
 
   if (arg == "triton") {
-    return TRITONSERVER_TRACE_MODE_TRITON;
+    return TRACE_MODE_TRITON;
   }
   if (arg == "opentelemetry") {
-    return TRITONSERVER_TRACE_MODE_OPENTELEMETRY;
+    return TRACE_MODE_OPENTELEMETRY;
   }
 
   throw ParseException(

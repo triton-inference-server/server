@@ -81,6 +81,7 @@ target_include_directories(
 
 # FIXME when Triton support of Opentelemetry is available on Windows
 # add ${OPENTELEMETRY_CPP_INCLUDE_DIRS} to above target_include_directories
+# JIRA DLIS-4786
 if (NOT WIN32)
   target_include_directories(
     grpc-endpoint-library

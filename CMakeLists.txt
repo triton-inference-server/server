@@ -1,4 +1,4 @@
-# Copyright 2020-2022, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright 2020-2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -162,6 +162,7 @@ endif()
 
 # Triton with Opentelemetry is not supported on Windows
 # FIXME: add location for Windows, when support is added
+# JIRA DLIS-4786
 if (WIN32)
   set(_FINDPACKAGE_OPENTELEMETRY_CONFIG_DIR "")
 else()
