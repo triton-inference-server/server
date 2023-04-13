@@ -134,6 +134,13 @@ class TestInstanceUpdate(unittest.TestCase):
         self.assertEqual(get_initialize_count(), 5)
         self.assertEqual(get_finalize_count(), 1)
         self.__triton.infer("instance_init_del", self.__get_inputs((1,)))
+        # Shuffle the instances
+        update_instance_group(
+            "{\ncount: 3\nkind: KIND_GPU\n},\n{\ncount: 1\nkind: KIND_CPU\n}")
+        self.__triton.load_model("instance_init_del")
+        self.assertEqual(get_initialize_count(), 5)
+        self.assertEqual(get_finalize_count(), 1)
+        self.__triton.infer("instance_init_del", self.__get_inputs((4,)))
         # Remove 1 GPU instance and add 1 CPU instance
         update_instance_group(
             "{\ncount: 2\nkind: KIND_GPU\n},\n{\ncount: 2\nkind: KIND_CPU\n}")
