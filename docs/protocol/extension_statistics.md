@@ -350,7 +350,7 @@ message ModelStatistics
   // executed in the model. The batch statistics indicate how many actual
   // model executions were performed and show differences due to different
   // batch size (for example, larger batches typically take longer to compute).
-  InferBatchStatistics batch_stats = 7;
+  repeated InferBatchStatistics batch_stats = 7;
 
   // The memory usage detected during model loading, which may be
   // used to estimate the memory to be released once the model is unloaded. Note
