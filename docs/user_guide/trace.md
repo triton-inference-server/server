@@ -32,13 +32,13 @@ Triton includes that capability to generate a detailed trace for
 individual inference requests. Tracing is enable by command-line
 arguments when running the tritonserver executable.
 
-Starting in 23.04 release, Triton has one flag `--trace-config` to specify 
-global or trace mode specific configuration setting. The format of this flag 
+`--trace-config` command line option in Triton can be used to specify 
+global and trace mode specific config setting.. The format of this flag 
 is `--trace-config=<mode>,<setting>=<value>`, where `<mode>` 
 is either `triton` or `opentelemetry`. By default, the trace mode is set to `triton`,
 and the server will use Triton's trace APIs. For `opentelemetry` mode, 
-the server will use the [OpenTelemetry's APIs](#opentelemetry-trace-support) to generate, collect and export 
-traces for individual inference requests.
+the server will use the [OpenTelemetry's APIs](#opentelemetry-trace-support) to generate, 
+collect and export traces for individual inference requests.
 
 To specify global trace settings (level, rate, count, or mode), 
 the format is `--trace-config=<setting>=<value>`.
@@ -71,17 +71,16 @@ The following table shows available Triton trace APIs settings for `--trace-conf
 
 | Setting     | Default Value |  Description                                                                                                                           |
 |:------------|:--------------|----------------------------------------------------------------------------------------------------------------------------------------|
-| `file`      |     -         | Indicates where the trace output should be written. The same as deprecated `--trace-file`.|
+| `file`      | empty string  | Indicates where the trace output should be written. The same as deprecated `--trace-file`.|
 | `log-frequency`| 0          | Specifies the rate that the traces are written to file. For example, a value of 50 specifies that Triton will log to file for every 50 traces collected. The same as deprecated `--trace-log-frequency`|
 
 In addition to configure trace settings for Triton trace APIs 
-in command line arguments, The user may
-modify the trace setting when Triton server
+in command line arguments, users may modify the trace setting when Triton server
 is running via the trace APIs, more information can be found in [trace
 protocol](../protocol/extension_trace.md). This option is currently not supported,
 when trace mode is set to `opentelemetry`.
 
-**Note**: the following flags are **depricated**:
+**Note**: the following flags are **deprecated**:
 
 The `--trace-file` option indicates where the trace output should be
 written. The `--trace-rate` option specifies the sampling rate. In
@@ -361,22 +360,14 @@ The meaning of the trace timestamps is:
 
 ## Opentelemetry trace support
 
-Starting with the 23.04 release, Triton provides an option to generate and export traces 
-using [Opentelemetry APIs and SDKs](https://opentelemetry.io/). Currently this option is
-only supported for Ubuntu based systems and does not support tracing for 
-[BLS](https://github.com/triton-inference-server/python_backend/tree/main#business-logic-scripting) models.
+Triton provides an option to generate and export traces 
+using [Opentelemetry APIs and SDKs](https://opentelemetry.io/). 
 
 To specify Opentelemetry mode for tracing, specify the `--trace-config` flag as follows:
 
 ```
-$ tritonserver --trace-config=mode=opentelemetry ...
-```
-At the moment, triton supports [OTLP/HTTP Exporter](https://github.com/open-telemetry/opentelemetry-specification/blob/main/specification/protocol/otlp.md#otlphttp), provided by Opentelemetry. The endpoint 
-can be specified as follows:
-```
 $ tritonserver --trace-config=mode=opentelemetry --trace-config=opentelemetry,url=<endpoint> ...
 ```
-By default, opentelemetry uses `0.0.0.0:4318/v1/traces` as an endpoint for HTTP exporter.
 
 ### Opentelemetry trace APIs settings
 
@@ -385,3 +376,10 @@ The following table shows available Opentelemetry trace APIs settings for `--tra
 | Setting     | Default Value |  Description                                                                                                                           |
 |:------------|:--------------|----------------------------------------------------------------------------------------------------------------------------------------|
 | `url`      | `0.0.0.0:4318/v1/traces`        |  `host:port` to which the receiver is going to receive trace data.|
+
+### Limitations
+
+- Opentelemetry trace APIs only supported for Ubuntu based systems and does not support tracing for 
+[BLS](https://github.com/triton-inference-server/python_backend/tree/main#business-logic-scripting) models.
+
+- Triton supports only [OTLP/HTTP Exporter](https://github.com/open-telemetry/opentelemetry-specification/blob/main/specification/protocol/otlp.md#otlphttp) and allows specification of only endpoint for this exporter through `--trace-config`. 

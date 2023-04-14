@@ -607,6 +607,42 @@ set -e
 kill $SERVER_PID
 wait $SERVER_PID
 
+# Check `--trace-config` sets arguments properly
+SERVER_ARGS="--trace-config=triton,file=some_file.log --trace-config=level=TIMESTAMPS \
+            --trace-config=rate=4 --trace-config=count=6 --trace-config=mode=triton --model-repository=$MODELSDIR"
+SERVER_LOG="./inference_server_trace_config.log"
+run_server
+if [ "$SERVER_PID" == "0" ]; then
+    echo -e "\n***\n*** Failed to start $SERVER\n***"
+    cat $SERVER_LOG
+    exit 1
+fi
+
+rm -f ./curl.out
+set +e
+code=`curl -s -w %{http_code} -o ./curl.out localhost:8000/v2/models/simple/trace/setting`
+set -e
+if [ "$code" != "200" ]; then
+    cat ./curl.out
+    echo -e "\n***\n*** Test Failed\n***"
+    RET=1
+fi
+if [ `grep -c "\"trace_level\":\[\"TIMESTAMPS\"\]" ./curl.out` != "1" ]; then
+    RET=1
+fi
+if [ `grep -c "\"trace_rate\":\"4\"" ./curl.out` != "1" ]; then
+    RET=1
+fi
+if [ `grep -c "\"trace_count\":\"6\"" ./curl.out` != "1" ]; then
+    RET=1
+fi
+if [ `grep -c "\"log_frequency\":\"0\"" ./curl.out` != "1" ]; then
+    RET=1
+fi
+if [ `grep -c "\"trace_file\":\"some_file.log\"" ./curl.out` != "1" ]; then
+    RET=1
+fi
+
 if [ $RET -eq 0 ]; then
     echo -e "\n***\n*** Test Passed\n***"
 else
