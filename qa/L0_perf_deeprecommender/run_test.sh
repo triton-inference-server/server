@@ -90,15 +90,16 @@ for STATIC_BATCH in $STATIC_BATCH_SIZES; do
             # optimization on the first requests.  Must warmup similar
             # to actual run so that all instances are ready
             $PERF_CLIENT -v -i ${PERF_CLIENT_PROTOCOL} -m $MODEL_NAME -p5000 \
-                         -b${STATIC_BATCH} --concurrency-range ${CONCURRENCY}
+                         -b${STATIC_BATCH} --concurrency-range ${CONCURRENCY} 1>&2
 
             $PERF_CLIENT -v -i ${PERF_CLIENT_PROTOCOL} -m $MODEL_NAME -p5000 \
                          -b${STATIC_BATCH} --concurrency-range ${CONCURRENCY} \
-                         -f ${NAME}.csv 2>&1 | tee ${NAME}.log
+                         -f ${NAME}.csv | tee ${NAME}.log 1>&2
             if (( $? != 0 )); then
                 RET=1
             fi
             curl localhost:8002/metrics -o ${NAME}.metrics >> ${NAME}.log 2>&1
+            curl localhost:8002/metrics -o ${NAME}.metrics >> ${NAME}.log 1>&2
             if (( $? != 0 )); then
                 RET=1
             fi
@@ -108,7 +109,9 @@ for STATIC_BATCH in $STATIC_BATCH_SIZES; do
             echo "======================= DEBUG ==================================="
             ls
             cat ${NAME}.csv
-            for f in `ls *.log`; do cat $f; done
+            for f in `ls *.log`; do cat $f 1>&2; done
+            cat ${SERVER_LOG}
+            cat ${SERVER_LOG} 1>&2
             echo "================================================================="
             ###
 
