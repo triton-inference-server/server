@@ -34,24 +34,22 @@ if __name__ == "__main__":
     file_path = sys.argv[2]
 
     sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-
     server_address = ('localhost', port)
     sock.bind(server_address)
-
     sock.listen(1)
+
     while True:
         trace=''
         connection, client_address = sock.accept()
         try:
             while True:
-                chunk = connection.recv(4096)
-                if not chunk:
-                    break
-                connection.sendall(chunk)
-                trace = chunk.decode()
-                sys.stdout = open(file_path, "a")
-                print(trace)
-                sys.stdout.close()
+                with open(file_path, "a") as sys.stdout:
+                    chunk = connection.recv(4096)
+                    if not chunk:
+                        break
+                    connection.sendall(chunk)
+                    trace = chunk.decode()
+                    print(trace)
         finally:
             connection.close()
 
