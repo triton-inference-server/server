@@ -325,7 +325,7 @@ TraceManager::Trace::~Trace()
 #ifndef _WIN32
     this->EndSpan();
 #else
-    LOG_WARN << "Unsupported trace mode: "
+    LOG_ERROR << "Unsupported trace mode: "
              << TraceManager::InferenceTraceModeString(setting_->mode_);
 #endif
   }
@@ -363,7 +363,7 @@ TraceManager::Trace::CaptureTimestamp(
       trace_span_->AddEvent(
           name, otel_timestamp, {{"triton.steady_timestamp_ns", timestamp_ns}});
 #else
-      LOG_WARN << "Unsupported trace mode: "
+      LOG_ERROR << "Unsupported trace mode: "
                << TraceManager::InferenceTraceModeString(setting_->mode_);
 #endif
     }
@@ -519,8 +519,8 @@ TraceManager::TraceActivity(
       ts->trace_span_->SetAttribute("triton.trace_parent_id", parent_id);
       ts->trace_span_->SetAttribute("triton.trace_request_id", request_id);
 #else
-      LOG_WARN << "Unsupported trace mode: "
-               << TraceManager::InferenceTraceModeString(setting_->mode_);
+      LOG_ERROR << "Unsupported trace mode: "
+               << TraceManager::InferenceTraceModeString(ts->setting_->mode_);
 #endif
     }
   }
@@ -540,8 +540,8 @@ TraceManager::TraceActivity(
         TRITONSERVER_InferenceTraceActivityString(activity), otel_timestamp,
         {{"triton.steady_timestamp_ns", timestamp_ns}});
 #else
-    LOG_WARN << "Unsupported trace mode: "
-             << TraceManager::InferenceTraceModeString(setting_->mode_);
+    LOG_ERROR << "Unsupported trace mode: "
+             << TraceManager::InferenceTraceModeString(ts->setting_->mode_);
 #endif
   }
 }
@@ -856,7 +856,7 @@ TraceManager::TraceSetting::SampleTrace()
 #ifndef _WIN32
       lts->InitTracer(config_map_);
 #else
-      LOG_WARN << "Unsupported trace mode: "
+      LOG_ERROR << "Unsupported trace mode: "
                << TraceManager::InferenceTraceModeString(mode_);
 #endif
     }
