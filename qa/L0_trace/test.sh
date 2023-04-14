@@ -1,5 +1,5 @@
 #!/bin/bash
-# Copyright 2022, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright 2022-2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -36,6 +36,7 @@ EXPECTED_NUM_TESTS="6"
 
 TRACE_COLLECTOR=socket_echo_server.py
 TRACE_COLLECTOR_LOG="trace_collector.log"
+OTLP_PORT=10000
 
 REPO_VERSION=${NVIDIA_TRITON_SERVER_VERSION}
 if [ "$#" -ge 1 ]; then
@@ -610,6 +611,8 @@ set -e
 kill $SERVER_PID
 wait $SERVER_PID
 
+
+
 # Check `--trace-config` sets arguments properly
 SERVER_ARGS="--trace-config=triton,file=some_file.log --trace-config=level=TIMESTAMPS \
             --trace-config=rate=4 --trace-config=count=6 --trace-config=mode=triton --model-repository=$MODELSDIR"
@@ -646,9 +649,69 @@ if [ `grep -c "\"trace_file\":\"some_file.log\"" ./curl.out` != "1" ]; then
     RET=1
 fi
 
+set -e
+
 kill $SERVER_PID
 wait $SERVER_PID
 
+set +e
+
+# Check opentelemetry trace exporter sends proper info.
+# A helper python script starts listenning on $OTLP_PORT, where
+# OTLP exporter sends traces. It then check that received data contains 
+# expected entries
+SERVER_ARGS="--trace-config=triton,file=some_file.log --trace-config=level=TIMESTAMPS \
+            --trace-config=rate=1 --trace-config=count=6 --trace-config=mode=opentelemetry --trace-config=opentelemetry,url=localhost:$OTLP_PORT --model-repository=$MODELSDIR"
+SERVER_LOG="./inference_server_trace_config.log"
+run_server
+if [ "$SERVER_PID" == "0" ]; then
+    echo -e "\n***\n*** Failed to start $SERVER\n***"
+    cat $SERVER_LOG
+    exit 1
+fi
+
+# This is a simple python code that opens port
+python $TRACE_COLLECTOR $OTLP_PORT $TRACE_COLLECTOR_LOG &
+COLLECTOR_PID=$! 
+
+# To make sure receiver is ready log gets all data
+sleep 3
+
+# Send http request and collect trace
+$SIMPLE_HTTP_CLIENT >> client_update.log 2>&1
+if [ $? -ne 0 ]; then
+    RET=1
+fi
+
+# Send grpc request and collect trace
+$SIMPLE_GRPC_CLIENT >> client_update.log 2>&1
+if [ $? -ne 0 ]; then
+    RET=1
+fi
+# To make sure log gets all data
+sleep 3
+
+EXPECTED_ENTRIES=${EXPECTED_ENTRIES:="REQUEST_START QUEUE_START INFER_RESPONSE_COMPLETE COMPUTE_START COMPUTE_INPUT_END COMPUTE_OUTPUT_START COMPUTE_END REQUEST_END"}
+HTTP_ENTRIES=${HTTP_ENTRIES:="HTTP_RECV_START HTTP_RECV_END HTTP_SEND_START HTTP_SEND_END"}
+GRPC_ENTRIES=${GRPC_ENTRIES:="GRPC_WAITREAD_START GRPC_WAITREAD_END GRPC_SEND_START GRPC_SEND_END"}
+
+for ENTRY in $EXPECTED_ENTRIES; do
+    if [ `grep -c $ENTRY $TRACE_COLLECTOR_LOG` != "2" ]; then
+        RET=1
+    fi
+done
+
+for ENTRY in $HTTP_ENTRIES; do
+    if [ `grep -c $ENTRY $TRACE_COLLECTOR_LOG` != "1" ]; then
+        RET=1
+    fi
+done
+
+for ENTRY in $GRPC_ENTRIES; do
+    if [ `grep -c $ENTRY $TRACE_COLLECTOR_LOG` != "1" ]; then
+        RET=1
+    fi
+done
 
 if [ $RET -eq 0 ]; then
     echo -e "\n***\n*** Test Passed\n***"
@@ -656,5 +719,14 @@ else
     echo -e "\n***\n*** Test FAILED\n***"
 fi
 
+set -e
+
+kill $SERVER_PID
+wait $SERVER_PID
+
+kill $COLLECTOR_PID
+wait $COLLECTOR_PID
+
+set +e
 
 exit $RET
