@@ -371,7 +371,8 @@ $ tritonserver --trace-config=mode=opentelemetry --trace-config=opentelemetry,ur
 
 ### Opentelemetry trace APIs settings
 
-The following table shows available Opentelemetry trace APIs settings for `--trace-config=opentelemetry,<setting>=<value>`.
+The following table shows available Opentelemetry trace APIs settings for 
+`--trace-config=opentelemetry,<setting>=<value>`.
 
 | Setting     | Default Value |  Description                                                                                                                           |
 |:------------|:--------------|----------------------------------------------------------------------------------------------------------------------------------------|
@@ -382,4 +383,10 @@ The following table shows available Opentelemetry trace APIs settings for `--tra
 - Opentelemetry trace APIs only supported for Ubuntu based systems and does not support tracing for 
 [BLS](https://github.com/triton-inference-server/python_backend/tree/main#business-logic-scripting) models.
 
-- Triton supports only [OTLP/HTTP Exporter](https://github.com/open-telemetry/opentelemetry-specification/blob/main/specification/protocol/otlp.md#otlphttp) and allows specification of only endpoint for this exporter through `--trace-config`. 
+- Triton supports only 
+[OTLP/HTTP Exporter](https://github.com/open-telemetry/opentelemetry-specification/blob/main/specification/protocol/otlp.md#otlphttp) 
+and allows specification of only endpoint for this exporter through `--trace-config`. 
+
+- Triton does not support configuration of the opentelemetry trace settings 
+during a Triton run and opentelemetry specific settings are not available 
+for the retrieval through [Triton's trace extension](https://github.com/triton-inference-server/server/blob/main/docs/protocol/extension_trace.md).

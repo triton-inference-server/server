@@ -128,7 +128,7 @@ class TraceManager {
   void GetTraceSetting(
       const std::string& model_name, TRITONSERVER_InferenceTraceLevel* level,
       uint32_t* rate, int32_t* count, uint32_t* log_frequency,
-      std::string* filepath, InferenceTraceMode* mode);
+      std::string* filepath);
 
   // Return the current timestamp.
   static uint64_t CaptureTimestamp()

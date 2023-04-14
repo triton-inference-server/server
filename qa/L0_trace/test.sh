@@ -34,6 +34,9 @@ CLIENT_LOG="client.log"
 TEST_RESULT_FILE="test_results.txt"
 EXPECTED_NUM_TESTS="6"
 
+TRACE_COLLECTOR=socket_echo_server.py
+TRACE_COLLECTOR_LOG="trace_collector.log"
+
 REPO_VERSION=${NVIDIA_TRITON_SERVER_VERSION}
 if [ "$#" -ge 1 ]; then
     REPO_VERSION=$1
@@ -642,6 +645,10 @@ fi
 if [ `grep -c "\"trace_file\":\"some_file.log\"" ./curl.out` != "1" ]; then
     RET=1
 fi
+
+kill $SERVER_PID
+wait $SERVER_PID
+
 
 if [ $RET -eq 0 ]; then
     echo -e "\n***\n*** Test Passed\n***"

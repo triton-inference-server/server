@@ -73,8 +73,7 @@ class TraceEndpointTest(tu.TestResultCollector):
             "trace_level": ["TIMESTAMPS"],
             "trace_rate": "1",
             "trace_count": "-1",
-            "log_frequency": "0",
-            "trace_mode": "TRITON"
+            "log_frequency": "0"
         }
         triton_client = httpclient.InferenceServerClient("localhost:8000")
         self.assertEqual(initial_settings,
@@ -89,8 +88,7 @@ class TraceEndpointTest(tu.TestResultCollector):
             "trace_level": ["TIMESTAMPS"],
             "trace_rate": "1",
             "trace_count": "-1",
-            "log_frequency": "0",
-            "trace_mode": "TRITON"
+            "log_frequency": "0"
         }
         triton_client = httpclient.InferenceServerClient("localhost:8000")
         self.assertEqual(initial_settings,
@@ -121,9 +119,6 @@ class TraceEndpointTest(tu.TestResultCollector):
                     "log_frequency": {
                         "value": ["0"]
                     },
-                    "trace_mode": {
-                        "value": ["TRITON"]
-                    }
                 }
             }), initial_settings)
 
@@ -145,24 +140,21 @@ class TraceEndpointTest(tu.TestResultCollector):
             "trace_level": ["TIMESTAMPS"],
             "trace_rate": "1",
             "trace_count": "-1",
-            "log_frequency": "0",
-            "trace_mode": "TRITON"
+            "log_frequency": "0"
         }
         expected_second_model_settings = {
             "trace_file": "model.log",
             "trace_level": ["TIMESTAMPS", "TENSORS"],
             "trace_rate": "1",
             "trace_count": "-1",
-            "log_frequency": "0",
-            "trace_mode": "TRITON"
+            "log_frequency": "0"
         }
         expected_global_settings = {
             "trace_file": "another.log",
             "trace_level": ["TIMESTAMPS", "TENSORS"],
             "trace_rate": "1",
             "trace_count": "-1",
-            "log_frequency": "0",
-            "trace_mode": "TRITON"
+            "log_frequency": "0"
         }
 
         model_update_settings = {"trace_file": "model.log"}
@@ -216,9 +208,6 @@ class TraceEndpointTest(tu.TestResultCollector):
                     "log_frequency": {
                         "value": ["0"]
                     },
-                    "trace_mode": {
-                        "value": ["TRITON"]
-                    }
                 }
             }), expected_first_model_settings)
 
@@ -242,9 +231,6 @@ class TraceEndpointTest(tu.TestResultCollector):
                     "log_frequency": {
                         "value": ["0"]
                     },
-                    "trace_mode": {
-                        "value": ["TRITON"]
-                    }
                 }
             }), expected_second_model_settings)
 
@@ -267,9 +253,6 @@ class TraceEndpointTest(tu.TestResultCollector):
                     "log_frequency": {
                         "value": ["0"]
                     },
-                    "trace_mode": {
-                        "value": ["TRITON"]
-                    }
                 }
             }), expected_global_settings)
 
@@ -324,24 +307,21 @@ class TraceEndpointTest(tu.TestResultCollector):
             "trace_level": ["OFF"],
             "trace_rate": "1",
             "trace_count": "-1",
-            "log_frequency": "0",
-            "trace_mode": "TRITON"
+            "log_frequency": "0"
         }
         expected_first_model_settings = {
             "trace_file": "global_unittest.log",
             "trace_level": ["OFF"],
             "trace_rate": "12",
             "trace_count": "-1",
-            "log_frequency": "34",
-            "trace_mode": "TRITON"
+            "log_frequency": "34"
         }
         expected_second_model_settings = {
             "trace_file": "global_unittest.log",
             "trace_level": ["OFF"],
             "trace_rate": "1",
             "trace_count": "-1",
-            "log_frequency": "34",
-            "trace_mode": "TRITON"
+            "log_frequency": "34"
         }
         global_clear_settings = {"trace_rate": None, "trace_count": None}
         model_clear_settings = {"trace_rate": None, "trace_level": None}
@@ -403,9 +383,6 @@ class TraceEndpointTest(tu.TestResultCollector):
                     "log_frequency": {
                         "value": ["0"]
                     },
-                    "trace_mode": {
-                        "value": ["TRITON"]
-                    }
                 }
             }), expected_global_settings)
         expected_first_model_settings = grpcclient.service_pb2.TraceSettingResponse(
@@ -428,9 +405,6 @@ class TraceEndpointTest(tu.TestResultCollector):
                     "log_frequency": {
                         "value": ["34"]
                     },
-                    "trace_mode": {
-                        "value": ["TRITON"]
-                    }
                 }
             }), expected_first_model_settings)
         expected_second_model_settings = grpcclient.service_pb2.TraceSettingResponse(
@@ -453,9 +427,6 @@ class TraceEndpointTest(tu.TestResultCollector):
                     "log_frequency": {
                         "value": ["34"]
                     },
-                    "trace_mode": {
-                        "value": ["TRITON"]
-                    }
                 }
             }), expected_second_model_settings)
 

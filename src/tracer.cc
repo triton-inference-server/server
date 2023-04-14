@@ -281,7 +281,7 @@ void
 TraceManager::GetTraceSetting(
     const std::string& model_name, TRITONSERVER_InferenceTraceLevel* level,
     uint32_t* rate, int32_t* count, uint32_t* log_frequency,
-    std::string* filepath, InferenceTraceMode* mode)
+    std::string* filepath)
 {
   std::shared_ptr<TraceSetting> trace_setting;
   {
@@ -296,7 +296,6 @@ TraceManager::GetTraceSetting(
   *count = trace_setting->count_;
   *log_frequency = trace_setting->log_frequency_;
   *filepath = trace_setting->file_->FileName();
-  *mode = trace_setting->mode_;
 }
 
 std::shared_ptr<TraceManager::Trace>

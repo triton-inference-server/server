@@ -1958,12 +1958,6 @@ TritonParser::PostProcessTraceArgs(
   if (explicit_disable_trace) {
     lparams.trace_level_ = TRITONSERVER_TRACE_LEVEL_DISABLED;
   }
-  if (!explicit_disable_trace && lparams.trace_filepath_.empty()) {
-    std::cerr
-        << "Warning: file path is missing. "
-           "Please set file path with --trace-config=triton,file=<filepath>"
-        << std::endl;
-  }
 }
 
 #endif  // TRITON_ENABLE_TRACING

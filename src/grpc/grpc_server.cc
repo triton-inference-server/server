@@ -1232,7 +1232,6 @@ CommonHandler::RegisterTrace()
     int32_t count;
     uint32_t log_frequency;
     std::string filepath;
-    triton::server::InferenceTraceMode mode = TRACE_MODE_TRITON;
     // Update trace setting
     if (!request.settings().empty()) {
       TraceManager::NewSetting new_setting;
@@ -1378,8 +1377,7 @@ CommonHandler::RegisterTrace()
     // Get current trace setting, this is needed even if the setting
     // has been updated above as some values may not be provided in the request.
     trace_manager_->GetTraceSetting(
-        request.model_name(), &level, &rate, &count, &log_frequency, &filepath,
-        &mode);
+        request.model_name(), &level, &rate, &count, &log_frequency, &filepath);
     // level
     {
       inference::TraceSettingResponse::SettingValue level_setting;
@@ -1402,8 +1400,6 @@ CommonHandler::RegisterTrace()
     (*response->mutable_settings())["log_frequency"].add_value(
         std::to_string(log_frequency));
     (*response->mutable_settings())["trace_file"].add_value(filepath);
-    (*response->mutable_settings())["trace_mode"].add_value(
-        TraceManager::InferenceTraceModeString(mode));
 
   earlyexit:
     GrpcStatusUtil::Create(status, err);
