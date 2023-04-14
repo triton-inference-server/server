@@ -1,0 +1,10 @@
+name: security-3rd-party-pr-checks
+on:
+  # Allow for manual run of security workflows
+  workflow_dispatch:
+  # Scan changed files in PRs (diff-aware scanning):
+  pull_request: {}
+jobs:
+  running-3rd-party-pr-security-checks:
+    uses: verkada/securitybots/.github/workflows/3rd-party-pr-checks.yml@main
+    secrets: inherit
