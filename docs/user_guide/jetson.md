@@ -141,7 +141,7 @@ wget -O - https://apt.kitware.com/keys/kitware-archive-latest.asc 2>/dev/null | 
     apt-add-repository 'deb https://apt.kitware.com/ubuntu/ focal main' && \
     apt-get update && \
     apt-get install -y --no-install-recommends \
-        cmake-data=3.21.1-0kitware1ubuntu20.04.1 cmake=3.21.1-0kitware1ubuntu20.04.1
+        cmake-data=3.25.2-0kitware1ubuntu20.04.1 cmake=3.25.2-0kitware1ubuntu20.04.1
 ```
 
 ### Runtime Dependencies for Triton
@@ -188,8 +188,9 @@ LD_LIBRARY_PATH="$LD_LIBRARY_PATH:/usr/lib/llvm-8/lib"
 ```
 
 **Note**: On Jetson, the backend directory must be explicitly specified using the
-`--backend-directory` flag. Triton defaults to using TensorFlow 2.x and a version string
-is required to use TensorFlow 1.x.
+`--backend-directory` flag. Starting from 23.04, Triton no longer supports
+TensorFlow 1.x. If you'd like to use TensorFlow 1.x with Triton prior to 23.04,
+a version string is required to use TensorFlow 1.x.
 
 ```
 tritonserver --model-repository=/path/to/model_repo --backend-directory=/path/to/tritonserver/backends \

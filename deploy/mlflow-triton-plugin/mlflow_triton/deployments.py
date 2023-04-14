@@ -259,7 +259,7 @@ class TritonPlugin(BaseDeploymentClient):
             res = {}
             for output in resp.get_response()['outputs']:
                 res[output['name']] = resp.as_numpy(output['name'])
-            return {"outputs": res}
+            return pd.DataFrame.from_dict({"outputs": res})
         except InferenceServerException as ex:
             raise MlflowException(str(ex))
 

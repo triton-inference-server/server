@@ -1,4 +1,4 @@
-// Copyright 2019-2022, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+// Copyright 2019-2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 //
 // Redistribution and use in source and binary forms, with or without
 // modification, are permitted provided that the following conditions
@@ -34,6 +34,7 @@
 #include <re2/re2.h>
 #include <algorithm>
 #include <list>
+#include <regex>
 #include <thread>
 #include "classification.h"
 
@@ -701,7 +702,7 @@ CheckBinaryInputData(
     triton::common::TritonJson::Value binary_data_size_json;
     if (params_json.Find("binary_data_size", &binary_data_size_json)) {
       RETURN_MSG_IF_ERR(
-          binary_data_size_json.AsUInt(byte_size),
+          binary_data_size_json.AsUInt(reinterpret_cast<uint64_t*>(byte_size)),
           "Unable to parse 'binary_data_size'");
       *is_binary = true;
     }
@@ -973,9 +974,10 @@ HTTPAPIServer::HTTPAPIServer(
     const std::shared_ptr<TRITONSERVER_Server>& server,
     triton::server::TraceManager* trace_manager,
     const std::shared_ptr<SharedMemoryManager>& shm_manager, const int32_t port,
-    const bool reuse_port, const std::string address, const int thread_cnt)
-    : HTTPServer(port, reuse_port, address, thread_cnt), server_(server),
-      trace_manager_(trace_manager), shm_manager_(shm_manager),
+    const bool reuse_port, const std::string& address,
+    const std::string& header_forward_pattern, const int thread_cnt)
+    : HTTPServer(port, reuse_port, address, header_forward_pattern, thread_cnt),
+      server_(server), trace_manager_(trace_manager), shm_manager_(shm_manager),
       allocator_(nullptr), server_regex_(R"(/v2(?:/health/(live|ready))?)"),
       model_regex_(
           R"(/v2/models/([^/]+)(?:/versions/([0-9]+))?(?:/(infer|ready|config|stats|trace/setting))?)"),
@@ -1069,13 +1071,14 @@ HTTPAPIServer::InferResponseAlloc(
     // ...then make sure shared memory size is at least as big as
     // the size of the output.
     if (byte_size > info->byte_size_) {
+      const auto info_byte_size = info->byte_size_;
       delete info;
       return TRITONSERVER_ErrorNew(
           TRITONSERVER_ERROR_INTERNAL,
           std::string(
               "shared memory size specified with the request for output '" +
               std::string(tensor_name) + "' (" +
-              std::to_string(info->byte_size_) + " bytes) should be at least " +
+              std::to_string(info_byte_size) + " bytes) should be at least " +
               std::to_string(byte_size) + " bytes to hold the results")
               .c_str());
     }
@@ -2353,82 +2356,110 @@ HTTPAPIServer::EVBufferToInput(
   AllocPayload::OutputInfo::Kind default_output_kind =
       AllocPayload::OutputInfo::JSON;
 
-  // Set sequence correlation ID and flags if any
   triton::common::TritonJson::Value params_json;
   if (request_json.Find("parameters", &params_json)) {
-    triton::common::TritonJson::Value seq_json;
-    if (params_json.Find("sequence_id", &seq_json)) {
-      // Try to parse sequence_id as uint64_t
-      uint64_t seq_id;
-      if (seq_json.AsUInt(&seq_id) != nullptr) {
-        // On failure try to parse as a string
-        std::string seq_id;
-        RETURN_MSG_IF_ERR(
-            seq_json.AsString(&seq_id), "Unable to parse 'sequence_id'");
-        RETURN_IF_ERR(TRITONSERVER_InferenceRequestSetCorrelationIdString(
-            irequest, seq_id.c_str()));
-      } else {
-        RETURN_IF_ERR(
-            TRITONSERVER_InferenceRequestSetCorrelationId(irequest, seq_id));
-      }
-    }
+    std::vector<std::string> parameters;
+    RETURN_MSG_IF_ERR(
+        params_json.Members(&parameters), "failed to get request params.");
 
     uint32_t flags = 0;
-
-    {
-      triton::common::TritonJson::Value start_json;
-      if (params_json.Find("sequence_start", &start_json)) {
+    for (auto& parameter : parameters) {
+      if (parameter == "sequence_id") {
+        uint64_t seq_id;
+        // Try to parse sequence_id as uint64_t
+        TRITONSERVER_Error* err;
+        if ((err = params_json.MemberAsUInt(parameter.c_str(), &seq_id)) !=
+            nullptr) {
+          TRITONSERVER_ErrorDelete(err);
+          // On failure try to parse as a string
+          std::string seq_id;
+          RETURN_MSG_IF_ERR(
+              params_json.MemberAsString(parameter.c_str(), &seq_id),
+              "Unable to parse 'sequence_id'");
+          RETURN_IF_ERR(TRITONSERVER_InferenceRequestSetCorrelationIdString(
+              irequest, seq_id.c_str()));
+        } else {
+          RETURN_IF_ERR(
+              TRITONSERVER_InferenceRequestSetCorrelationId(irequest, seq_id));
+        }
+      } else if (parameter == "sequence_start") {
         bool start;
         RETURN_MSG_IF_ERR(
-            start_json.AsBool(&start), "Unable to parse 'sequence_start'");
+            params_json.MemberAsBool(parameter.c_str(), &start),
+            "Unable to parse 'sequence_start'");
         if (start) {
           flags |= TRITONSERVER_REQUEST_FLAG_SEQUENCE_START;
         }
-      }
-
-      triton::common::TritonJson::Value end_json;
-      if (params_json.Find("sequence_end", &end_json)) {
+      } else if (parameter == "sequence_end") {
         bool end;
         RETURN_MSG_IF_ERR(
-            end_json.AsBool(&end), "Unable to parse 'sequence_end'");
+            params_json.MemberAsBool(parameter.c_str(), &end),
+            "Unable to parse 'sequence_end'");
         if (end) {
           flags |= TRITONSERVER_REQUEST_FLAG_SEQUENCE_END;
+        }
+      } else if (parameter == "priority") {
+        uint64_t p;
+        RETURN_MSG_IF_ERR(
+            params_json.MemberAsUInt(parameter.c_str(), &p),
+            "Unable to parse 'priority'");
+        RETURN_IF_ERR(TRITONSERVER_InferenceRequestSetPriority(irequest, p));
+      } else if (parameter == "timeout") {
+        uint64_t t;
+        RETURN_MSG_IF_ERR(
+            params_json.MemberAsUInt(parameter.c_str(), &t),
+            "Unable to parse 'timeout'");
+        RETURN_IF_ERR(
+            TRITONSERVER_InferenceRequestSetTimeoutMicroseconds(irequest, t));
+      } else if (parameter == "binary_data_output") {
+        bool bdo;
+        RETURN_MSG_IF_ERR(
+            params_json.MemberAsBool(parameter.c_str(), &bdo),
+            "Unable to parse 'binary_data_output'");
+        default_output_kind = (bdo) ? AllocPayload::OutputInfo::BINARY
+                                    : AllocPayload::OutputInfo::JSON;
+      } else if (parameter.rfind("triton_", 0) == 0) {
+        return TRITONSERVER_ErrorNew(
+            TRITONSERVER_ERROR_INVALID_ARG,
+            ("parameter keys starting with 'triton_' are reserved for Triton "
+             "usage "
+             "and should not be specified."));
+      } else {
+        triton::common::TritonJson::Value value;
+        if (!params_json.Find(parameter.c_str(), &value)) {
+          return TRITONSERVER_ErrorNew(
+              TRITONSERVER_ERROR_INTERNAL,
+              ("parameter key '" + parameter + "' was not found in the JSON")
+                  .c_str());
+        }
+
+        if (value.IsString()) {
+          std::string string_value;
+          RETURN_IF_ERR(value.AsString(&string_value));
+          RETURN_IF_ERR(TRITONSERVER_InferenceRequestSetStringParameter(
+              irequest, parameter.c_str(), string_value.c_str()));
+        } else if (value.IsInt()) {
+          int64_t int_value;
+          RETURN_IF_ERR(value.AsInt(&int_value));
+          RETURN_IF_ERR(TRITONSERVER_InferenceRequestSetIntParameter(
+              irequest, parameter.c_str(), int_value));
+        } else if (value.IsBool()) {
+          bool bool_value;
+          RETURN_IF_ERR(value.AsBool(&bool_value));
+          RETURN_IF_ERR(TRITONSERVER_InferenceRequestSetBoolParameter(
+              irequest, parameter.c_str(), bool_value));
+        } else {
+          return TRITONSERVER_ErrorNew(
+              TRITONSERVER_ERROR_INVALID_ARG,
+              ("parameter '" + parameter +
+               "' has invalid type. It should be either "
+               "'int', 'bool', or 'string'.")
+                  .c_str());
         }
       }
     }
 
     RETURN_IF_ERR(TRITONSERVER_InferenceRequestSetFlags(irequest, flags));
-
-    {
-      triton::common::TritonJson::Value priority_json;
-      if (params_json.Find("priority", &priority_json)) {
-        uint64_t p;
-        RETURN_MSG_IF_ERR(
-            priority_json.AsUInt(&p), "Unable to parse 'priority'");
-        RETURN_IF_ERR(TRITONSERVER_InferenceRequestSetPriority(irequest, p));
-      }
-    }
-
-    {
-      triton::common::TritonJson::Value timeout_json;
-      if (params_json.Find("timeout", &timeout_json)) {
-        uint64_t t;
-        RETURN_MSG_IF_ERR(timeout_json.AsUInt(&t), "Unable to parse 'timeout'");
-        RETURN_IF_ERR(
-            TRITONSERVER_InferenceRequestSetTimeoutMicroseconds(irequest, t));
-      }
-    }
-
-    {
-      triton::common::TritonJson::Value bdo_json;
-      if (params_json.Find("binary_data_output", &bdo_json)) {
-        bool bdo;
-        RETURN_MSG_IF_ERR(
-            bdo_json.AsBool(&bdo), "Unable to parse 'binary_data_output'");
-        default_output_kind = (bdo) ? AllocPayload::OutputInfo::BINARY
-                                    : AllocPayload::OutputInfo::JSON;
-      }
-    }
   }
 
   // Get the byte-size for each input and from that get the blocks
@@ -2524,7 +2555,7 @@ HTTPAPIServer::EVBufferToInput(
       uint64_t shm_offset;
       const char* shm_region;
       RETURN_IF_ERR(CheckSharedMemoryData(
-          request_input, &use_shm, &shm_region, &shm_offset, &byte_size));
+          request_input, &use_shm, &shm_region, &shm_offset, reinterpret_cast<uint64_t*>(&byte_size)));
       if (use_shm) {
         void* base;
         TRITONSERVER_MemoryType memory_type;
@@ -2734,6 +2765,41 @@ HTTPAPIServer::EVBufferToRawInput(
   return nullptr;  // success
 }
 
+struct HeaderSearchPayload {
+  HeaderSearchPayload(
+      const re2::RE2& regex, TRITONSERVER_InferenceRequest* request)
+      : regex_(regex), request_(request), error_(nullptr)
+  {
+  }
+
+  const re2::RE2& regex_;
+  TRITONSERVER_InferenceRequest* request_;
+  TRITONSERVER_Error* error_;
+};
+
+int
+ForEachHeader(evhtp_header_t* header, void* arg)
+{
+  HeaderSearchPayload* header_search_payload =
+      reinterpret_cast<HeaderSearchPayload*>(arg);
+
+  TRITONSERVER_InferenceRequest* request = header_search_payload->request_;
+  const re2::RE2& regex = header_search_payload->regex_;
+
+  std::string matched_string;
+  if (RE2::PartialMatch(std::string(header->key), regex)) {
+    header_search_payload->error_ =
+        TRITONSERVER_InferenceRequestSetStringParameter(
+            request, header->key, header->val);
+
+    if (header_search_payload->error_ != nullptr) {
+      return 1;
+    }
+  }
+
+  return 0;
+}
+
 void
 HTTPAPIServer::HandleInfer(
     evhtp_request_t* req, const std::string& model_name,
@@ -2869,6 +2935,16 @@ HTTPAPIServer::HandleInfer(
             (decompressed_buffer == nullptr) ? req->buffer_in
                                              : decompressed_buffer,
             infer_request.get());
+      }
+    }
+    if (err == nullptr && (!header_forward_pattern_.empty())) {
+      HeaderSearchPayload header_search_payload(
+          header_forward_regex_, irequest);
+      int status = evhtp_kvs_for_each(
+          req->headers_in, ForEachHeader,
+          reinterpret_cast<void*>(&header_search_payload));
+      if (status != 0) {
+        err = header_search_payload.error_;
       }
     }
     if (err == nullptr) {
@@ -3466,12 +3542,13 @@ HTTPAPIServer::Create(
     const std::shared_ptr<TRITONSERVER_Server>& server,
     triton::server::TraceManager* trace_manager,
     const std::shared_ptr<SharedMemoryManager>& shm_manager, const int32_t port,
-    const bool reuse_port, const std::string address, const int thread_cnt,
+    const bool reuse_port, const std::string& address,
+    const std::string& header_forward_pattern, const int thread_cnt,
     std::unique_ptr<HTTPServer>* http_server)
 {
   http_server->reset(new HTTPAPIServer(
       server, trace_manager, shm_manager, port, reuse_port, address,
-      thread_cnt));
+      header_forward_pattern, thread_cnt));
 
   const std::string addr = address + ":" + std::to_string(port);
   LOG_INFO << "Started HTTPService at " << addr;

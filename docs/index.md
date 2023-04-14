@@ -1,5 +1,5 @@
 <!--
-# Copyright 2022, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright 2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -25,11 +25,6 @@
 # (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 -->
-
----
-title: Triton Inference Server
----
-
 
 ::::{grid}
 :reverse:
@@ -95,4 +90,8 @@ Major features include:
 - [Metrics](user_guide/metrics.md) indicating GPU utilization, server
   throughput, server latency, and more
 
-Join the Triton and TensorRT community and stay current on the latest product updates, bug fixes, content, best practices, and more. Need enterprise support? NVIDIA global support is available for Triton Inference Server with the NVIDIA AI Enterprise software suite.
+Join the [Triton and TensorRT community](https://www.nvidia.com/en-us/deep-learning-ai/triton-tensorrt-newsletter/) and stay current on the latest product updates, bug fixes, content, best 
+practices, and more. Need enterprise support? NVIDIA global support is available 
+for Triton Inference Server with the [NVIDIA AI Enterprise software suite](https://www.nvidia.com/en-us/data-center/products/ai-enterprise/).
+
+See the [Lastest Release Notes](https://docs.nvidia.com/deeplearning/triton-inference-server/release-notes/rel-23-03.html#rel-23-03) for updates on the newest features and bug fixes.

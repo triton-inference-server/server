@@ -1,5 +1,5 @@
 #!/bin/bash
-# Copyright 2022, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright 2022-2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -299,6 +299,97 @@ else
     # Assert batching disabled    
     if [ "$(grep -a -E '\"dynamic_batching\": \{}' $SERVER_LOG)" != "" ]; then
         echo "*** FAILED: Found dynamic batching in configuration when none expected.\n"
+        RET=1
+    fi
+
+    kill $SERVER_PID
+    wait $SERVER_PID
+
+fi
+
+#
+# General backend tests
+# 
+
+# We want to make sure that backend configurations 
+# are not lost. For this purpose we are using only onnx backend
+
+rm -rf ./models/
+mkdir -p ./models/no_config/
+cp -r /data/inferenceserver/${REPO_VERSION}/qa_model_repository/onnx_float32_float32_float32/1 ./models/no_config/
+
+# First getting a baseline for the number of default configs 
+# added during a server set up 
+SERVER_ARGS="$COMMON_ARGS"
+SERVER_LOG=$SERVER_LOG_BASE.default_configs.log
+run_server
+
+if [ "$SERVER_PID" == "0" ]; then
+    echo -e "*** FAILED: Server failed to start $SERVER\n"
+    RET=1
+
+else
+    # Count number of default configs
+    BACKEND_CONFIG_MAP=$(grep -a "backend configuration:" $SERVER_LOG -A 1  | grep -v "backend configuration")
+    DEFAULT_CONFIG_COUNT=$(echo $BACKEND_CONFIG_MAP | jq -r | jq '.["cmdline"]' | jq 'length')
+    if [ $DEFAULT_CONFIG_COUNT -lt 4 ]; then
+        echo "*** FAILED: Expected number of default configs to be at least 4 but found: $DEFAULT_CONFIG_COUNT\n"
+        RET=1
+    fi
+
+    kill $SERVER_PID
+    wait $SERVER_PID
+
+fi
+
+# Now make sure that when setting specific backend configs
+# default ones are not lost.
+# Current logic for backend config resolution reads default configs first,
+# then specific configs and overrides defaults if needed. 
+# We would like to make sure that none of configs are lost and 
+# defaults are properly overriden.
+# One of defaultconfigs is `min-compute-capability`. This test
+# checks if it is properlly overriden.
+MIN_COMPUTE_CAPABILITY=XX
+SERVER_ARGS="--backend-config=onnxruntime,min-compute-capability=$MIN_COMPUTE_CAPABILITY $COMMON_ARGS"
+SERVER_LOG=$SERVER_LOG_BASE.global_configs.log
+run_server
+
+if [ "$SERVER_PID" == "0" ]; then
+    echo -e "*** FAILED: Server failed to start $SERVER\n"
+    RET=1
+
+else
+    # Count number of default configs
+    BACKEND_CONFIG_MAP=$(grep -a "backend configuration:" $SERVER_LOG -A 1  | grep -v "backend configuration")
+    CONFIG_VALUE=$(echo $BACKEND_CONFIG_MAP | jq -r | jq '.["cmdline"]' | jq -r '.["min-compute-capability"]')
+
+    if [ $CONFIG_VALUE != $MIN_COMPUTE_CAPABILITY ]; then
+        echo "*** FAILED: Expected min-compute-capability config to be $MIN_COMPUTE_CAPABILITY but found: $CONFIG_VALUE\n"
+        RET=1
+    fi
+
+    kill $SERVER_PID
+    wait $SERVER_PID
+
+fi
+# Now make sure that specific backend configs are not lost.
+SERVER_ARGS="--backend-config=onnxruntime,a=0 --backend-config=onnxruntime,y=0 --backend-config=onnxruntime,z=0 $COMMON_ARGS"
+SERVER_LOG=$SERVER_LOG_BASE.specific_configs.log
+EXPECTED_CONFIG_COUNT=$(($DEFAULT_CONFIG_COUNT+3))
+run_server
+
+if [ "$SERVER_PID" == "0" ]; then
+    echo -e "*** FAILED: Server failed to start $SERVER\n"
+    RET=1
+
+else
+    # Count number of default configs
+    BACKEND_CONFIG_MAP=$(grep -a "backend configuration:" $SERVER_LOG -A 1  | grep -v "backend configuration")
+    TOTAL_CONFIG_COUNT=$(echo $BACKEND_CONFIG_MAP | jq -r | jq '.["cmdline"]' | jq 'length')
+
+    if [ $TOTAL_CONFIG_COUNT -ne $EXPECTED_CONFIG_COUNT ]; then
+        echo "*** FAILED: Expected number of backend configs to be $EXPECTED_CONFIG_COUNT but found: $TOTAL_CONFIG_COUNT\n"
         RET=1
     fi
 

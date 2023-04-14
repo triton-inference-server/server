@@ -37,12 +37,15 @@ SERVER_LOG="./inference_server.log"
 RET=0
 rm -fr *.log python_backend/
 
-# Install torch
-# Skip torch install on Jetson since it is already installed.
+# Install torch 
+# Skip torch and torchvision install on Jetson since it is already installed.
 if [ "$TEST_JETSON" == "0" ]; then
     pip3 uninstall -y torch
-    pip3 install torch==1.13.0+cu117 -f https://download.pytorch.org/whl/torch_stable.html
+    pip3 install torch==1.13.0+cu117 -f https://download.pytorch.org/whl/torch_stable.html torchvision==0.14.0+cu117
 fi
+
+# Install `validators` for Model Instance Kind example
+pip3 install validators
 
 # Install JAX
 if [ "$TEST_JETSON" == "0" ]; then
@@ -377,6 +380,39 @@ if [ "$TEST_JETSON" == "0" ]; then
     kill $SERVER_PID
     wait $SERVER_PID
 fi
+
+# Example 7
+
+# Model Instance Kind
+CLIENT_LOG="./model_instance_kind.log"
+mkdir -p models/resnet50/1
+cp examples/instance_kind/model.py models/resnet50/1/
+cp examples/instance_kind/config.pbtxt models/resnet50/
+run_server
+if [ "$SERVER_PID" == "0" ]; then
+    echo -e "\n***\n*** Failed to start $SERVER\n***"
+    cat $SERVER_LOG
+    RET=1
+fi
+
+set +e
+python3 examples/instance_kind/client.py --label_file examples/instance_kind/resnet50_labels.txt > $CLIENT_LOG
+if [ $? -ne 0 ]; then
+    echo -e "\n***\n*** Failed to verify Model instance Kind example. \n***"
+    RET=1
+fi
+
+grep "PASS" $CLIENT_LOG
+if [ $? -ne 0 ]; then
+    echo -e "\n***\n*** Failed to verify Model Instance Kind example. Example failed to pass. \n***"
+    cat $CLIENT_LOG
+    RET=1
+fi
+set -e
+
+kill $SERVER_PID
+wait $SERVER_PID
+
 
 if [ $RET -eq 0 ]; then
     echo -e "\n***\n*** Example verification test PASSED.\n***"

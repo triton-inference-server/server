@@ -798,7 +798,8 @@ scheduler will:
 #### Additional Resources
 
 You can find additional end-to-end ensemble examples in the links below:
-
+* [This guide](https://github.com/triton-inference-server/tutorials/tree/main/Conceptual_Guide/Part_5-Model_Ensembles) 
+explores the concept of ensembles with a running example.
 * [Preprocessing in Python Backend Using
   Ensemble](https://github.com/triton-inference-server/python_backend#preprocessing)
 * [Accelerating Inference with NVIDIA Triton Inference Server and NVIDIA

@@ -1,4 +1,4 @@
-# Copyright 2019-2022, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright 2019-2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -175,21 +175,21 @@ def create_tf_modelfile(create_savedmodel, models_dir, model_version, max_batch,
 
     # Create the model. If non-batching then don't include the batch
     # dimension.
-    tf.reset_default_graph()
+    tf.compat.v1.reset_default_graph()
     if create_savedmodel and (max_batch == 0):
-        input0 = tf.placeholder(tf_input_dtype, [
+        input0 = tf.compat.v1.placeholder(tf_input_dtype, [
             1,
         ], "INPUT")
         if tf_input_dtype == tf.string:
             input0 = tf.strings.to_number(tf.strings.join(["0", input0]),
                                           tf_dtype)
-        start0 = tf.placeholder(tf_control_type, [
+        start0 = tf.compat.v1.placeholder(tf_control_type, [
             1,
         ], "START")
-        ready0 = tf.placeholder(tf_control_type, [
+        ready0 = tf.compat.v1.placeholder(tf_control_type, [
             1,
         ], "READY")
-        acc = tf.get_variable("ACC", [
+        acc = tf.compat.v1.get_variable("ACC", [
             1,
         ], dtype=tf_dtype)
 
@@ -198,14 +198,15 @@ def create_tf_modelfile(create_savedmodel, models_dir, model_version, max_batch,
             start0 = tf.cast(start0, tf.int32)
             ready0 = tf.cast(ready0, tf.int32)
 
-        tmp = tf.where(tf.equal(start0, 1), input0, tf.add(acc, input0))
-        newacc = tf.where(tf.equal(ready0, 1), tmp, acc)
+        tmp = tf.compat.v1.where(tf.equal(start0, 1), input0,
+                                 tf.add(acc, input0))
+        newacc = tf.compat.v1.where(tf.equal(ready0, 1), tmp, acc)
 
-        assign = tf.assign(acc, newacc)
+        assign = tf.compat.v1.assign(acc, newacc)
         if tf_input_dtype == tf.string:
-            output0 = tf.dtypes.as_string(assign, name="OUTPUT")
+            tf.strings.as_string(assign, name="OUTPUT")
         else:
-            output0 = tf.identity(assign, name="OUTPUT")
+            tf.identity(assign, name="OUTPUT")
     else:
         # For batching we can't use a tf.variable to hold the
         # accumulated values since that forces the size of the output
@@ -214,27 +215,28 @@ def create_tf_modelfile(create_savedmodel, models_dir, model_version, max_batch,
         # output shape being [None, 1]. So instead we just return 0 if
         # not-ready and 'INPUT'+'START' otherwise... the tests know to
         # expect this.
-        input0 = tf.placeholder(tf_input_dtype, [
+        input0 = tf.compat.v1.placeholder(tf_input_dtype, [
             None,
         ] + tu.shape_to_tf_shape(shape), "INPUT")
         if tf_input_dtype == tf.string:
             input0 = tf.strings.to_number(tf.strings.join(["0", input0]),
                                           tf_dtype)
-        start0 = tf.placeholder(tf_control_type, [None, 1], "START")
-        ready0 = tf.placeholder(tf_control_type, [None, 1], "READY")
+        start0 = tf.compat.v1.placeholder(tf_control_type, [None, 1], "START")
+        ready0 = tf.compat.v1.placeholder(tf_control_type, [None, 1], "READY")
 
         # Convert boolean value to int32 value
         if tf_control_type == tf.bool:
             start0 = tf.cast(start0, tf.int32)
             ready0 = tf.cast(ready0, tf.int32)
 
-        tmp = tf.where(tf.equal(ready0, 1), tf.add(start0, input0),
-                       tf.zeros(tf.shape(input0), dtype=tf_dtype))
+        tmp = tf.compat.v1.where(
+            tf.equal(ready0, 1), tf.add(start0, input0),
+            tf.zeros(tf.shape(input=input0), dtype=tf_dtype))
 
         if tf_input_dtype == tf.string:
-            output0 = tf.dtypes.as_string(tmp, name="OUTPUT")
+            tf.strings.as_string(tmp, name="OUTPUT")
         else:
-            output0 = tf.identity(tmp, name="OUTPUT")
+            tf.identity(tmp, name="OUTPUT")
 
     # Use a different model name for the non-batching variant
     if create_savedmodel:
@@ -252,24 +254,28 @@ def create_tf_modelfile(create_savedmodel, models_dir, model_version, max_batch,
         pass  # ignore existing dir
 
     if create_savedmodel:
-        with tf.Session() as sess:
-            sess.run(tf.initializers.global_variables())
-            input0_tensor = tf.get_default_graph().get_tensor_by_name("INPUT:0")
-            start0_tensor = tf.get_default_graph().get_tensor_by_name("START:0")
-            ready0_tensor = tf.get_default_graph().get_tensor_by_name("READY:0")
-            output0_tensor = tf.get_default_graph().get_tensor_by_name(
-                "OUTPUT:0")
-            tf.saved_model.simple_save(sess,
-                                       model_version_dir + "/model.savedmodel",
-                                       inputs={
-                                           "INPUT": input0_tensor,
-                                           "START": start0_tensor,
-                                           "READY": ready0_tensor
-                                       },
-                                       outputs={"OUTPUT": output0_tensor})
+        with tf.compat.v1.Session() as sess:
+            sess.run(tf.compat.v1.initializers.global_variables())
+            input0_tensor = tf.compat.v1.get_default_graph().get_tensor_by_name(
+                "INPUT:0")
+            start0_tensor = tf.compat.v1.get_default_graph().get_tensor_by_name(
+                "START:0")
+            ready0_tensor = tf.compat.v1.get_default_graph().get_tensor_by_name(
+                "READY:0")
+            output0_tensor = tf.compat.v1.get_default_graph(
+            ).get_tensor_by_name("OUTPUT:0")
+            tf.compat.v1.saved_model.simple_save(
+                sess,
+                model_version_dir + "/model.savedmodel",
+                inputs={
+                    "INPUT": input0_tensor,
+                    "START": start0_tensor,
+                    "READY": ready0_tensor
+                },
+                outputs={"OUTPUT": output0_tensor})
     else:
-        with tf.Session() as sess:
-            sess.run(tf.initializers.global_variables())
+        with tf.compat.v1.Session() as sess:
+            sess.run(tf.compat.v1.initializers.global_variables())
             graph_io.write_graph(sess.graph.as_graph_def(),
                                  model_version_dir,
                                  "model.graphdef",
@@ -460,7 +466,7 @@ def create_plan_shape_tensor_modelfile(models_dir, model_version, max_batch,
     config.flags = flags
     config.add_optimization_profile(profile)
 
-    config.max_workspace_size = 1 << 20
+    config.set_memory_pool_limit(trt.MemoryPoolType.WORKSPACE, 1 << 20)
     try:
         engine_bytes = builder.build_serialized_network(network, config)
     except AttributeError:
@@ -501,7 +507,7 @@ def create_plan_fixed_modelfile(models_dir, model_version, max_batch, dtype,
     network.mark_output(out0.get_output(0))
 
     config = builder.create_builder_config()
-    config.max_workspace_size = 1 << 20
+    config.set_memory_pool_limit(trt.MemoryPoolType.WORKSPACE, 1 << 20)
     builder.max_batch_size = max(1, max_batch)
     try:
         engine_bytes = builder.build_serialized_network(network, config)
@@ -566,7 +572,7 @@ def create_plan_fixed_rf_modelfile(models_dir, model_version, max_batch, dtype,
 
     config = builder.create_builder_config()
     config.flags = flags
-    config.max_workspace_size = 1 << 20
+    config.set_memory_pool_limit(trt.MemoryPoolType.WORKSPACE, 1 << 20)
     builder.max_batch_size = max(1, max_batch)
     try:
         engine_bytes = builder.build_serialized_network(network, config)
@@ -646,7 +652,7 @@ def create_plan_dynamic_modelfile(models_dir, model_version, max_batch, dtype,
     config = builder.create_builder_config()
     config.add_optimization_profile(profile)
 
-    config.max_workspace_size = 1 << 20
+    config.set_memory_pool_limit(trt.MemoryPoolType.WORKSPACE, 1 << 20)
     try:
         engine_bytes = builder.build_serialized_network(network, config)
     except AttributeError:
@@ -749,7 +755,7 @@ def create_plan_dynamic_rf_modelfile(models_dir, model_version, max_batch,
     config.flags = flags
     config.add_optimization_profile(profile)
 
-    config.max_workspace_size = 1 << 20
+    config.set_memory_pool_limit(trt.MemoryPoolType.WORKSPACE, 1 << 20)
     try:
         engine_bytes = builder.build_serialized_network(network, config)
     except AttributeError:
@@ -1494,6 +1500,7 @@ if __name__ == '__main__':
     if FLAGS.graphdef or FLAGS.savedmodel:
         import tensorflow as tf
         from tensorflow.python.framework import graph_io
+        tf.compat.v1.disable_eager_execution()
     if FLAGS.tensorrt or FLAGS.tensorrt_shape_io:
         import tensorrt as trt
     if FLAGS.onnx:

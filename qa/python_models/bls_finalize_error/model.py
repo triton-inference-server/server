@@ -1,4 +1,4 @@
-# Copyright (c) 2021, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright 2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -24,47 +24,22 @@
 # (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-from locust import HttpUser, task, between
-from locust import LoadTestShape
-import json
+import triton_python_backend_utils as pb_utils
+import time
+import numpy as np
 
+class TritonPythonModel:
+    def initialize(self, args):
+        pass
 
-class ProfileLoad(LoadTestShape):
-    '''
-    This load profile starts at 0 and steps up by step_users
-    increments every tick, up to target_users.  After reaching
-    target_user level, load will stay at target_user level
-    until time_limit is reached.
-    '''
+    def execute(self, requests):
+        pass
 
-    target_users = 1000
-    step_users = 50  # ramp users each step
-    time_limit = 3600  # seconds
-
-    def tick(self):
-        num_steps = self.target_users / self.step_users
-        run_time = round(self.get_run_time())
-
-        if run_time < self.time_limit:
-            if num_steps < run_time:
-                user_count = num_steps * self.step_users
-            else:
-                user_count = self.target_users
-            return (user_count, self.step_users)
-        else:
-            return None
-
-
-class TritonUser(HttpUser):
-    wait_time = between(0.2, 0.2)
-
-    @task()
-    def bert(self):
-        response = self.client.post(self.url1, data=json.dumps(self.data))
-
-    def on_start(self):
-        with open('bert_request.json') as f:
-            self.data = json.load(f)
-
-        self.url1 = '{}/v2/models/{}/infer'.format(self.environment.host,
-                                                   'bert_large')
+    def finalize(self):
+        print('Cleaning up...')
+        input0_np = np.random.randint(3, size=1, dtype=np.int32)
+        input0 = pb_utils.Tensor('IN', input0_np)
+        infer_request = pb_utils.InferenceRequest(model_name='square_int32',
+                                                inputs=[input0],
+                                                requested_output_names=['OUT'])
+        infer_responses = infer_request.exec(decoupled=True)

@@ -1,5 +1,5 @@
 #!/bin/bash
-# Copyright 2018-2022, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright 2018-2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -43,7 +43,7 @@ export CUDA_VISIBLE_DEVICES=0
 TEST_RESULT_FILE='test_results.txt'
 CLIENT_LOG_BASE="./client"
 INFER_TEST=infer_test.py
-SERVER_TIMEOUT=600
+SERVER_TIMEOUT=${SERVER_TIMEOUT:=600}
 
 if [ -z "$TEST_SYSTEM_SHARED_MEMORY" ]; then
     TEST_SYSTEM_SHARED_MEMORY="0"
@@ -63,8 +63,8 @@ if [ "$TEST_VALGRIND" -eq 1 ]; then
     LEAKCHECK_ARGS_BASE="--leak-check=full --show-leak-kinds=definite --max-threads=3000 --num-callers=20"
     SERVER_TIMEOUT=4000
     rm -f $LEAKCHECK_LOG_BASE*
-    # Remove onnx and python backends for now as the server hangs up when 
-    # loading onnx and python models during valgrind test. DLIS-4056
+    # Remove 'python', 'python_dlpack' and 'onnx' from BACKENDS and test them
+    # separately below.
     BACKENDS="graphdef savedmodel libtorch plan openvino"
 fi
 
@@ -133,6 +133,12 @@ export BACKENDS
 # If ENSEMBLES not specified, set to 1
 ENSEMBLES=${ENSEMBLES:="1"}
 export ENSEMBLES
+
+# Test for both batch and nobatch models
+NOBATCH=${NOBATCH:="1"}
+export NOBATCH
+BATCH=${BATCH:="1"}
+export BATCH
 
 if [[ $BACKENDS == *"python_dlpack"* ]]; then
     if [ "$TEST_JETSON" == "0" ]; then
@@ -245,7 +251,12 @@ function generate_model_repository() {
 
     KIND="KIND_GPU" && [[ "$TARGET" == "cpu" ]] && KIND="KIND_CPU"
     for FW in $BACKENDS; do
-      if [ "$FW" != "plan" ] && [ "$FW" != "python" ] && [ "$FW" != "python_dlpack" ] && [ "$FW" != "openvino" ];then
+      if [ "$FW" == "onnx" ] && [ "$TEST_VALGRIND" -eq 1 ]; then
+        # Reduce the instance count to make loading onnx models faster
+        for MC in `ls models/${FW}*/config.pbtxt`; do
+            echo "instance_group [ { kind: ${KIND} count: 1 }]" >> $MC
+        done
+      elif [ "$FW" != "plan" ] && [ "$FW" != "python" ] && [ "$FW" != "python_dlpack" ] && [ "$FW" != "openvino" ];then
         for MC in `ls models/${FW}*/config.pbtxt`; do
             echo "instance_group [ { kind: ${KIND} }]" >> $MC
         done
@@ -330,6 +341,98 @@ for TARGET in cpu gpu; do
     fi
     set -e
 done
+
+# Run 'python', 'python_dlpack' and 'onnx' models separately in valgrind test.
+# Loading python and python_dlpack models has OOM issue when running with
+# valgrind, so loading only batch or nobatch models for each time.
+# Loading all the onnx models at once requires more than 12 hours. Loading them
+# separately to reduce the loading time.
+if [ "$TEST_VALGRIND" -eq 1 ]; then
+  TESTING_BACKENDS="python python_dlpack onnx"
+  EXPECTED_NUM_TESTS=42
+  if [ "$TEST_JETSON" == "0" ]; then
+    if [[ "aarch64" != $(uname -m) ]] ; then
+        pip3 install torch==1.13.0+cpu -f https://download.pytorch.org/whl/torch_stable.html
+    else
+        pip3 install torch==1.13.0 -f https://download.pytorch.org/whl/torch_stable.html
+    fi
+  fi
+
+  for BACKENDS in $TESTING_BACKENDS; do
+    export BACKENDS
+    for TARGET in cpu gpu; do
+      rm -fr *models
+      generate_model_repository
+      mkdir nobatch_models
+      mv ./models/*nobatch_* ./nobatch_models/.
+      cp -fr ./models/nop_* ./nobatch_models/.
+
+      for BATCHING_MODE in batch nobatch; do
+        if [ "$TRITON_SERVER_CPU_ONLY" == "1" ]; then
+          if [ "$TARGET" == "gpu" ]; then
+              echo -e "Skip GPU testing on CPU-only device"
+              continue
+          fi
+        fi
+
+        SERVER_LOG=$SERVER_LOG_BASE.${TARGET}.${BACKENDS}.${BATCHING_MODE}.log
+        CLIENT_LOG=$CLIENT_LOG_BASE.${TARGET}.${BACKENDS}.${BATCHING_MODE}.log
+
+        if [ "$BATCHING_MODE" == "batch" ]; then
+          NOBATCH="0"
+          export NOBATCH
+          BATCH="1"
+          export BATCH
+          MODELDIR=`pwd`/models
+        else
+          NOBATCH="1"
+          export NOBATCH
+          BATCH="0"
+          export BATCH
+          MODELDIR=`pwd`/nobatch_models
+        fi
+
+        SERVER_ARGS="--model-repository=${MODELDIR} ${SERVER_ARGS_EXTRA}"
+        LEAKCHECK_LOG=$LEAKCHECK_LOG_BASE.${TARGET}.${BACKENDS}.${BATCHING_MODE}.log
+        LEAKCHECK_ARGS="$LEAKCHECK_ARGS_BASE --log-file=$LEAKCHECK_LOG"
+        run_server_leakcheck
+
+        if [ "$SERVER_PID" == "0" ]; then
+            echo -e "\n***\n*** Failed to start $SERVER\n***"
+            cat $SERVER_LOG
+            exit 1
+        fi
+
+        set +e
+
+        python3 $INFER_TEST >$CLIENT_LOG 2>&1
+        if [ $? -ne 0 ]; then
+            cat $CLIENT_LOG
+            RET=1
+        else
+            check_test_results $TEST_RESULT_FILE $EXPECTED_NUM_TESTS
+            if [ $? -ne 0 ]; then
+                cat $CLIENT_LOG
+                cat $TEST_RESULT_FILE
+                echo -e "\n***\n*** Test Result Verification Failed\n***"
+                RET=1
+            fi
+        fi
+
+        set -e
+
+        kill_server
+
+        set +e
+        python3 ../common/check_valgrind_log.py -f $LEAKCHECK_LOG
+        if [ $? -ne 0 ]; then
+            RET=1
+        fi
+        set -e
+      done
+    done
+  done
+fi
 
 if [ $RET -eq 0 ]; then
   echo -e "\n***\n*** Test Passed\n***"

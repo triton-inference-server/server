@@ -105,7 +105,6 @@ For tags `>=23.03`,
 [tritonserver release containers](https://catalog.ngc.nvidia.com/orgs/nvidia/containers/tritonserver)
 come with the following cache implementations out of the box:
 - [local](https://github.com/triton-inference-server/local_cache): `/opt/tritonserver/caches/local/libtritoncache_local.so`
-- [redis](https://github.com/triton-inference-server/redis_cache): `/opt/tritonserver/caches/redis/libtritoncache_redis.so`
 
 With these TRITONCACHE APIs, `tritonserver` exposes a new `--cache-config` 
 CLI flag that gives the user flexible customization of which cache implementation
@@ -125,13 +124,6 @@ When `--cache-config local,size=SIZE` is specified with a non-zero `SIZE`,
 Triton allocates the requested size in CPU memory and **shares the
 cache across all inference requests and across all models**. 
 
-#### Redis Cache
-
-The `redis` cache implementation was added along with these TRITONCACHE API
-changes for users that require a more configurable cache. More
-`redis` cache specific details can be found in the
-[redis cache implementation](https://github.com/triton-inference-server/redis_cache).
-
 #### Custom Cache
 
 With the new the TRITONCACHE API interface, it is now possible for
@@ -139,12 +131,11 @@ users to implement their own cache to suit any use-case specific needs.
 To see the required interface that must be implemented by a cache
 developer, see the 
 [TRITONCACHE API header](https://github.com/triton-inference-server/core/blob/main/include/triton/core/tritoncache.h).
-The `local` and `redis` cache implementations may be used as reference 
-implementations.
+The `local` cache implementation may be used as a reference implementation.
 
 Upon successfully developing and building a custom cache, the resulting shared
 library (ex: `libtritoncache_<name>.so`) must be placed in the cache directory
-similar to where the `local` and `redis` cache implementations live. By default,
+similar to where the `local` cache implementation lives. By default,
 this directory is `/opt/tritonserver/caches`, but a custom directory may be
 specified with `--cache-dir` as needed. 
 

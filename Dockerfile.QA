@@ -1,4 +1,4 @@
-# Copyright 2018-2022, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright 2018-2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -68,7 +68,7 @@ RUN wget -O - https://apt.kitware.com/keys/kitware-archive-latest.asc 2>/dev/nul
     apt-add-repository 'deb https://apt.kitware.com/ubuntu/ focal main' && \
     apt-get update && \
     apt-get install -y --no-install-recommends \
-      cmake-data=3.21.1-0kitware1ubuntu20.04.1 cmake=3.21.1-0kitware1ubuntu20.04.1
+      cmake-data=3.25.2-0kitware1ubuntu20.04.1 cmake=3.25.2-0kitware1ubuntu20.04.1
 
 # Add inception_graphdef model to example repo
 WORKDIR /workspace/docs/examples/model_repository
@@ -137,6 +137,7 @@ RUN mkdir -p qa/common && \
     cp bin/data_compressor_test qa/L0_data_compression/. && \
     cp bin/metrics_api_test qa/L0_metrics/. && \
     cp bin/response_cache_test qa/L0_response_cache/. && \
+    cp bin/triton_json_test qa/L0_json/. && \
     cp -r deploy/mlflow-triton-plugin qa/L0_mlflow/.
 
 # caffe2plan will not exist if the build was done without TensorRT enabled
@@ -197,12 +198,6 @@ RUN cp tritonbuild/identity/install/backends/identity/libtriton_identity.so \
     cp -r qa/L0_infer/. qa/L0_infer_cudashm && \
     mkdir -p qa/L0_infer_valgrind && \
     cp -r qa/L0_infer/. qa/L0_infer_valgrind && \
-    mkdir -p qa/L0_infer_tf1 && \
-    cp -r qa/L0_infer/. qa/L0_infer_tf1 && \
-    if [ -d qa/L0_tf_image_models ]; then \
-        mkdir -p qa/L0_tf_image_models_tf1 && \
-            cp -r qa/L0_tf_image_models/. qa/L0_tf_image_models_tf1; \
-    fi; \
     mkdir -p qa/L0_trt_shape_tensors_shm && \
     cp -r qa/L0_trt_shape_tensors/. qa/L0_trt_shape_tensors_shm && \
     mkdir -p qa/L0_trt_shape_tensors_cudashm && \

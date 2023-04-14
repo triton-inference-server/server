@@ -24,17 +24,25 @@
 # (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-apiVersion: networking.istio.io/v1alpha3
-kind: Gateway
+apiVersion: networking.k8s.io/v1
+kind: Ingress
 metadata:
-  name: triton-gateway
+  name: triton-external
+  annotations:
+    kubernetes.io/ingress.class: "gce"
+    kubernetes.io/ingress.global-static-ip-name: "ingress-triton"
 spec:
-  selector:
-    istio: ingressgateway # use istio default controller
-  servers:
-  - port:
-      number: 80 
-      name: http
-      protocol: HTTP
-    hosts:
-    - "*"
+  rules:
+  - http:
+      paths:
+      - path: "/"
+        pathType: Prefix
+        backend:
+          service:
+            name: triton-inference-server
+            port:
+              {{ if eq .Values.tritonProtocol "gRPC" }}
+              number: 8001
+              {{ else }}
+              number: 8000
+              {{ end }}

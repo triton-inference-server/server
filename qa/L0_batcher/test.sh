@@ -1,5 +1,5 @@
 #!/bin/bash
-# Copyright 2018-2022, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright 2018-2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -74,7 +74,7 @@ if [ "$TEST_VALGRIND" -eq 1 ]; then
                                 test_multi_batch_different_shape_allow_ragged"
 fi
 
-TF_VERSION=${TF_VERSION:=1}
+TF_VERSION=${TF_VERSION:=2}
 
 # On windows the paths invoked by the script (running in WSL) must use
 # /mnt/c when needed but the paths on the tritonserver command-line
@@ -91,6 +91,14 @@ else
     TRITON_DIR=${TRITON_DIR:="/opt/tritonserver"}
     SERVER=${TRITON_DIR}/bin/tritonserver
     BACKEND_DIR=${TRITON_DIR}/backends
+
+    # PyTorch on SBSA requires libgomp to be loaded first. See the following
+    # GitHub issue for more information:
+    # https://github.com/pytorch/pytorch/issues/2575
+    arch=`uname -m`
+    if [ $arch = "aarch64" ]; then
+      SERVER_LD_PRELOAD=/usr/lib/$(uname -m)-linux-gnu/libgomp.so.1
+    fi
 fi
 
 SERVER_ARGS_EXTRA="--backend-directory=${BACKEND_DIR} --backend-config=tensorflow,version=${TF_VERSION}"
@@ -239,6 +247,19 @@ if [[ $BACKENDS == *"onnx"* ]]; then
             echo "batch_output [{target_name: \"OUTPUT0\" \
                                     kind: BATCH_SCATTER_WITH_INPUT_SHAPE \
                                     source_input: \"INPUT0\" }] \
+                    dynamic_batching { preferred_batch_size: [ 2, 6 ], max_queue_delay_microseconds: 10000000 }" >> config.pbtxt)
+fi
+
+if [[ $BACKENDS == *"libtorch"* ]]; then
+    # Use nobatch model to match the ragged test requirement
+    cp -r $DATADIR/qa_identity_model_repository/libtorch_nobatch_zero_1_float32 var_models/libtorch_zero_1_float32 && \
+        (cd var_models/libtorch_zero_1_float32 && \
+            sed -i "s/nobatch_//" config.pbtxt && \
+            sed -i "s/^max_batch_size:.*/max_batch_size: 8/" config.pbtxt && \
+            sed -i "s/name: \"INPUT__0\"/name: \"INPUT__0\"\\nallow_ragged_batch: true/" config.pbtxt && \
+            echo "batch_output [{target_name: \"OUTPUT__0\" \
+                                    kind: BATCH_SCATTER_WITH_INPUT_SHAPE \
+                                    source_input: \"INPUT__0\" }] \
                     dynamic_batching { preferred_batch_size: [ 2, 6 ], max_queue_delay_microseconds: 10000000 }" >> config.pbtxt)
 fi
 

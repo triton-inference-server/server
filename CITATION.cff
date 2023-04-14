@@ -1,0 +1,7 @@
+cff-version: 1.2.0
+message: "If you use this software, please cite it as below."
+title: "Triton Inference Server: An Optimized Cloud and Edge Inferencing Solution."
+url: https://github.com/triton-inference-server
+repository-code: https://github.com/triton-inference-server/server
+authors:
+  - name: "NVIDIA Corporation"

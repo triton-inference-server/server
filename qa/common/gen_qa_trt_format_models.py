@@ -1,4 +1,4 @@
-# Copyright (c) 2020, NVIDIA CORPORATION. All rights reserved.
+# Copyright 2020-2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -29,6 +29,8 @@ import os
 import numpy as np
 import tensorrt as trt
 import test_util as tu
+
+np_dtype_string = np.dtype(object)
 
 
 def np_to_model_dtype(np_dtype):
@@ -182,7 +184,7 @@ def create_plan_dynamic_modelfile(models_dir,
     config = builder.create_builder_config()
     config.flags = flags
     config.add_optimization_profile(profile)
-    config.max_workspace_size = 1 << 20
+    config.set_memory_pool_limit(trt.MemoryPoolType.WORKSPACE, 1 << 20)
     try:
         engine_bytes = builder.build_serialized_network(network, config)
     except AttributeError:
@@ -260,7 +262,7 @@ def create_plan_fixed_modelfile(models_dir, max_batch, model_version,
             flags |= 1 << int(trt.BuilderFlag.FP16)
     config = builder.create_builder_config()
     config.flags = flags
-    config.max_workspace_size = 1 << 20
+    config.set_memory_pool_limit(trt.MemoryPoolType.WORKSPACE, 1 << 20)
     builder.max_batch_size = max(1, max_batch)
     try:
         engine_bytes = builder.build_serialized_network(network, config)

@@ -1,4 +1,4 @@
-# Copyright 2018-2022, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright 2018-2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -39,6 +39,7 @@ import numpy as np
 import infer_util as iu
 import test_util as tu
 import threading
+import concurrent.futures
 
 import tritonclient.grpc as grpcclient
 import tritonclient.http as httpclient
@@ -2624,6 +2625,122 @@ class LifeCycleTest(tu.TestResultCollector):
             triton_client.load_model(model_name + "_2")
         except Exception as ex:
             self.assertTrue(False, "unexpected error {}".format(ex))
+
+    def test_concurrent_load_speedup(self):
+        # Initialize client
+        try:
+            triton_client = grpcclient.InferenceServerClient("localhost:8001",
+                                                             verbose=True)
+        except Exception as ex:
+            self.assertTrue(False, "unexpected error {}".format(ex))
+        # Each model should have a loading delay of 10 seconds
+        model_pairs = [["identity_zero_1_int32_1", "identity_zero_1_int32_2"],
+                       ["python_identity_fp32_1", "python_identity_fp32_2"]]
+        # Test each model pair for speed up
+        for model_pair in model_pairs:
+            # Load both models concurrently
+            threads = []
+            for model_name in model_pair:
+                threads.append(
+                    threading.Thread(target=triton_client.load_model,
+                                     args=(model_name,)))
+            start_time = time.time()
+            for thread in threads:
+                thread.start()
+            for thread in threads:
+                thread.join()
+            end_time = time.time()
+            loading_time = end_time - start_time
+            # Each of the two models has a minimum loading delay of 10 seconds
+            # Speedup is observed when the concurrent loading time < 20 seconds
+            # but use a tighter bound of 15 seconds
+            self.assertLess(loading_time, 15.0,
+                            "Concurrent loading speedup not observed")
+            # Concurrent loading time cannot be < 10 seconds
+            self.assertGreaterEqual(loading_time, 10.0,
+                                    "Invalid concurrent loading time")
+            # Make sure the models are loaded
+            self.assertTrue(triton_client.is_server_live())
+            self.assertTrue(triton_client.is_server_ready())
+            for model_name in model_pair:
+                self.assertTrue(triton_client.is_model_ready(model_name))
+
+    def test_concurrent_load(self):
+        # Initialize client
+        try:
+            triton_client = grpcclient.InferenceServerClient("localhost:8001",
+                                                             verbose=True)
+        except Exception as ex:
+            self.assertTrue(False, "unexpected error {}".format(ex))
+        # Load same named model concurrently
+        with concurrent.futures.ThreadPoolExecutor() as pool:
+            # First load an 10 seconds delayed identity backend model
+            thread_1 = pool.submit(triton_client.load_model, "identity_model")
+            time.sleep(2)  # wait between loads
+            # Switch the model file to python backend
+            shutil.move("models", "models_v1")
+            shutil.move("models_v2", "models")
+            # Second load should be blocked until the first completes
+            thread_2 = pool.submit(triton_client.load_model, "identity_model")
+            # Both loads should succeed
+            thread_1.result()
+            thread_2.result()
+        # Check the model is ready
+        self.assertTrue(triton_client.is_server_live())
+        self.assertTrue(triton_client.is_server_ready())
+        self.assertTrue(triton_client.is_model_ready("identity_model"))
+        # Check the finally loaded model is the second one
+        model_metadata = triton_client.get_model_metadata("identity_model")
+        self.assertEqual(model_metadata.platform, "python")
+
+    def test_concurrent_load_unload(self):
+        # Initialize client
+        try:
+            triton_client = grpcclient.InferenceServerClient("localhost:8001",
+                                                             verbose=True)
+        except Exception as ex:
+            self.assertTrue(False, "unexpected error {}".format(ex))
+        # Load identity_zero_1_int32 and unload it while loading
+        # The unload operation should wait until the load is completed
+        with concurrent.futures.ThreadPoolExecutor() as pool:
+            load_thread = pool.submit(triton_client.load_model,
+                                      "identity_zero_1_int32")
+            time.sleep(2)  # wait between load and unload
+            unload_thread = pool.submit(triton_client.unload_model,
+                                        "identity_zero_1_int32")
+            load_thread.result()
+            unload_thread.result()
+        self.assertTrue(triton_client.is_server_live())
+        self.assertTrue(triton_client.is_server_ready())
+        self.assertFalse(triton_client.is_model_ready("identity_zero_1_int32"))
+        # Load ensemble_zero_1_float32 and unload its dependency while loading
+        # The unload operation should wait until the load is completed
+        with concurrent.futures.ThreadPoolExecutor() as pool:
+            load_thread = pool.submit(triton_client.load_model,
+                                      "ensemble_zero_1_float32")
+            time.sleep(2)  # wait between load and unload
+            unload_thread = pool.submit(triton_client.unload_model,
+                                        "custom_zero_1_float32")
+            load_thread.result()
+            unload_thread.result()
+        self.assertTrue(triton_client.is_server_live())
+        self.assertTrue(triton_client.is_server_ready())
+        self.assertFalse(
+            triton_client.is_model_ready("ensemble_zero_1_float32"))
+        self.assertFalse(triton_client.is_model_ready("custom_zero_1_float32"))
+        # Load both models and unload them concurrently
+        model_names = ["identity_zero_1_int32", "ensemble_zero_1_float32"]
+        for is_load in [True, False]:
+            action_fn = triton_client.load_model if is_load else triton_client.unload_model
+            with concurrent.futures.ThreadPoolExecutor() as pool:
+                threads = []
+                for model_name in model_names:
+                    threads.append(pool.submit(action_fn, model_name))
+                for thread in concurrent.futures.as_completed(threads):
+                    thread.result()
+            for model_name in model_names:
+                self.assertEqual(is_load,
+                                 triton_client.is_model_ready(model_name))
 
 
 if __name__ == '__main__':

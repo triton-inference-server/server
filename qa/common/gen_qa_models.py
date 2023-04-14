@@ -1,4 +1,4 @@
-# Copyright 2018-2022, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright 2018-2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -175,17 +175,19 @@ def create_graphdef_modelfile(models_dir,
 
     # Create the model. If non-batching then don't include the batch
     # dimension.
-    tf.reset_default_graph()
+    tf.compat.v1.reset_default_graph()
     if max_batch == 0:
-        in0 = tf.placeholder(tf_input_dtype, tu.shape_to_tf_shape(input_shape),
-                             "INPUT0")
-        in1 = tf.placeholder(tf_input_dtype, tu.shape_to_tf_shape(input_shape),
-                             "INPUT1")
+        in0 = tf.compat.v1.placeholder(tf_input_dtype,
+                                       tu.shape_to_tf_shape(input_shape),
+                                       "INPUT0")
+        in1 = tf.compat.v1.placeholder(tf_input_dtype,
+                                       tu.shape_to_tf_shape(input_shape),
+                                       "INPUT1")
     else:
-        in0 = tf.placeholder(tf_input_dtype, [
+        in0 = tf.compat.v1.placeholder(tf_input_dtype, [
             None,
         ] + tu.shape_to_tf_shape(input_shape), "INPUT0")
-        in1 = tf.placeholder(tf_input_dtype, [
+        in1 = tf.compat.v1.placeholder(tf_input_dtype, [
             None,
         ] + tu.shape_to_tf_shape(input_shape), "INPUT1")
 
@@ -200,12 +202,12 @@ def create_graphdef_modelfile(models_dir,
 
     # Cast or convert result to the output dtype.
     if tf_output0_dtype == tf.string:
-        cast0 = tf.dtypes.as_string(add if not swap else sub, name="TOSTR0")
+        cast0 = tf.strings.as_string(add if not swap else sub, name="TOSTR0")
     else:
         cast0 = tf.cast(add if not swap else sub, tf_output0_dtype, "CAST0")
 
     if tf_output1_dtype == tf.string:
-        cast1 = tf.dtypes.as_string(sub if not swap else add, name="TOSTR1")
+        cast1 = tf.strings.as_string(sub if not swap else add, name="TOSTR1")
     else:
         cast1 = tf.cast(sub if not swap else add, tf_output1_dtype, "CAST1")
 
@@ -223,7 +225,7 @@ def create_graphdef_modelfile(models_dir,
     except OSError as ex:
         pass  # ignore existing dir
 
-    with tf.Session() as sess:
+    with tf.compat.v1.Session() as sess:
         graph_io.write_graph(sess.graph.as_graph_def(),
                              model_version_dir,
                              "model.graphdef",
@@ -328,17 +330,19 @@ def create_savedmodel_modelfile(models_dir,
 
     # Create the model. If non-batching then don't include the batch
     # dimension.
-    tf.reset_default_graph()
+    tf.compat.v1.reset_default_graph()
     if max_batch == 0:
-        in0 = tf.placeholder(tf_input_dtype, tu.shape_to_tf_shape(input_shape),
-                             "TENSOR_INPUT0")
-        in1 = tf.placeholder(tf_input_dtype, tu.shape_to_tf_shape(input_shape),
-                             "TENSOR_INPUT1")
+        in0 = tf.compat.v1.placeholder(tf_input_dtype,
+                                       tu.shape_to_tf_shape(input_shape),
+                                       "TENSOR_INPUT0")
+        in1 = tf.compat.v1.placeholder(tf_input_dtype,
+                                       tu.shape_to_tf_shape(input_shape),
+                                       "TENSOR_INPUT1")
     else:
-        in0 = tf.placeholder(tf_input_dtype, [
+        in0 = tf.compat.v1.placeholder(tf_input_dtype, [
             None,
         ] + tu.shape_to_tf_shape(input_shape), "TENSOR_INPUT0")
-        in1 = tf.placeholder(tf_input_dtype, [
+        in1 = tf.compat.v1.placeholder(tf_input_dtype, [
             None,
         ] + tu.shape_to_tf_shape(input_shape), "TENSOR_INPUT1")
 
@@ -353,17 +357,17 @@ def create_savedmodel_modelfile(models_dir,
 
     # Cast or convert result to the output dtype.
     if tf_output0_dtype == tf.string:
-        cast0 = tf.dtypes.as_string(add if not swap else sub, name="TOSTR0")
+        cast0 = tf.strings.as_string(add if not swap else sub, name="TOSTR0")
     else:
         cast0 = tf.cast(add if not swap else sub, tf_output0_dtype, "CAST0")
 
     if tf_output1_dtype == tf.string:
-        cast1 = tf.dtypes.as_string(sub if not swap else add, name="TOSTR1")
+        cast1 = tf.strings.as_string(sub if not swap else add, name="TOSTR1")
     else:
         cast1 = tf.cast(sub if not swap else add, tf_output1_dtype, "CAST1")
 
-    out0 = tf.identity(cast0, "TENSOR_OUTPUT0")
-    out1 = tf.identity(cast1, "TENSOR_OUTPUT1")
+    tf.identity(cast0, "TENSOR_OUTPUT0")
+    tf.identity(cast1, "TENSOR_OUTPUT1")
 
     # Use a different model name for the non-batching variant
     model_name = tu.get_model_name(
@@ -376,25 +380,26 @@ def create_savedmodel_modelfile(models_dir,
     except OSError as ex:
         pass  # ignore existing dir
 
-    with tf.Session() as sess:
-        input0_tensor = tf.get_default_graph().get_tensor_by_name(
+    with tf.compat.v1.Session() as sess:
+        input0_tensor = tf.compat.v1.get_default_graph().get_tensor_by_name(
             "TENSOR_INPUT0:0")
-        input1_tensor = tf.get_default_graph().get_tensor_by_name(
+        input1_tensor = tf.compat.v1.get_default_graph().get_tensor_by_name(
             "TENSOR_INPUT1:0")
-        output0_tensor = tf.get_default_graph().get_tensor_by_name(
+        output0_tensor = tf.compat.v1.get_default_graph().get_tensor_by_name(
             "TENSOR_OUTPUT0:0")
-        output1_tensor = tf.get_default_graph().get_tensor_by_name(
+        output1_tensor = tf.compat.v1.get_default_graph().get_tensor_by_name(
             "TENSOR_OUTPUT1:0")
-        tf.saved_model.simple_save(sess,
-                                   model_version_dir + "/model.savedmodel",
-                                   inputs={
-                                       "INPUT0": input0_tensor,
-                                       "INPUT1": input1_tensor
-                                   },
-                                   outputs={
-                                       "OUTPUT0": output0_tensor,
-                                       "OUTPUT1": output1_tensor
-                                   })
+        tf.compat.v1.saved_model.simple_save(sess,
+                                             model_version_dir +
+                                             "/model.savedmodel",
+                                             inputs={
+                                                 "INPUT0": input0_tensor,
+                                                 "INPUT1": input1_tensor
+                                             },
+                                             outputs={
+                                                 "OUTPUT0": output0_tensor,
+                                                 "OUTPUT1": output1_tensor
+                                             })
 
 
 def create_savedmodel_modelconfig(models_dir, max_batch, model_version,
@@ -574,7 +579,7 @@ def create_plan_dynamic_rf_modelfile(models_dir, max_batch, model_version,
     config = builder.create_builder_config()
     config.flags = flags
     config.add_optimization_profile(profile)
-    config.max_workspace_size = 1 << 20
+    config.set_memory_pool_limit(trt.MemoryPoolType.WORKSPACE, 1 << 20)
     try:
         engine_bytes = builder.build_serialized_network(network, config)
     except AttributeError:
@@ -720,7 +725,7 @@ def create_plan_dynamic_modelfile(models_dir, max_batch, model_version,
                                       [1 + i] + opt_shape, [1 + i] + max_shape)
             config.add_optimization_profile(profile[10 + i])
 
-    config.max_workspace_size = 1 << 20
+    config.set_memory_pool_limit(trt.MemoryPoolType.WORKSPACE, 1 << 20)
     try:
         engine_bytes = builder.build_serialized_network(network, config)
     except AttributeError:
@@ -796,7 +801,7 @@ def create_plan_fixed_rf_modelfile(models_dir, max_batch, model_version,
             flags |= 1 << int(trt.BuilderFlag.FP16)
     config = builder.create_builder_config()
     config.flags = flags
-    config.max_workspace_size = 1 << 20
+    config.set_memory_pool_limit(trt.MemoryPoolType.WORKSPACE, 1 << 20)
     builder.max_batch_size = max(1, max_batch)
     try:
         engine_bytes = builder.build_serialized_network(network, config)
@@ -844,7 +849,7 @@ def create_plan_fixed_modelfile(models_dir, max_batch, model_version,
     network.mark_output(out1.get_output(0))
 
     config = builder.create_builder_config()
-    config.max_workspace_size = 1 << 20
+    config.set_memory_pool_limit(trt.MemoryPoolType.WORKSPACE, 1 << 20)
     builder.max_batch_size = max(1, max_batch)
     try:
         engine_bytes = builder.build_serialized_network(network, config)
@@ -1895,6 +1900,7 @@ if __name__ == '__main__':
     if FLAGS.graphdef or FLAGS.savedmodel:
         import tensorflow as tf
         from tensorflow.python.framework import graph_io
+        tf.compat.v1.disable_eager_execution()
     if FLAGS.tensorrt:
         import tensorrt as trt
     if FLAGS.onnx:
