@@ -78,7 +78,8 @@ $model_stat =
   "inference_count" : $number,
   "execution_count" : $number,
   "inference_stats" : $inference_stats,
-  "batch_stats" : [ $batch_stat, ... ]
+  "batch_stats" : [ $batch_stat, ... ],
+  "memory_usage" : [ $memory_usage, ...]
 }
 ```
 
@@ -118,6 +119,14 @@ $model_stat =
   how many actual model executions were performed and show differences
   due to different batch size (for example, larger batches typically
   take longer to compute).
+
+- "memory_usage" : The memory usage detected during model loading, which may be
+  used to estimate the memory to be released once the model is unloaded. Note
+  that the estimation is inferenced by the profiling tools and framework's
+  memory schema, therefore it is advised to perform experiments to understand
+  the scenario that the reported memory usage can be relied on. As a starting
+  point, the GPU memory usage for models in ONNX Runtime backend and TensorRT
+  backend is usually aligned.
 
 ```
 $inference_stats =
@@ -216,6 +225,22 @@ $duration_stat =
 - "count" : The number of times the statistic was collected.
 
 - “ns” : The total duration for the statistic in nanoseconds.
+
+```
+$memory_usage = 
+{
+  "type" : $string,
+  "id" : $number,
+  "byte_size" : $number
+}
+```
+
+- "type" : The type of memory, the value can be "CPU", "CPU_PINNED", "GPU".
+
+- "id" : The id of the memory, typically used with "type" to identify
+  a device that hosts the memory.
+
+- "byte_size" : The byte size of the memory.
 
 ### Statistics Response JSON Error Object
 
@@ -326,6 +351,15 @@ message ModelStatistics
   // model executions were performed and show differences due to different
   // batch size (for example, larger batches typically take longer to compute).
   InferBatchStatistics batch_stats = 7;
+
+  // The memory usage detected during model loading, which may be
+  // used to estimate the memory to be released once the model is unloaded. Note
+  // that the estimation is inferenced by the profiling tools and framework's
+  // memory schema, therefore it is advised to perform experiments to understand
+  // the scenario that the reported memory usage can be relied on. As a starting
+  // point, the GPU memory usage for models in ONNX Runtime backend and TensorRT
+  // backend is usually aligned.
+  repeated MemoryUsage memory_usage = 8;
 }
 
 // Inference statistics.
@@ -415,5 +449,19 @@ message InferBatchStatistics
   // For example, this duration should include the time to copy output
   // tensor data from the GPU.
   StatisticDuration compute_output = 4;
+}
+
+// Memory usage.
+message MemoryUsage 
+{
+  // The type of memory, the value can be "CPU", "CPU_PINNED", "GPU".
+  string type = 1;
+
+  // The id of the memory, typically used with "type" to identify
+  // a device that hosts the memory.
+  uint64_t id = 2;
+
+  // The byte size of the memory.
+  uint64_t byte_size = 3;
 }
 ```
