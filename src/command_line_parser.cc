@@ -1826,17 +1826,16 @@ TritonParser::ParseTraceConfigOption(const std::string& arg)
         std::to_string(ParseTraceModeOption(arg.substr(0, delim_name)));
   } else if (delim_name == 0) {
     std::stringstream ss;
-    ss << "No framework specified. --tracing-config option format is "
-       << "<framework name>,<setting>=<value> or "
+    ss << "No trace mode specified. --trace-config option format is "
+       << "<trace mode>,<setting>=<value> or "
        << "<setting>=<value>. Got " << arg << std::endl;
     throw ParseException(ss.str());
   }  // else global trace config
 
   if (delim_setting < 0) {
     std::stringstream ss;
-    ss << "--trace-config option format is '<framework "
-          "name>,<setting>=<value>'. Got "
-       << arg << std::endl;
+    ss << "--trace-config option format is '<trace mode>,<setting>=<value>'. Got " 
+      << arg << std::endl;
     throw ParseException(ss.str());
   }
   std::string setting_string =
@@ -1845,8 +1844,7 @@ TritonParser::ParseTraceConfigOption(const std::string& arg)
 
   if (setting_string.empty() || value_string.empty()) {
     std::stringstream ss;
-    ss << "--trace-config option format is '<backend "
-          "name>,<setting>=<value>'. Got "
+    ss << "--trace-config option format is '<trace mode>,<setting>=<value>'. Got "
        << arg << std::endl;
     throw ParseException(ss.str());
   }

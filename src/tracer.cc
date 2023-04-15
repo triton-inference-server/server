@@ -390,7 +390,6 @@ TraceManager::Trace::InitTracer(
       std::move(this->exporter_));
   this->provider_ = otel_trace_sdk::TracerProviderFactory::Create(
       std::move(this->processor_));
-  otel_trace_api::Provider::SetTracerProvider(this->provider_);
 }
 
 void
