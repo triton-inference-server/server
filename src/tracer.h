@@ -79,8 +79,8 @@ class TraceManager {
         : clear_level_(false), level_(nullptr), clear_rate_(false),
           rate_(nullptr), clear_count_(false), count_(nullptr),
           clear_log_frequency_(false), log_frequency_(nullptr),
-          clear_filepath_(false), filepath_(nullptr), clear_mode_(false),
-          mode_(nullptr), clear_config_map_(false), config_map_(nullptr)
+          clear_filepath_(false), filepath_(nullptr), mode_(nullptr),
+          config_map_(nullptr)
     {
     }
     bool clear_level_;
@@ -98,10 +98,8 @@ class TraceManager {
     bool clear_filepath_;
     const std::string* filepath_;
 
-    bool clear_mode_;
     const InferenceTraceMode* mode_;
 
-    bool clear_config_map_;
     const TraceConfigMap* config_map_;
   };
 

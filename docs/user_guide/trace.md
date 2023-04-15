@@ -380,8 +380,9 @@ The following table shows available Opentelemetry trace APIs settings for
 
 ### Limitations
 
-- Opentelemetry trace APIs only supported for Ubuntu based systems and does not support tracing for 
-[BLS](https://github.com/triton-inference-server/python_backend/tree/main#business-logic-scripting) models.
+- Opentelemetry trace mode is not supported on Windows system
+
+- Tracing [BLS](https://github.com/triton-inference-server/python_backend/tree/main#business-logic-scripting) models is not supported.
 
 - Triton supports only 
 [OTLP/HTTP Exporter](https://github.com/open-telemetry/opentelemetry-specification/blob/main/specification/protocol/otlp.md#otlphttp) 

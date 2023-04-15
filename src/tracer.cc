@@ -163,16 +163,7 @@ TraceManager::UpdateTraceSettingInternal(
                                    : (((current_setting != nullptr) &&
                                        current_setting->filepath_specified_) ||
                                       (new_setting.filepath_ != nullptr)));
-  const bool mode_specified =
-      (new_setting.clear_mode_ ? false
-                               : (((current_setting != nullptr) &&
-                                   current_setting->mode_specified_) ||
-                                  (new_setting.mode_ != nullptr)));
-  const bool config_map_specified =
-      (new_setting.config_map_ ? false
-                               : (((current_setting != nullptr) &&
-                                   current_setting->config_map_specified_) ||
-                                  (new_setting.config_map_ != nullptr)));
+
   if (level_specified) {
     level = (new_setting.level_ != nullptr) ? *new_setting.level_
                                             : current_setting->level_;
@@ -194,15 +185,6 @@ TraceManager::UpdateTraceSettingInternal(
     filepath = (new_setting.filepath_ != nullptr)
                    ? *new_setting.filepath_
                    : current_setting->file_->FileName();
-  }
-  if (mode_specified) {
-    mode = (new_setting.mode_ != nullptr) ? *new_setting.mode_
-                                          : current_setting->mode_;
-  }
-  if (config_map_specified) {
-    config_map = (new_setting.config_map_ != nullptr)
-                     ? *new_setting.config_map_
-                     : current_setting->config_map_;
   }
 
   // Some special case when updating model setting
@@ -243,7 +225,8 @@ TraceManager::UpdateTraceSettingInternal(
   std::shared_ptr<TraceSetting> lts(new TraceSetting(
       level, rate, count, log_frequency, file, mode, config_map,
       level_specified, rate_specified, count_specified, log_frequency_specified,
-      filepath_specified, mode_specified, config_map_specified));
+      filepath_specified, false /*mode_specified*/,
+      false /*config_map_specified*/));
   // The only invalid setting allowed is if it disables tracing
   if ((!lts->Valid()) && (level != TRITONSERVER_TRACE_LEVEL_DISABLED)) {
     return TRITONSERVER_ErrorNew(
@@ -325,7 +308,7 @@ TraceManager::Trace::~Trace()
     this->EndSpan();
 #else
     LOG_ERROR << "Unsupported trace mode: "
-             << TraceManager::InferenceTraceModeString(setting_->mode_);
+              << TraceManager::InferenceTraceModeString(setting_->mode_);
 #endif
   }
 }
@@ -363,7 +346,7 @@ TraceManager::Trace::CaptureTimestamp(
           name, otel_timestamp, {{"triton.steady_timestamp_ns", timestamp_ns}});
 #else
       LOG_ERROR << "Unsupported trace mode: "
-               << TraceManager::InferenceTraceModeString(setting_->mode_);
+                << TraceManager::InferenceTraceModeString(setting_->mode_);
 #endif
     }
   }
@@ -518,7 +501,7 @@ TraceManager::TraceActivity(
       ts->trace_span_->SetAttribute("triton.trace_request_id", request_id);
 #else
       LOG_ERROR << "Unsupported trace mode: "
-               << TraceManager::InferenceTraceModeString(ts->setting_->mode_);
+                << TraceManager::InferenceTraceModeString(ts->setting_->mode_);
 #endif
     }
   }
@@ -539,7 +522,7 @@ TraceManager::TraceActivity(
         {{"triton.steady_timestamp_ns", timestamp_ns}});
 #else
     LOG_ERROR << "Unsupported trace mode: "
-             << TraceManager::InferenceTraceModeString(ts->setting_->mode_);
+              << TraceManager::InferenceTraceModeString(ts->setting_->mode_);
 #endif
   }
 }
@@ -855,7 +838,7 @@ TraceManager::TraceSetting::SampleTrace()
       lts->InitTracer(config_map_);
 #else
       LOG_ERROR << "Unsupported trace mode: "
-               << TraceManager::InferenceTraceModeString(mode_);
+                << TraceManager::InferenceTraceModeString(mode_);
 #endif
     }
     return lts;

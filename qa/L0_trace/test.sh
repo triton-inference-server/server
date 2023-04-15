@@ -34,7 +34,7 @@ CLIENT_LOG="client.log"
 TEST_RESULT_FILE="test_results.txt"
 EXPECTED_NUM_TESTS="6"
 
-TRACE_COLLECTOR=socket_echo_server.py
+TRACE_COLLECTOR=trace_collector.py
 TRACE_COLLECTOR_LOG="trace_collector.log"
 OTLP_PORT=10000
 
@@ -612,7 +612,6 @@ kill $SERVER_PID
 wait $SERVER_PID
 
 
-
 # Check `--trace-config` sets arguments properly
 SERVER_ARGS="--trace-config=triton,file=some_file.log --trace-config=level=TIMESTAMPS \
             --trace-config=rate=4 --trace-config=count=6 --trace-config=mode=triton --model-repository=$MODELSDIR"
@@ -654,12 +653,11 @@ set -e
 kill $SERVER_PID
 wait $SERVER_PID
 
-set +e
-
 # Check opentelemetry trace exporter sends proper info.
 # A helper python script starts listenning on $OTLP_PORT, where
 # OTLP exporter sends traces. It then check that received data contains 
 # expected entries
+# FIXME: Redesign this test to remove time sensitivity
 SERVER_ARGS="--trace-config=triton,file=some_file.log --trace-config=level=TIMESTAMPS \
             --trace-config=rate=1 --trace-config=count=6 --trace-config=mode=opentelemetry --trace-config=opentelemetry,url=localhost:$OTLP_PORT --model-repository=$MODELSDIR"
 SERVER_LOG="./inference_server_trace_config.log"
@@ -674,22 +672,29 @@ fi
 python $TRACE_COLLECTOR $OTLP_PORT $TRACE_COLLECTOR_LOG &
 COLLECTOR_PID=$! 
 
+set +e
+
 # To make sure receiver is ready log gets all data
 sleep 3
 
 # Send http request and collect trace
 $SIMPLE_HTTP_CLIENT >> client_update.log 2>&1
 if [ $? -ne 0 ]; then
+    cat client_update.log
     RET=1
 fi
 
 # Send grpc request and collect trace
 $SIMPLE_GRPC_CLIENT >> client_update.log 2>&1
 if [ $? -ne 0 ]; then
+    cat client_update.log
     RET=1
 fi
 # To make sure log gets all data
 sleep 3
+
+kill $COLLECTOR_PID
+wait $COLLECTOR_PID
 
 EXPECTED_ENTRIES=${EXPECTED_ENTRIES:="REQUEST_START QUEUE_START INFER_RESPONSE_COMPLETE COMPUTE_START COMPUTE_INPUT_END COMPUTE_OUTPUT_START COMPUTE_END REQUEST_END"}
 HTTP_ENTRIES=${HTTP_ENTRIES:="HTTP_RECV_START HTTP_RECV_END HTTP_SEND_START HTTP_SEND_END"}
@@ -723,9 +728,6 @@ set -e
 
 kill $SERVER_PID
 wait $SERVER_PID
-
-kill $COLLECTOR_PID
-wait $COLLECTOR_PID
 
 set +e
 
