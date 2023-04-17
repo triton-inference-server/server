@@ -121,9 +121,8 @@ struct TritonServerParameters {
   std::set<std::string> startup_models_{};
   // Interval, in seconds, when the model repository is polled for changes.
   int32_t repository_poll_secs_{15};
-  // hardware_concurrency() returns 0 if not well defined or not computable.
-  uint32_t model_load_thread_count_{
-      std::max(2u, 2 * std::thread::hardware_concurrency())};
+  // Number of threads to use for concurrently loading models
+  uint32_t model_load_thread_count_{4};
   std::map<int, double> load_gpu_limit_;
 
   // Rate limiter configuration

@@ -199,8 +199,7 @@ To reduce service downtime, Triton loads new models in the background while
 continuing to serve inferences on existing models. Based on use case and
 performance requirements, the optimal amount of resources dedicated to loading
 models may differ. Triton exposes a `--model-load-thread-count` option to
-configure the number of threads dedicated to loading models, which defaults to
-twice the number of CPU cores (`2*num_cpus`) visible to the server. 
+configure the number of threads dedicated to loading models, which defaults to 4.
 
 To set this parameter with the C API, refer to 
 `TRITONSERVER_ServerOptionsSetModelLoadThreadCount` in 

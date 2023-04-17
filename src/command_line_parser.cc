@@ -395,7 +395,7 @@ TritonParser::SetupOptions()
       {OPTION_MODEL_LOAD_THREAD_COUNT, "model-load-thread-count",
        Option::ArgInt,
        "The number of threads used to concurrently load models in "
-       "model repositories. Default is 2*<num_cpu_cores>."},
+       "model repositories. Default is 4."},
       {OPTION_MODEL_NAMESPACING, "model-namespacing", Option::ArgBool,
        "Whether model namespacing is enable or not. If true, models with the "
        "same name can be served if they are in different namespace."}};
@@ -679,7 +679,6 @@ TritonParser::SetupOptions()
        Option::ArgInt,
        "The number of threads used to accelerate copies and other operations "
        "required to manage input and output tensor contents. Default is 0."},
-
       {OPTION_HOST_POLICY, "host-policy", "<string>,<string>=<string>",
        "Specify a host policy setting associated with a policy name. The "
        "format of this flag is --host-policy=<policy_name>,<setting>=<value>. "
