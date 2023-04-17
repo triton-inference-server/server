@@ -305,7 +305,7 @@ TraceManager::Trace::~Trace()
     setting_->WriteTrace(streams_);
   } else if (setting_->mode_ == TRACE_MODE_OPENTELEMETRY) {
 #ifndef _WIN32
-    this->EndSpan();
+    EndSpan();
 #else
     LOG_ERROR << "Unsupported trace mode: "
               << TraceManager::InferenceTraceModeString(setting_->mode_);
@@ -340,7 +340,7 @@ TraceManager::Trace::CaptureTimestamp(
       otel_common::SystemTimestamp otel_timestamp{
           (time_offset_ + std::chrono::nanoseconds{timestamp_ns})};
       if (trace_span_ == nullptr) {
-        this->InitSpan(otel_timestamp);
+        InitSpan(otel_timestamp);
       }
       trace_span_->AddEvent(
           name, otel_timestamp, {{"triton.steady_timestamp_ns", timestamp_ns}});
@@ -368,15 +368,15 @@ TraceManager::Trace::InitTracer(
       }
     }
   }
-  this->exporter_ = otlp::OtlpHttpExporterFactory::Create(opts);
-  this->processor_ = otel_trace_sdk::SimpleSpanProcessorFactory::Create(
-      std::move(this->exporter_));
-  this->provider_ = otel_trace_sdk::TracerProviderFactory::Create(
-      std::move(this->processor_));
+  exporter_ = otlp::OtlpHttpExporterFactory::Create(opts);
+  processor_ = otel_trace_sdk::SimpleSpanProcessorFactory::Create(
+      std::move(exporter_));
+  provider_ = otel_trace_sdk::TracerProviderFactory::Create(
+      std::move(processor_));
 }
 
 void
-TraceManager::Trace::InitSpan(otel_common::SystemTimestamp timestamp_ns)
+TraceManager::Trace::InitSpan(const otel_common::SystemTimestamp& timestamp_ns)
 {
   otel_trace_api::StartSpanOptions options;
   options.kind = otel_trace_api::SpanKind::kServer;  // server
@@ -438,7 +438,6 @@ TraceManager::TraceActivity(
   // group the activity of the same trace together for more readable output.
   auto ts =
       reinterpret_cast<std::shared_ptr<TraceManager::Trace>*>(userp)->get();
-
 
   std::lock_guard<std::mutex> lk(ts->mtx_);
   std::stringstream* ss = nullptr;

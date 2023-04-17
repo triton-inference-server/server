@@ -79,10 +79,10 @@ target_include_directories(
   PRIVATE $<TARGET_PROPERTY:gRPC::grpc,INTERFACE_INCLUDE_DIRECTORIES>
 )
 
-# FIXME when Triton support of Opentelemetry is available on Windows
+# FIXME when Triton support of OpenTelemetry is available on Windows
 # add ${OPENTELEMETRY_CPP_INCLUDE_DIRS} to above target_include_directories
 # JIRA DLIS-4786
-if (NOT WIN32)
+if (NOT WIN32 AND ${TRITON_ENABLE_TRACING})
   target_include_directories(
     grpc-endpoint-library
     PRIVATE ${OPENTELEMETRY_CPP_INCLUDE_DIRS}

@@ -1508,7 +1508,7 @@ TritonParser::Parse(int argc, char** argv)
   }
   lparams.enable_cache_ = (cache_size_present || cache_config_present);
   return {lparams, {}};
-}  // namespace server
+}
 
 std::string
 TritonParser::FormatUsageMessage(std::string str, int offset)
@@ -1795,7 +1795,7 @@ TritonParser::ParseTraceLevelOption(std::string arg)
   throw ParseException("invalid value for trace level option: " + arg);
 }
 
-triton::server::InferenceTraceMode
+InferenceTraceMode
 TritonParser::ParseTraceModeOption(std::string arg)
 {
   std::transform(arg.begin(), arg.end(), arg.begin(), [](unsigned char c) {

@@ -78,15 +78,12 @@ endif()
 
 # OpenTelemetry
 #
-if (NOT WIN32)
-  if(${TRITON_ENABLE_TRACING})
+if (NOT WIN32 AND ${TRITON_ENABLE_TRACING})
+    find_package(absl CONFIG REQUIRED)
     find_package(CURL CONFIG REQUIRED)
-    message(STATUS "Using curl ${CURL_VERSION}")
     find_package(nlohmann_json CONFIG REQUIRED)
-    message(STATUS "Using nlohmann_json for otel")
     find_package(opentelemetry-cpp CONFIG REQUIRED)
     message(STATUS "Using opentelemetry-cpp ${opentelemetry-cpp_VERSION}")
-  endif()
 endif()
 
 # re2
@@ -397,7 +394,7 @@ if(${TRITON_ENABLE_HTTP}
   # FIXME when Triton support of Opentelemetry is available on Windows
   # add ${OPENTELEMETRY_CPP_INCLUDE_DIRS} to above target_include_directories
   # JIRA DLIS-4786
-  if (NOT WIN32)
+  if (NOT WIN32 AND ${TRITON_ENABLE_TRACING})
     target_include_directories(
       http-endpoint-library
       PRIVATE ${OPENTELEMETRY_CPP_INCLUDE_DIRS}
