@@ -33,8 +33,6 @@ from functools import partial
 import numpy as np
 import queue
 import unittest
-import os
-import time
 import socket
 import test_util as tu
 

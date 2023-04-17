@@ -35,7 +35,6 @@ from PIL import Image
 import test_util as tu
 
 import tritonclient.http as httpclient
-from tritonclient.utils import InferenceServerException
 
 
 class InferTest(tu.TestResultCollector):

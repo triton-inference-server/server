@@ -31,7 +31,6 @@ sys.path.append("../clients")
 
 import logging
 
-import os
 import unittest
 import numpy as np
 import infer_util as iu

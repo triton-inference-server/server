@@ -32,7 +32,6 @@ import unittest
 import numpy as np
 import infer_util as iu
 import test_util as tu
-import tritonclient.http as httpclient
 
 
 class PassiveInstanceTest(tu.TestResultCollector):

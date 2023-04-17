@@ -28,9 +28,7 @@ import sys
 
 sys.path.append("../common")
 
-import argparse
 import numpy as np
-import requests as httpreq
 import unittest
 from builtins import range
 import tritonhttpclient as httpclient

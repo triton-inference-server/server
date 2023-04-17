@@ -30,20 +30,15 @@ import sys
 sys.path.append("../common")
 
 import os
-import shutil
 import time
 import unittest
 import numpy as np
-import infer_util as iu
 import test_util as tu
 import tritonclient.http as httpclient
 
-import argparse
-import csv
 import json
 import os
 import requests
-import socket
 import sys
 
 

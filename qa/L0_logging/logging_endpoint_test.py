@@ -29,7 +29,6 @@
 import sys
 sys.path.append("../common")
 
-import numpy as np
 import sys
 import unittest
 import tritonclient.http as httpclient

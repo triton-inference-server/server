@@ -29,17 +29,11 @@ import sys
 sys.path.append("../common")
 
 from builtins import range
-from future.utils import iteritems
-import os
-import shutil
-import time
 import unittest
 import numpy as np
-import infer_util as iu
 import test_util as tu
 import tritonhttpclient
 import tritonclient.utils.shared_memory as shm
-from tritonclientutils import InferenceServerException
 
 
 def div_up(a, b):

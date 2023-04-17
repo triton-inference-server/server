@@ -27,7 +27,6 @@
 import os
 from os import listdir
 import numpy as np
-from ctypes import *
 
 import tritonclient.http as httpclient
 from tritonclient.utils import *

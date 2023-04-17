@@ -32,7 +32,6 @@ import unittest
 import numpy as np
 import test_util as tu
 import tritonclient.http as client
-from tritonclient.utils import InferenceServerException
 
 class TrtDataDependentShapeTest(tu.TestResultCollector):
     def setUp(self):

@@ -30,14 +30,11 @@ import sys
 sys.path.append("../common")
 
 from builtins import range
-from future.utils import iteritems
 import unittest
 import test_util as tu
 import numpy as np
 
 import tritonclient.http as httpclient
-from tritonclient.utils import np_to_triton_dtype
-from tritonclient.utils import InferenceServerException
 
 
 class IONamingConvention(tu.TestResultCollector):

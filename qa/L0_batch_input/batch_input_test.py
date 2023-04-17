@@ -30,7 +30,6 @@ sys.path.append("../common")
 
 import unittest
 import numpy as np
-import infer_util as iu
 import test_util as tu
 import tritonhttpclient
 from tritonclientutils import InferenceServerException

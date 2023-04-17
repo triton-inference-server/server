@@ -36,7 +36,6 @@ import time
 import threading
 import unittest
 import tritonclient.grpc as grpcclient
-from tritonclient.utils import np_to_triton_dtype
 import test_util as tu
 
 _deferred_exceptions_lock = threading.Lock()

@@ -29,9 +29,7 @@ import sys
 
 sys.path.append('../common')
 
-import argparse
 import numpy as np
-import os
 from builtins import range
 import tritonclient.http as tritonhttpclient
 import tritonclient.grpc as tritongrpcclient

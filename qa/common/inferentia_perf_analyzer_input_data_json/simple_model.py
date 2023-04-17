@@ -121,6 +121,5 @@ if __name__ == '__main__':
         gen_tf_model(FLAGS.name, FLAGS.batch_size, FLAGS.tf_version)
     elif FLAGS.model_type == 'pytorch':
         import torch
-        import torch_neuron  # lgtm[py/unused-import]
         from torch import nn
         gen_pytorch_model(FLAGS.name, FLAGS.batch_size)

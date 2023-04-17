@@ -28,14 +28,10 @@ import sys
 
 sys.path.append("../common")
 
-from builtins import range
-from future.utils import iteritems
 import unittest
 import numpy as np
-import os
 import test_util as tu
 import tritonhttpclient as httpclient
-from tritonclientutils import InferenceServerException
 
 
 class TagSigdefTest(tu.TestResultCollector):

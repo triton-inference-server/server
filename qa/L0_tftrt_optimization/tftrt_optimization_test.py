@@ -32,7 +32,6 @@ import unittest
 import numpy as np
 import test_util as tu
 import tritonhttpclient as httpclient
-from tritonclientutils import InferenceServerException
 
 
 class TFTRTOptimizationTest(tu.TestResultCollector):

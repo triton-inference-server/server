@@ -28,11 +28,6 @@ import sys
 
 sys.path.append("../common")
 
-from builtins import range
-from future.utils import iteritems
-import os
-import shutil
-import time
 import unittest
 import numpy as np
 import infer_util as iu
