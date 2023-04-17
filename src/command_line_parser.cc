@@ -332,14 +332,15 @@ enum TritonOptionId {
 void
 TritonParser::SetupOptions()
 {
+
+  global_options_ = {{OPTION_HELP, "help", Option::ArgNone, "Print usage"}};
+
   server_options_ = {
       {OPTION_ID, "id", Option::ArgStr, "Identifier for this server."},
       {OPTION_EXIT_TIMEOUT_SECS, "exit-timeout-secs", Option::ArgInt,
        "Timeout (in seconds) when exiting to wait for in-flight inferences to "
        "finish. After the timeout expires the server exits even if inferences "
        "are still in flight."}};
-
-  global_options_ = {{OPTION_HELP, "help", Option::ArgNone, "Print usage"}};
 
   model_repo_options_ = {
       {OPTION_MODEL_REPOSITORY, "model-store", Option::ArgStr,
@@ -711,31 +712,16 @@ void
 TritonParser::SetupOptionGroups()
 {
   SetupOptions();
-
   option_groups_.emplace_back(GLOBAL_OPTION_GROUP, global_options_);
   option_groups_.emplace_back("Server", server_options_);
   option_groups_.emplace_back("Model Repository", model_repo_options_);
-#ifdef TRITON_ENABLE_LOGGING
   option_groups_.emplace_back("Logging", logging_options_);
-#endif  // TRITON_ENABLE_LOGGING
-#if defined(TRITON_ENABLE_HTTP)
   option_groups_.emplace_back("HTTP", http_options_);
-#endif  // TRITON_ENABLE_HTTP
-#if defined(TRITON_ENABLE_GRPC)
   option_groups_.emplace_back("GRPC", grpc_options_);
-#endif  // TRITON_ENABLE_GRPC
-#if defined(TRITON_ENABLE_SAGEMAKER)
   option_groups_.emplace_back("Sagemaker", sagemaker_options_);
-#endif  // TRITON_ENABLE_SAGEMAKER
-#if defined(TRITON_ENABLE_VERTEX_AI)
   option_groups_.emplace_back("Vertex", vertex_options_);
-#endif  // TRITON_ENABLE_VERTEX_AI
-#ifdef TRITON_ENABLE_METRICS
   option_groups_.emplace_back("Metrics", metric_options_);
-#endif  // TRITON_ENABLE_METRICS
-#ifdef TRITON_ENABLE_TRACING
   option_groups_.emplace_back("Tracing", tracing_options_);
-#endif  // TRITON_ENABLE_TRACING
   option_groups_.emplace_back("Backend", backend_options_);
   option_groups_.emplace_back("Repository Agent", repo_agent_options_);
   option_groups_.emplace_back("Response Cache", cache_options_);
