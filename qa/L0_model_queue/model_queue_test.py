@@ -36,6 +36,7 @@ import numpy as np
 import infer_util as iu
 import test_util as tu
 from tritonclientutils import InferenceServerException
+from ctypes import *
 
 _max_queue_delay_ms = 10000
 
