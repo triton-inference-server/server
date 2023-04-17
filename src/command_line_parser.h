@@ -38,7 +38,7 @@
 #include "triton/core/tritonserver.h"
 #if defined(TRITON_ENABLE_HTTP) || defined(TRITON_ENABLE_METRICS)
 #include "http_server.h"
-#endif  // TRITON_ENABLE_HTTP|| TRITON_ENABLE_METRICS
+#endif  // TRITON_ENABLE_HTTP || TRITON_ENABLE_METRICS
 #ifdef TRITON_ENABLE_SAGEMAKER
 #include "sagemaker_server.h"
 #endif  // TRITON_ENABLE_SAGEMAKER
@@ -92,10 +92,10 @@ struct Option {
     return lo;
   }
 
-  const int id_;
-  const std::string flag_;
-  const std::string arg_desc_;
-  const std::string desc_;
+  int id_;
+  std::string flag_;
+  std::string arg_desc_;
+  std::string desc_;
 };
 
 struct TritonServerParameters {
@@ -253,7 +253,8 @@ class ParseException : public std::exception {
 // parser)
 class TritonParser {
  public:
-  // Parse command line arguements into a parameters struct and transform
+  TritonParser();
+  // Parse command line arguments into a parameters struct and transform
   // the argument list to contain only unrecognized options. The content of
   // unrecognized argument list shares the same lifecycle as 'argv'.
   // Raise ParseException if fail to parse recognized options.
@@ -287,6 +288,28 @@ class TritonParser {
       const std::string& arg, const std::string& first_delim,
       const std::string& second_delim);
 
-  static std::vector<Option> recognized_options_;
+  // Initialize individual option groups
+  void SetupOptions();
+  // Initialize option group mappings
+  void SetupOptionGroups();
+
+  // Sum of option groups: vector to maintain insertion order for Usage()
+  std::vector<std::pair<std::string, std::vector<Option>&>> option_groups_;
+  // Individual option groups
+  std::vector<Option> global_options_;
+  std::vector<Option> server_options_;
+  std::vector<Option> model_repo_options_;
+  std::vector<Option> logging_options_;
+  std::vector<Option> http_options_;
+  std::vector<Option> grpc_options_;
+  std::vector<Option> sagemaker_options_;
+  std::vector<Option> vertex_options_;
+  std::vector<Option> metric_options_;
+  std::vector<Option> tracing_options_;
+  std::vector<Option> backend_options_;
+  std::vector<Option> repo_agent_options_;
+  std::vector<Option> cache_options_;
+  std::vector<Option> rate_limiter_options_;
+  std::vector<Option> memory_device_options_;
 };
 }}  // namespace triton::server
