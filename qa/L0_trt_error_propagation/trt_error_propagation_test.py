@@ -26,7 +26,6 @@
 
 import unittest
 import shutil
-import numpy as np
 import tritonclient.grpc as grpcclient
 from tritonclient.utils import InferenceServerException
 
