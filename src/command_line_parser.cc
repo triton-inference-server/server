@@ -713,8 +713,8 @@ TritonParser::SetupOptionGroups()
   SetupOptions();
   option_groups_.emplace_back(GLOBAL_OPTION_GROUP, global_options_);
   option_groups_.emplace_back("Server", server_options_);
-  option_groups_.emplace_back("Model Repository", model_repo_options_);
   option_groups_.emplace_back("Logging", logging_options_);
+  option_groups_.emplace_back("Model Repository", model_repo_options_);
   option_groups_.emplace_back("HTTP", http_options_);
   option_groups_.emplace_back("GRPC", grpc_options_);
   option_groups_.emplace_back("Sagemaker", sagemaker_options_);
