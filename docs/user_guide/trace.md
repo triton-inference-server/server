@@ -34,24 +34,24 @@ arguments when running the tritonserver executable.
 
 `--trace-config` command line option in Triton can be used to specify 
 global and trace mode specific config setting. The format of this flag 
-is `--trace-config=<mode>,<setting>=<value>`, where `<mode>` 
+is `--trace-config <mode>,<setting>=<value>`, where `<mode>` 
 is either `triton` or `opentelemetry`. By default, the trace mode is set to `triton`,
 and the server will use Triton's trace APIs. For `opentelemetry` mode, 
 the server will use the [OpenTelemetry's APIs](#opentelemetry-trace-support) to generate, 
 collect and export traces for individual inference requests.
 
 To specify global trace settings (level, rate, count, or mode), 
-the format is `--trace-config=<setting>=<value>`.
+the format is `--trace-config <setting>=<value>`.
 
 An example usage, which invokes Triton's trace APIs:
 
 ```
 $ tritonserver \
-    --trace-config=triton,file=/tmp/trace.json \
-    --trace-config=triton,log-frequency=50 \
-    --trace-config=rate=100 \
-    --trace-config=level=TIMESTAMPS \
-    --trace-config=count=100 ...
+    --trace-config triton,file=/tmp/trace.json \
+    --trace-config triton,log-frequency=50 \
+    --trace-config rate=100 \
+    --trace-config level=TIMESTAMPS \
+    --trace-config count=100 ...
 ```
 
 ## Trace Settings
@@ -84,7 +84,7 @@ The following table shows available global trace settings to pass to `--trace-co
 ### Triton Trace APIs Settings
 
 The following table shows available Triton trace APIs settings for 
-`--trace-config=triton,<setting>=<value>`.
+`--trace-config triton,<setting>=<value>`.
 
 | Setting     | Default Value |  Description                                  |
 |:------------|:--------------|-----------------------------------------------|
@@ -388,14 +388,14 @@ To specify OpenTelemetry mode for tracing, specify the `--trace-config`
 flag as follows:
 
 ```
-$ tritonserver --trace-config=mode=opentelemetry \
-    --trace-config=opentelemetry,url=<endpoint> ...
+$ tritonserver --trace-config mode=opentelemetry \
+    --trace-config opentelemetry,url=<endpoint> ...
 ```
 
 ### OpenTelemetry trace APIs settings
 
 The following table shows available OpenTelemetry trace APIs settings for 
-`--trace-config=opentelemetry,<setting>=<value>`.
+`--trace-config opentelemetry,<setting>=<value>`.
 
 | Setting| Default Value |  Description |
 |--------|---------------|--------------|
