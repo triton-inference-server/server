@@ -35,7 +35,7 @@
 #include <string>
 #include <unordered_map>
 
-#ifndef _WIN32
+#if !defined (_WIN32) && defined (TRITON_ENABLE_TRACING)
 #include "opentelemetry/exporters/otlp/otlp_http_exporter_factory.h"
 #include "opentelemetry/nostd/shared_ptr.h"
 #include "opentelemetry/sdk/trace/processor.h"
@@ -157,7 +157,7 @@ class TraceManager {
 
     uint64_t trace_id_;
 
-#ifndef _WIN32
+#if !defined (_WIN32) && defined (TRITON_ENABLE_TRACING)
     // OpenTelemetry SDK relies on system's clock for event timestamps.
     // Triton Tracing records timestamps using steady_clock. This is a
     // monotonic clock, i.e. time is always moving forward. It is not related
