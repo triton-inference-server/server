@@ -645,7 +645,7 @@ std::vector<Option> TritonParser::recognized_options_
       {OPTION_MODEL_LOAD_THREAD_COUNT, "model-load-thread-count",
        Option::ArgInt,
        "The number of threads used to concurrently load models in "
-       "model repositories. Default is 2*<num_cpu_cores>."},
+       "model repositories. Default is 4."},
       {OPTION_BACKEND_CONFIG, "backend-config", "<string>,<string>=<string>",
        "Specify a backend-specific configuration setting. The format of this "
        "flag is --backend-config=<backend_name>,<setting>=<value>. Where "
