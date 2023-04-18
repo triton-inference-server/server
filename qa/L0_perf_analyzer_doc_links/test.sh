@@ -16,6 +16,17 @@ LOG="`pwd`/log.txt"
 CONFIG="`pwd`/mkdocs.yml"
 RET=0
 
+# Need to remove all links that start with -- or -. Mkdocs converts all -- to - for anchor links. 
+# This breaks all links to cli commands throughout the docs. This will iterate over all 
+# files in the docs directory and remove -- and - at the start of options, which allows the 
+# tool to check links for correctness.
+for file in `pwd`/docs/*
+do
+  echo $file
+  sed -i 's/`-*/`/g' $file
+  sed -i 's/#-*/#/g' $file
+done
+
 exec mkdocs serve -f $CONFIG > $LOG &
 PID=$!
 sleep 20
