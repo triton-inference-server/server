@@ -1,5 +1,5 @@
 #!/usr/bin/env python
-# Copyright (c) 2021, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright 2021-2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -35,7 +35,6 @@ from PIL import Image
 import test_util as tu
 
 import tritonclient.http as httpclient
-from tritonclient.utils import InferenceServerException
 
 
 class InferTest(tu.TestResultCollector):

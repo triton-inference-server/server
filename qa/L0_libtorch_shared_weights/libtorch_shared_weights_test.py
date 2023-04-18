@@ -1,4 +1,4 @@
-# Copyright 2022, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright 2022-2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -28,9 +28,7 @@ import sys
 
 sys.path.append("../common")
 
-import argparse
 import numpy as np
-import requests as httpreq
 import unittest
 from builtins import range
 import tritonhttpclient as httpclient

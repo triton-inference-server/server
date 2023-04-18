@@ -30,10 +30,8 @@ sys.path.append("../common")
 
 import unittest
 import numpy as np
-import os
 import infer_util as iu
 import test_util as tu
-import tritonhttpclient as httpclient
 
 TENSOR_SIZE = 16384
 

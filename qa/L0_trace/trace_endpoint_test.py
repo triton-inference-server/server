@@ -1,6 +1,6 @@
 #!/usr/bin/python
 
-# Copyright (c) 2022, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright 2022-2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -30,7 +30,6 @@ import sys
 
 sys.path.append("../common")
 
-import numpy as np
 import sys
 import unittest
 import tritonclient.http as httpclient

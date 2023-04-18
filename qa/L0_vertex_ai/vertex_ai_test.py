@@ -1,5 +1,5 @@
 #!/usr/bin/python
-# Copyright (c) 2021, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright 2021-2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -30,20 +30,13 @@ import sys
 sys.path.append("../common")
 
 import os
-import shutil
-import time
 import unittest
 import numpy as np
-import infer_util as iu
 import test_util as tu
 import tritonclient.http as httpclient
 
-import argparse
-import csv
-import json
 import os
 import requests
-import socket
 import sys
 
 

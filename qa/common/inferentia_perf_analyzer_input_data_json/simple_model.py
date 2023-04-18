@@ -1,5 +1,5 @@
 #!/usr/bin/env python
-# Copyright (c) 2021, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright 2021-2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -121,6 +121,5 @@ if __name__ == '__main__':
         gen_tf_model(FLAGS.name, FLAGS.batch_size, FLAGS.tf_version)
     elif FLAGS.model_type == 'pytorch':
         import torch
-        import torch_neuron  # lgtm[py/unused-import]
         from torch import nn
         gen_pytorch_model(FLAGS.name, FLAGS.batch_size)
