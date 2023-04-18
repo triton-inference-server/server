@@ -273,7 +273,7 @@ for model_type in FIXED VARIABLE; do
     MODEL_PATH=models && [[ "$model_type" == "VARIABLE" ]] && MODEL_PATH=var_models
     for i in $NO_DELAY_TESTS ; do
         SERVER_ARGS="--model-repository=$MODELDIR/$MODEL_PATH ${SERVER_ARGS_EXTRA}"
-        SERVER_LOG="./$i.$model_type.serverlog"
+        SERVER_LOG="./$i.$model_type.server.log"
 
         if [ "$TEST_VALGRIND" -eq 1 ]; then
             LEAKCHECK_LOG="./$i.$model_type.valgrind.log"
@@ -326,7 +326,7 @@ for model_type in FIXED VARIABLE; do
             [[ "$i" != "test_multi_batch_use_best_preferred" ]] &&
             [[ "$i" != "test_multi_batch_delayed_use_max_batch" ]] && export TRITONSERVER_DELAY_SCHEDULER=2
         SERVER_ARGS="--model-repository=$MODELDIR/$MODEL_PATH ${SERVER_ARGS_EXTRA}"
-        SERVER_LOG="./$i.$model_type.serverlog"
+        SERVER_LOG="./$i.$model_type.server.log"
 
         if [ "$TEST_VALGRIND" -eq 1 ]; then
             LEAKCHECK_LOG="./$i.$model_type.valgrind.log"
@@ -376,7 +376,7 @@ done
 export BATCHER_TYPE=VARIABLE
 for i in $DIFFERENT_SHAPE_TESTS ; do
     SERVER_ARGS="--model-repository=$MODELDIR/var_models ${SERVER_ARGS_EXTRA}"
-    SERVER_LOG="./$i.VARIABLE.serverlog"
+    SERVER_LOG="./$i.VARIABLE.server.log"
 
     if [ "$TEST_VALGRIND" -eq 1 ]; then
         LEAKCHECK_LOG="./$i.VARIABLE.valgrind.log"
@@ -429,7 +429,7 @@ for i in \
         test_multi_batch_delayed_preferred_different_shape ; do
     export TRITONSERVER_DELAY_SCHEDULER=4
     SERVER_ARGS="--model-repository=$MODELDIR/var_models ${SERVER_ARGS_EXTRA}"
-    SERVER_LOG="./$i.VARIABLE.serverlog"
+    SERVER_LOG="./$i.VARIABLE.server.log"
 
     if [ "$TEST_VALGRIND" -eq 1 ]; then
         LEAKCHECK_LOG="./$i.VARIABLE.valgrind.log"
@@ -482,7 +482,7 @@ for i in $PREFERRED_BATCH_ONLY_TESTS ; do
             [[ "$i" != "test_preferred_batch_only_unaligned" ]] && export TRITONSERVER_DELAY_SCHEDULER=7 &&
             [[ "$i" != "test_preferred_batch_only_use_biggest_preferred" ]] && export TRITONSERVER_DELAY_SCHEDULER=3
     SERVER_ARGS="--model-repository=$MODELDIR/preferred_batch_only_models ${SERVER_ARGS_EXTRA}"
-    SERVER_LOG="./$i.PREFERRED_BATCH_ONLY.serverlog"
+    SERVER_LOG="./$i.PREFERRED_BATCH_ONLY.server.log"
 
     if [ "$TEST_VALGRIND" -eq 1 ]; then
         LEAKCHECK_LOG="./$i.PREFERRED_BATCH_ONLY.valgrind.log"
@@ -551,7 +551,7 @@ for i in $MAX_QUEUE_DELAY_ONLY_TESTS ; do
         sed -i "s/max_queue_delay_microseconds:.*\[.*\]/max_queue_delay_microseconds: ${MAX_QUEUE_DELAY_MICROSECONDS}/g" config.pbtxt )
 
     SERVER_ARGS="--model-repository=$MODELDIR/custom_models ${SERVER_ARGS_EXTRA}"
-    SERVER_LOG="./$i.MAX_QUEUE_DELAY_ONLY.serverlog"
+    SERVER_LOG="./$i.MAX_QUEUE_DELAY_ONLY.server.log"
 
     if [ "$TEST_VALGRIND" -eq 1 ]; then
         LEAKCHECK_LOG="./$i.MAX_QUEUE_DELAY_ONLY.valgrind.log"
@@ -629,7 +629,7 @@ if [[ "$(< /proc/sys/kernel/osrelease)" != *microsoft* ]]; then
 
     # not preserve
     SERVER_ARGS="--trace-file=not_preserve.log --trace-level=MIN --trace-rate=1 --model-repository=$MODELDIR/custom_models ${SERVER_ARGS_EXTRA}"
-    SERVER_LOG="./not_preserve.serverlog"
+    SERVER_LOG="./not_preserve.server.log"
 
     if [ "$TEST_VALGRIND" -eq 1 ]; then
         LEAKCHECK_LOG="./not_preserve.valgrind.log"
@@ -684,7 +684,7 @@ if [[ "$(< /proc/sys/kernel/osrelease)" != *microsoft* ]]; then
             sed -i "s/dynamic_batching.*/dynamic_batching { preferred_batch_size: [ 4 ] preserve_ordering: true }/g" config.pbtxt)
 
     SERVER_ARGS="--trace-file=preserve.log --trace-level=MIN --trace-rate=1 --model-repository=$MODELDIR/custom_models  ${SERVER_ARGS_EXTRA}"
-    SERVER_LOG="./preserve.serverlog"
+    SERVER_LOG="./preserve.server.log"
 
     if [ "$TEST_VALGRIND" -eq 1 ]; then
         LEAKCHECK_LOG="./preserve.valgrind.log"

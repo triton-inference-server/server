@@ -88,7 +88,7 @@ for model_trial in 4; do
         export TRITONSERVER_BACKLOG_DELAY_SCHEDULER=0
         export TRITONSERVER_DELAY_SCHEDULER=12
         SERVER_ARGS="--model-repository=`pwd`/$MODEL_DIR"
-        SERVER_LOG="./$i.$MODEL_DIR.serverlog"
+        SERVER_LOG="./$i.$MODEL_DIR.server.log"
         run_server
         if [ "$SERVER_PID" == "0" ]; then
             echo -e "\n***\n*** Failed to start $SERVER\n***"

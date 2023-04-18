@@ -489,7 +489,7 @@ for model_trial in $MODEL_TRIALS; do
 
     for i in $NO_DELAY_TESTS; do
         SERVER_ARGS="--model-repository=$MODELDIR/$MODEL_PATH ${SERVER_ARGS_EXTRA}"
-        SERVER_LOG="./$i.$MODEL_PATH.serverlog"
+        SERVER_LOG="./$i.$MODEL_PATH.server.log"
 
         if [ "$TEST_VALGRIND" -eq 1 ]; then
             LEAKCHECK_LOG="./$i.$MODEL_PATH.valgrind.log"
@@ -549,7 +549,7 @@ for model_trial in $MODEL_TRIALS; do
             [[ "$i" != "test_half_batch" ]] && export TRITONSERVER_DELAY_SCHEDULER=4 &&
             [[ "$i" != "test_backlog_sequence_timeout" ]] && export TRITONSERVER_DELAY_SCHEDULER=12
         SERVER_ARGS="--model-repository=$MODELDIR/$MODEL_PATH ${SERVER_ARGS_EXTRA}"
-        SERVER_LOG="./$i.$MODEL_PATH.serverlog"
+        SERVER_LOG="./$i.$MODEL_PATH.server.log"
 
         if [ "$TEST_VALGRIND" -eq 1 ]; then
             LEAKCHECK_LOG="./$i.$MODEL_PATH.valgrind.log"
@@ -619,7 +619,7 @@ if [[ $BACKENDS == *"custom"* ]]; then
     export TRITONSERVER_DELAY_SCHEDULER=12
 
     SERVER_ARGS="--model-repository=$MODELDIR/$MODEL_PATH ${SERVER_ARGS_EXTRA}"
-    SERVER_LOG="./$i.$MODEL_PATH.serverlog"
+    SERVER_LOG="./$i.$MODEL_PATH.server.log"
 
     if [ "$TEST_VALGRIND" -eq 1 ]; then
       LEAKCHECK_LOG="./$i.$MODEL_PATH.valgrind.log"
@@ -677,7 +677,7 @@ for i in $QUEUE_DELAY_TESTS ; do
     export TRITONSERVER_BACKLOG_DELAY_SCHEDULER=0
     export TRITONSERVER_DELAY_SCHEDULER=2
     SERVER_ARGS="--model-repository=$MODELDIR/$MODEL_PATH ${SERVER_ARGS_EXTRA}"
-    SERVER_LOG="./$i.$MODEL_PATH.serverlog"
+    SERVER_LOG="./$i.$MODEL_PATH.server.log"
 
     if [ "$TEST_VALGRIND" -eq 1 ]; then
         LEAKCHECK_LOG="./$i.$MODEL_PATH.valgrind.log"
@@ -739,7 +739,7 @@ if [ "$TEST_SYSTEM_SHARED_MEMORY" -ne 1 ] && [ "$TEST_CUDA_SHARED_MEMORY" -ne 1 
     cp ../python_models/identity_fp32_timeout/model.py ${MODEL_PATH}/identity_fp32_timeout/1/.
 
     SERVER_ARGS="--model-repository=$MODELDIR/$MODEL_PATH ${SERVER_ARGS_EXTRA}"
-    SERVER_LOG="./$TEST_CASE.$MODEL_PATH.serverlog"
+    SERVER_LOG="./$TEST_CASE.$MODEL_PATH.server.log"
 
     if [ "$TEST_VALGRIND" -eq 1 ]; then
         LEAKCHECK_LOG="./$i.$MODEL_PATH.valgrind.log"

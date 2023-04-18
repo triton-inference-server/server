@@ -65,7 +65,7 @@ done
 for model_trial in 1 2 4 ; do
     MODEL_DIR=models${model_trial}
     SERVER_ARGS="--model-repository=`pwd`/$MODEL_DIR"
-    SERVER_LOG="./$MODEL_DIR.serverlog"
+    SERVER_LOG="./$MODEL_DIR.server.log"
     run_server
     if [ "$SERVER_PID" == "0" ]; then
         echo -e "\n***\n*** Failed to start $SERVER\n***"

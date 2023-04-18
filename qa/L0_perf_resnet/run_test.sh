@@ -75,7 +75,7 @@ if [[ "${PERF_CLIENT_PROTOCOL}" == "triton_c_api" ]]; then
 else
     SERVICE_ARGS="-i ${PERF_CLIENT_PROTOCOL}"
 
-    SERVER_LOG="${NAME}.serverlog"
+    SERVER_LOG="${NAME}.server.log"
     run_server
     if (( $SERVER_PID == 0 )); then
         echo -e "\n***\n*** Failed to start $SERVER\n***"

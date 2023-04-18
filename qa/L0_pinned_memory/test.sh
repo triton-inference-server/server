@@ -81,7 +81,7 @@ for BACKEND in $BACKENDS; do
 
     # With pinned memory
     SERVER_ARGS="--model-repository=`pwd`/models --log-verbose=1"
-    SERVER_LOG="${ENSEMBLE_NAME}.pinned.serverlog"
+    SERVER_LOG="${ENSEMBLE_NAME}.pinned.server.log"
     run_server
     if (( $SERVER_PID == 0 )); then
         echo -e "\n***\n*** Failed to start $SERVER\n***"
@@ -108,7 +108,7 @@ for BACKEND in $BACKENDS; do
 
     # Restart the server without verbose logging
     SERVER_ARGS="--model-repository=`pwd`/models"
-    SERVER_LOG="${ENSEMBLE_NAME}.pinned.serverlog"
+    SERVER_LOG="${ENSEMBLE_NAME}.pinned.server.log"
     run_server
     if (( $SERVER_PID == 0 )); then
         echo -e "\n***\n*** Failed to start $SERVER\n***"
@@ -133,7 +133,7 @@ for BACKEND in $BACKENDS; do
 
     # Without pinned memory
     SERVER_ARGS="--model-repository=`pwd`/models --pinned-memory-pool-byte-size=0 --log-verbose=1"
-    SERVER_LOG="${ENSEMBLE_NAME}.nonpinned.serverlog"
+    SERVER_LOG="${ENSEMBLE_NAME}.nonpinned.server.log"
     run_server
     if (( $SERVER_PID == 0 )); then
         echo -e "\n***\n*** Failed to start $SERVER\n***"
@@ -160,7 +160,7 @@ for BACKEND in $BACKENDS; do
 
     # Restart the server without verbose logging
     SERVER_ARGS="--model-repository=`pwd`/models --pinned-memory-pool-byte-size=0"
-    SERVER_LOG="${ENSEMBLE_NAME}.nonpinned.serverlog"
+    SERVER_LOG="${ENSEMBLE_NAME}.nonpinned.server.log"
     run_server
     if (( $SERVER_PID == 0 )); then
         echo -e "\n***\n*** Failed to start $SERVER\n***"
