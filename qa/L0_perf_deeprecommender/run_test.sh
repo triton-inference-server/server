@@ -70,7 +70,7 @@ for STATIC_BATCH in $STATIC_BATCH_SIZES; do
                         echo "dynamic_batching { preferred_batch_size: [ ${DYNAMIC_BATCH} ] }" >> config.pbtxt)
             fi
 
-            SERVER_LOG="${NAME}.serverlog"
+            SERVER_LOG="${NAME}.server.log"
             run_server
             if (( $SERVER_PID == 0 )); then
                 echo -e "\n***\n*** Failed to start $SERVER\n***"

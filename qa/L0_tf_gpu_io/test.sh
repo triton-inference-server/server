@@ -67,7 +67,7 @@ for BACKEND in $BACKENDS; do
             echo "optimization { execution_accelerators { gpu_execution_accelerator : [ { name : \"gpu_io\"} ] } }" >> config.pbtxt)
 
     SERVER_ARGS="--model-repository=`pwd`/models --log-verbose=1"
-    SERVER_LOG="${MODEL_NAME}.serverlog"
+    SERVER_LOG="${MODEL_NAME}.server.log"
     run_server
     if [ "$SERVER_PID" == "0" ]; then
         echo -e "\n***\n*** Failed to start $SERVER\n***"
@@ -114,7 +114,7 @@ cp -r $DATADIR/qa_tf_tag_sigdef_repository/sig_tag0 models
     echo "optimization { execution_accelerators { gpu_execution_accelerator : [ { name : \"gpu_io\"} ] } }" >> config.pbtxt)
 
 SERVER_ARGS="--model-repository=`pwd`/models --log-verbose=1"
-SERVER_LOG="sig_tag0.serverlog"
+SERVER_LOG="sig_tag0.server.log"
 run_server
 if [ "$SERVER_PID" == "0" ]; then
     echo -e "\n***\n*** Failed to start $SERVER\n***"

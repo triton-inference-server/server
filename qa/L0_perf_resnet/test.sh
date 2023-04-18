@@ -38,7 +38,7 @@ if [ ! -z "$TEST_REPO_ARCH" ]; then
     REPO_VERSION=${REPO_VERSION}_${TEST_REPO_ARCH}
 fi
 
-rm -f *.log *.serverlog *.csv *.tjson *.json
+rm -f *.log  *.csv *.tjson *.json
 
 PROTOCOLS="grpc http triton_c_api"
 
