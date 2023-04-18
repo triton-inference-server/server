@@ -526,25 +526,25 @@ std::vector<Option> TritonParser::recognized_options_
 #endif  // TRITON_ENABLE_METRICS
 #ifdef TRITON_ENABLE_TRACING
       {OPTION_TRACE_FILEPATH, "trace-file", Option::ArgStr,
-       "DEPRECATED: Please use --trace-config=triton,file=<path/to/your/file>"
+       "DEPRECATED: Please use --trace-config triton,file=<path/to/your/file>"
        " Set the file where trace output will be saved. If "
        "--trace-log-frequency"
        " is also specified, this argument value will be the prefix of the files"
        " to save the trace output. See --trace-log-frequency for detail."},
       {OPTION_TRACE_LEVEL, "trace-level", Option::ArgStr,
-       "DEPRECATED: Please use --trace-config=level=<OFF|TIMESTAMPS|TENSORS>"
+       "DEPRECATED: Please use --trace-config level=<OFF|TIMESTAMPS|TENSORS>"
        "Specify a trace level. OFF to disable tracing, TIMESTAMPS to "
        "trace timestamps, TENSORS to trace tensors. It may be specified "
        "multiple times to trace multiple informations. Default is OFF."},
       {OPTION_TRACE_RATE, "trace-rate", Option::ArgInt,
-       "DEPRECATED: Please use --trace-config=rate=<rate value>"
+       "DEPRECATED: Please use --trace-config rate=<rate value>"
        "Set the trace sampling rate. Default is 1000."},
       {OPTION_TRACE_COUNT, "trace-count", Option::ArgInt,
-       "DEPRECATED: Please use --trace-config=count=<count value>"
+       "DEPRECATED: Please use --trace-config count=<count value>"
        "Set the number of traces to be sampled. If the value is -1, the number "
        "of traces to be sampled will not be limited. Default is -1."},
       {OPTION_TRACE_LOG_FREQUENCY, "trace-log-frequency", Option::ArgInt,
-       "DEPRECATED: Please use --trace-config=triton,log-frequency=<value>"
+       "DEPRECATED: Please use --trace-config triton,log-frequency=<value>"
        "Set the trace log frequency. If the value is 0, Triton will only log "
        "the trace output to <trace-file> when shutting down. Otherwise, Triton "
        "will log the trace output to <trace-file>.<idx> when it collects the "
@@ -554,12 +554,12 @@ std::vector<Option> TritonParser::recognized_options_
        "101-th to the 200-th traces to file <trace-file>.1. Default is 0."},
       {OPTION_TRACE_CONFIG, "trace-config", "<string>,<string>=<string>",
        "Specify global or trace mode specific configuration setting. "
-       "The format of this flag is --trace-config="
+       "The format of this flag is --trace-config "
        "<mode>,<setting>=<value>. "
        "Where <mode> is either \"triton\" or \"opentelemetry\". "
        "The default is \"triton\". To specify global trace settings "
        "(level, rate, count, or mode), the format would be "
-       "--trace-config=<setting>=<value>. For \"triton\" mode, the server will "
+       "--trace-config <setting>=<value>. For \"triton\" mode, the server will "
        "use "
        "Triton's Trace APIs. For \"opentelemetry\" mode, the server will use "
        "OpenTelemetry's APIs to generate, collect and export traces for "
@@ -1270,7 +1270,7 @@ TritonParser::Parse(int argc, char** argv)
       case OPTION_TRACE_FILEPATH: {
         std::cerr << "Warning: '--trace-file' has been deprecated and will be"
                      " removed in future releases. Please use "
-                     "'--trace-config=triton,file=<filepath> instead."
+                     "'--trace-config triton,file=<filepath> instead."
                   << std::endl;
         trace_filepath_present = true;
         lparams.trace_filepath_ = optarg;
@@ -1279,7 +1279,7 @@ TritonParser::Parse(int argc, char** argv)
       case OPTION_TRACE_LEVEL: {
         std::cerr << "Warning: '--trace-level' has been deprecated and will be"
                      " removed in future releases. Please use "
-                     "'--trace-config=level=<OFF|TIMESTAMPS|TENSORS> instead."
+                     "'--trace-config level=<OFF|TIMESTAMPS|TENSORS> instead."
                   << std::endl;
         trace_level_present = true;
         auto parsed_level = ParseTraceLevelOption(optarg);
@@ -1292,7 +1292,7 @@ TritonParser::Parse(int argc, char** argv)
       case OPTION_TRACE_RATE:
         std::cerr << "Warning: '--trace-rate' has been deprecated and will be"
                      " removed in future releases. Please use "
-                     "'--trace-config=rate=<rate value> instead."
+                     "'--trace-config rate=<rate value> instead."
                   << std::endl;
         trace_rate_present = true;
         lparams.trace_rate_ = ParseOption<int>(optarg);
@@ -1301,7 +1301,7 @@ TritonParser::Parse(int argc, char** argv)
       case OPTION_TRACE_COUNT:
         std::cerr << "Warning: '--trace-count' has been deprecated and will be"
                      " removed in future releases. Please use "
-                     "'--trace-config=count=<count value> instead."
+                     "'--trace-config count=<count value> instead."
                   << std::endl;
         trace_count_present = true;
         lparams.trace_count_ = ParseOption<int>(optarg);
@@ -1310,7 +1310,7 @@ TritonParser::Parse(int argc, char** argv)
         std::cerr << "Warning: '--trace-log-frequency' has been deprecated and "
                      "will be"
                      " removed in future releases. Please use "
-                     "'--trace-config=triton,log-frequency=<log frequency "
+                     "'--trace-config triton,log-frequency=<log frequency "
                      "value> instead."
                   << std::endl;
         trace_log_frequency_present = true;
