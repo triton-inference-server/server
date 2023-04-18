@@ -397,10 +397,10 @@ $ tritonserver --trace-config mode=opentelemetry \
 The following table shows available OpenTelemetry trace APIs settings for 
 `--trace-config opentelemetry,<setting>=<value>`.
 
-| Setting| Default Value |  Description |
-|--------|---------------|--------------|
-| `url`| `0.0.0.0:4318/v1/traces`| `host:port` to which the receiver is going|
-|      |                         | to receive trace data.|
+| Setting| Default Value           |  Description                             |
+|--------|-------------------------|------------------------------------------|
+| `url`  | `0.0.0.0:4318/v1/traces`| `host:port` to which the receiver is     |
+|        |                         | going to receive trace data.             |
 
 ### Limitations
 

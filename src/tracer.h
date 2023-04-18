@@ -35,7 +35,7 @@
 #include <string>
 #include <unordered_map>
 
-#if !defined (_WIN32) && defined (TRITON_ENABLE_TRACING)
+#if !defined(_WIN32) && defined(TRITON_ENABLE_TRACING)
 #include "opentelemetry/exporters/otlp/otlp_http_exporter_factory.h"
 #include "opentelemetry/nostd/shared_ptr.h"
 #include "opentelemetry/sdk/trace/processor.h"
