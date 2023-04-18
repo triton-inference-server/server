@@ -1,4 +1,4 @@
-# Copyright 2022, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright 2022-2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -24,9 +24,6 @@
 # (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-import numpy as np
-import sys
-import os
 import triton_python_backend_utils as pb_utils
 from cuda import cuda
 

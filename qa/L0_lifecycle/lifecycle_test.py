@@ -2247,7 +2247,6 @@ class LifeCycleTest(tu.TestResultCollector):
                     self.assertTrue(False, "unexpected error {}".format(ex))
 
     def test_file_override(self):
-        import base64
 
         model_shape = (1, 16)
         override_base = "override_model"

@@ -29,15 +29,12 @@ import sys
 sys.path.append("../common")
 
 import numpy as np
-import infer_util as iu
-import test_util as tu
 import tritonclient.http as httpclient
 import tritonclient.grpc as grpcclient
 import tritonclient.http.aio as asynchttpclient
 import tritonclient.grpc.aio as asyncgrpcclient
 from tritonclient.utils import InferenceServerException
 from unittest import IsolatedAsyncioTestCase
-import json
 import unittest
 import queue
 from functools import partial

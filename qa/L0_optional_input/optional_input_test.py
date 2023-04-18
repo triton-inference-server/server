@@ -1,6 +1,6 @@
 #!/usr/bin/python
 
-# Copyright 2021-2022, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright 2021-2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -36,7 +36,6 @@ import time
 import threading
 import unittest
 import tritonclient.grpc as grpcclient
-from tritonclient.utils import np_to_triton_dtype
 import test_util as tu
 
 _deferred_exceptions_lock = threading.Lock()

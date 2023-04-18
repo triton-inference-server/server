@@ -1,4 +1,4 @@
-# Copyright 2021-2022, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright 2021-2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -32,7 +32,6 @@ from functools import partial
 import test_util as tu
 import shm_util
 import tritonclient.grpc as grpcclient
-import tritonclient.http as httpclient
 from tritonclient.utils import *
 import numpy as np
 import unittest
