@@ -484,12 +484,6 @@ fi
 set -e
 
 
-if [ $RET -eq 0 ]; then
-    echo -e "\n***\n*** Test Passed\n***"
-else
-    echo -e "\n***\n*** Test FAILED\n***"
-fi
-
 # trace-rate == 1, trace-level=TIMESTAMPS, trace-level=TENSORS
 SERVER_ARGS="--http-thread-count=1 --trace-file=trace_ensemble_tensor.log \
              --trace-level=TIMESTAMPS --trace-level=TENSORS --trace-rate=1 --model-repository=$MODELSDIR"
@@ -568,6 +562,61 @@ done
 
 set -e
 
+
+if [ $RET -eq 0 ]; then
+    echo -e "\n***\n*** Test Passed\n***"
+else
+    echo -e "\n***\n*** Test FAILED\n***"
+fi
+
+
+# check deprecation warnings 
+SERVER_ARGS=" --trace-file=/tmp/trace.json --trace-rate=100 --trace-level=TIMESTAMPS \
+              --trace-log-frequency=50 --trace-count=100 --model-repository=$MODELSDIR"
+SERVER_LOG="./inference_server_trace_config_flag.log"
+run_server
+if [ "$SERVER_PID" == "0" ]; then
+    echo -e "\n***\n*** Failed to start $SERVER\n***"
+    cat $SERVER_LOG
+    exit 1
+fi
+
+set +e
+
+if [ `grep -c "Warning: '--trace-file' has been deprecated" $SERVER_LOG` != "1" ]; then
+    cat $SERVER_LOG
+    echo -e "\n***\n*** Test Failed\n***"
+    RET=1
+fi
+
+if [ `grep -c "Warning: '--trace-rate' has been deprecated" $SERVER_LOG` != "1" ]; then
+    cat $SERVER_LOG
+    echo -e "\n***\n*** Test Failed\n***"
+    RET=1
+fi
+
+if [ `grep -c "Warning: '--trace-level' has been deprecated" $SERVER_LOG` != "1" ]; then
+    cat $SERVER_LOG
+    echo -e "\n***\n*** Test Failed\n***"
+    RET=1
+fi
+
+if [ `grep -c "Warning: '--trace-log-frequency' has been deprecated" $SERVER_LOG` != "1" ]; then
+    cat $SERVER_LOG
+    echo -e "\n***\n*** Test Failed\n***"
+    RET=1
+fi
+
+if [ `grep -c "Warning: '--trace-count' has been deprecated" $SERVER_LOG` != "1" ]; then
+    cat $SERVER_LOG
+    echo -e "\n***\n*** Test Failed\n***"
+    RET=1
+fi
+
+set -e
+
+kill $SERVER_PID
+wait $SERVER_PID
 
 if [ $RET -eq 0 ]; then
     echo -e "\n***\n*** Test Passed\n***"

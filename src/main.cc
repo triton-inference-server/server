@@ -384,7 +384,8 @@ StartTracing(triton::server::TraceManager** trace_manager)
   TRITONSERVER_Error* err = triton::server::TraceManager::Create(
       trace_manager, g_triton_params.trace_level_, g_triton_params.trace_rate_,
       g_triton_params.trace_count_, g_triton_params.trace_log_frequency_,
-      g_triton_params.trace_filepath_);
+      g_triton_params.trace_filepath_, g_triton_params.trace_mode_,
+      g_triton_params.trace_config_map_);
 
   if (err != nullptr) {
     LOG_TRITONSERVER_ERROR(err, "failed to configure tracing");
