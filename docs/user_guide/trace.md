@@ -57,44 +57,92 @@ $ tritonserver \
 ## Trace Settings
 ### Global Settings
 The following table shows available global trace settings to pass to `--trace-config`
-
-| Setting     | Default Value |  Description                                  |
-|:------------|:--------------|-----------------------------------------------|
-| `rate`      | 1000          | Specifies the sampling rate. The same as      |
-|             |               | deprecated `--trace-rate`. For example, a     |
-|             |               | value of 1000 specifies that every 1000-th    |
-|             |               | inference request will be traced.             |
-| `level`     | OFF           | Indicates the level of trace detail that      |
-|             |               | should be collected and may be specified      |
-|             |               | multiple times to trace multiple informations.|
-|             |               |  The same as deprecated `--trace-level`.      |
-|             |               | Choices are `TIMESTAMPS` and `TENSORS`.       |
-|             |               | Note that `opentelemetry` mode does not       |
-|             |               | currently support `TENSORS` level.            |
-| `count`     | -1            | Specifies the remaining number of traces to be|
-|             |               | collected. The default value of -1 specifies  | 
-|             |               | to never stop collecting traces. With a value |
-|             |               | of 100, Triton will stop tracing requests     |
-|             |               | after 100 traces are collected. The same as   |
-|             |               | deprecated `--trace-count`.                   |
-| `mode`      | triton        | Specifies which trace APIs to use for         |
-|             |               | collecting traces. The choices are "triton" or| 
-|             |               | "opentelemetry".                              |
+<table>
+  <thead>
+  <tr>
+    <th>Setting</th>
+    <th>Default Value</th>
+    <th>Description</th>
+  </tr>
+  </thead>
+  <tbody>
+    <tr>
+    <td><code>rate</code></td>
+    <td>1000</td>
+    <td>
+      Specifies the sampling rate. The same as deprecated 
+      <code>--trace-rate</code>. <br/>
+      For example, a value of 1000 specifies that every 1000-th inference <br/>
+      request will be traced.
+    </td>
+    </tr>
+    <tr>
+    <td><code>level</code></td>
+    <td>OFF</td>
+    <td>
+      Indicates the level of trace detail that should be collected and <br/>
+      may be specified  multiple times to trace multiple informations. <br/>
+      The same as deprecated <code>--trace-level</code>. <br/>
+      Choices are <code>TIMESTAMPS</code> and <code>TENSORS</code>.<br/>  
+      <b>Note</b> that <code>opentelemetry</code> mode does not currently <br/> 
+      support <code>TENSORS</code> level.
+    </td>
+    </tr>
+    <tr>
+    <td><code>count</code></td>
+    <td>-1</td>
+    <td>
+      Specifies the remaining number of traces to be collected. <br/>
+      The default value of -1 specifies to never stop collecting traces. <br/>
+      With a value  of 100, Triton will stop tracing requests<br/>
+      after 100 traces are collected.<br/> 
+      The same as  deprecated <code>--trace-count</code>. 
+    </td>
+    </tr>
+    <tr>
+    <td><code>mode</code></td>
+    <td>triton</td>
+    <td>
+      Specifies which trace APIs to use for collecting traces. <br/>
+      The choices are <code>triton</code> or <code>opentelemetry</code>. <br/>
+    </td>
+    </tr>
+  </tbody>
+</table>
 
 ### Triton Trace APIs Settings
 
 The following table shows available Triton trace APIs settings for 
 `--trace-config triton,<setting>=<value>`.
-
-| Setting     | Default Value |  Description                                  |
-|:------------|:--------------|-----------------------------------------------|
-| `file`      | empty string  | Indicates where the trace output should be    |
-|             |               | written. The same as deprecated `--trace-file`.|
-| `log-frequency`| 0          | Specifies the rate that the traces are written| 
-|             |               | to file. For example, a value of 50 specifies |
-|             |               | that Triton will log to file for every 50     |
-|             |               | traces collected. The same as deprecated      |
-|             |               | `--trace-log-frequency`                       |
+<table>
+  <thead>
+  <tr>
+    <th>Setting</th>
+    <th>Default Value</th>
+    <th>Description</th>
+  </tr>
+  </thead>
+  <tbody>
+    <tr>
+    <td><code>file</code></td>
+    <td>empty string</td>
+    <td>
+      Indicates where the trace output should be written. <br/>
+      The same as deprecated <code>--trace-file</code>. <br/>
+    </td>
+    </tr>
+    <tr>
+    <td><code>log-frequency</code></td>
+    <td>0</td>
+    <td>
+      Specifies the rate that the traces are written to file. <br/>
+      For example, a value of 50 specifies that Triton will log <br/>
+      to file for every 50 traces collected. <br/>
+      The same as deprecated <code>--trace-log-frequency</code>.<br/>
+    </td>
+    </tr>
+  </tbody>
+</table>
 
 In addition to the trace configuration settings in the command line, you can
 modify the trace configuration using the [trace
@@ -396,11 +444,25 @@ $ tritonserver --trace-config mode=opentelemetry \
 
 The following table shows available OpenTelemetry trace APIs settings for 
 `--trace-config opentelemetry,<setting>=<value>`.
-
-| Setting| Default Value           |  Description                             |
-|--------|-------------------------|------------------------------------------|
-| `url`  | `0.0.0.0:4318/v1/traces`| `host:port` to which the receiver is     |
-|        |                         | going to receive trace data.             |
+<table>
+  <thead>
+  <tr>
+    <th>Setting</th>
+    <th>Default Value</th>
+    <th>Description</th>
+  </tr>
+  </thead>
+  <tbody>
+    <tr>
+    <td><code>url</code></td>
+    <td><code>0.0.0.0:4318/v1/traces</code></td>
+    <td>
+      <code>host:port</code> to which the receiver is going to receive 
+      trace data.
+    </td>
+    </tr>
+  </tbody>
+</table>
 
 ### Limitations
 
