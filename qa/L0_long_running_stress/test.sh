@@ -138,7 +138,7 @@ cp -r $DATADIR/tf_model_store/resnet_v1_50_graphdef $MODEL_DIR/resnet_v1_50_grap
     echo "optimization { }" >> config.pbtxt)
 
 SERVER_ARGS="--model-repository=`pwd`/$MODEL_DIR"
-SERVER_LOG="./serverlog"
+SERVER_LOG="./server.log"
 run_server
 if [ "$SERVER_PID" == "0" ]; then
     echo -e "\n***\n*** Failed to start $SERVER\n***"

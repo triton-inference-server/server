@@ -96,7 +96,7 @@ for BACKEND in $BACKENDS; do
         RET=1
     fi
 
-    grep "] non-pinned" ${ENSEMBLE_NAME}.pinned.serverlog
+    grep "] non-pinned" ${ENSEMBLE_NAME}.pinned.server.log
     if [ $? -eq 0 ]; then
         echo -e "\n***\n*** Failed. Expected only pinned memory is allocated\n***"
         RET=1
@@ -148,7 +148,7 @@ for BACKEND in $BACKENDS; do
         RET=1
     fi
 
-    grep "] pinned" ${ENSEMBLE_NAME}.nonpinned.serverlog
+    grep "] pinned" ${ENSEMBLE_NAME}.nonpinned.server.log
     if [ $? -eq 0 ]; then
         echo -e "\n***\n*** Failed. Expected only non-pinned memory is allocated\n***"
         RET=1
