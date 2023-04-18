@@ -49,7 +49,7 @@ SERVER_ARGS="--model-repository=`pwd`/models"
 SERVER_LOG="./inference_server.log"
 source ../common/util.sh
 
-rm -fr *.serverlog *.log *.serverlog
+rm -fr  *.log 
 rm -fr models && mkdir models
 cp -r /data/inferenceserver/${REPO_VERSION}/qa_shapetensor_model_repository/* models/.
 
@@ -134,7 +134,7 @@ sed -i "s/^version_policy:.*/version_policy: { specific { versions: [1] }}/" $CO
 for i in \
             test_dynamic_different_shape_values \
             test_dynamic_identical_shape_values; do
-        SERVER_LOG="./$i.serverlog"
+        SERVER_LOG="./$i.server.log"
         run_server
         if [ "$SERVER_PID" == "0" ]; then
             echo -e "\n***\n*** Failed to start $SERVER\n***"
@@ -169,7 +169,7 @@ for i in \
             test_sequence_identical_shape_values ; do
         export TRITONSERVER_BACKLOG_DELAY_SCHEDULER=0
         export TRITONSERVER_DELAY_SCHEDULER=12
-        SERVER_LOG="./$i.serverlog"
+        SERVER_LOG="./$i.server.log"
         run_server
         if [ "$SERVER_PID" == "0" ]; then
             echo -e "\n***\n*** Failed to start $SERVER\n***"
@@ -215,7 +215,7 @@ for i in \
     test_dynaseq_different_shape_values_parallel \
     ;do
     SERVER_ARGS="--model-repository=`pwd`/models"
-    SERVER_LOG="./$i.serverlog"
+    SERVER_LOG="./$i.server.log"
     run_server
     if [ "$SERVER_PID" == "0" ]; then
         echo -e "\n***\n*** Failed to start $SERVER\n***"

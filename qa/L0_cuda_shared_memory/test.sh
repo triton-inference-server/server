@@ -50,7 +50,7 @@ for i in \
         test_unregisterall; do
     for client_type in http grpc; do
         SERVER_ARGS="--model-repository=`pwd`/models --log-verbose=1"
-        SERVER_LOG="./$i.$client_type.serverlog"
+        SERVER_LOG="./$i.$client_type.server.log"
         run_server
         if [ "$SERVER_PID" == "0" ]; then
             echo -e "\n***\n*** Failed to start $SERVER\n***"

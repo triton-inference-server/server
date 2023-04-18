@@ -32,7 +32,7 @@ import re
 import pathlib
 
 FLAGS = None
-SKIP_EXTS = ('jpeg', 'jpg', 'pgm', 'png', 'log', 'serverlog', 'preprocessed',
+SKIP_EXTS = ('jpeg', 'jpg', 'pgm', 'png', 'log', 'preprocessed',
              'jmx', 'gz', 'json', 'pdf', 'so', 'onnx', 'svg')
 REPO_PATH_FROM_THIS_FILE = '../..'
 SKIP_PATHS = (
