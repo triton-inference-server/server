@@ -343,7 +343,7 @@ TraceManager::Trace::CaptureTimestamp(
         InitSpan(otel_timestamp);
       }
       trace_span_->AddEvent(
-          name, otel_timestamp, {{"triton.steady_timestamp_ns", timestamp_ns}});
+          name, otel_timestamp);
 #else
       LOG_ERROR << "Unsupported trace mode: "
                 << TraceManager::InferenceTraceModeString(setting_->mode_);
@@ -517,8 +517,7 @@ TraceManager::TraceActivity(
       ts->InitSpan(otel_timestamp);
     }
     ts->trace_span_->AddEvent(
-        TRITONSERVER_InferenceTraceActivityString(activity), otel_timestamp,
-        {{"triton.steady_timestamp_ns", timestamp_ns}});
+        TRITONSERVER_InferenceTraceActivityString(activity), otel_timestamp);
 #else
     LOG_ERROR << "Unsupported trace mode: "
               << TraceManager::InferenceTraceModeString(ts->setting_->mode_);
