@@ -59,30 +59,30 @@ ENV DEBIAN_FRONTEND=noninteractive
 
 RUN apt-get update && \
     apt-get install -y --no-install-recommends \
-    ca-certificates \
-    software-properties-common \
-    autoconf \
-    automake \
-    build-essential \
-    curl \
-    git \
-    gperf \
-    libb64-dev \
-    libgoogle-perftools-dev \
-    libopencv-dev \
-    libopencv-core-dev \
-    libssl-dev \
-    libtool \
-    pkg-config \
-    python3 \
-    python3-pip \
-    python3-dev \
-    rapidjson-dev \
-    vim \
-    wget \
-    python3-pdfkit \
-    openjdk-11-jdk \
-    maven && \
+            ca-certificates \
+            software-properties-common \
+            autoconf \
+            automake \
+            build-essential \
+            curl \
+            git \
+            gperf \
+            libb64-dev \
+            libgoogle-perftools-dev \
+            libopencv-dev \
+            libopencv-core-dev \
+            libssl-dev \
+            libtool \
+            pkg-config \
+            python3 \
+            python3-pip \
+            python3-dev \
+            rapidjson-dev \
+            vim \
+            wget \
+            python3-pdfkit \
+            openjdk-11-jdk \
+            maven && \
     pip3 install --upgrade wheel setuptools && \
     pip3 install --upgrade grpcio-tools && \
     pip3 install --upgrade pip
@@ -90,20 +90,20 @@ RUN apt-get update && \
 ARG CMAKE_UBUNTU_VERSION
 # Client build requires recent version of CMake (FetchContent required)
 RUN wget -O - https://apt.kitware.com/keys/kitware-archive-latest.asc 2>/dev/null | \
-    gpg --dearmor - |  \
-    tee /etc/apt/trusted.gpg.d/kitware.gpg >/dev/null && \
+      gpg --dearmor - |  \
+      tee /etc/apt/trusted.gpg.d/kitware.gpg >/dev/null && \
     if [ "$CMAKE_UBUNTU_VERSION" = "20.04" ]; then \
-    apt-add-repository 'deb https://apt.kitware.com/ubuntu/ focal main' && \
-    apt-get update && \
-    apt-get install -y --no-install-recommends \
-    cmake-data=3.25.2-0kitware1ubuntu20.04.1 cmake=3.25.2-0kitware1ubuntu20.04.1; \
+      apt-add-repository 'deb https://apt.kitware.com/ubuntu/ focal main' && \
+      apt-get update && \
+      apt-get install -y --no-install-recommends \
+        cmake-data=3.25.2-0kitware1ubuntu20.04.1 cmake=3.25.2-0kitware1ubuntu20.04.1; \
     elif [ "$CMAKE_UBUNTU_VERSION" = "18.04" ]; then \
-    apt-add-repository 'deb https://apt.kitware.com/ubuntu/ bionic main' && \
-    apt-get update && \
-    apt-get install -y --no-install-recommends \
-    cmake-data=3.18.4-0kitware1 cmake=3.18.4-0kitware1; \
+      apt-add-repository 'deb https://apt.kitware.com/ubuntu/ bionic main' && \
+      apt-get update && \
+      apt-get install -y --no-install-recommends \
+        cmake-data=3.18.4-0kitware1 cmake=3.18.4-0kitware1; \
     else \
-    echo "ERROR: Only support CMAKE_UBUNTU_VERSION to be 18.04 or 20.04" && false; \
+      echo "ERROR: Only support CMAKE_UBUNTU_VERSION to be 18.04 or 20.04" && false; \
     fi && \
     cmake --version
 
@@ -128,30 +128,30 @@ COPY ${TRITON_CLIENT_REPO_SUBDIR} client
 
 WORKDIR /workspace/build
 RUN cmake -DCMAKE_INSTALL_PREFIX=/workspace/install \
-    -DTRITON_VERSION=`cat /workspace/TRITON_VERSION` \
-    -DTRITON_COMMON_REPO_TAG=${TRITON_COMMON_REPO_TAG} \
-    -DTRITON_CORE_REPO_TAG=${TRITON_CORE_REPO_TAG} \
-    -DTRITON_BACKEND_REPO_TAG=${TRITON_BACKEND_REPO_TAG} \
-    -DTRITON_THIRD_PARTY_REPO_TAG=${TRITON_THIRD_PARTY_REPO_TAG} \
-    -DTRITON_ENABLE_CC_HTTP=ON -DTRITON_ENABLE_CC_GRPC=ON \
-    -DTRITON_ENABLE_PYTHON_HTTP=ON -DTRITON_ENABLE_PYTHON_GRPC=ON \
-    -DTRITON_ENABLE_JAVA_HTTP=ON \
-    -DTRITON_ENABLE_PERF_ANALYZER=ON \
-    -DTRITON_ENABLE_PERF_ANALYZER_C_API=ON \
-    -DTRITON_ENABLE_PERF_ANALYZER_TFS=ON \
-    -DTRITON_ENABLE_PERF_ANALYZER_TS=ON \
-    -DTRITON_ENABLE_EXAMPLES=ON -DTRITON_ENABLE_TESTS=ON \
-    -DTRITON_ENABLE_GPU=${TRITON_ENABLE_GPU} /workspace/client
+          -DTRITON_VERSION=`cat /workspace/TRITON_VERSION` \
+          -DTRITON_COMMON_REPO_TAG=${TRITON_COMMON_REPO_TAG} \
+          -DTRITON_CORE_REPO_TAG=${TRITON_CORE_REPO_TAG} \
+          -DTRITON_BACKEND_REPO_TAG=${TRITON_BACKEND_REPO_TAG} \
+          -DTRITON_THIRD_PARTY_REPO_TAG=${TRITON_THIRD_PARTY_REPO_TAG} \
+          -DTRITON_ENABLE_CC_HTTP=ON -DTRITON_ENABLE_CC_GRPC=ON \
+          -DTRITON_ENABLE_PYTHON_HTTP=ON -DTRITON_ENABLE_PYTHON_GRPC=ON \
+          -DTRITON_ENABLE_JAVA_HTTP=ON \
+          -DTRITON_ENABLE_PERF_ANALYZER=ON \
+          -DTRITON_ENABLE_PERF_ANALYZER_C_API=ON \
+          -DTRITON_ENABLE_PERF_ANALYZER_TFS=ON \
+          -DTRITON_ENABLE_PERF_ANALYZER_TS=ON \
+          -DTRITON_ENABLE_EXAMPLES=ON -DTRITON_ENABLE_TESTS=ON \
+          -DTRITON_ENABLE_GPU=${TRITON_ENABLE_GPU} /workspace/client
 RUN make -j16 cc-clients python-clients java-clients && \
     rm -fr ~/.m2
 
 # Install Java API Bindings
 RUN if [ "$TARGETPLATFORM" = "linux/amd64" ]; then \
-    source /workspace/client/src/java-api-bindings/scripts/install_dependencies_and_build.sh \
-    --maven-version ${JAVA_BINDINGS_MAVEN_VERSION} \
-    --core-tag ${TRITON_CORE_REPO_TAG} \
-    --javacpp-tag ${JAVA_BINDINGS_JAVACPP_PRESETS_TAG} \
-    --jar-install-path /workspace/install/java-api-bindings; \
+        source /workspace/client/src/java-api-bindings/scripts/install_dependencies_and_build.sh \
+        --maven-version ${JAVA_BINDINGS_MAVEN_VERSION} \
+        --core-tag ${TRITON_CORE_REPO_TAG} \
+        --javacpp-tag ${JAVA_BINDINGS_JAVACPP_PRESETS_TAG} \
+        --jar-install-path /workspace/install/java-api-bindings; \
     fi
 
 ############################################################################
@@ -169,24 +169,24 @@ ARG TRITON_ENABLE_GPU
 
 RUN apt-get update && \
     apt-get install -y --no-install-recommends \
-    software-properties-common \
-    curl \
-    git \
-    gperf \
-    libb64-dev \
-    libgoogle-perftools-dev \
-    libopencv-dev \
-    libopencv-core-dev \
-    libssl-dev \
-    libtool \
-    python3 \
-    python3-pip \
-    python3-dev \
-    vim \
-    wget \
-    python3-pdfkit \
-    maven \
-    default-jdk && \
+            software-properties-common \
+            curl \
+            git \
+            gperf \
+            libb64-dev \
+            libgoogle-perftools-dev \
+            libopencv-dev \
+            libopencv-core-dev \
+            libssl-dev \
+            libtool \
+            python3 \
+            python3-pip \
+            python3-dev \
+            vim \
+            wget \
+            python3-pdfkit \
+            maven \
+            default-jdk && \
     pip3 install --upgrade wheel setuptools && \
     pip3 install --upgrade grpcio-tools && \
     pip3 install --upgrade pip
@@ -222,16 +222,16 @@ COPY qa/images/mug.jpg images/mug.jpg
 # be used to run the client examples.
 RUN pip3 install --upgrade numpy pillow attrdict && \
     find install/python/ -maxdepth 1 -type f -name \
-    "tritonclient-*linux*.whl" | xargs printf -- '%s[all]' | \
+         "tritonclient-*linux*.whl" | xargs printf -- '%s[all]' | \
     xargs pip3 install --upgrade
 
 # Install DCGM
 RUN if [ "$TRITON_ENABLE_GPU" = "ON" ]; then \
-    [ "$(uname -m)" != "x86_64" ] && arch="sbsa" || arch="x86_64" && \
-    curl -o /tmp/cuda-keyring.deb \
-    https://developer.download.nvidia.com/compute/cuda/repos/ubuntu2004/$arch/cuda-keyring_1.0-1_all.deb \
-    && apt install /tmp/cuda-keyring.deb && rm /tmp/cuda-keyring.deb && \
-    apt-get update && apt-get install -y datacenter-gpu-manager=1:${DCGM_VERSION}; \
+        [ "$(uname -m)" != "x86_64" ] && arch="sbsa" || arch="x86_64" && \
+        curl -o /tmp/cuda-keyring.deb \
+        https://developer.download.nvidia.com/compute/cuda/repos/ubuntu2004/$arch/cuda-keyring_1.0-1_all.deb \
+        && apt install /tmp/cuda-keyring.deb && rm /tmp/cuda-keyring.deb && \
+        apt-get update && apt-get install -y datacenter-gpu-manager=1:${DCGM_VERSION}; \
     fi
 
 # Build expects "python" executable (not python3).
