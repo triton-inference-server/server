@@ -36,6 +36,12 @@
 #include <vector>
 #include "triton/common/logging.h"
 #include "triton/core/tritonserver.h"
+#ifdef TRITON_ENABLE_GRPC
+// To avoid ambiguous reference during build
+// grpc headers should be imported first
+// https://github.com/open-telemetry/opentelemetry-cpp/blob/main/examples/otlp/README.md#additional-notes-regarding-abseil-library
+#include "grpc/grpc_server.h"
+#endif  // TRITON_ENABLE_GRPC
 #if defined(TRITON_ENABLE_HTTP) || defined(TRITON_ENABLE_METRICS)
 #include "http_server.h"
 #endif  // TRITON_ENABLE_HTTP|| TRITON_ENABLE_METRICS
@@ -45,9 +51,6 @@
 #ifdef TRITON_ENABLE_VERTEX_AI
 #include "vertex_ai_server.h"
 #endif  // TRITON_ENABLE_VERTEX_AI
-#ifdef TRITON_ENABLE_GRPC
-#include "grpc/grpc_server.h"
-#endif  // TRITON_ENABLE_GRPC
 
 #ifndef _WIN32
 #include <getopt.h>
@@ -67,6 +70,10 @@ struct option {
   int val_;
 };
 #endif
+#ifdef TRITON_ENABLE_TRACING
+#include "tracer.h"
+#endif
+
 
 namespace triton { namespace server {
 
@@ -169,6 +176,8 @@ struct TritonServerParameters {
   int32_t trace_rate_{1000};
   int32_t trace_count_{-1};
   int32_t trace_log_frequency_{0};
+  InferenceTraceMode trace_mode_{TRACE_MODE_TRITON};
+  TraceConfigMap trace_config_map_;
 #endif  // TRITON_ENABLE_TRACING
 
 // The configurations for various endpoints (i.e. HTTP, GRPC and metrics)
@@ -280,12 +289,31 @@ class TritonParser {
   ParseGrpcRestrictedProtocolOption(const std::string& arg);
 #ifdef TRITON_ENABLE_TRACING
   TRITONSERVER_InferenceTraceLevel ParseTraceLevelOption(std::string arg);
+  InferenceTraceMode ParseTraceModeOption(std::string arg);
+  std::tuple<std::string, std::string, std::string> ParseTraceConfigOption(
+      const std::string& arg);
+  // Helper functions for post processing for collected trace arguments.
+  void SetGlobalTraceArgs(
+      TritonServerParameters& lparams, bool trace_level_present,
+      bool trace_rate_present, bool trace_count_present,
+      bool explicit_disable_trace);
+  void SetTritonTraceArgs(
+      TritonServerParameters& lparams, bool trace_filepath_present,
+      bool trace_log_frequency_present);
+  void VerifyOpentelemetryTraceArgs(
+      bool trace_filepath_present, bool trace_log_frequency_present);
+  void PostProcessTraceArgs(
+      TritonServerParameters& lparams, bool trace_level_present,
+      bool trace_rate_present, bool trace_count_present,
+      bool trace_filepath_present, bool trace_log_frequency_present,
+      bool explicit_disable_trace);
 #endif  // TRITON_ENABLE_TRACING
-  // Helper function to parse option in
-  // "<string>[1st_delim]<string>[2nd_delim]<string>" format
-  std::tuple<std::string, std::string, std::string> ParseGenericConfigOption(
-      const std::string& arg, const std::string& first_delim,
-      const std::string& second_delim);
+      // Helper function to parse option in
+      // "<string>[1st_delim]<string>[2nd_delim]<string>" format
+      std::
+          tuple<std::string, std::string, std::string> ParseGenericConfigOption(
+              const std::string& arg, const std::string& first_delim,
+              const std::string& second_delim);
 
   static std::vector<Option> recognized_options_;
 };
