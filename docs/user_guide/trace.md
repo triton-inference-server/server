@@ -470,7 +470,7 @@ The following table shows available OpenTelemetry trace APIs settings for
   <tbody>
     <tr>
     <td><code>url</code></td>
-    <td><code>0.0.0.0:4318/v1/traces</code></td>
+    <td><code>http://localhost:4318/v1/traces</code></td>
     <td>
       <code>host:port</code> to which the receiver is going to receive 
       trace data.
@@ -488,8 +488,9 @@ models is not supported.
 
 - Triton supports only 
 [OTLP/HTTP Exporter](https://github.com/open-telemetry/opentelemetry-specification/blob/main/specification/protocol/otlp.md#otlphttp) 
-and allows specification of only endpoint for this exporter through 
-`--trace-config`. 
+and allows specification of only url for this exporter through 
+`--trace-config`. Other options and corresponding default values can be
+found [here](https://github.com/open-telemetry/opentelemetry-cpp/tree/v1.8.3/exporters/otlp#configuration-options--otlp-http-exporter-).
 
 - Triton does not support configuration of the opentelemetry trace settings 
 during a Triton run and opentelemetry specific settings are not available 
