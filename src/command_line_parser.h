@@ -70,6 +70,10 @@ struct option {
   int val_;
 };
 #endif
+#ifdef TRITON_ENABLE_TRACING
+#include "tracer.h"
+#endif
+
 
 namespace triton { namespace server {
 
@@ -172,8 +176,8 @@ struct TritonServerParameters {
   int32_t trace_rate_{1000};
   int32_t trace_count_{-1};
   int32_t trace_log_frequency_{0};
-  triton::server::InferenceTraceMode trace_mode_{TRACE_MODE_TRITON};
-  triton::server::TraceConfigMap trace_config_map_;
+  InferenceTraceMode trace_mode_{TRACE_MODE_TRITON};
+  TraceConfigMap trace_config_map_;
 #endif  // TRITON_ENABLE_TRACING
 
 // The configurations for various endpoints (i.e. HTTP, GRPC and metrics)
@@ -285,7 +289,7 @@ class TritonParser {
   ParseGrpcRestrictedProtocolOption(const std::string& arg);
 #ifdef TRITON_ENABLE_TRACING
   TRITONSERVER_InferenceTraceLevel ParseTraceLevelOption(std::string arg);
-  triton::server::InferenceTraceMode ParseTraceModeOption(std::string arg);
+  InferenceTraceMode ParseTraceModeOption(std::string arg);
   std::tuple<std::string, std::string, std::string> ParseTraceConfigOption(
       const std::string& arg);
   // Helper functions for post processing for collected trace arguments.
@@ -304,11 +308,12 @@ class TritonParser {
       bool trace_filepath_present, bool trace_log_frequency_present,
       bool explicit_disable_trace);
 #endif  // TRITON_ENABLE_TRACING
-  // Helper function to parse option in
-  // "<string>[1st_delim]<string>[2nd_delim]<string>" format
-  std::tuple<std::string, std::string, std::string> ParseGenericConfigOption(
-      const std::string& arg, const std::string& first_delim,
-      const std::string& second_delim);
+      // Helper function to parse option in
+      // "<string>[1st_delim]<string>[2nd_delim]<string>" format
+      std::
+          tuple<std::string, std::string, std::string> ParseGenericConfigOption(
+              const std::string& arg, const std::string& first_delim,
+              const std::string& second_delim);
 
   static std::vector<Option> recognized_options_;
 };
