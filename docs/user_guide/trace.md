@@ -439,6 +439,20 @@ flag as follows:
 $ tritonserver --trace-config mode=opentelemetry \
     --trace-config opentelemetry,url=<endpoint> ...
 ```
+### Differences in trace contents from Triton's trace [output](#json-trace-output)
+
+Each [span](https://opentelemetry.io/docs/concepts/observability-primer/#spans) 
+produced by OpenTelemetry APIs collects the same timestamps as Triton's trace
+APIs. Additionally, every span reports `model_name`, `model_version`, `request_id`,
+and `parent_id` as an [attribute](https://opentelemetry.io/docs/concepts/observability-primer/#span-attributes).
+
+The span reports collected `TIMESTAMPS` - a name and the timestamp 
+in nanoseconds - similar to Triton Trace APIs. However, OpenTelemetry relies 
+on system's clock for event timestamps - a clock based on the system's 
+real-time clock. Triton Trace APIs report timestamps using steady clock - 
+a monotonic clock, meaning time is always moving forward. It is not related 
+to wall clock time (for example, it can be time since last reboot).
+
 
 ### OpenTelemetry trace APIs settings
 
