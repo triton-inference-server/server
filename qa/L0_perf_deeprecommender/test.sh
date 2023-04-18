@@ -43,7 +43,7 @@ TRTEXEC=/usr/src/tensorrt/bin/trtexec
 MODEL="deeprecommender"
 PROTOCOLS="grpc http"
 
-rm -f *.log *.serverlog *.csv *.metrics *.tjson *.json
+rm -f *.log  *.csv *.metrics *.tjson *.json
 
 #
 # Test minimum latency

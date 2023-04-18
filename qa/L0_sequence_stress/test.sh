@@ -39,7 +39,7 @@ RET=0
 #   models1 - one instance with batch-size 4
 #   models2 - two instances with batch-size 2
 #   models4 - four instances with batch-size 1
-rm -fr *.log *.serverlog models{1,2,4} && mkdir models{1,2,4}
+rm -fr *.log  models{1,2,4} && mkdir models{1,2,4}
 for m in ../custom_models/custom_sequence_int32 ; do
     cp -r $m models1/. && \
         (cd models1/$(basename $m) && \

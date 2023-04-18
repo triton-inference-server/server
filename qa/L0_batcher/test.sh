@@ -146,7 +146,7 @@ MAX_QUEUE_DELAY_ONLY_TESTS=${MAX_QUEUE_DELAY_ONLY_TESTS:="test_max_queue_delay_o
                                                     test_max_queue_delay_only_non_default"}
 
 # Setup non-variable-size model repository
-rm -fr *.log *.serverlog models && mkdir models
+rm -fr *.log  models && mkdir models
 for BACKEND in $BACKENDS; do
     TMP_MODEL_DIR="$DATADIR/qa_model_repository/${BACKEND}_float32_float32_float32"
     if [ "$BACKEND" == "python" ]; then

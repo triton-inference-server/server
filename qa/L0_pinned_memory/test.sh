@@ -50,7 +50,7 @@ source ../common/util.sh
 # Select the single GPU that will be available to the inference server
 export CUDA_VISIBLE_DEVICES=0
 
-rm -f *.log *.serverlog *.csv *.metrics
+rm -f *.log  *.csv *.metrics
 RET=0
 
 rm -fr ./custom_models && mkdir ./custom_models && \

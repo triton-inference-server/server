@@ -173,7 +173,7 @@ export INITIAL_STATE_ZERO
 #   models1 - one instance with batch-size 4
 #   models2 - two instances with batch-size 2
 #   models4 - four instances with batch-size 1
-rm -fr *.log *.serverlog models{0,1,2,4} queue_delay_models && mkdir models{0,1,2,4} queue_delay_models
+rm -fr *.log  models{0,1,2,4} queue_delay_models && mkdir models{0,1,2,4} queue_delay_models
 
 # Get the datatype to use based on the backend
 function get_datatype () {

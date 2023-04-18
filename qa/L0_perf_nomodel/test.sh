@@ -38,7 +38,7 @@ if [ ! -z "$TEST_REPO_ARCH" ]; then
     REPO_VERSION=${REPO_VERSION}_${TEST_REPO_ARCH}
 fi
 
-rm -f *.log *.serverlog *.csv *.tjson *.json
+rm -f *.log  *.csv *.tjson *.json
 
 # Descriptive name for the current results
 UNDERTEST_NAME=${NVIDIA_TRITON_SERVER_VERSION}

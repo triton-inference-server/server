@@ -49,7 +49,7 @@ SERVER_ARGS="--model-repository=`pwd`/models"
 SERVER_LOG="./inference_server.log"
 source ../common/util.sh
 
-rm -fr *.serverlog *.log *.serverlog
+rm -fr  *.log 
 rm -fr models && mkdir models
 cp -r /data/inferenceserver/${REPO_VERSION}/qa_shapetensor_model_repository/* models/.
 
