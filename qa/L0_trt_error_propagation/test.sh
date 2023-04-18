@@ -25,52 +25,58 @@
 # (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-REPO_VERSION=${NVIDIA_TRITON_SERVER_VERSION}
-if [ "$#" -ge 1 ]; then
-    REPO_VERSION=$1
-fi
-if [ -z "$REPO_VERSION" ]; then
-    echo -e "Repository version must be specified"
-    echo -e "\n***\n*** Test Failed\n***"
-    exit 1
-fi
-if [ ! -z "$TEST_REPO_ARCH" ]; then
-    REPO_VERSION=${REPO_VERSION}_${TEST_REPO_ARCH}
-fi
-
 export CUDA_VISIBLE_DEVICES=0
 SERVER=/opt/tritonserver/bin/tritonserver
 source ../common/util.sh
 
+# Create TensorRT model with invalid plan file
 rm -rf models && mkdir models
-cp -r /data/inferenceserver/${REPO_VERSION}/qa_identity_big_model_repository/plan_* models
+mkdir models/invalid_plan_file && (cd models/invalid_plan_file && \
+    echo -e "name: \"invalid_plan_file\"" >> config.pbtxt && \
+    echo -e "platform: \"tensorrt_plan\"" >> config.pbtxt && \
+    echo -e "input [\n {\n name: \"INPUT\"\n data_type: TYPE_FP32\n dims: [-1]\n }\n ]" >> config.pbtxt && \
+    echo -e "output [\n {\n name: \"OUTPUT\"\n data_type: TYPE_FP32\n dims: [-1]\n }\n ]" >> config.pbtxt && \
+    mkdir 1 && echo "----- invalid model.plan -----" >> 1/model.plan)
 
-SERVER_ARGS="--model-repository=models --model-control-mode=explicit --disable-auto-complete-config"
-SERVER_LOG="./server.log"
-run_server
-if [ "$SERVER_PID" == "0" ]; then
-    echo -e "\n***\n*** Failed to start $SERVER\n***"
-    cat $SERVER_LOG
-    exit 1
-fi
+# Test with and without auto complete enabled
+for ENABLE_AUTOCOMPLETE in "YES" "NO"; do
 
-RET=0
+    if [[ "$ENABLE_AUTOCOMPLETE" == "YES" ]]; then
+        TEST_NAME="test_invalid_trt_model_autocomplete"
+        SERVER_ARGS="--model-repository=models --model-control-mode=explicit"
+    else
+        TEST_NAME="test_invalid_trt_model"
+        SERVER_ARGS="--model-repository=models --model-control-mode=explicit --disable-auto-complete-config"
+    fi
 
-set +e
-python trt_error_propagation_test.py > trt_error_propagation_test.log 2>&1
-if [ $? -ne 0 ]; then
-    cat trt_error_propagation_test.log
-    RET=1
-fi
-set -e
+    SERVER_LOG="./$TEST_NAME.server.log"
+    run_server
+    if [ "$SERVER_PID" == "0" ]; then
+        echo -e "\n***\n*** Failed to start $SERVER\n***"
+        cat $SERVER_LOG
+        exit 1
+    fi
 
-kill $SERVER_PID
-wait $SERVER_PID
+    RET=0
 
-if [ $RET -eq 0 ]; then
-    echo -e "\n***\n*** Test Passed\n***"
-else
-    echo -e "\n***\n*** Test FAILED\n***"
-fi
+    set +e
+    python trt_error_propagation_test.py TestTrtErrorPropagation.$TEST_NAME > $TEST_NAME.log 2>&1
+    if [ $? -ne 0 ]; then
+        cat $TEST_NAME.log
+        echo -e "\n***\n*** Test FAILED\n***"
+        RET=1
+    fi
+    set -e
 
-exit $RET
+    kill $SERVER_PID
+    wait $SERVER_PID
+
+    if [ $RET -ne 0 ]; then
+        exit $RET
+    fi
+
+done
+
+# Exit with success
+echo -e "\n***\n*** Test Passed\n***"
+exit 0

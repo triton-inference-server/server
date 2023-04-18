@@ -25,7 +25,6 @@
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 import unittest
-import shutil
 import tritonclient.grpc as grpcclient
 from tritonclient.utils import InferenceServerException
 
@@ -38,24 +37,23 @@ class TestTrtErrorPropagation(unittest.TestCase):
                                                          verbose=True)
 
     def test_invalid_trt_model(self):
-        model_name = "plan_zero_1_float32"
-        model_file_path = "models/" + model_name + "/1/model.plan"
-        # Invalidate model file
-        shutil.move(model_file_path, "model.plan.backup")
-        with open(model_file_path, mode="w") as f:
-            f.write("----- invalid model.plan -----\n")
-        # Try loading the invalid model
         with self.assertRaises(InferenceServerException) as e:
-            self.__triton.load_model(model_name)
+            self.__triton.load_model("invalid_plan_file")
         err_msg = str(e.exception)
-        self.assertTrue("Internal: unable to create TensorRT engine" in err_msg,
-                        "Caught an unexpected exception")
-        self.assertTrue(
-            "Error Code 4: Internal Error (Engine deserialization failed.)"
-            in err_msg,
+        self.assertIn("Internal: unable to create TensorRT engine", err_msg,
+                      "Caught an unexpected exception")
+        self.assertIn(
+            "Error Code 4: Internal Error (Engine deserialization failed.)",
+            err_msg,
             "Detailed error message not propagated back to triton client")
-        # Restore model file
-        shutil.move("model.plan.backup", model_file_path)
+
+    def test_invalid_trt_model_autocomplete(self):
+        with self.assertRaises(InferenceServerException) as e:
+            self.__triton.load_model("invalid_plan_file")
+        err_msg = str(e.exception)
+        self.assertIn(
+            "Internal: unable to load plan file to auto complete config",
+            err_msg, "Caught an unexpected exception")
 
 
 if __name__ == '__main__':
