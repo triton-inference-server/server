@@ -417,6 +417,14 @@ def create_libtorch_modelfile(create_savedmodel, models_dir, model_version,
 
                 def forward(self, input0, input1):
                     return input0, input1
+
+                @torch.jit.export
+                def swap(self, input0, input1):
+                    ''' This additional function is to test whether
+                    Triton can serve libtorch model successfully with
+                    a custom method name. 
+                    '''
+                    return input1, input0
     elif io_cnt == 3:
         if (dtype == np_dtype_string):
 
@@ -1228,3 +1236,4 @@ if __name__ == '__main__':
         create_libtorch_linalg_modelconfig(True, FLAGS.models_dir,
                                            model_version)
         create_libtorch_linalg_modelfile(True, FLAGS.models_dir, model_version)
+        create_models(FLAGS.models_dir, np.float32, [-1], io_cnt=2)
