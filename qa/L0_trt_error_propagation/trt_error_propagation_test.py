@@ -37,9 +37,9 @@ class TestTrtErrorPropagation(unittest.TestCase):
                                                          verbose=True)
 
     def test_invalid_trt_model(self):
-        with self.assertRaises(InferenceServerException) as e:
+        with self.assertRaises(InferenceServerException) as cm:
             self.__triton.load_model("invalid_plan_file")
-        err_msg = str(e.exception)
+        err_msg = str(cm.exception)
         self.assertIn("Internal: unable to create TensorRT engine", err_msg,
                       "Caught an unexpected exception")
         self.assertIn(
@@ -48,9 +48,9 @@ class TestTrtErrorPropagation(unittest.TestCase):
             "Detailed error message not propagated back to triton client")
 
     def test_invalid_trt_model_autocomplete(self):
-        with self.assertRaises(InferenceServerException) as e:
+        with self.assertRaises(InferenceServerException) as cm:
             self.__triton.load_model("invalid_plan_file")
-        err_msg = str(e.exception)
+        err_msg = str(cm.exception)
         self.assertIn(
             "Internal: unable to load plan file to auto complete config",
             err_msg, "Caught an unexpected exception")
