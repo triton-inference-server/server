@@ -99,10 +99,10 @@ struct Option {
     return lo;
   }
 
-  int id_;
-  std::string flag_;
-  std::string arg_desc_;
-  std::string desc_;
+  const int id_;
+  const std::string flag_;
+  const std::string arg_desc_;
+  const std::string desc_;
 };
 
 struct TritonServerParameters {

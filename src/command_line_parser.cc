@@ -91,7 +91,8 @@ getopt_long(
 #include "triton/common/triton_json.h"
 
 
-namespace triton { namespace server {
+namespace triton {
+namespace server {
 
 // [FIXME] expose following parse helpers for other type of parser
 namespace {
@@ -333,42 +334,43 @@ enum TritonOptionId {
 void
 TritonParser::SetupOptions()
 {
-  global_options_ = {{OPTION_HELP, "help", Option::ArgNone, "Print usage"}};
+  global_options_.push_back(
+      {OPTION_HELP, "help", Option::ArgNone, "Print usage"});
 
-  server_options_ = {
-      {OPTION_ID, "id", Option::ArgStr, "Identifier for this server."},
+  server_options_.push_back(
+      {OPTION_ID, "id", Option::ArgStr, "Identifier for this server."});
+  server_options_.push_back(
       {OPTION_EXIT_TIMEOUT_SECS, "exit-timeout-secs", Option::ArgInt,
        "Timeout (in seconds) when exiting to wait for in-flight inferences to "
        "finish. After the timeout expires the server exits even if inferences "
-       "are still in flight."}};
+       "are still in flight."});
 
-  model_repo_options_ = {
-      {OPTION_MODEL_REPOSITORY, "model-store", Option::ArgStr,
-       "Equivalent to --model-repository."},
+  model_repo_options_.push_back({OPTION_MODEL_REPOSITORY, "model-store",
+                                 Option::ArgStr,
+                                 "Equivalent to --model-repository."});
+  model_repo_options_.push_back(
       {OPTION_MODEL_REPOSITORY, "model-repository", Option::ArgStr,
        "Path to model repository directory. It may be specified multiple times "
        "to add multiple model repositories. Note that if a model is not unique "
        "across all model repositories at any time, the model will not be "
-       "available."},
+       "available."});
+  model_repo_options_.push_back(
       {OPTION_EXIT_ON_ERROR, "exit-on-error", Option::ArgBool,
-       "Exit the inference server if an error occurs during initialization."},
+       "Exit the inference server if an error occurs during initialization."});
+  model_repo_options_.push_back(
       {OPTION_DISABLE_AUTO_COMPLETE_CONFIG, "disable-auto-complete-config",
        Option::ArgNone,
        "If set, disables the triton and backends from auto completing model "
        "configuration files. Model configuration files must be provided and "
        "all required "
-       "configuration settings must be specified."},
-      {OPTION_STRICT_MODEL_CONFIG, "strict-model-config", Option::ArgBool,
-       "DEPRECATED: If true model configuration files must be provided and all "
-       "required "
-       "configuration settings must be specified. If false the model "
-       "configuration may be absent or only partially specified and the "
-       "server will attempt to derive the missing required configuration."},
+       "configuration settings must be specified."});
+  model_repo_options_.push_back(
       {OPTION_STRICT_READINESS, "strict-readiness", Option::ArgBool,
        "If true /v2/health/ready endpoint indicates ready if the server "
        "is responsive and all models are available. If false "
        "/v2/health/ready endpoint indicates ready if server is responsive "
-       "even if some/all models are unavailable."},
+       "even if some/all models are unavailable."});
+  model_repo_options_.push_back(
       {OPTION_MODEL_CONTROL_MODE, "model-control-mode", Option::ArgStr,
        "Specify the mode for model management. Options are \"none\", \"poll\" "
        "and \"explicit\". The default is \"none\". "
@@ -379,11 +381,13 @@ TritonParser::SetupOptions()
        "those changes. The poll rate is controlled by 'repository-poll-secs'. "
        "For \"explicit\", model load and unload is initiated by using the "
        "model control APIs, and only models specified with --load-model will "
-       "be loaded at startup."},
+       "be loaded at startup."});
+  model_repo_options_.push_back(
       {OPTION_POLL_REPO_SECS, "repository-poll-secs", Option::ArgInt,
        "Interval in seconds between each poll of the model repository to check "
        "for changes. Valid only when --model-control-mode=poll is "
-       "specified."},
+       "specified."});
+  model_repo_options_.push_back(
       {OPTION_STARTUP_MODEL, "load-model", Option::ArgStr,
        "Name of the model to be loaded on server startup. It may be specified "
        "multiple times to add multiple models. To load ALL models at startup, "
@@ -391,199 +395,230 @@ TritonParser::SetupOptions()
        "--load-model argument, this does not imply any pattern matching. "
        "Specifying --load-model=* in conjunction with another --load-model "
        "argument will result in error. Note that this option will only take "
-       "effect if --model-control-mode=explicit is true."},
+       "effect if --model-control-mode=explicit is true."});
+  model_repo_options_.push_back(
       {OPTION_MODEL_LOAD_THREAD_COUNT, "model-load-thread-count",
        Option::ArgInt,
        "The number of threads used to concurrently load models in "
-       "model repositories. Default is 4."},
+       "model repositories. Default is 4."});
+  model_repo_options_.push_back(
       {OPTION_MODEL_NAMESPACING, "model-namespacing", Option::ArgBool,
        "Whether model namespacing is enable or not. If true, models with the "
-       "same name can be served if they are in different namespace."}};
+       "same name can be served if they are in different namespace."});
 
-  http_options_ = {
 #if defined(TRITON_ENABLE_HTTP)
-    {OPTION_ALLOW_HTTP, "allow-http", Option::ArgBool,
-     "Allow the server to listen for HTTP requests."},
-    {OPTION_HTTP_PORT, "http-port", Option::ArgInt,
-     "The port for the server to listen on for HTTP requests."},
-    {OPTION_HTTP_HEADER_FORWARD_PATTERN, "http-header-forward-pattern",
-     Option::ArgStr,
-     "The regular expression pattern that will be used for forwarding HTTP "
-     "headers as inference request parameters."},
-    {OPTION_REUSE_HTTP_PORT, "reuse-http-port", Option::ArgBool,
-     "Allow multiple servers to listen on the same HTTP port when every "
-     "server has this option set. If you plan to use this option as a way to "
-     "load balance between different Triton servers, the same model "
-     "repository or set of models must be used for every server."},
-    {OPTION_HTTP_ADDRESS, "http-address", Option::ArgStr,
-     "The address for the http server to binds to."},
-    {OPTION_HTTP_THREAD_COUNT, "http-thread-count", Option::ArgInt,
-     "Number of threads handling HTTP requests."}
+  http_options_.push_back({OPTION_ALLOW_HTTP, "allow-http", Option::ArgBool,
+                           "Allow the server to listen for HTTP requests."});
+  http_options_.push_back(
+      {OPTION_HTTP_PORT, "http-port", Option::ArgInt,
+       "The port for the server to listen on for HTTP requests."});
+  http_options_.push_back(
+      {OPTION_HTTP_HEADER_FORWARD_PATTERN, "http-header-forward-pattern",
+       Option::ArgStr,
+       "The regular expression pattern that will be used for forwarding HTTP "
+       "headers as inference request parameters."});
+  http_options_.push_back(
+      {OPTION_REUSE_HTTP_PORT, "reuse-http-port", Option::ArgBool,
+       "Allow multiple servers to listen on the same HTTP port when every "
+       "server has this option set. If you plan to use this option as a way to "
+       "load balance between different Triton servers, the same model "
+       "repository or set of models must be used for every server."});
+  http_options_.push_back({OPTION_HTTP_ADDRESS, "http-address", Option::ArgStr,
+                           "The address for the http server to binds to."});
+  http_options_.push_back({OPTION_HTTP_THREAD_COUNT, "http-thread-count",
+                           Option::ArgInt,
+                           "Number of threads handling HTTP requests."});
 #endif  // TRITON_ENABLE_HTTP
-  };
 
-  grpc_options_ = {
 #if defined(TRITON_ENABLE_GRPC)
-    {OPTION_ALLOW_GRPC, "allow-grpc", Option::ArgBool,
-     "Allow the server to listen for GRPC requests."},
-    {OPTION_GRPC_HEADER_FORWARD_PATTERN, "grpc-header-forward-pattern",
-     Option::ArgStr,
-     "The regular expression pattern that will be used for forwarding GRPC "
-     "headers as inference request parameters."},
-    {OPTION_GRPC_PORT, "grpc-port", Option::ArgInt,
-     "The port for the server to listen on for GRPC requests."},
-    {OPTION_REUSE_GRPC_PORT, "reuse-grpc-port", Option::ArgBool,
-     "Allow multiple servers to listen on the same GRPC port when every "
-     "server has this option set. If you plan to use this option as a way to "
-     "load balance between different Triton servers, the same model "
-     "repository or set of models must be used for every server."},
-    {OPTION_GRPC_ADDRESS, "grpc-address", Option::ArgStr,
-     "The address for the grpc server to binds to."},
-    {OPTION_GRPC_INFER_ALLOCATION_POOL_SIZE, "grpc-infer-allocation-pool-size",
-     Option::ArgInt,
-     "The maximum number of inference request/response objects that remain "
-     "allocated for reuse. As long as the number of in-flight requests "
-     "doesn't exceed this value there will be no allocation/deallocation of "
-     "request/response objects."},
-    {OPTION_GRPC_USE_SSL, "grpc-use-ssl", Option::ArgBool,
-     "Use SSL authentication for GRPC requests. Default is false."},
-    {OPTION_GRPC_USE_SSL_MUTUAL, "grpc-use-ssl-mutual", Option::ArgBool,
-     "Use mututal SSL authentication for GRPC requests. This option will "
-     "preempt '--grpc-use-ssl' if it is also specified. Default is false."},
-    {OPTION_GRPC_SERVER_CERT, "grpc-server-cert", Option::ArgStr,
-     "File holding PEM-encoded server certificate. Ignored unless "
-     "--grpc-use-ssl is true."},
-    {OPTION_GRPC_SERVER_KEY, "grpc-server-key", Option::ArgStr,
-     "File holding PEM-encoded server key. Ignored unless "
-     "--grpc-use-ssl is true."},
-    {OPTION_GRPC_ROOT_CERT, "grpc-root-cert", Option::ArgStr,
-     "File holding PEM-encoded root certificate. Ignore unless "
-     "--grpc-use-ssl is false."},
-    {OPTION_GRPC_RESPONSE_COMPRESSION_LEVEL,
-     "grpc-infer-response-compression-level", Option::ArgStr,
-     "The compression level to be used while returning the infer response to "
-     "the peer. Allowed values are none, low, medium and high. By default, "
-     "compression level is selected as none."},
-    {OPTION_GRPC_ARG_KEEPALIVE_TIME_MS, "grpc-keepalive-time", Option::ArgInt,
-     "The period (in milliseconds) after which a keepalive ping is sent on "
-     "the transport. Default is 7200000 (2 hours)."},
-    {OPTION_GRPC_ARG_KEEPALIVE_TIMEOUT_MS, "grpc-keepalive-timeout",
-     Option::ArgInt,
-     "The period (in milliseconds) the sender of the keepalive ping waits "
-     "for an acknowledgement. If it does not receive an acknowledgment "
-     "within this time, it will close the connection. "
-     "Default is 20000 (20 seconds)."},
-    {OPTION_GRPC_ARG_KEEPALIVE_PERMIT_WITHOUT_CALLS,
-     "grpc-keepalive-permit-without-calls", Option::ArgBool,
-     "Allows keepalive pings to be sent even if there are no calls in flight "
-     "(0 : false; 1 : true). Default is 0 (false)."},
-    {OPTION_GRPC_ARG_HTTP2_MAX_PINGS_WITHOUT_DATA,
-     "grpc-http2-max-pings-without-data", Option::ArgInt,
-     "The maximum number of pings that can be sent when there is no "
-     "data/header frame to be sent. gRPC Core will not continue sending "
-     "pings if we run over the limit. Setting it to 0 allows sending pings "
-     "without such a restriction. Default is 2."},
-    {OPTION_GRPC_ARG_HTTP2_MIN_RECV_PING_INTERVAL_WITHOUT_DATA_MS,
-     "grpc-http2-min-recv-ping-interval-without-data", Option::ArgInt,
-     "If there are no data/header frames being sent on the transport, this "
-     "channel argument on the server side controls the minimum time "
-     "(in milliseconds) that gRPC Core would expect between receiving "
-     "successive pings. If the time between successive pings is less than "
-     "this time, then the ping will be considered a bad ping from the peer. "
-     "Such a ping counts as a ‘ping strike’. Default is 300000 (5 minutes)."},
-    {OPTION_GRPC_ARG_HTTP2_MAX_PING_STRIKES, "grpc-http2-max-ping-strikes",
-     Option::ArgInt,
-     "Maximum number of bad pings that the server will tolerate before "
-     "sending an HTTP2 GOAWAY frame and closing the transport. Setting it to "
-     "0 allows the server to accept any number of bad pings. Default is 2."},
-    {OPTION_GRPC_RESTRICTED_PROTOCOL, "grpc-restricted-protocol",
-     "<string>:<string>=<string>",
-     "Specify restricted GRPC protocol setting. The format of this "
-     "flag is --grpc-restricted-protocol=<protocols>,<key>=<value>. Where "
-     "<protocol> is a comma-separated list of protocols to be restricted. "
-     "<key> will be additional header key to be checked when a GRPC request "
-     "is received, and <value> is the value expected to be matched."}
+  grpc_options_.push_back({OPTION_ALLOW_GRPC, "allow-grpc", Option::ArgBool,
+                           "Allow the server to listen for GRPC requests."});
+  grpc_options_.push_back(
+      {OPTION_GRPC_HEADER_FORWARD_PATTERN, "grpc-header-forward-pattern",
+       Option::ArgStr,
+       "The regular expression pattern that will be used for forwarding GRPC "
+       "headers as inference request parameters."});
+  grpc_options_.push_back(
+      {OPTION_GRPC_PORT, "grpc-port", Option::ArgInt,
+       "The port for the server to listen on for GRPC requests."});
+  grpc_options_.push_back(
+      {OPTION_REUSE_GRPC_PORT, "reuse-grpc-port", Option::ArgBool,
+       "Allow multiple servers to listen on the same GRPC port when every "
+       "server has this option set. If you plan to use this option as a way to "
+       "load balance between different Triton servers, the same model "
+       "repository or set of models must be used for every server."});
+  grpc_options_.push_back({OPTION_GRPC_ADDRESS, "grpc-address", Option::ArgStr,
+                           "The address for the grpc server to binds to."});
+  grpc_options_.push_back(
+      {OPTION_GRPC_INFER_ALLOCATION_POOL_SIZE,
+       "grpc-infer-allocation-pool-size", Option::ArgInt,
+       "The maximum number of inference request/response objects that remain "
+       "allocated for reuse. As long as the number of in-flight requests "
+       "doesn't exceed this value there will be no allocation/deallocation of "
+       "request/response objects."});
+  grpc_options_.push_back(
+      {OPTION_GRPC_USE_SSL, "grpc-use-ssl", Option::ArgBool,
+       "Use SSL authentication for GRPC requests. Default is false."});
+  grpc_options_.push_back(
+      {OPTION_GRPC_USE_SSL_MUTUAL, "grpc-use-ssl-mutual", Option::ArgBool,
+       "Use mututal SSL authentication for GRPC requests. This option will "
+       "preempt '--grpc-use-ssl' if it is also specified. Default is false."});
+  grpc_options_.push_back(
+      {OPTION_GRPC_SERVER_CERT, "grpc-server-cert", Option::ArgStr,
+       "File holding PEM-encoded server certificate. Ignored unless "
+       "--grpc-use-ssl is true."});
+  grpc_options_.push_back(
+      {OPTION_GRPC_SERVER_KEY, "grpc-server-key", Option::ArgStr,
+       "File holding PEM-encoded server key. Ignored unless "
+       "--grpc-use-ssl is true."});
+  grpc_options_.push_back(
+      {OPTION_GRPC_ROOT_CERT, "grpc-root-cert", Option::ArgStr,
+       "File holding PEM-encoded root certificate. Ignore unless "
+       "--grpc-use-ssl is false."});
+  grpc_options_.push_back(
+      {OPTION_GRPC_RESPONSE_COMPRESSION_LEVEL,
+       "grpc-infer-response-compression-level", Option::ArgStr,
+       "The compression level to be used while returning the infer response to "
+       "the peer. Allowed values are none, low, medium and high. By default, "
+       "compression level is selected as none."});
+  grpc_options_.push_back(
+      {OPTION_GRPC_ARG_KEEPALIVE_TIME_MS, "grpc-keepalive-time", Option::ArgInt,
+       "The period (in milliseconds) after which a keepalive ping is sent on "
+       "the transport. Default is 7200000 (2 hours)."});
+  grpc_options_.push_back(
+      {OPTION_GRPC_ARG_KEEPALIVE_TIMEOUT_MS, "grpc-keepalive-timeout",
+       Option::ArgInt,
+       "The period (in milliseconds) the sender of the keepalive ping waits "
+       "for an acknowledgement. If it does not receive an acknowledgment "
+       "within this time, it will close the connection. "
+       "Default is 20000 (20 seconds)."});
+  grpc_options_.push_back(
+      {OPTION_GRPC_ARG_KEEPALIVE_PERMIT_WITHOUT_CALLS,
+       "grpc-keepalive-permit-without-calls", Option::ArgBool,
+       "Allows keepalive pings to be sent even if there are no calls in flight "
+       "(0 : false; 1 : true). Default is 0 (false)."});
+  grpc_options_.push_back(
+      {OPTION_GRPC_ARG_HTTP2_MAX_PINGS_WITHOUT_DATA,
+       "grpc-http2-max-pings-without-data", Option::ArgInt,
+       "The maximum number of pings that can be sent when there is no "
+       "data/header frame to be sent. gRPC Core will not continue sending "
+       "pings if we run over the limit. Setting it to 0 allows sending pings "
+       "without such a restriction. Default is 2."});
+  grpc_options_.push_back(
+      {OPTION_GRPC_ARG_HTTP2_MIN_RECV_PING_INTERVAL_WITHOUT_DATA_MS,
+       "grpc-http2-min-recv-ping-interval-without-data", Option::ArgInt,
+       "If there are no data/header frames being sent on the transport, this "
+       "channel argument on the server side controls the minimum time "
+       "(in milliseconds) that gRPC Core would expect between receiving "
+       "successive pings. If the time between successive pings is less than "
+       "this time, then the ping will be considered a bad ping from the peer. "
+       "Such a ping counts as a ‘ping strike’. Default is 300000 (5 "
+       "minutes)."});
+  grpc_options_.push_back(
+      {OPTION_GRPC_ARG_HTTP2_MAX_PING_STRIKES, "grpc-http2-max-ping-strikes",
+       Option::ArgInt,
+       "Maximum number of bad pings that the server will tolerate before "
+       "sending an HTTP2 GOAWAY frame and closing the transport. Setting it to "
+       "0 allows the server to accept any number of bad pings. Default is 2."});
+  grpc_options_.push_back(
+      {OPTION_GRPC_RESTRICTED_PROTOCOL, "grpc-restricted-protocol",
+       "<string>:<string>=<string>",
+       "Specify restricted GRPC protocol setting. The format of this "
+       "flag is --grpc-restricted-protocol=<protocols>,<key>=<value>. Where "
+       "<protocol> is a comma-separated list of protocols to be restricted. "
+       "<key> will be additional header key to be checked when a GRPC request "
+       "is received, and <value> is the value expected to be matched."});
 #endif  // TRITON_ENABLE_GRPC
-  };
 
-  logging_options_ = {
 #ifdef TRITON_ENABLE_LOGGING
+  logging_options_.push_back(
       {OPTION_LOG_VERBOSE, "log-verbose", Option::ArgInt,
        "Set verbose logging level. Zero (0) disables verbose logging and "
-       "values >= 1 enable verbose logging."},
-      {OPTION_LOG_INFO, "log-info", Option::ArgBool,
-       "Enable/disable info-level logging."},
-      {OPTION_LOG_WARNING, "log-warning", Option::ArgBool,
-       "Enable/disable warning-level logging."},
-      {OPTION_LOG_ERROR, "log-error", Option::ArgBool,
-       "Enable/disable error-level logging."},
+       "values >= 1 enable verbose logging."});
+  logging_options_.push_back({OPTION_LOG_INFO, "log-info", Option::ArgBool,
+                              "Enable/disable info-level logging."});
+  logging_options_.push_back({OPTION_LOG_WARNING, "log-warning",
+                              Option::ArgBool,
+                              "Enable/disable warning-level logging."});
+  logging_options_.push_back({OPTION_LOG_ERROR, "log-error", Option::ArgBool,
+                              "Enable/disable error-level logging."});
+  logging_options_.push_back(
       {OPTION_LOG_FORMAT, "log-format", Option::ArgStr,
        "Set the logging format. Options are \"default\" and \"ISO8601\". "
        "The default is \"default\". For \"default\", the log severity (L) and "
        "timestamp will be logged as \"LMMDD hh:mm:ss.ssssss\". "
-       "For \"ISO8601\", the log format will be \"YYYY-MM-DDThh:mm:ssZ L\"."},
+       "For \"ISO8601\", the log format will be \"YYYY-MM-DDThh:mm:ssZ L\"."});
+  logging_options_.push_back(
       {OPTION_LOG_FILE, "log-file", Option::ArgStr,
        "Set the name of the log output file. If specified, log outputs will be "
        "saved to this file. If not specified, log outputs will stream to the "
-       "console."}
+       "console."});
 #endif  // TRITON_ENABLE_LOGGING
-  };
 
-  sagemaker_options_ = {
 #if defined(TRITON_ENABLE_SAGEMAKER)
-    {OPTION_ALLOW_SAGEMAKER, "allow-sagemaker", Option::ArgBool,
-     "Allow the server to listen for Sagemaker requests. Default is false."},
-    {OPTION_SAGEMAKER_PORT, "sagemaker-port", Option::ArgInt,
-     "The port for the server to listen on for Sagemaker requests. Default "
-     "is 8080."},
-    {OPTION_SAGEMAKER_SAFE_PORT_RANGE, "sagemaker-safe-port-range",
-     "<integer>-<integer>",
-     "Set the allowed port range for endpoints other than the SageMaker "
-     "endpoints."},
-    {OPTION_SAGEMAKER_THREAD_COUNT, "sagemaker-thread-count", Option::ArgInt,
-     "Number of threads handling Sagemaker requests. Default is 8."}
+  sagemaker_options_.push_back(
+      {OPTION_ALLOW_SAGEMAKER, "allow-sagemaker", Option::ArgBool,
+       "Allow the server to listen for Sagemaker requests. Default is false."});
+  sagemaker_options_.push_back(
+      {OPTION_SAGEMAKER_PORT, "sagemaker-port", Option::ArgInt,
+       "The port for the server to listen on for Sagemaker requests. Default "
+       "is 8080."});
+  sagemaker_options_.push_back(
+      {OPTION_SAGEMAKER_SAFE_PORT_RANGE, "sagemaker-safe-port-range",
+       "<integer>-<integer>",
+       "Set the allowed port range for endpoints other than the SageMaker "
+       "endpoints."});
+  sagemaker_options_.push_back(
+      {OPTION_SAGEMAKER_THREAD_COUNT, "sagemaker-thread-count", Option::ArgInt,
+       "Number of threads handling Sagemaker requests. Default is 8."});
 #endif  // TRITON_ENABLE_SAGEMAKER
-  };
 
-  vertex_options_ = {
 #if defined(TRITON_ENABLE_VERTEX_AI)
-    {OPTION_ALLOW_VERTEX_AI, "allow-vertex-ai", Option::ArgBool,
-     "Allow the server to listen for Vertex AI requests. Default is true if "
-     "AIP_MODE=PREDICTION, false otherwise."},
-    {OPTION_VERTEX_AI_PORT, "vertex-ai-port", Option::ArgInt,
-     "The port for the server to listen on for Vertex AI requests. Default "
-     "is AIP_HTTP_PORT if set, 8080 otherwise."},
-    {OPTION_VERTEX_AI_THREAD_COUNT, "vertex-ai-thread-count", Option::ArgInt,
-     "Number of threads handling Vertex AI requests. Default is 8."},
-    {OPTION_VERTEX_AI_DEFAULT_MODEL, "vertex-ai-default-model", Option::ArgStr,
-     "The name of the model to use for single-model inference requests."}
+  vertex_options_.push_back(
+      {OPTION_ALLOW_VERTEX_AI, "allow-vertex-ai", Option::ArgBool,
+       "Allow the server to listen for Vertex AI requests. Default is true if "
+       "AIP_MODE=PREDICTION, false otherwise."});
+  vertex_options_.push_back(
+      {OPTION_VERTEX_AI_PORT, "vertex-ai-port", Option::ArgInt,
+       "The port for the server to listen on for Vertex AI requests. Default "
+       "is AIP_HTTP_PORT if set, 8080 otherwise."});
+  vertex_options_.push_back(
+      {OPTION_VERTEX_AI_THREAD_COUNT, "vertex-ai-thread-count", Option::ArgInt,
+       "Number of threads handling Vertex AI requests. Default is 8."});
+  vertex_options_.push_back(
+      {OPTION_VERTEX_AI_DEFAULT_MODEL, "vertex-ai-default-model",
+       Option::ArgStr,
+       "The name of the model to use for single-model inference requests."});
 #endif  // TRITON_ENABLE_VERTEX_AI
-  };
 
-  metric_options_ = {
 #if defined(TRITON_ENABLE_METRICS)
-    {OPTION_ALLOW_METRICS, "allow-metrics", Option::ArgBool,
-     "Allow the server to provide prometheus metrics."},
-    {OPTION_ALLOW_GPU_METRICS, "allow-gpu-metrics", Option::ArgBool,
-     "Allow the server to provide GPU metrics. Ignored unless "
-     "--allow-metrics is true."},
-    {OPTION_ALLOW_CPU_METRICS, "allow-cpu-metrics", Option::ArgBool,
-     "Allow the server to provide CPU metrics. Ignored unless "
-     "--allow-metrics is true."},
-    {OPTION_METRICS_PORT, "metrics-port", Option::ArgInt,
-     "The port reporting prometheus metrics."},
-    {OPTION_METRICS_INTERVAL_MS, "metrics-interval-ms", Option::ArgFloat,
-     "Metrics will be collected once every <metrics-interval-ms> "
-     "milliseconds. Default is 2000 milliseconds."},
-    {OPTION_METRICS_CONFIG, "metrics-config", "<string>=<string>",
-     "Specify a metrics-specific configuration setting. The format of this "
-     "flag is --metrics-config=<setting>=<value>. It can be specified "
-     "multiple times."}
+  metric_options_.push_back(
+      {OPTION_ALLOW_METRICS, "allow-metrics", Option::ArgBool,
+       "Allow the server to provide prometheus metrics."});
+  metric_options_.push_back(
+      {OPTION_ALLOW_GPU_METRICS, "allow-gpu-metrics", Option::ArgBool,
+       "Allow the server to provide GPU metrics. Ignored unless "
+       "--allow-metrics is true."});
+  metric_options_.push_back(
+      {OPTION_ALLOW_CPU_METRICS, "allow-cpu-metrics", Option::ArgBool,
+       "Allow the server to provide CPU metrics. Ignored unless "
+       "--allow-metrics is true."});
+  metric_options_.push_back({OPTION_METRICS_PORT, "metrics-port",
+                             Option::ArgInt,
+                             "The port reporting prometheus metrics."});
+  metric_options_.push_back(
+      {OPTION_METRICS_INTERVAL_MS, "metrics-interval-ms", Option::ArgFloat,
+       "Metrics will be collected once every <metrics-interval-ms> "
+       "milliseconds. Default is 2000 milliseconds."});
+  metric_options_.push_back(
+      {OPTION_METRICS_CONFIG, "metrics-config", "<string>=<string>",
+       "Specify a metrics-specific configuration setting. The format of this "
+       "flag is --metrics-config=<setting>=<value>. It can be specified "
+       "multiple times."});
 #endif  // TRITON_ENABLE_METRICS
-  };
 
-  tracing_options_ = {
 #ifdef TRITON_ENABLE_TRACING
+  tracing_options_.push_back(
       {OPTION_TRACE_CONFIG, "trace-config", "<string>,<string>=<string>",
        "Specify global or trace mode specific configuration setting. "
        "The format of this flag is --trace-config "
@@ -595,25 +630,25 @@ TritonParser::SetupOptions()
        "use "
        "Triton's Trace APIs. For \"opentelemetry\" mode, the server will use "
        "OpenTelemetry's APIs to generate, collect and export traces for "
-       "individual inference requests."}
+       "individual inference requests."});
 #endif  // TRITON_ENABLE_TRACING
-  };
 
-  cache_options_ = {
+  cache_options_.push_back(
       {OPTION_CACHE_CONFIG, "cache-config", "<string>,<string>=<string>",
        "Specify a cache-specific configuration setting. The format of this "
        "flag is --cache-config=<cache_name>,<setting>=<value>. Where "
        "<cache_name> is the name of the cache, such as 'local' or 'redis'. "
        "Example: --cache-config=local,size=1048576 will configure a 'local' "
-       "cache implementation with a fixed buffer pool of size 1048576 bytes."},
+       "cache implementation with a fixed buffer pool of size 1048576 bytes."});
+  cache_options_.push_back(
       {OPTION_CACHE_DIR, "cache-directory", Option::ArgStr,
        "The global directory searched for cache shared libraries. Default is "
        "'/opt/tritonserver/caches'. This directory is expected to contain a "
        "cache implementation as a shared library with the name "
-       "'libtritoncache.so'."}};
+       "'libtritoncache.so'."});
 
 
-  rate_limiter_options_ = {
+  rate_limiter_options_.push_back(
       // FIXME:  fix the default to execution_count once RL logic is complete.
       {OPTION_RATE_LIMIT, "rate-limit", Option::ArgStr,
        "Specify the mode for rate limiting. Options are \"execution_count\" "
@@ -623,7 +658,8 @@ TritonParser::SetupOptions()
        "used to run inference. The inference will finally be executed once "
        "the required resources are available. For \"off\", the server will "
        "ignore any rate limiter config and run inference as soon as an "
-       "instance is ready."},
+       "instance is ready."});
+  rate_limiter_options_.push_back(
       {OPTION_RATE_LIMIT_RESOURCE, "rate-limit-resource",
        "<string>:<integer>:<integer>",
        "The number of resources available to the server. The format of this "
@@ -635,9 +671,9 @@ TritonParser::SetupOptions()
        "This flag can be specified multiple times to specify each resources "
        "and their availability. By default, the max across all instances that "
        "list the resource is selected as its availability. The values for this "
-       "flag is case-insensitive."}};
+       "flag is case-insensitive."});
 
-  memory_device_options_ = {
+  memory_device_options_.push_back(
       {OPTION_PINNED_MEMORY_POOL_BYTE_SIZE, "pinned-memory-pool-byte-size",
        Option::ArgInt,
        "The total byte size that can be allocated as pinned system memory. "
@@ -646,7 +682,8 @@ TritonParser::SetupOptions()
        "exceeds the specified byte size. If 'numa-node' is configured via "
        "--host-policy, the pinned system memory of the pool size will be "
        "allocated on each numa node. This option will not affect the "
-       "allocation conducted by the backend frameworks. Default is 256 MB."},
+       "allocation conducted by the backend frameworks. Default is 256 MB."});
+  memory_device_options_.push_back(
       {OPTION_CUDA_MEMORY_POOL_BYTE_SIZE, "cuda-memory-pool-byte-size",
        "<integer>:<integer>",
        "The total byte size that can be allocated as CUDA memory for the GPU "
@@ -657,66 +694,82 @@ TritonParser::SetupOptions()
        "2 integers separated by colons in the format "
        "<GPU device ID>:<pool byte size>. This option can be used multiple "
        "times, but only once per GPU device. Subsequent uses will overwrite "
-       "previous uses for the same GPU device. Default is 64 MB."},
-
+       "previous uses for the same GPU device. Default is 64 MB."});
+  memory_device_options_.push_back(
       {OPTION_MIN_SUPPORTED_COMPUTE_CAPABILITY,
        "min-supported-compute-capability", Option::ArgFloat,
        "The minimum supported CUDA compute capability. GPUs that don't support "
-       "this compute capability will not be used by the server."},
-
+       "this compute capability will not be used by the server."});
+  memory_device_options_.push_back(
       {OPTION_BUFFER_MANAGER_THREAD_COUNT, "buffer-manager-thread-count",
        Option::ArgInt,
        "The number of threads used to accelerate copies and other operations "
-       "required to manage input and output tensor contents. Default is 0."},
+       "required to manage input and output tensor contents. Default is 0."});
+  memory_device_options_.push_back(
       {OPTION_HOST_POLICY, "host-policy", "<string>,<string>=<string>",
        "Specify a host policy setting associated with a policy name. The "
        "format of this flag is --host-policy=<policy_name>,<setting>=<value>. "
        "Currently supported settings are 'numa-node', 'cpu-cores'. Note that "
        "'numa-node' setting will affect pinned memory pool behavior, see "
-       "--pinned-memory-pool for more detail."},
+       "--pinned-memory-pool for more detail."});
+  memory_device_options_.push_back(
       {OPTION_MODEL_LOAD_GPU_LIMIT, "model-load-gpu-limit",
        "<device_id>:<fraction>",
        "Specify the limit on GPU memory usage as a fraction. If model loading "
        "on the device is requested and the current memory usage exceeds the "
        "limit, the load will be rejected. If not specified, the limit will "
-       "not be set."}};
+       "not be set."});
 
-  backend_options_ = {
+  backend_options_.push_back(
       {OPTION_BACKEND_DIR, "backend-directory", Option::ArgStr,
        "The global directory searched for backend shared libraries. Default is "
-       "'/opt/tritonserver/backends'."},
+       "'/opt/tritonserver/backends'."});
+  backend_options_.push_back(
       {OPTION_BACKEND_CONFIG, "backend-config", "<string>,<string>=<string>",
        "Specify a backend-specific configuration setting. The format of this "
        "flag is --backend-config=<backend_name>,<setting>=<value>. Where "
-       "<backend_name> is the name of the backend, such as 'tensorrt'."}};
+       "<backend_name> is the name of the backend, such as 'tensorrt'."});
 
-  repo_agent_options_ = {
+  repo_agent_options_.push_back(
       {OPTION_REPOAGENT_DIR, "repoagent-directory", Option::ArgStr,
        "The global directory searched for repository agent shared libraries. "
-       "Default is '/opt/tritonserver/repoagents'."}};
+       "Default is '/opt/tritonserver/repoagents'."});
 
-  deprecated_options_ = {
+  // Deprecations
+  deprecated_options_.push_back(
+      {OPTION_STRICT_MODEL_CONFIG, "strict-model-config", Option::ArgBool,
+       "DEPRECATED: If true model configuration files must be provided and all "
+       "required "
+       "configuration settings must be specified. If false the model "
+       "configuration may be absent or only partially specified and the "
+       "server will attempt to derive the missing required configuration."});
+  deprecated_options_.push_back(
       {OPTION_RESPONSE_CACHE_BYTE_SIZE, "response-cache-byte-size",
-       Option::ArgInt, "DEPRECATED: Please use --cache-config instead."},
+       Option::ArgInt, "DEPRECATED: Please use --cache-config instead."});
 #ifdef TRITON_ENABLE_TRACING
+  deprecated_options_.push_back(
       {OPTION_TRACE_FILEPATH, "trace-file", Option::ArgStr,
        "DEPRECATED: Please use --trace-config triton,file=<path/to/your/file>"
        " Set the file where trace output will be saved. If "
        "--trace-log-frequency"
        " is also specified, this argument value will be the prefix of the files"
-       " to save the trace output. See --trace-log-frequency for detail."},
+       " to save the trace output. See --trace-log-frequency for detail."});
+  deprecated_options_.push_back(
       {OPTION_TRACE_LEVEL, "trace-level", Option::ArgStr,
        "DEPRECATED: Please use --trace-config level=<OFF|TIMESTAMPS|TENSORS>"
        "Specify a trace level. OFF to disable tracing, TIMESTAMPS to "
        "trace timestamps, TENSORS to trace tensors. It may be specified "
-       "multiple times to trace multiple informations. Default is OFF."},
+       "multiple times to trace multiple informations. Default is OFF."});
+  deprecated_options_.push_back(
       {OPTION_TRACE_RATE, "trace-rate", Option::ArgInt,
        "DEPRECATED: Please use --trace-config rate=<rate value>"
-       "Set the trace sampling rate. Default is 1000."},
+       "Set the trace sampling rate. Default is 1000."});
+  deprecated_options_.push_back(
       {OPTION_TRACE_COUNT, "trace-count", Option::ArgInt,
        "DEPRECATED: Please use --trace-config count=<count value>"
        "Set the number of traces to be sampled. If the value is -1, the number "
-       "of traces to be sampled will not be limited. Default is -1."},
+       "of traces to be sampled will not be limited. Default is -1."});
+  deprecated_options_.push_back(
       {OPTION_TRACE_LOG_FREQUENCY, "trace-log-frequency", Option::ArgInt,
        "DEPRECATED: Please use --trace-config triton,log-frequency=<value>"
        "Set the trace log frequency. If the value is 0, Triton will only log "
@@ -725,10 +778,10 @@ TritonParser::SetupOptions()
        "specified number of traces. For example, if the log frequency is 100, "
        "when Triton collects the 100-th trace, it logs the traces to file "
        "<trace-file>.0, and when it collects the 200-th trace, it logs the "
-       "101-th to the 200-th traces to file <trace-file>.1. Default is 0."}
+       "101-th to the 200-th traces to file <trace-file>.1. Default is 0."});
 #endif  // TRITON_ENABLE_TRACING
-  };
-}
+};
+}  // namespace server
 
 void
 TritonParser::SetupOptionGroups()
@@ -2040,4 +2093,5 @@ TritonParser::PostProcessTraceArgs(
 
 #endif  // TRITON_ENABLE_TRACING
 
-}}  // namespace triton::server
+}  // namespace triton
+}  // namespace triton::server
