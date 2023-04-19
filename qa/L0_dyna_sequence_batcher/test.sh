@@ -65,7 +65,7 @@ fi
 
 RET=0
 
-rm -fr *.log *.serverlog
+rm -fr *.log 
 
 # models
 rm -fr models && mkdir models
@@ -104,7 +104,7 @@ for i in \
         test_simple_sequence \
         test_length1_sequence \
          ; do
-    SERVER_LOG="./$i.serverlog"
+    SERVER_LOG="./$i.server.log"
     SERVER_ARGS="--model-repository=`pwd`/models"
     run_server
     if [ "$SERVER_PID" == "0" ]; then
@@ -147,7 +147,7 @@ for i in \
         test_backlog_sequence_timeout \
     ; do
 
-    SERVER_LOG="./$i.serverlog"
+    SERVER_LOG="./$i.server.log"
     SERVER_ARGS="--model-repository=`pwd`/models"
     run_server
     if [ "$SERVER_PID" == "0" ]; then
@@ -186,7 +186,7 @@ if [ $IMPLICIT_STATE == "0" ]; then
         test_multi_sequence_different_shape_allow_ragged \
         ; do
 
-        SERVER_LOG="./$i.serverlog"
+        SERVER_LOG="./$i.server.log"
         SERVER_ARGS="--model-repository=`pwd`/ragged_models"
         run_server
         if [ "$SERVER_PID" == "0" ]; then

@@ -57,7 +57,7 @@ RET=0
 export CUDA_VISIBLE_DEVICES=0
 
 # Prepare base model. Only test with custom backend as it is sufficient
-rm -fr *.log *.serverlog models custom_zero_1_float32
+rm -fr *.log  models custom_zero_1_float32
 cp -r ../custom_models/custom_zero_1_float32 . && \
     mkdir -p ./custom_zero_1_float32/1 && \
     mkdir -p ./ensemble_zero_1_float32/1
@@ -86,7 +86,7 @@ rm -fr models && mkdir models && \
         echo "]" >> config.pbtxt)
 
 TEST_CASE=test_max_queue_size
-SERVER_LOG="./$TEST_CASE.serverlog"
+SERVER_LOG="./$TEST_CASE.server.log"
 run_server
 if [ "$SERVER_PID" == "0" ]; then
     echo -e "\n***\n*** Failed to start $SERVER\n***"
@@ -129,7 +129,7 @@ rm -fr models && mkdir models && \
         echo "}" >> config.pbtxt)
 
 TEST_CASE=test_policy_delay
-SERVER_LOG="./$TEST_CASE.serverlog"
+SERVER_LOG="./$TEST_CASE.server.log"
 run_server
 if [ "$SERVER_PID" == "0" ]; then
     echo -e "\n***\n*** Failed to start $SERVER\n***"
@@ -171,7 +171,7 @@ rm -fr models && mkdir models && \
         echo "}" >> config.pbtxt)
 
 TEST_CASE=test_policy_reject
-SERVER_LOG="./$TEST_CASE.serverlog"
+SERVER_LOG="./$TEST_CASE.server.log"
 run_server
 if [ "$SERVER_PID" == "0" ]; then
     echo -e "\n***\n*** Failed to start $SERVER\n***"
@@ -214,7 +214,7 @@ rm -fr models && mkdir models && \
         echo "}" >> config.pbtxt)
 
 TEST_CASE=test_timeout_override
-SERVER_LOG="./$TEST_CASE.serverlog"
+SERVER_LOG="./$TEST_CASE.server.log"
 run_server
 if [ "$SERVER_PID" == "0" ]; then
     echo -e "\n***\n*** Failed to start $SERVER\n***"
@@ -255,7 +255,7 @@ rm -fr models && mkdir models && \
         echo "}" >> config.pbtxt)
 
 TEST_CASE=test_priority_levels
-SERVER_LOG="./$TEST_CASE.serverlog"
+SERVER_LOG="./$TEST_CASE.server.log"
 run_server
 if [ "$SERVER_PID" == "0" ]; then
     echo -e "\n***\n*** Failed to start $SERVER\n***"
@@ -312,7 +312,7 @@ rm -fr models && mkdir models && \
         echo "}" >> config.pbtxt)
 
 TEST_CASE=test_priority_with_policy
-SERVER_LOG="./$TEST_CASE.serverlog"
+SERVER_LOG="./$TEST_CASE.server.log"
 run_server
 if [ "$SERVER_PID" == "0" ]; then
     echo -e "\n***\n*** Failed to start $SERVER\n***"

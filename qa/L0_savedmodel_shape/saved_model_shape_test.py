@@ -1,4 +1,4 @@
-# Copyright (c) 2018-2021, NVIDIA CORPORATION. All rights reserved.
+# Copyright (c) 2018-2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -28,13 +28,10 @@ import sys
 
 sys.path.append("../common")
 
-from builtins import range
-from future.utils import iteritems
 import unittest
 import numpy as np
 import infer_util as iu
 import test_util as tu
-import os
 
 np_dtype_string = np.dtype(object)
 

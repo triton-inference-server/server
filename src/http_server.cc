@@ -2555,7 +2555,8 @@ HTTPAPIServer::EVBufferToInput(
       uint64_t shm_offset;
       const char* shm_region;
       RETURN_IF_ERR(CheckSharedMemoryData(
-          request_input, &use_shm, &shm_region, &shm_offset, reinterpret_cast<uint64_t*>(&byte_size)));
+          request_input, &use_shm, &shm_region, &shm_offset,
+          reinterpret_cast<uint64_t*>(&byte_size)));
       if (use_shm) {
         void* base;
         TRITONSERVER_MemoryType memory_type;

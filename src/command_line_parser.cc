@@ -306,6 +306,7 @@ enum TritonOptionId {
   OPTION_TRACE_RATE,
   OPTION_TRACE_COUNT,
   OPTION_TRACE_LOG_FREQUENCY,
+  OPTION_TRACE_CONFIG,
 #endif  // TRITON_ENABLE_TRACING
   OPTION_MODEL_CONTROL_MODE,
   OPTION_POLL_REPO_SECS,
@@ -585,26 +586,44 @@ TritonParser::SetupOptions()
   tracing_options_ = {
 #ifdef TRITON_ENABLE_TRACING
       {OPTION_TRACE_FILEPATH, "trace-file", Option::ArgStr,
-       "Set the file where trace output will be saved. If --trace-log-frequency"
+       "DEPRECATED: Please use --trace-config triton,file=<path/to/your/file>"
+       " Set the file where trace output will be saved. If "
+       "--trace-log-frequency"
        " is also specified, this argument value will be the prefix of the files"
        " to save the trace output. See --trace-log-frequency for detail."},
       {OPTION_TRACE_LEVEL, "trace-level", Option::ArgStr,
+       "DEPRECATED: Please use --trace-config level=<OFF|TIMESTAMPS|TENSORS>"
        "Specify a trace level. OFF to disable tracing, TIMESTAMPS to "
        "trace timestamps, TENSORS to trace tensors. It may be specified "
        "multiple times to trace multiple informations. Default is OFF."},
       {OPTION_TRACE_RATE, "trace-rate", Option::ArgInt,
+       "DEPRECATED: Please use --trace-config rate=<rate value>"
        "Set the trace sampling rate. Default is 1000."},
       {OPTION_TRACE_COUNT, "trace-count", Option::ArgInt,
+       "DEPRECATED: Please use --trace-config count=<count value>"
        "Set the number of traces to be sampled. If the value is -1, the number "
        "of traces to be sampled will not be limited. Default is -1."},
       {OPTION_TRACE_LOG_FREQUENCY, "trace-log-frequency", Option::ArgInt,
+       "DEPRECATED: Please use --trace-config triton,log-frequency=<value>"
        "Set the trace log frequency. If the value is 0, Triton will only log "
        "the trace output to <trace-file> when shutting down. Otherwise, Triton "
        "will log the trace output to <trace-file>.<idx> when it collects the "
        "specified number of traces. For example, if the log frequency is 100, "
        "when Triton collects the 100-th trace, it logs the traces to file "
        "<trace-file>.0, and when it collects the 200-th trace, it logs the "
-       "101-th to the 200-th traces to file <trace-file>.1. Default is 0."}
+       "101-th to the 200-th traces to file <trace-file>.1. Default is 0."},
+      {OPTION_TRACE_CONFIG, "trace-config", "<string>,<string>=<string>",
+       "Specify global or trace mode specific configuration setting. "
+       "The format of this flag is --trace-config "
+       "<mode>,<setting>=<value>. "
+       "Where <mode> is either \"triton\" or \"opentelemetry\". "
+       "The default is \"triton\". To specify global trace settings "
+       "(level, rate, count, or mode), the format would be "
+       "--trace-config <setting>=<value>. For \"triton\" mode, the server will "
+       "use "
+       "Triton's Trace APIs. For \"opentelemetry\" mode, the server will use "
+       "OpenTelemetry's APIs to generate, collect and export traces for "
+       "individual inference requests."},
 #endif  // TRITON_ENABLE_TRACING
   };
 
@@ -1039,6 +1058,11 @@ TritonParser::Parse(int argc, char** argv)
   bool cache_config_present{false};
 #ifdef TRITON_ENABLE_TRACING
   bool explicit_disable_trace{false};
+  bool trace_filepath_present{false};
+  bool trace_level_present{false};
+  bool trace_rate_present{false};
+  bool trace_count_present{false};
+  bool trace_log_frequency_present{false};
 #endif  // TRITON_ENABLE_TRACING
 
 #ifdef TRITON_ENABLE_GRPC
@@ -1310,10 +1334,21 @@ TritonParser::Parse(int argc, char** argv)
 #endif  // TRITON_ENABLE_METRICS
 
 #ifdef TRITON_ENABLE_TRACING
-      case OPTION_TRACE_FILEPATH:
+      case OPTION_TRACE_FILEPATH: {
+        std::cerr << "Warning: '--trace-file' has been deprecated and will be"
+                     " removed in future releases. Please use "
+                     "'--trace-config triton,file=<filepath> instead."
+                  << std::endl;
+        trace_filepath_present = true;
         lparams.trace_filepath_ = optarg;
         break;
+      }
       case OPTION_TRACE_LEVEL: {
+        std::cerr << "Warning: '--trace-level' has been deprecated and will be"
+                     " removed in future releases. Please use "
+                     "'--trace-config level=<OFF|TIMESTAMPS|TENSORS> instead."
+                  << std::endl;
+        trace_level_present = true;
         auto parsed_level = ParseTraceLevelOption(optarg);
         explicit_disable_trace |=
             (parsed_level == TRITONSERVER_TRACE_LEVEL_DISABLED);
@@ -1322,14 +1357,42 @@ TritonParser::Parse(int argc, char** argv)
         break;
       }
       case OPTION_TRACE_RATE:
+        std::cerr << "Warning: '--trace-rate' has been deprecated and will be"
+                     " removed in future releases. Please use "
+                     "'--trace-config rate=<rate value> instead."
+                  << std::endl;
+        trace_rate_present = true;
         lparams.trace_rate_ = ParseOption<int>(optarg);
         break;
+
       case OPTION_TRACE_COUNT:
+        std::cerr << "Warning: '--trace-count' has been deprecated and will be"
+                     " removed in future releases. Please use "
+                     "'--trace-config count=<count value> instead."
+                  << std::endl;
+        trace_count_present = true;
         lparams.trace_count_ = ParseOption<int>(optarg);
         break;
       case OPTION_TRACE_LOG_FREQUENCY:
+        std::cerr << "Warning: '--trace-log-frequency' has been deprecated and "
+                     "will be"
+                     " removed in future releases. Please use "
+                     "'--trace-config triton,log-frequency=<log frequency "
+                     "value> instead."
+                  << std::endl;
+        trace_log_frequency_present = true;
         lparams.trace_log_frequency_ = ParseOption<int>(optarg);
         break;
+      case OPTION_TRACE_CONFIG: {
+        auto trace_config_setting = ParseTraceConfigOption(optarg);
+        triton::server::TraceConfig& tc =
+            lparams
+                .trace_config_map_[std::get<0>(trace_config_setting).c_str()];
+        tc.push_back(std::make_pair(
+            std::get<1>(trace_config_setting).c_str(),
+            std::get<2>(trace_config_setting).c_str()));
+        break;
+      }
 #endif  // TRITON_ENABLE_TRACING
 
       case OPTION_POLL_REPO_SECS:
@@ -1485,9 +1548,10 @@ TritonParser::Parse(int argc, char** argv)
 #endif  // TRITON_ENABLE_METRICS
 
 #ifdef TRITON_ENABLE_TRACING
-  if (explicit_disable_trace) {
-    lparams.trace_level_ = TRITONSERVER_TRACE_LEVEL_DISABLED;
-  }
+  PostProcessTraceArgs(
+      lparams, trace_level_present, trace_rate_present, trace_count_present,
+      trace_filepath_present, trace_log_frequency_present,
+      explicit_disable_trace);
 #endif  // TRITON_ENABLE_TRACING
 
   // Check if there is a conflict between --disable-auto-complete-config
@@ -1803,6 +1867,170 @@ TritonParser::ParseTraceLevelOption(std::string arg)
 
   throw ParseException("invalid value for trace level option: " + arg);
 }
+
+InferenceTraceMode
+TritonParser::ParseTraceModeOption(std::string arg)
+{
+  std::transform(arg.begin(), arg.end(), arg.begin(), [](unsigned char c) {
+    return std::tolower(c);
+  });
+
+  if (arg == "triton") {
+    return TRACE_MODE_TRITON;
+  }
+  if (arg == "opentelemetry") {
+    return TRACE_MODE_OPENTELEMETRY;
+  }
+
+  throw ParseException(
+      "invalid value for trace mode option: " + arg +
+      ". Available options are \"triton\" and \"opentelemetry\"");
+}
+
+std::tuple<std::string, std::string, std::string>
+TritonParser::ParseTraceConfigOption(const std::string& arg)
+{
+  int delim_name = arg.find(",");
+  int delim_setting = arg.find("=", delim_name + 1);
+
+  std::string name_string = std::string();
+  if (delim_name > 0) {
+    name_string =
+        std::to_string(ParseTraceModeOption(arg.substr(0, delim_name)));
+  } else if (delim_name == 0) {
+    std::stringstream ss;
+    ss << "No trace mode specified. --trace-config option format is "
+       << "<trace mode>,<setting>=<value> or "
+       << "<setting>=<value>. Got " << arg << std::endl;
+    throw ParseException(ss.str());
+  }  // else global trace config
+
+  if (delim_setting < 0) {
+    std::stringstream ss;
+    ss << "--trace-config option format is '<trace mode>,<setting>=<value>'. Got " 
+      << arg << std::endl;
+    throw ParseException(ss.str());
+  }
+  std::string setting_string =
+      arg.substr(delim_name + 1, delim_setting - delim_name - 1);
+  std::string value_string = arg.substr(delim_setting + 1);
+
+  if (setting_string.empty() || value_string.empty()) {
+    std::stringstream ss;
+    ss << "--trace-config option format is '<trace mode>,<setting>=<value>'. Got "
+       << arg << std::endl;
+    throw ParseException(ss.str());
+  }
+
+  return {name_string, setting_string, value_string};
+}
+
+void
+TritonParser::SetGlobalTraceArgs(
+    TritonServerParameters& lparams, bool trace_level_present,
+    bool trace_rate_present, bool trace_count_present,
+    bool explicit_disable_trace)
+{
+  for (const auto& global_setting : lparams.trace_config_map_[""]) {
+    if (global_setting.first == "rate") {
+      if (trace_rate_present) {
+        std::cerr << "Warning: Overriding deprecated '--trace-rate' "
+                     "in favor of provided rate value in --trace-config!"
+                  << std::endl;
+      }
+      lparams.trace_rate_ = ParseOption<int>(global_setting.second);
+    }
+    if (global_setting.first == "level") {
+      if (trace_level_present) {
+        std::cerr << "Warning: Overriding deprecated '--trace-level' "
+                     "in favor of provided level in --trace-config!"
+                  << std::endl;
+      }
+      auto parsed_level_config = ParseTraceLevelOption(global_setting.second);
+      explicit_disable_trace |=
+          (parsed_level_config == TRITONSERVER_TRACE_LEVEL_DISABLED);
+      lparams.trace_level_ = static_cast<TRITONSERVER_InferenceTraceLevel>(
+          lparams.trace_level_ | parsed_level_config);
+    }
+    if (global_setting.first == "mode") {
+      lparams.trace_mode_ = ParseTraceModeOption(global_setting.second);
+    }
+    if (global_setting.first == "count") {
+      if (trace_count_present) {
+        std::cerr << "Warning: Overriding deprecated '--trace-count' "
+                     "in favor of provided count in --trace-config!"
+                  << std::endl;
+      }
+      lparams.trace_count_ = ParseOption<int>(global_setting.second);
+    }
+  }
+}
+
+void
+TritonParser::SetTritonTraceArgs(
+    TritonServerParameters& lparams, bool trace_filepath_present,
+    bool trace_log_frequency_present)
+{
+  for (const auto& mode_setting :
+       lparams.trace_config_map_[std::to_string(TRACE_MODE_TRITON)]) {
+    if (mode_setting.first == "file") {
+      if (trace_filepath_present) {
+        std::cerr << "Warning: Overriding deprecated '--trace-file' "
+                     "in favor of provided file in --trace-config!"
+                  << std::endl;
+      }
+      lparams.trace_filepath_ = mode_setting.second;
+    } else if (mode_setting.first == "log-frequency") {
+      if (trace_log_frequency_present) {
+        std::cerr << "Warning: Overriding deprecated '--trace-file' "
+                     "in favor of provided file in --trace-config!"
+                  << std::endl;
+      }
+      lparams.trace_log_frequency_ = ParseOption<int>(mode_setting.second);
+    }
+  }
+}
+
+void
+TritonParser::VerifyOpentelemetryTraceArgs(
+    bool trace_filepath_present, bool trace_log_frequency_present)
+{
+  if (trace_filepath_present) {
+    std::cerr << "Warning: '--trace-file' is deprecated and will "
+                 "be ignored with opentelemetry tracing mode. "
+              << std::endl;
+  }
+  if (trace_log_frequency_present) {
+    std::cerr << "Warning: '--trace-log-frequency' is deprecated "
+                 "and will be ignored with opentelemetry tracing mode."
+              << std::endl;
+  }
+}
+
+void
+TritonParser::PostProcessTraceArgs(
+    TritonServerParameters& lparams, bool trace_level_present,
+    bool trace_rate_present, bool trace_count_present,
+    bool trace_filepath_present, bool trace_log_frequency_present,
+    bool explicit_disable_trace)
+{
+  SetGlobalTraceArgs(
+      lparams, trace_level_present, trace_rate_present, trace_count_present,
+      explicit_disable_trace);
+
+  if (lparams.trace_mode_ == TRACE_MODE_OPENTELEMETRY) {
+    VerifyOpentelemetryTraceArgs(
+        trace_filepath_present, trace_log_frequency_present);
+  } else if (lparams.trace_mode_ == TRACE_MODE_TRITON) {
+    SetTritonTraceArgs(
+        lparams, trace_filepath_present, trace_log_frequency_present);
+  }
+
+  if (explicit_disable_trace) {
+    lparams.trace_level_ = TRITONSERVER_TRACE_LEVEL_DISABLED;
+  }
+}
+
 #endif  // TRITON_ENABLE_TRACING
 
 }}  // namespace triton::server

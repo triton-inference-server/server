@@ -169,7 +169,7 @@ for BACKEND in $BACKENDS; do
 
     # Only start separate server if not using C API, since C API runs server in-process
     if [[ "${PERF_CLIENT_PROTOCOL}" != "triton_c_api" ]]; then
-        SERVER_LOG="${RESULTDIR}/${NAME}.serverlog"
+        SERVER_LOG="${RESULTDIR}/${NAME}.server.log"
         run_server
         if [ $SERVER_PID == 0 ]; then
             echo -e "\n***\n*** Failed to start $SERVER\n***"
