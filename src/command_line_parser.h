@@ -308,12 +308,11 @@ class TritonParser {
       bool trace_filepath_present, bool trace_log_frequency_present,
       bool explicit_disable_trace);
 #endif  // TRITON_ENABLE_TRACING
-      // Helper function to parse option in
-      // "<string>[1st_delim]<string>[2nd_delim]<string>" format
-      std::
-          tuple<std::string, std::string, std::string> ParseGenericConfigOption(
-              const std::string& arg, const std::string& first_delim,
-              const std::string& second_delim);
+  // Helper function to parse option in
+  // "<string>[1st_delim]<string>[2nd_delim]<string>" format
+  std::tuple<std::string, std::string, std::string> ParseGenericConfigOption(
+      const std::string& arg, const std::string& first_delim,
+      const std::string& second_delim);
 
   // Initialize individual option groups
   void SetupOptions();
@@ -338,5 +337,7 @@ class TritonParser {
   std::vector<Option> cache_options_;
   std::vector<Option> rate_limiter_options_;
   std::vector<Option> memory_device_options_;
+  // Group deprecated options to keep preferred options more succinct
+  std::vector<Option> deprecated_options_;
 };
 }}  // namespace triton::server

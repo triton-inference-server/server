@@ -333,7 +333,6 @@ enum TritonOptionId {
 void
 TritonParser::SetupOptions()
 {
-
   global_options_ = {{OPTION_HELP, "help", Option::ArgNone, "Print usage"}};
 
   server_options_ = {
@@ -585,33 +584,6 @@ TritonParser::SetupOptions()
 
   tracing_options_ = {
 #ifdef TRITON_ENABLE_TRACING
-      {OPTION_TRACE_FILEPATH, "trace-file", Option::ArgStr,
-       "DEPRECATED: Please use --trace-config triton,file=<path/to/your/file>"
-       " Set the file where trace output will be saved. If "
-       "--trace-log-frequency"
-       " is also specified, this argument value will be the prefix of the files"
-       " to save the trace output. See --trace-log-frequency for detail."},
-      {OPTION_TRACE_LEVEL, "trace-level", Option::ArgStr,
-       "DEPRECATED: Please use --trace-config level=<OFF|TIMESTAMPS|TENSORS>"
-       "Specify a trace level. OFF to disable tracing, TIMESTAMPS to "
-       "trace timestamps, TENSORS to trace tensors. It may be specified "
-       "multiple times to trace multiple informations. Default is OFF."},
-      {OPTION_TRACE_RATE, "trace-rate", Option::ArgInt,
-       "DEPRECATED: Please use --trace-config rate=<rate value>"
-       "Set the trace sampling rate. Default is 1000."},
-      {OPTION_TRACE_COUNT, "trace-count", Option::ArgInt,
-       "DEPRECATED: Please use --trace-config count=<count value>"
-       "Set the number of traces to be sampled. If the value is -1, the number "
-       "of traces to be sampled will not be limited. Default is -1."},
-      {OPTION_TRACE_LOG_FREQUENCY, "trace-log-frequency", Option::ArgInt,
-       "DEPRECATED: Please use --trace-config triton,log-frequency=<value>"
-       "Set the trace log frequency. If the value is 0, Triton will only log "
-       "the trace output to <trace-file> when shutting down. Otherwise, Triton "
-       "will log the trace output to <trace-file>.<idx> when it collects the "
-       "specified number of traces. For example, if the log frequency is 100, "
-       "when Triton collects the 100-th trace, it logs the traces to file "
-       "<trace-file>.0, and when it collects the 200-th trace, it logs the "
-       "101-th to the 200-th traces to file <trace-file>.1. Default is 0."},
       {OPTION_TRACE_CONFIG, "trace-config", "<string>,<string>=<string>",
        "Specify global or trace mode specific configuration setting. "
        "The format of this flag is --trace-config "
@@ -623,13 +595,11 @@ TritonParser::SetupOptions()
        "use "
        "Triton's Trace APIs. For \"opentelemetry\" mode, the server will use "
        "OpenTelemetry's APIs to generate, collect and export traces for "
-       "individual inference requests."},
+       "individual inference requests."}
 #endif  // TRITON_ENABLE_TRACING
   };
 
   cache_options_ = {
-      {OPTION_RESPONSE_CACHE_BYTE_SIZE, "response-cache-byte-size",
-       Option::ArgInt, "DEPRECATED: Please use --cache-config instead."},
       {OPTION_CACHE_CONFIG, "cache-config", "<string>,<string>=<string>",
        "Specify a cache-specific configuration setting. The format of this "
        "flag is --cache-config=<cache_name>,<setting>=<value>. Where "
@@ -724,6 +694,40 @@ TritonParser::SetupOptions()
       {OPTION_REPOAGENT_DIR, "repoagent-directory", Option::ArgStr,
        "The global directory searched for repository agent shared libraries. "
        "Default is '/opt/tritonserver/repoagents'."}};
+
+  deprecated_options_ = {
+      {OPTION_RESPONSE_CACHE_BYTE_SIZE, "response-cache-byte-size",
+       Option::ArgInt, "DEPRECATED: Please use --cache-config instead."},
+#ifdef TRITON_ENABLE_TRACING
+      {OPTION_TRACE_FILEPATH, "trace-file", Option::ArgStr,
+       "DEPRECATED: Please use --trace-config triton,file=<path/to/your/file>"
+       " Set the file where trace output will be saved. If "
+       "--trace-log-frequency"
+       " is also specified, this argument value will be the prefix of the files"
+       " to save the trace output. See --trace-log-frequency for detail."},
+      {OPTION_TRACE_LEVEL, "trace-level", Option::ArgStr,
+       "DEPRECATED: Please use --trace-config level=<OFF|TIMESTAMPS|TENSORS>"
+       "Specify a trace level. OFF to disable tracing, TIMESTAMPS to "
+       "trace timestamps, TENSORS to trace tensors. It may be specified "
+       "multiple times to trace multiple informations. Default is OFF."},
+      {OPTION_TRACE_RATE, "trace-rate", Option::ArgInt,
+       "DEPRECATED: Please use --trace-config rate=<rate value>"
+       "Set the trace sampling rate. Default is 1000."},
+      {OPTION_TRACE_COUNT, "trace-count", Option::ArgInt,
+       "DEPRECATED: Please use --trace-config count=<count value>"
+       "Set the number of traces to be sampled. If the value is -1, the number "
+       "of traces to be sampled will not be limited. Default is -1."},
+      {OPTION_TRACE_LOG_FREQUENCY, "trace-log-frequency", Option::ArgInt,
+       "DEPRECATED: Please use --trace-config triton,log-frequency=<value>"
+       "Set the trace log frequency. If the value is 0, Triton will only log "
+       "the trace output to <trace-file> when shutting down. Otherwise, Triton "
+       "will log the trace output to <trace-file>.<idx> when it collects the "
+       "specified number of traces. For example, if the log frequency is 100, "
+       "when Triton collects the 100-th trace, it logs the traces to file "
+       "<trace-file>.0, and when it collects the 200-th trace, it logs the "
+       "101-th to the 200-th traces to file <trace-file>.1. Default is 0."}
+#endif  // TRITON_ENABLE_TRACING
+  };
 }
 
 void
@@ -746,6 +750,7 @@ TritonParser::SetupOptionGroups()
   option_groups_.emplace_back("Rate Limiter", rate_limiter_options_);
   option_groups_.emplace_back(
       "Memory/Device Management", memory_device_options_);
+  option_groups_.emplace_back("DEPRECATED", deprecated_options_);
 }
 
 TritonParser::TritonParser()
@@ -1907,8 +1912,9 @@ TritonParser::ParseTraceConfigOption(const std::string& arg)
 
   if (delim_setting < 0) {
     std::stringstream ss;
-    ss << "--trace-config option format is '<trace mode>,<setting>=<value>'. Got " 
-      << arg << std::endl;
+    ss << "--trace-config option format is '<trace mode>,<setting>=<value>'. "
+          "Got "
+       << arg << std::endl;
     throw ParseException(ss.str());
   }
   std::string setting_string =
@@ -1917,7 +1923,8 @@ TritonParser::ParseTraceConfigOption(const std::string& arg)
 
   if (setting_string.empty() || value_string.empty()) {
     std::stringstream ss;
-    ss << "--trace-config option format is '<trace mode>,<setting>=<value>'. Got "
+    ss << "--trace-config option format is '<trace mode>,<setting>=<value>'. "
+          "Got "
        << arg << std::endl;
     throw ParseException(ss.str());
   }
