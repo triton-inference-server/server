@@ -91,8 +91,7 @@ getopt_long(
 #include "triton/common/triton_json.h"
 
 
-namespace triton {
-namespace server {
+namespace triton { namespace server {
 
 // [FIXME] expose following parse helpers for other type of parser
 namespace {
@@ -2092,5 +2091,4 @@ TritonParser::PostProcessTraceArgs(
 
 #endif  // TRITON_ENABLE_TRACING
 
-}  // namespace triton
-}  // namespace triton::server
+}}  // namespace triton::server
