@@ -780,8 +780,7 @@ TritonParser::SetupOptions()
        "<trace-file>.0, and when it collects the 200-th trace, it logs the "
        "101-th to the 200-th traces to file <trace-file>.1. Default is 0."});
 #endif  // TRITON_ENABLE_TRACING
-};
-}  // namespace server
+}
 
 void
 TritonParser::SetupOptionGroups()
