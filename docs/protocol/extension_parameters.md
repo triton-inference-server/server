@@ -85,3 +85,16 @@ Content-Length: <xx>
 The `parameters` field in the
 ModelInferRequest message can be used to send custom parameters.
 
+## Forwarding HTTP/GRPC Headers as Parameters
+
+Triton can forward HTTP/GRPC headers as inference request parameters. By 
+specifying a regular expression in `--http-header-forward-pattern` and
+`--grpc-header-forward-pattern`,
+Triton will add the headers that match with the regular experession as request
+parameters. All the forwarded headers will be added as a parameter with string
+value.
+
+The forwarded headers can be accessed using the
+[Python](https://github.com/triton-inference-server/python_backend#inference-request-parameters)
+or C Backend APIs as inference request parameters.
+
