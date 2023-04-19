@@ -92,7 +92,9 @@ specifying a regular expression in `--http-header-forward-pattern` and
 `--grpc-header-forward-pattern`,
 Triton will add the headers that match with the regular experession as request
 parameters. All the forwarded headers will be added as a parameter with string
-value.
+value. For example to forward all the headers that start with 'PREFIX_' from 
+both HTTP and GRPC, you should add `--http-header-forward-pattern PREFIX_.*
+--grpc-header-forward-pattern PREFIX_.*` to your `tritonserver` command.
 
 The forwarded headers can be accessed using the
 [Python](https://github.com/triton-inference-server/python_backend#inference-request-parameters)
