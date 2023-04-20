@@ -986,10 +986,10 @@ class SequenceBatcherTestUtil(tu.TestResultCollector):
     def check_status(self, model_name, batch_exec, exec_cnt, infer_cnt):
         start_time = time.time()
         # There is a time window between when responses are returned and statistics are updated.
-        # To prevent intermittent test failure during that window, wait up to 10 seconds for the
+        # To prevent intermittent test failure during that window, wait up to 5 seconds for the
         # inference statistics to be ready.
-        loop_count = 0
-        while (time.time() - start_time) < 10:
+        num_tries = 10
+        for i in range(num_tries):
             stats = self.triton_client_.get_inference_statistics(
                 model_name, "1")
             self.assertEqual(len(stats.model_stats), 1, "expect 1 model stats")
@@ -997,7 +997,7 @@ class SequenceBatcherTestUtil(tu.TestResultCollector):
             if actual_exec_cnt == exec_cnt:
                 break
             print("WARNING: expect {} executions, got {} (attempt {})".format(
-                exec_cnt, actual_exec_cnt, loop_count))
+                exec_cnt, actual_exec_cnt, i))
             time.sleep(0.5)
 
         self.assertEqual(stats.model_stats[0].name, model_name,
