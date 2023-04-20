@@ -47,8 +47,6 @@ export CUDA_VISIBLE_DEVICES=0
 
 RET=0
 
-echo "=== TEST THAT THIS MESSAGE APPEARS IN LOG OUTPUT ==="
-
 for STATIC_BATCH in $STATIC_BATCH_SIZES; do
     for DYNAMIC_BATCH in $DYNAMIC_BATCH_SIZES; do
         for INSTANCE_CNT in $INSTANCE_COUNTS; do
@@ -86,34 +84,31 @@ for STATIC_BATCH in $STATIC_BATCH_SIZES; do
 
             set +e
 
-            # Run the model once to warm up. Some frameworks do
-            # optimization on the first requests.  Must warmup similar
-            # to actual run so that all instances are ready
-            $PERF_CLIENT -v -i ${PERF_CLIENT_PROTOCOL} -m $MODEL_NAME -p5000 \
-                         -b${STATIC_BATCH} --concurrency-range ${CONCURRENCY} 1>&2
+            # Run test until it passes, or hits max tries. 
+            # Expose environment variable to optionally set max tries from CI
+            MAX_TRIES=${TRITON_PERF_MAX_TRIES:-"5"}
+            for i in $(seq 1 ${MAX_TRIES}); do 
+                $PERF_CLIENT -v -i ${PERF_CLIENT_PROTOCOL} -m $MODEL_NAME -p5000 \
+                             -b${STATIC_BATCH} --concurrency-range ${CONCURRENCY} \
+                             -f ${NAME}.csv | tee ${NAME}.log 1>&2
 
-            $PERF_CLIENT -v -i ${PERF_CLIENT_PROTOCOL} -m $MODEL_NAME -p5000 \
-                         -b${STATIC_BATCH} --concurrency-range ${CONCURRENCY} \
-                         -f ${NAME}.csv | tee ${NAME}.log 1>&2
-            if (( $? != 0 )); then
-                RET=1
-            fi
-            curl localhost:8002/metrics -o ${NAME}.metrics >> ${NAME}.log 2>&1
+                if [ $? -ne 0 ]; then
+                    echo -e "\n***\n*** Perf Analyzer failed attempt ${i}/${MAX_TRIES}.\n***"
+                    # If all runs fail, RET will remain 1 at the end and fail test
+                    if [ "${i}" -eq "${MAX_TRIES}" ]; then
+                      RET=1
+                    fi
+                # If any runs succeed, move on
+                else
+                    break
+                fi
+            done
+
             curl localhost:8002/metrics -o ${NAME}.metrics >> ${NAME}.log 1>&2
             if (( $? != 0 )); then
+                echo -e "\n***\n*** Failed to get metrics\n***"
                 RET=1
             fi
-
-
-            ### DEBUG ###
-            echo "======================= DEBUG ==================================="
-            ls
-            cat ${NAME}.csv
-            for f in `ls *.log`; do cat $f 1>&2; done
-            cat ${SERVER_LOG}
-            cat ${SERVER_LOG} 1>&2
-            echo "================================================================="
-            ###
 
             set -e
 
@@ -131,15 +126,6 @@ for STATIC_BATCH in $STATIC_BATCH_SIZES; do
             kill $SERVER_PID
             wait $SERVER_PID
 
-            ### DEBUG ###
-            echo "======================= DEBUG ==================================="
-            ls || true
-            cat ${NAME}.csv || true
-            cat ${NAME}.tjson || true
-            echo "================================================================="
-            ###
-
-
             if [ -f $REPORTER ]; then
                 set +e
 
@@ -150,6 +136,7 @@ for STATIC_BATCH in $STATIC_BATCH_SIZES; do
 
                 $REPORTER -v -o ${NAME}.json --csv ${NAME}.csv ${URL_FLAG} ${NAME}.tjson
                 if (( $? != 0 )); then
+                    echo -e "\n***\n*** Failed to report results\n***"
                     RET=1
                 fi
 

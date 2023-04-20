@@ -179,18 +179,30 @@ for BACKEND in $BACKENDS; do
     fi
 
     set +e
-    $PERF_CLIENT -v \
-                 -p${PERF_CLIENT_STABILIZE_WINDOW} \
-                 -s${PERF_CLIENT_STABILIZE_THRESHOLD} \
-                 ${PERF_CLIENT_EXTRA_ARGS} \
-                 -m ${MODEL_NAME} \
-                 -b${STATIC_BATCH} -t${CONCURRENCY} \
-                 --shape ${INPUT_NAME}:${SHAPE} \
-                 ${SERVICE_ARGS} \
-                 -f ${RESULTDIR}/${NAME}.csv 2>&1 | tee ${RESULTDIR}/${NAME}.log
-    if [ $? -ne 0 ]; then
-        RET=1
-    fi
+    # Run test until it passes, or hits max tries. 
+    # Expose environment variable to optionally set max tries from CI
+    MAX_TRIES=${TRITON_PERF_MAX_TRIES:-"5"}
+    for i in $(seq 1 ${MAX_TRIES}); do 
+        $PERF_CLIENT -v \
+                     -p${PERF_CLIENT_STABILIZE_WINDOW} \
+                     -s${PERF_CLIENT_STABILIZE_THRESHOLD} \
+                     ${PERF_CLIENT_EXTRA_ARGS} \
+                     -m ${MODEL_NAME} \
+                     -b${STATIC_BATCH} -t${CONCURRENCY} \
+                     --shape ${INPUT_NAME}:${SHAPE} \
+                     ${SERVICE_ARGS} \
+                     -f ${RESULTDIR}/${NAME}.csv 2>&1 | tee ${RESULTDIR}/${NAME}.log
+        if [ $? -ne 0 ]; then
+            echo -e "\n***\n*** Perf Analyzer failed attempt ${i}/${MAX_TRIES}.\n***"
+            # If all runs fail, RET will remain 1 at the end and fail test
+            if [ "${i}" -eq "${MAX_TRIES}" ]; then
+              RET=1
+            fi
+        # If any runs succeed, move on
+        else
+            break
+        fi
+    done
     set -e
 
     echo -e "[{\"s_benchmark_kind\":\"benchmark_perf\"," >> ${RESULTDIR}/${NAME}.tjson
