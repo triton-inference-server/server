@@ -993,6 +993,8 @@ class SequenceBatcherTestUtil(tu.TestResultCollector):
             actual_exec_cnt = stats.model_stats[0].execution_count
             if actual_exec_cnt == exec_cnt:
                 break
+            print("Waiting: expect {} executions, got {}".format(exec_cnt,
+                                                          actual_exec_cnt))
             time.sleep(0.5)
 
         self.assertEqual(stats.model_stats[0].name, model_name,
