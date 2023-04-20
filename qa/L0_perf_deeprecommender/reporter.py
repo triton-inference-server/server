@@ -142,24 +142,8 @@ if __name__ == '__main__':
           print(line)
         print("="*80)
     except Exception as e:
-      print("Exception occurred: {e}")
-
-    ### DEBUG STDERR #
-    import sys
-    print("=== STDERR ===", file=sys.stderr)
-    print(f"{FLAGS.csv=}", file=sys.stderr)
-
-    try:
-      with open(FLAGS.csv, "r") as f:
-        print("="*80, file=sys.stderr)
-        print(f.read(), file=sys.stderr)
-        print("="*80, file=sys.stderr)
-        for line in f.readlines():
-          print(line, file=sys.stderr)
-        print("="*80, file=sys.stderr)
-    except Exception as e:
-      print("Exception occurred: {e}", file=sys.stderr)
-    ###
+      print(f"Exception occurred: {e}")
+      raise e
 
     data = json.loads(FLAGS.file.read())
 
