@@ -191,7 +191,7 @@ for BACKEND in $BACKENDS; do
                      -b${STATIC_BATCH} -t${CONCURRENCY} \
                      --shape ${INPUT_NAME}:${SHAPE} \
                      ${SERVICE_ARGS} \
-                     -f ${RESULTDIR}/${NAME}.csv 2>&1 | tee ${RESULTDIR}/${NAME}.log
+                     -f ${RESULTDIR}/${NAME}.csv
         if [ $? -ne 0 ]; then
             echo -e "\n***\n*** Perf Analyzer failed attempt ${i}/${MAX_TRIES}.\n***"
             # If all runs fail, RET will remain 1 at the end and fail test
