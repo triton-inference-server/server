@@ -31,11 +31,7 @@ INSTANCE_COUNTS=${INSTANCE_COUNTS:=1}
 TF_VERSION=${TF_VERSION:=2}
 
 PERF_CLIENT=../clients/perf_client
-#REPORTER=../common/reporter.py
-#REPORTER=./reporter.py
-ls
-REPORTER=./tmp/server/qa/L0_perf_deeprecommender/reporter.py
-echo ${REPORTER}
+REPORTER=../common/reporter.py
 
 SERVER=/opt/tritonserver/bin/tritonserver
 SERVER_ARGS="--model-repository=`pwd`/models --backend-config=tensorflow,version=${TF_VERSION}"
