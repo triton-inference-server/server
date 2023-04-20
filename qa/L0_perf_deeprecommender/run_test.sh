@@ -88,12 +88,11 @@ for STATIC_BATCH in $STATIC_BATCH_SIZES; do
             # Expose environment variable to optionally set max tries from CI
             MAX_TRIES=${TRITON_PERF_MAX_TRIES:-"5"}
             for i in $(seq 1 ${MAX_TRIES}); do 
+                echo -e "\n***\n*** Perf Analyzer attempt ${i}/${MAX_TRIES}.\n***"
                 $PERF_CLIENT -v -i ${PERF_CLIENT_PROTOCOL} -m $MODEL_NAME -p5000 \
                              -b${STATIC_BATCH} --concurrency-range ${CONCURRENCY} \
-                             -f ${NAME}.csv | tee ${NAME}.log 1>&2
-
-                if [ $? -ne 0 ]; then
-                    echo -e "\n***\n*** Perf Analyzer failed attempt ${i}/${MAX_TRIES}.\n***"
+                             -f ${NAME}.csv || RV=$?
+                if [ ${RV} -ne 0 ]; then
                     # If all runs fail, RET will remain 1 at the end and fail test
                     if [ "${i}" -eq "${MAX_TRIES}" ]; then
                       RET=1
