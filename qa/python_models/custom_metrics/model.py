@@ -31,6 +31,7 @@ import requests
 
 
 class PBBLSMemoryTest(unittest.TestCase):
+
     def _get_metrics(self):
         metrics_url = "http://localhost:8002/metrics"
         r = requests.get(metrics_url)
@@ -128,6 +129,9 @@ class PBBLSMemoryTest(unittest.TestCase):
                 description=
                 "test metric family with same name but different kind",
                 kind=pb_utils.GAUGE)
+            self.assertIsNone(metric_family2)
+
+        self.assertIsNotNone(metric_family1)
 
     def test_dup_metric_family_diff_description(self):
         # Test that a duplicate metric family name will still return the
@@ -140,12 +144,16 @@ class PBBLSMemoryTest(unittest.TestCase):
             name="test_dup_metric_family_diff_description",
             description="second description",
             kind=pb_utils.COUNTER)
+
         metric2 = metric_family2.Metric()
+        self.assertEqual(metric2.value(), 0)
+
         # Delete metric_family1 and check if metric_family2 still references it
         del metric_family1
         pattern = 'test_dup_metric_family_diff_description first description'
         metrics = self._get_metrics()
         self.assertIn(pattern, metrics)
+
         # The first description will be kept if adding a duplicate metric
         # family name with a different description
         pattern = 'test_dup_metric_family_diff_description second description'
@@ -165,6 +173,9 @@ class PBBLSMemoryTest(unittest.TestCase):
         metric1 = metric_family1.Metric(labels={metric_key: "label1"})
         metric2 = metric_family2.Metric(labels={metric_key: "label2"})
 
+        self.assertEqual(metric1.value(), 0)
+        self.assertEqual(metric2.value(), 0)
+
         patterns = [
             '# HELP test_dup_metric_family dup description',
             '# TYPE test_dup_metric_family counter',
@@ -174,9 +185,6 @@ class PBBLSMemoryTest(unittest.TestCase):
         metrics = self._get_metrics()
         for pattern in patterns:
             self.assertIn(pattern, metrics)
-
-        del metric_family1
-        del metric_family2
 
     def test_dup_metric_labels(self):
         # Test that adding a duplicate metric will refer to the same
