@@ -1,0 +1,207 @@
+# Copyright 2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+#
+# Redistribution and use in source and binary forms, with or without
+# modification, are permitted provided that the following conditions
+# are met:
+#  * Redistributions of source code must retain the above copyright
+#    notice, this list of conditions and the following disclaimer.
+#  * Redistributions in binary form must reproduce the above copyright
+#    notice, this list of conditions and the following disclaimer in the
+#    documentation and/or other materials provided with the distribution.
+#  * Neither the name of NVIDIA CORPORATION nor the names of its
+#    contributors may be used to endorse or promote products derived
+#    from this software without specific prior written permission.
+#
+# THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS ``AS IS'' AND ANY
+# EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+# IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR
+# PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL THE COPYRIGHT OWNER OR
+# CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL,
+# EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
+# PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR
+# PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY
+# OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+# (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+# OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+
+import numpy as np
+import unittest
+import triton_python_backend_utils as pb_utils
+import requests
+
+
+class PBBLSMemoryTest(unittest.TestCase):
+    def _get_metrics(self):
+        metrics_url = "http://localhost:8002/metrics"
+        r = requests.get(metrics_url)
+        r.raise_for_status()
+        return r.text
+
+    def _metric_api_helper(self, metric, kind):
+        # The value should be 0.0 before the test
+        self.assertEqual(metric.value(), 0.0)
+
+        # Test increment positive value
+        increment = 2023.0
+        metric.increment(increment)
+        self.assertEqual(metric.value(), increment)
+
+        # Test increment negative value
+        decrement = -23.5
+        if kind == 'counter':
+            # Counter should not accept negative values
+            with self.assertRaises(pb_utils.TritonModelException):
+                metric.increment(decrement)
+        else:
+            metric.increment(decrement)
+            self.assertEqual(metric.value(), increment + decrement)
+
+        # Test set value
+        value = 999.9
+        if kind == 'counter':
+            # Counter does not support set
+            with self.assertRaises(pb_utils.TritonModelException):
+                metric.set(value)
+        else:
+            metric.set(value)
+            self.assertEqual(metric.value(), value)
+
+    def _dup_metric_helper(self, labels={}):
+        description = "dup metric"
+        metric_family = pb_utils.MetricFamily(name="test_dup_metric",
+                                              description=description,
+                                              kind=pb_utils.COUNTER)
+
+        # Verify dupe metrics reference same underlying metric
+        metric1 = metric_family.Metric(labels=labels)
+        metric2 = metric_family.Metric(labels=labels)
+
+        # The value should be 0 before the test
+        self.assertEqual(metric1.value(), 0.0)
+        self.assertEqual(metric2.value(), 0.0)
+
+        # Increment metric 1, check metric 2 == metric 1
+        increment = 7.5
+        metric1.increment(increment)
+        self.assertEqual(metric1.value(), metric2.value())
+
+        # Assert custom metric/family remains when there's still a reference to it
+        del metric1
+        metrics = self._get_metrics()
+        self.assertIn(description, metrics)
+
+    def test_counter_e2e(self):
+        metric_family = pb_utils.MetricFamily(
+            name="test_counter_e2e",
+            description="test metric counter kind end to end",
+            kind=pb_utils.COUNTER)
+        labels = {"example1": "counter_label1", "example2": "counter_label2"}
+        metric = metric_family.Metric(labels=labels)
+        self._metric_api_helper(metric, 'counter')
+
+        pattern = 'test_counter_e2e{example1="counter_label1",example2="counter_label2"}'
+        metrics = self._get_metrics()
+        self.assertIn(pattern, metrics)
+
+    def test_gauge_e2e(self):
+        metric_family = pb_utils.MetricFamily(
+            name="test_gauge_e2e",
+            description="test metric gauge kind end to end",
+            kind=pb_utils.GAUGE)
+        labels = {"example1": "counter_label1", "example2": "counter_label2"}
+        metric = metric_family.Metric(labels=labels)
+        self._metric_api_helper(metric, 'gauge')
+
+        pattern = 'test_gauge_e2e{example1="counter_label1",example2="counter_label2"}'
+        metrics = self._get_metrics()
+        self.assertIn(pattern, metrics)
+
+    def test_dup_metric_family_diff_kind(self):
+        # Test that a duplicate metric family can't be added with a conflicting type/kind
+        metric_family1 = pb_utils.MetricFamily(
+            name="test_dup_metric_family_diff_kind",
+            description="test metric family with same name but different kind",
+            kind=pb_utils.COUNTER)
+        with self.assertRaises(pb_utils.TritonModelException):
+            metric_family2 = pb_utils.MetricFamily(
+                name="test_dup_metric_family_diff_kind",
+                description=
+                "test metric family with same name but different kind",
+                kind=pb_utils.GAUGE)
+
+    def test_dup_metric_family_diff_description(self):
+        # Test that a duplicate metric family name will still return the
+        # original metric family even if the description is changed
+        metric_family1 = pb_utils.MetricFamily(
+            name="test_dup_metric_family_diff_description",
+            description="first description",
+            kind=pb_utils.COUNTER)
+        metric_family2 = pb_utils.MetricFamily(
+            name="test_dup_metric_family_diff_description",
+            description="second description",
+            kind=pb_utils.COUNTER)
+        metric2 = metric_family2.Metric()
+        # Delete metric_family1 and check if metric_family2 still references it
+        del metric_family1
+        pattern = 'test_dup_metric_family_diff_description first description'
+        metrics = self._get_metrics()
+        self.assertIn(pattern, metrics)
+        # The first description will be kept if adding a duplicate metric
+        # family name with a different description
+        pattern = 'test_dup_metric_family_diff_description second description'
+        self.assertNotIn(pattern, metrics)
+
+    def test_dup_metric_family(self):
+        # Test that adding a duplicate metric family will reuse the original
+        # and not add another entry to registry
+        metric_family1 = pb_utils.MetricFamily(name="test_dup_metric_family",
+                                               description="dup description",
+                                               kind=pb_utils.COUNTER)
+        metric_family2 = pb_utils.MetricFamily(name="test_dup_metric_family",
+                                               description="dup description",
+                                               kind=pb_utils.COUNTER)
+
+        metric_key = "custom_metric_key"
+        metric1 = metric_family1.Metric(labels={metric_key: "label1"})
+        metric2 = metric_family2.Metric(labels={metric_key: "label2"})
+
+        patterns = [
+            '# HELP test_dup_metric_family dup description',
+            '# TYPE test_dup_metric_family counter',
+            'test_dup_metric_family{custom_metric_key="label2"} 0',
+            'test_dup_metric_family{custom_metric_key="label1"} 0'
+        ]
+        metrics = self._get_metrics()
+        for pattern in patterns:
+            self.assertIn(pattern, metrics)
+
+        del metric_family1
+        del metric_family2
+
+    def test_dup_metric_labels(self):
+        # Test that adding a duplicate metric will refer to the same
+        # underlying metric, and all instances will be updated
+        labels = {"example1": "label1", "example2": "label2"}
+        self._dup_metric_helper(labels)
+
+    def test_dup_metric_empty_labels(self):
+        # Test that adding a duplicate metric will refer to the same
+        # underlying metric, and all instances will be updated
+        self._dup_metric_helper()
+
+
+class TritonPythonModel:
+
+    def execute(self, requests):
+        responses = []
+        for _ in requests:
+            # Run the unittest and store the results in InferenceResponse.
+            test = unittest.main('model', exit=False)
+            responses.append(
+                pb_utils.InferenceResponse([
+                    pb_utils.Tensor(
+                        'OUTPUT0',
+                        np.array([test.result.wasSuccessful()],
+                                 dtype=np.float16))
+                ]))
+        return responses

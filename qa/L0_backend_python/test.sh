@@ -441,6 +441,11 @@ if [ "$TEST_JETSON" == "0" ]; then
   fi
 fi
 
+(cd custom_metrics && bash -ex test.sh)
+if [ $? -ne 0 ]; then
+  RET=1
+fi
+
 if [ $RET -eq 0 ]; then
   echo -e "\n***\n*** Test Passed\n***"
 else
