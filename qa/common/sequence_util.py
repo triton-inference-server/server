@@ -984,8 +984,17 @@ class SequenceBatcherTestUtil(tu.TestResultCollector):
                              _max_sequence_idle_ms * 1000)  # 5 secs
 
     def check_status(self, model_name, batch_exec, exec_cnt, infer_cnt):
-        stats = self.triton_client_.get_inference_statistics(model_name, "1")
-        self.assertEqual(len(stats.model_stats), 1, "expect 1 model stats")
+        start_time = time.time()
+        # Wait up to 10 seconds for the inference statistics to be ready
+        while (time.time() - start_time) < 10:
+            stats = self.triton_client_.get_inference_statistics(
+                model_name, "1")
+            self.assertEqual(len(stats.model_stats), 1, "expect 1 model stats")
+            actual_exec_cnt = stats.model_stats[0].execution_count
+            if actual_exec_cnt == exec_cnt:
+                break
+            time.sleep(0.5)
+
         self.assertEqual(stats.model_stats[0].name, model_name,
                          "expect model stats for model {}".format(model_name))
         self.assertEqual(
