@@ -35,4 +35,9 @@ output [
   }
 ]
 
-instance_group [{ kind: KIND_CPU }]
+instance_group [
+  { 
+    count: 3
+    kind: KIND_CPU 
+  }
+]
