@@ -988,7 +988,7 @@ class SequenceBatcherTestUtil(tu.TestResultCollector):
         # There is a time window between when responses are returned and statistics are updated.
         # To prevent intermittent test failure during that window, wait up to 10 seconds for the
         # inference statistics to be ready.
-        num_tries = 20
+        num_tries = 10
         for i in range(num_tries):
             stats = self.triton_client_.get_inference_statistics(
                 model_name, "1")
@@ -998,7 +998,7 @@ class SequenceBatcherTestUtil(tu.TestResultCollector):
                 break
             print("WARNING: expect {} executions, got {} (attempt {})".format(
                 exec_cnt, actual_exec_cnt, i))
-            time.sleep(0.5)
+            time.sleep(1)
 
         self.assertEqual(stats.model_stats[0].name, model_name,
                          "expect model stats for model {}".format(model_name))
