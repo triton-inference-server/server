@@ -167,6 +167,7 @@ for BACKEND in $BACKENDS; do
                 echo "dynamic_batching { preferred_batch_size: [ ${DYNAMIC_BATCH} ] }" >> config.pbtxt)
     fi
 
+    echo "Time before starting server: $(date)"
     # Only start separate server if not using C API, since C API runs server in-process
     if [[ "${PERF_CLIENT_PROTOCOL}" != "triton_c_api" ]]; then
         SERVER_LOG="${RESULTDIR}/${NAME}.server.log"
@@ -178,6 +179,7 @@ for BACKEND in $BACKENDS; do
         fi
     fi
 
+    echo "Time before perf analyzer trials: $(date)"
     set +e
     set -o pipefail
     PA_MAX_TRIALS=${PA_MAX_TRIALS:-"50"}
@@ -195,6 +197,7 @@ for BACKEND in $BACKENDS; do
         echo -e "\n***\n*** FAILED Perf Analyzer measurement\n***"
         RET=1
     fi
+    echo "Time after perf analyzer trials: $(date)"
     set +o pipefail
     set -e
 

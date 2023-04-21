@@ -70,6 +70,7 @@ for STATIC_BATCH in $STATIC_BATCH_SIZES; do
                         echo "dynamic_batching { preferred_batch_size: [ ${DYNAMIC_BATCH} ] }" >> config.pbtxt)
             fi
 
+            echo "Time before starting server: $(date)"
             SERVER_LOG="${NAME}.server.log"
             run_server
             if (( $SERVER_PID == 0 )); then
@@ -79,6 +80,7 @@ for STATIC_BATCH in $STATIC_BATCH_SIZES; do
             fi
 
             set +e
+            echo "Time before perf analyzer trials: $(date)"
 
             # Run the model once to warm up. Some frameworks do
             # optimization on the first requests.  Must warmup similar
@@ -96,6 +98,7 @@ for STATIC_BATCH in $STATIC_BATCH_SIZES; do
                 echo -e "\n***\n*** FAILED Perf Analyzer measurement\n***"
                 RET=1
             fi
+            echo "Time after perf analyzer trials: $(date)"
             set +o pipefail
 
             curl localhost:8002/metrics -o ${NAME}.metrics >> ${NAME}.log 2>&1
