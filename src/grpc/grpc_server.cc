@@ -1203,15 +1203,15 @@ CommonHandler::RegisterModelStatistics()
           }
           {
             uint64_t id;
-            err = batch_stat.MemberAsUInt("id", &id);
+            err = usage.MemberAsUInt("id", &id);
             GOTO_IF_ERR(err, earlyexit);
-            batch_statistics->set_id(ucnt);
+            memory_usage->set_id(ucnt);
           }
           {
             uint64_t byte_size;
-            err = batch_stat.MemberAsUInt("byte_size", &byte_size);
+            err = usage.MemberAsUInt("byte_size", &byte_size);
             GOTO_IF_ERR(err, earlyexit);
-            batch_statistics->set_byte_size(byte_size);
+            memory_usage->set_byte_size(byte_size);
           }
         }
       }
