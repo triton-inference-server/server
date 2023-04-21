@@ -986,9 +986,9 @@ class SequenceBatcherTestUtil(tu.TestResultCollector):
     def check_status(self, model_name, batch_exec, exec_cnt, infer_cnt):
         start_time = time.time()
         # There is a time window between when responses are returned and statistics are updated.
-        # To prevent intermittent test failure during that window, wait up to 5 seconds for the
+        # To prevent intermittent test failure during that window, wait up to 10 seconds for the
         # inference statistics to be ready.
-        num_tries = 10
+        num_tries = 20
         for i in range(num_tries):
             stats = self.triton_client_.get_inference_statistics(
                 model_name, "1")
