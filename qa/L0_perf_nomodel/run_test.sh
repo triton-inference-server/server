@@ -179,18 +179,23 @@ for BACKEND in $BACKENDS; do
     fi
 
     set +e
+    set -o pipefail
+    PA_MAX_TRIALS=${PA_MAX_TRIALS:-"50"}
     $PERF_CLIENT -v \
                  -p${PERF_CLIENT_STABILIZE_WINDOW} \
                  -s${PERF_CLIENT_STABILIZE_THRESHOLD} \
                  ${PERF_CLIENT_EXTRA_ARGS} \
                  -m ${MODEL_NAME} \
                  -b${STATIC_BATCH} -t${CONCURRENCY} \
+                 --max-trials "${PA_MAX_TRIALS}" \
                  --shape ${INPUT_NAME}:${SHAPE} \
                  ${SERVICE_ARGS} \
                  -f ${RESULTDIR}/${NAME}.csv 2>&1 | tee ${RESULTDIR}/${NAME}.log
     if [ $? -ne 0 ]; then
+        echo -e "\n***\n*** FAILED Perf Analyzer measurement\n***"
         RET=1
     fi
+    set +o pipefail
     set -e
 
     echo -e "[{\"s_benchmark_kind\":\"benchmark_perf\"," >> ${RESULTDIR}/${NAME}.tjson
