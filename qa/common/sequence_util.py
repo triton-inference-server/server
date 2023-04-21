@@ -984,7 +984,6 @@ class SequenceBatcherTestUtil(tu.TestResultCollector):
                              _max_sequence_idle_ms * 1000)  # 5 secs
 
     def check_status(self, model_name, batch_exec, exec_cnt, infer_cnt):
-        start_time = time.time()
         # There is a time window between when responses are returned and statistics are updated.
         # To prevent intermittent test failure during that window, wait up to 10 seconds for the
         # inference statistics to be ready.
