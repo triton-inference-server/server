@@ -30,7 +30,7 @@ import triton_python_backend_utils as pb_utils
 import requests
 
 
-class PBBLSMemoryTest(unittest.TestCase):
+class PBCustomMetricsTest(unittest.TestCase):
 
     def _get_metrics(self):
         metrics_url = "http://localhost:8002/metrics"
