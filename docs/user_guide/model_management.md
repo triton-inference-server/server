@@ -201,6 +201,12 @@ request is received under
 'config.pbtxt' is detected under
 [Model Control Mode POLL](#model-control-mode-poll).
 
+* If a sequence model is updated with in-flight sequence(s), Triton does not
+guarentee any remaining request(s) from the in-flight sequence(s) will be routed
+to the same model instance for processing. It is currently the responsibility of
+the user to ensure any in-flight sequence(s) is complete before updating a
+sequence model.
+
 ## Concurrently Loading Models
 
 To reduce service downtime, Triton loads new models in the background while
