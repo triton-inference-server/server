@@ -193,6 +193,14 @@ existing shared-libraries to another location outside of the model
 repository, copy in the new shared libraries, and then reload the
 model.
 
+* If only the model instance configuration on the 'config.pbtxt' is modified
+(i.e. increasing/decreasing the instance count) for non-sequence models,
+then Triton will update the model rather then reloading it, when either a load
+request is received under
+[Model Control Mode EXPLICIT](#model-control-mode-explicit) or change to the
+'config.pbtxt' is detected under
+[Model Control Mode POLL](#model-control-mode-poll).
+
 ## Concurrently Loading Models
 
 To reduce service downtime, Triton loads new models in the background while
