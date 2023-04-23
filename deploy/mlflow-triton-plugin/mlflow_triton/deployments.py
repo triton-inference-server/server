@@ -57,7 +57,8 @@ class TritonPlugin(BaseDeploymentClient):
         super(TritonPlugin, self).__init__(target_uri=uri)
         self.server_config = Config()
         triton_url, self.triton_model_repo = self._get_triton_server_config()
-        self.supported_flavors = ['triton', 'onnx']  # need to add other flavors
+        # need to add other flavors
+        self.supported_flavors = ['triton', 'onnx']
         # URL cleaning for constructing Triton client
         ssl = False
         if triton_url.startswith("http://"):
@@ -189,8 +190,9 @@ class TritonPlugin(BaseDeploymentClient):
                 if 's3' in self.server_config:
                     meta_dict = ast.literal_eval(self.server_config['s3'].get_object(
                         Bucket=self.server_config['s3_bucket'],
-                        Key=d['name'] + f'/{_MLFLOW_META_FILENAME}',
-                        )['Body'].read().decode('utf-8'))
+                        Key='/'.join(filter(
+                            None, [self.server_config['s3_prefix'], d['name'], _MLFLOW_META_FILENAME])),
+                    )['Body'].read().decode('utf-8'))
                 elif os.path.isfile(mlflow_meta_path):
                     meta_dict = self._get_mlflow_meta_dict(d['name'])
 
@@ -276,11 +278,12 @@ class TritonPlugin(BaseDeploymentClient):
             self.server_config['s3'].put_object(
                 Body=json.dumps(meta_dict, indent=4).encode('utf-8'),
                 Bucket=self.server_config["s3_bucket"],
-                Key=f'{name}/{_MLFLOW_META_FILENAME}',
+                Key='/'.join(filter(None,
+                             [self.server_config['s3_prefix'], name, _MLFLOW_META_FILENAME])),
             )
         else:
             with open(os.path.join(triton_deployment_dir, _MLFLOW_META_FILENAME),
-                    "w") as outfile:
+                      "w") as outfile:
                 json.dump(meta_dict, outfile, indent=4)
 
         print("Saved", _MLFLOW_META_FILENAME, "to", triton_deployment_dir)
@@ -288,11 +291,12 @@ class TritonPlugin(BaseDeploymentClient):
     def _get_mlflow_meta_dict(self, name):
         mlflow_meta_path = os.path.join(self.triton_model_repo, name,
                                         _MLFLOW_META_FILENAME)
-        
+
         if 's3' in self.server_config:
             mlflow_meta_dict = ast.literal_eval(self.server_config['s3'].get_object(
                 Bucket=self.server_config['s3_bucket'],
-                Key=f'{name}/{_MLFLOW_META_FILENAME}',
+                Key='/'.join(filter(None,
+                             [self.server_config['s3_prefix'], name, _MLFLOW_META_FILENAME]))
             )['Body'].read().decode('utf-8'))
         else:
             with open(mlflow_meta_path, 'r') as metafile:
@@ -359,10 +363,10 @@ default_model_filename: "{}"
         return copy_paths
 
     def _walk(self, path):
-        """Walk a path like os.walk() if path is dir, 
+        """Walk a path like os.walk() if path is dir,
         return file in the expected format otherwise.
         :param path: dir or file path
-        
+
         :return: root, dirs, files
         """
         if os.path.isfile(path):
@@ -370,33 +374,35 @@ default_model_filename: "{}"
         elif os.path.isdir(path):
             return list(os.walk(path))
         else:
-            raise Exception(f'path: {path} is not a valid path to a file or dir.')
+            raise Exception(
+                f'path: {path} is not a valid path to a file or dir.')
 
     def _copy_files_to_triton_repo(self, artifact_path, name, flavor):
         copy_paths = self._get_copy_paths(artifact_path, name, flavor)
         for key in copy_paths:
-            if 's3' in self.server_config:             
+            if 's3' in self.server_config:
                 # copy model dir to s3 recursively
                 for root, dirs, files in self._walk(copy_paths[key]['from']):
                     for filename in files:
                         local_path = os.path.join(root, filename)
-                        
+
                         if flavor == "onnx":
                             s3_path = os.path.join(
-                                    copy_paths[key]['to'].replace(
-                                    self.server_config['triton_model_repo'], ''), 
-                                    filename,
-                                    ).replace('/', '', 1)
+                                copy_paths[key]['to'].replace(
+                                    self.server_config['triton_model_repo'], ''),
+                                filename,
+                            ).replace('/', '', 1)
 
                         elif flavor == "triton":
                             rel_path = os.path.relpath(
-                                    local_path,
-                                    copy_paths[key]['from'],
-                                    )
-                            s3_path = f'{name}/{rel_path}'
-                        
+                                local_path,
+                                copy_paths[key]['from'],
+                            )
+                            s3_path = '/'.join(
+                                filter(None, [self.server_config['s3_prefix'], name, rel_path]))
+
                         self.server_config['s3'].upload_file(
-                            local_path, 
+                            local_path,
                             self.server_config['s3_bucket'],
                             s3_path,
                         )
@@ -404,19 +410,20 @@ default_model_filename: "{}"
                 if os.path.isdir(copy_paths[key]['from']):
                     if os.path.isdir(copy_paths[key]['to']):
                         shutil.rmtree(copy_paths[key]['to'])
-                    shutil.copytree(copy_paths[key]['from'], copy_paths[key]['to'])
+                    shutil.copytree(
+                        copy_paths[key]['from'], copy_paths[key]['to'])
                 else:
                     if not os.path.isdir(copy_paths[key]['to']):
                         os.makedirs(copy_paths[key]['to'])
                     shutil.copy(copy_paths[key]['from'], copy_paths[key]['to'])
 
-        if 's3' not in self.server_config:  
+        if 's3' not in self.server_config:
             triton_deployment_dir = os.path.join(self.triton_model_repo, name)
             version_folder = os.path.join(triton_deployment_dir, "1")
             os.makedirs(version_folder, exist_ok=True)
 
         return copy_paths
-    
+
     def _delete_mlflow_meta(self, filepath):
         if 's3' in self.server_config:
             self.server_config['s3'].delete_object(
@@ -426,27 +433,27 @@ default_model_filename: "{}"
         elif os.path.isfile(filepath):
             os.remove(filepath)
 
-
     def _delete_deployment_files(self, name):
 
         triton_deployment_dir = os.path.join(self.triton_model_repo, name)
 
         if 's3' in self.server_config:
             objs = self.server_config['s3'].list_objects(
-                Bucket=self.server_config['s3_bucket'], 
-                Prefix=name,
+                Bucket=self.server_config['s3_bucket'],
+                Prefix='/'.join(filter(None,
+                                [self.server_config['s3_prefix'], name])),
             )
-            
+
             for key in objs['Contents']:
                 key = key['Key']
                 try:
                     self.server_config['s3'].delete_object(
                         Bucket=self.server_config['s3_bucket'],
                         Key=key,
-                    ) 
+                    )
                 except Exception as e:
                     raise Exception(f'Could not delete {key}: {e}')
-        
+
         else:
             # Check if the deployment directory exists
             if not os.path.isdir(triton_deployment_dir):
