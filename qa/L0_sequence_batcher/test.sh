@@ -735,8 +735,7 @@ if [ "$TEST_SYSTEM_SHARED_MEMORY" -ne 1 ] && [ "$TEST_CUDA_SHARED_MEMORY" -ne 1 
 
     TEST_CASE=SequenceBatcherRequestTimeoutTest
     MODEL_PATH=request_timeout_models
-    mkdir -p ${MODEL_PATH}/identity_fp32_timeout/1
-    cp ../python_models/identity_fp32_timeout/model.py ${MODEL_PATH}/identity_fp32_timeout/1/.
+    cp -r ../custom_models/custom_sequence_int32/1 ${MODEL_PATH}/custom_sequence_int32_timeout
 
     SERVER_ARGS="--model-repository=$MODELDIR/$MODEL_PATH ${SERVER_ARGS_EXTRA}"
     SERVER_LOG="./$TEST_CASE.$MODEL_PATH.server.log"

@@ -2860,15 +2860,21 @@ class SequenceBatcherRequestTimeoutTest(su.SequenceBatcherTestUtil):
         self.server_address_ = os.environ.get('TRITONSERVER_IPADDR',
                                               'localhost') + ":8001"
 
-        self.model_name_ = "identity_fp32_timeout"
-        self.tensor_data_ = np.ones(shape=[1, 1], dtype=np.float32)
-        self.inputs_ = [grpcclient.InferInput('INPUT0', [1, 1], "FP32")]
+        # Prepare input and expected output based on the model and
+        # the infer sequence sent for testing. If the test is to be extended
+        # for different sequence and model, then proper grouping should be added
+        self.model_name_ = "custom_sequence_int32_timeout"
+        self.tensor_data_ = np.ones(shape=[1, 1], dtype=np.int32)
+        self.inputs_ = [grpcclient.InferInput('INPUT', [1, 1], "INT32")]
         self.inputs_[0].set_data_from_numpy(self.tensor_data_)
+        self.expected_out_seq_ = [("OUTPUT", self.tensor_data_),
+                                  ("OUTPUT", self.tensor_data_ * 2),
+                                  ("OUTPUT", self.tensor_data_ * 3)]
 
     def send_sequence_with_timeout(self,
                                    seq_id,
                                    callback,
-                                   timeout_us=3000000,
+                                   timeout_us=2000000,
                                    request_pause_sec=0):
         with grpcclient.InferenceServerClient(
                 self.server_address_) as triton_client:
@@ -2897,8 +2903,8 @@ class SequenceBatcherRequestTimeoutTest(su.SequenceBatcherTestUtil):
         # expect the timeout will only be expired on backlog sequence and reject
         # all requests of the sequence once expired.
         # Sending two sequences while the model can only process one sequence
-        # at a time. Each model execution takes 5 second and all requests have
-        # 3 second timeout, so the second sequence will be rejected.
+        # at a time. Each model execution takes 3 second and all requests have
+        # 2 second timeout, so the second sequence will be rejected.
 
         # correlation ID is 1-index
         seq1_res = []
@@ -2920,16 +2926,19 @@ class SequenceBatcherRequestTimeoutTest(su.SequenceBatcherTestUtil):
         for t in threads:
             t.join()
 
-        for result, error in seq1_res:
+        for idx in range(len(seq1_res)):
+            result, error = seq1_res[idx]
             self.assertIsNone(
                 error,
                 "Expect sucessful inference for sequence 1 requests, got error: {}"
                 .format(error))
+            out = result.as_numpy(self.expected_out_seq_[idx][0])
+            expected_out = self.expected_out_seq_[idx][1]
             np.testing.assert_allclose(
-                result.as_numpy("OUTPUT0"),
-                self.tensor_data_,
-                err_msg="Unexpected output tensor, got {}".format(
-                    result.as_numpy("OUTPUT0")))
+                out,
+                expected_out,
+                err_msg="Unexpected output tensor: expect {}, got {}".format(
+                    expected_out, out))
 
         for _, error in seq2_res:
             self.assertIsNotNone(error, "Expect error for sequence 2 requests")
