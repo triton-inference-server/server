@@ -48,9 +48,9 @@ source ../common/util.sh
 function setup_models() {
     rm -rf models && mkdir models
     # Basic model that log instance creation and destruction
-    cp -r ../python_models/instance_init_del models/instance_init_del && \
-        mkdir models/instance_init_del/1 && \
-        mv models/instance_init_del/model.py models/instance_init_del/1
+    cp -r ../python_models/model_init_del models/model_init_del && \
+        mkdir models/model_init_del/1 && \
+        mv models/model_init_del/model.py models/model_init_del/1
 }
 
 SERVER_ARGS="--model-repository=models --model-control-mode=explicit --log-verbose=2"

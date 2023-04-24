@@ -26,12 +26,13 @@
 
 import os
 
+__model_name = "model_init_del"
+
 #
 # Helper functions for reading/writing state to disk
 #
 
-
-def read_int_from_txt_file(filename):
+def __get_count(filename):
     full_path = os.path.join(os.environ["MODEL_LOG_DIR"], filename)
     try:
         with open(full_path, mode="r", encoding="utf-8", errors="strict") as f:
@@ -40,91 +41,75 @@ def read_int_from_txt_file(filename):
         txt = "0"
     return int(txt)
 
-
-def write_int_to_txt_file(filename, number):
+def __store_count(filename, number):
     full_path = os.path.join(os.environ["MODEL_LOG_DIR"], filename)
     txt = str(number)
     with open(full_path, mode="w", encoding="utf-8", errors="strict") as f:
         f.write(txt)
 
+def __inc_count(filename):
+    count = __get_count(filename)
+    count += 1
+    __store_count(filename, count)
+    return count
+
+def __reset_count(filename):
+    count = 0
+    __store_count(filename, count)
+    return count
 
 #
 # Functions for communicating initialize and finalize count between the model
 # and test
 #
 
-
-def get_count(filename):
-    count = read_int_from_txt_file(filename)
-    return count
-
-
-def inc_count(filename):
-    count = read_int_from_txt_file(filename)
-    count += 1
-    write_int_to_txt_file(filename, count)
-    return count
-
-
-def reset_count(filename):
-    count = 0
-    write_int_to_txt_file(filename, count)
-    return count
-
+__initialize_count_filename = __model_name + "_initialize_count.txt"
+__finalize_count_filename = __model_name + "_finalize_count.txt"
 
 def get_initialize_count():
-    return get_count("instance_init_del_initialize_count.txt")
-
+    return __get_count(__initialize_count_filename)
 
 def inc_initialize_count():
-    return inc_count("instance_init_del_initialize_count.txt")
-
+    return __inc_count(__initialize_count_filename)
 
 def reset_initialize_count():
-    return reset_count("instance_init_del_initialize_count.txt")
-
+    return __reset_count(__initialize_count_filename)
 
 def get_finalize_count():
-    return get_count("instance_init_del_finalize_count.txt")
-
+    return __get_count(__finalize_count_filename)
 
 def inc_finalize_count():
-    return inc_count("instance_init_del_finalize_count.txt")
-
+    return __inc_count(__finalize_count_filename)
 
 def reset_finalize_count():
-    return reset_count("instance_init_del_finalize_count.txt")
-
+    return __reset_count(__finalize_count_filename)
 
 #
 # Functions for communicating varies of delay (in seconds) to the model
 #
 
+__initialize_delay_filename = __model_name + "_initialize_delay.txt"
+__finalize_delay_filename = __model_name + "_finalize_delay.txt"
 
 def get_initialize_delay():
-    delay = read_int_from_txt_file("instance_init_del_initialize_delay.txt")
+    delay = __get_count(__initialize_delay_filename)
     return delay
-
 
 def set_initialize_delay(delay):
-    write_int_to_txt_file("instance_init_del_initialize_delay.txt", delay)
+    __store_count(__initialize_delay_filename, delay)
     return delay
-
 
 def get_infer_delay():
-    delay = read_int_from_txt_file("instance_init_del_infer_delay.txt")
+    delay = __get_count(__finalize_delay_filename)
     return delay
-
 
 def set_infer_delay(delay):
-    write_int_to_txt_file("instance_init_del_infer_delay.txt", delay)
+    __store_count(__finalize_delay_filename, delay)
     return delay
-
 
 #
 # Functions for modifying the model
 #
-
 
 def update_instance_group(instance_group_str):
     full_path = os.path.join(os.path.dirname(__file__), "config.pbtxt")
@@ -139,12 +124,10 @@ def update_instance_group(instance_group_str):
         f.write(txt)
     return txt
 
-
 def update_model_file():
     full_path = os.path.join(os.path.dirname(__file__), "1", "model.py")
     with open(full_path, mode="a", encoding="utf-8", errors="strict") as f:
         f.write("\n# dummy model file update\n")
-
 
 def enable_batching():
     full_path = os.path.join(os.path.dirname(__file__), "config.pbtxt")
@@ -155,7 +138,6 @@ def enable_batching():
         f.seek(0)
         f.write(txt)
     return txt
-
 
 def disable_batching():
     full_path = os.path.join(os.path.dirname(__file__), "config.pbtxt")

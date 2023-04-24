@@ -30,7 +30,7 @@ import concurrent.futures
 import numpy as np
 import tritonclient.grpc as grpcclient
 from tritonclient.utils import InferenceServerException
-from models.instance_init_del.util import *
+from models.model_init_del.util import *
 
 
 class TestInstanceUpdate(unittest.TestCase):
@@ -56,195 +56,195 @@ class TestInstanceUpdate(unittest.TestCase):
     def test_add_rm_add(self):
         # Load model
         update_instance_group("{\ncount: 3\nkind: KIND_CPU\n}")
-        self.__triton.load_model("instance_init_del")
+        self.__triton.load_model("model_init_del")
         self.assertEqual(get_initialize_count(), 3)
         self.assertEqual(get_finalize_count(), 0)
-        self.__triton.infer("instance_init_del", self.__get_inputs((8,)))
+        self.__triton.infer("model_init_del", self.__get_inputs((8,)))
         # Add 1 instance
         update_instance_group("{\ncount: 4\nkind: KIND_CPU\n}")
-        self.__triton.load_model("instance_init_del")
+        self.__triton.load_model("model_init_del")
         self.assertEqual(get_initialize_count(), 4)
         self.assertEqual(get_finalize_count(), 0)
-        self.__triton.infer("instance_init_del", self.__get_inputs((2,)))
+        self.__triton.infer("model_init_del", self.__get_inputs((2,)))
         # Remove 1 instance
         update_instance_group("{\ncount: 3\nkind: KIND_CPU\n}")
-        self.__triton.load_model("instance_init_del")
+        self.__triton.load_model("model_init_del")
         self.assertEqual(get_initialize_count(), 4)
         self.assertEqual(get_finalize_count(), 1)
-        self.__triton.infer("instance_init_del", self.__get_inputs((4,)))
+        self.__triton.infer("model_init_del", self.__get_inputs((4,)))
         # Add 1 instance
         update_instance_group("{\ncount: 4\nkind: KIND_CPU\n}")
-        self.__triton.load_model("instance_init_del")
+        self.__triton.load_model("model_init_del")
         self.assertEqual(get_initialize_count(), 5)
         self.assertEqual(get_finalize_count(), 1)
-        self.__triton.infer("instance_init_del", self.__get_inputs((1,)))
+        self.__triton.infer("model_init_del", self.__get_inputs((1,)))
         # Unload model
-        self.__triton.unload_model("instance_init_del")
+        self.__triton.unload_model("model_init_del")
         time.sleep(10)  # wait for unload to complete
         self.assertEqual(get_initialize_count(), 5)
         self.assertEqual(get_finalize_count(), 5)
         with self.assertRaises(InferenceServerException):
-            self.__triton.infer("instance_init_del", self.__get_inputs((5,)))
+            self.__triton.infer("model_init_del", self.__get_inputs((5,)))
 
     def test_rm_add_rm(self):
         # Load model
         update_instance_group("{\ncount: 2\nkind: KIND_CPU\n}")
-        self.__triton.load_model("instance_init_del")
+        self.__triton.load_model("model_init_del")
         self.assertEqual(get_initialize_count(), 2)
         self.assertEqual(get_finalize_count(), 0)
-        self.__triton.infer("instance_init_del", self.__get_inputs((4,)))
+        self.__triton.infer("model_init_del", self.__get_inputs((4,)))
         # Remove 1 instance
         update_instance_group("{\ncount: 1\nkind: KIND_CPU\n}")
-        self.__triton.load_model("instance_init_del")
+        self.__triton.load_model("model_init_del")
         self.assertEqual(get_initialize_count(), 2)
         self.assertEqual(get_finalize_count(), 1)
-        self.__triton.infer("instance_init_del", self.__get_inputs((2,)))
+        self.__triton.infer("model_init_del", self.__get_inputs((2,)))
         # Add 1 instance
         update_instance_group("{\ncount: 2\nkind: KIND_CPU\n}")
-        self.__triton.load_model("instance_init_del")
+        self.__triton.load_model("model_init_del")
         self.assertEqual(get_initialize_count(), 3)
         self.assertEqual(get_finalize_count(), 1)
-        self.__triton.infer("instance_init_del", self.__get_inputs((3,)))
+        self.__triton.infer("model_init_del", self.__get_inputs((3,)))
         # Remove 1 instance
         update_instance_group("{\ncount: 1\nkind: KIND_CPU\n}")
-        self.__triton.load_model("instance_init_del")
+        self.__triton.load_model("model_init_del")
         self.assertEqual(get_initialize_count(), 3)
         self.assertEqual(get_finalize_count(), 2)
-        self.__triton.infer("instance_init_del", self.__get_inputs((8,)))
+        self.__triton.infer("model_init_del", self.__get_inputs((8,)))
         # Unload model
-        self.__triton.unload_model("instance_init_del")
+        self.__triton.unload_model("model_init_del")
         time.sleep(10)  # wait for unload to complete
         self.assertEqual(get_initialize_count(), 3)
         self.assertEqual(get_finalize_count(), 3)
         with self.assertRaises(InferenceServerException):
-            self.__triton.infer("instance_init_del", self.__get_inputs((12,)))
+            self.__triton.infer("model_init_del", self.__get_inputs((12,)))
 
     def test_gpu_cpu_instance_mix(self):
         # Load model
         update_instance_group(
             "{\ncount: 2\nkind: KIND_CPU\n},\n{\ncount: 1\nkind: KIND_GPU\n}")
-        self.__triton.load_model("instance_init_del")
+        self.__triton.load_model("model_init_del")
         self.assertEqual(get_initialize_count(), 3)
         self.assertEqual(get_finalize_count(), 0)
-        self.__triton.infer("instance_init_del", self.__get_inputs((2,)))
+        self.__triton.infer("model_init_del", self.__get_inputs((2,)))
         # Add 2 GPU instance and remove 1 CPU instance
         update_instance_group(
             "{\ncount: 1\nkind: KIND_CPU\n},\n{\ncount: 3\nkind: KIND_GPU\n}")
-        self.__triton.load_model("instance_init_del")
+        self.__triton.load_model("model_init_del")
         self.assertEqual(get_initialize_count(), 5)
         self.assertEqual(get_finalize_count(), 1)
-        self.__triton.infer("instance_init_del", self.__get_inputs((1,)))
+        self.__triton.infer("model_init_del", self.__get_inputs((1,)))
         # Shuffle the instances
         update_instance_group(
             "{\ncount: 3\nkind: KIND_GPU\n},\n{\ncount: 1\nkind: KIND_CPU\n}")
-        self.__triton.load_model("instance_init_del")
+        self.__triton.load_model("model_init_del")
         self.assertEqual(get_initialize_count(), 5)
         self.assertEqual(get_finalize_count(), 1)
-        self.__triton.infer("instance_init_del", self.__get_inputs((4,)))
+        self.__triton.infer("model_init_del", self.__get_inputs((4,)))
         # Remove 1 GPU instance and add 1 CPU instance
         update_instance_group(
             "{\ncount: 2\nkind: KIND_GPU\n},\n{\ncount: 2\nkind: KIND_CPU\n}")
-        self.__triton.load_model("instance_init_del")
+        self.__triton.load_model("model_init_del")
         self.assertEqual(get_initialize_count(), 6)
         self.assertEqual(get_finalize_count(), 2)
-        self.__triton.infer("instance_init_del", self.__get_inputs((1,)))
+        self.__triton.infer("model_init_del", self.__get_inputs((1,)))
         # Unload model
-        self.__triton.unload_model("instance_init_del")
+        self.__triton.unload_model("model_init_del")
         time.sleep(10)  # wait for unload to complete
         self.assertEqual(get_initialize_count(), 6)
         self.assertEqual(get_finalize_count(), 6)
         with self.assertRaises(InferenceServerException):
-            self.__triton.infer("instance_init_del", self.__get_inputs((2,)))
+            self.__triton.infer("model_init_del", self.__get_inputs((2,)))
 
     def test_invalid_config(self):
         # Load model
         update_instance_group("{\ncount: 8\nkind: KIND_CPU\n}")
-        self.__triton.load_model("instance_init_del")
+        self.__triton.load_model("model_init_del")
         self.assertEqual(get_initialize_count(), 8)
         self.assertEqual(get_finalize_count(), 0)
-        self.__triton.infer("instance_init_del", self.__get_inputs((16,)))
+        self.__triton.infer("model_init_del", self.__get_inputs((16,)))
         # Invalid config
         update_instance_group("--- invalid config ---")
         with self.assertRaises(InferenceServerException):
-            self.__triton.load_model("instance_init_del")
+            self.__triton.load_model("model_init_del")
         # Correct config
         update_instance_group("{\ncount: 4\nkind: KIND_CPU\n}")
-        self.__triton.load_model("instance_init_del")
+        self.__triton.load_model("model_init_del")
         self.assertEqual(get_initialize_count(), 8)
         self.assertEqual(get_finalize_count(), 4)
-        self.__triton.infer("instance_init_del", self.__get_inputs((9,)))
+        self.__triton.infer("model_init_del", self.__get_inputs((9,)))
         # Unload model
-        self.__triton.unload_model("instance_init_del")
+        self.__triton.unload_model("model_init_del")
         time.sleep(10)  # wait for unload to complete
         self.assertEqual(get_initialize_count(), 8)
         self.assertEqual(get_finalize_count(), 8)
         with self.assertRaises(InferenceServerException):
-            self.__triton.infer("instance_init_del", self.__get_inputs((8,)))
+            self.__triton.infer("model_init_del", self.__get_inputs((8,)))
 
     def test_model_file_update(self):
         # Load model
         update_instance_group("{\ncount: 5\nkind: KIND_CPU\n}")
-        self.__triton.load_model("instance_init_del")
+        self.__triton.load_model("model_init_del")
         self.assertEqual(get_initialize_count(), 5)
         self.assertEqual(get_finalize_count(), 0)
-        self.__triton.infer("instance_init_del", self.__get_inputs((1,)))
+        self.__triton.infer("model_init_del", self.__get_inputs((1,)))
         # Update instance and model file
         update_instance_group("{\ncount: 6\nkind: KIND_CPU\n}")
         update_model_file()
-        self.__triton.load_model("instance_init_del")
+        self.__triton.load_model("model_init_del")
         time.sleep(10)  # wait for unload to complete
         self.assertEqual(get_initialize_count(), 11)
         self.assertEqual(get_finalize_count(), 5)
-        self.__triton.infer("instance_init_del", self.__get_inputs((3,)))
+        self.__triton.infer("model_init_del", self.__get_inputs((3,)))
         # Unload model
-        self.__triton.unload_model("instance_init_del")
+        self.__triton.unload_model("model_init_del")
         time.sleep(10)  # wait for unload to complete
         self.assertEqual(get_initialize_count(), 11)
         self.assertEqual(get_finalize_count(), 11)
         with self.assertRaises(InferenceServerException):
-            self.__triton.infer("instance_init_del", self.__get_inputs((4,)))
+            self.__triton.infer("model_init_del", self.__get_inputs((4,)))
 
     def test_more_than_instance_update(self):
         # Load model
         update_instance_group("{\ncount: 4\nkind: KIND_CPU\n}")
-        self.__triton.load_model("instance_init_del")
+        self.__triton.load_model("model_init_del")
         self.assertEqual(get_initialize_count(), 4)
         self.assertEqual(get_finalize_count(), 0)
-        self.__triton.infer("instance_init_del", self.__get_inputs((2,)))
+        self.__triton.infer("model_init_del", self.__get_inputs((2,)))
         # Update batching and instance
         enable_batching()
         update_instance_group("{\ncount: 2\nkind: KIND_CPU\n}")
-        self.__triton.load_model("instance_init_del")
+        self.__triton.load_model("model_init_del")
         time.sleep(10)  # wait for unload to complete
         self.assertEqual(get_initialize_count(), 6)
         self.assertEqual(get_finalize_count(), 4)
-        self.__triton.infer("instance_init_del", self.__get_inputs((1, 1)))
+        self.__triton.infer("model_init_del", self.__get_inputs((1, 1)))
         # Unload model
-        self.__triton.unload_model("instance_init_del")
+        self.__triton.unload_model("model_init_del")
         time.sleep(10)  # wait for unload to complete
         self.assertEqual(get_initialize_count(), 6)
         self.assertEqual(get_finalize_count(), 6)
         with self.assertRaises(InferenceServerException):
-            self.__triton.infer("instance_init_del", self.__get_inputs((1, 4)))
+            self.__triton.infer("model_init_del", self.__get_inputs((1, 4)))
 
     def test_update_while_inferencing(self):
         # Load model
         update_instance_group("{\ncount: 1\nkind: KIND_CPU\n}")
-        self.__triton.load_model("instance_init_del")
+        self.__triton.load_model("model_init_del")
         self.assertEqual(get_initialize_count(), 1)
         self.assertEqual(get_finalize_count(), 0)
-        self.__triton.infer("instance_init_del", self.__get_inputs((2,)))
+        self.__triton.infer("model_init_del", self.__get_inputs((2,)))
         # Add 1 instance while inferencing
         set_infer_delay(10)
         update_instance_group("{\ncount: 2\nkind: KIND_CPU\n}")
         with concurrent.futures.ThreadPoolExecutor() as pool:
             infer_start_time = time.time()
-            infer_thread = pool.submit(self.__triton.infer, "instance_init_del",
+            infer_thread = pool.submit(self.__triton.infer, "model_init_del",
                                        self.__get_inputs((1,)))
             time.sleep(2)  # make sure inference has started
             update_start_time = time.time()
             update_thread = pool.submit(self.__triton.load_model,
-                                        "instance_init_del")
+                                        "model_init_del")
             update_thread.result()
             update_end_time = time.time()
             infer_thread.result()
@@ -257,32 +257,32 @@ class TestInstanceUpdate(unittest.TestCase):
         self.assertLess(update_time, 5.0, "Update blocked by infer")
         self.assertEqual(get_initialize_count(), 2)
         self.assertEqual(get_finalize_count(), 0)
-        self.__triton.infer("instance_init_del", self.__get_inputs((8,)))
+        self.__triton.infer("model_init_del", self.__get_inputs((8,)))
         # Unload model
-        self.__triton.unload_model("instance_init_del")
+        self.__triton.unload_model("model_init_del")
         time.sleep(10)  # wait for unload to complete
         self.assertEqual(get_initialize_count(), 2)
         self.assertEqual(get_finalize_count(), 2)
         with self.assertRaises(InferenceServerException):
-            self.__triton.infer("instance_init_del", self.__get_inputs((4,)))
+            self.__triton.infer("model_init_del", self.__get_inputs((4,)))
 
     def test_infer_while_updating(self):
         # Load model
         update_instance_group("{\ncount: 1\nkind: KIND_CPU\n}")
-        self.__triton.load_model("instance_init_del")
+        self.__triton.load_model("model_init_del")
         self.assertEqual(get_initialize_count(), 1)
         self.assertEqual(get_finalize_count(), 0)
-        self.__triton.infer("instance_init_del", self.__get_inputs((2,)))
+        self.__triton.infer("model_init_del", self.__get_inputs((2,)))
         # Infer while adding 1 instance
         set_initialize_delay(10)
         update_instance_group("{\ncount: 2\nkind: KIND_CPU\n}")
         with concurrent.futures.ThreadPoolExecutor() as pool:
             update_start_time = time.time()
             update_thread = pool.submit(self.__triton.load_model,
-                                        "instance_init_del")
+                                        "model_init_del")
             time.sleep(2)  # make sure update has started
             infer_start_time = time.time()
-            infer_thread = pool.submit(self.__triton.infer, "instance_init_del",
+            infer_thread = pool.submit(self.__triton.infer, "model_init_del",
                                        self.__get_inputs((1,)))
             infer_thread.result()
             infer_end_time = time.time()
@@ -296,14 +296,14 @@ class TestInstanceUpdate(unittest.TestCase):
         self.assertLess(infer_time, 5.0, "Infer blocked by update")
         self.assertEqual(get_initialize_count(), 2)
         self.assertEqual(get_finalize_count(), 0)
-        self.__triton.infer("instance_init_del", self.__get_inputs((8,)))
+        self.__triton.infer("model_init_del", self.__get_inputs((8,)))
         # Unload model
-        self.__triton.unload_model("instance_init_del")
+        self.__triton.unload_model("model_init_del")
         time.sleep(10)  # wait for unload to complete
         self.assertEqual(get_initialize_count(), 2)
         self.assertEqual(get_finalize_count(), 2)
         with self.assertRaises(InferenceServerException):
-            self.__triton.infer("instance_init_del", self.__get_inputs((4,)))
+            self.__triton.infer("model_init_del", self.__get_inputs((4,)))
 
 
 if __name__ == "__main__":
