@@ -32,7 +32,7 @@ __model_name = "model_init_del"
 # Helper functions for reading/writing state to disk
 #
 
-def __get_count(filename):
+def __get_number(filename):
     full_path = os.path.join(os.environ["MODEL_LOG_DIR"], filename)
     try:
         with open(full_path, mode="r", encoding="utf-8", errors="strict") as f:
@@ -41,70 +41,54 @@ def __get_count(filename):
         txt = "0"
     return int(txt)
 
-def __store_count(filename, number):
+def __store_number(filename, number):
     full_path = os.path.join(os.environ["MODEL_LOG_DIR"], filename)
     txt = str(number)
     with open(full_path, mode="w", encoding="utf-8", errors="strict") as f:
         f.write(txt)
 
-def __inc_count(filename):
-    count = __get_count(filename)
-    count += 1
-    __store_count(filename, count)
-    return count
-
-def __reset_count(filename):
-    count = 0
-    __store_count(filename, count)
-    return count
+def __inc_number(filename):
+    number = __get_number(filename)
+    number += 1
+    __store_number(filename, number)
+    return number
 
 #
 # Functions for communicating initialize and finalize count between the model
 # and test
 #
 
-__initialize_count_filename = __model_name + "_initialize_count.txt"
-__finalize_count_filename = __model_name + "_finalize_count.txt"
+def __get_count_filename(kind):
+    if kind != "initialize" and kind != "finalize":
+        raise KeyError("Invalid count kind: " + str(kind))
+    filename = __model_name + "_" + kind + "_count.txt"
+    return filename
 
-def get_initialize_count():
-    return __get_count(__initialize_count_filename)
+def get_count(kind):
+    return __get_number(__get_count_filename(kind))
 
-def inc_initialize_count():
-    return __inc_count(__initialize_count_filename)
+def inc_count(kind):
+    return __inc_number(__get_count_filename(kind))
 
-def reset_initialize_count():
-    return __reset_count(__initialize_count_filename)
-
-def get_finalize_count():
-    return __get_count(__finalize_count_filename)
-
-def inc_finalize_count():
-    return __inc_count(__finalize_count_filename)
-
-def reset_finalize_count():
-    return __reset_count(__finalize_count_filename)
+def reset_count(kind):
+    count = 0
+    return __store_number(__get_count_filename(kind), count)
 
 #
 # Functions for communicating varies of delay (in seconds) to the model
 #
 
-__initialize_delay_filename = __model_name + "_initialize_delay.txt"
-__finalize_delay_filename = __model_name + "_finalize_delay.txt"
+def __get_delay_filename(kind):
+    if kind != "initialize" and kind != "infer":
+        raise KeyError("Invalid delay kind: " + str(kind))
+    filename = __model_name + "_" + kind + "_delay.txt"
+    return filename
 
-def get_initialize_delay():
-    delay = __get_count(__initialize_delay_filename)
-    return delay
+def get_delay(kind):
+    return __get_number(__get_delay_filename(kind))
 
-def set_initialize_delay(delay):
-    __store_count(__initialize_delay_filename, delay)
-    return delay
-
-def get_infer_delay():
-    delay = __get_count(__finalize_delay_filename)
-    return delay
-
-def set_infer_delay(delay):
-    __store_count(__finalize_delay_filename, delay)
+def set_delay(kind, delay):
+    __store_number(__get_delay_filename(kind), delay)
     return delay
 
 #
