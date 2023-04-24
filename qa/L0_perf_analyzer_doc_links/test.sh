@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-LOG="`pwd`/log.txt"
+LOG="`pwd`/doc_links.log"
 CONFIG="`pwd`/mkdocs.yml"
 RET=0
 
