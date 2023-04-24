@@ -100,6 +100,11 @@ class PerfAnalyzerScenario(Scenario):
     # Some class static variables
     command_ = "../clients/perf_analyzer"
     generation_mutex_ = threading.Lock()
+    # Perf Analyzer return codes that are acceptable for this test.
+    #   0: Success
+    #   2: Failed to get stable measurement. This test uses Perf Analyzer to
+    #      generate system load, so stable measurement is not required.
+    allowed_retcodes_ = [ 0, 2 ]
 
     class ModelOption:
         # 'concurrency_range' is a 3 element tuple/list that specifies
@@ -150,13 +155,16 @@ class PerfAnalyzerScenario(Scenario):
                     "{}:{}".format(sequence_id_range[0], sequence_id_range[1])
                 ]
 
-            completed_process = subprocess.run(arg_list,
-                                               text=True,
-                                               stdout=subprocess.PIPE,
-                                               stderr=subprocess.STDOUT)
+            result = subprocess.run(arg_list,
+                                    text=True,
+                                    stdout=subprocess.PIPE,
+                                    stderr=subprocess.STDOUT)
             # Write output to file before checking return code
-            print(completed_process.stdout, file=out_stream)
-            completed_process.check_returncode()
+            print(result.stdout, file=out_stream)
+
+            # Check return code and raise exception on bad return codes
+            if result.returncode not in PerfAnalyzerScenario.allowed_retcodes_:
+              result.check_returncode()
 
             # Read queue time and adjust concurrency
             with open(csv_file, newline='') as csvfile:
@@ -172,7 +180,7 @@ class PerfAnalyzerScenario(Scenario):
                             self.concurrency_range_[2] - 1,
                             self.concurrency_range_[0])
                     break
-            m = re.search(r'Request count: ([0-9]+)', completed_process.stdout)
+            m = re.search(r'Request count: ([0-9]+)', result.stdout)
             return int(m.group(1))
 
     def __init__(self,
