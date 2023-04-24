@@ -16,6 +16,16 @@ LOG="`pwd`/log.txt"
 CONFIG="`pwd`/mkdocs.yml"
 RET=0
 
+# Download necessary packages
+python3 -m pip install mkdocs
+python3 -m pip install mkdocs-htmlproofer-plugin==0.10.3
+
+#Download perf_analyzer docs
+TRITON_CLIENT_REPO_TAG="${TRITON_CLIENT_REPO_TAG:=main}" 
+git clone -b ${TRITON_CLIENT_REPO_TAG} https://github.com/triton-inference-server/client.git
+cp `pwd`/client/src/c++/perf_analyzer/README.md .
+cp -rf `pwd`/client/src/c++/perf_analyzer/docs .
+
 # Need to remove all links that start with -- or -. Mkdocs converts all -- to - for anchor links. 
 # This breaks all links to cli commands throughout the docs. This will iterate over all 
 # files in the docs directory and remove -- and - at the start of options, which allows the 
