@@ -42,17 +42,8 @@ class TestInstanceUpdate(unittest.TestCase):
     __model_name = "model_init_del"
 
     def setUp(self):
-        # Reset counters
-        reset_count("initialize")
-        reset_count("finalize")
-        # Reset batching
-        disable_batching()
-        # Reset delays
-        set_delay("initialize", 0)
-        set_delay("infer", 0)
         # Initialize client
-        self.__triton = grpcclient.InferenceServerClient("localhost:8001",
-                                                         verbose=True)
+        self.__triton = grpcclient.InferenceServerClient("localhost:8001")
 
     def __get_inputs(self, batching=False):
         self.assertIsInstance(batching, bool)
@@ -63,6 +54,22 @@ class TestInstanceUpdate(unittest.TestCase):
         inputs = [grpcclient.InferInput("INPUT0", shape, "FP32")]
         inputs[0].set_data_from_numpy(np.ones(shape, dtype=np.float32))
         return inputs
+
+    def __infer(self, batching=False):
+        self.__triton.infer(self.__model_name, self.__get_inputs(batching))
+
+    def __concurrent_infer(self, concurrency=4, batching=False):
+        pool = concurrent.futures.ThreadPoolExecutor()
+        stop = [False]
+        def repeat_infer():
+            while not stop[0]:
+                self.__infer()
+        infer_threads = [pool.submit(repeat_infer) for i in range(concurrency)]
+        def stop_infer():
+            stop[0] = True
+            [t.result() for t in infer_threads]
+            pool.shutdown()
+        return stop_infer
 
     def __poll_finalize_count(self, expected_finalize_count):
         timeout = 30  # seconds
@@ -75,6 +82,15 @@ class TestInstanceUpdate(unittest.TestCase):
             num_retry += 1
 
     def __load_model(self, instance_count, instance_config=""):
+        # Reset counters
+        reset_count("initialize")
+        reset_count("finalize")
+        # Reset batching
+        disable_batching()
+        # Reset delays
+        set_delay("initialize", 0)
+        set_delay("infer", 0)
+        # Load model
         self.__update_instance_count(instance_count, 0, instance_config)
 
     def __update_instance_count(self,
@@ -104,7 +120,7 @@ class TestInstanceUpdate(unittest.TestCase):
         if wait_for_finalize:
             self.__poll_finalize_count(new_finalize_count)
         self.assertEqual(get_count("finalize"), new_finalize_count)
-        self.__triton.infer(self.__model_name, self.__get_inputs(batching))
+        self.__infer(batching)
 
     def __unload_model(self, batching=False):
         prev_initialize_count = get_count("initialize")
@@ -113,22 +129,26 @@ class TestInstanceUpdate(unittest.TestCase):
         self.assertEqual(get_count("initialize"), prev_initialize_count)
         self.assertEqual(get_count("finalize"), prev_initialize_count)
         with self.assertRaises(InferenceServerException):
-            self.__triton.infer(self.__model_name, self.__get_inputs(batching))
+            self.__infer(batching)
 
     # Test add -> remove -> add an instance
     def test_add_rm_add_instance(self):
         self.__load_model(3)
+        stop = self.__concurrent_infer()
         self.__update_instance_count(1, 0)  # add 1 instance
         self.__update_instance_count(0, 1)  # remove 1 instance
         self.__update_instance_count(1, 0)  # add 1 instance
+        stop()
         self.__unload_model()
 
     # Test remove -> add -> remove an instance
     def test_rm_add_rm_instance(self):
         self.__load_model(2)
+        stop = self.__concurrent_infer()
         self.__update_instance_count(0, 1)  # remove 1 instance
         self.__update_instance_count(1, 0)  # add 1 instance
         self.__update_instance_count(0, 1)  # remove 1 instance
+        stop()
         self.__unload_model()
 
     # Test reduce instance count to zero
@@ -220,8 +240,7 @@ class TestInstanceUpdate(unittest.TestCase):
         update_instance_group("{\ncount: 2\nkind: KIND_CPU\n}")
         with concurrent.futures.ThreadPoolExecutor() as pool:
             infer_start_time = time.time()
-            infer_thread = pool.submit(self.__triton.infer, self.__model_name,
-                                       self.__get_inputs())
+            infer_thread = pool.submit(self.__infer)
             time.sleep(2)  # make sure inference has started
             update_start_time = time.time()
             update_thread = pool.submit(self.__triton.load_model,
@@ -238,7 +257,7 @@ class TestInstanceUpdate(unittest.TestCase):
         self.assertLess(update_time, 5.0, "Update blocked by infer")
         self.assertEqual(get_count("initialize"), 2)
         self.assertEqual(get_count("finalize"), 0)
-        self.__triton.infer(self.__model_name, self.__get_inputs())
+        self.__infer()
         # Unload model
         self.__unload_model()
 
@@ -255,8 +274,7 @@ class TestInstanceUpdate(unittest.TestCase):
                                         self.__model_name)
             time.sleep(2)  # make sure update has started
             infer_start_time = time.time()
-            infer_thread = pool.submit(self.__triton.infer, self.__model_name,
-                                       self.__get_inputs())
+            infer_thread = pool.submit(self.__infer)
             infer_thread.result()
             infer_end_time = time.time()
             update_thread.result()
@@ -269,7 +287,7 @@ class TestInstanceUpdate(unittest.TestCase):
         self.assertLess(infer_time, 5.0, "Infer blocked by update")
         self.assertEqual(get_count("initialize"), 2)
         self.assertEqual(get_count("finalize"), 0)
-        self.__triton.infer(self.__model_name, self.__get_inputs())
+        self.__infer()
         # Unload model
         self.__unload_model()
 

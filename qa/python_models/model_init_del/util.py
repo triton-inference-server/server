@@ -49,9 +49,19 @@ def __store_number(filename, number):
         f.flush()
 
 def __inc_number(filename):
-    number = __get_number(filename)
-    number += 1
-    __store_number(filename, number)
+    full_path = os.path.join(os.environ["MODEL_LOG_DIR"], filename)
+    try:
+        with open(full_path, mode="r+", encoding="utf-8", errors="strict") as f:
+            txt = f.read()
+            number = int(txt) + 1
+            txt = str(number)
+            f.truncate(0)
+            f.seek(0)
+            f.write(txt)
+            f.flush()
+    except FileNotFoundError:
+        number = 1
+        __store_number(filename, number)
     return number
 
 #
@@ -73,7 +83,8 @@ def inc_count(kind):
 
 def reset_count(kind):
     count = 0
-    return __store_number(__get_count_filename(kind), count)
+    __store_number(__get_count_filename(kind), count)
+    return count
 
 #
 # Functions for communicating varies of delay (in seconds) to the model
