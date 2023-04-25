@@ -25,6 +25,7 @@
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 import os
+import fcntl
 
 __model_name = "model_init_del"
 
@@ -36,6 +37,7 @@ def __get_number(filename):
     full_path = os.path.join(os.environ["MODEL_LOG_DIR"], filename)
     try:
         with open(full_path, mode="r", encoding="utf-8", errors="strict") as f:
+            fcntl.lockf(f, fcntl.LOCK_SH)
             txt = f.read()
     except FileNotFoundError:
         txt = "0"
@@ -45,20 +47,20 @@ def __store_number(filename, number):
     full_path = os.path.join(os.environ["MODEL_LOG_DIR"], filename)
     txt = str(number)
     with open(full_path, mode="w", encoding="utf-8", errors="strict") as f:
+        fcntl.lockf(f, fcntl.LOCK_EX)
         f.write(txt)
-        f.flush()
 
 def __inc_number(filename):
     full_path = os.path.join(os.environ["MODEL_LOG_DIR"], filename)
     try:
         with open(full_path, mode="r+", encoding="utf-8", errors="strict") as f:
+            fcntl.lockf(f, fcntl.LOCK_EX)
             txt = f.read()
             number = int(txt) + 1
             txt = str(number)
             f.truncate(0)
             f.seek(0)
             f.write(txt)
-            f.flush()
     except FileNotFoundError:
         number = 1
         __store_number(filename, number)
@@ -118,14 +120,12 @@ def update_instance_group(instance_group_str):
         f.truncate(0)
         f.seek(0)
         f.write(txt)
-        f.flush()
     return txt
 
 def update_model_file():
     full_path = os.path.join(os.path.dirname(__file__), "1", "model.py")
     with open(full_path, mode="a", encoding="utf-8", errors="strict") as f:
         f.write("\n# dummy model file update\n")
-        f.flush()
 
 def enable_batching():
     full_path = os.path.join(os.path.dirname(__file__), "config.pbtxt")
@@ -135,7 +135,6 @@ def enable_batching():
         f.truncate(0)
         f.seek(0)
         f.write(txt)
-        f.flush()
     return txt
 
 def disable_batching():
@@ -146,5 +145,4 @@ def disable_batching():
         f.truncate(0)
         f.seek(0)
         f.write(txt)
-        f.flush()
     return txt

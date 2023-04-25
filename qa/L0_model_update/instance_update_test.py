@@ -71,15 +71,17 @@ class TestInstanceUpdate(unittest.TestCase):
             pool.shutdown()
         return stop_infer
 
-    def __poll_finalize_count(self, expected_finalize_count):
-        timeout = 30  # seconds
-        poll_interval = 0.1  # seconds
-        max_retry = timeout / poll_interval
-        num_retry = 0
-        while (num_retry < max_retry and
-               get_count("finalize") < expected_finalize_count):
-            time.sleep(poll_interval)
-            num_retry += 1
+    def __check_count(self, kind, expected_count, poll=False):
+        self.assertIsInstance(poll, bool)
+        if poll:
+            timeout = 30  # seconds
+            poll_interval = 0.1  # seconds
+            max_retry = timeout / poll_interval
+            num_retry = 0
+            while num_retry < max_retry and get_count(kind) < expected_count:
+                time.sleep(poll_interval)
+                num_retry += 1
+        self.assertEqual(get_count(kind), expected_count)
 
     def __load_model(self, instance_count, instance_config=""):
         # Reset counters
@@ -104,7 +106,6 @@ class TestInstanceUpdate(unittest.TestCase):
         self.assertIsInstance(del_count, int)
         self.assertGreaterEqual(del_count, 0)
         self.assertIsInstance(instance_config, str)
-        self.assertIsInstance(wait_for_finalize, bool)
         prev_initialize_count = get_count("initialize")
         prev_finalize_count = get_count("finalize")
         new_initialize_count = prev_initialize_count + add_count
@@ -116,18 +117,15 @@ class TestInstanceUpdate(unittest.TestCase):
                                "\nkind: KIND_CPU\n}")
         update_instance_group(instance_config)
         self.__triton.load_model(self.__model_name)
-        self.assertEqual(get_count("initialize"), new_initialize_count)
-        if wait_for_finalize:
-            self.__poll_finalize_count(new_finalize_count)
-        self.assertEqual(get_count("finalize"), new_finalize_count)
+        self.__check_count("initialize", new_initialize_count)
+        self.__check_count("finalize", new_finalize_count, wait_for_finalize)
         self.__infer(batching)
 
     def __unload_model(self, batching=False):
         prev_initialize_count = get_count("initialize")
         self.__triton.unload_model(self.__model_name)
-        self.__poll_finalize_count(prev_initialize_count)
-        self.assertEqual(get_count("initialize"), prev_initialize_count)
-        self.assertEqual(get_count("finalize"), prev_initialize_count)
+        self.__check_count("initialize", prev_initialize_count)
+        self.__check_count("finalize", prev_initialize_count, True)
         with self.assertRaises(InferenceServerException):
             self.__infer(batching)
 
@@ -255,8 +253,8 @@ class TestInstanceUpdate(unittest.TestCase):
         # ongoing inference should not block the update.
         self.assertGreaterEqual(infer_time, 10.0, "Invalid infer time")
         self.assertLess(update_time, 5.0, "Update blocked by infer")
-        self.assertEqual(get_count("initialize"), 2)
-        self.assertEqual(get_count("finalize"), 0)
+        self.__check_count("initialize", 2)
+        self.__check_count("finalize", 0)
         self.__infer()
         # Unload model
         self.__unload_model()
@@ -285,8 +283,8 @@ class TestInstanceUpdate(unittest.TestCase):
         # existing instances.
         self.assertGreaterEqual(update_time, 10.0, "Invalid update time")
         self.assertLess(infer_time, 5.0, "Infer blocked by update")
-        self.assertEqual(get_count("initialize"), 2)
-        self.assertEqual(get_count("finalize"), 0)
+        self.__check_count("initialize", 2)
+        self.__check_count("finalize", 0)
         self.__infer()
         # Unload model
         self.__unload_model()
