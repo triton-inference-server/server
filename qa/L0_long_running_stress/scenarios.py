@@ -180,8 +180,13 @@ class PerfAnalyzerScenario(Scenario):
                             self.concurrency_range_[2] - 1,
                             self.concurrency_range_[0])
                     break
+            # Parse request count, return 0 if allowed failure occurs
             m = re.search(r'Request count: ([0-9]+)', result.stdout)
-            return int(m.group(1))
+            
+            request_count = 0
+            if m and m.group(1):
+              request_count = int(m.group(1))
+            return request_count
 
     def __init__(self,
                  name,
