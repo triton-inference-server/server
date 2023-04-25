@@ -24,6 +24,7 @@
 # (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
+import cupy as cp
 import numpy as np
 import unittest
 import torch
@@ -46,15 +47,15 @@ class PBTensorTest(unittest.TestCase):
             pb_tensor = pb_utils.Tensor.from_dlpack('test_tensor',
                                                     dlpack_tensor)
             self.assertTrue(
-                np.all(pb_tensor.as_numpy() == pytorch_tensor.numpy()))
+                np.array_equal(pb_tensor.as_numpy(), pytorch_tensor.numpy()))
 
             # Convert the tensor back to DLPack and ensure that both tensors are
             # the same
             pytorch_tensor_dlpack = from_dlpack(pb_tensor.to_dlpack())
-            self.assertTrue(torch.all(pytorch_tensor_dlpack == pytorch_tensor))
+            self.assertTrue(torch.equal(pytorch_tensor_dlpack, pytorch_tensor))
 
-            self.assertTrue(
-                pytorch_tensor.type() == pytorch_tensor_dlpack.type())
+            self.assertEqual(
+                pytorch_tensor.type(), pytorch_tensor_dlpack.type())
 
             # Now let's check that upgraded DLPack implementation also
             # works as expected, i.e. from_dlpack should work with 
@@ -62,16 +63,16 @@ class PBTensorTest(unittest.TestCase):
 
             pb_tensor_upgraded = pb_utils.Tensor.from_dlpack('test_tensor',
                                                     pytorch_tensor)
-            self.assertTrue(
-                np.all(pb_tensor_upgraded.as_numpy() == pytorch_tensor.numpy()))
+            self.assertTrue(np.array_equal(
+                pb_tensor_upgraded.as_numpy(), pytorch_tensor.numpy()))
 
             # Here we check that `pb_tensor` as a producer, properly
             # invokes `__dlpack__` and `__dlpack_device__`
             pytorch_tensor_dlpack = from_dlpack(pb_tensor_upgraded)
-            self.assertTrue(torch.all(pytorch_tensor_dlpack == pytorch_tensor))
+            self.assertTrue(torch.equal(pytorch_tensor_dlpack, pytorch_tensor))
 
-            self.assertTrue(
-                pytorch_tensor.type() == pytorch_tensor_dlpack.type())  
+            self.assertEqual(
+                pytorch_tensor.type(), pytorch_tensor_dlpack.type())  
 
     def test_non_contiguous_error(self):
         pytorch_tensor = torch.rand([20, 30], dtype=torch.float16)
@@ -118,18 +119,18 @@ class PBTensorTest(unittest.TestCase):
             # Convert the tensor back to DLPack and ensure that both tensors are
             # the same
             pytorch_tensor_dlpack = from_dlpack(pb_tensor.to_dlpack())
-            self.assertTrue(torch.all(pytorch_tensor_dlpack == pytorch_tensor))
-            self.assertTrue(
-                pytorch_tensor.type() == pytorch_tensor_dlpack.type())
+            self.assertTrue(torch.equal(pytorch_tensor_dlpack, pytorch_tensor))
+            self.assertEqual(
+                pytorch_tensor.type(), pytorch_tensor_dlpack.type())
             
             # Now we make sure that updated DLPack implementation works
             # with GPU as well
             pb_tensor = pb_utils.Tensor.from_dlpack('test_tensor',
                                                     pytorch_tensor)
             pytorch_tensor_dlpack = from_dlpack(pb_tensor)
-            self.assertTrue(torch.all(pytorch_tensor_dlpack == pytorch_tensor))
-            self.assertTrue(
-                pytorch_tensor.type() == pytorch_tensor_dlpack.type())
+            self.assertTrue(torch.equal(pytorch_tensor_dlpack, pytorch_tensor))
+            self.assertEqual(
+                pytorch_tensor.type(), pytorch_tensor_dlpack.type())
             
 
     def test_dlpack_gpu_numpy(self):
@@ -141,7 +142,8 @@ class PBTensorTest(unittest.TestCase):
         # Make sure that `__dlpack_device__` works as expected
         self.assertFalse(pb_tensor.is_cpu())
         self.assertTrue(pytorch_tensor.is_cuda)
-        self.assertEqual(pb_tensor.__dlpack_device__(), pytorch_tensor.__dlpack_device__())
+        self.assertEqual(
+            pb_tensor.__dlpack_device__(), pytorch_tensor.__dlpack_device__())
     
         with self.assertRaises(Exception) as e:
             pb_tensor.as_numpy()
@@ -156,11 +158,13 @@ class PBTensorTest(unittest.TestCase):
                                     device='cpu') * 100
         pb_tensor = pb_utils.Tensor.from_dlpack('tensor', pytorch_tensor)
         numpy_tensor_dlpack = np.from_dlpack(pb_tensor)
-        self.assertTrue(np.all(numpy_tensor_dlpack == pytorch_tensor.numpy()))
+        self.assertTrue(np.array_equal(
+            numpy_tensor_dlpack, pytorch_tensor.numpy()))
         # Make sure that `__dlpack_device__` works as expected
         self.assertTrue(pb_tensor.is_cpu())
         self.assertFalse(pytorch_tensor.is_cuda)
-        self.assertEqual(pb_tensor.__dlpack_device__(), pytorch_tensor.__dlpack_device__())
+        self.assertEqual(
+            pb_tensor.__dlpack_device__(), pytorch_tensor.__dlpack_device__())
     
     def test_bool_datatype(self):
         # [FIXME] pass bool_array directly to `pb_utils.Tensor.from_dlpack`,
@@ -168,7 +172,64 @@ class PBTensorTest(unittest.TestCase):
         bool_array = np.asarray([False, True])
         bool_tensor = pb_utils.Tensor('tensor', bool_array)
         bool_tensor_dlpack = pb_utils.Tensor.from_dlpack('tensor', bool_tensor)
-        self.assertTrue(np.all(bool_array == bool_tensor_dlpack.as_numpy()))
+        self.assertTrue(
+            np.array_equal(bool_array, bool_tensor_dlpack.as_numpy()))
+    
+    def test_cuda_multi_stream(self):
+        s1 = torch.cuda.Stream()
+        size = 5000
+        pytorch_tensor = torch.tensor([0,0,0,0], device='cuda')
+        expected_output = torch.tensor([2,2,2,2], device='cuda')
+        with torch.cuda.stream(s1):
+            matrix_a = torch.randn(size,size, device='cuda')
+            res = torch.matmul(matrix_a,matrix_a)
+            for _ in range(1000):
+                res = torch.matmul(res,matrix_a)
+            pytorch_tensor += torch.tensor([2,2,2,2], device='cuda')
+        
+        pb_tensor = pb_utils.Tensor.from_dlpack('tensor', pytorch_tensor)
+        pytorch_tensor_dlpack = from_dlpack(pb_tensor)
+        self.assertTrue(torch.equal(pytorch_tensor_dlpack, expected_output))
+    
+    def test_cuda_non_blocking_multi_stream(self):
+        s1 = cp.cuda.Stream(non_blocking=True)
+        size = 5000
+        cupy_tensor = cp.array([0,0,0,0])
+        expected_output = cp.array([2,2,2,2])
+        with s1:
+            matrix_a = cp.random.rand(size,size)
+            res = cp.matmul(matrix_a,matrix_a)
+            for _ in range(1000):
+                res = cp.matmul(res,matrix_a)
+            cupy_tensor += cp.array([2,2,2,2])
+        
+        pb_tensor = pb_utils.Tensor.from_dlpack('tensor', cupy_tensor)
+        # Verify that non-blocking stream has no pending jobs left
+        self.assertTrue(s1.done)
+        cupy_tensor_dlpack = cp.from_dlpack(pb_tensor)
+        self.assertTrue(cp.array_equal(cupy_tensor_dlpack, expected_output))
+        self.assertFalse(pb_tensor.is_cpu())
+        self.assertEqual(
+            pb_tensor.__dlpack_device__(), cupy_tensor.__dlpack_device__())
+    
+    def test_cuda_non_blocking_multi_gpu(self):
+        size = 5000
+        expected_output = cp.array([2,2,2,2])
+        with cp.cuda.Device(1):
+            cupy_tensor = cp.array([0,0,0,0])
+            matrix_a = cp.random.rand(size,size)
+            res = cp.matmul(matrix_a,matrix_a)
+            for _ in range(1000):
+                res = cp.matmul(res,matrix_a)
+            cupy_tensor += cp.array([2,2,2,2])
+        with cp.cuda.Device(0):
+            pb_tensor = pb_utils.Tensor.from_dlpack('tensor', cupy_tensor)
+            cupy_tensor_dlpack = cp.from_dlpack(pb_tensor)
+            self.assertTrue(cp.array_equal(cupy_tensor_dlpack, expected_output))
+            self.assertFalse(pb_tensor.is_cpu())
+            self.assertEqual(
+                pb_tensor.__dlpack_device__(), cupy_tensor.__dlpack_device__())
+
 
 
 class TritonPythonModel:

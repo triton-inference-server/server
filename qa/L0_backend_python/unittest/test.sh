@@ -43,6 +43,9 @@ pip3 uninstall -y torch
 pip3 install torch==1.13.0+cu117 -f https://download.pytorch.org/whl/torch_stable.html
 pip3 install tensorflow
 
+# Install CuPy for testing non_blocking compute streams
+pip3 install cupy-cuda12x
+
 rm -fr *.log ./models
 
 mkdir -p models/dlpack_test/1/
