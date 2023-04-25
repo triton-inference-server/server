@@ -31,6 +31,34 @@ from mlflow.exceptions import MlflowException
 
 class Config(dict):
 
+    def __init__(self):
+        super().__init__()
+        self.s3_regex = re.compile(
+            's3://(http://|https://|)([0-9a-zA-Z\\-.]+):([0-9]+)/'
+            '([0-9a-z.\\-]+)(((/[0-9a-zA-Z.\\-_]+)*)?)')
+        self['triton_url'] = os.environ.get('TRITON_URL')
+        self['triton_model_repo'] = os.environ.get('TRITON_MODEL_REPO')
+
+        if self['triton_model_repo'].startswith('s3://'):
+            uri = self.parse_path(self['triton_model_repo'])
+            if uri.protocol == "https://":
+                protocol = "https://"
+            else:
+                protocol = "http://"
+            endpoint_url = None
+            if uri.host_name != "" and uri.host_port != "":
+                endpoint_url = '{}{}:{}'.format(
+                    protocol, uri.host_name, uri.host_port)
+
+            import boto3
+            # boto3 handles AWS credentials
+            self['s3'] = boto3.client(
+                's3', endpoint_url=endpoint_url)
+            self['s3_bucket'] = uri.bucket
+            self['s3_prefix'] = uri.prefix
+            self['triton_model_repo'] = 's3://{}'.format(
+                os.path.join(uri.bucket, uri.prefix))
+
     def parse_path(self, path):
         # Cleanup extra slashes
         clean_path = self.clean_path(path)
@@ -107,31 +135,3 @@ class Config(dict):
                 previous_slash = False
 
         return clean_path
-
-    def __init__(self):
-        super().__init__()
-        self.s3_regex = re.compile(
-            's3://(http://|https://|)([0-9a-zA-Z\\-.]+):([0-9]+)/'
-            '([0-9a-z.\\-]+)(((/[0-9a-zA-Z.\\-_]+)*)?)')
-        self['triton_url'] = os.environ.get('TRITON_URL')
-        self['triton_model_repo'] = os.environ.get('TRITON_MODEL_REPO')
-
-        if self['triton_model_repo'].startswith('s3://'):
-            uri = self.parse_path(self['triton_model_repo'])
-            if uri.protocol == "https://":
-                scheme = "https://"
-            else:
-                scheme = "http://"
-            endpoint_url = None
-            if uri.host_name != "" and uri.host_port != "":
-                endpoint_url = '{}{}:{}'.format(
-                    scheme, uri.host_name, uri.host_port)
-            import boto3
-            # boto3 handles AWS credentials
-            self['s3'] = boto3.client(
-                's3', endpoint_url=endpoint_url)
-            self['s3_bucket'] = uri.bucket
-            self['s3_prefix'] = uri.prefix
-            self['triton_model_repo'] = 's3://{}'.format(
-                '/'.join(filter(None, [uri.bucket, uri.prefix])))
-

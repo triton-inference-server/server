@@ -190,8 +190,8 @@ class TritonPlugin(BaseDeploymentClient):
                 if 's3' in self.server_config:
                     meta_dict = ast.literal_eval(self.server_config['s3'].get_object(
                         Bucket=self.server_config['s3_bucket'],
-                        Key='/'.join(filter(
-                            None, [self.server_config['s3_prefix'], d['name'], _MLFLOW_META_FILENAME])),
+                        Key=os.path.join(
+                            self.server_config['s3_prefix'], d['name'], _MLFLOW_META_FILENAME),
                     )['Body'].read().decode('utf-8'))
                 elif os.path.isfile(mlflow_meta_path):
                     meta_dict = self._get_mlflow_meta_dict(d['name'])
@@ -278,8 +278,8 @@ class TritonPlugin(BaseDeploymentClient):
             self.server_config['s3'].put_object(
                 Body=json.dumps(meta_dict, indent=4).encode('utf-8'),
                 Bucket=self.server_config["s3_bucket"],
-                Key='/'.join(filter(None,
-                             [self.server_config['s3_prefix'], name, _MLFLOW_META_FILENAME])),
+                Key=os.path.join(
+                    self.server_config['s3_prefix'], name, _MLFLOW_META_FILENAME),
             )
         else:
             with open(os.path.join(triton_deployment_dir, _MLFLOW_META_FILENAME),
@@ -295,8 +295,8 @@ class TritonPlugin(BaseDeploymentClient):
         if 's3' in self.server_config:
             mlflow_meta_dict = ast.literal_eval(self.server_config['s3'].get_object(
                 Bucket=self.server_config['s3_bucket'],
-                Key='/'.join(filter(None,
-                             [self.server_config['s3_prefix'], name, _MLFLOW_META_FILENAME]))
+                Key=os.path.join(
+                    self.server_config['s3_prefix'], name, _MLFLOW_META_FILENAME),
             )['Body'].read().decode('utf-8'))
         else:
             with open(mlflow_meta_path, 'r') as metafile:
@@ -398,8 +398,8 @@ default_model_filename: "{}"
                                 local_path,
                                 copy_paths[key]['from'],
                             )
-                            s3_path = '/'.join(
-                                filter(None, [self.server_config['s3_prefix'], name, rel_path]))
+                            s3_path = os.path.join(
+                                self.server_config['s3_prefix'], name, rel_path)
 
                         self.server_config['s3'].upload_file(
                             local_path,
@@ -440,8 +440,7 @@ default_model_filename: "{}"
         if 's3' in self.server_config:
             objs = self.server_config['s3'].list_objects(
                 Bucket=self.server_config['s3_bucket'],
-                Prefix='/'.join(filter(None,
-                                [self.server_config['s3_prefix'], name])),
+                Prefix=os.path.join(self.server_config['s3_prefix'], name),
             )
 
             for key in objs['Contents']:
