@@ -55,7 +55,7 @@ if [ "$TRITON_PERF_LONG" == 1 ]; then
     EMAIL_SUBJECT="Long"
 else
     # ~ 10 minutes
-    TEST_DURATION=${TEST_DURATION:-"600"}
+    TEST_DURATION=${TRITON_TEST_DURATION:-"600"}
     LOAD_THREAD_COUNT=0
     EMAIL_SUBJECT=""
 fi
