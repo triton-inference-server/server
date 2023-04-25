@@ -1,5 +1,5 @@
 #!/bin/bash
-# Copyright 2019-2022, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright 2019-2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -93,15 +93,21 @@ else
                     ${SERVICE_ARGS}
     set -e
 fi
+
 set +e
+set -o pipefail
+PA_MAX_TRIALS=${PA_MAX_TRIALS:-"50"}
 # Measure perf client results and write them to a file for reporting
 $PERF_CLIENT -v -m $MODEL_NAME -p${MEASUREMENT_WINDOW} \
                 -b${STATIC_BATCH} --concurrency-range ${CONCURRENCY} \
+                --max-trials "${PA_MAX_TRIALS}" \
                 ${SERVICE_ARGS} \
                 -f ${NAME}.csv 2>&1 | tee ${NAME}.log
 if (( $? != 0 )); then
+    echo -e "\n***\n*** FAILED Perf Analyzer measurement\n***"
     RET=1
 fi
+set +o pipefail
 set -e
 
 echo -e "[{\"s_benchmark_kind\":\"benchmark_perf\"," >> ${NAME}.tjson
