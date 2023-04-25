@@ -81,14 +81,14 @@ class TestInstanceUpdate(unittest.TestCase):
                                 add_count,
                                 del_count,
                                 instance_config="",
-                                model_will_reload=False,
+                                wait_for_finalize=False,
                                 batching=False):
         self.assertIsInstance(add_count, int)
         self.assertGreaterEqual(add_count, 0)
         self.assertIsInstance(del_count, int)
         self.assertGreaterEqual(del_count, 0)
         self.assertIsInstance(instance_config, str)
-        self.assertIsInstance(model_will_reload, bool)
+        self.assertIsInstance(wait_for_finalize, bool)
         prev_initialize_count = get_count("initialize")
         prev_finalize_count = get_count("finalize")
         new_initialize_count = prev_initialize_count + add_count
@@ -101,14 +101,13 @@ class TestInstanceUpdate(unittest.TestCase):
         update_instance_group(instance_config)
         self.__triton.load_model(self.__model_name)
         self.assertEqual(get_count("initialize"), new_initialize_count)
-        if model_will_reload:
+        if wait_for_finalize:
             self.__poll_finalize_count(new_finalize_count)
         self.assertEqual(get_count("finalize"), new_finalize_count)
         self.__triton.infer(self.__model_name, self.__get_inputs(batching))
 
     def __unload_model(self, batching=False):
         prev_initialize_count = get_count("initialize")
-        prev_finalize_count = get_count("finalize")
         self.__triton.unload_model(self.__model_name)
         self.__poll_finalize_count(prev_initialize_count)
         self.assertEqual(get_count("initialize"), prev_initialize_count)
@@ -130,6 +129,14 @@ class TestInstanceUpdate(unittest.TestCase):
         self.__update_instance_count(0, 1)  # remove 1 instance
         self.__update_instance_count(1, 0)  # add 1 instance
         self.__update_instance_count(0, 1)  # remove 1 instance
+        self.__unload_model()
+
+    # Test reduce instance count to zero
+    def test_rm_instance_to_zero(self):
+        self.__load_model(1)
+        # Setting instance group count to 0 will be overwritten to 1, so no
+        # instances should be created or removed.
+        self.__update_instance_count(0, 0, "{\ncount: 0\nkind: KIND_CPU\n}")
         self.__unload_model()
 
     # Test add/remove multiple CPU instances at a time
@@ -190,7 +197,7 @@ class TestInstanceUpdate(unittest.TestCase):
         self.__update_instance_count(6,
                                      5,
                                      "{\ncount: 6\nkind: KIND_CPU\n}",
-                                     model_will_reload=True)
+                                     wait_for_finalize=True)
         self.__unload_model()
 
     # Test instance update with non instance config changed in config.pbtxt
@@ -200,7 +207,7 @@ class TestInstanceUpdate(unittest.TestCase):
         self.__update_instance_count(2,
                                      4,
                                      "{\ncount: 2\nkind: KIND_CPU\n}",
-                                     model_will_reload=True,
+                                     wait_for_finalize=True,
                                      batching=True)
         self.__unload_model(batching=True)
 
