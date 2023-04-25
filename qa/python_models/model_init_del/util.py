@@ -46,6 +46,7 @@ def __store_number(filename, number):
     txt = str(number)
     with open(full_path, mode="w", encoding="utf-8", errors="strict") as f:
         f.write(txt)
+        f.flush()
 
 def __inc_number(filename):
     number = __get_number(filename)
@@ -106,12 +107,14 @@ def update_instance_group(instance_group_str):
         f.truncate(0)
         f.seek(0)
         f.write(txt)
+        f.flush()
     return txt
 
 def update_model_file():
     full_path = os.path.join(os.path.dirname(__file__), "1", "model.py")
     with open(full_path, mode="a", encoding="utf-8", errors="strict") as f:
         f.write("\n# dummy model file update\n")
+        f.flush()
 
 def enable_batching():
     full_path = os.path.join(os.path.dirname(__file__), "config.pbtxt")
@@ -121,6 +124,7 @@ def enable_batching():
         f.truncate(0)
         f.seek(0)
         f.write(txt)
+        f.flush()
     return txt
 
 def disable_batching():
@@ -131,4 +135,5 @@ def disable_batching():
         f.truncate(0)
         f.seek(0)
         f.write(txt)
+        f.flush()
     return txt
