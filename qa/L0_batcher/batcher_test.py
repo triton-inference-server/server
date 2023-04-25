@@ -210,7 +210,8 @@ class BatcherTest(tu.TestResultCollector):
         # inference statistics to be ready.
         num_tries = 10
         for i in range(num_tries):
-            stats = self.triton_client_.get_inference_statistics(model_name, "1")
+            stats = self.triton_client_.get_inference_statistics(
+                model_name, "1")
             self.assertEqual(len(stats.model_stats), 1, "expect 1 model stats")
             actual_exec_cnt = stats.model_stats[0].execution_count
             if actual_exec_cnt == exec_count:
