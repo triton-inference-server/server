@@ -116,6 +116,7 @@ class TestInstanceUpdate(unittest.TestCase):
         with self.assertRaises(InferenceServerException):
             self.__triton.infer(self.__model_name, self.__get_inputs(batching))
 
+    # Test add -> remove -> add an instance
     def test_add_rm_add_instance(self):
         self.__load_model(3)
         self.__update_instance_count(1, 0)  # add 1 instance
@@ -123,6 +124,7 @@ class TestInstanceUpdate(unittest.TestCase):
         self.__update_instance_count(1, 0)  # add 1 instance
         self.__unload_model()
 
+    # Test remove -> add -> remove an instance
     def test_rm_add_rm_instance(self):
         self.__load_model(2)
         self.__update_instance_count(0, 1)  # remove 1 instance
@@ -130,6 +132,7 @@ class TestInstanceUpdate(unittest.TestCase):
         self.__update_instance_count(0, 1)  # remove 1 instance
         self.__unload_model()
 
+    # Test add/remove multiple CPU instances at a time
     def test_cpu_instance_update(self):
         self.__load_model(8)
         self.__update_instance_count(0, 4)  # remove 4 instances
@@ -139,12 +142,14 @@ class TestInstanceUpdate(unittest.TestCase):
         self.__update_instance_count(5, 0)  # add 5 instances
         self.__unload_model()
 
+    # Test add/remove multiple GPU instances at a time
     def test_gpu_instance_update(self):
         self.__load_model(6, "{\ncount: 6\nkind: KIND_GPU\n}")
         self.__update_instance_count(0, 2, "{\ncount: 4\nkind: KIND_GPU\n}")
         self.__update_instance_count(3, 0, "{\ncount: 7\nkind: KIND_GPU\n}")
         self.__unload_model()
 
+    # Test add/remove multiple CPU/GPU instances at a time
     def test_gpu_cpu_instance_update(self):
         # Load model with 1 GPU instance and 2 CPU instance
         self.__load_model(
@@ -165,6 +170,7 @@ class TestInstanceUpdate(unittest.TestCase):
         # Unload model
         self.__unload_model()
 
+    # Test instance update with invalid instance group config
     def test_invalid_config(self):
         # Load model with 8 instances
         self.__load_model(8)
@@ -177,6 +183,7 @@ class TestInstanceUpdate(unittest.TestCase):
         # Unload model
         self.__unload_model()
 
+    # Test instance update with model file changed
     def test_model_file_update(self):
         self.__load_model(5)
         update_model_file()
@@ -186,6 +193,7 @@ class TestInstanceUpdate(unittest.TestCase):
                                      model_will_reload=True)
         self.__unload_model()
 
+    # Test instance update with non instance config changed in config.pbtxt
     def test_non_instance_config_update(self):
         self.__load_model(4)
         enable_batching()
@@ -196,6 +204,7 @@ class TestInstanceUpdate(unittest.TestCase):
                                      batching=True)
         self.__unload_model(batching=True)
 
+    # Test instance update with an ongoing inference
     def test_update_while_inferencing(self):
         # Load model with 1 instance
         self.__load_model(1)
@@ -226,6 +235,7 @@ class TestInstanceUpdate(unittest.TestCase):
         # Unload model
         self.__unload_model()
 
+    # Test inference with an ongoing instance update
     def test_infer_while_updating(self):
         # Load model with 1 instance
         self.__load_model(1)
