@@ -2865,11 +2865,11 @@ class SequenceBatcherRequestTimeoutTest(su.SequenceBatcherTestUtil):
         # for different sequence and model, then proper grouping should be added
         self.model_name_ = "custom_sequence_int32_timeout"
         self.tensor_data_ = np.ones(shape=[1, 1], dtype=np.int32)
-        self.inputs_ = [grpcclient.InferInput('INPUT', [1, 1], "INT32")]
+        self.inputs_ = [grpcclient.InferInput('INPUT0', [1, 1], "INT32")]
         self.inputs_[0].set_data_from_numpy(self.tensor_data_)
-        self.expected_out_seq_ = [("OUTPUT", self.tensor_data_),
-                                  ("OUTPUT", self.tensor_data_ * 2),
-                                  ("OUTPUT", self.tensor_data_ * 3)]
+        self.expected_out_seq_ = [("OUTPUT0", self.tensor_data_),
+                                  ("OUTPUT0", self.tensor_data_),
+                                  ("OUTPUT0", self.tensor_data_)]
 
     def send_sequence_with_timeout(self,
                                    seq_id,

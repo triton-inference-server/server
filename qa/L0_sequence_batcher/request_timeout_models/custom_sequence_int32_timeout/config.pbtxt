@@ -24,13 +24,12 @@
 # (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-backend: "sequence"
-default_model_filename: "libtriton_sequence.so"
+backend: "identity"
 max_batch_size: 1
 
 input [
   {
-    name: "INPUT"
+    name: "INPUT0"
     data_type: TYPE_INT32
     dims: [ 1 ]
   }
@@ -38,7 +37,7 @@ input [
 
 output [
   {
-    name: "OUTPUT"
+    name: "OUTPUT0"
     data_type: TYPE_INT32
     dims: [ 1 ]
   }
@@ -53,26 +52,6 @@ instance_group [
 
 sequence_batching {
   max_sequence_idle_microseconds: 50000000
-  control_input [
-    {
-      name: "START"
-      control [
-        {
-          kind: CONTROL_SEQUENCE_START
-          int32_false_true: [ 0, 1 ]
-        }
-      ]
-    },
-    {
-      name: "READY"
-      control [
-        {
-          kind: CONTROL_SEQUENCE_READY
-          int32_false_true: [ 0, 1 ]
-        }
-      ]
-    }
-  ]
 }
 
 parameters [
