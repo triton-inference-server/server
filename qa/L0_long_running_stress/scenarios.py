@@ -162,30 +162,35 @@ class PerfAnalyzerScenario(Scenario):
             # Write output to file before checking return code
             print(result.stdout, file=out_stream)
 
+            # Only parse results if PA succeeded without any error
+            request_count = 0
+            if result.returncode == 0:
+                # Read queue time and adjust concurrency
+                with open(csv_file, newline='') as csvfile:
+                    reader = csv.DictReader(csvfile)
+                    for row in reader:
+                        current_queue_us = int(row['Server Queue'])
+                        if current_queue_us < self.queue_latency_range_us_[0]:
+                            self.concurrency_range_[2] = min(
+                                self.concurrency_range_[2] + 1,
+                                self.concurrency_range_[1])
+                        elif current_queue_us > self.queue_latency_range_us_[0]:
+                            self.concurrency_range_[2] = max(
+                                self.concurrency_range_[2] - 1,
+                                self.concurrency_range_[0])
+                        break
+                # Parse request count, return 0 if allowed failure occurs
+                m = re.search(r'Request count: ([0-9]+)', result.stdout)
+                
+                if m and m.group(1):
+                  request_count = int(m.group(1))
+            # Skip if PA fails for an allowable reason, such as unstable measurement 
+            elif result.returncode in PerfAnalyzerScenario.allowed_retcodes_:
+                print(f"SKIPPED: Perf Analyzer returned code [{result.returncode}] so skip these results")
             # Check return code and raise exception on bad return codes
-            if result.returncode not in PerfAnalyzerScenario.allowed_retcodes_:
+            else:
               result.check_returncode()
 
-            # Read queue time and adjust concurrency
-            with open(csv_file, newline='') as csvfile:
-                reader = csv.DictReader(csvfile)
-                for row in reader:
-                    current_queue_us = int(row['Server Queue'])
-                    if current_queue_us < self.queue_latency_range_us_[0]:
-                        self.concurrency_range_[2] = min(
-                            self.concurrency_range_[2] + 1,
-                            self.concurrency_range_[1])
-                    elif current_queue_us > self.queue_latency_range_us_[0]:
-                        self.concurrency_range_[2] = max(
-                            self.concurrency_range_[2] - 1,
-                            self.concurrency_range_[0])
-                    break
-            # Parse request count, return 0 if allowed failure occurs
-            m = re.search(r'Request count: ([0-9]+)', result.stdout)
-            
-            request_count = 0
-            if m and m.group(1):
-              request_count = int(m.group(1))
             return request_count
 
     def __init__(self,
