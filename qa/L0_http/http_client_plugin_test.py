@@ -30,12 +30,13 @@ import sys
 sys.path.append("../common")
 
 import unittest
-from unittest.mock import MagicMock, patch
+from unittest.mock import AsyncMock, patch, MagicMock
 import numpy as np
 import test_util as tu
 import tritonclient.http as tritonhttpclient
 from tritonclient.http import InferenceServerClientPlugin
 from tritonclient.utils import np_to_triton_dtype
+import tritonclient.http.aio as asynctritonhttpclient
 
 
 # A simple plugin that adds headers to the inference request.
@@ -46,6 +47,66 @@ class TestPlugin(InferenceServerClientPlugin):
 
     def execute(self, request):
         request.headers.update(self._headers)
+
+
+class HTTPClientPluginAsyncTest(unittest.IsolatedAsyncioTestCase):
+
+    async def asyncSetUp(self):
+        self._headers = {'MY-KEY': 'MY-VALUE'}
+        self._plugin = TestPlugin(self._headers)
+        self._client = asynctritonhttpclient.InferenceServerClient(
+            url='localhost:8001')
+
+    async def test_server_is_live(self):
+        self._client._stub.get = AsyncMock()
+
+        self._client.register_plugin(self._plugin)
+        await self._client.is_server_live()
+        self._client._stub.get.assert_awaited_with(url=unittest.mock.ANY,
+                                                   headers=self._headers)
+
+        # Make sure unregistering the plugin would no longer add the headers
+        self._client.unregister_plugin()
+        await self._client.is_server_live()
+        self._client._stub.get.assert_awaited_with(url=unittest.mock.ANY,
+                                                   headers={})
+
+    async def test_simple_infer(self):
+        # Only the read function must return async
+        post_return = MagicMock()
+        post_return.read = AsyncMock()
+        self._client._stub.post = AsyncMock(return_value=post_return)
+
+        np_input = np.arange(8, dtype=np.float32).reshape(1, -1)
+        model = "onnx_zero_1_float32"
+
+        # Setup inputs
+        inputs = []
+        inputs.append(
+            tritonhttpclient.InferInput('INPUT0', np_input.shape,
+                                        np_to_triton_dtype(np_input.dtype)))
+
+        # Set the binary data to False so that 'Inference-Header-Length' is not
+        # added to the headers.
+        inputs[0].set_data_from_numpy(np_input, binary_data=False)
+
+        async def run_infer(headers):
+            with patch('tritonclient.http.aio._raise_if_error'):
+                with patch('tritonclient.http.aio.InferResult'):
+                    await self._client.infer(model_name=model, inputs=inputs)
+                    self._client._stub.post.assert_awaited_with(
+                        url=unittest.mock.ANY,
+                        data=unittest.mock.ANY,
+                        headers=headers)
+
+        self._client.register_plugin(self._plugin)
+        await run_infer(self._headers)
+
+        self._client.unregister_plugin()
+        await run_infer({})
+
+    async def asyncTearDown(self):
+        await self._client.close()
 
 
 class HTTPClientPluginTest(tu.TestResultCollector):
