@@ -289,6 +289,44 @@ class TestInstanceUpdate(unittest.TestCase):
         # Unload model
         self.__unload_model()
 
+    # Test instance resource requirement increase
+    def test_instance_resource_increase(self):
+        # Load model
+        self.__load_model(
+            1,
+            "{\ncount: 1\nkind: KIND_CPU\nrate_limiter {\nresources [\n{\nname: \"R1\"\ncount: 2\n}\n]\n}\n}"
+        )
+        # Increase resource requirement
+        self.__update_instance_count(
+            1, 1,
+            "{\ncount: 1\nkind: KIND_CPU\nrate_limiter {\nresources [\n{\nname: \"R1\"\ncount: 8\n}\n]\n}\n}"
+        )
+        # Check the model is not blocked from infer due to the default resource
+        # possibly not updated to the larger resource requirement.
+        infer_count = 8
+        infer_complete = [False for i in range(infer_count)]
+        def infer():
+            for i in range(infer_count):
+                self.__infer()
+                infer_complete[i] = True
+        with concurrent.futures.ThreadPoolExecutor() as pool:
+            infer_thread = pool.submit(infer)
+            time.sleep(infer_count / 2)  # each infer should take < 0.5 seconds
+            self.assertNotIn(False, infer_complete, "Infer possibly stuck")
+            infer_thread.result()
+        # Unload model
+        self.__unload_model()
+
+    # Test for instance update on direct sequence scheduling
+    @unittest.skip("Sequence will not continue after update [FIXME: DLIS-4820]")
+    def test_instance_update_on_direct_sequence_scheduling(self):
+        pass
+
+    # Test for instance update on oldest sequence scheduling
+    @unittest.skip("Sequence will not continue after update [FIXME: DLIS-4820]")
+    def test_instance_update_on_oldest_sequence_scheduling(self):
+        pass
+
 
 if __name__ == "__main__":
     unittest.main()

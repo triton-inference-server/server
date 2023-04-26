@@ -53,7 +53,7 @@ function setup_models() {
         mv models/model_init_del/model.py models/model_init_del/1
 }
 
-SERVER_ARGS="--model-repository=models --model-control-mode=explicit --log-verbose=2"
+SERVER_ARGS="--model-repository=models --model-control-mode=explicit --rate-limit=execution_count --log-verbose=2"
 SERVER_LOG="./server.log"
 setup_models
 run_server
