@@ -94,4 +94,4 @@ Join the [Triton and TensorRT community](https://www.nvidia.com/en-us/deep-learn
 practices, and more. Need enterprise support? NVIDIA global support is available 
 for Triton Inference Server with the [NVIDIA AI Enterprise software suite](https://www.nvidia.com/en-us/data-center/products/ai-enterprise/).
 
-See the [Lastest Release Notes](https://docs.nvidia.com/deeplearning/triton-inference-server/release-notes/rel-23-03.html#rel-23-03) for updates on the newest features and bug fixes.
+See the [Lastest Release Notes](https://docs.nvidia.com/deeplearning/triton-inference-server/release-notes/rel-23-04.html#rel-23-04) for updates on the newest features and bug fixes.
