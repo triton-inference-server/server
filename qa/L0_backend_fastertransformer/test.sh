@@ -43,9 +43,12 @@ rm -f $SERVER_LOG* $CLIENT_LOG*
 RET=0
 # install dependencies
 apt-get update && \
-    apt-get install -y --no-install-recommends python3-pip python3-protobuf 
+    apt-get install -y --no-install-recommends python3 python3-pip python3-protobuf 
 python3 -m pip install --upgrade pip && \
     pip3 install --upgrade numpy
+
+# install client libraries
+pip3 install tritonclient[all]
 
 # Clone repo
 git clone --single-branch --depth=1 -b ${FASTERTRANSFORMER_BRANCH_TAG} ${FASTERTRANSFORMER_BRANCH}
