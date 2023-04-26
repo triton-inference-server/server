@@ -145,14 +145,14 @@ class ArgumentValidationTest(unittest.TestCase):
             pb_utils.Tensor("OUTPUT0", None)
 
         # Test None as dlpack capsule
-        with self.assertRaises(TypeError) as e:
+        with self.assertRaises(pb_utils.TritonModelException) as e:
             pb_utils.Tensor.from_dlpack("OUTPUT0", None)
 
-        # Test empty string as model name (from_dlpack)
-        with self.assertRaises(TypeError) as e:
+        # Test empty string as tensor name (from_dlpack)
+        with self.assertRaises(pb_utils.TritonModelException) as e:
             pb_utils.Tensor.from_dlpack("", None)
 
-        # Test empty string as model name
+        # Test empty string as tensor name
         with self.assertRaises(TypeError) as e:
             pb_utils.Tensor("", None)
 
