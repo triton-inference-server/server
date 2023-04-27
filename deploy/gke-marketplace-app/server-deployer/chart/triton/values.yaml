@@ -31,14 +31,14 @@ maxReplicaCount: 3
 tritonProtocol: HTTP
 # HPA GPU utilization autoscaling target
 HPATargetAverageValue: 85
-modelRepositoryPath: gs://triton_sample_models/23_02
-publishedVersion: '2.31.0'
+modelRepositoryPath: gs://triton_sample_models/23_04
+publishedVersion: '2.33.0'
 gcpMarketplace: true
 
 image:
   registry: gcr.io
   repository: nvidia-ngc-public/tritonserver
-  tag: 23.02-py3
+  tag: 23.04-py3
   pullPolicy: IfNotPresent
   # modify the model repository here to match your GCP storage bucket
   numGpus: 1

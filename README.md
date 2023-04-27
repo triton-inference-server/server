@@ -32,7 +32,7 @@
 
 **LATEST RELEASE: You are currently on the main branch which tracks
 under-development progress towards the next release. The current release is 
-version [2.32.0](https://github.com/triton-inference-server/server/tree/r23.04)
+version [2.33.0](https://github.com/triton-inference-server/server/tree/r23.04)
 and corresponds to the 23.04 container release on 
 [NVIDIA GPU Cloud (NGC)](https://catalog.ngc.nvidia.com/orgs/nvidia/containers/tritonserver).**
 
