@@ -35,6 +35,7 @@ import numpy as np
 import test_util as tu
 import tritonclient.http as tritonhttpclient
 from tritonclient.http import InferenceServerClientPlugin
+from tritonclient.http.aio import InferenceServerClientPlugin as AsyncClientPlugin
 from tritonclient.utils import np_to_triton_dtype
 import tritonclient.http.aio as asynctritonhttpclient
 
@@ -49,11 +50,21 @@ class TestPlugin(InferenceServerClientPlugin):
         request.headers.update(self._headers)
 
 
+# A simple plugin that adds headers to the inference request.
+class AsyncTestPlugin(AsyncClientPlugin):
+
+    def __init__(self, headers):
+        self._headers = headers
+
+    async def execute(self, request):
+        request.headers.update(self._headers)
+
+
 class HTTPClientPluginAsyncTest(unittest.IsolatedAsyncioTestCase):
 
     async def asyncSetUp(self):
         self._headers = {'MY-KEY': 'MY-VALUE'}
-        self._plugin = TestPlugin(self._headers)
+        self._plugin = AsyncTestPlugin(self._headers)
         self._client = asynctritonhttpclient.InferenceServerClient(
             url='localhost:8001')
 
