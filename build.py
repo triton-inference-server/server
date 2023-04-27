@@ -68,8 +68,8 @@ from inspect import getsourcefile
 #
 TRITON_VERSION_MAP = {
     '2.34.0dev': (
-        '23.04',  # triton container
-        '23.04dev',  # upstream container
+        '23.04dev',  # triton container
+        '23.04',  # upstream container
         '1.14.1',  # ORT
         '2022.1.0',  # ORT OpenVINO
         '2022.1.0',  # Standalone OpenVINO
