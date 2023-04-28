@@ -2874,7 +2874,7 @@ class SequenceBatcherRequestTimeoutTest(su.SequenceBatcherTestUtil):
     def send_sequence_with_timeout(self,
                                    seq_id,
                                    callback,
-                                   timeout_us=2000000,
+                                   timeout_us=3000000,
                                    request_pause_sec=0):
         with grpcclient.InferenceServerClient(
                 self.server_address_) as triton_client:
@@ -2903,8 +2903,8 @@ class SequenceBatcherRequestTimeoutTest(su.SequenceBatcherTestUtil):
         # expect the timeout will only be expired on backlog sequence and reject
         # all requests of the sequence once expired.
         # Sending two sequences while the model can only process one sequence
-        # at a time. Each model execution takes 3 second and all requests have
-        # 2 second timeout, so the second sequence will be rejected.
+        # at a time. Each model execution takes 5 second and all requests have
+        # 3 second timeout, so the second sequence will be rejected.
 
         # correlation ID is 1-index
         seq1_res = []
