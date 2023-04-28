@@ -42,6 +42,7 @@ export CUDA_VISIBLE_DEVICES=0
 
 RET=0
 
+CLIENT_PLUGIN_TEST="./grpc_client_plugin_test.py"
 # On windows the paths invoked by the script (running in WSL) must use
 # /mnt/c when needed but the paths on the tritonserver command-line
 # must be C:/ style.
@@ -230,6 +231,12 @@ done
 $SIMPLE_REUSE_INFER_OBJECTS_CLIENT -v >> ${CLIENT_LOG}.c++.reuse 2>&1
 if [ $? -ne 0 ]; then
     cat ${CLIENT_LOG}.c++.reuse
+    RET=1
+fi
+
+python3 $CLIENT_PLUGIN_TEST >> ${CLIENT_LOG}.python.plugin 2>&1
+if [ $? -ne 0 ]; then
+    cat ${CLIENT_LOG}.python.plugin
     RET=1
 fi
 
