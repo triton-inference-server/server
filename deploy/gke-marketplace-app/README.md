@@ -68,14 +68,14 @@ kubectl annotate serviceaccount --namespace custom-metrics \
   iam.gke.io/gcp-service-account=<google-service-account>@<project-id>.iam.gserviceaccount.com  
 ```
 
-Currently, GKE >= 1.18.7 only supported in GKE rapid channel, to find the latest version, please visit [GKE release notes](https://cloud.google.com/kubernetes-engine/docs/release-notes).
+To find the latest version of GKE cluster, please visit [GKE release notes](https://cloud.google.com/kubernetes-engine/docs/release-notes).
 ```
 export PROJECT_ID=<your GCP project ID>
 export ZONE=<GCP zone of your choice>
 export REGION=<GCP region of your choice>
 export DEPLOYMENT_NAME=<GKE cluster name, triton-gke for example>
 # example: export SERVICE_ACCOUNT="gke-test@k80-exploration.iam.gserviceaccount.com"
-export SERVICE_ACCOUNT=<Your GKE service account>
+export SERVICE_ACCOUNT=<Your IAM service account>
 
 gcloud beta container clusters create ${DEPLOYMENT_NAME} \
 --addons=HorizontalPodAutoscaling,HttpLoadBalancing \
