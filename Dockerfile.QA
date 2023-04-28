@@ -99,6 +99,7 @@ RUN mkdir -p qa/common && \
     cp -r docs/examples/model_repository/simple qa/L0_cuda_shared_memory/models/. && \
     mkdir qa/L0_client_java/models && \
     cp -r docs/examples/model_repository/simple qa/L0_client_java/models && \
+    mkdir qa/L0_grpc/models && \
     cp -r docs/examples/model_repository/simple qa/L0_grpc/models && \
     cp -r docs/examples/model_repository/simple_dyna_sequence qa/L0_grpc/models && \
     cp -r docs/examples/model_repository/simple_int8 qa/L0_grpc/models && \
