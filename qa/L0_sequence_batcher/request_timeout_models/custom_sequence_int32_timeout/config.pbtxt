@@ -57,6 +57,6 @@ sequence_batching {
 parameters [
   {
     key: "execute_delay_ms"
-    value: { string_value: "3000" }
+    value: { string_value: "5000" }
   }
 ]
