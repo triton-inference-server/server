@@ -40,12 +40,23 @@ class TestTrtErrorPropagation(unittest.TestCase):
         with self.assertRaises(InferenceServerException) as cm:
             self.__triton.load_model("invalid_plan_file")
         err_msg = str(cm.exception)
-        self.assertIn("Internal: unable to create TensorRT engine", err_msg,
-                      "Caught an unexpected exception")
+        # "[err_msg]" -> "[triton_err_msg]: [backend_err_msg]: [trt_err_msg]"
+        backend_err_msg = "Internal: unable to create TensorRT engine: "
         self.assertIn(
-            "Error Code 4: Internal Error (Engine deserialization failed.)",
-            err_msg,
-            "Detailed error message not propagated back to triton client")
+            backend_err_msg, err_msg,
+            "Cannot find the expected error message from TensorRT backend")
+        triton_err_msg, trt_err_msg = err_msg.split(backend_err_msg)
+        for triton_err_msg_part in [
+                "load failed for model", "version 1 is at UNAVAILABLE state: "
+        ]:
+            self.assertIn(
+                triton_err_msg_part, triton_err_msg,
+                "Cannot find an expected part of error message from Triton")
+        for trt_err_msg_part in ["Error Code ", "Internal Error "]:
+            self.assertIn(
+                trt_err_msg_part, trt_err_msg,
+                "Cannot find an expected part of error message from TensorRT framework"
+            )
 
     def test_invalid_trt_model_autocomplete(self):
         with self.assertRaises(InferenceServerException) as cm:
