@@ -116,6 +116,13 @@ for PROTOCOL in http grpc; do
         if [ "$LANG" == "c++" ]; then
             MEMORY_GROWTH_TEST=$MEMORY_GROWTH_TEST_CPP
             MAX_ALLOWED_ALLOC="10"
+            # NOTE: This test has risk of exhausting all available sockets in
+            # the ephemeral port range. Re-using the same client connection 
+            # ("-R") can easily solve this problem. However, to cleanly separate
+            # the resources used by different client objects, we create new
+            # connections for each request and retry/sleep on failure to give
+            # the system time to reclaim sockets after TIME_WAIT.
+            # TIP: You can use the "ss -s" command to observe the socket usage.
             EXTRA_ARGS="-r ${REPETITION_CPP} -i ${PROTOCOL}"
         else
             MEMORY_GROWTH_TEST="python $MEMORY_GROWTH_TEST_PY"
