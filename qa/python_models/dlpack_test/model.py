@@ -215,8 +215,54 @@ class PBTensorTest(unittest.TestCase):
         self.assertFalse(pb_tensor.is_cpu())
         self.assertEqual(
             pb_tensor.__dlpack_device__(), cupy_tensor.__dlpack_device__())
+        
+    def test_cuda_multi_gpu(self):
+        # Test that pb_tensor on different device
+        size = 5000
+        expected_output = cp.array([2,2,2,2])
+        expected_dlpack_device = (2, 1) #  DLDeviceType::kDLCUDA, device_id 1
+        with cp.cuda.Device(1):
+            cupy_tensor = cp.array([0,0,0,0])
+            matrix_a = cp.random.rand(size,size)
+            res = cp.matmul(matrix_a,matrix_a)
+            for _ in range(1000):
+                res = cp.matmul(res,matrix_a)
+            cupy_tensor += cp.array([2,2,2,2])
+        with cp.cuda.Device(0):
+            pb_tensor = pb_utils.Tensor.from_dlpack('tensor', cupy_tensor)
+            cupy_tensor_dlpack = cp.from_dlpack(pb_tensor)
+        
+        self.assertTrue(cp.array_equal(cupy_tensor_dlpack, expected_output))
+        self.assertFalse(pb_tensor.is_cpu())
+        self.assertEqual(pb_tensor.__dlpack_device__(), expected_dlpack_device)
+        self.assertEqual(
+            pb_tensor.__dlpack_device__(), cupy_tensor.__dlpack_device__())
+        
+    def test_cuda_blocking_stream_multi_gpu(self):
+        # Test that pb_tensor on different device 
+        size = 5000
+        expected_output = cp.array([2,2,2,2])
+        expected_dlpack_device = (2, 1) #  DLDeviceType::kDLCUDA, device_id 1
+        with cp.cuda.Device(1):
+            blocking_stream = cp.cuda.Stream(non_blocking=False)
+            with blocking_stream:
+                cupy_tensor = cp.array([0,0,0,0])
+                matrix_a = cp.random.rand(size,size)
+                res = cp.matmul(matrix_a,matrix_a)
+                for _ in range(1000):
+                    res = cp.matmul(res,matrix_a)
+                cupy_tensor += cp.array([2,2,2,2])
+        with cp.cuda.Device(0):
+            pb_tensor = pb_utils.Tensor.from_dlpack('tensor', cupy_tensor)
+            cupy_tensor_dlpack = cp.from_dlpack(pb_tensor)
+
+        self.assertTrue(cp.array_equal(cupy_tensor_dlpack, expected_output))
+        self.assertFalse(pb_tensor.is_cpu())
+        self.assertEqual(pb_tensor.__dlpack_device__(), expected_dlpack_device)
+        self.assertEqual(
+            pb_tensor.__dlpack_device__(), cupy_tensor.__dlpack_device__())
     
-    def test_cuda_non_blocking_multi_gpu(self):
+    def test_cuda_non_blocking_stream_multi_gpu(self):
         # Test that pb_tensor on different device 
         size = 5000
         expected_output = cp.array([2,2,2,2])
@@ -239,29 +285,6 @@ class PBTensorTest(unittest.TestCase):
         self.assertEqual(pb_tensor.__dlpack_device__(), expected_dlpack_device)
         self.assertEqual(
             pb_tensor.__dlpack_device__(), cupy_tensor.__dlpack_device__())
-
-    def test_cuda_multi_gpu(self):
-        # Test that pb_tensor on different device
-        size = 5000
-        expected_output = cp.array([2,2,2,2])
-        expected_dlpack_device = (2, 1) #  DLDeviceType::kDLCUDA, device_id 1
-        with cp.cuda.Device(1):
-            cupy_tensor = cp.array([0,0,0,0])
-            matrix_a = cp.random.rand(size,size)
-            res = cp.matmul(matrix_a,matrix_a)
-            for _ in range(1000):
-                res = cp.matmul(res,matrix_a)
-            cupy_tensor += cp.array([2,2,2,2])
-        with cp.cuda.Device(0):
-            pb_tensor = pb_utils.Tensor.from_dlpack('tensor', cupy_tensor)
-            cupy_tensor_dlpack = cp.from_dlpack(pb_tensor)
-        
-        self.assertTrue(cp.array_equal(cupy_tensor_dlpack, expected_output))
-        self.assertFalse(pb_tensor.is_cpu())
-        self.assertEqual(pb_tensor.__dlpack_device__(), expected_dlpack_device)
-        self.assertEqual(
-            pb_tensor.__dlpack_device__(), cupy_tensor.__dlpack_device__())
-
 
 
 class TritonPythonModel:
