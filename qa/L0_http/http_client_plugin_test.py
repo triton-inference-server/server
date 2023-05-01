@@ -46,17 +46,7 @@ class TestPlugin(InferenceServerClientPlugin):
     def __init__(self, headers):
         self._headers = headers
 
-    def execute(self, request):
-        request.headers.update(self._headers)
-
-
-# A simple plugin that adds headers to the inference request.
-class AsyncTestPlugin(AsyncClientPlugin):
-
-    def __init__(self, headers):
-        self._headers = headers
-
-    async def execute(self, request):
+    def __call__(self, request):
         request.headers.update(self._headers)
 
 
@@ -64,7 +54,7 @@ class HTTPClientPluginAsyncTest(unittest.IsolatedAsyncioTestCase):
 
     async def asyncSetUp(self):
         self._headers = {'MY-KEY': 'MY-VALUE'}
-        self._plugin = AsyncTestPlugin(self._headers)
+        self._plugin = TestPlugin(self._headers)
         self._client = asynctritonhttpclient.InferenceServerClient(
             url='localhost:8001')
 

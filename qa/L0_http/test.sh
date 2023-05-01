@@ -42,7 +42,7 @@ export CUDA_VISIBLE_DEVICES=0
 
 RET=0
 
-CLIENT_PLUGIN_TEST="./grpc_client_plugin_test.py"
+CLIENT_PLUGIN_TEST="./http_client_plugin_test.py"
 # On windows the paths invoked by the script (running in WSL) must use
 # /mnt/c when needed but the paths on the tritonserver command-line
 # must be C:/ style.
