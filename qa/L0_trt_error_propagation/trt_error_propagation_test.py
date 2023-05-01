@@ -39,25 +39,18 @@ class TestTrtErrorPropagation(unittest.TestCase):
     def test_invalid_trt_model(self):
         with self.assertRaises(InferenceServerException) as cm:
             self.__triton.load_model("invalid_plan_file")
-        got_err_msg = str(cm.exception)
-        # "[err_msg]" -> "[triton_err_msg]: [backend_err_msg]: [trt_err_msg]"
-        expected_backend_err_msg = "Internal: unable to create TensorRT engine: "
-        self.assertIn(
-            expected_backend_err_msg, got_err_msg,
-            "Cannot find the expected error message from TensorRT backend")
-        got_triton_err_msg, got_trt_err_msg = got_err_msg.split(
-            expected_backend_err_msg)
-        for expected_triton_err_msg_part in [
-                "load failed for model", "version 1 is at UNAVAILABLE state: "
-        ]:
+        err_msg = str(cm.exception)
+        # All 'expected_msg_parts' should be present in the 'err_msg' in order
+        expected_msg_parts = [
+            "load failed for model", "version 1 is at UNAVAILABLE state: ",
+            "Internal: unable to create TensorRT engine: ", "Error Code ",
+            "Internal Error "
+        ]
+        for expected_msg_part in expected_msg_parts:
             self.assertIn(
-                expected_triton_err_msg_part, got_triton_err_msg,
-                "Cannot find an expected part of error message from Triton")
-        for expected_trt_err_msg_part in ["Error Code ", "Internal Error "]:
-            self.assertIn(
-                expected_trt_err_msg_part, got_trt_err_msg,
-                "Cannot find an expected part of error message from TensorRT framework"
-            )
+                expected_msg_part, err_msg,
+                "Cannot find an expected part of error message")
+            _, err_msg = err_msg.split(expected_msg_part)
 
     def test_invalid_trt_model_autocomplete(self):
         with self.assertRaises(InferenceServerException) as cm:
