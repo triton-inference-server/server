@@ -195,6 +195,19 @@ class TestInstanceUpdate(unittest.TestCase):
         # Unload model
         self.__unload_model()
 
+    # Test model instance name update
+    def test_instance_name_update(self):
+        # Load 3 instances with 2 different names
+        self.__load_model(
+            3,
+            "{\nname: \"old_1\"\ncount: 1\nkind: KIND_CPU\n},\n{\nname: \"old_2\"\ncount: 2\nkind: KIND_GPU\n}")
+        # Change the instance names
+        self.__update_instance_count(
+            0, 0,
+            "{\nname: \"new_1\"\ncount: 1\nkind: KIND_CPU\n},\n{\nname: \"new_2\"\ncount: 2\nkind: KIND_GPU\n}")
+        # Unload model
+        self.__unload_model()
+
     # Test instance update with invalid instance group config
     def test_invalid_config(self):
         # Load model with 8 instances
