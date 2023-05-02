@@ -34,7 +34,6 @@ import numpy as np
 import test_util as tu
 import tritonclient.grpc as tritongrpcclient
 from tritonclient.grpc import InferenceServerClientPlugin
-from tritonclient.grpc.aio import InferenceServerClientPlugin as AsyncClientPlugin
 from tritonclient.utils import np_to_triton_dtype
 import tritonclient.grpc.aio as asynctritongrpcclient
 

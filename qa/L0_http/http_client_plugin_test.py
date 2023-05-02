@@ -35,7 +35,6 @@ import numpy as np
 import test_util as tu
 import tritonclient.http as tritonhttpclient
 from tritonclient.http import InferenceServerClientPlugin
-from tritonclient.http.aio import InferenceServerClientPlugin as AsyncClientPlugin
 from tritonclient.utils import np_to_triton_dtype
 import tritonclient.http.aio as asynctritonhttpclient
 
