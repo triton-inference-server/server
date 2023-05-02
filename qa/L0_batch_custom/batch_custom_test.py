@@ -136,7 +136,7 @@ class BatcherTest(tu.TestResultCollector):
             print("WARNING: expect {} executions, got {} (attempt {})".format(
                 exec_count, actual_exec_cnt, i))
             time.sleep(1)
-            
+
         self.assertEqual(stats.model_stats[0].name, model_name,
                          "expect model stats for model {}".format(model_name))
         self.assertEqual(
