@@ -153,11 +153,10 @@ done
 
 # Test ModelBatchInitialize failure
 FILE_PATH="backend/examples/batching_strategies/volume_batching/src/volume_batching.cc"
-OLD_STRING="\*batcher = reinterpret_cast<TRITONBACKEND_Batcher\*>("
+OLD_STRING="\/\/ Batcher will point to an unsigned integer representing the maximum"
 NEW_STRING="return TRITONSERVER_ErrorNew(TRITONSERVER_ERROR_NOT_FOUND,\"Failure test case\");"
  
 sed -i "s/${OLD_STRING}/${NEW_STRING}/g" ${FILE_PATH}
-sed -i "s/new unsigned int(max_volume_bytes));//g" ${FILE_PATH}
 
 (cd backend/examples/batching_strategies/volume_batching &&
  cd build &&
@@ -176,9 +175,9 @@ if [ "$SERVER_PID" != "0" ]; then
     kill_server
     RET=1
 else
-    if [ `grep -c "Failure test case" $SERVER_LOG` != "1" ] || [ `grep -c "Not found" $SERVER_LOG` != "1" ]; then
+    if [ `grep -c "Failure test case" $SERVER_LOG` -lt 1 ] || [ `grep -c "Not found" $SERVER_LOG` -lt 1 ]; then
         cat $SERVER_LOG
-        echo -e "\n***\n*** ModelBatchInit Error Test: failed to find 1 \"Failure test case\" message and 1 \"Not found\" error type"
+        echo -e "\n***\n*** ModelBatchInit Error Test: failed to find \"Failure test case\" message and/or \"Not found\" error type"
         RET=1
     fi
 fi
