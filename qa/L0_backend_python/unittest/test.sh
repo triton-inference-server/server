@@ -32,6 +32,7 @@ CLIENT_LOG="./client.log"
 EXPECTED_NUM_TESTS="1"
 TEST_RESULT_FILE='test_results.txt'
 SERVER_LOG="./inference_server.log"
+export CUDA_VISIBLE_DEVICES=0,1,2,3
 
 RET=0
 rm -fr *.log ./models
@@ -87,4 +88,5 @@ else
     echo -e "\n***\n*** Unittest test PASSED. \n***"
 fi
 
+export CUDA_VISIBLE_DEVICES=0
 exit $RET
