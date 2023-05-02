@@ -43,11 +43,11 @@ RUN wget https://github.com/pseudomuto/protoc-gen-doc/releases/download/v1.3.2/p
     mv protoc-gen-doc-1.3.2.linux-amd64.go1.12.6/protoc-gen-doc /usr/local/bin/
 
 # install sphinx et al
-RUN pip3 install --upgrade "sphinx>=3.5,<5" "nbclient<0.6,>=0.2" \
-    docutils==0.16 ablog myst-nb rst-to-myst nbsphinx==0.8.8 \
-    sphinx-book-theme==0.3.2 sphinx-copybutton sphinx-design sphinx-prompt  \
-    sphinxcontrib-bibtex sphinx-tabs==3.2.0 \
-    exhale==0.2.3 breathe==4.14.1 sphinx-sitemap ipython
+RUN pip3 install sphinx==4.5.0 nbclient==0.5.13 \
+    docutils==0.16 ablog==0.10.33.post1 myst-nb==0.17.2 rst-to-myst==0.3.4 nbsphinx==0.8.8 \
+    sphinx-book-theme==0.3.2 sphinx-copybutton==0.5.2 sphinx-design==0.4.1 sphinx-prompt==1.5.0  \
+    sphinxcontrib-bibtex==2.5.0 sphinx-tabs==3.2.0 \
+    exhale==0.2.3 breathe==4.14.1 sphinx-sitemap==2.5.0 ipython==8.12.1 attrs==21.4.0
 
 # Set visitor script to be included on every HTML page
 ENV VISITS_COUNTING_SCRIPT="//assets.adobedtm.com/b92787824f2e0e9b68dc2e993f9bd995339fe417/satelliteLib-7ba51e58dc61bcb0e9311aadd02a0108ab24cc6c.js"
