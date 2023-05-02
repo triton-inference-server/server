@@ -40,8 +40,6 @@ import os
 from tritonclient.utils import *
 import tritonclient.http as httpclient
 
-TEST_JETSON = bool(int(os.environ.get('TEST_JETSON', 0)))
-
 
 class PythonTest(tu.TestResultCollector):
 
@@ -113,43 +111,38 @@ class PythonTest(tu.TestResultCollector):
             np.testing.assert_equal(output1, expected_output1,
                                     "OUTPUT1 doesn't match expected OUTPUT1")
 
-    # We do not use a docker on Jetson so it does not impose a shared memory
-    # allocation limit of 1GB. This means test will pass without the expected
-    # error on jetson and is hence unnecessary.
-    if not TEST_JETSON:
+    def test_growth_error(self):
+        # 2 MiBs
+        total_byte_size = 2 * 1024 * 1024
+        shape = [total_byte_size]
+        model_name = 'identity_uint8_nobatch'
+        dtype = np.uint8
+        with self._shm_leak_detector.Probe() as shm_probe:
+            self._infer_help(model_name, shape, dtype)
 
-        def test_growth_error(self):
-            # 2 MiBs
-            total_byte_size = 2 * 1024 * 1024
-            shape = [total_byte_size]
-            model_name = 'identity_uint8_nobatch'
-            dtype = np.uint8
-            with self._shm_leak_detector.Probe() as shm_probe:
-                self._infer_help(model_name, shape, dtype)
+        # 1 GiB payload leads to error in the main Python backned process.
+        # Total shared memory available is 1GiB.
+        total_byte_size = 1024 * 1024 * 1024
+        shape = [total_byte_size]
+        with self.assertRaises(InferenceServerException) as ex:
+            self._infer_help(model_name, shape, dtype)
+        self.assertIn("Failed to increase the shared memory pool size",
+                      str(ex.exception))
 
-            # 1 GiB payload leads to error in the main Python backned process.
-            # Total shared memory available is 1GiB.
-            total_byte_size = 1024 * 1024 * 1024
-            shape = [total_byte_size]
-            with self.assertRaises(InferenceServerException) as ex:
-                self._infer_help(model_name, shape, dtype)
-            self.assertIn("Failed to increase the shared memory pool size",
-                          str(ex.exception))
+        # 512 MiBs payload leads to error in the Python stub process.
+        total_byte_size = 512 * 1024 * 1024
+        shape = [total_byte_size]
+        with self.assertRaises(InferenceServerException) as ex:
+            self._infer_help(model_name, shape, dtype)
+        self.assertIn("Failed to increase the shared memory pool size",
+                      str(ex.exception))
 
-            # 512 MiBs payload leads to error in the Python stub process.
-            total_byte_size = 512 * 1024 * 1024
-            shape = [total_byte_size]
-            with self.assertRaises(InferenceServerException) as ex:
-                self._infer_help(model_name, shape, dtype)
-            self.assertIn("Failed to increase the shared memory pool size",
-                          str(ex.exception))
-
-            # 2 MiBs
-            # Send a small paylaod to make sure it is still working properly
-            total_byte_size = 2 * 1024 * 1024
-            shape = [total_byte_size]
-            with self._shm_leak_detector.Probe() as shm_probe:
-                self._infer_help(model_name, shape, dtype)
+        # 2 MiBs
+        # Send a small paylaod to make sure it is still working properly
+        total_byte_size = 2 * 1024 * 1024
+        shape = [total_byte_size]
+        with self._shm_leak_detector.Probe() as shm_probe:
+            self._infer_help(model_name, shape, dtype)
 
     def test_async_infer(self):
         model_name = "identity_uint8"
@@ -189,8 +182,9 @@ class PythonTest(tu.TestResultCollector):
 
                 # Make sure the requests ran in parallel.
                 stats = client.get_inference_statistics(model_name)
-                test_cond = (len(stats['model_stats']) != 1) or (
-                    stats['model_stats'][0]['name'] != model_name)
+                test_cond = (len(stats['model_stats'])
+                             != 1) or (stats['model_stats'][0]['name']
+                                       != model_name)
                 self.assertFalse(
                     test_cond,
                     "error: expected statistics for {}".format(model_name))
