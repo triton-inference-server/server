@@ -384,7 +384,7 @@ class ShmLeakDetector:
             assert not shm_leak_detected, "Shared memory leak detected."
 
     def __init__(self, prefix='triton_python_backend_shm_region'):
-        if TEST_JETSON:
+        if _test_jetson:
             return
         import triton_shm_monitor
         self._shm_monitors = []
@@ -397,6 +397,7 @@ class ShmLeakDetector:
     def Probe(self):
         # Jetson cleanup takes too long and results in false positives.
         # Do not use the shared memory check on Jetson.
+        # [DLIS-4876] Investigate how to re-enable shared memory check on Jetson.
         if _test_jetson:
             return self.ShmLeakProbe(None)
         else:
