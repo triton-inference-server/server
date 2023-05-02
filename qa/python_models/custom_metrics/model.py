@@ -39,6 +39,10 @@ class PBCustomMetricsTest(unittest.TestCase):
         return r.text
 
     def _metric_api_helper(self, metric, kind):
+        # Adding logger to test if custom metrics and logging work together
+        # as they use the same message queue.
+        logger = pb_utils.Logger
+
         # The value should be 0.0 before the test
         self.assertEqual(metric.value(), 0.0)
 
@@ -46,6 +50,7 @@ class PBCustomMetricsTest(unittest.TestCase):
         increment = 2023.0
         metric.increment(increment)
         self.assertEqual(metric.value(), increment)
+        logger.log_info("Incremented metric to : {}".format(metric.value()))
 
         # Test increment negative value
         decrement = -23.5
@@ -56,6 +61,7 @@ class PBCustomMetricsTest(unittest.TestCase):
         else:
             metric.increment(decrement)
             self.assertEqual(metric.value(), increment + decrement)
+            logger.log_info("Decremented metric to : {}".format(metric.value()))
 
         # Test set value
         value = 999.9
@@ -66,12 +72,18 @@ class PBCustomMetricsTest(unittest.TestCase):
         else:
             metric.set(value)
             self.assertEqual(metric.value(), value)
+            logger.log_info("Set metric to : {}".format(metric.value()))
 
     def _dup_metric_helper(self, labels={}):
+        # Adding logger to test if custom metrics and logging work together
+        # as they use the same message queue.
+        logger = pb_utils.Logger
+
         description = "dup metric"
-        metric_family = pb_utils.MetricFamily(name="test_dup_metric",
-                                              description=description,
-                                              kind=pb_utils.COUNTER)
+        metric_family = pb_utils.MetricFamily(
+            name="test_dup_metric",
+            description=description,
+            kind=pb_utils.MetricFamily.COUNTER)
 
         # Verify dupe metrics reference same underlying metric
         metric1 = metric_family.Metric(labels=labels)
@@ -85,6 +97,8 @@ class PBCustomMetricsTest(unittest.TestCase):
         increment = 7.5
         metric1.increment(increment)
         self.assertEqual(metric1.value(), metric2.value())
+        logger.log_info("Incremented metric1 to : {}".format(metric1.value()))
+        logger.log_info("Incremented metric2 to : {}".format(metric2.value()))
 
         # Assert custom metric/family remains when there's still a reference to it
         del metric1
@@ -95,7 +109,7 @@ class PBCustomMetricsTest(unittest.TestCase):
         metric_family = pb_utils.MetricFamily(
             name="test_counter_e2e",
             description="test metric counter kind end to end",
-            kind=pb_utils.COUNTER)
+            kind=pb_utils.MetricFamily.COUNTER)
         labels = {"example1": "counter_label1", "example2": "counter_label2"}
         metric = metric_family.Metric(labels=labels)
         self._metric_api_helper(metric, 'counter')
@@ -108,7 +122,7 @@ class PBCustomMetricsTest(unittest.TestCase):
         metric_family = pb_utils.MetricFamily(
             name="test_gauge_e2e",
             description="test metric gauge kind end to end",
-            kind=pb_utils.GAUGE)
+            kind=pb_utils.MetricFamily.GAUGE)
         labels = {"example1": "counter_label1", "example2": "counter_label2"}
         metric = metric_family.Metric(labels=labels)
         self._metric_api_helper(metric, 'gauge')
@@ -122,13 +136,13 @@ class PBCustomMetricsTest(unittest.TestCase):
         metric_family1 = pb_utils.MetricFamily(
             name="test_dup_metric_family_diff_kind",
             description="test metric family with same name but different kind",
-            kind=pb_utils.COUNTER)
+            kind=pb_utils.MetricFamily.COUNTER)
         with self.assertRaises(pb_utils.TritonModelException):
             metric_family2 = pb_utils.MetricFamily(
                 name="test_dup_metric_family_diff_kind",
                 description=
                 "test metric family with same name but different kind",
-                kind=pb_utils.GAUGE)
+                kind=pb_utils.MetricFamily.GAUGE)
             self.assertIsNone(metric_family2)
 
         self.assertIsNotNone(metric_family1)
@@ -139,11 +153,11 @@ class PBCustomMetricsTest(unittest.TestCase):
         metric_family1 = pb_utils.MetricFamily(
             name="test_dup_metric_family_diff_description",
             description="first description",
-            kind=pb_utils.COUNTER)
+            kind=pb_utils.MetricFamily.COUNTER)
         metric_family2 = pb_utils.MetricFamily(
             name="test_dup_metric_family_diff_description",
             description="second description",
-            kind=pb_utils.COUNTER)
+            kind=pb_utils.MetricFamily.COUNTER)
 
         metric2 = metric_family2.Metric()
         self.assertEqual(metric2.value(), 0)
@@ -162,12 +176,14 @@ class PBCustomMetricsTest(unittest.TestCase):
     def test_dup_metric_family(self):
         # Test that adding a duplicate metric family will reuse the original
         # and not add another entry to registry
-        metric_family1 = pb_utils.MetricFamily(name="test_dup_metric_family",
-                                               description="dup description",
-                                               kind=pb_utils.COUNTER)
-        metric_family2 = pb_utils.MetricFamily(name="test_dup_metric_family",
-                                               description="dup description",
-                                               kind=pb_utils.COUNTER)
+        metric_family1 = pb_utils.MetricFamily(
+            name="test_dup_metric_family",
+            description="dup description",
+            kind=pb_utils.MetricFamily.COUNTER)
+        metric_family2 = pb_utils.MetricFamily(
+            name="test_dup_metric_family",
+            description="dup description",
+            kind=pb_utils.MetricFamily.COUNTER)
 
         metric_key = "custom_metric_key"
         metric1 = metric_family1.Metric(labels={metric_key: "label1"})
