@@ -1,4 +1,4 @@
-# Copyright 2018-2022, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright 2018-2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -35,6 +35,7 @@ from tritonclient.utils import *
 # By default, find tritonserver on "localhost", but can be overridden
 # with TRITONSERVER_IPADDR envvar
 _tritonserver_ipaddr = os.environ.get('TRITONSERVER_IPADDR', 'localhost')
+_test_jetson = bool(int(os.environ.get('TEST_JETSON', 0)))
 
 
 def _range_repr_dtype(dtype):
@@ -357,6 +358,8 @@ class ShmLeakDetector:
             self._shm_monitors = shm_monitors
 
         def __enter__(self):
+            if _test_jetson:
+                return self
             self._shm_region_free_sizes = []
             for shm_monitor in self._shm_monitors:
                 self._shm_region_free_sizes.append(shm_monitor.free_memory())
@@ -364,6 +367,8 @@ class ShmLeakDetector:
             return self
 
         def __exit__(self, type, value, traceback):
+            if _test_jetson:
+                return
             current_shm_sizes = []
             for shm_monitor in self._shm_monitors:
                 current_shm_sizes.append(shm_monitor.free_memory())
@@ -379,6 +384,8 @@ class ShmLeakDetector:
             assert not shm_leak_detected, "Shared memory leak detected."
 
     def __init__(self, prefix='triton_python_backend_shm_region'):
+        if _test_jetson:
+            return
         import triton_shm_monitor
         self._shm_monitors = []
         shm_regions = listdir('/dev/shm')
@@ -388,4 +395,10 @@ class ShmLeakDetector:
                     triton_shm_monitor.SharedMemoryManager(shm_region))
 
     def Probe(self):
-        return self.ShmLeakProbe(self._shm_monitors)
+        # Jetson cleanup takes too long and results in false positives.
+        # Do not use the shared memory check on Jetson.
+        # [DLIS-4876] Investigate how to re-enable shared memory check on Jetson.
+        if _test_jetson:
+            return self.ShmLeakProbe(None)
+        else:
+            return self.ShmLeakProbe(self._shm_monitors)
