@@ -673,7 +673,7 @@ def onnxruntime_cmake_args(images, library_paths):
             cmake_backend_arg('onnxruntime', 'TRITON_BUILD_PLATFORM', None,
                               'jetpack'),
             cmake_backend_enable('onnxruntime',
-                                 'TRITON_ENABLE_ONNXRUNTIME_OPENVINO', False),
+                                 'TRITON_ENABLE_ONNXRUNTIME_OPENVINO', False)
         ]
     else:
         if target_platform() == 'windows':
