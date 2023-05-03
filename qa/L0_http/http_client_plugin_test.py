@@ -58,15 +58,19 @@ class HTTPClientPluginAsyncTest(unittest.IsolatedAsyncioTestCase):
             url='localhost:8001')
 
     async def test_server_is_live(self):
+        # We are testing is_server_live as an example API that uses GET method
+        # for communication with the server.
         self._client._stub.get = AsyncMock()
 
         self._client.register_plugin(self._plugin)
+        self.assertEqual(self._plugin, self._client.plugin())
         await self._client.is_server_live()
         self._client._stub.get.assert_awaited_with(url=unittest.mock.ANY,
                                                    headers=self._headers)
 
         # Make sure unregistering the plugin would no longer add the headers
         self._client.unregister_plugin()
+        self.assertEqual(None, self._client.plugin())
         await self._client.is_server_live()
         self._client._stub.get.assert_awaited_with(url=unittest.mock.ANY,
                                                    headers={})
@@ -121,6 +125,8 @@ class HTTPClientPluginTest(tu.TestResultCollector):
         self._client._client_stub = MagicMock()
 
     def test_server_is_live(self):
+        # We are testing is_server_live as an example API that uses GET method
+        # for communication with the server.
         self._client.register_plugin(self._plugin)
         self._client.is_server_live()
         self._client._client_stub.get.assert_called_with(unittest.mock.ANY,

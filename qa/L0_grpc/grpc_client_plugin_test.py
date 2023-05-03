@@ -99,6 +99,7 @@ class GRPCClientPluginTest(tu.TestResultCollector):
         model = "client_plugin_test"
         inputs = prepare_infer_inputs(self._headers)
         self._client.register_plugin(self._plugin)
+        self.assertEqual(self._plugin, self._client.plugin())
         response = self._client.infer(model_name=model, inputs=inputs)
         test_success = response.as_numpy('TEST_SUCCESS')
         self.assertEqual(test_success, True)
@@ -106,6 +107,7 @@ class GRPCClientPluginTest(tu.TestResultCollector):
         # Unregister the plugin
         inputs = prepare_infer_inputs({})
         self._client.unregister_plugin()
+        self.assertEqual(None, self._client.plugin())
         response = self._client.infer(model_name=model, inputs=inputs)
         test_success = response.as_numpy('TEST_SUCCESS')
         self.assertEqual(test_success, True)
