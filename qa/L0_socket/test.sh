@@ -1,5 +1,5 @@
 #!/bin/bash
-# Copyright 2019-2022, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright 2019-2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -46,8 +46,8 @@ for address in default explicit; do
         SAME_EXPLICIT_ADDRESS=""
         DIFF_EXPLICIT_ADDRESS_ARGS=""
     else
-        SAME_EXPLICIT_ADDRESS="--http-address 127.0.0.1 --grpc-address 127.0.0.1"
-        DIFF_EXPLICIT_ADDRESS="--http-address 127.0.0.1 --grpc-address 127.0.0.2"
+        SAME_EXPLICIT_ADDRESS="--http-address 127.0.0.1 --grpc-address 127.0.0.1 --metrics-address 127.0.0.1"
+        DIFF_EXPLICIT_ADDRESS="--http-address 127.0.0.1 --grpc-address 127.0.0.2 --metrics-address 127.0.0.3"
     fi
 
     for p in http grpc; do
@@ -352,10 +352,14 @@ for p in http grpc; do
     fi
     kill_server
 
-    # allow multiple servers bind to the same http/grpc port with setting the reuse flag
+    # 1. Allow multiple servers bind to the same http/grpc port with setting the reuse flag
+    # 2. Test different forms of setting --metrics-address and verify metrics are queryable
+    #   (a) Test default metrics-address being same as http-address
+    #   (b) Test setting metrics-address explicitly to 0.0.0.0
+    #   (c) Test setting metrics-address explicitly to 127.0.0.1
     SERVER0_ARGS="--model-repository=$DATADIR --metrics-port 8002 --reuse-http-port=1 --reuse-grpc-port=1"
-    SERVER1_ARGS="--model-repository=$DATADIR --metrics-port 8003 --reuse-http-port=1 --reuse-grpc-port=1"
-    SERVER2_ARGS="--model-repository=$DATADIR --metrics-port 8004 --reuse-http-port=1 --reuse-grpc-port=1"
+    SERVER1_ARGS="--model-repository=$DATADIR --metrics-address 0.0.0.0 --metrics-port 8003 --reuse-http-port=1 --reuse-grpc-port=1"
+    SERVER2_ARGS="--model-repository=$DATADIR --metrics-address 127.0.0.1 --metrics-port 8004 --reuse-http-port=1 --reuse-grpc-port=1"
     run_multiple_servers_nowait 3
     sleep 15
     if [ "$SERVER0_PID" == "0" ]; then
