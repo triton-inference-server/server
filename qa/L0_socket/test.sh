@@ -359,7 +359,7 @@ for p in http grpc; do
     #   (c) Test setting metrics-address explicitly to 127.0.0.1
     SERVER0_ARGS="--model-repository=$DATADIR --metrics-port 8002 --reuse-http-port=1 --reuse-grpc-port=1"
     SERVER1_ARGS="--model-repository=$DATADIR --metrics-address 0.0.0.0 --metrics-port 8003 --reuse-http-port=1 --reuse-grpc-port=1"
-    SERVER2_ARGS="--model-repository=$DATADIR --metrics-address 127.0.0.1 --metrics-port 8004 --reuse-http-port=1 --reuse-grpc-port=1"
+    SERVER2_ARGS="--model-repository=$DATADIR --metrics-address 127.0.0.2 --metrics-port 8004 --reuse-http-port=1 --reuse-grpc-port=1"
     run_multiple_servers_nowait 3
     sleep 15
     if [ "$SERVER0_PID" == "0" ]; then
@@ -398,7 +398,7 @@ for p in http grpc; do
 
     server0_request_count=`curl -s localhost:8002/metrics | awk '/nv_inference_request_success{/ {print $2}'`
     server1_request_count=`curl -s localhost:8003/metrics | awk '/nv_inference_request_success{/ {print $2}'`
-    server2_request_count=`curl -s localhost:8004/metrics | awk '/nv_inference_request_success{/ {print $2}'`
+    server2_request_count=`curl -s 127.0.0.2:8004/metrics | awk '/nv_inference_request_success{/ {print $2}'`
     if [ ${server0_request_count%.*} -eq 0 ] || \
        [ ${server1_request_count%.*} -eq 0 ] || \
        [ ${server2_request_count%.*} -eq 0 ]; then
