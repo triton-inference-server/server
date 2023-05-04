@@ -42,12 +42,14 @@ export CUDA_VISIBLE_DEVICES=0
 
 RET=0
 
+CLIENT_PLUGIN_TEST="./grpc_client_plugin_test.py"
 # On windows the paths invoked by the script (running in WSL) must use
 # /mnt/c when needed but the paths on the tritonserver command-line
 # must be C:/ style.
 if [[ "$(< /proc/sys/kernel/osrelease)" == *microsoft* ]]; then
     SDKDIR=${SDKDIR:=C:/sdk}
     MODELDIR=${MODELDIR:=C:/models}
+    CLIENT_PLUGIN_MODELDIR=${MODELDIR:=C:/client_plugin_models}
     DATADIR=${DATADIR:="/mnt/c/data/inferenceserver/${REPO_VERSION}"}
     BACKEND_DIR=${BACKEND_DIR:=C:/tritonserver/backends}
     SERVER=${SERVER:=/mnt/c/tritonserver/bin/tritonserver.exe}
@@ -93,6 +95,7 @@ if [[ "$(< /proc/sys/kernel/osrelease)" == *microsoft* ]]; then
     CC_UNIT_TEST=${SDKDIR}/python/cc_client_test
 else
     MODELDIR=${MODELDIR:=`pwd`/models}
+    CLIENT_PLUGIN_MODELDIR=${CLIENTPLUGINMODELDIR:=`pwd`/client_plugin_models}
     DATADIR=${DATADIR:="/data/inferenceserver/${REPO_VERSION}"}
     TRITON_DIR=${TRITON_DIR:="/opt/tritonserver"}
     SERVER=${TRITON_DIR}/bin/tritonserver
@@ -330,6 +333,24 @@ if [ $? -ne 0 ]; then
     RET=1
 fi
 
+set -e
+kill $SERVER_PID
+wait $SERVER_PID
+
+SERVER_ARGS="--backend-directory=${BACKEND_DIR} --model-repository=${CLIENT_PLUGIN_MODELDIR} --http-header-forward-pattern=.* --grpc-header-forward-pattern=.*"
+run_server
+if [ "$SERVER_PID" == "0" ]; then
+    echo -e "\n***\n*** Failed to start $SERVER\n***"
+    cat $SERVER_LOG
+    exit 1
+fi
+
+set +e
+python3 $CLIENT_PLUGIN_TEST >> ${CLIENT_LOG}.python.plugin 2>&1
+if [ $? -ne 0 ]; then
+    cat ${CLIENT_LOG}.python.plugin
+    RET=1
+fi
 set -e
 kill $SERVER_PID
 wait $SERVER_PID
