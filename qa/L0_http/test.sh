@@ -242,9 +242,6 @@ if [ $? -ne 0 ]; then
     RET=1
 fi
 
-kill $SERVER_PID
-wait $SERVER_PID
-
 cp $NGINX_CONF /etc/nginx/sites-available/default
 
 # Create a password file with username:password
@@ -264,6 +261,7 @@ if [ $? -ne 0 ]; then
     cat ${CLIENT_LOG}.python.plugin.auth
     RET=1
 fi
+service nginx stop
 
 # Test with the base path in url.
 $SIMPLE_INFER_CLIENT -u localhost:8000/base_path -v >> ${CLIENT_LOG}.c++.base_path_url 2>&1

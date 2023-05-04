@@ -43,6 +43,8 @@ export CUDA_VISIBLE_DEVICES=0
 RET=0
 
 CLIENT_PLUGIN_TEST="./grpc_client_plugin_test.py"
+BASIC_AUTH_TEST="./grpc_basic_auth_test.py"
+NGINX_CONF="./nginx.conf"
 # On windows the paths invoked by the script (running in WSL) must use
 # /mnt/c when needed but the paths on the tritonserver command-line
 # must be C:/ style.
@@ -352,8 +354,27 @@ if [ $? -ne 0 ]; then
     RET=1
 fi
 set -e
-kill $SERVER_PID
-wait $SERVER_PID
+
+cp $NGINX_CONF /etc/nginx/sites-available/default
+
+# Create a password file with username:password
+echo -n 'username:' > pswd
+echo "password" | openssl passwd -stdin -apr1 >> pswd
+service nginx restart
+
+run_server
+if [ "$SERVER_PID" == "0" ]; then
+    echo -e "\n***\n*** Failed to start $SERVER\n***"
+    cat $SERVER_LOG
+    exit 1
+fi
+
+python3 $BASIC_AUTH_TEST
+if [ $? -ne 0 ]; then
+    cat ${CLIENT_LOG}.python.plugin.auth
+    RET=1
+fi
+service nginx stop
 
 export GRPC_TRACE=compression, channel
 export GRPC_VERBOSITY=DEBUG
