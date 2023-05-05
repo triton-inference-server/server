@@ -31,7 +31,7 @@ get_shm_pages() {
 
 install_conda() {
   rm -rf ./miniconda
-  file_name="Miniconda3-py38_4.9.2-Linux-x86_64.sh"
+  file_name="Miniconda3-py310_23.1.0-1-Linux-x86_64.sh"
   wget https://repo.anaconda.com/miniconda/$file_name
 
   # install miniconda in silent mode
