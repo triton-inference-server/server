@@ -1131,6 +1131,7 @@ RUN apt-get update && \
             libgoogle-perftools-dev \
             libnuma-dev \
             curl \
+            libjemalloc-dev \
             {backend_dependencies} && \
     rm -rf /var/lib/apt/lists/*
 
