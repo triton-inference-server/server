@@ -355,19 +355,10 @@ if [ $? -ne 0 ]; then
 fi
 set -e
 
-cp $NGINX_CONF /etc/nginx/sites-available/default
-
 # Create a password file with username:password
 echo -n 'username:' > pswd
 echo "password" | openssl passwd -stdin -apr1 >> pswd
-service nginx restart
-
-run_server
-if [ "$SERVER_PID" == "0" ]; then
-    echo -e "\n***\n*** Failed to start $SERVER\n***"
-    cat $SERVER_LOG
-    exit 1
-fi
+nginx -c `pwd`/$NGINX_CONF
 
 python3 $BASIC_AUTH_TEST
 if [ $? -ne 0 ]; then
@@ -375,6 +366,9 @@ if [ $? -ne 0 ]; then
     RET=1
 fi
 service nginx stop
+
+kill $SERVER_PID
+wait $SERVER_PID
 
 export GRPC_TRACE=compression, channel
 export GRPC_VERBOSITY=DEBUG
