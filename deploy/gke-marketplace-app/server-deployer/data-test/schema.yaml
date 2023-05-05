@@ -44,8 +44,6 @@ x-google-marketplace:
     - requests:
         gpu:
           nvidia.com/gpu: {}
-    istio:
-      type: REQUIRED
 
   images:
     '':
@@ -89,7 +87,7 @@ properties:
   modelRepositoryPath:
     type: string
     title: Bucket where models are stored. Please make sure the user/service account to create the GKE app has permission to this GCS bucket. Read Triton documentation on configs and formatting details, supporting TensorRT, TensorFlow, Pytorch, Onnx ... etc.
-    default: gs://triton_sample_models/models
+    default: gs://triton_sample_models/23_02
   image.ldPreloadPath:
     type: string
     title: Leave this empty by default. Triton allows users to create custom layers for backend such as TensorRT plugin or Tensorflow custom ops, the compiled shared library must be provided via LD_PRELOAD environment variable.
@@ -106,11 +104,6 @@ properties:
     type: boolean
     title: Select by default. When use A100 MIG, unselect to disable GPU Memory metrics reported by Triton, as current GPU metrics not support on A100 MIG.
     default: True  
-  istioEnabled:
-    type: boolean
-    x-google-marketplace:
-      type: ISTIO_ENABLED
-    default: True
 
   
 required:

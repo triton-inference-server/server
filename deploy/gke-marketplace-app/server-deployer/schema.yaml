@@ -44,8 +44,6 @@ x-google-marketplace:
     - requests:
         gpu:
           nvidia.com/gpu: {}
-    istio:
-      type: REQUIRED
 
   images:
     '':
@@ -106,11 +104,6 @@ properties:
     type: boolean
     title: Select by default. When use A100 MIG, unselect to disable GPU Memory metrics reported by Triton, as current GPU metrics not support on A100 MIG.
     default: True  
-  istioEnabled:
-    type: boolean
-    x-google-marketplace:
-      type: ISTIO_ENABLED
-    default: True
 
   
 required:
