@@ -29,8 +29,6 @@ import sys
 
 sys.path.append("../common")
 
-import unittest
-import numpy as np
 import test_util as tu
 import tritonclient.grpc as tritongrpcclient
 import tritonclient.grpc.aio as asynctritongrpcclient

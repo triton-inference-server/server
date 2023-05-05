@@ -29,8 +29,6 @@ import sys
 
 sys.path.append("../common")
 
-import unittest
-import numpy as np
 import test_util as tu
 import tritonclient.http as tritonhttpclient
 import tritonclient.http.aio as asynctritonhttpclient
