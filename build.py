@@ -74,7 +74,7 @@ TRITON_VERSION_MAP = {
         '2022.1.0',  # ORT OpenVINO
         '2022.1.0',  # Standalone OpenVINO
         '2.2.9',  # DCGM version
-        'py38_4.12.0')  # Conda version.
+        'py310_23.1.0-1')  # Conda version.
 }
 
 CORE_BACKENDS = ['ensemble']
@@ -845,9 +845,9 @@ def install_miniconda(conda_version, target_machine):
             .format(FLAGS.version))
     miniconda_url = f"https://repo.anaconda.com/miniconda/Miniconda3-{conda_version}-Linux-{target_machine}.sh"
     if target_machine == 'x86_64':
-        sha_sum = "3190da6626f86eee8abf1b2fd7a5af492994eb2667357ee4243975cdbb175d7a"
+        sha_sum = "32d73e1bc33fda089d7cd9ef4c1be542616bd8e437d1f77afeeaf7afdb019787"
     else:
-        sha_sum = "0c20f121dc4c8010032d64f8e9b27d79e52d28355eb8d7972eafc90652387777"
+        sha_sum = "80d6c306b015e1e3b01ea59dc66c676a81fa30279bc2da1f180a7ef7b2191d6e"
     return f'''
 RUN mkdir -p /opt/
 RUN wget "{miniconda_url}" -O miniconda.sh -q && \
@@ -1303,7 +1303,7 @@ def create_build_dockerfiles(container_build_dir, images, backends, repoagents,
         base_image = 'nvcr.io/nvidia/tritonserver:{}-py3-min'.format(
             FLAGS.upstream_container_version)
     else:
-        base_image = 'ubuntu:20.04'
+        base_image = 'ubuntu:22.04'
 
     dockerfileargmap = {
         'NVIDIA_BUILD_REF':

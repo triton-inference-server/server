@@ -104,7 +104,7 @@ cp -r backend/examples/batching_strategies/single_batching/build/libtriton_singl
 # Run a test to validate the single batching strategy example.
 # Then, run tests to validate the volume batching example being passed in via the backend dir, model dir, version dir, and model config.
 BACKEND_DIR="/opt/tritonserver/backends/onnxruntime"
-MODEL_DIR="models/$MODEL_NAME/"
+MODEL_DIR="models/$MODEL_NAME"
 VERSION_DIR="$MODEL_DIR/1/"
 
 test_types=('single_batching_backend' 'backend_directory' 'model_directory' 'version_directory' 'model_config')
@@ -153,10 +153,41 @@ for i in "${!test_setups[@]}"; do
     wait $SERVER_PID
 done
 
+# Test ModelBatchInitialize failure
+FILE_PATH="backend/examples/batching_strategies/volume_batching/src/volume_batching.cc"
+OLD_STRING="\/\/ Batcher will point to an unsigned integer representing the maximum"
+NEW_STRING="return TRITONSERVER_ErrorNew(TRITONSERVER_ERROR_NOT_FOUND,\"Failure test case\");"
+ 
+sed -i "s/${OLD_STRING}/${NEW_STRING}/g" ${FILE_PATH}
+
+(cd backend/examples/batching_strategies/volume_batching &&
+ cd build &&
+ cmake -DCMAKE_INSTALL_PREFIX:PATH=`pwd`/install \
+       -DTRITON_CORE_REPO_TAG=$TRITON_CORE_REPO_TAG .. &&
+ make -j4 install)
+
+cp -r backend/examples/batching_strategies/volume_batching/build/libtriton_volumebatching.so models/${MODEL_NAME}/libtriton_volumebatching.so
+
+SERVER_LOG=${SERVER_LOG_BASE}_batching_init_failure
+
+run_server
+if [ "$SERVER_PID" != "0" ]; then
+    cat $SERVER_LOG
+    echo -e "\n***\n*** ModelBatchInit Error Test: unexpected successful server start $SERVER\n***"
+    kill_server
+    RET=1
+else
+    if [ `grep -c "Failure test case" $SERVER_LOG` -lt 1 ] || [ `grep -c "Not found" $SERVER_LOG` -lt 1 ]; then
+        cat $SERVER_LOG
+        echo -e "\n***\n*** ModelBatchInit Error Test: failed to find \"Failure test case\" message and/or \"Not found\" error type"
+        RET=1
+    fi
+fi
+
+
 if [ $RET -eq 0 ]; then
     echo -e "\n***\n*** Test Passed\n***"
 else
-    cat $CLIENT_LOG
     echo -e "\n***\n*** Test FAILED\n***"
 fi
 

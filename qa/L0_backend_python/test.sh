@@ -139,8 +139,8 @@ fi
 prev_num_pages=`get_shm_pages`
 run_server
 if [ "$SERVER_PID" == "0" ]; then
-    echo -e "\n***\n*** Failed to start $SERVER\n***"
     cat $SERVER_LOG
+    echo -e "\n***\n*** Failed to start $SERVER\n***"
     exit 1
 fi
 
@@ -176,8 +176,8 @@ prev_num_pages=`get_shm_pages`
 # Triton non-graceful exit
 run_server
 if [ "$SERVER_PID" == "0" ]; then
-    echo -e "\n***\n*** Failed to start $SERVER\n***"
     cat $SERVER_LOG
+    echo -e "\n***\n*** Failed to start $SERVER\n***"
     exit 1
 fi
 
@@ -216,8 +216,8 @@ if [ "$TEST_JETSON" == "0" ]; then
   prev_num_pages=`get_shm_pages`
   run_server
   if [ "$SERVER_PID" == "0" ]; then
-      echo -e "\n***\n*** Failed to start $SERVER\n***"
       cat $SERVER_LOG
+      echo -e "\n***\n*** Failed to start $SERVER\n***"
       exit 1
   fi
 
@@ -252,8 +252,8 @@ cp ../python_models/identity_fp32/config.pbtxt ./models/multi_file/
 prev_num_pages=`get_shm_pages`
 run_server
 if [ "$SERVER_PID" == "0" ]; then
-    echo -e "\n***\n*** Failed to start $SERVER\n***"
     cat $SERVER_LOG
+    echo -e "\n***\n*** Failed to start $SERVER\n***"
     exit 1
 fi
 
@@ -286,9 +286,9 @@ export MY_ENV="MY_ENV"
 prev_num_pages=`get_shm_pages`
 run_server
 if [ "$SERVER_PID" == "0" ]; then
+    cat $SERVER_LOG
     echo -e "\n***\n*** Failed to start $SERVER\n***"
     echo -e "\n***\n*** Environment variable test failed \n***"
-    cat $SERVER_LOG
     exit 1
 fi
 
@@ -315,8 +315,8 @@ SERVER_ARGS="$BASE_SERVER_ARGS --backend-config=python,shm-default-byte-size=$sh
 
 run_server
 if [ "$SERVER_PID" == "0" ]; then
-    echo -e "\n***\n*** Failed to start $SERVER\n***"
     cat $SERVER_LOG
+    echo -e "\n***\n*** Failed to start $SERVER\n***"
     exit 1
 fi
 
@@ -355,6 +355,7 @@ else
     if grep "$ERROR_MESSAGE" $SERVER_LOG; then
         echo -e "Found \"$ERROR_MESSAGE\"" >> $CLIENT_LOG
     else
+        echo $CLIENT_LOG
         echo -e "Not found \"$ERROR_MESSAGE\"" >> $CLIENT_LOG
         RET=1
     fi
@@ -444,7 +445,6 @@ fi
 if [ $RET -eq 0 ]; then
   echo -e "\n***\n*** Test Passed\n***"
 else
-  cat $SERVER_LOG
   echo -e "\n***\n*** Test FAILED\n***"
 fi
 
