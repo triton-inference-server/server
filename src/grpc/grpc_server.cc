@@ -752,6 +752,15 @@ CommonHandler::RegisterModelMetadata()
       GOTO_IF_ERR(err, earlyexit);
       response->set_platform(std::string(platform, platformlen));
 
+      if (model_metadata_json.Find("card")) {
+        const char* card;
+        size_t cardlen;
+        err = model_metadata_json.MemberAsString("card", &card, &cardlen);
+        GOTO_IF_ERR(err, earlyexit);
+
+        response->set_card(std::string(card, cardlen));
+      }
+
       if (model_metadata_json.Find("inputs")) {
         triton::common::TritonJson::Value inputs_json;
         err = model_metadata_json.MemberAsArray("inputs", &inputs_json);
