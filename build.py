@@ -1303,7 +1303,7 @@ def create_build_dockerfiles(container_build_dir, images, backends, repoagents,
         base_image = 'nvcr.io/nvidia/tritonserver:{}-py3-min'.format(
             FLAGS.upstream_container_version)
     else:
-        base_image = 'ubuntu:20.04'
+        base_image = 'ubuntu:22.04'
 
     dockerfileargmap = {
         'NVIDIA_BUILD_REF':
