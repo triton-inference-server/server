@@ -26,11 +26,9 @@
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 import unittest
-import numpy as np
 import time
 
 import tritonclient.http as tritonclient
-from tritonclient.utils import InferenceServerException
 
 import nvidia_smi
 
