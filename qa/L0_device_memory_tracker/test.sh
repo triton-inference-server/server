@@ -59,6 +59,7 @@ RET=0
 rm -rf models && mkdir models
 # ONNX
 cp -r /data/inferenceserver/${REPO_VERSION}/onnx_model_store/* models/.
+rm -r models/*cpu
 
 # Convert to get TRT models against the system
 CAFFE2PLAN=../common/caffe2plan
@@ -94,7 +95,7 @@ pip install nvidia-ml-py3
 # Start server to load all models (in parallel), then gradually unload
 # the models and expect the memory usage changes matches what are reported
 # in statistic.
-SERVER_ARGS="--model-repository=models --model-control-mode=explicit --load-model=*"
+SERVER_ARGS="--backend-config=triton-backend-memory-tracker=true --model-repository=models --model-control-mode=explicit --load-model=*"
 run_server
 if [ "$SERVER_PID" == "0" ]; then
     echo -e "\n***\n*** Failed to start $SERVER\n***"
