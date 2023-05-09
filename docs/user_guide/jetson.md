@@ -144,7 +144,7 @@ apt update && apt install -y gpg wget && \
       echo "deb [signed-by=/usr/share/keyrings/kitware-archive-keyring.gpg] https://apt.kitware.com/ubuntu/ $UBUNTU_CODENAME main" | \
       tee /etc/apt/sources.list.d/kitware.list >/dev/null && \
       apt-get update && \
-      apt-get install -y --no-install-recommends cmake=3.25.2* cmake-data=3.25.2* 
+      apt-get install -y --no-install-recommends cmake cmake-data 
 ```
 
 ### Runtime Dependencies for Triton
@@ -155,7 +155,7 @@ The following runtime dependencies must be installed before running Triton serve
 apt-get update && \
         apt-get install -y --no-install-recommends \
         libb64-0d \
-        libre2-5 \
+        libre2-9 \
         libssl1.1 \
         rapidjson-dev \
         libopenblas-dev \
