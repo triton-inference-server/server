@@ -59,7 +59,7 @@ class MemoryUsageTest(unittest.TestCase):
         # unload and verify recorded usage
         before_total_usage = self.report_used_gpu_memory()
         self.client_.unload_model(model_stat["name"])
-        # unload return after puttting model to unload process,
+        # unload can return before the model is fully unloaded,
         # wait to be finished
         time.sleep(2)
         usage_delta = before_total_usage - self.report_used_gpu_memory()

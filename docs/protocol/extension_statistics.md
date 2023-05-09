@@ -459,7 +459,7 @@ message MemoryUsage
 
   // The id of the memory, typically used with "type" to identify
   // a device that hosts the memory.
-  uint64_t id = 2;
+  int64_t id = 2;
 
   // The byte size of the memory.
   uint64_t byte_size = 3;

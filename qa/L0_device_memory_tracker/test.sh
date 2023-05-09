@@ -89,6 +89,11 @@ if [ $? -ne 0 ]; then
 fi
 set -e
 
+# Set multiple instances on selected model to test instance-wise collection
+# and accumulation.
+echo "instance_group [{ count: 2; kind: KIND_GPU }]" >> models/resnet152_plan/config.pbtxt
+echo "instance_group [{ count: 2; kind: KIND_GPU }]" >> models/densenet/config.pbtxt
+
 # testing use nvidia-smi for Python to validate the reported usage
 pip install nvidia-ml-py3
 
