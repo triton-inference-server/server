@@ -155,7 +155,7 @@ The following runtime dependencies must be installed before running Triton serve
 apt-get update && \
         apt-get install -y --no-install-recommends \
         libb64-0d \
-        libre2-5 \
+        libre2-9 \
         libssl1.1 \
         rapidjson-dev \
         libopenblas-dev \
