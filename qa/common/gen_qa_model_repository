@@ -51,11 +51,11 @@
 TRITON_VERSION=${TRITON_VERSION:=23.04}
 
 # ONNX. Use ONNX_OPSET 0 to use the default for ONNX version
-ONNX_VERSION=1.10.1
+ONNX_VERSION=1.14.0
 ONNX_OPSET=0
 
 # OPENVINO version
-OPENVINO_VERSION=2021.4.582
+OPENVINO_VERSION=2022.3.0
 
 UBUNTU_IMAGE=${UBUNTU_IMAGE:=ubuntu:22.04}
 PYTORCH_IMAGE=${PYTORCH_IMAGE:=nvcr.io/nvidia/pytorch:$TRITON_VERSION-py3}
@@ -204,19 +204,11 @@ apt-get update && \
             software-properties-common
 ln -s /usr/bin/python3 /usr/bin/python
 
-(wget https://apt.repos.intel.com/openvino/2021/GPG-PUB-KEY-INTEL-OPENVINO-2021 && \
-    apt-key add GPG-PUB-KEY-INTEL-OPENVINO-2021 && rm GPG-PUB-KEY-INTEL-OPENVINO-2021 && \
-    cd /etc/apt/sources.list.d && \
-    echo "deb https://apt.repos.intel.com/openvino/2021 all main">intel-openvino-2021.list && \
-    apt update && \
-    apt install -y intel-openvino-dev-ubuntu20-${OPENVINO_VERSION})
-
 pip3 install "protobuf<=3.20.1" # TODO: Remove current line DLIS-3838
 
 pip3 install  "numpy<=1.23.5" setuptools
 
-PYTHONPATH=/opt/intel/openvino_${OPENVINO_VERSION}/python/python3
-source /opt/intel/openvino_${OPENVINO_VERSION}/bin/setupvars.sh .
+pip3 install openvino==$OPENVINO_VERSION
 
 # Since variable shape tensors are not allowed, identity models may fail to generate.
 # TODO Add variable size tensor models after DLIS-2827 adds support for variable shape tensors.
