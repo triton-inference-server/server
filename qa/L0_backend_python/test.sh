@@ -371,81 +371,54 @@ and shared memory pages after starting triton equals to $current_num_pages \n***
     exit 1
 fi
 
-(cd lifecycle && bash -ex test.sh)
-if [ $? -ne 0 ]; then
-  RET=1
-fi
-
-(cd restart && bash -ex test.sh)
-if [ $? -ne 0 ]; then
-  RET=1
-fi
-
-(cd model_control && bash -ex test.sh)
-if [ $? -ne 0 ]; then
-  RET=1
-fi
-
-(cd examples && bash -ex test.sh)
-if [ $? -ne 0 ]; then
-  RET=1
-fi
-
-(cd argument_validation && bash -ex test.sh)
-if [ $? -ne 0 ]; then
-  RET=1
-fi
-
-(cd logging && bash -ex test.sh)
-if [ $? -ne 0 ]; then
-  RET=1
-fi
-
 # Disable env test for Jetson since build is non-dockerized and cloud storage repos are not supported
 # Disable ensemble, unittest, io and bls tests for Jetson since GPU Tensors are not supported
 # Disable variants test for Jetson since already built without GPU Tensor support
 # Disable decoupled test because it uses GPU tensors
 if [ "$TEST_JETSON" == "0" ]; then
-  (cd env && bash -ex test.sh)
-  if [ $? -ne 0 ]; then
-    RET=1
-  fi
+    SUBTESTS="ensemble unittest io bls decoupled variants"
+    for TEST in ${SUBTESTS}; do
+        # Run each subtest in a separate virtual environment to avoid conflicts
+        # between dependencies.
+        virtualenv --system-site-packages venv
+        source venv/bin/activate
 
-  (cd ensemble && bash -ex test.sh)
-  if [ $? -ne 0 ]; then
-    RET=1
-  fi
+        (cd ${TEST} && bash -ex test.sh)
+        if [ $? -ne 0 ]; then
+        echo "Subtest ${TEST} FAILED"
+        RET=1
+        fi
 
-  (cd unittest && bash -ex test.sh)
-  if [ $? -ne 0 ]; then
-    RET=1
-  fi
+        deactivate
+        rm -fr venv
+    done
 
-  (cd io && bash -ex test.sh)
-  if [ $? -ne 0 ]; then
-    RET=1
-  fi
-
-  (cd bls && bash -ex test.sh)
-  if [ $? -ne 0 ]; then
-    RET=1
-  fi
-
-  (cd decoupled && bash -ex test.sh)
-  if [ $? -ne 0 ]; then
-    RET=1
-  fi
-
-  (cd variants && bash -ex test.sh)
-  if [ $? -ne 0 ]; then
-    RET=1
-  fi
+    # In 'env' test we use miniconda for dependency management. No need to run
+    # the test in a virtual environment.
+    (cd env && bash -ex test.sh)
+    if [ $? -ne 0 ]; then
+        echo "Subtest env FAILED"
+        RET=1
+    fi
 fi
 
-(cd custom_metrics && bash -ex test.sh)
-if [ $? -ne 0 ]; then
-  RET=1
-fi
+SUBTESTS="lifecycle restart model_control examples argument_validation logging custom_metrics"
+for TEST in ${SUBTESTS}; do
+    # Run each subtest in a separate virtual environment to avoid conflicts
+    # between dependencies.
+    virtualenv --system-site-packages venv
+    source venv/bin/activate
+
+    (cd ${TEST} && bash -ex test.sh)
+
+    if [ $? -ne 0 ]; then
+        echo "Subtest ${TEST} FAILED"
+        RET=1
+    fi
+
+    deactivate
+    rm -fr venv
+done
 
 if [ $RET -eq 0 ]; then
   echo -e "\n***\n*** Test Passed\n***"

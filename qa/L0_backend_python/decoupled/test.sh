@@ -34,6 +34,9 @@ BACKEND_DIR=${TRITON_DIR}/backends
 SERVER_ARGS="--model-repository=`pwd`/models --backend-directory=${BACKEND_DIR} --log-verbose=1"
 SERVER_LOG="./inference_server.log"
 
+pip3 uninstall -y torch
+pip3 install torch==1.13.0+cu117 -f https://download.pytorch.org/whl/torch_stable.html
+
 RET=0
 source ../../common/util.sh
 
