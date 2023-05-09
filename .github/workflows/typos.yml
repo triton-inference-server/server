@@ -37,4 +37,4 @@ jobs:
 
     # https://github.com/marketplace/actions/typos-action
     - name: Check spelling of all files in repository
-      uses: crate-ci/typos@master
+      uses: crate-ci/typos@v1.0.4
