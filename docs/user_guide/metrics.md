@@ -98,7 +98,7 @@ Count*. The count metrics are illustrated by the following examples:
 
 ### Latencies
 
-Starting in 23.04, Triton exposes the ability to choose the types of metrics
+Starting in 23.05, Triton exposes the ability to choose the types of metrics
 that are published through the `--metrics-config` CLI options.
 
 #### Counters
