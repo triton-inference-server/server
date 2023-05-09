@@ -46,7 +46,7 @@ apt update && apt install -y gpg wget && \
     echo "deb [signed-by=/usr/share/keyrings/kitware-archive-keyring.gpg] https://apt.kitware.com/ubuntu/ $UBUNTU_CODENAME main" | \
     tee /etc/apt/sources.list.d/kitware.list >/dev/null && \
     apt-get update && \
-    apt-get install -y --no-install-recommends cmake=3.25.2* cmake-data=3.25.2* \
+    apt-get install -y --no-install-recommends cmake cmake-data \
             rapidjson-dev
 cmake --version
 
