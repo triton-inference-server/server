@@ -339,11 +339,6 @@ RUN pip3 install --upgrade wheel setuptools && \
     pip3 install --upgrade numpy pillow attrdict future grpcio requests gsutil \
                            awscli six grpcio-channelz prettytable virtualenv
 
-# L0_http_fuzz is hitting similar issue with boofuzz with latest version (0.4.0):
-# https://github.com/jtpereyda/boofuzz/issues/529
-# Hence, fixing the boofuzz version to 0.3.0
-RUN pip3 install 'boofuzz==0.3.0'
-
 # go needed for example go client test.
 RUN if [ "$TARGETPLATFORM" = "linux/arm64" ]; then \
       wget https://golang.org/dl/go1.19.1.linux-arm64.tar.gz && \
