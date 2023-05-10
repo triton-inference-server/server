@@ -1,5 +1,5 @@
 <!--
-# Copyright 2018-2022, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright 2018-2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -81,15 +81,33 @@ If you are seeing some memory growth when using the [model control
 protocol](../protocol/extension_model_repository.md) for loading and unloading
 models, it is possible that it's not an actual memory leak but some system's
 malloc heuristics that causes memory to be unable to be released back to the OS
-right away. You can try to switch from malloc to tcmalloc for better memory
-performance by setting `LD_PRELOAD` as below when running Triton:
+right away. To improve memory performance, you can consider switching from
+malloc to [tcmalloc](https://github.com/google/tcmalloc) or
+[jemalloc](https://github.com/jemalloc/jemalloc) by setting the `LD_PRELOAD`
+environment variable when running Triton, as shown below:
 ```
+# Using tcmalloc
 LD_PRELOAD=/usr/lib/$(uname -m)-linux-gnu/libtcmalloc.so.4:${LD_PRELOAD} tritonserver --model-repository=/models ...
 ```
-The tcmalloc library is already installed within Triton container. You can also
-install tcmalloc using
 ```
+# Using jemalloc
+LD_PRELOAD=/usr/lib/$(uname -m)-linux-gnu/libjemalloc.so:${LD_PRELOAD} tritonserver --model-repository=/models ...
+```
+We recommend experimenting with both tcmalloc and jemalloc to determine which
+one works better for your use case, as they have different strategies for
+memory allocation and deallocation and may perform differently depending on the
+workload.
+
+Both tcmalloc and jemalloc libraries are already installed within the Triton
+container. However, if you need to install them, you can do so using the
+following commands:
+```
+# Install tcmalloc
 apt-get install gperf libgoogle-perftools-dev
+```
+```
+# Install jemalloc
+apt-get install libjemalloc-dev
 ```
 
 ## Model Control Mode POLL
