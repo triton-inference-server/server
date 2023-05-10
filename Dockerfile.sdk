@@ -37,7 +37,6 @@ ARG TRITON_CORE_REPO_TAG=main
 ARG TRITON_BACKEND_REPO_TAG=main
 ARG TRITON_THIRD_PARTY_REPO_TAG=main
 ARG TRITON_MODEL_ANALYZER_REPO_TAG=main
-ARG CMAKE_UBUNTU_VERSION=20.04
 ARG TRITON_ENABLE_GPU=ON
 ARG JAVA_BINDINGS_MAVEN_VERSION=3.8.4
 ARG JAVA_BINDINGS_JAVACPP_PRESETS_TAG=1.5.8
@@ -87,7 +86,6 @@ RUN apt-get update && \
     pip3 install --upgrade grpcio-tools && \
     pip3 install --upgrade pip
 
-ARG CMAKE_UBUNTU_VERSION
 # Client build requires recent version of CMake (FetchContent required)
 # Using CMAKE installation instruction from:: https://apt.kitware.com/
 RUN apt update && apt install -y gpg wget && \
