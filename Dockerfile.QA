@@ -296,12 +296,16 @@ RUN if [ $(cat /etc/os-release | grep 'VERSION_ID="20.04"' | wc -l) -ne 0 ]; the
         apt-get update && \
         apt-get install -y --no-install-recommends \
                 libpng-dev; \
+    elif [ $(cat /etc/os-release | grep 'VERSION_ID="22.04"' | wc -l) -ne 0 ]; then \
+        apt-get update && \
+        apt-get install -y --no-install-recommends \
+                libpng-dev; \
     elif [ $(cat /etc/os-release | grep 'VERSION_ID="18.04"' | wc -l) -ne 0 ]; then \
         apt-get update && \
         apt-get install -y --no-install-recommends \
                 libpng-dev; \
     else \
-        echo "Ubuntu version must be either 18.04 or 20.04" && \
+        echo "Ubuntu version must be either 18.04, 20.04 or 22.04" && \
         exit 1; \
     fi
 
