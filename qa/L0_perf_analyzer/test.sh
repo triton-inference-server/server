@@ -854,9 +854,9 @@ if [ $(cat $CLIENT_LOG |  grep "Request Rate: 40" | wc -l) -eq 0 ]; then
 fi
 set -e
 
-# Test DEB-new-option mode 
+# Test --serial-sequences mode 
 set +e
-$PERF_ANALYZER -v -i $PROTOCOL -m  simple_savedmodel_sequence_object -p 1000 --request-rate-range 100:200:50 --DEB-new-option \
+$PERF_ANALYZER -v -i $PROTOCOL -m  simple_savedmodel_sequence_object -p 1000 --request-rate-range 100:200:50 --serial-sequences \
     --input-data=$SEQ_JSONDATAFILE -s ${STABILITY_THRESHOLD} >$CLIENT_LOG 2>&1
     if [ $? -ne 0 ]; then
         cat $CLIENT_LOG
@@ -869,7 +869,7 @@ $PERF_ANALYZER -v -i $PROTOCOL -m  simple_savedmodel_sequence_object -p 1000 --r
         RET=1
     fi
     set -e
-$PERF_ANALYZER -v -i $PROTOCOL -m  simple_savedmodel_sequence_object -p 1000 --request-intervals $CUSTOM_SCHEDULE_FILE --DEB-new-option \
+$PERF_ANALYZER -v -i $PROTOCOL -m  simple_savedmodel_sequence_object -p 1000 --request-intervals $CUSTOM_SCHEDULE_FILE --serial-sequences \
     --input-data=$SEQ_JSONDATAFILE -s ${STABILITY_THRESHOLD} >$CLIENT_LOG 2>&1
     if [ $? -ne 0 ]; then
         cat $CLIENT_LOG
