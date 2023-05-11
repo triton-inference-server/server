@@ -163,6 +163,7 @@ class TestInstanceUpdate(unittest.TestCase):
         self.__update_instance_count(0, 4)  # remove 4 instances
         self.__update_instance_count(0, 3)  # remove 3 instances
         self.__update_instance_count(0, 0)  # no change
+        time.sleep(0.1)  # larger the gap for config.pbtxt timestamp to update
         self.__update_instance_count(2, 0)  # add 2 instances
         self.__update_instance_count(5, 0)  # add 5 instances
         self.__unload_model()
