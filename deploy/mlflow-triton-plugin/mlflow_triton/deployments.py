@@ -388,10 +388,11 @@ default_model_filename: "{}"
 
                         if flavor == "onnx":
                             s3_path = os.path.join(
+                                self.server_config['s3_prefix'],
                                 copy_paths[key]['to'].replace(
-                                    self.server_config['triton_model_repo'], ''),
+                                    self.server_config['triton_model_repo'], '').replace('/', '', 1),
                                 filename,
-                            ).replace('/', '', 1)
+                            )
 
                         elif flavor == "triton":
                             rel_path = os.path.relpath(
