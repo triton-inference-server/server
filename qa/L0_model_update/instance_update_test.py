@@ -25,6 +25,7 @@
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 import unittest
+import os
 import random
 import time
 import concurrent.futures
@@ -206,11 +207,13 @@ class TestInstanceUpdate(unittest.TestCase):
         # Load 3 instances with 2 different names
         self.__load_model(
             3,
-            "{\nname: \"old_1\"\ncount: 1\nkind: KIND_CPU\n},\n{\nname: \"old_2\"\ncount: 2\nkind: KIND_GPU\n}")
+            "{\nname: \"old_1\"\ncount: 1\nkind: KIND_CPU\n},\n{\nname: \"old_2\"\ncount: 2\nkind: KIND_GPU\n}"
+        )
         # Change the instance names
         self.__update_instance_count(
             0, 0,
-            "{\nname: \"new_1\"\ncount: 1\nkind: KIND_CPU\n},\n{\nname: \"new_2\"\ncount: 2\nkind: KIND_GPU\n}")
+            "{\nname: \"new_1\"\ncount: 1\nkind: KIND_CPU\n},\n{\nname: \"new_2\"\ncount: 2\nkind: KIND_GPU\n}"
+        )
         # Unload model
         self.__unload_model()
 
@@ -309,6 +312,8 @@ class TestInstanceUpdate(unittest.TestCase):
         self.__unload_model()
 
     # Test instance resource requirement increase
+    @unittest.skipUnless(os.environ["RATE_LIMIT_MODE"] == "execution_count",
+                         "Rate limiter precondition not met for this test")
     def test_instance_resource_increase(self):
         # Load model
         self.__load_model(
