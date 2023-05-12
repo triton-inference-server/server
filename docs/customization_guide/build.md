@@ -111,7 +111,7 @@ building with Docker.
     image pulled from [NGC](https://ngc.nvidia.com) that contains the
     CUDA, cuDNN, TensorRT and other dependencies that are required to
     build Triton. When building without GPU support, the *min* image
-    is the standard ubuntu:20.04 image.
+    is the standard ubuntu:22.04 image.
 
   * Run the cmake_build script within the *tritonserver_buildbase*
     image to actually build Triton. The cmake_build script performs
