@@ -71,11 +71,11 @@ TRITON_VERSION_MAP = {
     '2.35.0dev': (
         '23.06dev',  # triton container
         '23.05',  # upstream container
-        '1.14.1',  # ORT
+        '1.15.0',  # ORT
         '2022.1.0',  # ORT OpenVINO
         '2022.1.0',  # Standalone OpenVINO
         '2.2.9',  # DCGM version
-        'py38_4.12.0')  # Conda version.
+        'py310_23.1.0-1')  # Conda version.
 }
 
 CORE_BACKENDS = ['ensemble']
@@ -858,9 +858,9 @@ def install_miniconda(conda_version, target_machine):
             .format(FLAGS.version))
     miniconda_url = f"https://repo.anaconda.com/miniconda/Miniconda3-{conda_version}-Linux-{target_machine}.sh"
     if target_machine == 'x86_64':
-        sha_sum = "3190da6626f86eee8abf1b2fd7a5af492994eb2667357ee4243975cdbb175d7a"
+        sha_sum = "32d73e1bc33fda089d7cd9ef4c1be542616bd8e437d1f77afeeaf7afdb019787"
     else:
-        sha_sum = "0c20f121dc4c8010032d64f8e9b27d79e52d28355eb8d7972eafc90652387777"
+        sha_sum = "80d6c306b015e1e3b01ea59dc66c676a81fa30279bc2da1f180a7ef7b2191d6e"
     return f'''
 RUN mkdir -p /opt/
 RUN wget "{miniconda_url}" -O miniconda.sh -q && \
@@ -946,13 +946,15 @@ RUN wget -O /tmp/boost.tar.gz \
     mv /tmp/boost_1_80_0/boost /usr/include/boost
 
 # Server build requires recent version of CMake (FetchContent required)
-RUN wget -O - https://apt.kitware.com/keys/kitware-archive-latest.asc 2>/dev/null | \
-      gpg --dearmor - |  \
-      tee /etc/apt/trusted.gpg.d/kitware.gpg >/dev/null && \
-    apt-add-repository 'deb https://apt.kitware.com/ubuntu/ focal main' && \
+RUN apt update && apt install -y gpg wget && \
+    wget -O - https://apt.kitware.com/keys/kitware-archive-latest.asc 2>/dev/null | \
+        gpg --dearmor - |  \
+        tee /usr/share/keyrings/kitware-archive-keyring.gpg >/dev/null && \
+    . /etc/os-release && \
+    echo "deb [signed-by=/usr/share/keyrings/kitware-archive-keyring.gpg] https://apt.kitware.com/ubuntu/ $UBUNTU_CODENAME main" | \
+    tee /etc/apt/sources.list.d/kitware.list >/dev/null && \
     apt-get update && \
-    apt-get install -y --no-install-recommends \
-      cmake-data=3.25.2-0kitware1ubuntu20.04.1 cmake=3.25.2-0kitware1ubuntu20.04.1
+    apt-get install -y --no-install-recommends cmake cmake-data 
 '''
 
         if FLAGS.enable_gpu:
@@ -1137,7 +1139,7 @@ RUN apt-get update && \
             software-properties-common \
             libb64-0d \
             libcurl4-openssl-dev \
-            libre2-5 \
+            libre2-9 \
             git \
             gperf \
             dirmngr \
@@ -1315,7 +1317,7 @@ def create_build_dockerfiles(container_build_dir, images, backends, repoagents,
         base_image = 'nvcr.io/nvidia/tritonserver:{}-py3-min'.format(
             FLAGS.upstream_container_version)
     else:
-        base_image = 'ubuntu:20.04'
+        base_image = 'ubuntu:22.04'
 
     dockerfileargmap = {
         'NVIDIA_BUILD_REF':
