@@ -53,6 +53,8 @@ function setup_models() {
         mv models/model_init_del/model.py models/model_init_del/1
 }
 
+RET=0
+
 # Test model instance update with and without rate limiting enabled
 for RATE_LIMIT_MODE in "off" "execution_count"; do
 
@@ -69,13 +71,11 @@ for RATE_LIMIT_MODE in "off" "execution_count"; do
         exit 1
     fi
 
-    RET=0
-
     set +e
     python instance_update_test.py > $TEST_LOG 2>&1
     if [ $? -ne 0 ]; then
-        cat $TEST_LOG.log
-        echo -e "\n***\n*** Test FAILED\n***"
+        echo -e "\n***\n*** Failed model instance update test on rate limit mode $RATE_LIMIT_MODE\n***"
+        cat $TEST_LOG
         RET=1
     fi
     set -e
@@ -83,12 +83,11 @@ for RATE_LIMIT_MODE in "off" "execution_count"; do
     kill $SERVER_PID
     wait $SERVER_PID
 
-    if [ $RET -ne 0 ]; then
-        exit $RET
-    fi
-
 done
 
-# Exit with success
-echo -e "\n***\n*** Test Passed\n***"
-exit 0
+if [ $RET -eq 0 ]; then
+    echo -e "\n***\n*** Test Passed\n***"
+else
+    echo -e "\n***\n*** Test FAILED\n***"
+fi
+exit $RET
