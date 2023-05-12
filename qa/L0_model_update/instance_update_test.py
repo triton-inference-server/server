@@ -25,6 +25,7 @@
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 import unittest
+import os
 import random
 import time
 import concurrent.futures
@@ -63,7 +64,7 @@ class TestInstanceUpdate(unittest.TestCase):
         stop = [False]
         def repeat_infer():
             while not stop[0]:
-                self.__infer()
+                self.__infer(batching)
         infer_threads = [pool.submit(repeat_infer) for i in range(concurrency)]
         def stop_infer():
             stop[0] = True
@@ -83,17 +84,20 @@ class TestInstanceUpdate(unittest.TestCase):
                 num_retry += 1
         self.assertEqual(get_count(kind), expected_count)
 
-    def __load_model(self, instance_count, instance_config=""):
+    def __load_model(self, instance_count, instance_config="", batching=False):
         # Reset counters
         reset_count("initialize")
         reset_count("finalize")
-        # Reset batching
-        disable_batching()
+        # Set batching
+        enable_batching() if batching else disable_batching()
         # Reset delays
         set_delay("initialize", 0)
         set_delay("infer", 0)
         # Load model
-        self.__update_instance_count(instance_count, 0, instance_config)
+        self.__update_instance_count(instance_count,
+                                     0,
+                                     instance_config,
+                                     batching=batching)
 
     def __update_instance_count(self,
                                 add_count,
@@ -131,23 +135,25 @@ class TestInstanceUpdate(unittest.TestCase):
 
     # Test add -> remove -> add an instance
     def test_add_rm_add_instance(self):
-        self.__load_model(3)
-        stop = self.__concurrent_infer()
-        self.__update_instance_count(1, 0)  # add 1 instance
-        self.__update_instance_count(0, 1)  # remove 1 instance
-        self.__update_instance_count(1, 0)  # add 1 instance
-        stop()
-        self.__unload_model()
+        for batching in [False, True]:
+            self.__load_model(3, batching=batching)
+            stop = self.__concurrent_infer(batching=batching)
+            self.__update_instance_count(1, 0, batching=batching)  # add
+            self.__update_instance_count(0, 1, batching=batching)  # remove
+            self.__update_instance_count(1, 0, batching=batching)  # add
+            stop()
+            self.__unload_model(batching=batching)
 
     # Test remove -> add -> remove an instance
     def test_rm_add_rm_instance(self):
-        self.__load_model(2)
-        stop = self.__concurrent_infer()
-        self.__update_instance_count(0, 1)  # remove 1 instance
-        self.__update_instance_count(1, 0)  # add 1 instance
-        self.__update_instance_count(0, 1)  # remove 1 instance
-        stop()
-        self.__unload_model()
+        for batching in [False, True]:
+            self.__load_model(2, batching=batching)
+            stop = self.__concurrent_infer(batching=batching)
+            self.__update_instance_count(0, 1, batching=batching)  # remove
+            self.__update_instance_count(1, 0, batching=batching)  # add
+            self.__update_instance_count(0, 1, batching=batching)  # remove
+            stop()
+            self.__unload_model(batching=batching)
 
     # Test reduce instance count to zero
     def test_rm_instance_to_zero(self):
@@ -163,6 +169,7 @@ class TestInstanceUpdate(unittest.TestCase):
         self.__update_instance_count(0, 4)  # remove 4 instances
         self.__update_instance_count(0, 3)  # remove 3 instances
         self.__update_instance_count(0, 0)  # no change
+        time.sleep(0.1)  # larger the gap for config.pbtxt timestamp to update
         self.__update_instance_count(2, 0)  # add 2 instances
         self.__update_instance_count(5, 0)  # add 5 instances
         self.__unload_model()
@@ -195,6 +202,21 @@ class TestInstanceUpdate(unittest.TestCase):
         # Unload model
         self.__unload_model()
 
+    # Test model instance name update
+    def test_instance_name_update(self):
+        # Load 3 instances with 2 different names
+        self.__load_model(
+            3,
+            "{\nname: \"old_1\"\ncount: 1\nkind: KIND_CPU\n},\n{\nname: \"old_2\"\ncount: 2\nkind: KIND_GPU\n}"
+        )
+        # Change the instance names
+        self.__update_instance_count(
+            0, 0,
+            "{\nname: \"new_1\"\ncount: 1\nkind: KIND_CPU\n},\n{\nname: \"new_2\"\ncount: 2\nkind: KIND_GPU\n}"
+        )
+        # Unload model
+        self.__unload_model()
+
     # Test instance update with invalid instance group config
     def test_invalid_config(self):
         # Load model with 8 instances
@@ -220,7 +242,7 @@ class TestInstanceUpdate(unittest.TestCase):
 
     # Test instance update with non instance config changed in config.pbtxt
     def test_non_instance_config_update(self):
-        self.__load_model(4)
+        self.__load_model(4, batching=False)
         enable_batching()
         self.__update_instance_count(2,
                                      4,
@@ -290,6 +312,8 @@ class TestInstanceUpdate(unittest.TestCase):
         self.__unload_model()
 
     # Test instance resource requirement increase
+    @unittest.skipUnless(os.environ["RATE_LIMIT_MODE"] == "execution_count",
+                         "Rate limiter precondition not met for this test")
     def test_instance_resource_increase(self):
         # Load model
         self.__load_model(
