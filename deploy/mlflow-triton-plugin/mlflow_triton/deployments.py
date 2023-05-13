@@ -390,7 +390,7 @@ default_model_filename: "{}"
                             s3_path = os.path.join(
                                 self.server_config['s3_prefix'],
                                 copy_paths[key]['to'].replace(
-                                    self.server_config['triton_model_repo'], '').replace('/', '', 1),
+                                    self.server_config['triton_model_repo'], '').strip('/'),
                                 filename,
                             )
 
