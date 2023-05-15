@@ -33,13 +33,14 @@ class Config(dict):
 
     def __init__(self):
         super().__init__()
-        self.s3_regex = re.compile(
-            's3://(http://|https://|)([0-9a-zA-Z\\-.]+):([0-9]+)/'
-            '([0-9a-z.\\-]+)(((/[0-9a-zA-Z.\\-_]+)*)?)')
         self['triton_url'] = os.environ.get('TRITON_URL')
         self['triton_model_repo'] = os.environ.get('TRITON_MODEL_REPO')
 
         if self['triton_model_repo'].startswith('s3://'):
+            self.s3_regex = re.compile(
+                's3://(http://|https://|)([0-9a-zA-Z\\-.]+):([0-9]+)/'
+                '([0-9a-z.\\-]+)(((/[0-9a-zA-Z.\\-_]+)*)?)')
+
             uri = self.parse_path(self['triton_model_repo'])
             if uri.protocol == "https://":
                 protocol = "https://"
