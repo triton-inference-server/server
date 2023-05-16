@@ -193,6 +193,8 @@ class TritonPlugin(BaseDeploymentClient):
                         )['Body'].read().decode('utf-8'))
                 elif os.path.isfile(mlflow_meta_path):
                     meta_dict = self._get_mlflow_meta_dict(d['name'])
+                else:
+                    continue
 
                 d['triton_model_path'] = meta_dict['triton_model_path']
                 d['mlflow_model_uri'] = meta_dict['mlflow_model_uri']
@@ -288,7 +290,7 @@ class TritonPlugin(BaseDeploymentClient):
     def _get_mlflow_meta_dict(self, name):
         mlflow_meta_path = os.path.join(self.triton_model_repo, name,
                                         _MLFLOW_META_FILENAME)
-        
+
         if 's3' in self.server_config:
             mlflow_meta_dict = ast.literal_eval(self.server_config['s3'].get_object(
                 Bucket=self.server_config['s3_bucket'],
@@ -359,10 +361,10 @@ default_model_filename: "{}"
         return copy_paths
 
     def _walk(self, path):
-        """Walk a path like os.walk() if path is dir, 
+        """Walk a path like os.walk() if path is dir,
         return file in the expected format otherwise.
         :param path: dir or file path
-        
+
         :return: root, dirs, files
         """
         if os.path.isfile(path):
@@ -375,16 +377,16 @@ default_model_filename: "{}"
     def _copy_files_to_triton_repo(self, artifact_path, name, flavor):
         copy_paths = self._get_copy_paths(artifact_path, name, flavor)
         for key in copy_paths:
-            if 's3' in self.server_config:             
+            if 's3' in self.server_config:
                 # copy model dir to s3 recursively
                 for root, dirs, files in self._walk(copy_paths[key]['from']):
                     for filename in files:
                         local_path = os.path.join(root, filename)
-                        
+
                         if flavor == "onnx":
                             s3_path = os.path.join(
                                     copy_paths[key]['to'].replace(
-                                    self.server_config['triton_model_repo'], ''), 
+                                    self.server_config['triton_model_repo'], ''),
                                     filename,
                                     ).replace('/', '', 1)
 
@@ -394,9 +396,9 @@ default_model_filename: "{}"
                                     copy_paths[key]['from'],
                                     )
                             s3_path = f'{name}/{rel_path}'
-                        
+
                         self.server_config['s3'].upload_file(
-                            local_path, 
+                            local_path,
                             self.server_config['s3_bucket'],
                             s3_path,
                         )
@@ -410,13 +412,13 @@ default_model_filename: "{}"
                         os.makedirs(copy_paths[key]['to'])
                     shutil.copy(copy_paths[key]['from'], copy_paths[key]['to'])
 
-        if 's3' not in self.server_config:  
+        if 's3' not in self.server_config:
             triton_deployment_dir = os.path.join(self.triton_model_repo, name)
             version_folder = os.path.join(triton_deployment_dir, "1")
             os.makedirs(version_folder, exist_ok=True)
 
         return copy_paths
-    
+
     def _delete_mlflow_meta(self, filepath):
         if 's3' in self.server_config:
             self.server_config['s3'].delete_object(
@@ -433,20 +435,20 @@ default_model_filename: "{}"
 
         if 's3' in self.server_config:
             objs = self.server_config['s3'].list_objects(
-                Bucket=self.server_config['s3_bucket'], 
+                Bucket=self.server_config['s3_bucket'],
                 Prefix=name,
             )
-            
+
             for key in objs['Contents']:
                 key = key['Key']
                 try:
                     self.server_config['s3'].delete_object(
                         Bucket=self.server_config['s3_bucket'],
                         Key=key,
-                    ) 
+                    )
                 except Exception as e:
                     raise Exception(f'Could not delete {key}: {e}')
-        
+
         else:
             # Check if the deployment directory exists
             if not os.path.isdir(triton_deployment_dir):
