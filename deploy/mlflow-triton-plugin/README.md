@@ -57,7 +57,7 @@ python setup.py install
 ## Quick Start
 
 In this documentation, we will use the files in `examples` to showcase how
-the plugin interacts with Triton Infernce Server. The `onnx_float32_int32_int32`
+the plugin interacts with Triton Inference Server. The `onnx_float32_int32_int32`
 model in `examples` is a simple model that takes two float32 inputs, INPUT0 and
 INPUT1, with shape [-1, 16], and produces two int32 outputs, OUTPUT0 and
 OUTPUT1, where OUTPUT0 is the element-wise summation of INPUT0 and INPUT1 and
@@ -85,7 +85,7 @@ The MLFlow ONNX built-in functionalities can be used to publish `onnx` flavor
 models to MLFlow directly, and the MLFlow Triton plugin will prepare the model
 to the format expected by Triton. You may also log
 [`config.pbtxt`](https://github.com/triton-inference-server/server/blob/main/docs/protocol/extension_model_configuration.md)
-as additonal artifact which Triton will be used to serve the model. Otherwise,
+as additional artifact which Triton will be used to serve the model. Otherwise,
 the server should be run with auto-complete feature enabled
 (`--strict-model-config=false`) to generate the model configuration.
 
