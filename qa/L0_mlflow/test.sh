@@ -39,6 +39,7 @@ rm -fr *.log *.json
 # install a higher version of python which uses blinker 1.6,
 # but it is unknown whether this test should rely on 
 # the default installation of python.
+apt-get update
 apt remove -y python3-blinker
 
 RET=0
