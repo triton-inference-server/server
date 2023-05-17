@@ -43,10 +43,6 @@ apt remove -y python3-blinker
 
 RET=0
 
-# Uninstall the python 3.10 version of blinker. This 
-# causes other dependencies to not install
-apt-get remove python3-blinker
-
 # Set up MLflow and dependencies used by the test
 pip install mlflow onnx onnxruntime boto3
 
