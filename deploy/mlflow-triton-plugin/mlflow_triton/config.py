@@ -124,7 +124,6 @@ class Config(dict):
 
         # Remove extra internal slashes
         true_path = path[ltrim_length:rtrim_length + 1]
-        slash_locations = []
         previous_slash = False
         for i in range(len(true_path)):
             if true_path[i] == '/':
