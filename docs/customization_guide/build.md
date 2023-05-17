@@ -57,7 +57,7 @@ following platforms. See [Building on Unsupported
 Platforms](#building-on-unsupported-platforms) if you are attempting
 to build Triton on a platform that is not listed here.
 
-* [Ubuntu 20.04, x86-64](#building-for-ubuntu-2004)
+* [Ubuntu 22.04, x86-64](#building-for-ubuntu-2204)
 
 * [Jetpack 4.x, NVIDIA Jetson (Xavier, Nano, TX2)](#building-for-jetpack-4x)
 
@@ -67,9 +67,9 @@ If you are developing or debugging Triton, see [Development and
 Incremental Builds](#development-and-incremental-builds) for information
 on how to perform incremental build.
 
-## Building for Ubuntu 20.04
+## Building for Ubuntu 22.04
 
-For Ubuntu-20.04, build.py supports both a Docker build and a
+For Ubuntu-22.04, build.py supports both a Docker build and a
 non-Docker build.
 
 * [Build using Docker](#building-with-docker) and the TensorFlow and PyTorch
@@ -274,7 +274,7 @@ issues since non-supported versions are not tested.
 ## Building for Windows 10
 
 For Windows 10, build.py supports both a Docker build and a non-Docker
-build in a similar way as described for [Ubuntu](#building-for-ubuntu-2004). The primary
+build in a similar way as described for [Ubuntu](#building-for-ubuntu-2204). The primary
 difference is that the minimal/base image used as the base of
 Dockerfile.buildbase image can be built from the provided
 [Dockerfile.win10.min](https://github.com/triton-inference-server/server/blob/main/Dockerfile.win10.min)
@@ -378,7 +378,7 @@ platforms by reading the above documentation and then follow the
 process for the supported platform that most closely matches the
 platform you are interested in (for example, if you are trying to
 build for RHEL/x86-64 then follow the [Building for Ubuntu
-20.04](#building-for-ubuntu-2004) process. You will likely need to
+22.04](#building-for-ubuntu-2204) process. You will likely need to
 make changes in the following areas and then manually run docker_build
 and cmake_build or the equivalent commands to perform a build.
 
@@ -410,7 +410,7 @@ and cmake_build or the equivalent commands to perform a build.
   [TensorFlow](https://github.com/triton-inference-server/tensorflow_backend)
   backend extracts pre-built shared libraries from the TensorFlow NGC
   container as part of the build. This container is only available for
-  Ubuntu-20.04 / x86-64, so if you require the TensorFlow backend for
+  Ubuntu-22.04 / x86-64, so if you require the TensorFlow backend for
   your platform you will need download the TensorFlow container and
   modify its build to produce shared libraries for your platform. You
   must use the TensorFlow source and build scripts from within the NGC
