@@ -44,7 +44,7 @@
 #endif  // TRITON_ENABLE_GRPC
 #if defined(TRITON_ENABLE_HTTP) || defined(TRITON_ENABLE_METRICS)
 #include "http_server.h"
-#endif  // TRITON_ENABLE_HTTP|| TRITON_ENABLE_METRICS
+#endif  // TRITON_ENABLE_HTTP || TRITON_ENABLE_METRICS
 #ifdef TRITON_ENABLE_SAGEMAKER
 #include "sagemaker_server.h"
 #endif  // TRITON_ENABLE_SAGEMAKER
@@ -197,14 +197,9 @@ struct TritonServerParameters {
 
 #ifdef TRITON_ENABLE_METRICS
   bool allow_metrics_{true};
-  // Note that socket address is not part of metrics config,
-  // current implementation enforce metric to use the same address as in
-  // HTTP endpoint.
-  // [FIXME] server can be built with metrics ON and HTTP OFF, but we are
-  // not exposing metrics address configuration (currently only set along with
-  // HTTP address), which causes metrics will always listen on localhost in this
-  // build setting.
-  std::string metrics_address_{"0.0.0.0"};
+  // Defaults to http_address_ if TRITON_ENABLE_HTTP is enabled for backwards,
+  // otherwise defaults to "0.0.0.0" for TRITON_ENABLE_HTTP is disabled.
+  std::string metrics_address_{""};
   int32_t metrics_port_{8002};
   // Metric settings for Triton core
   float metrics_interval_ms_{2000};
@@ -261,7 +256,8 @@ class ParseException : public std::exception {
 // parser)
 class TritonParser {
  public:
-  // Parse command line arguements into a parameters struct and transform
+  TritonParser();
+  // Parse command line arguments into a parameters struct and transform
   // the argument list to contain only unrecognized options. The content of
   // unrecognized argument list shares the same lifecycle as 'argv'.
   // Raise ParseException if fail to parse recognized options.
@@ -307,13 +303,36 @@ class TritonParser {
       bool trace_filepath_present, bool trace_log_frequency_present,
       bool explicit_disable_trace);
 #endif  // TRITON_ENABLE_TRACING
-      // Helper function to parse option in
-      // "<string>[1st_delim]<string>[2nd_delim]<string>" format
-      std::
-          tuple<std::string, std::string, std::string> ParseGenericConfigOption(
-              const std::string& arg, const std::string& first_delim,
-              const std::string& second_delim);
+  // Helper function to parse option in
+  // "<string>[1st_delim]<string>[2nd_delim]<string>" format
+  std::tuple<std::string, std::string, std::string> ParseGenericConfigOption(
+      const std::string& arg, const std::string& first_delim,
+      const std::string& second_delim);
 
-  static std::vector<Option> recognized_options_;
+  // Initialize individual option groups
+  void SetupOptions();
+  // Initialize option group mappings
+  void SetupOptionGroups();
+
+  // Sum of option groups: vector to maintain insertion order for Usage()
+  std::vector<std::pair<std::string, std::vector<Option>&>> option_groups_;
+  // Individual option groups
+  std::vector<Option> global_options_;
+  std::vector<Option> server_options_;
+  std::vector<Option> model_repo_options_;
+  std::vector<Option> logging_options_;
+  std::vector<Option> http_options_;
+  std::vector<Option> grpc_options_;
+  std::vector<Option> sagemaker_options_;
+  std::vector<Option> vertex_options_;
+  std::vector<Option> metric_options_;
+  std::vector<Option> tracing_options_;
+  std::vector<Option> backend_options_;
+  std::vector<Option> repo_agent_options_;
+  std::vector<Option> cache_options_;
+  std::vector<Option> rate_limiter_options_;
+  std::vector<Option> memory_device_options_;
+  // Group deprecated options to keep preferred options more succinct
+  std::vector<Option> deprecated_options_;
 };
 }}  // namespace triton::server

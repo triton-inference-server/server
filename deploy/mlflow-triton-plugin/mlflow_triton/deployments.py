@@ -195,6 +195,8 @@ class TritonPlugin(BaseDeploymentClient):
                     )['Body'].read().decode('utf-8'))
                 elif os.path.isfile(mlflow_meta_path):
                     meta_dict = self._get_mlflow_meta_dict(d['name'])
+                else:
+                    continue
 
                 d['triton_model_path'] = meta_dict['triton_model_path']
                 d['mlflow_model_uri'] = meta_dict['mlflow_model_uri']

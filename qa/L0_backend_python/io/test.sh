@@ -1,5 +1,5 @@
 #!/bin/bash
-# Copyright 2021-2022, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright 2021-2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -43,7 +43,7 @@ RET=0
 rm -fr *.log ./models
 
 pip3 uninstall -y torch
-pip3 install torch==1.13.0
+pip3 install torch==1.13.0+cu117 -f https://download.pytorch.org/whl/torch_stable.html
 
 # IOTest.test_ensemble_io
 TRIALS="default decoupled"

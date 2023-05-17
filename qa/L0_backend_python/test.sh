@@ -139,8 +139,8 @@ fi
 prev_num_pages=`get_shm_pages`
 run_server
 if [ "$SERVER_PID" == "0" ]; then
-    echo -e "\n***\n*** Failed to start $SERVER\n***"
     cat $SERVER_LOG
+    echo -e "\n***\n*** Failed to start $SERVER\n***"
     exit 1
 fi
 
@@ -176,8 +176,8 @@ prev_num_pages=`get_shm_pages`
 # Triton non-graceful exit
 run_server
 if [ "$SERVER_PID" == "0" ]; then
-    echo -e "\n***\n*** Failed to start $SERVER\n***"
     cat $SERVER_LOG
+    echo -e "\n***\n*** Failed to start $SERVER\n***"
     exit 1
 fi
 
@@ -216,8 +216,8 @@ if [ "$TEST_JETSON" == "0" ]; then
   prev_num_pages=`get_shm_pages`
   run_server
   if [ "$SERVER_PID" == "0" ]; then
-      echo -e "\n***\n*** Failed to start $SERVER\n***"
       cat $SERVER_LOG
+      echo -e "\n***\n*** Failed to start $SERVER\n***"
       exit 1
   fi
 
@@ -252,8 +252,8 @@ cp ../python_models/identity_fp32/config.pbtxt ./models/multi_file/
 prev_num_pages=`get_shm_pages`
 run_server
 if [ "$SERVER_PID" == "0" ]; then
-    echo -e "\n***\n*** Failed to start $SERVER\n***"
     cat $SERVER_LOG
+    echo -e "\n***\n*** Failed to start $SERVER\n***"
     exit 1
 fi
 
@@ -286,9 +286,9 @@ export MY_ENV="MY_ENV"
 prev_num_pages=`get_shm_pages`
 run_server
 if [ "$SERVER_PID" == "0" ]; then
+    cat $SERVER_LOG
     echo -e "\n***\n*** Failed to start $SERVER\n***"
     echo -e "\n***\n*** Environment variable test failed \n***"
-    cat $SERVER_LOG
     exit 1
 fi
 
@@ -315,8 +315,8 @@ SERVER_ARGS="$BASE_SERVER_ARGS --backend-config=python,shm-default-byte-size=$sh
 
 run_server
 if [ "$SERVER_PID" == "0" ]; then
-    echo -e "\n***\n*** Failed to start $SERVER\n***"
     cat $SERVER_LOG
+    echo -e "\n***\n*** Failed to start $SERVER\n***"
     exit 1
 fi
 
@@ -355,6 +355,7 @@ else
     if grep "$ERROR_MESSAGE" $SERVER_LOG; then
         echo -e "Found \"$ERROR_MESSAGE\"" >> $CLIENT_LOG
     else
+        echo $CLIENT_LOG
         echo -e "Not found \"$ERROR_MESSAGE\"" >> $CLIENT_LOG
         RET=1
     fi
@@ -370,81 +371,58 @@ and shared memory pages after starting triton equals to $current_num_pages \n***
     exit 1
 fi
 
-(cd lifecycle && bash -ex test.sh)
-if [ $? -ne 0 ]; then
-  RET=1
-fi
-
-(cd restart && bash -ex test.sh)
-if [ $? -ne 0 ]; then
-  RET=1
-fi
-
-(cd model_control && bash -ex test.sh)
-if [ $? -ne 0 ]; then
-  RET=1
-fi
-
-(cd examples && bash -ex test.sh)
-if [ $? -ne 0 ]; then
-  RET=1
-fi
-
-(cd argument_validation && bash -ex test.sh)
-if [ $? -ne 0 ]; then
-  RET=1
-fi
-
-(cd logging && bash -ex test.sh)
-if [ $? -ne 0 ]; then
-  RET=1
-fi
-
 # Disable env test for Jetson since build is non-dockerized and cloud storage repos are not supported
 # Disable ensemble, unittest, io and bls tests for Jetson since GPU Tensors are not supported
 # Disable variants test for Jetson since already built without GPU Tensor support
 # Disable decoupled test because it uses GPU tensors
 if [ "$TEST_JETSON" == "0" ]; then
-  (cd env && bash -ex test.sh)
-  if [ $? -ne 0 ]; then
-    RET=1
-  fi
+    SUBTESTS="ensemble unittest io bls decoupled variants"
+    for TEST in ${SUBTESTS}; do
+        # Run each subtest in a separate virtual environment to avoid conflicts
+        # between dependencies.
+        virtualenv --system-site-packages venv
+        source venv/bin/activate
 
-  (cd ensemble && bash -ex test.sh)
-  if [ $? -ne 0 ]; then
-    RET=1
-  fi
+        (cd ${TEST} && bash -ex test.sh)
+        if [ $? -ne 0 ]; then
+        echo "Subtest ${TEST} FAILED"
+        RET=1
+        fi
 
-  (cd unittest && bash -ex test.sh)
-  if [ $? -ne 0 ]; then
-    RET=1
-  fi
+        deactivate
+        rm -fr venv
+    done
 
-  (cd io && bash -ex test.sh)
-  if [ $? -ne 0 ]; then
-    RET=1
-  fi
-
-  (cd bls && bash -ex test.sh)
-  if [ $? -ne 0 ]; then
-    RET=1
-  fi
-
-  (cd decoupled && bash -ex test.sh)
-  if [ $? -ne 0 ]; then
-    RET=1
-  fi
-
-  (cd variants && bash -ex test.sh)
-  if [ $? -ne 0 ]; then
-    RET=1
-  fi
+    # In 'env' test we use miniconda for dependency management. No need to run
+    # the test in a virtual environment.
+    (cd env && bash -ex test.sh)
+    if [ $? -ne 0 ]; then
+        echo "Subtest env FAILED"
+        RET=1
+    fi
 fi
+
+SUBTESTS="lifecycle restart model_control examples argument_validation logging custom_metrics"
+for TEST in ${SUBTESTS}; do
+    # Run each subtest in a separate virtual environment to avoid conflicts
+    # between dependencies.
+    virtualenv --system-site-packages venv
+    source venv/bin/activate
+
+    (cd ${TEST} && bash -ex test.sh)
+
+    if [ $? -ne 0 ]; then
+        echo "Subtest ${TEST} FAILED"
+        RET=1
+    fi
+
+    deactivate
+    rm -fr venv
+done
 
 if [ $RET -eq 0 ]; then
   echo -e "\n***\n*** Test Passed\n***"
 else
-  cat $SERVER_LOG
   echo -e "\n***\n*** Test FAILED\n***"
 fi
 

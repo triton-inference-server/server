@@ -48,7 +48,7 @@ def gen_pytorch_model(name, batch_size):
     batch_size = 1
     example_inputs = torch.zeros([8, 4], dtype=torch.int64), torch.zeros(
         [8, 4], dtype=torch.int64)
-    model_neuron = torch.neuron.trace(model,
+    model_neuron = torch_neuron.trace(model,
                                       example_inputs,
                                       dynamic_batch_size=True)
     model_neuron.save('{}.pt'.format(name))
@@ -121,5 +121,6 @@ if __name__ == '__main__':
         gen_tf_model(FLAGS.name, FLAGS.batch_size, FLAGS.tf_version)
     elif FLAGS.model_type == 'pytorch':
         import torch
+        import torch_neuron
         from torch import nn
         gen_pytorch_model(FLAGS.name, FLAGS.batch_size)

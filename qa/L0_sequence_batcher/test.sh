@@ -112,7 +112,7 @@ else
     fi
 fi
 
-SERVER_ARGS_EXTRA="--backend-directory=${BACKEND_DIR} --backend-config=tensorflow,version=${TF_VERSION}"
+SERVER_ARGS_EXTRA="--backend-directory=${BACKEND_DIR} --backend-config=tensorflow,version=${TF_VERSION} --log-verbose=1"
 
 source ../common/util.sh
 
@@ -735,8 +735,7 @@ if [ "$TEST_SYSTEM_SHARED_MEMORY" -ne 1 ] && [ "$TEST_CUDA_SHARED_MEMORY" -ne 1 
 
     TEST_CASE=SequenceBatcherRequestTimeoutTest
     MODEL_PATH=request_timeout_models
-    mkdir -p ${MODEL_PATH}/identity_fp32_timeout/1
-    cp ../python_models/identity_fp32_timeout/model.py ${MODEL_PATH}/identity_fp32_timeout/1/.
+    mkdir -p ${MODEL_PATH}/custom_sequence_int32_timeout/1
 
     SERVER_ARGS="--model-repository=$MODELDIR/$MODEL_PATH ${SERVER_ARGS_EXTRA}"
     SERVER_LOG="./$TEST_CASE.$MODEL_PATH.server.log"
