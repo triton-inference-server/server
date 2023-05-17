@@ -55,6 +55,47 @@ SERVER=/opt/tritonserver/bin/tritonserver
 SERVER_ARGS="--model-repository=$DATADIR"
 source ../common/util.sh
 
+# Remove this once foobuzz and tornado packages upgrade to work with python 3.10
+# This test tests the server's ability to handle poor input and not the compatibility 
+# with python 3.10. Python 3.8 is ok to use here.
+function_install_python38() {
+    apt-get update
+    apt-get remove -y python3
+    wget https://www.python.org/ftp/python/3.8.16/Python-3.8.16.tar.xz
+
+    # md5sum is not secure. Only use for sanity check
+    MD5SUM_PYTHON38=$(md5sum Python-3.8.16.tar.xz | awk '{ print $1 }' -)
+    CORRECT_MD5SUM_PYTHON38=621ac153586a3152e2ab7d3a8614df9a
+    if [ "$MD5SUM_PYTHON38" != "$CORRECT_MD5SUM_PYTHON38" ]; then
+        echo "md5sum of downloaded Python-3.8.16.tar.xz does not match! $MD5SUM_PYTHON38 != $CORRECT_MD5SUM_PYTHON38"
+        RET=1
+    fi 
+
+    # check the file size as well
+    FILE_SIZE_PYTHON38=$(ls -l Python-3.8.16.tar.xz | awk '{ print $5 }' -)
+    CORRECT_FILE_SIZE_PYTHON38=19046724
+    if [ "$FILE_SIZE_PYTHON38" != "$CORRECT_FILE_SIZE_PYTHON38" ]; then
+        echo "file size is not correct! $FILE_SIZE_PYTHON38 != $ $CORRECT_FILE_SIZE_PYTHON38" 
+        RET=1
+    fi
+    echo "Validated md5sum and file size of Python-3.8.16.tar.xz"
+
+    # Unpack pythonn and install 
+    tar -xf Python-3.8.16.tar.xz
+    cd Python-3.8.16
+    apt-get install -y libsqlite3-dev libffi-dev
+    ./configure --enable-loadable-sqlite-extensions
+    make 
+    make install
+
+    # Install test script dependencies
+    pip3 install --upgrade wheel setuptools boofuzz==0.3.0 numpy pillow attrdict future grpcio requests gsutil \
+                            awscli six grpcio-channelz prettytable virtualenv
+}
+WORKING_DIR=`pwd`
+function_install_python38
+cd $WORKING_DIR
+
 run_server
 if [ "$SERVER_PID" == "0" ]; then
     echo -e "\n***\n*** Failed to start $SERVER\n***"
@@ -65,7 +106,7 @@ fi
 set +e
 
 # Test health
-python $FUZZTEST -v >> ${FUZZ_LOG} 2>&1
+python3 $FUZZTEST -v >> ${FUZZ_LOG} 2>&1
 if [ $? -ne 0 ]; then
     cat ${FUZZ_LOG}
     RET=1
