@@ -80,7 +80,7 @@ function_install_python38() {
     fi
     echo "Validated md5sum and file size of Python-3.8.16.tar.xz"
 
-    # Unpack pythonn and install 
+    # Unpack python and install 
     tar -xf Python-3.8.16.tar.xz
     cd Python-3.8.16
     apt-get install -y libsqlite3-dev libffi-dev
