@@ -1,5 +1,5 @@
 #!/bin/bash
-# Copyright (c) 2021 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright 2021-2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -73,7 +73,7 @@ for FLAG in true false; do
 
     set +e
 
-    python $SIMPLE_INFER_CLIENT_PY >> $CLIENT_LOG 2>&1
+    python $LIBTORCH_INFER_CLIENT_PY >> $CLIENT_LOG 2>&1
     if [ $? -ne 0 ]; then
         RET=1
     fi
