@@ -31,6 +31,16 @@ source ../common/util.sh
 
 rm -fr *.log *.json
 
+# The default version of python 3.10.6 included in
+# Ubuntu 22.04 installs blinker 1.4. This doesn't 
+# work with the awscli which we try to install. 
+# Uninstalling blinker and allowing pip to install blinker 1.6 
+# fixes this issue. The alternative to this is to 
+# install a higher version of python which uses blinker 1.6,
+# but it is unknown whether this test should rely on 
+# the default installation of python.
+apt remove -y python3-blinker
+
 RET=0
 
 # Uninstall the python 3.10 version of blinker. This 
