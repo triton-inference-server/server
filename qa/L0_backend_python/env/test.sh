@@ -85,7 +85,9 @@ cp python3.6.tar.gz models/python_3_6/python_3_6_environment.tar.gz
 cp ../../python_models/python_version/model.py ./models/python_3_6/1/
 cp python_backend/builddir/triton_python_backend_stub ./models/python_3_6
 
-# Test conda env without custom Python backend stub
+# Test conda env without custom Python backend stub This environment should
+# always use the default Python version shipped in the container. For Ubuntu 22.04
+# it is Python 3.10 and for Ubuntu 20.04 is 3.8
 path_to_conda_pack='$$TRITON_MODEL_DIRECTORY/python_3_10_environment.tar.gz'
 create_conda_env "3.10" "python-3-10"
 conda install -c conda-forge libstdcxx-ng=12 -y
