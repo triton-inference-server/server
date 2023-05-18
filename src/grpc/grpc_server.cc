@@ -1202,10 +1202,10 @@ CommonHandler::RegisterModelStatistics()
             memory_usage->set_type(std::string(type, type_len));
           }
           {
-            uint64_t id;
-            err = usage.MemberAsUInt("id", &id);
+            int64_t id;
+            err = usage.MemberAsInt("id", &id);
             GOTO_IF_ERR(err, earlyexit);
-            memory_usage->set_id(ucnt);
+            memory_usage->set_id(id);
           }
           {
             uint64_t byte_size;
