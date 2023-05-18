@@ -30,7 +30,6 @@ import sys
 
 sys.path.append("../common")
 
-import torch
 import unittest
 import numpy as np
 import test_util as tu
@@ -77,9 +76,7 @@ class InferTest(tu.TestResultCollector):
 
         if model_name == "libtorch_instance_kind_err":
             with self.assertRaises(InferenceServerException) as ex:
-                results = triton_client.infer(model_name,
-                                              inputs,
-                                              outputs=outputs)
+                triton_client.infer(model_name, inputs, outputs=outputs)
             self.assertIn(
                 "Expected all tensors to be on the same device, but found at least two devices",
                 str(ex.exception))

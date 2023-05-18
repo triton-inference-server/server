@@ -27,7 +27,6 @@
 
 import torch
 import torch.nn as nn
-from torch.nn.parallel import DataParallel
 
 
 class TestModel(nn.Module):
