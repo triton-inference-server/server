@@ -127,10 +127,31 @@ def update_instance_group(instance_group_str):
     full_path = os.path.join(os.path.dirname(__file__), "config.pbtxt")
     with open(full_path, mode="r+", encoding="utf-8", errors="strict") as f:
         txt = f.read()
-        txt = txt.split("instance_group [")[0]
+        txt, post_match = txt.split("instance_group [")
         txt += "instance_group [\n"
         txt += instance_group_str
-        txt += "\n]\n"
+        txt += "\n]  # end instance_group\n"
+        txt += post_match.split("\n]  # end instance_group\n")[1]
+        f.truncate(0)
+        f.seek(0)
+        f.write(txt)
+    return txt
+
+def update_sequence_batching(sequence_batching_str):
+    full_path = os.path.join(os.path.dirname(__file__), "config.pbtxt")
+    with open(full_path, mode="r+", encoding="utf-8", errors="strict") as f:
+        txt = f.read()
+        if "sequence_batching {" in txt:
+            txt, post_match = txt.split("sequence_batching {")
+            if sequence_batching_str != "":
+                txt += "sequence_batching {\n"
+                txt += sequence_batching_str
+                txt += "\n}  # end sequence_batching\n"
+            txt += post_match.split("\n}  # end sequence_batching\n")[1]
+        elif sequence_batching_str != "":
+            txt += "\nsequence_batching {\n"
+            txt += sequence_batching_str
+            txt += "\n}  # end sequence_batching\n"
         f.truncate(0)
         f.seek(0)
         f.write(txt)
