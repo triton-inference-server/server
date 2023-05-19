@@ -356,7 +356,7 @@ aws configure set default.region $AWS_DEFAULT_REGION && \
 # Copy models into S3 bucket
 aws s3 cp tmp_cred_test_models/ "${BUCKET_URL_SLASH}" --recursive --include "*"
 
-SERVER_ARGS="--model-repository=$ROOT_REPO --exit-timeout-secs=120"
+SERVER_ARGS="--model-repository=$BUCKET_URL --exit-timeout-secs=120"
 
 run_server
 if [ "$SERVER_PID" == "0" ]; then
