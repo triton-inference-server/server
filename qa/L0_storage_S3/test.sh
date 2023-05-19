@@ -390,6 +390,27 @@ wait $SERVER_PID
 aws s3 rm "${BUCKET_URL_SLASH}" --recursive --include "*"
 aws s3 rb "${BUCKET_URL}"
 
+# Test access decline error message
+export AWS_SECRET_ACCESS_KEY="[Invalid]" && export AWS_SESSION_TOKEN=""
+SERVER_ARGS="--model-repository=$BUCKET_URL --exit-timeout-secs=120"
+run_server
+if [ "$SERVER_PID" != "0" ]; then
+    echo -e "\n***\n*** Unexpected server start $SERVER\n***"
+    cat $SERVER_LOG
+    kill $SERVER_PID
+    wait $SERVER_PID
+    RET=1
+else
+  # AWS S3 does not appear to reply on access decline, but other implementations
+  # might provide extra messages, so make sure Triton will print the messages.
+  EXPECTED_MSG="Unable to create S3 filesystem client. Check account credentials. Exception: '' Message: 'No response body.'"
+  if ! grep "$EXPECTED_MSG" $SERVER_LOG; then
+    echo -e "\n***\n*** Expected error message not found\n***"
+    cat $SERVER_LOG
+    RET=1
+  fi
+fi
+
 if [ $RET -eq 0 ]; then
   echo -e "\n***\n*** Test Passed\n***"
 else
