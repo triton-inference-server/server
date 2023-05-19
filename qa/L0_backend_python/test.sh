@@ -368,7 +368,7 @@ and shared memory pages after starting triton equals to $current_num_pages \n***
     exit 1
 fi
 
-# Disable env test for Jetson since build is non-dockerized and cloud storage repos are not supported
+# Disable env test for Jetson since cloud storage repos are not supported
 # Disable ensemble, unittest, io and bls tests for Jetson since GPU Tensors are not supported
 # Disable variants test for Jetson since already built without GPU Tensor support
 # Disable decoupled test because it uses GPU tensors
