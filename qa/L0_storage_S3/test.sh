@@ -386,11 +386,7 @@ set -e
 kill $SERVER_PID
 wait $SERVER_PID
 
-# Clean up bucket contents and delete bucket
-aws s3 rm "${BUCKET_URL_SLASH}" --recursive --include "*"
-aws s3 rb "${BUCKET_URL}"
-
-# Test access decline error message
+# Test access decline
 export AWS_SECRET_ACCESS_KEY="[Invalid]" && export AWS_SESSION_TOKEN=""
 SERVER_ARGS="--model-repository=$BUCKET_URL --exit-timeout-secs=120"
 run_server
@@ -410,6 +406,19 @@ else
     RET=1
   fi
 fi
+
+# Restore S3 credentials
+rm ~/.aws/credentials && rm ~/.aws/config
+export AWS_DEFAULT_REGION=$AWS_DEFAULT_REGION_BACKUP
+export AWS_ACCESS_KEY_ID=$AWS_ACCESS_KEY_ID_BACKUP
+export AWS_SECRET_ACCESS_KEY=$AWS_SECRET_ACCESS_KEY_BACKUP
+aws configure set default.region $AWS_DEFAULT_REGION && \
+    aws configure set aws_access_key_id $AWS_ACCESS_KEY_ID && \
+    aws configure set aws_secret_access_key $AWS_SECRET_ACCESS_KEY
+
+# Clean up bucket contents and delete bucket
+aws s3 rm "${BUCKET_URL_SLASH}" --recursive --include "*"
+aws s3 rb "${BUCKET_URL}"
 
 if [ $RET -eq 0 ]; then
   echo -e "\n***\n*** Test Passed\n***"
