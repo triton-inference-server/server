@@ -342,6 +342,7 @@ else
     RET=1
   fi
 fi
+# Restore keys for destroying buckets
 export AWS_SECRET_ACCESS_KEY=$AWS_SECRET_ACCESS_KEY_BACKUP
 
 # Destroy buckets
