@@ -123,6 +123,31 @@ def np_to_onnx_dtype(np_dtype):
         return onnx.TensorProto.STRING
     return None
 
+def np_to_torch_dtype(np_dtype):
+    if np_dtype == bool:
+        return torch.bool
+    elif np_dtype == np.int8:
+        return torch.int8
+    elif np_dtype == np.int16:
+        return torch.int16
+    elif np_dtype == np.int32:
+        return torch.int
+    elif np_dtype == np.int64:
+        return torch.long
+    elif np_dtype == np.uint8:
+        return torch.uint8
+    elif np_dtype == np.uint16:
+        return None  # Not supported in Torch
+    elif np_dtype == np.float16:
+        return None
+    elif np_dtype == np.float32:
+        return torch.float
+    elif np_dtype == np.float64:
+        return torch.double
+    elif np_dtype == np_dtype_string:
+        return None  # Not supported in Torch
+    return None
+
 
 def create_savedmodel_modelfile(models_dir, model_version, dtype):
     # Create special identity model for batch input testing.
@@ -633,6 +658,47 @@ def create_onnx_itemshape_modelfile(models_dir, model_version, dtype):
     onnx.save(model_def, model_version_dir + "/model.onnx")
 
 
+def create_libtorch_itemshape_modelfile(models_dir, model_version, dtype):
+    # Create special identity model for batch input 'BATCH_ITEM_SHAPE' testing,
+    # such model has one ragged input and one batch input, and one output to
+    # return the batch input directly. Because 'BATCH_ITEM_SHAPE' should be
+    # generated to have matching batch dimension, the output can be produced
+    # via identity op and expect Triton will scatter the output properly.
+
+    torch_dtype = np_to_torch_dtype(dtype)
+
+    # Create the model
+    model_name = "torch_batch_item"
+    model_version_dir = models_dir + "/" + model_name + "/" + str(model_version)
+
+    input_shape = [-1]
+    batch_shape = [-1, 2]
+
+    if (dtype == np_dtype_string):
+
+        raise Exception("PyTorch ragged model generation for string models not yet implemented")
+
+    else:
+
+        class IdentityNet(nn.Module):
+
+            def __init__(self):
+                super(IdentityNet, self).__init__()
+
+            def forward(self, RAGGED_INPUT, BATCH_INPUT):
+                return BATCH_INPUT
+
+    identityModel = IdentityNet()
+    traced = torch.jit.script(identityModel)
+
+    try:
+        os.makedirs(model_version_dir)
+    except OSError as ex:
+        pass  # ignore existing dir
+
+    traced.save(model_version_dir + "/model.onnx")
+
+
 def create_itemshape_modelconfig(models_dir, max_batch, model_version, dtype,
                                  backend, platform):
     version_policy_str = "{ latest { num_versions: 1 }}"
@@ -717,6 +783,14 @@ def create_batch_input_models(models_dir):
         create_itemshape_modelconfig(models_dir, 4, model_version, np.float32,
                                      "onnxruntime", "onnx")
         create_onnx_itemshape_modelfile(models_dir, model_version, np.float32)
+    
+    if FLAGS.libtorch:
+        # create_modelconfig(models_dir, 4, model_version, np.float32,
+        #                    "pytorch", "pytorch_libtorch")
+        # create_libtorch_modelfile(models_dir, model_version, np.float32)
+        create_itemshape_modelconfig(models_dir, 4, model_version, np.float32,
+                                     "pytorch", "pytorch_libtorch")
+        create_libtorch_itemshape_modelfile(models_dir, model_version, np.float32)
 
 
 if __name__ == '__main__':
