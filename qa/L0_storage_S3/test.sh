@@ -356,7 +356,7 @@ aws configure set default.region $AWS_DEFAULT_REGION && \
 # Copy models into S3 bucket
 aws s3 cp tmp_cred_test_models/ "${BUCKET_URL_SLASH}" --recursive --include "*"
 
-SERVER_ARGS="--model-repository=$ROOT_REPO --exit-timeout-secs=120"
+SERVER_ARGS="--model-repository=$BUCKET_URL --exit-timeout-secs=120"
 
 run_server
 if [ "$SERVER_PID" == "0" ]; then
@@ -385,6 +385,36 @@ set -e
 
 kill $SERVER_PID
 wait $SERVER_PID
+
+# Test access decline
+export AWS_SECRET_ACCESS_KEY="[Invalid]" && export AWS_SESSION_TOKEN=""
+SERVER_ARGS="--model-repository=$BUCKET_URL --exit-timeout-secs=120"
+run_server
+if [ "$SERVER_PID" != "0" ]; then
+    echo -e "\n***\n*** Unexpected server start $SERVER\n***"
+    cat $SERVER_LOG
+    kill $SERVER_PID
+    wait $SERVER_PID
+    RET=1
+else
+  # AWS S3 does not appear to reply on access decline, but other implementations
+  # might provide extra messages, so make sure Triton will print the messages.
+  EXPECTED_MSG="Unable to create S3 filesystem client. Check account credentials. Exception: '' Message: 'No response body.'"
+  if ! grep "$EXPECTED_MSG" $SERVER_LOG; then
+    echo -e "\n***\n*** Expected error message not found\n***"
+    cat $SERVER_LOG
+    RET=1
+  fi
+fi
+
+# Restore S3 credentials
+rm ~/.aws/credentials && rm ~/.aws/config
+export AWS_DEFAULT_REGION=$AWS_DEFAULT_REGION_BACKUP
+export AWS_ACCESS_KEY_ID=$AWS_ACCESS_KEY_ID_BACKUP
+export AWS_SECRET_ACCESS_KEY=$AWS_SECRET_ACCESS_KEY_BACKUP
+aws configure set default.region $AWS_DEFAULT_REGION && \
+    aws configure set aws_access_key_id $AWS_ACCESS_KEY_ID && \
+    aws configure set aws_secret_access_key $AWS_SECRET_ACCESS_KEY
 
 # Clean up bucket contents and delete bucket
 aws s3 rm "${BUCKET_URL_SLASH}" --recursive --include "*"
