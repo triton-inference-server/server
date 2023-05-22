@@ -541,7 +541,7 @@ for i in \
     fi
 
     set +e
-    $CC_UNIT_TEST --gtest_filter=HTTP*$i >> ${CLIENT_LOG}.$i 2>&1
+    $CC_UNIT_TEST --gtest_filter=GRPC*$i >> ${CLIENT_LOG}.$i 2>&1
     if [ $? -ne 0 ]; then
         cat ${CLIENT_LOG}.$i
         RET=1
