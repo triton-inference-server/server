@@ -321,6 +321,7 @@ kill $SERVER_PID
 wait $SERVER_PID
 
 # Test access decline
+AWS_SECRET_ACCESS_KEY_BACKUP=$AWS_SECRET_ACCESS_KEY
 export AWS_SECRET_ACCESS_KEY="[Invalid]"
 SERVER_ARGS="--model-repository=s3://localhost:4572/${BUCKET_NAME}1 --exit-timeout-secs=120"
 SERVER_LOG="./inference_server.access_decline.log"
@@ -341,6 +342,8 @@ else
     RET=1
   fi
 fi
+# Restore keys for destroying buckets
+export AWS_SECRET_ACCESS_KEY=$AWS_SECRET_ACCESS_KEY_BACKUP
 
 # Destroy buckets
 for BUCKET_SUFFIX in 1 2; do
