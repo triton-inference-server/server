@@ -123,6 +123,7 @@ def np_to_onnx_dtype(np_dtype):
         return onnx.TensorProto.STRING
     return None
 
+
 def np_to_torch_dtype(np_dtype):
     if np_dtype == bool:
         return torch.bool
@@ -470,10 +471,12 @@ def create_libtorch_modelfile(models_dir, model_version, dtype):
 
     if (dtype == np_dtype_string):
 
-        raise Exception("PyTorch ragged model generation for string models not yet implemented")
+        raise Exception(
+            "PyTorch ragged model generation for string models not yet implemented"
+        )
 
     else:
-        
+
         class IdentityNet(nn.Module):
 
             def __init__(self):
@@ -487,15 +490,16 @@ def create_libtorch_modelfile(models_dir, model_version, dtype):
                 BATCH_OUTPUT = torch.matmul(batch_entry, BATCH_INPUT)
 
                 BATCH_AND_SIZE_INPUT = BATCH_AND_SIZE_INPUT.view(1, -1)
-                BATCH_AND_SIZE_OUTPUT = torch.matmul(batch_entry, BATCH_AND_SIZE_INPUT)
+                BATCH_AND_SIZE_OUTPUT = torch.matmul(batch_entry,
+                                                     BATCH_AND_SIZE_INPUT)
 
                 RAGGED_INPUT = RAGGED_INPUT.view(1, -1)
                 RAGGED_OUTPUT = torch.matmul(batch_entry, RAGGED_INPUT)
 
                 return BATCH_OUTPUT, BATCH_AND_SIZE_OUTPUT, RAGGED_OUTPUT
-                
+
     traced = torch.jit.script(identityModel)
-    
+
     graph_proto = onnx.helper.make_graph(onnx_nodes, model_name, onnx_inputs,
                                          onnx_outputs)
 
@@ -505,7 +509,7 @@ def create_libtorch_modelfile(models_dir, model_version, dtype):
         pass  # ignore existing dir
 
     traced.save(model_version_dir + "/model.onnx")
-    
+
 
 def create_modelconfig(models_dir, max_batch, model_version, dtype, backend,
                        platform):
@@ -598,7 +602,7 @@ def create_savedmodel_itemshape_modelfile(models_dir, model_version, dtype):
 
     tf.compat.v1.reset_default_graph()
     tf.compat.v1.placeholder(tf_dtype, tu.shape_to_tf_shape([-1]),
-                                       "TENSOR_RAGGED_INPUT")
+                             "TENSOR_RAGGED_INPUT")
     # Shape is predefined
     batch_node = tf.compat.v1.placeholder(tf_dtype,
                                           tu.shape_to_tf_shape([-1, 2]),
@@ -750,7 +754,9 @@ def create_libtorch_itemshape_modelfile(models_dir, model_version, dtype):
 
     if (dtype == np_dtype_string):
 
-        raise Exception("PyTorch ragged model generation for string models not yet implemented")
+        raise Exception(
+            "PyTorch ragged model generation for string models not yet implemented"
+        )
 
     else:
 
@@ -857,14 +863,15 @@ def create_batch_input_models(models_dir):
         create_itemshape_modelconfig(models_dir, 4, model_version, np.float32,
                                      "onnxruntime", "onnx")
         create_onnx_itemshape_modelfile(models_dir, model_version, np.float32)
-    
+
     if FLAGS.libtorch:
-        # create_modelconfig(models_dir, 4, model_version, np.float32,
-        #                    "pytorch", "pytorch_libtorch")
-        # create_libtorch_modelfile(models_dir, model_version, np.float32)
+        create_modelconfig(models_dir, 4, model_version, np.float32, "pytorch",
+                           "pytorch_libtorch")
+        create_libtorch_modelfile(models_dir, model_version, np.float32)
         create_itemshape_modelconfig(models_dir, 4, model_version, np.float32,
                                      "pytorch", "pytorch_libtorch")
-        create_libtorch_itemshape_modelfile(models_dir, model_version, np.float32)
+        create_libtorch_itemshape_modelfile(models_dir, model_version,
+                                            np.float32)
 
 
 if __name__ == '__main__':
