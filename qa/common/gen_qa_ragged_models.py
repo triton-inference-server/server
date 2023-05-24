@@ -433,6 +433,80 @@ def create_onnx_modelfile(models_dir, model_version, dtype):
     onnx.save(model_def, model_version_dir + "/model.onnx")
 
 
+def create_libtorch_modelfile(models_dir, model_version, dtype):
+    # Create special identity model for batch input testing.
+    # Because the ragged input and batch input are one dimensional vector
+    # when passing to the model, the model must generate output with batch
+    # dimension so that Triton can scatter it to different responses along
+    # the batch dimension.
+    # 'BATCH_AND_SIZE_INPUT' is also used as a hint to generate output with
+    # batch dimension, 'BATCH_AND_SIZE_INPUT' must have shape [batch_size].
+    # Each output corresponds to the input with the same name, so if there
+    # are two requests, one has "RAGGED_INPUT" [2, 4] and the other has [1],
+    # since the input is ragged, the model sees the input as [2, 4, 1], and
+    # "BATCH_AND_SIZE_INPUT" will have shape [2]. Then the model output will
+    # be [[2, 4, 1], [2, 4, 1]] and Triton will send responses that each has
+    # value [[2, 4, 1]].
+    # For "BATCH_INPUT", the input tensor must only have one variable dimension
+    # to be broadcasted along the batch dimension properly, thus the currently
+    # allowed batch input types are:
+    # - BATCH_ACCUMULATED_ELEMENT_COUNT
+    # - BATCH_ACCUMULATED_ELEMENT_COUNT_WITH_ZERO
+    # - BATCH_MAX_ELEMENT_COUNT_AS_SHAPE
+    # - BATCH_ITEM_SHAPE_FLATTEN
+
+    torch_dtype = np_to_torch_dtype(dtype)
+
+    # Create the model
+    model_name = "libtorch_batch_input"
+    model_version_dir = models_dir + "/" + model_name + "/" + str(model_version)
+
+    in0_shape = [-1]
+    bs_shape = [-1]
+    batch_shape = [-1]
+    out_shape = [-1, -1]
+    bs_out_shape = [-1, -1]
+    batch_out_shape = [-1, -1]
+
+    if (dtype == np_dtype_string):
+
+        raise Exception("PyTorch ragged model generation for string models not yet implemented")
+
+    else:
+        
+        class IdentityNet(nn.Module):
+
+            def __init__(self):
+                super(IdentityNet, self).__init__()
+
+            def forward(self, BATCH_INPUT, BATCH_AND_SIZE_INPUT, RAGGED_INPUT):
+                batch_entry = BATCH_AND_SIZE_INPUT / BATCH_AND_SIZE_INPUT
+                batch_entry = batch_entry.view(-1, 1)
+
+                BATCH_INPUT = BATCH_INPUT.view(1, -1)
+                BATCH_OUTPUT = torch.matmul(batch_entry, BATCH_INPUT)
+
+                BATCH_AND_SIZE_INPUT = BATCH_AND_SIZE_INPUT.view(1, -1)
+                BATCH_AND_SIZE_OUTPUT = torch.matmul(batch_entry, BATCH_AND_SIZE_INPUT)
+
+                RAGGED_INPUT = RAGGED_INPUT.view(1, -1)
+                RAGGED_OUTPUT = torch.matmul(batch_entry, RAGGED_INPUT)
+
+                return BATCH_OUTPUT, BATCH_AND_SIZE_OUTPUT, RAGGED_OUTPUT
+                
+    traced = torch.jit.script(identityModel)
+    
+    graph_proto = onnx.helper.make_graph(onnx_nodes, model_name, onnx_inputs,
+                                         onnx_outputs)
+
+    try:
+        os.makedirs(model_version_dir)
+    except OSError as ex:
+        pass  # ignore existing dir
+
+    traced.save(model_version_dir + "/model.onnx")
+    
+
 def create_modelconfig(models_dir, max_batch, model_version, dtype, backend,
                        platform):
     version_policy_str = "{ latest { num_versions: 1 }}"
