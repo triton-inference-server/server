@@ -209,6 +209,7 @@ class TestInstanceUpdate(unittest.TestCase):
         self.__update_instance_count(
             0, 0,
             "{\ncount: 3\nkind: KIND_GPU\n},\n{\ncount: 1\nkind: KIND_CPU\n}")
+        time.sleep(0.1)  # larger the gap for config.pbtxt timestamp to update
         # Remove 1 GPU instance and add 1 CPU instance
         self.__update_instance_count(
             1, 1,
