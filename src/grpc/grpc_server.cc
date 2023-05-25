@@ -1183,6 +1183,37 @@ CommonHandler::RegisterModelStatistics()
             batch_statistics->mutable_compute_output()->set_ns(ucnt);
           }
         }
+
+        triton::common::TritonJson::Value memory_usage_json;
+        err = model_stat.MemberAsArray("memory_usage", &memory_usage_json);
+        GOTO_IF_ERR(err, earlyexit);
+
+        for (size_t idx = 0; idx < memory_usage_json.ArraySize(); ++idx) {
+          triton::common::TritonJson::Value usage;
+          err = memory_usage_json.IndexAsObject(idx, &usage);
+          GOTO_IF_ERR(err, earlyexit);
+
+          auto memory_usage = statistics->add_memory_usage();
+          {
+            const char* type;
+            size_t type_len;
+            err = usage.MemberAsString("type", &type, &type_len);
+            GOTO_IF_ERR(err, earlyexit);
+            memory_usage->set_type(std::string(type, type_len));
+          }
+          {
+            int64_t id;
+            err = usage.MemberAsInt("id", &id);
+            GOTO_IF_ERR(err, earlyexit);
+            memory_usage->set_id(id);
+          }
+          {
+            uint64_t byte_size;
+            err = usage.MemberAsUInt("byte_size", &byte_size);
+            GOTO_IF_ERR(err, earlyexit);
+            memory_usage->set_byte_size(byte_size);
+          }
+        }
       }
     }
 
