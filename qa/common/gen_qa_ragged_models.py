@@ -498,17 +498,15 @@ def create_libtorch_modelfile(models_dir, model_version, dtype):
 
                 return BATCH_OUTPUT, BATCH_AND_SIZE_OUTPUT, RAGGED_OUTPUT
 
+    identityModel = IdentityNet()
     traced = torch.jit.script(identityModel)
-
-    graph_proto = onnx.helper.make_graph(onnx_nodes, model_name, onnx_inputs,
-                                         onnx_outputs)
 
     try:
         os.makedirs(model_version_dir)
     except OSError as ex:
         pass  # ignore existing dir
 
-    traced.save(model_version_dir + "/model.onnx")
+    traced.save(model_version_dir + "/model.pt")
 
 
 def create_modelconfig(models_dir, max_batch, model_version, dtype, backend,
@@ -746,7 +744,7 @@ def create_libtorch_itemshape_modelfile(models_dir, model_version, dtype):
     torch_dtype = np_to_torch_dtype(dtype)
 
     # Create the model
-    model_name = "torch_batch_item"
+    model_name = "libtorch_batch_item"
     model_version_dir = models_dir + "/" + model_name + "/" + str(model_version)
 
     input_shape = [-1]
@@ -776,7 +774,7 @@ def create_libtorch_itemshape_modelfile(models_dir, model_version, dtype):
     except OSError as ex:
         pass  # ignore existing dir
 
-    traced.save(model_version_dir + "/model.onnx")
+    traced.save(model_version_dir + "/model.pt")
 
 
 def create_itemshape_modelconfig(models_dir, max_batch, model_version, dtype,
@@ -863,13 +861,12 @@ def create_batch_input_models(models_dir):
         create_itemshape_modelconfig(models_dir, 4, model_version, np.float32,
                                      "onnxruntime", "onnx")
         create_onnx_itemshape_modelfile(models_dir, model_version, np.float32)
-
     if FLAGS.libtorch:
         create_modelconfig(models_dir, 4, model_version, np.float32, "pytorch",
-                           "pytorch_libtorch")
+                           "libtorch")
         create_libtorch_modelfile(models_dir, model_version, np.float32)
         create_itemshape_modelconfig(models_dir, 4, model_version, np.float32,
-                                     "pytorch", "pytorch_libtorch")
+                                     "pytorch", "libtorch")
         create_libtorch_itemshape_modelfile(models_dir, model_version,
                                             np.float32)
 
@@ -896,6 +893,10 @@ if __name__ == '__main__':
                         required=False,
                         action='store_true',
                         help='Generate Onnx Runtime Onnx models')
+    parser.add_argument('--libtorch',
+                        required=False,
+                        action='store_true',
+                        help='Generate Libtorch models')
     parser.add_argument(
         '--onnx_opset',
         type=int,
@@ -913,5 +914,8 @@ if __name__ == '__main__':
         tf.compat.v1.disable_eager_execution()
     if FLAGS.onnx:
         import onnx
+    if FLAGS.libtorch:
+        import torch
+        from torch import nn
 
     create_batch_input_models(FLAGS.models_dir)

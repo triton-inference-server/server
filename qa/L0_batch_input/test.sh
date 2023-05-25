@@ -1,5 +1,5 @@
 #!/bin/bash
-# Copyright 2020-2022, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright 2020-2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -54,7 +54,7 @@ SERVER_LOG="./inference_server.log"
 source ../common/util.sh
 
 # If BACKENDS not specified, set to all
-BACKENDS=${BACKENDS:="onnx savedmodel plan"}
+BACKENDS=${BACKENDS:="onnx savedmodel plan libtorch"}
 
 rm -f $SERVER_LOG $CLIENT_LOG
 
