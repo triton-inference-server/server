@@ -123,33 +123,6 @@ def np_to_onnx_dtype(np_dtype):
         return onnx.TensorProto.STRING
     return None
 
-
-def np_to_torch_dtype(np_dtype):
-    if np_dtype == bool:
-        return torch.bool
-    elif np_dtype == np.int8:
-        return torch.int8
-    elif np_dtype == np.int16:
-        return torch.int16
-    elif np_dtype == np.int32:
-        return torch.int
-    elif np_dtype == np.int64:
-        return torch.long
-    elif np_dtype == np.uint8:
-        return torch.uint8
-    elif np_dtype == np.uint16:
-        return None  # Not supported in Torch
-    elif np_dtype == np.float16:
-        return None
-    elif np_dtype == np.float32:
-        return torch.float
-    elif np_dtype == np.float64:
-        return torch.double
-    elif np_dtype == np_dtype_string:
-        return None  # Not supported in Torch
-    return None
-
-
 def create_savedmodel_modelfile(models_dir, model_version, dtype):
     # Create special identity model for batch input testing.
     # Because the ragged input and batch input are one dimensional vector
@@ -456,18 +429,9 @@ def create_libtorch_modelfile(models_dir, model_version, dtype):
     # - BATCH_MAX_ELEMENT_COUNT_AS_SHAPE
     # - BATCH_ITEM_SHAPE_FLATTEN
 
-    torch_dtype = np_to_torch_dtype(dtype)
-
     # Create the model
     model_name = "libtorch_batch_input"
     model_version_dir = models_dir + "/" + model_name + "/" + str(model_version)
-
-    in0_shape = [-1]
-    bs_shape = [-1]
-    batch_shape = [-1]
-    out_shape = [-1, -1]
-    bs_out_shape = [-1, -1]
-    batch_out_shape = [-1, -1]
 
     if (dtype == np_dtype_string):
 
@@ -741,14 +705,9 @@ def create_libtorch_itemshape_modelfile(models_dir, model_version, dtype):
     # generated to have matching batch dimension, the output can be produced
     # via identity op and expect Triton will scatter the output properly.
 
-    torch_dtype = np_to_torch_dtype(dtype)
-
     # Create the model
     model_name = "libtorch_batch_item"
     model_version_dir = models_dir + "/" + model_name + "/" + str(model_version)
-
-    input_shape = [-1]
-    batch_shape = [-1, 2]
 
     if (dtype == np_dtype_string):
 
