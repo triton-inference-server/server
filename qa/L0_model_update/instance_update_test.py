@@ -217,6 +217,33 @@ class TestInstanceUpdate(unittest.TestCase):
         # Unload model
         self.__unload_model()
 
+    # Test instance signature grouping
+    def test_instance_signature(self):
+        # Load 2 GPU instances and 3 CPU instances
+        self.__load_model(
+            5,
+            "{\nname: \"GPU_group\"\ncount: 2\nkind: KIND_GPU\n},\n{\nname: \"CPU_group\"\ncount: 3\nkind: KIND_CPU\n}"
+        )
+        # Flatten the instances representation
+        self.__update_instance_count(
+            0, 0,
+            "{\nname: \"CPU_1\"\ncount: 1\nkind: KIND_CPU\n},\n{\nname: \"CPU_2_3\"\ncount: 2\nkind: KIND_CPU\n},\n{\nname: \"GPU_1\"\ncount: 1\nkind: KIND_GPU\n},\n{\nname: \"GPU_2\"\ncount: 1\nkind: KIND_GPU\n}"
+        )
+        time.sleep(0.1)  # larger the gap for config.pbtxt timestamp to update
+        # Consolidate different representations
+        self.__update_instance_count(
+            0, 0,
+            "{\nname: \"CPU_group\"\ncount: 3\nkind: KIND_CPU\n},\n{\nname: \"GPU_group\"\ncount: 2\nkind: KIND_GPU\n}"
+        )
+        time.sleep(0.1)  # larger the gap for config.pbtxt timestamp to update
+        # Flatten the instances representation
+        self.__update_instance_count(
+            0, 0,
+            "{\nname: \"GPU_1\"\ncount: 1\nkind: KIND_GPU\n},\n{\nname: \"GPU_2\"\ncount: 1\nkind: KIND_GPU\n},\n{\nname: \"CPU_1\"\ncount: 1\nkind: KIND_CPU\n},\n{\nname: \"CPU_2\"\ncount: 1\nkind: KIND_CPU\n},\n{\nname: \"CPU_3\"\ncount: 1\nkind: KIND_CPU\n}"
+        )
+        # Unload model
+        self.__unload_model()
+
     # Test instance update with invalid instance group config
     def test_invalid_config(self):
         # Load model with 8 instances
