@@ -99,8 +99,10 @@ for BACKEND in $BACKENDS; do
         exit 1
     fi
 
+    export BACKEND
+
     set +e
-    python $BATCH_INPUT_TEST >$CLIENT_LOG 2>&1
+    python3 $BATCH_INPUT_TEST >$CLIENT_LOG 2>&1
     if [ $? -ne 0 ]; then
         cat $CLIENT_LOG
         echo -e "\n***\n*** Test Failed\n***"
