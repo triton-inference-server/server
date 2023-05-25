@@ -670,8 +670,6 @@ def onnxruntime_cmake_args(images, library_paths):
                               None, ort_include_path),
             cmake_backend_arg('onnxruntime', 'TRITON_ONNXRUNTIME_LIB_PATHS',
                               None, ort_lib_path),
-            cmake_backend_arg('onnxruntime', 'TRITON_BUILD_PLATFORM', None,
-                              'jetpack'),
             cmake_backend_enable('onnxruntime',
                                  'TRITON_ENABLE_ONNXRUNTIME_OPENVINO', False)
         ]
