@@ -81,14 +81,15 @@ for BACKEND in $BACKENDS; do
     # Use nobatch model to showcase ragged input, identity model to verify
     # batch input is generated properly
     cp -r $IDENTITY_DATADIR/${BACKEND}_nobatch_zero_1_float32 models/ragged_io
-    IO_SUFFIX=$([[ "$BACKEND" == "libtorch" ]] && echo "__0" || echo "0")
     (cd models/ragged_io && \
+          # In case of libtorch, update I/O names
+          sed -i "s/__0/0/" config.pbtxt && \
           sed -i "s/${BACKEND}_nobatch_zero_1_float32/ragged_io/" config.pbtxt && \
           sed -i "s/^max_batch_size:.*/max_batch_size: 4/" config.pbtxt && \
-          sed -i "s/name: \"INPUT${IO_SUFFIX}\"/name: \"INPUT${IO_SUFFIX}\"\\nallow_ragged_batch: true/" config.pbtxt && \
-          echo "batch_output [{target_name: \"OUTPUT${IO_SUFFIX}\" \
+          sed -i "s/name: \"INPUT0\"/name: \"INPUT0\"\\nallow_ragged_batch: true/" config.pbtxt && \
+          echo "batch_output [{target_name: \"OUTPUT0\" \
                                  kind: BATCH_SCATTER_WITH_INPUT_SHAPE \
-                                 source_input: \"INPUT${IO_SUFFIX}\" }] \
+                                 source_input: \"INPUT0\" }] \
                 dynamic_batching { max_queue_delay_microseconds: 1000000 }" >> config.pbtxt)
 
 

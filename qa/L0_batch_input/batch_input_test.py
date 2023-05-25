@@ -33,9 +33,7 @@ import numpy as np
 import test_util as tu
 import tritonhttpclient
 from tritonclientutils import InferenceServerException
-import os
 
-TEST_BACKEND = os.environ.get("BACKEND", "")
 
 class BatchInputTest(tu.TestResultCollector):
 
@@ -57,18 +55,12 @@ class BatchInputTest(tu.TestResultCollector):
 
         # The model is identity model
         self.inputs = []
-        if TEST_BACKEND == "libtorch":
-            input_name = "INPUT__0"
-            output_name = "OUTPUT__0"
-        else:
-            print("1")
-            input_name = "INPUT0"
-            output_name = "OUTPUT0"
         for value in [2, 4, 1, 3]:
             self.inputs.append(
-                [tritonhttpclient.InferInput(input_name, [1, value], "FP32")])
+                [tritonhttpclient.InferInput('INPUT0', [1, value], "FP32")])
             self.inputs[-1][0].set_data_from_numpy(
                 np.full([1, value], value, np.float32))
+        output_name = 'OUTPUT0'
         outputs = [tritonhttpclient.InferRequestedOutput(output_name)]
 
         async_requests = []
