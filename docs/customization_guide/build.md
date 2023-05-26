@@ -197,10 +197,10 @@ To include the TensorFlow2 backend in your CPU-only build, you must
 provide this additional flag to build.py:
 `--extra-backend-cmake-arg=tensorflow2:TRITON_TENSORFLOW_INSTALL_EXTRA_DEPS=ON`.
 
-When building without GPU support, you must use the `--image=gpu-base,nvcr.io/nvidia/tritonserver:<xx.yy>-py3-min`
-flag. This is needed since the CPU-only builds of the TensorFlow and
-PyTorch backends require some CUDA stubs and runtime dependencies that are
-not present in the CPU-only base container.
+CPU-only builds of the TensorFlow and PyTorch backends require some CUDA stubs 
+and runtime dependencies that are not present in the CPU-only base container. 
+These are retrieved from a GPU base container, which can be changed with the 
+`--image=gpu-base,nvcr.io/nvidia/tritonserver:<xx.yy>-py3-min` flag.
 
 ### Building Without Docker
 
