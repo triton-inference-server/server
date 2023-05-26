@@ -74,7 +74,7 @@ TRITON_VERSION_MAP = {
         '1.15.0',  # ORT
         '2022.1.0',  # ORT OpenVINO
         '2022.1.0',  # Standalone OpenVINO
-        '3.1.8',  # DCGM version
+        '2.4.7',  # DCGM version
         'py310_23.1.0-1')  # Conda version.
 }
 
