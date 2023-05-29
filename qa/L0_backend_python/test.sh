@@ -128,6 +128,10 @@ mkdir -p models/string_fixed/1/
 cp ../python_models/string_fixed/model.py ./models/string_fixed/1/
 cp ../python_models/string_fixed/config.pbtxt ./models/string_fixed
 
+mkdir -p models/dlpack_identity/1/
+cp ../python_models/dlpack_identity/model.py ./models/dlpack_identity/1/
+cp ../python_models/dlpack_identity/config.pbtxt ./models/dlpack_identity
+
 # Skip torch install on Jetson since it is already installed.
 if [ "$TEST_JETSON" == "0" ]; then
   pip3 install torch==1.13.0+cpu -f https://download.pytorch.org/whl/torch_stable.html
