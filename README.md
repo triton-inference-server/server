@@ -179,9 +179,9 @@ A Triton *client* application sends inference and other requests to Triton. The
 [Python and C++ client libraries](https://github.com/triton-inference-server/client)
 provide APIs to simplify this communication.
 
-- Review client examples for [C++](https://github.com/triton-inference-server/client/blob/r23.05/src/c%2B%2B/examples),
-  [Python](https://github.com/triton-inference-server/client/blob/r23.05/src/python/examples),
-  and [Java](https://github.com/triton-inference-server/client/blob/r23.05/src/java/src/r23.05/java/triton/client/examples)
+- Review client examples for [C++](https://github.com/triton-inference-server/client/tree/r23.05/src/c%2B%2B/examples),
+  [Python](https://github.com/triton-inference-server/client/tree/r23.05/src/python/examples),
+  and [Java](https://github.com/triton-inference-server/client/tree/r23.05/src/java/src/main/java/triton/client)
 - Configure [HTTP](https://github.com/triton-inference-server/client#http-options)
   and [gRPC](https://github.com/triton-inference-server/client#grpc-options)
   client options
