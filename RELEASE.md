@@ -81,7 +81,7 @@
   by using a different malloc implementation. Tcmalloc and jemalloc are 
   installed in the Triton container and can be 
   [used by specifying the library in LD_PRELOAD](https://github.com/triton-inference-server/server/blob/r22.12/docs/user_guide/model_management.md). 
-  We recommend experimenting with both tcmalloc and jemalloc to determine which 
+  We recommend experimenting with both `tcmalloc` and `jemalloc` to determine which 
   one works better for your use case.
 
 * Auto-complete may cause an increase in server start time. To avoid a start 
