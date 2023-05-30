@@ -78,9 +78,11 @@
 
 * Some systems which implement `malloc()` may not release memory back to the 
   operating system right away causing a false memory leak. This can be mitigated 
-  by using a different malloc implementation. Tcmalloc is installed in the 
-  Triton container and can be 
-  [used by specifying the library in `LD_PRELOAD`](https://github.com/triton-inference-server/server/blob/r22.12/docs/user_guide/model_management.md).
+  by using a different malloc implementation. Tcmalloc and jemalloc are 
+  installed in the Triton container and can be 
+  [used by specifying the library in LD_PRELOAD](https://github.com/triton-inference-server/server/blob/r22.12/docs/user_guide/model_management.md). 
+  We recommend experimenting with both tcmalloc and jemalloc to determine which 
+  one works better for your use case.
 
 * Auto-complete may cause an increase in server start time. To avoid a start 
   time increase, users can provide the full model configuration and launch the 
