@@ -460,7 +460,7 @@ def create_libtorch_modelfile(models_dir, model_version, dtype):
                 RAGGED_INPUT = RAGGED_INPUT.view(1, -1)
                 RAGGED_OUTPUT = torch.matmul(batch_entry, RAGGED_INPUT)
 
-                return BATCH_OUTPUT, BATCH_AND_SIZE_OUTPUT, RAGGED_OUTPUT
+                return RAGGED_OUTPUT, BATCH_AND_SIZE_OUTPUT, BATCH_OUTPUT
 
     identityModel = IdentityNet()
     traced = torch.jit.script(identityModel)
