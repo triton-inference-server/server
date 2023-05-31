@@ -63,37 +63,8 @@
 #define REGISTER_GRPC_INFER_THREAD_COUNT 2
 
 namespace triton { namespace server { namespace grpc {
+
 namespace {
-
-std::ostream&
-operator<<(std::ostream& out, const Steps& step)
-{
-  switch (step) {
-    case START:
-      out << "START";
-      break;
-    case COMPLETE:
-      out << "COMPLETE";
-      break;
-    case FINISH:
-      out << "FINISH";
-      break;
-    case ISSUED:
-      out << "ISSUED";
-      break;
-    case READ:
-      out << "READ";
-      break;
-    case WRITEREADY:
-      out << "WRITEREADY";
-      break;
-    case WRITTEN:
-      out << "WRITTEN";
-      break;
-  }
-
-  return out;
-}
 
 //
 // The server has separate handling mechanisms for inference RPCs
@@ -2238,13 +2209,6 @@ CommonHandler::RegisterRepositoryModelUnload()
       "RepositoryModelUnload", 0, OnRegisterRepositoryModelUnload,
       OnExecuteRepositoryModelUnload, true /* async */, cq_, restricted_kv);
 }
-
-//=========================================================================
-//  The following section contains the handling mechanism for inference
-//  RPCs such as ModelInfer and ModelStreamInfer. This implementation
-//  is tuned more towards performance and reducing the latency.
-//=========================================================================
-
 
 }  // namespace
 

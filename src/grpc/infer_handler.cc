@@ -37,6 +37,37 @@ NextUniqueId()
 
 namespace triton { namespace server { namespace grpc {
 
+// Define operator in triton::server::grpc namespace for use in all helpers
+std::ostream&
+operator<<(std::ostream& out, const Steps& step)
+{
+  switch (step) {
+    case START:
+      out << "START";
+      break;
+    case COMPLETE:
+      out << "COMPLETE";
+      break;
+    case FINISH:
+      out << "FINISH";
+      break;
+    case ISSUED:
+      out << "ISSUED";
+      break;
+    case READ:
+      out << "READ";
+      break;
+    case WRITEREADY:
+      out << "WRITEREADY";
+      break;
+    case WRITTEN:
+      out << "WRITTEN";
+      break;
+  }
+
+  return out;
+}
+
 TRITONSERVER_Error*
 OutputBufferAttributesHelper(
     TRITONSERVER_ResponseAllocator* allocator, const char* tensor_name,
@@ -287,12 +318,17 @@ SetInferenceRequestMetadata(
       }
       RETURN_IF_ERR(TRITONSERVER_InferenceRequestSetTimeoutMicroseconds(
           inference_request, infer_param.int64_param()));
-    } else if (param.first.rfind("triton_", 0) == 0) {
+    } else if (
+        (param.first.rfind("triton_", 0) == 0) &&
+        !Contains(TRITON_PARAMS, param.first)) {
       return TRITONSERVER_ErrorNew(
           TRITONSERVER_ERROR_INVALID_ARG,
-          ("parameter keys starting with 'triton_' are reserved for Triton "
-           "usage "
-           "and should not be specified."));
+          (std::string(
+               "parameter keys starting with 'triton_' are reserved for Triton "
+               "usage. Only the following keys starting with 'triton_' are "
+               "allowed: ") +
+           Join(TRITON_PARAMS, " "))
+              .c_str());
     } else {
       const auto& infer_param = param.second;
       if (infer_param.parameter_choice_case() ==
@@ -607,6 +643,12 @@ InferRequestComplete(
         "deleting GRPC inference request");
   }
 }
+
+//=========================================================================
+//  The following section contains the handling mechanism for inference
+//  RPCs such as ModelInfer. This implementation is tuned more towards
+//  performance and reducing the latency.
+//=========================================================================
 
 void
 ModelInferHandler::StartNewRequest()

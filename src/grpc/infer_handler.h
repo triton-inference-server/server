@@ -62,6 +62,9 @@ typedef enum {
   WRITTEN
 } Steps;
 
+// Debugging helper
+std::ostream& operator<<(std::ostream& out, const Steps& step);
+
 //
 // C++11 doesn't have a barrier so we implement our own.
 //

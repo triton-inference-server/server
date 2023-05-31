@@ -101,6 +101,12 @@ StreamOutputBufferAttributes(
       allocator, tensor_name, payload->shm_map_, buffer_attributes);
 }
 
+//=========================================================================
+//  The following section contains the handling mechanism for inference
+//  RPCs such as ModelStreamInfer. This implementation is tuned more towards
+//  performance and reducing the latency.
+//=========================================================================
+
 void
 ModelStreamInferHandler::StartNewRequest()
 {
@@ -267,14 +273,7 @@ ModelStreamInferHandler::Process(InferHandler::State* state, bool rpc_ok)
           &state->alloc_payload_ /* response_allocator_userp */,
           StreamInferResponseComplete, reinterpret_cast<void*>(state));
     }
-    // Get request ID for logging in case of error.
-    const char* request_id = "";
-    LOG_TRITONSERVER_ERROR(
-        TRITONSERVER_InferenceRequestId(irequest, &request_id),
-        "unable to retrieve request ID string");
-    if (!strncmp(request_id, "", 1)) {
-      request_id = "<id_unknown>";
-    }
+
     if (err == nullptr) {
       TRITONSERVER_InferenceTrace* triton_trace = nullptr;
 #ifdef TRITON_ENABLE_TRACING
@@ -302,6 +301,12 @@ ModelStreamInferHandler::Process(InferHandler::State* state, bool rpc_ok)
         response = state->response_queue_->GetLastAllocatedResponse();
       } else {
         response = state->response_queue_->GetNonDecoupledResponse();
+      }
+
+      // Get request ID for logging in case of error.
+      std::string request_id = request.id();
+      if (request_id.empty()) {
+        request_id = "<id_unknown>";
       }
       LOG_VERBOSE(1) << "[request id: " << request_id << "] "
                      << "Infer failed: " << TRITONSERVER_ErrorMessage(err);
@@ -526,8 +531,9 @@ ModelStreamInferHandler::StreamInferResponseComplete(
 #endif  // TRITON_ENABLE_TRACING
 
   // Log appropriate errors
+  state->complete_ = ((flags & TRITONSERVER_RESPONSE_COMPLETE_FINAL) != 0);
   if (!state->is_decoupled_) {
-    if ((flags & TRITONSERVER_RESPONSE_COMPLETE_FINAL) == 0) {
+    if (!state->complete_) {
       LOG_ERROR << "[INTERNAL] ModelStreamInfer received a response without "
                    "FINAL flag for a model with one-to-one transaction";
     }
@@ -538,20 +544,26 @@ ModelStreamInferHandler::StreamInferResponseComplete(
   }
 
   auto& response_queue = state->response_queue_;
+  // Get request ID from request object to simplify case of null iresponse
+  std::string request_id = state->request_.id();
+  if (request_id.empty()) {
+    request_id = "<id_unknown>";
+  }
 
-  if (iresponse != nullptr) {
-    auto response = response_queue->GetResponseAt(response_index);
-    if (response == nullptr) {
-      LOG_ERROR << "expected the response allocator to have added the response";
-    }
-
+  inference::ModelStreamInferResponse* response;
+  if (iresponse) {
+    // Backend returned a non-null response
     TRITONSERVER_Error* err = nullptr;
-    if (iresponse != nullptr) {
+    response = response_queue->GetResponseAt(response_index);
+    if (response) {
       inference::ModelInferResponse& infer_response =
           *(response->mutable_infer_response());
+      // Validate Triton iresponse and set grpc/protobuf response fields from it
       err = InferResponseCompleteCommon<inference::ModelStreamInferResponse>(
           state->tritonserver_, iresponse, infer_response,
           state->alloc_payload_);
+    } else {
+      LOG_ERROR << "expected the response allocator to have added the response";
     }
 
     if (err != nullptr) {
@@ -559,36 +571,77 @@ ModelStreamInferHandler::StreamInferResponseComplete(
       GrpcStatusUtil::Create(&status, err);
       response->mutable_infer_response()->Clear();
       response->set_error_message(status.error_message());
-
-      // repopulate the id so that client knows which request failed.
-      const char* id;
-      LOG_TRITONSERVER_ERROR(
-          TRITONSERVER_InferenceResponseId(iresponse, &id),
-          "couldn't retrieve id for failed request");
-      LOG_VERBOSE(1) << "Failed for ID: " << id << std::endl;
-      response->mutable_infer_response()->set_id(id);
+      LOG_VERBOSE(1) << "Failed for ID: " << request_id << std::endl;
     }
 
     TRITONSERVER_ErrorDelete(err);
-
     LOG_TRITONSERVER_ERROR(
         TRITONSERVER_InferenceResponseDelete(iresponse),
         "deleting GRPC inference response");
   }
 
-  state->complete_ = ((flags & TRITONSERVER_RESPONSE_COMPLETE_FINAL) != 0);
-  if (!state->is_decoupled_) {
-    state->step_ = Steps::WRITEREADY;
-    state->context_->WriteResponseIfReady(state);
-  } else {
+  // Decoupled backends can return a null response via
+  // TRITONBACKEND_ResponseFactorySendFlags. By default, these null
+  // "flags_only" responses are not sent back to the client. Clients can
+  // opt-in to receiving these flags_only responses via request parameters.
+  // NOTE: The complete flag is the only flag used for this case at this time.
+  bool flags_only = (!iresponse && state->is_decoupled_ && state->complete_);
+  bool enable_flags_only = false;
+  if (flags_only) {
+    // Check request for opt-in parameter
+    const auto& request_params = state->request_.parameters();
+    const auto iter = request_params.find("triton_enable_flags_only_response");
+    if (iter != request_params.end()) {
+      const auto& param = iter->second;
+      if (param.parameter_choice_case() ==
+          inference::InferParameter::ParameterChoiceCase::kBoolParam) {
+        if (param.bool_param()) {
+          enable_flags_only = true;
+        }
+      } else {
+        LOG_ERROR << "invalid value type for "
+                     "'triton_enable_flags_only_response' parameter, expected "
+                     "bool_param.";
+      }
+    }
+  }
+
+  // Send flags_only response when detected and opted-in by client/request
+  const bool send_flags_only_response = (flags_only && enable_flags_only);
+  if (send_flags_only_response) {
+    // Create a response to send. Assume decoupled here based on prior checks.
+    state->response_queue_->AllocateResponse();
+    response = state->response_queue_->GetLastAllocatedResponse();
+    if (response) {
+      LOG_VERBOSE(1) << "[request id: " << request_id << "] "
+                     << "Sending flags-only response";
+      response->mutable_infer_response()->Clear();
+    } else {
+      LOG_ERROR << "expected the response allocator to have added the response";
+    }
+  }
+
+  // Set response parameters to indicate certain behaviors to client
+  if (response) {
+    response->mutable_infer_response()->set_id(request_id);
+    auto& params = *(response->mutable_infer_response()->mutable_parameters());
+    params["triton_final_response"].set_bool_param(state->complete_);
+    params["triton_flags_only_response"].set_bool_param(flags_only);
+  }
+
+  // Update states to signal that response/error is ready to write to stream
+  if (state->is_decoupled_) {
     std::lock_guard<std::mutex> lock(state->step_mtx_);
-    if (iresponse != nullptr) {
+    if (response) {
       state->response_queue_->MarkNextResponseComplete();
     }
     if (state->step_ == Steps::ISSUED) {
       state->step_ = Steps::WRITEREADY;
       state->context_->PutTaskBackToQueue(state);
     }
+  } else {
+    state->step_ = Steps::WRITEREADY;
+    state->context_->WriteResponseIfReady(state);
   }
 }
 
