@@ -177,6 +177,9 @@ If the environment variables are set they will take a higher priority
 and will be used by Triton instead of the credentials set using the
 aws config command.
 
+Note: S3 client may not work over HTTP 2.0, please see
+https://github.com/aws/aws-sdk-cpp/issues/1821 for more details.
+
 #### Azure Storage
 
 For a model repository residing in Azure Storage, the repository path
