@@ -606,6 +606,12 @@ def backend_cmake_args(images, components, be, install_dir, library_paths):
         )
         cargs.append(
             cmake_backend_enable(be, 'TRITON_ENABLE_MEMORY_TRACKER', False))
+    elif target_platform() == 'jetpack':
+        print(
+            "Warning: Detected Jetpack build, backend utility 'device memory tracker' will be disabled as Jetpack doesn't contain required version of the library."
+        )
+        cargs.append(
+            cmake_backend_enable(be, 'TRITON_ENABLE_MEMORY_TRACKER', False))
     elif FLAGS.enable_gpu:
         cargs.append(
             cmake_backend_enable(be, 'TRITON_ENABLE_MEMORY_TRACKER', True))
