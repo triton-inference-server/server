@@ -446,21 +446,21 @@ def create_libtorch_modelfile(models_dir, model_version, dtype):
             def __init__(self):
                 super(IdentityNet, self).__init__()
 
-            def forward(self, BATCH_INPUT, BATCH_AND_SIZE_INPUT, RAGGED_INPUT):
-                batch_entry = BATCH_AND_SIZE_INPUT / BATCH_AND_SIZE_INPUT
+            def forward(self, batch_input, batch_and_size_input, ragged_input):
+                batch_entry = batch_and_size_input / batch_and_size_input
                 batch_entry = batch_entry.view(-1, 1)
 
-                BATCH_INPUT = BATCH_INPUT.view(1, -1)
-                BATCH_OUTPUT = torch.matmul(batch_entry, BATCH_INPUT)
+                batch_input = batch_input.view(1, -1)
+                batch_output = torch.matmul(batch_entry, batch_input)
 
-                BATCH_AND_SIZE_INPUT = BATCH_AND_SIZE_INPUT.view(1, -1)
-                BATCH_AND_SIZE_OUTPUT = torch.matmul(batch_entry,
-                                                     BATCH_AND_SIZE_INPUT)
+                batch_and_size_input = batch_and_size_input.view(1, -1)
+                batch_and_size_output = torch.matmul(batch_entry,
+                                                     batch_and_size_input)
 
-                RAGGED_INPUT = RAGGED_INPUT.view(1, -1)
-                RAGGED_OUTPUT = torch.matmul(batch_entry, RAGGED_INPUT)
+                ragged_input = ragged_input.view(1, -1)
+                ragged_output = torch.matmul(batch_entry, ragged_input)
 
-                return RAGGED_OUTPUT, BATCH_AND_SIZE_OUTPUT, BATCH_OUTPUT
+                return ragged_output, batch_and_size_output, batch_output
 
     identityModel = IdentityNet()
     traced = torch.jit.script(identityModel)
