@@ -88,7 +88,7 @@ class DecoupledTest(tu.TestResultCollector):
     #
     # To forward this flags-only response to the client, users must opt-in to this
     # behavior by adding the following argument:
-    # client.async_stream_infer(..., enable_flags_only_response=True).
+    # client.async_stream_infer(..., enable_empty_response=True).
     #
     # If the decoupled backend/model always sends the final response flag along
     # with a non-null response, no opt-in is needed.
@@ -113,7 +113,7 @@ class DecoupledTest(tu.TestResultCollector):
                     outputs=self.requested_outputs_,
                     # Opt-in to receiving flags-only responses from model/backend
                     # to help detect final responses for decoupled models.
-                    enable_flags_only_response=True
+                    enable_empty_response=True
                 )
                 # Update delay input in accordance with the scaling factor
                 delay_data = delay_data * delay_factor
@@ -138,7 +138,7 @@ class DecoupledTest(tu.TestResultCollector):
                       completed_requests += 1
 
                     # Detect flags-only response, no need to process it
-                    if not response.parameters.get("triton_flags_only_response"):
+                    if not response.parameters.get("triton_empty_response"):
                       result_dict[response.id].append((recv_count, data_item))
                       recv_count += 1
 
