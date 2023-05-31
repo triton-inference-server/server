@@ -123,6 +123,7 @@ def np_to_onnx_dtype(np_dtype):
         return onnx.TensorProto.STRING
     return None
 
+
 def create_savedmodel_modelfile(models_dir, model_version, dtype):
     # Create special identity model for batch input testing.
     # Because the ragged input and batch input are one dimensional vector
