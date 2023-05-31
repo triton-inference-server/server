@@ -598,6 +598,18 @@ def backend_cmake_args(images, components, be, install_dir, library_paths):
     cargs.append(
         cmake_backend_enable(be, 'TRITON_ENABLE_METRICS', FLAGS.enable_metrics))
 
+    # [DLIS-4950] always enable below once Windows image is updated with CUPTI
+    # cargs.append(cmake_backend_enable(be, 'TRITON_ENABLE_MEMORY_TRACKER', True))
+    if (target_platform() == 'windows') and (not FLAGS.no_container_build):
+        print(
+            "Warning: Detected docker build is used for Windows, backend utility 'device memory tracker' will be disabled due to missing library in CUDA Windows docker image."
+        )
+        cargs.append(
+            cmake_backend_enable(be, 'TRITON_ENABLE_MEMORY_TRACKER', False))
+    elif FLAGS.enable_gpu:
+        cargs.append(
+            cmake_backend_enable(be, 'TRITON_ENABLE_MEMORY_TRACKER', True))
+
     cargs += cmake_backend_extra_args(be)
     cargs.append('..')
     return cargs
