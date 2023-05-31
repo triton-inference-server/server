@@ -47,8 +47,7 @@ constexpr int MAX_GRPC_MESSAGE_SIZE = INT32_MAX;
 constexpr int WILDCARD_DIM = -1;
 
 /// Request parameter keys that start with a "triton_" prefix for internal use
-const std::vector<std::string> TRITON_PARAMS{
-    "triton_enable_flags_only_response"};
+const std::vector<std::string> TRITON_PARAMS{"triton_enable_empty_response"};
 
 #define RETURN_IF_ERR(X)             \
   do {                               \

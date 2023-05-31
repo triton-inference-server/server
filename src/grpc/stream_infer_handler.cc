@@ -550,7 +550,7 @@ ModelStreamInferHandler::StreamInferResponseComplete(
     request_id = "<id_unknown>";
   }
 
-  inference::ModelStreamInferResponse* response;
+  inference::ModelStreamInferResponse* response = nullptr;
   if (iresponse) {
     // Backend returned a non-null response
     TRITONSERVER_Error* err = nullptr;
@@ -582,33 +582,33 @@ ModelStreamInferHandler::StreamInferResponseComplete(
 
   // Decoupled backends can return a null response via
   // TRITONBACKEND_ResponseFactorySendFlags. By default, these null
-  // "flags_only" responses are not sent back to the client. Clients can
-  // opt-in to receiving these flags_only responses via request parameters.
+  // "empty" responses are not sent back to the client. Clients can
+  // opt-in to receiving these empty responses via request parameters.
   // NOTE: The complete flag is the only flag used for this case at this time.
-  bool flags_only = (!iresponse && state->is_decoupled_ && state->complete_);
-  bool enable_flags_only = false;
-  if (flags_only) {
+  bool empty = (!iresponse && state->is_decoupled_ && state->complete_);
+  bool enable_empty = false;
+  if (empty) {
     // Check request for opt-in parameter
     const auto& request_params = state->request_.parameters();
-    const auto iter = request_params.find("triton_enable_flags_only_response");
+    const auto iter = request_params.find("triton_enable_empty_response");
     if (iter != request_params.end()) {
       const auto& param = iter->second;
       if (param.parameter_choice_case() ==
           inference::InferParameter::ParameterChoiceCase::kBoolParam) {
         if (param.bool_param()) {
-          enable_flags_only = true;
+          enable_empty = true;
         }
       } else {
         LOG_ERROR << "invalid value type for "
-                     "'triton_enable_flags_only_response' parameter, expected "
+                     "'triton_enable_empty_response' parameter, expected "
                      "bool_param.";
       }
     }
   }
 
-  // Send flags_only response when detected and opted-in by client/request
-  const bool send_flags_only_response = (flags_only && enable_flags_only);
-  if (send_flags_only_response) {
+  // Send empty response when detected and opted-in by client/request
+  const bool send_empty_response = (empty && enable_empty);
+  if (send_empty_response) {
     // Create a response to send. Assume decoupled here based on prior checks.
     state->response_queue_->AllocateResponse();
     response = state->response_queue_->GetLastAllocatedResponse();
@@ -626,7 +626,7 @@ ModelStreamInferHandler::StreamInferResponseComplete(
     response->mutable_infer_response()->set_id(request_id);
     auto& params = *(response->mutable_infer_response()->mutable_parameters());
     params["triton_final_response"].set_bool_param(state->complete_);
-    params["triton_flags_only_response"].set_bool_param(flags_only);
+    params["triton_empty_response"].set_bool_param(empty);
   }
 
   // Update states to signal that response/error is ready to write to stream
