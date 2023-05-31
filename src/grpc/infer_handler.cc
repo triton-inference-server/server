@@ -320,14 +320,14 @@ SetInferenceRequestMetadata(
           inference_request, infer_param.int64_param()));
     } else if (
         (param.first.rfind("triton_", 0) == 0) &&
-        !Contains(TRITON_PARAMS, param.first)) {
+        !Contains(TRITON_RESERVED_REQUEST_PARAMS, param.first)) {
       return TRITONSERVER_ErrorNew(
           TRITONSERVER_ERROR_INVALID_ARG,
           (std::string(
                "parameter keys starting with 'triton_' are reserved for Triton "
                "usage. Only the following keys starting with 'triton_' are "
                "allowed: ") +
-           Join(TRITON_PARAMS, " "))
+           Join(TRITON_RESERVED_REQUEST_PARAMS, " "))
               .c_str());
     } else {
       const auto& infer_param = param.second;
