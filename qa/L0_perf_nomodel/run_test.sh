@@ -47,12 +47,16 @@ TRITON_DIR=${TRITON_DIR:="/opt/tritonserver"}
 ARCH=${ARCH:="x86_64"}
 SERVER=${TRITON_DIR}/bin/tritonserver
 BACKEND_DIR=${TRITON_DIR}/backends
-DATADIR=${DATADIR:="/data/inferenceserver/${REPO_VERSION}"}
 MODEL_REPO="${PWD}/models"
 PERF_CLIENT=../clients/perf_client
 TF_VERSION=${TF_VERSION:=2}
 SERVER_ARGS="--model-repository=${MODEL_REPO} --backend-directory=${BACKEND_DIR} --backend-config=tensorflow,version=${TF_VERSION}"
 source ../common/util.sh
+
+# DATADIR is already set in environment variable for aarch64
+if [ "$ARCH" != "aarch64" ]; then
+    DATADIR="/data/inferenceserver/${REPO_VERSION}"
+fi
 
 # Select the single GPU that will be available to the inference server
 export CUDA_VISIBLE_DEVICES=0
