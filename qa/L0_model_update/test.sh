@@ -83,6 +83,15 @@ for RATE_LIMIT_MODE in "off" "execution_count"; do
     kill $SERVER_PID
     wait $SERVER_PID
 
+    set +e
+    grep "Should not print this" $SERVER_LOG
+    if [ $? -eq 0 ]; then
+        echo -e "\n***\n*** Found \"Should not print this\" on \"$SERVER_LOG\"\n***"
+        cat $SERVER_LOG
+        RET=1
+    fi
+    set -e
+
 done
 
 if [ $RET -eq 0 ]; then
