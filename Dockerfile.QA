@@ -62,13 +62,15 @@ RUN apt-get update && \
 RUN pip3 install --upgrade pip && \
     pip3 install --upgrade wheel setuptools
 
-RUN wget -O - https://apt.kitware.com/keys/kitware-archive-latest.asc 2>/dev/null | \
-      gpg --dearmor - |  \
-      tee /etc/apt/trusted.gpg.d/kitware.gpg >/dev/null && \
-    apt-add-repository 'deb https://apt.kitware.com/ubuntu/ focal main' && \
+RUN apt update && apt install -y gpg wget && \
+    wget -O - https://apt.kitware.com/keys/kitware-archive-latest.asc 2>/dev/null | \
+        gpg --dearmor - |  \
+        tee /usr/share/keyrings/kitware-archive-keyring.gpg >/dev/null && \
+    . /etc/os-release && \
+    echo "deb [signed-by=/usr/share/keyrings/kitware-archive-keyring.gpg] https://apt.kitware.com/ubuntu/ $UBUNTU_CODENAME main" | \
+    tee /etc/apt/sources.list.d/kitware.list >/dev/null && \
     apt-get update && \
-    apt-get install -y --no-install-recommends \
-      cmake-data=3.25.2-0kitware1ubuntu20.04.1 cmake=3.25.2-0kitware1ubuntu20.04.1
+    apt-get install -y --no-install-recommends cmake cmake-data 
 
 # Add inception_graphdef model to example repo
 WORKDIR /workspace/docs/examples/model_repository
@@ -294,12 +296,16 @@ RUN if [ $(cat /etc/os-release | grep 'VERSION_ID="20.04"' | wc -l) -ne 0 ]; the
         apt-get update && \
         apt-get install -y --no-install-recommends \
                 libpng-dev; \
+    elif [ $(cat /etc/os-release | grep 'VERSION_ID="22.04"' | wc -l) -ne 0 ]; then \
+        apt-get update && \
+        apt-get install -y --no-install-recommends \
+                libpng-dev; \
     elif [ $(cat /etc/os-release | grep 'VERSION_ID="18.04"' | wc -l) -ne 0 ]; then \
         apt-get update && \
         apt-get install -y --no-install-recommends \
                 libpng-dev; \
     else \
-        echo "Ubuntu version must be either 18.04 or 20.04" && \
+        echo "Ubuntu version must be either 18.04, 20.04 or 22.04" && \
         exit 1; \
     fi
 
@@ -332,11 +338,6 @@ RUN rm -f /usr/bin/python && \
 RUN pip3 install --upgrade wheel setuptools && \
     pip3 install --upgrade numpy pillow attrdict future grpcio requests gsutil \
                            awscli six grpcio-channelz prettytable virtualenv
-
-# L0_http_fuzz is hitting similar issue with boofuzz with latest version (0.4.0):
-# https://github.com/jtpereyda/boofuzz/issues/529
-# Hence, fixing the boofuzz version to 0.3.0
-RUN pip3 install 'boofuzz==0.3.0'
 
 # go needed for example go client test.
 RUN if [ "$TARGETPLATFORM" = "linux/arm64" ]; then \
