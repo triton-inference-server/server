@@ -96,8 +96,8 @@ class DecoupledTest(tu.TestResultCollector):
     # With this behavior, the client can programatically detect when all responses 
     # for an individual request have been received without knowing the expected
     # number of responses in advance and without closing the stream.
-    def _stream_infer_with_params(self, request_count, request_delay, 
-                      delay_data, delay_factor, user_data, result_dict):
+    def _stream_infer_with_params(self, request_count, request_delay, _,
+                                  delay_data, delay_factor, user_data, result_dict):
         with grpcclient.InferenceServerClient(url="localhost:8001",
                                               verbose=True) as triton_client:
             # Establish stream
