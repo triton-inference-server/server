@@ -448,7 +448,7 @@ Java program with the Java bindings with the following steps:
       ## For In-Process C-API Java Bindings
       $ source clientrepo/src/java-api-bindings/scripts/install_dependencies_and_build.sh
       ## For C-API Wrapper Java Bindings
-      $ source clientrepo/src/java-api-bindings/scripts/install_dependencies_and_build.sh --include-developer-tools-server`
+      $ source clientrepo/src/java-api-bindings/scripts/install_dependencies_and_build.sh --enable-developer-tools-server`
       ```
       This will install the Java bindings to `/workspace/install/java-api-bindings/tritonserver-java-bindings.jar`
    
