@@ -100,8 +100,6 @@ for BACKEND in $BACKENDS; do
         exit 1
     fi
 
-    export BACKEND
-
     set +e
     python3 $BATCH_INPUT_TEST >$CLIENT_LOG 2>&1
     if [ $? -ne 0 ]; then
