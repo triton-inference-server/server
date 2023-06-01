@@ -58,12 +58,13 @@ class LifecycleTest(tu.TestResultCollector):
         self._shm_leak_detector = shm_util.ShmLeakDetector()
 
     def test_batch_error(self):
-        # The execute_error model returns an error for the first request and
-        # sucessfully processes the second request. This is making sure that
-        # an error in a single request does not completely fail the batch.
+        # The execute_error model returns an error for the first and third
+        # request and sucessfully processes the second request. This is making
+        # sure that an error in a single request does not completely fail the
+        # batch.
         model_name = "execute_error"
         shape = [2, 2]
-        number_of_requests = 2
+        number_of_requests = 3
         user_data = UserData()
         triton_client = grpcclient.InferenceServerClient("localhost:8001")
         triton_client.start_stream(callback=partial(callback, user_data))
@@ -83,7 +84,7 @@ class LifecycleTest(tu.TestResultCollector):
 
             for i in range(number_of_requests):
                 result = user_data._completed_requests.get()
-                if i == 0:
+                if i == 0 or i == 2:
                     self.assertIs(type(result), InferenceServerException)
                     continue
 
@@ -139,7 +140,8 @@ class LifecycleTest(tu.TestResultCollector):
                 self.assertTrue(
                     "Failed to process the request(s) for model instance "
                     "'execute_return_error_0', message: Expected a list in the "
-                    "execute return" in str(e.exception), "Exception message is not correct.")
+                    "execute return" in str(e.exception),
+                    "Exception message is not correct.")
 
                 # The second inference request will return a list of None object
                 # instead of Python InferenceResponse objects.
@@ -150,7 +152,8 @@ class LifecycleTest(tu.TestResultCollector):
                     "Failed to process the request(s) for model instance "
                     "'execute_return_error_0', message: Expected an "
                     "'InferenceResponse' object in the execute function return"
-                    " list" in str(e.exception), "Exception message is not correct.")
+                    " list" in str(e.exception),
+                    "Exception message is not correct.")
 
 
 if __name__ == '__main__':
