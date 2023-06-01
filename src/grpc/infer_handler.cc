@@ -644,11 +644,10 @@ InferRequestComplete(
   }
 }
 
-//=========================================================================
-//  The following section contains the handling mechanism for inference
-//  RPCs such as ModelInfer. This implementation is tuned more towards
-//  performance and reducing the latency.
-//=========================================================================
+//===========================================================================
+//  The following section contains the handling mechanism for ModelInfer RPC.
+//  This implementation is tuned towards performance and reducing latency.
+//===========================================================================
 
 void
 ModelInferHandler::StartNewRequest()

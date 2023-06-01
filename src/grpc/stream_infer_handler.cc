@@ -101,11 +101,10 @@ StreamOutputBufferAttributes(
       allocator, tensor_name, payload->shm_map_, buffer_attributes);
 }
 
-//=========================================================================
-//  The following section contains the handling mechanism for inference
-//  RPCs such as ModelStreamInfer. This implementation is tuned more towards
-//  performance and reducing the latency.
-//=========================================================================
+//=============================================================================
+//  The following section contains the handling mechanism for ModelStreamInfer
+//  RPC. This implementation is tuned towards performance and reducing latency.
+//=============================================================================
 
 void
 ModelStreamInferHandler::StartNewRequest()
@@ -546,8 +545,10 @@ ModelStreamInferHandler::StreamInferResponseComplete(
   auto& response_queue = state->response_queue_;
   // Get request ID from request object to simplify case of null iresponse
   std::string request_id = state->request_.id();
+  // Use separate var to handle logging case, while returning real id to client
+  std::string log_request_id = request_id;
   if (request_id.empty()) {
-    request_id = "<id_unknown>";
+    log_request_id = "<id_unknown>";
   }
 
   inference::ModelStreamInferResponse* response = nullptr;
@@ -571,7 +572,7 @@ ModelStreamInferHandler::StreamInferResponseComplete(
       GrpcStatusUtil::Create(&status, err);
       response->mutable_infer_response()->Clear();
       response->set_error_message(status.error_message());
-      LOG_VERBOSE(1) << "Failed for ID: " << request_id << std::endl;
+      LOG_VERBOSE(1) << "Failed for ID: " << log_request_id << std::endl;
     }
 
     TRITONSERVER_ErrorDelete(err);
@@ -613,7 +614,7 @@ ModelStreamInferHandler::StreamInferResponseComplete(
     state->response_queue_->AllocateResponse();
     response = state->response_queue_->GetLastAllocatedResponse();
     if (response) {
-      LOG_VERBOSE(1) << "[request id: " << request_id << "] "
+      LOG_VERBOSE(1) << "[request id: " << log_request_id << "] "
                      << "Sending flags-only response";
       response->mutable_infer_response()->Clear();
     } else {
