@@ -77,18 +77,18 @@ class DecoupledTest(tu.TestResultCollector):
     # its request. 
     #
     # For non-decoupled models, there is a 1:1 request:response ratio, so every
-    # response is the final response. 
+    # response is the final response, and this parameter is unnecessary. 
     # 
     # For decoupled models, there is a 1:N request:response ratio, so there may be
     # more one response before receiving the "final" response. 
     #
     # However, decoupled models have the unique property in that they can return
-    # a flags-only response to the server to indicate completion, that is not
+    # a flags-only response to the server to indicate completion, which is not
     # returned to the client by default (See TRITONBACKEND_ResponseFactorySendFlags). 
     #
     # To forward this flags-only response to the client, users must opt-in to this
     # behavior by adding the following argument:
-    # client.async_stream_infer(..., enable_empty_response=True).
+    # client.async_stream_infer(..., enable_empty_final_response=True).
     #
     # If the decoupled backend/model always sends the final response flag along
     # with a non-null response, no opt-in is needed.
@@ -113,7 +113,7 @@ class DecoupledTest(tu.TestResultCollector):
                     outputs=self.requested_outputs_,
                     # Opt-in to receiving flags-only responses from model/backend
                     # to help detect final responses for decoupled models.
-                    enable_empty_response=True
+                    enable_empty_final_response=True
                 )
                 # Update delay input in accordance with the scaling factor
                 delay_data = delay_data * delay_factor
@@ -137,8 +137,8 @@ class DecoupledTest(tu.TestResultCollector):
                     if response.parameters.get("triton_final_response"):
                       completed_requests += 1
 
-                    # Detect flags-only response, no need to process it
-                    if not response.parameters.get("triton_empty_response"):
+                    # Detect empty response, only process response if non-empty
+                    if response.outputs:
                       result_dict[response.id].append((recv_count, data_item))
                       recv_count += 1
 

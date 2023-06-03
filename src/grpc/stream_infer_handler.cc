@@ -242,7 +242,7 @@ ModelStreamInferHandler::Process(InferHandler::State* state, bool rpc_ok)
     }
 
     if (err == nullptr) {
-      err = SetInferenceRequestMetadata(irequest, request);
+      err = SetInferenceRequestMetadata(irequest, request, &state->parameters_);
     }
 
     if (err == nullptr) {
@@ -303,11 +303,11 @@ ModelStreamInferHandler::Process(InferHandler::State* state, bool rpc_ok)
       }
 
       // Get request ID for logging in case of error.
-      std::string request_id = request.id();
-      if (request_id.empty()) {
-        request_id = "<id_unknown>";
+      std::string log_request_id = request.id();
+      if (log_request_id.empty()) {
+        log_request_id = "<id_unknown>";
       }
-      LOG_VERBOSE(1) << "[request id: " << request_id << "] "
+      LOG_VERBOSE(1) << "[request id: " << log_request_id << "] "
                      << "Infer failed: " << TRITONSERVER_ErrorMessage(err);
 
       LOG_TRITONSERVER_ERROR(
@@ -543,11 +543,8 @@ ModelStreamInferHandler::StreamInferResponseComplete(
   }
 
   auto& response_queue = state->response_queue_;
-  // Get request ID from request object to simplify case of null iresponse
-  std::string request_id = state->request_.id();
-  // Use separate var to handle logging case, while returning real id to client
-  std::string log_request_id = request_id;
-  if (request_id.empty()) {
+  std::string log_request_id = state->request_.id();
+  if (log_request_id.empty()) {
     log_request_id = "<id_unknown>";
   }
 
@@ -586,48 +583,33 @@ ModelStreamInferHandler::StreamInferResponseComplete(
   // "empty" responses are not sent back to the client. Clients can
   // opt-in to receiving these empty responses via request parameters.
   // NOTE: The complete flag is the only flag used for this case at this time.
-  bool empty = (!iresponse && state->is_decoupled_ && state->complete_);
-  bool enable_empty = false;
-  if (empty) {
-    // Check request for opt-in parameter
-    const auto& request_params = state->request_.parameters();
-    const auto iter = request_params.find("triton_enable_empty_response");
-    if (iter != request_params.end()) {
-      const auto& param = iter->second;
-      if (param.parameter_choice_case() ==
-          inference::InferParameter::ParameterChoiceCase::kBoolParam) {
-        if (param.bool_param()) {
-          enable_empty = true;
-        }
-      } else {
-        LOG_ERROR << "invalid value type for "
-                     "'triton_enable_empty_response' parameter, expected "
-                     "bool_param.";
-      }
-    }
-  }
+  const bool empty_final =
+      (!iresponse && state->is_decoupled_ && state->complete_);
+  const bool enable_empty_final =
+      state->parameters_.enable_empty_final_response_;
 
-  // Send empty response when detected and opted-in by client/request
-  const bool send_empty_response = (empty && enable_empty);
-  if (send_empty_response) {
-    // Create a response to send. Assume decoupled here based on prior checks.
+  const bool create_empty_response = (empty_final && enable_empty_final);
+  if (create_empty_response) {
+    // Assume decoupled here based on prior checks.
     state->response_queue_->AllocateResponse();
     response = state->response_queue_->GetLastAllocatedResponse();
     if (response) {
       LOG_VERBOSE(1) << "[request id: " << log_request_id << "] "
-                     << "Sending flags-only response";
+                     << "Creating empty final response";
       response->mutable_infer_response()->Clear();
     } else {
       LOG_ERROR << "expected the response allocator to have added the response";
     }
   }
 
-  // Set response parameters to indicate certain behaviors to client
+  // Set response metadata to associate it with request
   if (response) {
-    response->mutable_infer_response()->set_id(request_id);
-    auto& params = *(response->mutable_infer_response()->mutable_parameters());
+    auto& infer_response = *(response->mutable_infer_response());
+    infer_response.set_id(state->request_.id());
+    infer_response.set_model_name(state->request_.model_name());
+    infer_response.set_model_version(state->request_.model_version());
+    auto& params = *(infer_response.mutable_parameters());
     params["triton_final_response"].set_bool_param(state->complete_);
-    params["triton_empty_response"].set_bool_param(empty);
   }
 
   // Update states to signal that response/error is ready to write to stream

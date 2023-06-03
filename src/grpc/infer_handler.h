@@ -65,6 +65,14 @@ typedef enum {
 // Debugging helper
 std::ostream& operator<<(std::ostream& out, const Steps& step);
 
+// Options used in InferHandler/StreamInferHandler states that are set from
+// request parameters
+struct StateParameters {
+  // Whether to generate an empty response when a FINAL flag is received with
+  // no corresponding response. Only applicable to StreamInferHandlerState.
+  bool enable_empty_final_response_ = false;
+};
+
 //
 // C++11 doesn't have a barrier so we implement our own.
 //
@@ -396,7 +404,13 @@ TRITONSERVER_Error* InferResponseAlloc(
 
 TRITONSERVER_Error* SetInferenceRequestMetadata(
     TRITONSERVER_InferenceRequest* inference_request,
-    const inference::ModelInferRequest& request);
+    const inference::ModelInferRequest& request, StateParameters* state_params);
+
+// Helper to set options for StreamInferHandler state when parsing
+// request parameters.
+TRITONSERVER_Error* SetStateParameterFromTritonParameter(
+    StateParameters* state_params,
+    const std::pair<std::string, inference::InferParameter>& param);
 
 void InferRequestComplete(
     TRITONSERVER_InferenceRequest* request, const uint32_t flags, void* userp);
@@ -802,6 +816,7 @@ class InferHandlerState {
     cb_count_ = 0;
     is_decoupled_ = false;
     complete_ = false;
+    parameters_ = {};
     request_.Clear();
     response_queue_->Reset();
     // Clear trace_timestamps_ here so they do not grow indefinitely since
@@ -850,7 +865,9 @@ class InferHandlerState {
   std::deque<std::pair<std::string, uint64_t>> trace_timestamps_;
 #endif  // TRITON_ENABLE_TRACING
 
-  bool is_decoupled_;
+  bool is_decoupled_ = false;
+  StateParameters parameters_;
+
   std::atomic<uint32_t> cb_count_;
   bool complete_;
 
@@ -941,6 +958,7 @@ class InferHandler : public HandlerBase {
   virtual void StartNewRequest() = 0;
   virtual bool Process(State* state, bool rpc_ok) = 0;
   bool ExecutePrecondition(InferHandler::State* state);
+
   TRITONSERVER_Error* ForwardHeadersAsParameters(
       TRITONSERVER_InferenceRequest* irequest, InferHandler::State* state);
 

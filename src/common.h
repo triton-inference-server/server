@@ -48,7 +48,7 @@ constexpr int WILDCARD_DIM = -1;
 
 /// Request parameter keys that start with a "triton_" prefix for internal use
 const std::vector<std::string> TRITON_RESERVED_REQUEST_PARAMS{
-    "triton_enable_empty_response"};
+    "triton_enable_empty_final_response"};
 
 #define RETURN_IF_ERR(X)             \
   do {                               \
