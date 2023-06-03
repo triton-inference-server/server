@@ -117,8 +117,9 @@ def infer_exact(
         # 60 sec is the default value for L0_infer_valgrind
         network_timeout=60.0):
     # Lazy shm imports...
-    if use_system_shared_memory or use_cuda_shared_memory:
+    if use_system_shared_memory:
         import tritonclient.utils.shared_memory as shm
+    if use_cuda_shared_memory:
         import tritonclient.utils.cuda_shared_memory as cudashm
 
     tester.assertTrue(use_http or use_grpc or use_streaming)
@@ -290,8 +291,9 @@ def inferAndCheckResults(tester, configs, pf, batch_size, model_version,
                          use_system_shared_memory, use_cuda_shared_memory,
                          network_timeout, skip_request_id_check):
     # Lazy shm imports...
-    if use_system_shared_memory or use_cuda_shared_memory:
+    if use_system_shared_memory:
         import tritonclient.utils.shared_memory as shm
+    if use_cuda_shared_memory:
         import tritonclient.utils.cuda_shared_memory as cudashm
     num_classes = 3
 
@@ -860,8 +862,9 @@ def infer_zero(tester,
                override_input_names=[],
                override_output_names=[]):
     # Lazy shm imports...
-    if use_system_shared_memory or use_cuda_shared_memory:
+    if use_system_shared_memory:
         import tritonclient.utils.shared_memory as shm
+    if use_cuda_shared_memory:
         import tritonclient.utils.cuda_shared_memory as cudashm
 
     tester.assertTrue(use_http or use_grpc or use_streaming)

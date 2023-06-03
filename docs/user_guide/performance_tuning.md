@@ -157,10 +157,10 @@ These containers can be started interactively instead, but for the sake of demon
 
 ```bash
 # Start server container in the background
-docker run -d --gpus=all --network=host -v $PWD:/mnt --name triton-server nvcr.io/nvidia/tritonserver:23.03-py3 
+docker run -d --gpus=all --network=host -v $PWD:/mnt --name triton-server nvcr.io/nvidia/tritonserver:23.05-py3 
 
 # Start client container in the background
-docker run -d --gpus=all --network=host -v $PWD:/mnt --name triton-client nvcr.io/nvidia/tritonserver:23.03-py3-sdk
+docker run -d --gpus=all --network=host -v $PWD:/mnt --name triton-client nvcr.io/nvidia/tritonserver:23.05-py3-sdk
 ```
 
 > **Note**

@@ -1,4 +1,4 @@
-# Copyright (c) 2019-2020, NVIDIA CORPORATION. All rights reserved.
+# Copyright 2019-2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -32,7 +32,6 @@ import unittest
 import numpy as np
 import test_util as tu
 import tritonhttpclient as httpclient
-from tritonclientutils import InferenceServerException
 
 
 class TFTRTOptimizationTest(tu.TestResultCollector):

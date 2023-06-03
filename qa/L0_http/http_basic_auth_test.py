@@ -1,4 +1,5 @@
-# Copyright (c) 2021, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+#!/usr/bin/python
+# Copyright 2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -23,18 +24,48 @@
 # OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 # (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+import unittest
+import sys
 
-apiVersion: networking.istio.io/v1alpha3
-kind: Gateway
-metadata:
-  name: triton-gateway
-spec:
-  selector:
-    istio: ingressgateway # use istio default controller
-  servers:
-  - port:
-      number: 80 
-      name: http
-      protocol: HTTP
-    hosts:
-    - "*"
+sys.path.append("../common")
+
+import test_util as tu
+import tritonclient.http as tritonhttpclient
+import tritonclient.http.aio as asynctritonhttpclient
+
+from tritonclient.http.auth import BasicAuth
+from tritonclient.http.aio.auth import BasicAuth as AsyncBasicAuth
+
+
+class HTTPBasicAuthTest(tu.TestResultCollector):
+
+    def setUp(self):
+        # Use the nginx port
+        self._client = tritonhttpclient.InferenceServerClient(
+            url='localhost:8004')
+        self._client.register_plugin(BasicAuth('username', 'password'))
+
+    def test_client_call(self):
+        self.assertTrue(self._client.is_server_live())
+
+    def tearDown(self):
+        self._client.close()
+
+
+class HTTPBasicAuthAsyncTest(unittest.IsolatedAsyncioTestCase):
+
+    async def asyncSetUp(self):
+        # Use the nginx port
+        self._client = asynctritonhttpclient.InferenceServerClient(
+            url='localhost:8004')
+        self._client.register_plugin(AsyncBasicAuth('username', 'password'))
+
+    async def test_client_call(self):
+        self.assertTrue(await self._client.is_server_live())
+
+    async def asyncTearDown(self):
+        await self._client.close()
+
+
+if __name__ == '__main__':
+    unittest.main()

@@ -131,17 +131,20 @@ pip3 install --upgrade wheel setuptools cython && \
 **Note**: OpenCV 4.2.0 is installed as a part of JetPack. It is one of the dependencies for the client build.
 
 **Note**: When building Triton on Jetson, you will require a recent version of cmake.
-We recommend using cmake 3.21.1. Below is a script to upgrade your cmake version to 3.21.1.
+We recommend using cmake 3.25.2. Below is a script to upgrade your cmake version to 3.25.2.
 
 ```
 apt remove cmake
-wget -O - https://apt.kitware.com/keys/kitware-archive-latest.asc 2>/dev/null | \
-      gpg --dearmor - | \
-      tee /etc/apt/trusted.gpg.d/kitware.gpg >/dev/null && \
-    apt-add-repository 'deb https://apt.kitware.com/ubuntu/ focal main' && \
-    apt-get update && \
-    apt-get install -y --no-install-recommends \
-        cmake-data=3.25.2-0kitware1ubuntu20.04.1 cmake=3.25.2-0kitware1ubuntu20.04.1
+# Using CMAKE installation instruction from:: https://apt.kitware.com/
+apt update && apt install -y gpg wget && \
+      wget -O - https://apt.kitware.com/keys/kitware-archive-latest.asc 2>/dev/null | \
+            gpg --dearmor - |  \
+            tee /usr/share/keyrings/kitware-archive-keyring.gpg >/dev/null && \
+      . /etc/os-release && \
+      echo "deb [signed-by=/usr/share/keyrings/kitware-archive-keyring.gpg] https://apt.kitware.com/ubuntu/ $UBUNTU_CODENAME main" | \
+      tee /etc/apt/sources.list.d/kitware.list >/dev/null && \
+      apt-get update && \
+      apt-get install -y --no-install-recommends cmake cmake-data 
 ```
 
 ### Runtime Dependencies for Triton
@@ -152,7 +155,7 @@ The following runtime dependencies must be installed before running Triton serve
 apt-get update && \
         apt-get install -y --no-install-recommends \
         libb64-0d \
-        libre2-5 \
+        libre2-9 \
         libssl1.1 \
         rapidjson-dev \
         libopenblas-dev \
@@ -188,8 +191,9 @@ LD_LIBRARY_PATH="$LD_LIBRARY_PATH:/usr/lib/llvm-8/lib"
 ```
 
 **Note**: On Jetson, the backend directory must be explicitly specified using the
-`--backend-directory` flag. Triton defaults to using TensorFlow 2.x and a version string
-is required to use TensorFlow 1.x.
+`--backend-directory` flag. Starting from 23.05, Triton no longer supports
+TensorFlow 1.x. If you'd like to use TensorFlow 1.x with Triton prior to 23.05,
+a version string is required to use TensorFlow 1.x.
 
 ```
 tritonserver --model-repository=/path/to/model_repo --backend-directory=/path/to/tritonserver/backends \

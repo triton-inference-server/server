@@ -49,7 +49,7 @@ pip3 install validators
 
 # Install JAX
 if [ "$TEST_JETSON" == "0" ]; then
-    pip3 install --upgrade "jax[cuda]" -f https://storage.googleapis.com/jax-releases/jax_cuda_releases.html
+    pip3 install --upgrade "jax[cuda12_local]" -f https://storage.googleapis.com/jax-releases/jax_cuda_releases.html
 fi
 
 git clone https://github.com/triton-inference-server/python_backend -b $PYTHON_BACKEND_REPO_TAG
@@ -405,6 +405,36 @@ fi
 grep "PASS" $CLIENT_LOG
 if [ $? -ne 0 ]; then
     echo -e "\n***\n*** Failed to verify Model Instance Kind example. Example failed to pass. \n***"
+    cat $CLIENT_LOG
+    RET=1
+fi
+set -e
+
+kill $SERVER_PID
+wait $SERVER_PID
+
+# Custom Metrics
+CLIENT_LOG="./custom_metrics_client.log"
+mkdir -p models/custom_metrics/1
+cp examples/custom_metrics/model.py models/custom_metrics/1/model.py
+cp examples/custom_metrics/config.pbtxt models/custom_metrics/config.pbtxt
+run_server
+if [ "$SERVER_PID" == "0" ]; then
+    echo -e "\n***\n*** Failed to start $SERVER\n***"
+    cat $SERVER_LOG
+    RET=1
+fi
+
+set +e
+python3 examples/custom_metrics/client.py > $CLIENT_LOG
+if [ $? -ne 0 ]; then
+    echo -e "\n***\n*** Failed to verify Custom Metrics example. \n***"
+    RET=1
+fi
+
+grep "PASS" $CLIENT_LOG
+if [ $? -ne 0 ]; then
+    echo -e "\n***\n*** Failed to verify Custom Metrics example. \n***"
     cat $CLIENT_LOG
     RET=1
 fi

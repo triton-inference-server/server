@@ -50,7 +50,7 @@ source ../common/util.sh
 # Select the single GPU that will be available to the inference server
 export CUDA_VISIBLE_DEVICES=0
 
-rm -f *.log *.serverlog *.csv *.metrics
+rm -f *.log  *.csv *.metrics
 RET=0
 
 rm -fr ./custom_models && mkdir ./custom_models && \
@@ -81,7 +81,7 @@ for BACKEND in $BACKENDS; do
 
     # With pinned memory
     SERVER_ARGS="--model-repository=`pwd`/models --log-verbose=1"
-    SERVER_LOG="${ENSEMBLE_NAME}.pinned.serverlog"
+    SERVER_LOG="${ENSEMBLE_NAME}.pinned.server.log"
     run_server
     if (( $SERVER_PID == 0 )); then
         echo -e "\n***\n*** Failed to start $SERVER\n***"
@@ -96,7 +96,7 @@ for BACKEND in $BACKENDS; do
         RET=1
     fi
 
-    grep "] non-pinned" ${ENSEMBLE_NAME}.pinned.serverlog
+    grep "] non-pinned" ${ENSEMBLE_NAME}.pinned.server.log
     if [ $? -eq 0 ]; then
         echo -e "\n***\n*** Failed. Expected only pinned memory is allocated\n***"
         RET=1
@@ -108,7 +108,7 @@ for BACKEND in $BACKENDS; do
 
     # Restart the server without verbose logging
     SERVER_ARGS="--model-repository=`pwd`/models"
-    SERVER_LOG="${ENSEMBLE_NAME}.pinned.serverlog"
+    SERVER_LOG="${ENSEMBLE_NAME}.pinned.server.log"
     run_server
     if (( $SERVER_PID == 0 )); then
         echo -e "\n***\n*** Failed to start $SERVER\n***"
@@ -133,7 +133,7 @@ for BACKEND in $BACKENDS; do
 
     # Without pinned memory
     SERVER_ARGS="--model-repository=`pwd`/models --pinned-memory-pool-byte-size=0 --log-verbose=1"
-    SERVER_LOG="${ENSEMBLE_NAME}.nonpinned.serverlog"
+    SERVER_LOG="${ENSEMBLE_NAME}.nonpinned.server.log"
     run_server
     if (( $SERVER_PID == 0 )); then
         echo -e "\n***\n*** Failed to start $SERVER\n***"
@@ -148,7 +148,7 @@ for BACKEND in $BACKENDS; do
         RET=1
     fi
 
-    grep "] pinned" ${ENSEMBLE_NAME}.nonpinned.serverlog
+    grep "] pinned" ${ENSEMBLE_NAME}.nonpinned.server.log
     if [ $? -eq 0 ]; then
         echo -e "\n***\n*** Failed. Expected only non-pinned memory is allocated\n***"
         RET=1
@@ -160,7 +160,7 @@ for BACKEND in $BACKENDS; do
 
     # Restart the server without verbose logging
     SERVER_ARGS="--model-repository=`pwd`/models --pinned-memory-pool-byte-size=0"
-    SERVER_LOG="${ENSEMBLE_NAME}.nonpinned.serverlog"
+    SERVER_LOG="${ENSEMBLE_NAME}.nonpinned.server.log"
     run_server
     if (( $SERVER_PID == 0 )); then
         echo -e "\n***\n*** Failed to start $SERVER\n***"

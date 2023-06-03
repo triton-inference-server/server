@@ -32,6 +32,7 @@ CLIENT_LOG="./client.log"
 EXPECTED_NUM_TESTS="1"
 TEST_RESULT_FILE='test_results.txt'
 SERVER_LOG="./inference_server.log"
+export CUDA_VISIBLE_DEVICES=0,1,2,3
 
 RET=0
 rm -fr *.log ./models
@@ -42,6 +43,9 @@ source ../../common/util.sh
 pip3 uninstall -y torch
 pip3 install torch==1.13.0+cu117 -f https://download.pytorch.org/whl/torch_stable.html
 pip3 install tensorflow
+
+# Install CuPy for testing non_blocking compute streams
+pip3 install cupy-cuda12x
 
 rm -fr *.log ./models
 
@@ -84,4 +88,5 @@ else
     echo -e "\n***\n*** Unittest test PASSED. \n***"
 fi
 
+export CUDA_VISIBLE_DEVICES=0
 exit $RET

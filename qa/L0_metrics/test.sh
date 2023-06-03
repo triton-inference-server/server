@@ -1,5 +1,5 @@
 #!/bin/bash
-# Copyright 2020-2022, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright 2020-2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -42,12 +42,39 @@ MODELDIR=`pwd`/models
 DATADIR=/data/inferenceserver/${REPO_VERSION}/qa_model_repository
 TRITON_DIR=${TRITON_DIR:="/opt/tritonserver"}
 SERVER=${TRITON_DIR}/bin/tritonserver
-SERVER_ARGS="--model-repository=${MODELDIR}"
+BASE_SERVER_ARGS="--model-repository=${MODELDIR}"
+SERVER_ARGS="${BASE_SERVER_ARGS}"
 SERVER_LOG="./inference_server.log"
 source ../common/util.sh
 
-rm -f $SERVER_LOG
+CLIENT_LOG="client.log"
+TEST_RESULT_FILE="test_results.txt"
+function check_unit_test() {
+    if [ $? -ne 0 ]; then
+        cat $CLIENT_LOG
+        echo -e "\n***\n*** Test Failed\n***"
+        RET=1
+    else
+	EXPECTED_NUM_TESTS=1
+        check_test_results ${TEST_RESULT_FILE} ${EXPECTED_NUM_TESTS}
+        if [ $? -ne 0 ]; then
+            cat $CLIENT_LOG
+            echo -e "\n***\n*** Test Result Verification Failed\n***"
+            RET=1
+        fi
+    fi
+}
 
+function run_and_check_server() {
+    run_server
+    if [ "$SERVER_PID" == "0" ]; then
+      echo -e "\n***\n*** Failed to start $SERVER\n***"
+      cat $SERVER_LOG
+      exit 1
+    fi
+}
+
+rm -f $SERVER_LOG
 RET=0
 
 ### UNIT TESTS
@@ -81,12 +108,7 @@ mkdir -p $MODELDIR/${model}/1 && \
 
 set +e
 export CUDA_VISIBLE_DEVICES=0,1,2
-run_server
-if [ "$SERVER_PID" == "0" ]; then
-  echo -e "\n***\n*** Failed to start $SERVER\n***"
-  cat $SERVER_LOG
-  exit 1
-fi
+run_and_check_server
 
 num_gpus=`curl -s localhost:8002/metrics | grep "nv_gpu_utilization{" | wc -l`
 if [ $num_gpus -ne 3 ]; then
@@ -99,12 +121,7 @@ kill $SERVER_PID
 wait $SERVER_PID
 
 export CUDA_VISIBLE_DEVICES=0
-run_server
-if [ "$SERVER_PID" == "0" ]; then
-  echo -e "\n***\n*** Failed to start $SERVER\n***"
-  cat $SERVER_LOG
-  exit 1
-fi
+run_and_check_server
 
 num_gpus=`curl -s localhost:8002/metrics | grep "nv_gpu_utilization{" | wc -l`
 if [ $num_gpus -ne 1 ]; then
@@ -122,13 +139,8 @@ METRICS_INTERVAL_MS=500
 # the update is not ready for unexpected reason
 WAIT_INTERVAL_SECS=0.6
 
-SERVER_ARGS="$SERVER_ARGS --metrics-interval-ms=${METRICS_INTERVAL_MS}"
-run_server
-if [ "$SERVER_PID" == "0" ]; then
-  echo -e "\n***\n*** Failed to start $SERVER\n***"
-  cat $SERVER_LOG
-  exit 1
-fi
+SERVER_ARGS="$BASE_SERVER_ARGS --metrics-interval-ms=${METRICS_INTERVAL_MS}"
+run_and_check_server
 
 num_iterations=10
 
@@ -159,7 +171,6 @@ for (( i = 0; i < $num_iterations; ++i )); do
   prev_energy=$current_energy
 done
 
-
 ### CPU / RAM Metrics
 
 # The underlying values for these metrics do not always update frequently,
@@ -167,7 +178,7 @@ done
 CPU_METRICS="nv_cpu_utilization nv_cpu_memory_used_bytes"
 WAIT_INTERVAL_SECS=2.0
 for metric in ${CPU_METRICS}; do
-    echo "\n=== Checking Metric: ${metric} ===\n"
+    echo -e "\n=== Checking Metric: ${metric} ===\n"
     prev_value=`curl -s localhost:8002/metrics | grep ${metric} | grep -v "HELP\|TYPE" | awk '{print $2}'`
 
     num_not_updated=0
@@ -205,6 +216,81 @@ fi
 kill $SERVER_PID
 wait $SERVER_PID
 
+### Metric Config CLI and different Metric Types ###
+MODELDIR="${PWD}/unit_test_models"
+mkdir -p "${MODELDIR}/identity_cache_on/1"
+mkdir -p "${MODELDIR}/identity_cache_off/1"
+BASE_SERVER_ARGS="--model-repository=${MODELDIR} --model-control-mode=explicit"
+PYTHON_TEST="metrics_test.py"
+
+# Check default settings: Counters should be enabled, summaries should be disabled
+SERVER_ARGS="${BASE_SERVER_ARGS} --load-model=identity_cache_off"
+run_and_check_server
+python3 ${PYTHON_TEST} MetricsTest.test_inf_counters_exist 2>&1 | tee ${CLIENT_LOG}
+check_unit_test
+python3 ${PYTHON_TEST} MetricsTest.test_inf_summaries_missing 2>&1 | tee ${CLIENT_LOG}
+check_unit_test
+python3 ${PYTHON_TEST} MetricsTest.test_cache_counters_missing 2>&1 | tee ${CLIENT_LOG}
+check_unit_test
+python3 ${PYTHON_TEST} MetricsTest.test_cache_summaries_missing 2>&1 | tee ${CLIENT_LOG}
+check_unit_test
+kill $SERVER_PID
+wait $SERVER_PID
+
+# Enable summaries, counters still enabled by default
+SERVER_ARGS="${BASE_SERVER_ARGS} --load-model=identity_cache_off --metrics-config summary_latencies=true"
+run_and_check_server
+python3 ${PYTHON_TEST} MetricsTest.test_inf_counters_exist 2>&1 | tee ${CLIENT_LOG}
+check_unit_test
+python3 ${PYTHON_TEST} MetricsTest.test_inf_summaries_exist 2>&1 | tee ${CLIENT_LOG}
+check_unit_test
+python3 ${PYTHON_TEST} MetricsTest.test_cache_counters_missing 2>&1 | tee ${CLIENT_LOG}
+check_unit_test
+python3 ${PYTHON_TEST} MetricsTest.test_cache_summaries_missing 2>&1 | tee ${CLIENT_LOG}
+check_unit_test
+kill $SERVER_PID
+wait $SERVER_PID
+
+# Enable summaries, disable counters
+SERVER_ARGS="${BASE_SERVER_ARGS} --load-model=identity_cache_off --metrics-config summary_latencies=true --metrics-config counter_latencies=false"
+run_and_check_server
+python3 ${PYTHON_TEST} MetricsTest.test_inf_counters_missing 2>&1 | tee ${CLIENT_LOG}
+check_unit_test
+python3 ${PYTHON_TEST} MetricsTest.test_inf_summaries_exist 2>&1 | tee ${CLIENT_LOG}
+check_unit_test
+python3 ${PYTHON_TEST} MetricsTest.test_cache_counters_missing 2>&1 | tee ${CLIENT_LOG}
+check_unit_test
+python3 ${PYTHON_TEST} MetricsTest.test_cache_summaries_missing 2>&1 | tee ${CLIENT_LOG}
+check_unit_test
+kill $SERVER_PID
+wait $SERVER_PID
+
+# Enable summaries and counters, check cache metrics
+CACHE_ARGS="--cache-config local,size=1048576"
+SERVER_ARGS="${BASE_SERVER_ARGS} ${CACHE_ARGS} --load-model=identity_cache_on --metrics-config summary_latencies=true --metrics-config counter_latencies=true"
+run_and_check_server
+python3 ${PYTHON_TEST} MetricsTest.test_inf_counters_exist 2>&1 | tee ${CLIENT_LOG}
+check_unit_test
+# DLIS-4762: Asserts that request summary is not published when cache is
+# enabled for a model, until this if fixed.
+python3 ${PYTHON_TEST} MetricsTest.test_inf_summaries_exist_with_cache 2>&1 | tee ${CLIENT_LOG}
+check_unit_test
+python3 ${PYTHON_TEST} MetricsTest.test_cache_counters_exist 2>&1 | tee ${CLIENT_LOG}
+check_unit_test
+python3 ${PYTHON_TEST} MetricsTest.test_cache_summaries_exist 2>&1 | tee ${CLIENT_LOG}
+check_unit_test
+kill $SERVER_PID
+wait $SERVER_PID
+
+# Check setting custom summary quantiles
+export SUMMARY_QUANTILES="0.1:0.0.1,0.7:0.01,0.75:0.01"
+SERVER_ARGS="${BASE_SERVER_ARGS} --load-model=identity_cache_off --metrics-config summary_latencies=true --metrics-config summary_quantiles=${SUMMARY_QUANTILES}"
+run_and_check_server
+python3 ${PYTHON_TEST} MetricsTest.test_summaries_custom_quantiles 2>&1 | tee ${CLIENT_LOG}
+check_unit_test
+kill $SERVER_PID
+wait $SERVER_PID
+   
 if [ $RET -eq 0 ]; then
   echo -e "\n***\n*** Test Passed\n***"
 else

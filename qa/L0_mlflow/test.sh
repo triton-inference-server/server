@@ -1,5 +1,5 @@
 #!/bin/bash
-# Copyright 2022, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright 2022-2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -31,10 +31,28 @@ source ../common/util.sh
 
 rm -fr *.log *.json
 
+# The default version of python 3.10.6 included in
+# Ubuntu 22.04 installs blinker 1.4. This doesn't 
+# work with the awscli which we try to install. 
+# Uninstalling blinker and allowing pip to install blinker 1.6 
+# fixes this issue. The alternative to this is to 
+# install a higher version of python which uses blinker 1.6,
+# but it is unknown whether this test should rely on 
+# the default installation of python.
+apt remove -y python3-blinker
+
 RET=0
 
 # Set up MLflow and dependencies used by the test
-pip install mlflow onnx onnxruntime
+pip install mlflow onnx onnxruntime boto3
+
+# Install AWS CLI
+if ! command -v aws --version &> /dev/null; then
+ curl "https://awscli.amazonaws.com/awscli-exe-linux-$(uname -m).zip" -o "awscliv2.zip"
+ unzip awscliv2.zip
+ ./aws/install
+ rm -r ./aws/ ./awscliv2.zip
+fi
 
 # Set environment variables for MLFlow and Triton plugin
 export MLFLOW_MODEL_REPO=./mlflow/artifacts
@@ -55,8 +73,12 @@ EOF
 
 rm -rf ./models
 mkdir -p ./models
+# Put some models in model repository to make sure MLFlow plugin would ignore
+# model that is not registered via MLFlow
+cp -r ./mlflow-triton-plugin/examples/onnx_float32_int32_int32 ./models/existing_model
+
 SERVER=/opt/tritonserver/bin/tritonserver
-SERVER_ARGS="--model-repository=./models --strict-model-config=false --model-control-mode=explicit"
+SERVER_ARGS="--model-repository=./models --strict-model-config=false --model-control-mode=explicit --load-model=*"
 SERVER_LOG="./inference_server.log"
 run_server
 if [ "$SERVER_PID" == "0" ]; then
@@ -92,6 +114,10 @@ if [ $CLI_RET -eq 0 ]; then
     fi
     if [ `grep -c "onnx_float32_int32_int32.*READY" $CLI_LOG` != "1" ]; then
         echo -e "\n***\n*** Expect deployed 'triton' flavor model to be listed\n***"
+        CLI_RET=1
+    fi
+    if [ `grep -c "existing_model.*READY" $CLI_LOG` != "0" ]; then
+        echo -e "\n***\n*** Unexpected non-MLflow model listed\n***"
         CLI_RET=1
     fi
 fi
@@ -152,6 +178,7 @@ PY_TEST=plugin_test.py
 TEST_RESULT_FILE='test_results.txt'
 python $PY_TEST >>$PY_LOG 2>&1
 if [ $? -ne 0 ]; then
+    cat $SERVER_LOG
     cat $PY_LOG
     echo -e "\n***\n*** Python Test Failed\n***"
     RET=1
@@ -166,6 +193,80 @@ fi
 set -e
 
 kill_server
+
+
+#
+# Test S3, the setup is duplicated from L0_storage_S3, except the bucket is
+# created empty
+#
+
+# Clear mlflow registered models if any
+python - << EOF
+from mlflow.tracking import MlflowClient
+c = MlflowClient()
+for m in c.search_registered_models():
+    c.delete_registered_model(m.name)
+EOF
+
+# S3 credentials are necessary for this test. Pass via ENV variables
+aws configure set default.region $AWS_DEFAULT_REGION && \
+    aws configure set aws_access_key_id $AWS_ACCESS_KEY_ID && \
+    aws configure set aws_secret_access_key $AWS_SECRET_ACCESS_KEY
+
+# S3 bucket path (Point to bucket when testing cloud storage)
+BUCKET_URL="s3://triton-bucket-${CI_JOB_ID}"
+
+# Cleanup and delete S3 test bucket if it already exists (due to test failure)
+aws s3 rm $BUCKET_URL --recursive --include "*" && \
+    aws s3 rb $BUCKET_URL || true
+
+# Make S3 test bucket
+aws s3 mb "${BUCKET_URL}"
+
+# Remove Slash in BUCKET_URL
+BUCKET_URL=${BUCKET_URL%/}
+BUCKET_URL_SLASH="${BUCKET_URL}/"
+
+export TRITON_MODEL_REPO=${BUCKET_URL}
+SERVER_ARGS="--model-repository=${TRITON_MODEL_REPO} --model-control-mode=explicit"
+SERVER_LOG="./inference_server.s3.log"
+run_server
+if [ "$SERVER_PID" == "0" ]; then
+    echo -e "\n***\n*** Failed to start $SERVER\n***"
+    cat $SERVER_LOG
+    # Clean up bucket contents and delete bucket before exiting test
+    aws s3 rm "${BUCKET_URL_SLASH}" --recursive --include "*"
+    aws s3 rb "${BUCKET_URL}"
+    exit 1
+fi
+
+# ONNX flavor with Python package
+set +e
+PY_LOG=plugin_py.s3.log
+PY_TEST=plugin_test.py
+TEST_RESULT_FILE='test_results.txt'
+python $PY_TEST >>$PY_LOG 2>&1
+if [ $? -ne 0 ]; then
+    cat $SERVER_LOG
+    cat $PY_LOG
+    echo -e "\n***\n*** Python Test Failed\n***"
+    RET=1
+else
+    check_test_results $TEST_RESULT_FILE 2
+    if [ $? -ne 0 ]; then
+        cat $PY_LOG
+        echo -e "\n***\n*** Test Result Verification Failed\n***"
+        RET=1
+    fi
+fi
+set -e
+
+kill_server
+
+# Clean up bucket contents and delete bucket
+aws s3 rm "${BUCKET_URL_SLASH}" --recursive --include "*"
+aws s3 rb "${BUCKET_URL}"
+
 if [ $RET -eq 0 ]; then
   echo -e "\n***\n*** Test Passed\n***"
 else

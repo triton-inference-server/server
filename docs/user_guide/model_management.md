@@ -1,5 +1,5 @@
 <!--
-# Copyright 2018-2022, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright 2018-2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -81,15 +81,33 @@ If you are seeing some memory growth when using the [model control
 protocol](../protocol/extension_model_repository.md) for loading and unloading
 models, it is possible that it's not an actual memory leak but some system's
 malloc heuristics that causes memory to be unable to be released back to the OS
-right away. You can try to switch from malloc to tcmalloc for better memory
-performance by setting `LD_PRELOAD` as below when running Triton:
+right away. To improve memory performance, you can consider switching from
+malloc to [tcmalloc](https://github.com/google/tcmalloc) or
+[jemalloc](https://github.com/jemalloc/jemalloc) by setting the `LD_PRELOAD`
+environment variable when running Triton, as shown below:
 ```
+# Using tcmalloc
 LD_PRELOAD=/usr/lib/$(uname -m)-linux-gnu/libtcmalloc.so.4:${LD_PRELOAD} tritonserver --model-repository=/models ...
 ```
-The tcmalloc library is already installed within Triton container. You can also
-install tcmalloc using
 ```
+# Using jemalloc
+LD_PRELOAD=/usr/lib/$(uname -m)-linux-gnu/libjemalloc.so:${LD_PRELOAD} tritonserver --model-repository=/models ...
+```
+We recommend experimenting with both tcmalloc and jemalloc to determine which
+one works better for your use case, as they have different strategies for
+memory allocation and deallocation and may perform differently depending on the
+workload.
+
+Both tcmalloc and jemalloc libraries are already installed within the Triton
+container. However, if you need to install them, you can do so using the
+following commands:
+```
+# Install tcmalloc
 apt-get install gperf libgoogle-perftools-dev
+```
+```
+# Install jemalloc
+apt-get install libjemalloc-dev
 ```
 
 ## Model Control Mode POLL
@@ -193,14 +211,27 @@ existing shared-libraries to another location outside of the model
 repository, copy in the new shared libraries, and then reload the
 model.
 
+* If only the model instance configuration on the 'config.pbtxt' is modified
+(i.e. increasing/decreasing the instance count) for non-sequence models,
+then Triton will update the model rather then reloading it, when either a load
+request is received under
+[Model Control Mode EXPLICIT](#model-control-mode-explicit) or change to the
+'config.pbtxt' is detected under
+[Model Control Mode POLL](#model-control-mode-poll).
+
+* If a sequence model is updated with in-flight sequence(s), Triton does not
+guarentee any remaining request(s) from the in-flight sequence(s) will be routed
+to the same model instance for processing. It is currently the responsibility of
+the user to ensure any in-flight sequence(s) is complete before updating a
+sequence model.
+
 ## Concurrently Loading Models
 
 To reduce service downtime, Triton loads new models in the background while
 continuing to serve inferences on existing models. Based on use case and
 performance requirements, the optimal amount of resources dedicated to loading
 models may differ. Triton exposes a `--model-load-thread-count` option to
-configure the number of threads dedicated to loading models, which defaults to
-twice the number of CPU cores (`2*num_cpus`) visible to the server. 
+configure the number of threads dedicated to loading models, which defaults to 4.
 
 To set this parameter with the C API, refer to 
 `TRITONSERVER_ServerOptionsSetModelLoadThreadCount` in 

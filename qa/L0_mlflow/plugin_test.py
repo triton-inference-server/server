@@ -30,7 +30,6 @@ import sys
 
 sys.path.append("../common")
 
-import sys
 import unittest
 import test_util as tu
 from mlflow.deployments import get_deploy_client

@@ -24,7 +24,7 @@
 # (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-apiVersion: autoscaling/v2beta1
+apiVersion: autoscaling/v2
 kind: HorizontalPodAutoscaler
 metadata:
   name: triton-hpa
@@ -37,8 +37,12 @@ spec:
   metrics:
   - type: External
     external:
-      metricName: kubernetes.io|container|accelerator|duty_cycle
-      targetAverageValue: {{ .Values.HPATargetAverageValue }}
+      metric:
+         name: kubernetes.io|container|accelerator|duty_cycle
+      target:
+         type: AverageValue
+         averageValue: {{ .Values.HPATargetAverageValue }}
+
   scaleTargetRef:
     apiVersion: apps/v1
     kind: Deployment

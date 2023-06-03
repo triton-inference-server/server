@@ -34,21 +34,23 @@
 #include <thread>
 #include <unordered_map>
 #include <vector>
-
 #include "triton/common/logging.h"
 #include "triton/core/tritonserver.h"
+#ifdef TRITON_ENABLE_GRPC
+// To avoid ambiguous reference during build
+// grpc headers should be imported first
+// https://github.com/open-telemetry/opentelemetry-cpp/blob/main/examples/otlp/README.md#additional-notes-regarding-abseil-library
+#include "grpc/grpc_server.h"
+#endif  // TRITON_ENABLE_GRPC
 #if defined(TRITON_ENABLE_HTTP) || defined(TRITON_ENABLE_METRICS)
 #include "http_server.h"
-#endif  // TRITON_ENABLE_HTTP|| TRITON_ENABLE_METRICS
+#endif  // TRITON_ENABLE_HTTP || TRITON_ENABLE_METRICS
 #ifdef TRITON_ENABLE_SAGEMAKER
 #include "sagemaker_server.h"
 #endif  // TRITON_ENABLE_SAGEMAKER
 #ifdef TRITON_ENABLE_VERTEX_AI
 #include "vertex_ai_server.h"
 #endif  // TRITON_ENABLE_VERTEX_AI
-#ifdef TRITON_ENABLE_GRPC
-#include "grpc_server.h"
-#endif  // TRITON_ENABLE_GRPC
 
 #ifndef _WIN32
 #include <getopt.h>
@@ -68,6 +70,10 @@ struct option {
   int val_;
 };
 #endif
+#ifdef TRITON_ENABLE_TRACING
+#include "tracer.h"
+#endif
+
 
 namespace triton { namespace server {
 
@@ -122,9 +128,8 @@ struct TritonServerParameters {
   std::set<std::string> startup_models_{};
   // Interval, in seconds, when the model repository is polled for changes.
   int32_t repository_poll_secs_{15};
-  // hardware_concurrency() returns 0 if not well defined or not computable.
-  uint32_t model_load_thread_count_{
-      std::max(2u, 2 * std::thread::hardware_concurrency())};
+  // Number of threads to use for concurrently loading models
+  uint32_t model_load_thread_count_{4};
   std::map<int, double> load_gpu_limit_;
 
   // Rate limiter configuration
@@ -170,6 +175,8 @@ struct TritonServerParameters {
   int32_t trace_rate_{1000};
   int32_t trace_count_{-1};
   int32_t trace_log_frequency_{0};
+  InferenceTraceMode trace_mode_{TRACE_MODE_TRITON};
+  TraceConfigMap trace_config_map_;
 #endif  // TRITON_ENABLE_TRACING
 
 // The configurations for various endpoints (i.e. HTTP, GRPC and metrics)
@@ -178,6 +185,7 @@ struct TritonServerParameters {
   std::string http_address_{"0.0.0.0"};
   int32_t http_port_{8000};
   bool reuse_http_port_{false};
+  std::string http_forward_header_pattern_;
   // The number of threads to initialize for the HTTP front-end.
   int http_thread_cnt_{8};
 #endif  // TRITON_ENABLE_HTTP
@@ -189,19 +197,16 @@ struct TritonServerParameters {
 
 #ifdef TRITON_ENABLE_METRICS
   bool allow_metrics_{true};
-  // Note that socket address is not part of metrics config,
-  // current implementation enforce metric to use the same address as in
-  // HTTP endpoint.
-  // [FIXME] server can be built with metrics ON and HTTP OFF, but we are
-  // not exposing metrics address configuration (currently only set along with
-  // HTTP address), which causes metrics will always listen on localhost in this
-  // build setting.
-  std::string metrics_address_{"0.0.0.0"};
+  // Defaults to http_address_ if TRITON_ENABLE_HTTP is enabled for backwards,
+  // otherwise defaults to "0.0.0.0" for TRITON_ENABLE_HTTP is disabled.
+  std::string metrics_address_{""};
   int32_t metrics_port_{8002};
   // Metric settings for Triton core
   float metrics_interval_ms_{2000};
   bool allow_gpu_metrics_{true};
   bool allow_cpu_metrics_{true};
+  std::vector<std::tuple<std::string, std::string, std::string>>
+      metrics_config_settings_;
 #endif  // TRITON_ENABLE_METRICS
 
 #ifdef TRITON_ENABLE_SAGEMAKER
@@ -251,7 +256,8 @@ class ParseException : public std::exception {
 // parser)
 class TritonParser {
  public:
-  // Parse command line arguements into a parameters struct and transform
+  TritonParser();
+  // Parse command line arguments into a parameters struct and transform
   // the argument list to contain only unrecognized options. The content of
   // unrecognized argument list shares the same lifecycle as 'argv'.
   // Raise ParseException if fail to parse recognized options.
@@ -272,10 +278,30 @@ class TritonParser {
       const std::string& arg);
   std::tuple<std::string, std::string, std::string> ParseHostPolicyOption(
       const std::string& arg);
+  std::tuple<std::string, std::string, std::string> ParseMetricsConfigOption(
+      const std::string& arg);
   std::tuple<std::string, std::string, std::string>
   ParseGrpcRestrictedProtocolOption(const std::string& arg);
 #ifdef TRITON_ENABLE_TRACING
   TRITONSERVER_InferenceTraceLevel ParseTraceLevelOption(std::string arg);
+  InferenceTraceMode ParseTraceModeOption(std::string arg);
+  std::tuple<std::string, std::string, std::string> ParseTraceConfigOption(
+      const std::string& arg);
+  // Helper functions for post processing for collected trace arguments.
+  void SetGlobalTraceArgs(
+      TritonServerParameters& lparams, bool trace_level_present,
+      bool trace_rate_present, bool trace_count_present,
+      bool explicit_disable_trace);
+  void SetTritonTraceArgs(
+      TritonServerParameters& lparams, bool trace_filepath_present,
+      bool trace_log_frequency_present);
+  void VerifyOpentelemetryTraceArgs(
+      bool trace_filepath_present, bool trace_log_frequency_present);
+  void PostProcessTraceArgs(
+      TritonServerParameters& lparams, bool trace_level_present,
+      bool trace_rate_present, bool trace_count_present,
+      bool trace_filepath_present, bool trace_log_frequency_present,
+      bool explicit_disable_trace);
 #endif  // TRITON_ENABLE_TRACING
   // Helper function to parse option in
   // "<string>[1st_delim]<string>[2nd_delim]<string>" format
@@ -283,6 +309,30 @@ class TritonParser {
       const std::string& arg, const std::string& first_delim,
       const std::string& second_delim);
 
-  static std::vector<Option> recognized_options_;
+  // Initialize individual option groups
+  void SetupOptions();
+  // Initialize option group mappings
+  void SetupOptionGroups();
+
+  // Sum of option groups: vector to maintain insertion order for Usage()
+  std::vector<std::pair<std::string, std::vector<Option>&>> option_groups_;
+  // Individual option groups
+  std::vector<Option> global_options_;
+  std::vector<Option> server_options_;
+  std::vector<Option> model_repo_options_;
+  std::vector<Option> logging_options_;
+  std::vector<Option> http_options_;
+  std::vector<Option> grpc_options_;
+  std::vector<Option> sagemaker_options_;
+  std::vector<Option> vertex_options_;
+  std::vector<Option> metric_options_;
+  std::vector<Option> tracing_options_;
+  std::vector<Option> backend_options_;
+  std::vector<Option> repo_agent_options_;
+  std::vector<Option> cache_options_;
+  std::vector<Option> rate_limiter_options_;
+  std::vector<Option> memory_device_options_;
+  // Group deprecated options to keep preferred options more succinct
+  std::vector<Option> deprecated_options_;
 };
 }}  // namespace triton::server

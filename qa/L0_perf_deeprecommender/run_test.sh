@@ -1,5 +1,5 @@
 #!/bin/bash
-# Copyright 2019-2022, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright 2019-2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -70,7 +70,8 @@ for STATIC_BATCH in $STATIC_BATCH_SIZES; do
                         echo "dynamic_batching { preferred_batch_size: [ ${DYNAMIC_BATCH} ] }" >> config.pbtxt)
             fi
 
-            SERVER_LOG="${NAME}.serverlog"
+            echo "Time before starting server: $(date)"
+            SERVER_LOG="${NAME}.server.log"
             run_server
             if (( $SERVER_PID == 0 )); then
                 echo -e "\n***\n*** Failed to start $SERVER\n***"
@@ -79,6 +80,7 @@ for STATIC_BATCH in $STATIC_BATCH_SIZES; do
             fi
 
             set +e
+            echo "Time before perf analyzer trials: $(date)"
 
             # Run the model once to warm up. Some frameworks do
             # optimization on the first requests.  Must warmup similar
@@ -86,14 +88,22 @@ for STATIC_BATCH in $STATIC_BATCH_SIZES; do
             $PERF_CLIENT -v -i ${PERF_CLIENT_PROTOCOL} -m $MODEL_NAME -p5000 \
                          -b${STATIC_BATCH} --concurrency-range ${CONCURRENCY}
 
+            set -o pipefail
+            PA_MAX_TRIALS=${PA_MAX_TRIALS:-"50"}
             $PERF_CLIENT -v -i ${PERF_CLIENT_PROTOCOL} -m $MODEL_NAME -p5000 \
                          -b${STATIC_BATCH} --concurrency-range ${CONCURRENCY} \
+                         --max-trials "${PA_MAX_TRIALS}" \
                          -f ${NAME}.csv 2>&1 | tee ${NAME}.log
             if (( $? != 0 )); then
+                echo -e "\n***\n*** FAILED Perf Analyzer measurement\n***"
                 RET=1
             fi
+            echo "Time after perf analyzer trials: $(date)"
+            set +o pipefail
+
             curl localhost:8002/metrics -o ${NAME}.metrics >> ${NAME}.log 2>&1
             if (( $? != 0 )); then
+                echo -e "\n***\n*** FAILED to get metrics\n***"
                 RET=1
             fi
 

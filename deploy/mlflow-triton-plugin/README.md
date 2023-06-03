@@ -57,7 +57,7 @@ python setup.py install
 ## Quick Start
 
 In this documentation, we will use the files in `examples` to showcase how
-the plugin interacts with Triton Infernce Server. The `onnx_float32_int32_int32`
+the plugin interacts with Triton Inference Server. The `onnx_float32_int32_int32`
 model in `examples` is a simple model that takes two float32 inputs, INPUT0 and
 INPUT1, with shape [-1, 16], and produces two int32 outputs, OUTPUT0 and
 OUTPUT1, where OUTPUT0 is the element-wise summation of INPUT0 and INPUT1 and
@@ -74,7 +74,8 @@ to exploit the deployment feature of the plugin.
 Once the server has started, the following environment must be set so that the plugin
 can interact with the server properly:
 * `TRITON_URL`: The address to the Triton HTTP endpoint
-* `TRITON_MODEL_REPO`: The path to the Triton model repository
+* `TRITON_MODEL_REPO`: The path to the Triton model repository. It can be an s3 URI but keep in \
+mind that the env vars AWS_ACCESS_KEY_ID and AWS_SECRET_ACCESS_KEY are needed.
 
 ### Publish models to MLflow
 
@@ -84,7 +85,7 @@ The MLFlow ONNX built-in functionalities can be used to publish `onnx` flavor
 models to MLFlow directly, and the MLFlow Triton plugin will prepare the model
 to the format expected by Triton. You may also log
 [`config.pbtxt`](https://github.com/triton-inference-server/server/blob/main/docs/protocol/extension_model_configuration.md)
-as additonal artifact which Triton will be used to serve the model. Otherwise,
+as additional artifact which Triton will be used to serve the model. Otherwise,
 the server should be run with auto-complete feature enabled
 (`--strict-model-config=false`) to generate the model configuration.
 

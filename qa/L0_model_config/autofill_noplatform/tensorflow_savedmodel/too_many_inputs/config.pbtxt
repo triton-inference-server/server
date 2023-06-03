@@ -11,7 +11,7 @@ input [
     dims: [ 16 ]
   },
   {
-    name: "INPUT_EXTRA"
+    name: "INPUT1"
     data_type: TYPE_INT32
     dims: [ 16 ]
   }

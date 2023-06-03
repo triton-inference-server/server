@@ -32,11 +32,10 @@
 
 #include <event2/buffer.h>
 #include <re2/re2.h>
-
 #include <algorithm>
 #include <list>
+#include <regex>
 #include <thread>
-
 #include "classification.h"
 
 #define TRITONJSON_STATUSTYPE TRITONSERVER_Error*
@@ -975,9 +974,10 @@ HTTPAPIServer::HTTPAPIServer(
     const std::shared_ptr<TRITONSERVER_Server>& server,
     triton::server::TraceManager* trace_manager,
     const std::shared_ptr<SharedMemoryManager>& shm_manager, const int32_t port,
-    const bool reuse_port, const std::string address, const int thread_cnt)
-    : HTTPServer(port, reuse_port, address, thread_cnt), server_(server),
-      trace_manager_(trace_manager), shm_manager_(shm_manager),
+    const bool reuse_port, const std::string& address,
+    const std::string& header_forward_pattern, const int thread_cnt)
+    : HTTPServer(port, reuse_port, address, header_forward_pattern, thread_cnt),
+      server_(server), trace_manager_(trace_manager), shm_manager_(shm_manager),
       allocator_(nullptr), server_regex_(R"(/v2(?:/health/(live|ready))?)"),
       model_regex_(
           R"(/v2/models/([^/]+)(?:/versions/([0-9]+))?(?:/(infer|ready|config|stats|trace/setting))?)"),
@@ -2555,7 +2555,8 @@ HTTPAPIServer::EVBufferToInput(
       uint64_t shm_offset;
       const char* shm_region;
       RETURN_IF_ERR(CheckSharedMemoryData(
-          request_input, &use_shm, &shm_region, &shm_offset, reinterpret_cast<uint64_t*>(&byte_size)));
+          request_input, &use_shm, &shm_region, &shm_offset,
+          reinterpret_cast<uint64_t*>(&byte_size)));
       if (use_shm) {
         void* base;
         TRITONSERVER_MemoryType memory_type;
@@ -2765,6 +2766,41 @@ HTTPAPIServer::EVBufferToRawInput(
   return nullptr;  // success
 }
 
+struct HeaderSearchPayload {
+  HeaderSearchPayload(
+      const re2::RE2& regex, TRITONSERVER_InferenceRequest* request)
+      : regex_(regex), request_(request), error_(nullptr)
+  {
+  }
+
+  const re2::RE2& regex_;
+  TRITONSERVER_InferenceRequest* request_;
+  TRITONSERVER_Error* error_;
+};
+
+int
+ForEachHeader(evhtp_header_t* header, void* arg)
+{
+  HeaderSearchPayload* header_search_payload =
+      reinterpret_cast<HeaderSearchPayload*>(arg);
+
+  TRITONSERVER_InferenceRequest* request = header_search_payload->request_;
+  const re2::RE2& regex = header_search_payload->regex_;
+
+  std::string matched_string;
+  if (RE2::PartialMatch(std::string(header->key), regex)) {
+    header_search_payload->error_ =
+        TRITONSERVER_InferenceRequestSetStringParameter(
+            request, header->key, header->val);
+
+    if (header_search_payload->error_ != nullptr) {
+      return 1;
+    }
+  }
+
+  return 0;
+}
+
 void
 HTTPAPIServer::HandleInfer(
     evhtp_request_t* req, const std::string& model_name,
@@ -2900,6 +2936,16 @@ HTTPAPIServer::HandleInfer(
             (decompressed_buffer == nullptr) ? req->buffer_in
                                              : decompressed_buffer,
             infer_request.get());
+      }
+    }
+    if (err == nullptr && (!header_forward_pattern_.empty())) {
+      HeaderSearchPayload header_search_payload(
+          header_forward_regex_, irequest);
+      int status = evhtp_kvs_for_each(
+          req->headers_in, ForEachHeader,
+          reinterpret_cast<void*>(&header_search_payload));
+      if (status != 0) {
+        err = header_search_payload.error_;
       }
     }
     if (err == nullptr) {
@@ -3497,12 +3543,13 @@ HTTPAPIServer::Create(
     const std::shared_ptr<TRITONSERVER_Server>& server,
     triton::server::TraceManager* trace_manager,
     const std::shared_ptr<SharedMemoryManager>& shm_manager, const int32_t port,
-    const bool reuse_port, const std::string address, const int thread_cnt,
+    const bool reuse_port, const std::string& address,
+    const std::string& header_forward_pattern, const int thread_cnt,
     std::unique_ptr<HTTPServer>* http_server)
 {
   http_server->reset(new HTTPAPIServer(
       server, trace_manager, shm_manager, port, reuse_port, address,
-      thread_cnt));
+      header_forward_pattern, thread_cnt));
 
   const std::string addr = address + ":" + std::to_string(port);
   LOG_INFO << "Started HTTPService at " << addr;

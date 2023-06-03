@@ -947,9 +947,9 @@ SagemakerAPIServer::SageMakerMMELoadModel(
   std::string repo_path = parse_map.at("url");
   std::string model_name = parse_map.at("model_name");
 
-  /* Error out if there's more than one subdir/version within
-   * supplied model repo, as ensemble in MME is not (currently)
-   * supported
+  /* Check subdirs for models and find ensemble model within the repo_path
+   * If only 1 model, that will be selected as model_subdir
+   * Else ensemble model directory is set as model_subdir
    */
   DIR* dir;
   struct dirent* ent;

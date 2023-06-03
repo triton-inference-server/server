@@ -1,5 +1,5 @@
 #!/bin/bash
-# Copyright 2019-2022, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright 2019-2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -54,15 +54,13 @@ rm -fr models && mkdir -p models && \
             sed -i "s/^max_batch_size:.*/max_batch_size: ${MAX_BATCH}/" config.pbtxt && \
             echo "instance_group [ { count: ${INSTANCE_CNT} }]")
 
-# Onnx and onnx-trt models are very slow on Jetson.
 MEASUREMENT_WINDOW=5000
+PERF_CLIENT=../clients/perf_client
+# Onnx and onnx-trt models are very slow on Jetson.
 if [ "$ARCH" == "aarch64" ]; then
-    PERF_CLIENT=${TRITON_DIR}/clients/bin/perf_client
     if [ "$MODEL_FRAMEWORK" == "onnx" ] || [ "$MODEL_FRAMEWORK" == "onnx_trt" ]; then
         MEASUREMENT_WINDOW=20000
     fi
-else
-    PERF_CLIENT=../clients/perf_client
 fi
 
 # Overload use of PERF_CLIENT_PROTOCOL for convenience with existing test and 
@@ -75,7 +73,7 @@ if [[ "${PERF_CLIENT_PROTOCOL}" == "triton_c_api" ]]; then
 else
     SERVICE_ARGS="-i ${PERF_CLIENT_PROTOCOL}"
 
-    SERVER_LOG="${NAME}.serverlog"
+    SERVER_LOG="${NAME}.server.log"
     run_server
     if (( $SERVER_PID == 0 )); then
         echo -e "\n***\n*** Failed to start $SERVER\n***"
@@ -93,15 +91,21 @@ else
                     ${SERVICE_ARGS}
     set -e
 fi
+
 set +e
+set -o pipefail
+PA_MAX_TRIALS=${PA_MAX_TRIALS:-"50"}
 # Measure perf client results and write them to a file for reporting
 $PERF_CLIENT -v -m $MODEL_NAME -p${MEASUREMENT_WINDOW} \
                 -b${STATIC_BATCH} --concurrency-range ${CONCURRENCY} \
+                --max-trials "${PA_MAX_TRIALS}" \
                 ${SERVICE_ARGS} \
                 -f ${NAME}.csv 2>&1 | tee ${NAME}.log
 if (( $? != 0 )); then
+    echo -e "\n***\n*** FAILED Perf Analyzer measurement\n***"
     RET=1
 fi
+set +o pipefail
 set -e
 
 echo -e "[{\"s_benchmark_kind\":\"benchmark_perf\"," >> ${NAME}.tjson

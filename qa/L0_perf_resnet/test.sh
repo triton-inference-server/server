@@ -38,7 +38,7 @@ if [ ! -z "$TEST_REPO_ARCH" ]; then
     REPO_VERSION=${REPO_VERSION}_${TEST_REPO_ARCH}
 fi
 
-rm -f *.log *.serverlog *.csv *.tjson *.json
+rm -f *.log  *.csv *.tjson *.json
 
 PROTOCOLS="grpc http triton_c_api"
 
@@ -227,6 +227,6 @@ if [ "$ARCH" == "x86_64" ]; then
        INSTANCE_CNT=${INSTANCE_CNT} \
        CONCURRENCY=${CONCURRENCY} \
        ARCH=${ARCH} \
-       BACKEND_CONFIG=" --backend-config=tensorflow,version=1" \
+       BACKEND_CONFIG=" --backend-config=tensorflow,version=2" \
        bash -x run_test.sh
 fi

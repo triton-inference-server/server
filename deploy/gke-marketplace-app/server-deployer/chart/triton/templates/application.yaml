@@ -48,7 +48,7 @@ spec:
 
     notes: |-
 
-      Send request to Triton server by using IP address of istio-ingressgateway, 
+      Send request to Triton server by using IP address "ingress-triton", 
       send to IP:80/v2/models/{}/infer
 
       Links:
@@ -63,10 +63,6 @@ spec:
     kind: Deployment
   - group: v1
     kind: Service
-  - group: autoscaling/v2beta1
+  - group: autoscaling/v2
     kind: HorizontalPodAutoscaler
-  - group: networking.istio.io/v1alpha3
-    kind: VirtualService
-  - group: networking.istio.io/v1alpha3
-    kind: Gateway
 {{  end }}

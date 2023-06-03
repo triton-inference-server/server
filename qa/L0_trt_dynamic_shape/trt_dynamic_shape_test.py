@@ -1,4 +1,4 @@
-# Copyright (c) 2019, NVIDIA CORPORATION. All rights reserved.
+# Copyright 2019-2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -28,11 +28,6 @@ import sys
 
 sys.path.append("../common")
 
-from builtins import range
-from future.utils import iteritems
-import os
-import shutil
-import time
 import unittest
 import numpy as np
 import infer_util as iu

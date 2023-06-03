@@ -320,6 +320,31 @@ set -e
 kill $SERVER_PID
 wait $SERVER_PID
 
+# Test access decline
+AWS_SECRET_ACCESS_KEY_BACKUP=$AWS_SECRET_ACCESS_KEY
+export AWS_SECRET_ACCESS_KEY="[Invalid]"
+SERVER_ARGS="--model-repository=s3://localhost:4572/${BUCKET_NAME}1 --exit-timeout-secs=120"
+SERVER_LOG="./inference_server.access_decline.log"
+run_server
+if [ "$SERVER_PID" != "0" ]; then
+    echo -e "\n***\n*** Unexpected server start $SERVER\n***"
+    cat $SERVER_LOG
+    kill $SERVER_PID
+    wait $SERVER_PID
+    RET=1
+else
+  # MinIO does not appear to reply on access decline, but other implementations
+  # might provide extra messages, so make sure Triton will print the messages.
+  EXPECTED_MSG="Unable to create S3 filesystem client. Check account credentials. Exception: '' Message: 'No response body.'"
+  if ! grep "$EXPECTED_MSG" $SERVER_LOG; then
+    echo -e "\n***\n*** Expected error message not found\n***"
+    cat $SERVER_LOG
+    RET=1
+  fi
+fi
+# Restore keys for destroying buckets
+export AWS_SECRET_ACCESS_KEY=$AWS_SECRET_ACCESS_KEY_BACKUP
+
 # Destroy buckets
 for BUCKET_SUFFIX in 1 2; do
     awslocal $ENDPOINT_FLAG s3 rm s3://$BUCKET_NAME$BUCKET_SUFFIX --recursive --include "*" && \

@@ -57,7 +57,7 @@ following platforms. See [Building on Unsupported
 Platforms](#building-on-unsupported-platforms) if you are attempting
 to build Triton on a platform that is not listed here.
 
-* [Ubuntu 20.04, x86-64](#building-for-ubuntu-2004)
+* [Ubuntu 22.04, x86-64](#building-for-ubuntu-2204)
 
 * [Jetpack 4.x, NVIDIA Jetson (Xavier, Nano, TX2)](#building-for-jetpack-4x)
 
@@ -67,9 +67,9 @@ If you are developing or debugging Triton, see [Development and
 Incremental Builds](#development-and-incremental-builds) for information
 on how to perform incremental build.
 
-## Building for Ubuntu 20.04
+## Building for Ubuntu 22.04
 
-For Ubuntu-20.04, build.py supports both a Docker build and a
+For Ubuntu-22.04, build.py supports both a Docker build and a
 non-Docker build.
 
 * [Build using Docker](#building-with-docker) and the TensorFlow and PyTorch
@@ -111,7 +111,7 @@ building with Docker.
     image pulled from [NGC](https://ngc.nvidia.com) that contains the
     CUDA, cuDNN, TensorRT and other dependencies that are required to
     build Triton. When building without GPU support, the *min* image
-    is the standard ubuntu:20.04 image.
+    is the standard ubuntu:22.04 image.
 
   * Run the cmake_build script within the *tritonserver_buildbase*
     image to actually build Triton. The cmake_build script performs
@@ -173,7 +173,7 @@ $ ./build.py ... --repo-tag=common:<container tag> --repo-tag=core:<container ta
 
 If you are building on a release branch then `<container tag>` will
 default to the branch name. For example, if you are building on the
-r23.03 branch, `<container tag>` will default to r23.03. If you are
+r23.05 branch, `<container tag>` will default to r23.05. If you are
 building on any other branch (including the *main* branch) then
 `<container tag>` will default to "main". Therefore, you typically do
 not need to provide `<container tag>` at all (nor the preceding
@@ -197,10 +197,10 @@ To include the TensorFlow2 backend in your CPU-only build, you must
 provide this additional flag to build.py:
 `--extra-backend-cmake-arg=tensorflow2:TRITON_TENSORFLOW_INSTALL_EXTRA_DEPS=ON`.
 
-When building without GPU support, you must use the `--image=gpu-base,nvcr.io/nvidia/tritonserver:<xx.yy>-py3-min`
-flag. This is needed since the CPU-only builds of the TensorFlow and
-PyTorch backends require some CUDA stubs and runtime dependencies that are
-not present in the CPU-only base container.
+CPU-only builds of the TensorFlow and PyTorch backends require some CUDA stubs 
+and runtime dependencies that are not present in the CPU-only base container. 
+These are retrieved from a GPU base container, which can be changed with the 
+`--image=gpu-base,nvcr.io/nvidia/tritonserver:<xx.yy>-py3-min` flag.
 
 ### Building Without Docker
 
@@ -274,7 +274,7 @@ issues since non-supported versions are not tested.
 ## Building for Windows 10
 
 For Windows 10, build.py supports both a Docker build and a non-Docker
-build in a similar way as described for [Ubuntu](#building-for-ubuntu-2004). The primary
+build in a similar way as described for [Ubuntu](#building-for-ubuntu-2204). The primary
 difference is that the minimal/base image used as the base of
 Dockerfile.buildbase image can be built from the provided
 [Dockerfile.win10.min](https://github.com/triton-inference-server/server/blob/main/Dockerfile.win10.min)
@@ -334,8 +334,8 @@ python build.py --cmake-dir=<path/to/repo>/build --build-dir=/tmp/citritonbuild 
 If you are building on *main* branch then '<container tag>' will
 default to "main". If you are building on a release branch then
 '<container tag>' will default to the branch name. For example, if you
-are building on the r23.03 branch, '<container tag>' will default to
-r23.03. Therefore, you typically do not need to provide '<container
+are building on the r23.05 branch, '<container tag>' will default to
+r23.05. Therefore, you typically do not need to provide '<container
 tag>' at all (nor the preceding colon). You can use a different
 '<container tag>' for a component to instead use the corresponding
 branch/tag in the build. For example, if you have a branch called
@@ -378,7 +378,7 @@ platforms by reading the above documentation and then follow the
 process for the supported platform that most closely matches the
 platform you are interested in (for example, if you are trying to
 build for RHEL/x86-64 then follow the [Building for Ubuntu
-20.04](#building-for-ubuntu-2004) process. You will likely need to
+22.04](#building-for-ubuntu-2204) process. You will likely need to
 make changes in the following areas and then manually run docker_build
 and cmake_build or the equivalent commands to perform a build.
 
@@ -410,7 +410,7 @@ and cmake_build or the equivalent commands to perform a build.
   [TensorFlow](https://github.com/triton-inference-server/tensorflow_backend)
   backend extracts pre-built shared libraries from the TensorFlow NGC
   container as part of the build. This container is only available for
-  Ubuntu-20.04 / x86-64, so if you require the TensorFlow backend for
+  Ubuntu-22.04 / x86-64, so if you require the TensorFlow backend for
   your platform you will need download the TensorFlow container and
   modify its build to produce shared libraries for your platform. You
   must use the TensorFlow source and build scripts from within the NGC

@@ -1,5 +1,5 @@
 #!/usr/bin/env python
-# Copyright 2019-2022, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright 2019-2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -29,9 +29,7 @@ import sys
 
 sys.path.append('../common')
 
-import argparse
 import numpy as np
-import os
 from builtins import range
 import tritonclient.http as tritonhttpclient
 import tritonclient.grpc as tritongrpcclient

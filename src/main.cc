@@ -39,12 +39,14 @@
 #endif
 
 #include <stdint.h>
+
 #include <algorithm>
 #include <cctype>
 #include <iomanip>
 #include <iostream>
 #include <sstream>
 #include <thread>
+
 #include "triton_signal.h"
 
 #ifdef TRITON_ENABLE_ASAN
@@ -68,7 +70,7 @@
 #include "vertex_ai_server.h"
 #endif  // TRITON_ENABLE_VERTEX_AI
 #ifdef TRITON_ENABLE_GRPC
-#include "grpc_server.h"
+#include "grpc/grpc_server.h"
 #endif  // TRITON_ENABLE_GRPC
 
 #ifdef TRITON_ENABLE_GPU
@@ -135,6 +137,7 @@ StartHttpService(
   TRITONSERVER_Error* err = triton::server::HTTPAPIServer::Create(
       server, trace_manager, shm_manager, g_triton_params.http_port_,
       g_triton_params.reuse_http_port_, g_triton_params.http_address_,
+      g_triton_params.http_forward_header_pattern_,
       g_triton_params.http_thread_cnt_, service);
   if (err == nullptr) {
     err = (*service)->Start();
@@ -381,7 +384,8 @@ StartTracing(triton::server::TraceManager** trace_manager)
   TRITONSERVER_Error* err = triton::server::TraceManager::Create(
       trace_manager, g_triton_params.trace_level_, g_triton_params.trace_rate_,
       g_triton_params.trace_count_, g_triton_params.trace_log_frequency_,
-      g_triton_params.trace_filepath_);
+      g_triton_params.trace_filepath_, g_triton_params.trace_mode_,
+      g_triton_params.trace_config_map_);
 
   if (err != nullptr) {
     LOG_TRITONSERVER_ERROR(err, "failed to configure tracing");
