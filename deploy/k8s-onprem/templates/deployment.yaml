@@ -72,7 +72,7 @@ spec:
           args: 
             - tritonserver
             {{- range .Values.serverArgs }}
-            - {{.}}
+            - {{ . }}
             {{- end }}
 
           ports:
