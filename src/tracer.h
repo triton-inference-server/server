@@ -186,7 +186,7 @@ class TraceManager {
     void InitTracer(const TraceConfigMap& config_map);
 
     // Starts a span with the provided timestamp
-    void InitSpan(const opentelemetry::common::SystemTimestamp& timestamp_ns);
+    void InitSpan(const opentelemetry::common::SystemTimestamp& timestamp_ns, uint64_t& raw_timestamp_ns);
 
     // Ends the started span and cleans up tracer
     void EndSpan();
