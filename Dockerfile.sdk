@@ -29,7 +29,7 @@
 #
 
 # Base image on the minimum Triton container
-ARG BASE_IMAGE=nvcr.io/nvidia/tritonserver:23.04-py3-min
+ARG BASE_IMAGE=nvcr.io/nvidia/tritonserver:23.05-py3-min
 
 ARG TRITON_CLIENT_REPO_SUBDIR=clientrepo
 ARG TRITON_COMMON_REPO_TAG=main
@@ -37,13 +37,12 @@ ARG TRITON_CORE_REPO_TAG=main
 ARG TRITON_BACKEND_REPO_TAG=main
 ARG TRITON_THIRD_PARTY_REPO_TAG=main
 ARG TRITON_MODEL_ANALYZER_REPO_TAG=main
-ARG CMAKE_UBUNTU_VERSION=20.04
 ARG TRITON_ENABLE_GPU=ON
 ARG JAVA_BINDINGS_MAVEN_VERSION=3.8.4
 ARG JAVA_BINDINGS_JAVACPP_PRESETS_TAG=1.5.8
 
 # DCGM version to install for Model Analyzer
-ARG DCGM_VERSION=2.2.9
+ARG DCGM_VERSION=2.4.7
 
 ARG NVIDIA_TRITON_SERVER_SDK_VERSION=unknown
 ARG NVIDIA_BUILD_ID=unknown
@@ -87,25 +86,18 @@ RUN apt-get update && \
     pip3 install --upgrade grpcio-tools && \
     pip3 install --upgrade pip
 
-ARG CMAKE_UBUNTU_VERSION
 # Client build requires recent version of CMake (FetchContent required)
-RUN wget -O - https://apt.kitware.com/keys/kitware-archive-latest.asc 2>/dev/null | \
-      gpg --dearmor - |  \
-      tee /etc/apt/trusted.gpg.d/kitware.gpg >/dev/null && \
-    if [ "$CMAKE_UBUNTU_VERSION" = "20.04" ]; then \
-      apt-add-repository 'deb https://apt.kitware.com/ubuntu/ focal main' && \
-      apt-get update && \
-      apt-get install -y --no-install-recommends \
-        cmake-data=3.25.2-0kitware1ubuntu20.04.1 cmake=3.25.2-0kitware1ubuntu20.04.1; \
-    elif [ "$CMAKE_UBUNTU_VERSION" = "18.04" ]; then \
-      apt-add-repository 'deb https://apt.kitware.com/ubuntu/ bionic main' && \
-      apt-get update && \
-      apt-get install -y --no-install-recommends \
-        cmake-data=3.18.4-0kitware1 cmake=3.18.4-0kitware1; \
-    else \
-      echo "ERROR: Only support CMAKE_UBUNTU_VERSION to be 18.04 or 20.04" && false; \
-    fi && \
-    cmake --version
+# Using CMAKE installation instruction from:: https://apt.kitware.com/
+RUN apt update && apt install -y gpg wget && \
+    wget -O - https://apt.kitware.com/keys/kitware-archive-latest.asc 2>/dev/null | \
+        gpg --dearmor - |  \
+        tee /usr/share/keyrings/kitware-archive-keyring.gpg >/dev/null && \
+    . /etc/os-release && \
+    echo "deb [signed-by=/usr/share/keyrings/kitware-archive-keyring.gpg] https://apt.kitware.com/ubuntu/ $UBUNTU_CODENAME main" | \
+    tee /etc/apt/sources.list.d/kitware.list >/dev/null && \
+    apt-get update && \
+    apt-get install -y --no-install-recommends cmake cmake-data && \
+    cmake --version 
 
 # Build expects "python" executable (not python3).
 RUN rm -f /usr/bin/python && \
@@ -224,7 +216,7 @@ RUN pip3 install --upgrade numpy pillow attrdict && \
 RUN if [ "$TRITON_ENABLE_GPU" = "ON" ]; then \
         [ "$(uname -m)" != "x86_64" ] && arch="sbsa" || arch="x86_64" && \
         curl -o /tmp/cuda-keyring.deb \
-        https://developer.download.nvidia.com/compute/cuda/repos/ubuntu2004/$arch/cuda-keyring_1.0-1_all.deb \
+        https://developer.download.nvidia.com/compute/cuda/repos/ubuntu2204/$arch/cuda-keyring_1.0-1_all.deb \
         && apt install /tmp/cuda-keyring.deb && rm /tmp/cuda-keyring.deb && \
         apt-get update && apt-get install -y datacenter-gpu-manager=1:${DCGM_VERSION}; \
     fi

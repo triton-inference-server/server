@@ -131,9 +131,6 @@ cp ../python_models/string_fixed/config.pbtxt ./models/string_fixed
 # Skip torch install on Jetson since it is already installed.
 if [ "$TEST_JETSON" == "0" ]; then
   pip3 install torch==1.13.0+cpu -f https://download.pytorch.org/whl/torch_stable.html
-else
-  # test_growth_error is skipped on jetson
-  EXPECTED_NUM_TESTS=8
 fi
 
 prev_num_pages=`get_shm_pages`
@@ -371,7 +368,7 @@ and shared memory pages after starting triton equals to $current_num_pages \n***
     exit 1
 fi
 
-# Disable env test for Jetson since build is non-dockerized and cloud storage repos are not supported
+# Disable env test for Jetson since cloud storage repos are not supported
 # Disable ensemble, unittest, io and bls tests for Jetson since GPU Tensors are not supported
 # Disable variants test for Jetson since already built without GPU Tensor support
 # Disable decoupled test because it uses GPU tensors

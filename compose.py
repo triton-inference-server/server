@@ -434,7 +434,7 @@ if __name__ == '__main__':
                     "nvcr.io/nvidia/tritonserver:{}-cpu-only-py3".format(
                         FLAGS.container_version),
                 "min":
-                    "ubuntu:20.04"
+                    "ubuntu:22.04"
             }
     fail_if(
         len(images) < 2,
