@@ -85,7 +85,7 @@ RET=0
 BACKENDS=${BACKENDS:="graphdef savedmodel onnx libtorch plan"}
 
 function run_unit_tests() {
-    python $INFER_TEST >$CLIENT_LOG 2>&1
+    BACKENDS=$BACKENDS python $INFER_TEST >$CLIENT_LOG 2>&1
     if [ $? -ne 0 ]; then
         cat $CLIENT_LOG
         echo -e "\n***\n*** Test Failed\n***"

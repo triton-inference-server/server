@@ -67,7 +67,6 @@ from inspect import getsourcefile
 # incorrectly load the other version of the openvino libraries.
 #
 TRITON_VERSION_MAP = {
-
     '2.35.0dev': (
         '23.06dev',  # triton container
         '23.05',  # upstream container
@@ -908,7 +907,8 @@ ENV DEBIAN_FRONTEND=noninteractive
 # libcurl4-openSSL-dev is needed for GCS
 # python3-dev is needed by Torchvision
 # python3-pip and libarchive-dev is needed by python backend
-# uuid-dev and pkg-config is needed for Azure Storage
+# uuid-dev, pkg-config, and libxml2-dev is needed for Azure Storage
+# [DO NOT MERGE] check if some dependencies can be removed
 # scons is needed for armnn_tflite backend build dep
 RUN apt-get update && \
     apt-get install -y --no-install-recommends \
@@ -936,8 +936,7 @@ RUN apt-get update && \
             wget \
             zlib1g-dev \
             libarchive-dev \
-            pkg-config \
-            uuid-dev \
+            libxml2-dev \ 
             libnuma-dev && \
     rm -rf /var/lib/apt/lists/*
 
