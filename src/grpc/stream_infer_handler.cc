@@ -549,6 +549,7 @@ ModelStreamInferHandler::StreamInferResponseComplete(
   }
 
   inference::ModelStreamInferResponse* response = nullptr;
+  bool failed = false;
   if (iresponse) {
     // Backend returned a non-null response
     TRITONSERVER_Error* err = nullptr;
@@ -565,6 +566,7 @@ ModelStreamInferHandler::StreamInferResponseComplete(
     }
 
     if (err != nullptr) {
+      failed = true;
       ::grpc::Status status;
       GrpcStatusUtil::Create(&status, err);
       response->mutable_infer_response()->Clear();
@@ -602,12 +604,15 @@ ModelStreamInferHandler::StreamInferResponseComplete(
     }
   }
 
-  // Set response metadata to associate it with request
   if (response) {
     auto& infer_response = *(response->mutable_infer_response());
-    infer_response.set_id(state->request_.id());
-    infer_response.set_model_name(state->request_.model_name());
-    infer_response.set_model_version(state->request_.model_version());
+    // Set response metadata to associate it with request. These will be set
+    // by InferResponseCompleteCommon for successful inference.
+    if (create_empty_response || failed) {
+      infer_response.set_id(state->request_.id());
+      infer_response.set_model_name(state->request_.model_name());
+      infer_response.set_model_version(state->request_.model_version());
+    }
     auto& params = *(infer_response.mutable_parameters());
     params["triton_final_response"].set_bool_param(state->complete_);
   }
