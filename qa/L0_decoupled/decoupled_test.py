@@ -133,11 +133,11 @@ class DecoupledTest(tu.TestResultCollector):
                     if not response.id:
                       sys.exit("No response id found. Was a request_id provided?")
 
-                    # Detect final response
-                    if response.parameters.get("triton_final_response"):
+                    # Detect final response. Parameters are oneof and we expect bool_param
+                    if response.parameters.get("triton_final_response").bool_param:
                       completed_requests += 1
 
-                    # Detect empty response, only process response if non-empty
+                    # Only process non-empty response, ignore if empty (no outputs) 
                     if response.outputs:
                       result_dict[response.id].append((recv_count, data_item))
                       recv_count += 1
