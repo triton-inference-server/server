@@ -908,6 +908,7 @@ ENV DEBIAN_FRONTEND=noninteractive
 # python3-dev is needed by Torchvision
 # python3-pip and libarchive-dev is needed by python backend
 # libxml2-dev is needed for Azure Storage
+# zip is needed for vcpkg (build system used by Azure Storage)
 # scons is needed for armnn_tflite backend build dep
 RUN apt-get update && \
     apt-get install -y --no-install-recommends \
@@ -931,6 +932,7 @@ RUN apt-get update && \
             rapidjson-dev \
             scons \
             software-properties-common \
+            zip \
             unzip \
             wget \
             zlib1g-dev \
