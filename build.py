@@ -932,6 +932,7 @@ RUN apt-get update && \
             rapidjson-dev \
             scons \
             software-properties-common \
+            pkg-config \
             zip \
             unzip \
             wget \
