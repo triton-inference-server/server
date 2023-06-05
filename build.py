@@ -907,8 +907,7 @@ ENV DEBIAN_FRONTEND=noninteractive
 # libcurl4-openSSL-dev is needed for GCS
 # python3-dev is needed by Torchvision
 # python3-pip and libarchive-dev is needed by python backend
-# uuid-dev, pkg-config, and libxml2-dev is needed for Azure Storage
-# [DO NOT MERGE] check if some dependencies can be removed
+# libxml2-dev is needed for Azure Storage
 # scons is needed for armnn_tflite backend build dep
 RUN apt-get update && \
     apt-get install -y --no-install-recommends \
