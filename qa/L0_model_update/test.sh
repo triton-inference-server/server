@@ -55,15 +55,20 @@ function setup_models() {
 
 RET=0
 
-# Test model instance update with and without rate limiting enabled
-for RATE_LIMIT_MODE in "off" "execution_count"; do
+# Test model instance update with rate limiting on/off and explicit resource
+for RATE_LIMIT_MODE in "off" "execution_count" "execution_count_with_explicit_resource"; do
+
+    RATE_LIMIT_ARGS="--rate-limit=$RATE_LIMIT_MODE"
+    if [ "$RATE_LIMIT_MODE" == "execution_count_with_explicit_resource" ]; then
+        RATE_LIMIT_ARGS="--rate-limit=execution_count --rate-limit-resource=R1:10"
+    fi
 
     export RATE_LIMIT_MODE=$RATE_LIMIT_MODE
     TEST_LOG="instance_update_test.rate_limit_$RATE_LIMIT_MODE.log"
     SERVER_LOG="./instance_update_test.rate_limit_$RATE_LIMIT_MODE.server.log"
 
     setup_models
-    SERVER_ARGS="--model-repository=models --model-control-mode=explicit --rate-limit=$RATE_LIMIT_MODE --log-verbose=2"
+    SERVER_ARGS="--model-repository=models --model-control-mode=explicit $RATE_LIMIT_ARGS --log-verbose=2"
     run_server
     if [ "$SERVER_PID" == "0" ]; then
         echo -e "\n***\n*** Failed to start $SERVER\n***"

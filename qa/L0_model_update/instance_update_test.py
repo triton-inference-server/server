@@ -338,10 +338,10 @@ class TestInstanceUpdate(unittest.TestCase):
         # Unload model
         self.__unload_model()
 
-    # Test instance resource requirement update
-    @unittest.skipUnless(os.environ["RATE_LIMIT_MODE"] == "execution_count",
+    # Test instance resource requirement increase
+    @unittest.skipUnless("execution_count" in os.environ["RATE_LIMIT_MODE"],
                          "Rate limiter precondition not met for this test")
-    def test_instance_resource_update(self):
+    def test_instance_resource_increase(self):
         # Load model
         self.__load_model(
             1,
@@ -365,19 +365,46 @@ class TestInstanceUpdate(unittest.TestCase):
             time.sleep(infer_count / 2)  # each infer should take < 0.5 seconds
             self.assertNotIn(False, infer_complete, "Infer possibly stuck")
             infer_thread.result()
-        # Decrease the resource requirement
-        self.__update_instance_count(
-            1, 1,
-            "{\ncount: 1\nkind: KIND_CPU\nrate_limiter {\nresources [\n{\nname: \"R1\"\ncount: 6\n}\n]\n}\n}"
+        # Unload model
+        self.__unload_model()
+
+    # Test instance resource requirement increase above explicit resource
+    @unittest.skipUnless(os.environ["RATE_LIMIT_MODE"] ==
+                         "execution_count_with_explicit_resource",
+                         "Rate limiter precondition not met for this test")
+    def test_instance_resource_increase_above_explicit(self):
+        # Load model
+        self.__load_model(
+            1,
+            "{\ncount: 1\nkind: KIND_CPU\nrate_limiter {\nresources [\n{\nname: \"R1\"\ncount: 2\n}\n]\n}\n}"
         )
-        # Further decrease the resource requirement. The previous decrease
-        # should have lower the max resource in the rate limiter, which the
-        # error "Should not print this ..." should not be printed into the
-        # server log because the max resource is above the previously set limit
-        # and it will be checked by the main bash test script.
+        # Increase resource requirement
+        with self.assertRaises(InferenceServerException):
+            self.__update_instance_count(
+                0, 0,
+                "{\ncount: 1\nkind: KIND_CPU\nrate_limiter {\nresources [\n{\nname: \"R1\"\ncount: 32\n}\n]\n}\n}"
+            )
+        # Correct the resource requirement to match the explicit resource
         self.__update_instance_count(
             1, 1,
+            "{\ncount: 1\nkind: KIND_CPU\nrate_limiter {\nresources [\n{\nname: \"R1\"\ncount: 10\n}\n]\n}\n}"
+        )
+        # Unload model
+        self.__unload_model()
+
+    # Test instance resource requirement decrease
+    @unittest.skipUnless("execution_count" in os.environ["RATE_LIMIT_MODE"],
+                         "Rate limiter precondition not met for this test")
+    def test_instance_resource_decrease(self):
+        # Load model
+        self.__load_model(
+            1,
             "{\ncount: 1\nkind: KIND_CPU\nrate_limiter {\nresources [\n{\nname: \"R1\"\ncount: 4\n}\n]\n}\n}"
+        )
+        # Decrease resource requirement
+        self.__update_instance_count(
+            1, 1,
+            "{\ncount: 1\nkind: KIND_CPU\nrate_limiter {\nresources [\n{\nname: \"R1\"\ncount: 2\n}\n]\n}\n}"
         )
         # Unload model
         self.__unload_model()
