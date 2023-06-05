@@ -57,6 +57,7 @@ RET=0
 
 rm -f *.log *.txt
 
+mkdir -p models/libtorch_multi_devices/1
 mkdir -p models/libtorch_multi_gpu/1
 cp models/libtorch_multi_devices/config.pbtxt models/libtorch_multi_gpu/.
 (cd models/libtorch_multi_gpu && \
@@ -71,14 +72,6 @@ if [ $? -ne 0 ]; then
     RET=1
 fi
 set -e
-
-# Create the model that does not set instance_group_kind to 'KIND_MODEL'
-mkdir -p models/libtorch_instance_kind_err/1
-cp models/libtorch_multi_devices/config.pbtxt models/libtorch_instance_kind_err/.
-cp models/libtorch_multi_devices/1/model.pt models/libtorch_instance_kind_err/1/.
-(cd models/libtorch_instance_kind_err && \
-    sed -i "s/name: \"libtorch_multi_devices\"/name: \"libtorch_instance_kind_err\"/" config.pbtxt && \
-    sed -i "s/kind: KIND_MODEL/kind: KIND_GPU/" config.pbtxt)
 
 run_server
 if [ "$SERVER_PID" == "0" ]; then
@@ -133,22 +126,6 @@ if grep "$MESSAGE" $SERVER_LOG; then
 else
     echo -e "Not found \"$MESSAGE\"" >> $CLIENT_LOG
     RET=1
-fi
-
-MESSAGE="INPUT0 device: cuda:2, INPUT1 device: cuda:0"
-export MODEL_NAME='libtorch_instance_kind_err'
-python3 $CLIENT_PY >> $CLIENT_LOG 2>&1 
-if [ $? -ne 0 ]; then
-    echo -e "\n***\n*** Model $MODEL_NAME FAILED. \n***"
-    cat $CLIENT_LOG
-    RET=1
-else
-    check_test_results $TEST_RESULT_FILE $EXPECTED_NUM_TESTS
-    if [ $? -ne 0 ]; then
-        cat $CLIENT_LOG
-        echo -e "\n***\n*** Test Result Verification Failed\n***"
-        RET=1
-    fi
 fi
 
 set -e

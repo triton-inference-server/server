@@ -29,14 +29,23 @@ import torch
 import torch.nn as nn
 
 
+class SumModule(nn.Module):
+
+    def __init__(self):
+        super(SumModule, self).__init__()
+
+    def forward(self, x):
+        return torch.sum(x, dim=1)
+
+
 class TestModel(nn.Module):
 
     def __init__(self, device1, device2):
         super(TestModel, self).__init__()
         self.device1 = device1
         self.device2 = device2
-        self.layers1 = nn.Sequential(nn.Linear(16, 4),).to(self.device1)
-        self.layers2 = nn.Sequential(nn.Linear(16, 4)).to(self.device2)
+        self.layers1 = SumModule().to(self.device1)
+        self.layers2 = SumModule().to(self.device2)
 
     def forward(self, INPUT0, INPUT1):
         INPUT0 = INPUT0.to(self.device1)
@@ -44,8 +53,8 @@ class TestModel(nn.Module):
         print('INPUT0 device: {}, INPUT1 device: {}\n'.format(
             INPUT0.device, INPUT1.device))
 
-        op0 = self.layers1(INPUT0 + INPUT0)
-        op1 = self.layers2(INPUT1 + INPUT1)
+        op0 = self.layers1(torch.stack([INPUT0, INPUT0], dim=1))
+        op1 = self.layers2(torch.stack([INPUT1, INPUT1], dim=1))
         return op0, op1
 
 

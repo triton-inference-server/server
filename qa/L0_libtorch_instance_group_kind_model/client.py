@@ -74,23 +74,19 @@ class InferTest(tu.TestResultCollector):
         outputs.append(
             httpclient.InferRequestedOutput('OUTPUT__1', binary_data=True))
 
-        if model_name == "libtorch_instance_kind_err":
-            with self.assertRaises(InferenceServerException) as ex:
-                triton_client.infer(model_name, inputs, outputs=outputs)
-            self.assertIn(
-                "Expected all tensors to be on the same device, but found at least two devices",
-                str(ex.exception))
-            return
-
         results = triton_client.infer(model_name, inputs, outputs=outputs)
 
         output0_data = results.as_numpy('OUTPUT__0')
         output1_data = results.as_numpy('OUTPUT__1')
 
-        # Only validate the shape, as the output will differ every time the
-        # model is compiled and used on different devices.
-        self.assertEqual(output0_data.shape, (1, 4))
-        self.assertEqual(output1_data.shape, (1, 4))
+        expected_output_0 = input0_data + input0_data
+        expected_output_1 = input1_data + input1_data
+
+        self.assertEqual(output0_data.shape, (1, 16))
+        self.assertEqual(output1_data.shape, (1, 16))
+
+        self.assertTrue(np.all(expected_output_0 == output0_data))
+        self.assertTrue(np.all(expected_output_1 == output1_data))
 
 
 if __name__ == '__main__':
