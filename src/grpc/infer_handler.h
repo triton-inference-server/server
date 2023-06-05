@@ -404,12 +404,12 @@ TRITONSERVER_Error* InferResponseAlloc(
 
 TRITONSERVER_Error* SetInferenceRequestMetadata(
     TRITONSERVER_InferenceRequest* inference_request,
-    const inference::ModelInferRequest& request, StateParameters* state_params);
+    const inference::ModelInferRequest& request, StateParameters& state_params);
 
 // Helper to set options for StreamInferHandler state when parsing
 // request parameters.
 TRITONSERVER_Error* SetStateParameterFromTritonParameter(
-    StateParameters* state_params,
+    StateParameters& state_params,
     const std::pair<std::string, inference::InferParameter>& param);
 
 void InferRequestComplete(

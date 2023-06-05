@@ -242,7 +242,7 @@ ModelStreamInferHandler::Process(InferHandler::State* state, bool rpc_ok)
     }
 
     if (err == nullptr) {
-      err = SetInferenceRequestMetadata(irequest, request, &state->parameters_);
+      err = SetInferenceRequestMetadata(irequest, request, state->parameters_);
     }
 
     if (err == nullptr) {

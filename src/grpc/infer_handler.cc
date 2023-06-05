@@ -37,7 +37,6 @@ NextUniqueId()
 
 namespace triton { namespace server { namespace grpc {
 
-// Define operator in triton::server::grpc namespace for use in all helpers
 std::ostream&
 operator<<(std::ostream& out, const Steps& step)
 {
@@ -247,7 +246,7 @@ InferResponseStart(TRITONSERVER_ResponseAllocator* allocator, void* userp)
 TRITONSERVER_Error*
 SetInferenceRequestMetadata(
     TRITONSERVER_InferenceRequest* inference_request,
-    const inference::ModelInferRequest& request, StateParameters* state_params)
+    const inference::ModelInferRequest& request, StateParameters& state_params)
 {
   RETURN_IF_ERR(TRITONSERVER_InferenceRequestSetId(
       inference_request, request.id().c_str()));
@@ -319,6 +318,17 @@ SetInferenceRequestMetadata(
       RETURN_IF_ERR(TRITONSERVER_InferenceRequestSetTimeoutMicroseconds(
           inference_request, infer_param.int64_param()));
     } else if (param.first.rfind("triton_", 0) == 0) {
+      if (!Contains(TRITON_RESERVED_REQUEST_PARAMS, param.first)) {
+        return TRITONSERVER_ErrorNew(
+            TRITONSERVER_ERROR_INVALID_ARG,
+            (std::string(
+                 "parameter keys starting with 'triton_' are reserved for "
+                 "Triton "
+                 "usage. Only the following keys starting with 'triton_' are "
+                 "allowed: ") +
+             Join(TRITON_RESERVED_REQUEST_PARAMS, " "))
+                .c_str());
+      }
       RETURN_IF_ERR(SetStateParameterFromTritonParameter(state_params, param));
     } else {
       const auto& infer_param = param.second;
@@ -369,14 +379,9 @@ SetInferenceRequestMetadata(
 
 TRITONSERVER_Error*
 SetStateParameterFromTritonParameter(
-    StateParameters* state_params,
+    StateParameters& state_params,
     const std::pair<std::string, inference::InferParameter>& param)
 {
-  if (!state_params) {
-    return TRITONSERVER_ErrorNew(
-        TRITONSERVER_ERROR_INVALID_ARG, "State parameters was not set.");
-  }
-
   const auto& key = param.first;
   const auto& value = param.second;
   if (key == "triton_enable_empty_final_response") {
@@ -388,16 +393,7 @@ SetStateParameterFromTritonParameter(
            std::string("' parameter, expected bool_param."))
               .c_str());
     }
-    state_params->enable_empty_final_response_ = value.bool_param();
-  } else if (!Contains(TRITON_RESERVED_REQUEST_PARAMS, key)) {
-    return TRITONSERVER_ErrorNew(
-        TRITONSERVER_ERROR_INVALID_ARG,
-        (std::string(
-             "parameter keys starting with 'triton_' are reserved for Triton "
-             "usage. Only the following keys starting with 'triton_' are "
-             "allowed: ") +
-         Join(TRITON_RESERVED_REQUEST_PARAMS, " "))
-            .c_str());
+    state_params.enable_empty_final_response_ = value.bool_param();
   }
 
   return nullptr;  // success
@@ -869,7 +865,7 @@ ModelInferHandler::Execute(InferHandler::State* state)
   }
 
   if (err == nullptr) {
-    err = SetInferenceRequestMetadata(irequest, request, &state->parameters_);
+    err = SetInferenceRequestMetadata(irequest, request, state->parameters_);
   }
 
   if (err == nullptr) {
