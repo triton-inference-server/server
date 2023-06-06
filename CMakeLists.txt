@@ -195,9 +195,6 @@ endif() # TRITON_ENABLE_GCS
 if(${TRITON_ENABLE_S3})
   set(TRITON_DEPENDS ${TRITON_DEPENDS} aws-sdk-cpp)
 endif() # TRITON_ENABLE_S3
-if(${TRITON_ENABLE_AZURE_STORAGE})
-  set(TRITON_DEPENDS ${TRITON_DEPENDS} azure-storage-cpplite)
-endif() # TRITON_ENABLE_AZURE_STORAGE
 if(${TRITON_ENABLE_HTTP} OR ${TRITON_ENABLE_METRICS} OR ${TRITON_ENABLE_SAGEMAKER} OR ${TRITON_ENABLE_VERTEX_AI})
   set(TRITON_DEPENDS ${TRITON_DEPENDS} libevent libevhtp)
 endif() # TRITON_ENABLE_HTTP || TRITON_ENABLE_METRICS || TRITON_ENABLE_SAGEMAKER || TRITON_ENABLE_VERTEX_AI
@@ -226,7 +223,6 @@ ExternalProject_Add(triton-server
     -DLibevent_DIR:PATH=${TRITON_THIRD_PARTY_INSTALL_PREFIX}/libevent/lib/cmake/libevent
     -Dlibevhtp_DIR:PATH=${TRITON_THIRD_PARTY_INSTALL_PREFIX}/libevhtp/lib/cmake/libevhtp
     -Dstorage_client_DIR:PATH=${TRITON_THIRD_PARTY_INSTALL_PREFIX}/google-cloud-cpp/${LIB_DIR}/cmake/storage_client
-    -Dazure-storage-cpplite_DIR:PATH=${TRITON_THIRD_PARTY_INSTALL_PREFIX}/azure-storage-cpplite
     -Dgoogle_cloud_cpp_common_DIR:PATH=${TRITON_THIRD_PARTY_INSTALL_PREFIX}/google-cloud-cpp/${LIB_DIR}/cmake/google_cloud_cpp_common
     -DCrc32c_DIR:PATH=${TRITON_THIRD_PARTY_INSTALL_PREFIX}/crc32c/${LIB_DIR}/cmake/Crc32c
     -DAWSSDK_DIR:PATH=${TRITON_THIRD_PARTY_INSTALL_PREFIX}/aws-sdk-cpp/${LIB_DIR}/cmake/AWSSDK
