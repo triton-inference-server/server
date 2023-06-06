@@ -41,6 +41,8 @@ from tritonclient.utils import *
 import tritonclient.utils.cuda_shared_memory as cuda_shared_memory
 import tritonclient.http as httpclient
 
+TEST_JETSON = bool(int(os.environ.get('TEST_JETSON', 0)))
+
 
 class PythonTest(tu.TestResultCollector):
 
@@ -152,6 +154,8 @@ class PythonTest(tu.TestResultCollector):
         with self._shm_leak_detector.Probe() as shm_probe:
             self._infer_help(model_name, shape, dtype)
 
+    # GPU tensors are not supported on jetson
+    if not TEST_JETSON:
         # CUDA Shared memory is not supported on jetson
         def test_gpu_tensor_error(self):
             model_name = 'identity_bool'
@@ -248,9 +252,8 @@ class PythonTest(tu.TestResultCollector):
 
                 # Make sure the requests ran in parallel.
                 stats = client.get_inference_statistics(model_name)
-                test_cond = (len(stats['model_stats'])
-                             != 1) or (stats['model_stats'][0]['name']
-                                       != model_name)
+                test_cond = (len(stats['model_stats']) != 1) or (
+                    stats['model_stats'][0]['name'] != model_name)
                 self.assertFalse(
                     test_cond,
                     "error: expected statistics for {}".format(model_name))
