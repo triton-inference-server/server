@@ -297,22 +297,24 @@ SetInferenceRequestMetadata(
     } else if (param.first.compare("priority") == 0) {
       const auto& infer_param = param.second;
       if (infer_param.parameter_choice_case() ==
-	  inference::InferParameter::ParameterChoiceCase::kInt64Param) {
-	if (infer_param.int64_param() < 0) {
-	  return TRITONSERVER_ErrorNew(
-				       TRITONSERVER_ERROR_INVALID_ARG,
-				       "invalid value for 'priority', expected value >= 0.");
-	}
-	RETURN_IF_ERR(TRITONSERVER_InferenceRequestSetPriorityU64(inference_request, infer_param.int64_param()));
-      }
-      else if (infer_param.parameter_choice_case() ==
-	       inference::InferParameter::ParameterChoiceCase::kUint64Param) {
-	RETURN_IF_ERR(TRITONSERVER_InferenceRequestSetPriorityU64(inference_request, infer_param.uint64_param()));
+          inference::InferParameter::ParameterChoiceCase::kInt64Param) {
+        if (infer_param.int64_param() < 0) {
+          return TRITONSERVER_ErrorNew(
+              TRITONSERVER_ERROR_INVALID_ARG,
+              "invalid value for 'priority', expected value >= 0.");
+        }
+        RETURN_IF_ERR(TRITONSERVER_InferenceRequestSetPriorityU64(
+            inference_request, infer_param.int64_param()));
+      } else if (
+          infer_param.parameter_choice_case() ==
+          inference::InferParameter::ParameterChoiceCase::kUint64Param) {
+        RETURN_IF_ERR(TRITONSERVER_InferenceRequestSetPriorityU64(
+            inference_request, infer_param.uint64_param()));
       } else {
-	return TRITONSERVER_ErrorNew(
-				     TRITONSERVER_ERROR_INVALID_ARG,
-				     "invalid value type for 'priority' parameter, expected "
-				     "int64_param or uint64_param.");	
+        return TRITONSERVER_ErrorNew(
+            TRITONSERVER_ERROR_INVALID_ARG,
+            "invalid value type for 'priority' parameter, expected "
+            "int64_param or uint64_param.");
       }
     } else if (param.first.compare("timeout") == 0) {
       const auto& infer_param = param.second;
