@@ -32,7 +32,6 @@ import time
 import queue
 import unittest
 from functools import partial
-from collections import defaultdict
 
 import numpy as np
 import test_util as tu
