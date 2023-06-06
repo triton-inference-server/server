@@ -355,10 +355,33 @@ done
 kill $MINIO_PID
 wait $MINIO_PID
 
-if [ $RET -eq 0 ]; then
-  echo -e "\n***\n*** Test Passed\n***"
+# Test the S3 client will not advertise HTTP/2
+TEST_LOG="./http2_advertise_test.log"
+python3 mock_s3_service.py > $TEST_LOG 2>&1 &
+sleep 2  # make sure the mock service has started
+SERVER_LOG="./http2_advertise_test.server.log"
+SERVER_ARGS="--model-repository=s3://localhost:8080/dummy-bucket --exit-timeout-secs=120"
+run_server
+if [ "$SERVER_PID" != "0" ]; then
+    echo -e "\n***\n*** Unexpected server start $SERVER\n***"
+    cat $SERVER_LOG
+    kill $SERVER_PID
+    wait $SERVER_PID
+    RET=1
 else
-  echo -e "\n***\n*** Test Failed\n***"
+    sleep 2  # make sure the mock service has stopped
+    PASSED_MSG="TEST PASSED"
+    if ! grep "$PASSED_MSG" $TEST_LOG; then
+        echo -e "\n***\n*** S3 client HTTP/2 advertise test failed\n***"
+        cat $TEST_LOG
+        RET=1
+    fi
 fi
 
+# Print and return test result
+if [ $RET -eq 0 ]; then
+    echo -e "\n***\n*** Test Passed\n***"
+else
+    echo -e "\n***\n*** Test Failed\n***"
+fi
 exit $RET
