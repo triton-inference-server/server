@@ -345,6 +345,8 @@ python3 $SRCDIR/gen_qa_dyna_sequence_models.py --libtorch --models_dir=$DYNASEQD
 chmod -R 777 $DYNASEQDESTDIR
 python3 $SRCDIR/gen_qa_torchtrt_models.py --models_dir=$TORCHTRTDESTDIR
 chmod -R 777 $TORCHTRTDESTDIR
+python3 $SRCDIR/gen_qa_ragged_models.py --libtorch --models_dir=$RAGGEDDESTDIR
+chmod -R 777 $RAGGEDDESTDIR
 EOF
 
 chmod a+x $HOST_SRCDIR/$TORCHSCRIPT
@@ -364,6 +366,7 @@ docker run $DOCKER_GPU_ARGS --rm --entrypoint $SRCDIR/$TORCHSCRIPT \
        --mount type=bind,source=$HOST_DYNASEQDESTDIR,target=$DYNASEQDESTDIR \
        --mount type=bind,source=$HOST_VARSEQDESTDIR,target=$VARSEQDESTDIR \
        --mount type=bind,source=$HOST_TORCHTRTDESTDIR,target=$TORCHTRTDESTDIR \
+       --mount type=bind,source=$HOST_RAGGEDDESTDIR,target=$RAGGEDDESTDIR \
        $PYTORCH_IMAGE
 if [ $? -ne 0 ]; then
     echo -e "Failed"
