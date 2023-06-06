@@ -131,7 +131,7 @@ class DecoupledTest(tu.TestResultCollector):
                     # Request IDs should generally be provided with each request
                     # to associate decoupled responses with their requests.
                     if not response.id:
-                      sys.exit("No response id found. Was a request_id provided?")
+                      raise ValueError("No response id found. Was a request_id provided?")
 
                     # Detect final response. Parameters are oneof and we expect bool_param
                     if response.parameters.get("triton_final_response").bool_param:
@@ -139,6 +139,8 @@ class DecoupledTest(tu.TestResultCollector):
 
                     # Only process non-empty response, ignore if empty (no outputs) 
                     if response.outputs:
+                      if response.id not in result_dict:
+                          result_dict[response.id] = []
                       result_dict[response.id].append((recv_count, data_item))
                       recv_count += 1
 
@@ -169,6 +171,8 @@ class DecoupledTest(tu.TestResultCollector):
                     raise data_item
                 else:
                     this_id = data_item.get_response().id
+                    if this_id not in result_dict:
+                      result_dict[this_id] = []
                     result_dict[this_id].append((recv_count, data_item))
 
                 recv_count += 1
@@ -229,10 +233,11 @@ class DecoupledTest(tu.TestResultCollector):
         self.requested_outputs_ = self.outputs_ if validate_fn is None else self.outputs_[
             0:1]
 
-        user_data = UserData()
-        result_dict = defaultdict(list)
 
         for infer_helper in [self._stream_infer, self._stream_infer_with_params]:
+            user_data = UserData()
+            result_dict = {}
+
             try:
                 if "square" not in self.model_name_:
                     expected_count = (repeat_count * request_count)
