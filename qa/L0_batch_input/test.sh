@@ -1,5 +1,5 @@
 #!/bin/bash
-# Copyright 2020-2022, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright 2020-2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -54,7 +54,7 @@ SERVER_LOG="./inference_server.log"
 source ../common/util.sh
 
 # If BACKENDS not specified, set to all
-BACKENDS=${BACKENDS:="onnx savedmodel plan"}
+BACKENDS=${BACKENDS:="onnx savedmodel plan libtorch"}
 
 rm -f $SERVER_LOG $CLIENT_LOG
 
@@ -82,6 +82,8 @@ for BACKEND in $BACKENDS; do
     # batch input is generated properly
     cp -r $IDENTITY_DATADIR/${BACKEND}_nobatch_zero_1_float32 models/ragged_io
     (cd models/ragged_io && \
+          # In case of libtorch, update I/O names
+          sed -i "s/__0/0/" config.pbtxt && \
           sed -i "s/${BACKEND}_nobatch_zero_1_float32/ragged_io/" config.pbtxt && \
           sed -i "s/^max_batch_size:.*/max_batch_size: 4/" config.pbtxt && \
           sed -i "s/name: \"INPUT0\"/name: \"INPUT0\"\\nallow_ragged_batch: true/" config.pbtxt && \
@@ -99,7 +101,7 @@ for BACKEND in $BACKENDS; do
     fi
 
     set +e
-    python $BATCH_INPUT_TEST >$CLIENT_LOG 2>&1
+    python3 $BATCH_INPUT_TEST >$CLIENT_LOG 2>&1
     if [ $? -ne 0 ]; then
         cat $CLIENT_LOG
         echo -e "\n***\n*** Test Failed\n***"
