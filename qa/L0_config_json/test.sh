@@ -373,6 +373,52 @@ fi
 kill $SERVER_PID
 wait $SERVER_PID
 
+# Test max_priority_level
+TRIAL=max_priority_level
+
+rm -fr models && mkdir models
+mkdir -p models/max_priority_level/1 && cp max_priority_level.pbtxt models/max_priority_level/config.pbtxt
+
+run_server
+if [ "$SERVER_PID" == "0" ]; then
+    echo -e "\n***\n*** Failed to start $SERVER\n***"
+    cat $SERVER_LOG
+    exit 1
+fi
+
+set +e
+code=`curl -s -w %{http_code} -o ./$TRIAL.out localhost:8000/v2/models/max_priority_level/config`
+set -e
+if [ "$code" != "200" ]; then
+    cat $TRIAL.out
+    echo -e "\n***\n*** Test Failed\n***"
+    RET=1
+fi
+
+declare -A expected_values
+
+MAX_UINT64=18446744073709551615
+MAX_UINT32=4294967295
+MAX_UINT32_PLUS_1=4294967296
+
+expected_values["priority_levels"]=$MAX_UINT64
+expected_values["default_priority_level"]=$MAX_UINT32
+expected_values[$MAX_UINT32_PLUS_1]=\{\"timeout_action\":\"REJECT\",\"default_timeout_microseconds\":18446744073709551615,\"allow_timeout_override\":true,\"max_queue_size\":10\}
+expected_values["default_timeout_microseconds"]=$MAX_UINT64
+
+for key in "${!expected_values[@]}"; do
+    value=${expected_values[$key]}
+    matches=`grep -o "\"$key\":$value" $TRIAL.out | wc -l`
+    if [ $matches -ne 1 ]; then
+	cat $TRIAL.out
+	echo -e "\n***\n*** Expected 1 $key == $value, got $matches\n***"
+	RET=1
+    fi
+done
+
+kill $SERVER_PID
+wait $SERVER_PID
+
 if [ $RET -eq 0 ]; then
     echo -e "\n***\n*** Test Passed\n***"
 else
