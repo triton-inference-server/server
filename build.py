@@ -1768,8 +1768,7 @@ def enable_all():
             'tensorrt'
         ]
         all_repoagents = ['checksum']
-        # DLIS-4491: Add redis cache to build
-        all_caches = ['local']
+        all_caches = ['local', 'redis']
         all_filesystems = ['gcs', 's3', 'azure_storage']
         all_endpoints = ['http', 'grpc', 'sagemaker', 'vertex-ai']
 
@@ -1787,8 +1786,7 @@ def enable_all():
             'openvino', 'tensorrt'
         ]
         all_repoagents = ['checksum']
-        # DLIS-4491: Add redis cache to build
-        all_caches = ['local']
+        all_caches = ['local', 'redis']
         all_filesystems = []
         all_endpoints = ['http', 'grpc']
 
