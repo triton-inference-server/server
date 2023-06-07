@@ -37,6 +37,36 @@ NextUniqueId()
 
 namespace triton { namespace server { namespace grpc {
 
+std::ostream&
+operator<<(std::ostream& out, const Steps& step)
+{
+  switch (step) {
+    case START:
+      out << "START";
+      break;
+    case COMPLETE:
+      out << "COMPLETE";
+      break;
+    case FINISH:
+      out << "FINISH";
+      break;
+    case ISSUED:
+      out << "ISSUED";
+      break;
+    case READ:
+      out << "READ";
+      break;
+    case WRITEREADY:
+      out << "WRITEREADY";
+      break;
+    case WRITTEN:
+      out << "WRITTEN";
+      break;
+  }
+
+  return out;
+}
+
 TRITONSERVER_Error*
 OutputBufferAttributesHelper(
     TRITONSERVER_ResponseAllocator* allocator, const char* tensor_name,
@@ -216,7 +246,7 @@ InferResponseStart(TRITONSERVER_ResponseAllocator* allocator, void* userp)
 TRITONSERVER_Error*
 SetInferenceRequestMetadata(
     TRITONSERVER_InferenceRequest* inference_request,
-    const inference::ModelInferRequest& request)
+    const inference::ModelInferRequest& request, StateParameters& state_params)
 {
   RETURN_IF_ERR(TRITONSERVER_InferenceRequestSetId(
       inference_request, request.id().c_str()));
@@ -288,11 +318,18 @@ SetInferenceRequestMetadata(
       RETURN_IF_ERR(TRITONSERVER_InferenceRequestSetTimeoutMicroseconds(
           inference_request, infer_param.int64_param()));
     } else if (param.first.rfind("triton_", 0) == 0) {
-      return TRITONSERVER_ErrorNew(
-          TRITONSERVER_ERROR_INVALID_ARG,
-          ("parameter keys starting with 'triton_' are reserved for Triton "
-           "usage "
-           "and should not be specified."));
+      if (!Contains(TRITON_RESERVED_REQUEST_PARAMS, param.first)) {
+        return TRITONSERVER_ErrorNew(
+            TRITONSERVER_ERROR_INVALID_ARG,
+            (std::string(
+                 "parameter keys starting with 'triton_' are reserved for "
+                 "Triton "
+                 "usage. Only the following keys starting with 'triton_' are "
+                 "allowed: ") +
+             Join(TRITON_RESERVED_REQUEST_PARAMS, " "))
+                .c_str());
+      }
+      RETURN_IF_ERR(SetStateParameterFromTritonParameter(state_params, param));
     } else {
       const auto& infer_param = param.second;
       if (infer_param.parameter_choice_case() ==
@@ -338,6 +375,28 @@ SetInferenceRequestMetadata(
   }
 
   return nullptr;  // Success
+}
+
+TRITONSERVER_Error*
+SetStateParameterFromTritonParameter(
+    StateParameters& state_params,
+    const std::pair<std::string, inference::InferParameter>& param)
+{
+  const auto& key = param.first;
+  const auto& value = param.second;
+  if (key == "triton_enable_empty_final_response") {
+    if (value.parameter_choice_case() !=
+        inference::InferParameter::ParameterChoiceCase::kBoolParam) {
+      return TRITONSERVER_ErrorNew(
+          TRITONSERVER_ERROR_INVALID_ARG,
+          (std::string("invalid value type for '") + key +
+           std::string("' parameter, expected bool_param."))
+              .c_str());
+    }
+    state_params.enable_empty_final_response_ = value.bool_param();
+  }
+
+  return nullptr;  // success
 }
 
 TRITONSERVER_Error*
@@ -608,6 +667,11 @@ InferRequestComplete(
   }
 }
 
+//===========================================================================
+//  The following section contains the handling mechanism for ModelInfer RPC.
+//  This implementation is tuned towards performance and reducing latency.
+//===========================================================================
+
 void
 ModelInferHandler::StartNewRequest()
 {
@@ -801,7 +865,7 @@ ModelInferHandler::Execute(InferHandler::State* state)
   }
 
   if (err == nullptr) {
-    err = SetInferenceRequestMetadata(irequest, request);
+    err = SetInferenceRequestMetadata(irequest, request, state->parameters_);
   }
 
   if (err == nullptr) {
