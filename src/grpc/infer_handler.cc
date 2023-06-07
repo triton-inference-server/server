@@ -303,12 +303,12 @@ SetInferenceRequestMetadata(
               TRITONSERVER_ERROR_INVALID_ARG,
               "invalid value for 'priority', expected value >= 0.");
         }
-        RETURN_IF_ERR(TRITONSERVER_InferenceRequestSetPriorityU64(
+        RETURN_IF_ERR(TRITONSERVER_InferenceRequestSetPriorityUInt64(
             inference_request, infer_param.int64_param()));
       } else if (
           infer_param.parameter_choice_case() ==
           inference::InferParameter::ParameterChoiceCase::kUint64Param) {
-        RETURN_IF_ERR(TRITONSERVER_InferenceRequestSetPriorityU64(
+        RETURN_IF_ERR(TRITONSERVER_InferenceRequestSetPriorityUInt64(
             inference_request, infer_param.uint64_param()));
       } else {
         return TRITONSERVER_ErrorNew(
