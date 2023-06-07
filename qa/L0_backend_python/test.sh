@@ -166,8 +166,6 @@ set -e
 kill $SERVER_PID
 wait $SERVER_PID
 
-exit 0
-
 current_num_pages=`get_shm_pages`
 if [ $current_num_pages -ne $prev_num_pages ]; then
     ls /dev/shm
