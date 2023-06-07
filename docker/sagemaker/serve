@@ -27,6 +27,10 @@
 
 SAGEMAKER_SINGLE_MODEL_REPO=/opt/ml/model/
 
+# Use 'ready' for ping check in single-model endpoint mode, and use 'live' for ping check in multi-model endpoint model
+# https://github.com/kserve/kserve/blob/master/docs/predict-api/v2/rest_predict_v2.yaml#L10-L26
+SAGEMAKER_TRITON_PING_MODE="ready"
+
 # Note: in Triton on SageMaker, each model url is registered as a separate repository
 # e.g., /opt/ml/models/<hash>/model. Specifying MME model repo path as /opt/ml/models causes Triton
 # to treat it as an additional empty repository and changes 
@@ -42,8 +46,9 @@ if [ -n "$SAGEMAKER_MULTI_MODEL" ]; then
     if [ "$SAGEMAKER_MULTI_MODEL" == "true" ]; then
         mkdir -p ${SAGEMAKER_MULTI_MODEL_REPO}
         SAGEMAKER_MODEL_REPO=${SAGEMAKER_MULTI_MODEL_REPO}
+        SAGEMAKER_TRITON_PING_MODE="live"
         is_mme_mode=true
-        echo "Triton is running in SageMaker MME mode." 
+        echo -e "Triton is running in SageMaker MME mode. Using Triton ping mode: \"${SAGEMAKER_TRITON_PING_MODE}\"" 
     fi
 fi
 
@@ -134,4 +139,4 @@ elif [ "${is_mme_mode}" = false ]; then
     SAGEMAKER_ARGS="${SAGEMAKER_ARGS} --load-model=${SAGEMAKER_TRITON_DEFAULT_MODEL_NAME}"
 fi
 
-tritonserver --allow-sagemaker=true --allow-grpc=false --allow-http=false --allow-metrics=false --model-control-mode=explicit $SAGEMAKER_ARGS
+tritonserver --allow-sagemaker=true --allow-grpc=true --allow-http=false --allow-metrics=true --model-control-mode=explicit $SAGEMAKER_ARGS

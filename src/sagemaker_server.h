@@ -78,7 +78,7 @@ class SagemakerAPIServer : public HTTPAPIServer {
         model_path_regex_(
             R"((\/opt\/ml\/models\/[0-9A-Za-z._]+)\/(model)\/?([0-9A-Za-z._]+)?)"),
         platform_ensemble_regex_(R"(platform:(\s)*\"ensemble\")"),
-        ping_mode_("live"),
+        ping_mode_(GetEnvironmentVariableOrDefault("SAGEMAKER_TRITON_PING_MODE", "ready")),
         model_name_(GetEnvironmentVariableOrDefault(
             "SAGEMAKER_TRITON_DEFAULT_MODEL_NAME",
             "unspecified_SAGEMAKER_TRITON_DEFAULT_MODEL_NAME")),
