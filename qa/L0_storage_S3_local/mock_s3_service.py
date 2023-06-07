@@ -36,34 +36,34 @@ class MockS3Service():
 
     def __init__(self):
         # Test passed when:
-        # - one or more requests are received; and
-        # - all requests do not advertise for HTTP/2.
-        test_results = [0, False]  # [requests received, advertised for HTTP/2]
+        # - at least one HEAD request is received; and
+        # - at least one GET request is received; and
+        # - all received requests do not advertise for HTTP/2.
+        test_results = {"head_count": 0, "get_count": 0, "http2_ads": False}
 
         class RequestValidator(BaseHTTPRequestHandler):
             protocol_version = "HTTP/1.1"
 
-            def __CheckRequest(self):
-                # Requests received
-                test_results[0] += 1
-                # Advertised for HTTP/2
+            def __CheckHttp2Ads(self):
                 if "connection" in self.headers:
-                    v = self.headers["connection"]
+                    v = self.headers["connection"].lower()
                     if "upgrade" in v or "http2" in v:
-                        test_results[1] = True
+                        test_results["http2_ads"] = True
                 if "upgrade" in self.headers and "h2c" in self.headers[
-                        "upgrade"]:
-                    test_results[1] = True
+                        "upgrade"].lower():
+                    test_results["http2_ads"] = True
                 if "http2-settings" in self.headers:
-                    test_results[1] = True
+                    test_results["http2_ads"] = True
 
             def do_HEAD(self):
-                self.__CheckRequest()
+                self.__CheckHttp2Ads()
+                test_results["head_count"] += 1
                 self.send_response(200)
                 self.end_headers()
 
             def do_GET(self):
-                self.__CheckRequest()
+                self.__CheckHttp2Ads()
+                test_results["get_count"] += 1
                 self.send_error(404, "Thank you for using the mock s3 service!",
                                 "Your bucket is not found here!")
 
@@ -82,8 +82,8 @@ class MockS3Service():
         self.__service_thread.join()
 
     def TestPassed(self):
-        # [requests received, advertised for HTTP/2]
-        return self.__test_results[0] > 0 and not self.__test_results[1]
+        return self.__test_results["head_count"] > 0 and self.__test_results[
+            "get_count"] > 0 and not self.__test_results["http2_ads"]
 
 
 if __name__ == "__main__":
