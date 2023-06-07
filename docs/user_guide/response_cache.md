@@ -105,6 +105,7 @@ For tags `>=23.03`,
 [tritonserver release containers](https://catalog.ngc.nvidia.com/orgs/nvidia/containers/tritonserver)
 come with the following cache implementations out of the box:
 - [local](https://github.com/triton-inference-server/local_cache): `/opt/tritonserver/caches/local/libtritoncache_local.so`
+- [redis](https://github.com/triton-inference-server/redis_cache): `/opt/tritonserver/caches/redis/libtritoncache_redis.so`
 
 With these TRITONCACHE APIs, `tritonserver` exposes a new `--cache-config` 
 CLI flag that gives the user flexible customization of which cache implementation
@@ -124,6 +125,32 @@ When `--cache-config local,size=SIZE` is specified with a non-zero `SIZE`,
 Triton allocates the requested size in CPU memory and **shares the
 cache across all inference requests and across all models**. 
 
+#### Redis Cache
+
+The `redis` cache implementation exposes the ability for Triton to communicate
+with a Redis server for caching. The `redis_cache` implementation is essentially
+a Redis client that acts as an intermediary between Triton and Redis. 
+
+To list a few benefits of the `redis` cache compared to the `local` cache in
+the context of Triton:
+- The Redis server can be hosted remotely as long as it is accesible by Triton,
+  so it is not tied directly to the Triton process lifetime. 
+  - This means Triton can be restarted and still have access to previously cached entries.
+  - This also means that Triton doesn't have to compete with the cache for memory/resource usage.
+- Multiple Triton instances can share a cache by configuring each Triton instance
+  to communicate with the same Redis server.
+- The Redis server can be updated/restarted independently of Triton, and
+  Triton will fallback to operating as it would with no cache access during 
+  any Redis server downtime, and log appropriate errors.
+
+In general, the Redis server can be configured/deployed as needed for your use 
+case, and Triton's `redis` cache will simply act as a client of your Redis 
+deployment. The [Redis docs](https://redis.io/docs/) should be consulted for 
+questions and details about configuring the Redis server.
+
+For Triton-specific `redis` cache implementation details/configuration, see the
+[redis cache implementation](https://github.com/triton-inference-server/redis_cache).
+
 #### Custom Cache
 
 With the new the TRITONCACHE API interface, it is now possible for
@@ -131,11 +158,11 @@ users to implement their own cache to suit any use-case specific needs.
 To see the required interface that must be implemented by a cache
 developer, see the 
 [TRITONCACHE API header](https://github.com/triton-inference-server/core/blob/main/include/triton/core/tritoncache.h).
-The `local` cache implementation may be used as a reference implementation.
+The `local` or `redis` cache implementations may be used as reference.
 
 Upon successfully developing and building a custom cache, the resulting shared
 library (ex: `libtritoncache_<name>.so`) must be placed in the cache directory
-similar to where the `local` cache implementation lives. By default,
+similar to where the `local` and `redis` cache implementations live. By default,
 this directory is `/opt/tritonserver/caches`, but a custom directory may be
 specified with `--cache-dir` as needed. 
 
@@ -184,9 +211,10 @@ a response.
 For cases where cache hits are common and computation is expensive, 
 the cache can significantly improve overall performance.
 
-For cases where all or most requests are unique (cache misses), the
-cache may negatively impact the overall performance due to the overhead
-of managing the cache.
+For cases where most requests are unique (cache misses) or the compute is
+fast/cheap (the model is not compute-bound), the cache can negatively impact
+the overall performance due to the overhead of managing and communicating with
+the cache.
 
 ## Known Limitations
 
