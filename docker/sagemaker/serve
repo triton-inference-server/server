@@ -105,6 +105,9 @@ if [ -n "$SAGEMAKER_TRITON_MODEL_LOAD_GPU_LIMIT" ]; then
         SAGEMAKER_ARGS="${SAGEMAKER_ARGS} --model-load-gpu-limit ${i}:${SAGEMAKER_TRITON_MODEL_LOAD_GPU_LIMIT}"
     done
 fi
+if [ -n "$SAGEMAKER_TRITON_ADDITIONAL_ARGS" ]; then
+    SAGEMAKER_ARGS="${SAGEMAKER_ARGS} ${SAGEMAKER_TRITON_ADDITIONAL_ARGS}"
+fi
 
 
 if [ "${is_mme_mode}" = false ] && [ -f "${SAGEMAKER_MODEL_REPO}/config.pbtxt" ]; then
