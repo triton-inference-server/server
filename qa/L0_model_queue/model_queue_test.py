@@ -403,6 +403,7 @@ class ModelQueueTest(tu.TestResultCollector):
         # first request.
         dtype = np.float32
         shapes = ([16],)
+        MAX_UINT32_PLUS_1 = 4294967296
         for trial in self.trials_:
             threads = []
             threads.append(
@@ -411,7 +412,7 @@ class ModelQueueTest(tu.TestResultCollector):
                                  kwargs=trial))
             threads.append(
                 threading.Thread(target=self.check_response,
-                                 args=(1, dtype, shapes, 0, 0, (15000, 10000)),
+                                 args=(1, dtype, shapes, MAX_UINT32_PLUS_1, 0, (15000, 10000)),
                                  kwargs=trial))
             threads.append(
                 threading.Thread(target=self.check_response,
