@@ -101,7 +101,8 @@ that are used to communicate with a cache implementation of the user's choice.
 
 A cache implementation is a shared library that implements the required
 TRITONCACHE APIs and is dynamically loaded on server startup, if enabled. 
-For tags `>=23.03`, 
+
+Triton's most recent
 [tritonserver release containers](https://catalog.ngc.nvidia.com/orgs/nvidia/containers/tritonserver)
 come with the following cache implementations out of the box:
 - [local](https://github.com/triton-inference-server/local_cache): `/opt/tritonserver/caches/local/libtritoncache_local.so`
