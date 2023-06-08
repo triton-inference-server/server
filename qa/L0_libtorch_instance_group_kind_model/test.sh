@@ -57,11 +57,11 @@ RET=0
 
 rm -f *.log *.txt
 
-mkdir -p models/libtorch_multi_devices/1
+mkdir -p models/libtorch_multi_device/1
 mkdir -p models/libtorch_multi_gpu/1
-cp models/libtorch_multi_devices/config.pbtxt models/libtorch_multi_gpu/.
+cp models/libtorch_multi_device/config.pbtxt models/libtorch_multi_gpu/.
 (cd models/libtorch_multi_gpu && \
-    sed -i "s/name: \"libtorch_multi_devices\"/name: \"libtorch_multi_gpu\"/" config.pbtxt)
+    sed -i "s/name: \"libtorch_multi_device\"/name: \"libtorch_multi_gpu\"/" config.pbtxt)
 
 # Generate the models which are partioned across multiple devices
 set +e
@@ -82,8 +82,7 @@ fi
 
 set +e
 
-MESSAGE="INPUT0 device: cpu, INPUT1 device: cuda:3"
-export MODEL_NAME='libtorch_multi_devices'
+export MODEL_NAME='libtorch_multi_device'
 python3 $CLIENT_PY >> $CLIENT_LOG 2>&1 
 if [ $? -ne 0 ]; then
     echo -e "\n***\n*** Model $MODEL_NAME FAILED. \n***"
@@ -98,14 +97,17 @@ else
     fi
 fi
 
-if grep "$MESSAGE" $SERVER_LOG; then
-    echo -e "Found \"$MESSAGE\"" >> $CLIENT_LOG
-else
-    echo -e "Not found \"$MESSAGE\"" >> $CLIENT_LOG
-    RET=1
-fi
+MESSAGES=("SumModule - INPUT0 device: cpu, INPUT1 device: cpu"
+    "DiffModule - INPUT0 device: cuda:3, INPUT1 device: cuda:3")
+for MESSAGE in "${MESSAGES[@]}"; do
+    if grep -q "$MESSAGE" "$SERVER_LOG"; then
+        echo -e "Found \"$MESSAGE\"" >> "$CLIENT_LOG"
+    else
+        echo -e "Not found \"$MESSAGE\"" >> "$CLIENT_LOG"
+        RET=1
+    fi
+done
 
-MESSAGE="INPUT0 device: cuda:2, INPUT1 device: cuda:0"
 export MODEL_NAME='libtorch_multi_gpu'
 python3 $CLIENT_PY >> $CLIENT_LOG 2>&1 
 if [ $? -ne 0 ]; then
@@ -121,12 +123,16 @@ else
     fi
 fi
 
-if grep "$MESSAGE" $SERVER_LOG; then
-    echo -e "Found \"$MESSAGE\"" >> $CLIENT_LOG
-else
-    echo -e "Not found \"$MESSAGE\"" >> $CLIENT_LOG
-    RET=1
-fi
+MESSAGES=("SumModule - INPUT0 device: cuda:2, INPUT1 device: cuda:2"
+    "DiffModule - INPUT0 device: cuda:0, INPUT1 device: cuda:0")
+for MESSAGE in "${MESSAGES[@]}"; do
+    if grep -q "$MESSAGE" "$SERVER_LOG"; then
+        echo -e "Found \"$MESSAGE\"" >> "$CLIENT_LOG"
+    else
+        echo -e "Not found \"$MESSAGE\"" >> "$CLIENT_LOG"
+        RET=1
+    fi
+done
 
 set -e
 

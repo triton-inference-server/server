@@ -30,36 +30,47 @@ import torch.nn as nn
 
 
 class SumModule(nn.Module):
-
     def __init__(self):
         super(SumModule, self).__init__()
 
-    def forward(self, x):
-        return torch.sum(x, dim=1)
+    def forward(self, INPUT0, INPUT1):
+        print('SumModule - INPUT0 device: {}, INPUT1 device: {}\n'.format(
+            INPUT0.device, INPUT1.device))
+        return INPUT0 + INPUT1
+
+class DiffModule(nn.Module):
+    def __init__(self):
+        super(DiffModule, self).__init__()
+
+    def forward(self, INPUT0, INPUT1):
+        print('DiffModule - INPUT0 device: {}, INPUT1 device: {}\n'.format(
+            INPUT0.device, INPUT1.device))
+        return INPUT0 - INPUT1
 
 
 class TestModel(nn.Module):
 
-    def __init__(self, device1, device2):
+    def __init__(self, device0, device1):
         super(TestModel, self).__init__()
+        self.device0 = device0
         self.device1 = device1
-        self.device2 = device2
-        self.layers1 = SumModule().to(self.device1)
-        self.layers2 = SumModule().to(self.device2)
+
+        self.layers1 = SumModule().to(self.device0)
+        self.layers2 = DiffModule().to(self.device1)
 
     def forward(self, INPUT0, INPUT1):
-        INPUT0 = INPUT0.to(self.device1)
-        INPUT1 = INPUT1.to(self.device2)
-        print('INPUT0 device: {}, INPUT1 device: {}\n'.format(
-            INPUT0.device, INPUT1.device))
+        INPUT0_0 = INPUT0.to(self.device0)
+        INPUT0_1 = INPUT0.to(self.device1)
+        INPUT1_0 = INPUT1.to(self.device0)
+        INPUT1_1 = INPUT1.to(self.device1)
 
-        op0 = self.layers1(torch.stack([INPUT0, INPUT0], dim=1))
-        op1 = self.layers2(torch.stack([INPUT1, INPUT1], dim=1))
+        op0 = self.layers1(INPUT0_0, INPUT1_0)
+        op1 = self.layers2(INPUT0_1, INPUT1_1)
         return op0, op1
 
 
 devices = [("cuda:2", "cuda:0"), ("cpu", "cuda:3")]
-model_names = ["libtorch_multi_gpu", "libtorch_multi_devices"]
+model_names = ["libtorch_multi_gpu", "libtorch_multi_device"]
 
 for device_pair, model_name in zip(devices, model_names):
     model = TestModel(device_pair[0], device_pair[1])

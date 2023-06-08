@@ -78,8 +78,8 @@ class InferTest(tu.TestResultCollector):
         output0_data = results.as_numpy('OUTPUT__0')
         output1_data = results.as_numpy('OUTPUT__1')
 
-        expected_output_0 = input0_data + input0_data
-        expected_output_1 = input1_data + input1_data
+        expected_output_0 = input0_data + input1_data
+        expected_output_1 = input0_data - input1_data
 
         self.assertEqual(output0_data.shape, (1, 16))
         self.assertEqual(output1_data.shape, (1, 16))
