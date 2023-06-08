@@ -71,7 +71,7 @@ The User Guide describes how to configure Triton, organize and configure your mo
 * Using the Client API [[Overview](README.md#client-libraries-and-examples) || [Details](https://github.com/triton-inference-server/client)]
 * Analyzing Performance [[Overview](README.md#performance-analysis)]
 * Deploying on edge (Jetson) [[Overview](README.md#jetson-and-jetpack)]
-
+* Debugging Guide [Details](./user_guide/debugging_guide.md)
 
 ### Model Repository 
 [Model Repositories](user_guide/model_repository.md) are the organizational hub for using Triton. All models, configuration files, and additional resources needed to serve the models are housed inside a model repository.
