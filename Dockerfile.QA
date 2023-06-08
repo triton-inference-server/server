@@ -311,10 +311,10 @@ RUN if [ $(cat /etc/os-release | grep 'VERSION_ID="20.04"' | wc -l) -ne 0 ]; the
 
 # CI/QA for memcheck requires valgrind
 # libarchive-dev is required by Python backend
+# TODO: Return  libopencv-dev \ ... testing if anything breaks
 RUN apt-get update && apt-get install -y --no-install-recommends \
                               curl \
                               gdb \
-                              libopencv-dev \
                               libarchive-dev \
                               libopencv-core-dev \
                               libzmq3-dev \
