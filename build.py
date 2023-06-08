@@ -1104,6 +1104,12 @@ ENV PATH /opt/tritonserver/bin:${PATH}
 ENV LD_LIBRARY_PATH /opt/tritonserver/backends/onnxruntime:${LD_LIBRARY_PATH}
 '''
 
+    # Necessary for libtorch.so to find correct HPCX libraries
+    if enable_gpu and ('pytorch' in backends):
+        df += '''
+ENV LD_LIBRARY_PATH /opt/hpcx/ucx/lib/:${LD_LIBRARY_PATH}
+'''
+
     backend_dependencies = ""
     # libgomp1 is needed by both onnxruntime and pytorch backends
     if ('onnxruntime' in backends) or ('pytorch' in backends):
