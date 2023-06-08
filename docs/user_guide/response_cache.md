@@ -153,7 +153,7 @@ For Triton-specific `redis` cache implementation details/configuration, see the
 
 #### Custom Cache
 
-With the new the TRITONCACHE API interface, it is now possible for
+With the TRITONCACHE API interface, it is now possible for
 users to implement their own cache to suit any use-case specific needs.
 To see the required interface that must be implemented by a cache
 developer, see the 
