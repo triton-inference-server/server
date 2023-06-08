@@ -29,12 +29,54 @@ RET=0
 
 TEST_LOG="./response_cache_test.log"
 UNIT_TEST=./response_cache_test
+export CUDA_VISIBLE_DEVICES=0
+
+# Only localhost supported in this test for now, but in future could make
+# use of a persistent remote redis server, or similarly use --replicaof arg.
+export TRITON_REDIS_HOST="localhost"
+export TRITON_REDIS_PORT="6379"
 
 rm -fr *.log
 
-# UNIT TEST
+function install_redis() {
+  ## Install redis if not already installed
+  if ! command -v redis-server >/dev/null 2>&1; then
+    apt update -y && apt install -y redis
+  fi
+}
+
+function start_redis() {
+  # Run redis server in background
+  redis-server --daemonize yes --port "${TRITON_REDIS_PORT}"
+
+  # Check redis server is running
+  REDIS_PING_RESPONSE=$(redis-cli -h ${TRITON_REDIS_HOST} -p ${TRITON_REDIS_PORT} ping)
+  if [ "${REDIS_PING_RESPONSE}" == "PONG" ]; then
+    echo "Redis successfully started in background"
+  else
+    echo -e "\n***\n*** Failed: Redis server did not start successfully\n***"
+    RET=1
+  fi
+}
+
+function stop_redis() {
+  echo "Stopping Redis server..."
+  redis-cli -h "${TRITON_REDIS_HOST}" -p "${TRITON_REDIS_PORT}" shutdown > /dev/null 2>&1 || true
+  echo "Redis server shutdown"
+}
+
+# UNIT TESTS
 set +e
-export CUDA_VISIBLE_DEVICES=0
+
+## Unit tests currently run for both Local and Redis cache implementaitons
+## by default. However, we could break out the unit tests for each
+## into separate runs gtest filters if needed in the future:
+## - `${UNIT_TEST} --gtest_filter=*Local*`
+## - `${UNIT_TEST} --gtest_filter=*Redis*`
+install_redis
+# Stop any existing redis server first for good measure
+stop_redis
+start_redis
 LD_LIBRARY_PATH=/opt/tritonserver/lib:$LD_LIBRARY_PATH $UNIT_TEST >>$TEST_LOG 2>&1
 if [ $? -ne 0 ]; then
     cat $TEST_LOG
@@ -48,10 +90,33 @@ function check_server_success_and_kill {
     if [ "${SERVER_PID}" == "0" ]; then
         echo -e "\n***\n*** Failed to start ${SERVER}\n***"
         cat ${SERVER_LOG}
-        exit 1
+        RET=1
+    else
+        kill ${SERVER_PID}
+        wait ${SERVER_PID}
     fi
-    kill $SERVER_PID
-    wait $SERVER_PID
+}
+
+function check_server_expected_failure {
+    EXPECTED_MESSAGE="${1}"
+    if [ "${SERVER_PID}" != "0" ]; then
+        echo -e "\n***\n*** Failed: ${SERVER} started successfully when it was expected to fail\n***"
+        cat ${SERVER_LOG}
+        RET=1
+
+        kill ${SERVER_PID}
+        wait ${SERVER_PID}
+    else
+        # Check that server fails with the correct error message
+        set +e
+        grep -i "${EXPECTED_MESSAGE}" ${SERVER_LOG} 
+        if [ $? -ne 0 ]; then
+            echo -e "\n***\n*** Failed: Expected [${EXPECTED_MESSAGE}] error message in output\n***"
+            cat $SERVER_LOG
+            RET=1
+        fi
+        set -e
+    fi
 }
 
 MODEL_DIR="${PWD}/models"
@@ -102,46 +167,35 @@ check_server_success_and_kill
 # Test that specifying multiple cache types is not supported and should fail
 SERVER_ARGS="--model-repository=${MODEL_DIR} --cache-config=local,size=8192 --cache-config=redis,key=value ${EXTRA_ARGS}"
 run_server
-if [ "$SERVER_PID" != "0" ]; then
-    echo -e "\n***\n*** Failed: $SERVER started successfully when it was expected to fail\n***"
-    cat $SERVER_LOG
-    RET=1
-
-    kill $SERVER_PID
-    wait $SERVER_PID
-else
-    # Check that server fails with the correct error message
-    set +e
-    grep -i "multiple cache configurations" ${SERVER_LOG}
-    if [ $? -ne 0 ]; then
-        echo -e "\n***\n*** Failed: Expected multiple cache configuration error message in output\n***"
-        cat $SERVER_LOG
-        RET=1
-    fi
-    set -e
-fi
+check_server_expected_failure "multiple cache configurations"
 
 # Test that specifying both config styles is incompatible and should fail
 SERVER_ARGS="--model-repository=${MODEL_DIR} --response-cache-byte-size=12345 --cache-config=local,size=67890 ${EXTRA_ARGS}"
 run_server
-if [ "$SERVER_PID" != "0" ]; then
-    echo -e "\n***\n*** Failed: $SERVER started successfully when it was expected to fail\n***"
-    cat $SERVER_LOG
-    RET=1
+check_server_expected_failure "incompatible flags"
 
-    kill $SERVER_PID
-    wait $SERVER_PID
-else
-    # Check that server fails with the correct error message
-    set +e
-    grep -i "incompatible flags" ${SERVER_LOG}
-    if [ $? -ne 0 ]; then
-        echo -e "\n***\n*** Failed: Expected incompatible cache config flags error message in output\n***"
-        cat $SERVER_LOG
-        RET=1
-    fi
-    set -e
-fi
+# Test simple redis cache config succeeds
+SERVER_ARGS="--model-repository=${MODEL_DIR} --cache-config=redis,host=${TRITON_REDIS_HOST} --cache-config redis,port=${TRITON_REDIS_PORT} ${EXTRA_ARGS}"
+run_server
+check_server_success_and_kill
+
+# Test triton fails to initialize if it can't connect to redis cache
+SERVER_ARGS="--model-repository=${MODEL_DIR} --cache-config=redis,host=localhost --cache-config=redis,port=nonexistent ${EXTRA_ARGS}"
+run_server
+check_server_expected_failure "Failed to connect to Redis: Connection refused"
+
+# Test triton fails to initialize if it can't resolve host for redis cache
+SERVER_ARGS="--model-repository=${MODEL_DIR} --cache-config=redis,host=nonexistent --cache-config=redis,port=nonexistent ${EXTRA_ARGS}"
+run_server
+check_server_expected_failure "Failed to connect to Redis: Temporary failure in name resolution"
+
+# Test triton fails to initialize if minimum required args (host & port) not all provided
+SERVER_ARGS="--model-repository=${MODEL_DIR} --cache-config=redis,port=${TRITON_REDIS_HOST} ${EXTRA_ARGS}"
+run_server
+check_server_expected_failure "Must at a minimum specify"
+
+# Clean up redis server before exiting test
+stop_redis
 
 if [ $RET -eq 0 ]; then
   echo -e "\n***\n*** Test Passed\n***"
