@@ -217,29 +217,37 @@ class PBCustomMetricsTest(unittest.TestCase):
         # Test the error handling when the corresponding 'MetricFamily' is
         # deleted before the 'Metric' is deleted, and the 'Metric' is still
         # being used for metric operations
-        metric_family = pb_utils.MetricFamily(
-            name="test_metric_lifetime_error",
-            description="test metric lifetime error",
-            kind=pb_utils.MetricFamily.COUNTER)
-        labels = {"example1": "counter_label1", "example2": "counter_label2"}
-        metric = metric_family.Metric(labels=labels)
+        for kind in [
+                pb_utils.MetricFamily.COUNTER, pb_utils.MetricFamily.GAUGE
+        ]:
+            metric_family = pb_utils.MetricFamily(
+                name="test_metric_lifetime_error",
+                description="test metric lifetime error",
+                kind=kind)
+            labels = {
+                "example1": "counter_label1",
+                "example2": "counter_label2"
+            }
+            metric = metric_family.Metric(labels=labels)
 
-        # Intentionally delete the 'MetricFamily' before the 'Metric' being deleted
-        del metric_family
+            # Intentionally delete the 'MetricFamily' before the 'Metric' being deleted
+            del metric_family
 
-        error_msg = "Invalid metric operation as the corresponding 'MetricFamily' has been deleted."
+            error_msg = "Invalid metric operation as the corresponding 'MetricFamily' has been deleted."
 
-        with self.assertRaises(pb_utils.TritonModelException) as ex:
-            metric.set(10)
-        self.assertIn(error_msg, str(ex.exception))
+            # Counter does not support set
+            if kind is not pb_utils.MetricFamily.COUNTER:
+                with self.assertRaises(pb_utils.TritonModelException) as ex:
+                    metric.set(10)
+                self.assertIn(error_msg, str(ex.exception))
 
-        with self.assertRaises(pb_utils.TritonModelException) as ex:
-            metric.increment(10)
-        self.assertIn(error_msg, str(ex.exception))
+            with self.assertRaises(pb_utils.TritonModelException) as ex:
+                metric.increment(10)
+            self.assertIn(error_msg, str(ex.exception))
 
-        with self.assertRaises(pb_utils.TritonModelException) as ex:
-            metric.value()
-        self.assertIn(error_msg, str(ex.exception))
+            with self.assertRaises(pb_utils.TritonModelException) as ex:
+                metric.value()
+            self.assertIn(error_msg, str(ex.exception))
 
 
 class TritonPythonModel:
