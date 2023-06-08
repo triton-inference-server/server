@@ -61,8 +61,23 @@ function start_redis() {
 
 function stop_redis() {
   echo "Stopping Redis server..."
-  redis-cli -h "${TRITON_REDIS_HOST}" -p "${TRITON_REDIS_PORT}" shutdown > /dev/null 2>&1 || true
+  redis-cli -h "${TRITON_REDIS_HOST}" -p "${TRITON_REDIS_PORT}" shutdown || true
   echo "Redis server shutdown"
+}
+
+function set_redis_auth() {
+  # NOTE: Per-user auth [Access Control List (ACL)] is only supported in 
+  #       Redis >= 6.0 and is more comprehensive in what can be configured. 
+  #       For simplicity and wider range of Redis version support, use
+  #       server-wide password  via "requirepass" for now.
+  redis-cli -h "${TRITON_REDIS_HOST}" -p "${TRITON_REDIS_PORT}" config set requirepass "${REDIS_PW}"
+  export REDISCLI_AUTH="${REDIS_PW}"
+}
+
+function unset_redis_auth() {
+  # Authenticate implicitly via REDISCLI_AUTH env var, then unset password/var
+  redis-cli -h "${TRITON_REDIS_HOST}" -p "${TRITON_REDIS_PORT}" config set requirepass ""
+  unset REDISCLI_AUTH
 }
 
 # UNIT TESTS
@@ -174,8 +189,11 @@ SERVER_ARGS="--model-repository=${MODEL_DIR} --response-cache-byte-size=12345 --
 run_server
 check_server_expected_failure "incompatible flags"
 
+## Redis Cache CLI tests
+REDIS_ENDPOINT="--cache-config redis,host=${TRITON_REDIS_HOST} --cache-config redis,port=${TRITON_REDIS_PORT}"
+
 # Test simple redis cache config succeeds
-SERVER_ARGS="--model-repository=${MODEL_DIR} --cache-config=redis,host=${TRITON_REDIS_HOST} --cache-config redis,port=${TRITON_REDIS_PORT} ${EXTRA_ARGS}"
+SERVER_ARGS="--model-repository=${MODEL_DIR} ${REDIS_ENDPOINT} ${EXTRA_ARGS}"
 run_server
 check_server_success_and_kill
 
@@ -187,14 +205,42 @@ check_server_expected_failure "Failed to connect to Redis: Connection refused"
 # Test triton fails to initialize if it can't resolve host for redis cache
 SERVER_ARGS="--model-repository=${MODEL_DIR} --cache-config=redis,host=nonexistent --cache-config=redis,port=nonexistent ${EXTRA_ARGS}"
 run_server
-check_server_expected_failure "Failed to connect to Redis: Temporary failure in name resolution"
+# Either of these errors can be returned for bad hostname, so check for either.
+MSG1="Temporary failure in name resolution"
+MSG2="Name or service not known"
+check_server_expected_failure "${MSG1}\|${MSG2}"
 
 # Test triton fails to initialize if minimum required args (host & port) not all provided
 SERVER_ARGS="--model-repository=${MODEL_DIR} --cache-config=redis,port=${TRITON_REDIS_HOST} ${EXTRA_ARGS}"
 run_server
 check_server_expected_failure "Must at a minimum specify"
 
+## Redis Authentication tests
+
+# Automatically provide auth via REDISCLI_AUTH env var when set: https://redis.io/docs/ui/cli/
+REDIS_PW="redis123!"
+set_redis_auth
+
+# Test simple redis authentication succeeds with correct credentials
+REDIS_CACHE_AUTH="--cache-config redis,password=${REDIS_PW}"
+SERVER_ARGS="--model-repository=${MODEL_DIR} ${REDIS_ENDPOINT} ${REDIS_CACHE_AUTH} ${EXTRA_ARGS}"
+run_server
+check_server_success_and_kill
+
+# Test simple redis authentication fails with wrong credentials
+REDIS_CACHE_AUTH="--cache-config redis,password=wrong"
+SERVER_ARGS="--model-repository=${MODEL_DIR} ${REDIS_ENDPOINT} ${REDIS_CACHE_AUTH} ${EXTRA_ARGS}"
+run_server
+check_server_expected_failure "WRONGPASS"
+
+
+# Test simple redis authentication fails with no credentials
+SERVER_ARGS="--model-repository=${MODEL_DIR} ${REDIS_ENDPOINT} ${EXTRA_ARGS}"
+run_server
+check_server_expected_failure "NOAUTH Authentication required"
+
 # Clean up redis server before exiting test
+unset_redis_auth
 stop_redis
 
 if [ $RET -eq 0 ]; then
