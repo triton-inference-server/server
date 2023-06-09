@@ -1106,12 +1106,8 @@ ENV LD_LIBRARY_PATH /opt/tritonserver/backends/onnxruntime:${LD_LIBRARY_PATH}
 
     # Necessary for libtorch.so to find correct HPCX libraries
     if ('pytorch' in backends):
-        if not enable_gpu:
-            df += '''
-ENV LD_LIBRARY_PATH /opt/hpcx/ucc/lib/:${LD_LIBRARY_PATH}
-'''
         df += '''
-ENV LD_LIBRARY_PATH /opt/hpcx/ucx/lib/:${LD_LIBRARY_PATH}
+ENV LD_LIBRARY_PATH /opt/hpcx/ucc/lib/:/opt/hpcx/ucx/lib/:${LD_LIBRARY_PATH}
 '''
 
     backend_dependencies = ""
