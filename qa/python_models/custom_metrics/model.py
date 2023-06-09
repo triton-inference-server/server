@@ -217,13 +217,14 @@ class PBCustomMetricsTest(unittest.TestCase):
         # Test the error handling when the corresponding 'MetricFamily' is
         # deleted before the 'Metric' is deleted, and the 'Metric' is still
         # being used for metric operations
-        for kind in [
-                pb_utils.MetricFamily.COUNTER, pb_utils.MetricFamily.GAUGE
-        ]:
+        kinds = [pb_utils.MetricFamily.COUNTER, pb_utils.MetricFamily.GAUGE]
+        metric_family_names = [
+            "test_metric_lifetime_error_counter",
+            "test_metric_lifetime_error_gauge"
+        ]
+        for kind, name in zip(kinds, metric_family_names):
             metric_family = pb_utils.MetricFamily(
-                name="test_metric_lifetime_error",
-                description="test metric lifetime error",
-                kind=kind)
+                name=name, description="test metric lifetime error", kind=kind)
             labels = {
                 "example1": "counter_label1",
                 "example2": "counter_label2"
