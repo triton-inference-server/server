@@ -109,8 +109,7 @@ include(FetchContent)
 
 FetchContent_Declare(
   repo-core
-  #GIT_REPOSITORY https://github.com/triton-inference-server/core.git
-  GIT_REPOSITORY oandreeva@172.17.0.1:/home/oandreeva/Code/core
+  GIT_REPOSITORY https://github.com/triton-inference-server/core.git
   GIT_TAG ${TRITON_CORE_REPO_TAG}
 )
 FetchContent_Declare(
