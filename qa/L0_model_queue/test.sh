@@ -1,5 +1,5 @@
 #!/bin/bash
-# Copyright 2020-2021, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright 2020-2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -255,6 +255,50 @@ rm -fr models && mkdir models && \
         echo "}" >> config.pbtxt)
 
 TEST_CASE=test_priority_levels
+SERVER_LOG="./$TEST_CASE.server.log"
+run_server
+if [ "$SERVER_PID" == "0" ]; then
+    echo -e "\n***\n*** Failed to start $SERVER\n***"
+    cat $SERVER_LOG
+    exit 1
+fi
+
+echo "Test: $TEST_CASE" >>$CLIENT_LOG
+
+set +e
+python $MODEL_QUEUE_TEST ModelQueueTest.$TEST_CASE >>$CLIENT_LOG 2>&1
+if [ $? -ne 0 ]; then
+    echo -e "\n***\n*** Test Failed\n***"
+    RET=1
+else
+    check_test_results $TEST_RESULT_FILE 1
+    if [ $? -ne 0 ]; then
+        cat $CLIENT_LOG
+        echo -e "\n***\n*** Test Result Verification Failed\n***"
+        RET=1
+    fi
+fi
+set -e
+
+kill $SERVER_PID
+wait $SERVER_PID
+
+MAX_UINT64=18446744073709551615
+MAX_UINT32_PLUS_1=4294967296
+
+# test_max_priority_levels
+rm -fr models && mkdir models && \
+    cp -r ensemble_zero_1_float32 models/. && \
+    cp -r custom_zero_1_float32 models/. && \
+    (cd models/custom_zero_1_float32 && \
+        echo "dynamic_batching { " >> config.pbtxt && \
+        echo "    preferred_batch_size: [ 4, 8 ]" >> config.pbtxt && \
+        echo "    max_queue_delay_microseconds: 10000000" >> config.pbtxt && \
+        echo "    priority_levels: $MAX_UINT64" >> config.pbtxt && \
+        echo "    default_priority_level: $MAX_UINT32_PLUS_1" >> config.pbtxt && \
+        echo "}" >> config.pbtxt)
+
+TEST_CASE=test_max_priority_levels
 SERVER_LOG="./$TEST_CASE.server.log"
 run_server
 if [ "$SERVER_PID" == "0" ]; then
