@@ -176,7 +176,7 @@ struct TritonServerParameters {
   int32_t trace_rate_{1000};
   int32_t trace_count_{-1};
   int32_t trace_log_frequency_{0};
-  InferenceTraceMode trace_mode_{TRACE_MODE_TRITON};
+  TRITONSERVER_InferenceTraceMode trace_mode_{TRITONSERVER_TRACE_MODE_TRITON};
   TraceConfigMap trace_config_map_;
 #endif  // TRITON_ENABLE_TRACING
 
@@ -285,7 +285,7 @@ class TritonParser {
   ParseGrpcRestrictedProtocolOption(const std::string& arg);
 #ifdef TRITON_ENABLE_TRACING
   TRITONSERVER_InferenceTraceLevel ParseTraceLevelOption(std::string arg);
-  InferenceTraceMode ParseTraceModeOption(std::string arg);
+  TRITONSERVER_InferenceTraceMode ParseTraceModeOption(std::string arg);
   std::tuple<std::string, std::string, std::string> ParseTraceConfigOption(
       const std::string& arg);
   // Helper functions for post processing for collected trace arguments.

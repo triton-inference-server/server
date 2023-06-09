@@ -434,16 +434,14 @@ TritonParser::SetupOptions()
 #endif  // TRITON_ENABLE_HTTP
 
 #if defined(TRITON_ENABLE_GRPC)
-  grpc_options_.push_back(
-      {OPTION_ALLOW_GRPC, "allow-grpc", Option::ArgBool,
-       "Allow the server to listen for GRPC requests."});
+  grpc_options_.push_back({OPTION_ALLOW_GRPC, "allow-grpc", Option::ArgBool,
+                           "Allow the server to listen for GRPC requests."});
   grpc_options_.push_back(
       {OPTION_GRPC_ADDRESS, "grpc-address", Option::ArgStr,
        "The address for the grpc server to binds to. Default is 0.0.0.0"});
-  grpc_options_.push_back(
-      {OPTION_GRPC_PORT, "grpc-port", Option::ArgInt,
-       "The port for the server to listen on for GRPC "
-       "requests. Default is 8001."});
+  grpc_options_.push_back({OPTION_GRPC_PORT, "grpc-port", Option::ArgInt,
+                           "The port for the server to listen on for GRPC "
+                           "requests. Default is 8001."});
   grpc_options_.push_back(
       {OPTION_REUSE_GRPC_PORT, "reuse-grpc-port", Option::ArgBool,
        "Allow multiple servers to listen on the same GRPC port when every "
@@ -1948,7 +1946,7 @@ TritonParser::ParseTraceLevelOption(std::string arg)
   throw ParseException("invalid value for trace level option: " + arg);
 }
 
-InferenceTraceMode
+TRITONSERVER_InferenceTraceMode
 TritonParser::ParseTraceModeOption(std::string arg)
 {
   std::transform(arg.begin(), arg.end(), arg.begin(), [](unsigned char c) {
@@ -1956,10 +1954,10 @@ TritonParser::ParseTraceModeOption(std::string arg)
   });
 
   if (arg == "triton") {
-    return TRACE_MODE_TRITON;
+    return TRITONSERVER_TRACE_MODE_TRITON;
   }
   if (arg == "opentelemetry") {
-    return TRACE_MODE_OPENTELEMETRY;
+    return TRITONSERVER_TRACE_MODE_OPENTELEMETRY;
   }
 
   throw ParseException(
@@ -2054,7 +2052,8 @@ TritonParser::SetTritonTraceArgs(
     bool trace_log_frequency_present)
 {
   for (const auto& mode_setting :
-       lparams.trace_config_map_[std::to_string(TRACE_MODE_TRITON)]) {
+       lparams
+           .trace_config_map_[std::to_string(TRITONSERVER_TRACE_MODE_TRITON)]) {
     if (mode_setting.first == "file") {
       if (trace_filepath_present) {
         std::cerr << "Warning: Overriding deprecated '--trace-file' "
@@ -2100,10 +2099,10 @@ TritonParser::PostProcessTraceArgs(
       lparams, trace_level_present, trace_rate_present, trace_count_present,
       explicit_disable_trace);
 
-  if (lparams.trace_mode_ == TRACE_MODE_OPENTELEMETRY) {
+  if (lparams.trace_mode_ == TRITONSERVER_TRACE_MODE_OPENTELEMETRY) {
     VerifyOpentelemetryTraceArgs(
         trace_filepath_present, trace_log_frequency_present);
-  } else if (lparams.trace_mode_ == TRACE_MODE_TRITON) {
+  } else if (lparams.trace_mode_ == TRITONSERVER_TRACE_MODE_TRITON) {
     SetTritonTraceArgs(
         lparams, trace_filepath_present, trace_log_frequency_present);
   }

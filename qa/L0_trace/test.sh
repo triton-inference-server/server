@@ -718,6 +718,12 @@ for ENTRY in $GRPC_ENTRIES; do
     fi
 done
 
+#Check that we have 2 nested spans
+
+if [ `grep -c CHILD_OF` != "2"]; then
+    RET=1
+fi
+
 if [ $RET -eq 0 ]; then
     echo -e "\n***\n*** Test Passed\n***"
 else
