@@ -30,19 +30,28 @@ import torch.nn as nn
 
 
 class SumModule(nn.Module):
-    def __init__(self):
+
+    def __init__(self, device):
         super(SumModule, self).__init__()
+        self.device = device
 
     def forward(self, INPUT0, INPUT1):
+        INPUT0 = INPUT0.to(self.device)
+        INPUT1 = INPUT1.to(self.device)
         print('SumModule - INPUT0 device: {}, INPUT1 device: {}\n'.format(
             INPUT0.device, INPUT1.device))
         return INPUT0 + INPUT1
 
+
 class DiffModule(nn.Module):
-    def __init__(self):
+
+    def __init__(self, device):
         super(DiffModule, self).__init__()
+        self.device = device
 
     def forward(self, INPUT0, INPUT1):
+        INPUT0 = INPUT0.to(self.device)
+        INPUT1 = INPUT1.to(self.device)
         print('DiffModule - INPUT0 device: {}, INPUT1 device: {}\n'.format(
             INPUT0.device, INPUT1.device))
         return INPUT0 - INPUT1
@@ -55,17 +64,12 @@ class TestModel(nn.Module):
         self.device0 = device0
         self.device1 = device1
 
-        self.layers1 = SumModule().to(self.device0)
-        self.layers2 = DiffModule().to(self.device1)
+        self.layer1 = SumModule(self.device0)
+        self.layer2 = DiffModule(self.device1)
 
     def forward(self, INPUT0, INPUT1):
-        INPUT0_0 = INPUT0.to(self.device0)
-        INPUT0_1 = INPUT0.to(self.device1)
-        INPUT1_0 = INPUT1.to(self.device0)
-        INPUT1_1 = INPUT1.to(self.device1)
-
-        op0 = self.layers1(INPUT0_0, INPUT1_0)
-        op1 = self.layers2(INPUT0_1, INPUT1_1)
+        op0 = self.layer1(INPUT0, INPUT1)
+        op1 = self.layer2(INPUT0, INPUT1)
         return op0, op1
 
 
