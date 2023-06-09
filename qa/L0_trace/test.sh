@@ -720,7 +720,7 @@ done
 
 #Check that we have 2 nested spans
 
-if [ `grep -c "CHILD_OF" $TRACE_COLLECTOR_LOG` != "2"]; then
+if [ `grep -c 'parent_span_id' $TRACE_COLLECTOR_LOG` != "4" ]; then
     RET=1
 fi
 
