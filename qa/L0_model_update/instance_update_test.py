@@ -404,10 +404,26 @@ class TestInstanceUpdate(unittest.TestCase):
         # Decrease resource requirement
         self.__update_instance_count(
             1, 1,
-            "{\ncount: 1\nkind: KIND_CPU\nrate_limiter {\nresources [\n{\nname: \"R1\"\ncount: 2\n}\n]\n}\n}"
+            "{\ncount: 1\nkind: KIND_CPU\nrate_limiter {\nresources [\n{\nname: \"R1\"\ncount: 3\n}\n]\n}\n}"
         )
         # Unload model
         self.__unload_model()
+        # The resource count of 3 is unique across this entire test, so check
+        # the server output to make sure it is printed, which ensures the
+        # max resource is actually decreased.
+        time.sleep(1)  # make sure the log file is updated
+        log_path = os.path.join(
+            os.environ["MODEL_LOG_DIR"], "instance_update_test.rate_limit_" +
+            os.environ["RATE_LIMIT_MODE"] + ".server.log")
+        with open(log_path, mode="r", encoding="utf-8", errors="strict") as f:
+            if os.environ["RATE_LIMIT_MODE"] == "execution_count":
+                # Make sure the previous max resource limit of 4 is reduced to 3
+                # when no explicit limit is set.
+                self.assertIn("Resource: R1\t Count: 3", f.read())
+            else:
+                # Make sure the max resource limit is never set to 3 when
+                # explicit limit of 10 is set.
+                self.assertNotIn("Resource: R1\t Count: 3", f.read())
 
     # Test for instance update on direct sequence scheduling
     @unittest.skip("Sequence will not continue after update [FIXME: DLIS-4820]")
