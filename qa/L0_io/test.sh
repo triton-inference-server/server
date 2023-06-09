@@ -149,8 +149,9 @@ cp -r $ENSEMBLEDIR/nop_TYPE_FP32_-1 $MODELSDIR/. && \
 # prepare libtorch multi-device and multi-gpu models
 cp -r ../L0_libtorch_instance_group_kind_model/models/libtorch_multi_device $MODELSDIR/.
 cp ../L0_libtorch_instance_group_kind_model/gen_models.py ./gen_libtorch_model.py
+mkdir -p $MODELSDIR/libtorch_multi_device/1
 mkdir -p $MODELSDIR/libtorch_multi_gpu/1
-cp $MODELSDIR/libtorch_multi_device/config.pbtxt models/libtorch_multi_gpu/.
+cp $MODELSDIR/libtorch_multi_device/config.pbtxt $MODELSDIR/libtorch_multi_gpu/.
 (cd $MODELSDIR/libtorch_multi_gpu && \
     sed -i "s/name: \"libtorch_multi_device\"/name: \"libtorch_multi_gpu\"/" config.pbtxt)
 
@@ -164,7 +165,6 @@ fi
 set -e
 
 TRIALS="graphdef savedmodel onnx libtorch plan python python_dlpack libtorch_multi_gpu libtorch_multi_device"
-
 for input_device in -1 0 1; do
     for output_device in -1 0 1; do
         for trial in ${TRIALS}; do
