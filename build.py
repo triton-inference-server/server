@@ -872,7 +872,7 @@ def install_dcgm_libraries(dcgm_version, target_machine):
             return """
 ENV DCGM_VERSION {}
 # Install DCGM. Steps from https://developer.nvidia.com/dcgm#Downloads
-RUN curl -o /tmp/cuda-keyring.deb \
+RUN curl -L -o /tmp/cuda-keyring.deb \
     https://developer.download.nvidia.com/compute/cuda/repos/ubuntu2204/sbsa/cuda-keyring_1.0-1_all.deb \
     && apt install /tmp/cuda-keyring.deb && rm /tmp/cuda-keyring.deb && \
     apt-get update && apt-get install -y datacenter-gpu-manager=1:{}
@@ -883,7 +883,7 @@ RUN curl -o /tmp/cuda-keyring.deb \
             return """
 ENV DCGM_VERSION {}
 # Install DCGM. Steps from https://developer.nvidia.com/dcgm#Downloads
-RUN curl -o /tmp/cuda-keyring.deb \
+RUN curl -L -o /tmp/cuda-keyring.deb \
     https://developer.download.nvidia.com/compute/cuda/repos/ubuntu2204/x86_64/cuda-keyring_1.0-1_all.deb \
     && apt install /tmp/cuda-keyring.deb && rm /tmp/cuda-keyring.deb && \
     apt-get update && apt-get install -y datacenter-gpu-manager=1:{}
