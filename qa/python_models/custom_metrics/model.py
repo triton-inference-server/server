@@ -213,6 +213,43 @@ class PBCustomMetricsTest(unittest.TestCase):
         # underlying metric, and all instances will be updated
         self._dup_metric_helper()
 
+    def test_metric_lifetime_error(self):
+        # Test the error handling when the corresponding 'MetricFamily' is
+        # deleted before the 'Metric' is deleted, and the 'Metric' is still
+        # being used for metric operations
+        kinds = [pb_utils.MetricFamily.COUNTER, pb_utils.MetricFamily.GAUGE]
+        metric_family_names = [
+            "test_metric_lifetime_error_counter",
+            "test_metric_lifetime_error_gauge"
+        ]
+        for kind, name in zip(kinds, metric_family_names):
+            metric_family = pb_utils.MetricFamily(
+                name=name, description="test metric lifetime error", kind=kind)
+            labels = {
+                "example1": "counter_label1",
+                "example2": "counter_label2"
+            }
+            metric = metric_family.Metric(labels=labels)
+
+            # Intentionally delete the 'MetricFamily' before the 'Metric' being deleted
+            del metric_family
+
+            error_msg = "Invalid metric operation as the corresponding 'MetricFamily' has been deleted."
+
+            # Counter does not support set
+            if kind is not pb_utils.MetricFamily.COUNTER:
+                with self.assertRaises(pb_utils.TritonModelException) as ex:
+                    metric.set(10)
+                self.assertIn(error_msg, str(ex.exception))
+
+            with self.assertRaises(pb_utils.TritonModelException) as ex:
+                metric.increment(10)
+            self.assertIn(error_msg, str(ex.exception))
+
+            with self.assertRaises(pb_utils.TritonModelException) as ex:
+                metric.value()
+            self.assertIn(error_msg, str(ex.exception))
+
 
 class TritonPythonModel:
 
