@@ -94,3 +94,93 @@ If using [Triton's in-process C API](../customization_guide/inference_protocols.
 your application should be cognizant that the callback function you registered with 
 `TRITONSERVER_InferenceRequestSetResponseCallback` can be invoked any number of times,
 each time with a new response. You can take a look at [grpc_server.cc](https://github.com/triton-inference-server/server/blob/main/src/grpc_server.cc)
+
+### Knowing When a Decoupled Inference Request is Complete
+
+A request is considered complete when a response containing the
+`TRITONSERVER_RESPONSE_COMPLETE_FINAL` flag is received. For decoupled models,
+there are two ways this can happen. The model/backend calls one of the
+following [TRITONBACKEND APIs](https://github.com/triton-inference-server/core/blob/main/include/triton/core/tritonbackend.h):
+1. `TRITONBACKEND_ResponseSend(response, TRITONSERVER_RESPONSE_COMPLETE_FINAL, ...)`
+2. `TRITONBACKEND_ResponseFactorySendFlags(factory, TRITONSERVER_RESPONSE_COMPLETE_FINAL)`
+
+As described in the
+[backend repo](https://github.com/triton-inference-server/backend/blob/main/README.md#special-cases)
+for decoupled models:
+
+> If the backend should not send any more responses for the request,
+> `TRITONBACKEND_ResponseFactorySendFlags` can be used to send 
+> `TRITONSERVER_RESPONSE_COMPLETE_FINAL` using the ResponseFactory.
+
+In the `TRITONBACKEND_ResponseFactorySendFlags` case, only the `flags` are
+communicated back to the frontend to update some internal state, and there 
+is no actual Inference Response sent back along with the flags. The default
+behavior in this case is not to send anything back to the client, as there
+is no response to send.
+
+In some cases, this default behavior proved to be significantly more performant.
+For example, take a decoupled model with an `N` request -> `1` response structure.
+For each of the first `N-1` requests, the model will send "zero" responses back
+by using `TRITONBACKEND_ResponseFactorySendFlags` as described above, and likely
+update some internal states in the model. Finally, on the `N`th request, the
+model is ready to send a response. 
+
+If the client is written in such a way that it is aware of the model's
+expected behavior, it can save resources and avoid network contention by
+not needing to communicate the `N-1` "empty" responses back and forth with
+the client, and instead the client will just wait until it receives the single
+non-empty response expected at the end on request `N`.
+
+However, there are cases where a user may want to write a client that can
+generically handle any model, without knowing implementation details about it.
+Similarly, there are cases where the number of responses a model will send
+is unknown beforehand, so the client may need a programatic way to know when
+the final response for a given request has been received. A common case for
+this may be where for a language model that has a `1` request -> `N` response
+structure. 
+
+To handle this case, Triton exposes a boolean `"triton_final_response"` response 
+parameter that communicates to the client that this response is the final response
+for the associated request/response ID when communicating with decoupled models. 
+
+> **NOTE**
+> This response parameter is only provided for `decoupled` models at this time.
+> Since every response will be the final response for non-decoupled models,
+> this would be redundant to communicate.
+
+
+#### TRITONBACKEND_ResponseSend 
+
+When a final response is sent via
+`TRITONBACKEND_ResponseSend(response, TRITONSERVER_RESPONSE_COMPLETE_FINAL, ...)`,
+an actual response is sent to the frontend by the backend/model, so this response
+parameter will be included in the response back to the client by default.
+
+#### TRITONBACKEND_ResponseFactorySendFlags 
+
+When a final response is sent via
+`TRITONBACKEND_ResponseFactorySendFlags(factory, TRITONSERVER_RESPONSE_COMPLETE_FINAL)`,
+no response is sent to the frontend by the backend/model, so nothing will be sent
+back to the client by default. For the client to receive a response containing
+this "final" signal via the `"triton_final_response"` parameter, the client
+will have to opt-in through the client library.
+
+To opt-in through the Python client library, the `enable_empty_final_response` arg
+should be set when calling `async_stream_infer(..., enable_empty_final_response=True)`.
+
+> **NOTE**
+> The `enable_empty_final_response` response parameter is only exposed in
+> the `async_stream_infer` method as this time, since this feature is only
+> needed for `decoupled` models.
+
+The [decoupled_test.py](https://github.com/triton-inference-server/server/blob/main/qa/L0_decoupled/decoupled_test.py)
+demonstrates an example of using this opt-in arg and programatically identifying
+when a final response is received through the `"triton_final_response"`
+response parameter.
+
+If using 
+[Triton's in-process C API](../customization_guide/inference_protocols.md#in-process-triton-server-api)
+instead of the GRPC frontend,
+then your application should be handling the logic to identify when the final
+response associated with a request has been received, such as by checking for
+the `TRITONSERVER_RESPONSE_COMPLETE_FINAL` response flag mentioned above.
