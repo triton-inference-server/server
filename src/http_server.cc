@@ -2403,7 +2403,8 @@ HTTPAPIServer::EVBufferToInput(
         RETURN_MSG_IF_ERR(
             params_json.MemberAsUInt(parameter.c_str(), &p),
             "Unable to parse 'priority'");
-        RETURN_IF_ERR(TRITONSERVER_InferenceRequestSetPriority(irequest, p));
+        RETURN_IF_ERR(
+            TRITONSERVER_InferenceRequestSetPriorityUInt64(irequest, p));
       } else if (parameter == "timeout") {
         uint64_t t;
         RETURN_MSG_IF_ERR(
