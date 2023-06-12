@@ -38,7 +38,6 @@ import requests as httpreq
 import os
 
 from tritonclient.utils import *
-import tritonclient.utils.cuda_shared_memory as cuda_shared_memory
 import tritonclient.http as httpclient
 
 TEST_JETSON = bool(int(os.environ.get('TEST_JETSON', 0)))
@@ -155,9 +154,11 @@ class PythonTest(tu.TestResultCollector):
             self._infer_help(model_name, shape, dtype)
 
     # GPU tensors are not supported on jetson
+    # CUDA Shared memory is not supported on jetson
     if not TEST_JETSON:
-        # CUDA Shared memory is not supported on jetson
+
         def test_gpu_tensor_error(self):
+            import tritonclient.utils.cuda_shared_memory as cuda_shared_memory
             model_name = 'identity_bool'
             with httpclient.InferenceServerClient("localhost:8000") as client:
                 input_data = np.array([[True] * 1000], dtype=bool)
@@ -184,6 +185,7 @@ class PythonTest(tu.TestResultCollector):
                 cuda_shared_memory.destroy_shared_memory_region(shm0_handle)
 
         def test_dlpack_tensor_error(self):
+            import tritonclient.utils.cuda_shared_memory as cuda_shared_memory
             model_name = 'dlpack_identity'
             with httpclient.InferenceServerClient("localhost:8000") as client:
                 input_data = np.array([[1] * 1000], dtype=np.float32)
