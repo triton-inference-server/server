@@ -283,22 +283,21 @@ class TestInstanceUpdate(unittest.TestCase):
     def test_load_api_with_config(self):
         # Load model with 1 instance
         self.__load_model(1)
-        # Add 1 instance via the load API
-        new_conf = {
-            "name": self.__model_name,
-            "backend": "python",
-            "max_batch_size": 0,
-            "input": {
-                "name": "INPUT0", "data_type": "TYPE_FP32", "dims": -1
-            },
-            "output": {
-                "name": "OUTPUT0", "data_type": "TYPE_FP32", "dims": -1
-            },
-            "instance_group": {
-                "count": 2, "kind": "KIND_CPU"
-            }
-        }
-        self.__triton.load_model(self.__model_name, config=json.dumps(new_conf))
+        # Get the model config from Triton
+        config = self.__triton.get_model_config(self.__model_name, as_json=True)
+        self.assertIn("config", config)
+        self.assertIsInstance(config["config"], dict)
+        config = config["config"]
+        self.assertIn("instance_group", config)
+        self.assertIsInstance(config["instance_group"], list)
+        self.assertEqual(len(config["instance_group"]), 1)
+        self.assertIn("count", config["instance_group"][0])
+        self.assertIsInstance(config["instance_group"][0]["count"], int)
+        # Add an extra instance into the model config
+        config["instance_group"][0]["count"] += 1
+        self.assertEqual(config["instance_group"][0]["count"], 2)
+        # Load the extra instance via the load API
+        self.__triton.load_model(self.__model_name, config=json.dumps(config))
         self.__check_count("initialize", 2)  # 2 instances in total
         self.__check_count("finalize", 0)  # no instance is removed
         self.__infer()
