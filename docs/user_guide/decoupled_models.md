@@ -87,7 +87,7 @@ exactly one response per request. Even standard ModelInfer RPC in the GRPC endpo
 does not support decoupled responses. In order to run inference on a decoupled
 model, the client must use the bi-directional streaming RPC. See
 [here](https://github.com/triton-inference-server/common/blob/main/protobuf/grpc_service.proto)
-for more details. The [decoupled_test.py](https://github.com/triton-inference-server/server/blob/main/qa/L0_decoupled/decoupled_test.py) demonstrates
+for more details. The [decoupled_test.py](../../qa/L0_decoupled/decoupled_test.py) demonstrates
 how the gRPC streaming can be used to infer decoupled models.
 
 If using [Triton's in-process C API](../customization_guide/inference_protocols.md#in-process-triton-server-api),
@@ -134,7 +134,7 @@ non-empty response expected at the end on request `N`.
 However, there are cases where a user may want to write a client that can
 generically handle any model, without knowing implementation details about it.
 Similarly, there are cases where the number of responses a model will send
-is unknown beforehand, so the client may need a programatic way to know when
+is unknown beforehand, so the client may need a programmatic way to know when
 the final response for a given request has been received. A common case for
 this may be where for a language model that has a `1` request -> `N` response
 structure. 
@@ -173,8 +173,8 @@ should be set when calling `async_stream_infer(..., enable_empty_final_response=
 > the `async_stream_infer` method as this time, since this feature is only
 > needed for `decoupled` models.
 
-The [decoupled_test.py](https://github.com/triton-inference-server/server/blob/main/qa/L0_decoupled/decoupled_test.py)
-demonstrates an example of using this opt-in arg and programatically identifying
+The [decoupled_test.py](../../qa/L0_decoupled/decoupled_test.py)
+demonstrates an example of using this opt-in arg and programmatically identifying
 when a final response is received through the `"triton_final_response"`
 response parameter.
 
