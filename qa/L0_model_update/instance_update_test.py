@@ -278,6 +278,24 @@ class TestInstanceUpdate(unittest.TestCase):
                                      batching=True)
         self.__unload_model(batching=True)
 
+    # Test passing new instance config via load API
+    def test_load_api_with_config(self):
+        # Load model with 1 instance
+        self.__load_model(1)
+        # Add 1 instance via the load API
+        new_config = "{\"name\": \"" + self.__model_name + "\",\n"
+        new_config += "\"backend\": \"python\",\n"
+        new_config += "\"max_batch_size\": 0,\n"
+        new_config += "\"input\": {\"name\": \"INPUT0\", \"data_type\": \"TYPE_FP32\", \"dims\": -1},\n"
+        new_config += "\"output\": {\"name\": \"OUTPUT0\", \"data_type\": \"TYPE_FP32\", \"dims\": -1},\n"
+        new_config += "\"instance_group\": {\"count\": 2, \"kind\": \"KIND_CPU\"}}"
+        self.__triton.load_model(self.__model_name, config=new_config)
+        self.__check_count("initialize", 2)  # 2 instances in total
+        self.__check_count("finalize", 0)  # no instance is removed
+        self.__infer()
+        # Unload model
+        self.__unload_model()
+
     # Test instance update with an ongoing inference
     def test_update_while_inferencing(self):
         # Load model with 1 instance
