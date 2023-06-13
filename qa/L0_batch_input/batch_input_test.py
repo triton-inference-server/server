@@ -31,6 +31,7 @@ sys.path.append("../common")
 import unittest
 import numpy as np
 import test_util as tu
+import time
 import tritonhttpclient
 from tritonclientutils import InferenceServerException
 
@@ -51,6 +52,7 @@ class BatchInputTest(tu.TestResultCollector):
             url="localhost:8000", concurrency=len(self.inputs))
 
     def test_ragged_output(self):
+        print("test_ragged_output")
         model_name = "ragged_io"
 
         # The model is identity model
@@ -78,6 +80,7 @@ class BatchInputTest(tu.TestResultCollector):
                 for expected_value in expected_value_list
             ]
             for idx in range(len(async_requests)):
+                print("idx: {}".format(idx))
                 # Get the result from the initiated asynchronous inference request.
                 # Note the call will block till the server responds.
                 result = async_requests[idx].get_result()
@@ -92,10 +95,13 @@ class BatchInputTest(tu.TestResultCollector):
             self.assertTrue(False, "unexpected error {}".format(ex))
 
     def test_ragged_input(self):
+        print("test_ragged_input")
         model_name = "ragged_acc_shape"
 
         output_name = 'RAGGED_OUTPUT'
-        outputs = [tritonhttpclient.InferRequestedOutput(output_name)]
+        outputs = [tritonhttpclient.InferRequestedOutput(output_name),
+        tritonhttpclient.InferRequestedOutput("BATCH_OUTPUT"),
+        tritonhttpclient.InferRequestedOutput("BATCH_AND_SIZE_OUTPUT")]
 
         async_requests = []
         try:
@@ -112,10 +118,14 @@ class BatchInputTest(tu.TestResultCollector):
                 expected_value += value_list
             expected_value = np.asarray([expected_value], dtype=np.float32)
             for idx in range(len(async_requests)):
+                print("idx: {}".format(idx))
                 # Get the result from the initiated asynchronous inference request.
                 # Note the call will block till the server responds.
                 result = async_requests[idx].get_result()
-
+                print("BATCH_AND_SIZE_OUTPUT:")
+                print(result.as_numpy("BATCH_AND_SIZE_OUTPUT"))
+                print("BATCH_OUTPUT:")
+                print(result.as_numpy("BATCH_OUTPUT"))
                 # Validate the results by comparing with precomputed values.
                 output_data = result.as_numpy(output_name)
                 self.assertTrue(
@@ -126,6 +136,7 @@ class BatchInputTest(tu.TestResultCollector):
             self.assertTrue(False, "unexpected error {}".format(ex))
 
     def test_element_count(self):
+        print("test_element_count")
         model_name = "ragged_element_count_acc_zero"
 
         output_name = 'BATCH_AND_SIZE_OUTPUT'
@@ -142,6 +153,7 @@ class BatchInputTest(tu.TestResultCollector):
 
             expected_value = np.asarray([[2, 4, 1, 3]], np.float32)
             for idx in range(len(async_requests)):
+                print("idx: {}".format(idx))
                 # Get the result from the initiated asynchronous inference request.
                 # Note the call will block till the server responds.
                 result = async_requests[idx].get_result()
@@ -156,6 +168,7 @@ class BatchInputTest(tu.TestResultCollector):
             self.assertTrue(False, "unexpected error {}".format(ex))
 
     def test_accumulated_element_count(self):
+        print("test_accumulated_element_count")
         model_name = "ragged_acc_shape"
 
         output_name = 'BATCH_AND_SIZE_OUTPUT'
@@ -170,8 +183,10 @@ class BatchInputTest(tu.TestResultCollector):
                                             inputs=inputs,
                                             outputs=outputs))
 
+
             expected_value = np.asarray([[2, 6, 7, 10]], np.float32)
             for idx in range(len(async_requests)):
+                print("idx: {}".format(idx))
                 # Get the result from the initiated asynchronous inference request.
                 # Note the call will block till the server responds.
                 result = async_requests[idx].get_result()
@@ -186,6 +201,7 @@ class BatchInputTest(tu.TestResultCollector):
             self.assertTrue(False, "unexpected error {}".format(ex))
 
     def test_accumulated_element_count_with_zero(self):
+        print("test_accumulated_element_count_with_zero")
         model_name = "ragged_element_count_acc_zero"
 
         output_name = 'BATCH_OUTPUT'
@@ -202,6 +218,7 @@ class BatchInputTest(tu.TestResultCollector):
 
             expected_value = np.asarray([[0, 2, 6, 7, 10]], np.float32)
             for idx in range(len(async_requests)):
+                print("idx: {}".format(idx))
                 # Get the result from the initiated asynchronous inference request.
                 # Note the call will block till the server responds.
                 result = async_requests[idx].get_result()
@@ -216,6 +233,7 @@ class BatchInputTest(tu.TestResultCollector):
             self.assertTrue(False, "unexpected error {}".format(ex))
 
     def test_max_element_count_as_shape(self):
+        print("test_max_element_count_as_shape")
         model_name = "ragged_acc_shape"
 
         output_name = 'BATCH_OUTPUT'
@@ -231,6 +249,7 @@ class BatchInputTest(tu.TestResultCollector):
                                             outputs=outputs))
 
             for idx in range(len(async_requests)):
+                print("idx: {}".format(idx))
                 # Get the result from the initiated asynchronous inference request.
                 # Note the call will block till the server responds.
                 result = async_requests[idx].get_result()
@@ -245,6 +264,7 @@ class BatchInputTest(tu.TestResultCollector):
             self.assertTrue(False, "unexpected error {}".format(ex))
 
     def test_batch_item_shape_flatten(self):
+        print("test_batch_item_shape_flatten")
         # Use 4 set of inputs with shape
         # [1, 4, 1], [1, 1, 2], [1, 1, 2], [1, 2, 2]
         # Note that the test only checks the formation of "BATCH_INPUT" where
@@ -274,6 +294,7 @@ class BatchInputTest(tu.TestResultCollector):
 
             expected_value = np.asarray([[4, 1, 1, 2, 1, 2, 2, 2]], np.float32)
             for idx in range(len(async_requests)):
+                print("idx: {}".format(idx))
                 # Get the result from the initiated asynchronous inference request.
                 # Note the call will block till the server responds.
                 result = async_requests[idx].get_result()
