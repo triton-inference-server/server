@@ -1946,7 +1946,7 @@ TritonParser::ParseTraceLevelOption(std::string arg)
   throw ParseException("invalid value for trace level option: " + arg);
 }
 
-TRITONSERVER_InferenceTraceMode
+InferenceTraceMode
 TritonParser::ParseTraceModeOption(std::string arg)
 {
   std::transform(arg.begin(), arg.end(), arg.begin(), [](unsigned char c) {
@@ -1954,10 +1954,10 @@ TritonParser::ParseTraceModeOption(std::string arg)
   });
 
   if (arg == "triton") {
-    return TRITONSERVER_TRACE_MODE_TRITON;
+    return TRACE_MODE_TRITON;
   }
   if (arg == "opentelemetry") {
-    return TRITONSERVER_TRACE_MODE_OPENTELEMETRY;
+    return TRACE_MODE_OPENTELEMETRY;
   }
 
   throw ParseException(
@@ -2053,7 +2053,7 @@ TritonParser::SetTritonTraceArgs(
 {
   for (const auto& mode_setting :
        lparams
-           .trace_config_map_[std::to_string(TRITONSERVER_TRACE_MODE_TRITON)]) {
+           .trace_config_map_[std::to_string(TRACE_MODE_TRITON)]) {
     if (mode_setting.first == "file") {
       if (trace_filepath_present) {
         std::cerr << "Warning: Overriding deprecated '--trace-file' "
@@ -2099,10 +2099,10 @@ TritonParser::PostProcessTraceArgs(
       lparams, trace_level_present, trace_rate_present, trace_count_present,
       explicit_disable_trace);
 
-  if (lparams.trace_mode_ == TRITONSERVER_TRACE_MODE_OPENTELEMETRY) {
+  if (lparams.trace_mode_ == TRACE_MODE_OPENTELEMETRY) {
     VerifyOpentelemetryTraceArgs(
         trace_filepath_present, trace_log_frequency_present);
-  } else if (lparams.trace_mode_ == TRITONSERVER_TRACE_MODE_TRITON) {
+  } else if (lparams.trace_mode_ == TRACE_MODE_TRITON) {
     SetTritonTraceArgs(
         lparams, trace_filepath_present, trace_log_frequency_present);
   }
