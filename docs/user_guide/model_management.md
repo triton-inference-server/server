@@ -218,6 +218,12 @@ request is received under
 [Model Control Mode EXPLICIT](#model-control-mode-explicit) or change to the
 'config.pbtxt' is detected under
 [Model Control Mode POLL](#model-control-mode-poll).
+  * The new model configuration may also be passed to Triton via the
+[load API](../protocol/extension_model_repository.md#load).
+  * Some text editors create a swap file in the model directory when the
+'config.pbtxt' is modified in place. The swap file is not part of the model
+configuration, so its presence in the model directory may be detected as a new file
+and cause the model to fully reload when only an update is expected.
 
 * If a sequence model is updated with in-flight sequence(s), Triton does not
 guarentee any remaining request(s) from the in-flight sequence(s) will be routed

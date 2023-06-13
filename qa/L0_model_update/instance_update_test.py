@@ -29,6 +29,7 @@ import os
 import random
 import time
 import concurrent.futures
+import json
 import numpy as np
 import tritonclient.grpc as grpcclient
 from tritonclient.utils import InferenceServerException
@@ -277,6 +278,31 @@ class TestInstanceUpdate(unittest.TestCase):
                                      wait_for_finalize=True,
                                      batching=True)
         self.__unload_model(batching=True)
+
+    # Test passing new instance config via load API
+    def test_load_api_with_config(self):
+        # Load model with 1 instance
+        self.__load_model(1)
+        # Get the model config from Triton
+        config = self.__triton.get_model_config(self.__model_name, as_json=True)
+        self.assertIn("config", config)
+        self.assertIsInstance(config["config"], dict)
+        config = config["config"]
+        self.assertIn("instance_group", config)
+        self.assertIsInstance(config["instance_group"], list)
+        self.assertEqual(len(config["instance_group"]), 1)
+        self.assertIn("count", config["instance_group"][0])
+        self.assertIsInstance(config["instance_group"][0]["count"], int)
+        # Add an extra instance into the model config
+        config["instance_group"][0]["count"] += 1
+        self.assertEqual(config["instance_group"][0]["count"], 2)
+        # Load the extra instance via the load API
+        self.__triton.load_model(self.__model_name, config=json.dumps(config))
+        self.__check_count("initialize", 2)  # 2 instances in total
+        self.__check_count("finalize", 0)  # no instance is removed
+        self.__infer()
+        # Unload model
+        self.__unload_model()
 
     # Test instance update with an ongoing inference
     def test_update_while_inferencing(self):
