@@ -35,6 +35,7 @@ export CUDA_VISIBLE_DEVICES=0
 # use of a persistent remote redis server, or similarly use --replicaof arg.
 export TRITON_REDIS_HOST="localhost"
 export TRITON_REDIS_PORT="6379"
+REDIS_LOG="./redis-server.log"
 
 rm -fr *.log
 
@@ -47,7 +48,11 @@ function install_redis() {
 
 function start_redis() {
   # Run redis server in background
-  redis-server redis.conf --daemonize yes --port "${TRITON_REDIS_PORT}"
+  redis-server                    \
+    --daemonize yes               \
+    --port "${TRITON_REDIS_PORT}" \
+    --logfile "${REDIS_LOG}"      \
+    --loglevel debug
 
   # Check redis server is running
   REDIS_PING_RESPONSE=$(redis-cli -h ${TRITON_REDIS_HOST} -p ${TRITON_REDIS_PORT} ping)
