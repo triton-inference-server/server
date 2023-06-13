@@ -1,5 +1,5 @@
 #!/bin/bash
-# Copyright 2019-2022, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright 2019-2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -228,6 +228,13 @@ for i in \
         RET=1
     fi
 done
+
+# Test with json input and output data
+$SIMPLE_STRING_INFER_CLIENT --json-input-data --json-output-data >> ${CLIENT_LOG}.c++.json 2>&1
+if [ $? -ne 0 ]; then
+    cat ${CLIENT_LOG}.c++.json
+    RET=1
+fi
 
 # Test while reusing the InferInput and InferRequestedOutput objects
 $SIMPLE_REUSE_INFER_OBJECTS_CLIENT -v >> ${CLIENT_LOG}.c++.reuse 2>&1
