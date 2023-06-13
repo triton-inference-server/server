@@ -214,7 +214,7 @@ class BatcherTest(tu.TestResultCollector):
                 model_name, "1")
             self.assertEqual(len(stats.model_stats), 1, "expect 1 model stats")
             actual_exec_cnt = stats.model_stats[0].execution_count
-            if actual_exec_cnt == exec_count:
+            if actual_exec_cnt in exec_count:
                 break
             print("WARNING: expect {} executions, got {} (attempt {})".format(
                 exec_count, actual_exec_cnt, i))
@@ -254,7 +254,7 @@ class BatcherTest(tu.TestResultCollector):
         self.assertIn(
             actual_exec_cnt, exec_count,
             "expected model-exec-count {}, got {}".format(
-                request_cnt, actual_exec_cnt))
+                exec_count, actual_exec_cnt))
 
         actual_infer_cnt = stats.model_stats[0].inference_count
         self.assertEqual(
