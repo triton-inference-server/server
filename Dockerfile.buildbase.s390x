@@ -1,0 +1,41 @@
+
+ARG TRITON_VERSION=2.36.0dev
+ARG TRITON_CONTAINER_VERSION=23.07dev
+ARG BASE_IMAGE=s390x/ubuntu:22.04
+
+FROM ${BASE_IMAGE}
+
+ARG TRITON_VERSION
+ARG TRITON_CONTAINER_VERSION
+
+# Ensure apt-get won't prompt for selecting options
+ENV DEBIAN_FRONTEND=noninteractive
+
+# libcurl4-openSSL-dev is needed for GCS
+# python3-dev is needed by Torchvision
+# python3-pip and libarchive-dev is needed by python backend
+# libxml2-dev is needed for Azure Storage
+# scons is needed for armnn_tflite backend build dep
+RUN apt-get update &&     apt-get install -y --no-install-recommends             ca-certificates             autoconf             automake             build-essential             docker.io             git             gperf             libre2-dev             libssl-dev             libtool             libcurl4-openssl-dev             libb64-dev             libgoogle-perftools-dev             patchelf             python3-dev             python3-pip             python3-setuptools             rapidjson-dev             scons             software-properties-common             pkg-config             unzip             wget             zlib1g-dev             libarchive-dev             libxml2-dev \ 
+            libnuma-dev &&     rm -rf /var/lib/apt/lists/*
+
+RUN pip3 install --upgrade pip &&     pip3 install --upgrade wheel setuptools docker
+
+# Install boost version >= 1.78 for boost::span
+# Current libboost-dev apt packages are < 1.78, so install from tar.gz
+RUN wget -O /tmp/boost.tar.gz         https://boostorg.jfrog.io/artifactory/main/release/1.80.0/source/boost_1_80_0.tar.gz &&     (cd /tmp && tar xzf boost.tar.gz) &&     mv /tmp/boost_1_80_0/boost /usr/include/boost
+
+# Server build requires recent version of CMake (FetchContent required)
+RUN apt update && apt install -y gpg wget &&     wget -O - https://apt.kitware.com/keys/kitware-archive-latest.asc 2>/dev/null |         gpg --dearmor - |          tee /usr/share/keyrings/kitware-archive-keyring.gpg >/dev/null &&     . /etc/os-release &&     echo "deb [signed-by=/usr/share/keyrings/kitware-archive-keyring.gpg] https://apt.kitware.com/ubuntu/ $UBUNTU_CODENAME main" |     tee /etc/apt/sources.list.d/kitware.list >/dev/null &&     apt-get update &&     apt-get install -y --no-install-recommends cmake cmake-data 
+
+ENV TRITON_SERVER_VERSION ${TRITON_VERSION}
+ENV NVIDIA_TRITON_SERVER_VERSION ${TRITON_CONTAINER_VERSION}
+
+WORKDIR /workspace
+RUN rm -fr *
+COPY . .
+ENTRYPOINT []
+
+RUN mkdir -p /opt/
+#RUN wget "https://repo.anaconda.com/miniconda/Miniconda3-py310_23.1.0-1-Linux-s390x.sh" -O miniconda.sh -q &&     echo "80d6c306b015e1e3b01ea59dc66c676a81fa30279bc2da1f180a7ef7b2191d6e" "miniconda.sh" > shasum &&     sha256sum -c ./shasum &&     sh miniconda.sh -b -p /opt/conda &&     rm miniconda.sh shasum &&     find /opt/conda/ -follow -type f -name '*.a' -delete &&     find /opt/conda/ -follow -type f -name '*.js.map' -delete &&     /opt/conda/bin/conda clean -afy
+ENV PATH /opt/conda/bin:${PATH}
