@@ -172,7 +172,9 @@ class BatchInputTest(tu.TestResultCollector):
         model_name = "ragged_acc_shape"
 
         output_name = 'BATCH_AND_SIZE_OUTPUT'
-        outputs = [tritonhttpclient.InferRequestedOutput(output_name)]
+        outputs = [tritonhttpclient.InferRequestedOutput(output_name),
+        tritonhttpclient.InferRequestedOutput("RAGGED_OUTPUT"),
+        tritonhttpclient.InferRequestedOutput("BATCH_OUTPUT")]
 
         async_requests = []
         try:
@@ -190,6 +192,10 @@ class BatchInputTest(tu.TestResultCollector):
                 # Get the result from the initiated asynchronous inference request.
                 # Note the call will block till the server responds.
                 result = async_requests[idx].get_result()
+                print("RAGGED_OUTPUT:")
+                print(result.as_numpy("RAGGED_OUTPUT"))
+                print("BATCH_OUTPUT:")
+                print(result.as_numpy("BATCH_OUTPUT"))
 
                 # Validate the results by comparing with precomputed values.
                 output_data = result.as_numpy(output_name)
@@ -205,7 +211,9 @@ class BatchInputTest(tu.TestResultCollector):
         model_name = "ragged_element_count_acc_zero"
 
         output_name = 'BATCH_OUTPUT'
-        outputs = [tritonhttpclient.InferRequestedOutput(output_name)]
+        outputs = [tritonhttpclient.InferRequestedOutput(output_name),
+        tritonhttpclient.InferRequestedOutput("RAGGED_OUTPUT"),
+        tritonhttpclient.InferRequestedOutput("BATCH_AND_SIZE_OUTPUT")]
 
         async_requests = []
         try:
@@ -222,6 +230,10 @@ class BatchInputTest(tu.TestResultCollector):
                 # Get the result from the initiated asynchronous inference request.
                 # Note the call will block till the server responds.
                 result = async_requests[idx].get_result()
+                print("RAGGED_OUTPUT:")
+                print(result.as_numpy("RAGGED_OUTPUT"))
+                print("BATCH_AND_SIZE_OUTPUT:")
+                print(result.as_numpy("BATCH_AND_SIZE_OUTPUT"))
 
                 # Validate the results by comparing with precomputed values.
                 output_data = result.as_numpy(output_name)
