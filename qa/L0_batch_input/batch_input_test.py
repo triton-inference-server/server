@@ -30,8 +30,11 @@ sys.path.append("../common")
 
 import unittest
 import numpy as np
+from functools import partial
+import queue
 import test_util as tu
 import time
+import tritonclient.grpc as grpcclient
 import tritonhttpclient
 from tritonclientutils import InferenceServerException
 
@@ -41,6 +44,8 @@ class BatchInputTest(tu.TestResultCollector):
     def setUp(self):
         self.dtype_ = np.float32
         self.inputs = []
+        self.grpc_inputs = []
+        self.grpc = grpcclient.InferenceServerClient(url='localhost:8001')
         # 4 set of inputs with shape [2], [4], [1], [3]
         for value in [2, 4, 1, 3]:
             self.inputs.append([
@@ -48,8 +53,21 @@ class BatchInputTest(tu.TestResultCollector):
             ])
             self.inputs[-1][0].set_data_from_numpy(
                 np.full([1, value], value, np.float32))
+            self.grpc_inputs.append([
+                grpcclient.InferInput('RAGGED_INPUT', [1, value], "FP32")
+            ])
+            self.grpc_inputs[-1][0].set_data_from_numpy(
+                np.full([1, value], value, np.float32))
         self.client = tritonhttpclient.InferenceServerClient(
             url="localhost:8000", concurrency=len(self.inputs))
+
+        def callback(user_data, result, error):
+            if error:
+                user_data.put(error)
+            else:
+                user_data.put(result)
+
+        self.grpc_callback = callback
 
     def test_ragged_output(self):
         print("test_ragged_output")
@@ -171,19 +189,23 @@ class BatchInputTest(tu.TestResultCollector):
         print("test_accumulated_element_count")
         model_name = "ragged_acc_shape"
 
+        user_data = queue.Queue()
+        self.grpc.start_stream(callback=partial(self.grpc_callback, user_data))
+
         output_name = 'BATCH_AND_SIZE_OUTPUT'
-        outputs = [tritonhttpclient.InferRequestedOutput(output_name),
-        tritonhttpclient.InferRequestedOutput("RAGGED_OUTPUT"),
-        tritonhttpclient.InferRequestedOutput("BATCH_OUTPUT")]
+        outputs = [grpcclient.InferRequestedOutput(output_name),
+        grpcclient.InferRequestedOutput("RAGGED_OUTPUT"),
+        grpcclient.InferRequestedOutput("BATCH_OUTPUT")]
 
         async_requests = []
         try:
-            for inputs in self.inputs:
+            for inputs in self.grpc_inputs:
                 # Asynchronous inference call.
-                async_requests.append(
-                    self.client.async_infer(model_name=model_name,
+                self.grpc.async_infer(model_name=model_name,
                                             inputs=inputs,
-                                            outputs=outputs))
+                                            outputs=outputs,
+                                            callback=partial(self.grpc_callback,
+                                                   user_data))
 
 
             expected_value = np.asarray([[2, 6, 7, 10]], np.float32)
@@ -191,7 +213,7 @@ class BatchInputTest(tu.TestResultCollector):
                 print("idx: {}".format(idx))
                 # Get the result from the initiated asynchronous inference request.
                 # Note the call will block till the server responds.
-                result = async_requests[idx].get_result()
+                result = user_data.get()
                 print("RAGGED_OUTPUT:")
                 print(result.as_numpy("RAGGED_OUTPUT"))
                 print("BATCH_OUTPUT:")
@@ -205,6 +227,7 @@ class BatchInputTest(tu.TestResultCollector):
                         idx, expected_value, output_data))
         except InferenceServerException as ex:
             self.assertTrue(False, "unexpected error {}".format(ex))
+        self.grpc.stop_stream()
 
     def test_accumulated_element_count_with_zero(self):
         print("test_accumulated_element_count_with_zero")
