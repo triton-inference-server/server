@@ -35,31 +35,23 @@ import queue
 import test_util as tu
 import time
 import tritonclient.grpc as grpcclient
-import tritonhttpclient
-from tritonclientutils import InferenceServerException
+import tritonclient.http as httpclient
+from tritonclient.utils import InferenceServerException
 
 
 class BatchInputTest(tu.TestResultCollector):
 
     def setUp(self):
         self.dtype_ = np.float32
-        self.inputs = []
-        self.grpc_inputs = []
-        self.grpc = grpcclient.InferenceServerClient(url='localhost:8001')
+        self.grpc_inputs = [] #replace with inputs
         # 4 set of inputs with shape [2], [4], [1], [3]
         for value in [2, 4, 1, 3]:
-            self.inputs.append([
-                tritonhttpclient.InferInput('RAGGED_INPUT', [1, value], "FP32")
-            ])
-            self.inputs[-1][0].set_data_from_numpy(
-                np.full([1, value], value, np.float32))
             self.grpc_inputs.append([
                 grpcclient.InferInput('RAGGED_INPUT', [1, value], "FP32")
             ])
             self.grpc_inputs[-1][0].set_data_from_numpy(
                 np.full([1, value], value, np.float32))
-        self.client = tritonhttpclient.InferenceServerClient(
-            url="localhost:8000", concurrency=len(self.inputs))
+        self.grpc = grpcclient.InferenceServerClient(url='localhost:8001') #Replace with client
 
         def callback(user_data, result, error):
             if error:
@@ -74,23 +66,28 @@ class BatchInputTest(tu.TestResultCollector):
         model_name = "ragged_io"
 
         # The model is identity model
-        self.inputs = []
+        self.grpc_inputs = []
         for value in [2, 4, 1, 3]:
-            self.inputs.append(
-                [tritonhttpclient.InferInput('INPUT0', [1, value], "FP32")])
-            self.inputs[-1][0].set_data_from_numpy(
+            self.grpc_inputs.append(
+                [grpcclient.InferInput('INPUT0', [1, value], "FP32")])
+            self.grpc_inputs[-1][0].set_data_from_numpy(
                 np.full([1, value], value, np.float32))
+
+        user_data = queue.Queue()
+        self.grpc.start_stream(callback=partial(self.grpc_callback, user_data))
+
         output_name = 'OUTPUT0'
-        outputs = [tritonhttpclient.InferRequestedOutput(output_name)]
+        outputs = [grpcclient.InferRequestedOutput(output_name)]
 
         async_requests = []
         try:
-            for inputs in self.inputs:
+            for inputs in self.grpc_inputs:
                 # Asynchronous inference call.
-                async_requests.append(
-                    self.client.async_infer(model_name=model_name,
+                self.grpc.async_infer(model_name=model_name,
                                             inputs=inputs,
-                                            outputs=outputs))
+                                            outputs=outputs,
+                                            callback=partial(self.grpc_callback,
+                                                   user_data))
 
             expected_value_list = [[v] * v for v in [2, 4, 1, 3]]
             expected_value_list = [
@@ -101,7 +98,7 @@ class BatchInputTest(tu.TestResultCollector):
                 print("idx: {}".format(idx))
                 # Get the result from the initiated asynchronous inference request.
                 # Note the call will block till the server responds.
-                result = async_requests[idx].get_result()
+                result = user_data.get()
 
                 # Validate the results by comparing with precomputed values.
                 output_data = result.as_numpy(output_name)
@@ -111,24 +108,28 @@ class BatchInputTest(tu.TestResultCollector):
                         idx, expected_value_list[idx], output_data))
         except InferenceServerException as ex:
             self.assertTrue(False, "unexpected error {}".format(ex))
+        self.grpc.stop_stream()
 
     def test_ragged_input(self):
         print("test_ragged_input")
         model_name = "ragged_acc_shape"
+        user_data = queue.Queue()
+        self.grpc.start_stream(callback=partial(self.grpc_callback, user_data))
 
         output_name = 'RAGGED_OUTPUT'
-        outputs = [tritonhttpclient.InferRequestedOutput(output_name),
-        tritonhttpclient.InferRequestedOutput("BATCH_OUTPUT"),
-        tritonhttpclient.InferRequestedOutput("BATCH_AND_SIZE_OUTPUT")]
+        outputs = [grpcclient.InferRequestedOutput(output_name),
+        grpcclient.InferRequestedOutput("BATCH_OUTPUT"),
+        grpcclient.InferRequestedOutput("BATCH_AND_SIZE_OUTPUT")]
 
         async_requests = []
         try:
-            for inputs in self.inputs:
+            for inputs in self.grpc_inputs:
                 # Asynchronous inference call.
-                async_requests.append(
-                    self.client.async_infer(model_name=model_name,
+                self.grpc.async_infer(model_name=model_name,
                                             inputs=inputs,
-                                            outputs=outputs))
+                                            outputs=outputs,
+                                            callback=partial(self.grpc_callback,
+                                                   user_data))
 
             value_lists = [[v] * v for v in [2, 4, 1, 3]]
             expected_value = []
@@ -139,7 +140,7 @@ class BatchInputTest(tu.TestResultCollector):
                 print("idx: {}".format(idx))
                 # Get the result from the initiated asynchronous inference request.
                 # Note the call will block till the server responds.
-                result = async_requests[idx].get_result()
+                result = user_data.get()
                 print("BATCH_AND_SIZE_OUTPUT:")
                 print(result.as_numpy("BATCH_AND_SIZE_OUTPUT"))
                 print("BATCH_OUTPUT:")
@@ -152,29 +153,33 @@ class BatchInputTest(tu.TestResultCollector):
                         idx, expected_value, output_data))
         except InferenceServerException as ex:
             self.assertTrue(False, "unexpected error {}".format(ex))
+        self.grpc.stop_stream()
 
     def test_element_count(self):
         print("test_element_count")
         model_name = "ragged_element_count_acc_zero"
+        user_data = queue.Queue()
+        self.grpc.start_stream(callback=partial(self.grpc_callback, user_data))
 
         output_name = 'BATCH_AND_SIZE_OUTPUT'
-        outputs = [tritonhttpclient.InferRequestedOutput(output_name)]
+        outputs = [grpcclient.InferRequestedOutput(output_name)]
 
         async_requests = []
         try:
-            for inputs in self.inputs:
+            for inputs in self.grpc_inputs:
                 # Asynchronous inference call.
-                async_requests.append(
-                    self.client.async_infer(model_name=model_name,
+                self.grpc.async_infer(model_name=model_name,
                                             inputs=inputs,
-                                            outputs=outputs))
+                                            outputs=outputs,
+                                            callback=partial(self.grpc_callback,
+                                                   user_data))
 
             expected_value = np.asarray([[2, 4, 1, 3]], np.float32)
             for idx in range(len(async_requests)):
                 print("idx: {}".format(idx))
                 # Get the result from the initiated asynchronous inference request.
                 # Note the call will block till the server responds.
-                result = async_requests[idx].get_result()
+                result = user_data.get()
 
                 # Validate the results by comparing with precomputed values.
                 output_data = result.as_numpy(output_name)
@@ -184,11 +189,11 @@ class BatchInputTest(tu.TestResultCollector):
                         idx, expected_value, output_data))
         except InferenceServerException as ex:
             self.assertTrue(False, "unexpected error {}".format(ex))
+        self.grpc.stop_stream()
 
     def test_accumulated_element_count(self):
         print("test_accumulated_element_count")
         model_name = "ragged_acc_shape"
-
         user_data = queue.Queue()
         self.grpc.start_stream(callback=partial(self.grpc_callback, user_data))
 
@@ -232,27 +237,30 @@ class BatchInputTest(tu.TestResultCollector):
     def test_accumulated_element_count_with_zero(self):
         print("test_accumulated_element_count_with_zero")
         model_name = "ragged_element_count_acc_zero"
+        user_data = queue.Queue()
+        self.grpc.start_stream(callback=partial(self.grpc_callback, user_data))
 
         output_name = 'BATCH_OUTPUT'
-        outputs = [tritonhttpclient.InferRequestedOutput(output_name),
-        tritonhttpclient.InferRequestedOutput("RAGGED_OUTPUT"),
-        tritonhttpclient.InferRequestedOutput("BATCH_AND_SIZE_OUTPUT")]
+        outputs = [grpcclient.InferRequestedOutput(output_name),
+        grpcclient.InferRequestedOutput("RAGGED_OUTPUT"),
+        grpcclient.InferRequestedOutput("BATCH_AND_SIZE_OUTPUT")]
 
         async_requests = []
         try:
-            for inputs in self.inputs:
+            for inputs in self.grpc_inputs:
                 # Asynchronous inference call.
-                async_requests.append(
-                    self.client.async_infer(model_name=model_name,
+                self.grpc.async_infer(model_name=model_name,
                                             inputs=inputs,
-                                            outputs=outputs))
+                                            outputs=outputs,
+                                            callback=partial(self.grpc_callback,
+                                                   user_data))
 
             expected_value = np.asarray([[0, 2, 6, 7, 10]], np.float32)
             for idx in range(len(async_requests)):
                 print("idx: {}".format(idx))
                 # Get the result from the initiated asynchronous inference request.
                 # Note the call will block till the server responds.
-                result = async_requests[idx].get_result()
+                result = user_data.get()
                 print("RAGGED_OUTPUT:")
                 print(result.as_numpy("RAGGED_OUTPUT"))
                 print("BATCH_AND_SIZE_OUTPUT:")
@@ -266,28 +274,32 @@ class BatchInputTest(tu.TestResultCollector):
                         idx, expected_value, output_data))
         except InferenceServerException as ex:
             self.assertTrue(False, "unexpected error {}".format(ex))
+        self.grpc.stop_stream()
 
     def test_max_element_count_as_shape(self):
         print("test_max_element_count_as_shape")
         model_name = "ragged_acc_shape"
+        user_data = queue.Queue()
+        self.grpc.start_stream(callback=partial(self.grpc_callback, user_data))
 
         output_name = 'BATCH_OUTPUT'
-        outputs = [tritonhttpclient.InferRequestedOutput(output_name)]
+        outputs = [grpcclient.InferRequestedOutput(output_name)]
 
         async_requests = []
         try:
-            for inputs in self.inputs:
+            for inputs in self.grpc_inputs:
                 # Asynchronous inference call.
-                async_requests.append(
-                    self.client.async_infer(model_name=model_name,
+                self.grpc.async_infer(model_name=model_name,
                                             inputs=inputs,
-                                            outputs=outputs))
+                                            outputs=outputs,
+                                            callback=partial(self.grpc_callback,
+                                                   user_data))
 
             for idx in range(len(async_requests)):
                 print("idx: {}".format(idx))
                 # Get the result from the initiated asynchronous inference request.
                 # Note the call will block till the server responds.
-                result = async_requests[idx].get_result()
+                result = user_data.get()
 
                 # Validate the results by comparing with precomputed values.
                 output_data = result.as_numpy(output_name)
@@ -297,6 +309,7 @@ class BatchInputTest(tu.TestResultCollector):
                     .format(idx, 4, output_data.shape))
         except InferenceServerException as ex:
             self.assertTrue(False, "unexpected error {}".format(ex))
+        self.grpc.stop_stream()
 
     def test_batch_item_shape_flatten(self):
         print("test_batch_item_shape_flatten")
@@ -304,28 +317,27 @@ class BatchInputTest(tu.TestResultCollector):
         # [1, 4, 1], [1, 1, 2], [1, 1, 2], [1, 2, 2]
         # Note that the test only checks the formation of "BATCH_INPUT" where
         # the value of "RAGGED_INPUT" is irrelevant, only the shape matters
-        self.inputs = []
+        inputs = []
         for value in [[1, 4, 1], [1, 1, 2], [1, 1, 2], [1, 2, 2]]:
-            self.inputs.append(
-                [tritonhttpclient.InferInput('RAGGED_INPUT', value, "FP32")])
-            self.inputs[-1][0].set_data_from_numpy(
+            inputs.append(
+                [httpclient.InferInput('RAGGED_INPUT', value, "FP32")])
+            inputs[-1][0].set_data_from_numpy(
                 np.full(value, value[0], np.float32))
-        self.client = tritonhttpclient.InferenceServerClient(
-            url="localhost:8000", concurrency=len(self.inputs))
+        client = httpclient.InferenceServerClient(url="localhost:8000",
+                                                        concurrency=len(inputs))
 
         model_name = "batch_item_flatten"
 
         output_name = 'BATCH_OUTPUT'
-        outputs = [tritonhttpclient.InferRequestedOutput(output_name)]
+        outputs = [httpclient.InferRequestedOutput(output_name)]
 
         async_requests = []
         try:
-            for inputs in self.inputs:
+            for request_inputs in inputs:
                 # Asynchronous inference call.
-                async_requests.append(
-                    self.client.async_infer(model_name=model_name,
-                                            inputs=inputs,
-                                            outputs=outputs))
+                client.async_infer(model_name=model_name,
+                                            inputs=request_inputs,
+                                            outputs=outputs)
 
             expected_value = np.asarray([[4, 1, 1, 2, 1, 2, 2, 2]], np.float32)
             for idx in range(len(async_requests)):
@@ -350,10 +362,10 @@ class BatchInputTest(tu.TestResultCollector):
         inputs = []
         for value in [[2, 1, 2], [1, 1, 2], [1, 2, 2]]:
             inputs.append(
-                [tritonhttpclient.InferInput('RAGGED_INPUT', value, "FP32")])
+                [httpclient.InferInput('RAGGED_INPUT', value, "FP32")])
             inputs[-1][0].set_data_from_numpy(
                 np.full(value, value[0], np.float32))
-        client = tritonhttpclient.InferenceServerClient(url="localhost:8000",
+        client = httpclient.InferenceServerClient(url="localhost:8000",
                                                         concurrency=len(inputs))
 
         expected_outputs = [
@@ -365,7 +377,7 @@ class BatchInputTest(tu.TestResultCollector):
         model_name = "batch_item"
 
         output_name = 'BATCH_OUTPUT'
-        outputs = [tritonhttpclient.InferRequestedOutput(output_name)]
+        outputs = [httpclient.InferRequestedOutput(output_name)]
 
         async_requests = []
         try:
@@ -373,8 +385,8 @@ class BatchInputTest(tu.TestResultCollector):
                 # Asynchronous inference call.
                 async_requests.append(
                     client.async_infer(model_name=model_name,
-                                       inputs=request_inputs,
-                                       outputs=outputs))
+                                            inputs=request_inputs,
+                                            outputs=outputs))
 
             for idx in range(len(async_requests)):
                 # Get the result from the initiated asynchronous inference request.
