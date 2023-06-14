@@ -291,11 +291,8 @@ ReadDataFromJsonHelper(
     triton::common::TritonJson::Value el;
     RETURN_IF_ERR(tensor_data.At(i, &el));
 
-    // Recurse if not last dimension...
-    TRITONSERVER_Error* assert_err =
-        el.AssertType(triton::common::TritonJson::ValueType::ARRAY);
-    if (assert_err == nullptr) {
-      RETURN_IF_ERR(
+    if (el.IsArray()) {
+          RETURN_IF_ERR(
           ReadDataFromJsonHelper(base, dtype, el, counter, expected_cnt));
     } else {
       // Check if writing to 'serialized' is overrunning the expected byte_size
@@ -409,17 +406,17 @@ ReadDataFromJsonHelper(
                 TRITONSERVER_ERROR_INTERNAL,
                 "Shape does not match true shape of 'data' field");
           }
-          memcpy(
-              base + *counter, reinterpret_cast<char*>(&len), sizeof(uint32_t));
-          std::copy(cstr, cstr + len, base + *counter + sizeof(uint32_t));
-          *counter += len + sizeof(uint32_t);
+	  *((uint32_t*)(base + *counter)) = (uint32_t) len;
+	  *counter += sizeof(uint32_t);
+          std::copy(cstr, cstr + len, base + *counter);
+          *counter += len;
           break;
         }
         default:
           break;
       }
     }
-    TRITONSERVER_ErrorDelete(assert_err);
+    //    TRITONSERVER_ErrorDelete(assert_err);
   }
 
   return nullptr;  // success
