@@ -73,6 +73,22 @@ fi
 if [ -n "$SAGEMAKER_SAFE_PORT_RANGE" ]; then
     SAGEMAKER_ARGS="${SAGEMAKER_ARGS} --sagemaker-safe-port-range=${SAGEMAKER_SAFE_PORT_RANGE}"
 fi
+if [ -n $SAGEMAKER_TRITON_ALLOW_GRPC ]; then
+    SAGEMAKER_ARGS="${SAGEMAKER_ARGS} --allow-grpc=${SAGEMAKER_TRITON_ALLOW_GRPC}"
+else
+    SAGEMAKER_ARGS="${SAGEMAKER_ARGS} --allow-grpc=false"
+fi
+if [ -n $SAGEMAKER_TRITON_ALLOW_METRICS ]; then
+    SAGEMAKER_ARGS="${SAGEMAKER_ARGS} --allow-metrics=${SAGEMAKER_TRITON_ALLOW_METRICS}"
+else
+    SAGEMAKER_ARGS="${SAGEMAKER_ARGS} --allow-metrics=false"
+fi
+if [ -n "$SAGEMAKER_TRITON_METRICS_PORT" ]; then
+    SAGEMAKER_ARGS="${SAGEMAKER_ARGS} --metrics-port=${SAGEMAKER_TRITON_METRICS_PORT}"
+fi
+if [ -n "$SAGEMAKER_TRITON_GRPC_PORT" ]; then
+    SAGEMAKER_ARGS="${SAGEMAKER_ARGS} --grpc-port=${SAGEMAKER_TRITON_GRPC_PORT}"
+fi
 if [ -n "$SAGEMAKER_TRITON_BUFFER_MANAGER_THREAD_COUNT" ]; then
     SAGEMAKER_ARGS="${SAGEMAKER_ARGS} --buffer-manager-thread-count=${SAGEMAKER_TRITON_BUFFER_MANAGER_THREAD_COUNT}"
 fi
@@ -150,4 +166,4 @@ elif [ "${is_mme_mode}" = false ]; then
     SAGEMAKER_ARGS="${SAGEMAKER_ARGS} --load-model=${SAGEMAKER_TRITON_DEFAULT_MODEL_NAME}"
 fi
 
-tritonserver --allow-sagemaker=true --allow-grpc=true --allow-http=false --allow-metrics=true --model-control-mode=explicit $SAGEMAKER_ARGS
+tritonserver --allow-sagemaker=true --allow-http=false --model-control-mode=explicit $SAGEMAKER_ARGS
