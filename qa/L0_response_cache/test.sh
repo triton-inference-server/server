@@ -35,6 +35,7 @@ export CUDA_VISIBLE_DEVICES=0
 # use of a persistent remote redis server, or similarly use --replicaof arg.
 export TRITON_REDIS_HOST="localhost"
 export TRITON_REDIS_PORT="6379"
+REDIS_LOG="./redis-server.unit_tests.log"
 
 rm -fr *.log
 
@@ -47,7 +48,11 @@ function install_redis() {
 
 function start_redis() {
   # Run redis server in background
-  redis-server --daemonize yes --port "${TRITON_REDIS_PORT}"
+  redis-server                    \
+    --daemonize yes               \
+    --port "${TRITON_REDIS_PORT}" \
+    --logfile "${REDIS_LOG}"      \
+    --loglevel debug
 
   # Check redis server is running
   REDIS_PING_RESPONSE=$(redis-cli -h ${TRITON_REDIS_HOST} -p ${TRITON_REDIS_PORT} ping)
@@ -98,6 +103,7 @@ if [ $? -ne 0 ]; then
     echo -e "\n***\n*** Response Cache Unit Test Failed\n***"
     RET=1
 fi
+stop_redis
 set -e
 
 # SERVER TESTS
@@ -191,6 +197,8 @@ check_server_expected_failure "incompatible flags"
 
 ## Redis Cache CLI tests
 REDIS_ENDPOINT="--cache-config redis,host=${TRITON_REDIS_HOST} --cache-config redis,port=${TRITON_REDIS_PORT}"
+REDIS_LOG="./redis-server.cli_tests.log"
+start_redis
 
 # Test simple redis cache config succeeds
 SERVER_ARGS="--model-repository=${MODEL_DIR} ${REDIS_ENDPOINT} ${EXTRA_ARGS}"
