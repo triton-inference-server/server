@@ -123,5 +123,5 @@ An inference request is considered complete when a response containing the
 The [decoupled_test.py](../../qa/L0_decoupled/decoupled_test.py)
 demonstrates an example of opting-in through the streaming GRPC
 Python client API and programmatically identifying when a final response
-is received through the `"triton_final_response"` response parameter:
+is received through the `"triton_final_response"` response parameter.
 
