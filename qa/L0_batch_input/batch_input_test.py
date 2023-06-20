@@ -78,7 +78,6 @@ class BatchInputTest(tu.TestResultCollector):
 
         async_requests = []
         try:
-            # Use
             for input in test_inputs:
                 # Asynchronous inference call.
                 async_requests.append(
