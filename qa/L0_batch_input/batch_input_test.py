@@ -62,10 +62,11 @@ class BatchInputTest(tu.TestResultCollector):
         model_name = "ragged_io"
 
         # The model is identity model
-        inputs = []
+        test_inputs = []
         for value in [2, 4, 1, 3]:
-            inputs.append([grpcclient.InferInput('INPUT0', [1, value], "FP32")])
-            inputs[-1][0].set_data_from_numpy(
+            test_inputs.append(
+                [grpcclient.InferInput('INPUT0', [1, value], "FP32")])
+            test_inputs[-1][0].set_data_from_numpy(
                 np.full([1, value], value, np.float32))
 
         user_data = queue.Queue()
@@ -77,11 +78,12 @@ class BatchInputTest(tu.TestResultCollector):
 
         async_requests = []
         try:
-            for inputs in inputs:
+            # Use
+            for input in test_inputs:
                 # Asynchronous inference call.
                 async_requests.append(
                     self.client.async_stream_infer(model_name=model_name,
-                                                   inputs=inputs,
+                                                   inputs=input,
                                                    outputs=outputs))
 
             expected_value_list = [[v] * v for v in [2, 4, 1, 3]]
@@ -115,11 +117,11 @@ class BatchInputTest(tu.TestResultCollector):
 
         async_requests = []
         try:
-            for inputs in self.inputs:
+            for input in self.inputs:
                 # Asynchronous inference call.
                 async_requests.append(
                     self.client.async_stream_infer(model_name=model_name,
-                                                   inputs=inputs,
+                                                   inputs=input,
                                                    outputs=outputs))
 
             value_lists = [[v] * v for v in [2, 4, 1, 3]]
@@ -152,11 +154,11 @@ class BatchInputTest(tu.TestResultCollector):
 
         async_requests = []
         try:
-            for inputs in self.inputs:
+            for input in self.inputs:
                 # Asynchronous inference call.
                 async_requests.append(
                     self.client.async_stream_infer(model_name=model_name,
-                                                   inputs=inputs,
+                                                   inputs=input,
                                                    outputs=outputs))
 
             expected_value = np.asarray([[2, 4, 1, 3]], np.float32)
@@ -186,11 +188,11 @@ class BatchInputTest(tu.TestResultCollector):
 
         async_requests = []
         try:
-            for inputs in self.inputs:
+            for input in self.inputs:
                 # Asynchronous inference call.
                 async_requests.append(
                     self.client.async_stream_infer(model_name=model_name,
-                                                   inputs=inputs,
+                                                   inputs=input,
                                                    outputs=outputs))
 
             expected_value = np.asarray([[2, 6, 7, 10]], np.float32)
@@ -220,11 +222,11 @@ class BatchInputTest(tu.TestResultCollector):
 
         async_requests = []
         try:
-            for inputs in self.inputs:
+            for input in self.inputs:
                 # Asynchronous inference call.
                 async_requests.append(
                     self.client.async_stream_infer(model_name=model_name,
-                                                   inputs=inputs,
+                                                   inputs=input,
                                                    outputs=outputs))
 
             expected_value = np.asarray([[0, 2, 6, 7, 10]], np.float32)
@@ -254,11 +256,11 @@ class BatchInputTest(tu.TestResultCollector):
 
         async_requests = []
         try:
-            for inputs in self.inputs:
+            for input in self.inputs:
                 # Asynchronous inference call.
                 async_requests.append(
                     self.client.async_stream_infer(model_name=model_name,
-                                                   inputs=inputs,
+                                                   inputs=input,
                                                    outputs=outputs))
 
             for idx in range(len(async_requests)):
@@ -281,11 +283,11 @@ class BatchInputTest(tu.TestResultCollector):
         # [1, 4, 1], [1, 1, 2], [1, 1, 2], [1, 2, 2]
         # Note that the test only checks the formation of "BATCH_INPUT" where
         # the value of "RAGGED_INPUT" is irrelevant, only the shape matters
-        inputs = []
+        test_inputs = []
         for value in [[1, 4, 1], [1, 1, 2], [1, 1, 2], [1, 2, 2]]:
-            inputs.append(
+            test_inputs.append(
                 [grpcclient.InferInput('RAGGED_INPUT', value, "FP32")])
-            inputs[-1][0].set_data_from_numpy(
+            test_inputs[-1][0].set_data_from_numpy(
                 np.full(value, value[0], np.float32))
 
         model_name = "batch_item_flatten"
@@ -298,11 +300,11 @@ class BatchInputTest(tu.TestResultCollector):
 
         async_requests = []
         try:
-            for inputs in inputs:
+            for input in test_inputs:
                 # Asynchronous inference call.
                 async_requests.append(
                     self.client.async_stream_infer(model_name=model_name,
-                                                   inputs=inputs,
+                                                   inputs=input,
                                                    outputs=outputs))
 
             expected_value = np.asarray([[4, 1, 1, 2, 1, 2, 2, 2]], np.float32)
@@ -325,11 +327,11 @@ class BatchInputTest(tu.TestResultCollector):
         # Use 3 set of inputs with shape [2, 1, 2], [1, 1, 2], [1, 2, 2]
         # Note that the test only checks the formation of "BATCH_INPUT" where
         # the value of "RAGGED_INPUT" is irrelevant, only the shape matters
-        inputs = []
+        test_inputs = []
         for value in [[2, 1, 2], [1, 1, 2], [1, 2, 2]]:
-            inputs.append(
+            test_inputs.append(
                 [grpcclient.InferInput('RAGGED_INPUT', value, "FP32")])
-            inputs[-1][0].set_data_from_numpy(
+            test_inputs[-1][0].set_data_from_numpy(
                 np.full(value, value[0], np.float32))
 
         expected_outputs = [
@@ -348,11 +350,11 @@ class BatchInputTest(tu.TestResultCollector):
 
         async_requests = []
         try:
-            for inputs in inputs:
+            for input in test_inputs:
                 # Asynchronous inference call.
                 async_requests.append(
                     self.client.async_stream_infer(model_name=model_name,
-                                                   inputs=inputs,
+                                                   inputs=input,
                                                    outputs=outputs))
 
             for idx in range(len(async_requests)):
