@@ -53,18 +53,20 @@ class BatchInputTest(tu.TestResultCollector):
     def set_inputs(self, shapes, input_name):
         self.dtype_ = np.float32
         self.inputs = []
-        if len(shapes[0]) == 1:
-            for shape in shapes:
-                self.inputs.append(
-                    [grpcclient.InferInput(input_name, [1, shape[0]], "FP32")])
-                self.inputs[-1][0].set_data_from_numpy(
-                    np.full([1, shape[0]], shape[0], np.float32))
-        else:
-            for shape in shapes:
-                self.inputs.append(
-                    [grpcclient.InferInput(input_name, shape, "FP32")])
-                self.inputs[-1][0].set_data_from_numpy(
-                    np.full(shape, shape[0], np.float32))
+        for shape in shapes:
+            self.inputs.append(
+                [grpcclient.InferInput(input_name, [1, shape[0]], "FP32")])
+            self.inputs[-1][0].set_data_from_numpy(
+                np.full([1, shape[0]], shape[0], np.float32))
+
+    def set_inputs_for_batch_item(self, shapes, input_name):
+        self.dtype_ = np.float32
+        self.inputs = []
+        for shape in shapes:
+            self.inputs.append(
+                [grpcclient.InferInput(input_name, shape, "FP32")])
+            self.inputs[-1][0].set_data_from_numpy(
+                np.full(shape, shape[0], np.float32))
 
     def test_ragged_output(self):
         model_name = "ragged_io"
@@ -287,8 +289,8 @@ class BatchInputTest(tu.TestResultCollector):
         # [1, 4, 1], [1, 1, 2], [1, 1, 2], [1, 2, 2]
         # Note that the test only checks the formation of "BATCH_INPUT" where
         # the value of "RAGGED_INPUT" is irrelevant, only the shape matters
-        self.set_inputs([[1, 4, 1], [1, 1, 2], [1, 1, 2], [1, 2, 2]],
-                        "RAGGED_INPUT")
+        self.set_inputs_for_batch_item(
+            [[1, 4, 1], [1, 1, 2], [1, 1, 2], [1, 2, 2]], "RAGGED_INPUT")
 
         model_name = "batch_item_flatten"
         user_data = queue.Queue()
@@ -327,7 +329,8 @@ class BatchInputTest(tu.TestResultCollector):
         # Use 3 set of inputs with shape [2, 1, 2], [1, 1, 2], [1, 2, 2]
         # Note that the test only checks the formation of "BATCH_INPUT" where
         # the value of "RAGGED_INPUT" is irrelevant, only the shape matters
-        self.set_inputs([[2, 1, 2], [1, 1, 2], [1, 2, 2]], "RAGGED_INPUT")
+        self.set_inputs_for_batch_item([[2, 1, 2], [1, 1, 2], [1, 2, 2]],
+                                       "RAGGED_INPUT")
 
         expected_outputs = [
             np.array([[1.0, 2.0], [1.0, 2.0]]),
