@@ -46,8 +46,10 @@ used as custom parameters:
 - timeout
 - sequence_start
 - sequence_end
-- All the keys that start with "triton_" prefix.
 - headers
+- All the keys that start with `"triton_"` prefix. Some examples used today:
+  - `"triton_enable_empty_final_response"` request parameter
+  - `"triton_final_response"` response parameter
 
 When using both GRPC and HTTP endpoints, you need to make sure to not use
 the reserved parameters list to avoid unexpected behavior. The reserved
