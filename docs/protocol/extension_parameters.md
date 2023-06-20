@@ -92,7 +92,7 @@ ModelInferRequest message can be used to send custom parameters.
 Triton can forward HTTP/GRPC headers as inference request parameters. By 
 specifying a regular expression in `--http-header-forward-pattern` and
 `--grpc-header-forward-pattern`,
-Triton will add the headers that match with the regular experession as request
+Triton will add the headers that match with the regular expression as request
 parameters. All the forwarded headers will be added as a parameter with string
 value. For example to forward all the headers that start with 'PREFIX_' from 
 both HTTP and GRPC, you should add `--http-header-forward-pattern PREFIX_.*
