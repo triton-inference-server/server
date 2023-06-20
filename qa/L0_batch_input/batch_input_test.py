@@ -33,7 +33,6 @@ import numpy as np
 from functools import partial
 import queue
 import test_util as tu
-import time
 import tritonclient.grpc as grpcclient
 from tritonclient.utils import InferenceServerException
 
@@ -288,7 +287,6 @@ class BatchInputTest(tu.TestResultCollector):
                 [grpcclient.InferInput('RAGGED_INPUT', value, "FP32")])
             inputs[-1][0].set_data_from_numpy(
                 np.full(value, value[0], np.float32))
-        self.client = grpcclient.InferenceServerClient(url="localhost:8001")
 
         model_name = "batch_item_flatten"
         user_data = queue.Queue()
@@ -333,7 +331,6 @@ class BatchInputTest(tu.TestResultCollector):
                 [grpcclient.InferInput('RAGGED_INPUT', value, "FP32")])
             inputs[-1][0].set_data_from_numpy(
                 np.full(value, value[0], np.float32))
-        client = grpcclient.InferenceServerClient(url="localhost:8001")
 
         expected_outputs = [
             np.array([[1.0, 2.0], [1.0, 2.0]]),
