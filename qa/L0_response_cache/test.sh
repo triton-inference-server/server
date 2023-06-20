@@ -241,11 +241,17 @@ SERVER_ARGS="--model-repository=${MODEL_DIR} ${REDIS_ENDPOINT} ${REDIS_CACHE_AUT
 run_server
 check_server_expected_failure "WRONGPASS"
 
-
 # Test simple redis authentication fails with no credentials
 SERVER_ARGS="--model-repository=${MODEL_DIR} ${REDIS_ENDPOINT} ${EXTRA_ARGS}"
 run_server
 check_server_expected_failure "NOAUTH Authentication required"
+
+# Test simple redis authentication succeeds with correct credentials via env vars
+TRITONCACHE_REDIS_USERNAME=""
+TRITONCACHE_REDIS_PASSWORD="${REDIS_PW}"
+SERVER_ARGS="--model-repository=${MODEL_DIR} ${REDIS_ENDPOINT} ${EXTRA_ARGS}"
+run_server
+check_server_success_and_kill
 
 # Clean up redis server before exiting test
 unset_redis_auth
