@@ -46,8 +46,10 @@ used as custom parameters:
 - timeout
 - sequence_start
 - sequence_end
-- All the keys that start with "triton_" prefix.
 - headers
+- All the keys that start with `"triton_"` prefix. Some examples used today:
+  - `"triton_enable_empty_final_response"` request parameter
+  - `"triton_final_response"` response parameter
 
 When using both GRPC and HTTP endpoints, you need to make sure to not use
 the reserved parameters list to avoid unexpected behavior. The reserved
@@ -90,7 +92,7 @@ ModelInferRequest message can be used to send custom parameters.
 Triton can forward HTTP/GRPC headers as inference request parameters. By 
 specifying a regular expression in `--http-header-forward-pattern` and
 `--grpc-header-forward-pattern`,
-Triton will add the headers that match with the regular experession as request
+Triton will add the headers that match with the regular expression as request
 parameters. All the forwarded headers will be added as a parameter with string
 value. For example to forward all the headers that start with 'PREFIX_' from 
 both HTTP and GRPC, you should add `--http-header-forward-pattern PREFIX_.*
