@@ -54,7 +54,7 @@ class TritonPythonModel:
         print(
             f'Python version is {sys.version_info.major}.{sys.version_info.minor}, NumPy version is {np.version.version}, and Tensorflow version is {tensorflow.__version__}',
             flush=True)
-        print(f'Locale is {locale.getlocale()}',flush=True)
+        print(f'Locale is {locale.getlocale()}', flush=True)
 
     def execute(self, requests):
         """ This function is called on inference request.
