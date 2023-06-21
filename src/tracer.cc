@@ -342,16 +342,16 @@ TraceManager::Trace::CaptureTimestamp(
       }
       *ss << "{\"id\":" << trace_id_ << ",\"timestamps\":["
           << "{\"name\":\"" << name << "\",\"ns\":" << timestamp_ns << "}]}";
-    } else if (
-        setting_->mode_ == TRACE_MODE_OPENTELEMETRY &&
-        otel_context_.HasKey(kRootSpan)) {
+    } else if (setting_->mode_ == TRACE_MODE_OPENTELEMETRY) {
 #ifndef _WIN32
-      auto root_span = opentelemetry::nostd::get<
-          opentelemetry::nostd::shared_ptr<otel_trace_api::Span>>(
-          this->otel_context_.GetValue(kRootSpan));
-      root_span->AddEvent(
-          name, otel_common::SystemTimestamp{
-                    time_offset_ + std::chrono::nanoseconds{timestamp_ns}});
+      if (otel_context_.HasKey(kRootSpan)) {
+        auto root_span = opentelemetry::nostd::get<
+            opentelemetry::nostd::shared_ptr<otel_trace_api::Span>>(
+            this->otel_context_.GetValue(kRootSpan));
+        root_span->AddEvent(
+            name, otel_common::SystemTimestamp{
+                      time_offset_ + std::chrono::nanoseconds{timestamp_ns}});
+      }
 #else
       LOG_ERROR << "Unsupported trace mode: "
                 << TraceManager::InferenceTraceModeString(setting_->mode_);
