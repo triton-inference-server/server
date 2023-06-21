@@ -250,7 +250,15 @@ check_server_expected_failure "NOAUTH Authentication required"
 
 ### Credentials via environment variables
 
-# Test simple redis authentication succeeds with correct credentials via env vars
+# Test simple redis authentication succeeds with password-only via env vars
+# No username means use "default" as the username
+unset TRITONCACHE_REDIS_USERNAME
+export TRITONCACHE_REDIS_PASSWORD="${REDIS_PW}"
+SERVER_ARGS="--model-repository=${MODEL_DIR} ${REDIS_ENDPOINT} ${EXTRA_ARGS}"
+run_server
+check_server_success_and_kill
+
+# Test simple redis authentication succeeds with correct user and password via env vars
 export TRITONCACHE_REDIS_USERNAME="default"
 export TRITONCACHE_REDIS_PASSWORD="${REDIS_PW}"
 SERVER_ARGS="--model-repository=${MODEL_DIR} ${REDIS_ENDPOINT} ${EXTRA_ARGS}"
