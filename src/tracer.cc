@@ -361,19 +361,6 @@ TraceManager::Trace::CaptureTimestamp(
 }
 
 #ifndef _WIN32
-const char*
-TraceManager::InferenceTraceModeString(InferenceTraceMode mode)
-{
-  switch (mode) {
-    case TRACE_MODE_TRITON:
-      return "TRITON";
-    case TRACE_MODE_OPENTELEMETRY:
-      return "OPENTELEMETRY";
-  }
-
-  return "<unknown>";
-}
-
 void
 TraceManager::Trace::InitTracer(
     const triton::server::TraceConfigMap& config_map)
@@ -625,6 +612,19 @@ TraceManager::TraceRelease(TRITONSERVER_InferenceTrace* trace, void* userp)
   }
   LOG_TRITONSERVER_ERROR(
       TRITONSERVER_InferenceTraceDelete(trace), "deleting trace");
+}
+
+const char*
+TraceManager::InferenceTraceModeString(InferenceTraceMode mode)
+{
+  switch (mode) {
+    case TRACE_MODE_TRITON:
+      return "TRITON";
+    case TRACE_MODE_OPENTELEMETRY:
+      return "OPENTELEMETRY";
+  }
+
+  return "<unknown>";
 }
 
 void
