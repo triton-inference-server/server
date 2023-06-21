@@ -645,7 +645,12 @@ TraceManager::TraceActivity(
   std::lock_guard<std::mutex> lk(ts->mtx_);
 
   if (ts->setting_->mode_ == TRACE_MODE_OPENTELEMETRY) {
+#ifndef _WIN32
     ts->ReportToOpenTelemetry(trace, activity, timestamp_ns);
+#else
+    LOG_ERROR << "Unsupported trace mode: "
+              << TraceManager::InferenceTraceModeString(mode_);
+#endif
     return;
   }
 
