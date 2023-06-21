@@ -353,12 +353,11 @@ if [ "$SERVER_PID" == "0" ]; then
     exit 1
 fi
 
-# Ping and expect server to still be running (using 'live' instead of 'ready')
-# https://github.com/kserve/kserve/blob/master/docs/predict-api/v2/rest_predict_v2.yaml#L10-L26
+# Ping and expect error code in SME mode.
 set +e
 code=`curl -s -w %{http_code} -o ./ping.out localhost:8080/ping`
 set -e
-if [ "$code" != "200" ]; then
+if [ "$code" == "200" ]; then
     cat ./ping.out
     echo -e "\n***\n*** Test Failed\n***"
     RET=1
