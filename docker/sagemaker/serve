@@ -78,7 +78,7 @@ if [ -n "$SAGEMAKER_TRITON_ALLOW_GRPC" ]; then
 else
     SAGEMAKER_ARGS="${SAGEMAKER_ARGS} --allow-grpc=false"
 fi
-if [ -n $SAGEMAKER_TRITON_ALLOW_METRICS ]; then
+if [ -n "$SAGEMAKER_TRITON_ALLOW_METRICS" ]; then
     SAGEMAKER_ARGS="${SAGEMAKER_ARGS} --allow-metrics=${SAGEMAKER_TRITON_ALLOW_METRICS}"
 else
     SAGEMAKER_ARGS="${SAGEMAKER_ARGS} --allow-metrics=false"
