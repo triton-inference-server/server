@@ -968,7 +968,7 @@ set -e
 
 ## Test perf_analyzer without MPI library (`libmpi.so`) available
 
-rm -rf /opt/hpcx/ompi/lib/libmpi.s*
+rm -rf /opt/hpcx/ompi/lib/libmpi*
 
 set +e
 $PERF_ANALYZER -v -m graphdef_int32_int32_int32 -s ${STABILITY_THRESHOLD} >$CLIENT_LOG 2>&1
