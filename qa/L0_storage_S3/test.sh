@@ -82,7 +82,7 @@ RET=0
 # Test 3 Scenarios:
 # 1. Only AWS ENV vars (Without aws configure)
 # 2. AWS ENV vars + dummy values in aws configure [ENV vars have higher priority]
-# 3. Only aws configured (Without AWS ENV vars)
+# 3. Only AWS configured (Without AWS ENV vars)
 for ENV_VAR in "env" "env_dummy" "config"; do
     SERVER_LOG=$SERVER_LOG_BASE.$ENV_VAR.log
     CLIENT_LOG=$CLIENT_LOG_BASE.$ENV_VAR.log
