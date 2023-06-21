@@ -73,7 +73,7 @@ fi
 if [ -n "$SAGEMAKER_SAFE_PORT_RANGE" ]; then
     SAGEMAKER_ARGS="${SAGEMAKER_ARGS} --sagemaker-safe-port-range=${SAGEMAKER_SAFE_PORT_RANGE}"
 fi
-if [ -n $SAGEMAKER_TRITON_ALLOW_GRPC ]; then
+if [ -n "$SAGEMAKER_TRITON_ALLOW_GRPC" ]; then
     SAGEMAKER_ARGS="${SAGEMAKER_ARGS} --allow-grpc=${SAGEMAKER_TRITON_ALLOW_GRPC}"
 else
     SAGEMAKER_ARGS="${SAGEMAKER_ARGS} --allow-grpc=false"
