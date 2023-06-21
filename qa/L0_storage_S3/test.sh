@@ -1,5 +1,5 @@
 #!/bin/bash
-# Copyright (c) 2018-2021, NVIDIA CORPORATION. All rights reserved.
+# Copyright (c) 2018-2023, NVIDIA CORPORATION. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -82,7 +82,7 @@ RET=0
 # Test 3 Scenarios:
 # 1. Only AWS ENV vars (Without aws configure)
 # 2. AWS ENV vars + dummy values in aws configure [ENV vars have higher priority]
-# 3. Only aws configure (Without AWS ENV vars)
+# 3. Only aws configured (Without AWS ENV vars)
 for ENV_VAR in "env" "env_dummy" "config"; do
     SERVER_LOG=$SERVER_LOG_BASE.$ENV_VAR.log
     CLIENT_LOG=$CLIENT_LOG_BASE.$ENV_VAR.log
@@ -425,5 +425,36 @@ if [ $RET -eq 0 ]; then
 else
   echo -e "\n***\n*** Test FAILED\n***"
 fi
+
+# Test case where S3 folder has >1000 files
+rm -rf models
+
+mkdir -p models/model/1
+echo $'class TritonPythonModel:\n\tdef execute(self):\n\t\tpass' > ./models/model/1/model.py
+
+for i in {1..1000}; do
+    touch models/model/0${i}.txt
+done
+
+# Provide extended timeout to allow >1000 files to be loaded
+SERVER_ARGS="--model-repository=$BUCKET_URL --exit-timeout-secs=600 --model-control-mode=none"
+
+# copy contents of /models into S3 bucket and wait for them to be loaded.
+aws s3 cp models/ "${BUCKET_URL_SLASH}" --recursive --include "*"
+
+# Test that the server starts up. Files will be loaded in numerically
+# ascending order, so the model file is loaded after the first 1000
+# files. If AWS fails to load >1000 files, the model file will not
+# be loaded and the server will fail to start.
+
+run_server
+if [ "$SERVER_PID" == "0" ]; then
+    echo -e "\n***\n*** Failed to start $SERVER\n***"
+    cat $SERVER_LOG
+    exit 1
+fi
+
+kill $SERVER_PID
+wait $SERVER_PID
 
 exit $RET
