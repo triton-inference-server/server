@@ -229,6 +229,8 @@ check_server_expected_failure "Must at a minimum specify"
 REDIS_PW="redis123!"
 set_redis_auth
 
+### Credentials via command-line
+
 # Test simple redis authentication succeeds with correct credentials
 REDIS_CACHE_AUTH="--cache-config redis,password=${REDIS_PW}"
 SERVER_ARGS="--model-repository=${MODEL_DIR} ${REDIS_ENDPOINT} ${REDIS_CACHE_AUTH} ${EXTRA_ARGS}"
@@ -241,11 +243,35 @@ SERVER_ARGS="--model-repository=${MODEL_DIR} ${REDIS_ENDPOINT} ${REDIS_CACHE_AUT
 run_server
 check_server_expected_failure "WRONGPASS"
 
-
 # Test simple redis authentication fails with no credentials
 SERVER_ARGS="--model-repository=${MODEL_DIR} ${REDIS_ENDPOINT} ${EXTRA_ARGS}"
 run_server
 check_server_expected_failure "NOAUTH Authentication required"
+
+### Credentials via environment variables
+
+# Test simple redis authentication succeeds with password-only via env vars
+# No username means use "default" as the username
+unset TRITONCACHE_REDIS_USERNAME
+export TRITONCACHE_REDIS_PASSWORD="${REDIS_PW}"
+SERVER_ARGS="--model-repository=${MODEL_DIR} ${REDIS_ENDPOINT} ${EXTRA_ARGS}"
+run_server
+check_server_success_and_kill
+
+# Test simple redis authentication succeeds with correct user and password via env vars
+export TRITONCACHE_REDIS_USERNAME="default"
+export TRITONCACHE_REDIS_PASSWORD="${REDIS_PW}"
+SERVER_ARGS="--model-repository=${MODEL_DIR} ${REDIS_ENDPOINT} ${EXTRA_ARGS}"
+run_server
+check_server_success_and_kill
+
+# Test simple redis authentication fails with wrong credentials via env vars
+export TRITONCACHE_REDIS_PASSWORD="wrong"
+SERVER_ARGS="--model-repository=${MODEL_DIR} ${REDIS_ENDPOINT} ${EXTRA_ARGS}"
+run_server
+check_server_expected_failure "WRONGPASS"
+unset TRITONCACHE_REDIS_USERNAME
+unset TRITONCACHE_REDIS_PASSWORD
 
 # Clean up redis server before exiting test
 unset_redis_auth
