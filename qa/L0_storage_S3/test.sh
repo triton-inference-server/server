@@ -293,6 +293,7 @@ kill $SERVER_PID
 wait $SERVER_PID
 
 # Save models for AWS_SESSION_TOKEN test
+rm -rf tmp_cred_test_models
 mv models tmp_cred_test_models
 # Clean up bucket contents
 aws s3 rm "${BUCKET_URL_SLASH}" --recursive --include "*"
@@ -419,12 +420,6 @@ aws configure set default.region $AWS_DEFAULT_REGION && \
 # Clean up bucket contents
 aws s3 rm "${BUCKET_URL_SLASH}" --recursive --include "*"
 
-if [ $RET -eq 0 ]; then
-  echo -e "\n***\n*** Test Passed\n***"
-else
-  echo -e "\n***\n*** Test FAILED\n***"
-fi
-
 # Test case where S3 folder has >1000 files
 rm -rf models
 
@@ -437,6 +432,7 @@ done
 
 # Provide extended timeout to allow >1000 files to be loaded
 SERVER_ARGS="--model-repository=$BUCKET_URL --exit-timeout-secs=600 --model-control-mode=none"
+SERVER_LOG=$SERVER_LOG_BASE.many_files.log
 
 # copy contents of /models into S3 bucket and wait for them to be loaded.
 aws s3 cp models/ "${BUCKET_URL_SLASH}" --recursive --include "*"
@@ -459,5 +455,11 @@ wait $SERVER_PID
 # Clean up bucket contents and delete bucket
 aws s3 rm "${BUCKET_URL_SLASH}" --recursive --include "*"
 aws s3 rb "${BUCKET_URL}"
+
+if [ $RET -eq 0 ]; then
+  echo -e "\n***\n*** Test Passed\n***"
+else
+  echo -e "\n***\n*** Test FAILED\n***"
+fi
 
 exit $RET
