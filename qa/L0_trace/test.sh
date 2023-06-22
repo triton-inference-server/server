@@ -655,9 +655,15 @@ wait $SERVER_PID
 
 # Check opentelemetry trace exporter sends proper info.
 # A helper python script starts listenning on $OTLP_PORT, where
-# OTLP exporter sends traces. It then check that received data contains 
-# expected entries
+# OTLP exporter sends traces. 
+# Unittests then check that produced spans have expected format and events 
 # FIXME: Redesign this test to remove time sensitivity
+
+OPENTELEMETRY_TEST=opentelemetry_unittest.py
+OPENTELEMETRY_LOG="opentelemetry_unittest.log"
+TEST_RESULT_FILE="opentelemetry_results.txt"
+EXPECTED_NUM_TESTS="2"
+
 SERVER_ARGS="--trace-config=triton,file=some_file.log --trace-config=level=TIMESTAMPS \
             --trace-config=rate=1 --trace-config=count=6 --trace-config=mode=opentelemetry --trace-config=opentelemetry,url=localhost:$OTLP_PORT --model-repository=$MODELSDIR"
 SERVER_LOG="./inference_server_trace_config.log"
@@ -674,7 +680,7 @@ COLLECTOR_PID=$!
 
 set +e
 
-# To make sure receiver is ready log gets all data
+# To make sure receiver is ready
 sleep 3
 
 # Send http request and collect trace
@@ -696,38 +702,20 @@ sleep 3
 kill $COLLECTOR_PID
 wait $COLLECTOR_PID
 
-EXPECTED_ENTRIES=${EXPECTED_ENTRIES:="REQUEST_START QUEUE_START INFER_RESPONSE_COMPLETE COMPUTE_START COMPUTE_INPUT_END COMPUTE_OUTPUT_START COMPUTE_END REQUEST_END"}
-HTTP_ENTRIES=${HTTP_ENTRIES:="HTTP_RECV_START HTTP_RECV_END HTTP_SEND_START HTTP_SEND_END"}
-GRPC_ENTRIES=${GRPC_ENTRIES:="GRPC_WAITREAD_START GRPC_WAITREAD_END GRPC_SEND_START GRPC_SEND_END"}
 
-for ENTRY in $EXPECTED_ENTRIES; do
-    if [ `grep -c $ENTRY $TRACE_COLLECTOR_LOG` != "2" ]; then
-        RET=1
-    fi
-done
+set +e
 
-for ENTRY in $HTTP_ENTRIES; do
-    if [ `grep -c $ENTRY $TRACE_COLLECTOR_LOG` != "1" ]; then
-        RET=1
-    fi
-done
-
-for ENTRY in $GRPC_ENTRIES; do
-    if [ `grep -c $ENTRY $TRACE_COLLECTOR_LOG` != "1" ]; then
-        RET=1
-    fi
-done
-
-#Check that we have 2 nested spans
-
-if [ `grep -c 'parent_span_id' $TRACE_COLLECTOR_LOG` != "4" ]; then
+python $OPENTELEMETRY_TEST >>$OPENTELEMETRY_LOG 2>&1
+if [ $? -ne 0 ]; then
+    cat $OPENTELEMETRY_LOG
     RET=1
-fi
-
-if [ $RET -eq 0 ]; then
-    echo -e "\n***\n*** Test Passed\n***"
 else
-    echo -e "\n***\n*** Test FAILED\n***"
+    check_test_results $TEST_RESULT_FILE $EXPECTED_NUM_TESTS
+    if [ $? -ne 0 ]; then
+        cat $OPENTELEMETRY_LOG
+        echo -e "\n***\n*** Test Result Verification Failed\n***"
+        RET=1
+    fi
 fi
 
 set -e
