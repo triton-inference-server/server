@@ -69,6 +69,7 @@ def bls_add_sub(_=None):
 
     return True
 
+
 def bls_square(_=None):
     input0_np = np.random.randint(16, size=1, dtype=np.int32)
     input0 = pb_utils.Tensor('IN', input0_np)
@@ -85,7 +86,8 @@ def bls_square(_=None):
                 return False
 
             if len(infer_response.output_tensors()) > 0:
-                output0 = pb_utils.get_output_tensor_by_name(infer_response, 'OUT')
+                output0 = pb_utils.get_output_tensor_by_name(
+                    infer_response, 'OUT')
                 if output0 is None:
                     return False
 
@@ -96,10 +98,11 @@ def bls_square(_=None):
 
             response_count += 1
 
-    if not np.all(input0.as_numpy() == response_count-1):
+    if not np.all(input0.as_numpy() == response_count - 1):
         return False
 
     return True
+
 
 def bls_libtorch(model_name, result_device):
     shape = [16]
@@ -116,11 +119,11 @@ def bls_libtorch(model_name, result_device):
             pb_utils.TRITONSERVER_MEMORY_GPU, 0)
 
     infer_request = pb_utils.InferenceRequest(
-            model_name=model_name,
-            model_version=1,
-            inputs=[input0, input1],
-            requested_output_names=['OUTPUT__0', 'OUTPUT__1'],
-            preferred_memory=preferred_memory)
+        model_name=model_name,
+        model_version=1,
+        inputs=[input0, input1],
+        requested_output_names=['OUTPUT__0', 'OUTPUT__1'],
+        preferred_memory=preferred_memory)
 
     infer_response = infer_request.exec()
     if infer_response.has_error():
@@ -146,8 +149,10 @@ def bls_libtorch(model_name, result_device):
     else:
         if output0.is_cpu() or output1.is_cpu():
             return False
-        output0 = from_dlpack(output0.to_dlpack()).to('cpu').cpu().detach().numpy()
-        output1 = from_dlpack(output1.to_dlpack()).to('cpu').cpu().detach().numpy()
+        output0 = from_dlpack(
+            output0.to_dlpack()).to('cpu').cpu().detach().numpy()
+        output1 = from_dlpack(
+            output1.to_dlpack()).to('cpu').cpu().detach().numpy()
 
         if not np.all(output0 == expected_output_0):
             return False
@@ -155,6 +160,7 @@ def bls_libtorch(model_name, result_device):
             return False
 
     return True
+
 
 class PBBLSTest(unittest.TestCase):
 
@@ -605,13 +611,11 @@ class PBBLSTest(unittest.TestCase):
 
         # Expect timeout error
         self.assertTrue(infer_response.has_error())
-        self.assertIn(
-            "Request timeout expired",
-            infer_response.error().message())
+        self.assertIn("Request timeout expired",
+                      infer_response.error().message())
         self.assertTrue(len(infer_response.output_tensors()) == 0)
 
-    def _test_response_iterator_square(self,
-                                       expected_output_cnt,
+    def _test_response_iterator_square(self, expected_output_cnt,
                                        expected_output_value,
                                        response_iterator):
         response_count = 0
@@ -620,7 +624,8 @@ class PBBLSTest(unittest.TestCase):
         for infer_response in response_iterator:
             self.assertFalse(infer_response.has_error())
             if len(infer_response.output_tensors()) > 0:
-                output0 = pb_utils.get_output_tensor_by_name(infer_response, 'OUT')
+                output0 = pb_utils.get_output_tensor_by_name(
+                    infer_response, 'OUT')
                 self.assertIsNotNone(output0)
                 self.assertEqual(expected_output_value, output0.as_numpy())
 
@@ -671,8 +676,8 @@ class PBBLSTest(unittest.TestCase):
             response_count = 0
             for infer_response in infer_responses:
                 self.assertFalse(infer_response.has_error())
-                output0 = pb_utils.get_output_tensor_by_name(infer_response,
-                                                             'OUT')
+                output0 = pb_utils.get_output_tensor_by_name(
+                    infer_response, 'OUT')
                 self.assertIsNotNone(output0)
                 self.assertEqual(response_value, output0.as_numpy())
 

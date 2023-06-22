@@ -57,14 +57,13 @@ class TritonPythonModel:
 
         for request in requests:
             thread = threading.Thread(target=self.response_thread,
-                                       args=(request.get_response_sender(),
-                                             pb_utils.get_input_tensor_by_name(
-                                                 request, 'IN').as_numpy()))
+                                      args=(request.get_response_sender(),
+                                            pb_utils.get_input_tensor_by_name(
+                                                request, 'IN').as_numpy()))
             thread.daemon = True
             with self.inflight_thread_count_lck:
                 self.inflight_thread_count += 1
             thread.start()
-
 
         return None
 
@@ -95,22 +94,22 @@ class TritonPythonModel:
                         response,
                         flags=pb_utils.TRITONSERVER_RESPONSE_COMPLETE_FINAL)
                 else:
-                    output_tensors = [pb_utils.Tensor('OUT', output0.as_numpy())]
+                    output_tensors = [
+                        pb_utils.Tensor('OUT', output0.as_numpy())
+                    ]
                     response = pb_utils.InferenceResponse(
                         output_tensors=output_tensors)
                     response_sender.send(response)
 
             response_count += 1
 
-        if in_value != response_count-1:
-            error_message = (
-                "Expected {} responses, got {}".format(
-                    in_value, len(infer_responses)-1))
-            response = pb_utils.InferenceResponse(
-                error=error_message)
+        if in_value != response_count - 1:
+            error_message = ("Expected {} responses, got {}".format(
+                in_value,
+                len(infer_responses) - 1))
+            response = pb_utils.InferenceResponse(error=error_message)
             response_sender.send(
-                response,
-                flags=pb_utils.TRITONSERVER_RESPONSE_COMPLETE_FINAL)
+                response, flags=pb_utils.TRITONSERVER_RESPONSE_COMPLETE_FINAL)
         else:
             response_sender.send(
                 flags=pb_utils.TRITONSERVER_RESPONSE_COMPLETE_FINAL)

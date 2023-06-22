@@ -28,6 +28,7 @@ import os
 import numpy as np
 import triton_python_backend_utils as pb_utils
 
+
 def check_init_args(args):
     expected_args = {
         'model_name':
@@ -39,7 +40,8 @@ def check_init_args(args):
         'model_instance_device_id':
             '0',
         'model_repository':
-            os.getenv("TRITON_DIR", "/opt/tironserver") + '/qa/L0_backend_python/models/init_args',
+            os.getenv("TRITON_DIR", "/opt/tironserver") +
+            '/qa/L0_backend_python/models/init_args',
         'model_version':
             '1'
     }

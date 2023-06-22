@@ -27,24 +27,23 @@
 #include <rapidjson/document.h>
 #include <rapidjson/error/en.h>
 #include <unistd.h>
+
 #include <chrono>
 #include <cstring>
 #include <future>
 #include <iostream>
+#include <opencv2/dnn.hpp>
 #include <string>
 #include <thread>
 #include <unordered_map>
 #include <vector>
 
-#include "triton/core/tritonserver.h"
-
 #include "common.h"
-
-#include <opencv2/dnn.hpp>
 #include "opencv2/core.hpp"
 #include "opencv2/highgui.hpp"
 #include "opencv2/imgproc.hpp"
 #include "opencv2/opencv.hpp"
+#include "triton/core/tritonserver.h"
 
 #ifdef TRITON_ENABLE_GPU
 #include <cuda_runtime_api.h>

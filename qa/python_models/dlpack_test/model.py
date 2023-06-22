@@ -246,7 +246,7 @@ class PBTensorTest(unittest.TestCase):
                 self.assertTrue(cp.cuda.Stream(null=True).done)
             cupy_tensor_dlpack = cp.from_dlpack(pb_tensor)
 
-        with cp.cuda.Device(1):       
+        with cp.cuda.Device(1):
             self.assertTrue(cp.array_equal(cupy_tensor_dlpack, expected_output))
 
         self.assertFalse(pb_tensor.is_cpu())
@@ -279,8 +279,8 @@ class PBTensorTest(unittest.TestCase):
                 # all compute work
                 self.assertTrue(blocking_stream.done)
             cupy_tensor_dlpack = cp.from_dlpack(pb_tensor)
-            
-        with cp.cuda.Device(1):    
+
+        with cp.cuda.Device(1):
             self.assertTrue(cp.array_equal(cupy_tensor_dlpack, expected_output))
 
         self.assertFalse(pb_tensor.is_cpu())
@@ -317,8 +317,8 @@ class PBTensorTest(unittest.TestCase):
                 # all compute work
                 self.assertTrue(non_blocking_stream.done)
             cupy_tensor_dlpack = cp.from_dlpack(pb_tensor)
-            
-        with cp.cuda.Device(2):   
+
+        with cp.cuda.Device(2):
             self.assertTrue(cp.array_equal(cupy_tensor_dlpack, expected_output))
 
         self.assertFalse(pb_tensor.is_cpu())

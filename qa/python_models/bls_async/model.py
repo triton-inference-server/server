@@ -97,7 +97,6 @@ def verify_square_results(input0, infer_responses):
                   flush=True)
             return False
 
-        
         if len(infer_response.output_tensors()) > 0:
             output0 = pb_utils.get_output_tensor_by_name(infer_response, 'OUT')
 
@@ -118,8 +117,9 @@ def verify_square_results(input0, infer_responses):
 
         response_count += 1
 
-    if not np.all(input0 == response_count-1):
-        print('Expected {} responses, got {}'.format(input0, response_count-1))
+    if not np.all(input0 == response_count - 1):
+        print('Expected {} responses, got {}'.format(input0,
+                                                     response_count - 1))
         return False
 
     return True

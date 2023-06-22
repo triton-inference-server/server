@@ -59,15 +59,16 @@ np_dtype_string = np.dtype(object)
 
 class InferTest(tu.TestResultCollector):
 
-    def _full_exact(self,
-                    input_dtype,
-                    output0_dtype,
-                    output1_dtype,
-                    output0_raw,
-                    output1_raw,
-                    swap,
-                    # 60 sec is the default value
-                    network_timeout=60.0):
+    def _full_exact(
+            self,
+            input_dtype,
+            output0_dtype,
+            output1_dtype,
+            output0_raw,
+            output1_raw,
+            swap,
+            # 60 sec is the default value
+            network_timeout=60.0):
 
         def _infer_exact_helper(tester,
                                 pf,

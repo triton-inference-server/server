@@ -39,9 +39,12 @@ import tritonclient.grpc as grpcclient
 import tritonclient.http as httpclient
 from tritonclient.utils import InferenceServerException
 
+
 class UserData:
+
     def __init__(self):
         self._response_queue = queue.Queue()
+
 
 def callback(user_data, result, error):
     if error:
@@ -73,17 +76,17 @@ class DecoupledTest(tu.TestResultCollector):
 
     # Client can receive a "triton_final_response" response parameter
     # from Triton server that indicates when a response is the final response for
-    # its request. 
+    # its request.
     #
     # For non-decoupled models, there is a 1:1 request:response ratio, so every
-    # response is the final response, and this parameter is unnecessary. 
-    # 
+    # response is the final response, and this parameter is unnecessary.
+    #
     # For decoupled models, there is a 1:N request:response ratio, so there may be
-    # more one response before receiving the "final" response. 
+    # more one response before receiving the "final" response.
     #
     # However, decoupled models have the unique property in that they can return
     # a flags-only response to the server to indicate completion, which is not
-    # returned to the client by default (See TRITONBACKEND_ResponseFactorySendFlags). 
+    # returned to the client by default (See TRITONBACKEND_ResponseFactorySendFlags).
     #
     # To forward this flags-only response to the client, users must opt-in to this
     # behavior by adding the following argument:
@@ -92,11 +95,12 @@ class DecoupledTest(tu.TestResultCollector):
     # If the decoupled backend/model always sends the final response flag along
     # with a non-null response, no opt-in is needed.
     #
-    # With this behavior, the client can programatically detect when all responses 
+    # With this behavior, the client can programatically detect when all responses
     # for an individual request have been received without knowing the expected
     # number of responses in advance and without closing the stream.
     def _stream_infer_with_params(self, request_count, request_delay, _,
-                                  delay_data, delay_factor, user_data, result_dict):
+                                  delay_data, delay_factor, user_data,
+                                  result_dict):
         with grpcclient.InferenceServerClient(url="localhost:8001",
                                               verbose=True) as triton_client:
             # Establish stream
@@ -112,8 +116,7 @@ class DecoupledTest(tu.TestResultCollector):
                     outputs=self.requested_outputs_,
                     # Opt-in to receiving flags-only responses from model/backend
                     # to help detect final responses for decoupled models.
-                    enable_empty_final_response=True
-                )
+                    enable_empty_final_response=True)
                 # Update delay input in accordance with the scaling factor
                 delay_data = delay_data * delay_factor
                 delay_data = delay_data.astype(np.uint32)
@@ -130,18 +133,20 @@ class DecoupledTest(tu.TestResultCollector):
                     # Request IDs should generally be provided with each request
                     # to associate decoupled responses with their requests.
                     if not response.id:
-                      raise ValueError("No response id found. Was a request_id provided?")
+                        raise ValueError(
+                            "No response id found. Was a request_id provided?")
 
                     # Detect final response. Parameters are oneof and we expect bool_param
-                    if response.parameters.get("triton_final_response").bool_param:
-                      completed_requests += 1
+                    if response.parameters.get(
+                            "triton_final_response").bool_param:
+                        completed_requests += 1
 
-                    # Only process non-empty response, ignore if empty (no outputs) 
+                    # Only process non-empty response, ignore if empty (no outputs)
                     if response.outputs:
-                      if response.id not in result_dict:
-                          result_dict[response.id] = []
-                      result_dict[response.id].append((recv_count, data_item))
-                      recv_count += 1
+                        if response.id not in result_dict:
+                            result_dict[response.id] = []
+                        result_dict[response.id].append((recv_count, data_item))
+                        recv_count += 1
 
     def _stream_infer(self, request_count, request_delay, expected_count,
                       delay_data, delay_factor, user_data, result_dict):
@@ -171,7 +176,7 @@ class DecoupledTest(tu.TestResultCollector):
                 else:
                     this_id = data_item.get_response().id
                     if this_id not in result_dict:
-                      result_dict[this_id] = []
+                        result_dict[this_id] = []
                     result_dict[this_id].append((recv_count, data_item))
 
                 recv_count += 1
@@ -232,8 +237,9 @@ class DecoupledTest(tu.TestResultCollector):
         self.requested_outputs_ = self.outputs_ if validate_fn is None else self.outputs_[
             0:1]
 
-
-        for infer_helper in [self._stream_infer, self._stream_infer_with_params]:
+        for infer_helper in [
+                self._stream_infer, self._stream_infer_with_params
+        ]:
             user_data = UserData()
             result_dict = {}
 
@@ -254,8 +260,8 @@ class DecoupledTest(tu.TestResultCollector):
                 this_id = str(i)
                 if repeat_count != 0 and this_id not in result_dict.keys():
                     self.assertTrue(
-                        False,
-                        "response for request id {} not received".format(this_id))
+                        False, "response for request id {} not received".format(
+                            this_id))
                 elif repeat_count == 0 and this_id in result_dict.keys():
                     self.assertTrue(
                         False,
@@ -263,7 +269,8 @@ class DecoupledTest(tu.TestResultCollector):
                             this_id))
                 if repeat_count != 0:
                     if validate_fn is None:
-                        self.assertEqual(len(result_dict[this_id]), repeat_count)
+                        self.assertEqual(len(result_dict[this_id]),
+                                         repeat_count)
                         expected_data = data_offset
                         result_list = result_dict[this_id]
                         for j in range(len(result_list)):
@@ -278,7 +285,8 @@ class DecoupledTest(tu.TestResultCollector):
                             self.assertEqual(this_idx[0], j)
                             expected_data += 1
                     else:
-                        validate_fn(result_dict[this_id], data_offset, repeat_count)
+                        validate_fn(result_dict[this_id], data_offset,
+                                    repeat_count)
 
     def test_one_to_none(self):
         # Test cases where each request generates no response.
