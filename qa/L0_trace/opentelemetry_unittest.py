@@ -1,4 +1,4 @@
-# Copyright 2019-2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright 2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -28,9 +28,11 @@ import sys
 
 sys.path.append("../common")
 
-import test_util as tu
-import unittest
 import json
+import unittest
+
+import test_util as tu
+
 
 class OpenTelemetryTest(tu.TestResultCollector):
 
@@ -113,7 +115,10 @@ class OpenTelemetryTest(tu.TestResultCollector):
         # Check that child and parent span have the same trace_id
         # and child's `parent_span_id` is the same as parent's `span_id`
         self.assertEqual(child_span['trace_id'], parent_span['trace_id'])
-        self.assertTrue('parent_span_id' in child_span)
+        self.assertIn(
+            'parent_span_id', 
+            child_span, 
+            "child span does not have parent span id specified")
         self.assertEqual(child_span['parent_span_id'], parent_span['span_id'])
 
     def test_spans(self):
@@ -127,13 +132,13 @@ class OpenTelemetryTest(tu.TestResultCollector):
         
         # There should be 6 spans in total:
         # 3 for http request and 3 for grpc request.
-        self.assertTrue(len(self.spans) == 6)
+        self.assertEqual(len(self.spans), 6)
         # We should have 2 compute spans
-        self.assertTrue(parsed_spans.count("compute"), 2) 
+        self.assertEqual(parsed_spans.count("compute"), 2) 
         # 2 request spans (named simple - same as our model name)
-        self.assertTrue(parsed_spans.count(self.model_name), 2) 
+        self.assertEqual(parsed_spans.count(self.model_name), 2) 
         # 2 root spans
-        self.assertTrue(parsed_spans.count(self.root_span), 2) 
+        self.assertEqual(parsed_spans.count(self.root_span), 2) 
     
     def test_nested_spans(self):
 
@@ -146,7 +151,10 @@ class OpenTelemetryTest(tu.TestResultCollector):
             self._check_parent(child, parent)
         
         # root_span should not have `parent_span_id` field
-        self.assertFalse('parent_span_id' in self.spans[2])
+        self.assertNotIn(
+            'parent_span_id', 
+            self.spans[2],
+            "root span has a parent_span_id specified")
         
         # Last 3 spans in `self.spans` belong to GRPC request
         # Order of spans and their relationship described earlier
@@ -154,7 +162,10 @@ class OpenTelemetryTest(tu.TestResultCollector):
             self._check_parent(child, parent)
 
         # root_span should not have `parent_span_id` field
-        self.assertFalse('parent_span_id' in self.spans[5])
+        self.assertNotIn(
+            'parent_span_id',
+            self.spans[5],
+            "root span has a parent_span_id specified")
 
 
 if __name__ == '__main__':
