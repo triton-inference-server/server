@@ -645,7 +645,7 @@ TraceManager::TraceActivity(
     ts->ReportToOpenTelemetry(trace, activity, timestamp_ns);
 #else
     LOG_ERROR << "Unsupported trace mode: "
-              << TraceManager::InferenceTraceModeString(mode_);
+              << TraceManager::InferenceTraceModeString(ts->setting_->mode_);
 #endif
     return;
   }
