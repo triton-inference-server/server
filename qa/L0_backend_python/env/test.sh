@@ -123,6 +123,10 @@ for EXPECTED_VERSION_STRING in "$PY36_VERSION_STRING" "$PY37_VERSION_STRING" "$P
         RET=1
     fi
 done
+
+# Test default (non set) locale in python stub processes
+# NOTE: In certain pybind versions, the locale settings may not be propagated from parent to
+#       stub processes correctly. See https://github.com/triton-inference-server/python_backend/pull/260.
 grep "Locale is \(None, None\)" $SERVER_LOG
     if [ $? -ne 0 ]; then
         cat $SERVER_LOG
@@ -133,6 +137,9 @@ set -e
 
 rm $SERVER_LOG
 
+# Test locale set via environment variable in python stub processes
+# NOTE: In certain pybind versions, the locale settings may not be propagated from parent to
+#       stub processes correctly. See https://github.com/triton-inference-server/python_backend/pull/260.
 export LC_ALL=C.UTF-8
 run_server
 if [ "$SERVER_PID" == "0" ]; then
@@ -145,14 +152,6 @@ kill $SERVER_PID
 wait $SERVER_PID
 
 set +e
-for EXPECTED_VERSION_STRING in "$PY36_VERSION_STRING" "$PY37_VERSION_STRING" "$PY310_VERSION_STRING"; do
-    grep "$EXPECTED_VERSION_STRING" $SERVER_LOG
-    if [ $? -ne 0 ]; then
-        cat $SERVER_LOG
-        echo -e "\n***\n*** $EXPECTED_VERSION_STRING was not found in Triton logs. \n***"
-        RET=1
-    fi
-done
 grep "Locale is \('en_US', 'UTF-8'\)" $SERVER_LOG
     if [ $? -ne 0 ]; then
         cat $SERVER_LOG

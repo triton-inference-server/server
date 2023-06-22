@@ -27,6 +27,7 @@
 import numpy as np
 import sys
 import os
+import locale
 import triton_python_backend_utils as pb_utils
 
 
