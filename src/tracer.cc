@@ -307,12 +307,10 @@ TraceManager::Trace::~Trace()
     setting_->WriteTrace(streams_);
   } else if (setting_->mode_ == TRACE_MODE_OPENTELEMETRY) {
 #ifndef _WIN32
-    if (this->otel_context_.HasKey(kRootSpan)) {
-      auto root_span = opentelemetry::nostd::get<
+    auto root_span = opentelemetry::nostd::get<
           opentelemetry::nostd::shared_ptr<otel_trace_api::Span>>(
           this->otel_context_.GetValue(kRootSpan));
-      EndSpanNow(root_span);
-    }
+    EndSpanNow(root_span);
 #else
     LOG_ERROR << "Unsupported trace mode: "
               << TraceManager::InferenceTraceModeString(setting_->mode_);
@@ -344,14 +342,12 @@ TraceManager::Trace::CaptureTimestamp(
           << "{\"name\":\"" << name << "\",\"ns\":" << timestamp_ns << "}]}";
     } else if (setting_->mode_ == TRACE_MODE_OPENTELEMETRY) {
 #ifndef _WIN32
-      if (otel_context_.HasKey(kRootSpan)) {
-        auto root_span = opentelemetry::nostd::get<
-            opentelemetry::nostd::shared_ptr<otel_trace_api::Span>>(
-            this->otel_context_.GetValue(kRootSpan));
-        root_span->AddEvent(
-            name, otel_common::SystemTimestamp{
-                      time_offset_ + std::chrono::nanoseconds{timestamp_ns}});
-      }
+      auto root_span = opentelemetry::nostd::get<
+          opentelemetry::nostd::shared_ptr<otel_trace_api::Span>>(
+          this->otel_context_.GetValue(kRootSpan));
+      root_span->AddEvent(
+          name, otel_common::SystemTimestamp{
+                    time_offset_ + std::chrono::nanoseconds{timestamp_ns}});
 #else
       LOG_ERROR << "Unsupported trace mode: "
                 << TraceManager::InferenceTraceModeString(setting_->mode_);
