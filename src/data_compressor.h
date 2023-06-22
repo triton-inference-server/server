@@ -25,6 +25,9 @@
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #pragma once
 
+#include <event2/buffer.h>
+#include <zlib.h>
+
 #include <cassert>
 #include <cstring>
 #include <iostream>
@@ -32,8 +35,6 @@
 #include <string>
 #include <vector>
 
-#include <event2/buffer.h>
-#include <zlib.h>
 #include "common.h"
 #include "triton/core/tritonserver.h"
 

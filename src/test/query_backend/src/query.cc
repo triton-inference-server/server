@@ -25,6 +25,7 @@
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 #include <vector>
+
 #include "triton/backend/backend_common.h"
 #include "triton/backend/backend_model.h"
 #include "triton/backend/backend_model_instance.h"
@@ -104,8 +105,8 @@ TRITONBACKEND_ModelInstanceExecute(
     } else {
       names = {"OUTPUT0", "OUTPUT1"};
     }
-    std::vector<TRITONSERVER_MemoryType> types{TRITONSERVER_MEMORY_CPU_PINNED,
-                                               TRITONSERVER_MEMORY_CPU_PINNED};
+    std::vector<TRITONSERVER_MemoryType> types{
+        TRITONSERVER_MEMORY_CPU_PINNED, TRITONSERVER_MEMORY_CPU_PINNED};
     std::vector<int64_t> type_ids{1, 1};
     for (size_t i = 0; i < names.size(); ++i) {
       auto err = TRITONBACKEND_RequestOutputBufferProperties(

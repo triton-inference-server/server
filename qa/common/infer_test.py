@@ -37,8 +37,9 @@ import os
 np_dtype_string = np.dtype(object)
 
 # Allow caller to setup specific set of backends to test
-DEFAULT_BACKENDS="graphdef savedmodel plan onnx libtorch"
+DEFAULT_BACKENDS = "graphdef savedmodel plan onnx libtorch"
 TEST_BACKENDS = os.environ.get("BACKENDS", DEFAULT_BACKENDS).split()
+
 
 class InferTest(tu.TestResultCollector):
 
@@ -80,7 +81,6 @@ class InferTest(tu.TestResultCollector):
                                use_streaming=use_streaming,
                                correlation_id=correlation_id)
 
-
         input_size = 16
 
         if tu.validate_for_tf_model(input_dtype, output0_dtype, output1_dtype,
@@ -107,7 +107,8 @@ class InferTest(tu.TestResultCollector):
                 else:
                     shape = (input_size,)
                 _infer_exact_helper(self,
-                                    'plan', shape,
+                                    'plan',
+                                    shape,
                                     8,
                                     input_dtype,
                                     output0_dtype,

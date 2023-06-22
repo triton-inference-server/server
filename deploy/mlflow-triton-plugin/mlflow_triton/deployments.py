@@ -188,11 +188,12 @@ class TritonPlugin(BaseDeploymentClient):
                                                 d['name'],
                                                 _MLFLOW_META_FILENAME)
                 if 's3' in self.server_config:
-                    meta_dict = ast.literal_eval(self.server_config['s3'].get_object(
-                        Bucket=self.server_config['s3_bucket'],
-                        Key=os.path.join(
-                            self.server_config['s3_prefix'], d['name'], _MLFLOW_META_FILENAME),
-                    )['Body'].read().decode('utf-8'))
+                    meta_dict = ast.literal_eval(
+                        self.server_config['s3'].get_object(
+                            Bucket=self.server_config['s3_bucket'],
+                            Key=os.path.join(self.server_config['s3_prefix'],
+                                             d['name'], _MLFLOW_META_FILENAME),
+                        )['Body'].read().decode('utf-8'))
                 elif os.path.isfile(mlflow_meta_path):
                     meta_dict = self._get_mlflow_meta_dict(d['name'])
                 else:
@@ -280,12 +281,13 @@ class TritonPlugin(BaseDeploymentClient):
             self.server_config['s3'].put_object(
                 Body=json.dumps(meta_dict, indent=4).encode('utf-8'),
                 Bucket=self.server_config["s3_bucket"],
-                Key=os.path.join(
-                    self.server_config['s3_prefix'], name, _MLFLOW_META_FILENAME),
+                Key=os.path.join(self.server_config['s3_prefix'], name,
+                                 _MLFLOW_META_FILENAME),
             )
         else:
-            with open(os.path.join(triton_deployment_dir, _MLFLOW_META_FILENAME),
-                      "w") as outfile:
+            with open(
+                    os.path.join(triton_deployment_dir, _MLFLOW_META_FILENAME),
+                    "w") as outfile:
                 json.dump(meta_dict, outfile, indent=4)
 
         print("Saved", _MLFLOW_META_FILENAME, "to", triton_deployment_dir)
@@ -295,11 +297,12 @@ class TritonPlugin(BaseDeploymentClient):
                                         _MLFLOW_META_FILENAME)
 
         if 's3' in self.server_config:
-            mlflow_meta_dict = ast.literal_eval(self.server_config['s3'].get_object(
-                Bucket=self.server_config['s3_bucket'],
-                Key=os.path.join(
-                    self.server_config['s3_prefix'], name, _MLFLOW_META_FILENAME),
-            )['Body'].read().decode('utf-8'))
+            mlflow_meta_dict = ast.literal_eval(
+                self.server_config['s3'].get_object(
+                    Bucket=self.server_config['s3_bucket'],
+                    Key=os.path.join(self.server_config['s3_prefix'], name,
+                                     _MLFLOW_META_FILENAME),
+                )['Body'].read().decode('utf-8'))
         else:
             with open(mlflow_meta_path, 'r') as metafile:
                 mlflow_meta_dict = json.load(metafile)
@@ -392,7 +395,8 @@ default_model_filename: "{}"
                             s3_path = os.path.join(
                                 self.server_config['s3_prefix'],
                                 copy_paths[key]['to'].replace(
-                                    self.server_config['triton_model_repo'], '').strip('/'),
+                                    self.server_config['triton_model_repo'],
+                                    '').strip('/'),
                                 filename,
                             )
 
@@ -413,8 +417,8 @@ default_model_filename: "{}"
                 if os.path.isdir(copy_paths[key]['from']):
                     if os.path.isdir(copy_paths[key]['to']):
                         shutil.rmtree(copy_paths[key]['to'])
-                    shutil.copytree(
-                        copy_paths[key]['from'], copy_paths[key]['to'])
+                    shutil.copytree(copy_paths[key]['from'],
+                                    copy_paths[key]['to'])
                 else:
                     if not os.path.isdir(copy_paths[key]['to']):
                         os.makedirs(copy_paths[key]['to'])

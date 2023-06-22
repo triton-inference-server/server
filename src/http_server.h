@@ -27,12 +27,14 @@
 
 #include <evhtp/evhtp.h>
 #include <re2/re2.h>
+
 #include <list>
 #include <map>
 #include <memory>
 #include <string>
 #include <thread>
 #include <unordered_map>
+
 #include "common.h"
 #include "data_compressor.h"
 #include "shared_memory_manager.h"

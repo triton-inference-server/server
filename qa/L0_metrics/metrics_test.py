@@ -34,31 +34,25 @@ import unittest
 import test_util as tu
 
 INF_COUNTER_PATTERNS = [
-  'nv_inference_request_duration', 
-  'nv_inference_queue_duration',
-  'nv_inference_compute_input_duration',
-  'nv_inference_compute_infer_duration',
-  'nv_inference_compute_output_duration'
+    'nv_inference_request_duration', 'nv_inference_queue_duration',
+    'nv_inference_compute_input_duration',
+    'nv_inference_compute_infer_duration',
+    'nv_inference_compute_output_duration'
 ]
 INF_SUMMARY_PATTERNS = [
-  'nv_inference_request_summary',
-  'nv_inference_queue_summary',
-  'nv_inference_compute_input_summary',
-  'nv_inference_compute_infer_summary',
-  'nv_inference_compute_output_summary'
+    'nv_inference_request_summary', 'nv_inference_queue_summary',
+    'nv_inference_compute_input_summary', 'nv_inference_compute_infer_summary',
+    'nv_inference_compute_output_summary'
 ]
 CACHE_COUNTER_PATTERNS = [
-  'nv_cache_num_hits_per_model',
-  'nv_cache_num_misses_per_model',
-  'nv_cache_hit_duration_per_model',
-  'nv_cache_miss_duration_per_model'
+    'nv_cache_num_hits_per_model', 'nv_cache_num_misses_per_model',
+    'nv_cache_hit_duration_per_model', 'nv_cache_miss_duration_per_model'
 ]
-CACHE_SUMMARY_PATTERNS = [
-  'nv_cache_hit_summary',
-  'nv_cache_miss_summary'
-]
+CACHE_SUMMARY_PATTERNS = ['nv_cache_hit_summary', 'nv_cache_miss_summary']
+
 
 class MetricsTest(tu.TestResultCollector):
+
     def _get_metrics(self):
         metrics_url = "http://localhost:8002/metrics"
         r = requests.get(metrics_url)
@@ -128,6 +122,7 @@ class MetricsTest(tu.TestResultCollector):
             self.assertIn(metric, metrics)
         for metric in bad_patterns:
             self.assertNotIn(metric, metrics)
+
 
 if __name__ == '__main__':
     unittest.main()

@@ -26,7 +26,9 @@
 #pragma once
 
 #include <grpc++/grpc++.h>
+
 #include <vector>
+
 #include "../shared_memory_manager.h"
 #include "../tracer.h"
 #include "grpc_handler.h"

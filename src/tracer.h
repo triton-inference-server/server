@@ -157,7 +157,7 @@ class TraceManager {
 
     uint64_t trace_id_;
 
-#if !defined (_WIN32) && defined (TRITON_ENABLE_TRACING)
+#if !defined(_WIN32) && defined(TRITON_ENABLE_TRACING)
     // OpenTelemetry SDK relies on system's clock for event timestamps.
     // Triton Tracing records timestamps using steady_clock. This is a
     // monotonic clock, i.e. time is always moving forward. It is not related
