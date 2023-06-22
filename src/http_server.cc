@@ -258,9 +258,7 @@ JsonBytesArrayByteSize(
     RETURN_IF_ERR(tensor_data.At(i, &el));
 
     // Recurse if not last dimension...
-    TRITONSERVER_Error* assert_err =
-        el.AssertType(triton::common::TritonJson::ValueType::ARRAY);
-    if (assert_err == nullptr) {
+    if (el.IsArray()) {
       size_t byte_size_;
       RETURN_IF_ERR(JsonBytesArrayByteSize(el, &byte_size_));
       *byte_size += byte_size_;
@@ -273,7 +271,6 @@ JsonBytesArrayByteSize(
           el.AsString(&str, &len), "Unable to parse JSON bytes array");
       *byte_size += len + sizeof(uint32_t);
     }
-    TRITONSERVER_ErrorDelete(assert_err);
   }
 
   return nullptr;  // success
@@ -400,16 +397,23 @@ ReadDataFromJsonHelper(
           const char* cstr;
           size_t len = 0;
           RETURN_IF_ERR(el.AsString(&cstr, &len));
+	  if (len > std::numeric_limits<uint32_t>::max()) {
+	    return TRITONSERVER_ErrorNew(
+                TRITONSERVER_ERROR_INTERNAL,
+                "Length of bytes data larger than uint32_t max value");
+	  }
           if (static_cast<int64_t>(*counter + len + sizeof(uint32_t)) >
               expected_cnt) {
             return TRITONSERVER_ErrorNew(
                 TRITONSERVER_ERROR_INTERNAL,
                 "Shape does not match true shape of 'data' field");
           }
-	  *((uint32_t*)(base + *counter)) = (uint32_t) len;
+	  // Prepend bytes with length
+	  *reinterpret_cast<uint32_t*>(base +*counter) = static_cast<uint32_t>(len);
 	  *counter += sizeof(uint32_t);
-          std::copy(cstr, cstr + len, base + *counter);
-          *counter += len;
+	  // Copy bytes
+          std::copy(cstr, cstr + static_cast<uint32_t>(len), base + *counter);
+          *counter += static_cast<uint32_t>(len);
           break;
         }
         default:
