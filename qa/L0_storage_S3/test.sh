@@ -416,9 +416,8 @@ aws configure set default.region $AWS_DEFAULT_REGION && \
     aws configure set aws_access_key_id $AWS_ACCESS_KEY_ID && \
     aws configure set aws_secret_access_key $AWS_SECRET_ACCESS_KEY
 
-# Clean up bucket contents and delete bucket
+# Clean up bucket contents
 aws s3 rm "${BUCKET_URL_SLASH}" --recursive --include "*"
-aws s3 rb "${BUCKET_URL}"
 
 if [ $RET -eq 0 ]; then
   echo -e "\n***\n*** Test Passed\n***"
@@ -456,5 +455,9 @@ fi
 
 kill $SERVER_PID
 wait $SERVER_PID
+
+# Clean up bucket contents and delete bucket
+aws s3 rm "${BUCKET_URL_SLASH}" --recursive --include "*"
+aws s3 rb "${BUCKET_URL}"
 
 exit $RET
