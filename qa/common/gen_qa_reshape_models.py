@@ -182,14 +182,11 @@ def create_tf_modelfile(create_savedmodel, models_dir, model_version, max_batch,
             tf.identity(tin, name=output_name)
         else:
             if max_batch == 0:
-                tf.reshape(tin,
-                                     output_shapes[io_num],
-                                     name=output_name)
+                tf.reshape(tin, output_shapes[io_num], name=output_name)
             else:
                 tf.reshape(tin, [
                     -1,
-                ] + output_shapes[io_num],
-                                     name=output_name)
+                ] + output_shapes[io_num], name=output_name)
 
     # Use model name based on input/output count and non-batching variant
     if create_savedmodel:

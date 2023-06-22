@@ -26,10 +26,9 @@
 
 
 class TritonPythonModel:
+
     def execute(self, requests):
         undefined_variable
 
     def finalize(self):
         print('Cleaning up...')
-
-

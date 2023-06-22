@@ -48,13 +48,12 @@ class Config(dict):
                 protocol = "http://"
             endpoint_url = None
             if uri.host_name != "" and uri.host_port != "":
-                endpoint_url = '{}{}:{}'.format(
-                    protocol, uri.host_name, uri.host_port)
+                endpoint_url = '{}{}:{}'.format(protocol, uri.host_name,
+                                                uri.host_port)
 
             import boto3
             # boto3 handles AWS credentials
-            self['s3'] = boto3.client(
-                's3', endpoint_url=endpoint_url)
+            self['s3'] = boto3.client('s3', endpoint_url=endpoint_url)
             self['s3_bucket'] = uri.bucket
             self['s3_prefix'] = uri.prefix
             self['triton_model_repo'] = 's3://{}'.format(

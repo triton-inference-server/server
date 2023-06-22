@@ -35,7 +35,7 @@ class TritonPythonModel:
         Mock Model that uses the input data to determine how long to wait
         before returning identity data
         """
-        assert(len(requests) == 1)
+        assert (len(requests) == 1)
         delay = 0
         request = requests[0]
         responses = []

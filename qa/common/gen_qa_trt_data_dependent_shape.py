@@ -30,6 +30,7 @@ import numpy as np
 import tensorrt as trt
 import test_util as tu
 
+
 def np_to_model_dtype(np_dtype):
     if np_dtype == bool:
         return "TYPE_BOOL"
@@ -68,6 +69,7 @@ def np_to_trt_dtype(np_dtype):
     elif np_dtype == np.float32:
         return trt.float32
     return None
+
 
 # The 'nonzero' model that we use for data dependent shape is naturally
 # not support batching, because the layer output is not trivially separable
@@ -117,7 +119,7 @@ def create_data_dependent_modelfile(models_dir,
     config = builder.create_builder_config()
     config.add_optimization_profile(profile)
     config.set_memory_pool_limit(trt.MemoryPoolType.WORKSPACE, 1 << 20)
-    
+
     # serialized model
     engine_bytes = builder.build_serialized_network(network, config)
 
@@ -130,8 +132,9 @@ def create_data_dependent_modelfile(models_dir,
     with open(model_version_dir + "/model.plan", "wb") as f:
         f.write(engine_bytes)
 
+
 def create_data_dependent_modelconfig(models_dir,
-                                    model_name,
+                                      model_name,
                                       input_shape,
                                       input_dtype=np.int32):
     config_dir = models_dir + "/" + model_name
@@ -153,9 +156,8 @@ output [
     dims: [ {} ]
    }}
 ]
-'''.format(model_name,
-           np_to_model_dtype(input_dtype), tu.shape_to_dims_str(input_shape),
-           np_to_model_dtype(np.int32),
+'''.format(model_name, np_to_model_dtype(input_dtype),
+           tu.shape_to_dims_str(input_shape), np_to_model_dtype(np.int32),
            tu.shape_to_dims_str((len(input_shape), -1)))
 
     try:
@@ -176,10 +178,13 @@ if __name__ == '__main__':
     FLAGS, unparsed = parser.parse_known_args()
 
     # Fixed input shape
-    create_data_dependent_modelfile(FLAGS.models_dir, "plan_nobatch_nonzero_fixed", (4, 4))
-    create_data_dependent_modelconfig(FLAGS.models_dir, "plan_nobatch_nonzero_fixed", (4, 4))
+    create_data_dependent_modelfile(FLAGS.models_dir,
+                                    "plan_nobatch_nonzero_fixed", (4, 4))
+    create_data_dependent_modelconfig(FLAGS.models_dir,
+                                      "plan_nobatch_nonzero_fixed", (4, 4))
 
     # Dynamic input shape
-    create_data_dependent_modelfile(FLAGS.models_dir, "plan_nobatch_nonzero_dynamic", (-1, -1))
-    create_data_dependent_modelconfig(FLAGS.models_dir, "plan_nobatch_nonzero_dynamic", (-1, -1))
-
+    create_data_dependent_modelfile(FLAGS.models_dir,
+                                    "plan_nobatch_nonzero_dynamic", (-1, -1))
+    create_data_dependent_modelconfig(FLAGS.models_dir,
+                                      "plan_nobatch_nonzero_dynamic", (-1, -1))

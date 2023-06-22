@@ -182,9 +182,8 @@ class PythonTest(tu.TestResultCollector):
 
                 # Make sure the requests ran in parallel.
                 stats = client.get_inference_statistics(model_name)
-                test_cond = (len(stats['model_stats'])
-                             != 1) or (stats['model_stats'][0]['name']
-                                       != model_name)
+                test_cond = (len(stats['model_stats']) != 1) or (
+                    stats['model_stats'][0]['name'] != model_name)
                 self.assertFalse(
                     test_cond,
                     "error: expected statistics for {}".format(model_name))

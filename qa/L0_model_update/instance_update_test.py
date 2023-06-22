@@ -63,14 +63,18 @@ class TestInstanceUpdate(unittest.TestCase):
     def __concurrent_infer(self, concurrency=4, batching=False):
         pool = concurrent.futures.ThreadPoolExecutor()
         stop = [False]
+
         def repeat_infer():
             while not stop[0]:
                 self.__infer(batching)
+
         infer_threads = [pool.submit(repeat_infer) for i in range(concurrency)]
+
         def stop_infer():
             stop[0] = True
             [t.result() for t in infer_threads]
             pool.shutdown()
+
         return stop_infer
 
     def __check_count(self, kind, expected_count, poll=False):
@@ -382,10 +386,12 @@ class TestInstanceUpdate(unittest.TestCase):
         # possibly not updated to the larger resource requirement.
         infer_count = 8
         infer_complete = [False for i in range(infer_count)]
+
         def infer():
             for i in range(infer_count):
                 self.__infer()
                 infer_complete[i] = True
+
         with concurrent.futures.ThreadPoolExecutor() as pool:
             infer_thread = pool.submit(infer)
             time.sleep(infer_count / 2)  # each infer should take < 0.5 seconds

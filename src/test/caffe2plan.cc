@@ -30,6 +30,7 @@
 #include <errno.h>
 #include <stddef.h>
 #include <unistd.h>
+
 #include <algorithm>
 #include <cstring>
 #include <fstream>
@@ -415,9 +416,9 @@ main(int argc, char** argv)
 
   if (!CaffeToPlan(
           output_filename, prototxt_filename, model_filename, output_names,
-          (use_fp16) ? nvinfer1::DataType::kHALF
-                     : (use_int8) ? nvinfer1::DataType::kINT8
-                                  : nvinfer1::DataType::kFLOAT,
+          (use_fp16)   ? nvinfer1::DataType::kHALF
+          : (use_int8) ? nvinfer1::DataType::kINT8
+                       : nvinfer1::DataType::kFLOAT,
           calibration_filename, max_batch_size, max_workspace_size)) {
     std::cerr << "Failed to create PLAN file" << std::endl;
     return 1;

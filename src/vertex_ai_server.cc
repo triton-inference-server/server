@@ -26,6 +26,7 @@
 #include "vertex_ai_server.h"
 
 #include <memory>
+
 #include "common.h"
 
 namespace triton { namespace server {

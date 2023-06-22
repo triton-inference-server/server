@@ -108,7 +108,7 @@ Use clang-format to format all source files (\*.h, \*.cc, \*.proto,
 source files before submitting a pull request:
 
 ```
-$ apt-get install clang-format clang-format-6.0
+$ apt-get install clang-format-15
 ```
 
 For convenience there is a format.py script in the
