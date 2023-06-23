@@ -32,10 +32,12 @@
 
 #include <event2/buffer.h>
 #include <re2/re2.h>
+
 #include <algorithm>
 #include <list>
 #include <regex>
 #include <thread>
+
 #include "classification.h"
 
 #define TRITONJSON_STATUSTYPE TRITONSERVER_Error*
@@ -1345,7 +1347,7 @@ HTTPAPIServer::HandleRepositoryControl(
           };
       std::unique_ptr<
           std::vector<TRITONSERVER_Parameter*>, decltype(param_deleter)>
-      params(new std::vector<TRITONSERVER_Parameter*>(), param_deleter);
+          params(new std::vector<TRITONSERVER_Parameter*>(), param_deleter);
       // local variables to store the decoded file content, the data must
       // be valid until TRITONSERVER_ServerLoadModelWithParameters returns.
       std::list<std::vector<char>> binary_files;

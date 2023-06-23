@@ -37,6 +37,7 @@ TRT_LOGGER = trt.Logger()
 trt.init_libnvinfer_plugins(TRT_LOGGER, '')
 PLUGIN_CREATORS = trt.get_plugin_registry().plugin_creator_list
 
+
 def np_to_model_dtype(np_dtype):
     if np_dtype == bool:
         return "TYPE_BOOL"

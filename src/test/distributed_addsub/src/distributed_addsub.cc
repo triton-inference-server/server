@@ -27,6 +27,7 @@
 #include <atomic>
 #include <memory>
 #include <thread>
+
 #include "triton/backend/backend_common.h"
 #include "triton/backend/backend_model.h"
 #include "triton/backend/backend_model_instance.h"
@@ -661,10 +662,14 @@ TRITONBACKEND_ModelInstanceExecute(
     uint64_t input_1_byte_size = input_byte_size;
     GUARDED_RESPOND_IF_ERROR(
         responses, r,
-        ReadInputTensor(request, "INPUT0", input_0.data(), reinterpret_cast<size_t*>(&input_0_byte_size)));
+        ReadInputTensor(
+            request, "INPUT0", input_0.data(),
+            reinterpret_cast<size_t*>(&input_0_byte_size)));
     GUARDED_RESPOND_IF_ERROR(
         responses, r,
-        ReadInputTensor(request, "INPUT1", input_1.data(), reinterpret_cast<size_t*>(&input_1_byte_size)));
+        ReadInputTensor(
+            request, "INPUT1", input_1.data(),
+            reinterpret_cast<size_t*>(&input_1_byte_size)));
     if (responses[r] == nullptr) {
       LOG_MESSAGE(
           TRITONSERVER_LOG_ERROR,

@@ -28,6 +28,7 @@
 
 #include <algorithm>
 #include <numeric>
+
 #include "common.h"
 
 namespace triton { namespace server {

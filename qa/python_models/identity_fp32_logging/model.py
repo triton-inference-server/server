@@ -36,7 +36,7 @@ class TritonPythonModel:
         logger.log_warn("Initialize-Warning Msg!")
         logger.log_error("Initialize-Error Msg!")
         logger.log_verbose("Initialize-Verbose Msg!")
-        
+
     def execute(self, requests):
         """
         Identity model in Python backend.

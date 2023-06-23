@@ -74,9 +74,8 @@ class LogEndpointTest(tu.TestResultCollector):
             "log_format": "default"
         }
         triton_client = httpclient.InferenceServerClient("localhost:8000")
-        self.assertEqual(initial_settings,
-                         triton_client.get_log_settings())
-    
+        self.assertEqual(initial_settings, triton_client.get_log_settings())
+
     def test_http_get_settings(self):
         # Log settings will be the same as default settings since
         # no update has been made.
@@ -89,8 +88,7 @@ class LogEndpointTest(tu.TestResultCollector):
             "log_format": "default"
         }
         triton_client = httpclient.InferenceServerClient("localhost:8000")
-        self.assertEqual(initial_settings,
-                         triton_client.get_log_settings(),
+        self.assertEqual(initial_settings, triton_client.get_log_settings(),
                          "Unexpected initial log settings")
 
     def test_grpc_get_settings(self):
@@ -121,10 +119,9 @@ class LogEndpointTest(tu.TestResultCollector):
                 }
             }), initial_settings)
         triton_client = grpcclient.InferenceServerClient("localhost:8001")
-        self.assertEqual(initial_settings,
-                         triton_client.get_log_settings(),
+        self.assertEqual(initial_settings, triton_client.get_log_settings(),
                          "Unexpected initial log settings")
-    
+
     def test_http_update_settings(self):
         # Update each possible log configuration
         # field and check that they are reflected
@@ -205,8 +202,7 @@ class LogEndpointTest(tu.TestResultCollector):
             expected_log_settings_6,
             triton_client.update_log_settings(settings=expected_log_settings_6),
             "Unexpected updated log settings")
-        
-    
+
     def test_grpc_update_settings(self):
         # Update each possible log configuration
         # field and check that they are reflected
@@ -251,7 +247,7 @@ class LogEndpointTest(tu.TestResultCollector):
             expected_log_settings_1,
             triton_client.update_log_settings(settings=log_settings_1),
             "Unexpected updated log settings")
-            
+
         log_settings_2 = {
             "log_file": "log_file.log",
             "log_info": False,
@@ -436,11 +432,12 @@ class LogEndpointTest(tu.TestResultCollector):
                     },
                 }
             }), expected_log_settings_6)
-        
+
         self.assertEqual(
             expected_log_settings_6,
             triton_client.update_log_settings(settings=log_settings_6),
             "Unexpected updated log settings")
-    
+
+
 if __name__ == '__main__':
     unittest.main()

@@ -27,7 +27,9 @@
 #include "tracer.h"
 
 #include <stdlib.h>
+
 #include <unordered_map>
+
 #include "common.h"
 #include "triton/common/logging.h"
 #ifdef TRITON_ENABLE_GPU
@@ -342,8 +344,7 @@ TraceManager::Trace::CaptureTimestamp(
       if (trace_span_ == nullptr) {
         InitSpan(otel_timestamp);
       }
-      trace_span_->AddEvent(
-          name, otel_timestamp);
+      trace_span_->AddEvent(name, otel_timestamp);
 #else
       LOG_ERROR << "Unsupported trace mode: "
                 << TraceManager::InferenceTraceModeString(setting_->mode_);
@@ -369,10 +370,10 @@ TraceManager::Trace::InitTracer(
     }
   }
   exporter_ = otlp::OtlpHttpExporterFactory::Create(opts);
-  processor_ = otel_trace_sdk::SimpleSpanProcessorFactory::Create(
-      std::move(exporter_));
-  provider_ = otel_trace_sdk::TracerProviderFactory::Create(
-      std::move(processor_));
+  processor_ =
+      otel_trace_sdk::SimpleSpanProcessorFactory::Create(std::move(exporter_));
+  provider_ =
+      otel_trace_sdk::TracerProviderFactory::Create(std::move(processor_));
 }
 
 void

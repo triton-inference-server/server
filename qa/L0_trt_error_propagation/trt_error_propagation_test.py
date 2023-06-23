@@ -47,9 +47,8 @@ class TestTrtErrorPropagation(unittest.TestCase):
             "Internal Error "
         ]
         for expected_msg_part in expected_msg_parts:
-            self.assertIn(
-                expected_msg_part, err_msg,
-                "Cannot find an expected part of error message")
+            self.assertIn(expected_msg_part, err_msg,
+                          "Cannot find an expected part of error message")
             _, err_msg = err_msg.split(expected_msg_part)
 
     def test_invalid_trt_model_autocomplete(self):

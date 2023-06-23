@@ -412,7 +412,8 @@ class ModelQueueTest(tu.TestResultCollector):
                                  kwargs=trial))
             threads.append(
                 threading.Thread(target=self.check_response,
-                                 args=(1, dtype, shapes, MAX_UINT32_PLUS_1, 0, (15000, 10000)),
+                                 args=(1, dtype, shapes, MAX_UINT32_PLUS_1, 0,
+                                       (15000, 10000)),
                                  kwargs=trial))
             threads.append(
                 threading.Thread(target=self.check_response,
