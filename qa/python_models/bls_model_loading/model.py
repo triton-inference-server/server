@@ -38,8 +38,8 @@ class PBBLSModelLoadingTest(unittest.TestCase):
         pb_utils.unload_model(self.model_name)
 
     def test_load_unload_model(self):
-        self.assertFalse(pb_utils.is_model_ready(self.model_name))
-        pb_utils.load_model(self.model_name)
+        self.assertFalse(pb_utils.is_model_ready(model_name=self.model_name))
+        pb_utils.load_model(model_name=self.model_name)
         self.assertTrue(pb_utils.is_model_ready(self.model_name))
         pb_utils.unload_model(self.model_name)
         self.assertFalse(pb_utils.is_model_ready(self.model_name))
@@ -52,13 +52,13 @@ class PBBLSModelLoadingTest(unittest.TestCase):
         # Send the config with the wrong format
         wrong_config = "\"parameters\": {\"config\": {{\"backend\":\"onnxruntime\", \"version_policy\":{\"specific\":{\"versions\":[2]}}}}}"
         with self.assertRaises(pb_utils.TritonModelException):
-            pb_utils.load_model(self.model_name, wrong_config)
+            pb_utils.load_model(model_name=self.model_name, config=wrong_config)
         # The model should not be changed after a failed load model request
         for version in ["2", "3"]:
-            self.assertTrue(pb_utils.is_model_ready(self.model_name, version))
+            self.assertTrue(pb_utils.is_model_ready(model_name=self.model_name, model_version=version))
 
         # Send the config with the correct format
-        config = config = "{\"backend\":\"onnxruntime\", \"version_policy\":{\"specific\":{\"versions\":[2]}}}"
+        config = "{\"backend\":\"onnxruntime\", \"version_policy\":{\"specific\":{\"versions\":[2]}}}"
         pb_utils.load_model(self.model_name, config=config)
         # The model should be changed after a successful load model request
         self.assertTrue(pb_utils.is_model_ready(self.model_name, "2"))
@@ -81,7 +81,7 @@ class PBBLSModelLoadingTest(unittest.TestCase):
             pb_utils.load_model(self.model_name, "", files)
 
         # Request to load the model with override file and config in a different name
-        pb_utils.load_model(override_name, config, files)
+        pb_utils.load_model(model_name=override_name, config=config, files=files)
         # Sanity check that the model with original name is unchanged
         self.assertFalse(pb_utils.is_model_ready(self.model_name, "1"))
         self.assertTrue(pb_utils.is_model_ready(self.model_name, "3"))
