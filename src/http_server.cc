@@ -291,7 +291,7 @@ ReadDataFromJsonHelper(
     RETURN_IF_ERR(tensor_data.At(i, &el));
 
     if (el.IsArray()) {
-          RETURN_IF_ERR(
+      RETURN_IF_ERR(
           ReadDataFromJsonHelper(base, dtype, el, counter, expected_cnt));
     } else {
       // Check if writing to 'serialized' is overrunning the expected byte_size
@@ -399,21 +399,22 @@ ReadDataFromJsonHelper(
           const char* cstr;
           size_t len = 0;
           RETURN_IF_ERR(el.AsString(&cstr, &len));
-	  if (len > std::numeric_limits<uint32_t>::max()) {
-	    return TRITONSERVER_ErrorNew(
+          if (len > std::numeric_limits<uint32_t>::max()) {
+            return TRITONSERVER_ErrorNew(
                 TRITONSERVER_ERROR_INTERNAL,
                 "Length of bytes data larger than uint32_t max value");
-	  }
+          }
           if (static_cast<int64_t>(*counter + len + sizeof(uint32_t)) >
               expected_cnt) {
             return TRITONSERVER_ErrorNew(
                 TRITONSERVER_ERROR_INTERNAL,
                 "Shape does not match true shape of 'data' field");
           }
-	  // Prepend bytes with length
-	  *reinterpret_cast<uint32_t*>(base +*counter) = static_cast<uint32_t>(len);
-	  *counter += sizeof(uint32_t);
-	  // Copy bytes
+          // Prepend bytes with length
+          *reinterpret_cast<uint32_t*>(base + *counter) =
+              static_cast<uint32_t>(len);
+          *counter += sizeof(uint32_t);
+          // Copy bytes
           std::copy(cstr, cstr + static_cast<uint32_t>(len), base + *counter);
           *counter += static_cast<uint32_t>(len);
           break;
