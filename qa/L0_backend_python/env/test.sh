@@ -127,6 +127,7 @@ done
 # Test default (non set) locale in python stub processes
 # NOTE: In certain pybind versions, the locale settings may not be propagated from parent to
 #       stub processes correctly. See https://github.com/triton-inference-server/python_backend/pull/260.
+export LC_ALL=INVALID
 grep "Locale is \(None, None\)" $SERVER_LOG
     if [ $? -ne 0 ]; then
         cat $SERVER_LOG
