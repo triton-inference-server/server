@@ -72,6 +72,9 @@ class TestModel(nn.Module):
         op1 = self.layer2(INPUT0, INPUT1)
         return op0, op1
 
+if torch.cuda.device_count() < 4:
+    print("Need at least 4 GPUs to run this test")
+    exit(1)
 
 devices = [("cuda:2", "cuda:0"), ("cpu", "cuda:3")]
 model_names = ["libtorch_multi_gpu", "libtorch_multi_device"]
