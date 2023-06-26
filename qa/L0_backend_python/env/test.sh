@@ -128,7 +128,7 @@ done
 # NOTE: In certain pybind versions, the locale settings may not be propagated from parent to
 #       stub processes correctly. See https://github.com/triton-inference-server/python_backend/pull/260.
 export LC_ALL=INVALID
-grep "Locale is \(None, None\)" $SERVER_LOG
+grep "Locale is (None, None)" $SERVER_LOG
     if [ $? -ne 0 ]; then
         cat $SERVER_LOG
         echo -e "\n***\n*** Default unset Locale was not found in Triton logs. \n***"
@@ -153,7 +153,7 @@ kill $SERVER_PID
 wait $SERVER_PID
 
 set +e
-grep "Locale is \('en_US', 'UTF-8'\)" $SERVER_LOG
+grep "Locale is ('en_US', 'UTF-8')" $SERVER_LOG
     if [ $? -ne 0 ]; then
         cat $SERVER_LOG
         echo -e "\n***\n*** Locale UTF-8 was not found in Triton logs. \n***"
