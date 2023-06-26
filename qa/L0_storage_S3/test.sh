@@ -424,9 +424,24 @@ aws s3 rm "${BUCKET_URL_SLASH}" --recursive --include "*"
 rm -rf models
 
 mkdir -p models/model/1
-echo $'class TritonPythonModel:\n\tdef execute(self):\n\t\tpass' > ./models/model/1/model.py
+# Create Python model that reads the number of files in the
+# model directory when loaded
+echo "import os
 
-for i in {1..1000}; do
+class TritonPythonModel:
+
+    def initialize(self, args):
+        count = 0
+        model_dir = args['model_repository']
+        for path in os.listdir(model_dir):
+            if os.path.isfile(os.path.join(model_dir, path)):
+                count += 1
+        print('Found {} files in model directory'.format(count))
+
+    def execute(self):
+        pass" > models/model/1/model.py
+
+for i in {1..1050}; do
     touch models/model/0${i}.txt
 done
 
@@ -451,6 +466,14 @@ fi
 
 kill $SERVER_PID
 wait $SERVER_PID
+
+# Confirm the correct number of files loaded
+EXPECTED_MSG="Found 1050 files in model directory"
+if ! grep "$EXPECTED_MSG" $SERVER_LOG; then
+echo -e "\n***\n*** Expected file count message not found\n***"
+cat $SERVER_LOG
+RET=1
+fi
 
 # Clean up bucket contents and delete bucket
 aws s3 rm "${BUCKET_URL_SLASH}" --recursive --include "*"
