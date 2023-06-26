@@ -1188,57 +1188,8 @@ RUN ln -sf ${_CUDA_COMPAT_PATH}/lib.real ${_CUDA_COMPAT_PATH}/lib \
  && ldconfig \
  && rm -f ${_CUDA_COMPAT_PATH}/lib
 '''
-
     else:
-        libs_arch = 'aarch64' if target_machine == 'aarch64' else 'x86_64'
-        if 'pytorch' in backends:
-            # Add extra dependencies for pytorch backend.
-            # Note: Even though the build is CPU-only, the version of pytorch
-            # we are using depend upon libraries like cuda and cudnn. Since
-            # these dependencies are not present in the ubuntu base image,
-            # we must copy these from the Triton min container ourselves.
-            cuda_arch = 'sbsa' if target_machine == 'aarch64' else 'x86_64'
-            df += '''
-RUN mkdir -p /usr/local/cuda/lib64/stubs
-COPY --from=min_container /usr/local/cuda/lib64/stubs/libcusparse.so /usr/local/cuda/lib64/stubs/libcusparse.so.12
-COPY --from=min_container /usr/local/cuda/lib64/stubs/libcusolver.so /usr/local/cuda/lib64/stubs/libcusolver.so.11
-COPY --from=min_container /usr/local/cuda/lib64/stubs/libcurand.so /usr/local/cuda/lib64/stubs/libcurand.so.10
-COPY --from=min_container /usr/local/cuda/lib64/stubs/libcufft.so /usr/local/cuda/lib64/stubs/libcufft.so.11
-COPY --from=min_container /usr/local/cuda/lib64/stubs/libcublas.so /usr/local/cuda/lib64/stubs/libcublas.so.12
-COPY --from=min_container /usr/local/cuda/lib64/stubs/libcublasLt.so /usr/local/cuda/lib64/stubs/libcublasLt.so.12
-COPY --from=min_container /usr/local/cuda/lib64/stubs/libcublasLt.so /usr/local/cuda/lib64/stubs/libcublasLt.so.11
-
-RUN mkdir -p /usr/local/cuda/targets/{cuda_arch}-linux/lib
-COPY --from=min_container /usr/local/cuda-12.1/targets/{cuda_arch}-linux/lib/libcudart.so.12 /usr/local/cuda/targets/{cuda_arch}-linux/lib/.
-COPY --from=min_container /usr/local/cuda-12.1/targets/{cuda_arch}-linux/lib/libcupti.so.12 /usr/local/cuda/targets/{cuda_arch}-linux/lib/.
-COPY --from=min_container /usr/local/cuda-12.1/targets/{cuda_arch}-linux/lib/libnvToolsExt.so.1 /usr/local/cuda/targets/{cuda_arch}-linux/lib/.
-COPY --from=min_container /usr/local/cuda-12.1/targets/{cuda_arch}-linux/lib/libnvJitLink.so.12 /usr/local/cuda/targets/{cuda_arch}-linux/lib/.
-
-RUN mkdir -p /opt/hpcx/ucc/lib/ /opt/hpcx/ucx/lib/
-COPY --from=min_container /opt/hpcx/ucc/lib/libucc.so.1 /opt/hpcx/ucc/lib/libucc.so.1
-COPY --from=min_container /opt/hpcx/ucx/lib/libucm.so.0 /opt/hpcx/ucx/lib/libucm.so.0
-COPY --from=min_container /opt/hpcx/ucx/lib/libucp.so.0 /opt/hpcx/ucx/lib/libucp.so.0
-COPY --from=min_container /opt/hpcx/ucx/lib/libucs.so.0 /opt/hpcx/ucx/lib/libucs.so.0
-COPY --from=min_container /opt/hpcx/ucx/lib/libuct.so.0 /opt/hpcx/ucx/lib/libuct.so.0
-
-COPY --from=min_container /usr/lib/{libs_arch}-linux-gnu/libcudnn.so.8 /usr/lib/{libs_arch}-linux-gnu/libcudnn.so.8
-
-# patchelf is needed to add deps of libcublasLt.so.12 to libtorch_cuda.so
-RUN apt-get update && \
-        apt-get install -y --no-install-recommends openmpi-bin patchelf
-
-ENV LD_LIBRARY_PATH /usr/local/cuda/targets/{cuda_arch}-linux/lib:/usr/local/cuda/lib64/stubs:${{LD_LIBRARY_PATH}}
-'''.format(cuda_arch=cuda_arch, libs_arch=libs_arch)
-
-        if ('pytorch' in backends) or ('tensorflow' in backends):
-            # Add NCCL dependency for tensorflow/pytorch backend.
-            # Note: Even though the build is CPU-only, the version of
-            # tensorflow/pytorch we are using depends upon the NCCL library.
-            # Since this dependency is not present in the ubuntu base image,
-            # we must copy it from the Triton min container ourselves.
-            df += '''
-COPY --from=min_container /usr/lib/{libs_arch}-linux-gnu/libnccl.so.2 /usr/lib/{libs_arch}-linux-gnu/libnccl.so.2
-'''.format(libs_arch=libs_arch)
+        add_cpu_libs_to_linux_dockerfile(df, backends, target_machine)
 
     # Add dependencies needed for python backend
     if 'python' in backends:
@@ -1279,6 +1230,58 @@ LABEL com.nvidia.build.ref={}
            argmap['NVIDIA_BUILD_REF'])
 
     return df
+
+
+def add_cpu_libs_to_linux_dockerfile(dockerfile, backends, target_machine):
+    libs_arch = 'aarch64' if target_machine == 'aarch64' else 'x86_64'
+    if 'pytorch' in backends:
+        # Add extra dependencies for pytorch backend.
+        # Note: Even though the build is CPU-only, the version of pytorch
+        # we are using depend upon libraries like cuda and cudnn. Since
+        # these dependencies are not present in the ubuntu base image,
+        # we must copy these from the Triton min container ourselves.
+        cuda_arch = 'sbsa' if target_machine == 'aarch64' else 'x86_64'
+        dockerfile += '''
+RUN mkdir -p /usr/local/cuda/lib64/stubs
+COPY --from=min_container /usr/local/cuda/lib64/stubs/libcusparse.so /usr/local/cuda/lib64/stubs/libcusparse.so.12
+COPY --from=min_container /usr/local/cuda/lib64/stubs/libcusolver.so /usr/local/cuda/lib64/stubs/libcusolver.so.11
+COPY --from=min_container /usr/local/cuda/lib64/stubs/libcurand.so /usr/local/cuda/lib64/stubs/libcurand.so.10
+COPY --from=min_container /usr/local/cuda/lib64/stubs/libcufft.so /usr/local/cuda/lib64/stubs/libcufft.so.11
+COPY --from=min_container /usr/local/cuda/lib64/stubs/libcublas.so /usr/local/cuda/lib64/stubs/libcublas.so.12
+COPY --from=min_container /usr/local/cuda/lib64/stubs/libcublasLt.so /usr/local/cuda/lib64/stubs/libcublasLt.so.12
+COPY --from=min_container /usr/local/cuda/lib64/stubs/libcublasLt.so /usr/local/cuda/lib64/stubs/libcublasLt.so.11
+
+RUN mkdir -p /usr/local/cuda/targets/{cuda_arch}-linux/lib
+COPY --from=min_container /usr/local/cuda-12.1/targets/{cuda_arch}-linux/lib/libcudart.so.12 /usr/local/cuda/targets/{cuda_arch}-linux/lib/.
+COPY --from=min_container /usr/local/cuda-12.1/targets/{cuda_arch}-linux/lib/libcupti.so.12 /usr/local/cuda/targets/{cuda_arch}-linux/lib/.
+COPY --from=min_container /usr/local/cuda-12.1/targets/{cuda_arch}-linux/lib/libnvToolsExt.so.1 /usr/local/cuda/targets/{cuda_arch}-linux/lib/.
+COPY --from=min_container /usr/local/cuda-12.1/targets/{cuda_arch}-linux/lib/libnvJitLink.so.12 /usr/local/cuda/targets/{cuda_arch}-linux/lib/.
+
+RUN mkdir -p /opt/hpcx/ucc/lib/ /opt/hpcx/ucx/lib/
+COPY --from=min_container /opt/hpcx/ucc/lib/libucc.so.1 /opt/hpcx/ucc/lib/libucc.so.1
+COPY --from=min_container /opt/hpcx/ucx/lib/libucm.so.0 /opt/hpcx/ucx/lib/libucm.so.0
+COPY --from=min_container /opt/hpcx/ucx/lib/libucp.so.0 /opt/hpcx/ucx/lib/libucp.so.0
+COPY --from=min_container /opt/hpcx/ucx/lib/libucs.so.0 /opt/hpcx/ucx/lib/libucs.so.0
+COPY --from=min_container /opt/hpcx/ucx/lib/libuct.so.0 /opt/hpcx/ucx/lib/libuct.so.0
+
+COPY --from=min_container /usr/lib/{libs_arch}-linux-gnu/libcudnn.so.8 /usr/lib/{libs_arch}-linux-gnu/libcudnn.so.8
+
+# patchelf is needed to add deps of libcublasLt.so.12 to libtorch_cuda.so
+RUN apt-get update && \
+        apt-get install -y --no-install-recommends openmpi-bin patchelf
+
+ENV LD_LIBRARY_PATH /usr/local/cuda/targets/{cuda_arch}-linux/lib:/usr/local/cuda/lib64/stubs:${{LD_LIBRARY_PATH}}
+'''.format(cuda_arch=cuda_arch, libs_arch=libs_arch)
+
+    if ('pytorch' in backends) or ('tensorflow' in backends):
+        # Add NCCL dependency for tensorflow/pytorch backend.
+        # Note: Even though the build is CPU-only, the version of
+        # tensorflow/pytorch we are using depends upon the NCCL library.
+        # Since this dependency is not present in the ubuntu base image,
+        # we must copy it from the Triton min container ourselves.
+        dockerfile += '''
+COPY --from=min_container /usr/lib/{libs_arch}-linux-gnu/libnccl.so.2 /usr/lib/{libs_arch}-linux-gnu/libnccl.so.2
+'''.format(libs_arch=libs_arch)
 
 
 def create_dockerfile_windows(ddir, dockerfile_name, argmap, backends,
