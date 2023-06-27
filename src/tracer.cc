@@ -438,14 +438,14 @@ TraceManager::Trace::ReportToOpenTelemetry(
     TRITONSERVER_InferenceTrace* trace,
     TRITONSERVER_InferenceTraceActivity activity, uint64_t timestamp_ns)
 {
-  auto current_span_key = GetSpanNameForActivity(activity);
-  if (current_span_key.empty()) {
-    return;
-  }
   uint64_t id;
   LOG_TRITONSERVER_ERROR(
       TRITONSERVER_InferenceTraceId(trace, &id), "getting trace id");
-  current_span_key = current_span_key + std::to_string(id);
+
+  auto current_span_key = GetSpanKeyForActivity(activity, id);
+  if (current_span_key.empty()) {
+    return;
+  }
 
   MaybeStartSpan(current_span_key, trace, activity, timestamp_ns, id);
 
@@ -460,15 +460,15 @@ TraceManager::Trace::ReportToOpenTelemetry(
 }
 
 std::string
-TraceManager::Trace::GetSpanNameForActivity(
-    TRITONSERVER_InferenceTraceActivity activity)
+TraceManager::Trace::GetSpanKeyForActivity(
+    TRITONSERVER_InferenceTraceActivity activity, uint64_t trace_id)
 {
   std::string span_name;
   switch (activity) {
     case TRITONSERVER_TRACE_REQUEST_START:
     case TRITONSERVER_TRACE_QUEUE_START:
     case TRITONSERVER_TRACE_REQUEST_END: {
-      span_name = kRequestSpan;
+      span_name = kRequestSpan + std::to_string(trace_id);
       break;
     }
 
@@ -476,7 +476,7 @@ TraceManager::Trace::GetSpanNameForActivity(
     case TRITONSERVER_TRACE_COMPUTE_INPUT_END:
     case TRITONSERVER_TRACE_COMPUTE_OUTPUT_START:
     case TRITONSERVER_TRACE_COMPUTE_END: {
-      span_name = kComputeSpan;
+      span_name = kComputeSpan + std::to_string(trace_id);
       break;
     }
     case TRITONSERVER_TRACE_TENSOR_QUEUE_INPUT:
@@ -509,7 +509,7 @@ void
 TraceManager::Trace::MaybeStartSpan(
     std::string span_key, TRITONSERVER_InferenceTrace* trace,
     TRITONSERVER_InferenceTraceActivity activity, uint64_t timestamp_ns,
-    uint64_t id)
+    uint64_t trace_id)
 {
   if (activity != TRITONSERVER_TRACE_REQUEST_START &&
       activity != TRITONSERVER_TRACE_COMPUTE_START) {
@@ -550,7 +550,7 @@ TraceManager::Trace::MaybeStartSpan(
         "getting model version");
     span->SetAttribute("triton.model_name", model_name);
     span->SetAttribute("triton.model_version", model_version);
-    span->SetAttribute("triton.trace_id", id);
+    span->SetAttribute("triton.trace_id", trace_id);
     span->SetAttribute("triton.trace_parent_id", parent_id);
   }
 
