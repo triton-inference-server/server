@@ -51,6 +51,12 @@ uint64_t NextUniqueId();
 #endif  // NDEBUG
 
 namespace triton { namespace server { namespace grpc {
+      
+#if defined(__BYTE_ORDER__) && (__BYTE_ORDER__ == __ORDER_BIG_ENDIAN__)
+      void NormalizeEndianness(TRITONSERVER_DataType datatype, std::string &serialized);
+#else
+#define NormalizeEndianness(datatype, serialized)
+#endif
 
 // The step of processing that the state is in. Every state must
 // recognize START, COMPLETE and FINISH and the others are optional.
@@ -456,7 +462,7 @@ InferResponseCompleteCommon(
   response.set_id(id);
   response.set_model_name(model_name);
   response.set_model_version(std::to_string(model_version));
-
+  printf("here response complete!\n");
   // Propagate response parameters.
   uint32_t parameter_count;
   RETURN_IF_ERR(TRITONSERVER_InferenceResponseParameterCount(
@@ -541,6 +547,7 @@ InferResponseCompleteCommon(
       for (size_t idx = 0; idx < dim_count; idx++) {
         output->add_shape(shape[idx]);
       }
+      printf("not classification output\n");
     } else {
       // Classification
       const uint32_t classification_count = itr->second;
@@ -608,7 +615,13 @@ InferResponseCompleteCommon(
       (*response.mutable_raw_output_contents())[output_idx] =
           std::move(serialized);
     }
-  }
+
+    // update to little endian if big endian
+    NormalizeEndianness(datatype,(*response.mutable_raw_output_contents())[output_idx]);
+    //    if (output->get_datatype()==TRITONSERVER_DataTypeString(TRITONSERVER_TYPE_BYTES)) {
+    //  }
+  }   
+  
 
   // Make sure response doesn't exceed GRPC limits.
   if (response.ByteSizeLong() > MAX_GRPC_MESSAGE_SIZE) {

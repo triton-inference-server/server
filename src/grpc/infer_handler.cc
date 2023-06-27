@@ -420,6 +420,7 @@ InferGRPCToInput(
   // Verify that the batch-byte-size of each input matches the size of
   // the provided tensor data (provided raw or from shared memory)
   int index = 0;
+  printf("here!\n");
   for (const auto& io : request.inputs()) {
     const void* base;
     size_t byte_size = 0;
@@ -476,6 +477,7 @@ InferGRPCToInput(
                 io.name() + "' for model '" + request.model_name() + "'")
                 .c_str());
       } else if (io.has_contents()) {
+	printf("here explicit tensors!\n");
         // Check the presence of explicit tensors
         TRITONSERVER_DataType dtype =
             TRITONSERVER_StringToDataType(io.datatype().c_str());
@@ -619,6 +621,7 @@ InferGRPCToInput(
           // Serialize the output tensor strings. Each string is
           // serialized as a 4-byte length followed by the string itself
           // with no null-terminator.
+	  printf("here on grpc server\n");
           for (const auto& element : io.contents().bytes_contents()) {
             uint32_t len{(uint32_t)element.size()};
             serialized.append(
@@ -632,6 +635,12 @@ InferGRPCToInput(
         }
       } else if (request.raw_input_contents().size() > index) {
         // Try to read the raw contents if available
+	printf("contents are raw %s!\n",io.datatype().c_str());
+	TRITONSERVER_DataType dtype =
+            TRITONSERVER_StringToDataType(io.datatype().c_str());
+	if (dtype==TRITONSERVER_TYPE_BYTES) {
+	  printf("Bytes!\n");
+	}
         const std::string& raw = request.raw_input_contents()[index++];
         base = raw.c_str();
         byte_size = raw.size();
@@ -770,6 +779,15 @@ ModelInferHandler::Process(InferHandler::State* state, bool rpc_ok)
   return !finished;
 }
 
+#if defined(__BYTE_ORDER__) && (__BYTE_ORDER__ == __ORDER_BIG_ENDIAN__)
+void NormalizeEndianness(TRITONSERVER_DataType datatype, std::string &serialized) {
+  if (datatype==TRITONSERVER_TYPE_BYTES) {
+    uint32_t *len = const_cast<uint32_t*>(reinterpret_cast<const uint32_t*>(serialized.c_str()));
+    *len = __builtin_bswap32(*len);
+  }
+}
+#endif
+					
 TRITONSERVER_Error*
 ResponseAllocatorHelper(
     TRITONSERVER_ResponseAllocator* allocator, const char* tensor_name,
@@ -789,7 +807,7 @@ ResponseAllocatorHelper(
       response->add_outputs();
   output_tensor->set_name(tensor_name);
   std::string* raw_output = response->add_raw_output_contents();
-
+  
   if (byte_size > 0) {
     const auto& pr = shm_map.find(tensor_name);
     if (pr != shm_map.end()) {
@@ -829,7 +847,7 @@ ResponseAllocatorHelper(
       *actual_memory_type = TRITONSERVER_MEMORY_CPU;
       *actual_memory_type_id = 0;
     }
-
+    
     raw_output->resize(byte_size);
     *buffer = static_cast<void*>(&((*raw_output)[0]));
 
@@ -890,6 +908,7 @@ ModelInferHandler::Execute(InferHandler::State* state)
     err = InferGRPCToInput(
         tritonserver_, shm_manager_, request, &serialized_data, irequest);
   }
+  printf("serialized_data: %lu\n",serialized_data.size());
   if (err == nullptr) {
     err = InferAllocatorPayload<inference::ModelInferResponse>(
         tritonserver_, shm_manager_, request, std::move(serialized_data),
