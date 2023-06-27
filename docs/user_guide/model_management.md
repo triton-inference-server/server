@@ -212,9 +212,8 @@ repository, copy in the new shared libraries, and then reload the
 model.
 
 * If only the model instance configuration on the 'config.pbtxt' is modified
-(i.e. increasing/decreasing the instance count) for non-sequence models,
-then Triton will update the model rather then reloading it, when either a load
-request is received under
+(i.e. increasing/decreasing the instance count), then Triton will update the
+model rather then reloading it, when either a load request is received under
 [Model Control Mode EXPLICIT](#model-control-mode-explicit) or change to the
 'config.pbtxt' is detected under
 [Model Control Mode POLL](#model-control-mode-poll).
@@ -225,11 +224,14 @@ request is received under
 configuration, so its presence in the model directory may be detected as a new file
 and cause the model to fully reload when only an update is expected.
 
-* If a sequence model is updated with in-flight sequence(s), Triton does not
-guarentee any remaining request(s) from the in-flight sequence(s) will be routed
-to the same model instance for processing. It is currently the responsibility of
-the user to ensure any in-flight sequence(s) is complete before updating a
-sequence model.
+* If a sequence model is *reloaded* with in-flight sequence(s) (i.e. changes to
+the model file), Triton does not guarentee any remaining request(s) from the
+in-flight sequence(s) will be routed to the same model instance for processing.
+It is currently the responsibility of the user to ensure any in-flight
+sequence(s) are completed before reloading a sequence model.
+  * If a sequence model is *updated* (i.e. increasing/decreasing the instance
+count), Triton will wait until the in-flight sequence is completed (or
+timed-out) before the instance behind the sequence is removed.
 
 ## Concurrently Loading Models
 
