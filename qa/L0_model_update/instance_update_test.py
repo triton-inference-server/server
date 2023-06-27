@@ -467,11 +467,11 @@ class TestInstanceUpdate(unittest.TestCase):
                 # explicit limit of 10 is set.
                 self.assertNotIn("Resource: R1\t Count: 3", f.read())
 
-    # Test wait for in-flight sequence completion and block new sequence
+    # Test sequence scheduler update
     def test_sequence_instance_update(self):
         for sequence_batching_type in [
-                "direct { }\nmax_sequence_idle_microseconds: 10000000",
-                "oldest { max_candidate_sequences: 4 }\nmax_sequence_idle_microseconds: 10000000"
+                "direct { }\nmax_sequence_idle_microseconds: 16000000",
+                "oldest { max_candidate_sequences: 4 }\nmax_sequence_idle_microseconds: 16000000"
         ]:
             # Load model
             update_instance_group("{\ncount: 2\nkind: KIND_CPU\n}")
@@ -479,77 +479,104 @@ class TestInstanceUpdate(unittest.TestCase):
             self.__triton.load_model(self.__model_name)
             self.__check_count("initialize", 2)
             self.__check_count("finalize", 0)
-            # Basic sequence inference
-            self.__triton.infer(self.__model_name,
-                                self.__get_inputs(),
-                                sequence_id=1,
-                                sequence_start=True)
-            self.__triton.infer(self.__model_name,
-                                self.__get_inputs(),
-                                sequence_id=1)
-            self.__triton.infer(self.__model_name,
-                                self.__get_inputs(),
-                                sequence_id=1,
-                                sequence_end=True)
-            # Update instance
-            update_instance_group("{\ncount: 4\nkind: KIND_CPU\n}")
-            self.__triton.load_model(self.__model_name)
-            self.__check_count("initialize", 4)
-            self.__check_count("finalize", 0)
-            # Start an in-flight sequence
-            self.__triton.infer(self.__model_name,
-                                self.__get_inputs(),
-                                sequence_id=1,
-                                sequence_start=True)
-            # Check update instance will wait for in-flight sequence completion
-            # and block new sequence from starting.
-            update_instance_group("{\ncount: 3\nkind: KIND_CPU\n}")
-            update_complete = [False]
-            def update():
-                self.__triton.load_model(self.__model_name)
-                update_complete[0] = True
-                self.__check_count("initialize", 4)
-                self.__check_count("finalize", 1)
-            infer_complete = [False]
-            def infer():
-                self.__triton.infer(self.__model_name,
-                                    self.__get_inputs(),
-                                    sequence_id=2,
-                                    sequence_start=True)
-                infer_complete[0] = True
-            with concurrent.futures.ThreadPoolExecutor() as pool:
-                # Update should wait until sequence 1 end
-                update_thread = pool.submit(update)
-                time.sleep(2)  # make sure update has started
-                self.assertFalse(update_complete[0],
-                                 "Unexpected update completion")
-                # New sequence should wait until update complete
-                infer_thread = pool.submit(infer)
-                time.sleep(2)  # make sure infer has started
-                self.assertFalse(infer_complete[0],
-                                 "Unexpected infer completion")
-                # End sequence 1 should unblock update
-                self.__triton.infer(self.__model_name,
-                                    self.__get_inputs(),
-                                    sequence_id=1,
-                                    sequence_end=True)
-                time.sleep(2)  # make sure update has returned
-                self.assertTrue(update_complete[0], "Update possibly stuck")
-                update_thread.result()
-                # Update completion should unblock new sequence
-                time.sleep(2)  # make sure infer has returned
-                self.assertTrue(infer_complete[0], "Infer possibly stuck")
-                infer_thread.result()
-            # End sequence 2
-            self.__triton.infer(self.__model_name,
-                                self.__get_inputs(),
-                                sequence_id=2,
-                                sequence_end=True)
+            # Test infer and update
+            self.__test_basic_sequence_infer_and_update()
+            self.__test_concurrent_sequence_infer_and_update()
             # Unload model
             self.__triton.unload_model(self.__model_name)
             self.__check_count("initialize", 4)
             self.__check_count("finalize", 4, True)
             self.__reset_model()
+
+    # Helper function for 'test_sequence_instance_update'
+    def __test_basic_sequence_infer_and_update(self):
+        # Basic sequence inference
+        self.__triton.infer(self.__model_name,
+                            self.__get_inputs(),
+                            sequence_id=1,
+                            sequence_start=True)
+        self.__triton.infer(self.__model_name,
+                            self.__get_inputs(),
+                            sequence_id=1)
+        self.__triton.infer(self.__model_name,
+                            self.__get_inputs(),
+                            sequence_id=1,
+                            sequence_end=True)
+        # Update instance without in-flight sequence
+        update_instance_group("{\ncount: 3\nkind: KIND_CPU\n}")
+        self.__triton.load_model(self.__model_name)
+        self.__check_count("initialize", 3)
+        self.__check_count("finalize", 0)
+        # Basic sequence inference
+        self.__triton.infer(self.__model_name,
+                            self.__get_inputs(),
+                            sequence_id=1,
+                            sequence_start=True)
+        self.__triton.infer(self.__model_name,
+                            self.__get_inputs(),
+                            sequence_id=1,
+                            sequence_end=True)
+
+    # Helper function for 'test_sequence_instance_update'
+    def __test_concurrent_sequence_infer_and_update(self):
+        # Start seqneuce 1 and 2
+        self.__triton.infer(self.__model_name,
+                            self.__get_inputs(),
+                            sequence_id=1,
+                            sequence_start=True)
+        self.__triton.infer(self.__model_name,
+                            self.__get_inputs(),
+                            sequence_id=2,
+                            sequence_start=True)
+        # Check scheduler update will wait for in-flight sequence completion
+        update_instance_group(
+            "{\ncount: 1\nkind: KIND_CPU\n},\n{\ncount: 1\nkind: KIND_GPU\n}")
+        update_complete = [False]
+
+        def update():
+            self.__triton.load_model(self.__model_name)
+            update_complete[0] = True
+            self.__check_count("initialize", 4)
+            self.__check_count("finalize", 2)
+
+        with concurrent.futures.ThreadPoolExecutor() as pool:
+            # Update should wait until sequence 1 and 2 end
+            update_thread = pool.submit(update)
+            time.sleep(2)  # make sure the update has started
+            self.assertFalse(update_complete[0], "Unexpected update completion")
+            # Sequence 1 and 2 may continue to infer during the update
+            self.__triton.infer(self.__model_name,
+                                self.__get_inputs(),
+                                sequence_id=1)
+            self.__triton.infer(self.__model_name,
+                                self.__get_inputs(),
+                                sequence_id=2)
+            time.sleep(4)  # make sure the infers have started
+            self.assertFalse(update_complete[0], "Unexpected update completion")
+            # Start sequence 3 should success
+            self.__triton.infer(self.__model_name,
+                                self.__get_inputs(),
+                                sequence_id=3,
+                                sequence_start=True)
+            time.sleep(2)  # make sure the infer has started
+            self.assertFalse(update_complete[0], "Unexpected update completion")
+            # End sequence 1 and 2 should unblock the update
+            self.__triton.infer(self.__model_name,
+                                self.__get_inputs(),
+                                sequence_id=1,
+                                sequence_end=True)
+            self.__triton.infer(self.__model_name,
+                                self.__get_inputs(),
+                                sequence_id=2,
+                                sequence_end=True)
+            time.sleep(4)  # make sure the update has returned
+            self.assertTrue(update_complete[0], "Update possibly stuck")
+            update_thread.result()
+        # End sequence 3
+        self.__triton.infer(self.__model_name,
+                            self.__get_inputs(),
+                            sequence_id=3,
+                            sequence_end=True)
 
 
 if __name__ == "__main__":
