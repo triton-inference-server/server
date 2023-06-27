@@ -166,7 +166,28 @@ class TraceManager {
 
     uint64_t trace_id_;
 
+    // Capture a timestamp generated outside of triton and associate it
+    // with this trace.
+    void CaptureTimestamp(const std::string& name, uint64_t timestamp_ns);
+
 #if !defined(_WIN32) && defined(TRITON_ENABLE_TRACING)
+    // Initializes Opentelemetry exporter, processor, provider and context
+    void InitTracer(const TraceConfigMap& config_map);
+
+    // Reports TRITONSERVER_InferenceTraceActivity as event to
+    // the currently active span. If activity is an instance of
+    // `TRITONSERVER_TRACE_REQUEST_START` or
+    // `TRITONSERVER_TRACE_COMPUTE_START`,
+    // it starts a new request or compute span. For the request span it
+    // adds some triton related attributes, and adds this span to
+    // `otel_context_`. Alternatively, if activity is
+    // `TRITONSERVER_TRACE_REQUEST_END` or `TRITONSERVER_TRACE_COMPUTE_END`,
+    // it ends the corresponding span.
+    void ReportToOpenTelemetry(
+        TRITONSERVER_InferenceTrace* trace,
+        TRITONSERVER_InferenceTraceActivity activity, uint64_t timestamp_ns);
+
+   private:
     // OpenTelemetry SDK relies on system's clock for event timestamps.
     // Triton Tracing records timestamps using steady_clock. This is a
     // monotonic clock, i.e. time is always moving forward. It is not related
@@ -192,45 +213,35 @@ class TraceManager {
     // OTel context to store spans, created in the current trace
     opentelemetry::context::Context otel_context_;
 
-    // Initializes Opentelemetry exporter, processor, provider and context
-    void InitTracer(const TraceConfigMap& config_map);
-
     // Starts a span with the provided timestamp
-    opentelemetry::nostd::shared_ptr<otel_trace_api::Span> InitSpan(
-        std::string name,
-        const opentelemetry::common::SystemTimestamp& timestamp_ns,
-        const uint64_t& raw_timestamp_ns, bool is_root_span,
-        std::string parent_span_key = "");
+    opentelemetry::nostd::shared_ptr<otel_trace_api::Span> StartSpan(
+        std::string display_name, const uint64_t& raw_timestamp_ns,
+        bool is_root_span, std::string parent_span_key = "");
 
     // Ends the provided span
-    void EndSpanNow(
-        opentelemetry::nostd::shared_ptr<otel_trace_api::Span> span);
+    void EndSpan(std::string span_key);
 
     // Ends the provided span at specified steady timestamp
-    void EndSpan(
-        opentelemetry::nostd::shared_ptr<otel_trace_api::Span> span,
-        const uint64_t& raw_timestamp_ns);
-
-    // Reports TRITONSERVER_InferenceTraceActivity as event to
-    // the currently active span. If activity is an instance of
-    // `TRITONSERVER_TRACE_REQUEST_START` or
-    // `TRITONSERVER_TRACE_COMPUTE_START`,
-    // it starts a new request or compute span. For the request span it
-    // adds some triton related attributes, and adds this span to
-    // `otel_context_`. Alternativelly, if activity is
-    // `TRITONSERVER_TRACE_REQUEST_END` or `TRITONSERVER_TRACE_COMPUTE_END`,
-    // it ends the coresponding span.
-    void ReportToOpenTelemetry(
-        TRITONSERVER_InferenceTrace* trace,
-        TRITONSERVER_InferenceTraceActivity activity, uint64_t timestamp_ns);
+    void EndSpan(std::string span_key, const uint64_t& raw_timestamp_ns);
 
     // Returns the span key, for which the activity belongs
     std::string GetSpanNameForActivity(
         TRITONSERVER_InferenceTraceActivity activity);
+
+    // Adds event to a span
+    void AddEvent(
+        std::string span_key, std::string event, uint64_t timestamp_ns);
+
+    // If activity is TRITONSERVER_TRACE_REQUEST_START, or
+    // TRITONSERVER_TRACE_COMPUTE_START, starts a new span and adds it to
+    // `otel_context_`. If the newly started span is a request span, then
+    // it will set `model_name`, `model_version`, `trace_id`, `trace_parent_id`,
+    // as span's attributes.
+    void MaybeStartSpan(
+        std::string span_key, TRITONSERVER_InferenceTrace* trace,
+        TRITONSERVER_InferenceTraceActivity activity, uint64_t timestamp_ns,
+        uint64_t id);
 #endif
-    // Capture a timestamp generated outside of triton and associate it
-    // with this trace.
-    void CaptureTimestamp(const std::string& name, uint64_t timestamp_ns);
   };
 
  private:
