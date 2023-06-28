@@ -46,7 +46,7 @@
 
 * The 
   [statistics extension](https://github.com/triton-inference-server/server/blob/r23.06/docs/protocol/extension_statistics.md) 
-  now includes the memory usage of the loaded models This statistics is 
+  now includes the memory usage of the loaded models. This statistics is 
   currently implemented only for TensorRT and ONNXRuntime backends.
 
 * Added support for batch inputs in ragged batching for PyTorch backend.
