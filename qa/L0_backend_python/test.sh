@@ -369,11 +369,11 @@ and shared memory pages after starting triton equals to $current_num_pages \n***
 fi
 
 # Disable env test for Jetson since cloud storage repos are not supported
-# Disable ensemble, unittest, io and bls tests for Jetson since GPU Tensors are not supported
+# Disable ensemble, io and bls tests for Jetson since GPU Tensors are not supported
 # Disable variants test for Jetson since already built without GPU Tensor support
 # Disable decoupled test because it uses GPU tensors
 if [ "$TEST_JETSON" == "0" ]; then
-    SUBTESTS="ensemble unittest io bls decoupled variants"
+    SUBTESTS="ensemble io bls decoupled variants"
     for TEST in ${SUBTESTS}; do
         # Run each subtest in a separate virtual environment to avoid conflicts
         # between dependencies.

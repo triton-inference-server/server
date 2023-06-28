@@ -27,7 +27,7 @@
 
 SERVER=/opt/tritonserver/bin/tritonserver
 SERVER_ARGS="--model-repository=`pwd`/models --log-verbose=1"
-CLIENT_PY=../python_unittest.py
+CLIENT_PY=../L0_backend_python/python_unittest.py
 CLIENT_LOG="./client.log"
 EXPECTED_NUM_TESTS="1"
 TEST_RESULT_FILE='test_results.txt'
@@ -37,7 +37,7 @@ export CUDA_VISIBLE_DEVICES=0,1,2,3
 RET=0
 rm -fr *.log ./models
 
-source ../../common/util.sh
+source ../common/util.sh
 
 # Uninstall the non CUDA version of PyTorch
 pip3 uninstall -y torch
@@ -50,8 +50,8 @@ pip3 install cupy-cuda12x
 rm -fr *.log ./models
 
 mkdir -p models/dlpack_test/1/
-cp ../../python_models/dlpack_test/model.py models/dlpack_test/1/
-cp ../../python_models/dlpack_test/config.pbtxt models/dlpack_test
+cp ../python_models/dlpack_test/model.py models/dlpack_test/1/
+cp ../python_models/dlpack_test/config.pbtxt models/dlpack_test
 
 run_server
 if [ "$SERVER_PID" == "0" ]; then
