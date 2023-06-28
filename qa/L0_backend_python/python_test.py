@@ -62,6 +62,7 @@ class PythonTest(tu.TestResultCollector):
             self.assertTrue(np.all(input_data_0 == output0))
 
     def _create_cuda_region(self, client, size, name):
+        import tritonclient.utils.cuda_shared_memory as cuda_shared_memory
         shm0_handle = cuda_shared_memory.create_shared_memory_region(
             name, byte_size=size, device_id=0)
         client.register_cuda_shared_memory(
