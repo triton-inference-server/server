@@ -1189,7 +1189,7 @@ RUN ln -sf ${_CUDA_COMPAT_PATH}/lib.real ${_CUDA_COMPAT_PATH}/lib \
  && rm -f ${_CUDA_COMPAT_PATH}/lib
 '''
     else:
-        df += add_cpu_libs_to_linux_dockerfile(df, backends, target_machine)
+        df += add_cpu_libs_to_linux_dockerfile(backends, target_machine)
 
     # Add dependencies needed for python backend
     if 'python' in backends:
@@ -1232,7 +1232,8 @@ LABEL com.nvidia.build.ref={}
     return df
 
 
-def add_cpu_libs_to_linux_dockerfile(df, backends, target_machine):
+def add_cpu_libs_to_linux_dockerfile(backends, target_machine):
+    df = ''
     libs_arch = 'aarch64' if target_machine == 'aarch64' else 'x86_64'
     if 'pytorch' in backends:
         # Add extra dependencies for pytorch backend.
