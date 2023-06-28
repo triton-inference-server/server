@@ -229,9 +229,6 @@ the model file), Triton does not guarentee any remaining request(s) from the
 in-flight sequence(s) will be routed to the same model instance for processing.
 It is currently the responsibility of the user to ensure any in-flight
 sequence(s) are completed before reloading a sequence model.
-  * If a sequence model is *updated* (i.e. increasing/decreasing the instance
-count), Triton will wait until the in-flight sequence is completed (or
-timed-out) before the instance behind the sequence is removed.
 
 ## Concurrently Loading Models
 
