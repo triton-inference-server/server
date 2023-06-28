@@ -29,8 +29,8 @@ SAGEMAKER_SINGLE_MODEL_REPO=/opt/ml/model/
 
 # Use 'ready' for ping check in single-model endpoint mode, and use 'live' for ping check in multi-model endpoint model
 # https://github.com/kserve/kserve/blob/master/docs/predict-api/v2/rest_predict_v2.yaml#L10-L26
-if [ -n "$SAGEMAKER_TRITON_PING_MODE" ]; then
-    SAGEMAKER_TRITON_PING_MODE=${SAGEMAKER_TRITON_PING_MODE}
+if [ -n "$SAGEMAKER_TRITON_OVERRIDE_PING_MODE" ]; then
+    SAGEMAKER_TRITON_PING_MODE=${SAGEMAKER_TRITON_OVERRIDE_PING_MODE}
 else
     SAGEMAKER_TRITON_PING_MODE="ready" 
 fi
@@ -50,8 +50,8 @@ if [ -n "$SAGEMAKER_MULTI_MODEL" ]; then
     if [ "$SAGEMAKER_MULTI_MODEL" == "true" ]; then
         mkdir -p ${SAGEMAKER_MULTI_MODEL_REPO}
         SAGEMAKER_MODEL_REPO=${SAGEMAKER_MULTI_MODEL_REPO}
-        if [ -n "$SAGEMAKER_TRITON_PING_MODE" ]; then
-            SAGEMAKER_TRITON_PING_MODE=${SAGEMAKER_TRITON_PING_MODE}
+        if [ -n "$SAGEMAKER_TRITON_OVERRIDE_PING_MODE" ]; then
+            SAGEMAKER_TRITON_PING_MODE=${SAGEMAKER_TRITON_OVERRIDE_PING_MODE}
         else
             SAGEMAKER_TRITON_PING_MODE="live" 
         fi
