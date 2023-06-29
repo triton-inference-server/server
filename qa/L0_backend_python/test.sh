@@ -53,7 +53,7 @@ SERVER_ARGS="$BASE_SERVER_ARGS --backend-config=python,shm-default-byte-size=524
 PYTHON_BACKEND_BRANCH=$PYTHON_BACKEND_REPO_TAG
 CLIENT_PY=./python_test.py
 CLIENT_LOG="./client.log"
-EXPECTED_NUM_TESTS="9"
+EXPECTED_NUM_TESTS="11"
 TEST_RESULT_FILE='test_results.txt'
 SERVER_LOG="./inference_server.log"
 source ../common/util.sh
@@ -128,9 +128,16 @@ mkdir -p models/string_fixed/1/
 cp ../python_models/string_fixed/model.py ./models/string_fixed/1/
 cp ../python_models/string_fixed/config.pbtxt ./models/string_fixed
 
+mkdir -p models/dlpack_identity/1/
+cp ../python_models/dlpack_identity/model.py ./models/dlpack_identity/1/
+cp ../python_models/dlpack_identity/config.pbtxt ./models/dlpack_identity
+
 # Skip torch install on Jetson since it is already installed.
 if [ "$TEST_JETSON" == "0" ]; then
   pip3 install torch==1.13.0+cpu -f https://download.pytorch.org/whl/torch_stable.html
+else
+  # GPU tensor tests are disabled on jetson
+  EXPECTED_NUM_TESTS=9
 fi
 
 prev_num_pages=`get_shm_pages`
