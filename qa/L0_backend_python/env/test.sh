@@ -63,9 +63,7 @@ cp ../../python_models/python_version/model.py ./models/python_3_7/1/
 cp python_backend/builddir/triton_python_backend_stub ./models/python_3_7
 conda deactivate
 
-# Tensorflow 2.1.0 only works with Python 3.4 - 3.7. Successful execution of
-# the Python model indicates that the environment has been setup correctly.
-# Create a model with python 3.7 version
+# Use python-3-7 without conda pack
 path_to_conda_pack="$PWD/python-3-7"
 create_conda_env_with_specified_path "3.7" $path_to_conda_pack 
 conda install numpy=1.20.1 -y
