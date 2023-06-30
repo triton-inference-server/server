@@ -555,7 +555,7 @@ for PROTOCOL in grpc http; do
             echo -e "\n***\n*** Test Failed\n***"
             RET=1
         fi
-        if [ $(cat $CLIENT_LOG | grep "can not batch tensors with different shapes together" | wc -l) -eq 0 ]; then
+        if [ $(cat $CLIENT_LOG | grep -P "The supplied shape .+ is incompatible with the model's input shape" | wc -l) -eq 0 ]; then
             cat $CLIENT_LOG
             echo -e "\n***\n*** Test Failed\n***"
             RET=1
@@ -636,7 +636,7 @@ for PROTOCOL in grpc http; do
             echo -e "\n***\n*** Test Failed\n***"
             RET=1
         fi
-        if [ $(cat $CLIENT_LOG |  grep "Inputs to operation Select of type Select must have the same size and shape." | wc -l) -eq 0 ]; then
+        if [ $(cat $CLIENT_LOG |  grep -P "The supplied shape .+ is incompatible with the model's input shape" | wc -l) -eq 0 ]; then
             cat $CLIENT_LOG
             echo -e "\n***\n*** Test Failed\n***"
             RET=1
@@ -687,7 +687,7 @@ if [ $? -eq 0 ]; then
     echo -e "\n***\n*** Test Failed\n***"
     RET=1
 fi
-if [ $(cat $CLIENT_LOG |  grep "Output size doesn't match expected size" | wc -l) -eq 0 ]; then
+if [ $(cat $CLIENT_LOG |  grep "mismatch in the data provided" | wc -l) -eq 0 ]; then
     cat $CLIENT_LOG
     echo -e "\n***\n*** Test Failed\n***"
     RET=1
