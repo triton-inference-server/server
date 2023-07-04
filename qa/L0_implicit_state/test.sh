@@ -41,7 +41,7 @@ DATADIR=${DATADIR:="/data/inferenceserver/${REPO_VERSION}"}
 TEST_RESULT_FILE='test_results.txt'
 
 export ENSEMBLES=0
-BACKENDS=${BACKENDS:="onnx plan"}
+BACKENDS=${BACKENDS:="libtorch onnx plan"}
 export BACKENDS
 export IMPLICIT_STATE=1
 INITIAL_STATE_ZERO=${INITIAL_STATE_ZERO:="0"}
@@ -78,9 +78,15 @@ for BACKEND in $BACKENDS; do
     rm -rf models/$model_name_allow_output
     cp -r $DATADIR/qa_sequence_implicit_model_repository/$model_name models/$model_name_allow_output
 
-    (cd models/$model_name_allow_output && \
-        sed -i "s/^name:.*/name: \"$model_name_allow_output\"/" config.pbtxt && \
-        echo -e "output [{ name: \"OUTPUT_STATE\" \n data_type: TYPE_INT32 \n dims: [ 1 ] }]" >> config.pbtxt)
+    if [ $BACKEND == "libtorch" ]; then
+    	(cd models/$model_name_allow_output && \
+    	    sed -i "s/^name:.*/name: \"$model_name_allow_output\"/" config.pbtxt && \
+    	    echo -e "output [{ name: \"OUTPUT_STATE__1\" \n data_type: TYPE_INT32 \n dims: [ 1 ] }]" >> config.pbtxt)
+    else
+    	(cd models/$model_name_allow_output && \
+    	    sed -i "s/^name:.*/name: \"$model_name_allow_output\"/" config.pbtxt && \
+    	    echo -e "output [{ name: \"OUTPUT_STATE\" \n data_type: TYPE_INT32 \n dims: [ 1 ] }]" >> config.pbtxt)
+    fi
 done
 
 CLIENT_LOG=`pwd`/client.log

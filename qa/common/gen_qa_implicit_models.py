@@ -430,38 +430,51 @@ def create_libtorch_modelfile_wo_initial_state(models_dir, model_version,
     if torch_dtype == torch.bool:
         torch_dtype = torch.int32
 
+    # If the input is a string then use int32 for operation and just
+    # cast to/from string for input and output.
+    if torch_dtype == List[str]:
+        torch_control_type = torch.int32
+
     model_name = tu.get_sequence_model_name(
         "libtorch_nobatch" if max_batch == 0 else "libtorch", dtype)
     # handle for -1 (when variable) since can't create tensor with shape of [-1]
     shape = [abs(ips) for ips in shape]
 
-    class SequenceNet(nn.Module):
+    if torch_dtype == List[str]:
 
-        def __init__(self):
-            super(SequenceNet, self).__init__()
+        class SequenceNet(nn.Module):
 
-        def forward(self, input0, input0_state, start0, ready0):
-            use_state = torch.logical_and(ready0, torch.logical_not(start0))
-            result = torch.mul(use_state, input0_state)
-            result += input0
-            return result, result
+            def __init__(self):
+                super(SequenceNet, self).__init__()
 
-    sequenceModel = SequenceNet()
-    print(shape, torch_dtype)
-    example_input0 = torch.zeros(shape, dtype=torch_dtype)
-    example_input1 = torch.zeros(shape, dtype=torch_dtype)
-    example_input2 = torch.zeros(shape, dtype=torch_control_type)
-    example_input3 = torch.zeros(shape, dtype=torch_control_type)
+            def forward(self, input0: List[str], input0_state: List[str],
+                        start0, ready0) -> Tuple[List[str], List[str]]:
+                use_state = torch.logical_and(ready0, torch.logical_not(start0))
 
-    # Convert boolean value to int32 value
-    if torch_control_type == torch.bool:
-        example_input2 = example_input1.long()
-        example_input3 = example_input2.long()
+                input0_state_int = torch.tensor(
+                    [int("0" + i) for i in input0_state],
+                    device=use_state.device)
+                input0_int = torch.tensor([int("0" + i) for i in input0],
+                                          device=use_state.device)
+                result_int = torch.mul(use_state, input0_state_int)
+                result_int += input0_int
+                result = [str(i.item()) for i in result_int.cpu()]
+                return result, result
+    else:
 
-    traced = torch.jit.trace(
-        sequenceModel,
-        (example_input0, example_input1, example_input2, example_input3))
+        class SequenceNet(nn.Module):
 
+            def __init__(self):
+                super(SequenceNet, self).__init__()
+
+            def forward(self, input0, input0_state, start0, ready0):
+                use_state = torch.logical_and(ready0, torch.logical_not(start0))
+
+                result = torch.mul(use_state, input0_state)
+                result += input0
+                return result, result
+
+    traced = torch.jit.script(SequenceNet())
     model_version_dir = models_dir + "/" + model_name + "/" + str(model_version)
 
     try:
@@ -491,29 +504,36 @@ def create_libtorch_modelfile_with_initial_state(models_dir, model_version,
     # handle for -1 (when variable) since can't create tensor with shape of [-1]
     shape = [abs(ips) for ips in shape]
 
-    class SequenceNet(nn.Module):
+    if torch_dtype == List[str]:
 
-        def __init__(self):
-            super(SequenceNet, self).__init__()
+        class SequenceNet(nn.Module):
 
-        def forward(self, input0, input0_state, start0, ready0):
-            result = input0_state + input0
-            return result, result
+            def __init__(self):
+                super(SequenceNet, self).__init__()
+
+            def forward(self, input0: List[str], input0_state: List[str],
+                        start0, ready0) -> Tuple[List[str], List[str]]:
+                input0_state_int = torch.tensor(
+                    [int("0" + i) for i in input0_state], device=start0.device)
+                input0_int = torch.tensor([int("0" + i) for i in input0],
+                                          device=start0.device)
+                result_int = (input0_state_int + input0_int).cpu()
+                result = [str(i.item()) for i in result_int]
+                return result, result
+    else:
+
+        class SequenceNet(nn.Module):
+
+            def __init__(self):
+                super(SequenceNet, self).__init__()
+
+            def forward(self, input0, input0_state, start0, ready0):
+                result = input0_state + input0
+                return result, result
 
     sequenceModel = SequenceNet()
-    example_input0 = torch.zeros(tuple(shape), dtype=torch_dtype)
-    example_input1 = torch.zeros(tuple(shape), dtype=torch_dtype)
-    example_input2 = torch.zeros(tuple(shape), dtype=torch_control_type)
-    example_input3 = torch.zeros(tuple(shape), dtype=torch_control_type)
 
-    # Convert boolean value to int32 value
-    if torch_control_type == torch.bool:
-        example_input2 = example_input1.long()
-        example_input3 = example_input2.long()
-
-    traced = torch.jit.trace(
-        sequenceModel,
-        (example_input0, example_input1, example_input2, example_input3))
+    traced = torch.jit.script(sequenceModel)
 
     model_version_dir = models_dir + "/" + model_name + "/" + str(model_version)
 
@@ -539,7 +559,7 @@ def create_libtorch_modelfile(models_dir, model_version, max_batch, dtype,
 def create_libtorch_modelconfig(models_dir, model_version, max_batch, dtype,
                                 shape, initial_state):
     if not tu.validate_for_libtorch_model(dtype, dtype, dtype, shape, shape,
-                                          shape, max_batch):
+                                          shape):
         return
 
     model_name = tu.get_sequence_model_name(
@@ -1367,10 +1387,6 @@ def create_models(models_dir, dtype, shape, initial_state, no_batch=True):
                                   shape + suffix)
 
     if FLAGS.libtorch:
-        if dtype == np_dtype_string:
-            return
-        if dtype == bool:
-            return
         suffix = []
         if dtype == np.int8:
             suffix = [1, 1]

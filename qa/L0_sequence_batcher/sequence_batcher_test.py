@@ -68,7 +68,7 @@ INITIAL_STATE_FILE = (int(os.environ['INITIAL_STATE_FILE']) == 1)
 _trials = ()
 if NO_BATCHING:
     for backend in BACKENDS.split(' '):
-        if (backend != "libtorch") and (backend != 'custom'):
+        if (backend != 'custom'):
             _trials += (backend + "_nobatch",)
 elif os.environ['BATCHER_TYPE'] == "VARIABLE":
     for backend in BACKENDS.split(' '):
@@ -130,10 +130,13 @@ class SequenceBatcherTest(su.SequenceBatcherTestUtil):
         if ("graphdef" in trial):
             return (np.dtype(object), np.bool_)
 
-        # Only test the string data type for ONNX models in implicit state
+        # Only test the string data type for ONNX and libtorch models in implicit state
         if IMPLICIT_STATE:
             if ("onnx" in trial):
                 return (np.dtype(object), np.int32, np.bool_)
+            if NO_BATCHING:
+                if ("libtorch" in trial):
+                    return (np.dtype(object), np.int32, np.bool_)
 
         return (np.int32, np.bool_)
 
@@ -156,7 +159,7 @@ class SequenceBatcherTest(su.SequenceBatcherTestUtil):
                                      trial,
                                      flag_str=None,
                                      dtype=None):
-        if dtype == np.dtype(object):
+        if dtype == np.dtype(object) and trial.startswith('onnx'):
             return value
 
         if INITIAL_STATE_FILE:
