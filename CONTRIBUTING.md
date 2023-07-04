@@ -113,8 +113,9 @@ To run these locally, you can
 [install pre-commit,](https://pre-commit.com/#install)
 then run `pre-commit install` inside the cloned repo. When you
 commit a change, the pre-commit hooks will run automatically.
-If a fix is implemented by a pre-commit hook, running commit a
-second time will pass and successfully commit.
+If a fix is implemented by a pre-commit hook, adding the file again
+and running `git commit` a second time will pass and successfully
+commit.
 
 # Contributor License Agreement (CLA)
 
