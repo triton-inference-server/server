@@ -109,10 +109,12 @@ located [in the repository's top-level .pre-commit-config.yaml](https://github.c
 The hooks do some sanity checking like linting and formatting.
 These checks must pass to merge a change.
 
-To run these locally, you can run `pip install pre-commit`
-inside the cloned repo. When you commit a change, the pre-commit
-hooks will run automatically. If a fix is implemented by a pre-commit
-hook, running it a second time will pass and successfully commit.
+To run these locally, you can
+[install pre-commit,](https://pre-commit.com/#install)
+then run `pre-commit install` inside the cloned repo. When you
+commit a change, the pre-commit hooks will run automatically.
+If a fix is implemented by a pre-commit hook, running commit a
+second time will pass and successfully commit.
 
 # Contributor License Agreement (CLA)
 
