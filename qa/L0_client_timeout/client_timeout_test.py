@@ -1,3 +1,5 @@
+#!/usr/bin/env python3
+
 # Copyright 2020-2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
@@ -28,20 +30,19 @@ import sys
 
 sys.path.append("../common")
 
-from functools import partial
-import numpy as np
 import queue
-import unittest
 import socket
-import test_util as tu
+import unittest
+from functools import partial
 
+import numpy as np
+import test_util as tu
 import tritongrpcclient as grpcclient
 import tritonhttpclient as httpclient
 from tritonclientutils import InferenceServerException
 
 
 class UserData:
-
     def __init__(self):
         self._completed_requests = queue.Queue()
 
@@ -54,54 +55,57 @@ def callback(user_data, result, error):
 
 
 class ClientTimeoutTest(tu.TestResultCollector):
-
     def setUp(self):
         self.model_name_ = "custom_identity_int32"
         self.input0_data_ = np.array([[10]], dtype=np.int32)
 
     def _prepare_request(self, protocol):
-        if (protocol == "grpc"):
+        if protocol == "grpc":
             self.inputs_ = []
-            self.inputs_.append(grpcclient.InferInput('INPUT0', [1, 1],
-                                                      "INT32"))
+            self.inputs_.append(grpcclient.InferInput("INPUT0", [1, 1], "INT32"))
             self.outputs_ = []
-            self.outputs_.append(grpcclient.InferRequestedOutput('OUTPUT0'))
+            self.outputs_.append(grpcclient.InferRequestedOutput("OUTPUT0"))
         else:
             self.inputs_ = []
-            self.inputs_.append(httpclient.InferInput('INPUT0', [1, 1],
-                                                      "INT32"))
+            self.inputs_.append(httpclient.InferInput("INPUT0", [1, 1], "INT32"))
             self.outputs_ = []
-            self.outputs_.append(httpclient.InferRequestedOutput('OUTPUT0'))
+            self.outputs_.append(httpclient.InferRequestedOutput("OUTPUT0"))
 
         self.inputs_[0].set_data_from_numpy(self.input0_data_)
 
     def test_grpc_infer(self):
-        triton_client = grpcclient.InferenceServerClient(url="localhost:8001",
-                                                         verbose=True)
+        triton_client = grpcclient.InferenceServerClient(
+            url="localhost:8001", verbose=True
+        )
         self._prepare_request("grpc")
 
         # The model is configured to take three seconds to send the
         # response. Expect an exception for small timeout values.
         with self.assertRaises(InferenceServerException) as cm:
-            result = triton_client.infer(model_name=self.model_name_,
-                                         inputs=self.inputs_,
-                                         outputs=self.outputs_,
-                                         client_timeout=0.2)
+            result = triton_client.infer(
+                model_name=self.model_name_,
+                inputs=self.inputs_,
+                outputs=self.outputs_,
+                client_timeout=0.2,
+            )
         self.assertIn("Deadline Exceeded", str(cm.exception))
 
         # Expect inference to pass successfully for a large timeout
         # value
-        result = triton_client.infer(model_name=self.model_name_,
-                                     inputs=self.inputs_,
-                                     outputs=self.outputs_,
-                                     client_timeout=10)
+        result = triton_client.infer(
+            model_name=self.model_name_,
+            inputs=self.inputs_,
+            outputs=self.outputs_,
+            client_timeout=10,
+        )
 
-        output0_data = result.as_numpy('OUTPUT0')
+        output0_data = result.as_numpy("OUTPUT0")
         self.assertTrue(np.array_equal(self.input0_data_, output0_data))
 
     def test_grpc_async_infer(self):
-        triton_client = grpcclient.InferenceServerClient(url="localhost:8001",
-                                                         verbose=True)
+        triton_client = grpcclient.InferenceServerClient(
+            url="localhost:8001", verbose=True
+        )
         self._prepare_request("grpc")
 
         user_data = UserData()
@@ -109,11 +113,13 @@ class ClientTimeoutTest(tu.TestResultCollector):
         # The model is configured to take three seconds to send the
         # response. Expect an exception for small timeout values.
         with self.assertRaises(InferenceServerException) as cm:
-            triton_client.async_infer(model_name=self.model_name_,
-                                      inputs=self.inputs_,
-                                      callback=partial(callback, user_data),
-                                      outputs=self.outputs_,
-                                      client_timeout=2)
+            triton_client.async_infer(
+                model_name=self.model_name_,
+                inputs=self.inputs_,
+                callback=partial(callback, user_data),
+                outputs=self.outputs_,
+                client_timeout=2,
+            )
             data_item = user_data._completed_requests.get()
             if type(data_item) == InferenceServerException:
                 raise data_item
@@ -121,23 +127,25 @@ class ClientTimeoutTest(tu.TestResultCollector):
 
         # Expect inference to pass successfully for a large timeout
         # value
-        triton_client.async_infer(model_name=self.model_name_,
-                                  inputs=self.inputs_,
-                                  callback=partial(callback, user_data),
-                                  outputs=self.outputs_,
-                                  client_timeout=10)
+        triton_client.async_infer(
+            model_name=self.model_name_,
+            inputs=self.inputs_,
+            callback=partial(callback, user_data),
+            outputs=self.outputs_,
+            client_timeout=10,
+        )
 
         # Wait until the results are available in user_data
         data_item = user_data._completed_requests.get()
         self.assertFalse(type(data_item) == InferenceServerException)
 
-        output0_data = data_item.as_numpy('OUTPUT0')
+        output0_data = data_item.as_numpy("OUTPUT0")
         self.assertTrue(np.array_equal(self.input0_data_, output0_data))
 
     def test_grpc_stream_infer(self):
-
-        triton_client = grpcclient.InferenceServerClient(url="localhost:8001",
-                                                         verbose=True)
+        triton_client = grpcclient.InferenceServerClient(
+            url="localhost:8001", verbose=True
+        )
 
         self._prepare_request("grpc")
         user_data = UserData()
@@ -146,11 +154,12 @@ class ClientTimeoutTest(tu.TestResultCollector):
         # response. Expect an exception for small timeout values.
         with self.assertRaises(InferenceServerException) as cm:
             triton_client.stop_stream()
-            triton_client.start_stream(callback=partial(callback, user_data),
-                                       stream_timeout=1)
-            triton_client.async_stream_infer(model_name=self.model_name_,
-                                             inputs=self.inputs_,
-                                             outputs=self.outputs_)
+            triton_client.start_stream(
+                callback=partial(callback, user_data), stream_timeout=1
+            )
+            triton_client.async_stream_infer(
+                model_name=self.model_name_, inputs=self.inputs_, outputs=self.outputs_
+            )
             data_item = user_data._completed_requests.get()
             if type(data_item) == InferenceServerException:
                 raise data_item
@@ -159,73 +168,75 @@ class ClientTimeoutTest(tu.TestResultCollector):
         # Expect inference to pass successfully for a large timeout
         # value
         triton_client.stop_stream()
-        triton_client.start_stream(callback=partial(callback, user_data),
-                                   stream_timeout=100)
+        triton_client.start_stream(
+            callback=partial(callback, user_data), stream_timeout=100
+        )
 
-        triton_client.async_stream_infer(model_name=self.model_name_,
-                                         inputs=self.inputs_,
-                                         outputs=self.outputs_)
+        triton_client.async_stream_infer(
+            model_name=self.model_name_, inputs=self.inputs_, outputs=self.outputs_
+        )
         data_item = user_data._completed_requests.get()
         triton_client.stop_stream()
 
         if type(data_item) == InferenceServerException:
             raise data_item
-        output0_data = data_item.as_numpy('OUTPUT0')
+        output0_data = data_item.as_numpy("OUTPUT0")
         self.assertTrue(np.array_equal(self.input0_data_, output0_data))
 
     def test_http_infer(self):
-
         self._prepare_request("http")
 
         # The model is configured to take three seconds to send the
         # response. Expect an exception for small timeout values.
         with self.assertRaises(socket.timeout) as cm:
             triton_client = httpclient.InferenceServerClient(
-                url="localhost:8000", verbose=True, network_timeout=2.0)
-            result = triton_client.infer(model_name=self.model_name_,
-                                         inputs=self.inputs_,
-                                         outputs=self.outputs_)
+                url="localhost:8000", verbose=True, network_timeout=2.0
+            )
+            result = triton_client.infer(
+                model_name=self.model_name_, inputs=self.inputs_, outputs=self.outputs_
+            )
         self.assertIn("timed out", str(cm.exception))
 
         # Expect to successfully pass with sufficiently large timeout
         triton_client = httpclient.InferenceServerClient(
-            url="localhost:8000", verbose=True, connection_timeout=10.0)
+            url="localhost:8000", verbose=True, connection_timeout=10.0
+        )
 
-        result = triton_client.infer(model_name=self.model_name_,
-                                     inputs=self.inputs_,
-                                     outputs=self.outputs_)
+        result = triton_client.infer(
+            model_name=self.model_name_, inputs=self.inputs_, outputs=self.outputs_
+        )
 
-        output0_data = result.as_numpy('OUTPUT0')
+        output0_data = result.as_numpy("OUTPUT0")
         self.assertTrue(np.array_equal(self.input0_data_, output0_data))
 
     def test_http_async_infer(self):
-
         self._prepare_request("http")
 
         # The model is configured to take three seconds to send the
         # response. Expect an exception for small timeout values.
         with self.assertRaises(socket.timeout) as cm:
             triton_client = httpclient.InferenceServerClient(
-                url="localhost:8000", verbose=True, network_timeout=2.0)
+                url="localhost:8000", verbose=True, network_timeout=2.0
+            )
             async_request = triton_client.async_infer(
-                model_name=self.model_name_,
-                inputs=self.inputs_,
-                outputs=self.outputs_)
+                model_name=self.model_name_, inputs=self.inputs_, outputs=self.outputs_
+            )
             result = async_request.get_result()
         self.assertIn("timed out", str(cm.exception))
 
         # Expect to successfully pass with sufficiently large timeout
         triton_client = httpclient.InferenceServerClient(
-            url="localhost:8000", verbose=True, connection_timeout=10.0)
+            url="localhost:8000", verbose=True, connection_timeout=10.0
+        )
 
-        async_request = triton_client.async_infer(model_name=self.model_name_,
-                                                  inputs=self.inputs_,
-                                                  outputs=self.outputs_)
+        async_request = triton_client.async_infer(
+            model_name=self.model_name_, inputs=self.inputs_, outputs=self.outputs_
+        )
         result = async_request.get_result()
 
-        output0_data = result.as_numpy('OUTPUT0')
+        output0_data = result.as_numpy("OUTPUT0")
         self.assertTrue(np.array_equal(self.input0_data_, output0_data))
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     unittest.main()

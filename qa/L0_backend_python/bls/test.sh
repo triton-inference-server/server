@@ -115,7 +115,7 @@ for TRIAL in non_decoupled decoupled ; do
     set +e
 
     export MODEL_NAME='bls'
-    python3 $CLIENT_PY >> $CLIENT_LOG 2>&1 
+    python3 $CLIENT_PY >> $CLIENT_LOG 2>&1
     if [ $? -ne 0 ]; then
         echo -e "\n***\n*** 'bls' $BLS_KIND test FAILED. \n***"
         cat $CLIENT_LOG
@@ -130,7 +130,7 @@ for TRIAL in non_decoupled decoupled ; do
     fi
 
     export MODEL_NAME='bls_memory'
-    python3 $CLIENT_PY >> $CLIENT_LOG 2>&1 
+    python3 $CLIENT_PY >> $CLIENT_LOG 2>&1
     if [ $? -ne 0 ]; then
         echo -e "\n***\n*** 'bls_memory' $BLS_KIND test FAILED. \n***"
         cat $CLIENT_LOG
@@ -145,7 +145,7 @@ for TRIAL in non_decoupled decoupled ; do
     fi
 
     export MODEL_NAME='bls_memory_async'
-    python3 $CLIENT_PY >> $CLIENT_LOG 2>&1 
+    python3 $CLIENT_PY >> $CLIENT_LOG 2>&1
     if [ $? -ne 0 ]; then
         echo -e "\n***\n*** 'bls_async_memory' $BLS_KIND test FAILED. \n***"
         cat $CLIENT_LOG
@@ -160,7 +160,7 @@ for TRIAL in non_decoupled decoupled ; do
     fi
 
     export MODEL_NAME='bls_async'
-    python3 $CLIENT_PY >> $CLIENT_LOG 2>&1 
+    python3 $CLIENT_PY >> $CLIENT_LOG 2>&1
     if [ $? -ne 0 ]; then
         echo -e "\n***\n*** 'bls_async' $BLS_KIND test FAILED. \n***"
         cat $CLIENT_LOG

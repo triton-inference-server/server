@@ -29,19 +29,19 @@ import sys
 
 sys.path.append("../common")
 
-from builtins import range
 import unittest
-import test_util as tu
-import numpy as np
+from builtins import range
 
+import numpy as np
+import test_util as tu
 import tritonclient.http as httpclient
 
 
 class IONamingConvention(tu.TestResultCollector):
-
     def _infer_helper(self, model_name, io_names, reversed_order=False):
-        triton_client = httpclient.InferenceServerClient("localhost:8000",
-                                                         verbose=False)
+        triton_client = httpclient.InferenceServerClient(
+            "localhost:8000", verbose=False
+        )
 
         # Create the data for the two inputs. Initialize the first to unique
         # integers and the second to all ones.
@@ -53,30 +53,34 @@ class IONamingConvention(tu.TestResultCollector):
         output_req = []
         inputs.append(
             httpclient.InferInput(
-                io_names[0] if not reversed_order else io_names[1], [1, 16],
-                "FP32"))
+                io_names[0] if not reversed_order else io_names[1], [1, 16], "FP32"
+            )
+        )
         inputs[-1].set_data_from_numpy(input0_data)
         inputs.append(
             httpclient.InferInput(
-                io_names[1] if not reversed_order else io_names[0], [1, 16],
-                "FP32"))
+                io_names[1] if not reversed_order else io_names[0], [1, 16], "FP32"
+            )
+        )
         inputs[-1].set_data_from_numpy(input1_data)
         output_req.append(
-            httpclient.InferRequestedOutput(io_names[2], binary_data=True))
+            httpclient.InferRequestedOutput(io_names[2], binary_data=True)
+        )
         output_req.append(
-            httpclient.InferRequestedOutput(io_names[3], binary_data=True))
+            httpclient.InferRequestedOutput(io_names[3], binary_data=True)
+        )
 
         results = triton_client.infer(model_name, inputs, outputs=output_req)
 
         output0_data = results.as_numpy(
-            io_names[2] if not reversed_order else io_names[3])
+            io_names[2] if not reversed_order else io_names[3]
+        )
         output1_data = results.as_numpy(
-            io_names[3] if not reversed_order else io_names[2])
+            io_names[3] if not reversed_order else io_names[2]
+        )
         for i in range(16):
-            self.assertEqual(input0_data[0][i] - input1_data[0][i],
-                             output0_data[0][i])
-            self.assertEqual(input0_data[0][i] + input1_data[0][i],
-                             output1_data[0][i])
+            self.assertEqual(input0_data[0][i] - input1_data[0][i], output0_data[0][i])
+            self.assertEqual(input0_data[0][i] + input1_data[0][i], output1_data[0][i])
 
     def test_io_index(self):
         io_names = ["INPUT__0", "INPUT__1", "OUTPUT__0", "OUTPUT__1"]
@@ -108,10 +112,8 @@ class IONamingConvention(tu.TestResultCollector):
 
     def test_unordered_index(self):
         io_names = ["INPUT1", "INPUT0", "OUT__1", "OUT__0"]
-        self._infer_helper("libtorch_unordered_index",
-                           io_names,
-                           reversed_order=True)
+        self._infer_helper("libtorch_unordered_index", io_names, reversed_order=True)
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     unittest.main()

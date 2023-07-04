@@ -44,7 +44,7 @@ PYTORCH_IMAGE=${PYTORCH_IMAGE:=nvcr.io/nvidia/pytorch:$NVIDIA_UPSTREAM_VERSION-p
 
 CUDA_DEVICE=${NV_GPU:=0}
 
-[[ $RUNNER_GPUS =~ ^[0-9] ]] && DOCKER_GPU_ARGS=$(eval $NV_DOCKER_ARGS) || DOCKER_GPU_ARGS="--gpus device=$CUDA_DEVICE" 
+[[ $RUNNER_GPUS =~ ^[0-9] ]] && DOCKER_GPU_ARGS=$(eval $NV_DOCKER_ARGS) || DOCKER_GPU_ARGS="--gpus device=$CUDA_DEVICE"
 
 ###
 HOST_BUILD_DIR=${HOST_BUILD_DIR:=/tmp}
@@ -66,8 +66,8 @@ PYTSCRIPT=pyt_gen.cmds
 SRCDIR=/tmp/src
 DESTDIR=/tmp/custom_ops
 
-# Tensorflow  
-# Set compilation option by "Select a particular C++ dialect." 
+# Tensorflow
+# Set compilation option by "Select a particular C++ dialect."
 [[ "${NVIDIA_UPSTREAM_VERSION}" < "22.10"  ]] && STD_FLAG="c++14" || STD_FLAG="c++17"
 
 cat >$HOST_SRCDIR/$TFSCRIPT <<EOF

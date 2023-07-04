@@ -1,3 +1,5 @@
+#!/usr/bin/env python3
+
 # Copyright 2019-2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
@@ -34,7 +36,7 @@ np_dtype_string = np.dtype(object)
 
 TRT_LOGGER = trt.Logger()
 
-trt.init_libnvinfer_plugins(TRT_LOGGER, '')
+trt.init_libnvinfer_plugins(TRT_LOGGER, "")
 PLUGIN_CREATORS = trt.get_plugin_registry().plugin_creator_list
 
 
@@ -82,70 +84,105 @@ def get_trt_plugin(plugin_name):
     plugin = None
     field_collection = None
     for plugin_creator in PLUGIN_CREATORS:
-        if (plugin_creator.name == "Normalize_TRT") and \
-                (plugin_name == "Normalize_TRT"):
-            nbWeights = trt.PluginField("nbWeights",
-                                        np.array([1], dtype=np.int32),
-                                        trt.PluginFieldType.INT32)
-            eps = trt.PluginField("eps", np.array([0.00001], dtype=np.float32),
-                                  trt.PluginFieldType.FLOAT32)
-            weights = trt.PluginField('weights',
-                                      np.array([1] * 16, dtype=np.float32),
-                                      trt.PluginFieldType.FLOAT32)
-            field_collection = trt.PluginFieldCollection(
-                [weights, eps, nbWeights])
+        if (plugin_creator.name == "Normalize_TRT") and (
+            plugin_name == "Normalize_TRT"
+        ):
+            nbWeights = trt.PluginField(
+                "nbWeights", np.array([1], dtype=np.int32), trt.PluginFieldType.INT32
+            )
+            eps = trt.PluginField(
+                "eps",
+                np.array([0.00001], dtype=np.float32),
+                trt.PluginFieldType.FLOAT32,
+            )
+            weights = trt.PluginField(
+                "weights",
+                np.array([1] * 16, dtype=np.float32),
+                trt.PluginFieldType.FLOAT32,
+            )
+            field_collection = trt.PluginFieldCollection([weights, eps, nbWeights])
             break
-        elif (plugin_creator.name
-              == "CustomGeluPluginDynamic") and (plugin_name
-                                                 == "CustomGeluPluginDynamic"):
-            type_id = trt.PluginField("type_id", np.array([0], np.int32),
-                                      trt.PluginFieldType.INT32)
-            bias = trt.PluginField("bias", np.array([[[1]]], np.float32),
-                                   trt.PluginFieldType.FLOAT32)
+        elif (plugin_creator.name == "CustomGeluPluginDynamic") and (
+            plugin_name == "CustomGeluPluginDynamic"
+        ):
+            type_id = trt.PluginField(
+                "type_id", np.array([0], np.int32), trt.PluginFieldType.INT32
+            )
+            bias = trt.PluginField(
+                "bias", np.array([[[1]]], np.float32), trt.PluginFieldType.FLOAT32
+            )
             field_collection = trt.PluginFieldCollection([type_id, bias])
             break
-        elif (plugin_creator.name
-              == "CustomClipPlugin") and (plugin_name == "CustomClipPlugin"):
-            min_clip = trt.PluginField("clipMin", np.array([0.1],\
-                dtype=np.float32), trt.PluginFieldType.FLOAT32)
-            max_clip = trt.PluginField("clipMax", np.array([0.5],\
-                dtype=np.float32), trt.PluginFieldType.FLOAT32)
+        elif (plugin_creator.name == "CustomClipPlugin") and (
+            plugin_name == "CustomClipPlugin"
+        ):
+            min_clip = trt.PluginField(
+                "clipMin",
+                np.array([0.1], dtype=np.float32),
+                trt.PluginFieldType.FLOAT32,
+            )
+            max_clip = trt.PluginField(
+                "clipMax",
+                np.array([0.5], dtype=np.float32),
+                trt.PluginFieldType.FLOAT32,
+            )
             field_collection = trt.PluginFieldCollection([min_clip, max_clip])
             break
 
     if field_collection is None:
         raise RuntimeError("Plugin not found: " + plugin_name)
-    plugin = plugin_creator.create_plugin(name=plugin_name,
-                                          field_collection=field_collection)
+    plugin = plugin_creator.create_plugin(
+        name=plugin_name, field_collection=field_collection
+    )
 
     return plugin
 
 
-def create_plan_modelfile(models_dir, max_batch, model_version, plugin_name,
-                          input_shape, output0_shape, input_dtype,
-                          output0_dtype):
-
-    if not tu.validate_for_trt_model(input_dtype, output0_dtype, output0_dtype,
-                                     input_shape, output0_shape, output0_shape):
+def create_plan_modelfile(
+    models_dir,
+    max_batch,
+    model_version,
+    plugin_name,
+    input_shape,
+    output0_shape,
+    input_dtype,
+    output0_dtype,
+):
+    if not tu.validate_for_trt_model(
+        input_dtype,
+        output0_dtype,
+        output0_dtype,
+        input_shape,
+        output0_shape,
+        output0_shape,
+    ):
         return
 
     trt_input_dtype = np_to_trt_dtype(input_dtype)
 
-    model_name = tu.get_model_name("plan_nobatch" if max_batch == 0 else "plan",
-                                   input_dtype, output0_dtype,
-                                   output0_dtype) + '_' + plugin_name
+    model_name = (
+        tu.get_model_name(
+            "plan_nobatch" if max_batch == 0 else "plan",
+            input_dtype,
+            output0_dtype,
+            output0_dtype,
+        )
+        + "_"
+        + plugin_name
+    )
 
     # using explicit batch is necessary for CustomGeluPluginDynamic
     if plugin_name == "CustomGeluPluginDynamic":
-        explicit_batch = 1 << (int)(
-            trt.NetworkDefinitionCreationFlag.EXPLICIT_BATCH)
+        explicit_batch = 1 << (int)(trt.NetworkDefinitionCreationFlag.EXPLICIT_BATCH)
         with trt.Builder(TRT_LOGGER) as builder, builder.create_network(
-                explicit_batch) as network:
-            input_layer = network.add_input(name="INPUT0",
-                                            dtype=trt_input_dtype,
-                                            shape=input_shape)
+            explicit_batch
+        ) as network:
+            input_layer = network.add_input(
+                name="INPUT0", dtype=trt_input_dtype, shape=input_shape
+            )
             plugin_layer = network.add_plugin_v2(
-                inputs=[input_layer], plugin=get_trt_plugin(plugin_name))
+                inputs=[input_layer], plugin=get_trt_plugin(plugin_name)
+            )
             plugin_layer.get_output(0).name = "OUTPUT0"
             network.mark_output(plugin_layer.get_output(0))
 
@@ -159,8 +196,7 @@ def create_plan_modelfile(models_dir, max_batch, model_version, plugin_name,
                 engine_bytes = engine.serialize()
                 del engine
 
-            model_version_dir = models_dir + "/" + model_name + "/" + str(
-                model_version)
+            model_version_dir = models_dir + "/" + model_name + "/" + str(model_version)
 
             try:
                 os.makedirs(model_version_dir)
@@ -170,13 +206,13 @@ def create_plan_modelfile(models_dir, max_batch, model_version, plugin_name,
             with open(model_version_dir + "/model.plan", "wb") as f:
                 f.write(engine_bytes)
     else:
-        with trt.Builder(
-                TRT_LOGGER) as builder, builder.create_network() as network:
-            input_layer = network.add_input(name="INPUT0",
-                                            dtype=trt_input_dtype,
-                                            shape=input_shape)
+        with trt.Builder(TRT_LOGGER) as builder, builder.create_network() as network:
+            input_layer = network.add_input(
+                name="INPUT0", dtype=trt_input_dtype, shape=input_shape
+            )
             plugin_layer = network.add_plugin_v2(
-                inputs=[input_layer], plugin=get_trt_plugin(plugin_name))
+                inputs=[input_layer], plugin=get_trt_plugin(plugin_name)
+            )
             plugin_layer.get_output(0).name = "OUTPUT0"
             network.mark_output(plugin_layer.get_output(0))
 
@@ -191,8 +227,7 @@ def create_plan_modelfile(models_dir, max_batch, model_version, plugin_name,
                 engine_bytes = engine.serialize()
                 del engine
 
-            model_version_dir = models_dir + "/" + model_name + "/" + str(
-                model_version)
+            model_version_dir = models_dir + "/" + model_name + "/" + str(model_version)
 
             try:
                 os.makedirs(model_version_dir)
@@ -203,22 +238,41 @@ def create_plan_modelfile(models_dir, max_batch, model_version, plugin_name,
                 f.write(engine_bytes)
 
 
-def create_plan_modelconfig(models_dir, max_batch, model_version, plugin_name,
-                            input_shape, output0_shape, input_dtype,
-                            output0_dtype):
-
-    if not tu.validate_for_trt_model(input_dtype, output0_dtype, output0_dtype,
-                                     input_shape, output0_shape, output0_shape):
+def create_plan_modelconfig(
+    models_dir,
+    max_batch,
+    model_version,
+    plugin_name,
+    input_shape,
+    output0_shape,
+    input_dtype,
+    output0_dtype,
+):
+    if not tu.validate_for_trt_model(
+        input_dtype,
+        output0_dtype,
+        output0_dtype,
+        input_shape,
+        output0_shape,
+        output0_shape,
+    ):
         return
 
     version_policy_str = "{ latest { num_versions: 1 }}"
 
     # Use a different model name for the non-batching variant
-    model_name = tu.get_model_name("plan_nobatch" if max_batch == 0 else "plan",
-                                   input_dtype, output0_dtype,
-                                   output0_dtype) + '_' + plugin_name
+    model_name = (
+        tu.get_model_name(
+            "plan_nobatch" if max_batch == 0 else "plan",
+            input_dtype,
+            output0_dtype,
+            output0_dtype,
+        )
+        + "_"
+        + plugin_name
+    )
     config_dir = models_dir + "/" + model_name
-    config = '''
+    config = """
 name: "{}"
 platform: "tensorrt_plan"
 max_batch_size: {}
@@ -237,10 +291,15 @@ output [
     dims: [ {} ]
    }}
 ]
-'''.format(model_name, max_batch, version_policy_str,
-           np_to_model_dtype(input_dtype), tu.shape_to_dims_str(input_shape),
-           np_to_model_dtype(output0_dtype),
-           tu.shape_to_dims_str(output0_shape))
+""".format(
+        model_name,
+        max_batch,
+        version_policy_str,
+        np_to_model_dtype(input_dtype),
+        tu.shape_to_dims_str(input_shape),
+        np_to_model_dtype(output0_dtype),
+        tu.shape_to_dims_str(output0_shape),
+    )
 
     try:
         os.makedirs(config_dir)
@@ -255,46 +314,93 @@ def create_plugin_models(models_dir):
     model_version = 1
 
     # custom CustomClipPlugin
-    create_plan_modelconfig(models_dir, 8, model_version, "CustomClipPlugin",
-                            (16,), (16,), np.float32, np.float32)
-    create_plan_modelfile(models_dir, 8, model_version, "CustomClipPlugin",
-                          (16,), (16,), np.float32, np.float32)
+    create_plan_modelconfig(
+        models_dir,
+        8,
+        model_version,
+        "CustomClipPlugin",
+        (16,),
+        (16,),
+        np.float32,
+        np.float32,
+    )
+    create_plan_modelfile(
+        models_dir,
+        8,
+        model_version,
+        "CustomClipPlugin",
+        (16,),
+        (16,),
+        np.float32,
+        np.float32,
+    )
 
     # default CustomGeluPluginDynamic plugin
-    create_plan_modelconfig(models_dir, 0, model_version,
-                            "CustomGeluPluginDynamic", (16, 1, 1), (16, 1, 1),
-                            np.float32, np.float32)
-    create_plan_modelfile(models_dir, 0, model_version,
-                          "CustomGeluPluginDynamic", (16, 1, 1), (16, 1, 1),
-                          np.float32, np.float32)
+    create_plan_modelconfig(
+        models_dir,
+        0,
+        model_version,
+        "CustomGeluPluginDynamic",
+        (16, 1, 1),
+        (16, 1, 1),
+        np.float32,
+        np.float32,
+    )
+    create_plan_modelfile(
+        models_dir,
+        0,
+        model_version,
+        "CustomGeluPluginDynamic",
+        (16, 1, 1),
+        (16, 1, 1),
+        np.float32,
+        np.float32,
+    )
 
     # default Normalize_TRT
-    create_plan_modelconfig(models_dir, 8, model_version, "Normalize_TRT", (
-        16,
-        16,
-        16,
-    ), (
-        16,
-        16,
-        16,
-    ), np.float32, np.float32)
-    create_plan_modelfile(models_dir, 8, model_version, "Normalize_TRT", (
-        16,
-        16,
-        16,
-    ), (
-        16,
-        16,
-        16,
-    ), np.float32, np.float32)
+    create_plan_modelconfig(
+        models_dir,
+        8,
+        model_version,
+        "Normalize_TRT",
+        (
+            16,
+            16,
+            16,
+        ),
+        (
+            16,
+            16,
+            16,
+        ),
+        np.float32,
+        np.float32,
+    )
+    create_plan_modelfile(
+        models_dir,
+        8,
+        model_version,
+        "Normalize_TRT",
+        (
+            16,
+            16,
+            16,
+        ),
+        (
+            16,
+            16,
+            16,
+        ),
+        np.float32,
+        np.float32,
+    )
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument('--models_dir',
-                        type=str,
-                        required=True,
-                        help='Top-level model directory')
+    parser.add_argument(
+        "--models_dir", type=str, required=True, help="Top-level model directory"
+    )
     FLAGS, unparsed = parser.parse_known_args()
 
     import test_util as tu

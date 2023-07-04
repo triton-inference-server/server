@@ -64,7 +64,9 @@ repos:
     - id: check-merge-conflict
     - id: check-json
     - id: check-toml
+    # Do not check template yaml files in deploy directory
     - id: check-yaml
+      exclude: ^deploy(\/[^\/]+)*\/templates\/.*$
     - id: check-shebang-scripts-are-executable
     - id: end-of-file-fixer
       types_or: [c, c++, cuda, proto, textproto, java, python]

@@ -159,7 +159,7 @@ for BACKEND in $BACKENDS; do
         cp $onnx_model/output0_labels.txt models/$python_model
         cp ../python_models/add_sub/model.py models/$python_model/1/
     else
-        cp -r $TMP_MODEL_DIR models/. 
+        cp -r $TMP_MODEL_DIR models/.
     fi
     (cd models/$(basename $TMP_MODEL_DIR) && \
           sed -i "s/^max_batch_size:.*/max_batch_size: 8/" config.pbtxt && \

@@ -70,7 +70,7 @@ documentation and using
 [grpc_service.proto](https://github.com/triton-inference-server/common/blob/main/protobuf/grpc_service.proto)
 you can generate language bindings for all the languages supported by
 GRPC. We provide three examples of this for
-[Go](https://github.com/triton-inference-server/client/blob/main/src/grpc_generated/go), 
+[Go](https://github.com/triton-inference-server/client/blob/main/src/grpc_generated/go),
 [Python](https://github.com/triton-inference-server/client/blob/main/src/python/examples/grpc_client.py) and
 [Java](https://github.com/triton-inference-server/client/blob/main/src/grpc_generated/java).
 
@@ -154,7 +154,7 @@ available Triton instances.
 
 ## If the server segfaults, how can I debug it?
 
-The NGC build is a Release build and does not contain Debug symbols. 
+The NGC build is a Release build and does not contain Debug symbols.
 The build.py as well defaults to a Release build. Refer to the instructions
 in [build.md](../customization_guide/build.md#building-with-debug-symbols) to create a Debug build
 of Triton. This will help find the cause of the segmentation fault when

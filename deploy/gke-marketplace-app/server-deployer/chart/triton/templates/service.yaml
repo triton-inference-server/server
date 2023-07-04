@@ -35,11 +35,11 @@ metadata:
     app: {{ template "triton-inference-server.name" . }}
     chart: {{ template "triton-inference-server.chart" . }}
     release: {{ .Release.Name }}
-    heritage: {{ .Release.Service }}    
+    heritage: {{ .Release.Service }}
 spec:
   type: {{ .Values.service.type }}
   ports:
-    - port: 8000 
+    - port: 8000
       targetPort: http
       name: http-inference-server
     - port: 8001

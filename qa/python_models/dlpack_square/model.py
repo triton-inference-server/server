@@ -1,3 +1,5 @@
+#!/usr/bin/env python3
+
 # Copyright 2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
@@ -24,17 +26,18 @@
 # (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-from torch.utils.dlpack import to_dlpack, from_dlpack
-import torch
 import json
-import numpy as np
 import threading
+
+import numpy as np
+import torch
 
 # triton_python_backend_utils is available in every Triton Python model. You
 # need to use this module to create inference requests and responses. It also
 # contains some utility functions for extracting information from model_config
 # and converting Triton input/output types to numpy types.
 import triton_python_backend_utils as pb_utils
+from torch.utils.dlpack import from_dlpack, to_dlpack
 
 numpy_to_pytorch_dtype = {
     np.bool_: torch.bool,
@@ -50,21 +53,23 @@ numpy_to_pytorch_dtype = {
 
 
 class TritonPythonModel:
-
     def initialize(self, args):
-        self.model_config = model_config = json.loads(args['model_config'])
+        self.model_config = model_config = json.loads(args["model_config"])
 
         output_config = pb_utils.get_output_config_by_name(model_config, "OUT")
-        self.output_dtype = pb_utils.triton_string_to_numpy(
-            output_config['data_type'])
+        self.output_dtype = pb_utils.triton_string_to_numpy(output_config["data_type"])
 
         using_decoupled = pb_utils.using_decoupled_model_transaction_policy(
-            model_config)
+            model_config
+        )
         if not using_decoupled:
             raise pb_utils.TritonModelException(
                 """the model `{}` can generate any number of responses per request,
                 enable decoupled transaction policy in model configuration to
-                serve this model""".format(args['model_name']))
+                serve this model""".format(
+                    args["model_name"]
+                )
+            )
 
         self.inflight_thread_count = 0
         self.inflight_thread_count_lck = threading.Lock()
@@ -78,10 +83,14 @@ class TritonPythonModel:
     def process_request(self, request):
         # Start a separate thread to send the responses for the request. The
         # sending back the responses is delegated to this thread.
-        thread = threading.Thread(target=self.response_thread,
-                                  args=(request.get_response_sender(),
-                                        pb_utils.get_input_tensor_by_name(
-                                            request, 'IN'), self.output_dtype))
+        thread = threading.Thread(
+            target=self.response_thread,
+            args=(
+                request.get_response_sender(),
+                pb_utils.get_input_tensor_by_name(request, "IN"),
+                self.output_dtype,
+            ),
+        )
 
         thread.daemon = True
 
@@ -96,28 +105,28 @@ class TritonPythonModel:
 
         for idx in range(in_input.as_numpy()[0]):
             if in_input.is_cpu():
-                if in_input.as_numpy(
-                ).dtype.type is np.bytes_ or in_input.as_numpy(
-                ).dtype == np.object_:
+                if (
+                    in_input.as_numpy().dtype.type is np.bytes_
+                    or in_input.as_numpy().dtype == np.object_
+                ):
                     out_0 = in_input.as_numpy().astype(np.int32)
-                    out_tensor = pb_utils.Tensor("OUT",
-                                                 out_0.astype(output_dtype))
+                    out_tensor = pb_utils.Tensor("OUT", out_0.astype(output_dtype))
                 else:
                     in_0_pytorch = from_dlpack(in_input.to_dlpack())
                     out_0 = in_0_pytorch
                     if output_dtype == np.object_:
                         out_tensor = pb_utils.Tensor(
-                            "OUT",
-                            out_0.numpy().astype(output_dtype))
+                            "OUT", out_0.numpy().astype(output_dtype)
+                        )
                     else:
                         out_0 = out_0.type(numpy_to_pytorch_dtype[output_dtype])
                         out_tensor = pb_utils.Tensor.from_dlpack(
-                            "OUT", to_dlpack(out_0))
+                            "OUT", to_dlpack(out_0)
+                        )
             else:
                 in_0_pytorch = from_dlpack(in_input.to_dlpack()).cuda()
                 out_0 = in_0_pytorch
-                out_tensor = pb_utils.Tensor.from_dlpack(
-                    "OUTPUT0", to_dlpack(out_0))
+                out_tensor = pb_utils.Tensor.from_dlpack("OUTPUT0", to_dlpack(out_0))
 
             response = pb_utils.InferenceResponse(output_tensors=[out_tensor])
             response_sender.send(response)
@@ -126,8 +135,7 @@ class TritonPythonModel:
         # done sending responses for the corresponding request. We can't use the
         # response sender after closing it. The response sender is closed by
         # setting the TRITONSERVER_RESPONSE_COMPLETE_FINAL.
-        response_sender.send(
-            flags=pb_utils.TRITONSERVER_RESPONSE_COMPLETE_FINAL)
+        response_sender.send(flags=pb_utils.TRITONSERVER_RESPONSE_COMPLETE_FINAL)
 
         with self.inflight_thread_count_lck:
             self.inflight_thread_count -= 1

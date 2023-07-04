@@ -210,7 +210,7 @@ wait $SERVER_PID
 
 set +e
 
-PY310_ENV_EXTRACTION="Extracting Python execution env" 
+PY310_ENV_EXTRACTION="Extracting Python execution env"
 if [ `grep -c "${PY310_ENV_EXTRACTION}" ${SERVER_LOG}` != "2" ]; then
     cat $SERVER_LOG
     echo -e "\n***\n*** Python execution environment should be extracted exactly twice. \n***"

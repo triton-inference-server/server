@@ -1,4 +1,6 @@
-# Copyright (c) 2021, NVIDIA CORPORATION. All rights reserved.
+#!/usr/bin/env python3
+
+# Copyright 2021-2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -29,8 +31,9 @@ import sys
 
 def generate_compressed_data():
     with open("raw_data", "rb") as f:
-        import zlib
         import gzip
+        import zlib
+
         raw_data = f.read()
         with open("deflate_compressed_data", "wb") as of:
             of.write(zlib.compress(raw_data))
@@ -40,8 +43,9 @@ def generate_compressed_data():
 
 def validate_compressed_data():
     with open("raw_data", "rb") as f:
-        import zlib
         import gzip
+        import zlib
+
         raw_data = f.read()
         with open("generated_deflate_compressed_data", "rb") as cf:
             decompressed_data = zlib.decompress(cf.read())
@@ -53,5 +57,5 @@ def validate_compressed_data():
                 exit(1)
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     globals()[sys.argv[1]]()

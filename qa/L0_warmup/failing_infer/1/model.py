@@ -1,4 +1,6 @@
-# Copyright 2022, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+#!/usr/bin/env python3
+
+# Copyright 2022-2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -28,7 +30,7 @@ import triton_python_backend_utils as pb_utils
 
 
 class TritonPythonModel:
-    """Test model that always returns error for all requests. """
+    """Test model that always returns error for all requests."""
 
     def execute(self, requests):
         responses = []
@@ -36,8 +38,9 @@ class TritonPythonModel:
         for _ in requests:
             responses.append(
                 pb_utils.InferenceResponse(
-                    output_tensors=[],
-                    error=pb_utils.TritonError("An Error Occurred")))
+                    output_tensors=[], error=pb_utils.TritonError("An Error Occurred")
+                )
+            )
 
         # You must return a list of pb_utils.InferenceResponse. Length
         # of this list must match the length of `requests` list.

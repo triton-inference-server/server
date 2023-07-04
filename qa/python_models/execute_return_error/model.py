@@ -1,3 +1,5 @@
+#!/usr/bin/env python3
+
 # Copyright 2021-2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
@@ -26,7 +28,6 @@
 
 
 class TritonPythonModel:
-
     def initialize(self, args):
         self._i = -1
 

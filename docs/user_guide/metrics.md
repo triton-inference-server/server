@@ -45,13 +45,13 @@ all metric reporting, while the `--allow-gpu-metrics=false` and
 metrics respectively.
 
 The `--metrics-port` option can be used to select a different port. By default,
-Triton reuses the `--http-address` option for the metrics endpoint and binds the 
+Triton reuses the `--http-address` option for the metrics endpoint and binds the
 http and metrics endpoints to the same specific address when http service is
 enabled. If http service is not enabled, the metric address will bind to `0.0.0.0`
 by default. To uniquely specify the metric endpoint, `--metrics-address` option
 can be used. See the `tritonserver --help` output for more info on these CLI options.
 
-To change the interval at whichs metrics are polled/updated, see the `--metrics-interval-ms` flag. Metrics that are updated "Per Request" are unaffected by this interval setting. This interval only applies to metrics that are designated as "Per Interval" in the tables of each section below:
+To change the interval at which's metrics are polled/updated, see the `--metrics-interval-ms` flag. Metrics that are updated "Per Request" are unaffected by this interval setting. This interval only applies to metrics that are designated as "Per Interval" in the tables of each section below:
 
 - [Inference Request Metrics](#inference-request-metrics)
 - [GPU Metrics](#gpu-metrics)
@@ -105,7 +105,7 @@ that are published through the `--metrics-config` CLI options.
 
 #### Counters
 
-By default, the following 
+By default, the following
 [Counter](https://prometheus.io/docs/concepts/metric_types/#counter)
 metrics are used for latencies:
 
@@ -129,7 +129,7 @@ To disable these metrics specifically, you can set `--metrics-config counter_lat
 To get configurable quantiles over a sliding time window, Triton supports
 a set a [Summary](https://prometheus.io/docs/concepts/metric_types/#summary)
 metrics for latencies as well. These metrics are disabled by default, but can
-be enabled by setting `--metrics-config summary_latencies=true`. 
+be enabled by setting `--metrics-config summary_latencies=true`.
 
 For more information on how the quantiles are calculated, see
 [this explanation](https://grafana.com/blog/2022/03/01/how-summary-metrics-work-in-prometheus/).
@@ -146,7 +146,7 @@ The following summary metrics are available:
 
 Each summary above is actually composed of several sub-metrics. For each
 metric, there is a set of `quantile` metrics tracking the latency for each
-quantile. Additionaly, there are `_count` and `_sum` metrics that aggregate
+quantile. Additionally, there are `_count` and `_sum` metrics that aggregate
 the count and observed values for each. For example, see the following
 information exposed by the Inference Queue Summary metrics:
 ```
@@ -187,8 +187,8 @@ To better understand the setting of error values for computing each quantile, se
 
 ## GPU Metrics
 
-GPU metrics are collected through the use of [DCGM](https://developer.nvidia.com/dcgm). 
-Collection of GPU metrics can be toggled with the `--allow-gpu-metrics` CLI flag. 
+GPU metrics are collected through the use of [DCGM](https://developer.nvidia.com/dcgm).
+Collection of GPU metrics can be toggled with the `--allow-gpu-metrics` CLI flag.
 If building Triton locally, the `TRITON_ENABLE_METRICS_GPU` CMake build flag can be used to toggle building the relevant code entirely.
 
 |Category      |Metric          |Metric Name |Description                            |Granularity|Frequency    |
@@ -203,7 +203,7 @@ If building Triton locally, the `TRITON_ENABLE_METRICS_GPU` CMake build flag can
 
 ## CPU Metrics
 
-Collection of CPU metrics can be toggled with the `--allow-cpu-metrics` CLI flag. 
+Collection of CPU metrics can be toggled with the `--allow-cpu-metrics` CLI flag.
 If building Triton locally, the `TRITON_ENABLE_METRICS_CPU` CMake build flag can be used to toggle building the relevant code entirely.
 
 > **Note**
@@ -225,15 +225,15 @@ Cache metrics can be reported in two ways:
 by Triton directly, such as the cache hit/miss counts and durations described
 below.
 
-2. As of 23.03, additional cache metrics may be reported depending on the 
-[cache implementation](response_cache.md#cache-implementations) 
+2. As of 23.03, additional cache metrics may be reported depending on the
+[cache implementation](response_cache.md#cache-implementations)
 being used through Triton's [Metrics API](#custom-metrics).
 
 ### Triton-reported Response Cache Metrics
 
-Compute latency metrics in the 
-[Inference Request Metrics table](#inference-request-metrics) above are 
-calculated for the time spent in model inference backends. If the response 
+Compute latency metrics in the
+[Inference Request Metrics table](#inference-request-metrics) above are
+calculated for the time spent in model inference backends. If the response
 cache is enabled for a given model (see [Response Cache](response_cache.md)
 docs for more info), total inference times may be affected by response cache
 lookup times.
@@ -243,7 +243,7 @@ response, and "Compute Input Time" /  "Compute Time" / "Compute Output Time"
 are not recorded.
 
 On cache misses, "Cache Miss Time" indicates the time spent looking up
-the request hash and inserting the computed output tensor data into the cache. 
+the request hash and inserting the computed output tensor data into the cache.
 Otherwise, "Compute Input Time" /  "Compute Time" / "Compute Output Time" will
 be recorded as usual.
 
@@ -271,7 +271,7 @@ custom metrics with the existing Triton metrics endpoint. The user takes the
 ownership of the custom metrics created through the APIs and must manage their
 lifetime following the API documentation.
 
-The 
+The
 [identity_backend](https://github.com/triton-inference-server/identity_backend/blob/main/README.md#custom-metric-example)
 demonstrates a practical example of adding a custom metric to a backend.
 

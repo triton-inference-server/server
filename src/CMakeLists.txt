@@ -390,7 +390,7 @@ if(${TRITON_ENABLE_HTTP}
     http-endpoint-library
     PRIVATE $<TARGET_PROPERTY:libevhtp::evhtp,INTERFACE_INCLUDE_DIRECTORIES>
   )
-  
+
   # FIXME when Triton support of Opentelemetry is available on Windows
   # add ${OPENTELEMETRY_CPP_INCLUDE_DIRS} to above target_include_directories
   # JIRA DLIS-4786
@@ -506,18 +506,18 @@ if(${TRITON_ENABLE_TRACING})
     tracing-library EXCLUDE_FROM_ALL
     tracer.cc tracer.h
   )
-  
+
   if (NOT WIN32)
     target_compile_features(tracing-library PRIVATE cxx_std_17)
 
     target_include_directories(
-      tracing-library 
+      tracing-library
       PRIVATE ${OPENTELEMETRY_CPP_INCLUDE_DIRS}
     )
 
     target_link_libraries(
       tracing-library
-      PRIVATE 
+      PRIVATE
       ${OPENTELEMETRY_CPP_LIBRARIES})
   endif()
 

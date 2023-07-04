@@ -683,7 +683,7 @@ TRITONBACKEND_ModelInstanceExecute(
     // Compute... Get GPU instance from model state and let it compute
     // the subtraction, while the CPU instance computes the addition.
     // In real world some parallelization should be used, but here just
-    // seralize the "distributed" work.
+    // serialize the "distributed" work.
     TRITONBACKEND_Response* response = responses[r];
 
     uint64_t compute_start_ns = 0;

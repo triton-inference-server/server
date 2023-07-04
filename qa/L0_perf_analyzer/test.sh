@@ -409,7 +409,7 @@ for PROTOCOL in grpc http; do
         RET=1
     fi
     set -e
-    
+
     # Binary search for concurrency range mode and make sure it doesn't hang
     $PERF_ANALYZER -v -a --request-distribution "poisson" --shared-memory none \
     --percentile 99 --binary-search --concurrency-range 1:8:2 -l 5 \
@@ -809,8 +809,8 @@ set -e
 
 # Test with optional inputs missing and invalid
 set +e
-OPTIONAL_INPUT_ERROR_STRING="For batch sizes larger than 1, the same set of 
-inputs must be specified for each batch. You cannot use different set of 
+OPTIONAL_INPUT_ERROR_STRING="For batch sizes larger than 1, the same set of
+inputs must be specified for each batch. You cannot use different set of
 optional inputs for each individual batch."
 $PERF_ANALYZER -v -m optional -b 2 --measurement-mode "count_windows" \
     --input-data=${INT_OPTIONAL_JSONDATAFILE} -s ${STABILITY_THRESHOLD} >$CLIENT_LOG 2>&1
@@ -854,7 +854,7 @@ if [ $(cat $CLIENT_LOG |  grep "Request Rate: 40" | wc -l) -eq 0 ]; then
 fi
 set -e
 
-# Test --serial-sequences mode 
+# Test --serial-sequences mode
 set +e
 $PERF_ANALYZER -v -i $PROTOCOL -m  simple_savedmodel_sequence_object -p 1000 --request-rate-range 100:200:50 --serial-sequences \
     --input-data=$SEQ_JSONDATAFILE -s ${STABILITY_THRESHOLD} >$CLIENT_LOG 2>&1
@@ -880,7 +880,7 @@ if [ $(cat $CLIENT_LOG |  grep "${ERROR_STRING}" | wc -l) -ne 0 ]; then
     cat $CLIENT_LOG
     echo -e "\n***\n*** Test Failed\n***"
     RET=1
-fi    
+fi
 set -e
 
 ## Test perf_analyzer with MPI / multiple models
@@ -984,23 +984,23 @@ wait $SERVER_PID
 
 # Generate valid CA
 openssl genrsa -passout pass:1234 -des3 -out ca.key 4096
-openssl req -passin pass:1234 -new -x509 -days 365 -key ca.key -out ca.crt -subj  "/C=SP/ST=Spain/L=Valdepenias/O=Test/OU=Test/CN=Root CA"
+openssl req -passing pass:1234 -new -x509 -days 365 -key ca.key -out ca.crt -subj  "/C=SP/ST=Spain/L=Valdepenias/O=Test/OU=Test/CN=Root CA"
 
 # Generate valid Server Key/Cert
 openssl genrsa -passout pass:1234 -des3 -out server.key 4096
-openssl req -passin pass:1234 -new -key server.key -out server.csr -subj  "/C=SP/ST=Spain/L=Valdepenias/O=Test/OU=Server/CN=localhost"
-openssl x509 -req -passin pass:1234 -days 365 -in server.csr -CA ca.crt -CAkey ca.key -set_serial 01 -out server.crt
+openssl req -passing pass:1234 -new -key server.key -out server.csr -subj  "/C=SP/ST=Spain/L=Valdepenias/O=Test/OU=Server/CN=localhost"
+openssl x509 -req -passing pass:1234 -days 365 -in server.csr -CA ca.crt -CAkey ca.key -set_serial 01 -out server.crt
 
 # Remove passphrase from the Server Key
-openssl rsa -passin pass:1234 -in server.key -out server.key
+openssl rsa -passing pass:1234 -in server.key -out server.key
 
 # Generate valid Client Key/Cert
 openssl genrsa -passout pass:1234 -des3 -out client.key 4096
-openssl req -passin pass:1234 -new -key client.key -out client.csr -subj  "/C=SP/ST=Spain/L=Valdepenias/O=Test/OU=Client/CN=localhost"
-openssl x509 -passin pass:1234 -req -days 365 -in client.csr -CA ca.crt -CAkey ca.key -set_serial 01 -out client.crt
+openssl req -passing pass:1234 -new -key client.key -out client.csr -subj  "/C=SP/ST=Spain/L=Valdepenias/O=Test/OU=Client/CN=localhost"
+openssl x509 -passing pass:1234 -req -days 365 -in client.csr -CA ca.crt -CAkey ca.key -set_serial 01 -out client.crt
 
 # Remove passphrase from Client Key
-openssl rsa -passin pass:1234 -in client.key -out client.key
+openssl rsa -passing pass:1234 -in client.key -out client.key
 
 # Create mutated client key (Make first char of each like capital)
 cp client.key client2.key && sed -i "s/\b\(.\)/\u\1/g" client2.key

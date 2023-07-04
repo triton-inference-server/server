@@ -1010,8 +1010,8 @@ LOG_IDX=$((LOG_IDX+1))
 
 # Test loading all models on startup in EXPLICIT model control mode AND
 # an additional --load-model argument, it should fail
-rm -fr models 
-mkdir models 
+rm -fr models
+mkdir models
 for i in onnx ; do
     cp -r $DATADIR/qa_model_repository/${i}_float32_float32_float32 models/.
     sed -i "s/max_batch_size:.*/max_batch_size: 1/" models/${i}_float32_float32_float32/config.pbtxt
@@ -1542,7 +1542,7 @@ mkdir models
 cp -r ../custom_models/custom_zero_1_float32 models/. && \
     mkdir -p models/custom_zero_1_float32/1 && \
     (cd models/custom_zero_1_float32 && \
-        echo "dynamic_batching {}" >> config.pbtxt 
+        echo "dynamic_batching {}" >> config.pbtxt
         echo "parameters [" >> config.pbtxt && \
         echo "{ key: \"execute_delay_ms\"; value: { string_value: \"5000\" }}" >> config.pbtxt && \
         echo "]" >> config.pbtxt)
@@ -1621,7 +1621,7 @@ cp -r ensemble_zero_1_float32 models/. && \
 cp -r ../custom_models/custom_zero_1_float32 models/. && \
     mkdir -p models/custom_zero_1_float32/1 && \
     (cd models/custom_zero_1_float32 && \
-        echo "dynamic_batching {}" >> config.pbtxt 
+        echo "dynamic_batching {}" >> config.pbtxt
         echo "parameters [" >> config.pbtxt && \
         echo "{ key: \"execute_delay_ms\"; value: { string_value: \"5000\" }}" >> config.pbtxt && \
         echo "]" >> config.pbtxt)

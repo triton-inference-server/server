@@ -1,4 +1,6 @@
-# Copyright (c) 2022, NVIDIA CORPORATION. All rights reserved.
+#!/usr/bin/env python3
+
+# Copyright 2022-2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -25,24 +27,22 @@
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 import json
+
 import numpy as np
 import triton_python_backend_utils as pb_utils
 
 
 class TritonPythonModel:
-
     def initialize(self, args):
-        self.model_config = json.loads(args['model_config'])
+        self.model_config = json.loads(args["model_config"])
 
     def execute(self, requests):
-        """ This function is called on inference request.
-        """
+        """This function is called on inference request."""
 
         responses = []
         for _ in requests:
             # Include one of each specially parsed JSON value: nan, inf, and -inf
-            out_0 = np.array([np.nan, np.inf, np.NINF, 1, 2, 3],
-                             dtype=np.float32)
+            out_0 = np.array([np.nan, np.inf, np.NINF, 1, 2, 3], dtype=np.float32)
             out_tensor_0 = pb_utils.Tensor("OUTPUT0", out_0)
             responses.append(pb_utils.InferenceResponse([out_tensor_0]))
 

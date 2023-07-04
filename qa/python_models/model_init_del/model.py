@@ -1,3 +1,5 @@
+#!/usr/bin/env python3
+
 # Copyright 2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
@@ -24,18 +26,17 @@
 # (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-import triton_python_backend_utils as pb_utils
-
-import sys
 import os
+import sys
 import time
 
+import triton_python_backend_utils as pb_utils
+
 sys.path.append(os.path.dirname(os.path.dirname(os.path.realpath(__file__))))
-from util import inc_count, get_delay
+from util import get_delay, inc_count
 
 
 class TritonPythonModel:
-
     def initialize(self, args):
         inc_count("initialize")
         self.__sleep("initialize")

@@ -1,4 +1,6 @@
-# Copyright (c) 2022, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+#!/usr/bin/env python3
+
+# Copyright 2022-2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -25,44 +27,50 @@
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 import json
+
 import triton_python_backend_utils as pb_utils
 
 
 class TritonPythonModel:
-    """ This model tries to send response after closing
+    """This model tries to send response after closing
     the response_sender.
     """
 
     def initialize(self, args):
-        self.model_config = model_config = json.loads(args['model_config'])
+        self.model_config = model_config = json.loads(args["model_config"])
 
         using_decoupled = pb_utils.using_decoupled_model_transaction_policy(
-            model_config)
+            model_config
+        )
         if not using_decoupled:
             raise pb_utils.TritonModelException(
                 """the model `{}` can generate any number of responses per request,
-                enable decoupled transaction policy in model configuration to 
-                serve this model""".format(args['model_name']))
+                enable decoupled transaction policy in model configuration to
+                serve this model""".format(
+                    args["model_name"]
+                )
+            )
 
-        output0_config = pb_utils.get_output_config_by_name(
-            model_config, "OUTPUT0")
-        output1_config = pb_utils.get_output_config_by_name(
-            model_config, "OUTPUT1")
+        output0_config = pb_utils.get_output_config_by_name(model_config, "OUTPUT0")
+        output1_config = pb_utils.get_output_config_by_name(model_config, "OUTPUT1")
 
         self.output0_dtype = pb_utils.triton_string_to_numpy(
-            output0_config['data_type'])
+            output0_config["data_type"]
+        )
         self.output1_dtype = pb_utils.triton_string_to_numpy(
-            output1_config['data_type'])
+            output1_config["data_type"]
+        )
 
     def execute(self, requests):
-        """ Create a response sender object and use that
+        """Create a response sender object and use that
         for sending the response.
         """
 
         # This model does not support batching, so 'request_count' should always be 1.
         if len(requests) != 1:
-            raise pb_utils.TritonModelException("unsupported batch size " +
-                                                len(requests))
+            raise pb_utils.TritonModelException(
+                "unsupported batch size " + len(requests)
+            )
 
         output0_dtype = self.output0_dtype
         output1_dtype = self.output1_dtype
@@ -70,13 +78,14 @@ class TritonPythonModel:
         response_sender = requests[0].get_response_sender()
         in_0 = pb_utils.get_input_tensor_by_name(requests[0], "INPUT0")
         in_1 = pb_utils.get_input_tensor_by_name(requests[0], "INPUT1")
-        out_0, out_1 = (in_0.as_numpy() + in_1.as_numpy(),
-                        in_0.as_numpy() - in_1.as_numpy())
+        out_0, out_1 = (
+            in_0.as_numpy() + in_1.as_numpy(),
+            in_0.as_numpy() - in_1.as_numpy(),
+        )
 
         out_tensor_0 = pb_utils.Tensor("OUTPUT0", out_0.astype(output0_dtype))
         out_tensor_1 = pb_utils.Tensor("OUTPUT1", out_1.astype(output1_dtype))
         response = pb_utils.InferenceResponse([out_tensor_0, out_tensor_1])
 
-        response_sender.send(
-            flags=pb_utils.TRITONSERVER_RESPONSE_COMPLETE_FINAL)
+        response_sender.send(flags=pb_utils.TRITONSERVER_RESPONSE_COMPLETE_FINAL)
         response_sender.send(response)

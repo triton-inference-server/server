@@ -1,4 +1,6 @@
-# Copyright (c) 2022, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+#!/usr/bin/env python3
+
+# Copyright 2022-2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -24,29 +26,30 @@
 # (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-import triton_python_backend_utils as pb_utils
-import c_python_backend_utils as c_utils
 from os import path
+
+import c_python_backend_utils as c_utils
+import triton_python_backend_utils as pb_utils
 
 
 class TritonPythonModel:
-
     def execute(self, requests):
         # This function will be called once to record the free memory. Then,
         # the stub process will be killed to trigger Python backend restart.
         # After that this value will be read again to make sure that it matches
         # before restart.
 
-        file_name = 'free_memory.txt'
+        file_name = "free_memory.txt"
         current_free_memory = str(c_utils.shared_memory.free_memory())
         if path.exists(file_name):
-            with open(file_name, 'r') as f:
+            with open(file_name, "r") as f:
                 expected_free_memory = f.read()
-                assert expected_free_memory == current_free_memory, \
-                        (f'Free shared memory before and after restart are not equal. '
-                         '{expected_free_memory} (before) != {current_free_memory} (after).')
+                assert expected_free_memory == current_free_memory, (
+                    f"Free shared memory before and after restart are not equal. "
+                    "{expected_free_memory} (before) != {current_free_memory} (after)."
+                )
         else:
-            with open(file_name, 'w') as f:
+            with open(file_name, "w") as f:
                 f.write(current_free_memory)
 
         responses = []

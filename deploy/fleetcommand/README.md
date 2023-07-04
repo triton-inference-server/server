@@ -87,7 +87,7 @@ echo -n 'AWS_SESSION_TOKEN' | base64
 
 Deploy the Triton Inference Server to your Location in Fleet Command by creating
 a Deployment.  You can specify configuration parameters to override the default
-[values.yaml](values.yaml) in the Application Configuration section.  
+[values.yaml](values.yaml) in the Application Configuration section.
 
 *Note:* You _must_ provide a `--model-repository` parameter with a path to your
 prepared model repository in your S3 bucket.  Otherwise, the Triton will not
@@ -114,7 +114,7 @@ for more info.
 If you have `prometheus-operator` deployed, you can enable the ServiceMonitor
 for the Triton Inference Server by setting `serviceMonitor.enabled: true` in
 Application Configuration.  This will also deploy a Grafana dashboard for Triton
-as a ConfigMap.  
+as a ConfigMap.
 
 Otherwise, metrics can be scraped by pointing an external Prometheus
 instance at the `metricsNodePort` in the values.

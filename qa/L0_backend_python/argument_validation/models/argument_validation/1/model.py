@@ -1,4 +1,6 @@
-# Copyright (c) 2022, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+#!/usr/bin/env python3
+
+# Copyright 2022-2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -24,18 +26,18 @@
 # (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-import numpy as np
 import unittest
+
+import numpy as np
 import triton_python_backend_utils as pb_utils
 
 
 class ArgumentValidationTest(unittest.TestCase):
-
     def test_infer_request_args(self):
         # Dummy arguments used in the tests.
-        inputs = [pb_utils.Tensor('INPUT0', np.asarray([1, 2], dtype=np.int32))]
-        model_name = 'my_model'
-        requested_output_names = ['my_output']
+        inputs = [pb_utils.Tensor("INPUT0", np.asarray([1, 2], dtype=np.int32))]
+        model_name = "my_model"
+        requested_output_names = ["my_output"]
 
         #
         # inputs field validation
@@ -46,21 +48,24 @@ class ArgumentValidationTest(unittest.TestCase):
             pb_utils.InferenceRequest(
                 inputs=[None],
                 model_name=model_name,
-                requested_output_names=requested_output_names)
+                requested_output_names=requested_output_names,
+            )
 
         # Test None object as list of inputs
         with self.assertRaises(TypeError) as e:
             pb_utils.InferenceRequest(
                 inputs=None,
                 model_name=model_name,
-                requested_output_names=requested_output_names)
+                requested_output_names=requested_output_names,
+            )
 
         # model_name validation
         with self.assertRaises(TypeError) as e:
             pb_utils.InferenceRequest(
                 model_name=None,
                 inputs=inputs,
-                requested_output_names=requested_output_names)
+                requested_output_names=requested_output_names,
+            )
 
         #
         # Requested output name validations
@@ -68,14 +73,14 @@ class ArgumentValidationTest(unittest.TestCase):
 
         # Test list of None objects as requested_output_names
         with self.assertRaises(TypeError) as e:
-            pb_utils.InferenceRequest(requested_output_names=[None],
-                                      inputs=inputs,
-                                      model_name=model_name)
+            pb_utils.InferenceRequest(
+                requested_output_names=[None], inputs=inputs, model_name=model_name
+            )
 
         with self.assertRaises(TypeError) as e:
-            pb_utils.InferenceRequest(requested_output_names=None,
-                                      inputs=inputs,
-                                      model_name=model_name)
+            pb_utils.InferenceRequest(
+                requested_output_names=None, inputs=inputs, model_name=model_name
+            )
 
         # Other arguments validation
 
@@ -85,7 +90,8 @@ class ArgumentValidationTest(unittest.TestCase):
                 requested_output_names=requested_output_names,
                 inputs=inputs,
                 model_name=model_name,
-                correleation_id=None)
+                correleation_id=None,
+            )
 
         # request_id set to None
         with self.assertRaises(TypeError) as e:
@@ -93,7 +99,8 @@ class ArgumentValidationTest(unittest.TestCase):
                 requested_output_names=requested_output_names,
                 inputs=inputs,
                 model_name=model_name,
-                request_id=None)
+                request_id=None,
+            )
 
         # model_version set to None
         with self.assertRaises(TypeError) as e:
@@ -101,7 +108,8 @@ class ArgumentValidationTest(unittest.TestCase):
                 requested_output_names=requested_output_names,
                 inputs=inputs,
                 model_name=model_name,
-                model_version=None)
+                model_version=None,
+            )
 
         # flags set to None
         with self.assertRaises(TypeError) as e:
@@ -109,17 +117,16 @@ class ArgumentValidationTest(unittest.TestCase):
                 requested_output_names=requested_output_names,
                 inputs=inputs,
                 model_name=model_name,
-                flags=None)
+                flags=None,
+            )
 
         # Empty lists should not raise an exception
-        pb_utils.InferenceRequest(requested_output_names=[],
-                                  inputs=[],
-                                  model_name=model_name)
+        pb_utils.InferenceRequest(
+            requested_output_names=[], inputs=[], model_name=model_name
+        )
 
     def test_infer_response_args(self):
-        outputs = [
-            pb_utils.Tensor('OUTPUT0', np.asarray([1, 2], dtype=np.int32))
-        ]
+        outputs = [pb_utils.Tensor("OUTPUT0", np.asarray([1, 2], dtype=np.int32))]
 
         # Test list of None object as output tensor
         with self.assertRaises(pb_utils.TritonModelException) as e:
@@ -195,12 +202,15 @@ class TritonPythonModel:
         responses = []
         for _ in requests:
             # Run the unittest and store the results in InferenceResponse.
-            test = unittest.main('model', exit=False)
+            test = unittest.main("model", exit=False)
             responses.append(
-                pb_utils.InferenceResponse([
-                    pb_utils.Tensor(
-                        'OUTPUT0',
-                        np.array([test.result.wasSuccessful()],
-                                 dtype=np.float16))
-                ]))
+                pb_utils.InferenceResponse(
+                    [
+                        pb_utils.Tensor(
+                            "OUTPUT0",
+                            np.array([test.result.wasSuccessful()], dtype=np.float16),
+                        )
+                    ]
+                )
+            )
         return responses

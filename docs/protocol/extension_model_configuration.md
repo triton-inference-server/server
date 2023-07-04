@@ -39,7 +39,7 @@ In all JSON schemas shown in this document `$number`, `$string`, `$boolean`,
 `$object` and `$array` refer to the fundamental JSON types. #optional
 indicates an optional JSON field.
 
-Triton exposes the model configuation endpoint at the following
+Triton exposes the model configuration endpoint at the following
 URL. The versions portion of the URL is optional; if not provided
 Triton will return model configuration for the highest-numbered
 version of the model.

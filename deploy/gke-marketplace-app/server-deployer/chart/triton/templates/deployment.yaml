@@ -33,7 +33,7 @@ metadata:
     app: {{ template "triton-inference-server.name" . }}
     chart: {{ template "triton-inference-server.chart" . }}
     release: {{ .Release.Name }}
-    heritage: {{ .Release.Service }}    
+    heritage: {{ .Release.Service }}
 spec:
   replicas: {{ .Values.initReplicaCount }}
   selector:

@@ -1,4 +1,6 @@
-# Copyright (c) 2021, NVIDIA CORPORATION. All rights reserved.
+#!/usr/bin/env python3
+
+# Copyright 2021-2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -24,23 +26,21 @@
 # (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-import sys
 import json
+import sys
 
-sys.path.append('../../')
+sys.path.append("../../")
 import triton_python_backend_utils as pb_utils
 
 
 class TritonPythonModel:
-    """This model always returns the input that it has received.
-    """
+    """This model always returns the input that it has received."""
 
     def initialize(self, args):
-        self.model_config = json.loads(args['model_config'])
+        self.model_config = json.loads(args["model_config"])
 
     def execute(self, requests):
-        """ This function is called on inference request.
-        """
+        """This function is called on inference request."""
 
         responses = []
         for request in requests:

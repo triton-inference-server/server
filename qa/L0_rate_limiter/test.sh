@@ -278,7 +278,7 @@ kill $SERVER_PID
 wait $SERVER_PID
 
 ##
-## Tests with mulitple instances of the same model
+## Tests with multiple instances of the same model
 ##
 # Replace the second model with a second instance with same resource requirements and priority.
 # TODO: Currently there is no way to check which instance got to run inferences hence we only

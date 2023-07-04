@@ -1,4 +1,6 @@
-# Copyright (c) 2022, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+#!/usr/bin/env python3
+
+# Copyright 2022-2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -24,19 +26,19 @@
 # (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-import triton_python_backend_utils as pb_utils
 import json
+import sys
 import threading
 import time
+
 import numpy as np
 import torch
+import triton_python_backend_utils as pb_utils
 from torch.utils.dlpack import from_dlpack, to_dlpack
-import sys
 
 
 class TritonPythonModel:
-    """ This model sends an error message with the first request.
-    """
+    """This model sends an error message with the first request."""
 
     def initialize(self, args):
         logger = pb_utils.Logger
@@ -45,22 +47,25 @@ class TritonPythonModel:
         logger.log_warn("Initialize-Warning Msg!")
         logger.log_error("Initialize-Error Msg!")
         # You must parse model_config. JSON string is not parsed here
-        self.model_config = model_config = json.loads(args['model_config'])
+        self.model_config = model_config = json.loads(args["model_config"])
 
         using_decoupled = pb_utils.using_decoupled_model_transaction_policy(
-            model_config)
+            model_config
+        )
         if not using_decoupled:
             raise pb_utils.TritonModelException(
                 """the model `{}` can generate any number of responses per request,
                 enable decoupled transaction policy in model configuration to
-                serve this model""".format(args['model_name']))
+                serve this model""".format(
+                    args["model_name"]
+                )
+            )
 
         # Get OUT configuration
         out_config = pb_utils.get_output_config_by_name(model_config, "OUT")
 
         # Convert Triton types to numpy types
-        self.out_dtype = pb_utils.triton_string_to_numpy(
-            out_config['data_type'])
+        self.out_dtype = pb_utils.triton_string_to_numpy(out_config["data_type"])
 
         self.inflight_thread_count = 0
         self.inflight_thread_count_lck = threading.Lock()
@@ -71,8 +76,7 @@ class TritonPythonModel:
         logger.log_error("Initialize-Error Msg!")
 
     def execute(self, requests):
-        """ This function is called on inference request.
-        """
+        """This function is called on inference request."""
         logger = pb_utils.Logger
         logger.log("Execute-Specific Msg!", logger.INFO)
         logger.log_info("Execute-Info Msg!")
@@ -80,30 +84,33 @@ class TritonPythonModel:
         logger.log_error("Execute-Error Msg!")
         # Only generate the error for the first request
         for i, request in enumerate(requests):
-            request_input = pb_utils.get_input_tensor_by_name(request, 'IN')
+            request_input = pb_utils.get_input_tensor_by_name(request, "IN")
 
             # Sync BLS request
             infer_request = pb_utils.InferenceRequest(
-                model_name='identity_fp32',
+                model_name="identity_fp32",
                 requested_output_names=["OUTPUT0"],
-                inputs=[pb_utils.Tensor('INPUT0', request_input.as_numpy())])
+                inputs=[pb_utils.Tensor("INPUT0", request_input.as_numpy())],
+            )
             infer_response = infer_request.exec()
             if infer_response.has_error():
                 raise pb_utils.TritonModelException(
                     f"BLS Response has an error: {infer_response.error().message()}"
                 )
 
-            output0 = pb_utils.get_output_tensor_by_name(
-                infer_response, "OUTPUT0")
+            output0 = pb_utils.get_output_tensor_by_name(infer_response, "OUTPUT0")
             if np.any(output0.as_numpy() != request_input.as_numpy()):
                 raise pb_utils.TritonModelException(
                     f"BLS Request input and BLS response output do not match. {request_input.as_numpy()} != {output0.as_numpy()}"
                 )
 
-            thread1 = threading.Thread(target=self.response_thread,
-                                       args=(request.get_response_sender(),
-                                             pb_utils.get_input_tensor_by_name(
-                                                 request, 'IN').as_numpy()))
+            thread1 = threading.Thread(
+                target=self.response_thread,
+                args=(
+                    request.get_response_sender(),
+                    pb_utils.get_input_tensor_by_name(request, "IN").as_numpy(),
+                ),
+            )
             thread1.daemon = True
             with self.inflight_thread_count_lck:
                 self.inflight_thread_count += 1
@@ -131,15 +138,16 @@ class TritonPythonModel:
         logger.log_error("_get_gpu_bls_outputs-Error Msg!")
 
         infer_request = pb_utils.InferenceRequest(
-            model_name='dlpack_add_sub',
+            model_name="dlpack_add_sub",
             inputs=[input0_pb, input1_pb],
-            requested_output_names=['OUTPUT0', 'OUTPUT1'])
+            requested_output_names=["OUTPUT0", "OUTPUT1"],
+        )
         infer_response = infer_request.exec()
         if infer_response.has_error():
             return False
 
-        output0 = pb_utils.get_output_tensor_by_name(infer_response, 'OUTPUT0')
-        output1 = pb_utils.get_output_tensor_by_name(infer_response, 'OUTPUT1')
+        output0 = pb_utils.get_output_tensor_by_name(infer_response, "OUTPUT0")
+        output1 = pb_utils.get_output_tensor_by_name(infer_response, "OUTPUT1")
         if output0 is None or output1 is None:
             return False
 
@@ -193,30 +201,32 @@ class TritonPythonModel:
         input1 = torch.rand(16)
 
         if is_input0_gpu:
-            input0 = input0.to('cuda')
+            input0 = input0.to("cuda")
 
         if is_input1_gpu:
-            input1 = input1.to('cuda')
+            input1 = input1.to("cuda")
 
-        input0_pb = pb_utils.Tensor.from_dlpack('INPUT0', to_dlpack(input0))
-        input1_pb = pb_utils.Tensor.from_dlpack('INPUT1', to_dlpack(input1))
+        input0_pb = pb_utils.Tensor.from_dlpack("INPUT0", to_dlpack(input0))
+        input1_pb = pb_utils.Tensor.from_dlpack("INPUT1", to_dlpack(input1))
         gpu_bls_return = self._get_gpu_bls_outputs(input0_pb, input1_pb)
         if gpu_bls_return:
             output0_dlpack, output1_dlpack = gpu_bls_return
         else:
             return False
 
-        expected_output_0 = from_dlpack(
-            input0_pb.to_dlpack()).to('cpu') + from_dlpack(
-                input1_pb.to_dlpack()).to('cpu')
-        expected_output_1 = from_dlpack(
-            input0_pb.to_dlpack()).to('cpu') - from_dlpack(
-                input1_pb.to_dlpack()).to('cpu')
+        expected_output_0 = from_dlpack(input0_pb.to_dlpack()).to("cpu") + from_dlpack(
+            input1_pb.to_dlpack()
+        ).to("cpu")
+        expected_output_1 = from_dlpack(input0_pb.to_dlpack()).to("cpu") - from_dlpack(
+            input1_pb.to_dlpack()
+        ).to("cpu")
 
         output0_matches = torch.all(
-            expected_output_0 == from_dlpack(output0_dlpack).to('cpu'))
+            expected_output_0 == from_dlpack(output0_dlpack).to("cpu")
+        )
         output1_matches = torch.all(
-            expected_output_1 == from_dlpack(output1_dlpack).to('cpu'))
+            expected_output_1 == from_dlpack(output1_dlpack).to("cpu")
+        )
         if not output0_matches or not output1_matches:
             return False
 
@@ -230,8 +240,7 @@ class TritonPythonModel:
         logger.log_error("execute_gpu_bls-Error Msg!")
         for input0_device in [True, False]:
             for input1_device in [True, False]:
-                test_status = self._test_gpu_bls_add_sub(
-                    input0_device, input1_device)
+                test_status = self._test_gpu_bls_add_sub(input0_device, input1_device)
                 if not test_status:
                     return False
 
@@ -250,39 +259,39 @@ class TritonPythonModel:
 
         status = self.execute_gpu_bls()
         if not status:
-            infer_response = pb_utils.InferenceResponse(
-                error="GPU BLS test failed.")
+            infer_response = pb_utils.InferenceResponse(error="GPU BLS test failed.")
             response_sender.send(infer_response)
         else:
             in_value = in_input
             infer_request = pb_utils.InferenceRequest(
-                model_name='identity_fp32',
+                model_name="identity_fp32",
                 requested_output_names=["OUTPUT0"],
-                inputs=[pb_utils.Tensor('INPUT0', in_input)])
+                inputs=[pb_utils.Tensor("INPUT0", in_input)],
+            )
             infer_response = infer_request.exec()
-            output0 = pb_utils.get_output_tensor_by_name(
-                infer_response, "OUTPUT0")
+            output0 = pb_utils.get_output_tensor_by_name(infer_response, "OUTPUT0")
             if infer_response.has_error():
                 response = pb_utils.InferenceResponse(
-                    error=infer_response.error().message())
+                    error=infer_response.error().message()
+                )
                 response_sender.send(
-                    response,
-                    flags=pb_utils.TRITONSERVER_RESPONSE_COMPLETE_FINAL)
+                    response, flags=pb_utils.TRITONSERVER_RESPONSE_COMPLETE_FINAL
+                )
             elif np.any(in_input != output0.as_numpy()):
                 error_message = (
                     "BLS Request input and BLS response output do not match."
-                    f" {in_value} != {output0.as_numpy()}")
+                    f" {in_value} != {output0.as_numpy()}"
+                )
                 response = pb_utils.InferenceResponse(error=error_message)
                 response_sender.send(
-                    response,
-                    flags=pb_utils.TRITONSERVER_RESPONSE_COMPLETE_FINAL)
+                    response, flags=pb_utils.TRITONSERVER_RESPONSE_COMPLETE_FINAL
+                )
             else:
-                output_tensors = [pb_utils.Tensor('OUT', in_value)]
-                response = pb_utils.InferenceResponse(
-                    output_tensors=output_tensors)
+                output_tensors = [pb_utils.Tensor("OUT", in_value)]
+                response = pb_utils.InferenceResponse(output_tensors=output_tensors)
                 response_sender.send(
-                    response,
-                    flags=pb_utils.TRITONSERVER_RESPONSE_COMPLETE_FINAL)
+                    response, flags=pb_utils.TRITONSERVER_RESPONSE_COMPLETE_FINAL
+                )
 
         with self.inflight_thread_count_lck:
             self.inflight_thread_count -= 1
@@ -297,13 +306,13 @@ class TritonPythonModel:
         the model to perform any necessary clean ups before exit.
         """
         logger = pb_utils.Logger
-        logger.log_info('Finalize invoked')
+        logger.log_info("Finalize invoked")
 
         inflight_threads = True
         while inflight_threads:
             with self.inflight_thread_count_lck:
-                inflight_threads = (self.inflight_thread_count != 0)
+                inflight_threads = self.inflight_thread_count != 0
             if inflight_threads:
                 time.sleep(0.1)
 
-        logger.log_info('Finalize complete...')
+        logger.log_info("Finalize complete...")

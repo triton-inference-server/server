@@ -117,7 +117,7 @@ for PROTOCOL in http grpc; do
             MEMORY_GROWTH_TEST=$MEMORY_GROWTH_TEST_CPP
             MAX_ALLOWED_ALLOC="10"
             # NOTE: This test has risk of exhausting all available sockets in
-            # the ephemeral port range. Re-using the same client connection 
+            # the ephemeral port range. Re-using the same client connection
             # ("-R") can easily solve this problem. However, to cleanly separate
             # the resources used by different client objects, we create new
             # connections for each request and retry/sleep on failure to give

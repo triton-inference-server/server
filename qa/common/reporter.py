@@ -30,39 +30,48 @@ import argparse
 import csv
 import json
 import os
-import requests
 import socket
+
+import requests
 
 FLAGS = None
 
 ENVS = [
-    "CUDA_DRIVER_VERSION", "CUDA_VERSION", "TRITON_SERVER_VERSION",
-    "NVIDIA_TRITON_SERVER_VERSION", "TRT_VERSION", "CUDNN_VERSION",
-    "CUBLAS_VERSION", "BENCHMARK_PIPELINE", "BENCHMARK_REPO_BRANCH",
-    "BENCHMARK_REPO_COMMIT", "BENCHMARK_CLUSTER", "BENCHMARK_GPU_COUNT"
+    "CUDA_DRIVER_VERSION",
+    "CUDA_VERSION",
+    "TRITON_SERVER_VERSION",
+    "NVIDIA_TRITON_SERVER_VERSION",
+    "TRT_VERSION",
+    "CUDNN_VERSION",
+    "CUBLAS_VERSION",
+    "BENCHMARK_PIPELINE",
+    "BENCHMARK_REPO_BRANCH",
+    "BENCHMARK_REPO_COMMIT",
+    "BENCHMARK_CLUSTER",
+    "BENCHMARK_GPU_COUNT",
 ]
 
 
-def annotate(datas):
+def annotate(data):
     # Add all interesting envvar values
-    for data in datas:
+    for data in data:
         for env in ENVS:
             if env in os.environ:
                 val = os.environ[env]
-                data['s_' + env.lower()] = val
+                data["s_" + env.lower()] = val
 
         # Add this system's name. If running within slurm use
         # SLURM_JOB_NODELIST as the name (this assumes that the slurm
         # job was scheduled on a single node, otherwise
         # SLURM_JOB_NODELIST will list multiple nodes).
-        if 'SLURM_JOB_NODELIST' in os.environ:
-            data['s_benchmark_system'] = os.environ['SLURM_JOB_NODELIST']
+        if "SLURM_JOB_NODELIST" in os.environ:
+            data["s_benchmark_system"] = os.environ["SLURM_JOB_NODELIST"]
         else:
-            data['s_benchmark_system'] = socket.gethostname()
+            data["s_benchmark_system"] = socket.gethostname()
 
 
 def annotate_csv(data, csv_file):
-    csv_reader = csv.reader(csv_file, delimiter=',')
+    csv_reader = csv.reader(csv_file, delimiter=",")
     linenum = 0
     header_row = None
     concurrency_row = None
@@ -77,57 +86,59 @@ def annotate_csv(data, csv_file):
     if (header_row is not None) and (concurrency_row is not None):
         avg_latency_us = 0
         for header, result in zip(header_row, concurrency_row):
-            if header == 'Inferences/Second':
-                data['d_infer_per_sec'] = float(result)
-            elif ((header == 'Client Send') or
-                  (header == 'Network+Server Send/Recv') or
-                  (header == 'Server Queue') or
-                  (header == 'Server Compute Input') or
-                  (header == 'Server Compute Output') or
-                  (header == 'Server Compute Infer') or
-                  (header == 'Client Recv')):
+            if header == "Inferences/Second":
+                data["d_infer_per_sec"] = float(result)
+            elif (
+                (header == "Client Send")
+                or (header == "Network+Server Send/Recv")
+                or (header == "Server Queue")
+                or (header == "Server Compute Input")
+                or (header == "Server Compute Output")
+                or (header == "Server Compute Infer")
+                or (header == "Client Recv")
+            ):
                 avg_latency_us += float(result)
-            elif header == 'p50 latency':
-                data['d_latency_p50_ms'] = float(result) / 1000.0
-            elif header == 'p90 latency':
-                data['d_latency_p90_ms'] = float(result) / 1000.0
-            elif header == 'p95 latency':
-                data['d_latency_p95_ms'] = float(result) / 1000.0
-            elif header == 'p99 latency':
-                data['d_latency_p99_ms'] = float(result) / 1000.0
+            elif header == "p50 latency":
+                data["d_latency_p50_ms"] = float(result) / 1000.0
+            elif header == "p90 latency":
+                data["d_latency_p90_ms"] = float(result) / 1000.0
+            elif header == "p95 latency":
+                data["d_latency_p95_ms"] = float(result) / 1000.0
+            elif header == "p99 latency":
+                data["d_latency_p99_ms"] = float(result) / 1000.0
 
-        data['d_latency_avg_ms'] = avg_latency_us / 1000.0
+        data["d_latency_avg_ms"] = avg_latency_us / 1000.0
 
 
 def post_to_url(url, data):
-    headers = {'Content-Type': 'application/json', 'Accept-Charset': 'UTF-8'}
+    headers = {"Content-Type": "application/json", "Accept-Charset": "UTF-8"}
     r = requests.post(url, data=data, headers=headers)
     r.raise_for_status()
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument('-v',
-                        '--verbose',
-                        action="store_true",
-                        required=False,
-                        default=False,
-                        help='Enable verbose output')
-    parser.add_argument('-o',
-                        '--output',
-                        type=str,
-                        required=False,
-                        help='Output filename')
-    parser.add_argument('-u',
-                        '--url',
-                        type=str,
-                        required=False,
-                        help='Post results to a URL')
-    parser.add_argument('--csv',
-                        type=argparse.FileType('r'),
-                        required=False,
-                        help='perf_analyzer generated CSV')
-    parser.add_argument('file', type=argparse.FileType('r'))
+    parser.add_argument(
+        "-v",
+        "--verbose",
+        action="store_true",
+        required=False,
+        default=False,
+        help="Enable verbose output",
+    )
+    parser.add_argument(
+        "-o", "--output", type=str, required=False, help="Output filename"
+    )
+    parser.add_argument(
+        "-u", "--url", type=str, required=False, help="Post results to a URL"
+    )
+    parser.add_argument(
+        "--csv",
+        type=argparse.FileType("r"),
+        required=False,
+        help="perf_analyzer generated CSV",
+    )
+    parser.add_argument("file", type=argparse.FileType("r"))
     FLAGS = parser.parse_args()
 
     data = json.loads(FLAGS.file.read())
@@ -138,8 +149,7 @@ if __name__ == '__main__':
 
     if FLAGS.csv is not None:
         if len(data) != 1:
-            raise Exception(
-                "--csv requires that json data have a single array entry")
+            raise Exception("--csv requires that json data have a single array entry")
         annotate_csv(data[0], FLAGS.csv)
         if FLAGS.verbose:
             print("*** Annotate CSV ***")

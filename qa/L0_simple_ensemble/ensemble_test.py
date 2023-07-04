@@ -1,4 +1,6 @@
-# Copyright (c) 2020-2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+#!/usr/bin/env python3
+
+# Copyright 2020-2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -30,72 +32,77 @@ sys.path.append("../common")
 sys.path.append("../clients")
 
 import logging
-
 import unittest
-import numpy as np
+
 import infer_util as iu
+import numpy as np
 import test_util as tu
 import tritonhttpclient
 
 
 class EnsembleTest(tu.TestResultCollector):
-
     def _get_infer_count_per_version(self, model_name):
-        triton_client = tritonhttpclient.InferenceServerClient("localhost:8000",
-                                                               verbose=True)
+        triton_client = tritonhttpclient.InferenceServerClient(
+            "localhost:8000", verbose=True
+        )
         stats = triton_client.get_inference_statistics(model_name)
         self.assertEqual(len(stats["model_stats"]), 2)
         infer_count = [0, 0]
         for model_stat in stats["model_stats"]:
-            self.assertEqual(model_stat["name"], model_name,
-                             "expected stats for model " + model_name)
-            model_version = model_stat['version']
+            self.assertEqual(
+                model_stat["name"], model_name, "expected stats for model " + model_name
+            )
+            model_version = model_stat["version"]
             if model_version == "1":
-                infer_count[0] = model_stat["inference_stats"]["success"][
-                    "count"]
+                infer_count[0] = model_stat["inference_stats"]["success"]["count"]
             elif model_version == "2":
-                infer_count[1] = model_stat["inference_stats"]["success"][
-                    "count"]
+                infer_count[1] = model_stat["inference_stats"]["success"]["count"]
             else:
                 self.assertTrue(
-                    False, "unexpected version {} for model {}".format(
-                        model_version, model_name))
+                    False,
+                    "unexpected version {} for model {}".format(
+                        model_version, model_name
+                    ),
+                )
         return infer_count
 
     def test_ensemble_add_sub(self):
         for bs in (1, 8):
-            iu.infer_exact(self, "ensemble_add_sub", (bs, 16), bs, np.int32,
-                           np.int32, np.int32)
+            iu.infer_exact(
+                self, "ensemble_add_sub", (bs, 16), bs, np.int32, np.int32, np.int32
+            )
 
         infer_count = self._get_infer_count_per_version("simple")
         # The two 'simple' versions should have the same infer count
-        if (infer_count[0] != infer_count[1]):
+        if infer_count[0] != infer_count[1]:
             self.assertTrue(
-                False,
-                "unexpeced different infer count for different 'simple' versions"
+                False, "unexpeced different infer count for different 'simple' versions"
             )
 
     def test_ensemble_add_sub_one_output(self):
         for bs in (1, 8):
-            iu.infer_exact(self,
-                           "ensemble_add_sub", (bs, 16),
-                           bs,
-                           np.int32,
-                           np.int32,
-                           np.int32,
-                           outputs=("OUTPUT0",))
+            iu.infer_exact(
+                self,
+                "ensemble_add_sub",
+                (bs, 16),
+                bs,
+                np.int32,
+                np.int32,
+                np.int32,
+                outputs=("OUTPUT0",),
+            )
 
         infer_count = self._get_infer_count_per_version("simple")
         # Only 'simple' version 2 should have non-zero infer count
         # as it is in charge of producing OUTPUT0
-        if (infer_count[0] != 0):
+        if infer_count[0] != 0:
             self.assertTrue(
-                False, "unexpeced non-zero infer count for 'simple' version 1")
-        elif (infer_count[1] == 0):
-            self.assertTrue(
-                False, "unexpeced zero infer count for 'simple' version 2")
+                False, "unexpeced non-zero infer count for 'simple' version 1"
+            )
+        elif infer_count[1] == 0:
+            self.assertTrue(False, "unexpeced zero infer count for 'simple' version 2")
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     logging.basicConfig(stream=sys.stderr)
     unittest.main()

@@ -28,7 +28,7 @@
 
 # Triton Examples
 
-**New to Triton Inference Server?** Make use of [these tutorials](https://github.com/triton-inference-server/tutorials) to begin your Triton journey! 
+**New to Triton Inference Server?** Make use of [these tutorials](https://github.com/triton-inference-server/tutorials) to begin your Triton journey!
 
 This folder contains the following:
 * jetson: This covers deploying Triton Inference Server on Jetson devices.
