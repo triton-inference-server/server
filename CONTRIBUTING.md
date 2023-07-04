@@ -105,9 +105,9 @@ proposed change so that the Triton team can provide feedback.
 
 All pull requests are checked against the
 [pre-commit hooks](https://github.com/pre-commit/pre-commit-hooks)
-located [here](../.pre-commit-config.yaml). The hooks do some sanity
-checking like linting and formatting. These checks must pass to merge
-a change.
+located [in the repository's top-level .pre-commit-config.yaml](../.pre-commit-config.yaml).
+The hooks do some sanity checking like linting and formatting.
+These checks must pass to merge a change.
 
 To run these locally, you can run `pip install pre-commit`
 inside the cloned repo. When you commit a change, the pre-commit
