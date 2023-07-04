@@ -28,7 +28,7 @@ import argparse
 import os
 import numpy as np
 import gen_ensemble_model_utils as emu
-from typing import List
+from typing import List, Tuple
 
 FLAGS = None
 np_dtype_string = np.dtype(object)
@@ -424,22 +424,13 @@ def create_libtorch_modelfile_wo_initial_state(models_dir, model_version,
         return
 
     torch_dtype = np_to_torch_dtype(dtype)
-    torch_control_type = torch_dtype
-
     # If input dtype is bool, then use bool type for control and
     # int32 type for input/output
     if torch_dtype == torch.bool:
         torch_dtype = torch.int32
 
-    # If the input is a string then use int32 for operation and just
-    # cast to/from string for input and output.
-    if torch_dtype == List[str]:
-        torch_control_type = torch.int32
-
     model_name = tu.get_sequence_model_name(
         "libtorch_nobatch" if max_batch == 0 else "libtorch", dtype)
-    # handle for -1 (when variable) since can't create tensor with shape of [-1]
-    shape = [abs(ips) for ips in shape]
 
     if torch_dtype == List[str]:
 
@@ -493,7 +484,6 @@ def create_libtorch_modelfile_with_initial_state(models_dir, model_version,
         return
 
     torch_dtype = np_to_torch_dtype(dtype)
-    torch_control_type = torch_dtype
 
     # If input dtype is bool, then use bool type for control and
     # int32 type for input/output
@@ -503,8 +493,6 @@ def create_libtorch_modelfile_with_initial_state(models_dir, model_version,
     model_name = tu.get_sequence_model_name(
         "libtorch_nobatch" if max_batch == 0 else "libtorch", dtype)
     # handle for -1 (when variable) since can't create tensor with shape of [-1]
-    shape = [abs(ips) for ips in shape]
-
     if torch_dtype == List[str]:
 
         class SequenceNet(nn.Module):
