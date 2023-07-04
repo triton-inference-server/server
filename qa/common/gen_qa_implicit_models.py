@@ -28,7 +28,7 @@ import argparse
 import os
 import numpy as np
 import gen_ensemble_model_utils as emu
-from typing import List, Tuple
+from typing import List
 
 FLAGS = None
 np_dtype_string = np.dtype(object)
@@ -122,6 +122,7 @@ def np_to_torch_dtype(np_dtype):
         return torch.double
     elif np_dtype == np_dtype_string:
         return List[str]
+    return None
 
 
 def create_onnx_modelfile_wo_initial_state(models_dir, model_version, max_batch,
