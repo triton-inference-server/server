@@ -65,6 +65,7 @@ repos:
         - id: check-json
         - id: check-toml
         - id: check-yaml
+          exclude: ^deploy(\/[^\/]+)*\/templates\/.*$
         - id: check-shebang-scripts-are-executable
         - id: end-of-file-fixer
           types_or: [c, c++, cuda, proto, textproto, java, python]
