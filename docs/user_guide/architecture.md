@@ -298,7 +298,8 @@ additional tensors that have to be transferred.
 
 Implicit state management requires backend support. Currently, only
 [onnxruntime_backend](https://github.com/triton-inference-server/onnxruntime_backend)
-and [tensorrt_backend](https://github.com/triton-inference-server/tensorrt_backend)
+[tensorrt_backend](https://github.com/triton-inference-server/tensorrt_backend),
+and [pytorch_backend](https://github.com/triton-inference-server/pytorch_backend)
 support implicit state.
 
 ##### State Initialization
