@@ -84,7 +84,7 @@ class ClientNoBatchTest(tu.TestResultCollector):
             inputs[1].set_data_from_numpy(in1)
 
             try:
-                results = triton_client.infer(model_name, inputs, outputs=outputs)
+                _ = triton_client.infer(model_name, inputs, outputs=outputs)
                 self.assertTrue(
                     False, "expected failure with no batch request for batching model"
                 )
@@ -137,7 +137,7 @@ class ClientNoBatchTest(tu.TestResultCollector):
             inputs[1].set_data_from_numpy(in1)
 
             try:
-                results = triton_client.infer(model_name, inputs, outputs=outputs)
+                _ = triton_client.infer(model_name, inputs, outputs=outputs)
                 self.assertTrue(
                     False,
                     "expected failure with batched request for non-batching model",

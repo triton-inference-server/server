@@ -82,7 +82,7 @@ class ClientTimeoutTest(tu.TestResultCollector):
         # The model is configured to take three seconds to send the
         # response. Expect an exception for small timeout values.
         with self.assertRaises(InferenceServerException) as cm:
-            result = triton_client.infer(
+            _ = triton_client.infer(
                 model_name=self.model_name_,
                 inputs=self.inputs_,
                 outputs=self.outputs_,
@@ -192,7 +192,7 @@ class ClientTimeoutTest(tu.TestResultCollector):
             triton_client = httpclient.InferenceServerClient(
                 url="localhost:8000", verbose=True, network_timeout=2.0
             )
-            result = triton_client.infer(
+            _ = triton_client.infer(
                 model_name=self.model_name_, inputs=self.inputs_, outputs=self.outputs_
             )
         self.assertIn("timed out", str(cm.exception))

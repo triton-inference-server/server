@@ -100,7 +100,7 @@ class RestrictedProtocolTest(unittest.TestCase):
         with self.assertRaisesRegex(
             InferenceServerException, "This protocol is restricted"
         ):
-            results = self.client_.infer(
+            _ = self.client_.infer(
                 model_name=self.model_name_, inputs=inputs, headers={"test": "1"}
             )
         self.client_.infer(
