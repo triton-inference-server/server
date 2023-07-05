@@ -138,7 +138,7 @@ class IOTest(tu.TestResultCollector):
         # responses with different GPU output shapes
         num_requests = 5
         for _ in range(num_requests):
-            result = self._client.async_infer(
+            _ = self._client.async_infer(
                 model_name=model_name,
                 inputs=inputs,
                 callback=partial(callback, user_data),
