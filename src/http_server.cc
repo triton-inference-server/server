@@ -278,6 +278,52 @@ JsonBytesArrayByteSize(
   return nullptr;  // success
 }
 
+template<typename T>
+TRITONSERVER_ERROR * ReadJsonAsUint(triton::common::TritonJson::Value &el, int* counter, char* base) {
+  uint64_t value = 0;
+  RETURN_IF_ERR(el.AsUInt(&value));
+  if (value > std::std::numeric_limits<T>::max()) {
+    return TRITONSERVER_ErrorNew(
+				 TRITONSERVER_ERROR_INTERNAL,
+				 "Unsigned JSON value larger than datatype");
+    
+  }
+  T* data_vec = reinterpret_cast<T*>(base);
+  data_vec[*counter] = static_cast<T>(value);
+  *counter += 1;
+  return nullptr;
+}
+
+template<typename T>
+TRITONSERVER_ERROR * ReadJsonAsInt(triton::common::TritonJson::Value &el, int* counter, char* base) {
+  int64_t value = 0;
+  RETURN_IF_ERR(el.AsInt(&value));
+  if (value > std::std::numeric_limits<T>::max()) {
+    return TRITONSERVER_ErrorNew(
+				 TRITONSERVER_ERROR_INTERNAL,
+				 "Unsigned JSON value larger than datatype");
+    
+  }
+  if (value < std::std::numeric_limits<T>::min()) {
+    return TRITONSERVER_ErrorNew(
+				 TRITONSERVER_ERROR_INTERNAL,
+				 "Unsigned JSON value smaller than datatype");
+    
+  }
+  T* data_vec = reinterpret_cast<T*>(base);
+  data_vec[*counter] = static_cast<T>(value);
+  *counter += 1;
+  return nullptr;
+}
+
+TRITONSERVER_ERROR * ReadJsonAsBool(triton::common::TritonJson::Value &el, int* counter, char* base) {
+  bool b = false;
+  RETURN_IF_ERR(el.AsBool(&b));
+  uint8_t* data_vec = reinterpret_cast<uint8_t*>(base);
+  data_vec[*counter] = (uint8_t)(b ? 1 : 0);
+  *counter += 1;
+}
+
 TRITONSERVER_Error*
 ReadDataFromJsonHelper(
     char* base, const TRITONSERVER_DataType dtype,
@@ -302,81 +348,39 @@ ReadDataFromJsonHelper(
       }
       switch (dtype) {
         case TRITONSERVER_TYPE_BOOL: {
-          bool b = false;
-          RETURN_IF_ERR(el.AsBool(&b));
-          uint8_t* data_vec = reinterpret_cast<uint8_t*>(base);
-          // FIXME for unsigned should bounds check and raise error
-          // since otherwise the actually used value will be
-          // unexpected.
-          data_vec[*counter] = (uint8_t)(b ? 1 : 0);
-          *counter += 1;
+	  RETURN_IF_ERR(ReadJsonAsBool(el, counter, base));
           break;
         }
         case TRITONSERVER_TYPE_UINT8: {
-          uint64_t ui = 0;
-          RETURN_IF_ERR(el.AsUInt(&ui));
-          uint8_t* data_vec = reinterpret_cast<uint8_t*>(base);
-          data_vec[*counter] = (uint8_t)ui;
-          *counter += 1;
+	  RETURN_IF_ERR(ReadJSonAsUint<uint8_t>(el, counter, base))
           break;
         }
         case TRITONSERVER_TYPE_UINT16: {
-          uint64_t ui = 0;
-          RETURN_IF_ERR(el.AsUInt(&ui));
-          uint16_t* data_vec = reinterpret_cast<uint16_t*>(base);
-          data_vec[*counter] = (uint16_t)ui;
-          *counter += 1;
+	  ReadJsonAsUint<uint16_t>(el, counter, base);
           break;
         }
         case TRITONSERVER_TYPE_UINT32: {
-          uint64_t ui = 0;
-          RETURN_IF_ERR(el.AsUInt(&ui));
-          uint32_t* data_vec = reinterpret_cast<uint32_t*>(base);
-          data_vec[*counter] = (uint32_t)ui;
-          *counter += 1;
-          break;
+	  ReadJsonAsUint<uint32_t>(el, counter, base);
+	  break;
         }
         case TRITONSERVER_TYPE_UINT64: {
-          uint64_t ui = 0;
-          RETURN_IF_ERR(el.AsUInt(&ui));
-          uint64_t* data_vec = reinterpret_cast<uint64_t*>(base);
-          data_vec[*counter] = ui;
-          *counter += 1;
+	  ReadJsonAsUint<uint64_t>(el, counter, base);
           break;
         }
         case TRITONSERVER_TYPE_INT8: {
-          // FIXME for signed type just assigning to smaller type is
-          // "implementation defined" and so really need to bounds
-          // check.
-          int64_t si = 0;
-          RETURN_IF_ERR(el.AsInt(&si));
-          int8_t* data_vec = reinterpret_cast<int8_t*>(base);
-          data_vec[*counter] = (int8_t)si;
-          *counter += 1;
+	  ReadJsonAsInt<int8_t>(el, counter, base);
           break;
         }
         case TRITONSERVER_TYPE_INT16: {
-          int64_t si = 0;
-          RETURN_IF_ERR(el.AsInt(&si));
-          int16_t* data_vec = reinterpret_cast<int16_t*>(base);
-          data_vec[*counter] = (int16_t)si;
-          *counter += 1;
+	  ReadJsonAsInt<int16_t>(el, counter, base);
           break;
         }
         case TRITONSERVER_TYPE_INT32: {
-          int64_t si = 0;
-          RETURN_IF_ERR(el.AsInt(&si));
-          int32_t* data_vec = reinterpret_cast<int32_t*>(base);
-          data_vec[*counter] = (int32_t)si;
-          *counter += 1;
+	  ReadJsonAsInt<int32_t>(el, counter, base);
           break;
         }
         case TRITONSERVER_TYPE_INT64: {
-          int64_t si = 0;
-          RETURN_IF_ERR(el.AsInt(&si));
-          int64_t* data_vec = reinterpret_cast<int64_t*>(base);
-          data_vec[*counter] = si;
-          *counter += 1;
+	  ReadJsonASInt<int64_t>(el, counter, base);
           break;
         }
         case TRITONSERVER_TYPE_FP32: {
@@ -411,12 +415,11 @@ ReadDataFromJsonHelper(
                 "Shape does not match true shape of 'data' field");
           }
           // Prepend bytes with length
-          *reinterpret_cast<uint32_t*>(base + *counter) =
-              static_cast<uint32_t>(len);
+          *reinterpret_cast<uint32_t*>(base + *counter) = static_cast<uint32_t>(len);
           *counter += sizeof(uint32_t);
           // Copy bytes
-          std::copy(cstr, cstr + static_cast<uint32_t>(len), base + *counter);
-          *counter += static_cast<uint32_t>(len);
+          std::copy(cstr, cstr + len, base + *counter);
+          *counter += len;
           break;
         }
         default:
@@ -2315,6 +2318,29 @@ HTTPAPIServer::GetResponseCompressionType(evhtp_request_t* req)
   return DataCompressor::Type::IDENTITY;
 }
 
+
+#if defined(__BYTE_ORDER__) && (__BYTE_ORDER__ == __ORDER_BIG_ENDIAN__)
+      // Normalize to host endian on input
+void
+NormalizeEndianness(
+    TRITONSERVER_DataType datatype, char* buffer, size_t size,
+    bool starting_block)
+{
+  if (datatype == TRITONSERVER_TYPE_BYTES and starting_block) {
+    if size
+      < sizeof(uint32_t)
+      {
+        // error
+      }
+      uint32_t *len = const_cast<uint32_t*>(reinterpret_cast<const uint32_t*>(buffer);
+      *len = __builtin_bswap32(*len);
+  }
+  // handle
+}
+#else
+#define NormalizeEndianness(datatype, bufffer, size)
+#endif
+
 TRITONSERVER_Error*
 HTTPAPIServer::EVBufferToInput(
     const std::string& model_name, TRITONSERVER_InferenceRequest* irequest,
@@ -2525,7 +2551,14 @@ HTTPAPIServer::EVBufferToInput(
             "data format");
       }
 
+
+      // function here
+
+
       // Process one block at a time
+      uint32_t bytes_element_size = 0;
+      uint32_t next_position = 0;
+      size_t offset = 0;
       while ((byte_size > 0) && (v_idx < n)) {
         char* base = static_cast<char*>(v[v_idx].iov_base);
         size_t base_size;
@@ -2538,6 +2571,62 @@ HTTPAPIServer::EVBufferToInput(
           base_size = v[v_idx].iov_len;
           byte_size -= v[v_idx].iov_len;
           v_idx++;
+        }
+
+        // [0, 0, 0, 10, 1, 2, 3, 4, 5, 6, 7, 8, 9]
+        // next_position = 0, base_size = 13
+        // current_size = 10
+        // next_position = 0 +4 + 10
+        // offset=0
+        // next_position = 1
+
+        // [10, 0 ,0, 0, 20, 1, 2, 3, 4, 5, 6, 7, 8, 9]
+        // next_position = 1, base_size = 14
+        // current_size = 20
+        // next_position = 1 + 4 + 20
+        // offset=0
+        // next_position = 11
+
+
+        // [10, 11, 12, 13, 14, 15, 16, 17, 18, 19]
+        // next_position = 11, base_size = 10
+        // next_position = 1
+
+        // [20,0]
+        // next_position = 1, base_size = 2
+        // current_size = 30
+        // offset=3
+        // next_position = 1 + 30 + 4
+
+        // [0,0,30,1,2,3,4,5,6,7,8,9,10,11,12,13,14]
+        // next_position = 33, base_size = 17
+        // next_position = 16
+
+        // [15,16,17,18,19,20,21,22,23,24,25,26]
+        // next_position = 16, base_size = 12
+        // next_position = 4
+
+        // [27, 28, 19, 30]
+        // next_position = 4, base_size = 4
+        //
+
+        if (dtype == TRITONSERVER_TYPE_BYTES) {
+          while (next_position < base_size) {
+            uint32_t current_size;
+            LittleEndianToHost(
+                TRITONSERVER_TYPE_UINT32, base + next_position,
+                std::min(sizeof(uint32_t), base_size - next_position),
+                v[v_idx].iov_base, std::min(byte_size, v[v_idx].iov_len),
+                &offset, reinterpret_cast<void*>(&current_size));
+            next_position += sizeof(uint32_t) + current_size;
+          }
+          next_position = next_position - base_size;
+        } else {
+          LittleEndianToHost(
+              dtype, base + next_position, base_size - next_position,
+              v[v_idx].iov_base, std::min(byte_size, v[v_idx].iov_len), &offset,
+              reinterpret_cast<void*>(&current_size));
+          next_position = offset;
         }
 
         RETURN_IF_ERR(TRITONSERVER_InferenceRequestAppendInputData(
@@ -2554,6 +2643,7 @@ HTTPAPIServer::EVBufferToInput(
                 " additional bytes for model '" + model_name + "'")
                 .c_str());
       }
+
     } else {
       // Process input if in shared memory.
       bool use_shm;
@@ -2746,6 +2836,14 @@ HTTPAPIServer::EVBufferToRawInput(
             "unexpected error getting input buffers");
       }
     }
+
+    // GetDataTypeForRaw
+    // Use
+    // TRITONAPI_DECLSPEC TRITONSERVER_Error*
+    // TRITONSERVER_ServerModelMetadata(
+    // TRITONSERVER_Server* server, const char* model_name,
+    // const int64_t model_version, TRITONSERVER_Message** model_metadata)
+
     // Process one block at a time
     while ((byte_size > 0) && (v_idx < n)) {
       char* base = static_cast<char*>(v[v_idx].iov_base);
@@ -3343,6 +3441,20 @@ HTTPAPIServer::InferRequestClass::FinalizeResponse(
         RETURN_IF_ERR(parameters_json.AddUInt("binary_data_size", byte_size));
       }
       if (byte_size > 0) {
+        if (dtype == TRITONSERVER_TYPE_BYTES) {
+          uint32_t current_position = 0;
+          uint32_t next_position = 0;
+          while (current_position < byte_size) {
+            next_position +=
+                *reinterpet_cast<uint32_t*>(base + current_position);
+            HostToLittleEndian(
+                TRITONSERVER_TYPE_UINT32, base + current_position,
+                sizeof(uint32_t));
+            next_position = current_position;
+          }
+        } else {
+          HostToLittleEndian(datatype, base, byte_size);
+        }
         ordered_buffers.push_back(info->evbuffer_);
       }
     } else if (info->kind_ == AllocPayload::OutputInfo::JSON) {

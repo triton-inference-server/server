@@ -111,4 +111,172 @@ Join(const std::vector<std::string>& vec, const std::string& delim)
   return ss.str();
 }
 
-}}  // namespace triton::server
+
+uint16_t
+bswap(uint16_t input)
+{
+  return __builtin_bswap16(input);
+}
+uint32_t
+bswap(uint32_t input)
+{
+  return __builtin_bswap32(input);
+}
+uint64_t
+bswap(uint64_t input)
+{
+  return __builtin_bswap64(input);
+}
+
+template <typename T>
+TRITONSERVER_Error*
+SwapEndian(const char* buffer, size_t size)
+{
+  if (size % sizeof(T)) {
+    return TRITONSERVER_ErrorNew(
+        TRITONSERVER_ERROR_INTERNAL,
+        "Number of bytes is not multiple of type size. Can't swap endianness.");
+  }
+  for (; size > 0; size -= sizeof(T), buffer += sizeof(T)) {
+    T* temp = const_cast<T*>(reinterpret_cast<const T*>(buffer));
+    *temp = bswap(*temp);
+  }
+  return nullptr;
+}
+
+void
+LittleEndianToHost(
+    struct evbuffer_iovec* buffers, int buffer_index, int total_buffers,
+    int byte_size, TRITONSERVER_DataType datatype)
+{
+  size_t offset = 0;
+  while ((byte_size > 0) && (buffer_index < total_buffers)) {
+    char* base = static_cast<char*>(buffers[buffer_index].iov_base) + offset;
+    size_t base_size = std::min(byte_size, buffers[buffer_index].iov_len);
+    SwapEndian(datatype, base, base_size, offset);
+  }
+}
+
+
+template <typename T>
+TRITONSERVER_Error*
+SwapEndian(
+    const char* buffer, size_t size, const char* next_buffer, size_t next_size,
+    size_t* offset, T* last_value)
+{
+  size_t left_over = size % sizeof(T);
+  size_t count = size / sizeof(T);
+  size_t remaining = sizeof(T) - left_over;
+  *offset = remaining;
+  if ((remaining) && (remaining > next_size)) {
+    return TRITONSERVER_ErrorNew(
+        TRITONSERVER_ERROR_INTERNAL,
+        "Number of bytes is not multiple of type size. Can't swap endianness.");
+  }
+
+  for (; count > 0; --count, buffer += sizeof(T)) {
+    T* temp = const_cast<T*>(reinterpret_cast<const T*>(buffer));
+    *temp = bswap(*temp);
+    *last_value = *temp;
+  }
+
+  if (remaining) {
+    T temp;
+    char* temp_buffer = reinterpret_cast<char*> & temp;
+    for (uint32 i = 0; i < left_over; ++i, ++temp_buffer, ++buffer) {
+      *temp_buffer = *buffer;
+    }
+    for (uint32 i = 0; i < remaining; ++i, ++temp_buffer, ++next_buffer) {
+      *temp_buffer = *next_buffer;
+    }
+
+    temp = bswap(temp);
+
+    *last_value = temp;
+
+    for (uint32 i = 0, buffer -= left_over; i < left;
+         ++i, ++temp_buffer, ++buffer) {
+      *const_cast<char*>(buffer) = *temp_buffer;
+    }
+
+    for (uint32 i = 0, next_buffer -= remaining; i < remaining;
+         ++i, ++temp_buffer, ++next_buffer) {
+      *const_cast<char*>(next_buffer) = *temp_buffer;
+    }
+  }
+  return nullptr;
+}
+
+TRITONSERVER_Error*
+SwapEndian(TRITONSERVER_DataType datatype, std::string& serialized)
+{
+  return SwapEndian(datatype, serialized.c_str(), serialized.length());
+}
+
+  TRITONSERVER_Error* SwapEndian(
+      TRITONSERVER_DataType datatype, const char* buffer, size_t size)
+  {
+    switch (datatype) {
+      case TRITONSERVER_TYPE_UINT16:
+      case TRITONSERVER_TYPE_INT16:
+      case TRITONSERVER_TYPE_FP16: {
+        return SwapEndian<uint16_t>(buffer, size);
+      }
+      case TRITONSERVER_TYPE_UINT32:
+      case TRITONSERVER_TYPE_INT32:
+      case TRITONSERVER_TYPE_FP32: {
+        return SwapEndian<uint32_t>(buffer, size);
+      }
+      case TRITONSERVER_TYPE_UINT64:
+      case TRITONSERVER_TYPE_INT64:
+      case TRITONSERVER_TYPE_FP64: {
+        return SwapEndian<uint64_t>(buffer, size);
+      }
+      default: {
+      }
+    }
+    return nullptr;
+  }
+
+
+  TRITONSERVER_Error*
+  SwapEndian(
+      TRITONSERVER_DataType datatype, const char* buffer, size_t size,
+      const char* next_buffer, size_t next_size, size_t* offset,
+      void* last_value)
+  {
+    switch (datatype) {
+      case TRITONSERVER_TYPE_UINT16:
+      case TRITONSERVER_TYPE_INT16:
+      case TRITONSERVER_TYPE_FP16: {
+        return SwapEndian<uint16_t>(
+            buffer, size, next_buffer, next_size, offset,
+            reinterpret_cast<uint16_t*> last_value);
+      }
+      case TRITONSERVER_TYPE_UINT32:
+      case TRITONSERVER_TYPE_INT32:
+      case TRITONSERVER_TYPE_FP32: {
+        return SwapEndian<uint32_t>(
+            buffer, size, next_buffer, next_size, offset,
+            reinterpret_cast<uint32_t*> last_value);
+      }
+      case TRITONSERVER_TYPE_UINT64:
+      case TRITONSERVER_TYPE_INT64:
+      case TRITONSERVER_TYPE_FP64: {
+        return SwapEndian<uint64_t>(
+            buffer, size, next_buffer, next_size, offset,
+            reinterpret_cast<uint64_t*> last_value);
+      }
+      default: {
+      }
+    }
+    return nullptr;
+  }
+
+  TRITONSERVER_Error* SwapEndian(
+      TRITONSERVER_DataType datatype, const char* buffer, size_t size,
+      const char* next_buffer, size_t next_size)
+  {
+  }
+}
+}  // namespace server

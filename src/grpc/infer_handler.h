@@ -53,6 +53,7 @@ uint64_t NextUniqueId();
 namespace triton { namespace server { namespace grpc {
       
 #if defined(__BYTE_ORDER__) && (__BYTE_ORDER__ == __ORDER_BIG_ENDIAN__)
+      // Normalize to little endian on output
       void NormalizeEndianness(TRITONSERVER_DataType datatype, std::string &serialized);
 #else
 #define NormalizeEndianness(datatype, serialized)

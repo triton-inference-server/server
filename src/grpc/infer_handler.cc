@@ -780,6 +780,7 @@ ModelInferHandler::Process(InferHandler::State* state, bool rpc_ok)
 }
 
 #if defined(__BYTE_ORDER__) && (__BYTE_ORDER__ == __ORDER_BIG_ENDIAN__)
+// output normalized to little endian
 void NormalizeEndianness(TRITONSERVER_DataType datatype, std::string &serialized) {
   if (datatype==TRITONSERVER_TYPE_BYTES) {
     uint32_t *len = const_cast<uint32_t*>(reinterpret_cast<const uint32_t*>(serialized.c_str()));
