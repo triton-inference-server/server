@@ -373,8 +373,7 @@ TraceManager::Trace::InitTracer(
       std::chrono::duration_cast<std::chrono::nanoseconds>(
           std::chrono::steady_clock::now().time_since_epoch())
           .count();
-  auto root_span =
-      StartSpan("InferRequest", steady_timestamp_ns);
+  auto root_span = StartSpan("InferRequest", steady_timestamp_ns);
   // Initializing OTel context and storing "InferRequest" span as a root span
   // to keep it alive for the duration of the request.
   otel_context_ = opentelemetry::context::Context({kRootSpan, root_span});
@@ -386,6 +385,12 @@ TraceManager::Trace::StartSpan(
     TRITONSERVER_InferenceTraceActivity activity, uint64_t timestamp_ns,
     uint64_t trace_id)
 {
+  uint64_t parent_id;
+  LOG_TRITONSERVER_ERROR(
+      TRITONSERVER_InferenceTraceParentId(trace, &parent_id),
+      "getting trace parent id");
+  std::string parent_span_key = "";
+
   // Currently, only 2 types of sub-spans are supported:
   // request span and compute span. Compute span is a leaf span
   // and can not be a parent of any sub-span. If parent_id==0,
@@ -396,16 +401,13 @@ TraceManager::Trace::StartSpan(
   // If parent_id > 0, then this is a child trace, spawned from
   // the ensamble's main request. For this instance, the parent
   // span is the ensembles's request span.
-  uint64_t parent_id;
-  LOG_TRITONSERVER_ERROR(
-      TRITONSERVER_InferenceTraceParentId(trace, &parent_id),
-      "getting trace parent id");
-  std::string parent_span_key =
-      (parent_id == 0 && activity == TRITONSERVER_TRACE_REQUEST_START)
-          ? kRootSpan
-      : (activity == TRITONSERVER_TRACE_REQUEST_START)
-          ? kRequestSpan + std::to_string(parent_id)
-          : kRequestSpan + std::to_string(trace_id);
+  if (parent_id == 0 && activity == TRITONSERVER_TRACE_REQUEST_START) {
+    parent_span_key = kRootSpan;
+  } else if (activity == TRITONSERVER_TRACE_REQUEST_START) {
+    parent_span_key = kRequestSpan + std::to_string(parent_id);
+  } else if (activity == TRITONSERVER_TRACE_COMPUTE_START) {
+    parent_span_key = kRequestSpan + std::to_string(trace_id);
+  }
 
   std::string display_name = "compute";
   const char* model_name;
