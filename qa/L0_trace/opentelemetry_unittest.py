@@ -192,7 +192,6 @@ class OpenTelemetryTest(tu.TestResultCollector):
 def prepare_data(client):
 
     inputs = []
-    outputs = []
     input0_data = np.full(shape=(1, 16), fill_value=-1, dtype=np.int32)
     input1_data = np.full(shape=(1, 16), fill_value=-1, dtype=np.int32)
 
