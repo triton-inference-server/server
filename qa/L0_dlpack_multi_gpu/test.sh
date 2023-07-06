@@ -27,7 +27,7 @@
 
 SERVER=/opt/tritonserver/bin/tritonserver
 SERVER_ARGS="--model-repository=`pwd`/models --log-verbose=1"
-CLIENT_PY=../L0_backend_python/python_unittest.py
+CLIENT_PY=./python_unittest.py
 CLIENT_LOG="./client.log"
 EXPECTED_NUM_TESTS="1"
 TEST_RESULT_FILE='test_results.txt'
@@ -52,6 +52,8 @@ rm -fr *.log ./models
 mkdir -p models/dlpack_test/1/
 cp ../python_models/dlpack_test/model.py models/dlpack_test/1/
 cp ../python_models/dlpack_test/config.pbtxt models/dlpack_test
+cp ../L0_backend_python/python_unittest.py .
+sed -i 's#sys.path.append("../../common")#sys.path.append("../common")#g' python_unittest.py
 
 run_server
 if [ "$SERVER_PID" == "0" ]; then
