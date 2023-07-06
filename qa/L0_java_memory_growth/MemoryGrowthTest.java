@@ -1,4 +1,5 @@
-// Copyright (c) 2022, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+// Copyright (c) 2022-2023, NVIDIA CORPORATION & AFFILIATES. All rights
+// reserved.
 //
 // Redistribution and use in source and binary forms, with or without
 // modification, are permitted provided that the following conditions
@@ -68,7 +69,8 @@ public class MemoryGrowthTest {
       super(p);
       deallocator(new DeleteDeallocator(this));
     }
-    protected static class DeleteDeallocator extends TRITONSERVER_Server implements Deallocator {
+    protected static class DeleteDeallocator
+        extends TRITONSERVER_Server implements Deallocator {
       DeleteDeallocator(Pointer p) { super(p); }
       @Override public void deallocate() { TRITONSERVER_ServerDelete(this); }
     }
@@ -80,7 +82,8 @@ public class MemoryGrowthTest {
       System.err.println(msg);
     }
 
-    System.err.println("Usage: java " + MemoryGrowthTest.class.getSimpleName() + " [options]");
+    System.err.println(
+        "Usage: java " + MemoryGrowthTest.class.getSimpleName() + " [options]");
     System.err.println("\t-i Set number of iterations");
     System.err.println(
         "\t-m <\"system\"|\"pinned\"|gpu>"
@@ -89,7 +92,8 @@ public class MemoryGrowthTest {
         + " will be based on the model's preferred type.");
     System.err.println("\t-v Enable verbose logging");
     System.err.println("\t-r [model repository absolute path]");
-    System.err.println("\t--max-growth Specify maximum allowed memory growth (%)");
+    System.err.println(
+        "\t--max-growth Specify maximum allowed memory growth (%)");
     System.err.println("\t--max-memory Specify maximum allowed memory (MB)");
 
     System.exit(1);
@@ -98,9 +102,10 @@ public class MemoryGrowthTest {
   static class ResponseAlloc extends TRITONSERVER_ResponseAllocatorAllocFn_t {
     @Override
     public TRITONSERVER_Error call(
-        TRITONSERVER_ResponseAllocator allocator, String tensor_name, long byte_size,
-        int preferred_memory_type, long preferred_memory_type_id, Pointer userp,
-        PointerPointer buffer, PointerPointer buffer_userp, IntPointer actual_memory_type,
+        TRITONSERVER_ResponseAllocator allocator, String tensor_name,
+        long byte_size, int preferred_memory_type,
+        long preferred_memory_type_id, Pointer userp, PointerPointer buffer,
+        PointerPointer buffer_userp, IntPointer actual_memory_type,
         LongPointer actual_memory_type_id)
     {
       // Initially attempt to make the actual memory type and id that we
@@ -134,11 +139,13 @@ public class MemoryGrowthTest {
     }
   }
 
-  static class ResponseRelease extends TRITONSERVER_ResponseAllocatorReleaseFn_t {
+  static class ResponseRelease
+      extends TRITONSERVER_ResponseAllocatorReleaseFn_t {
     @Override
     public TRITONSERVER_Error call(
-        TRITONSERVER_ResponseAllocator allocator, Pointer buffer, Pointer buffer_userp,
-        long byte_size, int memory_type, long memory_type_id)
+        TRITONSERVER_ResponseAllocator allocator, Pointer buffer,
+        Pointer buffer_userp, long byte_size, int memory_type,
+        long memory_type_id)
     {
       String name = null;
       if (buffer_userp != null) {
@@ -153,15 +160,21 @@ public class MemoryGrowthTest {
     }
   }
 
-  static class InferRequestComplete extends TRITONSERVER_InferenceRequestReleaseFn_t {
-    @Override public void call(TRITONSERVER_InferenceRequest request, int flags, Pointer userp)
+  static class InferRequestComplete
+      extends TRITONSERVER_InferenceRequestReleaseFn_t {
+    @Override
+    public void call(
+        TRITONSERVER_InferenceRequest request, int flags, Pointer userp)
     {
       // We reuse the request so we don't delete it here.
     }
   }
 
-  static class InferResponseComplete extends TRITONSERVER_InferenceResponseCompleteFn_t {
-    @Override public void call(TRITONSERVER_InferenceResponse response, int flags, Pointer userp)
+  static class InferResponseComplete
+      extends TRITONSERVER_InferenceResponseCompleteFn_t {
+    @Override
+    public void call(
+        TRITONSERVER_InferenceResponse response, int flags, Pointer userp)
     {
       if (response != null) {
         // Send 'response' to the future.
@@ -170,18 +183,21 @@ public class MemoryGrowthTest {
     }
   }
 
-  static ConcurrentHashMap<Pointer, CompletableFuture<TRITONSERVER_InferenceResponse>> futures =
+  static ConcurrentHashMap<
+      Pointer, CompletableFuture<TRITONSERVER_InferenceResponse>> futures =
       new ConcurrentHashMap<>();
   static ResponseAlloc responseAlloc = new ResponseAlloc();
   static ResponseRelease responseRelease = new ResponseRelease();
   static InferRequestComplete inferRequestComplete = new InferRequestComplete();
-  static InferResponseComplete inferResponseComplete = new InferResponseComplete();
+  static InferResponseComplete inferResponseComplete =
+      new InferResponseComplete();
 
   static TRITONSERVER_Error ParseModelMetadata(
       JsonObject model_metadata, boolean[] is_int, boolean[] is_torch_model)
   {
     String seen_data_type = null;
-    for (JsonElement input_element : model_metadata.get("inputs").getAsJsonArray()) {
+    for (JsonElement input_element :
+         model_metadata.get("inputs").getAsJsonArray()) {
       JsonObject input = input_element.getAsJsonObject();
       if (!input.get("datatype").getAsString().equals("INT32")
           && !input.get("datatype").getAsString().equals("FP32")) {
@@ -198,7 +214,8 @@ public class MemoryGrowthTest {
             "the inputs and outputs of 'simple' model must have the data type");
       }
     }
-    for (JsonElement output_element : model_metadata.get("outputs").getAsJsonArray()) {
+    for (JsonElement output_element :
+         model_metadata.get("outputs").getAsJsonArray()) {
       JsonObject output = output_element.getAsJsonObject();
       if (!output.get("datatype").getAsString().equals("INT32")
           && !output.get("datatype").getAsString().equals("FP32")) {
@@ -214,11 +231,13 @@ public class MemoryGrowthTest {
     }
 
     is_int[0] = seen_data_type.equals("INT32");
-    is_torch_model[0] = model_metadata.get("platform").getAsString().equals("pytorch_libtorch");
+    is_torch_model[0] =
+        model_metadata.get("platform").getAsString().equals("pytorch_libtorch");
     return null;
   }
 
-  static void GenerateInputData(IntPointer[] input0_data, IntPointer[] input1_data)
+  static void GenerateInputData(
+      IntPointer[] input0_data, IntPointer[] input1_data)
   {
     input0_data[0] = new IntPointer(16);
     input1_data[0] = new IntPointer(16);
@@ -228,7 +247,8 @@ public class MemoryGrowthTest {
     }
   }
 
-  static void GenerateInputData(FloatPointer[] input0_data, FloatPointer[] input1_data)
+  static void GenerateInputData(
+      FloatPointer[] input0_data, FloatPointer[] input1_data)
   {
     input0_data[0] = new FloatPointer(16);
     input1_data[0] = new FloatPointer(16);
@@ -239,8 +259,8 @@ public class MemoryGrowthTest {
   }
 
   static void CompareResult(
-      String output0_name, String output1_name, IntPointer input0, IntPointer input1,
-      IntPointer output0, IntPointer output1)
+      String output0_name, String output1_name, IntPointer input0,
+      IntPointer input1, IntPointer output0, IntPointer output1)
   {
     for (int i = 0; i < 16; ++i) {
       if ((input0.get(i) + input1.get(i)) != output0.get(i)) {
@@ -253,8 +273,8 @@ public class MemoryGrowthTest {
   }
 
   static void CompareResult(
-      String output0_name, String output1_name, FloatPointer input0, FloatPointer input1,
-      FloatPointer output0, FloatPointer output1)
+      String output0_name, String output1_name, FloatPointer input0,
+      FloatPointer input1, FloatPointer output0, FloatPointer output1)
   {
     for (int i = 0; i < 16; ++i) {
       if ((input0.get(i) + input1.get(i)) != output0.get(i)) {
@@ -267,9 +287,9 @@ public class MemoryGrowthTest {
   }
 
   static void Check(
-      TRITONSERVER_InferenceResponse response, Pointer input0_data, Pointer input1_data,
-      String output0, String output1, long expected_byte_size, int expected_datatype,
-      boolean is_int)
+      TRITONSERVER_InferenceResponse response, Pointer input0_data,
+      Pointer input1_data, String output0, String output1,
+      long expected_byte_size, int expected_datatype, boolean is_int)
   {
     HashMap<String, Pointer> output_data = new HashMap<>();
 
@@ -294,8 +314,8 @@ public class MemoryGrowthTest {
 
       FAIL_IF_ERR(
           TRITONSERVER_InferenceResponseOutput(
-              response, idx, cname, datatype, shape, dim_count, base, byte_size, memory_type,
-              memory_type_id, userp),
+              response, idx, cname, datatype, shape, dim_count, base, byte_size,
+              memory_type, memory_type_id, userp),
           "getting output info");
 
       if (cname.isNull()) {
@@ -307,28 +327,30 @@ public class MemoryGrowthTest {
         FAIL("unexpected output '" + name + "'");
       }
 
-      if ((dim_count.get() != 2) || (shape.get(0) != 1) || (shape.get(1) != 16)) {
+      if ((dim_count.get() != 2) || (shape.get(0) != 1)
+          || (shape.get(1) != 16)) {
         FAIL("unexpected shape for '" + name + "'");
       }
 
       if (datatype.get() != expected_datatype) {
         FAIL(
-            "unexpected datatype '" + TRITONSERVER_DataTypeString(datatype.get()) + "' for '" + name
+            "unexpected datatype '"
+            + TRITONSERVER_DataTypeString(datatype.get()) + "' for '" + name
             + "'");
       }
 
       if (byte_size.get() != expected_byte_size) {
         FAIL(
-            "unexpected byte-size, expected " + expected_byte_size + ", got " + byte_size.get()
-            + " for " + name);
+            "unexpected byte-size, expected " + expected_byte_size + ", got "
+            + byte_size.get() + " for " + name);
       }
 
       if (enforce_memory_type && (memory_type.get() != requested_memory_type)) {
         FAIL(
             "unexpected memory type, expected to be allocated in "
             + TRITONSERVER_MemoryTypeString(requested_memory_type) + ", got "
-            + TRITONSERVER_MemoryTypeString(memory_type.get()) + ", id " + memory_type_id.get()
-            + " for " + name);
+            + TRITONSERVER_MemoryTypeString(memory_type.get()) + ", id "
+            + memory_type_id.get() + " for " + name);
       }
 
       // We make a copy of the data here... which we could avoid for
@@ -340,12 +362,15 @@ public class MemoryGrowthTest {
 
     if (is_int) {
       CompareResult(
-          output0, output1, new IntPointer(input0_data), new IntPointer(input1_data),
-          new IntPointer(output_data.get(output0)), new IntPointer(output_data.get(output1)));
+          output0, output1, new IntPointer(input0_data),
+          new IntPointer(input1_data), new IntPointer(output_data.get(output0)),
+          new IntPointer(output_data.get(output1)));
     } else {
       CompareResult(
-          output0, output1, new FloatPointer(input0_data), new FloatPointer(input1_data),
-          new FloatPointer(output_data.get(output0)), new FloatPointer(output_data.get(output1)));
+          output0, output1, new FloatPointer(input0_data),
+          new FloatPointer(input1_data),
+          new FloatPointer(output_data.get(output0)),
+          new FloatPointer(output_data.get(output1)));
     }
   }
 
@@ -354,9 +379,11 @@ public class MemoryGrowthTest {
   @param  max_float_allowed     Maximum allowed memory growth (%)
   @param  max_mem_allowed       Maximum allowed memory (MB)
    */
-  static boolean ValidateMemoryGrowth(float max_growth_allowed, int max_mem_allowed)
+  static boolean ValidateMemoryGrowth(
+      float max_growth_allowed, int max_mem_allowed)
   {
-    // Allocate list starting capacity to hold up to 24 hours worth of snapshots.
+    // Allocate list starting capacity to hold up to 24 hours worth of
+    // snapshots.
     List<Double> memory_snapshots = new ArrayList<Double>(20000);
     while (!done) {
       try {
@@ -366,13 +393,15 @@ public class MemoryGrowthTest {
         System.out.println("Memory growth validation interrupted.");
       }
       System.gc();
-      double snapshot = Runtime.getRuntime().totalMemory() - Runtime.getRuntime().freeMemory();
+      double snapshot = Runtime.getRuntime().totalMemory()
+          - Runtime.getRuntime().freeMemory();
       memory_snapshots.add(snapshot);
       System.out.println("Memory allocated (MB):" + snapshot / 1E6);
     }
     if (memory_snapshots.size() < 5) {
       System.out.println(
-          "Error: Not enough snapshots, found " + memory_snapshots.size() + " snapshots");
+          "Error: Not enough snapshots, found " + memory_snapshots.size()
+          + " snapshots");
       return false;
     }
 
@@ -380,8 +409,10 @@ public class MemoryGrowthTest {
     // between 90th percentile and 10th percentile memory usage.
     final double bytes_in_mb = 1E6;
     Collections.sort(memory_snapshots);
-    int index_max = ((int) Math.ceil(max_percentile / 100.0 * memory_snapshots.size())) - 1;
-    int index_min = ((int) Math.ceil(min_percentile / 100.0 * memory_snapshots.size())) - 1;
+    int index_max =
+        ((int) Math.ceil(max_percentile / 100.0 * memory_snapshots.size())) - 1;
+    int index_min =
+        ((int) Math.ceil(min_percentile / 100.0 * memory_snapshots.size())) - 1;
     double memory_allocation_delta =
         memory_snapshots.get(index_max) - memory_snapshots.get(index_min);
     double memory_allocation_delta_mb = memory_allocation_delta / bytes_in_mb;
@@ -396,7 +427,9 @@ public class MemoryGrowthTest {
 
     if (memory_allocation_delta_percent >= max_growth_allowed) {
       passed = false;
-      System.out.println("Exceeded allowed memory growth (" + (max_growth_allowed * 100) + "%)");
+      System.out.println(
+          "Exceeded allowed memory growth (" + (max_growth_allowed * 100)
+          + "%)");
     }
 
     if ((memory_snapshots.get(index_max) / bytes_in_mb) >= max_mem_allowed) {
@@ -414,16 +447,19 @@ public class MemoryGrowthTest {
   {
     // Create the allocator that will be used to allocate buffers for
     // the result tensors.
-    TRITONSERVER_ResponseAllocator allocator = new TRITONSERVER_ResponseAllocator(null);
+    TRITONSERVER_ResponseAllocator allocator =
+        new TRITONSERVER_ResponseAllocator(null);
     FAIL_IF_ERR(
         TRITONSERVER_ResponseAllocatorNew(
             allocator, responseAlloc, responseRelease, null /* start_fn */),
         "creating response allocator");
 
     // Inference
-    TRITONSERVER_InferenceRequest irequest = new TRITONSERVER_InferenceRequest(null);
+    TRITONSERVER_InferenceRequest irequest =
+        new TRITONSERVER_InferenceRequest(null);
     FAIL_IF_ERR(
-        TRITONSERVER_InferenceRequestNew(irequest, server, model_name, -1 /* model_version */),
+        TRITONSERVER_InferenceRequestNew(
+            irequest, server, model_name, -1 /* model_version */),
         "creating inference request");
 
     FAIL_IF_ERR(
@@ -442,7 +478,8 @@ public class MemoryGrowthTest {
     long[] input0_shape = {1, 16};
     long[] input1_shape = {1, 16};
 
-    int datatype = (is_int[0]) ? TRITONSERVER_TYPE_INT32 : TRITONSERVER_TYPE_FP32;
+    int datatype =
+        (is_int[0]) ? TRITONSERVER_TYPE_INT32 : TRITONSERVER_TYPE_FP32;
 
     FAIL_IF_ERR(
         TRITONSERVER_InferenceRequestAddInput(
@@ -498,68 +535,79 @@ public class MemoryGrowthTest {
 
     // Perform inference...
     {
-      CompletableFuture<TRITONSERVER_InferenceResponse> completed = new CompletableFuture<>();
+      CompletableFuture<TRITONSERVER_InferenceResponse> completed =
+          new CompletableFuture<>();
       futures.put(irequest, completed);
 
       FAIL_IF_ERR(
           TRITONSERVER_InferenceRequestSetResponseCallback(
-              irequest, allocator, null /* response_allocator_userp */, inferResponseComplete,
-              irequest),
+              irequest, allocator, null /* response_allocator_userp */,
+              inferResponseComplete, irequest),
           "setting response callback");
 
       FAIL_IF_ERR(
-          TRITONSERVER_ServerInferAsync(server, irequest, null /* trace */), "running inference");
+          TRITONSERVER_ServerInferAsync(server, irequest, null /* trace */),
+          "running inference");
 
       // Wait for the inference to complete.
       TRITONSERVER_InferenceResponse completed_response = completed.get();
       futures.remove(irequest);
 
-      FAIL_IF_ERR(TRITONSERVER_InferenceResponseError(completed_response), "response status");
+      FAIL_IF_ERR(
+          TRITONSERVER_InferenceResponseError(completed_response),
+          "response status");
       if (check_accuracy) {
         Check(
-            completed_response, input0_data, input1_data, output0, output1, input0_size, datatype,
-            is_int[0]);
+            completed_response, input0_data, input1_data, output0, output1,
+            input0_size, datatype, is_int[0]);
       }
       FAIL_IF_ERR(
-          TRITONSERVER_InferenceResponseDelete(completed_response), "deleting inference response");
+          TRITONSERVER_InferenceResponseDelete(completed_response),
+          "deleting inference response");
     }
 
     // Modify some input data in place and then reuse the request
     // object. For simplicity we only do this when the input tensors are
     // in non-pinned system memory.
-    if (!enforce_memory_type || (requested_memory_type == TRITONSERVER_MEMORY_CPU)) {
+    if (!enforce_memory_type
+        || (requested_memory_type == TRITONSERVER_MEMORY_CPU)) {
       if (is_int[0]) {
         new IntPointer(input0_data).put(0, 27);
       } else {
         new FloatPointer(input0_data).put(0, 27.0f);
       }
 
-      CompletableFuture<TRITONSERVER_InferenceResponse> completed = new CompletableFuture<>();
+      CompletableFuture<TRITONSERVER_InferenceResponse> completed =
+          new CompletableFuture<>();
       futures.put(irequest, completed);
 
       // Using a new promise so have to re-register the callback to set
       // the promise as the userp.
       FAIL_IF_ERR(
           TRITONSERVER_InferenceRequestSetResponseCallback(
-              irequest, allocator, null /* response_allocator_userp */, inferResponseComplete,
-              irequest),
+              irequest, allocator, null /* response_allocator_userp */,
+              inferResponseComplete, irequest),
           "setting response callback");
 
       FAIL_IF_ERR(
-          TRITONSERVER_ServerInferAsync(server, irequest, null /* trace */), "running inference");
+          TRITONSERVER_ServerInferAsync(server, irequest, null /* trace */),
+          "running inference");
 
       // Wait for the inference to complete.
       TRITONSERVER_InferenceResponse completed_response = completed.get();
       futures.remove(irequest);
-      FAIL_IF_ERR(TRITONSERVER_InferenceResponseError(completed_response), "response status");
+      FAIL_IF_ERR(
+          TRITONSERVER_InferenceResponseError(completed_response),
+          "response status");
       if (check_accuracy) {
         Check(
-            completed_response, input0_data, input1_data, output0, output1, input0_size, datatype,
-            is_int[0]);
+            completed_response, input0_data, input1_data, output0, output1,
+            input0_size, datatype, is_int[0]);
       }
 
       FAIL_IF_ERR(
-          TRITONSERVER_InferenceResponseDelete(completed_response), "deleting inference response");
+          TRITONSERVER_InferenceResponseDelete(completed_response),
+          "deleting inference response");
     }
 
     // Remove input data and then add back different data.
@@ -573,39 +621,48 @@ public class MemoryGrowthTest {
               0 /* memory_type_id */),
           "assigning INPUT1 data to INPUT0");
 
-      CompletableFuture<TRITONSERVER_InferenceResponse> completed = new CompletableFuture<>();
+      CompletableFuture<TRITONSERVER_InferenceResponse> completed =
+          new CompletableFuture<>();
       futures.put(irequest, completed);
 
       // Using a new promise so have to re-register the callback to set
       // the promise as the userp.
       FAIL_IF_ERR(
           TRITONSERVER_InferenceRequestSetResponseCallback(
-              irequest, allocator, null /* response_allocator_userp */, inferResponseComplete,
-              irequest),
+              irequest, allocator, null /* response_allocator_userp */,
+              inferResponseComplete, irequest),
           "setting response callback");
 
       FAIL_IF_ERR(
-          TRITONSERVER_ServerInferAsync(server, irequest, null /* trace */), "running inference");
+          TRITONSERVER_ServerInferAsync(server, irequest, null /* trace */),
+          "running inference");
 
       // Wait for the inference to complete.
       TRITONSERVER_InferenceResponse completed_response = completed.get();
       futures.remove(irequest);
-      FAIL_IF_ERR(TRITONSERVER_InferenceResponseError(completed_response), "response status");
+      FAIL_IF_ERR(
+          TRITONSERVER_InferenceResponseError(completed_response),
+          "response status");
 
       if (check_accuracy) {
         // Both inputs are using input1_data...
         Check(
-            completed_response, input1_data, input1_data, output0, output1, input0_size, datatype,
-            is_int[0]);
+            completed_response, input1_data, input1_data, output0, output1,
+            input0_size, datatype, is_int[0]);
       }
 
       FAIL_IF_ERR(
-          TRITONSERVER_InferenceResponseDelete(completed_response), "deleting inference response");
+          TRITONSERVER_InferenceResponseDelete(completed_response),
+          "deleting inference response");
     }
 
-    FAIL_IF_ERR(TRITONSERVER_InferenceRequestDelete(irequest), "deleting inference request");
+    FAIL_IF_ERR(
+        TRITONSERVER_InferenceRequestDelete(irequest),
+        "deleting inference request");
 
-    FAIL_IF_ERR(TRITONSERVER_ResponseAllocatorDelete(allocator), "deleting response allocator");
+    FAIL_IF_ERR(
+        TRITONSERVER_ResponseAllocatorDelete(allocator),
+        "deleting response allocator");
   }
 
   public static void main(String[] args) throws Exception
@@ -660,7 +717,8 @@ public class MemoryGrowthTest {
             max_growth_allowed = Integer.parseInt(args[i]) / 100.0f;
           }
           catch (NumberFormatException e) {
-            Usage("--max-growth must be an integer value specifying allowed memory growth (%)");
+            Usage(
+                "--max-growth must be an integer value specifying allowed memory growth (%)");
           }
           break;
         case "--max-memory":
@@ -669,7 +727,8 @@ public class MemoryGrowthTest {
             max_mem_allowed = Integer.parseInt(args[i]);
           }
           catch (NumberFormatException e) {
-            Usage("--max-memory must be an integer value specifying maximum allowed memory (MB)");
+            Usage(
+                "--max-memory must be an integer value specifying maximum allowed memory (MB)");
           }
           break;
       }
@@ -678,7 +737,8 @@ public class MemoryGrowthTest {
     if (model_repository_path == null) {
       Usage("-r must be used to specify model repository path");
     }
-    if (enforce_memory_type && requested_memory_type != TRITONSERVER_MEMORY_CPU) {
+    if (enforce_memory_type
+        && requested_memory_type != TRITONSERVER_MEMORY_CPU) {
       Usage("-m can only be set to \"system\" without enabling GPU");
     }
 
@@ -693,16 +753,21 @@ public class MemoryGrowthTest {
     }
 
     // Create the server...
-    TRITONSERVER_ServerOptions server_options = new TRITONSERVER_ServerOptions(null);
-    FAIL_IF_ERR(TRITONSERVER_ServerOptionsNew(server_options), "creating server options");
+    TRITONSERVER_ServerOptions server_options =
+        new TRITONSERVER_ServerOptions(null);
     FAIL_IF_ERR(
-        TRITONSERVER_ServerOptionsSetModelRepositoryPath(server_options, model_repository_path),
+        TRITONSERVER_ServerOptionsNew(server_options),
+        "creating server options");
+    FAIL_IF_ERR(
+        TRITONSERVER_ServerOptionsSetModelRepositoryPath(
+            server_options, model_repository_path),
         "setting model repository path");
     FAIL_IF_ERR(
         TRITONSERVER_ServerOptionsSetLogVerbose(server_options, verbose_level),
         "setting verbose logging level");
     FAIL_IF_ERR(
-        TRITONSERVER_ServerOptionsSetBackendDirectory(server_options, "/opt/tritonserver/backends"),
+        TRITONSERVER_ServerOptionsSetBackendDirectory(
+            server_options, "/opt/tritonserver/backends"),
         "setting backend directory");
     FAIL_IF_ERR(
         TRITONSERVER_ServerOptionsSetRepoAgentDirectory(
@@ -718,18 +783,27 @@ public class MemoryGrowthTest {
         "setting minimum supported CUDA compute capability");
 
     TRITONSERVER_Server server_ptr = new TRITONSERVER_Server(null);
-    FAIL_IF_ERR(TRITONSERVER_ServerNew(server_ptr, server_options), "creating server");
-    FAIL_IF_ERR(TRITONSERVER_ServerOptionsDelete(server_options), "deleting server options");
+    FAIL_IF_ERR(
+        TRITONSERVER_ServerNew(server_ptr, server_options), "creating server");
+    FAIL_IF_ERR(
+        TRITONSERVER_ServerOptionsDelete(server_options),
+        "deleting server options");
 
-    TRITONSERVER_ServerDeleter server = new TRITONSERVER_ServerDeleter(server_ptr);
+    TRITONSERVER_ServerDeleter server =
+        new TRITONSERVER_ServerDeleter(server_ptr);
 
     // Wait until the server is both live and ready.
     int health_iters = 0;
     while (true) {
       boolean[] live = {false}, ready = {false};
-      FAIL_IF_ERR(TRITONSERVER_ServerIsLive(server, live), "unable to get server liveness");
-      FAIL_IF_ERR(TRITONSERVER_ServerIsReady(server, ready), "unable to get server readiness");
-      System.out.println("Server Health: live " + live[0] + ", ready " + ready[0]);
+      FAIL_IF_ERR(
+          TRITONSERVER_ServerIsLive(server, live),
+          "unable to get server liveness");
+      FAIL_IF_ERR(
+          TRITONSERVER_ServerIsReady(server, ready),
+          "unable to get server readiness");
+      System.out.println(
+          "Server Health: live " + live[0] + ", ready " + ready[0]);
       if (live[0] && ready[0]) {
         break;
       }
@@ -743,20 +817,24 @@ public class MemoryGrowthTest {
 
     // Print status of the server.
     {
-      TRITONSERVER_Message server_metadata_message = new TRITONSERVER_Message(null);
+      TRITONSERVER_Message server_metadata_message =
+          new TRITONSERVER_Message(null);
       FAIL_IF_ERR(
           TRITONSERVER_ServerMetadata(server, server_metadata_message),
           "unable to get server metadata message");
       BytePointer buffer = new BytePointer((Pointer) null);
       SizeTPointer byte_size = new SizeTPointer(1);
       FAIL_IF_ERR(
-          TRITONSERVER_MessageSerializeToJson(server_metadata_message, buffer, byte_size),
+          TRITONSERVER_MessageSerializeToJson(
+              server_metadata_message, buffer, byte_size),
           "unable to serialize server metadata message");
 
       System.out.println("Server Status:");
       System.out.println(buffer.limit(byte_size.get()).getString());
 
-      FAIL_IF_ERR(TRITONSERVER_MessageDelete(server_metadata_message), "deleting status metadata");
+      FAIL_IF_ERR(
+          TRITONSERVER_MessageDelete(server_metadata_message),
+          "deleting status metadata");
     }
 
     String model_name = "simple";
@@ -778,26 +856,32 @@ public class MemoryGrowthTest {
         continue;
       }
 
-      TRITONSERVER_Message model_metadata_message = new TRITONSERVER_Message(null);
+      TRITONSERVER_Message model_metadata_message =
+          new TRITONSERVER_Message(null);
       FAIL_IF_ERR(
-          TRITONSERVER_ServerModelMetadata(server, model_name, 1, model_metadata_message),
+          TRITONSERVER_ServerModelMetadata(
+              server, model_name, 1, model_metadata_message),
           "unable to get model metadata message");
       BytePointer buffer = new BytePointer((Pointer) null);
       SizeTPointer byte_size = new SizeTPointer(1);
       FAIL_IF_ERR(
-          TRITONSERVER_MessageSerializeToJson(model_metadata_message, buffer, byte_size),
+          TRITONSERVER_MessageSerializeToJson(
+              model_metadata_message, buffer, byte_size),
           "unable to serialize model status protobuf");
 
       JsonParser parser = new JsonParser();
       JsonObject model_metadata = null;
       try {
-        model_metadata = parser.parse(buffer.limit(byte_size.get()).getString()).getAsJsonObject();
+        model_metadata = parser.parse(buffer.limit(byte_size.get()).getString())
+                             .getAsJsonObject();
       }
       catch (Exception e) {
         FAIL("error: failed to parse model metadata from JSON: " + e);
       }
 
-      FAIL_IF_ERR(TRITONSERVER_MessageDelete(model_metadata_message), "deleting status protobuf");
+      FAIL_IF_ERR(
+          TRITONSERVER_MessageDelete(model_metadata_message),
+          "deleting status protobuf");
 
       if (!model_metadata.get("name").getAsString().equals(model_name)) {
         FAIL("unable to find metadata for model");
@@ -805,7 +889,8 @@ public class MemoryGrowthTest {
 
       boolean found_version = false;
       if (model_metadata.has("versions")) {
-        for (JsonElement version : model_metadata.get("versions").getAsJsonArray()) {
+        for (JsonElement version :
+             model_metadata.get("versions").getAsJsonArray()) {
           if (version.getAsString().equals("1")) {
             found_version = true;
             break;
@@ -817,12 +902,14 @@ public class MemoryGrowthTest {
       }
 
       FAIL_IF_ERR(
-          ParseModelMetadata(model_metadata, is_int, is_torch_model), "parsing model metadata");
+          ParseModelMetadata(model_metadata, is_int, is_torch_model),
+          "parsing model metadata");
     }
 
     Runnable runnable = () ->
     {
-      boolean passed = ValidateMemoryGrowth(max_growth_allowed, max_mem_allowed);
+      boolean passed =
+          ValidateMemoryGrowth(max_growth_allowed, max_mem_allowed);
 
       // Sleep to give the garbage collector time to free the server.
       // This avoids race conditions between Triton bindings' printing and
@@ -845,7 +932,8 @@ public class MemoryGrowthTest {
 
     for (int i = 0; i < num_iterations; i++) {
       try (PointerScope scope = new PointerScope()) {
-        RunInference(server, model_name, is_int, is_torch_model, check_accuracy);
+        RunInference(
+            server, model_name, is_int, is_torch_model, check_accuracy);
       }
     }
     done = true;

@@ -1,4 +1,5 @@
-// Copyright (c) 2022, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+// Copyright (c) 2022-2023, NVIDIA CORPORATION & AFFILIATES. All rights
+// reserved.
 //
 // Redistribution and use in source and binary forms, with or without
 // modification, are permitted provided that the following conditions
@@ -60,7 +61,8 @@ public class SequenceTest {
       super(p);
       deallocator(new DeleteDeallocator(this));
     }
-    protected static class DeleteDeallocator extends TRITONSERVER_Server implements Deallocator {
+    protected static class DeleteDeallocator
+        extends TRITONSERVER_Server implements Deallocator {
       DeleteDeallocator(Pointer p) { super(p); }
       @Override public void deallocate() { TRITONSERVER_ServerDelete(this); }
     }
@@ -72,7 +74,8 @@ public class SequenceTest {
       System.err.println(msg);
     }
 
-    System.err.println("Usage: java " + SequenceTest.class.getSimpleName() + " [options]");
+    System.err.println(
+        "Usage: java " + SequenceTest.class.getSimpleName() + " [options]");
     System.err.println("\t-m [model name]");
     System.err.println("\t-v Enable verbose logging");
     System.err.println("\t-r [model repository absolute path]");
@@ -83,9 +86,10 @@ public class SequenceTest {
   static class ResponseAlloc extends TRITONSERVER_ResponseAllocatorAllocFn_t {
     @Override
     public TRITONSERVER_Error call(
-        TRITONSERVER_ResponseAllocator allocator, String tensor_name, long byte_size,
-        int preferred_memory_type, long preferred_memory_type_id, Pointer userp,
-        PointerPointer buffer, PointerPointer buffer_userp, IntPointer actual_memory_type,
+        TRITONSERVER_ResponseAllocator allocator, String tensor_name,
+        long byte_size, int preferred_memory_type,
+        long preferred_memory_type_id, Pointer userp, PointerPointer buffer,
+        PointerPointer buffer_userp, IntPointer actual_memory_type,
         LongPointer actual_memory_type_id)
     {
       // Initially attempt to make the actual memory type and id that we
@@ -98,7 +102,9 @@ public class SequenceTest {
       if (byte_size == 0) {
         buffer.put(0, null);
         buffer_userp.put(0, null);
-        System.out.println("allocated " + byte_size + " bytes for result tensor " + tensor_name);
+        System.out.println(
+            "allocated " + byte_size + " bytes for result tensor "
+            + tensor_name);
       } else {
         Pointer allocated_ptr = new Pointer();
         actual_memory_type.put(0, requested_memory_type);
@@ -113,8 +119,8 @@ public class SequenceTest {
           buffer_userp.put(0, new BytePointer(tensor_name));
           System.out.println(
               "allocated " + byte_size + " bytes in "
-              + TRITONSERVER_MemoryTypeString(actual_memory_type.get()) + " for result tensor "
-              + tensor_name);
+              + TRITONSERVER_MemoryTypeString(actual_memory_type.get())
+              + " for result tensor " + tensor_name);
         }
       }
 
@@ -122,11 +128,13 @@ public class SequenceTest {
     }
   }
 
-  static class ResponseRelease extends TRITONSERVER_ResponseAllocatorReleaseFn_t {
+  static class ResponseRelease
+      extends TRITONSERVER_ResponseAllocatorReleaseFn_t {
     @Override
     public TRITONSERVER_Error call(
-        TRITONSERVER_ResponseAllocator allocator, Pointer buffer, Pointer buffer_userp,
-        long byte_size, int memory_type, long memory_type_id)
+        TRITONSERVER_ResponseAllocator allocator, Pointer buffer,
+        Pointer buffer_userp, long byte_size, int memory_type,
+        long memory_type_id)
     {
       BytePointer name = null;
       if (buffer_userp != null) {
@@ -137,7 +145,8 @@ public class SequenceTest {
 
       System.out.println(
           "Releasing buffer " + buffer + " of size " + byte_size + " in "
-          + TRITONSERVER_MemoryTypeString(memory_type) + " for result '" + name.getString() + "'");
+          + TRITONSERVER_MemoryTypeString(memory_type) + " for result '"
+          + name.getString() + "'");
       Pointer.free(buffer);
       name.deallocate();
 
@@ -145,15 +154,21 @@ public class SequenceTest {
     }
   }
 
-  static class InferRequestComplete extends TRITONSERVER_InferenceRequestReleaseFn_t {
-    @Override public void call(TRITONSERVER_InferenceRequest request, int flags, Pointer userp)
+  static class InferRequestComplete
+      extends TRITONSERVER_InferenceRequestReleaseFn_t {
+    @Override
+    public void call(
+        TRITONSERVER_InferenceRequest request, int flags, Pointer userp)
     {
       // We reuse the request so we don't delete it here.
     }
   }
 
-  static class InferResponseComplete extends TRITONSERVER_InferenceResponseCompleteFn_t {
-    @Override public void call(TRITONSERVER_InferenceResponse response, int flags, Pointer userp)
+  static class InferResponseComplete
+      extends TRITONSERVER_InferenceResponseCompleteFn_t {
+    @Override
+    public void call(
+        TRITONSERVER_InferenceResponse response, int flags, Pointer userp)
     {
       if (response != null) {
         // Send 'response' to the future.
@@ -162,17 +177,21 @@ public class SequenceTest {
     }
   }
 
-  static ConcurrentHashMap<Pointer, CompletableFuture<TRITONSERVER_InferenceResponse>> futures =
+  static ConcurrentHashMap<
+      Pointer, CompletableFuture<TRITONSERVER_InferenceResponse>> futures =
       new ConcurrentHashMap<>();
   static ResponseAlloc responseAlloc = new ResponseAlloc();
   static ResponseRelease responseRelease = new ResponseRelease();
   static InferRequestComplete inferRequestComplete = new InferRequestComplete();
-  static InferResponseComplete inferResponseComplete = new InferResponseComplete();
+  static InferResponseComplete inferResponseComplete =
+      new InferResponseComplete();
 
-  static TRITONSERVER_Error ParseModelMetadata(JsonObject model_metadata, boolean[] is_torch_model)
+  static TRITONSERVER_Error ParseModelMetadata(
+      JsonObject model_metadata, boolean[] is_torch_model)
   {
     String seen_data_type = null;
-    for (JsonElement input_element : model_metadata.get("inputs").getAsJsonArray()) {
+    for (JsonElement input_element :
+         model_metadata.get("inputs").getAsJsonArray()) {
       JsonObject input = input_element.getAsJsonObject();
       if (!input.get("datatype").getAsString().equals("INT32")) {
         return TRITONSERVER_ErrorNew(
@@ -187,7 +206,8 @@ public class SequenceTest {
             "the inputs and outputs of sequence model must have the data type");
       }
     }
-    for (JsonElement output_element : model_metadata.get("outputs").getAsJsonArray()) {
+    for (JsonElement output_element :
+         model_metadata.get("outputs").getAsJsonArray()) {
       JsonObject output = output_element.getAsJsonObject();
       if (!output.get("datatype").getAsString().equals("INT32")) {
         return TRITONSERVER_ErrorNew(
@@ -200,14 +220,15 @@ public class SequenceTest {
       }
     }
 
-    is_torch_model[0] = model_metadata.get("platform").getAsString().equals("pytorch_libtorch");
+    is_torch_model[0] =
+        model_metadata.get("platform").getAsString().equals("pytorch_libtorch");
     return null;
   }
 
   // Custom function to set metadata required for sequence batcher
   static void SetSequenceMetadata(
-      TRITONSERVER_InferenceRequest irequest, long correlation_id, boolean sequence_start,
-      boolean sequence_end)
+      TRITONSERVER_InferenceRequest irequest, long correlation_id,
+      boolean sequence_start, boolean sequence_end)
   {
     FAIL_IF_ERR(
         TRITONSERVER_InferenceRequestSetCorrelationId(irequest, correlation_id),
@@ -219,13 +240,16 @@ public class SequenceTest {
     if (sequence_end) {
       flags += TRITONSERVER_REQUEST_FLAG_SEQUENCE_END;
     }
-    FAIL_IF_ERR(TRITONSERVER_InferenceRequestSetFlags(irequest, flags), "Unable to set flags");
+    FAIL_IF_ERR(
+        TRITONSERVER_InferenceRequestSetFlags(irequest, flags),
+        "Unable to set flags");
   }
 
   // Custom function for adjusting sequence batcher
   // expected results for backends that do not implement
   // full accumulator
-  static int GetExpectedResult(String model_name, int expected_result, int value, String flag)
+  static int GetExpectedResult(
+      String model_name, int expected_result, int value, String flag)
   {
     if ((!model_name.contains("nobatch") && !model_name.contains("custom"))
         || model_name.contains("graphdef") || model_name.contains("plan")
@@ -242,8 +266,9 @@ public class SequenceTest {
   // plus customized check that final sequence result
   // "out" matches expected result
   static void Check(
-      String model_name, TRITONSERVER_InferenceResponse response, int input_value, String output0,
-      long expected_byte_size, int expected_datatype, boolean sequence_end, int expected_result)
+      String model_name, TRITONSERVER_InferenceResponse response,
+      int input_value, String output0, long expected_byte_size,
+      int expected_datatype, boolean sequence_end, int expected_result)
   {
     HashMap<String, Pointer> output_data = new HashMap<>();
 
@@ -268,8 +293,8 @@ public class SequenceTest {
 
       FAIL_IF_ERR(
           TRITONSERVER_InferenceResponseOutput(
-              response, idx, cname, datatype, shape, dim_count, base, byte_size, memory_type,
-              memory_type_id, userp),
+              response, idx, cname, datatype, shape, dim_count, base, byte_size,
+              memory_type, memory_type_id, userp),
           "getting output info");
 
       if (cname.isNull()) {
@@ -287,22 +312,23 @@ public class SequenceTest {
 
       if (datatype.get() != expected_datatype) {
         FAIL(
-            "unexpected datatype '" + TRITONSERVER_DataTypeString(datatype.get()) + "' for '" + name
+            "unexpected datatype '"
+            + TRITONSERVER_DataTypeString(datatype.get()) + "' for '" + name
             + "'");
       }
 
       if (byte_size.get() != expected_byte_size) {
         FAIL(
-            "unexpected byte-size, expected " + expected_byte_size + ", got " + byte_size.get()
-            + " for " + name);
+            "unexpected byte-size, expected " + expected_byte_size + ", got "
+            + byte_size.get() + " for " + name);
       }
 
       if (memory_type.get() != requested_memory_type) {
         FAIL(
             "unexpected memory type, expected to be allocated in "
             + TRITONSERVER_MemoryTypeString(requested_memory_type) + ", got "
-            + TRITONSERVER_MemoryTypeString(memory_type.get()) + ", id " + memory_type_id.get()
-            + " for " + name);
+            + TRITONSERVER_MemoryTypeString(memory_type.get()) + ", id "
+            + memory_type_id.get() + " for " + name);
       }
 
       // We make a copy of the data here... which we could avoid for
@@ -316,7 +342,8 @@ public class SequenceTest {
     int out = new IntPointer(output_data.get(output0)).get(0);
     System.out.println("Value: " + out);
     if (sequence_end) {
-      expected_result = GetExpectedResult(model_name, expected_result, input_value, "end");
+      expected_result =
+          GetExpectedResult(model_name, expected_result, input_value, "end");
       if (out != expected_result) {
         FAIL("Expected result: " + expected_result + ", got " + out);
       } else {
@@ -370,16 +397,21 @@ public class SequenceTest {
     }
 
     // Create the server...
-    TRITONSERVER_ServerOptions server_options = new TRITONSERVER_ServerOptions(null);
-    FAIL_IF_ERR(TRITONSERVER_ServerOptionsNew(server_options), "creating server options");
+    TRITONSERVER_ServerOptions server_options =
+        new TRITONSERVER_ServerOptions(null);
     FAIL_IF_ERR(
-        TRITONSERVER_ServerOptionsSetModelRepositoryPath(server_options, model_repository_path),
+        TRITONSERVER_ServerOptionsNew(server_options),
+        "creating server options");
+    FAIL_IF_ERR(
+        TRITONSERVER_ServerOptionsSetModelRepositoryPath(
+            server_options, model_repository_path),
         "setting model repository path");
     FAIL_IF_ERR(
         TRITONSERVER_ServerOptionsSetLogVerbose(server_options, verbose_level),
         "setting verbose logging level");
     FAIL_IF_ERR(
-        TRITONSERVER_ServerOptionsSetBackendDirectory(server_options, "/opt/tritonserver/backends"),
+        TRITONSERVER_ServerOptionsSetBackendDirectory(
+            server_options, "/opt/tritonserver/backends"),
         "setting backend directory");
     FAIL_IF_ERR(
         TRITONSERVER_ServerOptionsSetRepoAgentDirectory(
@@ -390,18 +422,27 @@ public class SequenceTest {
         "setting strict model configuration");
 
     TRITONSERVER_Server server_ptr = new TRITONSERVER_Server(null);
-    FAIL_IF_ERR(TRITONSERVER_ServerNew(server_ptr, server_options), "creating server");
-    FAIL_IF_ERR(TRITONSERVER_ServerOptionsDelete(server_options), "deleting server options");
+    FAIL_IF_ERR(
+        TRITONSERVER_ServerNew(server_ptr, server_options), "creating server");
+    FAIL_IF_ERR(
+        TRITONSERVER_ServerOptionsDelete(server_options),
+        "deleting server options");
 
-    TRITONSERVER_ServerDeleter server = new TRITONSERVER_ServerDeleter(server_ptr);
+    TRITONSERVER_ServerDeleter server =
+        new TRITONSERVER_ServerDeleter(server_ptr);
 
     // Wait until the server is both live and ready.
     int health_iters = 0;
     while (true) {
       boolean[] live = {false}, ready = {false};
-      FAIL_IF_ERR(TRITONSERVER_ServerIsLive(server, live), "unable to get server liveness");
-      FAIL_IF_ERR(TRITONSERVER_ServerIsReady(server, ready), "unable to get server readiness");
-      System.out.println("Server Health: live " + live[0] + ", ready " + ready[0]);
+      FAIL_IF_ERR(
+          TRITONSERVER_ServerIsLive(server, live),
+          "unable to get server liveness");
+      FAIL_IF_ERR(
+          TRITONSERVER_ServerIsReady(server, ready),
+          "unable to get server readiness");
+      System.out.println(
+          "Server Health: live " + live[0] + ", ready " + ready[0]);
       if (live[0] && ready[0]) {
         break;
       }
@@ -415,20 +456,24 @@ public class SequenceTest {
 
     // Print status of the server.
     {
-      TRITONSERVER_Message server_metadata_message = new TRITONSERVER_Message(null);
+      TRITONSERVER_Message server_metadata_message =
+          new TRITONSERVER_Message(null);
       FAIL_IF_ERR(
           TRITONSERVER_ServerMetadata(server, server_metadata_message),
           "unable to get server metadata message");
       BytePointer buffer = new BytePointer((Pointer) null);
       SizeTPointer byte_size = new SizeTPointer(1);
       FAIL_IF_ERR(
-          TRITONSERVER_MessageSerializeToJson(server_metadata_message, buffer, byte_size),
+          TRITONSERVER_MessageSerializeToJson(
+              server_metadata_message, buffer, byte_size),
           "unable to serialize server metadata message");
 
       System.out.println("Server Status:");
       System.out.println(buffer.limit(byte_size.get()).getString());
 
-      FAIL_IF_ERR(TRITONSERVER_MessageDelete(server_metadata_message), "deleting status metadata");
+      FAIL_IF_ERR(
+          TRITONSERVER_MessageDelete(server_metadata_message),
+          "deleting status metadata");
     }
 
     // Wait for the model to become available.
@@ -447,26 +492,32 @@ public class SequenceTest {
         continue;
       }
 
-      TRITONSERVER_Message model_metadata_message = new TRITONSERVER_Message(null);
+      TRITONSERVER_Message model_metadata_message =
+          new TRITONSERVER_Message(null);
       FAIL_IF_ERR(
-          TRITONSERVER_ServerModelMetadata(server, model_name, 1, model_metadata_message),
+          TRITONSERVER_ServerModelMetadata(
+              server, model_name, 1, model_metadata_message),
           "unable to get model metadata message");
       BytePointer buffer = new BytePointer((Pointer) null);
       SizeTPointer byte_size = new SizeTPointer(1);
       FAIL_IF_ERR(
-          TRITONSERVER_MessageSerializeToJson(model_metadata_message, buffer, byte_size),
+          TRITONSERVER_MessageSerializeToJson(
+              model_metadata_message, buffer, byte_size),
           "unable to serialize model status protobuf");
 
       JsonParser parser = new JsonParser();
       JsonObject model_metadata = null;
       try {
-        model_metadata = parser.parse(buffer.limit(byte_size.get()).getString()).getAsJsonObject();
+        model_metadata = parser.parse(buffer.limit(byte_size.get()).getString())
+                             .getAsJsonObject();
       }
       catch (Exception e) {
         FAIL("error: failed to parse model metadata from JSON: " + e);
       }
 
-      FAIL_IF_ERR(TRITONSERVER_MessageDelete(model_metadata_message), "deleting status protobuf");
+      FAIL_IF_ERR(
+          TRITONSERVER_MessageDelete(model_metadata_message),
+          "deleting status protobuf");
 
       if (!model_metadata.get("name").getAsString().equals(model_name)) {
         FAIL("unable to find metadata for model");
@@ -474,7 +525,8 @@ public class SequenceTest {
 
       boolean found_version = false;
       if (model_metadata.has("versions")) {
-        for (JsonElement version : model_metadata.get("versions").getAsJsonArray()) {
+        for (JsonElement version :
+             model_metadata.get("versions").getAsJsonArray()) {
           if (version.getAsString().equals("1")) {
             found_version = true;
             break;
@@ -485,21 +537,26 @@ public class SequenceTest {
         FAIL("unable to find version 1 status for model");
       }
 
-      FAIL_IF_ERR(ParseModelMetadata(model_metadata, is_torch_model), "parsing model metadata");
+      FAIL_IF_ERR(
+          ParseModelMetadata(model_metadata, is_torch_model),
+          "parsing model metadata");
     }
 
     // Create the allocator that will be used to allocate buffers for
     // the result tensors.
-    TRITONSERVER_ResponseAllocator allocator = new TRITONSERVER_ResponseAllocator(null);
+    TRITONSERVER_ResponseAllocator allocator =
+        new TRITONSERVER_ResponseAllocator(null);
     FAIL_IF_ERR(
         TRITONSERVER_ResponseAllocatorNew(
             allocator, responseAlloc, responseRelease, null /* start_fn */),
         "creating response allocator");
 
     // Inference
-    TRITONSERVER_InferenceRequest irequest = new TRITONSERVER_InferenceRequest(null);
+    TRITONSERVER_InferenceRequest irequest =
+        new TRITONSERVER_InferenceRequest(null);
     FAIL_IF_ERR(
-        TRITONSERVER_InferenceRequestNew(irequest, server, model_name, -1 /* model_version */),
+        TRITONSERVER_InferenceRequestNew(
+            irequest, server, model_name, -1 /* model_version */),
         "creating inference request");
 
     FAIL_IF_ERR(
@@ -561,38 +618,48 @@ public class SequenceTest {
       if (i == num_requests - 1) {
         sequence_end = true;
       }
-      SetSequenceMetadata(irequest, correlation_id, sequence_start, sequence_end);
+      SetSequenceMetadata(
+          irequest, correlation_id, sequence_start, sequence_end);
 
       // Perform inference...
-      CompletableFuture<TRITONSERVER_InferenceResponse> completed = new CompletableFuture<>();
+      CompletableFuture<TRITONSERVER_InferenceResponse> completed =
+          new CompletableFuture<>();
       futures.put(irequest, completed);
 
       FAIL_IF_ERR(
           TRITONSERVER_InferenceRequestSetResponseCallback(
-              irequest, allocator, null /* response_allocator_userp */, inferResponseComplete,
-              irequest),
+              irequest, allocator, null /* response_allocator_userp */,
+              inferResponseComplete, irequest),
           "setting response callback");
 
       FAIL_IF_ERR(
-          TRITONSERVER_ServerInferAsync(server, irequest, null /* trace */), "running inference");
+          TRITONSERVER_ServerInferAsync(server, irequest, null /* trace */),
+          "running inference");
 
       // Wait for the inference to complete.
       TRITONSERVER_InferenceResponse completed_response = completed.get();
       futures.remove(irequest);
 
-      FAIL_IF_ERR(TRITONSERVER_InferenceResponseError(completed_response), "response status");
+      FAIL_IF_ERR(
+          TRITONSERVER_InferenceResponseError(completed_response),
+          "response status");
 
       Check(
-          model_name, completed_response, input, output0, input0_size, datatype, sequence_end,
-          expected_result);
+          model_name, completed_response, input, output0, input0_size, datatype,
+          sequence_end, expected_result);
 
       FAIL_IF_ERR(
-          TRITONSERVER_InferenceResponseDelete(completed_response), "deleting inference response");
+          TRITONSERVER_InferenceResponseDelete(completed_response),
+          "deleting inference response");
     }
 
-    FAIL_IF_ERR(TRITONSERVER_InferenceRequestDelete(irequest), "deleting inference request");
+    FAIL_IF_ERR(
+        TRITONSERVER_InferenceRequestDelete(irequest),
+        "deleting inference request");
 
-    FAIL_IF_ERR(TRITONSERVER_ResponseAllocatorDelete(allocator), "deleting response allocator");
+    FAIL_IF_ERR(
+        TRITONSERVER_ResponseAllocatorDelete(allocator),
+        "deleting response allocator");
 
     System.exit(0);
   }

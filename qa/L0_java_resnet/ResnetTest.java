@@ -1,4 +1,5 @@
-// Copyright (c) 2022, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+// Copyright (c) 2022-2023, NVIDIA CORPORATION & AFFILIATES. All rights
+// reserved.
 //
 // Redistribution and use in source and binary forms, with or without
 // modification, are permitted provided that the following conditions
@@ -75,7 +76,8 @@ public class ResnetTest {
       super(p);
       deallocator(new DeleteDeallocator(this));
     }
-    protected static class DeleteDeallocator extends TRITONSERVER_Server implements Deallocator {
+    protected static class DeleteDeallocator
+        extends TRITONSERVER_Server implements Deallocator {
       DeleteDeallocator(Pointer p) { super(p); }
       @Override public void deallocate() { TRITONSERVER_ServerDelete(this); }
     }
@@ -87,7 +89,8 @@ public class ResnetTest {
       System.err.println(msg);
     }
 
-    System.err.println("Usage: java " + ResnetTest.class.getSimpleName() + " [options]");
+    System.err.println(
+        "Usage: java " + ResnetTest.class.getSimpleName() + " [options]");
     System.err.println(
         "\t-m <\"system\"|\"pinned\"|gpu>"
         + " Enforce the memory type for input and output tensors."
@@ -102,9 +105,10 @@ public class ResnetTest {
   static class ResponseAlloc extends TRITONSERVER_ResponseAllocatorAllocFn_t {
     @Override
     public TRITONSERVER_Error call(
-        TRITONSERVER_ResponseAllocator allocator, String tensor_name, long byte_size,
-        int preferred_memory_type, long preferred_memory_type_id, Pointer userp,
-        PointerPointer buffer, PointerPointer buffer_userp, IntPointer actual_memory_type,
+        TRITONSERVER_ResponseAllocator allocator, String tensor_name,
+        long byte_size, int preferred_memory_type,
+        long preferred_memory_type_id, Pointer userp, PointerPointer buffer,
+        PointerPointer buffer_userp, IntPointer actual_memory_type,
         LongPointer actual_memory_type_id)
     {
       // Initially attempt to make the actual memory type and id that we
@@ -117,7 +121,9 @@ public class ResnetTest {
       if (byte_size == 0) {
         buffer.put(0, null);
         buffer_userp.put(0, null);
-        System.out.println("allocated " + byte_size + " bytes for result tensor " + tensor_name);
+        System.out.println(
+            "allocated " + byte_size + " bytes for result tensor "
+            + tensor_name);
       } else {
         Pointer allocated_ptr = new Pointer();
         if (enforce_memory_type) {
@@ -134,8 +140,8 @@ public class ResnetTest {
           buffer_userp.put(0, Loader.newGlobalRef(tensor_name));
           System.out.println(
               "allocated " + byte_size + " bytes in "
-              + TRITONSERVER_MemoryTypeString(actual_memory_type.get()) + " for result tensor "
-              + tensor_name);
+              + TRITONSERVER_MemoryTypeString(actual_memory_type.get())
+              + " for result tensor " + tensor_name);
         }
       }
 
@@ -143,11 +149,13 @@ public class ResnetTest {
     }
   }
 
-  static class ResponseRelease extends TRITONSERVER_ResponseAllocatorReleaseFn_t {
+  static class ResponseRelease
+      extends TRITONSERVER_ResponseAllocatorReleaseFn_t {
     @Override
     public TRITONSERVER_Error call(
-        TRITONSERVER_ResponseAllocator allocator, Pointer buffer, Pointer buffer_userp,
-        long byte_size, int memory_type, long memory_type_id)
+        TRITONSERVER_ResponseAllocator allocator, Pointer buffer,
+        Pointer buffer_userp, long byte_size, int memory_type,
+        long memory_type_id)
     {
       String name = null;
       if (buffer_userp != null) {
@@ -163,15 +171,21 @@ public class ResnetTest {
     }
   }
 
-  static class InferRequestComplete extends TRITONSERVER_InferenceRequestReleaseFn_t {
-    @Override public void call(TRITONSERVER_InferenceRequest request, int flags, Pointer userp)
+  static class InferRequestComplete
+      extends TRITONSERVER_InferenceRequestReleaseFn_t {
+    @Override
+    public void call(
+        TRITONSERVER_InferenceRequest request, int flags, Pointer userp)
     {
       // We reuse the request so we don't delete it here.
     }
   }
 
-  static class InferResponseComplete extends TRITONSERVER_InferenceResponseCompleteFn_t {
-    @Override public void call(TRITONSERVER_InferenceResponse response, int flags, Pointer userp)
+  static class InferResponseComplete
+      extends TRITONSERVER_InferenceResponseCompleteFn_t {
+    @Override
+    public void call(
+        TRITONSERVER_InferenceResponse response, int flags, Pointer userp)
     {
       if (response != null) {
         // Send 'response' to the future.
@@ -180,12 +194,14 @@ public class ResnetTest {
     }
   }
 
-  static ConcurrentHashMap<Pointer, CompletableFuture<TRITONSERVER_InferenceResponse>> futures =
+  static ConcurrentHashMap<
+      Pointer, CompletableFuture<TRITONSERVER_InferenceResponse>> futures =
       new ConcurrentHashMap<>();
   static ResponseAlloc responseAlloc = new ResponseAlloc();
   static ResponseRelease responseRelease = new ResponseRelease();
   static InferRequestComplete inferRequestComplete = new InferRequestComplete();
-  static InferResponseComplete inferResponseComplete = new InferResponseComplete();
+  static InferResponseComplete inferResponseComplete =
+      new InferResponseComplete();
 
   static void GenerateInputData(FloatPointer[] input_data)
   {
@@ -207,7 +223,8 @@ public class ResnetTest {
             model_name + "inference failure: unexpected output "
             + "in " + model_name + ", index " + i);
 
-        System.out.println("Value: " + output.get(i) + ", expected " + expected_output.get(i));
+        System.out.println(
+            "Value: " + output.get(i) + ", expected " + expected_output.get(i));
 
         return false; // Failure
       }
@@ -216,8 +233,9 @@ public class ResnetTest {
   }
 
   static void Check(
-      String model_name, Backend backend, TRITONSERVER_InferenceResponse response,
-      Pointer input_data, String output, int expected_datatype) throws Exception
+      String model_name, Backend backend,
+      TRITONSERVER_InferenceResponse response, Pointer input_data,
+      String output, int expected_datatype) throws Exception
   {
     HashMap<String, Pointer> output_data = new HashMap<>();
 
@@ -242,8 +260,8 @@ public class ResnetTest {
 
       FAIL_IF_ERR(
           TRITONSERVER_InferenceResponseOutput(
-              response, idx, cname, datatype, shape, dim_count, base, byte_size, memory_type,
-              memory_type_id, userp),
+              response, idx, cname, datatype, shape, dim_count, base, byte_size,
+              memory_type, memory_type_id, userp),
           "getting output info");
 
       if (cname.isNull()) {
@@ -257,13 +275,15 @@ public class ResnetTest {
 
       int output_length = backend == backend.TF ? 1001 : 1000;
 
-      if ((dim_count.get() != 2) || (shape.get(0) != 1) || shape.get(1) != output_length) {
+      if ((dim_count.get() != 2) || (shape.get(0) != 1)
+          || shape.get(1) != output_length) {
         FAIL("unexpected shape for '" + name + "'");
       }
 
       if (datatype.get() != expected_datatype) {
         FAIL(
-            "unexpected datatype '" + TRITONSERVER_DataTypeString(datatype.get()) + "' for '" + name
+            "unexpected datatype '"
+            + TRITONSERVER_DataTypeString(datatype.get()) + "' for '" + name
             + "'");
       }
 
@@ -271,8 +291,8 @@ public class ResnetTest {
         FAIL(
             "unexpected memory type, expected to be allocated in "
             + TRITONSERVER_MemoryTypeString(requested_memory_type) + ", got "
-            + TRITONSERVER_MemoryTypeString(memory_type.get()) + ", id " + memory_type_id.get()
-            + " for " + name);
+            + TRITONSERVER_MemoryTypeString(memory_type.get()) + ", id "
+            + memory_type_id.get() + " for " + name);
       }
 
       // We make a copy of the data here... which we could avoid for
@@ -309,8 +329,8 @@ public class ResnetTest {
       }
     }
 
-    boolean correct_results =
-        AreValidResults(model_name, new FloatPointer(output_data.get(output)), expected_output);
+    boolean correct_results = AreValidResults(
+        model_name, new FloatPointer(output_data.get(output)), expected_output);
 
     if (correct_results) {
       System.out.println(backend.name() + " test PASSED");
@@ -319,8 +339,8 @@ public class ResnetTest {
     }
   }
 
-  static void PerformInference(TRITONSERVER_ServerDeleter server, String model_name)
-      throws Exception
+  static void PerformInference(
+      TRITONSERVER_ServerDeleter server, String model_name) throws Exception
   {
     // Get type of model
     Backend backend = Backend.NONE;
@@ -354,16 +374,19 @@ public class ResnetTest {
 
     // Create the allocator that will be used to allocate buffers for
     // the result tensors.
-    TRITONSERVER_ResponseAllocator allocator = new TRITONSERVER_ResponseAllocator(null);
+    TRITONSERVER_ResponseAllocator allocator =
+        new TRITONSERVER_ResponseAllocator(null);
     FAIL_IF_ERR(
         TRITONSERVER_ResponseAllocatorNew(
             allocator, responseAlloc, responseRelease, null /* start_fn */),
         "creating response allocator");
 
     // Inference
-    TRITONSERVER_InferenceRequest irequest = new TRITONSERVER_InferenceRequest(null);
+    TRITONSERVER_InferenceRequest irequest =
+        new TRITONSERVER_InferenceRequest(null);
     FAIL_IF_ERR(
-        TRITONSERVER_InferenceRequestNew(irequest, server, model_name, -1 /* model_version */),
+        TRITONSERVER_InferenceRequestNew(
+            irequest, server, model_name, -1 /* model_version */),
         "creating inference request");
 
     FAIL_IF_ERR(
@@ -423,38 +446,50 @@ public class ResnetTest {
 
     FAIL_IF_ERR(
         TRITONSERVER_InferenceRequestAppendInputData(
-            irequest, input, input_base, input_size, requested_memory_type, 0 /* memory_type_id */),
+            irequest, input, input_base, input_size, requested_memory_type,
+            0 /* memory_type_id */),
         "assigning INPUT data");
 
     // Perform inference...
     {
-      CompletableFuture<TRITONSERVER_InferenceResponse> completed = new CompletableFuture<>();
+      CompletableFuture<TRITONSERVER_InferenceResponse> completed =
+          new CompletableFuture<>();
       futures.put(irequest, completed);
 
       FAIL_IF_ERR(
           TRITONSERVER_InferenceRequestSetResponseCallback(
-              irequest, allocator, null /* response_allocator_userp */, inferResponseComplete,
-              irequest),
+              irequest, allocator, null /* response_allocator_userp */,
+              inferResponseComplete, irequest),
           "setting response callback");
 
       FAIL_IF_ERR(
-          TRITONSERVER_ServerInferAsync(server, irequest, null /* trace */), "running inference");
+          TRITONSERVER_ServerInferAsync(server, irequest, null /* trace */),
+          "running inference");
 
       // Wait for the inference to complete.
       TRITONSERVER_InferenceResponse completed_response = completed.get();
       futures.remove(irequest);
 
-      FAIL_IF_ERR(TRITONSERVER_InferenceResponseError(completed_response), "response status");
+      FAIL_IF_ERR(
+          TRITONSERVER_InferenceResponseError(completed_response),
+          "response status");
 
-      Check(model_name, backend, completed_response, input_data, output, datatype);
+      Check(
+          model_name, backend, completed_response, input_data, output,
+          datatype);
 
       FAIL_IF_ERR(
-          TRITONSERVER_InferenceResponseDelete(completed_response), "deleting inference response");
+          TRITONSERVER_InferenceResponseDelete(completed_response),
+          "deleting inference response");
     }
 
-    FAIL_IF_ERR(TRITONSERVER_InferenceRequestDelete(irequest), "deleting inference request");
+    FAIL_IF_ERR(
+        TRITONSERVER_InferenceRequestDelete(irequest),
+        "deleting inference request");
 
-    FAIL_IF_ERR(TRITONSERVER_ResponseAllocatorDelete(allocator), "deleting response allocator");
+    FAIL_IF_ERR(
+        TRITONSERVER_ResponseAllocatorDelete(allocator),
+        "deleting response allocator");
   }
 
   public static void main(String[] args) throws Exception
@@ -496,7 +531,8 @@ public class ResnetTest {
     if (model_repository_path == null) {
       Usage("-r must be used to specify model repository path");
     }
-    if (enforce_memory_type && requested_memory_type != TRITONSERVER_MEMORY_CPU) {
+    if (enforce_memory_type
+        && requested_memory_type != TRITONSERVER_MEMORY_CPU) {
       Usage("-m can only be set to \"system\" without enabling GPU");
     }
 
@@ -511,16 +547,21 @@ public class ResnetTest {
     }
 
     // Create the server...
-    TRITONSERVER_ServerOptions server_options = new TRITONSERVER_ServerOptions(null);
-    FAIL_IF_ERR(TRITONSERVER_ServerOptionsNew(server_options), "creating server options");
+    TRITONSERVER_ServerOptions server_options =
+        new TRITONSERVER_ServerOptions(null);
     FAIL_IF_ERR(
-        TRITONSERVER_ServerOptionsSetModelRepositoryPath(server_options, model_repository_path),
+        TRITONSERVER_ServerOptionsNew(server_options),
+        "creating server options");
+    FAIL_IF_ERR(
+        TRITONSERVER_ServerOptionsSetModelRepositoryPath(
+            server_options, model_repository_path),
         "setting model repository path");
     FAIL_IF_ERR(
         TRITONSERVER_ServerOptionsSetLogVerbose(server_options, verbose_level),
         "setting verbose logging level");
     FAIL_IF_ERR(
-        TRITONSERVER_ServerOptionsSetBackendDirectory(server_options, "/opt/tritonserver/backends"),
+        TRITONSERVER_ServerOptionsSetBackendDirectory(
+            server_options, "/opt/tritonserver/backends"),
         "setting backend directory");
     FAIL_IF_ERR(
         TRITONSERVER_ServerOptionsSetRepoAgentDirectory(
@@ -536,18 +577,27 @@ public class ResnetTest {
         "setting minimum supported CUDA compute capability");
 
     TRITONSERVER_Server server_ptr = new TRITONSERVER_Server(null);
-    FAIL_IF_ERR(TRITONSERVER_ServerNew(server_ptr, server_options), "creating server");
-    FAIL_IF_ERR(TRITONSERVER_ServerOptionsDelete(server_options), "deleting server options");
+    FAIL_IF_ERR(
+        TRITONSERVER_ServerNew(server_ptr, server_options), "creating server");
+    FAIL_IF_ERR(
+        TRITONSERVER_ServerOptionsDelete(server_options),
+        "deleting server options");
 
-    TRITONSERVER_ServerDeleter server = new TRITONSERVER_ServerDeleter(server_ptr);
+    TRITONSERVER_ServerDeleter server =
+        new TRITONSERVER_ServerDeleter(server_ptr);
 
     // Wait until the server is both live and ready.
     int health_iters = 0;
     while (true) {
       boolean[] live = {false}, ready = {false};
-      FAIL_IF_ERR(TRITONSERVER_ServerIsLive(server, live), "unable to get server liveness");
-      FAIL_IF_ERR(TRITONSERVER_ServerIsReady(server, ready), "unable to get server readiness");
-      System.out.println("Server Health: live " + live[0] + ", ready " + ready[0]);
+      FAIL_IF_ERR(
+          TRITONSERVER_ServerIsLive(server, live),
+          "unable to get server liveness");
+      FAIL_IF_ERR(
+          TRITONSERVER_ServerIsReady(server, ready),
+          "unable to get server readiness");
+      System.out.println(
+          "Server Health: live " + live[0] + ", ready " + ready[0]);
       if (live[0] && ready[0]) {
         break;
       }
@@ -561,20 +611,24 @@ public class ResnetTest {
 
     // Print status of the server.
     {
-      TRITONSERVER_Message server_metadata_message = new TRITONSERVER_Message(null);
+      TRITONSERVER_Message server_metadata_message =
+          new TRITONSERVER_Message(null);
       FAIL_IF_ERR(
           TRITONSERVER_ServerMetadata(server, server_metadata_message),
           "unable to get server metadata message");
       BytePointer buffer = new BytePointer((Pointer) null);
       SizeTPointer byte_size = new SizeTPointer(1);
       FAIL_IF_ERR(
-          TRITONSERVER_MessageSerializeToJson(server_metadata_message, buffer, byte_size),
+          TRITONSERVER_MessageSerializeToJson(
+              server_metadata_message, buffer, byte_size),
           "unable to serialize server metadata message");
 
       System.out.println("Server Status:");
       System.out.println(buffer.limit(byte_size.get()).getString());
 
-      FAIL_IF_ERR(TRITONSERVER_MessageDelete(server_metadata_message), "deleting status metadata");
+      FAIL_IF_ERR(
+          TRITONSERVER_MessageDelete(server_metadata_message),
+          "deleting status metadata");
     }
 
     for (String model : MODELS) {
