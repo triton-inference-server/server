@@ -864,6 +864,8 @@ def install_miniconda(conda_version, target_machine):
     miniconda_url = f"https://repo.anaconda.com/miniconda/Miniconda3-{conda_version}-Linux-{target_machine}.sh"
     if target_machine == 'x86_64':
         sha_sum = "32d73e1bc33fda089d7cd9ef4c1be542616bd8e437d1f77afeeaf7afdb019787"
+    elif target_machine == 's390x' :
+        sha_sum = "0d00a9d34c5fd17d116bf4e7c893b7441a67c7a25416ede90289d87216104a97"
     else:
         sha_sum = "80d6c306b015e1e3b01ea59dc66c676a81fa30279bc2da1f180a7ef7b2191d6e"
     return f'''
@@ -1179,6 +1181,15 @@ ENV TCMALLOC_RELEASE_RATE 200
         df += fastertransformer_buildscript.create_postbuild(
             is_multistage_build=False)
 
+    if target_machine == "s390x":
+        df += '''
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends \
+        gcc-s390x-linux-gnu \
+        g++-s390x-linux-gnu && \
+    rm -rf /var/lib/apt/lists/*
+'''
+
     if enable_gpu:
         df += install_dcgm_libraries(argmap['DCGM_VERSION'], target_machine)
         df += '''
@@ -1337,6 +1348,9 @@ def create_build_dockerfiles(container_build_dir, images, backends, repoagents,
         base_image = images['base']
     elif target_platform() == 'windows':
         base_image = 'mcr.microsoft.com/dotnet/framework/sdk:4.8'
+    elif target_machine() == 's390x':
+        fail_if (FLAGS.enable_gpu, "s390x for testing big endian support only. GPU support not enabled.")
+        base_image = 's390x/ubuntu:22.04'
     elif FLAGS.enable_gpu:
         base_image = 'nvcr.io/nvidia/tritonserver:{}-py3-min'.format(
             FLAGS.upstream_container_version)
