@@ -658,6 +658,8 @@ set -e
 kill $SERVER_PID
 wait $SERVER_PID
 
+set +e 
+
 # Check opentelemetry trace exporter sends proper info.
 # A helper python script starts listenning on $OTLP_PORT, where
 # OTLP exporter sends traces. 
@@ -673,6 +675,12 @@ SERVER_ARGS="--trace-config=level=TIMESTAMPS --trace-config=rate=1 \
                 --trace-config=opentelemetry,url=localhost:$OTLP_PORT \
                 --model-repository=$MODELSDIR"
 SERVER_LOG="./inference_server_trace_config.log"
+
+# Increasing OTLP timeout, since we don't use a valid OTLP collector
+# and don't send a proper signal back.
+export OTEL_EXPORTER_OTLP_TIMEOUT=50000
+export OTEL_EXPORTER_OTLP_TRACES_TIMEOUT=50000
+
 run_server
 if [ "$SERVER_PID" == "0" ]; then
     echo -e "\n***\n*** Failed to start $SERVER\n***"
@@ -684,13 +692,14 @@ fi
 apt-get update && apt-get install -y netcat
 nc -l -k 127.0.0.1 $OTLP_PORT >> $TRACE_COLLECTOR_LOG 2>&1 & COLLECTOR_PID=$!
 
+set +e
 # Preparing traces for unittest. 
 # Note: need to run this separately, to speed up trace collection. 
 # Otherwise internal (opentelemetry_unittest.OpenTelemetryTest.setUp) check
 # will slow down collection.
-python -c 'import opentelemetry_unittest; opentelemetry_unittest.prepare_traces()' >>$CLIENT_LOG 2>&1
+python -c 'import opentelemetry_unittest; \
+        opentelemetry_unittest.prepare_traces()' >>$CLIENT_LOG 2>&1
 
-set +e
 # Unittest will not start untill expected number of spans is collected.
 python $OPENTELEMETRY_TEST >>$OPENTELEMETRY_LOG 2>&1
 if [ $? -ne 0 ]; then
