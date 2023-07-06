@@ -408,14 +408,6 @@ def create_onnx_modelfile(models_dir, model_version, max_batch, dtype, shape,
         create_onnx_modelfile_with_initial_state(models_dir, model_version,
                                                  max_batch, dtype, shape)
 
-    if initial_state is None:
-        create_onnx_modelfile_wo_initial_state(models_dir, model_version,
-                                               max_batch, dtype, shape)
-    else:
-        # This model assumes that the initial state contains correct data
-        create_onnx_modelfile_with_initial_state(models_dir, model_version,
-                                                 max_batch, dtype, shape)
-
 
 def create_libtorch_modelfile_wo_initial_state(models_dir, model_version,
                                                max_batch, dtype, shape):
