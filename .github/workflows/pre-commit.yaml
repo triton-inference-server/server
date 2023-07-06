@@ -28,8 +28,6 @@ name: pre-commit
 
 on:
   pull_request:
-  push:
-    branches: [main]
 
 jobs:
   pre-commit:
