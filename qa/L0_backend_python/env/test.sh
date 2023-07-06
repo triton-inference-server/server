@@ -63,27 +63,28 @@ cp ../../python_models/python_version/model.py ./models/python_3_7/1/
 cp python_backend/builddir/triton_python_backend_stub ./models/python_3_7
 conda deactivate
 
-# Use python-3-5 without conda pack
-# Create a model with python 3.5 version
+# Use python-3-7 without conda pack
+# Create a model with python 3.7 version and numpy 1.20.3 to distinguish from 
+# previous test.
 # Tensorflow 2.1.0 only works with Python 3.4 - 3.7. Successful execution of
 # the Python model indicates that the environment has been setup correctly.
-path_to_conda_pack="$PWD/python-3-5"
-create_conda_env_with_specified_path "3.5" $path_to_conda_pack 
-conda install numpy=1.18.1 -y
+path_to_conda_pack="$PWD/python-3-7-1"
+create_conda_env_with_specified_path "3.7" $path_to_conda_pack
+conda install numpy=1.20.3 -y
 conda install tensorflow=2.1.0 -y
 conda install -c conda-forge libstdcxx-ng=12 -y
 
-PY35_VERSION_STRING="Python version is 3.5, NumPy version is 1.18.1, and Tensorflow version is 2.1.0"
+PY37_1_VERSION_STRING="Python version is 3.7, NumPy version is 1.20.3, and Tensorflow version is 2.1.0"
 create_python_backend_stub
-mkdir -p models/python_3_5/1/
-cp ../../python_models/python_version/config.pbtxt ./models/python_3_5
-(cd models/python_3_5 && \
-          sed -i "s/^name:.*/name: \"python_3_5\"/" config.pbtxt && \
+mkdir -p models/python_3_7_1/1/
+cp ../../python_models/python_version/config.pbtxt ./models/python_3_7_1
+(cd models/python_3_7_1 && \
+          sed -i "s/^name:.*/name: \"python_3_7_1\"/" config.pbtxt && \
           echo "parameters: {key: \"EXECUTION_ENV_PATH\", value: {string_value: \"$path_to_conda_pack\"}}">> config.pbtxt)
-cp ../../python_models/python_version/model.py ./models/python_3_5/1/
+cp ../../python_models/python_version/model.py ./models/python_3_7_1/1/
 # Copy activate script to folder
-cp $path_to_conda_pack/lib/python3.5/site-packages/conda_pack/scripts/posix/activate $path_to_conda_pack/bin/.
-cp python_backend/builddir/triton_python_backend_stub ./models/python_3_5
+cp $path_to_conda_pack/lib/python3.7/site-packages/conda_pack/scripts/posix/activate $path_to_conda_pack/bin/.
+cp python_backend/builddir/triton_python_backend_stub ./models/python_3_7_1
 conda deactivate
 
 # Create a model with python 3.6 version
@@ -138,7 +139,7 @@ kill $SERVER_PID
 wait $SERVER_PID
 
 set +e
-for EXPECTED_VERSION_STRING in "$PY35_VERSION_STRING" "$PY36_VERSION_STRING" "$PY37_VERSION_STRING" "$PY310_VERSION_STRING"; do
+for EXPECTED_VERSION_STRING in "$PY36_VERSION_STRING" "$PY37_VERSION_STRING" "$PY37_1_VERSION_STRING" "$PY310_VERSION_STRING"; do
     grep "$EXPECTED_VERSION_STRING" $SERVER_LOG
     if [ $? -ne 0 ]; then
         cat $SERVER_LOG
