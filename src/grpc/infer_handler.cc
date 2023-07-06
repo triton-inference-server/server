@@ -498,11 +498,9 @@ InferGRPCToInput(
             serialized.reserve(
                 io.contents().int_contents_size() * elem_byte_size);
             for (const auto& element : io.contents().int_contents()) {
-              // Assuming the system is little-endian, picking the
-              // least significant byte of 32-bit integer as a
-              // int8 element
+	      int8_t element_value = static_cast<int8_t>(element);
               serialized.append(
-                  reinterpret_cast<const char*>(&element), elem_byte_size);
+                  reinterpret_cast<const char*>(&element_value), elem_byte_size);
             }
             base = serialized.c_str();
             byte_size = serialized.size();
@@ -515,11 +513,9 @@ InferGRPCToInput(
             serialized.reserve(
                 io.contents().int_contents_size() * elem_byte_size);
             for (const auto& element : io.contents().int_contents()) {
-              // Assuming the system is little-endian, picking the
-              // least 2 significant bytes of 32-bit integer as a
-              // int16 element
+	      int16_t element_value = static_cast<int16_t>(element);
               serialized.append(
-                  reinterpret_cast<const char*>(&element), elem_byte_size);
+                  reinterpret_cast<const char*>(&element_value), elem_byte_size);
             }
             base = serialized.c_str();
             byte_size = serialized.size();
@@ -550,11 +546,9 @@ InferGRPCToInput(
             serialized.reserve(
                 io.contents().uint_contents_size() * elem_byte_size);
             for (const auto& element : io.contents().uint_contents()) {
-              // Assuming the system is little-endian, picking the
-              // least significant byte of 32-bit unsigned integer as a
-              // uint8 element
+ 	      uint8_t element_value = static_cast<uint8_t>(element);
               serialized.append(
-                  reinterpret_cast<const char*>(&element), elem_byte_size);
+                  reinterpret_cast<const char*>(&element_value), elem_byte_size);
             }
             base = serialized.c_str();
             byte_size = serialized.size();
@@ -567,11 +561,9 @@ InferGRPCToInput(
             serialized.reserve(
                 io.contents().uint_contents_size() * elem_byte_size);
             for (const auto& element : io.contents().uint_contents()) {
-              // Assuming the system is little-endian, picking the
-              // least 2 significant bytes of 32-bit integer as a
-              // uint16 element
+	      uint16_t element_value = static_cast<uint16_t>(element);
               serialized.append(
-                  reinterpret_cast<const char*>(&element), elem_byte_size);
+                  reinterpret_cast<const char*>(&element_value), elem_byte_size);
             }
             base = serialized.c_str();
             byte_size = serialized.size();
@@ -616,7 +608,7 @@ InferGRPCToInput(
           serialized_data->emplace_back();
           auto& serialized = serialized_data->back();
 
-          // Serialize the output tensor strings. Each string is
+          // Serialize the input tensor strings. Each string is
           // serialized as a 4-byte length followed by the string itself
           // with no null-terminator.
           for (const auto& element : io.contents().bytes_contents()) {
@@ -882,7 +874,7 @@ ModelInferHandler::Execute(InferHandler::State* state)
     err = ForwardHeadersAsParameters(irequest, state);
   }
 
-  // Will be used to hold the serialized data in case explicit string
+  // Will be used to hold the serialized data in case explicit
   // tensors are present in the request.
   std::list<std::string> serialized_data;
 
