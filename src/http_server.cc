@@ -405,16 +405,23 @@ ReadDataFromJsonHelper(
           const char* cstr;
           size_t len = 0;
           RETURN_IF_ERR(el.AsString(&cstr, &len));
+          if (len > std::numeric_limits<uint32_t>::max()) {
+            return TRITONSERVER_ErrorNew(
+                TRITONSERVER_ERROR_INTERNAL,
+                "Length of bytes data larger than uint32_t max value");
+          }
           if (static_cast<int64_t>(*counter + len + sizeof(uint32_t)) >
               expected_cnt) {
             return TRITONSERVER_ErrorNew(
                 TRITONSERVER_ERROR_INTERNAL,
                 "Shape does not match true shape of 'data' field");
           }
-          memcpy(
-              base + *counter, reinterpret_cast<char*>(&len), sizeof(uint32_t));
-          std::copy(cstr, cstr + len, base + *counter + sizeof(uint32_t));
-          *counter += len + sizeof(uint32_t);
+          // Prepend bytes with length
+          *reinterpret_cast<uint32_t*>(base + *counter) = static_cast<uint32_t>(len);
+          *counter += sizeof(uint32_t);
+          // Copy bytes
+          std::copy(cstr, cstr + len, base + *counter);
+          *counter += len;
           break;
         }
         default:
