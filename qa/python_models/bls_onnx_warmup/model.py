@@ -27,7 +27,6 @@
 import numpy as np
 import unittest
 import triton_python_backend_utils as pb_utils
-import torch
 from torch.utils.dlpack import from_dlpack
 
 
