@@ -66,14 +66,19 @@ rm -f *.log
 rm -fr $MODELSDIR && mkdir -p $MODELSDIR
 
 # set up simple and global_simple model using MODELBASE
-rm -fr $MODELSDIR && mkdir -p $MODELSDIR && \
-    cp -r $DATADIR/$MODELBASE $MODELSDIR/simple && \
+cp -r $DATADIR/$MODELBASE $MODELSDIR/simple && \
     rm -r $MODELSDIR/simple/2 && rm -r $MODELSDIR/simple/3 && \
     (cd $MODELSDIR/simple && \
             sed -i "s/^name:.*/name: \"simple\"/" config.pbtxt) && \
     cp -r $MODELSDIR/simple $MODELSDIR/global_simple && \
     (cd $MODELSDIR/global_simple && \
             sed -i "s/^name:.*/name: \"global_simple\"/" config.pbtxt) && \
+    cp -r $ENSEMBLEDIR/simple_onnx_int32_int32_int32 $MODELSDIR/ensemble_add_sub_int32_int32_int32 && \
+    rm -r $MODELSDIR/ensemble_add_sub_int32_int32_int32/2 && \
+    rm -r $MODELSDIR/ensemble_add_sub_int32_int32_int32/3 && \
+    (cd $MODELSDIR/ensemble_add_sub_int32_int32_int32 && \
+            sed -i "s/^name:.*/name: \"ensemble_add_sub_int32_int32_int32\"/" config.pbtxt && \
+            sed -i "s/model_name:.*/model_name: \"simple\"/" config.pbtxt)
 
 RET=0
 
@@ -661,11 +666,12 @@ wait $SERVER_PID
 
 OPENTELEMETRY_TEST=opentelemetry_unittest.py
 OPENTELEMETRY_LOG="opentelemetry_unittest.log"
-TEST_RESULT_FILE="opentelemetry_results.txt"
 EXPECTED_NUM_TESTS="2"
 
-SERVER_ARGS="--trace-config=triton,file=some_file.log --trace-config=level=TIMESTAMPS \
-            --trace-config=rate=1 --trace-config=count=6 --trace-config=mode=opentelemetry --trace-config=opentelemetry,url=localhost:$OTLP_PORT --model-repository=$MODELSDIR"
+SERVER_ARGS="--trace-config=level=TIMESTAMPS --trace-config=rate=1 \
+                --trace-config=count=100 --trace-config=mode=opentelemetry \
+                --trace-config=opentelemetry,url=localhost:$OTLP_PORT \
+                --model-repository=$MODELSDIR"
 SERVER_LOG="./inference_server_trace_config.log"
 run_server
 if [ "$SERVER_PID" == "0" ]; then
@@ -674,37 +680,18 @@ if [ "$SERVER_PID" == "0" ]; then
     exit 1
 fi
 
-# This is a simple python code that opens port
-python $TRACE_COLLECTOR $OTLP_PORT $TRACE_COLLECTOR_LOG &
-COLLECTOR_PID=$! 
+# Using netcat as trace collector
+apt-get update && apt-get install -y netcat
+nc -l -k 127.0.0.1 $OTLP_PORT >> $TRACE_COLLECTOR_LOG 2>&1 & COLLECTOR_PID=$!
+
+# Preparing traces for unittest. 
+# Note: need to run this separately, to speed up trace collection. 
+# Otherwise internal (opentelemetry_unittest.OpenTelemetryTest.setUp) check
+# will slow down collection.
+python -c 'import opentelemetry_unittest; opentelemetry_unittest.prepare_traces()' >>$CLIENT_LOG 2>&1
 
 set +e
-
-# To make sure receiver is ready
-sleep 3
-
-# Send http request and collect trace
-$SIMPLE_HTTP_CLIENT >> client_update.log 2>&1
-if [ $? -ne 0 ]; then
-    cat client_update.log
-    RET=1
-fi
-
-# Send grpc request and collect trace
-$SIMPLE_GRPC_CLIENT >> client_update.log 2>&1
-if [ $? -ne 0 ]; then
-    cat client_update.log
-    RET=1
-fi
-# To make sure log gets all data
-sleep 3
-
-kill $COLLECTOR_PID
-wait $COLLECTOR_PID
-
-
-set +e
-
+# Unittest will not start untill expected number of spans is collected.
 python $OPENTELEMETRY_TEST >>$OPENTELEMETRY_LOG 2>&1
 if [ $? -ne 0 ]; then
     cat $OPENTELEMETRY_LOG
@@ -718,11 +705,12 @@ else
     fi
 fi
 
+kill $COLLECTOR_PID
+wait $COLLECTOR_PID
+
 set -e
 
 kill $SERVER_PID
 wait $SERVER_PID
-
-set +e
 
 exit $RET

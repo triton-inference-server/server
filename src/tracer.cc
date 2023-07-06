@@ -374,16 +374,68 @@ TraceManager::Trace::InitTracer(
           std::chrono::steady_clock::now().time_since_epoch())
           .count();
   auto root_span =
-      StartSpan("InferRequest", steady_timestamp_ns, true /*is_root_span*/);
-  // Initializing OTel context and storring "InferRequest" span as a root span
+      StartSpan("InferRequest", steady_timestamp_ns);
+  // Initializing OTel context and storing "InferRequest" span as a root span
   // to keep it alive for the duration of the request.
   otel_context_ = opentelemetry::context::Context({kRootSpan, root_span});
+}
+
+void
+TraceManager::Trace::StartSpan(
+    std::string span_key, TRITONSERVER_InferenceTrace* trace,
+    TRITONSERVER_InferenceTraceActivity activity, uint64_t timestamp_ns,
+    uint64_t trace_id)
+{
+  // Currently, only 2 types of sub-spans are supported:
+  // request span and compute span. Compute span is a leaf span
+  // and can not be a parent of any sub-span. If parent_id==0,
+  // then current model is either a standalone model, or an ensemble model.
+  // In both cases, the parent of the new request sub-span is the kRootSpan.
+  // A request span with trace id = `trace_id` is a parent of a compute span,
+  // started in the same trace.
+  // If parent_id > 0, then this is a child trace, spawned from
+  // the ensamble's main request. For this instance, the parent
+  // span is the ensembles's request span.
+  uint64_t parent_id;
+  LOG_TRITONSERVER_ERROR(
+      TRITONSERVER_InferenceTraceParentId(trace, &parent_id),
+      "getting trace parent id");
+  std::string parent_span_key =
+      (parent_id == 0 && activity == TRITONSERVER_TRACE_REQUEST_START)
+          ? kRootSpan
+      : (activity == TRITONSERVER_TRACE_REQUEST_START)
+          ? kRequestSpan + std::to_string(parent_id)
+          : kRequestSpan + std::to_string(trace_id);
+
+  std::string display_name = "compute";
+  const char* model_name;
+  if (activity == TRITONSERVER_TRACE_REQUEST_START) {
+    LOG_TRITONSERVER_ERROR(
+        TRITONSERVER_InferenceTraceModelName(trace, &model_name),
+        "getting model name");
+    display_name = model_name;
+  }
+
+  auto span = StartSpan(display_name, timestamp_ns, parent_span_key);
+
+  if (activity == TRITONSERVER_TRACE_REQUEST_START) {
+    int64_t model_version;
+    LOG_TRITONSERVER_ERROR(
+        TRITONSERVER_InferenceTraceModelVersion(trace, &model_version),
+        "getting model version");
+    span->SetAttribute("triton.model_name", model_name);
+    span->SetAttribute("triton.model_version", model_version);
+    span->SetAttribute("triton.trace_id", trace_id);
+    span->SetAttribute("triton.trace_parent_id", parent_id);
+  }
+
+  otel_context_ = otel_context_.SetValue(span_key, span);
 }
 
 opentelemetry::nostd::shared_ptr<otel_trace_api::Span>
 TraceManager::Trace::StartSpan(
     std::string display_name, const uint64_t& raw_timestamp_ns,
-    bool is_root_span, std::string parent_span_key)
+    std::string parent_span_key)
 {
   otel_trace_api::StartSpanOptions options;
   options.kind = otel_trace_api::SpanKind::kServer;
@@ -394,7 +446,7 @@ TraceManager::Trace::StartSpan(
 
   // If the new span is a child span, we need to retrieve its parent from
   // the context and provide it through StartSpanOptions to the child span
-  if (!is_root_span && otel_context_.HasKey(parent_span_key)) {
+  if (!parent_span_key.empty() && otel_context_.HasKey(parent_span_key)) {
     auto parent_span = opentelemetry::nostd::get<
         opentelemetry::nostd::shared_ptr<otel_trace_api::Span>>(
         otel_context_.GetValue(parent_span_key));
@@ -447,16 +499,7 @@ TraceManager::Trace::ReportToOpenTelemetry(
     return;
   }
 
-  MaybeStartSpan(current_span_key, trace, activity, timestamp_ns, id);
-
-  AddEvent(
-      current_span_key, TRITONSERVER_InferenceTraceActivityString(activity),
-      timestamp_ns);
-
-  if (activity == TRITONSERVER_TRACE_REQUEST_END ||
-      activity == TRITONSERVER_TRACE_COMPUTE_END) {
-    EndSpan(current_span_key, timestamp_ns);
-  }
+  AddEvent(current_span_key, trace, activity, timestamp_ns, id);
 }
 
 std::string
@@ -495,6 +538,27 @@ TraceManager::Trace::GetSpanKeyForActivity(
 
 void
 TraceManager::Trace::AddEvent(
+    std::string span_key, TRITONSERVER_InferenceTrace* trace,
+    TRITONSERVER_InferenceTraceActivity activity, uint64_t timestamp_ns,
+    uint64_t id)
+{
+  if (activity == TRITONSERVER_TRACE_REQUEST_START ||
+      activity == TRITONSERVER_TRACE_COMPUTE_START) {
+    StartSpan(span_key, trace, activity, timestamp_ns, id);
+  }
+
+  AddEvent(
+      span_key, TRITONSERVER_InferenceTraceActivityString(activity),
+      timestamp_ns);
+
+  if (activity == TRITONSERVER_TRACE_REQUEST_END ||
+      activity == TRITONSERVER_TRACE_COMPUTE_END) {
+    EndSpan(span_key, timestamp_ns);
+  }
+}
+
+void
+TraceManager::Trace::AddEvent(
     std::string span_key, std::string event, uint64_t timestamp)
 {
   if (otel_context_.HasKey(span_key)) {
@@ -503,58 +567,6 @@ TraceManager::Trace::AddEvent(
         otel_context_.GetValue(span_key));
     span->AddEvent(event, time_offset_ + std::chrono::nanoseconds{timestamp});
   }
-}
-
-void
-TraceManager::Trace::MaybeStartSpan(
-    std::string span_key, TRITONSERVER_InferenceTrace* trace,
-    TRITONSERVER_InferenceTraceActivity activity, uint64_t timestamp_ns,
-    uint64_t trace_id)
-{
-  if (activity != TRITONSERVER_TRACE_REQUEST_START &&
-      activity != TRITONSERVER_TRACE_COMPUTE_START) {
-    return;
-  }
-
-  // Currently, only 2 types of sub-spans are supported:
-  // request span and compute span. Compute span is a leaf span
-  // and can not be a parent of any sub-span. If parent_id==0,
-  // then current model is either a standalone model, or an ensemble model.
-  // In both cases, the parent of the new request sub-span is the kRootSpan.
-  // If parent_id > 0, then this is a child trace, spawned from
-  // the ensamble's main request. For this instance, the parent
-  // span is the ensembles's request span.
-  uint64_t parent_id;
-  LOG_TRITONSERVER_ERROR(
-      TRITONSERVER_InferenceTraceParentId(trace, &parent_id),
-      "getting trace parent id");
-  std::string parent_span_key =
-      (parent_id != 0) ? kRequestSpan + std::to_string(parent_id) : kRootSpan;
-
-  std::string display_name = "compute";
-  const char* model_name;
-  if (activity == TRITONSERVER_TRACE_REQUEST_START) {
-    LOG_TRITONSERVER_ERROR(
-        TRITONSERVER_InferenceTraceModelName(trace, &model_name),
-        "getting model name");
-    display_name = model_name;
-  }
-
-  auto span = StartSpan(
-      display_name, timestamp_ns, false /*is_root_span*/, parent_span_key);
-
-  if (activity == TRITONSERVER_TRACE_REQUEST_START) {
-    int64_t model_version;
-    LOG_TRITONSERVER_ERROR(
-        TRITONSERVER_InferenceTraceModelVersion(trace, &model_version),
-        "getting model version");
-    span->SetAttribute("triton.model_name", model_name);
-    span->SetAttribute("triton.model_version", model_version);
-    span->SetAttribute("triton.trace_id", trace_id);
-    span->SetAttribute("triton.trace_parent_id", parent_id);
-  }
-
-  otel_context_ = otel_context_.SetValue(span_key, span);
 }
 #endif
 
