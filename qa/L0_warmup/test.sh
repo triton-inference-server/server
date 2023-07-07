@@ -42,7 +42,7 @@ export CUDA_VISIBLE_DEVICES=0
 
 CLIENT=../clients/image_client
 CLIENT_LOG="./client.log"
-CLIENT_PY=/opt/tritonserver/qa/L0_backend_python/python_unittest.py
+CLIENT_PY=./python_unittest.py
 EXPECTED_NUM_TESTS="1"
 TEST_RESULT_FILE='test_results.txt'
 
@@ -448,6 +448,9 @@ cp -r /data/inferenceserver/${REPO_VERSION}/qa_model_repository/onnx_nobatch_flo
 mkdir -p models/bls_onnx_warmup/1/
 cp ../python_models/bls_onnx_warmup/model.py models/bls_onnx_warmup/1/
 cp ../python_models/bls_onnx_warmup/config.pbtxt models/bls_onnx_warmup/.
+
+cp ../L0_backend_python/python_unittest.py .
+sed -i 's#sys.path.append("../../common")#sys.path.append("../common")#g' python_unittest.py
 
 run_server
 if [ "$SERVER_PID" == "0" ]; then

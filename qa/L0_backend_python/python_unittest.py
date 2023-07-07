@@ -26,7 +26,7 @@
 
 import sys
 
-sys.path.append("/opt/tritonserver/qa/common")
+sys.path.append("../../common")
 
 import test_util as tu
 import shm_util
