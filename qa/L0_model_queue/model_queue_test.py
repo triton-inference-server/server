@@ -1,4 +1,4 @@
-# Copyright (c) 2020-2021, NVIDIA CORPORATION. All rights reserved.
+# Copyright (c) 2020-2023, NVIDIA CORPORATION. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -376,6 +376,44 @@ class ModelQueueTest(tu.TestResultCollector):
             threads.append(
                 threading.Thread(target=self.check_response,
                                  args=(1, dtype, shapes, 0, 0, (15000, 10000)),
+                                 kwargs=trial))
+            threads.append(
+                threading.Thread(target=self.check_response,
+                                 args=(2, dtype, shapes, 1, 0, (100, 0)),
+                                 kwargs=trial))
+            threads[0].start()
+            # wait to make sure the order is correct
+            time.sleep(0.1)
+            threads[1].start()
+            time.sleep(0.2)
+            threads[2].start()
+
+            for t in threads:
+                t.join()
+
+            try:
+                self.check_deferred_exception()
+            except InferenceServerException as ex:
+                self.assertTrue(False, "unexpected error {}".format(ex))
+
+    def test_max_priority_levels(self):
+        # Send 2 requests with batch sizes 2, 1 in default priority (MAX_UINT32+1). Then send
+        # 1 request with batch size 2 in priority 1. Expect the third request is
+        # place in the front of the queue and form a preferred batch with the
+        # first request.
+        dtype = np.float32
+        shapes = ([16],)
+        MAX_UINT32_PLUS_1 = 4294967296
+        for trial in self.trials_:
+            threads = []
+            threads.append(
+                threading.Thread(target=self.check_response,
+                                 args=(2, dtype, shapes, 0, 0, (500, 200)),
+                                 kwargs=trial))
+            threads.append(
+                threading.Thread(target=self.check_response,
+                                 args=(1, dtype, shapes, MAX_UINT32_PLUS_1, 0,
+                                       (15000, 10000)),
                                  kwargs=trial))
             threads.append(
                 threading.Thread(target=self.check_response,

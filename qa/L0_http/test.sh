@@ -1,5 +1,5 @@
 #!/bin/bash
-# Copyright 2019-2022, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright 2019-2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -42,6 +42,9 @@ export CUDA_VISIBLE_DEVICES=0
 
 RET=0
 
+CLIENT_PLUGIN_TEST="./http_client_plugin_test.py"
+BASIC_AUTH_TEST="./http_basic_auth_test.py"
+NGINX_CONF="./nginx.conf"
 # On windows the paths invoked by the script (running in WSL) must use
 # /mnt/c when needed but the paths on the tritonserver command-line
 # must be C:/ style.
@@ -226,12 +229,37 @@ for i in \
     fi
 done
 
+# Test with json input and output data
+$SIMPLE_STRING_INFER_CLIENT --json-input-data --json-output-data >> ${CLIENT_LOG}.c++.json 2>&1
+if [ $? -ne 0 ]; then
+    cat ${CLIENT_LOG}.c++.json
+    RET=1
+fi
+
 # Test while reusing the InferInput and InferRequestedOutput objects
 $SIMPLE_REUSE_INFER_OBJECTS_CLIENT -v >> ${CLIENT_LOG}.c++.reuse 2>&1
 if [ $? -ne 0 ]; then
     cat ${CLIENT_LOG}.c++.reuse
     RET=1
 fi
+
+python3 $CLIENT_PLUGIN_TEST >> ${CLIENT_LOG}.python.plugin 2>&1
+if [ $? -ne 0 ]; then
+    cat ${CLIENT_LOG}.python.plugin
+    RET=1
+fi
+
+# Create a password file with username:password
+echo -n 'username:' > pswd
+echo "password" | openssl passwd -stdin -apr1 >> pswd  
+nginx -c `pwd`/$NGINX_CONF
+
+python3 $BASIC_AUTH_TEST
+if [ $? -ne 0 ]; then
+    cat ${CLIENT_LOG}.python.plugin.auth
+    RET=1
+fi
+service nginx stop
 
 # Test with the base path in url.
 $SIMPLE_INFER_CLIENT -u localhost:8000/base_path -v >> ${CLIENT_LOG}.c++.base_path_url 2>&1

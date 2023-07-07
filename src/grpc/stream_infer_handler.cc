@@ -25,6 +25,7 @@
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 #include "stream_infer_handler.h"
+
 #include <regex>
 
 namespace triton { namespace server { namespace grpc {
@@ -100,6 +101,11 @@ StreamOutputBufferAttributes(
   return OutputBufferAttributesHelper(
       allocator, tensor_name, payload->shm_map_, buffer_attributes);
 }
+
+//=============================================================================
+//  The following section contains the handling mechanism for ModelStreamInfer
+//  RPC. This implementation is tuned towards performance and reducing latency.
+//=============================================================================
 
 void
 ModelStreamInferHandler::StartNewRequest()
@@ -237,7 +243,7 @@ ModelStreamInferHandler::Process(InferHandler::State* state, bool rpc_ok)
     }
 
     if (err == nullptr) {
-      err = SetInferenceRequestMetadata(irequest, request);
+      err = SetInferenceRequestMetadata(irequest, request, state->parameters_);
     }
 
     if (err == nullptr) {
@@ -267,14 +273,7 @@ ModelStreamInferHandler::Process(InferHandler::State* state, bool rpc_ok)
           &state->alloc_payload_ /* response_allocator_userp */,
           StreamInferResponseComplete, reinterpret_cast<void*>(state));
     }
-    // Get request ID for logging in case of error.
-    const char* request_id = "";
-    LOG_TRITONSERVER_ERROR(
-        TRITONSERVER_InferenceRequestId(irequest, &request_id),
-        "unable to retrieve request ID string");
-    if (!strncmp(request_id, "", 1)) {
-      request_id = "<id_unknown>";
-    }
+
     if (err == nullptr) {
       TRITONSERVER_InferenceTrace* triton_trace = nullptr;
 #ifdef TRITON_ENABLE_TRACING
@@ -303,7 +302,13 @@ ModelStreamInferHandler::Process(InferHandler::State* state, bool rpc_ok)
       } else {
         response = state->response_queue_->GetNonDecoupledResponse();
       }
-      LOG_VERBOSE(1) << "[request id: " << request_id << "] "
+
+      // Get request ID for logging in case of error.
+      std::string log_request_id = request.id();
+      if (log_request_id.empty()) {
+        log_request_id = "<id_unknown>";
+      }
+      LOG_VERBOSE(1) << "[request id: " << log_request_id << "] "
                      << "Infer failed: " << TRITONSERVER_ErrorMessage(err);
 
       LOG_TRITONSERVER_ERROR(
@@ -526,8 +531,9 @@ ModelStreamInferHandler::StreamInferResponseComplete(
 #endif  // TRITON_ENABLE_TRACING
 
   // Log appropriate errors
+  state->complete_ = ((flags & TRITONSERVER_RESPONSE_COMPLETE_FINAL) != 0);
   if (!state->is_decoupled_) {
-    if ((flags & TRITONSERVER_RESPONSE_COMPLETE_FINAL) == 0) {
+    if (!state->complete_) {
       LOG_ERROR << "[INTERNAL] ModelStreamInfer received a response without "
                    "FINAL flag for a model with one-to-one transaction";
     }
@@ -538,57 +544,93 @@ ModelStreamInferHandler::StreamInferResponseComplete(
   }
 
   auto& response_queue = state->response_queue_;
+  std::string log_request_id = state->request_.id();
+  if (log_request_id.empty()) {
+    log_request_id = "<id_unknown>";
+  }
 
-  if (iresponse != nullptr) {
-    auto response = response_queue->GetResponseAt(response_index);
-    if (response == nullptr) {
-      LOG_ERROR << "expected the response allocator to have added the response";
-    }
-
+  inference::ModelStreamInferResponse* response = nullptr;
+  bool failed = false;
+  if (iresponse) {
+    // Backend returned a non-null response
     TRITONSERVER_Error* err = nullptr;
-    if (iresponse != nullptr) {
+    response = response_queue->GetResponseAt(response_index);
+    if (response) {
       inference::ModelInferResponse& infer_response =
           *(response->mutable_infer_response());
+      // Validate Triton iresponse and set grpc/protobuf response fields from it
       err = InferResponseCompleteCommon<inference::ModelStreamInferResponse>(
           state->tritonserver_, iresponse, infer_response,
           state->alloc_payload_);
+    } else {
+      LOG_ERROR << "expected the response allocator to have added the response";
     }
 
     if (err != nullptr) {
+      failed = true;
       ::grpc::Status status;
       GrpcStatusUtil::Create(&status, err);
       response->mutable_infer_response()->Clear();
       response->set_error_message(status.error_message());
-
-      // repopulate the id so that client knows which request failed.
-      const char* id;
-      LOG_TRITONSERVER_ERROR(
-          TRITONSERVER_InferenceResponseId(iresponse, &id),
-          "couldn't retrieve id for failed request");
-      LOG_VERBOSE(1) << "Failed for ID: " << id << std::endl;
-      response->mutable_infer_response()->set_id(id);
+      LOG_VERBOSE(1) << "Failed for ID: " << log_request_id << std::endl;
     }
 
     TRITONSERVER_ErrorDelete(err);
-
     LOG_TRITONSERVER_ERROR(
         TRITONSERVER_InferenceResponseDelete(iresponse),
         "deleting GRPC inference response");
   }
 
-  state->complete_ = ((flags & TRITONSERVER_RESPONSE_COMPLETE_FINAL) != 0);
-  if (!state->is_decoupled_) {
-    state->step_ = Steps::WRITEREADY;
-    state->context_->WriteResponseIfReady(state);
-  } else {
+  // Decoupled backends can return a null response via
+  // TRITONBACKEND_ResponseFactorySendFlags. By default, these null
+  // "empty" responses are not sent back to the client. Clients can
+  // opt-in to receiving these empty responses via request parameters.
+  // NOTE: The complete flag is the only flag used for this case at this time.
+  const bool empty_final =
+      (!iresponse && state->is_decoupled_ && state->complete_);
+  const bool enable_empty_final =
+      state->parameters_.enable_empty_final_response_;
+
+  const bool create_empty_response = (empty_final && enable_empty_final);
+  if (create_empty_response) {
+    // Assume decoupled here based on prior checks.
+    state->response_queue_->AllocateResponse();
+    response = state->response_queue_->GetLastAllocatedResponse();
+    if (response) {
+      LOG_VERBOSE(1) << "[request id: " << log_request_id << "] "
+                     << "Creating empty final response";
+      response->mutable_infer_response()->Clear();
+    } else {
+      LOG_ERROR << "expected the response allocator to have added the response";
+    }
+  }
+
+  if (response) {
+    auto& infer_response = *(response->mutable_infer_response());
+    // Set response metadata to associate it with request. These will be set
+    // by InferResponseCompleteCommon for successful inference.
+    if (create_empty_response || failed) {
+      infer_response.set_id(state->request_.id());
+      infer_response.set_model_name(state->request_.model_name());
+      infer_response.set_model_version(state->request_.model_version());
+    }
+    auto& params = *(infer_response.mutable_parameters());
+    params["triton_final_response"].set_bool_param(state->complete_);
+  }
+
+  // Update states to signal that response/error is ready to write to stream
+  if (state->is_decoupled_) {
     std::lock_guard<std::mutex> lock(state->step_mtx_);
-    if (iresponse != nullptr) {
+    if (response) {
       state->response_queue_->MarkNextResponseComplete();
     }
     if (state->step_ == Steps::ISSUED) {
       state->step_ = Steps::WRITEREADY;
       state->context_->PutTaskBackToQueue(state);
     }
+  } else {
+    state->step_ = Steps::WRITEREADY;
+    state->context_->WriteResponseIfReady(state);
   }
 }
 

@@ -1,4 +1,4 @@
-// Copyright 2019-2022, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+// Copyright 2019-2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 //
 // Redistribution and use in source and binary forms, with or without
 // modification, are permitted provided that the following conditions
@@ -26,8 +26,10 @@
 #pragma once
 
 #include <iostream>
+#include <sstream>
 #include <string>
 #include <vector>
+
 #include "triton/core/tritonserver.h"
 
 namespace triton { namespace server {
@@ -44,6 +46,10 @@ constexpr int MAX_GRPC_MESSAGE_SIZE = INT32_MAX;
 /// The value for a dimension in a shape that indicates that that
 /// dimension can take on any size.
 constexpr int WILDCARD_DIM = -1;
+
+/// Request parameter keys that start with a "triton_" prefix for internal use
+const std::vector<std::string> TRITON_RESERVED_REQUEST_PARAMS{
+    "triton_enable_empty_final_response"};
 
 #define RETURN_IF_ERR(X)             \
   do {                               \
@@ -90,17 +96,17 @@ constexpr int WILDCARD_DIM = -1;
     }                                                             \
   } while (false)
 
-#define THROW_IF_ERR(EX_TYPE, X, MSG)                   \
-  do {                                                  \
-    TRITONSERVER_Error* err__ = (X);                    \
-    if (err__ != nullptr) {                             \
+#define THROW_IF_ERR(EX_TYPE, X, MSG)                     \
+  do {                                                    \
+    TRITONSERVER_Error* err__ = (X);                      \
+    if (err__ != nullptr) {                               \
       auto ex__ = (EX_TYPE)(                            \
           std::string("error: ") + (MSG) + ": " +       \
           TRITONSERVER_ErrorCodeString(err__) + " - " + \
-          TRITONSERVER_ErrorMessage(err__));            \
-      TRITONSERVER_ErrorDelete(err__);                  \
-      throw ex__;                                       \
-    }                                                   \
+          TRITONSERVER_ErrorMessage(err__)); \
+      TRITONSERVER_ErrorDelete(err__);                    \
+      throw ex__;                                         \
+    }                                                     \
   } while (false)
 
 #define IGNORE_ERR(X)                  \
@@ -142,10 +148,25 @@ std::string GetEnvironmentVariableOrDefault(
     const std::string& variable_name, const std::string& default_value);
 
 /// Get the number of elements in a shape.
+///
 /// \param dims The shape.
 /// \return The number of elements, or -1 if the number of elements
 /// cannot be determined because the shape contains one or more
 /// wilcard dimensions.
 int64_t GetElementCount(const std::vector<int64_t>& dims);
+
+/// Returns if 'vec' contains 'str'.
+///
+/// \param vec The vector of strings to search.
+/// \param str The string to lookup.
+/// \return True if the str is found, false otherwise.
+bool Contains(const std::vector<std::string>& vec, const std::string& str);
+
+/// Joins vector of strings 'vec' into a single string delimited by 'delim'.
+///
+/// \param vec The vector of strings to join.
+/// \param delim The delimiter to join with.
+/// \return The joint string.
+std::string Join(const std::vector<std::string>& vec, const std::string& delim);
 
 }}  // namespace triton::server

@@ -1,5 +1,5 @@
 #!/bin/bash
-# Copyright 2021-2022, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright 2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -24,64 +24,60 @@
 # OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 # (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+FASTERTRANSFORMER_BRANCH_TAG=${FASTERTRANSFORMER_BRANCH_TAG:="main"}
+FASTERTRANSFORMER_BRANCH=${FASTERTRANSFORMER_BRANCH:="https://github.com/triton-inference-server/fastertransformer_backend.git"}
+SERVER_TIMEOUT=600
+SERVER_LOG="$PWD/inference_server"
+CLIENT_LOG="$PWD/client"
 
-SERVER=/opt/tritonserver/bin/tritonserver
-SERVER_ARGS="--model-repository=`pwd`/models --log-verbose=1"
-CLIENT_PY=../python_unittest.py
-CLIENT_LOG="./client.log"
-EXPECTED_NUM_TESTS="1"
-TEST_RESULT_FILE='test_results.txt'
-SERVER_LOG="./inference_server.log"
+MODEL_DIR=${MODEL_DIR:=$PWD/fastertransformer_backend/all_models/t5/}
+TRITON_DIR=${TRITON_DIR:="/opt/tritonserver"}
+SERVER=${TRITON_DIR}/bin/tritonserver
+BACKEND_DIR=${TRITON_DIR}/backends
+SERVER_ARGS_EXTRA="--exit-timeout-secs=${SERVER_TIMEOUT} --backend-directory=${BACKEND_DIR}"
+SERVER_ARGS="--model-repository=${MODEL_DIR} ${SERVER_ARGS_EXTRA}"
+source ../common/util.sh
+
+rm -f $SERVER_LOG* $CLIENT_LOG*
 
 RET=0
-rm -fr *.log ./models
+# install dependencies
+apt-get update && \
+    apt-get install -y --no-install-recommends python3 python3-pip python3-protobuf 
+python3 -m pip install --upgrade pip && \
+    pip3 install --upgrade numpy
 
-source ../../common/util.sh
+# install client libraries
+pip3 install tritonclient[all]
 
-# Uninstall the non CUDA version of PyTorch
-pip3 uninstall -y torch
-pip3 install torch==1.13.0+cu117 -f https://download.pytorch.org/whl/torch_stable.html
-pip3 install tensorflow
-
-rm -fr *.log ./models
-
-mkdir -p models/dlpack_test/1/
-cp ../../python_models/dlpack_test/model.py models/dlpack_test/1/
-cp ../../python_models/dlpack_test/config.pbtxt models/dlpack_test
+# Clone repo
+git clone --single-branch --depth=1 -b ${FASTERTRANSFORMER_BRANCH_TAG} ${FASTERTRANSFORMER_BRANCH}
+cd fastertransformer_backend
 
 run_server
+
 if [ "$SERVER_PID" == "0" ]; then
     echo -e "\n***\n*** Failed to start $SERVER\n***"
     cat $SERVER_LOG
-    RET=1
+    exit 1
 fi
 
 set +e
-export MODEL_NAME="dlpack_test"
-python3 $CLIENT_PY > $CLIENT_LOG 2>&1 
 
+python3 tools/issue_request.py tools/requests/sample_request_single_t5.json >$CLIENT_LOG 2>&1
 if [ $? -ne 0 ]; then
-    echo -e "\n***\n*** python_unittest.py FAILED. \n***"
-    RET=1
-else
-    check_test_results $TEST_RESULT_FILE $EXPECTED_NUM_TESTS
-    if [ $? -ne 0 ]; then
-        cat $CLIENT_LOG
-        echo -e "\n***\n*** Test Result Verification Failed\n***"
-        RET=1
-    fi
-fi
-set -e
-
-kill $SERVER_PID
-wait $SERVER_PID
-
-if [ $RET -eq 1 ]; then
     cat $CLIENT_LOG
-    cat $SERVER_LOG
-    echo -e "\n***\n*** Unittest test FAILED. \n***"
+    RET=1
+fi
+
+kill_server
+
+if [ $RET -eq 0 ]; then
+  echo -e "\n***\n*** Test Passed\n***"
 else
-    echo -e "\n***\n*** Unittest test PASSED. \n***"
+    cat $SERVER_LOG
+    cat $CLIENT_LOG
+    echo -e "\n***\n*** Test FAILED\n***"
 fi
 
 exit $RET

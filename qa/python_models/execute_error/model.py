@@ -1,4 +1,4 @@
-# Copyright (c) 2020, NVIDIA CORPORATION. All rights reserved.
+# Copyright 2020-2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -34,7 +34,7 @@ class TritonPythonModel:
         """
         responses = []
 
-        # Only generate the error for the first request
+        # Generate the error for the first and third request
         i = 0
         for request in requests:
             input_tensor = pb_utils.get_input_tensor_by_name(request, "IN")
@@ -44,8 +44,12 @@ class TritonPythonModel:
                     'An error occured during execution')
                 responses.append(pb_utils.InferenceResponse([out_tensor],
                                                             error))
-            else:
+            elif i == 1:
                 responses.append(pb_utils.InferenceResponse([out_tensor]))
+            elif i == 2:
+                error = pb_utils.TritonError(
+                    'An error occured during execution')
+                responses.append(pb_utils.InferenceResponse(error=error))
             i += 1
 
         return responses

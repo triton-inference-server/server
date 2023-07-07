@@ -130,6 +130,7 @@ RUN chown triton-server:triton-server /opt/tritonserver/repoagents
     with open(os.path.join(ddir, dockerfile_name), "a") as dfile:
         dfile.write(df)
 
+
 def add_requested_caches(ddir, dockerfile_name, caches):
     df = "#  Copying over caches \n"
     for cache in caches:
@@ -142,6 +143,7 @@ RUN chown triton-server:triton-server /opt/tritonserver/caches
 '''
     with open(os.path.join(ddir, dockerfile_name), "a") as dfile:
         dfile.write(df)
+
 
 def end_dockerfile(ddir, dockerfile_name, argmap):
     # Install additional dependencies
@@ -372,8 +374,7 @@ if __name__ == '__main__':
         '--cache',
         action='append',
         required=False,
-        help=
-        'Include <cache-name> in the generated Docker image. The flag may '
+        help='Include <cache-name> in the generated Docker image. The flag may '
         'be specified multiple times.')
     parser.add_argument(
         '--skip-pull',
@@ -434,7 +435,7 @@ if __name__ == '__main__':
                     "nvcr.io/nvidia/tritonserver:{}-cpu-only-py3".format(
                         FLAGS.container_version),
                 "min":
-                    "ubuntu:20.04"
+                    "ubuntu:22.04"
             }
     fail_if(
         len(images) < 2,

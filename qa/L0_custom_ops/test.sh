@@ -171,7 +171,7 @@ SERVER_ARGS="--model-repository=/data/inferenceserver/${REPO_VERSION}/qa_custom_
 # FIXME: Pre-loading the python library system to satisfy the symbol definitions
 # as the custom op library is built with different python version within
 # pytorch container. See DLIS-4152.
-SERVER_LD_PRELOAD="/usr/lib/x86_64-linux-gnu/libpython3.8.so.1:/data/inferenceserver/${REPO_VERSION}/qa_custom_ops/libtorch_custom_ops/libtorch_modulo/custom_modulo.so"
+SERVER_LD_PRELOAD="/usr/lib/x86_64-linux-gnu/libpython3.10.so.1:/data/inferenceserver/${REPO_VERSION}/qa_custom_ops/libtorch_custom_ops/libtorch_modulo/custom_modulo.so"
 run_server
 if [ "$SERVER_PID" == "0" ]; then
     echo -e "\n***\n*** Failed to start $SERVER\n***"

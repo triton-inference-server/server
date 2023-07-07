@@ -92,8 +92,12 @@ else
 fi
 
 # Threshold memory growth in MB
-MAX_ALLOWED_ALLOC="150"
-export MAX_ALLOWED_ALLOC
+# NOTES:
+# - Bounded memory growth tests typically show < 70 MB usage
+#   - Plan/ONNX is typically between 20-40 MB
+#   - Savedmodel is closer to 50-70 MB
+# - Unbounded memory growth test typically shows > 100 MB usage
+export MAX_ALLOWED_ALLOC="100"
 
 # Create local model repository
 mkdir -p models/
@@ -164,22 +168,23 @@ for MODEL in $(ls models); do
     SECONDS=0
     # Run the perf analyzer 'REPETITION' times
     for ((i=1; i<=$REPETITION; i++)); do
+        # [TMA-621] Use --no-stability mode in perf analyzer when available
         $PERF_ANALYZER -v -m $MODEL -i grpc --concurrency-range $CONCURRENCY -b $CLIENT_BS > $TEMP_CLIENT_LOG 2>&1
-        # Only record failure log for unexpected perf analyzer error
-        # [TMA-625] Currently check failure log as WAR, should check for specific
-        # code once perf analyzer returns different code for different error
-        if [ $? -ne 0 ] && [ `grep -c "^No valid requests recorded" $TEMP_CLIENT_LOG` == "0" ]; then
+        PA_RET=$?
+        # Success
+        if [ ${PA_RET} -eq 0 ]; then
+          continue
+        # Unstable measurement: OK for this test
+        elif [ ${PA_RET} -eq 2 ]; then
+          continue
+        # Other failures unexpected, report error
+        else
             cat $TEMP_CLIENT_LOG >> $CLIENT_LOG
             echo -e "\n***\n*** perf_analyzer for $MODEL failed on iteration $i\n***" >> $CLIENT_LOG
-            TEMP_RET=1
+            RET=1
         fi
     done
     TEST_DURATION=$SECONDS
-
-    if [ $TEMP_RET -ne 0 ]; then
-        cat $CLIENT_LOG
-        RET=1
-    fi
 
     set -e
 
@@ -200,9 +205,11 @@ for MODEL in $(ls models); do
     python $MASSIF_TEST $MASSIF_LOG $MAX_ALLOWED_ALLOC --start-from-middle >> $CLIENT_LOG 2>&1
     if [ $? -ne 0 ]; then
         cat $CLIENT_LOG
-        echo -e "\n***\n*** Test for $MODEL Failed\n***"
+        echo -e "\n***\n*** Test for $MODEL Failed.\n***"
         RET=1
     fi
+    # Always output memory usage for easier triage of MAX_ALLOWED_ALLOC settings in the future
+    grep -i "Change in memory allocation" "${CLIENT_LOG}" || true
     set -e
 done
 
@@ -272,11 +279,17 @@ if [ $SKIP_BUSYOP -ne 1 ]; then
     cat ${GRAPH_LOG}
     # Check the massif output
     python $MASSIF_TEST $MASSIF_LOG $MAX_ALLOWED_ALLOC --start-from-middle >> $CLIENT_LOG 2>&1
+    # This busyop test is expected to return a non-zero error since it is
+    # intentionally testing unbounded growth. If it returns success for some
+    # reason, raise error.
     if [ $? -ne 1 ]; then
         cat $CLIENT_LOG
-        echo -e "\n***\n*** Test for graphdef_busyop Failed\n***"
+        echo -e "\n***\n*** Massif test for graphdef_busyop Failed\n***"
+        echo -e "\n***\n*** Expected unbounded growth, but found acceptable growth within ${MAX_ALLOWED_ALLOC} MB\n***"
         RET=1
     fi
+    # Always output memory usage for easier triage of MAX_ALLOWED_ALLOC settings in the future
+    grep -i "Change in memory allocation" "${CLIENT_LOG}" || true
 fi
 set -e
 

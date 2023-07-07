@@ -1,4 +1,4 @@
-// Copyright 2020-2022, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+// Copyright 2020-2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 //
 // Redistribution and use in source and binary forms, with or without
 // modification, are permitted provided that the following conditions
@@ -25,6 +25,9 @@
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 #include "common.h"
+
+#include <algorithm>
+#include <iterator>
 
 #include "triton/core/tritonserver.h"
 
@@ -90,6 +93,22 @@ GetElementCount(const std::vector<int64_t>& dims)
   }
 
   return cnt;
+}
+
+bool
+Contains(const std::vector<std::string>& vec, const std::string& str)
+{
+  return std::find(vec.begin(), vec.end(), str) != vec.end();
+}
+
+std::string
+Join(const std::vector<std::string>& vec, const std::string& delim)
+{
+  std::stringstream ss;
+  std::copy(
+      vec.begin(), vec.end(),
+      std::ostream_iterator<std::string>(ss, delim.c_str()));
+  return ss.str();
 }
 
 }}  // namespace triton::server

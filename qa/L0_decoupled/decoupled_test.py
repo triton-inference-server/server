@@ -1,5 +1,4 @@
-#!/bin/bash
-# Copyright (c) 2020-2021, NVIDIA CORPORATION. All rights reserved.
+# Copyright 2020-2023, NVIDIA CORPORATION. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -26,33 +25,32 @@
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 import sys
-
 sys.path.append("../common")
 
-from functools import partial
-import numpy as np
-import queue
-import unittest
 import os
 import time
-import test_util as tu
+import queue
+import unittest
+from functools import partial
 
-import tritongrpcclient as grpcclient
-import tritonhttpclient as httpclient
-from tritonclientutils import InferenceServerException
+import numpy as np
+import test_util as tu
+import tritonclient.grpc as grpcclient
+import tritonclient.http as httpclient
+from tritonclient.utils import InferenceServerException
 
 
 class UserData:
 
     def __init__(self):
-        self._completed_requests = queue.Queue()
+        self._response_queue = queue.Queue()
 
 
 def callback(user_data, result, error):
     if error:
-        user_data._completed_requests.put(error)
+        user_data._response_queue.put(error)
     else:
-        user_data._completed_requests.put(result)
+        user_data._response_queue.put(result)
 
 
 class DecoupledTest(tu.TestResultCollector):
@@ -76,6 +74,80 @@ class DecoupledTest(tu.TestResultCollector):
         # Some trials only expect a subset of outputs
         self.requested_outputs_ = self.outputs_
 
+    # Client can receive a "triton_final_response" response parameter
+    # from Triton server that indicates when a response is the final response for
+    # its request.
+    #
+    # For non-decoupled models, there is a 1:1 request:response ratio, so every
+    # response is the final response, and this parameter is unnecessary.
+    #
+    # For decoupled models, there is a 1:N request:response ratio, so there may be
+    # more one response before receiving the "final" response.
+    #
+    # However, decoupled models have the unique property in that they can return
+    # a flags-only response to the server to indicate completion, which is not
+    # returned to the client by default (See TRITONBACKEND_ResponseFactorySendFlags).
+    #
+    # To forward this flags-only response to the client, users must opt-in to this
+    # behavior by adding the following argument:
+    # client.async_stream_infer(..., enable_empty_final_response=True).
+    #
+    # If the decoupled backend/model always sends the final response flag along
+    # with a non-null response, no opt-in is needed.
+    #
+    # With this behavior, the client can programatically detect when all responses
+    # for an individual request have been received without knowing the expected
+    # number of responses in advance and without closing the stream.
+    def _stream_infer_with_params(self, request_count, request_delay, _,
+                                  delay_data, delay_factor, user_data,
+                                  result_dict):
+        with grpcclient.InferenceServerClient(url="localhost:8001",
+                                              verbose=True) as triton_client:
+            # Establish stream
+            triton_client.start_stream(callback=partial(callback, user_data))
+            # Send specified many requests in parallel
+            for i in range(request_count):
+                time.sleep((request_delay / 1000))
+                self.inputs_[1].set_data_from_numpy(delay_data)
+                triton_client.async_stream_infer(
+                    model_name=self.model_name_,
+                    inputs=self.inputs_,
+                    request_id=str(i),
+                    outputs=self.requested_outputs_,
+                    # Opt-in to receiving flags-only responses from model/backend
+                    # to help detect final responses for decoupled models.
+                    enable_empty_final_response=True)
+                # Update delay input in accordance with the scaling factor
+                delay_data = delay_data * delay_factor
+                delay_data = delay_data.astype(np.uint32)
+
+            # Retrieve results...
+            recv_count = 0
+            completed_requests = 0
+            while completed_requests < request_count:
+                data_item = user_data._response_queue.get()
+                if type(data_item) == InferenceServerException:
+                    raise data_item
+                else:
+                    response = data_item.get_response()
+                    # Request IDs should generally be provided with each request
+                    # to associate decoupled responses with their requests.
+                    if not response.id:
+                        raise ValueError(
+                            "No response id found. Was a request_id provided?")
+
+                    # Detect final response. Parameters are oneof and we expect bool_param
+                    if response.parameters.get(
+                            "triton_final_response").bool_param:
+                        completed_requests += 1
+
+                    # Only process non-empty response, ignore if empty (no outputs)
+                    if response.outputs:
+                        if response.id not in result_dict:
+                            result_dict[response.id] = []
+                        result_dict[response.id].append((recv_count, data_item))
+                        recv_count += 1
+
     def _stream_infer(self, request_count, request_delay, expected_count,
                       delay_data, delay_factor, user_data, result_dict):
         with grpcclient.InferenceServerClient(url="localhost:8001",
@@ -98,12 +170,12 @@ class DecoupledTest(tu.TestResultCollector):
             # Retrieve results...
             recv_count = 0
             while recv_count < expected_count:
-                data_item = user_data._completed_requests.get()
+                data_item = user_data._response_queue.get()
                 if type(data_item) == InferenceServerException:
                     raise data_item
                 else:
                     this_id = data_item.get_response().id
-                    if this_id not in result_dict.keys():
+                    if this_id not in result_dict:
                         result_dict[this_id] = []
                     result_dict[this_id].append((recv_count, data_item))
 
@@ -165,51 +237,56 @@ class DecoupledTest(tu.TestResultCollector):
         self.requested_outputs_ = self.outputs_ if validate_fn is None else self.outputs_[
             0:1]
 
-        user_data = UserData()
-        result_dict = {}
+        for infer_helper in [
+                self._stream_infer, self._stream_infer_with_params
+        ]:
+            user_data = UserData()
+            result_dict = {}
 
-        try:
-            if "square" not in self.model_name_:
-                expected_count = (repeat_count * request_count)
-            else:
-                expected_count = sum(
-                    x for x in range(data_offset, data_offset +
-                                     repeat_count)) * request_count
-            self._stream_infer(request_count, request_delay, expected_count,
-                               delay_data, delay_factor, user_data, result_dict)
-        except Exception as ex:
-            self.assertTrue(False, "unexpected error {}".format(ex))
-
-        # Validate the results..
-        for i in range(request_count):
-            this_id = str(i)
-            if repeat_count != 0 and this_id not in result_dict.keys():
-                self.assertTrue(
-                    False,
-                    "response for request id {} not received".format(this_id))
-            elif repeat_count == 0 and this_id in result_dict.keys():
-                self.assertTrue(
-                    False,
-                    "received unexpected response for request id {}".format(
-                        this_id))
-            if repeat_count != 0:
-                if validate_fn is None:
-                    self.assertEqual(len(result_dict[this_id]), repeat_count)
-                    expected_data = data_offset
-                    result_list = result_dict[this_id]
-                    for j in range(len(result_list)):
-                        if order_sequence is not None:
-                            self.assertEqual(result_list[j][0],
-                                             order_sequence[i][j])
-                        this_data = result_list[j][1].as_numpy('OUT')
-                        self.assertEqual(len(this_data), 1)
-                        self.assertEqual(this_data[0], expected_data)
-                        this_idx = result_list[j][1].as_numpy('IDX')
-                        self.assertEqual(len(this_idx), 1)
-                        self.assertEqual(this_idx[0], j)
-                        expected_data += 1
+            try:
+                if "square" not in self.model_name_:
+                    expected_count = (repeat_count * request_count)
                 else:
-                    validate_fn(result_dict[this_id], data_offset, repeat_count)
+                    expected_count = sum(
+                        x for x in range(data_offset, data_offset +
+                                         repeat_count)) * request_count
+                infer_helper(request_count, request_delay, expected_count,
+                             delay_data, delay_factor, user_data, result_dict)
+            except Exception as ex:
+                self.assertTrue(False, "unexpected error {}".format(ex))
+
+            # Validate the results..
+            for i in range(request_count):
+                this_id = str(i)
+                if repeat_count != 0 and this_id not in result_dict.keys():
+                    self.assertTrue(
+                        False, "response for request id {} not received".format(
+                            this_id))
+                elif repeat_count == 0 and this_id in result_dict.keys():
+                    self.assertTrue(
+                        False,
+                        "received unexpected response for request id {}".format(
+                            this_id))
+                if repeat_count != 0:
+                    if validate_fn is None:
+                        self.assertEqual(len(result_dict[this_id]),
+                                         repeat_count)
+                        expected_data = data_offset
+                        result_list = result_dict[this_id]
+                        for j in range(len(result_list)):
+                            if order_sequence is not None:
+                                self.assertEqual(result_list[j][0],
+                                                 order_sequence[i][j])
+                            this_data = result_list[j][1].as_numpy('OUT')
+                            self.assertEqual(len(this_data), 1)
+                            self.assertEqual(this_data[0], expected_data)
+                            this_idx = result_list[j][1].as_numpy('IDX')
+                            self.assertEqual(len(this_idx), 1)
+                            self.assertEqual(this_idx[0], j)
+                            expected_data += 1
+                    else:
+                        validate_fn(result_dict[this_id], data_offset,
+                                    repeat_count)
 
     def test_one_to_none(self):
         # Test cases where each request generates no response.

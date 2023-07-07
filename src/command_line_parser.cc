@@ -296,6 +296,7 @@ enum TritonOptionId {
   OPTION_ALLOW_METRICS,
   OPTION_ALLOW_GPU_METRICS,
   OPTION_ALLOW_CPU_METRICS,
+  OPTION_METRICS_ADDRESS,
   OPTION_METRICS_PORT,
   OPTION_METRICS_INTERVAL_MS,
   OPTION_METRICS_CONFIG,
@@ -344,9 +345,9 @@ TritonParser::SetupOptions()
        "finish. After the timeout expires the server exits even if inferences "
        "are still in flight."});
 
-  model_repo_options_.push_back({OPTION_MODEL_REPOSITORY, "model-store",
-                                 Option::ArgStr,
-                                 "Equivalent to --model-repository."});
+  model_repo_options_.push_back(
+      {OPTION_MODEL_REPOSITORY, "model-store", Option::ArgStr,
+       "Equivalent to --model-repository."});
   model_repo_options_.push_back(
       {OPTION_MODEL_REPOSITORY, "model-repository", Option::ArgStr,
        "Path to model repository directory. It may be specified multiple times "
@@ -406,48 +407,54 @@ TritonParser::SetupOptions()
        "same name can be served if they are in different namespace."});
 
 #if defined(TRITON_ENABLE_HTTP)
-  http_options_.push_back({OPTION_ALLOW_HTTP, "allow-http", Option::ArgBool,
-                           "Allow the server to listen for HTTP requests."});
+  http_options_.push_back(
+      {OPTION_ALLOW_HTTP, "allow-http", Option::ArgBool,
+       "Allow the server to listen for HTTP requests."});
+  http_options_.push_back(
+      {OPTION_HTTP_ADDRESS, "http-address", Option::ArgStr,
+       "The address for the http server to bind to. Default is 0.0.0.0"});
   http_options_.push_back(
       {OPTION_HTTP_PORT, "http-port", Option::ArgInt,
-       "The port for the server to listen on for HTTP requests."});
-  http_options_.push_back(
-      {OPTION_HTTP_HEADER_FORWARD_PATTERN, "http-header-forward-pattern",
-       Option::ArgStr,
-       "The regular expression pattern that will be used for forwarding HTTP "
-       "headers as inference request parameters."});
+       "The port for the server to listen on for HTTP "
+       "requests. Default is 8000."});
   http_options_.push_back(
       {OPTION_REUSE_HTTP_PORT, "reuse-http-port", Option::ArgBool,
        "Allow multiple servers to listen on the same HTTP port when every "
        "server has this option set. If you plan to use this option as a way to "
        "load balance between different Triton servers, the same model "
        "repository or set of models must be used for every server."});
-  http_options_.push_back({OPTION_HTTP_ADDRESS, "http-address", Option::ArgStr,
-                           "The address for the http server to binds to."});
-  http_options_.push_back({OPTION_HTTP_THREAD_COUNT, "http-thread-count",
-                           Option::ArgInt,
-                           "Number of threads handling HTTP requests."});
+  http_options_.push_back(
+      {OPTION_HTTP_HEADER_FORWARD_PATTERN, "http-header-forward-pattern",
+       Option::ArgStr,
+       "The regular expression pattern that will be used for forwarding HTTP "
+       "headers as inference request parameters."});
+  http_options_.push_back(
+      {OPTION_HTTP_THREAD_COUNT, "http-thread-count", Option::ArgInt,
+       "Number of threads handling HTTP requests."});
 #endif  // TRITON_ENABLE_HTTP
 
 #if defined(TRITON_ENABLE_GRPC)
-  grpc_options_.push_back({OPTION_ALLOW_GRPC, "allow-grpc", Option::ArgBool,
-                           "Allow the server to listen for GRPC requests."});
   grpc_options_.push_back(
-      {OPTION_GRPC_HEADER_FORWARD_PATTERN, "grpc-header-forward-pattern",
-       Option::ArgStr,
-       "The regular expression pattern that will be used for forwarding GRPC "
-       "headers as inference request parameters."});
+      {OPTION_ALLOW_GRPC, "allow-grpc", Option::ArgBool,
+       "Allow the server to listen for GRPC requests."});
+  grpc_options_.push_back(
+      {OPTION_GRPC_ADDRESS, "grpc-address", Option::ArgStr,
+       "The address for the grpc server to binds to. Default is 0.0.0.0"});
   grpc_options_.push_back(
       {OPTION_GRPC_PORT, "grpc-port", Option::ArgInt,
-       "The port for the server to listen on for GRPC requests."});
+       "The port for the server to listen on for GRPC "
+       "requests. Default is 8001."});
   grpc_options_.push_back(
       {OPTION_REUSE_GRPC_PORT, "reuse-grpc-port", Option::ArgBool,
        "Allow multiple servers to listen on the same GRPC port when every "
        "server has this option set. If you plan to use this option as a way to "
        "load balance between different Triton servers, the same model "
        "repository or set of models must be used for every server."});
-  grpc_options_.push_back({OPTION_GRPC_ADDRESS, "grpc-address", Option::ArgStr,
-                           "The address for the grpc server to binds to."});
+  grpc_options_.push_back(
+      {OPTION_GRPC_HEADER_FORWARD_PATTERN, "grpc-header-forward-pattern",
+       Option::ArgStr,
+       "The regular expression pattern that will be used for forwarding GRPC "
+       "headers as inference request parameters."});
   grpc_options_.push_back(
       {OPTION_GRPC_INFER_ALLOCATION_POOL_SIZE,
        "grpc-infer-allocation-pool-size", Option::ArgInt,
@@ -534,13 +541,15 @@ TritonParser::SetupOptions()
       {OPTION_LOG_VERBOSE, "log-verbose", Option::ArgInt,
        "Set verbose logging level. Zero (0) disables verbose logging and "
        "values >= 1 enable verbose logging."});
-  logging_options_.push_back({OPTION_LOG_INFO, "log-info", Option::ArgBool,
-                              "Enable/disable info-level logging."});
-  logging_options_.push_back({OPTION_LOG_WARNING, "log-warning",
-                              Option::ArgBool,
-                              "Enable/disable warning-level logging."});
-  logging_options_.push_back({OPTION_LOG_ERROR, "log-error", Option::ArgBool,
-                              "Enable/disable error-level logging."});
+  logging_options_.push_back(
+      {OPTION_LOG_INFO, "log-info", Option::ArgBool,
+       "Enable/disable info-level logging."});
+  logging_options_.push_back(
+      {OPTION_LOG_WARNING, "log-warning", Option::ArgBool,
+       "Enable/disable warning-level logging."});
+  logging_options_.push_back(
+      {OPTION_LOG_ERROR, "log-error", Option::ArgBool,
+       "Enable/disable error-level logging."});
   logging_options_.push_back(
       {OPTION_LOG_FORMAT, "log-format", Option::ArgStr,
        "Set the logging format. Options are \"default\" and \"ISO8601\". "
@@ -602,9 +611,14 @@ TritonParser::SetupOptions()
       {OPTION_ALLOW_CPU_METRICS, "allow-cpu-metrics", Option::ArgBool,
        "Allow the server to provide CPU metrics. Ignored unless "
        "--allow-metrics is true."});
-  metric_options_.push_back({OPTION_METRICS_PORT, "metrics-port",
-                             Option::ArgInt,
-                             "The port reporting prometheus metrics."});
+  metric_options_.push_back(
+      {OPTION_METRICS_ADDRESS, "metrics-address", Option::ArgStr,
+       "The address for the metrics server to bind to. Default is the same as "
+       "--http-address if built with HTTP support. Otherwise, default is "
+       "0.0.0.0"});
+  metric_options_.push_back(
+      {OPTION_METRICS_PORT, "metrics-port", Option::ArgInt,
+       "The port reporting prometheus metrics. Default is 8002."});
   metric_options_.push_back(
       {OPTION_METRICS_INTERVAL_MS, "metrics-interval-ms", Option::ArgFloat,
        "Metrics will be collected once every <metrics-interval-ms> "
@@ -1231,9 +1245,6 @@ TritonParser::Parse(int argc, char** argv)
         break;
       case OPTION_HTTP_ADDRESS:
         lparams.http_address_ = optarg;
-#ifdef TRITON_ENABLE_METRICS
-        lparams.metrics_address_ = optarg;
-#endif  // TRITON_ENABLE_METRICS
         break;
       case OPTION_HTTP_HEADER_FORWARD_PATTERN:
         lparams.http_forward_header_pattern_ = optarg;
@@ -1376,6 +1387,9 @@ TritonParser::Parse(int argc, char** argv)
         break;
       case OPTION_ALLOW_CPU_METRICS:
         lparams.allow_cpu_metrics_ = ParseOption<bool>(optarg);
+        break;
+      case OPTION_METRICS_ADDRESS:
+        lparams.metrics_address_ = optarg;
         break;
       case OPTION_METRICS_PORT:
         lparams.metrics_port_ = ParseOption<int>(optarg);
@@ -1601,6 +1615,16 @@ TritonParser::Parse(int argc, char** argv)
 #ifdef TRITON_ENABLE_METRICS
   lparams.allow_gpu_metrics_ &= lparams.allow_metrics_;
   lparams.allow_cpu_metrics_ &= lparams.allow_metrics_;
+  // Set metrics_address to default if never specified
+  if (lparams.metrics_address_.empty()) {
+#ifdef TRITON_ENABLE_HTTP
+    // If built with HTTP support, default to HTTP address
+    lparams.metrics_address_ = lparams.http_address_;
+#else
+    // Otherwise have default for builds without HTTP support
+    lparams.metrics_address_ = "0.0.0.0";
+#endif  // TRITON_ENABLE_HTTP
+  }
 #endif  // TRITON_ENABLE_METRICS
 
 #ifdef TRITON_ENABLE_TRACING

@@ -34,6 +34,7 @@
 #include <thread>
 #include <unordered_map>
 #include <vector>
+
 #include "triton/common/logging.h"
 #include "triton/core/tritonserver.h"
 #ifdef TRITON_ENABLE_GRPC
@@ -197,14 +198,9 @@ struct TritonServerParameters {
 
 #ifdef TRITON_ENABLE_METRICS
   bool allow_metrics_{true};
-  // Note that socket address is not part of metrics config,
-  // current implementation enforce metric to use the same address as in
-  // HTTP endpoint.
-  // [FIXME] server can be built with metrics ON and HTTP OFF, but we are
-  // not exposing metrics address configuration (currently only set along with
-  // HTTP address), which causes metrics will always listen on localhost in this
-  // build setting.
-  std::string metrics_address_{"0.0.0.0"};
+  // Defaults to http_address_ if TRITON_ENABLE_HTTP is enabled for backwards,
+  // otherwise defaults to "0.0.0.0" for TRITON_ENABLE_HTTP is disabled.
+  std::string metrics_address_{""};
   int32_t metrics_port_{8002};
   // Metric settings for Triton core
   float metrics_interval_ms_{2000};

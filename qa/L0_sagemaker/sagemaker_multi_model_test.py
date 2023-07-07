@@ -282,7 +282,10 @@ class SageMakerMultiModelTest(tu.TestResultCollector):
     def test_sm_6_ensemble_model(self):
         # Load ensemble model
         request_body = {"model_name": self.model3_name, "url": self.model3_url}
-        headers = {"Content-Type": "application/json", "X-Amzn-SageMaker-Target-Model": f"{self.model3_name}"}
+        headers = {
+            "Content-Type": "application/json",
+            "X-Amzn-SageMaker-Target-Model": f"{self.model3_name}"
+        }
         r = requests.post(self.url_mme_,
                           data=json.dumps(request_body),
                           headers=headers)
@@ -326,7 +329,6 @@ class SageMakerMultiModelTest(tu.TestResultCollector):
         self.assertEqual(
             r.status_code, 200,
             "Expected status code 200, received {}".format(r.status_code))
-        
 
 
 if __name__ == "__main__":

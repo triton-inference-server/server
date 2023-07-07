@@ -31,9 +31,9 @@ import unittest
 import numpy as np
 import test_util as tu
 
-
 from tritonclient.utils import *
 import tritonclient.http as httpclient
+
 
 class LogTest(tu.TestResultCollector):
 
@@ -43,13 +43,14 @@ class LogTest(tu.TestResultCollector):
             input_data = np.array([[1.0]], dtype=np.float32)
             inputs = [
                 httpclient.InferInput("INPUT0", input_data.shape,
-                                        np_to_triton_dtype(input_data.dtype))
+                                      np_to_triton_dtype(input_data.dtype))
             ]
             inputs[0].set_data_from_numpy(input_data)
             result = client.infer(model_name, inputs)
             output0 = result.as_numpy('OUTPUT0')
             self.assertIsNotNone(output0)
             self.assertTrue(np.all(output0 == input_data))
+
 
 if __name__ == '__main__':
     unittest.main()

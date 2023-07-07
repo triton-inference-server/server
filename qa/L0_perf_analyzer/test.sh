@@ -555,7 +555,7 @@ for PROTOCOL in grpc http; do
             echo -e "\n***\n*** Test Failed\n***"
             RET=1
         fi
-        if [ $(cat $CLIENT_LOG | grep "can not batch tensors with different shapes together" | wc -l) -eq 0 ]; then
+        if [ $(cat $CLIENT_LOG | grep -P "The supplied shape .+ is incompatible with the model's input shape" | wc -l) -eq 0 ]; then
             cat $CLIENT_LOG
             echo -e "\n***\n*** Test Failed\n***"
             RET=1
@@ -636,7 +636,7 @@ for PROTOCOL in grpc http; do
             echo -e "\n***\n*** Test Failed\n***"
             RET=1
         fi
-        if [ $(cat $CLIENT_LOG |  grep "Inputs to operation Select of type Select must have the same size and shape." | wc -l) -eq 0 ]; then
+        if [ $(cat $CLIENT_LOG |  grep -P "The supplied shape .+ is incompatible with the model's input shape" | wc -l) -eq 0 ]; then
             cat $CLIENT_LOG
             echo -e "\n***\n*** Test Failed\n***"
             RET=1
@@ -687,7 +687,7 @@ if [ $? -eq 0 ]; then
     echo -e "\n***\n*** Test Failed\n***"
     RET=1
 fi
-if [ $(cat $CLIENT_LOG |  grep "Output size doesn't match expected size" | wc -l) -eq 0 ]; then
+if [ $(cat $CLIENT_LOG |  grep "mismatch in the data provided" | wc -l) -eq 0 ]; then
     cat $CLIENT_LOG
     echo -e "\n***\n*** Test Failed\n***"
     RET=1
@@ -854,7 +854,34 @@ if [ $(cat $CLIENT_LOG |  grep "Request Rate: 40" | wc -l) -eq 0 ]; then
 fi
 set -e
 
+# Test --serial-sequences mode 
+set +e
+$PERF_ANALYZER -v -i $PROTOCOL -m  simple_savedmodel_sequence_object -p 1000 --request-rate-range 100:200:50 --serial-sequences \
+    --input-data=$SEQ_JSONDATAFILE -s ${STABILITY_THRESHOLD} >$CLIENT_LOG 2>&1
+if [ $? -ne 0 ]; then
+    cat $CLIENT_LOG
+    echo -e "\n***\n*** Test Failed\n***"
+    RET=1
+fi
+if [ $(cat $CLIENT_LOG |  grep "${ERROR_STRING}" | wc -l) -ne 0 ]; then
+    cat $CLIENT_LOG
+    echo -e "\n***\n*** Test Failed\n***"
+    RET=1
+fi
 
+$PERF_ANALYZER -v -i $PROTOCOL -m  simple_savedmodel_sequence_object -p 1000 --request-intervals $CUSTOM_SCHEDULE_FILE --serial-sequences \
+    --input-data=$SEQ_JSONDATAFILE -s ${STABILITY_THRESHOLD} >$CLIENT_LOG 2>&1
+if [ $? -ne 0 ]; then
+    cat $CLIENT_LOG
+    echo -e "\n***\n*** Test Failed\n***"
+    RET=1
+fi
+if [ $(cat $CLIENT_LOG |  grep "${ERROR_STRING}" | wc -l) -ne 0 ]; then
+    cat $CLIENT_LOG
+    echo -e "\n***\n*** Test Failed\n***"
+    RET=1
+fi    
+set -e
 
 ## Test perf_analyzer with MPI / multiple models
 
@@ -941,7 +968,7 @@ set -e
 
 ## Test perf_analyzer without MPI library (`libmpi.so`) available
 
-rm -rf /opt/hpcx
+rm -rf /opt/hpcx/ompi/lib/libmpi*
 
 set +e
 $PERF_ANALYZER -v -m graphdef_int32_int32_int32 -s ${STABILITY_THRESHOLD} >$CLIENT_LOG 2>&1

@@ -33,6 +33,7 @@ __model_name = "model_init_del"
 # Helper functions for reading/writing state to disk
 #
 
+
 def __get_number(filename):
     full_path = os.path.join(os.environ["MODEL_LOG_DIR"], filename)
     try:
@@ -43,12 +44,14 @@ def __get_number(filename):
         txt = "0"
     return int(txt)
 
+
 def __store_number(filename, number):
     full_path = os.path.join(os.environ["MODEL_LOG_DIR"], filename)
     txt = str(number)
     with open(full_path, mode="w", encoding="utf-8", errors="strict") as f:
         fcntl.lockf(f, fcntl.LOCK_EX)
         f.write(txt)
+
 
 def __inc_number(filename):
     full_path = os.path.join(os.environ["MODEL_LOG_DIR"], filename)
@@ -66,10 +69,12 @@ def __inc_number(filename):
         __store_number(filename, number)
     return number
 
+
 #
 # Functions for communicating initialize and finalize count between the model
 # and test
 #
+
 
 def __get_count_filename(kind):
     if kind != "initialize" and kind != "finalize":
@@ -77,20 +82,25 @@ def __get_count_filename(kind):
     filename = __model_name + "_" + kind + "_count.txt"
     return filename
 
+
 def get_count(kind):
     return __get_number(__get_count_filename(kind))
 
+
 def inc_count(kind):
     return __inc_number(__get_count_filename(kind))
+
 
 def reset_count(kind):
     count = 0
     __store_number(__get_count_filename(kind), count)
     return count
 
+
 #
 # Functions for communicating varies of delay (in seconds) to the model
 #
+
 
 def __get_delay_filename(kind):
     if kind != "initialize" and kind != "infer":
@@ -98,16 +108,20 @@ def __get_delay_filename(kind):
     filename = __model_name + "_" + kind + "_delay.txt"
     return filename
 
+
 def get_delay(kind):
     return __get_number(__get_delay_filename(kind))
+
 
 def set_delay(kind, delay):
     __store_number(__get_delay_filename(kind), delay)
     return delay
 
+
 #
 # Functions for modifying the model
 #
+
 
 def update_instance_group(instance_group_str):
     full_path = os.path.join(os.path.dirname(__file__), "config.pbtxt")
@@ -122,10 +136,12 @@ def update_instance_group(instance_group_str):
         f.write(txt)
     return txt
 
+
 def update_model_file():
     full_path = os.path.join(os.path.dirname(__file__), "1", "model.py")
     with open(full_path, mode="a", encoding="utf-8", errors="strict") as f:
         f.write("\n# dummy model file update\n")
+
 
 def enable_batching():
     full_path = os.path.join(os.path.dirname(__file__), "config.pbtxt")
@@ -136,6 +152,7 @@ def enable_batching():
         f.seek(0)
         f.write(txt)
     return txt
+
 
 def disable_batching():
     full_path = os.path.join(os.path.dirname(__file__), "config.pbtxt")

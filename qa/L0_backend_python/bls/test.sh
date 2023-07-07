@@ -227,6 +227,98 @@ else
     RET=1
 fi
 
+# Test model loading API with BLS
+rm -fr ./models
+mkdir -p models/bls_model_loading/1/
+cp ../../python_models/bls_model_loading/model.py models/bls_model_loading/1/
+cp ../../python_models/bls_model_loading/config.pbtxt models/bls_model_loading/
+cp -fr ${DATADIR}/qa_model_repository/onnx_int32_int32_int32 models/.
+# Make only version 2, 3 is valid version directory
+rm -rf models/onnx_int32_int32_int32/1
+
+SERVER_LOG="./bls_model_loading_server.log"
+SERVER_ARGS="--model-repository=`pwd`/models --backend-directory=${BACKEND_DIR} --model-control-mode=explicit --log-verbose=1"
+
+run_server
+if [ "$SERVER_PID" == "0" ]; then
+    echo -e "\n***\n*** Failed to start $SERVER\n***"
+    cat $SERVER_LOG
+    exit 1
+fi
+
+export MODEL_NAME='bls_model_loading'
+
+set +e
+code=`curl -s -w %{http_code} -X POST localhost:8000/v2/repository/models/${MODEL_NAME}/load`
+set -e
+if [ "$code" == "400" ]; then
+    echo -e "\n***\n*** Failed to load model '${MODEL_NAME}'\n***"
+    RET=1
+fi
+
+set +e
+
+python3 $CLIENT_PY >> $CLIENT_LOG 2>&1
+if [ $? -ne 0 ]; then
+    echo -e "\n***\n*** 'bls_model_loading' test FAILED. \n***"
+    cat $CLIENT_LOG
+    RET=1
+else
+    check_test_results $TEST_RESULT_FILE $EXPECTED_NUM_TESTS
+    if [ $? -ne 0 ]; then
+        cat $CLIENT_LOG
+        echo -e "\n***\n*** Test Result Verification Failed\n***"
+        RET=1
+    fi
+fi
+
+set -e
+
+kill $SERVER_PID
+wait $SERVER_PID
+
+# Test model loading API with BLS warmup
+(cd models/bls_model_loading && \
+        echo "model_warmup [{" >> config.pbtxt && \
+        echo "    name : \"regular sample\"" >> config.pbtxt && \
+        echo "    batch_size: 1" >> config.pbtxt && \
+        echo "    inputs {" >> config.pbtxt && \
+        echo "        key: \"INPUT0\"" >> config.pbtxt && \
+        echo "        value: {" >> config.pbtxt && \
+        echo "            data_type: TYPE_FP32" >> config.pbtxt && \
+        echo "            dims: 4" >> config.pbtxt && \
+        echo "            zero_data: false" >> config.pbtxt && \
+        echo "        }" >> config.pbtxt && \
+        echo "    }" >> config.pbtxt && \
+        echo "    inputs {" >> config.pbtxt && \
+        echo "        key: \"INPUT1\"" >> config.pbtxt && \
+        echo "        value: {" >> config.pbtxt && \
+        echo "            data_type: TYPE_FP32" >> config.pbtxt && \
+        echo "            dims: 4" >> config.pbtxt && \
+        echo "            zero_data: false" >> config.pbtxt && \
+        echo "        }" >> config.pbtxt && \
+        echo "    }" >> config.pbtxt && \
+        echo "}]" >> config.pbtxt )
+
+SERVER_LOG="./bls_model_loading_server_warmup.log"
+run_server
+if [ "$SERVER_PID" == "0" ]; then
+    echo -e "\n***\n*** Failed to start $SERVER\n***"
+    cat $SERVER_LOG
+    exit 1
+fi
+
+set +e
+code=`curl -s -w %{http_code} -X POST localhost:8000/v2/repository/models/${MODEL_NAME}/load`
+set -e
+if [ "$code" == "400" ]; then
+    echo -e "\n***\n*** Failed to load model '${MODEL_NAME}'\n***"
+    RET=1
+fi
+
+kill $SERVER_PID
+wait $SERVER_PID
+
 if [ $RET -eq 1 ]; then
     cat $CLIENT_LOG
     cat $SERVER_LOG

@@ -53,7 +53,7 @@ class PythonUnittest(tu.TestResultCollector):
 
     def test_python_unittest(self):
         model_name = os.environ['MODEL_NAME']
-        bls_kind =  os.environ.get('BLS_KIND', 'non_decoupled')
+        bls_kind = os.environ.get('BLS_KIND', 'non_decoupled')
 
         if bls_kind == "decoupled":
             # Skip the shared memory probe for decoupled models for now as

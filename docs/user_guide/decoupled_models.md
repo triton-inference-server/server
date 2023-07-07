@@ -1,5 +1,5 @@
 <!--
-# Copyright 2022, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright 2022-2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -87,10 +87,41 @@ exactly one response per request. Even standard ModelInfer RPC in the GRPC endpo
 does not support decoupled responses. In order to run inference on a decoupled
 model, the client must use the bi-directional streaming RPC. See
 [here](https://github.com/triton-inference-server/common/blob/main/protobuf/grpc_service.proto)
-for more details. The [decoupled_test.py](https://github.com/triton-inference-server/server/blob/main/qa/L0_decoupled/decoupled_test.py) demonstrates
+for more details. The [decoupled_test.py](../../qa/L0_decoupled/decoupled_test.py) demonstrates
 how the gRPC streaming can be used to infer decoupled models.
 
 If using [Triton's in-process C API](../customization_guide/inference_protocols.md#in-process-triton-server-api),
 your application should be cognizant that the callback function you registered with 
 `TRITONSERVER_InferenceRequestSetResponseCallback` can be invoked any number of times,
 each time with a new response. You can take a look at [grpc_server.cc](https://github.com/triton-inference-server/server/blob/main/src/grpc_server.cc)
+
+### Knowing When a Decoupled Inference Request is Complete
+
+An inference request is considered complete when a response containing the
+`TRITONSERVER_RESPONSE_COMPLETE_FINAL` flag is received from a model/backend. 
+
+1. Client applications using streaming GRPC can access this information by
+   checking the response parameters for the `"triton_final_response"` parameter.
+   Decoupled models may not send a response for each request depending on how
+   the model/backend is designed. In these cases where no response is sent by
+   the backend, the streaming GRPC client can opt-in to receive an empty final 
+   response for each request. By default, empty final responses are not sent to
+   save on network traffic.
+
+   ```python
+   # Example of streaming GRPC client opting-in
+   client.async_stream_infer(
+     ...,
+     enable_empty_final_response=True
+   )
+   ```
+
+2. Client applications using the C API can check the
+   `TRITONSERVER_RESPONSE_COMPLETE_FINAL` flag directly in their response
+   handling / callback logic.
+
+The [decoupled_test.py](../../qa/L0_decoupled/decoupled_test.py)
+demonstrates an example of opting-in through the streaming GRPC
+Python client API and programmatically identifying when a final response
+is received through the `"triton_final_response"` response parameter.
+

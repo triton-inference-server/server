@@ -1,5 +1,5 @@
 <!--
-# Copyright 2018-2022, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright 2018-2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -44,10 +44,12 @@ all metric reporting, while the `--allow-gpu-metrics=false` and
 `--allow-cpu-metrics=false` can be used to disable just the GPU and CPU
 metrics respectively.
 
-The `--metrics-port` option can be used to select a different port. For now,
-Triton reuses http address for metrics endpoint. The option `--http-address`
-can be used to bind http and metrics endpoints to the same specific address
-when http service is enabled.
+The `--metrics-port` option can be used to select a different port. By default,
+Triton reuses the `--http-address` option for the metrics endpoint and binds the 
+http and metrics endpoints to the same specific address when http service is
+enabled. If http service is not enabled, the metric address will bind to `0.0.0.0`
+by default. To uniquely specify the metric endpoint, `--metrics-address` option
+can be used. See the `tritonserver --help` output for more info on these CLI options.
 
 To change the interval at whichs metrics are polled/updated, see the `--metrics-interval-ms` flag. Metrics that are updated "Per Request" are unaffected by this interval setting. This interval only applies to metrics that are designated as "Per Interval" in the tables of each section below:
 
@@ -98,7 +100,7 @@ Count*. The count metrics are illustrated by the following examples:
 
 ### Latencies
 
-Starting in 23.04, Triton exposes the ability to choose the types of metrics
+Starting in 23.06, Triton exposes the ability to choose the types of metrics
 that are published through the `--metrics-config` CLI options.
 
 #### Counters

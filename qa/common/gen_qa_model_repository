@@ -48,16 +48,16 @@
 ##
 ############################################################################
 
-TRITON_VERSION=${TRITON_VERSION:=23.04}
+TRITON_VERSION=${TRITON_VERSION:=23.06}
 
 # ONNX. Use ONNX_OPSET 0 to use the default for ONNX version
-ONNX_VERSION=1.10.1
+ONNX_VERSION=1.13.0
 ONNX_OPSET=0
 
 # OPENVINO version
-OPENVINO_VERSION=2021.4.582
+OPENVINO_VERSION=2023.0.0
 
-UBUNTU_IMAGE=${UBUNTU_IMAGE:=ubuntu:20.04}
+UBUNTU_IMAGE=${UBUNTU_IMAGE:=ubuntu:22.04}
 PYTORCH_IMAGE=${PYTORCH_IMAGE:=nvcr.io/nvidia/pytorch:$TRITON_VERSION-py3}
 TENSORFLOW_IMAGE=${TENSORFLOW_IMAGE:=nvcr.io/nvidia/tensorflow:$TRITON_VERSION-tf2-py3}
 TENSORRT_IMAGE=${TENSORRT_IMAGE:=nvcr.io/nvidia/tensorrt:$TRITON_VERSION-py3}
@@ -204,19 +204,11 @@ apt-get update && \
             software-properties-common
 ln -s /usr/bin/python3 /usr/bin/python
 
-(wget https://apt.repos.intel.com/openvino/2021/GPG-PUB-KEY-INTEL-OPENVINO-2021 && \
-    apt-key add GPG-PUB-KEY-INTEL-OPENVINO-2021 && rm GPG-PUB-KEY-INTEL-OPENVINO-2021 && \
-    cd /etc/apt/sources.list.d && \
-    echo "deb https://apt.repos.intel.com/openvino/2021 all main">intel-openvino-2021.list && \
-    apt update && \
-    apt install -y intel-openvino-dev-ubuntu20-${OPENVINO_VERSION})
-
 pip3 install "protobuf<=3.20.1" # TODO: Remove current line DLIS-3838
 
 pip3 install  "numpy<=1.23.5" setuptools
 
-PYTHONPATH=/opt/intel/openvino_${OPENVINO_VERSION}/python/python3
-source /opt/intel/openvino_${OPENVINO_VERSION}/bin/setupvars.sh .
+pip3 install openvino==$OPENVINO_VERSION
 
 # Since variable shape tensors are not allowed, identity models may fail to generate.
 # TODO Add variable size tensor models after DLIS-2827 adds support for variable shape tensors.
@@ -353,6 +345,8 @@ python3 $SRCDIR/gen_qa_dyna_sequence_models.py --libtorch --models_dir=$DYNASEQD
 chmod -R 777 $DYNASEQDESTDIR
 python3 $SRCDIR/gen_qa_torchtrt_models.py --models_dir=$TORCHTRTDESTDIR
 chmod -R 777 $TORCHTRTDESTDIR
+python3 $SRCDIR/gen_qa_ragged_models.py --libtorch --models_dir=$RAGGEDDESTDIR
+chmod -R 777 $RAGGEDDESTDIR
 EOF
 
 chmod a+x $HOST_SRCDIR/$TORCHSCRIPT
@@ -372,6 +366,7 @@ docker run $DOCKER_GPU_ARGS --rm --entrypoint $SRCDIR/$TORCHSCRIPT \
        --mount type=bind,source=$HOST_DYNASEQDESTDIR,target=$DYNASEQDESTDIR \
        --mount type=bind,source=$HOST_VARSEQDESTDIR,target=$VARSEQDESTDIR \
        --mount type=bind,source=$HOST_TORCHTRTDESTDIR,target=$TORCHTRTDESTDIR \
+       --mount type=bind,source=$HOST_RAGGEDDESTDIR,target=$RAGGEDDESTDIR \
        $PYTORCH_IMAGE
 if [ $? -ne 0 ]; then
     echo -e "Failed"

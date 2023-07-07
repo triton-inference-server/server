@@ -108,7 +108,7 @@ class TritonPythonModel:
             with self.inflight_thread_count_lck:
                 self.inflight_thread_count += 1
             thread1.start()
-        
+
         logger = pb_utils.Logger
         logger.log("Execute-Specific Msg!", logger.INFO)
         logger.log_info("Execute-Info Msg!")

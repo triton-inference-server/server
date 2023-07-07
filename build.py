@@ -67,14 +67,14 @@ from inspect import getsourcefile
 # incorrectly load the other version of the openvino libraries.
 #
 TRITON_VERSION_MAP = {
-    '2.34.0dev': (
-        '23.05dev',  # triton container
-        '23.04',  # upstream container
-        '1.14.1',  # ORT
-        '2022.1.0',  # ORT OpenVINO
-        '2022.1.0',  # Standalone OpenVINO
-        '2.2.9',  # DCGM version
-        'py38_4.12.0')  # Conda version.
+    '2.36.0dev': (
+        '23.07dev',  # triton container
+        '23.06',  # upstream container
+        '1.15.0',  # ORT
+        '2023.0.0',  # ORT OpenVINO
+        '2023.0.0',  # Standalone OpenVINO
+        '2.4.7',  # DCGM version
+        'py310_23.1.0-1')  # Conda version.
 }
 
 CORE_BACKENDS = ['ensemble']
@@ -598,6 +598,24 @@ def backend_cmake_args(images, components, be, install_dir, library_paths):
     cargs.append(
         cmake_backend_enable(be, 'TRITON_ENABLE_METRICS', FLAGS.enable_metrics))
 
+    # [DLIS-4950] always enable below once Windows image is updated with CUPTI
+    # cargs.append(cmake_backend_enable(be, 'TRITON_ENABLE_MEMORY_TRACKER', True))
+    if (target_platform() == 'windows') and (not FLAGS.no_container_build):
+        print(
+            "Warning: Detected docker build is used for Windows, backend utility 'device memory tracker' will be disabled due to missing library in CUDA Windows docker image."
+        )
+        cargs.append(
+            cmake_backend_enable(be, 'TRITON_ENABLE_MEMORY_TRACKER', False))
+    elif target_platform() == 'jetpack':
+        print(
+            "Warning: Detected Jetpack build, backend utility 'device memory tracker' will be disabled as Jetpack doesn't contain required version of the library."
+        )
+        cargs.append(
+            cmake_backend_enable(be, 'TRITON_ENABLE_MEMORY_TRACKER', False))
+    elif FLAGS.enable_gpu:
+        cargs.append(
+            cmake_backend_enable(be, 'TRITON_ENABLE_MEMORY_TRACKER', True))
+
     cargs += cmake_backend_extra_args(be)
     cargs.append('..')
     return cargs
@@ -818,7 +836,7 @@ def install_dcgm_libraries(dcgm_version, target_machine):
 ENV DCGM_VERSION {}
 # Install DCGM. Steps from https://developer.nvidia.com/dcgm#Downloads
 RUN curl -o /tmp/cuda-keyring.deb \
-    https://developer.download.nvidia.com/compute/cuda/repos/ubuntu2004/sbsa/cuda-keyring_1.0-1_all.deb \
+    https://developer.download.nvidia.com/compute/cuda/repos/ubuntu2204/sbsa/cuda-keyring_1.0-1_all.deb \
     && apt install /tmp/cuda-keyring.deb && rm /tmp/cuda-keyring.deb && \
     apt-get update && apt-get install -y datacenter-gpu-manager=1:{}
 '''.format(dcgm_version, dcgm_version)
@@ -827,7 +845,7 @@ RUN curl -o /tmp/cuda-keyring.deb \
 ENV DCGM_VERSION {}
 # Install DCGM. Steps from https://developer.nvidia.com/dcgm#Downloads
 RUN curl -o /tmp/cuda-keyring.deb \
-    https://developer.download.nvidia.com/compute/cuda/repos/ubuntu2004/x86_64/cuda-keyring_1.0-1_all.deb \
+    https://developer.download.nvidia.com/compute/cuda/repos/ubuntu2204/x86_64/cuda-keyring_1.0-1_all.deb \
     && apt install /tmp/cuda-keyring.deb && rm /tmp/cuda-keyring.deb && \
     apt-get update && apt-get install -y datacenter-gpu-manager=1:{}
 '''.format(dcgm_version, dcgm_version)
@@ -845,9 +863,9 @@ def install_miniconda(conda_version, target_machine):
             .format(FLAGS.version))
     miniconda_url = f"https://repo.anaconda.com/miniconda/Miniconda3-{conda_version}-Linux-{target_machine}.sh"
     if target_machine == 'x86_64':
-        sha_sum = "3190da6626f86eee8abf1b2fd7a5af492994eb2667357ee4243975cdbb175d7a"
+        sha_sum = "32d73e1bc33fda089d7cd9ef4c1be542616bd8e437d1f77afeeaf7afdb019787"
     else:
-        sha_sum = "0c20f121dc4c8010032d64f8e9b27d79e52d28355eb8d7972eafc90652387777"
+        sha_sum = "80d6c306b015e1e3b01ea59dc66c676a81fa30279bc2da1f180a7ef7b2191d6e"
     return f'''
 RUN mkdir -p /opt/
 RUN wget "{miniconda_url}" -O miniconda.sh -q && \
@@ -889,7 +907,7 @@ ENV DEBIAN_FRONTEND=noninteractive
 # libcurl4-openSSL-dev is needed for GCS
 # python3-dev is needed by Torchvision
 # python3-pip and libarchive-dev is needed by python backend
-# uuid-dev and pkg-config is needed for Azure Storage
+# libxml2-dev is needed for Azure Storage
 # scons is needed for armnn_tflite backend build dep
 RUN apt-get update && \
     apt-get install -y --no-install-recommends \
@@ -913,12 +931,12 @@ RUN apt-get update && \
             rapidjson-dev \
             scons \
             software-properties-common \
+            pkg-config \
             unzip \
             wget \
             zlib1g-dev \
             libarchive-dev \
-            pkg-config \
-            uuid-dev \
+            libxml2-dev \ 
             libnuma-dev && \
     rm -rf /var/lib/apt/lists/*
 
@@ -933,13 +951,15 @@ RUN wget -O /tmp/boost.tar.gz \
     mv /tmp/boost_1_80_0/boost /usr/include/boost
 
 # Server build requires recent version of CMake (FetchContent required)
-RUN wget -O - https://apt.kitware.com/keys/kitware-archive-latest.asc 2>/dev/null | \
-      gpg --dearmor - |  \
-      tee /etc/apt/trusted.gpg.d/kitware.gpg >/dev/null && \
-    apt-add-repository 'deb https://apt.kitware.com/ubuntu/ focal main' && \
+RUN apt update && apt install -y gpg wget && \
+    wget -O - https://apt.kitware.com/keys/kitware-archive-latest.asc 2>/dev/null | \
+        gpg --dearmor - |  \
+        tee /usr/share/keyrings/kitware-archive-keyring.gpg >/dev/null && \
+    . /etc/os-release && \
+    echo "deb [signed-by=/usr/share/keyrings/kitware-archive-keyring.gpg] https://apt.kitware.com/ubuntu/ $UBUNTU_CODENAME main" | \
+    tee /etc/apt/sources.list.d/kitware.list >/dev/null && \
     apt-get update && \
-    apt-get install -y --no-install-recommends \
-      cmake-data=3.25.2-0kitware1ubuntu20.04.1 cmake=3.25.2-0kitware1ubuntu20.04.1
+    apt-get install -y --no-install-recommends cmake cmake-data 
 '''
 
         if FLAGS.enable_gpu:
@@ -1084,6 +1104,12 @@ ENV PATH /opt/tritonserver/bin:${PATH}
 ENV LD_LIBRARY_PATH /opt/tritonserver/backends/onnxruntime:${LD_LIBRARY_PATH}
 '''
 
+    # Necessary for libtorch.so to find correct HPCX libraries
+    if ('pytorch' in backends):
+        df += '''
+ENV LD_LIBRARY_PATH /opt/hpcx/ucc/lib/:/opt/hpcx/ucx/lib/:${LD_LIBRARY_PATH}
+'''
+
     backend_dependencies = ""
     # libgomp1 is needed by both onnxruntime and pytorch backends
     if ('onnxruntime' in backends) or ('pytorch' in backends):
@@ -1124,13 +1150,14 @@ RUN apt-get update && \
             software-properties-common \
             libb64-0d \
             libcurl4-openssl-dev \
-            libre2-5 \
+            libre2-9 \
             git \
             gperf \
             dirmngr \
             libgoogle-perftools-dev \
             libnuma-dev \
             curl \
+            libjemalloc-dev \
             {backend_dependencies} && \
     rm -rf /var/lib/apt/lists/*
 
@@ -1161,50 +1188,8 @@ RUN ln -sf ${_CUDA_COMPAT_PATH}/lib.real ${_CUDA_COMPAT_PATH}/lib \
  && ldconfig \
  && rm -f ${_CUDA_COMPAT_PATH}/lib
 '''
-
     else:
-        libs_arch = 'aarch64' if target_machine == 'aarch64' else 'x86_64'
-        if 'pytorch' in backends:
-            # Add extra dependencies for pytorch backend.
-            # Note: Even though the build is CPU-only, the version of pytorch
-            # we are using depend upon libraries like cuda and cudnn. Since
-            # these dependencies are not present in the ubuntu base image,
-            # we must copy these from the Triton min container ourselves.
-            cuda_arch = 'sbsa' if target_machine == 'aarch64' else 'x86_64'
-            df += '''
-RUN mkdir -p /usr/local/cuda/lib64/stubs
-COPY --from=min_container /usr/local/cuda/lib64/stubs/libcusparse.so /usr/local/cuda/lib64/stubs/libcusparse.so.12
-COPY --from=min_container /usr/local/cuda/lib64/stubs/libcusolver.so /usr/local/cuda/lib64/stubs/libcusolver.so.11
-COPY --from=min_container /usr/local/cuda/lib64/stubs/libcurand.so /usr/local/cuda/lib64/stubs/libcurand.so.10
-COPY --from=min_container /usr/local/cuda/lib64/stubs/libcufft.so /usr/local/cuda/lib64/stubs/libcufft.so.11
-COPY --from=min_container /usr/local/cuda/lib64/stubs/libcublas.so /usr/local/cuda/lib64/stubs/libcublas.so.12
-COPY --from=min_container /usr/local/cuda/lib64/stubs/libcublasLt.so /usr/local/cuda/lib64/stubs/libcublasLt.so.12
-COPY --from=min_container /usr/local/cuda/lib64/stubs/libcublasLt.so /usr/local/cuda/lib64/stubs/libcublasLt.so.11
-
-RUN mkdir -p /usr/local/cuda/targets/{cuda_arch}-linux/lib
-COPY --from=min_container /usr/local/cuda-12.1/targets/{cuda_arch}-linux/lib/libcudart.so.12 /usr/local/cuda/targets/{cuda_arch}-linux/lib/.
-COPY --from=min_container /usr/local/cuda-12.1/targets/{cuda_arch}-linux/lib/libcupti.so.12 /usr/local/cuda/targets/{cuda_arch}-linux/lib/.
-COPY --from=min_container /usr/local/cuda-12.1/targets/{cuda_arch}-linux/lib/libnvToolsExt.so.1 /usr/local/cuda/targets/{cuda_arch}-linux/lib/.
-COPY --from=min_container /usr/local/cuda-12.1/targets/{cuda_arch}-linux/lib/libnvJitLink.so.12 /usr/local/cuda/targets/{cuda_arch}-linux/lib/.
-
-COPY --from=min_container /usr/lib/{libs_arch}-linux-gnu/libcudnn.so.8 /usr/lib/{libs_arch}-linux-gnu/libcudnn.so.8
-
-# patchelf is needed to add deps of libcublasLt.so.12 to libtorch_cuda.so
-RUN apt-get update && \
-        apt-get install -y --no-install-recommends openmpi-bin patchelf
-
-ENV LD_LIBRARY_PATH /usr/local/cuda/targets/{cuda_arch}-linux/lib:/usr/local/cuda/lib64/stubs:${{LD_LIBRARY_PATH}}
-'''.format(cuda_arch=cuda_arch, libs_arch=libs_arch)
-
-        if ('pytorch' in backends) or ('tensorflow' in backends):
-            # Add NCCL dependency for tensorflow/pytorch backend.
-            # Note: Even though the build is CPU-only, the version of
-            # tensorflow/pytorch we are using depends upon the NCCL library.
-            # Since this dependency is not present in the ubuntu base image,
-            # we must copy it from the Triton min container ourselves.
-            df += '''
-COPY --from=min_container /usr/lib/{libs_arch}-linux-gnu/libnccl.so.2 /usr/lib/{libs_arch}-linux-gnu/libnccl.so.2
-'''.format(libs_arch=libs_arch)
+        df += add_cpu_libs_to_linux_dockerfile(backends, target_machine)
 
     # Add dependencies needed for python backend
     if 'python' in backends:
@@ -1243,6 +1228,61 @@ LABEL com.nvidia.build.id={}
 LABEL com.nvidia.build.ref={}
 '''.format(argmap['NVIDIA_BUILD_ID'], argmap['NVIDIA_BUILD_ID'],
            argmap['NVIDIA_BUILD_REF'])
+
+    return df
+
+
+def add_cpu_libs_to_linux_dockerfile(backends, target_machine):
+    df = ''
+    libs_arch = 'aarch64' if target_machine == 'aarch64' else 'x86_64'
+    if 'pytorch' in backends:
+        # Add extra dependencies for pytorch backend.
+        # Note: Even though the build is CPU-only, the version of pytorch
+        # we are using depend upon libraries like cuda and cudnn. Since
+        # these dependencies are not present in the ubuntu base image,
+        # we must copy these from the Triton min container ourselves.
+        cuda_arch = 'sbsa' if target_machine == 'aarch64' else 'x86_64'
+        df += '''
+RUN mkdir -p /usr/local/cuda/lib64/stubs
+COPY --from=min_container /usr/local/cuda/lib64/stubs/libcusparse.so /usr/local/cuda/lib64/stubs/libcusparse.so.12
+COPY --from=min_container /usr/local/cuda/lib64/stubs/libcusolver.so /usr/local/cuda/lib64/stubs/libcusolver.so.11
+COPY --from=min_container /usr/local/cuda/lib64/stubs/libcurand.so /usr/local/cuda/lib64/stubs/libcurand.so.10
+COPY --from=min_container /usr/local/cuda/lib64/stubs/libcufft.so /usr/local/cuda/lib64/stubs/libcufft.so.11
+COPY --from=min_container /usr/local/cuda/lib64/stubs/libcublas.so /usr/local/cuda/lib64/stubs/libcublas.so.12
+COPY --from=min_container /usr/local/cuda/lib64/stubs/libcublasLt.so /usr/local/cuda/lib64/stubs/libcublasLt.so.12
+COPY --from=min_container /usr/local/cuda/lib64/stubs/libcublasLt.so /usr/local/cuda/lib64/stubs/libcublasLt.so.11
+
+RUN mkdir -p /usr/local/cuda/targets/{cuda_arch}-linux/lib
+COPY --from=min_container /usr/local/cuda-12.1/targets/{cuda_arch}-linux/lib/libcudart.so.12 /usr/local/cuda/targets/{cuda_arch}-linux/lib/.
+COPY --from=min_container /usr/local/cuda-12.1/targets/{cuda_arch}-linux/lib/libcupti.so.12 /usr/local/cuda/targets/{cuda_arch}-linux/lib/.
+COPY --from=min_container /usr/local/cuda-12.1/targets/{cuda_arch}-linux/lib/libnvToolsExt.so.1 /usr/local/cuda/targets/{cuda_arch}-linux/lib/.
+COPY --from=min_container /usr/local/cuda-12.1/targets/{cuda_arch}-linux/lib/libnvJitLink.so.12 /usr/local/cuda/targets/{cuda_arch}-linux/lib/.
+
+RUN mkdir -p /opt/hpcx/ucc/lib/ /opt/hpcx/ucx/lib/
+COPY --from=min_container /opt/hpcx/ucc/lib/libucc.so.1 /opt/hpcx/ucc/lib/libucc.so.1
+COPY --from=min_container /opt/hpcx/ucx/lib/libucm.so.0 /opt/hpcx/ucx/lib/libucm.so.0
+COPY --from=min_container /opt/hpcx/ucx/lib/libucp.so.0 /opt/hpcx/ucx/lib/libucp.so.0
+COPY --from=min_container /opt/hpcx/ucx/lib/libucs.so.0 /opt/hpcx/ucx/lib/libucs.so.0
+COPY --from=min_container /opt/hpcx/ucx/lib/libuct.so.0 /opt/hpcx/ucx/lib/libuct.so.0
+
+COPY --from=min_container /usr/lib/{libs_arch}-linux-gnu/libcudnn.so.8 /usr/lib/{libs_arch}-linux-gnu/libcudnn.so.8
+
+# patchelf is needed to add deps of libcublasLt.so.12 to libtorch_cuda.so
+RUN apt-get update && \
+        apt-get install -y --no-install-recommends openmpi-bin patchelf
+
+ENV LD_LIBRARY_PATH /usr/local/cuda/targets/{cuda_arch}-linux/lib:/usr/local/cuda/lib64/stubs:${{LD_LIBRARY_PATH}}
+'''.format(cuda_arch=cuda_arch, libs_arch=libs_arch)
+
+    if ('pytorch' in backends) or ('tensorflow' in backends):
+        # Add NCCL dependency for tensorflow/pytorch backend.
+        # Note: Even though the build is CPU-only, the version of
+        # tensorflow/pytorch we are using depends upon the NCCL library.
+        # Since this dependency is not present in the ubuntu base image,
+        # we must copy it from the Triton min container ourselves.
+        df += '''
+COPY --from=min_container /usr/lib/{libs_arch}-linux-gnu/libnccl.so.2 /usr/lib/{libs_arch}-linux-gnu/libnccl.so.2
+'''.format(libs_arch=libs_arch)
 
     return df
 
@@ -1301,7 +1341,7 @@ def create_build_dockerfiles(container_build_dir, images, backends, repoagents,
         base_image = 'nvcr.io/nvidia/tritonserver:{}-py3-min'.format(
             FLAGS.upstream_container_version)
     else:
-        base_image = 'ubuntu:20.04'
+        base_image = 'ubuntu:22.04'
 
     dockerfileargmap = {
         'NVIDIA_BUILD_REF':
@@ -1747,8 +1787,7 @@ def enable_all():
             'tensorrt'
         ]
         all_repoagents = ['checksum']
-        # DLIS-4491: Add redis cache to build
-        all_caches = ['local']
+        all_caches = ['local', 'redis']
         all_filesystems = ['gcs', 's3', 'azure_storage']
         all_endpoints = ['http', 'grpc', 'sagemaker', 'vertex-ai']
 
@@ -1766,8 +1805,7 @@ def enable_all():
             'openvino', 'tensorrt'
         ]
         all_repoagents = ['checksum']
-        # DLIS-4491: Add redis cache to build
-        all_caches = ['local']
+        all_caches = ['local', 'redis']
         all_filesystems = []
         all_endpoints = ['http', 'grpc']
 

@@ -66,7 +66,7 @@ function wait_for_server_ready() {
 
     local wait_secs=$wait_time_secs
     until test $wait_secs -eq 0 ; do
-        if ! kill -0 $spid; then
+        if ! kill -0 $spid > /dev/null 2>&1; then
             echo "=== Server not running."
             WAIT_RET=1
             return
@@ -147,13 +147,13 @@ function wait_for_model_stable() {
 }
 
 function gdb_helper () {
-  if ! command -v gdb; then
+  if ! command -v gdb > /dev/null 2>&1; then
     echo "=== WARNING: gdb not installed"
     return
   fi
 
   ### Server Hang ###
-  if kill -0 ${SERVER_PID}; then
+  if kill -0 ${SERVER_PID} > /dev/null 2>&1; then
     # If server process is still alive, try to get backtrace and core dump from it
     GDB_LOG="gdb_bt.${SERVER_PID}.log"
     echo -e "=== WARNING: SERVER HANG DETECTED, DUMPING GDB BACKTRACE TO [${PWD}/${GDB_LOG}] ==="
@@ -166,7 +166,7 @@ function gdb_helper () {
 
   ### Server Segfaulted ###
   # If there are any core dumps locally from a segfault, load them and get a backtrace
-  for corefile in $(ls core.*); do
+  for corefile in $(ls core.* > /dev/null 2>&1); do
     GDB_LOG="${corefile}.log"
     echo -e "=== WARNING: SEGFAULT DETECTED, DUMPING GDB BACKTRACE TO [${PWD}/${GDB_LOG}] ==="
     gdb -batch ${SERVER} ${corefile} -ex "thread apply all bt" | tee "${corefile}.log" || true; 
@@ -204,7 +204,7 @@ function run_server () {
         gdb_helper || true
 
         # Cleanup
-        kill $SERVER_PID || true
+        kill $SERVER_PID > /dev/null 2>&1 || true
         SERVER_PID=0
     fi
 }

@@ -1,6 +1,6 @@
 #!/usr/bin/python
 
-# Copyright 2019-2022, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright 2019-2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -61,6 +61,14 @@ class PythonTest(tu.TestResultCollector):
             output0 = result.as_numpy('OUTPUT0')
             self.assertTrue(np.all(input_data_0 == output0))
 
+    def _create_cuda_region(self, client, size, name):
+        import tritonclient.utils.cuda_shared_memory as cuda_shared_memory
+        shm0_handle = cuda_shared_memory.create_shared_memory_region(
+            name, byte_size=size, device_id=0)
+        client.register_cuda_shared_memory(
+            name, cuda_shared_memory.get_raw_handle(shm0_handle), 0, size)
+        return shm0_handle
+
     def _optional_input_infer(self, model_name, has_input0, has_input1):
         with httpclient.InferenceServerClient("localhost:8000") as client:
             shape = (1,)
@@ -113,43 +121,101 @@ class PythonTest(tu.TestResultCollector):
             np.testing.assert_equal(output1, expected_output1,
                                     "OUTPUT1 doesn't match expected OUTPUT1")
 
-    # We do not use a docker on Jetson so it does not impose a shared memory
-    # allocation limit of 1GB. This means test will pass without the expected
-    # error on jetson and is hence unnecessary.
+    def test_growth_error(self):
+        # 2 MiBs
+        total_byte_size = 2 * 1024 * 1024
+        shape = [total_byte_size]
+        model_name = 'identity_uint8_nobatch'
+        dtype = np.uint8
+        with self._shm_leak_detector.Probe() as shm_probe:
+            self._infer_help(model_name, shape, dtype)
+
+        # 1 GiB payload leads to error in the main Python backned process.
+        # Total shared memory available is 1GiB.
+        total_byte_size = 1024 * 1024 * 1024
+        shape = [total_byte_size]
+        with self.assertRaises(InferenceServerException) as ex:
+            self._infer_help(model_name, shape, dtype)
+        self.assertIn("Failed to increase the shared memory pool size",
+                      str(ex.exception))
+
+        # 512 MiBs payload leads to error in the Python stub process.
+        total_byte_size = 512 * 1024 * 1024
+        shape = [total_byte_size]
+        with self.assertRaises(InferenceServerException) as ex:
+            self._infer_help(model_name, shape, dtype)
+        self.assertIn("Failed to increase the shared memory pool size",
+                      str(ex.exception))
+
+        # 2 MiBs
+        # Send a small paylaod to make sure it is still working properly
+        total_byte_size = 2 * 1024 * 1024
+        shape = [total_byte_size]
+        with self._shm_leak_detector.Probe() as shm_probe:
+            self._infer_help(model_name, shape, dtype)
+
+    # GPU tensors are not supported on jetson
+    # CUDA Shared memory is not supported on jetson
     if not TEST_JETSON:
 
-        def test_growth_error(self):
-            # 2 MiBs
-            total_byte_size = 2 * 1024 * 1024
-            shape = [total_byte_size]
-            model_name = 'identity_uint8_nobatch'
-            dtype = np.uint8
-            with self._shm_leak_detector.Probe() as shm_probe:
-                self._infer_help(model_name, shape, dtype)
+        def test_gpu_tensor_error(self):
+            import tritonclient.utils.cuda_shared_memory as cuda_shared_memory
+            model_name = 'identity_bool'
+            with httpclient.InferenceServerClient("localhost:8000") as client:
+                input_data = np.array([[True] * 1000], dtype=bool)
+                inputs = [
+                    httpclient.InferInput("INPUT0", input_data.shape,
+                                          np_to_triton_dtype(input_data.dtype))
+                ]
+                inputs[0].set_data_from_numpy(input_data)
 
-            # 1 GiB payload leads to error in the main Python backned process.
-            # Total shared memory available is 1GiB.
-            total_byte_size = 1024 * 1024 * 1024
-            shape = [total_byte_size]
-            with self.assertRaises(InferenceServerException) as ex:
-                self._infer_help(model_name, shape, dtype)
-            self.assertIn("Failed to increase the shared memory pool size",
-                          str(ex.exception))
+                requested_outputs = [httpclient.InferRequestedOutput('OUTPUT0')]
 
-            # 512 MiBs payload leads to error in the Python stub process.
-            total_byte_size = 512 * 1024 * 1024
-            shape = [total_byte_size]
-            with self.assertRaises(InferenceServerException) as ex:
-                self._infer_help(model_name, shape, dtype)
-            self.assertIn("Failed to increase the shared memory pool size",
-                          str(ex.exception))
+                # intentionally create a shared memory region with not enough size.
+                client.unregister_cuda_shared_memory()
+                shm0_handle = self._create_cuda_region(client, 1,
+                                                       'output0_data')
 
-            # 2 MiBs
-            # Send a small paylaod to make sure it is still working properly
-            total_byte_size = 2 * 1024 * 1024
-            shape = [total_byte_size]
-            with self._shm_leak_detector.Probe() as shm_probe:
-                self._infer_help(model_name, shape, dtype)
+                requested_outputs[0].set_shared_memory('output0_data', 1)
+                with self.assertRaises(InferenceServerException) as ex:
+                    client.infer(model_name, inputs, outputs=requested_outputs)
+                self.assertIn(
+                    "should be at least 1000 bytes to hold the results",
+                    str(ex.exception))
+                client.unregister_cuda_shared_memory()
+                cuda_shared_memory.destroy_shared_memory_region(shm0_handle)
+
+        def test_dlpack_tensor_error(self):
+            import tritonclient.utils.cuda_shared_memory as cuda_shared_memory
+            model_name = 'dlpack_identity'
+            with httpclient.InferenceServerClient("localhost:8000") as client:
+                input_data = np.array([[1] * 1000], dtype=np.float32)
+                inputs = [
+                    httpclient.InferInput("INPUT0", input_data.shape,
+                                          np_to_triton_dtype(input_data.dtype))
+                ]
+
+                requested_outputs = [httpclient.InferRequestedOutput('OUTPUT0')]
+                input_data_size = input_data.itemsize * input_data.size
+                client.unregister_cuda_shared_memory()
+                input_region = self._create_cuda_region(client, input_data_size,
+                                                        'input0_data')
+                inputs[0].set_shared_memory('input0_data', input_data_size)
+                cuda_shared_memory.set_shared_memory_region(
+                    input_region, [input_data])
+
+                # Intentionally create a small region to trigger an error
+                shm0_handle = self._create_cuda_region(client, 1,
+                                                       'output0_data')
+                requested_outputs[0].set_shared_memory('output0_data', 1)
+
+                with self.assertRaises(InferenceServerException) as ex:
+                    client.infer(model_name, inputs, outputs=requested_outputs)
+                self.assertIn(
+                    "should be at least 4000 bytes to hold the results",
+                    str(ex.exception))
+                client.unregister_cuda_shared_memory()
+                cuda_shared_memory.destroy_shared_memory_region(shm0_handle)
 
     def test_async_infer(self):
         model_name = "identity_uint8"

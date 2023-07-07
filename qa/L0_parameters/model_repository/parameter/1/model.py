@@ -63,8 +63,7 @@ class TritonPythonModel:
         return auto_complete_model_config
 
     def execute(self, requests):
-        # A simple model that puts the parameters in the in the request in the
-        # output.
+        # A simple model that puts the request parameters into the outputs.
         responses = []
         for request in requests:
             parameters = json.loads(request.parameters())

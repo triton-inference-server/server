@@ -61,9 +61,7 @@ class ImplicitStateTest(tu.TestResultCollector):
         self.assertIn("unable to add state 'undefined_state'", err_str)
         self.assertIn(
             "state configuration is missing for model 'no_implicit_state'",
-            err_str
-        )
-
+            err_str)
 
     def test_wrong_implicit_state_name(self):
         triton_client = tritonhttpclient.InferenceServerClient("localhost:8000")
@@ -81,10 +79,8 @@ class ImplicitStateTest(tu.TestResultCollector):
                                 sequence_start=True)
 
         err_str = str(e.exception).lower()
-        self.assertIn(
-            "state 'undefined_state' is not a valid state name",
-            err_str
-        )
+        self.assertIn("state 'undefined_state' is not a valid state name",
+                      err_str)
 
     def test_no_update(self):
         # Test implicit state without updating any state
@@ -134,8 +130,7 @@ class ImplicitStateTest(tu.TestResultCollector):
                     sequence_end=True)
             self.assertIn(
                 "unexpected inference output 'OUTPUT_STATE' for model",
-                str(e.exception)
-            )
+                str(e.exception))
 
     def test_request_output(self):
         triton_client = tritonhttpclient.InferenceServerClient("localhost:8000")

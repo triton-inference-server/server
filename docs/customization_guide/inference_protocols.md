@@ -388,6 +388,9 @@ The API is documented in
 [tritonserver.java](https://github.com/bytedeco/javacpp-presets/blob/master/tritonserver/src/gen/java/org/bytedeco/tritonserver/global/tritonserver.java).
 Alternatively, the user can refer to the web version [API docs](http://bytedeco.org/javacpp-presets/tritonserver/apidocs/)
 generated from `tritonserver.java`.
+**Note:** Currently, `tritonserver.java` contains bindings for both the `In-process C-API`
+and the bindings for `C-API Wrapper`. More information about the [developer_tools/server C-API wrapper](https://github.com/triton-inference-server/developer_tools/blob/main/server/README.md) can be found in the [developer_tools repository](https://github.com/triton-inference-server/developer_tools/).
+
 A simple example using the Java API can be found in
 [Samples folder](https://github.com/bytedeco/javacpp-presets/tree/master/tritonserver/samples)
 which includes `Simple.java` which is similar to 
@@ -442,7 +445,10 @@ Java program with the Java bindings with the following steps:
       $ git clone --single-branch --depth=1 -b <client repo tag>
                      https://github.com/triton-inference-server/client.git clientrepo
       # Run build script
+      ## For In-Process C-API Java Bindings
       $ source clientrepo/src/java-api-bindings/scripts/install_dependencies_and_build.sh
+      ## For C-API Wrapper Java Bindings
+      $ source clientrepo/src/java-api-bindings/scripts/install_dependencies_and_build.sh --enable-developer-tools-server`
       ```
       This will install the Java bindings to `/workspace/install/java-api-bindings/tritonserver-java-bindings.jar`
    
@@ -454,6 +460,7 @@ Java program with the Java bindings with the following steps:
       $ docker cp ${id}:/workspace/install/java-api-bindings/tritonserver-java-bindings.jar <Uber Jar directory>/tritonserver-java-bindings.jar
       $ docker stop ${id}
       ``` 
+      **Note:** `tritonserver-java-bindings.jar` only includes the `In-Process Java Bindings`. To use the `C-API Wrapper Java Bindings`, please use the build script.
 2. Use the built "Uber Jar" that contains the Java bindings
    ```bash
    $ java -cp <Uber Jar directory>/tritonserver-java-bindings.jar <your Java program>

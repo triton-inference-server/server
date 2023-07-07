@@ -1,5 +1,5 @@
 #!/bin/bash
-# Copyright 2019-2022, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright 2019-2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -47,13 +47,11 @@ MODELSDIR=`pwd`/models
 DATADIR=/data/inferenceserver/${REPO_VERSION}/qa_model_repository
 ENSEMBLEDIR=/data/inferenceserver/${REPO_VERSION}/qa_ensemble_model_repository/qa_model_repository
 
-export CUDA_VISIBLE_DEVICES=0,1
-
 # Must explicitly set LD_LIBRARY_PATH so that IO_TEST_UTIL can find
 # libtritonserver.so.
 LD_LIBRARY_PATH=/opt/tritonserver/lib:$LD_LIBRARY_PATH
 
-rm -f $CLIENT_LOG.*
+rm -f $CLIENT_LOG*
 
 # PyTorch is required for the Python backend dlpack add sub models
 pip3 install torch==1.13.0+cu117 -f https://download.pytorch.org/whl/torch_stable.html
@@ -148,23 +146,47 @@ cp -r $MODELSDIR/fan_graphdef_float32_float32_float32 $MODELSDIR/fan_${full} && 
 cp -r $ENSEMBLEDIR/nop_TYPE_FP32_-1 $MODELSDIR/. && \
     mkdir -p $MODELSDIR/nop_TYPE_FP32_-1/1
 
+# prepare libtorch multi-device and multi-gpu models
+cp -r ../L0_libtorch_instance_group_kind_model/models/libtorch_multi_device $MODELSDIR/.
+cp ../L0_libtorch_instance_group_kind_model/gen_models.py ./gen_libtorch_model.py
+mkdir -p $MODELSDIR/libtorch_multi_device/1
+mkdir -p $MODELSDIR/libtorch_multi_gpu/1
+cp $MODELSDIR/libtorch_multi_device/config.pbtxt $MODELSDIR/libtorch_multi_gpu/.
+(cd $MODELSDIR/libtorch_multi_gpu && \
+    sed -i "s/name: \"libtorch_multi_device\"/name: \"libtorch_multi_gpu\"/" config.pbtxt)
+
+set +e
+python3 gen_libtorch_model.py >> $CLIENT_LOG 2>&1 
+if [ $? -ne 0 ]; then
+    echo -e "\n***\n*** Error when generating libtorch models. \n***"
+    cat $CLIENT_LOG
+    exit 1
+fi
+set -e
+
+TRIALS="graphdef savedmodel onnx libtorch plan python python_dlpack libtorch_multi_gpu libtorch_multi_device"
 for input_device in -1 0 1; do
     for output_device in -1 0 1; do
-        for trial in graphdef savedmodel onnx libtorch plan python python_dlpack; do
+        for trial in ${TRIALS}; do
             # TensorRT Plan should only be deployed on GPU device
             model_devices="-1 0 1" && [[ "$trial" == "plan" ]] && model_devices="0 1"
+            full=${trial}_float32_float32_float32 && [[ "$trial" == "libtorch_multi"* ]] && full=${trial}
+
             for model_device in $model_devices; do
-                full=${trial}_float32_float32_float32
                 full_log=$CLIENT_LOG.$full.$input_device.$output_device.$model_device
 
                 host_policy=cpu
                 if [ "$model_device" == "-1" ]; then
-                    (cd $MODELSDIR/${full} && \
-                        sed -i "s/instance_group.*/instance_group [{ kind: KIND_CPU }]/" config.pbtxt)
+                    if [[ "$trial" != "libtorch_multi"* ]]; then
+                        (cd $MODELSDIR/${full} && \
+                            sed -i "s/instance_group.*/instance_group [{ kind: KIND_CPU }]/" config.pbtxt)
+                    fi
                 else
                     host_policy=gpu_${model_device}
-                    (cd $MODELSDIR/${full} && \
-                        sed -i "s/instance_group.*/instance_group [{ kind: KIND_GPU, gpus: [${model_device}] }]/" config.pbtxt)
+                    if [[ "$trial" != "libtorch_multi"* ]]; then
+                        (cd $MODELSDIR/${full} && \
+                            sed -i "s/instance_group.*/instance_group [{ kind: KIND_GPU, gpus: [${model_device}] }]/" config.pbtxt)
+                    fi
                 fi
 
                 set +e
@@ -196,14 +218,16 @@ for input_device in -1 0 1; do
                 set -e
 
                 # ensemble
-                set +e
-                $IO_TEST_UTIL -i $input_device -o $output_device -r $MODELSDIR -m fan_$full >>$full_log.ensemble 2>&1
-                if [ $? -ne 0 ]; then
-                    cat $full_log.ensemble
-                    echo -e "\n***\n*** Test Failed\n***"
-                    RET=1
+                if [[ "$trial" != "libtorch_multi"* ]]; then
+                    set +e
+                    $IO_TEST_UTIL -i $input_device -o $output_device -r $MODELSDIR -m fan_$full >>$full_log.ensemble 2>&1
+                    if [ $? -ne 0 ]; then
+                        cat $full_log.ensemble
+                        echo -e "\n***\n*** Test Failed\n***"
+                        RET=1
+                    fi
+                    set -e
                 fi
-                set -e
             done
         done
 

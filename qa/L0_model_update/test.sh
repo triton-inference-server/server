@@ -53,33 +53,55 @@ function setup_models() {
         mv models/model_init_del/model.py models/model_init_del/1
 }
 
-SERVER_ARGS="--model-repository=models --model-control-mode=explicit --rate-limit=execution_count --log-verbose=2"
-SERVER_LOG="./server.log"
-setup_models
-run_server
-if [ "$SERVER_PID" == "0" ]; then
-    echo -e "\n***\n*** Failed to start $SERVER\n***"
-    cat $SERVER_LOG
-    exit 1
-fi
-
 RET=0
 
-set +e
-python instance_update_test.py > instance_update_test.log 2>&1
-if [ $? -ne 0 ]; then
-    cat instance_update_test.log
-    RET=1
-fi
-set -e
+# Test model instance update with rate limiting on/off and explicit resource
+for RATE_LIMIT_MODE in "off" "execution_count" "execution_count_with_explicit_resource"; do
 
-kill $SERVER_PID
-wait $SERVER_PID
+    RATE_LIMIT_ARGS="--rate-limit=$RATE_LIMIT_MODE"
+    if [ "$RATE_LIMIT_MODE" == "execution_count_with_explicit_resource" ]; then
+        RATE_LIMIT_ARGS="--rate-limit=execution_count --rate-limit-resource=R1:10"
+    fi
+
+    export RATE_LIMIT_MODE=$RATE_LIMIT_MODE
+    TEST_LOG="instance_update_test.rate_limit_$RATE_LIMIT_MODE.log"
+    SERVER_LOG="./instance_update_test.rate_limit_$RATE_LIMIT_MODE.server.log"
+
+    setup_models
+    SERVER_ARGS="--model-repository=models --model-control-mode=explicit $RATE_LIMIT_ARGS --log-verbose=2"
+    run_server
+    if [ "$SERVER_PID" == "0" ]; then
+        echo -e "\n***\n*** Failed to start $SERVER\n***"
+        cat $SERVER_LOG
+        exit 1
+    fi
+
+    set +e
+    python instance_update_test.py > $TEST_LOG 2>&1
+    if [ $? -ne 0 ]; then
+        echo -e "\n***\n*** Failed model instance update test on rate limit mode $RATE_LIMIT_MODE\n***"
+        cat $TEST_LOG
+        RET=1
+    fi
+    set -e
+
+    kill $SERVER_PID
+    wait $SERVER_PID
+
+    set +e
+    grep "Should not print this" $SERVER_LOG
+    if [ $? -eq 0 ]; then
+        echo -e "\n***\n*** Found \"Should not print this\" on \"$SERVER_LOG\"\n***"
+        cat $SERVER_LOG
+        RET=1
+    fi
+    set -e
+
+done
 
 if [ $RET -eq 0 ]; then
     echo -e "\n***\n*** Test Passed\n***"
 else
     echo -e "\n***\n*** Test FAILED\n***"
 fi
-
 exit $RET

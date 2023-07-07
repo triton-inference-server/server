@@ -28,6 +28,7 @@
 
 #include <google/protobuf/arena.h>
 #include <grpc++/alarm.h>
+
 #include <chrono>
 #include <condition_variable>
 #include <cstdint>
@@ -38,6 +39,7 @@
 #include <queue>
 #include <sstream>
 #include <thread>
+
 #include "../classification.h"
 #include "../common.h"
 #include "grpc++/grpc++.h"
@@ -63,37 +65,8 @@
 #define REGISTER_GRPC_INFER_THREAD_COUNT 2
 
 namespace triton { namespace server { namespace grpc {
+
 namespace {
-
-std::ostream&
-operator<<(std::ostream& out, const Steps& step)
-{
-  switch (step) {
-    case START:
-      out << "START";
-      break;
-    case COMPLETE:
-      out << "COMPLETE";
-      break;
-    case FINISH:
-      out << "FINISH";
-      break;
-    case ISSUED:
-      out << "ISSUED";
-      break;
-    case READ:
-      out << "READ";
-      break;
-    case WRITEREADY:
-      out << "WRITEREADY";
-      break;
-    case WRITTEN:
-      out << "WRITTEN";
-      break;
-  }
-
-  return out;
-}
 
 //
 // The server has separate handling mechanisms for inference RPCs
@@ -330,8 +303,8 @@ class CommonHandler : public HandlerBase {
   static std::pair<std::string, std::string> empty_restricted_key_;
 };
 
-std::pair<std::string, std::string> CommonHandler::empty_restricted_key_{"",
-                                                                         ""};
+std::pair<std::string, std::string> CommonHandler::empty_restricted_key_{
+    "", ""};
 
 CommonHandler::CommonHandler(
     const std::string& name,
@@ -1181,6 +1154,37 @@ CommonHandler::RegisterModelStatistics()
             err = compute_output_json.MemberAsUInt("ns", &ucnt);
             GOTO_IF_ERR(err, earlyexit);
             batch_statistics->mutable_compute_output()->set_ns(ucnt);
+          }
+        }
+
+        triton::common::TritonJson::Value memory_usage_json;
+        err = model_stat.MemberAsArray("memory_usage", &memory_usage_json);
+        GOTO_IF_ERR(err, earlyexit);
+
+        for (size_t idx = 0; idx < memory_usage_json.ArraySize(); ++idx) {
+          triton::common::TritonJson::Value usage;
+          err = memory_usage_json.IndexAsObject(idx, &usage);
+          GOTO_IF_ERR(err, earlyexit);
+
+          auto memory_usage = statistics->add_memory_usage();
+          {
+            const char* type;
+            size_t type_len;
+            err = usage.MemberAsString("type", &type, &type_len);
+            GOTO_IF_ERR(err, earlyexit);
+            memory_usage->set_type(std::string(type, type_len));
+          }
+          {
+            int64_t id;
+            err = usage.MemberAsInt("id", &id);
+            GOTO_IF_ERR(err, earlyexit);
+            memory_usage->set_id(id);
+          }
+          {
+            uint64_t byte_size;
+            err = usage.MemberAsUInt("byte_size", &byte_size);
+            GOTO_IF_ERR(err, earlyexit);
+            memory_usage->set_byte_size(byte_size);
           }
         }
       }
@@ -2239,13 +2243,6 @@ CommonHandler::RegisterRepositoryModelUnload()
       OnExecuteRepositoryModelUnload, true /* async */, cq_, restricted_kv);
 }
 
-//=========================================================================
-//  The following section contains the handling mechanism for inference
-//  RPCs such as ModelInfer and ModelStreamInfer. This implementation
-//  is tuned more towards performance and reducing the latency.
-//=========================================================================
-
-
 }  // namespace
 
 //
@@ -2320,16 +2317,19 @@ Server::Server(
         std::to_string(keepalive_options.keepalive_time_ms_)};
     table_printer.InsertRow(row);
 
-    row = {"keepalive_timeout_ms",
-           std::to_string(keepalive_options.keepalive_timeout_ms_)};
+    row = {
+        "keepalive_timeout_ms",
+        std::to_string(keepalive_options.keepalive_timeout_ms_)};
     table_printer.InsertRow(row);
 
-    row = {"keepalive_permit_without_calls",
-           std::to_string(keepalive_options.keepalive_permit_without_calls_)};
+    row = {
+        "keepalive_permit_without_calls",
+        std::to_string(keepalive_options.keepalive_permit_without_calls_)};
     table_printer.InsertRow(row);
 
-    row = {"http2_max_pings_without_data",
-           std::to_string(keepalive_options.http2_max_pings_without_data_)};
+    row = {
+        "http2_max_pings_without_data",
+        std::to_string(keepalive_options.http2_max_pings_without_data_)};
     table_printer.InsertRow(row);
 
     row = {
@@ -2338,8 +2338,9 @@ Server::Server(
             keepalive_options.http2_min_recv_ping_interval_without_data_ms_)};
     table_printer.InsertRow(row);
 
-    row = {"http2_max_ping_strikes",
-           std::to_string(keepalive_options.http2_max_ping_strikes_)};
+    row = {
+        "http2_max_ping_strikes",
+        std::to_string(keepalive_options.http2_max_ping_strikes_)};
     table_printer.InsertRow(row);
     LOG_VERBOSE(1) << table_printer.PrintTable();
   }

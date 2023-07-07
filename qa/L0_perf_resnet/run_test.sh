@@ -54,15 +54,13 @@ rm -fr models && mkdir -p models && \
             sed -i "s/^max_batch_size:.*/max_batch_size: ${MAX_BATCH}/" config.pbtxt && \
             echo "instance_group [ { count: ${INSTANCE_CNT} }]")
 
-# Onnx and onnx-trt models are very slow on Jetson.
 MEASUREMENT_WINDOW=5000
+PERF_CLIENT=../clients/perf_client
+# Onnx and onnx-trt models are very slow on Jetson.
 if [ "$ARCH" == "aarch64" ]; then
-    PERF_CLIENT=${TRITON_DIR}/clients/bin/perf_client
     if [ "$MODEL_FRAMEWORK" == "onnx" ] || [ "$MODEL_FRAMEWORK" == "onnx_trt" ]; then
         MEASUREMENT_WINDOW=20000
     fi
-else
-    PERF_CLIENT=../clients/perf_client
 fi
 
 # Overload use of PERF_CLIENT_PROTOCOL for convenience with existing test and 

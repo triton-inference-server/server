@@ -27,6 +27,14 @@
 
 SAGEMAKER_SINGLE_MODEL_REPO=/opt/ml/model/
 
+# Use 'ready' for ping check in single-model endpoint mode, and use 'live' for ping check in multi-model endpoint model
+# https://github.com/kserve/kserve/blob/master/docs/predict-api/v2/rest_predict_v2.yaml#L10-L26
+if [ -n "$SAGEMAKER_TRITON_OVERRIDE_PING_MODE" ]; then
+    SAGEMAKER_TRITON_PING_MODE=${SAGEMAKER_TRITON_OVERRIDE_PING_MODE}
+else
+    SAGEMAKER_TRITON_PING_MODE="ready" 
+fi
+
 # Note: in Triton on SageMaker, each model url is registered as a separate repository
 # e.g., /opt/ml/models/<hash>/model. Specifying MME model repo path as /opt/ml/models causes Triton
 # to treat it as an additional empty repository and changes 
@@ -42,8 +50,13 @@ if [ -n "$SAGEMAKER_MULTI_MODEL" ]; then
     if [ "$SAGEMAKER_MULTI_MODEL" == "true" ]; then
         mkdir -p ${SAGEMAKER_MULTI_MODEL_REPO}
         SAGEMAKER_MODEL_REPO=${SAGEMAKER_MULTI_MODEL_REPO}
+        if [ -n "$SAGEMAKER_TRITON_OVERRIDE_PING_MODE" ]; then
+            SAGEMAKER_TRITON_PING_MODE=${SAGEMAKER_TRITON_OVERRIDE_PING_MODE}
+        else
+            SAGEMAKER_TRITON_PING_MODE="live" 
+        fi
         is_mme_mode=true
-        echo "Triton is running in SageMaker MME mode." 
+        echo -e "Triton is running in SageMaker MME mode. Using Triton ping mode: \"${SAGEMAKER_TRITON_PING_MODE}\"" 
     fi
 fi
 
@@ -59,6 +72,22 @@ if [ -n "$SAGEMAKER_BIND_TO_PORT" ]; then
 fi
 if [ -n "$SAGEMAKER_SAFE_PORT_RANGE" ]; then
     SAGEMAKER_ARGS="${SAGEMAKER_ARGS} --sagemaker-safe-port-range=${SAGEMAKER_SAFE_PORT_RANGE}"
+fi
+if [ -n "$SAGEMAKER_TRITON_ALLOW_GRPC" ]; then
+    SAGEMAKER_ARGS="${SAGEMAKER_ARGS} --allow-grpc=${SAGEMAKER_TRITON_ALLOW_GRPC}"
+else
+    SAGEMAKER_ARGS="${SAGEMAKER_ARGS} --allow-grpc=false"
+fi
+if [ -n "$SAGEMAKER_TRITON_ALLOW_METRICS" ]; then
+    SAGEMAKER_ARGS="${SAGEMAKER_ARGS} --allow-metrics=${SAGEMAKER_TRITON_ALLOW_METRICS}"
+else
+    SAGEMAKER_ARGS="${SAGEMAKER_ARGS} --allow-metrics=false"
+fi
+if [ -n "$SAGEMAKER_TRITON_METRICS_PORT" ]; then
+    SAGEMAKER_ARGS="${SAGEMAKER_ARGS} --metrics-port=${SAGEMAKER_TRITON_METRICS_PORT}"
+fi
+if [ -n "$SAGEMAKER_TRITON_GRPC_PORT" ]; then
+    SAGEMAKER_ARGS="${SAGEMAKER_ARGS} --grpc-port=${SAGEMAKER_TRITON_GRPC_PORT}"
 fi
 if [ -n "$SAGEMAKER_TRITON_BUFFER_MANAGER_THREAD_COUNT" ]; then
     SAGEMAKER_ARGS="${SAGEMAKER_ARGS} --buffer-manager-thread-count=${SAGEMAKER_TRITON_BUFFER_MANAGER_THREAD_COUNT}"
@@ -100,6 +129,9 @@ if [ -n "$SAGEMAKER_TRITON_MODEL_LOAD_GPU_LIMIT" ]; then
         SAGEMAKER_ARGS="${SAGEMAKER_ARGS} --model-load-gpu-limit ${i}:${SAGEMAKER_TRITON_MODEL_LOAD_GPU_LIMIT}"
     done
 fi
+if [ -n "$SAGEMAKER_TRITON_ADDITIONAL_ARGS" ]; then
+    SAGEMAKER_ARGS="${SAGEMAKER_ARGS} ${SAGEMAKER_TRITON_ADDITIONAL_ARGS}"
+fi
 
 
 if [ "${is_mme_mode}" = false ] && [ -f "${SAGEMAKER_MODEL_REPO}/config.pbtxt" ]; then
@@ -134,4 +166,4 @@ elif [ "${is_mme_mode}" = false ]; then
     SAGEMAKER_ARGS="${SAGEMAKER_ARGS} --load-model=${SAGEMAKER_TRITON_DEFAULT_MODEL_NAME}"
 fi
 
-tritonserver --allow-sagemaker=true --allow-grpc=false --allow-http=false --allow-metrics=false --model-control-mode=explicit $SAGEMAKER_ARGS
+tritonserver --allow-sagemaker=true --allow-http=false --model-control-mode=explicit $SAGEMAKER_ARGS

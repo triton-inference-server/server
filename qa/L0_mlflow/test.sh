@@ -1,5 +1,5 @@
 #!/bin/bash
-# Copyright 2022, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright 2022-2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -30,6 +30,16 @@ export CUDA_VISIBLE_DEVICES=0
 source ../common/util.sh
 
 rm -fr *.log *.json
+
+# The default version of python 3.10.6 included in
+# Ubuntu 22.04 installs blinker 1.4. This doesn't 
+# work with the awscli which we try to install. 
+# Uninstalling blinker and allowing pip to install blinker 1.6 
+# fixes this issue. The alternative to this is to 
+# install a higher version of python which uses blinker 1.6,
+# but it is unknown whether this test should rely on 
+# the default installation of python.
+apt remove -y python3-blinker
 
 RET=0
 
@@ -63,8 +73,12 @@ EOF
 
 rm -rf ./models
 mkdir -p ./models
+# Put some models in model repository to make sure MLFlow plugin would ignore
+# model that is not registered via MLFlow
+cp -r ./mlflow-triton-plugin/examples/onnx_float32_int32_int32 ./models/existing_model
+
 SERVER=/opt/tritonserver/bin/tritonserver
-SERVER_ARGS="--model-repository=./models --strict-model-config=false --model-control-mode=explicit"
+SERVER_ARGS="--model-repository=./models --strict-model-config=false --model-control-mode=explicit --load-model=*"
 SERVER_LOG="./inference_server.log"
 run_server
 if [ "$SERVER_PID" == "0" ]; then
@@ -100,6 +114,10 @@ if [ $CLI_RET -eq 0 ]; then
     fi
     if [ `grep -c "onnx_float32_int32_int32.*READY" $CLI_LOG` != "1" ]; then
         echo -e "\n***\n*** Expect deployed 'triton' flavor model to be listed\n***"
+        CLI_RET=1
+    fi
+    if [ `grep -c "existing_model.*READY" $CLI_LOG` != "0" ]; then
+        echo -e "\n***\n*** Unexpected non-MLflow model listed\n***"
         CLI_RET=1
     fi
 fi

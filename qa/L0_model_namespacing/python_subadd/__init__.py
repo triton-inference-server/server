@@ -77,13 +77,13 @@ class TritonPythonModel:
     def execute(self, requests):
         """ This function is called on inference request.
         """
-                
+
         responses = []
         for request in requests:
             in_0 = pb_utils.get_input_tensor_by_name(request, "INPUT0")
             in_1 = pb_utils.get_input_tensor_by_name(request, "INPUT1")
-            responses.append(
-                pb_utils.InferenceResponse(self.subadd(in_0, in_1)))
+            responses.append(pb_utils.InferenceResponse(self.subadd(in_0,
+                                                                    in_1)))
         return responses
 
     def subadd(self, in_0, in_1):
@@ -96,7 +96,7 @@ class TritonPythonModel:
                             in_0.as_numpy() + in_1.as_numpy())
 
         out_tensor_0 = pb_utils.Tensor("OUTPUT0",
-                                        out_0.astype(self.output0_dtype))
+                                       out_0.astype(self.output0_dtype))
         out_tensor_1 = pb_utils.Tensor("OUTPUT1",
-                                        out_1.astype(self.output1_dtype))
+                                       out_1.astype(self.output1_dtype))
         return [out_tensor_0, out_tensor_1]
