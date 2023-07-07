@@ -1,5 +1,5 @@
 <!--
-# Copyright (c) 2018-2020, NVIDIA CORPORATION. All rights reserved.
+# Copyright 2018-2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -298,7 +298,8 @@ additional tensors that have to be transferred.
 
 Implicit state management requires backend support. Currently, only
 [onnxruntime_backend](https://github.com/triton-inference-server/onnxruntime_backend)
-and [tensorrt_backend](https://github.com/triton-inference-server/tensorrt_backend)
+[tensorrt_backend](https://github.com/triton-inference-server/tensorrt_backend),
+and [pytorch_backend](https://github.com/triton-inference-server/pytorch_backend)
 support implicit state.
 
 ##### State Initialization

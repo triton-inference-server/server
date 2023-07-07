@@ -28,6 +28,7 @@ import argparse
 import os
 import numpy as np
 import gen_ensemble_model_utils as emu
+from typing import List, Tuple
 
 FLAGS = None
 np_dtype_string = np.dtype(object)
@@ -95,6 +96,32 @@ def np_to_trt_dtype(np_dtype):
         return trt.float16
     elif np_dtype == np.float32:
         return trt.float32
+    return None
+
+
+def np_to_torch_dtype(np_dtype):
+    if np_dtype == bool:
+        return torch.bool
+    elif np_dtype == np.int8:
+        return torch.int8
+    elif np_dtype == np.int16:
+        return torch.int16
+    elif np_dtype == np.int32:
+        return torch.int
+    elif np_dtype == np.int64:
+        return torch.long
+    elif np_dtype == np.uint8:
+        return torch.uint8
+    elif np_dtype == np.uint16:
+        return None  # Not supported in Torch
+    elif np_dtype == np.float16:
+        return None
+    elif np_dtype == np.float32:
+        return torch.float
+    elif np_dtype == np.float64:
+        return torch.double
+    elif np_dtype == np_dtype_string:
+        return List[str]
     return None
 
 
@@ -380,6 +407,319 @@ def create_onnx_modelfile(models_dir, model_version, max_batch, dtype, shape,
         # This model assumes that the initial state contains correct data
         create_onnx_modelfile_with_initial_state(models_dir, model_version,
                                                  max_batch, dtype, shape)
+
+
+def create_libtorch_modelfile_wo_initial_state(models_dir, model_version,
+                                               max_batch, dtype, shape):
+    if not tu.validate_for_libtorch_model(dtype, dtype, dtype, shape, shape,
+                                          shape):
+        return
+
+    torch_dtype = np_to_torch_dtype(dtype)
+    # If input dtype is bool, then use bool type for control and
+    # int32 type for input/output
+    if torch_dtype == torch.bool:
+        torch_dtype = torch.int32
+
+    model_name = tu.get_sequence_model_name(
+        "libtorch_nobatch" if max_batch == 0 else "libtorch", dtype)
+
+    if torch_dtype == List[str]:
+
+        class SequenceNet(nn.Module):
+
+            def __init__(self):
+                super(SequenceNet, self).__init__()
+
+            def forward(self, input0: List[str], input0_state: List[str],
+                        start0, ready0) -> Tuple[List[str], List[str]]:
+                use_state = torch.logical_and(ready0, torch.logical_not(start0))
+
+                input0_state_int = torch.tensor(
+                    [int("0" + i) for i in input0_state],
+                    device=use_state.device)
+                input0_int = torch.tensor([int("0" + i) for i in input0],
+                                          device=use_state.device)
+                result_int = torch.mul(use_state, input0_state_int)
+                result_int += input0_int
+                result = [str(i.item()) for i in result_int.cpu()]
+                return result, result
+    else:
+
+        class SequenceNet(nn.Module):
+
+            def __init__(self):
+                super(SequenceNet, self).__init__()
+
+            def forward(self, input0, input0_state, start0, ready0):
+                use_state = torch.logical_and(ready0, torch.logical_not(start0))
+
+                result = torch.mul(use_state, input0_state)
+                result += input0
+                return result, result
+
+    traced = torch.jit.script(SequenceNet())
+    model_version_dir = models_dir + "/" + model_name + "/" + str(model_version)
+
+    try:
+        os.makedirs(model_version_dir)
+    except OSError as ex:
+        pass  # ignore existing dir
+
+    traced.save(model_version_dir + "/model.pt")
+
+
+def create_libtorch_modelfile_with_initial_state(models_dir, model_version,
+                                                 max_batch, dtype, shape):
+    if not tu.validate_for_libtorch_model(dtype, dtype, dtype, shape, shape,
+                                          shape):
+        return
+
+    torch_dtype = np_to_torch_dtype(dtype)
+
+    # If input dtype is bool, then use bool type for control and
+    # int32 type for input/output
+    if torch_dtype == torch.bool:
+        torch_dtype = torch.int32
+
+    model_name = tu.get_sequence_model_name(
+        "libtorch_nobatch" if max_batch == 0 else "libtorch", dtype)
+    # handle for -1 (when variable) since can't create tensor with shape of [-1]
+    if torch_dtype == List[str]:
+
+        class SequenceNet(nn.Module):
+
+            def __init__(self):
+                super(SequenceNet, self).__init__()
+
+            def forward(self, input0: List[str], input0_state: List[str],
+                        start0, ready0) -> Tuple[List[str], List[str]]:
+                input0_state_int = torch.tensor(
+                    [int("0" + i) for i in input0_state], device=start0.device)
+                input0_int = torch.tensor([int("0" + i) for i in input0],
+                                          device=start0.device)
+                result_int = (input0_state_int + input0_int).cpu()
+                result = [str(i.item()) for i in result_int]
+                return result, result
+    else:
+
+        class SequenceNet(nn.Module):
+
+            def __init__(self):
+                super(SequenceNet, self).__init__()
+
+            def forward(self, input0, input0_state, start0, ready0):
+                result = input0_state + input0
+                return result, result
+
+    sequenceModel = SequenceNet()
+
+    traced = torch.jit.script(sequenceModel)
+
+    model_version_dir = models_dir + "/" + model_name + "/" + str(model_version)
+
+    try:
+        os.makedirs(model_version_dir)
+    except OSError as ex:
+        pass  # ignore existing dir
+
+    traced.save(model_version_dir + "/model.pt")
+
+
+def create_libtorch_modelfile(models_dir, model_version, max_batch, dtype,
+                              shape, initial_state):
+    if initial_state is None:
+        create_libtorch_modelfile_wo_initial_state(models_dir, model_version,
+                                                   max_batch, dtype, shape)
+    else:
+        # This model assumes that the initial state contains correct data
+        create_libtorch_modelfile_with_initial_state(models_dir, model_version,
+                                                     max_batch, dtype, shape)
+
+
+def create_libtorch_modelconfig(models_dir, model_version, max_batch, dtype,
+                                shape, initial_state):
+    if not tu.validate_for_libtorch_model(dtype, dtype, dtype, shape, shape,
+                                          shape):
+        return
+
+    model_name = tu.get_sequence_model_name(
+        "libtorch_nobatch" if max_batch == 0 else "libtorch", dtype)
+    config_dir = models_dir + "/" + model_name
+
+    if dtype == np.float32:
+        control_type = "fp32"
+    elif dtype == bool:
+        control_type = "bool"
+        dtype = np.int32
+    else:
+        control_type = "int32"
+
+    instance_group_string = '''
+instance_group [
+  {
+    kind: KIND_GPU
+  }
+]
+'''
+
+    config = f'''
+name: "{model_name}"
+platform: "pytorch_libtorch"
+max_batch_size: {max_batch}
+
+input [
+  {{
+    name: "INPUT__0"
+    data_type: {emu.dtype_str(dtype)}
+    dims: [ {tu.shape_to_dims_str(shape)} ]
+  }}
+]
+output [
+  {{
+    name: "OUTPUT__0"
+    data_type: {emu.dtype_str(dtype)}
+    dims: [ {tu.shape_to_dims_str(shape)} ]
+  }}
+]
+'''
+    config += instance_group_string
+
+    # Prepare the shapes for initial state initialization
+    shape_without_variable_dims = []
+    for dim in shape:
+        if dim == -1:
+            shape_without_variable_dims.append(1)
+        else:
+            shape_without_variable_dims.append(dim)
+
+    if initial_state is None:
+        config += '''
+    sequence_batching {{
+      max_sequence_idle_microseconds: 5000000
+      control_input [
+        {{
+          name: "START__2"
+          control [
+            {{
+              kind: CONTROL_SEQUENCE_START
+              {type}_false_true: [ 0, 1 ]
+            }}
+          ]
+        }},
+        {{
+          name: "READY__3"
+          control [
+            {{
+              kind: CONTROL_SEQUENCE_READY
+              {type}_false_true: [ 0, 1 ]
+            }}
+          ]
+        }}
+      ]
+      state [
+        {{
+          input_name: "INPUT_STATE__1"
+          output_name: "OUTPUT_STATE__1"
+          data_type: {dtype}
+          dims: {dims}
+        }} 
+      ]
+    }}
+    '''.format(type=control_type,
+               dims=tu.shape_to_dims_str(shape),
+               dtype=emu.dtype_str(dtype))
+    elif initial_state == 'zero':
+        config += f'''
+    sequence_batching {{
+      max_sequence_idle_microseconds: 5000000
+      control_input [
+        {{
+          name: "START__2"
+          control [
+            {{
+              kind: CONTROL_SEQUENCE_START
+              {control_type}_false_true: [ 0, 1 ]
+            }}
+          ]
+        }},
+        {{
+          name: "READY__3"
+          control [
+            {{
+              kind: CONTROL_SEQUENCE_READY
+              {control_type}_false_true: [ 0, 1 ]
+            }}
+          ]
+        }}
+      ]
+      state [
+        {{
+          input_name: "INPUT_STATE__1"
+          output_name: "OUTPUT_STATE__1"
+          data_type: {emu.dtype_str(dtype)}
+          dims: {tu.shape_to_dims_str(shape)}
+          initial_state: {{
+              name: "state init"
+              data_type: {emu.dtype_str(dtype)}
+              dims: {tu.shape_to_dims_str(shape_without_variable_dims)}
+              zero_data: true
+          }}
+        }} 
+      ]
+    }}
+    '''
+    elif initial_state == 'file':
+        config += '''
+    sequence_batching {{
+      max_sequence_idle_microseconds: 5000000
+      control_input [
+        {{
+          name: "START__2"
+          control [
+            {{
+              kind: CONTROL_SEQUENCE_START
+              {type}_false_true: [ 0, 1 ]
+            }}
+          ]
+        }},
+        {{
+          name: "READY__3"
+          control [
+            {{
+              kind: CONTROL_SEQUENCE_READY
+              {type}_false_true: [ 0, 1 ]
+            }}
+          ]
+        }}
+      ]
+      state [
+        {{
+          input_name: "INPUT_STATE_1"
+          output_name: "OUTPUT_STATE_1"
+          data_type: {dtype}
+          dims: {dims}
+          initial_state: {{
+              name: "state init"
+              data_type: {dtype}
+              dims: {shape_without_variable_dims}
+              data_file: input_state_data
+          }}
+        }} 
+      ]
+    }}
+    '''.format(type=control_type,
+               dims=tu.shape_to_dims_str(shape),
+               dtype=emu.dtype_str(dtype),
+               shape_without_variable_dims=tu.shape_to_dims_str(
+                   shape_without_variable_dims))
+
+    try:
+        os.makedirs(config_dir)
+    except OSError as ex:
+        pass  # ignore existing dir
+    with open(config_dir + "/config.pbtxt", "w") as cfile:
+        cfile.write(config)
 
 
 def create_onnx_modelconfig(models_dir, model_version, max_batch, dtype, shape,
@@ -1027,6 +1367,21 @@ def create_models(models_dir, dtype, shape, initial_state, no_batch=True):
             create_plan_modelfile(models_dir, model_version, 0, dtype,
                                   shape + suffix)
 
+    if FLAGS.libtorch:
+        suffix = []
+        if dtype == np.int8:
+            suffix = [1, 1]
+
+        create_libtorch_modelconfig(models_dir, model_version, 8, dtype,
+                                    shape + suffix, initial_state)
+        create_libtorch_modelfile(models_dir, model_version, 8, dtype,
+                                  shape + suffix, initial_state)
+        if no_batch:
+            create_libtorch_modelconfig(models_dir, model_version, 0, dtype,
+                                        shape + suffix, initial_state)
+            create_libtorch_modelfile(models_dir, model_version, 0, dtype,
+                                      shape + suffix, initial_state)
+
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
@@ -1090,6 +1445,10 @@ if __name__ == '__main__':
 
     if FLAGS.tensorrt:
         import tensorrt as trt
+
+    if FLAGS.libtorch:
+        import torch
+        from torch import nn
 
     import test_util as tu
 
