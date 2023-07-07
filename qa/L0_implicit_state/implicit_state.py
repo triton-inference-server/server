@@ -37,7 +37,7 @@ from tritonclient.utils import InferenceServerException
 import unittest
 import test_util as tu
 
-BACKENDS = os.environ.get('BACKENDS', "onnx plan")
+BACKENDS = os.environ.get('BACKENDS', "onnx plan libtorch")
 
 
 class ImplicitStateTest(tu.TestResultCollector):
@@ -112,14 +112,25 @@ class ImplicitStateTest(tu.TestResultCollector):
 
     def test_request_output_not_allowed(self):
         triton_client = tritonhttpclient.InferenceServerClient("localhost:8000")
-        inputs = []
-        inputs.append(tritonhttpclient.InferInput('INPUT', [1], 'INT32'))
-        inputs[0].set_data_from_numpy(np.asarray([1], dtype=np.int32))
-
-        outputs = []
-        outputs.append(tritonhttpclient.InferRequestedOutput('OUTPUT_STATE'))
 
         for backend in BACKENDS.split(" "):
+            inputs = []
+            if backend.strip() == 'libtorch':
+                inputs.append(
+                    tritonhttpclient.InferInput('INPUT__0', [1], 'INT32'))
+            else:
+                inputs.append(tritonhttpclient.InferInput(
+                    'INPUT', [1], 'INT32'))
+            inputs[0].set_data_from_numpy(np.asarray([1], dtype=np.int32))
+
+            outputs = []
+            if backend.strip() == 'libtorch':
+                outputs.append(
+                    tritonhttpclient.InferRequestedOutput('OUTPUT_STATE__1'))
+            else:
+                outputs.append(
+                    tritonhttpclient.InferRequestedOutput('OUTPUT_STATE'))
+
             with self.assertRaises(InferenceServerException) as e:
                 triton_client.infer(
                     model_name=f"{backend}_nobatch_sequence_int32",
@@ -128,21 +139,35 @@ class ImplicitStateTest(tu.TestResultCollector):
                     sequence_id=1,
                     sequence_start=True,
                     sequence_end=True)
-            self.assertIn(
-                "unexpected inference output 'OUTPUT_STATE' for model",
-                str(e.exception))
+            if backend.strip() == 'libtorch':
+                self.assertIn(
+                    "unexpected inference output 'OUTPUT_STATE__1' for model",
+                    str(e.exception))
+            else:
+                self.assertIn(
+                    "unexpected inference output 'OUTPUT_STATE' for model",
+                    str(e.exception))
 
     def test_request_output(self):
         triton_client = tritonhttpclient.InferenceServerClient("localhost:8000")
-        inputs = []
-        inputs.append(tritonhttpclient.InferInput('INPUT', [1], 'INT32'))
-        inputs[0].set_data_from_numpy(np.asarray([1], dtype=np.int32))
-
-        outputs = []
-        outputs.append(tritonhttpclient.InferRequestedOutput('OUTPUT_STATE'))
-        outputs.append(tritonhttpclient.InferRequestedOutput('OUTPUT'))
-
         for backend in BACKENDS.split(" "):
+            inputs = []
+            if backend.strip() == 'libtorch':
+                inputs.append(
+                    tritonhttpclient.InferInput('INPUT__0', [1], 'INT32'))
+            inputs[0].set_data_from_numpy(np.asarray([1], dtype=np.int32))
+
+            outputs = []
+            if backend.strip() == 'libtorch':
+                outputs.append(
+                    tritonhttpclient.InferRequestedOutput('OUTPUT_STATE__1'))
+                outputs.append(
+                    tritonhttpclient.InferRequestedOutput('OUTPUT__0'))
+            else:
+                outputs.append(
+                    tritonhttpclient.InferRequestedOutput('OUTPUT_STATE'))
+                outputs.append(tritonhttpclient.InferRequestedOutput('OUTPUT'))
+
             result = triton_client.infer(
                 model_name=f"{backend}_nobatch_sequence_int32_output",
                 inputs=inputs,
@@ -150,8 +175,12 @@ class ImplicitStateTest(tu.TestResultCollector):
                 sequence_id=1,
                 sequence_start=True,
                 sequence_end=True)
-            self.assertTrue(result.as_numpy('OUTPUT_STATE')[0], 1)
-            self.assertTrue(result.as_numpy('OUTPUT')[0], 1)
+            if backend.strip() == 'libtorch':
+                self.assertTrue(result.as_numpy('OUTPUT_STATE__1')[0], 1)
+                self.assertTrue(result.as_numpy('OUTPUT__0')[0], 1)
+            else:
+                self.assertTrue(result.as_numpy('OUTPUT_STATE')[0], 1)
+                self.assertTrue(result.as_numpy('OUTPUT')[0], 1)
 
 
 if __name__ == '__main__':

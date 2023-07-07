@@ -341,6 +341,10 @@ python3 $SRCDIR/gen_qa_sequence_models.py --libtorch --models_dir=$SEQDESTDIR
 chmod -R 777 $SEQDESTDIR
 python3 $SRCDIR/gen_qa_sequence_models.py --libtorch --variable --models_dir=$VARSEQDESTDIR
 chmod -R 777 $VARSEQDESTDIR
+python3 $SRCDIR/gen_qa_implicit_models.py --libtorch --models_dir=$IMPLICITSEQDESTDIR
+chmod -R 777 $IMPLICITSEQDESTDIR
+python3 $SRCDIR/gen_qa_implicit_models.py --libtorch --variable --models_dir=$VARIMPLICITSEQDESTDIR
+chmod -R 777 $VARIMPLICITSEQDESTDIR
 python3 $SRCDIR/gen_qa_dyna_sequence_models.py --libtorch --models_dir=$DYNASEQDESTDIR
 chmod -R 777 $DYNASEQDESTDIR
 python3 $SRCDIR/gen_qa_torchtrt_models.py --models_dir=$TORCHTRTDESTDIR

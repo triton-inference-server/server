@@ -191,6 +191,9 @@ function get_datatype () {
     if [[ $1 == "onnx" ]]; then
         dtype="object int32 bool"
     fi
+    if [[ $1 == "libtorch" ]]; then
+        dtype="object int32 bool"
+    fi
   fi
   echo $dtype
 }
@@ -268,6 +271,10 @@ fi
 
 for MODEL in $MODELS; do
   if [[ ! "$TEST_VALGRIND" -eq 1 ]]; then
+    # Skip libtorch string models
+    if [[ "$MODEL" =~ .*"libtorch".*"object".* ]]; then
+        continue
+    fi
     if [[ "$MODEL" =~ .*"python".* ]]; then
       generate_python_models "$MODEL" "models1"
     else
@@ -277,6 +284,11 @@ for MODEL in $MODELS; do
         sed -i "s/^max_batch_size:.*/max_batch_size: 4/" config.pbtxt && \
         sed -i "s/kind: KIND_GPU/kind: KIND_GPU\\ncount: 1/" config.pbtxt && \
         sed -i "s/kind: KIND_CPU/kind: KIND_CPU\\ncount: 1/" config.pbtxt)
+
+    # Skip libtorch string models
+    if [[ "$MODEL" =~ .*"libtorch".*"object".* ]]; then
+        continue
+    fi
 
     if [[ "$MODEL" =~ .*"python".* ]]; then
       generate_python_models "$MODEL" "models2"
@@ -443,6 +455,10 @@ for BACKEND in $BACKENDS; do
 done
 
 for MODEL in $MODELS; do
+  # Skip libtorch string models
+  if [[ "$MODEL" =~ .*"libtorch".*"object".* ]]; then
+      continue
+  fi
   if [[ "$MODEL" =~ .*"python".* ]]; then
       generate_python_models "$MODEL" "modelsv"
   else
