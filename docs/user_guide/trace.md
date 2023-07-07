@@ -430,6 +430,7 @@ The meaning of the trace timestamps is:
 ## OpenTelemetry trace support
 
 Triton provides an option to generate and export traces 
+for standalone and ensemble models
 using [OpenTelemetry APIs and SDKs](https://opentelemetry.io/). 
 
 To specify OpenTelemetry mode for tracing, specify the `--trace-config` 
