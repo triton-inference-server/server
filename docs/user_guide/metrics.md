@@ -51,7 +51,7 @@ enabled. If http service is not enabled, the metric address will bind to `0.0.0.
 by default. To uniquely specify the metric endpoint, `--metrics-address` option
 can be used. See the `tritonserver --help` output for more info on these CLI options.
 
-To change the interval at which's metrics are polled/updated, see the `--metrics-interval-ms` flag. Metrics that are updated "Per Request" are unaffected by this interval setting. This interval only applies to metrics that are designated as "Per Interval" in the tables of each section below:
+To change the interval at which metrics are polled/updated, see the `--metrics-interval-ms` flag. Metrics that are updated "Per Request" are unaffected by this interval setting. This interval only applies to metrics that are designated as "Per Interval" in the tables of each section below:
 
 - [Inference Request Metrics](#inference-request-metrics)
 - [GPU Metrics](#gpu-metrics)
