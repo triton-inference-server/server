@@ -155,6 +155,9 @@ class ImplicitStateTest(tu.TestResultCollector):
             if backend.strip() == 'libtorch':
                 inputs.append(
                     tritonhttpclient.InferInput('INPUT__0', [1], 'INT32'))
+            else:
+                inputs.append(tritonhttpclient.InferInput(
+                    'INPUT', [1], 'INT32'))
             inputs[0].set_data_from_numpy(np.asarray([1], dtype=np.int32))
 
             outputs = []
