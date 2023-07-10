@@ -149,7 +149,7 @@ wait $SERVER_PID
 
 set +e
 
-# Expect only the requests after calling trace API are traced 
+# Expect only the requests after calling trace API are traced
 $TRACE_SUMMARY -t trace_off_to_min.log > summary_off_to_min.log
 
 if [ `grep -c "COMPUTE_INPUT_END" summary_off_to_min.log` != "20" ]; then
@@ -188,7 +188,7 @@ if [ "$code" != "200" ]; then
     echo -e "\n***\n*** Test Failed\n***"
     RET=1
 fi
-# Check if the current setting is returned (not specified setting from global) 
+# Check if the current setting is returned (not specified setting from global)
 if [ `grep -c "\"trace_level\":\[\"TIMESTAMPS\"\]" ./curl.out` != "1" ]; then
     RET=1
 fi
@@ -213,7 +213,7 @@ if [ "$code" != "200" ]; then
     RET=1
 fi
 
-# Check if the current setting is returned (not specified setting from global) 
+# Check if the current setting is returned (not specified setting from global)
 if [ `grep -c "\"trace_level\":\[\"TIMESTAMPS\"\]" ./curl.out` != "1" ]; then
     RET=1
 fi
@@ -350,7 +350,7 @@ done
 rm -f ./curl.out
 set +e
 
-# Clear trace setting by explicitly asking removal for every feild except 'trace_rate'
+# Clear trace setting by explicitly asking removal for every field except 'trace_rate'
 rm -f ./curl.out
 set +e
 code=`curl -s -w %{http_code} -o ./curl.out -d'{"trace_file":null, "trace_level":null}' localhost:8000/v2/models/simple/trace/setting`
@@ -513,7 +513,7 @@ for p in {1..10}; do
     fi
 done
 
-# Check the current setting agian and expect 'trace_count' becomes 0
+# Check the current setting again and expect 'trace_count' becomes 0
 rm -f ./curl.out
 set +e
 code=`curl -s -w %{http_code} -o ./curl.out localhost:8000/v2/models/simple/trace/setting`
@@ -658,12 +658,12 @@ set -e
 kill $SERVER_PID
 wait $SERVER_PID
 
-set +e 
+set +e
 
 # Check opentelemetry trace exporter sends proper info.
-# A helper python script starts listenning on $OTLP_PORT, where
-# OTLP exporter sends traces. 
-# Unittests then check that produced spans have expected format and events 
+# A helper python script starts listening on $OTLP_PORT, where
+# OTLP exporter sends traces.
+# Unittests then check that produced spans have expected format and events
 # FIXME: Redesign this test to remove time sensitivity
 
 OPENTELEMETRY_TEST=opentelemetry_unittest.py
@@ -693,14 +693,14 @@ apt-get update && apt-get install -y netcat
 nc -l -k 127.0.0.1 $OTLP_PORT >> $TRACE_COLLECTOR_LOG 2>&1 & COLLECTOR_PID=$!
 
 set +e
-# Preparing traces for unittest. 
-# Note: need to run this separately, to speed up trace collection. 
+# Preparing traces for unittest.
+# Note: need to run this separately, to speed up trace collection.
 # Otherwise internal (opentelemetry_unittest.OpenTelemetryTest.setUp) check
 # will slow down collection.
 python -c 'import opentelemetry_unittest; \
         opentelemetry_unittest.prepare_traces()' >>$CLIENT_LOG 2>&1
 
-# Unittest will not start untill expected number of spans is collected.
+# Unittest will not start until expected number of spans is collected.
 python $OPENTELEMETRY_TEST >>$OPENTELEMETRY_LOG 2>&1
 if [ $? -ne 0 ]; then
     cat $OPENTELEMETRY_LOG

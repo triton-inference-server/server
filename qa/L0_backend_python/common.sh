@@ -67,7 +67,7 @@ create_conda_env() {
 create_conda_env_with_specified_path() {
   local python_version=$1
   local env_path=$2
-  conda create -p $env_path python=$python_version -y 
+  conda create -p $env_path python=$python_version -y
   conda activate $env_path
   conda install -c conda-forge conda-pack -y
 }
