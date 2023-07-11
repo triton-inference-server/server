@@ -467,6 +467,9 @@ InferGRPCToInput(
 #endif
       }
     } else {
+      TRITONSERVER_DataType dtype =
+	TRITONSERVER_StringToDataType(io.datatype().c_str());
+
       if (io.has_contents() && (!request.raw_input_contents().empty())) {
         return TRITONSERVER_ErrorNew(
             TRITONSERVER_ERROR_INVALID_ARG,
@@ -477,8 +480,6 @@ InferGRPCToInput(
                 .c_str());
       } else if (io.has_contents()) {
         // Check the presence of explicit tensors
-        TRITONSERVER_DataType dtype =
-            TRITONSERVER_StringToDataType(io.datatype().c_str());
         const size_t elem_byte_size = TRITONSERVER_DataTypeByteSize(dtype);
         if (io.contents().bool_contents_size() != 0) {
           RETURN_IF_ERR(InferGRPCToInputHelper(
@@ -497,10 +498,9 @@ InferGRPCToInput(
             auto& serialized = serialized_data->back();
             serialized.reserve(
                 io.contents().int_contents_size() * elem_byte_size);
-            for (const auto& element : io.contents().int_contents()) {
-	      int8_t element_value = static_cast<int8_t>(element);
+            for (const int8_t element : io.contents().int_contents()) {
               serialized.append(
-                  reinterpret_cast<const char*>(&element_value), elem_byte_size);
+                  reinterpret_cast<const char*>(&element), elem_byte_size);
             }
             base = serialized.c_str();
             byte_size = serialized.size();
@@ -512,10 +512,9 @@ InferGRPCToInput(
             auto& serialized = serialized_data->back();
             serialized.reserve(
                 io.contents().int_contents_size() * elem_byte_size);
-            for (const auto& element : io.contents().int_contents()) {
-	      int16_t element_value = static_cast<int16_t>(element);
+            for (const int16_t element : io.contents().int_contents()) {
               serialized.append(
-                  reinterpret_cast<const char*>(&element_value), elem_byte_size);
+                  reinterpret_cast<const char*>(&element), elem_byte_size);
             }
             base = serialized.c_str();
             byte_size = serialized.size();
@@ -545,10 +544,9 @@ InferGRPCToInput(
             auto& serialized = serialized_data->back();
             serialized.reserve(
                 io.contents().uint_contents_size() * elem_byte_size);
-            for (const auto& element : io.contents().uint_contents()) {
- 	      uint8_t element_value = static_cast<uint8_t>(element);
+            for (const uint8_t element : io.contents().uint_contents()) {
               serialized.append(
-                  reinterpret_cast<const char*>(&element_value), elem_byte_size);
+                  reinterpret_cast<const char*>(&element), elem_byte_size);
             }
             base = serialized.c_str();
             byte_size = serialized.size();
@@ -560,10 +558,9 @@ InferGRPCToInput(
             auto& serialized = serialized_data->back();
             serialized.reserve(
                 io.contents().uint_contents_size() * elem_byte_size);
-            for (const auto& element : io.contents().uint_contents()) {
-	      uint16_t element_value = static_cast<uint16_t>(element);
+            for (const uint16_t element : io.contents().uint_contents()) {
               serialized.append(
-                  reinterpret_cast<const char*>(&element_value), elem_byte_size);
+                  reinterpret_cast<const char*>(&element), elem_byte_size);
             }
             base = serialized.c_str();
             byte_size = serialized.size();
@@ -627,6 +624,7 @@ InferGRPCToInput(
         const std::string& raw = request.raw_input_contents()[index++];
         base = raw.c_str();
         byte_size = raw.size();
+	LittleEndianToHost(dtype, const_cast<char *>(static_cast<const char *>(base)), byte_size);	
       } else {
         return TRITONSERVER_ErrorNew(
             TRITONSERVER_ERROR_INVALID_ARG,

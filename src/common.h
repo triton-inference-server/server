@@ -70,6 +70,15 @@ const std::vector<std::string> TRITON_RESERVED_REQUEST_PARAMS{
     }                                                                  \
   } while (false)
 
+#define RETURN_VAL_IF_ERR(X, VAL)      \
+  do {                                 \
+    TRITONSERVER_Error* err__ = (X);   \
+    if (err__ != nullptr) {            \
+      TRITONSERVER_ErrorDelete(err__); \
+      return VAL;                      \
+    }                                  \
+  } while (false)
+
 #define GOTO_IF_ERR(X, T)            \
   do {                               \
     TRITONSERVER_Error* err__ = (X); \
@@ -96,17 +105,17 @@ const std::vector<std::string> TRITON_RESERVED_REQUEST_PARAMS{
     }                                                             \
   } while (false)
 
-#define THROW_IF_ERR(EX_TYPE, X, MSG)                     \
-  do {                                                    \
-    TRITONSERVER_Error* err__ = (X);                      \
-    if (err__ != nullptr) {                               \
+#define THROW_IF_ERR(EX_TYPE, X, MSG)                   \
+  do {                                                  \
+    TRITONSERVER_Error* err__ = (X);                    \
+    if (err__ != nullptr) {                             \
       auto ex__ = (EX_TYPE)(                            \
           std::string("error: ") + (MSG) + ": " +       \
           TRITONSERVER_ErrorCodeString(err__) + " - " + \
-          TRITONSERVER_ErrorMessage(err__)); \
-      TRITONSERVER_ErrorDelete(err__);                    \
-      throw ex__;                                         \
-    }                                                     \
+          TRITONSERVER_ErrorMessage(err__));            \
+      TRITONSERVER_ErrorDelete(err__);                  \
+      throw ex__;                                       \
+    }                                                   \
   } while (false)
 
 #define IGNORE_ERR(X)                  \
@@ -168,5 +177,36 @@ bool Contains(const std::vector<std::string>& vec, const std::string& str);
 /// \param delim The delimiter to join with.
 /// \return The joint string.
 std::string Join(const std::vector<std::string>& vec, const std::string& delim);
+
+
+#if defined(__BYTE_ORDER__) && (__BYTE_ORDER__ == __ORDER_BIG_ENDIAN__)
+
+#define TRITON_BIG_ENDIAN true
+void HostToLittleEndian(
+    TRITONSERVER_DataType datatype, char* base, size_t byte_size);
+void LittleEndianToHost(
+    TRITONSERVER_DataType datatype, char* base, size_t byte_size);
+void LittleEndianToHost(
+    TRITONSERVER_DataType datatype, char* base, size_t byte_size,
+    std::vector<char*>& partial_result, size_t& offset);
+TRITONSERVER_DataType GetDataTypeForRawInput(
+    TRITONSERVER_Server* server, const std::string& model_name,
+    const int64_t model_version);
+
+#else
+
+#undef TRITON_BIG_ENDIAN
+#define HostToLittleEndian(datatype, base, size) \
+  do {                                           \
+  } while (0)
+#define LittleEndianToHost(datatype, base, size, ...) \
+  do {                                                \
+  } while (0)
+#define GetDataTypeForRawInput(server, model_name, model_version) \
+  do {                                                            \
+  } while (0)
+
+#endif  // if defined(__BYTE_ORDER__) && (__BYTE_ORDER__ = __ORDER_BIG_ENDIAN__)
+
 
 }}  // namespace triton::server

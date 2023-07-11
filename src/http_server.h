@@ -310,8 +310,9 @@ class HTTPAPIServer : public HTTPServer {
       evbuffer* input_buffer, InferRequestClass* infer_req,
       size_t header_length);
   TRITONSERVER_Error* EVBufferToRawInput(
-      const std::string& model_name, TRITONSERVER_InferenceRequest* irequest,
-      evbuffer* input_buffer, InferRequestClass* infer_req);
+      const std::string& model_name, const int64_t requested_model_version,
+      TRITONSERVER_InferenceRequest* irequest, evbuffer* input_buffer,
+      InferRequestClass* infer_req);
 
   static void OKReplyCallback(evthr_t* thr, void* arg, void* shared);
   static void BADReplyCallback(evthr_t* thr, void* arg, void* shared);
