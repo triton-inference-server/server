@@ -108,6 +108,12 @@ if(${TRITON_ENABLE_HTTP} OR ${TRITON_ENABLE_GRPC})
     ../common.cc	
   )
 
+  target_compile_definitions(
+      endian_conversion_test
+      PRIVATE
+      TRITON_BIG_ENDIAN=true
+  )
+  
   set_target_properties(
     endian_conversion_test
     PROPERTIES
