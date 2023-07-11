@@ -123,69 +123,87 @@ Join(const std::vector<std::string>& vec, const std::string& delim)
 
 #ifdef TRITON_BIG_ENDIAN
 
+/// Returns uint16_t input with byte order swapped
+///
+/// \param[in] input 
+/// \return input with byte order swapped
+///
 uint16_t
 bswap(const uint16_t input)
 {
   return __builtin_bswap16(input);
 }
+
+/// Returns uint32_t input with byte order swapped
+///
+/// \param[in] input
+/// \return input with byte order swapped
+///
 uint32_t
 bswap(const uint32_t input)
 {
   return __builtin_bswap32(input);
 }
 
-uint32_t
-bswap_length(
-    const uint32_t length, const bool host_to_little_endian,
-    uint32_t* host_length)
-{
-  uint32_t swapped = bswap(length);
-  if (host_to_little_endian) {
-    *host_length = length;
-  } else {
-    *host_length = swapped;
-  }
-  return swapped;
-}
-
+/// Returns uint64_t input with byte order swapped
+///
+/// \param[in] input
+/// \return input with byte order swapped
+///
 uint64_t
 bswap(const uint64_t input)
 {
   return __builtin_bswap64(input);
 }
 
-template <typename T>
-void
-SwapEndian(char* buffer, size_t size)
+/// Returns uint32_t length with byte order swapped and
+/// returns length in host byte order.
+///
+/// \param[in] length
+/// \param[in] host_byte_order whether original length is in host byte order
+/// \param[out] host_length length in host byte order
+/// \return length with byte order swapped
+///
+uint32_t
+bswap_length(
+    const uint32_t length, const bool host_byte_order, uint32_t* host_length)
 {
-  for (size_t offset = 0; offset < size;
-       offset += sizeof(T), buffer += sizeof(T)) {
-    T* temp = reinterpret_cast<T*>(buffer);
-    *temp = bswap(*temp);
-  }
+  uint32_t swapped = bswap(length);
+  *host_length = host_byte_order ? length : swapped;
+  return swapped;
 }
 
+/// Swaps length byte order in place with support for non coniguous
+/// arrays and returns length in host byte order. For
+/// non-contiguous arrays the initial call must pass an empty partial result.
+///
+/// \param[in, out ] base pointer to array with length
+/// \param[in]] byte_size size of array
+/// \param[in] host_byte_order whether original length is in host byte order
+/// \param[out] host_length length in host byte order
+/// \param[in, out] partial_result vector for partial results.
+///
 void
 bswap_length_partial(
-    char* buffer, size_t size, const bool host_to_little_endian,
+    char* base, size_t byte_size, const bool host_byte_order,
     uint32_t* host_length, std::vector<char*>& partial_result)
 {
   *host_length = 0;
-  
+
   if (partial_result.size()) {
-    size_t offset = 0;
-    for (; (partial_result.size() < sizeof(uint32_t)) && (offset < size);
-         ++offset, ++buffer) {
-      partial_result.emplace_back(buffer);
+    for (size_t offset = 0,
+                remaining = sizeof(uint32_t) - partial_result.size();
+         (remaining) && (offset < byte_size); ++offset, ++base, --remaining) {
+      partial_result.emplace_back(base);
     }
     if (partial_result.size() == sizeof(uint32_t)) {
       char* host_length_buffer = reinterpret_cast<char*>(host_length);
       for (size_t left_index = 0, right_index = sizeof(uint32_t) - 1;
-           left_index < right_index; left_index += 1, right_index -= 1) {
-        uint8_t temp = *partial_result[right_index];
+           left_index < right_index; ++left_index, --right_index) {
+        char temp = *partial_result[right_index];
         *partial_result[right_index] = *partial_result[left_index];
         *partial_result[left_index] = temp;
-        if (host_to_little_endian) {
+        if (host_byte_order) {
           host_length_buffer[right_index] = *partial_result[left_index];
           host_length_buffer[left_index] = *partial_result[right_index];
         } else {
@@ -199,32 +217,55 @@ bswap_length_partial(
     return;
   }
 
-  if (size >= sizeof(uint32_t)) {
-    uint32_t* value = reinterpret_cast<uint32_t*>(buffer);
-    *value = bswap_length(*value, host_to_little_endian, host_length);
+  if (byte_size >= sizeof(uint32_t)) {
+    uint32_t* value = reinterpret_cast<uint32_t*>(base);
+    *value = bswap_length(*value, host_byte_order, host_length);
     return;
   }
 
-  for (; size; --size, ++buffer) {
-    partial_result.emplace_back(buffer);
+  for (; byte_size; --byte_size, ++base) {
+    partial_result.emplace_back(base);
   }
 }
 
+/// Swaps byte order in place
+///
+/// \param[in, out] base pointer to array of data type elements to convert
+/// \param[in] byte_size size of array in bytes
+///
 template <typename T>
 void
-SwapEndian(char* buffer, size_t size, std::vector<char*>& partial_result)
+SwapEndian(char* base, size_t byte_size)
+{
+  T* value = reinterpret_cast<T*>(base);
+  for (size_t offset = 0; offset < byte_size; offset += sizeof(T), ++value) {
+    *value = bswap(*value);
+  }
+}
+
+/// Swaps byte order in place with support for non-contiguous arrays. For
+/// non-contiguous arrays the initial call must pass an empty partial result.
+///
+/// \param[in, out] base pointer to array of data type elements to convert
+/// \param[in] byte_size size of array in bytes
+/// \param[in, out] partial_result vector to store partial results
+///
+template <typename T>
+void
+SwapEndian(char* base, size_t byte_size, std::vector<char*>& partial_result)
 {
   size_t offset = 0;
 
   if (partial_result.size()) {
-    for (; (partial_result.size() < sizeof(T)) && (offset < size);
-         ++offset, ++buffer) {
-      partial_result.emplace_back(buffer);
+    for (size_t remaining = sizeof(T) - partial_result.size();
+         (remaining > 0) && (offset < byte_size);
+         ++offset, ++base, --remaining) {
+      partial_result.emplace_back(base);
     }
     if (partial_result.size() == sizeof(T)) {
       for (size_t left_index = 0, right_index = sizeof(T) - 1;
-           left_index < right_index; left_index += 1, right_index -= 1) {
-        uint8_t temp = *partial_result[right_index];
+           left_index < right_index; ++left_index, --right_index) {
+        char temp = *partial_result[right_index];
         *partial_result[right_index] = *partial_result[left_index];
         *partial_result[left_index] = temp;
       }
@@ -232,50 +273,57 @@ SwapEndian(char* buffer, size_t size, std::vector<char*>& partial_result)
     }
   }
 
-  T* value = reinterpret_cast<T*>(buffer);
-  for (; size - offset >= sizeof(T); offset += sizeof(T), ++value) {
+  T* value = reinterpret_cast<T*>(base);
+  for (; byte_size - offset >= sizeof(T); offset += sizeof(T), ++value) {
     *value = bswap(*value);
   }
 
-  buffer = reinterpret_cast<char*>(value);
-
-  for (; offset < size; ++offset, ++buffer) {
-    partial_result.emplace_back(buffer);
+  base = reinterpret_cast<char*>(value);
+  for (; offset < byte_size; ++offset, ++base) {
+    partial_result.emplace_back(base);
   }
 }
 
 
+/// Swaps byte order in place.
+///
+/// \param[in] datatype data type of array
+/// \param[in, out] base pointer to array of data type elements to convert
+/// \param[in] byte_size size of array in bytes
+/// \param[in] host_byte_order whether original array is in host byte
+/// order
+///
 void
 SwapEndian(
-    TRITONSERVER_DataType datatype, char* buffer, size_t size,
-    bool host_to_little_endian)
+    TRITONSERVER_DataType datatype, char* base, size_t byte_size,
+    bool host_byte_order)
 {
   switch (datatype) {
     case TRITONSERVER_TYPE_UINT16:
     case TRITONSERVER_TYPE_INT16:
     case TRITONSERVER_TYPE_FP16: {
-      SwapEndian<uint16_t>(buffer, size);
+      SwapEndian<uint16_t>(base, byte_size);
       break;
     }
     case TRITONSERVER_TYPE_UINT32:
     case TRITONSERVER_TYPE_INT32:
     case TRITONSERVER_TYPE_FP32: {
-      SwapEndian<uint32_t>(buffer, size);
+      SwapEndian<uint32_t>(base, byte_size);
       break;
     }
     case TRITONSERVER_TYPE_UINT64:
     case TRITONSERVER_TYPE_INT64:
     case TRITONSERVER_TYPE_FP64: {
-      SwapEndian<uint64_t>(buffer, size);
+      SwapEndian<uint64_t>(base, byte_size);
       break;
     }
     case TRITONSERVER_TYPE_BYTES: {
-      size_t offset = 0;
-      uint32_t host_len;
-      while (offset < size) {
-        uint32_t* temp = reinterpret_cast<uint32_t*>(buffer + offset);
-        *temp = bswap_length(*temp, host_to_little_endian, &host_len);
-        offset += sizeof(uint32_t) + host_len;
+      size_t next_offset = 0;
+      uint32_t host_length = 0;
+      while (next_offset < byte_size) {
+        uint32_t* length = reinterpret_cast<uint32_t*>(base + next_offset);
+        *length = bswap_length(*length, host_byte_order, &host_length);
+        next_offset += sizeof(uint32_t) + host_length;
       }
       break;
     }
@@ -284,45 +332,60 @@ SwapEndian(
   }
 }
 
+/// Swaps byte order in place with support for non-contiguous arrays. For
+/// non-contiguous arrays the initial call must pass an empty partial result and
+/// 0 for the initial next_offset. Subsequent calls should pass the returned
+/// values without modification.
+///
+/// \param[in] datatype data type of array
+/// \param[in, out] base pointer to array of data type elements to convert
+/// \param[in] byte_size size of array in bytes
+/// \param[in] host_byte_order whether original array is in host byte
+/// order
+/// \param[in, out] partial_result vector to store partial results
+/// \param[in, out] next_offset intermediate value used for storing next offset
+/// for BYTES data type
+///
 void
 SwapEndian(
-    TRITONSERVER_DataType datatype, char* buffer, size_t size,
-    bool host_to_little_endian, std::vector<char*>& partial_result,
-    size_t& offset)
+    TRITONSERVER_DataType datatype, char* base, size_t byte_size,
+    bool host_byte_order, std::vector<char*>& partial_result,
+    size_t& next_offset)
 {
   switch (datatype) {
     case TRITONSERVER_TYPE_UINT16:
     case TRITONSERVER_TYPE_INT16:
     case TRITONSERVER_TYPE_FP16: {
-      SwapEndian<uint16_t>(buffer, size, partial_result);
+      SwapEndian<uint16_t>(base, byte_size, partial_result);
       break;
     }
     case TRITONSERVER_TYPE_UINT32:
     case TRITONSERVER_TYPE_INT32:
     case TRITONSERVER_TYPE_FP32: {
-      SwapEndian<uint32_t>(buffer, size, partial_result);
+      SwapEndian<uint32_t>(base, byte_size, partial_result);
       break;
     }
     case TRITONSERVER_TYPE_UINT64:
     case TRITONSERVER_TYPE_INT64:
     case TRITONSERVER_TYPE_FP64: {
-      SwapEndian<uint64_t>(buffer, size, partial_result);
+      SwapEndian<uint64_t>(base, byte_size, partial_result);
       break;
     }
     case TRITONSERVER_TYPE_BYTES: {
-      uint32_t host_len=0;
-      while (offset < size) {
-	size_t incoming_partial_result_size = partial_result.size();
+      uint32_t host_length = 0;
+      while (next_offset < byte_size) {
+        size_t partial_offset = partial_result.size();
         bswap_length_partial(
-            buffer + offset, size - offset, host_to_little_endian, &host_len,
-            partial_result);
+            base + next_offset, byte_size - next_offset, host_byte_order,
+            &host_length, partial_result);
         if (partial_result.size() == 0) {
-          offset += host_len + sizeof(uint32_t)-incoming_partial_result_size;
+          next_offset += sizeof(uint32_t) - partial_offset + host_length;
         } else {
-          offset = size;
+          next_offset = 0;
+          return;
         }
       }
-      offset -= size;
+      next_offset -= byte_size;
       break;
     }
     default: {
@@ -345,9 +408,9 @@ LittleEndianToHost(TRITONSERVER_DataType datatype, char* base, size_t byte_size)
 void
 LittleEndianToHost(
     TRITONSERVER_DataType datatype, char* base, size_t byte_size,
-    std::vector<char*>& partial_result, size_t& offset)
+    std::vector<char*>& partial_result, size_t& next_offset)
 {
-  SwapEndian(datatype, base, byte_size, false, partial_result, offset);
+  SwapEndian(datatype, base, byte_size, false, partial_result, next_offset);
 }
 
 TRITONSERVER_DataType
