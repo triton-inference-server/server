@@ -2531,7 +2531,7 @@ HTTPAPIServer::EVBufferToInput(
       }
 
 #ifdef TRITON_BIG_ENDIAN
-      size_t offset = 0;
+      size_t next_offset = 0;
       std::vector<char*> partial_result;
 #endif
 
@@ -2550,7 +2550,7 @@ HTTPAPIServer::EVBufferToInput(
           v_idx++;
         }
 
-        LittleEndianToHost(dtype, base, base_size, partial_result, offset);
+        LittleEndianToHost(dtype, base, base_size, partial_result, next_offset);
 
         RETURN_IF_ERR(TRITONSERVER_InferenceRequestAppendInputData(
             irequest, input_name, base, base_size, TRITONSERVER_MEMORY_CPU,
@@ -2761,7 +2761,7 @@ HTTPAPIServer::EVBufferToRawInput(
     }
 
 #ifdef TRITON_BIG_ENDIAN
-    size_t offset = 0;
+    size_t next_offset = 0;
     std::vector<char*> partial_result;
 
     auto dtype =
@@ -2789,7 +2789,7 @@ HTTPAPIServer::EVBufferToRawInput(
         v_idx++;
       }
 
-      LittleEndianToHost(dtype, base, base_size, partial_result, offset);
+      LittleEndianToHost(dtype, base, base_size, partial_result, next_offset);
 
       RETURN_IF_ERR(TRITONSERVER_InferenceRequestAppendInputData(
           irequest, raw_input_name, base, base_size, TRITONSERVER_MEMORY_CPU,
