@@ -107,7 +107,7 @@ class ImplicitStateTest(tu.TestResultCollector):
             )
             self.assertEqual(result.as_numpy("OUTPUT")[0], 1)
 
-        result_start = triton_client.infer(
+        _ = triton_client.infer(
             model_name="no_state_update",
             inputs=inputs,
             sequence_id=correlation_id,
