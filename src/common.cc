@@ -193,7 +193,8 @@ bswap_length_partial(
   if (partial_result.size()) {
     for (size_t offset = 0,
                 remaining = sizeof(uint32_t) - partial_result.size();
-         (remaining) && (offset < byte_size); ++offset, ++base, --remaining) {
+         (remaining > 0) && (offset < byte_size);
+         ++offset, ++base, --remaining) {
       partial_result.emplace_back(base);
     }
     if (partial_result.size() == sizeof(uint32_t)) {
