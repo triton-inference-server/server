@@ -96,6 +96,53 @@ if(${TRITON_ENABLE_HTTP} OR ${TRITON_ENABLE_METRICS} OR
   )
 endif()
 
+
+#
+# Unit test for little endian conversion
+#
+if(${TRITON_ENABLE_HTTP} OR ${TRITON_ENABLE_GRPC})
+  add_executable(
+    little_endian_conversion_test
+    little_endian_conversion_test.cc
+    ../common.h
+    ../common.cc	
+  )
+
+  set_target_properties(
+    little_endian_conversion_test
+    PROPERTIES
+      SKIP_BUILD_RPATH TRUE
+      BUILD_WITH_INSTALL_RPATH TRUE
+      INSTALL_RPATH_USE_LINK_PATH FALSE
+      INSTALL_RPATH ""
+  )
+
+  target_include_directories(
+    little_endian_conversion_test	
+    PRIVATE
+      ${CMAKE_CURRENT_SOURCE_DIR}/..
+      ${GTEST_INCLUDE_DIRS}
+  )
+
+  target_link_libraries(
+    little_endian_conversion_test
+    PRIVATE
+      triton-common-json      # from repo-common
+      triton-common-logging   # from repo-common
+      triton-core-serverapi   # from repo-core
+      triton-core-serverstub  # from repo-core
+      triton-common-json      # from repo-common
+      triton-core-serverapi   # from repo-core	
+      GTest::gtest
+      GTest::gtest_main
+  )
+
+  install(
+    TARGETS little_endian_conversion_test
+    RUNTIME DESTINATION bin
+  )
+endif()
+
 add_subdirectory(repoagent/relocation_repoagent repoagent/relocation_repoagent)
 
 add_subdirectory(distributed_addsub distributed_addsub)
