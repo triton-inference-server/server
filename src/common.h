@@ -182,13 +182,59 @@ std::string Join(const std::vector<std::string>& vec, const std::string& delim);
 #if defined(__BYTE_ORDER__) && (__BYTE_ORDER__ == __ORDER_BIG_ENDIAN__)
 
 #define TRITON_BIG_ENDIAN true
+
+/// Converts from host byte order to little endian byte order in place.
+///
+/// If host byte order is little endian then defined as an empty macro.
+///
+/// \param[in] datatype data type of array
+/// \param[in, out] base pointer to array of data type elements to convert
+/// \param[in] byte_size size of array in bytes
+///
 void HostToLittleEndian(
     TRITONSERVER_DataType datatype, char* base, size_t byte_size);
+
+/// Converts from little endian byte order to host byte order in place.
+///
+/// If host byte order is little endian then defined as an empty macro.
+///
+/// \param[in] datatype data type of array
+/// \param[in, out] base pointer to array of data type elements to convert
+/// \param[in] byte_size size of array in bytes
+///
 void LittleEndianToHost(
     TRITONSERVER_DataType datatype, char* base, size_t byte_size);
+
+/// Converts from little endian byte order to host byte order in place
+/// with support for non-contiguous arrays. For non-contiguous arrays
+/// the initial call must pass an empty partial result and 0 for the
+/// initial next_offset. Subsequent calls should pass the returned
+/// values without modification.
+///
+/// If host byte order is little endian then defined as an empty macro.
+///
+/// \param[in] datatype data type of array
+/// \param[in, out] base pointer to array of data type elements to convert
+/// \param[in] byte_size size of array in bytes
+/// \param[in, out] partial_result vector to store partial results
+/// \param[in, out] next_offset intermediate value used for storing next offset
+/// for BYTES data type
+///
 void LittleEndianToHost(
     TRITONSERVER_DataType datatype, char* base, size_t byte_size,
-    std::vector<char*>& partial_result, size_t& offset);
+    std::vector<char*>& partial_result, size_t& next_offset);
+
+/// Returns the data type for an http raw binary input. Returns the
+/// data type of the first input as raw binary inputs can only be used
+/// with models that have a single input.
+///
+/// If host byte order is little endian then defined as an empty macro.
+///
+/// \param[in] server server with requested model
+/// \param[in] model_name name of model
+/// \param[in] model_version version of model
+/// \return data type of first input or TRITONSERVER_TYPE_INVALID on error.
+///
 TRITONSERVER_DataType GetDataTypeForRawInput(
     TRITONSERVER_Server* server, const std::string& model_name,
     const int64_t model_version);
@@ -196,15 +242,16 @@ TRITONSERVER_DataType GetDataTypeForRawInput(
 #else
 
 #undef TRITON_BIG_ENDIAN
-#define HostToLittleEndian(datatype, base, size) \
-  do {                                           \
-  } while (0)
-#define LittleEndianToHost(datatype, base, size, ...) \
+
+#define HostToLittleEndian(datatype, base, byte_size) \
   do {                                                \
-  } while (0)
+  } while (false)
+#define LittleEndianToHost(datatype, base, byte_size, ...) \
+  do {                                                     \
+  } while (false)
 #define GetDataTypeForRawInput(server, model_name, model_version) \
   do {                                                            \
-  } while (0)
+  } while (false)
 
 #endif  // if defined(__BYTE_ORDER__) && (__BYTE_ORDER__ = __ORDER_BIG_ENDIAN__)
 

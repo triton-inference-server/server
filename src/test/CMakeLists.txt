@@ -98,18 +98,18 @@ endif()
 
 
 #
-# Unit test for little endian conversion
+# Unit test for endian conversion
 #
 if(${TRITON_ENABLE_HTTP} OR ${TRITON_ENABLE_GRPC})
   add_executable(
-    little_endian_conversion_test
-    little_endian_conversion_test.cc
+    endian_conversion_test
+    endian_conversion_test.cc
     ../common.h
     ../common.cc	
   )
 
   set_target_properties(
-    little_endian_conversion_test
+    endian_conversion_test
     PROPERTIES
       SKIP_BUILD_RPATH TRUE
       BUILD_WITH_INSTALL_RPATH TRUE
@@ -118,14 +118,14 @@ if(${TRITON_ENABLE_HTTP} OR ${TRITON_ENABLE_GRPC})
   )
 
   target_include_directories(
-    little_endian_conversion_test	
+    endian_conversion_test	
     PRIVATE
       ${CMAKE_CURRENT_SOURCE_DIR}/..
       ${GTEST_INCLUDE_DIRS}
   )
 
   target_link_libraries(
-    little_endian_conversion_test
+    endian_conversion_test
     PRIVATE
       triton-common-json      # from repo-common
       triton-common-logging   # from repo-common
@@ -138,7 +138,7 @@ if(${TRITON_ENABLE_HTTP} OR ${TRITON_ENABLE_GRPC})
   )
 
   install(
-    TARGETS little_endian_conversion_test
+    TARGETS endian_conversion_test
     RUNTIME DESTINATION bin
   )
 endif()
