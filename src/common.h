@@ -179,8 +179,10 @@ bool Contains(const std::vector<std::string>& vec, const std::string& str);
 std::string Join(const std::vector<std::string>& vec, const std::string& delim);
 
 
-#if defined(__BYTE_ORDER__) && (__BYTE_ORDER__ == __ORDER_BIG_ENDIAN__)
+#if (defined(__BYTE_ORDER__) && (__BYTE_ORDER__ == __ORDER_BIG_ENDIAN__)) || (defined(TRITON_BIG_ENDIAN))
 
+#undef TRITON_BIG_ENDIAN
+    
 #define TRITON_BIG_ENDIAN true
 
 /// Converts from host byte order to little endian byte order in place.
