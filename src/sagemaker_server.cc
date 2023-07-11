@@ -568,7 +568,7 @@ SagemakerAPIServer::SageMakerMMEHandleInfer(
             infer_request.get(), header_length);
       } else {
         err = EVBufferToRawInput(
-            model_name, irequest,
+            model_name, requested_model_version, irequest,
             (decompressed_buffer == nullptr) ? req->buffer_in
                                              : decompressed_buffer,
             infer_request.get());
