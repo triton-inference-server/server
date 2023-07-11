@@ -131,8 +131,6 @@ if(${TRITON_ENABLE_HTTP} OR ${TRITON_ENABLE_GRPC})
       triton-common-logging   # from repo-common
       triton-core-serverapi   # from repo-core
       triton-core-serverstub  # from repo-core
-      triton-common-json      # from repo-common
-      triton-core-serverapi   # from repo-core	
       GTest::gtest
       GTest::gtest_main
   )
