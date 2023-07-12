@@ -1,5 +1,5 @@
 #!/bin/bash
-# Copyright 2019-2022, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright 2019-2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -42,6 +42,9 @@ export CUDA_VISIBLE_DEVICES=0
 
 CLIENT=../clients/image_client
 CLIENT_LOG="./client.log"
+CLIENT_PY=./python_unittest.py
+EXPECTED_NUM_TESTS="1"
+TEST_RESULT_FILE='test_results.txt'
 
 IMAGE="../images/vulture.jpeg"
 
@@ -56,6 +59,7 @@ SERVER_LOG="./inference_server.log"
 source ../common/util.sh
 
 RET=0
+rm -fr *.txt
 
 for BACKEND in ${BACKENDS}; do
     rm -f $SERVER_LOG $CLIENT_LOG
@@ -408,8 +412,83 @@ set -e
 kill $SERVER_PID
 wait $SERVER_PID
 
-if [ $RET -eq 0 ]; then
-  echo -e "\n***\n*** Test Passed\n***"
+# Test the onnx model to verify that the memory type of the output tensor
+# remains unchanged with the warmup setting
+pip3 uninstall -y torch
+pip3 install torch==1.13.0+cu117 -f https://download.pytorch.org/whl/torch_stable.html
+
+rm -fr models && mkdir models
+cp -r /data/inferenceserver/${REPO_VERSION}/qa_model_repository/onnx_nobatch_float32_float32_float32 models/.
+(cd models/onnx_nobatch_float32_float32_float32 && \
+            echo "" >> config.pbtxt && \
+            echo 'instance_group [{' >> config.pbtxt && \
+            echo '    kind : KIND_GPU' >> config.pbtxt && \
+            echo '}]' >> config.pbtxt && \
+            echo 'model_warmup [{' >> config.pbtxt && \
+            echo '    name : "sample"' >> config.pbtxt && \
+            echo '    batch_size: 1' >> config.pbtxt && \
+            echo '    inputs {' >> config.pbtxt && \
+            echo '        key: "INPUT0"' >> config.pbtxt && \
+            echo '        value: {' >> config.pbtxt && \
+            echo '            data_type: TYPE_FP32' >> config.pbtxt && \
+            echo "            dims: 16" >> config.pbtxt && \
+            echo "            zero_data: false" >> config.pbtxt && \
+            echo '        }' >> config.pbtxt && \
+            echo '    }' >> config.pbtxt && \
+             echo '    inputs {' >> config.pbtxt && \
+            echo '        key: "INPUT1"' >> config.pbtxt && \
+            echo '        value: {' >> config.pbtxt && \
+            echo '            data_type: TYPE_FP32' >> config.pbtxt && \
+            echo "            dims: 16" >> config.pbtxt && \
+            echo "            zero_data: false" >> config.pbtxt && \
+            echo '        }' >> config.pbtxt && \
+            echo '    }' >> config.pbtxt && \
+            echo '}]' >> config.pbtxt )
+
+mkdir -p models/bls_onnx_warmup/1/
+cp ../python_models/bls_onnx_warmup/model.py models/bls_onnx_warmup/1/
+cp ../python_models/bls_onnx_warmup/config.pbtxt models/bls_onnx_warmup/.
+
+cp ../L0_backend_python/python_unittest.py .
+sed -i 's#sys.path.append("../../common")#sys.path.append("../common")#g' python_unittest.py
+
+run_server
+if [ "$SERVER_PID" == "0" ]; then
+    echo -e "\n***\n*** Failed to start $SERVER\n***"
+    cat $SERVER_LOG
+    exit 1
+fi
+
+set +e
+
+export MODEL_NAME='bls_onnx_warmup'
+python3 $CLIENT_PY >> $CLIENT_LOG 2>&1
+if [ $? -ne 0 ]; then
+    echo -e "\n***\n*** 'bls_onnx_warmup' test FAILED. \n***"
+    cat $CLIENT_LOG
+    RET=1
+else
+    check_test_results $TEST_RESULT_FILE $EXPECTED_NUM_TESTS
+    if [ $? -ne 0 ]; then
+        cat $CLIENT_LOG
+        echo -e "\n***\n*** Test Result Verification Failed\n***"
+        RET=1
+    fi
+fi
+
+set -e
+
+
+kill $SERVER_PID
+wait $SERVER_PID
+
+
+if [ $RET -eq 1 ]; then
+    cat $CLIENT_LOG
+    cat $SERVER_LOG
+    echo -e "\n***\n*** Test Failed \n***"
+else
+    echo -e "\n***\n*** Test Passed \n***"
 fi
 
 exit $RET

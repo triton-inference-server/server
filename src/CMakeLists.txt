@@ -508,6 +508,8 @@ if(${TRITON_ENABLE_TRACING})
   )
   
   if (NOT WIN32)
+    target_compile_features(tracing-library PRIVATE cxx_std_17)
+
     target_include_directories(
       tracing-library 
       PRIVATE ${OPENTELEMETRY_CPP_INCLUDE_DIRS}
