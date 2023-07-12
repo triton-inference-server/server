@@ -62,6 +62,11 @@ for test_name in $TEST_LIST; do
     done
 done
 
+# Set this variable to avoid generation of '__pycache__' in the model directory,
+# which will cause unintended model reload in POLLING model as Triton sees
+# changes in the model directory
+export PYTHONDONTWRITEBYTECODE=1
+
 # Polling
 for test_name in $TEST_LIST; do
     TEST_SUITE="ModelNamespacePoll"
