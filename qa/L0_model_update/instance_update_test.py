@@ -186,6 +186,27 @@ class TestInstanceUpdate(unittest.TestCase):
         self.__update_instance_count(3, 0, "{\ncount: 7\nkind: KIND_GPU\n}")
         self.__unload_model()
 
+    # Test add/remove multiple CPU/GPU instances at a time
+    def test_gpu_cpu_instance_update(self):
+        # Load model with 1 GPU instance and 2 CPU instance
+        self.__load_model(
+            3,
+            "{\ncount: 2\nkind: KIND_CPU\n},\n{\ncount: 1\nkind: KIND_GPU\n}")
+        # Add 2 GPU instance and remove 1 CPU instance
+        self.__update_instance_count(
+            2, 1,
+            "{\ncount: 1\nkind: KIND_CPU\n},\n{\ncount: 3\nkind: KIND_GPU\n}")
+        # Shuffle the instances
+        self.__update_instance_count(
+            0, 0,
+            "{\ncount: 3\nkind: KIND_GPU\n},\n{\ncount: 1\nkind: KIND_CPU\n}")
+        # Remove 1 GPU instance and add 1 CPU instance
+        self.__update_instance_count(
+            1, 1,
+            "{\ncount: 2\nkind: KIND_GPU\n},\n{\ncount: 2\nkind: KIND_CPU\n}")
+        # Unload model
+        self.__unload_model()
+
     # Test model instance name update
     def test_instance_name_update(self):
         # Load 3 instances with 2 different names
@@ -193,45 +214,37 @@ class TestInstanceUpdate(unittest.TestCase):
             3,
             "{\nname: \"old_1\"\ncount: 1\nkind: KIND_CPU\n},\n{\nname: \"old_2\"\ncount: 2\nkind: KIND_GPU\n}"
         )
-        # Rename all instances
-        self.__update_instance_count(
-            3, 3,
-            "{\nname: \"new_1\"\ncount: 1\nkind: KIND_CPU\n},\n{\nname: \"new_2\"\ncount: 2\nkind: KIND_GPU\n}"
-        )
-        # Shuffle the instances
+        # Change the instance names
         self.__update_instance_count(
             0, 0,
-            "{\nname: \"new_2\"\ncount: 2\nkind: KIND_GPU\n},\n{\nname: \"new_1\"\ncount: 1\nkind: KIND_CPU\n}"
+            "{\nname: \"new_1\"\ncount: 1\nkind: KIND_CPU\n},\n{\nname: \"new_2\"\ncount: 2\nkind: KIND_GPU\n}"
         )
-        time.sleep(0.1)  # larger the gap for config.pbtxt timestamp to update
         # Unload model
         self.__unload_model()
 
-    # Test multiple model instances with the same name
-    def test_instance_same_name(self):
-        # Load 2 instances with the same name
+    # Test instance signature grouping
+    def test_instance_signature(self):
+        # Load 2 GPU instances and 3 CPU instances
         self.__load_model(
-            2,
-            "{\nname: \"n\"\ncount: 1\nkind: KIND_CPU\n},\n{\nname: \"n\"\ncount: 1\nkind: KIND_CPU\n}"
+            5,
+            "{\nname: \"GPU_group\"\ncount: 2\nkind: KIND_GPU\n},\n{\nname: \"CPU_group\"\ncount: 3\nkind: KIND_CPU\n}"
         )
-        # Remove 1 instance with the same name
-        self.__update_instance_count(
-            0, 1, "{\nname: \"n\"\ncount: 1\nkind: KIND_CPU\n}")
-        # Add 2 instances with the same name
-        self.__update_instance_count(
-            2, 0,
-            "{\nname: \"n\"\ncount: 1\nkind: KIND_CPU\n},\n{\nname: \"n\"\ncount: 1\nkind: KIND_CPU\n},\n{\nname: \"n\"\ncount: 1\nkind: KIND_CPU\n}"
-        )
-        # No change
+        # Flatten the instances representation
         self.__update_instance_count(
             0, 0,
-            "{\nname: \"n\"\ncount: 1\nkind: KIND_CPU\n},\n{\nname: \"n\"\ncount: 1\nkind: KIND_CPU\n},\n{\nname: \"n\"\ncount: 1\nkind: KIND_CPU\n}"
+            "{\nname: \"CPU_1\"\ncount: 1\nkind: KIND_CPU\n},\n{\nname: \"CPU_2_3\"\ncount: 2\nkind: KIND_CPU\n},\n{\nname: \"GPU_1\"\ncount: 1\nkind: KIND_GPU\n},\n{\nname: \"GPU_2\"\ncount: 1\nkind: KIND_GPU\n}"
         )
         time.sleep(0.1)  # larger the gap for config.pbtxt timestamp to update
-        # Change instance kind but keeping the same name
+        # Consolidate different representations
         self.__update_instance_count(
-            1, 1,
-            "{\nname: \"n\"\ncount: 1\nkind: KIND_GPU\n},\n{\nname: \"n\"\ncount: 1\nkind: KIND_CPU\n},\n{\nname: \"n\"\ncount: 1\nkind: KIND_CPU\n}"
+            0, 0,
+            "{\nname: \"CPU_group\"\ncount: 3\nkind: KIND_CPU\n},\n{\nname: \"GPU_group\"\ncount: 2\nkind: KIND_GPU\n}"
+        )
+        time.sleep(0.1)  # larger the gap for config.pbtxt timestamp to update
+        # Flatten the instances representation
+        self.__update_instance_count(
+            0, 0,
+            "{\nname: \"GPU_1\"\ncount: 1\nkind: KIND_GPU\n},\n{\nname: \"GPU_2\"\ncount: 1\nkind: KIND_GPU\n},\n{\nname: \"CPU_1\"\ncount: 1\nkind: KIND_CPU\n},\n{\nname: \"CPU_2\"\ncount: 1\nkind: KIND_CPU\n},\n{\nname: \"CPU_3\"\ncount: 1\nkind: KIND_CPU\n}"
         )
         # Unload model
         self.__unload_model()
