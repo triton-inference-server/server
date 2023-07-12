@@ -117,10 +117,11 @@ if(${TRITON_ENABLE_HTTP} OR ${TRITON_ENABLE_GRPC})
   set_target_properties(
     endian_conversion_test
     PROPERTIES
-      SKIP_BUILD_RPATH TRUE
-      BUILD_WITH_INSTALL_RPATH TRUE
-      INSTALL_RPATH_USE_LINK_PATH FALSE
-      INSTALL_RPATH ""
+      POSITION_INDEPENDENT_CODE ON
+      SKIP_BUILD_RPATH FALSE
+      BUILD_WITH_INSTALL_RPATH FALSE
+      INSTALL_RPATH_USE_LINK_PATH TRUE
+      INSTALL_RPATH "/opt/tritonserver/lib"
   )
 
   target_include_directories(
@@ -134,7 +135,6 @@ if(${TRITON_ENABLE_HTTP} OR ${TRITON_ENABLE_GRPC})
     endian_conversion_test
     PRIVATE
       triton-common-json      # from repo-common
-      triton-common-logging   # from repo-common
       triton-core-serverapi   # from repo-core
       triton-core-serverstub  # from repo-core
       GTest::gtest
@@ -142,7 +142,7 @@ if(${TRITON_ENABLE_HTTP} OR ${TRITON_ENABLE_GRPC})
   )
 
   install(
-    TARGETS endian_conversion_test
+    TARGETS endian_conversion_test triton-core-serverstub
     RUNTIME DESTINATION bin
   )
 endif()
