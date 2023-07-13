@@ -47,6 +47,7 @@ DATADIR="./models"
 
 rm -rf ${DATADIR}
 cp -r /data/inferenceserver/${REPO_VERSION}/qa_trt_data_dependent_model_repository/ ${DATADIR}
+mkdir -p ensemble_plan_nobatch_nonzero_dynamic/1
 cp -r ensemble_plan_nobatch_nonzero_dynamic ${DATADIR}
 
 source ../common/util.sh
