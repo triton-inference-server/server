@@ -71,7 +71,7 @@ def np_to_trt_dtype(np_dtype):
     return None
 
 
-# The 'nonzero' model that we use for data dependent shape is naturally
+# The 'nonzero' model that we use for data dependent shape does
 # not support batching, because the layer output is not trivially separable
 # based on the request batch size.
 # input_shape is config shape
@@ -92,13 +92,16 @@ def create_data_dependent_modelfile(models_dir,
     # input
     in0 = network.add_input("INPUT", trt_input_dtype, input_shape)
 
-    # layers
-    non_zero = network.add_non_zero(in0)
+    # configure first non-zero layer
+    out0 = non_zero.get_output(0)
+    non_zero_1 = network.add_non_zero(out0)
+
+    # configure second non-zero layer to prevent TensorRT from returning maximum output size
+    out1 = non_zero_1.get_output(0)
 
     # configure output
-    out0 = non_zero.get_output(0)
-    out0.name = "OUTPUT"
-    network.mark_output(out0)
+    out1.name = "OUTPUT"
+    network.mark_output(out1)
 
     # optimization profile
     min_shape = []
