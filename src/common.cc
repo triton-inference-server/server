@@ -177,7 +177,7 @@ bswap_length(
 /// arrays and returns length in host byte order. For
 /// non-contiguous arrays the initial call must pass an empty partial result.
 ///
-/// \param[in, out ] base pointer to array with length
+/// \param[in, out] base pointer to array with length
 /// \param[in]] byte_size size of array
 /// \param[in] host_byte_order whether original length is in host byte order
 /// \param[out] host_length length in host byte order
