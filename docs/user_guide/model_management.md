@@ -224,6 +224,8 @@ request is received under
 'config.pbtxt' is modified in place. The swap file is not part of the model
 configuration, so its presence in the model directory may be detected as a new file
 and cause the model to fully reload when only an update is expected.
+  * The model instance reused might carry a different name than the one provided
+on the 'config.pbtxt', but the instances are equivalent beside their names.
 
 * If a sequence model is updated with in-flight sequence(s), Triton does not
 guarentee any remaining request(s) from the in-flight sequence(s) will be routed
