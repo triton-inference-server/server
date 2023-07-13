@@ -47,6 +47,7 @@ DATADIR="./models"
 
 rm -rf ${DATADIR}
 cp -r /data/inferenceserver/${REPO_VERSION}/qa_trt_data_dependent_model_repository/ ${DATADIR}
+cp -r ensemble_plan_nobatch_nonzero_dynamic ${DATADIR}
 
 source ../common/util.sh
 
@@ -73,7 +74,7 @@ if [ $? -ne 0 ]; then
     cat $CLIENT_LOG
     RET=1
 else
-    check_test_results $TEST_RESULT_FILE 2
+    check_test_results $TEST_RESULT_FILE 3
     if [ $? -ne 0 ]; then
         cat $CLIENT_LOG
         echo -e "\n***\n*** Test Result Verification Failed\n***"
