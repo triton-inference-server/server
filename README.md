@@ -206,7 +206,7 @@ designed for modularity and flexibility
 - [Create custom backends](https://github.com/triton-inference-server/backend)
   in either [C/C++](https://github.com/triton-inference-server/backend/blob/main/README.md#triton-backend-api)
   or [Python](https://github.com/triton-inference-server/python_backend)
-- Create [decouple backends and models](docs/user_guide/decoupled_models.md) that can send
+- Create [decoupled backends and models](docs/user_guide/decoupled_models.md) that can send
   multiple responses for a request or not send any responses for a request
 - Use a [Triton repository agent](docs/customization_guide/repository_agents.md) to add functionality
   that operates when a model is loaded and unloaded, such as authentication,
