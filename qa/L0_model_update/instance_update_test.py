@@ -467,8 +467,8 @@ class TestInstanceUpdate(unittest.TestCase):
                 # explicit limit of 10 is set.
                 self.assertNotIn("Resource: R1\t Count: 3", f.read())
 
-    # Test sequence scheduler update
-    def test_sequence_instance_update(self):
+    # Test instance update for direct and oldest scheduler
+    def test_scheduler_instance_update(self):
         for sequence_batching_type in [
                 "direct { }\nmax_sequence_idle_microseconds: 16000000",
                 "oldest { max_candidate_sequences: 4 }\nmax_sequence_idle_microseconds: 16000000"
@@ -488,7 +488,10 @@ class TestInstanceUpdate(unittest.TestCase):
             self.__check_count("finalize", 4, True)
             self.__reset_model()
 
-    # Helper function for 'test_sequence_instance_update'
+    # Helper function for 'test_scheduler_instance_update' testing the success
+    # of inferences and sequence instance updates without any overlappings. This
+    # function expects two sequence instances already loaded as a precondition,
+    # and will end with three sequence instances loaded.
     def __test_basic_sequence_infer_and_update(self):
         # Basic sequence inference
         self.__triton.infer(self.__model_name,
@@ -517,7 +520,17 @@ class TestInstanceUpdate(unittest.TestCase):
                             sequence_id=1,
                             sequence_end=True)
 
-    # Helper function for 'test_sequence_instance_update'
+    # Helper function for 'test_scheduler_instance_update' testing the correct
+    # behavior of sequence instance updates with overlapping inferences. This
+    # function expects three sequence instances already loaded as a
+    # precondition. Goal of the test:
+    #   1. Update will block while there are ongoing sequence(s).
+    #   2. Ongoing sequence(s) may continue during an update.
+    #   3. New sequence(s) may be started during an update.
+    #   4. Ending any ongoing sequences started prior to the update will allow
+    #      the update to complete.
+    #   5. New sequence(s) started during an update may continue/end after the
+    #      update is completed.
     def __test_concurrent_sequence_infer_and_update(self):
         # Start seqneuce 1 and 2
         self.__triton.infer(self.__model_name,
