@@ -93,10 +93,11 @@ def create_data_dependent_modelfile(models_dir,
     in0 = network.add_input("INPUT", trt_input_dtype, input_shape)
 
     # configure first non-zero layer
+    non_zero = network.add_non_zero(in0)
     out0 = non_zero.get_output(0)
-    non_zero_1 = network.add_non_zero(out0)
 
     # configure second non-zero layer to prevent TensorRT from returning maximum output size
+    non_zero_1 = network.add_non_zero(out0)
     out1 = non_zero_1.get_output(0)
 
     # configure output
