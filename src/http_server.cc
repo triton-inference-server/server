@@ -2761,17 +2761,14 @@ HTTPAPIServer::EVBufferToRawInput(
     }
 
 #ifdef TRITON_BIG_ENDIAN
+
     size_t next_offset = 0;
     std::vector<char*> partial_result;
 
-    auto dtype =
-        GetDataTypeForRawInput(server_.get(), model_name, model_version);
+    TRITONSERVER_DataType dtype = TRITONSERVER_TYPE_INVALID;
 
-    if (dtype == TRITONSERVER_TYPE_INVALID) {
-      return TRITONSERVER_ErrorNew(
-          TRITONSERVER_ERROR_INTERNAL,
-          "unexpected error getting data type for raw input");
-    }
+    RETURN_IF_ERR(GetDataTypeForRawInput(server_.get(), model_name, model_version, &dtype)));
+
 #endif
 
     // Process one block at a time
