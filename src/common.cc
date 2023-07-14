@@ -129,7 +129,7 @@ Join(const std::vector<std::string>& vec, const std::string& delim)
 /// \return input with byte order swapped
 ///
 uint16_t
-bswap(const uint16_t input)
+SwapBytes(const uint16_t input)
 {
   return __builtin_bswap16(input);
 }
@@ -140,7 +140,7 @@ bswap(const uint16_t input)
 /// \return input with byte order swapped
 ///
 uint32_t
-bswap(const uint32_t input)
+SwapBytes(const uint32_t input)
 {
   return __builtin_bswap32(input);
 }
@@ -151,7 +151,7 @@ bswap(const uint32_t input)
 /// \return input with byte order swapped
 ///
 uint64_t
-bswap(const uint64_t input)
+SwapBytes(const uint64_t input)
 {
   return __builtin_bswap64(input);
 }
@@ -165,10 +165,10 @@ bswap(const uint64_t input)
 /// \return length with byte order swapped
 ///
 uint32_t
-bswap_length(
+SwapLength(
     const uint32_t length, const bool host_byte_order, uint32_t* host_length)
 {
-  uint32_t swapped = bswap(length);
+  uint32_t swapped = SwapBytes(length);
   *host_length = host_byte_order ? length : swapped;
   return swapped;
 }
@@ -184,7 +184,7 @@ bswap_length(
 /// \param[in, out] partial_result vector for partial results.
 ///
 void
-bswap_length_partial(
+SwapLength(
     char* base, size_t byte_size, const bool host_byte_order,
     uint32_t* host_length, std::vector<char*>& partial_result)
 {
@@ -220,7 +220,7 @@ bswap_length_partial(
 
   if (byte_size >= sizeof(uint32_t)) {
     uint32_t* value = reinterpret_cast<uint32_t*>(base);
-    *value = bswap_length(*value, host_byte_order, host_length);
+    *value = SwapLength(*value, host_byte_order, host_length);
     return;
   }
 
@@ -236,11 +236,11 @@ bswap_length_partial(
 ///
 template <typename T>
 void
-SwapEndian(char* base, size_t byte_size)
+SwapBytes(char* base, size_t byte_size)
 {
   T* value = reinterpret_cast<T*>(base);
   for (size_t offset = 0; offset < byte_size; offset += sizeof(T), ++value) {
-    *value = bswap(*value);
+    *value = SwapBytes(*value);
   }
 }
 
@@ -253,7 +253,7 @@ SwapEndian(char* base, size_t byte_size)
 ///
 template <typename T>
 void
-SwapEndian(char* base, size_t byte_size, std::vector<char*>& partial_result)
+SwapBytes(char* base, size_t byte_size, std::vector<char*>& partial_result)
 {
   size_t offset = 0;
 
@@ -276,7 +276,7 @@ SwapEndian(char* base, size_t byte_size, std::vector<char*>& partial_result)
 
   T* value = reinterpret_cast<T*>(base);
   for (; byte_size - offset >= sizeof(T); offset += sizeof(T), ++value) {
-    *value = bswap(*value);
+    *value = SwapBytes(*value);
   }
 
   base = reinterpret_cast<char*>(value);
@@ -295,7 +295,7 @@ SwapEndian(char* base, size_t byte_size, std::vector<char*>& partial_result)
 /// order
 ///
 void
-SwapEndian(
+SwapBytes(
     TRITONSERVER_DataType datatype, char* base, size_t byte_size,
     bool host_byte_order)
 {
@@ -303,19 +303,19 @@ SwapEndian(
     case TRITONSERVER_TYPE_UINT16:
     case TRITONSERVER_TYPE_INT16:
     case TRITONSERVER_TYPE_FP16: {
-      SwapEndian<uint16_t>(base, byte_size);
+      SwapBytes<uint16_t>(base, byte_size);
       break;
     }
     case TRITONSERVER_TYPE_UINT32:
     case TRITONSERVER_TYPE_INT32:
     case TRITONSERVER_TYPE_FP32: {
-      SwapEndian<uint32_t>(base, byte_size);
+      SwapBytes<uint32_t>(base, byte_size);
       break;
     }
     case TRITONSERVER_TYPE_UINT64:
     case TRITONSERVER_TYPE_INT64:
     case TRITONSERVER_TYPE_FP64: {
-      SwapEndian<uint64_t>(base, byte_size);
+      SwapBytes<uint64_t>(base, byte_size);
       break;
     }
     case TRITONSERVER_TYPE_BYTES: {
@@ -323,7 +323,7 @@ SwapEndian(
       uint32_t host_length = 0;
       while (next_offset < byte_size) {
         uint32_t* length = reinterpret_cast<uint32_t*>(base + next_offset);
-        *length = bswap_length(*length, host_byte_order, &host_length);
+        *length = SwapLength(*length, host_byte_order, &host_length);
         next_offset += sizeof(uint32_t) + host_length;
       }
       break;
@@ -348,7 +348,7 @@ SwapEndian(
 /// for BYTES data type
 ///
 void
-SwapEndian(
+SwapBytes(
     TRITONSERVER_DataType datatype, char* base, size_t byte_size,
     bool host_byte_order, std::vector<char*>& partial_result,
     size_t& next_offset)
@@ -357,26 +357,26 @@ SwapEndian(
     case TRITONSERVER_TYPE_UINT16:
     case TRITONSERVER_TYPE_INT16:
     case TRITONSERVER_TYPE_FP16: {
-      SwapEndian<uint16_t>(base, byte_size, partial_result);
+      SwapBytes<uint16_t>(base, byte_size, partial_result);
       break;
     }
     case TRITONSERVER_TYPE_UINT32:
     case TRITONSERVER_TYPE_INT32:
     case TRITONSERVER_TYPE_FP32: {
-      SwapEndian<uint32_t>(base, byte_size, partial_result);
+      SwapBytes<uint32_t>(base, byte_size, partial_result);
       break;
     }
     case TRITONSERVER_TYPE_UINT64:
     case TRITONSERVER_TYPE_INT64:
     case TRITONSERVER_TYPE_FP64: {
-      SwapEndian<uint64_t>(base, byte_size, partial_result);
+      SwapBytes<uint64_t>(base, byte_size, partial_result);
       break;
     }
     case TRITONSERVER_TYPE_BYTES: {
       uint32_t host_length = 0;
       while (next_offset < byte_size) {
         size_t partial_offset = partial_result.size();
-        bswap_length_partial(
+        SwapLength(
             base + next_offset, byte_size - next_offset, host_byte_order,
             &host_length, partial_result);
         if (partial_result.size() == 0) {
@@ -397,13 +397,13 @@ SwapEndian(
 void
 HostToLittleEndian(TRITONSERVER_DataType datatype, char* base, size_t byte_size)
 {
-  SwapEndian(datatype, base, byte_size, true);
+  SwapBytes(datatype, base, byte_size, true);
 }
 
 void
 LittleEndianToHost(TRITONSERVER_DataType datatype, char* base, size_t byte_size)
 {
-  SwapEndian(datatype, base, byte_size, false);
+   SwapBytes(datatype, base, byte_size, false);
 }
 
 void
@@ -411,45 +411,51 @@ LittleEndianToHost(
     TRITONSERVER_DataType datatype, char* base, size_t byte_size,
     std::vector<char*>& partial_result, size_t& next_offset)
 {
-  SwapEndian(datatype, base, byte_size, false, partial_result, next_offset);
+  SwapBytes(datatype, base, byte_size, false, partial_result, next_offset);
 }
 
-TRITONSERVER_DataType
+
+TRITONSERVER_Error*
 GetDataTypeForRawInput(
     TRITONSERVER_Server* server, const std::string& model_name,
-    const int64_t model_version)
+    const int64_t model_version, TRITONSERVER_DataType *datatype)
 {
   TRITONSERVER_Message* message = nullptr;
   triton::common::TritonJson::Value document;
   triton::common::TritonJson::Value inputs;
   triton::common::TritonJson::Value input;
-  const char* datatype = "";
-  size_t datatype_length = 0;
+  const char* datatype_string = "";
+  size_t datatype_string_length = 0;
   const char* buffer;
   size_t byte_size;
+  const char* error_message = "unexpected error getting data type for raw input";
 
-  RETURN_VAL_IF_ERR(
+  *datatype = TRITONSERVER_TYPE_INVALID;
+  
+  RETURN_MSG_IF_ERR(
       TRITONSERVER_ServerModelMetadata(
           server, model_name.c_str(), model_version, &message),
-      TRITONSERVER_TYPE_INVALID);
+      error_message);
 
-  RETURN_VAL_IF_ERR(
+  RETURN_MSG_IF_ERR(
       TRITONSERVER_MessageSerializeToJson(message, &buffer, &byte_size),
-      TRITONSERVER_TYPE_INVALID);
+      error_message);
 
-  RETURN_VAL_IF_ERR(
-      document.Parse(buffer, byte_size), TRITONSERVER_TYPE_INVALID);
+  RETURN_MSG_IF_ERR(
+      document.Parse(buffer, byte_size), error_message);
 
-  RETURN_VAL_IF_ERR(
-      document.MemberAsArray("inputs", &inputs), TRITONSERVER_TYPE_INVALID);
+  RETURN_MSG_IF_ERR(
+      document.MemberAsArray("inputs", &inputs), error_message);
 
-  RETURN_VAL_IF_ERR(inputs.IndexAsObject(0, &input), TRITONSERVER_TYPE_INVALID);
+  RETURN_MSG_IF_ERR(inputs.IndexAsObject(0, &input), error_message);
 
-  RETURN_VAL_IF_ERR(
-      input.MemberAsString("datatype", &datatype, &datatype_length),
-      TRITONSERVER_TYPE_INVALID);
+  RETURN_MSG_IF_ERR(
+      input.MemberAsString("datatype", &datatype_string, &datatype_string_length),
+      error_message);
 
-  return TRITONSERVER_StringToDataType(datatype);
+  *datatype = TRITONSERVER_StringToDataType(datatype_string);
+
+  return nullptr;
 }
 
 #endif  // TRITON_BIG_ENDIAN
