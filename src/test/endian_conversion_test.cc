@@ -129,6 +129,26 @@ TEST(EndianConversionTest, ConvertUINT32)
   ConversionTest(TRITONSERVER_TYPE_UINT32, original_values, swapped_values);
 }
 
+TEST(EndianConversionTest, ConvertFP32)
+{
+  std::array<uint32_t, 10> original_values_temp = {
+      0xdeadbeef, 0xdeadbeef, 0xdeadbeef, 0xdeadbeef, 0xdeadbeef,
+      0xdeadbeef, 0xdeadbeef, 0xdeadbeef, 0xdeadbeef, 0xdeadbeef};
+
+  const std::array<float, 10>* original_values =
+      reinterpret_cast<std::array<float, 10>*>(&original_values_temp[0]);
+
+  std::array<uint32_t, 10> swapped_values_temp = {
+      0xefbeadde, 0xefbeadde, 0xefbeadde, 0xefbeadde, 0xefbeadde,
+      0xefbeadde, 0xefbeadde, 0xefbeadde, 0xefbeadde, 0xefbeadde};
+
+  const std::array<float, 10>* swapped_values =
+      reinterpret_cast<std::array<float, 10>*>(&swapped_values_temp[0]);
+
+
+  ConversionTest(TRITONSERVER_TYPE_FP32, *original_values, *swapped_values);
+}
+
 TEST(EndianConversionTest, ConvertUINT16)
 {
   const std::array<uint16_t, 10> original_values = {
@@ -157,6 +177,29 @@ TEST(EndianConversionTest, ConvertUINT64)
       0xefbeaddeefbeadde};
 
   ConversionTest(TRITONSERVER_TYPE_UINT64, original_values, swapped_values);
+}
+
+TEST(EndianConversionTest, ConvertFP64)
+{
+  const std::array<uint64_t, 10> original_values_temp = {
+      0xdeadbeefdeadbeef, 0xdeadbeefdeadbeef, 0xdeadbeefdeadbeef,
+      0xdeadbeefdeadbeef, 0xdeadbeefdeadbeef, 0xdeadbeefdeadbeef,
+      0xdeadbeefdeadbeef, 0xdeadbeefdeadbeef, 0xdeadbeefdeadbeef,
+      0xdeadbeefdeadbeef};
+
+  const std::array<uint64_t, 10> swapped_values_temp = {
+      0xefbeaddeefbeadde, 0xefbeaddeefbeadde, 0xefbeaddeefbeadde,
+      0xefbeaddeefbeadde, 0xefbeaddeefbeadde, 0xefbeaddeefbeadde,
+      0xefbeaddeefbeadde, 0xefbeaddeefbeadde, 0xefbeaddeefbeadde,
+      0xefbeaddeefbeadde};
+
+  const std::array<double, 10>* original_values =
+      reinterpret_cast<const std::array<double, 10>*>(&original_values_temp[0]);
+
+  const std::array<double, 10>* swapped_values =
+      reinterpret_cast<const std::array<double, 10>*>(&swapped_values_temp[0]);
+
+  ConversionTest(TRITONSERVER_TYPE_UINT64, *original_values, *swapped_values);
 }
 
 TEST(EndianConversionTest, UINT8)
