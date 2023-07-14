@@ -27,6 +27,7 @@
 
 SIMPLE_HTTP_CLIENT=../clients/simple_http_infer_client
 SIMPLE_GRPC_CLIENT=../clients/simple_grpc_infer_client
+BLS_CLIENT=bls_simple_client.py
 TRACE_SUMMARY=../common/trace_summary.py
 
 CLIENT_TEST=trace_endpoint_test.py
@@ -55,6 +56,7 @@ export CUDA_VISIBLE_DEVICES=0
 
 DATADIR=/data/inferenceserver/${REPO_VERSION}/qa_model_repository
 ENSEMBLEDIR=$DATADIR/../qa_ensemble_model_repository/qa_model_repository/
+BLSDIR=../python_models/bls_simple
 MODELBASE=onnx_int32_int32_int32
 
 MODELSDIR=`pwd`/trace_models
@@ -78,7 +80,8 @@ cp -r $DATADIR/$MODELBASE $MODELSDIR/simple && \
     rm -r $MODELSDIR/ensemble_add_sub_int32_int32_int32/3 && \
     (cd $MODELSDIR/ensemble_add_sub_int32_int32_int32 && \
             sed -i "s/^name:.*/name: \"ensemble_add_sub_int32_int32_int32\"/" config.pbtxt && \
-            sed -i "s/model_name:.*/model_name: \"simple\"/" config.pbtxt)
+            sed -i "s/model_name:.*/model_name: \"simple\"/" config.pbtxt) && \
+    mkdir -p $MODELSDIR/bls_simple/1 && cp $BLSDIR/bls_simple.py $MODELSDIR/bls_simple/1/model.py
 
 RET=0
 
@@ -618,7 +621,7 @@ wait $SERVER_PID
 
 
 # Check `--trace-config` sets arguments properly
-SERVER_ARGS="--trace-config=triton,file=some_file.log --trace-config=level=TIMESTAMPS \
+SERVER_ARGS="--trace-config=triton,file=bls_trace.log --trace-config=level=TIMESTAMPS \
             --trace-config=rate=4 --trace-config=count=6 --trace-config=mode=triton --model-repository=$MODELSDIR"
 SERVER_LOG="./inference_server_trace_config.log"
 run_server
@@ -649,16 +652,41 @@ fi
 if [ `grep -c "\"log_frequency\":\"0\"" ./curl.out` != "1" ]; then
     RET=1
 fi
-if [ `grep -c "\"trace_file\":\"some_file.log\"" ./curl.out` != "1" ]; then
+if [ `grep -c "\"trace_file\":\"bls_trace.log\"" ./curl.out` != "1" ]; then
     RET=1
 fi
+
+set +e
+# Send bls requests to make sure simple model is traced
+for p in {1..4}; do
+    python -c 'import opentelemetry_unittest; \
+        opentelemetry_unittest.send_bls_request()'  >> client_update.log 2>&1
+done
 
 set -e
 
 kill $SERVER_PID
 wait $SERVER_PID
 
-set +e
+$TRACE_SUMMARY -t bls_trace.log > summary_bls.log
+
+if [ `grep -c "COMPUTE_INPUT_END" summary_bls.log` != "2" ]; then
+    cat summary_bls.log
+    echo -e "\n***\n*** Test Failed\n***"
+    RET=1
+fi
+
+if [ `grep -c ^simple summary_bls.log` != "1" ]; then
+    cat summary_bls.log
+    echo -e "\n***\n*** Test Failed\n***"
+    RET=1
+fi
+
+if [ `grep -c 'parent id' bls_trace.log` == "1" ]; then
+    cat summary_bls.log
+    echo -e "\n***\n*** Test Failed\n***"
+    RET=1
+fi
 
 # Check opentelemetry trace exporter sends proper info.
 # A helper python script starts listening on $OTLP_PORT, where
