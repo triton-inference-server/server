@@ -468,10 +468,10 @@ class TestInstanceUpdate(unittest.TestCase):
                 self.assertNotIn("Resource: R1\t Count: 3", f.read())
 
     # Test instance update for direct and oldest scheduler
-    def test_scheduler_instance_update(self):
+    def test_scheduler_update(self):
         for sequence_batching_type in [
-                "direct { }\nmax_sequence_idle_microseconds: 16000000",
-                "oldest { max_candidate_sequences: 4 }\nmax_sequence_idle_microseconds: 16000000"
+                "direct { }\nmax_sequence_idle_microseconds: 8000000",
+                "oldest { max_candidate_sequences: 4 }\nmax_sequence_idle_microseconds: 8000000"
         ]:
             # Load model
             update_instance_group("{\ncount: 2\nkind: KIND_CPU\n}")
@@ -480,19 +480,17 @@ class TestInstanceUpdate(unittest.TestCase):
             self.__check_count("initialize", 2)
             self.__check_count("finalize", 0)
             # Test infer and update
-            self.__test_basic_sequence_infer_and_update()
-            self.__test_concurrent_sequence_infer_and_update()
+            self.__test_scheduler_basic_sequence_update()
+            self.__test_scheduler_ongoing_sequence_update()
             # Unload model
             self.__triton.unload_model(self.__model_name)
-            self.__check_count("initialize", 4)
-            self.__check_count("finalize", 4, True)
+            self.__check_count("initialize", 5)
+            self.__check_count("finalize", 5, True)
             self.__reset_model()
 
-    # Helper function for 'test_scheduler_instance_update' testing the success
-    # of inferences and sequence instance updates without any overlappings. This
-    # function expects two sequence instances already loaded as a precondition,
-    # and will end with three sequence instances loaded.
-    def __test_basic_sequence_infer_and_update(self):
+    # Helper function for 'test_scheduler_update' testing the success of
+    # sequence instance updates without any ongoing sequences.
+    def __test_scheduler_basic_sequence_update(self):
         # Basic sequence inference
         self.__triton.infer(self.__model_name,
                             self.__get_inputs(),
@@ -505,10 +503,10 @@ class TestInstanceUpdate(unittest.TestCase):
                             self.__get_inputs(),
                             sequence_id=1,
                             sequence_end=True)
-        # Update instance without in-flight sequence
-        update_instance_group("{\ncount: 3\nkind: KIND_CPU\n}")
+        # Add 2 instances without in-flight sequence
+        update_instance_group("{\ncount: 4\nkind: KIND_CPU\n}")
         self.__triton.load_model(self.__model_name)
-        self.__check_count("initialize", 3)
+        self.__check_count("initialize", 4)
         self.__check_count("finalize", 0)
         # Basic sequence inference
         self.__triton.infer(self.__model_name,
@@ -519,20 +517,27 @@ class TestInstanceUpdate(unittest.TestCase):
                             self.__get_inputs(),
                             sequence_id=1,
                             sequence_end=True)
+        # Remove 1 instance without in-flight sequence
+        update_instance_group("{\ncount: 3\nkind: KIND_CPU\n}")
+        self.__triton.load_model(self.__model_name)
+        self.__check_count("initialize", 4)
+        self.__check_count("finalize", 1)
+        # Basic sequence inference
+        self.__triton.infer(self.__model_name,
+                            self.__get_inputs(),
+                            sequence_id=1,
+                            sequence_start=True)
+        self.__triton.infer(self.__model_name,
+                            self.__get_inputs(),
+                            sequence_id=1,
+                            sequence_end=True)
 
-    # Helper function for 'test_scheduler_instance_update' testing the correct
-    # behavior of sequence instance updates with overlapping inferences. This
-    # function expects three sequence instances already loaded as a
-    # precondition. Goal of the test:
-    #   1. Update will block while there are ongoing sequence(s).
-    #   2. Ongoing sequence(s) may continue during an update.
-    #   3. New sequence(s) may be started during an update.
-    #   4. Ending any ongoing sequences started prior to the update will allow
-    #      the update to complete.
-    #   5. New sequence(s) started during an update may continue/end after the
-    #      update is completed.
-    def __test_concurrent_sequence_infer_and_update(self):
-        # Start seqneuce 1 and 2
+    # Helper function for 'test_scheduler_update' testing ongoing sequences may
+    # continue to infer on the same instance after the instance processing the
+    # sequence is removed by an instance update, which the removed instance will
+    # live until the sequence ends.
+    def __test_scheduler_ongoing_sequence_update(self):
+        # Start seqneuce 1 and 2 on CPU instances
         self.__triton.infer(self.__model_name,
                             self.__get_inputs(),
                             sequence_id=1,
@@ -541,50 +546,37 @@ class TestInstanceUpdate(unittest.TestCase):
                             self.__get_inputs(),
                             sequence_id=2,
                             sequence_start=True)
-        # Check scheduler update will wait for in-flight sequence completion
-        update_instance_group(
-            "{\ncount: 1\nkind: KIND_CPU\n},\n{\ncount: 1\nkind: KIND_GPU\n}")
-        update_complete = [False]
-
-        def update():
-            self.__triton.load_model(self.__model_name)
-            update_complete[0] = True
-            self.__check_count("initialize", 4)
-            self.__check_count("finalize", 2)
-
-        with concurrent.futures.ThreadPoolExecutor() as pool:
-            # Update should wait until sequence 1 and 2 end
-            update_thread = pool.submit(update)
-            time.sleep(2)  # make sure the update has started
-            self.assertFalse(update_complete[0], "Unexpected update completion")
-            # Sequence 1 and 2 may continue to infer during the update
-            self.__triton.infer(self.__model_name,
-                                self.__get_inputs(),
-                                sequence_id=1)
-            self.__triton.infer(self.__model_name,
-                                self.__get_inputs(),
-                                sequence_id=2)
-            time.sleep(4)  # make sure the infers have started
-            self.assertFalse(update_complete[0], "Unexpected update completion")
-            # Start sequence 3 should success
-            self.__triton.infer(self.__model_name,
-                                self.__get_inputs(),
-                                sequence_id=3,
-                                sequence_start=True)
-            time.sleep(2)  # make sure the infer has started
-            self.assertFalse(update_complete[0], "Unexpected update completion")
-            # End sequence 1 and 2 should unblock the update
-            self.__triton.infer(self.__model_name,
-                                self.__get_inputs(),
-                                sequence_id=1,
-                                sequence_end=True)
-            self.__triton.infer(self.__model_name,
-                                self.__get_inputs(),
-                                sequence_id=2,
-                                sequence_end=True)
-            time.sleep(4)  # make sure the update has returned
-            self.assertTrue(update_complete[0], "Update possibly stuck")
-            update_thread.result()
+        # Remove all 3 CPU and add 1 GPU instance with in-flight sequences. Both
+        # in-flight sequences are assigned to any 2 CPU instances, so exactly 1
+        # CPU instance can be removed immediately.
+        update_instance_group("{\ncount: 1\nkind: KIND_GPU\n}")
+        self.__triton.load_model(self.__model_name)
+        self.__check_count("initialize", 5)
+        self.__check_count("finalize", 2)
+        # Sequence 1 and 2 may continue to infer
+        self.__triton.infer(self.__model_name,
+                            self.__get_inputs(),
+                            sequence_id=1)
+        self.__triton.infer(self.__model_name,
+                            self.__get_inputs(),
+                            sequence_id=2)
+        self.__check_count("finalize", 2)  # check 2 CPU instances not removed
+        # Start sequence 3 on GPU instance
+        self.__triton.infer(self.__model_name,
+                            self.__get_inputs(),
+                            sequence_id=3,
+                            sequence_start=True)
+        self.__check_count("finalize", 2)  # check 2 CPU instances not removed
+        # End sequence 1 and 2 will remove the 2 CPU instances
+        self.__triton.infer(self.__model_name,
+                            self.__get_inputs(),
+                            sequence_id=1,
+                            sequence_end=True)
+        self.__triton.infer(self.__model_name,
+                            self.__get_inputs(),
+                            sequence_id=2,
+                            sequence_end=True)
+        self.__check_count("finalize", 4)
         # End sequence 3
         self.__triton.infer(self.__model_name,
                             self.__get_inputs(),
