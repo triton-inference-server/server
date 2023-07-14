@@ -70,15 +70,6 @@ const std::vector<std::string> TRITON_RESERVED_REQUEST_PARAMS{
     }                                                                  \
   } while (false)
 
-#define RETURN_VAL_IF_ERR(X, VAL)      \
-  do {                                 \
-    TRITONSERVER_Error* err__ = (X);   \
-    if (err__ != nullptr) {            \
-      TRITONSERVER_ErrorDelete(err__); \
-      return VAL;                      \
-    }                                  \
-  } while (false)
-
 #define GOTO_IF_ERR(X, T)            \
   do {                               \
     TRITONSERVER_Error* err__ = (X); \
