@@ -27,7 +27,6 @@
 
 SIMPLE_HTTP_CLIENT=../clients/simple_http_infer_client
 SIMPLE_GRPC_CLIENT=../clients/simple_grpc_infer_client
-BLS_CLIENT=bls_simple_client.py
 TRACE_SUMMARY=../common/trace_summary.py
 
 CLIENT_TEST=trace_endpoint_test.py

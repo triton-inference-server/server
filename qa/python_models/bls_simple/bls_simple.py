@@ -32,13 +32,12 @@ class TritonPythonModel:
 
     @staticmethod
     def auto_complete_config(auto_complete_model_config):
-        
+
         inputs = [{
-	    'name': "MODEL_NAME",
-	    'data_type': 'TYPE_STRING',
-	    'dims': [1]
-	    },
-        {
+            'name': "MODEL_NAME",
+            'data_type': 'TYPE_STRING',
+            'dims': [1]
+        }, {
             'name': 'INPUT0',
             'data_type': 'TYPE_INT32',
             'dims': [1, 16]
@@ -57,7 +56,6 @@ class TritonPythonModel:
             'dims': [16]
         }]
 
-        
         config = auto_complete_model_config.as_dict()
         input_names = []
         output_names = []
@@ -83,20 +81,20 @@ class TritonPythonModel:
         for request in requests:
             in_0 = pb_utils.get_input_tensor_by_name(request, "INPUT0")
             in_1 = pb_utils.get_input_tensor_by_name(request, "INPUT1")
-            model_name = pb_utils.get_input_tensor_by_name(request, "MODEL_NAME")
+            model_name = pb_utils.get_input_tensor_by_name(
+                request, "MODEL_NAME")
             model_name_string = model_name.as_numpy()[0]
-            
+
             infer_request = pb_utils.InferenceRequest(
                 model_name=model_name_string,
                 requested_output_names=["OUTPUT0", "OUTPUT1"],
-                inputs=[in_0, in_1], request = request
-            )
-            
+                inputs=[in_0, in_1],
+                request=request)
+
             infer_response = infer_request.exec()
 
             inference_response = pb_utils.InferenceResponse(
-                output_tensors=infer_response.output_tensors()
-            )
+                output_tensors=infer_response.output_tensors())
             responses.append(inference_response)
 
         return responses

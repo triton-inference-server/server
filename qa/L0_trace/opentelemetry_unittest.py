@@ -50,41 +50,44 @@ class OpenTelemetryTest(tu.TestResultCollector):
                 else:
                     break
 
-        data = data.split("\n")
+        data = data.split('\n')
         full_spans = [
-            entry.split("POST")[0] for entry in data if "resource_spans" in entry
+            entry.split('POST')[0]
+            for entry in data
+            if "resource_spans" in entry
         ]
         self.spans = []
         for span in full_spans:
             span = json.loads(span)
-            self.spans.append(span["resource_spans"][0]["scope_spans"][0]["spans"][0])
+            self.spans.append(
+                span["resource_spans"][0]['scope_spans'][0]['spans'][0])
 
         self.simple_model_name = "simple"
         self.ensemble_model_name = "ensemble_add_sub_int32_int32_int32"
         self.root_span = "InferRequest"
 
     def _check_events(self, span_name, events):
-        root_events_http = [
-            "HTTP_RECV_START",
-            "HTTP_RECV_END",
-            "INFER_RESPONSE_COMPLETE",
-            "HTTP_SEND_START",
-            "HTTP_SEND_END",
-        ]
-        root_events_grpc = [
-            "GRPC_WAITREAD_START",
-            "GRPC_WAITREAD_END",
-            "INFER_RESPONSE_COMPLETE",
-            "GRPC_SEND_START",
-            "GRPC_SEND_END",
-        ]
-        request_events = ["REQUEST_START", "QUEUE_START", "REQUEST_END"]
-        compute_events = [
-            "COMPUTE_START",
-            "COMPUTE_INPUT_END",
-            "COMPUTE_OUTPUT_START",
-            "COMPUTE_END",
-        ]
+        root_events_http =\
+              ["HTTP_RECV_START",
+               "HTTP_RECV_END",
+               "INFER_RESPONSE_COMPLETE",
+               "HTTP_SEND_START",
+               "HTTP_SEND_END"]
+        root_events_grpc =\
+              ["GRPC_WAITREAD_START",
+               "GRPC_WAITREAD_END",
+               "INFER_RESPONSE_COMPLETE",
+               "GRPC_SEND_START",
+               "GRPC_SEND_END"]
+        request_events =\
+              ["REQUEST_START",
+               "QUEUE_START",
+               "REQUEST_END"]
+        compute_events =\
+              ["COMPUTE_START",
+               "COMPUTE_INPUT_END",
+               "COMPUTE_OUTPUT_START",
+               "COMPUTE_END"]
 
         if span_name == "compute":
             # Check that all compute related events (and only them)
@@ -92,19 +95,23 @@ class OpenTelemetryTest(tu.TestResultCollector):
             self.assertTrue(all(entry in events for entry in compute_events))
             self.assertFalse(all(entry in events for entry in request_events))
             self.assertFalse(
-                all(entry in events for entry in root_events_http + root_events_grpc)
-            )
+                all(entry in events
+                    for entry in root_events_http + root_events_grpc))
 
         elif span_name == self.root_span:
             # Check that root span has INFER_RESPONSE_COMPLETE, _RECV/_WAITREAD
             # and _SEND events (and only them)
             if "HTTP" in events:
-                self.assertTrue(all(entry in events for entry in root_events_http))
-                self.assertFalse(all(entry in events for entry in root_events_grpc))
+                self.assertTrue(
+                    all(entry in events for entry in root_events_http))
+                self.assertFalse(
+                    all(entry in events for entry in root_events_grpc))
 
             elif "GRPC" in events:
-                self.assertTrue(all(entry in events for entry in root_events_grpc))
-                self.assertFalse(all(entry in events for entry in root_events_http))
+                self.assertTrue(
+                    all(entry in events for entry in root_events_grpc))
+                self.assertFalse(
+                    all(entry in events for entry in root_events_http))
             self.assertFalse(all(entry in events for entry in request_events))
             self.assertFalse(all(entry in events for entry in compute_events))
 
@@ -113,20 +120,17 @@ class OpenTelemetryTest(tu.TestResultCollector):
             # are recorded in request span
             self.assertTrue(all(entry in events for entry in request_events))
             self.assertFalse(
-                all(entry in events for entry in root_events_http + root_events_grpc)
-            )
+                all(entry in events
+                    for entry in root_events_http + root_events_grpc))
             self.assertFalse(all(entry in events for entry in compute_events))
 
     def _check_parent(self, child_span, parent_span):
         # Check that child and parent span have the same trace_id
         # and child's `parent_span_id` is the same as parent's `span_id`
-        self.assertEqual(child_span["trace_id"], parent_span["trace_id"])
-        self.assertIn(
-            "parent_span_id",
-            child_span,
-            "child span does not have parent span id specified",
-        )
-        self.assertEqual(child_span["parent_span_id"], parent_span["span_id"])
+        self.assertEqual(child_span['trace_id'], parent_span['trace_id'])
+        self.assertIn('parent_span_id', child_span,
+                      "child span does not have parent span id specified")
+        self.assertEqual(child_span['parent_span_id'], parent_span['span_id'])
 
     def test_spans(self):
         parsed_spans = []
@@ -158,9 +162,8 @@ class OpenTelemetryTest(tu.TestResultCollector):
             self._check_parent(child, parent)
 
         # root_span should not have `parent_span_id` field
-        self.assertNotIn(
-            "parent_span_id", self.spans[2], "root span has a parent_span_id specified"
-        )
+        self.assertNotIn('parent_span_id', self.spans[2],
+                         "root span has a parent_span_id specified")
 
         # Next 3 spans in `self.spans` belong to GRPC request
         # Order of spans and their relationship described earlier
@@ -168,9 +171,8 @@ class OpenTelemetryTest(tu.TestResultCollector):
             self._check_parent(child, parent)
 
         # root_span should not have `parent_span_id` field
-        self.assertNotIn(
-            "parent_span_id", self.spans[5], "root span has a parent_span_id specified"
-        )
+        self.assertNotIn('parent_span_id', self.spans[5],
+                         "root span has a parent_span_id specified")
 
         # Final 4 spans in `self.spans` belong to ensemble request
         # Order of spans: compute span - request span - request span - root span
@@ -178,9 +180,9 @@ class OpenTelemetryTest(tu.TestResultCollector):
             self._check_parent(child, parent)
 
         # root_span should not have `parent_span_id` field
-        self.assertNotIn(
-            "parent_span_id", self.spans[9], "root span has a parent_span_id specified"
-        )
+        self.assertNotIn('parent_span_id', self.spans[9],
+                         "root span has a parent_span_id specified")
+
 
 
 def prepare_data(client):
@@ -199,43 +201,30 @@ def prepare_data(client):
 
 
 def prepare_traces():
-        
-        triton_client_http = httpclient.InferenceServerClient("localhost:8000",
-                                                               verbose=True)
-        triton_client_grpc = grpcclient.InferenceServerClient("localhost:8001",
-                                                               verbose=True)
-        inputs = prepare_data(httpclient)
-        triton_client_http.infer("simple",inputs)
-        
-        inputs = prepare_data(grpcclient)
-        triton_client_grpc.infer("simple", inputs)
 
-        inputs = prepare_data(httpclient)
-        triton_client_http.infer("ensemble_add_sub_int32_int32_int32", inputs)
+    triton_client_http = httpclient.InferenceServerClient("localhost:8000",
+                                                          verbose=True)
+    triton_client_grpc = grpcclient.InferenceServerClient("localhost:8001",
+                                                          verbose=True)
+    inputs = prepare_data(httpclient)
+    triton_client_http.infer("simple", inputs)
+
+    inputs = prepare_data(grpcclient)
+    triton_client_grpc.infer("simple", inputs)
+
+    inputs = prepare_data(httpclient)
+    triton_client_http.infer("ensemble_add_sub_int32_int32_int32", inputs)
+
 
 def send_bls_request():
 
     with httpclient.InferenceServerClient("localhost:8000") as client:
-        inputs = []
-        input0_data = np.full(shape=(1, 16), fill_value=-1, dtype=np.int32)
-        input1_data = np.full(shape=(1, 16), fill_value=-1, dtype=np.int32)
         
-
-        inputs.append(httpclient.InferInput('INPUT0', [1, 16], "INT32"))
-        inputs.append(httpclient.InferInput('INPUT1', [1, 16], "INT32"))
+        inputs = prepare_data(httpclient)
         inputs.append(httpclient.InferInput("MODEL_NAME", [1], "BYTES"))
-
-        # Initialize the data
-        inputs[0].set_data_from_numpy(input0_data)
-        inputs[1].set_data_from_numpy(input1_data)
         inputs[2].set_data_from_numpy(np.array(["simple"], dtype=np.object_))
-        
-        outputs = [
-            httpclient.InferRequestedOutput("OUTPUT0"),
-            httpclient.InferRequestedOutput("OUTPUT1"),
-        ]
+        client.infer("bls_simple", inputs)
 
-        response = client.infer("bls_simple", inputs, request_id=str(1), outputs=outputs)
 
 if __name__ == '__main__':
     unittest.main()

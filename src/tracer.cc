@@ -404,6 +404,10 @@ TraceManager::Trace::StartSpan(
   if (parent_id == 0 && activity == TRITONSERVER_TRACE_REQUEST_START) {
     parent_span_key = kRootSpan;
   } else if (activity == TRITONSERVER_TRACE_REQUEST_START) {
+    // [FIXME] For BLS requests parent span for children's request spans
+    // should be parent model's compute span. Currently,
+    // this won't work, since parent's compute span will be created 
+    // only after children's spans are created.  
     parent_span_key = kRequestSpan + std::to_string(parent_id);
   } else if (activity == TRITONSERVER_TRACE_COMPUTE_START) {
     parent_span_key = kRequestSpan + std::to_string(trace_id);
