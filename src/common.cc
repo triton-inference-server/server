@@ -131,7 +131,11 @@ Join(const std::vector<std::string>& vec, const std::string& delim)
 uint16_t
 SwapBytes(const uint16_t input)
 {
+#ifdef _MSC_VER
+  return _byteswap_ushort(input);
+#else
   return __builtin_bswap16(input);
+#endif
 }
 
 /// Returns uint32_t input with byte order swapped
@@ -142,7 +146,11 @@ SwapBytes(const uint16_t input)
 uint32_t
 SwapBytes(const uint32_t input)
 {
+#ifdef _MSC_VER
+  return _byteswap_ulong(input);
+#else
   return __builtin_bswap32(input);
+#endif
 }
 
 /// Returns uint64_t input with byte order swapped
@@ -153,7 +161,11 @@ SwapBytes(const uint32_t input)
 uint64_t
 SwapBytes(const uint64_t input)
 {
+#ifdef _MSC_VER
+  return _byteswap_uint64(input);
+#else
   return __builtin_bswap64(input);
+#endif
 }
 
 /// Returns uint32_t length with byte order swapped and
@@ -459,5 +471,5 @@ GetDataTypeForRawInput(
 }
 
 #endif  // TRITON_BIG_ENDIAN
-
-}}  // namespace triton::server
+}
+}  // namespace triton::server
