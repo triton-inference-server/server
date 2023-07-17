@@ -93,7 +93,7 @@ how the gRPC streaming can be used to infer decoupled models.
 If using [Triton's in-process C API](../customization_guide/inference_protocols.md#in-process-triton-server-api),
 your application should be cognizant that the callback function you registered with 
 `TRITONSERVER_InferenceRequestSetResponseCallback` can be invoked any number of times,
-each time with a new response. You can take a look at [grpc_server.cc](https://github.com/triton-inference-server/server/blob/main/src/grpc_server.cc)
+each time with a new response. You can take a look at [grpc_server.cc](https://github.com/triton-inference-server/server/blob/main/src/grpc/grpc_server.cc)
 
 ### Knowing When a Decoupled Inference Request is Complete
 
