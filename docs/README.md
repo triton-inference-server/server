@@ -189,7 +189,7 @@ The following resources are recommended to explore the full suite of Triton Infe
   - [Model Navigator](https://github.com/triton-inference-server/model_navigator):
   The Triton Model Navigator is a tool that provides the ability to automate the process of moving model from source to optimal format and configuration for deployment on Triton Inference Server. The tool supports export model from source to all possible formats and applies the Triton Inference Server backend optimizations.
 
-- **Backends**: Triton has supports a wide variety of frameworks used to run models. Users can extend this functionality by creating custom backends.
+- **Backends**: Triton supports a wide variety of frameworks used to run models. Users can extend this functionality by creating custom backends.
   - [PyTorch](https://github.com/triton-inference-server/pytorch_backend): Widely used Open Source DL Framework
   - [TensorFlow](https://github.com/triton-inference-server/tensorflow_backend): Widely used Open Source DL Framework
   - [TensorRT](https://github.com/triton-inference-server/tensorrt_backend): NVIDIA [TensorRT](https://developer.nvidia.com/tensorrt) is an inference acceleration SDK that provide a with range of graph optimizations, kernel optimization, use of lower precision, and more.
