@@ -1,3 +1,4 @@
+#!/bin/bash
 # Copyright (c) 2021-2022, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 
 # If detect Vertex AI environment, launch tritonserver with supplied arguments

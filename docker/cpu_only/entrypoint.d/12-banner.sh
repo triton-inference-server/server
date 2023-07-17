@@ -1,3 +1,4 @@
+#!/bin/bash
 # Copyright 2021-2022, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 
 prodname_uc=$(echo "${NVIDIA_PRODUCT_NAME}" | tr [:lower:] [:upper:] | sed 's/ /_/g' | sed 's/^NVIDIA_//')  # Product name
