@@ -478,14 +478,14 @@ class TestInstanceUpdate(unittest.TestCase):
             update_sequence_batching(sequence_batching_type)
             self.__triton.load_model(self.__model_name)
             self.__check_count("initialize", 2)
-            self.__check_count("finalize", 0)
+            self.__check_count("finalize", 0, poll=True)
             # Test infer and update
             self.__test_scheduler_basic_sequence_update()
             self.__test_scheduler_ongoing_sequence_update()
             # Unload model
             self.__triton.unload_model(self.__model_name)
             self.__check_count("initialize", 5)
-            self.__check_count("finalize", 5, True)
+            self.__check_count("finalize", 5, poll=True)
             self.__reset_model()
 
     # Helper function for 'test_scheduler_update' testing the success of
@@ -507,7 +507,7 @@ class TestInstanceUpdate(unittest.TestCase):
         update_instance_group("{\ncount: 4\nkind: KIND_CPU\n}")
         self.__triton.load_model(self.__model_name)
         self.__check_count("initialize", 4)
-        self.__check_count("finalize", 0)
+        self.__check_count("finalize", 0, poll=True)
         # Basic sequence inference
         self.__triton.infer(self.__model_name,
                             self.__get_inputs(),
@@ -521,7 +521,7 @@ class TestInstanceUpdate(unittest.TestCase):
         update_instance_group("{\ncount: 3\nkind: KIND_CPU\n}")
         self.__triton.load_model(self.__model_name)
         self.__check_count("initialize", 4)
-        self.__check_count("finalize", 1)
+        self.__check_count("finalize", 1, poll=True)
         # Basic sequence inference
         self.__triton.infer(self.__model_name,
                             self.__get_inputs(),
@@ -552,7 +552,7 @@ class TestInstanceUpdate(unittest.TestCase):
         update_instance_group("{\ncount: 1\nkind: KIND_GPU\n}")
         self.__triton.load_model(self.__model_name)
         self.__check_count("initialize", 5)
-        self.__check_count("finalize", 2)
+        self.__check_count("finalize", 2, poll=True)
         # Sequence 1 and 2 may continue to infer
         self.__triton.infer(self.__model_name,
                             self.__get_inputs(),
@@ -576,7 +576,7 @@ class TestInstanceUpdate(unittest.TestCase):
                             self.__get_inputs(),
                             sequence_id=2,
                             sequence_end=True)
-        self.__check_count("finalize", 4)
+        self.__check_count("finalize", 4, poll=True)
         # End sequence 3
         self.__triton.infer(self.__model_name,
                             self.__get_inputs(),
