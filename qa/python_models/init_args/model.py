@@ -34,7 +34,7 @@ def check_init_args(args):
         'model_name':
             'init_args',
         'model_instance_name':
-            'init_args_0',
+            'init_args_0_0',
         'model_instance_kind':
             'CPU',
         'model_instance_device_id':
