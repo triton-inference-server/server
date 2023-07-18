@@ -30,6 +30,8 @@
 skip = "./.git,./.github"
 # ignore short words, and typename parameters like OffsetT
 ignore-regex = "\\b(.{1,4}|[A-Z]\\w*T)\\b"
+# ignore allowed words
+ignore-words-list = "passin"
 # use the 'clear' dictionary for unambiguous spelling mistakes
 builtin = "clear"
 # disable warnings about binary files and wrong encoding
