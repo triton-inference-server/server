@@ -535,7 +535,7 @@ class TestInstanceUpdate(unittest.TestCase):
     # sequence is removed by an instance update, which the removed instance will
     # live until the sequence ends.
     def _test_scheduler_ongoing_sequence_update(self):
-        # Start seqneuce 1 and 2 on CPU instances
+        # Start sequence 1 and 2 on CPU instances
         self._triton.infer(self._model_name,
                            self._get_inputs(),
                            sequence_id=1,
