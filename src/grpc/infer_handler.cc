@@ -467,6 +467,9 @@ InferGRPCToInput(
 #endif
       }
     } else {
+      TRITONSERVER_DataType dtype =
+	TRITONSERVER_StringToDataType(io.datatype().c_str());
+
       if (io.has_contents() && (!request.raw_input_contents().empty())) {
         return TRITONSERVER_ErrorNew(
             TRITONSERVER_ERROR_INVALID_ARG,
@@ -477,8 +480,6 @@ InferGRPCToInput(
                 .c_str());
       } else if (io.has_contents()) {
         // Check the presence of explicit tensors
-        TRITONSERVER_DataType dtype =
-            TRITONSERVER_StringToDataType(io.datatype().c_str());
         const size_t elem_byte_size = TRITONSERVER_DataTypeByteSize(dtype);
         if (io.contents().bool_contents_size() != 0) {
           RETURN_IF_ERR(InferGRPCToInputHelper(
@@ -497,10 +498,7 @@ InferGRPCToInput(
             auto& serialized = serialized_data->back();
             serialized.reserve(
                 io.contents().int_contents_size() * elem_byte_size);
-            for (const auto& element : io.contents().int_contents()) {
-              // Assuming the system is little-endian, picking the
-              // least significant byte of 32-bit integer as a
-              // int8 element
+            for (const int8_t element : io.contents().int_contents()) {
               serialized.append(
                   reinterpret_cast<const char*>(&element), elem_byte_size);
             }
@@ -514,10 +512,7 @@ InferGRPCToInput(
             auto& serialized = serialized_data->back();
             serialized.reserve(
                 io.contents().int_contents_size() * elem_byte_size);
-            for (const auto& element : io.contents().int_contents()) {
-              // Assuming the system is little-endian, picking the
-              // least 2 significant bytes of 32-bit integer as a
-              // int16 element
+            for (const int16_t element : io.contents().int_contents()) {
               serialized.append(
                   reinterpret_cast<const char*>(&element), elem_byte_size);
             }
@@ -549,10 +544,7 @@ InferGRPCToInput(
             auto& serialized = serialized_data->back();
             serialized.reserve(
                 io.contents().uint_contents_size() * elem_byte_size);
-            for (const auto& element : io.contents().uint_contents()) {
-              // Assuming the system is little-endian, picking the
-              // least significant byte of 32-bit unsigned integer as a
-              // uint8 element
+            for (const uint8_t element : io.contents().uint_contents()) {
               serialized.append(
                   reinterpret_cast<const char*>(&element), elem_byte_size);
             }
@@ -566,10 +558,7 @@ InferGRPCToInput(
             auto& serialized = serialized_data->back();
             serialized.reserve(
                 io.contents().uint_contents_size() * elem_byte_size);
-            for (const auto& element : io.contents().uint_contents()) {
-              // Assuming the system is little-endian, picking the
-              // least 2 significant bytes of 32-bit integer as a
-              // uint16 element
+            for (const uint16_t element : io.contents().uint_contents()) {
               serialized.append(
                   reinterpret_cast<const char*>(&element), elem_byte_size);
             }
@@ -616,7 +605,7 @@ InferGRPCToInput(
           serialized_data->emplace_back();
           auto& serialized = serialized_data->back();
 
-          // Serialize the output tensor strings. Each string is
+          // Serialize the input tensor strings. Each string is
           // serialized as a 4-byte length followed by the string itself
           // with no null-terminator.
           for (const auto& element : io.contents().bytes_contents()) {
@@ -635,6 +624,7 @@ InferGRPCToInput(
         const std::string& raw = request.raw_input_contents()[index++];
         base = raw.c_str();
         byte_size = raw.size();
+	LittleEndianToHost(dtype, const_cast<char *>(static_cast<const char *>(base)), byte_size);	
       } else {
         return TRITONSERVER_ErrorNew(
             TRITONSERVER_ERROR_INVALID_ARG,
@@ -882,7 +872,7 @@ ModelInferHandler::Execute(InferHandler::State* state)
     err = ForwardHeadersAsParameters(irequest, state);
   }
 
-  // Will be used to hold the serialized data in case explicit string
+  // Will be used to hold the serialized data in case explicit
   // tensors are present in the request.
   std::list<std::string> serialized_data;
 

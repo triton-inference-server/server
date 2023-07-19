@@ -596,8 +596,12 @@ InferResponseCompleteCommon(
       }
 
       // Update the output with new datatype, shape and contents.
+      datatype = TRITONSERVER_TYPE_BYTES;
+      base = serialized.c_str();
+      byte_size = serialized.length();
+      
       output->set_datatype(
-          TRITONSERVER_DataTypeString(TRITONSERVER_TYPE_BYTES));
+          TRITONSERVER_DataTypeString(datatype));
 
       if (batch_size > 0) {
         output->add_shape(batch_size);
@@ -608,6 +612,7 @@ InferResponseCompleteCommon(
       (*response.mutable_raw_output_contents())[output_idx] =
           std::move(serialized);
     }
+    HostToLittleEndian(datatype, const_cast<char *>(static_cast<const char*>(base)), byte_size);
   }
 
   // Make sure response doesn't exceed GRPC limits.

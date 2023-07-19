@@ -31,6 +31,16 @@
 
 #include "triton/core/tritonserver.h"
 
+#ifdef TRITON_BIG_ENDIAN
+
+#define TRITONJSON_STATUSTYPE TRITONSERVER_Error*
+#define TRITONJSON_STATUSRETURN(M) \
+  return TRITONSERVER_ErrorNew(TRITONSERVER_ERROR_INTERNAL, (M).c_str())
+#define TRITONJSON_STATUSSUCCESS nullptr
+#include "triton/common/triton_json.h"
+
+#endif
+
 namespace triton { namespace server {
 
 TRITONSERVER_Error*
@@ -111,4 +121,355 @@ Join(const std::vector<std::string>& vec, const std::string& delim)
   return ss.str();
 }
 
-}}  // namespace triton::server
+#ifdef TRITON_BIG_ENDIAN
+
+/// Returns uint16_t input with byte order swapped
+///
+/// \param[in] input 
+/// \return input with byte order swapped
+///
+uint16_t
+SwapBytes(const uint16_t input)
+{
+#ifdef _MSC_VER
+  return _byteswap_ushort(input);
+#else
+  return __builtin_bswap16(input);
+#endif
+}
+
+/// Returns uint32_t input with byte order swapped
+///
+/// \param[in] input
+/// \return input with byte order swapped
+///
+uint32_t
+SwapBytes(const uint32_t input)
+{
+#ifdef _MSC_VER
+  return _byteswap_ulong(input);
+#else
+  return __builtin_bswap32(input);
+#endif
+}
+
+/// Returns uint64_t input with byte order swapped
+///
+/// \param[in] input
+/// \return input with byte order swapped
+///
+uint64_t
+SwapBytes(const uint64_t input)
+{
+#ifdef _MSC_VER
+  return _byteswap_uint64(input);
+#else
+  return __builtin_bswap64(input);
+#endif
+}
+
+/// Returns uint32_t length with byte order swapped and
+/// returns length in host byte order.
+///
+/// \param[in] length
+/// \param[in] host_byte_order whether original length is in host byte order
+/// \param[out] host_length length in host byte order
+/// \return length with byte order swapped
+///
+uint32_t
+SwapLength(
+    const uint32_t length, const bool host_byte_order, uint32_t* host_length)
+{
+  uint32_t swapped = SwapBytes(length);
+  *host_length = host_byte_order ? length : swapped;
+  return swapped;
+}
+
+/// Swaps length byte order in place with support for non coniguous
+/// arrays and returns length in host byte order. For
+/// non-contiguous arrays the initial call must pass an empty partial result.
+///
+/// \param[in, out] base pointer to array with length
+/// \param[in] byte_size size of array
+/// \param[in] host_byte_order whether original length is in host byte order
+/// \param[out] host_length length in host byte order
+/// \param[in, out] partial_result vector for partial results.
+///
+void
+SwapLength(
+    char* base, size_t byte_size, const bool host_byte_order,
+    uint32_t* host_length, std::vector<char*>& partial_result)
+{
+  *host_length = 0;
+
+  if (partial_result.size()) {
+    for (size_t offset = 0,
+                remaining = sizeof(uint32_t) - partial_result.size();
+         (remaining > 0) && (offset < byte_size);
+         ++offset, ++base, --remaining) {
+      partial_result.emplace_back(base);
+    }
+    if (partial_result.size() == sizeof(uint32_t)) {
+      char* host_length_buffer = reinterpret_cast<char*>(host_length);
+      for (size_t left_index = 0, right_index = sizeof(uint32_t) - 1;
+           left_index < right_index; ++left_index, --right_index) {
+        char temp = *partial_result[right_index];
+        *partial_result[right_index] = *partial_result[left_index];
+        *partial_result[left_index] = temp;
+        if (host_byte_order) {
+          host_length_buffer[right_index] = *partial_result[left_index];
+          host_length_buffer[left_index] = *partial_result[right_index];
+        } else {
+          host_length_buffer[right_index] = *partial_result[right_index];
+          host_length_buffer[left_index] = *partial_result[left_index];
+        }
+      }
+      partial_result.clear();
+      return;
+    }
+    return;
+  }
+
+  if (byte_size >= sizeof(uint32_t)) {
+    uint32_t* value = reinterpret_cast<uint32_t*>(base);
+    *value = SwapLength(*value, host_byte_order, host_length);
+    return;
+  }
+
+  for (; byte_size; --byte_size, ++base) {
+    partial_result.emplace_back(base);
+  }
+}
+
+/// Swaps byte order in place
+///
+/// \param[in, out] base pointer to array of data type elements to convert
+/// \param[in] byte_size size of array in bytes
+///
+template <typename T>
+void
+SwapBytes(char* base, size_t byte_size)
+{
+  T* value = reinterpret_cast<T*>(base);
+  for (size_t offset = 0; offset < byte_size; offset += sizeof(T), ++value) {
+    *value = SwapBytes(*value);
+  }
+}
+
+/// Swaps byte order in place with support for non-contiguous arrays. For
+/// non-contiguous arrays the initial call must pass an empty partial result.
+///
+/// \param[in, out] base pointer to array of data type elements to convert
+/// \param[in] byte_size size of array in bytes
+/// \param[in, out] partial_result vector to store partial results
+///
+template <typename T>
+void
+SwapBytes(char* base, size_t byte_size, std::vector<char*>& partial_result)
+{
+  size_t offset = 0;
+
+  if (partial_result.size()) {
+    for (size_t remaining = sizeof(T) - partial_result.size();
+         (remaining > 0) && (offset < byte_size);
+         ++offset, ++base, --remaining) {
+      partial_result.emplace_back(base);
+    }
+    if (partial_result.size() == sizeof(T)) {
+      for (size_t left_index = 0, right_index = sizeof(T) - 1;
+           left_index < right_index; ++left_index, --right_index) {
+        char temp = *partial_result[right_index];
+        *partial_result[right_index] = *partial_result[left_index];
+        *partial_result[left_index] = temp;
+      }
+      partial_result.clear();
+    }
+  }
+
+  T* value = reinterpret_cast<T*>(base);
+  for (; byte_size - offset >= sizeof(T); offset += sizeof(T), ++value) {
+    *value = SwapBytes(*value);
+  }
+
+  base = reinterpret_cast<char*>(value);
+  for (; offset < byte_size; ++offset, ++base) {
+    partial_result.emplace_back(base);
+  }
+}
+
+
+/// Swaps byte order in place.
+///
+/// \param[in] datatype data type of array
+/// \param[in, out] base pointer to array of data type elements to convert
+/// \param[in] byte_size size of array in bytes
+/// \param[in] host_byte_order whether original array is in host byte
+/// order
+///
+void
+SwapBytes(
+    TRITONSERVER_DataType datatype, char* base, size_t byte_size,
+    bool host_byte_order)
+{
+  switch (datatype) {
+    case TRITONSERVER_TYPE_UINT16:
+    case TRITONSERVER_TYPE_INT16:
+    case TRITONSERVER_TYPE_FP16: {
+      SwapBytes<uint16_t>(base, byte_size);
+      break;
+    }
+    case TRITONSERVER_TYPE_UINT32:
+    case TRITONSERVER_TYPE_INT32:
+    case TRITONSERVER_TYPE_FP32: {
+      SwapBytes<uint32_t>(base, byte_size);
+      break;
+    }
+    case TRITONSERVER_TYPE_UINT64:
+    case TRITONSERVER_TYPE_INT64:
+    case TRITONSERVER_TYPE_FP64: {
+      SwapBytes<uint64_t>(base, byte_size);
+      break;
+    }
+    case TRITONSERVER_TYPE_BYTES: {
+      size_t next_offset = 0;
+      uint32_t host_length = 0;
+      while (next_offset < byte_size) {
+        uint32_t* length = reinterpret_cast<uint32_t*>(base + next_offset);
+        *length = SwapLength(*length, host_byte_order, &host_length);
+        next_offset += sizeof(uint32_t) + host_length;
+      }
+      break;
+    }
+    default: {
+    }
+  }
+}
+
+/// Swaps byte order in place with support for non-contiguous arrays. For
+/// non-contiguous arrays the initial call must pass an empty partial result and
+/// 0 for the initial next_offset. Subsequent calls should pass the returned
+/// values without modification.
+///
+/// \param[in] datatype data type of array
+/// \param[in, out] base pointer to array of data type elements to convert
+/// \param[in] byte_size size of array in bytes
+/// \param[in] host_byte_order whether original array is in host byte
+/// order
+/// \param[in, out] partial_result vector to store partial results
+/// \param[in, out] next_offset intermediate value used for storing next offset
+/// for BYTES data type
+///
+void
+SwapBytes(
+    TRITONSERVER_DataType datatype, char* base, size_t byte_size,
+    bool host_byte_order, std::vector<char*>& partial_result,
+    size_t& next_offset)
+{
+  switch (datatype) {
+    case TRITONSERVER_TYPE_UINT16:
+    case TRITONSERVER_TYPE_INT16:
+    case TRITONSERVER_TYPE_FP16: {
+      SwapBytes<uint16_t>(base, byte_size, partial_result);
+      break;
+    }
+    case TRITONSERVER_TYPE_UINT32:
+    case TRITONSERVER_TYPE_INT32:
+    case TRITONSERVER_TYPE_FP32: {
+      SwapBytes<uint32_t>(base, byte_size, partial_result);
+      break;
+    }
+    case TRITONSERVER_TYPE_UINT64:
+    case TRITONSERVER_TYPE_INT64:
+    case TRITONSERVER_TYPE_FP64: {
+      SwapBytes<uint64_t>(base, byte_size, partial_result);
+      break;
+    }
+    case TRITONSERVER_TYPE_BYTES: {
+      uint32_t host_length = 0;
+      while (next_offset < byte_size) {
+        size_t partial_offset = partial_result.size();
+        SwapLength(
+            base + next_offset, byte_size - next_offset, host_byte_order,
+            &host_length, partial_result);
+        if (partial_result.size() == 0) {
+          next_offset += sizeof(uint32_t) - partial_offset + host_length;
+        } else {
+          next_offset = 0;
+          return;
+        }
+      }
+      next_offset -= byte_size;
+      break;
+    }
+    default: {
+    }
+  }
+}
+
+void
+HostToLittleEndian(TRITONSERVER_DataType datatype, char* base, size_t byte_size)
+{
+  SwapBytes(datatype, base, byte_size, true);
+}
+
+void
+LittleEndianToHost(TRITONSERVER_DataType datatype, char* base, size_t byte_size)
+{
+   SwapBytes(datatype, base, byte_size, false);
+}
+
+void
+LittleEndianToHost(
+    TRITONSERVER_DataType datatype, char* base, size_t byte_size,
+    std::vector<char*>& partial_result, size_t& next_offset)
+{
+  SwapBytes(datatype, base, byte_size, false, partial_result, next_offset);
+}
+
+
+TRITONSERVER_Error*
+GetDataTypeForRawInput(
+    TRITONSERVER_Server* server, const std::string& model_name,
+    const int64_t model_version, TRITONSERVER_DataType *datatype)
+{
+  TRITONSERVER_Message* message = nullptr;
+  triton::common::TritonJson::Value document;
+  triton::common::TritonJson::Value inputs;
+  triton::common::TritonJson::Value input;
+  const char* datatype_string = "";
+  size_t datatype_string_length = 0;
+  const char* buffer;
+  size_t byte_size;
+  const char* error_message = "unexpected error getting data type for raw input";
+
+  *datatype = TRITONSERVER_TYPE_INVALID;
+  
+  RETURN_MSG_IF_ERR(
+      TRITONSERVER_ServerModelMetadata(
+          server, model_name.c_str(), model_version, &message),
+      error_message);
+
+  RETURN_MSG_IF_ERR(
+      TRITONSERVER_MessageSerializeToJson(message, &buffer, &byte_size),
+      error_message);
+
+  RETURN_MSG_IF_ERR(
+      document.Parse(buffer, byte_size), error_message);
+
+  RETURN_MSG_IF_ERR(
+      document.MemberAsArray("inputs", &inputs), error_message);
+
+  RETURN_MSG_IF_ERR(inputs.IndexAsObject(0, &input), error_message);
+
+  RETURN_MSG_IF_ERR(
+      input.MemberAsString("datatype", &datatype_string, &datatype_string_length),
+      error_message);
+
+  *datatype = TRITONSERVER_StringToDataType(datatype_string);
+
+  return nullptr;
+}
+
+#endif  // TRITON_BIG_ENDIAN
+}
+}  // namespace triton::server

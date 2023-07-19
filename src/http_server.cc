@@ -405,16 +405,23 @@ ReadDataFromJsonHelper(
           const char* cstr;
           size_t len = 0;
           RETURN_IF_ERR(el.AsString(&cstr, &len));
+          if (len > std::numeric_limits<uint32_t>::max()) {
+            return TRITONSERVER_ErrorNew(
+                TRITONSERVER_ERROR_INTERNAL,
+                "Length of bytes data larger than uint32_t max value");
+          }
           if (static_cast<int64_t>(*counter + len + sizeof(uint32_t)) >
               expected_cnt) {
             return TRITONSERVER_ErrorNew(
                 TRITONSERVER_ERROR_INTERNAL,
                 "Shape does not match true shape of 'data' field");
           }
-          memcpy(
-              base + *counter, reinterpret_cast<char*>(&len), sizeof(uint32_t));
-          std::copy(cstr, cstr + len, base + *counter + sizeof(uint32_t));
-          *counter += len + sizeof(uint32_t);
+          // Prepend bytes with length
+          *reinterpret_cast<uint32_t*>(base + *counter) = static_cast<uint32_t>(len);
+          *counter += sizeof(uint32_t);
+          // Copy bytes
+          std::copy(cstr, cstr + len, base + *counter);
+          *counter += len;
           break;
         }
         default:
@@ -2523,6 +2530,11 @@ HTTPAPIServer::EVBufferToInput(
             "data format");
       }
 
+#ifdef TRITON_BIG_ENDIAN
+      size_t next_offset = 0;
+      std::vector<char*> partial_result;
+#endif
+
       // Process one block at a time
       while ((byte_size > 0) && (v_idx < n)) {
         char* base = static_cast<char*>(v[v_idx].iov_base);
@@ -2537,6 +2549,8 @@ HTTPAPIServer::EVBufferToInput(
           byte_size -= v[v_idx].iov_len;
           v_idx++;
         }
+
+        LittleEndianToHost(dtype, base, base_size, partial_result, next_offset);
 
         RETURN_IF_ERR(TRITONSERVER_InferenceRequestAppendInputData(
             irequest, input_name, base, base_size, TRITONSERVER_MEMORY_CPU,
@@ -2718,8 +2732,9 @@ HTTPAPIServer::EVBufferToInput(
 
 TRITONSERVER_Error*
 HTTPAPIServer::EVBufferToRawInput(
-    const std::string& model_name, TRITONSERVER_InferenceRequest* irequest,
-    evbuffer* input_buffer, InferRequestClass* infer_req)
+    const std::string& model_name, const int64_t model_version,
+    TRITONSERVER_InferenceRequest* irequest, evbuffer* input_buffer,
+    InferRequestClass* infer_req)
 {
   static const char* raw_input_name = "raw_input";
   RETURN_IF_ERR(
@@ -2744,6 +2759,14 @@ HTTPAPIServer::EVBufferToRawInput(
             "unexpected error getting input buffers");
       }
     }
+
+#ifdef TRITON_BIG_ENDIAN
+    size_t next_offset = 0;
+    std::vector<char*> partial_result;
+    TRITONSERVER_DataType dtype = TRITONSERVER_TYPE_INVALID;
+    RETURN_IF_ERR(GetDataTypeForRawInput(server_.get(), model_name, model_version, &dtype)));
+#endif
+
     // Process one block at a time
     while ((byte_size > 0) && (v_idx < n)) {
       char* base = static_cast<char*>(v[v_idx].iov_base);
@@ -2758,6 +2781,8 @@ HTTPAPIServer::EVBufferToRawInput(
         byte_size -= v[v_idx].iov_len;
         v_idx++;
       }
+
+      LittleEndianToHost(dtype, base, base_size, partial_result, next_offset);
 
       RETURN_IF_ERR(TRITONSERVER_InferenceRequestAppendInputData(
           irequest, raw_input_name, base, base_size, TRITONSERVER_MEMORY_CPU,
@@ -2935,7 +2960,7 @@ HTTPAPIServer::HandleInfer(
             infer_request.get(), header_length);
       } else {
         err = EVBufferToRawInput(
-            model_name, irequest,
+            model_name, requested_model_version, irequest,
             (decompressed_buffer == nullptr) ? req->buffer_in
                                              : decompressed_buffer,
             infer_request.get());
@@ -3341,6 +3366,9 @@ HTTPAPIServer::InferRequestClass::FinalizeResponse(
         RETURN_IF_ERR(parameters_json.AddUInt("binary_data_size", byte_size));
       }
       if (byte_size > 0) {
+        HostToLittleEndian(
+            datatype, const_cast<char*>(static_cast<const char*>(base)),
+            byte_size);
         ordered_buffers.push_back(info->evbuffer_);
       }
     } else if (info->kind_ == AllocPayload::OutputInfo::JSON) {

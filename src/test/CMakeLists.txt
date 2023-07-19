@@ -1,4 +1,4 @@
-# Copyright 2019-2022, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright 2019-2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -92,6 +92,57 @@ if(${TRITON_ENABLE_HTTP} OR ${TRITON_ENABLE_METRICS} OR
 
   install(
     TARGETS data_compressor_test
+    RUNTIME DESTINATION bin
+  )
+endif()
+
+
+#
+# Unit test for endian conversion
+#
+if(${TRITON_ENABLE_HTTP} OR ${TRITON_ENABLE_GRPC})
+  add_executable(
+    endian_conversion_test
+    endian_conversion_test.cc
+    ../common.h
+    ../common.cc	
+  )
+
+  target_compile_definitions(
+      endian_conversion_test
+      PRIVATE
+      TRITON_BIG_ENDIAN=true
+  )
+  
+  set_target_properties(
+    endian_conversion_test
+    PROPERTIES
+      POSITION_INDEPENDENT_CODE ON
+      SKIP_BUILD_RPATH FALSE
+      BUILD_WITH_INSTALL_RPATH FALSE
+      INSTALL_RPATH_USE_LINK_PATH TRUE
+      INSTALL_RPATH "/opt/tritonserver/lib"
+  )
+
+  target_include_directories(
+    endian_conversion_test	
+    PRIVATE
+      ${CMAKE_CURRENT_SOURCE_DIR}/..
+      ${GTEST_INCLUDE_DIRS}
+  )
+
+  target_link_libraries(
+    endian_conversion_test
+    PRIVATE
+      triton-common-json      # from repo-common
+      triton-core-serverapi   # from repo-core
+      triton-core-serverstub  # from repo-core
+      GTest::gtest
+      GTest::gtest_main
+  )
+
+  install(
+    TARGETS endian_conversion_test triton-core-serverstub
     RUNTIME DESTINATION bin
   )
 endif()
