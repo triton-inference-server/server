@@ -28,12 +28,27 @@ tags:
   autoscaling: true
   loadBalancing: true
 
-image:
+server:
   imageName: nvcr.io/nvidia/tritonserver:23.06-py3
   pullPolicy: IfNotPresent
   modelRepositoryServer: < Replace with the IP Address of your file server >
   modelRepositoryPath: /srv/models
-  numGpus: 1
+  env: {}
+    # EXAMPLE_VAR: "example_var"
+  args: []
+    # - "--model-repository=/models"
+  gpus: {}
+    # nvidia.com/gpu: 0
+    # nvidia.com/mig-1g.10gb: 0
+    # nvidia.com/mig-2g.20gb: 0
+    # nvidia.com/mig-3g.40gb: 0
+  extraVolumeMounts:
+    # - name: logs
+    #   mountPath: /logs
+  extraVolumes:
+    # - name: logs
+    #   emptyDir: {}
+
 
 traefik:
   ports:
