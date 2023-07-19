@@ -224,6 +224,12 @@ model rather then reloading it, when either a load request is received under
 configuration, so its presence in the model directory may be detected as a new file
 and cause the model to fully reload when only an update is expected.
 
+* If a sequence model is *updated* (i.e. decreasing the instance count), Triton
+will wait until the in-flight sequence is completed (or timed-out) before the
+instance behind the sequence is removed.
+  * If the instance count is decreased, arbitrary instance(s) are selected among
+idle instances and instances with in-flight sequence(s) for removal.
+
 * If a sequence model is *reloaded* with in-flight sequence(s) (i.e. changes to
 the model file), Triton does not guarantee any remaining request(s) from the
 in-flight sequence(s) will be routed to the same model instance for processing.
