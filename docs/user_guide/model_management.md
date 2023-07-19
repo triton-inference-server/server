@@ -225,7 +225,7 @@ configuration, so its presence in the model directory may be detected as a new f
 and cause the model to fully reload when only an update is expected.
 
 * If a sequence model is *reloaded* with in-flight sequence(s) (i.e. changes to
-the model file), Triton does not guarentee any remaining request(s) from the
+the model file), Triton does not guarantee any remaining request(s) from the
 in-flight sequence(s) will be routed to the same model instance for processing.
 It is currently the responsibility of the user to ensure any in-flight
 sequence(s) are completed before reloading a sequence model.
