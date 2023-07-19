@@ -36,7 +36,7 @@ def check_init_args(args):
         "model_instance_name": "init_args_0_0",
         "model_instance_kind": "CPU",
         "model_instance_device_id": "0",
-        "model_repository": os.getenv("TRITON_DIR", "/opt/tironserver")
+        "model_repository": os.getenv("TRITON_DIR", "/opt/tritonserver")
         + "/qa/L0_backend_python/models/init_args",
         "model_version": "1",
     }
