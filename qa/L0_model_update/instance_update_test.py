@@ -1,3 +1,5 @@
+#!/usr/bin/env python3
+
 # Copyright 2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
@@ -24,14 +26,24 @@
 # (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-import unittest
+import concurrent.futures
+import json
 import os
 import random
 import time
-import concurrent.futures
-import json
+import unittest
+
 import numpy as np
 import tritonclient.grpc as grpcclient
+from models.model_init_del.util import (
+    disable_batching,
+    enable_batching,
+    get_count,
+    reset_count,
+    set_delay,
+    update_instance_group,
+    update_model_file,
+)
 from tritonclient.utils import InferenceServerException
 from models.model_init_del.util import (get_count, reset_count, set_delay,
                                         update_instance_group,
@@ -133,8 +145,7 @@ class TestInstanceUpdate(unittest.TestCase):
         if len(instance_config) == 0:
             prev_count = prev_initialize_count - prev_finalize_count
             new_count = prev_count + add_count - del_count
-            instance_config = ("{\ncount: " + str(new_count) +
-                               "\nkind: KIND_CPU\n}")
+            instance_config = "{\ncount: " + str(new_count) + "\nkind: KIND_CPU\n}"
         update_instance_group(instance_config)
         self._triton.load_model(self._model_name)
         self._check_count("initialize", new_initialize_count)
@@ -242,7 +253,7 @@ class TestInstanceUpdate(unittest.TestCase):
         # Load 3 instances with 2 different names
         self._load_model(
             3,
-            "{\nname: \"old_1\"\ncount: 1\nkind: KIND_CPU\n},\n{\nname: \"old_2\"\ncount: 2\nkind: KIND_GPU\n}"
+            '{\nname: "old_1"\ncount: 1\nkind: KIND_CPU\n},\n{\nname: "old_2"\ncount: 2\nkind: KIND_GPU\n}',
         )
         # Change the instance names
         self._update_instance_count(
@@ -257,7 +268,7 @@ class TestInstanceUpdate(unittest.TestCase):
         # Load 2 GPU instances and 3 CPU instances
         self._load_model(
             5,
-            "{\nname: \"GPU_group\"\ncount: 2\nkind: KIND_GPU\n},\n{\nname: \"CPU_group\"\ncount: 3\nkind: KIND_CPU\n}"
+            '{\nname: "GPU_group"\ncount: 2\nkind: KIND_GPU\n},\n{\nname: "CPU_group"\ncount: 3\nkind: KIND_CPU\n}',
         )
         # Flatten the instances representation
         self._update_instance_count(
@@ -399,13 +410,15 @@ class TestInstanceUpdate(unittest.TestCase):
         self._unload_model()
 
     # Test instance resource requirement increase
-    @unittest.skipUnless("execution_count" in os.environ["RATE_LIMIT_MODE"],
-                         "Rate limiter precondition not met for this test")
+    @unittest.skipUnless(
+        "execution_count" in os.environ["RATE_LIMIT_MODE"],
+        "Rate limiter precondition not met for this test",
+    )
     def test_instance_resource_increase(self):
         # Load model
         self._load_model(
             1,
-            "{\ncount: 1\nkind: KIND_CPU\nrate_limiter {\nresources [\n{\nname: \"R1\"\ncount: 2\n}\n]\n}\n}"
+            '{\ncount: 1\nkind: KIND_CPU\nrate_limiter {\nresources [\n{\nname: "R1"\ncount: 2\n}\n]\n}\n}',
         )
         # Increase resource requirement
         self._update_instance_count(
@@ -431,14 +444,15 @@ class TestInstanceUpdate(unittest.TestCase):
         self._unload_model()
 
     # Test instance resource requirement increase above explicit resource
-    @unittest.skipUnless(os.environ["RATE_LIMIT_MODE"] ==
-                         "execution_count_with_explicit_resource",
-                         "Rate limiter precondition not met for this test")
+    @unittest.skipUnless(
+        os.environ["RATE_LIMIT_MODE"] == "execution_count_with_explicit_resource",
+        "Rate limiter precondition not met for this test",
+    )
     def test_instance_resource_increase_above_explicit(self):
         # Load model
         self._load_model(
             1,
-            "{\ncount: 1\nkind: KIND_CPU\nrate_limiter {\nresources [\n{\nname: \"R1\"\ncount: 2\n}\n]\n}\n}"
+            '{\ncount: 1\nkind: KIND_CPU\nrate_limiter {\nresources [\n{\nname: "R1"\ncount: 2\n}\n]\n}\n}',
         )
         # Increase resource requirement
         with self.assertRaises(InferenceServerException):
@@ -455,13 +469,15 @@ class TestInstanceUpdate(unittest.TestCase):
         self._unload_model()
 
     # Test instance resource requirement decrease
-    @unittest.skipUnless("execution_count" in os.environ["RATE_LIMIT_MODE"],
-                         "Rate limiter precondition not met for this test")
+    @unittest.skipUnless(
+        "execution_count" in os.environ["RATE_LIMIT_MODE"],
+        "Rate limiter precondition not met for this test",
+    )
     def test_instance_resource_decrease(self):
         # Load model
         self._load_model(
             1,
-            "{\ncount: 1\nkind: KIND_CPU\nrate_limiter {\nresources [\n{\nname: \"R1\"\ncount: 4\n}\n]\n}\n}"
+            '{\ncount: 1\nkind: KIND_CPU\nrate_limiter {\nresources [\n{\nname: "R1"\ncount: 4\n}\n]\n}\n}',
         )
         # Decrease resource requirement
         self._update_instance_count(
@@ -475,8 +491,11 @@ class TestInstanceUpdate(unittest.TestCase):
         # max resource is actually decreased.
         time.sleep(1)  # make sure the log file is updated
         log_path = os.path.join(
-            os.environ["MODEL_LOG_DIR"], "instance_update_test.rate_limit_" +
-            os.environ["RATE_LIMIT_MODE"] + ".server.log")
+            os.environ["MODEL_LOG_DIR"],
+            "instance_update_test.rate_limit_"
+            + os.environ["RATE_LIMIT_MODE"]
+            + ".server.log",
+        )
         with open(log_path, mode="r", encoding="utf-8", errors="strict") as f:
             if os.environ["RATE_LIMIT_MODE"] == "execution_count":
                 # Make sure the previous max resource limit of 4 is reduced to 3

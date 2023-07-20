@@ -32,12 +32,10 @@ from tritonclient.utils import *
 
 
 class TestHttpAioClient(unittest.IsolatedAsyncioTestCase):
-    """Test if aio rpc can reach the server
-    """
+    """Test if aio rpc can reach the server"""
 
     async def asyncSetUp(self):
-        self._triton_client = httpclient.InferenceServerClient(
-            url="localhost:8000")
+        self._triton_client = httpclient.InferenceServerClient(url="localhost:8000")
 
     async def asyncTearDown(self):
         await self._triton_client.close()
@@ -72,15 +70,15 @@ class TestHttpAioClient(unittest.IsolatedAsyncioTestCase):
 
     async def test_load_model(self):
         with self.assertRaisesRegex(
-                InferenceServerException,
-                "explicit model load / unload is not allowed if polling is enabled"
+            InferenceServerException,
+            "explicit model load / unload is not allowed if polling is enabled",
         ):
             await self._triton_client.load_model("simple")
 
     async def test_unload_model(self):
         with self.assertRaisesRegex(
-                InferenceServerException,
-                "explicit model load / unload is not allowed if polling is enabled"
+            InferenceServerException,
+            "explicit model load / unload is not allowed if polling is enabled",
         ):
             await self._triton_client.load_model("simple")
 

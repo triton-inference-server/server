@@ -50,7 +50,7 @@ source ../common/util.sh
 
 RET=0
 for i in {0..1}; do
-  
+
   # TEST_HEADER is a parameter used by `parameters_test.py` that controls
   # whether the script will test for inclusion of headers in parameters or not.
   if [ $i == 1 ]; then
@@ -64,7 +64,7 @@ for i in {0..1}; do
       cat $SERVER_LOG
       exit 1
   fi
-  
+
   set +e
   TEST_HEADER=$i python3 $TEST_SCRIPT_PY >$CLIENT_LOG 2>&1
   if [ $? -ne 0 ]; then
@@ -72,9 +72,9 @@ for i in {0..1}; do
       echo -e "\n***\n*** Test Failed\n***"
       RET=1
   fi
-  
+
   set -e
-  
+
   kill $SERVER_PID
   wait $SERVER_PID
 done

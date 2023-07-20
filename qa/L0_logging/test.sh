@@ -70,7 +70,7 @@ RET=0
 
 function verify_correct_settings () {
   log_file_expected=$1
-  log_info_expected=$2 
+  log_info_expected=$2
   log_warn_expected=$3
   log_error_expected=$4
   log_verbose_expected=$5
@@ -142,7 +142,7 @@ set -e
 kill $SERVER_PID
 wait $SERVER_PID
 
-# Test Log File (Arguement)
+# Test Log File (Argument)
 SERVER_ARGS="--log-file=log_file.log --model-repository=$MODELSDIR"
 SERVER_LOG="./inference_server_log_file.log"
 run_server
@@ -214,7 +214,7 @@ if [ $? -ne 0 ]; then
     RET=1
 fi
 
-# Check redirection worked properly (server log has tolerance of 40 due to 
+# Check redirection worked properly (server log has tolerance of 40 due to
 # unavoidable onnx framework logging)
 expected_log_count=75
 actual_log_count=$(grep -c ^[IWEV][0-9][0-9][0-9][0-9].* ./log_file.log)
@@ -245,7 +245,7 @@ set -e
 kill $SERVER_PID
 wait $SERVER_PID
 
-# Test Log Info (Arguement)
+# Test Log Info (Argument)
 rm -f log_file.log
 SERVER_ARGS="--log-file=log_file.log --log-info=false --log-verbose=1 --model-repository=$MODELSDIR"
 SERVER_LOG="./inference_server_log_file.log"
@@ -375,7 +375,7 @@ set -e
 kill $SERVER_PID
 wait $SERVER_PID
 
-# Test Log Verbose Level (Arguement)
+# Test Log Verbose Level (Argument)
 rm -f log_file.log
 SERVER_ARGS="--log-file=log_file.log --log-verbose=1 --model-repository=$MODELSDIR"
 SERVER_LOG="./inference_server_log_file.log"
@@ -423,7 +423,7 @@ set -e
 kill $SERVER_PID
 wait $SERVER_PID
 
-# Test Log Format (Arguement)
+# Test Log Format (Argument)
 rm -f log_file.log
 SERVER_ARGS="--log-file=log_file.log --log-verbose=1 --log-format=ISO8601 --model-repository=$MODELSDIR"
 SERVER_LOG="./inference_server_log_file.log"
@@ -453,7 +453,7 @@ line=$(head -n 1 log_file.log)
 date=$(date '+%m%d')
 final_date="I${date}"
 format_date=$(echo $line | head -n1 | awk '{print $1;}')
-if [[ $final_date == $format_date ]]; then 
+if [[ $final_date == $format_date ]]; then
     echo -e "\n***\n*** Test Failed: Unexpected Log Format $LINENO\n***"
     RET=1
 fi

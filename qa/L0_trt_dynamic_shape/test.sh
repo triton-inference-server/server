@@ -305,7 +305,7 @@ kill $SERVER_PID
 wait $SERVER_PID
 
 
-# Adding test cases for mulitple optimization profiles with static shapes.
+# Adding test cases for multiple optimization profiles with static shapes.
 # Will load only the following profiles with the static shapes:
 # Profile 7: [1, 33]
 # Profile 8: [3, 33]

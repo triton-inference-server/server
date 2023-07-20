@@ -83,7 +83,7 @@ PERF_CLIENT_PERCENTILE_ARGS="" &&
     PERF_CLIENT_PERCENTILE_ARGS="--percentile=${PERF_CLIENT_PERCENTILE}"
 PERF_CLIENT_EXTRA_ARGS="$PERF_CLIENT_PERCENTILE_ARGS --shared-memory ${SHARED_MEMORY}"
 
-# Overload use of PERF_CLIENT_PROTOCOL for convenience with existing test and 
+# Overload use of PERF_CLIENT_PROTOCOL for convenience with existing test and
 # reporting structure, though "triton_c_api" is not strictly a "protocol".
 if [[ "${PERF_CLIENT_PROTOCOL}" == "triton_c_api" ]]; then
     # Server will be run in-process with C API

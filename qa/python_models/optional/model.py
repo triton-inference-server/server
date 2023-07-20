@@ -1,4 +1,4 @@
-# Copyright (c) 2022, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright 2022, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -24,12 +24,11 @@
 # (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-import triton_python_backend_utils as pb_utils
 import numpy as np
+import triton_python_backend_utils as pb_utils
 
 
 class TritonPythonModel:
-
     def execute(self, requests):
         """Model supporting optional inputs. If the input is not provided, an
         input tensor of size 1 containing scalar 5 will be used."""
@@ -48,11 +47,10 @@ class TritonPythonModel:
             else:
                 input1_numpy = np.array([5], dtype=np.int32)
 
-            output0_tensor = pb_utils.Tensor("OUTPUT0",
-                                             input0_numpy + input1_numpy)
-            output1_tensor = pb_utils.Tensor("OUTPUT1",
-                                             input0_numpy - input1_numpy)
+            output0_tensor = pb_utils.Tensor("OUTPUT0", input0_numpy + input1_numpy)
+            output1_tensor = pb_utils.Tensor("OUTPUT1", input0_numpy - input1_numpy)
             responses.append(
-                pb_utils.InferenceResponse([output0_tensor, output1_tensor]))
+                pb_utils.InferenceResponse([output0_tensor, output1_tensor])
+            )
 
         return responses

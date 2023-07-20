@@ -92,7 +92,7 @@ function check_grpc_time {
     done
 }
 
-# Create input_data.json to communicate the requested model delay 
+# Create input_data.json to communicate the requested model delay
 # $1: desired model delay
 function create_input_data {
     echo "{\"data\":[{\"INPUT0\" : [${1}]}]}" > input_data.json
@@ -134,7 +134,7 @@ TOLERANCE="0.05"
 
 for model_delay in ${MODEL_DELAYS[@]}; do
     create_input_data ${model_delay}
-    EXPECTED_RESULT=$(python3 -c "print(1 / ${model_delay})")    
+    EXPECTED_RESULT=$(python3 -c "print(1 / ${model_delay})")
     for protocol in ${PROTOCOLS}; do
         for model in ${MODELS}; do
         echo "================================================================"

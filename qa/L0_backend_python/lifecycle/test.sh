@@ -72,7 +72,7 @@ set +e
 
 # Run this multiple times to catch any intermittent segfault.
 for i in {0..4}; do
-    python3 lifecycle_test.py > $CLIENT_LOG 2>&1 
+    python3 lifecycle_test.py > $CLIENT_LOG 2>&1
     if [ $? -ne 0 ]; then
         cat $CLIENT_LOG
         echo -e "\n***\n*** lifecycle_test.py FAILED. \n***"

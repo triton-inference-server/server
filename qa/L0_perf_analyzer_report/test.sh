@@ -125,7 +125,7 @@ done
 sed -i "s/${COMPOSING_MODEL}/${COMPOSING_MODEL_CACHE_ENABLED}/g" "${MODEL_DIR}/${ENSEMBLE_MODEL_CACHE_ENABLED}/config.pbtxt"
 sed -i "s/${COMPOSING_MODEL}/${COMPOSING_MODEL_CACHE_DISABLED}/g" "${MODEL_DIR}/${ENSEMBLE_MODEL_CACHE_DISABLED}/config.pbtxt"
 
-## Append cache config to each model config 
+## Append cache config to each model config
 echo -e "response_cache { enable: True }" >> "${MODEL_DIR}/${ENSEMBLE_MODEL_CACHE_ENABLED}/config.pbtxt"
 echo -e "response_cache { enable: False }" >> "${MODEL_DIR}/${ENSEMBLE_MODEL_CACHE_DISABLED}/config.pbtxt"
 echo -e "response_cache { enable: True }" >> "${MODEL_DIR}/${COMPOSING_MODEL_CACHE_ENABLED}/config.pbtxt"

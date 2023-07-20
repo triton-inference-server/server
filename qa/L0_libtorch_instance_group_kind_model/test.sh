@@ -63,9 +63,9 @@ cp models/libtorch_multi_device/config.pbtxt models/libtorch_multi_gpu/.
 (cd models/libtorch_multi_gpu && \
     sed -i "s/name: \"libtorch_multi_device\"/name: \"libtorch_multi_gpu\"/" config.pbtxt)
 
-# Generate the models which are partioned across multiple devices
+# Generate the models which are partitioned across multiple devices
 set +e
-python3 gen_models.py >> $CLIENT_LOG 2>&1 
+python3 gen_models.py >> $CLIENT_LOG 2>&1
 if [ $? -ne 0 ]; then
     echo -e "\n***\n*** Error when generating models. \n***"
     cat $CLIENT_LOG
@@ -83,7 +83,7 @@ fi
 set +e
 
 export MODEL_NAME='libtorch_multi_device'
-python3 $CLIENT_PY >> $CLIENT_LOG 2>&1 
+python3 $CLIENT_PY >> $CLIENT_LOG 2>&1
 if [ $? -ne 0 ]; then
     echo -e "\n***\n*** Model $MODEL_NAME FAILED. \n***"
     cat $CLIENT_LOG
@@ -109,7 +109,7 @@ for MESSAGE in "${MESSAGES[@]}"; do
 done
 
 export MODEL_NAME='libtorch_multi_gpu'
-python3 $CLIENT_PY >> $CLIENT_LOG 2>&1 
+python3 $CLIENT_PY >> $CLIENT_LOG 2>&1
 if [ $? -ne 0 ]; then
     echo -e "\n***\n*** Model $MODEL_NAME FAILED. \n***"
     cat $CLIENT_LOG
