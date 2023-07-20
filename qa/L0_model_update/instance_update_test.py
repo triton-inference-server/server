@@ -467,26 +467,34 @@ class TestInstanceUpdate(unittest.TestCase):
                 # explicit limit of 10 is set.
                 self.assertNotIn("Resource: R1\t Count: 3", f.read())
 
-    # Test instance update for direct and oldest scheduler
-    def test_scheduler_update(self):
-        for sequence_batching_type in [
-                "direct { }\nmax_sequence_idle_microseconds: 8000000",
-                "oldest { max_candidate_sequences: 4 }\nmax_sequence_idle_microseconds: 8000000"
-        ]:
-            # Load model
-            update_instance_group("{\ncount: 2\nkind: KIND_CPU\n}")
-            update_sequence_batching(sequence_batching_type)
-            self._triton.load_model(self._model_name)
-            self._check_count("initialize", 2)
-            self._check_count("finalize", 0, poll=True)
-            # Test infer and update
-            self._test_scheduler_basic_sequence_update()
-            self._test_scheduler_ongoing_sequence_update()
-            # Unload model
-            self._triton.unload_model(self._model_name)
-            self._check_count("initialize", 5)
-            self._check_count("finalize", 5, poll=True)
-            self._reset_model()
+    # Test instance update for direct scheduler
+    def test_direct_scheduler_update(self):
+        self._test_scheduler_update(
+            "direct { }\nmax_sequence_idle_microseconds: 8000000")
+
+    # Test instance update for direct scheduler
+    def test_oldest_scheduler_update(self):
+        self._test_scheduler_update(
+            "oldest { max_candidate_sequences: 4 }\nmax_sequence_idle_microseconds: 8000000"
+        )
+
+    # Helper function for 'test_direct_scheduler_update' and
+    # 'test_oldest_scheduler_update' testing scheduler update on the provided
+    # sequence scheduler settings string.
+    def _test_scheduler_update(self, sequence_batching_str):
+        # Load model
+        update_instance_group("{\ncount: 2\nkind: KIND_CPU\n}")
+        update_sequence_batching(sequence_batching_str)
+        self._triton.load_model(self._model_name)
+        self._check_count("initialize", 2)
+        self._check_count("finalize", 0, poll=True)
+        # Test infer and update
+        self._test_scheduler_basic_sequence_update()
+        self._test_scheduler_ongoing_sequence_update()
+        # Unload model
+        self._triton.unload_model(self._model_name)
+        self._check_count("initialize", 5)
+        self._check_count("finalize", 5, poll=True)
 
     # Helper function for 'test_scheduler_update' testing the success of
     # sequence instance updates without any ongoing sequences.
