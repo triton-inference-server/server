@@ -43,13 +43,9 @@ from models.model_init_del.util import (
     set_delay,
     update_instance_group,
     update_model_file,
+    update_sequence_batching,
 )
 from tritonclient.utils import InferenceServerException
-from models.model_init_del.util import (get_count, reset_count, set_delay,
-                                        update_instance_group,
-                                        update_sequence_batching,
-                                        update_model_file, enable_batching,
-                                        disable_batching)
 
 # The server is not restarted across different unit test cases. If a case would
 # to fail, all subsequent cases could also fail, because the model state may not
@@ -57,7 +53,6 @@ from models.model_init_del.util import (get_count, reset_count, set_delay,
 
 
 class TestInstanceUpdate(unittest.TestCase):
-
     _model_name = "model_init_del"
 
     def setUp(self):
@@ -122,17 +117,18 @@ class TestInstanceUpdate(unittest.TestCase):
         # Set batching
         enable_batching() if batching else disable_batching()
         # Load model
-        self._update_instance_count(instance_count,
-                                    0,
-                                    instance_config,
-                                    batching=batching)
+        self._update_instance_count(
+            instance_count, 0, instance_config, batching=batching
+        )
 
-    def _update_instance_count(self,
-                               add_count,
-                               del_count,
-                               instance_config="",
-                               wait_for_finalize=False,
-                               batching=False):
+    def _update_instance_count(
+        self,
+        add_count,
+        del_count,
+        instance_config="",
+        wait_for_finalize=False,
+        batching=False,
+    ):
         self.assertIsInstance(add_count, int)
         self.assertGreaterEqual(add_count, 0)
         self.assertIsInstance(del_count, int)
@@ -230,21 +226,21 @@ class TestInstanceUpdate(unittest.TestCase):
     def test_gpu_cpu_instance_update(self):
         # Load model with 1 GPU instance and 2 CPU instance
         self._load_model(
-            3,
-            "{\ncount: 2\nkind: KIND_CPU\n},\n{\ncount: 1\nkind: KIND_GPU\n}")
+            3, "{\ncount: 2\nkind: KIND_CPU\n},\n{\ncount: 1\nkind: KIND_GPU\n}"
+        )
         # Add 2 GPU instance and remove 1 CPU instance
         self._update_instance_count(
-            2, 1,
-            "{\ncount: 1\nkind: KIND_CPU\n},\n{\ncount: 3\nkind: KIND_GPU\n}")
+            2, 1, "{\ncount: 1\nkind: KIND_CPU\n},\n{\ncount: 3\nkind: KIND_GPU\n}"
+        )
         # Shuffle the instances
         self._update_instance_count(
-            0, 0,
-            "{\ncount: 3\nkind: KIND_GPU\n},\n{\ncount: 1\nkind: KIND_CPU\n}")
+            0, 0, "{\ncount: 3\nkind: KIND_GPU\n},\n{\ncount: 1\nkind: KIND_CPU\n}"
+        )
         time.sleep(0.1)  # larger the gap for config.pbtxt timestamp to update
         # Remove 1 GPU instance and add 1 CPU instance
         self._update_instance_count(
-            1, 1,
-            "{\ncount: 2\nkind: KIND_GPU\n},\n{\ncount: 2\nkind: KIND_CPU\n}")
+            1, 1, "{\ncount: 2\nkind: KIND_GPU\n},\n{\ncount: 2\nkind: KIND_CPU\n}"
+        )
         # Unload model
         self._unload_model()
 
@@ -257,8 +253,9 @@ class TestInstanceUpdate(unittest.TestCase):
         )
         # Change the instance names
         self._update_instance_count(
-            0, 0,
-            "{\nname: \"new_1\"\ncount: 1\nkind: KIND_CPU\n},\n{\nname: \"new_2\"\ncount: 2\nkind: KIND_GPU\n}"
+            0,
+            0,
+            '{\nname: "new_1"\ncount: 1\nkind: KIND_CPU\n},\n{\nname: "new_2"\ncount: 2\nkind: KIND_GPU\n}',
         )
         # Unload model
         self._unload_model()
@@ -272,20 +269,23 @@ class TestInstanceUpdate(unittest.TestCase):
         )
         # Flatten the instances representation
         self._update_instance_count(
-            0, 0,
-            "{\nname: \"CPU_1\"\ncount: 1\nkind: KIND_CPU\n},\n{\nname: \"CPU_2_3\"\ncount: 2\nkind: KIND_CPU\n},\n{\nname: \"GPU_1\"\ncount: 1\nkind: KIND_GPU\n},\n{\nname: \"GPU_2\"\ncount: 1\nkind: KIND_GPU\n}"
+            0,
+            0,
+            '{\nname: "CPU_1"\ncount: 1\nkind: KIND_CPU\n},\n{\nname: "CPU_2_3"\ncount: 2\nkind: KIND_CPU\n},\n{\nname: "GPU_1"\ncount: 1\nkind: KIND_GPU\n},\n{\nname: "GPU_2"\ncount: 1\nkind: KIND_GPU\n}',
         )
         time.sleep(0.1)  # larger the gap for config.pbtxt timestamp to update
         # Consolidate different representations
         self._update_instance_count(
-            0, 0,
-            "{\nname: \"CPU_group\"\ncount: 3\nkind: KIND_CPU\n},\n{\nname: \"GPU_group\"\ncount: 2\nkind: KIND_GPU\n}"
+            0,
+            0,
+            '{\nname: "CPU_group"\ncount: 3\nkind: KIND_CPU\n},\n{\nname: "GPU_group"\ncount: 2\nkind: KIND_GPU\n}',
         )
         time.sleep(0.1)  # larger the gap for config.pbtxt timestamp to update
         # Flatten the instances representation
         self._update_instance_count(
-            0, 0,
-            "{\nname: \"GPU_1\"\ncount: 1\nkind: KIND_GPU\n},\n{\nname: \"GPU_2\"\ncount: 1\nkind: KIND_GPU\n},\n{\nname: \"CPU_1\"\ncount: 1\nkind: KIND_CPU\n},\n{\nname: \"CPU_2\"\ncount: 1\nkind: KIND_CPU\n},\n{\nname: \"CPU_3\"\ncount: 1\nkind: KIND_CPU\n}"
+            0,
+            0,
+            '{\nname: "GPU_1"\ncount: 1\nkind: KIND_GPU\n},\n{\nname: "GPU_2"\ncount: 1\nkind: KIND_GPU\n},\n{\nname: "CPU_1"\ncount: 1\nkind: KIND_CPU\n},\n{\nname: "CPU_2"\ncount: 1\nkind: KIND_CPU\n},\n{\nname: "CPU_3"\ncount: 1\nkind: KIND_CPU\n}',
         )
         # Unload model
         self._unload_model()
@@ -307,21 +307,22 @@ class TestInstanceUpdate(unittest.TestCase):
     def test_model_file_update(self):
         self._load_model(5)
         update_model_file()
-        self._update_instance_count(6,
-                                    5,
-                                    "{\ncount: 6\nkind: KIND_CPU\n}",
-                                    wait_for_finalize=True)
+        self._update_instance_count(
+            6, 5, "{\ncount: 6\nkind: KIND_CPU\n}", wait_for_finalize=True
+        )
         self._unload_model()
 
     # Test instance update with non instance config changed in config.pbtxt
     def test_non_instance_config_update(self):
         self._load_model(4, batching=False)
         enable_batching()
-        self._update_instance_count(2,
-                                    4,
-                                    "{\ncount: 2\nkind: KIND_CPU\n}",
-                                    wait_for_finalize=True,
-                                    batching=True)
+        self._update_instance_count(
+            2,
+            4,
+            "{\ncount: 2\nkind: KIND_CPU\n}",
+            wait_for_finalize=True,
+            batching=True,
+        )
         self._unload_model(batching=True)
 
     # Test passing new instance config via load API
@@ -361,8 +362,7 @@ class TestInstanceUpdate(unittest.TestCase):
             infer_thread = pool.submit(self._infer)
             time.sleep(2)  # make sure inference has started
             update_start_time = time.time()
-            update_thread = pool.submit(self._triton.load_model,
-                                        self._model_name)
+            update_thread = pool.submit(self._triton.load_model, self._model_name)
             update_thread.result()
             update_end_time = time.time()
             infer_thread.result()
@@ -388,8 +388,7 @@ class TestInstanceUpdate(unittest.TestCase):
         update_instance_group("{\ncount: 2\nkind: KIND_CPU\n}")
         with concurrent.futures.ThreadPoolExecutor() as pool:
             update_start_time = time.time()
-            update_thread = pool.submit(self._triton.load_model,
-                                        self._model_name)
+            update_thread = pool.submit(self._triton.load_model, self._model_name)
             time.sleep(2)  # make sure update has started
             infer_start_time = time.time()
             infer_thread = pool.submit(self._infer)
@@ -422,8 +421,9 @@ class TestInstanceUpdate(unittest.TestCase):
         )
         # Increase resource requirement
         self._update_instance_count(
-            1, 1,
-            "{\ncount: 1\nkind: KIND_CPU\nrate_limiter {\nresources [\n{\nname: \"R1\"\ncount: 8\n}\n]\n}\n}"
+            1,
+            1,
+            '{\ncount: 1\nkind: KIND_CPU\nrate_limiter {\nresources [\n{\nname: "R1"\ncount: 8\n}\n]\n}\n}',
         )
         # Check the model is not blocked from infer due to the default resource
         # possibly not updated to the larger resource requirement.
@@ -457,13 +457,15 @@ class TestInstanceUpdate(unittest.TestCase):
         # Increase resource requirement
         with self.assertRaises(InferenceServerException):
             self._update_instance_count(
-                0, 0,
-                "{\ncount: 1\nkind: KIND_CPU\nrate_limiter {\nresources [\n{\nname: \"R1\"\ncount: 32\n}\n]\n}\n}"
+                0,
+                0,
+                '{\ncount: 1\nkind: KIND_CPU\nrate_limiter {\nresources [\n{\nname: "R1"\ncount: 32\n}\n]\n}\n}',
             )
         # Correct the resource requirement to match the explicit resource
         self._update_instance_count(
-            1, 1,
-            "{\ncount: 1\nkind: KIND_CPU\nrate_limiter {\nresources [\n{\nname: \"R1\"\ncount: 10\n}\n]\n}\n}"
+            1,
+            1,
+            '{\ncount: 1\nkind: KIND_CPU\nrate_limiter {\nresources [\n{\nname: "R1"\ncount: 10\n}\n]\n}\n}',
         )
         # Unload model
         self._unload_model()
@@ -481,8 +483,9 @@ class TestInstanceUpdate(unittest.TestCase):
         )
         # Decrease resource requirement
         self._update_instance_count(
-            1, 1,
-            "{\ncount: 1\nkind: KIND_CPU\nrate_limiter {\nresources [\n{\nname: \"R1\"\ncount: 3\n}\n]\n}\n}"
+            1,
+            1,
+            '{\ncount: 1\nkind: KIND_CPU\nrate_limiter {\nresources [\n{\nname: "R1"\ncount: 3\n}\n]\n}\n}',
         )
         # Unload model
         self._unload_model()
@@ -506,33 +509,40 @@ class TestInstanceUpdate(unittest.TestCase):
                 # explicit limit of 10 is set.
                 self.assertNotIn("Resource: R1\t Count: 3", f.read())
 
-    _direct_sequence_batching_str = "direct { }\nmax_sequence_idle_microseconds: 8000000"
-    _oldest_sequence_batching_str = "oldest { max_candidate_sequences: 4 }\nmax_sequence_idle_microseconds: 8000000"
+    _direct_sequence_batching_str = (
+        "direct { }\nmax_sequence_idle_microseconds: 8000000"
+    )
+    _oldest_sequence_batching_str = (
+        "oldest { max_candidate_sequences: 4 }\nmax_sequence_idle_microseconds: 8000000"
+    )
 
     # Test instance update for direct scheduler without any ongoing sequences
     def test_direct_scheduler_update_no_ongoing_sequences(self):
         self._test_scheduler_update_no_ongoing_sequences(
-            self._direct_sequence_batching_str)
+            self._direct_sequence_batching_str
+        )
 
     # Test instance update for direct scheduler with any ongoing sequences
     def test_direct_scheduler_update_with_ongoing_sequences(self):
         self._test_scheduler_update_with_ongoing_sequences(
-            self._direct_sequence_batching_str)
+            self._direct_sequence_batching_str
+        )
 
     # Test instance update for oldest scheduler without ongoing sequences
     def test_oldest_scheduler_update_no_ongoing_sequences(self):
         self._test_scheduler_update_no_ongoing_sequences(
-            self._oldest_sequence_batching_str)
+            self._oldest_sequence_batching_str
+        )
 
     # Test instance update for oldest scheduler with ongoing sequences
     def test_oldest_scheduler_update_with_ongoing_sequences(self):
         self._test_scheduler_update_with_ongoing_sequences(
-            self._oldest_sequence_batching_str)
+            self._oldest_sequence_batching_str
+        )
 
     # Helper function for testing the success of sequence instance updates
     # without any ongoing sequences.
-    def _test_scheduler_update_no_ongoing_sequences(self,
-                                                    sequence_batching_str):
+    def _test_scheduler_update_no_ongoing_sequences(self, sequence_batching_str):
         # Load model
         update_instance_group("{\ncount: 2\nkind: KIND_CPU\n}")
         update_sequence_batching(sequence_batching_str)
@@ -540,43 +550,37 @@ class TestInstanceUpdate(unittest.TestCase):
         self._check_count("initialize", 2)
         self._check_count("finalize", 0)
         # Basic sequence inference
-        self._triton.infer(self._model_name,
-                           self._get_inputs(),
-                           sequence_id=1,
-                           sequence_start=True)
+        self._triton.infer(
+            self._model_name, self._get_inputs(), sequence_id=1, sequence_start=True
+        )
         self._triton.infer(self._model_name, self._get_inputs(), sequence_id=1)
-        self._triton.infer(self._model_name,
-                           self._get_inputs(),
-                           sequence_id=1,
-                           sequence_end=True)
+        self._triton.infer(
+            self._model_name, self._get_inputs(), sequence_id=1, sequence_end=True
+        )
         # Add 2 instances without in-flight sequence
         update_instance_group("{\ncount: 4\nkind: KIND_CPU\n}")
         self._triton.load_model(self._model_name)
         self._check_count("initialize", 4)
         self._check_count("finalize", 0)
         # Basic sequence inference
-        self._triton.infer(self._model_name,
-                           self._get_inputs(),
-                           sequence_id=1,
-                           sequence_start=True)
-        self._triton.infer(self._model_name,
-                           self._get_inputs(),
-                           sequence_id=1,
-                           sequence_end=True)
+        self._triton.infer(
+            self._model_name, self._get_inputs(), sequence_id=1, sequence_start=True
+        )
+        self._triton.infer(
+            self._model_name, self._get_inputs(), sequence_id=1, sequence_end=True
+        )
         # Remove 1 instance without in-flight sequence
         update_instance_group("{\ncount: 3\nkind: KIND_CPU\n}")
         self._triton.load_model(self._model_name)
         self._check_count("initialize", 4)
         self._check_count("finalize", 1, poll=True)
         # Basic sequence inference
-        self._triton.infer(self._model_name,
-                           self._get_inputs(),
-                           sequence_id=1,
-                           sequence_start=True)
-        self._triton.infer(self._model_name,
-                           self._get_inputs(),
-                           sequence_id=1,
-                           sequence_end=True)
+        self._triton.infer(
+            self._model_name, self._get_inputs(), sequence_id=1, sequence_start=True
+        )
+        self._triton.infer(
+            self._model_name, self._get_inputs(), sequence_id=1, sequence_end=True
+        )
         # Unload model
         self._triton.unload_model(self._model_name)
         self._check_count("initialize", 4)
@@ -586,8 +590,7 @@ class TestInstanceUpdate(unittest.TestCase):
     # the same instance after the instance processing the sequence is removed
     # from an instance update, which the removed instance will live until the
     # sequences end.
-    def _test_scheduler_update_with_ongoing_sequences(self,
-                                                      sequence_batching_str):
+    def _test_scheduler_update_with_ongoing_sequences(self, sequence_batching_str):
         # Load model
         update_instance_group("{\ncount: 3\nkind: KIND_CPU\n}")
         update_sequence_batching(sequence_batching_str)
@@ -595,14 +598,12 @@ class TestInstanceUpdate(unittest.TestCase):
         self._check_count("initialize", 3)
         self._check_count("finalize", 0)
         # Start sequence 1 and 2 on CPU instances
-        self._triton.infer(self._model_name,
-                           self._get_inputs(),
-                           sequence_id=1,
-                           sequence_start=True)
-        self._triton.infer(self._model_name,
-                           self._get_inputs(),
-                           sequence_id=2,
-                           sequence_start=True)
+        self._triton.infer(
+            self._model_name, self._get_inputs(), sequence_id=1, sequence_start=True
+        )
+        self._triton.infer(
+            self._model_name, self._get_inputs(), sequence_id=2, sequence_start=True
+        )
         # Remove all 3 CPU and add 1 GPU instance with in-flight sequences. Both
         # in-flight sequences are assigned to any 2 CPU instances, so exactly 1
         # CPU instance can be removed immediately.
@@ -615,26 +616,22 @@ class TestInstanceUpdate(unittest.TestCase):
         self._triton.infer(self._model_name, self._get_inputs(), sequence_id=2)
         self._check_count("finalize", 1)  # check 2 CPU instances not removed
         # Start sequence 3 on GPU instance
-        self._triton.infer(self._model_name,
-                           self._get_inputs(),
-                           sequence_id=3,
-                           sequence_start=True)
+        self._triton.infer(
+            self._model_name, self._get_inputs(), sequence_id=3, sequence_start=True
+        )
         self._check_count("finalize", 1)  # check 2 CPU instances not removed
         # End sequence 1 and 2 will remove the 2 CPU instances
-        self._triton.infer(self._model_name,
-                           self._get_inputs(),
-                           sequence_id=1,
-                           sequence_end=True)
-        self._triton.infer(self._model_name,
-                           self._get_inputs(),
-                           sequence_id=2,
-                           sequence_end=True)
+        self._triton.infer(
+            self._model_name, self._get_inputs(), sequence_id=1, sequence_end=True
+        )
+        self._triton.infer(
+            self._model_name, self._get_inputs(), sequence_id=2, sequence_end=True
+        )
         self._check_count("finalize", 3, poll=True)  # 3 CPU
         # End sequence 3
-        self._triton.infer(self._model_name,
-                           self._get_inputs(),
-                           sequence_id=3,
-                           sequence_end=True)
+        self._triton.infer(
+            self._model_name, self._get_inputs(), sequence_id=3, sequence_end=True
+        )
         # Unload model
         self._triton.unload_model(self._model_name)
         self._check_count("initialize", 4)  # 3 CPU + 1 GPU
