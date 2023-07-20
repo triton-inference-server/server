@@ -483,38 +483,39 @@ class TestInstanceUpdate(unittest.TestCase):
                 # explicit limit of 10 is set.
                 self.assertNotIn("Resource: R1\t Count: 3", f.read())
 
-    # Test instance update for direct scheduler
-    def test_direct_scheduler_update(self):
-        self._test_scheduler_update(
-            "direct { }\nmax_sequence_idle_microseconds: 8000000")
+    _direct_sequence_batching_str = "direct { }\nmax_sequence_idle_microseconds: 8000000"
+    _oldest_sequence_batching_str = "oldest { max_candidate_sequences: 4 }\nmax_sequence_idle_microseconds: 8000000"
 
-    # Test instance update for direct scheduler
-    def test_oldest_scheduler_update(self):
-        self._test_scheduler_update(
-            "oldest { max_candidate_sequences: 4 }\nmax_sequence_idle_microseconds: 8000000"
-        )
+    # Test instance update for direct scheduler without any ongoing sequences
+    def test_direct_scheduler_update_no_ongoing_sequences(self):
+        self._test_scheduler_update_no_ongoing_sequences(
+            self._direct_sequence_batching_str)
 
-    # Helper function for 'test_direct_scheduler_update' and
-    # 'test_oldest_scheduler_update' testing scheduler update on the provided
-    # sequence scheduler settings string.
-    def _test_scheduler_update(self, sequence_batching_str):
+    # Test instance update for direct scheduler with any ongoing sequences
+    def test_direct_scheduler_update_with_ongoing_sequences(self):
+        self._test_scheduler_update_with_ongoing_sequences(
+            self._direct_sequence_batching_str)
+
+    # Test instance update for oldest scheduler without ongoing sequences
+    def test_oldest_scheduler_update_no_ongoing_sequences(self):
+        self._test_scheduler_update_no_ongoing_sequences(
+            self._oldest_sequence_batching_str)
+
+    # Test instance update for oldest scheduler with ongoing sequences
+    def test_oldest_scheduler_update_with_ongoing_sequences(self):
+        self._test_scheduler_update_with_ongoing_sequences(
+            self._oldest_sequence_batching_str)
+
+    # Helper function for testing the success of sequence instance updates
+    # without any ongoing sequences.
+    def _test_scheduler_update_no_ongoing_sequences(self,
+                                                    sequence_batching_str):
         # Load model
         update_instance_group("{\ncount: 2\nkind: KIND_CPU\n}")
         update_sequence_batching(sequence_batching_str)
         self._triton.load_model(self._model_name)
         self._check_count("initialize", 2)
-        self._check_count("finalize", 0, poll=True)
-        # Test infer and update
-        self._test_scheduler_basic_sequence_update()
-        self._test_scheduler_ongoing_sequence_update()
-        # Unload model
-        self._triton.unload_model(self._model_name)
-        self._check_count("initialize", 5)
-        self._check_count("finalize", 5, poll=True)
-
-    # Helper function for 'test_scheduler_update' testing the success of
-    # sequence instance updates without any ongoing sequences.
-    def _test_scheduler_basic_sequence_update(self):
+        self._check_count("finalize", 0)
         # Basic sequence inference
         self._triton.infer(self._model_name,
                            self._get_inputs(),
@@ -529,7 +530,7 @@ class TestInstanceUpdate(unittest.TestCase):
         update_instance_group("{\ncount: 4\nkind: KIND_CPU\n}")
         self._triton.load_model(self._model_name)
         self._check_count("initialize", 4)
-        self._check_count("finalize", 0, poll=True)
+        self._check_count("finalize", 0)
         # Basic sequence inference
         self._triton.infer(self._model_name,
                            self._get_inputs(),
@@ -553,12 +554,23 @@ class TestInstanceUpdate(unittest.TestCase):
                            self._get_inputs(),
                            sequence_id=1,
                            sequence_end=True)
+        # Unload model
+        self._triton.unload_model(self._model_name)
+        self._check_count("initialize", 4)
+        self._check_count("finalize", 4, poll=True)
 
-    # Helper function for 'test_scheduler_update' testing ongoing sequences may
-    # continue to infer on the same instance after the instance processing the
-    # sequence is removed by an instance update, which the removed instance will
-    # live until the sequence ends.
-    def _test_scheduler_ongoing_sequence_update(self):
+    # Helper function for testing if ongoing sequences may continue to infer on
+    # the same instance after the instance processing the sequence is removed
+    # from an instance update, which the removed instance will live until the
+    # sequences end.
+    def _test_scheduler_update_with_ongoing_sequences(self,
+                                                      sequence_batching_str):
+        # Load model
+        update_instance_group("{\ncount: 3\nkind: KIND_CPU\n}")
+        update_sequence_batching(sequence_batching_str)
+        self._triton.load_model(self._model_name)
+        self._check_count("initialize", 3)
+        self._check_count("finalize", 0)
         # Start sequence 1 and 2 on CPU instances
         self._triton.infer(self._model_name,
                            self._get_inputs(),
@@ -573,18 +585,18 @@ class TestInstanceUpdate(unittest.TestCase):
         # CPU instance can be removed immediately.
         update_instance_group("{\ncount: 1\nkind: KIND_GPU\n}")
         self._triton.load_model(self._model_name)
-        self._check_count("initialize", 5)
-        self._check_count("finalize", 2, poll=True)
+        self._check_count("initialize", 4)  # 3 CPU + 1 GPU
+        self._check_count("finalize", 1, poll=True)  # 1 CPU
         # Sequence 1 and 2 may continue to infer
         self._triton.infer(self._model_name, self._get_inputs(), sequence_id=1)
         self._triton.infer(self._model_name, self._get_inputs(), sequence_id=2)
-        self._check_count("finalize", 2)  # check 2 CPU instances not removed
+        self._check_count("finalize", 1)  # check 2 CPU instances not removed
         # Start sequence 3 on GPU instance
         self._triton.infer(self._model_name,
                            self._get_inputs(),
                            sequence_id=3,
                            sequence_start=True)
-        self._check_count("finalize", 2)  # check 2 CPU instances not removed
+        self._check_count("finalize", 1)  # check 2 CPU instances not removed
         # End sequence 1 and 2 will remove the 2 CPU instances
         self._triton.infer(self._model_name,
                            self._get_inputs(),
@@ -594,12 +606,16 @@ class TestInstanceUpdate(unittest.TestCase):
                            self._get_inputs(),
                            sequence_id=2,
                            sequence_end=True)
-        self._check_count("finalize", 4, poll=True)
+        self._check_count("finalize", 3, poll=True)  # 3 CPU
         # End sequence 3
         self._triton.infer(self._model_name,
                            self._get_inputs(),
                            sequence_id=3,
                            sequence_end=True)
+        # Unload model
+        self._triton.unload_model(self._model_name)
+        self._check_count("initialize", 4)  # 3 CPU + 1 GPU
+        self._check_count("finalize", 4, poll=True)  # 3 CPU + 1 GPU
 
 
 if __name__ == "__main__":
