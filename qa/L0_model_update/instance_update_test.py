@@ -145,29 +145,45 @@ class TestInstanceUpdate(unittest.TestCase):
         with self.assertRaises(InferenceServerException):
             self._infer(batching)
 
-    # Test add -> remove -> add an instance
-    def test_add_rm_add_instance(self):
-        for batching in [False, True]:
-            self._load_model(3, batching=batching)
-            stop = self._concurrent_infer(batching=batching)
-            self._update_instance_count(1, 0, batching=batching)  # add
-            self._update_instance_count(0, 1, batching=batching)  # remove
-            self._update_instance_count(1, 0, batching=batching)  # add
-            stop()
-            self._unload_model(batching=batching)
-            self._reset_model()  # for next iteration
+    # Test add -> remove -> add an instance without batching
+    def test_add_rm_add_instance_no_batching(self):
+        self._load_model(3, batching=False)
+        stop = self._concurrent_infer(batching=False)
+        self._update_instance_count(1, 0, batching=False)  # add
+        self._update_instance_count(0, 1, batching=False)  # remove
+        self._update_instance_count(1, 0, batching=False)  # add
+        stop()
+        self._unload_model(batching=False)
 
-    # Test remove -> add -> remove an instance
-    def test_rm_add_rm_instance(self):
-        for batching in [False, True]:
-            self._load_model(2, batching=batching)
-            stop = self._concurrent_infer(batching=batching)
-            self._update_instance_count(0, 1, batching=batching)  # remove
-            self._update_instance_count(1, 0, batching=batching)  # add
-            self._update_instance_count(0, 1, batching=batching)  # remove
-            stop()
-            self._unload_model(batching=batching)
-            self._reset_model()  # for next iteration
+    # Test add -> remove -> add an instance with batching
+    def test_add_rm_add_instance_with_batching(self):
+        self._load_model(4, batching=True)
+        stop = self._concurrent_infer(batching=True)
+        self._update_instance_count(1, 0, batching=True)  # add
+        self._update_instance_count(0, 1, batching=True)  # remove
+        self._update_instance_count(1, 0, batching=True)  # add
+        stop()
+        self._unload_model(batching=True)
+
+    # Test remove -> add -> remove an instance without batching
+    def test_rm_add_rm_instance_no_batching(self):
+        self._load_model(2, batching=False)
+        stop = self._concurrent_infer(batching=False)
+        self._update_instance_count(0, 1, batching=False)  # remove
+        self._update_instance_count(1, 0, batching=False)  # add
+        self._update_instance_count(0, 1, batching=False)  # remove
+        stop()
+        self._unload_model(batching=False)
+
+    # Test remove -> add -> remove an instance with batching
+    def test_rm_add_rm_instance_with_batching(self):
+        self._load_model(3, batching=True)
+        stop = self._concurrent_infer(batching=True)
+        self._update_instance_count(0, 1, batching=True)  # remove
+        self._update_instance_count(1, 0, batching=True)  # add
+        self._update_instance_count(0, 1, batching=True)  # remove
+        stop()
+        self._unload_model(batching=True)
 
     # Test reduce instance count to zero
     def test_rm_instance_to_zero(self):
