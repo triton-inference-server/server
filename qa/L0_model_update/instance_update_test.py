@@ -39,6 +39,10 @@ from models.model_init_del.util import (get_count, reset_count, set_delay,
                                         update_model_file, enable_batching,
                                         disable_batching)
 
+# The server is not restarted across different unit test cases. If a case would
+# to fail, all subsequent cases could also fail, because the model state may not
+# be properly cleaned up after the initial failure.
+
 
 class TestInstanceUpdate(unittest.TestCase):
 
