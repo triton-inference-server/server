@@ -96,17 +96,16 @@ const std::vector<std::string> TRITON_RESERVED_REQUEST_PARAMS{
     }                                                             \
   } while (false)
 
-#define THROW_IF_ERR(EX_TYPE, X, MSG)                     \
-  do {                                                    \
-    TRITONSERVER_Error* err__ = (X);                      \
-    if (err__ != nullptr) {                               \
-      auto ex__ = (EX_TYPE)(                            \
-          std::string("error: ") + (MSG) + ": " +       \
-          TRITONSERVER_ErrorCodeString(err__) + " - " + \
-          TRITONSERVER_ErrorMessage(err__)); \
-      TRITONSERVER_ErrorDelete(err__);                    \
-      throw ex__;                                         \
-    }                                                     \
+#define THROW_IF_ERR(EX_TYPE, X, MSG)                                     \
+  do {                                                                    \
+    TRITONSERVER_Error* err__ = (X);                                      \
+    if (err__ != nullptr) {                                               \
+      auto ex__ = (EX_TYPE)(std::string("error: ") + (MSG) + ": " +       \
+                            TRITONSERVER_ErrorCodeString(err__) + " - " + \
+                            TRITONSERVER_ErrorMessage(err__));            \
+      TRITONSERVER_ErrorDelete(err__);                                    \
+      throw ex__;                                                         \
+    }                                                                     \
   } while (false)
 
 #define IGNORE_ERR(X)                  \
@@ -152,7 +151,7 @@ std::string GetEnvironmentVariableOrDefault(
 /// \param dims The shape.
 /// \return The number of elements, or -1 if the number of elements
 /// cannot be determined because the shape contains one or more
-/// wilcard dimensions.
+/// wildcard dimensions.
 int64_t GetElementCount(const std::vector<int64_t>& dims);
 
 /// Returns if 'vec' contains 'str'.

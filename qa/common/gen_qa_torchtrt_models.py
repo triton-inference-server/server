@@ -1,4 +1,6 @@
-# Copyright (c) 2021, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+#!/usr/bin/env python3
+
+# Copyright 2021-2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -28,8 +30,8 @@ import argparse
 import os
 
 import torch
-import torchvision
 import torch_tensorrt
+import torchvision
 
 
 def create_resnet50_torchtrt(models_dir, max_batch):
@@ -42,10 +44,12 @@ def create_resnet50_torchtrt(models_dir, max_batch):
     trt_ts_module = torch_tensorrt.compile(
         resnet50_ts,
         inputs=[
-            torch_tensorrt.Input(min_shape=[1, 3, 224, 224],
-                                 opt_shape=[1, 3, 224, 224],
-                                 max_shape=[max_batch, 3, 224, 224],
-                                 dtype=torch.float)
+            torch_tensorrt.Input(
+                min_shape=[1, 3, 224, 224],
+                opt_shape=[1, 3, 224, 224],
+                max_shape=[max_batch, 3, 224, 224],
+                dtype=torch.float,
+            )
         ],
         enabled_precisions={torch.float},
     )
@@ -64,10 +68,9 @@ def create_resnet50_torchtrt(models_dir, max_batch):
 
 
 def create_resnet50_torchtrt_modelconfig(models_dir, max_batch):
-
     model_name = "resnet50_libtorch"
     config_dir = models_dir + "/" + model_name
-    config = '''
+    config = """
 name: "{}"
 backend: "pytorch"
 max_batch_size: {}
@@ -87,7 +90,9 @@ output [
     label_filename: "resnet50_labels.txt"
   }}
 ]
-'''.format(model_name, max_batch)
+""".format(
+        model_name, max_batch
+    )
 
     try:
         os.makedirs(config_dir)
@@ -98,12 +103,11 @@ output [
         cfile.write(config)
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument('--models_dir',
-                        type=str,
-                        required=True,
-                        help='Top-level model directory')
+    parser.add_argument(
+        "--models_dir", type=str, required=True, help="Top-level model directory"
+    )
     FLAGS, unparsed = parser.parse_known_args()
 
     create_resnet50_torchtrt(FLAGS.models_dir, 128)

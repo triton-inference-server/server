@@ -81,11 +81,11 @@ latency.
 
 For most models, the Triton feature that provides the largest
 performance improvement is [dynamic
-batching](model_configuration.md#dynamic-batcher). 
+batching](model_configuration.md#dynamic-batcher).
 [This example](https://github.com/triton-inference-server/tutorials/tree/main/Conceptual_Guide/Part_2-improving_resource_utilization#dynamic-batching--concurrent-model-execution)
  sheds more light on conceptual details. If your model does not
 support batching then you can skip ahead to [Model
-Instances](#model-instances). 
+Instances](#model-instances).
 
 
 ### Dynamic Batcher
@@ -131,8 +131,8 @@ typically applies when perf_analyzer is running on the same system as
 Triton. The first rule is that for minimum latency set the request
 concurrency to 1 and disable the dynamic batcher and use only 1 [model
 instance](#model-instances). The second rule is that for maximum
-throughput set the request concurrency to be 
-`2 * <maximum batch size> * <model instance count>`. We will discuss model 
+throughput set the request concurrency to be
+`2 * <maximum batch size> * <model instance count>`. We will discuss model
 instances [below](#model-instances), for now we are working with one model
 instance. So for maximum-batch-size 4 we want to run perf_analyzer
 with request concurrency of `2 * 4 * 1 = 8`.
@@ -219,7 +219,7 @@ settings that best satisfy your throughput and latency requirements.
 Triton has several optimization settings that apply to only a subset
 of the supported model frameworks. These optimization settings are
 controlled by the model configuration [optimization
-policy](model_configuration.md#optimization-policy). Visit 
+policy](model_configuration.md#optimization-policy). Visit
 [this guide](https://github.com/triton-inference-server/tutorials/tree/main/Conceptual_Guide/Part_4-inference_acceleration)
  for an end to end discussion.
 

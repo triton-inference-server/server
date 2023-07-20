@@ -32,13 +32,10 @@ from tritonclient.utils import *
 
 
 class TestGrpcAioClient(unittest.IsolatedAsyncioTestCase):
-    """Test if aio rpc can reach the server
-
-    """
+    """Test if aio rpc can reach the server"""
 
     def setUp(self):
-        self._triton_client = grpcclient.InferenceServerClient(
-            url="localhost:8001")
+        self._triton_client = grpcclient.InferenceServerClient(url="localhost:8001")
 
     async def asyncTearDown(self):
         await self._triton_client.close()
@@ -73,15 +70,15 @@ class TestGrpcAioClient(unittest.IsolatedAsyncioTestCase):
 
     async def test_load_model(self):
         with self.assertRaisesRegex(
-                InferenceServerException,
-                "\[StatusCode\.UNAVAILABLE\] explicit model load / unload is not allowed if polling is enabled"
+            InferenceServerException,
+            "\[StatusCode\.UNAVAILABLE\] explicit model load / unload is not allowed if polling is enabled",
         ):
             await self._triton_client.load_model("simple")
 
     async def test_unload_model(self):
         with self.assertRaisesRegex(
-                InferenceServerException,
-                "\[StatusCode\.UNAVAILABLE\] explicit model load / unload is not allowed if polling is enabled"
+            InferenceServerException,
+            "\[StatusCode\.UNAVAILABLE\] explicit model load / unload is not allowed if polling is enabled",
         ):
             await self._triton_client.load_model("simple")
 
@@ -99,8 +96,8 @@ class TestGrpcAioClient(unittest.IsolatedAsyncioTestCase):
 
     async def test_register_system_shared_memory(self):
         with self.assertRaisesRegex(
-                InferenceServerException,
-                "\[StatusCode\.INTERNAL\] Unable to open shared memory region: ''"
+            InferenceServerException,
+            "\[StatusCode\.INTERNAL\] Unable to open shared memory region: ''",
         ):
             await self._triton_client.register_system_shared_memory("", "", 0)
 
@@ -112,8 +109,8 @@ class TestGrpcAioClient(unittest.IsolatedAsyncioTestCase):
 
     async def test_register_cuda_shared_memory(self):
         with self.assertRaisesRegex(
-                InferenceServerException,
-                "\[StatusCode\.INVALID_ARGUMENT\] failed to register CUDA shared memory region '': failed to open CUDA IPC handle: invalid argument"
+            InferenceServerException,
+            "\[StatusCode\.INVALID_ARGUMENT\] failed to register CUDA shared memory region '': failed to open CUDA IPC handle: invalid argument",
         ):
             await self._triton_client.register_cuda_shared_memory("", b"", 0, 0)
 

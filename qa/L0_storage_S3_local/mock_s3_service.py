@@ -1,3 +1,5 @@
+#!/usr/bin/env python3
+
 # Copyright 2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
@@ -24,13 +26,12 @@
 # (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-import time
 import threading
-from http.server import HTTPServer, BaseHTTPRequestHandler
+import time
+from http.server import BaseHTTPRequestHandler, HTTPServer
 
 
-class MockS3Service():
-
+class MockS3Service:
     __address = "localhost"
     __port = 8080
 
@@ -49,8 +50,10 @@ class MockS3Service():
                     v = self.headers["connection"].lower()
                     if "upgrade" in v or "http2" in v:
                         test_results["http2_ads"] = True
-                if "upgrade" in self.headers and "h2c" in self.headers[
-                        "upgrade"].lower():
+                if (
+                    "upgrade" in self.headers
+                    and "h2c" in self.headers["upgrade"].lower()
+                ):
                     test_results["http2_ads"] = True
                 if "http2-settings" in self.headers:
                     test_results["http2_ads"] = True
@@ -64,14 +67,15 @@ class MockS3Service():
             def do_GET(self):
                 self.__CheckHttp2Ads()
                 test_results["get_count"] += 1
-                self.send_error(404, "Thank you for using the mock s3 service!",
-                                "Your bucket is not found here!")
+                self.send_error(
+                    404,
+                    "Thank you for using the mock s3 service!",
+                    "Your bucket is not found here!",
+                )
 
         self.__test_results = test_results
-        self.__server = HTTPServer((self.__address, self.__port),
-                                   RequestValidator)
-        self.__service_thread = threading.Thread(
-            target=self.__server.serve_forever)
+        self.__server = HTTPServer((self.__address, self.__port), RequestValidator)
+        self.__service_thread = threading.Thread(target=self.__server.serve_forever)
 
     def __enter__(self):
         self.__service_thread.start()
@@ -82,12 +86,14 @@ class MockS3Service():
         self.__service_thread.join()
 
     def TestPassed(self):
-        return self.__test_results["head_count"] > 0 and self.__test_results[
-            "get_count"] > 0 and not self.__test_results["http2_ads"]
+        return (
+            self.__test_results["head_count"] > 0
+            and self.__test_results["get_count"] > 0
+            and not self.__test_results["http2_ads"]
+        )
 
 
 if __name__ == "__main__":
-
     # Initialize mock service
     mock_s3_service = MockS3Service()
 

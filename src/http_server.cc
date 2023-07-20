@@ -1633,7 +1633,7 @@ HTTPAPIServer::HandleModelStats(
 #else
   auto err = TRITONSERVER_ErrorNew(
       TRITONSERVER_ERROR_UNAVAILABLE,
-      "the server does not suppport model statistics");
+      "the server does not support model statistics");
 #endif
 
   if (err != nullptr) {
@@ -1830,7 +1830,7 @@ HTTPAPIServer::HandleTrace(evhtp_request_t* req, const std::string& model_name)
   HTTP_RESPOND_IF_ERR(
       req, TRITONSERVER_ErrorNew(
                TRITONSERVER_ERROR_UNAVAILABLE,
-               "the server does not suppport tracing"));
+               "the server does not support tracing"));
 #endif
 }
 
@@ -1980,7 +1980,7 @@ HTTPAPIServer::HandleLogging(evhtp_request_t* req)
   HTTP_RESPOND_IF_ERR(
       req, TRITONSERVER_ErrorNew(
                TRITONSERVER_ERROR_UNAVAILABLE,
-               "the server does not suppport dynamic logging"));
+               "the server does not support dynamic logging"));
 #endif  // TRITON_ENABLE_LOGGING
 }
 

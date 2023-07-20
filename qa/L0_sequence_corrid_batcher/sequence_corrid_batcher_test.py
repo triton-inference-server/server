@@ -1,4 +1,6 @@
-# Copyright (c) 2020, NVIDIA CORPORATION. All rights reserved.
+#!/usr/bin/env python3
+
+# Copyright 2020-2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -29,24 +31,22 @@ import sys
 sys.path.append("../common")
 
 import os
-import time
 import threading
+import time
 import unittest
+
 import numpy as np
-import test_util as tu
 import sequence_util as su
+import test_util as tu
 
-_test_system_shared_memory = bool(
-    int(os.environ.get('TEST_SYSTEM_SHARED_MEMORY', 0)))
-_test_cuda_shared_memory = bool(
-    int(os.environ.get('TEST_CUDA_SHARED_MEMORY', 0)))
+_test_system_shared_memory = bool(int(os.environ.get("TEST_SYSTEM_SHARED_MEMORY", 0)))
+_test_cuda_shared_memory = bool(int(os.environ.get("TEST_CUDA_SHARED_MEMORY", 0)))
 
-_no_batching = (int(os.environ['NO_BATCHING']) == 1)
-_model_instances = int(os.environ['MODEL_INSTANCES'])
+_no_batching = int(os.environ["NO_BATCHING"]) == 1
+_model_instances = int(os.environ["MODEL_INSTANCES"])
 
 if _no_batching:
-    _trials = ("savedmodel_nobatch", "graphdef_nobatch", "plan_nobatch",
-               "onnx_nobatch")
+    _trials = ("savedmodel_nobatch", "graphdef_nobatch", "plan_nobatch", "onnx_nobatch")
 else:
     _trials = ("savedmodel", "graphdef", "plan", "onnx")
 
@@ -55,23 +55,20 @@ _max_sequence_idle_ms = 5000
 
 
 class SequenceCorrIDBatcherTest(su.SequenceBatcherTestUtil):
-
     def get_datatype(self, trial):
         return np.int32
 
-    def get_expected_result(self,
-                            expected_result,
-                            corrid,
-                            value,
-                            trial,
-                            flag_str=None):
+    def get_expected_result(self, expected_result, corrid, value, trial, flag_str=None):
         # Adjust the expected_result for models that
-        # couldn't implement the full accumulator. See
+        # could not implement the full accumulator. See
         # qa/common/gen_qa_dyna_sequence_models.py for more
         # information.
-        if ((("nobatch" not in trial) and ("custom" not in trial)) or \
-            ("graphdef" in trial) or ("plan" in trial) or \
-            ("onnx" in trial)) or ("libtorch" in trial):
+        if (
+            (("nobatch" not in trial) and ("custom" not in trial))
+            or ("graphdef" in trial)
+            or ("plan" in trial)
+            or ("onnx" in trial)
+        ) or ("libtorch" in trial):
             expected_result = value
             if flag_str is not None:
                 if "start" in flag_str:
@@ -88,14 +85,16 @@ class SequenceCorrIDBatcherTest(su.SequenceBatcherTestUtil):
         for trial in _trials:
             self.clear_deferred_exceptions()
             dtype = self.get_datatype(trial)
-            precreated_shm0_handles = self.precreate_register_regions((1, 3),
-                                                                      dtype, 0)
+            precreated_shm0_handles = self.precreate_register_regions((1, 3), dtype, 0)
             precreated_shm1_handles = self.precreate_register_regions(
-                (11, 12, 13, 14), dtype, 1)
+                (11, 12, 13, 14), dtype, 1
+            )
             precreated_shm2_handles = self.precreate_register_regions(
-                (111, 113), dtype, 2)
+                (111, 113), dtype, 2
+            )
             precreated_shm3_handles = self.precreate_register_regions(
-                (1111, 1112, 1113, 1114), dtype, 3)
+                (1111, 1112, 1113, 1114), dtype, 3
+            )
             try:
                 model_name = tu.get_dyna_sequence_model_name(trial, dtype)
 
@@ -104,12 +103,11 @@ class SequenceCorrIDBatcherTest(su.SequenceBatcherTestUtil):
                 # Need scheduler to wait for queue to contain all
                 # inferences for both sequences.
                 self.assertIn("TRITONSERVER_DELAY_SCHEDULER", os.environ)
+                self.assertEqual(int(os.environ["TRITONSERVER_DELAY_SCHEDULER"]), 12)
+                self.assertIn("TRITONSERVER_BACKLOG_DELAY_SCHEDULER", os.environ)
                 self.assertEqual(
-                    int(os.environ["TRITONSERVER_DELAY_SCHEDULER"]), 12)
-                self.assertIn("TRITONSERVER_BACKLOG_DELAY_SCHEDULER",
-                              os.environ)
-                self.assertEqual(
-                    int(os.environ["TRITONSERVER_BACKLOG_DELAY_SCHEDULER"]), 0)
+                    int(os.environ["TRITONSERVER_BACKLOG_DELAY_SCHEDULER"]), 0
+                )
 
                 corrids = [1001, 1002, 1003, 1004]
                 threads = []
@@ -124,12 +122,14 @@ class SequenceCorrIDBatcherTest(su.SequenceBatcherTestUtil):
                             (None, None),
                             # (flag_str, value, pre_delay_ms)
                             (("start", 1, None), ("end", 3, None)),
-                            self.get_expected_result(4 + corrids[0], corrids[0],
-                                                     3, trial, "end"),
-                            precreated_shm0_handles),
-                        kwargs={
-                            'sequence_name': "{}".format(self._testMethodName)
-                        }))
+                            self.get_expected_result(
+                                4 + corrids[0], corrids[0], 3, trial, "end"
+                            ),
+                            precreated_shm0_handles,
+                        ),
+                        kwargs={"sequence_name": "{}".format(self._testMethodName)},
+                    )
+                )
                 threads.append(
                     threading.Thread(
                         target=self.check_sequence_async,
@@ -140,15 +140,20 @@ class SequenceCorrIDBatcherTest(su.SequenceBatcherTestUtil):
                             corrids[1],
                             (None, None),
                             # (flag_str, value, pre_delay_ms)
-                            (("start", 11, None), (None, 12, None),
-                             (None, 13, None), ("end", 14, None)),
-                            self.get_expected_result(50 + corrids[1],
-                                                     corrids[1], 14, trial,
-                                                     "end"),
-                            precreated_shm1_handles),
-                        kwargs={
-                            'sequence_name': "{}".format(self._testMethodName)
-                        }))
+                            (
+                                ("start", 11, None),
+                                (None, 12, None),
+                                (None, 13, None),
+                                ("end", 14, None),
+                            ),
+                            self.get_expected_result(
+                                50 + corrids[1], corrids[1], 14, trial, "end"
+                            ),
+                            precreated_shm1_handles,
+                        ),
+                        kwargs={"sequence_name": "{}".format(self._testMethodName)},
+                    )
+                )
                 threads.append(
                     threading.Thread(
                         target=self.check_sequence_async,
@@ -160,13 +165,14 @@ class SequenceCorrIDBatcherTest(su.SequenceBatcherTestUtil):
                             (None, None),
                             # (flag_str, value, pre_delay_ms)
                             (("start", 111, None), ("end", 113, None)),
-                            self.get_expected_result(224 + corrids[2],
-                                                     corrids[2], 113, trial,
-                                                     "end"),
-                            precreated_shm2_handles),
-                        kwargs={
-                            'sequence_name': "{}".format(self._testMethodName)
-                        }))
+                            self.get_expected_result(
+                                224 + corrids[2], corrids[2], 113, trial, "end"
+                            ),
+                            precreated_shm2_handles,
+                        ),
+                        kwargs={"sequence_name": "{}".format(self._testMethodName)},
+                    )
+                )
                 threads.append(
                     threading.Thread(
                         target=self.check_sequence_async,
@@ -177,15 +183,20 @@ class SequenceCorrIDBatcherTest(su.SequenceBatcherTestUtil):
                             corrids[3],
                             (None, None),
                             # (flag_str, value, pre_delay_ms)
-                            (("start", 1111, None), (None, 1112, None),
-                             (None, 1113, None), ("end", 1114, None)),
-                            self.get_expected_result(4450 + corrids[3],
-                                                     corrids[3], 1114, trial,
-                                                     "end"),
-                            precreated_shm3_handles),
-                        kwargs={
-                            'sequence_name': "{}".format(self._testMethodName)
-                        }))
+                            (
+                                ("start", 1111, None),
+                                (None, 1112, None),
+                                (None, 1113, None),
+                                ("end", 1114, None),
+                            ),
+                            self.get_expected_result(
+                                4450 + corrids[3], corrids[3], 1114, trial, "end"
+                            ),
+                            precreated_shm3_handles,
+                        ),
+                        kwargs={"sequence_name": "{}".format(self._testMethodName)},
+                    )
+                )
 
                 threads[1].start()
                 threads[3].start()
@@ -211,5 +222,5 @@ class SequenceCorrIDBatcherTest(su.SequenceBatcherTestUtil):
                     self.cleanup_shm_regions(precreated_shm3_handles)
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     unittest.main()

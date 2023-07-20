@@ -138,7 +138,7 @@ for address in default explicit; do
         kill $SERVER_PID
         wait $SERVER_PID
 
-        # error if http/grpc port overlaps with grpc/http explicit port 
+        # error if http/grpc port overlaps with grpc/http explicit port
         if [ "$p" == "http" ]; then
             SERVER_ARGS="--model-repository=$DATADIR $SAME_EXPLICIT_ADDRESS --http-port 8003 --grpc-port 8003"
             run_server_nowait

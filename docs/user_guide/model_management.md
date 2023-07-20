@@ -55,8 +55,8 @@ Repository](#modifying-the-model-repository).
 ## Model Control Mode EXPLICIT
 
 At startup, Triton loads only those models specified explicitly with the
-`--load-model` command-line option. To load ALL models at startup, specify 
-`--load-model=*` as the ONLY `--load-model` argument. Specifying 
+`--load-model` command-line option. To load ALL models at startup, specify
+`--load-model=*` as the ONLY `--load-model` argument. Specifying
 `--load-model=*` in conjunction with another `--load-model` argument will
 result in error. If `--load-model` is not specified then no models are loaded
 at startup. Models that Triton is not able to load will be marked as
@@ -226,7 +226,7 @@ configuration, so its presence in the model directory may be detected as a new f
 and cause the model to fully reload when only an update is expected.
 
 * If a sequence model is updated with in-flight sequence(s), Triton does not
-guarentee any remaining request(s) from the in-flight sequence(s) will be routed
+guarantee any remaining request(s) from the in-flight sequence(s) will be routed
 to the same model instance for processing. It is currently the responsibility of
 the user to ensure any in-flight sequence(s) is complete before updating a
 sequence model.
@@ -239,7 +239,7 @@ performance requirements, the optimal amount of resources dedicated to loading
 models may differ. Triton exposes a `--model-load-thread-count` option to
 configure the number of threads dedicated to loading models, which defaults to 4.
 
-To set this parameter with the C API, refer to 
-`TRITONSERVER_ServerOptionsSetModelLoadThreadCount` in 
+To set this parameter with the C API, refer to
+`TRITONSERVER_ServerOptionsSetModelLoadThreadCount` in
 [tritonserver.h](https://github.com/triton-inference-server/core/blob/main/include/triton/core/tritonserver.h).
 

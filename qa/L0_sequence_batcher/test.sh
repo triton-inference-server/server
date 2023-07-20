@@ -241,7 +241,7 @@ for BACKEND in $BACKENDS; do
     MODELS="$MODELS ../custom_models/custom_sequence_int32"
   else
     DTYPES=$(get_datatype $BACKEND)
-    
+
     for DTYPE in $DTYPES; do
       MODELS="$MODELS $DATADIR/$FIXED_MODEL_REPOSITORY/${BACKEND}_sequence_${DTYPE}"
     done
@@ -256,7 +256,7 @@ for BACKEND in $BACKENDS; do
             MODELS="$MODELS ${TMP//onnx/python}"
           else
             MODELS="$MODELS $DATADIR/qa_ensemble_model_repository/$FIXED_MODEL_REPOSITORY/*_${BACKEND}_sequence_${DTYPE}"
-          fi 
+          fi
         fi
       done
     fi
@@ -743,7 +743,7 @@ done
 
 # Test request timeout with sequence batcher
 # only run the test outside shared memory setting as
-# shared memory feature is irrelevant 
+# shared memory feature is irrelevant
 if [ "$TEST_SYSTEM_SHARED_MEMORY" -ne 1 ] && [ "$TEST_CUDA_SHARED_MEMORY" -ne 1 ]; then
     export NO_BATCHING=0
     export MODEL_INSTANCES=1

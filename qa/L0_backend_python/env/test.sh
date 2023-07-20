@@ -64,7 +64,7 @@ cp python_backend/builddir/triton_python_backend_stub ./models/python_3_7
 conda deactivate
 
 # Use python-3-7 without conda pack
-# Create a model with python 3.7 version and numpy 1.20.3 to distinguish from 
+# Create a model with python 3.7 version and numpy 1.20.3 to distinguish from
 # previous test.
 # Tensorflow 2.1.0 only works with Python 3.4 - 3.7. Successful execution of
 # the Python model indicates that the environment has been setup correctly.
@@ -210,7 +210,7 @@ wait $SERVER_PID
 
 set +e
 
-PY310_ENV_EXTRACTION="Extracting Python execution env" 
+PY310_ENV_EXTRACTION="Extracting Python execution env"
 if [ `grep -c "${PY310_ENV_EXTRACTION}" ${SERVER_LOG}` != "2" ]; then
     cat $SERVER_LOG
     echo -e "\n***\n*** Python execution environment should be extracted exactly twice. \n***"

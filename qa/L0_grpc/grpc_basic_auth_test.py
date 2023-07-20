@@ -24,26 +24,23 @@
 # OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 # (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
-import unittest
 import sys
+import unittest
 
 sys.path.append("../common")
 
 import test_util as tu
 import tritonclient.grpc as tritongrpcclient
 import tritonclient.grpc.aio as asynctritongrpcclient
-
-from tritonclient.grpc.auth import BasicAuth
 from tritonclient.grpc.aio.auth import BasicAuth as AsyncBasicAuth
+from tritonclient.grpc.auth import BasicAuth
 
 
 class GRPCBasicAuthTest(tu.TestResultCollector):
-
     def setUp(self):
         # Use the nginx port
-        self._client = tritongrpcclient.InferenceServerClient(
-            url='localhost:8004')
-        self._client.register_plugin(BasicAuth('username', 'password'))
+        self._client = tritongrpcclient.InferenceServerClient(url="localhost:8004")
+        self._client.register_plugin(BasicAuth("username", "password"))
 
     def test_client_call(self):
         self.assertTrue(self._client.is_server_live())
@@ -53,12 +50,10 @@ class GRPCBasicAuthTest(tu.TestResultCollector):
 
 
 class GRPCBasicAuthAsyncTest(unittest.IsolatedAsyncioTestCase):
-
     async def asyncSetUp(self):
         # Use the nginx port
-        self._client = asynctritongrpcclient.InferenceServerClient(
-            url='localhost:8004')
-        self._client.register_plugin(AsyncBasicAuth('username', 'password'))
+        self._client = asynctritongrpcclient.InferenceServerClient(url="localhost:8004")
+        self._client.register_plugin(AsyncBasicAuth("username", "password"))
 
     async def test_client_call(self):
         self.assertTrue(await self._client.is_server_live())
@@ -67,5 +62,5 @@ class GRPCBasicAuthAsyncTest(unittest.IsolatedAsyncioTestCase):
         await self._client.close()
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     unittest.main()

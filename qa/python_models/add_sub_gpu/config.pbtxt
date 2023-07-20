@@ -32,7 +32,7 @@ input [
     name: "INPUT0"
     data_type: TYPE_FP32
     dims: [ 4 ]
-    
+
   }
 ]
 input [
@@ -40,7 +40,7 @@ input [
     name: "INPUT1"
     data_type: TYPE_FP32
     dims: [ 4 ]
-    
+
   }
 ]
 output [
@@ -55,8 +55,8 @@ output [
     name: "OUTPUT1"
     data_type: TYPE_FP32
     dims: [ 4 ]
-    
-    
+
+
   }
 ]
 

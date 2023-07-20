@@ -1,3 +1,4 @@
+#!/bin/bash
 # Copyright 2021-2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
@@ -52,7 +53,7 @@ install_build_deps() {
       echo "deb [signed-by=/usr/share/keyrings/kitware-archive-keyring.gpg] https://apt.kitware.com/ubuntu/ $UBUNTU_CODENAME main" | \
       tee /etc/apt/sources.list.d/kitware.list >/dev/null && \
       apt-get update && \
-      apt-get install -y --no-install-recommends cmake cmake-data 
+      apt-get install -y --no-install-recommends cmake cmake-data
 }
 
 create_conda_env() {
@@ -66,7 +67,7 @@ create_conda_env() {
 create_conda_env_with_specified_path() {
   local python_version=$1
   local env_path=$2
-  conda create -p $env_path python=$python_version -y 
+  conda create -p $env_path python=$python_version -y
   conda activate $env_path
   conda install -c conda-forge conda-pack -y
 }
