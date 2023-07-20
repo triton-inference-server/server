@@ -30,17 +30,16 @@ import sys
 sys.path.append("../common")
 
 import unittest
+
 import test_util as tu
+from tritongrpcclient import grpc_service_pb2, grpc_service_pb2_grpc
 
 import grpc
-from tritongrpcclient import grpc_service_pb2
-from tritongrpcclient import grpc_service_pb2_grpc
 
 _trials = ("graphdef", "libtorch", "onnx", "plan", "savedmodel")
 
 
 class OutputNameValidationTest(tu.TestResultCollector):
-
     def requestGenerator(self, model_name, output_name):
         request = grpc_service_pb2.ModelInferRequest()
         request.model_name = model_name
@@ -53,12 +52,11 @@ class OutputNameValidationTest(tu.TestResultCollector):
 
         request.inputs.extend([input])
 
-        output = grpc_service_pb2.ModelInferRequest(
-        ).InferRequestedOutputTensor()
+        output = grpc_service_pb2.ModelInferRequest().InferRequestedOutputTensor()
         output.name = output_name
         request.outputs.extend([output])
 
-        request.raw_input_contents.extend([bytes(4 * 'a', 'utf-8')])
+        request.raw_input_contents.extend([bytes(4 * "a", "utf-8")])
 
         return request
 
@@ -73,14 +71,14 @@ class OutputNameValidationTest(tu.TestResultCollector):
             try:
                 response = grpc_stub.ModelInfer(request)
                 self.assertTrue(
-                    False,
-                    "unexpected success for unknown output " + model_name)
+                    False, "unexpected success for unknown output " + model_name
+                )
             except grpc.RpcError as rpc_error:
                 msg = rpc_error.details()
                 self.assertTrue(
-                    msg.startswith(
-                        "unexpected inference output 'DUMMY' for model"))
+                    msg.startswith("unexpected inference output 'DUMMY' for model")
+                )
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     unittest.main()

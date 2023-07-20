@@ -28,9 +28,9 @@
 
 # Model Repository
 
-**Is this your first time setting up a model repository?** Check out 
+**Is this your first time setting up a model repository?** Check out
 [these tutorials](https://github.com/triton-inference-server/tutorials/tree/main/Conceptual_Guide/Part_1-model_deployment#setting-up-the-model-repository)
- to begin your Triton journey! 
+ to begin your Triton journey!
 
 The Triton Inference Server serves models from one or more model
 repositories that are specified when the server is started. While
@@ -80,7 +80,7 @@ corresponding model. The config.pbtxt file describes the [model
 configuration](model_configuration.md) for the model. For some models,
 config.pbtxt is required while for others it is optional. See
 [Auto-Generated Model
-Configuration](model_configuration.md#auto-generated-model-configuration) 
+Configuration](model_configuration.md#auto-generated-model-configuration)
 for more information.
 
 Each <model-name> directory must have at least one numeric
@@ -126,7 +126,7 @@ environment variable should be set and contains the location of a credential
 JSON file. If no credential is provided, Triton will use credentials from the
 [attached service account](https://cloud.google.com/docs/authentication/application-default-credentials#attached-sa)
 providing a value for the
-[Authorization HTTP header](https://googleapis.dev/cpp/google-cloud-storage/1.42.0/classgoogle_1_1cloud_1_1storage_1_1oauth2_1_1ComputeEngineCredentials.html#a8c3a5d405366523e2f4df06554f0a676) 
+[Authorization HTTP header](https://googleapis.dev/cpp/google-cloud-storage/1.42.0/classgoogle_1_1cloud_1_1storage_1_1oauth2_1_1ComputeEngineCredentials.html#a8c3a5d405366523e2f4df06554f0a676)
 can be obtained. If not obtainable, anonymous credential will be used.
 
 To access buckets with anonymous credential (also known as public bucket), the
@@ -159,9 +159,9 @@ subsequently the bucket path.
 $ tritonserver --model-repository=s3://host:port/bucket/path/to/model/repository ...
 ```
 
-By default, Triton uses HTTP to communicate with your instance of S3. If 
+By default, Triton uses HTTP to communicate with your instance of S3. If
 your instance of S3 supports HTTPS and you wish for Triton to use the HTTPS
-protocol to communicate with it, you can specify the same in the model 
+protocol to communicate with it, you can specify the same in the model
 repository path by prefixing the host name with https://.
 
 ```bash
@@ -201,8 +201,8 @@ $ export AZURE_STORAGE_KEY=$(az storage account keys list -n $AZURE_STORAGE_ACCO
 
 *This feature is currently in beta and may be subject to change.*
 
-To group the credentials into a single file for Triton, you may set the 
-`TRITON_CLOUD_CREDENTIAL_PATH` environment variable to a path pointing to a 
+To group the credentials into a single file for Triton, you may set the
+`TRITON_CLOUD_CREDENTIAL_PATH` environment variable to a path pointing to a
 JSON file of the following format, residing in the local file system.
 
 ```
@@ -254,7 +254,7 @@ This feature is intended for use-cases which multiple credentials are needed
 for each cloud storage provider. Be sure to replace any credential paths/keys
 with the actual paths/keys from the example above.
 
-If the `TRITON_CLOUD_CREDENTIAL_PATH` environment variable is not set, the 
+If the `TRITON_CLOUD_CREDENTIAL_PATH` environment variable is not set, the
 [Cloud Storage with Environment variables](#cloud-storage-with-environment-variables)
 will be used.
 

@@ -25,7 +25,7 @@
 # (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-# Note: This script is to be used with customized triton containers that need 
+# Note: This script is to be used with customized triton containers that need
 # dependencies to run L0_infer tests
 apt-get update && \
     apt-get install -y --no-install-recommends \

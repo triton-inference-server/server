@@ -1,4 +1,4 @@
-# Copyright 2021, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright (c) 2021-2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -32,14 +32,14 @@ GCC_PARMS+=-I${HOME}/tritonserver/include/tritonserver -D TRITON_ENABLE_GPU=ON -
 GCC_LIBS=-L${HOME}/tritonserver/lib -L/usr/lib -L/usr/local/cuda/targets/aarch64-linux/lib
 GCC_LIBS+=-lpthread -ltritonserver -lopencv_core -lopencv_highgui -lopencv_imgproc -lopencv_imgcodecs -lopencv_dnn -lcudart
 
-all: $(TARGET) 
+all: $(TARGET)
 
 
 %.o: %.cc
 	$(GCC) $(GCC_PARMS) -c -g -o $@ $^
 
 $(TARGET): $(TARGET).o
-	$(GCC) $^ $(GCC_LIBS) -o $@ 
+	$(GCC) $^ $(GCC_LIBS) -o $@
 
 clean:
 	rm -f $(TARGET).o $(TARGET)

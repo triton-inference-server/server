@@ -78,7 +78,7 @@ see trace setting "log_frequency" below for detail.
 - "trace_level" : the trace level. "OFF" to disable tracing,
 "TIMESTAMPS" to trace timestamps, "TENSORS" to trace tensors.
 This value is an array of string where user may specify multiple levels to
-trace multiple informations.
+trace multiple information.
 - "trace_rate" : the trace sampling rate. The value represents how many requests
 will one trace be sampled from. For example, if the trace rate is "1000",
 1 trace will be sampled for every 1000 requests.

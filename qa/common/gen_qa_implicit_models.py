@@ -1,3 +1,5 @@
+#!/usr/bin/env python3
+
 # Copyright 2021-2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
@@ -26,9 +28,10 @@
 
 import argparse
 import os
-import numpy as np
-import gen_ensemble_model_utils as emu
 from typing import List, Tuple
+
+import gen_ensemble_model_utils as emu
+import numpy as np
 
 FLAGS = None
 np_dtype_string = np.dtype(object)
@@ -125,14 +128,15 @@ def np_to_torch_dtype(np_dtype):
     return None
 
 
-def create_onnx_modelfile_wo_initial_state(models_dir, model_version, max_batch,
-                                           dtype, shape):
-
+def create_onnx_modelfile_wo_initial_state(
+    models_dir, model_version, max_batch, dtype, shape
+):
     if not tu.validate_for_onnx_model(dtype, dtype, dtype, shape, shape, shape):
         return
 
     model_name = tu.get_sequence_model_name(
-        "onnx_nobatch" if max_batch == 0 else "onnx", dtype)
+        "onnx_nobatch" if max_batch == 0 else "onnx", dtype
+    )
     model_version_dir = models_dir + "/" + model_name + "/" + str(model_version)
 
     onnx_dtype = np_to_onnx_dtype(dtype)
@@ -153,142 +157,178 @@ def create_onnx_modelfile_wo_initial_state(models_dir, model_version, max_batch,
     batch_dim = [] if max_batch == 0 else [None]
 
     onnx_input = onnx.helper.make_tensor_value_info(
-        "INPUT", onnx_dtype, batch_dim + onnx_input_shape)
+        "INPUT", onnx_dtype, batch_dim + onnx_input_shape
+    )
     onnx_input_state = onnx.helper.make_tensor_value_info(
-        "INPUT_STATE", onnx_dtype, batch_dim + onnx_input_shape)
-    onnx_start = onnx.helper.make_tensor_value_info("START", onnx_control_dtype,
-                                                    batch_dim + [1])
-    onnx_ready = onnx.helper.make_tensor_value_info("READY", onnx_control_dtype,
-                                                    batch_dim + [1])
+        "INPUT_STATE", onnx_dtype, batch_dim + onnx_input_shape
+    )
+    onnx_start = onnx.helper.make_tensor_value_info(
+        "START", onnx_control_dtype, batch_dim + [1]
+    )
+    onnx_ready = onnx.helper.make_tensor_value_info(
+        "READY", onnx_control_dtype, batch_dim + [1]
+    )
     onnx_output = onnx.helper.make_tensor_value_info(
-        "OUTPUT", onnx_dtype, batch_dim + onnx_output_shape)
+        "OUTPUT", onnx_dtype, batch_dim + onnx_output_shape
+    )
     onnx_output_state = onnx.helper.make_tensor_value_info(
-        "OUTPUT_STATE", onnx_dtype, batch_dim + onnx_output_shape)
+        "OUTPUT_STATE", onnx_dtype, batch_dim + onnx_output_shape
+    )
 
     internal_input = onnx.helper.make_node("Identity", ["INPUT"], ["_INPUT"])
-    internal_input_state = onnx.helper.make_node("Identity", ["INPUT_STATE"],
-                                                 ["_INPUT_STATE"])
-    # cast int8, int16 input to higer precision int as Onnx Add/Sub operator doesn't support those type
-    if ((onnx_dtype == onnx.TensorProto.INT8) or
-        (onnx_dtype == onnx.TensorProto.INT16)):
-        internal_input = onnx.helper.make_node("Cast", ["INPUT"], ["_INPUT"],
-                                               to=onnx.TensorProto.INT32)
-        internal_input_state = onnx.helper.make_node("Cast", ["INPUT_STATE"],
-                                                     ["_INPUT_STATE"],
-                                                     to=onnx.TensorProto.INT32)
+    internal_input_state = onnx.helper.make_node(
+        "Identity", ["INPUT_STATE"], ["_INPUT_STATE"]
+    )
+    # cast int8, int16 input to higher precision int as Onnx Add/Sub operator doesn't support those type
+    if (onnx_dtype == onnx.TensorProto.INT8) or (onnx_dtype == onnx.TensorProto.INT16):
+        internal_input = onnx.helper.make_node(
+            "Cast", ["INPUT"], ["_INPUT"], to=onnx.TensorProto.INT32
+        )
+        internal_input_state = onnx.helper.make_node(
+            "Cast", ["INPUT_STATE"], ["_INPUT_STATE"], to=onnx.TensorProto.INT32
+        )
 
     # Convert boolean value to int32 value
     if onnx_control_dtype == onnx.TensorProto.BOOL:
         if onnx_dtype != onnx.TensorProto.STRING:
-            internal_input1 = onnx.helper.make_node("Cast", ["START"],
-                                                    ["_START"],
-                                                    to=onnx.TensorProto.INT32)
-            internal_input2 = onnx.helper.make_node("Cast", ["READY"],
-                                                    ["_READY"],
-                                                    to=onnx.TensorProto.INT32)
-            not_start_cast = onnx.helper.make_node("Not", ["START"],
-                                                   ["_NOT_START_CAST"])
-            not_start = onnx.helper.make_node("Cast", ["_NOT_START_CAST"],
-                                              ["_NOT_START"],
-                                              to=onnx.TensorProto.INT32)
-            not_ready_cast = onnx.helper.make_node("Not", ["START"],
-                                                   ["_NOT_READY_CAST"])
-            not_ready = onnx.helper.make_node("Cast", ["_NOT_READY_CAST"],
-                                              ["_NOT_READY"],
-                                              to=onnx.TensorProto.INT32)
+            internal_input1 = onnx.helper.make_node(
+                "Cast", ["START"], ["_START"], to=onnx.TensorProto.INT32
+            )
+            internal_input2 = onnx.helper.make_node(
+                "Cast", ["READY"], ["_READY"], to=onnx.TensorProto.INT32
+            )
+            not_start_cast = onnx.helper.make_node(
+                "Not", ["START"], ["_NOT_START_CAST"]
+            )
+            not_start = onnx.helper.make_node(
+                "Cast", ["_NOT_START_CAST"], ["_NOT_START"], to=onnx.TensorProto.INT32
+            )
+            not_ready_cast = onnx.helper.make_node(
+                "Not", ["START"], ["_NOT_READY_CAST"]
+            )
+            not_ready = onnx.helper.make_node(
+                "Cast", ["_NOT_READY_CAST"], ["_NOT_READY"], to=onnx.TensorProto.INT32
+            )
             input_state_cond = onnx.helper.make_node(
-                "And", ["READY", "_NOT_START_CAST"], ["input_state_cond"])
+                "And", ["READY", "_NOT_START_CAST"], ["input_state_cond"]
+            )
             input_state_cond_cast = onnx.helper.make_node(
-                "Cast", ["input_state_cond"], ["input_state_cond_cast"],
-                to=onnx.TensorProto.INT32)
+                "Cast",
+                ["input_state_cond"],
+                ["input_state_cond_cast"],
+                to=onnx.TensorProto.INT32,
+            )
             mul_state = onnx.helper.make_node(
-                "Mul", ["_INPUT_STATE", "input_state_cond_cast"], ["mul_state"])
-            add = onnx.helper.make_node("Add", ["_INPUT", "mul_state"],
-                                        ["CAST"])
+                "Mul", ["_INPUT_STATE", "input_state_cond_cast"], ["mul_state"]
+            )
+            add = onnx.helper.make_node("Add", ["_INPUT", "mul_state"], ["CAST"])
 
     else:
-
         if onnx_dtype != onnx.TensorProto.STRING:
-            start_cast = onnx.helper.make_node("Cast", ["START"],
-                                               ["_START_CAST"],
-                                               to=onnx.TensorProto.BOOL)
-            not_start_cast = onnx.helper.make_node("Not", ["_START_CAST"],
-                                                   ["_NOT_START_CAST"])
-            not_start = onnx.helper.make_node("Cast", ["_NOT_START_CAST"],
-                                              ["_NOT_START"],
-                                              to=onnx.TensorProto.INT32)
+            start_cast = onnx.helper.make_node(
+                "Cast", ["START"], ["_START_CAST"], to=onnx.TensorProto.BOOL
+            )
+            not_start_cast = onnx.helper.make_node(
+                "Not", ["_START_CAST"], ["_NOT_START_CAST"]
+            )
+            not_start = onnx.helper.make_node(
+                "Cast", ["_NOT_START_CAST"], ["_NOT_START"], to=onnx.TensorProto.INT32
+            )
 
-            ready_cast = onnx.helper.make_node("Cast", ["READY"],
-                                               ["_READY_CAST"],
-                                               to=onnx.TensorProto.BOOL)
-            not_ready_cast = onnx.helper.make_node("Not", ["_READY_CAST"],
-                                                   ["_NOT_READY_CAST"])
-            not_ready = onnx.helper.make_node("Cast", ["_NOT_READY_CAST"],
-                                              ["_NOT_READY"],
-                                              to=onnx.TensorProto.INT32)
+            ready_cast = onnx.helper.make_node(
+                "Cast", ["READY"], ["_READY_CAST"], to=onnx.TensorProto.BOOL
+            )
+            not_ready_cast = onnx.helper.make_node(
+                "Not", ["_READY_CAST"], ["_NOT_READY_CAST"]
+            )
+            not_ready = onnx.helper.make_node(
+                "Cast", ["_NOT_READY_CAST"], ["_NOT_READY"], to=onnx.TensorProto.INT32
+            )
             # Take advantage of knowledge that the READY false value is 0 and true is 1
             input_state_cond = onnx.helper.make_node(
-                "And", ["_NOT_START_CAST", "_READY_CAST"], ["input_state_cond"])
+                "And", ["_NOT_START_CAST", "_READY_CAST"], ["input_state_cond"]
+            )
             input_state_cond_cast = onnx.helper.make_node(
-                "Cast", ["input_state_cond"], ["input_state_cond_cast"],
-                to=onnx.TensorProto.INT32)
+                "Cast",
+                ["input_state_cond"],
+                ["input_state_cond_cast"],
+                to=onnx.TensorProto.INT32,
+            )
             mul_state = onnx.helper.make_node(
-                "Mul", ["_INPUT_STATE", "input_state_cond_cast"], ["mul_state"])
-            add = onnx.helper.make_node("Add", ["_INPUT", "mul_state"],
-                                        ["CAST"])
+                "Mul", ["_INPUT_STATE", "input_state_cond_cast"], ["mul_state"]
+            )
+            add = onnx.helper.make_node("Add", ["_INPUT", "mul_state"], ["CAST"])
 
     if onnx_dtype == onnx.TensorProto.STRING:
         cast = onnx.helper.make_node("Identity", ["_INPUT"], ["OUTPUT"])
-        cast_output_state = onnx.helper.make_node("Identity", ["_INPUT"],
-                                                  ["OUTPUT_STATE"])
+        cast_output_state = onnx.helper.make_node(
+            "Identity", ["_INPUT"], ["OUTPUT_STATE"]
+        )
     elif onnx_dtype == onnx.TensorProto.FLOAT16:
         # Avoid cast from float16 to float16
         # (bug in Onnx Runtime, cast from float16 to float16 will become cast from float16 to float32)
         cast = onnx.helper.make_node("Identity", ["CAST"], ["OUTPUT"])
-        cast_output_state = onnx.helper.make_node("Identity", ["CAST"],
-                                                  ["OUTPUT_STATE"])
+        cast_output_state = onnx.helper.make_node(
+            "Identity", ["CAST"], ["OUTPUT_STATE"]
+        )
     else:
-        cast = onnx.helper.make_node("Cast", ["CAST"], ["OUTPUT"],
-                                     to=onnx_dtype)
-        cast_output_state = onnx.helper.make_node("Cast", ["CAST"],
-                                                  ["OUTPUT_STATE"],
-                                                  to=onnx_dtype)
+        cast = onnx.helper.make_node("Cast", ["CAST"], ["OUTPUT"], to=onnx_dtype)
+        cast_output_state = onnx.helper.make_node(
+            "Cast", ["CAST"], ["OUTPUT_STATE"], to=onnx_dtype
+        )
 
     if onnx_control_dtype == onnx.TensorProto.BOOL:
         if onnx_dtype != onnx.TensorProto.STRING:
             onnx_nodes = [
-                internal_input, internal_input_state, internal_input1,
-                internal_input2, not_start_cast, not_start, not_ready_cast,
-                not_ready, input_state_cond, input_state_cond_cast, mul_state,
-                add, cast, cast_output_state
+                internal_input,
+                internal_input_state,
+                internal_input1,
+                internal_input2,
+                not_start_cast,
+                not_start,
+                not_ready_cast,
+                not_ready,
+                input_state_cond,
+                input_state_cond_cast,
+                mul_state,
+                add,
+                cast,
+                cast_output_state,
             ]
         else:
-            onnx_nodes = [
-                internal_input, internal_input_state, cast, cast_output_state
-            ]
+            onnx_nodes = [internal_input, internal_input_state, cast, cast_output_state]
     else:
         if onnx_dtype != onnx.TensorProto.STRING:
             onnx_nodes = [
-                internal_input, internal_input_state, start_cast,
-                not_start_cast, not_start, ready_cast, not_ready_cast,
-                not_ready, input_state_cond, input_state_cond_cast, mul_state,
-                add, cast, cast_output_state
+                internal_input,
+                internal_input_state,
+                start_cast,
+                not_start_cast,
+                not_start,
+                ready_cast,
+                not_ready_cast,
+                not_ready,
+                input_state_cond,
+                input_state_cond_cast,
+                mul_state,
+                add,
+                cast,
+                cast_output_state,
             ]
         else:
-            onnx_nodes = [
-                internal_input, internal_input_state, cast, cast_output_state
-            ]
+            onnx_nodes = [internal_input, internal_input_state, cast, cast_output_state]
 
     onnx_inputs = [onnx_input_state, onnx_input, onnx_start, onnx_ready]
     onnx_outputs = [onnx_output, onnx_output_state]
-    graph_proto = onnx.helper.make_graph(onnx_nodes, model_name, onnx_inputs,
-                                         onnx_outputs)
+    graph_proto = onnx.helper.make_graph(
+        onnx_nodes, model_name, onnx_inputs, onnx_outputs
+    )
 
     if FLAGS.onnx_opset > 0:
         model_opset = onnx.helper.make_operatorsetid("", FLAGS.onnx_opset)
-        model_def = onnx.helper.make_model(graph_proto,
-                                           producer_name="triton",
-                                           opset_imports=[model_opset])
+        model_def = onnx.helper.make_model(
+            graph_proto, producer_name="triton", opset_imports=[model_opset]
+        )
     else:
         model_def = onnx.helper.make_model(graph_proto, producer_name="triton")
 
@@ -300,13 +340,15 @@ def create_onnx_modelfile_wo_initial_state(models_dir, model_version, max_batch,
     onnx.save(model_def, model_version_dir + "/model.onnx")
 
 
-def create_onnx_modelfile_with_initial_state(models_dir, model_version,
-                                             max_batch, dtype, shape):
+def create_onnx_modelfile_with_initial_state(
+    models_dir, model_version, max_batch, dtype, shape
+):
     if not tu.validate_for_onnx_model(dtype, dtype, dtype, shape, shape, shape):
         return
 
     model_name = tu.get_sequence_model_name(
-        "onnx_nobatch" if max_batch == 0 else "onnx", dtype)
+        "onnx_nobatch" if max_batch == 0 else "onnx", dtype
+    )
     model_version_dir = models_dir + "/" + model_name + "/" + str(model_version)
 
     onnx_dtype = np_to_onnx_dtype(dtype)
@@ -327,65 +369,80 @@ def create_onnx_modelfile_with_initial_state(models_dir, model_version,
     batch_dim = [] if max_batch == 0 else [None]
 
     onnx_input = onnx.helper.make_tensor_value_info(
-        "INPUT", onnx_dtype, batch_dim + onnx_input_shape)
+        "INPUT", onnx_dtype, batch_dim + onnx_input_shape
+    )
     onnx_input_state = onnx.helper.make_tensor_value_info(
-        "INPUT_STATE", onnx_dtype, batch_dim + onnx_input_shape)
-    onnx_start = onnx.helper.make_tensor_value_info("START", onnx_control_dtype,
-                                                    batch_dim + [1])
-    onnx_ready = onnx.helper.make_tensor_value_info("READY", onnx_control_dtype,
-                                                    batch_dim + [1])
+        "INPUT_STATE", onnx_dtype, batch_dim + onnx_input_shape
+    )
+    onnx_start = onnx.helper.make_tensor_value_info(
+        "START", onnx_control_dtype, batch_dim + [1]
+    )
+    onnx_ready = onnx.helper.make_tensor_value_info(
+        "READY", onnx_control_dtype, batch_dim + [1]
+    )
     onnx_output = onnx.helper.make_tensor_value_info(
-        "OUTPUT", onnx_dtype, batch_dim + onnx_output_shape)
+        "OUTPUT", onnx_dtype, batch_dim + onnx_output_shape
+    )
     onnx_output_state = onnx.helper.make_tensor_value_info(
-        "OUTPUT_STATE", onnx_dtype, batch_dim + onnx_output_shape)
+        "OUTPUT_STATE", onnx_dtype, batch_dim + onnx_output_shape
+    )
 
     internal_input = onnx.helper.make_node("Identity", ["INPUT"], ["_INPUT"])
-    internal_input_state = onnx.helper.make_node("Identity", ["INPUT_STATE"],
-                                                 ["_INPUT_STATE"])
-    # cast int8, int16 input to higer precision int as Onnx Add/Sub operator doesn't support those type
-    if ((onnx_dtype == onnx.TensorProto.INT8) or
-        (onnx_dtype == onnx.TensorProto.INT16)):
-        internal_input = onnx.helper.make_node("Cast", ["INPUT"], ["_INPUT"],
-                                               to=onnx.TensorProto.INT32)
-        internal_input_state = onnx.helper.make_node("Cast", ["INPUT_STATE"],
-                                                     ["_INPUT_STATE"],
-                                                     to=onnx.TensorProto.INT32)
+    internal_input_state = onnx.helper.make_node(
+        "Identity", ["INPUT_STATE"], ["_INPUT_STATE"]
+    )
+    # cast int8, int16 input to higher precision int as Onnx Add/Sub operator doesn't support those type
+    if (onnx_dtype == onnx.TensorProto.INT8) or (onnx_dtype == onnx.TensorProto.INT16):
+        internal_input = onnx.helper.make_node(
+            "Cast", ["INPUT"], ["_INPUT"], to=onnx.TensorProto.INT32
+        )
+        internal_input_state = onnx.helper.make_node(
+            "Cast", ["INPUT_STATE"], ["_INPUT_STATE"], to=onnx.TensorProto.INT32
+        )
 
     if onnx_dtype == onnx.TensorProto.STRING:
         identity = onnx.helper.make_node("Identity", ["_INPUT"], ["OUTPUT"])
-        identity_output_state = onnx.helper.make_node("Identity", ["_INPUT"],
-                                                      ["OUTPUT_STATE"])
+        identity_output_state = onnx.helper.make_node(
+            "Identity", ["_INPUT"], ["OUTPUT_STATE"]
+        )
         onnx_nodes = [
-            internal_input, internal_input_state, identity,
-            identity_output_state
+            internal_input,
+            internal_input_state,
+            identity,
+            identity_output_state,
         ]
     else:
         add = onnx.helper.make_node("Add", ["_INPUT", "_INPUT_STATE"], ["CAST"])
-        cast = onnx.helper.make_node("Cast", ["CAST"], ["OUTPUT"],
-                                     to=onnx_dtype)
-        cast_output_state = onnx.helper.make_node("Cast", ["CAST"],
-                                                  ["OUTPUT_STATE"],
-                                                  to=onnx_dtype)
+        cast = onnx.helper.make_node("Cast", ["CAST"], ["OUTPUT"], to=onnx_dtype)
+        cast_output_state = onnx.helper.make_node(
+            "Cast", ["CAST"], ["OUTPUT_STATE"], to=onnx_dtype
+        )
         # Avoid cast from float16 to float16
         # (bug in Onnx Runtime, cast from float16 to float16 will become cast from float16 to float32)
         if onnx_dtype == onnx.TensorProto.FLOAT16:
             cast = onnx.helper.make_node("Identity", ["CAST"], ["OUTPUT"])
-            cast_output_state = onnx.helper.make_node("Identity", ["CAST"],
-                                                      ["OUTPUT_STATE"])
+            cast_output_state = onnx.helper.make_node(
+                "Identity", ["CAST"], ["OUTPUT_STATE"]
+            )
         onnx_nodes = [
-            internal_input, internal_input_state, add, cast, cast_output_state
+            internal_input,
+            internal_input_state,
+            add,
+            cast,
+            cast_output_state,
         ]
 
     onnx_inputs = [onnx_input_state, onnx_input, onnx_start, onnx_ready]
     onnx_outputs = [onnx_output, onnx_output_state]
-    graph_proto = onnx.helper.make_graph(onnx_nodes, model_name, onnx_inputs,
-                                         onnx_outputs)
+    graph_proto = onnx.helper.make_graph(
+        onnx_nodes, model_name, onnx_inputs, onnx_outputs
+    )
 
     if FLAGS.onnx_opset > 0:
         model_opset = onnx.helper.make_operatorsetid("", FLAGS.onnx_opset)
-        model_def = onnx.helper.make_model(graph_proto,
-                                           producer_name="triton",
-                                           opset_imports=[model_opset])
+        model_def = onnx.helper.make_model(
+            graph_proto, producer_name="triton", opset_imports=[model_opset]
+        )
     else:
         model_def = onnx.helper.make_model(graph_proto, producer_name="triton")
 
@@ -397,22 +454,24 @@ def create_onnx_modelfile_with_initial_state(models_dir, model_version,
     onnx.save(model_def, model_version_dir + "/model.onnx")
 
 
-def create_onnx_modelfile(models_dir, model_version, max_batch, dtype, shape,
-                          initial_state):
-
+def create_onnx_modelfile(
+    models_dir, model_version, max_batch, dtype, shape, initial_state
+):
     if initial_state is None:
-        create_onnx_modelfile_wo_initial_state(models_dir, model_version,
-                                               max_batch, dtype, shape)
+        create_onnx_modelfile_wo_initial_state(
+            models_dir, model_version, max_batch, dtype, shape
+        )
     else:
         # This model assumes that the initial state contains correct data
-        create_onnx_modelfile_with_initial_state(models_dir, model_version,
-                                                 max_batch, dtype, shape)
+        create_onnx_modelfile_with_initial_state(
+            models_dir, model_version, max_batch, dtype, shape
+        )
 
 
-def create_libtorch_modelfile_wo_initial_state(models_dir, model_version,
-                                               max_batch, dtype, shape):
-    if not tu.validate_for_libtorch_model(dtype, dtype, dtype, shape, shape,
-                                          shape):
+def create_libtorch_modelfile_wo_initial_state(
+    models_dir, model_version, max_batch, dtype, shape
+):
+    if not tu.validate_for_libtorch_model(dtype, dtype, dtype, shape, shape, shape):
         return
 
     torch_dtype = np_to_torch_dtype(dtype)
@@ -422,32 +481,34 @@ def create_libtorch_modelfile_wo_initial_state(models_dir, model_version,
         torch_dtype = torch.int32
 
     model_name = tu.get_sequence_model_name(
-        "libtorch_nobatch" if max_batch == 0 else "libtorch", dtype)
+        "libtorch_nobatch" if max_batch == 0 else "libtorch", dtype
+    )
 
     if torch_dtype == List[str]:
 
         class SequenceNet(nn.Module):
-
             def __init__(self):
                 super(SequenceNet, self).__init__()
 
-            def forward(self, input0: List[str], input0_state: List[str],
-                        start0, ready0) -> Tuple[List[str], List[str]]:
+            def forward(
+                self, input0: List[str], input0_state: List[str], start0, ready0
+            ) -> Tuple[List[str], List[str]]:
                 use_state = torch.logical_and(ready0, torch.logical_not(start0))
 
                 input0_state_int = torch.tensor(
-                    [int("0" + i) for i in input0_state],
-                    device=use_state.device)
-                input0_int = torch.tensor([int("0" + i) for i in input0],
-                                          device=use_state.device)
+                    [int("0" + i) for i in input0_state], device=use_state.device
+                )
+                input0_int = torch.tensor(
+                    [int("0" + i) for i in input0], device=use_state.device
+                )
                 result_int = torch.mul(use_state, input0_state_int)
                 result_int += input0_int
                 result = [str(i.item()) for i in result_int.cpu()]
                 return result, result
+
     else:
 
         class SequenceNet(nn.Module):
-
             def __init__(self):
                 super(SequenceNet, self).__init__()
 
@@ -469,10 +530,10 @@ def create_libtorch_modelfile_wo_initial_state(models_dir, model_version,
     traced.save(model_version_dir + "/model.pt")
 
 
-def create_libtorch_modelfile_with_initial_state(models_dir, model_version,
-                                                 max_batch, dtype, shape):
-    if not tu.validate_for_libtorch_model(dtype, dtype, dtype, shape, shape,
-                                          shape):
+def create_libtorch_modelfile_with_initial_state(
+    models_dir, model_version, max_batch, dtype, shape
+):
+    if not tu.validate_for_libtorch_model(dtype, dtype, dtype, shape, shape, shape):
         return
 
     torch_dtype = np_to_torch_dtype(dtype)
@@ -483,28 +544,31 @@ def create_libtorch_modelfile_with_initial_state(models_dir, model_version,
         torch_dtype = torch.int32
 
     model_name = tu.get_sequence_model_name(
-        "libtorch_nobatch" if max_batch == 0 else "libtorch", dtype)
+        "libtorch_nobatch" if max_batch == 0 else "libtorch", dtype
+    )
     # handle for -1 (when variable) since can't create tensor with shape of [-1]
     if torch_dtype == List[str]:
 
         class SequenceNet(nn.Module):
-
             def __init__(self):
                 super(SequenceNet, self).__init__()
 
-            def forward(self, input0: List[str], input0_state: List[str],
-                        start0, ready0) -> Tuple[List[str], List[str]]:
+            def forward(
+                self, input0: List[str], input0_state: List[str], start0, ready0
+            ) -> Tuple[List[str], List[str]]:
                 input0_state_int = torch.tensor(
-                    [int("0" + i) for i in input0_state], device=start0.device)
-                input0_int = torch.tensor([int("0" + i) for i in input0],
-                                          device=start0.device)
+                    [int("0" + i) for i in input0_state], device=start0.device
+                )
+                input0_int = torch.tensor(
+                    [int("0" + i) for i in input0], device=start0.device
+                )
                 result_int = (input0_state_int + input0_int).cpu()
                 result = [str(i.item()) for i in result_int]
                 return result, result
+
     else:
 
         class SequenceNet(nn.Module):
-
             def __init__(self):
                 super(SequenceNet, self).__init__()
 
@@ -526,25 +590,29 @@ def create_libtorch_modelfile_with_initial_state(models_dir, model_version,
     traced.save(model_version_dir + "/model.pt")
 
 
-def create_libtorch_modelfile(models_dir, model_version, max_batch, dtype,
-                              shape, initial_state):
+def create_libtorch_modelfile(
+    models_dir, model_version, max_batch, dtype, shape, initial_state
+):
     if initial_state is None:
-        create_libtorch_modelfile_wo_initial_state(models_dir, model_version,
-                                                   max_batch, dtype, shape)
+        create_libtorch_modelfile_wo_initial_state(
+            models_dir, model_version, max_batch, dtype, shape
+        )
     else:
         # This model assumes that the initial state contains correct data
-        create_libtorch_modelfile_with_initial_state(models_dir, model_version,
-                                                     max_batch, dtype, shape)
+        create_libtorch_modelfile_with_initial_state(
+            models_dir, model_version, max_batch, dtype, shape
+        )
 
 
-def create_libtorch_modelconfig(models_dir, model_version, max_batch, dtype,
-                                shape, initial_state):
-    if not tu.validate_for_libtorch_model(dtype, dtype, dtype, shape, shape,
-                                          shape):
+def create_libtorch_modelconfig(
+    models_dir, model_version, max_batch, dtype, shape, initial_state
+):
+    if not tu.validate_for_libtorch_model(dtype, dtype, dtype, shape, shape, shape):
         return
 
     model_name = tu.get_sequence_model_name(
-        "libtorch_nobatch" if max_batch == 0 else "libtorch", dtype)
+        "libtorch_nobatch" if max_batch == 0 else "libtorch", dtype
+    )
     config_dir = models_dir + "/" + model_name
 
     if dtype == np.float32:
@@ -555,15 +623,15 @@ def create_libtorch_modelconfig(models_dir, model_version, max_batch, dtype,
     else:
         control_type = "int32"
 
-    instance_group_string = '''
+    instance_group_string = """
 instance_group [
   {
     kind: KIND_GPU
   }
 ]
-'''
+"""
 
-    config = f'''
+    config = f"""
 name: "{model_name}"
 platform: "pytorch_libtorch"
 max_batch_size: {max_batch}
@@ -582,7 +650,7 @@ output [
     dims: [ {tu.shape_to_dims_str(shape)} ]
   }}
 ]
-'''
+"""
     config += instance_group_string
 
     # Prepare the shapes for initial state initialization
@@ -594,7 +662,7 @@ output [
             shape_without_variable_dims.append(dim)
 
     if initial_state is None:
-        config += '''
+        config += """
     sequence_batching {{
       max_sequence_idle_microseconds: 5000000
       control_input [
@@ -623,14 +691,16 @@ output [
           output_name: "OUTPUT_STATE__1"
           data_type: {dtype}
           dims: {dims}
-        }} 
+        }}
       ]
     }}
-    '''.format(type=control_type,
-               dims=tu.shape_to_dims_str(shape),
-               dtype=emu.dtype_str(dtype))
-    elif initial_state == 'zero':
-        config += f'''
+    """.format(
+            type=control_type,
+            dims=tu.shape_to_dims_str(shape),
+            dtype=emu.dtype_str(dtype),
+        )
+    elif initial_state == "zero":
+        config += f"""
     sequence_batching {{
       max_sequence_idle_microseconds: 5000000
       control_input [
@@ -665,12 +735,12 @@ output [
               dims: {tu.shape_to_dims_str(shape_without_variable_dims)}
               zero_data: true
           }}
-        }} 
+        }}
       ]
     }}
-    '''
-    elif initial_state == 'file':
-        config += '''
+    """
+    elif initial_state == "file":
+        config += """
     sequence_batching {{
       max_sequence_idle_microseconds: 5000000
       control_input [
@@ -705,14 +775,17 @@ output [
               dims: {shape_without_variable_dims}
               data_file: input_state_data
           }}
-        }} 
+        }}
       ]
     }}
-    '''.format(type=control_type,
-               dims=tu.shape_to_dims_str(shape),
-               dtype=emu.dtype_str(dtype),
-               shape_without_variable_dims=tu.shape_to_dims_str(
-                   shape_without_variable_dims))
+    """.format(
+            type=control_type,
+            dims=tu.shape_to_dims_str(shape),
+            dtype=emu.dtype_str(dtype),
+            shape_without_variable_dims=tu.shape_to_dims_str(
+                shape_without_variable_dims
+            ),
+        )
 
     try:
         os.makedirs(config_dir)
@@ -722,14 +795,15 @@ output [
         cfile.write(config)
 
 
-def create_onnx_modelconfig(models_dir, model_version, max_batch, dtype, shape,
-                            initial_state):
-
+def create_onnx_modelconfig(
+    models_dir, model_version, max_batch, dtype, shape, initial_state
+):
     if not tu.validate_for_onnx_model(dtype, dtype, dtype, shape, shape, shape):
         return
 
     model_name = tu.get_sequence_model_name(
-        "onnx_nobatch" if max_batch == 0 else "onnx", dtype)
+        "onnx_nobatch" if max_batch == 0 else "onnx", dtype
+    )
     config_dir = models_dir + "/" + model_name
 
     if dtype == np.float32:
@@ -740,22 +814,30 @@ def create_onnx_modelconfig(models_dir, model_version, max_batch, dtype, shape,
     else:
         control_type = "int32"
 
-    instance_group_string = '''
+    instance_group_string = """
 instance_group [
   {
     kind: KIND_GPU
   }
 ]
-'''
+"""
 
     # [TODO] move create_general_modelconfig() out of emu as it is general
     # enough for all backends to use
     config = emu.create_general_modelconfig(
         model_name,
         "onnxruntime_onnx",
-        max_batch, [dtype], [shape], [None], [dtype], [shape], [None], [None],
+        max_batch,
+        [dtype],
+        [shape],
+        [None],
+        [dtype],
+        [shape],
+        [None],
+        [None],
         force_tensor_number_suffix=False,
-        instance_group_str=instance_group_string)
+        instance_group_str=instance_group_string,
+    )
 
     # Prepare the shapes for initial state initialization
     shape_without_variable_dims = []
@@ -766,7 +848,7 @@ instance_group [
             shape_without_variable_dims.append(dim)
 
     if initial_state is None:
-        config += '''
+        config += """
     sequence_batching {{
       max_sequence_idle_microseconds: 5000000
       control_input [
@@ -795,14 +877,16 @@ instance_group [
           output_name: "OUTPUT_STATE"
           data_type: {dtype}
           dims: {dims}
-        }} 
+        }}
       ]
     }}
-    '''.format(type=control_type,
-               dims=tu.shape_to_dims_str(shape),
-               dtype=emu.dtype_str(dtype))
-    elif initial_state == 'zero':
-        config += f'''
+    """.format(
+            type=control_type,
+            dims=tu.shape_to_dims_str(shape),
+            dtype=emu.dtype_str(dtype),
+        )
+    elif initial_state == "zero":
+        config += f"""
     sequence_batching {{
       max_sequence_idle_microseconds: 5000000
       control_input [
@@ -837,12 +921,12 @@ instance_group [
               dims: {tu.shape_to_dims_str(shape_without_variable_dims)}
               zero_data: true
           }}
-        }} 
+        }}
       ]
     }}
-    '''
-    elif initial_state == 'file':
-        config += '''
+    """
+    elif initial_state == "file":
+        config += """
     sequence_batching {{
       max_sequence_idle_microseconds: 5000000
       control_input [
@@ -877,14 +961,17 @@ instance_group [
               dims: {shape_without_variable_dims}
               data_file: input_state_data
           }}
-        }} 
+        }}
       ]
     }}
-    '''.format(type=control_type,
-               dims=tu.shape_to_dims_str(shape),
-               dtype=emu.dtype_str(dtype),
-               shape_without_variable_dims=tu.shape_to_dims_str(
-                   shape_without_variable_dims))
+    """.format(
+            type=control_type,
+            dims=tu.shape_to_dims_str(shape),
+            dtype=emu.dtype_str(dtype),
+            shape_without_variable_dims=tu.shape_to_dims_str(
+                shape_without_variable_dims
+            ),
+        )
 
     try:
         os.makedirs(config_dir)
@@ -895,8 +982,7 @@ instance_group [
         cfile.write(config)
 
 
-def create_plan_fixed_modelfile(models_dir, model_version, max_batch, dtype,
-                                shape):
+def create_plan_fixed_modelfile(models_dir, model_version, max_batch, dtype, shape):
     trt_dtype = np_to_trt_dtype(dtype)
     TRT_LOGGER = trt.Logger(trt.Logger.INFO)
     builder = trt.Builder(TRT_LOGGER)
@@ -907,15 +993,19 @@ def create_plan_fixed_modelfile(models_dir, model_version, max_batch, dtype,
     network.add_input("READY", trt_dtype, [1 for i in shape])
     constant_1_data = trt.Weights(np.ones([1 for i in shape], dtype=dtype))
     constant_1 = network.add_constant([1 for i in shape], constant_1_data)
-    not_start = network.add_elementwise(constant_1.get_output(0), start0,
-                                        trt.ElementWiseOperation.SUB)
+    not_start = network.add_elementwise(
+        constant_1.get_output(0), start0, trt.ElementWiseOperation.SUB
+    )
     not_start.set_output_type(0, trt_dtype)
-    internal_state = network.add_elementwise(in_state0, not_start.get_output(0),
-                                             trt.ElementWiseOperation.PROD)
-    out0 = network.add_elementwise(internal_state.get_output(0), in0,
-                                   trt.ElementWiseOperation.SUM)
-    out0_state = network.add_elementwise(internal_state.get_output(0), in0,
-                                         trt.ElementWiseOperation.SUM)
+    internal_state = network.add_elementwise(
+        in_state0, not_start.get_output(0), trt.ElementWiseOperation.PROD
+    )
+    out0 = network.add_elementwise(
+        internal_state.get_output(0), in0, trt.ElementWiseOperation.SUM
+    )
+    out0_state = network.add_elementwise(
+        internal_state.get_output(0), in0, trt.ElementWiseOperation.SUM
+    )
 
     out0.get_output(0).name = "OUTPUT"
     network.mark_output(out0.get_output(0))
@@ -935,7 +1025,8 @@ def create_plan_fixed_modelfile(models_dir, model_version, max_batch, dtype,
     del network
 
     model_name = tu.get_sequence_model_name(
-        "plan_nobatch" if max_batch == 0 else "plan", dtype)
+        "plan_nobatch" if max_batch == 0 else "plan", dtype
+    )
     model_version_dir = models_dir + "/" + model_name + "/" + str(model_version)
 
     try:
@@ -947,8 +1038,7 @@ def create_plan_fixed_modelfile(models_dir, model_version, max_batch, dtype,
         f.write(engine_bytes)
 
 
-def create_plan_fixed_rf_modelfile(models_dir, model_version, max_batch, dtype,
-                                   shape):
+def create_plan_fixed_rf_modelfile(models_dir, model_version, max_batch, dtype, shape):
     trt_dtype = np_to_trt_dtype(dtype)
     trt_memory_format = trt.TensorFormat.LINEAR
 
@@ -961,16 +1051,20 @@ def create_plan_fixed_rf_modelfile(models_dir, model_version, max_batch, dtype,
     ready0 = network.add_input("READY", trt_dtype, [1 for i in shape])
     constant_1_data = trt.Weights(np.ones([1 for i in shape], dtype=dtype))
     constant_1 = network.add_constant([1 for i in shape], constant_1_data)
-    not_start = network.add_elementwise(constant_1.get_output(0), start0,
-                                        trt.ElementWiseOperation.SUB)
+    not_start = network.add_elementwise(
+        constant_1.get_output(0), start0, trt.ElementWiseOperation.SUB
+    )
     not_start.set_output_type(0, trt_dtype)
 
-    internal_state = network.add_elementwise(in_state0, not_start.get_output(0),
-                                             trt.ElementWiseOperation.PROD)
-    out0 = network.add_elementwise(internal_state.get_output(0), in0,
-                                   trt.ElementWiseOperation.SUM)
-    out0_state = network.add_elementwise(internal_state.get_output(0), in0,
-                                         trt.ElementWiseOperation.SUM)
+    internal_state = network.add_elementwise(
+        in_state0, not_start.get_output(0), trt.ElementWiseOperation.PROD
+    )
+    out0 = network.add_elementwise(
+        internal_state.get_output(0), in0, trt.ElementWiseOperation.SUM
+    )
+    out0_state = network.add_elementwise(
+        internal_state.get_output(0), in0, trt.ElementWiseOperation.SUM
+    )
 
     out0.get_output(0).name = "OUTPUT"
     network.mark_output(out0.get_output(0))
@@ -987,7 +1081,7 @@ def create_plan_fixed_rf_modelfile(models_dir, model_version, max_batch, dtype,
     out0.get_output(0).allowed_formats = 1 << int(trt_memory_format)
     out0_state.get_output(0).allowed_formats = 1 << int(trt_memory_format)
 
-    if (trt_dtype == trt.int8):
+    if trt_dtype == trt.int8:
         in0.dynamic_range = (-128.0, 127.0)
         in_state0.dynamic_range = (-128.0, 127.0)
         out0.dynamic_range = (-128.0, 127.0)
@@ -997,9 +1091,9 @@ def create_plan_fixed_rf_modelfile(models_dir, model_version, max_batch, dtype,
 
     flags = 1 << int(trt.BuilderFlag.STRICT_TYPES)
 
-    if (trt_dtype == trt.int8):
+    if trt_dtype == trt.int8:
         flags |= 1 << int(trt.BuilderFlag.INT8)
-    elif (trt_dtype == trt.float16):
+    elif trt_dtype == trt.float16:
         flags |= 1 << int(trt.BuilderFlag.FP16)
 
     config = builder.create_builder_config()
@@ -1014,7 +1108,8 @@ def create_plan_fixed_rf_modelfile(models_dir, model_version, max_batch, dtype,
         del engine
 
     model_name = tu.get_sequence_model_name(
-        "plan_nobatch" if max_batch == 0 else "plan", dtype)
+        "plan_nobatch" if max_batch == 0 else "plan", dtype
+    )
     model_version_dir = models_dir + "/" + model_name + "/" + str(model_version)
 
     try:
@@ -1026,17 +1121,17 @@ def create_plan_fixed_rf_modelfile(models_dir, model_version, max_batch, dtype,
         f.write(engine_bytes)
 
 
-def create_plan_dynamic_modelfile(models_dir, model_version, max_batch, dtype,
-                                  shape):
+def create_plan_dynamic_modelfile(models_dir, model_version, max_batch, dtype, shape):
     trt_dtype = np_to_trt_dtype(dtype)
     TRT_LOGGER = trt.Logger(trt.Logger.INFO)
     builder = trt.Builder(TRT_LOGGER)
 
     # EXPLICIT_BATCH must be used when the dimension is variable
     network = builder.create_network(
-        1 << int(trt.NetworkDefinitionCreationFlag.EXPLICIT_BATCH))
+        1 << int(trt.NetworkDefinitionCreationFlag.EXPLICIT_BATCH)
+    )
 
-    unit_shape = ([1] * len(shape))
+    unit_shape = [1] * len(shape)
     if max_batch != 0:
         in0 = network.add_input("INPUT", trt_dtype, [-1] + shape)
         start0 = network.add_input("START", trt_dtype, [-1] + unit_shape)
@@ -1051,15 +1146,19 @@ def create_plan_dynamic_modelfile(models_dir, model_version, max_batch, dtype,
     # Append the dimension by 1 so that broadcasting works properly
     constant_1_data = trt.Weights(np.ones(unit_shape + [1], dtype=dtype))
     constant_1 = network.add_constant(unit_shape + [1], constant_1_data)
-    not_start = network.add_elementwise(constant_1.get_output(0), start0,
-                                        trt.ElementWiseOperation.SUB)
+    not_start = network.add_elementwise(
+        constant_1.get_output(0), start0, trt.ElementWiseOperation.SUB
+    )
     not_start.set_output_type(0, trt_dtype)
-    internal_state = network.add_elementwise(in_state0, not_start.get_output(0),
-                                             trt.ElementWiseOperation.PROD)
-    out0 = network.add_elementwise(internal_state.get_output(0), in0,
-                                   trt.ElementWiseOperation.SUM)
-    out0_state = network.add_elementwise(internal_state.get_output(0), in0,
-                                         trt.ElementWiseOperation.SUM)
+    internal_state = network.add_elementwise(
+        in_state0, not_start.get_output(0), trt.ElementWiseOperation.PROD
+    )
+    out0 = network.add_elementwise(
+        internal_state.get_output(0), in0, trt.ElementWiseOperation.SUM
+    )
+    out0_state = network.add_elementwise(
+        internal_state.get_output(0), in0, trt.ElementWiseOperation.SUM
+    )
 
     out0.get_output(0).name = "OUTPUT"
     network.mark_output(out0.get_output(0))
@@ -1088,10 +1187,18 @@ def create_plan_dynamic_modelfile(models_dir, model_version, max_batch, dtype,
     profile.set_shape("INPUT", min_shape, opt_shape, max_shape)
     profile.set_shape("INPUT_STATE", min_shape, opt_shape, max_shape)
     if max_batch != 0:
-        profile.set_shape("START", [1] + unit_shape, [max_batch] + unit_shape,
-                          [max_batch] + unit_shape)
-        profile.set_shape("READY", [1] + unit_shape, [max_batch] + unit_shape,
-                          [max_batch] + unit_shape)
+        profile.set_shape(
+            "START",
+            [1] + unit_shape,
+            [max_batch] + unit_shape,
+            [max_batch] + unit_shape,
+        )
+        profile.set_shape(
+            "READY",
+            [1] + unit_shape,
+            [max_batch] + unit_shape,
+            [max_batch] + unit_shape,
+        )
     else:
         profile.set_shape("START", unit_shape, unit_shape, unit_shape)
         profile.set_shape("READY", unit_shape, unit_shape, unit_shape)
@@ -1107,7 +1214,8 @@ def create_plan_dynamic_modelfile(models_dir, model_version, max_batch, dtype,
         del engine
 
     model_name = tu.get_sequence_model_name(
-        "plan_nobatch" if max_batch == 0 else "plan", dtype)
+        "plan_nobatch" if max_batch == 0 else "plan", dtype
+    )
     model_version_dir = models_dir + "/" + model_name + "/" + str(model_version)
 
     try:
@@ -1119,8 +1227,9 @@ def create_plan_dynamic_modelfile(models_dir, model_version, max_batch, dtype,
         f.write(engine_bytes)
 
 
-def create_plan_dynamic_rf_modelfile(models_dir, model_version, max_batch,
-                                     dtype, shape):
+def create_plan_dynamic_rf_modelfile(
+    models_dir, model_version, max_batch, dtype, shape
+):
     trt_dtype = np_to_trt_dtype(dtype)
     trt_memory_format = trt.TensorFormat.LINEAR
 
@@ -1129,9 +1238,10 @@ def create_plan_dynamic_rf_modelfile(models_dir, model_version, max_batch,
 
     # EXPLICIT_BATCH must be used when the dimension is variable
     network = builder.create_network(
-        1 << int(trt.NetworkDefinitionCreationFlag.EXPLICIT_BATCH))
+        1 << int(trt.NetworkDefinitionCreationFlag.EXPLICIT_BATCH)
+    )
 
-    unit_shape = ([1] * len(shape))
+    unit_shape = [1] * len(shape)
     if max_batch != 0:
         in0 = network.add_input("INPUT", trt_dtype, [-1] + shape)
         start0 = network.add_input("START", trt_dtype, [-1] + unit_shape)
@@ -1146,15 +1256,19 @@ def create_plan_dynamic_rf_modelfile(models_dir, model_version, max_batch,
     # Append the dimension by 1 so that broadcasting works properly
     constant_1_data = trt.Weights(np.ones(unit_shape + [1], dtype=dtype))
     constant_1 = network.add_constant(unit_shape + [1], constant_1_data)
-    not_start = network.add_elementwise(constant_1.get_output(0), start0,
-                                        trt.ElementWiseOperation.SUB)
+    not_start = network.add_elementwise(
+        constant_1.get_output(0), start0, trt.ElementWiseOperation.SUB
+    )
     not_start.set_output_type(0, trt_dtype)
-    internal_state = network.add_elementwise(in_state0, not_start.get_output(0),
-                                             trt.ElementWiseOperation.PROD)
-    out0 = network.add_elementwise(internal_state.get_output(0), in0,
-                                   trt.ElementWiseOperation.SUM)
-    out0_state = network.add_elementwise(internal_state.get_output(0), in0,
-                                         trt.ElementWiseOperation.SUM)
+    internal_state = network.add_elementwise(
+        in_state0, not_start.get_output(0), trt.ElementWiseOperation.PROD
+    )
+    out0 = network.add_elementwise(
+        internal_state.get_output(0), in0, trt.ElementWiseOperation.SUM
+    )
+    out0_state = network.add_elementwise(
+        internal_state.get_output(0), in0, trt.ElementWiseOperation.SUM
+    )
     out0.get_output(0).name = "OUTPUT"
     network.mark_output(out0.get_output(0))
 
@@ -1169,7 +1283,7 @@ def create_plan_dynamic_rf_modelfile(models_dir, model_version, max_batch,
     ready0.allowed_formats = 1 << int(trt_memory_format)
     out0.get_output(0).allowed_formats = 1 << int(trt_memory_format)
 
-    if (trt_dtype == trt.int8):
+    if trt_dtype == trt.int8:
         in0.dynamic_range = (-128.0, 127.0)
         in_state0.dynamic_range = (-128.0, 127.0)
         out0.dynamic_range = (-128.0, 127.0)
@@ -1178,9 +1292,9 @@ def create_plan_dynamic_rf_modelfile(models_dir, model_version, max_batch,
 
     flags = 1 << int(trt.BuilderFlag.STRICT_TYPES)
 
-    if (trt_dtype == trt.int8):
+    if trt_dtype == trt.int8:
         flags |= 1 << int(trt.BuilderFlag.INT8)
-    elif (trt_dtype == trt.float16):
+    elif trt_dtype == trt.float16:
         flags |= 1 << int(trt.BuilderFlag.FP16)
 
     min_shape = []
@@ -1204,10 +1318,18 @@ def create_plan_dynamic_rf_modelfile(models_dir, model_version, max_batch,
     profile.set_shape("INPUT", min_shape, opt_shape, max_shape)
     profile.set_shape("INPUT_STATE", min_shape, opt_shape, max_shape)
     if max_batch != 0:
-        profile.set_shape("START", [1] + unit_shape, [max_batch] + unit_shape,
-                          [max_batch] + unit_shape)
-        profile.set_shape("READY", [1] + unit_shape, [max_batch] + unit_shape,
-                          [max_batch] + unit_shape)
+        profile.set_shape(
+            "START",
+            [1] + unit_shape,
+            [max_batch] + unit_shape,
+            [max_batch] + unit_shape,
+        )
+        profile.set_shape(
+            "READY",
+            [1] + unit_shape,
+            [max_batch] + unit_shape,
+            [max_batch] + unit_shape,
+        )
     else:
         profile.set_shape("START", unit_shape, unit_shape, unit_shape)
         profile.set_shape("READY", unit_shape, unit_shape, unit_shape)
@@ -1225,7 +1347,8 @@ def create_plan_dynamic_rf_modelfile(models_dir, model_version, max_batch,
         del engine
 
     model_name = tu.get_sequence_model_name(
-        "plan_nobatch" if max_batch == 0 else "plan", dtype)
+        "plan_nobatch" if max_batch == 0 else "plan", dtype
+    )
     model_version_dir = models_dir + "/" + model_name + "/" + str(model_version)
 
     try:
@@ -1238,35 +1361,38 @@ def create_plan_dynamic_rf_modelfile(models_dir, model_version, max_batch,
 
 
 def create_plan_modelfile(models_dir, model_version, max_batch, dtype, shape):
-
     if not tu.validate_for_trt_model(dtype, dtype, dtype, shape, shape, shape):
         return
 
     if dtype != np.float32:
-        if (not tu.shape_is_fixed(shape)):
-            create_plan_dynamic_rf_modelfile(models_dir, model_version,
-                                             max_batch, dtype, shape)
+        if not tu.shape_is_fixed(shape):
+            create_plan_dynamic_rf_modelfile(
+                models_dir, model_version, max_batch, dtype, shape
+            )
         else:
-            create_plan_fixed_rf_modelfile(models_dir, model_version, max_batch,
-                                           dtype, shape)
+            create_plan_fixed_rf_modelfile(
+                models_dir, model_version, max_batch, dtype, shape
+            )
     else:
-        if (not tu.shape_is_fixed(shape)):
-            create_plan_dynamic_modelfile(models_dir, model_version, max_batch,
-                                          dtype, shape)
+        if not tu.shape_is_fixed(shape):
+            create_plan_dynamic_modelfile(
+                models_dir, model_version, max_batch, dtype, shape
+            )
         else:
-            create_plan_fixed_modelfile(models_dir, model_version, max_batch,
-                                        dtype, shape)
+            create_plan_fixed_modelfile(
+                models_dir, model_version, max_batch, dtype, shape
+            )
 
 
 def create_plan_modelconfig(models_dir, model_version, max_batch, dtype, shape):
-
     if not tu.validate_for_trt_model(dtype, dtype, dtype, shape, shape, shape):
         return
 
     model_name = tu.get_sequence_model_name(
-        "plan_nobatch" if max_batch == 0 else "plan", dtype)
+        "plan_nobatch" if max_batch == 0 else "plan", dtype
+    )
     config_dir = models_dir + "/" + model_name
-    config = '''
+    config = """
 name: "{}"
 platform: "tensorrt_plan"
 max_batch_size: {}
@@ -1298,7 +1424,7 @@ sequence_batching {{
       output_name: "OUTPUT_STATE"
       data_type: {dtype}
       dims: {shape}
-    }} 
+    }}
   ]
 }}
 input [
@@ -1320,12 +1446,14 @@ instance_group [
     kind: KIND_GPU
   }}
 ]
-'''.format(model_name,
-           max_batch,
-           "int32" if dtype == np.int32 else "fp32",
-           "int32" if dtype == np.int32 else "fp32",
-           dtype=np_to_model_dtype(dtype),
-           shape=tu.shape_to_dims_str(shape))
+""".format(
+        model_name,
+        max_batch,
+        "int32" if dtype == np.int32 else "fp32",
+        "int32" if dtype == np.int32 else "fp32",
+        dtype=np_to_model_dtype(dtype),
+        shape=tu.shape_to_dims_str(shape),
+    )
 
     try:
         os.makedirs(config_dir)
@@ -1340,15 +1468,17 @@ def create_models(models_dir, dtype, shape, initial_state, no_batch=True):
     model_version = 1
 
     if FLAGS.onnx:
-        create_onnx_modelconfig(models_dir, model_version, 8, dtype, shape,
-                                initial_state)
-        create_onnx_modelfile(models_dir, model_version, 8, dtype, shape,
-                              initial_state)
+        create_onnx_modelconfig(
+            models_dir, model_version, 8, dtype, shape, initial_state
+        )
+        create_onnx_modelfile(models_dir, model_version, 8, dtype, shape, initial_state)
         if no_batch:
-            create_onnx_modelconfig(models_dir, model_version, 0, dtype, shape,
-                                    initial_state)
-            create_onnx_modelfile(models_dir, model_version, 0, dtype, shape,
-                                  initial_state)
+            create_onnx_modelconfig(
+                models_dir, model_version, 0, dtype, shape, initial_state
+            )
+            create_onnx_modelfile(
+                models_dir, model_version, 0, dtype, shape, initial_state
+            )
 
     if FLAGS.tensorrt:
         if dtype == bool:
@@ -1357,87 +1487,103 @@ def create_models(models_dir, dtype, shape, initial_state, no_batch=True):
         if dtype == np.int8:
             suffix = [1, 1]
 
-        create_plan_modelconfig(models_dir, model_version, 8, dtype,
-                                shape + suffix)
-        create_plan_modelfile(models_dir, model_version, 8, dtype,
-                              shape + suffix)
+        create_plan_modelconfig(models_dir, model_version, 8, dtype, shape + suffix)
+        create_plan_modelfile(models_dir, model_version, 8, dtype, shape + suffix)
         if no_batch:
-            create_plan_modelconfig(models_dir, model_version, 0, dtype,
-                                    shape + suffix)
-            create_plan_modelfile(models_dir, model_version, 0, dtype,
-                                  shape + suffix)
+            create_plan_modelconfig(models_dir, model_version, 0, dtype, shape + suffix)
+            create_plan_modelfile(models_dir, model_version, 0, dtype, shape + suffix)
 
     if FLAGS.libtorch:
         suffix = []
         if dtype == np.int8:
             suffix = [1, 1]
 
-        create_libtorch_modelconfig(models_dir, model_version, 8, dtype,
-                                    shape + suffix, initial_state)
-        create_libtorch_modelfile(models_dir, model_version, 8, dtype,
-                                  shape + suffix, initial_state)
+        create_libtorch_modelconfig(
+            models_dir, model_version, 8, dtype, shape + suffix, initial_state
+        )
+        create_libtorch_modelfile(
+            models_dir, model_version, 8, dtype, shape + suffix, initial_state
+        )
         if no_batch:
-            create_libtorch_modelconfig(models_dir, model_version, 0, dtype,
-                                        shape + suffix, initial_state)
-            create_libtorch_modelfile(models_dir, model_version, 0, dtype,
-                                      shape + suffix, initial_state)
+            create_libtorch_modelconfig(
+                models_dir, model_version, 0, dtype, shape + suffix, initial_state
+            )
+            create_libtorch_modelfile(
+                models_dir, model_version, 0, dtype, shape + suffix, initial_state
+            )
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument('--models_dir',
-                        type=str,
-                        required=True,
-                        help='Top-level model directory')
-    parser.add_argument('--graphdef',
-                        required=False,
-                        action='store_true',
-                        help='Generate GraphDef models')
-    parser.add_argument('--savedmodel',
-                        required=False,
-                        action='store_true',
-                        help='Generate SavedModel models')
-    parser.add_argument('--tensorrt',
-                        required=False,
-                        action='store_true',
-                        help='Generate TensorRT PLAN models')
-    parser.add_argument('--initial-state',
-                        required=False,
-                        choices=['zero', 'file'],
-                        help='Generate models that rely on initial state.')
     parser.add_argument(
-        '--tensorrt-shape-io',
+        "--models_dir", type=str, required=True, help="Top-level model directory"
+    )
+    parser.add_argument(
+        "--graphdef",
         required=False,
-        action='store_true',
-        help='Generate TensorRT PLAN models w/ shape tensor i/o')
-    parser.add_argument('--onnx',
-                        required=False,
-                        action='store_true',
-                        help='Generate Onnx models')
+        action="store_true",
+        help="Generate GraphDef models",
+    )
     parser.add_argument(
-        '--onnx_opset',
+        "--savedmodel",
+        required=False,
+        action="store_true",
+        help="Generate SavedModel models",
+    )
+    parser.add_argument(
+        "--tensorrt",
+        required=False,
+        action="store_true",
+        help="Generate TensorRT PLAN models",
+    )
+    parser.add_argument(
+        "--initial-state",
+        required=False,
+        choices=["zero", "file"],
+        help="Generate models that rely on initial state.",
+    )
+    parser.add_argument(
+        "--tensorrt-shape-io",
+        required=False,
+        action="store_true",
+        help="Generate TensorRT PLAN models w/ shape tensor i/o",
+    )
+    parser.add_argument(
+        "--onnx", required=False, action="store_true", help="Generate Onnx models"
+    )
+    parser.add_argument(
+        "--onnx_opset",
         type=int,
         required=False,
         default=0,
-        help='Opset used for Onnx models. Default is to use ONNXRT default')
-    parser.add_argument('--libtorch',
-                        required=False,
-                        action='store_true',
-                        help='Generate Pytorch LibTorch models')
-    parser.add_argument('--openvino',
-                        required=False,
-                        action='store_true',
-                        help='Generate OpenVino models')
-    parser.add_argument('--variable',
-                        required=False,
-                        action='store_true',
-                        help='Used variable-shape tensors for input/output')
-    parser.add_argument('--ensemble',
-                        required=False,
-                        action='store_true',
-                        help='Generate ensemble models against the models' +
-                        ' in all platforms. Note that the models generated' +
-                        ' are not completed.')
+        help="Opset used for Onnx models. Default is to use ONNXRT default",
+    )
+    parser.add_argument(
+        "--libtorch",
+        required=False,
+        action="store_true",
+        help="Generate Pytorch LibTorch models",
+    )
+    parser.add_argument(
+        "--openvino",
+        required=False,
+        action="store_true",
+        help="Generate OpenVino models",
+    )
+    parser.add_argument(
+        "--variable",
+        required=False,
+        action="store_true",
+        help="Used variable-shape tensors for input/output",
+    )
+    parser.add_argument(
+        "--ensemble",
+        required=False,
+        action="store_true",
+        help="Generate ensemble models against the models"
+        + " in all platforms. Note that the models generated"
+        + " are not completed.",
+    )
     FLAGS, unparsed = parser.parse_known_args()
 
     if FLAGS.onnx:
@@ -1454,30 +1600,74 @@ if __name__ == '__main__':
 
     # Tests with models that accept fixed-shape input/output tensors
     if not FLAGS.variable:
-        create_models(FLAGS.models_dir, np.float32, [
-            1,
-        ], FLAGS.initial_state)
-        create_models(FLAGS.models_dir, np.int32, [
-            1,
-        ], FLAGS.initial_state)
-        create_models(FLAGS.models_dir, np_dtype_string, [
-            1,
-        ], FLAGS.initial_state)
-        create_models(FLAGS.models_dir, bool, [
-            1,
-        ], FLAGS.initial_state)
+        create_models(
+            FLAGS.models_dir,
+            np.float32,
+            [
+                1,
+            ],
+            FLAGS.initial_state,
+        )
+        create_models(
+            FLAGS.models_dir,
+            np.int32,
+            [
+                1,
+            ],
+            FLAGS.initial_state,
+        )
+        create_models(
+            FLAGS.models_dir,
+            np_dtype_string,
+            [
+                1,
+            ],
+            FLAGS.initial_state,
+        )
+        create_models(
+            FLAGS.models_dir,
+            bool,
+            [
+                1,
+            ],
+            FLAGS.initial_state,
+        )
 
     # Tests with models that accept variable-shape input/output tensors
     if FLAGS.variable:
-        create_models(FLAGS.models_dir, np.int32, [
-            -1,
-        ], FLAGS.initial_state, False)
-        create_models(FLAGS.models_dir, np.float32, [
-            -1,
-        ], FLAGS.initial_state, False)
-        create_models(FLAGS.models_dir, np_dtype_string, [
-            -1,
-        ], FLAGS.initial_state, False)
-        create_models(FLAGS.models_dir, bool, [
-            -1,
-        ], FLAGS.initial_state, False)
+        create_models(
+            FLAGS.models_dir,
+            np.int32,
+            [
+                -1,
+            ],
+            FLAGS.initial_state,
+            False,
+        )
+        create_models(
+            FLAGS.models_dir,
+            np.float32,
+            [
+                -1,
+            ],
+            FLAGS.initial_state,
+            False,
+        )
+        create_models(
+            FLAGS.models_dir,
+            np_dtype_string,
+            [
+                -1,
+            ],
+            FLAGS.initial_state,
+            False,
+        )
+        create_models(
+            FLAGS.models_dir,
+            bool,
+            [
+                -1,
+            ],
+            FLAGS.initial_state,
+            False,
+        )

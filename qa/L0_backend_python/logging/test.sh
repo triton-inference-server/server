@@ -68,7 +68,7 @@ source ../../common/util.sh
 function verify_log_counts () {
   non_verbose_expected=$1
   verbose_expected=$2
-  
+
   if [ `grep -c "Specific Msg!" $SERVER_LOG` != $non_verbose_expected ]; then
     echo -e "\n***\n*** Test Failed: Specific Msg Count Incorrect\n***"
     RET=1
@@ -145,7 +145,7 @@ if [ "$SERVER_PID" == "0" ]; then
 fi
 
 set +e
-# Enable verbose logging 
+# Enable verbose logging
 code=`curl -s -w %{http_code} -o ./curl.out -d'{"log_verbose_level":1}' localhost:8000/v2/logging`
 
 if [ "$code" != "200" ]; then

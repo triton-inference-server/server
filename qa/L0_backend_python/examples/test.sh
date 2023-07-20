@@ -37,7 +37,7 @@ SERVER_LOG="./inference_server.log"
 RET=0
 rm -fr *.log python_backend/
 
-# Install torch 
+# Install torch
 # Skip torch and torchvision install on Jetson since it is already installed.
 if [ "$TEST_JETSON" == "0" ]; then
     pip3 uninstall -y torch

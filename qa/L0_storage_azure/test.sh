@@ -218,7 +218,7 @@ for FW in ${AUTOCOMPLETE_BACKENDS}; do
     for model in ${FW}_float32_float32_float32 ${FW}_object_object_object; do
         cp -r /data/inferenceserver/${REPO_VERSION}/qa_model_repository/${model} models/
         # Config files specify things expected by unit test like label_filename
-        # and max_batch_size for comparing results, so remove some key fields 
+        # and max_batch_size for comparing results, so remove some key fields
         # for autocomplete to fill that won't break the unit test.
         sed -i '/platform:/d' models/${model}/config.pbtxt
         sed -i '/data_type:/d' models/${model}/config.pbtxt

@@ -37,7 +37,7 @@ for most use cases.
 For those who wish to jump right in, skip to the
 [end-to-end example](#end-to-end-example).
 
-For additional material, see the 
+For additional material, see the
 [Triton Conceptual Guide tutorial](https://github.com/triton-inference-server/tutorials/tree/main/Conceptual_Guide/Part_4-inference_acceleration).
 
 ## Overview
@@ -187,7 +187,7 @@ other frameworks.
 mkdir -p ./models/densenet_onnx/1
 
 # Download model and place it in model repository
-wget -O models/densenet_onnx/1/model.onnx 
+wget -O models/densenet_onnx/1/model.onnx
 https://contentmamluswest001.blob.core.windows.net/content/14b2744cf8d6418c87ffddc3f3127242/9502630827244d60a1214f250e3bbca7/08aed7327d694b8dbaee2c97b8d0fcba/densenet121-1.2.onnx
 ```
 
@@ -318,7 +318,7 @@ SERVER_PID=`ps | grep tritonserver | awk '{ printf $1 }'`
 kill ${SERVER_PID}
 
 # Install model analyzer
-pip install --upgrade pip 
+pip install --upgrade pip
 pip install triton-model-analyzer wkhtmltopdf
 
 # Profile the model using local (default) mode
@@ -369,7 +369,7 @@ your models for your use case.
 
 6. Extract optimal config from Model Analyzer results
 
-In our example above, `densenet_onnx_config_3` was the optimal configuration. 
+In our example above, `densenet_onnx_config_3` was the optimal configuration.
 So let's extract that `config.pbtxt` and put it back in our model repository for future use.
 
 ```bash

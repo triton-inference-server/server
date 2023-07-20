@@ -28,10 +28,10 @@
 
 # Model Configuration
 
-**Is this your first time writing a config file?** Check out 
+**Is this your first time writing a config file?** Check out
 [this guide](https://github.com/triton-inference-server/tutorials/tree/main/Conceptual_Guide/Part_1-model_deployment#model-configuration)
- or this 
-[example](https://github.com/triton-inference-server/tutorials/tree/main/HuggingFace#examples)! 
+ or this
+[example](https://github.com/triton-inference-server/tutorials/tree/main/HuggingFace#examples)!
 
 Each model in a [model repository](model_repository.md) must include a
 model configuration that provides required and optional information
@@ -39,7 +39,7 @@ about the model. Typically, this configuration is provided in a
 config.pbtxt file specified as [ModelConfig
 protobuf](https://github.com/triton-inference-server/common/blob/main/protobuf/model_config.proto).
 In some cases, discussed in [Auto-Generated Model
-Configuraton](#auto-generated-model-configuration), the model
+Configuration](#auto-generated-model-configuration), the model
 configuration can be generated automatically by Triton and so does not
 need to be provided explicitly.
 
@@ -135,7 +135,7 @@ expected by the model.
 
 #### Special Conventions for PyTorch Backend
 
-**Naming Convention:** 
+**Naming Convention:**
 
 Due to the absence of sufficient metadata for inputs/outputs in TorchScript
 model files, the "name" attribute of inputs/outputs in the configuration must
@@ -147,7 +147,7 @@ the forward function in the model's definition.
 
 For example, if the forward function for the Torchscript model was defined as
 `forward(self, input0, input1)`, the first and second inputs should be named
-"input0" and "input1" respectively. 
+"input0" and "input1" respectively.
 
 2. `<name>__<index>`: Where \<name\> can be any string and \<index\> is an
 integer index that refers to the position of the corresponding input/output.
@@ -158,9 +158,9 @@ can be named "OUTPUT__0" and "OUTPUT__1" respectively.
 
 3. If all inputs (or outputs) do not follow the same naming convention, then we
 enforce strict ordering from the model configuration i.e. we assume the order of
-inputs (or outputs) in the configuartion is the true ordering of these inputs.
+inputs (or outputs) in the configuration is the true ordering of these inputs.
 
-***Dictionary of Tensors as Input:*** 
+***Dictionary of Tensors as Input:***
 
 The PyTorch backend supports passing of inputs to the model in the form of a
 Dictionary of Tensors. This is only supported when there is a *single* input to
@@ -290,7 +290,7 @@ function can be implemented in Python backend to provide
 and [`output`](#inputs-and-outputs) properties using `set_max_batch_size`,
 `add_input`, and `add_output` functions. These properties will allow Triton
 to load the Python model with [Minimal Model Configuration](#minimal-model-configuration)
-in absence of a configuration file. 
+in absence of a configuration file.
 All other model types *must* provide a model configuration file.
 
 When developing a custom backend, you can populate required settings
@@ -298,7 +298,7 @@ in the configuration and call `TRITONBACKEND_ModelSetConfig` API to
 update completed configuration with Triton core. You can take a
 look at [TensorFlow](https://github.com/triton-inference-server/tensorflow_backend)
 and [Onnxruntime](https://github.com/triton-inference-server/onnxruntime_backend)
-backends as examples of how to acheive this. Currently, only
+backends as examples of how to achieve this. Currently, only
 [inputs, outputs](#inputs-and-outputs), [max_batch_size](#maximum-batch-size)
 and [dynamic batching](#dynamic-batcher) settings can be populated by
 backend. For custom backends, your config.pbtxt file must
@@ -323,25 +323,25 @@ config.pbtxt file.
 
 ### Default Max Batch Size and Dynamic Batcher
 
-When a model is using the auto-complete feature, a default maximum 
-batch size may be set by using the `--backend-config=default-max-batch-size=<int>` 
+When a model is using the auto-complete feature, a default maximum
+batch size may be set by using the `--backend-config=default-max-batch-size=<int>`
 command line argument. This allows all models which are capable of
 batching and which make use of [Auto Generated Model Configuration](#auto-generated-model-configuration)
-to have a default maximum batch size. This value is set to 4 by 
+to have a default maximum batch size. This value is set to 4 by
 default. Backend developers may make use of this default-max-batch-size
 by obtaining it from the TRITONBACKEND_BackendConfig api. Currently, the
-following backends which utilize these default batch values and turn on 
+following backends which utilize these default batch values and turn on
 dynamic batching in their generated model configurations are:
 
 1. [TensorFlow backend](https://github.com/triton-inference-server/tensorflow_backend)
 2. [Onnxruntime backend](https://github.com/triton-inference-server/onnxruntime_backend)
 3. [TensorRT backend](https://github.com/triton-inference-server/tensorrt_backend)
    1. TensorRT models store the maximum batch size explicitly and do not make use
-   of the default-max-batch-size parameter. However, if max_batch_size > 1 
+   of the default-max-batch-size parameter. However, if max_batch_size > 1
    and no [scheduler](model_configuration.md#scheduling-and-batching)
    is provided, the dynamic batch scheduler will be enabled.
-   
-If a value greater than 1 for the maximum batch size is set for the 
+
+If a value greater than 1 for the maximum batch size is set for the
 model, the [dynamic_batching](#dynamic-batcher) config will be set
 if no scheduler is provided in the configuration file.
 
@@ -731,21 +731,21 @@ requirements and run on the same device as them.
 
 [Ensemble models](architecture.md#ensemble-models)
 are an abstraction Triton uses to execute a user-defined pipeline of models.
-Since there is no physical instance associated with an ensemble model, the 
+Since there is no physical instance associated with an ensemble model, the
 `instance_group` field can not be specified for it.
 
-However, each composing model that makes up an ensemble can specify 
+However, each composing model that makes up an ensemble can specify
 `instance_group` in its config file and individually support parallel
 execution as described above when the ensemble receives multiple requests.
 
 ## CUDA Compute Capability
 
-Similar to the `default_model_filename` field, you can optionally specify the 
+Similar to the `default_model_filename` field, you can optionally specify the
 `cc_model_filenames` field to map the GPU's
-[CUDA Compute Capability](https://developer.nvidia.com/cuda-gpus) 
-to a correspoding model filename at model load time. This is particularly 
-useful for TensorRT models, since they are generally tied to a specific 
-compute capability. 
+[CUDA Compute Capability](https://developer.nvidia.com/cuda-gpus)
+to a corresponding model filename at model load time. This is particularly
+useful for TensorRT models, since they are generally tied to a specific
+compute capability.
 
 ```
 cc_model_filenames [
@@ -798,7 +798,7 @@ configuration. These settings control the preferred size(s) of the
 dynamically created batches, the maximum time that requests can be
 delayed in the scheduler to allow other requests to join the dynamic
 batch, and queue properties such a queue size, priorities, and
-time-outs. Refer to 
+time-outs. Refer to
 [this guide](https://github.com/triton-inference-server/tutorials/tree/main/Conceptual_Guide/Part_2-improving_resource_utilization#what-is-dynamic-batching)
 for a more detailed example of dynamic batching.
 
@@ -849,7 +849,7 @@ dynamic batcher should attempt to create. For most models,
 [Recommended Configuration
 Process](#recommended-configuration-process). An exception is TensorRT
 models that specify multiple optimization profiles for different batch
-sizes. In this case, bacause some optimization profiles may give
+sizes. In this case, because some optimization profiles may give
 significant performance improvement compared to others, it may make
 sense to use *preferred_batch_size* for the batch sizes supported by
 those higher-performance optimization profiles.
@@ -942,10 +942,10 @@ timeout.
 #### Custom Batching
 
 You can set custom batching rules that work _in addition to_ the specified behavior of the dynamic batcher.
-To do so, you would implement five functions in [tritonbackend.h](https://github.com/triton-inference-server/core/blob/main/include/triton/core/tritonbackend.h) 
+To do so, you would implement five functions in [tritonbackend.h](https://github.com/triton-inference-server/core/blob/main/include/triton/core/tritonbackend.h)
 and create a shared library. These functions are described below.
 
-| Function | Description| 
+| Function | Description|
 | :--          |   :--           |
 | TRITONBACKEND_ModelBatchIncludeRequest | Determines whether a request should be included in the current batch |
 | TRITONBACKEND_ModelBatchInitialize | Initializes a record-keeping data structure for a new batch |
@@ -953,10 +953,10 @@ and create a shared library. These functions are described below.
 | TRITONBACKEND_ModelBatcherInitialize | Initializes a read-only data structure for use with all batches |
 | TRITONBACKEND_ModelBatcherFinalize | Deallocates the read-only data structure after the model is unloaded |
 
-The path to the shared library can be passed into the model configuration via the parameter 
-`TRITON_BATCH_STRATEGY_PATH`. If not provided, the dynamic batcher will look for a custom 
-batching strategy named batchstrategy.so in the model version, model, and backend directories, 
-in that order. If found, it will load it. This lets you easily share a custom batching strategy 
+The path to the shared library can be passed into the model configuration via the parameter
+`TRITON_BATCH_STRATEGY_PATH`. If not provided, the dynamic batcher will look for a custom
+batching strategy named batchstrategy.so in the model version, model, and backend directories,
+in that order. If found, it will load it. This lets you easily share a custom batching strategy
 among all models using the same backend.
 
 For a tutorial of how to create and use a custom batching library, please see the
@@ -1036,7 +1036,7 @@ for examples on specifying different variants of warmup samples.
 ## Response Cache
 
 The model configuration `response_cache` section has an `enable` boolean used to
-enable the Response Cache for this model. 
+enable the Response Cache for this model.
 
 ```
 response_cache {
@@ -1045,6 +1045,6 @@ response_cache {
 ```
 
 In addition to enabling the cache in the model config, a `--cache-config` must
-be specified when starting the server to enable caching on the server-side. See 
+be specified when starting the server to enable caching on the server-side. See
 the [Response Cache](response_cache.md) doc for more details on enabling
 server-side caching.

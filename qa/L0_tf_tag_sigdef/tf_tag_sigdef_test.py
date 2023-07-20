@@ -1,3 +1,5 @@
+#!/usr/bin/env python3
+
 # Copyright 2021-2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
@@ -29,6 +31,7 @@ import sys
 sys.path.append("../common")
 
 import unittest
+
 import numpy as np
 import test_util as tu
 import tritonhttpclient as httpclient
@@ -49,16 +52,14 @@ class TagSigdefTest(tu.TestResultCollector):
         # for details
         multiplier = modelVersion + 1
         output_name = "OUTPUT"
-        triton_client = httpclient.InferenceServerClient("localhost:8000",
-                                                         verbose=True)
+        triton_client = httpclient.InferenceServerClient("localhost:8000", verbose=True)
         inputs = []
         outputs = []
-        inputs.append(httpclient.InferInput('INPUT', shape, "FP32"))
+        inputs.append(httpclient.InferInput("INPUT", shape, "FP32"))
         input_data = np.ones(shape=shape).astype(np.float32)
         inputs[0].set_data_from_numpy(input_data, binary_data=True)
 
-        outputs.append(
-            httpclient.InferRequestedOutput(output_name, binary_data=True))
+        outputs.append(httpclient.InferRequestedOutput(output_name, binary_data=True))
         results = triton_client.infer(model_name, inputs, outputs=outputs)
         output_data = results.as_numpy(output_name)
         test_output = input_data * multiplier
@@ -77,5 +78,5 @@ class TagSigdefTest(tu.TestResultCollector):
         self._test_helper(3, self.test_tag, self.test_sig_def)
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     unittest.main()

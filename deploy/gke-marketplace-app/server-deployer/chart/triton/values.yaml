@@ -49,7 +49,7 @@ image:
   allowGPUMetrics: True
 
 service:
-  type: NodePort 
+  type: NodePort
 
 deployment:
   livenessProbe:

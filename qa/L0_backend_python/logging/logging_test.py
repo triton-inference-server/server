@@ -1,4 +1,6 @@
-# Copyright 2018-2022, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+#!/usr/bin/env python3
+
+# Copyright 2018-2023, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -28,29 +30,29 @@ import sys
 
 sys.path.append("../../common")
 import unittest
+
 import numpy as np
 import test_util as tu
-
-from tritonclient.utils import *
 import tritonclient.http as httpclient
+from tritonclient.utils import *
 
 
 class LogTest(tu.TestResultCollector):
-
     def test_log_output(self):
-        model_name = 'identity_fp32_logging'
+        model_name = "identity_fp32_logging"
         with httpclient.InferenceServerClient("localhost:8000") as client:
             input_data = np.array([[1.0]], dtype=np.float32)
             inputs = [
-                httpclient.InferInput("INPUT0", input_data.shape,
-                                      np_to_triton_dtype(input_data.dtype))
+                httpclient.InferInput(
+                    "INPUT0", input_data.shape, np_to_triton_dtype(input_data.dtype)
+                )
             ]
             inputs[0].set_data_from_numpy(input_data)
             result = client.infer(model_name, inputs)
-            output0 = result.as_numpy('OUTPUT0')
+            output0 = result.as_numpy("OUTPUT0")
             self.assertIsNotNone(output0)
             self.assertTrue(np.all(output0 == input_data))
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     unittest.main()
