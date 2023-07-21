@@ -56,7 +56,17 @@ class TestInstanceUpdate(unittest.TestCase):
     _model_name = "model_init_del"
 
     def setUp(self):
-        self._reset_model()
+        # Reset counters
+        reset_count("initialize")
+        reset_count("finalize")
+        # Reset batching
+        disable_batching()
+        # Reset delays
+        set_delay("initialize", 0)
+        set_delay("infer", 0)
+        # Reset sequence batching
+        update_sequence_batching("")
+        # Initialize client
         self._triton = grpcclient.InferenceServerClient("localhost:8001")
 
     def tearDown(self):
@@ -71,18 +81,6 @@ class TestInstanceUpdate(unittest.TestCase):
         # Best effort to reset the model state for the next test case
         self._triton.unload_model(self._model_name)
         time.sleep(30)  # time for instances to finish unloading
-
-    def _reset_model(self):
-        # Reset counters
-        reset_count("initialize")
-        reset_count("finalize")
-        # Reset batching
-        disable_batching()
-        # Reset delays
-        set_delay("initialize", 0)
-        set_delay("infer", 0)
-        # Reset sequence batching
-        update_sequence_batching("")
 
     def _get_inputs(self, batching=False):
         self.assertIsInstance(batching, bool)
