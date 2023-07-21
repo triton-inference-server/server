@@ -47,10 +47,6 @@ from models.model_init_del.util import (
 )
 from tritonclient.utils import InferenceServerException
 
-# The server is not restarted across different unit test cases. If a case would
-# to fail, all subsequent cases could also fail, because the model state may not
-# be properly cleaned up after the initial failure.
-
 
 class TestInstanceUpdate(unittest.TestCase):
     _model_name = "model_init_del"
