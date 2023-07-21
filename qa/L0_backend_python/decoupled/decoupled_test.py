@@ -220,7 +220,7 @@ class DecoupledTest(tu.TestResultCollector):
             if type(data_item) == InferenceServerException:
                 self.assertEqual(
                     data_item.message(),
-                    "Python model 'decoupled_return_response_error_0' is using "
+                    "Python model 'decoupled_return_response_error_0_0' is using "
                     "the decoupled mode and the execute function must return "
                     "None.",
                     "Exception message didn't match.",
