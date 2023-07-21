@@ -59,6 +59,19 @@ class TestInstanceUpdate(unittest.TestCase):
         self._reset_model()
         self._triton = grpcclient.InferenceServerClient("localhost:8001")
 
+    def tearDown(self):
+        # Check if the test passed for this test case that is tearing down
+        r = self.defaultTestResult()
+        self._feedErrorsToResult(r, self._outcome.errors)
+        # Use `r = self._outcome.result` for the above, if Python >= 3.11
+        passed = all(self != test_case for test_case, _ in r.errors + r.failures)
+        if passed:
+            # Do nothing if passed
+            return
+        # Best effort to reset the model state for the next test case
+        self._triton.unload_model(self._model_name)
+        time.sleep(30)  # time for instances to finish unloading
+
     def _reset_model(self):
         # Reset counters
         reset_count("initialize")
