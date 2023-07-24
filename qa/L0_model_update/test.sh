@@ -38,6 +38,10 @@ if [ ! -z "$TEST_REPO_ARCH" ]; then
     REPO_VERSION=${REPO_VERSION}_${TEST_REPO_ARCH}
 fi
 
+# This L0_model_update test should make changes to models without restarting the
+# server, unless restarting the server is the only way of accomplishing the
+# change.
+
 export CUDA_VISIBLE_DEVICES=0
 export PYTHONDONTWRITEBYTECODE="True"
 export MODEL_LOG_DIR="`pwd`"
