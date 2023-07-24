@@ -146,7 +146,7 @@ class LifecycleTest(tu.TestResultCollector):
 
                 self.assertTrue(
                     "Failed to process the request(s) for model instance "
-                    "'execute_return_error_0', message: Expected a list in the "
+                    "'execute_return_error_0_0', message: Expected a list in the "
                     "execute return" in str(e.exception),
                     "Exception message is not correct.",
                 )
@@ -158,7 +158,7 @@ class LifecycleTest(tu.TestResultCollector):
 
                 self.assertTrue(
                     "Failed to process the request(s) for model instance "
-                    "'execute_return_error_0', message: Expected an "
+                    "'execute_return_error_0_0', message: Expected an "
                     "'InferenceResponse' object in the execute function return"
                     " list" in str(e.exception),
                     "Exception message is not correct.",
