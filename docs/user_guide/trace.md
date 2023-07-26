@@ -512,7 +512,9 @@ The following table shows available OpenTelemetry trace APIs settings for
     <td><code>Empty</code></td>
     <td>
       Key-value pairs to be used as resource attributes. <br/>
-      Should be specified as follows:<br/>
+      Should be specified following the provided template:<br/>
+      <code>--trace-config opentelemetry,resource=<<text>key</text>>=<<text>value</text>></code><br/>
+      For example:<br/>
       <code>--trace-config opentelemetry,resource=service.name=triton</code><br/>
       <code>--trace-config opentelemetry,resource=service.version=1</code><br/>
       Alternatively, key-vaue attributes can be specified through <br/>

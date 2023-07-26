@@ -123,13 +123,16 @@ class TraceManager {
       const std::string& filepath, const InferenceTraceMode mode,
       const TraceConfigMap& config_map);
 
+#if !defined(_WIN32) && defined(TRITON_ENABLE_TRACING)
   ~TraceManager()
   {
-    if (opentelemetry::trace::Provider::GetTracerProvider() != nullptr) {
-      std::shared_ptr<otel_trace_api::TracerProvider> none;
-      otel_trace_api::Provider::SetTracerProvider(none);
+    if (global_setting_->mode_ == TRACE_MODE_OPENTELEMETRY) {
+      CleanupTracer();
     }
-  };
+  }
+#else
+  ~TraceManager() = default;
+#endif
 
   // Return a trace that should be used to collected trace activities
   // for an inference request. Return nullptr if no tracing should occur.
@@ -158,11 +161,16 @@ class TraceManager {
   static const char* InferenceTraceModeString(InferenceTraceMode mode);
 
 #if !defined(_WIN32) && defined(TRITON_ENABLE_TRACING)
-  /// Initializes Opentelemetry exporter, processor, provider and context.
+  /// Initializes Opentelemetry exporter, processor,
+  /// and sets the global trace provider.
   ///
   /// \param config_map A config map, which stores all parameters, specified
   /// by user.
   void InitTracer(const TraceConfigMap& config_map);
+
+  /// Cleans global tracer provider, set by InitTracer.
+  void CleanupTracer();
+
 #endif
 
   struct Trace {

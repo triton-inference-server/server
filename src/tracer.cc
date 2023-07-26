@@ -387,6 +387,13 @@ TraceManager::InitTracer(const triton::server::TraceConfigMap& config_map)
 }
 
 void
+TraceManager::CleanupTracer()
+{
+  std::shared_ptr<otel_trace_api::TracerProvider> none;
+  otel_trace_api::Provider::SetTracerProvider(none);
+}
+
+void
 TraceManager::Trace::StartSpan(
     std::string span_key, TRITONSERVER_InferenceTrace* trace,
     TRITONSERVER_InferenceTraceActivity activity, uint64_t timestamp_ns,
