@@ -427,11 +427,41 @@ The meaning of the trace timestamps is:
 
   * BACKEND_OUTPUT: The tensor in the response of a backend.
 
+## Tracing for BLS models
+
+Triton does not collect traces for child models, invoked from
+[BLS](https://github.com/triton-inference-server/python_backend/tree/main#business-logic-scripting) models.
+
+To include child models into collected traces, user needs to provide `trace`
+argument (as shown in the example), when constructing an InferenceRequest object.
+
+```python
+
+import triton_python_backend_utils as pb_utils
+
+
+class TritonPythonModel:
+  ...
+    def execute(self, requests):
+      ...
+      for request in requests:
+        ...
+        # Create an InferenceRequest object. `model_name`,
+        # `requested_output_names`, and `inputs` are the required arguments and
+        # must be provided when constructing an InferenceRequest object. Make
+        # sure to replace `inputs` argument with a list of `pb_utils.Tensor`
+        # objects.
+        inference_request = pb_utils.InferenceRequest(
+            model_name='model_name',
+            requested_output_names=['REQUESTED_OUTPUT_1', 'REQUESTED_OUTPUT_2'],
+            inputs=[<pb_utils.Tensor object>], trace = request.trace())
+
+```
+
 ## OpenTelemetry trace support
 
-Triton provides an option to generate and export traces
-for standalone and ensemble models
-using [OpenTelemetry APIs and SDKs](https://opentelemetry.io/).
+Triton provides an option to generate and export traces using
+[OpenTelemetry APIs and SDKs](https://opentelemetry.io/).
 
 To specify OpenTelemetry mode for tracing, specify the `--trace-config`
 flag as follows:
@@ -477,15 +507,27 @@ The following table shows available OpenTelemetry trace APIs settings for
       trace data.
     </td>
     </tr>
+    <tr>
+    <td><code>resource</code></td>
+    <td><code>Empty</code></td>
+    <td>
+      Key-value pairs to be used as resource attributes. <br/>
+      Should be specified as follows:<br/>
+      <code>--trace-config opentelemetry,resource=service.name=triton</code><br/>
+      <code>--trace-config opentelemetry,resource=service.version=1</code><br/>
+      Alternatively, key-vaue attributes can be specified through <br/>
+      <a href="https://opentelemetry.io/docs/concepts/sdk-configuration/general-sdk-configuration/#otel_resource_attributes">
+      OTEL_RESOURCE_ATTRIBUTES</a>
+      environment variable.
+    </td>
+    </tr>
   </tbody>
 </table>
+
 
 ### Limitations
 
 - OpenTelemetry trace mode is not supported on Windows systems.
-
-- Tracing [BLS](https://github.com/triton-inference-server/python_backend/tree/main#business-logic-scripting)
-models is not supported.
 
 - Triton supports only
 [OTLP/HTTP Exporter](https://github.com/open-telemetry/opentelemetry-specification/blob/main/specification/protocol/otlp.md#otlphttp)

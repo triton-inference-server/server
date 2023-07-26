@@ -659,7 +659,7 @@ set +e
 # Send bls requests to make sure simple model is traced
 for p in {1..4}; do
     python -c 'import opentelemetry_unittest; \
-        opentelemetry_unittest.send_bls_request()'  >> client_update.log 2>&1
+        opentelemetry_unittest.send_bls_request(model_name="ensemble_add_sub_int32_int32_int32")'  >> client_update.log 2>&1
 done
 
 set -e
@@ -695,18 +695,18 @@ fi
 
 OPENTELEMETRY_TEST=opentelemetry_unittest.py
 OPENTELEMETRY_LOG="opentelemetry_unittest.log"
-EXPECTED_NUM_TESTS="2"
+EXPECTED_NUM_TESTS="3"
 
 SERVER_ARGS="--trace-config=level=TIMESTAMPS --trace-config=rate=1 \
                 --trace-config=count=100 --trace-config=mode=opentelemetry \
                 --trace-config=opentelemetry,url=localhost:$OTLP_PORT \
+                --trace-config=opentelemetry,resource=test.key=test.value \
+                --trace-config=opentelemetry,resource=service.name=test_triton \
                 --model-repository=$MODELSDIR"
 SERVER_LOG="./inference_server_trace_config.log"
 
-# Increasing OTLP timeout, since we don't use a valid OTLP collector
-# and don't send a proper signal back.
-export OTEL_EXPORTER_OTLP_TIMEOUT=50000
-export OTEL_EXPORTER_OTLP_TRACES_TIMEOUT=50000
+export OTEL_EXPORTER_OTLP_TIMEOUT=5
+export OTEL_EXPORTER_OTLP_TRACES_TIMEOUT=5
 
 run_server
 if [ "$SERVER_PID" == "0" ]; then
