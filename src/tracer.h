@@ -123,16 +123,7 @@ class TraceManager {
       const std::string& filepath, const InferenceTraceMode mode,
       const TraceConfigMap& config_map);
 
-#if !defined(_WIN32) && defined(TRITON_ENABLE_TRACING)
-  ~TraceManager()
-  {
-    if (global_setting_->mode_ == TRACE_MODE_OPENTELEMETRY) {
-      CleanupTracer();
-    }
-  }
-#else
-  ~TraceManager() = default;
-#endif
+  ~TraceManager() { CleanupTracer(); }
 
   // Return a trace that should be used to collected trace activities
   // for an inference request. Return nullptr if no tracing should occur.
