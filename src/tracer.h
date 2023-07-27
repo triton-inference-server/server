@@ -160,14 +160,17 @@ class TraceManager {
 
   static const char* InferenceTraceModeString(InferenceTraceMode mode);
 
-  /// Initializes Opentelemetry exporter, processor,
+  /// In OpenTelemetry trace mode initializes Opentelemetry exporter, processor,
   /// and sets the global trace provider.
+  /// In Triton trace mode is a no-op.
   ///
   /// \param config_map A config map, which stores all parameters, specified
   /// by user.
   void InitTracer(const TraceConfigMap& config_map);
 
-  /// Cleans global tracer provider, set by InitTracer.
+  /// In OpenTelemetry trace mode cleans global tracer provider,
+  /// set by InitTracer.
+  /// In Triton trace mode is a no-op.
   void CleanupTracer();
 
   struct Trace {
