@@ -429,11 +429,13 @@ The meaning of the trace timestamps is:
 
 ## Tracing for BLS models
 
-Triton does not collect traces for child models, invoked from
-[BLS](https://github.com/triton-inference-server/python_backend/tree/main#business-logic-scripting) models.
+Triton does not collect traces for child models invoked from
+[BLS](https://github.com/triton-inference-server/python_backend/tree/main#business-logic-scripting)
+models by default.
 
-To include child models into collected traces, user needs to provide `trace`
-argument (as shown in the example), when constructing an InferenceRequest object.
+To include child models into collected traces, user needs to provide the `trace`
+argument (as shown in the example below), when constructing an InferenceRequest object.
+This helps Triton associate the child model with the parent model's trace (`request.trace()`).
 
 ```python
 
