@@ -36,6 +36,7 @@
 #include <cuda_runtime_api.h>
 #endif  // TRITON_ENABLE_GPU
 #ifndef _WIN32
+#include "opentelemetry/sdk/resource/semantic_conventions.h"
 namespace otlp = opentelemetry::exporter::otlp;
 namespace otel_trace_sdk = opentelemetry::sdk::trace;
 namespace otel_trace_api = opentelemetry::trace;
@@ -58,9 +59,7 @@ TraceManager::Create(
   *manager = new TraceManager(
       level, rate, count, log_frequency, filepath, mode, config_map);
 
-  if (mode == TRACE_MODE_OPENTELEMETRY) {
-    (*manager)->InitTracer(config_map);
-  }
+  (*manager)->InitTracer(config_map);
 
   return nullptr;  // success
 }
@@ -353,12 +352,17 @@ TraceManager::Trace::CaptureTimestamp(
   }
 }
 
-#ifndef _WIN32
 void
 TraceManager::InitTracer(const triton::server::TraceConfigMap& config_map)
 {
+  if (global_setting_->mode_ == TRACE_MODE_TRITON) {
+    return;
+  }
+#if !defined(_WIN32) && defined(TRITON_ENABLE_TRACING)
   otlp::OtlpHttpExporterOptions opts;
   otel_resource::ResourceAttributes attributes = {};
+  attributes[otel_resource::SemanticConventions::kServiceName] =
+      "triton-inference-server";
   auto mode_key = std::to_string(TRACE_MODE_OPENTELEMETRY);
   auto otel_options_it = config_map.find(mode_key);
   if (otel_options_it != config_map.end()) {
@@ -384,15 +388,22 @@ TraceManager::InitTracer(const triton::server::TraceConfigMap& config_map)
           std::move(processor), resource);
 
   otel_trace_api::Provider::SetTracerProvider(provider);
+#endif
 }
 
 void
 TraceManager::CleanupTracer()
 {
+  if (global_setting_->mode_ == TRACE_MODE_TRITON) {
+    return;
+  }
+#if !defined(_WIN32) && defined(TRITON_ENABLE_TRACING)
   std::shared_ptr<otel_trace_api::TracerProvider> none;
   otel_trace_api::Provider::SetTracerProvider(none);
+#endif
 }
 
+#ifndef _WIN32
 void
 TraceManager::Trace::StartSpan(
     std::string span_key, TRITONSERVER_InferenceTrace* trace,
@@ -599,10 +610,11 @@ TraceManager::TraceRelease(TRITONSERVER_InferenceTrace* trace, void* userp)
       TRITONSERVER_InferenceTraceId(trace, &id), "getting trace id");
 
   auto ts = reinterpret_cast<std::shared_ptr<TraceManager::Trace>*>(userp);
-  (*ts)->instance_tracker_.erase(id);
+  std::lock_guard<std::mutex> lk((*ts)->mtx_);
+  (*ts)->spawned_traces_tracker_.erase(id);
   // The userp will be shared with the trace children, so only delete it
   // if no more TraceRelease calls are expected
-  if ((*ts)->instance_tracker_.empty()) {
+  if ((*ts)->spawned_traces_tracker_.empty()) {
     delete ts;
   }
   LOG_TRITONSERVER_ERROR(
@@ -638,8 +650,9 @@ TraceManager::TraceActivity(
       reinterpret_cast<std::shared_ptr<TraceManager::Trace>*>(userp)->get();
 
   std::lock_guard<std::mutex> lk(ts->mtx_);
-  if (ts->instance_tracker_.find(id) == ts->instance_tracker_.end()) {
-    ts->instance_tracker_.emplace(id);
+  if (ts->spawned_traces_tracker_.find(id) ==
+      ts->spawned_traces_tracker_.end()) {
+    ts->spawned_traces_tracker_.emplace(id);
   }
 
   if (ts->setting_->mode_ == TRACE_MODE_OPENTELEMETRY) {
@@ -756,7 +769,7 @@ TraceManager::TraceTensorActivity(
         std::unique_ptr<std::stringstream> stream(new std::stringstream());
         ss = stream.get();
         ts->streams_.emplace(id, std::move(stream));
-        ts->instance_tracker_.emplace(id);
+        ts->spawned_traces_tracker_.emplace(id);
       } else {
         ss = ts->streams_[id].get();
         // If the string stream is not newly created, add "," as there is

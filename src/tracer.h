@@ -160,7 +160,6 @@ class TraceManager {
 
   static const char* InferenceTraceModeString(InferenceTraceMode mode);
 
-#if !defined(_WIN32) && defined(TRITON_ENABLE_TRACING)
   /// Initializes Opentelemetry exporter, processor,
   /// and sets the global trace provider.
   ///
@@ -170,8 +169,6 @@ class TraceManager {
 
   /// Cleans global tracer provider, set by InitTracer.
   void CleanupTracer();
-
-#endif
 
   struct Trace {
     Trace() : trace_(nullptr), trace_id_(0) {}
@@ -183,7 +180,7 @@ class TraceManager {
     // We use the set to track the number of spawned traces, so that
     // when TraceManager::TraceRelease() with 'trace_userp_' is called
     // we can safely release 'trace_userp_'
-    std::set<uint64_t> instance_tracker_;
+    std::set<uint64_t> spawned_traces_tracker_;
     // Triton trace object that this trace is assosicated with,
     // 'Trace' object does not take ownership of 'trace_'. The caller of
     // SampleTrace() must call TraceManager::TraceRelease() with 'trace_userp_'

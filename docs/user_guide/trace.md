@@ -511,7 +511,7 @@ The following table shows available OpenTelemetry trace APIs settings for
     </tr>
     <tr>
     <td><code>resource</code></td>
-    <td><code>Empty</code></td>
+    <td><code>service.name=triton-inference-server</code></td>
     <td>
       Key-value pairs to be used as resource attributes. <br/>
       Should be specified following the provided template:<br/>
