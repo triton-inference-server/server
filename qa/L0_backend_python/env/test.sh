@@ -151,7 +151,7 @@ done
 conda update -n base -c defaults conda -y
 rm $SERVER_LOG
 # Create a model with python 3.8 version
-# Successful execution of the Python model indicates that the environment has 
+# Successful execution of the Python model indicates that the environment has
 # been setup correctly.
 
 create_conda_env "3.8" "python-3-8"
@@ -174,7 +174,7 @@ cp ../../python_models/python_version/model.py ./models/python_3_8/1/
 cp python_backend/builddir/triton_python_backend_stub ./models/python_3_8
 
 # Create a model with python 3.9 version
-# Successful execution of the Python model indicates that the environment has 
+# Successful execution of the Python model indicates that the environment has
 # been setup correctly.
 create_conda_env "3.9" "python-3-9"
 conda install -c conda-forge libstdcxx-ng=12 -y
@@ -195,12 +195,12 @@ cp ../../python_models/python_version/model.py ./models/python_3_9/1/
 cp python_backend/builddir/triton_python_backend_stub ./models/python_3_9
 
 # Create a model with python 3.11 version
-# Successful execution of the Python model indicates that the environment has 
+# Successful execution of the Python model indicates that the environment has
 # been setup correctly.
 create_conda_env "3.11" "python-3-11"
-# tensorflow needs to be installed before numpy so pip does not mess up conda 
-# enviroment
-pip install tensorflow==2.12.0 
+# tensorflow needs to be installed before numpy so pip does not mess up conda
+# environment
+pip install tensorflow==2.12.0
 conda install -c conda-forge libstdcxx-ng=12 -y
 conda install numpy=1.23.5 -y
 PY311_VERSION_STRING="Python version is 3.11, NumPy version is 1.23.5, and Tensorflow version is 2.12.0"
@@ -211,6 +211,7 @@ path_to_conda_pack=`pwd`/python3.11.tar.gz
 path_to_conda_pack="$PWD/python-3-11"
 mkdir -p $path_to_conda_pack
 tar -xzf python3.11.tar.gz -C $path_to_conda_pack
+mkdir -p models/python_3_11/1/
 cp ../../python_models/python_version/config.pbtxt ./models/python_3_11
 (cd models/python_3_11 && \
           sed -i "s/^name:.*/name: \"python_3_11\"/" config.pbtxt && \
